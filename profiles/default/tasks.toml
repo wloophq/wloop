@@ -30,15 +30,18 @@ label   = "Focus"
 summary = "Star it in Focus, or take the star off."
 
 [verbs.project]
+handler = "project"
 label   = "Project"
 summary = "Attach it to a project, or start a new project with it."
 input   = "Project title"
 
 [verbs.approve]
+handler = "approve"
 label   = "Approve"
 summary = "Approve what it proposes: its draft, its recommended answer or its unit's action."
 
 [verbs.delegate]
+handler = "delegate"
 label   = "Delegate"
 summary = "Hand it to an agent, which runs its unit's action."
 input   = "Guidance for the agent (optional)"
@@ -52,40 +55,49 @@ label   = "Dismiss"
 summary = "Throw it away: it goes to the trash, and a draft it carries is discarded."
 
 [verbs.seen]
+handler = "seen"
 label   = "Seen"
 summary = "Mark what changed on it as read."
 
 [verbs.context]
+handler = "context"
 label   = "Context"
 summary = "Set the contexts it is listed under."
 input   = "Contexts, comma separated (empty clears)"
 
 [verbs.area]
+handler = "area"
 label   = "Area"
 summary = "Set the area it belongs to."
 input   = "Area (empty clears)"
 
 [verbs.answer]
+handler = "answer"
 label   = "Answer"
 summary = "Answer the question it asks."
 
 [verbs.edit]
+handler = "edit"
 label   = "Edit"
 summary = "Change its draft before it is sent."
 
 [verbs.retry]
+handler = "retry"
 label   = "Retry"
 summary = "Send its failed draft again."
 
 [verbs.reviewed]
+handler = "reviewed"
 label   = "Reviewed"
 summary = "Mark the project reviewed; the next review comes after its interval."
 
 [verbs.sequential]
+handler = "sequential"
 label   = "Sequential"
 summary = "Take the project's actions one at a time, or all at once again."
 
 [verbs.reply]
+handler = "reply"
 label   = "Reply"
 summary = "Write a reply on its unit; it waits in the Outbox for your approval."
 input   = "Reply, saved to the Outbox for your approval"

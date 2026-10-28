@@ -2,7 +2,6 @@ package brief
 
 import (
 	"context"
-	"math"
 	"path/filepath"
 	"testing"
 	"time"
@@ -213,7 +212,7 @@ func TestABreakerEventNotesTheLoopEventsOnly(t *testing.T) {
 	r.q.d.Store = inventory.New(db)
 	from := log.Gen()
 	r.q.recordBreaker(context.Background(), breakerOpened, dinv.BriefRun{EndedAt: t0, Error: "boom"})
-	got := log.Since(from, port.Topic(math.MaxUint32))
+	got := log.Since(from, ^port.Topic(0))
 	if !got.Has(port.TopicLoopEvents) || got.Has(port.TopicSourceEvents) {
 		t.Fatalf("topics %b", got.Topics)
 	}

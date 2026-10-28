@@ -230,7 +230,7 @@ func TestSaveSnapshotsSameAsUpsertLoop(t *testing.T) {
 	if !reflect.DeepEqual(added, loopAdded) {
 		t.Fatalf("added %v, loop added %v", added, loopAdded)
 	}
-	all := port.Topic(1<<32 - 1)
+	all := ^port.Topic(0)
 	if want := loopLog.Since(loopFrom, all); got.Topics != want.Topics || !slices.Equal(got.Units, want.Units) {
 		t.Fatalf("batch noted %+v, the loop %+v", got, want)
 	}

@@ -128,6 +128,64 @@
       },
       "type": "object"
     },
+    "gates": {
+      "additionalProperties": false,
+      "description": "The gates its runs and drafts open.",
+      "properties": {
+        "approval": {
+          "additionalProperties": false,
+          "description": "The approval of its gates.",
+          "properties": {
+            "mode": {
+              "description": "The mode when no rule holds.",
+              "enum": [
+                "send",
+                "delay",
+                "wait",
+                "dry_run",
+                "run"
+              ],
+              "type": "string"
+            },
+            "rule": {
+              "description": "A rule; the first whose when holds gives the mode.",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "mode": {
+                    "description": "The rule's mode.",
+                    "enum": [
+                      "send",
+                      "delay",
+                      "wait",
+                      "dry_run",
+                      "run"
+                    ],
+                    "type": "string"
+                  },
+                  "when": {
+                    "description": "When the rule applies to a gate.",
+                    "type": "string"
+                  },
+                  "window": {
+                    "description": "With mode delay only: how long a person has to stop the gate's consequence.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "window": {
+              "description": "With mode delay only: how long a person has to stop the gate's consequence.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
     "key": {
       "description": "The facts forming the idempotency key, by default <slot>.fingerprint: a key that ran or was dismissed is not planned again. A workflow with trigger.on may add trigger.event.id, so each event plans its own run.",
       "items": {
@@ -588,6 +646,65 @@
                 "verb"
               ]
             }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
+                  "const": "gate.open"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "description": "The gate, of gates.toml, the step opens. Required.",
+                  "type": "string"
+                },
+                "use": {
+                  "const": "gate.open"
+                }
+              },
+              "required": [
+                "name"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
+                  "const": "task.set"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "prop": {
+                  "description": "The property, of tasks.toml, the step sets. Required.",
+                  "type": "string"
+                },
+                "use": {
+                  "const": "task.set"
+                },
+                "value": {
+                  "description": "The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD, a duration, a list comma-separated. Required.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "prop",
+                "value"
+              ]
+            }
           }
         ],
         "properties": {
@@ -604,7 +721,9 @@
               "draft.propose",
               "classify",
               "notify.self",
-              "task.verb"
+              "task.verb",
+              "gate.open",
+              "task.set"
             ],
             "type": "string"
           }
@@ -624,8 +743,26 @@
       "additionalProperties": false,
       "description": "What plans the workflow: on or schedule; absent, every sweep.",
       "properties": {
+        "actors": {
+          "description": "With on, the actors whose events plan it; every actor when absent.",
+          "items": {
+            "enum": [
+              "person",
+              "workflow",
+              "agent",
+              "plugin"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "depth": {
+          "default": 3,
+          "description": "With on, the longest chain of workflows triggering each other the event may close; at most 5.",
+          "type": "integer"
+        },
         "on": {
-          "description": "The source event kinds the workflow reacts to; verb_<verb>, a verb a person ran on a task, with provider task.",
+          "description": "The source event kinds the workflow reacts to; verb_<verb>, a verb a person ran on a task, and task.woke, a task's wake matched, with provider task.",
           "items": {
             "enum": [
               "opened",
@@ -675,7 +812,8 @@
               "verb_answer",
               "verb_reviewed",
               "verb_sequential",
-              "verb_reply"
+              "verb_reply",
+              "task.woke"
             ],
             "type": "string"
           },

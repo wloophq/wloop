@@ -141,7 +141,7 @@ type Ledger interface {
 	// Save replaces the items of p's workflows, leaving out, in the same
 	// write, an item whose key is done or dismissed: a writer that planned
 	// before a run or a dismiss never brings the item back. It notes
-	// TopicGate only when the pending set changes.
+	// TopicPending only when the pending set changes.
 	Save(ctx context.Context, p PlanWrite, evs ...port.Event) error
 	Items(ctx context.Context, f Filter) ([]workflow.Item, error)
 	Run(ctx context.Context, k workflow.Key) (workflow.Run, bool, error)

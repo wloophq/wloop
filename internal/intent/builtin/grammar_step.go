@@ -31,6 +31,11 @@ var stepGrammar = []Key{
 	stepKey(StepTaskVerb, "on", KindText, "", "With waiting, the people the task waits on, comma-separated."),
 	stepKey(StepTaskVerb, "resurface", KindText, "", "With waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD."),
 	stepKey(StepTaskVerb, "set", KindText, "", "With context, the contexts, comma-separated; with area, the area."),
+
+	required(stepKey(StepGateOpen, "name", KindText, "", "The gate, of gates.toml, the step opens. Required.")),
+
+	required(stepKey(StepTaskSet, "prop", KindText, "", "The property, of tasks.toml, the step sets. Required.")),
+	required(stepKey(StepTaskSet, "value", KindText, "", "The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD, a duration, a list comma-separated. Required.")),
 }
 
 func required(k Key) Key {

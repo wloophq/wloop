@@ -118,6 +118,7 @@ type GitHub struct {
 	Scope            Scope        `json:"scope"`
 	Stalled          Stalled      `json:"stalled"`
 	Drafts           PluginDrafts `json:"drafts"`
+	Gates            PluginGates  `json:"gates"`
 	Nudge            Nudge        `json:"nudge"`
 	// RateLimitFraction is the share of the GitHub rate limit the sweeps
 	// may spend.
@@ -292,6 +293,12 @@ type WorkflowConfig struct {
 	// besides its manifest's when; "" adds none.
 	OnlyWhen string          `json:"only_when,omitempty"`
 	Drafts   *WorkflowDrafts `json:"drafts,omitempty"`
+	Gates    *WorkflowGates  `json:"gates,omitempty"`
+}
+
+// WorkflowGates holds the approval of the gates a workflow opens.
+type WorkflowGates struct {
+	Approval *ApprovalConfig `json:"approval,omitempty"`
 }
 
 // WorkflowDrafts holds the approval of the drafts a workflow proposes.

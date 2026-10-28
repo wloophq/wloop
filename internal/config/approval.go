@@ -26,6 +26,11 @@ type PluginDrafts struct {
 	Approval *PluginApproval `json:"approval,omitempty"`
 }
 
+// PluginGates holds the approval of the gates a plugin's own rules open.
+type PluginGates struct {
+	Approval *PluginApproval `json:"approval,omitempty"`
+}
+
 type PluginApproval struct {
 	Mode   string `json:"mode"`
 	Window Days   `json:"window,omitempty"`

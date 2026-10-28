@@ -49,13 +49,15 @@ A workflow moves the task itself with the `task.verb` step: `verb = "someday"`, 
 
 ```toml
 summary = "Mark done a waiting task whose unit has nothing open"
-provider = "entry"
+provider = "task"
 when = 'task.state == "waiting" && task.unit != "" && task.items_open == 0'
 
 [[step]]
 use = "task.verb"
 verb = "done"
 ```
+
+A workflow sets a property of the task with the `task.set` step: `prop`, a property of `tasks.toml`, and `value`. The property records the workflow as its writer.
 
 ## The plan
 

@@ -17,6 +17,9 @@ type Rename struct {
 // config.toml that still writes an old one fails to load, its problem
 // naming the new one: no old name is accepted beside its new one.
 var Renamed = []Rename{
+	{"entry.units_ended", "task.link_ended"},
+	{"entry.unit_started_by_me", "task.link_started_by_me"},
+	{"entry.unit_closure_posted", "task.link_closure_posted"},
 	{"entry.", "task."},
 	{string(dslack.Provider) + ".live_entry", string(dslack.Provider) + ".live_task"},
 	{"config.gtd.", "config.tasks."},

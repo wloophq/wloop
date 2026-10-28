@@ -41,7 +41,7 @@ Manifests name Go through a closed vocabulary, listed in `internal/intent/builti
 Some decisions stay in Go as mechanism and are exposed as facts for the profile to act on:
 
 - which tasks exist (`task.Reconcile`, the close-task condition in `internal/domain/task/rules.go`);
-- when a plugin's unit has ended (`<slot>.ended`, such as `pr.ended` and `slack.ended`), which `task.units_ended` reads; whether a turn attaches its results to its task is the intent's (`record.attach_url`, `drafts.attach_posts`), and closing the task is the `task-results-ended` workflow's;
+- when a plugin's unit has ended (`<slot>.ended`, such as `pr.ended` and `slack.ended`), which `task.link_ended` reads; whether a turn attaches its results to its task is the intent's (`record.attach_url`, `drafts.attach_posts`), and closing the task is the `task-results-ended` workflow's;
 - working-day arithmetic and who owes an item;
 - the GitHub round planners' due logic (`pr.first.due`, `pr.review.action`, `pr.address.due`);
 - injection markers, JSON schemas and limits;

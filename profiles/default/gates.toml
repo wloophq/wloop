@@ -1,2 +1,91 @@
 # The words of the gates, the decisions that wait on you. A user profile's
 # gates.toml replaces the keys it sets.
+
+# One gate per kind: the loop opens the first gate of a kind when it opens
+# one by kind.
+
+[gates.draft]
+kind = "draft"
+label = "Send this draft?"
+
+[gates.draft.intents.approve]
+label = "Approve"
+status = "approved"
+
+[gates.draft.intents.discard]
+label = "Discard"
+status = "rejected"
+
+[gates.plan]
+kind = "plan"
+label = "Run this?"
+
+[gates.plan.intents.run]
+label = "Run now"
+status = "approved"
+
+[gates.plan.intents.skip]
+label = "Skip"
+status = "rejected"
+
+[gates.question]
+kind = "question"
+label = "The agent asks"
+
+[gates.question.intents.answer]
+label = "Answer"
+status = "answered"
+answer = true
+
+[gates.question.intents.dismiss]
+label = "Dismiss"
+status = "dismissed"
+
+[gates.post]
+kind = "post"
+label = "The agent says"
+
+[gates.post.intents.reply]
+label = "Reply"
+status = "answered"
+answer = true
+
+[gates.post.intents.dismiss]
+label = "Dismiss"
+status = "dismissed"
+
+[gates.proposal]
+kind = "proposal"
+label = "Apply this proposal?"
+
+[gates.proposal.intents.approve]
+label = "Approve"
+status = "approved"
+
+[gates.proposal.intents.reject]
+label = "Reject"
+status = "rejected"
+
+[gates.trust]
+kind = "trust"
+label = "Trust this repository for its first run?"
+
+[gates.trust.intents.trust]
+label = "Trust and run"
+status = "approved"
+
+[gates.trust.intents.dismiss]
+label = "Not now"
+status = "dismissed"
+
+[gates.review-diff]
+kind = "step"
+label = "Review the diff"
+
+[gates.review-diff.intents.approve]
+label = "Looks good"
+status = "approved"
+
+[gates.review-diff.intents.dismiss]
+label = "Dismiss"
+status = "dismissed"

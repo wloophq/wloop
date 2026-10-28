@@ -2,7 +2,6 @@ package inventory
 
 import (
 	"context"
-	"math"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -22,7 +21,7 @@ import (
 	"github.com/wloophq/wloop/internal/meter/metertest"
 )
 
-const everyTopic = port.Topic(math.MaxUint32)
+const everyTopic = ^port.Topic(0)
 
 // writeCase pins what one write method notes: seed runs first and its
 // notes are left out; call must note exactly once.

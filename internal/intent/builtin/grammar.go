@@ -19,6 +19,7 @@ const (
 	SurfaceTasks    Surface = "tasks"    // tasks.toml
 	SurfaceViews    Surface = "views"    // views.toml
 	SurfaceGates    Surface = "gates"    // gates.toml
+	SurfaceRecords  Surface = "records"  // records.toml
 	SurfaceKeys     Surface = "keys"     // keys.toml
 	SurfaceNotices  Surface = "notices"  // notices.toml
 	SurfaceBlock    Surface = "block"    // a judgment block's front matter
@@ -74,7 +75,8 @@ type Value struct {
 }
 
 // Grammar is every reserved key of the language.
-var Grammar = slices.Concat(intentGrammar, workflowGrammar, stepGrammar, actionsGrammar, configGrammar, profileGrammar, toolsGrammar, tasksGrammar, viewsGrammar, gatesGrammar, keysGrammar, noticesGrammar)
+var Grammar = slices.Concat(intentGrammar, workflowGrammar, stepGrammar, actionsGrammar, configGrammar, profileGrammar, toolsGrammar, tasksGrammar, viewsGrammar, gatesGrammar, recordsGrammar, keysGrammar, noticesGrammar,
+	gateApprovalRows(SurfaceIntent), gateApprovalRows(SurfaceWorkflow))
 
 // Problem is a key Check refuses, at its dotted path in the document.
 type Problem struct {

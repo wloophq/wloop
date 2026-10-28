@@ -254,9 +254,10 @@ var sections = []struct {
 }{
 	{builtin.SurfaceIntent, "Intent manifest (`intents/<name>/intent.toml`)"},
 	{builtin.SurfaceActions, "Built-in actions (`actions.toml`)"},
-	{builtin.SurfaceTasks, "Task verbs (`tasks.toml`)"},
+	{builtin.SurfaceTasks, "Tasks: properties, states and verbs (`tasks.toml`)"},
 	{builtin.SurfaceViews, "Views and the review (`views.toml`)"},
 	{builtin.SurfaceGates, "Gates (`gates.toml`)"},
+	{builtin.SurfaceRecords, "Record kinds (`records.toml`)"},
 	{builtin.SurfaceKeys, "Key help (`keys.toml`)"},
 	{builtin.SurfaceWorkflow, "Workflow manifest (`workflows/<name>/workflow.toml`)"},
 	{builtin.SurfaceStep, "Steps and their arguments"},
@@ -438,9 +439,10 @@ var schemas = []struct {
 	{"intent.schema.json", "Intent manifest (intent.toml)", builtin.SurfaceIntent},
 	{"workflow.schema.json", "Workflow manifest (workflow.toml)", builtin.SurfaceWorkflow},
 	{"actions.schema.json", "Built-in actions (actions.toml)", builtin.SurfaceActions},
-	{"tasks.schema.json", "Task verbs (tasks.toml)", builtin.SurfaceTasks},
+	{"tasks.schema.json", "Tasks: properties, states and verbs (tasks.toml)", builtin.SurfaceTasks},
 	{"views.schema.json", "Views and the review (views.toml)", builtin.SurfaceViews},
 	{"gates.schema.json", "Gates (gates.toml)", builtin.SurfaceGates},
+	{"records.schema.json", "Record kinds (records.toml)", builtin.SurfaceRecords},
 	{"keys.schema.json", "Key help (keys.toml)", builtin.SurfaceKeys},
 	{"config.schema.json", "Configuration (config.toml)", builtin.SurfaceConfig},
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/port"
 	coresweep "github.com/wloophq/wloop/internal/core/sweep"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/workspaces"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -57,8 +58,10 @@ type stepDeps struct {
 	Classify classifyDeps
 	// Drafts are what draft.propose reads; nil refuses it.
 	Drafts *draftDeps
-	Pub    port.Publisher
-	Log    func(format string, args ...any)
+	// Props are what task.set writes; nil refuses it.
+	Props coretasks.PropStore
+	Pub   port.Publisher
+	Log   func(format string, args ...any)
 	// Headless starts turn.start's headless turns; Turns counts the
 	// automated turns turns.per_day caps.
 	Headless headlessStarter
@@ -200,6 +203,8 @@ func stepRegistry() map[string]stepEntry {
 		stepClassify:             {check: (*stepSet).classifyCheck, run: (*stepSet).classifyRun},
 		"notify.self":            {check: (*stepSet).notifyCheck, run: (*stepSet).notifyRun},
 		builtin.StepTaskVerb:     {check: (*stepSet).taskVerbCheck, run: (*stepSet).taskVerbRun},
+		builtin.StepTaskSet:      {check: (*stepSet).taskSetCheck, run: (*stepSet).taskSetRun},
+		builtin.StepGateOpen:     {check: (*stepSet).gateOpenCheck, run: (*stepSet).gateOpenRun},
 	}
 }
 

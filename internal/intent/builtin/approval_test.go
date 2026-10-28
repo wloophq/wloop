@@ -108,7 +108,7 @@ func TestARuleReadingAnUntrustedFactIsRefused(t *testing.T) {
 			t.Errorf("%s: %v", f.Name, err)
 		}
 	}
-	for _, name := range []string{"slack.started_by_me", "slack.closure_posted", "task.unit_started_by_me", "task.unit_closure_posted",
+	for _, name := range []string{"slack.started_by_me", "slack.closure_posted", "task.link_started_by_me", "task.link_closure_posted",
 		"slack.items_open", "slack.items_unowned", "slack.items_unowned_age_days", "task.items_open", "task.items_resolved", "task.items_owed"} {
 		if i := slices.IndexFunc(Facts, func(f Fact) bool { return f.Name == name }); i < 0 || !Facts[i].Untrusted {
 			t.Errorf("%s is trusted", name)

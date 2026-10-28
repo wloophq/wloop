@@ -191,16 +191,33 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 		"task.unit_provider":       "",
 		"task.units":               []string{},
 		"task.unit_providers":      []string{},
-		"task.units_ended":         false,
+		"task.link_ended":          false,
 		"task.captured_by_user":    e.CapturedByUser(),
 		"task.turns":               0,
-		"task.unit_started_by_me":  false,
-		"task.unit_closure_posted": false,
+		"task.link_started_by_me":  false,
+		"task.link_closure_posted": false,
 		"task.items_open":          0,
 		"task.items_resolved":      0,
 		"task.items_owed":          0,
 		"task.settled_at":          time.Time{},
 		"task.fingerprint":         string(e.ID) + "|" + string(e.State) + "|" + e.Updated.UTC().Format(time.RFC3339Nano),
+		"task.category":            "",
+		"task.owed_by":             "",
+		"task.owed_since":          time.Time{},
+		"task.since_movement":      time.Duration(0),
+		"task.check_on":            time.Time{},
+		"task.gates_open":          0,
+		"task.runs_live":           0,
+		"task.wake_until":          time.Time{},
+		"task.wake_when":           "",
+		"task.repo":                "",
+		"task.sequential_next":     false,
+		"task.review_due":          false,
+		"task.children_ready":      false,
+		"task.ask_age":             time.Duration(0),
+		"task.promised":            time.Time{},
+		"task.extraction_lag":      time.Duration(0),
+		"task.link_owes":           []string{},
 	}
 	if w := e.Waiting; w != nil {
 		keys := make([]string, 0, len(w.On))
@@ -243,14 +260,14 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 	if err != nil {
 		return nil, err
 	}
-	f["task.units_ended"] = ended
+	f["task.link_ended"] = ended
 	if p.d.Cards != nil {
 		uf, ok, err := p.d.Cards.UnitFacts(ctx, eu)
 		if err != nil {
 			return nil, err
 		}
 		if ok {
-			f["task.unit_started_by_me"], f["task.unit_closure_posted"] = uf.StartedByMe, uf.ClosurePosted
+			f["task.link_started_by_me"], f["task.link_closure_posted"] = uf.StartedByMe, uf.ClosurePosted
 		}
 	}
 	got, err := p.d.Items.Load(ctx, us)

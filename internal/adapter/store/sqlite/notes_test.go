@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -29,7 +28,7 @@ import (
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 )
 
-const everyTopic = port.Topic(math.MaxUint32)
+const everyTopic = ^port.Topic(0)
 
 var (
 	noteRef = pr.Ref{Owner: "acme", Repo: "api", Number: 7}
@@ -227,7 +226,7 @@ var writes = []writeCase{
 			it := noteItem(workflow.DecisionPending)
 			return e.db.Ledger().Save(ctx, automation.PlanWrite{Workflows: []string{it.Workflow}, Items: []workflow.Item{it}}, loopEvent(workflow.KindPlanned))
 		},
-		topics: port.TopicGate | port.TopicLoopEvents, units: []unit.Unit{u7, term1},
+		topics: port.TopicPending | port.TopicLoopEvents, units: []unit.Unit{u7, term1},
 	},
 	{
 		method: "ledger.Record",
@@ -312,7 +311,7 @@ var reads = []string{
 	"Classifications.Output", "Classifications.Spent",
 	"Fetches.Last",
 	"DB.AgentTranscript", "DB.WorkflowActivity",
-	"DB.Tasks", "taskStore.Tasks", "taskStore.TasksSince", "taskStore.Task", "taskStore.TasksOf", "taskStore.Counts",
+	"DB.Tasks", "taskStore.Tasks", "taskStore.TasksSince", "taskStore.Task", "taskStore.TasksOf", "taskStore.Counts", "DB.Props",
 }
 
 // notesAll are the write methods that note Change.All.

@@ -146,7 +146,7 @@ func (r *rig) propose(u unit.Unit, p round.Pending) {
 	r.mu.Lock()
 	r.pending[u] = p
 	r.mu.Unlock()
-	r.f.Log.Note(port.TopicGate, u)
+	r.f.Log.Note(port.TopicPending, u)
 }
 
 func (r *rig) Settings(context.Context) (readmodel.Base, error) {

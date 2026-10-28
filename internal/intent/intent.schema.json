@@ -266,6 +266,64 @@
       },
       "type": "array"
     },
+    "gates": {
+      "additionalProperties": false,
+      "description": "The gates its runs and drafts open.",
+      "properties": {
+        "approval": {
+          "additionalProperties": false,
+          "description": "The approval of its gates.",
+          "properties": {
+            "mode": {
+              "description": "The mode when no rule holds.",
+              "enum": [
+                "send",
+                "delay",
+                "wait",
+                "dry_run",
+                "run"
+              ],
+              "type": "string"
+            },
+            "rule": {
+              "description": "A rule; the first whose when holds gives the mode.",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "mode": {
+                    "description": "The rule's mode.",
+                    "enum": [
+                      "send",
+                      "delay",
+                      "wait",
+                      "dry_run",
+                      "run"
+                    ],
+                    "type": "string"
+                  },
+                  "when": {
+                    "description": "When the rule applies to a gate.",
+                    "type": "string"
+                  },
+                  "window": {
+                    "description": "With mode delay only: how long a person has to stop the gate's consequence.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "window": {
+              "description": "With mode delay only: how long a person has to stop the gate's consequence.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
     "guidance": {
       "additionalProperties": false,
       "description": "The guidance a person gives the turn.",
@@ -496,6 +554,10 @@
           "description": "The artifact the unit's history shows.",
           "type": "string"
         },
+        "missing": {
+          "description": "The gate, of gates.toml, a run that ends without the record requires names opens.",
+          "type": "string"
+        },
         "outcome": {
           "description": "The outcome fields a record may carry.",
           "items": {
@@ -512,7 +574,7 @@
           "type": "string"
         },
         "require": {
-          "description": "What a record in a state must carry.",
+          "description": "What a record in a state must carry; record.requires is the record kind a run owes.",
           "items": {
             "additionalProperties": false,
             "properties": {
@@ -535,6 +597,10 @@
             "type": "object"
           },
           "type": "array"
+        },
+        "requires": {
+          "description": "The record kind, of records.toml, a run of the intent owes; a run that ends without it opens the gate missing names. Left out, a run owes no record. Not record.require, what a record in a state carries.",
+          "type": "string"
         },
         "states": {
           "description": "The states a record may take. Required.",

@@ -86,7 +86,24 @@ func (w *walker) row(pat []string) (Key, bool) {
 	return Key{}, false
 }
 
+// confused are the rows whose keys a slip swaps, each with the other's path:
+// a value of the wrong shape at one names the other.
+var confused = map[string]string{
+	"record.require[]": "record.requires",
+	"record.requires":  "record.require",
+}
+
 func (w *walker) value(pat []string, path string, v any) {
+	if other, ok := confused[strings.Join(pat, ".")]; ok {
+		n := len(w.problems)
+		defer func() {
+			for i := n; i < len(w.problems); i++ {
+				if strings.HasPrefix(w.problems[i].Msg, "must be") {
+					w.problems[i].Msg += fmt.Sprintf("; did you mean %s?", other)
+				}
+			}
+		}()
+	}
 	r, isRow := w.row(pat)
 	array := strings.HasSuffix(pat[len(pat)-1], "[]")
 	switch x := v.(type) {

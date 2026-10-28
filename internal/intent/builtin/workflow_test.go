@@ -21,8 +21,11 @@ var workflowTable = map[string]string{
 		"idle_for:D unread_answers:I unread_since:T unread_for:D pr_state:S duplicate:B worktree_gone:B closed_by_manager:B transcript_gone:B process_gone:B fingerprint:S repo:S",
 	"workspace": "role:S main:B pr:S pr_state:S pr_finished_for:D path_exists:B temporary:B duplicate:B dirty:I untracked:I " +
 		"unpushed:I newest_turn_state:S open_turn:B pendency:L sessions:I manager:S last_activity:T quiet_for:D fingerprint:S repo:S",
-	"task": "id:S kind:S state:S waiting_on:L resurface_at:T waiting_days:I since_nudge:D nudge_due_at:T muted:B unit:S unit_provider:S units:L unit_providers:L units_ended:B turns:I captured_by_user:B " +
-		"unit_started_by_me:B unit_closure_posted:B items_open:I items_resolved:I items_owed:I settled_at:T fingerprint:S",
+	"task": "id:S kind:S state:S waiting_on:L resurface_at:T waiting_days:I since_nudge:D nudge_due_at:T muted:B unit:S unit_provider:S units:L unit_providers:L link_ended:B turns:I captured_by_user:B " +
+		"link_started_by_me:B link_closure_posted:B items_open:I items_resolved:I items_owed:I settled_at:T fingerprint:S " +
+		"category:S owed_by:S owed_since:T since_movement:D check_on:T gates_open:I runs_live:I wake_until:T wake_when:S repo:S " +
+		"sequential_next:B review_due:B children_ready:B ask_age:D promised:T extraction_lag:D link_owes:L",
+	"gate": "kind:S name:S status:S delivery:S",
 	"slack": "channel:S conversation:S started_by_me:B closure_posted:B live_task:B items_open:I items_unowned:I items_unowned_age_days:I " +
 		"ended:B settled_at:T fingerprint:S",
 	"brief":   "goal:S risk:S kind:S size:S tags:L missing:L",

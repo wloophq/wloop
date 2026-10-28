@@ -21,14 +21,47 @@ type VerbText struct {
 }
 
 type mTasks struct {
-	Verbs map[string]mVerbText `toml:"verbs"`
+	Verbs            map[string]mVerbText `toml:"verbs"`
+	Props            map[string]mProp     `toml:"props"`
+	States           map[string]mState    `toml:"states"`
+	OwedBy           *mOwedBy             `toml:"owed_by"`
+	Chat             *mChat               `toml:"chat"`
+	Areas            []string             `toml:"areas"`
+	Contexts         []string             `toml:"contexts"`
+	StaleWaitingDays *int                 `toml:"stale_waiting_days"`
 }
 
 type mVerbText struct {
-	Label   *string `toml:"label"`
-	Summary *string `toml:"summary"`
-	Input   *string `toml:"input"`
-	Offer   *string `toml:"offer"`
+	Label   *string           `toml:"label"`
+	Summary *string           `toml:"summary"`
+	Input   *string           `toml:"input"`
+	Offer   *string           `toml:"offer"`
+	From    []string          `toml:"from"`
+	To      *string           `toml:"to"`
+	By      map[string]string `toml:"by"`
+	Gate    *string           `toml:"gate"`
+	Handler *string           `toml:"handler"`
+	Send    *string           `toml:"send"`
+}
+
+type mProp struct {
+	Type    *string  `toml:"type"`
+	Values  []string `toml:"values"`
+	Writers []string `toml:"writers"`
+	Doc     *string  `toml:"doc"`
+}
+
+type mState struct {
+	Category *string `toml:"category"`
+	Label    *string `toml:"label"`
+}
+
+type mOwedBy struct {
+	Expr *string `toml:"expr"`
+}
+
+type mChat struct {
+	Intent *string `toml:"intent"`
 }
 
 // mergeTasks lays the verbs of file over out.
@@ -53,6 +86,9 @@ func mergeTasks(out ListTexts, file string, src []byte) Problems {
 			if p := s.predicate("verbs."+id+".offer", *t.Offer, builtin.OfferEnv()); p != nil {
 				w.Offer = p
 			}
+		}
+		if t.Gate == nil && slices.Contains(slices.Collect(maps.Values(t.By)), "gate") {
+			s.add("verbs."+id+".gate", "is required: a by.<actor> of \"gate\" opens the gate it names")
 		}
 		if w.Label == "" && t.Label == nil {
 			s.add("verbs."+id+".label", "is required")

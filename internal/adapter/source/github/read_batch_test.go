@@ -3,7 +3,6 @@ package ghsource
 import (
 	"context"
 	"fmt"
-	"math"
 	"testing"
 	"time"
 
@@ -89,7 +88,7 @@ func TestIdleReadEmitsNoPRTopic(t *testing.T) {
 	if rep.Events != 0 {
 		t.Fatalf("re-storing added %d events", rep.Events)
 	}
-	if ch := f.Log.Since(from, port.Topic(math.MaxUint32)); !ch.Empty() {
+	if ch := f.Log.Since(from, ^port.Topic(0)); !ch.Empty() {
 		t.Fatalf("re-storing the same snapshots noted %+v", ch)
 	}
 	stored, err := f.Inventory.PRs(ctx, refs)

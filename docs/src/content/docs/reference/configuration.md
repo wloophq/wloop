@@ -72,6 +72,10 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `github.drafts.approval` | table |  | Their approval; left out, each waits for you. |
 | `github.drafts.approval.mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The approval mode. |
 | `github.drafts.approval.window` | duration |  | How long a delay waits before the draft goes; only with mode delay. |
+| `github.gates` | table |  | The gates the plugin's own rules open. |
+| `github.gates.approval` | table |  | Their approval; left out, each waits for you. |
+| `github.gates.approval.mode` | one of `send`, `delay`, `wait`, `dry_run`, `run` |  | The approval mode. |
+| `github.gates.approval.window` | duration |  | How long a delay waits before the gate's consequence; only with mode delay. |
 
 ### GitHub address rounds
 
@@ -117,6 +121,10 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `slack.drafts.approval` | table |  | Their approval; left out, each waits for you. |
 | `slack.drafts.approval.mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The approval mode. |
 | `slack.drafts.approval.window` | duration |  | How long a delay waits before the draft goes; only with mode delay. |
+| `slack.gates` | table |  | The gates the plugin's own rules open. |
+| `slack.gates.approval` | table |  | Their approval; left out, each waits for you. |
+| `slack.gates.approval.mode` | one of `send`, `delay`, `wait`, `dry_run`, `run` |  | The approval mode. |
+| `slack.gates.approval.window` | duration |  | How long a delay waits before the gate's consequence; only with mode delay. |
 
 ### Slack ingest
 
@@ -177,6 +185,19 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `workflows.&lt;name&gt;.drafts.approval.rule[].when` | predicate |  | When the rule applies. |
 | `workflows.&lt;name&gt;.drafts.approval.rule[].mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The rule's mode. |
 | `workflows.&lt;name&gt;.drafts.approval.rule[].window` | duration |  | The rule's delay; only with mode delay. |
+
+### Workflow gate approval
+
+| Setting | Kind | Default | Meaning |
+|---|---|---|---|
+| `workflows.&lt;name&gt;.gates` | table |  | The gates the workflow opens. |
+| `workflows.&lt;name&gt;.gates.approval` | table |  | The approval of the workflow's gates, over the manifest's field by field. |
+| `workflows.&lt;name&gt;.gates.approval.mode` | one of `send`, `delay`, `wait`, `dry_run`, `run` |  | The mode when no rule matches; left out, the manifest's. |
+| `workflows.&lt;name&gt;.gates.approval.window` | duration |  | How long a delay waits before it goes; only with mode delay. |
+| `workflows.&lt;name&gt;.gates.approval.rule[]` | table |  | Rules tried in order before the mode, the first match wins; set, they replace the manifest's, and [] clears them. |
+| `workflows.&lt;name&gt;.gates.approval.rule[].when` | predicate |  | When the rule applies. |
+| `workflows.&lt;name&gt;.gates.approval.rule[].mode` | one of `send`, `delay`, `wait`, `dry_run`, `run` |  | The rule's mode. |
+| `workflows.&lt;name&gt;.gates.approval.rule[].window` | duration |  | The rule's delay; only with mode delay. |
 
 ### Turns and headless calls
 

@@ -26,12 +26,27 @@ type ListTexts struct {
 }
 
 type mViews struct {
-	Views  map[string]mViewText `toml:"views"`
-	Review map[string]mViewText `toml:"review"`
+	Views  map[string]mViewText   `toml:"views"`
+	Review map[string]mReviewText `toml:"review"`
+	Badge  *mBadge                `toml:"badge"`
 }
 
 type mViewText struct {
+	Label        *string `toml:"label"`
+	Over         *string `toml:"over"`
+	When         *string `toml:"when"`
+	Group        *string `toml:"group"`
+	Sort         *string `toml:"sort"`
+	Key          *string `toml:"key"`
+	HideDisabled *bool   `toml:"hide_disabled"`
+}
+
+type mReviewText struct {
 	Label *string `toml:"label"`
+}
+
+type mBadge struct {
+	Views []string `toml:"views"`
 }
 
 // BundledLists is the verbs' and views' texts of the bundled profile alone.
@@ -124,8 +139,16 @@ func mergeViews(out ListTexts, file string, src []byte) Problems {
 		return problems
 	}
 	s := &sheet{file: file, at: positions(src), problems: problems}
-	labels(s, "views", "view", m.Views, out.Views, builtin.Views)
-	labels(s, "review", "review step", m.Review, out.Review, builtin.ReviewSteps)
+	viewLabels := map[string]*string{}
+	for id, v := range m.Views {
+		viewLabels[id] = v.Label
+	}
+	stepLabels := map[string]*string{}
+	for id, v := range m.Review {
+		stepLabels[id] = v.Label
+	}
+	labels(s, "views", "view", viewLabels, out.Views, builtin.Views)
+	labels(s, "review", "review step", stepLabels, out.Review, builtin.ReviewSteps)
 	s.addGrammar(grammar(builtin.SurfaceViews, src))
 	return s.problems
 }
@@ -158,14 +181,14 @@ func text(s *sheet, path string, v *string, dst *string) {
 }
 
 // labels lays the label tables m of section over out, each id one of ids.
-func labels(s *sheet, section, noun string, m map[string]mViewText, out map[string]string, ids []string) {
+func labels(s *sheet, section, noun string, m map[string]*string, out map[string]string, ids []string) {
 	for _, id := range slices.Sorted(maps.Keys(m)) {
 		path := section + "." + id
 		if !slices.Contains(ids, id) {
 			s.add(path, "names no %s%s", noun, expr.DidYouMean(id, ids))
 			continue
 		}
-		switch v := m[id].Label; {
+		switch v := m[id]; {
 		case v == nil && out[id] == "":
 			s.add(path+".label", "is required")
 		case v == nil:

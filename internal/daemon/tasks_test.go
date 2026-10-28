@@ -304,7 +304,7 @@ func TestVerbErrors(t *testing.T) {
 func TestCaptureLandsInInbox(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, nil)
-	rec := post(t, r.s, api.TasksPath, `{"title":"call the bank","notes":"before 5"}`)
+	rec := post(t, r.s, api.TasksPath, `{"title":"call the bank","brief":"before 5"}`)
 	var v api.TaskView
 	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &v) != nil {
 		t.Fatalf("%d %s", rec.Code, rec.Body)

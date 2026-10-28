@@ -170,7 +170,7 @@ type LedgerBackend interface {
 // RunLedger checks a plan and run store: Save replaces the items of the
 // workflows it names, leaving out any whose key is done or dismissed, Record stores a run and keeps a non-terminal item,
 // Count counts done runs, and writes note TopicLoopEvents with events and
-// TopicGate only when the pending set changes.
+// TopicPending only when the pending set changes.
 func RunLedger(t *testing.T, mk func(*testing.T) LedgerBackend) {
 	ctx := context.Background()
 	a := unit.Unit{Provider: unit.Session, Key: "t1"}
@@ -360,7 +360,7 @@ func RunLedger(t *testing.T, mk func(*testing.T) LedgerBackend) {
 		if err := l.Save(ctx, automation.PlanWrite{Workflows: []string{"w"}, Items: []workflow.Item{p}}, ev); err != nil {
 			t.Fatal(err)
 		}
-		if c := log.Since(g, port.TopicGate|port.TopicLoopEvents); !c.Has(port.TopicGate) || !c.Has(port.TopicLoopEvents) {
+		if c := log.Since(g, port.TopicPending|port.TopicLoopEvents); !c.Has(port.TopicPending) || !c.Has(port.TopicLoopEvents) {
 			t.Errorf("a new pending item with an event noted %+v", c)
 		}
 		g = log.Gen()
@@ -375,7 +375,7 @@ func RunLedger(t *testing.T, mk func(*testing.T) LedgerBackend) {
 		if err := l.Save(ctx, automation.PlanWrite{Workflows: []string{"w"}, Items: []workflow.Item{later}}); err != nil {
 			t.Fatal(err)
 		}
-		if c := log.Since(g, ^port.Topic(0)); !c.Has(port.TopicGate) || c.Has(port.TopicLoopEvents) {
+		if c := log.Since(g, ^port.Topic(0)); !c.Has(port.TopicPending) || c.Has(port.TopicLoopEvents) {
 			t.Errorf("a re-timed pending item noted %+v", c)
 		}
 		g = log.Gen()
@@ -384,7 +384,7 @@ func RunLedger(t *testing.T, mk func(*testing.T) LedgerBackend) {
 		if err := l.Record(ctx, workflow.Run{Key: run.Key, Status: workflow.RunDone, At: at0}, run, ran); err != nil {
 			t.Fatal(err)
 		}
-		if c := log.Since(g, ^port.Topic(0)); c.Has(port.TopicGate) || !c.Has(port.TopicLoopEvents) {
+		if c := log.Since(g, ^port.Topic(0)); c.Has(port.TopicPending) || !c.Has(port.TopicLoopEvents) {
 			t.Errorf("a done run outside the pending set noted %+v", c)
 		}
 	})

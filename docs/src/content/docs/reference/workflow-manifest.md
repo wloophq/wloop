@@ -49,8 +49,10 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `trigger` | table |  | What plans the workflow: on or schedule; absent, every sweep. |
-| `trigger.on` | list of `opened`, `push`, `review_requested`, `review_request_removed`, `review`, `comment`, `check`, `ready`, `draft`, `merged`, `closed`, `round_sent`, `round_held`, `round_pending`, `round_skipped`, `guidance`, `round_blocked`, `round_unblocked`, `muted`, `unmuted`, `held`, `released`, `adopted`, `tracked`, `untracked`, `nudged`, `removed`, `status`, `would_review`, `would_address`, `review_ended`, `verb_next`, `verb_waiting`, `verb_schedule`, `verb_someday`, `verb_reference`, `verb_focus`, `verb_project`, `verb_approve`, `verb_delegate`, `verb_done`, `verb_dismiss`, `verb_context`, `verb_area`, `verb_answer`, `verb_reviewed`, `verb_sequential`, `verb_reply` |  | The source event kinds the workflow reacts to; verb_&lt;verb&gt;, a verb a person ran on a task, with provider task. |
+| `trigger.on` | list of `opened`, `push`, `review_requested`, `review_request_removed`, `review`, `comment`, `check`, `ready`, `draft`, `merged`, `closed`, `round_sent`, `round_held`, `round_pending`, `round_skipped`, `guidance`, `round_blocked`, `round_unblocked`, `muted`, `unmuted`, `held`, `released`, `adopted`, `tracked`, `untracked`, `nudged`, `removed`, `status`, `would_review`, `would_address`, `review_ended`, `verb_next`, `verb_waiting`, `verb_schedule`, `verb_someday`, `verb_reference`, `verb_focus`, `verb_project`, `verb_approve`, `verb_delegate`, `verb_done`, `verb_dismiss`, `verb_context`, `verb_area`, `verb_answer`, `verb_reviewed`, `verb_sequential`, `verb_reply`, `task.woke` |  | The source event kinds the workflow reacts to; verb_&lt;verb&gt;, a verb a person ran on a task, and task.woke, a task's wake matched, with provider task. |
 | `trigger.schedule` | string |  | A cron schedule, in local time. |
+| `trigger.actors` | list of `person`, `workflow`, `agent`, `plugin` |  | With on, the actors whose events plan it; every actor when absent. |
+| `trigger.depth` | integer | `3` | With on, the longest chain of workflows triggering each other the event may close; at most 5. |
 | `observe` | bool | `false` | Plans items pending and never runs them by itself; a person applies an item by hand. |
 | `limits` | table |  | How many runs the workflow may take. |
 | `limits.per_run` | integer | `0` | Runs per evaluation; 0 is no limit. |
@@ -63,7 +65,7 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `step[]` | table |  | A step the run takes, in order. Required: at least one. |
-| `step[].use` | one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb` |  | The step. |
+| `step[].use` | one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`, `gate.open`, `task.set` |  | The step. |
 | `step[].&lt;name&gt;` | string or list |  | The step's arguments. |
 
 ### Run approval
@@ -77,6 +79,19 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | `approval.rule[].when` | predicate |  | When the rule applies. |
 | `approval.rule[].mode` | one of `run`, `delay`, `wait` |  | The mode when the rule applies. |
 | `approval.rule[].window` | duration |  | The rule's window; only with mode delay, which needs it. |
+
+### Gate approval
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
+| `gates` | table |  | The gates its runs and drafts open. |
+| `gates.approval` | table |  | The approval of its gates. |
+| `gates.approval.mode` | one of `send`, `delay`, `wait`, `dry_run`, `run` |  | The mode when no rule holds. |
+| `gates.approval.window` | duration |  | With mode delay only: how long a person has to stop the gate's consequence. |
+| `gates.approval.rule[]` | table |  | A rule; the first whose when holds gives the mode. |
+| `gates.approval.rule[].when` | predicate |  | When the rule applies to a gate. |
+| `gates.approval.rule[].mode` | one of `send`, `delay`, `wait`, `dry_run`, `run` |  | The rule's mode. |
+| `gates.approval.rule[].window` | duration |  | With mode delay only: how long a person has to stop the gate's consequence. |
 
 ### Drafts
 
@@ -124,6 +139,9 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `task.verb` | `on` | string |  | With waiting, the people the task waits on, comma-separated. |
 | `task.verb` | `resurface` | string |  | With waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD. |
 | `task.verb` | `set` | string |  | With context, the contexts, comma-separated; with area, the area. |
+| `gate.open` | `name` | string |  | The gate, of gates.toml, the step opens. Required. |
+| `task.set` | `prop` | string |  | The property, of tasks.toml, the step sets. Required. |
+| `task.set` | `value` | string |  | The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD, a duration, a list comma-separated. Required. |
 
 - A guard refuses a step instead of skipping it: the item stays in the plan with the reason, and runs when the guard passes.
 - A step that fails retries with backoff, three times per key, then stays `blocked` with its error.

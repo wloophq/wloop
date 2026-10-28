@@ -155,7 +155,8 @@ CREATE TABLE turn_answers (
   at TEXT NOT NULL, text TEXT NOT NULL, source TEXT NOT NULL,
   option_id TEXT NOT NULL DEFAULT '', yes INTEGER NOT NULL DEFAULT 0, no INTEGER NOT NULL DEFAULT 0,
   route TEXT NOT NULL, session TEXT NOT NULL DEFAULT '',
-  message_id INTEGER NOT NULL DEFAULT 0, read_at TEXT NOT NULL DEFAULT '', noticed_at TEXT NOT NULL DEFAULT ''
+  message_id INTEGER NOT NULL DEFAULT 0, read_at TEXT NOT NULL DEFAULT '', noticed_at TEXT NOT NULL DEFAULT '',
+  gate_id INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX turn_answers_unit ON turn_answers(provider, unit_key);
 
@@ -350,7 +351,8 @@ CREATE TABLE tasks (
   waiting TEXT NOT NULL DEFAULT '', deadline TEXT NOT NULL DEFAULT '',
   changed INTEGER NOT NULL DEFAULT 0, seen_at TEXT NOT NULL DEFAULT '',
   origin TEXT NOT NULL, created TEXT NOT NULL, updated TEXT NOT NULL,
-  rev INTEGER NOT NULL
+  rev INTEGER NOT NULL,
+  category TEXT NOT NULL DEFAULT ''
 ) WITHOUT ROWID;
 CREATE INDEX tasks_state ON tasks (state);
 CREATE INDEX tasks_rev ON tasks (rev);
@@ -374,6 +376,25 @@ CREATE TABLE task_contexts (
   context TEXT NOT NULL, ord INTEGER NOT NULL,
   PRIMARY KEY (task_id, context)
 ) WITHOUT ROWID;
+
+-- task_props.value is the property's task.Value as JSON; writer is who wrote it.
+CREATE TABLE task_props (
+  task_id TEXT NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,
+  name TEXT NOT NULL, value TEXT NOT NULL, writer TEXT NOT NULL, at TEXT NOT NULL,
+  PRIMARY KEY (task_id, name)
+) WITHOUT ROWID;
+
+-- A gate's task_id is NULL while no task holds its unit. intents is a JSON list.
+CREATE TABLE gates (
+  id INTEGER PRIMARY KEY,
+  task_id TEXT REFERENCES tasks (id),
+  provider TEXT NOT NULL DEFAULT '', unit_key TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', subject TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL, intents TEXT NOT NULL, intent TEXT NOT NULL DEFAULT '', answer TEXT NOT NULL DEFAULT '',
+  by_actor TEXT NOT NULL DEFAULT '', rule TEXT NOT NULL DEFAULT '',
+  deadline TEXT NOT NULL DEFAULT '', default_intent TEXT NOT NULL DEFAULT '',
+  opened_at TEXT NOT NULL, closed_at TEXT NOT NULL DEFAULT ''
+);
 
 CREATE TABLE task_position (
   only INTEGER PRIMARY KEY CHECK (only = 1),

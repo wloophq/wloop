@@ -30,6 +30,7 @@ type Slack struct {
 	// EndedAfter is how long a unit stays quiet before it has ended; zero is DefaultSlackEndedAfter.
 	EndedAfter Days         `json:"ended_after,omitempty"`
 	Drafts     PluginDrafts `json:"drafts"`
+	Gates      PluginGates  `json:"gates"`
 }
 
 // SlackTurns sets what a turn on a Slack unit reads.

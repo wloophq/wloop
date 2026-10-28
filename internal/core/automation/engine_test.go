@@ -949,7 +949,7 @@ func TestOwnWritesDoNotWakeTheSweep(t *testing.T) {
 	r.put(s1, "a")
 	g0 := r.log.Gen()
 	r.sweep()
-	if c := r.log.Since(g0, port.SweepInputs); c.Topics != port.TopicGate {
+	if c := r.log.Since(g0, port.SweepInputs); c.Topics != port.TopicPending {
 		t.Errorf("the first pass woke the sweep with %+v; want the pending set once", c)
 	}
 	if c := r.log.Since(g0, ^port.Topic(0)); !c.Has(port.TopicLoopEvents) {

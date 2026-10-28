@@ -30,6 +30,8 @@ const (
 	StepClassify     = "classify"
 	StepNotifySelf   = "notify.self"
 	StepTaskVerb     = "task.verb"
+	StepGateOpen     = "gate.open"
+	StepTaskSet      = "task.set"
 )
 
 // TaskStepVerbs are the verbs task.verb runs: the moves of a task
@@ -96,6 +98,10 @@ var Steps = []StepDef{
 		"A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts \"pr.slug\"}}`, none once the unit is gone)."},
 	{StepTaskVerb, providers(unit.Task), workflow.ReachLocal, nil,
 		"Runs a verb on the task: `verb` (`next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done` or `dismiss`), with `until` and `on_activity` for schedule, `on` and `resurface` for waiting, and `set` for context and area. The plan blocks it while the task's state refuses the verb, and `done` and `dismiss` on a task derived from a unit's items, which closes when they resolve. It records no `verb_<verb>` event, which only a person's verb records, so a workflow never triggers another through it."},
+	{StepGateOpen, nil, workflow.ReachLocal, nil,
+		"Opens the gate `name` of gates.toml on the unit, a decision that waits for you with the intents gates.toml gives it."},
+	{StepTaskSet, providers(unit.Task), workflow.ReachLocal, nil,
+		"Sets the task's property `prop` of tasks.toml to `value`, written by the workflow; a property the workflow may not write is refused."},
 }
 
 // StepArg is the grammar row of step use's argument k.

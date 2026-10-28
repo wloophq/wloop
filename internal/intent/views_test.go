@@ -184,3 +184,14 @@ func TestSeenTakesNoOffer(t *testing.T) {
 		t.Errorf("%s", problems)
 	}
 }
+
+func TestAGatedVerbNamesItsGate(t *testing.T) {
+	_, problems := loadListsWith(t, string(defaultLists()), "[verbs.done.by]\nagent = \"gate\"\n")
+	if !strings.Contains(problems, "verbs.done.gate: is required") {
+		t.Errorf("%s", problems)
+	}
+	_, problems = loadListsWith(t, string(defaultLists()), "[verbs.done]\ngate = \"proposal\"\n[verbs.done.by]\nagent = \"gate\"\n")
+	if strings.Contains(problems, "verbs.done.gate") {
+		t.Errorf("%s", problems)
+	}
+}
