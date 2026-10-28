@@ -25,7 +25,7 @@ const (
 	stepsMax    = 512
 )
 
-// stepsOf is what the daemon knows of one job's failed steps. A finished job
+// stepsOf is what the plugin knows of one job's failed steps. A finished job
 // does not change, so a read is kept until it is evicted.
 type stepsOf struct {
 	steps    []string

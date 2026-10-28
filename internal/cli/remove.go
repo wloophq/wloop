@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -19,7 +20,7 @@ import (
 )
 
 // Remove deletes the local workspace of a pull request, the one the call
-// names or else the one the inventory links, and unlinks it. It checks what the
+// names or else the one the inventory links, and unlinks it when linked. It checks what the
 // workspace manager's own removal does not: an agent at work, commits GitHub
 // does not hold, and ignored files that may matter; the manager refuses
 // uncommitted and untracked files itself. With force it checks nothing but
@@ -32,17 +33,17 @@ func (a envActions) Remove(ctx context.Context, u unit.Unit, c daemon.Call) erro
 	if err != nil {
 		return err
 	}
-	id := c.WorkspaceID
-	if id == "" && a.store != nil {
+	linked := ""
+	if a.store != nil {
 		stored, ok, err := a.store.PR(ctx, ref)
 		if err != nil {
 			return err
 		}
 		if ok {
-			id = stored.Workspace.ID
+			linked = stored.Workspace.ID
 		}
 	}
-	w, err := e.finishedWorkspace(ctx, ref, pr, id)
+	w, err := e.finishedWorkspace(ctx, ref, pr, cmp.Or(c.WorkspaceID, linked))
 	if err != nil {
 		return err
 	}
@@ -56,7 +57,7 @@ func (a envActions) Remove(ctx context.Context, u unit.Unit, c daemon.Call) erro
 		return err
 	}
 	fmt.Fprintf(e.Out, "removed %s (%s)\n", w.DisplayName, w.Path)
-	if a.store == nil {
+	if linked == "" || linked != w.ID {
 		return nil
 	}
 	return a.store.SetWorkspace(ctx, ref, dinv.Workspace{})

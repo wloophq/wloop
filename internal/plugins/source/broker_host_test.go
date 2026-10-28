@@ -17,9 +17,15 @@ import (
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
-// hostOver is the broker of plugin acme over a fresh store's events, marks
-// and drafts.
+// hostOver is the broker of plugin acme over a fresh store's events, marks,
+// drafts and overrides.
 func hostOver(t *testing.T) (src.Host, *sqlite.DB) {
+	t.Helper()
+	b, db := brokerOver(t)
+	return b.Host(), db
+}
+
+func brokerOver(t *testing.T) (*psource.Broker, *sqlite.DB) {
 	t.Helper()
 	db, err := sqlite.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -31,7 +37,7 @@ func hostOver(t *testing.T) (src.Host, *sqlite.DB) {
 		t.Fatal(err)
 	}
 	b := &psource.Broker{ID: "acme", Units: psource.Units{Codecs: unit.NewRegistry(c)}, Events: sqlite.New(db), Marks: db, Drafts: db, Overrides: db}
-	return b.Host(), db
+	return b, db
 }
 
 func TestTheBrokerKeepsAPluginsEventsAndReadsThemBack(t *testing.T) {
@@ -114,6 +120,20 @@ func TestTheBrokerSetsOverridesCompareAndSetAndReadsThemInTheRoundState(t *testi
 	}
 	if st, err := h.Reader.RoundState(ctx, own); err != nil || !st.Paused {
 		t.Errorf("the hold reaches the plugin as %+v %v, want paused", st, err)
+	}
+}
+
+func TestAWiderPauseReachesThePluginAsPaused(t *testing.T) {
+	t.Parallel()
+	b, _ := brokerOver(t)
+	held := unit.Unit{Provider: "acme", Key: "t1"}
+	b.Paused = func(_ context.Context, u unit.Unit) (bool, error) { return u == held, nil }
+	h := b.Host()
+	ctx := context.Background()
+	for key, want := range map[string]bool{"t1": true, "t2": false} {
+		if st, err := h.Reader.RoundState(ctx, plugin.Unit{Provider: "acme", Key: key}); err != nil || st.Paused != want {
+			t.Errorf("%s: round state %+v %v, want paused %v", key, st, err, want)
+		}
 	}
 }
 
