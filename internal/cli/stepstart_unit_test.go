@@ -264,7 +264,7 @@ func TestRoundsReadTheManifestKeys(t *testing.T) {
 		}
 	}
 	addr := startPlan{args: startArgs{def: dintent.Def{RoundKind: builtin.RoundKindAddress}}, facts: workflow.Facts{"pr.address.reviewers": []string{"bob"}}}
-	if addr.address() == nil || (startPlan{args: startArgs{def: dintent.Def{RoundKind: builtin.RoundKindReview}}}).address() != nil {
+	if addr.address(testNow) == nil || (startPlan{args: startArgs{def: dintent.Def{RoundKind: builtin.RoundKindReview}}}).address(testNow) != nil {
 		t.Error("the address reason follows the role's round")
 	}
 }

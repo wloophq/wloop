@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -49,8 +51,9 @@ type step struct {
 	// conflictHead is the head whose conflict with the base a triage round
 	// resolves.
 	conflictHead string
-	lastReviewAt time.Time
-	read         *github.PullRequest // the pull request as the facts read it, for the turn
+	// onSent are the marks the round's plan writes once it is sent.
+	onSent map[string]string
+	read   *github.PullRequest // the pull request as the facts read it, for the turn
 	// briefMissing is why the round goes without its brief, "" with one.
 	briefMissing string
 	// confirmed is a round the user sent from the plan.
@@ -76,14 +79,25 @@ func (s step) payload() turn.Payload {
 	return p
 }
 
-// mark is the round mark the step's reviews fingerprint sets.
-func (s step) mark() string { return markOf(s.kind) }
-
 func markOf(k stepKind) string {
 	if k == stepAddress {
 		return round.AddressedReviews
 	}
 	return round.Reviewed
+}
+
+// sent records the step sent in st: a round spent today, and the marks its
+// plan writes.
+func (s step) sent(st *round.Store, now time.Time) {
+	st.RecordSent(s.key(), "", "", now)
+	setMarks(st, s.key(), s.onSent)
+}
+
+// setMarks sets marks of key in st; a value "" removes one.
+func setMarks(st *round.Store, key string, marks map[string]string) {
+	for _, name := range slices.Sorted(maps.Keys(marks)) {
+		st.SetMark(key, name, marks[name])
+	}
 }
 
 func (s step) roundKind() string {
@@ -275,16 +289,14 @@ func untrustedWhy(u *turns.UntrustedError) string {
 
 // roundCall is a round a workflow's turn.start sends.
 type roundCall struct {
-	Kind         stepKind
-	Workspace    wsdomain.Workspace
-	Unit         unit.Unit
-	Facts        dinv.PlanFacts
-	Reason       string
-	Fingerprint  string
-	ChecksHead   string
-	ConflictHead string
-	LastReviewAt time.Time
-	Guidance     string
+	Kind      stepKind
+	Workspace wsdomain.Workspace
+	Unit      unit.Unit
+	Facts     dinv.PlanFacts
+	Reason    string
+	// OnSent are the marks the round's plan writes once it is sent.
+	OnSent   map[string]string
+	Guidance string
 	// BriefMissing is why the round goes without its brief, "" with one.
 	BriefMissing string
 	// Observed is a round the facts only log: its workspace is gone and its
@@ -308,7 +320,7 @@ func (e *Env) sendRound(ctx context.Context, st *round.Store, c roundCall) (sent
 	}
 	s := &sweep{e: e, cfg: cfg, st: st, now: e.Now()}
 	return s.send(ctx, step{kind: c.Kind, ws: c.Workspace, pr: ref, reason: c.Reason, observed: c.Observed,
-		fingerprint: c.Fingerprint, checksHead: c.ChecksHead, conflictHead: c.ConflictHead, lastReviewAt: c.LastReviewAt,
+		fingerprint: c.OnSent[markOf(c.Kind)], checksHead: c.OnSent[round.AddressedChecks], conflictHead: c.OnSent[round.AddressedConflict], onSent: c.OnSent,
 		read: &github.PullRequest{Facts: c.Facts.Facts}, briefMissing: c.BriefMissing, confirmed: c.Confirmed,
 		fresh: true, why: c.Why, address: c.Address}, c.Guidance)
 }
@@ -364,7 +376,7 @@ func (s *sweep) followup(ctx context.Context, st step, guidance string) (bool, e
 		s.logf("%s: %s, but its submission was not observed; the next sweep retries", st.describe(), verb)
 		return false, nil
 	}
-	s.st.RecordSent(st.key(), st.mark(), st.fingerprint, s.now)
+	st.sent(s.st, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), sent.ID))
 	s.logf("%s: %s", st.describe(), verb)
 	return true, nil
@@ -414,7 +426,7 @@ func (s *sweep) openRound(ctx context.Context, st step, guidance string, planned
 		s.logf("%s: created, but its submission was not observed; check the session", st.describe())
 		return false, nil
 	}
-	s.st.RecordSent(st.key(), st.mark(), st.fingerprint, s.now)
+	st.sent(s.st, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), sent.ID))
 	s.logf("%s", st.describe())
 	return true, nil
@@ -473,9 +485,8 @@ func (s *sweep) address(ctx context.Context, st step, guidance string) (bool, er
 		s.logf("%s: %s, but its submission was not observed; the next sweep retries", st.describe(), verb)
 		return false, nil
 	}
-	s.st.RecordSent(st.key(), st.mark(), st.fingerprint, s.now)
+	st.sent(s.st, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), turnID))
-	s.st.SetHeads(st.key(), st.checksHead, st.conflictHead)
 	s.logf("%s: %s", st.describe(), verb)
 	return true, nil
 }

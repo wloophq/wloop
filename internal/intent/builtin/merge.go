@@ -43,6 +43,7 @@ type Vocabulary struct {
 	workflowSlots      []string
 	deliveries         []string
 	events             map[string]unit.ProviderID
+	answering          map[unit.ProviderID][]string
 	payloads           map[string]unit.ProviderID
 	rounds             []unit.ProviderID
 	taskKinds          []string
@@ -107,7 +108,7 @@ func Install(v *Vocabulary) {
 	installed = v
 	Facts, ActionFacts, Effects, Roles, Steps = v.facts, v.actionFacts, v.effects, v.roles, v.steps
 	Slots, Providers, BriefSubjects = v.slots, slices.Sorted(maps.Keys(v.slots)), v.briefSubjects
-	WorkflowSlots, DraftDeliveries, EventProviders = v.workflowSlots, v.deliveries, v.events
+	WorkflowSlots, DraftDeliveries, EventProviders, AnsweringEvents = v.workflowSlots, v.deliveries, v.events, v.answering
 	PayloadProviders, RoundProviders, PluginTaskKinds = v.payloads, v.rounds, v.taskKinds
 	Tools, ToolAnswers, PluginDraftKinds = v.tools, v.toolAnswers, v.draftKinds
 }
@@ -225,6 +226,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	unitSlots := slices.Clone(coreUnitSlots)
 	deliveries := slices.Clone(coreDeliveries)
 	events := coreEventProviders()
+	answering := map[unit.ProviderID][]string{}
 	payloads := map[string]unit.ProviderID{}
 	var rounds []unit.ProviderID
 	var taskKinds []string
@@ -265,6 +267,9 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 		}
 		for _, k := range v.Events {
 			events[k.Name] = id
+			if k.AnswersAskedTurn {
+				answering[id] = append(answering[id], k.Name)
+			}
 		}
 		for _, f := range v.Facts {
 			wf, intent, ok := factRows(id, v.Slot, f)
@@ -310,7 +315,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	}
 	return &Vocabulary{facts: facts, actionFacts: actionFacts, effects: effects, roles: roles, steps: stepsWith(steps),
 		slots: slots, briefSubjects: briefSubjects, workflowSlots: slices.Concat(unitSlots, nonUnitSlots),
-		deliveries: deliveries, events: events, payloads: payloads, rounds: rounds, taskKinds: taskKinds,
+		deliveries: deliveries, events: events, answering: answering, payloads: payloads, rounds: rounds, taskKinds: taskKinds,
 		tools: tools, toolAnswers: answers, draftKinds: draftKinds}
 }
 

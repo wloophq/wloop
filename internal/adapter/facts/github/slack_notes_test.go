@@ -28,9 +28,6 @@ func TestSlackNotesCostGitHubNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := p.Refresh(ctx); err != nil {
-		t.Fatal(err)
-	}
 	if len(w.recorded) != 0 || !slices.Equal(w.rows[r].Reasons, rows.Reasons) || !w.rows[r].UpdatedAt.Equal(rows.UpdatedAt) {
 		t.Errorf("a Slack note changed the pull request: recorded %v", w.recorded)
 	}

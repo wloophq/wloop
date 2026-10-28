@@ -48,8 +48,11 @@ const stepClassify = "classify"
 // stepDeps are what the builtin steps read and act through; newStepSet
 // fills the removal ports the Env has.
 type stepDeps struct {
-	Units      automation.Units
-	Candidates roundCandidates
+	Units automation.Units
+	// Planners plan the rounds of their plugin's units, by provider.
+	Planners map[unit.ProviderID]roundPlanner
+	// Overrides are the host's overrides a plan reads; nil reads none.
+	Overrides overrideReader
 	// Briefs is nil when briefs are off: every round goes without one.
 	Briefs   briefPort
 	Rounds   Rounds

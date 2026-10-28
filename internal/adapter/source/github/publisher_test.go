@@ -20,7 +20,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github/githubtest"
-	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // fakeGitHub serves the issue comments REST endpoints of every pull request.
@@ -311,7 +310,7 @@ func (failingEvents) RecordEvent(context.Context, dinv.Event) error {
 func TestGitHubNudgeRecordsOnlyWhatMayHaveGone(t *testing.T) {
 	nudge := func() draft.Draft {
 		d := commentDraft("@{github:alice} @{github:bob} friendly nudge")
-		d.Kind, d.Effects = draft.Nudge, []string{builtin.EffectPRNudged}
+		d.Kind, d.Effects = draft.Nudge, []string{EffectNudged}
 		return d
 	}
 	ctx := context.Background()

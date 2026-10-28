@@ -152,11 +152,14 @@ type planner struct {
 	owners    []string
 	completed string
 	targets   *targets
+	// rounds is the round state the planner reads: the view's, or the
+	// host's state a Plan takes.
+	rounds *round.Store
 }
 
 func (v *view) planner(ctx context.Context, now time.Time) *planner {
 	return &planner{ctx: ctx, v: v, now: now, cfg: v.cfg, owners: v.owners(),
-		completed: v.cfg.Column(v.p.d.Sink, config.ColumnCompleted), targets: v.targetsOf(ctx)}
+		completed: v.cfg.Column(v.p.d.Sink, config.ColumnCompleted), targets: v.targetsOf(ctx), rounds: v.rounds}
 }
 
 // owners are the GitHub owners automated rounds may run for: the configured
@@ -257,7 +260,7 @@ func (pl *planner) review(ref pr.Ref, r *result) error {
 		CompletedStatus: pl.completed,
 		TrustedOwners:   pl.owners,
 		TrustedAuthors:  pl.cfg.For(ref.Owner, ref.Repo).GitHub.TrustedAuthors,
-		LastFingerprint: pl.v.rounds.Mark(ref.String(), round.Reviewed),
+		LastFingerprint: pl.rounds.Mark(ref.String(), round.Reviewed),
 		Recorded:        pl.recorded(ref),
 	})
 	r.review.reason, r.review.settle = d.Reason, !r.stale
@@ -303,7 +306,7 @@ func (pl *planner) reviewWithoutWorkspace(ref pr.Ref, r *result) (bool, string, 
 		return false, "its review ended", nil
 	case pl.now.Sub(newest) >= dinv.ReviewTurnsFollowed:
 		return false, fmt.Sprintf("its newest review turn is older than %s", dinv.ReviewTurnsFollowed), nil
-	case pl.v.rounds.FirstRoundSkipped(ref.String()):
+	case pl.rounds.FirstRoundSkipped(ref.String()):
 		return false, "you removed it", nil
 	case pl.v.overrides[ref].Adopted:
 		return false, "you took it over", nil
@@ -423,7 +426,7 @@ func (pl *planner) first(ref pr.Ref, r *result) {
 		no(why, why)
 		return
 	}
-	if pl.v.rounds.FirstRoundSkipped(ref.String()) {
+	if pl.rounds.FirstRoundSkipped(ref.String()) {
 		no("you skipped its first round", "you skipped its first round")
 		return
 	}
@@ -468,7 +471,7 @@ func (pl *planner) address(ref pr.Ref, r *result) {
 		!containsFold(pl.owners, ref.Owner) || pl.developed(row) {
 		return
 	}
-	if pl.v.rounds.FirstRoundSkipped(ref.String()) {
+	if pl.rounds.FirstRoundSkipped(ref.String()) {
 		r.address.reason = "you removed its workspace"
 		return
 	}
@@ -513,13 +516,13 @@ func (pl *planner) addressStep(w wsdomain.Workspace, f dinv.PlanFacts, r *result
 	var fp string
 	if pl.cfg.GitHub.AddressReviews {
 		var handled time.Time
-		if prev := pl.v.rounds.Mark(key, round.AddressedReviews); prev != "" {
+		if prev := pl.rounds.Mark(key, round.AddressedReviews); prev != "" {
 			handled, _ = time.Parse(time.RFC3339Nano, prev)
 		}
 		who, fp = dchange.ReviewsToAddress(dchange.AddressInput{PR: f.Facts, Viewer: pl.v.viewer, Handled: handled, SkipReviewers: pl.cfg.GitHub.AddressSkipReviewers})
 	}
 	if pl.cfg.GitHub.AddressChecks {
-		failed = dchange.FailingChecks(f.Facts, pl.v.rounds.Mark(key, round.AddressedChecks), pl.cfg.GitHub.IgnoreChecks)
+		failed = dchange.FailingChecks(f.Facts, pl.rounds.Mark(key, round.AddressedChecks), pl.cfg.GitHub.IgnoreChecks)
 	}
 	var reasons []string
 	if len(who) > 0 {
@@ -529,7 +532,7 @@ func (pl *planner) addressStep(w wsdomain.Workspace, f dinv.PlanFacts, r *result
 		reasons = append(reasons, "failing checks: "+strings.Join(failed, ", "))
 		r.address.checksHead = f.HeadRefOid
 	}
-	if pl.cfg.GitHub.AddressConflicts && pl.conflicts(f) && !mark.Handled(pl.v.rounds.Mark(key, round.AddressedConflict), f.HeadRefOid) {
+	if pl.cfg.GitHub.AddressConflicts && pl.conflicts(f) && !mark.Handled(pl.rounds.Mark(key, round.AddressedConflict), f.HeadRefOid) {
 		reasons = append(reasons, "conflicts with "+f.BaseRefName)
 		r.address.conflictHead = f.HeadRefOid
 	}

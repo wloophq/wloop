@@ -46,7 +46,7 @@ var golden = []string{
 	"round_day_notes: day, kind, note",
 	"round_day_prs: day, provider, unit_key, rounds",
 	"round_days: day, total",
-	"round_state: provider, unit_key, sent_at, agent_home, first_round_skipped",
+	"round_state: provider, unit_key, sent_at, agent_home",
 	"segment_map: provider, conversation, segment_id, team, from_ts, to_ts, created_at, updated_at, closed",
 	"session_handles: session_id, manager, handle, runtime, from_at, to_at",
 	"sessions: session_id, manager, agent, pane, agent_session, workspace_id, worktree, home, managed, started_at, mcp_at, idle_since, closed_at, typed_at, typed_line, user_prompt_at, prompt_seen_at, provider, unit_key",

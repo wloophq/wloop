@@ -18,6 +18,9 @@ const (
 	// AddressedConflict is the head whose conflict with the base a triage
 	// round covered.
 	AddressedConflict = "addressed.conflict"
+	// FirstSkipped is set when the user skipped the automatic first round;
+	// the planner plans no other one.
+	FirstSkipped = "first.skipped"
 )
 
 type PR struct {
@@ -27,9 +30,6 @@ type PR struct {
 	// AgentHome is the agent home of the session that asked for the review,
 	// reused by the rounds the watch starts.
 	AgentHome string
-	// FirstRoundSkipped is set when the user skipped the automatic first
-	// round; the sweep does not plan another one.
-	FirstRoundSkipped bool
 }
 
 type Day struct {
@@ -47,7 +47,6 @@ type Fields uint8
 const (
 	FieldSentAt Fields = 1 << iota
 	FieldAgentHome
-	FieldFirstRoundSkipped
 )
 
 // The kinds of a Note.
@@ -214,15 +213,13 @@ func (s *Store) Count(key string, now time.Time) {
 	s.changes.Counts = append(s.changes.Counts, Count{Day: day, Key: key})
 }
 
-func (s *Store) FirstRoundSkipped(key string) bool { return s.PRs[key].FirstRoundSkipped }
+func (s *Store) FirstRoundSkipped(key string) bool { return s.Mark(key, FirstSkipped) != "" }
 
-func (s *Store) SkipFirstRound(key string) {
-	s.set(key, FieldFirstRoundSkipped, func(p *PR) { p.FirstRoundSkipped = true })
-}
+func (s *Store) SkipFirstRound(key string) { s.SetMark(key, FirstSkipped, "1") }
 
 func (s *Store) ClearFirstRoundSkipped(key string) {
-	if p, ok := s.PRs[key]; ok && p.FirstRoundSkipped {
-		s.set(key, FieldFirstRoundSkipped, func(p *PR) { p.FirstRoundSkipped = false })
+	if s.FirstRoundSkipped(key) {
+		s.SetMark(key, FirstSkipped, "")
 	}
 }
 

@@ -196,6 +196,10 @@ var PayloadProviders = map[string]unit.ProviderID{}
 // tasks.toml.
 var EventProviders = coreEventProviders()
 
+// AnsweringEvents are the event kinds of each provider that answer the turn
+// that asked for them, by provider: what reconcile = "my_review" reads.
+var AnsweringEvents = map[unit.ProviderID][]string{}
+
 func coreEventProviders() map[string]unit.ProviderID { return map[string]unit.ProviderID{} }
 
 // LoopEventKinds are the event kinds the loop records on a unit of any

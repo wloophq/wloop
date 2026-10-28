@@ -2,24 +2,23 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"slices"
 	"strings"
 
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/turn"
 )
-
-// nudgedWho is the input nudge.prepare fills with whom the round asks,
-// which pr.nudged records.
-const nudgedWho = "who"
 
 // The workspace builtins whose role links a worktree to the pull request.
 const (
@@ -58,79 +57,38 @@ type sentRound struct {
 	id        string
 	submitted bool
 	guidance  string
-	// fingerprint is the reviews the round covers, "" when unread.
-	fingerprint string
 }
 
-// effectRun is what an effect does on a route, by phase: guide before the
-// round, sent once it went out, state on the round state the route loaded,
-// unsent when it did not go out.
+// effectRun is what a host effect does on a route, by phase: guide before
+// the round, unsent when it did not go out.
 type effectRun struct {
-	guide, sent, unsent func(r *sentRound)
-	state               func(r *sentRound, st *round.Store)
-	// writesIf, when set, says whether the state phase writes for r.
-	writesIf func(r *sentRound) bool
+	guide, unsent func(r *sentRound)
 }
 
-// onSentEffect is a turn effect and what it does on each route.
+// onSentEffect is a turn effect the host applies and what it does on each
+// route; every other turn effect is its plugin's, applied through
+// ApplyEffect once the round went out.
 type onSentEffect struct {
 	name string
 	on   map[route]effectRun
 }
 
-var (
-	keepsGuidance = effectRun{
-		guide:  func(r *sentRound) { r.guidance = r.env.handGuidance(r.ctx, r.ref, r.guidance) },
-		unsent: func(r *sentRound) { r.env.keepGuidance(r.ctx, r.ref, r.guidance) },
-	}
-	// recordsNudge keys the nudged event by its turn, so a turn that posted
-	// nothing does not hold the next nudge.
-	recordsNudge = effectRun{sent: func(r *sentRound) {
-		r.env.recordTurnEvent(r.ctx, r.ref, dinv.KindNudged, r.id, strings.Join(inputList(r.inputs[nudgedWho]), ", "))
-	}}
-	markAddressed = effectRun{state: func(r *sentRound, st *round.Store) { r.env.recordAddressed(st, r.ref, r.pr.HeadRefOid) }}
-)
+var keepsGuidance = effectRun{
+	guide:  func(r *sentRound) { r.guidance = r.env.handGuidance(r.ctx, r.ref, r.guidance) },
+	unsent: func(r *sentRound) { r.env.keepGuidance(r.ctx, r.ref, r.guidance) },
+}
 
-// onSent is the turn effects the command line runs, in the order each
-// phase runs them. The daemon records the round-sent event of a round asked
-// through its action.
+// onSent is the turn effects the command line applies, in the order each
+// phase runs them.
 var onSent = []onSentEffect{
 	{name: builtin.EffectGuidanceHanded, on: map[route]effectRun{routeSession: keepsGuidance, routeAsked: keepsGuidance}},
-	{name: builtin.EffectPRRoundSent, on: map[route]effectRun{routeSession: {sent: func(r *sentRound) {
-		r.env.recordEvent(r.ctx, r.ref, dinv.KindRoundSent, withInstructions(handInSession, r.id))
-	}}}},
-	{name: builtin.EffectPRNudged, on: map[route]effectRun{routeSession: recordsNudge, routeAsked: recordsNudge, routeLaunch: recordsNudge}},
-	{name: builtin.EffectPRReviewed, on: map[route]effectRun{routeLaunch: {
-		sent: func(r *sentRound) {
-			if r.submitted {
-				r.fingerprint = r.env.reviewFingerprint(r.ctx, r.cfg, r.ref)
-			}
-		},
-		state:    func(r *sentRound, st *round.Store) { st.SetMark(r.ref.String(), round.Reviewed, r.fingerprint) },
-		writesIf: func(r *sentRound) bool { return r.fingerprint != "" },
-	}}},
-	{name: builtin.EffectPRAddressed, on: map[route]effectRun{routeSession: markAddressed, routeAsked: markAddressed, routeLaunch: markAddressed}},
 }
 
 type phase func(c effectRun, r *sentRound)
 
 func guidePhase(c effectRun, r *sentRound) { runCell(c.guide, r) }
 
-func sentPhase(c effectRun, r *sentRound) { runCell(c.sent, r) }
-
 func unsentPhase(c effectRun, r *sentRound) { runCell(c.unsent, r) }
-
-func statePhase(st *round.Store) phase {
-	return func(c effectRun, r *sentRound) {
-		if c.writes(r) {
-			c.state(r, st)
-		}
-	}
-}
-
-func (c effectRun) writes(r *sentRound) bool {
-	return c.state != nil && (c.writesIf == nil || c.writesIf(r))
-}
 
 func runCell(f func(r *sentRound), r *sentRound) {
 	if f != nil {
@@ -138,7 +96,7 @@ func runCell(f func(r *sentRound), r *sentRound) {
 	}
 }
 
-// runPhase runs p of the turn effects d names, on route rt.
+// runPhase runs p of the host's turn effects d names, on route rt.
 func runPhase(rt route, d dintent.Def, r *sentRound, p phase) {
 	for _, e := range onSent {
 		if slices.Contains(d.Effects, e.name) {
@@ -147,15 +105,36 @@ func runPhase(rt route, d dintent.Def, r *sentRound, p phase) {
 	}
 }
 
-// writesRounds is whether the state phase of d's effects on rt writes the
-// round state for r.
-func writesRounds(rt route, d dintent.Def, r *sentRound) bool {
-	for _, e := range onSent {
-		if slices.Contains(d.Effects, e.name) && e.on[rt].writes(r) {
-			return true
+// applyPluginEffects applies, through ApplyEffect, the turn effects of d
+// that belong to the plugin of r's unit, once r went out on route rt. A
+// failure is only logged: the round is out.
+func (e *Env) applyPluginEffects(ctx context.Context, rt route, d dintent.Def, r *sentRound) {
+	u := r.ref.Unit()
+	var names []string
+	for _, name := range d.Effects {
+		hosts := slices.ContainsFunc(onSent, func(h onSentEffect) bool { return h.name == name })
+		if fx, ok := builtin.EffectOf(name); ok && !hosts && fx.Plugin && fx.Provider == u.Provider && fx.Applies&builtin.AppliesTurn != 0 {
+			names = append(names, name)
 		}
 	}
-	return false
+	if len(names) == 0 {
+		return
+	}
+	a, ok := e.turnEffects(u.Provider, rt, r)
+	if !ok {
+		fmt.Fprintf(e.Err, "warning: %s: no plugin applies %s\n", r.ref, strings.Join(names, ", "))
+		return
+	}
+	head := ""
+	if r.pr != nil {
+		head = r.pr.HeadRefOid
+	}
+	for _, name := range names {
+		req := src.EffectRequest{Effect: name, Unit: psource.Wire(u), Turn: &src.TurnRef{ID: r.id, Head: head}}
+		if err := a.ApplyEffect(context.WithoutCancel(ctx), req); err != nil {
+			fmt.Fprintf(e.Err, "warning: %s: applying %s: %v\n", r.ref, name, err)
+		}
+	}
 }
 
 // roundRun is a round of an intent about to go out in the workspace its

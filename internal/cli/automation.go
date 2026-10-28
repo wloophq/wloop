@@ -35,8 +35,8 @@ import (
 var _ workspaces.FetchLog = (*sqlite.Fetches)(nil)
 
 // engineDeps are what the engine runs over besides the Env. SessionFacts,
-// WorkspaceFacts and Candidates override the Env's session and workspace
-// providers and the github module's rounds.
+// WorkspaceFacts and Planners override the Env's session and workspace
+// providers and the plugins' round planners.
 type engineDeps struct {
 	DB             *sqlite.DB
 	Modules        []source.Module
@@ -44,9 +44,10 @@ type engineDeps struct {
 	WorkspaceFacts automation.Units
 	// Snapshot overrides the Env's workspace snapshot for the removal's
 	// session guard.
-	Snapshot   coresweep.Snapshot
-	Candidates roundCandidates
-	Briefs     *brief.Queue
+	Snapshot coresweep.Snapshot
+	// Planners override the plugins' round planners, by provider.
+	Planners map[unit.ProviderID]roundPlanner
+	Briefs   *brief.Queue
 	// Asker answers classify's headless calls; nil refuses every classify.
 	Asker turns.Asker
 	// Pub hears the engine's events once stored and the steps' once
@@ -99,10 +100,11 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	}
 	codecs = append(codecs, sessionAndWorkspaceCodecs()...)
 	units := newUnitSet(providers)
-	if d.Candidates == nil {
-		d.Candidates = candidatesOf(d.Modules)
+	units.blocks = &startBlocks{e: e}
+	if d.Planners == nil {
+		d.Planners = e.planners(d.Modules)
 	}
-	sd := stepDeps{Units: units, Candidates: d.Candidates, Rounds: e.Rounds, Drafts: d.Drafts, Pub: d.Pub, Log: d.Log,
+	sd := stepDeps{Units: units, Planners: d.Planners, Rounds: e.Rounds, Drafts: d.Drafts, Pub: d.Pub, Log: d.Log,
 		Headless: d.TurnStart.Headless, Turns: d.TurnStart.Turns}
 	if d.DB != nil {
 		sd.Pub = stepEvents{rec: sqlite.New(d.DB), next: d.Pub, log: d.Log}
@@ -116,6 +118,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 		sd.Removal.Snapshot = e.planSnapshot()
 	}
 	if d.DB != nil {
+		sd.Overrides = d.DB
 		sd.Props = serviceProps{e}
 		sd.Classify.Store = d.DB.Classifications()
 		sd.Removal.Fetched = d.DB.Fetches()
@@ -488,6 +491,8 @@ type unitSet struct {
 	classified *classifiedUnits
 	// briefed adds the brief.* facts; nil adds none.
 	briefed *briefedFacts
+	// blocks lifts the answered start blocks first; nil lifts none.
+	blocks *startBlocks
 }
 
 var (
@@ -560,6 +565,11 @@ func (s *unitSet) facts(ctx context.Context, u unit.Unit, event bool) (workflow.
 
 func (s *unitSet) Refresh(ctx context.Context) error {
 	var errs []error
+	if s.blocks != nil {
+		if err := s.blocks.Refresh(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("start blocks: %w", err))
+		}
+	}
 	for _, id := range s.order {
 		if r, ok := s.providers[id].(automation.Refresher); ok {
 			if err := r.Refresh(ctx); err != nil {
@@ -630,6 +640,9 @@ func (s *unitSet) Seen() port.Generation {
 
 func (s *unitSet) Due() time.Time {
 	var due time.Time
+	if s.blocks != nil {
+		due = s.blocks.Due()
+	}
 	for _, id := range s.order {
 		if d, ok := s.providers[id].(automation.Dueer); ok {
 			if t := d.Due(); !t.IsZero() && (due.IsZero() || t.Before(due)) {

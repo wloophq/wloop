@@ -22,7 +22,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
-	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	sourcereg "github.com/wloophq/wloop/internal/source"
 )
@@ -227,7 +226,7 @@ func (p *Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence,
 // at; a failure is only logged, since failing a posted draft would invite a
 // second post.
 func (p *Publisher) recordNudge(ctx context.Context, d draft.Draft, ref pr.Ref, body string, at time.Time) {
-	if !slices.Contains(d.Effects, builtin.EffectPRNudged) {
+	if !slices.Contains(d.Effects, EffectNudged) {
 		return
 	}
 	if at.IsZero() {

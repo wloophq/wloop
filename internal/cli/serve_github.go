@@ -10,6 +10,7 @@ import (
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
 	dgh "github.com/wloophq/wloop/internal/domain/github"
+	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/turn"
 
@@ -215,3 +216,93 @@ func githubBriefs(q *interruptFirst) present.BriefQueue { return present.BriefQu
 
 // githubPayloads is GitHub's turn payload, over the read rounds make.
 func (e *Env) githubPayloads() turn.PayloadReader { return ghsource.TurnPayloads{PRs: basicsReader{e}} }
+
+// nudgedWho is the input nudge.prepare fills with whom the round asks,
+// which pr.nudged records.
+const nudgedWho = "who"
+
+// githubEffects is the GitHub plugin's ApplyEffect while it runs in
+// process: the turn effects of r, a round that went out on route rt. A
+// draft's pr.nudged is the publisher's, applied as it posts.
+type githubEffects struct {
+	rt route
+	r  *sentRound
+}
+
+func (g githubEffects) ApplyEffect(ctx context.Context, req src.EffectRequest) error {
+	r := g.r
+	if req.Draft != nil || r == nil {
+		return nil
+	}
+	e := r.env
+	switch req.Effect {
+	case ghsource.EffectRoundSent:
+		if g.rt == routeSession {
+			e.recordEvent(ctx, r.ref, dinv.KindRoundSent, withInstructions(handInSession, r.id))
+		}
+	case ghsource.EffectNudged:
+		e.recordTurnEvent(ctx, r.ref, dinv.KindNudged, r.id, strings.Join(inputList(r.inputs[nudgedWho]), ", "))
+	case ghsource.EffectReviewed:
+		if g.rt != routeLaunch || !r.submitted {
+			return nil
+		}
+		if fp := e.reviewFingerprint(ctx, r.cfg, r.ref); fp != "" {
+			return e.updateRounds(ctx, func(st *round.Store) { st.SetMark(r.ref.String(), round.Reviewed, fp) })
+		}
+	case ghsource.EffectAddressed:
+		if r.pr == nil {
+			return nil
+		}
+		return e.updateRounds(ctx, func(st *round.Store) { e.recordAddressed(st, r.ref, r.pr.HeadRefOid) })
+	}
+	return nil
+}
+
+// turnEffects applies the effects of provider p's plugin on a turn r that
+// went out on route rt: the plugin's while it runs, else GitHub's in
+// process; false when neither does.
+func (e *Env) turnEffects(p unit.ProviderID, rt route, r *sentRound) (effectApplier, bool) {
+	if a, ok := e.runningApplier(p); ok {
+		return a, true
+	}
+	if p == unit.GitHub {
+		return githubEffects{rt: rt, r: r}, true
+	}
+	return nil, false
+}
+
+// runningApplier is the effect applier of provider p's running plugin.
+func (e *Env) runningApplier(p unit.ProviderID) (effectApplier, bool) {
+	if e.pluginEffects != nil {
+		return e.pluginEffects(p)
+	}
+	if e.pluginKind == nil {
+		return nil, false
+	}
+	if _, err := e.pluginKind.Client(string(p)); err != nil {
+		return nil, false
+	}
+	return runningPlanner{kind: e.pluginKind, id: string(p)}, true
+}
+
+// draftAppliers apply the draft effects of each provider's plugin: the
+// running plugin's, else GitHub's in process.
+func (e *Env) draftAppliers() func(p unit.ProviderID) (effectApplier, bool) {
+	return func(p unit.ProviderID) (effectApplier, bool) { return e.turnEffects(p, 0, nil) }
+}
+
+// unitConfig is the configuration of u's repository, with the agent home of
+// the session that asked for its rounds when no project sets one.
+func (e *Env) unitConfig(ctx context.Context, cfg config.Config, u unit.Unit, st *round.Store) (config.Config, error) {
+	repo, err := present.Repo(ctx, u)
+	if err != nil {
+		return config.Config{}, err
+	}
+	if owner, name, ok := strings.Cut(repo, "/"); ok {
+		cfg = cfg.For(owner, name)
+	}
+	if cfg.AgentHome == "" {
+		cfg.AgentHome = st.AgentHome(u.Key)
+	}
+	return cfg, nil
+}

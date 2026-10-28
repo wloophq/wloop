@@ -21,7 +21,9 @@ type Service struct {
 	AgentSessions AgentSessions
 	Sessions      Sessions
 	Launcher      Launcher
-	GitHub        GitHub
+	// Answers are the user's answers asked turns reconcile with; nil reads
+	// none.
+	Answers Answers
 	// Changed tells the views the pull requests whose turns changed; nil
 	// does nothing.
 	Changed func(ctx context.Context, refs ...unit.Unit)

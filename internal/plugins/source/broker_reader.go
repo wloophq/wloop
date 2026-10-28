@@ -19,8 +19,9 @@ func (reader) Books(context.Context, []plugin.Unit) ([]src.Book, error) {
 	return nil, src.ErrUnsupported
 }
 
-// RoundState is the host's overrides of one of the plugin's own units, and
-// whether its rounds are paused: by its hold or a wider pause.
+// RoundState is the host's round bookkeeping of one of the plugin's own
+// units, its overrides, and whether its rounds are paused: by its hold or a
+// wider pause.
 func (r reader) RoundState(ctx context.Context, w plugin.Unit) (src.RoundState, error) {
 	if r.b.Overrides == nil {
 		return src.RoundState{}, src.ErrUnsupported
@@ -29,11 +30,17 @@ func (r reader) RoundState(ctx context.Context, w plugin.Unit) (src.RoundState, 
 	if err != nil {
 		return src.RoundState{}, err
 	}
+	var st src.RoundState
+	if r.b.Rounds != nil {
+		if st, err = r.b.Rounds(ctx, u); err != nil {
+			return src.RoundState{}, err
+		}
+	}
 	o, err := r.b.Overrides.Override(ctx, u)
 	if err != nil {
 		return src.RoundState{}, err
 	}
-	st := src.RoundState{Overrides: o, Paused: o[port.OverrideHold] == port.OverrideTrue}
+	st.Overrides, st.Paused = o, o[port.OverrideHold] == port.OverrideTrue
 	if !st.Paused && r.b.Paused != nil {
 		if st.Paused, err = r.b.Paused(ctx, u); err != nil {
 			return src.RoundState{}, err

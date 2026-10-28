@@ -154,7 +154,7 @@ func (e *Env) turnByHand(ctx context.Context, h handTurn, text io.Writer) error 
 			return false, err
 		}
 		sr.pr, sr.cfg, sr.inputs, sr.id = pr, cfg, h.inputs, sent.ID
-		runPhase(routeSession, d, sr, sentPhase)
+		e.applyPluginEffects(ctx, routeSession, d, sr)
 		e.recordGuidance(ctx, ref, sr.guidance)
 		return true, nil
 	})
@@ -382,7 +382,7 @@ func (e *Env) handRound(ctx context.Context, rt route, ref github.Ref, guidance 
 			runPhase(rt, d, r, unsentPhase)
 		}
 	}()
-	if !keepsHome && !writesRounds(rt, d, r) {
+	if !keepsHome {
 		var err error
 		sent, err = send(nil, r)
 		return err
@@ -398,7 +398,6 @@ func (e *Env) handRound(ctx context.Context, rt route, ref github.Ref, guidance 
 	if sent, err = send(st, r); err != nil {
 		return err
 	}
-	runPhase(rt, d, r, statePhase(st))
 	return rounds.Save(ctx, st)
 }
 

@@ -29,16 +29,17 @@ type Effect struct {
 	Plugin bool
 }
 
-// The effects code applies by name.
+// The effects the host applies by name. A plugin's own effects run through
+// its ApplyEffect, but for the two the host applies around a round of the
+// GitHub plugin's: handing it the guidance queued on its unit, which goes
+// into the turn before it is sent, and the round-sent event of a round the
+// daemon's action sent.
 const (
 	EffectPlanCleared    = "plan.cleared"
 	EffectGuidanceHanded = "pr.guidance_handed"
 	EffectPRRoundSent    = "pr.round_sent"
-	EffectPRReviewed     = "pr.reviewed"
-	EffectPRAddressed    = "pr.addressed"
 	EffectTaskNudged     = "task.nudged"
 	EffectUnitClosed     = "unit.closed"
-	EffectPRNudged       = "pr.nudged"
 )
 
 // Effects is the effect vocabulary of turns and drafts: the core's, then
