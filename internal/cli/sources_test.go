@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
@@ -263,4 +265,13 @@ func TestCardsJobResolvesTheItemsOfALapsedPR(t *testing.T) {
 		its, err := db.Items().Load(ctx, []unit.Unit{r7.Unit()})
 		return err == nil && len(its[r7.Unit()]) == 1 && its[r7.Unit()][0].State == items.Resolved && its[r7.Unit()][0].Resolution == items.Superseded
 	})
+}
+
+// viewerIs is the forge's Identity of login with teams.
+func viewerIs(login string, teams ...string) func(context.Context) (src.Identity, error) {
+	return func(context.Context) (src.Identity, error) { return identityOf(login, teams...), nil }
+}
+
+func identityOf(login string, teams ...string) src.Identity {
+	return src.Identity{Viewer: src.Person{Key: "github:" + login, Name: login}, Teams: teams}
 }

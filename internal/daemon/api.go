@@ -16,7 +16,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/port"
-	dgh "github.com/wloophq/wloop/internal/domain/github"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/web"
@@ -198,13 +197,13 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		Build:              web.Build(s.deps.Version),
 		Jobs:               s.jobStatuses(),
 		Warnings:           s.warnings.list(),
-		Viewer:             s.viewer.cachedLogin(),
+		Viewer:             s.cachedLogin(),
 		StalledReviewHours: time.Duration(s.deps.Cfg.GitHub.Stalled.Review).Hours(),
 		WorkspaceManagers:  s.deps.WorkspaceManagers,
 		Store:              s.deps.Store,
 	}
 	if s.deps.PRs != nil {
-		h.RateLimit = wireLimit(s.graphQLBudget())
+		h.RateLimit = s.graphQLBudget()
 		h.SlowSync = s.rateLimitLow()
 	}
 	if s.deps.GitAccess != nil {
@@ -314,7 +313,7 @@ func (s *Server) handleRemoveDone(w http.ResponseWriter, r *http.Request) {
 		}
 		var out bytes.Buffer
 		if err := s.act(ctx, "remove", u, api.ActionRequest{}, &out); err != nil {
-			kept := api.Kept{Ref: refOf(u), Reason: err.Error()}
+			kept := api.Kept{Named: named(u), Reason: err.Error()}
 			var refused Refusal
 			if errors.As(err, &refused) {
 				kept.Detail, kept.Source, kept.Forceable = refused.Detail, refused.Source, refused.Forceable
@@ -323,7 +322,7 @@ func (s *Server) handleRemoveDone(w http.ResponseWriter, r *http.Request) {
 			res.Kept = append(res.Kept, kept)
 			continue
 		}
-		res.Removed = append(res.Removed, refOf(u))
+		res.Removed = append(res.Removed, named(u))
 	}
 	writeJSON(w, res)
 }
@@ -461,14 +460,14 @@ func (s *Server) handleApp(w http.ResponseWriter, r *http.Request) {
 // rateLimitLow says the client refuses background reads: the fast sweep
 // skips its turns while it holds.
 func (s *Server) rateLimitLow() bool {
-	return s.deps.Budget != nil && !s.deps.Budget.Allow(dgh.PriorityBackground)
+	return s.deps.Budget != nil && s.deps.Budget.Low()
 }
 
-func (s *Server) graphQLBudget() dgh.Limit {
+func (s *Server) graphQLBudget() api.RateLimit {
 	if s.deps.Budget == nil {
-		return dgh.Limit{}
+		return api.RateLimit{}
 	}
-	return s.deps.Budget.Budget()[dgh.ResourceGraphQL]
+	return s.deps.Budget.RateLimit()
 }
 
 func (s *Server) handleRows(w http.ResponseWriter, r *http.Request) {

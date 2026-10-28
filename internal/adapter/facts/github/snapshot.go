@@ -51,14 +51,14 @@ type view struct {
 	partial bool
 
 	mu      sync.Mutex
-	prFacts map[pr.Ref]sweep.Facts
+	prFacts map[pr.Ref]dinv.PlanFacts
 	events  map[pr.Ref][]dinv.Event
 	ended   map[unit.Unit]bool
 	targets *targets
 }
 
 func (p *Provider) build(ctx context.Context, now time.Time) (*view, error) {
-	v := &view{p: p, builtAt: now, cfg: p.cfg(), prFacts: map[pr.Ref]sweep.Facts{}, events: map[pr.Ref][]dinv.Event{}}
+	v := &view{p: p, builtAt: now, cfg: p.cfg(), prFacts: map[pr.Ref]dinv.PlanFacts{}, events: map[pr.Ref][]dinv.Event{}}
 	if p.d.Changes != nil {
 		v.gen = p.d.Changes.Gen()
 	}
@@ -175,7 +175,7 @@ func (v *view) listed(ctx context.Context, now time.Time) []unit.Unit {
 		if _, ok := waitingAnswer(b); ok {
 			add(u)
 		}
-		if at, ok := newestReview(b); ok && now.Sub(at) < sweep.ReviewTurnsFollowed {
+		if at, ok := newestReview(b); ok && now.Sub(at) < dinv.ReviewTurnsFollowed {
 			add(u)
 		}
 	}
@@ -255,7 +255,7 @@ func (v *view) loadEvents(ctx context.Context, units []unit.Unit) error {
 	return nil
 }
 
-func (v *view) factsOf(ref pr.Ref) (sweep.Facts, bool) {
+func (v *view) factsOf(ref pr.Ref) (dinv.PlanFacts, bool) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	f, ok := v.prFacts[ref]
@@ -289,7 +289,7 @@ func waitingAnswer(b turn.Book) (turn.Answer, bool) {
 }
 
 // InventoryInputs are the planning inputs as the inventory stores them.
-func InventoryInputs(st *inventory.Store) sweep.Inputs { return inventoryInputs{st} }
+func InventoryInputs(st *inventory.Store) dinv.PlanInputs { return inventoryInputs{st} }
 
 type inventoryInputs struct{ store *inventory.Store }
 
@@ -303,7 +303,7 @@ func (i inventoryInputs) Rows(ctx context.Context) ([]dinv.PR, error) {
 
 // Facts reads the details of rows in one query; a detail of another version
 // gives its facts with a zero ReadAt, as the collector has yet to re-read it.
-func (i inventoryInputs) Facts(ctx context.Context, rows []dinv.PR, viewer string) (map[unit.Unit]sweep.Facts, error) {
+func (i inventoryInputs) Facts(ctx context.Context, rows []dinv.PR, viewer string) (map[unit.Unit]dinv.PlanFacts, error) {
 	refs := make([]pr.Ref, len(rows))
 	for n, row := range rows {
 		refs[n] = row.Ref
@@ -312,10 +312,10 @@ func (i inventoryInputs) Facts(ctx context.Context, rows []dinv.PR, viewer strin
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[unit.Unit]sweep.Facts, len(rows))
+	out := make(map[unit.Unit]dinv.PlanFacts, len(rows))
 	for _, row := range rows {
 		d, ok := details[row.Ref]
-		f := sweep.Facts{Facts: inventory.FactsOf(row, d, viewer)}
+		f := dinv.PlanFacts{Facts: inventory.FactsOf(row, d, viewer)}
 		if ok && d.Version == inventory.DetailVersion {
 			f.ReadAt = d.ReadAt
 		}
@@ -552,7 +552,7 @@ func prBlocks(ctx context.Context, st Store) (map[pr.Ref]dinv.Event, error) {
 	}
 	out := make(map[pr.Ref]dinv.Event, len(all))
 	for _, ev := range all {
-		if ref, ok := port.PROf(ev); ok {
+		if ref, ok := pr.RefOf(ev.Unit); ok {
 			out[ref] = dinv.Event{PR: ref, Kind: ev.Kind, Key: ev.Key, At: ev.At, Data: ev.Data}
 		}
 	}

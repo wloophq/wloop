@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/port"
-	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/usage"
 )
 
@@ -64,7 +64,7 @@ func (r *reader) Usage(_ context.Context, t Turn) ([]usage.Model, error) {
 
 func turnOf(seq int64, kind, session string, endedAgo time.Duration) Turn {
 	return Turn{
-		Seq: seq, PR: pr.Ref{Owner: "o", Repo: "r", Number: 1}, Kind: kind, AgentSession: session,
+		Seq: seq, Unit: unit.Unit{Provider: "acme", Key: "r1"}, Kind: kind, AgentSession: session,
 		From: now.Add(-endedAgo - time.Minute), To: now.Add(-endedAgo),
 	}
 }
@@ -158,7 +158,7 @@ func TestAReadThatKeepsFailingGivesUp(t *testing.T) {
 	if got != "usage: 0 read, 1 unavailable, 1 retried" {
 		t.Fatalf("summary = %q", got)
 	}
-	if !slices.Equal(logs, []string{"usage: turn 1 of o/r#1: disk"}) {
+	if !slices.Equal(logs, []string{"usage: turn 1 of acme:r1: disk"}) {
 		t.Fatalf("logs %q, want the first error only", logs)
 	}
 }

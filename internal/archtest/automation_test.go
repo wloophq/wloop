@@ -55,6 +55,7 @@ type providerSite struct {
 var coreProviderAllowlist = []providerSite{
 	{"internal/core/turns/headless.go", "taskInput", `"task"`, 1, "the headless turn's task input, which shares the task provider's spelling"},
 	{"internal/client/tui/views.go", "taskProvider", "unit.Task", 1, "debt: the TUI keys its busy map by the task provider; K2 keys it by the served unit"},
+	{"internal/catalog/catalog.go", "withSource", "unit.GitHub", 1, "debt: the catalog's built-in actions name the GitHub plugin"},
 	{"internal/adapter/facts/session/facts.go", "Provider.build", "unit.GitHub", 1, "debt: a session's facts read its linked pull request's state"},
 	{"internal/adapter/orca/orca.go", "Adapter.Apply", "unit.GitHub", 1, "Orca links a worktree to a GitHub pull request only"},
 	{"internal/workspace/orca/orca.go", "Manager.LinkUnit", "unit.GitHub", 1, "Orca's linkedPR holds a GitHub pull request only"},
@@ -72,7 +73,6 @@ var coreProviderAllowlist = []providerSite{
 	{"internal/adapter/store/sqlite/retain.go", "retainWorkflowEventsSQL", "unit.Session", 1, "the store keeps the sessions the core keeps"},
 	{"internal/adapter/store/sqlite/retain.go", "retainWorkflowEventsSQL", "unit.Workspace", 1, "the store keeps the workspaces the core keeps"},
 	{"internal/adapter/store/sqlite/slack.go", "slackProvider", `"slack"`, 1, "the store keeps the Slack plugin's tables"},
-	{"internal/adapter/store/sqlite/turns.go", "prOf", "unit.GitHub", 1, "debt: a pull request's turns are keyed by owner, repository and number"},
 	{"internal/adapter/store/sqlite/turns.go", "compareUnits", "unit.GitHub", 2, "debt: pull requests sort by owner, repository and number"},
 	{"internal/cli/actions.go", "Env.fetchPR", "unit.GitHub", 1, "debt: the GitHub viewer read outside the plugin"},
 	{"internal/cli/facts.go", "inventoryFacts.MyReviews", "unit.GitHub", 1, "debt: the GitHub viewer read outside the plugin"},

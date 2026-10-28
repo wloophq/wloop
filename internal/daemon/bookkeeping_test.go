@@ -30,7 +30,7 @@ func newLiveServer(t *testing.T) (*Server, *storetest.Fixture) {
 	sessions := turnstest.NewSessions()
 	d := withStore(Deps{Activity: f.DB, Changes: f.Log, Snapshot: f.DB, Intakes: f.DB.Intakes(), Pauses: f.Rounds, Cfg: config.Defaults(), Version: "test",
 		Now:      func() time.Time { return now },
-		Viewer:   func(context.Context) (string, []string, error) { return "user-01", nil, nil },
+		Identity: viewerIs("user-01"),
 		Log:      func(string, ...any) {},
 		Turns:    &turns.Service{Intents: turnstest.Intents(), Store: f.Turns, Registry: f.Turns, Sessions: sessions, Clock: fixedClock(now)},
 		Sessions: sessions, Agents: snapshotOf(sessions), Items: &coreitems.Ledger{Store: f.DB.Items()}, Cards: f.DB.Cards()}, f.Inventory)

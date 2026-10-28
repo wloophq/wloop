@@ -15,7 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/sweep"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
-	dchange "github.com/wloophq/wloop/internal/domain/change"
+	dchange "github.com/wloophq/wloop/internal/domain/github/change"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -46,7 +46,7 @@ type world struct {
 	cfg       config.Config
 	viewer    string
 	rows      map[pr.Ref]dinv.PR
-	details   map[pr.Ref]sweep.Facts
+	details   map[pr.Ref]dinv.PlanFacts
 	ended     map[unit.Unit]bool
 	overrides map[pr.Ref]dinv.Override
 	blocks    map[pr.Ref]dinv.Event
@@ -63,7 +63,7 @@ type world struct {
 }
 
 func newWorld() *world {
-	w := &world{now: t0, cfg: config.Defaults(), viewer: me, rows: map[pr.Ref]dinv.PR{}, details: map[pr.Ref]sweep.Facts{},
+	w := &world{now: t0, cfg: config.Defaults(), viewer: me, rows: map[pr.Ref]dinv.PR{}, details: map[pr.Ref]dinv.PlanFacts{},
 		ended: map[unit.Unit]bool{}, overrides: map[pr.Ref]dinv.Override{}, blocks: map[pr.Ref]dinv.Event{},
 		events: map[pr.Ref][]dinv.Event{}, books: map[unit.Unit]turn.Book{}, rounds: round.New(),
 		git: &fakeGit{heads: map[string]string{}, dirty: map[string]bool{}}, branches: &fakeBranches{}}
@@ -105,7 +105,7 @@ func (w *world) add(n int, author string, edit func(*dinv.PR, *pr.Facts)) pr.Ref
 	f.Author, f.ReviewRequests, f.IsCrossRepository, f.ChecksState = row.Author, row.ReviewRequests, row.IsFork, row.ChecksState
 	f.Mergeable, f.ReviewDecision = row.Mergeable, row.ReviewDecision
 	w.rows[r] = row
-	w.details[r] = sweep.Facts{Facts: f, ReadAt: w.now.Add(-time.Minute)}
+	w.details[r] = dinv.PlanFacts{Facts: f, ReadAt: w.now.Add(-time.Minute)}
 	return r
 }
 
@@ -127,9 +127,9 @@ func (w *world) Rows(context.Context) ([]dinv.PR, error) {
 	return rows, nil
 }
 
-func (w *world) Facts(_ context.Context, rows []dinv.PR, _ string) (map[unit.Unit]sweep.Facts, error) {
+func (w *world) Facts(_ context.Context, rows []dinv.PR, _ string) (map[unit.Unit]dinv.PlanFacts, error) {
 	w.factReads++
-	out := map[unit.Unit]sweep.Facts{}
+	out := map[unit.Unit]dinv.PlanFacts{}
 	for _, r := range rows {
 		out[r.Ref.Unit()] = w.details[r.Ref]
 	}

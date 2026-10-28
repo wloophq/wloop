@@ -22,7 +22,7 @@ func (s *Server) handleKeys(w http.ResponseWriter, r *http.Request) {
 	if s.deps.Tasks != nil {
 		views = s.servedViews(s.deps.Tasks)
 	}
-	writeJSON(w, api.KeysResponse{Bindings: keyViews(surface, views, s.servedSpecs(), catalog.PlanSpecs(l), coreWords{l.Keys, l.Lists, l.Tasks})})
+	writeJSON(w, api.KeysResponse{Bindings: keyViews(surface, views, s.deps.Plugins, s.servedSpecs(), catalog.PlanSpecs(l), coreWords{l.Keys, l.Lists, l.Tasks})})
 }
 
 // coreWords are the profile's words for the core keys: their help, and a
@@ -33,8 +33,9 @@ type coreWords struct {
 	tasks intentload.TasksDef
 }
 
-// keyViews are the core keys, the keys of views, then the keys of specs and of plan.
-func keyViews(surface keys.Surface, views []api.TaskViewSpec, specs, plan []api.ActionSpec, words coreWords) []api.KeyView {
+// keyViews are the core keys, the keys of views and of the plugins' views, then the keys of specs and of plan.
+// A plugin's key that a view holds is left out.
+func keyViews(surface keys.Surface, views []api.TaskViewSpec, plugins []api.Plugin, specs, plan []api.ActionSpec, words coreWords) []api.KeyView {
 	bundled := bundledWords()
 	out := []api.KeyView{}
 	for _, b := range keys.Core {
@@ -56,6 +57,16 @@ func keyViews(surface keys.Surface, views []api.TaskViewSpec, specs, plan []api.
 	for _, b := range keys.Views(jumps) {
 		if slices.Contains(b.Surfaces, surface) {
 			out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: label[b.Action]})
+		}
+	}
+	for _, p := range plugins {
+		if !p.Enabled || p.UI == nil || p.UI.Key == "" || slices.ContainsFunc(jumps, func(v keys.View) bool { return v.Key == p.UI.Key }) {
+			continue
+		}
+		for _, b := range keys.Views([]keys.View{{ID: string(p.ID), Key: p.UI.Key}}) {
+			if slices.Contains(b.Surfaces, surface) {
+				out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: string(p.ID), Help: p.Name})
+			}
 		}
 	}
 	add := func(specs []api.ActionSpec, ctx keys.Context) {

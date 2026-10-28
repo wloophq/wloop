@@ -75,11 +75,11 @@ func startDaemon(t *testing.T, actions daemon.Actions) *testDaemon {
 	d := &testDaemon{socket: filepath.Join(dir, "daemon.sock"), store: st}
 	srv := daemon.New(withRows(daemon.Deps{
 		Cfg: Defaults(), Version: "test", Actions: actions,
-		Now:    func() time.Time { return daemonNow },
-		Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil },
-		Sweep:  daemon.SweepFunc(func(context.Context) (string, string, error) { return "", "", nil }),
-		Log:    t.Logf,
-		Tasks:  coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: stDB.Tasks(), Clock: clockFunc(func() time.Time { return daemonNow })}),
+		Now:      func() time.Time { return daemonNow },
+		Identity: viewerIs("me"),
+		Sweep:    daemon.SweepFunc(func(context.Context) (string, string, error) { return "", "", nil }),
+		Log:      t.Logf,
+		Tasks:    coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: stDB.Tasks(), Clock: clockFunc(func() time.Time { return daemonNow })}),
 	}, st))
 	h := srv.Handler()
 	l, err := net.Listen("unix", d.socket)

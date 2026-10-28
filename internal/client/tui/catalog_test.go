@@ -3,12 +3,13 @@ package tui
 import (
 	"cmp"
 	"encoding/json"
-	intentload "github.com/wloophq/wloop/internal/intent"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	intentload "github.com/wloophq/wloop/internal/intent"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand/brandtest"
@@ -110,7 +111,7 @@ func setPR(r *api.Row, change func(p *prView)) {
 }
 
 // servedKeys are the bindings GET /api/keys serves the terminal for specs:
-// the core keys, the views' keys, then the actions' keys.
+// the core keys, the views' keys, the GitHub plugin's, then the actions' keys.
 func servedKeys(specs api.ActionsResponse) []api.KeyView {
 	help, _ := intentload.BundledKeys(os.DirFS("../../../profiles/default"))
 	var out []api.KeyView
@@ -126,6 +127,9 @@ func servedKeys(specs api.ActionsResponse) []api.KeyView {
 	}
 	for _, b := range keys.Views(views) {
 		out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: lists.Views[strings.TrimPrefix(b.Action, "nav:")]})
+	}
+	for _, b := range keys.Views([]keys.View{{ID: "github", Key: "g g"}}) {
+		out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "github", Help: "GitHub"})
 	}
 	add := func(specs []api.ActionSpec, ctx keys.Context) {
 		for _, s := range specs {

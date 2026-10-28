@@ -14,19 +14,16 @@ import (
 // request from another unit by asking the GitHub plugin's own package, with
 // how many times each asks.
 var pluginIdentityAllowlist = []providerSite{
-	{"internal/adapter/facts/session/facts.go", "repoOf", "port.PROf", 1, "debt: a session's facts read its linked pull request"},
-	{"internal/adapter/store/inventory/byunit.go", "unitRef", "port.PROf", 1, "debt: the inventory keeps GitHub's pull request tables"},
+	{"internal/adapter/facts/session/facts.go", "repoOf", "pr.RefOf", 1, "debt: a session's facts read its linked pull request"},
+	{"internal/adapter/store/inventory/byunit.go", "unitRef", "pr.RefOf", 1, "debt: the inventory keeps GitHub's pull request tables"},
 	{"internal/brief/github_source.go", "GitHubSource.ref", "pr.RefOf", 1, "debt: the brief queue builds GitHub's brief source and its units outside the plugin"},
 	{"internal/brief/queue.go", "Queue.source", "pr.Codec{}.Provider", 1, "debt: the brief queue builds GitHub's brief source and its units outside the plugin"},
 	{"internal/brief/queue.go", "Queue.intent", "pr.Codec{}.Provider", 1, "debt: the brief queue builds GitHub's brief intent outside the plugin"},
 	{"internal/brief/units.go", "refOf", "pr.RefOf", 1, "debt: the brief queue builds GitHub's brief source and its units outside the plugin"},
-	{"internal/catalog/catalog.go", "withSource", "pr.Codec{}.Provider", 1, "debt: the catalog's built-in actions name the GitHub plugin"},
 	{"internal/cli/launcher.go", "githubRef", "pr.Codec{}.Provider", 1, "debt: the launcher reads a pull request's workspace outside the plugin"},
 	{"internal/cli/launcher.go", "cliLauncher.Launch", "pr.RefOf", 1, "debt: the launcher reads a pull request's workspace outside the plugin"},
 	{"internal/cli/launcher.go", "isPR", "pr.RefOf", 1, "debt: the launcher reads a pull request's workspace outside the plugin"},
 	{"internal/cli/serve_ended.go", "openPRBooks.Books", "pr.RefOf", 1, "debt: the ended turns' books are pull requests"},
-	{"internal/core/port/port.go", "PROf", "pr.RefOf", 1, "debt: the core's pull request event helper, tracked in pluginDebt"},
-	{"internal/core/turns/service.go", "unitArg", "port.PROf", 1, "debt: a turn's URL is its pull request's"},
 	{"internal/daemon/actions.go", "Server.readAheadQueued", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
 	{"internal/daemon/actions.go", "Server.runAction", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
 	{"internal/daemon/api.go", "Server.handleRemoveDone", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
@@ -35,8 +32,8 @@ var pluginIdentityAllowlist = []providerSite{
 	{"internal/daemon/briefs.go", "refsOf", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
 	{"internal/daemon/headless.go", "Server.runHeadless", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
 	{"internal/daemon/plan.go", "Server.actOnPlanItem", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
-	{"internal/daemon/refs.go", "isPullRequest", "port.PROf", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
-	{"internal/daemon/refs.go", "refOf", "port.PROf", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
+	{"internal/daemon/refs.go", "isPullRequest", "pr.RefOf", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
+	{"internal/daemon/refs.go", "refOf", "pr.RefOf", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
 	{"internal/daemon/rows.go", "Server.detail", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
 	{"internal/daemon/unitactions.go", "sourceFollowed", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
 	{"internal/daemon/unitactions.go", "unitAction", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
@@ -44,7 +41,7 @@ var pluginIdentityAllowlist = []providerSite{
 
 // pluginIdentity flags, outside the providers' homes and the GitHub
 // adapters, a question about a unit's provider asked of the GitHub plugin's
-// package: pr.RefOf, pr.Codec{}.Provider(), port.PROf and the daemon's
+// package: pr.RefOf, pr.Codec{}.Provider() and the daemon's
 // isPullRequest. A declaration may ask as many times as its entry says; used
 // counts what each entry matched.
 func pluginIdentity(fset *token.FileSet, file string, f *ast.File, allow []providerSite, used map[int]int) []string {
@@ -52,14 +49,10 @@ func pluginIdentity(fset *token.FileSet, file string, f *ast.File, allow []provi
 	if testFile(file) || strings.HasSuffix(filepath.Base(dir), "test") || providerHome(file) || ownProvider(dir) == "github" {
 		return nil
 	}
-	prName, portName := "pr", "port"
+	prName := "pr"
 	for _, imp := range f.Imports {
-		p, _ := strconv.Unquote(imp.Path.Value)
-		switch {
-		case p == module+"internal/domain/pr" && imp.Name != nil:
+		if p, _ := strconv.Unquote(imp.Path.Value); p == module+"internal/domain/pr" && imp.Name != nil {
 			prName = imp.Name.Name
-		case p == module+"internal/core/port" && imp.Name != nil:
-			portName = imp.Name.Name
 		}
 	}
 	pkgSel := func(e ast.Expr, pkg, name string) bool {
@@ -80,8 +73,6 @@ func pluginIdentity(fset *token.FileSet, file string, f *ast.File, allow []provi
 			switch {
 			case pkgSel(fn, prName, "RefOf"):
 				return "pr.RefOf"
-			case pkgSel(fn, portName, "PROf"):
-				return "port.PROf"
 			case fn.Sel.Name == "Provider":
 				x := fn.X
 				if p, ok := x.(*ast.ParenExpr); ok {
@@ -152,19 +143,18 @@ func open(u unit.Unit) {
 	if _, ok := dpr.RefOf(u); ok {
 	}
 	_ = (dpr.Codec{}).Provider()
-	_ = port.PROf(ev)
 	_ = isPullRequest(u)
 	_ = other.RefOf(u)
 }
 `)
 	none := map[int]int{}
-	flagged(t, "outside", pluginIdentity(fset, "internal/daemon/x.go", f, nil, none), 4, "asks the GitHub plugin's package")
+	flagged(t, "outside", pluginIdentity(fset, "internal/daemon/x.go", f, nil, none), 3, "asks the GitHub plugin's package")
 	flagged(t, "the plugin's own package", pluginIdentity(fset, "internal/domain/pr/x.go", f, nil, none), 0, "")
 	flagged(t, "a GitHub adapter", pluginIdentity(fset, "internal/adapter/source/github/x.go", f, nil, none), 0, "")
 	flagged(t, "a test file", pluginIdentity(fset, "internal/daemon/x_test.go", f, nil, none), 0, "")
 	allow := []providerSite{{"internal/daemon/x.go", "open", "pr.RefOf", 1, "planted"}, {"internal/daemon/x.go", "open", "isPullRequest", 2, "planted"}}
 	used := map[int]int{}
-	flagged(t, "allowlisted", pluginIdentity(fset, "internal/daemon/x.go", f, allow, used), 2, "asks the GitHub plugin's package")
+	flagged(t, "allowlisted", pluginIdentity(fset, "internal/daemon/x.go", f, allow, used), 1, "asks the GitHub plugin's package")
 	flagged(t, "an entry allowing more", staleSites(allow, used), 1, "allows 2, matches 1")
 	fset, f = parse(t, `package x
 func open(u unit.Unit) {

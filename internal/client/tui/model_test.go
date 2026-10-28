@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"reflect"
 	"slices"
@@ -11,14 +12,21 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 var now = time.Date(2026, 10, 14, 15, 0, 0, 0, time.UTC)
 
-func ref(n int) pr.Ref { return pr.Ref{Owner: "acme", Repo: "api", Number: n} }
+// testRef is pull request n of acme/api.
+type testRef int
+
+func ref(n int) testRef { return testRef(n) }
+
+func (r testRef) String() string { return fmt.Sprintf("acme/api#%d", int(r)) }
+func (r testRef) Unit() unit.Unit {
+	return unit.Unit{Provider: unit.GitHub, Key: r.String()}
+}
 
 func row(n int, title string, kind api.Kind, views ...string) api.Row {
 	r := api.Row{Unit: ref(n).Unit(), Label: ref(n).String(), Title: title, Kind: kind, Views: views, Summary: api.Summary{WaitsOn: "me", Reason: "review requested", Since: now.Add(-3 * time.Hour)},
@@ -568,13 +576,17 @@ func TestKeysWhileFilteringAreText(t *testing.T) {
 
 func TestPastingAPullRequestURLSelectsIt(t *testing.T) {
 	m := newModel(t)
-	m.SetData(rows(), api.Health{})
-	press(m, Key{Rune: '/'}, Key{Name: KeyPaste, Text: "https://github.com/acme/api/pull/9"}, Key{Name: KeyEnter})
+	rs := rows()
+	for i := range rs {
+		rs[i].Link = "https://github.com/" + strings.Replace(rs[i].Label, "#", "/pull/", 1)
+	}
+	m.SetData(rs, api.Health{})
+	press(m, Key{Rune: '/'}, Key{Name: KeyPaste, Text: "https://github.com/acme/api/pull/9/files"}, Key{Name: KeyEnter})
 	if m.views[m.view].ID != api.ViewLoop || m.sel != ref(9).Unit() || len(m.filter) != 0 {
 		t.Fatalf("view %s, selection %v, filter %q", m.views[m.view].ID, m.sel, string(m.filter))
 	}
 	press(m, Key{Rune: '/'}, Key{Name: KeyPaste, Text: "https://github.com/acme/api/pull/99"}, Key{Name: KeyEnter})
-	if !strings.Contains(m.status, "acme/api#99 is not in") {
+	if !strings.Contains(m.status, "https://github.com/acme/api/pull/99 is not in") {
 		t.Fatalf("status %q", m.status)
 	}
 }

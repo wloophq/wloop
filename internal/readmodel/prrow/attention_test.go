@@ -24,7 +24,7 @@ func pendingRow(n int) api.Row {
 
 // offering is r with the actions a gated row of the inventory offers.
 func offering(d Deriver, r api.Row) api.Row {
-	r.Actions = catalog.States(catalog.Facts{Ref: refOf(r), Row: r, Tracked: true, Open: situation.Kind(r.Kind) != situation.KindDone, HeldByCap: situation.Kind(r.Kind) == situation.KindHeldByCap, GateOn: true, Intents: d.Loaded})
+	r.Actions = catalog.States(catalog.Facts{PR: refOf(r).Unit(), Owner: refOf(r).Owner, Repo: refOf(r).Repo, Row: r, Tracked: true, Open: situation.Kind(r.Kind) != situation.KindDone, HeldByCap: situation.Kind(r.Kind) == situation.KindHeldByCap, GateOn: true, Intents: d.Loaded})
 	return r
 }
 

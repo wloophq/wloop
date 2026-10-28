@@ -11,6 +11,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/ingest"
@@ -70,9 +72,9 @@ func TestEveryRouteIsScoped(t *testing.T) {
 func TestRequestUnderTestScopeNests(t *testing.T) {
 	t.Parallel()
 	s := newServerWith(t, func(d *Deps) {
-		d.Viewer = func(ctx context.Context) (string, []string, error) {
+		d.Identity = func(ctx context.Context) (src.Identity, error) {
 			meter.Add(ctx, meter.Sample{Res: meter.GitHub, Op: "viewer"})
-			return "me", nil, nil
+			return identityOf("me"), nil
 		}
 	})
 	ctx, scope := metertest.Start(t, context.Background())

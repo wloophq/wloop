@@ -11,9 +11,8 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/config"
-	"github.com/wloophq/wloop/internal/core/sweep"
-	dchange "github.com/wloophq/wloop/internal/domain/change"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
+	dchange "github.com/wloophq/wloop/internal/domain/github/change"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -206,20 +205,20 @@ func (pl *planner) derive(ref pr.Ref) (result, error) {
 // prOf is ref's stored facts, or why the plan cannot decide on it; follows
 // says something the plan lists follows it. A stale detail is decided on:
 // turn.start refuses it.
-func (pl *planner) prOf(ref pr.Ref, follows bool, r *result) (sweep.Facts, string) {
+func (pl *planner) prOf(ref pr.Ref, follows bool, r *result) (dinv.PlanFacts, string) {
 	row, ok := pl.v.byRef[ref]
 	if !ok {
-		return sweep.Facts{}, whyNotStored
+		return dinv.PlanFacts{}, whyNotStored
 	}
 	f, read := pl.v.factsOf(ref)
 	if row.State == dgh.StateOpen && row.Lapsed() && !follows {
-		return sweep.Facts{}, whyLapsed
+		return dinv.PlanFacts{}, whyLapsed
 	}
 	if r.stale {
 		r.dueAt("unread", pl.now.Add(time.Duration(pl.cfg.Sweep.Fast)))
 	}
 	if !read {
-		return sweep.Facts{}, "not read in full yet"
+		return dinv.PlanFacts{}, "not read in full yet"
 	}
 	return f, ""
 }
@@ -302,8 +301,8 @@ func (pl *planner) reviewWithoutWorkspace(ref pr.Ref, r *result) (bool, string, 
 	switch {
 	case ended && (!found || stored.State != dgh.StateOpen):
 		return false, "its review ended", nil
-	case pl.now.Sub(newest) >= sweep.ReviewTurnsFollowed:
-		return false, fmt.Sprintf("its newest review turn is older than %s", sweep.ReviewTurnsFollowed), nil
+	case pl.now.Sub(newest) >= dinv.ReviewTurnsFollowed:
+		return false, fmt.Sprintf("its newest review turn is older than %s", dinv.ReviewTurnsFollowed), nil
 	case pl.v.rounds.FirstRoundSkipped(ref.String()):
 		return false, "you removed it", nil
 	case pl.v.overrides[ref].Adopted:
@@ -311,7 +310,7 @@ func (pl *planner) reviewWithoutWorkspace(ref pr.Ref, r *result) (bool, string, 
 	case found && stored.State != "" && stored.State != dgh.StateOpen:
 		return false, "it is " + strings.ToLower(stored.State), nil
 	}
-	r.dueAt("review cutoff", newest.Add(sweep.ReviewTurnsFollowed))
+	r.dueAt("review cutoff", newest.Add(dinv.ReviewTurnsFollowed))
 	return true, "", nil
 }
 
@@ -504,7 +503,7 @@ func (pl *planner) developed(p dinv.PR) bool {
 // addressStep decides a triage round when others reviewed a pull request I
 // develop since the last one, its checks failed on a new head, or a new head
 // has conflicted with the base past the conflict window.
-func (pl *planner) addressStep(w wsdomain.Workspace, f sweep.Facts, r *result) {
+func (pl *planner) addressStep(w wsdomain.Workspace, f dinv.PlanFacts, r *result) {
 	if f.State != dgh.StateOpen || (pl.completed != "" && w.Status == pl.completed) {
 		r.address.reason = "nothing to address"
 		return
@@ -544,7 +543,7 @@ func (pl *planner) addressStep(w wsdomain.Workspace, f sweep.Facts, r *result) {
 // conflicts says whether f's head conflicts with its base and the pull
 // request has for the conflict window. The row keeps a conflict through
 // GitHub's UNKNOWN after a push, so the head's own read must confirm it.
-func (pl *planner) conflicts(f sweep.Facts) bool {
+func (pl *planner) conflicts(f dinv.PlanFacts) bool {
 	since, ok := pl.v.byRef[f.Ref].ConflictingSince()
 	return ok && f.Mergeable == "CONFLICTING" && pl.now.Sub(since) >= pl.v.conflictWindow()
 }

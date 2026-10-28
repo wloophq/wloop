@@ -59,6 +59,18 @@ const (
 	NoteCanceled = "canceled by the user"
 )
 
+// BriefState is what an intake shows of its unit's brief: whether one is
+// recorded, the attempts that failed since its last success, whether the
+// queue gave up on it, the error of a last run that failed, and when it
+// tries again.
+type BriefState struct {
+	Found     bool
+	Failures  int
+	GaveUp    bool
+	LastError string
+	RetryAt   time.Time
+}
+
 type Intake struct {
 	Seq                                         int64
 	Unit                                        unit.Unit

@@ -14,7 +14,6 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -123,7 +122,7 @@ func withSource(s api.ActionSpec) api.ActionSpec {
 	s.Source = SourceBuiltin
 	s.Scope = cmp.Or(s.Scope, ScopeUnit)
 	if githubBuiltins[s.ID] {
-		s.Plugin = string(pr.Codec{}.Provider())
+		s.Plugin = string(unit.GitHub)
 	}
 	return s
 }

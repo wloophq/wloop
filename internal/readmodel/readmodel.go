@@ -4,7 +4,10 @@ package readmodel
 
 import (
 	"context"
+	"strings"
 	"time"
+
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
@@ -38,8 +41,10 @@ type Provider interface {
 
 // Base is what every row of a rebuild shares, built once per rebuild.
 type Base struct {
+	// Viewers and Teams are the viewer's login and teams in each source, as
+	// its plugin's Identity says.
 	Viewers map[unit.ProviderID]string
-	Teams   []string // the github viewer's teams
+	Teams   map[unit.ProviderID][]string
 	Specs   []api.ActionSpec
 	// SpecsVersion is the version of GET /api/actions the rows' actions follow.
 	SpecsVersion string
@@ -53,6 +58,28 @@ type Base struct {
 	AgentsOK bool
 	// Asked is the action a request asks for; zero for a served row.
 	Asked catalog.Asked
+}
+
+// Identify sets the viewer and the teams of provider p from id, the
+// Identity its plugin serves; a viewer whose key is not p's names no login.
+func (b *Base) Identify(p unit.ProviderID, id src.Identity) {
+	if b.Viewers == nil {
+		b.Viewers = map[unit.ProviderID]string{}
+	}
+	if b.Teams == nil {
+		b.Teams = map[unit.ProviderID][]string{}
+	}
+	b.Viewers[p], b.Teams[p] = Login(p, id), id.Teams
+}
+
+// Login is the viewer's login in provider p from id; "" when its key is
+// not p's.
+func Login(p unit.ProviderID, id src.Identity) string {
+	login, ok := strings.CutPrefix(id.Viewer.Key, string(p)+":")
+	if !ok {
+		return ""
+	}
+	return login
 }
 
 // Summary is what any provider's row says in generic terms.

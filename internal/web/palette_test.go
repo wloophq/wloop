@@ -58,7 +58,7 @@ return { title: pal.title, items: strip(pal.items), help: k.log.help, bindings: 
 		{"toggle Focus", "f"}, {"make a project or attach to one", "p"}, {"approve the draft or proposal", "a"},
 		{"delegate to an agent", "d"}, {"done", "e"}, {"dismiss", "Backspace"},
 		{"Hold", "H"}, {"Dismiss the turn", "X"}, {"Act", ""}, {"open the source", "o"},
-		{"capture", "n"}, {"Inbox", "g i"}, {"the GitHub views", "g g"}, {"filter", "/"}, {"help", "?"}, {"Area...", ""},
+		{"capture", "n"}, {"Inbox", "g i"}, {"GitHub", "g g"}, {"filter", "/"}, {"help", "?"}, {"Area...", ""},
 	} {
 		if !has(want.Label, want.Key) {
 			t.Errorf("the palette lacks %q on %q: %+v", want.Label, want.Key, got.Items)

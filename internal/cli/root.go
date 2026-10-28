@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"time"
 
+	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
 	acd "github.com/wloophq/wloop/internal/adapter/claudedesktop"
 	adossier "github.com/wloophq/wloop/internal/adapter/dossier"
@@ -278,7 +280,7 @@ func (e *Env) planBooks() coresweep.Books {
 }
 
 // planInputs are the stored pull requests the facts read.
-func (e *Env) planInputs() coresweep.Inputs {
+func (e *Env) planInputs() dinv.PlanInputs {
 	if e.planReads != nil {
 		return e.planReads
 	}

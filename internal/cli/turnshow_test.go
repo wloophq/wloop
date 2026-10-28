@@ -20,7 +20,7 @@ import (
 
 func bookFixture() api.TurnBook {
 	at := func(h, m int) time.Time { return time.Date(2026, 10, 19, h, m, 0, 0, time.UTC) }
-	return api.TurnBook{PR: pr.Ref{Owner: "acme", Repo: "docs", Number: 407}, Turns: []api.TurnShown{
+	return api.TurnBook{Unit: api.Named{Unit: pr.Ref{Owner: "acme", Repo: "docs", Number: 407}.Unit(), Label: "acme/docs#407"}, Turns: []api.TurnShown{
 		{
 			Turn: dturn.Turn{Seq: 26, Intent: "review", ID: "7bd21eee5264", Trigger: dturn.ByHand, State: dturn.Done,
 				Guidance: "Do we really want to delete these documents? Is the procedure safe and the most efficient one for this kind of problem?",
@@ -73,7 +73,7 @@ func TestTurnShowStaysJSONWhenPiped(t *testing.T) {
 	if code := te.run("instructions", "nudge", r7.URL(), "--", "be", "brief"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	book, err := client.New(te.Socket).TurnBook(context.Background(), pr.Ref(r7))
+	book, err := client.New(te.Socket).TurnBook(context.Background(), r7.URL())
 	if err != nil {
 		t.Fatal(err)
 	}

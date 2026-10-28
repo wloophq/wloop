@@ -12,7 +12,6 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
-	coresweep "github.com/wloophq/wloop/internal/core/sweep"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -279,7 +278,7 @@ type roundCall struct {
 	Kind         stepKind
 	Workspace    wsdomain.Workspace
 	Unit         unit.Unit
-	Facts        coresweep.Facts
+	Facts        dinv.PlanFacts
 	Reason       string
 	Fingerprint  string
 	ChecksHead   string

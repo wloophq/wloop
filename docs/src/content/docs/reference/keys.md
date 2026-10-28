@@ -33,7 +33,7 @@ The same keys work in the web cockpit and the terminal client, on the selected t
 | Key | Action |
 |---|---|
 | `g f`, `g i`, `g o`, `g n`, `g w`, `g p`, `g r` | Focus, Inbox, Outbox, Next, Waiting, Projects, Review: each view's `key` in `views.toml`, and a view of yours adds its own (`g`, a space and a key no core key uses) |
-| `g g` | the GitHub views |
+| `g g` | the GitHub views: a plugin's own chord, which its UI declares (`key`), served while the plugin is enabled; a view's key in `views.toml` takes it first |
 | `Shift+1`..`9` | switch area |
 | `/` | filter |
 | `Cmd+K` (web), `Ctrl+K` (terminal) | the palette, with every action and its key |

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
@@ -33,7 +32,7 @@ func goldenModel(t *testing.T, color bool) *Model {
 	pending.Summary.Reason = "new commits since the last review"
 
 	stalled := row(1365, "Remove hardcoded credentials from the common constants fallbacks", "changes", "needs-me", "mine")
-	stalled.Unit = pr.Ref{Owner: "acme", Repo: "billing-service", Number: 1365}.Unit()
+	stalled.Unit = unit.Unit{Provider: unit.GitHub, Key: "acme/billing-service#1365"}
 	stalled.Label = "acme/billing-service#1365"
 	stalled.Link = "https://github.com/acme/billing-service/pull/1365"
 	stalled.Summary.Stalled, stalled.Summary.Since = true, now.Add(-9*24*time.Hour)

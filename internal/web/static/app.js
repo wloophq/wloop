@@ -235,10 +235,10 @@ const keyUnit = (k) => ({ provider: k.slice(0, k.indexOf(":")), key: k.slice(k.i
 const unitPath = (u, ...rest) => "/api/units/" + [u.provider, u.key, ...rest].map(encodeURIComponent).join("/");
 const unitOf = (x) => x.unit;
 const keyOf = (x) => unitKey(unitOf(x));
-const labelOf = (x) => x.label || refLabel(x.ref);
+const labelOf = (x) => x.label || "";
 const labelTail = (r) => (pl(r).repo && labelOf(r).startsWith(pl(r).repo) ? labelOf(r).slice(pl(r).repo.length) : labelOf(r));
 const refLabel = (ref) => `${ref.owner}/${ref.repo}#${ref.number}`;
-const eventRef = (e) => (e.pr && e.pr.number ? refLabel(e.pr) : "");
+const eventRef = (it) => it.label || "";
 
 function fold(s) {
   return String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
@@ -347,7 +347,7 @@ function matches(r, ts) {
 
 function matchesActivity(it, ts) {
   const e = it.event;
-  const fields = [it.title, eventRef(e), it.author, e.actor, EVENT_LABEL[e.kind] || e.kind, e.data].map(fold);
+  const fields = [it.title, eventRef(it), it.author, e.actor, EVENT_LABEL[e.kind] || e.kind, e.data].map(fold);
   return ts.every((t) => fields.some((f) => f.includes(t)));
 }
 
@@ -361,8 +361,8 @@ function activityPasses(it, lens) {
 }
 
 function activityRepos(it) {
-  const p = it.event.pr;
-  return p && p.number ? [`${p.owner}/${p.repo}`] : [];
+  const m = /^(\S+\/\S+)#\d+$/.exec(it.label || "");
+  return m ? [m[1]] : [];
 }
 
 // foldMap folds s and maps each folded position back to s, so a match in
@@ -792,7 +792,7 @@ function candidatesYAML(meta, cands) {
     const b = c.brief && c.brief.brief;
     const asks = (c.review_requests || []).map((w) => w.replace(/^team:/, ""));
     const fields = [
-      ["ref", yamlString(refLabel(c.ref))],
+      ["ref", yamlString(labelOf(c))],
       ["url", yamlString(candidateURL(c))],
       ["title", yamlString(c.title)],
       ["author", yamlString(c.author)],
@@ -972,9 +972,9 @@ async function removeAllClean(n, view) {
     });
     const out = await res.json().catch(() => ({}));
     if (!res.ok || out.error) throw new Error(apiError(out, `HTTP ${res.status}`, res.status));
-    const removed = (out.removed || []).map(refLabel);
-    const kept = (out.kept || []).map((k) => `${refLabel(k.ref)} (${k.reason})`);
-    const details = (out.kept || []).filter((k) => k.detail).map((k) => `${refLabel(k.ref)}: ${k.detail}`);
+    const removed = (out.removed || []).map(labelOf);
+    const kept = (out.kept || []).map((k) => `${labelOf(k)} (${k.reason})`);
+    const details = (out.kept || []).filter((k) => k.detail).map((k) => `${labelOf(k)}: ${k.detail}`);
     const text = [
       `Removed ${removed.length}${removed.length ? ": " + removed.join(", ") : ""}.`,
       kept.length ? `Kept ${kept.length}: ${kept.join("; ")}.` : "",
@@ -1495,7 +1495,7 @@ function renderActivity(lens) {
         h("span", { class: "kind" }, EVENT_LABEL[e.kind] || e.kind.replaceAll("_", " ")),
         requested ? h("span", { class: "who" }, " from " + requestedFrom(e.data)) : null,
         e.actor ? h("span", { class: "who" }, (requested ? " by " : " ") + actorLabel(e.actor)) : null,
-        " ", h("span", { class: "ref" }, eventRef(e)),
+        " ", h("span", { class: "ref" }, eventRef(it)),
         " ", h("span", { class: "title" }, it.title)),
       data ? h("span", { class: "data" }, data) : null));
   }
@@ -2135,8 +2135,8 @@ function candidateItem(c, sel) {
   const wait = candidateWait(c, row, state.health && state.health.stalled_review_hours);
   return h("li", { class: ["cand", row ? waitClass(row) : "", key === sel ? "sel" : ""].join(" ") },
     h("button", { type: "button", class: "cand-pick", "aria-pressed": String(key === sel), "data-focus": `cand:${key}`, onclick: () => selectCandidate(key) },
-      h("span", { class: "title" }, c.title || refLabel(c.ref)),
-      h("span", { class: "meta" }, `${refLabel(c.ref)} by ${c.author} · opened ${ago(c.created_at)} · updated ${ago(c.updated_at)}`,
+      h("span", { class: "title" }, c.title || labelOf(c)),
+      h("span", { class: "meta" }, `${labelOf(c)} by ${c.author} · opened ${ago(c.created_at)} · updated ${ago(c.updated_at)}`,
         wait ? h("span", { class: wait.late ? "wait late" : "wait", title: row ? `waiting on ${waitingLabel(row)}` : "since the last activity" }, wait.text) : null,
         c.draft ? h("span", { class: "flag" }, "draft") : null,
         c.state && c.state !== "OPEN" ? h("span", { class: "flag" }, c.state.toLowerCase()) : null)),
@@ -2175,10 +2175,10 @@ async function actOnCandidate(c, name, extra = {}) {
   await load();
   if (ok === undefined && implicit) {
     const undone = (await act(row, "untrack")) ? "untracked it again" : `untracking it failed too: ${state.actionError}`;
-    status(`${name} ${refLabel(c.ref)}: ${refused || "cancelled"}; ${undone}`, { error: true });
+    status(`${name} ${labelOf(c)}: ${refused || "cancelled"}; ${undone}`, { error: true });
     return false;
   }
-  if (refused) return status(`${name} ${refLabel(c.ref)}: ${refused}`, { error: true }), false;
+  if (refused) return status(`${name} ${labelOf(c)}: ${refused}`, { error: true }), false;
   status(ok ? (implicit ? `${name} started; it is in {{name}} now` : `${name} sent`) : (state.actionError || `${name} failed`), { error: !ok, done: ok });
   return ok;
 }
@@ -2202,7 +2202,7 @@ function renderExploreActions() {
     guidance.value = state.guidance[key] || "";
   }
   document.getElementById("explore-act-head").replaceChildren(
-    h("a", { href: candidateURL(c), target: "_blank", rel: "noopener noreferrer", "data-focus": "explore:gh" }, refLabel(c.ref)), " ", c.title);
+    h("a", { href: candidateURL(c), target: "_blank", rel: "noopener noreferrer", "data-focus": "explore:gh" }, labelOf(c)), " ", c.title);
   document.getElementById("explore-act-buttons").replaceChildren(
     ...actionButtons(c, "explore", { scope: "explore", run: (id) => actOnCandidate(c, id, { guidance: guidance.value.trim() }) }),
     row ? h("button", { type: "button", class: "act", disabled: state.busy.has(key), "data-focus": "explore:detail", onclick: () => writeHash({ pr: key }) }, "Detail") : null);

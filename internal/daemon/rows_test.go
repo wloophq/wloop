@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
@@ -63,8 +65,8 @@ func newFixture(t *testing.T) *fixture {
 	cfg.GitHub.AddressSkipReviewers = []string{"skipper"}
 	f := &fixture{t: t, st: st, db: stDB, now: fixtureNow}
 	f.s = New(withStore(Deps{Cfg: cfg, Activity: stDB, Version: "test", Now: f.clock,
-		Viewer: func(context.Context) (string, []string, error) { return "fer", []string{"acme/search"}, nil },
-		Log:    func(string, ...any) {}}, st))
+		Identity: viewerIs("fer", "acme/search"),
+		Log:      func(string, ...any) {}}, st))
 	f.s.token = ""
 	stopOnCleanup(t, f.s)
 	return f
@@ -252,12 +254,12 @@ func TestViewerCachedForTTLAndStaleOnFailure(t *testing.T) {
 	f.open(12, "bob", fixtureNow.Add(-time.Hour), requests("fer"))
 	var calls int
 	var fail bool
-	f.s.deps.Viewer = func(context.Context) (string, []string, error) {
+	f.s.deps.Identity = func(context.Context) (src.Identity, error) {
 		calls++
 		if fail {
-			return "", nil, errors.New("github down")
+			return src.Identity{}, errors.New("github down")
 		}
-		return "fer", nil, nil
+		return identityOf("fer"), nil
 	}
 	needsMe := func() int { return len(f.rows("?view=needs-me")) }
 	if needsMe() != 1 || needsMe() != 1 || calls != 1 {
@@ -286,9 +288,9 @@ func TestViewerFailureAtStartupIsCachedBriefly(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
 	var calls int
-	f.s.deps.Viewer = func(context.Context) (string, []string, error) {
+	f.s.deps.Identity = func(context.Context) (src.Identity, error) {
 		calls++
-		return "", nil, errors.New("github down")
+		return src.Identity{}, errors.New("github down")
 	}
 	for range 2 {
 		if code := get(t, f.s, "/api/rows", nil); code != http.StatusInternalServerError {
@@ -716,9 +718,9 @@ func TestTeamChangeReachesRowsInsideTheViewerTTL(t *testing.T) {
 	setTeams("acme/search")
 	f := &fixture{t: t, st: st, db: stDB, now: fixtureNow}
 	f.s = New(withStore(Deps{Changes: log, Activity: stDB, Cfg: config.Defaults(), Version: "test", Now: f.clock,
-		Viewer: func(ctx context.Context) (string, []string, error) {
+		Identity: func(ctx context.Context) (src.Identity, error) {
 			teams, err := ghsource.MyTeams(ctx, st)
-			return "fer", teams, err
+			return identityOf("fer", teams...), err
 		},
 		Log: func(string, ...any) {}}, st))
 	f.s.token = ""

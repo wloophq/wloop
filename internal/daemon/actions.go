@@ -984,7 +984,7 @@ func (s *Server) updateOverrideLocked(ctx context.Context, u unit.Unit, change f
 const overrideAttempts = 5
 
 func (s *Server) recordEvent(ctx context.Context, u unit.Unit, kind, data string) error {
-	return s.deps.Events.RecordEvent(ctx, dinv.Event{PR: refOf(u), Kind: kind, At: s.deps.Now(), Data: data})
+	return s.deps.Events.RecordEvent(ctx, port.Event{Unit: u, Kind: kind, At: s.deps.Now(), Data: data})
 }
 
 // prepareNudge refuses when nobody but the user is to be asked, or the

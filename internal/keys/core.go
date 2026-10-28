@@ -71,7 +71,6 @@ func core() []Binding {
 		{"i", "edit", List, terminalOnly},
 		{"o", "open-source", List, everySurface},
 		{"n", "capture", Global, screens},
-		{"g g", "nav:github", Global, screens},
 		{"/", "filter", Global, screens},
 		{"Cmd+K", "palette", Global, webOnly},
 		{"Ctrl+K", "palette", Global, terminalOnly},

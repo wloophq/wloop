@@ -14,7 +14,6 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/rowset"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/termfmt"
@@ -652,18 +651,18 @@ func (m *Model) restoreSelection() {
 	m.keepTaskSelection()
 }
 
-// jump turns a pasted pull request URL into the selection of its row, in
-// the first view that holds it.
+// jump turns a pasted web address into the selection of the row it links
+// to, or a page under it, in the first view that holds it.
 func (m *Model) jump() {
-	ref, err := pr.ParseURL(strings.TrimSpace(string(m.filter)))
-	if err != nil {
+	addr := strings.TrimSpace(string(m.filter))
+	if !strings.HasPrefix(addr, "https://") && !strings.HasPrefix(addr, "http://") {
 		m.restoreSelection()
 		return
 	}
 	m.filter = nil
 	for i, v := range m.views {
 		for _, r := range m.in(v.ID) {
-			if strings.EqualFold(r.Label, ref.String()) {
+			if links(r.Link, addr) {
 				m.view, m.sel = i, r.Unit
 				m.keepSelection()
 				return
@@ -675,7 +674,15 @@ func (m *Model) jump() {
 	for i, v := range m.views {
 		labels[i] = v.Label
 	}
-	m.status = ref.String() + " is not in " + orList(labels) + "; " + brand.Command + " open " + ref.URL() + " shows it"
+	m.status = addr + " is not in " + orList(labels) + "; " + brand.Command + " open " + addr + " shows it"
+}
+
+// links says whether addr is link or a page under it.
+func links(link, addr string) bool {
+	if link == "" || len(addr) < len(link) || !strings.EqualFold(addr[:len(link)], link) {
+		return false
+	}
+	return len(addr) == len(link) || strings.ContainsRune("/?#", rune(addr[len(link)]))
 }
 
 func (m *Model) send(c Command) (Command, bool) {

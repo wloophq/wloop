@@ -266,11 +266,24 @@ func (p *Provider) loadIntakes(ctx context.Context, ins map[unit.Unit]*input, re
 		in.intakes = byUnit[in.pr.Ref.Unit()]
 		if len(in.intakes) > 0 && p.src.Intake != nil {
 			rec, found := recs[in.pr.Ref]
-			w := p.src.Intake(in.intakes[0], rec, found, p.attemptOf(in.pr, rec))
+			w := p.src.Intake(in.intakes[0], BriefState(rec, found), p.attemptOf(in.pr, rec))
 			in.intake = &w
 		}
 	}
 	return nil
+}
+
+// BriefState is what an intake shows of the brief record rec, found false
+// for none.
+func BriefState(rec dinv.BriefRecord, found bool) intake.BriefState {
+	if !found {
+		return intake.BriefState{}
+	}
+	b := intake.BriefState{Found: true, Failures: rec.Failures, GaveUp: !rec.GaveUpAt.IsZero(), RetryAt: rec.RetryAt}
+	if rec.LastRun != 0 && rec.LastRun != rec.Run {
+		b.LastError = rec.Error
+	}
+	return b
 }
 
 // attemptOf is the brief attempt an intake of pr waits on.
@@ -312,7 +325,7 @@ func (p *Provider) Derive(base readmodel.Base, in any, at time.Time) (api.Row, e
 // DeriverAt is the deriver of a request: base and the settings, at the
 // minute at, with no turn and no intake of any pull request.
 func DeriverAt(base readmodel.Base, set readmodel.RowSettings, briefOn bool, at time.Time) Deriver {
-	return Deriver{Viewer: base.Viewers[unit.GitHub], Teams: base.Teams, Ignore: IgnoreOf(set.Cfg), Now: at, Stalled: set.Cfg.GitHub.Stalled,
+	return Deriver{Viewer: base.Viewers[unit.GitHub], Teams: base.Teams[unit.GitHub], Ignore: IgnoreOf(set.Cfg), Now: at, Stalled: set.Cfg.GitHub.Stalled,
 		Pending: base.Pending, Loaded: set.Loaded, Specs: base.Specs, Cfg: set.Cfg, GateOn: set.GateOn, BriefOn: briefOn,
 		Forceable: set.Forceable, SpecsVersion: cmp.Or(base.SpecsVersion, catalog.VersionOf(set.Loaded)), Asked: base.Asked}
 }

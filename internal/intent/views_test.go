@@ -205,12 +205,11 @@ func TestAGatedVerbNamesItsGate(t *testing.T) {
 }
 
 func TestAViewsKeyComesFromTheProfile(t *testing.T) {
-	got, problems := loadListsWith(t, string(defaultLists()), "[views.waiting]\nkey = \"g x\"\n\n[views.someday]\nkey = \"g g\"\n\n[views.logbook]\nkey = \"l\"\n\n[views.focus]\nkey = \"g p\"\n")
+	got, problems := loadListsWith(t, string(defaultLists()), "[views.waiting]\nkey = \"g x\"\n\n[views.logbook]\nkey = \"l\"\n\n[views.focus]\nkey = \"g p\"\n")
 	if got.Keys["waiting"] != "g x" || got.Keys["inbox"] != "g i" || got.Keys["someday"] != "" || got.Keys["logbook"] != "" {
 		t.Errorf("keys %v", got.Keys)
 	}
 	for _, want := range []string{
-		"views.someday.key: g g is the core key of nav:github",
 		"views.logbook.key: l is not a chord",
 		"views.focus.key: g p is the key of views.projects too",
 	} {

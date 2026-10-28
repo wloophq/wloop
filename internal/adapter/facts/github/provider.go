@@ -63,7 +63,7 @@ type RoundState interface {
 // Deps are what the provider reads. Changes, Teams, Agents and Intents may be
 // nil: without Changes every call reads the store again.
 type Deps struct {
-	Inputs   sweep.Inputs
+	Inputs   dinv.PlanInputs
 	Store    Store
 	Snapshot sweep.Snapshot
 	Books    sweep.Books
@@ -85,7 +85,7 @@ type Deps struct {
 type Candidate struct {
 	Round        string
 	Workspace    wsdomain.Workspace
-	Facts        sweep.Facts
+	Facts        dinv.PlanFacts
 	Fingerprint  string
 	ChecksHead   string
 	ConflictHead string
@@ -124,7 +124,7 @@ func New(d Deps) *Provider {
 var errNotGitHub = errors.New("not a pull request")
 
 func refOf(u unit.Unit) (pr.Ref, error) {
-	ref, ok := port.PROf(port.Event{Unit: u})
+	ref, ok := pr.RefOf(u)
 	if !ok {
 		return pr.Ref{}, fmt.Errorf("%s: %w", u.Label(), errNotGitHub)
 	}

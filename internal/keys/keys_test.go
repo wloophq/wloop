@@ -42,7 +42,6 @@ func spec92() []row {
 		{"i", "edit", List, []Surface{TUI}},
 		{"o", "open-source", List, all},
 		{"n", "capture", Global, screen},
-		{"g g", "nav:github", Global, screen},
 		{"/", "filter", Global, screen},
 		{"Cmd+K", "palette", Global, []Surface{Web}},
 		{"Ctrl+K", "palette", Global, []Surface{TUI}},
@@ -126,7 +125,7 @@ func TestCanonical(t *testing.T) {
 
 func TestReservedPerSurface(t *testing.T) {
 	r := Reserved(TUI)
-	for _, k := range []string{"q", "Tab", "Ctrl+C", "Ctrl+K", "g", "g g", "Enter", "Esc", "Backspace", "/", "?", "[", "]", "Shift+1", "Shift+9"} {
+	for _, k := range []string{"q", "Tab", "Ctrl+C", "Ctrl+K", "g", "Enter", "Esc", "Backspace", "/", "?", "[", "]", "Shift+1", "Shift+9"} {
 		if !r[k] {
 			t.Errorf("tui: %q is not reserved", k)
 		}
@@ -234,14 +233,14 @@ func TestViewKeysComeFromTheCatalog(t *testing.T) {
 		t.Fatalf("Views = %v, want %v", got, want)
 	}
 	for _, b := range Core {
-		if strings.HasPrefix(b.Action, "nav:") && b.Key != "g g" && b.Action != "nav:cycle" {
+		if strings.HasPrefix(b.Action, "nav:") && b.Action != "nav:cycle" {
 			t.Errorf("core binds %s to %s: a view's key comes from the catalog", b.Key, b.Action)
 		}
 	}
 }
 
 func TestCheckViewRefusesAKeyThatIsNoFreeChord(t *testing.T) {
-	for _, k := range []string{"g m", "g 1", "g I"} {
+	for _, k := range []string{"g m", "g 1", "g I", "g g"} {
 		if err := CheckView(k); err != nil {
 			t.Errorf("CheckView(%q) = %v", k, err)
 		}
@@ -250,7 +249,6 @@ func TestCheckViewRefusesAKeyThatIsNoFreeChord(t *testing.T) {
 		"m":     "is not a chord",
 		"G":     "is not a chord",
 		"h x":   "is not a chord",
-		"g g":   "is the core key of nav:github",
 		"g":     "is not a chord",
 		"Cmd+K": "is not a chord",
 		"g ??":  "is not a key",

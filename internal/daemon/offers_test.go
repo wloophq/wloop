@@ -107,9 +107,9 @@ func newCatalogRig(t *testing.T) catalogRig {
 	ts := &turns.Service{Store: repo, Registry: repo, Sessions: sessions, Intents: turnstest.Intents(), Launcher: noLaunch{}, Clock: clockFunc(func() time.Time { return catalogNow })}
 	inbox := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: db.Tasks(), Items: itemsNone{}, Facts: enabledUnits{map[unit.ProviderID]bool{}}, Clock: fixedClock(catalogNow)})
 	d := withStore(Deps{Pauses: sqlite.NewRounds(db), Activity: db, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return catalogNow },
-		Viewer:  func(context.Context) (string, []string, error) { return "me", nil, nil },
-		Log:     func(string, ...any) {},
-		Actions: &fakeActions{}, Intakes: db.Intakes(), IntakeBriefs: intaketest.NewBriefs(waitBriefing),
+		Identity: viewerIs("me"),
+		Log:      func(string, ...any) {},
+		Actions:  &fakeActions{}, Intakes: db.Intakes(), IntakeBriefs: intaketest.NewBriefs(waitBriefing),
 		Turns:    ts,
 		Messages: &messages.Service{Store: inventory.NewMessages(db), Books: repo, Turns: ts, Tasks: inbox, Intents: turnstest.Intents(), Clock: fixedClock(catalogNow)},
 		Sessions: sessions,

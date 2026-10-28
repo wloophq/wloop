@@ -19,9 +19,9 @@ func TestExplorePrintsCandidatesThroughTheDaemon(t *testing.T) {
 		"POST /api/explore": api.ExploreResult{Query: "is:pr is:open repo:acme/api", Read: `read "acme/api" as repo:acme/api`, Total: 2, Cost: 1,
 			RateLimit: api.RateLimit{Remaining: 4900, Limit: 5000},
 			Candidates: []api.Candidate{
-				{Ref: pr.Ref(r7), Title: "Batch export", Author: "ana", Additions: 120, Deletions: 4, ChangedFiles: 3,
+				{Unit: r7.Unit(), Label: r7.String(), Title: "Batch export", Author: "ana", Additions: 120, Deletions: 4, ChangedFiles: 3,
 					ReviewDecision: "REVIEW_REQUIRED", ChecksState: "SUCCESS", UpdatedAt: testNow.Add(-2 * time.Hour)},
-				{Ref: pr.Ref{Owner: "acme", Repo: "api", Number: 9}, Title: "Cache", Author: "zoe", IsDraft: true, ChangedFiles: 1,
+				{Unit: pr.Ref{Owner: "acme", Repo: "api", Number: 9}.Unit(), Label: "acme/api#9", Title: "Cache", Author: "zoe", IsDraft: true, ChangedFiles: 1,
 					UpdatedAt: testNow.Add(-3 * time.Hour)},
 			}},
 	})

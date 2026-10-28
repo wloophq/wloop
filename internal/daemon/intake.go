@@ -580,10 +580,11 @@ func (s *Server) intentOf(ctx context.Context, action string, row api.Row) (turn
 	if action != "run_now" {
 		return turn.Intent(action), nil
 	}
-	login, _, err := s.viewerInfo(ctx)
+	id, err := s.viewerInfo(ctx)
 	if err != nil {
 		return "", err
 	}
+	login := s.login(id)
 	p, _ := prrow.PayloadOf(row)
 	mine := login != "" && strings.EqualFold(p.Author, login)
 	name, err := catalog.RunNowIntent(s.loaded().Registry, p.Workspace, p.Override, mine)
@@ -781,7 +782,7 @@ func (s *Server) wireIntake(ctx context.Context, i intake.Intake, after int, wit
 		rec, found, err = s.deps.Records.BriefRecord(ctx, i.Unit)
 		found = found && err == nil
 	}
-	w := s.intakeView(i, rec, found, s.deps.Now(), func() (int, error) { return s.deps.BriefViews.Attempt(ctx, refOf(i.Unit)) })
+	w := s.intakeView(i, prrow.BriefState(rec, found), s.deps.Now(), func() (int, error) { return s.deps.BriefViews.Attempt(ctx, refOf(i.Unit)) })
 	if withLog {
 		w.Log = slices.Clone(i.Log[min(max(after, 0), len(i.Log)):])
 	}
@@ -791,26 +792,24 @@ func (s *Server) wireIntake(ctx context.Context, i intake.Intake, after int, wit
 // briefing tells an intake whose brief attempt and retry show.
 func briefing(i intake.Intake) bool { return i.State.Open() && i.State != intake.Starting }
 
-// intakeView is the wire intake without its log, from the pull request's
-// brief record as of now; attempt asks the brief queue.
-func (s *Server) intakeView(i intake.Intake, rec dinv.BriefRecord, found bool, now time.Time, attempt func() (int, error)) api.Intake {
+// intakeView is the wire intake without its log, from its unit's brief as
+// of now; attempt asks the brief queue.
+func (s *Server) intakeView(i intake.Intake, b intake.BriefState, now time.Time, attempt func() (int, error)) api.Intake {
 	w := api.Intake{Seq: i.Seq, PR: refOf(i.Unit).URL(), Intent: string(i.Intent), Source: i.Source, State: string(i.State), Brief: i.Brief, Note: i.Note, Error: i.Error, LogLen: len(i.Log)}
 	if !briefing(i) || s.deps.Records == nil {
 		return w
 	}
 	w.Attempt = 1
-	if found && rec.GaveUpAt.IsZero() {
-		w.Attempt = rec.Failures + 1
+	if b.Found && !b.GaveUp {
+		w.Attempt = b.Failures + 1
 		if s.deps.BriefViews != nil {
 			if n, err := attempt(); err == nil {
 				w.Attempt = n
 			}
 		}
-		if rec.LastRun != 0 && rec.LastRun != rec.Run {
-			w.LastError = rec.Error
-		}
-		if rec.RetryAt.After(now) {
-			w.Next = rec.RetryAt
+		w.LastError = b.LastError
+		if b.RetryAt.After(now) {
+			w.Next = b.RetryAt
 		}
 	}
 	return w

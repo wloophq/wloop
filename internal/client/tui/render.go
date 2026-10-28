@@ -4,13 +4,11 @@ import (
 	"cmp"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
@@ -286,20 +284,21 @@ func (m *Model) list(rows []api.Row, cur, width, height int, now time.Time) []st
 }
 
 // shortRef is a unit's label within w cells: a label of the form
-// owner/repo#n loses the owner when it does not fit, then has the
-// repository cut, never the number; any other label is cut at its end.
+// <scope>/<name>#<n> loses its scope when it does not fit, then has the
+// name cut, never the #<n>; any other label is cut at its end.
 func shortRef(label string, w int) string {
 	label = termfmt.Clean(label)
 	if termfmt.Cells(label) <= w {
 		return label
 	}
-	ref, err := pr.ParseKey(label)
-	if err != nil {
+	hash := strings.LastIndex(label, "#")
+	slash := strings.LastIndex(label[:max(hash, 0)], "/")
+	if hash < 0 || slash <= 0 || slash+1 == hash || !digits(label[hash+1:]) || strings.ContainsAny(label, " \t") {
 		return termfmt.Cut(label, w)
 	}
-	num := "#" + strconv.Itoa(ref.Number)
+	num := label[hash:]
 	if room := w - termfmt.Cells(num); room >= 2 {
-		return termfmt.Cut(ref.Repo, room) + num
+		return termfmt.Cut(label[slash+1:hash], room) + num
 	}
 	return termfmt.Cut(num, w)
 }
@@ -646,4 +645,8 @@ func (m *Model) help() string {
 		parts = append(parts, h.String())
 	}
 	return strings.Join(parts, "  ")
+}
+
+func digits(s string) bool {
+	return s != "" && strings.Trim(s, "0123456789") == ""
 }

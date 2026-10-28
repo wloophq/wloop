@@ -17,7 +17,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/round"
@@ -139,7 +138,7 @@ func reportedProvider(t *testing.T, r *reports, b *books, s sessions, m mutes, o
 		Viewer: func(context.Context) items.Person { return items.Person{Key: "acme:me", Name: "Me"} },
 		RowDeps: readmodel.RowDeps{Books: b, Sessions: s,
 			Intakes: func(context.Context) ([]intake.Intake, error) { return open, nil },
-			Intake: func(i intake.Intake, _ dinv.BriefRecord, _ bool, _ func() (int, error)) api.Intake {
+			Intake: func(i intake.Intake, _ intake.BriefState, _ func() (int, error)) api.Intake {
 				return api.Intake{Seq: i.Seq, State: api.IntakeBriefing}
 			},
 			Settings: func() readmodel.RowSettings { return readmodel.RowSettings{Loaded: l} }}})

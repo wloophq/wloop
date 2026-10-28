@@ -317,9 +317,9 @@ func (s *Server) handleTimings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	login, teams, err := s.viewerInfo(r.Context())
+	id, err := s.viewerInfo(r.Context())
 	if err != nil {
 		s.logf("timings: viewer: %v", err)
 	}
-	writeJSON(w, timings(d, since, s.deps.Now(), me{login: login, teams: teams}, reportsOf(s.loaded().Registry)))
+	writeJSON(w, timings(d, since, s.deps.Now(), me{login: s.login(id), teams: id.Teams}, reportsOf(s.loaded().Registry)))
 }

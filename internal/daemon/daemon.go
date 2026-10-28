@@ -24,6 +24,8 @@ import (
 	"syscall"
 	"time"
 
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+
 	dmessage "github.com/wloophq/wloop/internal/domain/message"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -50,7 +52,6 @@ import (
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/procgroup"
 	"github.com/wloophq/wloop/internal/readmodel"
-	"github.com/wloophq/wloop/internal/readmodel/prrow"
 )
 
 // ShutdownGrace is how long the daemon waits for open requests to finish when
@@ -137,7 +138,6 @@ type Deps struct {
 	RowProviders []func(readmodel.RowDeps) readmodel.Provider
 	// The inventory, one field per role; a nil role answers as a daemon
 	// with no store does.
-	Rows      prrow.Store
 	PRs       PullRequests
 	Events    EventLog
 	Overrides Overrides
@@ -188,7 +188,7 @@ type Deps struct {
 	// Retain drops the store's rows past their retention and says what it
 	// dropped; nil registers no retain job.
 	Retain func(ctx context.Context) (summary string, err error)
-	// Budget is the GitHub client's budget; nil reads as unknown.
+	// Budget is the forge's budget; nil reads as unknown.
 	Budget Budget
 	// Turns, Sessions and Views are the turn and view use cases and the
 	// sessions turns are typed into; nil answers 503 from the routes that
@@ -230,9 +230,11 @@ type Deps struct {
 	LoopMu *lock.Mutex
 	// App is the menu bar's status, shared across restarts of the server
 	// like LoopMu; nil makes one.
-	App    *AppState
-	Cfg    config.Config
-	Viewer func(ctx context.Context) (login string, teams []string, err error)
+	App *AppState
+	Cfg config.Config
+	// Identity is who the viewer is in the forge, as its plugin's
+	// Presenter.Identity says; nil knows nobody.
+	Identity func(ctx context.Context) (src.Identity, error)
 	// Forge is the plugin of the pull requests the daemon's viewer,
 	// explorer, intakes and budget serve.
 	Forge    unit.ProviderID
@@ -329,10 +331,12 @@ type Placer interface {
 	SessionPlace(ctx context.Context, u unit.Unit) (string, error)
 }
 
-// Budget is the GitHub budget as the client keeps it.
+// Budget is the forge's rate-limited budget.
 type Budget interface {
-	Allow(p dgh.Priority) bool
-	Budget() map[dgh.Resource]dgh.Limit
+	// Low says the budget refuses background reads.
+	Low() bool
+	// RateLimit is the budget as a client shows it.
+	RateLimit() api.RateLimit
 }
 
 // background tags a job's GitHub reads below the user's reserve.

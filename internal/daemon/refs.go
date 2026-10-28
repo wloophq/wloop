@@ -6,7 +6,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/intake"
-	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
@@ -14,7 +13,7 @@ import (
 
 // refOf is the pull request of a github unit, the zero reference for any other.
 func refOf(u unit.Unit) pr.Ref {
-	ref, _ := port.PROf(port.Event{Unit: u})
+	ref, _ := pr.RefOf(u)
 	return ref
 }
 
@@ -26,12 +25,12 @@ func (s *Server) can(p unit.ProviderID, c string) bool { return api.PluginCan(s.
 func (s *Server) sameUnit(a, b unit.Unit) bool { return s.deps.Units.Same(a, b) }
 
 func isPullRequest(u unit.Unit) bool {
-	_, ok := port.PROf(port.Event{Unit: u})
+	_, ok := pr.RefOf(u)
 	return ok
 }
 
 func removeDoneResult() api.RemoveDoneResult {
-	return api.RemoveDoneResult{Removed: []pr.Ref{}, Kept: []api.Kept{}}
+	return api.RemoveDoneResult{Removed: []api.Named{}, Kept: []api.Kept{}}
 }
 
 func refIntakes(ref pr.Ref, is []intake.Intake) map[pr.Ref][]intake.Intake {
@@ -65,3 +64,6 @@ func parsePRURL(raw string) (unit.Unit, error) {
 	}
 	return ref.Unit(), nil
 }
+
+// named is u with its label.
+func named(u unit.Unit) api.Named { return api.Named{Unit: u, Label: u.Label()} }

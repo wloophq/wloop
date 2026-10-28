@@ -35,7 +35,7 @@ func Module(cfg config.Config, d sourcereg.Deps) (sourcereg.Module, error) {
 			return prrow.New(prrow.Source{RowDeps: rd, Store: d.Inventory, Briefs: briefs})
 		}),
 		Track: func(ctx context.Context, u unit.Unit) (port.TrackRead, error) {
-			ref, ok := port.PROf(port.Event{Unit: u})
+			ref, ok := pr.RefOf(u)
 			if !ok {
 				return port.TrackRead{}, fmt.Errorf("%w: %s is not a pull request", port.ErrNotFound, u.Label())
 			}

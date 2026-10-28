@@ -323,7 +323,7 @@ func (s *Server) handleDoctor(w http.ResponseWriter, r *http.Request) {
 		rep.Checks = append(rep.Checks, reconcileChecks(*rec, err)...)
 	}
 	rep.Checks = append(append([]api.DoctorCheck{}, rep.Checks...), loadChecks(s.deps.Meter, s.deps.Now())...)
-	if s.deps.Rows != nil {
+	if len(s.deps.RowProviders) > 0 {
 		rep.Checks = append(rep.Checks, s.readModelCheck(r.Context()))
 	}
 	writeJSON(w, rep)
@@ -363,7 +363,7 @@ func (s *Server) handleTurnShow(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "no turn of "+u.Label())
 		return
 	}
-	out := api.TurnBook{PR: refOf(u), Turns: make([]api.TurnShown, 0, len(b.Turns))}
+	out := api.TurnBook{Unit: named(u), Turns: make([]api.TurnShown, 0, len(b.Turns))}
 	for _, t := range b.Turns {
 		shown := api.TurnShown{Turn: t, Records: []turn.Record{}, Answers: []turn.Answer{}}
 		if s.deps.Records != nil {

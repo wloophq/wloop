@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
@@ -231,7 +233,7 @@ func TestExploreKeepsTheBudgetItSpent(t *testing.T) {
 			sent++
 			return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body)), Request: r}, nil
 		})})
-	s := newServerWith(t, func(d *Deps) { d.Explorer, d.Budget = gh, gh })
+	s := newServerWith(t, func(d *Deps) { d.Explorer, d.Budget = gh, ghsource.Budget{Limiter: gh} })
 	if code, _, body := explorePost(t, s, "acme/api"); code != 200 {
 		t.Fatalf("%d %s", code, body)
 	}
@@ -395,8 +397,8 @@ func TestExploreFindsAnAuthorSearchHidesInTheKnownRepositories(t *testing.T) {
 	if searches <= github.SearchesPerRequest || fe.batches != requests {
 		t.Fatalf("the %d fallback searches ran in %d requests, want %d", searches, fe.batches, requests)
 	}
-	if len(res.Candidates) != 30 || res.Total != 60 || res.Cost != 1+requests || res.Candidates[0].Ref.Repo != "repository-00" {
-		t.Fatalf("%d candidates of %d, cost %d, first %v", len(res.Candidates), res.Total, res.Cost, res.Candidates[0].Ref)
+	if len(res.Candidates) != 30 || res.Total != 60 || res.Cost != 1+requests || !strings.HasPrefix(res.Candidates[0].Label, "acme-labs/repository-00#") {
+		t.Fatalf("%d candidates of %d, cost %d, first %v", len(res.Candidates), res.Total, res.Cost, res.Candidates[0].Label)
 	}
 	want := fmt.Sprintf(`read "@ivanova" as author:ivanova; GitHub search cannot see ivanova without a repository; searched the 21 repositories `+brand.Name+` knows in %d searches`, searches)
 	if res.Read != want || res.Empty != "" {
@@ -404,8 +406,8 @@ func TestExploreFindsAnAuthorSearchHidesInTheKnownRepositories(t *testing.T) {
 	}
 
 	fe.queries = nil
-	if _, res, _ := explorePost(t, s, "@ivanova sort:updated-desc"); res.Candidates[0].Ref.Repo != "repository-19" || !strings.HasSuffix(fe.queries[1], " sort:updated-desc|30") {
-		t.Fatalf("the merge does not follow the sort asked: first %v, searches %v", res.Candidates[0].Ref, fe.queries)
+	if _, res, _ := explorePost(t, s, "@ivanova sort:updated-desc"); !strings.HasPrefix(res.Candidates[0].Label, "acme-labs/repository-19#") || !strings.HasSuffix(fe.queries[1], " sort:updated-desc|30") {
+		t.Fatalf("the merge does not follow the sort asked: first %v, searches %v", res.Candidates[0].Label, fe.queries)
 	}
 
 	fe.queries, fe.pages = nil, func(string) dgh.CandidatePage { return dgh.CandidatePage{} }
@@ -449,7 +451,7 @@ func TestExploreKeepsTheSearchesThatDidNotFailAlone(t *testing.T) {
 		return nil
 	}
 	code, res, body := explorePost(t, s, "@ivanova")
-	if code != 200 || len(res.Candidates) == 0 || slices.ContainsFunc(res.Candidates, func(c api.Candidate) bool { return c.Ref.Repo == "repository-00" }) {
+	if code != 200 || len(res.Candidates) == 0 || slices.ContainsFunc(res.Candidates, func(c api.Candidate) bool { return strings.HasPrefix(c.Label, "acme-labs/repository-00#") }) {
 		t.Fatalf("%d %s", code, body)
 	}
 	if !strings.Contains(res.Read, "; 1 of the ") || !strings.HasSuffix(res.Read, " failed: the listed repositories cannot be searched") {

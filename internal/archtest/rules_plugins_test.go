@@ -17,7 +17,6 @@ var pluginRoots = map[string][]string{
 		"internal/domain/github",
 		"internal/domain/pr",
 		"internal/domain/inventory",
-		"internal/domain/change",
 		"internal/github",
 	},
 	"slack": {
@@ -35,6 +34,8 @@ var coreRoots = []string{
 	"internal/api",
 	"internal/web",
 	"internal/client",
+	"internal/catalog",
+	"internal/keys",
 }
 
 // pluginOf is the plugin a package belongs to, "" for none.
@@ -60,17 +61,7 @@ type debt struct {
 	from, to, reason string
 }
 
-var pluginDebt = []debt{
-	{"internal/api", "internal/domain/pr", "debt: the reconcile report, the turn book, events, explore candidates and remove-done results carry a pr.Ref where the API should carry a unit.Unit"},
-	{"internal/api/client", "internal/domain/pr", "debt: TurnBook and Facts take a pr.Ref, following the API"},
-	{"internal/client/tui", "internal/domain/pr", "debt: the filter jumps to a pasted pull request URL with pr.ParseURL, and shortRef shortens an owner/repo#n label with pr.ParseKey; a client parses what the daemon should resolve"},
-	{"internal/client/turncli", "internal/domain/pr", "debt: unitArg parses a pull request URL argument with pr.ParseURL; a client parses what the daemon should resolve"},
-	{"internal/core/port", "internal/domain/pr", "debt: PROf reads a pull request from a github event"},
-	{"internal/core/sweep", "internal/domain/inventory", "debt: the Inputs port returns the stored pull request rows as inventory.PR"},
-	{"internal/core/sweep", "internal/domain/pr", "debt: the sweep's Facts embed pr.Facts"},
-	{"internal/core/usage", "internal/domain/pr", "debt: a Turn names its pull request as a pr.Ref"},
-	{"internal/readmodel", "internal/domain/inventory", "debt: the RowDeps.Intake hook takes an inventory.BriefRecord"},
-}
+var pluginDebt = []debt{}
 
 // ruleR16 flags an import of a plugin package by a core package, or by a
 // package of another plugin, counting test imports; a test import of a
@@ -122,9 +113,9 @@ func staleDebt(debts []debt, used map[int]bool) []string {
 	return out
 }
 
-// TestCoreImportsNoPlugin checks that the core imports no plugin, no plugin
-// imports another, and `pluginDebt` only shrinks.
-func TestCoreImportsNoPlugin(t *testing.T) {
+// TestCoreImportsNoPluginDomain checks that the core imports no plugin, no
+// plugin imports another, and `pluginDebt` only shrinks.
+func TestCoreImportsNoPluginDomain(t *testing.T) {
 	t.Parallel()
 	used := map[int]bool{}
 	cores, plugins := 0, 0
@@ -165,6 +156,8 @@ func TestR16FlagsAPlantedImport(t *testing.T) {
 	flagged(t, "a plugin imports the core", r16("internal/adapter/source/slack", []string{module + "internal/core/items", module + "internal/domain/unit"}, nil), 0, "")
 	flagged(t, "outside core and plugins", r16("internal/daemon", []string{slack, gh}, nil), 0, "")
 	flagged(t, "a core sibling of a plugin root", r16("internal/domain/prx", []string{slack}, nil), 1, "(R16)")
+	flagged(t, "the catalog imports the pull request domain", r16("internal/catalog", []string{module + "internal/domain/pr"}, nil), 1, "(R16)")
+	flagged(t, "the keys import the GitHub change domain", r16("internal/keys", []string{module + "internal/domain/github/change"}, nil), 1, "(R16)")
 }
 
 func TestR16ExemptsPluginTestFakes(t *testing.T) {

@@ -50,6 +50,11 @@ func CheckPluginKeys(id unit.ProviderID, ui *api.PluginUI) error {
 	if ui == nil {
 		return nil
 	}
+	if ui.Key != "" {
+		if err := keys.CheckView(ui.Key); err != nil {
+			return fmt.Errorf("%s: the key of its views: %w", id, err)
+		}
+	}
 	claimed := map[keys.Surface]map[string]string{}
 	toggles := map[string]string{}
 	for _, b := range builtinActions {

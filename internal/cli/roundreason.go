@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/config"
-	dchange "github.com/wloophq/wloop/internal/domain/change"
+	dchange "github.com/wloophq/wloop/internal/domain/github/change"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dpr "github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"

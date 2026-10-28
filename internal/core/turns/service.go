@@ -169,11 +169,5 @@ func short(hash string) string {
 	return hash
 }
 
-// unitArg names a unit as the loop's commands read it: a pull request by its URL, any other unit as
-// <provider>:<key>.
-func unitArg(u unit.Unit) string {
-	if ref, ok := port.PROf(port.Event{Unit: u}); ok {
-		return ref.URL()
-	}
-	return u.String()
-}
+// unitArg names a unit as the loop's commands read it.
+func unitArg(u unit.Unit) string { return u.Address() }

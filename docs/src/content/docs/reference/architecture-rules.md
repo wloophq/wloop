@@ -16,7 +16,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestCockpitScriptsNameNoPlugin` | The cockpit's scripts quote no plugin's id. |
 | `TestContractSkeletonDeclared` | The shared names other packages build on still exist. |
 | `TestCoreImports` | The core imports only the standard library, the core, the domain and the meter, and nothing that reaches processes, the network or the database. |
-| `TestCoreImportsNoPlugin` | The core imports no plugin, no plugin imports another, and `pluginDebt` only shrinks. |
+| `TestCoreImportsNoPluginDomain` | The core imports no plugin, no plugin imports another, and `pluginDebt` only shrinks. |
 | `TestDaemonImports` | The daemon reaches adapters, GitHub and Orca only through ports. |
 | `TestDomainImports` | The domain imports no adapter, manager or `internal/github`. |
 | `TestDraftTextComesFromTheProfile` | No Go code outside its allowlist writes a draft's text from prose of its own: the Text of an outbox.Proposal or a draft.Draft is never a string constant, a format, or what a function of the same package builds from string literals. A draft's text comes from a profile template or from whoever wrote it. |
@@ -56,20 +56,6 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 ## Allowlists
 
 The entries a rule lets pass, each with its reason. An entry that matches nothing fails its rule, so these lists only shrink. Status is the entry's triage against the architecture rules: ✅ the exception holds; 🔧 it does not, and the fix is mechanical; 🧾 it does not, and the fix is a refactor.
-
-### `TestCoreImportsNoPlugin`
-
-| `pluginDebt` entry | Status | Reason |
-|---|---|---|
-| `internal/api` `internal/domain/pr` | 🧾 | the reconcile report, the turn book, events, explore candidates and remove-done results carry a pr.Ref where the API should carry a unit.Unit |
-| `internal/api/client` `internal/domain/pr` | 🧾 | TurnBook and Facts take a pr.Ref, following the API |
-| `internal/client/tui` `internal/domain/pr` | 🧾 | the filter jumps to a pasted pull request URL with pr.ParseURL, and shortRef shortens an owner/repo#n label with pr.ParseKey; a client parses what the daemon should resolve |
-| `internal/client/turncli` `internal/domain/pr` | 🧾 | unitArg parses a pull request URL argument with pr.ParseURL; a client parses what the daemon should resolve |
-| `internal/core/port` `internal/domain/pr` | 🧾 | PROf reads a pull request from a github event |
-| `internal/core/sweep` `internal/domain/inventory` | 🧾 | the Inputs port returns the stored pull request rows as inventory.PR |
-| `internal/core/sweep` `internal/domain/pr` | 🧾 | the sweep's Facts embed pr.Facts |
-| `internal/core/usage` `internal/domain/pr` | 🧾 | a Turn names its pull request as a pr.Ref |
-| `internal/readmodel` `internal/domain/inventory` | 🧾 | the RowDeps.Intake hook takes an inventory.BriefRecord |
 
 ### `TestDraftTextComesFromTheProfile`
 
@@ -121,19 +107,16 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 
 | `pluginIdentityAllowlist` entry | Status | Reason |
 |---|---|---|
-| `internal/adapter/facts/session/facts.go` `repoOf` `port.PROf` `1` | 🧾 | a session's facts read its linked pull request |
-| `internal/adapter/store/inventory/byunit.go` `unitRef` `port.PROf` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
+| `internal/adapter/facts/session/facts.go` `repoOf` `pr.RefOf` `1` | 🧾 | a session's facts read its linked pull request |
+| `internal/adapter/store/inventory/byunit.go` `unitRef` `pr.RefOf` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/brief/github_source.go` `GitHubSource.ref` `pr.RefOf` `1` | 🧾 | the brief queue builds GitHub's brief source and its units outside the plugin |
 | `internal/brief/queue.go` `Queue.intent` `pr.Codec{}.Provider` `1` | 🧾 | the brief queue builds GitHub's brief intent outside the plugin |
 | `internal/brief/queue.go` `Queue.source` `pr.Codec{}.Provider` `1` | 🧾 | the brief queue builds GitHub's brief source and its units outside the plugin |
 | `internal/brief/units.go` `refOf` `pr.RefOf` `1` | 🧾 | the brief queue builds GitHub's brief source and its units outside the plugin |
-| `internal/catalog/catalog.go` `withSource` `pr.Codec{}.Provider` `1` | 🧾 | the catalog's built-in actions name the GitHub plugin |
 | `internal/cli/launcher.go` `cliLauncher.Launch` `pr.RefOf` `1` | 🧾 | the launcher reads a pull request's workspace outside the plugin |
 | `internal/cli/launcher.go` `githubRef` `pr.Codec{}.Provider` `1` | 🧾 | the launcher reads a pull request's workspace outside the plugin |
 | `internal/cli/launcher.go` `isPR` `pr.RefOf` `1` | 🧾 | the launcher reads a pull request's workspace outside the plugin |
 | `internal/cli/serve_ended.go` `openPRBooks.Books` `pr.RefOf` `1` | 🧾 | the ended turns' books are pull requests |
-| `internal/core/port/port.go` `PROf` `pr.RefOf` `1` | 🧾 | the core's pull request event helper, tracked in pluginDebt |
-| `internal/core/turns/service.go` `unitArg` `port.PROf` `1` | 🧾 | a turn's URL is its pull request's |
 | `internal/daemon/actions.go` `Server.readAheadQueued` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
 | `internal/daemon/actions.go` `Server.runAction` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
 | `internal/daemon/api.go` `Server.handleRemoveDone` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
@@ -142,8 +125,8 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/daemon/briefs.go` `refsOf` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
 | `internal/daemon/headless.go` `Server.runHeadless` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
 | `internal/daemon/plan.go` `Server.actOnPlanItem` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
-| `internal/daemon/refs.go` `isPullRequest` `port.PROf` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
-| `internal/daemon/refs.go` `refOf` `port.PROf` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
+| `internal/daemon/refs.go` `isPullRequest` `pr.RefOf` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
+| `internal/daemon/refs.go` `refOf` `pr.RefOf` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
 | `internal/daemon/rows.go` `Server.detail` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
 | `internal/daemon/unitactions.go` `sourceFollowed` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
 | `internal/daemon/unitactions.go` `unitAction` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
@@ -214,7 +197,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/adapter/store/sqlite/retain.go` `retainWorkflowEventsSQL` `unit.Workspace` `1` | ✅ | the store keeps the workspaces the core keeps |
 | `internal/adapter/store/sqlite/slack.go` `slackProvider` `"slack"` `1` | ✅ | the store keeps the Slack plugin's tables |
 | `internal/adapter/store/sqlite/turns.go` `compareUnits` `unit.GitHub` `2` | 🧾 | pull requests sort by owner, repository and number |
-| `internal/adapter/store/sqlite/turns.go` `prOf` `unit.GitHub` `1` | 🧾 | a pull request's turns are keyed by owner, repository and number |
+| `internal/catalog/catalog.go` `withSource` `unit.GitHub` `1` | 🧾 | the catalog's built-in actions name the GitHub plugin |
 | `internal/cli/actions.go` `Env.fetchPR` `unit.GitHub` `1` | 🧾 | the GitHub viewer read outside the plugin |
 | `internal/cli/cli.go` `commands` `"slack"` `1` | ✅ | the slack command, the Slack plugin's own commands |
 | `internal/cli/facts.go` `inventoryFacts.MyReviews` `unit.GitHub` `1` | 🧾 | the GitHub viewer read outside the plugin |

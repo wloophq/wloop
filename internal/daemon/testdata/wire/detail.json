@@ -23,11 +23,6 @@
       "data": "",
       "key": "h2",
       "kind": "push",
-      "pr": {
-        "number": 7,
-        "owner": "acme",
-        "repo": "api"
-      },
       "unit": {
         "key": "acme/api#7",
         "provider": "github"
@@ -39,11 +34,6 @@
       "data": "",
       "key": "me",
       "kind": "review_requested",
-      "pr": {
-        "number": 7,
-        "owner": "acme",
-        "repo": "api"
-      },
       "unit": {
         "key": "acme/api#7",
         "provider": "github"

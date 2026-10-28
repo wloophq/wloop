@@ -19,7 +19,6 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/ingest"
 	"github.com/wloophq/wloop/internal/core/port"
-	"github.com/wloophq/wloop/internal/core/sweep"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -449,14 +448,14 @@ func (c *Collector) refreshOpen(ctx context.Context, resolved scope.Resolved, no
 
 // followedOpen are the stored open pull requests something follows: a scope
 // reason, a track, a workspace, or a review turn sent within
-// sweep.ReviewTurnsFollowed of now, as long as the sweep plans a follow-up on
+// dinv.ReviewTurnsFollowed of now, as long as the sweep plans a follow-up on
 // it.
 func (c *Collector) followedOpen(ctx context.Context, now time.Time) ([]dinv.PR, error) {
 	open, err := c.Store.ListPRs(ctx, true)
 	if err != nil {
 		return nil, err
 	}
-	reviewed, err := c.Store.Reviewed(ctx, now.Add(-sweep.ReviewTurnsFollowed))
+	reviewed, err := c.Store.Reviewed(ctx, now.Add(-dinv.ReviewTurnsFollowed))
 	if err != nil {
 		return nil, err
 	}

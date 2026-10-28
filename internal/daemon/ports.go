@@ -70,8 +70,8 @@ type PullRequests interface {
 // EventLog reads and records pull request events.
 type EventLog interface {
 	Events(ctx context.Context, u unit.Unit) ([]dinv.Event, error)
-	RecentActivity(ctx context.Context, limit int) ([]dinv.ActivityEvent, error)
-	RecordEvent(ctx context.Context, ev dinv.Event) error
+	RecentActivity(ctx context.Context, limit int) ([]port.Activity, error)
+	RecordEvent(ctx context.Context, ev port.Event) error
 	RecordSituations(ctx context.Context, sits []dinv.Situation) error
 }
 
@@ -95,12 +95,12 @@ type Metas interface {
 
 // Records reads what turns and briefs left behind.
 type Records interface {
-	Turn(ctx context.Context, id string) (dinv.StoredTurn, bool, error)
+	Turn(ctx context.Context, id string) (port.SentText, bool, error)
 	BriefRecord(ctx context.Context, u unit.Unit) (dinv.BriefRecord, bool, error)
 	BriefRun(ctx context.Context, id int64) (dinv.BriefRun, bool, error)
 	Timings(ctx context.Context, since time.Time) (dinv.TimingsData, error)
-	// UnitlessEvents are the events of no pull request, oldest first.
-	UnitlessEvents(ctx context.Context) ([]dinv.Event, error)
+	// UnitlessEvents are the events of no source's unit, oldest first.
+	UnitlessEvents(ctx context.Context) ([]port.Event, error)
 }
 
 // Collector rebuilds GitHub's scope and catches what the searches no longer

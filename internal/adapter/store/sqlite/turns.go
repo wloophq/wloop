@@ -86,16 +86,6 @@ var handleKeyedKinds = []string{
 	turns.KindSessionClosed, turns.KindTurnStopped, turns.KindStopBlocked, turns.KindMCPSeen, turns.KindSessionUnit,
 }
 
-// prOf is the pull request of a github unit, and the zero ref for a unit of
-// another provider.
-func prOf(u unit.Unit) pr.Ref {
-	if u.Provider != unit.GitHub {
-		return pr.Ref{}
-	}
-	ref, _ := pr.ParseKey(u.Key)
-	return ref
-}
-
 // StoredUnit is the unit an event of u, kind and key is stored under: u,
 // or the session unit of the key's handle for a handle-keyed kind with no
 // unit. Every writer of events applies it.

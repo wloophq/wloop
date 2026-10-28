@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	"github.com/wloophq/wloop/internal/github"
 
@@ -130,14 +132,6 @@ func briefHome(cfg config.Config) func(github.Ref) string {
 	}
 }
 
-func refsOfUnits(units []unit.Unit) []github.Ref {
-	out := make([]github.Ref, 0, len(units))
-	for _, u := range units {
-		out = append(out, prOf(u))
-	}
-	return out
-}
-
 // withoutGitHub is d with nothing of GitHub's when its plugin is disabled:
 // no brief queue, intakes, explorer, budget or viewer read.
 func withoutGitHub(d daemon.Deps) daemon.Deps {
@@ -145,7 +139,7 @@ func withoutGitHub(d daemon.Deps) daemon.Deps {
 		return d
 	}
 	d.Brief, d.BriefStatus, d.BriefViews, d.BriefsUnavailable = nil, nil, nil, ""
-	d.Intakes, d.IntakeBriefs, d.Explorer, d.Budget, d.Viewer = nil, nil, nil, nil, nil
+	d.Intakes, d.IntakeBriefs, d.Explorer, d.Budget, d.Identity = nil, nil, nil, nil, nil
 	return d
 }
 
@@ -160,28 +154,26 @@ func storedGitHubBudget(ctx context.Context, st *inventory.Store) ([]dgh.Limit, 
 	return ghsource.StoredBudget(ctx, st)
 }
 
-// githubTeams are the viewer's teams the GitHub source resolved.
-func githubTeams(ctx context.Context, st *inventory.Store) ([]string, error) {
-	return ghsource.MyTeams(ctx, st)
+func (e *Env) githubBudget() daemon.Budget { return ghsource.Budget{Limiter: e.GitHub} }
+
+// githubIdentity is the viewer as the GitHub plugin knows them.
+func (e *Env) githubIdentity(st *inventory.Store, logf func(string, ...any)) func(context.Context) (src.Identity, error) {
+	return ghsource.Identity(st, e.GitHub, logf)
 }
 
-// locators are the codec capabilities that know the unit a directory
-// holds, by provider.
-func (e *Env) locators() map[unit.ProviderID]unit.Locator {
-	return map[unit.ProviderID]unit.Locator{unit.GitHub: ghLocator{e}}
-}
+// githubLocator is the pull request of the checkout's branch, as gh reads it.
+type githubLocator struct{ e *Env }
 
-// ghLocator is the pull request of the checkout's branch, as gh reads it.
-type ghLocator struct{ e *Env }
-
-func (g ghLocator) UnitAt(ctx context.Context, dir string) (string, bool, error) {
+func (g githubLocator) Locate(ctx context.Context, dir string) (unit.Unit, bool, error) {
 	out, err := ghcli.RunIn(ctx, g.e.GH, dir, "pr", "view", "--json", "url", "--jq", ".url")
 	if err != nil {
-		return "", false, err
+		return unit.Unit{}, false, err
 	}
 	ref, err := pr.ParseURL(strings.TrimSpace(string(out)))
 	if err != nil {
-		return "", false, err
+		return unit.Unit{}, false, err
 	}
-	return ref.Unit().Key, true, nil
+	return ref.Unit(), true, nil
 }
+
+func (e *Env) githubLocators() []unit.Locator { return []unit.Locator{githubLocator{e}} }

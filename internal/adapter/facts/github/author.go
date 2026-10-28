@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	dchange "github.com/wloophq/wloop/internal/domain/change"
+	dchange "github.com/wloophq/wloop/internal/domain/github/change"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"

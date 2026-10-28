@@ -141,8 +141,8 @@ func TestPendingJoinsTheAgentSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []usage.Turn{
-		{Seq: b.Turns[0].Seq, PR: usageRef, Kind: "claude", AgentSession: "a1", Transcript: "/t/a1.jsonl", Home: "/h", Worktree: "/w", From: hours(-4), To: hours(-3)},
-		{Seq: b.Turns[1].Seq, PR: usageRef, Kind: "echo", From: hours(-2), To: hours(-1)},
+		{Seq: b.Turns[0].Seq, Unit: usageRef.Unit(), Kind: "claude", AgentSession: "a1", Transcript: "/t/a1.jsonl", Home: "/h", Worktree: "/w", From: hours(-4), To: hours(-3)},
+		{Seq: b.Turns[1].Seq, Unit: usageRef.Unit(), Kind: "echo", From: hours(-2), To: hours(-1)},
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("pending:\n%+v\nwant:\n%+v", got, want)

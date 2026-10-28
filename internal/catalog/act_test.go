@@ -45,7 +45,7 @@ func TestActOfferedWhateverTheRecommendedMode(t *testing.T) {
 	l := bundled(t)
 	thread := unit.Unit{Provider: "thread", Key: "1"}
 	for _, mode := range []string{"", "session", "headless"} {
-		mine := Facts{Intents: l, Ref: r7, Row: api.Row{Unit: r7.Unit()}, Mine: true, Open: true, Tracked: true, NudgeWho: []string{}, Recommended: mode}
+		mine := Facts{Intents: l, PR: r7, Owner: "acme", Repo: "api", Row: api.Row{Unit: r7}, Mine: true, Open: true, Tracked: true, NudgeWho: []string{}, Recommended: mode}
 		got := enabledDelegates(t, mine)
 		if !slices.Contains(got, string(dintent.Act)) || !slices.Contains(got, string(dintent.Address)) {
 			t.Errorf("recommended %q: delegates %v, want act beside address", mode, got)
@@ -66,9 +66,9 @@ func TestActOnAPullRequestNeedsItToBeYours(t *testing.T) {
 		f    Facts
 		want bool
 	}{
-		"someone else's": {Facts{Ref: r7, Row: api.Row{Unit: r7.Unit()}}, false},
-		"mine":           {Facts{Ref: r7, Row: api.Row{Unit: r7.Unit()}, Mine: true}, true},
-		"taken over":     {Facts{Ref: r7, Row: api.Row{Unit: r7.Unit()}, Override: api.Override{Adopted: true}}, true},
+		"someone else's": {Facts{PR: r7, Owner: "acme", Repo: "api", Row: api.Row{Unit: r7}}, false},
+		"mine":           {Facts{PR: r7, Owner: "acme", Repo: "api", Row: api.Row{Unit: r7}, Mine: true}, true},
+		"taken over":     {Facts{PR: r7, Owner: "acme", Repo: "api", Row: api.Row{Unit: r7}, Override: api.Override{Adopted: true}}, true},
 		"a thread":       {Facts{Row: api.Row{Unit: unit.Unit{Provider: "thread", Key: "1"}}}, true},
 	} {
 		c.f.Intents, c.f.Open, c.f.Tracked, c.f.NudgeWho = l, true, true, []string{}
@@ -86,7 +86,7 @@ func TestGitHubDelegateStaysWithReviewAndAddress(t *testing.T) {
 	specs := Specs(l)
 	act, _ := specByID(specs, string(dintent.Act))
 	for _, mine := range []bool{true} {
-		f := Facts{Intents: l, Ref: r7, Row: api.Row{Unit: r7.Unit()}, Open: true, Tracked: true, Mine: mine, NudgeWho: []string{}}
+		f := Facts{Intents: l, PR: r7, Owner: "acme", Repo: "api", Row: api.Row{Unit: r7}, Open: true, Tracked: true, Mine: mine, NudgeWho: []string{}}
 		got := enabledDelegates(t, f)
 		if len(got) < 2 || got[len(got)-1] != string(dintent.Act) {
 			t.Fatalf("mine %v: delegates %v, want review or address before act", mine, got)

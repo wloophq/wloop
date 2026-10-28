@@ -52,7 +52,7 @@ func (d Deriver) openIntakes(ref github.Ref) []catalog.Intake {
 // situation without the user's mute, which a nudge reads.
 func (d Deriver) FactsOf(pr dinv.PR, evs []dinv.Event, o dinv.Override, r api.Row, p Payload, unmuted api.Row) catalog.Facts {
 	f := catalog.Facts{
-		Ref: pr.Ref, Row: r, Author: p.Author, Workspace: p.Workspace, Override: p.Override, Tracked: true, Open: situation.Kind(r.Kind) != situation.KindDone, HeldByCap: situation.Kind(r.Kind) == situation.KindHeldByCap,
+		PR: pr.Ref.Unit(), Owner: pr.Ref.Owner, Repo: pr.Ref.Repo, Row: r, Author: p.Author, Workspace: p.Workspace, Override: p.Override, Tracked: true, Open: situation.Kind(r.Kind) != situation.KindDone, HeldByCap: situation.Kind(r.Kind) == situation.KindHeldByCap,
 		Mine:        d.Viewer != "" && strings.EqualFold(pr.Author, d.Viewer),
 		Muted:       o.MuteUntilStateChange || o.MutedUntil.After(d.Now),
 		MutedStored: o.MuteUntilStateChange || !o.MutedUntil.IsZero(),
@@ -96,7 +96,7 @@ func (d Deriver) UntrackedRow(c dgh.Candidate, o dinv.Override) api.Row {
 	if !open {
 		r.Kind, r.Summary.WaitsOn, r.Summary.Reason = api.Kind(situation.KindDone), "nobody", strings.ToLower(c.State)
 	}
-	f := catalog.Facts{Ref: c.Ref, Row: r, Author: p.Author, Workspace: p.Workspace, Override: p.Override, Open: open, Mine: d.Viewer != "" && strings.EqualFold(c.Author, d.Viewer),
+	f := catalog.Facts{PR: c.Ref.Unit(), Owner: c.Ref.Owner, Repo: c.Ref.Repo, Row: r, Author: p.Author, Workspace: p.Workspace, Override: p.Override, Open: open, Mine: d.Viewer != "" && strings.EqualFold(c.Author, d.Viewer),
 		Draft: c.IsDraft, State: c.State, Base: c.BaseBranch, GateOn: d.GateOn, BriefOn: d.BriefOn,
 		ReviewRequestedMe: slices.ContainsFunc(c.ReviewRequests, func(who string) bool { return strings.EqualFold(who, d.Viewer) }),
 		Config:            catalogConfig(d.Cfg.For(c.Ref.Owner, c.Ref.Repo)),

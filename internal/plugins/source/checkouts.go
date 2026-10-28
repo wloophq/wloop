@@ -25,18 +25,21 @@ func (c Checkouts) Checkout(ctx context.Context, u unit.Unit) (src.Checkout, boo
 	return cl.Checkout(ctx, Wire(u))
 }
 
-// UnitAt is the unit the checkout at dir holds, as unit.Locator says it.
-func (c Checkouts) UnitAt(ctx context.Context, dir string) (string, bool, error) {
+// Locate is the unit of the plugin the checkout at dir holds.
+func (c Checkouts) Locate(ctx context.Context, dir string) (unit.Unit, bool, error) {
 	cl, err := c.Kind.Client(c.ID)
 	if err != nil {
-		return "", false, err
+		return unit.Unit{}, false, err
 	}
 	u, ok, err := cl.Locate(ctx, dir)
 	if err != nil || !ok {
-		return "", ok, err
+		return unit.Unit{}, false, err
 	}
 	got, err := c.Units.Own(c.ID, u)
-	return got.Key, err == nil, err
+	if err != nil {
+		return unit.Unit{}, false, err
+	}
+	return got, true, nil
 }
 
 // WriteState writes a task's move back to the source.

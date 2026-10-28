@@ -6,7 +6,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/domain/card"
 	"github.com/wloophq/wloop/internal/domain/items"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -302,7 +301,6 @@ type Override struct {
 }
 
 type Event struct {
-	PR    pr.Ref    `json:"pr"`
 	Unit  unit.Unit `json:"unit"`
 	Kind  string    `json:"kind"`
 	Key   string    `json:"key"`
@@ -562,8 +560,8 @@ type ExploreRequest struct {
 // Candidate is a pull request Explore found, with what deciding whether to
 // help on it needs.
 type Candidate struct {
-	Ref            pr.Ref    `json:"ref"`
 	Unit           unit.Unit `json:"unit"`
+	Label          string    `json:"label"`
 	URL            string    `json:"url"`
 	Title          string    `json:"title"`
 	Author         string    `json:"author"`
@@ -600,12 +598,18 @@ type ExploreResult struct {
 }
 
 type RemoveDoneResult struct {
-	Removed []pr.Ref `json:"removed"`
-	Kept    []Kept   `json:"kept"`
+	Removed []Named `json:"removed"`
+	Kept    []Kept  `json:"kept"`
+}
+
+// Named is a unit with its label.
+type Named struct {
+	Unit  unit.Unit `json:"unit"`
+	Label string    `json:"label"`
 }
 
 type Kept struct {
-	Ref       pr.Ref `json:"ref"`
+	Named
 	Reason    string `json:"reason"`
 	Detail    string `json:"detail,omitempty"`
 	Source    string `json:"source,omitempty"`
@@ -613,7 +617,9 @@ type Kept struct {
 }
 
 type ActivityItem struct {
-	Event  Event  `json:"event"`
+	Event Event `json:"event"`
+	// Label is the event's unit as people read it; "" for none.
+	Label  string `json:"label,omitempty"`
 	Title  string `json:"title"`
 	URL    string `json:"url"`
 	Author string `json:"author"`
