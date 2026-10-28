@@ -13,8 +13,9 @@ import (
 	"sync"
 	"testing"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -28,11 +29,11 @@ var inventoryCommandFiles = []string{"adopt.go", "ahead.go", "hand.go", "intake.
 // githubMarks are the marks GitHub's rounds write, by their name in the
 // round package.
 var githubMarks = map[string]string{
-	"Reviewed":          round.Reviewed,
-	"AddressedReviews":  round.AddressedReviews,
-	"AddressedChecks":   round.AddressedChecks,
-	"AddressedConflict": round.AddressedConflict,
-	"FirstSkipped":      round.FirstSkipped,
+	"Reviewed":          ghsource.MarkReviewed,
+	"AddressedReviews":  ghsource.MarkAddressedReviews,
+	"AddressedChecks":   ghsource.MarkAddressedChecks,
+	"AddressedConflict": ghsource.MarkAddressedConflict,
+	"FirstSkipped":      ghsource.MarkFirstSkipped,
 }
 
 // pullStub is a forge plugin that also serves its pull requests' basics as
@@ -114,8 +115,15 @@ func TestInventoryCommandsReachGitHubThroughThePlugin(t *testing.T) {
 			}
 		}
 		asked := stub.asked()
-		if len(asked) != 1 || asked[0].Unit.Provider != "github" || asked[0].Unit.Key != "acme/api#20" {
-			t.Fatalf("plugin actions %+v", asked)
+		var actions []string
+		for _, a := range asked {
+			if a.Unit.Key != "acme/api#20" {
+				t.Fatalf("plugin actions %+v", asked)
+			}
+			actions = append(actions, a.Action)
+		}
+		if want := []string{ghsource.ActionBasics, ghsource.ActionAdopt}; !slices.Equal(actions, want) {
+			t.Fatalf("plugin actions %v, want %v", actions, want)
 		}
 		return te, stub, code
 	}

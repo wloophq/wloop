@@ -6,8 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/wloophq/wloop/internal/domain/round"
 )
 
 func TestVersion3MovesWhatRoundsHandledIntoMarks(t *testing.T) {
@@ -59,7 +57,7 @@ func TestVersion3MovesWhatRoundsHandledIntoMarks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p := st.PRs["acme/api#1"]; p.Marks[round.AddressedChecks] != "h1" || p.AgentHome != "/h" {
+	if p := st.PRs["acme/api#1"]; p.Marks["addressed.checks"] != "h1" || p.AgentHome != "/h" {
 		t.Errorf("loaded %+v", p)
 	}
 	if p := st.PRs["acme/api#3"]; len(p.Marks) != 0 {

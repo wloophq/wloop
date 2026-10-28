@@ -16,12 +16,26 @@ type Payloads struct {
 	ID   string
 	Kind *Kind
 	Now  func() time.Time
+	// Planner nil is the running plugin ID of Kind.
+	Planner func() (PayloadPlanner, error)
+}
+
+// PayloadPlanner is the plugin's Payload call.
+type PayloadPlanner interface {
+	Payload(ctx context.Context, req src.PayloadRequest) (src.PayloadResult, error)
+}
+
+func (p Payloads) planner() (PayloadPlanner, error) {
+	if p.Planner != nil {
+		return p.Planner()
+	}
+	return p.Kind.Client(p.ID)
 }
 
 var _ turn.PayloadReader = Payloads{}
 
 func (p Payloads) Payload(ctx context.Context, r turn.Request) (turn.Payload, error) {
-	c, err := p.Kind.Client(p.ID)
+	c, err := p.planner()
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +68,10 @@ type payload struct {
 	facts map[string]any
 }
 
-var _ turn.Contents = payload{}
+var (
+	_ turn.Contents    = payload{}
+	_ turn.DataPayload = payload{}
+)
 
 func (p payload) Unit() unit.Unit { return p.unit }
 
@@ -71,3 +88,7 @@ func (p payload) Fact(name string) (any, bool) {
 }
 
 func (p payload) Contents() string { return p.res.Contents }
+
+// Data is the plugin's data of the payload, which templates read under the
+// payload root its manifest names.
+func (p payload) Data() json.RawMessage { return p.res.Data }

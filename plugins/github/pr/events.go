@@ -37,6 +37,7 @@ const (
 	KindStatus               = "status"     // Data = board column
 	KindFollowed             = "followed"   // Key = the time, Data = the reasons, ","-joined
 	KindUnfollowed           = "unfollowed" // Key = the time, Data = the reasons it was followed for
+	KindReviewEnded          = "review_ended"
 )
 
 // ReviewTurnsFollowed bounds how long after its newest review round a pull

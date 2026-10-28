@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/expr"
@@ -52,6 +53,7 @@ type Vocabulary struct {
 	toolAnswers        []ToolAnswer
 	toolProviders      map[string]unit.ProviderID
 	draftKinds         map[unit.ProviderID]DraftKinds
+	marks              []Mark
 }
 
 // DraftKinds are a plugin's draft kinds and the delivery of a draft whose
@@ -130,6 +132,7 @@ func Install(v *Vocabulary) {
 	PayloadProviders, RoundProviders, PluginTaskKinds = v.payloads, v.rounds, v.taskKinds
 	Tools, ToolAnswers, ToolProviders, PluginDraftKinds = v.tools, v.toolAnswers, v.toolProviders, v.draftKinds
 	pluginDeliveries = v.pluginDeliveries
+	Marks = v.marks
 }
 
 // fits says why v, provider p's vocabulary among all, cannot merge.
@@ -152,6 +155,16 @@ func fits(p unit.ProviderID, src *manifest.Source, all map[unit.ProviderID]*mani
 		}
 		if o != p && v.Payload != "" && ov.Payload == v.Payload {
 			bad("payload %q is plugin %s's too", v.Payload, o)
+		}
+	}
+	for _, m := range v.Marks {
+		if err := mark.ValidName(m.Name); err != nil {
+			bad("mark %q: %v", m.Name, err)
+		}
+		for o, ov := range all {
+			if o != p && slices.ContainsFunc(ov.Marks, func(x manifest.Named) bool { return x.Name == m.Name }) {
+				bad("mark %q is plugin %s's too", m.Name, o)
+			}
 		}
 	}
 	for _, f := range v.Facts {
@@ -257,6 +270,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	tools, answers := slices.Clone(coreTools), slices.Clone(coreToolAnswers)
 	toolProviders := map[string]unit.ProviderID{}
 	draftKinds := map[unit.ProviderID]DraftKinds{}
+	var marks []Mark
 	for _, id := range ids {
 		src := all[id]
 		v := src.SourceVocabulary
@@ -277,6 +291,9 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 		}
 		if len(v.DraftKinds) > 0 || v.DefaultDelivery != "" {
 			draftKinds[id] = DraftKinds{Kinds: slices.Clone(v.DraftKinds), Default: v.DefaultDelivery}
+		}
+		for _, m := range v.Marks {
+			marks = append(marks, Mark{Name: m.Name, Doc: m.Doc, Provider: string(id)})
 		}
 		slots[id] = v.Slot
 		unitSlots = append(unitSlots, v.Slot)
@@ -344,7 +361,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	return &Vocabulary{facts: facts, actionFacts: actionFacts, effects: effects, roles: roles, steps: stepsWith(steps),
 		slots: slots, briefSubjects: briefSubjects, workflowSlots: slices.Concat(unitSlots, nonUnitSlots),
 		deliveries: deliveries, pluginDeliveries: pluginDelivs, events: events, answering: answering, payloads: payloads, rounds: rounds, taskKinds: taskKinds,
-		tools: tools, toolAnswers: answers, toolProviders: toolProviders, draftKinds: draftKinds}
+		tools: tools, toolAnswers: answers, toolProviders: toolProviders, draftKinds: draftKinds, marks: marks}
 }
 
 // PluginTaskKinds are the values of the task's kind property the merged

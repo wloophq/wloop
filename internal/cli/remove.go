@@ -234,7 +234,7 @@ func (agentGuard) CloseAll(context.Context, string, string) error { return nil }
 type envRounds struct{ e *Env }
 
 func (r envRounds) SkipFirstRound(ctx context.Context, u unit.Unit) error {
-	return r.e.withState(ctx, func(s *sweep) error { s.st.SkipFirstRound(u.Key); return nil })
+	return r.e.withState(ctx, func(s *sweep) error { s.st.SetMark(u.Key, markFirstSkipped, "1"); return nil })
 }
 
 // removalLog records a removal's event on the pull request in the store,

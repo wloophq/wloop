@@ -268,6 +268,12 @@ type Env struct {
 	hosted *hostedLate
 	// payloads are the enabled plugins' turn payload readers; nil outside serve.
 	payloads map[unit.ProviderID]turn.PayloadReader
+	// payloadPlanner builds GitHub's turn payloads in place of the running
+	// plugin; nil is the running plugin.
+	payloadPlanner func() (psource.PayloadPlanner, error)
+	// briefReader reads GitHub's brief inputs in place of the running
+	// plugin; nil is the running plugin.
+	briefReader func() (briefReader, error)
 }
 
 func NewEnv() *Env {

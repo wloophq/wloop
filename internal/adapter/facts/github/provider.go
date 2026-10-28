@@ -1,7 +1,7 @@
 // Package factsgithub is the github source's workflow facts: the pull
 // requests a sweep plans over, as automation.Units, and their author
-// facts, as views.Facts. It reads the store, the workspace snapshot and the
-// local checkouts, and never asks GitHub.
+// facts, as views.Facts. It lays the host's own state over what the GitHub
+// plugin reports, its planner's facts among it, and never asks GitHub.
 package factsgithub
 
 import (
@@ -20,47 +20,21 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/readmodel"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 )
 
-// The rounds a Plan names.
-const (
-	RoundFollowup = "follow-up"
-	RoundFirst    = "first"
-	RoundAddress  = "address"
-)
-
-// Store is what the facts read of the inventory besides the planning inputs,
-// and the events Refresh and Settle record.
+// Store is what the facts read of the inventory besides the planning
+// inputs.
 type Store interface {
 	Overrides(ctx context.Context) (map[pr.Ref]dinv.Override, error)
-	// FirstRoundBlocks maps each unit whose round is blocked to its
-	// round_blocked event.
-	FirstRoundBlocks(ctx context.Context) (map[unit.Unit]port.Event, error)
 	EventsByPR(ctx context.Context, refs []pr.Ref) (map[pr.Ref][]dinv.Event, error)
-	RecordEvent(ctx context.Context, ev dinv.Event) error
 }
 
-// Branches reads what a first round's review workspace would find of the
-// pull request's head branch in the local checkout.
-type Branches interface {
-	LocalBranchTip(ctx context.Context, dir, branch string) (string, error)
-	CheckedOutAt(ctx context.Context, dir, branch string) (string, error)
-	HasCommit(ctx context.Context, dir, oid string) (bool, error)
-	IsAncestor(ctx context.Context, dir, ancestor, commit string) (bool, error)
-}
-
-// RoundState is the sweep's round state as Settle receives it.
-type RoundState interface {
-	automation.State
-	Rounds() *round.Store
-}
-
-// Deps are what the provider reads. Changes, Teams and Intents may be
-// nil: without Changes every call reads the store again.
+// Deps are what the provider reads. Changes and Intents may be nil:
+// without Changes every call reads the store again.
 type Deps struct {
 	Inputs   dinv.PlanInputs
 	Store    Store
@@ -68,17 +42,13 @@ type Deps struct {
 	Books    sweep.Books
 	Rounds   sweep.Rounds
 	Git      sweep.LocalGit
-	Branches Branches
 	Cfg      func() config.Config
-	// Sink is the view sink whose columns the workspaces report as statuses.
-	Sink    string
-	Clock   port.Clock
-	Changes port.Changes
-	Teams   func(ctx context.Context) ([]string, error)
-	Intents func() *dintent.Registry
+	Clock    port.Clock
+	Changes  port.Changes
+	Intents  func() *dintent.Registry
 	// Reports are what the GitHub plugin last reported of its pull
-	// requests: their situations and the facts that read them alone; nil
-	// reports none.
+	// requests: their situations, the facts that read them alone and its
+	// planner's; nil reports none.
 	Reports readmodel.Reports
 }
 
@@ -93,10 +63,9 @@ type Provider struct {
 }
 
 var (
-	_ automation.Units   = (*Provider)(nil)
-	_ automation.Settler = (*Provider)(nil)
-	_ automation.Dueer   = (*Provider)(nil)
-	_ views.Facts        = (*Provider)(nil)
+	_ automation.Units = (*Provider)(nil)
+	_ automation.Dueer = (*Provider)(nil)
+	_ views.Facts      = (*Provider)(nil)
 )
 
 func New(d Deps) *Provider {
@@ -125,8 +94,8 @@ func (p *Provider) List(ctx context.Context, id unit.ProviderID) ([]unit.Unit, e
 		return nil, err
 	}
 	now := p.now()
-	units := v.listed(ctx, now)
-	if err := v.loadFacts(ctx, units); err != nil {
+	units, err := v.listed(ctx, now)
+	if err != nil {
 		return nil, err
 	}
 	if err := v.loadEvents(ctx, units); err != nil {
@@ -135,28 +104,27 @@ func (p *Provider) List(ctx context.Context, id unit.ProviderID) ([]unit.Unit, e
 	if err := v.loadReports(ctx, units); err != nil {
 		return nil, err
 	}
-	pl := v.planner(ctx, now)
-	ranks := make(map[unit.Unit]rank, len(units))
 	dues := map[string]time.Time{}
 	for _, u := range units {
 		ref, _ := refOf(u)
-		r, err := pl.derive(ref)
-		if err != nil {
-			return nil, err
-		}
-		ranks[u] = pl.rank(ref, r)
-		for k, t := range r.dues {
-			dues[k] = earliestOf(dues[k], t)
-		}
-		if r.runs() && v.rounds.CapReason(ref.String(), now, v.cfg.Turns.PerUnitPerDay) != "" {
+		if runs(v.facts(ref, now)) && v.rounds.CapReason(ref.String(), now, v.cfg.Turns.PerUnitPerDay) != "" {
 			dues["cap"] = nextDay(now)
 		}
 	}
 	p.mu.Lock()
 	p.dues = dues
 	p.mu.Unlock()
-	slices.SortStableFunc(units, func(a, b unit.Unit) int { return ranks[a].compare(ranks[b]) })
+	slices.SortStableFunc(units, func(a, b unit.Unit) int { return v.rank(a).Compare(v.rank(b)) })
 	return units, nil
+}
+
+// rank is where u's rounds rank, as the plugin's planner reported it.
+func (v *view) rank(u unit.Unit) prrow.Rank {
+	ref, _ := refOf(u)
+	if rep := v.reportOf(ref); rep != nil {
+		return rep.Plan.Rank
+	}
+	return prrow.Rank{Path: 3}
 }
 
 // Facts are the pr facts of u; a pull request the store does not hold yet
@@ -170,21 +138,13 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 	if err != nil {
 		return nil, err
 	}
-	if err := v.loadFacts(ctx, []unit.Unit{u}); err != nil {
-		return nil, err
-	}
 	if err := v.loadEvents(ctx, []unit.Unit{u}); err != nil {
 		return nil, err
 	}
 	if err := v.loadReports(ctx, []unit.Unit{u}); err != nil {
 		return nil, err
 	}
-	pl := v.planner(ctx, p.now())
-	r, err := pl.derive(ref)
-	if err != nil {
-		return nil, err
-	}
-	return pl.facts(ref, r), nil
+	return v.facts(ref, p.now()), nil
 }
 
 // Due is the earliest instant after now a decision of the last evaluation

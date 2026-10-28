@@ -769,6 +769,12 @@ message ApplyEffectRequest {
   // turn is set for a turn effect, draft for a draft effect.
   TurnRef turn = 4;
   Draft draft = 5;
+  // route is how a turn effect's turn went out: session, asked or launch.
+  string route = 6;
+  // taken says the agent was seen taking the turn.
+  bool taken = 7;
+  // inputs are the turn's inputs as a JSON object.
+  bytes inputs = 8;
 }
 
 message ApplyEffectResponse {}

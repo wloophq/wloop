@@ -9,7 +9,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
 )
 
 // DetailVersion is the shape of Detail this release reads; a stored detail
@@ -165,19 +164,20 @@ func StartBlockOf(e port.Event) (StartBlock, bool) {
 }
 
 // olderSkip are the marks dismissing a block an older release keyed writes:
-// it named the reviews and heads the GitHub round answered, not its marks.
+// it named the reviews and heads the GitHub round answered, not its marks,
+// which are the GitHub planner's mark names of that release.
 func olderSkip(kind, reviews, checks, conflict string) map[string]string {
 	switch kind {
 	case "first round":
-		return map[string]string{round.FirstSkipped: "1"}
+		return map[string]string{"first.skipped": "1"}
 	case "triage":
 		out := map[string]string{}
-		for name, v := range map[string]string{round.AddressedReviews: reviews, round.AddressedChecks: checks, round.AddressedConflict: conflict} {
+		for name, v := range map[string]string{"addressed.reviews": reviews, "addressed.checks": checks, "addressed.conflict": conflict} {
 			if v != "" {
 				out[name] = v
 			}
 		}
 		return out
 	}
-	return map[string]string{round.Reviewed: reviews}
+	return map[string]string{"reviewed": reviews}
 }

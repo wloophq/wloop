@@ -18,6 +18,8 @@ type Reported struct {
 	// Detail nil keeps the stored one.
 	Detail  *Detail
 	Tracked bool
+	// Adopted says the plugin keeps the pull request taken over.
+	Adopted bool
 }
 
 const reportedPRSQL = `INSERT INTO pull_requests
@@ -45,10 +47,13 @@ const (
 	reportedTrackSQL = `INSERT INTO overrides (provider, unit_key, tracked) VALUES (?,?,1)
  ON CONFLICT(provider, unit_key) DO UPDATE SET tracked=1 WHERE tracked IS NOT 1`
 	reportedUntrackSQL = `UPDATE overrides SET tracked=0 WHERE provider=? AND unit_key=? AND tracked`
+	reportedAdoptSQL   = `INSERT INTO overrides (provider, unit_key, taken_over) VALUES (?,?,1)
+ ON CONFLICT(provider, unit_key) DO UPDATE SET taken_over=1 WHERE taken_over IS NOT 1`
 )
 
 // SaveReported keeps rows as the plugin reported them, in one transaction:
-// each row whole, its sighting, its detail and its track, writing only what
+// each row whole, its sighting, its detail, its track and its adoption,
+// which only the plugin keeps from now on, writing only what
 // differs. It derives and records no event: the plugin recorded its events
 // on the host before it reported.
 func (s *Store) SaveReported(ctx context.Context, rows []Reported) error {
@@ -99,6 +104,12 @@ func (s *Store) SaveReported(ctx context.Context, rows []Reported) error {
 			res, err = tx.ExecContext(ctx, track, unitArgs(p.Ref)...)
 			if err := touchChanged(tx, res, err, port.TopicOverrides, p.Ref); err != nil {
 				return err
+			}
+			if r.Adopted {
+				res, err = tx.ExecContext(ctx, reportedAdoptSQL, unitArgs(p.Ref)...)
+				if err := touchChanged(tx, res, err, port.TopicOverrides, p.Ref); err != nil {
+					return err
+				}
 			}
 		}
 		return nil

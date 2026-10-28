@@ -54,3 +54,24 @@ func (i storeInputs) Ended(ctx context.Context, kind string, units []unit.Unit) 
 	}
 	return out, nil
 }
+
+// keptPR is u's pull request as the host keeps what the GitHub plugin
+// reported, which a round its plan names is sent with; zero when the host
+// keeps no such row.
+func (e *Env) keptPR(ctx context.Context, u unit.Unit) (dinv.PlanFacts, error) {
+	ref, err := githubRef(u)
+	if err != nil || e.Store == nil {
+		return dinv.PlanFacts{}, nil
+	}
+	in := storeInputs{e.Store}
+	row, found, err := e.Store.PR(ctx, ref)
+	if err != nil || !found {
+		return dinv.PlanFacts{}, err
+	}
+	viewer, err := in.Viewer(ctx)
+	if err != nil {
+		return dinv.PlanFacts{}, err
+	}
+	got, err := in.Facts(ctx, []dinv.PR{row}, viewer)
+	return got[u], err
+}

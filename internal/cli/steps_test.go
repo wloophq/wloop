@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/core/automation"
@@ -234,7 +236,7 @@ func TestARefusedLastLookAfterClosingSessionsIsRecorded(t *testing.T) {
 		if !asRefused(err, &refused) || !strings.Contains(refused.Reason, "changed while it was checked") || strings.Contains(refused.Reason, "its sessions were closed") != suffix {
 			t.Fatalf("%d closed: run: %v", closed, err)
 		}
-		if len(r.mgr.Removed()) != 0 || st.FirstRoundSkipped("acme/api#7") {
+		if len(r.mgr.Removed()) != 0 || (st.Mark("acme/api#7", ghsource.MarkFirstSkipped) != "") {
 			t.Fatalf("removed %v", r.mgr.Removed())
 		}
 	}
@@ -342,8 +344,8 @@ func TestWorkspaceRemoveSkipsTheFirstRoundInTheBoundState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(r.mgr.Removed(), []string{"ws1"}) || !st.FirstRoundSkipped("acme/api#7") {
-		t.Fatalf("removed %v, skipped %v", r.mgr.Removed(), st.FirstRoundSkipped("acme/api#7"))
+	if !slices.Equal(r.mgr.Removed(), []string{"ws1"}) || !(st.Mark("acme/api#7", ghsource.MarkFirstSkipped) != "") {
+		t.Fatalf("removed %v, skipped %v", r.mgr.Removed(), (st.Mark("acme/api#7", ghsource.MarkFirstSkipped) != ""))
 	}
 	if !strings.Contains(detail, "branch "+wt.Branch+" head ") {
 		t.Fatalf("detail %q", detail)

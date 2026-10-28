@@ -13,8 +13,12 @@ import (
 // Provider is the provider id of the plugin's units.
 const Provider = "github"
 
-// StateOpen is an open pull request's state.
-const StateOpen = "OPEN"
+// The states of a pull request.
+const (
+	StateOpen   = "OPEN"
+	StateMerged = "MERGED"
+	StateClosed = "CLOSED"
+)
 
 // ReasonTracked is the scope reason of a pull request the user tracks.
 const ReasonTracked = "tracked"

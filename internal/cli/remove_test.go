@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
 	"github.com/wloophq/wloop/internal/daemon"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -88,7 +90,7 @@ func TestRemovingAnOpenPullRequestsWorkspaceOptsOutOfItsFirstRound(t *testing.T)
 		t.Fatalf("writes %v", m.Writes)
 	}
 	st, err := te.Rounds.Load(context.Background())
-	if err != nil || !st.FirstRoundSkipped(r12.String()) {
+	if err != nil || !(st.Mark(r12.String(), ghsource.MarkFirstSkipped) != "") {
 		t.Fatalf("first round not skipped: %v", err)
 	}
 	m, te = finishedScenario(t, "OPEN")

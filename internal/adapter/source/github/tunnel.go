@@ -20,6 +20,10 @@ const ActionForward = "github.forward"
 // ActionBudget is the GitHub plugin's action that answers its API budget.
 const ActionBudget = "github.budget"
 
+// ActionAdopt is the GitHub plugin's action that takes a pull request over
+// into the loop.
+const ActionAdopt = "pr.adopt"
+
 // ActionRefresh is the GitHub plugin's action that reads a pull request in
 // full into its store and reports it.
 const ActionRefresh = "pr.refresh"

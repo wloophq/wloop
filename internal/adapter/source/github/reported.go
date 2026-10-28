@@ -20,6 +20,7 @@ type reportedData struct {
 	DetailVersion int               `json:"detail_version"`
 	DetailReadAt  time.Time         `json:"detail_read_at"`
 	Tracked       bool              `json:"tracked"`
+	Adopted       bool              `json:"adopted"`
 }
 
 // Reported keeps the pull requests the GitHub plugin reports in st, the
@@ -35,7 +36,7 @@ func Reported(st *inventory.Store) func(ctx context.Context, snaps map[unit.Unit
 			if err := json.Unmarshal(s.Data, &d); err != nil {
 				return fmt.Errorf("the snapshot of %s: %w", u.Label(), err)
 			}
-			r := inventory.Reported{PR: d.PR, Detail: d.Detail, Tracked: d.Tracked}
+			r := inventory.Reported{PR: d.PR, Detail: d.Detail, Tracked: d.Tracked, Adopted: d.Adopted}
 			if r.Detail != nil {
 				r.Detail.Version, r.Detail.ReadAt = d.DetailVersion, d.DetailReadAt
 			}

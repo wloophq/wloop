@@ -452,6 +452,7 @@ func newServeEnv(t *testing.T) *testEnv {
 	te.Out, te.Err = &syncBuffer{}, &syncBuffer{}
 	te.cfg = withoutWindows(te.cfg)
 	te.Exit = func(code int) { t.Errorf("unexpected exit %d", code) }
+	te.githubPluginOf()
 	return te
 }
 

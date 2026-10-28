@@ -2,6 +2,8 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -46,6 +48,17 @@ const (
 	// routeLaunch is a resume or a launch the turn service asks for.
 	routeLaunch
 )
+
+// wire is rt as an effect request names it.
+func (rt route) wire() string {
+	switch rt {
+	case routeAsked:
+		return src.RouteAsked
+	case routeLaunch:
+		return src.RouteLaunch
+	}
+	return src.RouteSession
+}
 
 // sentRound is what a turn effect reads of a round on its way out; the
 // route fills it as the round goes.
@@ -114,8 +127,9 @@ func runPhase(rt route, d dintent.Def, r *sentRound, p phase) {
 
 // applySentEffects applies the turn effects of d once r went out on route
 // rt: the host's sent phase, then, through ApplyEffect, those of the plugin
-// of r's unit. A failure is only logged: the round is out.
-func (e *Env) applySentEffects(ctx context.Context, rt route, d dintent.Def, r *sentRound) {
+// of r's unit. A failed effect is logged, as the round is out; an effect no
+// plugin applies is an error, which the round's caller reports.
+func (e *Env) applySentEffects(ctx context.Context, rt route, d dintent.Def, r *sentRound) error {
 	runPhase(rt, d, r, sentPhase)
 	u := r.ref.Unit()
 	var names []string
@@ -126,23 +140,33 @@ func (e *Env) applySentEffects(ctx context.Context, rt route, d dintent.Def, r *
 		}
 	}
 	if len(names) == 0 {
-		return
+		return nil
 	}
-	a, ok := e.turnEffects(u.Provider, rt, r)
+	a, ok := e.turnEffects(u.Provider)
 	if !ok {
-		fmt.Fprintf(e.Err, "warning: %s: no plugin applies %s\n", r.ref, strings.Join(names, ", "))
-		return
+		return fmt.Errorf("%s: no plugin applies %s", r.ref, strings.Join(names, ", "))
 	}
 	head := ""
 	if r.pr != nil {
 		head = r.pr.HeadRefOid
 	}
+	inputs, err := json.Marshal(r.inputs)
+	if err != nil {
+		fmt.Fprintf(e.Err, "warning: %s: the turn's inputs: %v\n", r.ref, err)
+	}
+	var errs []error
 	for _, name := range names {
-		req := src.EffectRequest{Effect: name, Unit: psource.Wire(u), Turn: &src.TurnRef{ID: r.id, Head: head}}
-		if err := a.ApplyEffect(context.WithoutCancel(ctx), req); err != nil {
+		req := src.EffectRequest{Effect: name, Unit: psource.Wire(u), Turn: &src.TurnRef{ID: r.id, Head: head}, Route: rt.wire(), Taken: r.submitted,
+			Inputs: inputs}
+		err := a.ApplyEffect(context.WithoutCancel(ctx), req)
+		switch {
+		case errors.Is(err, src.ErrUnsupported):
+			errs = append(errs, fmt.Errorf("%s: the plugin applies no %s: %w", r.ref, name, err))
+		case err != nil:
 			fmt.Fprintf(e.Err, "warning: %s: applying %s: %v\n", r.ref, name, err)
 		}
 	}
+	return errors.Join(errs...)
 }
 
 // roundRun is a round of an intent about to go out in the workspace its

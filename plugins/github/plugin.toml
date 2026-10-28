@@ -14,8 +14,8 @@ row_kinds = ["round_pending", "loop_waiting", "loop_stopped", "blocked", "to_add
   "changes", "checks", "conflicts", "reply", "reviewer_back", "review", "no_reviewer", "merge", "draft", "muted", "done"]
 
 default_delivery = "comment"
-config_reads = ["sweep", "views"]
-notify = ["workspaces", "events", "turns", "viewer", "config"]
+config_reads = ["sweep", "views", "projects", "brief"]
+notify = ["workspaces", "events", "turns", "viewer", "config", "rounds", "marks", "overrides"]
 
 [[source.signals]]
 name = "stalled"
@@ -28,6 +28,18 @@ doc = "A review workspace holds the pull request: the loop reviews it."
 [[source.signals]]
 name = "ready"
 doc = "The work on the pull request is approved: my review approved its head, or my own can merge."
+
+[[source.marks]]
+name = "addressed.reviews"
+doc = "The newest review an address round triaged on a pull request you develop, a time: `handled(\"addressed.reviews\", <time>)`."
+
+[[source.marks]]
+name = "addressed.checks"
+doc = "The head whose failing checks an address round covered: `handled(\"addressed.checks\", pr.head)`."
+
+[[source.marks]]
+name = "addressed.conflict"
+doc = "The head whose conflict with the base an address round covered: `handled(\"addressed.conflict\", pr.head)`."
 
 [source.codec]
 keys = ["{owner}/{repo}#{number}"]

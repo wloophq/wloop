@@ -53,17 +53,6 @@ func priorReview(reviews []pr.Review) *turn.PriorReview {
 	return &turn.PriorReview{Verdict: p.Verdict, Head: p.Head, At: p.At}
 }
 
-// basicsReader reads a turn's pull request with the read rounds already make.
-type basicsReader struct{ e *Env }
-
-func (b basicsReader) PR(ctx context.Context, ref pr.Ref) (turn.PR, error) {
-	pr, err := b.e.basics(ctx, ref)
-	if err != nil {
-		return turn.PR{}, err
-	}
-	return *turnPR(pr), nil
-}
-
 type sentTurn struct {
 	ID, Prompt, Text string
 	// Seq is the turn deliver stored; 0 when none is.

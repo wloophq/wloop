@@ -9,27 +9,15 @@ import (
 	"github.com/wloophq/wloop/internal/turn"
 )
 
-// PRReader reads a pull request and your reviews of it, in one read.
-type PRReader interface {
-	PR(ctx context.Context, ref github.Ref) (turn.PR, error)
-}
-
-// TurnPayloads is GitHub's turn payload: the pull request as PRs reads it,
-// its prior review anchored to the head the loop's last record covered.
-type TurnPayloads struct{ PRs PRReader }
+// TurnPayloads is GitHub's turn payload: the GitHub plugin's, which Plugin
+// reads, and the pull request a host round hands the turn, its prior review
+// anchored to the head the loop's last record covered.
+type TurnPayloads struct{ Plugin turn.PayloadReader }
 
 var _ turn.PayloadCompleter = TurnPayloads{}
 
 func (g TurnPayloads) Payload(ctx context.Context, r turn.Request) (turn.Payload, error) {
-	ref, err := dpr.ParseKey(r.Unit.Key)
-	if err != nil {
-		return nil, err
-	}
-	pr, err := g.PRs.PR(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-	return at(pr, ref).Anchored(r.LastVerdict), nil
+	return g.Plugin.Payload(ctx, r)
 }
 
 // CompletePayload is the caller's pull request at the request's unit, its

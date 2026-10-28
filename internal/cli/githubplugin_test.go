@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	factsgithub "github.com/wloophq/wloop/internal/adapter/facts/github"
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/brand"
@@ -18,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/plugins/bundled"
 	"github.com/wloophq/wloop/internal/plugins/host"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 	"github.com/wloophq/wloop/pkg/plugin"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 	"github.com/wloophq/wloop/pkg/plugin/plugintest"
@@ -55,11 +57,14 @@ func (te *testEnv) githubPluginOf() *src.Client {
 	t.Helper()
 	b := &psource.Broker{ID: string(unit.GitHub), Manifest: bundledGitHubSource(t), Units: psource.Units{Codecs: te.unitCodecs()},
 		Snapshots: psource.NewSnapshots(te.db.Snapshots()), Config: func() config.Config { return te.cfg },
-		Events: sqlite.New(te.db), Marks: te.db, Drafts: te.db, Overrides: te.db, Workspaces: te.Env.workspaceListing}
+		Events: sqlite.New(te.db), Marks: te.db, Drafts: te.db, Overrides: te.db, Workspaces: te.Env.workspaceListing,
+		Paused: te.Env.roundsPaused, Rounds: te.Env.storedRoundState, Books: sqlite.New(te.db).Books,
+		Hosted: &psource.Hosted{Profile: pluginProfile(string(unit.GitHub), te.Env.currentConfig)}}
 	b = te.Env.withGitHubBroker(b, string(unit.GitHub), te.db)
 	b.Reported = ghsource.Reported(te.Store)
 	now := te.Now
-	c := sourcetest.Launch(t, string(unit.GitHub), &ghplugin.Plugin{API: apitest.Options(quietGH{te.gh}), GH: quietGH{te.gh}, Now: func() time.Time { return now() }}, b.Host())
+	c := sourcetest.Launch(t, string(unit.GitHub), &ghplugin.Plugin{API: apitest.Options(quietGH{te.gh}), GH: quietGH{te.gh}, Now: func() time.Time { return now() },
+		Git: ghreporttest.GitOf(factsgithub.LocalGit(te.Env.Git), te.Env.Git)}, b.Host())
 	githubPlugins.Store(te, c)
 	t.Cleanup(func() { githubPlugins.Delete(te) })
 	return c
@@ -113,7 +118,7 @@ func (f testForge) Identity(ctx context.Context) (src.Identity, error) {
 }
 
 func (f testForge) Action(ctx context.Context, req src.ActionRequest) (json.RawMessage, error) {
-	if req.Action == ghsource.ActionRefresh {
+	if req.Action == ghsource.ActionRefresh || req.Action == ghsource.ActionAdopt {
 		return f.te.githubPluginOf().Action(ctx, req)
 	}
 	return f.te.github.Local().Action(ctx, req)

@@ -333,6 +333,28 @@
           },
           "type": "array"
         },
+        "marks": {
+          "description": "The marks the plugin's rounds write that a workflow may read with handled(); a name has no slash, space or control character.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "doc": {
+                "description": "What it means. Required.",
+                "type": "string"
+              },
+              "name": {
+                "description": "The name. Required.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "doc"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
         "name": {
           "description": "How a person reads the plugin's service, such as \"GitHub\". Required.",
           "type": "string"

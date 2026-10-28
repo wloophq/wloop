@@ -17,6 +17,7 @@ import (
 	"time"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 
 	factsgithub "github.com/wloophq/wloop/internal/adapter/facts/github"
 	factsession "github.com/wloophq/wloop/internal/adapter/facts/session"
@@ -765,9 +766,11 @@ func (f *fixtureEnv) engine(t *testing.T) *automation.Engine {
 	wf := factworkspace.New(factworkspace.Deps{Snapshot: f.snap, Holdings: ghsource.Holdings{PRs: factsgithub.InventoryInputs(te.Store), Overrides: inventory.ByUnit{Store: te.Store}},
 		Books: te.repo, Git: factworkspace.LocalGit{R: te.Env.Git.R}, Disk: f.disk, Changes: te.changes, Cfg: te.currentConfig, Clock: clock})
 	gh := factsgithub.New(factsgithub.Deps{Inputs: factsgithub.InventoryInputs(te.Store), Store: te.Store, Snapshot: f.snap, Books: te.repo,
-		Rounds: sqlite.NewRounds(f.db), Git: factsgithub.LocalGit(te.Env.Git), Branches: te.Env.Git, Cfg: te.currentConfig, Clock: clock, Changes: te.changes,
-		Teams: func(context.Context) ([]string, error) { return nil, nil }, Intents: func() *dintent.Registry { return te.loadedIntents().Registry },
-		Reports: te.Env.reports(te.Store)})
+		Rounds: sqlite.NewRounds(f.db), Git: factsgithub.LocalGit(te.Env.Git), Cfg: te.currentConfig, Clock: clock, Changes: te.changes,
+		Intents: func() *dintent.Registry { return te.loadedIntents().Registry },
+		Reports: ghreporttest.Inventory{Store: te.Store, Now: func() time.Time { return f.now }, Config: te.currentConfig,
+			Plan: &ghreporttest.InventoryPlan{Facts: storeInputs{te.Store}, Rounds: sqlite.NewRounds(f.db), Books: te.repo, Snapshot: f.snap,
+				Git: ghreporttest.GitOf(factsgithub.LocalGit(te.Env.Git), te.Env.Git)}}})
 	return te.newEngine(engineDeps{DB: f.db, Modules: []source.Module{{ID: unit.GitHub, Codec: pr.Codec{}, Facts: gh}}, SessionFacts: sf, WorkspaceFacts: wf, Snapshot: f.snap,
 		Subjects: map[unit.ProviderID]automation.Units{unit.Task: noUnits{}, slackPlugin: noUnits{}}})
 }

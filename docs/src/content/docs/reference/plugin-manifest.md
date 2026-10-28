@@ -59,6 +59,7 @@ every = "5m"
 | `draft_kinds` | array of tables | The kinds of the plugin's drafts; the host derives a draft's delivery from its kind. |
 | `default_delivery` | string | The delivery of a draft whose kind names none; one of deliveries. |
 | `signals` | array of tables | The link signals the plugin reports, read as task.link_signal.<name>. |
+| `marks` | array of tables | The marks the plugin's rounds write that a workflow may read with handled(); a name has no slash, space or control character. |
 | `kinds` | list of strings | The task kind values the plugin's units give their tasks. |
 | `situations` | array of tables | The situations the plugin derives, in the order the cockpit ranks them. |
 | `steps` | list of strings | The core workflow steps that run on the plugin's units, such as "turn.dismiss". |
@@ -143,6 +144,13 @@ every = "5m"
 | `delivery` | string | How it is posted, one of deliveries; empty is default_delivery. |
 
 ## `[[source.signals]]`
+
+| Key | Kind | Meaning |
+|---|---|---|
+| `name` | string | The name. Required. |
+| `doc` | string | What it means. Required. |
+
+## `[[source.marks]]`
 
 | Key | Kind | Meaning |
 |---|---|---|

@@ -766,7 +766,7 @@ func (b boundRounds) SkipFirstRound(_ context.Context, u unit.Unit) error {
 	if st == nil {
 		return errNoRoundState
 	}
-	st.SkipFirstRound(u.Key)
+	st.SetMark(u.Key, markFirstSkipped, "1")
 	return nil
 }
 

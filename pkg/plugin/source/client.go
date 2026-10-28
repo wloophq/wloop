@@ -218,7 +218,7 @@ func (c *Client) Payload(ctx context.Context, req PayloadRequest) (PayloadResult
 }
 
 func (c *Client) ApplyEffect(ctx context.Context, req EffectRequest) error {
-	in := &pb.ApplyEffectRequest{Effect: req.Effect, Unit: unitPB(req.Unit)}
+	in := &pb.ApplyEffectRequest{Effect: req.Effect, Unit: unitPB(req.Unit), Route: req.Route, Taken: req.Taken, Inputs: req.Inputs}
 	if t := req.Turn; t != nil {
 		in.Turn = &pb.TurnRef{Seq: t.Seq, Id: t.ID, Head: t.Head}
 	}

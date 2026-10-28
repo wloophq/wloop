@@ -200,8 +200,8 @@ func programReads(fset *token.FileSet, file string, info *types.Info, f *ast.Fil
 var builtinTables = []string{"internal/intent/builtin/builtin.go", "internal/intent/builtin/steps.go", "internal/intent/builtin/effects.go",
 	"internal/intent/builtin/roles.go", "internal/cli/builtins.go", "internal/cli/builtins_effects.go",
 	"internal/daemon/builtins.go", "internal/cli/steps.go", "internal/cli/root.go", "internal/intent/builtin/renamed.go",
-	// debt: the GitHub plugin's effect names, read by name while the plugin
-	// runs in the host's module; X8c2 moves them beside the plugin's manifest.
+	// debt: the GitHub plugin's nudge effect name, which the in-process
+	// publisher and proposals read until they run in the plugin.
 	"internal/adapter/source/github/effects.go"}
 
 // builtinNames are the effect, prepare, workspace and workflow step names

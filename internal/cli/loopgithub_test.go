@@ -6,6 +6,8 @@ import (
 	"io"
 	"time"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
 	"slices"
 	"strings"
 	"testing"
@@ -13,7 +15,6 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/domain/record"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent"
 
@@ -155,7 +156,7 @@ func TestALaunchedTurnOfAStoredPullRequestAsksGitHubNothing(t *testing.T) {
 		t.Fatalf("%v\n%s", err, te.err)
 	}
 	metertest.Within(t, sc, metertest.Budget{{Res: meter.GitHub}: 0})
-	if st := te.loadRounds(t); st.Mark(r7.String(), round.Reviewed) == "" {
+	if st := te.loadRounds(t); st.Mark(r7.String(), ghsource.MarkReviewed) == "" {
 		t.Fatal("the launched round marked no reviews covered")
 	}
 }

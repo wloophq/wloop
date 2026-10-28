@@ -104,7 +104,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	units := newUnitSet(providers)
 	units.blocks = &startBlocks{e: e}
 	if d.Planners == nil {
-		d.Planners = e.planners(d.Modules)
+		d.Planners = e.planners()
 	}
 	sd := stepDeps{Units: units, Keep: unitKeeping{units}, Planners: d.Planners, Rounds: e.Rounds, Drafts: d.Drafts, Pub: d.Pub, Log: d.Log,
 		Headless: d.TurnStart.Headless, Turns: d.TurnStart.Turns}

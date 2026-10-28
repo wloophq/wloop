@@ -15,13 +15,14 @@ import (
 	"testing"
 	"time"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/daemon"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/workspace"
@@ -383,7 +384,7 @@ func TestRoundsAskedByHandDoNotCountAgainstTheCap(t *testing.T) {
 	if why := st.CapReason(sc.ref.String(), testNow, 1); why != "" {
 		t.Fatalf("a triage asked by hand counted against the cap: %s", why)
 	}
-	if st.Mark(sc.ref.String(), round.AddressedReviews) == "" {
+	if st.Mark(sc.ref.String(), ghsource.MarkAddressedReviews) == "" {
 		t.Fatal("the triage was not recorded; the next sweep would send it again")
 	}
 }

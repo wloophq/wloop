@@ -2,12 +2,14 @@ package cli
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -69,7 +71,8 @@ func TestTakeOverMarksTheInventory(t *testing.T) {
 		t.Fatalf("not adopted: %+v %v", o, err)
 	}
 	evs, _ := st.Events(ctx, ref)
-	if len(evs) != 1 || evs[0].Kind != dinv.KindAdopted {
+	if n := slices.IndexFunc(evs, func(e dinv.Event) bool { return e.Kind == dinv.KindAdopted }); n < 0 ||
+		slices.ContainsFunc(evs[n+1:], func(e dinv.Event) bool { return e.Kind == dinv.KindAdopted }) {
 		t.Fatalf("events: %+v", evs)
 	}
 }
@@ -313,17 +316,17 @@ func TestTakeOverForgetsOnlyTheReviewsAddressed(t *testing.T) {
 	te.git.branch["/worktrees/feat/theirs"] = "feat/theirs"
 	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 20}
 	st := te.loadRounds(t)
-	st.SetMark(ref.String(), round.AddressedReviews, "2026-10-18T10:00:00Z")
-	st.SetMark(ref.String(), round.Reviewed, "2026-10-18T10:00:00Z@c9")
+	st.SetMark(ref.String(), ghsource.MarkAddressedReviews, "2026-10-18T10:00:00Z")
+	st.SetMark(ref.String(), ghsource.MarkReviewed, "2026-10-18T10:00:00Z@c9")
 	te.saveRounds(t, st)
 	if code := te.run("take-over", ref.URL()); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	st = te.loadRounds(t)
-	if got := st.Mark(ref.String(), round.AddressedReviews); got != "" {
+	if got := st.Mark(ref.String(), ghsource.MarkAddressedReviews); got != "" {
 		t.Fatalf("the reviews addressed, %q, survived the take-over", got)
 	}
-	if got := st.Mark(ref.String(), round.Reviewed); got == "" {
+	if got := st.Mark(ref.String(), ghsource.MarkReviewed); got == "" {
 		t.Fatal("the take-over forgot my own review")
 	}
 }

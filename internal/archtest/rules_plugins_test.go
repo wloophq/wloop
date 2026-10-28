@@ -78,7 +78,7 @@ var pluginDebt = []debt{
 	{"internal/brief", "internal/github", briefQueueDebt, false},
 }
 
-const briefQueueDebt = "debt: the brief queue briefs GitHub's pull requests in process until X8c2 moves its brief source into the GitHub plugin"
+const briefQueueDebt = "debt: the brief queue keys its runs by pull request; it reads their input through the GitHub plugin's Briefer"
 
 const daemonTestsDebt = "debt: the daemon's tests serve the GitHub plugin in process until X8c3 runs it as a binary"
 

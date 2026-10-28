@@ -30,20 +30,18 @@ func runTakeOver(ctx context.Context, e *Env, args []string) error {
 	return e.action(ctx, ref, "take_over", api.ActionRequest{}, "done by the daemon")
 }
 
-// markAdopted records the adoption in the inventory, as the take-over action
-// does, so the pull request shows in "mine".
+// markAdopted records the adoption adoptPR had the GitHub plugin keep, as
+// the take-over action does.
 func (e *Env) markAdopted(ctx context.Context, ref pr.Ref) error {
 	store, err := e.store()
 	if err != nil {
 		return err
 	}
-	if err := store.SetAdopted(ctx, ref); err != nil {
-		return err
-	}
 	return store.RecordEvent(ctx, dinv.Event{PR: ref, Kind: dinv.KindAdopted, At: e.Now()})
 }
 
-// adoptPR uses profile as the agent home when no project sets one,
+// adoptPR uses profile as the agent home when no project sets one, has
+// the GitHub plugin keep the adoption, so the pull request shows in "mine",
 // and returns the author workspace it settled on.
 func adoptPR(ctx context.Context, e *Env, cfg config.Config, ref pr.Ref, profile string) (wsdomain.Workspace, error) {
 	cfg = prConfig(cfg, ref, profile)
@@ -67,7 +65,7 @@ func adoptPR(ctx context.Context, e *Env, cfg config.Config, ref pr.Ref, profile
 		return wsdomain.Workspace{}, err
 	}
 	fmt.Fprintf(e.Out, "%s: %s\n%s\n", action, pr.Title, ws.Path)
-	return ws, e.clearFingerprint(ctx, ref)
+	return ws, e.adoptInPlugin(ctx, ref, pr)
 }
 
 // authorWorkspace finds the PR's author workspace, else turns its review

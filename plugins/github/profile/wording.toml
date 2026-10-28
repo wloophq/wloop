@@ -1,0 +1,4 @@
+# How a turn names a pull request; the reference and its short form are
+# the pull request's owner/repo#number.
+noun = "pull request"
+this = "this pull request"

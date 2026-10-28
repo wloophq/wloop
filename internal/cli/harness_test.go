@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
+	factsgithub "github.com/wloophq/wloop/internal/adapter/facts/github"
 	"github.com/wloophq/wloop/internal/adapter/gitcheck"
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/source/github/present"
@@ -637,6 +638,14 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 	te.served, te.stopServed = context.WithCancel(context.Background())
 	te.Env.intents = newEnvIntents(te.Env)
 	te.Env.planReads = syncedInputs{te}
+	te.Env.payloadPlanner = func() (psource.PayloadPlanner, error) { return te.liveGitHubPlugin() }
+	te.Env.briefReader = func() (briefReader, error) { return te.liveGitHubPlugin() }
+	te.Env.pluginEffects = func(p unit.ProviderID) (effectApplier, bool) {
+		if p != unit.GitHub {
+			return nil, false
+		}
+		return te.githubPluginOf(), true
+	}
 	if ws != nil {
 		te.cfg.WorkspaceManagers = slices.Compact([]string{ws.Name(), "orca"})
 	}
@@ -652,7 +661,9 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 	te.Rounds = sqlite.NewRounds(db)
 	te.Store = inventory.New(db)
 	te.Env.reports = func(st *inventory.Store) readmodel.Reports {
-		return ghreporttest.Inventory{Store: st, Now: func() time.Time { return te.Env.Now() }, Config: func() config.Config { return te.cfg }}
+		return ghreporttest.Inventory{Store: st, Now: func() time.Time { return te.Env.Now() }, Config: func() config.Config { return te.cfg },
+			Plan: &ghreporttest.InventoryPlan{Facts: storeInputs{st}, Rounds: te.Rounds, Books: te.repo, Snapshot: liveSnapshot{te.Env},
+				Git: ghreporttest.GitOf(factsgithub.LocalGit(te.Env.Git), te.Env.Git)}}
 	}
 	te.repo, te.sink = sqlite.New(db), testsink.New("test")
 	te.reg = &testRegistry{Registry: te.repo, Handles: te.repo, noMCP: map[string]bool{}}
@@ -899,4 +910,24 @@ func (te *testEnv) pluginPrepare() func(context.Context, src.ActionRequest) (jso
 	host := b.Host()
 	viewer := func(ctx context.Context) (string, error) { return te.Store.Viewer(ctx, unit.GitHub) }
 	return ghreporttest.Prepare(func() src.Host { return host }, viewer, func() []string { return prrow.IgnoreOf(te.cfg) }, te.Now)
+}
+
+// liveGitHubPlugin is te's GitHub plugin while te's test runs; work the
+// daemon still runs past its end reaches none.
+func (te *testEnv) liveGitHubPlugin() (*src.Client, error) {
+	if err := te.t.Context().Err(); err != nil {
+		return nil, fmt.Errorf("%w: the test ended", src.ErrUnavailable)
+	}
+	return te.githubPluginOf(), nil
+}
+
+// liveSnapshot is the workspace snapshot of e's managers as they are when
+// read; none while they keep no snapshot.
+type liveSnapshot struct{ e *Env }
+
+func (l liveSnapshot) Read(ctx context.Context, want wsdomain.Part) (*wsdomain.Snapshot, error) {
+	if l.e.WS == nil || !l.e.WS.Snapshots() {
+		return nil, nil
+	}
+	return l.e.WS.Read(ctx, want)
 }

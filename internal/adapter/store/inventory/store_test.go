@@ -16,7 +16,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
@@ -574,7 +573,7 @@ func TestFirstRoundBlocks(t *testing.T) {
 func TestAStartBlockAnOlderReleaseWroteReadsWithoutAConflictHead(t *testing.T) {
 	key := strings.Join([]string{"2026-10-09T10:00:00Z", "trust", "/src/api", "", "", "", "triage", "f1", "c2"}, "\n")
 	b, ok := StartBlockOf(port.Event{Kind: dinv.KindRoundBlocked, Key: key})
-	want := StartBlock{Question: "trust", Root: "/src/api", Round: "triage", Skip: map[string]string{round.AddressedReviews: "f1", round.AddressedChecks: "c2"}}
+	want := StartBlock{Question: "trust", Root: "/src/api", Round: "triage", Skip: map[string]string{"addressed.reviews": "f1", "addressed.checks": "c2"}}
 	if !ok || !reflect.DeepEqual(b, want) {
 		t.Fatalf("%+v %v", b, ok)
 	}

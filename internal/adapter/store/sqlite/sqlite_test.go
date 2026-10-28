@@ -181,8 +181,9 @@ func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a.SetHeads(key, "abc", "def")
-	b.RecordSent(key, round.Reviewed, "fp", now)
+	a.SetMark(key, "addressed.checks", "abc")
+	a.SetMark(key, "addressed.conflict", "def")
+	b.RecordSent(key, "reviewed", "fp", now)
 	b.SetAgentHome(key, "/home/me/.claude")
 	if err := r.Save(ctx, a); err != nil {
 		t.Fatal(err)
@@ -195,7 +196,7 @@ func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := c.PRs[key]
-	if p.Marks[round.AddressedChecks] != "abc" || p.Marks[round.AddressedConflict] != "def" || p.Marks[round.Reviewed] != "fp" || p.AgentHome != "/home/me/.claude" || !p.SentAt.Equal(now) {
+	if p.Marks["addressed.checks"] != "abc" || p.Marks["addressed.conflict"] != "def" || p.Marks["reviewed"] != "fp" || p.AgentHome != "/home/me/.claude" || !p.SentAt.Equal(now) {
 		t.Fatalf("%+v", p)
 	}
 	if d := c.Days[round.DayKey(now)]; d.Total != 1 || d.PerPR[key] != 1 {
@@ -203,7 +204,7 @@ func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
 	}
 
 	c.Count(key, now)
-	c.SetMark(key, round.AddressedConflict, "")
+	c.SetMark(key, "addressed.conflict", "")
 	c.FirstCapHit("acme/api#8", now)
 	other, _ := r.Load(ctx)
 	other.Count("acme/web#1", now)
@@ -217,7 +218,7 @@ func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
 	}
 	d, _ := r.Load(ctx)
 	day := d.Days[round.DayKey(now)]
-	if day.Total != 3 || day.PerPR[key] != 2 || day.PerPR["acme/web#1"] != 1 || !slices.Equal(day.CapLogged, []string{"acme/api#8"}) || d.PRs[key].Marks[round.Reviewed] != "fp" || d.PRs[key].Marks[round.AddressedConflict] != "" {
+	if day.Total != 3 || day.PerPR[key] != 2 || day.PerPR["acme/web#1"] != 1 || !slices.Equal(day.CapLogged, []string{"acme/api#8"}) || d.PRs[key].Marks["reviewed"] != "fp" || d.PRs[key].Marks["addressed.conflict"] != "" {
 		t.Fatalf("day %+v, pr %+v", day, d.PRs[key])
 	}
 
@@ -237,7 +238,7 @@ func TestRoundsSaveRefusesAKeyThatDoesNotParse(t *testing.T) {
 	db, _ := openTemp(t)
 	r := NewRounds(db)
 	st := round.New()
-	st.SetMark("not a key", round.Reviewed, "x")
+	st.SetMark("not a key", "reviewed", "x")
 	if err := r.Save(context.Background(), st); err == nil {
 		t.Fatal("saved a key that does not parse")
 	}

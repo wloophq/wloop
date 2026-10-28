@@ -391,4 +391,14 @@ What a sent draft applies, once: the names a `draft.propose` step lists in `effe
 | `pr.addressed` | github | Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered. |
 | `pr.nudged` | github | Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft. |
 
+## Marks
+
+The marks the plugins' rounds write that a workflow's `when` may read with `handled("<name>", <fact>)`, besides those a loaded workflow records. A plugin declares them in its manifest's `[[source.marks]]`.
+
+| Mark | Unit | Covers |
+|---|---|---|
+| `addressed.reviews` | github | The newest review an address round triaged on a pull request you develop, a time: `handled("addressed.reviews", <time>)`. |
+| `addressed.checks` | github | The head whose failing checks an address round covered: `handled("addressed.checks", pr.head)`. |
+| `addressed.conflict` | github | The head whose conflict with the base an address round covered: `handled("addressed.conflict", pr.head)`. |
+
 This page is generated from the binary's fact registry by `make docs-ref`.

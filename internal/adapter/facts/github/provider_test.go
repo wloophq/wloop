@@ -26,8 +26,8 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
-	"github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
+	"github.com/wloophq/wloop/plugins/github/plan"
 )
 
 // t0 is a Wednesday afternoon.
@@ -80,8 +80,8 @@ func (w *world) provider() *factsgithub.Provider { return w.providerWith(nil) }
 // providerWith is provider over a change log, which keeps its view between
 // calls; nil builds one per call.
 func (w *world) providerWith(changes port.Changes) *factsgithub.Provider {
-	d := factsgithub.Deps{Inputs: w, Store: w, Snapshot: w, Books: w, Rounds: w, Git: w.git, Branches: w.branches,
-		Cfg: func() config.Config { return w.cfg }, Sink: "board", Clock: clock{w},
+	d := factsgithub.Deps{Inputs: w, Store: w, Snapshot: w, Books: w, Rounds: w, Git: w.git,
+		Cfg: func() config.Config { return w.cfg }, Clock: clock{w},
 		Intents: func() *dintent.Registry { return turnstest.Intents() }, Reports: w}
 	if changes != nil {
 		d.Changes = changes
@@ -293,10 +293,10 @@ func TestFollowupFactsMatchChangeReviewer(t *testing.T) {
 		{name: "no review by me", edit: func(_ *dinv.PR, f *pr.Facts) { f.Reviews = nil }},
 		{name: "new commits", action: "follow-up"},
 		{name: "this head got its follow-up", setup: func(w *world) {
-			w.rounds.SetMark(ref(7).String(), round.Reviewed, t0.Add(-2*time.Hour).UTC().Format(time.RFC3339)+"@c2")
+			w.rounds.SetMark(ref(7).String(), plan.MarkReviewed, t0.Add(-2*time.Hour).UTC().Format(time.RFC3339)+"@c2")
 		}},
 		{name: "this review got its follow-up", setup: func(w *world) {
-			w.rounds.SetMark(ref(7).String(), round.Reviewed, t0.Add(-2*time.Hour).UTC().Format(time.RFC3339))
+			w.rounds.SetMark(ref(7).String(), plan.MarkReviewed, t0.Add(-2*time.Hour).UTC().Format(time.RFC3339))
 		}},
 		{name: "draft", edit: func(row *dinv.PR, _ *pr.Facts) { row.IsDraft = true }},
 		{name: "fork", edit: func(row *dinv.PR, _ *pr.Facts) { row.IsFork = true }},
@@ -312,7 +312,7 @@ func TestFollowupFactsMatchChangeReviewer(t *testing.T) {
 				c.setup(w)
 			}
 			want := dchange.Reviewer(dchange.ReviewerInput{PR: w.details[r].Facts, Viewer: me, WorkspaceStatus: w.snap.Workspaces[1].Status,
-				CompletedStatus: "Done", TrustedOwners: []string{"acme"}, LastFingerprint: w.rounds.Mark(r.String(), round.Reviewed)})
+				CompletedStatus: "Done", TrustedOwners: []string{"acme"}, LastFingerprint: w.rounds.Mark(r.String(), plan.MarkReviewed)})
 			f := w.facts(t, w.provider(), r.Unit())
 			if f["pr.review.action"] != c.action || f["pr.review.reason"] != want.Reason {
 				t.Fatalf("review = %q, %q; want %q, %q", f["pr.review.action"], f["pr.review.reason"], c.action, want.Reason)
@@ -361,7 +361,7 @@ func TestFirstRoundFactsCarryTheSkipReason(t *testing.T) {
 		reason string
 	}{
 		{name: "due", due: true, reason: "my review was requested"},
-		{name: "skipped", setup: func(w *world) { w.rounds.SkipFirstRound(ref(3).String()) }, reason: "you skipped its first round"},
+		{name: "skipped", setup: func(w *world) { w.rounds.SetMark(ref(3).String(), plan.MarkFirstSkipped, "1") }, reason: "you skipped its first round"},
 		{name: "review workspace", setup: func(w *world) {
 			w.workspace(wsdomain.Workspace{ID: "rev", DisplayName: "REVIEW feature", Branch: "feature-x"})
 		}, reason: "its review workspace exists"},
@@ -414,18 +414,18 @@ func TestAddressFactsMatchReviewsToAddressAndFailingChecks(t *testing.T) {
 	if f["pr.address.reason"] != "reviewed by bob; failing checks: lint" || f["pr.address.observed"] != false {
 		t.Fatalf("reason = %q, observed %v", f["pr.address.reason"], f["pr.address.observed"])
 	}
-	c, ok := w.planned(t, p, r.Unit(), factsgithub.RoundAddress)
-	want := map[string]string{round.AddressedReviews: fp, round.AddressedChecks: "head"}
+	c, ok := w.planned(t, p, r.Unit(), plan.RoundAddress)
+	want := map[string]string{plan.MarkAddressedReviews: fp, plan.MarkAddressedChecks: "head"}
 	if !ok || !maps.Equal(c.OnSent, want) || !maps.Equal(c.OnSkipped, want) || c.Workspace.ID != "dev" || c.Head != "head" {
 		t.Fatalf("round = %+v, %v", c, ok)
 	}
 
-	w.rounds.SetMark(r.String(), round.AddressedReviews, fp)
-	w.rounds.SetHeads(r.String(), "head", "")
+	w.rounds.SetMark(r.String(), plan.MarkAddressedReviews, fp)
+	w.rounds.SetMark(r.String(), plan.MarkAddressedChecks, "head")
 	if f := w.facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "nothing to address" {
 		t.Fatalf("a handled pull request is due: %v", f)
 	}
-	if _, ok := w.planned(t, w.provider(), r.Unit(), factsgithub.RoundAddress); ok {
+	if _, ok := w.planned(t, w.provider(), r.Unit(), plan.RoundAddress); ok {
 		t.Fatal("a handled pull request plans its round")
 	}
 }
@@ -444,8 +444,8 @@ func TestAConflictPastItsWindowStartsOneAddressRoundPerHead(t *testing.T) {
 	if f["pr.head"] != "head" || f["pr.conflicting_for"] != time.Hour {
 		t.Fatalf("signals: head %v, conflicting for %v", f["pr.head"], f["pr.conflicting_for"])
 	}
-	c, ok := w.planned(t, p, r.Unit(), factsgithub.RoundAddress)
-	if want := map[string]string{round.AddressedConflict: "head"}; !ok || !maps.Equal(c.OnSent, want) || !maps.Equal(c.OnSkipped, want) {
+	c, ok := w.planned(t, p, r.Unit(), plan.RoundAddress)
+	if want := map[string]string{plan.MarkAddressedConflict: "head"}; !ok || !maps.Equal(c.OnSent, want) || !maps.Equal(c.OnSkipped, want) {
 		t.Fatalf("round = %+v, %v", c, ok)
 	}
 	first := f["pr.fingerprint"]
@@ -453,7 +453,7 @@ func TestAConflictPastItsWindowStartsOneAddressRoundPerHead(t *testing.T) {
 	for name, v := range c.OnSkipped {
 		w.rounds.SetMark(r.String(), name, v)
 	}
-	if _, ok := w.planned(t, w.provider(), r.Unit(), factsgithub.RoundAddress); ok || w.rounds.Mark(r.String(), round.AddressedConflict) != "head" {
+	if _, ok := w.planned(t, w.provider(), r.Unit(), plan.RoundAddress); ok || w.rounds.Mark(r.String(), plan.MarkAddressedConflict) != "head" {
 		t.Fatalf("an address round skipped with its conflict head is planned again")
 	}
 	if f := w.facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "nothing to address" || f["pr.address.conflict"] != false {
@@ -461,13 +461,8 @@ func TestAConflictPastItsWindowStartsOneAddressRoundPerHead(t *testing.T) {
 	}
 
 	row, d := w.rows[r], w.details[r]
-	row.HeadOid, d.HeadRefOid, d.Mergeable = "head2", "head2", "UNKNOWN"
+	row.HeadOid, d.HeadRefOid = "head2", "head2"
 	w.rows[r], w.details[r] = row, d
-	if f := w.facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false {
-		t.Fatalf("a new head GitHub has not judged yet, under the stored conflict: %v", f)
-	}
-	d.Mergeable = "CONFLICTING"
-	w.details[r] = d
 	f = w.facts(t, w.provider(), r.Unit())
 	if f["pr.address.due"] != true || f["pr.fingerprint"] == first {
 		t.Fatalf("a conflict on a new head: %v", f)
@@ -594,9 +589,7 @@ func TestFactsAreReadOnlyAndSendNoGitHubRequest(t *testing.T) {
 	ctx := context.Background()
 	for _, u := range units {
 		w.facts(t, p, u)
-		if _, err := p.Plan(ctx, plugin.Unit{Provider: string(u.Provider), Key: u.Key}, w.roundState(u)); err != nil {
-			t.Fatal(err)
-		}
+		w.plan(u, w.roundState(u))
 		if _, err := p.Author(ctx, u, true); err != nil {
 			t.Fatal(err)
 		}
@@ -610,19 +603,13 @@ func TestFactsAreReadOnlyAndSendNoGitHubRequest(t *testing.T) {
 	}
 }
 
-// state is the sweep's round state as the composition root gives Settle.
-type state struct{ st *round.Store }
-
-func (s state) Save(context.Context) error { return nil }
-func (s state) Rounds() *round.Store       { return s.st }
-
 func TestSettleWritesTheBasesBookkeeping(t *testing.T) {
 	w := newWorld()
 	reviewed := w.review(7, nil)
 	reviewedAt := t0.Add(-2 * time.Hour).UTC().Format(time.RFC3339)
-	w.rounds.SetMark(reviewed.String(), round.Reviewed, reviewedAt)
+	w.rounds.SetMark(reviewed.String(), plan.MarkReviewed, reviewedAt)
 	skipped := w.requested(3, func(row *dinv.PR, _ *pr.Facts) { row.HeadBranch = "skipped" })
-	w.rounds.SkipFirstRound(skipped.String())
+	w.rounds.SetMark(skipped.String(), plan.MarkFirstSkipped, "1")
 	w.workspace(wsdomain.Workspace{ID: "rev3", DisplayName: "REVIEW skipped", Branch: "skipped"})
 	w.blocks[skipped] = dinv.Event{PR: skipped, Kind: dinv.KindRoundBlocked, Data: "old"}
 	busy := w.requested(4, func(row *dinv.PR, _ *pr.Facts) { row.HeadBranch = "busy" })
@@ -633,15 +620,11 @@ func TestSettleWritesTheBasesBookkeeping(t *testing.T) {
 	w.blocks[gone] = dinv.Event{PR: gone, Kind: dinv.KindRoundBlocked, Data: "old"}
 	held := w.requested(12, func(row *dinv.PR, _ *pr.Facts) { row.HeadBranch = "busy" })
 	w.overrides[held] = dinv.Override{PR: held, Hold: true}
-	w.rounds.Saved()
-
-	if err := w.provider().Settle(context.Background(), state{w.rounds}); err != nil {
-		t.Fatal(err)
-	}
-	if fp := w.rounds.Mark(reviewed.String(), round.Reviewed); fp != reviewedAt+"@c2" {
+	w.settle()
+	if fp := w.rounds.Mark(reviewed.String(), plan.MarkReviewed); fp != reviewedAt+"@c2" {
 		t.Fatalf("fingerprint = %q, want the head added", fp)
 	}
-	if w.rounds.FirstRoundSkipped(skipped.String()) {
+	if w.rounds.Mark(skipped.String(), plan.MarkFirstSkipped) != "" {
 		t.Fatal("a review workspace left the first round skipped")
 	}
 	got := map[pr.Ref]string{}
@@ -656,14 +639,20 @@ func TestSettleWritesTheBasesBookkeeping(t *testing.T) {
 	if !maps.Equal(got, want) {
 		t.Fatalf("recorded %v, want %v", got, want)
 	}
-	if err := w.provider().Settle(context.Background(), struct{ state2 }{}); err == nil {
-		t.Fatal("settling without the round store succeeded")
-	}
 }
 
-type state2 struct{}
-
-func (state2) Save(context.Context) error { return nil }
+// settle has the plugin's planner settle the world: its marks onto the
+// round state, its events recorded.
+func (w *world) settle() {
+	env, pe, ins := w.inputs()
+	marks, evs := ghreporttest.Settled(env, pe, ins)
+	for ref, m := range marks {
+		for name, v := range m {
+			w.rounds.SetMark(ref.String(), name, v)
+		}
+	}
+	w.recorded = append(w.recorded, evs...)
+}
 
 func TestStaleDetailSetsStale(t *testing.T) {
 	w := newWorld()
@@ -739,35 +728,18 @@ func TestWaitsOnUserFollowsTheRow(t *testing.T) {
 	}
 }
 
-func TestDueMatchesTheBasesNextDue(t *testing.T) {
-	day := 24 * time.Hour
+func TestDueIsTheCapsRollover(t *testing.T) {
 	for _, c := range []struct {
 		name  string
 		setup func(w *world)
 		want  time.Time
 	}{
-		{"review cutoff", func(w *world) {
-			r := w.add(7, "alice", nil)
-			w.books[r.Unit()] = turn.Book{Unit: r.Unit(), Turns: []turn.Turn{{Seq: 1, Intent: "review", Role: "pr.review", State: turn.Done, SentAt: t0.Add(-10 * day)}}}
-		}, t0.Add(20 * day)},
 		{"cap rollover", func(w *world) {
 			r := w.review(7, nil)
 			for range w.cfg.Turns.PerUnitPerDay {
 				w.rounds.Count(r.String(), t0)
 			}
 		}, nextDay(t0)},
-		{"conflict window", func(w *world) {
-			w.mine(5, func(row *dinv.PR, f *pr.Facts) {
-				row.Mergeable, row.MergeableAt, row.ChecksState = "CONFLICTING", t0.Add(-time.Minute), ""
-				f.Reviews, f.Checks = nil, nil
-			})
-		}, t0.Add(4 * time.Minute)},
-		{"stale detail", func(w *world) {
-			r := w.review(7, nil)
-			d := w.details[r]
-			d.ReadAt = time.Time{}
-			w.details[r] = d
-		}, t0.Add(2 * time.Minute)},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			w := newWorld()
@@ -929,13 +901,11 @@ func (w *world) roundState(u unit.Unit) src.RoundState {
 	return src.RoundState{Marks: maps.Clone(p.Marks), SentAt: p.SentAt, AgentHome: p.AgentHome, Today: day.PerPR[u.Key], DayTotal: day.Total}
 }
 
-// planned is the round name p plans on u over w's round state.
-func (w *world) planned(t *testing.T, p *factsgithub.Provider, u unit.Unit, name string) (src.Round, bool) {
+// planned is the round name the plugin's planner plans on u over w's round
+// state.
+func (w *world) planned(t *testing.T, _ *factsgithub.Provider, u unit.Unit, name string) (src.Round, bool) {
 	t.Helper()
-	plan, err := p.Plan(context.Background(), plugin.Unit{Provider: string(u.Provider), Key: u.Key}, w.roundState(u))
-	if err != nil {
-		t.Fatal(err)
-	}
+	plan := w.plan(u, w.roundState(u))
 	i := slices.IndexFunc(plan.Rounds, func(r src.Round) bool { return r.Name == name })
 	if i < 0 {
 		return src.Round{}, false
@@ -943,21 +913,23 @@ func (w *world) planned(t *testing.T, p *factsgithub.Provider, u unit.Unit, name
 	return plan.Rounds[i], true
 }
 
+func (w *world) plan(u unit.Unit, st src.RoundState) src.Plan {
+	env, pe, ins := w.inputs()
+	r, _ := pr.RefOf(u)
+	return ghreporttest.PlanOf(env, pe, ins, r, st)
+}
+
 func TestTheFirstRoundPlanReadsTheHostsRoundState(t *testing.T) {
 	w := newWorld()
 	r := w.requested(3, nil)
 	p := w.provider()
-	first, ok := w.planned(t, p, r.Unit(), factsgithub.RoundFirst)
-	if !ok || !maps.Equal(first.OnSkipped, map[string]string{round.FirstSkipped: "1"}) || len(first.OnSent) != 0 {
+	first, ok := w.planned(t, p, r.Unit(), plan.RoundFirst)
+	if !ok || !maps.Equal(first.OnSkipped, map[string]string{plan.MarkFirstSkipped: "1"}) || len(first.OnSent) != 0 {
 		t.Fatalf("first round %+v, %v", first, ok)
 	}
 	st := w.roundState(r.Unit())
-	st.Marks = map[string]string{round.FirstSkipped: "1"}
-	plan, err := p.Plan(context.Background(), plugin.Unit{Provider: string(r.Unit().Provider), Key: r.Unit().Key}, st)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(plan.Rounds) != 0 {
+	st.Marks = map[string]string{plan.MarkFirstSkipped: "1"}
+	if plan := w.plan(r.Unit(), st); len(plan.Rounds) != 0 {
 		t.Fatalf("a round state whose first round was skipped plans %+v", plan.Rounds)
 	}
 }
@@ -973,23 +945,46 @@ func (w *world) Units(_ context.Context, p unit.ProviderID) ([]unit.Unit, error)
 	return out, nil
 }
 
-// Reported are the plugin's reports of units, derived from the world now.
+// Reported are the plugin's reports of units, its planner's included,
+// derived from the world now.
 func (w *world) Reported(_ context.Context, units []unit.Unit) (map[unit.Unit]src.Snapshot, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	all := w.planned1()
 	out := map[unit.Unit]src.Snapshot{}
 	for _, u := range units {
-		r, ok := pr.RefOf(u)
-		row, held := w.rows[r]
-		if !ok || !held {
-			continue
+		if s, ok := all[u]; ok {
+			out[u] = s
 		}
-		in := ghreporttest.Input{PR: row, Events: w.events[r], Adopted: w.overrides[r].Adopted, Tracked: w.overrides[r].Tracked}
+	}
+	return out, nil
+}
+
+// inputs are the world's pull requests as the plugin's planner reads them.
+func (w *world) inputs() (ghreporttest.Env, ghreporttest.PlanEnv, []ghreporttest.Input) {
+	cfg := w.cfg
+	env := ghreporttest.Env{Viewer: w.viewer, Now: w.now, Stalled: &cfg.GitHub.Stalled, Teams: []string{}}
+	pe := ghreporttest.PlanEnv{Rounds: w.rounds, Pause: w.pause, Books: w.books, Snapshot: w.snap, Git: ghreporttest.GitOf(w.git, w.branches), Config: cfg}
+	var ins []ghreporttest.Input
+	for _, r := range slices.SortedFunc(maps.Keys(w.rows), func(a, b pr.Ref) int { return a.Number - b.Number }) {
+		row := w.rows[r]
+		evs := slices.Clone(w.events[r])
+		if b, ok := w.blocks[r]; ok {
+			evs = append(evs, b)
+		}
+		if w.ended[r.Unit()] {
+			evs = append(evs, dinv.Event{PR: r, Kind: dinv.KindReviewEnded, At: w.now})
+		}
+		in := ghreporttest.Input{PR: row, Events: evs, Adopted: w.overrides[r].Adopted, Tracked: w.overrides[r].Tracked, Held: w.overrides[r].Hold}
 		if f, ok := w.details[r]; ok {
 			in.Facts = &f
 		}
-		cfg := w.cfg
-		out[u] = ghreporttest.Snapshot(ghreporttest.Env{Viewer: w.viewer, Now: w.now, Stalled: &cfg.GitHub.Stalled, Teams: []string{}}, in)
+		ins = append(ins, in)
 	}
-	return out, nil
+	return env, pe, ins
+}
+
+func (w *world) planned1() map[unit.Unit]src.Snapshot {
+	env, pe, ins := w.inputs()
+	return ghreporttest.Planned(env, pe, ins)
 }

@@ -154,9 +154,9 @@ func (e *Env) turnByHand(ctx context.Context, h handTurn, text io.Writer) error 
 			return false, err
 		}
 		sr.pr, sr.cfg, sr.inputs, sr.id = pr, cfg, h.inputs, sent.ID
-		e.applySentEffects(ctx, routeSession, d, sr)
+		err = e.applySentEffects(ctx, routeSession, d, sr)
 		e.recordGuidance(ctx, ref, sr.guidance)
-		return true, nil
+		return true, err
 	})
 }
 
@@ -394,10 +394,10 @@ func (e *Env) handRound(ctx context.Context, rt route, ref pr.Ref, guidance stri
 	if err != nil {
 		return err
 	}
-	if sent, err = send(st, r); err != nil {
+	if sent, err = send(st, r); err != nil && !sent {
 		return err
 	}
-	return rounds.Save(ctx, st)
+	return errors.Join(rounds.Save(ctx, st), err)
 }
 
 // locators know the unit a checkout holds: each source plugin's this

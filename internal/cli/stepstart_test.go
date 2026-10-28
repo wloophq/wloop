@@ -9,6 +9,7 @@ import (
 	"time"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/automation"
@@ -25,8 +26,6 @@ import (
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
-	"github.com/wloophq/wloop/internal/source"
-	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
@@ -37,7 +36,6 @@ import (
 type fakePlanner struct {
 	mu     sync.Mutex
 	rounds map[string][]src.Round
-	reads  map[string]dinv.PlanFacts
 	states []src.RoundState
 }
 
@@ -46,12 +44,6 @@ func (f *fakePlanner) Plan(_ context.Context, u plugin.Unit, st src.RoundState) 
 	defer f.mu.Unlock()
 	f.states = append(f.states, st)
 	return src.Plan{Rounds: slices.Clone(f.rounds[u.Key])}, nil
-}
-
-func (f *fakePlanner) PlanFacts(_ context.Context, u unit.Unit) (dinv.PlanFacts, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.reads[u.Key], nil
 }
 
 // round is the round name of key's plan; false when it plans none.
@@ -90,28 +82,16 @@ func plannedRounds(t *testing.T, sc sweepCase) *fakePlanner {
 	return out
 }
 
-// livePlanner is the github planner of sc's pull request, once the
-// collector read sc's fake GitHub.
+// livePlanner is the GitHub plugin's planner of sc's pull request, once
+// it read sc's fake GitHub.
 func livePlanner(t *testing.T, sc sweepCase) roundPlanner {
 	t.Helper()
 	te := sc.te
-	ctx := context.Background()
-	if err := te.syncInventory(ctx); err != nil {
+	if err := te.syncInventory(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	linkWorkspaces(t, te)
-	cfg := te.cfg
-	ws := te.WS
-	if !ws.Snapshots() {
-		ws = workspace.NewSet(workspace.NewCached(sc.ws, sc.ws, time.Minute))
-	}
-	mod, err := ghsource.Module(cfg, source.Deps{DB: te.db, Inventory: te.Store, GitHub: te.github.API, WS: ws, Sink: te.boardSink(cfg),
-		Turns: te.Turns, Clock: clockFunc(sc.env.Now), Log: t.Logf, Git: te.Git, Agents: te.Agents,
-		Intents: func() *dintent.Registry { return te.loadedIntents().Registry }})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return sc.env.planners([]source.Module{mod})[unit.GitHub]
+	return te.githubPluginOf()
 }
 
 // offeredRounds are the rounds the github planner plans on sc's pull
@@ -133,11 +113,7 @@ func offeredRounds(t *testing.T, sc sweepCase) *fakePlanner {
 	if err != nil {
 		t.Fatal(err)
 	}
-	read, err := gh.(prReader).PlanFacts(ctx, u)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return &fakePlanner{rounds: map[string][]src.Round{u.Key: plan.Rounds}, reads: map[string]dinv.PlanFacts{u.Key: read}}
+	return &fakePlanner{rounds: map[string][]src.Round{u.Key: plan.Rounds}}
 }
 
 // fakeBriefs answers every turn with rd and counts what asked.
@@ -393,13 +369,13 @@ func TestDismissWritesSweepSkipsRecords(t *testing.T) {
 		kind          string
 	}{
 		"follow-up": {followupScenario, string(dintent.Review), roundFollowup, func(t *testing.T, st *round.Store, c src.Round, key string) {
-			if want := c.OnSkipped[round.Reviewed]; st.Mark(key, round.Reviewed) != want || want == "" {
-				t.Errorf("fingerprint %q, want %q", st.Mark(key, round.Reviewed), want)
+			if want := c.OnSkipped[ghsource.MarkReviewed]; st.Mark(key, ghsource.MarkReviewed) != want || want == "" {
+				t.Errorf("fingerprint %q, want %q", st.Mark(key, ghsource.MarkReviewed), want)
 			}
 		}, "follow-up"},
 		"triage": {addressScenario, string(dintent.Address), "", func(t *testing.T, st *round.Store, c src.Round, key string) {
-			if st.Mark(key, round.AddressedReviews) != c.OnSkipped[round.AddressedReviews] || st.Mark(key, round.AddressedChecks) != c.OnSkipped[round.AddressedChecks] {
-				t.Errorf("fingerprint %q, checks head %q; want %+v", st.Mark(key, round.AddressedReviews), st.Mark(key, round.AddressedChecks), c)
+			if st.Mark(key, ghsource.MarkAddressedReviews) != c.OnSkipped[ghsource.MarkAddressedReviews] || st.Mark(key, ghsource.MarkAddressedChecks) != c.OnSkipped[ghsource.MarkAddressedChecks] {
+				t.Errorf("fingerprint %q, checks head %q; want %+v", st.Mark(key, ghsource.MarkAddressedReviews), st.Mark(key, ghsource.MarkAddressedChecks), c)
 			}
 		}, "triage"},
 	} {

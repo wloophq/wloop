@@ -154,10 +154,7 @@ func TestSettleKeepsTheAgentsQuestionOnAnOpenPRNoLongerRequestingMe(t *testing.T
 	for _, r := range []pr.Ref{open, closed} {
 		w.blocks[r] = dinv.Event{PR: r, Kind: dinv.KindRoundBlocked, Key: b.Key(t0.Add(-time.Hour)), At: t0.Add(-time.Hour), Data: "could not start"}
 	}
-	w.rounds.Saved()
-	if err := w.provider().Settle(context.Background(), state{w.rounds}); err != nil {
-		t.Fatal(err)
-	}
+	w.settle()
 	if len(w.recorded) != 1 || w.recorded[0].PR != closed || w.recorded[0].Kind != dinv.KindRoundUnblocked || w.recorded[0].Data != "it is closed" {
 		t.Fatalf("recorded %+v", w.recorded)
 	}

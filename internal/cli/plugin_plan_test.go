@@ -2,12 +2,16 @@ package cli
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"maps"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -31,10 +35,12 @@ import (
 // key, keeps the round state of each plan and the effects it applied.
 type stubPlanner struct {
 	*sourcetest.Stub
-	mu      sync.Mutex
-	rounds  map[string][]src.Round
-	states  []src.RoundState
-	effects []src.EffectRequest
+	// unsupported answers every effect with src.ErrUnsupported.
+	unsupported bool
+	mu          sync.Mutex
+	rounds      map[string][]src.Round
+	states      []src.RoundState
+	effects     []src.EffectRequest
 }
 
 func newStubPlanner(rounds map[string][]src.Round) *stubPlanner {
@@ -56,6 +62,9 @@ func (p *stubPlanner) ApplyEffect(_ context.Context, req src.EffectRequest) erro
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.effects = append(p.effects, req)
+	if p.unsupported {
+		return fmt.Errorf("%w: effect %s", src.ErrUnsupported, req.Effect)
+	}
 	return nil
 }
 
@@ -92,7 +101,7 @@ func TestARoundLaunchesFromAPluginPlan(t *testing.T) {
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	key := sc.ref.String()
 	p := newStubPlanner(map[string][]src.Round{key: {{Name: roundFollowup, Workspace: src.WorkspaceRef{Manager: "orca", ID: "ws-rev"},
-		Head: "c3", Reason: "the plugin planned it", OnSent: map[string]string{round.Reviewed: "fp-plan", "plugin.own": "x"}}}})
+		Head: "c3", Reason: "the plugin planned it", OnSent: map[string]string{ghsource.MarkReviewed: "fp-plan", "plugin.own": "x"}}}})
 	r.launchPlanner(t, p)
 	got, err := r.run(t, automation.RunOpts{})
 	if err != nil {
@@ -105,7 +114,7 @@ func TestARoundLaunchesFromAPluginPlan(t *testing.T) {
 		t.Fatalf("prompts %+v", sc.ws.Prompts)
 	}
 	st := sc.te.loadRounds(t)
-	if st.Mark(key, round.Reviewed) != "fp-plan" || st.Mark(key, "plugin.own") != "x" || st.Days[round.DayKey(testNow)].PerPR[key] != 1 {
+	if st.Mark(key, ghsource.MarkReviewed) != "fp-plan" || st.Mark(key, "plugin.own") != "x" || st.Days[round.DayKey(testNow)].PerPR[key] != 1 {
 		t.Fatalf("marks %v, rounds today %d", st.PRs[key].Marks, st.Days[round.DayKey(testNow)].PerPR[key])
 	}
 	if len(p.planned()) == 0 {
@@ -126,11 +135,11 @@ func TestPlanReceivesTheRoundState(t *testing.T) {
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	key := sc.ref.String()
 	p := newStubPlanner(map[string][]src.Round{key: {{Name: roundFollowup, Reason: "planned",
-		OnSkipped: map[string]string{round.Reviewed: "fp-skip", "plugin.gone": ""}}}})
+		OnSkipped: map[string]string{ghsource.MarkReviewed: "fp-skip", "plugin.gone": ""}}}})
 	r.launchPlanner(t, p)
 	sent := testNow.Add(-time.Hour)
 	st := r.load(t)
-	st.RecordSent(key, round.Reviewed, "fp-old", sent)
+	st.RecordSent(key, ghsource.MarkReviewed, "fp-old", sent)
 	st.SetMark(key, "plugin.gone", "y")
 	st.SetAgentHome(key, "/homes/ana")
 	st.Count("acme/api#99", testNow)
@@ -148,7 +157,7 @@ func TestPlanReceivesTheRoundState(t *testing.T) {
 		t.Fatal("the plugin was never asked its plan")
 	}
 	got := states[len(states)-1]
-	if got.Marks[round.Reviewed] != "fp-old" || got.Marks["plugin.gone"] != "y" || !got.SentAt.Equal(sent) || got.AgentHome != "/homes/ana" {
+	if got.Marks[ghsource.MarkReviewed] != "fp-old" || got.Marks["plugin.gone"] != "y" || !got.SentAt.Equal(sent) || got.AgentHome != "/homes/ana" {
 		t.Errorf("bookkeeping %+v", got)
 	}
 	if got.Today != 1 || got.DayTotal != 2 {
@@ -168,7 +177,7 @@ func TestPlanReceivesTheRoundState(t *testing.T) {
 	}
 	r.save(t)
 	saved := sc.te.loadRounds(t)
-	if saved.Mark(key, round.Reviewed) != "fp-skip" || saved.Mark(key, "plugin.gone") != "" {
+	if saved.Mark(key, ghsource.MarkReviewed) != "fp-skip" || saved.Mark(key, "plugin.gone") != "" {
 		t.Fatalf("a skip writes the plan's OnSkipped: %v", saved.PRs[key].Marks)
 	}
 	if !slicesContainsKind(r.rec.events, dinv.KindRoundSkipped) {
@@ -217,6 +226,23 @@ func TestAPluginEffectRunsThroughApplyEffect(t *testing.T) {
 	last := p.applied()[len(p.applied())-1]
 	if last.Effect != "pr.nudged" || last.Draft == nil || last.Draft.ID != 4 || last.Turn != nil {
 		t.Fatalf("draft effect request %+v", last)
+	}
+}
+
+func TestAnEffectThePluginDoesNotApplyFailsTheLaunch(t *testing.T) {
+	t.Parallel()
+	sc := followupScenario(t)
+	sc.te.gh.basics = openBasics
+	p := newStubPlanner(nil)
+	p.unsupported = true
+	c := sourcetest.Launch(t, string(unit.GitHub), p, src.Host{})
+	sc.env.pluginEffects = func(id unit.ProviderID) (effectApplier, bool) { return c, id == unit.GitHub }
+	err := (cliLauncher{sc.env}).Launch(context.Background(), turns.Launch{Unit: sc.ref.Unit(), Intent: dturn.Intent(dintent.Review), Trigger: dturn.ByHand})
+	if !errors.Is(err, src.ErrUnsupported) || !strings.Contains(err.Error(), "pr.reviewed") {
+		t.Fatalf("launch = %v, want the unsupported effect", err)
+	}
+	if len(p.applied()) != 1 {
+		t.Fatalf("applied %+v", p.applied())
 	}
 }
 
@@ -310,7 +336,7 @@ func TestADismissedFirstRoundIsNotPlannedAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.save(t)
-	if got := sc.te.loadRounds(t).Mark(sc.ref.String(), round.FirstSkipped); got == "" {
+	if got := sc.te.loadRounds(t).Mark(sc.ref.String(), ghsource.MarkFirstSkipped); got == "" {
 		t.Fatal("the dismissal wrote no skip")
 	}
 	if first, ok := firstPlanned(t, sc, gh); ok {
