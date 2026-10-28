@@ -15,12 +15,13 @@ import (
 	"github.com/wloophq/wloop/internal/core/views"
 	"github.com/wloophq/wloop/internal/domain/event"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
 // Retention says how long each kind of row is kept. Zero keeps forever.
+// Every event, turn, record, answer, plan item and brief of a task, or of
+// a unit linked to a task, is kept forever: no rule reaches them.
 type Retention struct {
 	SessionEvents time.Duration // events of no unit or a session unit, of the kinds in SessionEventKinds
 	ViewEvents    time.Duration // view_applied, view_override and view_sink_failed events
@@ -42,7 +43,6 @@ type Retention struct {
 	WorkflowRuns   time.Duration
 	PlanItems      time.Duration // plan items not pending, last saved that long ago
 	WorkflowEvents time.Duration // the engine's events, workflow.EngineKinds
-	VerbEvents     time.Duration // the verbs people ran on tasks, task.VerbEventKinds
 	// UnitlessLoopRows drops the turns, records, answers, intakes, events,
 	// workflow runs and plan items of a github unit with no pull_requests
 	// row, no overrides row and nothing newer.
@@ -79,7 +79,6 @@ var DefaultRetention = Retention{
 	WorkflowRuns:     retentionWindow,
 	PlanItems:        7 * 24 * time.Hour,
 	WorkflowEvents:   retentionWindow,
-	VerbEvents:       retentionWindow,
 	UnitlessLoopRows: retentionWindow,
 	Classifications:  retentionWindow,
 	Fetches:          retentionWindow,
@@ -102,7 +101,6 @@ const (
 // and PlanItems count under their tables.
 const (
 	WorkflowEventsKey   = "workflow_events"
-	VerbEventsKey       = "verb_events"
 	UnitlessLoopRowsKey = "unitless_loop_rows"
 )
 
@@ -124,7 +122,7 @@ func (r Retained) String() string {
 const endedAt = `max(merged_at, closed_at)`
 
 const (
-	retainViewEventsSQL = `DELETE FROM events WHERE kind IN (?, ?, ?) AND at < ?`
+	retainViewEventsSQL = `DELETE FROM events WHERE kind IN (?, ?, ?) AND at < ?` + untaskedEvents
 	retainSessionsSQL   = `DELETE FROM sessions WHERE closed_at != '' AND closed_at < ?
 		AND session_id NOT IN (SELECT session FROM turns WHERE state IN ('sent', 'started', 'asked')
 			UNION SELECT sent_to FROM turns WHERE state IN ('sent', 'started', 'asked'))`
@@ -137,7 +135,7 @@ const (
 		(SELECT j.value FROM turn_instructions r, json_each(r.parts) j WHERE r.parts != '')`
 	retainViewRowsSQL     = `DELETE FROM view_applied WHERE provider = 'github' AND unit_key IN ` + endedUnits
 	endedPRsSQL           = `SELECT owner, repo, number FROM pull_requests WHERE state != 'OPEN' AND ` + endedAt + ` != '' AND ` + endedAt + ` < ?`
-	retainPlanItemsSQL    = `DELETE FROM plan_items WHERE decision != 'pending' AND saved_at < ?`
+	retainPlanItemsSQL    = `DELETE FROM plan_items WHERE decision != 'pending' AND saved_at < ?` + untaskedPlanItems
 	retainWorkflowRunsSQL = `DELETE FROM workflow_runs WHERE status = 'done' AND at < ?`
 	retainSessionRunsSQL  = `DELETE FROM workflow_runs WHERE provider = 'session' AND at < ? AND unit_key NOT IN (SELECT session_id FROM sessions)`
 	retainSessionMarksSQL = `DELETE FROM unit_marks WHERE provider = 'session' AND unit_key NOT IN (SELECT session_id FROM sessions)`
@@ -164,17 +162,29 @@ const (
 
 // A step that ran on a unit of work lives as long as that unit's events.
 var retainWorkflowEventsSQL = `DELETE FROM events WHERE kind IN (` + strings.TrimSuffix(strings.Repeat("?, ", len(workflow.EngineKinds)), ", ") + `) AND at < ?
-	AND NOT (kind = '` + workflow.KindStepRan + `' AND provider NOT IN ('', '` + string(unit.Session) + `', '` + string(unit.Workspace) + `'))`
+	AND NOT (kind = '` + workflow.KindStepRan + `' AND provider NOT IN ('', '` + string(unit.Session) + `', '` + string(unit.Workspace) + `'))` + untaskedEvents
 
-var retainVerbEventsSQL = `DELETE FROM events WHERE kind IN (` + strings.TrimSuffix(strings.Repeat("?, ", len(task.VerbEventKinds)), ", ") + `) AND at < ?`
-
-// unitlessTables are the endedTables UnitlessLoopRows deletes from.
+// unitlessTables are the endedTables UnitlessLoopRows deletes from; like
+// every endedTables query, they skip a unit linked to a task.
 var unitlessTables = []string{"turn_usage", "turns", "turn_records", "turn_answers", "intakes", "events", "workflow_runs", "plan_items", "unit_marks", "round_state"}
 
 // Session-keyed bookkeeping is stored under its session unit, the rest
 // under no unit; a pull request's events never match.
 var retainSessionEventsSQL = `DELETE FROM events WHERE kind IN (` + strings.TrimSuffix(strings.Repeat("?, ", len(SessionEventKinds)), ", ") +
-	`) AND at < ? AND +provider IN ('', 'session')`
+	`) AND at < ? AND +provider IN ('', 'session')` + untaskedEvents
+
+// untaskedEvents and untaskedPlanItems keep every row on a task's unit,
+// or on a unit linked to a task, out of a retention rule.
+const (
+	untaskedEvents = ` AND events.provider != 'task'
+		AND NOT EXISTS (SELECT 1 FROM task_units tu WHERE tu.provider = events.provider AND tu.unit_key = events.unit_key)`
+	untaskedPlanItems = ` AND plan_items.provider != 'task'
+		AND NOT EXISTS (SELECT 1 FROM task_units tu WHERE tu.provider = plan_items.provider AND tu.unit_key = plan_items.unit_key)`
+)
+
+// untaskedUnits reads the bound JSON list of unit keys as endedUnits does,
+// but those a task holds, whose rows are kept forever.
+const untaskedUnits = `(SELECT value FROM json_each(?) WHERE value NOT IN (SELECT unit_key FROM task_units))`
 
 // endedUnits and endedRefs read the bound JSON list of the ended pull
 // requests' unit keys, or of their [owner, repo, number] triples;
@@ -192,21 +202,21 @@ type endedTable struct {
 	query  string
 }
 
-// endedTables are the core's rows of an ended pull request, in delete
-// order: turn_usage goes before the turns it hangs from.
+// endedTables are the core's rows of an ended pull request no task links,
+// in delete order: turn_usage goes before the turns it hangs from.
 var endedTables = slices.Concat([]endedTable{
-	{"turn_usage", port.TopicUsage, `DELETE FROM turn_usage WHERE turn_seq IN (SELECT seq FROM turns WHERE provider = 'github' AND unit_key IN ` + endedUnits + `)`},
-	{"turns", port.TopicTurns, `DELETE FROM turns WHERE provider = 'github' AND unit_key IN ` + endedUnits},
-	{"turn_records", port.TopicTurns, `DELETE FROM turn_records WHERE provider = 'github' AND unit_key IN ` + endedUnits},
-	{"turn_answers", port.TopicTurns, `DELETE FROM turn_answers WHERE provider = 'github' AND unit_key IN ` + endedUnits},
-	{"intakes", port.TopicIntakes, `DELETE FROM intakes WHERE provider = 'github' AND unit_key IN ` + endedUnits},
-	{"events", port.TopicSourceEvents | port.TopicLoopEvents, `DELETE FROM events WHERE provider = 'github' AND unit_key IN ` + endedUnits},
-	{"overrides", port.TopicOverrides, `DELETE FROM overrides WHERE provider = 'github' AND unit_key IN ` + endedUnits},
-	{"workflow_runs", 0, `DELETE FROM workflow_runs WHERE provider = 'github' AND unit_key IN ` + endedUnits},
-	{"plan_items", port.TopicPending, `DELETE FROM plan_items WHERE provider = 'github' AND unit_key IN ` + endedUnits},
-	{"unit_marks", port.TopicRounds, `DELETE FROM unit_marks WHERE provider = 'github' AND unit_key IN ` + endedUnits},
-	{"round_state", port.TopicRounds, `DELETE FROM round_state WHERE provider = 'github' AND unit_key IN ` + endedUnits},
-	{"view_applied", port.TopicViews, `DELETE FROM view_applied WHERE provider = 'github' AND unit_key IN ` + endedUnits},
+	{"turn_usage", port.TopicUsage, `DELETE FROM turn_usage WHERE turn_seq IN (SELECT seq FROM turns WHERE provider = 'github' AND unit_key IN ` + untaskedUnits + `)`},
+	{"turns", port.TopicTurns, `DELETE FROM turns WHERE provider = 'github' AND unit_key IN ` + untaskedUnits},
+	{"turn_records", port.TopicTurns, `DELETE FROM turn_records WHERE provider = 'github' AND unit_key IN ` + untaskedUnits},
+	{"turn_answers", port.TopicTurns, `DELETE FROM turn_answers WHERE provider = 'github' AND unit_key IN ` + untaskedUnits},
+	{"intakes", port.TopicIntakes, `DELETE FROM intakes WHERE provider = 'github' AND unit_key IN ` + untaskedUnits},
+	{"events", port.TopicSourceEvents | port.TopicLoopEvents, `DELETE FROM events WHERE provider = 'github' AND unit_key IN ` + untaskedUnits},
+	{"overrides", port.TopicOverrides, `DELETE FROM overrides WHERE provider = 'github' AND unit_key IN ` + untaskedUnits},
+	{"workflow_runs", 0, `DELETE FROM workflow_runs WHERE provider = 'github' AND unit_key IN ` + untaskedUnits},
+	{"plan_items", port.TopicPending, `DELETE FROM plan_items WHERE provider = 'github' AND unit_key IN ` + untaskedUnits},
+	{"unit_marks", port.TopicRounds, `DELETE FROM unit_marks WHERE provider = 'github' AND unit_key IN ` + untaskedUnits},
+	{"round_state", port.TopicRounds, `DELETE FROM round_state WHERE provider = 'github' AND unit_key IN ` + untaskedUnits},
+	{"view_applied", port.TopicViews, `DELETE FROM view_applied WHERE provider = 'github' AND unit_key IN ` + untaskedUnits},
 }, briefEndedTables)
 
 // endedPluginTables are the GitHub plugin's rows of an ended pull request,
@@ -296,13 +306,6 @@ func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained,
 				args = append(args, k)
 			}
 			r.exec(WorkflowEventsKey, port.TopicLoopEvents, retainWorkflowEventsSQL, append(args, cutoff(now, p.WorkflowEvents))...)
-		}
-		if p.VerbEvents > 0 {
-			args := make([]any, 0, len(task.VerbEventKinds)+1)
-			for _, k := range task.VerbEventKinds {
-				args = append(args, k)
-			}
-			r.exec(VerbEventsKey, port.TopicLoopEvents, retainVerbEventsSQL, append(args, cutoff(now, p.VerbEvents))...)
 		}
 		if p.UnitlessLoopRows > 0 {
 			r.unitless(cutoff(now, p.UnitlessLoopRows), in.prKeys)

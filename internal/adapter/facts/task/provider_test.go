@@ -47,6 +47,7 @@ type env struct {
 	s     facttask.Settings
 	ended map[unit.Unit]bool
 	turns map[unit.Unit]int
+	repos map[unit.Unit]string
 }
 
 func newEnv(t *testing.T) *env {
@@ -56,7 +57,7 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	e := &env{t: t, db: db, clock: &clock{now: monday}, s: facttask.Settings{StaleDays: 2, RenudgeAfter: 72 * time.Hour}, ended: map[unit.Unit]bool{}, turns: map[unit.Unit]int{}}
+	e := &env{t: t, db: db, clock: &clock{now: monday}, s: facttask.Settings{StaleDays: 2, RenudgeAfter: 72 * time.Hour}, ended: map[unit.Unit]bool{}, turns: map[unit.Unit]int{}, repos: map[unit.Unit]string{}}
 	e.p = facttask.New(facttask.Deps{
 		Tasks: db.Tasks(), Items: db.Items(), Drafts: db.Drafts(),
 		Cards:    coretasks.CardFacts{Cards: db.Cards()},
@@ -64,6 +65,7 @@ func newEnv(t *testing.T) *env {
 		Settings: func() facttask.Settings { return e.s },
 		Ended:    func(_ context.Context, u unit.Unit) (bool, error) { return e.ended[u], nil },
 		Turns:    func(_ context.Context, u unit.Unit) (int, error) { return e.turns[u], nil },
+		Repo:     func(_ context.Context, u unit.Unit) (string, error) { return e.repos[u], nil },
 		Clock:    e.clock,
 	})
 	return e
@@ -379,6 +381,24 @@ func TestTaskUnitsEndedWhenEveryUnitEnded(t *testing.T) {
 	e.ended[chatB] = true
 	if f := e.facts("e-02"); f["task.link_ended"] != true {
 		t.Error("an entry whose every unit ended has not")
+	}
+}
+
+func TestTaskRepoIsTheFirstRepositoryOfItsUnits(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	e.task(task.Task{ID: "e-01", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "none"})
+	e.task(task.Task{ID: "e-02", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "two", Units: []unit.Unit{chatA, chatB}})
+	e.repos[chatB] = "acme/api"
+	if f := e.facts("e-01"); f["task.repo"] != "" {
+		t.Errorf("a task with no unit is of %q", f["task.repo"])
+	}
+	if f := e.facts("e-02"); f["task.repo"] != "acme/api" {
+		t.Errorf("task.repo %q, want its second unit's, the first that has one", f["task.repo"])
+	}
+	e.repos[chatA] = "acme/web"
+	if f := e.facts("e-02"); f["task.repo"] != "acme/web" {
+		t.Errorf("task.repo %q, want its first unit's", f["task.repo"])
 	}
 }
 

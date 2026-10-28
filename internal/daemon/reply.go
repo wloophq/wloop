@@ -36,7 +36,7 @@ func (s *Server) replyRefusal(e task.Task) string {
 
 // runReply holds the reply the task's args carry as a user draft on its first unit, for the task and its
 // items there; send "now" approves it at once.
-func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretasks.Service, e task.Task, req api.TaskRequest) {
+func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretasks.Service, e task.Task, req api.TaskRequest, actor task.Actor) {
 	if why := s.replyRefusal(e); why != "" {
 		writeTasksError(w, fmt.Errorf("%w: %s", coretasks.ErrVerb, why))
 		return
@@ -59,7 +59,7 @@ func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretas
 		writeTasksError(w, taskDraftError(err))
 		return
 	}
-	s.recordVerb(ctx, g, e, coretasks.Request{Verb: task.VerbReply, Source: req.Source})
+	s.recordVerb(ctx, g, e, coretasks.Request{Verb: task.VerbReply, Source: req.Source, Actor: actor})
 	now, err := g.Task(ctx, e.ID)
 	if err != nil {
 		now = e

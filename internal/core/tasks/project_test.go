@@ -49,7 +49,7 @@ func newProjectRig() *projectRig {
 
 func (r *projectRig) do(t *testing.T, id task.ID, verb task.Verb, args map[string]string) coretasks.Result {
 	t.Helper()
-	res, err := r.svc.Do(context.Background(), id, coretasks.Request{Verb: verb, Args: args})
+	res, err := r.svc.Do(context.Background(), id, coretasks.Request{Actor: task.ActorPerson, Verb: verb, Args: args})
 	if err != nil {
 		t.Fatalf("%s on %s: %v", verb, id, err)
 	}
@@ -101,10 +101,10 @@ func TestProjectFromTask(t *testing.T) {
 		t.Errorf("a second project of the same name: %+v", p2)
 	}
 
-	if _, err := r.svc.Do(context.Background(), p.ID, coretasks.Request{Verb: task.VerbProject, Args: map[string]string{"title": "inner"}}); !errors.Is(err, coretasks.ErrVerb) {
+	if _, err := r.svc.Do(context.Background(), p.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbProject, Args: map[string]string{"title": "inner"}}); !errors.Is(err, coretasks.ErrVerb) {
 		t.Errorf("a project put in a project: %v, want ErrVerb", err)
 	}
-	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Verb: task.VerbProject}); !errors.Is(err, coretasks.ErrArgs) {
+	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbProject}); !errors.Is(err, coretasks.ErrArgs) {
 		t.Errorf("project with neither id nor title: %v, want ErrArgs", err)
 	}
 
@@ -139,7 +139,7 @@ func TestAttachAndReorder(t *testing.T) {
 		t.Fatalf("after moving c first: %v, want %v", got, want)
 	}
 	for _, bad := range []map[string]string{{"id": "p", "position": "0"}, {"id": "p", "position": "x"}, {"id": "a"}, {"id": "nope"}} {
-		if _, err := r.svc.Do(context.Background(), d.ID, coretasks.Request{Verb: task.VerbProject, Args: bad}); err == nil {
+		if _, err := r.svc.Do(context.Background(), d.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbProject, Args: bad}); err == nil {
 			t.Errorf("project %v: no error", bad)
 		}
 	}
@@ -199,7 +199,7 @@ func TestToggleSequential(t *testing.T) {
 	if ids, n = next(); !slices.Equal(ids, []task.ID{"a", "b"}) || n != 3 {
 		t.Fatalf("back to parallel: next %v, count %d", ids, n)
 	}
-	if _, err := r.svc.Do(ctx, "a", coretasks.Request{Verb: task.VerbSequential}); !errors.Is(err, coretasks.ErrVerb) {
+	if _, err := r.svc.Do(ctx, "a", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSequential}); !errors.Is(err, coretasks.ErrVerb) {
 		t.Errorf("sequential on an action: %v, want ErrVerb", err)
 	}
 }
@@ -221,12 +221,12 @@ func TestMarkReviewed(t *testing.T) {
 		t.Errorf("every 36h set %v", got.ReviewEvery)
 	}
 	for _, bad := range []string{"0d", "-1h", "soon"} {
-		if _, err := r.svc.Do(ctx, "p", coretasks.Request{Verb: task.VerbReviewed, Args: map[string]string{"every": bad}}); !errors.Is(err, coretasks.ErrArgs) {
+		if _, err := r.svc.Do(ctx, "p", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbReviewed, Args: map[string]string{"every": bad}}); !errors.Is(err, coretasks.ErrArgs) {
 			t.Errorf("every %q: %v, want ErrArgs", bad, err)
 		}
 	}
 	r.action(t, "a", "p", 1, task.State("next"))
-	if _, err := r.svc.Do(ctx, "a", coretasks.Request{Verb: task.VerbReviewed}); !errors.Is(err, coretasks.ErrVerb) {
+	if _, err := r.svc.Do(ctx, "a", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbReviewed}); !errors.Is(err, coretasks.ErrVerb) {
 		t.Errorf("reviewed on an action: %v, want ErrVerb", err)
 	}
 }
@@ -296,7 +296,7 @@ func TestDoneProjectResolvesItsDossier(t *testing.T) {
 			t.Errorf("dossier of %s resolved %v, %v; want at %v", id, got, ok, at)
 		}
 	}
-	if _, err := r.svc.Do(context.Background(), "p", coretasks.Request{Verb: task.VerbDone}); !errors.Is(err, coretasks.ErrVerb) {
+	if _, err := r.svc.Do(context.Background(), "p", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone}); !errors.Is(err, coretasks.ErrVerb) {
 		t.Errorf("done twice: %v, want ErrVerb", err)
 	}
 }

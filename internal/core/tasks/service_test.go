@@ -67,7 +67,7 @@ type rig struct {
 func newRig() *rig {
 	r := &rig{store: taskstest.New(), items: &fakeItems{byUnit: map[unit.Unit][]items.Item{}, reads: map[unit.Unit]int{}},
 		facts: &fakeFacts{facts: map[unit.Unit]task.UnitFacts{}, off: map[unit.ProviderID]bool{}}, clock: &clock{t0}}
-	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates, StaleWaitingDays: 2})
+	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority, StaleWaitingDays: 2})
 	return r
 }
 
@@ -132,7 +132,7 @@ func TestVerbTransitions(t *testing.T) {
 			r := newRig()
 			e := r.put(t, task.Task{ID: "e-x", Kind: task.KindCapture, State: from, Origin: task.OriginUser,
 				Snooze: task.Snooze{Until: t0.Add(time.Hour), Return: task.State("next")}})
-			res, err := r.svc.Do(ctx, e.ID, coretasks.Request{Verb: verb, Args: args[verb]})
+			res, err := r.svc.Do(ctx, e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: verb, Args: args[verb]})
 			to := want[from]
 			if to == no {
 				if !errors.Is(err, coretasks.ErrVerb) || !strings.Contains(err.Error(), string(verb)) || !strings.Contains(err.Error(), string(from)) {
@@ -154,13 +154,13 @@ func TestVerbTransitions(t *testing.T) {
 	}
 	r := newRig()
 	r.put(t, task.Task{ID: "e-x", State: "inbox", Category: task.CategoryInbox})
-	if _, err := r.svc.Do(ctx, "e-x", coretasks.Request{Verb: "fly"}); !errors.Is(err, coretasks.ErrArgs) {
+	if _, err := r.svc.Do(ctx, "e-x", coretasks.Request{Actor: task.ActorPerson, Verb: "fly"}); !errors.Is(err, coretasks.ErrArgs) {
 		t.Errorf("an unknown verb: %v", err)
 	}
-	if _, err := r.svc.Do(ctx, "e-x", coretasks.Request{Verb: task.VerbSchedule}); !errors.Is(err, coretasks.ErrArgs) {
+	if _, err := r.svc.Do(ctx, "e-x", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSchedule}); !errors.Is(err, coretasks.ErrArgs) {
 		t.Errorf("schedule without a date: %v", err)
 	}
-	if _, err := r.svc.Do(ctx, "e-missing", coretasks.Request{Verb: task.VerbNext}); !errors.Is(err, coretasks.ErrNoTask) {
+	if _, err := r.svc.Do(ctx, "e-missing", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbNext}); !errors.Is(err, coretasks.ErrNoTask) {
 		t.Errorf("a missing entry: %v", err)
 	}
 }
@@ -168,7 +168,7 @@ func TestVerbTransitions(t *testing.T) {
 func TestScheduleKeepsWhereItReturns(t *testing.T) {
 	r := newRig()
 	r.put(t, task.Task{ID: "e-x", State: "next", Category: task.CategoryReady})
-	res, err := r.svc.Do(context.Background(), "e-x", coretasks.Request{Verb: task.VerbSchedule, Args: map[string]string{"until": "2026-10-30", "on_activity": "true"}})
+	res, err := r.svc.Do(context.Background(), "e-x", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSchedule, Args: map[string]string{"until": "2026-10-30", "on_activity": "true"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,7 +186,7 @@ func TestFocusNeverMovesTheTask(t *testing.T) {
 		e.Become(s, taskstest.BundledStates)
 		r.put(t, e)
 		for _, on := range []bool{true, false} {
-			res, err := r.svc.Do(context.Background(), id, coretasks.Request{Verb: task.VerbFocus})
+			res, err := r.svc.Do(context.Background(), id, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbFocus})
 			if err != nil || res.Task.State != s || res.Task.Starred() != on || res.Task.Written["focus"].By != task.WriterPerson {
 				t.Fatalf("%s: %+v %v", s, res.Task, err)
 			}
@@ -198,7 +198,7 @@ func TestSeenClearsTheMark(t *testing.T) {
 	r := newRig()
 	r.put(t, task.Task{ID: "e-x", State: "inbox", Category: task.CategoryInbox, Changed: true})
 	r.clock.t = t0.Add(time.Hour)
-	res, err := r.svc.Do(context.Background(), "e-x", coretasks.Request{Verb: task.VerbSeen})
+	res, err := r.svc.Do(context.Background(), "e-x", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSeen})
 	if err != nil || res.Task.Changed || !res.Task.SeenAt.Equal(r.clock.t) || res.Task.Category != task.CategoryInbox {
 		t.Fatalf("%+v %v", res.Task, err)
 	}
@@ -267,7 +267,7 @@ func TestDisabledPluginTasksStay(t *testing.T) {
 	if got := r.task(t, e.ID); !got.Same(e) {
 		t.Fatalf("the entry changed: %+v", got)
 	}
-	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Verb: task.VerbDone}); !errors.Is(err, coretasks.ErrPluginDisabled) {
+	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone}); !errors.Is(err, coretasks.ErrPluginDisabled) {
 		t.Fatalf("a verb on a disabled plugin's entry: %v", err)
 	}
 	inbox := r.put(t, task.Task{ID: "e-msg", Kind: task.KindMessage, State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU}, Origin: task.OriginMessage})
@@ -357,14 +357,14 @@ func TestRegisteredViewSource(t *testing.T) {
 		t.Fatalf("counts: %+v %v", c, err)
 	}
 	var ran []string
-	r.svc.Register(task.KindDraft, task.VerbApprove, func(ctx context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
+	r.svc.Register(task.KindDraft, string(task.VerbApprove), func(ctx context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
 		ran = append(ran, fmt.Sprint(e.ID, " ", req.Verb))
 		return coretasks.Result{Task: e}, nil
 	})
-	if _, err := r.svc.Do(ctx, "draft:7", coretasks.Request{Verb: task.VerbApprove}); err != nil || !slices.Equal(ran, []string{"draft:7 approve"}) {
+	if _, err := r.svc.Do(ctx, "draft:7", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbApprove}); err != nil || !slices.Equal(ran, []string{"draft:7 approve"}) {
 		t.Fatalf("approve: %v %v", ran, err)
 	}
-	if _, err := r.svc.Do(ctx, "draft:7", coretasks.Request{Verb: task.VerbNext}); !errors.Is(err, coretasks.ErrVerb) {
+	if _, err := r.svc.Do(ctx, "draft:7", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbNext}); !errors.Is(err, coretasks.ErrVerb) {
 		t.Fatalf("next on a draft: %v", err)
 	}
 }
@@ -383,7 +383,7 @@ func TestUserScheduleSurvivesMute(t *testing.T) {
 		t.Fatalf("muted: %+v", e)
 	}
 	mine := time.Date(2026, 12, 1, 18, 0, 0, 0, brt)
-	if _, err := r.svc.Do(ctx, id, coretasks.Request{Verb: task.VerbSchedule, Args: map[string]string{"until": "2026-12-01"}}); err != nil {
+	if _, err := r.svc.Do(ctx, id, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSchedule, Args: map[string]string{"until": "2026-12-01"}}); err != nil {
 		t.Fatal(err)
 	}
 	check := func(when string) {

@@ -72,7 +72,7 @@ func (ev *taskViewer) project(ctx context.Context, e task.Task, v *api.TaskView)
 		case verb == task.VerbProject && e.Kind == task.KindProject:
 			err = errors.New("a project cannot join a project")
 		case verb == task.VerbProject, e.Kind == task.KindProject && slices.Contains([]task.Verb{task.VerbDone, task.VerbDismiss, task.VerbReference}, verb):
-			err = ev.g.Accepts(e, verb)
+			err = ev.g.Accepts(e, verb, task.ActorPerson)
 		case e.Kind == task.KindProject && (verb == task.VerbReviewed || verb == task.VerbSequential) && !e.Open():
 			err = fmt.Errorf("%s on a %s project", verb, e.State)
 		}

@@ -28,7 +28,7 @@ var tasksGrammar = []Key{
 	{Path: "verbs.*.from", In: SurfaceTasks, Kind: KindList, Elem: KindText, Doc: "The states the verb moves a task from, each a state of states; every state when absent."},
 	{Path: "verbs.*.to", In: SurfaceTasks, Kind: KindText, Doc: "The state the verb moves a task to, a state of states; absent, the verb moves none."},
 	{Path: "verbs.*.by", In: SurfaceTasks, Kind: KindMap, Doc: "Who may run the verb, by actor (person, workflow, agent, plugin); an actor left out may not."},
-	{Path: "verbs.*.by.*", In: SurfaceTasks, Kind: KindText, Doc: "A predicate over the task's facts that lets the actor run the verb where it holds, or \"gate\", which opens a proposal gate a person approves."},
+	{Path: "verbs.*.by.*", In: SurfaceTasks, Kind: KindText, Doc: "A predicate over the task's facts that lets the actor run the verb where it holds, or \"gate\", which opens the gate the verb's gate names, and a person's approval runs the verb as theirs; true lets the actor run it anywhere."},
 	{Path: "verbs.*.gate", In: SurfaceTasks, Kind: KindText, Doc: "The gate, of gates.toml, a by.<actor> of \"gate\" opens; required when one does."},
 	{Path: "verbs.*.handler", In: SurfaceTasks, Kind: KindEnum, Values: verbHandlerValues, Doc: "What the verb runs besides its move, a handler of the loop's; none when absent."},
 	{Path: "verbs.*.send", In: SurfaceTasks, Kind: KindEnum, Values: named("now", "draft"), Default: "draft", Doc: "With reply: now sends the reply at once, draft proposes it in the Outbox."},
@@ -72,6 +72,9 @@ type VerbHandler struct{ Name, Doc string }
 
 // VerbHandlers are the handlers a verb names with handler.
 var VerbHandlers = []VerbHandler{
+	{"focus", "Stars the task in Focus, or takes the star off."},
+	{"schedule", "Hides the task until a date or until its unit moves, then brings it back where it was."},
+	{"waiting", "Records who the task waits on and when it resurfaces."},
 	{"approve", "Resolves the task's open gate as approved, or runs its unit's approve action."},
 	{"delegate", "Starts a turn on the task, headless or in a session."},
 	{"answer", "Answers the task's open question gate with the text it asks for."},
@@ -84,6 +87,15 @@ var VerbHandlers = []VerbHandler{
 	{"seen", "Marks the task seen; clients send it when it opens."},
 	{"reviewed", "Marks a parent task reviewed."},
 	{"sequential", "Switches a parent task's children between sequential and parallel."},
+}
+
+// HandlerArgs are the arguments a verb takes by its handler, which a
+// task.verb step may pass; a verb with no handler, or another, takes none.
+var HandlerArgs = map[string][]string{
+	"schedule": {"until", "on_activity"},
+	"waiting":  {"on", "resurface"},
+	"context":  {"set"},
+	"area":     {"set"},
 }
 
 func verbHandlerValues() []Value {

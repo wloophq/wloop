@@ -134,7 +134,7 @@ func TestMessageAnswerDifferential(t *testing.T) {
 					r := newMessageRig(t)
 					m := r.question(t)
 					arrange(r)
-					res, err := r.s.deps.Tasks.Do(context.Background(), task.ID(m.TaskID), coretasks.Request{Verb: task.VerbAnswer,
+					res, err := r.s.deps.Tasks.Do(context.Background(), task.ID(m.TaskID), coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbAnswer,
 						Args: map[string]string{"option_id": "publish", "guidance": "say thanks"}, Source: source})
 					if err != nil {
 						t.Fatal(err)
@@ -185,7 +185,7 @@ func TestDismissingAQuestionMessageThroughTheDaemon(t *testing.T) {
 				if rec := post(t, r.s, api.TaskPath(m.TaskID, "dismiss"), ``); rec.Code != 200 {
 					t.Fatalf("%d %s", rec.Code, rec.Body)
 				}
-			} else if _, err := r.s.deps.Tasks.Do(context.Background(), task.ID(m.TaskID), coretasks.Request{Verb: task.VerbDismiss, Source: "tui"}); err != nil {
+			} else if _, err := r.s.deps.Tasks.Do(context.Background(), task.ID(m.TaskID), coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss, Source: "tui"}); err != nil {
 				t.Fatal(err)
 			}
 			books, _ := r.store.Books(context.Background(), r8u.Unit())
@@ -241,7 +241,7 @@ func TestMessageAnswerKeepsItsSource(t *testing.T) {
 				if rec := post(t, r.s, api.TaskPath(m.TaskID, "answer"), `{"args":{"option_id":"hold"},"source":"`+c.source+`"}`); rec.Code != 200 {
 					t.Fatalf("%d %s", rec.Code, rec.Body)
 				}
-			} else if _, err := r.s.deps.Tasks.Do(context.Background(), task.ID(m.TaskID), coretasks.Request{Verb: task.VerbAnswer,
+			} else if _, err := r.s.deps.Tasks.Do(context.Background(), task.ID(m.TaskID), coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbAnswer,
 				Args: map[string]string{"option_id": "hold"}, Source: c.source}); err != nil {
 				t.Fatal(err)
 			}
@@ -269,7 +269,7 @@ func TestMessageOfADisabledPluginAnswers409(t *testing.T) {
 		}
 	}
 	r.facts.off[unit.GitHub] = true
-	if _, err := r.s.deps.Tasks.Do(context.Background(), task.ID(m.TaskID), coretasks.Request{Verb: task.VerbAnswer, Args: map[string]string{"option_id": "hold"}}); err == nil {
+	if _, err := r.s.deps.Tasks.Do(context.Background(), task.ID(m.TaskID), coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbAnswer, Args: map[string]string{"option_id": "hold"}}); err == nil {
 		t.Fatal("the entry verb answered a disabled plugin's message")
 	}
 	if books, _ := r.store.Books(context.Background(), r8u.Unit()); len(books[r8u.Unit()].Answers) != 0 {
@@ -286,7 +286,7 @@ func TestApproveAnswersAConfirmWithYes(t *testing.T) {
 		t.Fatal(err)
 	}
 	open, _ := r.msgs.Open(ctx)
-	if _, err := r.s.deps.Tasks.Do(ctx, task.ID(open[0].TaskID), coretasks.Request{Verb: task.VerbApprove, Source: "tui"}); err != nil {
+	if _, err := r.s.deps.Tasks.Do(ctx, task.ID(open[0].TaskID), coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbApprove, Source: "tui"}); err != nil {
 		t.Fatal(err)
 	}
 	books, _ := r.store.Books(ctx, r8u.Unit())
@@ -297,7 +297,7 @@ func TestApproveAnswersAConfirmWithYes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.s.deps.Tasks.Do(ctx, task.ID(m.TaskID), coretasks.Request{Verb: task.VerbApprove}); !errors.Is(err, coretasks.ErrVerb) {
+	if _, err := r.s.deps.Tasks.Do(ctx, task.ID(m.TaskID), coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbApprove}); !errors.Is(err, coretasks.ErrVerb) {
 		t.Fatalf("approve on a proposal with no accept option: %v", err)
 	}
 }

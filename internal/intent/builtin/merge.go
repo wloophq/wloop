@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
@@ -176,6 +177,9 @@ func fits(p unit.ProviderID, src *manifest.Source, all map[unit.ProviderID]*mani
 	for _, k := range v.Events {
 		if c, ok := coreEventProviders()[k.Name]; ok {
 			bad("event %s is %s's", k.Name, c)
+		}
+		if strings.HasPrefix(k.Name, task.VerbEventKind("")) {
+			bad("event %s is the kind of a task verb's event", k.Name)
 		}
 		for o, ov := range all {
 			if o != p && slices.ContainsFunc(ov.Events, func(c manifest.Event) bool { return c.Name == k.Name }) {

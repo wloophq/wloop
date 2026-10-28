@@ -60,7 +60,7 @@ func (s *Server) registerOutbox() {
 		return
 	}
 	for verb := range draftVerbs {
-		s.deps.Tasks.Register(task.KindDraft, verb, s.draftVerb(verb))
+		s.deps.Tasks.Register(task.KindDraft, string(verb), s.draftVerb(verb))
 	}
 	s.deps.Tasks.RegisterView(task.ViewOutbox, draftPrefix, outboxView{s})
 }

@@ -47,15 +47,15 @@ type projects struct {
 func (s *Service) ServeProjects(d ProjectDeps) {
 	p := &projects{s: s, d: d}
 	for _, k := range actionKinds {
-		s.Register(k, task.VerbProject, p.attach)
+		s.Register(k, string(task.VerbProject), p.attach)
 	}
-	s.Register(task.KindProject, task.VerbProject, func(ctx context.Context, e task.Task, req Request) (Result, error) {
+	s.Register(task.KindProject, string(task.VerbProject), func(ctx context.Context, e task.Task, req Request) (Result, error) {
 		return Result{}, fmt.Errorf("%w: a project cannot join a project", ErrVerb)
 	})
-	s.Register(task.KindProject, task.VerbSequential, p.sequential)
-	s.Register(task.KindProject, task.VerbReviewed, p.reviewed)
+	s.Register(task.KindProject, string(task.VerbSequential), p.sequential)
+	s.Register(task.KindProject, string(task.VerbReviewed), p.reviewed)
 	for _, v := range endVerbs {
-		s.Register(task.KindProject, v, p.end)
+		s.Register(task.KindProject, string(v), p.end)
 	}
 	s.RegisterView(task.ViewReview, "", &reviewSource{s: s, store: d.Store})
 }
@@ -121,7 +121,7 @@ func (p *projects) locked(ctx context.Context, id task.ID, req Request, f func(e
 	if err != nil {
 		return task.Task{}, err
 	}
-	if err := s.d.Store.Apply(ctx, cs, verbEvents(e, req, now)...); err != nil {
+	if err := s.d.Store.Apply(ctx, cs, s.verbEvents(e, req, now)...); err != nil {
 		return task.Task{}, err
 	}
 	for _, c := range cs {
@@ -137,7 +137,7 @@ func (p *projects) locked(ctx context.Context, id task.ID, req Request, f func(e
 func (p *projects) attach(ctx context.Context, e task.Task, req Request) (Result, error) {
 	var created task.Task
 	got, err := p.locked(ctx, e.ID, req, func(e task.Task, now time.Time) ([]task.Change, error) {
-		if err := p.s.accepts(e, task.VerbProject); err != nil {
+		if err := p.s.accepts(e, req.Verb); err != nil {
 			return nil, err
 		}
 		pos := 0

@@ -26,12 +26,19 @@ const TasksFile = "tasks.toml"
 // VerbText is a verb's words: Input is the question a verb that asks for
 // a value puts first. Offer, when set, is where a task offers the verb.
 // From are the states it moves a task from, every state when empty; To the
-// state it moves it to, "" for none.
+// state it moves it to, "" for none. By are who may run it, by actor: a
+// predicate's source over the task's facts, or "gate"; an actor left out
+// may not. Gate is the gate a "gate" opens, Handler what it runs besides
+// its move ("" for none), Send how a reply's handler sends. Allow are By's
+// predicates compiled, by actor; a "gate" has none.
 type VerbText struct {
 	Label, Summary, Input string
 	Offer                 workflow.Predicate
 	From                  []string
 	To                    string
+	By                    map[string]string
+	Allow                 map[string]workflow.Predicate
+	Gate, Handler, Send   string
 }
 
 // TasksDef is the profile's tasks.toml over every layer. Props and States
@@ -109,6 +116,15 @@ func (d TasksDef) FirstOf(c task.Category) string {
 func (d TasksDef) Move(verb string) ([]string, string, bool) {
 	v, ok := d.Verbs[verb]
 	return v.From, v.To, ok
+}
+
+// Handler is the handler verb runs besides its move, "" for none.
+func (d TasksDef) Handler(verb string) string { return d.Verbs[verb].Handler }
+
+// VerbKinds are the kinds of the events of the profile's verbs, in name
+// order.
+func (d TasksDef) VerbKinds() []string {
+	return task.VerbEventKinds(slices.Sorted(maps.Keys(d.Verbs)))
 }
 
 // HeldProblems are the problems of the states stored tasks hold, held, that
@@ -509,10 +525,20 @@ func (l *tasksLoad) mergeVerbs(s *sheet, verbs map[string]mVerbText) {
 			w.To = *t.To
 		}
 		l.verbActors(s, path, t.By)
+		if t.By != nil {
+			w.By = maps.Clone(w.By)
+			if w.By == nil {
+				w.By = map[string]string{}
+			}
+			maps.Copy(w.By, t.By)
+		}
 		if t.Gate != nil {
 			l.gates[path] = ref{s, path + ".gate", *t.Gate}
+			w.Gate = *t.Gate
 		}
-		if t.Gate == nil && slices.Contains(slices.Collect(maps.Values(t.By)), "gate") {
+		text(s, path+".handler", t.Handler, &w.Handler)
+		text(s, path+".send", t.Send, &w.Send)
+		if w.Gate == "" && slices.Contains(slices.Collect(maps.Values(w.By)), "gate") {
 			s.add(path+".gate", "is required: a by.<actor> of \"gate\" opens the gate it names")
 		}
 		if w.Label == "" && t.Label == nil {
@@ -583,18 +609,43 @@ func (l *tasksLoad) check(gates *GatesDef) Problems {
 			}
 		}
 	}
-	env := builtin.WorkflowEnv(builtin.TaskSlot)
-	maps.Copy(env, l.def.Facts())
+	env := ByEnv(l.def)
 	for _, at := range slices.Sorted(maps.Keys(l.preds)) {
 		r := l.preds[at]
-		if _, err := expr.CompileWorkflow(r.name, env); err != nil {
+		pred, err := expr.CompileWorkflow(r.name, env)
+		if err != nil {
 			msg, snippet := exprMsg(err)
 			p := r.s.problem(r.path, "%s", msg)
 			p.Snippet = snippet
 			out = append(out, p)
+			continue
 		}
+		verb, actor, _ := strings.Cut(strings.TrimPrefix(at, "verbs."), ".by.")
+		v := l.def.Verbs[verb]
+		v.Allow = maps.Clone(v.Allow)
+		if v.Allow == nil {
+			v.Allow = map[string]workflow.Predicate{}
+		}
+		v.Allow[actor] = pred
+		l.def.Verbs[verb] = v
 	}
 	return out
+}
+
+// ByFacts are the facts a verb's by reads besides the task.prop.* of
+// tasks.toml: the task's own, which the authority reads off the task with
+// no facts provider at hand.
+var ByFacts = []string{"task.id", "task.kind", "task.state", "task.category", "task.muted", "task.unit", "task.unit_provider"}
+
+// ByEnv is the env a verb's by compiles over: ByFacts and d's properties.
+func ByEnv(d TasksDef) expr.Env {
+	all := builtin.WorkflowEnv(builtin.TaskSlot)
+	env := expr.Env{}
+	for _, name := range ByFacts {
+		env[name] = all[name]
+	}
+	maps.Copy(env, d.Facts())
+	return env
 }
 
 // declared is the keys of the map table section of s's file in their

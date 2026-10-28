@@ -1192,7 +1192,7 @@ func newTurnRig(t *testing.T) *turnRig {
 		Clock: fixedClock(s.deps.Now()), Command: brand.Command}
 	r.msgs, r.tasks, r.facts = messagestest.New(), taskstest.New(), enabledUnits{map[unit.ProviderID]bool{}}
 	clock := fixedClock(s.deps.Now())
-	s.deps.Tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: r.tasks, Items: itemsNone{}, Facts: r.facts, Clock: clock})
+	s.deps.Tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority, Store: r.tasks, Items: itemsNone{}, Facts: r.facts, Clock: clock})
 	s.deps.Messages = &messages.Service{Store: r.msgs, Books: r.store, Turns: s.deps.Turns, Tasks: s.deps.Tasks, Intents: turnstest.Intents(), Clock: clock}
 	return r
 }

@@ -1,0 +1,3 @@
+# A user profile lets workflows move tasks to Someday.
+[verbs.someday]
+by = { workflow = "true" }

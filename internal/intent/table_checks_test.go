@@ -69,7 +69,7 @@ func TestWorkflowValuesAreTheTables(t *testing.T) {
 		{`provider = "session"`, `provider = "sesion"`}:                           `provider: "sesion" is not one of "github", "session", "slack", "task" or "workspace"; did you mean "session"?`,
 		{`use = "session.close"`, `use = "session.clsoe"`}:                        `step[0].use: "session.clsoe" is not one of`,
 		{`use = "session.close"`, "use = \"session.close\"\nreasn = \"x\""}:       `step[0].reasn: unknown key`,
-		{`when = 'session`, "[trigger]\non = [\"zzz\"]\n\nwhen = 'session"}:       `trigger.on[0]: "zzz" is not one of`,
+		{`when = 'session`, "[trigger]\non = [\"zzz\"]\n\nwhen = 'session"}:       `trigger.on[0]: names no event kind`,
 		{`session.managed &&`, `session.managed && session.manager == "orca" &&`}: "",
 	} {
 		got := workflowProblems(t, strings.Replace(quietSession, edit[0], edit[1], 1))

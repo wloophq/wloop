@@ -392,7 +392,7 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	}
 	l.Registry = dintent.NewRegistry(defs)
 	var wfProblems, wfWarnings Problems
-	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems, wfWarnings = loadWorkflows(layers, bundled, l.turnProblem, l.profileFacts)
+	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems, wfWarnings = loadWorkflows(layers, bundled, l.turnProblem, l.profileFacts, l.Tasks)
 	l.Problems = append(l.Problems, wfProblems...)
 	l.Warnings = append(l.Warnings, wfWarnings...)
 	return l, broken

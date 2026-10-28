@@ -49,10 +49,10 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `trigger` | table |  | What plans the workflow: on or schedule; absent, every sweep. |
-| `trigger.on` | list of `muted`, `unmuted`, `held`, `released`, `adopted`, `tracked`, `untracked`, `nudged`, `removed`, `status`, `check`, `closed`, `comment`, `draft`, `guidance`, `merged`, `opened`, `push`, `ready`, `review`, `review_ended`, `review_request_removed`, `review_requested`, `round_blocked`, `round_held`, `round_pending`, `round_sent`, `round_skipped`, `round_unblocked`, `verb_answer`, `verb_approve`, `verb_area`, `verb_context`, `verb_delegate`, `verb_dismiss`, `verb_done`, `verb_focus`, `verb_next`, `verb_project`, `verb_reference`, `verb_reply`, `verb_reviewed`, `verb_schedule`, `verb_sequential`, `verb_someday`, `verb_waiting`, `would_address`, `would_review`, `task.woke` |  | The source event kinds the workflow reacts to; verb_&lt;verb&gt;, a verb a person ran on a task, and task.woke, a task's wake matched, with provider task. |
+| `trigger.on` | list of strings |  | The event kinds the workflow reacts to: the loop's, the plugins', task.woke (a task's wake matched) and verb_&lt;verb&gt;, a verb of tasks.toml run on a task by anyone, a workflow included; the last two with provider task. |
 | `trigger.schedule` | string |  | A cron schedule, in local time. |
-| `trigger.actors` | list of `person`, `workflow`, `agent`, `plugin` |  | With on, the actors whose events plan it; every actor when absent. |
-| `trigger.depth` | integer | `3` | With on, the longest chain of workflows triggering each other the event may close; at most 5. |
+| `trigger.actors` | list of `person`, `workflow`, `agent`, `plugin` |  | With on, the actors whose verb events plan it (person, workflow, agent, plugin); every actor when absent. |
+| `trigger.depth` | integer | `3` | With on, the longest chain of workflows triggering each other the workflow may close: an event a chain of that many workflows caused plans it no more, and a workflow already in an event's chain never runs on it. 1 to 5. |
 | `observe` | bool | `false` | Plans items pending and never runs them by itself; a person applies an item by hand. |
 | `limits` | table |  | How many runs the workflow may take. |
 | `limits.per_run` | integer | `0` | Runs per evaluation; 0 is no limit. |
@@ -133,12 +133,12 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `classify` | `prompt` | file | `prompt.md` | The classification's prompt, beside the manifest. |
 | `classify` | `schema` | file | `schema.json` | The JSON schema of its answer, beside the manifest. |
 | `notify.self` | `text` | file | `text.md.tmpl` | The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`. |
-| `task.verb` | `verb` | one of `next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done`, `dismiss` |  | The verb run on the task. Required. |
-| `task.verb` | `until` | string |  | With schedule, the date the task returns: RFC 3339 or YYYY-MM-DD. |
-| `task.verb` | `on_activity` | string |  | With schedule, `true` returns the task on new activity on its unit. |
-| `task.verb` | `on` | string |  | With waiting, the people the task waits on, comma-separated. |
-| `task.verb` | `resurface` | string |  | With waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD. |
-| `task.verb` | `set` | string |  | With context, the contexts, comma-separated; with area, the area. |
+| `task.verb` | `verb` | string |  | The verb of tasks.toml run on the task, one whose by.workflow lets a workflow run it. Required. |
+| `task.verb` | `until` | string |  | With a verb whose handler is schedule, the date the task returns: RFC 3339 or YYYY-MM-DD. |
+| `task.verb` | `on_activity` | string |  | With a verb whose handler is schedule, `true` returns the task on new activity on its unit. |
+| `task.verb` | `on` | string |  | With a verb whose handler is waiting, the people the task waits on, comma-separated. |
+| `task.verb` | `resurface` | string |  | With a verb whose handler is waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD. |
+| `task.verb` | `set` | string |  | With a verb whose handler is context, the contexts, comma-separated; with area, the area. |
 | `gate.open` | `name` | string |  | The gate, of gates.toml, the step opens. Required. |
 | `task.set` | `prop` | string |  | The property, of tasks.toml, the step sets. Required. |
 | `task.set` | `value` | string |  | The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD, a duration, a list comma-separated. Required. |

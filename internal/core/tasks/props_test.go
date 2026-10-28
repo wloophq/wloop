@@ -45,7 +45,9 @@ func TestATaskSetDuringAVerbIsKept(t *testing.T) {
 	var wg sync.WaitGroup
 	t.Cleanup(wg.Wait)
 	var verbErr, setErr error
-	wg.Go(func() { _, verbErr = svc.Do(ctx, "t-1", coretasks.Request{Verb: task.VerbNext}) })
+	wg.Go(func() {
+		_, verbErr = svc.Do(ctx, "t-1", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbNext})
+	})
 	<-read
 	wg.Go(func() {
 		defer close(setDone)

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"path/filepath"
 	"reflect"
@@ -68,7 +70,7 @@ func newTasksRig(t *testing.T, edit func(*Deps)) *tasksRig {
 		}
 		enabled := d.PluginEnabled
 		r.ledger.Enabled = enabled
-		r.g = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: db.Tasks(), Items: r.ledger,
+		r.g = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority, Store: db.Tasks(), Items: r.ledger,
 			Facts: coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: func() task.Me { return meID }},
 			Me:    meID, Clock: fixedClock(tasksNow), StaleWaitingDays: 2, Disabled: disabledOf(enabled)})
 		d.Tasks = r.g
@@ -275,6 +277,15 @@ func TestVerbPostMovesAndStreams(t *testing.T) {
 	c := nextChange(t, sub)
 	if c.Type != "changed" || c.Counters.Views["next"] != 1 || c.Counters.Views["inbox"] != 0 || !slices.Contains(c.Units, r7u) {
 		t.Fatalf("%+v %+v", c, c.Counters)
+	}
+}
+
+func TestAVerbTheProfileForbidsIsForbidden(t *testing.T) {
+	t.Parallel()
+	rec := httptest.NewRecorder()
+	writeTasksError(rec, fmt.Errorf("%w: agent may not run done on this entry", coretasks.ErrForbidden))
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("%d %s", rec.Code, rec.Body)
 	}
 }
 
@@ -641,7 +652,7 @@ func TestRegisteredHandlerWins(t *testing.T) {
 	c, g := bridgeRig(t)
 	c.propose(t)
 	var got []string
-	g.Register(task.KindAction, task.VerbApprove, func(_ context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
+	g.Register(task.KindAction, string(task.VerbApprove), func(_ context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
 		got = append(got, string(e.ID)+" "+req.Source)
 		return coretasks.Result{Task: e, Lines: []string{"handled"}}, nil
 	})
@@ -743,7 +754,7 @@ func TestTaskAnswerRouteMatchesTheUnitAnswer(t *testing.T) {
 	if got := r.outcome(rec.Code, res.Lines); !reflect.DeepEqual(got, want) {
 		t.Fatalf("by entry %+v\nby unit %+v", got, want)
 	}
-	if evs := r.tasks.Events; len(evs) != 1 || evs[0].Kind != "verb_answer" || evs[0].Actor != "cockpit" {
+	if evs := r.tasks.Events; len(evs) != 1 || evs[0].Kind != "verb_answer" || evs[0].Actor != "person:cockpit" {
 		t.Fatalf("events %+v", evs)
 	}
 }
@@ -839,14 +850,15 @@ func TestATasksMessageShowsItsAnswersAndWhetherTheAgentReadThem(t *testing.T) {
 	}
 }
 
-func TestAVerbAWorkflowRunsOnAMessageRecordsNothing(t *testing.T) {
+func TestAVerbAWorkflowRunsOnAMessageRecordsItsActor(t *testing.T) {
 	t.Parallel()
 	r := newMessageRig(t)
 	m := r.question(t)
-	if _, err := r.s.deps.Tasks.Do(context.Background(), task.ID(m.TaskID), coretasks.Request{Verb: task.VerbDismiss, Source: "workflow stale", Automated: true}); err != nil {
+	req := coretasks.Request{Verb: task.VerbDismiss, Source: "stale", Actor: task.ActorWorkflow, Chain: workflow.Chain{}.Then("stale")}
+	if _, err := r.s.deps.Tasks.Do(context.Background(), task.ID(m.TaskID), req); err != nil {
 		t.Fatal(err)
 	}
-	if evs := r.tasks.Events; len(evs) != 0 {
+	if evs := r.tasks.Events; len(evs) != 1 || evs[0].Kind != "verb_dismiss" || evs[0].Actor != "workflow:stale" {
 		t.Fatalf("events %+v", evs)
 	}
 }

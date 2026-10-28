@@ -182,7 +182,7 @@ func TestVerbEventsWriteWithOrWithoutAChange(t *testing.T) {
 	if err := db.Tasks().Apply(ctx, nil, ev); err != nil {
 		t.Fatal(err)
 	}
-	got, err := db.Events().Since(ctx, 0, task.VerbEventKinds)
+	got, err := db.Events().Since(ctx, 0, task.VerbEventKinds([]string{"done"}))
 	if err != nil {
 		t.Fatal(err)
 	}

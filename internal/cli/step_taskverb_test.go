@@ -18,17 +18,30 @@ import (
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
-	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
-const somedayWorkflow = `summary = "Move a next action to Someday"
+const clarifyWorkflow = `summary = "Move a captured task to Next"
 provider = "task"
-when = 'task.state == "next"'
+when = 'task.state == "inbox"'
 
 [[step]]
 use = "task.verb"
-verb = "someday"
+verb = "next"
+`
+
+const starWorkflow = `summary = "Star a task a workflow moved to Next"
+provider = "task"
+when = 'trigger.event.kind == "verb_next"'
+key = ["trigger.event.id"]
+
+[trigger]
+on = ["verb_next"]
+actors = ["workflow"]
+
+[[step]]
+use = "task.verb"
+verb = "focus"
 `
 
 // taskRig is the entries service over a store, served as the daemon's.
@@ -51,7 +64,7 @@ func newTaskRig(t *testing.T, files map[string]string) *taskRig {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	te.tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: db.Tasks(), Facts: coretasks.CardFacts{Cards: db.Cards()}, Clock: clockFunc(func() time.Time { return te.Now() })})
+	te.tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority, Store: db.Tasks(), Facts: coretasks.CardFacts{Cards: db.Cards()}, Clock: clockFunc(func() time.Time { return te.Now() })})
 	return &taskRig{te: te, db: db}
 }
 
@@ -64,32 +77,43 @@ func (r *taskRig) put(t *testing.T, id task.ID, state task.State) {
 	}
 }
 
-func TestTaskVerbMovesTheTaskAndRecordsNoVerbEvent(t *testing.T) {
+func TestTaskVerbRecordsItsEventAndAnotherWorkflowReactsInChain(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	r := newTaskRig(t, map[string]string{"workflows/my-someday/workflow.toml": somedayWorkflow})
-	r.put(t, "e-01", task.State("next"))
+	r := newTaskRig(t, map[string]string{"workflows/my-clarify/workflow.toml": clarifyWorkflow, "workflows/my-star/workflow.toml": starWorkflow})
+	r.put(t, "e-01", task.State("inbox"))
 	ed := engineDeps{DB: r.db, SessionFacts: noUnits{}, WorkspaceFacts: noUnits{}}
 	r.te.wireSubjects(&serveWiring{DB: r.db, Cfg: r.te.cfg, Engine: &ed})
 	eng := r.te.newEngine(ed)
 
-	if _, _, err := eng.Sweep(ctx, &sync.Mutex{}); err != nil {
-		t.Fatal(err)
+	for range 3 {
+		if _, _, err := eng.Sweep(ctx, &sync.Mutex{}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	e, err := r.db.Tasks().Task(ctx, "e-01")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if e.State != task.State("someday") {
-		items, _ := eng.Ledger.Items(ctx, automation.Filter{Workflow: "my-someday"})
-		t.Fatalf("state %s; items %+v", e.State, items)
+	if e.State != task.State("next") || !e.Starred() {
+		items, _ := eng.Ledger.Items(ctx, automation.Filter{})
+		t.Fatalf("state %s, starred %v; items %+v", e.State, e.Starred(), items)
 	}
-	evs, err := r.db.Events().Since(ctx, 0, task.VerbEventKinds)
+	evs, err := r.db.Events().Since(ctx, 0, task.VerbEventKinds([]string{"next", "focus"}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(evs) > 0 {
-		t.Fatalf("recorded %+v", evs)
+	want := []struct {
+		kind, actor string
+		chain       []string
+	}{{"verb_next", "workflow:my-clarify", []string{"my-clarify"}}, {"verb_focus", "workflow:my-star", []string{"my-clarify", "my-star"}}}
+	if len(evs) != len(want) {
+		t.Fatalf("events %+v", evs)
+	}
+	for i, w := range want {
+		if evs[i].Kind != w.kind || evs[i].Actor != w.actor || evs[i].Chain.Depth != len(w.chain) || !slices.Equal(evs[i].Chain.Workflows, w.chain) {
+			t.Errorf("event %d %+v, want %s by %s in chain %v", i, evs[i], w.kind, w.actor, w.chain)
+		}
 	}
 }
 
@@ -107,8 +131,11 @@ func TestTaskVerbCheckRefusesWhatTheTasksStateRefuses(t *testing.T) {
 	if !strings.Contains(refusal, "done on a done entry") {
 		t.Fatalf("refusal %q", refusal)
 	}
-	if refusal, err := s.Check(ctx, wfStep("task.verb", "verb", "reference"), u, workflow.Why{Workflow: "w"}, automation.CheckOpts{}); err != nil || refusal != "" {
-		t.Fatalf("reference on a done entry: %q %v", refusal, err)
+	if refusal, err := s.Check(ctx, wfStep("task.verb", "verb", "dismiss"), u, workflow.Why{Workflow: "w"}, automation.CheckOpts{}); err != nil || refusal != "" {
+		t.Fatalf("dismiss on a done entry: %q %v", refusal, err)
+	}
+	if refusal, err := s.Check(ctx, wfStep("task.verb", "verb", "reference"), u, workflow.Why{Workflow: "w"}, automation.CheckOpts{}); err != nil || !strings.Contains(refusal, "workflow may not run reference") {
+		t.Fatalf("reference, which no by.workflow lets a workflow run: %q %v", refusal, err)
 	}
 }
 
@@ -129,26 +156,22 @@ func TestTaskVerbLeavesClosingADerivedTaskToItsItems(t *testing.T) {
 			t.Errorf("%s on a derived entry: %q %v", v, refusal, err)
 		}
 	}
-	if refusal, err := s.Check(ctx, wfStep("task.verb", "verb", "someday"), task.UnitOf("e-02"), why, automation.CheckOpts{}); err != nil || refusal != "" {
-		t.Errorf("someday on a derived entry: %q %v", refusal, err)
+	if refusal, err := s.Check(ctx, wfStep("task.verb", "verb", "next"), task.UnitOf("e-02"), why, automation.CheckOpts{}); err != nil || refusal != "" {
+		t.Errorf("next on a derived entry: %q %v", refusal, err)
 	}
 }
 
 func TestTaskVerbRunsOnlyVerbsThatMoveAStoredTask(t *testing.T) {
 	t.Parallel()
-	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates})
-	for _, v := range builtin.TaskStepVerbs {
+	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority})
+	for _, v := range task.Verbs {
 		moves := false
 		for _, s := range []task.State{"inbox", "next", "waiting", "scheduled", "someday", "reference", "done", "trash"} {
-			moves = moves || g.Accepts(task.Task{State: s}, task.Verb(v)) == nil
+			moves = moves || g.Accepts(task.Task{State: s}, v, task.ActorWorkflow) == nil
 		}
-		if !moves {
-			t.Errorf("no state takes %s", v)
-		}
-	}
-	for _, v := range []task.Verb{task.VerbApprove, task.VerbDelegate, task.VerbAnswer, task.VerbReply, task.VerbEdit, task.VerbRetry, task.VerbProject, task.VerbSeen} {
-		if slices.Contains(builtin.TaskStepVerbs, string(v)) {
-			t.Errorf("task.verb runs %s", v)
+		want := slices.Contains([]task.Verb{task.VerbNext, task.VerbWaiting, task.VerbSchedule, task.VerbFocus, task.VerbDone, task.VerbDismiss}, v)
+		if moves != want {
+			t.Errorf("a workflow runs %s: %v, want %v", v, moves, want)
 		}
 	}
 }

@@ -66,13 +66,13 @@ func TestADisabledPluginsTasksLeaveTheViewsAndCountsButStayDismissable(t *testin
 	if err != nil || len(p.Tasks) != 2 || p.Counters.Badge != 2 {
 		t.Fatalf("page %+v %v", p, err)
 	}
-	if _, err := r.svc.Do(ctx, "e-gh", coretasks.Request{Verb: task.VerbNext}); !errors.Is(err, coretasks.ErrPluginDisabled) {
+	if _, err := r.svc.Do(ctx, "e-gh", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbNext}); !errors.Is(err, coretasks.ErrPluginDisabled) {
 		t.Fatalf("next: %v", err)
 	}
-	if res, err := r.svc.Do(ctx, "e-gh", coretasks.Request{Verb: task.VerbDismiss}); err != nil || res.Task.Category != task.CategoryDropped {
+	if res, err := r.svc.Do(ctx, "e-gh", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss}); err != nil || res.Task.Category != task.CategoryDropped {
 		t.Fatalf("dismiss: %+v %v", res, err)
 	}
-	if res, err := r.svc.Do(ctx, "e-both", coretasks.Request{Verb: task.VerbDismiss}); err != nil || res.Task.Category != task.CategoryInbox ||
+	if res, err := r.svc.Do(ctx, "e-both", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss}); err != nil || res.Task.Category != task.CategoryInbox ||
 		len(res.Task.Units) != 1 || res.Task.Units[0].Provider != "slack" {
 		t.Fatalf("dismiss of an entry with a unit of an enabled plugin detaches the disabled one: %+v %v", res, err)
 	}
@@ -98,11 +98,11 @@ func TestDismissDetachesADisabledPluginsUnitsFromAMixedTask(t *testing.T) {
 	r.put(t, task.Task{ID: "e-two", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{slack, unitV},
 		Origin: task.OriginUser})
 
-	_, err := r.svc.Do(ctx, "e-mixed", coretasks.Request{Verb: task.VerbDone})
+	_, err := r.svc.Do(ctx, "e-mixed", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone})
 	if !errors.Is(err, coretasks.ErrPluginDisabled) || !strings.Contains(err.Error(), "slack") {
 		t.Fatalf("done names the disabled plugin: %v", err)
 	}
-	res, err := r.svc.Do(ctx, "e-mixed", coretasks.Request{Verb: task.VerbDismiss})
+	res, err := r.svc.Do(ctx, "e-mixed", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,10 +111,10 @@ func TestDismissDetachesADisabledPluginsUnitsFromAMixedTask(t *testing.T) {
 		!slices.Equal(got.Items, []task.ItemRef{{Unit: unitU, Item: "a"}}) || res.Task.ID != got.ID || !slices.Equal(res.Task.Units, got.Units) {
 		t.Fatalf("detached %+v, result %+v", got, res.Task)
 	}
-	if res, err := r.svc.Do(ctx, "e-mixed", coretasks.Request{Verb: task.VerbDone}); err != nil || res.Task.Category != task.CategoryDone {
+	if res, err := r.svc.Do(ctx, "e-mixed", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone}); err != nil || res.Task.Category != task.CategoryDone {
 		t.Fatalf("done once detached: %+v %v", res, err)
 	}
-	if _, err := r.svc.Do(ctx, "e-two", coretasks.Request{Verb: task.VerbDismiss}); err != nil {
+	if _, err := r.svc.Do(ctx, "e-two", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss}); err != nil {
 		t.Fatal(err)
 	}
 	if got := r.task(t, "e-two"); got.Category != task.CategoryInbox || !slices.Equal(got.Units, []unit.Unit{unitV}) {
@@ -127,7 +127,7 @@ func TestDismissTrashesATaskWithNoUnitOfAnEnabledPluginWhole(t *testing.T) {
 	r.facts.off[unit.GitHub] = true
 	r.put(t, task.Task{ID: "e-gh", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU},
 		Items: []task.ItemRef{{Unit: unitU, Item: "a"}}, Origin: task.OriginUser})
-	res, err := r.svc.Do(context.Background(), "e-gh", coretasks.Request{Verb: task.VerbDismiss})
+	res, err := r.svc.Do(context.Background(), "e-gh", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss})
 	got := r.task(t, "e-gh")
 	if err != nil || res.Task.Category != task.CategoryDropped || got.Category != task.CategoryDropped || len(got.Units) != 1 || len(got.Items) != 1 {
 		t.Fatalf("trashed whole: %+v %+v %v", got, res, err)
@@ -141,7 +141,7 @@ func TestDismissTrashesADerivedMixedTaskWhole(t *testing.T) {
 	id := task.DerivedID(task.KindAction, slack, "i1")
 	r.put(t, task.Task{ID: id, Kind: task.KindAction, State: "next", Category: task.CategoryReady, Units: []unit.Unit{slack, unitU},
 		Items: []task.ItemRef{{Unit: slack, Item: "i1"}, {Unit: unitU, Item: "a"}}, Origin: task.OriginDerived})
-	if _, err := r.svc.Do(context.Background(), id, coretasks.Request{Verb: task.VerbDismiss}); err != nil {
+	if _, err := r.svc.Do(context.Background(), id, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss}); err != nil {
 		t.Fatal(err)
 	}
 	if got := r.task(t, id); got.Category != task.CategoryDropped || len(got.Units) != 2 || len(got.Items) != 2 {
@@ -155,7 +155,7 @@ func TestDetachDropsItemsOnAnyUnitOfTheDisabledPlugin(t *testing.T) {
 	a, b := unit.Unit{Provider: "slack", Key: "C1/1.1"}, unit.Unit{Provider: "slack", Key: "C1/2.2"}
 	r.put(t, task.Task{ID: "e-mixed", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU, a},
 		Items: []task.ItemRef{{Unit: unitU, Item: "x"}, {Unit: b, Item: "y"}}, Origin: task.OriginUser})
-	if _, err := r.svc.Do(context.Background(), "e-mixed", coretasks.Request{Verb: task.VerbDismiss}); err != nil {
+	if _, err := r.svc.Do(context.Background(), "e-mixed", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss}); err != nil {
 		t.Fatal(err)
 	}
 	if got := r.task(t, "e-mixed"); !slices.Equal(got.Items, []task.ItemRef{{Unit: unitU, Item: "x"}}) {
@@ -169,7 +169,7 @@ func TestDetachDropsItemsOfADisabledPluginWithNoUnitOnTheTask(t *testing.T) {
 	slack, ticket := unit.Unit{Provider: "slack", Key: "C1/1.1"}, unit.Unit{Provider: "jira", Key: "T-1"}
 	r.put(t, task.Task{ID: "e-mixed", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU, slack},
 		Items: []task.ItemRef{{Unit: unitU, Item: "x"}, {Unit: ticket, Item: "y"}}, Origin: task.OriginUser})
-	if _, err := r.svc.Do(context.Background(), "e-mixed", coretasks.Request{Verb: task.VerbDismiss}); err != nil {
+	if _, err := r.svc.Do(context.Background(), "e-mixed", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss}); err != nil {
 		t.Fatal(err)
 	}
 	if got := r.task(t, "e-mixed"); !slices.Equal(got.Units, []unit.Unit{unitU}) || !slices.Equal(got.Items, []task.ItemRef{{Unit: unitU, Item: "x"}}) {

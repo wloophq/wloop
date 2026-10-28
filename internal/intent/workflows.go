@@ -17,6 +17,7 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/jsonschema"
 	"github.com/wloophq/wloop/internal/domain/mark"
+	"github.com/wloophq/wloop/internal/domain/task"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -89,7 +90,7 @@ type wUnit struct {
 // bundled one whose override fails is listed in reverted and loads without
 // it. turnProblem, when set, is why a turn.start may not name an intent
 // or run it under a runner, with the argument at fault; "" when it may.
-func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems, warnings Problems) {
+func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env, tasks TasksDef) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems, warnings Problems) {
 	var units []*wUnit
 	bundledUnits := map[string]*wUnit{}
 	if bundled != nil {
@@ -135,12 +136,12 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(inten
 	}
 	broken, reverted = map[string]Problems{}, map[string]Problems{}
 	for _, u := range units {
-		u.load(turnProblem, extras)
+		u.load(turnProblem, extras, tasks)
 		if len(u.problems) > 0 && len(u.files.overlay) > 0 {
 			reverted[u.name] = u.files.own(u.problems, "workflow.toml")
 			problems = append(problems, reverted[u.name]...)
 			u.files.overlay = nil
-			u.load(turnProblem, extras)
+			u.load(turnProblem, extras, tasks)
 		}
 		if len(u.problems) > 0 {
 			problems = append(problems, u.problems...)
@@ -206,9 +207,9 @@ func (u *wUnit) unknownMarks(readable map[string]bool) Problems {
 	return out
 }
 
-func (u *wUnit) load(turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env) {
+func (u *wUnit) load(turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env, tasks TasksDef) {
 	file := u.files.path("workflow.toml")
-	s := &sheet{file: file, extras: extras}
+	s := &sheet{file: file, extras: extras, tasks: tasks}
 	defer func() { u.problems, u.warnings = s.problems, s.warnings }()
 	if !workflowNameRe.MatchString(u.name) {
 		s.problems = append(s.problems, Problem{File: u.dir, Msg: "a workflow name is 2 to 40 lowercase letters, digits and -, starting with a letter"})
@@ -383,14 +384,23 @@ func (s *sheet) defineTrigger(w *workflow.Workflow, t *wTrigger) {
 		if len(t.On) == 0 {
 			s.add("trigger.on", "must name at least one event kind")
 		}
+		kinds, verbs := builtin.TriggerEventKinds(), s.tasks.VerbKinds()
 		for i, k := range t.On {
+			at := fmt.Sprintf("trigger.on[%d]", i)
 			switch {
 			case slices.Contains(workflow.EngineKinds, k):
-				s.add(fmt.Sprintf("trigger.on[%d]", i), "%s is an engine event; a workflow reacts to source events", k)
+				s.add(at, "%s is an engine event; a workflow reacts to source events", k)
+			case slices.Contains(verbs, k) && w.Provider != task.UnitOf("").Provider:
+				s.add(at, "%s is an event of %s units; it needs provider = %q", k, task.UnitOf("").Provider, task.UnitOf("").Provider)
+			case slices.Contains(verbs, k):
+			case !slices.Contains(kinds, k):
+				all := slices.Concat(kinds, verbs)
+				s.add(at, "names no event kind%s", expr.DidYouMean(k, all))
 			case builtin.EventProviders[k] != "" && w.Provider != builtin.EventProviders[k]:
-				s.add(fmt.Sprintf("trigger.on[%d]", i), "%s is an event of %s units; it needs provider = %q", k, builtin.EventProviders[k], builtin.EventProviders[k])
+				s.add(at, "%s is an event of %s units; it needs provider = %q", k, builtin.EventProviders[k], builtin.EventProviders[k])
 			}
 		}
+		s.defineChain(w, t)
 	default:
 		w.Trigger.Kind = workflow.TriggerSchedule
 		c, err := workflow.ParseCron(*t.Schedule)
@@ -399,6 +409,29 @@ func (s *sheet) defineTrigger(w *workflow.Workflow, t *wTrigger) {
 		}
 		w.Trigger.Schedule = c
 	}
+}
+
+// defineChain reads trigger.actors and trigger.depth, which bound the
+// chains of workflows an event trigger closes.
+func (s *sheet) defineChain(w *workflow.Workflow, t *wTrigger) {
+	for i, a := range t.Actors {
+		if !slices.ContainsFunc(task.Actors, func(x task.Actor) bool { return string(x) == a }) {
+			continue
+		}
+		if slices.Contains(w.Trigger.Actors, a) {
+			s.add(fmt.Sprintf("trigger.actors[%d]", i), "names %s twice", a)
+			continue
+		}
+		w.Trigger.Actors = append(w.Trigger.Actors, a)
+	}
+	if t.Depth == nil {
+		return
+	}
+	if d := *t.Depth; d < 1 || d > workflow.MaxChainDepth {
+		s.add("trigger.depth", "must be 1 to %d: the longest chain of workflows triggering each other, %d when absent", workflow.MaxChainDepth, workflow.DefaultChainDepth)
+		return
+	}
+	w.Trigger.Depth = *t.Depth
 }
 
 func stepDef(use string) (builtin.StepDef, bool) {
@@ -551,25 +584,31 @@ func (s *sheet) stepFiles(steps []workflow.Step, read func(string) ([]byte, erro
 	}
 }
 
-// taskVerb checks task.verb's arguments: a verb, only the arguments it
-// takes, and a date or on_activity for schedule.
+// taskVerb checks task.verb's arguments: a verb of tasks.toml a workflow
+// may run, only the arguments its handler takes, and a date or
+// on_activity for the schedule handler.
 func (s *sheet) taskVerb(p string, args map[string]any) {
 	verb, _ := args["verb"].(string)
 	if verb == "" {
 		s.add(p+".verb", "is required: the verb run on the task")
 		return
 	}
-	if !slices.Contains(builtin.TaskStepVerbs, verb) {
+	v, ok := s.tasks.Verbs[verb]
+	if !ok {
+		s.add(p+".verb", "names no verb of %s%s", TasksFile, expr.DidYouMean(verb, slices.Sorted(maps.Keys(s.tasks.Verbs))))
 		return
 	}
-	takes := builtin.TaskVerbArgs[verb]
+	if v.By[string(task.ActorWorkflow)] == "" {
+		s.add(p+".verb", "%s has no by.workflow in %s: no workflow may run it", verb, TasksFile)
+	}
+	takes := builtin.HandlerArgs[v.Handler]
 	for _, k := range slices.Sorted(maps.Keys(args)) {
 		if k != "verb" && !slices.Contains(takes, k) {
 			s.add(p+"."+k, "is not an argument of %s", verb)
 		}
 	}
-	if verb == "schedule" && args["until"] == nil && args["on_activity"] != "true" {
-		s.add(p+".verb", "schedule needs until or on_activity = \"true\"")
+	if slices.Contains(takes, "on_activity") && args["until"] == nil && args["on_activity"] != "true" {
+		s.add(p+".verb", "%s needs until or on_activity = \"true\"", verb)
 	}
 }
 

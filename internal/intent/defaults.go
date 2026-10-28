@@ -37,6 +37,9 @@ type sheet struct {
 	// taskFacts are the task.prop.* facts of tasks.toml, which a predicate
 	// over a task's facts reads.
 	taskFacts expr.Env
+	// tasks is the profile's tasks.toml, whose verbs a workflow's trigger
+	// and task.verb steps name.
+	tasks TasksDef
 }
 
 // pos is where path's value starts, else its nearest placed parent, else 1:1.

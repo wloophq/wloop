@@ -196,7 +196,7 @@ func TestNewReplyResurfacesSnoozed(t *testing.T) {
 	if len(es) != 1 || es[0].Kind != task.KindWaiting || es[0].State != task.State("waiting") {
 		t.Fatalf("entries %+v", es)
 	}
-	if _, err := fl.tasks.Do(context.Background(), es[0].ID, coretasks.Request{Verb: task.VerbSchedule, Args: map[string]string{"on_activity": "true"}}); err != nil {
+	if _, err := fl.tasks.Do(context.Background(), es[0].ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSchedule, Args: map[string]string{"on_activity": "true"}}); err != nil {
 		t.Fatal(err)
 	}
 	if es = fl.tasksOf(t, u); es[0].State != task.State("scheduled") || es[0].Changed {

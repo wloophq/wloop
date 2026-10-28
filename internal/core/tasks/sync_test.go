@@ -19,7 +19,7 @@ func TestAUserScheduleEndingUnderAMuteStaysScheduled(t *testing.T) {
 		t.Fatal(err)
 	}
 	id := task.DerivedID(task.KindAction, unitU, "a")
-	if _, err := r.svc.Do(ctx, id, coretasks.Request{Verb: task.VerbSchedule, Args: map[string]string{"until": t0.Add(time.Hour).Format(time.RFC3339)}}); err != nil {
+	if _, err := r.svc.Do(ctx, id, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSchedule, Args: map[string]string{"until": t0.Add(time.Hour).Format(time.RFC3339)}}); err != nil {
 		t.Fatal(err)
 	}
 	muteEnd := t0.Add(72 * time.Hour)

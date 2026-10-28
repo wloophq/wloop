@@ -603,42 +603,30 @@
               "additionalProperties": false,
               "properties": {
                 "on": {
-                  "description": "With waiting, the people the task waits on, comma-separated.",
+                  "description": "With a verb whose handler is waiting, the people the task waits on, comma-separated.",
                   "type": "string"
                 },
                 "on_activity": {
-                  "description": "With schedule, `true` returns the task on new activity on its unit.",
+                  "description": "With a verb whose handler is schedule, `true` returns the task on new activity on its unit.",
                   "type": "string"
                 },
                 "resurface": {
-                  "description": "With waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD.",
+                  "description": "With a verb whose handler is waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD.",
                   "type": "string"
                 },
                 "set": {
-                  "description": "With context, the contexts, comma-separated; with area, the area.",
+                  "description": "With a verb whose handler is context, the contexts, comma-separated; with area, the area.",
                   "type": "string"
                 },
                 "until": {
-                  "description": "With schedule, the date the task returns: RFC 3339 or YYYY-MM-DD.",
+                  "description": "With a verb whose handler is schedule, the date the task returns: RFC 3339 or YYYY-MM-DD.",
                   "type": "string"
                 },
                 "use": {
                   "const": "task.verb"
                 },
                 "verb": {
-                  "description": "The verb run on the task. Required.",
-                  "enum": [
-                    "next",
-                    "waiting",
-                    "schedule",
-                    "someday",
-                    "reference",
-                    "focus",
-                    "context",
-                    "area",
-                    "done",
-                    "dismiss"
-                  ],
+                  "description": "The verb of tasks.toml run on the task, one whose by.workflow lets a workflow run it. Required.",
                   "type": "string"
                 }
               },
@@ -744,7 +732,7 @@
       "description": "What plans the workflow: on or schedule; absent, every sweep.",
       "properties": {
         "actors": {
-          "description": "With on, the actors whose events plan it; every actor when absent.",
+          "description": "With on, the actors whose verb events plan it (person, workflow, agent, plugin); every actor when absent.",
           "items": {
             "enum": [
               "person",
@@ -758,63 +746,12 @@
         },
         "depth": {
           "default": 3,
-          "description": "With on, the longest chain of workflows triggering each other the event may close; at most 5.",
+          "description": "With on, the longest chain of workflows triggering each other the workflow may close: an event a chain of that many workflows caused plans it no more, and a workflow already in an event's chain never runs on it. 1 to 5.",
           "type": "integer"
         },
         "on": {
-          "description": "The source event kinds the workflow reacts to; verb_<verb>, a verb a person ran on a task, and task.woke, a task's wake matched, with provider task.",
+          "description": "The event kinds the workflow reacts to: the loop's, the plugins', task.woke (a task's wake matched) and verb_<verb>, a verb of tasks.toml run on a task by anyone, a workflow included; the last two with provider task.",
           "items": {
-            "enum": [
-              "muted",
-              "unmuted",
-              "held",
-              "released",
-              "adopted",
-              "tracked",
-              "untracked",
-              "nudged",
-              "removed",
-              "status",
-              "check",
-              "closed",
-              "comment",
-              "draft",
-              "guidance",
-              "merged",
-              "opened",
-              "push",
-              "ready",
-              "review",
-              "review_ended",
-              "review_request_removed",
-              "review_requested",
-              "round_blocked",
-              "round_held",
-              "round_pending",
-              "round_sent",
-              "round_skipped",
-              "round_unblocked",
-              "verb_answer",
-              "verb_approve",
-              "verb_area",
-              "verb_context",
-              "verb_delegate",
-              "verb_dismiss",
-              "verb_done",
-              "verb_focus",
-              "verb_next",
-              "verb_project",
-              "verb_reference",
-              "verb_reply",
-              "verb_reviewed",
-              "verb_schedule",
-              "verb_sequential",
-              "verb_someday",
-              "verb_waiting",
-              "would_address",
-              "would_review",
-              "task.woke"
-            ],
             "type": "string"
           },
           "type": "array"

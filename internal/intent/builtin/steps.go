@@ -2,7 +2,6 @@ package builtin
 
 import (
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -34,29 +33,6 @@ const (
 	StepGateOpen     = "gate.open"
 	StepTaskSet      = "task.set"
 )
-
-// TaskStepVerbs are the verbs task.verb runs: the moves of a task
-// between lists and its focus, context and area. Approving, delegating and
-// answering never come from automation.
-var TaskStepVerbs = verbNames(task.VerbNext, task.VerbWaiting, task.VerbSchedule, task.VerbSomeday, task.VerbReference,
-	task.VerbFocus, task.VerbContext, task.VerbArea, task.VerbDone, task.VerbDismiss)
-
-// TaskVerbArgs are the arguments each verb takes; the loader refuses any
-// other.
-var TaskVerbArgs = map[string][]string{
-	string(task.VerbSchedule): {"until", "on_activity"},
-	string(task.VerbWaiting):  {"on", "resurface"},
-	string(task.VerbContext):  {"set"},
-	string(task.VerbArea):     {"set"},
-}
-
-func verbNames(vs ...task.Verb) []string {
-	out := make([]string, len(vs))
-	for i, v := range vs {
-		out[i] = string(v)
-	}
-	return out
-}
 
 // The values of draft.propose's arguments.
 var (

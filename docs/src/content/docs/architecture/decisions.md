@@ -11,7 +11,6 @@ Each entry is a file under `docs/src/content/docs/architecture/decisions/`, with
 |---|---|
 | [A draft is what its proposer declares](/architecture/decisions/a-draft-is-what-its-proposer-declares/) | A draft carries its purpose, delivery and effects; nothing follows from its kind, and a comment waits for a person. |
 | [A provider is asked what it can do](/architecture/decisions/a-provider-is-asked-what-it-can-do/) | A plugin declares its capabilities, and a provider id appears only in its plugin and the tables. |
-| [A verb a person runs is an event](/architecture/decisions/a-verb-a-person-runs-is-an-event/) | Every verb a person runs on a task records one verb event, and a verb a workflow runs records none. |
 | [Architecture rules are tests](/architecture/decisions/architecture-rules-are-tests/) | Each architecture rule is a test with a self-test, and its reference page is generated. |
 | [Authority comes from you](/architecture/decisions/authority-comes-from-you/) | Endorsing, approving, taking over and removing come only from your surfaces, never from an agent. |
 | [Behavior lives in the profile](/architecture/decisions/behavior-lives-in-the-profile/) | Behavior is profile files; Go provides a closed vocabulary and never enumerates intents. |
@@ -32,3 +31,4 @@ Each entry is a file under `docs/src/content/docs/architecture/decisions/`, with
 | [The store migrates forward](/architecture/decisions/the-store-migrates-forward/) | Every schema change is a new version with a migration, and a newer store is refused. |
 | [Units generalize the pull request](/architecture/decisions/units-generalize-the-pull-request/) | Work is keyed by unit.Unit, and only a provider's codec mints and parses a key. |
 | [What the loop proposes to post is a draft](/architecture/decisions/what-the-loop-proposes-to-post-is-a-draft/) | What the loop proposes to post is a draft, published once and only when approved. |
+| [Workflows trigger each other in a bounded chain](/architecture/decisions/workflows-trigger-each-other-in-a-bounded-chain/) | Every verb records its event with its actor and its chain, and an event trigger stops at its depth and never re-enters its chain. |

@@ -9,10 +9,12 @@ import (
 	"sync/atomic"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
+	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/daemon"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -28,7 +30,8 @@ func (e *Env) newTasks(db *sqlite.DB, cfg config.Config, its coretasks.Items) *c
 		enabled := func(p unit.ProviderID) bool { return !slices.Contains(off(), p) }
 		facts := coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: e.tasksMe.get}
 		e.tasks = coretasks.New(coretasks.Deps{Store: db.Tasks(), Items: its, Facts: facts, Clock: clockFunc(e.Now),
-			StaleWaitingDays: cfg.Tasks.StaleWaitingDays, Disabled: off, States: profileStates{e}})
+			StaleWaitingDays: cfg.Tasks.StaleWaitingDays, Disabled: off, States: profileStates{e},
+			Authority: catalog.Authority(e.loadedIntents), Gates: db.Gates(e.Now)})
 	}
 	return e.tasks
 }
@@ -44,6 +47,23 @@ func (p profileStates) FirstOf(c task.Category) string { return p.e.loadedIntent
 
 func (p profileStates) Move(verb string) ([]string, string, bool) {
 	return p.e.loadedIntents().Tasks.Move(verb)
+}
+
+func (p profileStates) Handler(verb string) string { return p.e.loadedIntents().Tasks.Handler(verb) }
+
+// Gate is the gate of gates.toml verb's gate names, with its kind and intents.
+func (p profileStates) Gate(verb string) (gate.Gate, bool) {
+	l := p.e.loadedIntents()
+	name := l.Tasks.Verbs[verb].Gate
+	d, ok := l.Gates.Gate(name)
+	if name == "" || !ok {
+		return gate.Gate{}, false
+	}
+	g := gate.Gate{Name: d.Name, Kind: d.Kind}
+	for _, in := range d.Intents {
+		g.Intents = append(g.Intents, in.Name)
+	}
+	return g, true
 }
 
 // offProviders are the plugins cfg disables and those the daemon serves disabled (built), once serveTasks

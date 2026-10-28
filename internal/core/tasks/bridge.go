@@ -11,8 +11,3 @@ func (s *Service) SetMe(me task.Me) {
 	defer s.mu.Unlock()
 	s.d.Me = me
 }
-
-// Accepts says whether e's state takes verb with no handler: ErrArgs for an unknown verb, ErrVerb naming the
-// verb and the state for a refused one. approve, delegate, answer, edit, retry, reply, reviewed and sequential
-// move nothing on their own, so it refuses them.
-func (s *Service) Accepts(e task.Task, verb task.Verb) error { return s.accepts(e, verb) }

@@ -38,7 +38,7 @@ func TestAPluginRefusedAtBuildCountsAsOff(t *testing.T) {
 	if err != nil || c.Views[task.ViewInbox] != 0 || c.Badge != 0 {
 		t.Fatalf("counts %+v %v", c, err)
 	}
-	if _, err := d.Tasks.Do(ctx, e.ID, coretasks.Request{Verb: task.VerbNext}); !errors.Is(err, coretasks.ErrPluginDisabled) {
+	if _, err := d.Tasks.Do(ctx, e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbNext}); !errors.Is(err, coretasks.ErrPluginDisabled) {
 		t.Fatalf("next on a refused plugin's entry: %v", err)
 	}
 }

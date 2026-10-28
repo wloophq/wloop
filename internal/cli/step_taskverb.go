@@ -8,6 +8,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
@@ -21,7 +22,8 @@ func (s *stepSet) tasks() (*coretasks.Service, error) {
 // taskRefusal is err as the reason a task refuses a verb, "" when err
 // is not one.
 func taskRefusal(err error) string {
-	if errors.Is(err, coretasks.ErrVerb) || errors.Is(err, coretasks.ErrNoTask) || errors.Is(err, coretasks.ErrPluginDisabled) {
+	if errors.Is(err, coretasks.ErrVerb) || errors.Is(err, coretasks.ErrNoTask) || errors.Is(err, coretasks.ErrPluginDisabled) ||
+		errors.Is(err, coretasks.ErrForbidden) {
 		return err.Error()
 	}
 	return ""
@@ -44,13 +46,13 @@ func (s *stepSet) taskVerbCheck(ctx context.Context, c stepCall, _ automation.Ch
 		return "", err
 	}
 	v := task.Verb(c.arg("verb"))
-	if e.Origin == task.OriginDerived && (v == task.VerbDone || v == task.VerbDismiss) {
+	if e.Origin == task.OriginDerived && s.closes(v) {
 		return "a derived task closes when its items resolve", nil
 	}
 	if g.Handles(e.Kind, v) {
 		return "", nil
 	}
-	if err := g.Accepts(e, v); err != nil {
+	if err := g.Accepts(e, v, task.ActorWorkflow); err != nil {
 		if r := taskRefusal(err); r != "" {
 			return r, nil
 		}
@@ -75,7 +77,11 @@ func (s *stepSet) taskVerbRun(ctx context.Context, c stepCall, _ automation.RunO
 			args[k] = a
 		}
 	}
-	req := coretasks.Request{Verb: v, Args: args, Source: "workflow " + c.why.Workflow, Automated: true}
+	var chain workflow.Chain
+	if ev := c.why.Event; ev != nil {
+		chain = ev.Chain
+	}
+	req := coretasks.Request{Verb: v, Args: args, Source: c.why.Workflow, Actor: task.ActorWorkflow, Chain: chain.Then(c.why.Workflow)}
 	if _, err := g.Do(ctx, id, req); err != nil {
 		if r := taskRefusal(err); r != "" {
 			return "", automation.Refused{Reason: r}
@@ -83,4 +89,12 @@ func (s *stepSet) taskVerbRun(ctx context.Context, c stepCall, _ automation.RunO
 		return "", err
 	}
 	return fmt.Sprintf("ran %s on %s", v, id), nil
+}
+
+// closes says whether verb moves a task into the done or the dropped category, as the profile says.
+func (s *stepSet) closes(v task.Verb) bool {
+	l := s.e.loadedIntents()
+	_, to, _ := l.Tasks.Move(string(v))
+	c, ok := l.Tasks.CategoryOf(to)
+	return ok && (c == task.CategoryDone || c == task.CategoryDropped)
 }
