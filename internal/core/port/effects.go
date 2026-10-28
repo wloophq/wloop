@@ -30,10 +30,10 @@ type Locator interface {
 }
 
 // Deliverer is optional: an Effects value that implements it says how it
-// posts a draft whose proposer asked for delivery d, which the draft then
-// carries, so its approval reads what the provider will show.
+// posts a draft of kind k, whatever delivery its proposer asked for, which
+// the draft then carries, so its approval reads what the provider will show.
 type Deliverer interface {
-	Delivers(d draft.Delivery) draft.Delivery
+	Delivers(k draft.Kind) draft.Delivery
 }
 
 // Placer is optional: an Effects value that implements it names, when a draft

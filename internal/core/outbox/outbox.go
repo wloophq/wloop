@@ -224,7 +224,7 @@ func (s *Service) delivered(d draft.Draft) draft.Draft {
 		return d
 	}
 	if dl, ok := fx.(port.Deliverer); ok && d.Delivery != "" {
-		if got := dl.Delivers(d.Delivery); got != d.Delivery {
+		if got := dl.Delivers(cmp.Or(d.Kind, draft.KindOf(d.Purpose, d.Delivery))); got != d.Delivery {
 			d.Delivery, d.Kind = got, draft.KindOf(d.Purpose, got)
 		}
 	}

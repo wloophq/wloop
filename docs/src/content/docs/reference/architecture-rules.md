@@ -69,12 +69,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/harness_test.go` | 🧾 | the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin |
 | `internal/cli/serve_test.go` | 🧾 | the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin |
 
-### `TestDraftTextComesFromTheProfile`
-
-| `draftTextAllowlist` entry | Status | Reason |
-|---|---|---|
-| `internal/adapter/source/github/proposals.go` | ✅ | GitHub's nudge text, github-nudge |
-
 ### `TestNoIntentEnumerations`
 
 | `intentAllowlist` entry | Status | Reason |
@@ -88,9 +82,9 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 
 | `pluginProposers` entry | Status | Reason |
 |---|---|---|
-| `internal/adapter/source/github/proposals.go` | ✅ | GitHub's nudge rule, github-nudge |
 | `internal/core/proposals/proposals.go` | ✅ | the job that runs the plugins' own rules |
 | `internal/plugins/source/broker_gates.go` | ✅ | a source plugin's own rule, which proposes through OpenGate with no session |
+| `internal/plugins/source/proposals.go` | ✅ | a source plugin's own rules, which the proposals job reads through Planner.Proposals |
 
 ### `TestProseIsEmbeddedOnlyFromProfiles`
 

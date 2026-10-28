@@ -16,9 +16,9 @@ import (
 // commenting posts every draft that is not a reaction as a comment.
 type commenting struct{ *fakeEffects }
 
-func (commenting) Delivers(d draft.Delivery) draft.Delivery {
-	if d == draft.Reaction {
-		return d
+func (commenting) Delivers(k draft.Kind) draft.Delivery {
+	if k == draft.React {
+		return draft.Reaction
 	}
 	return draft.CommentDelivery
 }

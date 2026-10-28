@@ -84,11 +84,16 @@ func (p Publisher) Landed(ctx context.Context, d draft.Draft) (unit.Unit, bool, 
 	return out, err == nil, err
 }
 
-// Delivers is d when the manifest declares it, else its default delivery:
-// a plugin posts every draft as one of its own deliveries.
-func (p Publisher) Delivers(d draft.Delivery) draft.Delivery {
-	if slices.ContainsFunc(p.Source.Deliveries, func(m manifest.Delivery) bool { return m.Name == string(d) }) || p.Source.DefaultDelivery == "" {
-		return d
+// Delivers is the delivery the manifest's draft kind k names, else its
+// default delivery: a plugin posts every draft as one of its own
+// deliveries. A manifest with neither posts k as its shape says.
+func (p Publisher) Delivers(k draft.Kind) draft.Delivery {
+	if i := slices.IndexFunc(p.Source.DraftKinds, func(m manifest.DraftKind) bool { return m.Name == string(k) }); i >= 0 && p.Source.DraftKinds[i].Delivery != "" {
+		return draft.Delivery(p.Source.DraftKinds[i].Delivery)
 	}
-	return draft.Delivery(p.Source.DefaultDelivery)
+	if p.Source.DefaultDelivery != "" {
+		return draft.Delivery(p.Source.DefaultDelivery)
+	}
+	_, d := draft.ShapeOf(k)
+	return d
 }

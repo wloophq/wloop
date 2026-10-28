@@ -128,7 +128,8 @@ func withStore(d Deps, st *inventory.Store) Deps {
 	g := &githubTest{deps: present.Deps{Store: st, Reports: ghreporttest.Inventory{Store: st, Now: st.Now}}}
 	d.Presenters = map[unit.ProviderID]func(PresenterHost) Presenter{unit.GitHub: func(h PresenterHost) Presenter {
 		g.deps.Host = (&psource.Broker{ID: string(unit.GitHub), Units: psource.Units{Codecs: h.Units}, Events: sqlite.New(st.DB()), Marks: st.DB(),
-			Drafts: st.DB(), Overrides: st.DB()}).Host()
+			Drafts: st.DB(), Overrides: st.DB(), Books: h.Books}).Host()
+		g.deps.Plugin = pluginPrepare(func() src.Host { return g.deps.Host }, h)
 		return present.New(g.deps, present.Host(h))
 	}}
 	githubDeps.Store(reflect.ValueOf(d.Presenters).Pointer(), g)
@@ -1125,4 +1126,32 @@ func identityOf(login string, teams ...string) src.Identity {
 func refOf(u unit.Unit) pr.Ref {
 	ref, _ := pr.RefOf(u)
 	return ref
+}
+
+// pluginPrepare is the GitHub plugin's nudge prepare over the host broker
+// serves the presenter, as h names its viewer and configuration, at the
+// read model's time, which a test moves.
+func pluginPrepare(host func() src.Host, h PresenterHost) func(context.Context, src.ActionRequest) (json.RawMessage, error) {
+	viewer := func(ctx context.Context) (string, error) {
+		if h.Viewer == nil {
+			return "", nil
+		}
+		id, err := h.Viewer(ctx)
+		return readmodel.Login(unit.GitHub, id), err
+	}
+	ignore := func() []string {
+		if h.Settings == nil {
+			return nil
+		}
+		return prrow.IgnoreOf(h.Settings().Cfg)
+	}
+	now := func() time.Time {
+		if h.Model != nil {
+			if _, at, err := h.Model.Base(context.Background()); err == nil {
+				return at
+			}
+		}
+		return h.Now()
+	}
+	return ghreporttest.Prepare(host, viewer, ignore, now)
 }

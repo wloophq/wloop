@@ -68,7 +68,7 @@ Some decisions stay in Go as mechanism and are exposed as facts for the profile 
 
 These texts and decisions are still in Go, and are moving to the profile:
 
-- the GitHub plugin's `github-nudge` rule and its text (`internal/adapter/source/github/proposals.go`);
+- the GitHub plugin's `github-nudge` rule and its text (`plugins/github/nudge`);
 - the workflow providers, pull requests, sessions, workspaces, tasks and Slack units (`builtin.Slots`);
 - the lists' predicates, the counters and the automatic focus star read the bundled properties `focus`, `area`, `contexts` and `due` by name (`internal/domain/task`), and the set of verbs is a Go list (`task.Verbs`), as are the verbs that ask for a value first (`builtin.TaskVerbInputs`) and a kind's own dismiss or done that the daemon and the projects register by the verb's name; a verb's move, its handler and who may run it come from `tasks.toml`;
 - notification titles, the digest and the menu bar's copy;

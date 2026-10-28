@@ -4,16 +4,28 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/wloophq/wloop/internal/github"
 )
 
 func TestAForwardThatTimesOutAfterThePluginPostedIsNotPostedAgain(t *testing.T) {
-	f, srv := newFakeGitHub(t)
+	var posts atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			posts.Add(1)
+		}
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":1}`))
+	}))
+	t.Cleanup(srv.Close)
 	forwards := 0
 	gh := PluginClient(func(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
 		forwards++
@@ -32,14 +44,14 @@ func TestAForwardThatTimesOutAfterThePluginPostedIsNotPostedAgain(t *testing.T) 
 		_, _ = io.Copy(io.Discard, res.Body)
 		res.Body.Close()
 		return nil, fmt.Errorf("the plugin's answer: %w", context.DeadlineExceeded)
-	}, func() time.Time { return f.now })
-	p := &Publisher{GH: gh, Events: &recordedEvents{}, Now: func() time.Time { return f.now }}
+	}, func() time.Time { return time.Date(2026, 10, 22, 15, 0, 0, 0, time.UTC) })
 
-	_, err := p.Publish(context.Background(), commentDraft("hello"))
-	if err == nil || !strings.HasPrefix(err.Error(), mayHaveBeenPosted) {
-		t.Fatalf("error %v, want one that says the comment may have been posted", err)
+	_, err := gh.REST(context.Background(), github.Request{Method: http.MethodPost, Path: "repos/acme/api/issues/12/comments", Body: []byte(`{"body":"hello"}`), Mutation: true})
+	var se *github.StatusError
+	if !errors.As(err, &se) || se.Status != http.StatusBadGateway {
+		t.Fatalf("error %v, want the plugin's 502", err)
 	}
-	if forwards != 1 || f.posts() != 1 || len(f.posted(issue12)) != 1 {
-		t.Fatalf("%d forwards, %d POSTs, %d comments; want one of each", forwards, f.posts(), len(f.posted(issue12)))
+	if forwards != 1 || posts.Load() != 1 {
+		t.Fatalf("%d forwards, %d POSTs; want one of each", forwards, posts.Load())
 	}
 }

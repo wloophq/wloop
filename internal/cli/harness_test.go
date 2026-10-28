@@ -44,11 +44,14 @@ import (
 	"github.com/wloophq/wloop/internal/ghcli"
 	"github.com/wloophq/wloop/internal/github/githubtest"
 	"github.com/wloophq/wloop/internal/gitx"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 var testNow = time.Date(2026, 10, 9, 15, 0, 0, 0, time.UTC)
@@ -813,7 +816,8 @@ func (te *testEnv) serveWith(t *testing.T, with func(daemon.Deps) daemon.Deps) {
 	d := withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(mu), LoopMu: mu, Facts: te.prFacts(te.cfg),
 		DryRunTurn: te.dryRunTurn, Doctor: te.doctorState,
 		Cfg: te.cfg, Version: "test", Now: te.Now, Identity: viewerIs("me"), Log: t.Logf}, te.Store)
-	d = withGitHub(d, present.Deps{Store: te.Store, Reports: te.Env.reports(te.Store), Host: te.moduleHost(te.db)(unit.GitHub), Explorer: derivedRows{te.gh}})
+	d = withGitHub(d, present.Deps{Store: te.Store, Reports: te.Env.reports(te.Store), Host: te.moduleHost(te.db)(unit.GitHub), Explorer: derivedRows{te.gh},
+		Plugin: te.pluginPrepare()})
 	d = te.Env.serveMessages(context.Background(), d, te.db, te.cfg, t.Logf)
 	if with != nil {
 		d = with(d)
@@ -881,4 +885,18 @@ func (te *testEnv) agentCommand(ctx context.Context, cfg config.Config, worktree
 		return "", err
 	}
 	return a.Command(s)
+}
+
+// pluginPrepare is the GitHub plugin's nudge prepare over te's store and
+// turns, as the running plugin serves the presenter.
+func (te *testEnv) pluginPrepare() func(context.Context, src.ActionRequest) (json.RawMessage, error) {
+	b := &psource.Broker{ID: string(unit.GitHub), Units: psource.Units{Codecs: te.unitCodecs()}, Events: sqlite.New(te.db)}
+	if te.Turns != nil {
+		b.Books = func(ctx context.Context, units ...unit.Unit) (map[unit.Unit]dturn.Book, error) {
+			return te.Turns.Store.Books(ctx, units...)
+		}
+	}
+	host := b.Host()
+	viewer := func(ctx context.Context) (string, error) { return te.Store.Viewer(ctx, unit.GitHub) }
+	return ghreporttest.Prepare(func() src.Host { return host }, viewer, func() []string { return prrow.IgnoreOf(te.cfg) }, te.Now)
 }

@@ -19,21 +19,20 @@ import (
 
 // Module is the GitHub source as it runs in the host's process: the pull
 // requests the GitHub plugin reports, served as prrow's rows. Its ingestion
-// job reads nothing: the composition root makes the plugin's job its own.
+// job reads nothing and it publishes nothing: the composition root makes
+// the plugin's job, publisher and proposals its own.
 func Module(cfg config.Config, d sourcereg.Deps) (sourcereg.Module, error) {
 	var briefs prrow.Briefs
 	if d.Briefs != nil {
 		briefs = d.Briefs
 	}
-	n := &nudges{viewer: func(ctx context.Context) (string, error) { return d.Inventory.Viewer(ctx, unit.GitHub) },
-		teams: func(ctx context.Context) ([]string, error) { return MyTeams(ctx, d.Inventory) }}
 	return sourcereg.Module{
 		ID:     unit.GitHub,
 		Codec:  pr.Codec{},
 		Ingest: idleJob(cfg),
-		Rows: n.rows(func(rd readmodel.RowDeps) readmodel.Provider {
+		Rows: func(rd readmodel.RowDeps) readmodel.Provider {
 			return prrow.New(prrow.Source{RowDeps: rd, Reports: d.Reports, Store: d.Inventory, Briefs: briefs})
-		}),
+		},
 		Facts:      factsOf(cfg, d),
 		Slow:       func(context.Context) (string, string, error) { return "skipped", "the GitHub plugin does not run", nil },
 		Items:      Cards{Reports: d.Reports}.Items,
@@ -41,8 +40,6 @@ func Module(cfg config.Config, d sourcereg.Deps) (sourcereg.Module, error) {
 		Identity:   identity(d.Inventory),
 		UnitEvents: unitEvents{d.Inventory},
 		UI:         UI(),
-		Publisher:  publisherOf(d),
-		Proposals:  n.Proposals,
 		Detail:     true,
 		Briefs:     brief.GitHubSource{Store: d.Inventory, Source: brief.Source{GitHub: d.GitHub}, MaxDiffBytes: cfg.Brief.MaxInputBytes, Retry: time.Duration(cfg.Sweep.Slow)},
 	}, nil

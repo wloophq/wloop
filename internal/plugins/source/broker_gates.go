@@ -27,7 +27,8 @@ type gates struct{ b *Broker }
 // effect the turn's intent does not allow. A draft on another unit than
 // the turn's answers none of its items and declares no effect. Without a
 // session, the draft is on the plugin's own unit and its origin is the
-// plugin's rule.
+// plugin's rule. The plugin's delivery is ignored: the host derives it
+// from the draft's kind through the manifest.
 func (g gates) OpenGate(ctx context.Context, req src.GateRequest) (src.GateRef, error) {
 	h := g.b.Hosted
 	if h == nil || h.Drafts == nil {
@@ -35,9 +36,9 @@ func (g gates) OpenGate(ctx context.Context, req src.GateRequest) (src.GateRef, 
 	}
 	d := req.Draft
 	p := outbox.Proposal{Items: d.Items, Kind: draft.Kind(d.Kind), Target: d.Target, Text: d.Text, Reaction: d.Reaction, Effects: d.Effects,
-		Purpose: d.Purpose, Delivery: draft.Delivery(d.Delivery)}
+		Purpose: d.Purpose}
 	if p.Kind != "" {
-		p.Purpose, p.Delivery = "", ""
+		p.Purpose = ""
 	}
 	if req.Session == "" {
 		u, err := g.b.Units.Own(g.b.ID, d.Unit)
