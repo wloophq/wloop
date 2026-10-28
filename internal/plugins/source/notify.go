@@ -1,18 +1,14 @@
 package source
 
 import (
+	"cmp"
 	"context"
 	"sync"
-	"time"
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/pkg/plugin"
 )
-
-// NotifyTimeout bounds one plugin's Notify, so a plugin that hangs delays
-// the others' by no more.
-const NotifyTimeout = 10 * time.Second
 
 // Notify tells each running plugin of the host changes its manifest's
 // notify subscribes to, from the changes after from until ctx ends, one
@@ -73,7 +69,7 @@ func (k *Kind) notify(ctx context.Context, c port.Change) {
 				continue
 			}
 		}
-		nctx, cancel := context.WithTimeout(ctx, NotifyTimeout)
+		nctx, cancel := context.WithTimeout(ctx, cmp.Or(k.NotifyTimeout, DefaultNotifyTimeout))
 		err := s.client.Notify(nctx, units, s.topics)
 		cancel()
 		if err != nil && ctx.Err() == nil && k.Logf != nil {

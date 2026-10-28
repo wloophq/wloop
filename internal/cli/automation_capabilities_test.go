@@ -1,0 +1,34 @@
+package cli
+
+import (
+	"testing"
+
+	"github.com/wloophq/wloop/internal/core/automation"
+)
+
+// TestAutomationCapabilitiesAreSnapshotFields carries X3b's review finding
+// I2: the engine's optional capabilities stay in the unit set only while the
+// built-in GitHub and Slack modules implement them; a reporting plugin's
+// units read as snapshot fields, host bookkeeping or Notify.
+func TestAutomationCapabilitiesAreSnapshotFields(t *testing.T) {
+	t.Skip("carried from X3b review: X8b removes the built-in modules' capabilities")
+	var set any = (*unitSet)(nil)
+	for name, kept := range map[string]bool{
+		"Refresher":  implements[automation.Refresher](set),
+		"Settler":    implements[automation.Settler](set),
+		"Gainer":     implements[automation.Gainer](set),
+		"Owner":      implements[automation.Owner](set),
+		"Seener":     implements[automation.Seener](set),
+		"Scoper":     implements[automation.Scoper](set),
+		"EventFacts": implements[automation.EventFacts](set),
+	} {
+		if kept {
+			t.Errorf("the unit set still routes %s", name)
+		}
+	}
+}
+
+func implements[T any](v any) bool {
+	_, ok := v.(T)
+	return ok
+}

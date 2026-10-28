@@ -18,6 +18,10 @@ import (
 // loading plugin its health.
 const DefaultHealthPoll = time.Second
 
+// DefaultNotifyTimeout is the bound of one Notify of a Kind with a zero
+// NotifyTimeout.
+const DefaultNotifyTimeout = 10 * time.Second
+
 // Kind starts and stops the source kind of plugin processes for the
 // plugin host, and holds the client of each running one.
 type Kind struct {
@@ -33,6 +37,9 @@ type Kind struct {
 	Loaded func(id string)
 	// HealthPoll is how often a loading plugin is asked its health.
 	HealthPoll time.Duration
+	// NotifyTimeout bounds one plugin's Notify, so a plugin that hangs
+	// delays the others by no more; zero is DefaultNotifyTimeout.
+	NotifyTimeout time.Duration
 	// Logf logs a failed notification; nil logs nothing.
 	Logf func(format string, args ...any)
 
@@ -44,7 +51,9 @@ type Kind struct {
 
 type attached struct {
 	client *src.Client
-	server *src.HostServer
+	// notified is what Notify reaches: the client.
+	notified notifier
+	server   *src.HostServer
 	// notify are the topics the plugin's manifest subscribes to.
 	notify []plugin.Topic
 	cancel context.CancelFunc
@@ -101,6 +110,7 @@ func (k *Kind) Start(ctx context.Context, m *manifest.Manifest, c *plugin.Client
 		return fmt.Errorf("start %s: %w", m.ID, err)
 	}
 	a := &attached{client: src.NewClient(c), server: server, done: make(chan struct{})}
+	a.notified = a.client
 	for _, n := range s.Notify {
 		a.notify = append(a.notify, plugin.Topic(n))
 	}
@@ -223,7 +233,7 @@ func (k *Kind) subscribers(ts []plugin.Topic) []subscriber {
 			}
 		}
 		if len(topics) > 0 {
-			out = append(out, subscriber{id: id, client: a.client, topics: topics})
+			out = append(out, subscriber{id: id, client: a.notified, topics: topics})
 		}
 	}
 	slices.SortFunc(out, func(a, b subscriber) int { return cmp.Compare(a.id, b.id) })
@@ -232,6 +242,10 @@ func (k *Kind) subscribers(ts []plugin.Topic) []subscriber {
 
 type subscriber struct {
 	id     string
-	client *src.Client
+	client notifier
 	topics []plugin.Topic
+}
+
+type notifier interface {
+	Notify(ctx context.Context, units []plugin.Unit, topics []plugin.Topic) error
 }
