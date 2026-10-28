@@ -145,3 +145,42 @@ func TestAStoreWithNoExportStartsEmpty(t *testing.T) {
 		t.Fatalf("%d pull requests, %v", len(all), err)
 	}
 }
+
+func TestImportedRowsSortWithThePluginsOwn(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	dir := t.TempDir()
+	plantImport(t, dir)
+	exported, err := sql.Open("sqlite", filepath.Join(dir, store.ImportFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := exported.Exec(`INSERT INTO pull_requests (owner, repo, number, title, state, updated_at)
+		VALUES ('acme', 'cli', 3, 'Imported later', 'OPEN', '2026-10-20T12:00:00.500000000Z')`); err != nil {
+		t.Fatal(err)
+	}
+	exported.Close()
+	db, err := Open(ctx, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	for _, p := range []pr.PR{
+		{Ref: pr.Ref{Owner: "acme", Repo: "web", Number: 9}, State: pr.StateOpen, UpdatedAt: time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)},
+		{Ref: pr.Ref{Owner: "acme", Repo: "ops", Number: 5}, State: pr.StateOpen, UpdatedAt: time.Date(2026, 10, 20, 12, 0, 1, 0, time.UTC)},
+	} {
+		upsert(t, db, p)
+	}
+	all, err := db.ListPRs(ctx, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, p := range all {
+		got = append(got, p.Ref.String())
+	}
+	want := []string{"acme/ops#5", "acme/cli#3", "acme/api#1", "acme/web#9", "acme/web#2"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("order %v, want %v", got, want)
+	}
+}
