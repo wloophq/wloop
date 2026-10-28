@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -31,6 +32,26 @@ func (r reporter) Report(ctx context.Context, snapshots []src.Snapshot) error {
 	return r.b.Snapshots.Put(ctx, byUnit)
 }
 
-func (r reporter) Changed(context.Context, []plugin.Unit, []plugin.Topic) error {
-	return src.ErrUnsupported
+// Changed records in the change log that the plugin's units changed, as
+// unit data and under the host topics behind topics; no unit is a change
+// of none in particular. A unit that is not the plugin's refuses it.
+func (r reporter) Changed(_ context.Context, units []plugin.Unit, topics []plugin.Topic) error {
+	if r.b.Note == nil {
+		return src.ErrUnsupported
+	}
+	own := make([]unit.Unit, 0, len(units))
+	var errs []error
+	for _, w := range units {
+		u, err := r.b.Units.Own(r.b.ID, w)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		own = append(own, u)
+	}
+	if err := errors.Join(errs...); err != nil {
+		return err
+	}
+	r.b.Note(port.TopicPRs|HostTopics(topics...), own...)
+	return nil
 }

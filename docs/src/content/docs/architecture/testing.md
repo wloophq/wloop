@@ -9,7 +9,7 @@ description: Fakes and contracts, goldens, budgets, the brand build and the arch
 
 The core is tested without a network, a process or a real tool: the architecture tests keep `os/exec`, `net/http` and `database/sql` out of it. Each port's fake lives in the core package's `<name>test` package (`turnstest`, `taskstest`, `messagestest`, `viewstest`, `workspacestest`, `automationtest`, `intaketest`, `ingesttest`) beside the contract suite the fake and the real adapter both pass. A real adapter runs its contract behind the `contract` build tag. CI compiles the `contract` and `live` tests on every pull request with `make vet-tags`, without running them.
 
-Test-only adapters prove that each seam holds a second implementation: the `echo` agent (`TestEchoAgentRunsWithoutClaudeOrOrca` runs install, a review, the hooks and `turn end` with no Claude or Orca token anywhere), the `testsink` view sink, the fake workspace manager and the `fakethread` provider.
+Test-only adapters prove that each seam holds a second implementation: the `echo` agent (`TestEchoAgentRunsWithoutClaudeOrOrca` runs install, a review, the hooks and `turn end` with no Claude or Orca token anywhere), the `testsink` view sink, the fake workspace manager and the `fakesource` plugin reports.
 
 ## Time
 

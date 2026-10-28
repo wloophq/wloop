@@ -88,8 +88,5 @@ func factsOf(cfg config.Config, d sourcereg.Deps) *factsgithub.Provider {
 	if d.Turns != nil {
 		fd.Books = d.Turns.Store
 	}
-	if d.GitHub != nil {
-		fd.Stubs = d.GitHub
-	}
 	return factsgithub.New(fd)
 }

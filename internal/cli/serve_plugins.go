@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/wloophq/wloop/internal/plugins/codec"
@@ -257,12 +258,28 @@ func installPlugins(configDir, exe string) ([]host.Plugin, error) {
 func (e *Env) servePlugins(ctx context.Context, store snapshot.Store, cfg config.Config, logf func(string, ...any)) (stop func()) {
 	snaps := psource.NewSnapshots(store)
 	codecs := e.unitCodecs()
+	note := func(t port.Topic, units ...unit.Unit) {
+		if e.changes != nil {
+			e.changes.Note(t, units...)
+		}
+	}
+	snaps.OnStale(func(unit.ProviderID) {
+		if e.changes != nil {
+			e.changes.NoteAll(port.TopicPRs)
+		}
+	})
 	e.pluginKind = &psource.Kind{
 		Snapshots: snaps,
 		StateDir:  func(id string) string { return filepath.Join(e.StateDir, "plugins", id) },
 		Broker: func(id string, s *manifest.Source) *psource.Broker {
-			return &psource.Broker{ID: id, Manifest: s, Snapshots: snaps, Units: psource.Units{Codecs: codecs}, Config: e.currentConfig}
+			return &psource.Broker{ID: id, Manifest: s, Snapshots: snaps, Units: psource.Units{Codecs: codecs}, Config: e.currentConfig,
+				Note: note}
 		},
+		Loaded: func(id string) {
+			logf("plugin %s: loaded", id)
+			note(port.TopicPRs | port.TopicJobs)
+		},
+		Logf: logf,
 	}
 	if e.noJobs {
 		logf("plugins: --no-jobs starts none")
@@ -278,12 +295,23 @@ func (e *Env) servePlugins(ctx context.Context, store snapshot.Store, cfg config
 	}
 	for _, r := range runs {
 		logf("plugin %s: runs %s, %s", r.Manifest.ID, r.Spec.Path, why[r.Manifest.ID])
+		e.pluginKind.Expect(r.Manifest.ID)
 	}
-	h := &host.Host{Launcher: host.ExecLauncher{}, Kinds: []host.Kind{e.pluginKind}, Logf: logf}
+	var launcher plugin.Launcher = host.ExecLauncher{}
+	if e.pluginLauncher != nil {
+		launcher = e.pluginLauncher
+	}
+	h := &host.Host{Launcher: launcher, Kinds: []host.Kind{e.pluginKind}, Logf: logf}
 	pctx, cancel := context.WithCancel(ctx)
+	var notifying sync.WaitGroup
+	if e.changes != nil {
+		from := e.changes.Gen()
+		notifying.Go(func() { e.pluginKind.Notify(pctx, e.changes, from) })
+	}
 	h.Start(pctx, runs)
 	return func() {
 		cancel()
+		notifying.Wait()
 		h.Wait()
 	}
 }

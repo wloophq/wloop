@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/source/fakethread"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/plugins/source/fakesource"
 	"github.com/wloophq/wloop/internal/readmodel"
 )
 
@@ -142,8 +142,8 @@ func TestReadModelServesAFakeProvider(t *testing.T) {
 
 func TestThreadRowNeedsNoPRField(t *testing.T) {
 	at := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
-	th := fakethread.Thread{Key: "C1/171.1", Channel: "general", Title: "deploy?", Kind: fakethread.KindWaiting, WaitsOn: "me", Reason: "ana asked you", Since: at}
-	m := readmodel.New(change.NewLog(change.DefaultWindow, nil), nil, nil, nil, nil, fakethread.New(th))
+	th := fakesource.Thread{Key: "C1/171.1", Channel: "general", Title: "deploy?", Kind: fakesource.KindWaiting, WaitsOn: "me", Reason: "ana asked you", Since: at}
+	m := readmodel.New(change.NewLog(change.DefaultWindow, nil), nil, nil, nil, nil, fakesource.New(th).Rows())
 	page, err := m.Rows(context.Background(), api.ViewNeedsMe, api.Since{})
 	if err != nil {
 		t.Fatal(err)
@@ -152,7 +152,7 @@ func TestThreadRowNeedsNoPRField(t *testing.T) {
 		t.Fatalf("needs-me %+v", page.Rows)
 	}
 	r := page.Rows[0]
-	if r.Unit != th.Unit() || r.Payload != nil || r.Summary.Line != "ana asked you" || !slices.Equal(r.Facets[fakethread.FacetChannel], []string{"general"}) {
+	if r.Unit != th.Unit() || r.Payload != nil || r.Summary.Line != "ana asked you" || !slices.Equal(r.Facets[fakesource.FacetChannel], []string{"general"}) {
 		t.Fatalf("thread row %+v", r)
 	}
 	raw, err := json.Marshal(r)

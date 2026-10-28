@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/source/fakethread"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
@@ -28,6 +27,7 @@ import (
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/plugins/source/fakesource"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 	"github.com/wloophq/wloop/profiles"
@@ -80,7 +80,7 @@ func newUnitStartRig(t *testing.T, intentToml string) *unitStartRig {
 	saved := plugins
 	plugins = append(slices.Clone(plugins), threadModule(thread1))
 	t.Cleanup(func() { plugins = saved })
-	te.payloads = map[unit.ProviderID]turn.PayloadReader{ingesttest.Provider: fakethread.Payloads{}}
+	te.payloads = map[unit.ProviderID]turn.PayloadReader{ingesttest.Provider: fakesource.Payloads{}}
 	userProfile(t, te, map[string]string{"intents/implement/intent.toml": intentToml, "intents/implement/instructions.md.tmpl": implementBody})
 	te.Env.serveTurnLedger(te.db, te.cfg, t.Logf)
 	kind, sum := items.Request, "Add a retry to the export job"

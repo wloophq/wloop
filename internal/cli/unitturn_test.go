@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
-	"github.com/wloophq/wloop/internal/adapter/source/fakethread"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
@@ -25,6 +24,7 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	"github.com/wloophq/wloop/internal/plugins/source/fakesource"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -65,7 +65,7 @@ func withThreads(t *testing.T, te *testEnv) {
 	saved := plugins
 	plugins = append(slices.Clone(plugins), threadModule(thread1))
 	t.Cleanup(func() { plugins = saved })
-	te.payloads = map[unit.ProviderID]turn.PayloadReader{ingesttest.Provider: fakethread.Payloads{}}
+	te.payloads = map[unit.ProviderID]turn.PayloadReader{ingesttest.Provider: fakesource.Payloads{}}
 	userProfile(t, te, map[string]string{"intents/discuss/intent.toml": discussIntent, "intents/discuss/instructions.md.tmpl": discussBody})
 }
 

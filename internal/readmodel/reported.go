@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/domain/card"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/items"
@@ -42,6 +43,11 @@ type ReportedSource struct {
 	// Viewer is the user as the plugin's people are keyed, whom a card
 	// waiting on the user names; nil names nobody.
 	Viewer func(ctx context.Context) items.Person
+	// Stale says u's plugin no longer stands behind its last report; nil
+	// says none is.
+	Stale func(u unit.Unit) bool
+	// Catalog is the plugin's views, facets and situations; nil serves none.
+	Catalog Presenter
 }
 
 // Reported serves a source plugin's units as rows: each unit's last
@@ -50,7 +56,10 @@ type ReportedSource struct {
 // an open intake shows in the row's line.
 type Reported struct{ src ReportedSource }
 
-var _ Provider = (*Reported)(nil)
+var (
+	_ Provider  = (*Reported)(nil)
+	_ Presenter = (*Reported)(nil)
+)
 
 // NewReported is the provider of src's units.
 func NewReported(src ReportedSource) *Reported {
@@ -61,6 +70,27 @@ func NewReported(src ReportedSource) *Reported {
 }
 
 func (p *Reported) Provider() unit.ProviderID { return p.src.ID }
+
+func (p *Reported) Views() []api.ViewSpec {
+	if p.src.Catalog == nil {
+		return nil
+	}
+	return p.src.Catalog.Views()
+}
+
+func (p *Reported) Facets() []api.FacetSpec {
+	if p.src.Catalog == nil {
+		return nil
+	}
+	return p.src.Catalog.Facets()
+}
+
+func (p *Reported) Situations() []api.SituationSpec {
+	if p.src.Catalog == nil {
+		return nil
+	}
+	return p.src.Catalog.Situations()
+}
 
 // Listed are the units the plugin reported.
 func (p *Reported) Listed(ctx context.Context) ([]unit.Unit, error) {
@@ -80,6 +110,7 @@ type reported struct {
 	intake     *api.Intake
 	// unmuted derives the row as if the user had not muted the unit.
 	unmuted bool
+	stale   bool
 }
 
 // Load reads each unit's last snapshot, its turn book and session, its mute
@@ -92,7 +123,7 @@ func (p *Reported) Load(ctx context.Context, units []unit.Unit) (map[unit.Unit]a
 	ins := make(map[unit.Unit]*reported, len(snaps))
 	listed := slices.SortedFunc(maps.Keys(snaps), api.CompareUnits)
 	for _, u := range listed {
-		ins[u] = &reported{unit: u, snap: snaps[u]}
+		ins[u] = &reported{unit: u, snap: snaps[u], stale: p.src.Stale != nil && p.src.Stale(u)}
 	}
 	if err := p.loadRuns(ctx, ins, listed); err != nil {
 		return nil, err
@@ -238,7 +269,20 @@ func (p *Reported) Derive(base Base, in any, at time.Time) (api.Row, error) {
 	if i := x.intake; i != nil && i.Waiting() {
 		r.Summary.Line = overlay.Briefing(*i)
 	}
+	r.Stale = x.stale
+	r.Actions, r.SpecsVersion = offered(base, r, s.Offers), base.SpecsVersion
 	return r, nil
+}
+
+// offered are the intents' actions on r, then the actions the plugin
+// offers on the unit.
+func offered(base Base, r api.Row, offers []src.Offer) []api.ActionState {
+	ids := make([]string, 0, len(offers))
+	for _, o := range offers {
+		ids = append(ids, o.Action)
+	}
+	return catalog.WithOffers(catalog.UnitStates(catalog.Facts{Row: r, Tracked: true, Open: !r.Summary.Closed, Asked: base.Asked,
+		Intents: base.Intents}), ids)
 }
 
 // situation is the unit's situation as its plugin reported it, under the

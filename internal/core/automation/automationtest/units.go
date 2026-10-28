@@ -247,6 +247,14 @@ func (f *Units) Report(_ *testing.T, u unit.Unit) {
 	f.revs[u]++
 }
 
+// RestartRevs has every unit's source count its revs from zero again, as a
+// provider rebuilt by a daemon restart does.
+func (f *Units) RestartRevs() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	clear(f.revs)
+}
+
 // Revs are the units' revs; a unit SetMoved names is reported again at
 // every read.
 func (f *Units) Revs(ctx context.Context, units []unit.Unit) (map[unit.Unit]uint64, error) {

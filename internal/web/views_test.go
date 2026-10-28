@@ -8,6 +8,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/plugins/source/fakesource"
 )
 
 // treeJS builds h(...) as a plain tree and reads it back.
@@ -226,11 +227,9 @@ func TestFakeProviderRowRenders(t *testing.T) {
 const CSS = { escape: (s) => s }; const document = { querySelector: () => null };
 const providerName = (id) => id;
 `
-	row := map[string]any{
-		"unit": map[string]string{"provider": "fakethread", "key": "T1/C1"}, "label": "#general thread", "title": "Can someone look at the deploy?",
-		"link": "https://example.invalid/T1/C1", "kind": "waiting", "views": []string{"all"}, "actions": []any{},
-		"summary": map[string]any{"waiting_on": "me", "reason": "a question waits on you"},
-	}
+	row := fakesource.Row(fakesource.Thread{Key: "T1/C1", Channel: "general thread", Title: "Can someone look at the deploy?",
+		Kind: fakesource.KindWaiting, WaitsOn: "me", Reason: "a question waits on you"})
+	row.Views = append(row.Views, "all")
 	var got struct {
 		Row, Card string
 		Keys      []string

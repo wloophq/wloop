@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/agent/echo"
-	"github.com/wloophq/wloop/internal/adapter/source/fakethread"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
@@ -33,6 +32,7 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	"github.com/wloophq/wloop/internal/plugins/source/fakesource"
 	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -297,7 +297,7 @@ func threadTurnModule(th unit.Unit) source.Plugin {
 	build := p.Build
 	p.Build = func(cfg config.Config, d source.Deps) (source.Module, error) {
 		m, err := build(cfg, d)
-		m.Payload = fakethread.Payloads{}
+		m.Payload = fakesource.Payloads{}
 		return m, err
 	}
 	return p

@@ -280,6 +280,8 @@ type TasksPage struct {
 	Gates    []GateView `json:"gates,omitempty"`
 	Removed  []string   `json:"removed"`
 	Counters Counters   `json:"counters"`
+	// Loading are the plugins whose units are not all reported yet.
+	Loading []Loading `json:"loading,omitempty"`
 }
 
 // TaskCreate creates a task: a Title alone captures it. Brief is its brief's markdown, Props its properties

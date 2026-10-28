@@ -1,4 +1,4 @@
-package fakethread
+package fakesource
 
 import (
 	"context"

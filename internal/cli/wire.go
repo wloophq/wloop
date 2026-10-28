@@ -23,6 +23,7 @@ type serveWiring struct {
 func (e *Env) wireParts() []func(w *serveWiring) {
 	return []func(w *serveWiring){
 		e.wireSubjects,
+		e.wireReported,
 		e.wireDrafts,
 		e.wireTurnStart,
 		e.wireProse,

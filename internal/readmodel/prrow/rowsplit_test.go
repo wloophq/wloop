@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/source/fakethread"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand/brandtest"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/plugins/source/fakesource"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/situation"
 )
@@ -74,7 +74,7 @@ func TestGitHubRowKeepsPRFieldsInThePayload(t *testing.T) {
 
 func TestPayloadOfRefusesAnotherProvider(t *testing.T) {
 	gh := deriveCases(t, fixtureNow)[0]
-	thread := fakethread.Row(fakethread.Thread{Key: "C1/1.1", Channel: "general", Kind: fakethread.KindWaiting, WaitsOn: "me"})
+	thread := fakesource.Row(fakesource.Thread{Key: "C1/1.1", Channel: "general", Kind: fakesource.KindWaiting, WaitsOn: "me"})
 	thread.Payload = gh.Payload
 	if _, ok := PayloadOf(thread); ok {
 		t.Error("a thread row read as GitHub's")
@@ -304,13 +304,13 @@ func TestFacetsDoNotDependOnTheClock(t *testing.T) {
 }
 
 func TestProviderFacetsStayWithTheirRows(t *testing.T) {
-	c := readmodel.BuildCatalog(New(Source{}), fakethread.New())
-	i := slices.IndexFunc(c.Facets, func(f api.FacetSpec) bool { return f.ID == fakethread.FacetChannel })
+	c := readmodel.BuildCatalog(New(Source{}), fakesource.New().Rows())
+	i := slices.IndexFunc(c.Facets, func(f api.FacetSpec) bool { return f.ID == fakesource.FacetChannel })
 	if i < 0 || c.Facets[i].Provider != "thread" {
 		t.Fatalf("channel facet: %+v", c.Facets)
 	}
 	for _, r := range deriveCases(t, fixtureNow) {
-		if _, ok := r.Facets[fakethread.FacetChannel]; ok {
+		if _, ok := r.Facets[fakesource.FacetChannel]; ok {
 			t.Errorf("%s carries the thread facet", r.Label)
 		}
 		for id := range r.Facets {
@@ -319,8 +319,8 @@ func TestProviderFacetsStayWithTheirRows(t *testing.T) {
 			}
 		}
 	}
-	thread := fakethread.Row(fakethread.Thread{Key: "C1/1.1", Channel: "general", Kind: fakethread.KindWaiting, WaitsOn: "me"})
-	if !slices.Equal(slices.Collect(maps.Keys(thread.Facets)), []string{fakethread.FacetChannel}) {
+	thread := fakesource.Row(fakesource.Thread{Key: "C1/1.1", Channel: "general", Kind: fakesource.KindWaiting, WaitsOn: "me"})
+	if !slices.Equal(slices.Collect(maps.Keys(thread.Facets)), []string{fakesource.FacetChannel}) {
 		t.Errorf("thread facets %v", thread.Facets)
 	}
 }
