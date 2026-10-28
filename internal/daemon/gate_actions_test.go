@@ -115,7 +115,7 @@ func TestAnAgentSessionCannotApplyAGatedPlanItem(t *testing.T) {
 	it := r.pending7(t)
 	g := r.planGate(t, it)
 	sess := r.items(t, r.sess, workflow.DecisionPending)[0]
-	for _, c := range []struct{ id, action string }{{it.ID, "apply"}, {it.ID, "guide"}, {it.ID, "dismiss"}, {sess.ID, "apply"}} {
+	for _, c := range []struct{ id, action string }{{it.ID, "apply"}, {it.ID, "guide"}, {it.ID, "dismiss"}, {it.ID, "skip"}, {sess.ID, "apply"}} {
 		body := fmt.Sprintf(`{"ids":[%q],"action":%q,"guidance":"look"}`, c.id, c.action)
 		if rec := postFrom(t, r.s, "term_1", api.Plan, body); rec.Code != http.StatusForbidden {
 			t.Fatalf("an agent session's %s on %s: %d %s", c.action, c.id, rec.Code, rec.Body)
