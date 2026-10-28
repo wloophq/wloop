@@ -37,7 +37,8 @@ func v6GatesFixture(t *testing.T) string {
 			(33, 'slack', 'T1/C1/1.1', '', 'reply', 'turn', 'wait', 0, '', 'discarded', 'user', 'discarded', '2026-10-27T09:00:00Z', '2026-10-27T10:00:00Z'),
 			(34, 'slack', 'T1/C1/1.1', '', 'nudge', 'auto', 'wait', 0, '', 'discarded', 'moot', 'discarded', '2026-10-27T09:00:00Z', '2026-10-27T10:00:00Z'),
 			(35, 'slack', 'T9/C9/9.9', '', 'reply', 'turn', 'wait', 0, '', 'proposed', '', '', '2026-10-27T09:00:00Z', '2026-10-27T09:00:00Z'),
-			(36, 'slack', 'T1/C1/1.1', '', 'nudge', 'auto', 'delay', 1800000000000, '2026-10-27T09:30:00Z', 'failed', '', 'released', '2026-10-27T09:00:00Z', '2026-10-27T09:30:00Z')`,
+			(36, 'slack', 'T1/C1/1.1', '', 'nudge', 'auto', 'delay', 1800000000000, '2026-10-27T09:30:00Z', 'failed', '', 'released', '2026-10-27T09:00:00Z', '2026-10-27T09:30:00Z'),
+			(37, 'slack', 'T1/C1/1.1', '', 'nudge', 'auto', 'wait', 0, '', 'discarded', 'nudged by hand', 'discarded', '2026-10-27T09:00:00Z', '2026-10-27T10:00:00Z')`,
 		`INSERT INTO plan_items (id, workflow, provider, unit_key, key_value, decision, reason, steps, default_outcome, deadline, at) VALUES
 			('p1', 'review', 'github', 'acme/api#7', 'k', 'pending', 'announced', '[{"use":"turn.start"}]', 'run', '2026-10-28T10:00:00.000000000Z', '2026-10-28T09:00:00.000000000Z'),
 			('p2', 'review', 'github', 'acme/api#7', 'k2', 'run', '', '[{"use":"turn.start"}]', '', '', '2026-10-28T09:00:00.000000000Z'),
@@ -113,6 +114,7 @@ func TestEveryPendingDraftHasAnOpenGate(t *testing.T) {
 		{"33", gate.Rejected, "discard", task.ActorPerson, "", "2026-10-27T10:00:00Z", taskA},
 		{"34", gate.Superseded, "", task.ActorWorkflow, "", "2026-10-27T10:00:00Z", taskA},
 		{"36", gate.Approved, "approve", task.ActorWorkflow, "window", "2026-10-27T09:30:00Z", taskA},
+		{"37", gate.Rejected, "discard", task.ActorPerson, "", "2026-10-27T10:00:00Z", taskA},
 	} {
 		g := gateOf(t, all, gate.KindDraft, c.subject)
 		if g.Status != c.status || g.Intent != c.intent || g.By != c.by || g.Rule != c.rule || g.Task != c.task ||
@@ -227,14 +229,14 @@ func TestItemProposalsBecomeGates(t *testing.T) {
 		mirrored.Name != "proposal" || !slices.Equal(mirrored.Intents, []string{"approve", "reject"}) {
 		t.Fatalf("the proposal its message mirrors %+v", mirrored)
 	}
-	if open := gateOf(t, all, gate.KindProposal, "proposal/41"); open.Status != gate.Open || open.Task != taskB || open.Unit != gatesPR {
+	if open := gateOf(t, all, gate.KindProposal, gate.ProposalSubject(41)); open.Status != gate.Open || open.Task != taskB || open.Unit != gatesPR {
 		t.Fatalf("the open proposal %+v", open)
 	}
-	if rejected := gateOf(t, all, gate.KindProposal, "proposal/42"); rejected.Status != gate.Rejected || rejected.Intent != "reject" || rejected.By != task.ActorPerson {
+	if rejected := gateOf(t, all, gate.KindProposal, gate.ProposalSubject(42)); rejected.Status != gate.Rejected || rejected.Intent != "reject" || rejected.By != task.ActorPerson {
 		t.Fatalf("the rejected proposal %+v", rejected)
 	}
 	for _, g := range all {
-		if g.Subject == "proposal/40" {
+		if g.Subject == gate.ProposalSubject(40) {
 			t.Errorf("proposal 40 has a second gate %+v", g)
 		}
 	}
@@ -243,7 +245,7 @@ func TestItemProposalsBecomeGates(t *testing.T) {
 func TestAGateOnAUnitWithNoTaskHasANullTask(t *testing.T) {
 	t.Parallel()
 	_, path, all := migratedGates(t)
-	for _, g := range []gate.Gate{gateOf(t, all, gate.KindDraft, "35"), gateOf(t, all, gate.KindProposal, "proposal/42")} {
+	for _, g := range []gate.Gate{gateOf(t, all, gate.KindDraft, "35"), gateOf(t, all, gate.KindProposal, gate.ProposalSubject(42))} {
 		if g.Task != "" || g.Unit != gatesNowhere {
 			t.Errorf("gate %+v", g)
 		}

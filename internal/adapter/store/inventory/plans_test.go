@@ -121,7 +121,7 @@ func TestHotPlans(t *testing.T) {
 	}
 }
 
-// indexesPlannedElsewhere are the indexes of the turn, stop, session handle, plan, entry, project and draft tables, whose
+// indexesPlannedElsewhere are the indexes of the turn, stop, session handle, plan, task, project, draft and gate tables, whose
 // statements the sqlite package's plans cover, and the unique index that
 // only constrains INSERT OR IGNORE.
 var indexesPlannedElsewhere = []string{

@@ -83,10 +83,7 @@ const (
 	v6Released      = "released"
 	v6DelayApproval = "delay"
 	v6RunDefault    = "run"
-	v6UserDiscard   = "user"
 	windowRule      = "window"
-	// proposalSubject prefixes the subject of an item proposal's gate, which no message mirrors.
-	proposalSubject = "proposal/"
 )
 
 // v6Withdrawn are the reasons a workflow withdrew a draft it proposed.
@@ -149,13 +146,10 @@ func (m *gateMigration) drafts(ctx context.Context) error {
 			}
 		case r.state == "discarded" && slices.Contains(v6Withdrawn, r.reason):
 			g.Status, g.By = gate.Superseded, task.ActorWorkflow
-		case r.state == "discarded" && r.reason == v6UserDiscard:
-			g.Status, g.Intent, g.By = gate.Rejected, words.no, task.ActorPerson
+		case r.state == "discarded" && r.reason == v6DryRun:
+			g.Status, g.Intent, g.By, g.Rule = gate.Rejected, words.no, task.ActorWorkflow, v6DryRun
 		case r.state == "discarded":
-			g.Status, g.Intent, g.By = gate.Rejected, words.no, task.ActorWorkflow
-			if r.reason == v6DryRun {
-				g.Rule = v6DryRun
-			}
+			g.Status, g.Intent, g.By = gate.Rejected, words.no, task.ActorPerson
 		case r.outcome == v6Released && r.mode == v6DelayApproval:
 			g.Status, g.Intent, g.By, g.Rule = gate.Approved, words.yes, task.ActorWorkflow, windowRule
 		case r.outcome == v6Released:
@@ -318,7 +312,7 @@ func (m *gateMigration) proposals(ctx context.Context) error {
 		if m.mirrored[r.id] {
 			continue
 		}
-		g := gate.Gate{Kind: gate.KindProposal, Unit: r.u, Subject: proposalSubject + strconv.FormatInt(r.id, 10), OpenedAt: v6Time(r.at)}
+		g := gate.Gate{Kind: gate.KindProposal, Unit: r.u, Subject: gate.ProposalSubject(r.id), OpenedAt: v6Time(r.at)}
 		g.Status, g.Intent, g.By = proposalStatus(r.state)
 		if g.Status != gate.Open {
 			g.ClosedAt = g.OpenedAt
