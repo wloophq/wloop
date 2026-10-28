@@ -27,7 +27,9 @@ import (
 	"fmt"
 	"strings"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/pkg/plugin/source"
 )
+func plugin(n int) source.Draft { return source.Draft{Text: fmt.Sprint("Any news on ", n, "?")} }
 func closing(n int) string { return fmt.Sprint("Closing ", n) }
 func rendered(s string) (string, error) {
 	if s == "" { return "", errors.New("nothing to render") }
@@ -40,7 +42,8 @@ func f(in string) []draft.Draft {
 	return []draft.Draft{d, {Text: closing(2)}, {Text: in}, {Text: t}}
 }
 `
-	deps := map[string]*types.Package{draftPkg: dp}
+	_, _, sp := planted(t, fset, sdkSourcePkg, "source.go", "package source\ntype Draft struct { Text string }\n", nil)
+	deps := map[string]*types.Package{draftPkg: dp, sdkSourcePkg: sp}
 	for path, body := range map[string]string{
 		"fmt":     "func Sprint(a ...any) string { return \"\" }\nfunc Sprintf(f string, a ...any) string { return f }",
 		"errors":  "func New(s string) error { return nil }",
@@ -56,11 +59,11 @@ func f(in string) []draft.Draft {
 		}
 	}
 	hits := draftTextHits(fset, "internal/x/x.go", info, f, funcs)
-	if len(hits) != 3 {
-		t.Fatalf("want 3 hits, got %q", hits)
+	if len(hits) != 4 {
+		t.Fatalf("want 4 hits, got %q", hits)
 	}
-	for _, want := range []string{"a string constant", "a format", "built by closing"} {
-		flagged(t, want, filter(hits, want), 1, want)
+	for want, n := range map[string]int{"a string constant": 1, "a format": 2, "built by closing": 1} {
+		flagged(t, want, filter(hits, want), n, want)
 	}
 }
 

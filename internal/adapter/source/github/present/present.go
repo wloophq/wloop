@@ -1,5 +1,5 @@
 // Package present is the GitHub plugin's source logic the daemon reaches
-// through Action and View: the user's mutes, the nudge's prepare, the rows
+// through Action and View: the user's mutes, the rows
 // of pull requests the read model does not list, the detail, the checks,
 // Explore and the timings; and its bookkeeping on each snapshot of the
 // rows.
@@ -76,6 +76,9 @@ type Deps struct {
 	// FailedSteps names the failed steps of a GitHub Actions job; nil
 	// names none.
 	FailedSteps func(ctx context.Context, owner, repo string, job int64) ([]string, error)
+	// Plugin runs an action of the running GitHub plugin, which serves the
+	// nudge's prepare; nil serves none.
+	Plugin func(ctx context.Context, req src.ActionRequest) (json.RawMessage, error)
 	// ExploreAttempt bounds one search and ExploreRetryPause separates
 	// its two tries; zero is the default.
 	ExploreAttempt, ExploreRetryPause time.Duration
@@ -154,7 +157,10 @@ func (p *Presenter) Action(ctx context.Context, req src.ActionRequest) (json.Raw
 	case ActionUnmute:
 		err = p.unmute(ctx, u)
 	case ActionNudgePrepare:
-		res.Inputs, err = p.prepareNudge(ctx, u, args)
+		if p.d.Plugin == nil {
+			return nil, fmt.Errorf("%w: %s is the GitHub plugin's", src.ErrUnavailable, req.Action)
+		}
+		return p.d.Plugin(ctx, req)
 	default:
 		return nil, fmt.Errorf("%w: no action %s", src.ErrUnsupported, req.Action)
 	}

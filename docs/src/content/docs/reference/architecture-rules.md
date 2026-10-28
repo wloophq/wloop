@@ -21,7 +21,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestDaemonImports` | The daemon reaches adapters, GitHub and Orca only through ports. |
 | `TestDaemonImportsNoPluginDomain` | The daemon's own code imports no plugin package, under no debt: it reaches source logic through the plugins' Action and View only. |
 | `TestDomainImports` | The domain imports no adapter, manager or `internal/github`. |
-| `TestDraftTextComesFromTheProfile` | No Go code outside its allowlist writes a draft's text from prose of its own: the Text of an outbox.Proposal or a draft.Draft is never a string constant, a format, or what a function of the same package builds from string literals. A draft's text comes from a profile template or from whoever wrote it. |
+| `TestDraftTextComesFromTheProfile` | No Go code outside its allowlist writes a draft's text from prose of its own: the Text of an outbox.Proposal, a draft.Draft or a plugin's source.Draft is never a string constant, a format, or what a function of the same package builds from string literals. A draft's text comes from a profile template or from whoever wrote it. |
 | `TestEveryDecisionNamesATestThatExists` | Every entry of the decision log names on its Enforced by line at least one test, and only tests the repository declares. |
 | `TestEveryRuleTestStatesItsRule` | Every rule test, a test that does not call flagged, states its rule in a doc comment. |
 | `TestGitHubPluginImportsOnlyTheSDK` | No package under `plugins/github`, tests included, imports a package under `internal/` or a package of another plugin: the GitHub plugin builds against the SDK and its own packages alone. |
@@ -69,12 +69,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/harness_test.go` | 🧾 | the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin |
 | `internal/cli/serve_test.go` | 🧾 | the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin |
 
-### `TestDraftTextComesFromTheProfile`
-
-| `draftTextAllowlist` entry | Status | Reason |
-|---|---|---|
-| `internal/adapter/source/github/proposals.go` | ✅ | GitHub's nudge text, github-nudge |
-
 ### `TestNoIntentEnumerations`
 
 | `intentAllowlist` entry | Status | Reason |
@@ -88,9 +82,9 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 
 | `pluginProposers` entry | Status | Reason |
 |---|---|---|
-| `internal/adapter/source/github/proposals.go` | ✅ | GitHub's nudge rule, github-nudge |
 | `internal/core/proposals/proposals.go` | ✅ | the job that runs the plugins' own rules |
 | `internal/plugins/source/broker_gates.go` | ✅ | a source plugin's own rule, which proposes through OpenGate with no session |
+| `internal/plugins/source/proposals.go` | ✅ | a source plugin's own rules, which the proposals job reads through Planner.Proposals |
 
 ### `TestProseIsEmbeddedOnlyFromProfiles`
 

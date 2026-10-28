@@ -162,6 +162,12 @@ func (r *running) reloadConfig(ctx context.Context) {
 	r.client.SetFloors(api.DefaultFloors(s.Collect.RateLimitFraction))
 }
 
+func (r *running) settings() settings {
+	r.cfgMu.Lock()
+	defer r.cfgMu.Unlock()
+	return r.cfg
+}
+
 func (r *running) collectConfig() collect.Config {
 	r.cfgMu.Lock()
 	defer r.cfgMu.Unlock()
@@ -234,6 +240,37 @@ func (r *running) report(ctx context.Context, all bool) error {
 const reportChunk = 200
 
 func (r *running) snapshots(ctx context.Context, refs []pr.Ref) ([]src.Snapshot, error) {
+	at := r.now()
+	rows, err := r.rows(ctx, refs, at)
+	if err != nil {
+		return nil, err
+	}
+	rev, err := r.nextRev(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var out []src.Snapshot
+	for _, d := range rows {
+		raw, err := json.Marshal(d.data)
+		if err != nil {
+			return nil, err
+		}
+		s := d.row.Report()
+		s.Unit, s.Rev, s.At, s.Data = d.row.PR.Ref.Unit(), rev, at, raw
+		out = append(out, s)
+		r.dueAt(d.row.PR.Ref, d.row.Due())
+	}
+	return out, nil
+}
+
+// derived is a stored pull request's source row and the data it reports.
+type derived struct {
+	row  row.Row
+	data Data
+}
+
+// rows are the source rows of the stored pull requests of refs at at.
+func (r *running) rows(ctx context.Context, refs []pr.Ref, at time.Time) ([]derived, error) {
 	rows, err := r.db.PRs(ctx, refs)
 	if err != nil {
 		return nil, err
@@ -250,12 +287,7 @@ func (r *running) snapshots(ctx context.Context, refs []pr.Ref) ([]src.Snapshot,
 	if err != nil {
 		return nil, err
 	}
-	rev, err := r.nextRev(ctx)
-	if err != nil {
-		return nil, err
-	}
-	at := r.now()
-	var out []src.Snapshot
+	var out []derived
 	for _, ref := range refs {
 		p, ok := rows[ref]
 		if !ok {
@@ -272,16 +304,9 @@ func (r *running) snapshots(ctx context.Context, refs []pr.Ref) ([]src.Snapshot,
 			d.Detail, d.DetailVersion, d.DetailReadAt = &det, det.Version, det.ReadAt
 			ri.Detail = &det
 		}
-		derived := row.Derive(ri)
-		d.Row = &derived.Payload
-		raw, err := json.Marshal(d)
-		if err != nil {
-			return nil, err
-		}
-		s := derived.Report()
-		s.Unit, s.Rev, s.At, s.Data = ref.Unit(), rev, at, raw
-		out = append(out, s)
-		r.dueAt(ref, derived.Due())
+		x := row.Derive(ri)
+		d.Row = &x.Payload
+		out = append(out, derived{row: x, data: d})
 	}
 	return out, nil
 }

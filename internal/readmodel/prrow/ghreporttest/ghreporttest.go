@@ -54,6 +54,18 @@ type Input struct {
 
 // Snapshot is the snapshot the plugin reports of in under env.
 func Snapshot(env Env, in Input) src.Snapshot {
+	r := Row(env, in)
+	raw, err := json.Marshal(ghplugin.Data{PR: r.PR, Tracked: in.Tracked, Row: &r.Payload})
+	if err != nil {
+		panic(fmt.Sprintf("ghreporttest: %v", err))
+	}
+	s := r.Report()
+	s.Unit, s.Rev, s.At, s.Data = r.PR.Ref.Unit(), 1, env.Now, raw
+	return s
+}
+
+// Row is the source row the plugin derives of in under env.
+func Row(env Env, in Input) row.Row {
 	p := PluginPR(in.PR)
 	if env.MaxDetailAge == 0 {
 		sw := config.Defaults().Sweep
@@ -74,18 +86,11 @@ func Snapshot(env Env, in Input) src.Snapshot {
 			detail.Reviews = append(detail.Reviews, ghpr.Review{ID: r.ID, State: r.State, Author: r.Author, SubmittedAt: r.SubmittedAt, CommitOid: r.CommitOid})
 		}
 	}
-	r := row.Derive(row.Input{PR: p, Events: evs, Override: ghpr.Override{Ref: p.Ref, Adopted: in.Adopted, Tracked: in.Tracked}, Detail: detail,
+	return row.Derive(row.Input{PR: p, Events: evs, Override: ghpr.Override{Ref: p.Ref, Adopted: in.Adopted, Tracked: in.Tracked}, Detail: detail,
 		MaxDetailAge: env.MaxDetailAge,
 		Viewer:       env.Viewer, Teams: env.Teams, Ignore: env.Ignore,
 		Stalled:     situation.Thresholds{Review: time.Duration(th.Review), Reply: time.Duration(th.Reply), Merge: time.Duration(th.Merge)},
 		AddressedAt: in.AddressedAt, Loop: env.Loop, Now: env.Now})
-	raw, err := json.Marshal(ghplugin.Data{PR: p, Tracked: in.Tracked, Row: &r.Payload})
-	if err != nil {
-		panic(fmt.Sprintf("ghreporttest: %v", err))
-	}
-	s := r.Report()
-	s.Unit, s.Rev, s.At, s.Data = p.Ref.Unit(), 1, env.Now, raw
-	return s
 }
 
 // PluginPR is p as the plugin keeps it.
@@ -147,9 +152,40 @@ func (i Inventory) Units(ctx context.Context, p unit.ProviderID) ([]unit.Unit, e
 }
 
 func (i Inventory) Reported(ctx context.Context, units []unit.Unit) (map[unit.Unit]src.Snapshot, error) {
-	prs, err := i.Store.ListPRs(ctx, false)
+	env, ins, err := i.inputs(ctx, units)
 	if err != nil {
 		return nil, err
+	}
+	out := make(map[unit.Unit]src.Snapshot, len(ins))
+	for _, in := range ins {
+		out[in.PR.Ref.Unit()] = Snapshot(env, in)
+	}
+	return out, nil
+}
+
+// Rows are the source rows the plugin derives now of every pull request i
+// holds.
+func (i Inventory) Rows(ctx context.Context) ([]row.Row, error) {
+	units, err := i.Units(ctx, unit.GitHub)
+	if err != nil {
+		return nil, err
+	}
+	env, ins, err := i.inputs(ctx, units)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]row.Row, len(ins))
+	for n, in := range ins {
+		out[n] = Row(env, in)
+	}
+	return out, nil
+}
+
+// inputs are the env and the inputs of the pull requests of units i holds.
+func (i Inventory) inputs(ctx context.Context, units []unit.Unit) (Env, []Input, error) {
+	prs, err := i.Store.ListPRs(ctx, false)
+	if err != nil {
+		return Env{}, nil, err
 	}
 	want := map[unit.Unit]bool{}
 	for _, u := range units {
@@ -164,15 +200,15 @@ func (i Inventory) Reported(ctx context.Context, units []unit.Unit) (map[unit.Un
 		}
 	}
 	if len(refs) == 0 {
-		return map[unit.Unit]src.Snapshot{}, nil
+		return Env{}, nil, nil
 	}
 	evs, err := i.Store.EventsByPR(ctx, refs)
 	if err != nil {
-		return nil, err
+		return Env{}, nil, err
 	}
 	overrides, err := i.Store.Overrides(ctx)
 	if err != nil {
-		return nil, err
+		return Env{}, nil, err
 	}
 	env := i.Env
 	if env.Loop == "" {
@@ -190,7 +226,7 @@ func (i Inventory) Reported(ctx context.Context, units []unit.Unit) (map[unit.Un
 	if i.Identity != nil && env.Viewer == "" {
 		id, err := i.Identity(ctx)
 		if err != nil {
-			return nil, err
+			return Env{}, nil, err
 		}
 		env.Viewer, env.Teams = strings.TrimPrefix(id.Viewer.Key, "github:"), id.Teams
 		if env.Teams == nil {
@@ -199,24 +235,24 @@ func (i Inventory) Reported(ctx context.Context, units []unit.Unit) (map[unit.Un
 	}
 	if env.Viewer == "" {
 		if env.Viewer, err = i.Store.Viewer(ctx, unit.GitHub); err != nil {
-			return nil, err
+			return Env{}, nil, err
 		}
 	}
 	if env.Teams == nil {
 		raw, err := i.Store.Meta(ctx, metaTeams)
 		if err != nil {
-			return nil, err
+			return Env{}, nil, err
 		}
 		if raw != "" {
 			_ = json.Unmarshal([]byte(raw), &env.Teams)
 		}
 	}
-	out := make(map[unit.Unit]src.Snapshot, len(refs))
+	out := make([]Input, 0, len(refs))
 	for _, ref := range refs {
 		o := overrides[ref]
-		out[ref.Unit()] = Snapshot(env, Input{PR: byRef[ref], Events: evs[ref], Adopted: o.Adopted, Tracked: o.Tracked})
+		out = append(out, Input{PR: byRef[ref], Events: evs[ref], Adopted: o.Adopted, Tracked: o.Tracked})
 	}
-	return out, nil
+	return env, out, nil
 }
 
 // Keeper keeps reports, as the host's snapshot store does.

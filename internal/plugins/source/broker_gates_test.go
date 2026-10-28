@@ -230,3 +230,29 @@ func TestAToolThatPostsAtOnceIsRefusedForASessionThatIsNotLive(t *testing.T) {
 		}
 	}
 }
+
+func TestAPluginsDraftCarriesNoDeliveryOfItsOwn(t *testing.T) {
+	t.Parallel()
+	g, ds := gatesOver(t)
+	own := plugin.Unit{Provider: "acme", Key: "t1"}
+	for _, d := range []src.Draft{
+		{Unit: own, Purpose: "nudge", Delivery: "reaction", Text: "any news?", Origin: src.DraftOrigin{Kind: "auto", Rule: "acme-nudge", Key: "k"}},
+		{Unit: own, Kind: "reply", Delivery: "reaction", Text: "hi"},
+	} {
+		session := ""
+		if d.Kind != "" {
+			session = "live"
+		}
+		if _, err := g.OpenGate(context.Background(), src.GateRequest{Draft: d, Session: session}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, p := range ds.proposed {
+		if p.Delivery != "" {
+			t.Errorf("proposed %+v with the plugin's delivery", p)
+		}
+	}
+	if ds.proposed[0].Purpose != "nudge" || ds.proposed[1].Kind != draft.Reply {
+		t.Fatalf("proposed %+v", ds.proposed)
+	}
+}

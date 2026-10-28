@@ -171,7 +171,10 @@ func briefHome(cfg config.Config) func(pr.Ref) string {
 
 // githubPresenter are the GitHub presenter's deps over the env's client.
 func (e *Env) githubPresenter(store *inventory.Store, host src.Host, briefs *interruptFirst) present.Deps {
-	deps := present.Deps{Store: store, Reports: e.sourceReports(store), Host: host, Explorer: e.github.API, Budget: e.githubBudget(), FailedSteps: e.failedSteps()}
+	deps := present.Deps{Store: store, Reports: e.sourceReports(store), Host: host, Explorer: e.github.API, Budget: e.githubBudget(), FailedSteps: e.failedSteps(),
+		Plugin: func(ctx context.Context, req src.ActionRequest) (json.RawMessage, error) {
+			return e.forgeCalls().Action(ctx, req)
+		}}
 	if briefs != nil {
 		deps.Briefs = briefs
 	}
@@ -453,13 +456,13 @@ func (e *Env) githubModule(build source.Build) source.Build {
 		if err != nil || e.pluginKind == nil {
 			return m, err
 		}
-		return e.relayGitHub(cfg, m), nil
+		return e.relayGitHub(cfg, m)
 	}
 }
 
-// relayGitHub is m with its ingestion, slow sweep, tracks and checkouts
-// relayed to the GitHub plugin serve runs.
-func (e *Env) relayGitHub(cfg config.Config, m source.Module) source.Module {
+// relayGitHub is m with its ingestion, slow sweep, tracks, checkouts,
+// publisher and proposals relayed to the GitHub plugin serve runs.
+func (e *Env) relayGitHub(cfg config.Config, m source.Module) (source.Module, error) {
 	r := relay{id: unit.GitHub, kind: e.pluginKind, now: e.Now, units: psource.Units{Codecs: e.unitCodecs()}}
 	every := time.Duration(cmp.Or(cfg.Sweep.Fast, config.Defaults().Sweep.Fast))
 	m.Ingest = ingest.Job{Every: every, Prepare: func(ctx context.Context, now time.Time) (ingest.Plan, string, error) {
@@ -477,7 +480,13 @@ func (e *Env) relayGitHub(cfg config.Config, m source.Module) source.Module {
 	}
 	m.Track, m.Untrack = r.track, r.untrack
 	m.Checkouts = pluginCheckouts{psource.Checkouts{ID: string(unit.GitHub), Units: r.units, Kind: e.pluginKind}}
-	return m
+	s, err := e.pluginSource(unit.GitHub)
+	if err != nil {
+		return source.Module{}, err
+	}
+	m.Publisher = psource.Publisher{ID: string(unit.GitHub), Source: s, Units: r.units, Kind: e.pluginKind}
+	m.Proposals = psource.Proposals{ID: string(unit.GitHub), Units: r.units, Kind: e.pluginKind}.Proposals
+	return m, nil
 }
 
 // afterGitHubJob seeds the host's GitHub client with the budget the

@@ -46,9 +46,16 @@ posts = true
 [[source.deliveries]]
 name = "reaction"
 
+[[source.deliveries]]
+name = "edit"
+
 [[source.draft_kinds]]
 name = "react"
 delivery = "reaction"
+
+[[source.draft_kinds]]
+name = "edit"
+delivery = "edit"
 
 [[source.roles]]
 name = "pr.review"

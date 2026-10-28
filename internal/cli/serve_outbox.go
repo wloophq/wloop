@@ -107,10 +107,11 @@ type pinnedEffects struct {
 	turns turnReader
 }
 
-func (p pinnedEffects) Delivers(d draft.Delivery) draft.Delivery {
+func (p pinnedEffects) Delivers(k draft.Kind) draft.Delivery {
 	if dl, ok := p.Effects.(port.Deliverer); ok {
-		return dl.Delivers(d)
+		return dl.Delivers(k)
 	}
+	_, d := draft.ShapeOf(k)
 	return d
 }
 

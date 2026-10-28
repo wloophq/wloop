@@ -79,6 +79,9 @@ func Derive(in Input) Row {
 	return r
 }
 
+// Events are the host's events of the pull request the row derives from.
+func (r Row) Events() []pr.Event { return r.in.Events }
+
 // Kind is the row's situation kind.
 func (r Row) Kind() situation.Kind { return r.Situation.Kind }
 

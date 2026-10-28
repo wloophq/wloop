@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/slack/auth"
 	dslack "github.com/wloophq/wloop/plugins/slack/domain"
 	"github.com/wloophq/wloop/plugins/slack/draft"
@@ -305,7 +306,7 @@ func TestPublishErrorsHoldNoToken(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "chat.postMessage") || !strings.Contains(err.Error(), "restricted_action") {
 		t.Fatalf("err %v", err)
 	}
-	if strings.HasPrefix(err.Error(), mayHaveBeenPosted) {
+	if strings.HasPrefix(err.Error(), src.ErrMayHavePosted.Error()) {
 		t.Fatalf("a refusal says it may have been posted: %v", err)
 	}
 	for _, s := range []string{err.Error(), ps.f.logs.String()} {
@@ -353,7 +354,7 @@ func TestPublishTimeoutSaysMayHaveBeenPosted(t *testing.T) {
 			if err == nil {
 				t.Fatal("published")
 			}
-			if got := strings.HasPrefix(err.Error(), mayHaveBeenPosted); got != tc.may {
+			if got := strings.HasPrefix(err.Error(), src.ErrMayHavePosted.Error()); got != tc.may {
 				t.Fatalf("err %q, may have been posted %v, want %v", err, got, tc.may)
 			}
 		})
@@ -528,7 +529,7 @@ func TestVerifyUnsureSaysCheck(t *testing.T) {
 	ps := newPubSlack(t)
 	ps.f.api.Handle("conversations.replies", func(url.Values) any { return slacktest.Response{Status: http.StatusServiceUnavailable, Body: "x"} })
 	_, ok, err := ps.publisher().Verify(context.Background(), threadDraft(draft.Reply, "on it"), time.Unix(1700000300, 0))
-	want := mayHaveBeenPosted + "; check https://slack.com/archives/" + pubConv + "/p" + strings.ReplaceAll(pubParent, ".", "")
+	want := src.ErrMayHavePosted.Error() + "; check https://slack.com/archives/" + pubConv + "/p" + strings.ReplaceAll(pubParent, ".", "")
 	if ok || err == nil || !strings.HasPrefix(err.Error(), want) {
 		t.Fatalf("Verify = %v %v, want %q", ok, err, want)
 	}
@@ -537,7 +538,7 @@ func TestVerifyUnsureSaysCheck(t *testing.T) {
 	ps.f.api.Handle("conversations.info", func(url.Values) any { return map[string]any{"ok": false, "error": "invalid_auth"} })
 	seg := ps.segmentUnit(t)
 	_, _, err = ps.publisher().Verify(context.Background(), draft.Draft{Unit: seg, Kind: draft.Reply, Text: "x"}, time.Unix(1700000300, 0))
-	if err == nil || !strings.HasPrefix(err.Error(), mayHaveBeenPosted+"; check https://slack.com/archives/"+pubDM) {
+	if err == nil || !strings.HasPrefix(err.Error(), src.ErrMayHavePosted.Error()+"; check https://slack.com/archives/"+pubDM) {
 		t.Fatalf("logged-out Verify = %v", err)
 	}
 }
@@ -560,7 +561,7 @@ func TestPublishRefreshFailureIsNotPosted(t *testing.T) {
 	p := ps.publisher()
 	p.Send = &send.Service{Client: &slackapi.Client{BaseURL: ps.f.api.URL, Tokens: &refreshFails{n: 1}}}
 	_, err := p.Publish(context.Background(), threadDraft(draft.Reply, "hi"))
-	if err == nil || strings.HasPrefix(err.Error(), mayHaveBeenPosted) || !strings.Contains(err.Error(), "token") {
+	if err == nil || strings.HasPrefix(err.Error(), src.ErrMayHavePosted.Error()) || !strings.Contains(err.Error(), "token") {
 		t.Fatalf("err %v", err)
 	}
 	if n := len(ps.calls("chat.postMessage")); n != 0 {

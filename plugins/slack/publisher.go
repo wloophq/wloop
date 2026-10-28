@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+
 	"github.com/wloophq/wloop/plugins/slack/auth"
 	dslack "github.com/wloophq/wloop/plugins/slack/domain"
 	"github.com/wloophq/wloop/plugins/slack/draft"
@@ -22,10 +24,6 @@ import (
 	"github.com/wloophq/wloop/plugins/slack/store"
 	"github.com/wloophq/wloop/plugins/slack/unit"
 )
-
-// mayHaveBeenPosted starts a Publish or Verify error when the post may have
-// reached Slack; the outbox asks for a confirmation before a retry.
-const mayHaveBeenPosted = "may have been posted"
 
 const (
 	// verifySkew widens Verify's window: Slack's clock stamps the ts.
@@ -433,7 +431,7 @@ func (p *Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence,
 		return draft.Evidence{}, p.failed(pl, err)
 	}
 	if posted.TS == "" {
-		return draft.Evidence{}, fmt.Errorf("%s to %s: Slack's answer names no message", mayHaveBeenPosted, pl.where())
+		return draft.Evidence{}, fmt.Errorf("%w to %s: Slack's answer names no message", src.ErrMayHavePosted, pl.where())
 	}
 	channel := cmp.Or(posted.Channel, pl.res.Channel)
 	p.logf("slack_draft_published draft=%d delivery=%s channel=%s ts=%s", d.ID, d.Delivery, channel, posted.TS)
@@ -447,7 +445,7 @@ func (p *Publisher) evidence(ctx context.Context, channel, ts string, at time.Ti
 
 func (p *Publisher) failed(pl plan, err error) error {
 	if written(err) {
-		return fmt.Errorf("%s to %s: %w", mayHaveBeenPosted, pl.where(), err)
+		return fmt.Errorf("%w to %s: %w", src.ErrMayHavePosted, pl.where(), err)
 	}
 	return fmt.Errorf("posting to %s: %w", pl.where(), err)
 }
@@ -534,7 +532,7 @@ func (p *Publisher) unsure(ctx context.Context, d draft.Draft, pl plan, err erro
 			}
 		}
 	}
-	return fmt.Errorf("%s; check %s (%w)", mayHaveBeenPosted, conversationLink(channel, ts), err)
+	return fmt.Errorf("%w; check %s (%w)", src.ErrMayHavePosted, conversationLink(channel, ts), err)
 }
 
 func conversationLink(channel, ts string) string {

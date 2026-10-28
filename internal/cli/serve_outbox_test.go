@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api/client"
@@ -27,6 +26,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -259,11 +259,15 @@ func TestTurnDraftIsPinnedToItsUnit(t *testing.T) {
 
 func TestAPinnedPublisherPostsAsItsPluginDelivers(t *testing.T) {
 	t.Parallel()
-	gh := pinnedEffects{Effects: &ghsource.Publisher{}}
-	if got := gh.Delivers(draft.Message); got != draft.CommentDelivery {
+	s, err := (&Env{}).pluginSource(unit.GitHub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gh := pinnedEffects{Effects: psource.Publisher{ID: string(unit.GitHub), Source: s}}
+	if got := gh.Delivers(draft.Reply); got != draft.CommentDelivery {
 		t.Errorf("github: %s", got)
 	}
-	if got := (pinnedEffects{Effects: &recordingPublisher{}}).Delivers(draft.Message); got != draft.Message {
+	if got := (pinnedEffects{Effects: &recordingPublisher{}}).Delivers(draft.Reply); got != draft.Message {
 		t.Errorf("a publisher that declares nothing: %s", got)
 	}
 }

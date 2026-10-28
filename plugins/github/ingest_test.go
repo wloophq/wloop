@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -162,7 +164,10 @@ func (*fakeHost) Config(context.Context) (src.Config, error) {
 	return src.Config{Plugin: json.RawMessage(`{"scope":{"people":["ana"]}}`), Host: json.RawMessage(`{"sweep":{"fast":"2m","slow":"1h"}}`)}, nil
 }
 
-func (*fakeHost) Profile(context.Context, string) ([]byte, error) { return nil, src.ErrUnsupported }
+// Profile reads the plugin's own profile layer.
+func (*fakeHost) Profile(_ context.Context, path string) ([]byte, error) {
+	return os.ReadFile(filepath.Join("profile", filepath.FromSlash(path)))
+}
 
 // reported are the snapshots of ref the plugin reported, in order.
 func (h *fakeHost) reported(ref pr.Ref) []Data {

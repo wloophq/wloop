@@ -52,6 +52,8 @@ func (p *Plugin) Action(ctx context.Context, req src.ActionRequest) (json.RawMes
 			return nil, err
 		}
 		return nil, r.report(ctx, false)
+	case ActionNudgePrepare:
+		return r.prepareNudge(ctx, req.Unit, req.Args)
 	case ActionBudget:
 		return json.Marshal(r.client.Budget())
 	case ActionForward:

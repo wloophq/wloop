@@ -1,4 +1,4 @@
-package ghsource
+package publish
 
 import (
 	"context"
@@ -14,12 +14,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/domain/draft"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/domain/items"
-	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/github/githubtest"
+	sdk "github.com/wloophq/wloop/pkg/plugin"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+	"github.com/wloophq/wloop/plugins/github/api/apitest"
+	"github.com/wloophq/wloop/plugins/github/nudge"
+	"github.com/wloophq/wloop/plugins/github/pr"
 )
 
 // fakeGitHub serves the issue comments REST endpoints of every pull request.
@@ -129,17 +128,17 @@ func (t toServer) RoundTrip(r *http.Request) (*http.Response, error) {
 
 type recordedEvents struct {
 	mu  sync.Mutex
-	evs []dinv.Event
+	evs []src.Event
 }
 
-func (r *recordedEvents) RecordEvent(_ context.Context, ev dinv.Event) error {
+func (r *recordedEvents) record(_ context.Context, ev src.Event) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.evs = append(r.evs, ev)
 	return nil
 }
 
-func testPublisher(t *testing.T, people ...items.Person) (*Publisher, *fakeGitHub, *recordedEvents) {
+func testPublisher(t *testing.T, people ...src.Person) (*Publisher, *fakeGitHub, *recordedEvents) {
 	t.Helper()
 	f, srv := newFakeGitHub(t)
 	u, err := url.Parse(srv.URL)
@@ -148,10 +147,10 @@ func testPublisher(t *testing.T, people ...items.Person) (*Publisher, *fakeGitHu
 	}
 	evs := &recordedEvents{}
 	p := &Publisher{
-		GH:     githubtest.Client(toServer{u}),
+		GH:     apitest.Client(toServer{u}),
 		Viewer: func(context.Context) (string, error) { return "octocat", nil },
-		Events: evs,
-		People: func(context.Context, unit.Unit) ([]items.Person, error) { return people, nil },
+		Record: evs.record,
+		People: func(context.Context, sdk.Unit) ([]src.Person, error) { return people, nil },
 		Now:    func() time.Time { return f.now },
 	}
 	return p, f, evs
@@ -161,8 +160,8 @@ var pr12 = pr.Ref{Owner: "owner", Repo: "repo", Number: 12}
 
 const issue12 = "/repos/owner/repo/issues/12"
 
-func commentDraft(text string) draft.Draft {
-	return draft.Draft{ID: 7, Unit: pr12.Unit(), Kind: draft.Comment, Target: "owner/repo#12", Text: text, State: draft.Sending}
+func commentDraft(text string) src.Draft {
+	return src.Draft{ID: 7, Unit: pr12.Unit(), Kind: "comment", Delivery: "comment", Target: "owner/repo#12", Text: text, State: "sending"}
 }
 
 func TestGitHubPublishPostsAComment(t *testing.T) {
@@ -202,7 +201,7 @@ func TestGitHubPublishIsAMutation(t *testing.T) {
 			if err == nil {
 				t.Fatal("published through a failure")
 			}
-			if got := strings.HasPrefix(err.Error(), mayHaveBeenPosted); got != tc.posted {
+			if got := strings.HasPrefix(err.Error(), src.ErrMayHavePosted.Error()); got != tc.posted {
 				t.Fatalf("error %q: may have been posted %v, want %v", err, got, tc.posted)
 			}
 			if n := f.posts(); n != 1 {
@@ -216,7 +215,7 @@ func TestGitHubPublishIsAMutation(t *testing.T) {
 }
 
 func TestGitHubPublishConvertsMentions(t *testing.T) {
-	p, f, _ := testPublisher(t, items.Person{Key: "slack:U000AAA", Name: "Ana"})
+	p, f, _ := testPublisher(t, src.Person{Key: "slack:U000AAA", Name: "Ana"})
 	d := commentDraft("@{github:octocat} could you check what @{slack:U000AAA} asked? cc @{group:acme/core}")
 	if _, err := p.Publish(context.Background(), d); err != nil {
 		t.Fatal(err)
@@ -240,7 +239,7 @@ func TestGitHubPublishRefusesAnUnknownPerson(t *testing.T) {
 }
 
 func TestGitHubVerifyFindsTheComment(t *testing.T) {
-	p, f, _ := testPublisher(t, items.Person{Key: "slack:U000AAA", Name: "Ana"})
+	p, f, _ := testPublisher(t, src.Person{Key: "slack:U000AAA", Name: "Ana"})
 	ctx := context.Background()
 	d := commentDraft("@{github:alice} see what @{slack:U000AAA} said")
 	started := f.now.Add(-time.Second)
@@ -279,13 +278,14 @@ func TestGitHubValidateRefusesForeignTargets(t *testing.T) {
 	if err := p.Validate(ctx, self); err != nil {
 		t.Fatalf("empty target: %v", err)
 	}
-	for name, edit := range map[string]func(d *draft.Draft){
-		"other pull request": func(d *draft.Draft) { d.Target = "owner/repo#13" },
-		"other repository":   func(d *draft.Draft) { d.Target = "owner/other#12" },
-		"not a target":       func(d *draft.Draft) { d.Target = "#general" },
-		"react":              func(d *draft.Draft) { d.Kind, d.Delivery, d.Reaction = draft.React, draft.Reaction, "eyes" },
-		"slack unit":         func(d *draft.Draft) { d.Unit = unit.Unit{Provider: "slack", Key: "C000AAA/1.2"} },
-		"empty":              func(d *draft.Draft) { d.Text = "  " },
+	for name, edit := range map[string]func(d *src.Draft){
+		"other pull request": func(d *src.Draft) { d.Target = "owner/repo#13" },
+		"other repository":   func(d *src.Draft) { d.Target = "owner/other#12" },
+		"not a target":       func(d *src.Draft) { d.Target = "#general" },
+		"react":              func(d *src.Draft) { d.Kind, d.Delivery, d.Reaction = "react", "reaction", "eyes" },
+		"edit":               func(d *src.Draft) { d.Kind, d.Delivery = "edit", "edit" },
+		"slack unit":         func(d *src.Draft) { d.Unit = sdk.Unit{Provider: "slack", Key: "C000AAA/1.2"} },
+		"empty":              func(d *src.Draft) { d.Text = "  " },
 	} {
 		d := ok
 		edit(&d)
@@ -301,16 +301,12 @@ func TestGitHubValidateRefusesForeignTargets(t *testing.T) {
 	}
 }
 
-type failingEvents struct{}
-
-func (failingEvents) RecordEvent(context.Context, dinv.Event) error {
-	return errors.New("store closed")
-}
+func failingEvents(context.Context, src.Event) error { return errors.New("store closed") }
 
 func TestGitHubNudgeRecordsOnlyWhatMayHaveGone(t *testing.T) {
-	nudge := func() draft.Draft {
+	nudgeDraft := func() src.Draft {
 		d := commentDraft("@{github:alice} @{github:bob} friendly nudge")
-		d.Kind, d.Effects = draft.Nudge, []string{EffectNudged}
+		d.Kind, d.Effects = "nudge", []string{nudge.EffectNudged}
 		return d
 	}
 	ctx := context.Background()
@@ -331,7 +327,7 @@ func TestGitHubNudgeRecordsOnlyWhatMayHaveGone(t *testing.T) {
 			created := f.now
 			p.Now = func() time.Time { return created.Add(-time.Second) }
 			f.fail = tc.fail
-			_, err := p.Publish(ctx, nudge())
+			_, err := p.Publish(ctx, nudgeDraft())
 			if (err == nil) != (tc.fail == 0) {
 				t.Fatalf("err %v", err)
 			}
@@ -349,7 +345,7 @@ func TestGitHubNudgeRecordsOnlyWhatMayHaveGone(t *testing.T) {
 			if tc.fail == 0 {
 				want = created
 			}
-			if e.Kind != dinv.KindNudged || e.Data != "@alice, @bob" || e.PR != pr12 || !e.At.Equal(want) {
+			if e.Kind != pr.KindNudged || string(e.Data) != "@alice, @bob" || e.Unit != pr12.Unit() || !e.At.Equal(want) {
 				t.Fatalf("event %+v, want at %s", e, want)
 			}
 		})
@@ -362,27 +358,27 @@ func TestGitHubNudgeRecordsOnlyWhatMayHaveGone(t *testing.T) {
 	})
 	t.Run("found after a crash", func(t *testing.T) {
 		p, f, evs := testPublisher(t)
-		d := nudge()
+		d := nudgeDraft()
 		f.add(issue12, "octocat", "@alice @bob friendly nudge", f.now)
 		ev, found, err := p.Verify(ctx, d, f.now.Add(-time.Second))
 		if err != nil || !found || ev.Ref == "" {
 			t.Fatalf("found %v err %v", found, err)
 		}
-		if len(evs.evs) != 1 || !evs.evs[0].At.Equal(f.now) || evs.evs[0].Data != "@alice, @bob" {
+		if len(evs.evs) != 1 || !evs.evs[0].At.Equal(f.now) || string(evs.evs[0].Data) != "@alice, @bob" {
 			t.Fatalf("events %+v", evs.evs)
 		}
 	})
 	t.Run("not found after a crash", func(t *testing.T) {
 		p, f, evs := testPublisher(t)
-		if _, found, err := p.Verify(ctx, nudge(), f.now); err != nil || found || len(evs.evs) != 0 {
+		if _, found, err := p.Verify(ctx, nudgeDraft(), f.now); err != nil || found || len(evs.evs) != 0 {
 			t.Fatalf("found %v err %v events %+v", found, err, evs.evs)
 		}
 	})
 	t.Run("record fails after the post", func(t *testing.T) {
 		p, f, _ := testPublisher(t)
 		var logged []string
-		p.Events, p.Log = failingEvents{}, func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) }
-		ev, err := p.Publish(ctx, nudge())
+		p.Record, p.Log = failingEvents, func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) }
+		ev, err := p.Publish(ctx, nudgeDraft())
 		if err != nil || ev.Ref == "" || len(f.posted(issue12)) != 1 {
 			t.Fatalf("evidence %+v, err %v", ev, err)
 		}
@@ -393,7 +389,7 @@ func TestGitHubNudgeRecordsOnlyWhatMayHaveGone(t *testing.T) {
 }
 
 func TestGitHubPublishNeverPingsThroughAnotherProvidersName(t *testing.T) {
-	p, f, _ := testPublisher(t, items.Person{Key: "slack:U000AAA", Name: "Ana @alice (ana@corp.test)"})
+	p, f, _ := testPublisher(t, src.Person{Key: "slack:U000AAA", Name: "Ana @alice (ana@corp.test)"})
 	d := commentDraft("ask @{slack:U000AAA} and @{group:@acme/core}")
 	if _, err := p.Publish(context.Background(), d); err != nil {
 		t.Fatal(err)
@@ -412,15 +408,5 @@ func TestGitHubWhereNamesThePullRequest(t *testing.T) {
 	}
 	if _, err := p.Where(context.Background(), commentDraft("ask @{slack:U000BBB}")); err == nil {
 		t.Fatal("a draft that cannot post has a destination")
-	}
-}
-
-func TestGitHubDeliversEveryTextDraftAsAComment(t *testing.T) {
-	p := &Publisher{}
-	for in, want := range map[draft.Delivery]draft.Delivery{draft.Message: draft.CommentDelivery, draft.CommentDelivery: draft.CommentDelivery, draft.Reaction: draft.Reaction,
-		draft.EditDelivery: draft.EditDelivery} {
-		if got := p.Delivers(in); got != want {
-			t.Errorf("%s: %s, want %s", in, got, want)
-		}
 	}
 }
