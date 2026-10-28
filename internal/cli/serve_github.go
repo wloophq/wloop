@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -27,6 +28,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/ghcli"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
@@ -186,6 +188,19 @@ func (e *Env) forgeCalls() forgeCalls {
 		}
 	}
 	return ghsource.Local{GH: e.GH, API: e.GitHub}
+}
+
+// forgeViewer is the viewer's login as the forge's plugin knows them.
+func (e *Env) forgeViewer(ctx context.Context) (string, error) {
+	id, err := e.forgeCalls().Identity(ctx)
+	if err != nil {
+		return "", err
+	}
+	login := readmodel.Login(unit.GitHub, id)
+	if login == "" {
+		return "", errors.New("the forge's plugin knows no viewer")
+	}
+	return login, nil
 }
 
 // githubLocator is the pull request of the checkout's branch, as gh reads it.

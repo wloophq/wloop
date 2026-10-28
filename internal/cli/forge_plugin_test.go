@@ -47,7 +47,7 @@ func (s *forgeStub) Identity(context.Context) (src.Identity, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.identities++
-	return src.Identity{Viewer: src.Person{Key: "github:" + s.login, Name: s.login}}, nil
+	return src.Identity{Viewer: src.Person{Key: "github:" + s.login, Name: "Ana Example"}}, nil
 }
 
 func (s *forgeStub) RunCLI(_ context.Context, req src.CLIRequest, _, stderr io.Writer) (int, error) {
