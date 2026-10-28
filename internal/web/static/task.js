@@ -96,9 +96,10 @@ function taskBrief(e) {
   const r = e.brief;
   if (!r) return null;
   const b = r.data && typeof r.data === "object" ? r.data : {};
-  const known = b.goal || b.context || b.risk || (b.open_questions || []).length;
+  const known = b.text || b.goal || b.context || b.risk || (b.open_questions || []).length;
   return h("section", { class: "d-brief", "aria-label": "Brief" },
     h("h2", { class: "d-sub" }, "Brief"),
+    b.text ? h("div", { class: "draft-text" }, b.text) : null,
     b.goal ? h("p", { class: "goal" }, b.goal) : null,
     b.context ? h("p", {}, b.context) : null,
     b.risk ? h("p", { class: "risk-" + b.risk }, `Risk: ${b.risk}`, b.risk_why ? ` (${b.risk_why})` : "") : null,

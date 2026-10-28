@@ -315,12 +315,12 @@ func TestVerbErrors(t *testing.T) {
 func TestCaptureLandsInInbox(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, nil)
-	rec := post(t, r.s, api.TasksPath, `{"title":"call the bank","brief":"before 5"}`)
+	rec := post(t, r.s, api.TasksPath, `{"title":"call the bank"}`)
 	var v api.TaskView
 	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &v) != nil {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if v.Kind != "capture" || v.State != "inbox" || v.Title != "call the bank" || v.Notes != "before 5" {
+	if v.Kind != "capture" || v.State != "inbox" || v.Title != "call the bank" {
 		t.Fatalf("%+v", v)
 	}
 	if p := r.page(t, "view=inbox"); !slices.Equal(taskIDs(p.Tasks), []string{v.ID}) || p.Counters.Badge != 1 {

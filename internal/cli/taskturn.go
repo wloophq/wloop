@@ -2,12 +2,14 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
@@ -34,8 +36,11 @@ func (e *Env) nameFacts(ctx context.Context, u unit.Unit) map[string]any {
 }
 
 // taskPayload is a task as its turn reads it: the user's title and
-// notes, the work's brief.
-type taskPayload struct{ task task.Task }
+// notes, the brief its record holds.
+type taskPayload struct {
+	task  task.Task
+	brief string
+}
 
 func (p taskPayload) Unit() unit.Unit { return task.UnitOf(p.task.ID) }
 
@@ -48,10 +53,13 @@ func (p taskPayload) Wording() turn.Wording {
 func (p taskPayload) Fact(string) (any, bool) { return nil, false }
 
 func (p taskPayload) Contents() string {
-	if strings.TrimSpace(p.task.Notes) == "" || p.task.Notes == p.task.Title {
-		return p.task.Title
+	out := p.task.Title
+	for _, part := range []string{p.task.Notes, p.brief} {
+		if strings.TrimSpace(part) != "" && part != p.task.Title {
+			out += "\n\n" + part
+		}
 	}
-	return p.task.Title + "\n\n" + p.task.Notes
+	return out
 }
 
 // taskPayloads reads a task's turn payload from the daemon's tasks.
@@ -66,7 +74,33 @@ func (r taskPayloads) Payload(ctx context.Context, req turn.Request) (turn.Paylo
 	if err != nil {
 		return nil, err
 	}
-	return taskPayload{tk}, nil
+	brief, err := r.e.taskBrief(ctx, tk.ID)
+	if err != nil {
+		return nil, err
+	}
+	return taskPayload{task: tk, brief: brief}, nil
+}
+
+// taskBrief is the markdown brief task id's own brief record holds; "" for none, or outside a store.
+func (e *Env) taskBrief(ctx context.Context, id task.ID) (string, error) {
+	if e.Store == nil {
+		return "", nil
+	}
+	u := task.UnitOf(id)
+	recs, err := e.Store.DB().Records(ctx, builtin.BuildsBrief, u)
+	if err != nil {
+		return "", err
+	}
+	rec, ok := recs[u]
+	if !ok {
+		return "", nil
+	}
+	var data map[string]any
+	if json.Unmarshal([]byte(rec.Data), &data) != nil {
+		return "", nil
+	}
+	text, _ := data[builtin.BriefText].(string)
+	return text, nil
 }
 
 // PrepareAhead readies, before the round takes the loop mutex, the
@@ -86,7 +120,11 @@ func (a envActions) PrepareAhead(ctx context.Context, name string, u unit.Unit, 
 	if cfg.AgentHome == "" {
 		cfg.AgentHome = c.AgentHome
 	}
-	run := unitRun{def: d, cfg: cfg, r: turn.Request{Inputs: c.Inputs}, manager: c.Manager}
+	inputs, err := e.keptRepo(ctx, d, u, c.Inputs)
+	if err != nil {
+		return err
+	}
+	run := unitRun{def: d, cfg: cfg, r: turn.Request{Inputs: inputs}, manager: c.Manager}
 	repo, err := runRepo(run)
 	if err != nil || repo == "" {
 		return err

@@ -32,7 +32,15 @@ Once you create or correct an item it is **confirmed**: extraction never overwri
 - A unit you started, with every item resolved and no closing message posted, gets a "Close" task in the Inbox.
 - When every item of a task resolves, the task moves to Done. When one reopens, the task comes back to the Inbox, marked changed.
 
-You can capture a task by hand with `n`.
+## Create a task
+
+One route, `POST /api/tasks`, creates every task you make: a title alone captures it in the Inbox, as `n` in the terminal does. `{{command}} task new --title <title> --brief-file <path> --prop <name>=<value> --repo <owner/name>` creates one with the rest, and prints it as `task:<id>`:
+
+- the file's markdown is the task's brief record, in its `text` field;
+- each `--prop` is a property `tasks.toml` declares, parsed by its type in the daemon's time zone, such as `priority=high`, `due=2026-11-02` or `size=30m`; a property the profile does not declare, one its writers leave you out of, or a value its type refuses, creates nothing;
+- `--repo` is where the task's work runs: a later `start` on the task without `--repo` works in that repository.
+
+A task created from an agent's session is written by `agent`: its brief and properties are untrusted, and a property agents do not write is refused.
 
 ## Units attached to a task
 
@@ -53,7 +61,7 @@ A record is a typed note on a unit or a task, of a kind `records.toml` declares:
 
 ## Start new work
 
-`{{command}} start --repo acme/api <brief>` captures the brief as a task (its first line is the title, the whole brief its notes), prints `entry:<id>`, then starts an agent session on it. `{{command}} start entry:<id>` starts one on a task you captured before, and the cockpit offers Start on such a task. Start runs only on a task you captured; a derived task is refused.
+`{{command}} start --repo acme/api <brief>` creates a task from the brief through the same route, prints `task:<id>`, then starts an agent session on it. `--brief-file <path>` reads the brief from a file instead. The manifest's `[target] title` makes the title, bundled as `{{title 72 .guidance}}`: the brief's first line without its markdown heading marks, cut at a whole word within 72 characters. The whole brief is the task's brief record, which the session reads. `{{command}} start task:<id>` starts one on a task you created before, such as one `task new` made, and the cockpit offers Start on such a task. Start runs only on a task you captured; a derived task is refused.
 
 - **With `--repo`**, the session works in a fresh worktree of that repository, branched from its default base and named after the task's title and short id. A repository no manager knows is cloned into the matching project's `projects_dir`; an existing folder there must be a checkout of that repository. `--manager` picks the workspace manager, and `--parent` the worktree the new one goes under in Orca (the one the command runs in by default). The project's `workspace_managers`, `agent` and `agent_home` apply, to the clone's trust and to the session alike. The manager is chosen before anything is cloned, so a start it refuses clones nothing. A failed start prints the command that retries it on the task with the same flags.
 - **Without `--repo`**, the session runs with no checkout, in the neutral repository, for a message to post or an answer to find.

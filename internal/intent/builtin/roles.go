@@ -19,6 +19,9 @@ const (
 // BuildsBrief is what the brief intent builds, and the kind of the record, of records.toml, that a brief is.
 const BuildsBrief = "brief"
 
+// BriefText is the field of a brief record that holds a brief a person or an agent wrote, as markdown.
+const BriefText = "text"
+
 // Builds are what a builder intent may build.
 var Builds = []string{BuildsBrief}
 

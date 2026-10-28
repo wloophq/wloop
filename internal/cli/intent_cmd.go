@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 
@@ -32,6 +33,8 @@ const (
 	flagNoBrief = "--no-brief"
 	flagManager = "--manager"
 	flagParent  = "--parent"
+	// flagBriefFile reads the brief of a task a capturing intent creates.
+	flagBriefFile = "--brief-file"
 )
 
 // intentArgs is what an intent's command line asked for.
@@ -39,6 +42,7 @@ type intentArgs struct {
 	inputs          map[string]any
 	noWait, noBrief bool
 	guidance        string
+	briefFile       string
 	// manager and parent are the workspace manager and the parent worktree
 	// of the worktree the turn creates, "" for the configured and none.
 	manager, parent string
@@ -105,10 +109,14 @@ func runCapturing(ctx context.Context, e *Env, d dintent.Def, args []string) err
 	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(p.guidance) == "" {
+	brief, err := capturedBrief(p)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(brief) == "" {
 		return errors.New(intentUsage(d))
 	}
-	title, err := e.loadedIntents().TargetTitle(d.Name, p.guidance)
+	title, err := e.loadedIntents().TargetTitle(d.Name, brief)
 	if err != nil {
 		return err
 	}
@@ -116,17 +124,42 @@ func runCapturing(ctx context.Context, e *Env, d dintent.Def, args []string) err
 	if err != nil {
 		return err
 	}
-	tk, err := c.Capture(ctx, api.TaskCreate{Title: cmp.Or(title, p.guidance), Brief: p.guidance})
+	tk, err := c.CreateTask(ctx, api.TaskCreate{Title: cmp.Or(title, firstWords(brief)), Brief: brief})
 	if err != nil {
 		return err
 	}
 	u := task.UnitOf(task.ID(tk.ID))
 	fmt.Fprintf(e.Out, "captured %s\n", u)
-	p.guidance = ""
+	p.guidance, p.briefFile = "", ""
 	if err := askOn(ctx, e, d, u, p); err != nil {
 		return fmt.Errorf("%w; run it again on the entry with %s", err, retryLine(retryArgs(d, u, p)))
 	}
 	return nil
+}
+
+// capturedBrief is the brief p captures: the file its --brief-file names, else its words.
+func capturedBrief(p intentArgs) (string, error) {
+	if p.briefFile == "" {
+		return p.guidance, nil
+	}
+	if strings.TrimSpace(p.guidance) != "" {
+		return "", fmt.Errorf("%s and a brief in words: give the brief one way", flagBriefFile)
+	}
+	raw, err := os.ReadFile(p.briefFile)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", flagBriefFile, err)
+	}
+	return string(raw), nil
+}
+
+// firstWords is the first non-blank line of brief, the title of a task whose intent declares none.
+func firstWords(brief string) string {
+	for l := range strings.Lines(brief) {
+		if t := strings.TrimSpace(l); t != "" {
+			return t
+		}
+	}
+	return ""
 }
 
 // retryLine is args as a shell line.
@@ -174,6 +207,9 @@ func runIntentOn(ctx context.Context, e *Env, d dintent.Def, u unit.Unit, args [
 func askOn(ctx context.Context, e *Env, d dintent.Def, u unit.Unit, p intentArgs) error {
 	if p.noWait || p.noBrief || beforeSet(d, p.inputs, beforeTakeOver) {
 		return fmt.Errorf("%s, %s and taking over apply to pull requests only", flagNoWait, flagNoBrief)
+	}
+	if p.briefFile != "" {
+		return fmt.Errorf("%s gives a new task its brief, and %s exists", flagBriefFile, u)
 	}
 	c, err := e.daemonClient(ctx)
 	if err != nil {
@@ -243,6 +279,19 @@ func parseIntentArgs(reg *dintent.Registry, d dintent.Def, surface, usage string
 				return p, fmt.Errorf("%s takes no value", name)
 			}
 			p.noWait, p.noBrief = p.noWait || name == flagNoWait, p.noBrief || name == flagNoBrief
+			continue
+		case flagBriefFile:
+			if d.Target.Missing != dintent.TargetCapture {
+				return p, flagError(reg, d, name)
+			}
+			if !hasValue {
+				if i+1 >= len(args) {
+					return p, fmt.Errorf("%s needs a value\n%s", name, usage)
+				}
+				i++
+				value = args[i]
+			}
+			p.briefFile = value
 			continue
 		case flagManager, flagParent:
 			if d.WorkspaceRepo == nil {

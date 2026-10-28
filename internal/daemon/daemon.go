@@ -30,6 +30,7 @@ import (
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
 	dmessage "github.com/wloophq/wloop/internal/domain/message"
+	"github.com/wloophq/wloop/internal/domain/placement"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
@@ -338,6 +339,10 @@ type Deps struct {
 	// routes and serves no TaskView.Gates.
 	Gates      *gates.Service
 	GateReader gates.Reader
+	// RecordWriter keeps the brief a created task carries; nil refuses a create with a brief. Placements
+	// keep where a created task's work runs; nil refuses a create with a placement.
+	RecordWriter RecordWriter
+	Placements   placement.Overrides
 	// Drafts are the outbox's drafts the notifications read; nil: no draft notifies.
 	Drafts Drafts
 	// TasksMe resolves the user's identity over the enabled plugins and sets it on Tasks, saying whether it grew;

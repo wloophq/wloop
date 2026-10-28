@@ -166,11 +166,12 @@ Start new work from a brief.
 {{command}} start [task:<id>] [--repo <repo>] [--manager <name>] [--parent <worktree>] [guidance...]
 ```
 
-Start new work from a brief: in a fresh worktree of a repository, or with no checkout. The target is entry:&lt;id&gt;, or none to capture the brief as a new task; words after it are guidance for the turn.
+Start new work from a brief: in a fresh worktree of a repository, or with no checkout. The target is task:&lt;id&gt;, or none to capture the brief as a new task; words after it are guidance for the turn.
 
 | Flag | Description |
 | --- | --- |
 | `--repo <repo>` | Owner/name of the repository to work in; without it the session has no checkout |
+| `--brief-file <path>` | Read the new task's brief from a file, instead of the words after the flags |
 | `--manager <name>` | The workspace manager that creates the worktree, instead of the configured ones |
 | `--parent <worktree>` | The worktree the new one goes under, where its manager keeps parents; the one the command runs in by default |
 
@@ -178,7 +179,8 @@ Examples:
 
 ```sh
 {{command}} start --repo acme/api add retries to the webhook sender; done when a failed delivery is retried three times
-{{command}} start entry:e-3f9a2c4b5d6e7f80 --repo acme/api
+{{command}} start task:t-3f9a2c4b5d6e7f80 --repo acme/api
+{{command}} start --repo acme/api --brief-file brief.md
 ```
 
 See [Tasks and views](/concepts/tasks/).
@@ -332,17 +334,26 @@ See [What waits for you](/concepts/approval/).
 
 ### task
 
-Make this agent session a run of a task.
+Create a task, or make this agent session a run of one.
 
 ```sh
+{{command}} task new --title <title> [--brief-file <path>] [--prop <name>=<value>]... [--repo <owner/name>]
 {{command}} task attach task:<id>
 ```
 
-attach makes the agent session it runs in, one a workspace manager started, a run of the task: the task's page lists it with its workspace, session and transcript, and what it posts or drafts lands on the task. Its turn owes no record, so the session stops as it would without {{name}}.
+new creates a task in the Inbox and prints it as task:&lt;id&gt;: a title alone captures it. Each property is one tasks.toml declares, parsed by its type, and a value its type refuses creates nothing. attach makes the agent session it runs in, one a workspace manager started, a run of the task: the task's page lists it with its workspace, session and transcript, and what it posts or drafts lands on the task. Its turn owes no record, so the session stops as it would without {{name}}.
+
+| Flag | Description |
+| --- | --- |
+| `--title <title>` | new: the task's title, one short line |
+| `--brief-file <path>` | new: a file whose markdown is the task's brief |
+| `--prop <name>=<value>` | new: a property of the task; repeatable |
+| `--repo <owner/name>` | new: the repository the task's work runs in |
 
 Examples:
 
 ```sh
+{{command}} task new --title "Add retries to the webhook sender" --brief-file brief.md --prop priority=high --repo acme/api
 {{command}} task attach task:t-3f9a2c4b5d6e7f80
 ```
 

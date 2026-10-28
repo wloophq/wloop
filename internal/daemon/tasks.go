@@ -196,32 +196,6 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, v)
 }
 
-func (s *Server) handleCapture(w http.ResponseWriter, r *http.Request) {
-	g, ok := s.tasks(w)
-	if !ok {
-		return
-	}
-	var req api.TaskCreate
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, tasksBodyMax)).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid body: "+err.Error())
-		return
-	}
-	if len(req.Props) > 0 || req.Placement != "" {
-		notImplemented(w, "S1")
-		return
-	}
-	if req.Unit != nil && s.refusePlugin(w, *req.Unit) {
-		return
-	}
-	ctx := r.Context()
-	e, err := g.Capture(ctx, req.Title, req.Brief, req.Unit)
-	if err != nil {
-		writeTasksError(w, err)
-		return
-	}
-	s.writeTask(w, ctx, g, e)
-}
-
 func (s *Server) handleTaskVerb(w http.ResponseWriter, r *http.Request) {
 	var req api.TaskRequest
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, tasksBodyMax)).Decode(&req); err != nil && !errors.Is(err, io.EOF) {

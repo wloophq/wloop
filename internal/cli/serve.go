@@ -298,8 +298,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 		Changes:   e.changes,
 		Snapshot:  db,
 
-		Timeline:    timeline.Merged{Log: db, Holdings: db},
-		TaskRecords: db,
+		Timeline: timeline.Merged{Log: db, Holdings: db},
 
 		Intakes:           db.Intakes(),
 		IntakeBriefs:      intakeBriefs,

@@ -1,6 +1,7 @@
 {
  "type": "object",
  "properties": {
+  "text": {"type": "string", "description": "The brief as a person or an agent wrote it, in markdown: what to do and how to know it is done."},
   "goal": {"type": "string"},
   "context": {"type": "string"},
   "kind": {"type": "string"},

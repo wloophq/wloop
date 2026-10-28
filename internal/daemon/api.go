@@ -78,7 +78,7 @@ func (s *Server) routes() []route {
 		{"POST " + api.PluginRun, s.handlePluginRun},
 		{"GET " + api.ViewsPath, s.handleViews},
 		{"GET " + api.TasksPath, s.handleTasks},
-		{"POST " + api.TasksPath, s.handleCapture},
+		{"POST " + api.TasksPath, s.handleTaskCreate},
 		{"GET " + api.TaskDetail, s.handleTask},
 		{"POST " + api.TaskVerb, s.handleTaskVerb},
 		{"GET " + api.TimelinePath, s.handleTimeline},

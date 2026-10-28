@@ -9,6 +9,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/ingest"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -71,6 +72,11 @@ type Overrides interface {
 	SetOverride(ctx context.Context, u unit.Unit, set, ifMatch map[string]string) (written bool, err error)
 	// Held are the units of provider p the user holds.
 	Held(ctx context.Context, p unit.ProviderID) ([]unit.Unit, error)
+}
+
+// RecordWriter keeps a unit's record of a kind, written by w; a new one replaces the unit's last of that kind.
+type RecordWriter interface {
+	PutRecord(ctx context.Context, u unit.Unit, kind string, w task.Writer, data []byte, at time.Time) error
 }
 
 // Metas keeps the daemon's small values by key.
