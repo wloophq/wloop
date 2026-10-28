@@ -676,6 +676,9 @@ func (c Config) validateWorkflows() error {
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(c.Workflows)) {
+		if n := builtin.RenamedTo(name); n != "" && strings.Contains(name, "-") {
+			return fmt.Errorf("workflows.%s: the workflow was renamed%s", name, expr.DidYouMean(name, []string{n}))
+		}
 		w := c.Workflows[name]
 		if w.OnlyWhen != "" {
 			if err := workflowRule("workflows."+name+".only_when", w.OnlyWhen, false); err != nil {

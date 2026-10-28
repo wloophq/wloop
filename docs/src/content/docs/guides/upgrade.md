@@ -49,7 +49,7 @@ The words for tasks have new names in the profile and the configuration. Each ol
 - the `[gtd]` table of `config.toml` is `[tasks]` (`tasks.stale_waiting_days`, `tasks.areas`, `tasks.contexts`);
 - the facts `entry.*` are `task.*`, `slack.live_entry` is `slack.live_task` and `config.gtd.*` is `config.tasks.*`;
 - the step `entry.verb` is `task.verb`, and the effect `entry.nudged` is `task.nudged`;
-- the workflow `entry-results-ended` is `task-results-ended`: rename an override directory of the old name in your profile;
+- the workflow `entry-results-ended` is `task-results-ended`: rename an override directory of the old name in your profile, and a `[workflows.entry-results-ended]` block of `config.toml`;
 - `profile schema --gtd` is `--tasks`, `--views` or `--gates`.
 
 ## Going back to an earlier release

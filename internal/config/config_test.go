@@ -713,3 +713,14 @@ func TestGtdConfigSectionNamesTasks(t *testing.T) {
 		t.Fatalf("err %v", err)
 	}
 }
+
+func TestAConfigWorkflowsBlockOfARenamedWorkflowNamesItsNewName(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("[workflows.entry-results-ended]\nenabled = false\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := LoadFile(path, tools())
+	if err == nil || !strings.Contains(err.Error(), `workflows.entry-results-ended: `) || !strings.Contains(err.Error(), `did you mean "task-results-ended"?`) {
+		t.Fatalf("err %v", err)
+	}
+}

@@ -45,7 +45,10 @@ func TestNoRenamedNameIsLive(t *testing.T) {
 		}
 	}
 	for p := range Slots {
-		if p != unit.Task && isOld(string(p)) {
+		if unit.Task == "entry" && p == unit.Task {
+			continue
+		}
+		if isOld(string(p)) {
 			t.Errorf("provider %s was renamed and is a provider again", p)
 		}
 	}
