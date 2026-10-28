@@ -21,14 +21,45 @@ type VerbText struct {
 }
 
 type mTasks struct {
-	Verbs map[string]mVerbText `toml:"verbs"`
+	Verbs            map[string]mVerbText `toml:"verbs"`
+	Props            map[string]mProp     `toml:"props"`
+	States           map[string]mState    `toml:"states"`
+	OwedBy           *mOwedBy             `toml:"owed_by"`
+	Chat             *mChat               `toml:"chat"`
+	Areas            []string             `toml:"areas"`
+	Contexts         []string             `toml:"contexts"`
+	StaleWaitingDays *int                 `toml:"stale_waiting_days"`
 }
 
 type mVerbText struct {
-	Label   *string `toml:"label"`
-	Summary *string `toml:"summary"`
-	Input   *string `toml:"input"`
-	Offer   *string `toml:"offer"`
+	Label   *string           `toml:"label"`
+	Summary *string           `toml:"summary"`
+	Input   *string           `toml:"input"`
+	Offer   *string           `toml:"offer"`
+	From    []string          `toml:"from"`
+	To      *string           `toml:"to"`
+	By      map[string]string `toml:"by"`
+	Send    *string           `toml:"send"`
+}
+
+type mProp struct {
+	Type    *string  `toml:"type"`
+	Values  []string `toml:"values"`
+	Writers []string `toml:"writers"`
+	Doc     *string  `toml:"doc"`
+}
+
+type mState struct {
+	Category *string `toml:"category"`
+	Label    *string `toml:"label"`
+}
+
+type mOwedBy struct {
+	Expr *string `toml:"expr"`
+}
+
+type mChat struct {
+	Intent *string `toml:"intent"`
 }
 
 // mergeTasks lays the verbs of file over out.

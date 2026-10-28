@@ -346,7 +346,7 @@ func TestPlanWritesNoteGateOnlyWhenPendingChanges(t *testing.T) {
 		}
 		return got
 	}
-	if c := save(p); c.Topics != port.TopicGate || !slices.Equal(c.Units, []unit.Unit{wfUnit}) {
+	if c := save(p); c.Topics != port.TopicPending || !slices.Equal(c.Units, []unit.Unit{wfUnit}) {
 		t.Errorf("a new pending item noted %+v", c)
 	}
 	if c := save(p, blocked); !c.Empty() {
@@ -354,10 +354,10 @@ func TestPlanWritesNoteGateOnlyWhenPendingChanges(t *testing.T) {
 	}
 	other := p
 	other.Default = workflow.OutcomeWait
-	if c := save(other, blocked); c.Topics != port.TopicGate {
+	if c := save(other, blocked); c.Topics != port.TopicPending {
 		t.Errorf("a pending item whose default changed noted %+v", c)
 	}
-	if c := save(blocked); c.Topics != port.TopicGate || !slices.Equal(c.Units, []unit.Unit{wfUnit}) {
+	if c := save(blocked); c.Topics != port.TopicPending || !slices.Equal(c.Units, []unit.Unit{wfUnit}) {
 		t.Errorf("a dropped pending item noted %+v", c)
 	}
 }
@@ -403,7 +403,7 @@ func TestEngineEventsShareTheSaveTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n != 1 || got.Topics != port.TopicGate|port.TopicLoopEvents {
+	if n != 1 || got.Topics != port.TopicPending|port.TopicLoopEvents {
 		t.Errorf("a save with its event noted %d times %+v, want once with gate and loop events", n, got)
 	}
 

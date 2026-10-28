@@ -30,6 +30,7 @@ var groups = map[builtin.Surface][]group{
 		{"Guidance and brief", []string{"guidance", "brief"}},
 		{"Judgment", []string{"profile", "dims", "also_profile"}},
 		{"What it records", []string{"record"}},
+		{"Gate approval", []string{"gates"}},
 		{"Effects and drafts", []string{"effects", "drafts"}},
 	},
 	builtin.SurfaceWorkflow: {
@@ -37,6 +38,7 @@ var groups = map[builtin.Surface][]group{
 		{"When it is planned", []string{"trigger", "observe", "limits"}},
 		{"Steps", []string{"step"}},
 		{"Run approval", []string{"approval"}},
+		{"Gate approval", []string{"gates"}},
 		{"Drafts", []string{"drafts"}},
 	},
 	builtin.SurfaceConfig: {
@@ -51,6 +53,7 @@ var groups = map[builtin.Surface][]group{
 		{"Slack extraction", []string{"slack.extraction"}},
 		{"Workflow overrides", []string{"workflows"}},
 		{"Workflow draft approval", []string{"workflows.*.drafts"}},
+		{"Workflow gate approval", []string{"workflows.*.gates"}},
 		{"Turns and headless calls", []string{"turns", "headless", "brief", "classify"}},
 		{"Drafts and notifications", []string{"drafts", "notifications"}},
 		{"Units and tasks", []string{"items", "tasks"}},

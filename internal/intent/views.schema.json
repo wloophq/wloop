@@ -3,6 +3,20 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "properties": {
+    "badge": {
+      "additionalProperties": false,
+      "description": "The menu bar's badge.",
+      "properties": {
+        "views": {
+          "description": "The views whose counts the badge adds up.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "review": {
       "additionalProperties": {
         "additionalProperties": false,
@@ -26,8 +40,38 @@
         "additionalProperties": false,
         "description": "A view, by its name.",
         "properties": {
+          "group": {
+            "description": "The fact the view groups by.",
+            "type": "string"
+          },
+          "hide_disabled": {
+            "default": false,
+            "description": "The view hides the tasks of a disabled plugin.",
+            "type": "boolean"
+          },
+          "key": {
+            "description": "The key that jumps to the view, in internal/keys' notation.",
+            "type": "string"
+          },
           "label": {
             "description": "The name people read in the list of views. Required.",
+            "type": "string"
+          },
+          "over": {
+            "default": "tasks",
+            "description": "What the view lists: tasks, or gates.",
+            "enum": [
+              "tasks",
+              "gates"
+            ],
+            "type": "string"
+          },
+          "sort": {
+            "description": "The facts the view sorts by, comma-separated; a leading - sorts one descending.",
+            "type": "string"
+          },
+          "when": {
+            "description": "Which tasks or gates the view lists, over their facts.",
             "type": "string"
           }
         },

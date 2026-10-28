@@ -181,6 +181,21 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `record.require[].state` | string |  | The state. |
 | `record.require[].artifact` | string |  | The artifact it must carry. |
 | `record.require[].fields` | list of strings |  | The outcome fields it must carry. |
+| `record.requires` | string |  | The record kind, of records.toml, a run of the intent owes; a run that ends without it opens the gate missing names. Left out, a run owes no record. |
+| `record.missing` | string |  | The gate, of gates.toml, a run that ends without the record requires names opens. |
+
+### Gate approval
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
+| `gates` | table |  | The gates its runs and drafts open. |
+| `gates.approval` | table |  | The approval of its gates; wait when absent. |
+| `gates.approval.mode` | one of `send`, `delay`, `wait`, `dry_run`, `run` |  | The mode when no rule holds. |
+| `gates.approval.window` | duration |  | With mode delay only: how long a person has to stop the gate's consequence. |
+| `gates.approval.rule[]` | table |  | A rule; the first whose when holds gives the mode. |
+| `gates.approval.rule[].when` | predicate |  | When the rule applies to a gate. |
+| `gates.approval.rule[].mode` | one of `send`, `delay`, `wait`, `dry_run`, `run` |  | The rule's mode. |
+| `gates.approval.rule[].window` | duration |  | With mode delay only: how long a person has to stop the gate's consequence. |
 
 ### Effects and drafts
 

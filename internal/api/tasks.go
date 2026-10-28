@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/url"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 )
 
 // The tasks' routes: ViewsPath serves the ViewsCatalog, TasksPath lists a view (query parameters view, area,
-// context as "a,b" and since, a Since's String) and takes a capture, TaskVerb runs a verb, CountersPath
+// context as "a,b" and since, a Since's String) and takes a TaskCreate, TaskVerb runs a verb, CountersPath
 // serves the counters of the query parameter area (narrowed to the tasks holding each CountersTerm), DigestPath the daily digest of the query parameter day
 // (YYYY-MM-DD).
 const (
@@ -20,6 +21,24 @@ const (
 	TaskVerb     = TaskDetail + "/{verb}"
 	CountersPath = "/api/counters"
 	DigestPath   = "/api/digest"
+)
+
+// A task's timeline, runs and chat, and the gates and runs as resources: TimelinePath serves a task's
+// []TimelineEvent (query parameters kinds as "a,b", before as RFC 3339 and limit), RunsPath its []RunView,
+// ChatPath takes a ChatRequest, AttachPath makes the caller's session, from SessionHeader, a run of the task.
+// GatesPath lists the open []GateView, GatePath resolves gate id with intent (a TaskRequest's args carry an
+// answer). RunOpen opens a run's workspace in its manager, RunEnter enters its session, RunTranscript pages
+// its transcript (query parameters from and limit).
+const (
+	TimelinePath  = TaskDetail + "/timeline"
+	RunsPath      = TaskDetail + "/runs"
+	ChatPath      = TaskDetail + "/chat"
+	AttachPath    = TaskDetail + "/attach"
+	GatesPath     = "/api/gates"
+	GatePath      = GatesPath + "/{id}/{intent}"
+	RunOpen       = "/api/runs/{seq}/open"
+	RunEnter      = "/api/runs/{seq}/enter"
+	RunTranscript = "/api/runs/{seq}/transcript"
 )
 
 // TaskPath is the path of task id, followed by the segments of rest.
@@ -55,6 +74,7 @@ type TaskView struct {
 	ID               string       `json:"id"`
 	Kind             string       `json:"kind"`
 	State            string       `json:"state"`
+	Category         string       `json:"category,omitempty"`
 	Title            string       `json:"title"`
 	Notes            string       `json:"notes,omitempty"`
 	Focus            bool         `json:"focus"`
@@ -90,6 +110,92 @@ type TaskView struct {
 	ReviewEvery     string    `json:"review_every,omitempty"` // a Go duration
 	ReviewedAt      time.Time `json:"reviewed_at,omitzero"`
 	ReviewDue       bool      `json:"review_due,omitempty"`
+
+	// Props are the task's properties by name, each in its type's JSON: a string, a number, an RFC 3339 time,
+	// a Go duration string, a list of strings, or a list of people for an actor.
+	Props map[string]json.RawMessage `json:"props,omitempty"`
+	// OwedBy is who owes the task's next step, as the profile's owed_by says: "me" or a person's key.
+	OwedBy string      `json:"owed_by,omitempty"`
+	Asks   []AskView   `json:"asks,omitempty"`
+	Gates  []GateView  `json:"gates,omitempty"` // the open ones
+	Runs   []RunView   `json:"runs,omitempty"`  // detail only
+	Brief  *RecordView `json:"brief,omitempty"`
+	// Parent is the parent task's id; Children are its children's, in sibling order.
+	Parent   string   `json:"parent,omitempty"`
+	Children []string `json:"children,omitempty"`
+}
+
+// AskView is an item a task serves, as its asker put it, with the source messages it quotes.
+type AskView struct {
+	Item      string   `json:"item"`
+	Summary   string   `json:"summary"`
+	Asker     string   `json:"asker,omitempty"`
+	Permalink string   `json:"permalink,omitempty"`
+	Quotes    []string `json:"quotes,omitempty"`
+}
+
+// GateView is a gate as clients offer it: Text its words from gates.toml, Intents what a person may resolve it
+// with, in order, Subject its subject as its kind serves it.
+type GateView struct {
+	ID       int64           `json:"id"`
+	Kind     string          `json:"kind"`
+	Name     string          `json:"name,omitempty"`
+	Status   string          `json:"status"`
+	Text     string          `json:"text,omitempty"`
+	Intents  []IntentView    `json:"intents"`
+	Deadline time.Time       `json:"deadline,omitzero"`
+	Subject  json.RawMessage `json:"subject,omitempty"`
+}
+
+type IntentView struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+// RunView is a run of a task: the turn Seq of Intent in State, where it ran, its session and that session's
+// state, the command that resumes it, and the run actions it offers (open, enter, transcript).
+type RunView struct {
+	Seq          int64    `json:"seq"`
+	Intent       string   `json:"intent"`
+	State        string   `json:"state"`
+	Manager      string   `json:"manager,omitempty"`
+	Workspace    string   `json:"workspace,omitempty"`
+	Worktree     string   `json:"worktree,omitempty"`
+	Session      string   `json:"session,omitempty"`
+	SessionState string   `json:"session_state,omitempty"`
+	Resume       string   `json:"resume,omitempty"`
+	Actions      []string `json:"actions,omitempty"`
+}
+
+// RecordView is a record of a declared kind, such as a brief, with its data as its schema holds it.
+type RecordView struct {
+	Kind string          `json:"kind"`
+	At   time.Time       `json:"at"`
+	Data json.RawMessage `json:"data"`
+}
+
+// TimelineEvent is one event of a task's timeline: Unit is the unit it happened on, "" for the task itself.
+type TimelineEvent struct {
+	Kind  string          `json:"kind"`
+	Sub   string          `json:"sub,omitempty"`
+	Actor string          `json:"actor,omitempty"`
+	At    time.Time       `json:"at"`
+	Unit  string          `json:"unit,omitempty"`
+	Data  json.RawMessage `json:"data,omitempty"`
+}
+
+// ChatRequest is a message to a task's agent; Intent picks the intent of the turn it starts when no session
+// is live, the profile's chat intent when "".
+type ChatRequest struct {
+	Text   string `json:"text"`
+	Intent string `json:"intent,omitempty"`
+}
+
+// WakeView is a task's wake: until a time, or When, a condition, holds; Return is the state it goes back to.
+type WakeView struct {
+	Until  time.Time `json:"until,omitzero"`
+	When   string    `json:"when,omitempty"`
+	Return string    `json:"return,omitempty"`
 }
 
 type WaitingView struct {
@@ -139,10 +245,14 @@ type TasksPage struct {
 	Counters Counters   `json:"counters"`
 }
 
-type CaptureRequest struct {
-	Title string     `json:"title"`
-	Notes string     `json:"notes,omitempty"`
-	Unit  *unit.Unit `json:"unit,omitempty"`
+// TaskCreate creates a task: a Title alone captures it. Brief is its brief's markdown, Props its properties
+// as their text, Placement a hint of where its work runs, such as a repository, and Unit the unit it is about.
+type TaskCreate struct {
+	Title     string            `json:"title"`
+	Brief     string            `json:"brief,omitempty"`
+	Props     map[string]string `json:"props,omitempty"`
+	Placement string            `json:"placement,omitempty"`
+	Unit      *unit.Unit        `json:"unit,omitempty"`
 }
 
 // TaskRequest args: waiting {on, resurface}; schedule {until (RFC3339 or YYYY-MM-DD), on_activity "true"};

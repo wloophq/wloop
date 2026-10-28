@@ -144,6 +144,8 @@ var configGrammar = slices.Concat(
 	},
 	cfgApproval("workflows.*.approval", RunModes, "the workflow's runs"),
 	cfgApproval("workflows.*.drafts.approval", DraftModes, "the workflow's drafts"),
+	[]Key{cfgKey("workflows.*.gates", KindTable, "", "The gates the workflow opens.")},
+	cfgApproval("workflows.*.gates.approval", GateModes, "the workflow's gates"),
 	[]Key{
 		cfgKey("intents", KindMap, "", "Each intent's settings, by intent name."),
 		cfgKey("intents.*", KindTable, "", "One intent's settings."),
@@ -215,6 +217,27 @@ var configGrammar = slices.Concat(
 		cfgKey("slack.turns", KindTable, "", "What a turn on a Slack unit reads."),
 		cfgKey("slack.turns.max_chars", KindInt, "", "The characters of the unit's messages rendered into the instructions; 0 is 30000."),
 	},
-	cfgPluginDrafts("github"),
-	cfgPluginDrafts("slack"),
+	cfgPluginApprovals("github", "slack"),
 )
+
+// cfgPluginApprovals are the drafts and gates keys of each plugin of ids.
+func cfgPluginApprovals(ids ...string) []Key {
+	var out []Key
+	for _, id := range ids {
+		out = append(out, cfgPluginDrafts(id)...)
+	}
+	for _, id := range ids {
+		out = append(out, cfgPluginGates(id)...)
+	}
+	return out
+}
+
+// cfgPluginGates are the gates keys of plugin id.
+func cfgPluginGates(id string) []Key {
+	return []Key{
+		cfgKey(id+".gates", KindTable, "", "The gates the plugin's own rules open."),
+		cfgKey(id+".gates.approval", KindTable, "", "Their approval; left out, each waits for you."),
+		cfgEnum(id+".gates.approval.mode", GateModes, "", "The approval mode."),
+		cfgKey(id+".gates.approval.window", KindDur, "", "How long a delay waits before the gate's consequence; only with mode delay."),
+	}
+}

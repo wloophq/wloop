@@ -235,16 +235,33 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task.unit_provider` | string | The provider of task.unit; empty for a task with none. |
 | `task.units` | list | The task's units as provider:key, in order: the unit it was captured or derived on, then those attached to it in attach order, then any only its items name. The task itself is not one of them. |
 | `task.unit_providers` | list | The providers of task.units, each once, in order. |
-| `task.units_ended` | bool | The task has a unit, and every one of task.units has ended as its plugin says (pr.ended, slack.ended); a unit of a plugin that says nothing never ends. |
+| `task.link_ended` | bool | The task has a unit, and every one of task.units has ended as its plugin says (pr.ended, slack.ended); a unit of a plugin that says nothing never ends. |
 | `task.turns` | int | Turns run on the task itself, such as a start; turns on its units are not counted. |
 | `task.captured_by_user` | bool | The user captured the task: origin user and kind capture. False for a task derived from a unit's items, such as one from a Slack thread, or opened by another service. |
-| `task.unit_started_by_me` | bool | The viewer started task.unit, from the facts the tasks receive. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `task.unit_closure_posted` | bool | A closure was posted on task.unit, from the facts the tasks receive. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.link_started_by_me` | bool | The viewer started task.unit, from the facts the tasks receive. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.link_closure_posted` | bool | A closure was posted on task.unit, from the facts the tasks receive. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `task.items_open` | int | Open items of the task's units. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `task.items_resolved` | int | Resolved items of the task's units. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `task.items_owed` | int | Open items of the task's units that the task holds. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `task.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the task, withdrawn ones included; zero when none. |
 | `task.fingerprint` | string | The task's id, state and update time. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.category` | string | The category of the task's state: inbox, ready, active, waiting, deferred, done or dropped. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.owed_by` | string | Who owes the task's next step, as tasks.toml's owed_by says: me, a person's key, or empty when nobody does. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.owed_since` | timestamp | Since when task.owed_by has owed the next step; zero when nobody does. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.since_movement` | duration | Time since the task, or a unit linked to it, last moved: a state change, a source event, a run. |
+| `task.check_on` | timestamp | When to check on the task, its check_on property; zero when unset. |
+| `task.gates_open` | int | The task's open gates. |
+| `task.runs_live` | int | The task's runs whose session is live. |
+| `task.wake_until` | timestamp | When the task's wake wakes it; zero when it has none, or one that waits on events or a condition only. |
+| `task.wake_when` | string | The condition the task's wake waits on; empty when none. |
+| `task.repo` | string | owner/repo of the task's work: its placement, else its pull request's; empty when unknown. |
+| `task.sequential_next` | bool | The task is the first open child of a sequential parent. |
+| `task.review_due` | bool | The task is a parent whose review is due. |
+| `task.children_ready` | bool | The task has a child in the ready category. |
+| `task.ask_age` | duration | The age of the task's oldest unanswered ask; zero when none is. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.promised` | timestamp | The date the user promised the task by, its promised property; zero when unset. |
+| `task.extraction_lag` | duration | How long the oldest message of a unit linked to the task has waited to be extracted; zero when none waits. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.link_owes` | list | The people the task's links owe a step to, as the plugins report them, each once. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 
 ### Slack conversations (`slack.*`)
 
@@ -281,6 +298,15 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `draft.items_owed` | int | Items of the draft still open and held by its person, or unowned for a draft of no person. |
 | `draft.items_assigned` | int | Items of the draft that have an owner, someone waited on, or are no longer open. |
 | `draft.unit_open` | bool | The draft's unit still exists: its task is neither done nor in the trash, or its unit is stored. |
+
+### Gates (`gate.*`)
+
+| `gate` fact | Type | Meaning |
+|---|---|---|
+| `gate.kind` | string | The gate's kind: draft, plan, question, post, proposal, trust or step. |
+| `gate.name` | string | The gate's name in gates.toml; empty for a gate of no profile name. |
+| `gate.status` | string | The gate's status: open, approved, rejected, answered, dismissed or superseded. |
+| `gate.delivery` | string | A draft gate's delivery state, such as sending or failed; empty for any other gate. |
 
 ### Triggers (`trigger.*`)
 
@@ -335,6 +361,8 @@ The steps a `[[step]]` may name with `use`. `{{command}} workflows steps` prints
 | `classify` | any | A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). Event triggers only, cached by fingerprint, under `classify.per_day`. |
 | `notify.self` | any | A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts "pr.slug"}}`, none once the unit is gone). |
 | `task.verb` | task | Runs a verb on the task: `verb` (`next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done` or `dismiss`), with `until` and `on_activity` for schedule, `on` and `resurface` for waiting, and `set` for context and area. The plan blocks it while the task's state refuses the verb, and `done` and `dismiss` on a task derived from a unit's items, which closes when they resolve. It records no `verb_<verb>` event, which only a person's verb records, so a workflow never triggers another through it. |
+| `gate.open` | any | Opens the gate `name` of gates.toml on the unit, a decision that waits for you with the intents gates.toml gives it. |
+| `task.set` | task | Sets the task's property `prop` of tasks.toml to `value`, written by the workflow; a property the workflow may not write is refused. |
 
 ## Draft effects
 

@@ -3,11 +3,149 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "properties": {
+    "areas": {
+      "description": "The areas a task may be in, the values of the area property.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "chat": {
+      "additionalProperties": false,
+      "description": "The chat on a task.",
+      "properties": {
+        "intent": {
+          "description": "The intent of the turn a message starts on a task with no live session.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "contexts": {
+      "description": "The contexts the menu offers; a task may hold others.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "owed_by": {
+      "additionalProperties": false,
+      "description": "Who owes a task's next step.",
+      "properties": {
+        "expr": {
+          "description": "An expression over the task's facts whose value, me or a person's key, is task.owed_by.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "props": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "A property, by its name.",
+        "properties": {
+          "doc": {
+            "description": "What the property holds, for the facts' reference and the agents.",
+            "type": "string"
+          },
+          "type": {
+            "description": "The property's type. Required.",
+            "enum": [
+              "string",
+              "string[]",
+              "int",
+              "enum",
+              "date",
+              "duration",
+              "actor",
+              "actor[]"
+            ],
+            "type": "string"
+          },
+          "values": {
+            "description": "An enum's values, in order.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "writers": {
+            "description": "Who may write the property; one an agent or a plugin may write is untrusted, so no approval rule reads it.",
+            "items": {
+              "enum": [
+                "person",
+                "workflow",
+                "agent",
+                "plugin"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object"
+      },
+      "description": "The task properties, by name; each is the fact task.prop.<name>.",
+      "type": "object"
+    },
+    "stale_waiting_days": {
+      "description": "Working days a task waits before it is stale.",
+      "type": "integer"
+    },
+    "states": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "A state, by its name.",
+        "properties": {
+          "category": {
+            "description": "The state's category, which is all Go reads of it. Required.",
+            "enum": [
+              "inbox",
+              "ready",
+              "active",
+              "waiting",
+              "deferred",
+              "done",
+              "dropped"
+            ],
+            "type": "string"
+          },
+          "label": {
+            "description": "The name people read.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category"
+        ],
+        "type": "object"
+      },
+      "description": "The states a task takes, by name, in the order clients list them.",
+      "type": "object"
+    },
     "verbs": {
       "additionalProperties": {
         "additionalProperties": false,
         "description": "A verb, by its name.",
         "properties": {
+          "by": {
+            "additionalProperties": {
+              "description": "A predicate over the task's facts that lets the actor run the verb where it holds, or \"gate\", which opens a proposal gate a person approves.",
+              "type": "string"
+            },
+            "description": "Who may run the verb, by actor (person, workflow, agent, plugin); an actor left out may not.",
+            "type": "object"
+          },
+          "from": {
+            "description": "The states the verb moves a task from; every state when absent.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "input": {
             "description": "The question a verb that asks for a value puts first (waiting, schedule, project, context, area, delegate, reply); required for those.",
             "type": "string"
@@ -21,8 +159,21 @@
             "description": "When a task offers the verb, over the task's own facts (task.id, task.kind, task.state, task.muted, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run.",
             "type": "string"
           },
+          "send": {
+            "default": "draft",
+            "description": "With reply: now sends the reply at once, draft proposes it in the Outbox.",
+            "enum": [
+              "now",
+              "draft"
+            ],
+            "type": "string"
+          },
           "summary": {
             "description": "One line, what pressing it does: its tooltip. Required.",
+            "type": "string"
+          },
+          "to": {
+            "description": "The state the verb moves a task to; absent, the verb moves none.",
             "type": "string"
           }
         },
@@ -36,6 +187,6 @@
       "type": "object"
     }
   },
-  "title": "Task verbs (tasks.toml)",
+  "title": "Tasks: properties, states and verbs (tasks.toml)",
   "type": "object"
 }

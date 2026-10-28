@@ -1,0 +1,48 @@
+{
+  "$id": "https://github.com/wloophq/wloop/records.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "records": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "A record kind, by its name, such as brief, report or decision.",
+        "properties": {
+          "projects": {
+            "additionalProperties": {
+              "description": "The property, of tasks.toml, the field sets.",
+              "type": "string"
+            },
+            "description": "The record's fields that set a property of its task, by field.",
+            "type": "object"
+          },
+          "schema": {
+            "description": "The JSON schema a record of the kind follows, a file under records/. Required.",
+            "type": "string"
+          },
+          "writers": {
+            "description": "Who may write a record of the kind; a record an agent or a plugin wrote is untrusted.",
+            "items": {
+              "enum": [
+                "person",
+                "workflow",
+                "agent",
+                "plugin"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "schema"
+        ],
+        "type": "object"
+      },
+      "description": "The record kinds a run, a person or a plugin writes on a task, by kind.",
+      "type": "object"
+    }
+  },
+  "title": "Record kinds (records.toml)",
+  "type": "object"
+}

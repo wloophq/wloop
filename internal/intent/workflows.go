@@ -42,6 +42,7 @@ type wManifest struct {
 	Marks    map[string]string `toml:"marks"`
 	Approval *mApproval        `toml:"approval"`
 	Drafts   *wDrafts          `toml:"drafts"`
+	Gates    *mGates           `toml:"gates"`
 }
 
 // wDrafts is the [drafts] table: the approval of the drafts the
@@ -59,6 +60,8 @@ type wWithdraw struct {
 type wTrigger struct {
 	On       []string `toml:"on"`
 	Schedule *string  `toml:"schedule"`
+	Actors   []string `toml:"actors"`
+	Depth    *int     `toml:"depth"`
 }
 
 type wLimits struct {

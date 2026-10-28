@@ -43,7 +43,7 @@ var intentGroups = []group{
 // builtin.WorkflowSlots.
 var workflowGroups = map[string]string{
 	"pr": "Pull requests", "session": "Sessions", "workspace": "Workspaces", "task": "Tasks", "slack": "Slack conversations",
-	"brief": "Briefs", "draft": "Drafts", "trigger": "Triggers", "config": "The configuration",
+	"brief": "Briefs", "draft": "Drafts", "gate": "Gates", "trigger": "Triggers", "config": "The configuration",
 }
 
 func intentFacts() []builtin.Fact {

@@ -30,6 +30,20 @@ type Store interface {
 	Apply(ctx context.Context, cs []task.Change, evs ...port.Event) error
 }
 
+// PropStore keeps the tasks' properties. SetProp replaces the property's
+// value and records its writer; ErrNoTask when the task does not exist. It
+// checks no type and no writer: the caller holds the profile that declares
+// them. PropsOf are a task's properties, empty for one with none.
+type PropStore interface {
+	SetProp(ctx context.Context, id task.ID, name string, v task.Value, w task.Writer) error
+	PropsOf(ctx context.Context, id task.ID) (task.Props, error)
+}
+
+// ViewEval says whether task t is in the profile's view; injected, so the
+// core pages over a view without importing the package that evaluates the
+// profile's predicates.
+type ViewEval func(view string, t task.Task) (bool, error)
+
 type Since struct {
 	Epoch string
 	Rev   uint64

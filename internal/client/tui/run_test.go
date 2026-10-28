@@ -171,7 +171,7 @@ func (f *fakeDaemon) TaskDrafts(_ context.Context, task string) ([]api.Draft, er
 	return out, nil
 }
 
-func (f *fakeDaemon) Capture(_ context.Context, req api.CaptureRequest) (api.TaskView, error) {
+func (f *fakeDaemon) Capture(_ context.Context, req api.TaskCreate) (api.TaskView, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.captures = append(f.captures, req.Title)

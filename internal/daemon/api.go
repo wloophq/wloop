@@ -79,6 +79,15 @@ func (s *Server) routes() []route {
 		{"POST " + api.TasksPath, s.handleCapture},
 		{"GET " + api.TaskDetail, s.handleTask},
 		{"POST " + api.TaskVerb, s.handleTaskVerb},
+		{"GET " + api.TimelinePath, owedBy("T1")},
+		{"GET " + api.RunsPath, owedBy("U1")},
+		{"POST " + api.ChatPath, owedBy("U2")},
+		{"POST " + api.AttachPath, owedBy("U1")},
+		{"GET " + api.GatesPath, owedBy("G2")},
+		{"POST " + api.GatePath, owedBy("G2")},
+		{"POST " + api.RunOpen, owedBy("U1")},
+		{"POST " + api.RunEnter, owedBy("U1")},
+		{"GET " + api.RunTranscript, owedBy("U1")},
 		{"GET " + api.CountersPath, s.handleCounters},
 		{"GET " + api.Drafts, s.handleDrafts},
 		{"POST " + api.Drafts, s.handleDraftCreate},
@@ -141,6 +150,15 @@ func writeJSON(w http.ResponseWriter, v any) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write(append(body, '\n'))
+}
+
+// notImplemented answers 501 for a route of the task model's contract that task owes.
+func notImplemented(w http.ResponseWriter, task string) {
+	writeError(w, http.StatusNotImplemented, "not implemented: "+task)
+}
+
+func owedBy(task string) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) { notImplemented(w, task) }
 }
 
 func writeError(w http.ResponseWriter, code int, msg string) {

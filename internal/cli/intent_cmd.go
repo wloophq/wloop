@@ -117,7 +117,7 @@ func runCapturing(ctx context.Context, e *Env, d dintent.Def, args []string) err
 	if err != nil {
 		return err
 	}
-	tk, err := c.Capture(ctx, api.CaptureRequest{Title: cmp.Or(title, p.guidance), Notes: p.guidance})
+	tk, err := c.Capture(ctx, api.TaskCreate{Title: cmp.Or(title, p.guidance), Brief: p.guidance})
 	if err != nil {
 		return err
 	}

@@ -95,7 +95,7 @@ when = 'draft.delivery == "reaction"'
 mode = "send"
 ```
 
-A rule never reads a fact the [facts](/reference/facts/) page marks **Untrusted**, such as `task.unit_started_by_me`, which the extraction reads from the thread's text. The config's block overlays the workflow's `[drafts.approval]` the same way, a `rule` list alone keeping its mode; on a workflow that has none, it overlays the block of the intent whose turns the workflow starts, and `wait` for the drafts the workflow proposes itself. One that does not merge, such as a `window` over a mode other than `delay`, holds every draft of the workflow for you, and `{{command}} doctor` names it.
+A rule never reads a fact the [facts](/reference/facts/) page marks **Untrusted**, such as `task.link_started_by_me`, which the extraction reads from the thread's text. The config's block overlays the workflow's `[drafts.approval]` the same way, a `rule` list alone keeping its mode; on a workflow that has none, it overlays the block of the intent whose turns the workflow starts, and `wait` for the drafts the workflow proposes itself. One that does not merge, such as a `window` over a mode other than `delay`, holds every draft of the workflow for you, and `{{command}} doctor` names it.
 
 A workflow's `observe` and a draft's `dry_run` mode differ: `observe = true` plans the workflow and proposes nothing, while `drafts.approval.mode = "dry_run"` proposes each draft and stores it as what would have been sent, without sending it.
 

@@ -151,6 +151,8 @@ var intentGrammar = []Key{
 	{Path: "record.require[].state", In: SurfaceIntent, Kind: KindText, Doc: "The state."},
 	{Path: "record.require[].artifact", In: SurfaceIntent, Kind: KindText, Doc: "The artifact it must carry."},
 	{Path: "record.require[].fields", In: SurfaceIntent, Kind: KindList, Elem: KindText, Doc: "The outcome fields it must carry."},
+	{Path: "record.requires", In: SurfaceIntent, Kind: KindText, Doc: "The record kind, of records.toml, a run of the intent owes; a run that ends without it opens the gate missing names. Left out, a run owes no record."},
+	{Path: "record.missing", In: SurfaceIntent, Kind: KindText, Doc: "The gate, of gates.toml, a run that ends without the record requires names opens."},
 	{Path: "builds", In: SurfaceIntent, Kind: KindEnum, Values: named(Builds...), Doc: "A builder, never a turn."},
 	{Path: "prompt", In: SurfaceIntent, Kind: KindFile, Doc: "A builder's prompt file, through the profile layers."},
 	{Path: "schema", In: SurfaceIntent, Kind: KindFile, Doc: "A builder's extra fields' schema file, beside the manifest."},

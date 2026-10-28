@@ -225,6 +225,35 @@
           "description": "A follow-up review recreates the review workspace the user deleted; off, the sweep only logs it.",
           "type": "boolean"
         },
+        "gates": {
+          "additionalProperties": false,
+          "description": "The gates the plugin's own rules open.",
+          "properties": {
+            "approval": {
+              "additionalProperties": false,
+              "description": "Their approval; left out, each waits for you.",
+              "properties": {
+                "mode": {
+                  "description": "The approval mode.",
+                  "enum": [
+                    "send",
+                    "delay",
+                    "wait",
+                    "dry_run",
+                    "run"
+                  ],
+                  "type": "string"
+                },
+                "window": {
+                  "description": "How long a delay waits before the gate's consequence; only with mode delay.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
         "ignore_checks": {
           "description": "Checks whose failure never starts an address round.",
           "items": {
@@ -642,6 +671,35 @@
           },
           "type": "object"
         },
+        "gates": {
+          "additionalProperties": false,
+          "description": "The gates the plugin's own rules open.",
+          "properties": {
+            "approval": {
+              "additionalProperties": false,
+              "description": "Their approval; left out, each waits for you.",
+              "properties": {
+                "mode": {
+                  "description": "The approval mode.",
+                  "enum": [
+                    "send",
+                    "delay",
+                    "wait",
+                    "dry_run",
+                    "run"
+                  ],
+                  "type": "string"
+                },
+                "window": {
+                  "description": "How long a delay waits before the gate's consequence; only with mode delay.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
         "ingest": {
           "additionalProperties": false,
           "description": "What the Slack plugin admits and how it listens.",
@@ -902,6 +960,64 @@
           "enabled": {
             "description": "Switches the workflow; left out, it is on.",
             "type": "boolean"
+          },
+          "gates": {
+            "additionalProperties": false,
+            "description": "The gates the workflow opens.",
+            "properties": {
+              "approval": {
+                "additionalProperties": false,
+                "description": "The approval of the workflow's gates, over the manifest's field by field.",
+                "properties": {
+                  "mode": {
+                    "description": "The mode when no rule matches; left out, the manifest's.",
+                    "enum": [
+                      "send",
+                      "delay",
+                      "wait",
+                      "dry_run",
+                      "run"
+                    ],
+                    "type": "string"
+                  },
+                  "rule": {
+                    "description": "Rules tried in order before the mode, the first match wins; set, they replace the manifest's, and [] clears them.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "mode": {
+                          "description": "The rule's mode.",
+                          "enum": [
+                            "send",
+                            "delay",
+                            "wait",
+                            "dry_run",
+                            "run"
+                          ],
+                          "type": "string"
+                        },
+                        "when": {
+                          "description": "When the rule applies.",
+                          "type": "string"
+                        },
+                        "window": {
+                          "description": "The rule's delay; only with mode delay.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "window": {
+                    "description": "How long a delay waits before it goes; only with mode delay.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
           },
           "observe": {
             "description": "Plans the workflow's items pending, for you to run; left out, the manifest's.",

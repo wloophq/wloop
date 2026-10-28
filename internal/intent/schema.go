@@ -37,6 +37,11 @@ var ViewsSchema []byte
 //go:embed gates.schema.json
 var GatesSchema []byte
 
+// RecordsSchema is the JSON Schema of records.toml, for editors.
+//
+//go:embed records.schema.json
+var RecordsSchema []byte
+
 // KeysSchema is the JSON Schema of keys.toml, for editors.
 //
 //go:embed keys.schema.json

@@ -158,6 +158,29 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `record.require[].state` (string): The state.
 - `record.require[].artifact` (string): The artifact it must carry.
 - `record.require[].fields` (list of strings): The outcome fields it must carry.
+- `record.requires` (string): The record kind, of records.toml, a run of the intent owes; a run that ends without it opens the gate missing names. Left out, a run owes no record.
+- `record.missing` (string): The gate, of gates.toml, a run that ends without the record requires names opens.
+
+### Gate approval
+
+- `gates` (table): The gates its runs and drafts open.
+- `gates.approval` (table): The approval of its gates; wait when absent.
+- `gates.approval.mode` (one of `send`, `delay`, `wait`, `dry_run`, `run`): The mode when no rule holds.
+  - `send`: Posts at once.
+  - `delay`: Posts when the window ends unless a person stops it.
+  - `wait`: Waits for a person.
+  - `dry_run`: Stores the draft and never sends it; nobody can release it.
+  - `run`: Runs at once.
+- `gates.approval.window` (duration): With mode delay only: how long a person has to stop the gate's consequence.
+- `gates.approval.rule[]` (table): A rule; the first whose when holds gives the mode.
+- `gates.approval.rule[].when` (predicate): When the rule applies to a gate.
+- `gates.approval.rule[].mode` (one of `send`, `delay`, `wait`, `dry_run`, `run`): The rule's mode.
+  - `send`: Posts at once.
+  - `delay`: Posts when the window ends unless a person stops it.
+  - `wait`: Waits for a person.
+  - `dry_run`: Stores the draft and never sends it; nobody can release it.
+  - `run`: Runs at once.
+- `gates.approval.rule[].window` (duration): With mode delay only: how long a person has to stop the gate's consequence.
 
 ### Effects and drafts
 
@@ -189,7 +212,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `<name>.input.label` (string): The input's name.
 - `<name>.input.help` (string): What to write, shown in the empty input.
 
-## Task verbs (`tasks.toml`)
+## Tasks: properties, states and verbs (`tasks.toml`)
 
 - `verbs` (table): The verbs a task offers, by verb.
 - `verbs.<name>` (table): A verb, by its name.
@@ -197,18 +220,71 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `verbs.<name>.summary` (string): One line, what pressing it does: its tooltip. Required.
 - `verbs.<name>.offer` (predicate, default `true`): When a task offers the verb, over the task's own facts (task.id, task.kind, task.state, task.muted, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run.
 - `verbs.<name>.input` (string): The question a verb that asks for a value puts first (waiting, schedule, project, context, area, delegate, reply); required for those.
+- `verbs.<name>.from` (list of strings): The states the verb moves a task from; every state when absent.
+- `verbs.<name>.to` (string): The state the verb moves a task to; absent, the verb moves none.
+- `verbs.<name>.by` (table by name): Who may run the verb, by actor (person, workflow, agent, plugin); an actor left out may not.
+- `verbs.<name>.by.<name>` (string): A predicate over the task's facts that lets the actor run the verb where it holds, or "gate", which opens a proposal gate a person approves.
+- `verbs.<name>.send` (one of `now`, `draft`, default `draft`): With reply: now sends the reply at once, draft proposes it in the Outbox.
+- `props` (table by name): The task properties, by name; each is the fact task.prop.&lt;name&gt;.
+- `props.<name>` (table): A property, by its name.
+- `props.<name>.type` (one of `string`, `string[]`, `int`, `enum`, `date`, `duration`, `actor`, `actor[]`): The property's type. Required.
+- `props.<name>.values` (list of strings): An enum's values, in order.
+- `props.<name>.writers` (list of `person`, `workflow`, `agent`, `plugin`): Who may write the property; one an agent or a plugin may write is untrusted, so no approval rule reads it.
+  - `person`: A person, through a client.
+  - `workflow`: A profile workflow's step.
+  - `agent`: An agent's turn; untrusted.
+  - `plugin`: A source plugin; untrusted.
+- `props.<name>.doc` (string): What the property holds, for the facts' reference and the agents.
+- `states` (table by name): The states a task takes, by name, in the order clients list them.
+- `states.<name>` (table): A state, by its name.
+- `states.<name>.category` (one of `inbox`, `ready`, `active`, `waiting`, `deferred`, `done`, `dropped`): The state's category, which is all Go reads of it. Required.
+- `states.<name>.label` (string): The name people read.
+- `owed_by` (table): Who owes a task's next step.
+- `owed_by.expr` (string): An expression over the task's facts whose value, me or a person's key, is task.owed_by.
+- `chat` (table): The chat on a task.
+- `chat.intent` (string): The intent of the turn a message starts on a task with no live session.
+- `areas` (list of strings): The areas a task may be in, the values of the area property.
+- `contexts` (list of strings): The contexts the menu offers; a task may hold others.
+- `stale_waiting_days` (integer): Working days a task waits before it is stale.
 
 ## Views and the review (`views.toml`)
 
 - `views` (table): The lists of tasks, by view.
 - `views.<name>` (table): A view, by its name.
 - `views.<name>.label` (string): The name people read in the list of views. Required.
+- `views.<name>.over` (one of `tasks`, `gates`, default `tasks`): What the view lists: tasks, or gates.
+- `views.<name>.when` (predicate): Which tasks or gates the view lists, over their facts.
+- `views.<name>.group` (string): The fact the view groups by.
+- `views.<name>.sort` (string): The facts the view sorts by, comma-separated; a leading - sorts one descending.
+- `views.<name>.key` (string): The key that jumps to the view, in internal/keys' notation.
+- `views.<name>.hide_disabled` (bool, default `false`): The view hides the tasks of a disabled plugin.
+- `badge` (table): The menu bar's badge.
+- `badge.views` (list of strings): The views whose counts the badge adds up.
 - `review` (table): The review's steps, by step.
 - `review.<name>` (table): A step of the review: inbox, outbox, waiting, projects, someday or focus.
 - `review.<name>.label` (string): What the step asks of you, as the review lists it. Required.
 
 ## Gates (`gates.toml`)
 
+- `gates` (table by name): The gates a profile names, by name.
+- `gates.<name>` (table): A gate, by its name: the one a gate.open step, an intent's record.missing or a verb's by.&lt;actor&gt; opens.
+- `gates.<name>.label` (string): What the gate asks of you, as clients list it.
+- `gates.<name>.intents` (table by name): What you may resolve the gate with, by intent, in the order clients offer them.
+- `gates.<name>.intents.<name>` (table): An intent, by its name.
+- `gates.<name>.intents.<name>.label` (string): The name people read on its button.
+
+## Record kinds (`records.toml`)
+
+- `records` (table by name): The record kinds a run, a person or a plugin writes on a task, by kind.
+- `records.<name>` (table): A record kind, by its name, such as brief, report or decision.
+- `records.<name>.schema` (file): The JSON schema a record of the kind follows, a file under records/. Required.
+- `records.<name>.writers` (list of `person`, `workflow`, `agent`, `plugin`): Who may write a record of the kind; a record an agent or a plugin wrote is untrusted.
+  - `person`: A person, through a client.
+  - `workflow`: A profile workflow's step.
+  - `agent`: An agent's turn; untrusted.
+  - `plugin`: A source plugin; untrusted.
+- `records.<name>.projects` (table by name): The record's fields that set a property of its task, by field.
+- `records.<name>.projects.<name>` (string): The property, of tasks.toml, the field sets.
 
 ## Key help (`keys.toml`)
 
@@ -236,8 +312,10 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ### When it is planned
 
 - `trigger` (table): What plans the workflow: on or schedule; absent, every sweep.
-- `trigger.on` (list of `opened`, `push`, `review_requested`, `review_request_removed`, `review`, `comment`, `check`, `ready`, `draft`, `merged`, `closed`, `round_sent`, `round_held`, `round_pending`, `round_skipped`, `guidance`, `round_blocked`, `round_unblocked`, `muted`, `unmuted`, `held`, `released`, `adopted`, `tracked`, `untracked`, `nudged`, `removed`, `status`, `would_review`, `would_address`, `review_ended`, `verb_next`, `verb_waiting`, `verb_schedule`, `verb_someday`, `verb_reference`, `verb_focus`, `verb_project`, `verb_approve`, `verb_delegate`, `verb_done`, `verb_dismiss`, `verb_context`, `verb_area`, `verb_answer`, `verb_reviewed`, `verb_sequential`, `verb_reply`): The source event kinds the workflow reacts to; verb_&lt;verb&gt;, a verb a person ran on a task, with provider task.
+- `trigger.on` (list of `opened`, `push`, `review_requested`, `review_request_removed`, `review`, `comment`, `check`, `ready`, `draft`, `merged`, `closed`, `round_sent`, `round_held`, `round_pending`, `round_skipped`, `guidance`, `round_blocked`, `round_unblocked`, `muted`, `unmuted`, `held`, `released`, `adopted`, `tracked`, `untracked`, `nudged`, `removed`, `status`, `would_review`, `would_address`, `review_ended`, `verb_next`, `verb_waiting`, `verb_schedule`, `verb_someday`, `verb_reference`, `verb_focus`, `verb_project`, `verb_approve`, `verb_delegate`, `verb_done`, `verb_dismiss`, `verb_context`, `verb_area`, `verb_answer`, `verb_reviewed`, `verb_sequential`, `verb_reply`, `task.woke`): The source event kinds the workflow reacts to; verb_&lt;verb&gt;, a verb a person ran on a task, and task.woke, a task's wake matched, with provider task.
 - `trigger.schedule` (string): A cron schedule, in local time.
+- `trigger.actors` (list of `person`, `workflow`, `agent`, `plugin`): With on, the actors whose events plan it; every actor when absent.
+- `trigger.depth` (integer, default `3`): With on, the longest chain of workflows triggering each other the event may close; at most 5.
 - `observe` (bool, default `false`): Plans items pending and never runs them by itself; a person applies an item by hand.
 - `limits` (table): How many runs the workflow may take.
 - `limits.per_run` (integer, default `0`): Runs per evaluation; 0 is no limit.
@@ -248,7 +326,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ### Steps
 
 - `step[]` (table): A step the run takes, in order. Required: at least one.
-- `step[].use` (one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`): The step.
+- `step[].use` (one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`, `gate.open`, `task.set`): The step.
   - `session.close`: Closes the agent session.
   - `workspace.remove`: Removes the workspace, after its guards. Never with `force`: a manifest that sets it fails to load.
   - `workspace.unregister`: Unregisters a workspace whose path is gone.
@@ -260,11 +338,34 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `classify`: A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). Event triggers only, cached by fingerprint, under `classify.per_day`.
   - `notify.self`: A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts "pr.slug"}}`, none once the unit is gone).
   - `task.verb`: Runs a verb on the task: `verb` (`next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done` or `dismiss`), with `until` and `on_activity` for schedule, `on` and `resurface` for waiting, and `set` for context and area. The plan blocks it while the task's state refuses the verb, and `done` and `dismiss` on a task derived from a unit's items, which closes when they resolve. It records no `verb_&lt;verb&gt;` event, which only a person's verb records, so a workflow never triggers another through it.
+  - `gate.open`: Opens the gate `name` of gates.toml on the unit, a decision that waits for you with the intents gates.toml gives it.
+  - `task.set`: Sets the task's property `prop` of tasks.toml to `value`, written by the workflow; a property the workflow may not write is refused.
 - `step[].<name>` (string or list): The step's arguments.
 
 ### Run approval
 
 - `approval` (an [approval table](#approval-tables) of run modes, default mode `run`): The run approval: how a matched item runs.
+
+### Gate approval
+
+- `gates` (table): The gates its runs and drafts open.
+- `gates.approval` (table): The approval of its gates; wait when absent.
+- `gates.approval.mode` (one of `send`, `delay`, `wait`, `dry_run`, `run`): The mode when no rule holds.
+  - `send`: Posts at once.
+  - `delay`: Posts when the window ends unless a person stops it.
+  - `wait`: Waits for a person.
+  - `dry_run`: Stores the draft and never sends it; nobody can release it.
+  - `run`: Runs at once.
+- `gates.approval.window` (duration): With mode delay only: how long a person has to stop the gate's consequence.
+- `gates.approval.rule[]` (table): A rule; the first whose when holds gives the mode.
+- `gates.approval.rule[].when` (predicate): When the rule applies to a gate.
+- `gates.approval.rule[].mode` (one of `send`, `delay`, `wait`, `dry_run`, `run`): The rule's mode.
+  - `send`: Posts at once.
+  - `delay`: Posts when the window ends unless a person stops it.
+  - `wait`: Waits for a person.
+  - `dry_run`: Stores the draft and never sends it; nobody can release it.
+  - `run`: Runs at once.
+- `gates.approval.rule[].window` (duration): With mode delay only: how long a person has to stop the gate's consequence.
 
 ### Drafts
 
@@ -316,6 +417,11 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `on` (string): With waiting, the people the task waits on, comma-separated.
   - `resurface` (string): With waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD.
   - `set` (string): With context, the contexts, comma-separated; with area, the area.
+- `gate.open`:
+  - `name` (string): The gate, of gates.toml, the step opens. Required.
+- `task.set`:
+  - `prop` (string): The property, of tasks.toml, the step sets. Required.
+  - `value` (string): The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD, a duration, a list comma-separated. Required.
 
 ## Defaults (`defaults.toml`)
 
@@ -540,6 +646,15 @@ The fields each notice reads besides `Name` and `Command`:
   - `wait`: Waits for a person.
   - `dry_run`: Stores the draft and never sends it; nobody can release it.
 - `github.drafts.approval.window` (duration): How long a delay waits before the draft goes; only with mode delay.
+- `github.gates` (table): The gates the plugin's own rules open.
+- `github.gates.approval` (table): Their approval; left out, each waits for you.
+- `github.gates.approval.mode` (one of `send`, `delay`, `wait`, `dry_run`, `run`): The approval mode.
+  - `send`: Posts at once.
+  - `delay`: Posts when the window ends unless a person stops it.
+  - `wait`: Waits for a person.
+  - `dry_run`: Stores the draft and never sends it; nobody can release it.
+  - `run`: Runs at once.
+- `github.gates.approval.window` (duration): How long a delay waits before the gate's consequence; only with mode delay.
 
 ### GitHub address rounds
 
@@ -583,6 +698,15 @@ The fields each notice reads besides `Name` and `Command`:
   - `wait`: Waits for a person.
   - `dry_run`: Stores the draft and never sends it; nobody can release it.
 - `slack.drafts.approval.window` (duration): How long a delay waits before the draft goes; only with mode delay.
+- `slack.gates` (table): The gates the plugin's own rules open.
+- `slack.gates.approval` (table): Their approval; left out, each waits for you.
+- `slack.gates.approval.mode` (one of `send`, `delay`, `wait`, `dry_run`, `run`): The approval mode.
+  - `send`: Posts at once.
+  - `delay`: Posts when the window ends unless a person stops it.
+  - `wait`: Waits for a person.
+  - `dry_run`: Stores the draft and never sends it; nobody can release it.
+  - `run`: Runs at once.
+- `slack.gates.approval.window` (duration): How long a delay waits before the gate's consequence; only with mode delay.
 
 ### Slack ingest
 
@@ -623,6 +747,27 @@ The fields each notice reads besides `Name` and `Command`:
 
 - `workflows.<name>.drafts` (table): The drafts the workflow proposes.
 - `workflows.<name>.drafts.approval` (an [approval table](#approval-tables) of draft modes): The approval of the workflow's drafts, over the manifest's field by field.
+
+### Workflow gate approval
+
+- `workflows.<name>.gates` (table): The gates the workflow opens.
+- `workflows.<name>.gates.approval` (table): The approval of the workflow's gates, over the manifest's field by field.
+- `workflows.<name>.gates.approval.mode` (one of `send`, `delay`, `wait`, `dry_run`, `run`): The mode when no rule matches; left out, the manifest's.
+  - `send`: Posts at once.
+  - `delay`: Posts when the window ends unless a person stops it.
+  - `wait`: Waits for a person.
+  - `dry_run`: Stores the draft and never sends it; nobody can release it.
+  - `run`: Runs at once.
+- `workflows.<name>.gates.approval.window` (duration): How long a delay waits before it goes; only with mode delay.
+- `workflows.<name>.gates.approval.rule[]` (table): Rules tried in order before the mode, the first match wins; set, they replace the manifest's, and [] clears them.
+- `workflows.<name>.gates.approval.rule[].when` (predicate): When the rule applies.
+- `workflows.<name>.gates.approval.rule[].mode` (one of `send`, `delay`, `wait`, `dry_run`, `run`): The rule's mode.
+  - `send`: Posts at once.
+  - `delay`: Posts when the window ends unless a person stops it.
+  - `wait`: Waits for a person.
+  - `dry_run`: Stores the draft and never sends it; nobody can release it.
+  - `run`: Runs at once.
+- `workflows.<name>.gates.approval.rule[].window` (duration): The rule's delay; only with mode delay.
 
 ### Turns and headless calls
 

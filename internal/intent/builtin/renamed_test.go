@@ -55,7 +55,7 @@ func TestARenamedFactNamesALiveOne(t *testing.T) {
 	for _, f := range Facts {
 		names[f.Name] = true
 	}
-	for _, old := range []string{"entry.state", "entry.units_ended", "entry.title", "slack.live_entry", "config.gtd.stale_waiting_days"} {
+	for _, old := range []string{"entry.state", "entry.units_ended", "entry.unit_started_by_me", "entry.unit_closure_posted", "entry.title", "slack.live_entry", "config.gtd.stale_waiting_days"} {
 		if n := RenamedTo(old); !names[n] {
 			t.Errorf("%s renames to %q, no fact", old, n)
 		}

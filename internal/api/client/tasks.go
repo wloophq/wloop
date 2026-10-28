@@ -50,7 +50,7 @@ func (c *Client) Task(ctx context.Context, id string) (api.TaskView, error) {
 }
 
 // Capture files a task in the Inbox.
-func (c *Client) Capture(ctx context.Context, req api.CaptureRequest) (api.TaskView, error) {
+func (c *Client) Capture(ctx context.Context, req api.TaskCreate) (api.TaskView, error) {
 	var e api.TaskView
 	err := c.do(ctx, ReadTimeout, http.MethodPost, api.TasksPath, req, &e)
 	return e, err

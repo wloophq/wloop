@@ -209,7 +209,7 @@ func TestTaskFactsReadTheTaskItsItemsAndItsUnitsCard(t *testing.T) {
 		"task.id": "e-01", "task.kind": "waiting", "task.state": "waiting",
 		"task.waiting_days": 3, "task.since_nudge": 80 * time.Hour,
 		"task.unit": "chat:T1/C1/100.1", "task.unit_provider": "chat",
-		"task.unit_started_by_me": true, "task.unit_closure_posted": true,
+		"task.link_started_by_me": true, "task.link_closure_posted": true,
 		"task.items_open": 2, "task.items_resolved": 1, "task.items_owed": 1, "task.muted": false,
 		"task.nudge_due_at": monday.Add(-8 * time.Hour),
 	}
@@ -369,15 +369,15 @@ func TestTaskUnitsEndedWhenEveryUnitEnded(t *testing.T) {
 	e := newEnv(t)
 	e.task(task.Task{ID: "e-01", Kind: task.KindCapture, State: task.Next, Title: "none"})
 	e.task(task.Task{ID: "e-02", Kind: task.KindCapture, State: task.Next, Title: "two", Units: []unit.Unit{chatA, chatB}})
-	if f := e.facts("e-01"); f["task.units_ended"] != false {
+	if f := e.facts("e-01"); f["task.link_ended"] != false {
 		t.Error("an entry with no unit has its units ended")
 	}
 	e.ended[chatA] = true
-	if f := e.facts("e-02"); f["task.units_ended"] != false {
+	if f := e.facts("e-02"); f["task.link_ended"] != false {
 		t.Error("an entry with a unit still going has its units ended")
 	}
 	e.ended[chatB] = true
-	if f := e.facts("e-02"); f["task.units_ended"] != true {
+	if f := e.facts("e-02"); f["task.link_ended"] != true {
 		t.Error("an entry whose every unit ended has not")
 	}
 }
