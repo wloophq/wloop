@@ -1,0 +1,983 @@
+syntax = "proto3";
+
+package wloop.source.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "wloop/plugin/v1/plugin.proto";
+
+option go_package = "github.com/wloophq/wloop/pkg/plugin/source/pb";
+
+// SourceService is what a source plugin serves: the union of the SDK's
+// capability interfaces. A plugin implements only the capabilities it has;
+// every other call answers UNIMPLEMENTED, and Capabilities lists the ones it
+// has. Fields that carry JSON hold an object whose shape the plugin and its
+// profile layer own.
+service SourceService {
+  // Capabilities lists the capabilities the plugin implements.
+  rpc Capabilities(CapabilitiesRequest) returns (CapabilitiesResponse);
+
+  // Ingester.
+  rpc Ingest(IngestRequest) returns (IngestResponse);
+  rpc Track(TrackRequest) returns (TrackResponse);
+  rpc Untrack(UntrackRequest) returns (UntrackResponse);
+  rpc Resolve(ResolveRequest) returns (ResolveResponse);
+  rpc Locate(LocateRequest) returns (LocateResponse);
+
+  // Presenter.
+  rpc Action(ActionRequest) returns (ActionResponse);
+  rpc View(ViewRequest) returns (ViewResponse);
+  rpc Identity(IdentityRequest) returns (IdentityResponse);
+
+  // Publisher.
+  rpc Validate(ValidateRequest) returns (ValidateResponse);
+  rpc Where(WhereRequest) returns (WhereResponse);
+  rpc Place(PlaceRequest) returns (PlaceResponse);
+  rpc Publish(PublishRequest) returns (PublishResponse);
+  rpc Verify(VerifyRequest) returns (VerifyResponse);
+
+  // Lander.
+  rpc Landed(LandedRequest) returns (LandedResponse);
+  rpc Checkout(CheckoutRequest) returns (CheckoutResponse);
+  rpc WriteState(WriteStateRequest) returns (WriteStateResponse);
+
+  // Briefer.
+  rpc BriefInput(BriefInputRequest) returns (BriefInputResponse);
+  rpc BriefRevision(BriefRevisionRequest) returns (BriefRevisionResponse);
+  rpc BriefDescribe(BriefDescribeRequest) returns (BriefDescribeResponse);
+  rpc BriefStale(BriefStaleRequest) returns (BriefStaleResponse);
+
+  // Planner.
+  rpc Plan(PlanRequest) returns (PlanResponse);
+  rpc Payload(PayloadRequest) returns (PayloadResponse);
+  rpc ApplyEffect(ApplyEffectRequest) returns (ApplyEffectResponse);
+  rpc Proposals(ProposalsRequest) returns (ProposalsResponse);
+  rpc PlacementDefault(PlacementDefaultRequest) returns (PlacementDefaultResponse);
+
+  // Tooler.
+  rpc CallTool(CallToolRequest) returns (CallToolResponse);
+
+  // CLIRunner.
+  rpc RunCLI(RunCLIRequest) returns (RunCLIResponse);
+}
+
+// HostService is what the host serves a source plugin on the broker id of
+// its StartRequest: the union of the SDK's broker interfaces.
+service HostService {
+  // Reporter.
+  rpc Report(ReportRequest) returns (ReportResponse);
+  rpc Changed(ChangedRequest) returns (ChangedResponse);
+
+  // Ledger.
+  rpc ApplyItems(ApplyItemsRequest) returns (ApplyItemsResponse);
+  rpc QueryItems(QueryItemsRequest) returns (QueryItemsResponse);
+
+  // Reader.
+  rpc Tasks(TasksRequest) returns (TasksResponse);
+  rpc Books(BooksRequest) returns (BooksResponse);
+  rpc RoundState(RoundStateRequest) returns (RoundStateResponse);
+  rpc Workspaces(WorkspacesRequest) returns (WorkspacesResponse);
+  rpc Session(SessionRequest) returns (SessionResponse);
+
+  // Gates.
+  rpc OpenGate(OpenGateRequest) returns (OpenGateResponse);
+  rpc RecordSent(RecordSentRequest) returns (RecordSentResponse);
+  rpc RehomeDrafts(RehomeDraftsRequest) returns (RehomeDraftsResponse);
+  rpc SetOverride(SetOverrideRequest) returns (SetOverrideResponse);
+
+  // Recorder.
+  rpc RecordEvents(RecordEventsRequest) returns (RecordEventsResponse);
+  rpc SetMarks(SetMarksRequest) returns (SetMarksResponse);
+  rpc PutBrief(PutBriefRequest) returns (PutBriefResponse);
+
+  // Wakes.
+  rpc SetWake(SetWakeRequest) returns (SetWakeResponse);
+  rpc ClearWake(ClearWakeRequest) returns (ClearWakeResponse);
+
+  // Services.
+  rpc Ask(AskRequest) returns (AskResponse);
+  rpc Meter(MeterRequest) returns (MeterResponse);
+  rpc Config(ConfigRequest) returns (ConfigResponse);
+}
+
+// Call is what the host's caller carried in its context, sent as fields.
+message Call {
+  Priority priority = 1;
+  // meter_scope is the full name of the host's meter scope the call runs
+  // under; the plugin's samples go back to it through Meter.
+  string meter_scope = 2;
+}
+
+// Priority orders who may spend a rate-limited budget when it runs low.
+enum Priority {
+  // PRIORITY_UNSPECIFIED is a user action, as PRIORITY_USER.
+  PRIORITY_UNSPECIFIED = 0;
+  PRIORITY_USER = 1;
+  PRIORITY_BACKGROUND = 2;
+}
+
+message StringList {
+  repeated string values = 1;
+}
+
+message Person {
+  // key is "<provider>:<id>", "group:<name>" or "system:<name>".
+  string key = 1;
+  string name = 2;
+  repeated string aliases = 3;
+}
+
+message PersonList {
+  repeated Person people = 1;
+}
+
+message Anchor {
+  wloop.plugin.v1.Unit unit = 1;
+  string ref = 2;
+  string permalink = 3;
+  google.protobuf.Timestamp at = 4;
+}
+
+// TimeUnit is how an After value counts the time since its instant.
+enum TimeUnit {
+  TIME_UNIT_UNSPECIFIED = 0;
+  TIME_UNIT_CALENDAR = 1;
+  // TIME_UNIT_WORKING_DAYS counts Monday to Friday only, in UTC.
+  TIME_UNIT_WORKING_DAYS = 2;
+}
+
+// Since resolves, at read time, to the duration from since to the host's now.
+message Since {
+  google.protobuf.Timestamp since = 1;
+}
+
+// At resolves to true once the host's now reaches at; at is a deadline.
+message At {
+  google.protobuf.Timestamp at = 1;
+}
+
+// After resolves to true once the time from after to the host's now,
+// counted in unit, exceeds threshold; that instant is a deadline.
+message After {
+  google.protobuf.Timestamp after = 1;
+  google.protobuf.Duration threshold = 2;
+  TimeUnit unit = 3;
+}
+
+// Fact is one workflow fact of a unit: a literal, or a temporal value the
+// host resolves with its clock whenever it reads the fact.
+message Fact {
+  string name = 1;
+  oneof value {
+    bool bool = 2;
+    int64 int = 3;
+    string string = 4;
+    StringList list = 5;
+    google.protobuf.Duration duration = 6;
+    google.protobuf.Timestamp time = 7;
+    Since since = 8;
+    At at = 9;
+    After after = 10;
+  }
+}
+
+// LinkSignal is a signal the manifest declares, on one unit.
+message LinkSignal {
+  string name = 1;
+  bool on = 2;
+  // since is when the signal turned on; unset when unknown or off.
+  google.protobuf.Timestamp since = 3;
+}
+
+// Offer is a built-in or plugin action the plugin offers on the unit.
+message Offer {
+  string action = 1;
+  bytes args_json = 2;
+}
+
+message ExtractionHealth {
+  // pending counts the source messages not yet extracted.
+  int64 pending = 1;
+  // budget_hit says extraction stopped at a budget cap.
+  bool budget_hit = 2;
+  // oldest is the oldest message not yet extracted; unset with none.
+  google.protobuf.Timestamp oldest = 3;
+}
+
+message CardSignal {
+  string key = 1;
+  string value = 2;
+  // tone is "neutral", "good", "warn", "bad" or "info".
+  string tone = 3;
+  google.protobuf.Timestamp at = 4;
+}
+
+message Human {
+  Person who = 1;
+  string what = 2;
+  google.protobuf.Timestamp at = 3;
+  string link = 4;
+}
+
+// Card is what the plugin shows of one unit.
+message Card {
+  string label = 1;
+  string title = 2;
+  // state is the plugin's word: "open", "merged", "thread".
+  string state = 3;
+  // outcome is "" while open; "done" or "moot" once the unit is finished.
+  string outcome = 4;
+  repeated CardSignal signals = 5;
+  Human last_human = 6;
+  string why = 7;
+  repeated Person waits_on = 8;
+  google.protobuf.Timestamp since = 9;
+  string link = 10;
+  string turns_link = 11;
+  bool started_by_me = 12;
+  bool closure_posted = 13;
+  bool cares = 14;
+}
+
+message ItemOption {
+  string label = 1;
+  repeated Person argued_by = 2;
+}
+
+message ItemOptionList {
+  repeated ItemOption options = 1;
+}
+
+message ItemEvidence {
+  // kind is "message", "reaction", "external_claim", "unit_event" or "sent_draft".
+  string kind = 1;
+  Anchor anchor = 2;
+}
+
+// Item is a commitment the plugin observed: who asks whom for what.
+message Item {
+  string id = 1;
+  wloop.plugin.v1.Unit unit = 2;
+  string kind = 3;
+  string summary = 4;
+  string context = 5;
+  repeated ItemOption options = 6;
+  string deadline = 7;
+  repeated string urls = 8;
+  repeated string contexts = 9;
+  // category is the task category the plugin proposes for a new task, such
+  // as "inbox" or "ready"; never a state name. Empty is inbox.
+  string category = 10;
+  Anchor origin = 11;
+  Person requester = 12;
+  repeated Person assignees = 13;
+  Anchor assigned_at = 14;
+  string basis = 15;
+  repeated Person waiting_on = 16;
+  string state = 17;
+  string resolution = 18;
+  ItemEvidence evidence = 19;
+  repeated ItemEvidence trail = 20;
+  string confidence = 21;
+  string ambiguity = 22;
+  string provenance = 23;
+  bool confirmed = 24;
+  // task_key groups items into one task: the item id when empty, or the
+  // unit's key for a source whose unit is the task.
+  string task_key = 25;
+  google.protobuf.Timestamp user_at = 26;
+  google.protobuf.Timestamp created_at = 27;
+  google.protobuf.Timestamp updated_at = 28;
+}
+
+// Snapshot is everything the plugin reports of one unit. A later snapshot
+// of the unit replaces it whole.
+message Snapshot {
+  wloop.plugin.v1.Unit unit = 1;
+  // rev grows with every change of the unit the plugin reports; the host
+  // compares it with the rev its facts came from.
+  uint64 rev = 2;
+  google.protobuf.Timestamp at = 3;
+  // gone says the unit no longer exists in its source.
+  bool gone = 4;
+  bytes data_json = 5;
+  bytes situation_json = 6;
+  Card card = 7;
+  repeated Item items = 8;
+  repeated Fact facts = 9;
+  repeated LinkSignal signals = 10;
+  // owes are who the unit waits on, the task's link_owes.
+  repeated Person owes = 11;
+  repeated Offer offers = 12;
+  ExtractionHealth extraction_health = 13;
+  // contexts and due are the task fields the plugin writes, as writer plugin.
+  repeated string contexts = 14;
+  google.protobuf.Timestamp due = 15;
+}
+
+message DraftOrigin {
+  // kind is "turn", "session", "auto" or "user".
+  string kind = 1;
+  int64 turn_seq = 2;
+  string intent = 3;
+  string workflow = 4;
+  string rule = 5;
+  string key = 6;
+  wloop.plugin.v1.Unit unit = 7;
+}
+
+message DraftEvidence {
+  string ref = 1;
+  string permalink = 2;
+  google.protobuf.Timestamp at = 3;
+}
+
+// Draft is a post the loop proposes or sent. id is zero for a draft not yet
+// stored.
+message Draft {
+  int64 id = 1;
+  wloop.plugin.v1.Unit unit = 2;
+  repeated string items = 3;
+  string task = 4;
+  string kind = 5;
+  string purpose = 6;
+  string delivery = 7;
+  repeated string effects = 8;
+  string target = 9;
+  string text = 10;
+  string reaction = 11;
+  string replaced = 12;
+  DraftOrigin origin = 13;
+  string state = 14;
+  DraftEvidence evidence = 15;
+}
+
+message Placement {
+  string repo = 1;
+  string checkout = 2;
+  string role = 3;
+  bool shared = 4;
+}
+
+message CapabilitiesRequest {}
+
+message CapabilitiesResponse {
+  repeated string capabilities = 1;
+}
+
+message IngestRequest {
+  Call call = 1;
+  // job is the name of the manifest job the host runs.
+  string job = 2;
+  google.protobuf.Timestamp now = 3;
+}
+
+message IngestResponse {
+  string summary = 1;
+  string skipped = 2;
+}
+
+message TrackRequest {
+  Call call = 1;
+  wloop.plugin.v1.Unit unit = 2;
+}
+
+message TrackResponse {
+  // unit is the unit as its source names it.
+  wloop.plugin.v1.Unit unit = 1;
+  string state = 2;
+}
+
+message UntrackRequest {
+  Call call = 1;
+  wloop.plugin.v1.Unit unit = 2;
+}
+
+message UntrackResponse {}
+
+message ResolveRequest {
+  Call call = 1;
+  string address = 2;
+}
+
+message ResolveResponse {
+  wloop.plugin.v1.Unit unit = 1;
+  bool ok = 2;
+}
+
+message LocateRequest {
+  Call call = 1;
+  string url = 2;
+}
+
+message LocateResponse {
+  wloop.plugin.v1.Unit unit = 1;
+  bool ok = 2;
+}
+
+message ActionRequest {
+  Call call = 1;
+  wloop.plugin.v1.Unit unit = 2;
+  string action = 3;
+  string input = 4;
+  bytes args_json = 5;
+}
+
+message ActionResponse {
+  bytes result_json = 1;
+}
+
+message ViewRequest {
+  Call call = 1;
+  string view = 2;
+  bytes query_json = 3;
+}
+
+message ViewResponse {
+  bytes content_json = 1;
+}
+
+message IdentityRequest {
+  Call call = 1;
+}
+
+message IdentityResponse {
+  Person viewer = 1;
+  repeated string teams = 2;
+}
+
+message ValidateRequest {
+  Call call = 1;
+  Draft draft = 2;
+}
+
+message ValidateResponse {}
+
+message WhereRequest {
+  Call call = 1;
+  Draft draft = 2;
+}
+
+message WhereResponse {
+  string where = 1;
+}
+
+message PlaceRequest {
+  Call call = 1;
+  Draft draft = 2;
+}
+
+message PlaceResponse {
+  string target = 1;
+}
+
+message PublishRequest {
+  Call call = 1;
+  Draft draft = 2;
+}
+
+message PublishResponse {
+  DraftEvidence evidence = 1;
+}
+
+message VerifyRequest {
+  Call call = 1;
+  Draft draft = 2;
+  google.protobuf.Timestamp started_at = 3;
+}
+
+message VerifyResponse {
+  DraftEvidence evidence = 1;
+  bool posted = 2;
+}
+
+message LandedRequest {
+  Call call = 1;
+  Draft draft = 2;
+}
+
+message LandedResponse {
+  wloop.plugin.v1.Unit unit = 1;
+  bool ok = 2;
+}
+
+message CheckoutRequest {
+  Call call = 1;
+  wloop.plugin.v1.Unit unit = 2;
+}
+
+message CheckoutResponse {
+  // repo is "owner/name"; branch "" is the default branch; head "" unknown.
+  string repo = 1;
+  string branch = 2;
+  string head = 3;
+  bool ok = 4;
+}
+
+message WriteStateRequest {
+  Call call = 1;
+  wloop.plugin.v1.Unit unit = 2;
+  string task = 3;
+  string state = 4;
+  string category = 5;
+}
+
+message WriteStateResponse {
+  DraftEvidence evidence = 1;
+}
+
+message BriefInputRequest {
+  Call call = 1;
+  wloop.plugin.v1.Unit unit = 2;
+}
+
+message BriefInputResponse {
+  string text = 1;
+  int64 bytes = 2;
+  bool cut = 3;
+  bytes parts_json = 4;
+}
+
+message BriefRevisionRequest {
+  Call call = 1;
+  wloop.plugin.v1.Unit unit = 2;
+}
+
+message BriefRevisionResponse {
+  string revision = 1;
+  bytes parts_json = 2;
+}
+
+message BriefDescribeRequest {
+  Call call = 1;
+  BriefInputResponse input = 2;
+}
+
+message BriefDescribeResponse {
+  string line = 1;
+}
+
+message BriefWritten {
+  BriefRevisionResponse at = 1;
+  string version = 2;
+  string error = 3;
+  int64 failures = 4;
+  google.protobuf.Timestamp attempted_at = 5;
+}
+
+message BriefStaleRequest {
+  Call call = 1;
+  BriefWritten written = 2;
+  BriefRevisionResponse current = 3;
+  string version = 4;
+  google.protobuf.Timestamp now = 5;
+}
+
+message BriefStaleResponse {
+  bool stale = 1;
+}
+
+message PendingRound {
+  string intent = 1;
+  string reason = 2;
+  google.protobuf.Timestamp since = 3;
+  google.protobuf.Timestamp deadline = 4;
+}
+
+// RoundState is the host's round bookkeeping of one unit.
+message RoundState {
+  map<string, string> marks = 1;
+  google.protobuf.Timestamp sent_at = 2;
+  string agent_home = 3;
+  bool first_round_skipped = 4;
+  // today counts the unit's automatic rounds today, day_total every unit's.
+  int64 today = 5;
+  int64 day_total = 6;
+  bool paused = 7;
+  repeated PendingRound pending = 8;
+}
+
+message PlanRequest {
+  Call call = 1;
+  wloop.plugin.v1.Unit unit = 2;
+  RoundState state = 3;
+  google.protobuf.Timestamp now = 4;
+}
+
+message PlanResponse {
+  repeated Fact facts = 1;
+  // due is the plan's next deadline; unset with none.
+  google.protobuf.Timestamp due = 2;
+  // rank orders the units whose rounds are due, lowest first.
+  int64 rank = 3;
+}
+
+message PayloadRequest {
+  Call call = 1;
+  wloop.plugin.v1.Unit unit = 2;
+  string intent = 3;
+  string role = 4;
+  string trigger = 5;
+  bytes inputs_json = 6;
+  string guidance = 7;
+  string local = 8;
+  bool owned = 9;
+  bool plain = 10;
+}
+
+message PayloadResponse {
+  bytes payload_json = 1;
+}
+
+message TurnRef {
+  int64 seq = 1;
+  string id = 2;
+  string head = 3;
+}
+
+message ApplyEffectRequest {
+  Call call = 1;
+  string effect = 2;
+  wloop.plugin.v1.Unit unit = 3;
+  // turn is set for a turn effect, draft for a draft effect.
+  TurnRef turn = 4;
+  Draft draft = 5;
+}
+
+message ApplyEffectResponse {}
+
+message ProposalsRequest {
+  Call call = 1;
+  google.protobuf.Timestamp now = 2;
+}
+
+message ProposalsResponse {
+  repeated Draft drafts = 1;
+}
+
+message PlacementDefaultRequest {
+  Call call = 1;
+  wloop.plugin.v1.Unit unit = 2;
+  string item = 3;
+}
+
+message PlacementDefaultResponse {
+  Placement placement = 1;
+  bool ok = 2;
+}
+
+message CallToolRequest {
+  Call call = 1;
+  string tool = 2;
+  bytes args_json = 3;
+  // session is the MCP session's handle, turn the turn it serves; the
+  // plugin reads the session's unit and draft rules through Session.
+  string session = 4;
+  string turn = 5;
+}
+
+message CallToolResponse {
+  bytes result_json = 1;
+  bool is_error = 2;
+}
+
+message RunCLIRequest {
+  Call call = 1;
+  repeated string args = 2;
+  bytes stdin = 3;
+}
+
+// RunCLIResponse is the command's output, which the host prints: the plugin
+// process never writes stdout.
+message RunCLIResponse {
+  bytes stdout = 1;
+  bytes stderr = 2;
+  int64 exit_code = 3;
+}
+
+message ReportRequest {
+  repeated Snapshot snapshots = 1;
+}
+
+message ReportResponse {}
+
+message ChangedRequest {
+  repeated wloop.plugin.v1.Unit units = 1;
+  repeated string topics = 2;
+}
+
+message ChangedResponse {}
+
+message ItemFields {
+  optional string kind = 1;
+  optional string summary = 2;
+  optional string context = 3;
+  optional string deadline = 4;
+  optional string ambiguity = 5;
+  ItemOptionList options = 6;
+  StringList urls = 7;
+  StringList contexts = 8;
+  optional string category = 9;
+  Person requester = 10;
+  PersonList waiting_on = 11;
+  optional string confidence = 12;
+}
+
+// ItemOp is one change to the items ledger.
+message ItemOp {
+  // op is "create", "update", "assign", "resolve", "reopen", "link" or "evidence".
+  string op = 1;
+  wloop.plugin.v1.Unit unit = 2;
+  string item = 3;
+  Anchor anchor = 4;
+  ItemFields fields = 5;
+  repeated Person assignees = 6;
+  string basis = 7;
+  string resolution = 8;
+  ItemEvidence evidence = 9;
+  wloop.plugin.v1.Unit to = 10;
+  string link_kind = 11;
+  string reason = 12;
+}
+
+message ItemResult {
+  string item = 1;
+  string error = 2;
+}
+
+message ApplyItemsRequest {
+  repeated ItemOp ops = 1;
+}
+
+message ApplyItemsResponse {
+  repeated ItemResult results = 1;
+}
+
+message QueryItemsRequest {
+  repeated wloop.plugin.v1.Unit units = 1;
+  bool open_only = 2;
+}
+
+message QueryItemsResponse {
+  repeated Item items = 1;
+}
+
+message Task {
+  string id = 1;
+  string title = 2;
+  string state = 3;
+  string category = 4;
+  string parent = 5;
+  bytes props_json = 6;
+  repeated wloop.plugin.v1.Unit units = 7;
+}
+
+message TasksRequest {
+  repeated wloop.plugin.v1.Unit units = 1;
+}
+
+message TasksResponse {
+  repeated Task tasks = 1;
+}
+
+message Turn {
+  int64 seq = 1;
+  string id = 2;
+  string intent = 3;
+  string role = 4;
+  string workflow = 5;
+  string state = 6;
+  string head = 7;
+  string session = 8;
+  google.protobuf.Timestamp sent_at = 9;
+  google.protobuf.Timestamp started_at = 10;
+  google.protobuf.Timestamp ended_at = 11;
+}
+
+message TurnRecord {
+  int64 id = 1;
+  int64 turn_seq = 2;
+  string head = 3;
+  google.protobuf.Timestamp at = 4;
+  bytes record_json = 5;
+}
+
+message Book {
+  wloop.plugin.v1.Unit unit = 1;
+  repeated Turn turns = 2;
+  repeated TurnRecord records = 3;
+}
+
+message BooksRequest {
+  repeated wloop.plugin.v1.Unit units = 1;
+}
+
+message BooksResponse {
+  repeated Book books = 1;
+}
+
+message RoundStateRequest {
+  wloop.plugin.v1.Unit unit = 1;
+}
+
+message RoundStateResponse {
+  RoundState state = 1;
+}
+
+message Workspace {
+  string manager = 1;
+  string id = 2;
+  string repo = 3;
+  string path = 4;
+  string branch = 5;
+  string push_branch = 6;
+  string status = 7;
+  bool is_main = 8;
+  repeated wloop.plugin.v1.Unit units = 9;
+}
+
+message WorkspacesRequest {
+  // repo narrows to one repository, "owner/name"; empty lists every one.
+  string repo = 1;
+}
+
+message WorkspacesResponse {
+  repeated Workspace workspaces = 1;
+}
+
+message SessionRequest {
+  string handle = 1;
+}
+
+message SessionResponse {
+  wloop.plugin.v1.Unit unit = 1;
+  string turn = 2;
+  int64 turn_seq = 3;
+  string intent = 4;
+  string role = 5;
+  // allowed_effects are the effects a draft of the session may carry: the
+  // intent's draft rules.
+  repeated string allowed_effects = 6;
+}
+
+message GateRef {
+  string gate = 1;
+  int64 draft = 2;
+}
+
+message OpenGateRequest {
+  Draft draft = 1;
+}
+
+message OpenGateResponse {
+  GateRef gate = 1;
+}
+
+message RecordSentRequest {
+  Draft draft = 1;
+  string session = 2;
+}
+
+message RecordSentResponse {
+  GateRef gate = 1;
+}
+
+message RehomeDraftsRequest {
+  wloop.plugin.v1.Unit from = 1;
+  wloop.plugin.v1.Unit to = 2;
+}
+
+message RehomeDraftsResponse {
+  int64 moved = 1;
+}
+
+message SetOverrideRequest {
+  wloop.plugin.v1.Unit unit = 1;
+  string name = 2;
+  // value "" clears the override.
+  string value = 3;
+}
+
+message SetOverrideResponse {}
+
+message Event {
+  wloop.plugin.v1.Unit unit = 1;
+  string kind = 2;
+  string actor = 3;
+  google.protobuf.Timestamp at = 4;
+  Anchor anchor = 5;
+  bytes data_json = 6;
+}
+
+message RecordEventsRequest {
+  repeated Event events = 1;
+}
+
+message RecordEventsResponse {}
+
+message SetMarksRequest {
+  wloop.plugin.v1.Unit unit = 1;
+  // marks maps a mark name to its value; "" removes the mark.
+  map<string, string> marks = 2;
+}
+
+message SetMarksResponse {}
+
+message PutBriefRequest {
+  string task = 1;
+  wloop.plugin.v1.Unit unit = 2;
+  string version = 3;
+  bytes brief_json = 4;
+}
+
+message PutBriefResponse {}
+
+message SetWakeRequest {
+  wloop.plugin.v1.Unit unit = 1;
+  string task = 2;
+  google.protobuf.Timestamp until = 3;
+  // when is a predicate over the task's facts that wakes it once it holds.
+  string when = 4;
+}
+
+message SetWakeResponse {}
+
+message ClearWakeRequest {
+  wloop.plugin.v1.Unit unit = 1;
+  string task = 2;
+}
+
+message ClearWakeResponse {}
+
+message AskRequest {
+  string prompt = 1;
+  // schema is the JSON schema the answer must match; empty asks for text.
+  bytes schema_json = 2;
+  string tier = 3;
+  double max_cost_usd = 4;
+  string meter_scope = 5;
+}
+
+message AskResponse {
+  string text = 1;
+  double cost_usd = 2;
+}
+
+message MeterRequest {
+  string scope = 1;
+  string resource = 2;
+  string op = 3;
+  bool spawn = 4;
+  google.protobuf.Duration duration = 5;
+  bool failed = 6;
+  int64 points = 7;
+}
+
+message MeterResponse {}
+
+message ConfigRequest {}
+
+message ConfigResponse {
+  // config_json is the plugin's [plugins.<id>] table of config.toml.
+  bytes config_json = 1;
+}

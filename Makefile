@@ -75,6 +75,7 @@ docs-ref: ## Regenerate the reference pages of the documentation site, the profi
 	@p=$$(go run ./internal/archtest/cmd/rulesdoc) && printf '%s\n' "$$p" > docs/src/content/docs/reference/architecture-rules.md
 	@go run ./internal/intent/builtin/cmd/grammardoc
 	@go run ./internal/archtest/cmd/decisionsdoc
+	@go run ./pkg/plugin/manifest/cmd/manifestdoc
 
 proto: ## Lint the plugin protocol and regenerate its Go code into pkg/plugin, with the tools go.mod pins
 	go tool buf lint proto

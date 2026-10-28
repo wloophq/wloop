@@ -63,6 +63,29 @@ Test imports count too, except a plugin's own test fake: a core test builds its 
 
 A plugin's directory holds a `plugin.toml` (`pkg/plugin/manifest`) with its `id`, the `kinds` its binary serves, the `protocol` it speaks, and one table per kind, which the kind's SDK package decodes. `pkg/plugin/plugintest` serves kinds in-process, for tests on either side. Nothing under `pkg/` imports `internal/` (`TestTheSDKImportsNoInternal`), and the host passes its product name through the environment (`plugin.BrandEnv`).
 
+### The source kind
+
+`pkg/plugin/source` is the SDK of the `source` kind, with its protocol in `proto/wloop/source/v1`. Its `SourceService` is the union of capability interfaces of at most five methods each (`TestEveryCapabilityHasAtMostFiveMethods`); a plugin implements `source.Source` and the ones it has, `source.New` adapts it, and every other call answers `ErrUnsupported`:
+
+| Interface | Methods |
+|---|---|
+| `Ingester` | `Ingest` (one run of a manifest job), `Track`, `Untrack`, `Resolve`, `Locate` |
+| `Presenter` | `Action`, `View`, `Identity` |
+| `Publisher` | `Validate`, `Where`, `Place`, `Publish`, `Verify` |
+| `Lander` | `Landed`, `Checkout`, `WriteState` |
+| `Briefer` | `BriefInput`, `BriefRevision`, `BriefDescribe`, `BriefStale` |
+| `Planner` | `Plan(unit, roundState)`, `Payload`, `ApplyEffect`, `Proposals`, `PlacementDefault` |
+| `Tooler` | `CallTool(tool, args, session, turn)` |
+| `CLIRunner` | `RunCLI`, which returns the command's stdout, stderr and exit code for the host to print |
+
+The host serves the plugin's calls back on the connection's broker (`source.ServeHost`, whose id goes in `StartRequest.HostBroker`), through `HostService`, split the same way: `Reporter` (`Report`, `Changed`), `Ledger` (`ApplyItems`, `QueryItems`), `Reader` (`Tasks`, `Books`, `RoundState`, `Workspaces`, `Session`), `Gates` (`OpenGate`, `RecordSent`, `RehomeDrafts`, `SetOverride`), `Recorder` (`RecordEvents`, `SetMarks`, `PutBrief`), `Wakes` (`SetWake`, `ClearWake`) and `Services` (`Ask`, `Meter`, `Config`). A plugin proposes drafts through `OpenGate`; the host's approval policy holds or releases them.
+
+A plugin reports a unit as a `Snapshot`: its data and situation inputs as JSON the plugin's profile layer reads, its card, items, link signals, who it owes, offered actions, extraction health, the contexts and due date it writes, its facts and a `rev`. A fact is a literal or a temporal value the host resolves with its clock when it reads it: `Since(t)` is a duration, `At(t)` is true from `t` on, and `After(t, threshold, unit)` is true once more than `threshold` has passed since `t`, counted in calendar time or working days.
+
+Nothing the host's context carries crosses in a context: the call's priority and meter scope travel as a `Call` field of every request (`source.WithCall` on the host, `source.CallOf` in the plugin), a tool call carries its MCP session and turn, `Ask` its tier, cost cap and meter scope, and `Reader.Session` gives the session's draft rules. `pkg/plugin/source/sourcetest` runs a source in-process against a host.
+
+A source's `plugin.toml` has a `[source]` table: the codec (key and address templates, so a disabled plugin's keys still parse), the vocabulary it adds to the host's tables (slot, facts with types, effects, event kinds, roles naming host mechanisms, brief subject, row kinds, deliveries and whether each posts to people, link signals, task kinds, situations), the jobs the host runs through `Ingest`, the CLI commands and the MCP tools with their argument schemas. [Plugin manifest](/reference/plugin-manifest/) lists every key.
+
 ## Adding a source
 
 1. A package under `internal/adapter/source/<id>` with its codec, its `port.Source`, its store and its rows; its domain values under `internal/domain/<id>`; a client for the service if it needs one.
