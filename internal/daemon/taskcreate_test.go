@@ -5,15 +5,16 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
-func newCreateRig(t *testing.T) *tasksRig {
+func newCreateRig(t *testing.T, edit func(*Deps)) *tasksRig {
 	t.Helper()
-	r := newTasksRig(t, nil)
+	r := newTasksRig(t, edit)
 	r.s.deps.TaskRecords, r.s.deps.RecordWriter = r.db, r.db
 	r.s.deps.Placements = inventory.Placements{Store: inventory.New(r.db)}
 	return r
@@ -31,7 +32,7 @@ func created(t *testing.T, r *tasksRig, body string) api.TaskView {
 
 func TestCaptureIsTaskCreateWithATitle(t *testing.T) {
 	t.Parallel()
-	r := newCreateRig(t)
+	r := newCreateRig(t, nil)
 	v := created(t, r, `{"title":"call the bank"}`)
 	if v.Kind != "capture" || v.State != "inbox" || v.Title != "call the bank" || v.Notes != "" || v.Brief != nil || len(v.Props) != 0 {
 		t.Fatalf("a capture %+v", v)
@@ -67,5 +68,53 @@ func TestCaptureIsTaskCreateWithATitle(t *testing.T) {
 	}
 	if p := r.page(t, "view=inbox"); len(p.Tasks) != 2 {
 		t.Fatalf("a refused create made a task: %+v", p.Tasks)
+	}
+}
+
+func TestTaskCreateFromAnAgentSessionIsWrittenByTheAgent(t *testing.T) {
+	t.Parallel()
+	r := newCreateRig(t, nil)
+	for _, personOnly := range []string{`{"title":"x","props":{"due":"2026-11-02"}}`, `{"title":"x","props":{"area":"OSS"}}`} {
+		if rec := postFrom(t, r.s, "term_1", api.TasksPath, personOnly); rec.Code != 400 || !strings.Contains(rec.Body.String(), "agent") {
+			t.Errorf("%s from an agent session: %d %s", personOnly, rec.Code, rec.Body)
+		}
+	}
+	if p := r.page(t, "view=inbox"); len(p.Tasks) != 0 {
+		t.Fatalf("a refused create made a task: %+v", p.Tasks)
+	}
+
+	rec := postFrom(t, r.s, "term_1", api.TasksPath, `{"title":"Add retries","brief":"the sender gives up","props":{"priority":"high","effort":"s"}}`)
+	var v api.TaskView
+	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &v) != nil {
+		t.Fatalf("an agent's create: %d %s", rec.Code, rec.Body)
+	}
+	ctx := context.Background()
+	tk, err := r.db.Tasks().Task(ctx, task.ID(v.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"priority", "effort"} {
+		if by := tk.Written[name].By; by != task.WriterAgent {
+			t.Errorf("%s written by %q", name, by)
+		}
+	}
+	u := task.UnitOf(task.ID(v.ID))
+	recs, err := r.db.Records(ctx, "brief", u)
+	if err != nil || recs[u].Actor != string(task.WriterAgent) {
+		t.Fatalf("the brief record %+v %v", recs[u], err)
+	}
+}
+
+func TestTaskCreateParsesADateInTheDaemonsLocation(t *testing.T) {
+	t.Parallel()
+	zone := time.FixedZone("UTC-3", -3*60*60)
+	r := newCreateRig(t, func(d *Deps) { d.Now = func() time.Time { return tasksNow.In(zone) } })
+	v := created(t, r, `{"title":"Call Ana","props":{"due":"2026-11-02"}}`)
+	tk, err := r.db.Tasks().Task(context.Background(), task.ID(v.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if due := tk.Props["due"].Time; !due.Equal(time.Date(2026, 11, 2, 0, 0, 0, 0, zone)) {
+		t.Fatalf("due %v, want midnight of 2026-11-02 in the daemon's zone", due)
 	}
 }

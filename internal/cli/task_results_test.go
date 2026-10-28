@@ -7,10 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/lock"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/placement"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/task"
 
@@ -92,5 +94,24 @@ func TestServeWiresTheTaskResults(t *testing.T) {
 	te.serveDeps(context.Background(), db, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
 	if te.Turns.Results == nil || te.outbox == nil || te.outbox.Results == nil {
 		t.Fatal("the turns' and the Outbox's results are not wired")
+	}
+}
+
+type fixedOverrides map[unit.Unit]placement.Placement
+
+func (o fixedOverrides) Override(_ context.Context, u unit.Unit) (placement.Placement, bool, error) {
+	p, ok := o[u]
+	return p, ok, nil
+}
+
+func (fixedOverrides) SetOverride(context.Context, unit.Unit, placement.Placement) error { return nil }
+
+func TestATasksRepoIsItsPlacementOverride(t *testing.T) {
+	placed, bare := task.UnitOf("t-1"), task.UnitOf("t-2")
+	repo := unitsRepo(nil, config.Defaults, fixedOverrides{placed: {Repo: "acme/api"}})
+	for u, want := range map[unit.Unit]string{placed: "acme/api", bare: ""} {
+		if got, err := repo(context.Background(), u); err != nil || got != want {
+			t.Errorf("%s: repo %q, %v; want %q", u, got, err, want)
+		}
 	}
 }

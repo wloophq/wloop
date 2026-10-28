@@ -9,6 +9,7 @@ import (
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/placement"
 	"github.com/wloophq/wloop/internal/domain/task"
 
 	"github.com/wloophq/wloop/internal/core/automation"
@@ -84,10 +85,19 @@ func (e *Env) newTaskResults(g *coretasks.Service, mods []source.Module) taskRes
 	return taskResults{tasks: g, units: unit.NewRegistry(codecs...), intents: func() *dintent.Registry { return e.loadedIntents().Registry }}
 }
 
-// unitsRepo is the repository of a unit: the one the placement rules give it, else the repo fact of its
-// plugin's facts; "" when neither names one.
-func unitsRepo(mods []source.Module, cfg func() config.Config) func(ctx context.Context, u unit.Unit) (string, error) {
+// unitsRepo is the repository of a unit: its placement override's, else the one the placement rules give it,
+// else the repo fact of its plugin's facts; "" when none names one.
+func unitsRepo(mods []source.Module, cfg func() config.Config, overrides placement.Overrides) func(ctx context.Context, u unit.Unit) (string, error) {
 	return func(ctx context.Context, u unit.Unit) (string, error) {
+		if overrides != nil {
+			p, ok, err := overrides.Override(ctx, u)
+			if err != nil {
+				return "", err
+			}
+			if ok && p.Repo != "" {
+				return p.Repo, nil
+			}
+		}
 		if p, ok := cfg().PlacementMap().Place(u); ok && p.Repo != "" {
 			return p.Repo, nil
 		}
