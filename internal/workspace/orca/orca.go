@@ -353,7 +353,7 @@ func (m *Manager) Workspaces(ctx context.Context) ([]wsdomain.Workspace, wsdomai
 
 func (m *Manager) Create(ctx context.Context, req workspace.CreateRequest) (wsdomain.Workspace, string, error) {
 	ws, handle, err := m.create(ctx, req)
-	ws.BranchRenamed = renamedBranch(ws.Branch, req.HeadBranch)
+	ws.BranchRenamed = renamedBranch(ws.Branch, req.Checkout.Branch)
 	return ws, handle, err
 }
 
@@ -364,7 +364,7 @@ func renamedBranch(got, want string) bool {
 }
 
 func (m *Manager) create(ctx context.Context, req workspace.CreateRequest) (wsdomain.Workspace, string, error) {
-	if req.HeadBranch != "" && m.RPC != nil {
+	if req.Checkout.Branch != "" && m.RPC != nil {
 		if ws, handle, err := m.createFromPR(ctx, req); err == nil {
 			ws.ParentDropped = req.Parent != ""
 			return ws, handle, nil
@@ -820,9 +820,9 @@ func (m *Manager) createFromPR(ctx context.Context, req workspace.CreateRequest)
 	if err := m.do(ctx, &base, op{method: "worktree.resolvePrBase", params: map[string]any{
 		"repo":              repo,
 		"prNumber":          workspace.LinkedPR(req.Unit),
-		"headRefName":       req.HeadBranch,
-		"baseRefName":       req.BaseBranchName,
-		"isCrossRepository": req.CrossRepository,
+		"headRefName":       req.Checkout.Branch,
+		"baseRefName":       req.Checkout.Base,
+		"isCrossRepository": req.Checkout.Fork,
 	}}); err != nil {
 		return wsdomain.Workspace{}, "", err
 	}

@@ -342,52 +342,6 @@ func blockingServer(t *testing.T) (srv *httptest.Server, sent *atomic.Int32, arr
 	return srv, sent, arrivals
 }
 
-// expiredCtx reads as past its deadline once canceled.
-type expiredCtx struct{ context.Context }
-
-func (c expiredCtx) Err() error {
-	if c.Context.Err() != nil {
-		return context.DeadlineExceeded
-	}
-	return nil
-}
-
-// TestCallerDeadlineIsNotTransient ends the caller's context once the
-// request reached the server, so a slow handshake cannot expire it first.
-func TestCallerDeadlineIsNotTransient(t *testing.T) {
-	srv, sent, arrived := blockingServer(t)
-	c := tlsClient(srv, nil)
-	refs := []Ref{{Owner: "acme", Repo: "api", Number: 1}, {Owner: "acme", Repo: "api", Number: 2}, {Owner: "acme", Repo: "api", Number: 3}, {Owner: "acme", Repo: "api", Number: 4}}
-	endOnArrival := func() (context.Context, context.CancelFunc) {
-		ctx, cancel := context.WithCancel(context.Background())
-		go func() {
-			select {
-			case <-arrived:
-				cancel()
-			case <-ctx.Done():
-			}
-		}()
-		return ctx, cancel
-	}
-
-	ctx, cancel := endOnArrival()
-	defer cancel()
-	_, errs, _, err := c.InventoryByRef(expiredCtx{ctx}, refs)
-	if !errors.Is(err, context.DeadlineExceeded) || Transient(err) || len(errs) != 0 {
-		t.Fatalf("expired caller: err %v, transient %v, per-ref %v", err, Transient(err), errs)
-	}
-	if n := sent.Load(); n != 1 {
-		t.Fatalf("an expired caller sent %d requests: retried or split", n)
-	}
-
-	sent.Store(0)
-	ctx, cancel = endOnArrival()
-	defer cancel()
-	if _, _, _, err := c.InventoryByRef(ctx, refs); !errors.Is(err, context.Canceled) || Transient(err) || sent.Load() != 1 {
-		t.Fatalf("canceled caller: err %v, %d requests", err, sent.Load())
-	}
-}
-
 func TestRefusedTokenRereadOncePerRecheck(t *testing.T) {
 	var sent atomic.Int32
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -13,7 +13,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/views"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/view"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -31,7 +30,7 @@ type Columns struct {
 	AuthorColumns bool
 }
 
-// Link is a pull request's workspace as the inventory last saw it.
+// Link is a unit's workspace as its source last linked it.
 type Link struct {
 	WorkspaceID string
 	Review      bool
@@ -41,7 +40,7 @@ type Adapter struct {
 	m     *wsorca.Manager
 	cache *workspace.Cache
 	cols  Columns
-	links func(context.Context) (map[pr.Ref]Link, error)
+	links func(context.Context) (map[unit.Unit]Link, error)
 
 	mu     sync.Mutex
 	owners map[string]cardOwner
@@ -63,17 +62,17 @@ var (
 )
 
 // New is an adapter whose every read asks m.
-func New(m *wsorca.Manager, cfg Columns, links func(context.Context) (map[pr.Ref]Link, error)) *Adapter {
+func New(m *wsorca.Manager, cfg Columns, links func(context.Context) (map[unit.Unit]Link, error)) *Adapter {
 	return newAdapter(m, workspace.NewCache(m, nil, time.Now), cfg, links)
 }
 
-func newAdapter(m *wsorca.Manager, c *workspace.Cache, cfg Columns, links func(context.Context) (map[pr.Ref]Link, error)) *Adapter {
+func newAdapter(m *wsorca.Manager, c *workspace.Cache, cfg Columns, links func(context.Context) (map[unit.Unit]Link, error)) *Adapter {
 	return &Adapter{m: m, cache: c, cols: cfg, links: links, owners: map[string]cardOwner{}}
 }
 
 // Ports puts an Orca workspace manager behind the sessions and board ports. On a
 // *workspace.Cached the adapter reads its cache and invalidates it on each write.
-func Ports(ws workspace.Manager, cols Columns, links func(context.Context) (map[pr.Ref]Link, error)) (*Adapter, error) {
+func Ports(ws workspace.Manager, cols Columns, links func(context.Context) (map[unit.Unit]Link, error)) (*Adapter, error) {
 	m, ok := workspace.Direct(ws).(*wsorca.Manager)
 	if !ok {
 		return nil, fmt.Errorf("the Orca adapter cannot run on the workspace manager %q", ws.Name())
@@ -97,9 +96,9 @@ func (a *Adapter) WatchAgents(ctx context.Context, note func(units []unit.Unit))
 			return
 		}
 		var units []unit.Unit
-		for ref, l := range links {
+		for u, l := range links {
 			if slices.Contains(moved, l.WorkspaceID) {
-				units = append(units, ref.Unit())
+				units = append(units, u)
 			}
 		}
 		if len(units) > 0 {
@@ -254,11 +253,7 @@ func (a *Adapter) Apply(ctx context.Context, items []view.Item, force map[unit.U
 		return nil, err
 	}
 	linkOf := func(u unit.Unit) (Link, bool) {
-		ref, err := pr.ParseKey(u.Key)
-		if u.Provider != unit.GitHub || err != nil {
-			return Link{}, false
-		}
-		l, ok := links[ref]
+		l, ok := links[u]
 		return l, ok
 	}
 	var eligible []view.Item
@@ -407,9 +402,9 @@ func (a *Adapter) Placements(ctx context.Context) (map[unit.Unit]string, error) 
 		return nil, err
 	}
 	out := make(map[unit.Unit]string, len(links))
-	for ref, l := range links {
+	for u, l := range links {
 		if c, ok := columns[l.WorkspaceID]; ok {
-			out[ref.Unit()] = c
+			out[u] = c
 		}
 	}
 	return out, nil

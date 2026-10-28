@@ -150,46 +150,6 @@ func (s *Store) UpsertPR(ctx context.Context, pr dinv.PR) error {
 	return err
 }
 
-// StoredFacts is what storing a fresh GitHub snapshot needs of the stored one.
-type StoredFacts struct {
-	PR             dinv.PR // zero when not Found
-	Found          bool
-	Pushes         map[string]time.Time // push key -> at
-	UnfilledMerges []time.Time          // merged events lacking the merger or the commit
-}
-
-// StoredFacts reads the facts of refs: the stored pull requests, then
-// their pushes and unfilled merges from the host's events.
-func (s *Store) StoredFacts(ctx context.Context, refs []github.Ref) (map[github.Ref]StoredFacts, error) {
-	prs, err := s.PRs(ctx, refs)
-	if err != nil {
-		return nil, err
-	}
-	out := make(map[github.Ref]StoredFacts, len(refs))
-	for _, r := range refs {
-		p, found := prs[r]
-		out[r] = StoredFacts{PR: p, Found: found}
-	}
-	evs, err := s.hostEvents(ctx, refs, dinv.KindPush, dinv.KindMerged)
-	if err != nil {
-		return nil, err
-	}
-	for _, e := range evs {
-		f := out[e.PR]
-		switch {
-		case e.Kind == dinv.KindPush:
-			if f.Pushes == nil {
-				f.Pushes = map[string]time.Time{}
-			}
-			f.Pushes[e.Key] = e.At
-		case e.Key == "" && (e.Actor == "" || e.Data == ""):
-			f.UnfilledMerges = append(f.UnfilledMerges, e.At)
-		}
-		out[e.PR] = f
-	}
-	return out, nil
-}
-
 // refValues is the VALUES rows and arguments of refs, for an IN on the
 // primary key.
 func refValues(refs []github.Ref) (string, []any) {
@@ -485,12 +445,6 @@ func (s *Store) Details(ctx context.Context, refs []github.Ref) (map[github.Ref]
 	return s.details(ctx, refs, true)
 }
 
-// DetailStamps returns the Version and ReadAt of each ref's stored detail,
-// leaving its body unread.
-func (s *Store) DetailStamps(ctx context.Context, refs []github.Ref) (map[github.Ref]Detail, error) {
-	return s.details(ctx, refs, false)
-}
-
 func (s *Store) details(ctx context.Context, refs []github.Ref, withBody bool) (map[github.Ref]Detail, error) {
 	out := make(map[github.Ref]Detail, len(refs))
 	body := "''"
@@ -596,16 +550,6 @@ func seeRefs(ctx context.Context, tx *sqlite.Tx, refs []github.Ref, at time.Time
 	return nil
 }
 
-// SeeRefs records that a search or a read returned refs at at. A sighting
-// touches no topic.
-func (s *Store) SeeRefs(ctx context.Context, refs []github.Ref, at time.Time) error {
-	if len(refs) == 0 {
-		return nil
-	}
-	_, err := s.db.Write(ctx, func(tx *sqlite.Tx) error { return seeRefs(ctx, tx, refs, at) })
-	return err
-}
-
 // Seen is when a search or a read last returned each open pull request.
 func (s *Store) Seen(ctx context.Context) (map[github.Ref]time.Time, error) {
 	rows, err := s.db.R().QueryContext(ctx, `SELECT p.owner, p.repo, p.number, COALESCE(s.at, '') FROM pull_requests p LEFT JOIN pr_seen s USING (owner, repo, number) WHERE p.state = ?`, dgh.StateOpen)
@@ -643,80 +587,6 @@ func nextMergeable(stored, storedAt, next string, at time.Time) (string, string)
 		return stored, storedAt
 	}
 	return next, ts(at)
-}
-
-type stubRow struct{ requests, decision, mergeable, mergeableAt string }
-
-// TouchStubs refreshes the review requests, the review decision, the
-// sighting and the mergeable state of pull requests a search returned unchanged, in one transaction. A
-// closed pull request's mergeable state is not followed.
-func (s *Store) TouchStubs(ctx context.Context, stubs []github.Stub, seenAt time.Time) error {
-	if len(stubs) == 0 {
-		return nil
-	}
-	_, err := s.db.Write(ctx, func(tx *sqlite.Tx) error {
-		rows, err := stubRows(ctx, tx, stubs)
-		if err != nil {
-			return err
-		}
-		var sighted []github.Ref
-		for _, st := range stubs {
-			row, ok := rows[st.Ref]
-			if !ok {
-				continue
-			}
-			next := row
-			if st.State == "" || st.State == "OPEN" {
-				next.mergeable, next.mergeableAt = nextMergeable(row.mergeable, row.mergeableAt, st.Mergeable, seenAt)
-			}
-			next.requests = joinList(st.ReviewRequests)
-			next.decision = st.ReviewDecision
-			sighted = append(sighted, st.Ref)
-			if next == row {
-				continue
-			}
-			if _, err := tx.ExecContext(ctx, `UPDATE pull_requests SET review_requests=?, review_decision=?, mergeable=?, mergeable_at=? WHERE owner=? AND repo=? AND number=?`,
-				next.requests, next.decision, next.mergeable, next.mergeableAt, st.Ref.Owner, st.Ref.Repo, st.Ref.Number); err != nil {
-				return err
-			}
-			tx.Touch(port.TopicPRs, st.Ref.Unit())
-			rows[st.Ref] = next
-		}
-		return seeRefs(ctx, tx, sighted, seenAt)
-	})
-	return err
-}
-
-func stubRows(ctx context.Context, tx *sqlite.Tx, stubs []github.Stub) (map[github.Ref]stubRow, error) {
-	out := make(map[github.Ref]stubRow, len(stubs))
-	for chunk := range slices.Chunk(stubs, prReadChunk) {
-		refs := make([]github.Ref, len(chunk))
-		for i, st := range chunk {
-			refs[i] = st.Ref
-		}
-		marks, args := refValues(refs)
-		rows, err := tx.QueryContext(ctx, `SELECT owner, repo, number, review_requests, review_decision, mergeable, mergeable_at FROM pull_requests
-			WHERE (owner, repo, number) IN (VALUES `+marks+`)`, args...)
-		if err != nil {
-			return nil, err
-		}
-		err = func() error {
-			defer rows.Close()
-			for rows.Next() {
-				var ref github.Ref
-				var r stubRow
-				if err := rows.Scan(&ref.Owner, &ref.Repo, &ref.Number, &r.requests, &r.decision, &r.mergeable, &r.mergeableAt); err != nil {
-					return err
-				}
-				out[ref] = r
-			}
-			return rows.Err()
-		}()
-		if err != nil {
-			return nil, err
-		}
-	}
-	return out, nil
 }
 
 // SetReasons replaces ref's follow reasons, recording on the host first
@@ -1213,38 +1083,6 @@ func (s *Store) UnitlessEvents(ctx context.Context) ([]dinv.Event, error) {
 
 func endedSQL(marks string) string {
 	return `SELECT DISTINCT unit_key FROM events WHERE provider = 'github' AND unit_key IN (` + marks + `) AND kind=? AND key != ''`
-}
-
-const reviewedSQL = `SELECT unit_key, sent_at FROM turns INDEXED BY turns_sent_at
-	WHERE sent_at >= ? AND provider = 'github' AND intent = 'review' AND state != ?`
-
-// Reviewed lists the pull requests with a review turn, not withdrawn, sent
-// at or after since.
-func (s *Store) Reviewed(ctx context.Context, since time.Time) ([]github.Ref, error) {
-	// sent_at text drops trailing fraction zeros, so it orders by time only
-	// to the second: the SQL bound is a second early and the parsed time
-	// decides.
-	bound := since.Add(-time.Second).UTC().Format(time.RFC3339)
-	rows, err := s.db.R().QueryContext(ctx, reviewedSQL, bound, string(turn.Withdrawn))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []github.Ref
-	for rows.Next() {
-		var key, sent string
-		if err := rows.Scan(&key, &sent); err != nil {
-			return nil, err
-		}
-		at, err := time.Parse(sqlite.TimeLayout, sent)
-		if err != nil {
-			return nil, err
-		}
-		if ref := refOf(string(unit.GitHub), key); ref.Number != 0 && !at.Before(since) && !slices.Contains(out, ref) {
-			out = append(out, ref)
-		}
-	}
-	return out, rows.Err()
 }
 
 // Ended says, per pull request in refs, whether a keyed event of kind exists.

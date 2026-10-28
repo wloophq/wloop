@@ -334,3 +334,24 @@ func Loop(name string) string { return "loop:" + name }
 
 // Untagged names the registry's totals of samples added outside any scope.
 const Untagged = "untagged"
+
+// ScopeOf is the scope ctx carries; nil when it carries none.
+func ScopeOf(ctx context.Context) *Scope {
+	s, _ := ctx.Value(scopeKey).(*Scope)
+	return s
+}
+
+// Add records x in s, its enclosing scopes and the registry s reports to,
+// as Add does under a context that carries s. Spend says x only adds its
+// Points, the cost a response reports for a request already counted.
+func (s *Scope) Add(x Sample, spend bool) {
+	if !s.traced {
+		x.Detail = ""
+	}
+	if s.entry != nil {
+		s.entry.record(x, spend)
+	}
+	for sc := s; sc != nil; sc = sc.parent {
+		sc.record(x, spend)
+	}
+}

@@ -128,12 +128,19 @@ func (s *Set) Focus(ctx context.Context, ws wsdomain.Workspace) error {
 // List is every manager's workspaces, each carrying its manager; a manager
 // that cannot be read lists none, and only every one failing is an error.
 func (s *Set) List(ctx context.Context) ([]wsdomain.Workspace, error) {
+	out, _, err := s.ListAll(ctx)
+	return out, err
+}
+
+// ListAll is List, and the managers that could not be read.
+func (s *Set) ListAll(ctx context.Context) (_ []wsdomain.Workspace, failed []string, _ error) {
 	var out []wsdomain.Workspace
 	var errs []error
 	for _, m := range s.All() {
 		ws, err := m.List(ctx)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", m.Name(), err))
+			failed = append(failed, m.Name())
 			continue
 		}
 		for _, w := range ws {
@@ -142,9 +149,9 @@ func (s *Set) List(ctx context.Context) ([]wsdomain.Workspace, error) {
 		}
 	}
 	if len(errs) > 0 && len(errs) == s.Len() {
-		return nil, errors.Join(errs...)
+		return nil, failed, errors.Join(errs...)
 	}
-	return s.settle(ctx, out, nil), nil
+	return s.settle(ctx, out, nil), failed, nil
 }
 
 // settle keeps one workspace per worktree path, its owner's, and gives each

@@ -128,7 +128,7 @@ func withStore(d Deps, st *inventory.Store) Deps {
 	if now == nil {
 		now = time.Now
 	}
-	d.Track, d.Untrack = ghsource.Follows(st, func(ctx context.Context, ref github.Ref) (port.TrackRead, error) {
+	d.Track, d.Untrack = testFollows(st, func(ctx context.Context, ref github.Ref) (port.TrackRead, error) {
 		if read := g.read.Load(); read != nil && *read != nil {
 			return (*read)(ctx, ref.Unit())
 		}

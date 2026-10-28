@@ -23,7 +23,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github/githubtest"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/source"
@@ -139,21 +138,6 @@ func offeredRounds(t *testing.T, sc sweepCase) *fakePlanner {
 		t.Fatal(err)
 	}
 	return &fakePlanner{rounds: map[string][]src.Round{u.Key: plan.Rounds}, reads: map[string]dinv.PlanFacts{u.Key: read}}
-}
-
-// linkWorkspaces runs the collector's fast pass over te's workspaces, which
-// links each to its pull request in the inventory as the daemon's
-// ingestion does.
-func linkWorkspaces(t *testing.T, te *testEnv) {
-	t.Helper()
-	te.Store.UseClock(te.Now)
-	hosted := te.gh.hosted
-	te.gh.hosted = true
-	defer func() { te.gh.hosted = hosted }()
-	c := &ghsource.Collector{Store: te.Store, GH: githubtest.Runner(quietGH{te.gh}), WS: te.WS, Sink: te.boardSink(te.cfg), Cfg: te.cfg, Now: te.Now, Log: t.Logf}
-	if _, err := c.Fast(context.Background()); err != nil {
-		t.Fatal(err)
-	}
 }
 
 // fakeBriefs answers every turn with rd and counts what asked.

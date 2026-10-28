@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"encoding/json"
 	"slices"
 	"testing"
 	"time"
@@ -11,8 +10,7 @@ import (
 )
 
 func detail(readAt time.Time, labels ...string) Detail {
-	body, _ := json.Marshal(map[string]any{"Labels": labels, "ThreadsTotal": 1})
-	return Detail{Version: 2, ReadAt: readAt, Body: body}
+	return Detail{Version: DetailVersion, ReadAt: readAt, Labels: labels, ThreadsTotal: 1}
 }
 
 func TestUnchangedDetailNotRewritten(t *testing.T) {
@@ -49,7 +47,7 @@ func TestUnchangedDetailNotRewritten(t *testing.T) {
 		t.Fatalf("a new detail heard %+v", got)
 	}
 	d, err = db.Details(ctx, []pr.Ref{ref, {Owner: "acme", Repo: "api", Number: 9}})
-	if err != nil || len(d) != 1 || string(d[ref].Body) != string(detail(later, "bug", "urgent").Body) {
+	if err != nil || len(d) != 1 || !slices.Equal(d[ref].Labels, []string{"bug", "urgent"}) {
 		t.Fatalf("stored %+v: %v", d, err)
 	}
 }

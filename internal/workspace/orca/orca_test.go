@@ -336,7 +336,7 @@ func TestCreateFromPRNamesTheBranchAfterTheHead(t *testing.T) {
 	m := &Manager{R: canned{}, RPC: rpc}
 	ws, handle, err := m.Create(context.Background(), workspace.CreateRequest{
 		RepoID: "r1", Name: "REVIEW feat/x", Unit: prUnit(7), Agent: "claude", Prompt: "/skill url",
-		HeadBranch: "feat/x", BaseBranchName: "main",
+		Checkout: workspace.Checkout{Branch: "feat/x", Base: "main"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -359,7 +359,7 @@ func TestCreateMarksARenamedBranch(t *testing.T) {
 			"worktree.resolvePrBase": `{"ok":true,"result":{"baseBranch":"abc","branchNameOverride":"feat/x"}}`,
 			"worktree.create":        `{"ok":true,"result":{"worktree":{"id":"r1::/wt/x","path":"/wt/x","displayName":"REVIEW feat/x","branch":"refs/heads/` + branch + `"}}}`,
 		}}
-		ws, _, err := (&Manager{R: canned{}, RPC: rpc}).Create(context.Background(), workspace.CreateRequest{RepoID: "r1", Name: "REVIEW feat/x", Unit: prUnit(7), HeadBranch: "feat/x"})
+		ws, _, err := (&Manager{R: canned{}, RPC: rpc}).Create(context.Background(), workspace.CreateRequest{RepoID: "r1", Name: "REVIEW feat/x", Unit: prUnit(7), Checkout: workspace.Checkout{Branch: "feat/x"}})
 		if err != nil || ws.BranchRenamed != want {
 			t.Errorf("branch %s: renamed %v, err %v", branch, ws.BranchRenamed, err)
 		}
@@ -371,7 +371,7 @@ func TestCreateFallsBackToTheCLIWhenRPCFails(t *testing.T) {
 		R:   canned{"worktree create": `{"ok":true,"result":{"worktree":{"id":"r1::/wt/x","path":"/wt/x","displayName":"REVIEW feat/x"}}}`},
 		RPC: &fakeRPC{fail: errors.New("orca app layout not found")},
 	}
-	ws, _, err := m.Create(context.Background(), workspace.CreateRequest{RepoID: "r1", Name: "REVIEW feat/x", Unit: prUnit(7), HeadBranch: "feat/x"})
+	ws, _, err := m.Create(context.Background(), workspace.CreateRequest{RepoID: "r1", Name: "REVIEW feat/x", Unit: prUnit(7), Checkout: workspace.Checkout{Branch: "feat/x"}})
 	if err != nil || ws.Path != "/wt/x" {
 		t.Fatalf("ws = %+v, err = %v", ws, err)
 	}
@@ -639,7 +639,7 @@ func TestCreateFromPRDropsTheParent(t *testing.T) {
 		"worktree.resolvePrBase": `{"ok":true,"result":{"baseBranch":"abc","branchNameOverride":"feat/x"}}`,
 		"worktree.create":        `{"ok":true,"result":{"worktree":{"id":"r1::/wt/x","path":"/wt/x","branch":"refs/heads/feat/x"}}}`,
 	}}
-	ws, _, err := (&Manager{R: canned{}, RPC: rpc}).Create(context.Background(), workspace.CreateRequest{RepoID: "r1", Name: "x", Unit: prUnit(7), HeadBranch: "feat/x", Parent: "/wt/lead"})
+	ws, _, err := (&Manager{R: canned{}, RPC: rpc}).Create(context.Background(), workspace.CreateRequest{RepoID: "r1", Name: "x", Unit: prUnit(7), Parent: "/wt/lead", Checkout: workspace.Checkout{Branch: "feat/x"}})
 	if err != nil || !ws.ParentDropped || rpc.params["worktree.create"]["noParent"] != true {
 		t.Fatalf("ws = %+v, err = %v, params = %v", ws, err, rpc.params["worktree.create"])
 	}

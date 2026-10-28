@@ -14,6 +14,7 @@ import (
 	sdk "github.com/wloophq/wloop/pkg/plugin"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
+	"github.com/wloophq/wloop/plugins/github/api/apitest"
 	"github.com/wloophq/wloop/plugins/github/store"
 )
 
@@ -106,11 +107,11 @@ func TestTheManifestDeclaresTheCommandsThePluginServes(t *testing.T) {
 	}
 }
 
-func TestIdentityIsTheViewerGhNamesAndTheStoreKeepsIt(t *testing.T) {
+func TestIdentityIsTheViewerGitHubNamesAndTheStoreKeepsIt(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	gh := &fakeGH{answers: map[string]string{"api user": "ana\n"}, fail: map[string]error{}}
-	p := &Plugin{GH: gh}
+	p := &Plugin{GH: gh, API: apitest.Options(&githubGraphQL{})}
 	id, err := p.Identity(ctx)
 	if err != nil || id.Viewer.Key != "github:ana" || id.Viewer.Name != "ana" {
 		t.Fatalf("identity in CLI mode %+v %v", id, err)

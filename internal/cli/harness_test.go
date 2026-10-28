@@ -377,30 +377,6 @@ func (s syncedInputs) Ended(ctx context.Context, kind string, units []unit.Unit)
 	return storeInputs{s.te.Store}.Ended(ctx, kind, units)
 }
 
-// syncInventory reads every pull request of te's fake GitHub through the
-// collector into te's inventory, outside ctx's meter scope and the fake's
-// calls.
-func (te *testEnv) syncInventory(context.Context) error {
-	ctx := context.Background()
-	te.gh.mu.Lock()
-	viewer, _, order := te.gh.inventoryNodes()
-	te.gh.mu.Unlock()
-	if err := te.Store.SetViewer(ctx, unit.GitHub, viewer); err != nil {
-		return err
-	}
-	c := &ghsource.Collector{Store: te.Store, GH: githubtest.Runner(quietGH{te.gh}), Cfg: te.cfg, Now: te.Now}
-	for _, key := range order {
-		ref, err := pr.ParseKey(key)
-		if err != nil {
-			return err
-		}
-		if _, _, err := c.Refresh(ctx, ref); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // fakeGit serves read commands from canned values and records the rest.
 type fakeGit struct {
 	mu    sync.Mutex
@@ -621,7 +597,7 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 		background: &sync.WaitGroup{},
 		Out:        te.out,
 		Err:        te.err,
-		github:     githubClients{ghsource.Clients{GH: ghcli.Metered(te.gh), API: githubtest.Runner(te.gh)}},
+		github:     githubClients{Clients: ghsource.Clients{GH: ghcli.Metered(te.gh), API: githubtest.Runner(te.gh)}},
 		Git:        gitx.Git{R: te.git},
 		Files:      checkoutFiles{ws},
 		WS:         workspace.NewSet(ws),
@@ -652,6 +628,7 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 			return nil, fmt.Errorf("no agent in tests")
 		}}},
 	}
+	te.Env.forge = testForge{te}
 	te.served, te.stopServed = context.WithCancel(context.Background())
 	te.Env.intents = newEnvIntents(te.Env)
 	te.Env.planReads = syncedInputs{te}

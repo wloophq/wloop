@@ -192,15 +192,15 @@ func (m *Manager) Create(ctx context.Context, req workspace.CreateRequest) (_ ws
 			return wsdomain.Workspace{}, "", err
 		}
 	}
-	if req.HeadBranch != "" {
-		w.Branch = req.HeadBranch + m.BranchSuffix
+	if req.Checkout.Branch != "" {
+		w.Branch = req.Checkout.Branch + m.BranchSuffix
 		checkedOut := slices.ContainsFunc(m.WorkspaceList, func(o wsdomain.Workspace) bool { return o.RepoID == req.RepoID && o.Branch == w.Branch })
-		if tip := m.Tips[w.Branch]; checkedOut || (tip != "" && tip != req.HeadOid) {
+		if tip := m.Tips[w.Branch]; checkedOut || (tip != "" && tip != req.Checkout.Head) {
 			w.Branch += "-2"
-		} else if m.Tips != nil && req.HeadOid != "" {
-			m.Tips[w.Branch] = req.HeadOid
+		} else if m.Tips != nil && req.Checkout.Head != "" {
+			m.Tips[w.Branch] = req.Checkout.Head
 		}
-		w.BranchRenamed = w.Branch != req.HeadBranch
+		w.BranchRenamed = w.Branch != req.Checkout.Branch
 	}
 	w.ParentDropped = req.Parent != "" && !slices.ContainsFunc(m.WorkspaceList, func(o wsdomain.Workspace) bool { return o.Path == req.Parent })
 	m.WorkspaceList = append(m.WorkspaceList, w)

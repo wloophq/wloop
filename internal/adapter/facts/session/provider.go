@@ -17,15 +17,15 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/sweep"
 	"github.com/wloophq/wloop/internal/core/turns"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
-// PRStates reads the stored pull requests of units; one not stored is absent.
-type PRStates interface {
-	PRs(ctx context.Context, units []unit.Unit) (map[unit.Unit]dinv.PR, error)
+// UnitStates reads the state of units as their sources last reported it,
+// such as a pull request's OPEN or MERGED; a unit with none is absent.
+type UnitStates interface {
+	States(ctx context.Context, units []unit.Unit) (map[unit.Unit]string, error)
 }
 
 type Deps struct {
@@ -33,7 +33,10 @@ type Deps struct {
 	// Prompts are read, and Refresh writes through it.
 	Turns    *turns.Service
 	Snapshot sweep.Snapshot
-	PRs      PRStates
+	States   UnitStates
+	// Repo is the repository a unit's work is in, "owner/name"; nil, or ""
+	// for a unit in none.
+	Repo func(unit.Unit) string
 	// Changes is the store's change log: one read of the world serves every
 	// call until it or the snapshot moves; nil reads it on every call.
 	Changes port.Changes

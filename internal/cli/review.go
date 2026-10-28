@@ -65,14 +65,10 @@ func (e *Env) openReview(ctx context.Context, cfg config.Config, ref pr.Ref, pr 
 			return false, cmp.Or(err, errors.New(why))
 		}
 		ws, submitted, err = e.createWithAgent(ctx, cfg, ref, repo, workspace.CreateRequest{
-			Name:    cfg.GitHub.ReviewPrefix + pr.HeadRefName,
-			BaseRef: "origin/pr/" + fmt.Sprint(ref.Number),
-			Unit:    ref.Unit(),
-
-			HeadBranch:      pr.HeadRefName,
-			HeadOid:         pr.HeadRefOid,
-			BaseBranchName:  pr.BaseRefName,
-			CrossRepository: pr.IsCrossRepository,
+			Name:     cfg.GitHub.ReviewPrefix + pr.HeadRefName,
+			BaseRef:  "origin/pr/" + fmt.Sprint(ref.Number),
+			Unit:     ref.Unit(),
+			Checkout: workspace.Checkout{Branch: pr.HeadRefName, Head: pr.HeadRefOid, Base: pr.BaseRefName, Fork: pr.IsCrossRepository},
 		}, sent, opts)
 		if err != nil {
 			return false, err
@@ -147,8 +143,8 @@ func (e *Env) createWithAgent(ctx context.Context, cfg config.Config, ref pr.Ref
 	if err := e.WS.Keep(ctx, m, ws, repo.Path, true, req.Unit); err != nil {
 		fmt.Fprintf(e.Err, "warning: %s: recording who owns it: %v\n", ws.DisplayName, err)
 	}
-	if !req.CrossRepository && ws.BranchRenamed {
-		return ws, false, e.discard(ctx, ws, fmt.Errorf("%s created %s on branch %s instead of %s, which is taken", e.displayOf([]string{m.Name()}), ws.DisplayName, ws.Branch, req.HeadBranch))
+	if !req.Checkout.Fork && ws.BranchRenamed {
+		return ws, false, e.discard(ctx, ws, fmt.Errorf("%s created %s on branch %s instead of %s, which is taken", e.displayOf([]string{m.Name()}), ws.DisplayName, ws.Branch, req.Checkout.Branch))
 	}
 	s, err := e.agentSession(ctx, cfg, ws, opts)
 	if err != nil {

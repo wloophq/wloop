@@ -260,6 +260,7 @@ func installPlugins(configDir, exe string) ([]host.Plugin, error) {
 // runs none.
 func (e *Env) servePlugins(ctx context.Context, db *sqlite.DB, cfg config.Config, logf func(string, ...any)) (stop func()) {
 	snaps := psource.NewSnapshots(db.Snapshots())
+	meters := &psource.Meters{Registry: e.meter}
 	e.briefsHeard = &atomic.Pointer[brief.Queue]{}
 	briefIntents := e.briefIntents(logf)
 	hosted := e.hostedFor(db, cfg, logf)
@@ -278,17 +279,20 @@ func (e *Env) servePlugins(ctx context.Context, db *sqlite.DB, cfg config.Config
 		Snapshots: snaps,
 		StateDir:  func(id string) string { return filepath.Join(e.StateDir, "plugins", id) },
 		Broker: func(id string, s *manifest.Source) *psource.Broker {
-			return &psource.Broker{ID: id, Manifest: s, Snapshots: snaps, Units: psource.Units{Codecs: codecs}, Config: e.currentConfig,
+			return e.withGitHubBroker(&psource.Broker{ID: id, Manifest: s, Snapshots: snaps, Units: psource.Units{Codecs: codecs}, Config: e.currentConfig,
 				Note: note, Briefs: db, BriefRecords: e.briefRecords(db), Briefed: e.heardBrief, Now: e.Now, BriefIntent: briefIntents,
 				Events: sqlite.New(db), Marks: db, Drafts: db, Overrides: db, Paused: e.roundsPaused, Rounds: e.storedRoundState,
-				Links: db.Links(), Hosted: hosted(id)}
+				Links: db.Links(), Hosted: hosted(id), Meters: meters, Workspaces: e.workspaceListing}, id, db)
 		},
 		Loaded: func(id string) {
 			logf("plugin %s: loaded", id)
+			e.pluginLoaded(ctx, db, id)
 			note(port.TopicPRs | port.TopicJobs)
 		},
-		Logf: logf,
+		Logf:   logf,
+		Meters: meters,
 	}
+	e.viaGitHubPlugin()
 	if e.noJobs {
 		logf("plugins: --no-jobs starts none")
 		return func() {}

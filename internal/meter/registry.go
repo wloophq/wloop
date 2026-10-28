@@ -191,3 +191,9 @@ func copyOrNil(t Tally) Tally {
 	}
 	return t.Merge(nil)
 }
+
+// Add records x in r under the scope full name name, with no scope open:
+// a sample that reaches the host after the scope it was made under ended.
+func (r *Registry) Add(name string, x Sample, spend bool) {
+	r.entry(name).record(x, spend)
+}

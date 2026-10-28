@@ -31,6 +31,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/card"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel"
@@ -48,10 +49,26 @@ func withRows(d daemon.Deps, st *inventory.Store) daemon.Deps {
 	d = withSources(withStore(d, st), plugins, mods)
 	d = withGitHub(d, present.Deps{Store: st, Host: moduleBroker(d.Units, st.DB())})
 	d.Ingest, d.Collector = nil, nil
+	d.Follows = func(p unit.ProviderID) bool { return p == unit.GitHub }
+	d.Track = func(_ context.Context, u unit.Unit) (port.TrackRead, error) {
+		return port.TrackRead{Unit: u, Save: func(ctx context.Context) error { return setTracked(ctx, st, u, true) }}, nil
+	}
+	d.Untrack = func(ctx context.Context, u unit.Unit) error { return setTracked(ctx, st, u, false) }
 	if d.Forge == "" {
 		d.Forge = unit.GitHub
 	}
 	return d
+}
+
+// setTracked tracks or untracks u in st, as the GitHub plugin's follow
+// reports it.
+func setTracked(ctx context.Context, st *inventory.Store, u unit.Unit, tracked bool) error {
+	ref, err := pr.ParseKey(u.Key)
+	if err != nil {
+		return err
+	}
+	_, err = st.SetTracked(ctx, ref, tracked)
+	return err
 }
 
 // threadRows serves a row for each of units, titled by title or else by

@@ -301,14 +301,14 @@ func TestPRsChunks(t *testing.T) {
 	db := open(t)
 	ctx := context.Background()
 	refs := make([]pr.Ref, 1200)
-	var stored []pr.PR
+	var stored []Snapshot
 	for i := range refs {
 		refs[i] = pr.Ref{Owner: "acme", Repo: "api", Number: i + 1}
 		if i%2 == 0 {
-			stored = append(stored, pr.PR{Ref: refs[i], State: pr.StateOpen, Title: fmt.Sprint("t", i)})
+			stored = append(stored, Snapshot{PR: pr.PR{Ref: refs[i], State: pr.StateOpen, Title: fmt.Sprint("t", i)}})
 		}
 	}
-	if err := db.SavePRs(ctx, stored, noteAt); err != nil {
+	if _, err := db.SaveSnapshots(ctx, stored, noteAt); err != nil {
 		t.Fatal(err)
 	}
 	got, err := db.PRs(ctx, refs)

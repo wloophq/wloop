@@ -16,7 +16,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
@@ -816,7 +815,7 @@ func TestTrackRefusesPastTheCap(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
-	for n := 1; n <= ghsource.TrackMax; n++ {
+	for n := 1; n <= trackMax; n++ {
 		s.store().SetOverride(ctx, dinv.Override{PR: github.Ref{Owner: "acme", Repo: "big", Number: n}, Tracked: true})
 	}
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/track", `{}`); rec.Code != 400 || !strings.Contains(rec.Body.String(), "untrack one first") || !strings.Contains(rec.Body.String(), "acme/big#50") {
@@ -948,7 +947,7 @@ func TestTheTrackCapHoldsUnderConcurrentTracks(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
-	for n := 1; n < ghsource.TrackMax; n++ {
+	for n := 1; n < trackMax; n++ {
 		s.store().SetOverride(ctx, dinv.Override{PR: github.Ref{Owner: "acme", Repo: "big", Number: n}, Tracked: true})
 	}
 	codes := make([]int, 2)
@@ -958,7 +957,7 @@ func TestTheTrackCapHoldsUnderConcurrentTracks(t *testing.T) {
 	}
 	wg.Wait()
 	slices.Sort(codes)
-	if got, _ := s.store().Tracked(ctx); len(got) != ghsource.TrackMax || !slices.Equal(codes, []int{200, 400}) {
+	if got, _ := s.store().Tracked(ctx); len(got) != trackMax || !slices.Equal(codes, []int{200, 400}) {
 		t.Fatalf("%d tracked, codes %v", len(got), codes)
 	}
 }
@@ -1044,7 +1043,7 @@ func TestARefusedTrackStoresNothing(t *testing.T) {
 		saved := false
 		s.trackReads(func(context.Context, unit.Unit) (port.TrackRead, error) {
 			if c.race {
-				for n := 1; n <= ghsource.TrackMax; n++ {
+				for n := 1; n <= trackMax; n++ {
 					s.store().SetOverride(ctx, dinv.Override{PR: github.Ref{Owner: "acme", Repo: "big", Number: n}, Tracked: true})
 				}
 			}

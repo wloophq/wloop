@@ -35,6 +35,10 @@ type DB struct {
 	mu       sync.Mutex
 	listenMu sync.Mutex
 	listen   []func(Change)
+
+	useMu sync.Mutex
+	host  Host
+	clock func() time.Time
 }
 
 // Open opens dir's store, creating it with the plugin's schema, and imports

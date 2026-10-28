@@ -55,6 +55,8 @@ import (
 	"github.com/wloophq/wloop/internal/transport/mcp"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 	wsorca "github.com/wloophq/wloop/internal/workspace/orca"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+	"github.com/wloophq/wloop/pkg/plugin/source/sourcetest"
 )
 
 type syncBuffer struct {
@@ -369,7 +371,7 @@ func TestServeDepsShareTheLoopMutex(t *testing.T) {
 	}
 }
 
-func TestServeViewerTeamsAreTheOnesIBelongTo(t *testing.T) {
+func TestServeViewerTeamsAreTheOnesTheGitHubPluginNamed(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.GitHub.Scope.Teams = []string{"acme/platform", "acme/search"}
@@ -379,7 +381,9 @@ func TestServeViewerTeamsAreTheOnesIBelongTo(t *testing.T) {
 	}
 	store := inventory.New(storeDB)
 	t.Cleanup(func() { storeDB.Close() })
-	store.SetMeta(context.Background(), "scope_resolved", `{"Teams":["acme/platform","acme/search"],"MyTeams":["acme/search"]}`)
+	if err := ghsource.KeepIdentity(context.Background(), store, src.Identity{Viewer: src.Person{Key: "github:me", Name: "me"}, Teams: []string{"acme/search"}}); err != nil {
+		t.Fatal(err)
+	}
 	te.cfg = withoutWindows(te.cfg)
 	d := te.serveDeps(context.Background(), storeDB, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
 	id, err := d.Identity(context.Background())
@@ -763,43 +767,30 @@ func TestAgentForFollowsTheReloadedConfig(t *testing.T) {
 	}
 }
 
-// spentBudget is a GitHub that finds nothing and reports one GraphQL bucket.
-type spentBudget struct {
-	ghsource.GitHub
+// budgetStub is a GitHub plugin whose API budget is one GraphQL bucket.
+type budgetStub struct {
+	*forgeStub
 	limit dgh.Limit
 }
 
-func (b spentBudget) Allow(dgh.Priority) bool { return true }
-func (b spentBudget) Budget() map[dgh.Resource]dgh.Limit {
-	return map[dgh.Resource]dgh.Limit{dgh.ResourceGraphQL: b.limit}
-}
-func (spentBudget) Viewer(context.Context) (string, error) { return "me", nil }
-func (spentBudget) SearchStubsFirst(_ context.Context, qs []string, _ int) ([]github.StubPage, []error, error) {
-	return make([]github.StubPage, len(qs)), make([]error, len(qs)), nil
+func (b budgetStub) Action(_ context.Context, req src.ActionRequest) (json.RawMessage, error) {
+	if req.Action != ghsource.ActionBudget {
+		return nil, src.ErrUnsupported
+	}
+	return json.Marshal(map[dgh.Resource]dgh.Limit{dgh.ResourceGraphQL: b.limit})
 }
 
-func TestServeRestoresTheBudgetAFastRunKept(t *testing.T) {
+func TestServeRestoresTheBudgetTheGitHubPluginKeeps(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	at := te.Now()
-	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
-	ctx := context.Background()
 	spent := dgh.Limit{Resource: dgh.ResourceGraphQL, Limit: 5000, Remaining: 3000, ResetAt: at.Add(time.Hour).UTC()}
-	cfg := te.cfg
-	cfg.GitHub.Scope = config.Scope{People: []string{"ana"}}
-	col := &ghsource.Collector{Store: inventory.New(db), GH: spentBudget{limit: spent}, Cfg: cfg, Now: func() time.Time { return at }, Log: t.Logf}
-	if rep, err := col.Fast(ctx); err != nil || rep.Skipped != "" {
-		t.Fatalf("fast: %+v %v", rep, err)
-	}
-
+	te.Env.forge = sourcetest.Launch(t, "github", budgetStub{forgeStub: &forgeStub{Stub: sourcetest.NewStub(), login: "ana"}, limit: spent}, src.Host{})
 	te.Env.github.API = github.NewClient(github.Options{Host: "github.com", Now: func() time.Time { return at },
 		Token: func(context.Context) (string, error) { return "t", nil }})
+	cfg := te.cfg
 	cfg.GitHub.RateLimitFraction = 0.7
-	te.Env.restoreBudget(ctx, db, cfg, t.Logf)
+	te.Env.restoreBudget(context.Background(), cfg, t.Logf)
 	if got := te.Env.github.API.Budget()[dgh.ResourceGraphQL]; got.Remaining != 3000 || got.Limit != 5000 || !got.ResetAt.Equal(spent.ResetAt) {
 		t.Fatalf("restored %+v", got)
 	}
@@ -1270,6 +1261,7 @@ func TestDaemonReadsSpawnNoGh(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
+	te.serveGitHubPlugin(db, noGH{t})
 	dctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	d := te.serveDeps(dctx, db, te.cfg, t.Logf, &lock.Mutex{}, nil)

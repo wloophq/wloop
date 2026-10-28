@@ -2,18 +2,13 @@ package daemon
 
 import (
 	"context"
-	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
-	dgh "github.com/wloophq/wloop/internal/domain/github"
 	"github.com/wloophq/wloop/internal/domain/unit"
 
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
-	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
-	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	coreviews "github.com/wloophq/wloop/internal/core/views"
@@ -27,23 +22,7 @@ func (c fixedClock) Now() time.Time { return time.Time(c) }
 
 // failingCollector registers the fast job and fails its collection at once,
 // on a closed store, so the job runs without GitHub.
-func failingCollector(t *testing.T, d Deps) *ghsource.Collector {
-	t.Helper()
-	db, err := sqlitetest.Open(filepath.Join(d.StateDir, "closed.db"), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	closed := inventory.New(db)
-	db.Close()
-	return &ghsource.Collector{Store: closed, GH: unknownBudget{}, Cfg: d.Cfg, Now: time.Now}
-}
-
-// unknownBudget admits every read and serves none: a collector on a closed
-// store fails before it reads GitHub.
-type unknownBudget struct{ ghsource.GitHub }
-
-func (unknownBudget) Allow(dgh.Priority) bool            { return true }
-func (unknownBudget) Budget() map[dgh.Resource]dgh.Limit { return nil }
+func failingCollector(*testing.T, Deps) Collector { return failingSlow{} }
 
 func TestTheClosedLineIsPinnedForClaude(t *testing.T) {
 	t.Parallel()

@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	dgh "github.com/wloophq/wloop/internal/domain/github"
 	"net/http"
 	"strconv"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
+
+	dgh "github.com/wloophq/wloop/internal/domain/github"
 )
 
 func rateLimitBody(remaining, limit int, reset time.Time) string {

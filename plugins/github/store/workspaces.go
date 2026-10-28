@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"github.com/wloophq/wloop/plugins/github/pr"
 )
@@ -15,38 +16,72 @@ func setWorkspace(ctx context.Context, tx *Tx, ref pr.Ref, ws pr.Workspace) erro
 	return tx.touchChanged(res, err, ref)
 }
 
-// SetWorkspace links ref to ws.
+// SetWorkspace links ref to ws, recording on the host first the followed
+// or unfollowed event of a scope flip.
 func (db *DB) SetWorkspace(ctx context.Context, ref pr.Ref, ws pr.Workspace) error {
+	if err := db.recordFlipsOf(ctx, []pr.Ref{ref}, time.Time{}, func(_ pr.Ref, was scope) (scope, bool, error) {
+		return was.with(was.reasons, ws.ID), true, nil
+	}); err != nil {
+		return err
+	}
 	_, err := db.Write(ctx, func(tx *Tx) error { return setWorkspace(ctx, tx, ref, ws) })
 	return err
 }
 
 // ReplaceWorkspaces makes links the set of linked pull requests in one
 // transaction, so readers never see the links blank. It writes only the
-// links that differ from the stored ones.
+// links that differ from the stored ones, recording on the host first the
+// followed or unfollowed events of the scope flips.
 func (db *DB) ReplaceWorkspaces(ctx context.Context, links map[pr.Ref]pr.Workspace) error {
-	_, err := db.Write(ctx, func(tx *Tx) error {
+	linked, err := workspaceLinks(ctx, db.db)
+	if err != nil {
+		return err
+	}
+	drop, set := linkChanges(linked, links)
+	touched := append(drop, set...)
+	if len(touched) == 0 {
+		return nil
+	}
+	if err := db.recordFlipsOf(ctx, touched, time.Time{}, func(ref pr.Ref, was scope) (scope, bool, error) {
+		return was.with(was.reasons, links[ref].ID), true, nil
+	}); err != nil {
+		return err
+	}
+	_, err = db.Write(ctx, func(tx *Tx) error {
 		linked, err := workspaceLinks(ctx, tx)
 		if err != nil {
 			return err
 		}
-		for ref := range linked {
-			if ws, ok := links[ref]; !ok || linkKey(ws) == (linkColumns{}) {
-				if err := setWorkspace(ctx, tx, ref, pr.Workspace{}); err != nil {
-					return err
-				}
+		drop, set := linkChanges(linked, links)
+		for _, ref := range drop {
+			if err := setWorkspace(ctx, tx, ref, pr.Workspace{}); err != nil {
+				return err
 			}
 		}
-		for ref, ws := range links {
-			if key := linkKey(ws); key != (linkColumns{}) && key != linked[ref] {
-				if err := setWorkspace(ctx, tx, ref, ws); err != nil {
-					return err
-				}
+		for _, ref := range set {
+			if err := setWorkspace(ctx, tx, ref, links[ref]); err != nil {
+				return err
 			}
 		}
 		return nil
 	})
 	return err
+}
+
+// linkChanges are the linked pull requests links unlinks and those whose
+// link it sets or changes.
+func linkChanges(linked map[pr.Ref]linkColumns, links map[pr.Ref]pr.Workspace) (drop, set []pr.Ref) {
+	for ref := range linked {
+		if ws, ok := links[ref]; !ok || linkKey(ws) == (linkColumns{}) {
+			drop = append(drop, ref)
+		}
+	}
+	for ref, ws := range links {
+		if key := linkKey(ws); key != (linkColumns{}) && key != linked[ref] {
+			set = append(set, ref)
+		}
+	}
+	return drop, set
 }
 
 // linkColumns is the workspace columns of a pull request; the zero value is

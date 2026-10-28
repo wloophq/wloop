@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"slices"
+	"time"
 
 	"github.com/wloophq/wloop/plugins/github/pr"
 )
@@ -26,9 +27,15 @@ func (db *DB) Override(ctx context.Context, ref pr.Ref) (pr.Override, error) {
 	return o, err
 }
 
-// SetTracked tracks or untracks ref, keeping its reasons in step; changed
-// says the override moved.
+// SetTracked tracks or untracks ref, keeping its reasons in step and
+// recording on the host first the followed or unfollowed event of a scope
+// flip; changed says the override moved.
 func (db *DB) SetTracked(ctx context.Context, ref pr.Ref, tracked bool) (changed bool, err error) {
+	if err := db.recordFlipsOf(ctx, []pr.Ref{ref}, time.Time{}, func(_ pr.Ref, sc scope) (scope, bool, error) {
+		return sc.with(withTracked(sc.reasons, tracked), sc.ws), true, nil
+	}); err != nil {
+		return false, err
+	}
 	_, err = db.Write(ctx, func(tx *Tx) error {
 		query := `UPDATE overrides SET tracked=0 WHERE unit_key=? AND tracked`
 		if tracked {
@@ -103,4 +110,30 @@ func (db *DB) Tracked(ctx context.Context) ([]pr.Ref, error) {
 	}
 	slices.SortFunc(out, pr.Compare)
 	return out, nil
+}
+
+// Track tracks or untracks ref, recording the tracked or untracked event of
+// the move on the host, at at with data, before its write, as a scope flip
+// is: a move the host refused leaves the row as it was, and a retry after a
+// write that failed finds the host's last event of the kind it records and
+// records none. Changed says the override moved.
+func (db *DB) Track(ctx context.Context, ref pr.Ref, tracked bool, at time.Time, data string) (changed bool, err error) {
+	o, err := db.Override(ctx, ref)
+	if err != nil || o.Tracked == tracked {
+		return false, err
+	}
+	kind := pr.KindUntracked
+	if tracked {
+		kind = pr.KindTracked
+	}
+	held, err := db.HostEvents(ctx, []pr.Ref{ref}, time.Time{}, pr.KindTracked, pr.KindUntracked)
+	if err != nil {
+		return false, err
+	}
+	if len(held) == 0 || held[len(held)-1].Kind != kind {
+		if err := db.RecordEvents(ctx, []pr.Event{{PR: ref, Kind: kind, At: at, Data: data}}); err != nil {
+			return false, err
+		}
+	}
+	return db.SetTracked(ctx, ref, tracked)
 }

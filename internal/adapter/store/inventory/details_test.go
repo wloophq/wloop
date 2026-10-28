@@ -102,7 +102,7 @@ func TestDetailsOneQuery(t *testing.T) {
 	if _, err := s.SaveSnapshots(context.Background(), snaps, noteAt); err != nil {
 		t.Fatal(err)
 	}
-	for name, read := range map[string]func(context.Context, []github.Ref) (map[github.Ref]Detail, error){"Details": s.Details, "DetailStamps": s.DetailStamps} {
+	for name, read := range map[string]func(context.Context, []github.Ref) (map[github.Ref]Detail, error){"Details": s.Details} {
 		ctx, sc := metertest.Start(t, context.Background())
 		got, err := read(ctx, refs)
 		if err != nil || len(got) != 69 {

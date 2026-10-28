@@ -448,16 +448,28 @@ func runHeldRound(ctx context.Context, e *Env, base config.Config, ref pr.Ref, p
 	return rounds.Save(ctx, st)
 }
 
-// fetchPR reads ref in full from GitHub into the inventory and returns it as
-// the sweep reads it, with viewer, else the stored viewer, else GitHub's.
-func (e *Env) fetchPR(ctx context.Context, cfg config.Config, ref pr.Ref, viewer string) (*pr.PullRequest, string, error) {
+// fetchPR has the GitHub plugin read ref in full and report it, and
+// returns it as the sweep reads it, with viewer, else the stored viewer,
+// else GitHub's.
+func (e *Env) fetchPR(ctx context.Context, _ config.Config, ref pr.Ref, viewer string) (*pr.PullRequest, string, error) {
 	if e.Store == nil {
 		return nil, "", errNoStore
 	}
-	row, d, err := e.githubSource(cfg).Refresh(ctx, ref)
+	if err := e.refreshPR(ctx, ref); err != nil {
+		return nil, "", fmt.Errorf("read %s: %w", ref, err)
+	}
+	row, ok, err := e.Store.PR(ctx, ref)
+	if err == nil && !ok {
+		err = fmt.Errorf("read %s: the GitHub plugin reported no pull request", ref)
+	}
 	if err != nil {
 		return nil, "", err
 	}
+	details, err := e.Store.Details(ctx, []pr.Ref{ref})
+	if err != nil {
+		return nil, "", err
+	}
+	d := details[ref]
 	if viewer != "" {
 		return inventory.GitHubOf(row, d, viewer), viewer, nil
 	}

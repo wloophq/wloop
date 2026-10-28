@@ -204,7 +204,7 @@ func (m *Manager) Create(ctx context.Context, req workspace.CreateRequest) (wsdo
 		return wsdomain.Workspace{}, "", err
 	}
 	path := filepath.Join(dir, name)
-	branch := req.HeadBranch
+	branch := req.Checkout.Branch
 	if branch == "" {
 		branch = name
 	}
@@ -212,9 +212,9 @@ func (m *Manager) Create(ctx context.Context, req workspace.CreateRequest) (wsdo
 	args := []string{"worktree", "add"}
 	tip, exists := m.branchTip(ctx, repo, branch)
 	switch {
-	case exists && (req.CrossRepository || req.HeadOid != "" && tip != req.HeadOid):
+	case exists && (req.Checkout.Fork || req.Checkout.Head != "" && tip != req.Checkout.Head):
 		branch, renamed = m.freeBranch(ctx, repo, branch), true
-		base, err := m.base(ctx, repo, req, req.HeadOid)
+		base, err := m.base(ctx, repo, req, req.Checkout.Head)
 		if err != nil {
 			return wsdomain.Workspace{}, "", err
 		}

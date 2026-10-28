@@ -9,50 +9,38 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/orca"
-	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
-	"github.com/wloophq/wloop/internal/adapter/source/github/present"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/ingest"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	coreviews "github.com/wloophq/wloop/internal/core/views"
 	"github.com/wloophq/wloop/internal/core/views/viewstest"
-	dgh "github.com/wloophq/wloop/internal/domain/github"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/github"
+	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/orca/orcatest"
 )
 
-// quietGitHub finds nothing and reads nothing.
-type quietGitHub struct{}
-
-func (quietGitHub) SearchStubs(context.Context, string, string) (github.StubPage, error) {
-	return github.StubPage{}, nil
-}
-func (quietGitHub) SearchStubsFirst(_ context.Context, qs []string, _ int) ([]github.StubPage, []error, error) {
-	return make([]github.StubPage, len(qs)), make([]error, len(qs)), nil
-}
-func (quietGitHub) StubsByRef(context.Context, []github.Ref) (map[github.Ref]github.Stub, map[github.Ref]error, error) {
-	return nil, nil, nil
-}
-func (quietGitHub) InventoryByRef(context.Context, []github.Ref) (map[github.Ref]github.Snapshot, map[github.Ref]error, dgh.RateLimit, error) {
-	return nil, nil, dgh.RateLimit{}, nil
-}
-func (quietGitHub) Threads(context.Context, map[github.Ref]int) (map[github.Ref][]pr.Thread, map[github.Ref]error, error) {
-	return nil, nil, nil
-}
-func (quietGitHub) TeamMembers(context.Context, string, string) ([]string, error) { return nil, nil }
-func (quietGitHub) Viewer(context.Context) (string, error)                        { return "me", nil }
-func (quietGitHub) Allow(dgh.Priority) bool                                       { return true }
-func (quietGitHub) Budget() map[dgh.Resource]dgh.Limit                            { return nil }
-func (quietGitHub) FindByBranch(context.Context, []github.BranchQuery) (map[github.BranchQuery][]github.BranchMatch, error) {
-	return nil, nil
+// listingJob is an ingestion job that lists the workspaces once, as the
+// host lists them when the GitHub plugin's fast pass asks.
+func listingJob(set *workspace.Set) ingest.Job {
+	return ingest.Job{Every: 2 * time.Minute, Prepare: func(ctx context.Context, _ time.Time) (ingest.Plan, string, error) {
+		set.Invalidate(wsdomain.PartMutable)
+		if _, err := set.Repos(ctx); err != nil {
+			return ingest.Plan{}, "", err
+		}
+		if _, _, err := set.ListAll(ctx); err != nil {
+			return ingest.Plan{}, "", err
+		}
+		_, err := set.AgentActivity(ctx)
+		return ingest.Plan{}, "listed", err
+	}}
 }
 
 var liveColumns = orca.Columns{ReviewStatus: "reviewing", NeedsMeStatus: "needs-me", ReviewedStatus: "reviewed", InProgressStatus: "in-progress", CompletedStatus: "completed"}
@@ -78,7 +66,7 @@ func TestFastCycleOrcaCalls(t *testing.T) {
 	rt := orcatest.Start(t, orcatest.Live())
 	m := rt.Manager()
 	ws := workspace.NewCached(m, m, 2*time.Minute)
-	a, err := orca.Ports(ws, liveColumns, func(context.Context) (map[pr.Ref]orca.Link, error) { return nil, nil })
+	a, err := orca.Ports(ws, liveColumns, func(context.Context) (map[unit.Unit]orca.Link, error) { return nil, nil })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,8 +75,7 @@ func TestFastCycleOrcaCalls(t *testing.T) {
 	reg := turnstest.NewRegistry()
 	liveSessions(reg)
 	d := testDeps(t)
-	c := &ghsource.Collector{Store: d.Records.(present.Records).Store, GH: quietGitHub{}, WS: workspace.NewSet(ws), Cfg: d.Cfg, Now: time.Now}
-	d.Collector, d.Ingest = c, []IngestJob{{ID: unit.GitHub, Job: c.IngestJob()}}
+	d.Collector, d.Ingest = failingSlow{}, []IngestJob{{ID: unit.GitHub, Job: listingJob(workspace.NewSet(ws))}}
 	d.Turns = &turns.Service{Intents: turnstest.Intents(), Store: turnstest.NewStore(), Registry: reg, Sessions: turns.NewRouter(reg, a),
 		Clock: fixedClock(time.Now()), FastJob: 2 * time.Minute}
 	d.Views = &coreviews.Service{Books: turnstest.NewStore(), Intents: turnstest.Intents(), State: viewstest.NewState(),
@@ -152,8 +139,8 @@ func TestHookReloadsPanesAndNotesAgents(t *testing.T) {
 	m := rt.Manager()
 	ws := workspace.NewCached(m, m, 2*time.Minute)
 	ref := pr.Ref{Owner: "acme", Repo: "repo-0", Number: 1}
-	a, err := orca.Ports(ws, liveColumns, func(context.Context) (map[pr.Ref]orca.Link, error) {
-		return map[pr.Ref]orca.Link{ref: {WorkspaceID: orcatest.WorktreeID(0), Review: true}}, nil
+	a, err := orca.Ports(ws, liveColumns, func(context.Context) (map[unit.Unit]orca.Link, error) {
+		return map[unit.Unit]orca.Link{ref.Unit(): {WorkspaceID: orcatest.WorktreeID(0), Review: true}}, nil
 	})
 	if err != nil {
 		t.Fatal(err)

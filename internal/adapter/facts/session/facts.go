@@ -11,7 +11,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -35,7 +34,10 @@ type world struct {
 	agents    []turns.AgentObservation
 	units     map[string]unit.Unit
 	books     map[unit.Unit]turn.Book
-	prs       map[unit.Unit]string
+	// states are the units' states as their sources reported them, and
+	// repo the repository of a unit.
+	states map[unit.Unit]string
+	repo   func(unit.Unit) string
 	// transcripts are each session's known transcript file.
 	transcripts map[string]string
 	// closedByManager are the dormant sessions their manager's record closed.
@@ -130,20 +132,10 @@ func (p *Provider) build(ctx context.Context, snap *wsdomain.Snapshot) (*world, 
 			return nil, err
 		}
 	}
-	w.prs = map[unit.Unit]string{}
-	var prUnits []unit.Unit
-	for _, u := range wanted {
-		if u.Provider == unit.GitHub {
-			prUnits = append(prUnits, u)
-		}
-	}
-	if len(prUnits) > 0 && p.d.PRs != nil {
-		got, err := p.d.PRs.PRs(ctx, prUnits)
-		if err != nil {
+	w.states, w.repo = map[unit.Unit]string{}, p.d.Repo
+	if len(wanted) > 0 && p.d.States != nil {
+		if w.states, err = p.d.States.States(ctx, wanted); err != nil {
 			return nil, err
-		}
-		for u, pr := range got {
-			w.prs[u] = pr.State
 		}
 	}
 	return w, nil
@@ -257,14 +249,14 @@ func (s *state) facts(now time.Time, pf turns.PromptFacts, processGone bool) wor
 		"session.unread_answers":        s.unread,
 		"session.unread_since":          time.Time{},
 		"session.unread_for":            time.Duration(0),
-		"session.pr_state":              w.prs[s.unit],
+		"session.pr_state":              w.states[s.unit],
 		"session.duplicate":             s.duplicate(),
 		"session.worktree_gone":         s.worktreeGone(),
 		"session.transcript_gone":       s.transcriptGone,
 		"session.closed_by_manager":     w.closedByManager[s.sess.ID],
 		"session.process_gone":          processGone,
 		"session.fingerprint":           s.fingerprint(),
-		"session.repo":                  repoOf(s.unit),
+		"session.repo":                  w.repoOf(s.unit),
 	}
 	if s.hasAgent {
 		f["session.agent_state"] = s.agent.State.String()
@@ -354,10 +346,9 @@ func (s *state) fingerprint() string {
 	return s.sess.ID + ":" + string(s.sess.State()) + ":" + since + ":" + strconv.FormatInt(seq, 10)
 }
 
-func repoOf(u unit.Unit) string {
-	ref, ok := pr.RefOf(u)
-	if !ok {
+func (w *world) repoOf(u unit.Unit) string {
+	if w.repo == nil {
 		return ""
 	}
-	return ref.Owner + "/" + ref.Repo
+	return w.repo(u)
 }

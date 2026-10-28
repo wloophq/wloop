@@ -165,5 +165,23 @@ func TestInventoryCommandsReachGitHubThroughThePlugin(t *testing.T) {
 }
 
 func TestFetchPRRefreshesThroughThePlugin(t *testing.T) {
-	t.Skip("carried from X5c2 review: X8a2 reads a unit in full through the plugin, not the in-process collector")
+	te := newTestEnv(t, &fake.Manager{})
+	te.gh.basics = openBasics
+	ctx := context.Background()
+	te.Env.forge = te.githubPluginOf()
+	te.Env.github.API = nil
+	if _, ok, err := te.Store.PR(ctx, r7); err != nil || ok {
+		t.Fatalf("stored before the fetch: %v %v", ok, err)
+	}
+	full, viewer, err := te.fetchPR(ctx, te.cfg, r7, "me")
+	if err != nil || viewer != "me" || full.Title != "Add x" || full.HeadRefOid != "c2" || full.HeadRefName != "feat/x" {
+		t.Fatalf("fetched %+v as %q: %v", full, viewer, err)
+	}
+	if row, ok, err := te.Store.PR(ctx, r7); err != nil || !ok || row.HeadOid != "c2" {
+		t.Fatalf("the store keeps %+v %v %v, want the row the plugin reported", row, ok, err)
+	}
+	te.gh.basics = ""
+	if _, _, err := te.fetchPR(ctx, te.cfg, pr.Ref{Owner: "acme", Repo: "api", Number: 8}, "me"); err == nil {
+		t.Fatal("a pull request GitHub does not have was fetched")
+	}
 }

@@ -18,7 +18,6 @@ import (
 	"testing/synctest"
 	"time"
 
-	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
@@ -245,7 +244,7 @@ func TestZeroIntervalsFallBackToDefaults(t *testing.T) {
 	t.Parallel()
 	d := testDeps(t)
 	d.Cfg.Sweep.Fast, d.Cfg.Sweep.Slow = 0, 0
-	d.Collector = &ghsource.Collector{}
+	d.Collector = failingSlow{}
 	d.Sweep = SweepFunc(func(context.Context) (string, string, error) { return "", "", nil })
 	s := New(d)
 	def := config.Defaults().Sweep

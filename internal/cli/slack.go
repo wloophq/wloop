@@ -78,8 +78,11 @@ func runSlack(ctx context.Context, e *Env, args []string) error {
 func (e *Env) sourcePlugins() []source.Plugin {
 	out := slices.Clone(plugins)
 	for i := range out {
-		if out[i].ID == slackPlugin {
+		switch out[i].ID {
+		case slackPlugin:
 			out[i].Build = e.slackRelay
+		case unit.GitHub:
+			out[i].Build = e.githubModule(out[i].Build)
 		}
 	}
 	return out

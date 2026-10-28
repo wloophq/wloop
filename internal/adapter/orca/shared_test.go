@@ -10,7 +10,6 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/workspace/orca/orcatest"
@@ -37,7 +36,7 @@ func TestSharedWorkspaceSessionsByUnitOverOrca(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	repo := sqlite.New(db)
-	a := orca.New(rt.Manager(), orca.Columns{}, func(context.Context) (map[pr.Ref]orca.Link, error) { return nil, nil })
+	a := orca.New(rt.Manager(), orca.Columns{}, func(context.Context) (map[unit.Unit]orca.Link, error) { return nil, nil })
 	s := &turns.Service{Store: repo, Registry: repo, Sessions: turns.NewRouter(repo, a), Clock: at(now)}
 	ctx := context.Background()
 	threadA, threadB := unit.Unit{Provider: "slack", Key: "T000/C001/1.1"}, unit.Unit{Provider: "slack", Key: "T000/C001/2.2"}

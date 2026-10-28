@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -25,6 +27,7 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/ingest"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/daemon"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -92,20 +95,47 @@ func roleIntents(b dturn.Book, roles ...string) []dturn.Intent {
 
 // githubClients are GitHub's clients while its plugin runs in the host's
 // process.
-type githubClients struct{ ghsource.Clients }
+type githubClients struct {
+	ghsource.Clients
+	// viaPlugin makes serve send the API's requests through the GitHub
+	// plugin.
+	viaPlugin bool
+}
 
-func newGitHubClients() githubClients { return githubClients{ghsource.NewClients()} }
+func newGitHubClients() githubClients {
+	return githubClients{Clients: ghsource.NewClients(), viaPlugin: true}
+}
 
 // restoreBudget sets the client's floors from cfg and seeds its budget with
-// the one the last sweep kept.
-func (e *Env) restoreBudget(ctx context.Context, db *sqlite.DB, cfg config.Config, logf func(string, ...any)) {
+// the one the GitHub plugin keeps, when it runs.
+func (e *Env) restoreBudget(ctx context.Context, cfg config.Config, logf func(string, ...any)) {
 	e.github.SetFloors(cfg.GitHub.RateLimitFraction)
-	limits, err := storedGitHubBudget(ctx, inventory.New(db))
-	if err != nil {
+	if err := e.syncGitHubBudget(ctx); err != nil && !errors.Is(err, src.ErrUnavailable) && !errors.Is(err, src.ErrUnsupported) {
 		logf("GitHub budget: %v", err)
-		return
 	}
-	e.github.API.Restore(limits)
+}
+
+// syncGitHubBudget seeds the client's budget with the one the running
+// GitHub plugin keeps, which its own reads spent.
+func (e *Env) syncGitHubBudget(ctx context.Context) error {
+	raw, err := e.forgeCalls().Action(ctx, src.ActionRequest{Action: ghsource.ActionBudget})
+	if err != nil {
+		return err
+	}
+	var limits map[dgh.Resource]dgh.Limit
+	if err := json.Unmarshal(raw, &limits); err != nil {
+		return fmt.Errorf("the GitHub plugin's budget: %w", err)
+	}
+	e.github.API.Restore(slices.Collect(maps.Values(limits)))
+	return nil
+}
+
+// githubPlugin is the running GitHub plugin's client.
+func (e *Env) githubPlugin() (*src.Client, error) {
+	if e.pluginKind == nil {
+		return nil, fmt.Errorf("the GitHub plugin: %w", src.ErrUnavailable)
+	}
+	return e.pluginKind.Client(string(unit.GitHub))
 }
 
 // failedSteps reads the failed steps of a check's job from GitHub.
@@ -160,22 +190,27 @@ func withGitHub(d daemon.Deps, deps present.Deps) daemon.Deps {
 	return d
 }
 
-// githubSource is the GitHub source a pull request is read through outside
-// the jobs: no workspaces, sink or log.
-func (e *Env) githubSource(cfg config.Config) *ghsource.Collector {
-	return &ghsource.Collector{Store: e.Store, GH: e.github.API, Cfg: cfg, Now: e.Now}
-}
-
-// storedGitHubBudget is the GitHub budget the last sweep kept.
-func storedGitHubBudget(ctx context.Context, st *inventory.Store) ([]dgh.Limit, error) {
-	return ghsource.StoredBudget(ctx, st)
-}
-
 func (e *Env) githubBudget() daemon.Budget { return ghsource.Budget{Limiter: e.github.API} }
 
-// githubIdentity is the viewer as the GitHub plugin knows them.
+// githubIdentity is the viewer as the GitHub plugin last named them, which
+// st keeps for the in-process rows and facts; asked of the plugin while st
+// keeps none.
 func (e *Env) githubIdentity(st *inventory.Store, logf func(string, ...any)) func(context.Context) (src.Identity, error) {
-	return ghsource.Identity(st, e.github.API, logf)
+	return func(ctx context.Context) (src.Identity, error) {
+		if login, err := st.Viewer(ctx, unit.GitHub); err != nil || login != "" {
+			teams, terr := ghsource.MyTeams(ctx, st)
+			p := src.Person{Key: string(unit.GitHub) + ":" + login, Name: login}
+			return src.Identity{Viewer: p, Teams: teams}, errors.Join(err, terr)
+		}
+		id, err := e.forgeCalls().Identity(ctx)
+		if err != nil {
+			return src.Identity{}, err
+		}
+		if err := ghsource.KeepIdentity(ctx, st, id); err != nil {
+			logf("GitHub viewer: %v", err)
+		}
+		return id, nil
+	}
 }
 
 // forgeCalls is the forge's plugin as the round commands call it: the one
@@ -289,16 +324,6 @@ func (e *Env) reviewedMarks(ctx context.Context, cfg config.Config, ref pr.Ref) 
 	return ghsource.ReviewedMarks(dchange.ReviewerInput{PR: full.Facts, Viewer: viewer, TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.GitHub.TrustedAuthors})
 }
 
-// githubLocator is the pull request of the checkout's branch, as gh reads
-// it when asked.
-type githubLocator struct{ e *Env }
-
-func (g githubLocator) Locate(ctx context.Context, dir string) (unit.Unit, bool, error) {
-	return ghsource.Locator{GH: g.e.github.GH}.Locate(ctx, dir)
-}
-
-func (e *Env) githubLocators() []unit.Locator { return []unit.Locator{githubLocator{e}} }
-
 // roundsPaused says whether the pause holds u's rounds: everything is
 // paused, or u's repository.
 func (e *Env) roundsPaused(ctx context.Context, u unit.Unit) (bool, error) {
@@ -410,4 +435,193 @@ func (e *Env) unitConfig(ctx context.Context, cfg config.Config, u unit.Unit, st
 		cfg.AgentHome = st.AgentHome(u.Key)
 	}
 	return cfg, nil
+}
+
+// The GitHub plugin's jobs, as its manifest names them.
+const (
+	githubJobFast = "fast"
+	githubJobSlow = "slow"
+)
+
+// githubModule is the GitHub module: its rows, facts and presenter run in
+// the host's process over what the GitHub plugin reports; its ingestion,
+// its slow sweep, its tracks and its checkouts are the plugin's, which serve
+// runs. Outside serve it reads nothing.
+func (e *Env) githubModule(build source.Build) source.Build {
+	return func(cfg config.Config, d source.Deps) (source.Module, error) {
+		m, err := build(cfg, d)
+		if err != nil || e.pluginKind == nil {
+			return m, err
+		}
+		return e.relayGitHub(cfg, m), nil
+	}
+}
+
+// relayGitHub is m with its ingestion, slow sweep, tracks and checkouts
+// relayed to the GitHub plugin serve runs.
+func (e *Env) relayGitHub(cfg config.Config, m source.Module) source.Module {
+	r := relay{id: unit.GitHub, kind: e.pluginKind, now: e.Now, units: psource.Units{Codecs: e.unitCodecs()}}
+	every := time.Duration(cmp.Or(cfg.Sweep.Fast, config.Defaults().Sweep.Fast))
+	m.Ingest = ingest.Job{Every: every, Prepare: func(ctx context.Context, now time.Time) (ingest.Plan, string, error) {
+		p, skip, err := r.prepare(githubJobFast, m.Codec)(ctx, now)
+		e.afterGitHubJob(ctx)
+		return p, skip, err
+	}}
+	m.Slow = func(ctx context.Context) (string, string, error) {
+		summary, skipped, err := r.ingest(ctx, githubJobSlow)
+		if errors.Is(err, src.ErrUnavailable) {
+			return "skipped", err.Error(), nil
+		}
+		e.afterGitHubJob(ctx)
+		return summary, skipped, err
+	}
+	m.Track, m.Untrack = r.track, r.untrack
+	m.Checkouts = pluginCheckouts{psource.Checkouts{ID: string(unit.GitHub), Units: r.units, Kind: e.pluginKind}}
+	return m
+}
+
+// afterGitHubJob seeds the host's GitHub client with the budget the
+// plugin's job left.
+func (e *Env) afterGitHubJob(ctx context.Context) {
+	if err := e.syncGitHubBudget(ctx); err != nil && !errors.Is(err, src.ErrUnavailable) && !errors.Is(err, src.ErrUnsupported) {
+		e.warnf("GitHub budget: %v", err)
+	}
+}
+
+// pluginCheckouts are a plugin's checkouts as a module serves them.
+type pluginCheckouts struct{ c psource.Checkouts }
+
+func (p pluginCheckouts) Checkout(ctx context.Context, u unit.Unit) (source.Checkout, bool, error) {
+	c, ok, err := p.c.Checkout(ctx, u)
+	return source.Checkout{Repo: c.Repo, Branch: c.Branch, Head: c.Head}, ok, err
+}
+
+// withGitHubBroker is b, the broker of plugin id, with what only the GitHub
+// plugin is served: the store keeps the pull requests it reports and the
+// viewer it names, for the rows, facts and presenter that still run in the
+// host's process.
+func (e *Env) withGitHubBroker(b *psource.Broker, id string, db *sqlite.DB) *psource.Broker {
+	if id != string(unit.GitHub) {
+		return b
+	}
+	st := inventory.New(db)
+	b.Reported = ghsource.Reported(st)
+	note := b.Note
+	b.Note = func(t port.Topic, units ...unit.Unit) {
+		if note != nil {
+			note(t, units...)
+		}
+		if t&port.TopicViewer != 0 {
+			go e.keepGitHubIdentity(context.Background(), st)
+		}
+	}
+	return b
+}
+
+// keepGitHubIdentity keeps the viewer the running GitHub plugin names in st.
+func (e *Env) keepGitHubIdentity(ctx context.Context, st *inventory.Store) {
+	c, err := e.githubPlugin()
+	if err != nil {
+		return
+	}
+	id, err := c.Identity(ctx)
+	if err == nil {
+		err = ghsource.KeepIdentity(ctx, st, id)
+	}
+	if err != nil && !errors.Is(err, src.ErrUnavailable) {
+		e.warnf("GitHub viewer: %v", err)
+	}
+}
+
+// githubLoaded is what serve does once the GitHub plugin loaded: its
+// budget and its viewer reach the host.
+func (e *Env) githubLoaded(ctx context.Context, db *sqlite.DB) {
+	e.afterGitHubJob(ctx)
+	e.keepGitHubIdentity(ctx, inventory.New(db))
+}
+
+// viaGitHubPlugin points e's GitHub client at the running GitHub plugin,
+// which sends every request with its credentials, unless a test set the
+// client.
+func (e *Env) viaGitHubPlugin() {
+	if !e.github.viaPlugin {
+		return
+	}
+	e.github.API = ghsource.PluginClient(func(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
+		c, err := e.githubPlugin()
+		if err != nil {
+			return nil, err
+		}
+		return c.Action(ctx, src.ActionRequest{Action: ghsource.ActionForward, Args: args})
+	}, e.Now)
+}
+
+// workspaceListing is the host's workspaces of repo, "owner/name", every
+// one when "": the managers' repositories and workspaces, each with its
+// repository, its agents' states and the pull request its manager links;
+// partial when a manager could not be listed.
+func (e *Env) workspaceListing(ctx context.Context, repo string) (src.Listing, error) {
+	if e.WS == nil {
+		return src.Listing{}, nil
+	}
+	e.WS.Invalidate(wsdomain.PartMutable)
+	repos, err := e.WS.Repos(ctx)
+	if err != nil {
+		return src.Listing{}, err
+	}
+	list, failed, err := e.WS.ListAll(ctx)
+	if err != nil {
+		return src.Listing{}, err
+	}
+	activity, err := e.WS.AgentActivity(ctx)
+	if err != nil {
+		e.warnf("agent activity: %v", err)
+	}
+	out := src.Listing{Partial: len(failed) > 0}
+	type key struct{ manager, id string }
+	byID := map[key]wsdomain.Repo{}
+	for _, r := range repos {
+		byID[key{r.Manager, r.ID}] = r
+		out.Repos = append(out.Repos, src.Repo{ID: r.ID, Remote: r.RemoteKey, Path: r.Path, DefaultBranch: r.DefaultBranch})
+	}
+	for _, w := range list {
+		r := byID[key{w.Manager, w.RepoID}]
+		name := ""
+		if owner, n, ok := r.OwnerName(); ok {
+			name = owner + "/" + n
+		}
+		if repo != "" && !strings.EqualFold(repo, name) {
+			continue
+		}
+		lw := src.Workspace{Manager: w.Manager, ID: w.ID, Repo: name, RepoID: w.RepoID, Path: w.Path, DisplayName: w.DisplayName,
+			Comment: w.Comment, Branch: w.Branch, PushBranch: w.PushBranch, Status: w.Status, IsMain: w.IsMain, Local: w.HostID == wsdomain.LocalHost}
+		for _, s := range activity[w.ID].States {
+			lw.AgentStates = append(lw.AgentStates, s.String())
+		}
+		if owner, n, ok := r.OwnerName(); ok && w.LinkedPR != 0 {
+			lw.Units = append(lw.Units, psource.Wire(pr.Ref{Owner: owner, Repo: n, Number: w.LinkedPR}.Unit()))
+		}
+		out.Workspaces = append(out.Workspaces, lw)
+	}
+	return out, nil
+}
+
+// warnf writes a warning to e's error output.
+func (e *Env) warnf(format string, args ...any) {
+	if e.Err != nil {
+		fmt.Fprintf(e.Err, "warning: "+format+"\n", args...)
+	}
+}
+
+// refreshPR has the GitHub plugin read ref in full and report it.
+func (e *Env) refreshPR(ctx context.Context, ref pr.Ref) error {
+	_, err := e.forgeCalls().Action(ctx, src.ActionRequest{Unit: psource.Wire(ref.Unit()), Action: ghsource.ActionRefresh})
+	return err
+}
+
+// pluginLoaded is what serve does once plugin id loaded.
+func (e *Env) pluginLoaded(ctx context.Context, db *sqlite.DB, id string) {
+	if id == string(unit.GitHub) {
+		e.githubLoaded(ctx, db)
+	}
 }

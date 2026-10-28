@@ -35,7 +35,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/readmodel"
-	"github.com/wloophq/wloop/internal/scope"
 )
 
 var fixtureNow = time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC) // Thursday
@@ -707,11 +706,7 @@ func TestTeamChangeReachesRowsInsideTheViewerTTL(t *testing.T) {
 	st := inventory.New(stDB)
 	ctx := context.Background()
 	setTeams := func(teams ...string) {
-		b, err := json.Marshal(scope.Resolved{Viewer: "fer", MyTeams: teams})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := st.SetMetaNoting(ctx, "scope_resolved", string(b), port.TopicViewer); err != nil {
+		if err := ghsource.KeepIdentity(ctx, st, identityOf("fer", teams...)); err != nil {
 			t.Fatal(err)
 		}
 	}

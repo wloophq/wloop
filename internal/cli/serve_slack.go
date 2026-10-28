@@ -141,11 +141,21 @@ func (r relay) client() (*src.Client, error) {
 	return r.kind.Client(string(r.id))
 }
 
+// call is ctx as a request to the plugin carries it, at priority.
+func (r relay) call(ctx context.Context, priority src.Priority) (context.Context, func()) {
+	if r.kind == nil {
+		return src.WithCall(ctx, src.Call{Priority: priority}), func() {}
+	}
+	return r.kind.Meters.Call(ctx, priority)
+}
+
 func (r relay) ingest(ctx context.Context, job string) (summary, skipped string, err error) {
 	c, err := r.client()
 	if err != nil {
 		return "", "", err
 	}
+	ctx, done := r.call(ctx, src.PriorityBackground)
+	defer done()
 	res, err := c.Ingest(ctx, src.IngestRequest{Job: job, Now: r.now()})
 	return res.Summary, res.Skipped, err
 }
@@ -174,6 +184,8 @@ func (r relay) track(ctx context.Context, u unit.Unit) (port.TrackRead, error) {
 	if err != nil {
 		return port.TrackRead{}, err
 	}
+	ctx, done := r.call(ctx, src.PriorityUser)
+	defer done()
 	t, err := c.Track(ctx, src.TrackRequest{Unit: psource.Wire(u)})
 	if errors.Is(err, src.ErrNotFound) {
 		return port.TrackRead{}, fmt.Errorf("%w: %v", port.ErrNotFound, err)
@@ -186,6 +198,8 @@ func (r relay) track(ctx context.Context, u unit.Unit) (port.TrackRead, error) {
 		return port.TrackRead{}, err
 	}
 	return port.TrackRead{Unit: got, State: t.State, Save: func(ctx context.Context) error {
+		ctx, done := r.call(ctx, src.PriorityUser)
+		defer done()
 		_, err := c.Track(ctx, src.TrackRequest{Unit: t.Unit, Follow: true})
 		return err
 	}}, nil
@@ -196,6 +210,8 @@ func (r relay) untrack(ctx context.Context, u unit.Unit) error {
 	if err != nil {
 		return err
 	}
+	ctx, done := r.call(ctx, src.PriorityUser)
+	defer done()
 	return c.Untrack(ctx, psource.Wire(u))
 }
 

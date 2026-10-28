@@ -7,6 +7,7 @@ import (
 	"time"
 
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -33,7 +34,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/views"
 	"github.com/wloophq/wloop/internal/core/workspaces"
 	"github.com/wloophq/wloop/internal/domain/dossier"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -153,7 +153,7 @@ func (e *Env) sessionFacts() automation.Units {
 	if e.Turns == nil || e.Store == nil || snap == nil {
 		return nil
 	}
-	d := factsession.Deps{Turns: e.Turns, Snapshot: snap, PRs: inventory.ByUnit{Store: e.Store}, Transcript: e.transcriptOf, ClosedByManager: e.closedByManager,
+	d := factsession.Deps{Turns: e.Turns, Snapshot: snap, States: unitStates{e.Store}, Repo: unitRepo, Transcript: e.transcriptOf, ClosedByManager: e.closedByManager,
 		Cfg: e.currentConfig, Clock: clockFunc(func() time.Time { return e.Now() })}
 	if e.changes != nil {
 		d.Changes = e.changes
@@ -250,15 +250,15 @@ func orcaManager(identities map[string]string) ManagerEntry {
 // orcaPorts also points the cached manager's reloads at ctx and notes each moved
 // workspace's units under TopicAgents in changes.
 func orcaPorts(ctx context.Context, ws workspace.Manager, store *inventory.Store, cfg config.Config, changes *change.Log) (managerSessions, []views.Sink, error) {
-	links := func(ctx context.Context) (map[pr.Ref]orca.Link, error) {
+	links := func(ctx context.Context) (map[unit.Unit]orca.Link, error) {
 		prs, err := store.ListPRs(ctx, true)
 		if err != nil {
 			return nil, err
 		}
-		out := map[pr.Ref]orca.Link{}
+		out := map[unit.Unit]orca.Link{}
 		for _, p := range prs {
 			if p.Workspace.ID != "" && cmp.Or(p.Workspace.Manager, ws.Name()) == ws.Name() {
-				out[pr.Ref(p.Ref)] = orca.Link{WorkspaceID: p.Workspace.ID, Review: p.Workspace.IsReview}
+				out[p.Ref.Unit()] = orca.Link{WorkspaceID: p.Workspace.ID, Review: p.Workspace.IsReview}
 			}
 		}
 		return out, nil
@@ -372,4 +372,29 @@ func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (b
 		Sessions: sqlite.New(db).Sessions,
 		Clock:    clockFunc(func() time.Time { return e.Now() }),
 	})
+}
+
+// unitStates are the states of the pull requests among units, as the
+// GitHub plugin last reported them.
+type unitStates struct{ store *inventory.Store }
+
+func (s unitStates) States(ctx context.Context, units []unit.Unit) (map[unit.Unit]string, error) {
+	prs, err := inventory.ByUnit{Store: s.store}.PRs(ctx, units)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[unit.Unit]string, len(prs))
+	for u, p := range prs {
+		out[u] = p.State
+	}
+	return out, nil
+}
+
+// unitRepo is the repository of a pull request unit, "" for another unit.
+func unitRepo(u unit.Unit) string {
+	ref, ok := pr.RefOf(u)
+	if !ok {
+		return ""
+	}
+	return ref.Owner + "/" + ref.Repo
 }
