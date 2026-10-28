@@ -107,6 +107,11 @@ func (d Deriver) UntrackedRow(c dgh.Candidate, o dinv.Override) api.Row {
 	f.NudgeRefusal = fmt.Sprintf("%s is not tracked; track it before a nudge", c.Ref)
 	r.Actions = catalog.States(f)
 	r.SpecsVersion = d.SpecsVersion
+	author := []string{c.Author}
+	if f.Mine {
+		author = []string{"me", c.Author}
+	}
+	r.Facets = map[string][]string{FacetRepo: {p.Repo}, FacetAuthor: author, FacetStatus: {"none"}, FacetCI: {"none"}}
 	return d.Seal(r, p)
 }
 

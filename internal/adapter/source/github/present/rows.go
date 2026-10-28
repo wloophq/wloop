@@ -55,14 +55,15 @@ type stored struct {
 	evs []dinv.Event
 }
 
-// storedRead derives the row of a pull request the inventory holds from the
-// inventory, its turn book and its open intakes; unmuted drops the override
-// and the pending round.
+// storedRead derives the row of a pull request the plugin reported from its
+// report, the host's events and overrides, its turn book and its open
+// intakes; unmuted drops the override and the pending round.
 func (p *Presenter) storedRead(ctx context.Context, u unit.Unit, asked catalog.Asked, unmuted bool) (stored, bool, error) {
-	pull, found, err := p.inventoryPR(ctx, u)
+	rep, found, err := p.reportOf(ctx, u)
 	if err != nil || !found {
 		return stored{}, false, err
 	}
+	pull := rep.PR
 	ref := pull.Ref
 	evs, err := p.d.Store.Events(ctx, ref)
 	if err != nil {
@@ -102,7 +103,34 @@ func (p *Presenter) storedRead(ctx context.Context, u unit.Unit, asked catalog.A
 			d.Intakes = map[pr.Ref][]intake.Intake{ref: open}
 		}
 	}
-	return stored{row: d.Row(pull, evs, o), pr: pull, evs: evs}, true, nil
+	return stored{row: d.Row(rep, evs, o), pr: pull, evs: evs}, true, nil
+}
+
+// reportOf is the plugin's report of the pull request of u under any case.
+func (p *Presenter) reportOf(ctx context.Context, u unit.Unit) (prrow.Report, bool, error) {
+	if p.d.Reports == nil {
+		return prrow.Report{}, false, nil
+	}
+	units, err := p.d.Reports.Units(ctx, unit.GitHub)
+	if err != nil {
+		return prrow.Report{}, false, err
+	}
+	i := slices.IndexFunc(units, func(x unit.Unit) bool { return x == u })
+	if i < 0 {
+		i = slices.IndexFunc(units, func(x unit.Unit) bool { return p.same(x, u) })
+	}
+	if i < 0 {
+		return prrow.Report{}, false, nil
+	}
+	snaps, err := p.d.Reports.Reported(ctx, units[i:i+1])
+	if err != nil {
+		return prrow.Report{}, false, err
+	}
+	s, ok := snaps[units[i]]
+	if !ok {
+		return prrow.Report{}, false, nil
+	}
+	return prrow.ReportOf(s)
 }
 
 // deriverAt derives the rows of a request from base, with no turn and no

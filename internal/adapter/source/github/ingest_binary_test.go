@@ -30,6 +30,7 @@ import (
 	"github.com/wloophq/wloop/internal/plugins/bundled"
 	"github.com/wloophq/wloop/internal/plugins/host"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/pkg/plugin"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -171,6 +172,11 @@ func TestTheGitHubBinaryIngestsAndReportsAFollowedPullRequest(t *testing.T) {
 	snap, ok, err := snaps.Last(ctx, ref.Unit())
 	if err != nil || !ok || snap.Rev == 0 {
 		t.Fatalf("the followed pull request's snapshot %+v %v %v", snap, ok, err)
+	}
+	rep, ok, err := prrow.ReportOf(snap)
+	if err != nil || !ok || snap.Situation.Kind == "" || snap.Card == nil || snap.Card.Title != "Batch export" || rep.PR.Ref != ref ||
+		rep.Payload.Repo != "acme/api" || !slices.Contains(rep.Payload.Reasons, "tracked") || len(snap.Signals) != 3 || len(snap.Facts) == 0 {
+		t.Fatalf("the reported row %+v %v %v of %+v", rep, ok, err, snap)
 	}
 	row, ok, err := st.PR(ctx, ref)
 	if err != nil || !ok || row.Title != "Batch export" || row.HeadOid != "h2" || !slices.Contains(row.Reasons, "tracked") {

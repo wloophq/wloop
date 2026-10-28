@@ -132,64 +132,59 @@ func MuteLapsed(pr dinv.PR, o dinv.Override, kind situation.Kind) bool {
 	return o.MuteUntilStateChange && kind != situation.KindMuted && pr.State == dgh.StateOpen
 }
 
-// Row derives the row of a pull request of the inventory.
-func (d Deriver) Row(pr dinv.PR, evs []dinv.Event, o dinv.Override) api.Row {
-	return d.Seal(d.Parts(pr, evs, o))
+// Row derives the row of a pull request the plugin reported.
+func (d Deriver) Row(rep Report, evs []dinv.Event, o dinv.Override) api.Row {
+	return d.Seal(d.Parts(rep, evs, o))
 }
 
 // Parts derives a pull request's row and payload before Seal: a caller adds
-// the brief, the intake and the activity in between.
-func (d Deriver) Parts(pr dinv.PR, evs []dinv.Event, o dinv.Override) (api.Row, Payload) {
-	in := situation.Input{PR: pr, Events: evs, Override: o, Viewer: d.Viewer, MyTeams: d.Teams, Ignore: d.Ignore, Now: d.Now, Stalled: d.Stalled}
+// the brief, the intake and the activity in between. evs are the host's
+// events of the pull request and o its overrides there.
+func (d Deriver) Parts(rep Report, evs []dinv.Event, o dinv.Override) (api.Row, Payload) {
+	pr := rep.PR
+	var turn *TurnFact
 	f, hasTurn := d.Turns[pr.Ref]
 	if hasTurn {
-		in.Turn, in.SessionWaiting = &f.Facts, f.Waiting
-		if f.Unread && o.MuteUntilStateChange {
-			// An unread session cannot show that the muted state changed.
-			in.SessionWaiting = o.MutedKind == string(situation.KindLoopWaiting)
-		}
+		turn = &f
 	}
-	res := situation.Derive(in)
-	if MuteLapsed(pr, o, res.Kind) {
+	res, unmuted := SituationOf(rep, turn, o, evs, d.Now)
+	if MuteLapsed(pr, o, situation.Kind(res.Kind)) {
 		o.MuteUntilStateChange, o.MutedKind, o.MutedWaitingOn = false, "", ""
 	}
-	unmuted := res
-	if res.Kind == situation.KindMuted {
-		in.Override = dinv.Override{PR: pr.Ref}
-		unmuted = situation.Derive(in)
-	}
-	ws := Workspace(pr.Workspace)
-	ws.AgentStates = nonNil(ws.AgentStates)
+	o.Adopted = o.Adopted || rep.Payload.Override.Adopted
+	o.Tracked = o.Tracked || rep.Payload.Override.Tracked
 	r := api.Row{
 		Unit: pr.Ref.Unit(), Link: cmp.Or(pr.URL, pr.Ref.URL()), Label: pr.Ref.String(), Title: pr.Title, Kind: api.Kind(res.Kind),
 		Summary: api.Summary{WaitsOn: res.WaitingOn, Since: res.Since, Reason: res.Reason, Stalled: res.Stalled},
 	}
-	p := Payload{Author: pr.Author, Repo: pr.Ref.Owner + "/" + pr.Ref.Repo, Head: termfmt.OneLine(pr.HeadBranch, 255),
-		Reasons: nonNil(pr.Reasons), Workspace: ws, Override: Override(o), Viewer: d.Viewer}
-	switch res.Kind {
-	case situation.KindLoopWaiting, situation.KindLoopWorking, situation.KindLoopStopped:
+	p := rep.Payload
+	p.Reasons, p.Workspace.AgentStates = nonNil(p.Reasons), nonNil(p.Workspace.AgentStates)
+	p.Override, p.Viewer = Override(o), d.Viewer
+	switch situation.Kind(res.Kind) {
+	case situation.KindLoopWaiting, situation.KindLoopStopped, situation.KindLoopWorking:
 		r.Question = f.Question
 	}
-	if pend, ok := d.Pending[pr.Ref.Unit()]; ok && res.Kind != situation.KindDone {
+	if pend, ok := d.Pending[pr.Ref.Unit()]; ok && res.Kind != overlay.KindDone {
 		r.Pending = pendingOf(pend)
 		over := overlay.Pending{Intent: pend.Intent, Reason: pend.Reason}.Over(overlay.Situation{Kind: string(r.Kind),
 			WaitingOn: r.Summary.WaitsOn, Since: r.Summary.Since, Reason: r.Summary.Reason, Stalled: r.Summary.Stalled})
 		r.Kind = api.Kind(over.Kind)
 		r.Summary.WaitsOn, r.Summary.Since, r.Summary.Reason, r.Summary.Stalled = over.WaitingOn, over.Since, over.Reason, over.Stalled
 	}
-	if res.Kind == situation.KindMuted {
-		p.UnmutedKind, p.UnmutedWaitingOn, p.UnmutedReason = string(unmuted.Kind), unmuted.WaitingOn, unmuted.Reason
+	if res.Kind == overlay.KindMuted {
+		p.UnmutedKind, p.UnmutedWaitingOn, p.UnmutedReason = unmuted.Kind, unmuted.WaitingOn, unmuted.Reason
 	}
 	if o.MuteUntilStateChange || o.MutedUntil.After(d.Now) {
 		p.Mute = &Mute{Until: o.MutedUntil, UntilStateChange: o.MuteUntilStateChange}
 	}
-	p.LastHuman = d.lastHuman(pr, evs, r.Link)
-	p.Facts = d.facts(pr, r, p)
-	p.Approved = d.approved(pr, evs, r, p)
-	r.Views = d.views(r, p)
+	p.Facts = d.facts(rep.Payload.Facts, r, p)
+	overlaid := string(r.Kind) != rep.Situation.Kind
+	p.Approved = rep.Payload.Approved && !overlaid
+	r.Views = d.views(rep.Views, overlaid, r, p)
 	unmutedRow := api.Row{Kind: api.Kind(unmuted.Kind), Summary: api.Summary{WaitsOn: unmuted.WaitingOn, Reason: unmuted.Reason, Since: unmuted.Since}}
 	r.Actions = catalog.States(d.FactsOf(pr, evs, o, r, p, unmutedRow))
 	r.SpecsVersion = d.SpecsVersion
+	r.Facets = rep.Facets
 	return r, p
 }
 
@@ -198,7 +193,7 @@ func (d Deriver) Parts(pr dinv.PR, evs []dinv.Event, o dinv.Override) (api.Row, 
 func (d Deriver) Seal(r api.Row, p Payload) api.Row {
 	r.Summary.Closed = situation.Kind(r.Kind) == situation.KindDone
 	r.Summary.Line = summaryLine(r, p)
-	r.Facets = d.facetValues(r, p)
+	r.Facets = d.facetValues(r, p, r.Facets)
 	raw, err := json.Marshal(p)
 	if err != nil {
 		panic(fmt.Sprintf("prrow: encoding a payload: %v", err))
@@ -220,32 +215,13 @@ func summaryLine(r api.Row, p Payload) string {
 	return r.Summary.Reason
 }
 
-// humanEvents are the event kinds a person's own action on GitHub leaves.
-var humanEvents = []string{dinv.KindOpened, dinv.KindPush, dinv.KindReview, dinv.KindComment}
-
-// lastHuman is the newest action of a person other than the viewer, bots
-// and the ignored reviewers; nil for none.
-func (d Deriver) lastHuman(pr dinv.PR, evs []dinv.Event, link string) *LastHuman {
-	var last *dinv.Event
-	for i, e := range evs {
-		if !slices.Contains(humanEvents, e.Kind) || e.Actor == "" || strings.HasSuffix(e.Actor, "[bot]") ||
-			strings.EqualFold(e.Actor, d.Viewer) || slices.ContainsFunc(d.Ignore, func(s string) bool { return strings.EqualFold(s, e.Actor) }) {
-			continue
-		}
-		if last == nil || !e.At.Before(last.At) {
-			last = &evs[i]
-		}
-	}
-	if last == nil {
-		return nil
-	}
-	return &LastHuman{Who: last.Actor, What: last.Kind, At: last.At, Link: link}
-}
-
-func (d Deriver) facts(pr dinv.PR, r api.Row, p Payload) *api.RowFacts {
-	f := &api.RowFacts{CreatedAt: pr.CreatedAt, ChangedFiles: pr.ChangedFiles, Checks: api.CheckFacts{State: pr.ChecksState}}
-	for _, c := range pr.FailingChecks {
-		f.Checks.Failing = append(f.Checks.Failing, c.Name)
+// facts are the reported facts of the row with the instants ahead it waits
+// for.
+func (d Deriver) facts(reported *api.RowFacts, r api.Row, p Payload) *api.RowFacts {
+	f := &api.RowFacts{}
+	if reported != nil {
+		*f = *reported
+		f.Checks.Failing = slices.Clone(reported.Checks.Failing)
 	}
 	if r.Pending != nil {
 		f.Next = d.upcoming(f.Next, r.Pending.Deadline, api.UpcomingGate)
@@ -281,31 +257,6 @@ func BriefSummary(b brief.Summary) *api.BriefSummary {
 	return &api.BriefSummary{Kind: b.Kind, Size: b.Size, Risk: b.Risk, Goal: termfmt.OneLine(b.Goal, 300), OpenQuestions: b.OpenQuestions, Tags: b.Tags, Extra: b.Extra}
 }
 
-func (d Deriver) approved(pr dinv.PR, evs []dinv.Event, r api.Row, p Payload) bool {
-	if pr.State != "OPEN" || p.Workspace.ID == "" || p.Workspace.IsMain {
-		return false
-	}
-	switch situation.Kind(r.Kind) {
-	case situation.KindRoundPending, situation.KindLoopWorking, situation.KindLoopWaiting, situation.KindLoopStopped, situation.KindHeldByCap, situation.KindBlocked, situation.KindMuted:
-		return false
-	}
-	if p.Workspace.IsReview {
-		return d.approvedHead(pr, evs)
-	}
-	return d.Viewer != "" && strings.EqualFold(pr.Author, d.Viewer) && situation.Kind(r.Kind) == situation.KindMerge
-}
-
-// approvedHead tells whether my newest review approved the current head.
-func (d Deriver) approvedHead(pr dinv.PR, evs []dinv.Event) bool {
-	var last dinv.Event
-	for _, e := range evs {
-		if e.Kind == dinv.KindReview && strings.EqualFold(e.Actor, d.Viewer) && !e.At.Before(last.At) {
-			last = e
-		}
-	}
-	return d.Viewer != "" && pr.HeadOid != "" && last.Data == "APPROVED:"+pr.HeadOid
-}
-
 func nonNil(v []string) []string {
 	if v == nil {
 		return []string{}
@@ -313,32 +264,34 @@ func nonNil(v []string) []string {
 	return v
 }
 
-// views puts a pull request outside the scope (no reasons) only where the
-// loop or an adoption put it: loop, mine, and needs-me for a review
-// workspace's question or an author workspace whose agent waits for me.
-func (d Deriver) views(r api.Row, p Payload) []string {
-	out := []string{}
+// views are the views the plugin put the row in, laid over with the
+// host's state: an overlay that set the row's situation decides needs-me
+// and leaves it out of approved, the stalled view follows the host's clock,
+// and a pull request the user took over is the user's.
+func (d Deriver) views(reported []string, overlaid bool, r api.Row, p Payload) []string {
+	drop := []string{api.ViewStalled}
+	if overlaid {
+		drop = append(drop, api.ViewNeedsMe, api.ViewApproved)
+	}
+	out := slices.DeleteFunc(slices.Clone(reported), func(v string) bool { return slices.Contains(drop, v) })
+	if out == nil {
+		out = []string{}
+	}
 	kind := situation.Kind(r.Kind)
-	if needsMe(kind, r.Summary.WaitsOn, p) && kind != situation.KindMuted {
-		out = append(out, api.ViewNeedsMe)
+	add := func(v string, on bool) {
+		if on && !slices.Contains(out, v) {
+			out = append(out, v)
+		}
 	}
-	if r.Summary.Stalled && len(p.Reasons) > 0 {
-		out = append(out, api.ViewStalled)
-	}
-	if (mineAuthor(p) || p.Override.Adopted) && kind != situation.KindDone {
-		out = append(out, api.ViewMine)
-	}
-	if p.Workspace.IsReview {
-		out = append(out, api.ViewLoop)
-	}
-	if p.Approved {
-		out = append(out, api.ViewApproved)
-	}
-	if kind == situation.KindDone && p.Workspace.ID != "" {
-		out = append(out, api.ViewDone)
-	}
+	add(api.ViewNeedsMe, overlaid && needsMe(kind, r.Summary.WaitsOn, p) && kind != situation.KindMuted)
+	add(api.ViewStalled, r.Summary.Stalled && len(p.Reasons) > 0)
+	add(api.ViewMine, p.Override.Adopted && kind != situation.KindDone)
+	slices.SortStableFunc(out, func(a, b string) int { return slices.Index(viewOrder, a) - slices.Index(viewOrder, b) })
 	return out
 }
+
+// viewOrder is the order of a row's views.
+var viewOrder = []string{api.ViewNeedsMe, api.ViewStalled, api.ViewMine, api.ViewLoop, api.ViewApproved, api.ViewDone}
 
 func mineAuthor(p Payload) bool { return p.Viewer != "" && strings.EqualFold(p.Author, p.Viewer) }
 

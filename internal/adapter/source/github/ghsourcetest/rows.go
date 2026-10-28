@@ -4,10 +4,13 @@
 package ghsourcetest
 
 import (
+	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -15,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
@@ -36,6 +40,8 @@ func ago(d time.Duration) time.Time { return Now.Add(-d) }
 type Case struct {
 	Name string
 	Row  api.Row
+	// Report is what the GitHub plugin reported of the case.
+	Report prrow.Report
 }
 
 // Situation is what one row derives from.
@@ -79,7 +85,8 @@ func Cases() []Case {
 						s.Override.MutedUntil = Now.Add(5 * time.Hour)
 						s.add(dinv.KindMuted, Viewer, ago(time.Hour), "")
 					}
-					out = append(out, Case{Name: caseName(b.name, author, inScope, muted), Row: Derive(s)})
+					row, rep := DeriveReport(s)
+					out = append(out, Case{Name: caseName(b.name, author, inScope, muted), Row: row, Report: rep})
 				}
 			}
 		}
@@ -124,6 +131,12 @@ var ReviewWorkspace = dinv.Workspace{ID: "ws-r", DisplayName: "review", Status: 
 
 // Derive is s's row as prrow's deriver serves it at s.At (default Now) to Viewer.
 func Derive(s Situation) api.Row {
+	row, _ := DeriveReport(s)
+	return row
+}
+
+// DeriveReport is s's row and the plugin's report it derives from.
+func DeriveReport(s Situation) (api.Row, prrow.Report) {
 	l, err := turn.Bundled()
 	if err != nil {
 		panic(fmt.Sprintf("ghsourcetest: bundled intents: %v", err))
@@ -141,7 +154,36 @@ func Derive(s Situation) api.Row {
 		d.Turns[s.PR.Ref] = *s.Turn
 	}
 	s.Override.PR = s.PR.Ref
-	return d.Row(s.PR, s.Events, s.Override)
+	in := ghreporttest.Input{PR: s.PR, Events: s.Events, Adopted: s.Override.Adopted, Tracked: s.Override.Tracked}
+	if s.Turn != nil && s.Turn.Facts.Role == "pr.address" {
+		in.AddressedAt = s.Turn.Facts.At
+	}
+	rep, ok, err := prrow.ReportOf(ghreporttest.Snapshot(ghreporttest.Env{Viewer: Viewer, Teams: []string{Team}, Now: at, Loop: brand.Name}, in))
+	if err != nil || !ok {
+		panic(fmt.Sprintf("ghsourcetest: the report of %s: %v %v", s.PR.Ref, ok, err))
+	}
+	row := d.Row(rep, s.Events, s.Override)
+	if key, err := json.Marshal(row); err == nil {
+		derived.Store(string(key), rep)
+	}
+	return row, rep
+}
+
+// derived are the reports rows derived from, by the row's JSON.
+var derived sync.Map
+
+// ReportOf is the report row, a row Derive derived, derives from; false
+// for any other row.
+func ReportOf(row api.Row) (prrow.Report, bool) {
+	key, err := json.Marshal(row)
+	if err != nil {
+		return prrow.Report{}, false
+	}
+	rep, ok := derived.Load(string(key))
+	if !ok {
+		return prrow.Report{}, false
+	}
+	return rep.(prrow.Report), true
 }
 
 type base struct {

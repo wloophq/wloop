@@ -71,6 +71,7 @@ type fakeHost struct {
 	topics  [][]sdk.Topic
 	listing src.Listing
 	samples []src.Sample
+	books   []src.Book
 }
 
 func (h *fakeHost) host() src.Host {
@@ -122,7 +123,17 @@ func (h *fakeHost) Events(_ context.Context, q src.EventQuery) ([]src.Event, err
 
 func (*fakeHost) Tasks(context.Context, []sdk.Unit) ([]src.Task, error) { return nil, nil }
 
-func (*fakeHost) Books(context.Context, []sdk.Unit) ([]src.Book, error) { return nil, nil }
+func (h *fakeHost) Books(_ context.Context, units []sdk.Unit) ([]src.Book, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	var out []src.Book
+	for _, b := range h.books {
+		if slices.Contains(units, b.Unit) {
+			out = append(out, b)
+		}
+	}
+	return out, nil
+}
 
 func (*fakeHost) RoundState(context.Context, sdk.Unit) (src.RoundState, error) {
 	return src.RoundState{}, nil

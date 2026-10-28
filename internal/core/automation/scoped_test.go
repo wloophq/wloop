@@ -39,7 +39,7 @@ func settledWF(name string) workflow.Workflow {
 func TestAWorkflowReadsTheFactsScopedToIt(t *testing.T) {
 	r := newRig(t, settledWF("quiet"), settledWF("busy"))
 	su := scopedUnits{Units: r.units, settled: map[string]time.Time{"busy": t0.Add(time.Hour)}}
-	r.e.Units = su
+	r.e.Units, r.e.Keep = su, su
 	r.put(s1, "a")
 	p := r.evaluate()
 	if _, ok := planItem(p, "quiet", s1); !ok {
@@ -55,7 +55,8 @@ func TestAWorkflowReadsTheFactsScopedToIt(t *testing.T) {
 
 func TestADueRunKeysAScopedItemAsThePlanDid(t *testing.T) {
 	r := newRig(t, settledWF("quiet"))
-	r.e.Units = scopedUnits{Units: r.units, settled: map[string]time.Time{"quiet": t0.Add(-time.Hour)}}
+	r.e.Keep = scopedUnits{Units: r.units, settled: map[string]time.Time{"quiet": t0.Add(-time.Hour)}}
+	r.e.Units = r.e.Keep.(scopedUnits)
 	r.put(s1, "a")
 	r.sweep()
 	r.clock.Advance(6 * time.Minute)

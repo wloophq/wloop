@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/unit"
 
 	"github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -49,8 +50,59 @@ func (r reader) Tasks(ctx context.Context, units []plugin.Unit) ([]src.Task, err
 	return out, errors.Join(errs...)
 }
 
-func (reader) Books(context.Context, []plugin.Unit) ([]src.Book, error) {
-	return nil, src.ErrUnsupported
+// Books are the turns and records of the plugin's own units, each turn at
+// the time it reached its state: its last record's, else its start's, else
+// its send's.
+func (r reader) Books(ctx context.Context, units []plugin.Unit) ([]src.Book, error) {
+	if r.b.Books == nil {
+		return nil, src.ErrUnsupported
+	}
+	own := make([]unit.Unit, 0, len(units))
+	var errs []error
+	for _, w := range units {
+		u, err := r.b.Units.Own(r.b.ID, w)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		own = append(own, u)
+	}
+	if err := errors.Join(errs...); err != nil {
+		return nil, err
+	}
+	books, err := r.b.Books(ctx, own...)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]src.Book, 0, len(books))
+	for _, u := range own {
+		b, ok := books[u]
+		if !ok {
+			continue
+		}
+		wb := src.Book{Unit: Wire(u)}
+		for _, t := range b.Turns {
+			wt := src.Turn{Seq: t.Seq, ID: t.ID, Intent: string(t.Intent), Role: t.Role, Workflow: t.Workflow, State: string(t.State),
+				Head: t.Head, Session: t.Session, SentAt: t.SentAt, StartedAt: t.StartedAt, EndedAt: t.EndedAt, At: t.SentAt}
+			if !t.StartedAt.IsZero() {
+				wt.At = t.StartedAt
+			}
+			if rec, ok := b.LastRecord(t.Seq); ok {
+				wt.Summary, wt.At = rec.Record.Headline(), rec.At
+			}
+			wt.AnsweredAt, _ = b.AnsweredAt(t.Seq)
+			wb.Turns = append(wb.Turns, wt)
+		}
+		for _, rec := range b.Records {
+			raw, err := json.Marshal(rec.Record)
+			if err != nil {
+				return nil, err
+			}
+			wb.Records = append(wb.Records, src.TurnRecord{ID: rec.ID, TurnSeq: rec.TurnSeq, Head: rec.Head, At: rec.At, Record: raw})
+		}
+		out = append(out, wb)
+	}
+	return out, nil
 }
 
 // RoundState is the host's round bookkeeping of one of the plugin's own

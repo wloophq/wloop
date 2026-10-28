@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -12,6 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel/overlay"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 	"github.com/wloophq/wloop/internal/situation"
 )
 
@@ -149,4 +151,26 @@ func fixtureDeriver(t *testing.T, at time.Time, cases []rowCase) Deriver {
 		}
 	}
 	return d
+}
+
+// report is what the GitHub plugin reports of the case's pull request.
+func (c rowCase) report(t *testing.T) Report {
+	t.Helper()
+	in := ghreporttest.Input{PR: c.pr, Events: c.events, Adopted: c.override.Adopted, Tracked: c.override.Tracked}
+	if c.turn != nil && c.turn.Facts.Role == "pr.address" {
+		in.AddressedAt = c.turn.Facts.At
+	}
+	return reportOf(t, in)
+}
+
+// reportOf is what the GitHub plugin reports of in, derived by the
+// plugin's code with the fixtures' viewer and teams at fixtureNow.
+func reportOf(t *testing.T, in ghreporttest.Input) Report {
+	t.Helper()
+	s := ghreporttest.Snapshot(ghreporttest.Env{Viewer: fixtureViewer, Teams: []string{"acme/core"}, Now: fixtureNow, Loop: brand.Name}, in)
+	rep, ok, err := ReportOf(s)
+	if err != nil || !ok {
+		t.Fatalf("report of %s: %v %v", in.PR.Ref, ok, err)
+	}
+	return rep
 }

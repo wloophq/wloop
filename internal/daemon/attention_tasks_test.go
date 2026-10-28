@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/storetest"
 	"github.com/wloophq/wloop/internal/api"
@@ -67,13 +66,17 @@ func (r *notifyRig) settle(t *testing.T, u unit.Unit) api.Row {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c, err := ghsource.Card(ctx, row); err == nil {
+	its, err := r.s.cards().Items(ctx, row)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c, err := r.s.cards().Card(ctx, row); err == nil {
 		c.Unit = u
 		if _, err := r.db.Cards().Save(ctx, c, catalogNow); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := r.ledger.Reconcile(ctx, u, ghsource.Items(row), unit.Anchor{Unit: u, Ref: "row:1"}, items.Superseded); err != nil {
+	if _, err := r.ledger.Reconcile(ctx, u, its, unit.Anchor{Unit: u, Ref: "row:1"}, items.Superseded); err != nil {
 		t.Fatal(err)
 	}
 	if err := r.s.deps.Messages.Reconcile(ctx, u); err != nil {
@@ -458,13 +461,17 @@ func TestLiveTasksNotifyAsTheRows(t *testing.T) {
 	for _, row := range rows {
 		units = append(units, row.Unit)
 		byUnit[row.Unit] = rowAttention(t, s, row)
-		if c, err := ghsource.Card(ctx, row); err == nil {
+		its, err := s.cards().Items(ctx, row)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c, err := s.cards().Card(ctx, row); err == nil {
 			c.Unit = row.Unit
 			if _, err := f.DB.Cards().Save(ctx, c, f.Now); err != nil {
 				t.Fatal(err)
 			}
 		}
-		if _, err := ledger.Reconcile(ctx, row.Unit, ghsource.Items(row), unit.Anchor{Unit: row.Unit, Ref: "row:1"}, items.Superseded); err != nil {
+		if _, err := ledger.Reconcile(ctx, row.Unit, its, unit.Anchor{Unit: row.Unit, Ref: "row:1"}, items.Superseded); err != nil {
 			t.Fatal(err)
 		}
 	}

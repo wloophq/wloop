@@ -171,7 +171,7 @@ func briefHome(cfg config.Config) func(pr.Ref) string {
 
 // githubPresenter are the GitHub presenter's deps over the env's client.
 func (e *Env) githubPresenter(store *inventory.Store, host src.Host, briefs *interruptFirst) present.Deps {
-	deps := present.Deps{Store: store, Host: host, Explorer: e.github.API, Budget: e.githubBudget(), FailedSteps: e.failedSteps()}
+	deps := present.Deps{Store: store, Reports: e.sourceReports(store), Host: host, Explorer: e.github.API, Budget: e.githubBudget(), FailedSteps: e.failedSteps()}
 	if briefs != nil {
 		deps.Briefs = briefs
 	}
@@ -624,4 +624,30 @@ func (e *Env) pluginLoaded(ctx context.Context, db *sqlite.DB, id string) {
 	if id == string(unit.GitHub) {
 		e.githubLoaded(ctx, db)
 	}
+}
+
+// sourceReports are what the plugins the host runs last reported, read when
+// asked, as the plugins start after the modules are built; a test's
+// reports over store when it sets them.
+func (e *Env) sourceReports(store *inventory.Store) readmodel.Reports {
+	if e.reports != nil {
+		return e.reports(store)
+	}
+	return lateReports{e}
+}
+
+type lateReports struct{ e *Env }
+
+func (r lateReports) Units(ctx context.Context, p unit.ProviderID) ([]unit.Unit, error) {
+	if r.e.pluginKind == nil {
+		return nil, nil
+	}
+	return r.e.pluginKind.Snapshots.Units(ctx, p)
+}
+
+func (r lateReports) Reported(ctx context.Context, units []unit.Unit) (map[unit.Unit]src.Snapshot, error) {
+	if r.e.pluginKind == nil {
+		return nil, nil
+	}
+	return r.e.pluginKind.Snapshots.Reported(ctx, units)
 }

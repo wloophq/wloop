@@ -12,10 +12,10 @@ import (
 )
 
 const (
-	insertSourceEventSQL = `INSERT OR IGNORE INTO events (provider, unit_key, kind, key, actor, at, data) VALUES (?, ?, ?, ?, ?, ?, ?)`
+	insertSourceEventSQL = `INSERT OR IGNORE INTO events (provider, unit_key, kind, key, actor, at, data, anchor) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 	fillSourceEventSQL   = `UPDATE events SET actor = iif(actor = '', ?1, actor), data = iif(data = '', ?2, data)
 		WHERE provider = ?3 AND unit_key = ?4 AND kind = ?5 AND key = '' AND at = ?6 AND ((actor = '' AND ?1 != '') OR (data = '' AND ?2 != ''))`
-	unitEventsSQL = `SELECT provider, unit_key, kind, key, actor, at, data FROM events
+	unitEventsSQL = `SELECT provider, unit_key, kind, key, actor, at, data, anchor FROM events
 		WHERE (provider, unit_key) IN (SELECT value->>0, value->>1 FROM json_each(?1))
 		AND (?2 = '[]' OR kind IN (SELECT value FROM json_each(?2))) AND at >= ?3 ORDER BY at, id`
 	rehomeDraftSQL = `UPDATE drafts SET unit_key = ?, rev = rev + 1 WHERE provider = ? AND unit_key = ?`
@@ -36,7 +36,11 @@ func (s *Store) RecordSourceEvents(ctx context.Context, evs ...port.Event) error
 	_, err := s.db.Write(ctx, func(tx *Tx) error {
 		for _, ev := range evs {
 			at := ev.At.UTC().Format(event.TimeLayout)
-			res, err := tx.ExecContext(ctx, insertSourceEventSQL, string(ev.Unit.Provider), ev.Unit.Key, ev.Kind, ev.Key, ev.Actor, at, ev.Data)
+			anchor, err := anchorJSON(ev.Anchor)
+			if err != nil {
+				return err
+			}
+			res, err := tx.ExecContext(ctx, insertSourceEventSQL, string(ev.Unit.Provider), ev.Unit.Key, ev.Kind, ev.Key, ev.Actor, at, ev.Data, anchor)
 			if err != nil {
 				return err
 			}
@@ -90,9 +94,14 @@ func (s *Store) UnitEvents(ctx context.Context, units []unit.Unit, kinds []strin
 	var out []port.Event
 	for rows.Next() {
 		var ev port.Event
-		var provider, at string
-		if err := rows.Scan(&provider, &ev.Unit.Key, &ev.Kind, &ev.Key, &ev.Actor, &at, &ev.Data); err != nil {
+		var provider, at, anchor string
+		if err := rows.Scan(&provider, &ev.Unit.Key, &ev.Kind, &ev.Key, &ev.Actor, &at, &ev.Data, &anchor); err != nil {
 			return nil, err
+		}
+		if anchor != "" {
+			if err := json.Unmarshal([]byte(anchor), &ev.Anchor); err != nil {
+				return nil, fmt.Errorf("the anchor of a %s event: %w", ev.Kind, err)
+			}
 		}
 		ev.Unit.Provider = unit.ProviderID(provider)
 		if ev.At, err = time.Parse(event.TimeLayout, at); err != nil {
@@ -156,4 +165,13 @@ func (db *DB) RehomeDrafts(ctx context.Context, moves map[unit.Unit]unit.Unit) (
 		return nil
 	})
 	return moved, err
+}
+
+// anchorJSON is a as the events table keeps it: empty for none.
+func anchorJSON(a unit.Anchor) (string, error) {
+	if a == (unit.Anchor{}) {
+		return "", nil
+	}
+	raw, err := json.Marshal(a)
+	return string(raw), err
 }

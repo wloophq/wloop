@@ -229,7 +229,7 @@ func (c *Collector) linkWorkspaces(ctx context.Context, list []local, l *links, 
 			Manager: w.Manager, ID: w.ID, DisplayName: w.DisplayName, Status: w.Status,
 			IsReview:    c.reviewWorkspace(w),
 			AgentStates: w.AgentStates,
-			Comment:     oneLine(w.Comment, 1000),
+			Comment:     pr.OneLine(w.Comment, 1000),
 			IsMain:      w.IsMain,
 		}
 	}

@@ -62,6 +62,8 @@ type Plugin struct {
 	// stop ends the first report, which loading waits for.
 	stop    context.CancelFunc
 	loading sync.WaitGroup
+	// watching ends with the reports at their due times.
+	watching sync.WaitGroup
 }
 
 var (
@@ -108,6 +110,12 @@ func (p *Plugin) Start(ctx context.Context, req src.StartRequest) error {
 	lctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	p.stop = cancel
 	p.loading.Go(func() { r.load(lctx) })
+	p.watching.Go(func() {
+		r.watchDue(lctx, func(ctx context.Context, refs []pr.Ref) error {
+			r.mark(refs...)
+			return r.report(ctx, false)
+		})
+	})
 	return nil
 }
 
@@ -122,6 +130,7 @@ func (p *Plugin) Stop(context.Context) error {
 	}
 	stop()
 	p.loading.Wait()
+	p.watching.Wait()
 	return r.db.Close()
 }
 
@@ -144,17 +153,35 @@ func (p *Plugin) Health(context.Context) (sdk.Health, error) {
 	return sdk.Health{Status: sdk.StatusServing}, nil
 }
 
-// Notify links the workspaces again when the host's listing moved, and
-// reports what that changed.
-func (p *Plugin) Notify(ctx context.Context, _ []sdk.Unit, topics []sdk.Topic) error {
+// Notify links the workspaces again when the host's listing moved, reads
+// the configuration again when it changed, and reports again the pull
+// requests whose rows read what changed: their events and turns, the
+// viewer, the configuration.
+func (p *Plugin) Notify(ctx context.Context, units []sdk.Unit, topics []sdk.Topic) error {
 	r, err := p.running()
-	if err != nil || !slices.Contains(topics, sdk.TopicWorkspaces) {
+	if err != nil {
 		return nil
 	}
-	if err := r.col.Relink(ctx); err != nil {
-		return err
+	if slices.Contains(topics, sdk.TopicWorkspaces) {
+		if err := r.col.Relink(ctx); err != nil {
+			return err
+		}
 	}
-	return r.report(ctx, false)
+	if slices.Contains(topics, sdk.TopicConfig) {
+		r.reloadConfig(ctx)
+	}
+	all := slices.Contains(topics, sdk.TopicViewer) || slices.Contains(topics, sdk.TopicConfig)
+	if slices.ContainsFunc(topics, func(t sdk.Topic) bool { return t == sdk.TopicEvents || t == sdk.TopicTurns }) {
+		if len(units) == 0 {
+			all = true
+		}
+		for _, u := range units {
+			if ref, ok := pr.RefOf(u); ok {
+				r.mark(ref)
+			}
+		}
+	}
+	return r.report(ctx, all)
 }
 
 // Identity is the viewer: the login the store keeps, else the one GitHub's

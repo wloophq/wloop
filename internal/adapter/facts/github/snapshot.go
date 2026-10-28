@@ -21,6 +21,7 @@ import (
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/workspace"
 )
 
@@ -53,12 +54,16 @@ type view struct {
 	mu      sync.Mutex
 	prFacts map[pr.Ref]dinv.PlanFacts
 	events  map[pr.Ref][]dinv.Event
+	// reports are the plugin's reports read, nil for a pull request it
+	// has not reported.
+	reports map[pr.Ref]*prrow.Report
 	ended   map[unit.Unit]bool
 	targets *targets
 }
 
 func (p *Provider) build(ctx context.Context, now time.Time) (*view, error) {
-	v := &view{p: p, builtAt: now, cfg: p.cfg(), prFacts: map[pr.Ref]dinv.PlanFacts{}, events: map[pr.Ref][]dinv.Event{}}
+	v := &view{p: p, builtAt: now, cfg: p.cfg(), prFacts: map[pr.Ref]dinv.PlanFacts{}, events: map[pr.Ref][]dinv.Event{},
+		reports: map[pr.Ref]*prrow.Report{}}
 	if p.d.Changes != nil {
 		v.gen = p.d.Changes.Gen()
 	}
@@ -253,6 +258,52 @@ func (v *view) loadEvents(ctx context.Context, units []unit.Unit) error {
 		v.events[ref] = got[ref]
 	}
 	return nil
+}
+
+// loadReports reads the plugin's reports of the units not read yet, in one
+// query.
+func (v *view) loadReports(ctx context.Context, units []unit.Unit) error {
+	if v.p.d.Reports == nil {
+		return nil
+	}
+	v.mu.Lock()
+	var missing []unit.Unit
+	for _, u := range units {
+		if ref, err := refOf(u); err == nil {
+			if _, ok := v.reports[ref]; !ok {
+				missing = append(missing, ref.Unit())
+			}
+		}
+	}
+	v.mu.Unlock()
+	if len(missing) == 0 {
+		return nil
+	}
+	snaps, err := v.p.d.Reports.Reported(ctx, missing)
+	if err != nil {
+		return err
+	}
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	for _, u := range missing {
+		ref, _ := refOf(u)
+		v.reports[ref] = nil
+		rep, ok, err := prrow.ReportOf(snaps[u])
+		if err != nil {
+			return err
+		}
+		if ok {
+			v.reports[ref] = &rep
+		}
+	}
+	return nil
+}
+
+// reportOf is the plugin's report of ref; nil for none.
+func (v *view) reportOf(ref pr.Ref) *prrow.Report {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.reports[ref]
 }
 
 func (v *view) factsOf(ref pr.Ref) (dinv.PlanFacts, bool) {

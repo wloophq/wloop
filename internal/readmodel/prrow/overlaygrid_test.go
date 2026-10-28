@@ -1,13 +1,36 @@
-package situation
+package prrow
 
 import (
 	"fmt"
 	"time"
 
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/situation"
 )
+
+// The grid's pull request, the instant its hours count from, a Monday, and
+// the stalled thresholds of its sources.
+var (
+	gridRef = pr.Ref{Owner: "acme", Repo: "api", Number: 7}
+	gridT0  = time.Date(2026, 10, 5, 10, 0, 0, 0, time.UTC)
+)
+
+func h(n int) time.Time { return gridT0.Add(time.Duration(n) * time.Hour) }
+
+func ev(kind, key, actor string, at time.Time, data string) dinv.Event {
+	return dinv.Event{PR: gridRef, Kind: kind, Key: key, Actor: actor, At: at, Data: data}
+}
+
+func requested(reviewer, actor string, at time.Time) dinv.Event {
+	return ev(dinv.KindReviewRequest, reviewer+":"+at.UTC().Format(time.RFC3339), actor, at, reviewer)
+}
+
+func gridPR(author string, requested ...string) dinv.PR {
+	return dinv.PR{Ref: gridRef, Author: author, State: "OPEN", HeadOid: "h2", ChecksState: "SUCCESS", ReviewRequests: requested}
+}
 
 // gridSource is a pull request whose own situation, with no turn and no
 // mute, is one of the kinds the overlays cross.
@@ -20,29 +43,29 @@ type gridSource struct {
 
 func gridSources() []gridSource {
 	push := ev(dinv.KindPush, "h2", "ana", h(1), "")
-	draft, checks, approved, conflicts := pr("ana"), pr("ana"), pr("ana"), pr("ana")
+	draft, checks, approved, conflicts := gridPR("ana"), gridPR("ana"), gridPR("ana"), gridPR("ana")
 	draft.IsDraft = true
 	checks.ChecksState = "FAILURE"
 	approved.ReviewDecision = "APPROVED"
 	conflicts.ReviewDecision, conflicts.Mergeable, conflicts.BaseBranch = "APPROVED", "CONFLICTING", "main"
-	merged := pr("ana")
+	merged := gridPR("ana")
 	merged.State = "MERGED"
 	return []gridSource{
 		{"done", merged, []dinv.Event{ev(dinv.KindMerged, "", "ana", h(9), "")}, h(10)},
 		{"draft", draft, []dinv.Event{push}, h(10)},
 		{"checks", checks, []dinv.Event{push}, h(10)},
-		{"changes", pr("ana"), []dinv.Event{push, ev(dinv.KindReview, "r1", "me", h(3), "CHANGES_REQUESTED:h2")}, h(10)},
+		{"changes", gridPR("ana"), []dinv.Event{push, ev(dinv.KindReview, "r1", "me", h(3), "CHANGES_REQUESTED:h2")}, h(10)},
 		{"merge", approved, []dinv.Event{push, ev(dinv.KindReview, "r1", "me", h(3), "APPROVED:h2")}, h(10)},
 		{"conflicts", conflicts, []dinv.Event{push, ev(dinv.KindReview, "r1", "me", h(3), "APPROVED:h2")}, h(10)},
-		{"reply", pr("ana", "me"), []dinv.Event{push, requested("me", "ana", h(2)), ev(dinv.KindReview, "r1", "me", h(3), "COMMENTED:h2")}, h(10)},
-		{"reviewer_back", pr("ana", "me"), []dinv.Event{push, requested("me", "ana", h(2)), ev(dinv.KindReview, "r1", "me", h(3), "COMMENTED:h2"),
+		{"reply", gridPR("ana", "me"), []dinv.Event{push, requested("me", "ana", h(2)), ev(dinv.KindReview, "r1", "me", h(3), "COMMENTED:h2")}, h(10)},
+		{"reviewer_back", gridPR("ana", "me"), []dinv.Event{push, requested("me", "ana", h(2)), ev(dinv.KindReview, "r1", "me", h(3), "COMMENTED:h2"),
 			ev(dinv.KindComment, "c1", "ana", h(5), "")}, h(10)},
-		{"review", pr("ana", "carla"), []dinv.Event{push, requested("carla", "ana", h(2))}, h(10)},
-		{"review stalled", pr("ana", "me"), []dinv.Event{push, requested("me", "ana", h(2))}, h(100)},
-		{"no_reviewer", pr("ana"), []dinv.Event{push}, h(10)},
-		{"blocked", pr("ana", "me"), []dinv.Event{requested("me", "ana", h(1)), ev(dinv.KindRoundBlocked, "", "me", h(9), "the branch is busy")}, h(10)},
-		{"held", pr("ana", "me"), []dinv.Event{requested("me", "ana", h(1)), ev(dinv.KindRoundHeld, "", "me", h(9), "5 rounds today")}, h(10)},
-		{"to_address", pr("me", "bob"), []dinv.Event{ev(dinv.KindReview, "r1", "bob", h(2), "CHANGES_REQUESTED:h2"),
+		{"review", gridPR("ana", "carla"), []dinv.Event{push, requested("carla", "ana", h(2))}, h(10)},
+		{"review stalled", gridPR("ana", "me"), []dinv.Event{push, requested("me", "ana", h(2))}, h(100)},
+		{"no_reviewer", gridPR("ana"), []dinv.Event{push}, h(10)},
+		{"blocked", gridPR("ana", "me"), []dinv.Event{requested("me", "ana", h(1)), ev(dinv.KindRoundBlocked, "", "me", h(9), "the branch is busy")}, h(10)},
+		{"held", gridPR("ana", "me"), []dinv.Event{requested("me", "ana", h(1)), ev(dinv.KindRoundHeld, "", "me", h(9), "5 rounds today")}, h(10)},
+		{"to_address", gridPR("me", "bob"), []dinv.Event{ev(dinv.KindReview, "r1", "bob", h(2), "CHANGES_REQUESTED:h2"),
 			ev(dinv.KindWouldAddress, "w1", "", h(3), "reviewed by bob")}, h(4)},
 	}
 }
@@ -67,9 +90,9 @@ func gridTurns() []*gridTurn {
 
 func gridMutes() []dinv.Override {
 	return []dinv.Override{{}, {MutedUntil: h(200)}, {MutedUntil: h(1)},
-		{MuteUntilStateChange: true, MutedKind: string(KindLoopWaiting), MutedWaitingOn: "me"},
-		{MuteUntilStateChange: true, MutedKind: string(KindReview), MutedWaitingOn: "carla"},
-		{MuteUntilStateChange: true, MutedKind: string(KindNoReviewer), MutedWaitingOn: "author"}}
+		{MuteUntilStateChange: true, MutedKind: string(situation.KindLoopWaiting), MutedWaitingOn: "me"},
+		{MuteUntilStateChange: true, MutedKind: string(situation.KindReview), MutedWaitingOn: "carla"},
+		{MuteUntilStateChange: true, MutedKind: string(situation.KindNoReviewer), MutedWaitingOn: "author"}}
 }
 
 func gridPendings() []*round.Pending {

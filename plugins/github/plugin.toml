@@ -15,7 +15,19 @@ row_kinds = ["round_pending", "loop_waiting", "loop_stopped", "blocked", "to_add
 
 default_delivery = "comment"
 config_reads = ["sweep", "views"]
-notify = ["workspaces"]
+notify = ["workspaces", "events", "turns", "viewer", "config"]
+
+[[source.signals]]
+name = "stalled"
+doc = "The pull request's situation lasted past its stalled threshold, in working days."
+
+[[source.signals]]
+name = "in_loop"
+doc = "A review workspace holds the pull request: the loop reviews it."
+
+[[source.signals]]
+name = "ready"
+doc = "The work on the pull request is approved: my review approved its head, or my own can merge."
 
 [source.codec]
 keys = ["{owner}/{repo}#{number}"]

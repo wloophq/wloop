@@ -46,7 +46,7 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 			return "", "the workspace manager is unreachable: " + err.Error(), nil
 		}
 	}
-	if r, ok := e.Units.(Refresher); ok {
+	if r, ok := e.Keep.(Refresher); ok {
 		if err := r.Refresh(ctx); err != nil {
 			return "", "", fmt.Errorf("refreshing facts: %w", err)
 		}
@@ -55,7 +55,7 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 	if err != nil {
 		return "", "", err
 	}
-	if s, ok := e.Units.(Seener); ok {
+	if s, ok := e.Keep.(Seener); ok {
 		e.mu.Lock()
 		e.seen = s.Seen()
 		e.mu.Unlock()
@@ -155,7 +155,7 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 	if err := e.withdraw(ctx); err != nil {
 		e.logf("withdrawing drafts: %v", err)
 	}
-	if s, ok := e.Units.(Settler); ok {
+	if s, ok := e.Keep.(Settler); ok {
 		if err := s.Settle(ctx, st); err != nil {
 			return "", "", fmt.Errorf("settling: %w", err)
 		}

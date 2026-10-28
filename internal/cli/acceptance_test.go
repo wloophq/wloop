@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
 	factsgithub "github.com/wloophq/wloop/internal/adapter/facts/github"
 	factsession "github.com/wloophq/wloop/internal/adapter/facts/session"
 	factworkspace "github.com/wloophq/wloop/internal/adapter/facts/workspace"
@@ -760,11 +762,12 @@ func (f *fixtureEnv) engine(t *testing.T) *automation.Engine {
 	clock := clockFunc(func() time.Time { return f.now })
 	sf := factsession.New(factsession.Deps{Turns: te.Turns, Snapshot: f.snap, States: unitStates{te.Store}, Repo: unitRepo,
 		Exists: func(p string) bool { return f.exists[p] }, Changes: te.changes, Cfg: te.currentConfig, Clock: clock})
-	wf := factworkspace.New(factworkspace.Deps{Snapshot: f.snap, PRs: factsgithub.InventoryInputs(te.Store), Overrides: inventory.ByUnit{Store: te.Store},
+	wf := factworkspace.New(factworkspace.Deps{Snapshot: f.snap, Holdings: ghsource.Holdings{PRs: factsgithub.InventoryInputs(te.Store), Overrides: inventory.ByUnit{Store: te.Store}},
 		Books: te.repo, Git: factworkspace.LocalGit{R: te.Env.Git.R}, Disk: f.disk, Changes: te.changes, Cfg: te.currentConfig, Clock: clock})
 	gh := factsgithub.New(factsgithub.Deps{Inputs: factsgithub.InventoryInputs(te.Store), Store: te.Store, Snapshot: f.snap, Books: te.repo,
 		Rounds: sqlite.NewRounds(f.db), Git: factsgithub.LocalGit(te.Env.Git), Branches: te.Env.Git, Cfg: te.currentConfig, Clock: clock, Changes: te.changes,
-		Teams: func(context.Context) ([]string, error) { return nil, nil }, Intents: func() *dintent.Registry { return te.loadedIntents().Registry }})
+		Teams: func(context.Context) ([]string, error) { return nil, nil }, Intents: func() *dintent.Registry { return te.loadedIntents().Registry },
+		Reports: te.Env.reports(te.Store)})
 	return te.newEngine(engineDeps{DB: f.db, Modules: []source.Module{{ID: unit.GitHub, Codec: pr.Codec{}, Facts: gh}}, SessionFacts: sf, WorkspaceFacts: wf, Snapshot: f.snap,
 		Subjects: map[unit.ProviderID]automation.Units{unit.Task: noUnits{}, slackPlugin: noUnits{}}})
 }

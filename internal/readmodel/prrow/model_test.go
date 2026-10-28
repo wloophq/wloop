@@ -30,8 +30,10 @@ import (
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 	"github.com/wloophq/wloop/internal/situation"
 	"github.com/wloophq/wloop/internal/turn"
 )
@@ -55,6 +57,9 @@ type rig struct {
 	agentsOK bool
 
 	listed atomic.Int64
+	// reports are what the rows read the plugin's reports from; nil
+	// derives them from the inventory at each read.
+	reports readmodel.Reports
 }
 
 func newRig(t testing.TB, f *storetest.Fixture) *rig {
@@ -69,9 +74,25 @@ func newRig(t testing.TB, f *storetest.Fixture) *rig {
 	return r
 }
 
+// keepReports keeps the plugin's reports of the inventory in the store, as
+// the host keeps a running plugin's, and has the rows read them there.
+func (r *rig) keepReports() {
+	r.t.Helper()
+	snaps := psource.NewSnapshots(r.f.DB.Snapshots())
+	if err := (ghreporttest.Inventory{Store: r.f.Inventory, Now: r.clock}).Keep(context.Background(), snaps); err != nil {
+		r.t.Fatal(err)
+	}
+	r.reports = snaps
+	r.m = r.model()
+}
+
 // model is a new read model over the rig's sources, as a restart builds.
 func (r *rig) model() *readmodel.Model {
-	src := prrow.Source{Store: r.f.Inventory, Briefs: brief.New(brief.Deps{Store: r.f.Inventory}),
+	var reports readmodel.Reports = ghreporttest.Inventory{Store: r.f.Inventory, Now: r.clock}
+	if r.reports != nil {
+		reports = r.reports
+	}
+	src := prrow.Source{Store: r.f.Inventory, Reports: reports, Briefs: brief.New(brief.Deps{Store: r.f.Inventory}),
 		RowDeps: readmodel.RowDeps{Books: r.f.Turns, Sessions: r.f.Turns, Activity: r.f.DB, Intakes: r.f.DB.Intakes().Open, Intake: intakeView,
 			Settings: func() readmodel.RowSettings { return readmodel.RowSettings{Cfg: r.cfg, Loaded: r.loaded, GateOn: true} }}}
 	m := readmodel.New(r.f.Log, r.f.DB, r, readmodel.AgentsFunc(r.lastAgents), r, counting{prrow.New(src), &r.listed})
@@ -278,12 +299,13 @@ func TestRowsWithNoChangeIssueNoQuery(t *testing.T) {
 }
 
 // rebuildSQL is one rebuild at live size: one statement per input, the
-// pull requests and their overrides apart.
-const rebuildSQL = 10
+// reported units, their reports and their overrides apart.
+const rebuildSQL = 11
 
 func TestRebuildAtLiveSize(t *testing.T) {
 	f := storetest.Seeded(t, storetest.Live)
 	r := newRig(t, f)
+	r.keepReports()
 	r.openIntakes(f.Open[1], f.Open[2])
 	before := r.rows(r.m, api.Since{})
 	withIntake := 0

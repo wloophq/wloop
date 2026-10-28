@@ -23,6 +23,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
+	"github.com/wloophq/wloop/internal/readmodel"
 )
 
 // The rounds a Plan names.
@@ -75,6 +76,10 @@ type Deps struct {
 	Changes port.Changes
 	Teams   func(ctx context.Context) ([]string, error)
 	Intents func() *dintent.Registry
+	// Reports are what the GitHub plugin last reported of its pull
+	// requests: their situations and the facts that read them alone; nil
+	// reports none.
+	Reports readmodel.Reports
 }
 
 // Provider is the github source's facts.
@@ -127,6 +132,9 @@ func (p *Provider) List(ctx context.Context, id unit.ProviderID) ([]unit.Unit, e
 	if err := v.loadEvents(ctx, units); err != nil {
 		return nil, err
 	}
+	if err := v.loadReports(ctx, units); err != nil {
+		return nil, err
+	}
 	pl := v.planner(ctx, now)
 	ranks := make(map[unit.Unit]rank, len(units))
 	dues := map[string]time.Time{}
@@ -166,6 +174,9 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 		return nil, err
 	}
 	if err := v.loadEvents(ctx, []unit.Unit{u}); err != nil {
+		return nil, err
+	}
+	if err := v.loadReports(ctx, []unit.Unit{u}); err != nil {
 		return nil, err
 	}
 	pl := v.planner(ctx, p.now())

@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/plugins/github/collect"
 	"github.com/wloophq/wloop/plugins/github/gh"
 	"github.com/wloophq/wloop/plugins/github/pr"
+	"github.com/wloophq/wloop/plugins/github/row"
 	"github.com/wloophq/wloop/plugins/github/store"
 )
 
@@ -54,6 +55,14 @@ type running struct {
 	loadedMu sync.Mutex
 	loaded   bool
 	loadErr  string
+
+	// loop is the loop's name, as the items it asks of the user name it.
+	loop string
+
+	dueMu sync.Mutex
+	// dues are when each pull request's report changes with time alone.
+	dues    map[pr.Ref]time.Time
+	dueWake chan struct{}
 }
 
 func (p *Plugin) now() time.Time {
@@ -72,7 +81,8 @@ func (p *Plugin) brand() string {
 
 // start builds what a started plugin runs over db and the host's broker.
 func (p *Plugin) start(ctx context.Context, db *store.DB, host src.Host) *running {
-	r := &running{now: p.now, db: db, host: host, dirty: map[pr.Ref]bool{}}
+	r := &running{now: p.now, db: db, host: host, dirty: map[pr.Ref]bool{}, loop: p.brand(), dues: map[pr.Ref]time.Time{},
+		dueWake: make(chan struct{}, 1)}
 	if host.Recorder != nil && host.History != nil {
 		db.UseHost(eventHost{host})
 	}
@@ -174,6 +184,8 @@ type Data struct {
 	DetailVersion int           `json:"detail_version,omitempty"`
 	DetailReadAt  time.Time     `json:"detail_read_at,omitzero"`
 	Tracked       bool          `json:"tracked,omitempty"`
+	// Row is the source part of the pull request's row payload.
+	Row *row.Payload `json:"row,omitempty"`
 }
 
 // report reports the pull requests whose rows changed since the last
@@ -234,6 +246,10 @@ func (r *running) snapshots(ctx context.Context, refs []pr.Ref) ([]src.Snapshot,
 	if err != nil {
 		return nil, err
 	}
+	in, err := r.rowInputs(ctx, refs)
+	if err != nil {
+		return nil, err
+	}
 	rev, err := r.nextRev(ctx)
 	if err != nil {
 		return nil, err
@@ -241,21 +257,122 @@ func (r *running) snapshots(ctx context.Context, refs []pr.Ref) ([]src.Snapshot,
 	at := r.now()
 	var out []src.Snapshot
 	for _, ref := range refs {
-		row, ok := rows[ref]
+		p, ok := rows[ref]
 		if !ok {
 			continue
 		}
-		d := Data{PR: row, Tracked: slices.Contains(tracked, ref)}
+		o, err := r.db.Override(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		d := Data{PR: p, Tracked: slices.Contains(tracked, ref)}
+		ri := in.of(ref)
+		ri.PR, ri.Override, ri.Now = p, o, at
 		if det, ok := details[ref]; ok {
 			d.Detail, d.DetailVersion, d.DetailReadAt = &det, det.Version, det.ReadAt
+			ri.Detail = &det
 		}
+		derived := row.Derive(ri)
+		d.Row = &derived.Payload
 		raw, err := json.Marshal(d)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, src.Snapshot{Unit: ref.Unit(), Rev: rev, At: at, Data: raw})
+		s := derived.Report()
+		s.Unit, s.Rev, s.At, s.Data = ref.Unit(), rev, at, raw
+		out = append(out, s)
+		r.dueAt(ref, derived.Due())
 	}
 	return out, nil
+}
+
+// rowInputs are what the rows of refs read besides their pull requests:
+// the viewer, the configuration, and from the host their events and the
+// address turns of their books.
+type rowInputs struct {
+	base      row.Input
+	events    map[pr.Ref][]pr.Event
+	addressed map[pr.Ref]time.Time
+}
+
+func (in rowInputs) of(ref pr.Ref) row.Input {
+	out := in.base
+	out.Events, out.AddressedAt = in.events[ref], in.addressed[ref]
+	return out
+}
+
+func (r *running) rowInputs(ctx context.Context, refs []pr.Ref) (rowInputs, error) {
+	viewer, err := r.db.Viewer(ctx)
+	if err != nil {
+		return rowInputs{}, err
+	}
+	teams, err := collect.MyTeams(ctx, r.db)
+	if err != nil {
+		return rowInputs{}, err
+	}
+	r.cfgMu.Lock()
+	cfg := r.cfg
+	r.cfgMu.Unlock()
+	out := rowInputs{base: row.Input{Viewer: viewer, Teams: teams, Ignore: cfg.Ignore, Stalled: cfg.Stalled, Loop: r.loop,
+		MaxDetailAge: cfg.Collect.Slow + 2*cfg.Fast}, events: map[pr.Ref][]pr.Event{}, addressed: map[pr.Ref]time.Time{}}
+	units := make([]sdk.Unit, len(refs))
+	for i, ref := range refs {
+		units[i] = ref.Unit()
+	}
+	if r.host.History != nil {
+		evs, err := r.host.History.Events(ctx, src.EventQuery{Units: units})
+		if err != nil && !errors.Is(err, src.ErrUnsupported) {
+			return rowInputs{}, err
+		}
+		for _, e := range evs {
+			ref, ok := pr.RefOf(e.Unit)
+			if !ok {
+				continue
+			}
+			out.events[ref] = append(out.events[ref], pr.Event{PR: ref, Kind: e.Kind, Key: e.Key, Actor: e.Actor, At: e.At, Data: string(e.Data)})
+		}
+	}
+	if r.host.Reader != nil {
+		books, err := r.host.Reader.Books(ctx, units)
+		if err != nil && !errors.Is(err, src.ErrUnsupported) {
+			return rowInputs{}, err
+		}
+		for _, b := range books {
+			if ref, ok := pr.RefOf(b.Unit); ok {
+				if at, ok := addressedAt(b); ok {
+					out.addressed[ref] = at
+				}
+			}
+		}
+	}
+	return out, nil
+}
+
+// The roles plugin.toml declares, which addressedAt reads.
+const (
+	roleReview  = "pr.review"
+	roleAddress = "pr.address"
+)
+
+// addressedAt is when b's driving turn reached its state, for an address
+// turn: the newest turn of a role that drives the row, else the newest.
+func addressedAt(b src.Book) (time.Time, bool) {
+	var newest, driving *src.Turn
+	for i, t := range b.Turns {
+		if newest == nil || t.Seq > newest.Seq {
+			newest = &b.Turns[i]
+		}
+		if (t.Role == roleReview || t.Role == roleAddress) && (driving == nil || t.Seq > driving.Seq) {
+			driving = &b.Turns[i]
+		}
+	}
+	if driving == nil {
+		driving = newest
+	}
+	if driving == nil || driving.Role != roleAddress {
+		return time.Time{}, false
+	}
+	return driving.At, true
 }
 
 // nextRev is a rev above every rev the plugin reported before, kept across
@@ -273,6 +390,73 @@ func (r *running) nextRev(ctx context.Context) (uint64, error) {
 	}
 	next := last + 1
 	return next, r.db.SetMeta(ctx, metaRev, strconv.FormatUint(next, 10))
+}
+
+// dueAt asks for a report of ref at t, when its report changes with time
+// alone; zero asks for none.
+func (r *running) dueAt(ref pr.Ref, t time.Time) {
+	r.dueMu.Lock()
+	if t.IsZero() {
+		delete(r.dues, ref)
+	} else {
+		r.dues[ref] = t
+	}
+	r.dueMu.Unlock()
+	select {
+	case r.dueWake <- struct{}{}:
+	default:
+	}
+}
+
+// watchDue runs report with the pull requests whose due instant passed,
+// each time one does, until ctx ends.
+func (r *running) watchDue(ctx context.Context, report func(context.Context, []pr.Ref) error) {
+	for {
+		r.dueMu.Lock()
+		var due time.Time
+		for _, t := range r.dues {
+			if due.IsZero() || t.Before(due) {
+				due = t
+			}
+		}
+		r.dueMu.Unlock()
+		var fire <-chan time.Time
+		var t *time.Timer
+		if !due.IsZero() {
+			t = time.NewTimer(max(due.Sub(r.now()), 0))
+			fire = t.C
+		}
+		fired := false
+		select {
+		case <-ctx.Done():
+		case <-r.dueWake:
+		case <-fire:
+			fired = true
+		}
+		if t != nil {
+			t.Stop()
+		}
+		if ctx.Err() != nil {
+			return
+		}
+		if !fired {
+			continue
+		}
+		now := r.now()
+		var refs []pr.Ref
+		r.dueMu.Lock()
+		for ref, at := range r.dues {
+			if !at.After(now) {
+				refs = append(refs, ref)
+				delete(r.dues, ref)
+			}
+		}
+		r.dueMu.Unlock()
+		slices.SortFunc(refs, pr.Compare)
+		if err := report(ctx, refs); err != nil && ctx.Err() == nil {
+			logf("report at its due time: %v", err)
+		}
+	}
 }
 
 // The host's retention, which the plugin applies to its own store: a pull

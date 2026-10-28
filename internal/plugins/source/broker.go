@@ -8,6 +8,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -66,6 +67,8 @@ type Broker struct {
 	// Workspaces lists the host's workspaces of a repository, "" every one;
 	// nil serves no Reader.Workspaces.
 	Workspaces func(ctx context.Context, repo string) (src.Listing, error)
+	// Books are the turn books of units; nil serves no Reader.Books.
+	Books func(ctx context.Context, units ...unit.Unit) (map[unit.Unit]turn.Book, error)
 	// Reported hears each report the plugin made once it is kept; nil
 	// hears none.
 	Reported func(ctx context.Context, snapshots map[unit.Unit]src.Snapshot) error

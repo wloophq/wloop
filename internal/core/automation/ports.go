@@ -20,14 +20,14 @@ type Units interface {
 	Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error)
 }
 
-// Refresher is an optional capability of Units: the provider's own writes
+// Refresher is a capability of the engine's Keep: the provider's own writes
 // (keeping idle periods, registering terminals, census marks), run by Sweep
 // only, before Evaluate.
 type Refresher interface {
 	Refresh(ctx context.Context) error
 }
 
-// Settler is an optional capability of Units: planning bookkeeping, run by
+// Settler is a capability of the engine's Keep: planning bookkeeping, run by
 // an applying Sweep only, after the steps.
 type Settler interface {
 	Settle(ctx context.Context, st State) error
@@ -42,13 +42,13 @@ type StateLoader interface {
 	Load(ctx context.Context) (State, error)
 }
 
-// Gainer is an optional capability of Units: what acting on a unit frees,
+// Gainer is a capability of the engine's Keep: what acting on a unit frees,
 // read for items only.
 type Gainer interface {
 	Gain(ctx context.Context, u unit.Unit) (workflow.Gain, error)
 }
 
-// Owner is an optional capability of Units: the units of work a subject
+// Owner is a capability of the engine's Keep: the units of work a subject
 // belongs to, whose timelines show the steps run on it. None keeps them on
 // the subject.
 type Owner interface {
@@ -64,7 +64,7 @@ type Revisioner interface {
 	Revs(ctx context.Context, units []unit.Unit) (map[unit.Unit]uint64, error)
 }
 
-// Seener is an optional capability of Units: the generation of the
+// Seener is a capability of the engine's Keep: the generation of the
 // workspace snapshot its facts came from.
 type Seener interface {
 	Seen() port.Generation

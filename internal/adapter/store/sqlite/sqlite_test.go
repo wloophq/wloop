@@ -20,7 +20,7 @@ var golden = []string{
 	"dossier_moves: seq, from_path, to_path",
 	"dossiers: owner, rel_path, status, bytes, files, last_write_at, resolved_at, archived_at, purge_after",
 	"drafts: id, provider, unit_key, items, task, kind, target, text, reaction, original, edited, origin_kind, turn_seq, intent, workflow, rule, rule_key, state, evidence_ref, evidence_permalink, evidence_at, error, reason, created_at, updated_at, sending_at, rev, purpose, delivery, effects, effects_applied_at, origin_provider, origin_unit_key, replaced",
-	"events: id, provider, unit_key, kind, key, actor, at, data",
+	"events: id, provider, unit_key, kind, key, actor, at, data, anchor",
 	"extraction_cursors: provider, unit_key, last_ts, last_seq, verdict, verdict_why, viewer_role, topic, started_by_viewer, closure_posted, watched, at, closure_marked",
 	"extraction_days: day, calls, cost_usd",
 	"extraction_hints: provider, unit_key, item_id, mode, context, why",

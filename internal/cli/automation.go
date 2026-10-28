@@ -105,7 +105,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	if d.Planners == nil {
 		d.Planners = e.planners(d.Modules)
 	}
-	sd := stepDeps{Units: units, Planners: d.Planners, Rounds: e.Rounds, Drafts: d.Drafts, Pub: d.Pub, Log: d.Log,
+	sd := stepDeps{Units: units, Keep: unitKeeping{units}, Planners: d.Planners, Rounds: e.Rounds, Drafts: d.Drafts, Pub: d.Pub, Log: d.Log,
 		Headless: d.TurnStart.Headless, Turns: d.TurnStart.Turns}
 	if d.DB != nil {
 		sd.Pub = stepEvents{rec: sqlite.New(d.DB), next: d.Pub, log: d.Log}
@@ -143,6 +143,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 		Workflows: workflows,
 		Broken:    e.brokenWorkflows,
 		Units:     units,
+		Keep:      unitKeeping{units},
 		Steps:     steps,
 		Guidance:  recGuidance{e},
 		Clock:     clockFunc(func() time.Time { return e.Now() }),
@@ -527,14 +528,26 @@ type unitSet struct {
 }
 
 var (
-	_ automation.Refresher  = (*unitSet)(nil)
-	_ automation.Settler    = (*unitSet)(nil)
-	_ automation.Gainer     = (*unitSet)(nil)
-	_ automation.Owner      = (*unitSet)(nil)
 	_ automation.Revisioner = (*unitSet)(nil)
-	_ automation.Seener     = (*unitSet)(nil)
 	_ automation.Dueer      = (*unitSet)(nil)
-	_ automation.EventFacts = (*unitSet)(nil)
+)
+
+// unitKeeping is the host's bookkeeping of the set's units, which the
+// engine keeps apart from their facts: the start blocks and the host
+// providers' own writes, the planning settlement, what acting on a unit
+// frees, the units of work a subject belongs to, the workspace snapshot
+// its facts came from, the facts a workflow scopes and those an event
+// names.
+type unitKeeping struct{ s *unitSet }
+
+var (
+	_ automation.Refresher  = unitKeeping{}
+	_ automation.Settler    = unitKeeping{}
+	_ automation.Gainer     = unitKeeping{}
+	_ automation.Owner      = unitKeeping{}
+	_ automation.Seener     = unitKeeping{}
+	_ automation.Scoper     = unitKeeping{}
+	_ automation.EventFacts = unitKeeping{}
 )
 
 func newUnitSet(providers map[unit.ProviderID]automation.Units) *unitSet {
@@ -570,7 +583,8 @@ func (s *unitSet) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error
 
 // EventFacts reads u through its provider's EventFacts, or its Facts when
 // it has none.
-func (s *unitSet) EventFacts(ctx context.Context, u unit.Unit) (workflow.Facts, error) {
+func (k unitKeeping) EventFacts(ctx context.Context, u unit.Unit) (workflow.Facts, error) {
+	s := k.s
 	return s.facts(ctx, u, true)
 }
 
@@ -594,7 +608,8 @@ func (s *unitSet) facts(ctx context.Context, u unit.Unit, event bool) (workflow.
 	return s.classified.add(ctx, u, f)
 }
 
-func (s *unitSet) Refresh(ctx context.Context) error {
+func (k unitKeeping) Refresh(ctx context.Context) error {
+	s := k.s
 	var errs []error
 	if s.blocks != nil {
 		if err := s.blocks.Refresh(ctx); err != nil {
@@ -611,7 +626,8 @@ func (s *unitSet) Refresh(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-func (s *unitSet) Settle(ctx context.Context, st automation.State) error {
+func (k unitKeeping) Settle(ctx context.Context, st automation.State) error {
+	s := k.s
 	var errs []error
 	for _, id := range s.order {
 		if r, ok := s.providers[id].(automation.Settler); ok {
@@ -623,14 +639,16 @@ func (s *unitSet) Settle(ctx context.Context, st automation.State) error {
 	return errors.Join(errs...)
 }
 
-func (s *unitSet) Gain(ctx context.Context, u unit.Unit) (workflow.Gain, error) {
+func (k unitKeeping) Gain(ctx context.Context, u unit.Unit) (workflow.Gain, error) {
+	s := k.s
 	if g, ok := s.providers[u.Provider].(automation.Gainer); ok {
 		return g.Gain(ctx, u)
 	}
 	return workflow.Gain{}, nil
 }
 
-func (s *unitSet) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error) {
+func (k unitKeeping) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error) {
+	s := k.s
 	if o, ok := s.providers[u.Provider].(automation.Owner); ok {
 		return o.Owners(ctx, u)
 	}
@@ -659,7 +677,8 @@ func (s *unitSet) Revs(ctx context.Context, units []unit.Unit) (map[unit.Unit]ui
 }
 
 // Seen is the workspace snapshot generation the provider that reads it saw.
-func (s *unitSet) Seen() port.Generation {
+func (k unitKeeping) Seen() port.Generation {
+	s := k.s
 	var g port.Generation
 	for _, id := range s.order {
 		if r, ok := s.providers[id].(automation.Seener); ok {

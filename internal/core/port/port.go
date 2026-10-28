@@ -17,6 +17,9 @@ type Event struct {
 	Actor     string
 	Data      string
 	At        time.Time
+	// Anchor is the point of the unit the event happened at, such as a
+	// review comment; zero for none.
+	Anchor unit.Anchor
 }
 
 // Activity is an event as a feed shows it, with its unit's title, address,

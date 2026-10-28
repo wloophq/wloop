@@ -20,8 +20,8 @@ import (
 type recorder struct{ b *Broker }
 
 // RecordEvents keeps events on the plugin's own units in the host's event
-// log; an event of another provider's unit refuses the whole call. The log
-// keeps no anchor.
+// log, each with its anchor; an event of another provider's unit refuses
+// the whole call.
 func (r recorder) RecordEvents(ctx context.Context, events []src.Event) error {
 	if r.b.Events == nil {
 		return src.ErrUnsupported
@@ -34,7 +34,7 @@ func (r recorder) RecordEvents(ctx context.Context, events []src.Event) error {
 			errs = append(errs, err)
 			continue
 		}
-		evs = append(evs, port.Event{Unit: u, Kind: e.Kind, Key: e.Key, Actor: e.Actor, Data: string(e.Data), At: e.At})
+		evs = append(evs, port.Event{Unit: u, Kind: e.Kind, Key: e.Key, Actor: e.Actor, Data: string(e.Data), At: e.At, Anchor: anchorOf(e.Anchor)})
 	}
 	if err := errors.Join(errs...); err != nil {
 		return err

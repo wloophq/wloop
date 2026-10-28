@@ -158,8 +158,8 @@ func cardOf(_ context.Context, r api.Row) (card.Card, error) {
 	return c, nil
 }
 
-func itemsOf(r api.Row) []items.Item {
-	return []items.Item{{ID: "x:1", Unit: r.Unit, Kind: items.Request, Summary: r.Title}}
+func itemsOf(_ context.Context, r api.Row) ([]items.Item, error) {
+	return []items.Item{{ID: "x:1", Unit: r.Unit, Kind: items.Request, Summary: r.Title}}, nil
 }
 
 type logs struct {
@@ -311,7 +311,7 @@ func TestCardsJobPassesOutcome(t *testing.T) {
 	for state, want := range map[string]items.Resolution{"merged": items.Done, "closed": items.Moot, "open": items.Superseded} {
 		t.Run(state, func(t *testing.T) {
 			rows := newRows(api.Row{Unit: t1, Title: "x", Payload: json.RawMessage(`{"state":"` + state + `"}`)})
-			e := start(t, Provider{Card: cardOf, Items: func(api.Row) []items.Item { return nil }}, rows, nil)
+			e := start(t, Provider{Card: cardOf, Items: func(context.Context, api.Row) ([]items.Item, error) { return nil, nil }}, rows, nil)
 			e.idle(t)
 			calls := e.ledger.got()
 			if len(calls) != 1 || calls[0].absent != want {
@@ -323,7 +323,7 @@ func TestCardsJobPassesOutcome(t *testing.T) {
 
 func TestCardsJobUsesStoredOutcomeWhenTheCardFails(t *testing.T) {
 	rows := newRows(api.Row{Unit: t1, Title: "x", Payload: json.RawMessage(`{"state":"merged"}`)})
-	e := start(t, Provider{Card: cardOf, Items: func(api.Row) []items.Item { return nil }}, rows, nil)
+	e := start(t, Provider{Card: cardOf, Items: func(context.Context, api.Row) ([]items.Item, error) { return nil, nil }}, rows, nil)
 	e.idle(t)
 	e.change(rows.set(api.Row{Unit: t1, Title: "x", Payload: json.RawMessage(`{"state":"broken"}`)}), t1)
 	e.idle(t)

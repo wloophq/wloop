@@ -109,7 +109,7 @@ func newDerivedRig(t *testing.T, cases []ghsourcetest.Case) derivedRig {
 	for i, c := range cases {
 		u := c.Row.Unit
 		units = append(units, u)
-		cd, err := ghsource.Card(ctx, c.Row)
+		cd, err := ghsource.CardOf(c.Row, c.Report)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -117,7 +117,7 @@ func newDerivedRig(t *testing.T, cases []ghsourcetest.Case) derivedRig {
 			t.Fatal(err)
 		}
 		at := unit.Anchor{Unit: u, Ref: "row:" + strconv.Itoa(i+1)}
-		if _, err := ledger.Reconcile(ctx, u, ghsource.Items(c.Row), at, items.Superseded); err != nil {
+		if _, err := ledger.Reconcile(ctx, u, ghsource.ItemsOf(c.Row, c.Report), at, items.Superseded); err != nil {
 			t.Fatal(err)
 		}
 		if asked(c.Row) {
@@ -147,8 +147,8 @@ func (r derivedRig) tasks(t *testing.T, u unit.Unit) []task.Task {
 	return es
 }
 
-func viewerItem(r api.Row) bool {
-	return slices.ContainsFunc(ghsource.Items(r), func(it items.Item) bool {
+func viewerItem(c ghsourcetest.Case) bool {
+	return slices.ContainsFunc(ghsource.ItemsOf(c.Row, c.Report), func(it items.Item) bool {
 		return slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return p.Key == "github:"+ghsourcetest.Viewer })
 	})
 }
@@ -169,7 +169,7 @@ func TestEveryNeedsMeRowHasAnInboxOrNextTask(t *testing.T) {
 			if len(es) != 1 || es[0].Kind != task.KindMessage || es[0].State != task.State("inbox") {
 				t.Errorf("%s asked: %+v", c.Name, es)
 			}
-		case situation.Kind(c.Row.Kind) == situation.KindMuted && viewerItem(c.Row):
+		case situation.Kind(c.Row.Kind) == situation.KindMuted && viewerItem(c):
 			muted++
 			if !in(task.State("scheduled")) || in(task.State("inbox"), task.State("next")) {
 				t.Errorf("%s muted: %+v", c.Name, es)
@@ -193,7 +193,7 @@ func TestCardOnlyRowsHaveNoTask(t *testing.T) {
 	r := newDerivedRig(t, cases)
 	seen := map[string]int{}
 	for _, c := range cases {
-		if r.asked[c.Row.Unit] || len(ghsource.Items(c.Row)) > 0 {
+		if r.asked[c.Row.Unit] || len(ghsource.ItemsOf(c.Row, c.Report)) > 0 {
 			continue
 		}
 		base, _, _ := strings.Cut(c.Name, "/")

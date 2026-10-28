@@ -11,7 +11,6 @@ import (
 // built-in GitHub and Slack modules implement them; a reporting plugin's
 // units read as snapshot fields, host bookkeeping or Notify.
 func TestAutomationCapabilitiesAreSnapshotFields(t *testing.T) {
-	t.Skip("carried from X3b review: X8b removes the built-in modules' capabilities")
 	var set any = (*unitSet)(nil)
 	for name, kept := range map[string]bool{
 		"Refresher":  implements[automation.Refresher](set),

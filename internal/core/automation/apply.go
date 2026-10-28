@@ -120,7 +120,7 @@ func event(it workflow.Item, kind, key, data string, at time.Time) port.Event {
 // owners are the units of work u belongs to; none for a unit gone or a
 // provider that knows no owners.
 func (e *Engine) owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error) {
-	o, ok := e.Units.(Owner)
+	o, ok := e.Keep.(Owner)
 	if !ok {
 		return nil, nil
 	}

@@ -37,6 +37,9 @@ func (h history) Events(ctx context.Context, q src.EventQuery) ([]src.Event, err
 	out := make([]src.Event, len(evs))
 	for i, e := range evs {
 		out[i] = src.Event{Unit: Wire(e.Unit), Kind: e.Kind, Key: e.Key, Actor: e.Actor, At: e.At}
+		if e.Anchor != (unit.Anchor{}) {
+			out[i].Anchor = wireAnchor(e.Anchor)
+		}
 		if e.Data != "" {
 			out[i].Data = json.RawMessage(e.Data)
 		}

@@ -282,7 +282,7 @@ func (e *Env) servePlugins(ctx context.Context, db *sqlite.DB, cfg config.Config
 			return e.withGitHubBroker(&psource.Broker{ID: id, Manifest: s, Snapshots: snaps, Units: psource.Units{Codecs: codecs}, Config: e.currentConfig,
 				Note: note, Briefs: db, BriefRecords: e.briefRecords(db), Briefed: e.heardBrief, Now: e.Now, BriefIntent: briefIntents,
 				Events: sqlite.New(db), Marks: db, Drafts: db, Overrides: db, Paused: e.roundsPaused, Rounds: e.storedRoundState,
-				Links: db.Links(), Hosted: hosted(id), Meters: meters, Workspaces: e.workspaceListing}, id, db)
+				Links: db.Links(), Hosted: hosted(id), Meters: meters, Workspaces: e.workspaceListing, Books: sqlite.New(db).Books}, id, db)
 		},
 		Loaded: func(id string) {
 			logf("plugin %s: loaded", id)
