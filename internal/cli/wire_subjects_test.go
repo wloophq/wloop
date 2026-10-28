@@ -147,7 +147,7 @@ func TestPlanEvaluatesUserWorkflowsOnTaskAndSlackSubjects(t *testing.T) {
 	r := newSubjectsRig(t)
 	owed := r.item(t, subjectThread, "i1", items.Open, items.Person{Key: "slack:U0001"})
 	r.item(t, subjectThread, "i2", items.Open)
-	r.task(t, task.Task{ID: "e-01", Kind: task.KindWaiting, State: task.Waiting, Title: "w", Units: []unit.Unit{subjectThread},
+	r.task(t, task.Task{ID: "e-01", Kind: task.KindWaiting, State: "waiting", Category: task.CategoryWaiting, Title: "w", Units: []unit.Unit{subjectThread},
 		Items:   []task.ItemRef{{Unit: owed.Unit, Item: owed.ID}},
 		Waiting: &task.WaitingOn{On: []items.Person{{Key: "slack:U0001"}}, Since: testNow.Add(-72 * time.Hour)}}, task.OpCreate)
 	want := []string{"my-slack " + subjectThread.String(), "my-waiting task:e-01"}
@@ -178,7 +178,7 @@ func TestTheSweepWakesOnTaskItemAndDraftChanges(t *testing.T) {
 	}
 	var it items.Item
 	woke("a new item", func() { it = r.item(t, subjectThread, "i1", items.Open) })
-	close := task.Task{ID: "e-01", Kind: task.KindClose, State: task.Inbox, Title: "c", Units: []unit.Unit{subjectThread}}
+	close := task.Task{ID: "e-01", Kind: task.KindClose, State: "inbox", Category: task.CategoryInbox, Title: "c", Units: []unit.Unit{subjectThread}}
 	woke("a new entry", func() { r.task(t, close, task.OpCreate) })
 	if got := r.planned(t); slices.Contains(got, "my-close task:e-01") {
 		t.Fatalf("nothing resolved yet: %v", got)
@@ -221,8 +221,8 @@ func TestACapturedTaskWhoseUnitsEndedPlansItsClose(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newSubjectsRig(t)
-	r.task(t, task.Task{ID: "e-01", Kind: task.KindCapture, State: task.Next, Title: "ship it", Units: []unit.Unit{subjectThread}}, task.OpCreate)
-	derived := task.Task{ID: "e-02", Kind: task.KindClose, State: task.Inbox, Title: "close", Units: []unit.Unit{subjectThread},
+	r.task(t, task.Task{ID: "e-01", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "ship it", Units: []unit.Unit{subjectThread}}, task.OpCreate)
+	derived := task.Task{ID: "e-02", Kind: task.KindClose, State: "inbox", Category: task.CategoryInbox, Title: "close", Units: []unit.Unit{subjectThread},
 		Origin: task.OriginDerived, Created: testNow, Updated: testNow}
 	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: derived}}); err != nil {
 		t.Fatal(err)

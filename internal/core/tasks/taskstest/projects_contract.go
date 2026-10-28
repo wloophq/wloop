@@ -14,14 +14,15 @@ import (
 // store over it.
 func ProjectsContract(t *testing.T, open func(t *testing.T) (coretasks.Store, coretasks.ProjectStore)) {
 	ctx := context.Background()
-	project := func(id task.ID, slug string, st task.State) task.Task {
-		return task.Task{ID: id, Kind: task.KindProject, State: st, Title: "P " + string(id), Origin: task.OriginUser, Sequential: true,
+	project := func(id task.ID, slug string, st string) task.Task {
+		c, _ := BundledStates.CategoryOf(st)
+		return task.Task{ID: id, Kind: task.KindProject, State: InState(st), Category: c, Title: "P " + string(id), Origin: task.OriginUser, Sequential: true,
 			ReviewEvery: 14 * 24 * time.Hour, ReviewedAt: t0.Add(-time.Hour), Slug: slug, Created: t0, Updated: t0}
 	}
 
 	t.Run("project fields round-trip", func(t *testing.T) {
 		s, _ := open(t)
-		p := project("e-p1", "ship-it", task.Next)
+		p := project("e-p1", "ship-it", "next")
 		apply(t, s, p)
 		got, err := s.Task(ctx, p.ID)
 		if err != nil {
@@ -48,7 +49,7 @@ func ProjectsContract(t *testing.T, open func(t *testing.T) (coretasks.Store, co
 
 	t.Run("slugs stay taken", func(t *testing.T) {
 		s, ps := open(t)
-		apply(t, s, project("e-p1", "ship-it", task.Next), project("e-p2", "old", task.Done))
+		apply(t, s, project("e-p1", "ship-it", "next"), project("e-p2", "old", "done"))
 		for slug, want := range map[string]bool{"ship-it": true, "old": true, "other": false} {
 			if got, err := ps.SlugTaken(ctx, slug); err != nil || got != want {
 				t.Errorf("SlugTaken(%q) = %v, %v; want %v", slug, got, err, want)

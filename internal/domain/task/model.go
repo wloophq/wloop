@@ -8,19 +8,9 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// State is one per entry; lists are views of it.
+// State is a state the profile declares (tasks.toml); Go reads its
+// Category, never its name.
 type State string
-
-const (
-	Inbox     State = "inbox"
-	Next      State = "next"
-	Waiting   State = "waiting"
-	Scheduled State = "scheduled"
-	Someday   State = "someday"
-	Reference State = "reference"
-	Done      State = "done"
-	Trash     State = "trash"
-)
 
 type Kind string
 
@@ -45,16 +35,10 @@ type ItemRef struct {
 	Item string
 }
 
-type Focus struct {
-	On   bool
-	Auto string // "" set by the user, "deadline", "stale"
-	At   time.Time
-}
-
 type Snooze struct {
 	Until      time.Time // zero: no date
 	OnActivity bool
-	Return     State // state the entry gets back at Until; activity always returns to Inbox
+	Return     State // state the entry gets back at Until; "" the first inbox state
 	Mute       bool  // set from UnitFacts.Mute; cleared when the mute ends
 }
 
@@ -66,32 +50,39 @@ type WaitingOn struct {
 }
 
 type Task struct {
-	ID         ID
-	Kind       Kind
-	State      State
-	Title      string
-	Notes      string
-	Items      []ItemRef
-	Units      []unit.Unit // attached units; their cards render in the detail
-	Focus      Focus
-	Contexts   []string // "@decide", "@reply", "@agent", "@repo-<name>"
-	Area       string   // "" none
-	Project    ID       // "" none
-	Position   int      // order inside its project
-	Sequential bool     // KindProject only
+	ID   ID
+	Kind Kind
+	// State is the task's state; Category is its category, which every rule reads.
+	State    State
+	Category Category
+	Title    string
+	Notes    string
+	Items    []ItemRef
+	Units    []unit.Unit // attached units; their cards render in the detail
+	// Props are the task's properties; Written says who wrote each, and when.
+	Props      Props
+	Written    map[string]Written
+	Parent     ID  // "" none
+	Position   int // order among its parent's children
+	Sequential bool
 	Snooze     Snooze
 	Waiting    *WaitingOn // KindWaiting only
-	Deadline   time.Time
-	Changed    bool // "changed since you saw it"; cleared by the seen verb
+	Changed    bool       // "changed since you saw it"; cleared by the seen verb
 	SeenAt     time.Time
 	Origin     string // "derived", "user", "message", "draft"
 
 	Created, Updated time.Time
 
-	// KindProject only: the review interval (zero: DefaultReviewEvery), the last review and the dossier's slug.
+	// A parent's review interval (zero: DefaultReviewEvery) and last review; a project's dossier slug.
 	ReviewEvery time.Duration
 	ReviewedAt  time.Time
 	Slug        string
+}
+
+// Written is who last wrote a property, and when.
+type Written struct {
+	By Writer
+	At time.Time
 }
 
 // Me is the user's identity over the enabled plugins (items.Identity; Person.Is(Me)).

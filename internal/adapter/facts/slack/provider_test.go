@@ -13,6 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/items"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
@@ -89,16 +90,18 @@ func (e *env) facts(u unit.Unit) workflow.Facts {
 }
 
 func live(id task.ID, s task.State, us ...unit.Unit) task.Task {
-	return task.Task{ID: id, Kind: task.KindAction, State: s, Title: "a", Units: us}
+	e := task.Task{ID: id, Kind: task.KindAction, Title: "a", Units: us}
+	e.Become(s, taskstest.BundledStates)
+	return e
 }
 
 func TestSlackListsTheStoredUnitsWithALiveTask(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.task(live("e-01", task.Next, thread, unit.Unit{Provider: "chat", Key: "x"}))
-	e.task(live("e-02", task.Waiting, dm))
-	e.task(live("e-03", task.Done, other))
-	e.task(live("e-04", task.Inbox, thread))
+	e.task(live("e-01", task.State("next"), thread, unit.Unit{Provider: "chat", Key: "x"}))
+	e.task(live("e-02", task.State("waiting"), dm))
+	e.task(live("e-03", task.State("done"), other))
+	e.task(live("e-04", task.State("inbox"), thread))
 	got, err := e.p.List(context.Background(), dslack.Provider)
 	if err != nil {
 		t.Fatal(err)
@@ -144,9 +147,9 @@ func TestSlackFactsReadTheExtractionTheConversationAndTheItems(t *testing.T) {
 	e.item(thread, "i2", items.Open, monday.Add(-time.Hour))
 	e.item(thread, "i3", items.Open, monday.Add(-200*time.Hour), items.Person{Key: "slack:U0001"})
 	e.item(thread, "i4", items.Resolved, monday.Add(-200*time.Hour))
-	e.task(live("e-01", task.Next, thread))
-	muted := live("e-02", task.Scheduled, other)
-	muted.Snooze = task.Snooze{Mute: true, Return: task.Next}
+	e.task(live("e-01", task.State("next"), thread))
+	muted := live("e-02", task.State("scheduled"), other)
+	muted.Snooze = task.Snooze{Mute: true, Return: task.State("next")}
 	e.task(muted)
 	f := e.facts(thread)
 	for k, v := range map[string]any{
@@ -176,7 +179,7 @@ func TestUnownedItemsAgeInLocalWorkingDays(t *testing.T) {
 	friday := time.Date(2026, 2, 27, 11, 0, 0, 0, brt)
 	e.item(thread, "i1", items.Open, friday)
 	e.item(other, "i2", items.Open, time.Date(2026, 2, 27, 22, 0, 0, 0, brt))
-	e.task(live("e-01", task.Next, thread))
+	e.task(live("e-01", task.State("next"), thread))
 	e.clock.now = monday
 	if got := e.facts(other)["slack.items_unowned_age_days"]; got != 0 {
 		t.Errorf("an item of Friday 22:00 BRT is not a working day old on Monday 10:00 BRT: %v", got)

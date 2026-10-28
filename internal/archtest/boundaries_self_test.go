@@ -87,7 +87,7 @@ func planted(t *testing.T, fset *token.FileSet, path, file, src string, deps map
 	if err != nil {
 		t.Fatal(err)
 	}
-	info := &types.Info{Types: map[ast.Expr]types.TypeAndValue{}, Uses: map[*ast.Ident]types.Object{}, Selections: map[*ast.SelectorExpr]*types.Selection{}}
+	info := &types.Info{Types: map[ast.Expr]types.TypeAndValue{}, Uses: map[*ast.Ident]types.Object{}, Defs: map[*ast.Ident]types.Object{}, Selections: map[*ast.SelectorExpr]*types.Selection{}}
 	imp := importerFunc(func(p string) (*types.Package, error) {
 		if pkg, ok := deps[p]; ok {
 			return pkg, nil

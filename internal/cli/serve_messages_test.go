@@ -187,7 +187,7 @@ func TestLedgerProposalsReachTheInboxOnARealStore(t *testing.T) {
 	if got.State != message.Answered || got.Answer != messages.OptionReject {
 		t.Fatalf("decided elsewhere %+v", got)
 	}
-	if e, _ := db.Tasks().Task(ctx, task.ID(got.TaskID)); e.State != task.Done {
+	if e, _ := db.Tasks().Task(ctx, task.ID(got.TaskID)); e.State != task.State("done") {
 		t.Fatalf("entry %s", e.State)
 	}
 }

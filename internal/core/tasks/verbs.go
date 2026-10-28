@@ -10,75 +10,44 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
-var (
-	todo     = []task.State{task.Inbox, task.Next, task.Waiting, task.Scheduled, task.Someday}
-	live     = append(slices.Clone(todo), task.Reference)
-	anyState = append(slices.Clone(live), task.Done, task.Trash)
-)
+// handlerVerbs move nothing on their own: a registered handler or the daemon runs them.
+var handlerVerbs = []task.Verb{task.VerbApprove, task.VerbDelegate, task.VerbAnswer, task.VerbEdit, task.VerbRetry,
+	task.VerbReply, task.VerbReviewed, task.VerbSequential}
 
-func without(ss []task.State, drop ...task.State) []task.State {
-	return slices.DeleteFunc(slices.Clone(ss), func(s task.State) bool { return slices.Contains(drop, s) })
-}
+func known(v task.Verb) bool { return slices.Contains(task.Verbs, v) }
 
-// moves is the transition table: the states each verb accepts, and the state it moves the entry to ("" keeps it).
-// approve, delegate, answer, edit, retry and reply move nothing on their own: a registered handler or the
-// daemon runs them.
-var moves = map[task.Verb]struct {
-	from []task.State
-	to   task.State
-}{
-	task.VerbNext:      {append(without(todo, task.Next), task.Reference), task.Next},
-	task.VerbWaiting:   {without(todo, task.Waiting), task.Waiting},
-	task.VerbSchedule:  {todo, task.Scheduled},
-	task.VerbSomeday:   {without(todo, task.Someday), task.Someday},
-	task.VerbReference: {append(slices.Clone(todo), task.Done), task.Reference},
-	task.VerbDone:      {live, task.Done},
-	task.VerbDismiss:   {append(slices.Clone(live), task.Done), task.Trash},
-	task.VerbFocus:     {live, ""},
-	task.VerbProject:   {live, ""},
-	task.VerbContext:   {live, ""},
-	task.VerbArea:      {live, ""},
-	task.VerbSeen:      {anyState, ""},
-	task.VerbApprove:   {},
-	task.VerbDelegate:  {},
-	task.VerbAnswer:    {},
-	task.VerbEdit:      {},
-	task.VerbRetry:     {},
-	task.VerbReply:     {},
-}
-
-func known(v task.Verb) bool {
-	_, ok := moves[v]
-	return ok
-}
-
-// accepts says whether e's state takes verb, naming both when it does not.
-func accepts(e task.Task, v task.Verb) error {
-	m, ok := moves[v]
-	if !ok {
+// accepts says whether e's state takes verb, as the profile's from says, naming both when it does not.
+func (s *Service) accepts(e task.Task, v task.Verb) error {
+	if !known(v) {
 		return fmt.Errorf("%w: unknown verb %q", ErrArgs, v)
 	}
-	if !slices.Contains(m.from, e.State) {
+	from, _, ok := s.d.States.Move(string(v))
+	if !ok || slices.Contains(handlerVerbs, v) || len(from) > 0 && !slices.Contains(from, string(e.State)) {
 		return fmt.Errorf("%w: %s on a %s entry", ErrVerb, v, e.State)
 	}
 	return nil
 }
 
-// transition is the state change of a verb with no handler; project is the service's.
-func transition(e task.Task, req Request, now time.Time) (task.Task, error) {
-	if err := accepts(e, req.Verb); err != nil {
+// transition is the state change of a verb with no handler, to the state the profile's to names; project is
+// the service's.
+func (s *Service) transition(e task.Task, req Request, now time.Time) (task.Task, error) {
+	if err := s.accepts(e, req.Verb); err != nil {
 		return task.Task{}, err
 	}
-	m := moves[req.Verb]
+	_, to, _ := s.d.States.Move(string(req.Verb))
 	switch req.Verb {
 	case task.VerbSeen:
 		e.Changed, e.SeenAt = false, now
 	case task.VerbFocus:
-		e.Focus = task.Focus{On: !e.Focus.On, At: now}
+		v := task.FocusOn
+		if e.Starred() {
+			v = task.FocusOff
+		}
+		e.SetProp(task.PropFocus, task.Value{Text: v}, task.WriterPerson, now)
 	case task.VerbContext:
-		e.Contexts = split(req.Args["set"])
+		e.SetProp(task.PropContexts, task.Value{List: split(req.Args["set"])}, task.WriterPerson, now)
 	case task.VerbArea:
-		e.Area = strings.TrimSpace(req.Args["set"])
+		e.SetProp(task.PropArea, task.Value{Text: strings.TrimSpace(req.Args["set"])}, task.WriterPerson, now)
 	case task.VerbSchedule:
 		snooze, err := scheduleArgs(e, req.Args, now)
 		if err != nil {
@@ -92,11 +61,12 @@ func transition(e task.Task, req Request, now time.Time) (task.Task, error) {
 		}
 		e.Waiting = w
 	}
-	if m.to != "" {
+	if to != "" {
 		if req.Verb != task.VerbSchedule {
 			e.Snooze = task.Snooze{Mute: e.Snooze.Mute}
 		}
-		e.State, e.Changed, e.SeenAt = m.to, false, now
+		e.Become(task.State(to), s.d.States)
+		e.Changed, e.SeenAt = false, now
 	}
 	e.Updated = now
 	return e, nil
@@ -133,7 +103,7 @@ func scheduleArgs(e task.Task, args map[string]string, now time.Time) (task.Snoo
 		return task.Snooze{}, fmt.Errorf("%w: schedule needs until or on_activity", ErrArgs)
 	}
 	ret := e.State
-	if e.State == task.Scheduled {
+	if e.Snoozed() {
 		ret = e.Snooze.Return
 	}
 	return task.Snooze{Until: until, OnActivity: onActivity, Return: ret}, nil

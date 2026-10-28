@@ -23,6 +23,8 @@ type Deps struct {
 	Facts Facts
 	Me    task.Me
 	Clock port.Clock
+	// States are the profile's states and verbs; the service reads a task's category from its state.
+	States States
 	// StaleWaitingDays is how many working days a waiting entry waits before AutoFocus stars it.
 	StaleWaitingDays int
 	// Disabled are the providers whose plugin is disabled now; nil: none is.
@@ -37,10 +39,12 @@ type handlerKey struct {
 type Service struct {
 	d Deps
 	// mu serializes the service's read-modify-write of entries.
-	mu       sync.Mutex
-	reg      sync.RWMutex
-	handlers map[handlerKey]VerbHandler
-	views    map[task.View]viewSource
+	mu hookedMutex
+	// beforeApply, set by tests only, runs in Do between reading the task and writing it.
+	beforeApply func()
+	reg         sync.RWMutex
+	handlers    map[handlerKey]VerbHandler
+	views       map[task.View]viewSource
 }
 
 func New(d Deps) *Service {
@@ -107,11 +111,14 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 		cs, err = s.project(ctx, e, req.Args, now)
 	} else {
 		var next task.Task
-		next, err = transition(e, req, now)
+		next, err = s.transition(e, req, now)
 		cs = []task.Change{{Op: task.OpUpdate, Task: next, Why: string(req.Verb)}}
 	}
 	if err != nil {
 		return Result{}, err
+	}
+	if s.beforeApply != nil {
+		s.beforeApply()
 	}
 	if err := s.d.Store.Apply(ctx, cs, verbEvents(e, req, now)...); err != nil {
 		return Result{}, err
@@ -121,7 +128,7 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 
 // project attaches e to the project args["id"] names, or to a new one titled args["title"], after its last action.
 func (s *Service) project(ctx context.Context, e task.Task, args map[string]string, now time.Time) ([]task.Change, error) {
-	if err := accepts(e, task.VerbProject); err != nil {
+	if err := s.accepts(e, task.VerbProject); err != nil {
 		return nil, err
 	}
 	var cs []task.Change
@@ -137,8 +144,12 @@ func (s *Service) project(ctx context.Context, e task.Task, args map[string]stri
 		}
 		p = got
 	case title != "":
-		p = task.Task{ID: task.NewID(), Kind: task.KindProject, State: task.Next, Title: title,
-			Sequential: args["sequential"] == "true", Area: e.Area, Origin: task.OriginUser, Created: now, Updated: now}
+		p = task.Task{ID: task.NewID(), Kind: task.KindProject, Title: title,
+			Sequential: args["sequential"] == "true", Origin: task.OriginUser, Created: now, Updated: now}
+		if err := p.MoveTo(task.CategoryReady, s.d.States); err != nil {
+			return nil, err
+		}
+		p.SetProp(task.PropArea, e.Prop(task.PropArea), task.WriterPerson, now)
 		cs = append(cs, task.Change{Op: task.OpCreate, Task: p, Why: "project"})
 	default:
 		return nil, fmt.Errorf("%w: project needs id or title", ErrArgs)
@@ -149,11 +160,11 @@ func (s *Service) project(ctx context.Context, e task.Task, args map[string]stri
 	}
 	last := 0
 	for _, o := range open {
-		if o.Project == p.ID && o.ID != e.ID {
+		if o.Parent == p.ID && o.ID != e.ID {
 			last = max(last, o.Position)
 		}
 	}
-	e.Project, e.Position, e.Updated = p.ID, last+1, now
+	e.Parent, e.Position, e.Updated = p.ID, last+1, now
 	if pos, err := strconv.Atoi(args["position"]); err == nil {
 		e.Position = pos
 	}
@@ -171,7 +182,7 @@ func (s *Service) dismissOff(ctx context.Context, id task.ID, req Request, enabl
 	if err != nil {
 		return Result{}, err
 	}
-	if err := accepts(e, task.VerbDismiss); err != nil {
+	if err := s.accepts(e, task.VerbDismiss); err != nil {
 		return Result{}, err
 	}
 	units := slices.Clone(e.Units)
@@ -195,7 +206,7 @@ func (s *Service) dismissOff(ctx context.Context, id task.ID, req Request, enabl
 	now := s.now()
 	next, why := e, "detached"
 	if len(off) == 0 || e.Origin == task.OriginDerived || !slices.ContainsFunc(e.Units, func(u unit.Unit) bool { return !isOff(u) }) {
-		if next, err = transition(e, Request{Verb: task.VerbDismiss}, now); err != nil {
+		if next, err = s.transition(e, Request{Verb: task.VerbDismiss}, now); err != nil {
 			return Result{}, err
 		}
 		why = string(task.VerbDismiss)
@@ -272,8 +283,11 @@ func (s *Service) Open(ctx context.Context, r OpenRequest) (task.Task, error) {
 
 func (s *Service) create(ctx context.Context, kind task.Kind, title, notes string, u *unit.Unit, origin string, contexts []string) (task.Task, error) {
 	now := s.now()
-	e := task.Task{ID: task.NewID(), Kind: kind, State: task.Inbox, Title: title, Notes: notes, Origin: origin,
-		Contexts: slices.Clone(contexts), Created: now, Updated: now}
+	e := task.Task{ID: task.NewID(), Kind: kind, Title: title, Notes: notes, Origin: origin, Created: now, Updated: now}
+	if err := e.MoveTo(task.CategoryInbox, s.d.States); err != nil {
+		return task.Task{}, err
+	}
+	e.SetProp(task.PropContexts, task.Value{List: slices.Clone(contexts)}, task.WriterPlugin, now)
 	if u != nil && !u.IsZero() {
 		e.Units = []unit.Unit{*u}
 	}
@@ -283,10 +297,10 @@ func (s *Service) create(ctx context.Context, kind task.Kind, title, notes strin
 	return e, nil
 }
 
-// Close moves an entry opened by Open or Capture to Done or Trash; a derived entry, or one whose unit's plugin is
-// disabled, refuses it.
-func (s *Service) Close(ctx context.Context, id task.ID, to task.State) error {
-	if to != task.Done && to != task.Trash {
+// Close moves an entry opened by Open or Capture into the done or the dropped category; a derived entry, or one
+// whose unit's plugin is disabled, refuses it.
+func (s *Service) Close(ctx context.Context, id task.ID, to task.Category) error {
+	if to != task.CategoryDone && to != task.CategoryDropped {
 		return fmt.Errorf("%w: close to %s", ErrArgs, to)
 	}
 	s.mu.Lock()
@@ -301,11 +315,14 @@ func (s *Service) Close(ctx context.Context, id task.ID, to task.State) error {
 	if err := s.writable(ctx, e, nil); err != nil {
 		return err
 	}
-	if e.State == to {
+	if e.Category == to {
 		return nil
 	}
 	now := s.now()
-	e.State, e.Snooze, e.Updated = to, task.Snooze{}, now
+	if err := e.MoveTo(to, s.d.States); err != nil {
+		return err
+	}
+	e.Snooze, e.Updated = task.Snooze{}, now
 	return s.d.Store.Apply(ctx, []task.Change{{Op: task.OpResolve, Task: e, Why: "closed"}})
 }
 
@@ -399,7 +416,10 @@ func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 	enabled := map[unit.Unit]bool{}
 	units = slices.Clone(units)
 	for _, e := range open {
-		woke, ok := task.Wake(e, now)
+		woke, ok, err := task.Wake(e, s.d.States, now)
+		if err != nil {
+			return fmt.Errorf("waking %s: %w", e.ID, err)
+		}
 		if !ok {
 			continue
 		}
@@ -435,24 +455,35 @@ func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 		if err != nil {
 			return err
 		}
-		for _, c := range task.Reconcile(f, its, s.d.Me, p.of(have, u), now) {
+		cs, err := task.Reconcile(f, its, s.d.Me, p.of(have, u), s.d.States, now)
+		if err != nil {
+			return fmt.Errorf("the tasks of %s: %w", u, err)
+		}
+		for _, c := range cs {
 			p.put(c)
 		}
-		for _, c := range task.Activity(f, p.of(have, u), now) {
+		if cs, err = task.Activity(f, p.of(have, u), s.d.States, now); err != nil {
+			return fmt.Errorf("the activity on %s: %w", u, err)
+		}
+		for _, c := range cs {
 			p.put(c)
 		}
 	}
 	for _, e := range p.overlay(open) {
-		if !e.Live() {
+		if !e.Open() {
 			continue
 		}
 		next, why := e, []string{}
-		if woke, ok := task.Wake(next, now); ok {
+		woke, ok, err := task.Wake(next, s.d.States, now)
+		if err != nil {
+			return fmt.Errorf("waking %s: %w", e.ID, err)
+		}
+		if ok {
 			next, why = woke, append(why, "snooze ended")
 		}
-		if f, ok := task.AutoFocus(next, s.d.StaleWaitingDays, now); ok {
-			next.Focus, next.Updated = f, now
-			why = append(why, "focus "+cmp.Or(f.Auto, "cleared"))
+		if f, reason, ok := task.AutoFocus(next, s.d.StaleWaitingDays, now); ok {
+			next, next.Updated = f, now
+			why = append(why, "focus "+cmp.Or(reason, "cleared"))
 		}
 		if len(why) == 0 {
 			continue
@@ -469,6 +500,19 @@ func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 		return nil
 	}
 	return s.d.Store.Apply(ctx, p.changes())
+}
+
+// Recategorize gives every stored task the category of its state as the profile declares it now, and returns
+// the states stored tasks hold that the profile does not declare; those tasks keep their category. A store
+// that keeps no categories recategorizes nothing.
+func (s *Service) Recategorize(ctx context.Context) ([]string, error) {
+	r, ok := s.d.Store.(Recategorizer)
+	if !ok {
+		return nil, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return r.Recategorize(ctx, s.d.States.CategoryOf)
 }
 
 // Attach adds u to entry id's units, after those it holds; a unit it holds already changes nothing.

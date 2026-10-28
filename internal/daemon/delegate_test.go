@@ -19,7 +19,7 @@ import (
 
 // unitTask is an Inbox task of kind on units, with one item on each.
 func unitTask(id string, kind task.Kind, units ...unit.Unit) task.Task {
-	e := task.Task{ID: task.ID(id), Kind: kind, State: task.Inbox, Title: "Entry " + id, Units: units}
+	e := task.Task{ID: task.ID(id), Kind: kind, State: "inbox", Category: task.CategoryInbox, Title: "Entry " + id, Units: units}
 	for _, u := range units {
 		e.Items = append(e.Items, task.ItemRef{Unit: u, Item: "it-" + id})
 	}

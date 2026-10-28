@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -34,9 +36,44 @@ func NewID() ID {
 	return ID("t-" + hex.EncodeToString(b[:]))
 }
 
-// Open says whether the entry is still to do: not done, trash or reference.
+// Open says whether the task is still to do: its category is neither done nor dropped.
 func (e Task) Open() bool {
-	return e.State != Done && e.State != Trash && e.State != Reference
+	return e.Category != CategoryDone && e.Category != CategoryDropped
+}
+
+// States are the profile's states as the rules read them: the category of a state, and the first state of a
+// category, which a task moved into that category takes.
+type States interface {
+	CategoryOf(state string) (Category, bool)
+	FirstOf(c Category) string
+}
+
+// ErrNoStateOf is a move into a category the profile declares no state of.
+var ErrNoStateOf = errors.New("the profile declares no state of the category")
+
+// MoveTo moves the task into category c, in the first state st declares of it; ErrNoStateOf, naming c, when
+// st declares none, and the task is left as it was.
+func (e *Task) MoveTo(c Category, st States) error {
+	s := st.FirstOf(c)
+	if s == "" {
+		return fmt.Errorf("%w %s", ErrNoStateOf, c)
+	}
+	e.State, e.Category = State(s), c
+	return nil
+}
+
+// Become moves the task to state s, in the category st declares of it; an undeclared state keeps the
+// task's category.
+func (e *Task) Become(s State, st States) {
+	e.State = s
+	if c, ok := st.CategoryOf(string(s)); ok {
+		e.Category = c
+	}
+}
+
+// Snoozed says whether the task is deferred under a snooze: a date, activity or a mute wakes it.
+func (e Task) Snoozed() bool {
+	return e.Category == CategoryDeferred && (!e.Snooze.Until.IsZero() || e.Snooze.OnActivity || e.Snooze.Mute)
 }
 
 // FirstUnit is the unit the entry is about: its first unit, else its
@@ -54,9 +91,6 @@ func (e Task) FirstUnit() (unit.Unit, bool) {
 // CapturedByUser says whether the user captured the entry, rather than the
 // loop deriving it from a third party's message or draft.
 func (e Task) CapturedByUser() bool { return e.Origin == OriginUser && e.Kind == KindCapture }
-
-// Live says whether the entry is neither done nor trash.
-func (e Task) Live() bool { return e.State != Done && e.State != Trash }
 
 // Same says whether e and o hold the same values, Updated aside.
 func (e Task) Same(o Task) bool {
@@ -83,12 +117,28 @@ func (e Task) canonical() Task {
 	if len(c.Units) == 0 {
 		c.Units = nil
 	}
-	if len(c.Contexts) == 0 {
-		c.Contexts = nil
+	c.Props, c.Written = nil, nil
+	for name, v := range e.Props {
+		if v.IsZero() {
+			continue
+		}
+		if c.Props == nil {
+			c.Props, c.Written = Props{}, map[string]Written{}
+		}
+		v.Time = t(v.Time)
+		v.Actors, v.List = slices.Clone(v.Actors), slices.Clone(v.List)
+		for i := range v.Actors {
+			if len(v.Actors[i].Aliases) == 0 {
+				v.Actors[i].Aliases = nil
+			}
+		}
+		c.Props[name] = v
+		w := e.Written[name]
+		w.At = t(w.At)
+		c.Written[name] = w
 	}
-	c.Focus.At = t(e.Focus.At)
 	c.Snooze.Until = t(e.Snooze.Until)
-	c.Deadline, c.SeenAt, c.ReviewedAt, c.Created, c.Updated = t(e.Deadline), t(e.SeenAt), t(e.ReviewedAt), t(e.Created), t(e.Updated)
+	c.SeenAt, c.ReviewedAt, c.Created, c.Updated = t(e.SeenAt), t(e.ReviewedAt), t(e.Created), t(e.Updated)
 	if e.Waiting != nil {
 		w := *e.Waiting
 		w.On = slices.Clone(w.On)

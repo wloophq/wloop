@@ -4,7 +4,7 @@
 
 [1mReply on the batch export review[22m
   [2mstate    [22m  next · focus
-  [2mwhere    [22m  @computer
+  [2mcontexts [22m  computer
   [2masks     [22m  [33mPublish the review?[39m
   [2m         [22m  1. Comment only
   [2m         [22m  2. Publish APPROVE (recommended)

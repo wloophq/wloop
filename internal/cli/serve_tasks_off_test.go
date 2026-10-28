@@ -27,7 +27,7 @@ func TestAPluginRefusedAtBuildCountsAsOff(t *testing.T) {
 	ctx := context.Background()
 	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
 	u := unit.Unit{Provider: "slack", Key: "C1/1.1"}
-	e := task.Task{ID: "e-00000000000000ab", Kind: task.KindAction, State: task.Inbox, Title: "reply", Units: []unit.Unit{u},
+	e := task.Task{ID: "e-00000000000000ab", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Title: "reply", Units: []unit.Unit{u},
 		Origin: task.OriginUser, Created: at, Updated: at}
 	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)

@@ -57,7 +57,7 @@ func viewsPrelude(t *testing.T) string {
 }
 
 func task(id, state string, mod func(*api.TaskView)) api.TaskView {
-	e := api.TaskView{ID: id, Kind: "action", State: state, Title: "Task " + id, Contexts: []string{}, Units: []unit.Unit{}, Items: []api.ItemView{}, Verbs: []api.VerbState{},
+	e := api.TaskView{ID: id, Kind: "action", State: state, Title: "Task " + id, Units: []unit.Unit{}, Items: []api.ItemView{}, Verbs: []api.VerbState{},
 		Created: time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC), Updated: time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)}
 	if mod != nil {
 		mod(&e)

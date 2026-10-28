@@ -170,11 +170,12 @@ func (s *Service) CountsWhere(ctx context.Context, area string, keep func(task.T
 		return task.Counters{}, err
 	}
 	for _, e := range next {
-		if e.Area != "" {
-			c.Areas[e.Area]++
+		a := e.Prop(task.PropArea).Text
+		if a != "" {
+			c.Areas[a]++
 		}
-		if area == "" || e.Area == area {
-			for _, cx := range e.Contexts {
+		if area == "" || a == area {
+			for _, cx := range e.Prop(task.PropContexts).List {
 				c.Contexts[cx]++
 			}
 		}
@@ -272,12 +273,12 @@ func Delta(all []task.Task, q task.Query, changed func(task.ID) bool) (in []task
 	for _, e := range all {
 		if changed(e.ID) {
 			touched[e.ID] = true
-			if e.Project != "" {
-				touched[e.Project] = true
+			if e.Parent != "" {
+				touched[e.Parent] = true
 			}
 		}
 	}
-	hit := func(e task.Task) bool { return touched[e.ID] || (e.Project != "" && touched[e.Project]) }
+	hit := func(e task.Task) bool { return touched[e.ID] || (e.Parent != "" && touched[e.Parent]) }
 	inView := map[task.ID]bool{}
 	for _, e := range task.Select(all, q) {
 		inView[e.ID] = true

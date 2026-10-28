@@ -139,7 +139,7 @@ func TestMessageAnswerDifferential(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					if res.Task.State != task.Done {
+					if res.Task.State != task.State("done") {
 						t.Fatalf("the entry is %s after its answer", res.Task.State)
 					}
 					return r.outcome(200, res.Lines)
@@ -195,7 +195,7 @@ func TestDismissingAQuestionMessageThroughTheDaemon(t *testing.T) {
 			if got, _, _ := r.msgs.Message(context.Background(), m.ID); got.State != dmessage.Dismissed {
 				t.Fatalf("message %+v", got)
 			}
-			if e, _ := r.tasks.Task(context.Background(), task.ID(m.TaskID)); e.State != task.Trash {
+			if e, _ := r.tasks.Task(context.Background(), task.ID(m.TaskID)); e.State != task.State("trash") {
 				t.Fatalf("entry %s", e.State)
 			}
 		})

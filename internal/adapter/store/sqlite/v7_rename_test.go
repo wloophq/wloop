@@ -225,7 +225,7 @@ func TestV7RenameLeavesNoEntryReference(t *testing.T) {
 			}
 		}
 	}
-	if got := strings1(t, db, `SELECT id || ' ' || project FROM tasks ORDER BY id`); !slices.Equal(got, []string{"t-" + hexA + " t-" + hexP, "t-" + hexP + " "}) {
+	if got := strings1(t, db, `SELECT id || ' ' || parent FROM tasks ORDER BY id`); !slices.Equal(got, []string{"t-" + hexA + " t-" + hexP, "t-" + hexP + " "}) {
 		t.Errorf("tasks %q", got)
 	}
 	if got := strings1(t, db, `SELECT task_id FROM projects`); !slices.Equal(got, []string{"t-" + hexP}) {
@@ -524,14 +524,14 @@ func historyOf(t *testing.T, db *sql.DB, id string) {
 	}
 }
 
-// ownTask plants task id with its own state rows only: units, contexts, a mark, and a Slack message that
+// ownTask plants task id with its own state rows only: units, a property, a mark, and a Slack message that
 // names it.
 func ownTask(t *testing.T, db *sql.DB, id string) {
 	t.Helper()
 	for _, q := range []string{
 		`INSERT INTO tasks (id, kind, state, origin, created, updated, rev) VALUES (?1, 'close', 'inbox', 'derived', 't', 't', 1)`,
 		`INSERT INTO task_units (task_id, provider, unit_key, ord) VALUES (?1, 'slack', 'C1/2', 0)`,
-		`INSERT INTO task_contexts (task_id, context, ord) VALUES (?1, '@reply', 0)`,
+		`INSERT INTO task_props (task_id, name, value, writer, at) VALUES (?1, 'contexts', '{"list":["@reply"]}', 'plugin', 't')`,
 		`INSERT INTO unit_marks (provider, unit_key, mark, value) VALUES ('task', ?1, 'w/settled', 'v')`,
 		`INSERT INTO messages (task_id, provider, unit_key, kind, text, origin_kind, state, created_at) VALUES (?1, 'slack', 'C1/2', 'post', 'p', 'agent', 'open', 't')`,
 	} {

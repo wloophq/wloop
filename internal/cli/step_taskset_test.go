@@ -27,7 +27,7 @@ func TestTaskSetWritesAProp(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newTaskRig(t, map[string]string{"workflows/my-focus/workflow.toml": focusWorkflow})
-	r.put(t, "t-01", task.Next)
+	r.put(t, "t-01", task.State("next"))
 	ed := engineDeps{DB: r.db, SessionFacts: noUnits{}, WorkspaceFacts: noUnits{}}
 	r.te.wireSubjects(&serveWiring{DB: r.db, Cfg: r.te.cfg, Engine: &ed})
 	eng := r.te.newEngine(ed)
@@ -48,7 +48,7 @@ func TestTaskSetParsesTheValueByItsType(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newTaskRig(t, nil)
-	r.put(t, "t-01", task.Next)
+	r.put(t, "t-01", task.State("next"))
 	s := newStepSet(r.te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: r.te.Rounds, Props: r.db.Props(r.te.Now)})
 	why := workflow.Why{Workflow: "w"}
 	if _, err := s.Run(ctx, wfStep("task.set", "prop", "check_on", "value", "2026-11-02"), task.UnitOf("t-01"), why, automation.RunOpts{}); err != nil {
@@ -71,7 +71,7 @@ func TestTaskSetRefusesAPropWithoutTheWorkflowWriter(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newTaskRig(t, nil)
-	r.put(t, "t-01", task.Next)
+	r.put(t, "t-01", task.State("next"))
 	s := newStepSet(r.te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: r.te.Rounds, Props: r.db.Props(r.te.Now)})
 	why := workflow.Why{Workflow: "w"}
 	for _, prop := range []string{"risk", "undeclared"} {

@@ -171,9 +171,9 @@ func (p *Provider) quiet(newest string, now time.Time) bool {
 	return !at.IsZero() && now.Sub(at) >= p.endedAfter
 }
 
-// liveOn says whether e is a live, unmuted task attached to u.
+// liveOn says whether e is an open, unmuted task attached to u.
 func liveOn(e task.Task, u unit.Unit) bool {
-	return e.Live() && !e.Snooze.Mute && slices.Contains(e.Units, u)
+	return e.Open() && !e.Snooze.Mute && slices.Contains(e.Units, u)
 }
 
 // Scope sets slack.settled_at to the newest settled draft workflow wf

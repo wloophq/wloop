@@ -53,7 +53,7 @@ type hotPlan struct {
 }
 
 var hotPlans = []hotPlan{
-	{name: "open work of a dossier's unit", query: unitOpenSQL, args: 2, want: []string{"items_state (state=? AND provider=? AND unit_key=?)",
+	{name: "open work of a dossier's unit", query: unitOpenSQL, args: 4, want: []string{"items_state (state=? AND provider=? AND unit_key=?)",
 		"task_items_unit (provider=? AND unit_key=?)", "task_units_unit (provider=? AND unit_key=?)"}},
 	{name: "book of a turn", query: bookOfTurn, args: 1, want: []string{"SEARCH turns USING INDEX turns_turn_id (turn_id=?)"}},
 	{name: "book of a round and a handle", query: bookOfBoth, args: 3, want: []string{"turns_turn_id"}},
@@ -81,13 +81,14 @@ var hotPlans = []hotPlan{
 	{name: "events since a cursor", query: eventsSinceSQL, args: 1, want: []string{"SEARCH events USING INTEGER PRIMARY KEY (rowid>?)"}},
 	{name: "events of kinds since a cursor", query: eventsSinceKindsSQL, args: 2, want: []string{"SEARCH events USING INTEGER PRIMARY KEY (rowid>?)"}},
 	{name: "replace a workflow's plan items", query: `DELETE FROM plan_items WHERE workflow = ?`, args: 1, want: []string{"SEARCH plan_items USING INDEX plan_items_workflow (workflow=?)"}},
-	{name: "entries in a state", query: `SELECT ` + taskFields + ` FROM tasks WHERE ` + candidates("inbox") + taskOrder,
-		want: []string{"tasks_state (state=?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
+	{name: "tasks in a category", query: `SELECT ` + taskFields + ` FROM tasks WHERE category = ?` + taskOrder, args: 1,
+		want: []string{"tasks_category (category=?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
+	{name: "recategorize a state's tasks", query: recategorizeSQL, args: 4, want: []string{"tasks_state (state=?)"}},
 	{name: "entries changed since", query: `SELECT ` + taskFields + ` FROM tasks WHERE ` + changedSince + taskOrder, args: 1, want: []string{"tasks_rev (rev>?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
 	{name: "entries of a unit", query: `SELECT ` + taskFields + ` FROM tasks WHERE ` + ofUnit + taskOrder, args: 4,
 		want: []string{"task_units_unit (provider=? AND unit_key=?)", "task_items_unit (provider=? AND unit_key=?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
 	{name: "a project's slug", query: slugTakenSQL, args: 1, want: []string{"projects_slug (slug=?)"}},
-	{name: "open work of a project's dossier", query: projectOpenSQL, args: 1, want: []string{"projects_slug (slug=?)"}},
+	{name: "open work of a project's dossier", query: projectOpenSQL, args: 3, want: []string{"projects_slug (slug=?)"}},
 	{name: "the current review run", query: currentRunSQL, want: []string{"review_runs_open (finished_at=?)"}},
 	{name: "a workflow's plan items", query: `SELECT ` + itemColumns + ` FROM plan_items WHERE workflow = ? ORDER BY id`, args: 1, want: []string{"plan_items_workflow (workflow=?)"}},
 	{name: "due gates", query: gatesDueSQL, args: 2, want: []string{"gates_due (status=? AND deadline<?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},

@@ -2,6 +2,8 @@ package api
 
 import (
 	"cmp"
+	"encoding/json"
+	"maps"
 	"slices"
 	"strings"
 	"unicode"
@@ -32,12 +34,21 @@ func Fold(s string) string {
 	}, accents.Replace(strings.ToLower(s)))
 }
 
-// Texts are what a filter's free words search in a task: its title, notes, state, kind, area, project and
-// contexts, its units, the people it waits on, its items, its cards' people, its draft and its message. The
+// Texts are what a filter's free words search in a task: its title, notes, state, kind, the text and the lists
+// of text of its properties, its units, the people it waits on, its items, its cards' people, its draft and its message. The
 // cockpit's entryHaystack lists the same texts.
 func (e TaskView) Texts() []string {
-	out := []string{e.Title, e.Notes, e.State, e.Kind, e.Area, e.ProjectTitle}
-	out = append(out, e.Contexts...)
+	out := []string{e.Title, e.Notes, e.State, e.Kind}
+	for _, name := range slices.Sorted(maps.Keys(e.Props)) {
+		var text string
+		var list []string
+		switch raw := e.Props[name]; {
+		case json.Unmarshal(raw, &text) == nil:
+			out = append(out, text)
+		case json.Unmarshal(raw, &list) == nil:
+			out = append(out, list...)
+		}
+	}
 	for i, u := range e.Units {
 		out = append(out, e.UnitLabel(i), string(u.Provider)+":"+u.Key)
 	}

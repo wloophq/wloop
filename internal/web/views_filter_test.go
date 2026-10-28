@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -29,11 +30,15 @@ func TestTheFilterNarrowsTheViewCounts(t *testing.T) {
 	narrowed := api.Counters{Views: map[string]int{"focus": 0, "inbox": 1, "outbox": 0, "next": 2, "waiting": 0, "projects": 0, "someday": 0, "logbook": 1},
 		Areas: map[string]int{"OSS": 2}, Contexts: map[string]int{"@reply": 2}}
 	next := []api.TaskView{
-		task("n1", "next", func(e *api.TaskView) { e.Title, e.Area, e.Contexts = "Invoice the client", "OSS", []string{"@reply"} }),
-		task("n2", "next", func(e *api.TaskView) {
-			e.Title, e.Area, e.Contexts = "Review invoice terms", "OSS", []string{"@reply"}
+		task("n1", "next", func(e *api.TaskView) {
+			e.Title, e.Props = "Invoice the client", map[string]json.RawMessage{"area": json.RawMessage(`"OSS"`), "contexts": json.RawMessage(`["@reply"]`)}
 		}),
-		task("n3", "next", func(e *api.TaskView) { e.Title, e.Contexts = "Call Bob", []string{"@decide"} }),
+		task("n2", "next", func(e *api.TaskView) {
+			e.Title, e.Props = "Review invoice terms", map[string]json.RawMessage{"area": json.RawMessage(`"OSS"`), "contexts": json.RawMessage(`["@reply"]`)}
+		}),
+		task("n3", "next", func(e *api.TaskView) {
+			e.Title, e.Props = "Call Bob", map[string]json.RawMessage{"contexts": json.RawMessage(`["@decide"]`)}
+		}),
 	}
 	nodeRun(t, viewsPrelude(t), nil, `
 function writeHash() {}
@@ -121,7 +126,8 @@ func TestTheCockpitAndTheDaemonMatchTheSameTasks(t *testing.T) {
 	gh := unit.Unit{Provider: unit.GitHub, Key: "acme/api#12"}
 	es := []api.TaskView{
 		task("a", "next", func(e *api.TaskView) {
-			e.Title, e.Notes, e.Area, e.ProjectTitle, e.Contexts = "Ação rápida", "see the runbook", "OSS", "Launch", []string{"@reply"}
+			e.Title, e.Notes = "Ação rápida", "see the runbook"
+			e.Props = map[string]json.RawMessage{"area": json.RawMessage(`"OSS"`), "contexts": json.RawMessage(`["@reply"]`), "owner": json.RawMessage(`"Launch"`)}
 			e.Units, e.UnitLabels = []unit.Unit{gh, {Provider: "slack", Key: "T1/C9"}}, []string{"", "#deploys thread"}
 			e.Waiting = &api.WaitingView{On: []api.WaitingPerson{{Name: "Bruna"}}}
 			e.Items = []api.ItemView{{Summary: "answer the question"}}

@@ -116,7 +116,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 		sd.Removal.Snapshot = e.planSnapshot()
 	}
 	if d.DB != nil {
-		sd.Props = d.DB.Props(e.Now)
+		sd.Props = serviceProps{e}
 		sd.Classify.Store = d.DB.Classifications()
 		sd.Removal.Fetched = d.DB.Fetches()
 	}

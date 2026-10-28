@@ -33,7 +33,7 @@ func TestPropStoreContract(t *testing.T) {
 	taskstest.PropContract(t, func(t *testing.T) (coretasks.PropStore, func(task.ID)) {
 		db, _ := openProps(t)
 		return db.Props(func() time.Time { return propsNow }), func(id task.ID) {
-			applyTasks(t, db.Tasks(), task.Task{ID: id, Kind: task.KindCapture, State: task.Inbox, Title: "Call Ana",
+			applyTasks(t, db.Tasks(), task.Task{ID: id, Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "Call Ana",
 				Origin: task.OriginUser, Created: propsNow, Updated: propsNow})
 		}
 	})
@@ -43,7 +43,7 @@ func TestSetPropPagesTheTaskAgain(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db, log := openProps(t)
-	applyTasks(t, db.Tasks(), task.Task{ID: "t-01", Kind: task.KindCapture, State: task.Inbox, Title: "Call Ana",
+	applyTasks(t, db.Tasks(), task.Task{ID: "t-01", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "Call Ana",
 		Origin: task.OriginUser, Created: propsNow, Updated: propsNow})
 	q := task.Query{View: task.ViewInbox}
 	before, err := db.Tasks().TasksSince(ctx, q, coretasks.Since{})
@@ -70,7 +70,7 @@ func TestAnUnchangedSetPropNotesNothing(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db, log := openProps(t)
-	applyTasks(t, db.Tasks(), task.Task{ID: "t-01", Kind: task.KindCapture, State: task.Inbox, Title: "Call Ana",
+	applyTasks(t, db.Tasks(), task.Task{ID: "t-01", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "Call Ana",
 		Origin: task.OriginUser, Created: propsNow, Updated: propsNow})
 	props := db.Props(func() time.Time { return propsNow })
 	if err := props.SetProp(ctx, "t-01", "priority", task.Value{Text: "high"}, task.WriterPerson); err != nil {

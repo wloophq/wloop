@@ -54,26 +54,26 @@ Each plugin says when one of its units has ended: a pull request merged or close
 
 The `start` intent records `done` with the pull request's or the message's URL, which attaches it to the task (`record.attach_url`); posts it makes at once attach too (`drafts.attach_posts`). The task then closes when they end, as the next section says. When the cockpit's Start runs, it takes no `--repo`: the turn reuses the repository an earlier start on the task recorded, else it runs with no checkout.
 
-## Lists are states
+## Lists are categories
 
-| State | Means |
-|---|---|
-| `inbox` | not clarified yet |
-| `next` | an action you will do |
-| `waiting` | someone else owes it: who, since when, the last nudge and a date to resurface |
-| `scheduled` | snoozed until a date, or until new activity on one of its units |
-| `someday` | maybe later |
-| `reference` | kept to read, no action |
-| `done` | finished |
-| `trash` | dismissed |
+| State | Category | Means |
+|---|---|---|
+| `inbox` | `inbox` | not clarified yet |
+| `next` | `ready` | an action you will do |
+| `waiting` | `waiting` | someone else owes it: who, since when, the last nudge and a date to resurface |
+| `scheduled` | `deferred` | snoozed until a date, or until new activity on one of its units |
+| `someday` | `deferred` | maybe later |
+| `done` | `done` | finished |
+| `reference` | `done` | kept to read, no action |
+| `trash` | `dropped` | dismissed |
 
-Beside its state, a task has a **focus** star, **contexts** (labels such as `@decide`), an **area** (switching area filters every view but the Inbox), an optional **project** and a deadline.
+A task is open while its category is neither `done` nor `dropped`. Beside its state, a task has properties: the bundled ones include a **focus** star, **contexts** (labels such as `@decide`), an **area** (switching area filters every view but the Inbox) and a **due** date. A task's **parent** is the project it belongs to, and its children keep their order.
 
-The views are Focus (starred tasks, the landing view), Inbox, Outbox, Next, Waiting, Projects, Someday, Logbook (reference and done) and Review. The lists are inspired by David Allen's *Getting Things Done*®.
+The views are Focus (starred open tasks, the landing view), Inbox, Outbox, Next (the `ready` category), Waiting, Projects, Someday (`deferred` with no snooze), Logbook (the `done` category, newest first) and Review. The lists are inspired by David Allen's *Getting Things Done*®.
 
-The states and the task properties are the profile's `tasks.toml`. Each state has a category (`inbox`, `ready`, `active`, `waiting`, `deferred`, `done` or `dropped`), which is all {{name}} reads of it: a task proposed in a category takes the first state of it, in the order the file declares them, and a state of your `tasks.toml` comes after the bundled ones. Each property is the fact `task.prop.<name>`, typed from its `type`, and says who may write it: a property an agent or a plugin writes, such as `risk`, is untrusted, so no approval rule that sends or runs reads it. An `int` or a `duration` property of 0 is unset.
+The states and the task properties are the profile's `tasks.toml`. Each state has a category (`inbox`, `ready`, `active`, `waiting`, `deferred`, `done` or `dropped`), which is all {{name}} reads of it: a task proposed in a category takes the first state of it, in the order the file declares them, and a state of your `tasks.toml` comes after the bundled ones. The store keeps each task's category beside its state, and the lists read the category. When a reload of the profile moves a state to another category, the daemon gives the stored tasks of that state the new one; a state stored tasks hold that no layer declares any more is a profile problem the health shows, naming `states.<name>`, and those tasks keep the category they had until you declare it again or move them. Each property is the fact `task.prop.<name>`, typed from its `type`, and says who may write it: a property an agent or a plugin writes, such as `risk`, is untrusted, so no approval rule that sends or runs reads it. An `int` or a `duration` property of 0 is unset.
 
-The words of the verbs come from the profile's `tasks.toml`, and those of the views and the review's steps from its `views.toml`: each verb's label is its button, its summary the button's tooltip and its input the question it asks first. A verb's `offer`, a condition over the task's own facts (`task.kind`, `task.state`, `task.unit_provider`), says where a task offers it: `offer = 'task.kind != "capture"'` on `delegate` leaves Delegate off captured tasks, and the daemon refuses it there too. A workflow's `task.verb` step is not bound by it. Every verb you run on a task that changes it is a `verb_<verb>` event a [workflow](/concepts/workflows/#react-to-a-verb) can react to, but `seen` and the verbs on an Outbox draft (approve, edit, retry, dismiss), which are the draft's own.
+The words of the verbs come from the profile's `tasks.toml`, and those of the views and the review's steps from its `views.toml`: each verb's label is its button, its summary the button's tooltip and its input the question it asks first. A verb's `from` are the states it moves a task from, every state when left out, and its `to` the state it moves it to. A verb's `offer`, a condition over the task's own facts (`task.kind`, `task.state`, `task.unit_provider`), says where a task offers it: `offer = 'task.kind != "capture"'` on `delegate` leaves Delegate off captured tasks, and the daemon refuses it there too. A workflow's `task.verb` step is not bound by it. Every verb you run on a task that changes it is a `verb_<verb>` event a [workflow](/concepts/workflows/#react-to-a-verb) can react to, but `seen` and the verbs on an Outbox draft (approve, edit, retry, dismiss), which are the draft's own.
 
 - **Changed since you saw it.** New activity on a unit by someone else, after you last opened the task, brings a scheduled or waiting task back to the Inbox with the changed mark. Opening or moving the task clears it.
 - **Snooze.** `s` schedules a task until a date, until activity, or both. When the date passes it returns to the state it had. Muting the unit snoozes its tasks.
@@ -102,7 +102,7 @@ Their texts are templates of the profile; see [Tune the Slack proposals](/guides
 
 ## Projects
 
-A project is an outcome that takes more than one action. `p` on a task makes a project of it or attaches it to one. A project is parallel or sequential; a sequential one shows only its first open action in Next. Each project has a review interval, 7 days by default, and opens a [dossier](/concepts/turns/#dossiers).
+A project is an outcome that takes more than one action. `p` on a task makes a project of it or attaches it to one. Its actions are its children: each names the project as its parent and keeps its place among them. A project is parallel or sequential; a sequential one shows only its first open action in Next. Each project has a review interval, 7 days by default, kept on its task, and opens a [dossier](/concepts/turns/#dossiers).
 
 ## The review
 

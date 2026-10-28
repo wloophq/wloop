@@ -49,7 +49,7 @@ func taskIntentActions(l *intentload.Loaded, e task.Task) []api.ActionState {
 		return nil
 	}
 	u := task.UnitOf(e.ID)
-	f := catalog.Facts{Row: api.Row{Unit: u}, Intents: l, Open: e.Live(), CapturedByUser: e.CapturedByUser()}
+	f := catalog.Facts{Row: api.Row{Unit: u}, Intents: l, Open: e.Open(), CapturedByUser: e.CapturedByUser()}
 	var out []api.ActionState
 	for _, st := range catalog.UnitStates(f) {
 		d, ok := l.Registry.Get(dintent.Name(st.ID))

@@ -57,8 +57,8 @@ func TestAUnitHasEndedWhenItsPluginsEndedFactSaysSo(t *testing.T) {
 func TestTaskResultsResolveAddressesAndReadTheManifest(t *testing.T) {
 	ctx := context.Background()
 	store := taskstest.New()
-	g := coretasks.New(coretasks.Deps{Store: store, Clock: clockFunc(func() time.Time { return testNow })})
-	if err := store.Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-1", Kind: task.KindCapture, State: task.Next, Title: "ship it", Origin: task.OriginUser}}}); err != nil {
+	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: store, Clock: clockFunc(func() time.Time { return testNow })})
+	if err := store.Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-1", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "ship it", Origin: task.OriginUser}}}); err != nil {
 		t.Fatal(err)
 	}
 	reg := dintent.NewRegistry([]dintent.Def{{Name: "begin", AttachPosts: true}, {Name: "reply"}})

@@ -10,6 +10,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
@@ -33,7 +34,7 @@ func (o outboxSource) Count(context.Context, string) (int, error) { return len(o
 var (
 	countAreas    = []string{"", "OSS", "Hiring"}
 	countContexts = []string{"@decide", "@reply", "@agent", "@repo-op"}
-	countStates   = []task.State{task.Inbox, task.Next, task.Next, task.Waiting, task.Scheduled, task.Someday, task.Reference, task.Done, task.Trash}
+	countStates   = []task.State{task.State("inbox"), task.State("next"), task.State("next"), task.State("waiting"), task.State("scheduled"), task.State("someday"), task.State("reference"), task.State("done"), task.State("trash")}
 )
 
 // randomTasks spans areas, contexts and projects, some sequential and some ended.
@@ -43,19 +44,28 @@ func randomTasks(r *rand.Rand, n int) []task.Task {
 	for i := range n {
 		at := taskAt.Add(time.Duration(r.IntN(10000)) * time.Minute)
 		e := task.Task{ID: task.ID(fmt.Sprintf("e-%016x", i)), Kind: task.KindCapture, State: countStates[r.IntN(len(countStates))],
-			Title: fmt.Sprint(i), Origin: task.OriginUser, Area: countAreas[r.IntN(len(countAreas))], Created: at, Updated: at,
-			Focus: task.Focus{On: r.IntN(4) == 0}}
+			Title: fmt.Sprint(i), Origin: task.OriginUser, Created: at, Updated: at}
+		e.Become(e.State, taskstest.BundledStates)
+		if e.State == "scheduled" && r.IntN(2) == 0 {
+			e.Snooze = task.Snooze{OnActivity: true}
+		}
+		e.SetProp(task.PropArea, task.Value{Text: countAreas[r.IntN(len(countAreas))]}, task.WriterPerson, at)
+		if r.IntN(4) == 0 {
+			e.SetProp(task.PropFocus, task.Value{Text: task.FocusOn}, task.WriterPerson, at)
+		}
+		var cxs []string
 		for _, c := range countContexts {
 			if r.IntN(3) == 0 {
-				e.Contexts = append(e.Contexts, c)
+				cxs = append(cxs, c)
 			}
 		}
+		e.SetProp(task.PropContexts, task.Value{List: cxs}, task.WriterPerson, at)
 		switch {
 		case r.IntN(8) == 0:
 			e.Kind, e.Sequential = task.KindProject, r.IntN(2) == 0
 			projects = append(projects, e.ID)
 		case len(projects) > 0 && r.IntN(2) == 0:
-			e.Project, e.Position = projects[r.IntN(len(projects))], r.IntN(5)
+			e.Parent, e.Position = projects[r.IntN(len(projects))], r.IntN(5)
 		}
 		out = append(out, e)
 	}
@@ -78,7 +88,7 @@ func TestCountersEqualTheirLists(t *testing.T) {
 			defer db.Close()
 			store := db.Tasks()
 			applyTasks(t, store, tasks...)
-			svc := coretasks.New(coretasks.Deps{Store: store, Clock: fixedNow{taskAt}})
+			svc := coretasks.New(coretasks.Deps{Store: store, Clock: fixedNow{taskAt}, States: taskstest.BundledStates})
 			svc.RegisterView(task.ViewOutbox, "draft:", outboxSource{drafts: drafts})
 			for _, area := range countAreas {
 				c, err := svc.Counts(ctx, area)

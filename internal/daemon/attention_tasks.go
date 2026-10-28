@@ -49,7 +49,7 @@ func (ev *taskViewer) notice(ctx context.Context, e task.Task) *api.Attention {
 	if e.Kind == task.KindDraft {
 		return ev.draftAttention(ctx, e)
 	}
-	if e.State != task.Inbox || !ev.s.unitsEnabled(e.Units) {
+	if e.Category != task.CategoryInbox || !ev.s.unitsEnabled(e.Units) {
 		return nil
 	}
 	cat, token, a, ok := ev.inboxNotice(ctx, e)

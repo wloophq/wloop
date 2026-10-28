@@ -29,12 +29,12 @@ func TestDigestContents(t *testing.T) {
 	t.Parallel()
 	r, end := digestRig(t)
 	r.put(t,
-		at(task.Task{ID: "e-next", State: task.Next}, end.Add(-time.Hour)),
-		at(task.Task{ID: "e-wait", Kind: task.KindWaiting, State: task.Waiting, Waiting: &task.WaitingOn{Since: end}}, end.Add(-20*time.Hour)),
-		at(task.Task{ID: "e-old", State: task.Next}, end.Add(-25*time.Hour)),
-		at(task.Task{ID: "e-later", State: task.Next}, end.Add(time.Minute)),
-		at(task.Task{ID: "e-in", State: task.Inbox}, end.Add(-time.Hour)),
-		at(task.Task{ID: "e-off", State: task.Next, Units: []unit.Unit{{Provider: "slack", Key: "T000/C000/1.2"}}}, end.Add(-time.Hour)),
+		at(task.Task{ID: "e-next", State: "next", Category: task.CategoryReady}, end.Add(-time.Hour)),
+		at(task.Task{ID: "e-wait", Kind: task.KindWaiting, State: "waiting", Category: task.CategoryWaiting, Waiting: &task.WaitingOn{Since: end}}, end.Add(-20*time.Hour)),
+		at(task.Task{ID: "e-old", State: "next", Category: task.CategoryReady}, end.Add(-25*time.Hour)),
+		at(task.Task{ID: "e-later", State: "next", Category: task.CategoryReady}, end.Add(time.Minute)),
+		at(task.Task{ID: "e-in", State: "inbox", Category: task.CategoryInbox}, end.Add(-time.Hour)),
+		at(task.Task{ID: "e-off", State: "next", Category: task.CategoryReady, Units: []unit.Unit{{Provider: "slack", Key: "T000/C000/1.2"}}}, end.Add(-time.Hour)),
 	)
 	var d api.Digest
 	if code := get(t, r.s, api.DigestPath+"?day=2026-10-08", &d); code != 200 {
@@ -52,7 +52,7 @@ func TestDigestContents(t *testing.T) {
 func TestEmptyDigest(t *testing.T) {
 	t.Parallel()
 	r, end := digestRig(t)
-	r.put(t, at(task.Task{ID: "e-old", State: task.Next}, end.Add(-30*time.Hour)))
+	r.put(t, at(task.Task{ID: "e-old", State: "next", Category: task.CategoryReady}, end.Add(-30*time.Hour)))
 	raw := getRaw(t, r.s, api.DigestPath+"?day=2026-10-08")
 	if !strings.Contains(raw, `"tasks":null`) {
 		t.Fatalf("%s", raw)

@@ -17,6 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -311,9 +312,23 @@ var writes = []writeCase{
 		method: "taskStore.Apply",
 		call: func(ctx context.Context, e *noteEnv) error {
 			return e.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-1", Kind: task.KindCapture,
-				State: task.Inbox, Units: []unit.Unit{u7}, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}})
+				State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{u7}, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}})
 		},
 		topics: port.TopicTasks, units: []unit.Unit{u7},
+	},
+	{
+		method: "taskStore.Recategorize",
+		seed: func(t *testing.T, e *noteEnv) {
+			if err := e.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-1", Kind: task.KindCapture,
+				State: "inbox", Category: task.CategoryWaiting, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}}); err != nil {
+				t.Fatal(err)
+			}
+		},
+		call: func(ctx context.Context, e *noteEnv) error {
+			_, err := e.db.Tasks().(coretasks.Recategorizer).Recategorize(ctx, func(string) (task.Category, bool) { return task.CategoryInbox, true })
+			return err
+		},
+		topics: port.TopicTasks, units: []unit.Unit{task.UnitOf("t-1")},
 	},
 	{
 		method: "Fetches.Mark",

@@ -26,11 +26,11 @@ const (
 		files = excluded.files, last_write_at = excluded.last_write_at, resolved_at = excluded.resolved_at,
 		archived_at = excluded.archived_at, purge_after = excluded.purge_after`
 	unitOpenSQL = `SELECT EXISTS (SELECT 1 FROM items WHERE provider = ?1 AND unit_key = ?2 AND state = 'open')
-		OR EXISTS (SELECT 1 FROM tasks e WHERE e.state NOT IN ('done', 'trash', 'reference') AND (
+		OR EXISTS (SELECT 1 FROM tasks e WHERE e.category NOT IN (?3, ?4) AND (
 			e.id IN (SELECT task_id FROM task_items WHERE provider = ?1 AND unit_key = ?2) OR
 			e.id IN (SELECT task_id FROM task_units WHERE provider = ?1 AND unit_key = ?2)))`
 	projectOpenSQL = `SELECT EXISTS (SELECT 1 FROM projects p JOIN tasks e ON e.id = p.task_id
-		WHERE p.slug = ?1 AND p.slug != '' AND e.state NOT IN ('done', 'trash', 'reference'))`
+		WHERE p.slug = ?1 AND p.slug != '' AND e.category NOT IN (?2, ?3))`
 )
 
 func (s dossierStore) Put(ctx context.Context, d dossier.Dossier) error {
@@ -73,10 +73,10 @@ func (s dossierStore) List(ctx context.Context) ([]dossier.Dossier, error) {
 func (s dossierStore) Open(ctx context.Context, o dossier.Owner) (bool, error) {
 	var open bool
 	if o.Project != "" {
-		err := s.db.R().QueryRowContext(ctx, projectOpenSQL, o.Project).Scan(&open)
+		err := s.db.R().QueryRowContext(ctx, projectOpenSQL, append([]any{o.Project}, openArgs()...)...).Scan(&open)
 		return open, err
 	}
-	err := s.db.R().QueryRowContext(ctx, unitOpenSQL, string(o.Unit.Provider), o.Unit.Key).Scan(&open)
+	err := s.db.R().QueryRowContext(ctx, unitOpenSQL, append([]any{string(o.Unit.Provider), o.Unit.Key}, openArgs()...)...).Scan(&open)
 	return open, err
 }
 

@@ -13,59 +13,71 @@ func activeMute(f UnitFacts, now time.Time) *Mute {
 // applyMute snoozes a live entry under m once per mute: an entry woken by activity keeps the mark and stays
 // where the user put it, and an entry the user scheduled keeps the user's snooze. With m nil it returns a
 // muted entry to its state.
-func applyMute(e Task, m *Mute) Task {
+func applyMute(e Task, m *Mute, st States) (Task, error) {
 	switch {
-	case m != nil && e.Live() && !e.Snooze.Mute && e.State != Scheduled:
-		e.Snooze = Snooze{Until: m.Until, OnActivity: m.UntilStateChange, Return: e.State, Mute: true}
-		e.State = Scheduled
-	case m != nil && e.State == Scheduled && e.Snooze.Mute:
+	case m != nil && e.Open() && !e.Snooze.Mute && !e.Snoozed():
+		ret := e.State
+		if err := e.MoveTo(CategoryDeferred, st); err != nil {
+			return e, err
+		}
+		e.Snooze = Snooze{Until: m.Until, OnActivity: m.UntilStateChange, Return: ret, Mute: true}
+	case m != nil && e.Snoozed() && e.Snooze.Mute:
 		e.Snooze.Until, e.Snooze.OnActivity = m.Until, m.UntilStateChange
 	case m == nil && e.Snooze.Mute:
-		if e.State == Scheduled {
-			e.State = returnState(e.Snooze)
+		if e.Snoozed() {
+			if err := e.returnFrom(e.Snooze, st); err != nil {
+				return e, err
+			}
 		}
 		e.Snooze = Snooze{}
 	}
-	return e
+	return e, nil
 }
 
-func returnState(s Snooze) State {
-	if s.Return == "" || s.Return == Scheduled {
-		return Inbox
+// returnFrom moves the task back to the state s returns it to, the Inbox when s names none.
+func (e *Task) returnFrom(s Snooze, st States) error {
+	if s.Return == "" {
+		return e.MoveTo(CategoryInbox, st)
 	}
-	return s.Return
+	e.Become(s.Return, st)
+	return nil
 }
 
-// Wake returns a Scheduled entry to Snooze.Return when Until <= now.
-func Wake(e Task, now time.Time) (Task, bool) {
-	if e.State != Scheduled || e.Snooze.Until.IsZero() || e.Snooze.Until.After(now) {
-		return e, false
+// Wake returns a snoozed task to Snooze.Return when Until <= now.
+func Wake(e Task, st States, now time.Time) (Task, bool, error) {
+	if !e.Snoozed() || e.Snooze.Until.IsZero() || e.Snooze.Until.After(now) {
+		return e, false, nil
 	}
-	e.State = returnState(e.Snooze)
+	if err := e.returnFrom(e.Snooze, st); err != nil {
+		return e, false, err
+	}
 	e.Snooze = Snooze{}
 	e.Updated = now
-	return e, true
+	return e, true, nil
 }
 
 // Activity returns snoozed and waiting entries of f.Unit to Inbox with Changed set when f.LastHuman is after
 // what the user saw (SeenAt, or Created before any), unless the unit is muted without UntilStateChange.
-func Activity(f UnitFacts, have []Task, now time.Time) []Change {
+func Activity(f UnitFacts, have []Task, st States, now time.Time) ([]Change, error) {
 	if m := activeMute(f, now); m != nil && !m.UntilStateChange {
-		return nil
+		return nil, nil
 	}
 	var out []Change
 	for _, e := range have {
-		if e.State != Scheduled && e.State != Waiting {
+		if !e.Snoozed() && e.Category != CategoryWaiting {
 			continue
 		}
 		if !f.LastHuman.After(later(e.SeenAt, e.Created)) {
 			continue
 		}
-		e.State, e.Changed, e.Updated = Inbox, true, now
+		if err := e.MoveTo(CategoryInbox, st); err != nil {
+			return nil, err
+		}
+		e.Changed, e.Updated = true, now
 		e.Snooze = Snooze{Mute: e.Snooze.Mute}
 		out = append(out, Change{Op: OpReinbox, Task: e, Why: "activity on " + f.Unit.String()})
 	}
-	return out
+	return out, nil
 }
 
 func later(a, b time.Time) time.Time {

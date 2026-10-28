@@ -20,14 +20,14 @@ func at(min int) time.Time { return now.Add(time.Duration(min) * time.Minute) }
 
 func TestAreaSparesTheInbox(t *testing.T) {
 	all := []task.Task{
-		{ID: "e-in-oss", State: task.Inbox, Area: "OSS", Created: at(1)},
-		{ID: "e-in-hire", State: task.Inbox, Area: "Hiring", Created: at(2)},
-		{ID: "e-next-oss", State: task.Next, Area: "OSS", Created: at(3)},
-		{ID: "e-next-hire", State: task.Next, Area: "Hiring", Created: at(4)},
-		{ID: "e-wait-oss", State: task.Waiting, Area: "OSS", Created: at(5)},
-		{ID: "e-wait-none", State: task.Waiting, Created: at(6)},
-		{ID: "e-star-oss", State: task.Someday, Area: "OSS", Focus: task.Focus{On: true}, Created: at(7)},
-		{ID: "e-star-hire", State: task.Next, Area: "Hiring", Focus: task.Focus{On: true}, Created: at(8)},
+		{ID: "e-in-oss", State: "inbox", Category: task.CategoryInbox, Props: task.Props{"area": {Text: "OSS"}}, Created: at(1)},
+		{ID: "e-in-hire", State: "inbox", Category: task.CategoryInbox, Props: task.Props{"area": {Text: "Hiring"}}, Created: at(2)},
+		{ID: "e-next-oss", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "OSS"}}, Created: at(3)},
+		{ID: "e-next-hire", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "Hiring"}}, Created: at(4)},
+		{ID: "e-wait-oss", State: "waiting", Category: task.CategoryWaiting, Props: task.Props{"area": {Text: "OSS"}}, Created: at(5)},
+		{ID: "e-wait-none", State: "waiting", Category: task.CategoryWaiting, Created: at(6)},
+		{ID: "e-star-oss", State: "someday", Category: task.CategoryDeferred, Props: task.Props{"area": {Text: "OSS"}, "focus": {Text: "on"}}, Created: at(7)},
+		{ID: "e-star-hire", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "Hiring"}, "focus": {Text: "on"}}, Created: at(8)},
 	}
 	want := map[task.View][]task.ID{
 		task.ViewInbox:   {"e-in-oss", "e-in-hire"},
@@ -44,9 +44,9 @@ func TestAreaSparesTheInbox(t *testing.T) {
 
 func TestContextsCombineWithAnd(t *testing.T) {
 	all := []task.Task{
-		{ID: "e-both", State: task.Next, Contexts: []string{"@reply", "@decide"}},
-		{ID: "e-decide", State: task.Next, Contexts: []string{"@decide"}},
-		{ID: "e-reply", State: task.Next, Contexts: []string{"@reply", "@agent"}},
+		{ID: "e-both", State: "next", Category: task.CategoryReady, Props: task.Props{"contexts": {List: []string{"@reply", "@decide"}}}},
+		{ID: "e-decide", State: "next", Category: task.CategoryReady, Props: task.Props{"contexts": {List: []string{"@decide"}}}},
+		{ID: "e-reply", State: "next", Category: task.CategoryReady, Props: task.Props{"contexts": {List: []string{"@reply", "@agent"}}}},
 	}
 	got := ids(task.Select(all, task.Query{View: task.ViewNext, Contexts: []string{"@decide", "@reply"}}))
 	if !slices.Equal(got, []task.ID{"e-both"}) {
@@ -56,19 +56,19 @@ func TestContextsCombineWithAnd(t *testing.T) {
 
 func TestSequentialProjectShowsFirstAction(t *testing.T) {
 	all := []task.Task{
-		{ID: "e-seq", Kind: task.KindProject, State: task.Next, Sequential: true, Created: at(0)},
-		{ID: "e-s3", State: task.Next, Project: "e-seq", Position: 3, Created: at(1)},
-		{ID: "e-s1", State: task.Next, Project: "e-seq", Position: 1, Created: at(2)},
-		{ID: "e-s2", State: task.Next, Project: "e-seq", Position: 2, Created: at(3)},
-		{ID: "e-par", Kind: task.KindProject, State: task.Someday, Created: at(4)},
-		{ID: "e-p1", State: task.Next, Project: "e-par", Position: 1, Created: at(5)},
-		{ID: "e-p2", State: task.Next, Project: "e-par", Position: 2, Created: at(6)},
+		{ID: "e-seq", Kind: task.KindProject, State: "next", Category: task.CategoryReady, Sequential: true, Created: at(0)},
+		{ID: "e-s3", State: "next", Category: task.CategoryReady, Parent: "e-seq", Position: 3, Created: at(1)},
+		{ID: "e-s1", State: "next", Category: task.CategoryReady, Parent: "e-seq", Position: 1, Created: at(2)},
+		{ID: "e-s2", State: "next", Category: task.CategoryReady, Parent: "e-seq", Position: 2, Created: at(3)},
+		{ID: "e-par", Kind: task.KindProject, State: "someday", Category: task.CategoryDeferred, Created: at(4)},
+		{ID: "e-p1", State: "next", Category: task.CategoryReady, Parent: "e-par", Position: 1, Created: at(5)},
+		{ID: "e-p2", State: "next", Category: task.CategoryReady, Parent: "e-par", Position: 2, Created: at(6)},
 	}
 	next := func() []task.ID { return ids(task.Select(all, task.Query{View: task.ViewNext})) }
 	if got, want := next(), []task.ID{"e-seq", "e-s1", "e-p1", "e-p2"}; !slices.Equal(got, want) {
 		t.Fatalf("next %v, want %v", got, want)
 	}
-	all[2].State = task.Done
+	all[2].State, all[2].Category = "done", task.CategoryDone
 	if got, want := next(), []task.ID{"e-seq", "e-s2", "e-p1", "e-p2"}; !slices.Equal(got, want) {
 		t.Fatalf("after done: %v, want %v", got, want)
 	}
@@ -76,24 +76,29 @@ func TestSequentialProjectShowsFirstAction(t *testing.T) {
 
 func TestViewPredicates(t *testing.T) {
 	var all []task.Task
-	for i, s := range []task.State{task.Inbox, task.Next, task.Waiting, task.Scheduled, task.Someday, task.Reference, task.Done, task.Trash} {
+	for i, s := range bundledTable {
+		var sn task.Snooze
+		if s.name == "scheduled" {
+			sn = task.Snooze{OnActivity: true}
+		}
+		st := task.State(s.name)
 		all = append(all,
-			task.Task{ID: task.ID("e-" + string(s)), State: s, Created: at(i), Updated: at(i)},
-			task.Task{ID: task.ID("e-star-" + string(s)), State: s, Focus: task.Focus{On: true}, Created: at(10 + i), Updated: at(10 + i)},
-			task.Task{ID: task.ID("e-proj-" + string(s)), Kind: task.KindProject, State: s, Created: at(20 + i), Updated: at(20 + i)},
+			task.Task{ID: task.ID("e-" + s.name), State: st, Category: s.c, Snooze: sn, Created: at(i), Updated: at(i)},
+			task.Task{ID: task.ID("e-star-" + s.name), State: st, Category: s.c, Snooze: sn, Props: task.Props{"focus": {Text: "on"}}, Created: at(10 + i), Updated: at(10 + i)},
+			task.Task{ID: task.ID("e-proj-" + s.name), Kind: task.KindProject, State: st, Category: s.c, Snooze: sn, Created: at(20 + i), Updated: at(20 + i)},
 		)
 	}
 	cases := []struct {
 		view task.View
 		want []task.ID
 	}{
-		{task.ViewFocus, []task.ID{"e-star-inbox", "e-star-next", "e-star-waiting", "e-star-scheduled", "e-star-someday", "e-star-reference"}},
+		{task.ViewFocus, []task.ID{"e-star-inbox", "e-star-next", "e-star-waiting", "e-star-scheduled", "e-star-someday"}},
 		{task.ViewInbox, []task.ID{"e-inbox", "e-star-inbox", "e-proj-inbox"}},
 		{task.ViewNext, []task.ID{"e-next", "e-star-next", "e-proj-next"}},
 		{task.ViewWaiting, []task.ID{"e-waiting", "e-star-waiting", "e-proj-waiting"}},
-		{task.ViewProjects, []task.ID{"e-proj-inbox", "e-proj-next", "e-proj-waiting", "e-proj-scheduled", "e-proj-someday", "e-proj-reference"}},
+		{task.ViewProjects, []task.ID{"e-proj-inbox", "e-proj-next", "e-proj-waiting", "e-proj-scheduled", "e-proj-someday"}},
 		{task.ViewSomeday, []task.ID{"e-someday", "e-star-someday", "e-proj-someday"}},
-		{task.ViewLogbook, []task.ID{"e-proj-reference", "e-star-reference", "e-reference", "e-proj-done", "e-star-done", "e-done"}},
+		{task.ViewLogbook, []task.ID{"e-proj-reference", "e-proj-done", "e-star-reference", "e-star-done", "e-reference", "e-done"}},
 		{task.ViewOutbox, []task.ID{}},
 	}
 	for _, c := range cases {

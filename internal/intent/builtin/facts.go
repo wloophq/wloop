@@ -89,11 +89,8 @@ var Visibilities = []string{"public", "private", "internal"}
 // ReviewStates are GitHub's review states, and the empty value of no review.
 var ReviewStates = []string{"", "APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED", "PENDING"}
 
-// TaskKinds and TaskStates are a task's kinds and states.
-var (
-	TaskKinds  = []string{string(task.KindAction), string(task.KindWaiting), string(task.KindClose), string(task.KindMessage), string(task.KindDraft), string(task.KindCapture), string(task.KindProject), string(task.KindReference)}
-	TaskStates = []string{string(task.Inbox), string(task.Next), string(task.Waiting), string(task.Scheduled), string(task.Someday), string(task.Reference), string(task.Done), string(task.Trash)}
-)
+// TaskKinds are a task's kinds.
+var TaskKinds = []string{string(task.KindAction), string(task.KindWaiting), string(task.KindClose), string(task.KindMessage), string(task.KindDraft), string(task.KindCapture), string(task.KindProject), string(task.KindReference)}
 
 // TurnStates are the states a turn is in, and the empty value of none.
 var TurnStates = []string{"", string(dturn.Sent), string(dturn.Started), string(dturn.Asked), string(dturn.Done), string(dturn.Settled),
@@ -270,7 +267,7 @@ var otherFacts = []Fact{
 	wf("workspace", "repo", expr.String, "owner/repo; empty when unknown."),
 	wf("task", "id", expr.String, "The task's id."),
 	untrusted(enum(wf("task", "kind", expr.String, "The task's kind, such as action, waiting, close, message, capture or project."), enumOf(TaskKinds...))),
-	untrusted(enum(wf("task", "state", expr.String, "The task's state, one of the states tasks.toml declares."), enumOf(TaskStates...))),
+	untrusted(wf("task", "state", expr.String, "The task's state, one of the states tasks.toml declares.")),
 	untrusted(wf("task", "waiting_on", expr.List, "The person keys the task waits on, such as slack:U0123.")),
 	wf("task", "resurface_at", expr.Time, "When the task resurfaces; zero when it has no date. Test with `> timestamp(0)`."),
 	timeVarying(untrusted(wf("task", "waiting_days", expr.Int, "Working days the task has waited, in the configured location, as the waiting rules count them."))),

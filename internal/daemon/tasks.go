@@ -601,7 +601,7 @@ type taskViewer struct {
 	s        *Server
 	g        *coretasks.Service
 	detail   bool
-	projects map[task.ID]string
+	children map[task.ID][]task.ID
 	drafts   []draft.Draft
 	status   map[task.ID]coretasks.ProjectState
 	// whereBy bounds every draft destination lookup of this page.
@@ -609,18 +609,18 @@ type taskViewer struct {
 }
 
 func (s *Server) taskViews(_ context.Context, g *coretasks.Service, detail bool) *taskViewer {
-	return &taskViewer{s: s, g: g, detail: detail, projects: map[task.ID]string{}, whereBy: time.Now().Add(s.whereBudget())}
+	return &taskViewer{s: s, g: g, detail: detail, whereBy: time.Now().Add(s.whereBudget())}
 }
 
 func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, error) {
-	v := api.TaskView{ID: string(e.ID), Kind: string(e.Kind), State: string(e.State), Title: e.Title, Notes: e.Notes,
-		Focus: e.Focus.On, FocusAuto: e.Focus.Auto, Contexts: nonNil(slices.Clone(e.Contexts)), Area: e.Area, Project: string(e.Project),
-		Deadline: e.Deadline, Changed: e.Changed, Units: slices.Clone(e.Units), Items: []api.ItemView{}, Created: e.Created, Updated: e.Updated}
+	v := api.TaskView{ID: string(e.ID), Kind: string(e.Kind), State: string(e.State), Category: string(e.Category), Title: e.Title,
+		Notes: e.Notes, Parent: string(e.Parent), Props: propsView(ev.s.loaded().Tasks, e.Props), Changed: e.Changed,
+		Units: slices.Clone(e.Units), Items: []api.ItemView{}, Created: e.Created, Updated: e.Updated}
 	if v.Units == nil {
 		v.Units = []unit.Unit{}
 	}
 	v.UnitLabels = ev.s.unitLabels(v.Units)
-	if e.State == task.Scheduled {
+	if e.Snoozed() {
 		v.SnoozeUntil, v.SnoozeOnActivity, v.Muted = e.Snooze.Until, e.Snooze.OnActivity, e.Snooze.Mute
 	}
 	if e.Waiting != nil {
@@ -630,15 +630,8 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 		}
 		v.Waiting = w
 	}
-	if e.Project != "" {
-		title, ok := ev.projects[e.Project]
-		if !ok {
-			if p, err := ev.g.Task(ctx, e.Project); err == nil {
-				title = p.Title
-			}
-			ev.projects[e.Project] = title
-		}
-		v.ProjectTitle = title
+	if err := ev.childrenOf(ctx, e, &v); err != nil {
+		return api.TaskView{}, err
 	}
 	if err := ev.items(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
@@ -663,6 +656,55 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 		return api.TaskView{}, err
 	}
 	return v, nil
+}
+
+// childrenOf sets the open children of a project, or of any task in a detail, from one read per page.
+func (ev *taskViewer) childrenOf(ctx context.Context, e task.Task, v *api.TaskView) error {
+	if e.Kind != task.KindProject && !ev.detail {
+		return nil
+	}
+	if ev.children == nil {
+		got, err := ev.g.Children(ctx)
+		if err != nil {
+			return err
+		}
+		ev.children = got
+	}
+	for _, id := range ev.children[e.ID] {
+		v.Children = append(v.Children, string(id))
+	}
+	return nil
+}
+
+// propsView is each property in its type's JSON, as tasks.toml declares it; a property it does not declare in
+// the JSON of the value it holds.
+func propsView(def intentload.TasksDef, props task.Props) map[string]json.RawMessage {
+	if len(props) == 0 {
+		return nil
+	}
+	out := make(map[string]json.RawMessage, len(props))
+	for name, v := range props {
+		var x any
+		p, _ := def.Prop(name)
+		switch {
+		case p.Type == task.PropInt || p.Type == "" && v.Int != 0:
+			x = v.Int
+		case p.Type == task.PropDate || p.Type == "" && !v.Time.IsZero():
+			x = v.Time
+		case p.Type == task.PropDuration || p.Type == "" && v.Dur != 0:
+			x = v.Dur.String()
+		case p.Type == task.PropStrings || p.Type == "" && v.List != nil:
+			x = nonNil(v.List)
+		case p.Type == task.PropActor || p.Type == task.PropActors || p.Type == "" && v.Actors != nil:
+			x = v.Actors
+		default:
+			x = v.Text
+		}
+		if b, err := json.Marshal(x); err == nil {
+			out[name] = b
+		}
+	}
+	return out
 }
 
 func (ev *taskViewer) items(ctx context.Context, e task.Task, v *api.TaskView) error {
@@ -752,7 +794,7 @@ func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
 				st.Runners = ev.s.delegateModes(ctx, b.unit, runs.ID)
 			}
 		default:
-			if err := coretasks.Accepts(e, verb); err != nil {
+			if err := ev.g.Accepts(e, verb); err != nil {
 				st.Reason = err.Error()
 			} else {
 				st.Enabled = true
@@ -765,16 +807,19 @@ func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
 
 // syncTasks runs Sync once per burst of item, source-event and card notes, on its own goroutine, until ctx
 // ends: everything at start, after an All note and when the user's identity grows, and each minute for the
-// snoozes and stars that come due.
+// snoozes and stars that come due. At start and after each profile reload it first recategorizes the stored
+// tasks.
 func (s *Server) syncTasks(ctx context.Context) {
 	g := s.deps.Tasks
 	var poke <-chan struct{}
-	var from port.Generation
+	var from, cfgFrom port.Generation
 	if s.deps.Changes != nil {
-		p, cancel := change.Poke(s.deps.Changes, syncInputs)
+		p, cancel := change.Poke(s.deps.Changes, syncInputs|port.TopicConfig)
 		defer cancel()
 		poke = p
+		cfgFrom = s.deps.Changes.Gen()
 	}
+	recategorize := true
 	tick := time.NewTicker(syncTick)
 	defer tick.Stop()
 	all, settled := true, s.deps.TasksMe == nil
@@ -807,6 +852,13 @@ func (s *Server) syncTasks(ctx context.Context) {
 		}
 		units = append(units, retry...)
 		all, retry = false, nil
+		if s.deps.Changes != nil {
+			c := s.deps.Changes.Since(cfgFrom, port.TopicConfig)
+			cfgFrom, recategorize = c.Gen, recategorize || c.Has(port.TopicConfig)
+		}
+		if recategorize {
+			recategorize = !s.recategorize(ctx, g)
+		}
 		sctx, scope := meter.Start(ctx, meter.Loop("tasks"))
 		if err := g.Sync(sctx, units); err != nil && ctx.Err() == nil {
 			s.logf("tasks: sync: %v", err)
@@ -833,6 +885,29 @@ func (s *Server) syncTasks(ctx context.Context) {
 		}
 		quiet, late = nil, nil
 	}
+}
+
+// recategorize runs the recategorize pass and keeps the states stored tasks hold that the profile does not
+// declare, for the health; false when it failed, so the next pass tries again.
+func (s *Server) recategorize(ctx context.Context, g *coretasks.Service) bool {
+	unknown, err := g.Recategorize(ctx)
+	if err != nil {
+		if ctx.Err() == nil {
+			s.logf("tasks: recategorize: %v", err)
+		}
+		return false
+	}
+	s.heldStates.Store(&unknown)
+	return true
+}
+
+// heldProblems are the problems of the states stored tasks hold that the profile no longer declares.
+func (s *Server) heldProblems(l *intentload.Loaded) intentload.Problems {
+	held := s.heldStates.Load()
+	if held == nil {
+		return nil
+	}
+	return l.Tasks.HeldProblems(*held)
 }
 
 // feedTasks publishes a change with the counters after each burst of task and draft notes, naming the units

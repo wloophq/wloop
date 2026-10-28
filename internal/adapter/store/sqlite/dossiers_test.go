@@ -96,14 +96,14 @@ func TestDossierStoreOpenReadsItemsAndTasks(t *testing.T) {
 		t.Fatal("an open item does not keep the unit open")
 	}
 
-	e := task.Task{ID: task.NewID(), Kind: task.KindCapture, State: task.Next, Title: "t", Units: []unit.Unit{slackThread}, Origin: task.OriginUser, Created: at, Updated: at}
+	e := task.Task{ID: task.NewID(), Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "t", Units: []unit.Unit{slackThread}, Origin: task.OriginUser, Created: at, Updated: at}
 	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
 	if !open(slackThread) {
 		t.Fatal("a live entry does not keep the unit open")
 	}
-	e.State = task.Done
+	e.State, e.Category = "done", task.CategoryDone
 	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
@@ -121,14 +121,14 @@ func TestDossierStoreOpenReadsItemsAndTasks(t *testing.T) {
 	if project() {
 		t.Fatal("a project without an entry is open")
 	}
-	p := task.Task{ID: task.NewID(), Kind: task.KindProject, State: task.Next, Title: "Ship it", Slug: "ship-it", Origin: task.OriginUser, Created: at, Updated: at}
+	p := task.Task{ID: task.NewID(), Kind: task.KindProject, State: "next", Category: task.CategoryReady, Title: "Ship it", Slug: "ship-it", Origin: task.OriginUser, Created: at, Updated: at}
 	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: p}}); err != nil {
 		t.Fatal(err)
 	}
 	if !project() {
 		t.Fatal("a live project is not open")
 	}
-	p.State = task.Done
+	p.State, p.Category = "done", task.CategoryDone
 	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: p}}); err != nil {
 		t.Fatal(err)
 	}

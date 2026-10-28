@@ -72,7 +72,7 @@ func TestProjectDossierOnDisk(t *testing.T) {
 	if archived, _, err := ds.Sweep(ctx); err != nil || archived != 0 {
 		t.Fatalf("an open project's dossier swept: %d %v", archived, err)
 	}
-	if _, err := g.Do(ctx, res.Task.Project, coretasks.Request{Verb: task.VerbDone}); err != nil {
+	if _, err := g.Do(ctx, res.Task.Parent, coretasks.Request{Verb: task.VerbDone}); err != nil {
 		t.Fatal(err)
 	}
 	d, ok, err := ds.Get(ctx, dossier.Owner{Project: "ship-the-v2-api"})

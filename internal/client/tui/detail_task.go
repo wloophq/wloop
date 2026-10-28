@@ -3,12 +3,14 @@ package tui
 import (
 	"cmp"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/domain/record"
+	dtask "github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
@@ -202,7 +204,7 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 		}
 	}
 	state := []string{e.State}
-	if e.Focus {
+	if e.PropText(dtask.PropFocus) == dtask.FocusOn {
 		state = append(state, "focus")
 	}
 	if e.Changed {
@@ -215,18 +217,13 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 		state = append(state, "until activity")
 	}
 	fact("state", strings.Join(state, " · "), plain)
-	if len(e.Contexts) > 0 || e.Area != "" {
-		var where []string
-		for _, c := range e.Contexts {
-			where = append(where, "@"+c)
+	for _, name := range slices.Sorted(maps.Keys(e.Props)) {
+		if text := propText(e, name, now); text != "" && name != dtask.PropFocus {
+			fact(name, text, plain)
 		}
-		if e.Area != "" {
-			where = append(where, "area "+e.Area)
-		}
-		fact("where", strings.Join(where, " "), plain)
 	}
-	if e.ProjectTitle != "" {
-		fact("project", e.ProjectTitle, plain)
+	if e.Parent != "" {
+		fact("parent", e.Parent, plain)
 	}
 	if w := e.Waiting; w != nil {
 		var on []string
@@ -238,9 +235,6 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 			text += " · " + span(now.Sub(w.Since))
 		}
 		fact("waiting", text, plain)
-	}
-	if !e.Deadline.IsZero() {
-		fact("deadline", e.Deadline.In(now.Location()).Format("2006-01-02 15:04"), t.Yellow)
 	}
 	if e.Notes != "" {
 		para("notes", e.Notes)
@@ -371,4 +365,15 @@ func (m *Model) verbLabel(verb string) string {
 		}
 	}
 	return ""
+}
+
+// propText is a property as a person reads it: a time in now's location, a list joined.
+func propText(e api.TaskView, name string, now time.Time) string {
+	if at := e.PropTime(name); !at.IsZero() {
+		return at.In(now.Location()).Format("2006-01-02 15:04")
+	}
+	if l := e.PropList(name); len(l) > 0 {
+		return strings.Join(l, " ")
+	}
+	return e.PropText(name)
 }

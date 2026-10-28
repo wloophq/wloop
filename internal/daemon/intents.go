@@ -136,10 +136,12 @@ func cutGuidance(d dintent.Def, g string) string {
 	return g
 }
 
-// profileWarning is the health warning while a user intent does not load.
-func profileWarning(l *intentload.Loaded) string {
-	if len(l.Problems) == 0 {
+// profileWarning is the health warning while a user intent does not load, or stored tasks hold a state the
+// profile does not declare (held).
+func profileWarning(l *intentload.Loaded, held intentload.Problems) string {
+	problems := append(slices.Clone(l.Problems), held...)
+	if len(problems) == 0 {
 		return ""
 	}
-	return "profile: " + catalog.FirstProblem(l.Problems)
+	return "profile: " + catalog.FirstProblem(problems)
 }
