@@ -150,9 +150,12 @@ func (e *Env) applySentEffects(ctx context.Context, rt route, d dintent.Def, r *
 	if r.pr != nil {
 		head = r.pr.HeadRefOid
 	}
-	inputs, err := json.Marshal(r.inputs)
-	if err != nil {
-		fmt.Fprintf(e.Err, "warning: %s: the turn's inputs: %v\n", r.ref, err)
+	var inputs json.RawMessage
+	if len(r.inputs) > 0 {
+		var err error
+		if inputs, err = json.Marshal(r.inputs); err != nil {
+			fmt.Fprintf(e.Err, "warning: %s: the turn's inputs: %v\n", r.ref, err)
+		}
 	}
 	var errs []error
 	for _, name := range names {

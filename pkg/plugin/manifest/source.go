@@ -316,6 +316,12 @@ func (s *Source) validate() error {
 			bad("effect %q: doc is required", e.Name)
 		}
 	}
+	for _, m := range s.Marks {
+		unique("mark", m.Name)
+		if m.Doc == "" {
+			bad("mark %q: doc is required", m.Name)
+		}
+	}
 	named := func(what string, ns []Named) {
 		for _, n := range ns {
 			if !nameRe.MatchString(n.Name) {

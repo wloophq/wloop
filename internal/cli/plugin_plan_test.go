@@ -207,7 +207,7 @@ func TestAPluginEffectRunsThroughApplyEffect(t *testing.T) {
 	var names []string
 	for _, req := range p.applied() {
 		names = append(names, req.Effect)
-		if req.Unit.Key != sc.ref.String() || req.Turn == nil || req.Turn.ID == "" || req.Draft != nil {
+		if req.Unit.Key != sc.ref.String() || req.Turn == nil || req.Turn.ID == "" || req.Draft != nil || req.Route != src.RouteLaunch || req.Inputs != nil {
 			t.Errorf("request %+v", req)
 		}
 	}

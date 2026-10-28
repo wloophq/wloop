@@ -34,7 +34,6 @@ type aheadKey struct{}
 func (e *Env) ReadAhead(ctx context.Context, ref pr.Ref, full bool) context.Context {
 	r := &aheadReads{at: e.Now()}
 	r.basics, r.basicsErr = e.forgeBasics(ctx, ref)
-
 	if v, err := e.storedViewer(ctx); err == nil && v != "" {
 		r.viewer = v
 	} else if v, err := e.forgeViewer(ctx); err == nil {
