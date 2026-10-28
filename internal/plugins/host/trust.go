@@ -60,7 +60,7 @@ func Trusted(p Plugin, trust string, recorded Checksums) (checksum []byte, why s
 	case trust == TrustPath:
 		return nil, "trusted by its path", nil
 	case p.Bundled && recorded[p.ID()] != nil:
-		return recorded[p.ID()], "its recorded checksum", nil
+		return recorded[p.ID()], "trusted by its recorded checksum", nil
 	case p.Bundled:
 		return nil, "dev build, no checksum", nil
 	}

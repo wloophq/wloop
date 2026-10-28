@@ -276,7 +276,7 @@ func (e *Env) servePlugins(ctx context.Context, cfg config.Config, logf func(str
 		logf("%v", err)
 	}
 	for _, r := range runs {
-		logf("plugin %s: runs %s, trusted by %s", r.Manifest.ID, r.Spec.Path, why[r.Manifest.ID])
+		logf("plugin %s: runs %s, %s", r.Manifest.ID, r.Spec.Path, why[r.Manifest.ID])
 	}
 	h := &host.Host{Launcher: host.ExecLauncher{}, Kinds: []host.Kind{e.pluginKind}, Logf: logf}
 	pctx, cancel := context.WithCancel(ctx)

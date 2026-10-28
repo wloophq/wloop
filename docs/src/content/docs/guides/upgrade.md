@@ -59,6 +59,7 @@ Each plugin's settings live in its `[plugins.<id>]` table, and each old key fail
 - `[github]` is `[plugins.github]` and `[slack]` is `[plugins.slack]`, key for key;
 - `github.drafts.approval` is `plugins.github.gates.approval`, and `slack.drafts.approval` is `plugins.slack.gates.approval`;
 - the facts `config.github.*` are `config.plugins.github.*`, and the effect `guidance.handed` is `pr.guidance_handed`.
+- the events of a pull request and its rounds (`opened`, `merged`, `round_sent`, `review_ended` and the others) are the GitHub plugin's, so a workflow whose trigger names one needs `provider = "github"`, and an intent reads `pr.adopted`, `pr.held`, `pr.muted`, `pr.nudge.*` and `pr.last_review.*` only on GitHub units: a manifest of another provider that names one, which never fired or read an empty value, fails at load naming the provider.
 
 ## Going back to an earlier release
 

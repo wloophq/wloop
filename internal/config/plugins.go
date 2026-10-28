@@ -18,9 +18,6 @@ type Plugin struct {
 	Trust string `json:"trust,omitempty"`
 }
 
-// TrustPath is the trust that runs a plugin's binary by its path.
-const TrustPath = "path"
-
 // Plugins are the [plugins.<id>] tables. The bundled plugins' tables hold
 // their settings too; every other plugin's holds its switch and trust, and
 // its own keys, which only the plugin reads.
