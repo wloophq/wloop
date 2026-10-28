@@ -1,20 +1,12 @@
-package daemon
+package present
 
 import (
-	"context"
-	"encoding/json"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/core/intake"
-	"github.com/wloophq/wloop/internal/core/turns"
-	"github.com/wloophq/wloop/internal/core/turns/turnstest"
-	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/github"
 )
 
@@ -140,7 +132,7 @@ func TestTheBriefWaitOfAnAutomatedFirstTurn(t *testing.T) {
 func TestTheTurnListSkipsProbesAndCarriesEachDuration(t *testing.T) {
 	t.Parallel()
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
-	probe := github.Ref{Owner: ProbeOwner, Repo: ProbeRepo, Number: 1}
+	probe := github.Ref{Owner: api.ProbeOwner, Repo: api.ProbeRepo, Number: 1}
 	d := dinv.TimingsData{PRs: []dinv.PR{{Ref: ref}, {Ref: probe}},
 		Turns: []dinv.TimedTurn{
 			{Seq: 1, PR: ref, Intent: "review", Trigger: "automated", State: "done", Agent: "claude", SentAt: t0, StartedAt: t0.Add(5 * time.Second), EndedAt: t0.Add(35 * time.Second)},
@@ -166,16 +158,4 @@ func prsOf(rep api.TimingsReport) []string {
 		out = append(out, p.PR)
 	}
 	return out
-}
-
-func TestARequestOnAPullRequestWithNoTurnTakesTheSweeps(t *testing.T) {
-	t.Parallel()
-	books := turnstest.NewStore()
-	books.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), Role: "pr.review", ID: "by-sweep", Trigger: turn.Automated, State: turn.Sent, SentAt: t0}}})
-	s, _ := newIntakeServer(t, nil, func(d *Deps) { d.Turns = &turns.Service{Intents: turnstest.Intents(), Store: books} })
-	raw, _ := json.Marshal(actionPayload{Action: "review", AfterTurn: 0})
-	fresh := intake.Intake{Seq: 2, Unit: r7.Unit(), Intent: turn.Intent(dintent.Review), Request: raw}
-	if _, ok, err := s.sentWhileWaiting(context.Background(), fresh); err != nil || !ok {
-		t.Fatalf("a request on a pull request with no turn missed the sweep's: %v %v", ok, err)
-	}
 }

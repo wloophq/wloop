@@ -23,7 +23,7 @@ func TestRolesImplyTheRemovedKeys(t *testing.T) {
 		"act":     {context: "pr", policy: "round", board: "none"},
 		"address": {roundKind: "address", context: "pr", policy: "round", board: "author", drivesRow: true},
 		"brief":   {context: "pr", policy: "round", board: "none"},
-		"nudge":   {prepare: "nudge.prepare", context: "pr", policy: "round", board: "none"},
+		"nudge":   {prepare: "action:nudge.prepare", context: "pr", policy: "round", board: "none"},
 		"probe":   {context: "synthetic", launch: "probe", policy: "probe", board: "none"},
 		"review":  {roundKind: "review", reconcile: "my_review", context: "pr", policy: "round", board: "review", drivesRow: true},
 		"start":   {context: "pr", policy: "round", board: "none"},

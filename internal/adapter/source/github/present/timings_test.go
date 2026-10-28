@@ -1,15 +1,14 @@
-package daemon
+package present
 
 import (
-	"context"
-	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/turn"
 )
 
 var t0 = time.Date(2026, 10, 18, 12, 0, 0, 0, time.UTC)
@@ -129,28 +128,6 @@ func TestTimingsTokensByModel(t *testing.T) {
 	}
 }
 
-func TestTimingsEndpoint(t *testing.T) {
-	t.Parallel()
-	s := newServer(t)
-	if err := s.store().SetMeta(context.Background(), inventory.MetaTimingsSince, "2026-10-01T00:00:00.000000000Z"); err != nil {
-		t.Fatal(err)
-	}
-	var rep api.TimingsReport
-	if code := get(t, s, api.AdminTimings+"?since=7", &rep); code != 200 {
-		t.Fatalf("%d", code)
-	}
-	if !rep.RecordedSince.Equal(time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)) || !rep.Since.Equal(s.deps.Now().Add(-7*24*time.Hour)) {
-		t.Fatalf("report %+v", rep)
-	}
-	for _, bad := range []string{"0", "x", "400"} {
-		rec := httptest.NewRecorder()
-		s.Handler().ServeHTTP(rec, apiRequest("GET", api.AdminTimings+"?since="+bad, nil))
-		if rec.Code != 400 {
-			t.Errorf("since=%s: %d", bad, rec.Code)
-		}
-	}
-}
-
 func TestTimingsWaitingOnMeAndOthers(t *testing.T) {
 	t.Parallel()
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
@@ -242,4 +219,27 @@ func TestASpanThatBeganBeforeTheWindowIsLeftOut(t *testing.T) {
 	if len(rep.PRs) != 1 {
 		t.Fatalf("the pull request with a merge in the window is not listed: %+v", rep.PRs)
 	}
+}
+
+func TestProbeIsExcludedFromReportsByItsManifest(t *testing.T) {
+	t.Parallel()
+	at := time.Date(2026, 10, 8, 9, 0, 0, 0, time.UTC)
+	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
+	d := dinv.TimingsData{Turns: []dinv.TimedTurn{
+		{Seq: 1, PR: ref, Intent: "review", Trigger: "automated", State: "done", SentAt: at, StartedAt: at, EndedAt: at.Add(time.Minute)},
+		{Seq: 2, PR: ref, Intent: "probe", Trigger: "automated", State: "done", SentAt: at, StartedAt: at, EndedAt: at.Add(time.Minute)},
+	}}
+	rep := timings(d, at.Add(-time.Hour), at.Add(time.Hour), me{login: "me"}, reportsOf(bundledRegistry(t)))
+	if len(rep.TurnList) != 1 || rep.TurnList[0].Intent != "review" {
+		t.Fatalf("turns %+v", rep.TurnList)
+	}
+}
+
+func bundledRegistry(t *testing.T) *dintent.Registry {
+	t.Helper()
+	l, err := turn.Bundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return l.Registry
 }

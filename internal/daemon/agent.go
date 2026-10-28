@@ -251,12 +251,8 @@ func (s *Server) byHandRef(ctx context.Context, req api.ByHandRequest, handle st
 // prepareByHand runs the intent's prepare for a turn by hand, whose
 // request then carries what it filled.
 func (s *Server) prepareByHand(ctx context.Context, d dintent.Def, u unit.Unit, req api.ByHandRequest) (api.ByHandRequest, error) {
-	prepare, ok := prepares[d.Prepare]
-	if !ok {
-		return req, fmt.Errorf("%s: the daemon has no prepare %s", d.Name, d.Prepare)
-	}
 	c := Call{Guidance: req.Guidance, Inputs: maps.Clone(req.Inputs)}
-	if err := prepare(s, ctx, u, &c); err != nil {
+	if err := s.prepare(ctx, d, u, &c); err != nil {
 		return req, err
 	}
 	req.Guidance, req.Inputs = c.Guidance, c.Inputs

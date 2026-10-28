@@ -54,6 +54,7 @@ type providerSite struct {
 // coreProviderAllowlist are the places that may still name a provider.
 var coreProviderAllowlist = []providerSite{
 	{"internal/core/turns/headless.go", "taskInput", `"task"`, 1, "the headless turn's task input, which shares the task provider's spelling"},
+	{"internal/core/intake/intake.go", "SourceSession", `"session"`, 1, "the intake source a managed session asks from, which shares the session provider's spelling"},
 	{"internal/client/tui/views.go", "taskProvider", "unit.Task", 1, "debt: the TUI keys its busy map by the task provider; K2 keys it by the served unit"},
 	{"internal/catalog/catalog.go", "withSource", "unit.GitHub", 1, "debt: the catalog's built-in actions name the GitHub plugin"},
 	{"internal/adapter/facts/session/facts.go", "Provider.build", "unit.GitHub", 1, "debt: a session's facts read its linked pull request's state"},

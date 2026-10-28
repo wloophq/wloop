@@ -63,12 +63,23 @@ const (
 // recorded, the attempts that failed since its last success, whether the
 // queue gave up on it, the error of a last run that failed, and when it
 // tries again.
+// SourceSession is the source of an intake a managed session asked for.
+const SourceSession = "session"
+
 type BriefState struct {
 	Found     bool
 	Failures  int
 	GaveUp    bool
 	LastError string
 	RetryAt   time.Time
+}
+
+// StoredBrief is a unit's stored brief as an intake reads it: its state,
+// the brief's JSON and how long its last run took, zero when unknown.
+type StoredBrief struct {
+	State BriefState
+	JSON  string
+	Took  time.Duration
 }
 
 type Intake struct {

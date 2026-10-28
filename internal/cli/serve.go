@@ -302,7 +302,6 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 
 		Usage:    e.usageJob(db, logf),
 		Retain:   e.retainJob(db),
-		Explorer: e.GitHub,
 		Budget:   e.githubBudget(),
 		Turns:    e.Turns,
 		Sessions: sessions,
@@ -339,8 +338,10 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 		Doctor:     e.doctorWith(db),
 	}, store)
 	if briefs != nil {
-		d.Brief, d.BriefStatus, d.BriefViews = briefs, briefs, briefs
+		d.Brief, d.BriefStatus, d.BriefAttempts = githubBriefs(briefs), briefs, githubBriefs(briefs)
 	}
+	d = withGitHub(d, e.githubPresenter(store, host(forge), briefs))
+	d.PluginPresenter = e.pluginPresenter
 	d.Items = e.itemsLedger(db, cfg, logf)
 	if e.pluginKind != nil {
 		d.Loading = e.pluginKind.Loading
@@ -352,7 +353,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	if err != nil {
 		logf("sources: %v", err)
 	}
-	d = e.withCards(withoutGitHub(withSources(d, plugins, mods)), db, cfg, mods, logf)
+	d = e.withCards(withSources(d, plugins, mods), db, cfg, mods, logf)
 	e.resolve = d.Resolve
 	d = e.serveTasks(d, db, cfg, mods, logf)
 	e.serveProposals(ctx, db, cfg, mods, logf)
@@ -534,13 +535,6 @@ func appendSet(out []string, s string) []string {
 		return out
 	}
 	return append(out, s)
-}
-
-// withStore is d with every inventory role on st.
-func withStore(d daemon.Deps, st *inventory.Store) daemon.Deps {
-	u := inventory.ByUnit{Store: st}
-	d.PRs, d.Events, d.Overrides, d.Meta, d.Records = u, u, u, st, u
-	return d
 }
 
 const kindReconcileReport = "reconcile_report"

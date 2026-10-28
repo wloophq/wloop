@@ -2147,7 +2147,8 @@
         "enabled": true,
         "primary": true,
         "confirm": "Run the held round on acme/api#7 now? It does not count against the cap.",
-        "basis": "held:automatic round held: daily cap"
+        "basis": "held:automatic round held: daily cap",
+        "intent": "review"
       },
       {
         "id": "guide",

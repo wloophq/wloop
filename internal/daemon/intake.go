@@ -21,11 +21,9 @@ import (
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/port"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/meter"
-	"github.com/wloophq/wloop/internal/readmodel/prrow"
 )
 
 const (
@@ -33,7 +31,7 @@ const (
 	sourceCockpit = "cockpit"
 	sourceMenubar = "menubar"
 	sourceTUI     = "tui"
-	sourceSession = prrow.SourceSession
+	sourceSession = intake.SourceSession
 )
 
 const (
@@ -469,14 +467,14 @@ func (s *Server) briefLine(ctx context.Context, i intake.Intake, out io.Writer) 
 	if i.Brief != intake.BriefReady || s.deps.Records == nil {
 		return
 	}
-	rec, ok, err := s.deps.Records.BriefRecord(ctx, i.Unit)
+	rec, ok, err := s.deps.Records.Brief(ctx, i.Unit)
 	var b brief.Brief
-	if err != nil || !ok || json.Unmarshal([]byte(rec.Brief), &b) != nil {
+	if err != nil || !ok || json.Unmarshal([]byte(rec.JSON), &b) != nil {
 		return
 	}
 	took := ""
-	if run, ok, err := s.deps.Records.BriefRun(ctx, rec.Run); err == nil && ok && !run.EndedAt.IsZero() {
-		took = fmt.Sprintf(" in %.1f s", run.EndedAt.Sub(run.StartedAt).Seconds())
+	if rec.Took > 0 {
+		took = fmt.Sprintf(" in %.1f s", rec.Took.Seconds())
 	}
 	line := fmt.Sprintf("brief ready%s: %s, size %s, risk %s", took, b.Kind, b.Size, b.Risk)
 	if len(b.Tags) > 0 {
@@ -575,23 +573,15 @@ func (s *Server) expireSessionIntakesLocked(ctx context.Context) error {
 }
 
 // intentOf is the intent an intake action asks for: run_now's is the one
-// run.resolve picks for the row.
-func (s *Server) intentOf(ctx context.Context, action string, row api.Row) (turn.Intent, error) {
+// the row's action state names.
+func (s *Server) intentOf(action string, row api.Row) (turn.Intent, error) {
 	if action != "run_now" {
 		return turn.Intent(action), nil
 	}
-	id, err := s.viewerInfo(ctx)
-	if err != nil {
-		return "", err
+	if st, ok := offerOf(row, action); ok && st.Intent != "" {
+		return turn.Intent(st.Intent), nil
 	}
-	login := s.login(id)
-	p, _ := prrow.PayloadOf(row)
-	mine := login != "" && strings.EqualFold(p.Author, login)
-	name, err := catalog.RunNowIntent(s.loaded().Registry, p.Workspace, p.Override, mine)
-	if err != nil {
-		return "", conflict{msg: err.Error()}
-	}
-	return turn.Intent(name), nil
+	return "", conflict{msg: "no single intent runs the held round of " + row.Unit.Label()}
 }
 
 // conflict is a request the row's state refuses; refusal is the code of
@@ -661,7 +651,7 @@ func (s *Server) acceptAction(w http.ResponseWriter, r *http.Request, name strin
 		writeActionError(w, err)
 		return
 	}
-	intent, err := s.intentOf(ctx, name, row)
+	intent, err := s.intentOf(name, row)
 	if err != nil {
 		writeActionError(w, err)
 		return
@@ -775,14 +765,13 @@ func notReady(u unit.Unit, w api.Intake) string {
 // a waiting intake's attempt comes from the brief queue, its last error and
 // next attempt from its pull request's brief record.
 func (s *Server) wireIntake(ctx context.Context, i intake.Intake, after int, withLog bool) api.Intake {
-	var rec dinv.BriefRecord
-	found := false
+	var state intake.BriefState
 	if briefing(i) && s.deps.Records != nil {
-		var err error
-		rec, found, err = s.deps.Records.BriefRecord(ctx, i.Unit)
-		found = found && err == nil
+		if rec, found, err := s.deps.Records.Brief(ctx, i.Unit); err == nil && found {
+			state = rec.State
+		}
 	}
-	w := s.intakeView(i, prrow.BriefState(rec, found), s.deps.Now(), func() (int, error) { return s.deps.BriefViews.Attempt(ctx, refOf(i.Unit)) })
+	w := s.intakeView(i, state, s.deps.Now(), func() (int, error) { return s.deps.BriefAttempts.Attempt(ctx, i.Unit) })
 	if withLog {
 		w.Log = slices.Clone(i.Log[min(max(after, 0), len(i.Log)):])
 	}
@@ -795,14 +784,14 @@ func briefing(i intake.Intake) bool { return i.State.Open() && i.State != intake
 // intakeView is the wire intake without its log, from its unit's brief as
 // of now; attempt asks the brief queue.
 func (s *Server) intakeView(i intake.Intake, b intake.BriefState, now time.Time, attempt func() (int, error)) api.Intake {
-	w := api.Intake{Seq: i.Seq, PR: refOf(i.Unit).URL(), Intent: string(i.Intent), Source: i.Source, State: string(i.State), Brief: i.Brief, Note: i.Note, Error: i.Error, LogLen: len(i.Log)}
+	w := api.Intake{Seq: i.Seq, PR: i.Unit.Address(), Intent: string(i.Intent), Source: i.Source, State: string(i.State), Brief: i.Brief, Note: i.Note, Error: i.Error, LogLen: len(i.Log)}
 	if !briefing(i) || s.deps.Records == nil {
 		return w
 	}
 	w.Attempt = 1
 	if b.Found && !b.GaveUp {
 		w.Attempt = b.Failures + 1
-		if s.deps.BriefViews != nil {
+		if s.deps.BriefAttempts != nil {
 			if n, err := attempt(); err == nil {
 				w.Attempt = n
 			}

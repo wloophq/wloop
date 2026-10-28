@@ -32,6 +32,8 @@ type recordingActions struct {
 	mu       sync.Mutex
 	calls    []string
 	profiles []string
+	// store, when set, is marked by an adopt as the real take-over does.
+	store *inventory.Store
 }
 
 func (f *recordingActions) add(s string, c daemon.Call) error {
@@ -47,8 +49,13 @@ func (f *recordingActions) Open(_ context.Context, u unit.Unit, c daemon.Call) e
 	r := prOf(u)
 	return f.add("open "+r.String(), c)
 }
-func (f *recordingActions) Adopt(_ context.Context, u unit.Unit, c daemon.Call) error {
+func (f *recordingActions) Adopt(ctx context.Context, u unit.Unit, c daemon.Call) error {
 	r := prOf(u)
+	if f.store != nil {
+		if err := f.store.SetAdopted(ctx, r); err != nil {
+			return err
+		}
+	}
 	return f.add("adopt "+r.String(), c)
 }
 func (f *recordingActions) Intent(_ context.Context, name string, u unit.Unit, c daemon.Call) error {

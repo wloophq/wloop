@@ -68,7 +68,7 @@ func (s *Server) runHeadless(w http.ResponseWriter, r *http.Request, d dintent.D
 		return
 	}
 	name := string(d.Name)
-	if err := unitAction(s.loaded(), name, u, s.deps.Follows); err != nil {
+	if err := unitAction(s.loaded(), name, u, s.forge(u), s.deps.Follows); err != nil {
 		writeActionError(w, err)
 		return
 	}
@@ -79,7 +79,7 @@ func (s *Server) runHeadless(w http.ResponseWriter, r *http.Request, d dintent.D
 		writeActionError(w, err)
 		return
 	}
-	if isPullRequest(u) {
+	if s.forge(u) {
 		row, _, err := s.offered(context.WithoutCancel(r.Context()), u, catalog.Asked{Name: name}, api.ActionRequest{Guidance: req.Guidance})
 		if err != nil {
 			writeActionError(w, err)

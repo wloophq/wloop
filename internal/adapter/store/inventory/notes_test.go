@@ -185,25 +185,17 @@ var writes = []writeCase{
 		topics: port.TopicOverrides, refs: []github.Ref{ref},
 	},
 	{
-		method: "SetOverrideIf",
+		method: "SetTracked",
+		seed:   seedPRs("", ref),
 		call: func(ctx context.Context, s *Store) error {
-			_, err := s.SetOverrideIf(ctx, dinv.Override{PR: ref}, dinv.Override{PR: ref, Hold: true})
+			_, err := s.SetTracked(ctx, ref, true)
 			return err
 		},
-		topics: port.TopicOverrides, refs: []github.Ref{ref},
+		topics: port.TopicOverrides | port.TopicPRs | port.TopicFollow | port.TopicSourceEvents, refs: []github.Ref{ref}, host: true,
 	},
 	{
 		method: "SetAdopted",
 		call:   func(ctx context.Context, s *Store) error { return s.SetAdopted(ctx, ref) },
-		topics: port.TopicOverrides, refs: []github.Ref{ref},
-	},
-	{
-		method: "ClearMute",
-		seed:   seedMute,
-		call: func(ctx context.Context, s *Store) error {
-			_, err := s.ClearMute(ctx, ref, "review", "me")
-			return err
-		},
 		topics: port.TopicOverrides, refs: []github.Ref{ref},
 	},
 	{
@@ -341,13 +333,6 @@ func seedWanted(t *testing.T, s *Store) {
 	}
 }
 
-func seedMute(t *testing.T, s *Store) {
-	t.Helper()
-	if err := s.SetOverride(context.Background(), dinv.Override{PR: ref, MuteUntilStateChange: true, MutedKind: "review", MutedWaitingOn: "me"}); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func seedGuidance(t *testing.T, s *Store) {
 	if err := s.SetNextGuidance(context.Background(), ref, "go"); err != nil {
 		t.Fatal(err)
@@ -364,7 +349,7 @@ var reads = []string{
 }
 
 // silent are the exported write methods that note nothing.
-var silent = []string{"SeeRefs", "UseHost"}
+var silent = []string{"SeeRefs", "UseHost", "DB"}
 
 func openNoted(t *testing.T) (*Store, *change.Log) {
 	t.Helper()
@@ -496,8 +481,8 @@ func TestNoOpWriteNotesNothing(t *testing.T) {
 		}, func(ctx context.Context, s *Store) error {
 			return s.SetOverride(ctx, dinv.Override{PR: ref, Hold: true})
 		}},
-		{"SetOverrideIf", nil, func(ctx context.Context, s *Store) error {
-			_, err := s.SetOverrideIf(ctx, dinv.Override{PR: ref, Hold: true}, dinv.Override{PR: ref})
+		{"SetTracked", nil, func(ctx context.Context, s *Store) error {
+			_, err := s.SetTracked(ctx, ref, false)
 			return err
 		}},
 		{"SetAdopted", func(t *testing.T, s *Store) {
@@ -505,10 +490,6 @@ func TestNoOpWriteNotesNothing(t *testing.T) {
 				t.Fatal(err)
 			}
 		}, func(ctx context.Context, s *Store) error { return s.SetAdopted(ctx, ref) }},
-		{"ClearMute", nil, func(ctx context.Context, s *Store) error {
-			_, err := s.ClearMute(ctx, ref, "review", "me")
-			return err
-		}},
 		{"SetNextGuidance", seedGuidance, func(ctx context.Context, s *Store) error { return s.SetNextGuidance(ctx, ref, "go") }},
 		{"KeepNextGuidance", seedGuidance, func(ctx context.Context, s *Store) error { return s.KeepNextGuidance(ctx, ref, "other") }},
 		{"TakeNextGuidance", nil, func(ctx context.Context, s *Store) error {

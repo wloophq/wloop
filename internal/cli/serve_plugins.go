@@ -319,14 +319,27 @@ func (e *Env) servePlugins(ctx context.Context, store snapshot.Store, cfg config
 }
 
 // moduleHost is the broker the host serves a built-in source module of
-// provider id: its events, marks and drafts are the host's, in db.
+// provider id: its events, marks, drafts and overrides are the host's, in
+// db.
 func (e *Env) moduleHost(db *sqlite.DB) func(id unit.ProviderID) src.Host {
 	codecs := e.unitCodecs()
 	return func(id unit.ProviderID) src.Host {
 		b := &psource.Broker{ID: string(id), Units: psource.Units{Codecs: codecs}, Config: e.currentConfig,
-			Events: sqlite.New(db), Marks: db, Drafts: db}
+			Events: sqlite.New(db), Marks: db, Drafts: db, Overrides: db, Paused: e.roundsPaused}
 		return b.Host()
 	}
+}
+
+// pluginPresenter is the presenter of a running plugin of the source kind.
+func (e *Env) pluginPresenter(p unit.ProviderID) (daemon.Presenter, bool) {
+	if e.pluginKind == nil {
+		return nil, false
+	}
+	c, err := e.pluginKind.Client(string(p))
+	if err != nil {
+		return nil, false
+	}
+	return c, true
 }
 
 // unitCodecs are the codecs of every provider: the core's and every

@@ -217,6 +217,9 @@ func Unmuted(in any) any {
 	return &c
 }
 
+// Unmuted is in derived as if the user had not muted its unit.
+func (p *Reported) Unmuted(in any) any { return Unmuted(in) }
+
 // Derive is the row of one reported unit at at.
 func (p *Reported) Derive(base Base, in any, at time.Time) (api.Row, error) {
 	x, ok := in.(*reported)

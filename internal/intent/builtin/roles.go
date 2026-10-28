@@ -44,8 +44,9 @@ const (
 	ContextSynthetic = "synthetic"
 )
 
-// PrepareNudge is the prepare that fills a nudge's inputs or refuses it.
-const PrepareNudge = "nudge.prepare"
+// PrepareAction prefixes a role's prepare: the plugin action that fills its
+// turn's inputs or refuses the turn, such as "action:nudge.prepare".
+const PrepareAction = "action:"
 
 // ReconcileMyReview reconciles a review turn with the review the viewer
 // published.
@@ -86,7 +87,6 @@ var coreRoles = []Role{
 var (
 	RoundKinds = []string{RoundKindReview, RoundKindAddress}
 	Reconciles = []string{ReconcileMyReview}
-	Prepares   = []string{PrepareNudge}
 	Launches   = []string{LaunchProbe}
 	Contexts   = []string{ContextPR, ContextSynthetic}
 	Policies   = []string{PolicyRound, PolicyProbe}

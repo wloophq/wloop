@@ -13,6 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/automation"
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -200,10 +201,10 @@ func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance
 	}
 	it := items[0]
 	if action == "pause" {
-		if !isPullRequest(it.Unit) {
+		if !s.forge(it.Unit) {
 			return it, true, badRequest{"pause applies to pull requests; " + it.Unit.Label() + " is not one"}
 		}
-		if _, err := s.applyOverride(ctx, "pause", it.Unit, api.ActionRequest{}); err != nil {
+		if err := s.applyHold(ctx, "pause", it.Unit); err != nil {
 			return it, true, err
 		}
 		left, err := p.Items(ctx, automation.Filter{ID: id})
@@ -303,7 +304,11 @@ func (s *Server) actOnRound(ctx context.Context, u unit.Unit, a workflow.Action,
 	case err != nil:
 		return "", err
 	case !ok && a == workflow.ActionGuide && guidance != "":
-		return "no round pending; the guidance goes with the next automatic round", s.deps.Overrides.SetNextGuidance(ctx, u, guidance)
+		if s.deps.Overrides == nil {
+			return "", errStoreUnavailable
+		}
+		_, err := s.deps.Overrides.SetOverride(ctx, u, map[string]string{port.OverrideNextGuidance: guidance}, nil)
+		return "no round pending; the guidance goes with the next automatic round", err
 	case !ok && a == workflow.ActionApply:
 		return "", conflict{msg: "the row changed: the pending round already went out"}
 	case !ok:
@@ -355,8 +360,10 @@ func (s *Server) dropPaused(ctx context.Context, p round.Pause, why string) erro
 		}
 		seen[u] = true
 		held := p.On
-		if ref := refOf(u); ref.Repo != "" {
-			held = p.Holds(ref.Owner, ref.Repo)
+		if repo, err := s.repoOf(ctx, u); err != nil {
+			errs = append(errs, err)
+		} else if repo != "" {
+			held = held || p.HoldsRepo(repo)
 		}
 		if held {
 			errs = append(errs, s.deps.Plan.Drop(ctx, u, why))

@@ -25,8 +25,8 @@ var sharedTables = map[string]bool{"meta": true, "overrides": true}
 
 // overrideColumns are the columns of overrides by owner.
 var overrideColumns = map[string][]string{
-	"core":   {"muted_until", "mute_until_state", "muted_kind", "muted_waiting_on", "next_guidance"},
-	"plugin": {"hold", "taken_over", "tracked"},
+	"core":   {"muted_until", "mute_until_state", "muted_kind", "muted_waiting_on", "next_guidance", "hold"},
+	"plugin": {"taken_over", "tracked"},
 }
 
 var (
@@ -308,9 +308,7 @@ func owners(query string, core []string) map[string][]string {
 
 // sqlJoinAllowlist are the functions, by file, whose transaction still
 // writes a plugin's table and a core's.
-var sqlJoinAllowlist = []sqlJoinAllowed{
-	{"internal/adapter/store/inventory/store.go", "writeOverride", "debt: the overrides row, whose mute columns are the core's, and the pull request's reasons are written in one transaction until X4b's SetOverride writes the host's columns through the broker"},
-}
+var sqlJoinAllowlist = []sqlJoinAllowed{}
 
 type sqlJoinAllowed struct{ file, fn, reason string }
 

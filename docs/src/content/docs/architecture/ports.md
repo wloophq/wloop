@@ -21,7 +21,7 @@ Every outside tool sits behind a port the core declares (see [Layers](/architect
 | Git and the file system | `workspaces.Tree`, `workspaces.Remote`, `sweep.LocalGit`, `dossiers.Files` | `internal/adapter/gitcheck`, `internal/gitx`, `internal/adapter/dossier` | the `workspacestest` checkouts |
 | Time and change | `port.Clock`, `port.Changes`, `port.Publisher` | the system clock, `internal/core/change` | fixed clocks in tests |
 
-The daemon reaches the store and the GitHub reads through role ports of its own (`PullRequests`, `EventLog`, `Overrides`, `Metas`, `Records`, `Sweeper`), each at most five methods, wired in `internal/cli/serve.go`.
+The daemon reaches the store through role ports of its own (`EventLog`, `Overrides`, `Metas`, `Records`, `Sweeper`), each at most five methods and keyed by unit, wired in `internal/cli/serve.go`, and a plugin's source logic through its `Presenter` ([Plugins](/architecture/plugins/#actions-and-views)).
 
 ## Who reaches what
 

@@ -2,18 +2,37 @@ package daemon
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"slices"
+	"strings"
 
+	"github.com/wloophq/wloop/internal/api"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
-// prepares fill an intent's call before it runs, or refuse it.
-var prepares = map[string]func(s *Server, ctx context.Context, u unit.Unit, c *Call) error{
-	builtin.PrepareNudge: (*Server).prepareNudge,
+// prepare runs d's prepare on u, the plugin action it names, which fills
+// the call's inputs, normalized to d's, or refuses the call.
+func (s *Server) prepare(ctx context.Context, d dintent.Def, u unit.Unit, c *Call) error {
+	name, ok := strings.CutPrefix(d.Prepare, builtin.PrepareAction)
+	if !ok || name == "" {
+		return fmt.Errorf("%s: the daemon has no prepare %s", d.Name, d.Prepare)
+	}
+	res, err := s.askPlugin(ctx, name, u, api.PluginActionArgs{Request: api.ActionRequest{Guidance: c.Guidance}, Inputs: c.Inputs})
+	if err != nil {
+		return err
+	}
+	filled, err := d.NormalizeAll(res.Inputs)
+	if err != nil {
+		return fmt.Errorf("%s: prepare %s: %w", d.Name, d.Prepare, err)
+	}
+	if c.Inputs == nil {
+		c.Inputs = map[string]any{}
+	}
+	maps.Copy(c.Inputs, filled)
+	return nil
 }
 
 // actionEffect is a turn effect of a round asked through the daemon's
@@ -30,7 +49,7 @@ var actionEffects = []actionEffect{
 		return s.dropPending(ctx, u, askedByYou)
 	}},
 	{name: builtin.EffectPRRoundSent, after: func(s *Server, ctx context.Context, u unit.Unit) error {
-		return s.recordEvent(ctx, u, dinv.KindRoundSent, askedByYou)
+		return s.recordEvent(ctx, u, builtin.EventRoundSent, askedByYou)
 	}},
 }
 
@@ -39,9 +58,9 @@ func actionEffectsOf(d dintent.Def) []actionEffect {
 	return slices.DeleteFunc(slices.Clone(actionEffects), func(e actionEffect) bool { return !slices.Contains(d.Effects, e.name) })
 }
 
-// Implemented are the builtins the daemon implements: the prepares a role
-// binds and the turn effects it applies.
-type Implemented struct{ Prepares, Effects []string }
+// Implemented are the builtins the daemon implements: the turn effects it
+// applies. A role's prepare is its plugin's action (builtin.PrepareAction).
+type Implemented struct{ Effects []string }
 
 // Builtins are the builtins the daemon implements.
 func Builtins() Implemented {
@@ -49,5 +68,5 @@ func Builtins() Implemented {
 	for i, e := range actionEffects {
 		effects[i] = e.name
 	}
-	return Implemented{Prepares: slices.Sorted(maps.Keys(prepares)), Effects: effects}
+	return Implemented{Effects: effects}
 }

@@ -165,13 +165,15 @@ func fits(p unit.ProviderID, src *manifest.Source, all map[unit.ProviderID]*mani
 			key, name string
 			host      []string
 		}{
-			{"round_kind", r.RoundKind, RoundKinds}, {"reconcile", r.Reconcile, Reconciles}, {"prepare", r.Prepare, Prepares},
-			{"launch", r.Launch, Launches}, {"workspace", r.Workspace, Names[SlotWorkspace]}, {"context", r.Context, Contexts},
-			{"policy", r.Policy, Policies},
+			{"round_kind", r.RoundKind, RoundKinds}, {"reconcile", r.Reconcile, Reconciles}, {"launch", r.Launch, Launches},
+			{"workspace", r.Workspace, Names[SlotWorkspace]}, {"context", r.Context, Contexts}, {"policy", r.Policy, Policies},
 		} {
 			if m.name != "" && !slices.Contains(m.host, m.name) {
 				bad("role %s: %s %q names no host mechanism, one of %s", r.Name, m.key, m.name, strings.Join(m.host, ", "))
 			}
+		}
+		if action, ok := strings.CutPrefix(r.Prepare, PrepareAction); r.Prepare != "" && (!ok || action == "") {
+			bad("role %s: prepare %q names no action of the plugin, %s<action>", r.Name, r.Prepare, PrepareAction)
 		}
 	}
 	for _, k := range v.Events {

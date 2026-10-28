@@ -5,7 +5,7 @@ import (
 )
 
 func (s *Server) handleFacts(w http.ResponseWriter, r *http.Request) {
-	u, err := parsePRURL(r.URL.Query().Get("pr"))
+	u, err := s.parseForgeURL(r.URL.Query().Get("pr"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "pr: "+err.Error())
 		return

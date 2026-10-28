@@ -42,6 +42,9 @@ type Store struct {
 
 // New is the store of db, whose events reach the host's event log in db
 // until UseHost gives it the broker.
+// DB is the store the inventory keeps its tables in.
+func (s *Store) DB() *sqlite.DB { return s.db }
+
 func New(db *sqlite.DB) *Store {
 	h := dbHost{sqlite.New(db)}
 	return &Store{db: db, clock: time.Now, host: src.Host{Recorder: h, History: h}}
@@ -1397,51 +1400,71 @@ func scanEvents(rows *sql.Rows) ([]dinv.Event, error) {
 	return out, rows.Err()
 }
 
+// SetOverride writes o whole: the host's columns through the host's store,
+// then the plugin's with the pull request's reasons, each in its own
+// transaction.
 func (s *Store) SetOverride(ctx context.Context, o dinv.Override) error {
-	_, err := s.writeOverride(ctx, o, nil)
+	if _, err := s.db.SetOverride(ctx, o.PR.Unit(), hostOverride(o), nil); err != nil {
+		return err
+	}
+	_, err := s.writeOverride(ctx, o.PR, o.Adopted, o.Tracked)
 	return err
 }
 
-// SetOverrideIf writes o only while the stored override is still was, the
-// row o was derived from; written is false when another writer came between.
-func (s *Store) SetOverrideIf(ctx context.Context, was, o dinv.Override) (written bool, err error) {
-	return s.writeOverride(ctx, o, &was)
+// hostOverride are o's host columns by name, its next guidance left alone.
+func hostOverride(o dinv.Override) map[string]string {
+	set := map[string]string{port.OverrideMutedUntil: "", port.OverrideMuteUntilStateChange: "", port.OverrideMutedKind: o.MutedKind,
+		port.OverrideMutedWaitingOn: o.MutedWaitingOn, port.OverrideHold: ""}
+	if !o.MutedUntil.IsZero() {
+		set[port.OverrideMutedUntil] = o.MutedUntil.UTC().Format(time.RFC3339Nano)
+	}
+	if o.MuteUntilStateChange {
+		set[port.OverrideMuteUntilStateChange] = port.OverrideTrue
+	}
+	if o.Hold {
+		set[port.OverrideHold] = port.OverrideTrue
+	}
+	return set
 }
 
-func (s *Store) writeOverride(ctx context.Context, o dinv.Override, was *dinv.Override) (written bool, err error) {
-	query := `INSERT INTO overrides (` + overrideWriteColumns + `) VALUES (?,?,?,?,?,?,?,?,?)
-		 ON CONFLICT(provider, unit_key) DO UPDATE SET muted_until=excluded.muted_until, mute_until_state=excluded.mute_until_state,
-		 hold=excluded.hold, taken_over=excluded.taken_over, muted_kind=excluded.muted_kind, muted_waiting_on=excluded.muted_waiting_on,
-		 tracked=excluded.tracked
-		 WHERE (muted_until, mute_until_state, hold, taken_over, muted_kind, muted_waiting_on, tracked) IS NOT
-		 (excluded.muted_until, excluded.mute_until_state, excluded.hold, excluded.taken_over, excluded.muted_kind, excluded.muted_waiting_on, excluded.tracked)`
-	args := append(unitArgs(o.PR), ts(o.MutedUntil), o.MuteUntilStateChange, o.Hold, o.Adopted, o.MutedKind, o.MutedWaitingOn, o.Tracked)
-	if was != nil {
-		guard := []any{ts(was.MutedUntil), was.MuteUntilStateChange, was.Hold, was.Adopted, was.MutedKind, was.MutedWaitingOn, was.Tracked}
-		if (dinv.Override{PR: was.PR, NextGuidance: was.NextGuidance}) == *was {
-			query += ` AND (muted_until, mute_until_state, hold, taken_over, muted_kind, muted_waiting_on, tracked) IS (?,?,?,?,?,?,?)`
-			args = append(args, guard...)
-		} else {
-			query = `UPDATE overrides SET muted_until=?, mute_until_state=?, hold=?, taken_over=?, muted_kind=?, muted_waiting_on=?, tracked=?
-			 WHERE provider=? AND unit_key=? AND (muted_until, mute_until_state, hold, taken_over, muted_kind, muted_waiting_on, tracked) IS (?,?,?,?,?,?,?)
-			 AND (muted_until, mute_until_state, hold, taken_over, muted_kind, muted_waiting_on, tracked) IS NOT (?,?,?,?,?,?,?)`
-			cols := args[2:]
-			args = append(append(append(append([]any{}, cols...), unitArgs(o.PR)...), guard...), cols...)
-		}
+// SetTracked tracks or untracks ref, syncing the pull request's reasons in
+// the same transaction; changed says the override moved.
+func (s *Store) SetTracked(ctx context.Context, ref github.Ref, tracked bool) (changed bool, err error) {
+	o, err := s.Override(ctx, ref)
+	if err != nil {
+		return false, err
 	}
-	if err := s.recordFlipsOf(ctx, []github.Ref{o.PR}, time.Time{}, func(_ github.Ref, sc scope) (scope, bool, error) {
-		if was != nil {
-			cur, err := s.Override(ctx, o.PR)
-			if err != nil || !sameGuarded(cur, *was) {
-				return sc, false, err
-			}
-		}
-		return sc.with(withTracked(sc.reasons, o.Tracked), sc.ws), true, nil
+	return s.writeOverride(ctx, ref, o.Adopted, tracked)
+}
+
+// writeOverride writes ref's plugin columns of overrides, recording on the
+// host first the followed or unfollowed event of a scope flip; written
+// says a column moved.
+func (s *Store) writeOverride(ctx context.Context, ref github.Ref, adopted, tracked bool) (written bool, err error) {
+	if err := s.recordFlipsOf(ctx, []github.Ref{ref}, time.Time{}, func(_ github.Ref, sc scope) (scope, bool, error) {
+		return sc.with(withTracked(sc.reasons, tracked), sc.ws), true, nil
 	}); err != nil {
 		return false, err
 	}
 	_, err = s.db.Write(ctx, func(tx *sqlite.Tx) error {
-		res, err := tx.ExecContext(ctx, query, args...)
+		if !adopted && !tracked {
+			res, err := tx.ExecContext(ctx, `UPDATE overrides SET taken_over=0, tracked=0 WHERE provider=? AND unit_key=? AND (taken_over, tracked) IS NOT (0, 0)`,
+				unitArgs(ref)...)
+			if err != nil {
+				return err
+			}
+			n, err := res.RowsAffected()
+			if err != nil {
+				return err
+			}
+			if written = n > 0; written {
+				tx.Touch(port.TopicOverrides, ref.Unit())
+			}
+			return syncTracked(ctx, tx, ref, tracked)
+		}
+		res, err := tx.ExecContext(ctx, `INSERT INTO overrides (provider, unit_key, taken_over, tracked) VALUES (?,?,?,?)
+		 ON CONFLICT(provider, unit_key) DO UPDATE SET taken_over=excluded.taken_over, tracked=excluded.tracked
+		 WHERE (taken_over, tracked) IS NOT (excluded.taken_over, excluded.tracked)`, append(unitArgs(ref), adopted, tracked)...)
 		if err != nil {
 			return err
 		}
@@ -1449,43 +1472,12 @@ func (s *Store) writeOverride(ctx context.Context, o dinv.Override, was *dinv.Ov
 		if err != nil {
 			return err
 		}
-		written = n > 0
-		if written {
-			tx.Touch(port.TopicOverrides, o.PR.Unit())
-		} else if was != nil {
-			return nil
-		}
-		return syncTracked(ctx, tx, o.PR, o.Tracked)
-	})
-	return written, err
-}
-
-// sameGuarded says a and b agree on the columns SetOverrideIf compares.
-func sameGuarded(a, b dinv.Override) bool {
-	return a.MutedUntil.Equal(b.MutedUntil) && a.MuteUntilStateChange == b.MuteUntilStateChange && a.Hold == b.Hold &&
-		a.Adopted == b.Adopted && a.MutedKind == b.MutedKind && a.MutedWaitingOn == b.MutedWaitingOn && a.Tracked == b.Tracked
-}
-
-// ClearMute clears ref's "mute until state change" when it still mutes kind
-// waiting on waitingOn, writing the mute columns alone; cleared says it did.
-func (s *Store) ClearMute(ctx context.Context, ref github.Ref, kind, waitingOn string) (cleared bool, err error) {
-	_, err = s.db.Write(ctx, func(tx *sqlite.Tx) error {
-		res, err := tx.ExecContext(ctx, `UPDATE overrides SET muted_until='', mute_until_state=0, muted_kind='', muted_waiting_on=''
-		 WHERE provider=? AND unit_key=? AND mute_until_state=1 AND muted_kind=? AND muted_waiting_on=?`,
-			append(unitArgs(ref), kind, waitingOn)...)
-		if err != nil {
-			return err
-		}
-		n, err := res.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if cleared = n > 0; cleared {
+		if written = n > 0; written {
 			tx.Touch(port.TopicOverrides, ref.Unit())
 		}
-		return nil
+		return syncTracked(ctx, tx, ref, tracked)
 	})
-	return cleared, err
+	return written, err
 }
 
 // SetAdopted marks ref taken over, writing that column alone.

@@ -380,8 +380,8 @@ func TestEveryBuiltinNameHasAnImplementation(t *testing.T) {
 				t.Errorf("the role %s binds the %s %q, which has no implementation", r.Name, what, name)
 			}
 		}
-		if r.Prepare != "" && !slices.Contains(theirs.Prepares, r.Prepare) {
-			t.Errorf("the role %s binds the prepare %q, which has no implementation", r.Name, r.Prepare)
+		if r.Prepare != "" && !strings.HasPrefix(r.Prepare, builtin.PrepareAction) {
+			t.Errorf("the role %s binds the prepare %q, which names no plugin action", r.Name, r.Prepare)
 		}
 	}
 }

@@ -389,8 +389,13 @@ type Read struct {
 	p    Provider
 }
 
-// Derive is the unit's row from base and in, at the minute of the snapshot.
-func (r Read) Derive(base Base, in any) (api.Row, error) { return r.p.Derive(base, in, r.At) }
+// Derive is the unit's row from base and in, at the minute of the snapshot,
+// on the read's unit.
+func (r Read) Derive(base Base, in any) (api.Row, error) {
+	row, err := r.p.Derive(base, in, r.At)
+	row.Unit = r.Row.Unit
+	return row, err
+}
 
 // Read is u's entry; ok is false for a unit no provider lists. The row is a
 // copy the caller may change; In is shared and must not be.

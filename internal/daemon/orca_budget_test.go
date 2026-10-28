@@ -10,7 +10,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/orca"
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
+	"github.com/wloophq/wloop/internal/adapter/source/github/present"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -87,7 +87,7 @@ func TestFastCycleOrcaCalls(t *testing.T) {
 	reg := turnstest.NewRegistry()
 	liveSessions(reg)
 	d := testDeps(t)
-	c := &ghsource.Collector{Store: d.PRs.(inventory.ByUnit).Store, GH: quietGitHub{}, WS: workspace.NewSet(ws), Cfg: d.Cfg, Now: time.Now}
+	c := &ghsource.Collector{Store: d.Records.(present.Records).Store, GH: quietGitHub{}, WS: workspace.NewSet(ws), Cfg: d.Cfg, Now: time.Now}
 	d.Collector, d.Ingest = c, []IngestJob{{ID: unit.GitHub, Job: c.IngestJob()}}
 	d.Turns = &turns.Service{Intents: turnstest.Intents(), Store: turnstest.NewStore(), Registry: reg, Sessions: turns.NewRouter(reg, a),
 		Clock: fixedClock(time.Now()), FastJob: 2 * time.Minute}

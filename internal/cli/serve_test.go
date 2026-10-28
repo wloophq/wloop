@@ -199,7 +199,7 @@ func TestServeNoJobsRegistersNone(t *testing.T) {
 	if d.Collector != nil || d.Sweep != nil || d.Brief != nil || d.Usage != nil || d.Retain != nil {
 		t.Fatalf("--no-jobs left a job: collector %v sweep %v brief %v usage %v retain %v", d.Collector != nil, d.Sweep != nil, d.Brief != nil, d.Usage != nil, d.Retain != nil)
 	}
-	if d.Actions == nil || d.PRs == nil {
+	if d.Actions == nil || d.Overrides == nil {
 		t.Fatal("--no-jobs dropped the APIs")
 	}
 }

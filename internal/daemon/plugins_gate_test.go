@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/adapter/source/github/present"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/intake/intaketest"
@@ -154,8 +155,8 @@ func TestUnitScopedPostsOnDisabledPluginAre409(t *testing.T) {
 		}},
 		{"explore", func(t *testing.T) (*httptest.ResponseRecorder, bool) {
 			ex := &countingExplorer{}
-			s := newServerWith(t, func(d *Deps) { d.Explorer, d.PluginEnabled = ex, githubOff })
-			rec := post(t, s, "/api/explore", `{"query":"is:open"}`)
+			s := newServerWith(t, func(d *Deps) { githubOf(d).Explorer, d.PluginEnabled = ex, githubOff })
+			rec := post(t, s, api.PluginViewPath(unit.GitHub, present.ViewExplore), `{"query":"is:open"}`)
 			return rec, ex.n.Load() > 0
 		}},
 	} {

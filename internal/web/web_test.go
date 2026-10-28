@@ -174,7 +174,7 @@ func TestCockpitHasTheFilter(t *testing.T) {
 func TestCockpitHasExplore(t *testing.T) {
 	h := Handler("")
 	for path, wants := range map[string][]string{
-		"/static/app.js": {"function renderExplore", "function explore(", `"/api/explore"`, `"/api/explore/recent"`, "function actOnCandidate", `actionButtons(c, "explore"`, `"/api/actions"`, "function loadSpecs",
+		"/static/app.js": {"function renderExplore", "function explore(", `viewOfExplore("explore")`, `viewOfExplore("explore.recent")`, "function actOnCandidate", `actionButtons(c, "explore"`, `"/api/actions"`, "function loadSpecs",
 			`"-reviewed-by:@me"`, `"draft:false"`, "function candidateItem", `p.get("x")`, "r.read", "r.empty", "EXPLORE_SORTS", "candidateWait(c, row,", "stalled_review_hours", "Active in the last 30 days"},
 		"/":               {`id="explore"`, `id="explore-form"`, `id="explore-q"`, `id="explore-guidance"`, `id="explore-results"`},
 		"/static/app.css": {".cand", ".chip", ".explore-act", ".cand .wait.late"},

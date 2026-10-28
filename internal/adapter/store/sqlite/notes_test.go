@@ -80,6 +80,14 @@ func seedGate(t *testing.T, e *noteEnv) {
 // writes is every exported write method of the sqlite store types.
 var writes = []writeCase{
 	{
+		method: "DB.SetOverride",
+		call: func(ctx context.Context, e *noteEnv) error {
+			_, err := e.db.SetOverride(ctx, u7, map[string]string{port.OverrideHold: port.OverrideTrue}, nil)
+			return err
+		},
+		topics: port.TopicOverrides, units: []unit.Unit{u7},
+	},
+	{
 		method: "snapshotStore.Put",
 		call: func(ctx context.Context, e *noteEnv) error {
 			return e.db.Snapshots().Put(ctx, []snapshot.Stored{{Unit: u7, Rev: 1, JSON: []byte(`{}`)}}, []unit.Unit{term1})
@@ -367,7 +375,7 @@ var reads = []string{
 	"Rounds.AgentHome", "Rounds.Load", "Rounds.Pause",
 	"intakeStore.Intake", "intakeStore.Open",
 	"usageStore.Pending",
-	"DB.Ledger", "DB.Marks", "DB.Events", "DB.Classifications", "DB.Fetches",
+	"DB.Ledger", "DB.Marks", "DB.Events", "DB.Classifications", "DB.Fetches", "DB.Override", "DB.Held",
 	"ledger.Items", "ledger.Run", "ledger.Count",
 	"events.Since", "events.Head", "events.Cursor",
 	"Classifications.Output", "Classifications.Spent",

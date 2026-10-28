@@ -16,7 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/readmodel/prrow"
+	"github.com/wloophq/wloop/internal/readmodel"
 )
 
 // Drafts lists the outbox's drafts; *outbox.Service satisfies it.
@@ -84,12 +84,12 @@ func (ev *taskViewer) inboxNotice(ctx context.Context, e task.Task) (api.Categor
 	}
 	n, row, served, ok := ev.rowNotice(ctx, e)
 	switch {
-	case ok && n.Case == prrow.NoticeQuestion && question && n.Record == record:
+	case ok && n.Question && question && n.Record == record:
 		return api.QuestionCategory(record), n.Token, n.Attention, true
-	case ok && n.Case != prrow.NoticeQuestion && e.Kind == task.KindAction && holdsItem(e, n.Case.Item()):
+	case ok && !n.Question && e.Kind == task.KindAction && holdsItem(e, n.Item):
 		a := n.Attention
 		a.Actions = ev.asVerbs(e, row, a.Actions)
-		if n.Case == prrow.NoticeHeld {
+		if n.Held {
 			return api.CategoryHeld, n.Token, a, true
 		}
 		return api.CategoryInbox, n.Token, a, true
@@ -127,20 +127,20 @@ func (s *Server) draftsHeadless(ctx context.Context, g *coretasks.Service, e tas
 	return runs && s.bridgeMode(st.ID, string(turn.RunnerHeadless)) == nil
 }
 
-// rowNotice is the notice of e's first unit's row; served says the unit is a pull request the read model
-// serves, ok that its row notifies.
-func (ev *taskViewer) rowNotice(ctx context.Context, e task.Task) (n prrow.Notice, row api.Row, served, ok bool) {
-	if len(e.Units) == 0 || !isPullRequest(e.Units[0]) {
-		return prrow.Notice{}, api.Row{}, false, false
+// rowNotice is the notice of e's first unit's row; served says the unit is the forge's and the read model
+// serves it, ok that its row notifies.
+func (ev *taskViewer) rowNotice(ctx context.Context, e task.Task) (n readmodel.Notice, row api.Row, served, ok bool) {
+	if len(e.Units) == 0 || !ev.s.forge(e.Units[0]) {
+		return readmodel.Notice{}, api.Row{}, false, false
 	}
 	rd, served, err := ev.s.readRow(ctx, e.Units[0])
 	if err != nil {
 		ev.s.logf("notifications: the row of %s: %v", e.Units[0].Label(), err)
 	}
 	if !served {
-		return prrow.Notice{}, api.Row{}, false, false
+		return readmodel.Notice{}, api.Row{}, false, false
 	}
-	n, ok = ev.s.deriverAt(rd.Base, rd.At).Notice(rd.Row, rd.In)
+	n, ok = rd.Notice()
 	return n, rd.Row, true, ok
 }
 

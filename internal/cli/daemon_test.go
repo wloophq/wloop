@@ -73,6 +73,9 @@ func startDaemon(t *testing.T, actions daemon.Actions) *testDaemon {
 		t.Fatal(err)
 	}
 	d := &testDaemon{socket: filepath.Join(dir, "daemon.sock"), store: st}
+	if fa, ok := actions.(*recordingActions); ok {
+		fa.store = st
+	}
 	srv := daemon.New(withRows(daemon.Deps{
 		Cfg: Defaults(), Version: "test", Actions: actions,
 		Now:      func() time.Time { return daemonNow },

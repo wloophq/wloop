@@ -3,50 +3,12 @@ package daemon
 import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brief"
-	dgh "github.com/wloophq/wloop/internal/domain/github"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/turn"
 )
 
-func wireEvent(e dinv.Event) api.Event {
-	return api.Event{Unit: e.PR.Unit(), Kind: e.Kind, Key: e.Key, Actor: e.Actor, At: e.At, Data: e.Data}
-}
-
-func wireEvents(evs []dinv.Event) []api.Event {
-	out := make([]api.Event, len(evs))
-	for i, e := range evs {
-		out[i] = wireEvent(e)
-	}
-	return out
-}
-
-func wireBriefView(v *brief.View) *api.BriefView {
-	if v == nil {
-		return nil
-	}
-	out := &api.BriefView{State: v.State, Model: v.Model, At: v.At, Error: v.Error, Stale: v.Stale}
-	if b := v.Brief; b != nil {
-		out.Brief = &api.Brief{Goal: b.Goal, Context: b.Context, Kind: b.Kind, Size: b.Size, Risk: b.Risk,
-			RiskWhy: b.RiskWhy, OpenQuestions: b.OpenQuestions, Tags: b.Tags, Extra: b.Extra, ExtraVersions: b.ExtraVersions}
-	}
-	return out
-}
-
 func wireBriefStatus(s brief.Status) *api.BriefStatus {
 	return &api.BriefStatus{Ready: s.Ready, Pending: s.Pending, Failed: s.Failed, LastError: s.LastError, PausedUntil: s.PausedUntil}
-}
-
-func wireRateLimit(rl dgh.RateLimit) api.RateLimit {
-	return api.RateLimit{Cost: rl.Cost, Remaining: rl.Remaining, Limit: rl.Limit, ResetAt: rl.ResetAt}
-}
-
-func wireCandidate(c dgh.Candidate, b *brief.View) api.Candidate {
-	return api.Candidate{Unit: c.Ref.Unit(), Label: c.Ref.String(), URL: c.URL, Title: c.Title, Author: c.Author, State: c.State, IsDraft: c.IsDraft,
-		CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt, Additions: c.Additions, Deletions: c.Deletions,
-		ChangedFiles: c.ChangedFiles, HeadBranch: c.HeadBranch, BaseBranch: c.BaseBranch, ReviewDecision: c.ReviewDecision,
-		ReviewRequests: c.ReviewRequests, ChecksState: c.ChecksState, Comments: c.Comments, MyReview: c.MyReview,
-		MyReviewOnHead: c.MyReviewOnHead, Brief: wireBriefView(b)}
 }
 
 // wireTurnView is the turn an answer goes to, else the book's newest, with

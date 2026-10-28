@@ -16,6 +16,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
@@ -54,6 +55,8 @@ type fakeActions struct {
 	inputs      []map[string]any
 	// bound are the items and task of each intent call, as "i1,i2@task".
 	bound []string
+	// store, when set, is marked by an adopt as the real take-over does.
+	store *inventory.Store
 }
 
 func (f *fakeActions) record(ctx context.Context, call string, c Call) error {
@@ -75,7 +78,10 @@ func (f *fakeActions) Open(ctx context.Context, u unit.Unit, c Call) error {
 }
 func (f *fakeActions) Adopt(ctx context.Context, u unit.Unit, c Call) error {
 	r := refOf(u)
-	return f.record(ctx, "adopt "+r.String(), c)
+	if err := f.record(ctx, "adopt "+r.String(), c); err != nil || f.store == nil {
+		return err
+	}
+	return f.store.SetAdopted(ctx, r)
 }
 func (f *fakeActions) Intent(ctx context.Context, name string, u unit.Unit, c Call) error {
 	r := refOf(u)
@@ -261,7 +267,7 @@ func inputFlag(inputs map[string]any, name string) bool {
 func TestAddressCarriesTheTakeOver(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
-	fa := &fakeActions{}
+	fa := &fakeActions{store: s.store()}
 	s.deps.Actions = fa
 	address, _ := s.loaded().Registry.Get(dintent.Address)
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/address", `{"source":"cockpit"}`); len(address.Action.Refuse) == 0 || rec.Code != 409 || !strings.Contains(rec.Body.String(), address.Action.Refuse[0].Why.Src) {
@@ -278,7 +284,7 @@ func TestAddressCarriesTheTakeOver(t *testing.T) {
 func TestAddressCarriesTheSelfReview(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
-	fa := &fakeActions{}
+	fa := &fakeActions{store: s.store()}
 	s.deps.Actions = fa
 	post(t, s, "/api/units/github/acme%2Fapi%237/take_over", `{}`)
 	post(t, s, "/api/units/github/acme%2Fapi%237/address", `{"source":"cli","inputs":{"self_review":true}}`)
@@ -343,16 +349,13 @@ func TestDelegateErrorIs500AndRecordsNothing(t *testing.T) {
 	}
 }
 
-func TestAdoptMarksOverride(t *testing.T) {
+func TestTakeOverRecordsItsEvent(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	fa := &fakeActions{}
 	s.deps.Actions = fa
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/take_over", `{}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
-	}
-	if o, _ := s.store().Override(context.Background(), r7); !o.Adopted {
-		t.Fatalf("not adopted: %+v", o)
 	}
 	if countEvents(t, s, dinv.KindAdopted) != 1 || !slices.Equal(fa.calls, []string{"adopt acme/api#7"}) {
 		t.Fatalf("calls %v", fa.calls)
@@ -693,21 +696,6 @@ func TestNudgeRefusesAClosedPullRequest(t *testing.T) {
 	}
 }
 
-func TestNudgeSituationWithoutATime(t *testing.T) {
-	t.Parallel()
-	if got := nudgeSituation([]string{"@ana"}, api.Row{Kind: "draft", Summary: api.Summary{Reason: "draft"}}); got != "Waiting on: @ana, draft." {
-		t.Fatalf("%q", got)
-	}
-}
-
-func TestNudgeSituationCarriesNoCIText(t *testing.T) {
-	t.Parallel()
-	r := api.Row{Kind: "checks", Summary: api.Summary{Reason: "checks failing: lint, @acme/everyone"}}
-	if got := nudgeSituation([]string{"@ana"}, r); got != "Waiting on: @ana, checks failing." {
-		t.Fatalf("%q", got)
-	}
-}
-
 func TestNudgeRefusesABotAuthor(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
@@ -828,7 +816,7 @@ func TestTrackRefusesPastTheCap(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
-	for n := 1; n <= trackMax; n++ {
+	for n := 1; n <= ghsource.TrackMax; n++ {
 		s.store().SetOverride(ctx, dinv.Override{PR: github.Ref{Owner: "acme", Repo: "big", Number: n}, Tracked: true})
 	}
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/track", `{}`); rec.Code != 400 || !strings.Contains(rec.Body.String(), "untrack one first") || !strings.Contains(rec.Body.String(), "acme/big#50") {
@@ -843,13 +831,13 @@ func TestActionsUseTheInventorysName(t *testing.T) {
 	t.Parallel()
 	fa := &fakeActions{}
 	s := newServerWith(t, func(d *Deps) { d.Actions = fa })
-	s.track = func(_ context.Context, u unit.Unit) (port.TrackRead, error) {
+	s.trackReads(func(_ context.Context, u unit.Unit) (port.TrackRead, error) {
 		ref := refOf(u)
 		if ref != r7 {
 			t.Errorf("read %s", ref)
 		}
 		return port.TrackRead{Unit: r7.Unit()}, nil
-	}
+	})
 	ctx := context.Background()
 	if rec := post(t, s, "/api/units/github/Acme%2FAPI%237/track", `{}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -884,9 +872,9 @@ func TestTrackAnswersWhyItCouldNotRead(t *testing.T) {
 		{errors.New("disk I/O error"), 500, "disk"},
 	} {
 		s := newServer(t)
-		s.track = func(context.Context, unit.Unit) (port.TrackRead, error) {
+		s.trackReads(func(context.Context, unit.Unit) (port.TrackRead, error) {
 			return port.TrackRead{Unit: r7.Unit()}, c.err
-		}
+		})
 		rec := post(t, s, "/api/units/github/acme%2Fapi%237/track", `{}`)
 		if rec.Code != c.code || !strings.Contains(rec.Body.String(), c.says) {
 			t.Errorf("%v: %d %s", c.err, rec.Code, rec.Body)
@@ -901,7 +889,7 @@ func TestTrackRefusesAFinishedPullRequest(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	r8 := github.Ref{Owner: "acme", Repo: "api", Number: 8}
-	s.track = func(context.Context, unit.Unit) (port.TrackRead, error) { return port.TrackRead{Unit: r8.Unit()}, nil }
+	s.trackReads(func(context.Context, unit.Unit) (port.TrackRead, error) { return port.TrackRead{Unit: r8.Unit()}, nil })
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%238/track", `{}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "no track on acme/api#8") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
@@ -960,7 +948,7 @@ func TestTheTrackCapHoldsUnderConcurrentTracks(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
-	for n := 1; n < trackMax; n++ {
+	for n := 1; n < ghsource.TrackMax; n++ {
 		s.store().SetOverride(ctx, dinv.Override{PR: github.Ref{Owner: "acme", Repo: "big", Number: n}, Tracked: true})
 	}
 	codes := make([]int, 2)
@@ -970,47 +958,8 @@ func TestTheTrackCapHoldsUnderConcurrentTracks(t *testing.T) {
 	}
 	wg.Wait()
 	slices.Sort(codes)
-	if got, _ := s.store().Tracked(ctx); len(got) != trackMax || !slices.Equal(codes, []int{200, 400}) {
+	if got, _ := s.store().Tracked(ctx); len(got) != ghsource.TrackMax || !slices.Equal(codes, []int{200, 400}) {
 		t.Fatalf("%d tracked, codes %v", len(got), codes)
-	}
-}
-
-func TestAFinishedPullRequestIsUntracked(t *testing.T) {
-	t.Parallel()
-	s := newServer(t)
-	ctx := context.Background()
-	r8 := github.Ref{Owner: "acme", Repo: "api", Number: 8}
-	for _, ref := range []github.Ref{r7, r8} {
-		s.store().SetOverride(ctx, dinv.Override{PR: ref, Tracked: true, Hold: true})
-	}
-	s.untrackFinished(ctx)
-	if got, _ := s.store().Tracked(ctx); !slices.Equal(got, []github.Ref{r7}) {
-		t.Fatalf("tracked %v", got)
-	}
-	if o, _ := s.store().Override(ctx, r8); !o.Hold {
-		t.Fatalf("untracking dropped the hold: %+v", o)
-	}
-	evs, _ := s.store().Events(ctx, r8)
-	if len(evs) == 0 || evs[len(evs)-1].Kind != dinv.KindUntracked || evs[len(evs)-1].Data != "merged" {
-		t.Fatalf("events %+v", evs)
-	}
-}
-
-func TestUntrackFinishedBudget(t *testing.T) {
-	t.Parallel()
-	s := newServer(t)
-	ctx, sc := metertest.Start(t, context.Background())
-	for n := 1; n <= 7; n++ {
-		ref := github.Ref{Owner: "acme", Repo: "big", Number: n}
-		if err := s.store().UpsertPR(ctx, dinv.PR{Ref: ref, State: dgh.StateOpen, Reasons: []string{"author"}}); err != nil {
-			t.Fatal(err)
-		}
-		s.store().SetOverride(ctx, dinv.Override{PR: ref, Tracked: true})
-	}
-	before := metertest.Count(sc, metertest.Limit{Res: meter.SQL})
-	s.untrackFinished(ctx)
-	if n := metertest.Count(sc, metertest.Limit{Res: meter.SQL}) - before; n != 2 {
-		t.Fatalf("%d statements at 7 tracked, want 2\n%s", n, metertest.Report(sc.Tally()))
 	}
 }
 
@@ -1020,12 +969,12 @@ func TestASlowTrackReadDoesNotBlockTheRows(t *testing.T) {
 	ctx := context.Background()
 	s.store().SetOverride(ctx, dinv.Override{PR: r7, MuteUntilStateChange: true, MutedKind: "changes", MutedWaitingOn: "ana"})
 	reading, release := make(chan struct{}), make(chan struct{})
-	s.track = func(_ context.Context, u unit.Unit) (port.TrackRead, error) {
+	s.trackReads(func(_ context.Context, u unit.Unit) (port.TrackRead, error) {
 		ref := refOf(u)
 		close(reading)
 		<-release
 		return port.TrackRead{Unit: ref.Unit()}, nil
-	}
+	})
 	done := make(chan int)
 	go func() { done <- post(t, s, "/api/units/github/acme%2Fweb%233/track", `{}`).Code }()
 	<-reading
@@ -1052,7 +1001,7 @@ func TestANudgeThatTracksAsksWhomTheFreshReadNames(t *testing.T) {
 	ctx := context.Background()
 	web := github.Ref{Owner: "acme", Repo: "web", Number: 3}
 	old := s.deps.Now().Add(-72 * time.Hour)
-	s.track = func(context.Context, unit.Unit) (port.TrackRead, error) {
+	s.trackReads(func(context.Context, unit.Unit) (port.TrackRead, error) {
 		return port.TrackRead{Unit: web.Unit(), State: dgh.StateOpen, Save: func(ctx context.Context) error {
 			s.store().UpsertPR(ctx, dinv.PR{Ref: web, Title: "Other", Author: "zoe", State: "OPEN", HeadOid: "h1",
 				ChecksState: "SUCCESS", ReviewRequests: []string{"bob", "renovate[bot]"}, URL: web.URL()})
@@ -1063,7 +1012,7 @@ func TestANudgeThatTracksAsksWhomTheFreshReadNames(t *testing.T) {
 			})
 			return err
 		}}, nil
-	}
+	})
 	if rec := post(t, s, "/api/units/github/acme%2Fweb%233/track", `{}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
@@ -1093,14 +1042,14 @@ func TestARefusedTrackStoresNothing(t *testing.T) {
 		s := newServer(t)
 		ctx := context.Background()
 		saved := false
-		s.track = func(context.Context, unit.Unit) (port.TrackRead, error) {
+		s.trackReads(func(context.Context, unit.Unit) (port.TrackRead, error) {
 			if c.race {
-				for n := 1; n <= trackMax; n++ {
+				for n := 1; n <= ghsource.TrackMax; n++ {
 					s.store().SetOverride(ctx, dinv.Override{PR: github.Ref{Owner: "acme", Repo: "big", Number: n}, Tracked: true})
 				}
 			}
 			return port.TrackRead{Unit: web.Unit(), State: c.state, Save: func(context.Context) error { saved = true; return nil }}, nil
-		}
+		})
 		if rec := post(t, s, "/api/units/github/acme%2Fweb%233/track", `{}`); rec.Code != 400 || !strings.Contains(rec.Body.String(), c.says) || saved {
 			t.Errorf("%s: %d %s, saved %v", c.name, rec.Code, rec.Body, saved)
 		}
@@ -1130,11 +1079,11 @@ func TestUntrackingWhatOnlyTheTrackHeldTakesItOutOfAll(t *testing.T) {
 	s := newServer(t)
 	ctx := context.Background()
 	web := github.Ref{Owner: "acme", Repo: "web", Number: 3}
-	s.track = func(context.Context, unit.Unit) (port.TrackRead, error) {
+	s.trackReads(func(context.Context, unit.Unit) (port.TrackRead, error) {
 		return port.TrackRead{Unit: web.Unit(), State: dgh.StateOpen, Save: func(ctx context.Context) error {
 			return s.store().UpsertPR(ctx, dinv.PR{Ref: web, Title: "Other", Author: "zoe", State: "OPEN", URL: web.URL()})
 		}}, nil
-	}
+	})
 	listed := func() bool {
 		rows, err := s.rows(ctx, api.ViewAll)
 		if err != nil {

@@ -70,7 +70,7 @@ func rowAttention(t *testing.T, s *Server, row api.Row) *api.Attention {
 	if err != nil || !ok {
 		t.Fatalf("the row of %s: %v %v", row.Unit, ok, err)
 	}
-	return s.deriverAt(rd.Base, rd.At).Attention(rd.Row, rd.In)
+	return prrow.DeriverAt(rd.Base, s.rowSettings(), s.deps.Brief != nil, rd.At).Attention(rd.Row, rd.In)
 }
 
 func TestRowsCarryNoAttention(t *testing.T) {

@@ -62,8 +62,6 @@ func (s *Server) routes() []route {
 		{"GET " + api.Keys, s.handleKeys},
 		{"GET /api/events", s.handleEvents},
 		{"GET /api/activity", s.handleActivity},
-		{"POST /api/explore", s.handleExplore},
-		{"GET /api/explore/recent", s.handleExploreRecent},
 		{"POST /api/pause", s.handlePause},
 		{"POST /api/app", s.handleApp},
 		{"POST /api/workspaces/remove-done", s.handleRemoveDone},
@@ -74,6 +72,8 @@ func (s *Server) routes() []route {
 		{"POST " + api.Plan, s.handlePlanAct},
 		{"GET " + api.Plugins, s.handlePlugins},
 		{"GET " + api.PluginAssets, s.handlePluginAsset},
+		{"GET " + api.PluginView, s.handlePluginView},
+		{"POST " + api.PluginView, s.handlePluginView},
 		{"GET " + api.ViewsPath, s.handleViews},
 		{"GET " + api.TasksPath, s.handleTasks},
 		{"POST " + api.TasksPath, s.handleCapture},
@@ -202,7 +202,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		WorkspaceManagers:  s.deps.WorkspaceManagers,
 		Store:              s.deps.Store,
 	}
-	if s.deps.PRs != nil {
+	if s.deps.Budget != nil {
 		h.RateLimit = s.graphQLBudget()
 		h.SlowSync = s.rateLimitLow()
 	}
@@ -308,7 +308,7 @@ func (s *Server) handleRemoveDone(w http.ResponseWriter, r *http.Request) {
 	res := removeDoneResult()
 	for _, row := range rows {
 		u := row.Unit
-		if !isPullRequest(u) || !s.pluginEnabled(u.Provider) {
+		if !s.forge(u) || !s.pluginEnabled(u.Provider) {
 			continue
 		}
 		var out bytes.Buffer
@@ -353,7 +353,7 @@ func (s *Server) setPause(ctx context.Context, req api.PauseRequest) error {
 	prs := make([]unit.Unit, 0, len(req.PRs))
 	for _, key := range req.PRs {
 		u, err := s.deps.Units.Parse(string(s.deps.Forge), key)
-		if err != nil || refOf(u).Number <= 0 {
+		if err != nil {
 			return badRequest{key + " is not an owner/repo#n"}
 		}
 		prs = append(prs, u)
@@ -375,8 +375,12 @@ func (s *Server) setPause(ctx context.Context, req api.PauseRequest) error {
 			return conflict{msg: "everything is paused; resume with no argument resumes everything"}
 		}
 		for _, u := range prs {
-			if ref := refOf(u); p.HoldsRepo(ref.Owner + "/" + ref.Repo) {
-				return conflict{msg: ref.Owner + "/" + ref.Repo + " is paused as a whole; resume it to resume " + u.Label()}
+			repo, err := s.repoOf(ctx, u)
+			if err != nil {
+				return err
+			}
+			if repo != "" && p.HoldsRepo(repo) {
+				return conflict{msg: repo + " is paused as a whole; resume it to resume " + u.Label()}
 			}
 		}
 	}
@@ -410,7 +414,7 @@ func (s *Server) setPause(ctx context.Context, req api.PauseRequest) error {
 	}
 	action := map[bool]string{true: "pause", false: "resume"}[req.Paused]
 	for _, u := range prs {
-		if _, err := s.applyOverride(ctx, action, u, api.ActionRequest{}); err != nil {
+		if err := s.applyHold(ctx, action, u); err != nil {
 			return err
 		}
 	}
@@ -422,23 +426,20 @@ func (s *Server) setPause(ctx context.Context, req api.PauseRequest) error {
 	return nil
 }
 
-// pausedPRs are the pull requests paused one by one.
+// pausedPRs are the forge's units paused one by one.
 func (s *Server) pausedPRs(ctx context.Context) ([]unit.Unit, error) {
-	if s.deps.Overrides == nil {
+	if s.deps.Overrides == nil || s.deps.Forge == "" {
 		return nil, nil
 	}
-	all, err := s.deps.Overrides.Overrides(ctx)
-	if err != nil {
-		return nil, err
+	return s.deps.Overrides.Held(ctx, s.deps.Forge)
+}
+
+// repoOf is the repository of u, owner/name; "" for none.
+func (s *Server) repoOf(ctx context.Context, u unit.Unit) (string, error) {
+	if s.deps.Repo == nil {
+		return "", nil
 	}
-	var out []unit.Unit
-	for u, o := range all {
-		if o.Hold {
-			out = append(out, u)
-		}
-	}
-	slices.SortFunc(out, func(a, b unit.Unit) int { return strings.Compare(a.String(), b.String()) })
-	return out, nil
+	return s.deps.Repo(ctx, u)
 }
 
 func (s *Server) handleApp(w http.ResponseWriter, r *http.Request) {
@@ -510,13 +511,6 @@ func (s *Server) parseUnit(r *http.Request) (unit.Unit, bool) {
 		return unit.Unit{}, false
 	}
 	return u, true
-}
-
-// parsePR is the pull request a unit route names; the routes that act on a
-// pull request take no other unit.
-func (s *Server) parsePR(r *http.Request) (unit.Unit, bool) {
-	u, ok := s.parseUnit(r)
-	return u, ok && isPullRequest(u)
 }
 
 // writeNoUnit answers a unit route whose unit the daemon does not serve.

@@ -33,6 +33,20 @@ type Broker struct {
 	Marks MarkStore
 	// Drafts move drafts between units; nil serves no RehomeDrafts.
 	Drafts DraftHome
+	// Overrides are the host's overrides of units; nil serves neither
+	// SetOverride nor RoundState.
+	Overrides OverrideStore
+	// Paused says a unit's rounds are held by a pause wider than its own
+	// hold, such as its repository's; nil holds none.
+	Paused func(ctx context.Context, u unit.Unit) (bool, error)
+}
+
+// OverrideStore keeps the host's overrides of units by name
+// (port.Overrides); SetOverride writes set in one transaction while ifMatch
+// holds.
+type OverrideStore interface {
+	Override(ctx context.Context, u unit.Unit) (map[string]string, error)
+	SetOverride(ctx context.Context, u unit.Unit, set, ifMatch map[string]string) (written bool, err error)
 }
 
 // EventLog is the host's event log as a plugin writes and reads it.

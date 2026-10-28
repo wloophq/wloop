@@ -45,7 +45,6 @@ import (
 	coreusage "github.com/wloophq/wloop/internal/core/usage"
 	coreviews "github.com/wloophq/wloop/internal/core/views"
 	"github.com/wloophq/wloop/internal/domain/card"
-	dgh "github.com/wloophq/wloop/internal/domain/github"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
@@ -136,9 +135,8 @@ type Deps struct {
 	// RowProviders build the read model's providers with the daemon's row
 	// deps, one per source.
 	RowProviders []func(readmodel.RowDeps) readmodel.Provider
-	// The inventory, one field per role; a nil role answers as a daemon
-	// with no store does.
-	PRs       PullRequests
+	// The store, one field per role; a nil role answers as a daemon with
+	// no store does.
 	Events    EventLog
 	Overrides Overrides
 	Meta      Metas
@@ -153,13 +151,12 @@ type Deps struct {
 	Pauses    Pauses // nil reads as not paused and refuses a pause
 	// Collector runs the slow job; nil registers no fast and slow jobs.
 	Collector Collector
-	// Track reads a pull request about to be tracked, wrapping a failed read
-	// in port.ErrNotFound or port.ErrGitHub when it can tell which; nil
-	// tracks without reading.
+	// Track reads a unit about to be tracked through its source, wrapping a
+	// failed read in port.ErrNotFound or port.ErrGitHub when it can tell
+	// which; the read's Save admits and follows it. Nil tracks nothing.
 	Track func(ctx context.Context, u unit.Unit) (port.TrackRead, error)
 	// Follows says whether a provider's source keeps its own follows: track
-	// and untrack of its units go to Track and Untrack, never to the pull
-	// request overrides. Nil follows none.
+	// and untrack of its units go to Track and Untrack. Nil follows none.
 	Follows func(unit.ProviderID) bool
 	Untrack func(ctx context.Context, u unit.Unit) error
 	// Resolve is the unit an address a person gives lands in, such as a
@@ -178,13 +175,12 @@ type Deps struct {
 	// Snapshot pins the read model's loads to one read transaction; nil
 	// loads without one.
 	Snapshot readmodel.Snapshotter
-	// Brief, BriefStatus and BriefViews are the brief queue's roles; nil
+	// Brief, BriefStatus and BriefAttempts are the brief queue's roles; nil
 	// when brief.enabled is false.
-	Brief       BriefQueue
-	BriefStatus BriefHealth
-	BriefViews  BriefReads
-	Usage       *coreusage.Service // nil registers no usage job
-	Explorer    Explorer           // nil answers 503 to explore
+	Brief         BriefQueue
+	BriefStatus   BriefHealth
+	BriefAttempts BriefAttempts
+	Usage         *coreusage.Service // nil registers no usage job
 	// Retain drops the store's rows past their retention and says what it
 	// dropped; nil registers no retain job.
 	Retain func(ctx context.Context) (summary string, err error)
@@ -235,16 +231,28 @@ type Deps struct {
 	// Identity is who the viewer is in the forge, as its plugin's
 	// Presenter.Identity says; nil knows nobody.
 	Identity func(ctx context.Context) (src.Identity, error)
-	// Forge is the plugin of the pull requests the daemon's viewer,
-	// explorer, intakes and budget serve.
-	Forge    unit.ProviderID
-	Now      func() time.Time
-	Version  string
-	Log      func(format string, args ...any)
-	StateDir string
-	Socket   string
-	LockPath string
-	InfoPath string
+	// Forge is the plugin of the units the daemon's viewer, intakes, brief
+	// queue, timings and budget serve; they serve nothing while it is
+	// disabled.
+	Forge unit.ProviderID
+	// Repo is the repository of a unit, owner/name; "" none, and nil
+	// knows none.
+	Repo func(ctx context.Context, u unit.Unit) (string, error)
+	// Background tags a job's context as background work, below the user's
+	// reserve of the forge's budget; nil tags nothing.
+	Background func(ctx context.Context) context.Context
+	// Presenters build each compiled-in plugin's presenter, by provider,
+	// with what the daemon serves it.
+	Presenters map[unit.ProviderID]func(PresenterHost) Presenter
+	// PluginPresenter is a running plugin's presenter; nil runs none.
+	PluginPresenter func(unit.ProviderID) (Presenter, bool)
+	Now             func() time.Time
+	Version         string
+	Log             func(format string, args ...any)
+	StateDir        string
+	Socket          string
+	LockPath        string
+	InfoPath        string
 	// Restart is the command that restarts the daemon, which a refused
 	// client of another API major is told to run.
 	Restart string
@@ -339,10 +347,13 @@ type Budget interface {
 	RateLimit() api.RateLimit
 }
 
-// background tags a job's GitHub reads below the user's reserve.
-func background(run runFunc) runFunc {
+// background tags a job's context as background work.
+func (s *Server) background(run runFunc) runFunc {
 	return func(ctx context.Context) (string, string, error) {
-		return run(dgh.WithPriority(ctx, dgh.PriorityBackground))
+		if s.deps.Background != nil {
+			ctx = s.deps.Background(ctx)
+		}
+		return run(ctx)
 	}
 }
 
@@ -360,26 +371,20 @@ type Server struct {
 	modelOnce  sync.Once
 	viewer     viewerCache
 	app        *AppState
-	steps      stepCache
-	exploring  sync.Mutex
-	users      sync.Map // lowercase login -> whether GitHub knows it as a user
+	// presenters are the compiled-in plugins' presenters, built once.
+	presenters     map[unit.ProviderID]Presenter
+	presentersOnce sync.Once
 	// draftWheres keeps, by draft id, the destination its publisher resolved or when it last failed to.
 	draftWheres sync.Map
 	// whereLookup and wherePage override draftWhereTimeout and draftWhereBudget; zero keeps them.
 	whereLookup, wherePage time.Duration
-	// exploreAttempt bounds one GitHub search; exploreRetryPause separates
-	// the two tries.
-	exploreAttempt, exploreRetryPause time.Duration
-	// overrideMu serializes every read-modify-write of an override.
-	overrideMu sync.Mutex
 	// pauseMu serializes every read-modify-write of the pause.
 	pauseMu sync.Mutex
 	// track reads a pull request before it is tracked; nil tracks unread.
-	track             func(ctx context.Context, u unit.Unit) (port.TrackRead, error)
-	reconcile         reconcileState
-	homes             homeCache
-	situationsFailing atomic.Bool
-	mutesFailing      atomic.Bool
+	track        func(ctx context.Context, u unit.Unit) (port.TrackRead, error)
+	reconcile    reconcileState
+	homes        homeCache
+	mutesFailing atomic.Bool
 	// intakesExpiredAt is the minute the read model's keeper last expired
 	// the session intakes; only the keeper touches it.
 	intakesExpiredAt time.Time
@@ -427,11 +432,15 @@ func New(d Deps) *Server {
 	if d.App == nil {
 		d.App = &AppState{}
 	}
+	if d.Forge != "" && d.PluginEnabled != nil && !d.PluginEnabled(d.Forge) {
+		d.Brief, d.BriefStatus, d.BriefAttempts, d.BriefsUnavailable = nil, nil, nil, ""
+		d.Intakes, d.IntakeBriefs, d.Budget, d.Identity = nil, nil, nil, nil
+	}
 	if d.GitAccess == nil && d.Meta != nil {
 		d.GitAccess = &GitAccessLog{Store: d.Meta}
 	}
 	s := &Server{deps: d, jobs: map[string]*job{}, token: rand.Text(), warnings: &warnings{}, grace: ShutdownGrace, hub: newHub(), app: d.App,
-		track: d.Track, exploreAttempt: exploreAttempt, exploreRetryPause: exploreRetryPause,
+		track:     d.Track,
 		reconcile: reconcileState{ready: make(chan struct{}), done: make(chan struct{}), wait: ReconcileWait}, sessionWait: cmp.Or(d.SessionWait, brief.SessionWait),
 		streamClock: wallClock{}, draftClock: wallClock{}}
 	s.life, s.stopLife = context.WithCancel(meter.WithRegistry(context.Background(), d.Meter))
@@ -445,7 +454,7 @@ func New(d Deps) *Server {
 	ingested := make(chan struct{}, 1)
 	for _, in := range d.Ingest {
 		name := ingestJobName(in.ID)
-		s.jobs[name] = newJob(name, in.Job.Every, fastTimeout, background(func(ctx context.Context) (string, string, error) {
+		s.jobs[name] = newJob(name, in.Job.Every, fastTimeout, s.background(func(ctx context.Context) (string, string, error) {
 			defer func() {
 				select {
 				case ingested <- struct{}{}:
@@ -461,17 +470,15 @@ func New(d Deps) *Server {
 			// The end of each ingestion run wakes it; its own period is a watchdog.
 			every = time.Duration(d.Cfg.Sweep.Slow)
 		}
-		s.jobs["fast"] = newJob("fast", every, fastTimeout, background(func(ctx context.Context) (string, string, error) {
+		s.jobs["fast"] = newJob("fast", every, fastTimeout, s.background(func(ctx context.Context) (string, string, error) {
 			s.noteConfigStale()
 			phase(ctx, "turns", s.reconcileTurns)
-			phase(ctx, "untrack", s.untrackFinished)
 			return "", "", nil
 		}))
 		s.jobs["fast"].wakeOn(ingested)
-		s.jobs["slow"] = newJob("slow", time.Duration(d.Cfg.Sweep.Slow), slowTimeout, background(func(ctx context.Context) (string, string, error) {
+		s.jobs["slow"] = newJob("slow", time.Duration(d.Cfg.Sweep.Slow), slowTimeout, s.background(func(ctx context.Context) (string, string, error) {
 			summary, skipped, err := c.SlowJob(ctx)
 			s.refreshHomes(ctx)
-			s.untrackFinished(ctx)
 			return summary, skipped, err
 		}))
 	}
@@ -482,7 +489,7 @@ func New(d Deps) *Server {
 		}
 	}
 	if b := d.Brief; b != nil {
-		s.jobs["brief"] = newJob("brief", time.Duration(d.Cfg.Sweep.Slow), briefTimeout, background(func(ctx context.Context) (string, string, error) {
+		s.jobs["brief"] = newJob("brief", time.Duration(d.Cfg.Sweep.Slow), briefTimeout, s.background(func(ctx context.Context) (string, string, error) {
 			summary, err := b.Run(ctx)
 			return summary, "", err
 		}))
@@ -513,7 +520,7 @@ func (s *Server) sweepJob(sw Sweeper) *job {
 	var planned, seen atomic.Uint64
 	skips := 0
 	var j *job
-	j = newJob("sweep", time.Duration(s.deps.Cfg.Sweep.Slow), sweepTimeout, background(func(ctx context.Context) (string, string, error) {
+	j = newJob("sweep", time.Duration(s.deps.Cfg.Sweep.Slow), sweepTimeout, s.background(func(ctx context.Context) (string, string, error) {
 		defer func() {
 			if ctx.Err() == nil {
 				s.expireMutesOrLog(ctx)

@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
@@ -19,9 +20,6 @@ import (
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/situation"
 )
-
-// SourceSession is the intake source of a request a managed session asked.
-const SourceSession = "session"
 
 // RenudgeAfter is how long a wait that a nudge did not move stays nudged.
 const RenudgeAfter = 24 * time.Hour
@@ -43,7 +41,7 @@ func (d Deriver) openIntakes(ref github.Ref) []catalog.Intake {
 		var p intakeAction
 		_ = json.Unmarshal(i.Request, &p)
 		out = append(out, catalog.Intake{Intake: api.Intake{Seq: i.Seq, Intent: string(i.Intent), Source: i.Source, State: string(i.State)},
-			Action: p.Action, Inputs: p.Inputs, FromSession: i.Source == SourceSession})
+			Action: p.Action, Inputs: p.Inputs, FromSession: i.Source == intake.SourceSession})
 	}
 	return out
 }

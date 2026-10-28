@@ -3060,7 +3060,8 @@
         "enabled": true,
         "primary": true,
         "confirm": "Run the held round on acme/api#18 now? It does not count against the cap.",
-        "basis": "held:automatic round held: cap reached"
+        "basis": "held:automatic round held: cap reached",
+        "intent": "review"
       },
       {
         "id": "guide",

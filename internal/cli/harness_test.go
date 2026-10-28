@@ -21,6 +21,7 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
 	"github.com/wloophq/wloop/internal/adapter/gitcheck"
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+	"github.com/wloophq/wloop/internal/adapter/source/github/present"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
@@ -830,8 +831,9 @@ func (te *testEnv) serveWith(t *testing.T, with func(daemon.Deps) daemon.Deps) {
 	mu := &lock.Mutex{}
 	te.loop = mu
 	d := withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(mu), LoopMu: mu, Facts: te.prFacts(te.cfg),
-		DryRunTurn: te.dryRunTurn, Doctor: te.doctorState, Explorer: derivedRows{te.gh},
+		DryRunTurn: te.dryRunTurn, Doctor: te.doctorState,
 		Cfg: te.cfg, Version: "test", Now: te.Now, Identity: viewerIs("me"), Log: t.Logf}, te.Store)
+	d = withGitHub(d, present.Deps{Store: te.Store, Host: te.moduleHost(te.db)(unit.GitHub), Explorer: derivedRows{te.gh}})
 	d = te.Env.serveMessages(context.Background(), d, te.db, te.cfg, t.Logf)
 	if with != nil {
 		d = with(d)

@@ -13,6 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/github"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+	"github.com/wloophq/wloop/internal/adapter/source/github/present"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
@@ -132,14 +133,24 @@ func briefHome(cfg config.Config) func(github.Ref) string {
 	}
 }
 
-// withoutGitHub is d with nothing of GitHub's when its plugin is disabled:
-// no brief queue, intakes, explorer, budget or viewer read.
-func withoutGitHub(d daemon.Deps) daemon.Deps {
-	if d.Cfg.PluginEnabled(string(unit.GitHub)) {
-		return d
+// githubPresenter are the GitHub presenter's deps over the env's client.
+func (e *Env) githubPresenter(store *inventory.Store, host src.Host, briefs *interruptFirst) present.Deps {
+	deps := present.Deps{Store: store, Host: host, Explorer: e.GitHub, Budget: e.githubBudget(), FailedSteps: failedSteps(e.GitHub)}
+	if briefs != nil {
+		deps.Briefs = briefs
 	}
-	d.Brief, d.BriefStatus, d.BriefViews, d.BriefsUnavailable = nil, nil, nil, ""
-	d.Intakes, d.IntakeBriefs, d.Explorer, d.Budget, d.Identity = nil, nil, nil, nil, nil
+	return deps
+}
+
+// withGitHub is d with the GitHub plugin's presenter over deps, its
+// background priority and its pull requests' repositories.
+func withGitHub(d daemon.Deps, deps present.Deps) daemon.Deps {
+	if d.Presenters == nil {
+		d.Presenters = map[unit.ProviderID]func(daemon.PresenterHost) daemon.Presenter{}
+	}
+	d.Presenters[unit.GitHub] = func(h daemon.PresenterHost) daemon.Presenter { return present.New(deps, present.Host(h)) }
+	d.Background = func(ctx context.Context) context.Context { return dgh.WithPriority(ctx, dgh.PriorityBackground) }
+	d.Repo = present.Repo
 	return d
 }
 
@@ -177,3 +188,26 @@ func (g githubLocator) Locate(ctx context.Context, dir string) (unit.Unit, bool,
 }
 
 func (e *Env) githubLocators() []unit.Locator { return []unit.Locator{githubLocator{e}} }
+
+// roundsPaused says whether the pause holds u's rounds: everything is
+// paused, or u's repository.
+func (e *Env) roundsPaused(ctx context.Context, u unit.Unit) (bool, error) {
+	if e.Rounds == nil {
+		return false, nil
+	}
+	p, err := e.Rounds.Pause(ctx)
+	if err != nil || p.On {
+		return p.On, err
+	}
+	repo, err := present.Repo(ctx, u)
+	return repo != "" && p.HoldsRepo(repo), err
+}
+
+// withStore is d with every store role on st and its database.
+func withStore(d daemon.Deps, st *inventory.Store) daemon.Deps {
+	d.Events, d.Overrides, d.Meta, d.Records = inventory.ByUnit{Store: st}, st.DB(), st, present.Records{Store: st}
+	return d
+}
+
+// githubBriefs is the brief queue keyed by unit, as the daemon runs it.
+func githubBriefs(q *interruptFirst) present.BriefQueue { return present.BriefQueue{Q: q} }

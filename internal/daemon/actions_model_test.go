@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
+	"github.com/wloophq/wloop/internal/adapter/source/github/present"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/catalog"
@@ -48,7 +48,7 @@ func TestOfferedIssuesNoQueryWhenFresh(t *testing.T) {
 func TestDetailAtMostTwoQueries(t *testing.T) {
 	t.Parallel()
 	s := newNotedServer(t, func(d *Deps) {
-		withBriefs(d, brief.New(brief.Deps{Store: d.PRs.(inventory.ByUnit).Store, Now: d.Now, Taxonomy: func(github.Ref) string { return brief.DefaultTaxonomy }}))
+		withBriefs(d, brief.New(brief.Deps{Store: d.Records.(present.Records).Store, Now: d.Now, Taxonomy: func(github.Ref) string { return brief.DefaultTaxonomy }}))
 	})
 	warm(t, s)
 	ctx, sc := metertest.Start(t, context.Background())
@@ -65,9 +65,9 @@ func TestNudgeUnmutedRowNoQuery(t *testing.T) {
 	seedWaitingOnAna(t, s)
 	warm(t, s)
 	ctx, sc := metertest.Start(t, context.Background())
-	um, err := s.unmutedRow(ctx, r9.Unit())
-	if err != nil || um.row.Unit != r9.Unit() || len(um.evs) == 0 || um.d.Viewer != "me" {
-		t.Fatalf("%+v %d %q %v", um.row, len(um.evs), um.d.Viewer, err)
+	row, err := s.unmutedRow(ctx, r9.Unit())
+	if err != nil || row.Unit != r9.Unit() {
+		t.Fatalf("%+v %v", row, err)
 	}
 	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 0})
 }
@@ -85,19 +85,20 @@ func (c *bookCalls) Books(ctx context.Context, units ...unit.Unit) (map[unit.Uni
 func TestExploreBaseDeriverFromSnapshot(t *testing.T) {
 	t.Parallel()
 	books := &bookCalls{Store: turnstest.NewStore(turnstest.Strict(t))}
-	s := newNotedServer(t, func(d *Deps) {
-		d.Turns = &turns.Service{Intents: turnstest.Intents(), Store: books, Registry: turnstest.NewRegistry(turnstest.Strict(t)),
-			Sessions: turnstest.NewSessions(), Clock: fixedClock(d.Now())}
-	})
-	warm(t, s)
-	before := books.calls
 	cands := []dgh.Candidate{
 		{Ref: r7, Title: "Batch export", Author: "ana", State: dgh.StateOpen},
 		{Ref: github.Ref{Owner: "acme", Repo: "web", Number: 99}, Title: "Untracked", Author: "zoe", State: dgh.StateOpen},
 	}
-	got, err := s.wireCandidates(context.Background(), cands)
-	if err != nil || len(got) != 2 || len(got[0].Actions) == 0 || len(got[1].Actions) == 0 {
-		t.Fatalf("%+v %v", got, err)
+	s := newNotedServer(t, func(d *Deps) {
+		d.Turns = &turns.Service{Intents: turnstest.Intents(), Store: books, Registry: turnstest.NewRegistry(turnstest.Strict(t)),
+			Sessions: turnstest.NewSessions(), Clock: fixedClock(d.Now())}
+		githubOf(d).Explorer = &fakeExplorer{page: dgh.CandidatePage{Total: 2, Candidates: cands}}
+	})
+	warm(t, s)
+	before := books.calls
+	code, got, _ := explorePost(t, s, "is:open")
+	if code != 200 || len(got.Candidates) != 2 || len(got.Candidates[0].Actions) == 0 || len(got.Candidates[1].Actions) == 0 {
+		t.Fatalf("%d %+v", code, got)
 	}
 	if books.calls != before {
 		t.Fatalf("%d Books calls", books.calls-before)
@@ -134,8 +135,8 @@ func TestUnmutedRowOfALapsedPR(t *testing.T) {
 	t.Parallel()
 	s := newNotedServer(t, func(*Deps) {})
 	ref := seedLapsed(t, s)
-	um, err := s.unmutedRow(context.Background(), ref.Unit())
-	if err != nil || um.row.Unit != ref.Unit() || len(um.evs) != 1 || um.d.Viewer != "me" {
-		t.Fatalf("%+v %d %q %v", um.row, len(um.evs), um.d.Viewer, err)
+	row, err := s.unmutedRow(context.Background(), ref.Unit())
+	if err != nil || row.Unit != ref.Unit() {
+		t.Fatalf("%+v %v", row, err)
 	}
 }

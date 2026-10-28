@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
+	"github.com/wloophq/wloop/internal/core/port"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -222,4 +223,24 @@ func TestSetReasonsRecordsItsFlipOnceAcrossAFailedWrite(t *testing.T) {
 	}
 }
 
-func TestTheOverrideWriteSharesNoTransactionWithPullRequests(t *testing.T) { t.Skip("X4b") }
+func TestTheOverrideWriteSharesNoTransactionWithPullRequests(t *testing.T) {
+	s := open(t)
+	ctx := context.Background()
+	upsert(t, s, dinv.PR{Ref: ref, Title: "one", State: "OPEN"})
+	heal := failPRWrites(t, s)
+	defer heal()
+	until := time.Date(2026, 10, 30, 9, 0, 0, 0, time.UTC)
+	if err := s.SetOverride(ctx, dinv.Override{PR: ref, MutedUntil: until, Tracked: true}); err == nil {
+		t.Fatal("want the pull request's reasons to fail")
+	}
+	host, err := s.db.Override(ctx, ref.Unit())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if host[port.OverrideMutedUntil] != until.Format(time.RFC3339Nano) {
+		t.Errorf("the host's columns %v went down with the pull request's write", host)
+	}
+	if o, err := s.Override(ctx, ref); err != nil || o.Tracked {
+		t.Errorf("the plugin's columns %+v %v outlived the failed reasons write", o, err)
+	}
+}

@@ -2079,6 +2079,12 @@ function toggleTerm(term) {
   writeHash({ x: input.value }, true);
 }
 
+// viewOfExplore is the route of the view name of the plugin that serves the Explore view.
+function viewOfExplore(name) {
+  const provider = (catalog.views.find((v) => v.id === "explore") || {}).provider || "";
+  return `/api/plugins/${encodeURIComponent(provider)}/views/${encodeURIComponent(name)}`;
+}
+
 async function explore(query) {
   const input = document.getElementById("explore-q");
   query = String(query || "").trim();
@@ -2088,7 +2094,7 @@ async function explore(query) {
   state.explore.error = "";
   writeHash({ x: query }, true);
   try {
-    const res = await fetch("/api/explore", {
+    const res = await fetch(viewOfExplore("explore"), {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json", "X-Loop-API": API_VERSION },
       body: JSON.stringify({ query }),
@@ -2380,7 +2386,7 @@ function renderPlan(view) {
 async function loadExploreRecent() {
   if (readHash().view !== "explore") return;
   try {
-    state.explore.recent = await getJSON("/api/explore/recent");
+    state.explore.recent = await getJSON(viewOfExplore("explore.recent"));
   } catch {
     // Without the chips the search box still works.
   }

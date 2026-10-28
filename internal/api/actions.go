@@ -56,4 +56,7 @@ type ActionState struct {
 	Basis   string `json:"basis,omitempty"`
 	// Warning is shown under an enabled action.
 	Warning string `json:"warning,omitempty"`
+	// Intent is the intent an intake action runs as when it is not the
+	// action's own, such as run_now's on a held round; "" when none resolves.
+	Intent string `json:"intent,omitempty"`
 }
