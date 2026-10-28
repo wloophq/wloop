@@ -42,7 +42,7 @@ type slackEnv struct {
 	BaseURL string
 	// LockPath "" is the token store's default.
 	LockPath string
-	// LoginPort nil is the config's slack.redirect_port.
+	// LoginPort nil is the config's plugins.slack.redirect_port.
 	LoginPort *int
 	// Open nil opens the URL in the default browser.
 	Open func(url string) error
@@ -129,16 +129,6 @@ func runSlack(ctx context.Context, e *Env, args []string) error {
 	return usageError{usage: slackUsage}
 }
 
-// slackModule builds the Slack plugin over the login Keychain and slack.com.
-func slackModule(cfg config.Config, d source.Deps) (source.Module, error) {
-	return slackEnv{}.module(cfg, d)
-}
-
-func (s slackEnv) module(cfg config.Config, d source.Deps) (source.Module, error) {
-	kit := s.kit(cfg.Slack, d.Log)
-	return slacksource.Module(cfg, d, slacksource.Slack{Tokens: kit.Store, Client: kit.Client})
-}
-
 // sourcePlugins are the compiled-in plugins with the Slack module over e's Slack environment.
 func (e *Env) sourcePlugins() []source.Plugin {
 	out := slices.Clone(plugins)
@@ -183,7 +173,7 @@ func (e *Env) slackMessageUnit(ctx context.Context, message string) (unit.Unit, 
 		return unit.Unit{}, err
 	}
 	if !cfg.PluginEnabled(string(slackPlugin)) {
-		return unit.Unit{}, fmt.Errorf("%s names a Slack message, and the Slack plugin is disabled (slack.enabled is false)", message)
+		return unit.Unit{}, fmt.Errorf("%s names a Slack message, and the Slack plugin is disabled (plugins.slack.enabled is false)", message)
 	}
 	if _, err := e.slack.kit(cfg.Slack, nil).Store.Load(); errors.Is(err, auth.ErrNotLoggedIn) {
 		return unit.Unit{}, fmt.Errorf("%w; run %q", err, brand.Command+" slack login")
@@ -247,7 +237,7 @@ func (e *Env) slackLogin(ctx context.Context, cfg config.Config, kit *slackKit, 
 		return e.saveAppToken(kit)
 	}
 	if !cfg.Slack.Configured() {
-		return fmt.Errorf("slack login needs slack.client_id in %s", e.ConfigPath)
+		return fmt.Errorf("slack login needs plugins.slack.client_id in %s", e.ConfigPath)
 	}
 
 	port := cfg.Slack.Port()
@@ -429,7 +419,7 @@ func (e *Env) slackSend(ctx context.Context, cfg config.Config, kit *slackKit, a
 		return usageError{usage: slackUsage}
 	}
 	if !cfg.PluginEnabled(string(slackPlugin)) {
-		return errors.New("the Slack plugin is disabled (slack.enabled is false)")
+		return errors.New("the Slack plugin is disabled (plugins.slack.enabled is false)")
 	}
 	req := send.Request{Target: pos[0], Text: pos[1], Broadcast: *broadcast, Source: "cli"}
 	fs.Visit(func(f *flag.Flag) {
@@ -556,7 +546,7 @@ func (e *Env) slackChecks(cfg config.Config) []check {
 		out = append(out, check{markOK, "slack login", tok.User + " in " + teamLabel(tok) + " (Keychain service " + kit.Store.Service + ")", ""})
 	}
 	if !cfg.PluginEnabled(string(slackPlugin)) {
-		out = append(out, check{markInfo, "slack plugin", "disabled by slack.enabled; the Slack tools are off", ""})
+		out = append(out, check{markInfo, "slack plugin", "disabled by plugins.slack.enabled; the Slack tools are off", ""})
 	}
 	if len(cfg.Slack.PostAllowlist) > 0 {
 		out = append(out, check{markInfo, "slack post allowlist", strings.Join(cfg.Slack.PostAllowlist, ", "), ""})

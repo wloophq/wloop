@@ -9,9 +9,9 @@ import (
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/record"
-	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
@@ -181,28 +181,50 @@ var Stages = []string{"first", "follow-up"}
 var ReservedFlags = []string{"--no-wait", "--no-brief", "--turn", "--help", "--manager", "--parent"}
 
 // RoundProviders are the providers whose plugin keeps a per-unit count of
-// turns: every automated turn.start on their units spends
-// turns.per_unit_per_day; a workflow starting turns on any other must set
-// limits.per_day.
-var RoundProviders = []unit.ProviderID{unit.GitHub}
+// turns, their manifest's rounds: every automated turn.start on their units
+// spends turns.per_unit_per_day; a workflow starting turns on any other must
+// set limits.per_day.
+var RoundProviders []unit.ProviderID
 
 // PayloadProviders are the template roots a provider's payload alone holds,
-// which only an intent of that provider may read.
-var PayloadProviders = map[string]unit.ProviderID{"PR": unit.GitHub}
+// which only an intent of that provider may read: each plugin's payload.
+var PayloadProviders = map[string]unit.ProviderID{}
 
 // EventProviders are the event kinds only one provider's units record, by
 // kind: a workflow reacting to one needs that provider.
-var EventProviders = func() map[string]unit.ProviderID {
+var EventProviders = coreEventProviders()
+
+func coreEventProviders() map[string]unit.ProviderID {
 	out := map[string]unit.ProviderID{}
 	for _, k := range task.VerbEventKinds {
 		out[k] = unit.Task
 	}
 	return out
-}()
+}
 
-// Slots name each provider's fact slot.
-var Slots = map[unit.ProviderID]string{unit.GitHub: "pr", unit.Session: "session", unit.Workspace: "workspace",
-	unit.Task: "task", dslack.Provider: "slack"}
+// LoopEventKinds are the event kinds the loop records on a unit of any
+// provider, which a workflow's trigger.on names.
+var LoopEventKinds = []string{"muted", "unmuted", "held", "released", "adopted", "tracked", "untracked", "nudged", "removed", "status"}
+
+// TriggerEventKinds are the event kinds a workflow's trigger.on names: the
+// loop's, the plugins' and the task's.
+func TriggerEventKinds() []string {
+	out := slices.Clone(LoopEventKinds)
+	for _, k := range slices.Sorted(maps.Keys(EventProviders)) {
+		if !slices.Contains(out, k) {
+			out = append(out, k)
+		}
+	}
+	return append(out, wake.EventWoke)
+}
+
+// Slots name each provider's fact slot: the core providers', and each
+// plugin's.
+var Slots = coreSlots()
+
+func coreSlots() map[unit.ProviderID]string {
+	return map[unit.ProviderID]string{unit.Session: "session", unit.Workspace: "workspace", unit.Task: "task"}
+}
 
 // Providers are the providers an intent may serve: those of Slots, and a
 // plugin whose units have no workflow facts adds its own.

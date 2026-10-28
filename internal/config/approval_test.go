@@ -32,13 +32,13 @@ func TestDraftsRepeatAfterMustBePositive(t *testing.T) {
 
 func TestPluginDraftApprovalRefusesABadApproval(t *testing.T) {
 	for name, raw := range map[string]string{
-		"unknown mode":        `github = {drafts = {approval = {mode = "sometimes"}}}`,
-		"window without time": `github = {drafts = {approval = {mode = "delay"}}}`,
-		"time without window": `github = {drafts = {approval = {mode = "wait", window = "1h"}}}`,
-		"not an object":       `github = {drafts = {approval = 3}}`,
+		"unknown mode":        `plugins.github = {gates = {approval = {mode = "sometimes"}}}`,
+		"window without time": `plugins.github = {gates = {approval = {mode = "delay"}}}`,
+		"time without window": `plugins.github = {gates = {approval = {mode = "wait", window = "1h"}}}`,
+		"not an object":       `plugins.github = {gates = {approval = 3}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
-			if err := loadErr(t, raw); err == nil || !strings.Contains(err.Error(), "drafts.approval") {
+			if err := loadErr(t, raw); err == nil || !strings.Contains(err.Error(), "plugins.github.gates.approval") {
 				t.Fatalf("err = %v", err)
 			}
 		})

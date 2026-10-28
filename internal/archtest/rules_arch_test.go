@@ -228,7 +228,7 @@ var sqlAllowlist []allowed
 func ruleR13(fset *token.FileSet, file string, f *ast.File, allow []allowed, used map[int]bool) []string {
 	dir := path.Dir(file)
 	var out []string
-	if !under(dir, "internal/adapter/store/sqlite") {
+	if !under(dir, "internal/adapter/store/sqlite", pluginStore) {
 		sqlName := ""
 		for _, imp := range f.Imports {
 			if p, _ := strconv.Unquote(imp.Path.Value); p == "database/sql" {
@@ -251,7 +251,7 @@ func ruleR13(fset *token.FileSet, file string, f *ast.File, allow []allowed, use
 			return true
 		})
 	}
-	if testFile(file) || under(dir, "internal/adapter/store") {
+	if testFile(file) || under(dir, "internal/adapter/store", pluginStore) {
 		return out
 	}
 	ast.Inspect(f, func(n ast.Node) bool {

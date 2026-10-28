@@ -1,6 +1,10 @@
 package builtin
 
-import "github.com/wloophq/wloop/internal/domain/unit"
+import (
+	"slices"
+
+	"github.com/wloophq/wloop/internal/domain/unit"
+)
 
 // The roles Go resolves an intent by (Registry.ByRole).
 const (
@@ -68,19 +72,25 @@ type Role struct {
 	DrivesRow bool
 }
 
-// Roles are what Go resolves an intent by, a manifest's role.
-var Roles = []Role{
-	{Name: RoleReview, Doc: "The review round on someone else's pull request, in its review workspace: first or follow-up, reconciled with the review you published; it drives its workspace's row.",
-		Provider: unit.GitHub, RoundKind: RoundKindReview, Reconcile: ReconcileMyReview, Workspace: WorkspaceReview, Context: ContextPR, Policy: PolicyRound, DrivesRow: true},
-	{Name: RoleAddress, Doc: "The address round on a pull request you develop, in its author workspace: its reviews, failing checks and conflicts; its instructions say why it is due; it drives its workspace's row.",
-		Provider: unit.GitHub, RoundKind: RoundKindAddress, Workspace: WorkspaceAuthor, Context: ContextPR, Policy: PolicyRound, DrivesRow: true},
-	{Name: RoleNudge, Doc: "The nudge on a pull request: nudge.prepare fills its inputs from who the pull request waits on, or refuses it.",
-		Provider: unit.GitHub, Prepare: PrepareNudge, Context: ContextPR, Policy: PolicyRound},
-	{Name: RoleProbe, Doc: "The probe of an agent home: a synthetic pull request in the workspace the request names, under the probe's policy.",
-		Provider: unit.GitHub, Launch: LaunchProbe, Context: ContextSynthetic, Policy: PolicyProbe},
+// Roles are what Go resolves an intent by, a manifest's role: the core's,
+// then each plugin's.
+var Roles = slices.Clone(coreRoles)
+
+var coreRoles = []Role{
 	{Name: RoleHeadless, Doc: "The intent a headless turn on a unit runs when its request names none.",
 		Context: ContextPR, Policy: PolicyRound},
 }
+
+// The host mechanisms a plugin's role may name, by the manifest key that
+// names them.
+var (
+	RoundKinds = []string{RoundKindReview, RoundKindAddress}
+	Reconciles = []string{ReconcileMyReview}
+	Prepares   = []string{PrepareNudge}
+	Launches   = []string{LaunchProbe}
+	Contexts   = []string{ContextPR, ContextSynthetic}
+	Policies   = []string{PolicyRound, PolicyProbe}
+)
 
 // NoRole is what an intent without a role binds.
 var NoRole = Role{Context: ContextPR, Policy: PolicyRound}

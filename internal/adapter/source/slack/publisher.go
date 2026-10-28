@@ -205,7 +205,7 @@ func (p *Publisher) target(ctx context.Context, d draft.Draft, k dslack.Key, pl 
 	if len(p.Send.PostAllowlist) > 0 {
 		switch {
 		case user == "" && strings.HasPrefix(t, "@"):
-			return fmt.Errorf("%w: name the person by user id or email, not %s, while slack.post_allowlist is set", send.ErrNotAllowed, t)
+			return fmt.Errorf("%w: name the person by user id or email, not %s, while plugins.slack.post_allowlist is set", send.ErrNotAllowed, t)
 		case user == "" && strings.Contains(t, "@"):
 			u, err := p.Send.Client.UserByEmail(ctx, t)
 			if err != nil {

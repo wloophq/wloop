@@ -31,7 +31,6 @@ import (
 	coreusage "github.com/wloophq/wloop/internal/core/usage"
 	"github.com/wloophq/wloop/internal/core/views"
 	"github.com/wloophq/wloop/internal/daemon"
-	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -47,7 +46,6 @@ import (
 	"github.com/wloophq/wloop/internal/procgroup"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/source"
-	"github.com/wloophq/wloop/internal/termfmt"
 	"github.com/wloophq/wloop/internal/transport/mcp"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace"
@@ -60,61 +58,6 @@ const (
 	daemonLock   = "daemon.lock"
 	httpInfoFile = "http.json"
 )
-
-type storeRecorder struct{ store *inventory.Store }
-
-// Record writes ev once: an event with a key is stored at most once per
-// pull request, kind and key.
-func (r storeRecorder) Record(ctx context.Context, ev dinv.Event) error {
-	return r.store.RecordEvent(ctx, ev)
-}
-
-func (r storeRecorder) Overrides(ctx context.Context) (map[github.Ref]dinv.Override, error) {
-	return r.store.Overrides(ctx)
-}
-
-func (r storeRecorder) RecordUnit(ctx context.Context, ev port.Event) error {
-	return r.store.RecordUnitEvent(ctx, ev)
-}
-
-func (r storeRecorder) FirstRoundBlocks(ctx context.Context) (map[unit.Unit]port.Event, error) {
-	return r.store.FirstRoundBlocks(ctx)
-}
-
-func (r storeRecorder) KeepNextGuidance(ctx context.Context, ref github.Ref, guidance string) error {
-	return r.store.KeepNextGuidance(ctx, ref, guidance)
-}
-
-func (r storeRecorder) TakeNextGuidance(ctx context.Context, ref github.Ref) (string, error) {
-	return r.store.TakeNextGuidance(ctx, ref)
-}
-
-func (r storeRecorder) OpenQuestions(books map[unit.Unit]dturn.Book) map[github.Ref]map[string]bool {
-	out := map[github.Ref]map[string]bool{}
-	for u, b := range books {
-		ref := prOf(u)
-		for _, i := range roleIntents(b, builtin.RoleReview, builtin.RoleAddress) {
-			if b.OpenQuestion(i) {
-				if out[ref] == nil {
-					out[ref] = map[string]bool{}
-				}
-				out[ref][string(i)] = true
-			}
-		}
-	}
-	return out
-}
-
-// roleIntents are the intents of b's turns whose intent held one of roles.
-func roleIntents(b dturn.Book, roles ...string) []dturn.Intent {
-	var out []dturn.Intent
-	for _, t := range b.Turns {
-		if slices.Contains(roles, t.Role) && !slices.Contains(out, t.Intent) {
-			out = append(out, t.Intent)
-		}
-	}
-	return out
-}
 
 // runServe serves until ctx ends, or until the binary is replaced: then it
 // stops cleanly and execs the new one in place, so an upgrade needs no
@@ -198,8 +141,10 @@ func serve(ctx context.Context, e *Env, args []string) error {
 	e.serveTurns(vctx, db, store, startCfg, logf)
 	defer stopViews()
 	if e.noJobs {
-		logf("serving with --no-jobs: no collector, sweep, gate, brief, usage or retain")
+		logf("serving with --no-jobs: no collector, sweep, gate, brief, usage, retain or plugin")
 	}
+	stopPlugins := e.servePlugins(ctx, startCfg, logf)
+	defer stopPlugins()
 
 	// One loop mutex for every server this process runs: an action the
 	// degraded server delegated may still run after it stops.
@@ -293,18 +238,6 @@ func (m mcpEndpoint) wire(d daemon.Deps, cfg config.Config) daemon.Deps {
 type clockFunc func() time.Time
 
 func (f clockFunc) Now() time.Time { return f() }
-
-// restoreBudget sets the client's floors from cfg and seeds its budget with
-// the one the last sweep kept.
-func (e *Env) restoreBudget(ctx context.Context, db *sqlite.DB, cfg config.Config, logf func(string, ...any)) {
-	e.GitHub.SetFloors(github.DefaultFloors(cfg.GitHub.RateLimitFraction))
-	limits, err := storedGitHubBudget(ctx, inventory.New(db))
-	if err != nil {
-		logf("GitHub budget: %v", err)
-		return
-	}
-	e.GitHub.Restore(limits)
-}
 
 // serveDeps wires the daemon's jobs and use cases on db; the views run until
 // ctx ends. Under --no-jobs it plans no round and the views write no card.
@@ -1124,44 +1057,6 @@ func (e *Env) boardPaused(ctx context.Context, u unit.Unit) bool {
 	return err != nil || p.Holds(ref.Owner, ref.Repo)
 }
 
-func failedSteps(gh *github.Client) func(ctx context.Context, owner, repo string, job int64) ([]string, error) {
-	return func(ctx context.Context, owner, repo string, job int64) ([]string, error) {
-		resp, err := gh.REST(dgh.WithPriority(ctx, dgh.PriorityUser), github.Request{Path: fmt.Sprintf("repos/%s/%s/actions/jobs/%d", owner, repo, job)})
-		if err != nil {
-			return nil, err
-		}
-		var body struct {
-			Steps []struct {
-				Name       string `json:"name"`
-				Conclusion string `json:"conclusion"`
-			} `json:"steps"`
-		}
-		if err := json.Unmarshal(resp.Body, &body); err != nil {
-			return nil, err
-		}
-		var steps []string
-		for _, s := range body.Steps {
-			if s.Conclusion == "failure" {
-				steps = append(steps, termfmt.OneLine(s.Name, 120))
-			}
-		}
-		return steps, nil
-	}
-}
-
-// briefHome runs each brief under the agent home the configuration
-// names for the pull request's repository, when that project runs the
-// brief's agent.
-func briefHome(cfg config.Config) func(github.Ref) string {
-	return func(ref github.Ref) string {
-		c := cfg.For(ref.Owner, ref.Repo)
-		if c.Agent != cfg.Agent {
-			return cfg.AgentHome
-		}
-		return c.AgentHome
-	}
-}
-
 // serveUntilConfigLoads serves health, with the config error as the sweep's
 // warning, and returns once the config loads so the caller starts the jobs.
 // Delegated actions load the config themselves and answer with its error.
@@ -1312,14 +1207,6 @@ func (r *accessRecorder) submit(rec api.GitAccessRecord) {
 }
 
 func (r *accessRecorder) flush() { r.pending.Wait() }
-
-func refsOfUnits(units []unit.Unit) []github.Ref {
-	out := make([]github.Ref, 0, len(units))
-	for _, u := range units {
-		out = append(out, prOf(u))
-	}
-	return out
-}
 
 // fallbacksOf counts the CLI fallbacks of every manager of set that keeps a count.
 func fallbacksOf(set *workspace.Set) func() int64 {

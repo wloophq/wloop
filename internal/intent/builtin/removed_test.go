@@ -18,7 +18,8 @@ var removedKeys = map[Surface][]string{
 		"draft_approval", "withdraw"},
 	SurfaceConfig: {"workflows.*.mode", "workflows.*.approval.default", "workflows.*.draft_approval", "project_settings", "proposals",
 		"rounds", "turns.automated_per_day", "classify.daily_cap", "brief.max_diff_bytes", "slack.extraction.max_call_usd",
-		"slack.extraction.max_day_usd", "slack.extraction.max_day_calls", "plugins", "automated_reviewers", "owners",
+		"slack.extraction.max_day_usd", "slack.extraction.max_day_calls", "plugins.slack.extraction.max_call_usd",
+		"plugins.slack.extraction.max_day_usd", "plugins.slack.extraction.max_day_calls", "automated_reviewers", "owners",
 		"trusted_authors", "review_prefix", "followups_without_workspace", "address_without_workspace", "projects.trusted_authors",
 		"projects.followups_without_workspace", "projects.address_without_workspace"},
 }

@@ -20,12 +20,6 @@ type ApprovalRuleConfig struct {
 	Window Days   `json:"window,omitempty"`
 }
 
-// PluginDrafts holds the approval of the drafts a plugin's own rules
-// propose.
-type PluginDrafts struct {
-	Approval *PluginApproval `json:"approval,omitempty"`
-}
-
 // PluginGates holds the approval of the gates a plugin's own rules open.
 type PluginGates struct {
 	Approval *PluginApproval `json:"approval,omitempty"`
@@ -41,40 +35,34 @@ func (a PluginApproval) Approval() draft.Approval {
 	return draft.Approval{Mode: draft.ApprovalMode(a.Mode), Window: time.Duration(a.Window)}
 }
 
-var pluginDraftsType = reflect.TypeFor[PluginDrafts]()
+var pluginGatesType = reflect.TypeFor[PluginGates]()
 
 // PluginDraftApproval is the approval of the drafts plugin id's own rules
-// propose: its <id>.drafts.approval, wait when the config sets none.
+// propose: its plugins.<id>.gates.approval, wait when the config sets none.
 func (c Config) PluginDraftApproval(id string) draft.Approval {
-	if a := c.pluginDrafts()[id].Approval; a != nil {
+	if a := c.pluginGates()[id].Approval; a != nil {
 		return a.Approval()
 	}
 	return draft.Approval{Mode: draft.Wait}
 }
 
-// pluginDrafts are the <id>.drafts of each top-level table that has one.
-func (c Config) pluginDrafts() map[string]PluginDrafts {
-	out := map[string]PluginDrafts{}
-	v := reflect.ValueOf(c)
-	for i := range v.NumField() {
-		f := v.Type().Field(i)
-		name := jsonName(f)
-		if f.Type.Kind() != reflect.Struct || name == "" || name == "-" {
-			continue
-		}
-		if d := v.Field(i).FieldByName("Drafts"); d.IsValid() && d.Type() == pluginDraftsType {
-			out[name] = d.Interface().(PluginDrafts)
+// pluginGates are the gates of each bundled plugin's table.
+func (c Config) pluginGates() map[string]PluginGates {
+	out := map[string]PluginGates{}
+	for id, f := range c.Plugins.bundled() {
+		if g := f.FieldByName("Gates"); g.IsValid() && g.Type() == pluginGatesType {
+			out[id] = g.Interface().(PluginGates)
 		}
 	}
 	return out
 }
 
 func (c Config) validatePluginDrafts() error {
-	drafts := c.pluginDrafts()
-	for _, id := range slices.Sorted(maps.Keys(drafts)) {
-		if a := drafts[id].Approval; a != nil {
+	gates := c.pluginGates()
+	for _, id := range slices.Sorted(maps.Keys(gates)) {
+		if a := gates[id].Approval; a != nil {
 			if err := a.Approval().Validate(); err != nil {
-				return fmt.Errorf("%s.drafts.approval: %w", id, err)
+				return fmt.Errorf("plugins.%s.gates.approval: %w", id, err)
 			}
 		}
 	}

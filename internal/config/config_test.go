@@ -61,7 +61,7 @@ func TestLoadOverridesAndExpandsHome(t *testing.T) {
 [turns]
 per_unit_per_day = 2
 
-[github]
+[plugins.github]
 owners = ["acme"]
 `), 0o600); err != nil {
 		t.Fatal(err)
@@ -183,7 +183,7 @@ func TestFollowupsWithoutWorkspaceIsPerProject(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	file := filepath.Join(dir, "config.toml")
-	raw := `[github]
+	raw := `[plugins.github]
 followups_without_workspace = true
 
 [[projects]]
@@ -226,7 +226,7 @@ func TestAddressWithoutWorkspaceIsPerProject(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	file := filepath.Join(dir, "config.toml")
-	raw := `[github]
+	raw := `[plugins.github]
 address_without_workspace = true
 
 [[projects]]
@@ -278,16 +278,16 @@ func TestCockpitDefaults(t *testing.T) {
 func TestLoadCockpitKeys(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "config.toml")
-	os.WriteFile(file, []byte(`[github]
+	os.WriteFile(file, []byte(`[plugins.github]
 rate_limit_fraction = 0.3
 
-[github.scope]
+[plugins.github.scope]
 people = ["ana"]
 teams = ["acme/search"]
 repos = ["acme/api"]
 watch = ["bruno"]
 
-[github.stalled]
+[plugins.github.stalled]
 review = "3d"
 reply = "12h"
 
@@ -321,8 +321,8 @@ port = 47899
 func TestLoadRejectsOutOfRangeCockpitKeys(t *testing.T) {
 	for _, body := range []string{
 		`sweep = {fast = "0s"}`,
-		`github = {stalled = {review = "-1d"}}`,
-		`github = {rate_limit_fraction = 2}`,
+		`plugins.github = {stalled = {review = "-1d"}}`,
+		`plugins.github = {rate_limit_fraction = 2}`,
 		`http = {port = 70000}`,
 		`mcp = {port = 0}`,
 		`mcp = {port = 65536}`,
@@ -380,7 +380,7 @@ func TestTrustedAuthorsPerProject(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	file := filepath.Join(dir, "config.toml")
-	raw := `[github]
+	raw := `[plugins.github]
 trusted_authors = ["a[bot]"]
 
 [[projects]]
@@ -411,7 +411,7 @@ func TestEmptyTrustedAuthorIsRefused(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	for _, raw := range []string{
-		`github = {trusted_authors = ["a[bot]", " "]}`,
+		`plugins.github = {trusted_authors = ["a[bot]", " "]}`,
 		`projects = [{match = "acme/*", github = {trusted_authors = [""]}}]`,
 	} {
 		file := filepath.Join(dir, "config.toml")
@@ -556,7 +556,7 @@ agent_hom = "/h"
 [workflows.address.approval]
 windw = "1m"
 
-[github.drafts.aproval]
+[plugins.github.gates.aproval]
 `
 	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 		t.Fatal(err)
@@ -566,7 +566,7 @@ windw = "1m"
 	if !errors.As(err, &unknown) || unknown.File != path {
 		t.Fatalf("err %v", err)
 	}
-	want := []string{"agnet", "github.drafts.aproval", "projects[0].agent_hom", "sweep.fsat", "workflows.address.approval.windw"}
+	want := []string{"agnet", "plugins.github.gates.aproval", "projects[0].agent_hom", "sweep.fsat", "workflows.address.approval.windw"}
 	if !slices.Equal(unknown.Keys, want) || !strings.Contains(err.Error(), path+": unknown keys agnet, ") || !strings.Contains(err.Error(), "; sweep.fsat: did you mean \"fast\"?") {
 		t.Fatalf("keys %v, error %q", unknown.Keys, err)
 	}
@@ -665,7 +665,7 @@ func TestLoadRefusesWrongKindsInTOML(t *testing.T) {
 		"[sweep]\nfast = 5":                      "sweep.fast",
 		"[sweep]\nfast = 1979-05-27":             "sweep.fast",
 		"[turns]\nper_day = 1.5":                 "turns.per_day",
-		"[github]\nowners = \"acme\"":            "github.owners",
+		"[plugins.github]\nowners = \"acme\"":    "plugins.github.owners",
 		"[views.orca.columns]\nready = 07:00:00": "views.orca.columns.ready",
 		"[headless]\nper_call_usd = inf":         "headless.per_call_usd",
 		"[turns]\nper_day = nan":                 "turns.per_day",

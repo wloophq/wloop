@@ -179,17 +179,19 @@ func TestIsolatedConfigDisablesAutomation(t *testing.T) {
 		t.Fatal(err)
 	}
 	var doc struct {
-		Slack struct {
-			KeychainService string   `toml:"keychain_service"`
-			PostAllowlist   []string `toml:"post_allowlist"`
-			RequestLog      bool     `toml:"request_log"`
-		} `toml:"slack"`
+		Plugins struct {
+			Slack struct {
+				KeychainService string   `toml:"keychain_service"`
+				PostAllowlist   []string `toml:"post_allowlist"`
+				RequestLog      bool     `toml:"request_log"`
+			} `toml:"slack"`
+		} `toml:"plugins"`
 	}
 	if err := toml.Unmarshal(raw, &doc); err != nil {
 		t.Fatal(err)
 	}
-	if doc.Slack.KeychainService != "wloop-e2e-slack" || !slices.Equal(doc.Slack.PostAllowlist, []string{isolatedDM}) || !doc.Slack.RequestLog {
-		t.Errorf("slack %+v", doc.Slack)
+	if s := doc.Plugins.Slack; s.KeychainService != "wloop-e2e-slack" || !slices.Equal(s.PostAllowlist, []string{isolatedDM}) || !s.RequestLog {
+		t.Errorf("slack %+v", s)
 	}
 	for _, sub := range []string{"state", "config", "gh", "bin", "home"} {
 		if fi, err := os.Stat(filepath.Join(dir, sub)); err != nil || fi.Mode().Perm() != 0o700 {

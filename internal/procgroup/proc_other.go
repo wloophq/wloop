@@ -15,3 +15,9 @@ func KillAll() {}
 
 // Track does nothing without process groups.
 func Track(string) error { return nil }
+
+// Prepare does nothing without process groups.
+func Prepare(cmd *exec.Cmd) { cmd.WaitDelay = grace }
+
+// Adopt does nothing without process groups.
+func Adopt(int) (release func()) { return func() {} }

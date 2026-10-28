@@ -142,7 +142,7 @@ func TestASessionThatCannotTakeTheRoundIsAbandoned(t *testing.T) {
 
 func TestTrusts(t *testing.T) {
 	t.Parallel()
-	cfg := config.Config{GitHub: config.GitHub{TrustedAuthors: []string{"bot[bot]"}}}
+	cfg := config.Config{Plugins: config.Plugins{GitHub: config.GitHub{TrustedAuthors: []string{"bot[bot]"}}}}
 	for _, c := range []struct {
 		name string
 		pr   github.PullRequest

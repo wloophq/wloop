@@ -59,7 +59,7 @@ func TestMeFromEveryEnabledModule(t *testing.T) {
 	off = withIdentity(off, items.Person{Key: "off:someone"})
 	cfg := Defaults()
 	no := false
-	cfg.Plugins = map[string]config.Plugin{"off": {Enabled: &no}}
+	cfg.Plugins.Other = map[string]config.Plugin{"off": {Enabled: &no}}
 	mods, err := buildSources([]source.Plugin{gh, thread, off}, cfg, source.Deps{DB: db, Inventory: st, Clock: clockFunc(te.Now)})
 	if err != nil {
 		t.Fatal(err)

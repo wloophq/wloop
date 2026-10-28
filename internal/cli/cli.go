@@ -19,6 +19,8 @@ import (
 	"syscall"
 	"time"
 
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
@@ -53,6 +55,7 @@ import (
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/meter"
+	"github.com/wloophq/wloop/internal/plugins/host"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace"
 )
@@ -171,6 +174,13 @@ type Env struct {
 	// whatever the config selects.
 	Managers map[string]ManagerEntry
 
+	// plugins are the plugins found on disk, which serve runs; nil when
+	// none is.
+	plugins []host.Plugin
+	// pluginKind is serve's source kind: the clients and the snapshots of
+	// the source plugins it runs.
+	pluginKind *psource.Kind
+
 	// noJobs is serve --no-jobs: the daemon plans no round and writes no
 	// Orca card; it still writes unit cards and derived items to its store.
 	noJobs bool
@@ -245,6 +255,7 @@ func NewEnv() *Env {
 	agents, homes, protocols := agentRegistries(defaultAgents())
 	home := config.Home()
 	e := &Env{
+		plugins:       installed,
 		background:    &sync.WaitGroup{},
 		Out:           os.Stdout,
 		Err:           os.Stderr,

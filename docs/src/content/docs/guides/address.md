@@ -52,17 +52,17 @@ Failing checks or a conflict alone never start a round without a workspace. With
 address_without_workspace = true
 ```
 
-It can also go on a `[[projects]]` entry, as `github.address_without_workspace = true`, for some repositories only.
+It can also go on a `[[projects]]` entry, as `plugins.github.address_without_workspace = true`, for some repositories only.
 
 ## Turn it down
 
 | Setting | Effect |
 |---|---|
-| `github.address_reviews = false` | no round for reviews |
-| `github.address_skip_reviewers = ["some-bot"]` | reviews by these logins never start one |
-| `github.address_checks = false` | no round for failing checks |
-| `github.ignore_checks = ["codecov/patch"]` | these checks never start one |
-| `github.address_conflicts = false` | no round for a conflict with the base |
+| `plugins.github.address_reviews = false` | no round for reviews |
+| `plugins.github.address_skip_reviewers = ["some-bot"]` | reviews by these logins never start one |
+| `plugins.github.address_checks = false` | no round for failing checks |
+| `plugins.github.ignore_checks = ["codecov/patch"]` | these checks never start one |
+| `plugins.github.address_conflicts = false` | no round for a conflict with the base |
 | `turns.per_unit_per_day = 5` | at most this many automatic rounds per pull request per day, against a loop with a bot that reviews every push |
 | `workflows.address.only_when = 'pr.visibility == "private"'` | automatic rounds only in private repositories; any [workflow predicate](/guides/workflows/#narrow-one-to-some-pull-requests) over the owner, repository or author works the same way |
 
@@ -79,7 +79,7 @@ Verify each finding of @review-bot against the code. Fix the ones that hold;
 answer a wrong one with `@review-bot /dismiss <finding-id> <reason>`.
 ```
 
-The match is membership: a round that answers a person and the bot gets the bot's block too. A login in `github.address_skip_reviewers` is never among them, so its block never applies. A round asked for by hand lists the reviewers of the current head, marking those an earlier round already covered; it lists none until {{name}} has read the pull request in full.
+The match is membership: a round that answers a person and the bot gets the bot's block too. A login in `plugins.github.address_skip_reviewers` is never among them, so its block never applies. A round asked for by hand lists the reviewers of the current head, marking those an earlier round already covered; it lists none until {{name}} has read the pull request in full.
 
 ## How the guide reads
 

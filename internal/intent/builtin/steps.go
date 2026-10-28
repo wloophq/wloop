@@ -1,6 +1,7 @@
 package builtin
 
 import (
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -59,7 +60,7 @@ func verbNames(vs ...task.Verb) []string {
 
 // The values of draft.propose's arguments.
 var (
-	DraftDeliveries = []string{"message", "reaction", "comment"}
+	DraftDeliveries = []string{string(draft.Message), string(draft.Reaction)}
 	// DraftEmojiDeliveries are the deliveries that post an emoji, which
 	// need the reaction argument, and no text.
 	DraftEmojiDeliveries = []string{"reaction"}
@@ -75,16 +76,22 @@ var (
 var TurnRunners = []string{"session", "headless"}
 
 // Steps is the step vocabulary of workflow manifests.
-var Steps = []StepDef{
+var Steps = stepsWith(nil)
+
+// PluginSteps are the steps that run only on the units of the plugins whose
+// manifest lists them in steps; with none, a workflow cannot name them.
+var PluginSteps = []string{StepAnswerRefuse}
+
+var coreSteps = []StepDef{
 	{"session.close", providers(unit.Session), workflow.ReachLocal, nil,
 		"Closes the agent session."},
 	{"workspace.remove", providers(unit.Workspace), workflow.ReachLocal, nil,
 		"Removes the workspace, after its guards. Never with `force`: a manifest that sets it fails to load."},
 	{"workspace.unregister", providers(unit.Workspace), workflow.ReachLocal, nil,
 		"Unregisters a workspace whose path is gone."},
-	{StepTurnDismiss, providers(unit.Session, unit.GitHub), workflow.ReachLocal, nil,
+	{StepTurnDismiss, providers(unit.Session), workflow.ReachLocal, nil,
 		"Dismisses the open turn, recording the reason."},
-	{StepAnswerRefuse, providers(unit.GitHub), workflow.ReachLocal, nil,
+	{StepAnswerRefuse, nil, workflow.ReachLocal, nil,
 		"Refuses a queued answer whose route is gone."},
 	{"session.mark_dormant", providers(unit.Session), workflow.ReachLocal, nil,
 		"Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it."},

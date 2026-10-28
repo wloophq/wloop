@@ -61,7 +61,7 @@ To stop the automatic rounds on one pull request:
 
 ## First rounds on their own
 
-A pull request that requests your review by name, from a trusted author in an allowed owner, gets a first round without your asking. Limit it with `github.owners` (the GitHub owners automated rounds run for) and widen it with `github.trusted_authors` (logins such as `github-actions[bot]` whose pull requests count as trusted). `{{command}} plan --unit <url>` says why a requested review got no first round. Turn first rounds off with:
+A pull request that requests your review by name, from a trusted author in an allowed owner, gets a first round without your asking. Limit it with `plugins.github.owners` (the GitHub owners automated rounds run for) and widen it with `plugins.github.trusted_authors` (logins such as `github-actions[bot]` whose pull requests count as trusted). `{{command}} plan --unit <url>` says why a requested review got no first round. Turn first rounds off with:
 
 ```toml
 [workflows.review-first-round]
@@ -70,7 +70,7 @@ enabled = false
 
 ## The checkout's own agent settings
 
-A review session runs in the pull request's head, and by default loads that checkout's agent settings like any session there: `.claude/settings.json`, `.claude/settings.local.json`, the servers of `.mcp.json` and `CLAUDE.md`. Someone who can push to the pull request can change them. A pull request that fails the trust check (a fork, or an author outside the members, collaborators, owners and `github.trusted_authors`) never loads them, in a round you start by hand too, so its session runs in a manager that can start Claude Code with your user settings alone, such as Orca. `intents.<intent>.project_settings.when` turns them off where a predicate over the pull request's [facts](/reference/facts/#intent-facts) does not hold:
+A review session runs in the pull request's head, and by default loads that checkout's agent settings like any session there: `.claude/settings.json`, `.claude/settings.local.json`, the servers of `.mcp.json` and `CLAUDE.md`. Someone who can push to the pull request can change them. A pull request that fails the trust check (a fork, or an author outside the members, collaborators, owners and `plugins.github.trusted_authors`) never loads them, in a round you start by hand too, so its session runs in a manager that can start Claude Code with your user settings alone, such as Orca. `intents.<intent>.project_settings.when` turns them off where a predicate over the pull request's [facts](/reference/facts/#intent-facts) does not hold:
 
 ```toml
 [intents.review.project_settings]

@@ -173,7 +173,7 @@ func TestTurnFactsOfASample(t *testing.T) {
 		"turn.automated": false, "turn.owned": false, "turn.needs_take_over": false, "turn.resume": false,
 		"turn.try": false, "turn.planned": "", "turn.stage": "first", "unit.ref": "acme/api#7",
 		"pr.last_review.exists": true, "pr.last_review.verdict": "", "pr.last_review.decision": "APPROVED",
-		"config.github.address_reviews": false, "config.github.address_checks": false, "config.github.followups_without_workspace": false, "config.github.address_without_workspace": false,
+		"config.plugins.github.address_reviews": false, "config.plugins.github.address_checks": false, "config.plugins.github.followups_without_workspace": false, "config.plugins.github.address_without_workspace": false,
 	}
 	var seen []string
 	for _, f := range builtin.Facts {

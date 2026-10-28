@@ -88,9 +88,9 @@ doc     = "Who asked for the task."
 
 [props.kind]
 type    = "enum"
-values  = ["start", "capture", "project", "pull-request", "thread"]
+values  = ["start", "capture", "project"]
 writers = ["plugin", "workflow"]
-doc     = "What the task is: new work, a capture, a project, a pull request or a thread."
+doc     = "What the task is: new work, a capture, a project, or a kind a plugin gives its units' tasks, such as a pull request or a thread."
 
 [props.area]
 type    = "string"

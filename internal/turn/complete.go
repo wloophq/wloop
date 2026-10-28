@@ -242,13 +242,13 @@ func (f turnFacts) Get(field string) any {
 			return ""
 		}
 		return c.prior().Verdict
-	case "config.github.address_reviews":
+	case "config.plugins.github.address_reviews":
 		return c.Facts.AddressReviews
-	case "config.github.address_checks":
+	case "config.plugins.github.address_checks":
 		return c.Facts.AddressChecks
-	case "config.github.followups_without_workspace":
+	case "config.plugins.github.followups_without_workspace":
 		return c.Facts.FollowupsWithoutWorkspace
-	case "config.github.address_without_workspace":
+	case "config.plugins.github.address_without_workspace":
 		return c.Facts.AddressWithoutWorkspace
 	}
 	return nil

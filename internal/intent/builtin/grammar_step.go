@@ -7,7 +7,7 @@ var stepGrammar = []Key{
 	stepEnum(StepTurnStart, "runner", TurnRunners, "", "How the turn runs, one of the intent's runners; by default its first."),
 
 	required(stepKey(StepDraftPropose, "purpose", KindText, "", "What the draft is for, such as nudge or close. Required.")),
-	stepEnum(StepDraftPropose, "delivery", DraftDeliveries, DraftDeliveries[0], "How the draft posts."),
+	{Path: "delivery", In: SurfaceStep, Step: StepDraftPropose, Kind: KindEnum, Values: func() []Value { return names(DraftDeliveries) }, Default: DraftDeliveries[0], Doc: "How the draft posts: the core's message or reaction, or a delivery a plugin declares."},
 	stepKey(StepDraftPropose, "text", KindFile, "text.md.tmpl", "The template of the draft's text, beside the manifest."),
 	stepKey(StepDraftPropose, "reaction", KindText, "", "The emoji name, with delivery reaction."),
 	stepEnum(StepDraftPropose, "items", DraftItems, "all", "Which of the unit's items the draft lists."),

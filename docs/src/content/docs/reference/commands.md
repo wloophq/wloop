@@ -629,7 +629,7 @@ Connect to Slack, or disconnect.
 {{command}} slack logout
 ```
 
-Log in to Slack in the browser; it needs slack.client_id in the config. `--app-token` saves the app-level token read from standard input. logout revokes and deletes the tokens.
+Log in to Slack in the browser; it needs plugins.slack.client_id in the config. `--app-token` saves the app-level token read from standard input. logout revokes and deletes the tokens.
 
 | Flag | Description |
 | --- | --- |

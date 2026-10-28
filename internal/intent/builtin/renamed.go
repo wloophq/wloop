@@ -3,7 +3,6 @@ package builtin
 import (
 	"strings"
 
-	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
@@ -21,13 +20,33 @@ var Renamed = []Rename{
 	{"entry.unit_started_by_me", "task.link_started_by_me"},
 	{"entry.unit_closure_posted", "task.link_closure_posted"},
 	{"entry.", "task."},
-	{string(dslack.Provider) + ".live_entry", string(dslack.Provider) + ".live_task"},
+	{"slack.live_entry", "slack.live_task"},
 	{"config.gtd.", "config.tasks."},
 	{"gtd.", "tasks."},
 	{"gtd", "tasks"},
 	{"entry", "task"},
 	{"entry-results-ended", "task-results-ended"},
+	{"guidance.handed", "pr.guidance_handed"},
+	{"config.github.", "config.plugins.github."},
 }
+
+// RenamedKeys are the configuration keys a release renamed or moved, each
+// with the key that replaced it, the most specific first. An Old ending in
+// "." renames every key it prefixes.
+var RenamedKeys = []Rename{
+	{"github.drafts.approval", "plugins.github.gates.approval"},
+	{"github.drafts.approval.", "plugins.github.gates.approval."},
+	{"slack.drafts.approval", "plugins.slack.gates.approval"},
+	{"slack.drafts.approval.", "plugins.slack.gates.approval."},
+	{"github", "plugins.github"},
+	{"github.", "plugins.github."},
+	{"slack", "plugins.slack"},
+	{"slack.", "plugins.slack."},
+}
+
+// KeyRenamedTo is the configuration key that replaced old, "" when old was
+// never renamed.
+func KeyRenamedTo(old string) string { return renamedIn(RenamedKeys, old) }
 
 // RenamedFiles are the profile files a release renamed or split, and where
 // what each held is read now.
@@ -36,8 +55,10 @@ var RenamedFiles = map[string]string{
 }
 
 // RenamedTo is the name that replaced old, "" when old was never renamed.
-func RenamedTo(old string) string {
-	for _, r := range Renamed {
+func RenamedTo(old string) string { return renamedIn(Renamed, old) }
+
+func renamedIn(table []Rename, old string) string {
+	for _, r := range table {
 		if r.Old == old {
 			return r.New
 		}

@@ -357,7 +357,22 @@ func loadTasks(layers []profile.Layer, bundled fs.FS, gates *GatesDef) (TasksDef
 		return l.def, problems
 	}
 	problems = append(problems, missingVerbs(l.def.Verbs)...)
+	l.def.withPluginKinds()
 	return l.def, append(problems, l.check(gates)...)
+}
+
+// withPluginKinds adds to the kind property, when an enum, the task kinds
+// the plugins' manifests give their units' tasks.
+func (d *TasksDef) withPluginKinds() {
+	i := slices.IndexFunc(d.Props, func(p PropDef) bool { return p.Name == task.PropKind && p.Type == task.PropEnum })
+	if i < 0 {
+		return
+	}
+	for _, k := range builtin.PluginTaskKinds {
+		if !slices.Contains(d.Props[i].Values, k) {
+			d.Props[i].Values = append(slices.Clip(d.Props[i].Values), k)
+		}
+	}
 }
 
 // merge lays file over the definition so far.

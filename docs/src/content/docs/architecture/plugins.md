@@ -3,7 +3,7 @@ title: Plugins
 description: How a source of units plugs into the core, what it contributes, and the boundary that keeps the core free of it.
 ---
 
-The core of {{name}} is a task system over opaque units: tasks, the Inbox, the Outbox, projects, the review, the turns, the workflows and the read model work on `unit.Unit{Provider, Key}` and never on a pull request or a Slack thread. Where units come from is a plugin's business. The plugins are compiled in, `github` and `slack`, with no plugin framework and no plugins loaded at run time.
+The core of {{name}} is a task system over opaque units: tasks, the Inbox, the Outbox, projects, the review, the turns, the workflows and the read model work on `unit.Unit{Provider, Key}` and never on a pull request or a Slack thread. Where units come from is a plugin's business. The bundled plugins, `github` and `slack`, are compiled in for now; the daemon also runs plugins as their own processes, through the plugin host below.
 
 ## A plugin
 
@@ -36,7 +36,29 @@ The UI comes in three tiers: the card, which every surface renders the same way 
 
 ## A disabled plugin
 
-`<id>.enabled = false` (`github.enabled`, `slack.enabled`) leaves the module unbuilt: no ingestion, rows, jobs, facts, items, actions, notifications, MCP tools or publisher. Its codec stays, cards render from the stored snapshot, and every write to one of its units answers `409 {"error": "<id> is disabled"}` before the handler runs. On a task, Dismiss still works: it detaches the disabled plugin's units and their items, and an item's link to such a unit is stored and left out while the plugin is off ([Tasks and views](/concepts/tasks/)). The core works with no plugin enabled.
+`[plugins.<id>] enabled = false` (`plugins.github.enabled`, `plugins.slack.enabled`) leaves the module unbuilt: no ingestion, rows, jobs, facts, items, actions, notifications, MCP tools or publisher. Its codec stays, cards render from the stored snapshot, and every write to one of its units answers `409 {"error": "<id> is disabled"}` before the handler runs. On a task, Dismiss still works: it detaches the disabled plugin's units and their items, and an item's link to such a unit is stored and left out while the plugin is off ([Tasks and views](/concepts/tasks/)). The core works with no plugin enabled.
+
+A disabled plugin's vocabulary still merges and its codec still parses its keys, so a configuration or a profile that names its facts, keys or units loads as it does while it is on; its profile layer does not load and its process does not run.
+
+## The vocabulary
+
+`internal/intent/builtin` holds the core's rows only: no fact, effect, role, step provider, slot, payload root, event kind, row kind, delivery or task kind of a plugin (`TestBuiltinHasNoProviderRows`), and it imports no plugin's domain. Each plugin's rows come from the `[source]` table of its `plugin.toml`: `builtin.Merge` maps every source table onto the tables, refusing one that takes a core slot, name or provider, or whose role names a mechanism the host does not have, and `builtin.Install` makes the result the tables. The bundled plugins' manifests live in `plugins/<id>/plugin.toml` and `internal/plugins/bundled` installs their vocabulary when it initializes; the command's `main` installs the bundled and the found plugins' vocabulary once, before the configuration and the profile load. A fact of the manifest is a workflow fact of the plugin's slot and, with `slots`, an intent fact its intents alone read. The task kind values a manifest declares join `tasks.toml`'s `kind`. `make docs-ref` reads the bundled manifests.
+
+The codec of every plugin comes from its manifest (`internal/plugins/codec`), for an enabled plugin and a disabled one alike, and `Unit.Label` asks it how a person reads a key.
+
+## The plugin host
+
+`internal/plugins/host` runs plugin processes of any kind, and one adapter per kind connects a started process to the daemon (`internal/plugins/source` for sources):
+
+- **Discovery.** A plugin is a directory with its `plugin.toml`, its binary (`<command>-plugin-<id>`) and its profile layer (`profile/`), in `<config>/plugins/<id>/` or in the bundled directory beside the daemon's binary, `plugins/<id>/`; a user's directory overrides a bundled one of the same id.
+- **Trust.** A bundled plugin runs only with the SHA-256 its install recorded (`<state>/plugins/checksums`, which go-plugin checks); a bundled plugin with no record is a development build, run by its path and logged as such. Any other binary runs only with `[plugins.<id>] trust = "path"`, which only you write; the daemon's log names the path of each plugin it runs and how it is trusted.
+- **Start.** `serve` starts every enabled plugin it trusts, each the leader of a process group the daemon lists (`procgroup`); `serve --no-jobs` starts none. The source adapter serves the broker to the plugin and starts its kind; until it runs, its units keep their last snapshot, marked stale.
+- **Restart.** A plugin whose process ends is restarted after a backoff that doubles from a second to five minutes, and starts again from a second after a run longer than that; while it is down its units are stale.
+- **Shutdown.** When the daemon stops, each plugin's kinds get `Stop`, then its process is killed and go-plugin's clients cleaned up. There is no reattach.
+
+A plugin's profile layer loads while the plugin is enabled: the plugin's `profile/`, after the bundled profile, then your `plugins/<id>/` beside your profile's own files, after it (`profile.Chain`).
+
+`pkg/plugin/store` is a plugin's own SQLite store in its state directory, `<state>/plugins/<id>/`: it applies the plugin's migrations and imports the `import.db` the host exported for it once.
 
 ## The boundary
 

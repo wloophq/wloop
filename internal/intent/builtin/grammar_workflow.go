@@ -5,9 +5,6 @@ import (
 	"slices"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/domain/task"
-	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
@@ -22,7 +19,7 @@ var workflowGrammar = slices.Concat([]Key{
 	{Path: "marks.*", In: SurfaceWorkflow, Kind: KindFact, Doc: "The fact whose value the mark stores."},
 	{Path: "observe", In: SurfaceWorkflow, Kind: KindBool, Default: "false", Doc: "Plans items pending and never runs them by itself; a person applies an item by hand."},
 	{Path: "trigger", In: SurfaceWorkflow, Kind: KindTable, Doc: "What plans the workflow: on or schedule; absent, every sweep."},
-	{Path: "trigger.on", In: SurfaceWorkflow, Kind: KindList, Elem: KindEnum, Values: named(slices.Concat(inventory.EventKinds, task.VerbEventKinds, []string{wake.EventWoke})...), Doc: "The source event kinds the workflow reacts to; verb_<verb>, a verb a person ran on a task, and task.woke, a task's wake matched, with provider task."},
+	{Path: "trigger.on", In: SurfaceWorkflow, Kind: KindList, Elem: KindEnum, Values: func() []Value { return names(TriggerEventKinds()) }, Doc: "The source event kinds the workflow reacts to; verb_<verb>, a verb a person ran on a task, and task.woke, a task's wake matched, with provider task."},
 	{Path: "trigger.schedule", In: SurfaceWorkflow, Kind: KindText, Doc: "A cron schedule, in local time."},
 	{Path: "trigger.actors", In: SurfaceWorkflow, Kind: KindList, Elem: KindEnum, Values: actorValues, Doc: "With on, the actors whose events plan it; every actor when absent."},
 	{Path: "trigger.depth", In: SurfaceWorkflow, Kind: KindInt, Default: "3", Doc: "With on, the longest chain of workflows triggering each other the event may close; at most 5."},

@@ -17,7 +17,7 @@ import (
 // CursorBackfill is set once the first start's backfill finished.
 const CursorBackfill = "backfill"
 
-// DefaultSince is how far back the backfill reads without slack.ingest.since.
+// DefaultSince is how far back the backfill reads without plugins.slack.ingest.since.
 const DefaultSince = 7 * 24 * time.Hour
 
 const (
@@ -32,7 +32,7 @@ func (pl *poller) backfilled(ctx context.Context) (bool, error) {
 	return v != "", err
 }
 
-// since is the backfill's start: slack.ingest.since, else DefaultSince ago.
+// since is the backfill's start: plugins.slack.ingest.since, else DefaultSince ago.
 func (pl *poller) since(now time.Time) time.Time {
 	if s := pl.p.cfg.Ingest.Since; s != "" {
 		if t, err := time.Parse(time.DateOnly, s); err == nil {
@@ -46,7 +46,7 @@ func (pl *poller) since(now time.Time) time.Time {
 type threadKey struct{ conv, anchor string }
 
 // backfill reads the DMs and group DMs, the viewer's messages and the
-// mentions of the viewer since slack.ingest.since, with every thread they
+// mentions of the viewer since plugins.slack.ingest.since, with every thread they
 // sit in, through the socket's admission; then sets CursorBackfill.
 func (pl *poller) backfill(ctx context.Context) error {
 	src := pl.p.src

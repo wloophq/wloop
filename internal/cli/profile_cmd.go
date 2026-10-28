@@ -219,7 +219,7 @@ func runProfileWhere(e *Env, args []string) error {
 	_, statErr := os.Stat(file)
 	exists := statErr == nil
 	if !exists {
-		tree.Blocks = append(tree.Blocks, profile.Block{Layer: profile.Chain(cfg)[1], File: file, Path: p})
+		tree.Blocks = append(tree.Blocks, profile.Block{Layer: profile.Layer{Name: "user", Source: cfg.Profile, Dir: cfg.Profile}, File: file, Path: p})
 	}
 	g := tree.Compose(kinds[0], conds.facts())
 	state := "exists"

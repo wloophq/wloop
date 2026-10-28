@@ -35,7 +35,7 @@ Inside a round, the procedure publishes on its own except when one of these hold
 - it is unsure whether a finding blocks, or the verdict depends on intent the pull request does not state;
 - it would approve a change to an irreversible or risky surface (your profile lists them: schema migrations, data deletion, auth, billing, infrastructure by default);
 - a finding alleges a security problem;
-- the review would contradict a decision another human reviewer left. Bots and the logins in `github.automated_reviewers` never trigger this.
+- the review would contradict a decision another human reviewer left. Bots and the logins in `plugins.github.automated_reviewers` never trigger this.
 
 An address round stops the same way before a deep change of direction, an irreversible surface, or declining a blocking request.
 

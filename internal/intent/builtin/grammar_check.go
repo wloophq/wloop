@@ -29,6 +29,9 @@ func bare(s string) string { return strings.ReplaceAll(s, "[]", "") }
 
 func check(all []Key, surface Surface, doc map[string]any) []Problem {
 	w := walker{rows: rowsOf(all, surface)}
+	if surface == SurfaceConfig {
+		w.renamed = KeyRenamedTo
+	}
 	w.table(nil, "", doc)
 	return w.problems
 }
@@ -36,6 +39,8 @@ func check(all []Key, surface Surface, doc map[string]any) []Problem {
 type walker struct {
 	rows     []Key
 	problems []Problem
+	// renamed is the key that replaced a document path, "" for none.
+	renamed func(path string) string
 }
 
 func (w *walker) add(path, format string, args ...any) {
@@ -51,7 +56,9 @@ func (w *walker) table(pat []string, at string, m map[string]any) {
 		}
 		seg, ok := w.match(pat, k)
 		if !ok {
-			w.unknown(pat, k, path)
+			if !w.moved(path, m[k]) {
+				w.unknown(pat, k, path)
+			}
 			continue
 		}
 		w.value(append(slices.Clone(pat), seg), path, m[k])
@@ -75,6 +82,14 @@ func (w *walker) match(pat []string, k string) (string, bool) {
 		}
 	}
 	return wild, wild != ""
+}
+
+// parent says whether a row lies under pat.
+func (w *walker) parent(pat []string) bool {
+	return slices.ContainsFunc(w.rows, func(r Key) bool {
+		s := segments(r.Path)
+		return len(s) > len(pat) && slices.Equal(s[:len(pat)], pat)
+	})
 }
 
 func (w *walker) row(pat []string) (Key, bool) {
@@ -110,6 +125,9 @@ func (w *walker) value(pat []string, path string, v any) {
 	case map[string]any:
 		if isRow && !slices.Contains([]Kind{KindTable, KindMap, KindAny}, r.Kind) {
 			w.add(path, "must be %s, not a table", kindName(r.Kind))
+			return
+		}
+		if isRow && r.Kind == KindAny && r.Values == nil && !w.parent(pat) {
 			return
 		}
 		w.table(pat, path, x)
@@ -253,6 +271,44 @@ func OrList(names []string) string {
 		return strings.Join(q, "")
 	}
 	return strings.Join(q[:len(q)-1], ", ") + " or " + q[len(q)-1]
+}
+
+// moved reports a key that was renamed, at path with value v, naming the
+// key that replaced it; under a renamed table it reports instead each key
+// whose own rename differs from its table's, such as a moved and renamed
+// approval. False when path was never renamed.
+func (w *walker) moved(path string, v any) bool {
+	if w.renamed == nil {
+		return false
+	}
+	n := w.renamed(path)
+	if n == "" {
+		return false
+	}
+	var deeper []string
+	var walk func(at string, v any)
+	walk = func(at string, v any) {
+		m, ok := v.(map[string]any)
+		if !ok {
+			return
+		}
+		for _, k := range slices.Sorted(maps.Keys(m)) {
+			sub := at + "." + k
+			if r := w.renamed(sub); r != "" && r != w.renamed(at)+"."+k {
+				deeper = append(deeper, sub)
+				continue
+			}
+			walk(sub, m[k])
+		}
+	}
+	walk(path, v)
+	if len(deeper) == 0 {
+		deeper = []string{path}
+	}
+	for _, p := range deeper {
+		w.problems = append(w.problems, Problem{Path: p, Msg: fmt.Sprintf("renamed; did you mean %q?", w.renamed(p)), Near: w.renamed(p), Unknown: true})
+	}
+	return true
 }
 
 func (w *walker) unknown(pat []string, k, path string) {

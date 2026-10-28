@@ -224,7 +224,7 @@ func TestSlackLoginNeedsAClientID(t *testing.T) {
 	t.Parallel()
 	te := newSlackTestEnv(t)
 	te.cfg.Slack.ClientID = ""
-	if code := te.run("slack", "login"); code != 1 || !strings.Contains(te.err.String(), "slack.client_id") {
+	if code := te.run("slack", "login"); code != 1 || !strings.Contains(te.err.String(), "plugins.slack.client_id") {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	if len(te.kc.services) != 0 {
@@ -412,7 +412,7 @@ func TestSlackSendRefusesWhileDisabled(t *testing.T) {
 	te.fakeChannel()
 	off := false
 	te.cfg.Slack.Enabled = &off
-	if code := te.run("slack", "send", "--yes", "C0000000001", "hi"); code != 1 || !strings.Contains(te.err.String(), "slack.enabled") {
+	if code := te.run("slack", "send", "--yes", "C0000000001", "hi"); code != 1 || !strings.Contains(te.err.String(), "plugins.slack.enabled") {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	if n := len(te.srv.Calls("chat.postMessage")); n != 0 {

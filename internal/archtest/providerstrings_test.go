@@ -33,21 +33,23 @@ var providerStringAllowlist = []providerString{
 	{"internal/adapter/store/sqlite/retain_briefs.go", "github", 3, "debt: retention drops a pull request's rows once GitHub says it ended (issue 62)"},
 	{"internal/adapter/store/sqlite/rounds.go", "github", 7, "debt: the round state keeps GitHub's review rounds (issue 62)"},
 	{"internal/cli/doctor.go", "github", 1, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
-	{"internal/config/config.go", "github", 8, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
-	{"internal/config/config.go", "slack", 1, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
-	{"internal/intent/builtin/builtin.go", "slack", 2, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
+	{"internal/config/config.go", "github", 7, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
+	{"internal/intent/builtin/builtin.go", "slack", 1, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
 	{"internal/intent/builtin/cmd/factsdoc/main.go", "slack", 1, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
-	{"internal/intent/builtin/cmd/grammardoc/groups.go", "github", 9, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
-	{"internal/intent/builtin/cmd/grammardoc/groups.go", "slack", 3, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
+	{"internal/intent/builtin/cmd/grammardoc/groups.go", "github", 8, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
+	{"internal/intent/builtin/cmd/grammardoc/groups.go", "slack", 2, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
 	{"internal/intent/builtin/facts.go", "github", 1, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
-	{"internal/intent/builtin/facts.go", "slack", 13, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
-	{"internal/intent/builtin/grammar_config.go", "github", 26, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
-	{"internal/intent/builtin/grammar_config.go", "slack", 31, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
+	{"internal/intent/builtin/grammar_config.go", "github", 25, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
+	{"internal/config/plugins.go", "github", 1, "debt: the bundled plugins' settings are fields of the configuration until each plugin reads its table through the broker (issue 62)"},
+	{"internal/config/plugins.go", "slack", 1, "debt: the bundled plugins' settings are fields of the configuration until each plugin reads its table through the broker (issue 62)"},
+	{"internal/intent/builtin/renamed.go", "github", 7, "the renames name the keys of the configuration a release moved"},
+	{"internal/intent/builtin/renamed.go", "slack", 9, "the renames name the keys of the configuration a release moved"},
+	{"internal/intent/builtin/grammar_config.go", "slack", 30, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
 }
 
 // providerStringSpellings counts the spellings of id in the string s: s is
-// id, or starts with "id:" (a person key) or "id." (a plugin's config key
-// or fact); or s quotes it inside, as 'id' (SQL), "id" or "id. (a tag, a
+// id, or starts with "id:" (a person key), "id." (a plugin's fact) or
+// "plugins.id." (a plugin's config key); or s quotes it inside, as 'id' (SQL), "id" or "id. (a tag, a
 // key). An exact id and an "id:" prefix count only where whole is true:
 // TestTheCoreNamesNoProvider counts them elsewhere.
 func providerStringSpellings(s, id string, whole bool) int {
@@ -55,7 +57,7 @@ func providerStringSpellings(s, id string, whole bool) int {
 	switch {
 	case whole && (s == id || strings.HasPrefix(s, id+":")):
 		n++
-	case strings.HasPrefix(s, id+".") && !strings.HasPrefix(s, id+".com"):
+	case strings.HasPrefix(s, id+".") && !strings.HasPrefix(s, id+".com"), strings.HasPrefix(s, "plugins."+id+"."):
 		n++
 	}
 	return n
@@ -73,8 +75,7 @@ func providerStringsExempt(file, id string) bool {
 	if under(dir, "internal/domain/unit") || compositionRoot(file) || file == sourceRoot {
 		return true
 	}
-	wiring, _ := filepath.Match(slackWiring, file)
-	return wiring && id == "slack"
+	return wiresSource(file, id)
 }
 
 func historicalProviderString(file string) bool {
@@ -153,7 +154,7 @@ func providerStringBreaches(found map[string]map[string][]token.Position, allow 
 
 // TestProviderIdsInStringsOutsideThePluginsOnlyShrink checks that a
 // plugin's id spelled inside a Go string outside its plugin (an SQL
-// literal 'github', a config key "slack.enabled", a struct tag) appears
+// literal 'github', a config key "plugins.slack.enabled", a struct tag) appears
 // only in the store's migrations, which hold data already written, and in
 // the files of a counted allowlist that only shrinks.
 func TestProviderIdsInStringsOutsideThePluginsOnlyShrink(t *testing.T) {

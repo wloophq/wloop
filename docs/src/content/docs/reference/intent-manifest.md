@@ -45,7 +45,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
-| `role` | one of `pr.review`, `pr.address`, `pr.nudge`, `probe`, `headless` |  | What binds it to a plugin's mechanism. One intent per role and provider. |
+| `role` | one of `headless`, `pr.review`, `pr.address`, `pr.nudge`, `probe` |  | What binds it to a plugin's mechanism. One intent per role and provider. |
 | `provider` | one of `github`, `session`, `slack`, `task`, `workspace`, `any`, or a list of them |  | The units its turns serve: a provider id, a list of them, or any; defaults.toml provider when absent. |
 | `builds` | one of `brief` |  | A builder, never a turn. |
 | `prompt` | file |  | A builder's prompt file, through the profile layers. |
@@ -201,7 +201,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
-| `effects` | list of `plan.cleared`, `guidance.handed`, `pr.round_sent`, `pr.reviewed`, `pr.addressed`, `pr.nudged` |  | What sending the turn applies. |
+| `effects` | list of `plan.cleared`, `pr.guidance_handed`, `pr.round_sent`, `pr.reviewed`, `pr.addressed`, `pr.nudged` |  | What sending the turn applies. |
 | `drafts` | table |  | The drafts its turns' agents propose. |
 | `drafts.allowed_effects` | list of `task.nudged`, `unit.closed`, `pr.nudged` |  | The effects its agents may declare on their drafts. |
 | `drafts.attach_posts` | bool | `false` | On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts. |

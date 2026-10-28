@@ -15,7 +15,9 @@ var workflowTable = map[string]string{
 	"pr": "state:S merged_at:T closed_at:T finished_for:D ended:B draft:B head:S conflicting_for:D mine:B checks:S stalled:B age:D held:B adopted:B muted:B " +
 		"has_workspace:B stale:B open_turn:S open_turn_seq:I orphan_answer_id:I review.action:S review.reason:S review.observed:B " +
 		"first.due:B first.reason:S address.due:B address.reason:S address.reviewers:L address.checks:L address.conflict:B address.observed:B " +
-		"last_interaction_at:T silent_days:I waits_on_user:B nudge.refusal:S mute.refusal:S fingerprint:S repo:S repo_name:S owner:S author:S visibility:S",
+		"last_interaction_at:T silent_days:I waits_on_user:B nudge.refusal:S mute.refusal:S fingerprint:S repo:S repo_name:S owner:S author:S visibility:S " +
+		"slug:S base:S association:S cross_repository:B requested_teams:L labels:L review_requested_me:B nudge.who:L nudge.why:S " +
+		"last_review.exists:B last_review.verdict:S last_review.decision:S",
 	"session": "state:S manager:S managed:B listed:B orphaned:B agent_state:S user_active:B user_typed_after_turn:B prompt_knowable:B " +
 		"prompted_while_idle:B open_turn:S newest_state:S newest_age:D newest_intent:S closes_when_done:B idle_since:T " +
 		"idle_for:D unread_answers:I unread_since:T unread_for:D pr_state:S duplicate:B worktree_gone:B closed_by_manager:B transcript_gone:B process_gone:B fingerprint:S repo:S",
@@ -31,7 +33,7 @@ var workflowTable = map[string]string{
 	"brief":   "goal:S risk:S kind:S size:S tags:L missing:L",
 	"draft":   "person_waited:B items_owed:I items_assigned:I unit_open:B",
 	"trigger": "kind:S event.kind:S event.key:S event.id:I event.data:S fired_at:T",
-	"config": "cleanup.idle:D cleanup.asked_idle:D cleanup.workspace_grace:D cleanup.manual_idle:D cleanup.stale_workspace:D github.nudge.silent_days:I " +
+	"config": "cleanup.idle:D cleanup.asked_idle:D cleanup.workspace_grace:D cleanup.manual_idle:D cleanup.stale_workspace:D plugins.github.nudge.silent_days:I " +
 		"tasks.stale_waiting_days:I drafts.repeat_after:D turns.per_day:I",
 }
 
@@ -74,7 +76,7 @@ func TestEveryWorkflowFactHasASlotAndAType(t *testing.T) {
 			t.Errorf("%s is not in the plan's fact table", name)
 		}
 	}
-	if _, ok := FactType("pr.slug"); ok {
+	if _, ok := FactType("turn.automated"); ok {
 		t.Error("FactType reads intent facts")
 	}
 	for _, s := range Slots {
