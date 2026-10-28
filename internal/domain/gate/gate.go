@@ -47,9 +47,11 @@ const (
 //
 // Subject names the subject in its own table (a draft id, a plan item key,
 // a message id), as the kind reads it. Intents are the names a person may
-// resolve the gate with, in the order clients offer them. Deadline is zero
-// for a gate that waits for ever; one that passes resolves to Default with
-// the rule "window". By, Rule, Answer and ClosedAt are zero while Open.
+// resolve the gate with, in the order clients offer them; Intent is the one
+// it was resolved with, its Status the one gates.toml gives that intent.
+// Deadline is zero for a gate that waits for ever; one that passes resolves
+// to Default with the rule "window". Intent, By, Rule, Answer and ClosedAt are
+// zero while Open.
 type Gate struct {
 	ID       int64
 	Task     task.ID
@@ -59,6 +61,7 @@ type Gate struct {
 	Subject  string
 	Status   Status
 	Intents  []string
+	Intent   string
 	Answer   string
 	By       task.Actor
 	Rule     string

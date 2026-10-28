@@ -14,7 +14,7 @@ func v7Gates(ctx context.Context, tx *sql.Tx) error {
   task_id TEXT REFERENCES tasks (id),
   provider TEXT NOT NULL DEFAULT '', unit_key TEXT NOT NULL DEFAULT '',
   kind TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', subject TEXT NOT NULL DEFAULT '',
-  status TEXT NOT NULL, intents TEXT NOT NULL, answer TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL, intents TEXT NOT NULL, intent TEXT NOT NULL DEFAULT '', answer TEXT NOT NULL DEFAULT '',
   by_actor TEXT NOT NULL DEFAULT '', rule TEXT NOT NULL DEFAULT '',
   deadline TEXT NOT NULL DEFAULT '', default_intent TEXT NOT NULL DEFAULT '',
   opened_at TEXT NOT NULL, closed_at TEXT NOT NULL DEFAULT ''

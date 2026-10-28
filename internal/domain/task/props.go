@@ -10,12 +10,17 @@ import (
 // others are zero. Text holds string and enum, Int int, Time date, Dur
 // duration, Actors actor and actor[] (one person for actor), List string[].
 type Value struct {
-	Text   string
-	Int    int64
-	Time   time.Time
-	Dur    time.Duration
-	Actors []items.Person
-	List   []string
+	Text   string         `json:"text,omitempty"`
+	Int    int64          `json:"int,omitempty"`
+	Time   time.Time      `json:"time,omitzero"`
+	Dur    time.Duration  `json:"dur,omitempty"`
+	Actors []items.Person `json:"actors,omitempty"`
+	List   []string       `json:"list,omitempty"`
+}
+
+// IsZero says whether v holds no value, which unsets a property.
+func (v Value) IsZero() bool {
+	return v.Text == "" && v.Int == 0 && v.Time.IsZero() && v.Dur == 0 && len(v.Actors) == 0 && len(v.List) == 0
 }
 
 // Props are a task's properties by name; a property never set is absent.

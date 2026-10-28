@@ -177,11 +177,11 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `record.attach_url` | bool | `false` | On a turn whose unit is a task, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the task; needs url in record.outcome. |
 | `record.outcome_doc` | string |  | What the outcome holds, for the instructions. |
 | `record.history_artifact` | string |  | The artifact the unit's history shows. |
-| `record.require[]` | table |  | What a record in a state must carry. |
+| `record.require[]` | table |  | What a record in a state must carry; record.requires is the record kind a run owes. |
 | `record.require[].state` | string |  | The state. |
 | `record.require[].artifact` | string |  | The artifact it must carry. |
 | `record.require[].fields` | list of strings |  | The outcome fields it must carry. |
-| `record.requires` | string |  | The record kind, of records.toml, a run of the intent owes; a run that ends without it opens the gate missing names. Left out, a run owes no record. |
+| `record.requires` | string |  | The record kind, of records.toml, a run of the intent owes; a run that ends without it opens the gate missing names. Left out, a run owes no record. Not record.require, what a record in a state carries. |
 | `record.missing` | string |  | The gate, of gates.toml, a run that ends without the record requires names opens. |
 
 ### Gate approval
@@ -189,7 +189,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `gates` | table |  | The gates its runs and drafts open. |
-| `gates.approval` | table |  | The approval of its gates; wait when absent. |
+| `gates.approval` | table |  | The approval of its gates. |
 | `gates.approval.mode` | one of `send`, `delay`, `wait`, `dry_run`, `run` |  | The mode when no rule holds. |
 | `gates.approval.window` | duration |  | With mode delay only: how long a person has to stop the gate's consequence. |
 | `gates.approval.rule[]` | table |  | A rule; the first whose when holds gives the mode. |

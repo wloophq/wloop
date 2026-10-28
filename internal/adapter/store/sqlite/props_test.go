@@ -65,3 +65,31 @@ func TestSetPropPagesTheTaskAgain(t *testing.T) {
 		t.Fatalf("page %+v", page)
 	}
 }
+
+func TestAnUnchangedSetPropNotesNothing(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, log := openProps(t)
+	applyTasks(t, db.Tasks(), task.Task{ID: "t-01", Kind: task.KindCapture, State: task.Inbox, Title: "Call Ana",
+		Origin: task.OriginUser, Created: propsNow, Updated: propsNow})
+	props := db.Props(func() time.Time { return propsNow })
+	if err := props.SetProp(ctx, "t-01", "priority", task.Value{Text: "high"}, task.WriterPerson); err != nil {
+		t.Fatal(err)
+	}
+	from := log.Gen()
+	if err := props.SetProp(ctx, "t-01", "priority", task.Value{Text: "high"}, task.WriterPerson); err != nil {
+		t.Fatal(err)
+	}
+	if err := props.SetProp(ctx, "t-01", "absent", task.Value{}, task.WriterPerson); err != nil {
+		t.Fatal(err)
+	}
+	if c := log.Since(from, ^port.Topic(0)); !c.Empty() {
+		t.Fatalf("noted %+v", c)
+	}
+	if err := props.SetProp(ctx, "t-01", "priority", task.Value{Text: "high"}, task.WriterAgent); err != nil {
+		t.Fatal(err)
+	}
+	if c := log.Since(from, ^port.Topic(0)); c.Topics != port.TopicTasks {
+		t.Fatalf("a new writer noted %+v", c)
+	}
+}

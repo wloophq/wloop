@@ -27,8 +27,9 @@ func (db *DB) Props(now func() time.Time) PropStore { return PropStore{db, now} 
 const upsertPropSQL = `INSERT INTO task_props (task_id, name, value, writer, at) VALUES (?, ?, ?, ?, ?)
 	ON CONFLICT (task_id, name) DO UPDATE SET value = excluded.value, writer = excluded.writer, at = excluded.at`
 
-// SetProp writes the property and moves the task to a new rev, so a page
-// since an older one lists it again.
+// SetProp writes the property, or deletes it for a zero v, and moves the
+// task to a new rev, so a page since an older one lists it again; a write
+// that changes neither value nor writer moves nothing.
 func (s PropStore) SetProp(ctx context.Context, id task.ID, name string, v task.Value, w task.Writer) error {
 	body, err := json.Marshal(v)
 	if err != nil {
@@ -42,7 +43,22 @@ func (s PropStore) SetProp(ctx context.Context, id task.ID, name string, v task.
 		case err != nil:
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, upsertPropSQL, string(id), name, string(body), string(w), formatTime(s.now())); err != nil {
+		var oldBody, oldWriter string
+		switch err := tx.QueryRowContext(ctx, `SELECT value, writer FROM task_props WHERE task_id = ? AND name = ?`, string(id), name).Scan(&oldBody, &oldWriter); {
+		case errors.Is(err, sql.ErrNoRows):
+			if v.IsZero() {
+				return nil
+			}
+		case err != nil:
+			return err
+		case !v.IsZero() && oldBody == string(body) && oldWriter == string(w):
+			return nil
+		}
+		q, args := upsertPropSQL, []any{string(id), name, string(body), string(w), formatTime(s.now())}
+		if v.IsZero() {
+			q, args = `DELETE FROM task_props WHERE task_id = ? AND name = ?`, []any{string(id), name}
+		}
+		if _, err := tx.ExecContext(ctx, q, args...); err != nil {
 			return fmt.Errorf("property %s of %s: %w", name, id, err)
 		}
 		epoch, rev, err := readPosition(ctx, tx)

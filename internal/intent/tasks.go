@@ -39,6 +39,8 @@ type mVerbText struct {
 	From    []string          `toml:"from"`
 	To      *string           `toml:"to"`
 	By      map[string]string `toml:"by"`
+	Gate    *string           `toml:"gate"`
+	Handler *string           `toml:"handler"`
 	Send    *string           `toml:"send"`
 }
 
@@ -84,6 +86,9 @@ func mergeTasks(out ListTexts, file string, src []byte) Problems {
 			if p := s.predicate("verbs."+id+".offer", *t.Offer, builtin.OfferEnv()); p != nil {
 				w.Offer = p
 			}
+		}
+		if t.Gate == nil && slices.Contains(slices.Collect(maps.Values(t.By)), "gate") {
+			s.add("verbs."+id+".gate", "is required: a by.<actor> of \"gate\" opens the gate it names")
 		}
 		if w.Label == "" && t.Label == nil {
 			s.add("verbs."+id+".label", "is required")

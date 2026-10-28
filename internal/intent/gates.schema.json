@@ -6,28 +6,63 @@
     "gates": {
       "additionalProperties": {
         "additionalProperties": false,
-        "description": "A gate, by its name: the one a gate.open step, an intent's record.missing or a verb's by.<actor> opens.",
+        "description": "A gate, by its name: the one a gate.open step, an intent's record.missing or a verb's gate opens; a gate the loop opens by kind takes the first of its kind.",
         "properties": {
           "intents": {
             "additionalProperties": {
               "additionalProperties": false,
               "description": "An intent, by its name.",
               "properties": {
+                "answer": {
+                  "default": false,
+                  "description": "The intent takes text, such as a question's answer.",
+                  "type": "boolean"
+                },
                 "label": {
                   "description": "The name people read on its button.",
                   "type": "string"
+                },
+                "status": {
+                  "description": "The status the intent resolves the gate to. Required.",
+                  "enum": [
+                    "approved",
+                    "rejected",
+                    "answered",
+                    "dismissed",
+                    "superseded"
+                  ],
+                  "type": "string"
                 }
               },
+              "required": [
+                "status"
+              ],
               "type": "object"
             },
             "description": "What you may resolve the gate with, by intent, in the order clients offer them.",
             "type": "object"
+          },
+          "kind": {
+            "description": "What the gate decides, which names the consequence of resolving it. Required.",
+            "enum": [
+              "draft",
+              "plan",
+              "question",
+              "post",
+              "proposal",
+              "trust",
+              "step"
+            ],
+            "type": "string"
           },
           "label": {
             "description": "What the gate asks of you, as clients list it.",
             "type": "string"
           }
         },
+        "required": [
+          "kind"
+        ],
         "type": "object"
       },
       "description": "The gates a profile names, by name.",

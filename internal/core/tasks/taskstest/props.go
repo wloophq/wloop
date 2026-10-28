@@ -49,6 +49,11 @@ func (p *Props) SetProp(_ context.Context, id task.ID, name string, v task.Value
 	if p.props[id] == nil {
 		return fmt.Errorf("%w: %s", coretasks.ErrNoTask, id)
 	}
+	if v.IsZero() {
+		delete(p.props[id], name)
+		delete(p.Writers[id], name)
+		return nil
+	}
 	p.props[id][name] = v
 	p.Writers[id][name] = w
 	return nil
@@ -102,6 +107,22 @@ func PropContract(t *testing.T, open func(t *testing.T) (coretasks.PropStore, fu
 		}
 		if v, ok := got.Get("priority"); !ok || v.Text != "high" || len(got) != 1 {
 			t.Fatalf("props %v", got)
+		}
+	})
+	t.Run("a zero value deletes the property", func(t *testing.T) {
+		s, add := open(t)
+		add("t-01")
+		_ = s.SetProp(ctx, "t-01", "priority", task.Value{Text: "high"}, task.WriterPerson)
+		_ = s.SetProp(ctx, "t-01", "size", task.Value{Dur: time.Hour}, task.WriterPerson)
+		if err := s.SetProp(ctx, "t-01", "priority", task.Value{}, task.WriterPerson); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.SetProp(ctx, "t-01", "never", task.Value{}, task.WriterPerson); err != nil {
+			t.Fatal(err)
+		}
+		got, err := s.PropsOf(ctx, "t-01")
+		if _, ok := got.Get("priority"); ok || err != nil || len(got) != 1 {
+			t.Fatalf("props %v %v", got, err)
 		}
 	})
 	t.Run("a task with none has empty props", func(t *testing.T) {

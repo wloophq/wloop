@@ -29,6 +29,8 @@ var tasksGrammar = []Key{
 	{Path: "verbs.*.to", In: SurfaceTasks, Kind: KindText, Doc: "The state the verb moves a task to; absent, the verb moves none."},
 	{Path: "verbs.*.by", In: SurfaceTasks, Kind: KindMap, Doc: "Who may run the verb, by actor (person, workflow, agent, plugin); an actor left out may not."},
 	{Path: "verbs.*.by.*", In: SurfaceTasks, Kind: KindText, Doc: "A predicate over the task's facts that lets the actor run the verb where it holds, or \"gate\", which opens a proposal gate a person approves."},
+	{Path: "verbs.*.gate", In: SurfaceTasks, Kind: KindText, Doc: "The gate, of gates.toml, a by.<actor> of \"gate\" opens; required when one does."},
+	{Path: "verbs.*.handler", In: SurfaceTasks, Kind: KindEnum, Values: verbHandlerValues, Doc: "What the verb runs besides its move, a handler of the loop's; none when absent."},
 	{Path: "verbs.*.send", In: SurfaceTasks, Kind: KindEnum, Values: named("now", "draft"), Default: "draft", Doc: "With reply: now sends the reply at once, draft proposes it in the Outbox."},
 	{Path: "props", In: SurfaceTasks, Kind: KindMap, Doc: "The task properties, by name; each is the fact task.prop.<name>."},
 	{Path: "props.*", In: SurfaceTasks, Kind: KindTable, Doc: "A property, by its name."},
@@ -61,6 +63,33 @@ func categoryValues() []Value {
 	out := make([]Value, len(task.Categories))
 	for i, c := range task.Categories {
 		out[i] = Value{Name: string(c)}
+	}
+	return out
+}
+
+// VerbHandler is a handler a verb of tasks.toml may run besides its move.
+type VerbHandler struct{ Name, Doc string }
+
+// VerbHandlers are the handlers a verb names with handler.
+var VerbHandlers = []VerbHandler{
+	{"approve", "Resolves the task's open gate as approved, or runs its unit's approve action."},
+	{"delegate", "Starts a turn on the task, headless or in a session."},
+	{"answer", "Answers the task's open question gate with the text it asks for."},
+	{"edit", "Edits the text of the task's draft."},
+	{"retry", "Sends again the task's approved draft whose delivery failed."},
+	{"reply", "Posts a reply or a reaction on the task's unit; the composer's verb."},
+	{"project", "Files the task under a parent, creating it from a title."},
+	{"context", "Sets the task's contexts."},
+	{"area", "Sets the task's area."},
+	{"seen", "Marks the task seen; clients send it when it opens."},
+	{"reviewed", "Marks a parent task reviewed."},
+	{"sequential", "Switches a parent task's children between sequential and parallel."},
+}
+
+func verbHandlerValues() []Value {
+	out := make([]Value, len(VerbHandlers))
+	for i, h := range VerbHandlers {
+		out[i] = Value{Name: h.Name, Doc: h.Doc}
 	}
 	return out
 }

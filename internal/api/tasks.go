@@ -24,9 +24,9 @@ const (
 )
 
 // A task's timeline, runs and chat, and the gates and runs as resources: TimelinePath serves a task's
-// []TimelineEvent (query parameters kinds as "a,b", before as RFC 3339 and limit), RunsPath its []RunView,
+// []TimelineEvent, newest first (query parameters kinds as "a,b", before a Seq and limit), RunsPath its []RunView,
 // ChatPath takes a ChatRequest, AttachPath makes the caller's session, from SessionHeader, a run of the task.
-// GatesPath lists the open []GateView, GatePath resolves gate id with intent (a TaskRequest's args carry an
+// GatesPath lists []GateView (query parameter status as "a,b", open when absent), GatePath resolves gate id with intent (a TaskRequest's args carry an
 // answer). RunOpen opens a run's workspace in its manager, RunEnter enters its session, RunTranscript pages
 // its transcript (query parameters from and limit).
 const (
@@ -55,19 +55,51 @@ type ViewsCatalog struct {
 	Areas    []string       `json:"areas"`
 	Contexts []string       `json:"contexts"`
 	Verbs    []VerbSpec     `json:"verbs"` // key from internal/keys
+	// Review are the ids of the views the review walks, in order.
+	Review []string `json:"review,omitempty"`
+	// States are the profile's states in their declared order; Props its task properties.
+	States []StateSpec `json:"states,omitempty"`
+	Props  []PropSpec  `json:"props,omitempty"`
 }
 
+// TaskViewSpec is a view of views.toml: Over is what it lists (tasks or gates), Group the fact it groups by,
+// Key the key that jumps to it, Badge whether the badge counts it, HideDisabled whether it hides the tasks of a
+// disabled plugin.
 type TaskViewSpec struct {
-	ID    string `json:"id"`
-	Label string `json:"label"`
+	ID           string `json:"id"`
+	Label        string `json:"label"`
+	Over         string `json:"over,omitempty"`
+	Group        string `json:"group,omitempty"`
+	Key          string `json:"key,omitempty"`
+	Badge        bool   `json:"badge,omitempty"`
+	HideDisabled bool   `json:"hide_disabled,omitempty"`
 }
 
+// StateSpec is a state of tasks.toml and the category Go reads of it.
+type StateSpec struct {
+	Name     string `json:"name"`
+	Label    string `json:"label"`
+	Category string `json:"category"`
+}
+
+// PropSpec is a task property of tasks.toml: its type, an enum's values and who may write it.
+type PropSpec struct {
+	Name    string   `json:"name"`
+	Type    string   `json:"type"`
+	Values  []string `json:"values,omitempty"`
+	Writers []string `json:"writers,omitempty"`
+}
+
+// VerbSpec is a verb a task offers: From are the states it moves a task from (every state when empty), To
+// the state it moves it to ("" for none).
 type VerbSpec struct {
-	Verb    string `json:"verb"`
-	Label   string `json:"label"`
-	Summary string `json:"summary,omitempty"`
-	Input   string `json:"input,omitempty"` // the question a verb that asks for a value puts first
-	Key     string `json:"key"`
+	Verb    string   `json:"verb"`
+	Label   string   `json:"label"`
+	Summary string   `json:"summary,omitempty"`
+	Input   string   `json:"input,omitempty"` // the question a verb that asks for a value puts first
+	Key     string   `json:"key"`
+	From    []string `json:"from,omitempty"`
+	To      string   `json:"to,omitempty"`
 }
 
 type TaskView struct {
@@ -120,6 +152,7 @@ type TaskView struct {
 	Gates  []GateView  `json:"gates,omitempty"` // the open ones
 	Runs   []RunView   `json:"runs,omitempty"`  // detail only
 	Brief  *RecordView `json:"brief,omitempty"`
+	Wake   *WakeView   `json:"wake,omitempty"`
 	// Parent is the parent task's id; Children are its children's, in sibling order.
 	Parent   string   `json:"parent,omitempty"`
 	Children []string `json:"children,omitempty"`
@@ -134,22 +167,29 @@ type AskView struct {
 	Quotes    []string `json:"quotes,omitempty"`
 }
 
-// GateView is a gate as clients offer it: Text its words from gates.toml, Intents what a person may resolve it
-// with, in order, Subject its subject as its kind serves it.
+// GateView is a gate as clients offer it: Task and Unit what it is on ("" when none), Text its words from
+// gates.toml, Intents what a person may resolve it with, in order, Default the intent its Deadline resolves it
+// with, Delivery a draft gate's delivery state (sending, failed), Subject its subject as its kind serves it.
 type GateView struct {
 	ID       int64           `json:"id"`
+	Task     string          `json:"task,omitempty"`
+	Unit     string          `json:"unit,omitempty"`
 	Kind     string          `json:"kind"`
 	Name     string          `json:"name,omitempty"`
 	Status   string          `json:"status"`
 	Text     string          `json:"text,omitempty"`
 	Intents  []IntentView    `json:"intents"`
 	Deadline time.Time       `json:"deadline,omitzero"`
+	Default  string          `json:"default,omitempty"`
+	Delivery string          `json:"delivery,omitempty"`
 	Subject  json.RawMessage `json:"subject,omitempty"`
 }
 
+// IntentView is an intent a gate offers; Answer says it takes text, as a question's answer.
 type IntentView struct {
-	ID    string `json:"id"`
-	Label string `json:"label"`
+	ID     string `json:"id"`
+	Label  string `json:"label"`
+	Answer bool   `json:"answer,omitempty"`
 }
 
 // RunView is a run of a task: the turn Seq of Intent in State, where it ran, its session and that session's
@@ -174,8 +214,10 @@ type RecordView struct {
 	Data json.RawMessage `json:"data"`
 }
 
-// TimelineEvent is one event of a task's timeline: Unit is the unit it happened on, "" for the task itself.
+// TimelineEvent is one event of a task's timeline: Seq its stable position, which pages it, and Unit the unit it
+// happened on, "" for the task itself.
 type TimelineEvent struct {
+	Seq   int64           `json:"seq"`
 	Kind  string          `json:"kind"`
 	Sub   string          `json:"sub,omitempty"`
 	Actor string          `json:"actor,omitempty"`
@@ -236,11 +278,13 @@ type RunnerState struct {
 	Reason  string `json:"reason,omitempty"`
 }
 
+// TasksPage is a page of a view; a view over gates lists Gates and no Tasks.
 type TasksPage struct {
 	Epoch    string     `json:"epoch"`
 	Rev      uint64     `json:"rev"`
 	Full     bool       `json:"full"`
 	Tasks    []TaskView `json:"tasks"`
+	Gates    []GateView `json:"gates,omitempty"`
 	Removed  []string   `json:"removed"`
 	Counters Counters   `json:"counters"`
 }

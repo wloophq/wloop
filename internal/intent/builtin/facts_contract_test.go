@@ -1,10 +1,13 @@
 package builtin
 
 import (
+	"slices"
+	"strings"
+	"testing"
+
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"slices"
-	"testing"
+	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
 func TestIsUntrusted(t *testing.T) {
@@ -42,6 +45,15 @@ func TestEndedFactIsTheSlotsEndedFact(t *testing.T) {
 		got, ok := EndedFact(p)
 		if got != want || ok != (want != "") {
 			t.Errorf("EndedFact(%s) = %q, %t; want %q", p, got, ok, want)
+		}
+	}
+}
+
+func TestEveryTimeFactSaysHowToTestItSet(t *testing.T) {
+	t.Parallel()
+	for _, f := range Facts {
+		if f.Type == expr.Time && !strings.Contains(f.Doc, "`> timestamp(0)`") {
+			t.Errorf("%s: %q", f.Name, f.Doc)
 		}
 	}
 }

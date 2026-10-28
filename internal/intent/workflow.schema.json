@@ -134,7 +134,7 @@
       "properties": {
         "approval": {
           "additionalProperties": false,
-          "description": "The approval of its gates; wait when absent.",
+          "description": "The approval of its gates.",
           "properties": {
             "mode": {
               "description": "The mode when no rule holds.",

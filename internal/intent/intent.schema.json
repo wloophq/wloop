@@ -272,7 +272,7 @@
       "properties": {
         "approval": {
           "additionalProperties": false,
-          "description": "The approval of its gates; wait when absent.",
+          "description": "The approval of its gates.",
           "properties": {
             "mode": {
               "description": "The mode when no rule holds.",
@@ -574,7 +574,7 @@
           "type": "string"
         },
         "require": {
-          "description": "What a record in a state must carry.",
+          "description": "What a record in a state must carry; record.requires is the record kind a run owes.",
           "items": {
             "additionalProperties": false,
             "properties": {
@@ -599,7 +599,7 @@
           "type": "array"
         },
         "requires": {
-          "description": "The record kind, of records.toml, a run of the intent owes; a run that ends without it opens the gate missing names. Left out, a run owes no record.",
+          "description": "The record kind, of records.toml, a run of the intent owes; a run that ends without it opens the gate missing names. Left out, a run owes no record. Not record.require, what a record in a state carries.",
           "type": "string"
         },
         "states": {

@@ -26,7 +26,7 @@ var golden = []string{
 	"extraction_hints: provider, unit_key, item_id, mode, context, why",
 	"extraction_runs: id, provider, unit_key, at, model, cost_usd, outcome, error",
 	"fetches: workspace_id, at",
-	"gates: id, task_id, provider, unit_key, kind, name, subject, status, intents, answer, by_actor, rule, deadline, default_intent, opened_at, closed_at",
+	"gates: id, task_id, provider, unit_key, kind, name, subject, status, intents, intent, answer, by_actor, rule, deadline, default_intent, opened_at, closed_at",
 	"instruction_parts: sha, body",
 	"intakes: seq, provider, unit_key, intent, source, request, state, brief, note, accepted_at, briefing_at, starting_at, ended_at, turn_seq, turn_id, error, log",
 	"item_ops: seq, provider, unit_key, item, op, provenance, outcome, reason, at",

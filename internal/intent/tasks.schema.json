@@ -146,6 +146,28 @@
             },
             "type": "array"
           },
+          "gate": {
+            "description": "The gate, of gates.toml, a by.<actor> of \"gate\" opens; required when one does.",
+            "type": "string"
+          },
+          "handler": {
+            "description": "What the verb runs besides its move, a handler of the loop's; none when absent.",
+            "enum": [
+              "approve",
+              "delegate",
+              "answer",
+              "edit",
+              "retry",
+              "reply",
+              "project",
+              "context",
+              "area",
+              "seen",
+              "reviewed",
+              "sequential"
+            ],
+            "type": "string"
+          },
           "input": {
             "description": "The question a verb that asks for a value puts first (waiting, schedule, project, context, area, delegate, reply); required for those.",
             "type": "string"

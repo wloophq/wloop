@@ -13,25 +13,34 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// Store keeps the gates. Its lists are ordered by ID, oldest first; a list
+// Store writes the gates. Its lists are ordered by ID, oldest first; a list
 // nothing matches is empty.
 type Store interface {
 	// Open stores g as open with a new ID and OpenedAt, and returns it.
 	Open(ctx context.Context, g gate.Gate) (gate.Gate, error)
 	// Resolve closes the open gate id with r and returns it: ErrNoGate when
-	// there is none, ErrResolved when it is closed already.
+	// there is none, ErrResolved when it is closed already. A Resolution whose
+	// Status is open is refused.
 	Resolve(ctx context.Context, id int64, r Resolution) (gate.Gate, error)
-	// OfTask are task id's gates, open and closed.
-	OfTask(ctx context.Context, id task.ID) ([]gate.Gate, error)
-	// Opened are the open gates matching q.
-	Opened(ctx context.Context, q Query) ([]gate.Gate, error)
 	// Due are the open gates whose Deadline is set and not after now.
 	Due(ctx context.Context, now time.Time) ([]gate.Gate, error)
 }
 
+// Reader reads the gates, open and closed. Its lists are ordered by ID,
+// oldest first; a list nothing matches is empty.
+type Reader interface {
+	// Get is gate id; ErrNoGate when there is none.
+	Get(ctx context.Context, id int64) (gate.Gate, error)
+	// OfTask are task id's gates, open and closed.
+	OfTask(ctx context.Context, id task.ID) ([]gate.Gate, error)
+	// Where are the gates matching q.
+	Where(ctx context.Context, q Query) ([]gate.Gate, error)
+}
+
 // Resolution is how a gate closed: Intent is the intent a person or a rule
-// chose, Answer a question's text, By who resolved it, Rule the policy rule
-// that released it ("window" for a deadline's default), "" for a person.
+// chose and Status the one gates.toml gives it, Answer a question's text, By
+// who resolved it, Rule the policy rule that released it ("window" for a
+// deadline's default), "" for a person.
 type Resolution struct {
 	Status gate.Status
 	Intent string
@@ -40,12 +49,14 @@ type Resolution struct {
 	Rule   string
 }
 
-// Query narrows Opened: a zero field matches every gate.
+// Query narrows Where: a zero field matches every gate, but Statuses, which
+// matches the open gates when empty.
 type Query struct {
-	Kind gate.Kind
-	Name string
-	Task task.ID
-	Unit unit.Unit
+	Kind     gate.Kind
+	Name     string
+	Task     task.ID
+	Unit     unit.Unit
+	Statuses []gate.Status
 }
 
 // The consequences of a resolved gate, one port per kind.

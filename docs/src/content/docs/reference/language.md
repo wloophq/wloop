@@ -154,17 +154,17 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `record.attach_url` (bool, default `false`): On a turn whose unit is a task, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the task; needs url in record.outcome.
 - `record.outcome_doc` (string): What the outcome holds, for the instructions.
 - `record.history_artifact` (string): The artifact the unit's history shows.
-- `record.require[]` (table): What a record in a state must carry.
+- `record.require[]` (table): What a record in a state must carry; record.requires is the record kind a run owes.
 - `record.require[].state` (string): The state.
 - `record.require[].artifact` (string): The artifact it must carry.
 - `record.require[].fields` (list of strings): The outcome fields it must carry.
-- `record.requires` (string): The record kind, of records.toml, a run of the intent owes; a run that ends without it opens the gate missing names. Left out, a run owes no record.
+- `record.requires` (string): The record kind, of records.toml, a run of the intent owes; a run that ends without it opens the gate missing names. Left out, a run owes no record. Not record.require, what a record in a state carries.
 - `record.missing` (string): The gate, of gates.toml, a run that ends without the record requires names opens.
 
 ### Gate approval
 
 - `gates` (table): The gates its runs and drafts open.
-- `gates.approval` (table): The approval of its gates; wait when absent.
+- `gates.approval` (table): The approval of its gates.
 - `gates.approval.mode` (one of `send`, `delay`, `wait`, `dry_run`, `run`): The mode when no rule holds.
   - `send`: Posts at once.
   - `delay`: Posts when the window ends unless a person stops it.
@@ -224,6 +224,20 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `verbs.<name>.to` (string): The state the verb moves a task to; absent, the verb moves none.
 - `verbs.<name>.by` (table by name): Who may run the verb, by actor (person, workflow, agent, plugin); an actor left out may not.
 - `verbs.<name>.by.<name>` (string): A predicate over the task's facts that lets the actor run the verb where it holds, or "gate", which opens a proposal gate a person approves.
+- `verbs.<name>.gate` (string): The gate, of gates.toml, a by.&lt;actor&gt; of "gate" opens; required when one does.
+- `verbs.<name>.handler` (one of `approve`, `delegate`, `answer`, `edit`, `retry`, `reply`, `project`, `context`, `area`, `seen`, `reviewed`, `sequential`): What the verb runs besides its move, a handler of the loop's; none when absent.
+  - `approve`: Resolves the task's open gate as approved, or runs its unit's approve action.
+  - `delegate`: Starts a turn on the task, headless or in a session.
+  - `answer`: Answers the task's open question gate with the text it asks for.
+  - `edit`: Edits the text of the task's draft.
+  - `retry`: Sends again the task's approved draft whose delivery failed.
+  - `reply`: Posts a reply or a reaction on the task's unit; the composer's verb.
+  - `project`: Files the task under a parent, creating it from a title.
+  - `context`: Sets the task's contexts.
+  - `area`: Sets the task's area.
+  - `seen`: Marks the task seen; clients send it when it opens.
+  - `reviewed`: Marks a parent task reviewed.
+  - `sequential`: Switches a parent task's children between sequential and parallel.
 - `verbs.<name>.send` (one of `now`, `draft`, default `draft`): With reply: now sends the reply at once, draft proposes it in the Outbox.
 - `props` (table by name): The task properties, by name; each is the fact task.prop.&lt;name&gt;.
 - `props.<name>` (table): A property, by its name.
@@ -267,11 +281,21 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ## Gates (`gates.toml`)
 
 - `gates` (table by name): The gates a profile names, by name.
-- `gates.<name>` (table): A gate, by its name: the one a gate.open step, an intent's record.missing or a verb's by.&lt;actor&gt; opens.
+- `gates.<name>` (table): A gate, by its name: the one a gate.open step, an intent's record.missing or a verb's gate opens; a gate the loop opens by kind takes the first of its kind.
+- `gates.<name>.kind` (one of `draft`, `plan`, `question`, `post`, `proposal`, `trust`, `step`): What the gate decides, which names the consequence of resolving it. Required.
+  - `draft`: A draft to send: resolving it publishes the draft.
+  - `plan`: A run the plan holds: resolving it releases the plan item.
+  - `question`: An agent's question: resolving it delivers the answer to its session.
+  - `post`: An agent's post: resolving it delivers the reply to its session.
+  - `proposal`: Proposed task or item operations: resolving it applies them.
+  - `trust`: A repository's first run: resolving it unblocks the run.
+  - `step`: A workflow's gate.open: resolving it is an event workflows react to.
 - `gates.<name>.label` (string): What the gate asks of you, as clients list it.
 - `gates.<name>.intents` (table by name): What you may resolve the gate with, by intent, in the order clients offer them.
 - `gates.<name>.intents.<name>` (table): An intent, by its name.
 - `gates.<name>.intents.<name>.label` (string): The name people read on its button.
+- `gates.<name>.intents.<name>.status` (one of `approved`, `rejected`, `answered`, `dismissed`, `superseded`): The status the intent resolves the gate to. Required.
+- `gates.<name>.intents.<name>.answer` (bool, default `false`): The intent takes text, such as a question's answer.
 
 ## Record kinds (`records.toml`)
 
@@ -349,7 +373,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ### Gate approval
 
 - `gates` (table): The gates its runs and drafts open.
-- `gates.approval` (table): The approval of its gates; wait when absent.
+- `gates.approval` (table): The approval of its gates.
 - `gates.approval.mode` (one of `send`, `delay`, `wait`, `dry_run`, `run`): The mode when no rule holds.
   - `send`: Posts at once.
   - `delay`: Posts when the window ends unless a person stops it.

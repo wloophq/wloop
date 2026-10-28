@@ -31,18 +31,28 @@ type Store interface {
 }
 
 // PropStore keeps the tasks' properties. SetProp replaces the property's
-// value and records its writer; ErrNoTask when the task does not exist. It
-// checks no type and no writer: the caller holds the profile that declares
-// them. PropsOf are a task's properties, empty for one with none.
+// value and records its writer; a zero Value deletes the property, which
+// PropsOf then leaves out. ErrNoTask when the task does not exist. It checks
+// no type and no writer: the caller holds the profile that declares them.
+// PropsOf are a task's properties, empty for one with none.
 type PropStore interface {
 	SetProp(ctx context.Context, id task.ID, name string, v task.Value, w task.Writer) error
 	PropsOf(ctx context.Context, id task.ID) (task.Props, error)
 }
 
-// ViewEval says whether task t is in the profile's view; injected, so the
-// core pages over a view without importing the package that evaluates the
-// profile's predicates.
-type ViewEval func(view string, t task.Task) (bool, error)
+// The profile's evaluators the core calls, each injected, so the core runs
+// the profile's predicates and expressions without importing the package
+// that evaluates them.
+type (
+	// ViewEval says whether task t is in the profile's view.
+	ViewEval func(ctx context.Context, view string, t task.Task) (bool, error)
+	// Authority says whether actor a may run verb on task t (allow), and
+	// whether running it opens the verb's gate instead (gate).
+	Authority func(ctx context.Context, verb string, a task.Actor, t task.Task) (allow, gate bool, err error)
+	// OwedBy is who owes task t's next step, as tasks.toml's owed_by says: "me",
+	// a person's key, or "" when nobody does.
+	OwedBy func(ctx context.Context, t task.Task) (string, error)
+)
 
 type Since struct {
 	Epoch string

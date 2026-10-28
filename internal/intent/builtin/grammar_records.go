@@ -54,7 +54,7 @@ func GateModes() []Value {
 func gateApprovalRows(surface Surface) []Key {
 	return []Key{
 		{Path: "gates", In: surface, Kind: KindTable, Doc: "The gates its runs and drafts open."},
-		{Path: "gates.approval", In: surface, Kind: KindTable, Doc: "The approval of its gates; wait when absent."},
+		{Path: "gates.approval", In: surface, Kind: KindTable, Doc: "The approval of its gates."},
 		{Path: "gates.approval.mode", In: surface, Kind: KindEnum, Values: GateModes, Doc: "The mode when no rule holds."},
 		{Path: "gates.approval.window", In: surface, Kind: KindDur, Doc: "With mode delay only: how long a person has to stop the gate's consequence."},
 		{Path: "gates.approval.rule[]", In: surface, Kind: KindTable, Doc: "A rule; the first whose when holds gives the mode."},

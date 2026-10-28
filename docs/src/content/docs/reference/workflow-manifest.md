@@ -85,7 +85,7 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `gates` | table |  | The gates its runs and drafts open. |
-| `gates.approval` | table |  | The approval of its gates; wait when absent. |
+| `gates.approval` | table |  | The approval of its gates. |
 | `gates.approval.mode` | one of `send`, `delay`, `wait`, `dry_run`, `run` |  | The mode when no rule holds. |
 | `gates.approval.window` | duration |  | With mode delay only: how long a person has to stop the gate's consequence. |
 | `gates.approval.rule[]` | table |  | A rule; the first whose when holds gives the mode. |
