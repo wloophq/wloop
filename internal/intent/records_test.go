@@ -129,7 +129,7 @@ func TestAnIntentWithoutARecordTableLoadsAndOwesNothing(t *testing.T) {
 		t.Fatal(problems.Error())
 	}
 	d, ok := l.Registry.Get("ask-author")
-	if !ok || d.Record.Requires != "" || d.Record.Missing != "" || d.Record.States != nil || d.Records.Src != "false" {
+	if !ok || d.Record.Requires != "" || d.Record.Missing != "" || d.Record.States != nil || d.Records.Src != "true" || !d.Record.None {
 		t.Fatalf("an intent with no [record] %+v %v", d.Record, ok)
 	}
 	if rules, err := l.Rules("ask-author"); err != nil || rules.Requires != "" {

@@ -64,6 +64,7 @@ func TestProfileCheckPipedKeepsItsLines(t *testing.T) {
   act              bundled   Act on the open items of a unit without touching its code: settle what you can and propose the replies it needs as drafts for you to approve; Address works on the code of a pull request you develop
   address          bundled   Triage the reviews and failing checks of a pull request you develop, in its workspace, changing its code where they call for it; Act only settles open items and drafts replies
   ask-author       ` + filepath.Join(dir, "intents", "ask-author", "intent.toml") + `   Ask the author one question
+  attach           bundled   Make a session started outside the loop a run of a task, keeping its context
   brief            bundled   One brief per unit: goal, context, kind, size, risk, open questions and tags
   nudge            bundled   Ask whoever the pull request waits on for the next step, in a comment; guidance is the topic
   probe            bundled   Check that an agent home can read its turn, record it, take an answer and be resumed

@@ -71,6 +71,11 @@ func transcriptPrompts(lookup func(ctx context.Context, agentSession string) (pa
 	return claude.Prompts{UserHome: config.Home(), Transcript: lookup}
 }
 
+// agentTranscripts pages the agents' transcripts the hooks stored, through lookup.
+func agentTranscripts(lookup func(ctx context.Context, agentSession string) (path, kind string, err error)) turns.Transcripts {
+	return claude.Transcripts{Transcript: lookup}
+}
+
 // dossierFiles keeps the dossiers under the state directory; the adapter meters its own git calls.
 func (e *Env) dossierFiles(p dossier.Policy) dossiers.Files {
 	return adossier.Files{StateDir: e.StateDir, Home: e.Home, MaxFile: p.MaxFile, Now: e.Now}
@@ -364,6 +369,7 @@ func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (b
 			books, err := sqlite.New(db).Books(ctx, u)
 			return len(books[u].Turns), err
 		},
-		Clock: clockFunc(func() time.Time { return e.Now() }),
+		Sessions: sqlite.New(db).Sessions,
+		Clock:    clockFunc(func() time.Time { return e.Now() }),
 	})
 }

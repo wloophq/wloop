@@ -45,7 +45,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
-| `role` | one of `headless`, `pr.review`, `pr.address`, `pr.nudge`, `probe` |  | What binds it to a plugin's mechanism. One intent per role and provider. |
+| `role` | one of `headless`, `attach`, `pr.review`, `pr.address`, `pr.nudge`, `probe` |  | What binds it to a plugin's mechanism. One intent per role and provider. |
 | `provider` | one of `github`, `session`, `slack`, `task`, `workspace`, `any`, or a list of them |  | The units its turns serve: a provider id, a list of them, or any; defaults.toml provider when absent. |
 | `builds` | one of `brief` |  | A builder, never a turn. |
 | `prompt` | file |  | A builder's prompt file, through the profile layers. |
@@ -169,7 +169,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
-| `record` | table |  | The turn's record. Left out, a run records no outcome and owes nothing. |
+| `record` | table |  | The turn's record. Left out, a turn of the intent owes no record and its session's stop is never blocked for one. |
 | `record.when` | predicate | `true` | When the turn records its outcome. |
 | `record.states` | list of `done`, `settled`, `asked`, `failed` |  | The states a record may take. Required when the table sets when, artifacts, outcome, require or attach_url; a table that only sets requires and missing needs none. |
 | `record.artifacts` | list of `review-draft`, `triage` |  | The artifacts a record may carry. |

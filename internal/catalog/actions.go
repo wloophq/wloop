@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -236,6 +237,42 @@ var builtinActions = []builtinAction{
 	draftAction("draft.edit", "edit", &api.InputSpec{Kind: "text", Required: true}),
 	draftAction("draft.discard", "dismiss", nil),
 	draftAction("draft.retry", "retry", nil),
+	runAction(RunOpen),
+	runAction(RunEnter),
+	runAction(RunTranscript),
+}
+
+// The run actions, as a RunView's actions name them; actions.toml words each under runPrefix and its name.
+const (
+	RunOpen       = "open"
+	RunEnter      = "enter"
+	RunTranscript = "transcript"
+)
+
+const runPrefix = "run."
+
+// runAction is a run's action: no row offers it, a task's run does (RunActions).
+func runAction(name string) builtinAction {
+	spec := api.ActionSpec{ID: runPrefix + name, Group: "run", Scope: ScopeRun, Surfaces: []string{SurfaceDetail, SurfaceCLI}}
+	return builtinAction{spec, func(Facts) (api.ActionState, bool) { return absent() }}
+}
+
+// RunFacts are what a run's actions depend on: its workspace in a manager, a session not closed, and an agent
+// transcript.
+type RunFacts struct {
+	Workspace, Session, Transcript bool
+}
+
+// RunActions are the names of the run actions a run offers, in catalog order.
+func RunActions(f RunFacts) []string {
+	offered := map[string]bool{RunOpen: f.Workspace, RunEnter: f.Workspace && f.Session, RunTranscript: f.Transcript}
+	var out []string
+	for _, b := range builtinActions {
+		if name := strings.TrimPrefix(b.spec.ID, runPrefix); b.spec.Scope == ScopeRun && offered[name] {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 // draftAction is an Outbox action: no row offers it, the draft's task does (DraftStates).

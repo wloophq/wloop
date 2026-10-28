@@ -87,3 +87,10 @@ func (c *Client) Digest(ctx context.Context, day string) (api.Digest, error) {
 	err := c.do(ctx, ReadTimeout, http.MethodGet, api.DigestPath+"?"+url.Values{"day": {day}}.Encode(), nil, &out)
 	return out, err
 }
+
+// Attach makes the session of handle a run of task id.
+func (c *Client) Attach(ctx context.Context, handle, id string, req api.AttachRequest) (api.ByHandResult, error) {
+	var res api.ByHandResult
+	err := c.doAs(ctx, actionTimeout, handle, http.MethodPost, api.TaskPath(id, "attach"), req, &res)
+	return res, err
+}

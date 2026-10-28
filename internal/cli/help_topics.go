@@ -168,6 +168,16 @@ func helpGroups(manager string) []helpGroup {
 				Docs: "concepts/approval",
 			},
 			{
+				Names:   []string{"task"},
+				Summary: "Make this agent session a run of a task",
+				Usage:   []string{"task attach task:<id>"},
+				About: "attach makes the agent session it runs in, one a workspace manager started, a run of the task: " +
+					"the task's page lists it with its workspace, session and transcript, and what it posts or drafts lands on the task. " +
+					"Its turn owes no record, so the session stops as it would without " + name + ".",
+				Examples: []string{"task attach task:t-3f9a2c4b5d6e7f80"},
+				Docs:     "concepts/tasks",
+			},
+			{
 				Names:   []string{"explore"},
 				Summary: "Open pull requests of others to help on",
 				Usage:   []string{"explore <url|owner/repo|repo|login|@org/team|search>"},

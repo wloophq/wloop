@@ -483,7 +483,7 @@
     },
     "record": {
       "additionalProperties": false,
-      "description": "The turn's record. Left out, a run records no outcome and owes nothing.",
+      "description": "The turn's record. Left out, a turn of the intent owes no record and its session's stop is never blocked for one.",
       "properties": {
         "artifacts": {
           "description": "The artifacts a record may carry.",
@@ -612,6 +612,7 @@
       "description": "What binds it to a plugin's mechanism. One intent per role and provider.",
       "enum": [
         "headless",
+        "attach",
         "pr.review",
         "pr.address",
         "pr.nudge",

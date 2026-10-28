@@ -269,7 +269,8 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 		}
 	}
 	if m.Record == nil && d.Builds == "" {
-		d.Records = s.pred("record.when", nil, "false")
+		d.Records = s.pred("record.when", nil, "true")
+		d.Record.None = true
 	}
 	if m.Resume != nil {
 		d.Resume.Changed = str(m.Resume.Changed, DefaultChanged)

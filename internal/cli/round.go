@@ -337,6 +337,13 @@ func (e *Env) wake(ctx context.Context, cfg config.Config, m workspace.Manager, 
 	if err != nil || !found || !keep(last) {
 		return proc{}, false, err
 	}
+	return e.wakeSession(ctx, cfg, m, w, ws, u, opts, sess)
+}
+
+// wakeSession gives the dormant session sess of u in ws a live process again
+// through its manager m; woke is false when the wake failed and a new
+// session should start instead.
+func (e *Env) wakeSession(ctx context.Context, cfg config.Config, m workspace.Manager, w workspace.Waker, ws wsdomain.Workspace, u unit.Unit, opts roundOptions, sess dturn.Session) (proc, bool, error) {
 	opts.unit = u
 	s, err := e.agentSession(ctx, cfg, ws, opts)
 	if err != nil {

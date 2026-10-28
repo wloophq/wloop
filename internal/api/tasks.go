@@ -25,10 +25,11 @@ const (
 
 // A task's timeline, runs and chat, and the gates and runs as resources: TimelinePath serves a task's
 // []TimelineEvent, newest first (query parameters kinds as "a,b", before a Seq and limit), RunsPath its []RunView,
-// ChatPath takes a ChatRequest, AttachPath makes the caller's session, from SessionHeader, a run of the task.
+// ChatPath takes a ChatRequest, AttachPath makes the caller's session, from SessionHeader, a run of the task (it takes an AttachRequest
+// and answers a ByHandResult).
 // GatesPath lists []GateView (query parameter status as "a,b", open when absent), GatePath resolves gate id with intent (a TaskRequest's args carry an
 // answer). RunOpen opens a run's workspace in its manager, RunEnter enters its session, RunTranscript pages
-// its transcript (query parameters from and limit).
+// its transcript as a TranscriptPage (query parameters from and limit).
 const (
 	TimelinePath  = TaskDetail + "/timeline"
 	RunsPath      = TaskDetail + "/runs"
@@ -198,6 +199,30 @@ type RunView struct {
 	SessionState string   `json:"session_state,omitempty"`
 	Resume       string   `json:"resume,omitempty"`
 	Actions      []string `json:"actions,omitempty"`
+}
+
+// TranscriptLine is one message of a run's agent transcript: who wrote it (user or assistant) and its text.
+type TranscriptLine struct {
+	Role string    `json:"role"`
+	Text string    `json:"text"`
+	At   time.Time `json:"at,omitzero"`
+}
+
+// TranscriptPage is what RunTranscript serves: the transcript's lines from the asked one, oldest first, and
+// how many lines it holds in all.
+type TranscriptPage struct {
+	Lines []TranscriptLine `json:"lines"`
+	Total int              `json:"total"`
+}
+
+// AttachRequest is what AttachPath reads of the calling session's environment besides SessionHeader: its
+// directory, pane, agent session, agent home and agent.
+type AttachRequest struct {
+	Cwd          string `json:"cwd"`
+	Pane         string `json:"pane,omitempty"`
+	AgentSession string `json:"agent_session,omitempty"`
+	Home         string `json:"home,omitempty"`
+	Agent        string `json:"agent,omitempty"`
 }
 
 // RecordView is a record of a declared kind, such as a brief, with its data as its schema holds it.

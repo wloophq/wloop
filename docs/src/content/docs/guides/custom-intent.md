@@ -77,7 +77,7 @@ whether the question goes out; you ask the user.
 {{template "record" .}}
 ```
 
-Include `{{template "history" .}}` and `{{template "record" .}}` in any intent that records, and `{{if .Resume}}{{template "resume" .}}{{end}}` in any that can be answered.
+An intent without a `[record]` table owes no record: its turns are stored, but the Stop hook never blocks their sessions for one, as for the bundled `attach`. Include `{{template "history" .}}` and `{{template "record" .}}` in any intent that records, and `{{if .Resume}}{{template "resume" .}}{{end}}` in any that can be answered.
 
 ## 3. Check it
 

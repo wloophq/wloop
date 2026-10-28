@@ -202,6 +202,10 @@ type Deps struct {
 	Turns    *turns.Service
 	Sessions turns.Sessions
 	Views    *coreviews.Service
+	// RunHost opens a run's workspace and enters its session; Transcripts
+	// pages its agent transcript. nil offers neither.
+	RunHost     RunHost
+	Transcripts turns.Transcripts
 	// Agents are the agents' states as the workspace snapshot last read
 	// them, never a call to the manager; nil reads as unknown, so a started
 	// turn's session is never told waiting.

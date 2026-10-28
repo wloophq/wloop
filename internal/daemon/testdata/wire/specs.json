@@ -1,5 +1,5 @@
 {
-  "version": "5d1ccfc9deff",
+  "version": "4aab1c74eeb1",
   "specs": [
     {
       "id": "run_now",
@@ -525,6 +525,42 @@
       "source": "builtin",
       "scope": "draft",
       "verb": "retry"
+    },
+    {
+      "id": "run.open",
+      "label": "Open workspace",
+      "summary": "Bring the run's workspace on screen in the workspace manager it ran in.",
+      "group": "run",
+      "surfaces": [
+        "detail",
+        "cli"
+      ],
+      "source": "builtin",
+      "scope": "run"
+    },
+    {
+      "id": "run.enter",
+      "label": "Enter session",
+      "summary": "Bring the run's agent session on screen to type in it; a session with no live process is woken first.",
+      "group": "run",
+      "surfaces": [
+        "detail",
+        "cli"
+      ],
+      "source": "builtin",
+      "scope": "run"
+    },
+    {
+      "id": "run.transcript",
+      "label": "Transcript",
+      "summary": "Read what the person typed and what the agent answered in the run's session.",
+      "group": "run",
+      "surfaces": [
+        "detail",
+        "cli"
+      ],
+      "source": "builtin",
+      "scope": "run"
     }
   ],
   "plan": [

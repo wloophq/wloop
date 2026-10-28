@@ -11,7 +11,7 @@ var ActionGroups = []string{GroupStart, "turn", "control", "workspace", "brief",
 var ActionSurfaces = []string{"row", "detail", "tui", "menubar", "notification", "cli", "explore"}
 
 // BuiltinActionIDs are the built-in actions actions.toml words, one table
-// each: a row's, a draft's and a plan item's. plan_guide is the plan item's
+// each: a row's, a draft's, a plan item's and a task run's. plan_guide is the plan item's
 // guide, whose wire id is guide.
 var BuiltinActionIDs = []string{
 	"run_now", "skip", "guide", "trust_run", "unblock",
@@ -21,6 +21,7 @@ var BuiltinActionIDs = []string{
 	"brief_refresh", "intake_without", "intake_cancel",
 	"draft.approve", "draft.edit", "draft.discard", "draft.retry",
 	"plan_apply", "plan_dismiss", "plan_guide",
+	"run.open", "run.enter", "run.transcript",
 }
 
 func actionValues(names []string) func() []Value {

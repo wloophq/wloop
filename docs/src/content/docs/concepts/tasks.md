@@ -60,6 +60,20 @@ A record is a typed note on a unit or a task, of a kind `records.toml` declares:
 
 The `start` intent records `done` with the pull request's or the message's URL, which attaches it to the task (`record.attach_url`); posts it makes at once attach too (`drafts.attach_posts`). The task then closes when they end, as the next section says. When the cockpit's Start runs, it takes no `--repo`: the turn reuses the repository an earlier start on the task recorded, else it runs with no checkout.
 
+## Runs
+
+Every turn on a task is one of its runs. The task's page lists them newest first, each with its intent and state, the workspace manager, workspace and worktree it ran in, its session and that session's state (active, dormant or closed), and the command that resumes it. A run offers the actions it can take:
+
+- **Open workspace** brings its workspace on screen in the manager it ran in.
+- **Enter session** brings its session on screen to type in it. A dormant session is woken first in its own manager, as a round wakes one.
+- **Transcript** reads what the person typed and what the agent answered in the session, page by page.
+
+A headless call has no workspace or session, so it offers none of them. `{{command}} open` on a task focuses the workspace of its newest run that ran in one.
+
+### Attach a session
+
+`{{command}} task attach task:<id>`, run from an agent session a workspace manager started, makes that session a run of the task: the daemon starts the turn of the intent holding the `attach` role (the bundled `attach`) on it by hand, and the session takes the task as its unit, whatever unit it had before. What the session posts, drafts or records from then on lands on the task. The `attach` intent has no `[record]`, so its turn owes no record and the Stop hook never blocks the session for one. Outside a workspace manager's session, the command refuses with the `attach_needs_session` notice and changes nothing.
+
 ## Lists are categories
 
 | State | Category | Means |

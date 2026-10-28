@@ -14,6 +14,7 @@ const (
 	ScopeUnit  = "unit"
 	ScopeItem  = "item"
 	ScopeDraft = "draft"
+	ScopeRun   = "run"
 )
 
 // githubBuiltins are the built-in actions only a pull request offers.
@@ -28,7 +29,7 @@ var draftVerbs = []string{"approve", "dismiss", "edit", "retry"}
 // key or without a draft verb: the core entry keys reach drafts.
 func checkScope(s api.ActionSpec) error {
 	switch s.Scope {
-	case "", ScopeUnit, ScopeItem:
+	case "", ScopeUnit, ScopeItem, ScopeRun:
 		return nil
 	case ScopeDraft:
 		if s.Key != "" {

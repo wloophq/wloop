@@ -24,8 +24,9 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 ### Binding
 
-- `role` (one of `headless`, `pr.review`, `pr.address`, `pr.nudge`, `probe`): What binds it to a plugin's mechanism. One intent per role and provider.
+- `role` (one of `headless`, `attach`, `pr.review`, `pr.address`, `pr.nudge`, `probe`): What binds it to a plugin's mechanism. One intent per role and provider.
   - `headless`: The intent a headless turn on a unit runs when its request names none.
+  - `attach`: The intent a session started outside the loop runs when it attaches to a task: started by hand on that session, which becomes a run of the task.
   - `pr.review`: The review round on someone else's pull request, in its review workspace: first or follow-up, reconciled with the review you published; it drives its workspace's row.
   - `pr.address`: The address round on a pull request you develop, in its author workspace: its reviews, failing checks and conflicts; its instructions say why it is due; it drives its workspace's row.
   - `pr.nudge`: The nudge on a pull request: nudge.prepare fills its inputs from who the pull request waits on, or refuses it.
@@ -146,7 +147,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 ### What it records
 
-- `record` (table): The turn's record. Left out, a run records no outcome and owes nothing.
+- `record` (table): The turn's record. Left out, a turn of the intent owes no record and its session's stop is never blocked for one.
 - `record.when` (predicate, default `true`): When the turn records its outcome.
 - `record.states` (list of `done`, `settled`, `asked`, `failed`): The states a record may take. Required when the table sets when, artifacts, outcome, require or attach_url; a table that only sets requires and missing needs none.
 - `record.artifacts` (list of `review-draft`, `triage`): The artifacts a record may carry.
@@ -564,11 +565,13 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
 - `<name>` (template): A notice, by its name: a template over its fields, `Name` and `Command`.
   - `answered`: Typed into an idle session, or the reason that blocks its stop while it works: the user answered an Inbox message, Message, 0 for an answer stored before answers named their message, of the unit named as the loop's commands read it.
   - `record_owed`: The reason that blocks the stop of a session whose turn has no record: the unit, the turn's id and the directory a record file goes in.
+  - `attach_needs_session`: Why task attach refuses to run outside an agent session a workspace manager started: the task named as the command reads it, and the enabled workspace managers as displayed.
 
 The fields each notice reads besides `Name` and `Command`:
 
   - `answered` (`Message`: number, `Unit`)
   - `record_owed` (`Unit`, `Turn`, `ScratchDir`)
+  - `attach_needs_session` (`Task`, `Managers`)
 
 ## Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)
 
