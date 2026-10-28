@@ -146,7 +146,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 ### What it records
 
-- `record` (table): The turn's record.
+- `record` (table): The turn's record. Left out, a run records no outcome and owes nothing.
 - `record.when` (predicate, default `true`): When the turn records its outcome.
 - `record.states` (list of `done`, `settled`, `asked`, `failed`): The states a record may take. Required when the table sets when, artifacts, outcome, require or attach_url; a table that only sets requires and missing needs none.
 - `record.artifacts` (list of `review-draft`, `triage`): The artifacts a record may carry.

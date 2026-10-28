@@ -236,10 +236,7 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 	if m.Join != nil {
 		d.Join.DiffersOn = m.Join.DiffersOn
 	}
-	switch r := m.Record; {
-	case r == nil && d.Builds == "":
-		s.add("record.states", "is required")
-	case r != nil:
+	if r := m.Record; r != nil {
 		if r.States == nil && r.outcomes() {
 			s.add("record.states", "is required")
 		}
@@ -264,6 +261,9 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 				Fields:   q.Fields,
 			})
 		}
+	}
+	if m.Record == nil && d.Builds == "" {
+		d.Records = s.pred("record.when", nil, "false")
 	}
 	if m.Resume != nil {
 		d.Resume.Changed = str(m.Resume.Changed, DefaultChanged)

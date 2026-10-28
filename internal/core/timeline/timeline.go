@@ -56,7 +56,8 @@ func (m Merged) Of(ctx context.Context, id task.ID, f Filter) ([]Event, error) {
 
 // Records reads the records the units keep.
 type Records interface {
-	// Records are the record of kind on each of units that keeps one.
+	// Records are the record of kind on each of units that keeps one; with
+	// no units, on every unit that keeps one.
 	Records(ctx context.Context, kind string, units ...unit.Unit) (map[unit.Unit]port.Event, error)
 }
 
@@ -64,15 +65,21 @@ type Records interface {
 // the units it holds in order, that keeps one, as a pull request task's
 // brief is its pull request's; false when none does.
 func RecordOf(ctx context.Context, r Records, kind string, id task.ID, held []unit.Unit) (port.Event, bool, error) {
-	units := append([]unit.Unit{task.UnitOf(id)}, held...)
-	got, err := r.Records(ctx, kind, units...)
+	got, err := r.Records(ctx, kind, append([]unit.Unit{task.UnitOf(id)}, held...)...)
 	if err != nil {
 		return port.Event{}, false, err
 	}
-	for _, u := range units {
-		if ev, ok := got[u]; ok {
-			return ev, true, nil
+	ev, ok := Pick(got, id, held)
+	return ev, ok, nil
+}
+
+// Pick is task id's record among recs, the records of its kind by unit, as
+// RecordOf picks it.
+func Pick(recs map[unit.Unit]port.Event, id task.ID, held []unit.Unit) (port.Event, bool) {
+	for _, u := range append([]unit.Unit{task.UnitOf(id)}, held...) {
+		if ev, ok := recs[u]; ok {
+			return ev, true
 		}
 	}
-	return port.Event{}, false, nil
+	return port.Event{}, false
 }

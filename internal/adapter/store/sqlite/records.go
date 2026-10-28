@@ -73,11 +73,11 @@ func (db *DB) EventsOf(ctx context.Context, units []unit.Unit, f timeline.Filter
 	return out, err
 }
 
-// Records are the record of kind each of units keeps.
+// Records are the record of kind each of units keeps; with no units, every unit's.
 func (db *DB) Records(ctx context.Context, kind string, units ...unit.Unit) (map[unit.Unit]port.Event, error) {
 	out := map[unit.Unit]port.Event{}
 	if len(units) == 0 {
-		return out, nil
+		return out, db.everyRecord(ctx, kind, out)
 	}
 	evs, err := db.EventsOf(ctx, units, timeline.Filter{Kinds: []string{timeline.KindRecord}})
 	if err != nil {
@@ -180,4 +180,24 @@ func (db *DB) ItemsHeld(ctx context.Context, u unit.Unit) (map[task.ID][]string,
 			return nil
 		})
 	return out, err
+}
+
+// everyRecord puts in out every unit's record of kind.
+func (db *DB) everyRecord(ctx context.Context, kind string, out map[unit.Unit]port.Event) error {
+	return eachRow(ctx, db.R(), `SELECT provider, unit_key, actor, at, data FROM events WHERE kind = ? AND key = ?`,
+		[]any{timeline.KindRecord, kind}, func(rows *sql.Rows) error {
+			ev := port.Event{Kind: timeline.KindRecord, Key: kind}
+			var provider, at string
+			if err := rows.Scan(&provider, &ev.Unit.Key, &ev.Actor, &at, &ev.Data); err != nil {
+				return err
+			}
+			ev.Unit.Provider = unit.ProviderID(provider)
+			t, err := time.Parse(event.TimeLayout, at)
+			if err != nil {
+				return err
+			}
+			ev.At = t
+			out[ev.Unit] = ev
+			return nil
+		})
 }

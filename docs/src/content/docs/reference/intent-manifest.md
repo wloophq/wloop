@@ -169,7 +169,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
-| `record` | table |  | The turn's record. |
+| `record` | table |  | The turn's record. Left out, a run records no outcome and owes nothing. |
 | `record.when` | predicate | `true` | When the turn records its outcome. |
 | `record.states` | list of `done`, `settled`, `asked`, `failed` |  | The states a record may take. Required when the table sets when, artifacts, outcome, require or attach_url; a table that only sets requires and missing needs none. |
 | `record.artifacts` | list of `review-draft`, `triage` |  | The artifacts a record may carry. |

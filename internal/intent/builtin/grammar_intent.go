@@ -139,7 +139,7 @@ var intentGrammar = []Key{
 	{Path: "join.differs_on", In: SurfaceIntent, Kind: KindList, Elem: KindText, Doc: "Persisted inputs whose change starts a new turn."},
 	{Path: "resume", In: SurfaceIntent, Kind: KindTable, Doc: "What a resumed turn reads."},
 	{Path: "resume.changed", In: SurfaceIntent, Kind: KindText, Doc: "The text when the unit changed since the question."},
-	{Path: "record", In: SurfaceIntent, Kind: KindTable, Doc: "The turn's record."},
+	{Path: "record", In: SurfaceIntent, Kind: KindTable, Doc: "The turn's record. Left out, a run records no outcome and owes nothing."},
 	{Path: "record.when", In: SurfaceIntent, Kind: KindPred, Default: "true", Doc: "When the turn records its outcome."},
 	{Path: "record.states", In: SurfaceIntent, Kind: KindList, Elem: KindEnum, Values: named(RecordStates...), Doc: "The states a record may take. Required when the table sets when, artifacts, outcome, require or attach_url; a table that only sets requires and missing needs none."},
 	{Path: "record.artifacts", In: SurfaceIntent, Kind: KindList, Elem: KindEnum, Values: named(record.ArtifactKinds...), Doc: "The artifacts a record may carry."},

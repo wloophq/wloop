@@ -2,12 +2,15 @@ package daemon
 
 import (
 	"context"
+	"fmt"
 	"strconv"
+	"sync/atomic"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/core/intake"
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/timeline"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -91,5 +94,52 @@ func TestAnIntakeOnATaskWaitsOnTheTasksBrief(t *testing.T) {
 	}
 	if _, err := b.Ready(ctx, pr, true, nil); err != nil || inner.asked[2] != pr {
 		t.Fatalf("a unit waits on its own: %v", inner.asked)
+	}
+}
+
+// countedRecords counts the reads of the records it passes on.
+type countedRecords struct {
+	inner timeline.Records
+	reads atomic.Int32
+}
+
+func (c *countedRecords) Records(ctx context.Context, kind string, units ...unit.Unit) (map[unit.Unit]port.Event, error) {
+	c.reads.Add(1)
+	return c.inner.Records(ctx, kind, units...)
+}
+
+func TestAListPageReadsTheBriefsOnce(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	recs := &countedRecords{inner: r.db}
+	r.s.deps.TaskRecords = recs
+	ctx := context.Background()
+	const n = 300
+	var ts []task.Task
+	for i := range n {
+		pr := unit.Unit{Provider: unit.GitHub, Key: "acme/api#" + strconv.Itoa(i+1)}
+		ts = append(ts, task.Task{ID: task.ID(fmt.Sprintf("t-%016x", i+1)), State: "next", Category: task.CategoryReady, Title: "Review " + pr.Key, Units: []unit.Unit{pr}})
+		if i%2 == 0 {
+			if err := r.db.PutRecord(ctx, pr, "brief", task.WriterAgent, []byte(`{"goal":"g`+strconv.Itoa(i+1)+`"}`), tasksNow); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	r.put(t, ts...)
+	p := r.page(t, "view=next")
+	if len(p.Tasks) != n {
+		t.Fatalf("%d tasks on the page", len(p.Tasks))
+	}
+	briefed := 0
+	for _, v := range p.Tasks {
+		if v.Brief != nil {
+			briefed++
+		}
+	}
+	if briefed != n/2 {
+		t.Fatalf("%d tasks with a brief, want %d", briefed, n/2)
+	}
+	if got := recs.reads.Load(); got != 1 {
+		t.Fatalf("%d record reads for a page of %d tasks, want 1", got, n)
 	}
 }

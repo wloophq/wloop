@@ -532,7 +532,7 @@
     },
     "record": {
       "additionalProperties": false,
-      "description": "The turn's record.",
+      "description": "The turn's record. Left out, a run records no outcome and owes nothing.",
       "properties": {
         "artifacts": {
           "description": "The artifacts a record may carry.",

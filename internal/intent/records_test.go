@@ -119,3 +119,20 @@ func TestEveryBundledIntentThatRequiresARecordNamesItsGate(t *testing.T) {
 		}
 	}
 }
+
+func TestAnIntentWithoutARecordTableLoadsAndOwesNothing(t *testing.T) {
+	head, _, _ := strings.Cut(minimal, "[record]")
+	root := t.TempDir()
+	writeIntent(t, root, "ask-author", head, "Ask.\n")
+	l, problems := Load(userLayer(root), bundledFS(), testBase(), nil)
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	d, ok := l.Registry.Get("ask-author")
+	if !ok || d.Record.Requires != "" || d.Record.Missing != "" || d.Record.States != nil || d.Records.Src != "false" {
+		t.Fatalf("an intent with no [record] %+v %v", d.Record, ok)
+	}
+	if rules, err := l.Rules("ask-author"); err != nil || rules.Requires != "" {
+		t.Fatalf("its rules %+v %v", rules, err)
+	}
+}
