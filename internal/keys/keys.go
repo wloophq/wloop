@@ -30,7 +30,7 @@ const (
 
 type Binding struct {
 	Key      string // canonical: "x", "X" (Shift+x), "Enter", "Esc", "Backspace", "Tab", "Ctrl+K", "Cmd+K", "?", "/", "g f", "1".."9", "Shift+1".."Shift+9"
-	Action   string // gtd verb, "nav:<view>", "area:<n>", "answer:<n>", "move:down", "palette", "help", "filter", "open-source", "capture", ...
+	Action   string // task verb, "nav:<view>", "area:<n>", "answer:<n>", "move:down", "palette", "help", "filter", "open-source", "capture", ...
 	Context  Context
 	Surfaces []Surface
 }

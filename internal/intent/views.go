@@ -11,6 +11,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
+	"github.com/wloophq/wloop/internal/keys"
 	"github.com/wloophq/wloop/internal/profile"
 )
 
@@ -22,6 +23,8 @@ const ViewsFile = "views.toml"
 type ListTexts struct {
 	Views  map[string]string
 	Review map[string]string
+	// Keys are the keys that jump to the views, by view; a view without one has none.
+	Keys map[string]string
 }
 
 type mViews struct {
@@ -61,7 +64,7 @@ func BundledLists(bundled fs.FS) (ListTexts, Problems) {
 // reads is a problem naming where its words go now. The verbs' texts are
 // the TasksDef's; gates checks the gates a verb names, nil none.
 func loadLists(layers []profile.Layer, bundled fs.FS, gates *GatesDef) (ListTexts, TasksDef, Problems) {
-	out := ListTexts{Views: map[string]string{}, Review: map[string]string{}}
+	out := ListTexts{Views: map[string]string{}, Review: map[string]string{}, Keys: map[string]string{}}
 	problems := renamedFiles(layers)
 	if bundled == nil {
 		return out, TasksDef{Verbs: map[string]VerbText{}}, problems
@@ -74,6 +77,7 @@ func loadLists(layers []profile.Layer, bundled fs.FS, gates *GatesDef) (ListText
 	problems = append(problems, views...)
 	if read {
 		problems = append(problems, missingViews(out)...)
+		problems = append(problems, sharedViewKeys(out)...)
 	}
 	return out, tasks, problems
 }
@@ -144,9 +148,34 @@ func mergeViews(out ListTexts, file string, src []byte) Problems {
 		stepLabels[id] = v.Label
 	}
 	labels(s, "views", "view", viewLabels, out.Views, builtin.Views)
+	for _, id := range slices.Sorted(maps.Keys(m.Views)) {
+		if k := m.Views[id].Key; k != nil && strings.TrimSpace(*k) != "" && slices.Contains(builtin.Views, id) {
+			if err := keys.CheckView(strings.TrimSpace(*k)); err != nil {
+				s.add("views."+id+".key", "%s", err)
+				continue
+			}
+			out.Keys[id], _ = keys.Canonical(strings.TrimSpace(*k))
+		}
+	}
 	labels(s, "review", "review step", stepLabels, out.Review, builtin.ReviewSteps)
 	s.addGrammar(grammar(builtin.SurfaceViews, src))
 	return s.problems
+}
+
+// sharedViewKeys are the views whose key another view has too; the view keeps none.
+func sharedViewKeys(out ListTexts) Problems {
+	var problems Problems
+	owner := map[string]string{}
+	for _, id := range slices.Sorted(maps.Keys(out.Keys)) {
+		owner[out.Keys[id]] = id
+	}
+	for _, id := range slices.Sorted(maps.Keys(out.Keys)) {
+		if k := out.Keys[id]; owner[k] != id {
+			problems = append(problems, Problem{File: ViewsFile, Field: "views." + id + ".key", Msg: k + " is the key of views." + owner[k] + " too"})
+			delete(out.Keys, id)
+		}
+	}
+	return problems
 }
 
 // missingViews are the views and the review's steps out words none of.

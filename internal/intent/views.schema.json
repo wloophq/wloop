@@ -47,7 +47,7 @@
             "type": "boolean"
           },
           "key": {
-            "description": "The key that jumps to the view, in internal/keys' notation.",
+            "description": "The key that jumps to the view: `g`, a space and a key that no core key uses, such as `g i`. Its help is the view's label.",
             "type": "string"
           },
           "label": {

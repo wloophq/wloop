@@ -270,7 +270,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `views.<name>.when` (predicate): Which tasks or gates the view lists, over their facts.
 - `views.<name>.group` (string): The fact the view groups by.
 - `views.<name>.sort` (string): The facts the view sorts by, comma-separated; a leading - sorts one descending.
-- `views.<name>.key` (string): The key that jumps to the view, in internal/keys' notation.
+- `views.<name>.key` (string): The key that jumps to the view: `g`, a space and a key that no core key uses, such as `g i`. Its help is the view's label.
 - `views.<name>.hide_disabled` (bool, default `false`): The view hides the tasks of a disabled plugin.
 - `badge` (table): The menu bar's badge.
 - `badge.views` (list of strings): The views whose counts the badge adds up.
@@ -312,7 +312,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 ## Key help (`keys.toml`)
 
-- `help` (table): The help line of each core key, by context (list, global, question, review, plan), then action (`nav:inbox`, `done`); a numbered one as `answer:{n}`, `{n}` its number.
+- `help` (table): The help line of each core key, by context (list, global, question, review, plan), then action (`capture`, `done`); a numbered one as `answer:{n}`, `{n}` its number.
 - `help.<name>` (table): The keys of one context, by action.
 - `help.<name>.<name>` (string): What the key does, as the help and the palette list it. Required.
 

@@ -1,6 +1,8 @@
 # The help line each core key shows in the help and the palette, by the
 # context it works in, then the action it runs. A numbered action reads
 # {n}, its number. A user profile's keys.toml replaces the lines it sets.
+# The key that jumps to a view is the view's, in views.toml, and its help is
+# the view's label.
 
 [help.list]
 "move:down" = "move down"
@@ -24,13 +26,6 @@ open-source = "open the source"
 
 [help.global]
 capture = "capture"
-"nav:focus" = "Focus"
-"nav:inbox" = "Inbox"
-"nav:outbox" = "Outbox"
-"nav:next" = "Next"
-"nav:waiting" = "Waiting"
-"nav:projects" = "Projects"
-"nav:review" = "Review"
 "nav:github" = "the GitHub views"
 filter = "filter"
 palette = "every action and its key"
@@ -48,4 +43,4 @@ quit = "quit"
 approve = "apply the selected plan step"
 
 [help.question]
-"answer:{n}" = "answer option {n}"
+"answer:{n}" = "the gate's intent {n}"

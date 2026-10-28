@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -107,5 +108,39 @@ func TestKeysEndpoint(t *testing.T) {
 	}
 	if code := get(t, s, api.Keys+"?surface=watch", nil); code != 400 {
 		t.Errorf("an unknown surface: %d", code)
+	}
+}
+
+func TestAViewsKeyIsTheOneItsCatalogServes(t *testing.T) {
+	t.Parallel()
+	s := newTasksRig(t, nil).s
+	var cat api.ViewsCatalog
+	if code := get(t, s, api.ViewsPath, &cat); code != 200 {
+		t.Fatalf("%d", code)
+	}
+	var bound api.KeysResponse
+	get(t, s, api.Keys+"?surface=tui", &bound)
+	nav := map[string]api.KeyView{}
+	for _, b := range bound.Bindings {
+		if strings.HasPrefix(b.Action, "nav:") {
+			nav[strings.TrimPrefix(b.Action, "nav:")] = b
+		}
+	}
+	keyed := 0
+	for _, v := range cat.Views {
+		b, ok := nav[v.ID]
+		if v.Key == "" {
+			if ok {
+				t.Errorf("view %s has no key but %s jumps to it", v.ID, b.Key)
+			}
+			continue
+		}
+		keyed++
+		if b.Key != v.Key || b.Help != v.Label || b.Context != "global" {
+			t.Errorf("view %s (%s, %q): bound %+v", v.ID, v.Key, v.Label, b)
+		}
+	}
+	if keyed == 0 {
+		t.Fatalf("no served view has a key: %+v", cat.Views)
 	}
 }

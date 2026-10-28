@@ -90,7 +90,6 @@ func TestEveryPropertyAStylesheetReadsIsDeclared(t *testing.T) {
 }
 
 func TestDesignBundleFollowsAppCSS(t *testing.T) {
-	t.Skip("K1b")
 	preview, err := os.ReadFile("../../design/components/preview.css")
 	if err != nil {
 		t.Fatal(err)

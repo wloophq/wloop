@@ -1,23 +1,30 @@
-# The labels of the lists of tasks, and of the review's steps. A user
-# profile's views.toml replaces the keys it sets.
+# The labels of the lists of tasks and the keys that jump to them, and the
+# labels of the review's steps. A user profile's views.toml replaces the
+# tables and keys it sets.
 
 [views.focus]
 label = "Focus"
+key = "g f"
 
 [views.inbox]
 label = "Inbox"
+key = "g i"
 
 [views.outbox]
 label = "Outbox"
+key = "g o"
 
 [views.next]
 label = "Next"
+key = "g n"
 
 [views.waiting]
 label = "Waiting"
+key = "g w"
 
 [views.projects]
 label = "Projects"
+key = "g p"
 
 [views.someday]
 label = "Someday"
@@ -27,6 +34,7 @@ label = "Logbook"
 
 [views.review]
 label = "Review"
+key = "g r"
 
 [review.inbox]
 label = "Inbox to zero"

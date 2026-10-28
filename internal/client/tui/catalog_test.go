@@ -7,10 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand/brandtest"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/keys"
 )
 
@@ -108,7 +110,7 @@ func setPR(r *api.Row, change func(p *prView)) {
 }
 
 // servedKeys are the bindings GET /api/keys serves the terminal for specs:
-// the core keys, then the actions' keys.
+// the core keys, the views' keys, then the actions' keys.
 func servedKeys(specs api.ActionsResponse) []api.KeyView {
 	help, _ := intentload.BundledKeys(os.DirFS("../../../profiles/default"))
 	var out []api.KeyView
@@ -116,6 +118,14 @@ func servedKeys(specs api.ActionsResponse) []api.KeyView {
 		if slices.Contains(b.Surfaces, keys.TUI) {
 			out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: help.Help(string(b.Context), b.Action)})
 		}
+	}
+	lists, _ := intentload.BundledLists(os.DirFS("../../../profiles/default"))
+	var views []keys.View
+	for _, id := range builtin.Views {
+		views = append(views, keys.View{ID: id, Key: lists.Keys[id]})
+	}
+	for _, b := range keys.Views(views) {
+		out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: lists.Views[strings.TrimPrefix(b.Action, "nav:")]})
 	}
 	add := func(specs []api.ActionSpec, ctx keys.Context) {
 		for _, s := range specs {

@@ -108,19 +108,25 @@ func (s *Server) handleViews(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	texts, bundled := s.loaded().Lists, bundledWords().lists
-	cat := api.ViewsCatalog{Areas: nonNil(slices.Clone(s.deps.Cfg.Tasks.Areas)), Contexts: nonNil(slices.Clone(s.deps.Cfg.Tasks.Contexts))}
-	for _, v := range builtin.Views {
-		if v != string(task.ViewReview) || g.Serves(task.ViewReview) {
-			cat.Views = append(cat.Views, api.TaskViewSpec{ID: v, Label: cmp.Or(texts.Views[v], bundled.Views[v], v)})
-		}
-	}
+	cat := api.ViewsCatalog{Areas: nonNil(slices.Clone(s.deps.Cfg.Tasks.Areas)), Contexts: nonNil(slices.Clone(s.deps.Cfg.Tasks.Contexts)), Views: s.servedViews(g)}
 	for _, v := range builtin.TaskVerbs {
 		t, b := s.loaded().Tasks.Verbs[v], bundledWords().tasks.Verbs[v]
 		cat.Verbs = append(cat.Verbs, api.VerbSpec{Verb: v, Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
 			Input: cmp.Or(t.Input, b.Input), Key: verbKey(task.Verb(v))})
 	}
 	writeJSON(w, cat)
+}
+
+// servedViews are the views g serves, worded by the profile.
+func (s *Server) servedViews(g *coretasks.Service) []api.TaskViewSpec {
+	texts, bundled := s.loaded().Lists, bundledWords().lists
+	var out []api.TaskViewSpec
+	for _, v := range builtin.Views {
+		if v != string(task.ViewReview) || g.Serves(task.ViewReview) {
+			out = append(out, api.TaskViewSpec{ID: v, Label: cmp.Or(texts.Views[v], bundled.Views[v], v), Key: texts.Keys[v]})
+		}
+	}
+	return out
 }
 
 func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {

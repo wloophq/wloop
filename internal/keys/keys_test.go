@@ -42,13 +42,6 @@ func spec92() []row {
 		{"i", "edit", List, []Surface{TUI}},
 		{"o", "open-source", List, all},
 		{"n", "capture", Global, screen},
-		{"g f", "nav:focus", Global, screen},
-		{"g i", "nav:inbox", Global, screen},
-		{"g o", "nav:outbox", Global, screen},
-		{"g n", "nav:next", Global, screen},
-		{"g w", "nav:waiting", Global, screen},
-		{"g p", "nav:projects", Global, screen},
-		{"g r", "nav:review", Global, screen},
 		{"g g", "nav:github", Global, screen},
 		{"/", "filter", Global, screen},
 		{"Cmd+K", "palette", Global, []Surface{Web}},
@@ -133,7 +126,7 @@ func TestCanonical(t *testing.T) {
 
 func TestReservedPerSurface(t *testing.T) {
 	r := Reserved(TUI)
-	for _, k := range []string{"q", "Tab", "Ctrl+C", "Ctrl+K", "g", "g f", "Enter", "Esc", "Backspace", "/", "?", "[", "]", "Shift+1", "Shift+9"} {
+	for _, k := range []string{"q", "Tab", "Ctrl+C", "Ctrl+K", "g", "g g", "Enter", "Esc", "Backspace", "/", "?", "[", "]", "Shift+1", "Shift+9"} {
 		if !r[k] {
 			t.Errorf("tui: %q is not reserved", k)
 		}
@@ -231,5 +224,40 @@ func TestSurfacesOf(t *testing.T) {
 	}
 	if got := SurfacesOf([]string{"cli"}); len(got) != 0 {
 		t.Fatalf("%v", got)
+	}
+}
+
+func TestViewKeysComeFromTheCatalog(t *testing.T) {
+	got := Views([]View{{ID: "needs-me", Key: "g m"}, {ID: "later"}, {ID: "stalled", Key: "g s"}})
+	want := []Binding{{"g m", "nav:needs-me", Global, screens}, {"g s", "nav:stalled", Global, screens}}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("Views = %v, want %v", got, want)
+	}
+	for _, b := range Core {
+		if strings.HasPrefix(b.Action, "nav:") && b.Key != "g g" && b.Action != "nav:cycle" {
+			t.Errorf("core binds %s to %s: a view's key comes from the catalog", b.Key, b.Action)
+		}
+	}
+}
+
+func TestCheckViewRefusesAKeyThatIsNoFreeChord(t *testing.T) {
+	for _, k := range []string{"g m", "g 1", "g I"} {
+		if err := CheckView(k); err != nil {
+			t.Errorf("CheckView(%q) = %v", k, err)
+		}
+	}
+	for k, want := range map[string]string{
+		"m":     "is not a chord",
+		"G":     "is not a chord",
+		"h x":   "is not a chord",
+		"g g":   "is the core key of nav:github",
+		"g":     "is not a chord",
+		"Cmd+K": "is not a chord",
+		"g ??":  "is not a key",
+	} {
+		err := CheckView(k)
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("CheckView(%q) = %v, want an error saying %q", k, err, want)
+		}
 	}
 }
