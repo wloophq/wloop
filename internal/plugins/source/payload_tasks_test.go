@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,8 +24,8 @@ import (
 )
 
 // briefHost is a running plugin acme over a real store, whose tasks' brief
-// records project risk.
-func briefHost(t *testing.T) (*sqlite.DB, *sourcetest.Stub) {
+// records project risk; briefed are the units it told were briefed.
+func briefHost(t *testing.T) (*sqlite.DB, *sourcetest.Stub, *briefedUnits) {
 	t.Helper()
 	db, err := sqlite.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -36,6 +37,7 @@ func briefHost(t *testing.T) (*sqlite.DB, *sourcetest.Stub) {
 			return task.Value{Text: text}, prop == "risk" && w == task.WriterPlugin
 		}}
 	}}
+	briefed := &briefedUnits{}
 	snaps := psource.NewSnapshots(db.Snapshots())
 	k := &psource.Kind{Snapshots: snaps, StateDir: func(string) string { return t.TempDir() },
 		Broker: func(id string, s *manifest.Source) *psource.Broker {
@@ -44,11 +46,28 @@ func briefHost(t *testing.T) (*sqlite.DB, *sourcetest.Stub) {
 				t.Fatal(err)
 			}
 			return &psource.Broker{ID: id, Manifest: s, Snapshots: snaps, Units: psource.Units{Codecs: unit.NewRegistry(c)},
-				Config: func() config.Config { return config.Config{} }, Briefs: db, BriefRecords: records, Now: func() time.Time { return at0 }}
+				Config: func() config.Config { return config.Config{} }, Briefs: db, BriefRecords: records, Briefed: briefed.add, Now: func() time.Time { return at0 }}
 		}}
 	stub := sourcetest.NewStub()
 	start(t, k, "acme", "", stub)
-	return db, stub
+	return db, stub, briefed
+}
+
+type briefedUnits struct {
+	mu    sync.Mutex
+	units []unit.Unit
+}
+
+func (b *briefedUnits) add(u unit.Unit) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.units = append(b.units, u)
+}
+
+func (b *briefedUnits) list() []unit.Unit {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return slices.Clone(b.units)
 }
 
 // holdTask creates task id holding u, or u's items when items are named.
@@ -88,7 +107,7 @@ func briefOf(t *testing.T, db *sqlite.DB, u unit.Unit) (map[string]any, bool) {
 }
 
 func TestAPutBriefOnATaskThatDoesNotHoldTheUnitIsRefused(t *testing.T) {
-	db, stub := briefHost(t)
+	db, stub, briefed := briefHost(t)
 	ctx := context.Background()
 	u := unit.Unit{Provider: "acme", Key: "t1"}
 	holder, other := task.ID("t-00000000000000a1"), task.ID("t-00000000000000b2")
@@ -107,6 +126,9 @@ func TestAPutBriefOnATaskThatDoesNotHoldTheUnitIsRefused(t *testing.T) {
 	if b, ok := briefOf(t, db, task.UnitOf(holder)); !ok || b["goal"] != "Ship the export" {
 		t.Fatalf("the holder's brief %v %v", b, ok)
 	}
+	if got := briefed.list(); !slices.Equal(got, []unit.Unit{u}) {
+		t.Fatalf("told briefed %v, want the unit once, for the holder's brief", got)
+	}
 	props, err := db.Props(nil).PropsOf(ctx, holder)
 	if err != nil || props["risk"].Text != "high" {
 		t.Fatalf("the holder's risk %+v %v", props, err)
@@ -114,7 +136,7 @@ func TestAPutBriefOnATaskThatDoesNotHoldTheUnitIsRefused(t *testing.T) {
 }
 
 func TestAThreadWithTwoTasksWritesTwoBriefs(t *testing.T) {
-	db, stub := briefHost(t)
+	db, stub, _ := briefHost(t)
 	ctx := context.Background()
 	thread := unit.Unit{Provider: "acme", Key: "t1"}
 	export, invoice := task.ID("t-00000000000000a1"), task.ID("t-00000000000000b2")

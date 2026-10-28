@@ -58,7 +58,8 @@ func (r recorder) SetMarks(ctx context.Context, w plugin.Unit, marks map[string]
 // task, which must hold the unit or one of its items, it is that task's brief
 // record. Without one it is the brief the unit uses, and each task holding
 // an item of the unit gets, as its brief record, the brief with the asks of
-// the items it holds; the turns waiting on the unit's brief are told.
+// the items it holds. Either way the turns waiting on the unit's brief are
+// told.
 func (r recorder) PutBrief(ctx context.Context, b src.Brief) error {
 	if r.b.Briefs == nil || r.b.Now == nil {
 		return src.ErrUnsupported
@@ -89,7 +90,11 @@ func (r recorder) PutBrief(ctx context.Context, b src.Brief) error {
 		if _, ok := held[id]; !ok {
 			return fmt.Errorf("the task %s holds neither %s nor any of its items", id, u)
 		}
-		return r.putTaskBrief(ctx, id, b.Body, now)
+		err := r.putTaskBrief(ctx, id, b.Body, now)
+		if err == nil && r.b.Briefed != nil {
+			r.b.Briefed(u)
+		}
+		return err
 	}
 	if err := r.b.Briefs.PutUnitBrief(ctx, u, b.Version, string(b.Body), now); err != nil {
 		return err

@@ -161,7 +161,7 @@ type Briefs interface {
 	// Changed is closed by the next end of a brief run of the unit after the
 	// call, so a run that ends while the caller asks Ready still wakes it;
 	// the func releases it.
-	Changed(u unit.Unit) (<-chan struct{}, func())
+	Changed(ctx context.Context, u unit.Unit) (<-chan struct{}, func())
 	// Unwant drops the want of a brief once no intake waits on it.
 	Unwant(ctx context.Context, u unit.Unit) error
 }

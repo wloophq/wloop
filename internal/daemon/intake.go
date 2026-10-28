@@ -159,13 +159,13 @@ func (b taskBriefs) Ready(ctx context.Context, u unit.Unit, first bool, need []s
 	return b.Briefs.Ready(ctx, held, first, need)
 }
 
-func (b taskBriefs) Changed(u unit.Unit) (<-chan struct{}, func()) {
+func (b taskBriefs) Changed(ctx context.Context, u unit.Unit) (<-chan struct{}, func()) {
 	if id, ok := task.IDOf(u); ok {
-		if held, err := b.held(context.Background(), id); err == nil {
+		if held, err := b.held(ctx, id); err == nil {
 			u = held
 		}
 	}
-	return b.Briefs.Changed(u)
+	return b.Briefs.Changed(ctx, u)
 }
 
 func (b taskBriefs) Unwant(ctx context.Context, u unit.Unit) error {
@@ -214,7 +214,7 @@ func (offBriefs) Ready(context.Context, unit.Unit, bool, []string) (intake.Readi
 	return intake.Readiness{Go: true, Without: true, Cause: intake.CauseOff}, nil
 }
 
-func (offBriefs) Changed(unit.Unit) (<-chan struct{}, func()) { return nil, func() {} }
+func (offBriefs) Changed(context.Context, unit.Unit) (<-chan struct{}, func()) { return nil, func() {} }
 
 func (offBriefs) Unwant(context.Context, unit.Unit) error { return nil }
 

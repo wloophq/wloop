@@ -1,6 +1,10 @@
 package sqlite
 
-import "github.com/wloophq/wloop/internal/core/port"
+import (
+	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/core/timeline"
+	"github.com/wloophq/wloop/internal/intent/builtin"
+)
 
 // briefsInUse are the runs a unit's brief, its last attempt or a turn reads.
 const briefsInUse = `(SELECT run FROM unit_briefs UNION SELECT last_run FROM unit_briefs UNION SELECT brief_run FROM turns)`
@@ -31,7 +35,14 @@ var (
 		AND (started_at < ? AND id NOT IN ` + briefsInUse + ` OR (provider, unit_key) NOT IN ` + cursorUnits + `)` + untaskedBrief("brief_runs")
 	orphanCursorBriefsSQL = `DELETE FROM unit_briefs WHERE run IN ` + cursorRuns + `
 		AND (provider, unit_key) NOT IN ` + cursorUnits + untaskedBrief("unit_briefs")
+	orphanCursorRecordsSQL = `DELETE FROM events WHERE kind = '` + timeline.KindRecord + `' AND key = '` + builtin.BuildsBrief + `'
+		AND provider != 'task' AND (provider, unit_key) NOT IN ` + cursorUnits + `
+		AND NOT EXISTS (SELECT 1 FROM unit_briefs b WHERE b.provider = events.provider AND b.unit_key = events.unit_key)` + untaskedBrief("events")
 )
+
+// briefRecordsKey is the Retained key of the brief records a unit whose
+// cursor is gone kept.
+const briefRecordsKey = "brief_records"
 
 // briefs retains brief rows as of before: the bodies of runs no one reads,
 // the extraction's past daily runs no one reads, and the brief rows of a
@@ -39,6 +50,7 @@ var (
 func (r *retainer) briefs(before, cursors string) {
 	r.exec("brief_runs", port.TopicBriefs, retainBriefBodiesSQL, before)
 	r.exec("unit_briefs", port.TopicBriefs, orphanCursorBriefsSQL, cursors)
+	r.exec(briefRecordsKey, port.TopicBriefs|port.TopicLoopEvents, orphanCursorRecordsSQL, cursors)
 	r.exec("brief_runs", port.TopicBriefs, retainCursorRunsSQL, before, cursors)
 }
 

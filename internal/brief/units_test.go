@@ -36,7 +36,7 @@ func TestASlackUnitIsBriefedOnDemand(t *testing.T) {
 	if rd, err := a.Ready(ctx, thread, false, nil); err != nil || !rd.Go || !rd.Without {
 		t.Fatalf("a later turn without a brief: %+v %v", rd, err)
 	}
-	changed, release := a.Changed(thread)
+	changed, release := a.Changed(ctx, thread)
 	defer release()
 	rd, err := a.Ready(ctx, thread, true, nil)
 	if err != nil || rd.Go || rd.Wait != WaitBriefing || !rd.Next.Equal(t0.Add(DemandTimeout)) || len(src.wants) != 1 {

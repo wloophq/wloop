@@ -44,9 +44,12 @@ func TestASlackBriefGoesWithItsCursor(t *testing.T) {
 	exec(t, db, `INSERT INTO unit_briefs (provider, unit_key, run, last_run) VALUES ('slack', 'C2/2', 6, 6)`)
 	exec(t, db, `INSERT INTO brief_runs (id, provider, unit_key, intent, trigger, version, attempt_of, started_at, outcome)
 		VALUES (7, 'github', 'acme/api#1', 'brief', 'wanted', 'v', '', ?, 'ok')`, old)
+	for _, key := range []string{"C1/1", "C2/2"} {
+		exec(t, db, `INSERT INTO events (provider, unit_key, kind, key, actor, at, data) VALUES ('slack', ?, 'record', 'brief', 'plugin', ?, '{"goal":"g","tags":["domain:billing"]}')`, key, fresh)
+	}
 
 	got := retainBriefs(t, db, at(retainNow.Add(-7*day)))
-	if got["unit_briefs"] != 1 {
+	if got["unit_briefs"] != 1 || got[briefRecordsKey] != 1 {
 		t.Errorf("retained %v", got)
 	}
 	if left := column(t, db, `SELECT id FROM brief_runs ORDER BY id`); !slices.Equal(left, []string{"2", "4", "7"}) {
@@ -54,6 +57,9 @@ func TestASlackBriefGoesWithItsCursor(t *testing.T) {
 	}
 	if left := column(t, db, `SELECT unit_key FROM unit_briefs`); !slices.Equal(left, []string{"C1/1"}) {
 		t.Errorf("briefs left %q", left)
+	}
+	if left := column(t, db, `SELECT unit_key FROM events WHERE kind = 'record'`); !slices.Equal(left, []string{"C1/1"}) {
+		t.Errorf("brief records left %q", left)
 	}
 	if again := retainBriefs(t, db, at(retainNow.Add(-7*day))); len(again) != 0 {
 		t.Errorf("a second pass retained %v", again)
@@ -70,6 +76,7 @@ func TestACursorOfAPullRequestLeavesItsBriefs(t *testing.T) {
 			VALUES (?, 'github', 'acme/api#1', 'brief', ?, 'v', '', ?, 'ok', '{"goal":"g"}')`, id, trigger, old)
 	}
 	exec(t, db, `INSERT INTO unit_briefs (provider, unit_key, run, last_run) VALUES ('github', 'acme/api#1', 1, 2)`)
+	exec(t, db, `INSERT INTO events (provider, unit_key, kind, key, actor, at, data) VALUES ('github', 'acme/api#1', 'record', 'brief', 'agent', ?, '{"goal":"g"}')`, old)
 
 	if got := retainBriefs(t, db, at(retainNow.Add(-7*day))); len(got) != 0 {
 		t.Errorf("retained %v", got)
@@ -79,5 +86,8 @@ func TestACursorOfAPullRequestLeavesItsBriefs(t *testing.T) {
 	}
 	if left := column(t, db, `SELECT count(*) FROM unit_briefs`); !slices.Equal(left, []string{"1"}) {
 		t.Errorf("briefs left %q", left)
+	}
+	if left := column(t, db, `SELECT count(*) FROM events WHERE kind = 'record'`); !slices.Equal(left, []string{"1"}) {
+		t.Errorf("brief records left %q", left)
 	}
 }

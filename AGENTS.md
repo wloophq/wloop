@@ -15,6 +15,7 @@ Before adding an `if` on an intent name, a draft kind or a provider, or a string
 | Intents (manifest, instructions) | `profiles/default/intents/<name>/` |
 | Workflows (when, steps, texts) | `profiles/default/workflows/<name>/` |
 | Judgment blocks | `profiles/default/intent=<name>.md` |
+| Record kinds (schema, writers, the task properties their fields set) | `profiles/default/records.toml`, schemas under `profiles/default/records/` |
 | Partials every intent's instructions share | `profiles/default/partials/` |
 | Prompts of the loop's own calls (the headless wrapper) | `profiles/default/prompts/` |
 | What an agent reads about each MCP tool: description, parameters, answers | `profiles/default/tools.toml`; the tools in `builtin.Tools`, their answers and fields in `builtin.ToolAnswers` |
