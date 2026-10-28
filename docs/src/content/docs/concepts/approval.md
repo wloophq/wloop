@@ -73,7 +73,7 @@ A draft's gate opens under its approval policy:
 | Policy | The gate |
 |---|---|
 | `wait` (default) | waits in the Outbox until you approve or discard the draft |
-| `delay` | approves the draft when its `window` ends unless you decide first; an edit supersedes the gate with one that waits |
+| `delay` | approves the draft once its `window` ends, at the gates' next check, at most 30 seconds later, unless you decide first; an edit supersedes the gate with one that waits |
 | `send` | approves the draft at once |
 | `dry_run` | discards the draft at once: it is stored as what would have been sent, and never sent |
 
