@@ -75,7 +75,7 @@ func BoardOf(workspace string) string {
 var ReservedNames = []string{
 	"app", "brief", "config", "doctor", "eval-instructions", "explore", "help", "hook", "init", "install",
 	"instructions", "intake", "mute", "open", "outbox", "pause", "plan", "profile", "remove", "resume",
-	"serve", "slack", "status", "store", "take-over", "timings", "track", "trust", "tui", "turn", "uninstall", "unmute", "untrack",
+	"serve", "slack", "status", "store", "take-over", "task", "timings", "track", "trust", "tui", "turn", "uninstall", "unmute", "untrack",
 	"version", "workflows",
 
 	"answer", "brief_refresh", "continue", "dismiss", "guide", "intake_cancel", "intake_without", "remove_force", "skip",

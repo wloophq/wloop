@@ -82,7 +82,7 @@ func (s *Service) stop(ctx context.Context, r StopRequest) (StopAnswer, *unit.Un
 		for _, rec := range b.Records {
 			facts.Unacked = facts.Unacked || (rec.TurnSeq == t.Seq && !rec.Acked)
 		}
-		facts.Owes = b.OwesRecord(t.Seq)
+		facts.Owes = b.OwesRecord(t.Seq) && s.owesRecords(t.Intent)
 		last, ok, err := LastStop(ctx, s.Registry, r.Session)
 		if err != nil {
 			return StopAnswer{}, nil, evs, err
@@ -150,6 +150,16 @@ func (s *Service) stop(ctx context.Context, r StopRequest) (StopAnswer, *unit.Un
 		evs = append(evs, stopped)
 	}
 	return ans, changed, evs, nil
+}
+
+// owesRecords is false for an intent whose manifest declares no record; an
+// intent whose rules cannot be read still owes one.
+func (s *Service) owesRecords(i turn.Intent) bool {
+	if s.Intents == nil {
+		return true
+	}
+	r, err := s.Intents.Rules(string(i))
+	return err != nil || !r.None
 }
 
 // queuedFor are the indexes of the answers queued for the turns of handle's session, oldest first, but those a

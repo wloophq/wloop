@@ -13,6 +13,7 @@ const (
 	RoleNudge    = "pr.nudge"
 	RoleProbe    = "probe"
 	RoleHeadless = "headless"
+	RoleAttach   = "attach"
 )
 
 // BuildsBrief is what the brief intent builds, and the kind of the record, of records.toml, that a brief is.
@@ -71,6 +72,10 @@ type Role struct {
 	// DrivesRow says its turns drive the row of the workspace they run in;
 	// a user intent taking the role takes it over.
 	DrivesRow bool
+	// PerSession says a turn of its intent replaces only the open turns of
+	// that intent on its own session, so every session holding it is a run
+	// of its own.
+	PerSession bool
 }
 
 // Roles are what Go resolves an intent by, a manifest's role: the core's,
@@ -80,6 +85,8 @@ var Roles = slices.Clone(coreRoles)
 var coreRoles = []Role{
 	{Name: RoleHeadless, Doc: "The intent a headless turn on a unit runs when its request names none.",
 		Context: ContextPR, Policy: PolicyRound},
+	{Name: RoleAttach, Doc: "The intent a session started outside the loop runs when it attaches to a task: started by hand on that session, which becomes a run of the task.",
+		Provider: unit.Task, Context: ContextPR, Policy: PolicyRound, PerSession: true},
 }
 
 // The host mechanisms a plugin's role may name, by the manifest key that

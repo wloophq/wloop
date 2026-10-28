@@ -21,6 +21,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -75,6 +76,8 @@ type Deps struct {
 	Gates Gates
 	// Turns counts the turns run on a unit; nil: none.
 	Turns func(ctx context.Context, u unit.Unit) (int, error)
+	// Sessions are the sessions not closed, for task.runs_live; nil: none.
+	Sessions func(ctx context.Context) ([]turn.Session, error)
 	// Clock's location is where working days are counted.
 	Clock port.Clock
 }
@@ -255,6 +258,13 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 	}
 	if f["task.gates_open"], err = p.gatesOpen(ctx, e.ID); err != nil {
 		return nil, err
+	}
+	if p.d.Sessions != nil {
+		n, err := p.runsLive(ctx, task.UnitOf(e.ID))
+		if err != nil {
+			return nil, err
+		}
+		f["task.runs_live"] = n
 	}
 	us := unitsOf(e)
 	if len(us) == 0 {
@@ -444,4 +454,19 @@ func (p *Provider) gatesOpen(ctx context.Context, id task.ID) (int, error) {
 		}
 	}
 	return n, err
+}
+
+// runsLive counts the sessions of u with a live process.
+func (p *Provider) runsLive(ctx context.Context, u unit.Unit) (int, error) {
+	all, err := p.d.Sessions(ctx)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, s := range all {
+		if s.Unit == u && s.State() == turn.SessionActive {
+			n++
+		}
+	}
+	return n, nil
 }

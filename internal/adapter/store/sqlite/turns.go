@@ -658,3 +658,17 @@ func eachArgs(ctx context.Context, tx *sql.Tx, query string, args []any, fn func
 	}
 	return rows.Err()
 }
+
+var _ turns.TurnUnits = (*Store)(nil)
+
+// UnitOfTurn is the unit whose book holds turn seq.
+func (s *Store) UnitOfTurn(ctx context.Context, seq int64) (unit.Unit, bool, error) {
+	var u unit.Unit
+	err := s.db.Read(ctx, func(tx *sql.Tx) error {
+		return tx.QueryRowContext(ctx, `SELECT provider, unit_key FROM turns WHERE seq = ?`, seq).Scan(&u.Provider, &u.Key)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return unit.Unit{}, false, nil
+	}
+	return u, err == nil, err
+}

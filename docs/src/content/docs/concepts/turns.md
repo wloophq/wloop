@@ -35,7 +35,7 @@ The first line names the turn id. The agent reads them with `{{command}} instruc
 
 ## The record
 
-Every turn ends with a record: its state, a one-line summary, the outcome (verdict, URL, counts) and, for a question, its text, its options (marking those that publish), a recommendation, the draft to read and the notes a new session needs to finish.
+A turn of an intent with a `[record]` table ends with a record: its state, a one-line summary, the outcome (verdict, URL, counts) and, for a question, its text, its options (marking those that publish), a recommendation, the draft to read and the notes a new session needs to finish.
 
 The agent sends it with the `turn_end` tool of {{name}}'s MCP server, which the daemon serves at `http://127.0.0.1:<mcp.port>/mcp`. The daemon stores a record only for the turn it sent to, or that was started by, the calling session. A malformed record comes back with every problem listed, and the agent fixes it and calls again. A session without the tool writes the record to a file and runs `{{command}} turn end <url> --turn <id> --file <path>`.
 
@@ -46,7 +46,7 @@ A run can owe more than its record: `record.requires` in an intent's manifest na
 `{{command}} install` adds three hooks to each Claude Code home:
 
 - **SessionStart** registers the session: its manager and process handle (an Orca terminal, or a Claude Desktop session), worktree, agent session id and home.
-- **Stop** asks the daemon whether the session's turn owes a record. When it does, the hook blocks the stop once, telling the agent how to record. A second stop without one marks the turn `unrecorded` with the agent's last message.
+- **Stop** asks the daemon whether the session's turn owes a record; a turn of an intent without `[record]`, such as `attach`, owes none. When it does, the hook blocks the stop once, telling the agent how to record. A second stop without one marks the turn `unrecorded` with the agent's last message.
 - **UserPromptSubmit** records when you type in a session, so cleanup never closes a session under your hands. It prints nothing to the agent.
 
 All three exit at once outside a session of an enabled workspace manager, give the daemon 2 seconds, and allow the stop on any error, so a broken {{name}} never traps an agent.

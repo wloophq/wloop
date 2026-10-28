@@ -7,7 +7,12 @@ var Notices = []ToolAnswer{
 		Fields: []AnswerField{num("Message"), str("Unit")}},
 	{Name: "record_owed", Doc: "The reason that blocks the stop of a session whose turn has no record: the unit, the turn's id and the directory a record file goes in.",
 		Fields: []AnswerField{str("Unit"), str("Turn"), str("ScratchDir")}},
+	{Name: NoticeAttachNeedsSession, Doc: "Why task attach refuses to run outside an agent session a workspace manager started: the task named as the command reads it, and the enabled workspace managers as displayed.",
+		Fields: []AnswerField{str("Task"), str("Managers")}},
 }
+
+// NoticeAttachNeedsSession is the notice of task attach run outside a workspace manager's session.
+const NoticeAttachNeedsSession = "attach_needs_session"
 
 // NoticeOf is the notice name, false when there is none.
 func NoticeOf(name string) (ToolAnswer, bool) {

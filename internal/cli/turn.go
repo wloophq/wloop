@@ -19,6 +19,7 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/turn"
@@ -276,6 +277,9 @@ func (e *Env) storeTurn(ctx context.Context, cfg config.Config, r turn.Request) 
 		sent.send = &turns.SendRequest{Unit: r.Unit, Intent: dturn.Intent(r.Intent), Turn: out.ID, Trigger: turnTrigger(r.Trigger),
 			Guidance: r.Guidance, Agent: cfg.For(ref.Owner, ref.Repo).Agent, Records: true, Inputs: persisted(c),
 			Items: r.Items, Task: r.Task, Role: c.Def.Role}
+		if role, ok := builtin.RoleOf(c.Def.Role); ok {
+			sent.send.PerSession = role.PerSession
+		}
 		if r.Why != nil {
 			sent.send.Workflow = r.Why.Workflow
 		}

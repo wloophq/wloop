@@ -21,6 +21,7 @@ func TestRolesImplyTheRemovedKeys(t *testing.T) {
 	}
 	want := map[string]implied{
 		"act":     {context: "pr", policy: "round", board: "none"},
+		"attach":  {context: "pr", policy: "round", board: "none"},
 		"address": {roundKind: "address", context: "pr", policy: "round", board: "author", drivesRow: true},
 		"brief":   {context: "pr", policy: "round", board: "none"},
 		"nudge":   {prepare: "action:nudge.prepare", context: "pr", policy: "round", board: "none"},

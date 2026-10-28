@@ -472,5 +472,38 @@
       "cli"
     ],
     "source": "builtin"
+  },
+  {
+    "id": "run.open",
+    "label": "Open workspace",
+    "summary": "Bring the run's workspace on screen in the workspace manager it ran in.",
+    "group": "run",
+    "surfaces": [
+      "detail",
+      "cli"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "run.enter",
+    "label": "Enter session",
+    "summary": "Bring the run's agent session on screen to type in it; a session with no live process is woken first.",
+    "group": "run",
+    "surfaces": [
+      "detail",
+      "cli"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "run.transcript",
+    "label": "Transcript",
+    "summary": "Read what the person typed and what the agent answered in the run's session.",
+    "group": "run",
+    "surfaces": [
+      "detail",
+      "cli"
+    ],
+    "source": "builtin"
   }
 ]

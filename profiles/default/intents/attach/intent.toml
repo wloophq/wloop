@@ -1,0 +1,15 @@
+label       = "Attach"
+summary     = "Make a session started outside the loop a run of a task, keeping its context"
+user_facing = false
+answerable  = false
+role        = "attach"
+provider    = "task"
+workspace   = "given"
+runners     = ["session"]
+session     = { strategy = "new", title = "attach" }
+brief       = { render = false, wait = false }
+
+[headline]
+resumed = "attached to {{.unit.ref}}"
+[[headline.new]]
+line = 'This session is now a run of the task {{.unit.ref}}, {{template "started_by" .}}.'

@@ -259,6 +259,9 @@ type RecordRules struct {
 	// Requires is the record kind a run owes, "" for none; Missing the gate
 	// a run that ends without it opens.
 	Requires, Missing string
+	// None is an intent whose manifest has no [record]: its turns owe no
+	// record, so its sessions' stops are never blocked for one.
+	None bool
 }
 
 type Require struct {

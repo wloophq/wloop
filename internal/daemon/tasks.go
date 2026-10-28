@@ -680,6 +680,11 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 		if err := ev.cards(ctx, e, &v); err != nil {
 			return api.TaskView{}, err
 		}
+		runs, err := ev.s.runViews(ctx, task.UnitOf(e.ID))
+		if err != nil {
+			return api.TaskView{}, err
+		}
+		v.Runs = runs
 	}
 	msg, err := ev.s.taskMessage(ctx, string(e.ID))
 	if err != nil {

@@ -412,6 +412,13 @@ func TestEverySpecHasADispatchAndBack(t *testing.T) {
 			}
 			continue
 		}
+		if spec.Scope == catalog.ScopeRun {
+			routes := map[string]string{catalog.RunOpen: api.RunOpen, catalog.RunEnter: api.RunEnter, catalog.RunTranscript: api.RunTranscript}
+			if routes[strings.TrimPrefix(spec.ID, "run.")] == "" {
+				t.Errorf("%s has no run route", spec.ID)
+			}
+			continue
+		}
 		plugin := slices.Contains([]string{present.ActionMute, present.ActionUnmute}, spec.ID)
 		if !isBuiltin(spec.ID) && !isIntent((&Server{}).loaded(), spec.ID) && !plugin {
 			t.Errorf("%s has no dispatch", spec.ID)

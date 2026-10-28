@@ -161,3 +161,17 @@ note    = "Runs the round now with your guidance"
 [plan_guide.input]
 label = "Guidance"
 help  = "what the round should look at"
+
+# The actions of a task's run, on the task's page.
+
+["run.open"]
+label   = "Open workspace"
+summary = "Bring the run's workspace on screen in the workspace manager it ran in."
+
+["run.enter"]
+label   = "Enter session"
+summary = "Bring the run's agent session on screen to type in it; a session with no live process is woken first."
+
+["run.transcript"]
+label   = "Transcript"
+summary = "Read what the person typed and what the agent answered in the run's session."

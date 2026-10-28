@@ -713,6 +713,7 @@ func commands() map[string]command {
 		"explore":           runExplore,
 		"slack":             runSlack,
 		"outbox":            runOutbox,
+		"task":              runTask,
 		"version":           version,
 		"--version":         version,
 		"-v":                version,

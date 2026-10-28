@@ -20,6 +20,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -42,14 +43,15 @@ type clock struct{ now time.Time }
 func (c *clock) Now() time.Time { return c.now }
 
 type env struct {
-	t     *testing.T
-	db    *sqlite.DB
-	clock *clock
-	p     *facttask.Provider
-	s     facttask.Settings
-	ended map[unit.Unit]bool
-	turns map[unit.Unit]int
-	repos map[unit.Unit]string
+	t        *testing.T
+	db       *sqlite.DB
+	clock    *clock
+	p        *facttask.Provider
+	s        facttask.Settings
+	ended    map[unit.Unit]bool
+	turns    map[unit.Unit]int
+	repos    map[unit.Unit]string
+	sessions []turn.Session
 }
 
 func newEnv(t *testing.T) *env {
@@ -69,6 +71,7 @@ func newEnv(t *testing.T) *env {
 		Turns:    func(_ context.Context, u unit.Unit) (int, error) { return e.turns[u], nil },
 		Repo:     func(_ context.Context, u unit.Unit) (string, error) { return e.repos[u], nil },
 		Gates:    db.Gates(func() time.Time { return e.clock.now }),
+		Sessions: func(context.Context) ([]turn.Session, error) { return e.sessions, nil },
 		Clock:    e.clock,
 	})
 	return e

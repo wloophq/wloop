@@ -1,1 +1,1 @@
-testdata/bad/enum-value/intents/ask-author/intent.toml:5:8: role: "round.review" is not one of "headless", "pr.review", "pr.address", "pr.nudge" or "probe"
+testdata/bad/enum-value/intents/ask-author/intent.toml:5:8: role: "round.review" is not one of "headless", "attach", "pr.review", "pr.address", "pr.nudge" or "probe"

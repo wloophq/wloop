@@ -285,8 +285,11 @@ func (a envActions) prepare(ctx context.Context, ref pr.Ref, c daemon.Call) (*En
 }
 
 func (a envActions) Open(ctx context.Context, u unit.Unit, c daemon.Call) error {
-	ref := prOf(u)
 	e := a.call(c)
+	if !isPR(u) {
+		return e.focusRunWorkspace(ctx, u)
+	}
+	ref := prOf(u)
 	url := ref.URL()
 	if a.store != nil {
 		pr, ok, err := a.store.PR(ctx, ref)
@@ -505,4 +508,21 @@ func runBrief(ctx context.Context, e *Env, args []string) error {
 		fmt.Fprintln(e.Out, l)
 	}
 	return err
+}
+
+// focusRunWorkspace brings on screen the workspace of u's newest run that ran in one.
+func (e *Env) focusRunWorkspace(ctx context.Context, u unit.Unit) error {
+	if e.Turns == nil {
+		return fmt.Errorf("%s has no workspace to open", u.Label())
+	}
+	runs, err := e.Turns.RunsOf(ctx, u)
+	if err != nil {
+		return err
+	}
+	for _, r := range runs {
+		if r.Manager != "" && r.Workspace != "" {
+			return e.WS.Focus(ctx, wsdomain.Workspace{Manager: r.Manager, ID: r.Workspace})
+		}
+	}
+	return fmt.Errorf("%s has no workspace to open", u.Label())
 }
