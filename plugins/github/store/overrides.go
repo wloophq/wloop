@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"slices"
+	"time"
 
 	"github.com/wloophq/wloop/plugins/github/pr"
 )
@@ -26,9 +27,15 @@ func (db *DB) Override(ctx context.Context, ref pr.Ref) (pr.Override, error) {
 	return o, err
 }
 
-// SetTracked tracks or untracks ref, keeping its reasons in step; changed
-// says the override moved.
+// SetTracked tracks or untracks ref, keeping its reasons in step and
+// recording on the host first the followed or unfollowed event of a scope
+// flip; changed says the override moved.
 func (db *DB) SetTracked(ctx context.Context, ref pr.Ref, tracked bool) (changed bool, err error) {
+	if err := db.recordFlipsOf(ctx, []pr.Ref{ref}, time.Time{}, func(_ pr.Ref, sc scope) (scope, bool, error) {
+		return sc.with(withTracked(sc.reasons, tracked), sc.ws), true, nil
+	}); err != nil {
+		return false, err
+	}
 	_, err = db.Write(ctx, func(tx *Tx) error {
 		query := `UPDATE overrides SET tracked=0 WHERE unit_key=? AND tracked`
 		if tracked {

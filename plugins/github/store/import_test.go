@@ -84,6 +84,7 @@ func TestGitHubImportsTheExportedStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	db.UseHost(&memHost{})
 	p, ok, err := db.PR(ctx, ref)
 	if err != nil || !ok || p.Title != "Add retries" || p.Author != "ana" || !slices.Equal(p.Reasons, []string{"author", pr.ReasonTracked}) ||
 		p.Workspace.ID != "w1" || !slices.Equal(p.Workspace.AgentStates, []string{"working"}) || len(p.FailingChecks) != 1 ||
@@ -93,7 +94,7 @@ func TestGitHubImportsTheExportedStore(t *testing.T) {
 	if all, err := db.ListPRs(ctx, false); err != nil || len(all) != 2 {
 		t.Fatalf("imported %d pull requests, %v", len(all), err)
 	}
-	if d, err := db.Details(ctx, []pr.Ref{ref}); err != nil || d[ref].Version != 2 || string(d[ref].Body) != `{"Labels":["bug"]}` {
+	if d, err := db.Details(ctx, []pr.Ref{ref}); err != nil || d[ref].Version != 2 || !slices.Equal(d[ref].Labels, []string{"bug"}) {
 		t.Fatalf("imported detail %+v %v", d, err)
 	}
 	if at, err := db.LastFetch(ctx, "w1"); err != nil || !at.Equal(time.Date(2026, 10, 20, 11, 0, 0, 0, time.UTC)) {
@@ -164,6 +165,7 @@ func TestImportedRowsSortWithThePluginsOwn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	db.UseHost(&memHost{})
 	defer db.Close()
 	for _, p := range []pr.PR{
 		{Ref: pr.Ref{Owner: "acme", Repo: "web", Number: 9}, State: pr.StateOpen, UpdatedAt: time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)},

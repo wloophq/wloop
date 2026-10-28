@@ -758,7 +758,7 @@ func (f *fixtureEnv) engine(t *testing.T) *automation.Engine {
 	t.Helper()
 	te := f.te
 	clock := clockFunc(func() time.Time { return f.now })
-	sf := factsession.New(factsession.Deps{Turns: te.Turns, Snapshot: f.snap, PRs: inventory.ByUnit{Store: te.Store},
+	sf := factsession.New(factsession.Deps{Turns: te.Turns, Snapshot: f.snap, States: unitStates{te.Store}, Repo: unitRepo,
 		Exists: func(p string) bool { return f.exists[p] }, Changes: te.changes, Cfg: te.currentConfig, Clock: clock})
 	wf := factworkspace.New(factworkspace.Deps{Snapshot: f.snap, PRs: factsgithub.InventoryInputs(te.Store), Overrides: inventory.ByUnit{Store: te.Store},
 		Books: te.repo, Git: factworkspace.LocalGit{R: te.Env.Git.R}, Disk: f.disk, Changes: te.changes, Cfg: te.currentConfig, Clock: clock})

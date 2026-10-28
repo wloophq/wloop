@@ -7,6 +7,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/orca"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/view"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/meter"
@@ -17,8 +18,8 @@ import (
 
 func TestAdapterWritesInvalidate(t *testing.T) {
 	ref := pr.Ref{Owner: "acme", Repo: "repo-0", Number: 1}
-	links := func(context.Context) (map[pr.Ref]orca.Link, error) {
-		return map[pr.Ref]orca.Link{ref: {WorkspaceID: orcatest.WorktreeID(0), Review: true}}, nil
+	links := func(context.Context) (map[unit.Unit]orca.Link, error) {
+		return map[unit.Unit]orca.Link{ref.Unit(): {WorkspaceID: orcatest.WorktreeID(0), Review: true}}, nil
 	}
 	for _, c := range []struct {
 		name  string

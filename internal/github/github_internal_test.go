@@ -1,7 +1,6 @@
 package github
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -22,14 +21,6 @@ func TestCheckFromRollupContext(t *testing.T) {
 	for _, c := range cases {
 		if got := c.in.check(); got != c.want {
 			t.Errorf("%+v: got %+v, want %+v", c.in, got, c.want)
-		}
-	}
-}
-
-func TestTheFullReadReadsTheMergeableState(t *testing.T) {
-	for _, want := range []string{"mergeable", "baseRefName"} {
-		if !strings.Contains(inventoryFragment, want) {
-			t.Errorf("the full read lacks %s", want)
 		}
 	}
 }

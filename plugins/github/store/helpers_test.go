@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/github/pr"
 )
 
@@ -22,6 +23,7 @@ func open(t *testing.T) *DB {
 	if err != nil {
 		t.Fatal(err)
 	}
+	db.UseHost(&memHost{})
 	t.Cleanup(func() { db.Close() })
 	return db
 }
@@ -90,4 +92,61 @@ func rowWrites(t *testing.T, db *DB, table string) func() int {
 		}
 		return n
 	}
+}
+
+// memHost is the host's event log in memory: a keyed event is kept once per
+// unit, kind and key, an unkeyed one once per unit, kind and time.
+type memHost struct {
+	mu     sync.Mutex
+	events []src.Event
+	// fail makes the next RecordEvents fail.
+	fail error
+}
+
+func (h *memHost) RecordEvents(_ context.Context, evs []src.Event) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if err := h.fail; err != nil {
+		h.fail = nil
+		return err
+	}
+	for _, e := range evs {
+		if !slices.ContainsFunc(h.events, func(x src.Event) bool {
+			return x.Unit == e.Unit && x.Kind == e.Kind && x.Key == e.Key && (e.Key != "" || x.At.Equal(e.At))
+		}) {
+			h.events = append(h.events, e)
+		}
+	}
+	return nil
+}
+
+func (h *memHost) Events(_ context.Context, q src.EventQuery) ([]src.Event, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	var out []src.Event
+	for _, e := range h.events {
+		if slices.Contains(q.Units, e.Unit) && (len(q.Kinds) == 0 || slices.Contains(q.Kinds, e.Kind)) && !e.At.Before(q.Since) {
+			out = append(out, e)
+		}
+	}
+	slices.SortStableFunc(out, func(a, b src.Event) int { return a.At.Compare(b.At) })
+	return out, nil
+}
+
+// kinds are the kinds of the events h holds of ref, in order.
+func (h *memHost) kinds(ref pr.Ref) []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	var out []string
+	for _, e := range h.events {
+		if e.Unit == ref.Unit() {
+			out = append(out, e.Kind)
+		}
+	}
+	return out
+}
+
+func hostOf(db *DB) *memHost {
+	h, _ := db.hostOf()
+	return h.(*memHost)
 }

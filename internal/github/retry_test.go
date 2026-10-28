@@ -2,21 +2,20 @@ package github
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	dgh "github.com/wloophq/wloop/internal/domain/github"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	dgh "github.com/wloophq/wloop/internal/domain/github"
 )
 
 type clock struct {
@@ -327,58 +326,6 @@ func TestBreakerLetsOneProbeThrough(t *testing.T) {
 	close(hold)
 	if err := <-probe; err != nil {
 		t.Fatalf("probe: %v", err)
-	}
-}
-
-var aliasPattern = regexp.MustCompile(`(pr\d+): repository\(owner: "[^"]+", name: "[^"]+"\) \{ pullRequest\(number: (\d+)\)`)
-
-func TestTimedOutBatchSplitsOnce(t *testing.T) {
-	var mu sync.Mutex
-	var sizes []int
-	var s sleeps
-	c := fakeClient(transportFunc(func(r *http.Request) (*http.Response, error) {
-		var payload struct {
-			Query string `json:"query"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			return nil, err
-		}
-		aliases := aliasPattern.FindAllStringSubmatch(payload.Query, -1)
-		mu.Lock()
-		sizes = append(sizes, len(aliases))
-		n := len(sizes)
-		mu.Unlock()
-		if n <= 2 {
-			<-r.Context().Done()
-			return nil, r.Context().Err()
-		}
-		data := map[string]any{"viewer": map[string]string{"login": "me"}}
-		for _, a := range aliases {
-			num, _ := strconv.Atoi(a[2])
-			data[a[1]] = map[string]any{"pullRequest": map[string]any{"number": num, "repository": map[string]string{"nameWithOwner": "acme/api"}}}
-		}
-		body, _ := json.Marshal(map[string]any{"data": data})
-		return reply(r, http.StatusOK, nil, string(body)), nil
-	}), Options{Timeout: 50 * time.Millisecond, Sleep: s.Sleep})
-
-	var refs []Ref
-	for n := 1; n <= 20; n++ {
-		refs = append(refs, Ref{Owner: "acme", Repo: "api", Number: n})
-	}
-	prs, errs, _, err := c.InventoryByRef(context.Background(), refs)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if fmt.Sprint(sizes) != "[20 10 10]" || len(s.All()) != 1 {
-		t.Fatalf("requests of %v aliases, sleeps %v; want [20 10 10] after one backoff", sizes, s.All())
-	}
-	if len(prs) != 10 || len(errs) != 10 {
-		t.Fatalf("read %d, errs %v", len(prs), errs)
-	}
-	for n := 1; n <= 10; n++ {
-		if err := errs[Ref{Owner: "acme", Repo: "api", Number: n}]; !Transient(err) {
-			t.Fatalf("#%d: %v", n, err)
-		}
 	}
 }
 

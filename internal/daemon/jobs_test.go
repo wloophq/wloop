@@ -10,7 +10,6 @@ import (
 	"testing/synctest"
 	"time"
 
-	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/core/port"
 	coreusage "github.com/wloophq/wloop/internal/core/usage"
 	dusage "github.com/wloophq/wloop/internal/domain/usage"
@@ -87,11 +86,11 @@ func TestJobSkipIsAWarningNotAFailure(t *testing.T) {
 
 func TestSkippedCollectorSweepIsRecordedAsAWarning(t *testing.T) {
 	t.Parallel()
-	sweep := func(context.Context) (ghsource.Report, error) {
-		return ghsource.Report{Skipped: "rate limit at 100 of 5000, below 50%"}, nil
+	sweep := func(context.Context) (sweepReport, error) {
+		return sweepReport{Skipped: "rate limit at 100 of 5000, below 50%"}, nil
 	}
 	w := &warnings{}
-	j := newJob("slow", time.Hour, time.Second, func(ctx context.Context) (string, string, error) { return ghsource.Outcome(sweep(ctx)) })
+	j := newJob("slow", time.Hour, time.Second, func(ctx context.Context) (string, string, error) { return sweepOutcome(sweep(ctx)) })
 	j.once(context.Background(), func(string, ...any) {}, w.set)
 	got := w.list()
 	if len(got) != 1 || !strings.HasPrefix(got[0], "slow: rate limit at 100 of 5000") {
@@ -104,10 +103,10 @@ func TestSkippedCollectorSweepIsRecordedAsAWarning(t *testing.T) {
 
 func TestCollectorReportJoinsTruncationAndWarnings(t *testing.T) {
 	t.Parallel()
-	sweep := func(context.Context) (ghsource.Report, error) {
-		return ghsource.Report{Queries: 3, Fetched: 2, Truncated: []string{"q1"}, Warnings: []string{"team acme/x: 404"}}, nil
+	sweep := func(context.Context) (sweepReport, error) {
+		return sweepReport{Queries: 3, Fetched: 2, Truncated: []string{"q1"}, Warnings: []string{"team acme/x: 404"}}, nil
 	}
-	summary, skipped, err := func(ctx context.Context) (string, string, error) { return ghsource.Outcome(sweep(ctx)) }(context.Background())
+	summary, skipped, err := func(ctx context.Context) (string, string, error) { return sweepOutcome(sweep(ctx)) }(context.Background())
 	if err != nil || summary == "" {
 		t.Fatalf("summary %q err %v", summary, err)
 	}

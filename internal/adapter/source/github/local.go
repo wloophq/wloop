@@ -50,7 +50,7 @@ type Local struct {
 }
 
 type localAPI interface {
-	viewerReader
+	Viewer(ctx context.Context) (string, error)
 	Basics(ctx context.Context, ref pr.Ref) (*pr.PullRequest, error)
 }
 

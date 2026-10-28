@@ -14,9 +14,12 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	sdk "github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
+	"github.com/wloophq/wloop/plugins/github/api"
+	"github.com/wloophq/wloop/plugins/github/collect"
 	"github.com/wloophq/wloop/plugins/github/gh"
 	"github.com/wloophq/wloop/plugins/github/pr"
 	"github.com/wloophq/wloop/plugins/github/store"
@@ -47,9 +50,18 @@ const ExitNoGH = 127
 type Plugin struct {
 	// GH nil is gh on the PATH.
 	GH gh.Runner
+	// API are the API client's options; the zero value is GitHub's API at
+	// the host gh names, with gh's token. The plugin sets its meter and
+	// user agent.
+	API api.Options
+	// Now nil is the clock.
+	Now func() time.Time
 
-	mu sync.Mutex
-	db *store.DB
+	mu  sync.Mutex
+	run *running
+	// stop ends the first report, which loading waits for.
+	stop    context.CancelFunc
+	loading sync.WaitGroup
 }
 
 var (
@@ -68,11 +80,15 @@ func (p *Plugin) gh() gh.Runner {
 func (p *Plugin) store() *store.DB {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.db
+	if p.run == nil {
+		return nil
+	}
+	return p.run.db
 }
 
 // Start opens the plugin's store in its state directory, importing what
-// the host exported once.
+// the host exported once, and reports every stored pull request; the
+// plugin is loading until it has.
 func (p *Plugin) Start(ctx context.Context, req src.StartRequest) error {
 	if err := os.MkdirAll(req.StateDir, 0o700); err != nil {
 		return err
@@ -83,56 +99,114 @@ func (p *Plugin) Start(ctx context.Context, req src.StartRequest) error {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.db != nil {
+	if p.run != nil {
 		db.Close()
 		return errors.New("github: the plugin has started")
 	}
-	p.db = db
+	r := p.start(ctx, db, req.Host)
+	p.run = r
+	lctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	p.stop = cancel
+	p.loading.Go(func() { r.load(lctx) })
 	return nil
 }
 
-// Stop closes the store.
+// Stop ends the first report and closes the store.
 func (p *Plugin) Stop(context.Context) error {
 	p.mu.Lock()
-	db := p.db
-	p.db = nil
+	r, stop := p.run, p.stop
+	p.run, p.stop = nil, nil
 	p.mu.Unlock()
-	if db == nil {
+	if r == nil {
 		return nil
 	}
-	return db.Close()
+	stop()
+	p.loading.Wait()
+	return r.db.Close()
 }
 
-// Health is loading until the store is open.
+// Health is loading until the store is open and every stored pull request
+// was reported.
 func (p *Plugin) Health(context.Context) (sdk.Health, error) {
-	if p.store() == nil {
+	p.mu.Lock()
+	r := p.run
+	p.mu.Unlock()
+	if r == nil {
 		return sdk.Health{Status: sdk.StatusLoading, Reason: "starting"}, nil
+	}
+	loaded, why := r.isLoaded()
+	switch {
+	case !loaded:
+		return sdk.Health{Status: sdk.StatusLoading, Reason: "reporting the pull requests"}, nil
+	case why != "":
+		return sdk.Health{Status: sdk.StatusDegraded, Reason: "reporting the pull requests: " + why}, nil
 	}
 	return sdk.Health{Status: sdk.StatusServing}, nil
 }
 
-func (p *Plugin) Notify(context.Context, []sdk.Unit, []sdk.Topic) error { return nil }
-
-// Identity is the viewer as gh names them, kept in the store once started.
-func (p *Plugin) Identity(ctx context.Context) (src.Identity, error) {
-	out, err := p.gh().Run(ctx, "api", "user", "--jq", ".login")
-	if err != nil {
-		return src.Identity{}, fmt.Errorf("%w: %w", src.ErrUnavailable, err)
+// Notify links the workspaces again when the host's listing moved, and
+// reports what that changed.
+func (p *Plugin) Notify(ctx context.Context, _ []sdk.Unit, topics []sdk.Topic) error {
+	r, err := p.running()
+	if err != nil || !slices.Contains(topics, sdk.TopicWorkspaces) {
+		return nil
 	}
-	login := strings.TrimSpace(string(out))
-	if login == "" {
-		return src.Identity{}, fmt.Errorf("%w: gh named no viewer", src.ErrUnavailable)
+	if err := r.col.Relink(ctx); err != nil {
+		return err
 	}
-	if db := p.store(); db != nil {
-		if err := db.SetViewer(ctx, login); err != nil {
-			return src.Identity{}, err
-		}
-	}
-	return src.Identity{Viewer: src.Person{Key: pr.Provider + ":" + login, Name: login}}, nil
+	return r.report(ctx, false)
 }
 
-func (p *Plugin) Action(_ context.Context, req src.ActionRequest) (json.RawMessage, error) {
-	return nil, fmt.Errorf("%w: no action %s", src.ErrUnsupported, req.Action)
+// Identity is the viewer: the login the store keeps, else the one GitHub's
+// API names once started, or gh in CLI mode, which the store then keeps;
+// and the scope teams the viewer is in.
+func (p *Plugin) Identity(ctx context.Context) (src.Identity, error) {
+	p.mu.Lock()
+	r := p.run
+	p.mu.Unlock()
+	var db *store.DB
+	login := ""
+	if r != nil {
+		db = r.db
+		v, err := db.Viewer(ctx)
+		if err != nil {
+			return src.Identity{}, err
+		}
+		login = v
+	}
+	if login == "" {
+		var err error
+		if login, err = p.viewer(ctx, r); err != nil {
+			return src.Identity{}, fmt.Errorf("%w: %w", src.ErrUnavailable, err)
+		}
+		if login == "" {
+			return src.Identity{}, fmt.Errorf("%w: GitHub named no viewer", src.ErrUnavailable)
+		}
+		if db != nil {
+			if err := db.SetViewer(ctx, login); err != nil {
+				return src.Identity{}, err
+			}
+		}
+	}
+	id := src.Identity{Viewer: src.Person{Key: pr.Provider + ":" + login, Name: login}}
+	if db != nil {
+		teams, err := collect.MyTeams(ctx, db)
+		if err != nil {
+			return src.Identity{}, err
+		}
+		id.Teams = teams
+	}
+	return id, nil
+}
+
+// viewer is the viewer's login as GitHub's API names it, or gh when the
+// plugin has not started.
+func (p *Plugin) viewer(ctx context.Context, r *running) (string, error) {
+	if r != nil {
+		return r.client.Viewer(ctx)
+	}
+	out, err := p.gh().Run(ctx, "api", "user", "--jq", ".login")
+	return strings.TrimSpace(string(out)), err
 }
 
 func (p *Plugin) View(_ context.Context, req src.ViewRequest) (json.RawMessage, error) {

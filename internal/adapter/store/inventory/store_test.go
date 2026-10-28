@@ -48,42 +48,6 @@ func upsert(t *testing.T, s *Store, pr dinv.PR) {
 	}
 }
 
-func TestUpsertKeepsReasonsUnionAndRequests(t *testing.T) {
-	s := open(t)
-	ctx := context.Background()
-	pr := dinv.PR{Ref: ref, Title: "one", Author: "ana", State: "OPEN", Reasons: []string{"author"}, ReviewRequests: []string{"me", "team:acme/search"}}
-	if err := s.UpsertPR(ctx, pr); err != nil {
-		t.Fatal(err)
-	}
-	pr.Title = "two"
-	pr.Reasons = []string{"review-requested"}
-	pr.ReviewRequests = []string{"carla"}
-	if err := s.UpsertPR(ctx, pr); err != nil {
-		t.Fatal(err)
-	}
-	got, ok, err := s.PR(ctx, ref)
-	if err != nil || !ok {
-		t.Fatalf("read: %v %v", ok, err)
-	}
-	if got.Title != "two" || len(got.Reasons) != 2 || got.Reasons[0] != "author" || got.Reasons[1] != "review-requested" {
-		t.Fatalf("got %+v", got)
-	}
-	if len(got.ReviewRequests) != 1 || got.ReviewRequests[0] != "carla" {
-		t.Fatalf("requests are a snapshot, not a union: %v", got.ReviewRequests)
-	}
-	seen := time.Date(2026, 10, 5, 10, 0, 0, 0, time.UTC)
-	if err := s.TouchStubs(ctx, []github.Stub{{Ref: ref, ReviewRequests: []string{"dylan"}}}, seen); err != nil {
-		t.Fatal(err)
-	}
-	got, _, err = s.PR(ctx, ref)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got.ReviewRequests) != 1 || got.ReviewRequests[0] != "dylan" || !got.LastSeenAt.Equal(seen) || got.Title != "two" {
-		t.Fatalf("touch: %+v", got)
-	}
-}
-
 func TestFailingChecksRoundTrip(t *testing.T) {
 	s := open(t)
 	ctx := context.Background()
@@ -194,42 +158,6 @@ func TestOverrideKeepsTheSituationAtMuteTime(t *testing.T) {
 	o, err := s.Override(ctx, ref)
 	if err != nil || o != want {
 		t.Fatalf("override: %+v %v", o, err)
-	}
-}
-
-func TestMergeableKeepsAKnownValueAndWhenItTurnedConflicting(t *testing.T) {
-	s := open(t)
-	ctx := context.Background()
-	t0 := time.Date(2026, 10, 15, 10, 0, 0, 0, time.UTC)
-	step := func(mergeable string, at time.Time, wantValue string, wantAt time.Time) {
-		t.Helper()
-		upsert(t, s, dinv.PR{Ref: ref, State: "OPEN", Mergeable: mergeable, LastSeenAt: at})
-		pr, _, err := s.PR(ctx, ref)
-		if err != nil || pr.Mergeable != wantValue || !pr.MergeableAt.Equal(wantAt) {
-			t.Fatalf("after %q at %v: %q at %v (%v), want %q at %v", mergeable, at, pr.Mergeable, pr.MergeableAt, err, wantValue, wantAt)
-		}
-	}
-	step("CONFLICTING", t0, "CONFLICTING", t0)
-	step("UNKNOWN", t0.Add(time.Hour), "CONFLICTING", t0)
-	step("", t0.Add(2*time.Hour), "CONFLICTING", t0)
-	step("CONFLICTING", t0.Add(3*time.Hour), "CONFLICTING", t0)
-	step("MERGEABLE", t0.Add(4*time.Hour), "MERGEABLE", time.Time{})
-	step("CONFLICTING", t0.Add(5*time.Hour), "CONFLICTING", t0.Add(5*time.Hour))
-
-	at := t0.Add(6 * time.Hour)
-	if err := s.TouchStubs(ctx, []github.Stub{{Ref: ref, State: "OPEN", Mergeable: "MERGEABLE"}}, at); err != nil {
-		t.Fatal(err)
-	}
-	if pr, _, _ := s.PR(ctx, ref); pr.Mergeable != "MERGEABLE" {
-		t.Fatalf("a stub's known value was not kept: %q", pr.Mergeable)
-	}
-	for _, st := range []github.Stub{{Ref: ref, State: "OPEN", Mergeable: "UNKNOWN"}, {Ref: ref, State: "CLOSED", Mergeable: "CONFLICTING"}} {
-		if err := s.TouchStubs(ctx, []github.Stub{st}, at); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if pr, _, _ := s.PR(ctx, ref); pr.Mergeable != "MERGEABLE" {
-		t.Fatalf("an unknown or closed stub changed it: %q", pr.Mergeable)
 	}
 }
 

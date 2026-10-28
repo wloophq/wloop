@@ -3,6 +3,7 @@ package source
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/wloophq/wloop/internal/brief"
@@ -21,7 +22,18 @@ func (s services) Ask(ctx context.Context, req src.AskRequest) (src.AskResult, e
 	return s.b.Hosted.Ask(ctx, req)
 }
 
-func (services) Meter(context.Context, src.Sample) error { return src.ErrUnsupported }
+// Meter records a sample the plugin metered under the host's meter scope
+// its Call named; a resource the plugin does not cross is refused.
+func (s services) Meter(_ context.Context, x src.Sample) error {
+	if s.b.Meters == nil {
+		return src.ErrUnsupported
+	}
+	if !knownResource(x.Resource) {
+		return fmt.Errorf("%w: plugin %s meters no %q", src.ErrUnfit, s.b.ID, x.Resource)
+	}
+	s.b.Meters.add(x)
+	return nil
+}
 
 // Config is the plugin's [plugins.<id>] table and the host keys its
 // manifest's config_reads names, as the configuration in force holds them.

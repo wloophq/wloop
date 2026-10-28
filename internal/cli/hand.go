@@ -400,10 +400,10 @@ func (e *Env) handRound(ctx context.Context, rt route, ref pr.Ref, guidance stri
 	return rounds.Save(ctx, st)
 }
 
-// locators know the unit a checkout holds: the built-in modules', then each
-// source plugin's this process runs.
+// locators know the unit a checkout holds: each source plugin's this
+// process runs.
 func (e *Env) locators() []unit.Locator {
-	out := e.githubLocators()
+	var out []unit.Locator
 	if e.pluginKind == nil {
 		return out
 	}

@@ -83,8 +83,12 @@ func (r reader) RoundState(ctx context.Context, w plugin.Unit) (src.RoundState, 
 	return st, nil
 }
 
-func (reader) Workspaces(context.Context, string) (src.Listing, error) {
-	return src.Listing{}, src.ErrUnsupported
+// Workspaces lists the host's workspaces of repo, every one when "".
+func (r reader) Workspaces(ctx context.Context, repo string) (src.Listing, error) {
+	if r.b.Workspaces == nil {
+		return src.Listing{}, src.ErrUnsupported
+	}
+	return r.b.Workspaces(ctx, repo)
 }
 
 // Session is the session with id handle as a plugin's tool reads it: the

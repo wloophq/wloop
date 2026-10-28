@@ -3,16 +3,12 @@ package daemon
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
 
-	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
-	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -282,14 +278,7 @@ func TestFailedIngestWakesNoSweep(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var r *wakeRig
 		r = newWakeRig(t, func(d *Deps) {
-			closedDB, err := sqlitetest.Open(filepath.Join(d.StateDir, "closed.db"), nil)
-			if err != nil {
-				t.Fatal(err)
-			}
-			closed := inventory.New(closedDB)
-			closedDB.Close()
-			c := &ghsource.Collector{Store: closed, GH: unknownBudget{}, Cfg: d.Cfg, Now: time.Now}
-			d.Collector, d.Ingest = c, []IngestJob{{ID: unit.GitHub, Job: c.IngestJob()}}
+			d.Collector, d.Ingest = failingSlow{}, []IngestJob{{ID: unit.GitHub, Job: failingIngest()}}
 		})
 		r.start(t)
 		in := r.s.jobs[ingestJobName(unit.GitHub)]

@@ -24,7 +24,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestDraftTextComesFromTheProfile` | No Go code outside its allowlist writes a draft's text from prose of its own: the Text of an outbox.Proposal or a draft.Draft is never a string constant, a format, or what a function of the same package builds from string literals. A draft's text comes from a profile template or from whoever wrote it. |
 | `TestEveryDecisionNamesATestThatExists` | Every entry of the decision log names on its Enforced by line at least one test, and only tests the repository declares. |
 | `TestEveryRuleTestStatesItsRule` | Every rule test, a test that does not call flagged, states its rule in a doc comment. |
-| `TestGitHubPluginImportsOnlyTheSDK` | No package under `plugins/github`, tests included, imports a package under `internal/`: the GitHub plugin builds against the SDK alone. |
+| `TestGitHubPluginImportsOnlyTheSDK` | No package under `plugins/github`, tests included, imports a package under `internal/` or a package of another plugin: the GitHub plugin builds against the SDK and its own packages alone. |
 | `TestGoNamesNoBundledProperty` | Go names no property of the bundled tasks.toml: the constants PropFocus, PropArea, PropContexts, PropDue, FocusOn and FocusOff of internal/domain/task/props.go go once the lists, the counters and the automatic star are the profile's. |
 | `TestGoNamesNoState` | Go reads a task's category and never names a state: no Go literal is converted to, assigned to or compared with a task.State or a task.Category outside internal/intent and the version 7 migration, but the Category constants and Categories of internal/domain/task/schema.go, which declare the closed set; and no SQL text under internal/adapter/store compares the state column with a state the bundled profile declares, nor inlines a category, which it binds as a parameter. |
 | `TestLoopCodeImportsNoPR` | Loop code is keyed by `unit.Unit` and imports the pull request domain only in allowlisted files. |
@@ -68,7 +68,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 |---|---|---|
 | `internal/cli/harness_test.go` | 🧾 | the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin |
 | `internal/cli/serve_test.go` | 🧾 | the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin |
-| `internal/cli/stepstart_test.go` | 🧾 | the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin |
 
 ### `TestDraftTextComesFromTheProfile`
 
@@ -103,7 +102,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 
 | `pluginIdentityAllowlist` entry | Status | Reason |
 |---|---|---|
-| `internal/adapter/facts/session/facts.go` `repoOf` `pr.RefOf` `1` | 🧾 | a session's facts read its linked pull request |
 | `internal/adapter/store/inventory/byunit.go` `unitRef` `pr.RefOf` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/brief/github_source.go` `GitHubSource.ref` `pr.RefOf` `1` | 🧾 | the brief queue builds GitHub's brief source and its units outside the plugin |
 | `internal/brief/queue.go` `Queue.intent` `pr.Codec{}.Provider` `1` | 🧾 | the brief queue builds GitHub's brief intent outside the plugin |
@@ -118,7 +116,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 
 | `providerStringAllowlist` entry | Status | Reason |
 |---|---|---|
-| `internal/adapter/store/inventory/store.go` `github` `5` | 🧾 | the inventory keeps GitHub's pull request tables (issue 62) |
+| `internal/adapter/store/inventory/store.go` `github` `4` | 🧾 | the inventory keeps GitHub's pull request tables (issue 62) |
 | `internal/adapter/store/inventory/timings.go` `github` `3` | 🧾 | the inventory keeps GitHub's pull request tables (issue 62) |
 | `internal/adapter/store/sqlite/retain.go` `github` `21` | 🧾 | retention drops a pull request's rows once GitHub says it ended (issue 62) |
 | `internal/adapter/store/sqlite/retain.go` `slack` `3` | 🧾 | retention tells a Slack unit gone by the Slack tables; the plugin should say (issue 62) |
@@ -163,13 +161,10 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 
 | `coreProviderAllowlist` entry | Status | Reason |
 |---|---|---|
-| `internal/adapter/facts/session/facts.go` `Provider.build` `unit.GitHub` `1` | 🧾 | a session's facts read its linked pull request's state |
-| `internal/adapter/orca/orca.go` `Adapter.Apply` `unit.GitHub` `1` | ✅ | Orca links a worktree to a GitHub pull request only |
 | `internal/adapter/store/inventory/activity.go` `Store.RecentActivity` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/adapter/store/inventory/briefruns.go` `githubBriefs` `"github"` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/adapter/store/inventory/store.go` `Store.Ended` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/adapter/store/inventory/store.go` `Store.FirstRoundBlocks` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
-| `internal/adapter/store/inventory/store.go` `Store.Reviewed` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/adapter/store/inventory/store.go` `Store.Tracked` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/adapter/store/inventory/store.go` `Store.UnitlessEvents` `unit.Session` `1` | ✅ | the store keeps the sessions the core keeps |
 | `internal/adapter/store/inventory/store.go` `refOf` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |

@@ -91,16 +91,16 @@ type FailingCheck struct {
 // Workspace is the workspace a pull request is linked to.
 type Workspace struct {
 	// Manager owns the workspace; ID is its id there.
-	Manager     string
-	ID          string
-	DisplayName string
-	Status      string
-	IsReview    bool
-	AgentStates []string
-	Comment     string
+	Manager     string   `json:"manager,omitempty"`
+	ID          string   `json:"id"`
+	DisplayName string   `json:"display_name"`
+	Status      string   `json:"status"`
+	IsReview    bool     `json:"is_review"`
+	AgentStates []string `json:"agent_states"`
+	Comment     string   `json:"comment"`
 	// IsMain is the repository's main checkout on the pull request's branch,
 	// which the loop never removes.
-	IsMain bool
+	IsMain bool `json:"is_main"`
 }
 
 // Override is what the user set on a pull request that the plugin keeps.

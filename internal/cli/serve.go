@@ -155,7 +155,7 @@ func serve(ctx context.Context, e *Env, args []string) error {
 		if cfgErr == nil {
 			e.cfg.Rebase(cfg)
 			gctx, stop := context.WithCancel(ctx)
-			e.restoreBudget(gctx, db, cfg, logf)
+			e.restoreBudget(gctx, cfg, logf)
 			deps := endpoint.wire(serveDeps(gctx, e, db, cfg, logf, loopMu, appState), cfg)
 			deps.ConfigWarning = e.cfg.Warning
 			srv := daemon.New(deps)
@@ -1060,7 +1060,7 @@ func serveUntilConfigLoads(ctx context.Context, e *Env, db *sqlite.DB, logf func
 	cfg := e.defaultConfig()
 	dctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	e.restoreBudget(dctx, db, cfg, logf)
+	e.restoreBudget(dctx, cfg, logf)
 	deps := endpoint.wire(serveDeps(dctx, e, db, cfg, logf, loopMu, app), cfg)
 	deps.Collector, deps.Ingest = nil, nil
 	deps.Runtimes = withoutPluginJobs(deps.Runtimes)

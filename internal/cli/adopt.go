@@ -105,14 +105,10 @@ func (e *Env) authorWorkspace(ctx context.Context, cfg config.Config, ref pr.Ref
 			return ws, "", cmp.Or(err, errors.New(why))
 		}
 		ws, _, err = e.createWithAgent(ctx, cfg, ref, repo, workspace.CreateRequest{
-			Name:    pr.HeadRefName,
-			BaseRef: "origin/pr/" + fmt.Sprint(ref.Number),
-			Unit:    ref.Unit(),
-
-			HeadBranch:      pr.HeadRefName,
-			HeadOid:         pr.HeadRefOid,
-			BaseBranchName:  pr.BaseRefName,
-			CrossRepository: pr.IsCrossRepository,
+			Name:     pr.HeadRefName,
+			BaseRef:  "origin/pr/" + fmt.Sprint(ref.Number),
+			Unit:     ref.Unit(),
+			Checkout: workspace.Checkout{Branch: pr.HeadRefName, Head: pr.HeadRefOid, Base: pr.BaseRefName, Fork: pr.IsCrossRepository},
 		}, sentTurn{}, roundOptions{allowUserActive: true, trusted: trusts(cfg, pr)})
 		if err != nil {
 			return ws, "", err

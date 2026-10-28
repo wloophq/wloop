@@ -19,7 +19,6 @@ import (
 	"testing/synctest"
 	"time"
 
-	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
@@ -236,7 +235,7 @@ func TestIdleCyclePublishesNoRowChange(t *testing.T) {
 		runFeeds(t, s)
 		msgs := listen(t, s, nil)
 		fast := newJob("fast", time.Hour, time.Minute, func(ctx context.Context) (string, string, error) {
-			return ghsource.Outcome(ghsource.Report{Queries: 1}, s.store().UpsertPR(ctx, feedPR()))
+			return sweepOutcome(sweepReport{Queries: 1}, s.store().UpsertPR(ctx, feedPR()))
 		})
 		fast.onEnd = s.jobEnded
 		fast.once(context.Background(), func(string, ...any) {}, s.jobDone)

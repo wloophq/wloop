@@ -85,6 +85,7 @@ func TestTheUnitHereIsReadInTheCallersDirectory(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.gh.prView = "https://github.com/acme/web/pull/3\n"
+	te.serveGitHubPlugin(te.db, nil)
 	got, err := te.handUnit(context.Background(), "", "/src/web", wsdomain.Workspace{}, wsdomain.Repo{}, false)
 	if err != nil || got != (unit.Unit{Provider: "github", Key: "acme/web#3"}) {
 		t.Fatalf("%v %v", got, err)

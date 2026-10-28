@@ -61,6 +61,14 @@ type Broker struct {
 	Links port.LinkStore
 	// Hosted are the host's services the plugin spends; nil serves none.
 	Hosted *Hosted
+	// Meters take the samples the plugin meters; nil serves no Meter.
+	Meters *Meters
+	// Workspaces lists the host's workspaces of a repository, "" every one;
+	// nil serves no Reader.Workspaces.
+	Workspaces func(ctx context.Context, repo string) (src.Listing, error)
+	// Reported hears each report the plugin made once it is kept; nil
+	// hears none.
+	Reported func(ctx context.Context, snapshots map[unit.Unit]src.Snapshot) error
 }
 
 // BriefStore keeps the briefs a plugin writes. PutUnitBrief keeps body, the

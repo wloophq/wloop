@@ -14,7 +14,6 @@ import (
 // request from another unit by asking the GitHub plugin's own package, with
 // how many times each asks.
 var pluginIdentityAllowlist = []providerSite{
-	{"internal/adapter/facts/session/facts.go", "repoOf", "pr.RefOf", 1, "debt: a session's facts read its linked pull request"},
 	{"internal/adapter/store/inventory/byunit.go", "unitRef", "pr.RefOf", 1, "debt: the inventory keeps GitHub's pull request tables"},
 	{"internal/brief/github_source.go", "GitHubSource.ref", "pr.RefOf", 1, "debt: the brief queue builds GitHub's brief source and its units outside the plugin"},
 	{"internal/brief/queue.go", "Queue.source", "pr.Codec{}.Provider", 1, "debt: the brief queue builds GitHub's brief source and its units outside the plugin"},

@@ -1,0 +1,90 @@
+== pass 1 (first)
+outcome: "3 queries, 2 stubs, 4 read, 28 events, 0 failed" "" <nil>
+searches: ["is:pr is:open archived:false author:ana author:dylan author:me|" "is:pr is:open archived:false user-review-requested:me|" "is:pr is:open archived:false team-review-requested:acme/search|"]
+reads: [acme/api#7 acme/api#8 acme/api#9 acme/api#11]
+stub reads: []
+branch queries: []
+thread reads: 0
+notes:
+  changed [acme/api#7 acme/api#8]
+  changed [acme/api#9 acme/api#11]
+  changed [acme/api#8 acme/api#11]
+pr acme/api#11 "Linked" OPEN reasons [author review-requested] seen 2026-10-05T10:00:00Z workspace "w1" head h2
+pr acme/api#9 "Tracked" OPEN reasons [author review-requested tracked] seen 2026-10-05T10:00:00Z workspace "" head h2
+pr acme/api#8 "Export" OPEN reasons [author review-requested] seen 2026-10-05T10:00:00Z workspace "w2" head h2
+pr acme/api#7 "Batch export" OPEN reasons [author review-requested] seen 2026-10-05T10:00:00Z workspace "" head h2
+override acme/api#9 tracked true
+events acme/api#11 map[check:1 comment:1 followed:1 opened:1 push:2 review:1 review_requested:1]
+events acme/api#9 map[check:1 comment:1 followed:1 opened:1 push:2 review:1 review_requested:1]
+events acme/api#8 map[check:1 comment:1 followed:1 opened:1 push:2 review:1 review_requested:1]
+events acme/api#7 map[check:1 comment:1 followed:1 opened:1 push:2 review:1 review_requested:1]
+meta github_budget 
+meta fast_sweep_at 2026-10-05T10:00:00Z
+meta slow_sweep_at 
+meta scope_resolved 
+== pass 2 (unchanged)
+outcome: "3 queries, 4 stubs, 0 read, 0 events, 0 failed" "" <nil>
+searches: ["is:pr archived:false updated:>=2026-10-05T09:55:00Z author:ana author:dylan author:me|" "is:pr archived:false updated:>=2026-10-05T09:55:00Z user-review-requested:me|" "is:pr archived:false updated:>=2026-10-05T09:55:00Z team-review-requested:acme/search|"]
+reads: []
+stub reads: [[acme/api#11 acme/api#9]]
+branch queries: []
+thread reads: 0
+notes:
+  
+pr acme/api#11 "Linked" OPEN reasons [author review-requested] seen 2026-10-05T10:00:00Z workspace "w1" head h2
+pr acme/api#9 "Tracked" OPEN reasons [author review-requested tracked] seen 2026-10-05T10:00:00Z workspace "" head h2
+pr acme/api#8 "Export" OPEN reasons [author review-requested] seen 2026-10-05T10:00:00Z workspace "w2" head h2
+pr acme/api#7 "Batch export" OPEN reasons [author review-requested] seen 2026-10-05T10:00:00Z workspace "" head h2
+override acme/api#9 tracked true
+events acme/api#11 map[check:1 comment:1 followed:1 opened:1 push:2 review:1 review_requested:1]
+events acme/api#9 map[check:1 comment:1 followed:1 opened:1 push:2 review:1 review_requested:1]
+events acme/api#8 map[check:1 comment:1 followed:1 opened:1 push:2 review:1 review_requested:1]
+events acme/api#7 map[check:1 comment:1 followed:1 opened:1 push:2 review:1 review_requested:1]
+meta github_budget 
+meta fast_sweep_at 2026-10-05T10:00:00Z
+meta slow_sweep_at 
+meta scope_resolved 
+== pass 3 (low budget)
+outcome: "skipped" "rate limit at 10 of 5000, below 50%, until 2026-10-05T11:00:00Z" <nil>
+searches: []
+reads: []
+stub reads: []
+branch queries: []
+thread reads: 0
+notes:
+  
+pr acme/api#11 "Linked" OPEN reasons [author review-requested] seen 2026-10-05T10:00:00Z workspace "w1" head h2
+pr acme/api#9 "Tracked" OPEN reasons [author review-requested tracked] seen 2026-10-05T10:00:00Z workspace "" head h2
+pr acme/api#8 "Export" OPEN reasons [author review-requested] seen 2026-10-05T10:00:00Z workspace "w2" head h2
+pr acme/api#7 "Batch export" OPEN reasons [author review-requested] seen 2026-10-05T10:00:00Z workspace "" head h2
+override acme/api#9 tracked true
+events acme/api#11 map[check:1 comment:1 followed:1 opened:1 push:2 review:1 review_requested:1]
+events acme/api#9 map[check:1 comment:1 followed:1 opened:1 push:2 review:1 review_requested:1]
+events acme/api#8 map[check:1 comment:1 followed:1 opened:1 push:2 review:1 review_requested:1]
+events acme/api#7 map[check:1 comment:1 followed:1 opened:1 push:2 review:1 review_requested:1]
+meta github_budget 
+meta fast_sweep_at 2026-10-05T10:00:00Z
+meta slow_sweep_at 
+meta scope_resolved 
+== pass 4 (refused mid-run)
+outcome: "skipped" "fast pass: stubs: pull request stubs: read: GitHub budget low" <nil>
+searches: ["is:pr archived:false updated:>=2026-10-05T09:55:00Z author:ana author:dylan author:me|" "is:pr archived:false updated:>=2026-10-05T09:55:00Z user-review-requested:me|" "is:pr archived:false updated:>=2026-10-05T09:55:00Z team-review-requested:acme/search|"]
+reads: []
+stub reads: [[acme/api#11 acme/api#9 acme/api#8]]
+branch queries: []
+thread reads: 0
+notes:
+  
+pr acme/api#11 "Linked" OPEN reasons [author review-requested] seen 2026-10-05T10:00:00Z workspace "w1" head h2
+pr acme/api#9 "Tracked" OPEN reasons [author review-requested tracked] seen 2026-10-05T10:00:00Z workspace "" head h2
+pr acme/api#8 "Export" OPEN reasons [author review-requested] seen 2026-10-05T10:00:00Z workspace "w2" head h2
+pr acme/api#7 "Batch export" OPEN reasons [author review-requested] seen 2026-10-05T10:00:00Z workspace "" head h2
+override acme/api#9 tracked true
+events acme/api#11 map[check:1 comment:1 followed:1 opened:1 push:2 review:1 review_requested:1]
+events acme/api#9 map[check:1 comment:1 followed:1 opened:1 push:2 review:1 review_requested:1]
+events acme/api#8 map[check:1 comment:1 followed:1 opened:1 push:2 review:1 review_requested:1]
+events acme/api#7 map[check:1 comment:1 followed:1 opened:1 push:2 review:1 review_requested:1]
+meta github_budget 
+meta fast_sweep_at 2026-10-05T10:00:00Z
+meta slow_sweep_at 
+meta scope_resolved 

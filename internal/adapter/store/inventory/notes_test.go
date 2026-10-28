@@ -42,6 +42,15 @@ type writeCase struct {
 // rows.
 var writes = []writeCase{
 	{
+		method: "SaveReported", name: "/new",
+		call: func(ctx context.Context, s *Store) error {
+			p := openPR(ref, "author")
+			p.Workspace = dinv.Workspace{ID: "ws-1"}
+			return s.SaveReported(ctx, []Reported{{PR: p, Tracked: true}})
+		},
+		topics: port.TopicPRs | port.TopicFollow | port.TopicOverrides, refs: []github.Ref{ref},
+	},
+	{
 		method: "UpsertPR", name: "/new",
 		call:   func(ctx context.Context, s *Store) error { return s.UpsertPR(ctx, openPR(ref, "author")) },
 		topics: port.TopicPRs | port.TopicFollow | port.TopicSourceEvents, refs: []github.Ref{ref}, host: true,
@@ -92,14 +101,6 @@ var writes = []writeCase{
 			return err
 		},
 		topics: port.TopicSourceEvents, refs: []github.Ref{ref},
-	},
-	{
-		method: "TouchStubs",
-		seed:   seedPRs("author", ref, ref2),
-		call: func(ctx context.Context, s *Store) error {
-			return s.TouchStubs(ctx, []github.Stub{{Ref: ref, ReviewRequests: []string{"bob"}}, {Ref: ref2}}, noteAt)
-		},
-		topics: port.TopicPRs, refs: []github.Ref{ref},
 	},
 	{
 		method: "SetReasons",
@@ -342,14 +343,14 @@ func seedGuidance(t *testing.T, s *Store) {
 // reads are the exported methods of Store that write nothing.
 var reads = []string{
 	"UseClock",
-	"PR", "PRs", "PRsWithOverrides", "StoredFacts", "Seen", "LastEvent", "ListPRs", "Events", "EventsByPR", "UnitlessEvents", "FirstRoundBlocks",
+	"PR", "PRs", "PRsWithOverrides", "Seen", "LastEvent", "ListPRs", "Events", "EventsByPR", "UnitlessEvents", "FirstRoundBlocks",
 	"RecentActivity", "BriefStates", "Tracked", "Override", "Overrides", "UnitMutes", "Meta", "MetaPrefixed", "Viewer", "Viewers", "Turn", "LastBundledSHA",
 	"Timings", "Tags", "TagVocabulary", "BriefRuns", "BriefRun", "BriefRecord", "BriefRecords", "UnitBrief", "Ended",
-	"Details", "DetailStamps", "Reviewed",
+	"Details",
 }
 
 // silent are the exported write methods that note nothing.
-var silent = []string{"SeeRefs", "UseHost", "DB"}
+var silent = []string{"UseHost", "DB"}
 
 func openNoted(t *testing.T) (*Store, *change.Log) {
 	t.Helper()
@@ -443,15 +444,6 @@ func TestNoOpWriteNotesNothing(t *testing.T) {
 		seed func(t *testing.T, s *Store)
 		call func(ctx context.Context, s *Store) error
 	}{
-		{"TouchStubs/unknown", nil, func(ctx context.Context, s *Store) error {
-			return s.TouchStubs(ctx, []github.Stub{{Ref: ref}}, noteAt)
-		}},
-		{"TouchStubs/a sighting", seedPRs("author", ref), func(ctx context.Context, s *Store) error {
-			return s.TouchStubs(ctx, []github.Stub{{Ref: ref}}, noteAt.Add(time.Hour))
-		}},
-		{"SeeRefs", seedPRs("author", ref, ref2), func(ctx context.Context, s *Store) error {
-			return s.SeeRefs(ctx, []github.Ref{ref, ref2, ref3}, noteAt.Add(time.Hour))
-		}},
 		{"SaveSnapshots/same snapshots", seedPRs("author", ref, ref2), func(ctx context.Context, s *Store) error {
 			_, err := s.SaveSnapshots(ctx, []Snapshot{{PR: openPR(ref, "author")}, {PR: openPR(ref2, "author")}}, noteAt.Add(time.Hour))
 			return err
@@ -594,60 +586,6 @@ func TestUpsertSameSnapshotWritesNothing(t *testing.T) {
 	}
 	if stored, _, err := s.PR(ctx, ref); err != nil || !stored.LastSeenAt.Equal(pr.LastSeenAt) {
 		t.Fatalf("last seen %v, %v", stored.LastSeenAt, err)
-	}
-}
-
-func TestTouchStubsUnchangedEmitsNothing(t *testing.T) {
-	s, log := openNoted(t)
-	stubs := make([]github.Stub, 70)
-	for i := range stubs {
-		r := github.Ref{Owner: "acme", Repo: "api", Number: i + 1}
-		upsert(t, s, openPR(r, "author"))
-		stubs[i] = github.Stub{Ref: r}
-	}
-	writes := countRowWrites(t, s)
-	ctx, sc := metertest.Start(t, context.Background())
-	got, n := noted(t, log, func() error { return s.TouchStubs(ctx, stubs, noteAt) })
-	if n != 0 {
-		t.Fatalf("%d notes: %+v", n, got)
-	}
-	if w := writes(); w != 0 {
-		t.Fatalf("%d row updates, want 0", w)
-	}
-	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL, Op: "exec"}: 1, {Res: meter.SQL, Op: "query"}: 1})
-}
-
-func TestTouchStubsChangedRequestTouchesOneRef(t *testing.T) {
-	s, log := openNoted(t)
-	stubs := make([]github.Stub, 70)
-	for i := range stubs {
-		r := github.Ref{Owner: "acme", Repo: "api", Number: i + 1}
-		upsert(t, s, openPR(r, "author"))
-		stubs[i] = github.Stub{Ref: r}
-	}
-	stubs[41].ReviewRequests = []string{"bob"}
-	got, n := noted(t, log, func() error { return s.TouchStubs(context.Background(), stubs, noteAt.Add(time.Hour)) })
-	if n != 1 || got.Topics != port.TopicPRs || !slices.Equal(got.Units, unitsOf([]github.Ref{stubs[41].Ref})) {
-		t.Fatalf("%d notes: %+v", n, got)
-	}
-}
-
-func TestTouchStubsStoresReviewDecision(t *testing.T) {
-	s, log := openNoted(t)
-	ctx := context.Background()
-	pr := openPR(ref, "author")
-	pr.ReviewDecision = "REVIEW_REQUIRED"
-	upsert(t, s, pr)
-	stub := github.Stub{Ref: ref, State: dgh.StateOpen, ReviewDecision: "APPROVED"}
-	got, n := noted(t, log, func() error { return s.TouchStubs(ctx, []github.Stub{stub}, noteAt) })
-	if n != 1 || got.Topics != port.TopicPRs || !slices.Equal(got.Units, unitsOf([]github.Ref{ref})) {
-		t.Fatalf("%d notes: %+v", n, got)
-	}
-	if stored, _, err := s.PR(ctx, ref); err != nil || stored.ReviewDecision != "APPROVED" {
-		t.Fatalf("stored decision %q: %v", stored.ReviewDecision, err)
-	}
-	if got, n := noted(t, log, func() error { return s.TouchStubs(ctx, []github.Stub{stub}, noteAt) }); n != 0 {
-		t.Fatalf("the same decision noted %d times: %+v", n, got)
 	}
 }
 

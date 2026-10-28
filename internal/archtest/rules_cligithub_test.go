@@ -16,9 +16,8 @@ var githubClients = []string{"internal/github", "internal/ghcli"}
 // cliGitHubDebt are the test files of internal/cli that still import a
 // GitHub client, with why.
 var cliGitHubDebt = map[string]string{
-	"internal/cli/harness_test.go":   "debt: the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin",
-	"internal/cli/serve_test.go":     "debt: the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin",
-	"internal/cli/stepstart_test.go": "debt: the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin",
+	"internal/cli/harness_test.go": "debt: the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin",
+	"internal/cli/serve_test.go":   "debt: the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin",
 }
 
 // ruleCLIGitHubClient flags, in a file under internal/cli, an import of a

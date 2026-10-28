@@ -60,69 +60,6 @@ const upsertPRSQL = `INSERT INTO pull_requests
  WHERE (title, author, state, is_draft, head_oid, head_branch, base_branch, is_fork, checks_state, review_decision, review_requests, url, created_at, updated_at, merged_at, closed_at, reasons, body_edited_at, changed_files, failing_checks, mergeable, mergeable_at)
  IS NOT (excluded.title, excluded.author, excluded.state, excluded.is_draft, excluded.head_oid, excluded.head_branch, excluded.base_branch, excluded.is_fork, excluded.checks_state, excluded.review_decision, excluded.review_requests, excluded.url, excluded.created_at, excluded.updated_at, excluded.merged_at, excluded.closed_at, excluded.reasons, excluded.body_edited_at, excluded.changed_files, excluded.failing_checks, excluded.mergeable, excluded.mergeable_at)`
 
-// UpsertPR stores p as SavePRs does, seen at its LastSeenAt.
-func (db *DB) UpsertPR(ctx context.Context, p pr.PR) error {
-	return db.SavePRs(ctx, []pr.PR{p}, p.LastSeenAt)
-}
-
-// stored is what saving a pull request reads of its stored row.
-type stored struct {
-	reasons                string
-	mergeable, mergeableAt string
-	tracked                bool
-}
-
-// SavePRs stores prs in one transaction, rewriting a row only when a column
-// differs, and records each as seen at seenAt. A row's reasons are the
-// union of the stored ones and its own, with ReasonTracked exactly while
-// its override tracks it; seenAt dates a new conflict.
-func (db *DB) SavePRs(ctx context.Context, prs []pr.PR, seenAt time.Time) error {
-	if len(prs) == 0 {
-		return nil
-	}
-	refs := make([]pr.Ref, len(prs))
-	for i, p := range prs {
-		refs[i] = p.Ref
-	}
-	_, err := db.Write(ctx, func(tx *Tx) error {
-		prior, err := storedRows(ctx, tx, refs)
-		if err != nil {
-			return err
-		}
-		upsert, err := tx.PrepareContext(ctx, upsertPRSQL)
-		if err != nil {
-			return err
-		}
-		defer upsert.Close()
-		for _, p := range prs {
-			was := prior[p.Ref]
-			mergeable, mergeableAt := nextMergeable(was.mergeable, was.mergeableAt, p.Mergeable, seenAt)
-			storedReasons, err := splitList(was.reasons)
-			if err != nil {
-				return err
-			}
-			reasons := joinList(withTracked(append(slices.Clone(p.Reasons), storedReasons...), was.tracked))
-			failing := ""
-			if len(p.FailingChecks) > 0 {
-				raw, err := json.Marshal(p.FailingChecks)
-				if err != nil {
-					return err
-				}
-				failing = string(raw)
-			}
-			res, err := upsert.ExecContext(ctx, p.Ref.Owner, p.Ref.Repo, p.Ref.Number, p.Title, p.Author, p.State, p.IsDraft, p.HeadOid, p.HeadBranch, p.BaseBranch,
-				p.IsFork, p.ChecksState, p.ReviewDecision, joinList(p.ReviewRequests), p.URL, formatTime(p.CreatedAt), formatTime(p.UpdatedAt),
-				formatTime(p.MergedAt), formatTime(p.ClosedAt), reasons, formatTime(p.BodyEditedAt), p.ChangedFiles, failing, mergeable, mergeableAt)
-			if err := tx.touchChanged(res, err, p.Ref); err != nil {
-				return err
-			}
-			prior[p.Ref] = stored{reasons: reasons, mergeable: mergeable, mergeableAt: mergeableAt, tracked: was.tracked}
-		}
-		return seeRefs(ctx, tx, refs, seenAt)
-	})
-	return err
-}
-
 // nextMergeable is the mergeable state to store and when it turned
 // CONFLICTING. A value GitHub has not computed (UNKNOWN) or did not send
 // keeps the stored one: a conflict does not flip back to mergeable while
@@ -139,37 +76,6 @@ func nextMergeable(stored, storedAt, next string, at time.Time) (string, string)
 	return next, formatTime(at)
 }
 
-// storedRows reads what saving needs of each of refs, absent ones included.
-func storedRows(ctx context.Context, tx reader, refs []pr.Ref) (map[pr.Ref]stored, error) {
-	out := make(map[pr.Ref]stored, len(refs))
-	for chunk := range slices.Chunk(refs, prReadChunk) {
-		marks, args := refValues(chunk)
-		rows, err := tx.QueryContext(ctx, `WITH r(owner, repo, number) AS (VALUES `+marks+`)
-			SELECT r.owner, r.repo, r.number, coalesce(p.reasons, ''), coalesce(p.mergeable, ''), coalesce(p.mergeable_at, ''), coalesce(o.tracked, 0)
-			FROM r LEFT JOIN pull_requests p ON p.owner = r.owner AND p.repo = r.repo AND p.number = r.number
-			LEFT JOIN overrides o ON o.unit_key = r.owner || '/' || r.repo || '#' || r.number`, args...)
-		if err != nil {
-			return nil, err
-		}
-		err = func() error {
-			defer rows.Close()
-			for rows.Next() {
-				var ref pr.Ref
-				var st stored
-				if err := rows.Scan(&ref.Owner, &ref.Repo, &ref.Number, &st.reasons, &st.mergeable, &st.mergeableAt, &st.tracked); err != nil {
-					return err
-				}
-				out[ref] = st
-			}
-			return rows.Err()
-		}()
-		if err != nil {
-			return nil, err
-		}
-	}
-	return out, nil
-}
-
 // withTracked puts ReasonTracked in reasons exactly when tracked, sorted.
 func withTracked(reasons []string, tracked bool) []string {
 	out := slices.DeleteFunc(slices.Clone(reasons), func(r string) bool { return r == pr.ReasonTracked })
@@ -181,9 +87,19 @@ func withTracked(reasons []string, tracked bool) []string {
 }
 
 // SetReasons replaces ref's follow reasons, keeping ReasonTracked while its
-// override tracks it.
+// override tracks it, and recording on the host first the followed or
+// unfollowed event of a scope flip.
 func (db *DB) SetReasons(ctx context.Context, ref pr.Ref, reasons []string) error {
-	_, err := db.Write(ctx, func(tx *Tx) error {
+	tracked, err := isTracked(ctx, db.db, ref)
+	if err != nil {
+		return err
+	}
+	if err := db.recordFlipsOf(ctx, []pr.Ref{ref}, time.Time{}, func(_ pr.Ref, was scope) (scope, bool, error) {
+		return was.with(withTracked(reasons, tracked), was.ws), true, nil
+	}); err != nil {
+		return err
+	}
+	_, err = db.Write(ctx, func(tx *Tx) error {
 		tracked, err := isTracked(ctx, tx, ref)
 		if err != nil {
 			return err

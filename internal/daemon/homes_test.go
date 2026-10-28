@@ -3,16 +3,12 @@ package daemon
 import (
 	"context"
 	"net/http"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
 
-	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
-	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
 )
 
@@ -40,15 +36,9 @@ func wantCalls(t *testing.T, p *homeProbe, want int32, what string) {
 func TestFastCycleRunsNoHomeCheck(t *testing.T) {
 	t.Parallel()
 	d := testDeps(t)
-	closedDB, err := sqlitetest.Open(filepath.Join(d.StateDir, "closed.db"), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	closed := inventory.New(closedDB)
-	closedDB.Close()
 	p := &homeProbe{}
 	d.Homes = p.check
-	d.Collector = &ghsource.Collector{Store: closed, GH: unknownBudget{}, Cfg: d.Cfg, Now: time.Now}
+	d.Collector = failingSlow{}
 	s := New(d)
 	stopOnCleanup(t, s)
 	for range 10 {

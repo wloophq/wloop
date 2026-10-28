@@ -42,6 +42,9 @@ type Kind struct {
 	NotifyTimeout time.Duration
 	// Logf logs a failed notification; nil logs nothing.
 	Logf func(format string, args ...any)
+	// Meters carry the host's meter scopes to the plugins' calls; nil
+	// meters nothing.
+	Meters *Meters
 
 	mu      sync.Mutex
 	running map[string]*attached

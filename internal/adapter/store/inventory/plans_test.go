@@ -53,7 +53,6 @@ var hotPlans = []hotPlan{
 	{name: "ledger message", query: ledgerMessageSQL, args: 1, want: []string{"messages_proposal (proposal=?)"}},
 	{name: "recent activity", query: recentActivitySQL(marks(2)), args: 5, want: []string{"SCAN e USING INDEX events_recent"}},
 	{name: "active refs", query: activeRefsSQL, args: 1, want: []string{"events_recent (at>?)"}, tempSorts: []string{"USE TEMP B-TREE FOR DISTINCT"}},
-	{name: "reviewed", query: reviewedSQL, args: 2, want: []string{"turns_sent_at (sent_at>?)"}},
 	{name: "timed turns", query: timedTurnsSQL, args: 1, want: []string{"turns_sent_at (sent_at>?)"}, tempSorts: []string{"USE TEMP B-TREE FOR ORDER BY"}},
 	{name: "turn tokens", query: turnTokensSQL, args: 1, want: []string{"SEARCH t USING INTEGER PRIMARY KEY"}},
 	{name: "last situation", query: lastSituationSQL, args: 3, want: []string{"events_unit_kind (provider=? AND unit_key=? AND kind=?)"}, tempSorts: []string{"USE TEMP B-TREE FOR ORDER BY"}},

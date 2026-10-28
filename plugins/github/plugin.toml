@@ -14,6 +14,8 @@ row_kinds = ["round_pending", "loop_waiting", "loop_stopped", "blocked", "to_add
   "changes", "checks", "conflicts", "reply", "reviewer_back", "review", "no_reviewer", "merge", "draft", "muted", "done"]
 
 default_delivery = "comment"
+config_reads = ["sweep", "views"]
+notify = ["workspaces"]
 
 [source.codec]
 keys = ["{owner}/{repo}#{number}"]
@@ -499,6 +501,16 @@ name = "pr.fingerprint"
 type = "string"
 doc = "What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips."
 untrusted = true
+
+[[source.jobs]]
+name = "fast"
+every = "2m"
+every_from = "sweep.fast"
+
+[[source.jobs]]
+name = "slow"
+every = "1h"
+every_from = "sweep.slow"
 
 [[source.commands]]
 name = "clone"
