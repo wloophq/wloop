@@ -6,7 +6,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/domain/items"
@@ -23,37 +22,35 @@ func TestServicePropContract(t *testing.T) {
 	})
 }
 
-// gatedStore holds the first Apply until open is closed, telling held when it is waiting.
-type gatedStore struct {
-	coretasks.Store
-	once       sync.Once
-	held, open chan struct{}
-}
-
-func (g *gatedStore) Apply(ctx context.Context, cs []task.Change, evs ...port.Event) error {
-	g.once.Do(func() {
-		close(g.held)
-		<-g.open
-	})
-	return g.Store.Apply(ctx, cs, evs...)
-}
-
-// TestATaskSetDuringAVerbIsKept sends a task.set while a verb holds its write: the set waits for the verb's
-// write and lands on the task it wrote, so neither undoes the other.
+// TestATaskSetDuringAVerbIsKept stops a verb between reading its task and writing it, and sends a task.set
+// meanwhile: the verb goes on once the set waits for the service's lock, or once the set returned, which only
+// a set that skips the lock does, and so writes its older copy over the set.
 func TestATaskSetDuringAVerbIsKept(t *testing.T) {
 	t.Parallel()
 	r := newRig()
 	r.put(t, task.Task{ID: "t-1", Kind: task.KindCapture, State: "inbox", Title: "a", Origin: task.OriginUser})
-	g := &gatedStore{Store: r.store, held: make(chan struct{}), open: make(chan struct{})}
-	svc := coretasks.New(coretasks.Deps{Store: g, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates})
+	svc := coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates})
+	read, waiting, setDone := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	var once, waited sync.Once
+	coretasks.SetRaceHooks(svc, func() {
+		once.Do(func() {
+			close(read)
+			select {
+			case <-waiting:
+			case <-setDone:
+			}
+		})
+	}, func() { waited.Do(func() { close(waiting) }) })
 	ctx := context.Background()
 	var wg sync.WaitGroup
 	t.Cleanup(wg.Wait)
 	var verbErr, setErr error
 	wg.Go(func() { _, verbErr = svc.Do(ctx, "t-1", coretasks.Request{Verb: task.VerbNext}) })
-	<-g.held
-	wg.Go(func() { setErr = svc.SetProp(ctx, "t-1", "priority", task.Value{Text: "high"}, task.WriterWorkflow) })
-	close(g.open)
+	<-read
+	wg.Go(func() {
+		defer close(setDone)
+		setErr = svc.SetProp(ctx, "t-1", "priority", task.Value{Text: "high"}, task.WriterWorkflow)
+	})
 	wg.Wait()
 	if verbErr != nil || setErr != nil {
 		t.Fatalf("verb %v, set %v", verbErr, setErr)

@@ -39,10 +39,12 @@ type handlerKey struct {
 type Service struct {
 	d Deps
 	// mu serializes the service's read-modify-write of entries.
-	mu       sync.Mutex
-	reg      sync.RWMutex
-	handlers map[handlerKey]VerbHandler
-	views    map[task.View]viewSource
+	mu hookedMutex
+	// beforeApply, set by tests only, runs in Do between reading the task and writing it.
+	beforeApply func()
+	reg         sync.RWMutex
+	handlers    map[handlerKey]VerbHandler
+	views       map[task.View]viewSource
 }
 
 func New(d Deps) *Service {
@@ -114,6 +116,9 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 	}
 	if err != nil {
 		return Result{}, err
+	}
+	if s.beforeApply != nil {
+		s.beforeApply()
 	}
 	if err := s.d.Store.Apply(ctx, cs, verbEvents(e, req, now)...); err != nil {
 		return Result{}, err
