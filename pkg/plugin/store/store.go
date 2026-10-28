@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
 	_ "modernc.org/sqlite" // the SQLite driver
 )
@@ -37,13 +38,15 @@ type Migration struct {
 type Options struct {
 	Migrations []Migration
 	// Import copies what the plugin keeps from ImportSchema's tables, in the
-	// transaction that marks the import done; nil imports nothing.
+	// transaction that records the import in the store; nil imports nothing.
 	Import func(ctx context.Context, tx *sql.Tx) error
 }
 
 // Open opens dir's store, applies the migrations it lacks, then imports
-// dir's ImportFile once and renames it Imported. A failed migration or
-// import leaves the store as it was and the file in place.
+// dir's ImportFile once and renames it Imported. The store records the
+// import in the import's own transaction, so an ImportFile left in place by
+// a crash before the rename is renamed and never imported again. A failed
+// migration or import leaves the store as it was and the file in place.
 func Open(ctx context.Context, dir string, opts Options) (*sql.DB, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
@@ -100,11 +103,30 @@ func migrate(ctx context.Context, db *sql.DB, ms []Migration) error {
 	return nil
 }
 
+// importsTable records the import of ImportFile, in the store.
+const importsTable = "plugin_store_import"
+
 func importOnce(ctx context.Context, db *sql.DB, dir string, imp func(context.Context, *sql.Tx) error) error {
 	from := filepath.Join(dir, ImportFile)
 	if _, err := os.Stat(from); errors.Is(err, fs.ErrNotExist) || imp == nil {
 		return nil
 	}
+	if _, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS "+importsTable+" (file TEXT NOT NULL, at TEXT NOT NULL)"); err != nil {
+		return err
+	}
+	var done int
+	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM "+importsTable).Scan(&done); err != nil {
+		return err
+	}
+	if done == 0 {
+		if err := importFrom(ctx, db, from, imp); err != nil {
+			return err
+		}
+	}
+	return os.Rename(from, filepath.Join(dir, Imported))
+}
+
+func importFrom(ctx context.Context, db *sql.DB, from string, imp func(context.Context, *sql.Tx) error) error {
 	conn, err := db.Conn(ctx)
 	if err != nil {
 		return err
@@ -122,8 +144,9 @@ func importOnce(ctx context.Context, db *sql.DB, dir string, imp func(context.Co
 		_ = tx.Rollback()
 		return fmt.Errorf("store: importing %s: %w", from, err)
 	}
-	if err := tx.Commit(); err != nil {
+	if _, err := tx.ExecContext(ctx, "INSERT INTO "+importsTable+" (file, at) VALUES (?, ?)", ImportFile, time.Now().UTC().Format(time.RFC3339)); err != nil {
+		_ = tx.Rollback()
 		return err
 	}
-	return os.Rename(from, filepath.Join(dir, Imported))
+	return tx.Commit()
 }

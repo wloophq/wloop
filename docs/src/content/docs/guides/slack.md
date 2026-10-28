@@ -27,7 +27,7 @@ The manifest, also at [slack-app-manifest.yaml](/slack-app-manifest.yaml):
 In `config.toml`:
 
 ```toml
-[slack]
+[plugins.slack]
 client_id = "000000000000.000000000000"
 ```
 
@@ -48,11 +48,11 @@ Restart the daemon so it connects (on macOS, `launchctl kickstart -k gui/$(id -u
 By default, a message comes in when it mentions you, replies to you, sits in a thread you wrote in, or is in a DM. To widen it:
 
 ```toml
-[slack]
+[plugins.slack]
 client_id = "000000000000.000000000000"
 post_allowlist = ["C000", "U000"] # channel ids, or user ids for their DMs
 
-[slack.ingest]
+[plugins.slack.ingest]
 terms = ["api-outage", "billing"]
 allow_apps = ["B000"]
 ```

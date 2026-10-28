@@ -63,7 +63,7 @@ A draft goes out only once its approval policy lets it:
 
 A draft you write yourself (Save as draft on a task's page, Reply on a unit, see [Tasks and views](/concepts/tasks/), `outbox new`, or `slack send` to a thread) is `wait` too: Save to Outbox leaves it there, and Send now approves it right after proposing it, through the same publisher.
 
-Every bundled intent, workflow and rule uses `wait`. Your own intent or workflow can set another with a `[drafts.approval]` table, a workflow's drafts with `workflows.<name>.drafts.approval` in the configuration, and the drafts of a plugin's own rules (GitHub's nudge rule) with `<id>.drafts.approval`, such as `github.drafts.approval`. A turn's draft takes the `[drafts.approval]` of the workflow that started the turn, else its intent's, else `wait`; a workflow's own draft takes the workflow's, else `wait`. The configuration's `workflows.<name>.drafts.approval` is laid over that block.
+Every bundled intent, workflow and rule uses `wait`. Your own intent or workflow can set another with a `[drafts.approval]` table, a workflow's drafts with `workflows.<name>.drafts.approval` in the configuration, and the drafts of a plugin's own rules (GitHub's nudge rule) with `plugins.<id>.gates.approval`, such as `plugins.github.gates.approval`. A turn's draft takes the `[drafts.approval]` of the workflow that started the turn, else its intent's, else `wait`; a workflow's own draft takes the workflow's, else `wait`. The configuration's `workflows.<name>.drafts.approval` is laid over that block.
 
 A `[drafts.approval]` table holds a `mode` (`wait` when left out) and, before it, rules tried in order; the first whose `when` holds gives the draft's mode, and a draft no rule matches takes `mode`:
 

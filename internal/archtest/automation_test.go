@@ -86,8 +86,8 @@ var coreProviderAllowlist = []providerSite{
 	{"internal/cli/serve.go", "serveAllDeps", "unit.GitHub", 3, "debt: the daemon's wiring of the GitHub viewer and the forge"},
 	{"internal/cli/serve.go", "trackedBooks.Books", "unit.GitHub", 1, "debt: a carded pull request without a turn still gets an empty book, so its card stays"},
 	{"internal/cli/serve_payloads.go", "Env.payloadReaders", "unit.GitHub", 1, "debt: GitHub's payload reader, wired outside the plugin's Payload"},
-	{"internal/config/config.go", "Config.validateWorkflows", "unit.GitHub", 1, "debt: an intent's project settings read the pull request's turn facts, which go with the GitHub plugin"},
-	{"internal/config/config.go", "Config.ProjectSettingsFor", "unit.GitHub", 1, "debt: an intent's project settings read the pull request's turn facts, which go with the GitHub plugin"},
+	{"internal/config/config.go", "Config.validateWorkflows", "unit.GitHub", 1, "debt: an intent's project settings read the pull request's turn facts, which go with the GitHub plugin (X8c2)"},
+	{"internal/config/config.go", "Config.ProjectSettingsFor", "unit.GitHub", 1, "debt: an intent's project settings read the pull request's turn facts, which go with the GitHub plugin (X8c2)"},
 	{"internal/cli/storedfacts.go", "storedFacts.Facts", "unit.GitHub", 1, "debt: the stored facts of a pull request's turn"},
 	{"internal/meter/meter.go", "GitHub", `"github"`, 1, "the meter's resource of a GitHub API request, not a unit provider"},
 }

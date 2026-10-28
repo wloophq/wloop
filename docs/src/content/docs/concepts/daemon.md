@@ -36,7 +36,7 @@ The daemon's **inventory** is the set of pull requests it follows:
 - those you add with `{{command}} track <url>`.
 
 ```toml
-[github.scope]
+[plugins.github.scope]
 people = ["ana", "bruno"]
 teams = ["acme/backend"]
 repos = ["acme/api"]

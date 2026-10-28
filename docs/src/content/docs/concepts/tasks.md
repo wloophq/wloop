@@ -10,7 +10,7 @@ description: How what people ask of you becomes tasks, how the lists and project
 A **unit** is a thing work happens on: a pull request, a Slack thread, a DM topic. Units come from plugins. Two are compiled in: `github` (pull requests) and `slack` (threads and DM topics). Each can be turned off:
 
 ```toml
-[slack]
+[plugins.slack]
 enabled = false
 ```
 

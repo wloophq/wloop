@@ -82,7 +82,7 @@ time_varying = true
 [[source.facts]]
 name = "slack.ended"
 type = "bool"
-doc = "The Slack plugin's word that the unit has ended: a closure was posted or marked (unit.closed), or its newest stored message is older than slack.ended_after."
+doc = "The Slack plugin's word that the unit has ended: a closure was posted or marked (unit.closed), or its newest stored message is older than plugins.slack.ended_after."
 time_varying = true
 
 [[source.facts]]

@@ -73,3 +73,49 @@ func TestAFailedImportLeavesTheFile(t *testing.T) {
 		t.Errorf("the import file moved: %v", err)
 	}
 }
+
+func TestACrashBeforeTheRenameDoesNotImportTwice(t *testing.T) {
+	ctx := t.Context()
+	dir := t.TempDir()
+	exported, err := sql.Open("sqlite", filepath.Join(dir, store.ImportFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := exported.ExecContext(ctx, "CREATE TABLE things(name TEXT); INSERT INTO things VALUES ('ana')"); err != nil {
+		t.Fatal(err)
+	}
+	exported.Close()
+	done := filepath.Join(dir, store.Imported)
+	if err := os.Mkdir(done, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(done, "x"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	imports := 0
+	opts := store.Options{
+		Migrations: []store.Migration{{Version: 1, Up: exec("CREATE TABLE things(name TEXT)")}},
+		Import: func(ctx context.Context, tx *sql.Tx) error {
+			imports++
+			return exec("INSERT INTO things SELECT name FROM "+store.ImportSchema+".things")(ctx, tx)
+		},
+	}
+	if _, err := store.Open(ctx, dir, opts); err == nil {
+		t.Fatal("the planted crash: the rename was not refused")
+	}
+	if err := os.RemoveAll(done); err != nil {
+		t.Fatal(err)
+	}
+	db, err := store.Open(ctx, dir, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var n int
+	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM things").Scan(&n); err != nil || n != 1 || imports != 1 {
+		t.Errorf("things %d, imports %d, %v", n, imports, err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, store.ImportFile)); !os.IsNotExist(err) {
+		t.Errorf("the import file is left: %v", err)
+	}
+}

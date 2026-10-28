@@ -342,10 +342,10 @@ The first rule whose `match`, a glob over `<provider>:<key>`, matches gives the 
 projects_dir = "~/projects"
 profile = "mine"
 
-[github]
+[plugins.github]
 trusted_authors = ["github-actions[bot]"]
 
-[github.scope]
+[plugins.github.scope]
 teams = ["acme/backend"]
 repos = ["acme/api"]
 
