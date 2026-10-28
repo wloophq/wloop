@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/core/automation"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -74,12 +74,12 @@ func (w draftWithdrawals) Proposed(ctx context.Context, name string) ([]automati
 		}
 		subject := d.Unit
 		if d.Entry != "" {
-			subject = gtd.UnitOf(gtd.ID(d.Entry))
+			subject = task.UnitOf(task.ID(d.Entry))
 		}
 		pd := automation.ProposedDraft{ID: int64(d.ID), Workflow: d.Origin.Workflow, Subject: subject}
 		sub, err := w.d.subject(ctx, subject)
 		switch {
-		case err != nil && d.Entry != "" && errors.Is(err, coregtd.ErrNoEntry):
+		case err != nil && d.Entry != "" && errors.Is(err, coretasks.ErrNoEntry):
 			pd.Facts = workflow.Facts{"draft.person_waited": false, "draft.items_owed": 0, "draft.items_assigned": 0, "draft.unit_open": false}
 		case err != nil:
 			return nil, err

@@ -19,10 +19,10 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/workspaces"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
@@ -88,7 +88,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	for id, u := range d.Subjects {
 		providers[id] = u
 	}
-	codecs := []unit.Codec{pr.Codec{}, gtd.Codec{}}
+	codecs := []unit.Codec{pr.Codec{}, task.Codec{}}
 	for _, m := range d.Modules {
 		if m.Facts != nil {
 			providers[m.ID] = m.Facts

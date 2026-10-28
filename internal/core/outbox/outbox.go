@@ -13,8 +13,8 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -100,7 +100,7 @@ type ItemReader interface {
 type Results interface {
 	// AttachesPosts says whether the turns of intent attach their posts.
 	AttachesPosts(intent string) bool
-	Attach(ctx context.Context, entry gtd.ID, u unit.Unit) error
+	Attach(ctx context.Context, entry task.ID, u unit.Unit) error
 }
 
 type Service struct {
@@ -632,9 +632,9 @@ func (s *Service) attachPost(ctx context.Context, d draft.Draft) error {
 	if s.Results == nil || !slices.Contains(posts, d.Delivery) || d.Origin.Intent == "" {
 		return nil
 	}
-	id, ok := gtd.IDOf(d.Origin.Unit)
+	id, ok := task.IDOf(d.Origin.Unit)
 	posted := d.Unit
-	if onEntry, isEntry := gtd.IDOf(d.Unit); isEntry {
+	if onEntry, isEntry := task.IDOf(d.Unit); isEntry {
 		landed, found, err := s.landed(ctx, d)
 		if err != nil || !found {
 			return err

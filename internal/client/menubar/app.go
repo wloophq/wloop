@@ -17,7 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/rowset"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -93,7 +93,7 @@ type Controller struct {
 	sections  []api.MenubarSection
 	// plugins are the served plugins, read with the sections.
 	plugins  []api.Plugin
-	entries  map[gtd.View][]api.EntryView
+	entries  map[task.View][]api.EntryView
 	counters *api.Counters
 }
 
@@ -107,7 +107,7 @@ func New(cfg Config) *Controller {
 	if cfg.Log == nil {
 		cfg.Log = func(string, ...any) {}
 	}
-	c := &Controller{cfg: cfg, ctx: context.Background(), sent: map[string]bool{}, daily: map[string]bool{}, entries: map[gtd.View][]api.EntryView{}}
+	c := &Controller{cfg: cfg, ctx: context.Background(), sent: map[string]bool{}, daily: map[string]bool{}, entries: map[task.View][]api.EntryView{}}
 	cfg.Notifier.OnResponse(func(r Response) { c.Respond(c.runCtx(), r) })
 	c.loadSent()
 	return c
@@ -395,7 +395,7 @@ func (c *Controller) menu(h api.Health) []MenuItem {
 		items = append(items, MenuItem{Separator: true})
 	}
 	items = append(items,
-		MenuItem{Title: "Open cockpit", Enabled: true, Action: c.later(func(ctx context.Context) error { return c.open("view=" + string(gtd.ViewInbox)) })},
+		MenuItem{Title: "Open cockpit", Enabled: true, Action: c.later(func(ctx context.Context) error { return c.open("view=" + string(task.ViewInbox)) })},
 		MenuItem{Title: "Sweep now", Enabled: true, Action: c.later(func(ctx context.Context) error { return c.cfg.Daemon.Trigger(ctx, "sweep") })},
 	)
 	pause := MenuItem{Title: "Pause automatic rounds", Enabled: true, Action: c.later(func(ctx context.Context) error { return c.cfg.Daemon.SetPause(ctx, api.PauseRequest{Paused: true}) })}

@@ -8,8 +8,8 @@ import (
 
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -36,9 +36,9 @@ func TestRepeatAfterReadsTheConfigFact(t *testing.T) {
 func TestARunLeavingAPersonOnATimedHoldIsNotDone(t *testing.T) {
 	t.Parallel()
 	r := newDraftRig(t, draftWF("nudges", "purpose", "nudge", "items", "owed", "per", "person", "repeat_after", "24h"), "{{.Person.Key}}")
-	r.entries.m["e1"] = gtd.Entry{ID: "e1", Kind: gtd.KindWaiting, State: gtd.Waiting, Units: []unit.Unit{draftThread},
-		Items:   []gtd.ItemRef{{Unit: draftThread, Item: "i1"}, {Unit: draftThread, Item: "i2"}},
-		Waiting: &gtd.WaitingOn{On: []items.Person{ana, bob}}}
+	r.entries.m["e1"] = task.Entry{ID: "e1", Kind: task.KindWaiting, State: task.Waiting, Units: []unit.Unit{draftThread},
+		Items:   []task.ItemRef{{Unit: draftThread, Item: "i1"}, {Unit: draftThread, Item: "i2"}},
+		Waiting: &task.WaitingOn{On: []items.Person{ana, bob}}}
 	r.items.set(draftThread, openItem("i1", "The deck", r.now.Add(-96*time.Hour), ana), openItem("i2", "The budget", r.now.Add(-96*time.Hour), bob))
 	runErr := func() error {
 		_, err := r.s.Run(context.Background(), r.wf.Steps[0], draftEntry, workflow.Why{Workflow: r.wf.Name}, automation.RunOpts{})

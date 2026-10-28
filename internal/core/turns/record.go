@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/wloophq/wloop/internal/domain/gtd"
-	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"time"
+
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/task"
 
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -88,7 +89,7 @@ func (s *Service) recordEnd(ctx context.Context, r RecordRequest, byHeadless boo
 // attachResult attaches u to the entry of the turn's unit on; a failure is
 // logged, since the record is stored.
 func (s *Service) attachResult(ctx context.Context, on, u unit.Unit) {
-	id, _ := gtd.IDOf(on)
+	id, _ := task.IDOf(on)
 	if err := s.Results.Attach(ctx, id, u); err != nil {
 		s.logf("turn result %s on %s: %v", u, on, err)
 	}
@@ -100,7 +101,7 @@ func (s *Service) resultOf(u unit.Unit, rules dintent.RecordRules, rec record.Re
 	if s.Results == nil || !rules.AttachURL || rec.State != record.Done || rec.Outcome == nil || rec.Outcome.URL == "" {
 		return unit.Unit{}
 	}
-	if _, ok := gtd.IDOf(u); !ok {
+	if _, ok := task.IDOf(u); !ok {
 		return unit.Unit{}
 	}
 	got, _ := s.Results.UnitOf(rec.Outcome.URL)

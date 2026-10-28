@@ -6,16 +6,16 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/dossiers"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/dossier"
 )
 
 // serveProjects runs the project verbs and the weekly Review on g, the projects' dossiers kept by ds.
-func serveProjects(g *coregtd.Service, db *sqlite.DB, ds *dossiers.Service) {
+func serveProjects(g *coretasks.Service, db *sqlite.DB, ds *dossiers.Service) {
 	if g == nil || db == nil {
 		return
 	}
-	d := coregtd.ProjectDeps{Store: db.Projects()}
+	d := coretasks.ProjectDeps{Store: db.Projects()}
 	if ds != nil {
 		d.Dossiers = projectDossiers{ds}
 	}

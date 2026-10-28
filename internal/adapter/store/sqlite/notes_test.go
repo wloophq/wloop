@@ -17,10 +17,10 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/port"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	dusage "github.com/wloophq/wloop/internal/domain/usage"
@@ -272,8 +272,8 @@ var writes = []writeCase{
 	{
 		method: "entryStore.Apply",
 		call: func(ctx context.Context, e *noteEnv) error {
-			return e.db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpCreate, Entry: gtd.Entry{ID: "e-1", Kind: gtd.KindCapture,
-				State: gtd.Inbox, Units: []unit.Unit{u7}, Origin: gtd.OriginUser, Created: noteAt, Updated: noteAt}}})
+			return e.db.Entries().Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: task.Entry{ID: "e-1", Kind: task.KindCapture,
+				State: task.Inbox, Units: []unit.Unit{u7}, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}})
 		},
 		topics: port.TopicEntries, units: []unit.Unit{u7},
 	},

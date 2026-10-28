@@ -20,12 +20,12 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
-	"github.com/wloophq/wloop/internal/core/gtd/gtdtest"
 	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/messages/messagestest"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
@@ -1177,7 +1177,7 @@ type turnRig struct {
 	reg      *turnstest.Registry
 	launcher *fakeLauncher
 	msgs     *messagestest.Store
-	entries  *gtdtest.Store
+	entries  *taskstest.Store
 	facts    enabledUnits
 }
 
@@ -1190,9 +1190,9 @@ func newTurnRig(t *testing.T) *turnRig {
 		reg: turnstest.NewRegistry(turnstest.Strict(t)), launcher: &fakeLauncher{loopMu: s.deps.LoopMu}}
 	s.deps.Turns = &turns.Service{Intents: turnstest.Intents(), Store: r.store, Registry: r.reg, Sessions: r.sessions, Launcher: r.launcher,
 		Clock: fixedClock(s.deps.Now()), Command: brand.Command}
-	r.msgs, r.entries, r.facts = messagestest.New(), gtdtest.New(), enabledUnits{map[unit.ProviderID]bool{}}
+	r.msgs, r.entries, r.facts = messagestest.New(), taskstest.New(), enabledUnits{map[unit.ProviderID]bool{}}
 	clock := fixedClock(s.deps.Now())
-	s.deps.GTD = coregtd.New(coregtd.Deps{Store: r.entries, Items: itemsNone{}, Facts: r.facts, Clock: clock})
+	s.deps.GTD = coretasks.New(coretasks.Deps{Store: r.entries, Items: itemsNone{}, Facts: r.facts, Clock: clock})
 	s.deps.Messages = &messages.Service{Store: r.msgs, Books: r.store, Turns: s.deps.Turns, Entries: s.deps.GTD, Intents: turnstest.Intents(), Clock: clock}
 	return r
 }

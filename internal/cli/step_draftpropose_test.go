@@ -17,12 +17,12 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/source"
@@ -38,15 +38,15 @@ var (
 
 type memEntries struct {
 	mu sync.Mutex
-	m  map[gtd.ID]gtd.Entry
+	m  map[task.ID]task.Entry
 }
 
-func (m *memEntries) Entry(_ context.Context, id gtd.ID) (gtd.Entry, error) {
+func (m *memEntries) Entry(_ context.Context, id task.ID) (task.Entry, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	e, ok := m.m[id]
 	if !ok {
-		return gtd.Entry{}, fmt.Errorf("entry %s: %w", id, coregtd.ErrNoEntry)
+		return task.Entry{}, fmt.Errorf("entry %s: %w", id, coretasks.ErrNoEntry)
 	}
 	return e, nil
 }
@@ -114,7 +114,7 @@ func newDraftRig(t *testing.T, wf workflow.Workflow, text string) *draftRig {
 		}
 	}
 	r := &draftRig{t: t, db: db, wf: wf, cfg: te.cfg, now: time.Date(2026, 10, 14, 15, 0, 0, 0, time.UTC),
-		entries: &memEntries{m: map[gtd.ID]gtd.Entry{}}, items: &memItems{m: map[unit.Unit][]items.Item{}}, units: automationtest.NewUnits()}
+		entries: &memEntries{m: map[task.ID]task.Entry{}}, items: &memItems{m: map[unit.Unit][]items.Item{}}, units: automationtest.NewUnits()}
 	r.cfg.Profile = dir
 	clock := clockFunc(func() time.Time { return r.now })
 	r.svc = &outbox.Service{Store: countingDrafts{Store: db.Drafts(), n: &r.writes}, Clock: clock,
@@ -212,9 +212,9 @@ func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 	wf := draftWF("nudges", "purpose", "nudge", "items", "owed", "per", "person", "repeat_after", "24h")
 	wf.Steps[0].Args["effects"] = []any{"entry.nudged"}
 	r := newDraftRig(t, wf, "@{{\"{\"}}{{.Person.Key}}{{\"}\"}}, any news?{{range .Items}}\n- {{.Line}}{{end}}")
-	r.entries.m["e1"] = gtd.Entry{ID: "e1", Kind: gtd.KindWaiting, State: gtd.Waiting, Units: []unit.Unit{draftThread},
-		Items:   []gtd.ItemRef{{Unit: draftThread, Item: "i1"}, {Unit: draftThread, Item: "i2"}},
-		Waiting: &gtd.WaitingOn{On: []items.Person{ana, bob}}}
+	r.entries.m["e1"] = task.Entry{ID: "e1", Kind: task.KindWaiting, State: task.Waiting, Units: []unit.Unit{draftThread},
+		Items:   []task.ItemRef{{Unit: draftThread, Item: "i1"}, {Unit: draftThread, Item: "i2"}},
+		Waiting: &task.WaitingOn{On: []items.Person{ana, bob}}}
 	r.items.set(draftThread, openItem("i1", "The deck", r.now.Add(-96*time.Hour), ana), openItem("i2", "The budget", r.now.Add(-96*time.Hour), bob))
 	r.run(draftEntry)
 	ds := r.drafts()
@@ -379,12 +379,12 @@ func TestUnitClosedClosesTheEntryAndUnwatchesAfterWarmFor(t *testing.T) {
 		draftThread: {Verdict: "needs_closure", StartedByViewer: true, Watched: true, At: now}}}); err != nil {
 		t.Fatal(err)
 	}
-	closeOf := func(closed bool) []gtd.Change {
+	closeOf := func(closed bool) []task.Change {
 		done := items.Item{ID: "i1", Unit: draftThread, State: items.Resolved, Requester: ana}
-		f := gtd.UnitFacts{Unit: draftThread, StartedByMe: true, ClosurePosted: closed}
-		return gtd.Reconcile(f, []items.Item{done}, gtd.Me{Keys: []string{ana.Key}}, nil, now)
+		f := task.UnitFacts{Unit: draftThread, StartedByMe: true, ClosurePosted: closed}
+		return task.Reconcile(f, []items.Item{done}, task.Me{Keys: []string{ana.Key}}, nil, now)
 	}
-	if cs := closeOf(false); len(cs) != 1 || cs[0].Entry.Kind != gtd.KindClose {
+	if cs := closeOf(false); len(cs) != 1 || cs[0].Entry.Kind != task.KindClose {
 		t.Fatalf("no close entry before the closure: %+v", cs)
 	}
 	plain, err := svc.Propose(ctx, outbox.Proposal{Unit: draftThread, Kind: draft.Close, Text: "Closing.", Origin: draft.Origin{Kind: draft.OriginUser}})

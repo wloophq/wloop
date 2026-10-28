@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/messages"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -31,7 +31,7 @@ func TestAskedRecordBecomesAMessage(t *testing.T) {
 		t.Fatalf("message %+v", m)
 	}
 	e := r.entry(t, m.EntryID)
-	if e.Kind != gtd.KindMessage || e.State != gtd.Inbox || e.Origin != gtd.OriginMessage || e.Title != q.Text || !slices.Equal(e.Units, []unit.Unit{r7}) {
+	if e.Kind != task.KindMessage || e.State != task.Inbox || e.Origin != task.OriginMessage || e.Title != q.Text || !slices.Equal(e.Units, []unit.Unit{r7}) {
 		t.Fatalf("entry %+v", e)
 	}
 
@@ -56,13 +56,13 @@ func TestAskedTurnIsOneEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	var questions []gtd.Entry
+	var questions []task.Entry
 	for _, e := range r.inbox(t) {
-		if e.Kind == gtd.KindMessage {
+		if e.Kind == task.KindMessage {
 			questions = append(questions, e)
 		}
 	}
-	if len(questions) != 1 || questions[0].ID != gtd.ID(r.only(t).EntryID) {
+	if len(questions) != 1 || questions[0].ID != task.ID(r.only(t).EntryID) {
 		t.Fatalf("question entries %+v", questions)
 	}
 }
@@ -111,27 +111,27 @@ func TestTurnEventsCloseTheMessage(t *testing.T) {
 		event  func(t *testing.T, r *rig)
 		state  message.State
 		answer string
-		entry  gtd.State
+		entry  task.State
 	}{
 		{"answered", func(t *testing.T, r *rig) {
 			r.live()
 			if _, err := r.turns.Answer(context.Background(), turns.AnswerRequest{Unit: r7, OptionID: "publish", Source: turn.Cockpit}); err != nil {
 				t.Fatal(err)
 			}
-		}, message.Answered, "Publish (option publish)", gtd.Done},
+		}, message.Answered, "Publish (option publish)", task.Done},
 		{"question_dismissed", func(t *testing.T, r *rig) {
 			if err := r.turns.Dismiss(context.Background(), r7); err != nil {
 				t.Fatal(err)
 			}
-		}, message.Dismissed, "", gtd.Trash},
+		}, message.Dismissed, "", task.Trash},
 		{"replaced", func(t *testing.T, r *rig) {
 			b := r.book(t, r7)
 			b.Send(turn.Turn{Intent: b.Turns[0].Intent, ID: "def", Trigger: turn.ByHand, SentTo: "term_2", SentAt: r.clock.Now()})
 			r.books.Put(b)
-		}, message.Superseded, "", gtd.Trash},
+		}, message.Superseded, "", task.Trash},
 		{"done", func(t *testing.T, r *rig) {
 			r.record(t, r7, 1, record.Record{State: record.Done, Summary: "published", Outcome: &record.Outcome{Verdict: "APPROVE", URL: "https://example.com/r"}})
-		}, message.Superseded, "", gtd.Trash},
+		}, message.Superseded, "", task.Trash},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			r := newRig(t)
@@ -221,7 +221,7 @@ func TestDismissingAQuestionMessageDismissesTheTurn(t *testing.T) {
 	if b := r.book(t, r7); b.Turns[0].State != turn.Dismissed {
 		t.Fatalf("turn %s", b.Turns[0].State)
 	}
-	if got := r.message(t, m.ID); got.State != message.Dismissed || r.entry(t, m.EntryID).State != gtd.Trash {
+	if got := r.message(t, m.ID); got.State != message.Dismissed || r.entry(t, m.EntryID).State != task.Trash {
 		t.Fatalf("message %+v", got)
 	}
 	if err := r.svc.Dismiss(context.Background(), m.ID); !errors.Is(err, messages.ErrClosed) {
@@ -289,7 +289,7 @@ func TestAgentPostAnswerRouting(t *testing.T) {
 				t.Fatalf("book %+v %+v", b.Answers, b.Turns)
 			}
 			closed := r.message(t, m.ID)
-			if closed.State != message.Answered || closed.Answer != "Old column (option old). and drop the index" || r.entry(t, m.EntryID).State != gtd.Done {
+			if closed.State != message.Answered || closed.Answer != "Old column (option old). and drop the index" || r.entry(t, m.EntryID).State != task.Done {
 				t.Fatalf("message %+v", closed)
 			}
 			if c.route == turn.Queued {
@@ -376,7 +376,7 @@ func TestLedgerProposalBecomesAMessage(t *testing.T) {
 		len(m.Options) != 2 || m.Options[0].ID != messages.OptionAccept || m.Options[1].ID != messages.OptionReject {
 		t.Fatalf("message %+v", m)
 	}
-	if e := r.entry(t, m.EntryID); e.Kind != gtd.KindMessage || e.State != gtd.Inbox {
+	if e := r.entry(t, m.EntryID); e.Kind != task.KindMessage || e.State != task.Inbox {
 		t.Fatalf("entry %+v", e)
 	}
 	if n := len(r.inbox(t)); n != 1 {
@@ -404,7 +404,7 @@ func TestAcceptingAProposalDecidesIt(t *testing.T) {
 		if !slices.Equal(r.ledger.decided, []decision{{4, c.accept}}) {
 			t.Fatalf("decided %+v", r.ledger.decided)
 		}
-		if got := r.message(t, m.ID); got.State != message.Answered || got.Answer != c.answer.OptionID || r.entry(t, m.EntryID).State != gtd.Done {
+		if got := r.message(t, m.ID); got.State != message.Answered || got.Answer != c.answer.OptionID || r.entry(t, m.EntryID).State != task.Done {
 			t.Fatalf("message %+v", got)
 		}
 	}
@@ -424,7 +424,7 @@ func TestDecidedProposalClosesItsMessage(t *testing.T) {
 	if err := r.svc.ReconcileProposals(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.message(t, m.ID); got.State != message.Answered || got.Answer != messages.OptionAccept || r.entry(t, m.EntryID).State != gtd.Done {
+	if got := r.message(t, m.ID); got.State != message.Answered || got.Answer != messages.OptionAccept || r.entry(t, m.EntryID).State != task.Done {
 		t.Fatalf("message %+v", got)
 	}
 }
@@ -459,7 +459,7 @@ func TestProposeDedupesAndAttaches(t *testing.T) {
 	if _, err := r.svc.Answer(ctx, attached.ID, messages.Answer{Text: "yes, close it"}); err != nil {
 		t.Fatal(err)
 	}
-	if len(answered) != 1 || r.entry(t, string(capture.ID)).State != gtd.Inbox {
+	if len(answered) != 1 || r.entry(t, string(capture.ID)).State != task.Inbox {
 		t.Fatalf("answered %+v; an attached entry another owner holds was closed", answered)
 	}
 	if _, err := r.svc.Propose(ctx, messages.ProposeRequest{Unit: r7, Text: "x", Origin: message.Origin{Kind: message.OriginLedger}}); err == nil {
@@ -477,7 +477,7 @@ func TestDisabledPluginKeepsTheMessageOpen(t *testing.T) {
 	if err := r.svc.Reconcile(context.Background(), r7); err == nil {
 		t.Fatal("closing the entry of a disabled plugin did not fail")
 	}
-	if got := r.message(t, m.ID); got.State != message.Open || r.entry(t, m.EntryID).State != gtd.Inbox {
+	if got := r.message(t, m.ID); got.State != message.Open || r.entry(t, m.EntryID).State != task.Inbox {
 		t.Fatalf("message %+v", got)
 	}
 	r.facts.off[unit.GitHub] = false
@@ -520,7 +520,7 @@ func TestAnAgentPostClosesWhenItsTurnEnds(t *testing.T) {
 	r.record(t, r7, 1, askedRecord(question()))
 	r.reconcile(t, r7)
 	got := r.message(t, p.ID)
-	if got.State != message.Superseded || r.entry(t, p.EntryID).State != gtd.Trash {
+	if got.State != message.Superseded || r.entry(t, p.EntryID).State != task.Trash {
 		t.Fatalf("the post of an ended turn is %+v", got)
 	}
 	if _, err := r.svc.Answer(ctx, p.ID, messages.Answer{Text: "old"}); !errors.Is(err, messages.ErrClosed) {
@@ -562,7 +562,7 @@ func TestReaskRetitlesTheEntry(t *testing.T) {
 	r.asked(t, r7)
 	r.reconcile(t, r7)
 	first := r.only(t)
-	page, err := r.entries.EntriesSince(ctx, gtd.Query{View: gtd.ViewInbox}, coregtd.Since{})
+	page, err := r.entries.EntriesSince(ctx, task.Query{View: task.ViewInbox}, coretasks.Since{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -573,7 +573,7 @@ func TestReaskRetitlesTheEntry(t *testing.T) {
 	if e := r.entry(t, first.EntryID); e.Title != again.Text {
 		t.Fatalf("entry title %q", e.Title)
 	}
-	next, err := r.entries.EntriesSince(ctx, gtd.Query{View: gtd.ViewInbox}, coregtd.Since{Epoch: page.Epoch, Rev: page.Rev})
+	next, err := r.entries.EntriesSince(ctx, task.Query{View: task.ViewInbox}, coretasks.Since{Epoch: page.Epoch, Rev: page.Rev})
 	if err != nil || next.Full || len(next.Entries) != 1 || next.Entries[0].Title != again.Text {
 		t.Fatalf("page %+v %v", next, err)
 	}
@@ -627,7 +627,7 @@ type failingRetitle struct {
 	fail bool
 }
 
-func (f *failingRetitle) Retitle(ctx context.Context, id gtd.ID, title string) error {
+func (f *failingRetitle) Retitle(ctx context.Context, id task.ID, title string) error {
 	if f.fail {
 		f.fail = false
 		return errors.New("store busy")

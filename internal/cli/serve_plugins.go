@@ -11,7 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/daemon"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -52,7 +52,7 @@ func buildSources(ps []source.Plugin, cfg config.Config, sd source.Deps) ([]sour
 // streams, jobs and health run in the daemon; Track reads a unit through
 // its source.
 func withSources(d daemon.Deps, ps []source.Plugin, mods []source.Module) daemon.Deps {
-	codecs := []unit.Codec{dturn.SessionCodec{}, wsdomain.Codec{}, gtd.Codec{}}
+	codecs := []unit.Codec{dturn.SessionCodec{}, wsdomain.Codec{}, task.Codec{}}
 	for _, p := range ps {
 		codecs = append(codecs, p.Codec)
 	}

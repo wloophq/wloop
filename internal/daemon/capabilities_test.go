@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -68,7 +68,7 @@ func TestTheDaemonAsksCapabilitiesNotProviderIDs(t *testing.T) {
 func TestASessionOnAUnitWithItsOwnCheckoutAsksNoPlacer(t *testing.T) {
 	t.Parallel()
 	r, _, _ := newDelegateRig(t)
-	r.put(t, unitEntry("e-a", gtd.KindAction, actThread))
+	r.put(t, unitEntry("e-a", task.KindAction, actThread))
 	r.s.deps.Placer = placerFunc(func(unit.Unit) (string, error) { return "", errors.New("no workspace manager is enabled") })
 	modes := func() []api.RunnerState {
 		var v api.EntryView

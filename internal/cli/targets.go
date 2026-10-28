@@ -6,8 +6,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -53,11 +53,11 @@ func resolveTarget(ctx context.Context, arg string, providers []unit.ProviderID,
 // explicitEntry is the GTD entry arg names as entry:<id>, the only way an
 // argument names one.
 func explicitEntry(arg string) (unit.Unit, bool) {
-	key, ok := strings.CutPrefix(arg, string(gtd.Codec{}.Provider())+":")
-	if !ok || (gtd.Codec{}).Valid(key) != nil {
+	key, ok := strings.CutPrefix(arg, string(task.Codec{}.Provider())+":")
+	if !ok || (task.Codec{}).Valid(key) != nil {
 		return unit.Unit{}, false
 	}
-	return gtd.UnitOf(gtd.ID(key)), true
+	return task.UnitOf(task.ID(key)), true
 }
 
 // pluginCodecs are the codecs of the compiled-in plugins.

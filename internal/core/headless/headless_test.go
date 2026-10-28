@@ -12,21 +12,21 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
-	"github.com/wloophq/wloop/internal/core/gtd/gtdtest"
 	"github.com/wloophq/wloop/internal/core/headless"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/messages/messagestest"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	dusage "github.com/wloophq/wloop/internal/domain/usage"
@@ -462,12 +462,12 @@ func TestHeadlessDailyCap(t *testing.T) {
 
 type facts struct{}
 
-func (facts) UnitFacts(_ context.Context, u unit.Unit) (gtd.UnitFacts, bool, error) {
-	return gtd.UnitFacts{Unit: u}, true, nil
+func (facts) UnitFacts(_ context.Context, u unit.Unit) (task.UnitFacts, bool, error) {
+	return task.UnitFacts{Unit: u}, true, nil
 }
 
 func (r *rig) inbox() *messages.Service {
-	g := coregtd.New(coregtd.Deps{Store: gtdtest.New(), Items: r.ledger, Facts: facts{}, Clock: r.clock, StaleWaitingDays: 2})
+	g := coretasks.New(coretasks.Deps{Store: taskstest.New(), Items: r.ledger, Facts: facts{}, Clock: r.clock, StaleWaitingDays: 2})
 	return &messages.Service{Store: messagestest.New(), Books: r.store, Turns: r.turns, Entries: g, Intents: turnstest.Intents(), Clock: r.clock}
 }
 

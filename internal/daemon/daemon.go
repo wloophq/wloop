@@ -32,13 +32,13 @@ import (
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/change"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/ingest"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
 	coreusage "github.com/wloophq/wloop/internal/core/usage"
 	coreviews "github.com/wloophq/wloop/internal/core/views"
@@ -301,7 +301,7 @@ type Deps struct {
 	CardsJob CardsJob
 	// GTD is the entries service; nil answers 503 to the entries routes and runs no Sync. Messages are the
 	// Inbox messages, whose entries' verbs it registers on GTD.
-	GTD      *coregtd.Service
+	GTD      *coretasks.Service
 	Messages *messages.Service
 	// Drafts are the outbox's drafts the notifications read; nil: no draft notifies.
 	Drafts Drafts

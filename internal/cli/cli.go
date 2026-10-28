@@ -29,7 +29,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/dossiers"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/intake"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/messages"
@@ -37,6 +36,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/setup"
 	coresweep "github.com/wloophq/wloop/internal/core/sweep"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
 	coreusage "github.com/wloophq/wloop/internal/core/usage"
 	"github.com/wloophq/wloop/internal/core/views"
@@ -199,7 +199,7 @@ type Env struct {
 	items *coreitems.Ledger
 	// gtd and messages are the daemon's entries and Inbox messages, built once per daemon; gtdMe is the
 	// user's identity the entries reconcile with.
-	gtd   *coregtd.Service
+	gtd   *coretasks.Service
 	gtdMe *identity
 	// pluginsOff holds the plugins the daemon serves disabled, by config or build; empty until serveGTD.
 	pluginsOff *atomic.Pointer[[]unit.ProviderID]

@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -39,7 +39,7 @@ type Source struct {
 type Job struct {
 	Outbox Outbox
 	// Facts reads a unit's card facts; a plugin rule's draft on a unit whose closure is posted is withdrawn. nil: none.
-	Facts   coregtd.Facts
+	Facts   coretasks.Facts
 	Sources []Source
 	// Enabled says whether a provider's plugin is enabled; nil: every one is.
 	Enabled func(unit.ProviderID) bool

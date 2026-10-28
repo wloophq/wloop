@@ -7,15 +7,15 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/source"
 )
 
-// effectNudges stamps a sent nudge on its waiting entries (*coregtd.Service).
+// effectNudges stamps a sent nudge on its waiting entries (*coretasks.Service).
 type effectNudges interface {
-	Nudged(ctx context.Context, ids []gtd.ID, u unit.Unit, at time.Time) error
+	Nudged(ctx context.Context, ids []task.ID, u unit.Unit, at time.Time) error
 }
 
 // effectDeps are what the draft effects act through.
@@ -47,9 +47,9 @@ func (d effectDeps) entryNudged(ctx context.Context, dr draft.Draft) error {
 	if d.Nudges == nil {
 		return nil
 	}
-	var ids []gtd.ID
+	var ids []task.ID
 	if dr.Entry != "" {
-		ids = []gtd.ID{gtd.ID(dr.Entry)}
+		ids = []task.ID{task.ID(dr.Entry)}
 	}
 	at := dr.Evidence.At
 	if at.IsZero() {

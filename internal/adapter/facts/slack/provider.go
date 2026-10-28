@@ -18,9 +18,9 @@ import (
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -50,7 +50,7 @@ func New(db *sqlite.DB, clock port.Clock, endedAfter time.Duration) *Provider {
 
 // List is every Slack unit a live entry is attached to, in unit order.
 func (p *Provider) List(ctx context.Context, _ unit.ProviderID) ([]unit.Unit, error) {
-	es, err := p.db.Entries().Entries(ctx, gtd.Query{View: gtd.ViewOpen})
+	es, err := p.db.Entries().Entries(ctx, task.Query{View: task.ViewOpen})
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (p *Provider) keepDue(ctx context.Context, units []unit.Unit) error {
 			if !unowned(it) || it.CreatedAt.IsZero() {
 				continue
 			}
-			if at := gtd.AddWorkdays(it.CreatedAt, 1, now.Location()); at.After(now) && (due.IsZero() || at.Before(due)) {
+			if at := task.AddWorkdays(it.CreatedAt, 1, now.Location()); at.After(now) && (due.IsZero() || at.Before(due)) {
 				due = at
 			}
 		}
@@ -155,7 +155,7 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 		"slack.started_by_me":          st.StartedByViewer,
 		"slack.closure_posted":         st.ClosurePosted || st.ClosureMarked,
 		"slack.ended":                  st.ClosurePosted || st.ClosureMarked || p.quiet(newest, now),
-		"slack.live_entry":             slices.ContainsFunc(es, func(e gtd.Entry) bool { return liveOn(e, u) }),
+		"slack.live_entry":             slices.ContainsFunc(es, func(e task.Entry) bool { return liveOn(e, u) }),
 		"slack.items_open":             open,
 		"slack.items_unowned":          orphans,
 		"slack.items_unowned_age_days": age,
@@ -172,7 +172,7 @@ func (p *Provider) quiet(newest string, now time.Time) bool {
 }
 
 // liveOn says whether e is a live, unmuted entry attached to u.
-func liveOn(e gtd.Entry, u unit.Unit) bool {
+func liveOn(e task.Entry, u unit.Unit) bool {
 	return e.Live() && !e.Snooze.Mute && slices.Contains(e.Units, u)
 }
 
@@ -249,7 +249,7 @@ func later(a, b time.Time) time.Time {
 // no later than now.
 func workdaysSince(since, now time.Time, loc *time.Location) int {
 	n := 0
-	for !gtd.AddWorkdays(since, n+1, loc).After(now) {
+	for !task.AddWorkdays(since, n+1, loc).After(now) {
 		n++
 	}
 	return n

@@ -16,8 +16,8 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -34,7 +34,7 @@ type posted struct {
 
 // draftButtons are the only buttons a draft's notification offers: a draft
 // is approved where its whole text shows.
-var draftButtons = []string{"open", "gtd:" + string(gtd.VerbDismiss)}
+var draftButtons = []string{"open", "gtd:" + string(task.VerbDismiss)}
 
 // notify posts the attention of the entries that are new, and withdraws the
 // notifications of entries that left the Inbox and of drafts that left the
@@ -178,7 +178,7 @@ func routeOf(cat Category, entry string) string {
 	case api.CategoryNote:
 		return entry
 	case api.CategoryDigest:
-		return "view=" + string(gtd.ViewNext)
+		return "view=" + string(task.ViewNext)
 	}
 	return entryRoute(entry)
 }
@@ -202,7 +202,7 @@ func (c *Controller) answer(ctx context.Context, r Response, entry string) error
 	if r.No {
 		args["no"] = "true"
 	}
-	res, err := c.cfg.Daemon.EntryDo(ctx, entry, string(gtd.VerbAnswer), api.EntryRequest{Args: args, Source: AnswerSource})
+	res, err := c.cfg.Daemon.EntryDo(ctx, entry, string(task.VerbAnswer), api.EntryRequest{Args: args, Source: AnswerSource})
 	if err != nil {
 		c.notifyNote(r.ID, entry, "Answer not sent", err.Error())
 		return err
@@ -317,7 +317,7 @@ func (c *Controller) notifyNote(id, entry, title, body string) {
 
 // postNotice posts what a workflow's notify.self raised; it opens its unit.
 func (c *Controller) postNotice(n api.Notice) {
-	route := "view=" + string(gtd.ViewInbox)
+	route := "view=" + string(task.ViewInbox)
 	if !n.Unit.IsZero() {
 		route = unitRoute(n.Unit)
 	}

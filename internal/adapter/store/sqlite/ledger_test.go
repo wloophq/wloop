@@ -3,13 +3,14 @@ package sqlite
 import (
 	"context"
 	"encoding/json"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"maps"
 	"path/filepath"
 	"slices"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/wloophq/wloop/internal/domain/task"
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
@@ -638,8 +639,8 @@ func TestRetentionPrunesClassificationsAndFetches(t *testing.T) {
 func TestRetentionPrunesVerbEvents(t *testing.T) {
 	t.Parallel()
 	db, _ := openTemp(t)
-	event_(t, db, "entry", "e-1", gtd.VerbEventKind(gtd.VerbDone), "", past)
-	event_(t, db, "entry", "e-2", gtd.VerbEventKind(gtd.VerbNext), "", recent)
+	event_(t, db, "entry", "e-1", task.VerbEventKind(task.VerbDone), "", past)
+	event_(t, db, "entry", "e-2", task.VerbEventKind(task.VerbNext), "", recent)
 	event_(t, db, "entry", "e-3", "intake_guidance", "", past)
 
 	got := retain(t, db, DefaultRetention)

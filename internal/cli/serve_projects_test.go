@@ -10,10 +10,10 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/dossier"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -49,7 +49,7 @@ func TestProjectDossierOnDisk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := g.Do(ctx, capture.ID, coregtd.Request{Verb: gtd.VerbProject, Args: map[string]string{"title": "Ship the v2 API"}})
+	res, err := g.Do(ctx, capture.ID, coretasks.Request{Verb: task.VerbProject, Args: map[string]string{"title": "Ship the v2 API"}})
 	if err != nil || len(res.Lines) > 0 {
 		t.Fatalf("project: %+v %v", res, err)
 	}
@@ -72,7 +72,7 @@ func TestProjectDossierOnDisk(t *testing.T) {
 	if archived, _, err := ds.Sweep(ctx); err != nil || archived != 0 {
 		t.Fatalf("an open project's dossier swept: %d %v", archived, err)
 	}
-	if _, err := g.Do(ctx, res.Entry.Project, coregtd.Request{Verb: gtd.VerbDone}); err != nil {
+	if _, err := g.Do(ctx, res.Entry.Project, coretasks.Request{Verb: task.VerbDone}); err != nil {
 		t.Fatal(err)
 	}
 	d, ok, err := ds.Get(ctx, dossier.Owner{Project: "ship-the-v2-api"})

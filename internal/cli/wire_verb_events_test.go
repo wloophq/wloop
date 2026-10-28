@@ -8,8 +8,8 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/core/change"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -48,14 +48,14 @@ func TestAVerbAPersonRunsPlansItsWorkflow(t *testing.T) {
 	if err := db.Events().Advance(ctx, "my-done", 0, time.Time{}); err != nil {
 		t.Fatal(err)
 	}
-	g := coregtd.New(coregtd.Deps{Store: db.Entries(), Facts: coregtd.CardFacts{Cards: db.Cards()}, Clock: clockFunc(func() time.Time { return te.Now() })})
+	g := coretasks.New(coretasks.Deps{Store: db.Entries(), Facts: coretasks.CardFacts{Cards: db.Cards()}, Clock: clockFunc(func() time.Time { return te.Now() })})
 	at := testNow.Add(-time.Hour)
-	if err := db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpCreate, Entry: gtd.Entry{ID: "e-01", Kind: gtd.KindCapture, State: gtd.Next,
-		Title: "Ship it", Origin: gtd.OriginUser, Created: at, Updated: at}}}); err != nil {
+	if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: task.Entry{ID: "e-01", Kind: task.KindCapture, State: task.Next,
+		Title: "Ship it", Origin: task.OriginUser, Created: at, Updated: at}}}); err != nil {
 		t.Fatal(err)
 	}
-	for _, v := range []gtd.Verb{gtd.VerbDone, gtd.VerbReference, gtd.VerbDone} {
-		if _, err := g.Do(ctx, "e-01", coregtd.Request{Verb: v, Source: "cockpit"}); err != nil {
+	for _, v := range []task.Verb{task.VerbDone, task.VerbReference, task.VerbDone} {
+		if _, err := g.Do(ctx, "e-01", coretasks.Request{Verb: v, Source: "cockpit"}); err != nil {
 			t.Fatalf("%s: %v", v, err)
 		}
 	}
@@ -69,7 +69,7 @@ func TestAVerbAPersonRunsPlansItsWorkflow(t *testing.T) {
 	}
 	var left []string
 	for _, it := range p.Items {
-		if it.Workflow == "my-done" && it.Unit == gtd.UnitOf("e-01") && it.Why.Event != nil {
+		if it.Workflow == "my-done" && it.Unit == task.UnitOf("e-01") && it.Why.Event != nil {
 			left = append(left, it.Why.Event.Data)
 		}
 	}

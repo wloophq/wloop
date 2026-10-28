@@ -7,10 +7,10 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/proposals"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/meter"
@@ -55,7 +55,7 @@ func (e *Env) proposalsJob(db *sqlite.DB, cfg config.Config, mods []source.Modul
 	enabled := func(p unit.ProviderID) bool { return cfg.PluginEnabled(string(p)) }
 	return &proposals.Job{
 		Outbox: svc, Sources: srcs, Enabled: enabled,
-		Facts:       coregtd.CardFacts{Cards: db.Cards(), Enabled: enabled},
+		Facts:       coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled},
 		Approval:    func(p unit.ProviderID) draft.Approval { return cfg.PluginDraftApproval(string(p)) },
 		RepeatAfter: repeatAfter,
 		Clock:       clockFunc(e.Now), Log: logf,

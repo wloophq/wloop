@@ -17,13 +17,13 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/change"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/duration"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/meter"
 )
@@ -47,11 +47,11 @@ var errOutboxUnavailable = unavailable{"the Outbox is not served: the daemon run
 const mayHaveBeenPosted = "may have been posted"
 
 // draftVerbs are the entry verbs a draft takes, by the draft action each runs.
-var draftVerbs = map[gtd.Verb]string{
-	gtd.VerbApprove: "approve",
-	gtd.VerbEdit:    "edit",
-	gtd.VerbDismiss: "discard",
-	gtd.VerbRetry:   "retry",
+var draftVerbs = map[task.Verb]string{
+	task.VerbApprove: "approve",
+	task.VerbEdit:    "edit",
+	task.VerbDismiss: "discard",
+	task.VerbRetry:   "retry",
 }
 
 // registerOutbox serves the Outbox view from the drafts and makes a draft entry's verbs act on its draft.
@@ -60,9 +60,9 @@ func (s *Server) registerOutbox() {
 		return
 	}
 	for verb := range draftVerbs {
-		s.deps.GTD.Register(gtd.KindDraft, verb, s.draftVerb(verb))
+		s.deps.GTD.Register(task.KindDraft, verb, s.draftVerb(verb))
 	}
-	s.deps.GTD.RegisterView(gtd.ViewOutbox, draftPrefix, outboxView{s})
+	s.deps.GTD.RegisterView(task.ViewOutbox, draftPrefix, outboxView{s})
 }
 
 func (s *Server) handleDrafts(w http.ResponseWriter, r *http.Request) {
@@ -223,11 +223,11 @@ func writeDraftError(w http.ResponseWriter, err error) {
 }
 
 // draftVerb runs verb on a draft entry's draft, with the statuses the draft routes answer.
-func (s *Server) draftVerb(verb gtd.Verb) coregtd.VerbHandler {
-	return func(ctx context.Context, e gtd.Entry, req coregtd.Request) (coregtd.Result, error) {
+func (s *Server) draftVerb(verb task.Verb) coretasks.VerbHandler {
+	return func(ctx context.Context, e task.Entry, req coretasks.Request) (coretasks.Result, error) {
 		id, ok := draftIDOf(e.ID)
 		if !ok {
-			return coregtd.Result{}, fmt.Errorf("%w: %s", coregtd.ErrNoEntry, e.ID)
+			return coretasks.Result{}, fmt.Errorf("%w: %s", coretasks.ErrNoEntry, e.ID)
 		}
 		var a api.DraftAction
 		if text, ok := req.Args["text"]; ok {
@@ -237,26 +237,26 @@ func (s *Server) draftVerb(verb gtd.Verb) coregtd.VerbHandler {
 		if raw, ok := req.Args["confirm"]; ok {
 			b, err := strconv.ParseBool(raw)
 			if err != nil {
-				return coregtd.Result{}, fmt.Errorf("%w: confirm is true or false, not %q", coregtd.ErrArgs, raw)
+				return coretasks.Result{}, fmt.Errorf("%w: confirm is true or false, not %q", coretasks.ErrArgs, raw)
 			}
 			a.Confirm = b
 		}
 		if raw, ok := req.Args["rev"]; ok {
 			n, err := strconv.ParseInt(raw, 10, 64)
 			if err != nil || n < 0 {
-				return coregtd.Result{}, fmt.Errorf("%w: rev is the draft's revision, not %q", coregtd.ErrArgs, raw)
+				return coretasks.Result{}, fmt.Errorf("%w: rev is the draft's revision, not %q", coretasks.ErrArgs, raw)
 			}
 			a.Rev = &n
 		}
 		d, err := s.draftDo(ctx, id, draftVerbs[verb], a)
 		if err != nil {
-			return coregtd.Result{}, entryDraftError(err)
+			return coretasks.Result{}, entryDraftError(err)
 		}
 		got, err := s.deps.GTD.Entry(ctx, e.ID)
 		if err != nil {
-			return coregtd.Result{}, err
+			return coretasks.Result{}, err
 		}
-		return coregtd.Result{Entry: got, Lines: []string{fmt.Sprintf("draft %d is %s", d.ID, d.State)}}, nil
+		return coretasks.Result{Entry: got, Lines: []string{fmt.Sprintf("draft %d is %s", d.ID, d.State)}}, nil
 	}
 }
 
@@ -266,15 +266,15 @@ func entryDraftError(err error) error {
 	var bad badRequest
 	switch {
 	case errors.As(err, &off):
-		return fmt.Errorf("%w: %s", coregtd.ErrPluginDisabled, off)
+		return fmt.Errorf("%w: %s", coretasks.ErrPluginDisabled, off)
 	case errors.Is(err, outbox.ErrNotFound):
-		return fmt.Errorf("%w: %w", coregtd.ErrNoEntry, err)
+		return fmt.Errorf("%w: %w", coretasks.ErrNoEntry, err)
 	case errors.Is(err, outbox.ErrNeedsConfirm):
-		return fmt.Errorf("%w: %w: pass the confirm argument once you checked it was not posted", coregtd.ErrVerb, err)
+		return fmt.Errorf("%w: %w: pass the confirm argument once you checked it was not posted", coretasks.ErrVerb, err)
 	case errors.Is(err, outbox.ErrConflict), errors.Is(err, outbox.ErrDisabled):
-		return fmt.Errorf("%w: %w", coregtd.ErrVerb, err)
+		return fmt.Errorf("%w: %w", coretasks.ErrVerb, err)
 	case errors.Is(err, outbox.ErrInvalid), errors.As(err, &bad):
-		return fmt.Errorf("%w: %w", coregtd.ErrArgs, err)
+		return fmt.Errorf("%w: %w", coretasks.ErrArgs, err)
 	}
 	return err
 }

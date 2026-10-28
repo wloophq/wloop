@@ -6,7 +6,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -25,7 +25,7 @@ func (r *postResults) AttachesPosts(intent string) bool {
 	return false
 }
 
-func (r *postResults) Attach(_ context.Context, entry gtd.ID, u unit.Unit) error {
+func (r *postResults) Attach(_ context.Context, entry task.ID, u unit.Unit) error {
 	if entry != "e-1" {
 		panic("attached to " + entry)
 	}
@@ -34,7 +34,7 @@ func (r *postResults) Attach(_ context.Context, entry gtd.ID, u unit.Unit) error
 }
 
 func fromEntry(p Proposal) Proposal {
-	p.Origin = draft.Origin{Kind: draft.OriginSession, TurnSeq: 3, Intent: "begin", Unit: gtd.UnitOf("e-1")}
+	p.Origin = draft.Origin{Kind: draft.OriginSession, TurnSeq: 3, Intent: "begin", Unit: task.UnitOf("e-1")}
 	return p
 }
 
@@ -77,7 +77,7 @@ func TestOnlyAPostOfAnAttachingEntryTurnAttaches(t *testing.T) {
 	onUnit := fromEntry(reply("hi"))
 	onUnit.Origin.Unit = unit.Unit{}
 	auto := reply("hi")
-	auto.Origin = draft.Origin{Kind: draft.OriginAuto, Rule: "nudge", Key: "k", Unit: gtd.UnitOf("e-1")}
+	auto.Origin = draft.Origin{Kind: draft.OriginAuto, Rule: "nudge", Key: "k", Unit: task.UnitOf("e-1")}
 	for name, p := range map[string]Proposal{"a reaction": react, "an edit": edit, "an intent that does not attach": other,
 		"a turn on the post's own unit": onUnit, "a workflow's draft": auto} {
 		t.Run(name, func(t *testing.T) {
@@ -118,7 +118,7 @@ func TestADraftOnTheEntryAttachesTheUnitItsPostLandedIn(t *testing.T) {
 	r := &postResults{intents: []string{"begin"}}
 	e.svc.Results = r
 	p := onEntry("#general")
-	p.Unit = gtd.UnitOf("e-1")
+	p.Unit = task.UnitOf("e-1")
 	p.Origin = draft.Origin{Kind: draft.OriginSession, TurnSeq: 3, Intent: "begin"}
 	d := e.propose(p)
 	if _, err := e.svc.Approve(ctx, d.ID, nil); err != nil {

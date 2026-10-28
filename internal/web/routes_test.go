@@ -13,7 +13,7 @@ func routesPrelude(t *testing.T) string {
 	b.WriteString(`const location = { hash: "" }; const history = { replaceState: (_, __, h) => { location.hash = h; } };` + "\n")
 	b.WriteString(`const window = { addEventListener() {} };` + "\n")
 	b.WriteString(staticJS(t, "routes.js"))
-	b.WriteString(staticJS(t, "gtd.js"))
+	b.WriteString(staticJS(t, "views.js"))
 	for _, c := range []string{"UNIT_KEY", "QUERY_MAX"} {
 		b.WriteString(jsConst(t, src, c))
 	}

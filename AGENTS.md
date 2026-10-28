@@ -36,7 +36,7 @@ Adding a fact, a step, an effect or a reserved key: add it to its table with its
 
 These stay in Go and are exposed as facts for the profile to act on:
 
-- which GTD entries exist (`gtd.Reconcile`, the close-entry condition in `internal/domain/gtd/rules.go`);
+- which GTD entries exist (`task.Reconcile`, the close-entry condition in `internal/domain/task/rules.go`);
 - working-day arithmetic and `owedBy`'s fallback;
 - the GitHub round planners' due logic (`pr.first.due`, `pr.review.action`, `pr.address.due`);
 - injection markers, JSON schemas and limits;

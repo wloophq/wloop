@@ -9,19 +9,19 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/outbox"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel"
 )
 
 // unitEntry is an Inbox entry of kind on units, with one item on each.
-func unitEntry(id string, kind gtd.Kind, units ...unit.Unit) gtd.Entry {
-	e := gtd.Entry{ID: gtd.ID(id), Kind: kind, State: gtd.Inbox, Title: "Entry " + id, Units: units}
+func unitEntry(id string, kind task.Kind, units ...unit.Unit) task.Entry {
+	e := task.Entry{ID: task.ID(id), Kind: kind, State: task.Inbox, Title: "Entry " + id, Units: units}
 	for _, u := range units {
-		e.Items = append(e.Items, gtd.ItemRef{Unit: u, Item: "it-" + id})
+		e.Items = append(e.Items, task.ItemRef{Unit: u, Item: "it-" + id})
 	}
 	return e
 }
@@ -49,8 +49,8 @@ func verbState(v api.EntryView, verb string) api.VerbState {
 func TestDelegateOnAThreadEntryRunsActWithGuidanceAndMode(t *testing.T) {
 	t.Parallel()
 	r, h, fa := newDelegateRig(t)
-	r.put(t, unitEntry("e-a", gtd.KindAction, actThread), unitEntry("e-w", gtd.KindWaiting, actThread),
-		unitEntry("e-c", gtd.KindClose, actThread), unitEntry("e-n", gtd.KindCapture))
+	r.put(t, unitEntry("e-a", task.KindAction, actThread), unitEntry("e-w", task.KindWaiting, actThread),
+		unitEntry("e-c", task.KindClose, actThread), unitEntry("e-n", task.KindCapture))
 	for _, id := range []string{"e-a", "e-w", "e-c"} {
 		var v api.EntryView
 		if code := get(t, r.s, api.EntryPath(id), &v); code != 200 || !verbState(v, "delegate").Enabled {
@@ -85,7 +85,7 @@ func TestAThreadInboxNotificationOffersDraftForMeAndReply(t *testing.T) {
 	t.Parallel()
 	r, _, _ := newDelegateRig(t)
 	r.s.deps.Outbox = &outbox.Service{Store: r.db.Drafts(), Clock: fixedClock(entriesNow)}
-	r.put(t, unitEntry("e-a", gtd.KindAction, actThread), unitEntry("e-n", gtd.KindCapture))
+	r.put(t, unitEntry("e-a", task.KindAction, actThread), unitEntry("e-n", task.KindCapture))
 	var v api.EntryView
 	if code := get(t, r.s, api.EntryPath("e-a"), &v); code != 200 || v.Attention == nil {
 		t.Fatalf("%d %+v", code, v.Attention)
@@ -128,7 +128,7 @@ func (f placerFunc) SessionPlace(_ context.Context, u unit.Unit) (string, error)
 func TestDelegateSaysUpfrontWhetherASessionCanRun(t *testing.T) {
 	t.Parallel()
 	r, _, fa := newDelegateRig(t)
-	r.put(t, unitEntry("e-a", gtd.KindAction, actThread))
+	r.put(t, unitEntry("e-a", task.KindAction, actThread))
 	modes := func() []api.RunnerState {
 		var v api.EntryView
 		if code := get(t, r.s, api.EntryPath("e-a"), &v); code != 200 {

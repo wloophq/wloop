@@ -12,15 +12,15 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
-	"github.com/wloophq/wloop/internal/core/gtd/gtdtest"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/messages/messagestest"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/message"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -36,8 +36,8 @@ func (fixedClock) Now() time.Time { return inboxAt }
 
 type enabledFacts struct{}
 
-func (enabledFacts) UnitFacts(_ context.Context, u unit.Unit) (gtd.UnitFacts, bool, error) {
-	return gtd.UnitFacts{Unit: u}, true, nil
+func (enabledFacts) UnitFacts(_ context.Context, u unit.Unit) (task.UnitFacts, bool, error) {
+	return task.UnitFacts{Unit: u}, true, nil
 }
 
 type noItems struct{}
@@ -49,17 +49,17 @@ type inboxRig struct {
 	sid     string
 	books   *turnstest.Store
 	msgs    *messagestest.Store
-	entries *gtdtest.Store
-	gtd     *coregtd.Service
+	entries *taskstest.Store
+	gtd     *coretasks.Service
 }
 
 // inboxSession serves inbox_post over the messages service, with a started turn on term_1.
 func inboxSession(t *testing.T, handle string) *inboxRig {
 	t.Helper()
-	r := &inboxRig{books: turnstest.NewStore(), msgs: messagestest.New(), entries: gtdtest.New()}
+	r := &inboxRig{books: turnstest.NewStore(), msgs: messagestest.New(), entries: taskstest.New()}
 	r.books.Put(turn.Book{Unit: inboxUnit, Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), ID: "abc", SentTo: "term_1",
 		Session: "term_1", State: turn.Started, SentAt: inboxAt.Add(-time.Hour), StartedAt: inboxAt.Add(-time.Minute)}}})
-	r.gtd = coregtd.New(coregtd.Deps{Store: r.entries, Items: noItems{}, Facts: enabledFacts{}, Clock: fixedClock{}})
+	r.gtd = coretasks.New(coretasks.Deps{Store: r.entries, Items: noItems{}, Facts: enabledFacts{}, Clock: fixedClock{}})
 	svc := &messages.Service{Store: r.msgs, Books: r.books, Entries: r.gtd, Intents: turnstest.Intents(), Clock: fixedClock{}}
 	r.srv = &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800, Inbox: svc}
 	r.sid = call(t, r.srv, "", handle, initialize).Header().Get("Mcp-Session-Id")
@@ -116,8 +116,8 @@ func TestInboxPostCreatesAMessage(t *testing.T) {
 		m.Origin != (message.Origin{Kind: message.OriginAgent, TurnSeq: 1, Session: "term_1"}) {
 		t.Fatalf("message %+v", m)
 	}
-	e, err := r.entries.Entry(context.Background(), gtd.ID(m.EntryID))
-	if err != nil || e.Kind != gtd.KindMessage || e.State != gtd.Inbox {
+	e, err := r.entries.Entry(context.Background(), task.ID(m.EntryID))
+	if err != nil || e.Kind != task.KindMessage || e.State != task.Inbox {
 		t.Fatalf("entry %+v %v", e, err)
 	}
 	books, _ := r.books.Books(context.Background(), inboxUnit)
@@ -151,10 +151,10 @@ func TestInboxPostCannotMoveEntries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	snapshot := func() []gtd.Entry {
-		var all []gtd.Entry
-		for _, v := range gtd.StoredViews {
-			es, err := r.entries.Entries(ctx, gtd.Query{View: v})
+	snapshot := func() []task.Entry {
+		var all []task.Entry
+		for _, v := range task.StoredViews {
+			es, err := r.entries.Entries(ctx, task.Query{View: v})
 			if err != nil {
 				t.Fatal(err)
 			}

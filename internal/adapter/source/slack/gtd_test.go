@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/card"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel"
 	cardsjob "github.com/wloophq/wloop/internal/readmodel/cards"
@@ -48,7 +48,7 @@ func TestSlackIdentityMatchesTheViewer(t *testing.T) {
 type flow struct {
 	f     *fixture
 	model *readmodel.Model
-	gtd   *coregtd.Service
+	gtd   *coretasks.Service
 	units chan []unit.Unit
 }
 
@@ -64,11 +64,11 @@ func newFlow(t *testing.T, f *fixture, clock segClock) *flow {
 	if err != nil {
 		t.Fatal(err)
 	}
-	me := gtd.Me{Keys: append([]string{who.Key}, who.Aliases...)}
+	me := task.Me{Keys: append([]string{who.Key}, who.Aliases...)}
 	fl := &flow{f: f, units: make(chan []unit.Unit, 64)}
 	fl.model = readmodel.New(f.log, f.db, nil, nil, nil, f.p.rows(readmodel.RowDeps{}))
-	fl.gtd = coregtd.New(coregtd.Deps{Store: f.db.Entries(), Items: f.ledger(), Me: me, Clock: clock,
-		Facts: coregtd.CardFacts{Cards: f.db.Cards(), Me: func() gtd.Me { return me }}})
+	fl.gtd = coretasks.New(coretasks.Deps{Store: f.db.Entries(), Items: f.ledger(), Me: me, Clock: clock,
+		Facts: coretasks.CardFacts{Cards: f.db.Cards(), Me: func() task.Me { return me }}})
 	job := &cardsjob.Job{Store: f.db.Cards(), Ledger: f.ledger(), Providers: map[unit.ProviderID]cardsjob.Provider{dslack.Provider: {Card: Card}},
 		Clock: clock, Log: t.Logf}
 	wg.Go(func() { fl.model.Run(ctx, job.Changed) })
@@ -95,7 +95,7 @@ func (fl *flow) card(t *testing.T, u unit.Unit, ok func(card.Card) bool) card.Ca
 	}
 }
 
-func (fl *flow) entries(t *testing.T, u unit.Unit) []gtd.Entry {
+func (fl *flow) entries(t *testing.T, u unit.Unit) []task.Entry {
 	t.Helper()
 	if err := fl.gtd.Sync(context.Background(), []unit.Unit{u}); err != nil {
 		t.Fatal(err)
@@ -158,21 +158,21 @@ func TestSlackItemsBecomeEntries(t *testing.T) {
 		t.Fatalf("card %+v", c)
 	}
 	es := fl.entries(t, u)
-	var action, waiting []gtd.Entry
+	var action, waiting []task.Entry
 	for _, e := range es {
 		switch e.Kind {
-		case gtd.KindAction:
+		case task.KindAction:
 			action = append(action, e)
-		case gtd.KindWaiting:
+		case task.KindWaiting:
 			waiting = append(waiting, e)
 		default:
 			t.Errorf("unexpected entry %+v", e)
 		}
 	}
-	if len(action) != 1 || action[0].State != gtd.Inbox || action[0].Items[0].Item != ids["item n1"] || !slices.Contains(action[0].Units, u) {
+	if len(action) != 1 || action[0].State != task.Inbox || action[0].Items[0].Item != ids["item n1"] || !slices.Contains(action[0].Units, u) {
 		t.Errorf("action %+v", action)
 	}
-	if len(waiting) != 1 || waiting[0].State != gtd.Waiting || waiting[0].Waiting == nil || waiting[0].Waiting.On[0].Key != otherPerson.Key ||
+	if len(waiting) != 1 || waiting[0].State != task.Waiting || waiting[0].Waiting == nil || waiting[0].Waiting.On[0].Key != otherPerson.Key ||
 		waiting[0].Items[0].Item != ids["item n2"] {
 		t.Errorf("waiting %+v", waiting)
 	}
@@ -192,13 +192,13 @@ func TestNewReplyResurfacesSnoozed(t *testing.T) {
 	fl := newFlow(t, f, clock)
 	first := fl.card(t, u, func(c card.Card) bool { return c.State == "waits_on_others" })
 	es := fl.entries(t, u)
-	if len(es) != 1 || es[0].Kind != gtd.KindWaiting || es[0].State != gtd.Waiting {
+	if len(es) != 1 || es[0].Kind != task.KindWaiting || es[0].State != task.Waiting {
 		t.Fatalf("entries %+v", es)
 	}
-	if _, err := fl.gtd.Do(context.Background(), es[0].ID, coregtd.Request{Verb: gtd.VerbSchedule, Args: map[string]string{"on_activity": "true"}}); err != nil {
+	if _, err := fl.gtd.Do(context.Background(), es[0].ID, coretasks.Request{Verb: task.VerbSchedule, Args: map[string]string{"on_activity": "true"}}); err != nil {
 		t.Fatal(err)
 	}
-	if es = fl.entries(t, u); es[0].State != gtd.Scheduled || es[0].Changed {
+	if es = fl.entries(t, u); es[0].State != task.Scheduled || es[0].Changed {
 		t.Fatalf("snoozed %+v", es[0])
 	}
 
@@ -209,7 +209,7 @@ func TestNewReplyResurfacesSnoozed(t *testing.T) {
 		t.Fatalf("card %+v", c.LastHuman)
 	}
 	es = fl.entries(t, u)
-	if len(es) != 1 || es[0].State != gtd.Inbox || !es[0].Changed {
+	if len(es) != 1 || es[0].State != task.Inbox || !es[0].Changed {
 		t.Fatalf("after the reply %+v", es)
 	}
 }

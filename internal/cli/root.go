@@ -9,9 +9,9 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
 	acd "github.com/wloophq/wloop/internal/adapter/claudedesktop"
 	adossier "github.com/wloophq/wloop/internal/adapter/dossier"
-	factentry "github.com/wloophq/wloop/internal/adapter/facts/entry"
 	factsgithub "github.com/wloophq/wloop/internal/adapter/facts/github"
 	factsession "github.com/wloophq/wloop/internal/adapter/facts/session"
+	facttask "github.com/wloophq/wloop/internal/adapter/facts/task"
 	factworkspace "github.com/wloophq/wloop/internal/adapter/facts/workspace"
 	"github.com/wloophq/wloop/internal/adapter/gitcheck"
 	"github.com/wloophq/wloop/internal/adapter/orca"
@@ -21,9 +21,9 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/dossiers"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/port"
 	coresweep "github.com/wloophq/wloop/internal/core/sweep"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
 	coreusage "github.com/wloophq/wloop/internal/core/usage"
 	"github.com/wloophq/wloop/internal/core/views"
@@ -319,15 +319,15 @@ func (e *Env) closedByManager(ctx context.Context, manager, session, lastHandle 
 
 // entryFacts is the entry subject's facts provider, reading the config the
 // daemon holds at each read; ended says whether a unit has ended.
-func (e *Env) entryFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (bool, error)) *factentry.Provider {
+func (e *Env) entryFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (bool, error)) *facttask.Provider {
 	enabled := func(p unit.ProviderID) bool { return e.currentConfig().PluginEnabled(string(p)) }
-	return factentry.New(factentry.Deps{
+	return facttask.New(facttask.Deps{
 		Entries: db.Entries(), Items: db.Items(), Drafts: db.Drafts(),
-		Cards:   coregtd.CardFacts{Cards: db.Cards(), Enabled: enabled},
+		Cards:   coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled},
 		Enabled: enabled,
-		Settings: func() factentry.Settings {
+		Settings: func() facttask.Settings {
 			cfg := e.currentConfig()
-			return factentry.Settings{StaleDays: cfg.GTD.StaleWaitingDays, RenudgeAfter: time.Duration(cfg.Drafts.RepeatAfter)}
+			return facttask.Settings{StaleDays: cfg.GTD.StaleWaitingDays, RenudgeAfter: time.Duration(cfg.Drafts.RepeatAfter)}
 		},
 		Ended: ended,
 		Turns: func(ctx context.Context, u unit.Unit) (int, error) {

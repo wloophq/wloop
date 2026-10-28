@@ -21,11 +21,11 @@ import (
 	"github.com/wloophq/wloop/internal/brand/brandtest"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/intake/intaketest"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
@@ -104,7 +104,7 @@ func newCatalogRig(t *testing.T) catalogRig {
 	sessions := turnstest.NewSessions()
 	plan := newPendingPlan(catalogNow)
 	ts := &turns.Service{Store: repo, Registry: repo, Sessions: sessions, Intents: turnstest.Intents(), Launcher: noLaunch{}, Clock: clockFunc(func() time.Time { return catalogNow })}
-	inbox := coregtd.New(coregtd.Deps{Store: db.Entries(), Items: itemsNone{}, Facts: enabledUnits{map[unit.ProviderID]bool{}}, Clock: fixedClock(catalogNow)})
+	inbox := coretasks.New(coretasks.Deps{Store: db.Entries(), Items: itemsNone{}, Facts: enabledUnits{map[unit.ProviderID]bool{}}, Clock: fixedClock(catalogNow)})
 	d := withStore(Deps{Pauses: sqlite.NewRounds(db), Activity: db, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return catalogNow },
 		Viewer:  func(context.Context) (string, []string, error) { return "me", nil, nil },
 		Log:     func(string, ...any) {},

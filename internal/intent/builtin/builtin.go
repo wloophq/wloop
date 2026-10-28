@@ -7,10 +7,10 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/record"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
@@ -106,7 +106,7 @@ var ActionKeys = map[string]string{
 
 // IntentVerbs are the gtd verbs a manifest's verb may name: those an entry
 // bridges to its unit's served action.
-var IntentVerbs = []string{string(gtd.VerbApprove), string(gtd.VerbDelegate), string(gtd.VerbDismiss)}
+var IntentVerbs = []string{string(task.VerbApprove), string(task.VerbDelegate), string(task.VerbDismiss)}
 
 type FactSlot string
 
@@ -194,7 +194,7 @@ var PayloadProviders = map[string]unit.ProviderID{"PR": unit.GitHub}
 // kind: a workflow reacting to one needs that provider.
 var EventProviders = func() map[string]unit.ProviderID {
 	out := map[string]unit.ProviderID{}
-	for _, k := range gtd.VerbEventKinds {
+	for _, k := range task.VerbEventKinds {
 		out[k] = unit.Entry
 	}
 	return out

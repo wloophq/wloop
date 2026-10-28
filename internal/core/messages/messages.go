@@ -12,13 +12,13 @@ import (
 	"time"
 	"unicode"
 
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -42,12 +42,12 @@ type Ledger interface {
 	Decide(ctx context.Context, id int64, accept bool) (coreitems.Result, error)
 }
 
-// Entries opens and closes the Inbox entry of each message, as gtd.Service does.
+// Entries opens and closes the Inbox entry of each message, as task.Service does.
 type Entries interface {
-	Open(ctx context.Context, r coregtd.OpenRequest) (gtd.Entry, error)
-	Close(ctx context.Context, id gtd.ID, to gtd.State) error
-	Entry(ctx context.Context, id gtd.ID) (gtd.Entry, error)
-	Retitle(ctx context.Context, id gtd.ID, title string) error
+	Open(ctx context.Context, r coretasks.OpenRequest) (task.Entry, error)
+	Close(ctx context.Context, id task.ID, to task.State) error
+	Entry(ctx context.Context, id task.ID) (task.Entry, error)
+	Retitle(ctx context.Context, id task.ID, title string) error
 }
 
 // Intents names the intents whose questions an answer addresses.
@@ -149,7 +149,7 @@ func (s *Service) Reconcile(ctx context.Context, units ...unit.Unit) error {
 		w.ID, w.EntryID, w.CreatedAt = m.ID, m.EntryID, m.CreatedAt
 		if !sameContent(w, m) {
 			if w.EntryID != "" {
-				if err := s.Entries.Retitle(ctx, gtd.ID(w.EntryID), title(w.Text)); err != nil && !errors.Is(err, coregtd.ErrNoEntry) {
+				if err := s.Entries.Retitle(ctx, task.ID(w.EntryID), title(w.Text)); err != nil && !errors.Is(err, coretasks.ErrNoEntry) {
 					errs = append(errs, err)
 					continue
 				}
@@ -299,7 +299,7 @@ func (s *Service) ensureEntry(ctx context.Context, m message.Message) (message.M
 	if !m.Unit.IsZero() {
 		u = &m.Unit
 	}
-	e, err := s.Entries.Open(ctx, coregtd.OpenRequest{Kind: gtd.KindMessage, Title: title(m.Text), Unit: u, Origin: gtd.OriginMessage})
+	e, err := s.Entries.Open(ctx, coretasks.OpenRequest{Kind: task.KindMessage, Title: title(m.Text), Unit: u, Origin: task.OriginMessage})
 	if err != nil {
 		return m, fmt.Errorf("opening the entry of message %d: %w", m.ID, err)
 	}
@@ -311,16 +311,16 @@ func (s *Service) ensureEntry(ctx context.Context, m message.Message) (message.M
 // keeps the message open, so the next reconcile tries again.
 func (s *Service) close(ctx context.Context, m message.Message, st message.State, answer string) error {
 	if m.EntryID != "" {
-		to := gtd.Trash
+		to := task.Trash
 		if st == message.Answered {
-			to = gtd.Done
+			to = task.Done
 		}
-		e, err := s.Entries.Entry(ctx, gtd.ID(m.EntryID))
+		e, err := s.Entries.Entry(ctx, task.ID(m.EntryID))
 		switch {
-		case errors.Is(err, coregtd.ErrNoEntry):
+		case errors.Is(err, coretasks.ErrNoEntry):
 		case err != nil:
 			return err
-		case e.Kind == gtd.KindMessage:
+		case e.Kind == task.KindMessage:
 			if err := s.Entries.Close(ctx, e.ID, to); err != nil {
 				return fmt.Errorf("closing the entry of message %d: %w", m.ID, err)
 			}

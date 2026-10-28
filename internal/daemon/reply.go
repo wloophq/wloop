@@ -10,19 +10,19 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 // repliedKinds are the kinds of entry the user replies on: those about a unit's conversation.
-var repliedKinds = []gtd.Kind{gtd.KindAction, gtd.KindWaiting, gtd.KindClose, gtd.KindCapture}
+var repliedKinds = []task.Kind{task.KindAction, task.KindWaiting, task.KindClose, task.KindCapture}
 
 // replyRefusal is why the user cannot reply on e, "" when they can.
-func (s *Server) replyRefusal(e gtd.Entry) string {
+func (s *Server) replyRefusal(e task.Entry) string {
 	switch {
 	case s.deps.Outbox == nil:
 		return errOutboxUnavailable.Error()
@@ -36,9 +36,9 @@ func (s *Server) replyRefusal(e gtd.Entry) string {
 
 // runReply holds the reply the entry's args carry as a user draft on its first unit, for the entry and its
 // items there; send "now" approves it at once.
-func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coregtd.Service, e gtd.Entry, req api.EntryRequest) {
+func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretasks.Service, e task.Entry, req api.EntryRequest) {
 	if why := s.replyRefusal(e); why != "" {
-		writeGTDError(w, fmt.Errorf("%w: %s", coregtd.ErrVerb, why))
+		writeGTDError(w, fmt.Errorf("%w: %s", coretasks.ErrVerb, why))
 		return
 	}
 	send, err := sendArg(req.Args["send"])
@@ -59,7 +59,7 @@ func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coregtd
 		writeGTDError(w, entryDraftError(err))
 		return
 	}
-	s.recordVerb(ctx, g, e, coregtd.Request{Verb: gtd.VerbReply, Source: req.Source})
+	s.recordVerb(ctx, g, e, coretasks.Request{Verb: task.VerbReply, Source: req.Source})
 	now, err := g.Entry(ctx, e.ID)
 	if err != nil {
 		now = e
@@ -79,7 +79,7 @@ func sendArg(raw string) (bool, error) {
 	case "now":
 		return true, nil
 	}
-	return false, fmt.Errorf("%w: send is \"now\" or nothing, not %q", coregtd.ErrArgs, raw)
+	return false, fmt.Errorf("%w: send is \"now\" or nothing, not %q", coretasks.ErrArgs, raw)
 }
 
 // userDraftLine says where a user's draft went.
@@ -102,9 +102,9 @@ func (s *Server) handleDraftCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := context.WithoutCancel(r.Context())
 	if c.Entry != "" && s.deps.GTD != nil {
-		e, err := s.deps.GTD.Entry(ctx, gtd.ID(c.Entry))
+		e, err := s.deps.GTD.Entry(ctx, task.ID(c.Entry))
 		switch {
-		case errors.Is(err, coregtd.ErrNoEntry):
+		case errors.Is(err, coretasks.ErrNoEntry):
 			writeError(w, http.StatusNotFound, err.Error())
 			return
 		case err != nil:

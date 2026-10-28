@@ -15,12 +15,12 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/config"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/daemon"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/shell"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/gitx"
@@ -115,14 +115,14 @@ func TestStartCapturesClonesTrustsAndCreatesFromTheDefaultBase(t *testing.T) {
 		}
 	}
 
-	id := gtd.ID(strings.TrimPrefix(entry[1], "entry:"))
-	books, err := te.Turns.Store.Books(context.Background(), gtd.UnitOf(id))
-	if err != nil || len(books[gtd.UnitOf(id)].Turns) != 1 {
+	id := task.ID(strings.TrimPrefix(entry[1], "entry:"))
+	books, err := te.Turns.Store.Books(context.Background(), task.UnitOf(id))
+	if err != nil || len(books[task.UnitOf(id)].Turns) != 1 {
 		t.Fatalf("books %+v, %v", books, err)
 	}
-	sent := books[gtd.UnitOf(id)].Turns[0]
+	sent := books[task.UnitOf(id)].Turns[0]
 	rec := record.Record{State: record.Done, Summary: "opened the pull request", Outcome: &record.Outcome{URL: "https://github.com/acme/api/pull/9"}}
-	if _, err := te.Turns.RecordTurnEnd(context.Background(), turns.RecordRequest{Session: sent.SentTo, Turn: sent.ID, Unit: gtd.UnitOf(id), Record: rec}); err != nil {
+	if _, err := te.Turns.RecordTurnEnd(context.Background(), turns.RecordRequest{Session: sent.SentTo, Turn: sent.ID, Unit: task.UnitOf(id), Record: rec}); err != nil {
 		t.Fatal(err)
 	}
 	got, err := te.Env.gtd.Entry(context.Background(), id)
@@ -199,7 +199,7 @@ func TestStartWithoutARepositoryRunsInTheNeutralRepository(t *testing.T) {
 func TestStartRunsOnlyOnAnEntryTheUserCaptured(t *testing.T) {
 	te, m, _, _ := startEnv(t)
 	ctx := context.Background()
-	derived, err := te.Env.gtd.Open(ctx, coregtd.OpenRequest{Kind: gtd.KindMessage, Title: "ship the export", Origin: gtd.OriginMessage})
+	derived, err := te.Env.gtd.Open(ctx, coretasks.OpenRequest{Kind: task.KindMessage, Title: "ship the export", Origin: task.OriginMessage})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,7 +296,7 @@ func TestAHiddenStartActionStillRefusesADerivedEntry(t *testing.T) {
 	}
 	userProfile(t, te, map[string]string{"intents/start/intent.toml": manifest, "intents/start/instructions.md.tmpl": string(body)})
 	te.serveEntries(t)
-	derived, err := te.Env.gtd.Open(context.Background(), coregtd.OpenRequest{Kind: gtd.KindMessage, Title: "ship the export", Origin: gtd.OriginMessage})
+	derived, err := te.Env.gtd.Open(context.Background(), coretasks.OpenRequest{Kind: task.KindMessage, Title: "ship the export", Origin: task.OriginMessage})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +343,7 @@ func TestARoundTheDaemonDidNotPrepareClonesAndTrusts(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := daemon.Call{Inputs: map[string]any{"repo": "acme/api"}, Out: io.Discard}
-	if err := (envActions{te.Env, nil}).Intent(ctx, "start", gtd.UnitOf(e.ID), c); err != nil {
+	if err := (envActions{te.Env, nil}).Intent(ctx, "start", task.UnitOf(e.ID), c); err != nil {
 		t.Fatal(err)
 	}
 	path := filepath.Join(projects, "api")
