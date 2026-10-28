@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"slices"
@@ -341,6 +342,17 @@ func TestAClosedTurnAnswers409(t *testing.T) {
 	writeTasksError(rec, fmt.Errorf("%w: turn 1", turn.ErrClosed))
 	if rec.Code != 409 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestAProposalTheLedgerRefusedAnswers409(t *testing.T) {
+	t.Parallel()
+	refused := fmt.Errorf("gate 3 resolved approved, its consequence failed: %w: item: unknown \"i9\"", messages.ErrNotApplied)
+	for name, write := range map[string]func(http.ResponseWriter, error){"gate": writeGateError, "task": writeTasksError} {
+		rec := httptest.NewRecorder()
+		if write(rec, refused); rec.Code != 409 {
+			t.Errorf("%s route: %d %s", name, rec.Code, rec.Body)
+		}
 	}
 }
 

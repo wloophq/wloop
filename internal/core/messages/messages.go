@@ -137,7 +137,8 @@ func (s *Service) Reconcile(ctx context.Context, units ...unit.Unit) error {
 }
 
 // OpenMissing opens g, the missing gate of a turn that failed or ended without its record, unless one with
-// its subject is open on its unit already; it returns the open one.
+// its subject is open on its unit already; it returns the open one. A gate on a task that closed moves off it,
+// as a message's does, and a run whose own task closed asks nothing more: it returns no gate.
 func (s *Service) OpenMissing(ctx context.Context, g gate.Gate) (gate.Gate, error) {
 	s.gating.Lock()
 	defer s.gating.Unlock()
@@ -146,7 +147,18 @@ func (s *Service) OpenMissing(ctx context.Context, g gate.Gate) (gate.Gate, erro
 		return gate.Gate{}, err
 	}
 	if i := slices.IndexFunc(open, func(o gate.Gate) bool { return o.Unit == g.Unit && o.Subject == g.Subject }); i >= 0 {
-		return open[i], nil
+		if !s.closedTask(ctx, open[i].Task) {
+			return open[i], nil
+		}
+		if err := s.Gates.Supersede(ctx, open[i].ID, task.ActorWorkflow); err != nil {
+			return gate.Gate{}, fmt.Errorf("moving missing gate %d off its closed task: %w", open[i].ID, err)
+		}
+	}
+	if own, ok := task.IDOf(g.Unit); ok && s.closedTask(ctx, own) {
+		return gate.Gate{}, nil
+	}
+	if s.closedTask(ctx, g.Task) {
+		g.Task = ""
 	}
 	return s.Gates.Open(ctx, g, nil)
 }
@@ -476,7 +488,7 @@ func (s *Service) gated(ctx context.Context, m message.Message) (message.Message
 
 // closedTask says whether task id is done or dropped, where no list shows the gate it holds.
 func (s *Service) closedTask(ctx context.Context, id task.ID) bool {
-	if id == "" {
+	if id == "" || s.Tasks == nil {
 		return false
 	}
 	e, err := s.Tasks.Task(ctx, id)
@@ -837,15 +849,19 @@ func (s *Service) Reanswer(ctx context.Context, id int64, a Answer) (turns.Answe
 
 // Decide is a resolved proposal gate's consequence: an item proposal is accepted when the gate is approved
 // and rejected otherwise, a workflow's or core rule's goes to OnAnswer, and its message closes. A ledger
-// proposal is decided under the lock ReconcileProposals holds, which would close its message unanswered.
+// proposal is decided under the lock ReconcileProposals holds, which would close its message unanswered; one
+// whose operations the ledger refuses stays open on a new gate, and Decide returns ErrNotApplied.
 func (s *Service) Decide(ctx context.Context, g gate.Gate) error {
 	approved := g.Status == gate.Approved
 	if id, ok := proposalOf(g.Subject); ok {
 		if s.Ledger == nil {
 			return errors.New("no ledger decides item proposals")
 		}
-		_, err := s.Ledger.Decide(ctx, id, approved)
-		return err
+		res, err := s.Ledger.Decide(ctx, id, approved)
+		if err != nil || len(res.Refused) == 0 {
+			return err
+		}
+		return s.notApplied(ctx, gate.Gate{Kind: gate.KindProposal, Unit: g.Unit, Task: g.Task, Subject: g.Subject}, res)
 	}
 	m, err := s.subject(ctx, g)
 	if err != nil {
@@ -862,14 +878,65 @@ func (s *Service) Decide(ctx context.Context, g gate.Gate) error {
 		}
 		return s.closeAfter(ctx, m, g.Intent)
 	}
+	res, err := s.decideLedger(ctx, m, approved, g.Intent)
+	if err != nil || len(res.Refused) == 0 {
+		return err
+	}
+	reopen := gate.Gate{Kind: gate.KindProposal, Unit: m.Unit, Task: g.Task, Subject: subjectOf(m)}
+	if cur, ok, err := s.Store.Message(ctx, m.ID); err != nil || !ok || !cur.Open() {
+		reopen.Subject = gate.ProposalSubject(m.Origin.Proposal)
+	}
+	return s.notApplied(ctx, reopen, res)
+}
+
+// decideLedger decides m's item proposal and, when the ledger applies it, closes m with intent.
+func (s *Service) decideLedger(ctx context.Context, m message.Message, approved bool, intent string) (coreitems.Result, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	var res coreitems.Result
 	if s.Ledger != nil {
-		if _, err := s.Ledger.Decide(ctx, m.Origin.Proposal, approved); err != nil && !errors.Is(err, coreitems.ErrNoProposal) {
-			return err
+		var err error
+		if res, err = s.Ledger.Decide(ctx, m.Origin.Proposal, approved); err != nil && !errors.Is(err, coreitems.ErrNoProposal) {
+			return res, err
 		}
 	}
-	return s.close(ctx, m, g.Intent)
+	if len(res.Refused) > 0 {
+		return res, nil
+	}
+	return res, s.close(ctx, m, intent)
+}
+
+// ErrNotApplied is an approved proposal whose operations the ledger refused: it stays open, on a new gate.
+var ErrNotApplied = errors.New("the approved proposal was not applied")
+
+// notApplied opens g again, held for a person, so the proposal res refused reads open, and says why.
+func (s *Service) notApplied(ctx context.Context, g gate.Gate, res coreitems.Result) error {
+	why := make([]string, len(res.Refused))
+	for i, r := range res.Refused {
+		why[i] = r.Reason
+	}
+	err := fmt.Errorf("%w: %s", ErrNotApplied, strings.Join(why, "; "))
+	s.gating.Lock()
+	defer s.gating.Unlock()
+	open, oerr := s.Gates.Where(ctx, gates.Query{Kind: gate.KindProposal, Unit: g.Unit})
+	if oerr != nil {
+		return errors.Join(err, oerr)
+	}
+	if slices.ContainsFunc(open, func(o gate.Gate) bool { return o.Unit == g.Unit && o.Subject == g.Subject }) {
+		return err
+	}
+	if _, oerr := s.Gates.Open(ctx, g, holdForPerson{}); oerr != nil {
+		return errors.Join(err, fmt.Errorf("opening its gate again: %w", oerr))
+	}
+	return err
+}
+
+// holdForPerson holds a gate for a person: a proposal the ledger refused waits for one, whatever releases
+// proposals.
+type holdForPerson struct{}
+
+func (holdForPerson) Decide(context.Context, gate.Gate) (gates.Decision, error) {
+	return gates.Decision{Mode: gate.ModeWait}, nil
 }
 
 // proposalPrefix is what gate.ProposalSubject puts before an item proposal's id.

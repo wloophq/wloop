@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -302,4 +303,56 @@ func TestMessagesCostOnARealStore(t *testing.T) {
 	list := time.Since(start)
 	t.Logf("sqlite, %d asked turns: first reconcile %s (messages and entries created), a full reconcile with nothing to do %s, one unit's %s, listing the open messages %s",
 		n, first, again, one, list)
+}
+
+func TestARefusedAcceptKeepsItsProposalOpen(t *testing.T) {
+	t.Parallel()
+	log := change.NewLog(change.DefaultWindow, t.Logf)
+	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	te := newTestEnv(t, &fake.Manager{})
+	d := servedMessages(t, te, db, log)
+	te.Env.consequences = messageConsequences{d.Messages}
+	ledger := te.Env.itemsLedger(db, te.cfg, t.Logf)
+	ctx := context.Background()
+	u := ghUnit(7)
+	summary := "ship the fix today"
+	op := items.Op{Op: items.OpUpdate, Unit: u, Item: "gone", Anchor: unit.Anchor{Unit: u, Ref: "turn:1"}, Fields: &items.Fields{Summary: &summary}}
+	if err := db.Items().Commit(ctx, coreitems.Commit{Proposals: []coreitems.Proposal{{Unit: u, Item: "gone", Op: op, Provenance: items.Extracted,
+		State: coreitems.ProposalOpen, At: testNow}}}); err != nil {
+		t.Fatal(err)
+	}
+	m := waitOpen(t, d, func(ms []message.Message) bool { return len(ms) == 1 && ms[0].TaskID != "" })[0]
+	gs, err := d.GateReader.Where(ctx, gates.Query{Kind: gate.KindProposal, Unit: u})
+	if err != nil || len(gs) != 1 {
+		t.Fatalf("gates %+v %v", gs, err)
+	}
+	err = d.Gates.Resolve(ctx, gs[0].ID, gates.Resolution{Intent: "approve", By: task.ActorPerson})
+	if !errors.Is(err, messages.ErrNotApplied) || !strings.Contains(err.Error(), `unknown "gone"`) {
+		t.Fatalf("approving a refused op: %v", err)
+	}
+	if open := ps(t, ledger); len(open) != 1 {
+		t.Fatalf("open proposals %+v", open)
+	}
+	open, err := d.GateReader.Where(ctx, gates.Query{Kind: gate.KindProposal, Unit: u})
+	if err != nil || len(open) != 1 || open[0].ID == gs[0].ID ||
+		open[0].Subject != strconv.FormatInt(m.ID, 10) && open[0].Subject != gate.ProposalSubject(ps(t, ledger)[0].ID) {
+		t.Fatalf("open gates %+v %v", open, err)
+	}
+	if its, _ := ledger.Items(ctx, u); len(its) != 0 {
+		t.Fatalf("items %+v", its)
+	}
+}
+
+// ps are ledger's open proposals.
+func ps(t *testing.T, ledger *coreitems.Ledger) []coreitems.Proposal {
+	t.Helper()
+	open, err := ledger.Proposals(context.Background(), coreitems.ProposalOpen)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return open
 }

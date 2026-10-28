@@ -99,7 +99,8 @@ func writeTasksError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, coretasks.ErrForbidden):
 		writeError(w, http.StatusForbidden, err.Error())
-	case errors.Is(err, coretasks.ErrVerb), errors.Is(err, coretasks.ErrPluginDisabled), errors.Is(err, messages.ErrClosed), errors.Is(err, turn.ErrClosed):
+	case errors.Is(err, coretasks.ErrVerb), errors.Is(err, coretasks.ErrPluginDisabled), errors.Is(err, messages.ErrClosed), errors.Is(err, turn.ErrClosed),
+		errors.Is(err, messages.ErrNotApplied):
 		writeError(w, http.StatusConflict, err.Error())
 	default:
 		writeActionError(w, err)

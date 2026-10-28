@@ -11,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/message"
+	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -187,5 +188,38 @@ func TestARefusedOrphanAnswerAsksAgainThroughTheMissingGate(t *testing.T) {
 	r.reconcile(t, r7)
 	if g := r.openGates(t, gate.KindQuestion); len(g) != 1 || g[0].Name != "missing-record" {
 		t.Fatalf("gates after the refusal %+v", g)
+	}
+}
+
+func TestAMissingGateMovesOffAClosedTask(t *testing.T) {
+	r := newRig(t)
+	ctx := context.Background()
+	held, err := r.tasks.Open(ctx, coretasks.OpenRequest{Kind: task.KindAction, Title: "review acme/api#7", Unit: &r7, Origin: task.OriginUser})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.started(r7)
+	r.record(t, r7, 1, record.Record{State: record.Failed, Summary: "the build broke", Resume: "rerun it"})
+	b := r.book(t, r7)
+	b.Turns[0].State = turn.Failed
+	r.books.Put(b)
+	r.reconcile(t, r7)
+	first := r.openGates(t, gate.KindQuestion)
+	if len(first) != 1 || first[0].Task != held.ID {
+		t.Fatalf("gates %+v", first)
+	}
+	if err := r.tasks.Close(ctx, held.ID, task.CategoryDone); err != nil {
+		t.Fatal(err)
+	}
+	r.reconcile(t, r7)
+	if g, _ := r.gateStore.Get(ctx, first[0].ID); g.Status != gate.Superseded {
+		t.Fatalf("the gate on the done task %+v", g)
+	}
+	open := r.openGates(t, gate.KindQuestion)
+	if len(open) != 1 || open[0].Name != "missing-record" || open[0].Task == held.ID || open[0].Subject != first[0].Subject {
+		t.Fatalf("open gates %+v", open)
+	}
+	if e := r.task(t, string(open[0].Task)); e.Category == task.CategoryDone || e.Category == task.CategoryDropped {
+		t.Fatalf("the moved gate is on %+v", e)
 	}
 }
