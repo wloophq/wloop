@@ -14,8 +14,8 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/turns"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 type fakeTurns struct {
@@ -200,7 +200,7 @@ func decodeResult(t *testing.T, rec *httptest.ResponseRecorder) toolResult {
 }
 
 func TestToolCallRecords(t *testing.T) {
-	ft := &fakeTurns{answer: turns.Recorded{Unit: pr.Ref{Owner: "acme", Repo: "api", Number: 7}.Unit(), State: record.Settled, Added: true}}
+	ft := &fakeTurns{answer: turns.Recorded{Unit: unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}, State: record.Settled, Added: true}}
 	s := &Server{Texts: bundledTexts, Turns: ft, Port: 47800}
 	sid := call(t, s, "", "term_1", initialize).Header().Get("Mcp-Session-Id")
 	body := `{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"turn_end","arguments":{"turn":"r-1","record":{"state":"settled","summary":"nothing new since my review"}}}}`
@@ -389,7 +389,7 @@ func TestDeleteRefusesAnotherHandlesSession(t *testing.T) {
 }
 
 func TestToolCallRefusesExtraArgumentsAndTrimsTheRound(t *testing.T) {
-	ft := &fakeTurns{answer: turns.Recorded{Unit: pr.Ref{Owner: "acme", Repo: "api", Number: 7}.Unit(), State: record.Settled}}
+	ft := &fakeTurns{answer: turns.Recorded{Unit: unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}, State: record.Settled}}
 	s := &Server{Texts: bundledTexts, Turns: ft, Port: 47800}
 	sid := call(t, s, "", "term_1", initialize).Header().Get("Mcp-Session-Id")
 	extra := `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"turn_end","arguments":{"turn":"r-1","pr":"acme/api#7","state":"done","record":{"state":"settled","summary":"s"}}}}`

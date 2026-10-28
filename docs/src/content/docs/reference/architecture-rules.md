@@ -43,12 +43,13 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestOnlyTheDraftStepProposes` | Only the draft.propose step, and the plugin proposers its allowlist names, build a draft.Origin of kind auto: every other draft comes from a person, a turn or an agent. |
 | `TestOnlyTheStoreTouchesSQL` | Only the sqlite package opens the database, and SQL text appears only under `internal/adapter/store`. |
 | `TestPluginWritesNothingToStdout` | No file of `pkg/plugin` or `plugins/` writes to stdout: go-plugin reads a plugin's handshake from it, so a plugin logs to stderr only. |
-| `TestProseIsEmbeddedOnlyFromProfiles` | Prose files are embedded only from `profiles/`, except the allowlisted ones. |
+| `TestProseIsEmbeddedOnlyFromProfiles` | Prose files are embedded only from `profiles/` and a plugin's profile layer, `plugins/<id>/profile/`, except the allowlisted ones. |
 | `TestProviderIdentityThroughAPluginPackageOnlyShrinks` | Code outside a provider's homes tells a pull request from another unit through the GitHub plugin's package only where pluginIdentityAllowlist lists it. |
 | `TestProviderIdsInStringsOutsideThePluginsOnlyShrink` | A plugin's id spelled inside a Go string outside its plugin (an SQL literal 'github', a config key "plugins.slack.enabled", a struct tag) appears only in the store's migrations, which hold data already written, and in the files of a counted allowlist that only shrinks. |
 | `TestProvidersStayInAdaptersAndTheRoot` | Only a provider and the composition root import a provider's packages, provider names appear only in adapters and the root's allowlist, and only adapters parse an agent's state. |
 | `TestReadModelImports` | The read model reaches its inputs only through ports. |
 | `TestServeRunsThroughTheHarness` | A test of internal/cli starts serve's jobs only through the harness, so none outlives the test's files. |
+| `TestSlackPluginImportsOnlyTheSDK` | No package under `plugins/slack`, tests included, imports a package under `internal/`: the Slack plugin builds against the SDK alone. |
 | `TestSpawningPackagesImportMeter` | A package that spawns a process imports the meter. |
 | `TestTheCoreNamesNoProvider` | The core spells no provider id, and that outside the core a provider id appears only in its plugin's packages, the vocabulary tables, the unit package and the composition root. |
 | `TestTheEngineImportsNoProvider` | The automation engine imports no provider's domain. |
@@ -79,12 +80,12 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 |---|---|---|
 | `internal/adapter/source/github/proposals.go` | ✅ | GitHub's nudge rule, github-nudge |
 | `internal/core/proposals/proposals.go` | ✅ | the job that runs the plugins' own rules |
+| `internal/plugins/source/broker_gates.go` | ✅ | a source plugin's own rule, which proposes through OpenGate with no session |
 
 ### `TestProseIsEmbeddedOnlyFromProfiles`
 
 | `embedKept` entry | Status | Reason |
 |---|---|---|
-| `internal/adapter/source/slack/eval` | ✅ | the extraction eval's own prompts, a dev tool |
 | `skills` | ✅ | the skills install writes into agent homes |
 
 ### `TestProviderIdentityThroughAPluginPackageOnlyShrinks`
@@ -115,7 +116,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/doctor.go` `github` `1` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
 | `internal/config/config.go` `github` `7` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
 | `internal/config/plugins.go` `github` `1` | 🧾 | GitHub's settings are a field of the configuration until its plugin reads its table through the broker (X8a2) |
-| `internal/config/plugins.go` `slack` `1` | 🧾 | Slack's settings are a field of the configuration until its plugin reads its table through the broker (X7) |
+| `internal/config/plugins.go` `slack` `1` | 🧾 | Slack's settings are a field of the configuration while init and doctor read them there, until they ask the plugin (X9) |
 | `internal/intent/builtin/builtin.go` `slack` `1` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
 | `internal/intent/builtin/cmd/factsdoc/main.go` `slack` `1` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
 | `internal/intent/builtin/cmd/grammardoc/groups.go` `github` `8` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
@@ -166,7 +167,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/adapter/store/sqlite/registry.go` `sessionUnit` `unit.Session` `1` | ✅ | the store keeps the sessions the core keeps |
 | `internal/adapter/store/sqlite/retain.go` `retainWorkflowEventsSQL` `unit.Session` `1` | ✅ | the store keeps the sessions the core keeps |
 | `internal/adapter/store/sqlite/retain.go` `retainWorkflowEventsSQL` `unit.Workspace` `1` | ✅ | the store keeps the workspaces the core keeps |
-| `internal/adapter/store/sqlite/slack.go` `slackProvider` `"slack"` `1` | ✅ | the store keeps the Slack plugin's tables |
 | `internal/adapter/store/sqlite/turns.go` `compareUnits` `unit.GitHub` `2` | 🧾 | pull requests sort by owner, repository and number |
 | `internal/catalog/catalog.go` `withSource` `unit.GitHub` `1` | 🧾 | the catalog's built-in actions name the GitHub plugin |
 | `internal/cli/actions.go` `Env.fetchPR` `unit.GitHub` `1` | 🧾 | the GitHub viewer read outside the plugin |

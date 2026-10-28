@@ -10,11 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
@@ -48,16 +46,13 @@ func TestAReactionClosureClosesWithACheckMark(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newReplay(t)
-	b, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "workflows", "slack-closure", "workflow.toml"))
+	b, err := os.ReadFile(filepath.Join("..", "..", "plugins", "slack", "profile", "workflows", "slack-closure", "workflow.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	manifest := strings.Replace(string(b), `purpose = "close"`, "purpose = \"close\"\ndelivery = \"reaction\"\nreaction = \"white_check_mark\"\ntarget = \"item\"", 1)
 	userProfile(t, r.te, map[string]string{"workflows/slack-closure/workflow.toml": manifest})
-	if err := r.db.Extraction().Save(ctx, sqlite.ExtractionSave{States: map[unit.Unit]sqlite.ExtractionState{
-		rpD: {Verdict: "needs_closure", StartedByViewer: true, Watched: true, At: r.now}}}); err != nil {
-		t.Fatal(err)
-	}
+	r.slack.startedByMe(rpD)
 	d := firstDayClosure(t, r)
 	if d.Delivery != draft.Reaction || d.Reaction != "white_check_mark" || d.Target != "https://example.test/d1" || d.Text != "" {
 		t.Fatalf("closure %+v", d)
@@ -68,9 +63,8 @@ func TestAReactionClosureClosesWithACheckMark(t *testing.T) {
 	if _, failed, err := r.svc.Send(ctx); err != nil || failed > 0 {
 		t.Fatalf("send: %d failed, %v", failed, err)
 	}
-	st, err := r.db.Extraction().States(ctx, []unit.Unit{rpD})
-	if err != nil || !st[rpD].ClosureMarked {
-		t.Fatalf("the ✅ closed nothing: %+v, %v", st[rpD], err)
+	if !r.slack.isClosed(rpD) {
+		t.Fatal("the ✅ closed nothing")
 	}
 }
 
@@ -203,11 +197,11 @@ func TestAUserWorkflowThatFailsToLoadKeepsItsDrafts(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newReplay(t)
-	b, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "workflows", "slack-ask-owner", "workflow.toml"))
+	b, err := os.ReadFile(filepath.Join("..", "..", "plugins", "slack", "profile", "workflows", "slack-ask-owner", "workflow.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	text, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "workflows", "slack-ask-owner", "text.md.tmpl"))
+	text, err := os.ReadFile(filepath.Join("..", "..", "plugins", "slack", "profile", "workflows", "slack-ask-owner", "text.md.tmpl"))
 	if err != nil {
 		t.Fatal(err)
 	}

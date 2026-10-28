@@ -120,7 +120,7 @@ func serve(ctx context.Context, e *Env, args []string) error {
 	e.Rec = storeRecorder{store}
 	e.interrupted = new(atomic.Bool)
 	e.Rounds = sqlite.NewRounds(db)
-	endpoint := mcpEndpoint{port: *mcpPort, log: logf, slack: e.slack, key: e.mcpKey,
+	endpoint := mcpEndpoint{port: *mcpPort, log: logf, tools: e.pluginTools(db), key: e.mcpKey,
 		intents: func() *dintent.Registry {
 			if l := e.loadedIntents(); l != nil {
 				return l.Registry
@@ -200,9 +200,10 @@ func (e *Env) retainJob(db *sqlite.DB) func(context.Context) (string, error) {
 // mcpEndpoint is the daemon's MCP server over the daemon's turns; port, when
 // not 0, overrides mcp.port.
 type mcpEndpoint struct {
-	port  int
-	log   func(string, ...any)
-	slack slackEnv
+	port int
+	log  func(string, ...any)
+	// tools are the plugins' MCP tools under a configuration; nil is none.
+	tools func(config.Config) []mcp.PluginTool
 	// key is read on each request, so a key install writes later applies
 	// without a restart.
 	key func() string
@@ -227,7 +228,9 @@ func (m mcpEndpoint) wire(d daemon.Deps, cfg config.Config) daemon.Deps {
 	if d.Turns != nil {
 		srv.Turns = d.Turns
 	}
-	m.wireSlack(srv, d, cfg)
+	if m.tools != nil {
+		srv.Plugins = m.tools(cfg)
+	}
 	if d.Messages != nil {
 		srv.Inbox = d.Messages
 	}
@@ -343,6 +346,8 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	d = withGitHub(d, e.githubPresenter(store, host(forge), briefs))
 	d.PluginPresenter = e.pluginPresenter
 	d.Items = e.itemsLedger(db, cfg, logf)
+	d.PluginAction = e.pluginAction
+	d.PluginRun = e.pluginRun
 	if e.pluginKind != nil {
 		d.Loading = e.pluginKind.Loading
 	}
@@ -355,6 +360,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	}
 	d = e.withCards(withSources(d, plugins, mods), db, cfg, mods, logf)
 	e.resolve = d.Resolve
+	e.hosted.setResolve(d.Resolve)
 	d = e.serveTasks(d, db, cfg, mods, logf)
 	e.serveProposals(ctx, db, cfg, mods, logf)
 	d = e.serveOutbox(d, db, cfg, mods, logf)

@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	slacksource "github.com/wloophq/wloop/internal/adapter/source/slack"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/config"
@@ -26,6 +26,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -366,20 +367,17 @@ func TestUnitClosedClosesTheTaskAndUnwatchesAfterWarmFor(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	now := time.Date(2026, 10, 14, 15, 0, 0, 0, time.UTC)
 	clock := clockFunc(func() time.Time { return now })
-	m, err := slacksource.Module(config.Defaults(), source.Deps{DB: db, Clock: clock}, slacksource.Slack{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	var closed []unit.Unit
+	m := source.Module{ID: slackPlugin, OnPosted: map[string]outbox.Effect{builtin.EffectUnitClosed: func(_ context.Context, d draft.Draft) error {
+		closed = append(closed, d.Unit)
+		return nil
+	}}}
 	newSvc := func() *outbox.Service {
 		return &outbox.Service{Store: db.Drafts(), Clock: clock,
 			Effects: func(unit.ProviderID) (port.Effects, error) { return okEffects{}, nil },
 			Applier: outbox.EffectApplier{Store: db.DraftEffects(), Clock: clock, Effects: effectLookup(effectDeps{Modules: []source.Module{m}})}}
 	}
 	svc := newSvc()
-	if err := db.Extraction().Save(ctx, sqlite.ExtractionSave{States: map[unit.Unit]sqlite.ExtractionState{
-		draftThread: {Verdict: "needs_closure", StartedByViewer: true, Watched: true, At: now}}}); err != nil {
-		t.Fatal(err)
-	}
 	closeOf := func(closed bool) []task.Change {
 		done := items.Item{ID: "i1", Unit: draftThread, State: items.Resolved, Requester: ana}
 		f := task.UnitFacts{Unit: draftThread, StartedByMe: true, ClosurePosted: closed}
@@ -407,7 +405,7 @@ func TestUnitClosedClosesTheTaskAndUnwatchesAfterWarmFor(t *testing.T) {
 	if _, _, err := svc.Send(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if st, _ := db.Extraction().States(ctx, []unit.Unit{draftThread}); st[draftThread].ClosureMarked {
+	if len(closed) != 0 {
 		t.Fatal("a close draft that declares no effect marked the closure")
 	}
 	if _, err := svc.Approve(ctx, react.ID, nil); err != nil {
@@ -416,17 +414,16 @@ func TestUnitClosedClosesTheTaskAndUnwatchesAfterWarmFor(t *testing.T) {
 	if _, _, err := svc.Send(ctx); err != nil {
 		t.Fatal(err)
 	}
-	st, err := db.Extraction().States(ctx, []unit.Unit{draftThread})
-	if err != nil || !st[draftThread].ClosureMarked {
-		t.Fatalf("the reaction's unit.closed: %+v %v", st[draftThread], err)
+	if !slices.Equal(closed, []unit.Unit{draftThread}) {
+		t.Fatalf("the reaction's unit.closed closed %v", closed)
 	}
-	if cs := closeOf(st[draftThread].ClosurePosted || st[draftThread].ClosureMarked); len(cs) != 0 {
+	if cs := closeOf(true); len(cs) != 0 {
 		t.Fatalf("the close entry outlives the closure: %+v", cs)
 	}
 	if err := newSvc().Recover(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if pending, _ := db.DraftEffects().Unapplied(ctx); len(pending) != 0 {
-		t.Fatalf("applied again after a restart: %+v", pending)
+	if pending, _ := db.DraftEffects().Unapplied(ctx); len(pending) != 0 || len(closed) != 1 {
+		t.Fatalf("applied again after a restart: %+v, closed %v", pending, closed)
 	}
 }

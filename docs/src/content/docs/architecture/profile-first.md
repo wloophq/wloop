@@ -5,7 +5,7 @@ description: Behavior and text belong to the profile; Go provides facts, mechani
 
 {{name}} is meant to be customized. A behavior decision (when something happens, on which units, where it runs, what it instructs, which effects it asks for) is an intent or a workflow of the profile, and every text an agent or a person reads belongs there too. Go provides facts, mechanisms and gates: it reads units, launches agents, publishes, and holds the approval, the Outbox, the records, the budgets and the guards. It does not decide what to do and does not write prose.
 
-The embedded `profiles/default/` is the lowest layer of every profile. Your profile, the directory the configuration's `profile` names, sits above it.
+The embedded `profiles/default/` is the lowest layer of every profile. Each enabled plugin's layer sits above it, the Slack plugin's embedded from `plugins/slack/profile/` ([Plugins](/architecture/plugins/)). Your profile, the directory the configuration's `profile` names, sits above them.
 
 ## What lives in the profile
 
@@ -18,7 +18,7 @@ The embedded `profiles/default/` is the lowest layer of every profile. Your prof
 | Partials: the text every intent's instructions share, such as the record protocol, the history and the brief | `profiles/default/partials/<name>.md.tmpl` | replaces a partial for every intent under `partials/<name>.md.tmpl`, and adds partials its intents call |
 | Prompts of {{name}}'s own calls, such as the headless turn's wrapper | `profiles/default/prompts/` | replaces a prompt under `prompts/` |
 | The headings of a block's conditions in a turn's judgment | `profiles/default/labels.toml` | a `labels.toml` whose keys replace the bundled ones |
-| What an agent reads about each MCP tool: its `description`, its parameters' (`params`, by path) and what it answers (`answers`, by name) | `profiles/default/tools.toml` | a `tools.toml` whose keys replace the bundled ones |
+| What an agent reads about each MCP tool: its `description`, its parameters' (`params`, by path) and what it answers (`answers`, by name) | `profiles/default/tools.toml`, and a plugin's tools in its layer's `tools.toml` | a `tools.toml` whose keys replace the bundled ones |
 | The task states and their categories, the task properties with their types and writers, the verbs' words (`label`, `summary`, the button's tooltip, `input`, the question a verb that asks for a value puts first), where a task offers each (`offer`), its move (`from`, `to`), its `handler` and who may run it (`by`, `gate`) | `profiles/default/tasks.toml` | a `tasks.toml` whose keys replace the bundled ones and whose new states and properties come after the bundled ones |
 | The gates: each one's kind, words and the intents it is resolved with | `profiles/default/gates.toml` | a `gates.toml` whose keys replace the bundled ones and whose new gates and intents come after the bundled ones |
 | The labels of the views, the keys that jump to them, and the labels of the review's steps | `profiles/default/views.toml` | a `views.toml` whose keys replace the bundled ones |
@@ -72,7 +72,7 @@ These texts and decisions are still in Go, and are moving to the profile:
 - the lists' predicates, the counters and the automatic focus star read the bundled properties `focus`, `area`, `contexts` and `due` by name (`internal/domain/task`), and the set of verbs is a Go list (`task.Verbs`), as are the verbs that ask for a value first (`builtin.TaskVerbInputs`) and a kind's own dismiss or done that the daemon and the projects register by the verb's name; a verb's move, its handler and who may run it come from `tasks.toml`;
 - notification titles, the digest and the menu bar's copy;
 - the cockpit's and the terminal's chrome: the hints a prompt gives on its keys (Tab, Ctrl+E), the titles and empty states of the panes, the modes of the delegate and reply prompts (draft for me, hand to an agent, send now), and the reason shown when a task does not offer a verb;
-- the renderings of Slack messages that `slack_read` and `slack_search` return (`internal/adapter/source/slack`), the JSON-RPC errors of the MCP endpoint, and the error texts a mechanism returns through a tool's `failed` answer.
+- the renderings of Slack messages that `slack_read` and `slack_search` return (the Slack plugin's `plugins/slack`), the JSON-RPC errors of the MCP endpoint, and the error texts a mechanism returns through a tool's `failed` answer.
 
 ## Direction
 

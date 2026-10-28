@@ -128,7 +128,8 @@ func report(key string) src.Snapshot {
 			Stalled: src.After(since, time.Hour, src.Calendar)},
 		Card: &src.Card{Label: "acme " + key, Title: "Ship the " + key, Link: "https://acme.example/" + key, Why: "Bruno asked for your review",
 			WaitsOn: []src.Person{{Key: "acme:ana", Name: "Ana"}}, State: "open"},
-		Views: []string{api.ViewNeedsMe}, Facets: map[string]string{"repo": "acme/api"}, Data: json.RawMessage(`{"size":3}`),
+		Views: []string{api.ViewNeedsMe}, Facets: map[string]string{"repo": "acme/api"}, FacetValues: map[string][]string{"waits-on": {"me", "ana"}},
+		Data:  json.RawMessage(`{"size":3}`),
 		Items: []src.Item{{ID: "i1", Kind: "request", Summary: "review the schema", State: "open", WaitingOn: []src.Person{{Key: "acme:ana"}}}}}
 }
 
@@ -179,7 +180,7 @@ func TestARowIsDerivedFromItsSnapshotAndHostState(t *testing.T) {
 	got := row(plain, ins[plain])
 	if got.Kind != "review" || got.Summary.WaitsOn != "me" || !got.Summary.Stalled || got.Summary.Reason != "Bruno asked for your review" ||
 		got.Label != "acme plain" || got.Title != "Ship the plain" || got.Link != "https://acme.example/plain" ||
-		!slices.Equal(got.Views, []string{api.ViewNeedsMe}) || got.Facets["repo"][0] != "acme/api" || string(got.Payload) != `{"size":3}` ||
+		!slices.Equal(got.Views, []string{api.ViewNeedsMe}) || got.Facets["repo"][0] != "acme/api" || !slices.Equal(got.Facets["waits-on"], []string{"me", "ana"}) || string(got.Payload) != `{"size":3}` ||
 		len(got.Items) != 1 || got.Items[0].WaitingOn[0] != "acme:ana" || got.Summary.OpenItems != 1 || got.Pending != nil {
 		t.Errorf("the snapshot's row: %+v", got)
 	}

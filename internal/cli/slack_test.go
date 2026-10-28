@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -18,8 +17,16 @@ import (
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
-	"github.com/wloophq/wloop/internal/slack/auth"
-	"github.com/wloophq/wloop/internal/slack/slacktest"
+	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/plugins/bundled"
+	"github.com/wloophq/wloop/internal/plugins/host"
+	"github.com/wloophq/wloop/pkg/plugin"
+	"github.com/wloophq/wloop/pkg/plugin/manifest"
+	"github.com/wloophq/wloop/pkg/plugin/plugintest"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+	"github.com/wloophq/wloop/plugins/slack"
+	"github.com/wloophq/wloop/plugins/slack/auth"
+	"github.com/wloophq/wloop/plugins/slack/slacktest"
 )
 
 const testClientID = "1.2"
@@ -94,6 +101,34 @@ type slackTestEnv struct {
 	kc       *fakeKeychain
 	srv      *slacktest.Server
 	cfg      config.Config
+	// open plays the browser for the plugin's login; nil has none.
+	open func(url string) error
+}
+
+// bundledSlackManifest is the bundled Slack plugin's manifest.
+func bundledSlackManifest(t *testing.T) *manifest.Manifest {
+	t.Helper()
+	ms, err := bundled.Manifests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range ms {
+		if m.ID == string(slackPlugin) {
+			return m
+		}
+	}
+	t.Fatal("no bundled slack manifest")
+	return nil
+}
+
+// withSlackPlugin runs the real Slack plugin in-process for e's serve and
+// its CLI commands, over env.
+func withSlackPlugin(t *testing.T, e *Env, env slack.Env) {
+	t.Helper()
+	l := plugintest.NewLauncher(t)
+	l.Add(string(slackPlugin), map[plugin.Kind]plugin.Impl{src.Kind: src.New(&slack.Plugin{Env: env})})
+	e.pluginLauncher = l
+	e.plugins = []host.Plugin{{Manifest: bundledSlackManifest(t), Dir: t.TempDir(), Binary: brand.PluginBinary(string(slackPlugin)), Bundled: true}}
 }
 
 func newSlackTestEnv(t *testing.T) *slackTestEnv {
@@ -101,7 +136,8 @@ func newSlackTestEnv(t *testing.T) *slackTestEnv {
 	te := &slackTestEnv{out: &bytes.Buffer{}, err: &bytes.Buffer{}, kc: newFakeKeychain(), srv: slacktest.New(t), cfg: Defaults()}
 	te.cfg.Slack.ClientID = testClientID
 	te.cfg.Slack.KeychainService = "loop-test-slack"
-	port := 0
+	off := false
+	te.cfg.Slack.Ingest.Socket = &off
 	te.Env = &Env{
 		Out:        te.out,
 		Err:        te.err,
@@ -112,16 +148,23 @@ func newSlackTestEnv(t *testing.T) *slackTestEnv {
 		Home:       t.TempDir(),
 		Now:        func() time.Time { return testNow },
 		Sh:         func(context.Context, string, ...string) ([]byte, error) { return nil, errors.New("no shell in tests") },
-		slack: slackEnv{
-			Keychain:  te.kc,
-			BaseURL:   te.srv.URL,
-			LockPath:  filepath.Join(t.TempDir(), "slack.lock"),
-			LoginPort: &port,
-			Open:      func(string) error { return errors.New("no browser in tests") },
-			Now:       func() time.Time { return testNow },
-		},
 	}
+	withSlackPlugin(t, te.Env, te.pluginEnv(t, te.srv.URL))
 	return te
+}
+
+// pluginEnv is the Slack plugin's environment over te's Keychain and the
+// fake Slack at baseURL.
+func (te *slackTestEnv) pluginEnv(t *testing.T, baseURL string) slack.Env {
+	port := 0
+	return slack.Env{Keychain: te.kc, BaseURL: baseURL, LockPath: filepath.Join(t.TempDir(), "slack.lock"), LoginPort: &port,
+		Now: func() time.Time { return testNow },
+		Open: func(_ context.Context, u string) error {
+			if te.open == nil {
+				return errors.New("no browser in tests")
+			}
+			return te.open(u)
+		}}
 }
 
 func (te *slackTestEnv) run(args ...string) int {
@@ -185,7 +228,7 @@ func TestSlackLoginSavesTheToken(t *testing.T) {
 	t.Parallel()
 	te := newSlackTestEnv(t)
 	te.fakeOAuth()
-	te.slack.Open = func(u string) error { browse(t, u); return nil }
+	te.open = func(u string) error { browse(t, u); return nil }
 	if code := te.run("slack", "login"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
@@ -305,6 +348,7 @@ func TestSlackStatusNeverDeletesOnLoggedOut(t *testing.T) {
 	tok.Expires = testNow.Add(-time.Hour)
 	te.saveToken(t, tok)
 	te.srv.Handle("oauth.v2.access", func(url.Values) any { return map[string]any{"ok": false, "error": "invalid_refresh_token"} })
+	startSlackDaemon(t, te)
 	te.run("slack", "status")
 	te.run("slack", "send", "--yes", "C0000000001", "hi")
 	if _, ok := te.kc.items["loop-test-slack/current"]; !ok {
@@ -383,6 +427,7 @@ func TestSlackSendConfirms(t *testing.T) {
 			te := newSlackTestEnv(t)
 			te.saveToken(t, fakeToken())
 			te.fakeChannel()
+			startSlackDaemon(t, te)
 			te.In = strings.NewReader(tc.answer)
 			te.slack.Interactive = func() bool { return tc.interactive }
 			args := []string{"slack", "send", "C0000000001", "**hello**"}
@@ -427,7 +472,7 @@ func TestSlackAuthCommandsWorkWhileDisabled(t *testing.T) {
 	te.cfg.Slack.Enabled = &off
 	te.fakeOAuth()
 	te.srv.Handle("auth.revoke", func(url.Values) any { return nil })
-	te.slack.Open = func(u string) error { browse(t, u); return nil }
+	te.open = func(u string) error { browse(t, u); return nil }
 	for _, args := range [][]string{{"slack", "login"}, {"slack", "status"}, {"slack", "logout"}} {
 		if code := te.run(args...); code != 0 {
 			t.Fatalf("%q: exit %d: %s", args, code, te.err)
@@ -443,16 +488,8 @@ func TestKeychainServiceFromConfig(t *testing.T) {
 	te := newSlackTestEnv(t)
 	te.cfg.Slack.KeychainService = "x"
 	te.run("slack", "status")
-	te.run("slack", "send", "--yes", "C0000000001", "hi")
 	if !slices.Equal(te.kc.services, []string{"x"}) {
 		t.Fatalf("services %q", te.kc.services)
-	}
-	kit := te.slack.kit(te.cfg.Slack, nil)
-	if kit.Store.Service != "x" {
-		t.Fatalf("Service %q", kit.Store.Service)
-	}
-	if got := te.slack.kit(config.Slack{}, nil).Store.Service; got != brand.StateDir()+"-slack" {
-		t.Fatalf("default service %q", got)
 	}
 }
 
@@ -462,66 +499,21 @@ func TestPostAllowlistFromConfig(t *testing.T) {
 	te.cfg.Slack.PostAllowlist = []string{"U000"}
 	te.saveToken(t, fakeToken())
 	te.fakeChannel()
+	startSlackDaemon(t, te)
 	if code := te.run("slack", "send", "--yes", "C0000000001", "hi"); code != 1 || !strings.Contains(te.err.String(), "allowlist") {
 		t.Fatalf("CLI: exit %d: %s", code, te.err)
 	}
 	if n := len(te.srv.Calls("chat.postMessage")); n != 0 {
 		t.Fatalf("CLI posted %d", n)
 	}
-	if got := te.slack.kit(te.cfg.Slack, nil).Send.PostAllowlist; !slices.Equal(got, []string{"U000"}) {
-		t.Fatalf("CLI allowlist %q", got)
-	}
-	sender := wiredSlack(t, te, nil)
-	if got := sender.kit.Send.PostAllowlist; !slices.Equal(got, []string{"U000"}) {
-		t.Fatalf("daemon allowlist %q", got)
-	}
-}
-
-func TestRequestLogFromConfig(t *testing.T) {
-	t.Parallel()
-	te := newSlackTestEnv(t)
-	te.saveToken(t, fakeToken())
-	te.fakeChannel()
-	var mu sync.Mutex
-	var lines []string
-	logf := func(format string, args ...any) {
-		mu.Lock()
-		defer mu.Unlock()
-		lines = append(lines, fmt.Sprintf(format, args...))
-	}
-	sender := wiredSlack(t, te, logf)
-	if _, err := sender.Send(context.Background(), "", sendRequest("C0000000001", "hi")); err != nil {
-		t.Fatal(err)
-	}
-	if slices.ContainsFunc(lines, func(l string) bool { return strings.HasPrefix(l, "slack_call") }) {
-		t.Fatalf("request log while off: %q", lines)
-	}
-
-	te.cfg.Slack.RequestLog = true
-	lines = nil
-	sender = wiredSlack(t, te, logf)
-	if _, err := sender.Send(context.Background(), "", sendRequest("C0000000001", "hi")); err != nil {
-		t.Fatal(err)
-	}
-	if !slices.Contains(lines, "slack_call method=chat.postMessage status=200") {
-		t.Fatalf("lines %q", lines)
-	}
-	for _, l := range lines {
-		assertNoSlackToken(t, l)
-	}
-
-	te.out.Reset()
-	te.err.Reset()
-	if code := te.run("slack", "send", "--yes", "C0000000001", "hi"); code != 0 || !strings.Contains(te.err.String(), "slack_call method=chat.postMessage status=200") {
-		t.Fatalf("CLI: exit %d: %s", code, te.err)
-	}
 }
 
 func TestDoctorSlackChecks(t *testing.T) {
 	t.Parallel()
 	te := newSlackTestEnv(t)
+	ctx := context.Background()
 	te.cfg.Slack.ClientID = ""
-	if got := te.slackChecks(te.cfg); len(got) != 0 {
+	if got := te.slackChecks(ctx, te.cfg); len(got) != 0 {
 		t.Fatalf("unconfigured: %+v", got)
 	}
 	if len(te.kc.services) != 0 {
@@ -529,17 +521,21 @@ func TestDoctorSlackChecks(t *testing.T) {
 	}
 
 	te.cfg.Slack.ClientID = testClientID
-	got := te.slackChecks(te.cfg)
-	if len(got) == 0 || got[0].mark != markMissing || !strings.Contains(got[0].fix, "slack login") {
+	got := te.slackChecks(ctx, te.cfg)
+	if len(got) == 0 || !strings.Contains(got[0].info, "not logged in") || !strings.Contains(got[0].info, "slack login") {
 		t.Fatalf("logged out: %+v", got)
 	}
 	te.saveToken(t, fakeToken())
-	got = te.slackChecks(te.cfg)
-	if got[0].mark != markOK || !strings.Contains(got[0].info, "Acme") {
+	got = te.slackChecks(ctx, te.cfg)
+	if !strings.Contains(got[0].info, "Acme") {
 		t.Fatalf("logged in: %+v", got)
 	}
 	for _, c := range got {
 		assertNoSlackToken(t, c.info+c.fix)
+	}
+	te.plugins = nil
+	if got := te.slackChecks(ctx, te.cfg); got[0].mark != markMissing || !strings.Contains(got[0].info, "not installed") {
+		t.Fatalf("no plugin binary: %+v", got)
 	}
 }
 
@@ -607,4 +603,10 @@ func TestSlackHelpFlagPrintsTheUsage(t *testing.T) {
 			t.Errorf("%q: %s", args, out)
 		}
 	}
+}
+
+// slackThreadUnit is the Slack thread unit of the message ts in
+// conversation of team.
+func slackThreadUnit(team, conversation, ts string) unit.Unit {
+	return unit.Unit{Provider: slackPlugin, Key: team + "/" + conversation + "/" + ts}
 }

@@ -326,6 +326,14 @@ message Snapshot {
   map<string, string> facets = 17;
   // views are the ids of the manifest's views the unit's row is in.
   repeated string views = 18;
+  // facet_values are the values of the manifest's facets that hold more
+  // than one, by facet id; the host merges them over facets.
+  map<string, FacetValues> facet_values = 19;
+}
+
+// FacetValues are the values of one facet.
+message FacetValues {
+  repeated string values = 1;
 }
 
 // Situation is what the unit waits on, as the plugin derives it from its
@@ -459,6 +467,9 @@ message ActionRequest {
   string action = 3;
   string input = 4;
   bytes args_json = 5;
+  // actor is who asked for the action, "person" or "agent"; "" when the
+  // host does not say.
+  string actor = 6;
 }
 
 message ActionResponse {
@@ -1008,6 +1019,9 @@ message SessionResponse {
 message GateRef {
   string gate = 1;
   int64 draft = 2;
+  // state is the draft's state once the host's approval policy saw it:
+  // proposed, approved, or discarded under dry run.
+  string state = 3;
 }
 
 // OpenGateRequest proposes a draft. With a session, the host sets its origin,

@@ -4,8 +4,6 @@ import (
 	"errors"
 	"io/fs"
 	"maps"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -98,11 +96,11 @@ func readLayered(layers []profile.Layer, bundled fs.FS, name string, merge func(
 	}
 	problems := merge(name, src)
 	for _, l := range layers {
-		if l.Dir == "" {
+		if l.Bundled() {
 			continue
 		}
-		file := filepath.Join(l.Dir, name)
-		src, err := os.ReadFile(file)
+		r, err := profile.ReadFile(l, name)
+		file, src := r.Path, r.Body
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
@@ -119,13 +117,12 @@ func readLayered(layers []profile.Layer, bundled fs.FS, name string, merge func(
 func renamedFiles(layers []profile.Layer) Problems {
 	var problems Problems
 	for _, l := range layers {
-		if l.Dir == "" {
+		if l.Bundled() {
 			continue
 		}
 		for _, name := range slices.Sorted(maps.Keys(builtin.RenamedFiles)) {
-			file := filepath.Join(l.Dir, name)
-			if _, err := os.Stat(file); err == nil {
-				problems = append(problems, Problem{File: file, Msg: name + " is no longer read: " + builtin.RenamedFiles[name]})
+			if r, err := profile.ReadFile(l, name); err == nil {
+				problems = append(problems, Problem{File: r.Path, Msg: name + " is no longer read: " + builtin.RenamedFiles[name]})
 			}
 		}
 	}

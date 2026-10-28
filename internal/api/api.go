@@ -111,6 +111,8 @@ var Operations = []Operation{
 	{"GET", PluginAssets},
 	{"GET", PluginView},
 	{"POST", PluginView},
+	{"POST", PluginAction},
+	{"POST", PluginRun},
 	{"GET", ViewsPath},
 	{"GET", TasksPath},
 	{"POST", TasksPath},

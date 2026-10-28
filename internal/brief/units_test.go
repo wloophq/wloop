@@ -7,7 +7,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -46,8 +45,7 @@ func TestASlackUnitIsBriefedOnDemand(t *testing.T) {
 	if rd, _ := a.Peek(ctx, thread, true, nil); rd.Go {
 		t.Fatalf("peek after the want: %+v", rd)
 	}
-	if err := r.db.Extraction().Save(ctx, sqlite.ExtractionSave{States: map[unit.Unit]sqlite.ExtractionState{
-		thread: {Brief: `{"goal":"Ship the export","kind":"request","risk":"low","tags":["domain:billing"]}`, At: t0}}}); err != nil {
+	if err := r.db.PutUnitBrief(ctx, thread, "extraction", `{"goal":"Ship the export","kind":"request","risk":"low","tags":["domain:billing"]}`, t0); err != nil {
 		t.Fatal(err)
 	}
 	r.q.Noted(thread)

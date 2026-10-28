@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
@@ -41,7 +40,7 @@ func TestAnEnumHoldsItsFactsValues(t *testing.T) {
 }
 
 func TestEndedFactIsTheSlotsEndedFact(t *testing.T) {
-	for p, want := range map[unit.ProviderID]string{unit.GitHub: "pr.ended", dslack.Provider: "slack.ended", unit.Session: "", unit.Task: "", "nowhere": ""} {
+	for p, want := range map[unit.ProviderID]string{unit.GitHub: "pr.ended", "slack": "slack.ended", unit.Session: "", unit.Task: "", "nowhere": ""} {
 		got, ok := EndedFact(p)
 		if got != want || ok != (want != "") {
 			t.Errorf("EndedFact(%s) = %q, %t; want %q", p, got, ok, want)

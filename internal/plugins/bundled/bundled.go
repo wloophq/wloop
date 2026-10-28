@@ -1,6 +1,6 @@
-// Package bundled is the plugins the release bundles: their manifests, and
-// the vocabulary they merge into the builtin tables, which the package
-// installs when it initializes. The composition root imports it and installs
+// Package bundled is the plugins the release bundles: their manifests, their
+// profile layers, and the vocabulary they merge into the builtin tables,
+// which the package installs, with the layers, when it initializes. The composition root imports it and installs
 // the bundled and the discovered plugins' vocabulary over it; every test that
 // loads the bundled profile, whose intents and workflows name the bundled
 // plugins' facts, imports it too.
@@ -16,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/plugins/codec"
+	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 	"github.com/wloophq/wloop/plugins"
 )
@@ -40,6 +41,27 @@ func Manifests() ([]*manifest.Manifest, error) {
 			return nil, fmt.Errorf("bundled plugin %s: its manifest's id is %s", d.Name(), m.ID)
 		}
 		out = append(out, m)
+	}
+	return out, nil
+}
+
+// Profiles are the bundled plugins' profile layers, by id order.
+func Profiles() ([]profile.PluginFS, error) {
+	dirs, err := fs.ReadDir(plugins.Profiles, ".")
+	if err != nil {
+		return nil, err
+	}
+	var out []profile.PluginFS
+	for _, d := range dirs {
+		root := path.Join(d.Name(), profile.PluginProfileDir)
+		if _, err := fs.Stat(plugins.Profiles, root); err != nil {
+			continue
+		}
+		sub, err := fs.Sub(plugins.Profiles, root)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, profile.PluginFS{ID: d.Name(), Source: path.Join("plugins", root), FS: sub})
 	}
 	return out, nil
 }
@@ -98,4 +120,9 @@ func init() {
 		panic(err)
 	}
 	unit.UseLabels(unit.NewRegistry(slices.Collect(maps.Values(cs))...))
+	ps, err := Profiles()
+	if err != nil {
+		panic(err)
+	}
+	profile.UseBundledPlugins(ps)
 }

@@ -42,6 +42,9 @@ type Snapshot struct {
 	// Views the ids of the manifest's views its row is in.
 	Facets map[string]string `json:"facets,omitempty"`
 	Views  []string          `json:"views,omitempty"`
+	// FacetValues are the values of the manifest's facets that hold more
+	// than one, by facet id; the host merges them over Facets.
+	FacetValues map[string][]string `json:"facet_values,omitempty"`
 }
 
 // Situation is what a unit waits on, as the plugin derives it from its
@@ -321,7 +324,16 @@ type ActionRequest struct {
 	Action string
 	Input  string
 	Args   json.RawMessage
+	// Actor is who asked for the action: ActorPerson or ActorAgent; ""
+	// when the host does not say.
+	Actor string
 }
+
+// The actors of an action.
+const (
+	ActorPerson = "person"
+	ActorAgent  = "agent"
+)
 
 // ViewRequest asks for one of the plugin's views.
 type ViewRequest struct {

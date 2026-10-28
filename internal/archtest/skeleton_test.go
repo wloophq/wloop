@@ -18,31 +18,11 @@ import (
 // skeleton is every identifier other packages build on, by package; "T.M"
 // is a field or method M of type T.
 var skeleton = map[string][]string{
-	"internal/slack": {"TokenSource", "Client", "Client.Call", "Client.OnRateLimited", "Client.RequestLog",
-		"APIError", "Limiter", "Limiter.Low", "PostArgs", "Posted", "PageArgs", "MessagesPage", "SearchArgs"},
-	"internal/slack/auth": {"Token", "UserScopes", "Keychain", "SecurityKeychain", "Store", "Store.Load", "Store.Save",
-		"Store.Delete", "Store.Token", "Store.AppToken", "Store.SaveAppToken", "Store.DeleteAppToken", "Login", "Login.Run"},
-	"internal/slack/send": {"Request", "Resolved", "Sent", "Service", "Service.Resolve", "Service.Allowed", "Service.Send",
-		"ErrNotLoggedIn", "ErrAmbiguous", "ErrCannotPost", "ErrNotAllowed", "Mrkdwn"},
-	"internal/transport/mcp": {"Slack", "SlackReader", "SlackDrafts", "DraftArgs", "DraftResult",
-		"Server.Slack", "Server.SlackRead", "Server.SlackDraft"},
-	"internal/slack/socket": {"Envelope", "Envelope.EventID", "StateKind", "State", "Socket", "Conn", "Conn.Run",
-		"ErrInvalidAuth", "RedactURL"},
-	"internal/slack/socket/sockettest": {"New", "Server", "Server.URL", "Server.Open", "Server.Send", "Server.Hello",
-		"Server.Disconnect", "Server.Drop", "Server.Acks", "Server.Opens"},
-	"internal/domain/slack": {"Provider", "Kind", "Via", "ViaSocket", "ViaCatchUp", "ViaProbe", "ViaSearch", "ViaFollow",
-		"File", "Reaction", "Message", "Delta", "Delta.EventID", "Codec", "FromEvent", "MessageFrom", "HiddenSubtypes",
-		"ThreadObject", "DMObject", "ParseObject", "ThreadUnit", "ObjectOf", "ConversationKind", "Conversation", "User",
-		"Facts", "Facts.Units", "Thread", "DMWindow", "ChangeKind", "Change", "ErrUnknownUnit", "FactsReader", "ObjectRef",
-		"WatchReason", "Watcher", "Scheduler", "Segments", "Span", "SegmentWriter"},
-	"internal/adapter/source/slack": {"Metrics", "Metrics.Received", "Metrics.Admitted", "Metrics.Socket", "Metrics.CatchUp",
-		"Metrics.RateLimited", "Metrics.Backfill", "Metrics.Warn"},
+	"internal/transport/mcp": {"PluginTool", "Server.Plugins"},
 	"internal/core/port": {"Heat", "HeatActive", "HeatWarm", "HeatCold", "HeatReader", "TopicLinks", "TopicItems",
 		"TopicCards", "TopicTasks", "TopicDrafts", "Linker", "LinkStore", "Effects", "Validator",
 		"Topic", "TopicPending", "TopicGates", "TopicWakes", "TopicTimeline", "TopicRuns"},
-	"internal/adapter/source/slack/extract": {"Viewer", "Input", "Result", "ItemOut", "SegmentOut", "LinkOut", "LinkOut.Kind",
-		"ParseTarget", "Prompt", "Schema", "Extract", "Ops", "Render", "UnitState", "Hint", "Reader", "Job", "Job.Run", "Job.Warnings"},
-	"internal/adapter/store/sqlite": {"SchemaVersion", "ExtractionState.ClosureMarked", "PropStore", "PropStore.SetProp",
+	"internal/adapter/store/sqlite": {"SchemaVersion", "DB.PutUnitBrief", "PropStore", "PropStore.SetProp",
 		"PropStore.PropsOf", "DB.Props", "v7Props", "v7Gates", "v7Briefs", "v7Kinds", "v7Wakes", "v7PRTasks", "v7Dossiers",
 		"v7PluginStores", "v7Snapshots"},
 	"internal/domain/link": {"Kind", "Kind.Valid", "Origin", "Facts", "Link", "EventKind", "Event"},
@@ -136,7 +116,6 @@ var skeleton = map[string][]string{
 	"internal/core/tasks/taskstest":       {"Props", "NewProps", "PropContract"},
 	"internal/core/turns/turnstest":       {"Transcripts"},
 	"internal/adapter/agent/claude":       {"Transcripts"},
-	"internal/adapter/facts/slack":        {"Provider"},
 }
 
 // checker type-checks a module package from its source, importing its

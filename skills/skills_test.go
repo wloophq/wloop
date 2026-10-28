@@ -9,12 +9,18 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	pbundled "github.com/wloophq/wloop/internal/plugins/bundled"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
-var codecs = unit.NewRegistry(pr.Codec{}, slack.Codec())
+var codecs = func() *unit.Registry {
+	cs, err := pbundled.Codecs()
+	if err != nil {
+		panic(err)
+	}
+	return unit.NewRegistry(pr.Codec{}, cs["slack"])
+}()
 
 func target(d dintent.Def) string { return codecs.Target(d.ProviderOrDefault()) }
 
@@ -55,7 +61,7 @@ func TestATurnSkillGoesToTheIntentsWhoseManifestAsksForOne(t *testing.T) {
 }
 
 func TestATurnSkillNamesItsTargetAsTheIntentsManifestAndProviderDo(t *testing.T) {
-	d := dintent.Def{Name: "triage", Summary: "Triage a thread", UserFacing: true, Provider: slack.Provider, Skill: true,
+	d := dintent.Def{Name: "triage", Summary: "Triage a thread", UserFacing: true, Provider: "slack", Skill: true,
 		Help: dintent.Help{Target: "a Slack message ref or permalink"}}
 	body := string(Turn(d, target(d)).Render(brand.Command, version))
 	for _, want := range []string{"`" + brand.Command + " instructions triage <ref|permalink|slack:key> -- '<guidance>'`",

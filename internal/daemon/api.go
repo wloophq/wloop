@@ -74,6 +74,8 @@ func (s *Server) routes() []route {
 		{"GET " + api.PluginAssets, s.handlePluginAsset},
 		{"GET " + api.PluginView, s.handlePluginView},
 		{"POST " + api.PluginView, s.handlePluginView},
+		{"POST " + api.PluginAction, s.handlePluginAction},
+		{"POST " + api.PluginRun, s.handlePluginRun},
 		{"GET " + api.ViewsPath, s.handleViews},
 		{"GET " + api.TasksPath, s.handleTasks},
 		{"POST " + api.TasksPath, s.handleCapture},

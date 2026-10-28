@@ -16,7 +16,7 @@
 # home/ (the user home the binary sees; HOME stays real for the Keychain),
 # copies <binary> into bin/ beside the orca, gh, codex, launchctl and claude
 # stubs, and writes the config: brief, every workflow of
-# profiles/default/workflows/ and the github and slack plugins off, ports 47910+<index> (HTTP) and
+# profiles/default/workflows/ and plugins/*/profile/workflows/ and the github and slack plugins off, ports 47910+<index> (HTTP) and
 # 47810+<index> (MCP), the e2e Keychain service and <dm-channel-id> as the
 # only channel posts may reach. --slack turns the slack plugin on; every start
 # or pause of that directory then takes <dir>/../slack-socket.lock and refuses
@@ -216,7 +216,7 @@ cmd_setup() {
 	done
 
 	local workflows=() manifest
-	for manifest in "$repo"/profiles/default/workflows/*/workflow.toml; do
+	for manifest in "$repo"/profiles/default/workflows/*/workflow.toml "$repo"/plugins/*/profile/workflows/*/workflow.toml; do
 		[[ -f $manifest ]] && workflows+=("$(basename "$(dirname "$manifest")")")
 	done
 	[[ ${#workflows[@]} -gt 0 ]] || die "no workflow under $repo/profiles/default/workflows"

@@ -869,7 +869,7 @@ func TestDetailNamesTheProfileChain(t *testing.T) {
 	})
 	var d api.Detail
 	get(t, s, "/api/units/github/acme%2Fapi%237", &d)
-	if d.ProfileChain != "bundled + user" {
+	if d.ProfileChain != "bundled + plugin:slack + user" {
 		t.Fatalf("chain %q", d.ProfileChain)
 	}
 }

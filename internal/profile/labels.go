@@ -57,7 +57,7 @@ func (l Labels) over(o Labels) Labels {
 func LoadLabels(chain []Layer, vocab []DimDef) (Labels, error) {
 	var out Labels
 	for _, l := range chain {
-		r, err := readLayer(l, LabelsFile)
+		r, err := ReadFile(l, LabelsFile)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}

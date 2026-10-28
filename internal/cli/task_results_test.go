@@ -16,7 +16,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/core/automation"
-	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/source"
@@ -40,11 +39,11 @@ func (f endedFacts) Facts(_ context.Context, u unit.Unit) (workflow.Facts, error
 }
 
 func TestAUnitHasEndedWhenItsPluginsEndedFactSaysSo(t *testing.T) {
-	post := dslack.ThreadUnit("T000AAA", "C000AAA", "1.1")
-	quiet := dslack.ThreadUnit("T000AAA", "C000AAA", "2.2")
-	gone := dslack.ThreadUnit("T000AAA", "C000AAA", "3.3")
+	post := slackThreadUnit("T000AAA", "C000AAA", "1.1")
+	quiet := slackThreadUnit("T000AAA", "C000AAA", "2.2")
+	gone := slackThreadUnit("T000AAA", "C000AAA", "3.3")
 	pr := unit.Unit{Provider: unit.GitHub, Key: "acme/api#9"}
-	mods := []source.Module{{ID: dslack.Provider, Facts: endedFacts{fact: "slack.ended", ended: map[unit.Unit]bool{post: true, quiet: false}}}}
+	mods := []source.Module{{ID: slackPlugin, Facts: endedFacts{fact: "slack.ended", ended: map[unit.Unit]bool{post: true, quiet: false}}}}
 	ended := unitsEnded(mods)
 	for u, want := range map[unit.Unit]bool{post: true, quiet: false, gone: false, pr: false, {Provider: "chat", Key: "x"}: false} {
 		got, err := ended(context.Background(), u)

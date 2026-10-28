@@ -175,7 +175,7 @@ type placed struct {
 }
 
 func heading(kind Kind, labels Labels, before []placed, p placed) (int, string) {
-	bundled := p.b.Layer.Dir == ""
+	bundled := p.b.Layer.Embedded()
 	var label string
 	level := 3
 	if len(p.segs) == 0 {
@@ -248,7 +248,7 @@ func (t Tree) Compose(kind Kind, f Facts) Guide {
 			items = append(items, placed{b: b, segs: segsOf(b.Path)})
 		}
 	}
-	isUser := func(p placed) bool { return p.b.Layer.Dir != "" }
+	isUser := func(p placed) bool { return !p.b.Layer.Embedded() }
 	slices.SortStableFunc(items, func(a, b placed) int {
 		return cmp.Or(compareSegs(a.segs, b.segs), compareBool(isUser(a), isUser(b)))
 	})

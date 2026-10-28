@@ -12,9 +12,9 @@ import (
 
 type reporter struct{ b *Broker }
 
-// Report keeps each snapshot of the plugin's own units; a snapshot of a
-// unit that is not the plugin's, or whose key its codec refuses, refuses
-// the whole report.
+// Report keeps each snapshot of the plugin's own units and the links they
+// report; a snapshot of a unit that is not the plugin's, or whose key its
+// codec refuses, refuses the whole report.
 func (r reporter) Report(ctx context.Context, snapshots []src.Snapshot) error {
 	byUnit := make(map[unit.Unit]src.Snapshot, len(snapshots))
 	var errs []error
@@ -29,7 +29,10 @@ func (r reporter) Report(ctx context.Context, snapshots []src.Snapshot) error {
 	if err := errors.Join(errs...); err != nil {
 		return err
 	}
-	return r.b.Snapshots.Put(ctx, byUnit)
+	if err := r.b.Snapshots.Put(ctx, byUnit); err != nil {
+		return err
+	}
+	return r.b.replaceLinks(ctx, byUnit)
 }
 
 // Changed records in the change log that the plugin's units changed, as

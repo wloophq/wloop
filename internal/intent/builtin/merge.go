@@ -49,6 +49,7 @@ type Vocabulary struct {
 	taskKinds          []string
 	tools              []Value
 	toolAnswers        []ToolAnswer
+	toolProviders      map[string]unit.ProviderID
 	draftKinds         map[unit.ProviderID]DraftKinds
 }
 
@@ -62,6 +63,10 @@ type DraftKinds struct {
 // PluginDraftKinds are each merged plugin's draft kinds, by provider; the
 // host derives a draft's delivery from its kind through them.
 var PluginDraftKinds = map[unit.ProviderID]DraftKinds{}
+
+// ToolProviders are the merged plugins' tools, by name, to the plugin that
+// declares each; a core tool is not one of them.
+var ToolProviders = map[string]unit.ProviderID{}
 
 // Merge is the vocabulary of the core rows and the [source] tables of
 // srcs: their slots, facts, effects, roles, row kinds, deliveries, event
@@ -110,7 +115,7 @@ func Install(v *Vocabulary) {
 	Slots, Providers, BriefSubjects = v.slots, slices.Sorted(maps.Keys(v.slots)), v.briefSubjects
 	WorkflowSlots, DraftDeliveries, EventProviders, AnsweringEvents = v.workflowSlots, v.deliveries, v.events, v.answering
 	PayloadProviders, RoundProviders, PluginTaskKinds = v.payloads, v.rounds, v.taskKinds
-	Tools, ToolAnswers, PluginDraftKinds = v.tools, v.toolAnswers, v.draftKinds
+	Tools, ToolAnswers, ToolProviders, PluginDraftKinds = v.tools, v.toolAnswers, v.toolProviders, v.draftKinds
 }
 
 // fits says why v, provider p's vocabulary among all, cannot merge.
@@ -207,7 +212,9 @@ func fits(p unit.ProviderID, src *manifest.Source, all map[unit.ProviderID]*mani
 		}
 	}
 	for _, k := range src.ConfigReads {
-		if !slices.ContainsFunc(configGrammar, func(r Key) bool { return r.Path == k || strings.HasPrefix(r.Path, k+".") }) {
+		if !slices.ContainsFunc(configGrammar, func(r Key) bool {
+			return r.Path == k || strings.HasPrefix(r.Path, k+".") || strings.HasPrefix(r.Path, k+"[]")
+		}) {
 			bad("config_reads %q is no configuration key", k)
 		}
 	}
@@ -233,6 +240,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	rowKinds := map[unit.ProviderID][]string{}
 	steps := map[string][]unit.ProviderID{}
 	tools, answers := slices.Clone(coreTools), slices.Clone(coreToolAnswers)
+	toolProviders := map[string]unit.ProviderID{}
 	draftKinds := map[unit.ProviderID]DraftKinds{}
 	for _, id := range ids {
 		src := all[id]
@@ -242,6 +250,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 		}
 		for _, t := range src.Tools {
 			tools = append(tools, Value{Name: t.Name, Doc: t.Doc})
+			toolProviders[t.Name] = id
 			answers = append(answers, answersOf([]string{t.Name})...)
 			for _, a := range t.Answers {
 				ta := ToolAnswer{Tool: t.Name, Name: a.Name, Doc: a.Doc}
@@ -319,7 +328,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	return &Vocabulary{facts: facts, actionFacts: actionFacts, effects: effects, roles: roles, steps: stepsWith(steps),
 		slots: slots, briefSubjects: briefSubjects, workflowSlots: slices.Concat(unitSlots, nonUnitSlots),
 		deliveries: deliveries, events: events, answering: answering, payloads: payloads, rounds: rounds, taskKinds: taskKinds,
-		tools: tools, toolAnswers: answers, draftKinds: draftKinds}
+		tools: tools, toolAnswers: answers, toolProviders: toolProviders, draftKinds: draftKinds}
 }
 
 // PluginTaskKinds are the values of the task's kind property the merged

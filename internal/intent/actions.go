@@ -5,8 +5,6 @@ import (
 	"errors"
 	"io/fs"
 	"maps"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"text/template"
@@ -72,11 +70,11 @@ func loadActions(layers []profile.Layer, bundled fs.FS) (map[string]BuiltinActio
 	}
 	problems := mergeActions(out, ActionsFile, src)
 	for _, l := range layers {
-		if l.Dir == "" {
+		if l.Bundled() {
 			continue
 		}
-		file := filepath.Join(l.Dir, ActionsFile)
-		src, err := os.ReadFile(file)
+		r, err := profile.ReadFile(l, ActionsFile)
+		file, src := r.Path, r.Body
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}

@@ -130,7 +130,8 @@ func (s *server) Locate(ctx context.Context, r *pb.LocateRequest) (*pb.LocateRes
 
 func (s *server) Action(ctx context.Context, r *pb.ActionRequest) (*pb.ActionResponse, error) {
 	return serve[Presenter](ctx, s.src, "presenter", r.GetCall(), func(ctx context.Context, c Presenter) (*pb.ActionResponse, error) {
-		res, err := c.Action(ctx, ActionRequest{Unit: unitGo(r.GetUnit()), Action: r.GetAction(), Input: r.GetInput(), Args: raw(r.GetArgsJson())})
+		res, err := c.Action(ctx, ActionRequest{Unit: unitGo(r.GetUnit()), Action: r.GetAction(), Input: r.GetInput(), Args: raw(r.GetArgsJson()),
+			Actor: r.GetActor()})
 		return &pb.ActionResponse{ResultJson: res}, err
 	})
 }

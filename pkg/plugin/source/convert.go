@@ -225,7 +225,7 @@ func itemsGo(its []*pb.Item) []Item { return mapSlice(its, itemGo) }
 func snapshotPB(s Snapshot) *pb.Snapshot {
 	out := &pb.Snapshot{
 		Unit: unitPB(s.Unit), Rev: s.Rev, At: ts(s.At), Gone: s.Gone, DataJson: s.Data, Situation: situationPB(s.Situation),
-		Links: mapSlice(s.Links, linkPB), Facets: s.Facets, Views: s.Views,
+		Links: mapSlice(s.Links, linkPB), Facets: s.Facets, Views: s.Views, FacetValues: facetValuesPB(s.FacetValues),
 		Card: cardPB(s.Card), Items: itemsPB(s.Items), Facts: factsPB(s.Facts), Owes: peoplePB(s.Owes),
 		Signals: mapSlice(s.Signals, func(g Signal) *pb.LinkSignal {
 			return &pb.LinkSignal{Name: g.Name, On: g.On, Since: ts(g.Since)}
@@ -235,6 +235,17 @@ func snapshotPB(s Snapshot) *pb.Snapshot {
 	}
 	if h := s.Extraction; h != nil {
 		out.ExtractionHealth = &pb.ExtractionHealth{Pending: int64(h.Pending), BudgetHit: h.BudgetHit, Oldest: ts(h.Oldest)}
+	}
+	return out
+}
+
+func facetValuesPB(fv map[string][]string) map[string]*pb.FacetValues {
+	if len(fv) == 0 {
+		return nil
+	}
+	out := make(map[string]*pb.FacetValues, len(fv))
+	for id, vs := range fv {
+		out[id] = &pb.FacetValues{Values: vs}
 	}
 	return out
 }
@@ -253,6 +264,12 @@ func snapshotGo(s *pb.Snapshot) Snapshot {
 	}
 	if len(s.GetFacets()) > 0 {
 		out.Facets = s.GetFacets()
+	}
+	if len(s.GetFacetValues()) > 0 {
+		out.FacetValues = make(map[string][]string, len(s.GetFacetValues()))
+		for id, vs := range s.GetFacetValues() {
+			out.FacetValues[id] = vs.GetValues()
+		}
 	}
 	if h := s.GetExtractionHealth(); h != nil {
 		out.Extraction = &ExtractionHealth{Pending: int(h.GetPending()), BudgetHit: h.GetBudgetHit(), Oldest: tm(h.GetOldest())}
@@ -497,8 +514,12 @@ func workspaceGo(w *pb.Workspace) Workspace {
 		DisplayName: w.GetDisplayName(), Local: w.GetLocal(), AgentStates: w.GetAgentStates(), Comment: w.GetComment()}
 }
 
-func gateRefGo(g *pb.GateRef) GateRef { return GateRef{Gate: g.GetGate(), Draft: g.GetDraft()} }
-func gateRefPB(g GateRef) *pb.GateRef { return &pb.GateRef{Gate: g.Gate, Draft: g.Draft} }
+func gateRefGo(g *pb.GateRef) GateRef {
+	return GateRef{Gate: g.GetGate(), Draft: g.GetDraft(), State: g.GetState()}
+}
+func gateRefPB(g GateRef) *pb.GateRef {
+	return &pb.GateRef{Gate: g.Gate, Draft: g.Draft, State: g.State}
+}
 
 func callPB(c Call) *pb.Call {
 	p := pb.Priority_PRIORITY_USER

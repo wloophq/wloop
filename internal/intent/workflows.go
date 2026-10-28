@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"maps"
-	"os"
 	"path"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -85,11 +83,13 @@ type wUnit struct {
 	whenAt dintent.Pos
 }
 
-// loadWorkflows reads workflows/ of the bundled FS and of each directory layer.
-// A user workflow that fails is listed in broken and left out of loaded; a
-// bundled one whose override fails is listed in reverted and loads without
-// it. turnProblem, when set, is why a turn.start may not name an intent
-// or run it under a runner, with the argument at fault; "" when it may.
+// loadWorkflows reads workflows/ of the bundled FS and of each other layer.
+// A plugin's workflow is a bundled one that a higher layer's directory of
+// its name overrides. A user workflow that fails is listed in broken and
+// left out of loaded; a bundled one whose override fails is listed in
+// reverted and loads without it. turnProblem, when set, is why a
+// turn.start may not name an intent or run it under a runner, with the
+// argument at fault; "" when it may.
 func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env, tasks TasksDef) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems, warnings Problems) {
 	var units []*wUnit
 	bundledUnits := map[string]*wUnit{}
@@ -107,21 +107,24 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(inten
 	}
 	seen := map[string]string{}
 	for _, l := range layers {
-		if l.Dir == "" {
+		if l.Bundled() {
 			continue
 		}
-		entries, _ := os.ReadDir(filepath.Join(l.Dir, "workflows"))
+		entries, _ := profile.ReadDir(l, "workflows")
 		for _, e := range entries {
 			if !e.IsDir() {
 				continue
 			}
-			dir := filepath.Join(l.Dir, "workflows", e.Name())
+			fl, dir := layerFiles(l, path.Join("workflows", e.Name()))
 			if n := builtin.RenamedTo(e.Name()); n != "" && bundledUnits[n] != nil {
 				problems = append(problems, Problem{File: dir, Msg: e.Name() + " was renamed" + expr.DidYouMean(e.Name(), []string{n})})
 				continue
 			}
 			if b := bundledUnits[e.Name()]; b != nil {
-				if len(overrides([]string{dir})) > 0 {
+				switch {
+				case l.Embedded():
+					problems = append(problems, Problem{File: dir, Msg: fmt.Sprintf("%s is defined already in %s", e.Name(), b.files.base("workflow.toml"))})
+				case len(overrides([]string{dir})) > 0:
 					b.files.overlay = append(b.files.overlay, dir)
 				}
 				continue
@@ -130,8 +133,14 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(inten
 				problems = append(problems, Problem{File: dir, Msg: fmt.Sprintf("%s is defined already in %s", e.Name(), seen[e.Name()])})
 				continue
 			}
-			seen[e.Name()] = dir
-			units = append(units, &wUnit{name: e.Name(), dir: dir, files: files{dir: dir}})
+			u := &wUnit{name: e.Name(), dir: dir, files: fl}
+			if l.Plugin() {
+				u.bundled = true
+				bundledUnits[u.name] = u
+			} else {
+				seen[e.Name()] = dir
+			}
+			units = append(units, u)
 		}
 	}
 	broken, reverted = map[string]Problems{}, map[string]Problems{}

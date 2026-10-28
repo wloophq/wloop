@@ -255,5 +255,10 @@
   },
   "views": [
     "snapshot.Views[0]"
-  ]
+  ],
+  "facet_values": {
+    "snapshot.FacetValues.key": [
+      "snapshot.FacetValues.value[0]"
+    ]
+  }
 }

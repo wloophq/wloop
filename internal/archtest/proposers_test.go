@@ -19,6 +19,7 @@ const outboxPkg = module + "internal/core/outbox"
 var pluginProposers = map[string]string{
 	"internal/core/proposals/proposals.go":        "the job that runs the plugins' own rules",
 	"internal/adapter/source/github/proposals.go": "GitHub's nudge rule, github-nudge",
+	"internal/plugins/source/broker_gates.go":     "a source plugin's own rule, which proposes through OpenGate with no session",
 }
 
 // draftTextAllowlist are the files whose drafts' text Go still writes.

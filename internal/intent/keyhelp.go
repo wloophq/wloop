@@ -4,8 +4,6 @@ import (
 	"errors"
 	"io/fs"
 	"maps"
-	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -75,11 +73,11 @@ func loadKeys(layers []profile.Layer, bundled fs.FS) (KeyTexts, Problems) {
 	actions := KeyActions()
 	problems := mergeKeys(out, KeysFile, src, actions)
 	for _, l := range layers {
-		if l.Dir == "" {
+		if l.Bundled() {
 			continue
 		}
-		file := filepath.Join(l.Dir, KeysFile)
-		src, err := os.ReadFile(file)
+		r, err := profile.ReadFile(l, KeysFile)
+		file, src := r.Path, r.Body
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}

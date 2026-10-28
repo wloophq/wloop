@@ -57,6 +57,9 @@ func listPackages() ([]pkg, error) {
 		if err := dec.Decode(&p); err != nil {
 			return nil, err
 		}
+		if self, _ := local(p.ImportPath); externalPlugin(self) {
+			continue
+		}
 		p.Imports = slices.DeleteFunc(p.Imports, func(imp string) bool { return imp == module+"internal/brand" })
 		all = append(all, p)
 	}
@@ -86,6 +89,10 @@ func parseOnce(path string) (*ast.File, error) {
 }
 
 func local(path string) (string, bool) { return strings.CutPrefix(path, module) }
+
+// externalPlugin says the package is an external plugin's, which runs as
+// its own process and imports only the SDK; the host's rules skip it.
+func externalPlugin(path string) bool { return strings.HasPrefix(path, "plugins/") }
 
 func std(path string) bool { return !strings.Contains(strings.Split(path, "/")[0], ".") }
 

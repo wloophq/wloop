@@ -237,7 +237,7 @@ func runDoctor(ctx context.Context, e *Env, args []string) error {
 		}
 	}
 	section("Config")
-	section("Slack", e.slackChecks(cfg)...)
+	section("Slack", e.slackChecks(ctx, cfg)...)
 	section(homesSection, e.homeChecks(ctx, cfg)...)
 	section("Profile and intents", slices.Concat(e.agentModelChecks(cfg), e.restrictedChecks(ctx, cfg), e.profileChecks(cfg), e.intentChecks(), e.projectChecks(cfg))...)
 

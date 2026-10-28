@@ -23,6 +23,7 @@ var brandExempt = []string{".git", ".claude", "bin", "design", "docs", "internal
 var fixedNames = []*regexp.Regexp{
 	regexp.MustCompile(`^proto/` + brandtest.DefaultName + `/`),
 	regexp.MustCompile(`^pkg/plugin/(.+/)?pb/`),
+	regexp.MustCompile(`^plugins/slack/cmd/` + brandtest.DefaultName + `-plugin-slack/`),
 	regexp.MustCompile(`^internal/e2e/isolated_test.go:.*"` + brandtest.DefaultName + `-e2e-slack"`),
 	regexp.MustCompile(`^scripts/isolated-daemon.sh:.*"` + brandtest.DefaultName + `-e2e-slack"`),
 }

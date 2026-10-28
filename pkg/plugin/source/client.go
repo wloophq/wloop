@@ -85,7 +85,8 @@ func (c *Client) Locate(ctx context.Context, dir string) (plugin.Unit, bool, err
 
 func (c *Client) Action(ctx context.Context, req ActionRequest) (json.RawMessage, error) {
 	r, err := via(ctx, func(call *pb.Call) (*pb.ActionResponse, error) {
-		return c.c.Action(ctx, &pb.ActionRequest{Call: call, Unit: unitPB(req.Unit), Action: req.Action, Input: req.Input, ArgsJson: req.Args})
+		return c.c.Action(ctx, &pb.ActionRequest{Call: call, Unit: unitPB(req.Unit), Action: req.Action, Input: req.Input, ArgsJson: req.Args,
+			Actor: req.Actor})
 	})
 	return raw(r.GetResultJson()), err
 }

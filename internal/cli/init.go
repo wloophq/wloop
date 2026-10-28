@@ -394,15 +394,11 @@ func (w *initWizard) ask(ctx context.Context, f initFacts, a initAnswers) (initA
 	case fl.slackClientID != "":
 		w.slackLogin = true
 	default:
-		a.SlackClientID = w.askSlack(f.cur.Slack)
-		w.slackLogin = a.SlackClientID != "" && (a.SlackClientID != f.cur.Slack.ClientID || !w.slackDone(f.cur.Slack))
+		var again bool
+		a.SlackClientID, again = w.askSlack(ctx, f.cur)
+		w.slackLogin = a.SlackClientID != "" && (a.SlackClientID != f.cur.Slack.ClientID || again)
 	}
 	return a, nil
-}
-
-func (w *initWizard) slackDone(s config.Slack) bool {
-	st := w.e.slackState(s)
-	return st.appToken && st.login != ""
 }
 
 func (w *initWizard) askScope(ctx context.Context, f initFacts, a initAnswers) initAnswers {
@@ -552,7 +548,7 @@ func (w *initWizard) slack(ctx context.Context, cfg config.Config) {
 		}
 		return
 	}
-	if w.slackDone(cfg.Slack) {
+	if !w.slackLogin {
 		return
 	}
 	fmt.Fprintln(e.Out, "To finish Slack, run at a terminal:")

@@ -25,7 +25,6 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/profile"
-	slacksend "github.com/wloophq/wloop/internal/slack/send"
 )
 
 // draftProposeStep adapts draft.propose: Check renders the text and holds per
@@ -249,7 +248,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 		case len(its) == 0:
 			cd.refusal = "no " + a.items + " items"
 		case a.target == "item":
-			if cd.p.Target = its[0].Origin.Permalink; cd.p.Target == "" && slacksend.IsMessage(its[0].Origin.Ref) {
+			if cd.p.Target = its[0].Origin.Permalink; cd.p.Target == "" && s.e.pluginTakes(its[0].Origin.Ref) {
 				cd.p.Target = its[0].Origin.Ref
 			}
 			if cd.p.Target == "" && slices.Contains(builtin.DraftEmojiDeliveries, string(a.delivery)) {

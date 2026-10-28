@@ -2,6 +2,9 @@ package source
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"slices"
 
 	"github.com/wloophq/wloop/internal/core/port"
 
@@ -11,8 +14,39 @@ import (
 
 type reader struct{ b *Broker }
 
-func (reader) Tasks(context.Context, []plugin.Unit) ([]src.Task, error) {
-	return nil, src.ErrUnsupported
+// Tasks are the host's tasks linked to the plugin's units.
+func (r reader) Tasks(ctx context.Context, units []plugin.Unit) ([]src.Task, error) {
+	h := r.b.Hosted
+	if h == nil || h.Tasks == nil {
+		return nil, src.ErrUnsupported
+	}
+	var out []src.Task
+	seen := map[string]bool{}
+	var errs []error
+	for _, w := range units {
+		u, err := r.b.Units.Own(r.b.ID, w)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		ts, err := h.Tasks.TasksOf(ctx, u)
+		if err != nil {
+			return nil, err
+		}
+		for _, t := range ts {
+			if seen[string(t.ID)] {
+				continue
+			}
+			seen[string(t.ID)] = true
+			props, err := json.Marshal(t.Props)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, src.Task{ID: string(t.ID), Title: t.Title, State: string(t.State), Category: string(t.Category),
+				Parent: string(t.Parent), Props: props, Units: Wires(t.Units)})
+		}
+	}
+	return out, errors.Join(errs...)
 }
 
 func (reader) Books(context.Context, []plugin.Unit) ([]src.Book, error) {
@@ -53,6 +87,23 @@ func (reader) Workspaces(context.Context, string) (src.Listing, error) {
 	return src.Listing{}, src.ErrUnsupported
 }
 
-func (reader) Session(context.Context, string) (src.Session, error) {
-	return src.Session{}, src.ErrUnsupported
+// Session is the session with id handle as a plugin's tool reads it: the
+// unit of its newest turn, that turn and the effects its intent lets a
+// draft carry. A session with no turn has no unit.
+func (r reader) Session(ctx context.Context, handle string) (src.Session, error) {
+	h := r.b.Hosted
+	if h == nil || h.Sessions == nil {
+		return src.Session{}, src.ErrUnsupported
+	}
+	b, ok, err := h.Sessions.BookOf(ctx, handle)
+	if err != nil || !ok {
+		return src.Session{}, err
+	}
+	t, ok := b.OfSession(handle)
+	if !ok {
+		return src.Session{}, nil
+	}
+	out := src.Session{Unit: Wire(b.Unit), Turn: t.ID, TurnSeq: t.Seq, Intent: string(t.Intent), Role: t.Role}
+	out.AllowedEffects = slices.Clone(h.allowedEffects(string(t.Intent)))
+	return out, nil
 }

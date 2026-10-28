@@ -21,7 +21,6 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
-	slacksend "github.com/wloophq/wloop/internal/slack/send"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
@@ -304,7 +303,7 @@ func outboxNew(ctx context.Context, e *Env, c *client.Client, args []string) err
 		return err
 	}
 	cr := api.DraftCreate{Unit: u, Source: string(dturn.Terminal)}
-	if slacksend.IsMessage(pos[0]) {
+	if e.pluginTakes(pos[0]) {
 		cr.Target = pos[0]
 	}
 	if *react != "" {

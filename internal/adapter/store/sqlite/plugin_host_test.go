@@ -12,9 +12,9 @@ import (
 )
 
 func init() {
-	reads = append(reads, "Store.UnitEvents", "SegmentStore.Rehoming")
+	reads = append(reads, "Store.UnitEvents")
 	slackDM := unit.Unit{Provider: "slack", Key: "T000AAA/D000AAA/1700000000.000200"}
-	slackSeg := segUnit("T000AAA", "D000AAA", "1700000000000100")
+	slackSeg := unit.Unit{Provider: "slack", Key: "T000AAA/D000AAA/seg/1700000000000100"}
 	writes = append(writes,
 		writeCase{
 			method: "Store.RecordSourceEvents",
