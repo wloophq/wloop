@@ -167,3 +167,20 @@ func TestRestoringAV6BackupRestoresEntryDossierDirs(t *testing.T) {
 		t.Fatalf("dossiers %q, want them where the version 6 store names them", got)
 	}
 }
+
+func TestDaemonStartRenamesALeftoverEntryDossierDir(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	te.noDaemon(t)
+	setStore(t, te.storePath(), `INSERT INTO dossiers (owner, rel_path, status) VALUES ('task/t-`+dossierHex+`', 'task/t-`+dossierHex+`#', 'live')`)
+	writeTree(t, te.StateDir, "entry/e-"+dossierHex+"#/notes.md")
+	db, unlock, _, err := te.tryStore(context.Background(), t.Logf)
+	if err != nil || db == nil {
+		t.Fatalf("the store did not open: %v", err)
+	}
+	defer unlock()
+	defer db.Close()
+	if got := dossierTree(t, te.StateDir); !slices.Equal(got, []string{"task/t-" + dossierHex + "#/notes.md"}) {
+		t.Fatalf("dossiers %q", got)
+	}
+}

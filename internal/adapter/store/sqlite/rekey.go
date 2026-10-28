@@ -47,6 +47,7 @@ var taskColumns = []struct {
 	{"drafts", "rule_key", refText},
 	{"workflow_runs", "key_value", refText},
 	{"plan_items", "key_value", refText},
+	{"plan_items", "id", refText},
 	{"events", "key", refText},
 	{"events", "data", refText},
 }
@@ -182,7 +183,8 @@ func dropTask(ctx context.Context, tx *sql.Tx, id string) error {
 	return nil
 }
 
-// rewriteText replaces each value of r's column that holds a task id with what fn makes of it.
+// rewriteText replaces each value of r's column that holds a task id with what fn makes of it; a row
+// whose new value another row already holds is dropped.
 func rewriteText(ctx context.Context, tx *sql.Tx, r taskRef, fn func(string) string) error {
 	var vals []string
 	err := eachRow(ctx, tx, `SELECT DISTINCT `+r.column+` FROM `+r.table+` WHERE instr(`+r.column+`, '-') > 0`, nil, func(rows *sql.Rows) error {
@@ -199,6 +201,9 @@ func rewriteText(ctx context.Context, tx *sql.Tx, r taskRef, fn func(string) str
 	for _, v := range vals {
 		if nv := fn(v); nv != v {
 			if _, err := tx.ExecContext(ctx, `UPDATE OR IGNORE `+r.table+` SET `+r.column+` = ? WHERE `+r.column+` = ?`, nv, v); err != nil { //nolint:gosec // the names come from the store's own schema
+				return fmt.Errorf("rewriting %s.%s: %w", r.table, r.column, err)
+			}
+			if _, err := tx.ExecContext(ctx, `DELETE FROM `+r.table+` WHERE `+r.column+` = ?`, v); err != nil { //nolint:gosec // the names come from the store's own schema
 				return fmt.Errorf("rewriting %s.%s: %w", r.table, r.column, err)
 			}
 		}

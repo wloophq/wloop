@@ -9,8 +9,10 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -461,5 +463,38 @@ func TestDropTaskLeavesNoOrphan(t *testing.T) {
 	}
 	if got := strings1(t, db, `SELECT task_id FROM messages WHERE provider = 'slack'`); !slices.Equal(got, []string{""}) {
 		t.Errorf("the Slack message of the dropped task: %q, want it kept without its task", got)
+	}
+}
+
+func TestV7RenameRewritesTheRenamedWorkflowName(t *testing.T) {
+	t.Parallel()
+	a := "e-" + hexA
+	settled, _ := mark.New(time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC))
+	path := v6Store(t,
+		`INSERT INTO unit_marks (provider, unit_key, mark, value) VALUES ('entry', '`+a+`', 'entry-results-ended/settled', '`+settled.Value+`')`,
+		`INSERT INTO workflow_runs (workflow, provider, unit_key, key_value, status, at) VALUES ('entry-results-ended', 'entry', '`+a+`', 'v', 'done', 't')`,
+		`INSERT INTO plan_items (id, workflow, provider, unit_key, key_value, decision, at) VALUES ('entry-results-ended/entry/`+a+`/v', 'entry-results-ended', 'entry', '`+a+`', 'v', 'act', 't')`,
+		`INSERT INTO workflow_cursors (workflow, cursor) VALUES ('entry-results-ended', 7)`,
+		`INSERT INTO drafts (provider, unit_key, kind, origin_kind, workflow, rule, state, created_at, updated_at) VALUES ('slack', 'C1/1', 'close', 'auto', 'entry-results-ended', 'entry-results-ended', 'proposed', 't', 't')`,
+		`INSERT INTO turns (provider, unit_key, intent, turn_id, state, sent_at, workflow) VALUES ('entry', '`+a+`', 'act', 'r1', 'ended', 't', 'entry-results-ended')`,
+	)
+	db := migrateV6(t, path)
+	if left := mentions(t, rawDB(t, path), "entry-results-ended"); len(left) > 0 {
+		t.Errorf("the old workflow name is left in %v", left)
+	}
+	tk := unit.Unit{Provider: unit.Task, Key: "t-" + hexA}
+	marks, err := db.Marks(context.Background(), tk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := marks[mark.Of("task-results-ended", "settled")]; !mark.Handled(got, time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)) {
+		t.Errorf("marks %v: the settled mark no longer covers what it handled", marks)
+	}
+	got := strings1(t, rawDB(t, path), `SELECT workflow || ' ' || status FROM workflow_runs WHERE provider = ? AND unit_key = ?`, string(tk.Provider), tk.Key)
+	if !slices.Equal(got, []string{"task-results-ended done"}) {
+		t.Errorf("runs %q", got)
+	}
+	if got := strings1(t, rawDB(t, path), `SELECT id FROM plan_items`); !slices.Equal(got, []string{"task-results-ended/task/" + tk.Key + "/v"}) {
+		t.Errorf("plan items %q", got)
 	}
 }

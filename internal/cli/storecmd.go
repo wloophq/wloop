@@ -135,6 +135,11 @@ func (e *Env) tryStore(ctx context.Context, logf func(string, ...any)) (*sqlite.
 		unlock()
 		return nil, nil, storeWaiting{}, err
 	}
+	if s.Version >= taskRenamedAt {
+		if err := renameDossierDirs(e.StateDir, "entry", "task"); err != nil {
+			logf("store: %v", err)
+		}
+	}
 	st := e.storeOK(s)
 	e.storeStatus = &st
 	return db, unlock, storeWaiting{}, nil

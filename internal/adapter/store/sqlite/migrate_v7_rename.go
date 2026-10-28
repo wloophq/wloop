@@ -56,6 +56,9 @@ func v7Rename(ctx context.Context, tx *sql.Tx) error {
 	if err := v7TaskInput(ctx, tx); err != nil {
 		return err
 	}
+	if err := v7Workflows(ctx, tx); err != nil {
+		return err
+	}
 	refs, err := taskRefs(ctx, tx)
 	if err != nil {
 		return err
@@ -159,10 +162,10 @@ func v7TaskInput(ctx context.Context, tx *sql.Tx) error {
 	return nil
 }
 
-var v6TextID = regexp.MustCompile(`(` + v6Task + `:)?` + v6IDPrefix + `([0-9a-f]{16})`)
+var v6TextID = regexp.MustCompile(`(` + v6Task + `[:/])?` + v6IDPrefix + `([0-9a-f]{16})`)
 
 // v7Text rewrites the version 6 task ids that stand as whole tokens in s, with their provider when s names
-// a task's unit as entry:<id>.
+// a task's unit as entry:<id> or entry/<id>.
 func v7Text(s string) string {
 	var b strings.Builder
 	last := 0
@@ -173,11 +176,68 @@ func v7Text(s string) string {
 		}
 		b.WriteString(s[last:start])
 		if m[2] >= 0 {
-			b.WriteString(v7Task + ":")
+			b.WriteString(v7Task + s[m[3]-1:m[3]])
 		}
 		b.WriteString(v7IDPrefix + s[m[4]:m[5]])
 		last = end
 	}
 	b.WriteString(s[last:])
 	return b.String()
+}
+
+// v7RenamedWorkflows are the bundled workflows version 7 renames, by their version 6 name.
+var v7RenamedWorkflows = map[string]string{"entry-results-ended": "task-results-ended"}
+
+// workflowColumns are the columns that hold a workflow's name under another name than workflow; prefixed
+// holds it as "<name>/..." (a mark, a plan item's id).
+var workflowColumns = []struct {
+	table, column string
+	prefixed      bool
+}{
+	{"drafts", "rule", false},
+	{"unit_marks", "mark", true},
+	{"plan_items", "id", true},
+}
+
+// v7Workflows renames the renamed workflows in every column named workflow and in workflowColumns, so a
+// renamed workflow finds what it already handled.
+func v7Workflows(ctx context.Context, tx *sql.Tx) error {
+	type col struct {
+		table, column string
+		prefixed      bool
+	}
+	var cols []col
+	err := eachRow(ctx, tx, `SELECT m.name, p.name FROM sqlite_schema m JOIN pragma_table_info(m.name) p
+		WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%' ORDER BY m.name, p.cid`, nil, func(rows *sql.Rows) error {
+		var c col
+		if err := rows.Scan(&c.table, &c.column); err != nil {
+			return err
+		}
+		if c.column == "workflow" {
+			cols = append(cols, c)
+		}
+		for _, w := range workflowColumns {
+			if w.table == c.table && w.column == c.column {
+				cols = append(cols, col{c.table, c.column, w.prefixed})
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	for from, to := range v7RenamedWorkflows {
+		for _, c := range cols {
+			q := `UPDATE ` + c.table + ` SET ` + c.column + ` = ?2 WHERE ` + c.column + ` = ?1` //nolint:gosec // the names come from the store's own schema
+			args := []any{from, to}
+			if c.prefixed {
+				q = `UPDATE ` + c.table + ` SET ` + c.column + ` = ?2 || substr(` + c.column + `, ?3) WHERE substr(` + c.column + `, 1, ?4) = ?1` //nolint:gosec // the names come from the store's own schema
+				args = []any{from + "/", to + "/", len(from) + 2, len(from) + 1}
+			}
+			if _, err := tx.ExecContext(ctx, q, args...); err != nil {
+				return fmt.Errorf("the workflow %s in %s.%s: %w", from, c.table, c.column, err)
+			}
+		}
+	}
+	return nil
 }
