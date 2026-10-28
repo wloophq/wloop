@@ -47,11 +47,11 @@ func newNotifyRig(t *testing.T) *notifyRig {
 	r := &notifyRig{catalogRig: c, ledger: &coreitems.Ledger{Store: c.db.Items(), Clock: fixedClock(catalogNow)}}
 	enabled := func(p unit.ProviderID) bool { return c.s.pluginEnabled(p) }
 	r.ledger.Enabled = enabled
-	r.g = coretasks.New(coretasks.Deps{Store: c.db.Entries(), Items: r.ledger,
+	r.g = coretasks.New(coretasks.Deps{Store: c.db.Tasks(), Items: r.ledger,
 		Facts: coretasks.CardFacts{Cards: c.db.Cards(), Enabled: enabled, Me: func() task.Me { return meID }},
 		Me:    meID, Clock: fixedClock(catalogNow), StaleWaitingDays: 2})
-	c.s.deps.GTD, c.s.deps.Items, c.s.deps.Cards = r.g, r.ledger, c.db.Cards()
-	c.s.deps.Messages = &messages.Service{Store: inventory.NewMessages(c.db), Books: c.repo, Turns: c.s.deps.Turns, Entries: r.g,
+	c.s.deps.Tasks, c.s.deps.Items, c.s.deps.Cards = r.g, r.ledger, c.db.Cards()
+	c.s.deps.Messages = &messages.Service{Store: inventory.NewMessages(c.db), Books: c.repo, Turns: c.s.deps.Turns, Tasks: r.g,
 		Intents: turnstest.Intents(), Clock: fixedClock(catalogNow)}
 	c.s.registerMessages()
 	return r
@@ -85,15 +85,15 @@ func (r *notifyRig) settle(t *testing.T, u unit.Unit) api.Row {
 }
 
 // notified are the attentions of every entry of every view, by entry id.
-func (r *notifyRig) notified(t *testing.T) map[string]api.EntryView {
+func (r *notifyRig) notified(t *testing.T) map[string]api.TaskView {
 	t.Helper()
-	out := map[string]api.EntryView{}
+	out := map[string]api.TaskView{}
 	for _, v := range storedViews() {
-		var p api.EntriesPage
-		if code := get(t, r.s, api.EntriesPath+"?view="+v, &p); code != 200 {
+		var p api.TasksPage
+		if code := get(t, r.s, api.TasksPath+"?view="+v, &p); code != 200 {
 			t.Fatalf("view %s: %d", v, code)
 		}
-		for _, e := range p.Entries {
+		for _, e := range p.Tasks {
 			if e.Attention == nil {
 				continue
 			}
@@ -117,8 +117,8 @@ func newCategory(old string) api.Category {
 	return api.Category(old)
 }
 
-// entryActions are a row attention's action ids as an entry offers them.
-func entryActions(acts []api.AttentionAction) []string {
+// taskActions are a row attention's action ids as an entry offers them.
+func taskActions(acts []api.AttentionAction) []string {
 	out := []string{}
 	for _, a := range acts {
 		switch a.ID {
@@ -159,7 +159,7 @@ func rawActions(acts []api.AttentionAction) []string {
 	return out
 }
 
-func TestEntryAttentionMatchesRowAttention(t *testing.T) {
+func TestTaskAttentionMatchesRowAttention(t *testing.T) {
 	t.Parallel()
 	var compared atomic.Int32
 	t.Cleanup(func() {
@@ -176,8 +176,8 @@ func TestEntryAttentionMatchesRowAttention(t *testing.T) {
 			got := r.notified(t)
 			old := rowAttention(t, r.s, row)
 			if f.name == "pending_muted" {
-				es, err := r.db.Entries().EntriesOf(context.Background(), f.ref.Unit())
-				if err != nil || len(es) == 0 || slices.ContainsFunc(es, func(e task.Entry) bool { return e.State != task.Scheduled }) {
+				es, err := r.db.Tasks().TasksOf(context.Background(), f.ref.Unit())
+				if err != nil || len(es) == 0 || slices.ContainsFunc(es, func(e task.Task) bool { return e.State != task.Scheduled }) {
 					t.Fatalf("the muted unit's entries %+v %v", es, err)
 				}
 			}
@@ -199,14 +199,14 @@ func TestEntryAttentionMatchesRowAttention(t *testing.T) {
 			}
 			for id, e := range got {
 				a := e.Attention
-				cat, entry, ok := api.ParseNotificationID(a.ID)
-				if !ok || entry != id || cat != newCategory(old.Category) || a.Category != string(cat) {
+				cat, task, ok := api.ParseNotificationID(a.ID)
+				if !ok || task != id || cat != newCategory(old.Category) || a.Category != string(cat) {
 					t.Errorf("id %s category %s, old %s %s", a.ID, a.Category, old.ID, old.Category)
 				}
 				if a.Title != old.Title || a.Body != old.Body || a.Subtitle != old.Subtitle || a.Image != old.Image {
 					t.Errorf("entry %+v\nrow   %+v", a, old)
 				}
-				if want, have := entryActions(old.Actions), rawActions(a.Actions); !slices.Equal(want, have) {
+				if want, have := taskActions(old.Actions), rawActions(a.Actions); !slices.Equal(want, have) {
 					t.Errorf("actions %q, row %q", have, want)
 				}
 			}
@@ -228,53 +228,53 @@ func (f *fakeOutbox) List(_ context.Context, fl outbox.Filter) ([]draft.Draft, e
 	return out, nil
 }
 
-func (f *fakeOutbox) entry(d draft.Draft) task.Entry {
-	return task.Entry{ID: task.ID("draft:" + strconv.FormatInt(int64(d.ID), 10)), Kind: task.KindDraft, State: task.Inbox, Title: d.Text,
+func (f *fakeOutbox) task(d draft.Draft) task.Task {
+	return task.Task{ID: task.ID("draft:" + strconv.FormatInt(int64(d.ID), 10)), Kind: task.KindDraft, State: task.Inbox, Title: d.Text,
 		Units: []unit.Unit{d.Unit}, Origin: task.OriginDraft, Created: d.CreatedAt, Updated: d.UpdatedAt}
 }
 
-func (f *fakeOutbox) Entries(context.Context, task.Query) ([]task.Entry, error) {
-	var out []task.Entry
+func (f *fakeOutbox) Tasks(context.Context, task.Query) ([]task.Task, error) {
+	var out []task.Task
 	for _, d := range f.drafts {
 		if d.State == draft.Proposed || d.State == draft.Failed {
-			out = append(out, f.entry(d))
+			out = append(out, f.task(d))
 		}
 	}
 	return out, nil
 }
 
-func (f *fakeOutbox) Entry(_ context.Context, id task.ID) (task.Entry, bool, error) {
+func (f *fakeOutbox) Task(_ context.Context, id task.ID) (task.Task, bool, error) {
 	for _, d := range f.drafts {
-		if e := f.entry(d); e.ID == id {
+		if e := f.task(d); e.ID == id {
 			return e, true, nil
 		}
 	}
-	return task.Entry{}, false, nil
+	return task.Task{}, false, nil
 }
 
 func (f *fakeOutbox) Count(ctx context.Context, _ string) (int, error) {
-	es, _ := f.Entries(ctx, task.Query{})
+	es, _ := f.Tasks(ctx, task.Query{})
 	return len(es), nil
 }
 
-func withOutbox(r *entriesRig, drafts ...draft.Draft) *fakeOutbox {
+func withOutbox(r *tasksRig, drafts ...draft.Draft) *fakeOutbox {
 	f := &fakeOutbox{drafts: drafts}
 	r.g.RegisterView(task.ViewOutbox, "draft:", f)
 	r.s.deps.Drafts = f
 	return f
 }
 
-func proposed(id int64, entry string) draft.Draft {
-	return draft.Draft{ID: draft.ID(id), Unit: r7u, Entry: entry, Kind: draft.Comment, Purpose: "comment", Delivery: draft.CommentDelivery, Text: "Thanks, merging.\nmore", State: draft.Proposed,
-		CreatedAt: entriesNow.Add(-time.Hour), UpdatedAt: entriesNow.Add(-time.Duration(id) * time.Minute)}
+func proposed(id int64, task string) draft.Draft {
+	return draft.Draft{ID: draft.ID(id), Unit: r7u, Task: task, Kind: draft.Comment, Purpose: "comment", Delivery: draft.CommentDelivery, Text: "Thanks, merging.\nmore", State: draft.Proposed,
+		CreatedAt: tasksNow.Add(-time.Hour), UpdatedAt: tasksNow.Add(-time.Duration(id) * time.Minute)}
 }
 
 // attentions are the attentions of every view's entries, by entry id.
-func attentions(t *testing.T, r *entriesRig) map[string]*api.Attention {
+func attentions(t *testing.T, r *tasksRig) map[string]*api.Attention {
 	t.Helper()
 	out := map[string]*api.Attention{}
 	for _, v := range storedViews() {
-		for _, e := range r.page(t, "view="+v).Entries {
+		for _, e := range r.page(t, "view="+v).Tasks {
 			if e.Attention != nil {
 				if v != "inbox" && v != "outbox" && v != "focus" {
 					t.Errorf("%s entry %s notifies %+v", v, e.ID, e.Attention)
@@ -294,20 +294,20 @@ func actionIDs(a *api.Attention) []string {
 	return out
 }
 
-func TestInboxEntriesCarryAttention(t *testing.T) {
+func TestInboxTasksCarryAttention(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, nil)
-	r.put(t, task.Entry{ID: "e-in", State: task.Inbox, Title: "ask ana about the export"})
+	r := newTasksRig(t, nil)
+	r.put(t, task.Task{ID: "e-in", State: task.Inbox, Title: "ask ana about the export"})
 	got := attentions(t, r)
 	a := got["e-in"]
 	if len(got) != 1 || a == nil {
 		t.Fatalf("%+v", got)
 	}
-	cat, entry, ok := api.ParseNotificationID(a.ID)
-	if !ok || cat != api.CategoryInbox || entry != "e-in" || a.Category != "INBOX" || a.Body != "ask ana about the export" {
+	cat, tk, ok := api.ParseNotificationID(a.ID)
+	if !ok || cat != api.CategoryInbox || tk != "e-in" || a.Category != "INBOX" || a.Body != "ask ana about the export" {
 		t.Fatalf("%+v", a)
 	}
-	r.put(t, task.Entry{ID: "e-renamed", State: task.Inbox, Title: "another"})
+	r.put(t, task.Task{ID: "e-renamed", State: task.Inbox, Title: "another"})
 	if b := attentions(t, r)["e-renamed"]; b == nil || strings.Split(b.ID, "|")[2] == strings.Split(a.ID, "|")[2] {
 		t.Fatalf("another title kept the token: %+v", b)
 	}
@@ -315,14 +315,14 @@ func TestInboxEntriesCarryAttention(t *testing.T) {
 
 func TestOnlyInboxAndOutboxNotify(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, nil)
+	r := newTasksRig(t, nil)
 	r.put(t,
-		task.Entry{ID: "e-in", State: task.Inbox, Units: []unit.Unit{r7u}},
-		task.Entry{ID: "e-next", State: task.Next, Units: []unit.Unit{r7u}},
-		task.Entry{ID: "e-wait", Kind: task.KindWaiting, State: task.Waiting, Units: []unit.Unit{r7u}, Waiting: &task.WaitingOn{Since: entriesNow}},
-		task.Entry{ID: "e-muted", State: task.Scheduled, Units: []unit.Unit{r7u}, Snooze: task.Snooze{Until: entriesNow.Add(time.Hour), Return: task.Inbox, Mute: true}},
-		task.Entry{ID: "e-someday", State: task.Someday},
-		task.Entry{ID: "e-done", State: task.Done},
+		task.Task{ID: "e-in", State: task.Inbox, Units: []unit.Unit{r7u}},
+		task.Task{ID: "e-next", State: task.Next, Units: []unit.Unit{r7u}},
+		task.Task{ID: "e-wait", Kind: task.KindWaiting, State: task.Waiting, Units: []unit.Unit{r7u}, Waiting: &task.WaitingOn{Since: tasksNow}},
+		task.Task{ID: "e-muted", State: task.Scheduled, Units: []unit.Unit{r7u}, Snooze: task.Snooze{Until: tasksNow.Add(time.Hour), Return: task.Inbox, Mute: true}},
+		task.Task{ID: "e-someday", State: task.Someday},
+		task.Task{ID: "e-done", State: task.Done},
 	)
 	got := attentions(t, r)
 	if len(got) != 1 || got["e-in"] == nil {
@@ -332,8 +332,8 @@ func TestOnlyInboxAndOutboxNotify(t *testing.T) {
 
 func TestOutboxDraftNotifiesOnce(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, nil)
-	r.put(t, task.Entry{ID: "e-next", State: task.Next, Units: []unit.Unit{r7u}})
+	r := newTasksRig(t, nil)
+	r.put(t, task.Task{ID: "e-next", State: task.Next, Units: []unit.Unit{r7u}})
 	failed := proposed(3, "")
 	failed.State = draft.Failed
 	sent := proposed(4, "")
@@ -358,8 +358,8 @@ func TestOutboxDraftNotifiesOnce(t *testing.T) {
 
 func TestProposalAndDraftNotifyOnce(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, nil)
-	r.put(t, task.Entry{ID: "e-prop", Kind: task.KindMessage, State: task.Inbox, Title: "nudge ana?", Units: []unit.Unit{r7u}, Origin: task.OriginMessage})
+	r := newTasksRig(t, nil)
+	r.put(t, task.Task{ID: "e-prop", Kind: task.KindMessage, State: task.Inbox, Title: "nudge ana?", Units: []unit.Unit{r7u}, Origin: task.OriginMessage})
 	before := attentions(t, r)["e-prop"]
 	withOutbox(r, proposed(1, "e-prop"))
 	got := attentions(t, r)
@@ -374,11 +374,11 @@ func TestProposalAndDraftNotifyOnce(t *testing.T) {
 
 func TestNoNotificationForADisabledPlugin(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, func(d *Deps) { d.PluginEnabled = func(p unit.ProviderID) bool { return p != unit.GitHub } })
+	r := newTasksRig(t, func(d *Deps) { d.PluginEnabled = func(p unit.ProviderID) bool { return p != unit.GitHub } })
 	r.put(t,
-		task.Entry{ID: "e-gh", State: task.Inbox, Units: []unit.Unit{r7u}},
-		task.Entry{ID: "e-mixed", State: task.Inbox, Units: []unit.Unit{r7u, {Provider: "slack", Key: "T000/C000/1.2"}}},
-		task.Entry{ID: "e-capture", State: task.Inbox},
+		task.Task{ID: "e-gh", State: task.Inbox, Units: []unit.Unit{r7u}},
+		task.Task{ID: "e-mixed", State: task.Inbox, Units: []unit.Unit{r7u, {Provider: "slack", Key: "T000/C000/1.2"}}},
+		task.Task{ID: "e-capture", State: task.Inbox},
 	)
 	withOutbox(r, proposed(1, ""))
 	got := attentions(t, r)
@@ -391,7 +391,7 @@ func TestAskedTurnNotifiesOnce(t *testing.T) {
 	t.Parallel()
 	r := newNotifyRig(t)
 	r.settle(t, r7u)
-	if es, _ := r.db.Entries().EntriesOf(context.Background(), r7u); len(es) != 1 || es[0].State != task.Next {
+	if es, _ := r.db.Tasks().TasksOf(context.Background(), r7u); len(es) != 1 || es[0].State != task.Next {
 		t.Fatalf("the review request's entry %+v", es)
 	}
 	r.asks(t, turn.Asked, draftQuestion("publish?"))
@@ -410,7 +410,7 @@ func TestAskedTurnNotifiesOnce(t *testing.T) {
 	}
 }
 
-func TestHeldEntryIdStableAcrossRestart(t *testing.T) {
+func TestHeldTaskIdStableAcrossRestart(t *testing.T) {
 	t.Parallel()
 	r := newNotifyRig(t)
 	r.events(t, dinv.Event{PR: r7, Kind: dinv.KindRoundHeld, Key: "cap", At: catalogNow, Data: "daily cap"})
@@ -434,18 +434,18 @@ func TestHeldEntryIdStableAcrossRestart(t *testing.T) {
 	}
 }
 
-// TestLiveEntriesNotifyAsTheRows checks over the seeded live-size store that every row notification
+// TestLiveTasksNotifyAsTheRows checks over the seeded live-size store that every row notification
 // is one entry notification of the same unit, and no entry notifies where no row did.
-func TestLiveEntriesNotifyAsTheRows(t *testing.T) {
+func TestLiveTasksNotifyAsTheRows(t *testing.T) {
 	t.Parallel()
 	s, f := newLiveServer(t)
 	ctx := context.Background()
 	ledger := &coreitems.Ledger{Store: f.DB.Items(), Clock: fixedClock(f.Now)}
 	me := task.Me{Keys: []string{"github:user-01"}}
-	g := coretasks.New(coretasks.Deps{Store: f.DB.Entries(), Items: ledger, Facts: coretasks.CardFacts{Cards: f.DB.Cards(), Me: func() task.Me { return me }},
+	g := coretasks.New(coretasks.Deps{Store: f.DB.Tasks(), Items: ledger, Facts: coretasks.CardFacts{Cards: f.DB.Cards(), Me: func() task.Me { return me }},
 		Me: me, Clock: fixedClock(f.Now), StaleWaitingDays: 2})
-	s.deps.GTD, s.deps.Items = g, ledger
-	s.deps.Messages = &messages.Service{Store: inventory.NewMessages(f.DB), Books: f.Turns, Turns: s.deps.Turns, Entries: g,
+	s.deps.Tasks, s.deps.Items = g, ledger
+	s.deps.Messages = &messages.Service{Store: inventory.NewMessages(f.DB), Books: f.Turns, Turns: s.deps.Turns, Tasks: g,
 		Intents: turnstest.Intents(), Clock: fixedClock(f.Now)}
 	s.registerMessages()
 	var rows []api.Row
@@ -475,14 +475,14 @@ func TestLiveEntriesNotifyAsTheRows(t *testing.T) {
 	}
 	start := time.Now()
 	got := map[unit.Unit][]*api.Attention{}
-	entries := 0
+	tasks := 0
 	for _, v := range storedViews() {
-		var p api.EntriesPage
-		if code := get(t, s, api.EntriesPath+"?view="+v, &p); code != 200 {
+		var p api.TasksPage
+		if code := get(t, s, api.TasksPath+"?view="+v, &p); code != 200 {
 			t.Fatalf("%s: %d", v, code)
 		}
-		entries += len(p.Entries)
-		for _, e := range p.Entries {
+		tasks += len(p.Tasks)
+		for _, e := range p.Tasks {
 			if e.Attention == nil || v == string(task.ViewFocus) {
 				continue
 			}
@@ -493,7 +493,7 @@ func TestLiveEntriesNotifyAsTheRows(t *testing.T) {
 			got[e.Units[0]] = append(got[e.Units[0]], e.Attention)
 		}
 	}
-	t.Logf("%d rows, %d entries over every view served in %s", len(rows), entries, time.Since(start))
+	t.Logf("%d rows, %d entries over every view served in %s", len(rows), tasks, time.Since(start))
 	notified, answered := 0, 0
 	for u, old := range byUnit {
 		news := got[u]
@@ -540,11 +540,11 @@ func answerWaits(ctx context.Context, t *testing.T, f *storetest.Fixture, u unit
 	return false
 }
 
-func TestADraftOfASilentInboxEntryNotifiesItself(t *testing.T) {
+func TestADraftOfASilentInboxTaskNotifiesItself(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, func(d *Deps) { d.PluginEnabled = func(p unit.ProviderID) bool { return p != "slack" } })
+	r := newTasksRig(t, func(d *Deps) { d.PluginEnabled = func(p unit.ProviderID) bool { return p != "slack" } })
 	slack := unit.Unit{Provider: "slack", Key: "T000/C000/1.2"}
-	r.put(t, task.Entry{ID: "e-off", State: task.Inbox, Units: []unit.Unit{slack}}, task.Entry{ID: "e-in", State: task.Inbox})
+	r.put(t, task.Task{ID: "e-off", State: task.Inbox, Units: []unit.Unit{slack}}, task.Task{ID: "e-in", State: task.Inbox})
 	failed := proposed(2, "e-in")
 	failed.State = draft.Failed
 	withOutbox(r, proposed(1, "e-off"), failed)
@@ -563,7 +563,7 @@ func TestAStaleQuestionMessageDoesNotNotifyTwice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stale := dmessage.Message{EntryID: string(e.ID), Unit: r7u, Kind: dmessage.Question, Text: "an older question", State: dmessage.Open,
+	stale := dmessage.Message{TaskID: string(e.ID), Unit: r7u, Kind: dmessage.Question, Text: "an older question", State: dmessage.Open,
 		Origin: dmessage.Origin{Kind: dmessage.OriginTurn, TurnSeq: 99}, CreatedAt: catalogNow}
 	if _, err := r.s.deps.Messages.Store.Upsert(ctx, stale); err != nil {
 		t.Fatal(err)
@@ -573,14 +573,14 @@ func TestAStaleQuestionMessageDoesNotNotifyTwice(t *testing.T) {
 	}
 }
 
-func TestAnotherDerivedEntryOfANotifyingRowStaysSilent(t *testing.T) {
+func TestAnotherDerivedTaskOfANotifyingRowStaysSilent(t *testing.T) {
 	t.Parallel()
 	r := newNotifyRig(t)
 	r.events(t, dinv.Event{PR: r7, Kind: dinv.KindRoundHeld, Key: "cap", At: catalogNow, Data: "daily cap"})
 	r.settle(t, r7u)
-	other := task.Entry{ID: "e-other", Kind: task.KindAction, State: task.Inbox, Title: "look at it", Units: []unit.Unit{r7u},
+	other := task.Task{ID: "e-other", Kind: task.KindAction, State: task.Inbox, Title: "look at it", Units: []unit.Unit{r7u},
 		Items: []task.ItemRef{{Unit: r7u, Item: "gh:attention"}}, Origin: task.OriginDerived, Created: catalogNow, Updated: catalogNow}
-	if err := r.db.Entries().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Entry: other}}); err != nil {
+	if err := r.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: other}}); err != nil {
 		t.Fatal(err)
 	}
 	got := r.notified(t)
@@ -596,7 +596,7 @@ func TestAnotherDerivedEntryOfANotifyingRowStaysSilent(t *testing.T) {
 
 // storedViews are the views the entries store serves; review needs its source.
 func storedViews() []string {
-	return slices.DeleteFunc(slices.Clone(builtin.GTDViews), func(v string) bool { return v == string(task.ViewReview) })
+	return slices.DeleteFunc(slices.Clone(builtin.Views), func(v string) bool { return v == string(task.ViewReview) })
 }
 
 func TestANotificationOffersOnlyTheVerbsTheProfileOffers(t *testing.T) {
@@ -606,7 +606,7 @@ func TestANotificationOffersOnlyTheVerbsTheProfileOffers(t *testing.T) {
 		t.Fatal(err)
 	}
 	cache := cacheOver(t, dir)
-	r := newEntriesRig(t, func(d *Deps) { d.Intents = cache.Get })
+	r := newTasksRig(t, func(d *Deps) { d.Intents = cache.Get })
 	withOutbox(r, proposed(1, ""))
 	if a := attentions(t, r)["draft:1"]; a == nil || !slices.Equal(actionIDs(a), []string{"open"}) {
 		t.Errorf("%+v", a)

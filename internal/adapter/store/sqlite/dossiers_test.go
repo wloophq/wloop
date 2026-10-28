@@ -64,7 +64,7 @@ func TestDossierStoreRoundTrips(t *testing.T) {
 	}
 }
 
-func TestDossierStoreOpenReadsItemsAndEntries(t *testing.T) {
+func TestDossierStoreOpenReadsItemsAndTasks(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db, _ := openTemp(t)
@@ -96,15 +96,15 @@ func TestDossierStoreOpenReadsItemsAndEntries(t *testing.T) {
 		t.Fatal("an open item does not keep the unit open")
 	}
 
-	e := task.Entry{ID: task.NewID(), Kind: task.KindCapture, State: task.Next, Title: "t", Units: []unit.Unit{slackThread}, Origin: task.OriginUser, Created: at, Updated: at}
-	if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: e}}); err != nil {
+	e := task.Task{ID: task.NewID(), Kind: task.KindCapture, State: task.Next, Title: "t", Units: []unit.Unit{slackThread}, Origin: task.OriginUser, Created: at, Updated: at}
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
 	if !open(slackThread) {
 		t.Fatal("a live entry does not keep the unit open")
 	}
 	e.State = task.Done
-	if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpUpdate, Entry: e}}); err != nil {
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
 	if open(slackThread) {
@@ -121,15 +121,15 @@ func TestDossierStoreOpenReadsItemsAndEntries(t *testing.T) {
 	if project() {
 		t.Fatal("a project without an entry is open")
 	}
-	p := task.Entry{ID: task.NewID(), Kind: task.KindProject, State: task.Next, Title: "Ship it", Slug: "ship-it", Origin: task.OriginUser, Created: at, Updated: at}
-	if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: p}}); err != nil {
+	p := task.Task{ID: task.NewID(), Kind: task.KindProject, State: task.Next, Title: "Ship it", Slug: "ship-it", Origin: task.OriginUser, Created: at, Updated: at}
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: p}}); err != nil {
 		t.Fatal(err)
 	}
 	if !project() {
 		t.Fatal("a live project is not open")
 	}
 	p.State = task.Done
-	if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpUpdate, Entry: p}}); err != nil {
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: p}}); err != nil {
 		t.Fatal(err)
 	}
 	if project() {

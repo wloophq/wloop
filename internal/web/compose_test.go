@@ -11,8 +11,8 @@ import (
 
 var slackThread = unit.Unit{Provider: "slack", Key: "T1/C1/1700000000.000100"}
 
-func threadEntry(verbs ...api.VerbState) api.EntryView {
-	return entry("e-s", "inbox", func(e *api.EntryView) {
+func threadTask(verbs ...api.VerbState) api.TaskView {
+	return task("e-s", "inbox", func(e *api.TaskView) {
 		e.Title, e.Units = "Ana asks for the rollout date", []unit.Unit{slackThread}
 		e.UnitLabels = []string{"#ops"}
 		e.Verbs = verbs
@@ -27,13 +27,13 @@ applyPlugins([{ id: "slack", name: "Slack", enabled: true, reacts: true }, { id:
 `
 
 func TestDelegateBoxSendsGuidanceAndMode(t *testing.T) {
-	e := threadEntry(api.VerbState{Verb: "delegate", Enabled: true}, api.VerbState{Verb: "reply", Enabled: true})
+	e := threadTask(api.VerbState{Verb: "delegate", Enabled: true}, api.VerbState{Verb: "reply", Enabled: true})
 	var got struct {
 		Text    string
 		Buttons []string
 		Posts   []map[string]any
 	}
-	nodeRun(t, gtdPrelude(t)+detailHarness+composeHarness, nil, `
+	nodeRun(t, viewsPrelude(t)+detailHarness+composeHarness, nil, `
 (async () => {
   await loadDetailPane({ entry: "e-s" });
   let pane = entryPane(detailState.entry);
@@ -68,12 +68,12 @@ func TestDelegateBoxSendsGuidanceAndMode(t *testing.T) {
 }
 
 func TestDelegateBoxShowsWhyItIsOff(t *testing.T) {
-	e := threadEntry(api.VerbState{Verb: "delegate", Reason: "slack:T1 offers no action to delegate"})
+	e := threadTask(api.VerbState{Verb: "delegate", Reason: "slack:T1 offers no action to delegate"})
 	var got struct {
 		Text     string
 		Disabled bool
 	}
-	nodeRun(t, gtdPrelude(t)+detailHarness+composeHarness, nil, `
+	nodeRun(t, viewsPrelude(t)+detailHarness+composeHarness, nil, `
 (async () => {
   await loadDetailPane({ entry: "e-s" });
   const pane = entryPane(detailState.entry);
@@ -85,14 +85,14 @@ func TestDelegateBoxShowsWhyItIsOff(t *testing.T) {
 }
 
 func TestHandToAnAgentIsOffWithThePlacementReason(t *testing.T) {
-	e := threadEntry(api.VerbState{Verb: "delegate", Enabled: true, Runners: []api.RunnerState{
+	e := threadTask(api.VerbState{Verb: "delegate", Enabled: true, Runners: []api.RunnerState{
 		{Runner: "headless", Enabled: true}, {Runner: "session", Reason: "no workspace manager is enabled"}}})
 	var got struct {
 		Text              string
 		Headless, Session bool
 		Title             string
 	}
-	nodeRun(t, gtdPrelude(t)+detailHarness+composeHarness, nil, `
+	nodeRun(t, viewsPrelude(t)+detailHarness+composeHarness, nil, `
 (async () => {
   await loadDetailPane({ entry: "e-s" });
   const pane = entryPane(detailState.entry);
@@ -105,13 +105,13 @@ func TestHandToAnAgentIsOffWithThePlacementReason(t *testing.T) {
 	}
 }
 
-func TestEntryComposerSavesSendsAndReacts(t *testing.T) {
-	e := threadEntry(api.VerbState{Verb: "reply", Enabled: true})
+func TestTaskComposerSavesSendsAndReacts(t *testing.T) {
+	e := threadTask(api.VerbState{Verb: "reply", Enabled: true})
 	var got struct {
 		Args  []map[string]any
 		Empty string
 	}
-	nodeRun(t, gtdPrelude(t)+detailHarness+composeHarness, nil, `
+	nodeRun(t, viewsPrelude(t)+detailHarness+composeHarness, nil, `
 (async () => {
   let notices = [];
   detailEnv.notice = (t, err) => notices.push((err ? "! " : "") + t);
@@ -152,12 +152,12 @@ func TestEntryComposerSavesSendsAndReacts(t *testing.T) {
 	}
 }
 
-func TestEntryDetailListsItsDrafts(t *testing.T) {
-	e := threadEntry(api.VerbState{Verb: "reply", Enabled: true})
+func TestTaskDetailListsItsDrafts(t *testing.T) {
+	e := threadTask(api.VerbState{Verb: "reply", Enabled: true})
 	drafts := api.DraftsResponse{Drafts: []api.Draft{
-		{ID: 4, Unit: "slack/" + slackThread.Key, Entry: "e-s", Kind: "reply", Text: "Friday works", State: "proposed", Rev: 2, Where: "#ops in the thread",
+		{ID: 4, Unit: "slack/" + slackThread.Key, Task: "e-s", Kind: "reply", Text: "Friday works", State: "proposed", Rev: 2, Where: "#ops in the thread",
 			Actions: []api.ActionState{{ID: "draft.approve", Enabled: true}, {ID: "draft.edit", Enabled: true}, {ID: "draft.discard", Enabled: true}, {ID: "draft.retry", Reason: "the draft is proposed"}}},
-		{ID: 3, Unit: "slack/" + slackThread.Key, Entry: "e-s", Kind: "react", Reaction: "eyes", State: "sent",
+		{ID: 3, Unit: "slack/" + slackThread.Key, Task: "e-s", Kind: "react", Reaction: "eyes", State: "sent",
 			Actions: []api.ActionState{{ID: "draft.approve", Reason: "the draft is sent"}, {ID: "draft.edit", Reason: "the draft is sent"}, {ID: "draft.discard", Reason: "the draft is sent"}}},
 	}}
 	var got struct {
@@ -165,7 +165,7 @@ func TestEntryDetailListsItsDrafts(t *testing.T) {
 		Drafts int
 		Post   map[string]any
 	}
-	nodeRun(t, gtdPrelude(t)+detailHarness+composeHarness, nil, `
+	nodeRun(t, viewsPrelude(t)+detailHarness+composeHarness, nil, `
 (async () => {
   await loadDetailPane({ entry: "e-s" });
   const pane = entryPane(detailState.entry);
@@ -187,7 +187,7 @@ func TestUnitComposerPostsADraft(t *testing.T) {
 		Text   string
 		Reacts []bool
 	}
-	nodeRun(t, gtdPrelude(t)+detailHarness+composeHarness, nil, `
+	nodeRun(t, viewsPrelude(t)+detailHarness+composeHarness, nil, `
 (async () => {
   const d = { row: { unit: input.unit }, items: [] };
   let box = unitExtras(d);
@@ -214,20 +214,20 @@ func TestUnitComposerPostsADraft(t *testing.T) {
 	}
 }
 
-func TestGTDFilterMatchesEntriesByTheirWords(t *testing.T) {
-	es := []api.EntryView{
-		entry("e-1", "next", func(e *api.EntryView) {
+func TestTheViewFilterMatchesTasksByTheirWords(t *testing.T) {
+	es := []api.TaskView{
+		task("e-1", "next", func(e *api.TaskView) {
 			e.Title, e.UnitLabels, e.Units = "Rollout date", []string{"#ops"}, []unit.Unit{slackThread}
 		}),
-		entry("e-2", "next", func(e *api.EntryView) {
+		task("e-2", "next", func(e *api.TaskView) {
 			e.Title, e.Waiting = "Review the retry", &api.WaitingView{On: []api.WaitingPerson{{Name: "Dana Souza"}}}
 		}),
-		entry("e-3", "next", func(e *api.EntryView) {
+		task("e-3", "next", func(e *api.TaskView) {
 			e.Title, e.UnitLabels, e.Units = "Fix flaky uploads", []string{"acme/api#8"}, []unit.Unit{prUnit}
 		}),
 	}
 	var got map[string][]string
-	nodeRun(t, gtdPrelude(t), nil, `
+	nodeRun(t, viewsPrelude(t), nil, `
 const out = {};
 for (const q of ["", "#ops", "dana", "souza review", "ACME/API", "\"retry\"", "nothing"]) {
   out[q] = input.entries.filter((e) => entryMatches(e, gtdTerms(q))).map((e) => e.id);
@@ -241,20 +241,20 @@ process.stdout.write(JSON.stringify(out));`, map[string]any{"entries": es}, &got
 	}
 }
 
-func TestGTDListShowsOnlyMatchingEntries(t *testing.T) {
-	es := []api.EntryView{
-		entry("e-1", "inbox", func(e *api.EntryView) { e.Title = "Rollout date" }),
-		entry("e-2", "inbox", func(e *api.EntryView) { e.Title = "Review the retry" }),
+func TestAViewListShowsOnlyMatchingTasks(t *testing.T) {
+	es := []api.TaskView{
+		task("e-1", "inbox", func(e *api.TaskView) { e.Title = "Rollout date" }),
+		task("e-2", "inbox", func(e *api.TaskView) { e.Title = "Review the retry" }),
 	}
 	var got struct{ Text []string }
-	nodeRun(t, gtdPrelude(t), nil, `
+	nodeRun(t, viewsPrelude(t), nil, `
 function writeHash() {}
 gtdState.catalog = input.cat;
 gtdState.key = gtdQueryKey("inbox", "", []);
 gtdState.entries = input.entries;
 const out = [];
 for (const q of ["rollout", "zzz"]) out.push(text(gtdList({ view: "inbox", area: "", ctx: [], q }, "")));
-process.stdout.write(JSON.stringify({ Text: out }));`, map[string]any{"entries": es, "cat": gtdCatalog()}, &got)
+process.stdout.write(JSON.stringify({ Text: out }));`, map[string]any{"entries": es, "cat": viewsCatalog()}, &got)
 	if !strings.Contains(got.Text[0], "Rollout date") || strings.Contains(got.Text[0], "Review the retry") {
 		t.Errorf("filtered list: %s", got.Text[0])
 	}

@@ -48,7 +48,7 @@ func TestSlackIdentityMatchesTheViewer(t *testing.T) {
 type flow struct {
 	f     *fixture
 	model *readmodel.Model
-	gtd   *coretasks.Service
+	tasks *coretasks.Service
 	units chan []unit.Unit
 }
 
@@ -67,7 +67,7 @@ func newFlow(t *testing.T, f *fixture, clock segClock) *flow {
 	me := task.Me{Keys: append([]string{who.Key}, who.Aliases...)}
 	fl := &flow{f: f, units: make(chan []unit.Unit, 64)}
 	fl.model = readmodel.New(f.log, f.db, nil, nil, nil, f.p.rows(readmodel.RowDeps{}))
-	fl.gtd = coretasks.New(coretasks.Deps{Store: f.db.Entries(), Items: f.ledger(), Me: me, Clock: clock,
+	fl.tasks = coretasks.New(coretasks.Deps{Store: f.db.Tasks(), Items: f.ledger(), Me: me, Clock: clock,
 		Facts: coretasks.CardFacts{Cards: f.db.Cards(), Me: func() task.Me { return me }}})
 	job := &cardsjob.Job{Store: f.db.Cards(), Ledger: f.ledger(), Providers: map[unit.ProviderID]cardsjob.Provider{dslack.Provider: {Card: Card}},
 		Clock: clock, Log: t.Logf}
@@ -95,12 +95,12 @@ func (fl *flow) card(t *testing.T, u unit.Unit, ok func(card.Card) bool) card.Ca
 	}
 }
 
-func (fl *flow) entries(t *testing.T, u unit.Unit) []task.Entry {
+func (fl *flow) tasksOf(t *testing.T, u unit.Unit) []task.Task {
 	t.Helper()
-	if err := fl.gtd.Sync(context.Background(), []unit.Unit{u}); err != nil {
+	if err := fl.tasks.Sync(context.Background(), []unit.Unit{u}); err != nil {
 		t.Fatal(err)
 	}
-	es, err := fl.f.db.Entries().EntriesOf(context.Background(), u)
+	es, err := fl.f.db.Tasks().TasksOf(context.Background(), u)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +119,7 @@ func scriptedItem(ref, origin, requester string, waiting []string, state string)
 		"place": map[string]string{"context": "", "why": ""}}
 }
 
-func TestSlackItemsBecomeEntries(t *testing.T) {
+func TestSlackItemsBecomeTasks(t *testing.T) {
 	f := newFixture(t)
 	clock := segClock{tsAt(4)}
 	f.deps.Clock = segClock{t0}
@@ -157,8 +157,8 @@ func TestSlackItemsBecomeEntries(t *testing.T) {
 	if len(c.WaitsOn) != 2 {
 		t.Fatalf("card %+v", c)
 	}
-	es := fl.entries(t, u)
-	var action, waiting []task.Entry
+	es := fl.tasksOf(t, u)
+	var action, waiting []task.Task
 	for _, e := range es {
 		switch e.Kind {
 		case task.KindAction:
@@ -191,14 +191,14 @@ func TestNewReplyResurfacesSnoozed(t *testing.T) {
 
 	fl := newFlow(t, f, clock)
 	first := fl.card(t, u, func(c card.Card) bool { return c.State == "waits_on_others" })
-	es := fl.entries(t, u)
+	es := fl.tasksOf(t, u)
 	if len(es) != 1 || es[0].Kind != task.KindWaiting || es[0].State != task.Waiting {
 		t.Fatalf("entries %+v", es)
 	}
-	if _, err := fl.gtd.Do(context.Background(), es[0].ID, coretasks.Request{Verb: task.VerbSchedule, Args: map[string]string{"on_activity": "true"}}); err != nil {
+	if _, err := fl.tasks.Do(context.Background(), es[0].ID, coretasks.Request{Verb: task.VerbSchedule, Args: map[string]string{"on_activity": "true"}}); err != nil {
 		t.Fatal(err)
 	}
-	if es = fl.entries(t, u); es[0].State != task.Scheduled || es[0].Changed {
+	if es = fl.tasksOf(t, u); es[0].State != task.Scheduled || es[0].Changed {
 		t.Fatalf("snoozed %+v", es[0])
 	}
 
@@ -208,7 +208,7 @@ func TestNewReplyResurfacesSnoozed(t *testing.T) {
 	if c.LastHuman.What != "here is the doc" {
 		t.Fatalf("card %+v", c.LastHuman)
 	}
-	es = fl.entries(t, u)
+	es = fl.tasksOf(t, u)
 	if len(es) != 1 || es[0].State != task.Inbox || !es[0].Changed {
 		t.Fatalf("after the reply %+v", es)
 	}

@@ -46,12 +46,12 @@ func (c Category) known() bool {
 }
 
 // NotificationID is "<category>|<entry-id>|<token>".
-func NotificationID(cat Category, entry string, token string) string {
-	return string(cat) + "|" + entry + "|" + token
+func NotificationID(cat Category, task string, token string) string {
+	return string(cat) + "|" + task + "|" + token
 }
 
 // ParseNotificationID reads an id NotificationID wrote.
-func ParseNotificationID(id string) (cat Category, entry string, ok bool) {
+func ParseNotificationID(id string) (cat Category, task string, ok bool) {
 	p := strings.Split(id, "|")
 	if len(p) != 3 || p[1] == "" || p[2] == "" || !Category(p[0]).known() {
 		return "", "", false
@@ -60,9 +60,9 @@ func ParseNotificationID(id string) (cat Category, entry string, ok bool) {
 }
 
 type Digest struct {
-	Day     string   `json:"day"`
-	Title   string   `json:"title"`
-	Body    string   `json:"body"`
-	Counts  Counters `json:"counts"`
-	Entries []string `json:"entries"`
+	Day    string   `json:"day"`
+	Title  string   `json:"title"`
+	Body   string   `json:"body"`
+	Counts Counters `json:"counts"`
+	Tasks  []string `json:"entries"`
 }

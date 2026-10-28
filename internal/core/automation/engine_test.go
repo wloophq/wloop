@@ -1703,11 +1703,11 @@ func TestOnlyAWorkflowThatReadsMarksLoadsThem(t *testing.T) {
 
 func TestEventsPlanOnAnEndedUnitOncePerEvent(t *testing.T) {
 	ctx := context.Background()
-	w := eventWF("on-done", unit.Entry, "entry", always, "verb_done")
+	w := eventWF("on-done", unit.Task, "entry", always, "verb_done")
 	w.Key = []string{workflow.EventIDFact}
-	byFacts := eventWF("by-facts", unit.Entry, "entry", always, "verb_done")
+	byFacts := eventWF("by-facts", unit.Task, "entry", always, "verb_done")
 	r := newRig(t, w, byFacts)
-	e1 := unit.Unit{Provider: unit.Entry, Key: "e-1"}
+	e1 := unit.Unit{Provider: unit.Task, Key: "e-1"}
 	r.units.PutEnded(e1, workflow.Facts{"entry.fingerprint": "done"})
 	for _, name := range []string{"on-done", "by-facts"} {
 		if err := r.events.Advance(ctx, name, 0, time.Time{}); err != nil {

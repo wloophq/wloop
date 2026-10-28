@@ -54,7 +54,7 @@ func (e *Env) unitRound(ctx context.Context, d dintent.Def, u unit.Unit, c daemo
 	if cfg.AgentHome == "" {
 		cfg.AgentHome = c.AgentHome
 	}
-	r := turn.Request{Intent: turn.Intent(d.Name), Trigger: turn.ByHand, Unit: u, Guidance: c.Guidance, Inputs: c.Inputs, Items: c.Items, Entry: c.Entry}
+	r := turn.Request{Intent: turn.Intent(d.Name), Trigger: turn.ByHand, Unit: u, Guidance: c.Guidance, Inputs: c.Inputs, Items: c.Items, Task: c.Task}
 	if r.Inputs, err = e.keptRepo(ctx, d, u, r.Inputs); err != nil {
 		return err
 	}
@@ -85,7 +85,7 @@ func (e *Env) launchUnit(ctx context.Context, d dintent.Def, l turns.Launch) err
 		if r.Inputs == nil {
 			r.Inputs = prev.Inputs
 		}
-		r.Items, r.Entry = turns.ItemsOf(prev), turns.EntryOf(prev)
+		r.Items, r.Task = turns.ItemsOf(prev), turns.TaskOf(prev)
 		r.Resume = instructions.ResumeOf(b, l.ResumeOf, l.Answer, "", "")
 		if r.History, err = e.turnHistory(ctx, l.Unit, b); err != nil {
 			return err

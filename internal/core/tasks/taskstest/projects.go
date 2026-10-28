@@ -11,17 +11,17 @@ import (
 
 // Projects is an in-memory coretasks.ProjectStore over the projects of Entries.
 type Projects struct {
-	Entries *Store
-	mu      sync.Mutex
-	runs    []task.ReviewRun
+	Tasks *Store
+	mu    sync.Mutex
+	runs  []task.ReviewRun
 }
 
 var _ coretasks.ProjectStore = (*Projects)(nil)
 
 func (p *Projects) SlugTaken(ctx context.Context, slug string) (bool, error) {
-	p.Entries.mu.Lock()
-	defer p.Entries.mu.Unlock()
-	for _, e := range p.Entries.entries {
+	p.Tasks.mu.Lock()
+	defer p.Tasks.mu.Unlock()
+	for _, e := range p.Tasks.tasks {
 		if e.Kind == task.KindProject && e.Slug == slug {
 			return true, nil
 		}

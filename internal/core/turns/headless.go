@@ -26,7 +26,7 @@ type HeadlessStart struct {
 	// Role is the role the turn's intent holds, "" none.
 	Role  string
 	Items []string
-	Entry string
+	Task  string
 	// ResumeOf is the headless turn whose question this run answers, 0 none.
 	ResumeOf int64
 }
@@ -48,7 +48,7 @@ const (
 	// Interrupted is the summary of a headless turn a restart cut short.
 	Interrupted = "interrupted by a restart"
 	itemsInput  = "items"
-	entryInput  = "entry"
+	taskInput   = "entry"
 )
 
 // ErrHeadlessBusy is BeginHeadless's refusal while the unit has a headless turn started.
@@ -85,15 +85,15 @@ func ItemsOf(t turn.Turn) []string {
 	return out
 }
 
-// EntryOf is the GTD entry the turn was asked from, kept in its inputs; "" none.
-func EntryOf(t turn.Turn) string {
-	s, _ := t.Inputs[entryInput].(string)
+// TaskOf is the GTD entry the turn was asked from, kept in its inputs; "" none.
+func TaskOf(t turn.Turn) string {
+	s, _ := t.Inputs[taskInput].(string)
 	return s
 }
 
 // bound is inputs with items and entry kept under their reserved names.
-func bound(inputs map[string]any, items []string, entry string) map[string]any {
-	if len(items) == 0 && entry == "" {
+func bound(inputs map[string]any, items []string, task string) map[string]any {
+	if len(items) == 0 && task == "" {
 		return inputs
 	}
 	out := maps.Clone(inputs)
@@ -103,8 +103,8 @@ func bound(inputs map[string]any, items []string, entry string) map[string]any {
 	if len(items) > 0 {
 		out[itemsInput] = slices.Clone(items)
 	}
-	if entry != "" {
-		out[entryInput] = entry
+	if task != "" {
+		out[taskInput] = task
 	}
 	return out
 }
@@ -127,7 +127,7 @@ func (s *Service) BeginHeadless(ctx context.Context, h HeadlessStart) (int64, er
 	}
 	now := s.now()
 	b.Send(turn.Turn{Intent: h.Intent, ID: h.Turn, Trigger: h.Trigger, Guidance: h.Guidance, ResumeOf: h.ResumeOf,
-		Inputs: bound(map[string]any{itemsInput: append([]string{}, h.Items...)}, nil, h.Entry), SentAt: now, Runner: turn.RunnerHeadless, Workflow: h.Workflow, Role: h.Role})
+		Inputs: bound(map[string]any{itemsInput: append([]string{}, h.Items...)}, nil, h.Task), SentAt: now, Runner: turn.RunnerHeadless, Workflow: h.Workflow, Role: h.Role})
 	if _, err := b.Start(h.Turn, "", now); err != nil {
 		s.mu.Unlock()
 		return 0, err

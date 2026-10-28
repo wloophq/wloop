@@ -21,17 +21,17 @@ import (
 
 // registerMessages makes the message entries' answer, dismiss and approve verbs answer their messages.
 func (s *Server) registerMessages() {
-	if s.deps.GTD == nil || s.deps.Messages == nil {
+	if s.deps.Tasks == nil || s.deps.Messages == nil {
 		return
 	}
-	s.deps.GTD.Register(task.KindMessage, task.VerbAnswer, s.entryVerb(task.VerbAnswer))
-	s.deps.GTD.Register(task.KindMessage, task.VerbDismiss, s.entryVerb(task.VerbDismiss))
-	s.deps.GTD.Register(task.KindMessage, task.VerbApprove, s.entryVerb(task.VerbApprove))
+	s.deps.Tasks.Register(task.KindMessage, task.VerbAnswer, s.taskVerb(task.VerbAnswer))
+	s.deps.Tasks.Register(task.KindMessage, task.VerbDismiss, s.taskVerb(task.VerbDismiss))
+	s.deps.Tasks.Register(task.KindMessage, task.VerbApprove, s.taskVerb(task.VerbApprove))
 }
 
-func (s *Server) entryVerb(verb task.Verb) coretasks.VerbHandler {
-	return func(ctx context.Context, e task.Entry, req coretasks.Request) (coretasks.Result, error) {
-		m, ok, err := s.deps.Messages.Store.ByEntry(ctx, string(e.ID))
+func (s *Server) taskVerb(verb task.Verb) coretasks.VerbHandler {
+	return func(ctx context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
+		m, ok, err := s.deps.Messages.Store.ByTask(ctx, string(e.ID))
 		if err != nil {
 			return coretasks.Result{}, err
 		}
@@ -63,12 +63,12 @@ func (s *Server) entryVerb(verb task.Verb) coretasks.VerbHandler {
 		if err != nil {
 			return coretasks.Result{}, err
 		}
-		s.recordVerb(ctx, s.deps.GTD, e, req)
-		got, err := s.deps.GTD.Entry(ctx, e.ID)
+		s.recordVerb(ctx, s.deps.Tasks, e, req)
+		got, err := s.deps.Tasks.Task(ctx, e.ID)
 		if err != nil {
 			return coretasks.Result{}, err
 		}
-		return coretasks.Result{Entry: got, Lines: lines(out.String())}, nil
+		return coretasks.Result{Task: got, Lines: lines(out.String())}, nil
 	}
 }
 
@@ -148,12 +148,12 @@ type pluginOff struct{ provider unit.ProviderID }
 
 func (p pluginOff) Error() string { return string(p.provider) + " is disabled" }
 
-// entryMessage is the message a KindMessage entry carries, nil when it holds none.
-func (s *Server) entryMessage(ctx context.Context, entry string) (*api.Message, error) {
+// taskMessage is the message a KindMessage entry carries, nil when it holds none.
+func (s *Server) taskMessage(ctx context.Context, task string) (*api.Message, error) {
 	if s.deps.Messages == nil {
 		return nil, nil
 	}
-	m, ok, err := s.deps.Messages.Store.ByEntry(ctx, entry)
+	m, ok, err := s.deps.Messages.Store.ByTask(ctx, task)
 	if err != nil || !ok {
 		return nil, err
 	}
@@ -169,6 +169,6 @@ func (s *Server) entryMessage(ctx context.Context, entry string) (*api.Message, 
 }
 
 func messageView(m dmessage.Message) api.Message {
-	return api.Message{ID: m.ID, EntryID: m.EntryID, Unit: m.Unit, Kind: string(m.Kind), Text: m.Text, Options: m.Options,
+	return api.Message{ID: m.ID, TaskID: m.TaskID, Unit: m.Unit, Kind: string(m.Kind), Text: m.Text, Options: m.Options,
 		Recommend: m.Recommend, Confirm: m.Confirm, Origin: m.Origin.Kind, State: string(m.State), CreatedAt: m.CreatedAt}
 }

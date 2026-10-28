@@ -15,4 +15,4 @@ func (s *Service) SetMe(me task.Me) {
 // Accepts says whether e's state takes verb with no handler: ErrArgs for an unknown verb, ErrVerb naming the
 // verb and the state for a refused one. approve, delegate, answer, edit and retry move nothing on their own,
 // so it refuses them.
-func Accepts(e task.Entry, verb task.Verb) error { return accepts(e, verb) }
+func Accepts(e task.Task, verb task.Verb) error { return accepts(e, verb) }

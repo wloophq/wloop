@@ -199,7 +199,7 @@ func stepRegistry() map[string]stepEntry {
 		builtin.StepDraftPropose: draftProposeStep,
 		stepClassify:             {check: (*stepSet).classifyCheck, run: (*stepSet).classifyRun},
 		"notify.self":            {check: (*stepSet).notifyCheck, run: (*stepSet).notifyRun},
-		builtin.StepEntryVerb:    {check: (*stepSet).entryVerbCheck, run: (*stepSet).entryVerbRun},
+		builtin.StepTaskVerb:     {check: (*stepSet).taskVerbCheck, run: (*stepSet).taskVerbRun},
 	}
 }
 

@@ -93,10 +93,10 @@ type Call struct {
 	Force bool
 	// Inputs are the intent's inputs, normalized to their types.
 	Inputs map[string]any
-	// Items are the unit's item ids and Entry the GTD entry the action was asked from; the turn's
+	// Items are the unit's item ids and Task the GTD entry the action was asked from; the turn's
 	// drafts are tied to them.
 	Items []string
-	Entry string
+	Task  string
 	// Manager and Parent are the request's: the workspace manager of the
 	// worktree the turn creates and the caller's worktree.
 	Manager, Parent string
@@ -347,7 +347,7 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 		writeActionError(w, err)
 		return
 	}
-	if why, err := s.entryRefusal(r.Context(), l, name, u); err != nil || why != "" {
+	if why, err := s.taskRefusal(r.Context(), l, name, u); err != nil || why != "" {
 		if err == nil {
 			err = Refusal{Reason: why}
 		}
@@ -694,7 +694,7 @@ func (s *Server) actIntent(ctx context.Context, name string, u unit.Unit, req ap
 	if err != nil {
 		return badRequest{err.Error()}
 	}
-	call := Call{Guidance: cutGuidance(d, req.Guidance), AgentHome: req.AgentHome, Out: out, Inputs: inputs, Items: req.Items, Entry: req.Entry,
+	call := Call{Guidance: cutGuidance(d, req.Guidance), AgentHome: req.AgentHome, Out: out, Inputs: inputs, Items: req.Items, Task: req.Task,
 		Manager: req.Manager, Parent: req.Parent}
 	if a, ok := s.deps.Actions.(AheadPreparer); ok && !LoopHeld(ctx) {
 		if err := a.PrepareAhead(ctx, name, u, call); err != nil {

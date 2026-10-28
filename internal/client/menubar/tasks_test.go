@@ -14,8 +14,8 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-func plainEntry(n int) api.EntryView {
-	return api.EntryView{ID: fmt.Sprintf("e-%d", n), Kind: "action", State: "inbox", Title: "Review the retry", Units: []unit.Unit{uref(n)}}
+func plainTask(n int) api.TaskView {
+	return api.TaskView{ID: fmt.Sprintf("e-%d", n), Kind: "action", State: "inbox", Title: "Review the retry", Units: []unit.Unit{uref(n)}}
 }
 
 func index(items []string, prefix string) int {
@@ -41,8 +41,8 @@ func TestTitleIsTheBadge(t *testing.T) {
 
 func TestBadgeAgreesWithTheInbox(t *testing.T) {
 	r := newRig(t)
-	r.d.entries["inbox"] = []api.EntryView{plainEntry(1), plainEntry(2), plainEntry(3)}
-	r.d.entries["outbox"] = []api.EntryView{draftEntry(4)}
+	r.d.tasks["inbox"] = []api.TaskView{plainTask(1), plainTask(2), plainTask(3)}
+	r.d.tasks["outbox"] = []api.TaskView{draftTask(4)}
 	r.d.counters = api.Counters{Views: map[string]int{"inbox": 3, "outbox": 1}, Badge: 4}
 	r.c.Refresh(context.Background())
 	got := titles(r.tray.menu)
@@ -54,7 +54,7 @@ func TestBadgeAgreesWithTheInbox(t *testing.T) {
 func TestMenuListsFiveAndMore(t *testing.T) {
 	r := newRig(t)
 	for i := 1; i <= 7; i++ {
-		r.d.entries["inbox"] = append(r.d.entries["inbox"], plainEntry(i))
+		r.d.tasks["inbox"] = append(r.d.tasks["inbox"], plainTask(i))
 	}
 	r.d.rows["loop"] = []api.Row{reviewRow(9)}
 	r.d.health = api.Health{Jobs: []api.JobStatus{{Name: "ingest:github", LastOK: now.Add(-2 * time.Minute)}}}
@@ -84,7 +84,7 @@ func TestMenuListsFiveAndMore(t *testing.T) {
 
 func TestPluginSectionsFollowTheCatalog(t *testing.T) {
 	r := newRig(t)
-	r.d.entries["inbox"] = []api.EntryView{plainEntry(1)}
+	r.d.tasks["inbox"] = []api.TaskView{plainTask(1)}
 	r.d.rows["needs-me"] = []api.Row{reviewRow(3)}
 	r.d.rows["loop"] = []api.Row{reviewRow(2)}
 	r.c.Refresh(context.Background())
@@ -147,7 +147,7 @@ func TestDaemonDownShowsAQuestionMark(t *testing.T) {
 	}
 	r.d.mu.Lock()
 	r.d.err = nil
-	r.d.entries["inbox"] = []api.EntryView{plainEntry(2)}
+	r.d.tasks["inbox"] = []api.TaskView{plainTask(2)}
 	r.d.counters = api.Counters{Badge: 1}
 	r.d.mu.Unlock()
 	r.c.Refresh(context.Background())
@@ -156,10 +156,10 @@ func TestDaemonDownShowsAQuestionMark(t *testing.T) {
 	}
 }
 
-func TestEntryClickOpensItInTheCockpit(t *testing.T) {
+func TestTaskClickOpensItInTheCockpit(t *testing.T) {
 	r := newRig(t)
-	r.d.entries["focus"] = []api.EntryView{plainEntry(2)}
-	r.d.entries["outbox"] = []api.EntryView{{ID: "draft:5", Kind: "draft", State: "inbox", Title: "reply: on it"}}
+	r.d.tasks["focus"] = []api.TaskView{plainTask(2)}
+	r.d.tasks["outbox"] = []api.TaskView{{ID: "draft:5", Kind: "draft", State: "inbox", Title: "reply: on it"}}
 	r.c.Refresh(context.Background())
 	it, ok := find(r.tray.menu, "acme/api#2 · Review the retry")
 	if !ok {

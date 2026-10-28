@@ -113,19 +113,19 @@ func TestOpenQuestionsBecomeMessages(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	d := servedMessages(t, te, db, log)
 	open := waitOpen(t, d, func(ms []message.Message) bool {
-		return len(ms) == 3 && !slices.ContainsFunc(ms, func(m message.Message) bool { return m.EntryID == "" })
+		return len(ms) == 3 && !slices.ContainsFunc(ms, func(m message.Message) bool { return m.TaskID == "" })
 	})
 	var units []unit.Unit
 	for _, m := range open {
 		units = append(units, m.Unit)
-		if m.Kind != message.Question || m.EntryID == "" {
+		if m.Kind != message.Question || m.TaskID == "" {
 			t.Fatalf("message %+v", m)
 		}
 	}
 	if !slices.Equal(units, []unit.Unit{ghUnit(1), ghUnit(2), ghUnit(4)}) {
 		t.Fatalf("units %v", units)
 	}
-	inbox, err := db.Entries().Entries(context.Background(), task.Query{View: task.ViewInbox})
+	inbox, err := db.Tasks().Tasks(context.Background(), task.Query{View: task.ViewInbox})
 	if err != nil || len(inbox) != 3 {
 		t.Fatalf("inbox %+v %v", inbox, err)
 	}
@@ -157,9 +157,9 @@ func TestLedgerProposalsReachTheInboxOnARealStore(t *testing.T) {
 		}
 	}
 	propose("i1")
-	open := waitOpen(t, d, func(ms []message.Message) bool { return len(ms) == 1 && ms[0].EntryID != "" })
+	open := waitOpen(t, d, func(ms []message.Message) bool { return len(ms) == 1 && ms[0].TaskID != "" })
 	m := open[0]
-	if m.Kind != message.Proposal || m.Origin.Kind != message.OriginLedger || m.Unit != u || m.EntryID == "" {
+	if m.Kind != message.Proposal || m.Origin.Kind != message.OriginLedger || m.Unit != u || m.TaskID == "" {
 		t.Fatalf("message %+v", m)
 	}
 	if _, err := d.Messages.Answer(ctx, m.ID, messages.Answer{OptionID: messages.OptionAccept}); err != nil {
@@ -174,7 +174,7 @@ func TestLedgerProposalsReachTheInboxOnARealStore(t *testing.T) {
 	}
 
 	propose("i2")
-	open = waitOpen(t, d, func(ms []message.Message) bool { return len(ms) == 1 && ms[0].ID != m.ID && ms[0].EntryID != "" })
+	open = waitOpen(t, d, func(ms []message.Message) bool { return len(ms) == 1 && ms[0].ID != m.ID && ms[0].TaskID != "" })
 	ps, err := ledger.Proposals(ctx, coreitems.ProposalOpen)
 	if err != nil || len(ps) != 1 {
 		t.Fatalf("proposals %+v %v", ps, err)
@@ -187,7 +187,7 @@ func TestLedgerProposalsReachTheInboxOnARealStore(t *testing.T) {
 	if got.State != message.Answered || got.Answer != messages.OptionReject {
 		t.Fatalf("decided elsewhere %+v", got)
 	}
-	if e, _ := db.Entries().Entry(ctx, task.ID(got.EntryID)); e.State != task.Done {
+	if e, _ := db.Tasks().Task(ctx, task.ID(got.TaskID)); e.State != task.Done {
 		t.Fatalf("entry %s", e.State)
 	}
 }
@@ -202,7 +202,7 @@ func TestTheMCPEndpointPostsToTheInbox(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	te.registerSession(t, turn.Session{ID: "term_1", WorkspaceID: "ws-1"})
 	d := mcpEndpoint{port: 47801}.wire(te.Env.serveMessages(te.serving(context.Background()), daemon.Deps{Turns: te.Turns}, db, te.cfg, t.Logf), te.cfg)
-	if d.MCP == nil || d.Messages == nil || d.GTD == nil {
+	if d.MCP == nil || d.Messages == nil || d.Tasks == nil {
 		t.Fatalf("deps %+v", d)
 	}
 	rpc := func(sid, body string) *httptest.ResponseRecorder {

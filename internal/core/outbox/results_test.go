@@ -25,24 +25,24 @@ func (r *postResults) AttachesPosts(intent string) bool {
 	return false
 }
 
-func (r *postResults) Attach(_ context.Context, entry task.ID, u unit.Unit) error {
-	if entry != "e-1" {
-		panic("attached to " + entry)
+func (r *postResults) Attach(_ context.Context, tk task.ID, u unit.Unit) error {
+	if tk != "e-1" {
+		panic("attached to " + tk)
 	}
 	r.attached = append(r.attached, u)
 	return nil
 }
 
-func fromEntry(p Proposal) Proposal {
+func fromTask(p Proposal) Proposal {
 	p.Origin = draft.Origin{Kind: draft.OriginSession, TurnSeq: 3, Intent: "begin", Unit: task.UnitOf("e-1")}
 	return p
 }
 
-func TestARecordedPostAttachesItsUnitToTheTurnsEntry(t *testing.T) {
+func TestARecordedPostAttachesItsUnitToTheTurnsTask(t *testing.T) {
 	e := newEnv()
 	r := &postResults{intents: []string{"begin"}}
 	e.svc.Results = r
-	if _, err := e.svc.RecordSent(ctx, fromEntry(reply("shipped")), draft.Evidence{Ref: "1.3"}); err != nil {
+	if _, err := e.svc.RecordSent(ctx, fromTask(reply("shipped")), draft.Evidence{Ref: "1.3"}); err != nil {
 		t.Fatal(err)
 	}
 	if len(r.attached) != 1 || r.attached[0] != thread {
@@ -50,11 +50,11 @@ func TestARecordedPostAttachesItsUnitToTheTurnsEntry(t *testing.T) {
 	}
 }
 
-func TestASentPostAttachesItsUnitToTheTurnsEntry(t *testing.T) {
+func TestASentPostAttachesItsUnitToTheTurnsTask(t *testing.T) {
 	e := newEnv()
 	r := &postResults{intents: []string{"begin"}}
 	e.svc.Results = r
-	d := e.propose(fromEntry(reply("shipped")))
+	d := e.propose(fromTask(reply("shipped")))
 	if _, err := e.svc.Approve(ctx, d.ID, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -69,12 +69,12 @@ func TestASentPostAttachesItsUnitToTheTurnsEntry(t *testing.T) {
 	}
 }
 
-func TestOnlyAPostOfAnAttachingEntryTurnAttaches(t *testing.T) {
-	react := fromEntry(Proposal{Unit: thread, Kind: draft.React, Reaction: "eyes", Target: "https://example.test/p1"})
-	edit := fromEntry(Proposal{Unit: thread, Kind: draft.Edit, Text: "fixed", Replaced: "fixd", Target: "https://example.test/p1"})
-	other := fromEntry(reply("hi"))
+func TestOnlyAPostOfAnAttachingTaskTurnAttaches(t *testing.T) {
+	react := fromTask(Proposal{Unit: thread, Kind: draft.React, Reaction: "eyes", Target: "https://example.test/p1"})
+	edit := fromTask(Proposal{Unit: thread, Kind: draft.Edit, Text: "fixed", Replaced: "fixd", Target: "https://example.test/p1"})
+	other := fromTask(reply("hi"))
 	other.Origin.Intent = "reply"
-	onUnit := fromEntry(reply("hi"))
+	onUnit := fromTask(reply("hi"))
 	onUnit.Origin.Unit = unit.Unit{}
 	auto := reply("hi")
 	auto.Origin = draft.Origin{Kind: draft.OriginAuto, Rule: "nudge", Key: "k", Unit: task.UnitOf("e-1")}
@@ -104,7 +104,7 @@ func (l landing) Landed(context.Context, draft.Draft) (unit.Unit, bool, error) {
 	return l.landed, true, nil
 }
 
-func TestADraftOnTheEntryAttachesTheUnitItsPostLandedIn(t *testing.T) {
+func TestADraftOnTheTaskAttachesTheUnitItsPostLandedIn(t *testing.T) {
 	e := newEnv()
 	posted := unit.Unit{Provider: "chat", Key: "T1/C1/1.5"}
 	chat := &fakeEffects{}
@@ -117,7 +117,7 @@ func TestADraftOnTheEntryAttachesTheUnitItsPostLandedIn(t *testing.T) {
 	e.svc.Targets = []unit.ProviderID{"chat"}
 	r := &postResults{intents: []string{"begin"}}
 	e.svc.Results = r
-	p := onEntry("#general")
+	p := onTask("#general")
 	p.Unit = task.UnitOf("e-1")
 	p.Origin = draft.Origin{Kind: draft.OriginSession, TurnSeq: 3, Intent: "begin"}
 	d := e.propose(p)

@@ -8,16 +8,16 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
-func TestCountsWhereCountsOnlyTheKeptEntriesOfEachView(t *testing.T) {
+func TestCountsWhereCountsOnlyTheKeptTasksOfEachView(t *testing.T) {
 	ctx := context.Background()
 	r := newRig()
-	r.put(t, task.Entry{ID: "in-a", Kind: task.KindCapture, State: task.Inbox, Title: "invoice Ana"})
-	r.put(t, task.Entry{ID: "in-b", Kind: task.KindCapture, State: task.Inbox, Title: "call Bob"})
-	r.put(t, task.Entry{ID: "nx-a", Kind: task.KindAction, State: task.Next, Title: "invoice OSS", Area: "OSS", Contexts: []string{"@reply"}})
-	r.put(t, task.Entry{ID: "nx-b", Kind: task.KindAction, State: task.Next, Title: "review Hiring", Area: "Hiring", Contexts: []string{"@reply"}})
-	r.put(t, task.Entry{ID: "dn-a", Kind: task.KindAction, State: task.Done, Title: "invoice sent"})
-	r.svc.RegisterView(task.ViewOutbox, "draft:", outbox{drafts: []task.Entry{{ID: "draft:1", Kind: task.KindDraft, Title: "invoice reply"}, {ID: "draft:2", Kind: task.KindDraft, Title: "hello"}}})
-	invoice := func(e task.Entry) (bool, error) { return strings.Contains(e.Title, "invoice"), nil }
+	r.put(t, task.Task{ID: "in-a", Kind: task.KindCapture, State: task.Inbox, Title: "invoice Ana"})
+	r.put(t, task.Task{ID: "in-b", Kind: task.KindCapture, State: task.Inbox, Title: "call Bob"})
+	r.put(t, task.Task{ID: "nx-a", Kind: task.KindAction, State: task.Next, Title: "invoice OSS", Area: "OSS", Contexts: []string{"@reply"}})
+	r.put(t, task.Task{ID: "nx-b", Kind: task.KindAction, State: task.Next, Title: "review Hiring", Area: "Hiring", Contexts: []string{"@reply"}})
+	r.put(t, task.Task{ID: "dn-a", Kind: task.KindAction, State: task.Done, Title: "invoice sent"})
+	r.svc.RegisterView(task.ViewOutbox, "draft:", outbox{drafts: []task.Task{{ID: "draft:1", Kind: task.KindDraft, Title: "invoice reply"}, {ID: "draft:2", Kind: task.KindDraft, Title: "hello"}}})
+	invoice := func(e task.Task) (bool, error) { return strings.Contains(e.Title, "invoice"), nil }
 	c, err := r.svc.CountsWhere(ctx, "", invoice)
 	if err != nil {
 		t.Fatal(err)
@@ -31,7 +31,7 @@ func TestCountsWhereCountsOnlyTheKeptEntriesOfEachView(t *testing.T) {
 	if c.Areas["OSS"] != 1 || c.Areas["Hiring"] != 0 || c.Contexts["@reply"] != 1 || c.Badge != 2 {
 		t.Errorf("areas %v contexts %v badge %d", c.Areas, c.Contexts, c.Badge)
 	}
-	all, err := r.svc.CountsWhere(ctx, "Hiring", func(task.Entry) (bool, error) { return true, nil })
+	all, err := r.svc.CountsWhere(ctx, "Hiring", func(task.Task) (bool, error) { return true, nil })
 	if err != nil {
 		t.Fatal(err)
 	}

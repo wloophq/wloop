@@ -30,13 +30,13 @@ use = "entry.verb"
 verb = "someday"
 `
 
-// entryRig is the entries service over a store, served as the daemon's.
-type entryRig struct {
+// taskRig is the entries service over a store, served as the daemon's.
+type taskRig struct {
 	te *testEnv
 	db *sqlite.DB
 }
 
-func newEntryRig(t *testing.T, files map[string]string) *entryRig {
+func newTaskRig(t *testing.T, files map[string]string) *taskRig {
 	t.Helper()
 	te := newTestEnv(t, &fake.Manager{})
 	if files != nil {
@@ -50,23 +50,23 @@ func newEntryRig(t *testing.T, files map[string]string) *entryRig {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	te.gtd = coretasks.New(coretasks.Deps{Store: db.Entries(), Facts: coretasks.CardFacts{Cards: db.Cards()}, Clock: clockFunc(func() time.Time { return te.Now() })})
-	return &entryRig{te: te, db: db}
+	te.tasks = coretasks.New(coretasks.Deps{Store: db.Tasks(), Facts: coretasks.CardFacts{Cards: db.Cards()}, Clock: clockFunc(func() time.Time { return te.Now() })})
+	return &taskRig{te: te, db: db}
 }
 
-func (r *entryRig) put(t *testing.T, id task.ID, state task.State) {
+func (r *taskRig) put(t *testing.T, id task.ID, state task.State) {
 	t.Helper()
 	at := testNow.Add(-time.Hour)
-	if err := r.db.Entries().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Entry: task.Entry{ID: id, Kind: task.KindCapture, State: state,
+	if err := r.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: task.Task{ID: id, Kind: task.KindCapture, State: state,
 		Title: "Ship it", Origin: task.OriginUser, Created: at, Updated: at}}}); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestEntryVerbMovesTheEntryAndRecordsNoVerbEvent(t *testing.T) {
+func TestTaskVerbMovesTheTaskAndRecordsNoVerbEvent(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	r := newEntryRig(t, map[string]string{"workflows/my-someday/workflow.toml": somedayWorkflow})
+	r := newTaskRig(t, map[string]string{"workflows/my-someday/workflow.toml": somedayWorkflow})
 	r.put(t, "e-01", task.Next)
 	ed := engineDeps{DB: r.db, SessionFacts: noUnits{}, WorkspaceFacts: noUnits{}}
 	r.te.wireSubjects(&serveWiring{DB: r.db, Cfg: r.te.cfg, Engine: &ed})
@@ -75,7 +75,7 @@ func TestEntryVerbMovesTheEntryAndRecordsNoVerbEvent(t *testing.T) {
 	if _, _, err := eng.Sweep(ctx, &sync.Mutex{}); err != nil {
 		t.Fatal(err)
 	}
-	e, err := r.db.Entries().Entry(ctx, "e-01")
+	e, err := r.db.Tasks().Task(ctx, "e-01")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,10 +92,10 @@ func TestEntryVerbMovesTheEntryAndRecordsNoVerbEvent(t *testing.T) {
 	}
 }
 
-func TestEntryVerbCheckRefusesWhatTheEntrysStateRefuses(t *testing.T) {
+func TestTaskVerbCheckRefusesWhatTheTasksStateRefuses(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	r := newEntryRig(t, nil)
+	r := newTaskRig(t, nil)
 	r.put(t, "e-01", task.Done)
 	s := newStepSet(r.te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: r.te.Rounds})
 	u := task.UnitOf("e-01")
@@ -111,12 +111,12 @@ func TestEntryVerbCheckRefusesWhatTheEntrysStateRefuses(t *testing.T) {
 	}
 }
 
-func TestEntryVerbLeavesClosingADerivedEntryToItsItems(t *testing.T) {
+func TestTaskVerbLeavesClosingADerivedTaskToItsItems(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	r := newEntryRig(t, nil)
+	r := newTaskRig(t, nil)
 	at := testNow.Add(-time.Hour)
-	if err := r.db.Entries().Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: task.Entry{ID: "e-02", Kind: task.KindWaiting, State: task.Waiting,
+	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-02", Kind: task.KindWaiting, State: task.Waiting,
 		Title: "Waiting on the reviewer", Origin: task.OriginDerived, Created: at, Updated: at}}}); err != nil {
 		t.Fatal(err)
 	}
@@ -133,19 +133,19 @@ func TestEntryVerbLeavesClosingADerivedEntryToItsItems(t *testing.T) {
 	}
 }
 
-func TestEntryVerbRunsOnlyVerbsThatMoveAStoredEntry(t *testing.T) {
+func TestTaskVerbRunsOnlyVerbsThatMoveAStoredTask(t *testing.T) {
 	t.Parallel()
-	for _, v := range builtin.EntryStepVerbs {
+	for _, v := range builtin.TaskStepVerbs {
 		moves := false
 		for _, s := range []task.State{task.Inbox, task.Next, task.Waiting, task.Scheduled, task.Someday, task.Reference, task.Done, task.Trash} {
-			moves = moves || coretasks.Accepts(task.Entry{State: s}, task.Verb(v)) == nil
+			moves = moves || coretasks.Accepts(task.Task{State: s}, task.Verb(v)) == nil
 		}
 		if !moves {
 			t.Errorf("no state takes %s", v)
 		}
 	}
 	for _, v := range []task.Verb{task.VerbApprove, task.VerbDelegate, task.VerbAnswer, task.VerbReply, task.VerbEdit, task.VerbRetry, task.VerbProject, task.VerbSeen} {
-		if slices.Contains(builtin.EntryStepVerbs, string(v)) {
+		if slices.Contains(builtin.TaskStepVerbs, string(v)) {
 			t.Errorf("entry.verb runs %s", v)
 		}
 	}

@@ -60,7 +60,7 @@ func (m *Model) SetPlugins(ps []api.Plugin) {
 
 // pluginBase is the index of the first plugin view: the plugin views come
 // after every core view.
-func (m *Model) pluginBase() int { return m.gtdBase() + len(m.gtd) }
+func (m *Model) pluginBase() int { return m.viewsBase() + len(m.taskViews) }
 
 // plugin is the plugin view on screen.
 func (m *Model) plugin() (PluginView, bool) {
@@ -79,7 +79,7 @@ func (m *Model) viewKey() string {
 	if v, ok := m.plugin(); ok {
 		return "plugin:" + v.ID()
 	}
-	if v, ok := m.gtdView(); ok {
+	if v, ok := m.viewOnScreen(); ok {
 		return "gtd:" + v.ID
 	}
 	switch {
@@ -94,8 +94,8 @@ func (m *Model) viewKey() string {
 // goTo shows the view key names, else Focus, else the first view.
 func (m *Model) goTo(key string) {
 	m.view = 0
-	if len(m.gtd) > 0 {
-		m.view = m.gtdBase()
+	if len(m.taskViews) > 0 {
+		m.view = m.viewsBase()
 	}
 	switch {
 	case key == "plan":
@@ -104,11 +104,11 @@ func (m *Model) goTo(key string) {
 		m.view = slices.IndexFunc(m.views, func(v View) bool { return "rows:"+v.ID == key })
 	case slices.ContainsFunc(m.plugins, func(v PluginView) bool { return "plugin:"+v.ID() == key }):
 		m.view = m.pluginBase() + slices.IndexFunc(m.plugins, func(v PluginView) bool { return "plugin:"+v.ID() == key })
-	case slices.ContainsFunc(m.gtd, func(v View) bool { return "gtd:"+v.ID == key }):
-		m.view = m.gtdBase() + slices.IndexFunc(m.gtd, func(v View) bool { return "gtd:"+v.ID == key })
+	case slices.ContainsFunc(m.taskViews, func(v View) bool { return "gtd:"+v.ID == key }):
+		m.view = m.viewsBase() + slices.IndexFunc(m.taskViews, func(v View) bool { return "gtd:"+v.ID == key })
 	}
 	m.keepSelection()
-	m.keepEntrySelection()
+	m.keepTaskSelection()
 }
 
 // rowSet is the rows as a plugin view reads them, built once per SetData.

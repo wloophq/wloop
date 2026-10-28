@@ -8,7 +8,7 @@ import (
 )
 
 func TestTheTerminalReadsCapabilitiesFromTheAPI(t *testing.T) {
-	m := gtdModel(t)
+	m := viewsModel(t)
 	m.SetCatalog(api.CatalogResponse{Views: []api.ViewSpec{
 		{ID: "all", Label: "All", Rows: true, Surfaces: []string{"tui"}},
 		{ID: "changes", Label: "Changes", Provider: "forge", Rows: true, Surfaces: []string{"tui"}},

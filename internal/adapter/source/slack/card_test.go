@@ -160,7 +160,7 @@ func TestCardFromFactsAndState(t *testing.T) {
 	}
 }
 
-func TestCardGTDFields(t *testing.T) {
+func TestCardTaskFields(t *testing.T) {
 	f := newFixture(t)
 	f.login(t)
 	f.people(t)

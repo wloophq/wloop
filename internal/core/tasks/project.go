@@ -58,7 +58,7 @@ func (s *Service) ServeProjects(d ProjectDeps) {
 	for _, k := range actionKinds {
 		s.Register(k, task.VerbProject, p.attach)
 	}
-	s.Register(task.KindProject, task.VerbProject, func(ctx context.Context, e task.Entry, req Request) (Result, error) {
+	s.Register(task.KindProject, task.VerbProject, func(ctx context.Context, e task.Task, req Request) (Result, error) {
 		return Result{}, fmt.Errorf("%w: a project cannot join a project", ErrVerb)
 	})
 	s.Register(task.KindProject, task.VerbSequential, p.sequential)
@@ -85,7 +85,7 @@ type ProjectState struct {
 
 // ProjectsStatus is each live project's next action, open actions and review mark, over one read of the open set.
 func (s *Service) ProjectsStatus(ctx context.Context) (map[task.ID]ProjectState, error) {
-	open, err := s.d.Store.Entries(ctx, task.Query{View: task.ViewOpen})
+	open, err := s.d.Store.Tasks(ctx, task.Query{View: task.ViewOpen})
 	if err != nil {
 		return nil, err
 	}
@@ -101,25 +101,25 @@ func (s *Service) ProjectsStatus(ctx context.Context) (map[task.ID]ProjectState,
 
 // locked reads e again under the service's lock and runs f on it, applying the changes it returns with the
 // event of req's verb.
-func (p *projects) locked(ctx context.Context, id task.ID, req Request, f func(e task.Entry, now time.Time) ([]task.Change, error)) (task.Entry, error) {
+func (p *projects) locked(ctx context.Context, id task.ID, req Request, f func(e task.Task, now time.Time) ([]task.Change, error)) (task.Task, error) {
 	s := p.s
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	e, err := s.d.Store.Entry(ctx, id)
+	e, err := s.d.Store.Task(ctx, id)
 	if err != nil {
-		return task.Entry{}, err
+		return task.Task{}, err
 	}
 	now := s.now()
 	cs, err := f(e, now)
 	if err != nil {
-		return task.Entry{}, err
+		return task.Task{}, err
 	}
 	if err := s.d.Store.Apply(ctx, cs, verbEvents(e, req, now)...); err != nil {
-		return task.Entry{}, err
+		return task.Task{}, err
 	}
 	for _, c := range cs {
-		if c.Entry.ID == id {
-			e = c.Entry
+		if c.Task.ID == id {
+			e = c.Task
 		}
 	}
 	return e, nil
@@ -127,9 +127,9 @@ func (p *projects) locked(ctx context.Context, id task.ID, req Request, f func(e
 
 // attach puts e in the project args["id"] names, or in a new one titled args["title"]: after its last action, or
 // at args["position"], shifting the later ones.
-func (p *projects) attach(ctx context.Context, e task.Entry, req Request) (Result, error) {
-	var created task.Entry
-	got, err := p.locked(ctx, e.ID, req, func(e task.Entry, now time.Time) ([]task.Change, error) {
+func (p *projects) attach(ctx context.Context, e task.Task, req Request) (Result, error) {
+	var created task.Task
+	got, err := p.locked(ctx, e.ID, req, func(e task.Task, now time.Time) ([]task.Change, error) {
 		if err := accepts(e, task.VerbProject); err != nil {
 			return nil, err
 		}
@@ -142,10 +142,10 @@ func (p *projects) attach(ctx context.Context, e task.Entry, req Request) (Resul
 			pos = n
 		}
 		var cs []task.Change
-		var proj task.Entry
+		var proj task.Task
 		switch id, title := req.Args["id"], strings.TrimSpace(req.Args["title"]); {
 		case id != "":
-			got, err := p.s.d.Store.Entry(ctx, task.ID(id))
+			got, err := p.s.d.Store.Task(ctx, task.ID(id))
 			if err != nil {
 				return nil, err
 			}
@@ -158,18 +158,18 @@ func (p *projects) attach(ctx context.Context, e task.Entry, req Request) (Resul
 			if err != nil {
 				return nil, err
 			}
-			proj = task.Entry{ID: task.NewID(), Kind: task.KindProject, State: task.Next, Title: title, Slug: slug,
+			proj = task.Task{ID: task.NewID(), Kind: task.KindProject, State: task.Next, Title: title, Slug: slug,
 				Sequential: req.Args["sequential"] == "true", Area: e.Area, Origin: task.OriginUser, Created: now, Updated: now}
 			created = proj
-			cs = append(cs, task.Change{Op: task.OpCreate, Entry: proj, Why: "project"})
+			cs = append(cs, task.Change{Op: task.OpCreate, Task: proj, Why: "project"})
 		default:
 			return nil, fmt.Errorf("%w: project needs id or title", ErrArgs)
 		}
-		open, err := p.s.d.Store.Entries(ctx, task.Query{View: task.ViewOpen})
+		open, err := p.s.d.Store.Tasks(ctx, task.Query{View: task.ViewOpen})
 		if err != nil {
 			return nil, err
 		}
-		var others []task.Entry
+		var others []task.Task
 		last := 0
 		for _, o := range open {
 			if o.Project == proj.ID && o.ID != e.ID {
@@ -180,20 +180,20 @@ func (p *projects) attach(ctx context.Context, e task.Entry, req Request) (Resul
 		e.Project, e.Updated = proj.ID, now
 		if pos == 0 {
 			e.Position = last + 1
-			return append(cs, task.Change{Op: task.OpUpdate, Entry: e, Why: "project"}), nil
+			return append(cs, task.Change{Op: task.OpUpdate, Task: e, Why: "project"}), nil
 		}
 		for _, a := range task.Place(others, e, pos) {
 			if a.ID != e.ID {
 				a.Updated = now
 			}
-			cs = append(cs, task.Change{Op: task.OpUpdate, Entry: a, Why: "project position"})
+			cs = append(cs, task.Change{Op: task.OpUpdate, Task: a, Why: "project position"})
 		}
 		return cs, nil
 	})
 	if err != nil {
 		return Result{}, err
 	}
-	res := Result{Entry: got}
+	res := Result{Task: got}
 	if created.ID != "" && p.d.Dossiers != nil {
 		if err := p.d.Dossiers.Open(ctx, created.Slug); err != nil {
 			res.Lines = append(res.Lines, fmt.Sprintf("the dossier of project %s was not created: %v", created.Slug, err))
@@ -215,7 +215,7 @@ func (p *projects) slug(ctx context.Context, title string) (string, error) {
 }
 
 // liveProject refuses a project that is done or trashed, naming the verb.
-func liveProject(e task.Entry, v task.Verb) error {
+func liveProject(e task.Task, v task.Verb) error {
 	if !e.Live() {
 		return fmt.Errorf("%w: %s on a %s project", ErrVerb, v, e.State)
 	}
@@ -223,8 +223,8 @@ func liveProject(e task.Entry, v task.Verb) error {
 }
 
 // sequential sets args["set"] ("true" or "false"), or toggles.
-func (p *projects) sequential(ctx context.Context, e task.Entry, req Request) (Result, error) {
-	got, err := p.locked(ctx, e.ID, req, func(e task.Entry, now time.Time) ([]task.Change, error) {
+func (p *projects) sequential(ctx context.Context, e task.Task, req Request) (Result, error) {
+	got, err := p.locked(ctx, e.ID, req, func(e task.Task, now time.Time) ([]task.Change, error) {
 		if err := liveProject(e, req.Verb); err != nil {
 			return nil, err
 		}
@@ -237,14 +237,14 @@ func (p *projects) sequential(ctx context.Context, e task.Entry, req Request) (R
 			return nil, fmt.Errorf("%w: sequential set %q is neither true nor false", ErrArgs, set)
 		}
 		e.Updated = now
-		return []task.Change{{Op: task.OpUpdate, Entry: e, Why: "sequential"}}, nil
+		return []task.Change{{Op: task.OpUpdate, Task: e, Why: "sequential"}}, nil
 	})
-	return Result{Entry: got}, err
+	return Result{Task: got}, err
 }
 
 // reviewed marks the project reviewed now; args["every"] ("14d" or a Go duration) sets its interval.
-func (p *projects) reviewed(ctx context.Context, e task.Entry, req Request) (Result, error) {
-	got, err := p.locked(ctx, e.ID, req, func(e task.Entry, now time.Time) ([]task.Change, error) {
+func (p *projects) reviewed(ctx context.Context, e task.Task, req Request) (Result, error) {
+	got, err := p.locked(ctx, e.ID, req, func(e task.Task, now time.Time) ([]task.Change, error) {
 		if err := liveProject(e, req.Verb); err != nil {
 			return nil, err
 		}
@@ -256,9 +256,9 @@ func (p *projects) reviewed(ctx context.Context, e task.Entry, req Request) (Res
 			e.ReviewEvery = d
 		}
 		e.ReviewedAt, e.Updated = now, now
-		return []task.Change{{Op: task.OpUpdate, Entry: e, Why: "reviewed"}}, nil
+		return []task.Change{{Op: task.OpUpdate, Task: e, Why: "reviewed"}}, nil
 	})
-	return Result{Entry: got}, err
+	return Result{Task: got}, err
 }
 
 func interval(raw string) (time.Duration, error) {
@@ -278,20 +278,20 @@ func interval(raw string) (time.Duration, error) {
 }
 
 // end runs a verb that ends the project as the state change, then starts its dossier's lifecycle.
-func (p *projects) end(ctx context.Context, e task.Entry, req Request) (Result, error) {
-	var was task.Entry
-	got, err := p.locked(ctx, e.ID, req, func(e task.Entry, now time.Time) ([]task.Change, error) {
+func (p *projects) end(ctx context.Context, e task.Task, req Request) (Result, error) {
+	var was task.Task
+	got, err := p.locked(ctx, e.ID, req, func(e task.Task, now time.Time) ([]task.Change, error) {
 		was = e
 		next, err := transition(e, req, now)
 		if err != nil {
 			return nil, err
 		}
-		return []task.Change{{Op: task.OpUpdate, Entry: next, Why: string(req.Verb)}}, nil
+		return []task.Change{{Op: task.OpUpdate, Task: next, Why: string(req.Verb)}}, nil
 	})
 	if err != nil {
 		return Result{}, err
 	}
-	res := Result{Entry: got}
+	res := Result{Task: got}
 	if was.Open() && !got.Open() && got.Slug != "" && p.d.Dossiers != nil {
 		if err := p.d.Dossiers.Resolved(ctx, got.Slug, got.Updated); err != nil {
 			res.Lines = append(res.Lines, fmt.Sprintf("the dossier of project %s was not resolved: %v", got.Slug, err))

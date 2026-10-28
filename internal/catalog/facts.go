@@ -199,7 +199,7 @@ func (f Facts) Get(field string) any {
 }
 
 // OfferFacts are the facts of e a verb's offer reads.
-func OfferFacts(e task.Entry) workflow.Facts {
+func OfferFacts(e task.Task) workflow.Facts {
 	f := workflow.Facts{"entry.id": string(e.ID), "entry.kind": string(e.Kind), "entry.state": string(e.State),
 		"entry.muted": e.Snooze.Mute, "entry.unit": "", "entry.unit_provider": ""}
 	if u, ok := e.FirstUnit(); ok {

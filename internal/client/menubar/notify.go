@@ -25,7 +25,7 @@ import (
 // entry's units, the basis each button was served for and the options of
 // its question.
 type posted struct {
-	entry    string
+	task     string
 	subtitle string
 	units    []unit.Unit
 	basis    map[string]string
@@ -96,10 +96,10 @@ func (c *Controller) notify() {
 }
 
 // notifying are the entries of the menu's views that carry an attention.
-func (c *Controller) notifying() []api.EntryView {
-	var out []api.EntryView
+func (c *Controller) notifying() []api.TaskView {
+	var out []api.TaskView
 	for _, sec := range coreSections {
-		for _, e := range c.viewEntries(sec.view) {
+		for _, e := range c.viewTasks(sec.view) {
 			if e.Attention != nil {
 				out = append(out, e)
 			}
@@ -110,10 +110,10 @@ func (c *Controller) notifying() []api.EntryView {
 
 // notification is the entry's attention as the daemon gave it, with what
 // its buttons answer.
-func notification(e api.EntryView) (Notification, posted) {
+func notification(e api.TaskView) (Notification, posted) {
 	a := *e.Attention
 	n := Notification{ID: a.ID, Title: a.Title, Subtitle: a.Subtitle, Body: a.Body, Image: Image(a.Image)}
-	p := posted{entry: e.ID, subtitle: a.Subtitle, units: e.Units, basis: map[string]string{}}
+	p := posted{task: e.ID, subtitle: a.Subtitle, units: e.Units, basis: map[string]string{}}
 	if e.Message != nil {
 		p.options = e.Message.Options
 	}
@@ -150,7 +150,7 @@ func displayCategory(cat Category, actions []NotificationAction) Category {
 func (c *Controller) Respond(ctx context.Context, r Response) {
 	c.cfg.Log("notification response %s: action %q as %s, option %q, yes %v, text of %d bytes",
 		r.ID, r.Identifier, r.Action, r.OptionID, r.Yes, len(r.Text))
-	cat, entry, ok := api.ParseNotificationID(r.ID)
+	cat, task, ok := api.ParseNotificationID(r.ID)
 	if !ok {
 		c.cfg.Log("notification answer for an unknown id %q", r.ID)
 		return
@@ -158,32 +158,32 @@ func (c *Controller) Respond(ctx context.Context, r Response) {
 	var err error
 	switch {
 	case r.Action == ActionOpen || r.Action == ActionServed && cat == api.CategoryOutbox && r.Identifier == "open":
-		err = c.open(routeOf(cat, entry))
+		err = c.open(routeOf(cat, task))
 	case r.Action == ActionAnswer:
-		err = c.answer(ctx, r, entry)
+		err = c.answer(ctx, r, task)
 	case r.Action == ActionReply:
-		err = c.reply(ctx, r, entry)
+		err = c.reply(ctx, r, task)
 	case r.Action == ActionServed:
-		err = c.served(ctx, r, cat, entry)
+		err = c.served(ctx, r, cat, task)
 	}
 	if err != nil {
-		c.cfg.Log("%s %s: %v", r.Action, entry, err)
+		c.cfg.Log("%s %s: %v", r.Action, task, err)
 	}
 }
 
 // routeOf is the cockpit route a notification opens: a note's entry part is
 // its route, the digest opens Next, anything else its entry.
-func routeOf(cat Category, entry string) string {
+func routeOf(cat Category, tk string) string {
 	switch cat {
 	case api.CategoryNote:
-		return entry
+		return tk
 	case api.CategoryDigest:
 		return "view=" + string(task.ViewNext)
 	}
-	return entryRoute(entry)
+	return taskRoute(tk)
 }
 
-func (c *Controller) answer(ctx context.Context, r Response, entry string) error {
+func (c *Controller) answer(ctx context.Context, r Response, tk string) error {
 	args := map[string]string{}
 	if r.Text != "" {
 		args["guidance"] = r.Text
@@ -202,21 +202,21 @@ func (c *Controller) answer(ctx context.Context, r Response, entry string) error
 	if r.No {
 		args["no"] = "true"
 	}
-	res, err := c.cfg.Daemon.EntryDo(ctx, entry, string(task.VerbAnswer), api.EntryRequest{Args: args, Source: AnswerSource})
+	res, err := c.cfg.Daemon.TaskDo(ctx, tk, string(task.VerbAnswer), api.TaskRequest{Args: args, Source: AnswerSource})
 	if err != nil {
-		c.notifyNote(r.ID, entry, "Answer not sent", err.Error())
+		c.notifyNote(r.ID, tk, "Answer not sent", err.Error())
 		return err
 	}
 	if slices.Contains(res.Lines, api.AnswerQueued) {
-		c.notifyNote(r.ID, entry, "Answer queued", api.AnswerQueued)
+		c.notifyNote(r.ID, tk, "Answer queued", api.AnswerQueued)
 	}
 	return nil
 }
 
 // reply writes the notification's text as a reply on its entry's unit, and says where it went.
-func (c *Controller) reply(ctx context.Context, r Response, entry string) error {
+func (c *Controller) reply(ctx context.Context, r Response, task string) error {
 	if strings.TrimSpace(r.Text) == "" {
-		c.notifyNote(r.ID, entry, "Reply not saved", "Nothing was typed.")
+		c.notifyNote(r.ID, task, "Reply not saved", "Nothing was typed.")
 		return nil
 	}
 	args := map[string]string{"text": r.Text}
@@ -224,20 +224,20 @@ func (c *Controller) reply(ctx context.Context, r Response, entry string) error 
 	if r.Send {
 		args["send"], title = "now", "Reply sent"
 	}
-	res, err := c.cfg.Daemon.EntryDo(ctx, entry, "reply", api.EntryRequest{Args: args, Source: AnswerSource})
+	res, err := c.cfg.Daemon.TaskDo(ctx, task, "reply", api.TaskRequest{Args: args, Source: AnswerSource})
 	if err != nil {
-		c.notifyNote(r.ID, entry, "Reply not saved", err.Error())
+		c.notifyNote(r.ID, task, "Reply not saved", err.Error())
 		return err
 	}
 	body := ""
 	if len(res.Lines) > 0 {
 		body = res.Lines[len(res.Lines)-1]
 	}
-	c.notifyNote(r.ID, entry, title, body)
+	c.notifyNote(r.ID, task, title, body)
 	return nil
 }
 
-func (c *Controller) served(ctx context.Context, r Response, cat Category, entry string) error {
+func (c *Controller) served(ctx context.Context, r Response, cat Category, task string) error {
 	var err error
 	if verb, ok := strings.CutPrefix(r.Identifier, "gtd:"); ok {
 		if cat == api.CategoryOutbox && !slices.Contains(draftButtons, r.Identifier) {
@@ -247,35 +247,35 @@ func (c *Controller) served(ctx context.Context, r Response, cat Category, entry
 		if v, mode, ok := strings.Cut(verb, ":"); ok {
 			verb, args = v, map[string]string{"mode": mode}
 		}
-		_, err = c.cfg.Daemon.EntryDo(ctx, entry, verb, api.EntryRequest{Args: args, Source: source})
+		_, err = c.cfg.Daemon.TaskDo(ctx, task, verb, api.TaskRequest{Args: args, Source: source})
 	} else {
 		var u unit.Unit
-		if u, err = c.unitOf(ctx, r.ID, entry); err == nil {
+		if u, err = c.unitOf(ctx, r.ID, task); err == nil {
 			_, err = c.cfg.Daemon.Action(ctx, u, r.Identifier, api.ActionRequest{Guidance: r.Text, Source: source, Basis: c.basisOf(r.ID, r.Identifier)})
 		}
 	}
 	if err != nil {
-		c.notifyNote(r.ID, entry, "Action not sent", err.Error())
+		c.notifyNote(r.ID, task, "Action not sent", err.Error())
 	}
 	return err
 }
 
 // unitOf is the first unit of the notification's entry, read again from the
 // daemon when the app restarted since it was posted.
-func (c *Controller) unitOf(ctx context.Context, id, entry string) (unit.Unit, error) {
+func (c *Controller) unitOf(ctx context.Context, id, task string) (unit.Unit, error) {
 	c.mu.Lock()
 	p, ok := c.posted[id]
 	c.mu.Unlock()
 	units := p.units
 	if !ok {
-		e, err := c.cfg.Daemon.Entry(ctx, entry)
+		e, err := c.cfg.Daemon.Task(ctx, task)
 		if err != nil {
 			return unit.Unit{}, err
 		}
 		units = e.Units
 	}
 	if len(units) == 0 {
-		return unit.Unit{}, errors.New("entry " + entry + " has no unit to act on")
+		return unit.Unit{}, errors.New("entry " + task + " has no unit to act on")
 	}
 	return units[0], nil
 }
@@ -302,12 +302,12 @@ func (c *Controller) optionAnswer(id, option string) string {
 
 // notifyNote tells the user what became of an answer to notification id,
 // since the log is out of sight; the note opens the entry.
-func (c *Controller) notifyNote(id, entry, title, body string) {
+func (c *Controller) notifyNote(id, task, title, body string) {
 	c.mu.Lock()
 	subtitle := c.posted[id].subtitle
 	c.mu.Unlock()
 	c.postNote(Notification{
-		ID:       api.NotificationID(api.CategoryNote, entryRoute(entry), c.cfg.Now().UTC().Format("20060102T150405.000000000")),
+		ID:       api.NotificationID(api.CategoryNote, taskRoute(task), c.cfg.Now().UTC().Format("20060102T150405.000000000")),
 		Title:    title,
 		Subtitle: subtitle,
 		Body:     body,

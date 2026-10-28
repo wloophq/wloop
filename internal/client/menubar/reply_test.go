@@ -10,7 +10,7 @@ import (
 )
 
 func inboxNoteID(n int) string {
-	return api.NotificationID(api.CategoryInbox, entryID(n), "tok")
+	return api.NotificationID(api.CategoryInbox, taskID(n), "tok")
 }
 
 func TestAReplyTypedInTheNotificationGoesToTheOutboxOrOut(t *testing.T) {
@@ -23,7 +23,7 @@ func TestAReplyTypedInTheNotificationGoesToTheOutboxOrOut(t *testing.T) {
 			t.Fatalf("%s: %+v %v", c.action, resp, ok)
 		}
 		resp.Text = c.text
-		r.d.result = api.EntryResult{Lines: []string{"draft 3 saved to the Outbox for your approval"}}
+		r.d.result = api.TaskResult{Lines: []string{"draft 3 saved to the Outbox for your approval"}}
 		r.c.Respond(ctx, resp)
 	}
 	var got []string

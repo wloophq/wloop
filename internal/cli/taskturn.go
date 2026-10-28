@@ -11,10 +11,10 @@ import (
 	"github.com/wloophq/wloop/internal/turn"
 )
 
-var errGTDUnavailable = errors.New("the entries are read in the daemon alone")
+var errTasksUnavailable = errors.New("the entries are read in the daemon alone")
 
-// entryShortID is an entry's id cut to the first six hex digits after its prefix.
-func entryShortID(id task.ID) string {
+// taskShortID is an entry's id cut to the first six hex digits after its prefix.
+func taskShortID(id task.ID) string {
 	s := strings.TrimPrefix(string(id), "e-")
 	return s[:min(6, len(s))]
 }
@@ -23,50 +23,50 @@ func entryShortID(id task.ID) string {
 // provider or an entry the daemon cannot read.
 func (e *Env) nameFacts(ctx context.Context, u unit.Unit) map[string]any {
 	id, ok := task.IDOf(u)
-	if !ok || e.gtd == nil {
+	if !ok || e.tasks == nil {
 		return map[string]any{}
 	}
-	entry, err := e.gtd.Entry(ctx, id)
+	tk, err := e.tasks.Task(ctx, id)
 	if err != nil {
 		return map[string]any{}
 	}
-	return map[string]any{"entry.title": entry.Title, "entry.short_id": entryShortID(id)}
+	return map[string]any{"entry.title": tk.Title, "entry.short_id": taskShortID(id)}
 }
 
-// entryPayload is a GTD entry as its turn reads it: the user's title and
+// taskPayload is a GTD entry as its turn reads it: the user's title and
 // notes, the work's brief.
-type entryPayload struct{ entry task.Entry }
+type taskPayload struct{ task task.Task }
 
-func (p entryPayload) Unit() unit.Unit { return task.UnitOf(p.entry.ID) }
+func (p taskPayload) Unit() unit.Unit { return task.UnitOf(p.task.ID) }
 
-func (p entryPayload) Arg() string { return p.Unit().String() }
+func (p taskPayload) Arg() string { return p.Unit().String() }
 
-func (p entryPayload) Wording() turn.Wording {
-	return turn.Wording{Noun: "entry", This: "this entry", Ref: p.Unit().String(), Short: entryShortID(p.entry.ID)}
+func (p taskPayload) Wording() turn.Wording {
+	return turn.Wording{Noun: "entry", This: "this entry", Ref: p.Unit().String(), Short: taskShortID(p.task.ID)}
 }
 
-func (p entryPayload) Fact(string) (any, bool) { return nil, false }
+func (p taskPayload) Fact(string) (any, bool) { return nil, false }
 
-func (p entryPayload) Contents() string {
-	if strings.TrimSpace(p.entry.Notes) == "" || p.entry.Notes == p.entry.Title {
-		return p.entry.Title
+func (p taskPayload) Contents() string {
+	if strings.TrimSpace(p.task.Notes) == "" || p.task.Notes == p.task.Title {
+		return p.task.Title
 	}
-	return p.entry.Title + "\n\n" + p.entry.Notes
+	return p.task.Title + "\n\n" + p.task.Notes
 }
 
-// entryPayloads reads an entry's turn payload from the daemon's entries.
-type entryPayloads struct{ e *Env }
+// taskPayloads reads an entry's turn payload from the daemon's entries.
+type taskPayloads struct{ e *Env }
 
-func (r entryPayloads) Payload(ctx context.Context, req turn.Request) (turn.Payload, error) {
+func (r taskPayloads) Payload(ctx context.Context, req turn.Request) (turn.Payload, error) {
 	id, _ := task.IDOf(req.Unit)
-	if r.e.gtd == nil {
-		return nil, errGTDUnavailable
+	if r.e.tasks == nil {
+		return nil, errTasksUnavailable
 	}
-	entry, err := r.e.gtd.Entry(ctx, id)
+	tk, err := r.e.tasks.Task(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return entryPayload{entry}, nil
+	return taskPayload{tk}, nil
 }
 
 // PrepareAhead readies, before the round takes the loop mutex, the

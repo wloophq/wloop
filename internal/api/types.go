@@ -70,7 +70,7 @@ type Change struct {
 	All     bool        `json:"all,omitempty"`
 	Health  bool        `json:"health,omitempty"`
 	Notices []Notice    `json:"notices,omitempty"`
-	// Counters are the Area "" counters, on every "changed" change after a TopicEntries or TopicDrafts note.
+	// Counters are the Area "" counters, on every "changed" change after a TopicTasks or TopicDrafts note.
 	Counters *Counters `json:"counters,omitempty"`
 }
 
@@ -509,10 +509,10 @@ type ActionRequest struct {
 	// NoBrief starts a review, address or run without waiting for the
 	// brief.
 	NoBrief bool `json:"no_brief,omitempty"`
-	// Items and Entry tie what the action's turn drafts to the item ids of the unit and the entry it
+	// Items and Task tie what the action's turn drafts to the item ids of the unit and the entry it
 	// was asked from.
 	Items []string `json:"items,omitempty"`
-	Entry string   `json:"entry,omitempty"`
+	Task  string   `json:"entry,omitempty"`
 	// Manager is the workspace manager that creates the turn's worktree, ""
 	// for the configured ones; Parent is the caller's worktree, the new
 	// one's parent where its manager keeps parents.

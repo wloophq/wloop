@@ -25,7 +25,7 @@ repeat_after = "1d"
 when = '!draft.person_waited'
 `
 
-func TestAWorkflowOnEntriesProposesAndWithdrawsDrafts(t *testing.T) {
+func TestAWorkflowOnTasksProposesAndWithdrawsDrafts(t *testing.T) {
 	root := t.TempDir()
 	writeWorkflow(t, root, "my-nudge", slackNudge)
 	l, problems := Load(userLayer(root), nil, testBase(), nil)

@@ -270,12 +270,12 @@ var writes = []writeCase{
 		},
 	},
 	{
-		method: "entryStore.Apply",
+		method: "taskStore.Apply",
 		call: func(ctx context.Context, e *noteEnv) error {
-			return e.db.Entries().Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: task.Entry{ID: "e-1", Kind: task.KindCapture,
+			return e.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-1", Kind: task.KindCapture,
 				State: task.Inbox, Units: []unit.Unit{u7}, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}})
 		},
-		topics: port.TopicEntries, units: []unit.Unit{u7},
+		topics: port.TopicTasks, units: []unit.Unit{u7},
 	},
 	{
 		method: "Fetches.Mark",
@@ -308,7 +308,7 @@ var reads = []string{
 	"Classifications.Output", "Classifications.Spent",
 	"Fetches.Last",
 	"DB.AgentTranscript", "DB.WorkflowActivity",
-	"DB.Entries", "entryStore.Entries", "entryStore.EntriesSince", "entryStore.Entry", "entryStore.EntriesOf", "entryStore.Counts",
+	"DB.Tasks", "taskStore.Tasks", "taskStore.TasksSince", "taskStore.Task", "taskStore.TasksOf", "taskStore.Counts",
 }
 
 // notesAll are the write methods that note Change.All.

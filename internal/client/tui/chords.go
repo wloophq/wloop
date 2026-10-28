@@ -175,7 +175,7 @@ func (m *Model) run(b api.KeyView, k Key) (Command, bool) {
 // candidate may.
 func (m *Model) runBinding(b api.KeyView, k Key) (c Command, ok, took bool) {
 	a := b.Action
-	_, inGTD := m.gtdView()
+	_, inViews := m.viewOnScreen()
 	switch {
 	case b.Context == ctxReview:
 		return m.reviewAction(a)
@@ -189,8 +189,8 @@ func (m *Model) runBinding(b api.KeyView, k Key) (c Command, ok, took bool) {
 		if b.Context != ctxList {
 			return Command{}, false, false
 		}
-		if inGTD {
-			c, ok = m.entryUnitAction(k)
+		if inViews {
+			c, ok = m.taskUnitAction(k)
 			return c, ok, true
 		}
 		if m.view < m.planView() && k.Rune != 0 {
@@ -203,11 +203,11 @@ func (m *Model) runBinding(b api.KeyView, k Key) (c Command, ok, took bool) {
 	case a == "move:up":
 		m.move(-1)
 	case a == "detail:open":
-		if !inGTD {
+		if !inViews {
 			return Command{}, false, false
 		}
-		if e, ok := m.selectedEntry(); ok && !m.detailOpen(e) {
-			c, ok := m.openEntry(e, k.Read)
+		if e, ok := m.selectedTask(); ok && !m.detailOpen(e) {
+			c, ok := m.openTask(e, k.Read)
 			return c, ok, true
 		}
 	case a == "detail:close":
@@ -242,16 +242,16 @@ func (m *Model) runBinding(b api.KeyView, k Key) (c Command, ok, took bool) {
 				m.status = "capture cancelled: nothing typed"
 				return Command{}, false
 			}
-			return m.send(Command{Unit: entryUnit("capture"), Label: termfmt.Cut(text, 48), Action: "capture", capture: text})
+			return m.send(Command{Unit: taskUnit("capture"), Label: termfmt.Cut(text, 48), Action: "capture", capture: text})
 		}}
 	case a == "open-source":
 		c, ok = m.openSource()
 		return c, ok, true
 	case isVerb(a):
-		if !inGTD {
+		if !inViews {
 			return Command{}, false, false
 		}
-		c, ok = m.entryVerb(a, k.Read)
+		c, ok = m.taskVerb(a, k.Read)
 		return c, ok, true
 	default:
 		return Command{}, false, false
@@ -266,8 +266,8 @@ func (m *Model) navigate(to string) {
 		m.cycle()
 		return
 	}
-	if i := slices.IndexFunc(m.gtd, func(v View) bool { return v.ID == to }); i >= 0 {
-		m.setView(m.gtdBase() + i)
+	if i := slices.IndexFunc(m.taskViews, func(v View) bool { return v.ID == to }); i >= 0 {
+		m.setView(m.viewsBase() + i)
 		return
 	}
 	if i := slices.IndexFunc(m.views, func(v View) bool { return v.Provider == to }); i >= 0 {
@@ -283,11 +283,11 @@ func (m *Model) navigate(to string) {
 
 // pickArea makes the lists follow area n of the served areas.
 func (m *Model) pickArea(n int) {
-	if n < 1 || n > len(m.gtdCat.Areas) {
+	if n < 1 || n > len(m.viewsCat.Areas) {
 		m.status = fmt.Sprintf("no area %d", n)
 		return
 	}
-	m.setArea(m.gtdCat.Areas[n-1])
+	m.setArea(m.viewsCat.Areas[n-1])
 }
 
 func (m *Model) setArea(a string) {
@@ -303,10 +303,10 @@ func (m *Model) startFilter() {
 	m.filtering = true
 }
 
-// entryVerb runs verb on the selected entry, asking first for the value
+// taskVerb runs verb on the selected entry, asking first for the value
 // the verb needs.
-func (m *Model) entryVerb(verb string, read uint64) (Command, bool) {
-	e, ok := m.selectedEntry()
+func (m *Model) taskVerb(verb string, read uint64) (Command, bool) {
+	e, ok := m.selectedTask()
 	if !ok {
 		return Command{}, false
 	}
@@ -317,11 +317,11 @@ func (m *Model) entryVerb(verb string, read uint64) (Command, bool) {
 		m.status = verb + ": " + cmp.Or(e.Verbs[i].Reason, "not offered here")
 		return Command{}, false
 	}
-	if _, busy := m.busy[entryUnit(e.ID)]; busy {
-		m.status = fmt.Sprintf("%s %s still running", m.busy[entryUnit(e.ID)], entryLabel(e))
+	if _, busy := m.busy[taskUnit(e.ID)]; busy {
+		m.status = fmt.Sprintf("%s %s still running", m.busy[taskUnit(e.ID)], taskLabel(e))
 		return Command{}, false
 	}
-	c := Command{Unit: entryUnit(e.ID), Label: entryLabel(e), Action: verb, entry: e.ID, verb: verb}
+	c := Command{Unit: taskUnit(e.ID), Label: taskLabel(e), Action: verb, task: e.ID, verb: verb}
 	switch {
 	case e.Draft != nil && (verb == "approve" || verb == "dismiss" || verb == "retry"):
 		return m.draftVerb(c, e, read)
@@ -331,7 +331,7 @@ func (m *Model) entryVerb(verb string, read uint64) (Command, bool) {
 			m.status = "open a draft, or pick one with its digit, to edit it"
 			return Command{}, false
 		}
-		c.entry = "draft:" + strconv.FormatInt(shown.Draft.ID, 10)
+		c.task = "draft:" + strconv.FormatInt(shown.Draft.ID, 10)
 		return m.editPrompt(c, *shown.Draft, read)
 	case verb == "delegate":
 		return m.delegatePrompt(e, c, m.bridgedConfirm(e, verb), read)
@@ -346,7 +346,7 @@ func (m *Model) entryVerb(verb string, read uint64) (Command, bool) {
 	if !asks {
 		return m.send(c)
 	}
-	m.prompt = &prompt{action: verb, label: m.verbQuestion(verb) + " for " + entryLabel(e), read: read, submit: func(text string) (Command, bool) {
+	m.prompt = &prompt{action: verb, label: m.verbQuestion(verb) + " for " + taskLabel(e), read: read, submit: func(text string) (Command, bool) {
 		args, ok := ask.args(text)
 		if !ok {
 			m.status = verb + " " + c.Label + " cancelled: nothing usable typed"
@@ -361,7 +361,7 @@ func (m *Model) entryVerb(verb string, read uint64) (Command, bool) {
 // draftVerb approves or retries a draft only from its open detail, with
 // the revision on screen (and its text, to approve) after a y; a discard
 // asks for a y too.
-func (m *Model) draftVerb(c Command, e api.EntryView, read uint64) (Command, bool) {
+func (m *Model) draftVerb(c Command, e api.TaskView, read uint64) (Command, bool) {
 	target := draftTarget(e)
 	if c.verb == "dismiss" {
 		m.confirm(c, "discard the draft to "+target+"?", read)
@@ -388,7 +388,7 @@ func (m *Model) draftVerb(c Command, e api.EntryView, read uint64) (Command, boo
 
 // bridgedConfirm is the confirm of the unit action verb runs on e: the
 // first of its units whose row offers an enabled action of that verb.
-func (m *Model) bridgedConfirm(e api.EntryView, verb string) string {
+func (m *Model) bridgedConfirm(e api.TaskView, verb string) string {
 	if !slices.Contains([]string{"approve", "delegate", "dismiss"}, verb) {
 		return ""
 	}
@@ -406,10 +406,10 @@ func (m *Model) bridgedConfirm(e api.EntryView, verb string) string {
 	return ""
 }
 
-// entryUnitAction runs the served action of k on the first of the
+// taskUnitAction runs the served action of k on the first of the
 // selected entry's units whose row offers it.
-func (m *Model) entryUnitAction(k Key) (Command, bool) {
-	e, ok := m.selectedEntry()
+func (m *Model) taskUnitAction(k Key) (Command, bool) {
+	e, ok := m.selectedTask()
 	if !ok || k.Rune == 0 {
 		return Command{}, false
 	}
@@ -438,7 +438,7 @@ func (m *Model) entryUnitAction(k Key) (Command, bool) {
 		return m.begin(r, *spec, st, k.Read)
 	}
 	if fallback != nil {
-		m.status = fmt.Sprintf("no %s on %s", strings.ToLower(fallback.Label), entryLabel(e))
+		m.status = fmt.Sprintf("no %s on %s", strings.ToLower(fallback.Label), taskLabel(e))
 	}
 	return Command{}, false
 }
@@ -446,17 +446,17 @@ func (m *Model) entryUnitAction(k Key) (Command, bool) {
 // openSource opens the link of the selection: an entry's first unit, or
 // the row's.
 func (m *Model) openSource() (Command, bool) {
-	if _, ok := m.gtdView(); ok {
-		e, ok := m.selectedEntry()
+	if _, ok := m.viewOnScreen(); ok {
+		e, ok := m.selectedTask()
 		if !ok {
 			return Command{}, false
 		}
 		link := m.sourceLink(e)
 		if link == "" && len(e.Units) == 0 {
-			m.status = entryLabel(e) + " has no source to open"
+			m.status = taskLabel(e) + " has no source to open"
 			return Command{}, false
 		}
-		return m.send(Command{Unit: entryUnit(e.ID), Label: entryLabel(e), Action: "open-source", entry: e.ID, open: link, openFind: link == ""})
+		return m.send(Command{Unit: taskUnit(e.ID), Label: taskLabel(e), Action: "open-source", task: e.ID, open: link, openFind: link == ""})
 	}
 	r, ok := m.selected()
 	if !ok || m.view >= m.planView() || r.Link == "" {
@@ -497,8 +497,8 @@ func (m *Model) paletteItems() []paletteItem {
 			return m.run(b, k)
 		}
 	}
-	if _, ok := m.gtdView(); ok {
-		if e, ok := m.selectedEntry(); ok {
+	if _, ok := m.viewOnScreen(); ok {
+		if e, ok := m.selectedTask(); ok {
 			for _, v := range e.Verbs {
 				b, ok := m.binding(v.Verb, ctxList)
 				switch {
@@ -506,7 +506,7 @@ func (m *Model) paletteItems() []paletteItem {
 					items = append(items, paletteItem{label: cmp.Or(m.verbLabel(v.Verb), b.Help), key: b.Key, about: b.Summary, run: runKey(b)})
 				case v.Enabled && slices.Contains(projectVerbs, v.Verb):
 					verb := v.Verb
-					items = append(items, paletteItem{label: cmp.Or(m.verbLabel(verb), verb), run: func(read uint64) (Command, bool) { return m.entryVerb(verb, read) }})
+					items = append(items, paletteItem{label: cmp.Or(m.verbLabel(verb), verb), run: func(read uint64) (Command, bool) { return m.taskVerb(verb, read) }})
 				}
 			}
 			for _, u := range e.Units {
@@ -558,7 +558,7 @@ func (m *Model) rowItems(r api.Row) []paletteItem {
 // openAreas lists No area and the served areas, each with its Shift key.
 func (m *Model) openAreas() {
 	items := []paletteItem{{label: "No area", run: func(uint64) (Command, bool) { m.setArea(""); return Command{}, false }}}
-	for i, a := range m.gtdCat.Areas {
+	for i, a := range m.viewsCat.Areas {
 		key := ""
 		if i < 9 {
 			key = fmt.Sprintf("Shift+%d", i+1)

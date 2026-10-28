@@ -37,7 +37,7 @@ type Draft struct {
 	ID    int64    `json:"id"`
 	Unit  string   `json:"unit"` // "<provider>/<key>"
 	Items []string `json:"items"`
-	Entry string   `json:"entry,omitempty"`
+	Task  string   `json:"entry,omitempty"`
 	Kind  string   `json:"kind"`
 	// Purpose is what the draft is for, Delivery how it is posted (message,
 	// reaction or comment) and Effects what posting it applies.
@@ -112,7 +112,7 @@ const (
 // to go out through the same publisher. Source is cockpit, notification, tui or terminal.
 type DraftCreate struct {
 	Unit     unit.Unit `json:"unit"`
-	Entry    string    `json:"entry,omitempty"`
+	Task     string    `json:"entry,omitempty"`
 	Items    []string  `json:"items,omitempty"`
 	Kind     string    `json:"kind,omitempty"`
 	Text     string    `json:"text,omitempty"`

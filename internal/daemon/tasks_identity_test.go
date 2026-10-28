@@ -19,13 +19,13 @@ func TestSyncLogsAnIdentityErrorOnce(t *testing.T) {
 		var mu sync.Mutex
 		var lines []string
 		var calls atomic.Int32
-		r := newEntriesRig(t, func(d *Deps) {
+		r := newTasksRig(t, func(d *Deps) {
 			d.Log = func(format string, args ...any) {
 				mu.Lock()
 				defer mu.Unlock()
 				lines = append(lines, fmt.Sprintf(format, args...))
 			}
-			d.GTDMe = func(context.Context) (bool, error) {
+			d.TasksMe = func(context.Context) (bool, error) {
 				calls.Add(1)
 				return false, errors.New("slack: viewer unknown")
 			}

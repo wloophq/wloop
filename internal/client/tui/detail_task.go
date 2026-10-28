@@ -19,18 +19,18 @@ type askCard struct {
 	options   []record.Option
 	recommend string
 	confirm   bool
-	// entry is the entry whose answer verb takes the answer; row the row
+	// task is the entry whose answer verb takes the answer; row the row
 	// whose answer action does, when no entry does.
-	entry string
-	row   *api.Row
+	task string
+	row  *api.Row
 }
 
-// openEntry opens the detail of e and asks the daemon for it, marking it
+// openTask opens the detail of e and asks the daemon for it, marking it
 // seen first when it is an Inbox entry that changed.
-func (m *Model) openEntry(e api.EntryView, read uint64) (Command, bool) {
+func (m *Model) openTask(e api.TaskView, read uint64) (Command, bool) {
 	m.detailID, m.opened, m.detailStale, m.detailRead = e.ID, nil, false, read
-	c := Command{Unit: entryUnit(e.ID), Label: entryLabel(e), Action: "detail", entry: e.ID, fetch: true}
-	if v, _ := m.gtdView(); v.ID == viewInbox && e.Changed && !m.seen[e.ID] {
+	c := Command{Unit: taskUnit(e.ID), Label: taskLabel(e), Action: "detail", task: e.ID, fetch: true}
+	if v, _ := m.viewOnScreen(); v.ID == viewInbox && e.Changed && !m.seen[e.ID] {
 		if m.seen == nil {
 			m.seen = map[string]bool{}
 		}
@@ -42,10 +42,10 @@ func (m *Model) openEntry(e api.EntryView, read uint64) (Command, bool) {
 
 func (m *Model) closeDetail() { m.detailID, m.opened, m.detailStale = "", nil, false }
 
-func (m *Model) detailOpen(e api.EntryView) bool { return m.detailID != "" && m.detailID == e.ID }
+func (m *Model) detailOpen(e api.TaskView) bool { return m.detailID != "" && m.detailID == e.ID }
 
 // SetDetail shows the entry the daemon answered for the open detail.
-func (m *Model) SetDetail(id string, e api.EntryView, err error) {
+func (m *Model) SetDetail(id string, e api.TaskView, err error) {
 	if id != m.detailID {
 		return
 	}
@@ -62,11 +62,11 @@ func (m *Model) Refetch() (Command, bool) {
 		return Command{}, false
 	}
 	m.detailStale = false
-	return Command{Unit: entryUnit(m.detailID), Action: "detail", entry: m.detailID, fetch: true}, true
+	return Command{Unit: taskUnit(m.detailID), Action: "detail", task: m.detailID, fetch: true}, true
 }
 
 // shownDetail is the fetched detail of e, else e as the list has it.
-func (m *Model) shownDetail(e api.EntryView) api.EntryView {
+func (m *Model) shownDetail(e api.TaskView) api.TaskView {
 	if m.opened != nil && m.opened.ID == e.ID {
 		return *m.opened
 	}
@@ -75,9 +75,9 @@ func (m *Model) shownDetail(e api.EntryView) api.EntryView {
 
 // questionCard is the open question of e: its open message, else the
 // question its first unit's row asks.
-func (m *Model) questionCard(e api.EntryView) (askCard, bool) {
+func (m *Model) questionCard(e api.TaskView) (askCard, bool) {
 	if msg := e.Message; msg != nil && msg.State == "open" && (len(msg.Options) > 0 || msg.Confirm) {
-		return askCard{text: msg.Text, options: msg.Options, recommend: msg.Recommend, confirm: msg.Confirm, entry: e.ID}, true
+		return askCard{text: msg.Text, options: msg.Options, recommend: msg.Recommend, confirm: msg.Confirm, task: e.ID}, true
 	}
 	for _, u := range e.Units {
 		if r, ok := m.rowOf(u); ok && r.Question != nil {
@@ -96,8 +96,8 @@ func rowCard(r api.Row) askCard {
 // activeCard is the question the digits answer: the open entry detail's,
 // or the selected row's in a rows view.
 func (m *Model) activeCard() (askCard, bool) {
-	if _, ok := m.gtdView(); ok {
-		e, ok := m.selectedEntry()
+	if _, ok := m.viewOnScreen(); ok {
+		e, ok := m.selectedTask()
 		if !ok || !m.detailOpen(e) {
 			return askCard{}, false
 		}
@@ -129,8 +129,8 @@ func (c askCard) answers() []string {
 
 // answer picks the card's answer n.
 func (m *Model) answer(c askCard, n int, read uint64) (Command, bool) {
-	_, inGTD := m.gtdView()
-	if inGTD && read <= m.detailRead {
+	_, inViews := m.viewOnScreen()
+	if inViews && read <= m.detailRead {
 		return Command{}, false
 	}
 	if n < 1 || n > len(c.answers()) {
@@ -154,7 +154,7 @@ func (m *Model) answer(c askCard, n int, read uint64) (Command, bool) {
 		}
 		req.Basis = st.Basis
 		cmd := Command{Unit: r.Unit, Label: r.Label, Action: "answer", Req: req}
-		if !inGTD {
+		if !inViews {
 			m.confirm(cmd, fmt.Sprintf("answer %s: %d. %s?", r.Label, n, c.answers()[n-1]), read)
 			return Command{}, false
 		}
@@ -170,13 +170,13 @@ func (m *Model) answer(c askCard, n int, read uint64) (Command, bool) {
 		o := c.options[n-1]
 		args["option_id"], args["guidance"] = o.ID, o.Answer()
 	}
-	e, _ := m.selectedEntry()
-	return m.send(Command{Unit: entryUnit(c.entry), Label: entryLabel(e), Action: "answer", entry: c.entry, verb: "answer", args: args})
+	e, _ := m.selectedTask()
+	return m.send(Command{Unit: taskUnit(c.task), Label: taskLabel(e), Action: "answer", task: c.task, verb: "answer", args: args})
 }
 
-// entryDetail is the entry, its facts, the question card, the draft, its
+// taskDetail is the entry, its facts, the question card, the draft, its
 // items, one card per unit and the keys it offers.
-func (m *Model) entryDetail(e api.EntryView, width int, now time.Time) []string {
+func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 	t := m.t
 	lines := []string{t.Bold(termfmt.Cut(oneLine(cmp.Or(e.Title, e.ID)), width))}
 	col := 2 + factLabel + 2
@@ -266,7 +266,7 @@ func (m *Model) entryDetail(e api.EntryView, width int, now time.Time) []string 
 	if len(e.Cards) == 0 && m.opened == nil {
 		fact("", "loading…", t.Dim)
 	}
-	return append(lines, m.entryKeys(e, width, col)...)
+	return append(lines, m.taskKeys(e, width, col)...)
 }
 
 // unitCard adds one unit's stored card.
@@ -305,9 +305,9 @@ func (m *Model) unitCard(s api.CardView, fact func(label, text string, style fun
 	}
 }
 
-// entryKeys lists the entry's verbs with their keys: the enabled ones, then
+// taskKeys lists the entry's verbs with their keys: the enabled ones, then
 // the disabled ones dimmed.
-func (m *Model) entryKeys(e api.EntryView, width, col int) []string {
+func (m *Model) taskKeys(e api.TaskView, width, col int) []string {
 	t := m.t
 	on, off := m.verbHelp(e)
 	var lines []string
@@ -324,7 +324,7 @@ func (m *Model) entryKeys(e api.EntryView, width, col int) []string {
 
 // verbHelp are the entry's verbs that have a key, enabled and not, then
 // the enabled actions of its units' rows.
-func (m *Model) verbHelp(e api.EntryView) (on []helpItem, off []string) {
+func (m *Model) verbHelp(e api.TaskView) (on []helpItem, off []string) {
 	for _, v := range e.Verbs {
 		b, ok := m.binding(v.Verb, ctxList)
 		if !ok {
@@ -356,7 +356,7 @@ func (m *Model) verbHelp(e api.EntryView) (on []helpItem, off []string) {
 
 // verbQuestion is what a verb that asks puts first: the catalog's input.
 func (m *Model) verbQuestion(verb string) string {
-	for _, v := range m.gtdCat.Verbs {
+	for _, v := range m.viewsCat.Verbs {
 		if v.Verb == verb {
 			return cmp.Or(v.Input, v.Label, verb)
 		}
@@ -365,7 +365,7 @@ func (m *Model) verbQuestion(verb string) string {
 }
 
 func (m *Model) verbLabel(verb string) string {
-	for _, v := range m.gtdCat.Verbs {
+	for _, v := range m.viewsCat.Verbs {
 		if v.Verb == verb {
 			return v.Label
 		}

@@ -26,7 +26,7 @@ type Headless interface {
 type modeRequest struct {
 	Mode     string   `json:"mode"` // "headless" (default) or "session"
 	Items    []string `json:"items"`
-	Entry    string   `json:"entry"`
+	Task     string   `json:"entry"`
 	Guidance string   `json:"guidance"`
 }
 
@@ -72,7 +72,7 @@ func (s *Server) runHeadless(w http.ResponseWriter, r *http.Request, d dintent.D
 		writeActionError(w, err)
 		return
 	}
-	if why, err := s.entryRefusal(r.Context(), s.loaded(), name, u); err != nil || why != "" {
+	if why, err := s.taskRefusal(r.Context(), s.loaded(), name, u); err != nil || why != "" {
 		if err == nil {
 			err = Refusal{Reason: why}
 		}
@@ -91,7 +91,7 @@ func (s *Server) runHeadless(w http.ResponseWriter, r *http.Request, d dintent.D
 		writeError(w, http.StatusServiceUnavailable, "headless turns are not wired")
 		return
 	}
-	seq, err := s.deps.Headless.Start(r.Context(), headless.Request{Unit: u, Items: req.Items, Entry: req.Entry, Intent: turn.Intent(name),
+	seq, err := s.deps.Headless.Start(r.Context(), headless.Request{Unit: u, Items: req.Items, Task: req.Task, Intent: turn.Intent(name),
 		Guidance: req.Guidance, Trigger: turn.ByHand})
 	switch {
 	case errors.Is(err, headless.ErrBusy):

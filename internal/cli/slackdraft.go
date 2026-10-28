@@ -93,7 +93,7 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 	if err := checkEffects(def, string(t.Intent), a.Effects); err != nil {
 		return mcp.DraftResult{}, err
 	}
-	return s.propose(ctx, outbox.Proposal{Unit: b.Unit, Items: its, Entry: turns.EntryOf(*t), Kind: draft.Kind(a.Kind),
+	return s.propose(ctx, outbox.Proposal{Unit: b.Unit, Items: its, Task: turns.TaskOf(*t), Kind: draft.Kind(a.Kind),
 		Target: a.Target, Text: a.Text, Reaction: a.Reaction, Effects: a.Effects,
 		Origin: sessionOrigin(b, t, b.Unit, draft.OriginTurn)})
 }

@@ -342,7 +342,7 @@ func configFacts(cfg config.Config) workflow.Facts {
 		"config.cleanup.manual_idle":      time.Duration(c.ManualIdle),
 		"config.cleanup.stale_workspace":  time.Duration(c.StaleWorkspace),
 		"config.github.nudge.silent_days": cfg.GitHub.Nudge.SilentDays,
-		"config.gtd.stale_waiting_days":   cfg.GTD.StaleWaitingDays,
+		"config.gtd.stale_waiting_days":   cfg.Tasks.StaleWaitingDays,
 		"config.drafts.repeat_after":      time.Duration(cfg.Drafts.RepeatAfter),
 		"config.turns.per_day":            cfg.Turns.PerDay,
 	}

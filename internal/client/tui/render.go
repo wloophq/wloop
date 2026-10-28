@@ -46,8 +46,8 @@ func (m *Model) Render(width, height int, now time.Time) []string {
 		lines = pad(m.renderReview(lines, width, body, now), height-2)
 		return append(lines, m.statusLine(width), m.bottom(width))
 	}
-	if v, ok := m.gtdView(); ok {
-		lines = pad(m.renderEntries(lines, v, width, body, now), height-2)
+	if v, ok := m.viewOnScreen(); ok {
+		lines = pad(m.renderTasks(lines, v, width, body, now), height-2)
 		return append(lines, m.statusLine(width), m.bottom(width))
 	}
 	if m.view == m.planView() {
@@ -100,11 +100,11 @@ const pluginViewsGroup = " plugins"
 // whole, then each other group that fits whole, GTD views first.
 func (m *Model) tabs(width int) string {
 	t := m.t
-	gtd := make([]tab, len(m.gtd))
-	for i, label := range m.gtdTabs() {
-		gtd[i] = tab{label, m.gtdBase() + i}
+	views := make([]tab, len(m.taskViews))
+	for i, label := range m.viewTabs() {
+		views[i] = tab{label, m.viewsBase() + i}
 	}
-	groups := [][]tab{gtd}
+	groups := [][]tab{views}
 	at := map[string]int{}
 	add := func(provider string, x tab) {
 		i, ok := at[provider]
@@ -613,11 +613,11 @@ func (m *Model) bottom(width int) string {
 // the moves.
 func (m *Model) helpItems() []helpItem {
 	var items []helpItem
-	if _, ok := m.gtdView(); ok {
+	if _, ok := m.viewOnScreen(); ok {
 		if m.inReview() {
 			items = m.reviewHelp()
 		}
-		if e, ok := m.selectedEntry(); ok {
+		if e, ok := m.selectedTask(); ok {
 			verbs, _ := m.verbHelp(e)
 			items = append(items, verbs...)
 		}

@@ -36,14 +36,14 @@ import (
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
-// entriesNow is newServerOn's now.
+// tasksNow is newServerOn's now.
 var (
-	entriesNow = time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC)
-	meID       = task.Me{Keys: []string{"github:me"}}
-	r7u        = pr.Ref(r7).Unit()
+	tasksNow = time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC)
+	meID     = task.Me{Keys: []string{"github:me"}}
+	r7u      = pr.Ref(r7).Unit()
 )
 
-type entriesRig struct {
+type tasksRig struct {
 	s      *Server
 	db     *sqlite.DB
 	log    *change.Log
@@ -51,7 +51,7 @@ type entriesRig struct {
 	ledger *coreitems.Ledger
 }
 
-func newEntriesRig(t *testing.T, edit func(*Deps)) *entriesRig {
+func newTasksRig(t *testing.T, edit func(*Deps)) *tasksRig {
 	t.Helper()
 	log := change.NewLog(change.DefaultWindow, nil)
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "inv.db"), log)
@@ -59,19 +59,19 @@ func newEntriesRig(t *testing.T, edit func(*Deps)) *entriesRig {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	r := &entriesRig{db: db, log: log, ledger: &coreitems.Ledger{Store: db.Items(), Clock: fixedClock(entriesNow)}}
+	r := &tasksRig{db: db, log: log, ledger: &coreitems.Ledger{Store: db.Items(), Clock: fixedClock(tasksNow)}}
 	r.s = newServerOn(t, db, log, func(d *Deps) {
 		d.Items, d.Cards = r.ledger, db.Cards()
-		d.Cfg.GTD.Areas, d.Cfg.GTD.Contexts = []string{"OSS", "Hiring"}, []string{"@decide", "@reply"}
+		d.Cfg.Tasks.Areas, d.Cfg.Tasks.Contexts = []string{"OSS", "Hiring"}, []string{"@decide", "@reply"}
 		if edit != nil {
 			edit(d)
 		}
 		enabled := d.PluginEnabled
 		r.ledger.Enabled = enabled
-		r.g = coretasks.New(coretasks.Deps{Store: db.Entries(), Items: r.ledger,
+		r.g = coretasks.New(coretasks.Deps{Store: db.Tasks(), Items: r.ledger,
 			Facts: coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: func() task.Me { return meID }},
-			Me:    meID, Clock: fixedClock(entriesNow), StaleWaitingDays: 2, Disabled: disabledOf(enabled)})
-		d.GTD = r.g
+			Me:    meID, Clock: fixedClock(tasksNow), StaleWaitingDays: 2, Disabled: disabledOf(enabled)})
+		d.Tasks = r.g
 	})
 	stopOnCleanup(t, r.s)
 	return r
@@ -89,12 +89,12 @@ func disabledOf(enabled func(unit.ProviderID) bool) func() []unit.ProviderID {
 	}
 }
 
-func (r *entriesRig) put(t *testing.T, es ...task.Entry) {
+func (r *tasksRig) put(t *testing.T, es ...task.Task) {
 	t.Helper()
 	var cs []task.Change
 	for _, e := range es {
 		if e.Created.IsZero() {
-			e.Created, e.Updated = entriesNow, entriesNow
+			e.Created, e.Updated = tasksNow, tasksNow
 		}
 		if e.Origin == "" {
 			e.Origin = task.OriginUser
@@ -102,23 +102,23 @@ func (r *entriesRig) put(t *testing.T, es ...task.Entry) {
 		if e.Kind == "" {
 			e.Kind = task.KindCapture
 		}
-		cs = append(cs, task.Change{Op: task.OpCreate, Entry: e})
+		cs = append(cs, task.Change{Op: task.OpCreate, Task: e})
 	}
-	if err := r.db.Entries().Apply(context.Background(), cs); err != nil {
+	if err := r.db.Tasks().Apply(context.Background(), cs); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func (r *entriesRig) page(t *testing.T, query string) api.EntriesPage {
+func (r *tasksRig) page(t *testing.T, query string) api.TasksPage {
 	t.Helper()
-	var p api.EntriesPage
-	if code := get(t, r.s, api.EntriesPath+"?"+query, &p); code != 200 {
+	var p api.TasksPage
+	if code := get(t, r.s, api.TasksPath+"?"+query, &p); code != 200 {
 		t.Fatalf("GET %s: %d", query, code)
 	}
 	return p
 }
 
-func entryIDs(vs []api.EntryView) []string {
+func taskIDs(vs []api.TaskView) []string {
 	out := []string{}
 	for _, v := range vs {
 		out = append(out, v.ID)
@@ -137,11 +137,11 @@ func waitUntil(t *testing.T, what string, cond func() bool) {
 	}
 }
 
-func mixedEntries() []task.Entry {
-	return []task.Entry{
+func mixedTasks() []task.Task {
+	return []task.Task{
 		{ID: "e-1", State: task.Next, Area: "OSS", Contexts: []string{"@decide"}},
 		{ID: "e-2", State: task.Next, Area: "Hiring"},
-		{ID: "e-3", State: task.Next, Area: "OSS", Contexts: []string{"@reply"}, Created: entriesNow.Add(-time.Hour)},
+		{ID: "e-3", State: task.Next, Area: "OSS", Contexts: []string{"@reply"}, Created: tasksNow.Add(-time.Hour)},
 		{ID: "e-4", State: task.Inbox, Area: "Hiring"},
 		{ID: "e-p", Kind: task.KindProject, State: task.Next, Area: "OSS", Sequential: true, Title: "Launch"},
 		{ID: "e-5", State: task.Next, Area: "OSS", Project: "e-p", Position: 1},
@@ -150,16 +150,16 @@ func mixedEntries() []task.Entry {
 	}
 }
 
-func TestEntriesPageMatchesTheQuery(t *testing.T) {
+func TestTasksPageMatchesTheQuery(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, nil)
-	r.put(t, mixedEntries()...)
+	r := newTasksRig(t, nil)
+	r.put(t, mixedTasks()...)
 	ctx := context.Background()
 	for _, q := range []task.Query{{View: task.ViewNext, Area: "OSS"}, {View: task.ViewNext}, {View: task.ViewInbox, Area: "OSS"},
 		{View: task.ViewNext, Area: "OSS", Contexts: []string{"@reply"}}, {View: task.ViewProjects}} {
 		v := url.Values{"view": {string(q.View)}, "area": {q.Area}, "context": {strings.Join(q.Contexts, ",")}}
 		p := r.page(t, v.Encode())
-		want, err := r.db.Entries().Entries(ctx, q)
+		want, err := r.db.Tasks().Tasks(ctx, q)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -167,8 +167,8 @@ func TestEntriesPageMatchesTheQuery(t *testing.T) {
 		for _, e := range want {
 			wantIDs = append(wantIDs, string(e.ID))
 		}
-		if !p.Full || !slices.Equal(entryIDs(p.Entries), wantIDs) {
-			t.Errorf("%+v: page %v (full %v), store %v", q, entryIDs(p.Entries), p.Full, wantIDs)
+		if !p.Full || !slices.Equal(taskIDs(p.Tasks), wantIDs) {
+			t.Errorf("%+v: page %v (full %v), store %v", q, taskIDs(p.Tasks), p.Full, wantIDs)
 		}
 		c, err := r.g.Counts(ctx, q.Area)
 		if err != nil {
@@ -179,31 +179,31 @@ func TestEntriesPageMatchesTheQuery(t *testing.T) {
 		}
 	}
 	p := r.page(t, "view=next&area=OSS")
-	if i := slices.Index(entryIDs(p.Entries), "e-5"); i < 0 || p.Entries[i].ProjectTitle != "Launch" || len(p.Entries[i].Verbs) == 0 {
-		t.Fatalf("project action %+v", p.Entries)
+	if i := slices.Index(taskIDs(p.Tasks), "e-5"); i < 0 || p.Tasks[i].ProjectTitle != "Launch" || len(p.Tasks[i].Verbs) == 0 {
+		t.Fatalf("project action %+v", p.Tasks)
 	}
-	if code := get(t, r.s, api.EntriesPath+"?view=bogus", nil); code != 400 {
+	if code := get(t, r.s, api.TasksPath+"?view=bogus", nil); code != 400 {
 		t.Fatalf("an unknown view: %d", code)
 	}
 }
 
-func TestEntriesSinceIsIncremental(t *testing.T) {
+func TestTasksSinceIsIncremental(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, nil)
-	r.put(t, mixedEntries()...)
+	r := newTasksRig(t, nil)
+	r.put(t, mixedTasks()...)
 	inbox := r.page(t, "view=inbox")
 	next := r.page(t, "view=next")
-	if rec := post(t, r.s, api.EntryPath("e-4", "next"), `{"source":"cockpit"}`); rec.Code != 200 {
+	if rec := post(t, r.s, api.TaskPath("e-4", "next"), `{"source":"cockpit"}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	since := func(p api.EntriesPage) string { return api.Since{Epoch: p.Epoch, Rev: p.Rev}.String() }
+	since := func(p api.TasksPage) string { return api.Since{Epoch: p.Epoch, Rev: p.Rev}.String() }
 	got := r.page(t, "view=inbox&since="+url.QueryEscape(since(inbox)))
-	if got.Full || len(got.Entries) != 0 || !slices.Equal(got.Removed, []string{"e-4"}) || got.Rev != inbox.Rev+1 {
+	if got.Full || len(got.Tasks) != 0 || !slices.Equal(got.Removed, []string{"e-4"}) || got.Rev != inbox.Rev+1 {
 		t.Fatalf("inbox since: %+v", got)
 	}
 	got = r.page(t, "view=next&since="+url.QueryEscape(since(next)))
-	if got.Full || !slices.Equal(entryIDs(got.Entries), []string{"e-4"}) || len(got.Removed) != 0 {
-		t.Fatalf("next since: full %v entries %v removed %v", got.Full, entryIDs(got.Entries), got.Removed)
+	if got.Full || !slices.Equal(taskIDs(got.Tasks), []string{"e-4"}) || len(got.Removed) != 0 {
+		t.Fatalf("next since: full %v entries %v removed %v", got.Full, taskIDs(got.Tasks), got.Removed)
 	}
 	if got := r.page(t, "view=next&since=other:1"); !got.Full {
 		t.Fatal("another epoch is not Full")
@@ -211,11 +211,11 @@ func TestEntriesSinceIsIncremental(t *testing.T) {
 }
 
 // subscribe follows the hub and the entries feed until the test ends.
-func (r *entriesRig) subscribe(t *testing.T) *subscriber {
+func (r *tasksRig) subscribe(t *testing.T) *subscriber {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
-	wg.Go(func() { r.s.feedEntries(ctx) })
+	wg.Go(func() { r.s.feedTasks(ctx) })
 	t.Cleanup(func() { cancel(); wg.Wait() })
 	sub := r.s.hub.subscribe("test")
 	t.Cleanup(func() { r.s.hub.unsubscribe(sub) })
@@ -229,7 +229,7 @@ func waitFeedListening(t *testing.T, log *change.Log, sub *subscriber) {
 	t.Helper()
 	deadline := time.After(10 * time.Second)
 	for {
-		log.NoteAll(entryInputs)
+		log.NoteAll(taskInputs)
 		retry := time.After(4 * syncQuiet)
 		for waiting := true; waiting; {
 			select {
@@ -264,12 +264,12 @@ func nextChange(t *testing.T, sub *subscriber) api.Change {
 
 func TestVerbPostMovesAndStreams(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, nil)
-	r.put(t, task.Entry{ID: "e-1", State: task.Inbox, Units: []unit.Unit{r7u}})
+	r := newTasksRig(t, nil)
+	r.put(t, task.Task{ID: "e-1", State: task.Inbox, Units: []unit.Unit{r7u}})
 	sub := r.subscribe(t)
-	rec := post(t, r.s, api.EntryPath("e-1", "next"), `{"source":"cockpit"}`)
-	var res api.EntryResult
-	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &res) != nil || res.Entry.State != "next" || res.Entry.ID != "e-1" {
+	rec := post(t, r.s, api.TaskPath("e-1", "next"), `{"source":"cockpit"}`)
+	var res api.TaskResult
+	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &res) != nil || res.Task.State != "next" || res.Task.ID != "e-1" {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	c := nextChange(t, sub)
@@ -280,55 +280,55 @@ func TestVerbPostMovesAndStreams(t *testing.T) {
 
 func TestVerbErrors(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, nil)
-	r.put(t, task.Entry{ID: "e-1", State: task.Inbox})
-	rec := post(t, r.s, api.EntryPath("e-1", "bogus"), `{}`)
+	r := newTasksRig(t, nil)
+	r.put(t, task.Task{ID: "e-1", State: task.Inbox})
+	rec := post(t, r.s, api.TaskPath("e-1", "bogus"), `{}`)
 	if rec.Code != 400 || !strings.Contains(rec.Body.String(), "next, waiting, schedule") {
 		t.Fatalf("unknown verb: %d %s", rec.Code, rec.Body)
 	}
-	if rec := post(t, r.s, api.EntryPath("e-none", "next"), `{}`); rec.Code != 404 {
+	if rec := post(t, r.s, api.TaskPath("e-none", "next"), `{}`); rec.Code != 404 {
 		t.Fatalf("unknown id: %d %s", rec.Code, rec.Body)
 	}
-	if rec := post(t, r.s, api.EntryPath("e-1", "schedule"), `{}`); rec.Code != 400 {
+	if rec := post(t, r.s, api.TaskPath("e-1", "schedule"), `{}`); rec.Code != 400 {
 		t.Fatalf("a missing argument: %d %s", rec.Code, rec.Body)
 	}
-	if rec := post(t, r.s, api.EntryPath("e-1", "inbox"), `{}`); rec.Code != 400 {
+	if rec := post(t, r.s, api.TaskPath("e-1", "inbox"), `{}`); rec.Code != 400 {
 		t.Fatalf("a state for a verb: %d %s", rec.Code, rec.Body)
 	}
-	post(t, r.s, api.EntryPath("e-1", "done"), `{}`)
-	if rec := post(t, r.s, api.EntryPath("e-1", "next"), `{}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "done") {
+	post(t, r.s, api.TaskPath("e-1", "done"), `{}`)
+	if rec := post(t, r.s, api.TaskPath("e-1", "next"), `{}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "done") {
 		t.Fatalf("a refused state: %d %s", rec.Code, rec.Body)
 	}
 }
 
 func TestCaptureLandsInInbox(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, nil)
-	rec := post(t, r.s, api.EntriesPath, `{"title":"call the bank","notes":"before 5"}`)
-	var v api.EntryView
+	r := newTasksRig(t, nil)
+	rec := post(t, r.s, api.TasksPath, `{"title":"call the bank","notes":"before 5"}`)
+	var v api.TaskView
 	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &v) != nil {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	if v.Kind != "capture" || v.State != "inbox" || v.Title != "call the bank" || v.Notes != "before 5" {
 		t.Fatalf("%+v", v)
 	}
-	if p := r.page(t, "view=inbox"); !slices.Equal(entryIDs(p.Entries), []string{v.ID}) || p.Counters.Badge != 1 {
+	if p := r.page(t, "view=inbox"); !slices.Equal(taskIDs(p.Tasks), []string{v.ID}) || p.Counters.Badge != 1 {
 		t.Fatalf("%+v", p)
 	}
-	var detail api.EntryView
-	if code := get(t, r.s, api.EntryPath(v.ID), &detail); code != 200 || detail.ID != v.ID {
+	var detail api.TaskView
+	if code := get(t, r.s, api.TaskPath(v.ID), &detail); code != 200 || detail.ID != v.ID {
 		t.Fatalf("detail %d %+v", code, detail)
 	}
-	if rec := post(t, r.s, api.EntriesPath, `{"title":"  "}`); rec.Code != 400 {
+	if rec := post(t, r.s, api.TasksPath, `{"title":"  "}`); rec.Code != 400 {
 		t.Fatalf("an empty title: %d %s", rec.Code, rec.Body)
 	}
 }
 
 func TestCatalogServesViewsAndVerbs(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, nil)
-	var cat api.GTDCatalog
-	if code := get(t, r.s, api.GTDPath, &cat); code != 200 {
+	r := newTasksRig(t, nil)
+	var cat api.ViewsCatalog
+	if code := get(t, r.s, api.ViewsPath, &cat); code != 200 {
 		t.Fatalf("%d", code)
 	}
 	var views []string
@@ -352,25 +352,25 @@ func TestCatalogServesViewsAndVerbs(t *testing.T) {
 		}
 	}
 	r.g.RegisterView(task.ViewReview, "review:", reviewSource{})
-	if get(t, r.s, api.GTDPath, &cat); cat.Views[len(cat.Views)-1].ID != "review" {
+	if get(t, r.s, api.ViewsPath, &cat); cat.Views[len(cat.Views)-1].ID != "review" {
 		t.Fatalf("a registered review: %v", cat.Views)
 	}
 }
 
 func TestTheCatalogIsWordedByTheProfile(t *testing.T) {
 	t.Parallel()
-	texts := intentload.GTDTexts{
+	texts := intentload.ListTexts{
 		Verbs: map[string]intentload.VerbText{"done": {Label: "Finish", Summary: "Close it"}, "waiting": {Label: "Waiting", Summary: "Wait", Input: "On whom?"}},
 		Views: map[string]string{"next": "Now"},
 	}
-	r := newEntriesRig(t, func(d *Deps) {
-		d.Intents = func() *intentload.Loaded { return &intentload.Loaded{GTD: texts, Registry: dintent.NewRegistry(nil)} }
+	r := newTasksRig(t, func(d *Deps) {
+		d.Intents = func() *intentload.Loaded { return &intentload.Loaded{Lists: texts, Registry: dintent.NewRegistry(nil)} }
 	})
-	var cat api.GTDCatalog
-	if code := get(t, r.s, api.GTDPath, &cat); code != 200 {
+	var cat api.ViewsCatalog
+	if code := get(t, r.s, api.ViewsPath, &cat); code != 200 {
 		t.Fatalf("%d", code)
 	}
-	verbs := map[string]api.GTDVerb{}
+	verbs := map[string]api.VerbSpec{}
 	for _, v := range cat.Verbs {
 		verbs[v.Verb] = v
 	}
@@ -394,18 +394,18 @@ func TestTheCatalogIsWordedByTheProfile(t *testing.T) {
 
 type reviewSource struct{}
 
-func (reviewSource) Entries(context.Context, task.Query) ([]task.Entry, error) { return nil, nil }
-func (reviewSource) Entry(context.Context, task.ID) (task.Entry, bool, error) {
-	return task.Entry{}, false, nil
+func (reviewSource) Tasks(context.Context, task.Query) ([]task.Task, error) { return nil, nil }
+func (reviewSource) Task(context.Context, task.ID) (task.Task, bool, error) {
+	return task.Task{}, false, nil
 }
 func (reviewSource) Count(context.Context, string) (int, error) { return 0, nil }
 
 func TestCountersShipWithChanges(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, nil)
-	r.put(t, mixedEntries()...)
+	r := newTasksRig(t, nil)
+	r.put(t, mixedTasks()...)
 	sub := r.subscribe(t)
-	if rec := post(t, r.s, api.EntryPath("e-4", "someday"), `{}`); rec.Code != 200 {
+	if rec := post(t, r.s, api.TaskPath("e-4", "someday"), `{}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	c := nextChange(t, sub)
@@ -427,11 +427,11 @@ func TestCountersShipWithChanges(t *testing.T) {
 }
 
 // startSync runs the Sync worker until the test ends.
-func (r *entriesRig) startSync(t *testing.T) {
+func (r *tasksRig) startSync(t *testing.T) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
-	wg.Go(func() { r.s.syncEntries(ctx) })
+	wg.Go(func() { r.s.syncTasks(ctx) })
 	t.Cleanup(func() { cancel(); wg.Wait() })
 }
 
@@ -440,9 +440,9 @@ func owedToMe(u unit.Unit, id string) items.Op {
 		Summary: ptrOf("review " + id), WaitingOn: &[]items.Person{{Key: "github:me", Name: "me"}}}}
 }
 
-func TestItemsNoteSyncsEntries(t *testing.T) {
+func TestItemsNoteSyncsTasks(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, nil)
+	r := newTasksRig(t, nil)
 	sub := r.subscribe(t)
 	r.startSync(t)
 	if _, err := r.ledger.Apply(context.Background(), items.User, []items.Op{owedToMe(r7u, "i1")}); err != nil {
@@ -455,7 +455,7 @@ func TestItemsNoteSyncsEntries(t *testing.T) {
 	if c.Counters.Views["inbox"] != 1 {
 		t.Fatalf("%+v %+v", c, c.Counters)
 	}
-	es, err := r.db.Entries().EntriesOf(context.Background(), r7u)
+	es, err := r.db.Tasks().TasksOf(context.Background(), r7u)
 	if err != nil || len(es) != 1 || es[0].State != task.Inbox || es[0].Kind != task.KindAction {
 		t.Fatalf("%+v %v", es, err)
 	}
@@ -464,25 +464,25 @@ func TestItemsNoteSyncsEntries(t *testing.T) {
 func TestSourceActivityReinboxes(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
-		r := newEntriesRig(t, nil)
+		r := newTasksRig(t, nil)
 		ctx := context.Background()
-		r.put(t, task.Entry{ID: "e-s", State: task.Scheduled, Units: []unit.Unit{r7u}, Snooze: task.Snooze{OnActivity: true, Return: task.Next},
-			SeenAt: entriesNow.Add(-time.Hour), Created: entriesNow.Add(-2 * time.Hour), Updated: entriesNow.Add(-2 * time.Hour)})
+		r.put(t, task.Task{ID: "e-s", State: task.Scheduled, Units: []unit.Unit{r7u}, Snooze: task.Snooze{OnActivity: true, Return: task.Next},
+			SeenAt: tasksNow.Add(-time.Hour), Created: tasksNow.Add(-2 * time.Hour), Updated: tasksNow.Add(-2 * time.Hour)})
 		r.startSync(t)
 		r.log.Note(port.TopicSourceEvents, r7u)
 		time.Sleep(syncMaxDelay)
 		synctest.Wait()
-		if p := r.page(t, "view=inbox"); len(p.Entries) != 0 {
-			t.Fatalf("the source event moved the entry before its card: %+v", p.Entries)
+		if p := r.page(t, "view=inbox"); len(p.Tasks) != 0 {
+			t.Fatalf("the source event moved the entry before its card: %+v", p.Tasks)
 		}
 		ana := items.Person{Key: "github:ana", Name: "ana"}
-		c := card.Card{Unit: r7u, Title: "Batch export", State: "open", LastHuman: &card.Human{Who: ana, What: "commented", At: entriesNow.Add(-time.Minute)}}
-		if _, err := r.db.Cards().Save(ctx, c, entriesNow); err != nil {
+		c := card.Card{Unit: r7u, Title: "Batch export", State: "open", LastHuman: &card.Human{Who: ana, What: "commented", At: tasksNow.Add(-time.Minute)}}
+		if _, err := r.db.Cards().Save(ctx, c, tasksNow); err != nil {
 			t.Fatal(err)
 		}
 		waitUntil(t, "the entry back in the Inbox", func() bool {
 			p := r.page(t, "view=inbox")
-			return len(p.Entries) == 1 && p.Entries[0].ID == "e-s" && p.Entries[0].Changed
+			return len(p.Tasks) == 1 && p.Tasks[0].ID == "e-s" && p.Tasks[0].Changed
 		})
 	})
 }
@@ -502,9 +502,9 @@ func (b *blockingItems) Items(ctx context.Context, u unit.Unit) ([]items.Item, e
 
 func TestSyncRunsOffTheSubscriber(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, nil)
+	r := newTasksRig(t, nil)
 	b := &blockingItems{entered: make(chan struct{}), release: make(chan struct{})}
-	r.s.deps.GTD = coretasks.New(coretasks.Deps{Store: taskstest.New(), Items: b, Facts: coretasks.CardFacts{}, Clock: fixedClock(entriesNow)})
+	r.s.deps.Tasks = coretasks.New(coretasks.Deps{Store: taskstest.New(), Items: b, Facts: coretasks.CardFacts{}, Clock: fixedClock(tasksNow)})
 	r.startSync(t)
 	defer close(b.release)
 	noted := make(chan struct{})
@@ -530,9 +530,9 @@ func bridgeRig(t *testing.T) (catalogRig, *coretasks.Service) {
 	c := newCatalogRig(t)
 	store := taskstest.New()
 	g := coretasks.New(coretasks.Deps{Store: store, Facts: coretasks.CardFacts{}, Clock: fixedClock(catalogNow)})
-	c.s.deps.GTD = g
-	e := task.Entry{ID: "e-r", Kind: task.KindAction, State: task.Inbox, Units: []unit.Unit{r7u}, Origin: task.OriginDerived, Created: catalogNow, Updated: catalogNow}
-	if err := store.Apply(context.Background(), []task.Change{{Op: task.OpCreate, Entry: e}}); err != nil {
+	c.s.deps.Tasks = g
+	e := task.Task{ID: "e-r", Kind: task.KindAction, State: task.Inbox, Units: []unit.Unit{r7u}, Origin: task.OriginDerived, Created: catalogNow, Updated: catalogNow}
+	if err := store.Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
 	return c, g
@@ -542,7 +542,7 @@ func TestApproveRunsThePendingRound(t *testing.T) {
 	t.Parallel()
 	c, _ := bridgeRig(t)
 	c.propose(t)
-	rec := post(t, c.s, api.EntryPath("e-r", "approve"), `{"source":"cockpit"}`)
+	rec := post(t, c.s, api.TaskPath("e-r", "approve"), `{"source":"cockpit"}`)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "sent the review-follow-up round") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
@@ -562,7 +562,7 @@ func TestApproveRunsThePendingRound(t *testing.T) {
 func TestDelegateRunsTheIntent(t *testing.T) {
 	t.Parallel()
 	c, _ := bridgeRig(t)
-	rec := post(t, c.s, api.EntryPath("e-r", "delegate"), `{"source":"cockpit"}`)
+	rec := post(t, c.s, api.TaskPath("e-r", "delegate"), `{"source":"cockpit"}`)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "review accepted as intake") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
@@ -577,7 +577,7 @@ func TestBridgeRefusesWhatTheRowDoesNotOffer(t *testing.T) {
 	c, g := bridgeRig(t)
 	fa := &fakeActions{}
 	c.s.deps.Actions = fa
-	rec := post(t, c.s, api.EntryPath("e-r", "approve"), `{"source":"cockpit"}`)
+	rec := post(t, c.s, api.TaskPath("e-r", "approve"), `{"source":"cockpit"}`)
 	row, _ := c.s.currentRow(context.Background(), r7u)
 	want := c.s.offeredFor(row, task.VerbApprove).reason()
 	if rec.Code != 409 || !strings.Contains(rec.Body.String(), want) || want == "" {
@@ -586,15 +586,15 @@ func TestBridgeRefusesWhatTheRowDoesNotOffer(t *testing.T) {
 	if len(fa.calls) != 0 || len(c.plan.acted) != 0 {
 		t.Fatalf("dispatched: %v %v", fa.calls, c.plan.acted)
 	}
-	if e, _ := g.Entry(context.Background(), "e-r"); e.State != task.Inbox {
+	if e, _ := g.Task(context.Background(), "e-r"); e.State != task.Inbox {
 		t.Fatalf("the entry moved: %+v", e)
 	}
-	if rec := post(t, c.s, api.EntryPath("e-r", "dismiss"), `{}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "no open question") {
+	if rec := post(t, c.s, api.TaskPath("e-r", "dismiss"), `{}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "no open question") {
 		t.Fatalf("dismiss with the turn's dismiss offered disabled: %d %s", rec.Code, rec.Body)
 	}
 }
 
-func TestBridgeRunsOnlyForActionEntries(t *testing.T) {
+func TestBridgeRunsOnlyForActionTasks(t *testing.T) {
 	t.Parallel()
 	c, g := bridgeRig(t)
 	c.propose(t)
@@ -602,10 +602,10 @@ func TestBridgeRunsOnlyForActionEntries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rec := post(t, c.s, api.EntryPath(string(capture.ID), "approve"), `{"source":"cockpit"}`); rec.Code != 409 {
+	if rec := post(t, c.s, api.TaskPath(string(capture.ID), "approve"), `{"source":"cockpit"}`); rec.Code != 409 {
 		t.Fatalf("approve on a capture: %d %s", rec.Code, rec.Body)
 	}
-	if rec := post(t, c.s, api.EntryPath(string(capture.ID), "dismiss"), `{}`); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"state":"trash"`) {
+	if rec := post(t, c.s, api.TaskPath(string(capture.ID), "dismiss"), `{}`); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"state":"trash"`) {
 		t.Fatalf("dismiss on a capture: %d %s", rec.Code, rec.Body)
 	}
 	if len(c.plan.acted) != 0 || !c.plan.isPending(r7u) {
@@ -619,16 +619,16 @@ func TestBridgeRefusesADisabledPlugin(t *testing.T) {
 	c.propose(t)
 	c.s.deps.PluginEnabled = func(p unit.ProviderID) bool { return p != unit.GitHub }
 	for _, verb := range []string{"approve", "next"} {
-		rec := post(t, c.s, api.EntryPath("e-r", verb), `{"source":"cockpit"}`)
+		rec := post(t, c.s, api.TaskPath("e-r", verb), `{"source":"cockpit"}`)
 		if rec.Code != 409 || !strings.Contains(rec.Body.String(), `"plugin":"github"`) {
 			t.Fatalf("%s: %d %s", verb, rec.Code, rec.Body)
 		}
 	}
-	var v api.EntryView
-	if code := get(t, c.s, api.EntryPath("e-r"), &v); code != 200 || slices.ContainsFunc(v.Verbs, func(s api.VerbState) bool { return s.Enabled != (s.Verb == "dismiss") }) {
+	var v api.TaskView
+	if code := get(t, c.s, api.TaskPath("e-r"), &v); code != 200 || slices.ContainsFunc(v.Verbs, func(s api.VerbState) bool { return s.Enabled != (s.Verb == "dismiss") }) {
 		t.Fatalf("%d %+v", code, v.Verbs)
 	}
-	if rec := post(t, c.s, api.EntryPath("e-r", "dismiss"), `{"source":"cockpit"}`); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"state":"trash"`) {
+	if rec := post(t, c.s, api.TaskPath("e-r", "dismiss"), `{"source":"cockpit"}`); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"state":"trash"`) {
 		t.Fatalf("dismiss: %d %s", rec.Code, rec.Body)
 	}
 	if len(c.plan.acted) != 0 {
@@ -641,11 +641,11 @@ func TestRegisteredHandlerWins(t *testing.T) {
 	c, g := bridgeRig(t)
 	c.propose(t)
 	var got []string
-	g.Register(task.KindAction, task.VerbApprove, func(_ context.Context, e task.Entry, req coretasks.Request) (coretasks.Result, error) {
+	g.Register(task.KindAction, task.VerbApprove, func(_ context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
 		got = append(got, string(e.ID)+" "+req.Source)
-		return coretasks.Result{Entry: e, Lines: []string{"handled"}}, nil
+		return coretasks.Result{Task: e, Lines: []string{"handled"}}, nil
 	})
-	rec := post(t, c.s, api.EntryPath("e-r", "approve"), `{"source":"tui"}`)
+	rec := post(t, c.s, api.TaskPath("e-r", "approve"), `{"source":"tui"}`)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "handled") || !slices.Equal(got, []string{"e-r tui"}) {
 		t.Fatalf("%d %s %v", rec.Code, rec.Body, got)
 	}
@@ -719,7 +719,7 @@ func TestBridgeRanksAProviderIntentOverBundledAct(t *testing.T) {
 	}
 }
 
-func TestEntryAnswerRouteMatchesTheUnitAnswer(t *testing.T) {
+func TestTaskAnswerRouteMatchesTheUnitAnswer(t *testing.T) {
 	t.Parallel()
 	body := `{"option_id":"publish","guidance":"say thanks","source":"cockpit"}`
 	unitRig := newMessageRig(t)
@@ -730,28 +730,28 @@ func TestEntryAnswerRouteMatchesTheUnitAnswer(t *testing.T) {
 	r := newMessageRig(t)
 	m := r.question(t)
 	r.idle()
-	var v api.EntryView
-	if code := get(t, r.s, api.EntryPath(m.EntryID), &v); code != 200 || v.Message == nil || v.Message.ID != m.ID ||
+	var v api.TaskView
+	if code := get(t, r.s, api.TaskPath(m.TaskID), &v); code != 200 || v.Message == nil || v.Message.ID != m.ID ||
 		!slices.ContainsFunc(v.Verbs, func(s api.VerbState) bool { return s.Verb == "answer" && s.Enabled }) {
 		t.Fatalf("%d %+v", code, v)
 	}
-	rec = post(t, r.s, api.EntryPath(m.EntryID, "answer"), `{"args":{"option_id":"publish","guidance":"say thanks"},"source":"cockpit"}`)
-	var res api.EntryResult
+	rec = post(t, r.s, api.TaskPath(m.TaskID, "answer"), `{"args":{"option_id":"publish","guidance":"say thanks"},"source":"cockpit"}`)
+	var res api.TaskResult
 	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
 		t.Fatalf("%v %s", err, rec.Body)
 	}
 	if got := r.outcome(rec.Code, res.Lines); !reflect.DeepEqual(got, want) {
 		t.Fatalf("by entry %+v\nby unit %+v", got, want)
 	}
-	if evs := r.entries.Events; len(evs) != 1 || evs[0].Kind != "verb_answer" || evs[0].Actor != "cockpit" {
+	if evs := r.tasks.Events; len(evs) != 1 || evs[0].Kind != "verb_answer" || evs[0].Actor != "cockpit" {
 		t.Fatalf("events %+v", evs)
 	}
 }
 
 func TestCountersWithTermsCountWhatTheFilteredListsShow(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, nil)
-	r.put(t, mixedEntries()...)
+	r := newTasksRig(t, nil)
+	r.put(t, mixedTasks()...)
 	for _, area := range []string{"", "OSS"} {
 		for _, terms := range [][]string{{"launch"}, {"oss"}, {"OSS", "decide"}, {"nothing-holds-this"}} {
 			q := url.Values{api.CountersTerm: terms}
@@ -765,8 +765,8 @@ func TestCountersWithTermsCountWhatTheFilteredListsShow(t *testing.T) {
 			for _, view := range []string{"focus", "inbox", "next", "waiting", "projects", "someday", "logbook"} {
 				v := url.Values{"view": {view}, "area": {area}}
 				n := 0
-				for _, e := range r.page(t, v.Encode()).Entries {
-					if api.EntryMatches(e, terms) {
+				for _, e := range r.page(t, v.Encode()).Tasks {
+					if api.TaskMatches(e, terms) {
 						n++
 					}
 				}
@@ -786,7 +786,7 @@ func TestBridgeRelaysARefusalAsJSONOnly(t *testing.T) {
 	t.Parallel()
 	c, _ := bridgeRig(t)
 	c.propose(t)
-	rec := post(t, c.s, api.EntryPath("e-r", "approve"), `{"source":"<script>alert(1)</script>"}`)
+	rec := post(t, c.s, api.TaskPath("e-r", "approve"), `{"source":"<script>alert(1)</script>"}`)
 	if rec.Code != 400 || strings.Contains(rec.Body.String(), "<script>") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
@@ -801,40 +801,40 @@ func TestAVerbTheProfileDoesNotOfferIsNeitherListedNorRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	texts := intentload.GTDTexts{Verbs: map[string]intentload.VerbText{"someday": {Offer: offer}}}
-	r := newEntriesRig(t, func(d *Deps) {
-		d.Intents = func() *intentload.Loaded { return &intentload.Loaded{GTD: texts, Registry: dintent.NewRegistry(nil)} }
+	texts := intentload.ListTexts{Verbs: map[string]intentload.VerbText{"someday": {Offer: offer}}}
+	r := newTasksRig(t, func(d *Deps) {
+		d.Intents = func() *intentload.Loaded { return &intentload.Loaded{Lists: texts, Registry: dintent.NewRegistry(nil)} }
 	})
-	r.put(t, task.Entry{ID: "e-c", Kind: task.KindCapture, State: task.Inbox, Title: "c", Origin: task.OriginUser})
-	var v api.EntryView
-	if code := get(t, r.s, api.EntryPath("e-c"), &v); code != 200 || slices.ContainsFunc(v.Verbs, func(s api.VerbState) bool { return s.Verb == "someday" }) {
+	r.put(t, task.Task{ID: "e-c", Kind: task.KindCapture, State: task.Inbox, Title: "c", Origin: task.OriginUser})
+	var v api.TaskView
+	if code := get(t, r.s, api.TaskPath("e-c"), &v); code != 200 || slices.ContainsFunc(v.Verbs, func(s api.VerbState) bool { return s.Verb == "someday" }) {
 		t.Fatalf("%d %+v", code, v.Verbs)
 	}
-	if rec := post(t, r.s, api.EntryPath("e-c", "someday"), `{}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "not offered") {
+	if rec := post(t, r.s, api.TaskPath("e-c", "someday"), `{}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "not offered") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if rec := post(t, r.s, api.EntryPath("e-c", "next"), `{}`); rec.Code != 200 {
+	if rec := post(t, r.s, api.TaskPath("e-c", "next"), `{}`); rec.Code != 200 {
 		t.Fatalf("a verb the profile leaves alone: %d %s", rec.Code, rec.Body)
 	}
 }
 
-func TestAnEntrysMessageShowsItsAnswersAndWhetherTheAgentReadThem(t *testing.T) {
+func TestATasksMessageShowsItsAnswersAndWhetherTheAgentReadThem(t *testing.T) {
 	t.Parallel()
 	r := newMessageRig(t)
 	m := r.question(t)
 	r.idle()
-	if rec := post(t, r.s, api.EntryPath(m.EntryID, "answer"), `{"args":{"option_id":"publish"},"source":"cockpit"}`); rec.Code != 200 {
+	if rec := post(t, r.s, api.TaskPath(m.TaskID, "answer"), `{"args":{"option_id":"publish"},"source":"cockpit"}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	var v api.EntryView
-	if code := get(t, r.s, api.EntryPath(m.EntryID), &v); code != 200 || v.Message == nil || len(v.Message.Answers) != 1 ||
+	var v api.TaskView
+	if code := get(t, r.s, api.TaskPath(m.TaskID), &v); code != 200 || v.Message == nil || len(v.Message.Answers) != 1 ||
 		v.Message.Answers[0].OptionID != "publish" || v.Message.Answers[0].Message != m.ID || v.Message.Answers[0].ReadAt != nil {
 		t.Fatalf("%d %+v", code, v.Message)
 	}
 	if _, err := r.s.deps.Messages.Read(context.Background(), messages.ReadRequest{Session: "term-1", Unit: r8u.Unit()}); err != nil {
 		t.Fatal(err)
 	}
-	if code := get(t, r.s, api.EntryPath(m.EntryID), &v); code != 200 || v.Message.Answers[0].ReadAt == nil {
+	if code := get(t, r.s, api.TaskPath(m.TaskID), &v); code != 200 || v.Message.Answers[0].ReadAt == nil {
 		t.Fatalf("%d %+v", code, v.Message.Answers)
 	}
 }
@@ -843,10 +843,10 @@ func TestAVerbAWorkflowRunsOnAMessageRecordsNothing(t *testing.T) {
 	t.Parallel()
 	r := newMessageRig(t)
 	m := r.question(t)
-	if _, err := r.s.deps.GTD.Do(context.Background(), task.ID(m.EntryID), coretasks.Request{Verb: task.VerbDismiss, Source: "workflow stale", Automated: true}); err != nil {
+	if _, err := r.s.deps.Tasks.Do(context.Background(), task.ID(m.TaskID), coretasks.Request{Verb: task.VerbDismiss, Source: "workflow stale", Automated: true}); err != nil {
 		t.Fatal(err)
 	}
-	if evs := r.entries.Events; len(evs) != 0 {
+	if evs := r.tasks.Events; len(evs) != 0 {
 		t.Fatalf("events %+v", evs)
 	}
 }

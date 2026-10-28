@@ -78,7 +78,7 @@ func startDaemon(t *testing.T, actions daemon.Actions) *testDaemon {
 		Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil },
 		Sweep:  daemon.SweepFunc(func(context.Context) (string, string, error) { return "", "", nil }),
 		Log:    t.Logf,
-		GTD:    coretasks.New(coretasks.Deps{Store: stDB.Entries(), Clock: clockFunc(func() time.Time { return daemonNow })}),
+		Tasks:  coretasks.New(coretasks.Deps{Store: stDB.Tasks(), Clock: clockFunc(func() time.Time { return daemonNow })}),
 	}, st))
 	h := srv.Handler()
 	l, err := net.Listen("unix", d.socket)

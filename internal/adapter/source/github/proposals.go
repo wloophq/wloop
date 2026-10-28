@@ -139,7 +139,7 @@ func nudgeProposal(row, unmuted api.Row, evs []dinv.Event, unstarted map[string]
 		Unit:    row.Unit,
 		Items:   waitingItems(row, who),
 		Purpose: nudgePurpose,
-		Effects: []string{builtin.EffectPRNudged, builtin.EffectEntryNudged},
+		Effects: []string{builtin.EffectPRNudged, builtin.EffectTaskNudged},
 		Text:    nudgeText(who, unmuted),
 		Origin:  draft.Origin{Kind: draft.OriginAuto, Rule: NudgeRule, Key: row.Unit.String()},
 	}, true

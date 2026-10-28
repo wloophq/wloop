@@ -30,7 +30,7 @@ func (g *githubSource) Proposals(ctx context.Context, now time.Time) ([]outbox.P
 }
 
 func ghNudge(u unit.Unit) outbox.Proposal {
-	return outbox.Proposal{Unit: u, Kind: draft.Nudge, Text: "@{github:bob}, any news?", Entry: "e-forged",
+	return outbox.Proposal{Unit: u, Kind: draft.Nudge, Text: "@{github:bob}, any news?", Task: "e-forged",
 		Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 9, Intent: "autopost", Workflow: "w", Rule: "github-nudge", Key: "forged"},
 		Policy: draft.Fixed(draft.Approval{Mode: draft.Send})}
 }
@@ -46,7 +46,7 @@ func TestGitHubUnitGetsOneNudgeDraft(t *testing.T) {
 	}
 	d := all[0]
 	want := draft.Origin{Kind: draft.OriginAuto, Rule: "github-nudge", Key: pull.String()}
-	if d.Origin != want || d.Approval != (draft.Approval{Mode: draft.Wait}) || d.State != draft.Proposed || d.Entry != "" {
+	if d.Origin != want || d.Approval != (draft.Approval{Mode: draft.Wait}) || d.State != draft.Proposed || d.Task != "" {
 		t.Fatalf("the plugin's self-declared origin or approval leaked: %+v", d)
 	}
 }

@@ -42,7 +42,7 @@ func cloneAs(t *testing.T, origin string, clones *[]string) func(repo, path stri
 	}
 }
 
-var capturedEntry = regexp.MustCompile(`captured (entry:e-[0-9a-f]+)`)
+var capturedTask = regexp.MustCompile(`captured (entry:e-[0-9a-f]+)`)
 
 // startEnv serves a daemon whose manager knows no repository, cloning into
 // a projects_dir whose acme project trusts its clones in an agent home.
@@ -60,7 +60,7 @@ func startEnv(t *testing.T) (*testEnv, *fake.Manager, string, string) {
 	te.cfg.AgentHome = home
 	te.cfg.Projects = []config.Project{{Match: "acme/*", TrustClones: true}}
 	te.git.toplevel = "/worktrees/caller"
-	te.serveEntries(t)
+	te.serveWithTasks(t)
 	return te, m, projects, file
 }
 
@@ -71,8 +71,8 @@ func TestStartCapturesClonesTrustsAndCreatesFromTheDefaultBase(t *testing.T) {
 	if code := te.run("start", "--repo", "acme/api", "Add retries to the webhook sender", "done when a failed delivery is retried"); code != 0 {
 		t.Fatalf("exit %d: %s\n%s", code, te.err, te.out)
 	}
-	entry := capturedEntry.FindStringSubmatch(te.out.String())
-	if entry == nil {
+	tk := capturedTask.FindStringSubmatch(te.out.String())
+	if tk == nil {
 		t.Fatalf("no entry captured:\n%s", te.out)
 	}
 	path := filepath.Join(projects, "api")
@@ -90,7 +90,7 @@ func TestStartCapturesClonesTrustsAndCreatesFromTheDefaultBase(t *testing.T) {
 	if len(m.Creates) != 1 {
 		t.Fatalf("creates %+v", m.Creates)
 	}
-	short := strings.TrimPrefix(entry[1], "entry:e-")[:6]
+	short := strings.TrimPrefix(tk[1], "entry:e-")[:6]
 	c := m.Creates[0]
 	if c.Name != "add-retries-to-the-webhook-sender-done-when-a-"+short || !c.DefaultBase || c.Parent != "/worktrees/caller" {
 		t.Fatalf("create %+v", c)
@@ -109,13 +109,13 @@ func TestStartCapturesClonesTrustsAndCreatesFromTheDefaultBase(t *testing.T) {
 		t.Fatalf("prompt %q", m.Prompts[0].Text)
 	}
 	text := storedText(t, te, round[1])
-	for _, want := range []string{"Add retries to the webhook sender done when a failed delivery is retried", "fresh worktree of `acme/api`", "turn end " + entry[1]} {
+	for _, want := range []string{"Add retries to the webhook sender done when a failed delivery is retried", "fresh worktree of `acme/api`", "turn end " + tk[1]} {
 		if !strings.Contains(text, want) {
 			t.Errorf("the instructions lack %q:\n%s", want, text)
 		}
 	}
 
-	id := task.ID(strings.TrimPrefix(entry[1], "entry:"))
+	id := task.ID(strings.TrimPrefix(tk[1], "entry:"))
 	books, err := te.Turns.Store.Books(context.Background(), task.UnitOf(id))
 	if err != nil || len(books[task.UnitOf(id)].Turns) != 1 {
 		t.Fatalf("books %+v, %v", books, err)
@@ -125,7 +125,7 @@ func TestStartCapturesClonesTrustsAndCreatesFromTheDefaultBase(t *testing.T) {
 	if _, err := te.Turns.RecordTurnEnd(context.Background(), turns.RecordRequest{Session: sent.SentTo, Turn: sent.ID, Unit: task.UnitOf(id), Record: rec}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := te.Env.gtd.Entry(context.Background(), id)
+	got, err := te.Env.tasks.Task(context.Background(), id)
 	if err != nil || !slices.Contains(got.Units, unit.Unit{Provider: unit.GitHub, Key: "acme/api#9"}) {
 		t.Fatalf("the entry's units %v, %v", got.Units, err)
 	}
@@ -196,10 +196,10 @@ func TestStartWithoutARepositoryRunsInTheNeutralRepository(t *testing.T) {
 	}
 }
 
-func TestStartRunsOnlyOnAnEntryTheUserCaptured(t *testing.T) {
+func TestStartRunsOnlyOnATaskTheUserCaptured(t *testing.T) {
 	te, m, _, _ := startEnv(t)
 	ctx := context.Background()
-	derived, err := te.Env.gtd.Open(ctx, coretasks.OpenRequest{Kind: task.KindMessage, Title: "ship the export", Origin: task.OriginMessage})
+	derived, err := te.Env.tasks.Open(ctx, coretasks.OpenRequest{Kind: task.KindMessage, Title: "ship the export", Origin: task.OriginMessage})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,18 +209,18 @@ func TestStartRunsOnlyOnAnEntryTheUserCaptured(t *testing.T) {
 	if len(m.Prompts) != 0 {
 		t.Fatalf("prompts %+v", m.Prompts)
 	}
-	captured, err := te.Env.gtd.Capture(ctx, "ship the export", "", nil)
+	captured, err := te.Env.tasks.Capture(ctx, "ship the export", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	v, err := client.New(te.Socket).Entry(ctx, string(captured.ID))
+	v, err := client.New(te.Socket).Task(ctx, string(captured.ID))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if i := slices.IndexFunc(v.Actions, func(a api.ActionState) bool { return a.ID == "start" }); i < 0 || !v.Actions[i].Enabled || v.Actions[i].Label != "Start" {
 		t.Fatalf("the captured entry's actions %+v", v.Actions)
 	}
-	v, err = client.New(te.Socket).Entry(ctx, string(derived.ID))
+	v, err = client.New(te.Socket).Task(ctx, string(derived.ID))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,18 +229,18 @@ func TestStartRunsOnlyOnAnEntryTheUserCaptured(t *testing.T) {
 	}
 }
 
-func TestAStartAgainOnTheEntryReusesItsRepositoryAndWorktree(t *testing.T) {
+func TestAStartAgainOnTheTaskReusesItsRepositoryAndWorktree(t *testing.T) {
 	te, m, _, _ := startEnv(t)
 	var clones []string
 	te.gh.clone = cloneAs(t, "acme/api", &clones)
 	if code := te.run("start", "--repo", "acme/api", "add retries"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	entry := capturedEntry.FindStringSubmatch(te.out.String())
-	if entry == nil {
+	task := capturedTask.FindStringSubmatch(te.out.String())
+	if task == nil {
 		t.Fatalf("no entry captured:\n%s", te.out)
 	}
-	if code := te.run("start", entry[1]); code != 0 {
+	if code := te.run("start", task[1]); code != 0 {
 		t.Fatalf("again: exit %d: %s", code, te.err)
 	}
 	if len(clones) != 1 || len(m.Creates) != 1 || len(m.Prompts) != 2 {
@@ -255,7 +255,7 @@ func TestStartRunsInTheProjectsAgentHome(t *testing.T) {
 	te, m, _, _ := startEnv(t)
 	home, file := untrustedHome(t)
 	te.cfg.Projects = []config.Project{{Match: "acme/*", AgentHome: home, TrustClones: true}}
-	te.serveEntries(t)
+	te.serveWithTasks(t)
 	var clones []string
 	te.gh.clone = cloneAs(t, "acme/api", &clones)
 	if code := te.run("start", "--repo", "acme/api", "fix it"); code != 0 {
@@ -282,7 +282,7 @@ func TestStartTakesACheckoutWhoseOriginIsAnSSHAlias(t *testing.T) {
 	}
 }
 
-func TestAHiddenStartActionStillRefusesADerivedEntry(t *testing.T) {
+func TestAHiddenStartActionStillRefusesADerivedTask(t *testing.T) {
 	te, m, _, _ := startEnv(t)
 	raw, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "intents", "start", "intent.toml"))
 	if err != nil {
@@ -295,8 +295,8 @@ func TestAHiddenStartActionStillRefusesADerivedEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 	userProfile(t, te, map[string]string{"intents/start/intent.toml": manifest, "intents/start/instructions.md.tmpl": string(body)})
-	te.serveEntries(t)
-	derived, err := te.Env.gtd.Open(context.Background(), coretasks.OpenRequest{Kind: task.KindMessage, Title: "ship the export", Origin: task.OriginMessage})
+	te.serveWithTasks(t)
+	derived, err := te.Env.tasks.Open(context.Background(), coretasks.OpenRequest{Kind: task.KindMessage, Title: "ship the export", Origin: task.OriginMessage})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -313,8 +313,8 @@ func TestAFailedTrustLeavesNoCloneAndTheRetryTrustsANewOne(t *testing.T) {
 	if code := te.run("start", "--repo", "acme/api", "fix it"); code == 0 {
 		t.Fatalf("exit 0 with an unreadable agent home: %s", te.out)
 	}
-	entry := capturedEntry.FindStringSubmatch(te.out.String())
-	if entry == nil {
+	task := capturedTask.FindStringSubmatch(te.out.String())
+	if task == nil {
 		t.Fatalf("no entry captured:\n%s", te.out)
 	}
 	path := filepath.Join(projects, "api")
@@ -322,7 +322,7 @@ func TestAFailedTrustLeavesNoCloneAndTheRetryTrustsANewOne(t *testing.T) {
 		t.Fatalf("the clone whose trust failed is still at %s: %v", path, err)
 	}
 	writeFile(t, file, untrustedJSON)
-	if code := te.run("start", entry[1], "--repo", "acme/api"); code != 0 {
+	if code := te.run("start", task[1], "--repo", "acme/api"); code != 0 {
 		t.Fatalf("retry: exit %d: %s", code, te.err)
 	}
 	if len(clones) != 2 {
@@ -338,7 +338,7 @@ func TestARoundTheDaemonDidNotPrepareClonesAndTrusts(t *testing.T) {
 	var clones []string
 	te.gh.clone = cloneAs(t, "acme/api", &clones)
 	ctx := context.Background()
-	e, err := te.Env.gtd.Capture(ctx, "add retries", "", nil)
+	e, err := te.Env.tasks.Capture(ctx, "add retries", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

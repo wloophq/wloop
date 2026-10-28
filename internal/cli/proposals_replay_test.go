@@ -156,23 +156,23 @@ func (r *replay) items(u unit.Unit) map[string]items.Item {
 	return out
 }
 
-func (r *replay) entry(e task.Entry) {
+func (r *replay) task(e task.Task) {
 	r.t.Helper()
 	e.Origin, e.Created, e.Updated = task.OriginUser, r.now, r.now
-	if err := r.db.Entries().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Entry: e}}); err != nil {
+	if err := r.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		r.t.Fatal(err)
 	}
 }
 
-func (r *replay) change(id task.ID, f func(*task.Entry)) {
+func (r *replay) change(id task.ID, f func(*task.Task)) {
 	r.t.Helper()
-	e, err := r.db.Entries().Entry(context.Background(), id)
+	e, err := r.db.Tasks().Task(context.Background(), id)
 	if err != nil {
 		r.t.Fatal(err)
 	}
 	f(&e)
 	e.Updated = r.now
-	if err := r.db.Entries().Apply(context.Background(), []task.Change{{Op: task.OpUpdate, Entry: e}}); err != nil {
+	if err := r.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpUpdate, Task: e}}); err != nil {
 		r.t.Fatal(err)
 	}
 }
@@ -199,31 +199,31 @@ func (r *replay) scenario(at time.Time) {
 	switch {
 	case at.Equal(replayStart):
 		a1, a2, a3 := r.item(rpA, "a1", items.Open, before, rpAna), r.item(rpA, "a2", items.Open, before, rpBob), r.item(rpA, "a3", items.Open, before, rpAna)
-		r.entry(task.Entry{ID: "e-a", Kind: task.KindWaiting, State: task.Waiting, Title: "a", Units: []unit.Unit{rpA}, Items: refs(a1, a2, a3),
+		r.task(task.Task{ID: "e-a", Kind: task.KindWaiting, State: task.Waiting, Title: "a", Units: []unit.Unit{rpA}, Items: refs(a1, a2, a3),
 			Waiting: &task.WaitingOn{On: []items.Person{rpAna, rpBob, rpLegal}, Since: before}})
 		b1 := r.item(rpB, "b1", items.Open, before, rpCid)
 		r.item(rpB, "b2", items.Open, before)
-		r.entry(task.Entry{ID: "e-b", Kind: task.KindWaiting, State: task.Waiting, Title: "b", Units: []unit.Unit{rpB}, Items: refs(b1),
+		r.task(task.Task{ID: "e-b", Kind: task.KindWaiting, State: task.Waiting, Title: "b", Units: []unit.Unit{rpB}, Items: refs(b1),
 			Waiting: &task.WaitingOn{On: []items.Person{rpCid}, Since: before}, Snooze: task.Snooze{Mute: true}})
 		c1 := r.item(rpC, "c1", items.Open, replayStart, rpDan)
-		r.entry(task.Entry{ID: "e-c", Kind: task.KindWaiting, State: task.Waiting, Title: "c", Units: []unit.Unit{rpC}, Items: refs(c1),
+		r.task(task.Task{ID: "e-c", Kind: task.KindWaiting, State: task.Waiting, Title: "c", Units: []unit.Unit{rpC}, Items: refs(c1),
 			Waiting: &task.WaitingOn{On: []items.Person{rpDan}, Since: replayStart, Resurface: day(2, 14)}})
 		d1, d2, e1 := r.item(rpD, "d1", items.Resolved, before), r.item(rpD, "d2", items.Resolved, before), r.item(rpE, "e1", items.Resolved, before)
 		d2.Resolution = ""
 		r.commit(d2)
 		r.item(rpD, "d3", items.Open, before)
-		r.entry(task.Entry{ID: "e-d", Kind: task.KindClose, State: task.Inbox, Title: "d", Units: []unit.Unit{rpD, rpE}, Items: refs(d1, d2, e1)})
-		r.entry(task.Entry{ID: "e-g", Kind: task.KindWaiting, State: task.Waiting, Title: "g", Units: []unit.Unit{rpPR},
+		r.task(task.Task{ID: "e-d", Kind: task.KindClose, State: task.Inbox, Title: "d", Units: []unit.Unit{rpD, rpE}, Items: refs(d1, d2, e1)})
+		r.task(task.Task{ID: "e-g", Kind: task.KindWaiting, State: task.Waiting, Title: "g", Units: []unit.Unit{rpPR},
 			Waiting: &task.WaitingOn{On: []items.Person{{Key: "github:octo"}}, Since: before}})
 		f1 := r.item(rpF, "f1", items.Open, replayStart.AddDate(0, 0, -3).Add(9*time.Hour))
 		r.item(rpF, "f2", items.Open, replayStart.Add(time.Hour))
-		r.entry(task.Entry{ID: "e-f", Kind: task.KindAction, State: task.Next, Title: "f", Units: []unit.Unit{rpF}, Items: refs(f1)})
+		r.task(task.Task{ID: "e-f", Kind: task.KindAction, State: task.Next, Title: "f", Units: []unit.Unit{rpF}, Items: refs(f1)})
 	case is(day(1, 9)):
 		k1, k2 := r.item(rpK, "k1", items.Open, before, rpEve), r.item(rpK, "k2", items.Open, before, rpFay)
-		r.entry(task.Entry{ID: "e-k", Kind: task.KindWaiting, State: task.Waiting, Title: "k", Units: []unit.Unit{rpK}, Items: refs(k1, k2),
+		r.task(task.Task{ID: "e-k", Kind: task.KindWaiting, State: task.Waiting, Title: "k", Units: []unit.Unit{rpK}, Items: refs(k1, k2),
 			Waiting: &task.WaitingOn{On: []items.Person{rpEve}, Since: before}})
 	case is(day(1, 15)):
-		r.change("e-k", func(e *task.Entry) { e.Waiting.On = append(e.Waiting.On, rpFay) })
+		r.change("e-k", func(e *task.Task) { e.Waiting.On = append(e.Waiting.On, rpFay) })
 	case is(day(2, 12)):
 		a2 := r.items(rpA)["a2"]
 		a2.State, a2.Resolution = items.Resolved, items.Done
@@ -235,17 +235,17 @@ func (r *replay) scenario(at time.Time) {
 		r.item(rpF, "f3", items.Open, day(3, 10))
 	case is(day(4, 12)):
 		h1 := r.item(rpH, "h1", items.Resolved, day(4, 11))
-		r.entry(task.Entry{ID: "e-h", Kind: task.KindClose, State: task.Next, Title: "h", Units: []unit.Unit{rpH}, Items: refs(h1)})
+		r.task(task.Task{ID: "e-h", Kind: task.KindClose, State: task.Next, Title: "h", Units: []unit.Unit{rpH}, Items: refs(h1)})
 	case is(day(7, 9)):
-		r.change("e-b", func(e *task.Entry) { e.Snooze.Mute = false })
-		r.change("e-c", func(e *task.Entry) { e.State = task.Done })
+		r.change("e-b", func(e *task.Task) { e.Snooze.Mute = false })
+		r.change("e-c", func(e *task.Task) { e.State = task.Done })
 	case is(day(8, 12)):
-		r.change("e-a", func(e *task.Entry) { e.Waiting.On = []items.Person{rpBob, rpLegal} })
+		r.change("e-a", func(e *task.Task) { e.Waiting.On = []items.Person{rpBob, rpLegal} })
 		a4 := r.item(rpA, "a4", items.Open, day(8, 12), rpBob)
-		r.change("e-a", func(e *task.Entry) { e.Items = append(e.Items, refs(a4)...) })
+		r.change("e-a", func(e *task.Task) { e.Items = append(e.Items, refs(a4)...) })
 	case is(day(9, 15)):
-		r.change("e-d", func(e *task.Entry) { e.State = task.Someday })
-		r.change("e-h", func(e *task.Entry) { e.State = task.Done })
+		r.change("e-d", func(e *task.Task) { e.State = task.Someday })
+		r.change("e-h", func(e *task.Task) { e.State = task.Done })
 	case is(day(10, 9)):
 		f3 := r.items(rpF)["f3"]
 		f3.State, f3.Resolution = items.Resolved, items.Answered
@@ -284,7 +284,7 @@ func (r *replay) record() {
 			r.counts[r.now.Format("01-02")+" "+workflowOf(d)+" "+d.Purpose+" withdrawn "+d.Reason]++
 		case !seen:
 			proposed = append(proposed, fmt.Sprintf("propose %s %s on %s entry=%q key=%s items=%s approval=%s text=%q",
-				d.Purpose, d.Delivery, d.Unit, d.Entry, d.Origin.Key, strings.Join(d.Items, ","), d.Approval.Mode, d.Text))
+				d.Purpose, d.Delivery, d.Unit, d.Task, d.Origin.Key, strings.Join(d.Items, ","), d.Approval.Mode, d.Text))
 			r.settle = append(r.settle, d.ID)
 		case was == draft.Proposed && d.State == draft.Discarded && d.Reason != "":
 			withdrawn = append(withdrawn, fmt.Sprintf("withdraw %s key=%s reason=%s", d.Purpose, d.Origin.Key, d.Reason))
@@ -391,7 +391,7 @@ func (r *replay) draftsState() string {
 	for _, d := range ds {
 		fmt.Fprintf(&b, "%d:%s;", d.ID, d.State)
 	}
-	es, err := r.db.Entries().Entries(context.Background(), task.Query{View: task.ViewOpen})
+	es, err := r.db.Tasks().Tasks(context.Background(), task.Query{View: task.ViewOpen})
 	if err != nil {
 		r.t.Fatal(err)
 	}

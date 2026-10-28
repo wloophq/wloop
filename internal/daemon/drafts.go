@@ -56,13 +56,13 @@ var draftVerbs = map[task.Verb]string{
 
 // registerOutbox serves the Outbox view from the drafts and makes a draft entry's verbs act on its draft.
 func (s *Server) registerOutbox() {
-	if s.deps.GTD == nil || s.deps.Outbox == nil {
+	if s.deps.Tasks == nil || s.deps.Outbox == nil {
 		return
 	}
 	for verb := range draftVerbs {
-		s.deps.GTD.Register(task.KindDraft, verb, s.draftVerb(verb))
+		s.deps.Tasks.Register(task.KindDraft, verb, s.draftVerb(verb))
 	}
-	s.deps.GTD.RegisterView(task.ViewOutbox, draftPrefix, outboxView{s})
+	s.deps.Tasks.RegisterView(task.ViewOutbox, draftPrefix, outboxView{s})
 }
 
 func (s *Server) handleDrafts(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +72,7 @@ func (s *Server) handleDrafts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
-	f := outbox.Filter{States: []draft.State{draft.Proposed, draft.Failed}, Entry: q.Get("entry")}
+	f := outbox.Filter{States: []draft.State{draft.Proposed, draft.Failed}, Task: q.Get("entry")}
 	if raw := q.Get("state"); raw != "" {
 		f.States = nil
 		for _, st := range strings.Split(raw, ",") {
@@ -224,10 +224,10 @@ func writeDraftError(w http.ResponseWriter, err error) {
 
 // draftVerb runs verb on a draft entry's draft, with the statuses the draft routes answer.
 func (s *Server) draftVerb(verb task.Verb) coretasks.VerbHandler {
-	return func(ctx context.Context, e task.Entry, req coretasks.Request) (coretasks.Result, error) {
+	return func(ctx context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
 		id, ok := draftIDOf(e.ID)
 		if !ok {
-			return coretasks.Result{}, fmt.Errorf("%w: %s", coretasks.ErrNoEntry, e.ID)
+			return coretasks.Result{}, fmt.Errorf("%w: %s", coretasks.ErrNoTask, e.ID)
 		}
 		var a api.DraftAction
 		if text, ok := req.Args["text"]; ok {
@@ -250,25 +250,25 @@ func (s *Server) draftVerb(verb task.Verb) coretasks.VerbHandler {
 		}
 		d, err := s.draftDo(ctx, id, draftVerbs[verb], a)
 		if err != nil {
-			return coretasks.Result{}, entryDraftError(err)
+			return coretasks.Result{}, taskDraftError(err)
 		}
-		got, err := s.deps.GTD.Entry(ctx, e.ID)
+		got, err := s.deps.Tasks.Task(ctx, e.ID)
 		if err != nil {
 			return coretasks.Result{}, err
 		}
-		return coretasks.Result{Entry: got, Lines: []string{fmt.Sprintf("draft %d is %s", d.ID, d.State)}}, nil
+		return coretasks.Result{Task: got, Lines: []string{fmt.Sprintf("draft %d is %s", d.ID, d.State)}}, nil
 	}
 }
 
-// entryDraftError is a draft action's error as the entries' routes answer it.
-func entryDraftError(err error) error {
+// taskDraftError is a draft action's error as the entries' routes answer it.
+func taskDraftError(err error) error {
 	var off pluginOff
 	var bad badRequest
 	switch {
 	case errors.As(err, &off):
 		return fmt.Errorf("%w: %s", coretasks.ErrPluginDisabled, off)
 	case errors.Is(err, outbox.ErrNotFound):
-		return fmt.Errorf("%w: %w", coretasks.ErrNoEntry, err)
+		return fmt.Errorf("%w: %w", coretasks.ErrNoTask, err)
 	case errors.Is(err, outbox.ErrNeedsConfirm):
 		return fmt.Errorf("%w: %w: pass the confirm argument once you checked it was not posted", coretasks.ErrVerb, err)
 	case errors.Is(err, outbox.ErrConflict), errors.Is(err, outbox.ErrDisabled):
@@ -281,7 +281,7 @@ func entryDraftError(err error) error {
 
 // draftView is d on the wire, with its actions as they stand.
 func (s *Server) draftView(ctx context.Context, d draft.Draft) api.Draft {
-	v := api.Draft{ID: int64(d.ID), Unit: string(d.Unit.Provider) + "/" + d.Unit.Key, Items: slices.Clone(d.Items), Entry: d.Entry, Kind: string(d.Kind),
+	v := api.Draft{ID: int64(d.ID), Unit: string(d.Unit.Provider) + "/" + d.Unit.Key, Items: slices.Clone(d.Items), Task: d.Task, Kind: string(d.Kind),
 		Target: d.Target, Text: d.Text, Reaction: d.Reaction, Original: d.Original, Replaced: d.Replaced, Edited: d.Edited,
 		Origin: api.DraftOrigin{Kind: string(d.Origin.Kind), TurnSeq: d.Origin.TurnSeq, Intent: d.Origin.Intent,
 			Workflow: d.Origin.Workflow, Rule: d.Origin.Rule, Unit: originUnit(d.Origin)},

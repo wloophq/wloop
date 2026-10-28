@@ -112,7 +112,7 @@ func (c *moveClock) set(t time.Time) {
 }
 
 type outboxRig struct {
-	*entriesRig
+	*tasksRig
 	fx    *fakeFx
 	o     *outbox.Service
 	clock *moveClock
@@ -122,8 +122,8 @@ type outboxRig struct {
 // publisher, and off names the plugins that are disabled.
 func newOutboxRig(t *testing.T, off ...unit.ProviderID) *outboxRig {
 	t.Helper()
-	r := &outboxRig{fx: &fakeFx{}, clock: &moveClock{now: entriesNow}}
-	r.entriesRig = newEntriesRig(t, func(d *Deps) {
+	r := &outboxRig{fx: &fakeFx{}, clock: &moveClock{now: tasksNow}}
+	r.tasksRig = newTasksRig(t, func(d *Deps) {
 		if len(off) > 0 {
 			d.PluginEnabled = func(p unit.ProviderID) bool { return !slices.Contains(off, p) }
 		}
@@ -184,7 +184,7 @@ func TestDraftsListByState(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
 	first := r.propose(t, r7u, "first", draft.Wait)
-	r.clock.set(entriesNow.Add(time.Minute))
+	r.clock.set(tasksNow.Add(time.Minute))
 	second := r.propose(t, r7u, "second\nmore", draft.Wait)
 	r.propose(t, r7u, "watched", draft.DryRun)
 	var res api.DraftsResponse
@@ -295,7 +295,7 @@ type draftClock struct {
 	fire  chan time.Time
 }
 
-func (c draftClock) Now() time.Time { return entriesNow }
+func (c draftClock) Now() time.Time { return tasksNow }
 
 func (c draftClock) After(d time.Duration) <-chan time.Time {
 	c.waits <- d
@@ -364,8 +364,8 @@ func TestSenderWakesAtTheDeadline(t *testing.T) {
 	if len(r.fx.seen()) != 0 {
 		t.Fatal("published before the deadline")
 	}
-	r.clock.set(entriesNow.Add(time.Minute))
-	clock.fire <- entriesNow.Add(time.Minute)
+	r.clock.set(tasksNow.Add(time.Minute))
+	clock.fire <- tasksNow.Add(time.Minute)
 	waitUntil(t, "the window draft is sent", func() bool {
 		got, _ := r.o.Store.Get(context.Background(), d.ID)
 		return got.State == draft.Sent && got.Would.Outcome == draft.OutcomeReleased
@@ -380,7 +380,7 @@ func TestSenderClampsAPastDeadline(t *testing.T) {
 	r := newOutboxRig(t)
 	d := r.propose(t, r7u, "auto", draft.Delay)
 	r.fx.refuse = errors.New("unknown person")
-	r.clock.set(entriesNow.Add(time.Hour))
+	r.clock.set(tasksNow.Add(time.Hour))
 	clock := r.startSender(t)
 	for range 2 {
 		if w := clock.next(t); w != draftDueRetry {
@@ -397,7 +397,7 @@ func TestSenderRecoversBeforePublishing(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
 	r.fx.found = true
-	stuck := r.stored(t, draft.Draft{Unit: r7u, Text: "was sending", State: draft.Sending, SendingAt: entriesNow})
+	stuck := r.stored(t, draft.Draft{Unit: r7u, Text: "was sending", State: draft.Sending, SendingAt: tasksNow})
 	ready := r.stored(t, draft.Draft{Unit: r7u, Text: "approved", State: draft.Approved})
 	clock := r.startSender(t)
 	clock.next(t)
@@ -423,10 +423,10 @@ func TestOutboxViewListsOpenDrafts(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := r.page(t, "view=outbox")
-	if got, want := entryIDs(p.Entries), []string{fmt.Sprintf("draft:%d", b.ID), fmt.Sprintf("draft:%d", a.ID)}; !slices.Equal(got, want) {
+	if got, want := taskIDs(p.Tasks), []string{fmt.Sprintf("draft:%d", b.ID), fmt.Sprintf("draft:%d", a.ID)}; !slices.Equal(got, want) {
 		t.Fatalf("entries %v, want %v", got, want)
 	}
-	e := p.Entries[0]
+	e := p.Tasks[0]
 	if e.Kind != "draft" || e.Draft == nil || e.Draft.ID != int64(b.ID) || e.Title != "reply on acme/api#7: two" || !slices.Equal(e.Units, []unit.Unit{r7u}) ||
 		!slices.Equal(e.UnitLabels, []string{"acme/api#7"}) {
 		t.Fatalf("entry %+v", e)
@@ -438,8 +438,8 @@ func TestOutboxViewListsOpenDrafts(t *testing.T) {
 	if get(t, r.s, api.CountersPath, &c); c.Views["outbox"] != 2 {
 		t.Fatalf("counters route %+v", c)
 	}
-	var detail api.EntryView
-	if code := get(t, r.s, api.EntryPath(e.ID), &detail); code != 200 || detail.Draft == nil || detail.Draft.Text != "two\nsecond line" {
+	var detail api.TaskView
+	if code := get(t, r.s, api.TaskPath(e.ID), &detail); code != 200 || detail.Draft == nil || detail.Draft.Text != "two\nsecond line" {
 		t.Fatalf("detail %d %+v", code, detail)
 	}
 	verbs := map[string]bool{}
@@ -449,20 +449,20 @@ func TestOutboxViewListsOpenDrafts(t *testing.T) {
 	if !verbs["approve"] || !verbs["edit"] || !verbs["dismiss"] || verbs["retry"] || verbs["next"] || verbs["done"] {
 		t.Fatalf("verbs %+v", detail.Verbs)
 	}
-	if p := r.page(t, "view=outbox&context=@reply"); len(p.Entries) != 0 {
-		t.Fatalf("a context filter keeps %v", entryIDs(p.Entries))
+	if p := r.page(t, "view=outbox&context=@reply"); len(p.Tasks) != 0 {
+		t.Fatalf("a context filter keeps %v", taskIDs(p.Tasks))
 	}
 }
 
 func TestSendingDraftStaysVisibleBeforeRecovery(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	d := r.stored(t, draft.Draft{Unit: r7u, Text: "in flight", State: draft.Sending, SendingAt: entriesNow})
+	d := r.stored(t, draft.Draft{Unit: r7u, Text: "in flight", State: draft.Sending, SendingAt: tasksNow})
 	p := r.page(t, "view=outbox")
-	if !slices.Equal(entryIDs(p.Entries), []string{fmt.Sprintf("draft:%d", d.ID)}) || p.Counters.Views["outbox"] != 1 {
-		t.Fatalf("entries %v counters %+v", entryIDs(p.Entries), p.Counters)
+	if !slices.Equal(taskIDs(p.Tasks), []string{fmt.Sprintf("draft:%d", d.ID)}) || p.Counters.Views["outbox"] != 1 {
+		t.Fatalf("entries %v counters %+v", taskIDs(p.Tasks), p.Counters)
 	}
-	for _, v := range p.Entries[0].Verbs {
+	for _, v := range p.Tasks[0].Verbs {
 		if v.Enabled {
 			t.Errorf("%s enabled on a sending draft", v.Verb)
 		}
@@ -471,7 +471,7 @@ func TestSendingDraftStaysVisibleBeforeRecovery(t *testing.T) {
 
 func (r *outboxRig) verb(t *testing.T, id draft.ID, verb, args string) (int, string) {
 	t.Helper()
-	rec := post(t, r.s, api.EntryPath(fmt.Sprintf("draft:%d", id), verb), `{"source":"cockpit","args":`+args+`}`)
+	rec := post(t, r.s, api.TaskPath(fmt.Sprintf("draft:%d", id), verb), `{"source":"cockpit","args":`+args+`}`)
 	return rec.Code, rec.Body.String()
 }
 
@@ -530,8 +530,8 @@ func TestObservedDraftIsNotInTheOutbox(t *testing.T) {
 	r := newOutboxRig(t)
 	r.propose(t, r7u, "watch only", draft.DryRun)
 	p := r.page(t, "view=outbox")
-	if len(p.Entries) != 0 || p.Counters.Views["outbox"] != 0 {
-		t.Fatalf("entries %v counters %+v", entryIDs(p.Entries), p.Counters)
+	if len(p.Tasks) != 0 || p.Counters.Views["outbox"] != 0 {
+		t.Fatalf("entries %v counters %+v", taskIDs(p.Tasks), p.Counters)
 	}
 }
 
@@ -585,8 +585,8 @@ func TestDraftActionsDisabledWithPlugin(t *testing.T) {
 			t.Errorf("state %+v", st)
 		}
 	}
-	if p := r.page(t, "view=outbox"); len(p.Entries) != 0 || p.Counters.Views["outbox"] != 0 {
-		t.Fatalf("a disabled plugin's draft stays in the Outbox: %v", entryIDs(p.Entries))
+	if p := r.page(t, "view=outbox"); len(p.Tasks) != 0 || p.Counters.Views["outbox"] != 0 {
+		t.Fatalf("a disabled plugin's draft stays in the Outbox: %v", taskIDs(p.Tasks))
 	}
 }
 
@@ -727,7 +727,7 @@ func TestAHeldPublisherCostsOnePageBudget(t *testing.T) {
 		if took := time.Since(start); took != 0 || r.fx.whereCalls() != before {
 			t.Fatalf("a refresh took %v and looked up %d again, want the failures kept", took, r.fx.whereCalls()-before)
 		}
-		for _, e := range p.Entries {
+		for _, e := range p.Tasks {
 			if e.Draft == nil || e.Draft.Where != "" {
 				t.Fatalf("entry %+v", e)
 			}
@@ -786,7 +786,7 @@ type takingFx struct{ *fakeFx }
 
 func (takingFx) Takes(target string) bool { return strings.HasPrefix(target, "#") }
 
-func TestADraftOnAnEntryActsThroughThePublisherOfItsTarget(t *testing.T) {
+func TestADraftOnATaskActsThroughThePublisherOfItsTarget(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
 	r.o.Effects = func(p unit.ProviderID) (port.Effects, error) {
@@ -796,7 +796,7 @@ func TestADraftOnAnEntryActsThroughThePublisherOfItsTarget(t *testing.T) {
 		return nil, fmt.Errorf("%w: %s", outbox.ErrDisabled, p)
 	}
 	r.o.Targets = []unit.ProviderID{unit.GitHub}
-	d := r.stored(t, draft.Draft{Unit: unit.Unit{Provider: unit.Entry, Key: "e1"}, Target: "#general", Text: "hi", State: draft.Proposed})
+	d := r.stored(t, draft.Draft{Unit: unit.Unit{Provider: unit.Task, Key: "e1"}, Target: "#general", Text: "hi", State: draft.Proposed})
 	var got api.Draft
 	if code := get(t, r.s, api.DraftPath(int64(d.ID)), &got); code != 200 {
 		t.Fatalf("GET: %d", code)

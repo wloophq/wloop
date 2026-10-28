@@ -816,13 +816,13 @@ func (derivedRows) IsUser(context.Context, string) (bool, error) { return true, 
 // and AdminAPI wired as serve wires them, and points te's command line at it.
 func (te *testEnv) serve(t *testing.T) { te.serveWith(t, nil) }
 
-// serveEntries serves te's daemon with the GTD entries on te's store.
-func (te *testEnv) serveEntries(t *testing.T) {
+// serveWithTasks serves te's daemon with the GTD entries on te's store.
+func (te *testEnv) serveWithTasks(t *testing.T) {
 	mods, err := buildSources(plugins, te.cfg, source.Deps{Inventory: te.Store, Turns: te.Turns, Clock: clockFunc(te.Now)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	te.serveWith(t, func(d daemon.Deps) daemon.Deps { return te.serveGTD(d, te.db, te.cfg, mods, t.Logf) })
+	te.serveWith(t, func(d daemon.Deps) daemon.Deps { return te.serveTasks(d, te.db, te.cfg, mods, t.Logf) })
 }
 
 // serveWith serves te's daemon, its deps passed through with when set.

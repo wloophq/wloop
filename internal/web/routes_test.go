@@ -23,7 +23,7 @@ func routesPrelude(t *testing.T) string {
 	return b.String()
 }
 
-func TestEntryRouteOverView(t *testing.T) {
+func TestTaskRouteOverView(t *testing.T) {
 	var got struct {
 		View, Entry, PR string
 		Detail          bool
@@ -39,7 +39,7 @@ const r = readHash();
 const box = { dataset: {}, hidden: true, replaceChildren() {}, contains: () => false };
 globalThis.document = { activeElement: null, body: { classList: { add() {} } } };
 const shown = renderEntryDetail(box, r);
-process.stdout.write(JSON.stringify({ View: r.view, Entry: r.entry, PR: r.pr, Detail: shown && !box.hidden, List: text(gtdList(r, r.entry)), Back: hashString({ ...r, entry: "" }) }));`, gtdCatalog(), &got)
+process.stdout.write(JSON.stringify({ View: r.view, Entry: r.entry, PR: r.pr, Detail: shown && !box.hidden, List: text(gtdList(r, r.entry)), Back: hashString({ ...r, entry: "" }) }));`, viewsCatalog(), &got)
 	if got.View != "next" || got.Entry != "e-1" || got.PR != "" {
 		t.Errorf("#view=next&entry=e-1 reads view %q entry %q unit %q", got.View, got.Entry, got.PR)
 	}
@@ -60,7 +60,7 @@ location.hash = "#view=focus";
 (async () => {
   await loadGTD();
   process.stdout.write(JSON.stringify({ Asked: asked }));
-})();`, gtdCatalog(), &got)
+})();`, viewsCatalog(), &got)
 	if want := "/api/gtd,/api/entries?view=focus"; strings.Join(got.Asked, ",") != want {
 		t.Errorf("first load asked %v, want %s", got.Asked, want)
 	}

@@ -475,8 +475,8 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, turnPr
 		if use == builtin.StepDraftPropose {
 			s.draftPropose(p, st.Args, w.Provider)
 		}
-		if use == builtin.StepEntryVerb {
-			s.entryVerb(p, st.Args)
+		if use == builtin.StepTaskVerb {
+			s.taskVerb(p, st.Args)
 		}
 		args := maps.Clone(raw)
 		delete(args, "use")
@@ -544,18 +544,18 @@ func (s *sheet) stepFiles(steps []workflow.Step, read func(string) ([]byte, erro
 	}
 }
 
-// entryVerb checks entry.verb's arguments: a verb, only the arguments it
+// taskVerb checks entry.verb's arguments: a verb, only the arguments it
 // takes, and a date or on_activity for schedule.
-func (s *sheet) entryVerb(p string, args map[string]any) {
+func (s *sheet) taskVerb(p string, args map[string]any) {
 	verb, _ := args["verb"].(string)
 	if verb == "" {
 		s.add(p+".verb", "is required: the verb run on the entry")
 		return
 	}
-	if !slices.Contains(builtin.EntryStepVerbs, verb) {
+	if !slices.Contains(builtin.TaskStepVerbs, verb) {
 		return
 	}
-	takes := builtin.EntryVerbArgs[verb]
+	takes := builtin.TaskVerbArgs[verb]
 	for _, k := range slices.Sorted(maps.Keys(args)) {
 		if k != "verb" && !slices.Contains(takes, k) {
 			s.add(p+"."+k, "is not an argument of %s", verb)

@@ -29,7 +29,7 @@ import (
 type Request struct {
 	Unit     unit.Unit
 	Items    []string // item ids acted on
-	Entry    string
+	Task     string
 	Intent   turn.Intent // "" is the Service's Default
 	Guidance string
 	Trigger  turn.Trigger
@@ -173,7 +173,7 @@ func (s *Service) Again(ctx context.Context, q turn.Turn, said string) (turns.An
 	if err != nil {
 		return turns.AnswerResult{}, err
 	}
-	if _, err := s.Start(ctx, Request{Unit: u, Items: turns.ItemsOf(q), Entry: turns.EntryOf(q), Intent: q.Intent, Guidance: said,
+	if _, err := s.Start(ctx, Request{Unit: u, Items: turns.ItemsOf(q), Task: turns.TaskOf(q), Intent: q.Intent, Guidance: said,
 		Trigger: q.Trigger, Workflow: q.Workflow, ResumeOf: q.Seq}); err != nil {
 		return turns.AnswerResult{}, err
 	}
@@ -252,7 +252,7 @@ func (s *Service) begin(ctx context.Context, r Request) (started, error) {
 		return started{}, err
 	}
 	seq, err := s.Turns.BeginHeadless(ctx, turns.HeadlessStart{Unit: r.Unit, Intent: r.Intent, Turn: randomHex(), Trigger: r.Trigger,
-		Guidance: r.Guidance, Workflow: r.Workflow, Role: def.Role, Items: r.Items, Entry: r.Entry, ResumeOf: r.ResumeOf})
+		Guidance: r.Guidance, Workflow: r.Workflow, Role: def.Role, Items: r.Items, Task: r.Task, ResumeOf: r.ResumeOf})
 	if err != nil {
 		return started{}, err
 	}
@@ -472,7 +472,7 @@ func (s *Service) propose(ctx context.Context, st started, ps []proposed) []draf
 	origin := draft.Origin{Kind: draft.OriginTurn, TurnSeq: st.seq, Intent: string(st.req.Intent), Workflow: st.req.Workflow}
 	var out []draft.Draft
 	for _, p := range ps {
-		d, err := s.Outbox.Propose(ctx, outbox.Proposal{Unit: st.req.Unit, Items: p.Items, Entry: st.req.Entry, Kind: p.Kind,
+		d, err := s.Outbox.Propose(ctx, outbox.Proposal{Unit: st.req.Unit, Items: p.Items, Task: st.req.Task, Kind: p.Kind,
 			Target: p.Target, Text: p.Text, Reaction: p.Reaction, Effects: p.Effects, Origin: origin})
 		if err != nil {
 			s.logf("headless turn %d: a %s draft on %s was refused: %v", st.seq, p.Kind, st.req.Unit, err)

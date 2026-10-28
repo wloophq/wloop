@@ -9,23 +9,23 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 )
 
-// EntryQuery selects a view's entries; Contexts must all match, and the Inbox ignores Area.
-type EntryQuery struct {
+// TaskQuery selects a view's entries; Contexts must all match, and the Inbox ignores Area.
+type TaskQuery struct {
 	View     string
 	Area     string
 	Contexts []string
 }
 
-// GTD is the views, areas, contexts and verbs the daemon serves.
-func (c *Client) GTD(ctx context.Context) (api.GTDCatalog, error) {
-	var cat api.GTDCatalog
-	err := c.do(ctx, ReadTimeout, http.MethodGet, api.GTDPath, nil, &cat)
+// Views is the views, areas, contexts and verbs the daemon serves.
+func (c *Client) Views(ctx context.Context) (api.ViewsCatalog, error) {
+	var cat api.ViewsCatalog
+	err := c.do(ctx, ReadTimeout, http.MethodGet, api.ViewsPath, nil, &cat)
 	return cat, err
 }
 
-// EntriesSince is q's page since: every entry when since is zero or the daemon answers Full, else the entries
+// TasksSince is q's page since: every entry when since is zero or the daemon answers Full, else the entries
 // changed after it and the ids that left the view.
-func (c *Client) EntriesSince(ctx context.Context, q EntryQuery, since api.Since) (api.EntriesPage, error) {
+func (c *Client) TasksSince(ctx context.Context, q TaskQuery, since api.Since) (api.TasksPage, error) {
 	v := url.Values{}
 	v.Set("view", q.View)
 	if q.Area != "" {
@@ -37,29 +37,29 @@ func (c *Client) EntriesSince(ctx context.Context, q EntryQuery, since api.Since
 	if s := since.String(); s != "" {
 		v.Set("since", s)
 	}
-	var page api.EntriesPage
-	err := c.do(ctx, ReadTimeout, http.MethodGet, api.EntriesPath+"?"+v.Encode(), nil, &page)
+	var page api.TasksPage
+	err := c.do(ctx, ReadTimeout, http.MethodGet, api.TasksPath+"?"+v.Encode(), nil, &page)
 	return page, err
 }
 
-// Entry is entry id with its cards and items.
-func (c *Client) Entry(ctx context.Context, id string) (api.EntryView, error) {
-	var e api.EntryView
-	err := c.do(ctx, ReadTimeout, http.MethodGet, api.EntryPath(id), nil, &e)
+// Task is entry id with its cards and items.
+func (c *Client) Task(ctx context.Context, id string) (api.TaskView, error) {
+	var e api.TaskView
+	err := c.do(ctx, ReadTimeout, http.MethodGet, api.TaskPath(id), nil, &e)
 	return e, err
 }
 
 // Capture files an entry in the Inbox.
-func (c *Client) Capture(ctx context.Context, req api.CaptureRequest) (api.EntryView, error) {
-	var e api.EntryView
-	err := c.do(ctx, ReadTimeout, http.MethodPost, api.EntriesPath, req, &e)
+func (c *Client) Capture(ctx context.Context, req api.CaptureRequest) (api.TaskView, error) {
+	var e api.TaskView
+	err := c.do(ctx, ReadTimeout, http.MethodPost, api.TasksPath, req, &e)
 	return e, err
 }
 
-// EntryDo runs verb on entry id.
-func (c *Client) EntryDo(ctx context.Context, id, verb string, req api.EntryRequest) (api.EntryResult, error) {
-	var res api.EntryResult
-	err := c.do(ctx, actionTimeout, http.MethodPost, api.EntryPath(id, verb), req, &res)
+// TaskDo runs verb on entry id.
+func (c *Client) TaskDo(ctx context.Context, id, verb string, req api.TaskRequest) (api.TaskResult, error) {
+	var res api.TaskResult
+	err := c.do(ctx, actionTimeout, http.MethodPost, api.TaskPath(id, verb), req, &res)
 	return res, err
 }
 

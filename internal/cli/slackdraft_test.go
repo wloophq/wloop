@@ -336,7 +336,7 @@ func TestApprovedSlackDraftPublishesThroughTheDaemonOutbox(t *testing.T) {
 	}
 }
 
-func TestSlackDraftIsTiedToTheEntryTheTurnWasAskedFrom(t *testing.T) {
+func TestSlackDraftIsTiedToTheTaskTheTurnWasAskedFrom(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
 	ctx := context.Background()
@@ -351,7 +351,7 @@ func TestSlackDraftIsTiedToTheEntryTheTurnWasAskedFrom(t *testing.T) {
 		t.Fatalf("slack_draft = %q", got)
 	}
 	ds := w.drafts(t)
-	if len(ds) != 1 || ds[0].Entry != "e42" {
+	if len(ds) != 1 || ds[0].Task != "e42" {
 		t.Fatalf("drafts %+v", ds)
 	}
 }
@@ -743,12 +743,12 @@ func TestAReactionOnAReplyPermalinkIsRecordedOnItsThread(t *testing.T) {
 	}
 }
 
-func TestSlackDraftFromAnEntryTurnPostsToItsTargetThroughSlack(t *testing.T) {
+func TestSlackDraftFromATaskTurnPostsToItsTargetThroughSlack(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
 	ctx := context.Background()
-	entry := unit.Unit{Provider: unit.Entry, Key: "e1"}
-	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: entry, Turns: []dturn.Turn{
+	task := unit.Unit{Provider: unit.Task, Key: "e1"}
+	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: task, Turns: []dturn.Turn{
 		{Intent: "act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
 	}}); err != nil {
 		t.Fatal(err)
@@ -765,7 +765,7 @@ func TestSlackDraftFromAnEntryTurnPostsToItsTargetThroughSlack(t *testing.T) {
 		t.Fatalf("drafts %+v", ds)
 	}
 	d := ds[0]
-	if d.Unit != entry || d.Target != sessChannel || d.Origin != (draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1, Intent: "act"}) ||
+	if d.Unit != task || d.Target != sessChannel || d.Origin != (draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1, Intent: "act"}) ||
 		d.State != draft.Proposed || d.Would.Policy != draft.WouldWait {
 		t.Fatalf("draft %+v", d)
 	}
@@ -796,18 +796,18 @@ func TestSlackDraftFromAPullRequestTurnStillNeedsAPermalink(t *testing.T) {
 	}
 }
 
-func TestASendFromAnEntryTurnIsRecordedWithTheTurnAsOrigin(t *testing.T) {
+func TestASendFromATaskTurnIsRecordedWithTheTurnAsOrigin(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
-	entry := unit.Unit{Provider: unit.Entry, Key: "e1"}
-	if _, err := w.te.repo.Save(context.Background(), dturn.Book{Unit: entry, Turns: []dturn.Turn{
+	task := unit.Unit{Provider: unit.Task, Key: "e1"}
+	if _, err := w.te.repo.Save(context.Background(), dturn.Book{Unit: task, Turns: []dturn.Turn{
 		{Intent: "act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
 	}}); err != nil {
 		t.Fatal(err)
 	}
 	w.send(t, sessChannel)
 	ds := w.drafts(t)
-	want := draft.Origin{Kind: draft.OriginSession, TurnSeq: 1, Intent: "act", Unit: entry}
+	want := draft.Origin{Kind: draft.OriginSession, TurnSeq: 1, Intent: "act", Unit: task}
 	if len(ds) != 1 || ds[0].Unit != dslack.ThreadUnit("T000", sessChannel, sessPosted) || ds[0].State != draft.Sent || ds[0].Origin != want {
 		t.Fatalf("drafts %+v", ds)
 	}

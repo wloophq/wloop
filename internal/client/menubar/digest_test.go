@@ -20,7 +20,7 @@ func digestRig(t *testing.T, path, at string, start time.Time) (*rig, *fakeClock
 	r.c.cfg.SentPath, r.c.cfg.DigestAt = path, at
 	r.c.loadSent()
 	day := start.Format(time.DateOnly)
-	r.d.digests[day] = api.Digest{Day: day, Title: "Daily digest", Body: "2 new in Next or Waiting · 1 in Inbox", Entries: []string{"e-1", "e-2"}}
+	r.d.digests[day] = api.Digest{Day: day, Title: "Daily digest", Body: "2 new in Next or Waiting · 1 in Inbox", Tasks: []string{"e-1", "e-2"}}
 	return r, k
 }
 

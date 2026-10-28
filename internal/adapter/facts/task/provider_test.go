@@ -58,7 +58,7 @@ func newEnv(t *testing.T) *env {
 	t.Cleanup(func() { db.Close() })
 	e := &env{t: t, db: db, clock: &clock{now: monday}, s: facttask.Settings{StaleDays: 2, RenudgeAfter: 72 * time.Hour}, ended: map[unit.Unit]bool{}, turns: map[unit.Unit]int{}}
 	e.p = facttask.New(facttask.Deps{
-		Entries: db.Entries(), Items: db.Items(), Drafts: db.Drafts(),
+		Tasks: db.Tasks(), Items: db.Items(), Drafts: db.Drafts(),
 		Cards:    coretasks.CardFacts{Cards: db.Cards()},
 		Enabled:  func(p unit.ProviderID) bool { return p != mailX.Provider },
 		Settings: func() facttask.Settings { return e.s },
@@ -69,7 +69,7 @@ func newEnv(t *testing.T) *env {
 	return e
 }
 
-func (e *env) entry(en task.Entry) task.Entry {
+func (e *env) task(en task.Task) task.Task {
 	e.t.Helper()
 	if en.Origin == "" {
 		en.Origin = task.OriginUser
@@ -78,10 +78,10 @@ func (e *env) entry(en task.Entry) task.Entry {
 		en.Created, en.Updated = monday.Add(-time.Hour), monday.Add(-time.Hour)
 	}
 	op := task.OpCreate
-	if _, err := e.db.Entries().Entry(context.Background(), en.ID); err == nil {
+	if _, err := e.db.Tasks().Task(context.Background(), en.ID); err == nil {
 		op = task.OpUpdate
 	}
-	if err := e.db.Entries().Apply(context.Background(), []task.Change{{Op: op, Entry: en}}); err != nil {
+	if err := e.db.Tasks().Apply(context.Background(), []task.Change{{Op: op, Task: en}}); err != nil {
 		e.t.Fatal(err)
 	}
 	return en
@@ -110,8 +110,8 @@ func (e *env) facts(id task.ID) workflow.Facts {
 	return f
 }
 
-func waiting(id task.ID, u unit.Unit, since time.Time, its ...items.Item) task.Entry {
-	en := task.Entry{ID: id, Kind: task.KindWaiting, State: task.Waiting, Title: "w", Units: []unit.Unit{u},
+func waiting(id task.ID, u unit.Unit, since time.Time, its ...items.Item) task.Task {
+	en := task.Task{ID: id, Kind: task.KindWaiting, State: task.Waiting, Title: "w", Units: []unit.Unit{u},
 		Waiting: &task.WaitingOn{On: []items.Person{{Key: "chat:U1"}}, Since: since}}
 	for _, it := range its {
 		en.Items = append(en.Items, task.ItemRef{Unit: it.Unit, Item: it.ID})
@@ -119,17 +119,17 @@ func waiting(id task.ID, u unit.Unit, since time.Time, its ...items.Item) task.E
 	return en
 }
 
-func TestEntryListsTheOpenEntriesOfEnabledPlugins(t *testing.T) {
+func TestTaskListsTheOpenTasksOfEnabledPlugins(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.entry(waiting("e-01", chatA, monday))
-	e.entry(task.Entry{ID: "e-02", Kind: task.KindAction, State: task.Next, Title: "a", Units: []unit.Unit{chatB}})
-	e.entry(task.Entry{ID: "e-03", Kind: task.KindCapture, State: task.Inbox, Title: "c"})
-	e.entry(task.Entry{ID: "e-04", Kind: task.KindAction, State: task.Someday, Title: "m", Units: []unit.Unit{mailX}})
-	e.entry(task.Entry{ID: "e-05", Kind: task.KindAction, State: task.Done, Title: "d", Units: []unit.Unit{chatA}})
-	e.entry(task.Entry{ID: "e-06", Kind: task.KindAction, State: task.Trash, Title: "t", Units: []unit.Unit{chatA}})
-	e.entry(task.Entry{ID: "e-07", Kind: task.KindReference, State: task.Reference, Title: "r", Units: []unit.Unit{chatA}})
-	got, err := e.p.List(context.Background(), unit.Entry)
+	e.task(waiting("e-01", chatA, monday))
+	e.task(task.Task{ID: "e-02", Kind: task.KindAction, State: task.Next, Title: "a", Units: []unit.Unit{chatB}})
+	e.task(task.Task{ID: "e-03", Kind: task.KindCapture, State: task.Inbox, Title: "c"})
+	e.task(task.Task{ID: "e-04", Kind: task.KindAction, State: task.Someday, Title: "m", Units: []unit.Unit{mailX}})
+	e.task(task.Task{ID: "e-05", Kind: task.KindAction, State: task.Done, Title: "d", Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-06", Kind: task.KindAction, State: task.Trash, Title: "t", Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-07", Kind: task.KindReference, State: task.Reference, Title: "r", Units: []unit.Unit{chatA}})
+	got, err := e.p.List(context.Background(), unit.Task)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,10 +144,10 @@ func TestEntryListsTheOpenEntriesOfEnabledPlugins(t *testing.T) {
 	}
 }
 
-func TestEntryFactsAreTheSlotsFacts(t *testing.T) {
+func TestTaskFactsAreTheSlotsFacts(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.entry(waiting("e-01", chatA, monday))
+	e.task(waiting("e-01", chatA, monday))
 	f := e.facts("e-01")
 	var want, got []string
 	for _, d := range builtin.Facts {
@@ -189,7 +189,7 @@ func typeOf(v any) expr.Type {
 	return 0
 }
 
-func TestEntryFactsReadTheEntryItsItemsAndItsUnitsCard(t *testing.T) {
+func TestTaskFactsReadTheTaskItsItemsAndItsUnitsCard(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	e := newEnv(t)
@@ -200,7 +200,7 @@ func TestEntryFactsReadTheEntryItsItemsAndItsUnitsCard(t *testing.T) {
 	en := waiting("e-01", chatA, time.Date(2026, 2, 25, 9, 0, 0, 0, brt), owed)
 	en.Waiting.LastNudge = monday.Add(-80 * time.Hour)
 	en.Waiting.On = append(en.Waiting.On, items.Person{Key: "chat:U2"})
-	e.entry(en)
+	e.task(en)
 	if _, err := e.db.Cards().Save(ctx, card.Card{Unit: chatA, Title: "t", State: "thread", StartedByMe: true, ClosurePosted: true}, monday); err != nil {
 		t.Fatal(err)
 	}
@@ -231,20 +231,20 @@ func equal(a, b any) bool {
 	return a == b
 }
 
-func TestEntryDueIsTheNextNudgeOrResurfaceTime(t *testing.T) {
+func TestTaskDueIsTheNextNudgeOrResurfaceTime(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
 	i1 := e.item(chatA, "i1", items.Open, monday)
-	e.entry(waiting("e-01", chatA, monday, i1))
+	e.task(waiting("e-01", chatA, monday, i1))
 	soon := waiting("e-02", chatB, monday)
 	soon.Waiting.Resurface = monday.Add(5 * time.Hour)
-	e.entry(soon)
+	e.task(soon)
 	nudged := waiting("e-03", chatA, monday.Add(-10*24*time.Hour))
 	nudged.Waiting.LastNudge = monday.Add(-71 * time.Hour)
-	e.entry(nudged)
+	e.task(nudged)
 	list := func() time.Time {
 		t.Helper()
-		if _, err := e.p.List(context.Background(), unit.Entry); err != nil {
+		if _, err := e.p.List(context.Background(), unit.Task); err != nil {
 			t.Fatal(err)
 		}
 		return e.p.Due()
@@ -268,14 +268,14 @@ func TestEntryDueIsTheNextNudgeOrResurfaceTime(t *testing.T) {
 	}
 }
 
-func TestAnEntrysOwnerIsItsUnit(t *testing.T) {
+func TestATasksOwnerIsItsUnit(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
 	i1 := e.item(chatB, "i1", items.Open, monday)
-	e.entry(waiting("e-01", chatA, monday))
-	e.entry(task.Entry{ID: "e-02", Kind: task.KindAction, State: task.Next, Title: "a", Items: []task.ItemRef{{Unit: i1.Unit, Item: i1.ID}}})
-	e.entry(task.Entry{ID: "e-03", Kind: task.KindCapture, State: task.Inbox, Title: "c"})
-	e.entry(task.Entry{ID: "e-04", Kind: task.KindCapture, State: task.Next, Title: "c", Units: []unit.Unit{chatB, chatA}})
+	e.task(waiting("e-01", chatA, monday))
+	e.task(task.Task{ID: "e-02", Kind: task.KindAction, State: task.Next, Title: "a", Items: []task.ItemRef{{Unit: i1.Unit, Item: i1.ID}}})
+	e.task(task.Task{ID: "e-03", Kind: task.KindCapture, State: task.Inbox, Title: "c"})
+	e.task(task.Task{ID: "e-04", Kind: task.KindCapture, State: task.Next, Title: "c", Units: []unit.Unit{chatB, chatA}})
 	for id, want := range map[task.ID][]unit.Unit{"e-01": {chatA}, "e-02": {chatB}, "e-03": nil, "e-04": {chatB, chatA}, "e-99": nil} {
 		got, err := e.p.Owners(context.Background(), task.UnitOf(id))
 		if err != nil || !slices.Equal(got, want) {
@@ -284,14 +284,14 @@ func TestAnEntrysOwnerIsItsUnit(t *testing.T) {
 	}
 }
 
-func TestEntrySettledAtIsTheWorkflowsOwn(t *testing.T) {
+func TestTaskSettledAtIsTheWorkflowsOwn(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	e := newEnv(t)
-	e.entry(waiting("e-01", chatA, monday))
+	e.task(waiting("e-01", chatA, monday))
 	put := func(wf string, s draft.State, at time.Time) {
 		t.Helper()
-		d := draft.Draft{Unit: chatA, Entry: "e-01", Kind: draft.Nudge, Purpose: "nudge", Delivery: draft.Message, Text: "x", Original: "x",
+		d := draft.Draft{Unit: chatA, Task: "e-01", Kind: draft.Nudge, Purpose: "nudge", Delivery: draft.Message, Text: "x", Original: "x",
 			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: wf, Rule: wf, Key: "e-01:chat:U1"}, Approval: draft.Approval{Mode: draft.Wait},
 			State: s, CreatedAt: at, UpdatedAt: at}
 		if s == draft.Discarded {
@@ -321,11 +321,11 @@ func TestEntrySettledAtIsTheWorkflowsOwn(t *testing.T) {
 	}
 }
 
-func TestAnEntryThatLeftItsListStillHasEventFacts(t *testing.T) {
+func TestATaskThatLeftItsListStillHasEventFacts(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.entry(task.Entry{ID: "e-05", Kind: task.KindAction, State: task.Done, Title: "d", Units: []unit.Unit{chatA}})
-	e.entry(task.Entry{ID: "e-04", Kind: task.KindAction, State: task.Someday, Title: "m", Units: []unit.Unit{mailX}})
+	e.task(task.Task{ID: "e-05", Kind: task.KindAction, State: task.Done, Title: "d", Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-04", Kind: task.KindAction, State: task.Someday, Title: "m", Units: []unit.Unit{mailX}})
 	f, err := e.p.EventFacts(context.Background(), task.UnitOf("e-05"))
 	if err != nil || f["entry.state"] != "done" || f["entry.unit"] != chatA.String() {
 		t.Fatalf("event facts of a done entry: %v %v", f, err)
@@ -339,16 +339,16 @@ func TestAnEntryThatLeftItsListStillHasEventFacts(t *testing.T) {
 
 var docY = unit.Unit{Provider: "doc", Key: "d-1"}
 
-func TestEntryFactsSpanEveryUnitInOrder(t *testing.T) {
+func TestTaskFactsSpanEveryUnitInOrder(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
 	e.item(chatA, "i1", items.Open, monday)
 	owed := e.item(chatB, "i2", items.Open, monday, items.Person{Key: "chat:U1"})
 	e.item(chatB, "i3", items.Resolved, monday)
 	onDoc := e.item(docY, "i4", items.Open, monday)
-	en := task.Entry{ID: "e-01", Kind: task.KindCapture, State: task.Next, Title: "ship it", Units: []unit.Unit{chatA, chatB},
+	en := task.Task{ID: "e-01", Kind: task.KindCapture, State: task.Next, Title: "ship it", Units: []unit.Unit{chatA, chatB},
 		Items: []task.ItemRef{{Unit: owed.Unit, Item: owed.ID}, {Unit: onDoc.Unit, Item: onDoc.ID}}}
-	e.entry(en)
+	e.task(en)
 	f := e.facts("e-01")
 	if f["entry.unit"] != chatA.String() || f["entry.unit_provider"] != "chat" {
 		t.Errorf("the first unit: %v %v", f["entry.unit"], f["entry.unit_provider"])
@@ -364,11 +364,11 @@ func TestEntryFactsSpanEveryUnitInOrder(t *testing.T) {
 	}
 }
 
-func TestEntryUnitsEndedWhenEveryUnitEnded(t *testing.T) {
+func TestTaskUnitsEndedWhenEveryUnitEnded(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.entry(task.Entry{ID: "e-01", Kind: task.KindCapture, State: task.Next, Title: "none"})
-	e.entry(task.Entry{ID: "e-02", Kind: task.KindCapture, State: task.Next, Title: "two", Units: []unit.Unit{chatA, chatB}})
+	e.task(task.Task{ID: "e-01", Kind: task.KindCapture, State: task.Next, Title: "none"})
+	e.task(task.Task{ID: "e-02", Kind: task.KindCapture, State: task.Next, Title: "two", Units: []unit.Unit{chatA, chatB}})
 	if f := e.facts("e-01"); f["entry.units_ended"] != false {
 		t.Error("an entry with no unit has its units ended")
 	}
@@ -382,10 +382,10 @@ func TestEntryUnitsEndedWhenEveryUnitEnded(t *testing.T) {
 	}
 }
 
-func TestEntryTurnsCountsTheTurnsOnTheEntryItself(t *testing.T) {
+func TestTaskTurnsCountsTheTurnsOnTheTaskItself(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.entry(task.Entry{ID: "e-01", Kind: task.KindCapture, State: task.Next, Title: "tracked", Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-01", Kind: task.KindCapture, State: task.Next, Title: "tracked", Units: []unit.Unit{chatA}})
 	e.turns[chatA] = 3
 	if f := e.facts("e-01"); f["entry.turns"] != 0 {
 		t.Errorf("entry.turns %v, want the turns on its unit left out", f["entry.turns"])
@@ -396,12 +396,12 @@ func TestEntryTurnsCountsTheTurnsOnTheEntryItself(t *testing.T) {
 	}
 }
 
-func TestEntryCapturedByUser(t *testing.T) {
+func TestTaskCapturedByUser(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.entry(task.Entry{ID: "e-01", Kind: task.KindCapture, State: task.Inbox, Title: "mine"})
-	e.entry(task.Entry{ID: "e-02", Kind: task.KindAction, State: task.Inbox, Title: "derived", Origin: task.OriginDerived, Units: []unit.Unit{chatA}})
-	e.entry(task.Entry{ID: "e-03", Kind: task.KindMessage, State: task.Inbox, Title: "a message", Origin: task.OriginMessage, Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-01", Kind: task.KindCapture, State: task.Inbox, Title: "mine"})
+	e.task(task.Task{ID: "e-02", Kind: task.KindAction, State: task.Inbox, Title: "derived", Origin: task.OriginDerived, Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-03", Kind: task.KindMessage, State: task.Inbox, Title: "a message", Origin: task.OriginMessage, Units: []unit.Unit{chatA}})
 	for id, want := range map[task.ID]bool{"e-01": true, "e-02": false, "e-03": false} {
 		if got := e.facts(id)["entry.captured_by_user"]; got != want {
 			t.Errorf("%s: captured_by_user %v, want %v", id, got, want)

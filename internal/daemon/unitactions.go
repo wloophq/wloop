@@ -42,9 +42,9 @@ func unitAction(l *intentload.Loaded, name string, u unit.Unit, follows func(uni
 	return unitIntent(d, u)
 }
 
-// entryIntentActions are the actions of the intents that name the entry provider
+// taskIntentActions are the actions of the intents that name the entry provider
 // among theirs, over e's facts.
-func entryIntentActions(l *intentload.Loaded, e task.Entry) []api.ActionState {
+func taskIntentActions(l *intentload.Loaded, e task.Task) []api.ActionState {
 	if l == nil {
 		return nil
 	}
@@ -61,17 +61,17 @@ func entryIntentActions(l *intentload.Loaded, e task.Entry) []api.ActionState {
 	return out
 }
 
-// entryRefusal is why the entry u names refuses the intent name, "" when
+// taskRefusal is why the entry u names refuses the intent name, "" when
 // it takes it or names no entry.
-func (s *Server) entryRefusal(ctx context.Context, l *intentload.Loaded, name string, u unit.Unit) (string, error) {
+func (s *Server) taskRefusal(ctx context.Context, l *intentload.Loaded, name string, u unit.Unit) (string, error) {
 	id, ok := task.IDOf(u)
 	if !ok || isBuiltin(name) {
 		return "", nil
 	}
-	if s.deps.GTD == nil {
-		return "", errGTDUnavailable
+	if s.deps.Tasks == nil {
+		return "", errTasksUnavailable
 	}
-	e, err := s.deps.GTD.Entry(ctx, id)
+	e, err := s.deps.Tasks.Task(ctx, id)
 	if err != nil {
 		return "", notFound{err.Error()}
 	}
@@ -79,7 +79,7 @@ func (s *Server) entryRefusal(ctx context.Context, l *intentload.Loaded, name st
 	if !ok || !(d.ProviderOrDefault() == u.Provider || slices.Contains(d.Providers, u.Provider)) {
 		return "", nil
 	}
-	for _, st := range entryIntentActions(l, e) {
+	for _, st := range taskIntentActions(l, e) {
 		if st.ID == name {
 			return st.Reason, nil
 		}

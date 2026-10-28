@@ -25,12 +25,12 @@ var stepGrammar = []Key{
 
 	stepKey(StepNotifySelf, "text", KindFile, "text.md.tmpl", "The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`."),
 
-	required(stepEnum(StepEntryVerb, "verb", EntryStepVerbs, "", "The verb run on the entry. Required.")),
-	stepKey(StepEntryVerb, "until", KindText, "", "With schedule, the date the entry returns: RFC 3339 or YYYY-MM-DD."),
-	stepKey(StepEntryVerb, "on_activity", KindText, "", "With schedule, `true` returns the entry on new activity on its unit."),
-	stepKey(StepEntryVerb, "on", KindText, "", "With waiting, the people the entry waits on, comma-separated."),
-	stepKey(StepEntryVerb, "resurface", KindText, "", "With waiting, the date the entry resurfaces: RFC 3339 or YYYY-MM-DD."),
-	stepKey(StepEntryVerb, "set", KindText, "", "With context, the contexts, comma-separated; with area, the area."),
+	required(stepEnum(StepTaskVerb, "verb", TaskStepVerbs, "", "The verb run on the entry. Required.")),
+	stepKey(StepTaskVerb, "until", KindText, "", "With schedule, the date the entry returns: RFC 3339 or YYYY-MM-DD."),
+	stepKey(StepTaskVerb, "on_activity", KindText, "", "With schedule, `true` returns the entry on new activity on its unit."),
+	stepKey(StepTaskVerb, "on", KindText, "", "With waiting, the people the entry waits on, comma-separated."),
+	stepKey(StepTaskVerb, "resurface", KindText, "", "With waiting, the date the entry resurfaces: RFC 3339 or YYYY-MM-DD."),
+	stepKey(StepTaskVerb, "set", KindText, "", "With context, the contexts, comma-separated; with area, the area."),
 }
 
 func required(k Key) Key {

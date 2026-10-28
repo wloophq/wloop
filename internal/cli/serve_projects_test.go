@@ -41,7 +41,7 @@ func TestProjectDossierOnDisk(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	cfg := config.Config{}
-	g := e.entries(db, cfg, noItems{})
+	g := e.newTasks(db, cfg, noItems{})
 	ds := e.serveDossiers(ctx, db, cfg, t.Logf)
 	serveProjects(g, db, ds)
 
@@ -72,7 +72,7 @@ func TestProjectDossierOnDisk(t *testing.T) {
 	if archived, _, err := ds.Sweep(ctx); err != nil || archived != 0 {
 		t.Fatalf("an open project's dossier swept: %d %v", archived, err)
 	}
-	if _, err := g.Do(ctx, res.Entry.Project, coretasks.Request{Verb: task.VerbDone}); err != nil {
+	if _, err := g.Do(ctx, res.Task.Project, coretasks.Request{Verb: task.VerbDone}); err != nil {
 		t.Fatal(err)
 	}
 	d, ok, err := ds.Get(ctx, dossier.Owner{Project: "ship-the-v2-api"})

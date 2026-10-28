@@ -468,7 +468,7 @@ func (facts) UnitFacts(_ context.Context, u unit.Unit) (task.UnitFacts, bool, er
 
 func (r *rig) inbox() *messages.Service {
 	g := coretasks.New(coretasks.Deps{Store: taskstest.New(), Items: r.ledger, Facts: facts{}, Clock: r.clock, StaleWaitingDays: 2})
-	return &messages.Service{Store: messagestest.New(), Books: r.store, Turns: r.turns, Entries: g, Intents: turnstest.Intents(), Clock: r.clock}
+	return &messages.Service{Store: messagestest.New(), Books: r.store, Turns: r.turns, Tasks: g, Intents: turnstest.Intents(), Clock: r.clock}
 }
 
 func asked() record.Record {

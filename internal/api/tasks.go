@@ -9,41 +9,41 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// The entries' routes: GTDPath serves the GTDCatalog, EntriesPath lists a view (query parameters view, area,
-// context as "a,b" and since, a Since's String) and takes a capture, EntryVerb runs a verb, CountersPath
+// The entries' routes: ViewsPath serves the ViewsCatalog, TasksPath lists a view (query parameters view, area,
+// context as "a,b" and since, a Since's String) and takes a capture, TaskVerb runs a verb, CountersPath
 // serves the counters of the query parameter area (narrowed to the entries holding each CountersTerm), DigestPath the daily digest of the query parameter day
 // (YYYY-MM-DD).
 const (
-	GTDPath      = "/api/gtd"
-	EntriesPath  = "/api/entries"
-	EntryDetail  = EntriesPath + "/{id}"
-	EntryVerb    = EntryDetail + "/{verb}"
+	ViewsPath    = "/api/gtd"
+	TasksPath    = "/api/entries"
+	TaskDetail   = TasksPath + "/{id}"
+	TaskVerb     = TaskDetail + "/{verb}"
 	CountersPath = "/api/counters"
 	DigestPath   = "/api/digest"
 )
 
-// EntryPath is the path of entry id, followed by the segments of rest.
-func EntryPath(id string, rest ...string) string {
-	p := EntriesPath + "/" + url.PathEscape(id)
+// TaskPath is the path of entry id, followed by the segments of rest.
+func TaskPath(id string, rest ...string) string {
+	p := TasksPath + "/" + url.PathEscape(id)
 	for _, r := range rest {
 		p += "/" + url.PathEscape(r)
 	}
 	return p
 }
 
-type GTDCatalog struct {
-	Views    []GTDView `json:"views"` // core views in spec 9.1 order, review only once registered
-	Areas    []string  `json:"areas"`
-	Contexts []string  `json:"contexts"`
-	Verbs    []GTDVerb `json:"verbs"` // key from internal/keys
+type ViewsCatalog struct {
+	Views    []TaskViewSpec `json:"views"` // core views in spec 9.1 order, review only once registered
+	Areas    []string       `json:"areas"`
+	Contexts []string       `json:"contexts"`
+	Verbs    []VerbSpec     `json:"verbs"` // key from internal/keys
 }
 
-type GTDView struct {
+type TaskViewSpec struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`
 }
 
-type GTDVerb struct {
+type VerbSpec struct {
 	Verb    string `json:"verb"`
 	Label   string `json:"label"`
 	Summary string `json:"summary,omitempty"`
@@ -51,7 +51,7 @@ type GTDVerb struct {
 	Key     string `json:"key"`
 }
 
-type EntryView struct {
+type TaskView struct {
 	ID               string       `json:"id"`
 	Kind             string       `json:"kind"`
 	State            string       `json:"state"`
@@ -130,13 +130,13 @@ type RunnerState struct {
 	Reason  string `json:"reason,omitempty"`
 }
 
-type EntriesPage struct {
-	Epoch    string      `json:"epoch"`
-	Rev      uint64      `json:"rev"`
-	Full     bool        `json:"full"`
-	Entries  []EntryView `json:"entries"`
-	Removed  []string    `json:"removed"`
-	Counters Counters    `json:"counters"`
+type TasksPage struct {
+	Epoch    string     `json:"epoch"`
+	Rev      uint64     `json:"rev"`
+	Full     bool       `json:"full"`
+	Tasks    []TaskView `json:"entries"`
+	Removed  []string   `json:"removed"`
+	Counters Counters   `json:"counters"`
 }
 
 type CaptureRequest struct {
@@ -145,18 +145,18 @@ type CaptureRequest struct {
 	Unit  *unit.Unit `json:"unit,omitempty"`
 }
 
-// EntryRequest args: waiting {on, resurface}; schedule {until (RFC3339 or YYYY-MM-DD), on_activity "true"};
+// TaskRequest args: waiting {on, resurface}; schedule {until (RFC3339 or YYYY-MM-DD), on_activity "true"};
 // project {id | title (creates one)}; context {set "a,b"}; area {set}; answer: as ActionRequest fields;
 // delegate {guidance, mode "headless" | "session"}; reply {text | reaction, kind "reply" | "react",
 // send "now"}.
-type EntryRequest struct {
+type TaskRequest struct {
 	Args   map[string]string `json:"args,omitempty"`
 	Source string            `json:"source"`
 }
 
-type EntryResult struct {
-	Entry EntryView `json:"entry"`
-	Lines []string  `json:"lines,omitempty"`
+type TaskResult struct {
+	Task  TaskView `json:"entry"`
+	Lines []string `json:"lines,omitempty"`
 }
 
 type Counters struct {
@@ -169,7 +169,7 @@ type Counters struct {
 
 type Message struct {
 	ID        int64           `json:"id"`
-	EntryID   string          `json:"entry_id"`
+	TaskID    string          `json:"entry_id"`
 	Unit      unit.Unit       `json:"unit"`
 	Kind      string          `json:"kind"`
 	Text      string          `json:"text"`
@@ -184,7 +184,7 @@ type Message struct {
 }
 
 // UnitLabel is the i-th unit as a person reads it.
-func (e EntryView) UnitLabel(i int) string {
+func (e TaskView) UnitLabel(i int) string {
 	if i < len(e.UnitLabels) && e.UnitLabels[i] != "" {
 		return e.UnitLabels[i]
 	}

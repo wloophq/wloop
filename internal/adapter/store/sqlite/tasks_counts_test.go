@@ -13,19 +13,19 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
-type outboxSource struct{ drafts []task.Entry }
+type outboxSource struct{ drafts []task.Task }
 
-func (o outboxSource) Entries(context.Context, task.Query) ([]task.Entry, error) {
+func (o outboxSource) Tasks(context.Context, task.Query) ([]task.Task, error) {
 	return o.drafts, nil
 }
 
-func (o outboxSource) Entry(_ context.Context, id task.ID) (task.Entry, bool, error) {
+func (o outboxSource) Task(_ context.Context, id task.ID) (task.Task, bool, error) {
 	for _, d := range o.drafts {
 		if d.ID == id {
 			return d, true, nil
 		}
 	}
-	return task.Entry{}, false, nil
+	return task.Task{}, false, nil
 }
 
 func (o outboxSource) Count(context.Context, string) (int, error) { return len(o.drafts), nil }
@@ -36,13 +36,13 @@ var (
 	countStates   = []task.State{task.Inbox, task.Next, task.Next, task.Waiting, task.Scheduled, task.Someday, task.Reference, task.Done, task.Trash}
 )
 
-// randomEntries spans areas, contexts and projects, some sequential and some ended.
-func randomEntries(r *rand.Rand, n int) []task.Entry {
-	var out []task.Entry
+// randomTasks spans areas, contexts and projects, some sequential and some ended.
+func randomTasks(r *rand.Rand, n int) []task.Task {
+	var out []task.Task
 	var projects []task.ID
 	for i := range n {
-		at := entryAt.Add(time.Duration(r.IntN(10000)) * time.Minute)
-		e := task.Entry{ID: task.ID(fmt.Sprintf("e-%016x", i)), Kind: task.KindCapture, State: countStates[r.IntN(len(countStates))],
+		at := taskAt.Add(time.Duration(r.IntN(10000)) * time.Minute)
+		e := task.Task{ID: task.ID(fmt.Sprintf("e-%016x", i)), Kind: task.KindCapture, State: countStates[r.IntN(len(countStates))],
 			Title: fmt.Sprint(i), Origin: task.OriginUser, Area: countAreas[r.IntN(len(countAreas))], Created: at, Updated: at,
 			Focus: task.Focus{On: r.IntN(4) == 0}}
 		for _, c := range countContexts {
@@ -67,8 +67,8 @@ func TestCountersEqualTheirLists(t *testing.T) {
 	r := rand.New(rand.NewPCG(15, 2))
 	ctx := context.Background()
 	for round := range 20 {
-		entries := randomEntries(r, 20+r.IntN(80))
-		drafts := make([]task.Entry, r.IntN(4))
+		tasks := randomTasks(r, 20+r.IntN(80))
+		drafts := make([]task.Task, r.IntN(4))
 		t.Run(fmt.Sprint("round", round), func(t *testing.T) {
 			t.Parallel()
 			db, err := sqlite.Open(filepath.Join(t.TempDir(), "counts.db"), nil)
@@ -76,9 +76,9 @@ func TestCountersEqualTheirLists(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer db.Close()
-			store := db.Entries()
-			applyEntries(t, store, entries...)
-			svc := coretasks.New(coretasks.Deps{Store: store, Clock: fixedNow{entryAt}})
+			store := db.Tasks()
+			applyTasks(t, store, tasks...)
+			svc := coretasks.New(coretasks.Deps{Store: store, Clock: fixedNow{taskAt}})
 			svc.RegisterView(task.ViewOutbox, "draft:", outboxSource{drafts: drafts})
 			for _, area := range countAreas {
 				c, err := svc.Counts(ctx, area)
@@ -86,7 +86,7 @@ func TestCountersEqualTheirLists(t *testing.T) {
 					t.Fatal(err)
 				}
 				for _, v := range append([]task.View{task.ViewOutbox}, task.StoredViews...) {
-					list, err := svc.Entries(ctx, task.Query{View: v, Area: area})
+					list, err := svc.Tasks(ctx, task.Query{View: v, Area: area})
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -97,7 +97,7 @@ func TestCountersEqualTheirLists(t *testing.T) {
 				if c.Badge != c.Views[task.ViewInbox]+c.Views[task.ViewOutbox] {
 					t.Errorf("round %d area %q: badge %d", round, area, c.Badge)
 				}
-				next, err := svc.Entries(ctx, task.Query{View: task.ViewNext})
+				next, err := svc.Tasks(ctx, task.Query{View: task.ViewNext})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -128,17 +128,17 @@ func BenchmarkCounts(b *testing.B) {
 		b.Fatal(err)
 	}
 	defer db.Close()
-	es := randomEntries(rand.New(rand.NewPCG(500, 1)), 500)
+	es := randomTasks(rand.New(rand.NewPCG(500, 1)), 500)
 	var cs []task.Change
 	for _, e := range es {
-		cs = append(cs, task.Change{Op: task.OpCreate, Entry: e})
+		cs = append(cs, task.Change{Op: task.OpCreate, Task: e})
 	}
-	if err := db.Entries().Apply(context.Background(), cs); err != nil {
+	if err := db.Tasks().Apply(context.Background(), cs); err != nil {
 		b.Fatal(err)
 	}
 	b.ResetTimer()
 	for b.Loop() {
-		if _, err := db.Entries().Counts(context.Background(), "OSS"); err != nil {
+		if _, err := db.Tasks().Counts(context.Background(), "OSS"); err != nil {
 			b.Fatal(err)
 		}
 	}

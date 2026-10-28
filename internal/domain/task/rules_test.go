@@ -44,25 +44,25 @@ func facts(mod ...func(*task.UnitFacts)) task.UnitFacts {
 }
 
 // apply folds cs into have by id, as the store would.
-func apply(have []task.Entry, cs []task.Change) []task.Entry {
+func apply(have []task.Task, cs []task.Change) []task.Task {
 	out := slices.Clone(have)
 	for _, c := range cs {
-		i := slices.IndexFunc(out, func(e task.Entry) bool { return e.ID == c.Entry.ID })
+		i := slices.IndexFunc(out, func(e task.Task) bool { return e.ID == c.Task.ID })
 		if i < 0 {
-			out = append(out, c.Entry)
+			out = append(out, c.Task)
 		} else {
-			out[i] = c.Entry
+			out[i] = c.Task
 		}
 	}
 	return out
 }
 
-func reconcile(t *testing.T, f task.UnitFacts, its []items.Item, have []task.Entry, at time.Time) []task.Entry {
+func reconcile(t *testing.T, f task.UnitFacts, its []items.Item, have []task.Task, at time.Time) []task.Task {
 	t.Helper()
 	return apply(have, task.Reconcile(f, its, me, have, at))
 }
 
-func only(t *testing.T, es []task.Entry) task.Entry {
+func only(t *testing.T, es []task.Task) task.Task {
 	t.Helper()
 	if len(es) != 1 {
 		t.Fatalf("%d entries, want 1: %+v", len(es), es)
@@ -81,7 +81,7 @@ func TestOpenItemOwedByMeIsAnAction(t *testing.T) {
 	}
 	e.State, e.Contexts = task.Next, []string{"@decide"}
 	its[0].Summary = "do it better"
-	got := only(t, reconcile(t, facts(), its, []task.Entry{e}, now.Add(time.Hour)))
+	got := only(t, reconcile(t, facts(), its, []task.Task{e}, now.Add(time.Hour)))
 	if got.State != task.Next || got.Title != "do it better" || !slices.Equal(got.Contexts, []string{"@decide"}) {
 		t.Fatalf("after the item changed: %+v", got)
 	}
@@ -121,7 +121,7 @@ func TestItemsToOnePersonCollapse(t *testing.T) {
 		t.Fatalf("entry %+v", e)
 	}
 	its = append(its, item("d", owedBy(bob)))
-	es := reconcile(t, facts(), its, []task.Entry{e}, now)
+	es := reconcile(t, facts(), its, []task.Task{e}, now)
 	if len(es) != 2 || es[1].Waiting.On[0].Key != bob.Key || len(es[1].Items) != 1 {
 		t.Fatalf("entries %+v", es)
 	}
@@ -147,7 +147,7 @@ func TestCloseActionForMyResolvedUnit(t *testing.T) {
 		t.Fatalf("entry %+v", e)
 	}
 	posted := func(f *task.UnitFacts) { f.ClosurePosted = true }
-	if got := only(t, reconcile(t, facts(mine, posted), its, []task.Entry{e}, now)); got.State != task.Done {
+	if got := only(t, reconcile(t, facts(mine, posted), its, []task.Task{e}, now)); got.State != task.Done {
 		t.Fatalf("after the closure: %+v", got)
 	}
 	if es := reconcile(t, facts(mine), its[:1:1], nil, now); len(es) != 1 {
@@ -158,22 +158,22 @@ func TestCloseActionForMyResolvedUnit(t *testing.T) {
 	}
 }
 
-func TestResolvedItemsResolveTheEntry(t *testing.T) {
+func TestResolvedItemsResolveTheTask(t *testing.T) {
 	its := []items.Item{item("a", owedBy(ana)), item("b", owedBy(ana))}
 	e := only(t, reconcile(t, facts(), its, nil, now))
 	resolved(&its[0])
-	e = only(t, reconcile(t, facts(), its, []task.Entry{e}, now))
+	e = only(t, reconcile(t, facts(), its, []task.Task{e}, now))
 	if e.State != task.Waiting || !slices.Equal(e.Items, []task.ItemRef{{Unit: pr, Item: "b"}}) {
 		t.Fatalf("one resolved: %+v", e)
 	}
 	resolved(&its[1])
-	e = only(t, reconcile(t, facts(), its, []task.Entry{e}, now))
+	e = only(t, reconcile(t, facts(), its, []task.Task{e}, now))
 	if e.State != task.Done || len(e.Items) != 0 {
 		t.Fatalf("all resolved: %+v", e)
 	}
 }
 
-func TestOnlyItemsCreateEntries(t *testing.T) {
+func TestOnlyItemsCreateTasks(t *testing.T) {
 	f := facts(func(f *task.UnitFacts) { f.StartedByMe, f.Cares, f.LastHuman = true, true, now })
 	if es := reconcile(t, f, nil, nil, now); len(es) != 0 {
 		t.Fatalf("entries %+v", es)
@@ -184,16 +184,16 @@ func TestDismissedStaysDismissedUntilReopen(t *testing.T) {
 	its := []items.Item{item("a", owedBy(ana)), item("b", owedBy(ana))}
 	e := only(t, reconcile(t, facts(), its, nil, now))
 	e.State = task.Trash
-	if cs := task.Reconcile(facts(), its, me, []task.Entry{e}, now); len(cs) != 0 {
+	if cs := task.Reconcile(facts(), its, me, []task.Task{e}, now); len(cs) != 0 {
 		t.Fatalf("changes %+v", cs)
 	}
 	resolved(&its[0])
-	e = only(t, reconcile(t, facts(), its, []task.Entry{e}, now))
+	e = only(t, reconcile(t, facts(), its, []task.Task{e}, now))
 	if e.State != task.Trash {
 		t.Fatalf("after a resolve: %+v", e)
 	}
 	its[0].State = "open"
-	e = only(t, reconcile(t, facts(), its, []task.Entry{e}, now))
+	e = only(t, reconcile(t, facts(), its, []task.Task{e}, now))
 	if e.State != task.Inbox || len(e.Items) != 2 {
 		t.Fatalf("after the reopen: %+v", e)
 	}
@@ -229,7 +229,7 @@ func TestItemDeadlineParses(t *testing.T) {
 	}
 }
 
-func TestMutedUnitEntryIsSnoozed(t *testing.T) {
+func TestMutedUnitTaskIsSnoozed(t *testing.T) {
 	until := now.Add(72 * time.Hour)
 	mute := func(f *task.UnitFacts) { f.Mute = &task.Mute{Until: until} }
 	its := []items.Item{item("a", func(it *items.Item) { it.Initial = "next" })}
@@ -239,7 +239,7 @@ func TestMutedUnitEntryIsSnoozed(t *testing.T) {
 		t.Fatalf("new entry %+v", e)
 	}
 	plain := only(t, reconcile(t, facts(), its, nil, now))
-	got := only(t, reconcile(t, facts(mute), its, []task.Entry{plain}, now))
+	got := only(t, reconcile(t, facts(mute), its, []task.Task{plain}, now))
 	if got.State != task.Scheduled || got.Snooze != want {
 		t.Fatalf("existing entry %+v", got)
 	}
@@ -251,17 +251,17 @@ func TestMuteUntilStateChangeWakesOnActivity(t *testing.T) {
 		f := facts(func(f *task.UnitFacts) { f.Mute = &task.Mute{UntilStateChange: change} })
 		e := only(t, reconcile(t, f, its, nil, now))
 		f.LastHuman = now.Add(time.Hour)
-		cs := task.Activity(f, []task.Entry{e}, now.Add(2*time.Hour))
+		cs := task.Activity(f, []task.Task{e}, now.Add(2*time.Hour))
 		if !change {
 			if len(cs) != 0 {
 				t.Fatalf("activity moved a muted entry: %+v", cs)
 			}
 			continue
 		}
-		if len(cs) != 1 || cs[0].Entry.State != task.Inbox || !cs[0].Entry.Changed {
+		if len(cs) != 1 || cs[0].Task.State != task.Inbox || !cs[0].Task.Changed {
 			t.Fatalf("activity: %+v", cs)
 		}
-		if again := task.Reconcile(f, its, me, []task.Entry{cs[0].Entry}, now.Add(3*time.Hour)); len(again) != 0 {
+		if again := task.Reconcile(f, its, me, []task.Task{cs[0].Task}, now.Add(3*time.Hour)); len(again) != 0 {
 			t.Fatalf("the woken entry was muted again: %+v", again)
 		}
 	}
@@ -274,7 +274,7 @@ func TestUnmuteRestoresTheState(t *testing.T) {
 	if e.State != task.Scheduled {
 		t.Fatalf("muted: %+v", e)
 	}
-	e = only(t, reconcile(t, facts(), its, []task.Entry{e}, now))
+	e = only(t, reconcile(t, facts(), its, []task.Task{e}, now))
 	if e.State != task.Waiting || e.Snooze != (task.Snooze{}) {
 		t.Fatalf("unmuted: %+v", e)
 	}
@@ -285,7 +285,7 @@ func TestUnmuteRestoresTheState(t *testing.T) {
 }
 
 func TestDeadlineStars(t *testing.T) {
-	e := task.Entry{State: task.Next, Deadline: now}
+	e := task.Task{State: task.Next, Deadline: now}
 	f, ok := task.AutoFocus(e, 2, now)
 	if !ok || f != (task.Focus{On: true, Auto: task.FocusDeadline, At: now}) {
 		t.Fatalf("focus %+v %v", f, ok)
@@ -306,7 +306,7 @@ func TestDeadlineStars(t *testing.T) {
 
 func TestStaleCountsWorkingDays(t *testing.T) {
 	friday := time.Date(2026, 10, 16, 10, 0, 0, 0, brt)
-	e := task.Entry{State: task.Waiting, Kind: task.KindWaiting, Waiting: &task.WaitingOn{On: []items.Person{ana}, Since: friday}}
+	e := task.Task{State: task.Waiting, Kind: task.KindWaiting, Waiting: &task.WaitingOn{On: []items.Person{ana}, Since: friday}}
 	tuesday := time.Date(2026, 10, 20, 10, 1, 0, 0, brt)
 	if f, ok := task.AutoFocus(e, 2, tuesday); !ok || f.Auto != task.FocusStale {
 		t.Fatalf("tuesday: %+v %v", f, ok)
@@ -321,7 +321,7 @@ func TestStaleCountsWorkingDays(t *testing.T) {
 }
 
 func TestUserStarsAreNotCleared(t *testing.T) {
-	e := task.Entry{State: task.Next, Focus: task.Focus{On: true, At: now}}
+	e := task.Task{State: task.Next, Focus: task.Focus{On: true, At: now}}
 	if f, ok := task.AutoFocus(e, 2, now); ok || !f.On {
 		t.Fatalf("focus %+v %v", f, ok)
 	}
@@ -330,7 +330,7 @@ func TestUserStarsAreNotCleared(t *testing.T) {
 func TestActivityReinboxesWithChangedMark(t *testing.T) {
 	seen := now.Add(-time.Hour)
 	f := facts(func(f *task.UnitFacts) { f.LastHuman = now })
-	have := []task.Entry{
+	have := []task.Task{
 		{ID: "e-sched", State: task.Scheduled, Snooze: task.Snooze{OnActivity: true, Return: task.Next}, SeenAt: seen},
 		{ID: "e-date", State: task.Scheduled, Snooze: task.Snooze{Until: now.Add(time.Hour), Return: task.Next}, SeenAt: seen},
 		{ID: "e-wait", State: task.Waiting, SeenAt: seen},
@@ -339,10 +339,10 @@ func TestActivityReinboxesWithChangedMark(t *testing.T) {
 	}
 	var got []task.ID
 	for _, c := range task.Activity(f, have, now) {
-		if c.Entry.State != task.Inbox || !c.Entry.Changed || c.Op != task.OpReinbox || c.Entry.Snooze != (task.Snooze{}) {
+		if c.Task.State != task.Inbox || !c.Task.Changed || c.Op != task.OpReinbox || c.Task.Snooze != (task.Snooze{}) {
 			t.Errorf("change %+v", c)
 		}
-		got = append(got, c.Entry.ID)
+		got = append(got, c.Task.ID)
 	}
 	if want := []task.ID{"e-sched", "e-date", "e-wait"}; !slices.Equal(got, want) {
 		t.Fatalf("reinboxed %v, want %v", got, want)
@@ -351,7 +351,7 @@ func TestActivityReinboxesWithChangedMark(t *testing.T) {
 
 func TestOwnActivityDoesNotReinbox(t *testing.T) {
 	seen := now.Add(-time.Hour)
-	have := []task.Entry{{ID: "e-wait", State: task.Waiting, SeenAt: seen, Created: now.Add(-48 * time.Hour)}}
+	have := []task.Task{{ID: "e-wait", State: task.Waiting, SeenAt: seen, Created: now.Add(-48 * time.Hour)}}
 	for _, last := range []time.Time{{}, seen.Add(-time.Minute)} {
 		f := facts(func(f *task.UnitFacts) { f.LastHuman = last })
 		if cs := task.Activity(f, have, now); len(cs) != 0 {
@@ -369,7 +369,7 @@ func TestEmptyKeyIsNeverMe(t *testing.T) {
 }
 
 func TestWakeReturnsToItsState(t *testing.T) {
-	e := task.Entry{State: task.Scheduled, Snooze: task.Snooze{Until: now, Return: task.Next}}
+	e := task.Task{State: task.Scheduled, Snooze: task.Snooze{Until: now, Return: task.Next}}
 	got, ok := task.Wake(e, now)
 	if !ok || got.State != task.Next || got.Snooze != (task.Snooze{}) {
 		t.Fatalf("woke %+v %v", got, ok)
@@ -385,7 +385,7 @@ func TestWakeReturnsToItsState(t *testing.T) {
 
 func TestMutedUnitActivitySparesUserSchedule(t *testing.T) {
 	f := facts(func(f *task.UnitFacts) { f.Mute, f.LastHuman = &task.Mute{Until: now.Add(time.Hour)}, now })
-	have := []task.Entry{{ID: "e-mine", State: task.Scheduled, Snooze: task.Snooze{OnActivity: true, Return: task.Next}, Created: now.Add(-time.Hour)}}
+	have := []task.Task{{ID: "e-mine", State: task.Scheduled, Snooze: task.Snooze{OnActivity: true, Return: task.Next}, Created: now.Add(-time.Hour)}}
 	if cs := task.Activity(f, have, now); len(cs) != 0 {
 		t.Fatalf("activity on a muted unit moved %+v", cs)
 	}

@@ -12,7 +12,7 @@ import (
 // handleDigest serves the daily digest of the query parameter day: the counters, and the entries that moved
 // into Next or Waiting since the previous digest, at notifications.digest_at local time (midnight when off).
 func (s *Server) handleDigest(w http.ResponseWriter, r *http.Request) {
-	g, ok := s.gtd(w)
+	g, ok := s.tasks(w)
 	if !ok {
 		return
 	}
@@ -29,24 +29,24 @@ func (s *Server) handleDigest(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	d := api.Digest{Day: day, Title: "Daily digest"}
 	for _, v := range []task.View{task.ViewNext, task.ViewWaiting} {
-		es, err := g.Entries(ctx, task.Query{View: v})
+		es, err := g.Tasks(ctx, task.Query{View: v})
 		if err != nil {
-			writeGTDError(w, err)
+			writeTasksError(w, err)
 			return
 		}
 		for _, e := range es {
 			if e.Updated.After(start) && !e.Updated.After(end) && s.unitsEnabled(e.Units) {
-				d.Entries = append(d.Entries, string(e.ID))
+				d.Tasks = append(d.Tasks, string(e.ID))
 			}
 		}
 	}
 	c, err := g.Counts(ctx, "")
 	if err != nil {
-		writeGTDError(w, err)
+		writeTasksError(w, err)
 		return
 	}
 	d.Counts = wireCounters(c)
-	d.Body = fmt.Sprintf("%d new in Next or Waiting · %d in Inbox · %d in Outbox · %d next · %d waiting", len(d.Entries),
+	d.Body = fmt.Sprintf("%d new in Next or Waiting · %d in Inbox · %d in Outbox · %d next · %d waiting", len(d.Tasks),
 		d.Counts.Views[string(task.ViewInbox)], d.Counts.Views[string(task.ViewOutbox)], d.Counts.Views[string(task.ViewNext)], d.Counts.Views[string(task.ViewWaiting)])
 	writeJSON(w, d)
 }

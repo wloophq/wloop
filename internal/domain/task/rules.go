@@ -35,10 +35,10 @@ type want struct {
 // (f.Mute nil) an entry with Snooze.Mute returns to Snooze.Return. A muted entry never enters Inbox on its own.
 // Deadline: items.Item.Deadline in RFC 3339 is taken as is; "YYYY-MM-DD" is 18:00 in now's location that day;
 // anything else is none.
-func Reconcile(f UnitFacts, its []items.Item, me Me, have []Entry, now time.Time) []Change {
+func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, now time.Time) []Change {
 	mute := activeMute(f, now)
 	wants := wanted(f, its, me)
-	byID := map[ID]Entry{}
+	byID := map[ID]Task{}
 	for _, e := range have {
 		if e.Origin == OriginDerived {
 			byID[e.ID] = e
@@ -50,16 +50,16 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Entry, now time.Time
 		seen[w.id] = true
 		old, ok := byID[w.id]
 		if !ok {
-			e := w.entry(f, now)
+			e := w.task(f, now)
 			e = applyMute(e, mute)
-			out = append(out, Change{Op: OpCreate, Entry: e, Why: "derived from " + f.Unit.String()})
+			out = append(out, Change{Op: OpCreate, Task: e, Why: "derived from " + f.Unit.String()})
 			continue
 		}
 		e, op, why := w.update(old, f, now)
 		e = applyMute(e, mute)
 		if !e.Same(old) {
 			e.Updated = now
-			out = append(out, Change{Op: op, Entry: e, Why: why})
+			out = append(out, Change{Op: op, Task: e, Why: why})
 		}
 	}
 	for _, old := range have {
@@ -78,13 +78,13 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Entry, now time.Time
 		}
 		if !e.Same(old) {
 			e.Updated = now
-			out = append(out, Change{Op: op, Entry: e, Why: why})
+			out = append(out, Change{Op: op, Task: e, Why: why})
 		}
 	}
 	return out
 }
 
-func derivedFrom(e Entry, f UnitFacts) bool {
+func derivedFrom(e Task, f UnitFacts) bool {
 	return slices.Contains(e.Units, f.Unit)
 }
 
@@ -179,8 +179,8 @@ func (w want) since(now time.Time) time.Time {
 	return s
 }
 
-func (w want) entry(f UnitFacts, now time.Time) Entry {
-	e := Entry{ID: w.id, Kind: w.kind, State: w.initial, Title: w.title, Items: w.refs(), Units: units(f, w),
+func (w want) task(f UnitFacts, now time.Time) Task {
+	e := Task{ID: w.id, Kind: w.kind, State: w.initial, Title: w.title, Items: w.refs(), Units: units(f, w),
 		Deadline: w.deadline(now.Location()), Origin: OriginDerived, Created: now, Updated: now}
 	if w.kind == KindAction {
 		e.Contexts = slices.Clone(w.items[0].Contexts)
@@ -216,7 +216,7 @@ func units(f UnitFacts, w want) []unit.Unit {
 
 // update refreshes what the items own of old and keeps what the user set; a held entry that gains an
 // open item it did not hold returns to Inbox.
-func (w want) update(old Entry, f UnitFacts, now time.Time) (Entry, ChangeOp, string) {
+func (w want) update(old Task, f UnitFacts, now time.Time) (Task, ChangeOp, string) {
 	e := old
 	refs := w.refs()
 	e.Title, e.Items, e.Deadline = w.title, refs, w.deadline(now.Location())

@@ -25,10 +25,10 @@ func fact(name string, t expr.Type, slots []FactSlot, doc string) Fact {
 	return Fact{Name: name, Type: t, Slots: slots, Doc: doc}
 }
 
-// entryName is a name fact of a GTD entry, which only entry intents read.
-func entryName(name, doc string) Fact {
+// taskName is a name fact of a GTD entry, which only entry intents read.
+func taskName(name, doc string) Fact {
 	f := fact(name, expr.String, nam, doc)
-	f.Provider = unit.Entry
+	f.Provider = unit.Task
 	return f
 }
 
@@ -81,10 +81,10 @@ var Visibilities = []string{"public", "private", "internal"}
 // ReviewStates are GitHub's review states, and the empty value of no review.
 var ReviewStates = []string{"", "APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED", "PENDING"}
 
-// EntryKinds and EntryStates are a GTD entry's kinds and states.
+// TaskKinds and TaskStates are a GTD entry's kinds and states.
 var (
-	EntryKinds  = []string{string(task.KindAction), string(task.KindWaiting), string(task.KindClose), string(task.KindMessage), string(task.KindDraft), string(task.KindCapture), string(task.KindProject), string(task.KindReference)}
-	EntryStates = []string{string(task.Inbox), string(task.Next), string(task.Waiting), string(task.Scheduled), string(task.Someday), string(task.Reference), string(task.Done), string(task.Trash)}
+	TaskKinds  = []string{string(task.KindAction), string(task.KindWaiting), string(task.KindClose), string(task.KindMessage), string(task.KindDraft), string(task.KindCapture), string(task.KindProject), string(task.KindReference)}
+	TaskStates = []string{string(task.Inbox), string(task.Next), string(task.Waiting), string(task.Scheduled), string(task.Someday), string(task.Reference), string(task.Done), string(task.Trash)}
 )
 
 // TurnStates are the states a turn is in, and the empty value of none.
@@ -160,8 +160,8 @@ var otherFacts = []Fact{
 	fact("unit.label", expr.String, nam, "The unit as people read it: a pull request as owner/repo#12, any other unit as provider:key."),
 	fact("session.title", expr.String, nam, "The manifest's session.title."),
 	fact("workspace.name", expr.String, nam, "The name of the worktree created for the unit; empty when the turn creates none or before it is named."),
-	entryName("entry.title", "The entry's title."),
-	entryName("entry.short_id", "The entry's id, short: its first six hex digits."),
+	taskName("entry.title", "The entry's title."),
+	taskName("entry.short_id", "The entry's id, short: its first six hex digits."),
 	fact("session.started", expr.Time, nam, "When the session starts; a template formats it with Go's layout, as {{.session.started.Format \"02/01 15:04\"}}."),
 	fact("pr.last_review.exists", expr.Bool, trn, "The viewer reviewed the pull request before."),
 	enum(fact("pr.last_review.verdict", expr.String, trn, "The viewer's newest review state, any state; empty when none."), enumOf(ReviewStates...)),
@@ -261,8 +261,8 @@ var otherFacts = []Fact{
 	untrusted(wf("workspace", "fingerprint", expr.String, "The worktree path and its head.")),
 	wf("workspace", "repo", expr.String, "owner/repo; empty when unknown."),
 	wf("entry", "id", expr.String, "The entry's id."),
-	untrusted(enum(wf("entry", "kind", expr.String, "The entry's kind, such as action, waiting, close, message, capture or project."), enumOf(EntryKinds...))),
-	untrusted(enum(wf("entry", "state", expr.String, "The entry's state: inbox, next, waiting, scheduled, someday, reference, done or trash."), enumOf(EntryStates...))),
+	untrusted(enum(wf("entry", "kind", expr.String, "The entry's kind, such as action, waiting, close, message, capture or project."), enumOf(TaskKinds...))),
+	untrusted(enum(wf("entry", "state", expr.String, "The entry's state: inbox, next, waiting, scheduled, someday, reference, done or trash."), enumOf(TaskStates...))),
 	untrusted(wf("entry", "waiting_on", expr.List, "The person keys the entry waits on, such as slack:U0123.")),
 	wf("entry", "resurface_at", expr.Time, "When the entry resurfaces; zero when it has no date."),
 	timeVarying(untrusted(wf("entry", "waiting_days", expr.Int, "Working days the entry has waited, in the configured location, as the GTD rules count them."))),

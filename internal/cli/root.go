@@ -317,17 +317,17 @@ func (e *Env) closedByManager(ctx context.Context, manager, session, lastHandle 
 	return closed, nil
 }
 
-// entryFacts is the entry subject's facts provider, reading the config the
+// taskFacts is the entry subject's facts provider, reading the config the
 // daemon holds at each read; ended says whether a unit has ended.
-func (e *Env) entryFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (bool, error)) *facttask.Provider {
+func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (bool, error)) *facttask.Provider {
 	enabled := func(p unit.ProviderID) bool { return e.currentConfig().PluginEnabled(string(p)) }
 	return facttask.New(facttask.Deps{
-		Entries: db.Entries(), Items: db.Items(), Drafts: db.Drafts(),
+		Tasks: db.Tasks(), Items: db.Items(), Drafts: db.Drafts(),
 		Cards:   coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled},
 		Enabled: enabled,
 		Settings: func() facttask.Settings {
 			cfg := e.currentConfig()
-			return facttask.Settings{StaleDays: cfg.GTD.StaleWaitingDays, RenudgeAfter: time.Duration(cfg.Drafts.RepeatAfter)}
+			return facttask.Settings{StaleDays: cfg.Tasks.StaleWaitingDays, RenudgeAfter: time.Duration(cfg.Drafts.RepeatAfter)}
 		},
 		Ended: ended,
 		Turns: func(ctx context.Context, u unit.Unit) (int, error) {

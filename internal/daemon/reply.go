@@ -22,7 +22,7 @@ import (
 var repliedKinds = []task.Kind{task.KindAction, task.KindWaiting, task.KindClose, task.KindCapture}
 
 // replyRefusal is why the user cannot reply on e, "" when they can.
-func (s *Server) replyRefusal(e task.Entry) string {
+func (s *Server) replyRefusal(e task.Task) string {
 	switch {
 	case s.deps.Outbox == nil:
 		return errOutboxUnavailable.Error()
@@ -36,18 +36,18 @@ func (s *Server) replyRefusal(e task.Entry) string {
 
 // runReply holds the reply the entry's args carry as a user draft on its first unit, for the entry and its
 // items there; send "now" approves it at once.
-func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretasks.Service, e task.Entry, req api.EntryRequest) {
+func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretasks.Service, e task.Task, req api.TaskRequest) {
 	if why := s.replyRefusal(e); why != "" {
-		writeGTDError(w, fmt.Errorf("%w: %s", coretasks.ErrVerb, why))
+		writeTasksError(w, fmt.Errorf("%w: %s", coretasks.ErrVerb, why))
 		return
 	}
 	send, err := sendArg(req.Args["send"])
 	if err != nil {
-		writeGTDError(w, err)
+		writeTasksError(w, err)
 		return
 	}
 	u := e.Units[0]
-	c := api.DraftCreate{Unit: u, Entry: string(e.ID), Kind: req.Args["kind"], Text: req.Args["text"], Reaction: req.Args["reaction"],
+	c := api.DraftCreate{Unit: u, Task: string(e.ID), Kind: req.Args["kind"], Text: req.Args["text"], Reaction: req.Args["reaction"],
 		Send: send, Source: req.Source}
 	for _, ref := range e.Items {
 		if ref.Unit == u {
@@ -56,20 +56,20 @@ func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretas
 	}
 	d, err := s.writeUserDraft(ctx, c)
 	if err != nil {
-		writeGTDError(w, entryDraftError(err))
+		writeTasksError(w, taskDraftError(err))
 		return
 	}
 	s.recordVerb(ctx, g, e, coretasks.Request{Verb: task.VerbReply, Source: req.Source})
-	now, err := g.Entry(ctx, e.ID)
+	now, err := g.Task(ctx, e.ID)
 	if err != nil {
 		now = e
 	}
-	view, err := s.entryViews(ctx, g, false).view(ctx, now)
+	view, err := s.taskViews(ctx, g, false).view(ctx, now)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, api.EntryResult{Entry: view, Lines: []string{userDraftLine(d)}})
+	writeJSON(w, api.TaskResult{Task: view, Lines: []string{userDraftLine(d)}})
 }
 
 func sendArg(raw string) (bool, error) {
@@ -101,17 +101,17 @@ func (s *Server) handleDraftCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := context.WithoutCancel(r.Context())
-	if c.Entry != "" && s.deps.GTD != nil {
-		e, err := s.deps.GTD.Entry(ctx, task.ID(c.Entry))
+	if c.Task != "" && s.deps.Tasks != nil {
+		e, err := s.deps.Tasks.Task(ctx, task.ID(c.Task))
 		switch {
-		case errors.Is(err, coretasks.ErrNoEntry):
+		case errors.Is(err, coretasks.ErrNoTask):
 			writeError(w, http.StatusNotFound, err.Error())
 			return
 		case err != nil:
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		case !slices.Contains(e.Units, c.Unit):
-			writeError(w, http.StatusBadRequest, fmt.Sprintf("entry %s is not about %s", c.Entry, c.Unit.Label()))
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("entry %s is not about %s", c.Task, c.Unit.Label()))
 			return
 		}
 	}
@@ -148,7 +148,7 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate) (draft.D
 	s.draftMu.Lock()
 	defer s.draftMu.Unlock()
 	o := s.deps.Outbox
-	d, err := o.Propose(ctx, outbox.Proposal{Unit: c.Unit, Items: c.Items, Entry: c.Entry, Kind: kind, Text: c.Text, Target: strings.TrimSpace(c.Target),
+	d, err := o.Propose(ctx, outbox.Proposal{Unit: c.Unit, Items: c.Items, Task: c.Task, Kind: kind, Text: c.Text, Target: strings.TrimSpace(c.Target),
 		Reaction: strings.Trim(strings.TrimSpace(c.Reaction), ":"), Origin: draft.Origin{Kind: draft.OriginUser}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
 	if errors.Is(err, outbox.ErrDisabled) {
 		err = noPublisher{c.Unit.Provider, err}

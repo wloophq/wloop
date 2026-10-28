@@ -43,7 +43,7 @@ await pal.items.find((i) => i.label === "Area...").run();
 const areas = k.log.palette;
 areas.items[2].run();
 return { title: pal.title, items: strip(pal.items), help: k.log.help, bindings: BINDINGS.length, areas: strip(areas.items), picked: k.log.area, unit: k.log.unit,
-  narrowed: strip(paletteMatch(pal.items, "TO next")) };`, map[string]any{"entry": entryFixture(), "row": row}, &got)
+  narrowed: strip(paletteMatch(pal.items, "TO next")) };`, map[string]any{"entry": taskFixture(), "row": row}, &got)
 
 	has := func(label, key string) bool {
 		for _, it := range got.Items {

@@ -29,7 +29,7 @@ func TestAUserScheduleEndingUnderAMuteStaysScheduled(t *testing.T) {
 	if err := r.svc.Sync(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
-	e := r.entry(t, id)
+	e := r.task(t, id)
 	if e.State != task.Scheduled || !e.Snooze.Mute || !e.Snooze.Until.Equal(muteEnd) || e.Snooze.Return != task.Inbox {
 		t.Fatalf("woke under the mute: %+v", e)
 	}
@@ -38,7 +38,7 @@ func TestAUserScheduleEndingUnderAMuteStaysScheduled(t *testing.T) {
 	}
 }
 
-func TestActivityMovesOnlyItsUnitsEntries(t *testing.T) {
+func TestActivityMovesOnlyItsUnitsTasks(t *testing.T) {
 	ctx := context.Background()
 	r := newRig()
 	r.items.byUnit[unitU] = []items.Item{owed(unitU, "a")}
@@ -47,7 +47,7 @@ func TestActivityMovesOnlyItsUnitsEntries(t *testing.T) {
 	if err := r.svc.Sync(ctx, []unit.Unit{unitU, unitV}); err != nil {
 		t.Fatal(err)
 	}
-	if e := r.entry(t, task.DerivedID(task.KindAction, unitU, "a")); e.State != task.Scheduled || e.Changed {
+	if e := r.task(t, task.DerivedID(task.KindAction, unitU, "a")); e.State != task.Scheduled || e.Changed {
 		t.Fatalf("activity on V moved U's entry: %+v", e)
 	}
 }

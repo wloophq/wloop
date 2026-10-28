@@ -80,7 +80,7 @@ func (f *fakeActions) Adopt(ctx context.Context, u unit.Unit, c Call) error {
 func (f *fakeActions) Intent(ctx context.Context, name string, u unit.Unit, c Call) error {
 	r := refOf(u)
 	f.inputs = append(f.inputs, c.Inputs)
-	f.bound = append(f.bound, strings.Join(c.Items, ",")+"@"+c.Entry)
+	f.bound = append(f.bound, strings.Join(c.Items, ",")+"@"+c.Task)
 	switch name {
 	case "address":
 		f.takeOver = append(f.takeOver, inputFlag(c.Inputs, "take_over"))
@@ -1177,7 +1177,7 @@ type turnRig struct {
 	reg      *turnstest.Registry
 	launcher *fakeLauncher
 	msgs     *messagestest.Store
-	entries  *taskstest.Store
+	tasks    *taskstest.Store
 	facts    enabledUnits
 }
 
@@ -1190,10 +1190,10 @@ func newTurnRig(t *testing.T) *turnRig {
 		reg: turnstest.NewRegistry(turnstest.Strict(t)), launcher: &fakeLauncher{loopMu: s.deps.LoopMu}}
 	s.deps.Turns = &turns.Service{Intents: turnstest.Intents(), Store: r.store, Registry: r.reg, Sessions: r.sessions, Launcher: r.launcher,
 		Clock: fixedClock(s.deps.Now()), Command: brand.Command}
-	r.msgs, r.entries, r.facts = messagestest.New(), taskstest.New(), enabledUnits{map[unit.ProviderID]bool{}}
+	r.msgs, r.tasks, r.facts = messagestest.New(), taskstest.New(), enabledUnits{map[unit.ProviderID]bool{}}
 	clock := fixedClock(s.deps.Now())
-	s.deps.GTD = coretasks.New(coretasks.Deps{Store: r.entries, Items: itemsNone{}, Facts: r.facts, Clock: clock})
-	s.deps.Messages = &messages.Service{Store: r.msgs, Books: r.store, Turns: s.deps.Turns, Entries: s.deps.GTD, Intents: turnstest.Intents(), Clock: clock}
+	s.deps.Tasks = coretasks.New(coretasks.Deps{Store: r.tasks, Items: itemsNone{}, Facts: r.facts, Clock: clock})
+	s.deps.Messages = &messages.Service{Store: r.msgs, Books: r.store, Turns: s.deps.Turns, Tasks: s.deps.Tasks, Intents: turnstest.Intents(), Clock: clock}
 	return r
 }
 

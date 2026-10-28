@@ -24,8 +24,8 @@ type briefedFacts struct {
 	intent func(unit.ProviderID) brief.Intent
 }
 
-// entryUnitFact is the entry fact naming its unit as provider:key.
-const entryUnitFact = "entry.unit"
+// taskUnitFact is the entry fact naming its unit as provider:key.
+const taskUnitFact = "entry.unit"
 
 func (b briefedFacts) add(ctx context.Context, u unit.Unit, f workflow.Facts) (workflow.Facts, error) {
 	slot, ok := builtin.Slots[u.Provider]
@@ -33,7 +33,7 @@ func (b briefedFacts) add(ctx context.Context, u unit.Unit, f workflow.Facts) (w
 		return f, nil
 	}
 	of := u
-	if raw, ok := f[entryUnitFact].(string); ok {
+	if raw, ok := f[taskUnitFact].(string); ok {
 		p, key, found := strings.Cut(raw, ":")
 		if !found {
 			return withBrief(f, nil, b.intent(u.Provider)), nil

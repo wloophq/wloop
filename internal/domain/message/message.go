@@ -49,7 +49,7 @@ type Origin struct {
 
 type Message struct {
 	ID        int64
-	EntryID   string    // its Inbox entry, opened through gtd.Service.Open
+	TaskID    string    // its Inbox entry, opened through coretasks.Service.Open
 	Unit      unit.Unit // zero for a message on no unit
 	Kind      Kind
 	Text      string // <= 4000 bytes, no control characters
@@ -68,7 +68,7 @@ type Store interface {
 	// a workflow or core proposal by (Unit, Origin.Workflow) while open.
 	Upsert(ctx context.Context, m Message) (Message, error)
 	Message(ctx context.Context, id int64) (Message, bool, error)
-	ByEntry(ctx context.Context, entry string) (Message, bool, error)
+	ByTask(ctx context.Context, task string) (Message, bool, error)
 	Open(ctx context.Context) ([]Message, error)
 	// Close closes an open message as st with answer at at; Answered on one already answered rewords its answer.
 	Close(ctx context.Context, id int64, st State, answer string, at time.Time) error

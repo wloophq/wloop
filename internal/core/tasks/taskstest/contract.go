@@ -20,8 +20,8 @@ var (
 )
 
 // Full is an entry with every field set.
-func Full(id task.ID) task.Entry {
-	return task.Entry{
+func Full(id task.ID) task.Task {
+	return task.Task{
 		ID: id, Kind: task.KindWaiting, State: task.Scheduled, Title: "Ana owes 2 items", Notes: "notes",
 		Items:    []task.ItemRef{{Unit: pr, Item: "a"}, {Unit: other, Item: "b"}},
 		Units:    []unit.Unit{pr, other},
@@ -37,25 +37,25 @@ func Full(id task.ID) task.Entry {
 
 func position(t *testing.T, s coretasks.Store) coretasks.Since {
 	t.Helper()
-	p, err := s.EntriesSince(context.Background(), task.Query{View: task.ViewInbox}, coretasks.Since{})
+	p, err := s.TasksSince(context.Background(), task.Query{View: task.ViewInbox}, coretasks.Since{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return coretasks.Since{Epoch: p.Epoch, Rev: p.Rev}
 }
 
-func apply(t *testing.T, s coretasks.Store, es ...task.Entry) {
+func apply(t *testing.T, s coretasks.Store, es ...task.Task) {
 	t.Helper()
 	var cs []task.Change
 	for _, e := range es {
-		cs = append(cs, task.Change{Op: task.OpUpdate, Entry: e})
+		cs = append(cs, task.Change{Op: task.OpUpdate, Task: e})
 	}
 	if err := s.Apply(context.Background(), cs); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func ids(es []task.Entry) []task.ID {
+func ids(es []task.Task) []task.ID {
 	out := []task.ID{}
 	for _, e := range es {
 		out = append(out, e.ID)
@@ -70,7 +70,7 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 		s := open(t)
 		want := Full("e-0000000000000001")
 		apply(t, s, want)
-		got, err := s.Entry(ctx, want.ID)
+		got, err := s.Task(ctx, want.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -78,11 +78,11 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 			t.Fatalf("read back\n%+v\nwant\n%+v", got, want)
 		}
 		for _, u := range []unit.Unit{pr, other} {
-			if es, err := s.EntriesOf(ctx, u); err != nil || len(es) != 1 {
+			if es, err := s.TasksOf(ctx, u); err != nil || len(es) != 1 {
 				t.Fatalf("entries of %s: %v %v", u, es, err)
 			}
 		}
-		if _, err := s.Entry(ctx, "e-missing"); !errors.Is(err, coretasks.ErrNoEntry) {
+		if _, err := s.Task(ctx, "e-missing"); !errors.Is(err, coretasks.ErrNoTask) {
 			t.Fatalf("a missing entry: %v", err)
 		}
 	})
@@ -102,42 +102,42 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 	})
 	t.Run("EntriesSince", func(t *testing.T) {
 		s := open(t)
-		a := task.Entry{ID: "e-a", Kind: task.KindCapture, State: task.Inbox, Title: "a", Origin: task.OriginUser, Created: t0, Updated: t0}
+		a := task.Task{ID: "e-a", Kind: task.KindCapture, State: task.Inbox, Title: "a", Origin: task.OriginUser, Created: t0, Updated: t0}
 		b, c := a, a
 		b.ID, b.Title, b.Created = "e-b", "b", t0.Add(time.Second)
 		c.ID, c.Title, c.State = "e-c", "c", task.Next
 		apply(t, s, a, b, c)
 		q := task.Query{View: task.ViewInbox}
-		first, err := s.EntriesSince(ctx, q, coretasks.Since{})
-		if err != nil || !first.Full || !slices.Equal(ids(first.Entries), []task.ID{"e-a", "e-b"}) || first.Counters.Views[task.ViewInbox] != 2 {
+		first, err := s.TasksSince(ctx, q, coretasks.Since{})
+		if err != nil || !first.Full || !slices.Equal(ids(first.Tasks), []task.ID{"e-a", "e-b"}) || first.Counters.Views[task.ViewInbox] != 2 {
 			t.Fatalf("first page %+v %v", first, err)
 		}
 		a.Title, b.State = "a2", task.Next
 		apply(t, s, a, b)
-		page, err := s.EntriesSince(ctx, q, coretasks.Since{Epoch: first.Epoch, Rev: first.Rev})
+		page, err := s.TasksSince(ctx, q, coretasks.Since{Epoch: first.Epoch, Rev: first.Rev})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if page.Full || !slices.Equal(ids(page.Entries), []task.ID{"e-a"}) || page.Entries[0].Title != "a2" ||
+		if page.Full || !slices.Equal(ids(page.Tasks), []task.ID{"e-a"}) || page.Tasks[0].Title != "a2" ||
 			!slices.Equal(page.Removed, []task.ID{"e-b"}) || page.Rev <= first.Rev || page.Counters.Views[task.ViewInbox] != 1 {
 			t.Fatalf("page %+v", page)
 		}
-		if again, err := s.EntriesSince(ctx, q, coretasks.Since{Epoch: page.Epoch, Rev: page.Rev}); err != nil || again.Full || len(again.Entries)+len(again.Removed) != 0 {
+		if again, err := s.TasksSince(ctx, q, coretasks.Since{Epoch: page.Epoch, Rev: page.Rev}); err != nil || again.Full || len(again.Tasks)+len(again.Removed) != 0 {
 			t.Fatalf("a page at the head %+v %v", again, err)
 		}
-		if p, err := s.EntriesSince(ctx, q, coretasks.Since{Epoch: "other", Rev: page.Rev}); err != nil || !p.Full || !slices.Equal(ids(p.Entries), []task.ID{"e-a"}) {
+		if p, err := s.TasksSince(ctx, q, coretasks.Since{Epoch: "other", Rev: page.Rev}); err != nil || !p.Full || !slices.Equal(ids(p.Tasks), []task.ID{"e-a"}) {
 			t.Fatalf("another epoch %+v %v", p, err)
 		}
 	})
 	t.Run("ViewPredicates", func(t *testing.T) {
 		s := open(t)
-		var all []task.Entry
+		var all []task.Task
 		n := 0
 		for _, st := range []task.State{task.Inbox, task.Next, task.Waiting, task.Scheduled, task.Someday, task.Reference, task.Done, task.Trash} {
 			for _, area := range []string{"", "OSS"} {
 				for _, kind := range []task.Kind{task.KindAction, task.KindProject} {
 					n++
-					e := task.Entry{ID: task.ID("e-" + string(st) + "-" + area + "-" + string(kind)), Kind: kind, State: st, Area: area,
+					e := task.Task{ID: task.ID("e-" + string(st) + "-" + area + "-" + string(kind)), Kind: kind, State: st, Area: area,
 						Focus: task.Focus{On: n%3 == 0}, Contexts: []string{"@reply"}, Origin: task.OriginUser,
 						Created: t0.Add(time.Duration(n) * time.Second), Updated: t0.Add(time.Duration(n) * time.Second)}
 					if kind == task.KindProject && n%2 == 0 {
@@ -148,7 +148,7 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 			}
 		}
 		for i := range 3 {
-			all = append(all, task.Entry{ID: task.ID("e-step-" + string(rune('a'+i))), Kind: task.KindAction, State: task.Next,
+			all = append(all, task.Task{ID: task.ID("e-step-" + string(rune('a'+i))), Kind: task.KindAction, State: task.Next,
 				Project: "e-next--project", Position: 3 - i, Origin: task.OriginUser, Created: t0.Add(time.Duration(100+i) * time.Second), Updated: t0})
 		}
 		for i := range all {
@@ -163,7 +163,7 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 		for _, v := range task.StoredViews {
 			for _, area := range []string{"", "OSS"} {
 				q := task.Query{View: v, Area: area}
-				got, err := s.Entries(ctx, q)
+				got, err := s.Tasks(ctx, q)
 				if err != nil {
 					t.Fatal(err)
 				}

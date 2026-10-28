@@ -37,9 +37,9 @@ type Command struct {
 	Req    api.ActionRequest
 	PlanID string
 
-	// entry is the entry the command is about: verb runs on it with args,
+	// task is the entry the command is about: verb runs on it with args,
 	// fetch reads its detail, after a seen when seen is set.
-	entry string
+	task  string
 	verb  string
 	args  map[string]string
 	fetch bool
@@ -135,23 +135,23 @@ type Model struct {
 	// served are the plugins the daemon serves, enabled or not.
 	served []api.Plugin
 
-	// gtd are the core views of GET /api/gtd, after the plan; entries are
-	// each view's entries as last pulled, counters the tabs' counts.
-	gtd           []View
-	gtdCat        api.GTDCatalog
-	entries       map[string][]api.EntryView
-	entriesLoaded bool
-	counters      api.Counters
+	// taskViews are the core views of GET /api/gtd, after the plan; tasks are
+	// each view's tasks as last pulled, counters the tabs' counts.
+	taskViews   []View
+	viewsCat    api.ViewsCatalog
+	tasks       map[string][]api.TaskView
+	tasksLoaded bool
+	counters    api.Counters
 	// filtered are the counts of the entries the filter's words keep, as
 	// last read.
 	filtered *api.Counters
 	area     string
-	entrySel string
-	entryAt  int
+	taskSel  string
+	taskAt   int
 	// detailID is the entry whose detail is open; opened is what the
 	// daemon answered for it, stale once a page changed it.
 	detailID    string
-	opened      *api.EntryView
+	opened      *api.TaskView
 	detailStale bool
 	// detailRead is the read that opened the detail: a digit typed ahead
 	// in it does not answer.
@@ -269,9 +269,9 @@ func (m *Model) move(delta int) {
 		m.planMove(delta)
 		return
 	}
-	if _, ok := m.gtdView(); ok {
+	if _, ok := m.viewOnScreen(); ok {
 		if !m.reviewMove(delta) {
-			m.entryMove(delta)
+			m.taskMove(delta)
 		}
 		return
 	}
@@ -284,14 +284,14 @@ func (m *Model) move(delta int) {
 }
 
 func (m *Model) setView(i int) {
-	m.view, m.at, m.entryAt, m.entrySel, m.navigated = i, 0, 0, "", true
+	m.view, m.at, m.taskAt, m.taskSel, m.navigated = i, 0, 0, "", true
 	m.rv.step, m.rv.head = "", true
 	if m.rv.review != nil {
 		m.rv.step = firstOpenStep(m.rv.review.Steps, -1)
 	}
 	m.closeDetail()
 	m.keepSelection()
-	m.keepEntrySelection()
+	m.keepTaskSelection()
 }
 
 // Key applies one key press; ok means the command goes to the daemon.
@@ -649,7 +649,7 @@ func (m *Model) restoreSelection() {
 		m.sel = m.unfiltered
 	}
 	m.keepSelection()
-	m.keepEntrySelection()
+	m.keepTaskSelection()
 }
 
 // jump turns a pasted pull request URL into the selection of its row, in

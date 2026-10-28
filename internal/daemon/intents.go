@@ -35,7 +35,7 @@ var bundledWords = sync.OnceValue(func() coreWords {
 	if err != nil {
 		panic(err)
 	}
-	return coreWords{l.Keys, l.GTD}
+	return coreWords{l.Keys, l.Lists}
 })
 
 // isIntent tells an intent the registry offers or a user intent that failed

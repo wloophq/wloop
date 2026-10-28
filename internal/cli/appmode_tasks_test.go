@@ -89,18 +89,18 @@ func TestTheMenubarFollowsARealDaemonsInbox(t *testing.T) {
 	})
 	posted, _ := notes.seen()
 	n := posted[0]
-	cat, entry, ok := api.ParseNotificationID(n.ID)
+	cat, task, ok := api.ParseNotificationID(n.ID)
 	if !ok || cat != api.CategoryInbox {
 		t.Fatalf("posted %+v", n)
 	}
 	app.Respond(ctx, menubar.Response{ID: n.ID, Action: menubar.ActionOpen})
 	mu.Lock()
-	if want := "http://127.0.0.1:4321/?token=tok#entry=" + entry; !slices.Equal(opened, []string{want}) {
+	if want := "http://127.0.0.1:4321/?token=tok#entry=" + task; !slices.Equal(opened, []string{want}) {
 		t.Errorf("opened %v, want %s", opened, want)
 	}
 	mu.Unlock()
 
-	if _, err := client.New(te.Socket).EntryDo(ctx, entry, "next", api.EntryRequest{Source: "cli"}); err != nil {
+	if _, err := client.New(te.Socket).TaskDo(ctx, task, "next", api.TaskRequest{Source: "cli"}); err != nil {
 		t.Fatal(err)
 	}
 	eventually(t, "the withdrawal once the entry left the Inbox", func() bool {

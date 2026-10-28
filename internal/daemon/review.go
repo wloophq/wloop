@@ -14,7 +14,7 @@ import (
 )
 
 func (s *Server) handleReview(w http.ResponseWriter, r *http.Request) {
-	g, ok := s.gtd(w)
+	g, ok := s.tasks(w)
 	if !ok {
 		return
 	}
@@ -24,14 +24,14 @@ func (s *Server) handleReview(w http.ResponseWriter, r *http.Request) {
 	}
 	rv, err := g.Review(r.Context())
 	if err != nil {
-		writeGTDError(w, err)
+		writeTasksError(w, err)
 		return
 	}
 	writeJSON(w, s.wireReview(rv))
 }
 
 func (s *Server) handleReviewStepDone(w http.ResponseWriter, r *http.Request) {
-	g, ok := s.gtd(w)
+	g, ok := s.tasks(w)
 	if !ok {
 		return
 	}
@@ -41,14 +41,14 @@ func (s *Server) handleReviewStepDone(w http.ResponseWriter, r *http.Request) {
 	}
 	rv, err := g.ReviewStepDone(context.WithoutCancel(r.Context()), r.PathValue("step"))
 	if err != nil {
-		writeGTDError(w, err)
+		writeTasksError(w, err)
 		return
 	}
 	writeJSON(w, s.wireReview(rv))
 }
 
 func (s *Server) wireReview(rv coretasks.Review) api.Review {
-	texts, bundled := s.loaded().GTD, bundledWords().gtd
+	texts, bundled := s.loaded().Lists, bundledWords().lists
 	out := api.Review{ID: rv.ID, StartedAt: rv.StartedAt, Done: rv.Done, Steps: []api.ReviewStep{}}
 	for _, st := range rv.Steps {
 		label := cmp.Or(texts.Review[st.ID], bundled.Review[st.ID], st.ID)
@@ -61,7 +61,7 @@ func (s *Server) wireReview(rv coretasks.Review) api.Review {
 // project sets a project's next action, open actions and review on v, reading every project's status once per
 // viewer. The verbs a handler takes on a project, and project on any entry, are offered only where the entry's
 // state takes them.
-func (ev *entryViewer) project(ctx context.Context, e task.Entry, v *api.EntryView) error {
+func (ev *taskViewer) project(ctx context.Context, e task.Task, v *api.TaskView) error {
 	for i, st := range v.Verbs {
 		verb := task.Verb(st.Verb)
 		if !st.Enabled || !ev.g.Handles(e.Kind, verb) {

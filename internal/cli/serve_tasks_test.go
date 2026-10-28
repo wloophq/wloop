@@ -63,21 +63,21 @@ func TestMeFromEveryEnabledModule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := te.serveGTD(daemon.Deps{}, db, cfg, mods, func(string, ...any) {})
-	if _, err := d.GTDMe(ctx); err == nil || !strings.Contains(err.Error(), "github") {
+	d := te.serveTasks(daemon.Deps{}, db, cfg, mods, func(string, ...any) {})
+	if _, err := d.TasksMe(ctx); err == nil || !strings.Contains(err.Error(), "github") {
 		t.Fatalf("no viewer stored yet: %v", err)
 	}
-	if got := te.gtdMe.get().Keys; !slices.Equal(got, []string{"slack:U000AAA", "email:me@example.test"}) {
+	if got := te.tasksMe.get().Keys; !slices.Equal(got, []string{"slack:U000AAA", "email:me@example.test"}) {
 		t.Fatalf("before the viewer: %v", got)
 	}
 	if err := st.SetViewer(ctx, unit.GitHub, "octocat"); err != nil {
 		t.Fatal(err)
 	}
-	grew, err := d.GTDMe(ctx)
+	grew, err := d.TasksMe(ctx)
 	if err != nil || !grew {
 		t.Fatalf("grew %v, %v", grew, err)
 	}
-	got := te.gtdMe.get().Keys
+	got := te.tasksMe.get().Keys
 	if !slices.Contains(got, "github:octocat") || !slices.Contains(got, "slack:U000AAA") || slices.Contains(got, "off:someone") {
 		t.Fatalf("me %v", got)
 	}
@@ -101,7 +101,7 @@ func newDerivedRig(t *testing.T, cases []ghsourcetest.Case) derivedRig {
 	clock := clockFunc(func() time.Time { return ghsourcetest.Now })
 	ledger := &coreitems.Ledger{Store: db.Items(), Clock: clock}
 	me := task.Me{Keys: []string{"github:" + ghsourcetest.Viewer}}
-	svc := coretasks.New(coretasks.Deps{Store: db.Entries(), Items: ledger, Me: me, Clock: clock, StaleWaitingDays: 2,
+	svc := coretasks.New(coretasks.Deps{Store: db.Tasks(), Items: ledger, Me: me, Clock: clock, StaleWaitingDays: 2,
 		Facts: coretasks.CardFacts{Cards: db.Cards(), Me: func() task.Me { return me }}})
 	r := derivedRig{db: db, svc: svc, asked: map[unit.Unit]bool{}}
 	var units []unit.Unit
@@ -137,9 +137,9 @@ func asked(r api.Row) bool {
 	return k == situation.KindLoopWaiting || k == situation.KindLoopStopped
 }
 
-func (r derivedRig) entries(t *testing.T, u unit.Unit) []task.Entry {
+func (r derivedRig) tasks(t *testing.T, u unit.Unit) []task.Task {
 	t.Helper()
-	es, err := r.db.Entries().EntriesOf(context.Background(), u)
+	es, err := r.db.Tasks().TasksOf(context.Background(), u)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,15 +152,15 @@ func viewerItem(r api.Row) bool {
 	})
 }
 
-func TestEveryNeedsMeRowHasAnInboxOrNextEntry(t *testing.T) {
+func TestEveryNeedsMeRowHasAnInboxOrNextTask(t *testing.T) {
 	t.Parallel()
 	cases := ghsourcetest.Cases()
 	r := newDerivedRig(t, cases)
 	needs, muted, questions := 0, 0, 0
 	for _, c := range cases {
-		es := r.entries(t, c.Row.Unit)
+		es := r.tasks(t, c.Row.Unit)
 		in := func(states ...task.State) bool {
-			return slices.ContainsFunc(es, func(e task.Entry) bool { return slices.Contains(states, e.State) })
+			return slices.ContainsFunc(es, func(e task.Task) bool { return slices.Contains(states, e.State) })
 		}
 		switch {
 		case r.asked[c.Row.Unit]:
@@ -186,7 +186,7 @@ func TestEveryNeedsMeRowHasAnInboxOrNextEntry(t *testing.T) {
 	t.Logf("%d needs-me, %d muted, %d asked rows of %d", needs, muted, questions, len(cases))
 }
 
-func TestCardOnlyRowsHaveNoEntry(t *testing.T) {
+func TestCardOnlyRowsHaveNoTask(t *testing.T) {
 	t.Parallel()
 	cases := ghsourcetest.Cases()
 	r := newDerivedRig(t, cases)
@@ -197,7 +197,7 @@ func TestCardOnlyRowsHaveNoEntry(t *testing.T) {
 		}
 		base, _, _ := strings.Cut(c.Name, "/")
 		seen[base]++
-		if es := r.entries(t, c.Row.Unit); len(es) != 0 {
+		if es := r.tasks(t, c.Row.Unit); len(es) != 0 {
 			t.Errorf("%s derives no item, has entries %+v", c.Name, es)
 		}
 	}
@@ -245,22 +245,22 @@ func TestSyncRunsUnderNoJobs(t *testing.T) {
 	}()
 	waitHealth(t, te.Env, "the daemon", func(api.Health) bool { return true })
 	c := client.New(te.Socket)
-	var page api.EntriesPage
+	var page api.TasksPage
 	eventually(t, "the item's entry in the Inbox", func() bool {
-		page, err = c.EntriesSince(ctx, client.EntryQuery{View: "inbox"}, api.Since{})
-		return err == nil && len(page.Entries) == 1
+		page, err = c.TasksSince(ctx, client.TaskQuery{View: "inbox"}, api.Since{})
+		return err == nil && len(page.Tasks) == 1
 	})
-	if e := page.Entries[0]; e.Kind != "action" || !slices.Equal(e.Units, []unit.Unit{u}) || page.Counters.Badge != 1 {
+	if e := page.Tasks[0]; e.Kind != "action" || !slices.Equal(e.Units, []unit.Unit{u}) || page.Counters.Badge != 1 {
 		t.Fatalf("%+v", page)
 	}
-	res, err := c.EntryDo(ctx, page.Entries[0].ID, "next", api.EntryRequest{Source: "cli"})
-	if err != nil || res.Entry.State != "next" {
+	res, err := c.TaskDo(ctx, page.Tasks[0].ID, "next", api.TaskRequest{Source: "cli"})
+	if err != nil || res.Task.State != "next" {
 		t.Fatalf("%+v %v", res, err)
 	}
 	if counters, err := c.Counters(ctx, ""); err != nil || counters.Views["next"] != 1 || counters.Badge != 0 {
 		t.Fatalf("%+v %v", counters, err)
 	}
-	if cat, err := c.GTD(ctx); err != nil || len(cat.Views) == 0 {
+	if cat, err := c.Views(ctx); err != nil || len(cat.Views) == 0 {
 		t.Fatalf("%+v %v", cat, err)
 	}
 }
@@ -285,7 +285,7 @@ func socketDo(t *testing.T, sock, method, path, body string) (int, string) {
 	return resp.StatusCode, b.String()
 }
 
-func TestDisabledPluginEntriesRefuseOnARealServe(t *testing.T) {
+func TestDisabledPluginTasksRefuseOnARealServe(t *testing.T) {
 	te := newServeEnv(t)
 	no := false
 	te.cfg.GitHub.Enabled = &no
@@ -296,9 +296,9 @@ func TestDisabledPluginEntriesRefuseOnARealServe(t *testing.T) {
 	}
 	u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
-	e := task.Entry{ID: "e-00000000000000aa", Kind: task.KindAction, State: task.Inbox, Title: "review it", Units: []unit.Unit{u},
+	e := task.Task{ID: "e-00000000000000aa", Kind: task.KindAction, State: task.Inbox, Title: "review it", Units: []unit.Unit{u},
 		Items: []task.ItemRef{{Unit: u, Item: "gh:review"}}, Origin: task.OriginDerived, Created: at, Updated: at}
-	if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: e}}); err != nil {
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
 	db.Close()
@@ -311,25 +311,25 @@ func TestDisabledPluginEntriesRefuseOnARealServe(t *testing.T) {
 		}
 	}()
 	waitHealth(t, te.Env, "the daemon", func(api.Health) bool { return true })
-	code, body := socketDo(t, te.Socket, http.MethodGet, api.EntriesPath+"?view=inbox", "")
+	code, body := socketDo(t, te.Socket, http.MethodGet, api.TasksPath+"?view=inbox", "")
 	if code != 200 || strings.Contains(body, string(e.ID)) || !strings.Contains(body, `"badge":0`) {
 		t.Fatalf("the disabled plugin's entry is listed: %d %s", code, body)
 	}
-	if code, body := socketDo(t, te.Socket, http.MethodGet, api.EntryPath(string(e.ID)), ""); code != 200 || strings.Count(body, `"enabled":true`) != 1 {
+	if code, body := socketDo(t, te.Socket, http.MethodGet, api.TaskPath(string(e.ID)), ""); code != 200 || strings.Count(body, `"enabled":true`) != 1 {
 		t.Fatalf("the read-only entry: %d %s", code, body)
 	}
 	for _, verb := range []string{"next", "approve", "delegate", "done"} {
-		if code, body := socketDo(t, te.Socket, http.MethodPost, api.EntryPath(string(e.ID), verb), `{"source":"cli"}`); code != 409 || !strings.Contains(body, `"plugin":"github"`) {
+		if code, body := socketDo(t, te.Socket, http.MethodPost, api.TaskPath(string(e.ID), verb), `{"source":"cli"}`); code != 409 || !strings.Contains(body, `"plugin":"github"`) {
 			t.Errorf("%s: %d %s", verb, code, body)
 		}
 	}
-	if code, body := socketDo(t, te.Socket, http.MethodPost, api.EntryPath(string(e.ID), "dismiss"), `{"source":"cli"}`); code != 200 || !strings.Contains(body, `"state":"trash"`) {
+	if code, body := socketDo(t, te.Socket, http.MethodPost, api.TaskPath(string(e.ID), "dismiss"), `{"source":"cli"}`); code != 200 || !strings.Contains(body, `"state":"trash"`) {
 		t.Errorf("dismiss: %d %s", code, body)
 	}
-	if code, body := socketDo(t, te.Socket, http.MethodPost, api.EntriesPath, `{"title":"x","unit":{"provider":"github","key":"acme/api#7"}}`); code != 409 {
+	if code, body := socketDo(t, te.Socket, http.MethodPost, api.TasksPath, `{"title":"x","unit":{"provider":"github","key":"acme/api#7"}}`); code != 409 {
 		t.Errorf("a capture on the disabled unit: %d %s", code, body)
 	}
-	if code, body := socketDo(t, te.Socket, http.MethodPost, api.EntriesPath, `{"title":"call the bank"}`); code != 200 {
+	if code, body := socketDo(t, te.Socket, http.MethodPost, api.TasksPath, `{"title":"call the bank"}`); code != 200 {
 		t.Errorf("a plain capture: %d %s", code, body)
 	}
 }

@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestRetainDropsTheMarksOfEndedEntriesAndVanishedSlackUnits(t *testing.T) {
+func TestRetainDropsTheMarksOfEndedTasksAndVanishedSlackUnits(t *testing.T) {
 	t.Parallel()
 	db, _ := openTemp(t)
 	for id, state := range map[string]string{"e-open": "waiting", "e-done": "done", "e-trash": "trash", "e-ref": "reference"} {

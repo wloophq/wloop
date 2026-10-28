@@ -37,9 +37,9 @@ const (
 
 type Daemon interface {
 	RowsSince(ctx context.Context, since api.Since) (api.RowsPage, error)
-	EntriesSince(ctx context.Context, q client.EntryQuery, since api.Since) (api.EntriesPage, error)
-	Entry(ctx context.Context, id string) (api.EntryView, error)
-	EntryDo(ctx context.Context, id, verb string, req api.EntryRequest) (api.EntryResult, error)
+	TasksSince(ctx context.Context, q client.TaskQuery, since api.Since) (api.TasksPage, error)
+	Task(ctx context.Context, id string) (api.TaskView, error)
+	TaskDo(ctx context.Context, id, verb string, req api.TaskRequest) (api.TaskResult, error)
 	Digest(ctx context.Context, day string) (api.Digest, error)
 	Health(ctx context.Context) (api.Health, error)
 	Action(ctx context.Context, u unit.Unit, action string, req api.ActionRequest) ([]string, error)
@@ -93,7 +93,7 @@ type Controller struct {
 	sections  []api.MenubarSection
 	// plugins are the served plugins, read with the sections.
 	plugins  []api.Plugin
-	entries  map[task.View][]api.EntryView
+	tasks    map[task.View][]api.TaskView
 	counters *api.Counters
 }
 
@@ -107,7 +107,7 @@ func New(cfg Config) *Controller {
 	if cfg.Log == nil {
 		cfg.Log = func(string, ...any) {}
 	}
-	c := &Controller{cfg: cfg, ctx: context.Background(), sent: map[string]bool{}, daily: map[string]bool{}, entries: map[task.View][]api.EntryView{}}
+	c := &Controller{cfg: cfg, ctx: context.Background(), sent: map[string]bool{}, daily: map[string]bool{}, tasks: map[task.View][]api.TaskView{}}
 	cfg.Notifier.OnResponse(func(r Response) { c.Respond(c.runCtx(), r) })
 	c.loadSent()
 	return c
@@ -253,7 +253,7 @@ func (c *Controller) refresh(ctx context.Context, health, rows bool) {
 	var err error
 	if rows {
 		if err = c.pullRows(ctx); err == nil {
-			err = c.pullEntries(ctx)
+			err = c.pullTasks(ctx)
 		}
 	}
 	if err == nil && (health || !c.hasHealth) {
@@ -387,7 +387,7 @@ func (c *Controller) menu(h api.Health) []MenuItem {
 		open = "Open in " + h.WorkspaceManagers[0]
 	}
 	for _, sec := range coreSections {
-		items = append(items, c.entrySection(sec.label, sec.view)...)
+		items = append(items, c.taskSection(sec.label, sec.view)...)
 		items = append(items, MenuItem{Separator: true})
 	}
 	for _, sec := range c.sections {

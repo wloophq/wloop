@@ -94,7 +94,7 @@ func runIntent(ctx context.Context, e *Env, d dintent.Def, args []string) error 
 // run's guidance as its notes; a failed run says how to retry on it.
 func runCapturing(ctx context.Context, e *Env, d dintent.Def, args []string) error {
 	if len(args) > 0 {
-		if u, ok := explicitEntry(args[0]); ok {
+		if u, ok := explicitTask(args[0]); ok {
 			return runIntentOn(ctx, e, d, u, args[1:])
 		}
 	}
@@ -113,11 +113,11 @@ func runCapturing(ctx context.Context, e *Env, d dintent.Def, args []string) err
 	if err != nil {
 		return err
 	}
-	entry, err := c.Capture(ctx, api.CaptureRequest{Title: cmp.Or(title, p.guidance), Notes: p.guidance})
+	tk, err := c.Capture(ctx, api.CaptureRequest{Title: cmp.Or(title, p.guidance), Notes: p.guidance})
 	if err != nil {
 		return err
 	}
-	u := task.UnitOf(task.ID(entry.ID))
+	u := task.UnitOf(task.ID(tk.ID))
 	fmt.Fprintf(e.Out, "captured %s\n", u)
 	p.guidance = ""
 	if err := askOn(ctx, e, d, u, p); err != nil {

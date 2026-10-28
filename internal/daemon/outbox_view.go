@@ -23,7 +23,7 @@ var outboxStates = []draft.State{draft.Proposed, draft.Failed, draft.Sending}
 // outboxView serves the Outbox: one virtual entry per draft of an enabled plugin, newest first, never stored.
 type outboxView struct{ s *Server }
 
-func (v outboxView) Entries(ctx context.Context, q task.Query) ([]task.Entry, error) {
+func (v outboxView) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) {
 	if len(q.Contexts) > 0 {
 		return nil, nil
 	}
@@ -31,9 +31,9 @@ func (v outboxView) Entries(ctx context.Context, q task.Query) ([]task.Entry, er
 	if err != nil {
 		return nil, err
 	}
-	out := make([]task.Entry, 0, len(ds))
+	out := make([]task.Task, 0, len(ds))
 	for _, d := range ds {
-		out = append(out, draftEntry(d, v.s.unitLabel(d.Unit)))
+		out = append(out, draftTask(d, v.s.unitLabel(d.Unit)))
 	}
 	return out, nil
 }
@@ -43,19 +43,19 @@ func (v outboxView) drafts(ctx context.Context) ([]draft.Draft, error) {
 	return slices.DeleteFunc(ds, func(d draft.Draft) bool { return !v.s.pluginEnabled(d.Unit.Provider) }), err
 }
 
-func (v outboxView) Entry(ctx context.Context, id task.ID) (task.Entry, bool, error) {
+func (v outboxView) Task(ctx context.Context, id task.ID) (task.Task, bool, error) {
 	n, ok := draftIDOf(id)
 	if !ok {
-		return task.Entry{}, false, nil
+		return task.Task{}, false, nil
 	}
 	d, err := v.s.deps.Outbox.Store.Get(ctx, n)
 	if errors.Is(err, outbox.ErrNotFound) {
-		return task.Entry{}, false, nil
+		return task.Task{}, false, nil
 	}
 	if err != nil {
-		return task.Entry{}, false, err
+		return task.Task{}, false, err
 	}
-	return draftEntry(d, v.s.unitLabel(d.Unit)), true, nil
+	return draftTask(d, v.s.unitLabel(d.Unit)), true, nil
 }
 
 func (v outboxView) Count(ctx context.Context, _ string) (int, error) {
@@ -72,15 +72,15 @@ func draftIDOf(id task.ID) (draft.ID, bool) {
 	return draft.ID(n), err == nil && n > 0
 }
 
-// draftEntryStates are the entry states that tell where a draft stands.
-var draftEntryStates = map[draft.State]task.State{
+// draftTaskStates are the entry states that tell where a draft stands.
+var draftTaskStates = map[draft.State]task.State{
 	draft.Proposed: task.Inbox, draft.Failed: task.Inbox,
 	draft.Approved: task.Next, draft.Sending: task.Next,
 	draft.Sent: task.Done, draft.Discarded: task.Trash,
 }
 
-func draftEntry(d draft.Draft, where string) task.Entry {
-	e := task.Entry{ID: task.ID(draftPrefix + strconv.FormatInt(int64(d.ID), 10)), Kind: task.KindDraft, State: draftEntryStates[d.State],
+func draftTask(d draft.Draft, where string) task.Task {
+	e := task.Task{ID: task.ID(draftPrefix + strconv.FormatInt(int64(d.ID), 10)), Kind: task.KindDraft, State: draftTaskStates[d.State],
 		Title: draftTitle(d, where), Units: []unit.Unit{d.Unit}, Deadline: d.Deadline, Origin: task.OriginDraft,
 		Created: d.CreatedAt, Updated: d.UpdatedAt}
 	for _, it := range d.Items {
@@ -98,7 +98,7 @@ func draftTitle(d draft.Draft, where string) string {
 }
 
 // withDraft sets a draft entry's draft on v, and its verbs from the draft's actions: the others are refused.
-func (s *Server) withDraft(ctx context.Context, e task.Entry, v *api.EntryView) error {
+func (s *Server) withDraft(ctx context.Context, e task.Task, v *api.TaskView) error {
 	if e.Kind != task.KindDraft || s.deps.Outbox == nil {
 		return nil
 	}

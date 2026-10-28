@@ -19,7 +19,7 @@ func waitingOnAna(t *testing.T, r *rig) task.ID {
 		t.Fatal(err)
 	}
 	id := task.DerivedID(task.KindWaiting, unitU, ana.Key)
-	if e := r.entry(t, id); e.State != task.Waiting {
+	if e := r.task(t, id); e.State != task.Waiting {
 		t.Fatalf("%+v", e)
 	}
 	return id
@@ -33,20 +33,20 @@ func TestNudgedStampsForwardOnly(t *testing.T) {
 	if err := r.svc.Nudged(ctx, []task.ID{id, "e-gone"}, unitU, at); err != nil {
 		t.Fatal(err)
 	}
-	if e := r.entry(t, id); !e.Waiting.LastNudge.Equal(at) {
+	if e := r.task(t, id); !e.Waiting.LastNudge.Equal(at) {
 		t.Fatalf("%+v", e.Waiting)
 	}
 	if err := r.svc.Nudged(ctx, nil, unitU, t0.Add(time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	if e := r.entry(t, id); !e.Waiting.LastNudge.Equal(at) {
+	if e := r.task(t, id); !e.Waiting.LastNudge.Equal(at) {
 		t.Fatalf("moved back: %+v", e.Waiting)
 	}
 	later := t0.Add(2 * time.Hour)
 	if err := r.svc.Nudged(ctx, nil, unitU, later); err != nil {
 		t.Fatal(err)
 	}
-	if e := r.entry(t, id); !e.Waiting.LastNudge.Equal(later) {
+	if e := r.task(t, id); !e.Waiting.LastNudge.Equal(later) {
 		t.Fatalf("by unit: %+v", e.Waiting)
 	}
 }
@@ -74,7 +74,7 @@ func TestNudgeStampKeepsAConcurrentSyncMove(t *testing.T) {
 			}
 		}()
 		wg.Wait()
-		e := r.entry(t, id)
+		e := r.task(t, id)
 		if e.State != task.Inbox || !e.Changed || !e.Waiting.LastNudge.Equal(at) {
 			t.Fatalf("round %d: %s changed=%v lastNudge=%v", round, e.State, e.Changed, e.Waiting.LastNudge)
 		}

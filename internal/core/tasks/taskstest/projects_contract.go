@@ -14,8 +14,8 @@ import (
 // store over it.
 func ProjectsContract(t *testing.T, open func(t *testing.T) (coretasks.Store, coretasks.ProjectStore)) {
 	ctx := context.Background()
-	project := func(id task.ID, slug string, st task.State) task.Entry {
-		return task.Entry{ID: id, Kind: task.KindProject, State: st, Title: "P " + string(id), Origin: task.OriginUser, Sequential: true,
+	project := func(id task.ID, slug string, st task.State) task.Task {
+		return task.Task{ID: id, Kind: task.KindProject, State: st, Title: "P " + string(id), Origin: task.OriginUser, Sequential: true,
 			ReviewEvery: 14 * 24 * time.Hour, ReviewedAt: t0.Add(-time.Hour), Slug: slug, Created: t0, Updated: t0}
 	}
 
@@ -23,7 +23,7 @@ func ProjectsContract(t *testing.T, open func(t *testing.T) (coretasks.Store, co
 		s, _ := open(t)
 		p := project("e-p1", "ship-it", task.Next)
 		apply(t, s, p)
-		got, err := s.Entry(ctx, p.ID)
+		got, err := s.Task(ctx, p.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -37,10 +37,10 @@ func ProjectsContract(t *testing.T, open func(t *testing.T) (coretasks.Store, co
 		}
 		p.ReviewedAt, p.Updated = t0, t0.Add(time.Minute)
 		apply(t, s, p)
-		if got, _ := s.Entry(ctx, p.ID); !got.ReviewedAt.Equal(t0) {
+		if got, _ := s.Task(ctx, p.ID); !got.ReviewedAt.Equal(t0) {
 			t.Errorf("reviewed at %v, want %v", got.ReviewedAt, t0)
 		}
-		ps, err := s.Entries(ctx, task.Query{View: task.ViewProjects})
+		ps, err := s.Tasks(ctx, task.Query{View: task.ViewProjects})
 		if err != nil || len(ps) != 1 || ps[0].Slug != "ship-it" || ps[0].ReviewEvery != 14*24*time.Hour {
 			t.Errorf("projects view %+v, %v", ps, err)
 		}

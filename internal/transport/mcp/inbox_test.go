@@ -45,22 +45,22 @@ type noItems struct{}
 func (noItems) Items(context.Context, unit.Unit) ([]items.Item, error) { return nil, nil }
 
 type inboxRig struct {
-	srv     *Server
-	sid     string
-	books   *turnstest.Store
-	msgs    *messagestest.Store
-	entries *taskstest.Store
-	gtd     *coretasks.Service
+	srv       *Server
+	sid       string
+	books     *turnstest.Store
+	msgs      *messagestest.Store
+	taskStore *taskstest.Store
+	tasks     *coretasks.Service
 }
 
 // inboxSession serves inbox_post over the messages service, with a started turn on term_1.
 func inboxSession(t *testing.T, handle string) *inboxRig {
 	t.Helper()
-	r := &inboxRig{books: turnstest.NewStore(), msgs: messagestest.New(), entries: taskstest.New()}
+	r := &inboxRig{books: turnstest.NewStore(), msgs: messagestest.New(), taskStore: taskstest.New()}
 	r.books.Put(turn.Book{Unit: inboxUnit, Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), ID: "abc", SentTo: "term_1",
 		Session: "term_1", State: turn.Started, SentAt: inboxAt.Add(-time.Hour), StartedAt: inboxAt.Add(-time.Minute)}}})
-	r.gtd = coretasks.New(coretasks.Deps{Store: r.entries, Items: noItems{}, Facts: enabledFacts{}, Clock: fixedClock{}})
-	svc := &messages.Service{Store: r.msgs, Books: r.books, Entries: r.gtd, Intents: turnstest.Intents(), Clock: fixedClock{}}
+	r.tasks = coretasks.New(coretasks.Deps{Store: r.taskStore, Items: noItems{}, Facts: enabledFacts{}, Clock: fixedClock{}})
+	svc := &messages.Service{Store: r.msgs, Books: r.books, Tasks: r.tasks, Intents: turnstest.Intents(), Clock: fixedClock{}}
 	r.srv = &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800, Inbox: svc}
 	r.sid = call(t, r.srv, "", handle, initialize).Header().Get("Mcp-Session-Id")
 	if r.sid == "" {
@@ -116,7 +116,7 @@ func TestInboxPostCreatesAMessage(t *testing.T) {
 		m.Origin != (message.Origin{Kind: message.OriginAgent, TurnSeq: 1, Session: "term_1"}) {
 		t.Fatalf("message %+v", m)
 	}
-	e, err := r.entries.Entry(context.Background(), task.ID(m.EntryID))
+	e, err := r.taskStore.Task(context.Background(), task.ID(m.TaskID))
 	if err != nil || e.Kind != task.KindMessage || e.State != task.Inbox {
 		t.Fatalf("entry %+v %v", e, err)
 	}
@@ -143,18 +143,18 @@ func TestInboxPostNeedsAHandle(t *testing.T) {
 	}
 }
 
-func TestInboxPostCannotMoveEntries(t *testing.T) {
+func TestInboxPostCannotMoveTasks(t *testing.T) {
 	r := inboxSession(t, "term_1")
 	r.post(t, "term_1", `{"text":"first"}`)
 	ctx := context.Background()
-	capture, err := r.gtd.Capture(ctx, "call Ana", "", nil)
+	capture, err := r.tasks.Capture(ctx, "call Ana", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	snapshot := func() []task.Entry {
-		var all []task.Entry
+	snapshot := func() []task.Task {
+		var all []task.Task
 		for _, v := range task.StoredViews {
-			es, err := r.entries.Entries(ctx, task.Query{View: v})
+			es, err := r.taskStore.Tasks(ctx, task.Query{View: v})
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -47,7 +47,7 @@ type hotPlan struct {
 
 var hotPlans = []hotPlan{
 	{name: "open messages", query: messagesOpenSQL, want: []string{"messages_open (state=?)"}},
-	{name: "message by entry", query: messageByEntrySQL, args: 1, want: []string{"messages_entry (entry_id=?)"}},
+	{name: "message by entry", query: messageByTaskSQL, args: 1, want: []string{"messages_entry (entry_id=?)"}},
 	{name: "open question", query: openQuestionSQL, args: 5, want: []string{"messages_open (state=?)"}},
 	{name: "open workflow proposal", query: openWorkflowSQL, args: 4, want: []string{"messages_open (state=?)"}},
 	{name: "ledger message", query: ledgerMessageSQL, args: 1, want: []string{"messages_proposal (proposal=?)"}},

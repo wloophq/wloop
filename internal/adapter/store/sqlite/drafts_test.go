@@ -64,7 +64,7 @@ func init() {
 }
 
 func sampleDraft(u unit.Unit, at time.Time) draft.Draft {
-	return draft.Draft{Unit: u, Items: []string{"i1", "i2"}, Entry: "e1", Kind: draft.Nudge, Target: "#general",
+	return draft.Draft{Unit: u, Items: []string{"i1", "i2"}, Task: "e1", Kind: draft.Nudge, Target: "#general",
 		Text: "ping @{slack:U000AAA}", Original: "ping", Edited: true, Replaced: "pong",
 		Origin: draft.Origin{Kind: draft.OriginAuto, TurnSeq: 3, Intent: "reply", Workflow: "wf", Rule: "stalled-nudge", Key: "stalled-nudge:e1:slack:U000AAA",
 			Unit: unit.Unit{Provider: unit.GitHub, Key: "acme/widgets#7"}},
@@ -121,7 +121,7 @@ func TestDraftsStoreRoundTrips(t *testing.T) {
 	}
 
 	discarded := sampleDraft(ghPull, at)
-	discarded.State, discarded.Reason, discarded.Entry = draft.Discarded, "observe", ""
+	discarded.State, discarded.Reason, discarded.Task = draft.Discarded, "observe", ""
 	discarded.Origin = draft.Origin{Kind: draft.OriginTurn, TurnSeq: 8}
 	discarded.Approval, discarded.Deadline = draft.Approval{Mode: draft.DryRun}, time.Time{}
 	d2, _ := s.Insert(ctx, discarded)
@@ -145,7 +145,7 @@ func TestDraftsStoreRoundTrips(t *testing.T) {
 		"all":       {outbox.Filter{}, []draft.ID{d3.ID, d2.ID, first.ID}},
 		"states":    {outbox.Filter{States: []draft.State{draft.Sent, draft.Discarded}}, []draft.ID{d2.ID, first.ID}},
 		"unit":      {outbox.Filter{Unit: &slackThread}, []draft.ID{d3.ID, first.ID}},
-		"entry":     {outbox.Filter{Entry: "e1"}, []draft.ID{d3.ID, first.ID}},
+		"entry":     {outbox.Filter{Task: "e1"}, []draft.ID{d3.ID, first.ID}},
 		"rule":      {outbox.Filter{Rule: "stalled-nudge"}, []draft.ID{d3.ID, first.ID}},
 		"key":       {outbox.Filter{Rule: "stalled-nudge", Key: "stalled-nudge:e1:slack:U000AAA", States: draft.Open}, []draft.ID{d3.ID}},
 		"other key": {outbox.Filter{Key: "nope"}, nil},

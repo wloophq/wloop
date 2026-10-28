@@ -50,7 +50,7 @@ func New(db *sqlite.DB, clock port.Clock, endedAfter time.Duration) *Provider {
 
 // List is every Slack unit a live entry is attached to, in unit order.
 func (p *Provider) List(ctx context.Context, _ unit.ProviderID) ([]unit.Unit, error) {
-	es, err := p.db.Entries().Entries(ctx, task.Query{View: task.ViewOpen})
+	es, err := p.db.Tasks().Tasks(ctx, task.Query{View: task.ViewOpen})
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 	if err != nil {
 		return nil, err
 	}
-	es, err := p.db.Entries().EntriesOf(ctx, u)
+	es, err := p.db.Tasks().TasksOf(ctx, u)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +155,7 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 		"slack.started_by_me":          st.StartedByViewer,
 		"slack.closure_posted":         st.ClosurePosted || st.ClosureMarked,
 		"slack.ended":                  st.ClosurePosted || st.ClosureMarked || p.quiet(newest, now),
-		"slack.live_entry":             slices.ContainsFunc(es, func(e task.Entry) bool { return liveOn(e, u) }),
+		"slack.live_entry":             slices.ContainsFunc(es, func(e task.Task) bool { return liveOn(e, u) }),
 		"slack.items_open":             open,
 		"slack.items_unowned":          orphans,
 		"slack.items_unowned_age_days": age,
@@ -172,7 +172,7 @@ func (p *Provider) quiet(newest string, now time.Time) bool {
 }
 
 // liveOn says whether e is a live, unmuted entry attached to u.
-func liveOn(e task.Entry, u unit.Unit) bool {
+func liveOn(e task.Task, u unit.Unit) bool {
 	return e.Live() && !e.Snooze.Mute && slices.Contains(e.Units, u)
 }
 

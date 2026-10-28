@@ -274,10 +274,10 @@ func TestPlanAsksTheQueryAndActsWithTheRequest(t *testing.T) {
 
 func TestDigestAsksTheDay(t *testing.T) {
 	socket := serve(t, func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(api.Digest{Day: r.URL.Path + "?" + r.URL.RawQuery, Entries: []string{"e-1"}})
+		json.NewEncoder(w).Encode(api.Digest{Day: r.URL.Path + "?" + r.URL.RawQuery, Tasks: []string{"e-1"}})
 	})
 	d, err := New(socket).Digest(context.Background(), "2026-10-08")
-	if err != nil || d.Day != api.DigestPath+"?day=2026-10-08" || len(d.Entries) != 1 {
+	if err != nil || d.Day != api.DigestPath+"?day=2026-10-08" || len(d.Tasks) != 1 {
 		t.Fatalf("%+v %v", d, err)
 	}
 }

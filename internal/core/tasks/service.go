@@ -70,19 +70,19 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 		return Result{}, fmt.Errorf("%w: unknown verb %q", ErrArgs, req.Verb)
 	}
 	if src, ok := s.sourceOf(id); ok {
-		e, found, err := src.Entry(ctx, id)
+		e, found, err := src.Task(ctx, id)
 		if err != nil {
 			return Result{}, err
 		}
 		if !found {
-			return Result{}, fmt.Errorf("%w: %s", ErrNoEntry, id)
+			return Result{}, fmt.Errorf("%w: %s", ErrNoTask, id)
 		}
 		if h := s.handler(e.Kind, req.Verb); h != nil {
 			return h(ctx, e, req)
 		}
 		return Result{}, fmt.Errorf("%w: %s on a %s entry", ErrVerb, req.Verb, e.Kind)
 	}
-	e, err := s.d.Store.Entry(ctx, id)
+	e, err := s.d.Store.Task(ctx, id)
 	if err != nil {
 		return Result{}, err
 	}
@@ -98,7 +98,7 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if e, err = s.d.Store.Entry(ctx, id); err != nil {
+	if e, err = s.d.Store.Task(ctx, id); err != nil {
 		return Result{}, err
 	}
 	now := s.now()
@@ -106,9 +106,9 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 	if req.Verb == task.VerbProject {
 		cs, err = s.project(ctx, e, req.Args, now)
 	} else {
-		var next task.Entry
+		var next task.Task
 		next, err = transition(e, req, now)
-		cs = []task.Change{{Op: task.OpUpdate, Entry: next, Why: string(req.Verb)}}
+		cs = []task.Change{{Op: task.OpUpdate, Task: next, Why: string(req.Verb)}}
 	}
 	if err != nil {
 		return Result{}, err
@@ -116,19 +116,19 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 	if err := s.d.Store.Apply(ctx, cs, verbEvents(e, req, now)...); err != nil {
 		return Result{}, err
 	}
-	return Result{Entry: cs[len(cs)-1].Entry}, nil
+	return Result{Task: cs[len(cs)-1].Task}, nil
 }
 
 // project attaches e to the project args["id"] names, or to a new one titled args["title"], after its last action.
-func (s *Service) project(ctx context.Context, e task.Entry, args map[string]string, now time.Time) ([]task.Change, error) {
+func (s *Service) project(ctx context.Context, e task.Task, args map[string]string, now time.Time) ([]task.Change, error) {
 	if err := accepts(e, task.VerbProject); err != nil {
 		return nil, err
 	}
 	var cs []task.Change
-	var p task.Entry
+	var p task.Task
 	switch id, title := args["id"], strings.TrimSpace(args["title"]); {
 	case id != "":
-		got, err := s.d.Store.Entry(ctx, task.ID(id))
+		got, err := s.d.Store.Task(ctx, task.ID(id))
 		if err != nil {
 			return nil, err
 		}
@@ -137,13 +137,13 @@ func (s *Service) project(ctx context.Context, e task.Entry, args map[string]str
 		}
 		p = got
 	case title != "":
-		p = task.Entry{ID: task.NewID(), Kind: task.KindProject, State: task.Next, Title: title,
+		p = task.Task{ID: task.NewID(), Kind: task.KindProject, State: task.Next, Title: title,
 			Sequential: args["sequential"] == "true", Area: e.Area, Origin: task.OriginUser, Created: now, Updated: now}
-		cs = append(cs, task.Change{Op: task.OpCreate, Entry: p, Why: "project"})
+		cs = append(cs, task.Change{Op: task.OpCreate, Task: p, Why: "project"})
 	default:
 		return nil, fmt.Errorf("%w: project needs id or title", ErrArgs)
 	}
-	open, err := s.d.Store.Entries(ctx, task.Query{View: task.ViewOpen})
+	open, err := s.d.Store.Tasks(ctx, task.Query{View: task.ViewOpen})
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func (s *Service) project(ctx context.Context, e task.Entry, args map[string]str
 	if pos, err := strconv.Atoi(args["position"]); err == nil {
 		e.Position = pos
 	}
-	return append(cs, task.Change{Op: task.OpUpdate, Entry: e, Why: "project"}), nil
+	return append(cs, task.Change{Op: task.OpUpdate, Task: e, Why: "project"}), nil
 }
 
 // dismissOff dismisses entry id, which has a unit or an item of a disabled plugin, with no handler: it detaches
@@ -167,7 +167,7 @@ func (s *Service) project(ctx context.Context, e task.Entry, args map[string]str
 func (s *Service) dismissOff(ctx context.Context, id task.ID, req Request, enabled map[unit.Unit]bool) (Result, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	e, err := s.d.Store.Entry(ctx, id)
+	e, err := s.d.Store.Task(ctx, id)
 	if err != nil {
 		return Result{}, err
 	}
@@ -207,15 +207,15 @@ func (s *Service) dismissOff(ctx context.Context, id task.ID, req Request, enabl
 			why += " " + string(p)
 		}
 	}
-	if err := s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Entry: next, Why: why}}, verbEvents(e, req, now)...); err != nil {
+	if err := s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: next, Why: why}}, verbEvents(e, req, now)...); err != nil {
 		return Result{}, err
 	}
-	return Result{Entry: next}, nil
+	return Result{Task: next}, nil
 }
 
 // RecordVerb records that a person ran req's verb on e, once the handler or
 // the service that runs it succeeded.
-func (s *Service) RecordVerb(ctx context.Context, e task.Entry, req Request) error {
+func (s *Service) RecordVerb(ctx context.Context, e task.Task, req Request) error {
 	evs := verbEvents(e, req, s.now())
 	if len(evs) == 0 {
 		return nil
@@ -225,7 +225,7 @@ func (s *Service) RecordVerb(ctx context.Context, e task.Entry, req Request) err
 
 // verbEvents are the event of req's verb on e, which left e's state; none
 // for a verb that records nothing or an automated one.
-func verbEvents(e task.Entry, req Request, now time.Time) []port.Event {
+func verbEvents(e task.Task, req Request, now time.Time) []port.Event {
 	kind := task.VerbEventKind(req.Verb)
 	if req.Automated || !slices.Contains(task.VerbEventKinds, kind) {
 		return nil
@@ -234,7 +234,7 @@ func verbEvents(e task.Entry, req Request, now time.Time) []port.Event {
 }
 
 // writable refuses an entry with a unit whose plugin is disabled; ok caches the answers per unit.
-func (s *Service) writable(ctx context.Context, e task.Entry, ok map[unit.Unit]bool) error {
+func (s *Service) writable(ctx context.Context, e task.Task, ok map[unit.Unit]bool) error {
 	for _, u := range e.Units {
 		enabled, seen := ok[u]
 		if !seen {
@@ -255,30 +255,30 @@ func (s *Service) writable(ctx context.Context, e task.Entry, ok map[unit.Unit]b
 }
 
 // Capture files a new entry in the Inbox.
-func (s *Service) Capture(ctx context.Context, title, notes string, u *unit.Unit) (task.Entry, error) {
+func (s *Service) Capture(ctx context.Context, title, notes string, u *unit.Unit) (task.Task, error) {
 	if strings.TrimSpace(title) == "" {
-		return task.Entry{}, fmt.Errorf("%w: a capture needs a title", ErrArgs)
+		return task.Task{}, fmt.Errorf("%w: a capture needs a title", ErrArgs)
 	}
 	return s.create(ctx, task.KindCapture, title, notes, u, task.OriginUser, nil)
 }
 
 // Open creates an entry another service owns the content of (messages): Kind, Inbox, random id.
-func (s *Service) Open(ctx context.Context, r OpenRequest) (task.Entry, error) {
+func (s *Service) Open(ctx context.Context, r OpenRequest) (task.Task, error) {
 	if r.Kind == "" {
-		return task.Entry{}, fmt.Errorf("%w: open needs a kind", ErrArgs)
+		return task.Task{}, fmt.Errorf("%w: open needs a kind", ErrArgs)
 	}
 	return s.create(ctx, r.Kind, r.Title, "", r.Unit, cmp.Or(r.Origin, task.OriginMessage), r.Contexts)
 }
 
-func (s *Service) create(ctx context.Context, kind task.Kind, title, notes string, u *unit.Unit, origin string, contexts []string) (task.Entry, error) {
+func (s *Service) create(ctx context.Context, kind task.Kind, title, notes string, u *unit.Unit, origin string, contexts []string) (task.Task, error) {
 	now := s.now()
-	e := task.Entry{ID: task.NewID(), Kind: kind, State: task.Inbox, Title: title, Notes: notes, Origin: origin,
+	e := task.Task{ID: task.NewID(), Kind: kind, State: task.Inbox, Title: title, Notes: notes, Origin: origin,
 		Contexts: slices.Clone(contexts), Created: now, Updated: now}
 	if u != nil && !u.IsZero() {
 		e.Units = []unit.Unit{*u}
 	}
-	if err := s.d.Store.Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: e, Why: string(origin)}}); err != nil {
-		return task.Entry{}, err
+	if err := s.d.Store.Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e, Why: string(origin)}}); err != nil {
+		return task.Task{}, err
 	}
 	return e, nil
 }
@@ -291,7 +291,7 @@ func (s *Service) Close(ctx context.Context, id task.ID, to task.State) error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	e, err := s.d.Store.Entry(ctx, id)
+	e, err := s.d.Store.Task(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -306,14 +306,14 @@ func (s *Service) Close(ctx context.Context, id task.ID, to task.State) error {
 	}
 	now := s.now()
 	e.State, e.Snooze, e.Updated = to, task.Snooze{}, now
-	return s.d.Store.Apply(ctx, []task.Change{{Op: task.OpResolve, Entry: e, Why: "closed"}})
+	return s.d.Store.Apply(ctx, []task.Change{{Op: task.OpResolve, Task: e, Why: "closed"}})
 }
 
 // Retitle renames an entry opened by Open or Capture, as one change; a derived entry refuses it.
 func (s *Service) Retitle(ctx context.Context, id task.ID, title string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	e, err := s.d.Store.Entry(ctx, id)
+	e, err := s.d.Store.Task(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -324,7 +324,7 @@ func (s *Service) Retitle(ctx context.Context, id task.ID, title string) error {
 		return nil
 	}
 	e.Title, e.Updated = title, s.now()
-	return s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Entry: e, Why: "retitled"}})
+	return s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e, Why: "retitled"}})
 }
 
 // pending folds the changes of one Sync by entry, in first-seen order.
@@ -337,41 +337,41 @@ func (p *pending) put(c task.Change) {
 	if p.byID == nil {
 		p.byID = map[task.ID]task.Change{}
 	}
-	old, ok := p.byID[c.Entry.ID]
+	old, ok := p.byID[c.Task.ID]
 	if !ok {
-		p.order = append(p.order, c.Entry.ID)
+		p.order = append(p.order, c.Task.ID)
 	} else {
 		if old.Op == task.OpCreate {
 			c.Op = task.OpCreate
 		}
 		c.Why = old.Why + "; " + c.Why
 	}
-	p.byID[c.Entry.ID] = c
+	p.byID[c.Task.ID] = c
 }
 
-func (p *pending) overlay(es []task.Entry) []task.Entry {
+func (p *pending) overlay(es []task.Task) []task.Task {
 	out := slices.Clone(es)
 	have := map[task.ID]bool{}
 	for i, e := range out {
 		have[e.ID] = true
 		if c, ok := p.byID[e.ID]; ok {
-			out[i] = c.Entry
+			out[i] = c.Task
 		}
 	}
 	for _, id := range p.order {
 		if !have[id] {
-			out = append(out, p.byID[id].Entry)
+			out = append(out, p.byID[id].Task)
 		}
 	}
 	return out
 }
 
 // of is es with this Sync's changes over them, plus the entries it created that belong to u.
-func (p *pending) of(es []task.Entry, u unit.Unit) []task.Entry {
-	return slices.DeleteFunc(p.overlay(es), func(e task.Entry) bool { return !belongs(e, u) })
+func (p *pending) of(es []task.Task, u unit.Unit) []task.Task {
+	return slices.DeleteFunc(p.overlay(es), func(e task.Task) bool { return !belongs(e, u) })
 }
 
-func belongs(e task.Entry, u unit.Unit) bool {
+func belongs(e task.Task, u unit.Unit) bool {
 	return slices.Contains(e.Units, u) || slices.ContainsFunc(e.Items, func(r task.ItemRef) bool { return r.Unit == u })
 }
 
@@ -391,7 +391,7 @@ func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := s.now()
-	open, err := s.d.Store.Entries(ctx, task.Query{View: task.ViewOpen})
+	open, err := s.d.Store.Tasks(ctx, task.Query{View: task.ViewOpen})
 	if err != nil {
 		return err
 	}
@@ -409,7 +409,7 @@ func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 		case err != nil:
 			return err
 		}
-		p.put(task.Change{Op: task.OpUpdate, Entry: woke, Why: "snooze ended"})
+		p.put(task.Change{Op: task.OpUpdate, Task: woke, Why: "snooze ended"})
 		units = append(units, e.Units...)
 	}
 	seen := map[unit.Unit]bool{}
@@ -431,7 +431,7 @@ func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 		if err != nil {
 			return fmt.Errorf("items of %s: %w", u, err)
 		}
-		have, err := s.d.Store.EntriesOf(ctx, u)
+		have, err := s.d.Store.TasksOf(ctx, u)
 		if err != nil {
 			return err
 		}
@@ -462,7 +462,7 @@ func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 		case err != nil:
 			return err
 		default:
-			p.put(task.Change{Op: task.OpUpdate, Entry: next, Why: strings.Join(why, ", ")})
+			p.put(task.Change{Op: task.OpUpdate, Task: next, Why: strings.Join(why, ", ")})
 		}
 	}
 	if len(p.order) == 0 {
@@ -478,7 +478,7 @@ func (s *Service) Attach(ctx context.Context, id task.ID, u unit.Unit) error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	e, err := s.d.Store.Entry(ctx, id)
+	e, err := s.d.Store.Task(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -486,5 +486,5 @@ func (s *Service) Attach(ctx context.Context, id task.ID, u unit.Unit) error {
 		return nil
 	}
 	e.Units, e.Updated = append(slices.Clone(e.Units), u), s.now()
-	return s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Entry: e, Why: "attached " + u.String()}})
+	return s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e, Why: "attached " + u.String()}})
 }

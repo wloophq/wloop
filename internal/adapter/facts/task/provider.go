@@ -24,10 +24,10 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
-// Entries reads the GTD entries (coretasks.Store).
-type Entries interface {
-	Entries(ctx context.Context, q task.Query) ([]task.Entry, error)
-	Entry(ctx context.Context, id task.ID) (task.Entry, error)
+// Tasks reads the GTD entries (coretasks.Store).
+type Tasks interface {
+	Tasks(ctx context.Context, q task.Query) ([]task.Task, error)
+	Task(ctx context.Context, id task.ID) (task.Task, error)
 }
 
 // Items reads units' items (the items store).
@@ -51,8 +51,8 @@ type Settings struct {
 }
 
 type Deps struct {
-	Entries Entries
-	Items   Items
+	Tasks Tasks
+	Items Items
 	// Cards are the facts of the entries' units; nil: none.
 	Cards coretasks.Facts
 	// Drafts are read for entry.settled_at; nil: always zero.
@@ -101,9 +101,9 @@ func (p *Provider) settings() Settings {
 
 // listed says whether e is a subject: a live entry of no unit, or of a unit
 // whose plugin is enabled.
-func (p *Provider) listed(e task.Entry) bool { return e.Live() && p.enabledFor(e) }
+func (p *Provider) listed(e task.Task) bool { return e.Live() && p.enabledFor(e) }
 
-func (p *Provider) enabledFor(e task.Entry) bool {
+func (p *Provider) enabledFor(e task.Task) bool {
 	u, ok := e.FirstUnit()
 	return !ok || p.enabled(u.Provider)
 }
@@ -111,7 +111,7 @@ func (p *Provider) enabledFor(e task.Entry) bool {
 // List is every listed entry, by id, and keeps the earliest nudge-due or
 // resurface time after now for Due.
 func (p *Provider) List(ctx context.Context, _ unit.ProviderID) ([]unit.Unit, error) {
-	es, err := p.d.Entries.Entries(ctx, task.Query{View: task.ViewOpen})
+	es, err := p.d.Tasks.Tasks(ctx, task.Query{View: task.ViewOpen})
 	if err != nil {
 		return nil, err
 	}
@@ -143,17 +143,17 @@ func (p *Provider) Due() time.Time {
 	return p.due
 }
 
-// entry is u's entry; ErrUnitGone when it is gone, or no longer listed
+// task is u's entry; ErrUnitGone when it is gone, or no longer listed
 // unless anyState is true, or its plugin is disabled.
-func (p *Provider) entry(ctx context.Context, u unit.Unit, anyState bool) (task.Entry, error) {
-	e, err := p.d.Entries.Entry(ctx, task.ID(u.Key))
+func (p *Provider) task(ctx context.Context, u unit.Unit, anyState bool) (task.Task, error) {
+	e, err := p.d.Tasks.Task(ctx, task.ID(u.Key))
 	switch {
-	case errors.Is(err, coretasks.ErrNoEntry):
-		return task.Entry{}, automation.ErrUnitGone
+	case errors.Is(err, coretasks.ErrNoTask):
+		return task.Task{}, automation.ErrUnitGone
 	case err != nil:
-		return task.Entry{}, err
+		return task.Task{}, err
 	case anyState && !p.enabledFor(e), !anyState && !p.listed(e):
-		return task.Entry{}, automation.ErrUnitGone
+		return task.Task{}, automation.ErrUnitGone
 	}
 	return e, nil
 }
@@ -171,7 +171,7 @@ func (p *Provider) EventFacts(ctx context.Context, u unit.Unit) (workflow.Facts,
 }
 
 func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workflow.Facts, error) {
-	e, err := p.entry(ctx, u, anyState)
+	e, err := p.task(ctx, u, anyState)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +275,7 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 
 // ended says whether every unit of us but the entry's own has ended, with
 // at least one such unit.
-func (p *Provider) ended(ctx context.Context, e task.Entry, us []unit.Unit) (bool, error) {
+func (p *Provider) ended(ctx context.Context, e task.Task, us []unit.Unit) (bool, error) {
 	if p.d.Ended == nil {
 		return false, nil
 	}
@@ -299,7 +299,7 @@ func (p *Provider) Scope(ctx context.Context, wf string, u unit.Unit, f workflow
 	if p.d.Drafts == nil {
 		return f, nil
 	}
-	ds, err := p.d.Drafts.List(ctx, outbox.Filter{Entry: u.Key, Workflow: wf})
+	ds, err := p.d.Drafts.List(ctx, outbox.Filter{Task: u.Key, Workflow: wf})
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +310,7 @@ func (p *Provider) Scope(ctx context.Context, wf string, u unit.Unit, f workflow
 
 // Owners are the entry's units, whose timelines show the steps run on it.
 func (p *Provider) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error) {
-	e, err := p.entry(ctx, u, true)
+	e, err := p.task(ctx, u, true)
 	if errors.Is(err, automation.ErrUnitGone) {
 		return nil, nil
 	}
@@ -322,7 +322,7 @@ func (p *Provider) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error)
 
 // unitsOf are an entry's units in order: those attached to it, the unit it
 // was captured or derived on first, then those only its items name.
-func unitsOf(e task.Entry) []unit.Unit {
+func unitsOf(e task.Task) []unit.Unit {
 	out := slices.Clone(e.Units)
 	for _, r := range e.Items {
 		if !slices.Contains(out, r.Unit) {
@@ -333,7 +333,7 @@ func unitsOf(e task.Entry) []unit.Unit {
 }
 
 // held are the open items of its that entry e holds.
-func held(e task.Entry, its []items.Item) []items.Item {
+func held(e task.Task, its []items.Item) []items.Item {
 	var out []items.Item
 	for _, it := range its {
 		if it.State == items.Open && slices.Contains(e.Items, task.ItemRef{Unit: it.Unit, Item: it.ID}) {
@@ -343,7 +343,7 @@ func held(e task.Entry, its []items.Item) []items.Item {
 	return out
 }
 
-func resurface(e task.Entry) time.Time {
+func resurface(e task.Task) time.Time {
 	if e.Waiting == nil {
 		return time.Time{}
 	}
@@ -354,7 +354,7 @@ func resurface(e task.Entry) time.Time {
 // set, else StaleDays working days after it started waiting, and no sooner
 // than RenudgeAfter after its last nudge; zero when it waits on nobody or
 // has no date to wait for.
-func nudgeDue(e task.Entry, s Settings, loc *time.Location) time.Time {
+func nudgeDue(e task.Task, s Settings, loc *time.Location) time.Time {
 	w := e.Waiting
 	if w == nil || e.State != task.Waiting || len(w.On) == 0 {
 		return time.Time{}

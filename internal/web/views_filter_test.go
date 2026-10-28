@@ -11,7 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-func TestTheFilterNarrowsTheGTDCounts(t *testing.T) {
+func TestTheFilterNarrowsTheViewCounts(t *testing.T) {
 	var got struct {
 		URLs     []string       `json:"urls"`
 		Before   []any          `json:"before"`
@@ -28,14 +28,14 @@ func TestTheFilterNarrowsTheGTDCounts(t *testing.T) {
 		Areas: map[string]int{"OSS": 2, "Hiring": 1}, Contexts: map[string]int{"@decide": 1, "@reply": 2}}
 	narrowed := api.Counters{Views: map[string]int{"focus": 0, "inbox": 1, "outbox": 0, "next": 2, "waiting": 0, "projects": 0, "someday": 0, "logbook": 1},
 		Areas: map[string]int{"OSS": 2}, Contexts: map[string]int{"@reply": 2}}
-	next := []api.EntryView{
-		entry("n1", "next", func(e *api.EntryView) { e.Title, e.Area, e.Contexts = "Invoice the client", "OSS", []string{"@reply"} }),
-		entry("n2", "next", func(e *api.EntryView) {
+	next := []api.TaskView{
+		task("n1", "next", func(e *api.TaskView) { e.Title, e.Area, e.Contexts = "Invoice the client", "OSS", []string{"@reply"} }),
+		task("n2", "next", func(e *api.TaskView) {
 			e.Title, e.Area, e.Contexts = "Review invoice terms", "OSS", []string{"@reply"}
 		}),
-		entry("n3", "next", func(e *api.EntryView) { e.Title, e.Contexts = "Call Bob", []string{"@decide"} }),
+		task("n3", "next", func(e *api.TaskView) { e.Title, e.Contexts = "Call Bob", []string{"@decide"} }),
 	}
-	nodeRun(t, gtdPrelude(t), nil, `
+	nodeRun(t, viewsPrelude(t), nil, `
 function writeHash() {}
 const urls = [];
 let answer = null;
@@ -66,7 +66,7 @@ const route = { view: "next", area: "", ctx: [], entry: "", q: "invoice" };
     groups: all(list, (x) => x.tag === "h3").map(text),
     areas: all(list, (x) => x.tag === "option").map(text),
     chips: byClass(list, "chip").map(text) }));
-})();`, map[string]any{"cat": gtdCatalog(), "whole": whole, "narrowed": narrowed, "next": next}, &got)
+})();`, map[string]any{"cat": viewsCatalog(), "whole": whole, "narrowed": narrowed, "next": next}, &got)
 	if slices.ContainsFunc(got.Before, func(c any) bool { return c != "" }) {
 		t.Errorf("before the narrowed counters arrive the rail shows no whole count: %v", got.Before)
 	}
@@ -99,45 +99,45 @@ const route = { view: "next", area: "", ctx: [], entry: "", q: "invoice" };
 	}
 }
 
-func TestTheGTDHeadingCountsTheWholeViewWithoutAFilter(t *testing.T) {
+func TestTheViewHeadingCountsTheWholeViewWithoutAFilter(t *testing.T) {
 	var head string
-	nodeRun(t, gtdPrelude(t), nil, `
+	nodeRun(t, viewsPrelude(t), nil, `
 function writeHash() {}
 gtdState.catalog = input.cat;
 gtdState.key = gtdQueryKey("inbox", "", []);
 gtdState.entries = input.entries;
 process.stdout.write(JSON.stringify(text(byClass(gtdList({ view: "inbox", area: "", ctx: [], entry: "", q: "" }, ""), "lens-count"))));`,
-		map[string]any{"cat": gtdCatalog(), "entries": []api.EntryView{entry("a", "inbox", nil), entry("b", "inbox", nil)}}, &head)
+		map[string]any{"cat": viewsCatalog(), "entries": []api.TaskView{task("a", "inbox", nil), task("b", "inbox", nil)}}, &head)
 	if head != "2 of 2" {
 		t.Errorf("heading %q", head)
 	}
 }
 
-// TestTheCockpitAndTheDaemonMatchTheSameEntries keeps the cockpit's list
+// TestTheCockpitAndTheDaemonMatchTheSameTasks keeps the cockpit's list
 // and the daemon's counts on the same entries: the daemon matches the terms
 // the cockpit sends, trimmed as handleCounters trims them, with
-// api.EntryMatches.
-func TestTheCockpitAndTheDaemonMatchTheSameEntries(t *testing.T) {
+// api.TaskMatches.
+func TestTheCockpitAndTheDaemonMatchTheSameTasks(t *testing.T) {
 	gh := unit.Unit{Provider: unit.GitHub, Key: "acme/api#12"}
-	es := []api.EntryView{
-		entry("a", "next", func(e *api.EntryView) {
+	es := []api.TaskView{
+		task("a", "next", func(e *api.TaskView) {
 			e.Title, e.Notes, e.Area, e.ProjectTitle, e.Contexts = "Ação rápida", "see the runbook", "OSS", "Launch", []string{"@reply"}
 			e.Units, e.UnitLabels = []unit.Unit{gh, {Provider: "slack", Key: "T1/C9"}}, []string{"", "#deploys thread"}
 			e.Waiting = &api.WaitingView{On: []api.WaitingPerson{{Name: "Bruna"}}}
 			e.Items = []api.ItemView{{Summary: "answer the question"}}
 		}),
-		entry("b", "inbox", func(e *api.EntryView) {
+		task("b", "inbox", func(e *api.TaskView) {
 			e.Kind = "capture"
 			e.Cards = []api.CardView{{Card: card.Card{LastHuman: &card.Human{Who: items.Person{Key: "github:octocat"}}, WaitsOn: []items.Person{{Name: "Dora"}}}}}
 			e.Message = &api.Message{Text: "Which window?"}
 		}),
-		entry("c", "inbox", func(e *api.EntryView) {
+		task("c", "inbox", func(e *api.TaskView) {
 			e.Kind = "draft"
 			e.Draft = &api.Draft{Unit: "slack/T1/C1", Target: "C0REL", Where: "#releases", Text: "Ship it", Reaction: "eyes"}
 		}),
-		entry("d", "next", func(e *api.EntryView) { e.Title = "Škoda deal with Erdős" }),
-		entry("e", "next", func(e *api.EntryView) { e.Title = "회의 준비, がんばる" }),
-		entry("f", "next", func(e *api.EntryView) { e.Title, e.Notes = "Send the invoice", "e\u0301clair and CAFÉ" }),
+		task("d", "next", func(e *api.TaskView) { e.Title = "Škoda deal with Erdős" }),
+		task("e", "next", func(e *api.TaskView) { e.Title = "회의 준비, がんばる" }),
+		task("f", "next", func(e *api.TaskView) { e.Title, e.Notes = "Send the invoice", "e\u0301clair and CAFÉ" }),
 	}
 	queries := []string{"acao", "runbook oss", "launch", "@reply", "acme/api#12", "slack:t1/c9", "deploys", "bruna", "question", "octocat",
 		"dora", "window", "c0rel", "releases", "ship", "eyes", "slack/t1", "next", "capture", "draft ship", "nobody", `"entry a" ação`,
@@ -147,7 +147,7 @@ func TestTheCockpitAndTheDaemonMatchTheSameEntries(t *testing.T) {
 		Terms   []string `json:"terms"`
 		Matches []bool   `json:"matches"`
 	}
-	nodeRun(t, gtdPrelude(t), nil, `
+	nodeRun(t, viewsPrelude(t), nil, `
 process.stdout.write(JSON.stringify(input.queries.map((q) => {
   const ts = gtdTerms(q);
   return { terms: ts, matches: input.entries.map((e) => entryMatches(e, ts)) };
@@ -160,7 +160,7 @@ process.stdout.write(JSON.stringify(input.queries.map((q) => {
 			}
 		}
 		for j, e := range es {
-			if want := api.EntryMatches(e, sent); got[i].Matches[j] != want {
+			if want := api.TaskMatches(e, sent); got[i].Matches[j] != want {
 				t.Errorf("%q (terms %q) on %s: the list shows %v, the daemon counts %v", q, got[i].Terms, e.ID, got[i].Matches[j], want)
 			}
 		}
@@ -172,7 +172,7 @@ func TestAFailedFilteredReadLeavesTheRailWithoutCounts(t *testing.T) {
 		Rail   []any `json:"rail"`
 		Failed []any `json:"failed"`
 	}
-	nodeRun(t, gtdPrelude(t), nil, `
+	nodeRun(t, viewsPrelude(t), nil, `
 let fail = false;
 async function getJSON() { if (fail) throw new Error("HTTP 500"); return input.counters; }
 gtdState.catalog = input.cat;
@@ -183,7 +183,7 @@ const counts = (route) => gtdNav(gtdState.catalog, [], [], gtdCounters(route)).m
   fail = true;
   await loadFiltered({ area: "", q: "invoices" });
   process.stdout.write(JSON.stringify({ rail, failed: counts({ area: "", q: "invoices" }) }));
-})();`, map[string]any{"cat": gtdCatalog(), "counters": api.Counters{Views: map[string]int{"next": 2}}}, &got)
+})();`, map[string]any{"cat": viewsCatalog(), "counters": api.Counters{Views: map[string]int{"next": 2}}}, &got)
 	if got.Rail[3] != 2.0 {
 		t.Errorf("rail %v", got.Rail)
 	}

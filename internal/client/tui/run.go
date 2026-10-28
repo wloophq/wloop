@@ -28,13 +28,13 @@ type Daemon interface {
 	Events(ctx context.Context, client string, since api.Since) (<-chan api.Change, error)
 	Plan(ctx context.Context, q api.PlanQuery) (api.PlanResponse, error)
 	ActOnPlan(ctx context.Context, req api.PlanActRequest) (api.PlanResponse, error)
-	GTD(ctx context.Context) (api.GTDCatalog, error)
-	EntriesSince(ctx context.Context, q client.EntryQuery, since api.Since) (api.EntriesPage, error)
+	Views(ctx context.Context) (api.ViewsCatalog, error)
+	TasksSince(ctx context.Context, q client.TaskQuery, since api.Since) (api.TasksPage, error)
 	Counters(ctx context.Context, area string, terms ...string) (api.Counters, error)
-	Entry(ctx context.Context, id string) (api.EntryView, error)
-	EntryDo(ctx context.Context, id, verb string, req api.EntryRequest) (api.EntryResult, error)
-	EntryDrafts(ctx context.Context, entry string) ([]api.Draft, error)
-	Capture(ctx context.Context, req api.CaptureRequest) (api.EntryView, error)
+	Task(ctx context.Context, id string) (api.TaskView, error)
+	TaskDo(ctx context.Context, id, verb string, req api.TaskRequest) (api.TaskResult, error)
+	TaskDrafts(ctx context.Context, task string) ([]api.Draft, error)
+	Capture(ctx context.Context, req api.CaptureRequest) (api.TaskView, error)
 	Keys(ctx context.Context, surface string) (api.KeysResponse, error)
 	Review(ctx context.Context) (api.Review, error)
 	ReviewStepDone(ctx context.Context, step string) (api.Review, error)
@@ -91,14 +91,14 @@ type loaded struct {
 	plan    *[]api.PlanItem
 	closed  []api.ClosedSession
 	planErr error
-	// gtd and keys are the served views and bindings when this load read
-	// them; entries is the page of the GTD view on screen when it pulled
+	// viewsCat and keys are the served views and bindings when this load read
+	// them; tasks is the page of the GTD view on screen when it pulled
 	// one, counters the counts a change carried.
-	gtd        *api.GTDCatalog
-	keys       *api.KeysResponse
-	entries    *entriesRead
-	entriesErr error
-	counters   *api.Counters
+	viewsCat *api.ViewsCatalog
+	keys     *api.KeysResponse
+	tasks    *tasksRead
+	tasksErr error
+	counters *api.Counters
 	// filtered are the counts of the entries the filter keeps, when this
 	// load read them.
 	filtered    *filteredRead
@@ -108,9 +108,9 @@ type loaded struct {
 	reviewErr error
 }
 
-type entriesRead struct {
+type tasksRead struct {
 	view     string
-	entries  []api.EntryView
+	tasks    []api.TaskView
 	counters api.Counters
 }
 
@@ -131,7 +131,7 @@ type finished struct {
 // for a detail the drafts made for its entry.
 type carried struct {
 	lines  []string
-	entry  api.EntryView
+	task   api.TaskView
 	drafts []api.Draft
 }
 
@@ -188,7 +188,7 @@ func Run(ctx context.Context, cfg Config) error {
 	// track pulls the entries of the GTD view on screen once it changed,
 	// and asks again for an open detail a page changed.
 	track := func() {
-		view, area, ok := m.EntryQuery()
+		view, area, ok := m.TaskQuery()
 		if (shown.set(view, area, ok) && ok) || shown.setReview(m.inReview()) || shown.setFilter(m.area, m.FilterTerms()) {
 			kick()
 		}
@@ -244,8 +244,8 @@ func Run(ctx context.Context, cfg Config) error {
 		case f := <-done:
 			running--
 			if f.cmd.fetch {
-				m.SetDetail(f.cmd.entry, f.entry, f.err)
-				m.SetDrafts(f.cmd.entry, f.drafts)
+				m.SetDetail(f.cmd.task, f.task, f.err)
+				m.SetDrafts(f.cmd.task, f.drafts)
 			} else {
 				m.Done(f.cmd, f.lines, f.err)
 			}
@@ -258,7 +258,7 @@ func Run(ctx context.Context, cfg Config) error {
 			if !f.cmd.fetch || f.cmd.seen {
 				due.rows.Store(true)
 				due.plan.Store(true)
-				due.entries.Store(true)
+				due.tasks.Store(true)
 				due.filtered.Store(true)
 				kick()
 			}
@@ -275,8 +275,8 @@ func (m *Model) apply(r loaded) {
 	if r.plugins != nil {
 		m.SetPlugins(r.plugins)
 	}
-	if r.gtd != nil {
-		m.SetGTD(*r.gtd)
+	if r.viewsCat != nil {
+		m.SetViews(*r.viewsCat)
 	}
 	if r.keys != nil {
 		m.SetKeys(r.keys.Bindings)
@@ -288,8 +288,8 @@ func (m *Model) apply(r loaded) {
 	if r.review != nil {
 		m.SetReview(*r.review)
 	}
-	if e := r.entries; e != nil {
-		m.SetEntries(e.view, e.entries, e.counters)
+	if e := r.tasks; e != nil {
+		m.SetTasks(e.view, e.tasks, e.counters)
 	}
 	if f := r.filtered; f != nil {
 		m.SetFilteredCounters(f.area, f.counters)
@@ -307,8 +307,8 @@ func (m *Model) apply(r loaded) {
 	switch {
 	case r.specsErr != nil:
 		m.status = "actions not refreshed: " + r.specsErr.Error()
-	case r.entriesErr != nil:
-		m.status = "entries not refreshed: " + r.entriesErr.Error()
+	case r.tasksErr != nil:
+		m.status = "entries not refreshed: " + r.tasksErr.Error()
 	case r.reviewErr != nil:
 		m.status = "review not refreshed: " + r.reviewErr.Error()
 	case r.filteredErr != nil:
@@ -381,15 +381,15 @@ func (c *cursor) set(s api.Since) {
 // wants are what the next load asks the daemon for; counters are the
 // counts the last change carried.
 type wants struct {
-	health, rows, plan, entries, filtered atomic.Bool
-	counters                              atomic.Pointer[api.Counters]
+	health, rows, plan, tasks, filtered atomic.Bool
+	counters                            atomic.Pointer[api.Counters]
 }
 
 func (r *wants) all() {
 	r.health.Store(true)
 	r.rows.Store(true)
 	r.plan.Store(true)
-	r.entries.Store(true)
+	r.tasks.Store(true)
 	r.filtered.Store(true)
 }
 
@@ -446,10 +446,10 @@ func (q *query) set(view, area string, ok bool) bool {
 	return changed
 }
 
-func (q *query) get() (client.EntryQuery, bool) {
+func (q *query) get() (client.TaskQuery, bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	return client.EntryQuery{View: q.view, Area: q.area}, q.ok
+	return client.TaskQuery{View: q.view, Area: q.area}, q.ok
 }
 
 // pull brings the set up to the daemon: a delta from where it stands, or
@@ -469,16 +469,16 @@ func pull(ctx context.Context, d Daemon, set *rowset.Set) error {
 	return nil
 }
 
-// pullEntries brings the entries of q up to the daemon as pull does rows.
-func pullEntries(ctx context.Context, d Daemon, q client.EntryQuery, set *entrySet) (api.Counters, error) {
-	page, err := d.EntriesSince(ctx, q, set.since)
+// pullTasks brings the entries of q up to the daemon as pull does rows.
+func pullTasks(ctx context.Context, d Daemon, q client.TaskQuery, set *taskSet) (api.Counters, error) {
+	page, err := d.TasksSince(ctx, q, set.since)
 	if err != nil {
 		return api.Counters{}, err
 	}
 	if set.apply(page) {
 		return page.Counters, nil
 	}
-	if page, err = d.EntriesSince(ctx, q, api.Since{}); err != nil {
+	if page, err = d.TasksSince(ctx, q, api.Since{}); err != nil {
 		return api.Counters{}, err
 	}
 	set.apply(page)
@@ -487,8 +487,8 @@ func pullEntries(ctx context.Context, d Daemon, q client.EntryQuery, set *entryS
 
 // onceReads are the reads a load makes once, and again only after a failure.
 type onceReads struct {
-	catalog, plugins, gtd, keys bool
-	specs                       string
+	catalog, plugins, viewsCat, keys bool
+	specs                            string
 }
 
 func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loaded, answering *atomic.Bool, at *cursor, due *wants, shown *query) {
@@ -498,7 +498,7 @@ func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loa
 	needHealth, needRows, needPlan := true, true, true
 	var plan []api.PlanItem
 	var err error
-	sets := map[string]*entrySet{}
+	sets := map[string]*taskSet{}
 	var pulled, counted string
 	for {
 		select {
@@ -542,9 +542,9 @@ func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loa
 					r.review = &rv
 				}
 			}
-			r.entries, r.entriesErr = readEntries(ctx, d, have.gtd, due, shown, sets, &pulled)
+			r.tasks, r.tasksErr = readTasks(ctx, d, have.viewsCat, due, shown, sets, &pulled)
 			r.counters = due.counters.Swap(nil)
-			r.filtered, r.filteredErr = readFiltered(ctx, d, have.gtd, due, shown, &counted)
+			r.filtered, r.filteredErr = readFiltered(ctx, d, have.viewsCat, due, shown, &counted)
 		}
 		answering.Store(err == nil)
 		select {
@@ -588,9 +588,9 @@ func (have *onceReads) read(ctx context.Context, d Daemon, rows []api.Row, plann
 			r.plugins, have.plugins = nonNilPlugins(res), true
 		}
 	}
-	if !have.gtd {
-		if res, e := d.GTD(ctx); e == nil {
-			r.gtd, have.gtd = &res, true
+	if !have.viewsCat {
+		if res, e := d.Views(ctx); e == nil {
+			r.viewsCat, have.viewsCat = &res, true
 		}
 	}
 	return failed
@@ -603,14 +603,14 @@ func nonNilPlugins(ps []api.Plugin) []api.Plugin {
 	return ps
 }
 
-// readEntries pulls the page of the GTD view on screen when a change named
+// readTasks pulls the page of the GTD view on screen when a change named
 // entries or the screen moved to another view or area since the last pull.
-func readEntries(ctx context.Context, d Daemon, gtd bool, due *wants, shown *query, sets map[string]*entrySet, pulled *string) (*entriesRead, error) {
+func readTasks(ctx context.Context, d Daemon, onViews bool, due *wants, shown *query, sets map[string]*taskSet, pulled *string) (*tasksRead, error) {
 	q, ok := shown.get()
-	named := due.entries.Swap(false)
-	if !gtd || !ok {
+	named := due.tasks.Swap(false)
+	if !onViews || !ok {
 		if named {
-			due.entries.Store(true)
+			due.tasks.Store(true)
 		}
 		return nil, nil
 	}
@@ -620,24 +620,24 @@ func readEntries(ctx context.Context, d Daemon, gtd bool, due *wants, shown *que
 	}
 	set := sets[key]
 	if set == nil {
-		set = &entrySet{}
+		set = &taskSet{}
 		sets[key] = set
 	}
-	c, err := pullEntries(ctx, d, q, set)
+	c, err := pullTasks(ctx, d, q, set)
 	if err != nil {
-		due.entries.Store(true)
+		due.tasks.Store(true)
 		return nil, err
 	}
 	*pulled = key
-	return &entriesRead{view: q.View, entries: set.list(), counters: c}, nil
+	return &tasksRead{view: q.View, tasks: set.list(), counters: c}, nil
 }
 
 // readFiltered reads the counters the filter narrows when the filter has
 // words and they, the area or the entries changed since the last read.
-func readFiltered(ctx context.Context, d Daemon, gtd bool, due *wants, shown *query, counted *string) (*filteredRead, error) {
+func readFiltered(ctx context.Context, d Daemon, onViews bool, due *wants, shown *query, counted *string) (*filteredRead, error) {
 	area, terms := shown.filter()
 	named := due.filtered.Swap(false)
-	if !gtd || len(terms) == 0 {
+	if !onViews || len(terms) == 0 {
 		*counted = ""
 		return nil, nil
 	}
@@ -695,7 +695,7 @@ func listen(ctx context.Context, events <-chan api.Change, at *cursor, due *want
 				due.health.Store(true)
 			}
 			if c.Counters != nil || c.All {
-				due.entries.Store(true)
+				due.tasks.Store(true)
 				due.filtered.Store(true)
 			}
 			if c.Counters != nil {
@@ -735,28 +735,28 @@ func carry(ctx context.Context, cfg Config, c Command) (carried, error) {
 	switch {
 	case c.fetch:
 		if c.seen {
-			if _, err := d.EntryDo(ctx, c.entry, "seen", api.EntryRequest{Source: Source}); err != nil {
+			if _, err := d.TaskDo(ctx, c.task, "seen", api.TaskRequest{Source: Source}); err != nil {
 				return carried{}, err
 			}
 		}
-		e, err := d.Entry(ctx, c.entry)
+		e, err := d.Task(ctx, c.task)
 		if err != nil || e.Kind == "draft" {
-			return carried{entry: e}, err
+			return carried{task: e}, err
 		}
-		ds, err := d.EntryDrafts(ctx, c.entry)
-		return carried{entry: e, drafts: ds}, err
+		ds, err := d.TaskDrafts(ctx, c.task)
+		return carried{task: e, drafts: ds}, err
 	case c.capture != "":
 		e, err := d.Capture(ctx, api.CaptureRequest{Title: c.capture})
 		if err != nil {
 			return carried{}, err
 		}
-		return carried{lines: []string{"in the Inbox as " + e.ID}, entry: e}, nil
+		return carried{lines: []string{"in the Inbox as " + e.ID}, task: e}, nil
 	case c.open != "" || c.openFind:
 		lines, e, err := openLink(ctx, cfg, c)
-		return carried{lines: lines, entry: e}, err
+		return carried{lines: lines, task: e}, err
 	case c.verb != "":
-		res, err := d.EntryDo(ctx, c.entry, c.verb, api.EntryRequest{Args: c.args, Source: Source})
-		return carried{lines: res.Lines, entry: res.Entry}, err
+		res, err := d.TaskDo(ctx, c.task, c.verb, api.TaskRequest{Args: c.args, Source: Source})
+		return carried{lines: res.Lines, task: res.Task}, err
 	case c.reviewStep != "":
 		rv, err := d.ReviewStepDone(ctx, c.reviewStep)
 		if err != nil || !rv.Done {
@@ -770,15 +770,15 @@ func carry(ctx context.Context, cfg Config, c Command) (carried, error) {
 
 // openLink opens the command's link, looking it up first from the entry's
 // cards when the list had none.
-func openLink(ctx context.Context, cfg Config, c Command) ([]string, api.EntryView, error) {
+func openLink(ctx context.Context, cfg Config, c Command) ([]string, api.TaskView, error) {
 	if cfg.OpenURL == nil {
-		return nil, api.EntryView{}, errors.New("opening links is not supported here")
+		return nil, api.TaskView{}, errors.New("opening links is not supported here")
 	}
 	link := c.open
 	if link == "" {
-		e, err := cfg.Daemon.Entry(ctx, c.entry)
+		e, err := cfg.Daemon.Task(ctx, c.task)
 		if err != nil {
-			return nil, api.EntryView{}, err
+			return nil, api.TaskView{}, err
 		}
 		for _, s := range e.Cards {
 			if len(e.Units) > 0 && s.Card.Unit == e.Units[0] {
@@ -790,12 +790,12 @@ func openLink(ctx context.Context, cfg Config, c Command) ([]string, api.EntryVi
 		}
 	}
 	if !strings.HasPrefix(link, "https://") {
-		return nil, api.EntryView{}, fmt.Errorf("not opening %q: only https links open", link)
+		return nil, api.TaskView{}, fmt.Errorf("not opening %q: only https links open", link)
 	}
 	if err := cfg.OpenURL(link); err != nil {
-		return nil, api.EntryView{}, err
+		return nil, api.TaskView{}, err
 	}
-	return []string{"opened " + link}, api.EntryView{}, nil
+	return []string{"opened " + link}, api.TaskView{}, nil
 }
 
 // carryAction takes a plan action to its item, any other to its unit.

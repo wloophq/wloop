@@ -34,13 +34,13 @@ type reviewSource struct {
 	mu    sync.Mutex
 }
 
-func (r *reviewSource) Entries(ctx context.Context, q task.Query) ([]task.Entry, error) {
-	open, err := r.s.d.Store.Entries(ctx, task.Query{View: task.ViewOpen})
+func (r *reviewSource) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) {
+	open, err := r.s.d.Store.Tasks(ctx, task.Query{View: task.ViewOpen})
 	if err != nil {
 		return nil, err
 	}
 	st, now := task.ProjectsOf(open), r.s.now()
-	var out []task.Entry
+	var out []task.Task
 	for _, e := range open {
 		if task.NeedsReview(e, st[e.ID], now) && q.Matches(e) {
 			out = append(out, e)
@@ -50,12 +50,12 @@ func (r *reviewSource) Entries(ctx context.Context, q task.Query) ([]task.Entry,
 	return out, nil
 }
 
-func (r *reviewSource) Entry(ctx context.Context, id task.ID) (task.Entry, bool, error) {
-	return task.Entry{}, false, nil
+func (r *reviewSource) Task(ctx context.Context, id task.ID) (task.Task, bool, error) {
+	return task.Task{}, false, nil
 }
 
 func (r *reviewSource) Count(ctx context.Context, area string) (int, error) {
-	es, err := r.Entries(ctx, task.Query{View: task.ViewReview, Area: area})
+	es, err := r.Tasks(ctx, task.Query{View: task.ViewReview, Area: area})
 	return len(es), err
 }
 

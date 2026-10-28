@@ -430,13 +430,13 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	}
 	d = e.withCards(withoutGitHub(withSources(d, plugins, mods)), db, cfg, mods, logf)
 	e.resolve = d.Resolve
-	d = e.serveGTD(d, db, cfg, mods, logf)
+	d = e.serveTasks(d, db, cfg, mods, logf)
 	e.serveProposals(ctx, db, cfg, mods, logf)
 	d = e.serveOutbox(d, db, cfg, mods, logf)
 	e.servePlacement(mods)
 	d = links.serve(d, mods)
 	dossierSvc := e.serveDossiers(ctx, db, cfg, logf)
-	serveProjects(d.GTD, db, dossierSvc)
+	serveProjects(d.Tasks, db, dossierSvc)
 	e.serveDossierTurns(ctx, dossierSvc, db, cfg, logf)
 	e.servePayloads(mods)
 	d = e.serveHeadless(ctx, d, db, cfg, mods, logf)
