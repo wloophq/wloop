@@ -59,8 +59,8 @@ func goldenModel(t *testing.T, color bool) *Model {
 	return m
 }
 
-// viewsGolden is the golden model on GTD view, the Inbox with its first
-// entry's detail open, the Outbox with its draft's.
+// viewsGolden is the golden model on task view, the Inbox with its first
+// task's detail open, the Outbox with its draft's.
 func viewsGolden(t *testing.T, color bool, view string) *Model {
 	m := goldenModel(t, color)
 	m.SetViews(viewsCatalog())
@@ -77,7 +77,7 @@ func viewsGolden(t *testing.T, color bool, view string) *Model {
 	return m
 }
 
-// draftsGolden is Focus with its entry's detail open, listing the drafts
+// draftsGolden is Focus with its task's detail open, listing the drafts
 // made for it, the first one picked.
 func draftsGolden(t *testing.T, color bool) *Model {
 	m := viewsGolden(t, color, "focus")
@@ -110,10 +110,10 @@ func planGolden(t *testing.T, color bool) *Model {
 func TestRenderGolden(t *testing.T) {
 	models := map[string]func(*testing.T, bool) *Model{"render": goldenModel}
 	for _, v := range []string{"focus", "inbox", "outbox", "next", "waiting"} {
-		models["gtd-"+v] = func(t *testing.T, color bool) *Model { return viewsGolden(t, color, v) }
+		models["views-"+v] = func(t *testing.T, color bool) *Model { return viewsGolden(t, color, v) }
 	}
-	models["gtd-review"] = func(t *testing.T, color bool) *Model { return reviewModel(t, color) }
-	models["gtd-drafts"] = draftsGolden
+	models["views-review"] = func(t *testing.T, color bool) *Model { return reviewModel(t, color) }
+	models["views-drafts"] = draftsGolden
 	models["plan"] = planGolden
 	for prefix, model := range models {
 		for _, color := range []bool{false, true} {

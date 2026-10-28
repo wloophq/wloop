@@ -22,7 +22,7 @@ func (c *Client) Drafts(ctx context.Context, states ...string) ([]api.Draft, err
 
 // TaskDrafts are the drafts made for task in any state, newest first.
 func (c *Client) TaskDrafts(ctx context.Context, task string) ([]api.Draft, error) {
-	path := api.Drafts + "?" + url.Values{"entry": {task}, "state": {strings.Join(taskDraftStates, ",")}}.Encode()
+	path := api.Drafts + "?" + url.Values{"task": {task}, "state": {strings.Join(taskDraftStates, ",")}}.Encode()
 	var res api.DraftsResponse
 	err := c.do(ctx, ReadTimeout, http.MethodGet, path, nil, &res)
 	return res.Drafts, err

@@ -17,7 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/readmodel"
 )
 
-// unitTask is an Inbox entry of kind on units, with one item on each.
+// unitTask is an Inbox task of kind on units, with one item on each.
 func unitTask(id string, kind task.Kind, units ...unit.Unit) task.Task {
 	e := task.Task{ID: task.ID(id), Kind: kind, State: task.Inbox, Title: "Entry " + id, Units: units}
 	for _, u := range units {
@@ -26,7 +26,7 @@ func unitTask(id string, kind task.Kind, units ...unit.Unit) task.Task {
 	return e
 }
 
-// newDelegateRig serves the entries over a thread provider whose rows are read like Slack's.
+// newDelegateRig serves the tasks over a thread provider whose rows are read like Slack's.
 func newDelegateRig(t *testing.T) (*tasksRig, *startedHeadless, *fakeActions) {
 	t.Helper()
 	h, fa := &startedHeadless{}, &fakeActions{}

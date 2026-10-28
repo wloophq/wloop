@@ -41,7 +41,7 @@ function readRoute(hash) {
   return {
     view: p.get("view") || "",
     unit: routeUnitKey(p.get("unit")),
-    entry: (p.get("entry") || "").slice(0, 200),
+    task: (p.get("task") || "").slice(0, 200),
     area: (p.get("area") || "").slice(0, 100),
     ctx,
     q: p.get("q") || "",

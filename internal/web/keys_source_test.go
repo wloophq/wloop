@@ -9,7 +9,7 @@ import (
 func TestSourceLinkOpensOnlyHTTPS(t *testing.T) {
 	src := staticJS(t, "keys.js")
 	script := jsFunction(t, appJS(t), "safeURL") + jsFunction(t, src, "sourceLink")
-	for _, name := range []string{"isEntry", "sameUnit"} {
+	for _, name := range []string{"isTask", "sameUnit"} {
 		script += regexp.MustCompile(`(?m)^const `+name+` = .*;$`).FindString(src) + "\n"
 	}
 	u := map[string]any{"provider": "slack", "key": "C1/1.1"}

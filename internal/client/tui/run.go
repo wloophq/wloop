@@ -92,14 +92,14 @@ type loaded struct {
 	closed  []api.ClosedSession
 	planErr error
 	// viewsCat and keys are the served views and bindings when this load read
-	// them; tasks is the page of the GTD view on screen when it pulled
+	// them; tasks is the page of the task view on screen when it pulled
 	// one, counters the counts a change carried.
 	viewsCat *api.ViewsCatalog
 	keys     *api.KeysResponse
 	tasks    *tasksRead
 	tasksErr error
 	counters *api.Counters
-	// filtered are the counts of the entries the filter keeps, when this
+	// filtered are the counts of the tasks the filter keeps, when this
 	// load read them.
 	filtered    *filteredRead
 	filteredErr error
@@ -114,7 +114,7 @@ type tasksRead struct {
 	counters api.Counters
 }
 
-// filteredRead are the counters of area narrowed to the entries the
+// filteredRead are the counters of area narrowed to the tasks the
 // filter keeps.
 type filteredRead struct {
 	area     string
@@ -127,8 +127,8 @@ type finished struct {
 	err error
 }
 
-// carried is what a command brought back: its lines, the entry it left, and
-// for a detail the drafts made for its entry.
+// carried is what a command brought back: its lines, the task it left, and
+// for a detail the drafts made for its task.
 type carried struct {
 	lines  []string
 	task   api.TaskView
@@ -185,7 +185,7 @@ func Run(ctx context.Context, cfg Config) error {
 			}
 		})
 	}
-	// track pulls the entries of the GTD view on screen once it changed,
+	// track pulls the tasks of the task view on screen once it changed,
 	// and asks again for an open detail a page changed.
 	track := func() {
 		view, area, ok := m.TaskQuery()
@@ -308,7 +308,7 @@ func (m *Model) apply(r loaded) {
 	case r.specsErr != nil:
 		m.status = "actions not refreshed: " + r.specsErr.Error()
 	case r.tasksErr != nil:
-		m.status = "entries not refreshed: " + r.tasksErr.Error()
+		m.status = "tasks not refreshed: " + r.tasksErr.Error()
 	case r.reviewErr != nil:
 		m.status = "review not refreshed: " + r.reviewErr.Error()
 	case r.filteredErr != nil:
@@ -393,7 +393,7 @@ func (r *wants) all() {
 	r.filtered.Store(true)
 }
 
-// query is the GTD view the screen shows and the area it follows, shared
+// query is the task view the screen shows and the area it follows, shared
 // with the loads.
 type query struct {
 	mu         sync.Mutex
@@ -469,7 +469,7 @@ func pull(ctx context.Context, d Daemon, set *rowset.Set) error {
 	return nil
 }
 
-// pullTasks brings the entries of q up to the daemon as pull does rows.
+// pullTasks brings the tasks of q up to the daemon as pull does rows.
 func pullTasks(ctx context.Context, d Daemon, q client.TaskQuery, set *taskSet) (api.Counters, error) {
 	page, err := d.TasksSince(ctx, q, set.since)
 	if err != nil {
@@ -556,7 +556,7 @@ func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loa
 }
 
 // read fills r with the specs when their version changed, the bindings
-// with them, and the catalog, the plugins and the GTD views until each
+// with them, and the catalog, the plugins and the task views until each
 // was read once; the error is the first failure.
 func (have *onceReads) read(ctx context.Context, d Daemon, rows []api.Row, planned bool, r *loaded) error {
 	var failed error
@@ -603,8 +603,8 @@ func nonNilPlugins(ps []api.Plugin) []api.Plugin {
 	return ps
 }
 
-// readTasks pulls the page of the GTD view on screen when a change named
-// entries or the screen moved to another view or area since the last pull.
+// readTasks pulls the page of the task view on screen when a change named
+// tasks or the screen moved to another view or area since the last pull.
 func readTasks(ctx context.Context, d Daemon, onViews bool, due *wants, shown *query, sets map[string]*taskSet, pulled *string) (*tasksRead, error) {
 	q, ok := shown.get()
 	named := due.tasks.Swap(false)
@@ -633,7 +633,7 @@ func readTasks(ctx context.Context, d Daemon, onViews bool, due *wants, shown *q
 }
 
 // readFiltered reads the counters the filter narrows when the filter has
-// words and they, the area or the entries changed since the last read.
+// words and they, the area or the tasks changed since the last read.
 func readFiltered(ctx context.Context, d Daemon, onViews bool, due *wants, shown *query, counted *string) (*filteredRead, error) {
 	area, terms := shown.filter()
 	named := due.filtered.Swap(false)
@@ -727,9 +727,9 @@ func acceptedLine(i api.Intake) string {
 	return fmt.Sprintf("intake %d is already starting the turn; this request changed nothing", i.Seq)
 }
 
-// carry takes c to the daemon: an entry's verb, detail or capture, a link
+// carry takes c to the daemon: a task's verb, detail or capture, a link
 // to open, a plan action on its item, any other on its unit. It returns
-// the lines that report it, and the entry a detail read.
+// the lines that report it, and the task a detail read.
 func carry(ctx context.Context, cfg Config, c Command) (carried, error) {
 	d := cfg.Daemon
 	switch {
@@ -768,7 +768,7 @@ func carry(ctx context.Context, cfg Config, c Command) (carried, error) {
 	return carried{lines: lines}, err
 }
 
-// openLink opens the command's link, looking it up first from the entry's
+// openLink opens the command's link, looking it up first from the task's
 // cards when the list had none.
 func openLink(ctx context.Context, cfg Config, c Command) ([]string, api.TaskView, error) {
 	if cfg.OpenURL == nil {

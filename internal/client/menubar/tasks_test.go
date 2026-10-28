@@ -173,7 +173,7 @@ func TestTaskClickOpensItInTheCockpit(t *testing.T) {
 	d.Action()
 	waitFor(t, func() bool {
 		o := r.openedURLs()
-		return len(o) == 2 && slices.Contains(o, "cockpit#entry=e-2") && slices.Contains(o, "cockpit#entry=draft:5")
+		return len(o) == 2 && slices.Contains(o, "cockpit#task=e-2") && slices.Contains(o, "cockpit#task=draft:5")
 	})
 }
 

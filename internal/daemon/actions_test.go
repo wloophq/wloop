@@ -52,7 +52,7 @@ type fakeActions struct {
 	takeOver    []bool
 	maintainers []bool
 	inputs      []map[string]any
-	// bound are the items and entry of each intent call, as "i1,i2@entry".
+	// bound are the items and task of each intent call, as "i1,i2@task".
 	bound []string
 }
 

@@ -27,7 +27,7 @@ func pendingTask(n int) api.TaskView {
 	e.Title = "Round soon"
 	e.Attention = &api.Attention{ID: api.NotificationID(api.CategoryInbox, e.ID, now.UTC().Format(stamp)), Category: "INBOX", Title: "Round in 60 s",
 		Subtitle: uref(n).Key, Body: "follow-up: ana replied · waiting 20 min", Image: "round",
-		Actions: []api.AttentionAction{{ID: "gtd:approve", Title: "Run now"}, {ID: "gtd:dismiss", Title: "Skip"}, {ID: "guide", Title: "Guide", TextInput: true, Basis: "b-guide"},
+		Actions: []api.AttentionAction{{ID: "task:approve", Title: "Run now"}, {ID: "task:dismiss", Title: "Skip"}, {ID: "guide", Title: "Guide", TextInput: true, Basis: "b-guide"},
 			{ID: "hold", Title: "Hold", Basis: "b-hold"}, {ID: "open", Title: "Open"}}}
 	return e
 }
@@ -36,7 +36,7 @@ func heldTask(n int, day time.Time) api.TaskView {
 	e := plainTask(n)
 	e.Attention = &api.Attention{ID: api.NotificationID(api.CategoryHeld, e.ID, day.Local().Format(time.DateOnly)), Category: "HELD", Title: "Round held",
 		Subtitle: uref(n).Key, Body: "automatic round held: daily cap", Image: "held",
-		Actions: []api.AttentionAction{{ID: "gtd:approve", Title: "Run now"}, {ID: "hold", Title: "Hold"}, {ID: "open", Title: "Open"}}}
+		Actions: []api.AttentionAction{{ID: "task:approve", Title: "Run now"}, {ID: "hold", Title: "Hold"}, {ID: "open", Title: "Open"}}}
 	return e
 }
 
@@ -61,7 +61,7 @@ func questionTask(n int) api.TaskView {
 		Body: "the draft approves; publish it?",
 		Actions: []api.AttentionAction{
 			{ID: "answer:option:publish", Title: "Publish APPROVE (recommended)"}, {ID: "answer:option:comment", Title: "Comment only"},
-			{ID: "answer:option:hold", Title: "Hold the draft"}, {ID: "answer:text", Title: "Reply", TextInput: true}, {ID: "gtd:dismiss", Title: "Dismiss"},
+			{ID: "answer:option:hold", Title: "Hold the draft"}, {ID: "answer:text", Title: "Reply", TextInput: true}, {ID: "task:dismiss", Title: "Dismiss"},
 		}}
 	return e
 }
@@ -70,7 +70,7 @@ func draftTask(n int) api.TaskView {
 	id := fmt.Sprintf("draft:%d", n)
 	return api.TaskView{ID: id, Kind: "draft", State: "inbox", Title: "reply: on it", Units: []unit.Unit{uref(n)},
 		Attention: &api.Attention{ID: api.NotificationID(api.CategoryOutbox, id, now.UTC().Format(stamp)), Category: "OUTBOX", Title: "Draft to approve",
-			Subtitle: uref(n).Key, Body: "reply: on it", Actions: []api.AttentionAction{{ID: "open", Title: "Open"}, {ID: "gtd:dismiss", Title: "Discard"}}}}
+			Subtitle: uref(n).Key, Body: "reply: on it", Actions: []api.AttentionAction{{ID: "open", Title: "Open"}, {ID: "task:dismiss", Title: "Discard"}}}}
 }
 
 func buttons(n Notification) []string {
@@ -218,7 +218,7 @@ func TestResponsesBecomeTaskVerbs(t *testing.T) {
 	r.c.Refresh(ctx)
 	id, q := pendingTask(1).Attention.ID, questionTask(6).Attention.ID
 	for _, c := range []struct{ id, action, text string }{
-		{id, "gtd:approve", ""}, {id, "gtd:dismiss", ""}, {id, "guide", "look at the retry"}, {id, "hold", ""}, {id, "open", ""},
+		{id, "task:approve", ""}, {id, "task:dismiss", ""}, {id, "guide", "look at the retry"}, {id, "hold", ""}, {id, "open", ""},
 		{q, "answer:option:publish", ""},
 	} {
 		resp, ok := ResponseFor(c.id, c.action)
@@ -263,7 +263,7 @@ func TestOpenGoesToTheTask(t *testing.T) {
 	ctx := context.Background()
 	r.c.Respond(ctx, Response{ID: pendingTask(1).Attention.ID, Action: ActionOpen})
 	r.c.Respond(ctx, Response{ID: questionTask(6).Attention.ID, Action: ActionOpen})
-	want := []string{"cockpit#entry=e-1", "cockpit#entry=e-6"}
+	want := []string{"cockpit#task=e-1", "cockpit#task=e-6"}
 	waitFor(t, func() bool { return slices.Equal(r.openedURLs(), want) })
 	if len(r.d.snapshotActions())+len(r.d.snapshotVerbs()) != 0 {
 		t.Fatalf("opening posted %q %+v", r.d.snapshotActions(), r.d.snapshotVerbs())
@@ -276,7 +276,7 @@ func TestOutboxOpenGoesToTheDraftTask(t *testing.T) {
 	r.c.Refresh(context.Background())
 	resp, _ := ResponseFor(r.notes.posted[0].ID, "open")
 	r.c.Respond(context.Background(), resp)
-	if o := r.openedURLs(); !slices.Equal(o, []string{"cockpit#entry=draft:7"}) {
+	if o := r.openedURLs(); !slices.Equal(o, []string{"cockpit#task=draft:7"}) {
 		t.Fatalf("opened %v", o)
 	}
 	if len(r.d.snapshotActions()) != 0 {
@@ -287,14 +287,14 @@ func TestOutboxOpenGoesToTheDraftTask(t *testing.T) {
 func TestADraftNotificationNeverApproves(t *testing.T) {
 	r := newRig(t)
 	d := draftTask(7)
-	d.Attention.Actions = append([]api.AttentionAction{{ID: "gtd:approve", Title: "Approve"}}, d.Attention.Actions...)
+	d.Attention.Actions = append([]api.AttentionAction{{ID: "task:approve", Title: "Approve"}}, d.Attention.Actions...)
 	r.d.tasks["outbox"] = []api.TaskView{d}
 	r.c.Refresh(context.Background())
 	n := r.notes.posted[0]
-	if got := buttons(n); !slices.Equal(got, []string{"open Open", "gtd:dismiss Discard"}) {
+	if got := buttons(n); !slices.Equal(got, []string{"open Open", "task:dismiss Discard"}) {
 		t.Fatalf("a draft offers %q", got)
 	}
-	for _, action := range []string{"gtd:approve", "gtd:dismiss"} {
+	for _, action := range []string{"task:approve", "task:dismiss"} {
 		resp, _ := ResponseFor(n.ID, action)
 		r.c.Respond(context.Background(), resp)
 	}
@@ -341,11 +341,11 @@ func TestAnAnswerThatDidNotLandSaysSo(t *testing.T) {
 	}
 	n := r.notes.posted[0]
 	cat, route, ok := api.ParseNotificationID(n.ID)
-	if !ok || cat != api.CategoryNote || route != "entry=e-5" || n.Title != "Answer not sent" || !strings.Contains(n.Body, "no agent session") {
+	if !ok || cat != api.CategoryNote || route != "task=e-5" || n.Title != "Answer not sent" || !strings.Contains(n.Body, "no agent session") {
 		t.Fatalf("%+v", n)
 	}
 	r.c.Respond(context.Background(), Response{ID: n.ID, Action: ActionOpen})
-	if o := r.openedURLs(); !slices.Equal(o, []string{"cockpit#entry=e-5"}) {
+	if o := r.openedURLs(); !slices.Equal(o, []string{"cockpit#task=e-5"}) {
 		t.Fatalf("the note opened %v", o)
 	}
 }
@@ -355,7 +355,7 @@ func TestAnActionThatDidNotLandSaysSo(t *testing.T) {
 	r.d.tasks["inbox"] = []api.TaskView{pendingTask(7)}
 	r.c.Refresh(context.Background())
 	r.d.failing = errors.New("the row changed: the pending round already went out")
-	for _, action := range []string{"hold", "gtd:approve"} {
+	for _, action := range []string{"hold", "task:approve"} {
 		resp, _ := ResponseFor(pendingTask(7).Attention.ID, action)
 		r.c.Respond(context.Background(), resp)
 	}
@@ -681,7 +681,7 @@ func TestACategoryIsRegisteredFromTheServedButtons(t *testing.T) {
 
 func TestAQuestionCategoryStaysWhileAnotherNotificationUsesIt(t *testing.T) {
 	c := NewCategories()
-	actions := []NotificationAction{{ID: "gtd:dismiss", Title: "Dismiss"}}
+	actions := []NotificationAction{{ID: "task:dismiss", Title: "Dismiss"}}
 	a := Notification{ID: api.NotificationID("Q0", "e-1", "0"), Category: "Q0", Actions: actions}
 	b := Notification{ID: api.NotificationID("Q0", "e-2", "0"), Category: "Q0", Actions: actions}
 	if !c.Post(a) || c.Post(b) {
@@ -855,5 +855,42 @@ func TestConcurrentSavesKeepEveryID(t *testing.T) {
 	slices.Sort(want)
 	if f := readSent(t, path); !slices.Equal(f.IDs, want) {
 		t.Fatalf("the sent file holds %d of %d ids", len(f.IDs), len(want))
+	}
+}
+
+func TestNotificationActionsUseTaskIds(t *testing.T) {
+	r := newRig(t)
+	ctx := context.Background()
+	e := pendingTask(1)
+	e.Attention.Actions = []api.AttentionAction{{ID: "task:approve", Title: "Run now"}, {ID: "task:delegate:headless", Title: "Draft for me"}, {ID: "gtd:dismiss", Title: "Skip"}}
+	r.d.tasks["inbox"] = []api.TaskView{e}
+	r.d.tasks["outbox"] = []api.TaskView{draftTask(7)}
+	r.c.Refresh(ctx)
+	for _, action := range []string{"task:approve", "task:delegate:headless", "gtd:dismiss"} {
+		resp, _ := ResponseFor(e.Attention.ID, action)
+		r.c.Respond(ctx, resp)
+	}
+	var verbs []string
+	for _, v := range r.d.snapshotVerbs() {
+		verbs = append(verbs, fmt.Sprintf("%s %s %v", v.id, v.verb, v.req.Args))
+	}
+	if want := []string{"e-1 approve map[]", "e-1 delegate map[mode:headless]"}; !slices.Equal(verbs, want) {
+		t.Fatalf("verbs %q, want %q: an old gtd: id must not run a verb", verbs, want)
+	}
+	var draft Notification
+	for _, n := range r.notes.posted {
+		if cat, _, _ := api.ParseNotificationID(n.ID); cat == api.CategoryOutbox {
+			draft = n
+		}
+	}
+	if got := buttons(draft); !slices.Equal(got, []string{"open Open", "task:dismiss Discard"}) {
+		t.Fatalf("a draft offers %q", got)
+	}
+	r.d.failing = errors.New("refused")
+	resp, _ := ResponseFor(e.Attention.ID, "task:approve")
+	r.c.Respond(ctx, resp)
+	note := r.notes.snapshot()[len(r.notes.snapshot())-1]
+	if _, route, ok := api.ParseNotificationID(note.ID); !ok || route != "task=e-1" {
+		t.Fatalf("the note's id %q does not carry the task route", note.ID)
 	}
 }

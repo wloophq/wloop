@@ -18,7 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// repliedKinds are the kinds of entry the user replies on: those about a unit's conversation.
+// repliedKinds are the kinds of task the user replies on: those about a unit's conversation.
 var repliedKinds = []task.Kind{task.KindAction, task.KindWaiting, task.KindClose, task.KindCapture}
 
 // replyRefusal is why the user cannot reply on e, "" when they can.
@@ -27,14 +27,14 @@ func (s *Server) replyRefusal(e task.Task) string {
 	case s.deps.Outbox == nil:
 		return errOutboxUnavailable.Error()
 	case len(e.Units) == 0:
-		return "the entry has no conversation to reply in"
+		return "the task has no conversation to reply in"
 	case !slices.Contains(repliedKinds, e.Kind):
-		return fmt.Sprintf("a %s entry takes no reply", e.Kind)
+		return fmt.Sprintf("a %s task takes no reply", e.Kind)
 	}
 	return ""
 }
 
-// runReply holds the reply the entry's args carry as a user draft on its first unit, for the entry and its
+// runReply holds the reply the task's args carry as a user draft on its first unit, for the task and its
 // items there; send "now" approves it at once.
 func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretasks.Service, e task.Task, req api.TaskRequest) {
 	if why := s.replyRefusal(e); why != "" {
@@ -111,7 +111,7 @@ func (s *Server) handleDraftCreate(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		case !slices.Contains(e.Units, c.Unit):
-			writeError(w, http.StatusBadRequest, fmt.Sprintf("entry %s is not about %s", c.Task, c.Unit.Label()))
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("task %s is not about %s", c.Task, c.Unit.Label()))
 			return
 		}
 	}

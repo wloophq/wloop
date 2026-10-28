@@ -93,7 +93,7 @@ type Call struct {
 	Force bool
 	// Inputs are the intent's inputs, normalized to their types.
 	Inputs map[string]any
-	// Items are the unit's item ids and Task the GTD entry the action was asked from; the turn's
+	// Items are the unit's item ids and Task the task task the action was asked from; the turn's
 	// drafts are tied to them.
 	Items []string
 	Task  string

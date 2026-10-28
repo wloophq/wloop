@@ -29,8 +29,8 @@ const stampToken = "20060102T150405.000000000"
 // notifiedDrafts are the drafts that notify: proposed, or failed and waiting on a retry.
 var notifiedDrafts = []draft.State{draft.Proposed, draft.Failed}
 
-// attention is e's notification, nil when it posts none: an Inbox entry notifies once, a draft of the Outbox
-// once unless it serves an Inbox entry, whose id the draft then keys. A draft is never approved from a
+// attention is e's notification, nil when it posts none: an Inbox task notifies once, a draft of the Outbox
+// once unless it serves an Inbox task, whose id the draft then keys. A draft is never approved from a
 // notification, which shows its text cut. Nothing of a disabled plugin notifies.
 func (ev *taskViewer) attention(ctx context.Context, e task.Task) *api.Attention {
 	a := ev.notice(ctx, e)
@@ -69,12 +69,12 @@ func (s *Server) unitsEnabled(units []unit.Unit) bool {
 	return len(units) == 0 || slices.ContainsFunc(units, func(u unit.Unit) bool { return s.pluginEnabled(u.Provider) })
 }
 
-func verbAction(v task.Verb) string { return "gtd:" + string(v) }
+func verbAction(v task.Verb) string { return api.TaskActionPrefix + string(v) }
 
-// inboxNotice is what an Inbox entry notifies; ok is false when it notifies nothing. A question's message and
-// an entry derived from a pull request's items notify only through the row's notice, when the entry is the one
+// inboxNotice is what an Inbox task notifies; ok is false when it notifies nothing. A question's message and
+// a task derived from a pull request's items notify only through the row's notice, when the task is the one
 // that notice stands for (the question's message, the derived item of a round, a hold, a block or a waiting
-// agent), so they notify what the row did and only once. Any other entry notifies what it says of itself.
+// agent), so they notify what the row did and only once. Any other task notifies what it says of itself.
 func (ev *taskViewer) inboxNotice(ctx context.Context, e task.Task) (api.Category, string, api.Attention, bool) {
 	m, isMsg := ev.message(ctx, e)
 	question := isMsg && m.Kind == dmessage.Question
@@ -103,8 +103,8 @@ func (ev *taskViewer) inboxNotice(ctx context.Context, e task.Task) (api.Categor
 	return api.CategoryInbox, hashToken(e.Title), a, true
 }
 
-// inboxActions are Draft for me when the entry's delegate runs an action that drafts headless, and Reply and
-// Send reply when the entry takes a reply.
+// inboxActions are Draft for me when the task's delegate runs an action that drafts headless, and Reply and
+// Send reply when the task takes a reply.
 func (ev *taskViewer) inboxActions(ctx context.Context, e task.Task) []api.AttentionAction {
 	out := []api.AttentionAction{}
 	if ev.s.draftsHeadless(ctx, ev.g, e) {
@@ -148,8 +148,8 @@ func holdsItem(e task.Task, prefix string) bool {
 	return prefix != "" && slices.ContainsFunc(e.Items, func(r task.ItemRef) bool { return strings.HasPrefix(r.Item, prefix) })
 }
 
-// asVerbs names an action the entry's verb runs, as the bridge would pick it, by that verb: the entry's
-// button then moves the entry as its verb does.
+// asVerbs names an action the task's verb runs, as the bridge would pick it, by that verb: the task's
+// button then moves the task as its verb does.
 func (ev *taskViewer) asVerbs(e task.Task, row api.Row, acts []api.AttentionAction) []api.AttentionAction {
 	served := ev.s.servedSpecs()
 	verbOf := map[string]task.Verb{}
@@ -202,7 +202,7 @@ func (ev *taskViewer) recordOf(ctx context.Context, m dmessage.Message) int64 {
 	return 0
 }
 
-// messageNotice is a message entry's notification from the message alone.
+// messageNotice is a message task's notification from the message alone.
 func messageNotice(e task.Task, m dmessage.Message, record int64) (api.Category, string, api.Attention) {
 	a := api.Attention{Subtitle: unitsLabel(e.Units), Body: m.Text, Image: "ask"}
 	if a.Subtitle == "" {
@@ -282,7 +282,7 @@ func (ev *taskViewer) openDrafts(ctx context.Context) []draft.Draft {
 	return ev.drafts
 }
 
-// proposedFor is the newest proposed draft that serves entry id.
+// proposedFor is the newest proposed draft that serves task id.
 func (ev *taskViewer) proposedFor(ctx context.Context, id task.ID) (draft.Draft, bool) {
 	var best draft.Draft
 	found := false
@@ -294,7 +294,7 @@ func (ev *taskViewer) proposedFor(ctx context.Context, id task.ID) (draft.Draft,
 	return best, found
 }
 
-// draftAttention is a draft entry's notification, nil when the draft serves an Inbox entry that notifies, which
+// draftAttention is a draft task's notification, nil when the draft serves an Inbox task that notifies, which
 // then notifies for both.
 func (ev *taskViewer) draftAttention(ctx context.Context, e task.Task) *api.Attention {
 	n, err := strconv.ParseInt(strings.TrimPrefix(string(e.ID), draftPrefix), 10, 64)
@@ -325,7 +325,7 @@ func (ev *taskViewer) servesInbox(ctx context.Context, d draft.Draft) bool {
 	}
 	e, err := ev.g.Task(ctx, task.ID(d.Task))
 	if err != nil && !errors.Is(err, coretasks.ErrNoTask) {
-		ev.s.logf("notifications: the entry of draft %d: %v", d.ID, err)
+		ev.s.logf("notifications: the task of draft %d: %v", d.ID, err)
 	}
 	return err == nil && e.Kind != task.KindDraft && ev.attention(ctx, e) != nil
 }

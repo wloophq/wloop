@@ -59,7 +59,7 @@ func addRecord(t *testing.T, repo *sqlite.Store, n int, r record.Record) {
 	}
 }
 
-// rowAttention is the notification the deriver makes of a needs-me row, which entry notifications are
+// rowAttention is the notification the deriver makes of a needs-me row, which task notifications are
 // compared with.
 func rowAttention(t *testing.T, s *Server, row api.Row) *api.Attention {
 	t.Helper()

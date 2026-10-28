@@ -8,7 +8,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// The Outbox's routes: Drafts lists drafts (query parameters state, a comma list, and entry) and, posted a
+// The Outbox's routes: Drafts lists drafts (query parameters state, a comma list, and task) and, posted a
 // DraftCreate, holds a draft the user wrote; DraftDetail reads one and DraftActionPath runs one of
 // DraftActions on it with a DraftAction body.
 const (
@@ -37,7 +37,7 @@ type Draft struct {
 	ID    int64    `json:"id"`
 	Unit  string   `json:"unit"` // "<provider>/<key>"
 	Items []string `json:"items"`
-	Task  string   `json:"entry,omitempty"`
+	Task  string   `json:"task,omitempty"`
 	Kind  string   `json:"kind"`
 	// Purpose is what the draft is for, Delivery how it is posted (message,
 	// reaction or comment) and Effects what posting it applies.
@@ -72,7 +72,7 @@ type Draft struct {
 	Title string `json:"title,omitempty"`
 	Link  string `json:"link,omitempty"`
 	// Names are the display names of the people Text mentions, by mention key ("slack:U0123"), as the
-	// unit's items know them; the draft routes fill them and the item details, the Outbox entries do not.
+	// unit's items know them; the draft routes fill them and the item details, the Outbox tasks do not.
 	Names map[string]string `json:"names,omitempty"`
 	// ItemDetails are the items the draft is about, with their summaries.
 	ItemDetails []ItemView `json:"item_details,omitempty"`
@@ -107,12 +107,12 @@ const (
 	DraftReact = "react"
 )
 
-// DraftCreate is a draft the user writes on Unit, for Entry and its Items when set: Kind DraftReply with
+// DraftCreate is a draft the user writes on Unit, for Task and its Items when set: Kind DraftReply with
 // Text, or DraftReact with Reaction. It waits in the Outbox for approval, unless Send approves it at once
 // to go out through the same publisher. Source is cockpit, notification, tui or terminal.
 type DraftCreate struct {
 	Unit     unit.Unit `json:"unit"`
-	Task     string    `json:"entry,omitempty"`
+	Task     string    `json:"task,omitempty"`
 	Items    []string  `json:"items,omitempty"`
 	Kind     string    `json:"kind,omitempty"`
 	Text     string    `json:"text,omitempty"`

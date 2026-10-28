@@ -95,7 +95,7 @@ func TestTheMenubarFollowsARealDaemonsInbox(t *testing.T) {
 	}
 	app.Respond(ctx, menubar.Response{ID: n.ID, Action: menubar.ActionOpen})
 	mu.Lock()
-	if want := "http://127.0.0.1:4321/?token=tok#entry=" + task; !slices.Equal(opened, []string{want}) {
+	if want := "http://127.0.0.1:4321/?token=tok#task=" + task; !slices.Equal(opened, []string{want}) {
 		t.Errorf("opened %v, want %s", opened, want)
 	}
 	mu.Unlock()

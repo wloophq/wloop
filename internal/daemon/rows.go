@@ -46,7 +46,7 @@ func (c *viewerCache) cachedLogin() string {
 
 // viewerInfo serves a stale login when a refresh fails, so a GitHub hiccup
 // does not blank the cockpit, and waits viewerRetry before asking again. The
-// entry lasts until a TopicViewer note, or viewerTTL without a change log.
+// task lasts until a TopicViewer note, or viewerTTL without a change log.
 func (s *Server) viewerInfo(ctx context.Context) (string, []string, error) {
 	c := &s.viewer
 	now := s.deps.Now()

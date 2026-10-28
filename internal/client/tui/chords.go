@@ -22,7 +22,7 @@ const (
 // shiftDigits are what Shift+1..9 type on a US layout.
 const shiftDigits = "!@#$%^&*("
 
-// coreActions are the served core actions that are not GTD verbs.
+// coreActions are the served core actions that are not task verbs.
 var coreActions = []string{"move:", "detail:", "nav:", "area:", "answer:", "step:", "palette", "help", "filter", "open-source", "capture", "quit"}
 
 // verbAsks are the verbs that ask for a value on the bottom line first,
@@ -259,7 +259,7 @@ func (m *Model) runBinding(b api.KeyView, k Key) (c Command, ok, took bool) {
 	return Command{}, false, true
 }
 
-// navigate shows a GTD view, or the first view of a plugin named by its
+// navigate shows a task view, or the first view of a plugin named by its
 // provider id.
 func (m *Model) navigate(to string) {
 	if to == "cycle" {
@@ -303,7 +303,7 @@ func (m *Model) startFilter() {
 	m.filtering = true
 }
 
-// taskVerb runs verb on the selected entry, asking first for the value
+// taskVerb runs verb on the selected task, asking first for the value
 // the verb needs.
 func (m *Model) taskVerb(verb string, read uint64) (Command, bool) {
 	e, ok := m.selectedTask()
@@ -407,7 +407,7 @@ func (m *Model) bridgedConfirm(e api.TaskView, verb string) string {
 }
 
 // taskUnitAction runs the served action of k on the first of the
-// selected entry's units whose row offers it.
+// selected task's units whose row offers it.
 func (m *Model) taskUnitAction(k Key) (Command, bool) {
 	e, ok := m.selectedTask()
 	if !ok || k.Rune == 0 {
@@ -443,7 +443,7 @@ func (m *Model) taskUnitAction(k Key) (Command, bool) {
 	return Command{}, false
 }
 
-// openSource opens the link of the selection: an entry's first unit, or
+// openSource opens the link of the selection: a task's first unit, or
 // the row's.
 func (m *Model) openSource() (Command, bool) {
 	if _, ok := m.viewOnScreen(); ok {

@@ -33,8 +33,8 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
-// notifyRig is the catalog rig with the entries, the items ledger and the Inbox messages over its store, so a
-// fixture's row derives its items, card, message and entries as the daemon would.
+// notifyRig is the catalog rig with the tasks, the items ledger and the Inbox messages over its store, so a
+// fixture's row derives its items, card, message and tasks as the daemon would.
 type notifyRig struct {
 	catalogRig
 	g      *coretasks.Service
@@ -58,7 +58,7 @@ func newNotifyRig(t *testing.T) *notifyRig {
 }
 
 // settle derives u's card and items from its row as the cards job does, reconciles its messages and syncs its
-// entries; it returns the row.
+// tasks; it returns the row.
 func (r *notifyRig) settle(t *testing.T, u unit.Unit) api.Row {
 	t.Helper()
 	ctx := context.Background()
@@ -84,7 +84,7 @@ func (r *notifyRig) settle(t *testing.T, u unit.Unit) api.Row {
 	return row
 }
 
-// notified are the attentions of every entry of every view, by entry id.
+// notified are the attentions of every task of every view, by task id.
 func (r *notifyRig) notified(t *testing.T) map[string]api.TaskView {
 	t.Helper()
 	out := map[string]api.TaskView{}
@@ -106,7 +106,7 @@ func (r *notifyRig) notified(t *testing.T) map[string]api.TaskView {
 	return out
 }
 
-// newCategory is the category a row attention's category takes on an entry.
+// newCategory is the category a row attention's category takes on a task.
 func newCategory(old string) api.Category {
 	switch old {
 	case "HELD":
@@ -117,15 +117,15 @@ func newCategory(old string) api.Category {
 	return api.Category(old)
 }
 
-// taskActions are a row attention's action ids as an entry offers them.
+// taskActions are a row attention's action ids as a task offers them.
 func taskActions(acts []api.AttentionAction) []string {
 	out := []string{}
 	for _, a := range acts {
 		switch a.ID {
 		case "run_now":
-			a.ID = "gtd:approve"
+			a.ID = "task:approve"
 		case "skip":
-			a.ID = "gtd:dismiss"
+			a.ID = "task:dismiss"
 		}
 		out = append(out, a.ID+" "+a.Title)
 	}
@@ -215,7 +215,7 @@ func TestTaskAttentionMatchesRowAttention(t *testing.T) {
 }
 
 // fakeOutbox is the outbox as the daemon serves it: its open drafts listed, and the proposed or failed ones as
-// entries "draft:<id>".
+// tasks "draft:<id>".
 type fakeOutbox struct{ drafts []draft.Draft }
 
 func (f *fakeOutbox) List(_ context.Context, fl outbox.Filter) ([]draft.Draft, error) {
@@ -269,7 +269,7 @@ func proposed(id int64, task string) draft.Draft {
 		CreatedAt: tasksNow.Add(-time.Hour), UpdatedAt: tasksNow.Add(-time.Duration(id) * time.Minute)}
 }
 
-// attentions are the attentions of every view's entries, by entry id.
+// attentions are the attentions of every view's tasks, by task id.
 func attentions(t *testing.T, r *tasksRig) map[string]*api.Attention {
 	t.Helper()
 	out := map[string]*api.Attention{}
@@ -347,11 +347,11 @@ func TestOutboxDraftNotifiesOnce(t *testing.T) {
 		a := got[id]
 		d := proposed(int64(id[len(id)-1]-'0'), "")
 		if a == nil || a.ID != api.NotificationID(api.CategoryOutbox, id, d.UpdatedAt.UTC().Format(stampToken)) || a.Category != "OUTBOX" ||
-			!slices.Equal(actionIDs(a), []string{"open", "gtd:dismiss"}) || a.Body != "comment: Thanks, merging." {
+			!slices.Equal(actionIDs(a), []string{"open", "task:dismiss"}) || a.Body != "comment: Thanks, merging." {
 			t.Errorf("%s: %+v", id, a)
 		}
 	}
-	if a := got["draft:3"]; a == nil || !slices.Equal(actionIDs(a), []string{"open", "gtd:dismiss"}) {
+	if a := got["draft:3"]; a == nil || !slices.Equal(actionIDs(a), []string{"open", "task:dismiss"}) {
 		t.Errorf("failed %+v", a)
 	}
 }
@@ -364,7 +364,7 @@ func TestProposalAndDraftNotifyOnce(t *testing.T) {
 	withOutbox(r, proposed(1, "e-prop"))
 	got := attentions(t, r)
 	a := got["e-prop"]
-	if len(got) != 1 || a == nil || !slices.Equal(actionIDs(a), actionIDs(before)) || slices.Contains(actionIDs(a), "gtd:approve") {
+	if len(got) != 1 || a == nil || !slices.Equal(actionIDs(a), actionIDs(before)) || slices.Contains(actionIDs(a), "task:approve") {
 		t.Fatalf("%+v", got)
 	}
 	if before == nil || before.ID == a.ID {
@@ -435,7 +435,7 @@ func TestHeldTaskIdStableAcrossRestart(t *testing.T) {
 }
 
 // TestLiveTasksNotifyAsTheRows checks over the seeded live-size store that every row notification
-// is one entry notification of the same unit, and no entry notifies where no row did.
+// is one task notification of the same unit, and no task notifies where no row did.
 func TestLiveTasksNotifyAsTheRows(t *testing.T) {
 	t.Parallel()
 	s, f := newLiveServer(t)
@@ -548,7 +548,7 @@ func TestADraftOfASilentInboxTaskNotifiesItself(t *testing.T) {
 	failed := proposed(2, "e-in")
 	failed.State = draft.Failed
 	withOutbox(r, proposed(1, "e-off"), failed)
-	if got := attentions(t, r); len(got) != 3 || got["draft:1"] == nil || got["draft:2"] == nil || slices.Contains(actionIDs(got["e-in"]), "gtd:approve") {
+	if got := attentions(t, r); len(got) != 3 || got["draft:1"] == nil || got["draft:2"] == nil || slices.Contains(actionIDs(got["e-in"]), "task:approve") {
 		t.Fatalf("%+v", got)
 	}
 }
@@ -594,7 +594,7 @@ func TestAnotherDerivedTaskOfANotifyingRowStaysSilent(t *testing.T) {
 	}
 }
 
-// storedViews are the views the entries store serves; review needs its source.
+// storedViews are the views the tasks store serves; review needs its source.
 func storedViews() []string {
 	return slices.DeleteFunc(slices.Clone(builtin.Views), func(v string) bool { return v == string(task.ViewReview) })
 }

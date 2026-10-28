@@ -54,7 +54,7 @@ func TestEmptyDigest(t *testing.T) {
 	r, end := digestRig(t)
 	r.put(t, at(task.Task{ID: "e-old", State: task.Next}, end.Add(-30*time.Hour)))
 	raw := getRaw(t, r.s, api.DigestPath+"?day=2026-10-08")
-	if !strings.Contains(raw, `"entries":null`) {
+	if !strings.Contains(raw, `"tasks":null`) {
 		t.Fatalf("%s", raw)
 	}
 }

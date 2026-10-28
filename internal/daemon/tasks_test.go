@@ -210,7 +210,7 @@ func TestTasksSinceIsIncremental(t *testing.T) {
 	}
 }
 
-// subscribe follows the hub and the entries feed until the test ends.
+// subscribe follows the hub and the tasks feed until the test ends.
 func (r *tasksRig) subscribe(t *testing.T) *subscriber {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -524,7 +524,7 @@ func TestSyncRunsOffTheSubscriber(t *testing.T) {
 	}
 }
 
-// bridgeRig is the catalog rig serving the entries of a fake store, with entry e-r on acme/api#7.
+// bridgeRig is the catalog rig serving the tasks of a fake store, with task e-r on acme/api#7.
 func bridgeRig(t *testing.T) (catalogRig, *coretasks.Service) {
 	t.Helper()
 	c := newCatalogRig(t)

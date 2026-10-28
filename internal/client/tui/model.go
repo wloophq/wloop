@@ -1,5 +1,5 @@
-// Package tui is the terminal view of the daemon: the GTD views of its
-// entries, the plugins' views of their units and the workflows' plan, with
+// Package tui is the terminal view of the daemon: the task views of its
+// tasks, the plugins' views of their units and the workflows' plan, with
 // the keys of #keys.
 package tui
 
@@ -37,16 +37,16 @@ type Command struct {
 	Req    api.ActionRequest
 	PlanID string
 
-	// task is the entry the command is about: verb runs on it with args,
+	// task is the task the command is about: verb runs on it with args,
 	// fetch reads its detail, after a seen when seen is set.
 	task  string
 	verb  string
 	args  map[string]string
 	fetch bool
 	seen  bool
-	// capture is the title of an entry to capture.
+	// capture is the title of a task to capture.
 	capture string
-	// open is a link to open; openFind looks it up from the entry's cards.
+	// open is a link to open; openFind looks it up from the task's cards.
 	open     string
 	openFind bool
 	// reviewStep is a Review step to mark done.
@@ -135,20 +135,20 @@ type Model struct {
 	// served are the plugins the daemon serves, enabled or not.
 	served []api.Plugin
 
-	// taskViews are the core views of GET /api/gtd, after the plan; tasks are
+	// taskViews are the core views of GET /api/views, after the plan; tasks are
 	// each view's tasks as last pulled, counters the tabs' counts.
 	taskViews   []View
 	viewsCat    api.ViewsCatalog
 	tasks       map[string][]api.TaskView
 	tasksLoaded bool
 	counters    api.Counters
-	// filtered are the counts of the entries the filter's words keep, as
+	// filtered are the counts of the tasks the filter's words keep, as
 	// last read.
 	filtered *api.Counters
 	area     string
 	taskSel  string
 	taskAt   int
-	// detailID is the entry whose detail is open; opened is what the
+	// detailID is the task whose detail is open; opened is what the
 	// daemon answered for it, stale once a page changed it.
 	detailID    string
 	opened      *api.TaskView
@@ -157,7 +157,7 @@ type Model struct {
 	// in it does not answer.
 	detailRead uint64
 	seen       map[string]bool
-	// navigated is set once a key chose a view, so the GTD views arriving
+	// navigated is set once a key chose a view, so the task views arriving
 	// late do not move the screen to Focus.
 	navigated bool
 
@@ -167,8 +167,8 @@ type Model struct {
 
 	// edit is a prompt's text waiting for the editor.
 	edit *EditRequest
-	// drafts are the drafts made for the open detail's entry, draftsFor
-	// that entry, picked the one the draft keys act on, 0 none.
+	// drafts are the drafts made for the open detail's task, draftsFor
+	// that task, picked the one the draft keys act on, 0 none.
 	drafts    []api.Draft
 	draftsFor string
 	picked    int64

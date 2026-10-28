@@ -149,15 +149,16 @@ type QuestionView struct {
 	LastMessage string          `json:"last_message,omitempty"`
 }
 
-// AttentionAction ids are catalog ids, gtd:<verb> (gtd:<verb>:<mode> with
-// the delegate's mode) for an entry's verb, answer:option:<id>, answer:yes,
+// AttentionAction ids are catalog ids, task:<verb> (task:<verb>:<mode> with
+// the delegate's mode) for a task's verb, answer:option:<id>, answer:yes,
 // answer:no and answer:text for the answer's choices, and reply:save and
 // reply:send for a reply typed in the notification.
-// The actions of an Inbox entry's notification: Draft for me delegates it
+// The actions of an Inbox task's notification: Draft for me delegates it
 // headless, Reply saves the typed text to the Outbox as a reply on its unit
 // and Send reply sends it at once.
 const (
-	AttentionDraftForMe = "gtd:delegate:headless"
+	TaskActionPrefix    = "task:"
+	AttentionDraftForMe = TaskActionPrefix + "delegate:headless"
 	AttentionReply      = "reply:save"
 	AttentionSendReply  = "reply:send"
 )
@@ -509,10 +510,10 @@ type ActionRequest struct {
 	// NoBrief starts a review, address or run without waiting for the
 	// brief.
 	NoBrief bool `json:"no_brief,omitempty"`
-	// Items and Task tie what the action's turn drafts to the item ids of the unit and the entry it
+	// Items and Task tie what the action's turn drafts to the item ids of the unit and the task it
 	// was asked from.
 	Items []string `json:"items,omitempty"`
-	Task  string   `json:"entry,omitempty"`
+	Task  string   `json:"task,omitempty"`
 	// Manager is the workspace manager that creates the turn's worktree, ""
 	// for the configured ones; Parent is the caller's worktree, the new
 	// one's parent where its manager keeps parents.

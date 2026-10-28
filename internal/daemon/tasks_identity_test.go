@@ -41,7 +41,7 @@ func TestSyncLogsAnIdentityErrorOnce(t *testing.T) {
 		defer mu.Unlock()
 		n := 0
 		for _, l := range lines {
-			if strings.Contains(l, "entries: identity:") {
+			if strings.Contains(l, "tasks: identity:") {
 				n++
 			}
 		}

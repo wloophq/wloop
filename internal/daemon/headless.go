@@ -26,14 +26,14 @@ type Headless interface {
 type modeRequest struct {
 	Mode     string   `json:"mode"` // "headless" (default) or "session"
 	Items    []string `json:"items"`
-	Task     string   `json:"entry"`
+	Task     string   `json:"task"`
 	Guidance string   `json:"guidance"`
 }
 
 const actBodyMax = 64 << 10
 
 // runModes is the one place an intent that runs headless picks its mode, whoever posts it (the generic
-// action route, the GTD bridge): headless unless the body says "session", which runs the
+// action route, the task bridge): headless unless the body says "session", which runs the
 // ordinary action path.
 func (s *Server) runModes(w http.ResponseWriter, r *http.Request, d dintent.Def) {
 	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, actBodyMax))

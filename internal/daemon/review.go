@@ -59,7 +59,7 @@ func (s *Server) wireReview(rv coretasks.Review) api.Review {
 }
 
 // project sets a project's next action, open actions and review on v, reading every project's status once per
-// viewer. The verbs a handler takes on a project, and project on any entry, are offered only where the entry's
+// viewer. The verbs a handler takes on a project, and project on any task, are offered only where the task's
 // state takes them.
 func (ev *taskViewer) project(ctx context.Context, e task.Task, v *api.TaskView) error {
 	for i, st := range v.Verbs {

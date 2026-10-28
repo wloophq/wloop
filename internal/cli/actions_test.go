@@ -229,8 +229,8 @@ func TestCockpitURLTakesARoute(t *testing.T) {
 	cases := []struct{ route, want string }{
 		{"", "http://127.0.0.1:4321/?token=tok"},
 		{"view=loop", "http://127.0.0.1:4321/?token=tok#view=loop"},
-		{"entry=e-1", "http://127.0.0.1:4321/?token=tok#entry=e-1"},
-		{"entry=draft:7", "http://127.0.0.1:4321/?token=tok#entry=draft:7"},
+		{"task=e-1", "http://127.0.0.1:4321/?token=tok#task=e-1"},
+		{"task=draft:7", "http://127.0.0.1:4321/?token=tok#task=draft:7"},
 		{unitRoute(r7.Unit()), "http://127.0.0.1:4321/?token=tok#unit=github/acme%2Fapi%237"},
 		{"view=needs-me&" + unitRoute(r7.Unit()), "http://127.0.0.1:4321/?token=tok#view=needs-me&unit=github/acme%2Fapi%237"},
 	}

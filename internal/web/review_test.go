@@ -79,7 +79,7 @@ func TestReviewStepsWeb(t *testing.T) {
 		After   string   `json:"after"`
 		Moves   []string `json:"moves"`
 		Text    string   `json:"text"`
-		Tasks   []string `json:"entries"`
+		Tasks   []string `json:"tasks"`
 		Heads   []string `json:"heads"`
 		Focused []string `json:"focused"`
 	}
@@ -94,8 +94,8 @@ const gets = [], posts = [], focused = [];
 reviewEnv.getJSON = async (url) => {
   gets.push(url);
   if (url === "/api/review") return input.review;
-  if (url.includes("view=inbox")) return { entries: input.inbox, counters: { views: { inbox: 2 } } };
-  return { entries: input.projects };
+  if (url.includes("view=inbox")) return { tasks: input.inbox, counters: { views: { inbox: 2 } } };
+  return { tasks: input.projects };
 };
 reviewEnv.post = async (path, body) => { posts.push(path); return input.doneInbox; };
 reviewEnv.notice = () => {};
@@ -104,7 +104,7 @@ reviewEnv.focusStep = (id) => focused.push(id);
 (async () => {
   await loadReview();
   const first = reviewState.step;
-  const inboxIDs = gtdState.entries.map((e) => e.id);
+  const inboxIDs = tasksState.tasks.map((e) => e.id);
   await reviewKey("done");
   const after = reviewState.step;
   const moves = [];
@@ -115,7 +115,7 @@ reviewEnv.focusStep = (id) => focused.push(id);
   reviewState.step = "projects";
   await loadReviewStep();
   const panel = reviewPanel("");
-  process.stdout.write(JSON.stringify({ first, gets, posts, after, moves, text: text(panel), entries: gtdState.entries.map((e) => e.id).concat(inboxIDs),
+  process.stdout.write(JSON.stringify({ first, gets, posts, after, moves, text: text(panel), tasks: tasksState.tasks.map((e) => e.id).concat(inboxIDs),
     heads: all(panel, (x) => String(x.attrs["data-focus"] || "").startsWith("review:step:")).map((x) => x.attrs["data-focus"]), focused }));
 })();`, map[string]any{"review": review, "doneInbox": doneInbox, "inbox": []any{task("e-1", "inbox", nil), task("e-2", "inbox", nil)}, "projects": []any{project}}, &got)
 	if got.First != "inbox" {
@@ -127,11 +127,11 @@ reviewEnv.focusStep = (id) => focused.push(id);
 	if !slices.Equal(got.Moves, []string{"waiting", "outbox", "waiting"}) {
 		t.Errorf("[ [ ] moved through %v", got.Moves)
 	}
-	if !slices.Contains(got.Gets, "/api/entries?view=inbox") || !slices.Contains(got.Gets, "/api/entries?view=review") {
+	if !slices.Contains(got.Gets, "/api/tasks?view=inbox") || !slices.Contains(got.Gets, "/api/tasks?view=review") {
 		t.Errorf("step queries %v", got.Gets)
 	}
 	if !reflect.DeepEqual(got.Tasks, []string{"e-p", "e-1", "e-2"}) {
-		t.Errorf("entries %v", got.Tasks)
+		t.Errorf("tasks %v", got.Tasks)
 	}
 	for _, s := range []string{"Weekly review", "Inbox to zero", "Prune Focus", "Ship the v2 API", "review due", "no next action", "every 7d"} {
 		if !strings.Contains(got.Text, s) {
@@ -155,7 +155,7 @@ func TestProjectFactsShowTheNextActionAndTheLocalDay(t *testing.T) {
 	q.Kind, q.Title = "project", "Idle"
 	nodeRun(t, viewsPrelude(t), nil, `
 process.env.TZ = "America/Sao_Paulo";
-process.stdout.write(JSON.stringify({ with: text(entryItem(input.p, "")), without: text(entryItem(input.q, "")) }));`, map[string]any{"p": p, "q": q}, &got)
+process.stdout.write(JSON.stringify({ with: text(taskItem(input.p, "")), without: text(taskItem(input.q, "")) }));`, map[string]any{"p": p, "q": q}, &got)
 	for _, s := range []string{"next: Draft the plan", "2 open", "every 7d", "reviewed 2026-10-22"} {
 		if !strings.Contains(got.With, s) {
 			t.Errorf("the project lacks %q: %s", s, got.With)

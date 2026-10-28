@@ -202,7 +202,7 @@ func runOpen(ctx context.Context, e *Env, args []string) error {
 }
 
 // cockpitURL is the cockpit address with its token, at route, a hash
-// route of the cockpit such as "view=inbox", "entry=<id>" or unitRoute's.
+// route of the cockpit such as "view=inbox", "task=<id>" or unitRoute's.
 func cockpitURL(stateDir, route string) (string, error) {
 	info, err := daemon.ReadInfo(filepath.Join(stateDir, httpInfoFile))
 	if err != nil {

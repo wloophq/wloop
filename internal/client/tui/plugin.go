@@ -70,7 +70,7 @@ func (m *Model) plugin() (PluginView, bool) {
 	return nil, false
 }
 
-// viewCount is how many views there are: the row views, the plan, the GTD
+// viewCount is how many views there are: the row views, the plan, the task
 // views and the plugin views.
 func (m *Model) viewCount() int { return m.pluginBase() + len(m.plugins) }
 
@@ -80,7 +80,7 @@ func (m *Model) viewKey() string {
 		return "plugin:" + v.ID()
 	}
 	if v, ok := m.viewOnScreen(); ok {
-		return "gtd:" + v.ID
+		return "view:" + v.ID
 	}
 	switch {
 	case m.view < len(m.views):
@@ -104,8 +104,8 @@ func (m *Model) goTo(key string) {
 		m.view = slices.IndexFunc(m.views, func(v View) bool { return "rows:"+v.ID == key })
 	case slices.ContainsFunc(m.plugins, func(v PluginView) bool { return "plugin:"+v.ID() == key }):
 		m.view = m.pluginBase() + slices.IndexFunc(m.plugins, func(v PluginView) bool { return "plugin:"+v.ID() == key })
-	case slices.ContainsFunc(m.taskViews, func(v View) bool { return "gtd:"+v.ID == key }):
-		m.view = m.viewsBase() + slices.IndexFunc(m.taskViews, func(v View) bool { return "gtd:"+v.ID == key })
+	case slices.ContainsFunc(m.taskViews, func(v View) bool { return "view:"+v.ID == key }):
+		m.view = m.viewsBase() + slices.IndexFunc(m.taskViews, func(v View) bool { return "view:"+v.ID == key })
 	}
 	m.keepSelection()
 	m.keepTaskSelection()

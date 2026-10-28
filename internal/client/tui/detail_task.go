@@ -12,21 +12,21 @@ import (
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
-// askCard is a question an entry or a row asks, as its detail shows it and
+// askCard is a question a task or a row asks, as its detail shows it and
 // the digits answer it.
 type askCard struct {
 	text      string
 	options   []record.Option
 	recommend string
 	confirm   bool
-	// task is the entry whose answer verb takes the answer; row the row
-	// whose answer action does, when no entry does.
+	// task is the task whose answer verb takes the answer; row the row
+	// whose answer action does, when no task does.
 	task string
 	row  *api.Row
 }
 
 // openTask opens the detail of e and asks the daemon for it, marking it
-// seen first when it is an Inbox entry that changed.
+// seen first when it is an Inbox task that changed.
 func (m *Model) openTask(e api.TaskView, read uint64) (Command, bool) {
 	m.detailID, m.opened, m.detailStale, m.detailRead = e.ID, nil, false, read
 	c := Command{Unit: taskUnit(e.ID), Label: taskLabel(e), Action: "detail", task: e.ID, fetch: true}
@@ -44,7 +44,7 @@ func (m *Model) closeDetail() { m.detailID, m.opened, m.detailStale = "", nil, f
 
 func (m *Model) detailOpen(e api.TaskView) bool { return m.detailID != "" && m.detailID == e.ID }
 
-// SetDetail shows the entry the daemon answered for the open detail.
+// SetDetail shows the task the daemon answered for the open detail.
 func (m *Model) SetDetail(id string, e api.TaskView, err error) {
 	if id != m.detailID {
 		return
@@ -56,7 +56,7 @@ func (m *Model) SetDetail(id string, e api.TaskView, err error) {
 	m.opened, m.detailStale = &e, false
 }
 
-// Refetch asks again for the open detail once a page changed its entry.
+// Refetch asks again for the open detail once a page changed its task.
 func (m *Model) Refetch() (Command, bool) {
 	if !m.detailStale || m.detailID == "" {
 		return Command{}, false
@@ -93,7 +93,7 @@ func rowCard(r api.Row) askCard {
 	return askCard{text: cmp.Or(q.Text, q.LastMessage), options: q.Options, recommend: q.Recommend, confirm: q.Kind == "confirm", row: &r}
 }
 
-// activeCard is the question the digits answer: the open entry detail's,
+// activeCard is the question the digits answer: the open task detail's,
 // or the selected row's in a rows view.
 func (m *Model) activeCard() (askCard, bool) {
 	if _, ok := m.viewOnScreen(); ok {
@@ -174,7 +174,7 @@ func (m *Model) answer(c askCard, n int, read uint64) (Command, bool) {
 	return m.send(Command{Unit: taskUnit(c.task), Label: taskLabel(e), Action: "answer", task: c.task, verb: "answer", args: args})
 }
 
-// taskDetail is the entry, its facts, the question card, the draft, its
+// taskDetail is the task, its facts, the question card, the draft, its
 // items, one card per unit and the keys it offers.
 func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 	t := m.t
@@ -305,7 +305,7 @@ func (m *Model) unitCard(s api.CardView, fact func(label, text string, style fun
 	}
 }
 
-// taskKeys lists the entry's verbs with their keys: the enabled ones, then
+// taskKeys lists the task's verbs with their keys: the enabled ones, then
 // the disabled ones dimmed.
 func (m *Model) taskKeys(e api.TaskView, width, col int) []string {
 	t := m.t
@@ -322,7 +322,7 @@ func (m *Model) taskKeys(e api.TaskView, width, col int) []string {
 	return lines
 }
 
-// verbHelp are the entry's verbs that have a key, enabled and not, then
+// verbHelp are the task's verbs that have a key, enabled and not, then
 // the enabled actions of its units' rows.
 func (m *Model) verbHelp(e api.TaskView) (on []helpItem, off []string) {
 	for _, v := range e.Verbs {

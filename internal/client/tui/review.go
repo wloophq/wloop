@@ -21,7 +21,7 @@ var projectVerbs = []string{"reviewed", "sequential"}
 
 // reviewView is the weekly Review on screen: the daemon's Review, the step
 // shown, and whether the cursor is on that step's header rather than on one
-// of its entries.
+// of its tasks.
 type reviewView struct {
 	review *api.Review
 	step   string
@@ -69,7 +69,7 @@ func firstOpenStep(steps []api.ReviewStep, from int) string {
 	return steps[len(steps)-1].ID
 }
 
-// listView is the view whose entries a GTD view lists: the step's on the
+// listView is the view whose tasks a task view lists: the step's on the
 // Review.
 func (m *Model) listView(v View) string {
 	if v.ID != viewReview {
@@ -80,7 +80,7 @@ func (m *Model) listView(v View) string {
 }
 
 // reviewAction runs a key of the Review context; took is false where it
-// does not apply, so Enter on an entry opens it.
+// does not apply, so Enter on a task opens it.
 func (m *Model) reviewAction(action string) (c Command, ok, took bool) {
 	st, shown := m.reviewStep()
 	if !m.inReview() || !shown {
@@ -120,8 +120,8 @@ func (m *Model) showStep(id string) {
 	m.closeDetail()
 }
 
-// reviewMove moves between the step's header and its entries; false leaves
-// the move to the entry list.
+// reviewMove moves between the step's header and its tasks; false leaves
+// the move to the task list.
 func (m *Model) reviewMove(delta int) bool {
 	if !m.inReview() {
 		return false
@@ -142,7 +142,7 @@ func (m *Model) reviewMove(delta int) bool {
 }
 
 // renderReview draws the Review's steps, the step on screen's header and
-// its entries.
+// its tasks.
 func (m *Model) renderReview(lines []string, width, body int, now time.Time) []string {
 	t := m.t
 	if m.rv.review == nil {

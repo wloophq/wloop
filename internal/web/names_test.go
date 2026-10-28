@@ -58,12 +58,12 @@ func TestSlackTaskDetailReadsByName(t *testing.T) {
 	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
 globalThis.document = { activeElement: null, body: { classList: { add() {} } } };
 (async () => {
-  await loadDetailPane({ entry: "e-9" });
+  await loadDetailPane({ task: "e-9" });
   const box = { dataset: {}, contains: () => false, replaceChildren(...ns) { this.kids = ns.map((n) => Array.isArray(n) ? String(n) : n); } };
-  renderEntryDetail(box, { entry: "e-9" });
+  renderTaskDetail(box, { task: "e-9" });
   const head = byClass(box.kids, "d-head")[0];
   process.stdout.write(JSON.stringify({ Text: text(box.kids), Head: text(head), Pills: byClass(head, "pill").filter((p) => text(p) === "waiting").length }));
-})();`, map[string]any{"answers": map[string]any{"/api/entries/e-9": slackTask()}}, &got)
+})();`, map[string]any{"answers": map[string]any{"/api/tasks/e-9": slackTask()}}, &got)
 	if strings.Contains(got.Text, "[object ") {
 		t.Errorf("the detail prints an element list as text: %s", got.Text)
 	}
@@ -147,7 +147,7 @@ func TestRailGroupsViewsByPlugin(t *testing.T) {
 		Views []string
 	}
 	nodeRun(t, viewsPrelude(t), nil, `
-const nav = gtdNav(input.cat, input.served, [], null);
+const nav = viewNav(input.cat, input.served, [], null);
 const names = { github: "GitHub", slack: "Slack" };
 process.stdout.write(JSON.stringify(railSections(nav, (p) => names[p]).map((s) => ({ Title: s.title, Views: s.views.map((v) => v.id) }))));`,
 		map[string]any{"cat": viewsCatalog(), "served": served}, &got)
