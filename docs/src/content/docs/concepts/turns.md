@@ -39,7 +39,7 @@ A turn of an intent with a `[record]` table ends with a record: its state, a one
 
 The agent sends it with the `turn_end` tool of {{name}}'s MCP server, which the daemon serves at `http://127.0.0.1:<mcp.port>/mcp`. The daemon stores a record only for the turn it sent to, or that was started by, the calling session. A malformed record comes back with every problem listed, and the agent fixes it and calls again. A session without the tool writes the record to a file and runs `{{command}} turn end <url> --turn <id> --file <path>`.
 
-A run can owe more than its record: `record.requires` in an intent's manifest names a record kind of `records.toml` its run owes, and `record.missing` the gate of `gates.toml` a run that ends without one opens. A run that ends without a record, as when its session stops or goes away, opens that gate on its task, which you resolve to continue the run or dismiss. The bundled `start` requires a `report` and opens `missing-record`. An intent with no `[record]` table records no outcome and owes nothing, as `attach` does; one that sets no `record.requires` owes nothing more than its record, and its `[record]` table needs `states` only when it sets one of `when`, `artifacts`, `outcome`, `require` or `attach_url`.
+A run can owe more than its record: `record.requires` in an intent's manifest names a record kind of `records.toml` its run owes, and `record.missing` the gate of `gates.toml` a run opens when it fails or ends without its record, as when its session stops or goes away. That gate opens on its task, once, in place of a question; you answer it to resume the run with your text, continue it as it was, or dismiss it. It closes on its own when the run goes on another way, or a newer run of the intent takes its place. The bundled `start` requires a `report`, and every bundled intent that asks you a question names `missing-record`. An intent with no `[record]` table records no outcome and owes nothing, as `attach` does; one that sets no `record.requires` owes nothing more than its record, and its `[record]` table needs `states` only when it sets one of `when`, `artifacts`, `outcome`, `require` or `attach_url`.
 
 ## The hooks
 
@@ -55,10 +55,10 @@ All three exit at once outside a session of an enabled workspace manager, give t
 
 An `asked` turn shows its question in the cockpit's detail, in a notification (macOS) and in the terminal client (`W`). You can pick an option, answer Yes or No to a confirmation, or write your own answer; text given with an option reaches the agent as a note after the choice.
 
-The question is an Inbox message, as is every note an agent posts mid-turn with `inbox_post`, and every answer names the message it answers. The agent never receives the answer as text typed into its session. {{name}} tells the session that message N was answered, and the agent reads the answer with the `inbox_read` tool, or `{{command}} turn answer <unit> --message N` without the tool:
+The question is a message, as is every note an agent posts mid-turn with `inbox_post`, and each waits on its gate (see [Messages](/concepts/tasks/#messages)); every answer names the message and the gate it answers. The agent never receives the answer as text typed into its session. {{name}} tells the session that message N was answered, and the agent reads the answer with the `inbox_read` tool, or `{{command}} turn answer <unit> --message N` (or `--gate G`) without the tool:
 
 ```
-agent ──turn_end asked / inbox_post──▶ message N (Inbox) ◀── you answer N
+agent ──turn_end asked / inbox_post──▶ message N, gate G ◀── you resolve G
   ▲                                         │
   │ notice: "message N answered"            │ answer stored with message N
   └──── inbox_read ──▶ the answers of N, marked read
@@ -72,7 +72,7 @@ The notice goes:
 
 `inbox_read` with a message returns that message, its options and every answer to it; without one, every answer the agent has not read, oldest first. Reading marks an answer read: the message's card in the cockpit says whether the agent read each answer, a resume turn's answer counts as read, and the `answer-unread` workflow notifies you when a session leaves an answer unread for 15 minutes. The texts of the notices live in the profile's `notices.toml`.
 
-**Continue** sends a resume turn with no answer to an `asked`, `failed` or `unrecorded` turn. **Dismiss** closes it as `dismissed`. An answer typed directly in the agent's session still works.
+**Continue** sends a resume turn with no answer to an `asked`, `failed` or `unrecorded` turn. **Dismiss** closes it as `dismissed`. Answer, Continue and Dismiss are the intents of the question gate open on the unit, the question's or the missing gate of a stopped turn; with none open, Answer answers again a question already answered while its turn still asks. An answer typed directly in the agent's session still works, and closes the question's gate as superseded.
 
 ## Sessions
 

@@ -44,7 +44,6 @@ type batch struct {
 	links   map[unit.Unit][]link.Link
 	log     []LogEntry
 	created []Proposal
-	settled []Proposal
 	noops   map[itemKey]string
 	res     Result
 	err     error
@@ -475,7 +474,7 @@ func (b *batch) commit(ctx context.Context) (Result, error) {
 		}
 	}
 	c.Log = b.log
-	c.Proposals = append(slices.Clone(b.created), b.settled...)
+	c.Proposals = slices.Clone(b.created)
 	if len(c.Items)+len(c.Log)+len(c.Proposals) == 0 {
 		return b.res, nil
 	}

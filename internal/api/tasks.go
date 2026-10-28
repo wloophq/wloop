@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"encoding/json"
 	"net/url"
+	"slices"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/card"
@@ -125,7 +126,6 @@ type TaskView struct {
 	// Actions are the intents that serve the task's own unit, such as start.
 	Actions   []ActionState `json:"actions,omitempty"`
 	Attention *Attention    `json:"attention,omitempty"`
-	Message   *Message      `json:"message,omitempty"`
 	Created   time.Time     `json:"created"`
 	Updated   time.Time     `json:"updated"`
 
@@ -343,9 +343,10 @@ type Counters struct {
 	Badge    int            `json:"badge"`
 }
 
+// Message is the subject of a question, post or proposal gate, as GateView.Subject serves it: what was asked,
+// with the user's answers to it.
 type Message struct {
 	ID        int64           `json:"id"`
-	TaskID    string          `json:"task_id"`
 	Unit      unit.Unit       `json:"unit"`
 	Kind      string          `json:"kind"`
 	Text      string          `json:"text"`
@@ -353,7 +354,6 @@ type Message struct {
 	Recommend string          `json:"recommend,omitempty"`
 	Confirm   bool            `json:"confirm,omitempty"`
 	Origin    string          `json:"origin"`
-	State     string          `json:"state"`
 	CreatedAt time.Time       `json:"created_at"`
 	// Answers are the user's answers to the message, oldest first, each with when the agent read it.
 	Answers []TurnAnswer `json:"answers,omitempty"`
@@ -408,3 +408,20 @@ func (c ViewsCatalog) HandlerOf(verb string) string {
 	}
 	return verb
 }
+
+// MessageOf is the message of e's first open question, post or proposal gate, and that gate.
+func (e TaskView) MessageOf() (Message, GateView, bool) {
+	for _, g := range e.Gates {
+		if g.Status != "open" || len(g.Subject) == 0 || !slices.Contains(messageGateKinds, g.Kind) {
+			continue
+		}
+		var m Message
+		if json.Unmarshal(g.Subject, &m) == nil && m.ID != 0 {
+			return m, g, true
+		}
+	}
+	return Message{}, GateView{}, false
+}
+
+// messageGateKinds are the kinds of the gates a message is the subject of.
+var messageGateKinds = []string{"question", "post", "proposal"}

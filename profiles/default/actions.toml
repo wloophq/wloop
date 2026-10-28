@@ -3,25 +3,6 @@
 # facts. An empty note, warning or confirm shows nothing; why may not be
 # empty.
 
-[answer]
-label   = "Answer"
-summary = "Reply to the agent's open question with your text; the agent resumes from your answer."
-why     = "no open question on {{.pr.slug}}"
-
-[answer.input]
-label = "Answer"
-
-[continue]
-label   = "Continue"
-summary = "Let the agent resume without an answer, deciding the open question itself. Answer gives it your reply instead."
-why     = "no open question on {{.pr.slug}}"
-
-[dismiss]
-label   = "Dismiss"
-summary = "Close the agent's open question without resuming it; the pull request goes back to whoever it waits on."
-note    = "Close the question; the pull request goes back to whoever it waits on"
-why     = "no open question on {{.pr.slug}}"
-
 [take_over]
 label   = "Take over"
 summary = "Make someone else's pull request yours to develop: from then on it counts as one of yours, and Address works on it."

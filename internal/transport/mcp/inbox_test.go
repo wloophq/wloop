@@ -60,7 +60,8 @@ func inboxSession(t *testing.T, handle string) *inboxRig {
 	r.books.Put(turn.Book{Unit: inboxUnit, Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), ID: "abc", SentTo: "term_1",
 		Session: "term_1", State: turn.Started, SentAt: inboxAt.Add(-time.Hour), StartedAt: inboxAt.Add(-time.Minute)}}})
 	r.tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: r.taskStore, Items: noItems{}, Facts: enabledFacts{}, Clock: fixedClock{}})
-	svc := &messages.Service{Store: r.msgs, Books: r.books, Tasks: r.tasks, Intents: turnstest.Intents(), Clock: fixedClock{}}
+	svc := messagestest.NewGates(fixedClock{}.Now, rigTasks{r.taskStore, r.tasks}).Bind(&messages.Service{Store: r.msgs, Books: r.books, Tasks: r.tasks,
+		Intents: turnstest.Intents(), Clock: fixedClock{}})
 	r.srv = &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800, Inbox: svc}
 	r.sid = call(t, r.srv, "", handle, initialize).Header().Get("Mcp-Session-Id")
 	if r.sid == "" {
@@ -117,7 +118,7 @@ func TestInboxPostCreatesAMessage(t *testing.T) {
 		t.Fatalf("message %+v", m)
 	}
 	e, err := r.taskStore.Task(context.Background(), task.ID(m.TaskID))
-	if err != nil || e.Kind != task.KindMessage || e.State != task.State("inbox") {
+	if err != nil || e.Kind == task.KindMessage || e.State != task.State("inbox") {
 		t.Fatalf("entry %+v %v", e, err)
 	}
 	books, _ := r.books.Books(context.Background(), inboxUnit)
@@ -211,4 +212,18 @@ func TestInboxPostRefusesABadMessage(t *testing.T) {
 	if n := len(r.open(t)); n != 0 {
 		t.Fatalf("open %d", n)
 	}
+}
+
+// rigTasks give a gate the task of its unit from the store, and open one through the tasks service.
+type rigTasks struct {
+	store *taskstest.Store
+	svc   *coretasks.Service
+}
+
+func (r rigTasks) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
+	return r.store.TasksOf(ctx, u)
+}
+
+func (r rigTasks) Open(ctx context.Context, req coretasks.OpenRequest) (task.Task, error) {
+	return r.svc.Open(ctx, req)
 }

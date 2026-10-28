@@ -244,7 +244,7 @@ func TestV7RenameKeepsAnOpenQuestionRoutable(t *testing.T) {
 	tk := unit.Unit{Provider: unit.Task, Key: "t-" + hexA}
 	var id int64
 	var taskID, session string
-	if err := db.R().QueryRowContext(ctx, `SELECT id, task_id, session FROM messages WHERE state = 'open' AND provider = ? AND unit_key = ?
+	if err := db.R().QueryRowContext(ctx, `SELECT id, task_id, session FROM messages WHERE closed_at = '' AND provider = ? AND unit_key = ?
 		AND origin_kind = 'turn' AND turn_seq = 1 AND kind = 'question'`, string(tk.Provider), tk.Key).Scan(&id, &taskID, &session); err != nil {
 		t.Fatalf("the open question on %s: %v", tk, err)
 	}
@@ -530,7 +530,7 @@ func ownTask(t *testing.T, db *sql.DB, id string) {
 		`INSERT INTO task_units (task_id, provider, unit_key, ord) VALUES (?1, 'slack', 'C1/2', 0)`,
 		`INSERT INTO task_props (task_id, name, value, writer, at) VALUES (?1, 'contexts', '{"list":["@reply"]}', 'plugin', 't')`,
 		`INSERT INTO unit_marks (provider, unit_key, mark, value) VALUES ('task', ?1, 'w/settled', 'v')`,
-		`INSERT INTO messages (task_id, provider, unit_key, kind, text, origin_kind, state, created_at) VALUES (?1, 'slack', 'C1/2', 'post', 'p', 'agent', 'open', 't')`,
+		`INSERT INTO messages (task_id, provider, unit_key, kind, text, origin_kind, created_at) VALUES (?1, 'slack', 'C1/2', 'post', 'p', 'agent', 't')`,
 	} {
 		if _, err := db.Exec(q, id); err != nil {
 			t.Fatalf("%s: %v", q, err)

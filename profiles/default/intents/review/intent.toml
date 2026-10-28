@@ -42,6 +42,7 @@ warning = "{{if .row.question}}Starts a new round; the agent's open question is 
 [record]
 when      = '!turn.try'
 states    = ["done", "settled", "asked", "failed"]
+missing   = "missing-record"
 artifacts = ["review-draft"]
 outcome   = ["verdict", "url"]
 outcome_doc = '''

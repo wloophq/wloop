@@ -85,7 +85,7 @@ func TestATaskServesItsOpenGates(t *testing.T) {
 	}
 	gv := v.Gates[0]
 	if gv.ID != g.ID || gv.Kind != "question" || gv.Text != "The agent asks" || gv.Task != "t-0000000000000001" ||
-		len(gv.Intents) != 2 || gv.Intents[0].ID != "answer" || !gv.Intents[0].Answer || gv.Intents[1].Label != "Dismiss" {
+		len(gv.Intents) != 3 || gv.Intents[0].ID != "answer" || !gv.Intents[0].Answer || gv.Intents[2].Label != "Dismiss" {
 		t.Fatalf("gate view = %+v", gv)
 	}
 	var open []api.GateView

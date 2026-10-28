@@ -125,6 +125,8 @@ type Answer struct {
 	At      time.Time
 	// Message is the Inbox message the answer answers, 0 for one stored before answers named theirs.
 	Message int64
+	// Gate is the gate the answer resolved, 0 for one given with no gate open.
+	Gate int64
 	// Posted says that Message is one the agent posted during its turn, not its turn's question; the store
 	// reads it from the message.
 	Posted bool

@@ -113,7 +113,7 @@ func TestDismissDetachesADisabledPluginFromAMixedTask(t *testing.T) {
 	}
 }
 
-func TestDismissOnAMixedTaskRunsItsEnabledUnitsAction(t *testing.T) {
+func TestDismissOnAMixedTaskWithNoRowDismissTrashesIt(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t, "slack")
 	r.put(t, task.Task{ID: "e-mixed", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Title: "both", Units: []unit.Unit{r7u, slackUnit}})
@@ -122,15 +122,12 @@ func TestDismissOnAMixedTaskRunsItsEnabledUnitsAction(t *testing.T) {
 		t.Fatalf("GET: %d", code)
 	}
 	for _, vs := range v.Verbs {
-		if vs.Verb == "dismiss" && (vs.Enabled || vs.Reason == "" || vs.Reason == "slack is disabled") {
-			t.Errorf("dismiss follows the row of %s: %+v", r7u.Label(), vs)
+		if vs.Verb == "dismiss" && (!vs.Enabled || vs.Reason == "slack is disabled") {
+			t.Errorf("dismiss of a task whose rows offer no dismiss: %+v", vs)
 		}
 	}
-	if rec := post(t, r.s, api.TaskPath("e-mixed", "dismiss"), `{"source":"cockpit"}`); rec.Code != 409 || strings.Contains(rec.Body.String(), `"plugin":"slack"`) {
+	if rec := post(t, r.s, api.TaskPath("e-mixed", "dismiss"), `{"source":"cockpit"}`); rec.Code != 200 || strings.Contains(rec.Body.String(), `"plugin":"slack"`) {
 		t.Fatalf("dismiss: %d %s", rec.Code, rec.Body)
-	}
-	if got, err := r.g.Task(context.Background(), "e-mixed"); err != nil || len(got.Units) != 2 || got.State != task.State("inbox") {
-		t.Fatalf("untouched %+v %v", got, err)
 	}
 }
 

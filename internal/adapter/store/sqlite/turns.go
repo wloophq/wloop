@@ -180,7 +180,7 @@ const (
 		agent, brief_run, agent_session, inputs, runner, workflow, role FROM turns%s ORDER BY provider, unit_key, seq`
 	bookRecordsSQL = `SELECT provider, unit_key, id, turn_seq, session, agent_session, head, hash, at, acked, record
 		FROM turn_records%s ORDER BY provider, unit_key, id`
-	bookAnswersSQL = `SELECT provider, unit_key, id, turn_seq, at, text, source, option_id, yes, no, route, session, message_id, read_at, noticed_at,
+	bookAnswersSQL = `SELECT provider, unit_key, id, turn_seq, at, text, source, option_id, yes, no, route, session, message_id, gate_id, read_at, noticed_at,
 		coalesce((SELECT m.origin_kind = 'agent' FROM messages m WHERE m.id = turn_answers.message_id), 0)
 		FROM turn_answers%s ORDER BY provider, unit_key, id`
 )
@@ -255,7 +255,7 @@ func loadChunk(ctx context.Context, tx *sql.Tx, provider unit.ProviderID, keys [
 		var a turn.Answer
 		var at, read, noticed string
 		if err := rows.Scan(&ref.Provider, &ref.Key, &a.ID, &a.TurnSeq, &at, &a.Text, &a.Source, &a.OptionID, &a.Yes, &a.No, &a.Route, &a.Session,
-			&a.Message, &read, &noticed, &a.Posted); err != nil {
+			&a.Message, &a.Gate, &read, &noticed, &a.Posted); err != nil {
 			return err
 		}
 		a.At, a.ReadAt, a.NoticedAt = parseTime(at), parseTime(read), parseTime(noticed)
@@ -428,7 +428,7 @@ func storedRecord(r turn.Record, raw string) turn.Record {
 }
 
 func answerColumns(a turn.Answer) []any {
-	return []any{a.TurnSeq, formatTime(a.At), a.Text, string(a.Source), a.OptionID, a.Yes, a.No, string(a.Route), a.Session, a.Message, formatTime(a.ReadAt), formatTime(a.NoticedAt)}
+	return []any{a.TurnSeq, formatTime(a.At), a.Text, string(a.Source), a.OptionID, a.Yes, a.No, string(a.Route), a.Session, a.Message, a.Gate, formatTime(a.ReadAt), formatTime(a.NoticedAt)}
 }
 
 // saveBook writes the turns, records and answers of b that differ from stored
@@ -569,15 +569,15 @@ func saveBook(ctx context.Context, tx *Tx, ref unit.Unit, stored, b turn.Book) (
 				continue
 			}
 			if _, err := tx.ExecContext(ctx, `UPDATE turn_answers SET turn_seq = ?, at = ?, text = ?, source = ?, option_id = ?, yes = ?, no = ?, route = ?, session = ?,
-				message_id = ?, read_at = ?, noticed_at = ? WHERE id = ? AND provider = ? AND unit_key = ?`, append(cols, a.ID, string(ref.Provider), ref.Key)...); err != nil {
+				message_id = ?, gate_id = ?, read_at = ?, noticed_at = ? WHERE id = ? AND provider = ? AND unit_key = ?`, append(cols, a.ID, string(ref.Provider), ref.Key)...); err != nil {
 				return turn.Book{}, false, err
 			}
 			out.Answers[i] = a
 			changed = true
 			continue
 		}
-		res, err := tx.ExecContext(ctx, `INSERT INTO turn_answers (provider, unit_key, turn_seq, at, text, source, option_id, yes, no, route, session, message_id, read_at, noticed_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, append([]any{string(ref.Provider), ref.Key}, cols...)...)
+		res, err := tx.ExecContext(ctx, `INSERT INTO turn_answers (provider, unit_key, turn_seq, at, text, source, option_id, yes, no, route, session, message_id, gate_id, read_at, noticed_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, append([]any{string(ref.Provider), ref.Key}, cols...)...)
 		if err != nil {
 			return turn.Book{}, false, err
 		}

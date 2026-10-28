@@ -1147,6 +1147,7 @@ func newTurnRig(t *testing.T) *turnRig {
 	clock := fixedClock(s.deps.Now())
 	s.deps.Tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority, Store: r.tasks, Items: itemsNone{}, Facts: r.facts, Clock: clock})
 	s.deps.Messages = &messages.Service{Store: r.msgs, Books: r.store, Turns: s.deps.Turns, Tasks: s.deps.Tasks, Intents: turnstest.Intents(), Clock: clock}
+	serveMessageGates(s, r.tasks, s.deps.Tasks)
 	return r
 }
 

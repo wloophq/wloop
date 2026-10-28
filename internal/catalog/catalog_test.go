@@ -103,7 +103,7 @@ func TestEveryActionHasItsKey(t *testing.T) {
 			}
 		}
 	}
-	for _, g := range []string{"skip", "run_now", "guide", "trust_run", "unblock"} {
+	for _, g := range []string{"skip", "run_now", "guide", "trust_run", "unblock", "answer", "continue", "dismiss"} {
 		delete(actions, g)
 	}
 	if !maps.Equal(builtin.ActionKeys, actions) {

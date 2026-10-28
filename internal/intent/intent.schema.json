@@ -506,7 +506,7 @@
           "type": "string"
         },
         "missing": {
-          "description": "The gate, of gates.toml, a run that ends without the record requires names opens. Required with requires.",
+          "description": "The gate, of gates.toml, a run opens when it fails or ends without its record, which an answer resumes; left out, such a run opens none. Required with requires.",
           "type": "string"
         },
         "outcome": {

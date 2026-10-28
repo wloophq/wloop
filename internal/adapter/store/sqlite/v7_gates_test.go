@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/gates"
+	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
@@ -206,9 +207,9 @@ func TestAnOpenQuestionKeepsItsRouteThroughV7Gates(t *testing.T) {
 	if got := strings1(t, rawDB(t, path), `SELECT gate_id || ' ' || session || ' ' || route FROM turn_answers WHERE message_id = 10`); !slices.Equal(got, []string{itoa(q.ID) + " s1 queued"}) {
 		t.Fatalf("the queued answer %q", got)
 	}
-	var session, state string
-	if err := db.R().QueryRowContext(ctx, `SELECT session, state FROM messages WHERE id = ?`, q.Subject).Scan(&session, &state); err != nil || session != "s1" || state != "open" {
-		t.Fatalf("the gate's subject reads message %s on %q (%s): %v", q.Subject, session, state, err)
+	var session, closed string
+	if err := db.R().QueryRowContext(ctx, `SELECT session, closed_at FROM messages WHERE id = ?`, q.Subject).Scan(&session, &closed); err != nil || session != "s1" || closed != "" {
+		t.Fatalf("the gate's subject reads message %s on %q (closed %q): %v", q.Subject, session, closed, err)
 	}
 	books, err := New(db).Books(ctx, tk)
 	if err != nil {
@@ -284,5 +285,62 @@ func TestAMigratedDraftKeepsOnlyItsDelivery(t *testing.T) {
 	if got := strings1(t, raw, `SELECT name FROM pragma_table_info('drafts') WHERE name IN
 		('approval_mode', 'approval_window', 'deadline', 'would_policy', 'would_reason', 'would_outcome')`); len(got) != 0 {
 		t.Fatalf("columns left: %q", got)
+	}
+}
+
+func TestAMessageAndAnItemProposalTakeTheirStateFromTheirGate(t *testing.T) {
+	t.Parallel()
+	path := v6Store(t,
+		`INSERT INTO messages (id, entry_id, provider, unit_key, kind, text, origin_kind, turn_seq, state, answer, created_at) VALUES
+			(1, '', 'github', 'acme/api#7', 'question', 'Ship it?', 'turn', 1, 'answered', 'yes', '2026-10-27T09:00:00Z'),
+			(2, '', 'github', 'acme/api#7', 'question', 'Ship it now?', 'turn', 2, 'open', '', '2026-10-27T09:00:00Z')`,
+		`INSERT INTO messages (id, entry_id, provider, unit_key, kind, text, origin_kind, proposal, state, created_at) VALUES
+			(3, '', 'github', 'acme/api#7', 'proposal', 'Resolve i1?', 'ledger', 5, 'open', '2026-10-27T09:00:00Z')`,
+		`INSERT INTO item_proposals (id, provider, unit_key, item, op, provenance, dedupe, state, at) VALUES
+			(5, 'github', 'acme/api#7', 'i1', '{"op":"resolve","item":"i1"}', 'extracted', 'd5', 'accepted', '2026-10-27T09:00:00Z'),
+			(6, 'github', 'acme/api#7', 'i2', '{"op":"resolve","item":"i2"}', 'extracted', 'd6', 'rejected', '2026-10-27T09:00:00Z'),
+			(7, 'github', 'acme/api#7', 'i3', '{"op":"resolve","item":"i3"}', 'extracted', 'd7', 'open', '2026-10-27T09:00:00Z')`,
+	)
+	db := migrateV6(t, path)
+	ctx := context.Background()
+	all, err := db.Gates(nil).Where(ctx, gates.Query{Statuses: []gate.Status{gate.Open, gate.Approved, gate.Rejected, gate.Answered, gate.Dismissed, gate.Superseded}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := db.R().QueryContext(ctx, `SELECT id, closed_at FROM messages ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	n := 0
+	for rows.Next() {
+		var id, closed string
+		if err := rows.Scan(&id, &closed); err != nil {
+			t.Fatal(err)
+		}
+		i := slices.IndexFunc(all, func(g gate.Gate) bool {
+			return g.Subject == id && (g.Kind == gate.KindQuestion || g.Kind == gate.KindPost || g.Kind == gate.KindProposal)
+		})
+		if i < 0 {
+			t.Fatalf("message %s has no gate", id)
+		}
+		if open := all[i].Status == gate.Open; open != (closed == "") {
+			t.Errorf("message %s closed at %q, its gate %s", id, closed, all[i].Status)
+		}
+		n++
+	}
+	if n != 3 {
+		t.Fatalf("%d messages", n)
+	}
+	ps, err := db.Items().Proposals(ctx, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var states []coreitems.ProposalState
+	for _, p := range ps {
+		states = append(states, p.State)
+	}
+	if !slices.Equal(states, []coreitems.ProposalState{coreitems.ProposalAccepted, coreitems.ProposalRejected, coreitems.ProposalOpen}) {
+		t.Fatalf("proposal states %v", states)
 	}
 }

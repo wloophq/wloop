@@ -1,4 +1,4 @@
-summary = "Refuse a queued answer whose route is gone"
+summary = "Refuse a queued answer whose route is gone; its question asks again through its gate"
 provider = "github"
 when = 'pr.orphan_answer_id != 0'
 order = 31

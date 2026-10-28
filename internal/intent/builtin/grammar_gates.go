@@ -8,6 +8,7 @@ var gatesGrammar = []Key{
 	{Path: "gates.*", In: SurfaceGates, Kind: KindTable, Doc: "A gate, by its name: the one a gate.open step, an intent's record.missing or a verb's gate opens; a gate the loop opens by kind takes the first of its kind. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones."},
 	{Path: "gates.*.kind", In: SurfaceGates, Kind: KindEnum, Values: gateKindValues, Required: true, Doc: "What the gate decides, which names the consequence of resolving it; required for a new gate."},
 	{Path: "gates.*.label", In: SurfaceGates, Kind: KindText, Doc: "What the gate asks of you, as clients list it."},
+	{Path: "gates.*.text", In: SurfaceGates, Kind: KindTemplate, Doc: "The words of the gate's subject when the loop writes them, over the proposal facts: the first proposal gate words an item proposal of the ledger with it."},
 	{Path: "gates.*.intents", In: SurfaceGates, Kind: KindMap, Doc: "What you may resolve the gate with, by intent, in the order clients offer them."},
 	{Path: "gates.*.intents.*", In: SurfaceGates, Kind: KindTable, Doc: "An intent, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones."},
 	{Path: "gates.*.intents.*.label", In: SurfaceGates, Kind: KindText, Doc: "The name people read on its button."},

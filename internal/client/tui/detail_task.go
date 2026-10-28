@@ -75,10 +75,10 @@ func (m *Model) shownDetail(e api.TaskView) api.TaskView {
 	return e
 }
 
-// questionCard is the open question of e: its open message, else the
+// questionCard is the open question of e: the message of its open gate, else the
 // question its first unit's row asks.
 func (m *Model) questionCard(e api.TaskView) (askCard, bool) {
-	if msg := e.Message; msg != nil && msg.State == "open" && (len(msg.Options) > 0 || msg.Confirm) {
+	if msg, _, ok := e.MessageOf(); ok && (len(msg.Options) > 0 || msg.Confirm) {
 		return askCard{text: msg.Text, options: msg.Options, recommend: msg.Recommend, confirm: msg.Confirm, task: e.ID}, true
 	}
 	for _, u := range e.Units {
@@ -244,7 +244,7 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 		for i, a := range c.answers() {
 			fact("", fmt.Sprintf("%d. %s", i+1, a), plain)
 		}
-	} else if msg := e.Message; msg != nil {
+	} else if msg, _, ok := e.MessageOf(); ok {
 		fact("message", msg.Text, plain)
 	}
 	if d := draftOn(e); d != nil {

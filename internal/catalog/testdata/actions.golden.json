@@ -1,5 +1,49 @@
 [
   {
+    "id": "answer",
+    "label": "Answer",
+    "summary": "Reply to the agent's open question with your text; the agent resumes from your answer.",
+    "group": "turn",
+    "key": "W",
+    "surfaces": [
+      "detail",
+      "tui",
+      "notification"
+    ],
+    "input": {
+      "kind": "answer",
+      "required": true,
+      "label": "Answer"
+    },
+    "source": "builtin"
+  },
+  {
+    "id": "continue",
+    "label": "Continue",
+    "summary": "Let the agent resume without an answer, deciding the open question itself. Answer gives it your reply instead.",
+    "group": "turn",
+    "key": "C",
+    "surfaces": [
+      "detail",
+      "tui",
+      "notification"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "dismiss",
+    "label": "Dismiss",
+    "summary": "Close the agent's open question without resuming it; the pull request goes back to whoever it waits on.",
+    "group": "turn",
+    "key": "X",
+    "surfaces": [
+      "detail",
+      "tui",
+      "notification"
+    ],
+    "source": "builtin"
+  },
+  {
     "id": "run_now",
     "label": "Run now",
     "summary": "Start the round waiting on this pull request now, without waiting for its delay or the daily budget. Skip drops it instead.",
@@ -180,50 +224,6 @@
       "max": 500
     },
     "source": "intents/nudge/intent.toml"
-  },
-  {
-    "id": "answer",
-    "label": "Answer",
-    "summary": "Reply to the agent's open question with your text; the agent resumes from your answer.",
-    "group": "turn",
-    "key": "W",
-    "surfaces": [
-      "detail",
-      "tui",
-      "notification"
-    ],
-    "input": {
-      "kind": "answer",
-      "required": true,
-      "label": "Answer"
-    },
-    "source": "builtin"
-  },
-  {
-    "id": "continue",
-    "label": "Continue",
-    "summary": "Let the agent resume without an answer, deciding the open question itself. Answer gives it your reply instead.",
-    "group": "turn",
-    "key": "C",
-    "surfaces": [
-      "detail",
-      "tui",
-      "notification"
-    ],
-    "source": "builtin"
-  },
-  {
-    "id": "dismiss",
-    "label": "Dismiss",
-    "summary": "Close the agent's open question without resuming it; the pull request goes back to whoever it waits on.",
-    "group": "turn",
-    "key": "X",
-    "surfaces": [
-      "detail",
-      "tui",
-      "notification"
-    ],
-    "source": "builtin"
   },
   {
     "id": "take_over",

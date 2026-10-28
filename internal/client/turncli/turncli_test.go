@@ -33,7 +33,7 @@ func (f *fakeAgent) EndTurn(_ context.Context, handle string, r api.TurnEndReque
 	return f.ended, f.err
 }
 
-func (f *fakeAgent) TurnAnswer(_ context.Context, handle, arg string, message int64) (api.TurnText, error) {
+func (f *fakeAgent) TurnAnswer(_ context.Context, handle, arg string, message, _ int64) (api.TurnText, error) {
 	f.handles, f.args, f.messages = append(f.handles, handle), append(f.args, arg), append(f.messages, message)
 	return f.answer, f.err
 }

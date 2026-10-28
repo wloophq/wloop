@@ -3,7 +3,6 @@ package items
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -86,25 +85,12 @@ func (m *memStore) Commit(_ context.Context, c Commit) error {
 	m.log = append(m.log, c.Log...)
 	for _, p := range c.Proposals {
 		if p.ID != 0 {
-			if _, err := m.SetProposal(context.Background(), p.ID, p.State); err != nil {
-				return err
-			}
 			continue
 		}
 		p.ID = int64(len(m.proposals) + 1)
 		m.proposals = append(m.proposals, roundTrip(p))
 	}
 	return nil
-}
-
-func (m *memStore) SetProposal(_ context.Context, id int64, state ProposalState) (Proposal, error) {
-	for i := range m.proposals {
-		if m.proposals[i].ID == id {
-			m.proposals[i].State = state
-			return m.proposals[i], nil
-		}
-	}
-	return Proposal{}, fmt.Errorf("no proposal %d", id)
 }
 
 func (m *memStore) outcomes() []string {

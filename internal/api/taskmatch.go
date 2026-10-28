@@ -71,7 +71,7 @@ func (e TaskView) Texts() []string {
 	if d, ok := e.DraftOf(); ok {
 		out = append(out, d.Target, d.Where, d.Text, d.Reaction, d.Unit)
 	}
-	if m := e.Message; m != nil {
+	if m, _, ok := e.MessageOf(); ok {
 		out = append(out, m.Text)
 	}
 	return out

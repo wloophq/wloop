@@ -9,10 +9,11 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -55,11 +56,11 @@ func TestAQuestionOfAPullRequestThatEndsLeavesTheInbox(t *testing.T) {
 	if open[0].Unit != ghUnit(2) || open[1].Unit != ghUnit(3) {
 		t.Fatalf("open %+v", open)
 	}
-	if m, _, _ := d.Messages.Store.Message(ctx, 1); m.Unit != ghUnit(1) || m.State != message.Superseded {
+	if m, _, _ := d.Messages.Store.Message(ctx, 1); m.Unit != ghUnit(1) || m.Open() {
 		t.Fatalf("the merged one's message %+v", m)
 	}
-	inbox, err := db.Tasks().Tasks(ctx, task.Query{View: task.ViewInbox})
-	if err != nil || len(inbox) != 2 {
-		t.Fatalf("inbox %+v %v", inbox, err)
+	open1, err := d.GateReader.Where(ctx, gates.Query{Kind: gate.KindQuestion})
+	if err != nil || len(open1) != 2 || slices.ContainsFunc(open1, func(g gate.Gate) bool { return g.Subject == "1" }) {
+		t.Fatalf("open question gates %+v %v", open1, err)
 	}
 }

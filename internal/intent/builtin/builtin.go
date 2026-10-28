@@ -95,9 +95,6 @@ var ActionKeys = map[string]string{
 	"resume":    "H",
 	"mute":      "M",
 	"unmute":    "M",
-	"answer":    "W",
-	"continue":  "C",
-	"dismiss":   "X",
 }
 
 // GateRole is what an intent of a gate does, which its status and answer
@@ -116,7 +113,7 @@ func GateRoleOf(status gate.Status, answer bool) GateRole {
 	switch {
 	case answer:
 		return GateTakesText
-	case status == gate.Approved:
+	case status == gate.Approved || status == gate.Answered:
 		return GateApproves
 	case status == gate.Rejected || status == gate.Dismissed:
 		return GateRefuses
@@ -137,11 +134,12 @@ type GateKey struct {
 var GateKeys = []GateKey{
 	{gate.KindPlan, GateApproves, "R"}, {gate.KindPlan, GateTakesText, "G"}, {gate.KindPlan, GateRefuses, "S"},
 	{gate.KindTrust, GateApproves, "T"}, {gate.KindTrust, GateRefuses, "D"},
+	{gate.KindQuestion, GateTakesText, "W"}, {gate.KindQuestion, GateApproves, "C"}, {gate.KindQuestion, GateRefuses, "X"},
 }
 
 // RowGateKinds are the kinds of the gates whose intents a row offers as its
 // actions.
-var RowGateKinds = []gate.Kind{gate.KindPlan, gate.KindTrust}
+var RowGateKinds = []gate.Kind{gate.KindQuestion, gate.KindPlan, gate.KindTrust}
 
 // IntentVerbs are the verbs a manifest's verb may name: those a task
 // bridges to its unit's served action.

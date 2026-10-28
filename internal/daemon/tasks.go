@@ -234,7 +234,38 @@ func (s *Server) runTaskVerb(w http.ResponseWriter, r *http.Request, verb string
 			return
 		}
 	}
-	creq := coretasks.Request{Verb: v, Args: req.Args, Source: req.Source, Actor: actor}
+	s.doTaskVerb(w, r, g, e, coretasks.Request{Verb: v, Args: req.Args, Source: req.Source, Actor: actor}, req)
+}
+
+// gateVerbRoles are the roles of the gate intents a verb of each handler resolves a task's open gate with.
+var gateVerbRoles = map[string]builtin.GateRole{"approve": builtin.GateApproves, "answer": builtin.GateTakesText}
+
+// doTaskVerb runs creq on e: a verb whose handler approves or answers resolves the task's open gate, one a
+// handler takes runs it, a reply or a bridged verb runs on the task's unit.
+func (s *Server) doTaskVerb(w http.ResponseWriter, r *http.Request, g *coretasks.Service, e task.Task, creq coretasks.Request, req api.TaskRequest) {
+	ctx, v := context.WithoutCancel(r.Context()), creq.Verb
+	if role, ok := gateVerbRoles[s.loaded().Tasks.Handler(string(v))]; ok && creq.Approved == 0 && !g.Handles(e.Kind, v) {
+		if gated, err := g.Allowed(ctx, e, creq); err != nil || gated {
+			res, err := g.Do(ctx, e.ID, creq)
+			s.writeTaskResult(ctx, w, g, res, err)
+			return
+		}
+		var out strings.Builder
+		resolved, err := s.resolveTaskGate(ctx, e, role, creq, &out)
+		if err != nil {
+			writeTasksError(w, err)
+			return
+		}
+		if resolved {
+			s.recordVerb(ctx, g, e, creq)
+			now, err := g.Task(ctx, e.ID)
+			if err != nil {
+				now = e
+			}
+			s.writeTaskResult(ctx, w, g, coretasks.Result{Task: now, Lines: lines(out.String())}, nil)
+			return
+		}
+	}
 	reply := v == task.VerbReply && !g.Handles(e.Kind, v)
 	b, bridged := s.bridge(ctx, g, e, v)
 	if reply || bridged {
@@ -246,7 +277,7 @@ func (s *Server) runTaskVerb(w http.ResponseWriter, r *http.Request, verb string
 		}
 	}
 	if reply {
-		s.runReply(ctx, w, g, e, req, actor)
+		s.runReply(ctx, w, g, e, req, creq.Actor)
 		return
 	}
 	if bridged {
@@ -255,7 +286,7 @@ func (s *Server) runTaskVerb(w http.ResponseWriter, r *http.Request, verb string
 			writeError(w, http.StatusConflict, b.reason())
 			return
 		}
-		s.runBridge(w, r, g, e, v, b.unit, st, req, actor)
+		s.runBridge(w, r, g, e, v, b.unit, st, req, creq.Actor)
 		return
 	}
 	res, err := g.Do(ctx, e.ID, creq)
@@ -660,11 +691,6 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 		}
 		v.Runs = runs
 	}
-	msg, err := ev.s.taskMessage(ctx, string(e.ID))
-	if err != nil {
-		return api.TaskView{}, err
-	}
-	v.Message = msg
 	v.Attention = ev.attention(ctx, e)
 	v.Verbs = ev.verbs(ctx, e)
 	v.Actions = taskIntentActions(ev.s.loaded(), e)
@@ -833,6 +859,8 @@ func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
 		switch {
 		case off != "" && verb != task.VerbDismiss:
 			st.Reason = off
+		case ev.resolvesGate(ctx, e, verb):
+			st.Enabled = true
 		case ev.g.Handles(e.Kind, verb):
 			st.Enabled = true
 		case verb == task.VerbReply:
@@ -1029,3 +1057,17 @@ func (s *Server) presentations(units []unit.Unit) map[unit.Unit]readmodel.Presen
 }
 
 func (s *Server) unitLabel(u unit.Unit) string { return s.unitLabels([]unit.Unit{u})[0] }
+
+// resolvesGate says whether verb resolves an open gate of e: its handler approves or answers, no handler of
+// e's kind takes it, and e has an open gate that takes its role.
+func (ev *taskViewer) resolvesGate(ctx context.Context, e task.Task, verb task.Verb) bool {
+	role, ok := gateVerbRoles[ev.s.loaded().Tasks.Handler(string(verb))]
+	if !ok || ev.g.Handles(e.Kind, verb) {
+		return false
+	}
+	_, _, ok, err := ev.s.taskGate(ctx, e, role, api.ActionRequest{})
+	if err != nil {
+		ev.s.logf("the gates of %s: %v", e.ID, err)
+	}
+	return ok
+}

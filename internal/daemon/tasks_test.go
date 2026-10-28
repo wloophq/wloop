@@ -600,8 +600,8 @@ func TestBridgeRefusesWhatTheRowDoesNotOffer(t *testing.T) {
 	if e, _ := g.Task(context.Background(), "e-r"); e.State != task.State("inbox") {
 		t.Fatalf("the entry moved: %+v", e)
 	}
-	if rec := post(t, c.s, api.TaskPath("e-r", "dismiss"), `{}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "no open question") {
-		t.Fatalf("dismiss with the turn's dismiss offered disabled: %d %s", rec.Code, rec.Body)
+	if rec := post(t, c.s, api.TaskPath("e-r", "dismiss"), `{}`); rec.Code != 200 || len(fa.calls) != 0 {
+		t.Fatalf("dismiss with no question gate to dismiss: %d %s %v", rec.Code, rec.Body, fa.calls)
 	}
 }
 
@@ -742,7 +742,7 @@ func TestTaskAnswerRouteMatchesTheUnitAnswer(t *testing.T) {
 	m := r.question(t)
 	r.idle()
 	var v api.TaskView
-	if code := get(t, r.s, api.TaskPath(m.TaskID), &v); code != 200 || v.Message == nil || v.Message.ID != m.ID ||
+	if code := get(t, r.s, api.TaskPath(m.TaskID), &v); code != 200 || !messageIs(v, m.ID) ||
 		!slices.ContainsFunc(v.Verbs, func(s api.VerbState) bool { return s.Verb == "answer" && s.Enabled }) {
 		t.Fatalf("%d %+v", code, v)
 	}
@@ -829,7 +829,7 @@ func TestAVerbTheProfileDoesNotOfferIsNeitherListedNorRun(t *testing.T) {
 	}
 }
 
-func TestATasksMessageShowsItsAnswersAndWhetherTheAgentReadThem(t *testing.T) {
+func TestAnAnsweredGateShowsItsMessagesAnswersAndWhetherTheAgentReadThem(t *testing.T) {
 	t.Parallel()
 	r := newMessageRig(t)
 	m := r.question(t)
@@ -837,16 +837,26 @@ func TestATasksMessageShowsItsAnswersAndWhetherTheAgentReadThem(t *testing.T) {
 	if rec := post(t, r.s, api.TaskPath(m.TaskID, "answer"), `{"args":{"option_id":"publish"},"source":"cockpit"}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	var v api.TaskView
-	if code := get(t, r.s, api.TaskPath(m.TaskID), &v); code != 200 || v.Message == nil || len(v.Message.Answers) != 1 ||
-		v.Message.Answers[0].OptionID != "publish" || v.Message.Answers[0].Message != m.ID || v.Message.Answers[0].ReadAt != nil {
-		t.Fatalf("%d %+v", code, v.Message)
+	answers := func() []api.TurnAnswer {
+		t.Helper()
+		var gs []api.GateView
+		if code := get(t, r.s, api.GatesPath+"?status=answered", &gs); code != 200 || len(gs) != 1 {
+			t.Fatalf("%d %+v", code, gs)
+		}
+		var msg api.Message
+		if err := json.Unmarshal(gs[0].Subject, &msg); err != nil || msg.ID != m.ID {
+			t.Fatalf("%v %s", err, gs[0].Subject)
+		}
+		return msg.Answers
+	}
+	if a := answers(); len(a) != 1 || a[0].OptionID != "publish" || a[0].Message != m.ID || a[0].ReadAt != nil {
+		t.Fatalf("%+v", a)
 	}
 	if _, err := r.s.deps.Messages.Read(context.Background(), messages.ReadRequest{Session: "term-1", Unit: r8u.Unit()}); err != nil {
 		t.Fatal(err)
 	}
-	if code := get(t, r.s, api.TaskPath(m.TaskID), &v); code != 200 || v.Message.Answers[0].ReadAt == nil {
-		t.Fatalf("%d %+v", code, v.Message.Answers)
+	if a := answers(); a[0].ReadAt == nil {
+		t.Fatalf("%+v", a)
 	}
 }
 
@@ -861,4 +871,10 @@ func TestAVerbAWorkflowRunsOnAMessageRecordsItsActor(t *testing.T) {
 	if evs := r.tasks.Events; len(evs) != 1 || evs[0].Kind != "verb_dismiss" || evs[0].Actor != "workflow:stale" {
 		t.Fatalf("events %+v", evs)
 	}
+}
+
+// messageIs says whether v serves message id on an open gate.
+func messageIs(v api.TaskView, id int64) bool {
+	m, _, ok := v.MessageOf()
+	return ok && m.ID == id
 }

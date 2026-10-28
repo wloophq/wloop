@@ -14,7 +14,7 @@ Reply on the batch export review
              2. react · sent · from user
              :eyes:
   keys       x next  w waiting  s schedule  y someday  l reference  f focus  p project  a approve  d delegate  e done
-             Backspace dismiss  G guide  V review  W answer  C continue  X dismiss  A take over  H pause  M mute  O open
+             Backspace dismiss  W answer  C continue  X dismiss  G guide  V review  A take over  H pause  M mute  O open
 
 
 

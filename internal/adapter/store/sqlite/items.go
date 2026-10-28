@@ -4,14 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -33,15 +34,21 @@ const (
 		updated_at = excluded.updated_at`
 	insertItemOpSQL = `INSERT INTO item_ops (provider, unit_key, item, op, provenance, outcome, reason, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 	itemOpsSQL      = `SELECT item, op, provenance, outcome, reason, at FROM item_ops WHERE provider = ? AND unit_key = ? AND at >= ? ORDER BY seq`
-	insertProposal  = `INSERT INTO item_proposals (provider, unit_key, item, op, provenance, reason, dedupe, state, at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING`
-	proposalColumns   = `id, provider, unit_key, item, op, provenance, reason, state, at`
-	proposalsOfState  = `SELECT ` + proposalColumns + ` FROM item_proposals WHERE state = ? ORDER BY id`
-	proposalsAll      = `SELECT ` + proposalColumns + ` FROM item_proposals ORDER BY id`
-	proposalByID      = `SELECT ` + proposalColumns + ` FROM item_proposals WHERE id = ?`
-	setProposalSQL    = `UPDATE item_proposals SET state = ? WHERE id = ? AND state = 'open'`
-	settleProposalSQL = `UPDATE item_proposals SET state = ? WHERE id = ? AND state = 'open'`
+	insertProposal  = `INSERT INTO item_proposals (provider, unit_key, item, op, provenance, reason, dedupe, at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 )
+
+// proposalsSQL are the item proposals, each in the state of its newest gate: the gate of its ledger message,
+// or the one it has before its message exists. A proposal with no gate open or decided is open.
+var proposalsSQL = fmt.Sprintf(`SELECT id, provider, unit_key, item, op, provenance, reason, state, at FROM (
+	SELECT p.*, CASE coalesce((SELECT g.status FROM gates g WHERE g.provider = p.provider AND g.unit_key = p.unit_key AND g.kind = '%s'
+		AND g.subject IN ('%s' || p.id, (SELECT CAST(m.id AS TEXT) FROM messages m WHERE m.origin_kind = '%s' AND m.proposal = p.id))
+		ORDER BY g.id DESC LIMIT 1), '')
+	WHEN '%s' THEN '%s' WHEN '%s' THEN '%s' WHEN '%s' THEN '%s' ELSE '%s' END AS state
+	FROM item_proposals p)`,
+	gate.KindProposal, strings.TrimSuffix(gate.ProposalSubject(0), "0"), message.OriginLedger,
+	gate.Approved, coreitems.ProposalAccepted, gate.Rejected, coreitems.ProposalRejected, gate.Dismissed, coreitems.ProposalRejected,
+	coreitems.ProposalOpen)
 
 func (s itemStore) Load(ctx context.Context, units []unit.Unit) (map[unit.Unit][]items.Item, error) {
 	out := make(map[unit.Unit][]items.Item, len(units))
@@ -108,9 +115,9 @@ func (s itemStore) Query(ctx context.Context, q coreitems.Query) ([]items.Item, 
 }
 
 func (s itemStore) Proposals(ctx context.Context, state coreitems.ProposalState) ([]coreitems.Proposal, error) {
-	query, args := proposalsAll, []any(nil)
+	query, args := proposalsSQL+` ORDER BY id`, []any(nil)
 	if state != "" {
-		query, args = proposalsOfState, []any{string(state)}
+		query, args = proposalsSQL+` WHERE state = ? ORDER BY id`, []any{string(state)}
 	}
 	rows, err := s.db.R().QueryContext(ctx, query, args...)
 	if err != nil {
@@ -211,54 +218,19 @@ func (s itemStore) Commit(ctx context.Context, c coreitems.Commit) error {
 	return err
 }
 
+// saveProposal stores a new proposal; a proposal already stored is decided by its gate, which the store keeps.
 func saveProposal(ctx context.Context, tx *Tx, p coreitems.Proposal) error {
 	if p.ID != 0 {
-		res, err := tx.ExecContext(ctx, settleProposalSQL, string(p.State), p.ID)
-		if err != nil {
-			return err
-		}
-		if n, _ := res.RowsAffected(); n == 0 {
-			return fmt.Errorf("proposal %d is no longer open", p.ID)
-		}
-		tx.Touch(port.TopicItems, p.Unit)
 		return nil
 	}
 	op, err := json.Marshal(p.Op)
 	if err != nil {
 		return err
 	}
-	res, err := tx.ExecContext(ctx, insertProposal, string(p.Unit.Provider), p.Unit.Key, p.Item, string(op),
-		string(p.Provenance), p.Reason, coreitems.DedupeKey(p.Op), string(p.State), formatTime(p.At))
-	if err != nil {
+	if _, err := tx.ExecContext(ctx, insertProposal, string(p.Unit.Provider), p.Unit.Key, p.Item, string(op),
+		string(p.Provenance), p.Reason, coreitems.DedupeKey(p.Op), formatTime(p.At)); err != nil {
 		return fmt.Errorf("proposal on %s %s: %w", p.Unit, p.Item, err)
 	}
-	if n, _ := res.RowsAffected(); n > 0 {
-		tx.Touch(port.TopicItems, p.Unit)
-	}
+	tx.Touch(port.TopicItems, p.Unit)
 	return nil
-}
-
-var errNoProposal = errors.New("no proposal")
-
-func (s itemStore) SetProposal(ctx context.Context, id int64, state coreitems.ProposalState) (coreitems.Proposal, error) {
-	var p coreitems.Proposal
-	_, err := s.db.Write(ctx, func(tx *Tx) error {
-		var err error
-		if p, err = scanProposal(tx.QueryRowContext(ctx, proposalByID, id)); errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("%w %d", errNoProposal, id)
-		} else if err != nil {
-			return err
-		}
-		res, err := tx.ExecContext(ctx, setProposalSQL, string(state), id)
-		if err != nil {
-			return err
-		}
-		if n, _ := res.RowsAffected(); n == 0 {
-			return fmt.Errorf("proposal %d is %s, not open", id, p.State)
-		}
-		tx.Touch(port.TopicItems, p.Unit)
-		p.State = state
-		return nil
-	})
-	return p, err
 }

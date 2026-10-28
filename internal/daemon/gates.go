@@ -14,11 +14,13 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/turn"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/meter"
 )
@@ -119,7 +121,13 @@ func (s *Server) handleGate(w http.ResponseWriter, r *http.Request) {
 	if g.Kind == gate.KindDraft && s.deps.Outbox != nil {
 		err = s.resolveDraftGateAt(ctx, g, intent, req.Args, actor)
 	} else {
-		err = s.deps.Gates.Resolve(ctx, id, gates.Resolution{Intent: intent, Answer: req.Args["answer"], By: actor})
+		source := turn.Cockpit
+		if actor == task.ActorPerson {
+			source, err = answerSource(req.Source)
+		}
+		if err == nil {
+			err = s.deps.Gates.Resolve(messages.WithDelivery(ctx, &messages.Delivery{Source: source}), id, gates.Resolution{Intent: intent, Answer: req.Args["answer"], By: actor})
+		}
 	}
 	if err != nil {
 		writeGateError(w, err)
@@ -152,7 +160,8 @@ func writeGateError(w http.ResponseWriter, err error) {
 	}
 }
 
-// gateView is g as clients offer it: a draft gate with its draft as its subject and its delivery.
+// gateView is g as clients offer it: a draft gate with its draft as its subject and its delivery, a question,
+// post or proposal gate with its message.
 func (s *Server) gateView(ctx context.Context, g gate.Gate) api.GateView {
 	if o := s.deps.Outbox; o != nil && g.Kind == gate.KindDraft {
 		if id, err := strconv.ParseInt(g.Subject, 10, 64); err == nil {
@@ -161,7 +170,11 @@ func (s *Server) gateView(ctx context.Context, g gate.Gate) api.GateView {
 			}
 		}
 	}
-	return gateView(g, s.loaded().Gates)
+	v := gateView(g, s.loaded().Gates)
+	if m, ok := s.messageOf(ctx, g); ok {
+		v.Subject, _ = json.Marshal(s.messageView(ctx, m))
+	}
+	return v
 }
 
 // draftGateView is draft gate g with dv, its draft, as its subject, and its delivery.

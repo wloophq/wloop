@@ -46,10 +46,9 @@ type hotPlan struct {
 }
 
 var hotPlans = []hotPlan{
-	{name: "open messages", query: messagesOpenSQL, want: []string{"messages_open (state=?)"}},
-	{name: "message by entry", query: messageByTaskSQL, args: 1, want: []string{"messages_task (task_id=?)"}},
-	{name: "open question", query: openQuestionSQL, args: 5, want: []string{"messages_open (state=?)"}},
-	{name: "open workflow proposal", query: openWorkflowSQL, args: 4, want: []string{"messages_open (state=?)"}},
+	{name: "open messages", query: messagesOpenSQL, want: []string{"messages_open (closed_at=?)"}},
+	{name: "open question", query: openQuestionSQL, args: 5, want: []string{"messages_open (closed_at=?)"}},
+	{name: "open workflow proposal", query: openWorkflowSQL, args: 4, want: []string{"messages_open (closed_at=?)"}},
 	{name: "ledger message", query: ledgerMessageSQL, args: 1, want: []string{"messages_proposal (proposal=?)"}},
 	{name: "recent activity", query: recentActivitySQL(marks(2)), args: 5, want: []string{"SCAN e USING INDEX events_recent"}},
 	{name: "active refs", query: activeRefsSQL, args: 1, want: []string{"events_recent (at>?)"}, tempSorts: []string{"USE TEMP B-TREE FOR DISTINCT"}},

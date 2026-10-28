@@ -25,22 +25,21 @@ func NewMessages(db *sqlite.DB) *Messages { return &Messages{db: db} }
 
 const (
 	messageColumns = `id, task_id, provider, unit_key, kind, text, options, recommend, confirm,
-		origin_kind, turn_seq, session, workflow, proposal, state, answer, created_at, closed_at`
-	messagesOpenSQL  = `SELECT ` + messageColumns + ` FROM messages WHERE state = 'open' ORDER BY id`
-	messageByIDSQL   = `SELECT ` + messageColumns + ` FROM messages WHERE id = ?`
-	messageByTaskSQL = `SELECT ` + messageColumns + ` FROM messages WHERE task_id = ? ORDER BY id DESC LIMIT 1`
-	openQuestionSQL  = `SELECT id FROM messages WHERE state = 'open' AND provider = ? AND unit_key = ?
+		origin_kind, turn_seq, session, workflow, proposal, answer, created_at, closed_at`
+	messagesOpenSQL = `SELECT ` + messageColumns + ` FROM messages WHERE closed_at = '' ORDER BY id`
+	messageByIDSQL  = `SELECT ` + messageColumns + ` FROM messages WHERE id = ?`
+	openQuestionSQL = `SELECT id FROM messages WHERE closed_at = '' AND provider = ? AND unit_key = ?
 		AND origin_kind = ? AND turn_seq = ? AND kind = ?`
-	openWorkflowSQL = `SELECT id FROM messages WHERE state = 'open' AND provider = ? AND unit_key = ?
+	openWorkflowSQL = `SELECT id FROM messages WHERE closed_at = '' AND provider = ? AND unit_key = ?
 		AND origin_kind = ? AND workflow = ?`
 	ledgerMessageSQL = `SELECT id FROM messages WHERE origin_kind = 'ledger' AND proposal = ?`
 	insertMessageSQL = `INSERT INTO messages (task_id, provider, unit_key, kind, text, options, recommend, confirm,
-		origin_kind, turn_seq, session, workflow, proposal, state, answer, created_at, closed_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		origin_kind, turn_seq, session, workflow, proposal, answer, created_at, closed_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	updateMessageSQL = `UPDATE messages SET task_id = ?, text = ?, options = ?, recommend = ?, confirm = ?, session = ?
 		WHERE id = ?`
-	closeMessageSQL = `UPDATE messages SET state = ?1, answer = ?2, closed_at = CASE state WHEN 'open' THEN ?3 ELSE closed_at END
-		WHERE id = ?4 AND (state = 'open' OR (state = 'answered' AND ?1 = 'answered' AND answer != ?2))`
+	closeMessageSQL = `UPDATE messages SET answer = ?1, closed_at = CASE closed_at WHEN '' THEN ?2 ELSE closed_at END
+		WHERE id = ?3 AND (closed_at = '' OR (answer != '' AND ?1 != '' AND answer != ?1))`
 )
 
 // keyQuery is the statement and arguments that find the message m replaces when it has no ID, or "" when
@@ -74,12 +73,9 @@ func (s *Messages) Upsert(ctx context.Context, m message.Message) (message.Messa
 			}
 		}
 		if id == 0 {
-			if m.State == "" {
-				m.State = message.Open
-			}
 			res, err := tx.ExecContext(ctx, insertMessageSQL, m.TaskID, string(m.Unit.Provider), m.Unit.Key, string(m.Kind), m.Text,
 				string(options), m.Recommend, m.Confirm, m.Origin.Kind, m.Origin.TurnSeq, m.Origin.Session, m.Origin.Workflow,
-				m.Origin.Proposal, string(m.State), m.Answer, ts(m.CreatedAt), ts(m.ClosedAt))
+				m.Origin.Proposal, m.Answer, ts(m.CreatedAt), ts(m.ClosedAt))
 			if err != nil {
 				return err
 			}
@@ -126,10 +122,6 @@ func (s *Messages) Message(ctx context.Context, id int64) (message.Message, bool
 	return oneMessage(scanMessage(s.db.R().QueryRowContext(ctx, messageByIDSQL, id)))
 }
 
-func (s *Messages) ByTask(ctx context.Context, task string) (message.Message, bool, error) {
-	return oneMessage(scanMessage(s.db.R().QueryRowContext(ctx, messageByTaskSQL, task)))
-}
-
 func oneMessage(m message.Message, err error) (message.Message, bool, error) {
 	if errors.Is(err, sql.ErrNoRows) {
 		return message.Message{}, false, nil
@@ -154,10 +146,7 @@ func (s *Messages) Open(ctx context.Context) ([]message.Message, error) {
 	return out, rows.Err()
 }
 
-func (s *Messages) Close(ctx context.Context, id int64, st message.State, answer string, at time.Time) error {
-	if st == message.Open || st == "" {
-		return fmt.Errorf("closing message %d as %q", id, st)
-	}
+func (s *Messages) Close(ctx context.Context, id int64, answer string, at time.Time) error {
 	_, err := s.db.Write(ctx, func(tx *sqlite.Tx) error {
 		var u unit.Unit
 		var provider string
@@ -168,7 +157,7 @@ func (s *Messages) Close(ctx context.Context, id int64, st message.State, answer
 			return err
 		}
 		u.Provider = unit.ProviderID(provider)
-		res, err := tx.ExecContext(ctx, closeMessageSQL, string(st), answer, ts(at), id)
+		res, err := tx.ExecContext(ctx, closeMessageSQL, answer, ts(at), id)
 		if err != nil {
 			return err
 		}
@@ -186,13 +175,13 @@ type rowScanner interface{ Scan(dest ...any) error }
 
 func scanMessage(row rowScanner) (message.Message, error) {
 	var m message.Message
-	var provider, kind, options, state, created, closed string
+	var provider, kind, options, created, closed string
 	if err := row.Scan(&m.ID, &m.TaskID, &provider, &m.Unit.Key, &kind, &m.Text, &options, &m.Recommend, &m.Confirm,
-		&m.Origin.Kind, &m.Origin.TurnSeq, &m.Origin.Session, &m.Origin.Workflow, &m.Origin.Proposal, &state, &m.Answer,
+		&m.Origin.Kind, &m.Origin.TurnSeq, &m.Origin.Session, &m.Origin.Workflow, &m.Origin.Proposal, &m.Answer,
 		&created, &closed); err != nil {
 		return message.Message{}, err
 	}
-	m.Unit.Provider, m.Kind, m.State = unit.ProviderID(provider), message.Kind(kind), message.State(state)
+	m.Unit.Provider, m.Kind = unit.ProviderID(provider), message.Kind(kind)
 	if err := json.Unmarshal([]byte(options), &m.Options); err != nil {
 		return message.Message{}, fmt.Errorf("the options of message %d: %w", m.ID, err)
 	}

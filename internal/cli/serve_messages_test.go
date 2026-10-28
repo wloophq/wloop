@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,10 +17,12 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/gates"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/event"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
@@ -113,7 +116,7 @@ func TestOpenQuestionsBecomeMessages(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	d := servedMessages(t, te, db, log)
 	open := waitOpen(t, d, func(ms []message.Message) bool {
-		return len(ms) == 3 && !slices.ContainsFunc(ms, func(m message.Message) bool { return m.TaskID == "" })
+		return len(ms) == 2 && !slices.ContainsFunc(ms, func(m message.Message) bool { return m.TaskID == "" })
 	})
 	var units []unit.Unit
 	for _, m := range open {
@@ -122,13 +125,30 @@ func TestOpenQuestionsBecomeMessages(t *testing.T) {
 			t.Fatalf("message %+v", m)
 		}
 	}
-	if !slices.Equal(units, []unit.Unit{ghUnit(1), ghUnit(2), ghUnit(4)}) {
+	if !slices.Equal(units, []unit.Unit{ghUnit(1), ghUnit(2)}) {
 		t.Fatalf("units %v", units)
 	}
-	inbox, err := db.Tasks().Tasks(context.Background(), task.Query{View: task.ViewInbox})
-	if err != nil || len(inbox) != 3 {
-		t.Fatalf("inbox %+v %v", inbox, err)
+	gs, err := d.GateReader.Where(context.Background(), gates.Query{Kind: gate.KindQuestion})
+	if err != nil || len(gs) != 2 {
+		t.Fatalf("gates %+v %v", gs, err)
 	}
+	for _, m := range open {
+		if !slices.ContainsFunc(gs, func(g gate.Gate) bool { return g.Subject == strconv.FormatInt(m.ID, 10) && string(g.Task) == m.TaskID }) {
+			t.Fatalf("message %+v has no gate on its task in %+v", m, gs)
+		}
+	}
+}
+
+// messageConsequences apply the message gates' consequences through the messages, as the daemon does.
+type messageConsequences struct{ m *messages.Service }
+
+func (c messageConsequences) Release(context.Context, gate.Gate) error { return nil }
+func (c messageConsequences) Unblock(context.Context, gate.Gate) error { return nil }
+func (c messageConsequences) Deliver(ctx context.Context, g gate.Gate) error {
+	return c.m.Deliver(ctx, g)
+}
+func (c messageConsequences) Decide(ctx context.Context, g gate.Gate) error {
+	return c.m.Decide(ctx, g)
 }
 
 func TestLedgerProposalsReachTheInboxOnARealStore(t *testing.T) {
@@ -162,33 +182,47 @@ func TestLedgerProposalsReachTheInboxOnARealStore(t *testing.T) {
 	if m.Kind != message.Proposal || m.Origin.Kind != message.OriginLedger || m.Unit != u || m.TaskID == "" {
 		t.Fatalf("message %+v", m)
 	}
-	if _, err := d.Messages.Answer(ctx, m.ID, messages.Answer{OptionID: messages.OptionAccept}); err != nil {
+	te.Env.consequences = messageConsequences{d.Messages}
+	gateOf := func(m message.Message) gate.Gate {
+		t.Helper()
+		gs, err := d.GateReader.Where(ctx, gates.Query{Kind: gate.KindProposal, Unit: u})
+		if err != nil {
+			t.Fatal(err)
+		}
+		i := slices.IndexFunc(gs, func(g gate.Gate) bool { return g.Subject == strconv.FormatInt(m.ID, 10) })
+		if i < 0 {
+			t.Fatalf("no open gate of message %d in %+v", m.ID, gs)
+		}
+		return gs[i]
+	}
+	if m.Text != "Proposed update of item i1 on "+u.Label()+" (from extracted; you confirmed the item)" {
+		t.Fatalf("text %q", m.Text)
+	}
+	if err := d.Gates.Resolve(ctx, gateOf(m).ID, gates.Resolution{Intent: "approve", By: task.ActorPerson}); err != nil {
 		t.Fatal(err)
 	}
 	its, err := ledger.Items(ctx, u)
 	if err != nil || len(its) != 1 || its[0].Summary != changed || !its[0].Confirmed {
 		t.Fatalf("items %+v %v", its, err)
 	}
-	if got, _, _ := d.Messages.Store.Message(ctx, m.ID); got.State != message.Answered {
+	if got, _, _ := d.Messages.Store.Message(ctx, m.ID); got.Open() || got.Answer != "approve" {
 		t.Fatalf("message %+v", got)
+	}
+	if ps, _ := ledger.Proposals(ctx, coreitems.ProposalAccepted); len(ps) != 1 {
+		t.Fatalf("accepted %+v", ps)
 	}
 
 	propose("i2")
 	open = waitOpen(t, d, func(ms []message.Message) bool { return len(ms) == 1 && ms[0].ID != m.ID && ms[0].TaskID != "" })
-	ps, err := ledger.Proposals(ctx, coreitems.ProposalOpen)
-	if err != nil || len(ps) != 1 {
-		t.Fatalf("proposals %+v %v", ps, err)
-	}
-	if _, err := ledger.Decide(ctx, ps[0].ID, false); err != nil {
+	if err := d.Gates.Resolve(ctx, gateOf(open[0]).ID, gates.Resolution{Intent: "reject", By: task.ActorPerson}); err != nil {
 		t.Fatal(err)
 	}
 	waitOpen(t, d, func(ms []message.Message) bool { return len(ms) == 0 })
-	got, _, _ := d.Messages.Store.Message(ctx, open[0].ID)
-	if got.State != message.Answered || got.Answer != messages.OptionReject {
-		t.Fatalf("decided elsewhere %+v", got)
+	if ps, _ := ledger.Proposals(ctx, coreitems.ProposalOpen); len(ps) != 0 {
+		t.Fatalf("open proposals %+v", ps)
 	}
-	if e, _ := db.Tasks().Task(ctx, task.ID(got.TaskID)); e.State != task.State("done") {
-		t.Fatalf("entry %s", e.State)
+	if its, _ := ledger.Items(ctx, ghUnit(7)); len(its) != 2 || its[1].Summary != summary {
+		t.Fatalf("a rejected proposal changed its item: %+v", its)
 	}
 }
 

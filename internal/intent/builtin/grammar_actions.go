@@ -14,7 +14,6 @@ var ActionSurfaces = []string{"row", "detail", "tui", "menubar", "notification",
 // each: a row's, a draft's, a plan item's and a task run's. plan_guide is the plan item's
 // guide, whose wire id is guide.
 var BuiltinActionIDs = []string{
-	"answer", "continue", "dismiss",
 	"take_over", "pause", "resume", "mute", "unmute", "track", "untrack",
 	"open", "remove", "remove_force",
 	"brief_refresh", "intake_without", "intake_cancel",

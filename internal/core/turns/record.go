@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/gate"
@@ -74,6 +75,7 @@ func (s *Service) recordEnd(ctx context.Context, r RecordRequest, byHeadless boo
 	if err != nil {
 		return got, err
 	}
+	defer s.openMissing(ctx)
 	if len(ops) > 0 {
 		got.Ledger = s.applyLedger(context.WithoutCancel(ctx), ops)
 	}
@@ -225,6 +227,7 @@ func (s *Service) recordTurnEnd(ctx context.Context, r RecordRequest, byHeadless
 	if _, err := s.Store.Save(ctx, b, ev); err != nil {
 		return Recorded{}, nil, nil, err
 	}
+	s.ended(b.Unit, *t, r.Record)
 	return out, []port.Event{ev}, ops, nil
 }
 
@@ -375,16 +378,31 @@ type endedTurn struct {
 }
 
 // ended notes, under s.mu, that turn t on u ended with rec, so that
-// openMissing opens its intent's missing gate when rec is no record.
+// openMissing opens its intent's missing gate when rec is no record or a
+// failed one.
 func (s *Service) ended(u unit.Unit, t turn.Turn, rec record.Record) {
-	if rec.State == record.UnrecordedState {
+	if rec.State == record.UnrecordedState || rec.State == record.Failed {
 		s.unrecorded = append(s.unrecorded, endedTurn{u, t})
 	}
 }
 
+// missingPrefix keeps a missing gate's Subject from reading as a message id.
+const missingPrefix = "turn/"
+
+// MissingSubject is the Subject of the gate turn id opens when it ends
+// without its record or failed.
+func MissingSubject(id string) string { return missingPrefix + id }
+
+// MissingTurn is the turn id a missing gate's Subject names; false for any
+// other subject.
+func MissingTurn(subject string) (string, bool) {
+	id, ok := strings.CutPrefix(subject, missingPrefix)
+	return id, ok && id != ""
+}
+
 // openMissing opens, outside s.mu, the gate record.missing names for each
-// turn that ended without a record while its intent's record.requires names
-// one; a turn of an intent that requires none opens nothing.
+// turn that ended without a record or failed; a turn of an intent that
+// names no missing gate opens nothing.
 func (s *Service) openMissing(ctx context.Context) {
 	s.mu.Lock()
 	ended := s.unrecorded
@@ -395,15 +413,15 @@ func (s *Service) openMissing(ctx context.Context) {
 	}
 	for _, e := range ended {
 		rules, err := s.Intents.Rules(string(e.t.Intent))
-		if err != nil || rules.Requires == "" || rules.Missing == "" {
+		if err != nil || rules.Missing == "" {
 			continue
 		}
-		g := gate.Gate{Unit: e.u, Name: rules.Missing, Subject: e.t.ID}
+		g := gate.Gate{Unit: e.u, Name: rules.Missing, Subject: MissingSubject(e.t.ID)}
 		if id, ok := task.IDOf(e.u); ok {
 			g.Task = id
 		}
 		if _, err := s.Gates.OpenNamed(context.WithoutCancel(ctx), rules.Missing, g); err != nil {
-			s.logf("turn %s on %s ended without its %s: %v", e.t.ID, e.u, rules.Requires, err)
+			s.logf("turn %s on %s ended without its record: %v", e.t.ID, e.u, err)
 		}
 	}
 }

@@ -35,7 +35,8 @@ func (e *Env) briefProjection() brief.Projection {
 }
 
 // namedGates opens a gate of the loaded gates.toml by its name through the gates service, of the kind
-// and with the intents it declares.
+// and with the intents it declares: through the messages once they are served, which open a turn's missing
+// gate once.
 type namedGates struct {
 	e  *Env
 	db *sqlite.DB
@@ -43,5 +44,8 @@ type namedGates struct {
 
 func (n namedGates) OpenNamed(ctx context.Context, name string, g gate.Gate) (gate.Gate, error) {
 	g.Name, g.Kind, g.Intents = name, "", nil
+	if n.e.messages != nil && n.e.messages.Gates != nil {
+		return n.e.messages.OpenMissing(ctx, g)
+	}
 	return n.e.newGates(n.db, nil).Open(ctx, g, nil)
 }

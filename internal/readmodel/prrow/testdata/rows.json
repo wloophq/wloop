@@ -101,24 +101,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#1",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#1",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#1",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#1? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -288,24 +270,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#2",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#2",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#2",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#2? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -466,24 +430,6 @@
         "confirm": "Nudge @carol on acme/api#3? An agent posts one comment under your name."
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#3",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#3",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#3",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#3? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -641,24 +587,6 @@
         "confirm": "Nudge the maintainers (no reviewer requested) on acme/api#4? An agent posts one comment under your name."
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#4",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#4",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#4",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": false,
         "reason": "It is yours already",
@@ -811,24 +739,6 @@
         "enabled": false,
         "reason": "acme/api#5 waits on you (draft); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#5",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#5",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#5",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -998,24 +908,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#6",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#6",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#6",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": false,
         "reason": "It is yours already",
@@ -1180,24 +1072,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": false,
         "reason": "It is yours already",
@@ -1360,24 +1234,6 @@
         "enabled": false,
         "reason": "acme/api#8 waits on you (approved and green); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#8",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#8",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#8",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -1549,24 +1405,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#9",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#9",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#9",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": false,
         "reason": "It is yours already",
@@ -1726,24 +1564,6 @@
         "confirm": "Nudge @ana on acme/api#10? An agent posts one comment under your name."
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#10",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#10",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#10",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#10? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -1900,24 +1720,6 @@
         "enabled": true,
         "note": "Nudge @ana",
         "confirm": "Nudge @ana on acme/api#11? An agent posts one comment under your name."
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#11",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#11",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#11",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -2083,24 +1885,6 @@
         "confirm": "Nudge @dave on acme/api#12? An agent posts one comment under your name."
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#12",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#12",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#12",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": false,
         "reason": "It is yours already",
@@ -2236,24 +2020,6 @@
     },
     "actions": [
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#13",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#13",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#13",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "open",
         "enabled": true
       },
@@ -2363,24 +2129,6 @@
       ]
     },
     "actions": [
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#14",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#14",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#14",
-        "refusal": "dismiss.why"
-      },
       {
         "id": "open",
         "enabled": true
@@ -2519,24 +2267,6 @@
         "enabled": false,
         "reason": "acme/api#15 waits on you (review requested, no review on the head); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#15",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#15",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#15",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -2714,24 +2444,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#16",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#16",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#16",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#16? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -2906,24 +2618,6 @@
         "confirm": "Nudge @ana on acme/api#17? An agent posts one comment under your name."
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#17",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#17",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#17",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#17? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -3092,24 +2786,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#18",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#18",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#18",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#18? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -3273,24 +2949,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#19",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#19",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#19",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#19? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -3446,24 +3104,6 @@
         "enabled": false,
         "reason": "acme/api#20 waits on you (review to address, no workspace: carol asked); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#20",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#20",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#20",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -3637,24 +3277,6 @@
         "enabled": false,
         "reason": "acme/api#21 waits on you (review requested, no review on the head); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#21",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#21",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#21",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -3834,24 +3456,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#22",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#22",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#22",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#22? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -4012,24 +3616,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#23",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#23",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#23",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#23? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -4188,24 +3774,6 @@
         "enabled": false,
         "reason": "acme/api#24 waits on the review loop (tests broke); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#24",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#24",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#24",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -4374,24 +3942,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#25",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#25",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#25",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#25? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -4550,24 +4100,6 @@
         "enabled": true,
         "note": "Nudge @carol",
         "confirm": "Nudge @carol on acme/api#26? An agent posts one comment under your name."
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#26",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#26",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#26",
-        "refusal": "dismiss.why"
       },
       {
         "id": "resume",
@@ -4730,24 +4262,6 @@
         "enabled": true,
         "note": "Nudge @bob",
         "confirm": "Nudge @bob on acme/api#27? An agent posts one comment under your name."
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#27",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#27",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#27",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -4920,24 +4434,6 @@
         "confirm": "Nudge @ana on acme/api#28? An agent posts one comment under your name."
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#28",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#28",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#28",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#28? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -5103,24 +4599,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#29",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#29",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#29",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#29? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -5282,24 +4760,6 @@
         "enabled": true,
         "note": "Nudge @acme/web",
         "confirm": "Nudge @acme/web on acme/web#30? An agent posts one comment under your name."
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/web#30",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/web#30",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/web#30",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -5469,24 +4929,6 @@
         "enabled": false,
         "reason": "acme/api#31 waits on you (review requested, no review on the head); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#31",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#31",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#31",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",

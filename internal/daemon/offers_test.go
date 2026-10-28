@@ -120,6 +120,7 @@ func newCatalogRig(t *testing.T) catalogRig {
 	withBriefs(&d, stubBriefs{})
 	d.Plan, d.Pending = plan, plan
 	s := New(d)
+	serveMessageGates(s, db.Tasks(), inbox)
 	s.token = ""
 	stopOnCleanup(t, s)
 	plan.gated(s)
@@ -359,11 +360,11 @@ func TestEveryOfferAgreesWithTheHandler(t *testing.T) {
 				rec := post(t, c.s, path, requestFor(spec.ID, st))
 				var body struct{ Error string }
 				json.Unmarshal(rec.Body.Bytes(), &body)
-				_, isTurn := turnActions[spec.ID]
+				_, isQuestion := questionIntent(c.s.loaded(), spec.ID)
 				switch {
-				case isTurn && (!offered || !st.Enabled):
-					if rec.Code != 409 || body.Error != st.Reason {
-						t.Errorf("offered %+v (%v), the turn service answered %d %q", st, offered, rec.Code, body.Error)
+				case isQuestion && !offered:
+					if rec.Code != 409 {
+						t.Errorf("absent, the question's gate answered %d %q", rec.Code, body.Error)
 					}
 				case !offered:
 					if want := fmt.Sprintf("no %s on %s", spec.ID, f.ref); rec.Code != 409 || body.Error != want {
@@ -426,7 +427,7 @@ func TestEverySpecHasADispatchAndBack(t *testing.T) {
 		}
 	}
 	dispatched := slices.Concat(slices.Collect(maps.Keys(delegatedActions)), slices.Collect(maps.Keys(holdActions)), slices.Collect(maps.Keys(followActions)),
-		slices.Collect(maps.Keys(turnActions)), slices.Collect(maps.Keys(intakeRouteActions)), []string{"brief_refresh"})
+		slices.Collect(maps.Keys(intakeRouteActions)), []string{"brief_refresh"})
 	for _, g := range catalog.RowGateIntents((&Server{}).loaded()) {
 		dispatched = append(dispatched, g.Intent.Name)
 	}

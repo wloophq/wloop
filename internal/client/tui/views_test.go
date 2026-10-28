@@ -69,8 +69,9 @@ func viewTasks() map[string][]api.TaskView {
 	focus.Props["focus"], focus.Units = json.RawMessage(`"on"`), []unit.Unit{ref(7).Unit()}
 	asked := task("e2", "Deploy window tonight?", "inbox")
 	asked.Changed, asked.Verbs = true, verbs("next", "someday", "reference", "dismiss", "done", "focus", "waiting", "schedule", "project")
-	asked.Message = &api.Message{ID: 4, TaskID: "e2", Kind: "question", Text: "Which window?", State: "open", Recommend: "late",
-		Options: []record.Option{{ID: "early", Label: "Before six"}, {ID: "late", Label: "After ten"}}}
+	subject, _ := json.Marshal(api.Message{ID: 4, Kind: "question", Text: "Which window?", Recommend: "late",
+		Options: []record.Option{{ID: "early", Label: "Before six"}, {ID: "late", Label: "After ten"}}})
+	asked.Gates = []api.GateView{{ID: 4, Kind: "question", Status: "open", Intents: []api.IntentView{}, Subject: subject}}
 	captured := task("e3", "Buy cables", "inbox")
 	draft := task("draft:11", "Reply in the release thread", "outbox")
 	draft.Kind, draft.Verbs = "draft", verbs("approve", "dismiss")

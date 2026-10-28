@@ -21,8 +21,9 @@ func questionTask() api.TaskView {
 		e.Props = map[string]json.RawMessage{"contexts": json.RawMessage(`["@decide"]`)}
 		e.Units = []unit.Unit{prUnit}
 		e.Items = []api.ItemView{{Unit: prUnit, ID: "gh:review", Summary: "Review the retry change", State: "open", Kind: "action"}}
-		e.Message = &api.Message{ID: 3, TaskID: "e-1", Unit: prUnit, Kind: "question", Text: "Retry or revert?", State: "open", Recommend: "b",
-			Options: []record.Option{{ID: "a", Label: "Retry"}, {ID: "b", Label: "Revert"}}}
+		subject, _ := json.Marshal(api.Message{ID: 3, Unit: prUnit, Kind: "question", Text: "Retry or revert?", Recommend: "b",
+			Options: []record.Option{{ID: "a", Label: "Retry"}, {ID: "b", Label: "Revert"}}})
+		e.Gates = []api.GateView{{ID: 3, Kind: "question", Status: "open", Intents: []api.IntentView{}, Subject: subject}}
 		e.Cards = []api.CardView{{Card: card.Card{Unit: prUnit, Title: "Retry flaky uploads", State: "open", Why: "your review is requested",
 			Link: "https://github.com/acme/api/pull/8", Signals: []card.Signal{{Key: "checks", Value: "failing", Tone: "bad"}},
 			WaitsOn: []items.Person{{Key: "github:me", Name: "me"}}}}}

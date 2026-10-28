@@ -100,6 +100,16 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `draft.refusal` | string | draft_action | Why the action is disabled: plugin_off, state or posts_nothing; empty when it is enabled. |
 | `draft.maybe_posted` | bool | draft_action | The draft failed after its post may have reached its provider. |
 
+### An item proposal's gate (`proposal.*`; slot `proposal`)
+
+| Fact | Type | Slots | Meaning |
+|---|---|---|---|
+| `proposal.op` | string | proposal | The operation proposed on the item: update, resolve, reopen and the others an op names. |
+| `proposal.item` | string | proposal | The id of the item the operation changes. |
+| `proposal.unit` | string | proposal | The item's unit, as a person reads it. |
+| `proposal.reason` | string | proposal | Why the operation was proposed; empty when its proposer gave no reason. |
+| `proposal.provenance` | string | proposal | Who proposed it, as the ledger names its provenance: extracted, turn or derived. |
+
 ### The configuration (`config.*`)
 
 | Fact | Type | Slots | Meaning |

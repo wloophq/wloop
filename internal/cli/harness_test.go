@@ -818,7 +818,9 @@ func (te *testEnv) serveWith(t *testing.T, with func(daemon.Deps) daemon.Deps) {
 	if with != nil {
 		d = with(d)
 	}
-	te.Socket = serveSocket(t, daemon.New(d).Handler())
+	srv := daemon.New(d)
+	te.Env.consequences = srv
+	te.Socket = serveSocket(t, srv.Handler())
 }
 
 // checkoutFiles reads the file system, except that every workspace the

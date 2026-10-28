@@ -74,9 +74,11 @@ func TestADraftActionOfAUserActionsTomlNamesItsGateIntent(t *testing.T) {
 }
 
 func TestARowGateActionOfAUserActionsTomlNamesItsGateIntent(t *testing.T) {
-	got := actionsProblems(t, string(defaultProfile()), "[run_now]\nlabel = \"Go\"\n[trust_run]\nlabel = \"Trust\"\n")
+	got := actionsProblems(t, string(defaultProfile()), "[run_now]\nlabel = \"Go\"\n[trust_run]\nlabel = \"Trust\"\n[answer]\nlabel = \"Reply\"\n[continue]\nlabel = \"Go on\"\n")
 	for _, want := range []string{`run_now: names no built-in action: it is gates.plan.intents.run_now of gates.toml now`,
-		`trust_run: names no built-in action: it is gates.trust.intents.trust_run of gates.toml now`} {
+		`trust_run: names no built-in action: it is gates.trust.intents.trust_run of gates.toml now`,
+		`answer: names no built-in action: it is gates.question.intents.answer of gates.toml now`,
+		`continue: names no built-in action: it is gates.question.intents.continue of gates.toml now`} {
 		if !strings.Contains(got, want) {
 			t.Errorf("no %q in:\n%s", want, got)
 		}
@@ -85,7 +87,7 @@ func TestARowGateActionOfAUserActionsTomlNamesItsGateIntent(t *testing.T) {
 
 func TestABuiltinActionWithoutLabelOrSummaryFails(t *testing.T) {
 	got := actionsProblems(t, "", "")
-	if !strings.Contains(got, "answer: is missing") {
+	if !strings.Contains(got, "take_over: is missing") {
 		t.Errorf("%s", got)
 	}
 	got = actionsProblems(t, string(defaultProfile()), "[pause]\nlabel = \"\"\n")

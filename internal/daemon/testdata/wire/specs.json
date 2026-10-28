@@ -1,6 +1,55 @@
 {
-  "version": "63090c070e02",
+  "version": "227a48f3fadc",
   "specs": [
+    {
+      "id": "answer",
+      "label": "Answer",
+      "summary": "Reply to the agent's open question with your text; the agent resumes from your answer.",
+      "group": "turn",
+      "key": "W",
+      "surfaces": [
+        "detail",
+        "tui",
+        "notification"
+      ],
+      "input": {
+        "kind": "answer",
+        "required": true,
+        "label": "Answer"
+      },
+      "source": "builtin",
+      "scope": "unit",
+      "verb": "answer"
+    },
+    {
+      "id": "continue",
+      "label": "Continue",
+      "summary": "Let the agent resume without an answer, deciding the open question itself. Answer gives it your reply instead.",
+      "group": "turn",
+      "key": "C",
+      "surfaces": [
+        "detail",
+        "tui",
+        "notification"
+      ],
+      "source": "builtin",
+      "scope": "unit"
+    },
+    {
+      "id": "dismiss",
+      "label": "Dismiss",
+      "summary": "Close the agent's open question without resuming it; the pull request goes back to whoever it waits on.",
+      "group": "turn",
+      "key": "X",
+      "surfaces": [
+        "detail",
+        "tui",
+        "notification"
+      ],
+      "source": "builtin",
+      "scope": "unit",
+      "verb": "dismiss"
+    },
     {
       "id": "run_now",
       "label": "Run now",
@@ -201,55 +250,6 @@
       "source": "intents/nudge/intent.toml",
       "scope": "unit",
       "plugin": "github"
-    },
-    {
-      "id": "answer",
-      "label": "Answer",
-      "summary": "Reply to the agent's open question with your text; the agent resumes from your answer.",
-      "group": "turn",
-      "key": "W",
-      "surfaces": [
-        "detail",
-        "tui",
-        "notification"
-      ],
-      "input": {
-        "kind": "answer",
-        "required": true,
-        "label": "Answer"
-      },
-      "source": "builtin",
-      "scope": "unit",
-      "verb": "answer"
-    },
-    {
-      "id": "continue",
-      "label": "Continue",
-      "summary": "Let the agent resume without an answer, deciding the open question itself. Answer gives it your reply instead.",
-      "group": "turn",
-      "key": "C",
-      "surfaces": [
-        "detail",
-        "tui",
-        "notification"
-      ],
-      "source": "builtin",
-      "scope": "unit"
-    },
-    {
-      "id": "dismiss",
-      "label": "Dismiss",
-      "summary": "Close the agent's open question without resuming it; the pull request goes back to whoever it waits on.",
-      "group": "turn",
-      "key": "X",
-      "surfaces": [
-        "detail",
-        "tui",
-        "notification"
-      ],
-      "source": "builtin",
-      "scope": "unit",
-      "verb": "dismiss"
     },
     {
       "id": "take_over",

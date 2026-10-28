@@ -18,8 +18,8 @@ import (
 )
 
 // unitAction refuses an action on u, no unit of the forge when forge is
-// false, that only the forge's units take. Any other unit takes a turn
-// action, track and untrack when its source follows it, and an intent
+// false, that only the forge's units take. Any other unit takes a
+// question gate's intent, track and untrack when its source follows it, and an intent
 // unitIntent admits. The row of such a unit offers the
 // intents serving its provider, but this route does not check their
 // visible and enabled predicates; the tasks' bridge does.
@@ -27,7 +27,7 @@ func unitAction(l *intentload.Loaded, name string, u unit.Unit, forge bool, foll
 	if forge {
 		return nil
 	}
-	if _, ok := turnActions[name]; ok {
+	if _, ok := questionIntent(l, name); ok {
 		return nil
 	}
 	if sourceFollowed(name, u, follows) {

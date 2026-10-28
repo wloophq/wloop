@@ -135,7 +135,8 @@ func TestTheCockpitAndTheDaemonMatchTheSameTasks(t *testing.T) {
 		task("b", "inbox", func(e *api.TaskView) {
 			e.Kind = "capture"
 			e.Cards = []api.CardView{{Card: card.Card{LastHuman: &card.Human{Who: items.Person{Key: "github:octocat"}}, WaitsOn: []items.Person{{Name: "Dora"}}}}}
-			e.Message = &api.Message{Text: "Which window?"}
+			subject, _ := json.Marshal(api.Message{ID: 2, Text: "Which window?"})
+			e.Gates = []api.GateView{{ID: 2, Kind: "question", Status: "open", Intents: []api.IntentView{}, Subject: subject}}
 		}),
 		task("c", "inbox", func(e *api.TaskView) {
 			e.Kind = "draft"

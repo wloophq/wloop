@@ -133,8 +133,8 @@ func TestAnAnswerKeepsItsMessageAndReadState(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
 	b := bookOfFive(t, s)
-	if _, err := s.db.w.ExecContext(ctx, `INSERT INTO messages (id, provider, unit_key, kind, text, origin_kind, turn_seq, state, created_at)
-		VALUES (41, ?, ?, 'agent_post', 'q', 'agent', ?, 'open', 'x'), (42, ?, ?, 'question', 'q', 'turn', ?, 'open', 'x')`,
+	if _, err := s.db.w.ExecContext(ctx, `INSERT INTO messages (id, provider, unit_key, kind, text, origin_kind, turn_seq, created_at)
+		VALUES (41, ?, ?, 'agent_post', 'q', 'agent', ?, 'x'), (42, ?, ?, 'question', 'q', 'turn', ?, 'x')`,
 		string(u7.Provider), u7.Key, b.Turns[0].Seq, string(u7.Provider), u7.Key, b.Turns[0].Seq); err != nil {
 		t.Fatal(err)
 	}

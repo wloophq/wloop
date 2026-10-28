@@ -52,9 +52,6 @@ func TestBuiltinTextsComeFromTheProfile(t *testing.T) {
 			f.StartBlocked, f.TrustFolder, f.TrustHomes = true, "/src/api", []string{"~/.claude", "~/.codex"}
 		}, api.ActionState{Note: "Trust /src/api in ~/.claude, ~/.codex, then run the round"}},
 		{"unblock", "unblock", func(f *Facts) { f.StartBlocked = true }, api.ActionState{Note: "Lift the block without trusting; the round waits for a new trigger"}},
-		{"answer without a question", "answer", func(*Facts) {}, api.ActionState{Reason: "no open question on " + slug}},
-		{"continue without a question", "continue", func(*Facts) {}, api.ActionState{Reason: "no open question on " + slug}},
-		{"dismiss without a question", "dismiss", func(*Facts) {}, api.ActionState{Reason: "no open question on " + slug}},
 		{"dismiss on a question", "dismiss", func(f *Facts) { f.Question = true },
 			api.ActionState{Note: "Close the question; the pull request goes back to whoever it waits on"}},
 		{"take_over of mine", "take_over", func(f *Facts) { f.Mine = true }, api.ActionState{Reason: "It is yours already"}},

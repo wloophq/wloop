@@ -37,6 +37,9 @@ var Renamed = []Rename{
 	{"skip", "gates.plan.intents.skip"},
 	{"trust_run", "gates.trust.intents.trust_run"},
 	{"unblock", "gates.trust.intents.unblock"},
+	{"answer", "gates.question.intents.answer"},
+	{"continue", "gates.question.intents.continue"},
+	{"dismiss", "gates.question.intents.dismiss"},
 }
 
 // RenamedKeys are the configuration keys a release renamed or moved, each

@@ -103,6 +103,24 @@ type GateDef struct {
 	Kind    gate.Kind
 	Label   string
 	Intents []GateIntent
+	// Text words the gate's subject when the loop writes it, a template
+	// over the proposal facts; nil writes nothing.
+	Text *template.Template
+}
+
+// Words is the gate's text over facts, "" when it has none.
+func (g GateDef) Words(facts map[string]any) (string, error) {
+	if g.Text == nil {
+		return "", nil
+	}
+	var b strings.Builder
+	err := g.Text.Execute(&b, facts)
+	return strings.TrimSpace(b.String()), err
+}
+
+// ProposalFacts are the proposal facts, each value got by its name.
+func ProposalFacts(get func(name string) any) map[string]any {
+	return factMap(builtin.ProposalSlot, get)
 }
 
 // GateIntent is what a gate is resolved with: the status it resolves the
@@ -158,6 +176,7 @@ type mGatesFile struct {
 type mGate struct {
 	Kind    *string                `toml:"kind"`
 	Label   *string                `toml:"label"`
+	Text    *string                `toml:"text"`
 	Intents map[string]mGateIntent `toml:"intents"`
 }
 
@@ -282,6 +301,19 @@ func mergeGate(s *sheet, d *GatesDef, name string, m mGate) {
 		s.add(path+".kind", "is required: what the gate decides")
 	}
 	text(s, path+".label", m.Label, &g.Label)
+	switch {
+	case m.Text == nil:
+	case *m.Text == "":
+		g.Text = nil
+	default:
+		tmpl, err := ActionText(path+".text", *m.Text, sampleFacts(builtin.ProposalSlot))
+		if err != nil {
+			_, msg := templateMsg(path+".text", err)
+			s.add(path+".text", "%s", msg)
+		} else {
+			g.Text = tmpl
+		}
+	}
 	for _, in := range declared(s, path+".intents", m.Intents) {
 		mergeIntent(s, &g, path+".intents."+in, in, m.Intents[in])
 	}

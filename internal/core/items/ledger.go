@@ -147,26 +147,24 @@ func (l *Ledger) Proposals(ctx context.Context, state ProposalState) ([]Proposal
 	return l.Store.Proposals(ctx, state)
 }
 
-// Decide settles a proposal; accept applies its Op as user.
+// Decide applies proposal id's decision, which its gate holds: accept applies its Op as user, a rejection
+// changes nothing. ErrNoProposal is an id no proposal has.
 func (l *Ledger) Decide(ctx context.Context, id int64, accept bool) (Result, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	open, err := l.Store.Proposals(ctx, ProposalOpen)
+	all, err := l.Store.Proposals(ctx, "")
 	if err != nil {
 		return Result{}, err
 	}
-	i := slices.IndexFunc(open, func(p Proposal) bool { return p.ID == id })
+	i := slices.IndexFunc(all, func(p Proposal) bool { return p.ID == id })
 	if i < 0 {
 		return Result{}, fmt.Errorf("%w: %d", ErrNoProposal, id)
 	}
-	p := open[i]
+	p := all[i]
 	if err := l.refuseDisabled(p.Unit); err != nil {
 		return Result{}, err
 	}
 	if !accept {
-		if _, err := l.Store.SetProposal(ctx, id, ProposalRejected); err != nil {
-			return Result{}, err
-		}
 		return emptyResult(), nil
 	}
 	b, err := l.begin(ctx, []unit.Unit{p.Unit})
@@ -174,10 +172,6 @@ func (l *Ledger) Decide(ctx context.Context, id int64, accept bool) (Result, err
 		return Result{}, err
 	}
 	b.apply(ctx, 0, p.Op, items.User)
-	if len(b.res.Refused) == 0 {
-		p.State = ProposalAccepted
-		b.settled = append(b.settled, p)
-	}
 	return b.commit(ctx)
 }
 
@@ -205,6 +199,7 @@ type Refused struct {
 	Reason string   `json:"reason"`
 }
 
+// ProposalState is where a proposal stands, as its gate says: open until a person decides it.
 type ProposalState string // "open", "accepted", "rejected"
 
 const (
@@ -213,8 +208,8 @@ const (
 	ProposalRejected ProposalState = "rejected"
 )
 
-// ErrNoProposal is Decide's error for an id that names no open proposal.
-var ErrNoProposal = errors.New("no open proposal")
+// ErrNoProposal is Decide's error for an id that names no proposal.
+var ErrNoProposal = errors.New("no such proposal")
 
 type Proposal struct {
 	ID         int64            `json:"id"`
@@ -237,8 +232,7 @@ type Reader interface {
 
 type Store interface {
 	Reader
-	Commit(ctx context.Context, c Commit) error // items, op log, proposals in one transaction; notes TopicItems when anything but log rows changed
-	SetProposal(ctx context.Context, id int64, state ProposalState) (Proposal, error)
+	Commit(ctx context.Context, c Commit) error // items, op log, new proposals in one transaction; notes TopicItems when anything but log rows changed
 }
 
 type Commit struct {

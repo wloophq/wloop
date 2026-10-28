@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -18,12 +19,14 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	dmessage "github.com/wloophq/wloop/internal/domain/message"
@@ -62,6 +65,7 @@ func agentServer(t *testing.T) (*Server, *turns.Service) {
 			}
 			return fmt.Sprintf("message %d: %s", id, strings.Join(texts, ","))
 		}}, inventory.New(db)))
+	serveMessageGates(s, db.Tasks(), inbox)
 	stopOnCleanup(t, s)
 	return s, svc
 }
@@ -436,5 +440,36 @@ func TestThePromptHookReachesTheSession(t *testing.T) {
 	}
 	if rec := agentCall(t, h, "POST", api.AgentSessionsPrompt, "", `{"prompt":"hi"}`); rec.Code != http.StatusBadRequest {
 		t.Fatalf("a prompt without a handle: %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestTurnAnswerReadsTheAnswersOfAGate(t *testing.T) {
+	t.Parallel()
+	s, svc := agentServer(t)
+	sendTurn(t, s, svc, agentRef, turn.Intent(dintent.Review), "abc123abc123")
+	h := s.Handler()
+	if rec := agentCall(t, h, "POST", api.AgentTurnsStart, "term_1", `{"turn":"abc123abc123","intent":"review"}`); rec.Code != 200 {
+		t.Fatalf("start: %d %s", rec.Code, rec.Body)
+	}
+	ctx := context.Background()
+	m, err := s.deps.Messages.Post(ctx, messages.PostRequest{Session: bookOf(t, svc, agentRef).Turns[0].Session, Text: "Which column?"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gs, err := s.deps.GateReader.Where(ctx, gates.Query{Kind: gate.KindPost})
+	if err != nil || len(gs) != 1 {
+		t.Fatalf("gates %+v %v", gs, err)
+	}
+	if rec := post(t, s, gatePath(gs[0].ID, "reply"), `{"args":{"answer":"the old one"}}`); rec.Code != 200 {
+		t.Fatalf("reply: %d %s", rec.Code, rec.Body)
+	}
+	path := api.AgentAnswer + "?pr=" + agentRef.URL()
+	var text api.TurnText
+	rec := agentCall(t, h, "GET", path+"&gate="+strconv.FormatInt(gs[0].ID, 10), "term_1", "")
+	if _ = json.Unmarshal(rec.Body.Bytes(), &text); rec.Code != 200 || text.Text != fmt.Sprintf("message %d: %d:the old one", m.ID, m.ID) {
+		t.Fatalf("%d %q", rec.Code, text.Text)
+	}
+	if rec := agentCall(t, h, "GET", path+"&gate=999", "term_1", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("no such gate: %d %s", rec.Code, rec.Body)
 	}
 }
