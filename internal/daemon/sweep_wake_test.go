@@ -308,7 +308,7 @@ func TestFirstRunAfterStartPlans(t *testing.T) {
 				<-done
 			})
 			t.Cleanup(stop)
-			waitFor(t, func() bool { return r.sw.runs.Load() == 1 })
+			synctest.Wait()
 			stop()
 			if n := r.sw.runs.Load(); n != 1 {
 				t.Fatalf("%d notes before start: %d runs, want 1", notes, n)
@@ -491,12 +491,6 @@ func (c *sleepClock) After(d time.Duration) <-chan time.Time {
 	return ch
 }
 
-func (c *sleepClock) armed() int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return len(c.timers)
-}
-
 func (c *sleepClock) sleep(d time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -536,7 +530,7 @@ func TestADeadlineSurvivesAMachineSleep(t *testing.T) {
 			cancel()
 			<-exited
 		})
-		waitFor(t, func() bool { return clk.armed() > 0 })
+		synctest.Wait()
 		clk.sleep(13 * time.Hour)
 		clk.run(waitSlice)
 		select {
