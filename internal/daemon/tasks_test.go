@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"path/filepath"
 	"reflect"
@@ -275,6 +277,15 @@ func TestVerbPostMovesAndStreams(t *testing.T) {
 	c := nextChange(t, sub)
 	if c.Type != "changed" || c.Counters.Views["next"] != 1 || c.Counters.Views["inbox"] != 0 || !slices.Contains(c.Units, r7u) {
 		t.Fatalf("%+v %+v", c, c.Counters)
+	}
+}
+
+func TestAVerbTheProfileForbidsIsForbidden(t *testing.T) {
+	t.Parallel()
+	rec := httptest.NewRecorder()
+	writeTasksError(rec, fmt.Errorf("%w: agent may not run done on this entry", coretasks.ErrForbidden))
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("%d %s", rec.Code, rec.Body)
 	}
 }
 
