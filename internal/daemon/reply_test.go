@@ -37,7 +37,7 @@ func (r *outboxRig) drafts(t *testing.T) []draft.Draft {
 func TestReplySavesAUserDraftToTheOutbox(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	r.put(t, unitTask("e-1", task.KindAction, r7u))
+	r.put(t, unitTask("e-1", task.OriginDerived, r7u))
 	var v api.TaskView
 	if code := get(t, r.s, api.TaskPath("e-1"), &v); code != 200 ||
 		!slices.ContainsFunc(v.Verbs, func(s api.VerbState) bool { return s.Verb == "reply" && s.Enabled }) {
@@ -72,7 +72,7 @@ func TestReplySavesAUserDraftToTheOutbox(t *testing.T) {
 func TestReplySendNowApprovesThroughTheOutbox(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	r.put(t, unitTask("e-1", task.KindWaiting, r7u))
+	r.put(t, unitTask("e-1", task.OriginDerived, r7u))
 	rec := post(t, r.s, api.TaskPath("e-1", "reply"), `{"source":"notification","args":{"text":"Ping","send":"now"}}`)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "approved; it goes out") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -90,8 +90,8 @@ func TestReplySendNowApprovesThroughTheOutbox(t *testing.T) {
 func TestReplyRefusals(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	r.put(t, unitTask("e-none", task.KindCapture), unitTask("e-msg", task.KindMessage, r7u), unitTask("e-1", task.KindAction, r7u),
-		unitTask("e-s", task.KindAction, slackUnit))
+	r.put(t, unitTask("e-none", task.OriginUser), unitTask("e-msg", task.OriginMessage, r7u), unitTask("e-1", task.OriginDerived, r7u),
+		unitTask("e-s", task.OriginDerived, slackUnit))
 	for _, c := range []struct {
 		name, id, body string
 		code           int
@@ -122,7 +122,7 @@ func TestReplyRefusals(t *testing.T) {
 func TestDraftCreateRouteWritesOnAUnit(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	r.put(t, unitTask("e-1", task.KindAction, r7u))
+	r.put(t, unitTask("e-1", task.OriginDerived, r7u))
 	rec := post(t, r.s, api.Drafts, `{"unit":{"provider":"github","key":"acme/api#7"},"text":"LGTM","source":"cockpit"}`)
 	var d api.Draft
 	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &d) != nil || d.State != "held" || d.Origin.Kind != "user" || d.Task != "" || d.Kind != "reply" {

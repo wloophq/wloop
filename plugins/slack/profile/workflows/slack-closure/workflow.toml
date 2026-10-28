@@ -1,8 +1,8 @@
 summary = "Close a Slack thread you started once its items resolved, listing each item's resolution"
-provider = "task"
-when = '"slack" in task.unit_providers && task.kind == "close" && task.state in ["inbox", "next"] && task.items_resolved > 0'
+provider = "slack"
+when = 'slack.started_by_me && !slack.closure_posted && slack.items_open == 0 && slack.items_resolved > 0'
 order = 51
-key = ["task.settled_at"]
+key = ["slack.settled_at"]
 
 [[step]]
 use = "draft.propose"

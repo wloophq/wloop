@@ -50,16 +50,14 @@ func task(id, title, state string, contexts ...string) api.TaskView {
 		b, _ := json.Marshal(contexts)
 		props = map[string]json.RawMessage{"contexts": b}
 	}
-	return api.TaskView{ID: id, Kind: "action", State: state, Title: title, Props: props,
+	return api.TaskView{ID: id, State: state, Title: title, Props: props,
 		Verbs: verbs(allVerbs...), Created: now.Add(-30 * time.Hour), Updated: now.Add(-5 * time.Hour)}
 }
 
 func waitingOn(e api.TaskView, names ...string) api.TaskView {
-	w := &api.WaitingView{Since: now.Add(-3 * 24 * time.Hour)}
-	for _, n := range names {
-		w.On = append(w.On, api.WaitingPerson{Name: n})
+	if len(names) > 0 {
+		e.OwedBy = names[0]
 	}
-	e.Waiting = w
 	return e
 }
 
@@ -74,7 +72,7 @@ func viewTasks() map[string][]api.TaskView {
 	asked.Gates = []api.GateView{{ID: 4, Kind: "question", Status: "open", Intents: []api.IntentView{}, Subject: subject}}
 	captured := task("e3", "Buy cables", "inbox")
 	draft := task("draft:11", "Reply in the release thread", "outbox")
-	draft.Kind, draft.Verbs = "draft", verbs("approve", "dismiss")
+	draft.Verbs = verbs("approve", "dismiss")
 	draft.Gates = draftGates(api.Draft{ID: 11, Rev: 4, Kind: "reply", Purpose: "reply", Target: "C0REL", Where: "#releases thread", Text: "Ship it tonight.\nRollback plan in the doc.",
 		State: "pending", Origin: api.DraftOrigin{Kind: "turn"}})
 	return map[string][]api.TaskView{
@@ -616,12 +614,12 @@ func TestTaskDetail(t *testing.T) {
 		t.Fatalf("Enter: %+v %v", c, ok)
 	}
 	e := viewTasks()["focus"][0]
-	e.Items = []api.ItemView{{Unit: ref(7).Unit(), ID: "i1", Summary: "answer the reviewer on the batch size", State: "open", Kind: "request"}}
+	e.Asks = []api.AskView{{Item: "i1", Summary: "answer the reviewer on the batch size", Asker: "ana"}}
 	e.Cards = []api.CardView{{Card: card.Card{Unit: ref(7).Unit(), Title: "Batch export", State: "open", Why: "review requested",
 		Signals: []card.Signal{{Key: "checks", Value: "passing"}}, LastHuman: &card.Human{Who: items.Person{Name: "ana"}, What: "comment"}}}}
 	m.SetDetail("e1", e, nil)
 	screen := screenOf(m, 120, 40)
-	for _, want := range []string{"Reply on the batch export review", "state", "next · focus", "@computer", "request", "answer the reviewer on the batch size · open",
+	for _, want := range []string{"Reply on the batch export review", "state", "next · focus", "@computer", "ask", "answer the reviewer on the batch size · ana",
 		"unit", "acme/api#7 Batch export", "review requested", "checks passing", "last: ana comment", "x next"} {
 		if !strings.Contains(strings.ToLower(screen), strings.ToLower(want)) {
 			t.Errorf("detail lacks %q:\n%s", want, screen)

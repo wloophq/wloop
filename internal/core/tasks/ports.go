@@ -1,4 +1,4 @@
-// Package tasks is the GTD service: entries derived from items, captured by
+// Package tasks is the tasks service: tasks derived from items, captured by
 // the user or opened by other services, and the verbs that move them.
 package tasks
 
@@ -119,7 +119,6 @@ type Result struct {
 }
 
 type OpenRequest struct {
-	Kind     task.Kind
 	Title    string
 	Unit     *unit.Unit
 	Origin   string

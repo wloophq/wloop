@@ -340,7 +340,7 @@ func TestASessionOnATasksThreadIsGrantedTheTasksDossier(t *testing.T) {
 	t.Parallel()
 	te, db := servedDossiers(t)
 	ctx := context.Background()
-	tk := task.Task{ID: "t-00000000000000f1", Kind: task.KindAction, State: "next", Category: task.CategoryReady, Title: "Answer Ana",
+	tk := task.Task{ID: "t-00000000000000f1", State: "next", Category: task.CategoryReady, Title: "Answer Ana",
 		Units: []unit.Unit{headlessThread}, Origin: task.OriginDerived, Created: testNow, Updated: testNow}
 	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: tk}}); err != nil {
 		t.Fatal(err)

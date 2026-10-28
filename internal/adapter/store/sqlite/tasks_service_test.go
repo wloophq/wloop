@@ -52,7 +52,7 @@ func newTaskRig(t testing.TB) *taskRig {
 	store, _ := openTasks(t.(*testing.T))
 	r := &taskRig{store: store, items: taskItems{}, facts: &taskFacts{facts: map[unit.Unit]task.UnitFacts{}}, clock: &taskClock{taskAt}}
 	r.svc = coretasks.New(coretasks.Deps{Store: store, Items: r.items, Facts: r.facts, Me: task.Me{Keys: []string{"github:me"}},
-		Clock: r.clock, StaleWaitingDays: 2, States: taskstest.BundledStates})
+		Clock: r.clock, States: taskstest.BundledStates})
 	return r
 }
 
@@ -60,7 +60,7 @@ func prUnit(n int) unit.Unit {
 	return unit.Unit{Provider: unit.GitHub, Key: fmt.Sprintf("acme/api#%d", n)}
 }
 
-func TestServiceOverSqliteReinboxesOnActivity(t *testing.T) {
+func TestServiceOverSqliteKeepsClarifiedTasksOutOfTheInboxOnActivity(t *testing.T) {
 	t.Parallel()
 	r := newTaskRig(t)
 	ctx := context.Background()
@@ -72,20 +72,22 @@ func TestServiceOverSqliteReinboxesOnActivity(t *testing.T) {
 	if err := r.svc.Sync(ctx, []unit.Unit{u}); err != nil {
 		t.Fatal(err)
 	}
-	action, waiting := task.DerivedID(task.KindAction, u, "a"), task.DerivedID(task.KindWaiting, u, anaKey.Key)
+	action, waiting := task.DerivedID(u, "a"), task.DerivedID(u, "b")
 	r.clock.t = taskAt.Add(time.Hour)
-	if _, err := r.svc.Do(ctx, action, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSchedule, Args: map[string]string{"on_activity": "true"}}); err != nil {
-		t.Fatal(err)
+	for _, v := range []task.Verb{task.VerbNext, task.VerbSchedule} {
+		if _, err := r.svc.Do(ctx, action, coretasks.Request{Actor: task.ActorPerson, Verb: v, Args: map[string]string{"on_activity": "true"}}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	r.facts.facts[u] = task.UnitFacts{LastHuman: taskAt.Add(2 * time.Hour)}
 	r.clock.t = taskAt.Add(3 * time.Hour)
 	if err := r.svc.Sync(ctx, []unit.Unit{u}); err != nil {
 		t.Fatal(err)
 	}
-	for _, id := range []task.ID{action, waiting} {
+	for id, want := range map[task.ID]task.Category{action: task.CategoryReady, waiting: task.CategoryWaiting} {
 		e, err := r.store.Task(ctx, id)
-		if err != nil || e.Category != task.CategoryInbox || !e.Changed {
-			t.Fatalf("%s: %+v %v", id, e, err)
+		if err != nil || e.Category != want || !e.Changed {
+			t.Fatalf("%s after a new message: %+v %v, want %s and changed", id, e, err, want)
 		}
 	}
 	r.facts.off = true

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
@@ -72,7 +73,7 @@ func reviewCatalog() api.ViewsCatalog {
 func reviewTasks() map[string][]api.TaskView {
 	es := viewTasks()
 	p := task("e-p", "Ship the v2 API", "next")
-	p.Kind, p.ReviewDue, p.ReviewEvery = "project", true, "168h0m0s"
+	p.Props, p.ReviewDue, p.ReviewEvery = map[string]json.RawMessage{"kind": json.RawMessage(`"project"`)}, true, "168h0m0s"
 	es["review"] = []api.TaskView{p}
 	return es
 }
@@ -205,7 +206,7 @@ func TestPaletteRunsTheProjectVerbs(t *testing.T) {
 	m := newModel(t)
 	m.SetViews(reviewCatalog())
 	p := task("e-p", "Ship the v2 API", "next")
-	p.Kind = "project"
+	p.Props = map[string]json.RawMessage{"kind": json.RawMessage(`"project"`)}
 	p.Verbs = append(verbs("done"), api.VerbState{Verb: "reviewed", Enabled: true}, api.VerbState{Verb: "sequential", Enabled: true})
 	m.SetTasks("projects", []api.TaskView{p}, viewCounters())
 	m.navigate("projects")
@@ -225,10 +226,10 @@ func TestPaletteRunsTheProjectVerbs(t *testing.T) {
 	}
 }
 
-func TestProjectFactsNameTheNextAction(t *testing.T) {
+func TestProjectFactsCountTheOpenChildren(t *testing.T) {
 	p := task("e-p", "Ship", "next")
-	p.Kind, p.NextAction, p.NextActionTitle, p.OpenActions = "project", "e-a", "Draft the plan", 2
-	if got := strings.Join(projectFacts(p), " "); got != "next: Draft the plan 2 open" {
+	p.Props, p.Children = map[string]json.RawMessage{"kind": json.RawMessage(`"project"`)}, []string{"e-a", "e-b"}
+	if got := strings.Join(projectFacts(p), " "); got != "2 open" {
 		t.Errorf("facts %q", got)
 	}
 }

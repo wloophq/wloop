@@ -18,7 +18,7 @@ func waitingOnAna(t *testing.T, r *rig) task.ID {
 	if err := r.svc.Sync(context.Background(), []unit.Unit{unitU}); err != nil {
 		t.Fatal(err)
 	}
-	id := task.DerivedID(task.KindWaiting, unitU, ana.Key)
+	id := task.DerivedID(unitU, "a")
 	if e := r.task(t, id); e.Category != task.CategoryWaiting {
 		t.Fatalf("%+v", e)
 	}
@@ -30,24 +30,24 @@ func TestNudgedStampsForwardOnly(t *testing.T) {
 	r := newRig()
 	id := waitingOnAna(t, r)
 	at := t0.Add(time.Hour)
-	if err := r.svc.Nudged(ctx, []task.ID{id, "e-gone"}, unitU, at); err != nil {
+	if err := r.svc.Nudged(ctx, "e-gone", unitU, []string{"a"}, at); err != nil {
 		t.Fatal(err)
 	}
-	if e := r.task(t, id); !e.Waiting.LastNudge.Equal(at) {
-		t.Fatalf("%+v", e.Waiting)
+	if e := r.task(t, id); !e.Prop(task.PropLastNudge).Time.Equal(at) || e.Written[task.PropLastNudge].By != task.WriterWorkflow {
+		t.Fatalf("%+v", e.Props)
 	}
-	if err := r.svc.Nudged(ctx, nil, unitU, t0.Add(time.Minute)); err != nil {
+	if err := r.svc.Nudged(ctx, id, unitU, nil, t0.Add(time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	if e := r.task(t, id); !e.Waiting.LastNudge.Equal(at) {
-		t.Fatalf("moved back: %+v", e.Waiting)
+	if e := r.task(t, id); !e.Prop(task.PropLastNudge).Time.Equal(at) {
+		t.Fatalf("moved back: %+v", e.Props)
 	}
 	later := t0.Add(2 * time.Hour)
-	if err := r.svc.Nudged(ctx, nil, unitU, later); err != nil {
+	if err := r.svc.Nudged(ctx, "", unitU, []string{"a"}, later); err != nil {
 		t.Fatal(err)
 	}
-	if e := r.task(t, id); !e.Waiting.LastNudge.Equal(later) {
-		t.Fatalf("by unit: %+v", e.Waiting)
+	if e := r.task(t, id); !e.Prop(task.PropLastNudge).Time.Equal(later) {
+		t.Fatalf("by item: %+v", e.Props)
 	}
 }
 
@@ -69,14 +69,14 @@ func TestNudgeStampKeepsAConcurrentSyncMove(t *testing.T) {
 		}()
 		go func() {
 			defer wg.Done()
-			if err := r.svc.Nudged(ctx, []task.ID{id}, unitU, at); err != nil {
+			if err := r.svc.Nudged(ctx, id, unitU, nil, at); err != nil {
 				t.Error(err)
 			}
 		}()
 		wg.Wait()
 		e := r.task(t, id)
-		if e.Category != task.CategoryInbox || !e.Changed || !e.Waiting.LastNudge.Equal(at) {
-			t.Fatalf("round %d: %s changed=%v lastNudge=%v", round, e.State, e.Changed, e.Waiting.LastNudge)
+		if e.Category != task.CategoryWaiting || !e.Changed || !e.Prop(task.PropLastNudge).Time.Equal(at) {
+			t.Fatalf("round %d: %s changed=%v lastNudge=%v", round, e.State, e.Changed, e.Prop(task.PropLastNudge).Time)
 		}
 	}
 }

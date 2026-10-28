@@ -2,7 +2,6 @@ package web
 
 import (
 	"encoding/json"
-	intentload "github.com/wloophq/wloop/internal/intent"
 	"io/fs"
 	"maps"
 	"os"
@@ -12,6 +11,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	intentload "github.com/wloophq/wloop/internal/intent"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/keys"

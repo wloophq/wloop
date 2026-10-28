@@ -1,0 +1,192 @@
+package cli
+
+import (
+	"context"
+	"path/filepath"
+	"slices"
+	"testing"
+	"time"
+
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
+	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
+)
+
+var (
+	twBruno  = items.Person{Key: "slack:U000BRUNO", Name: "Bruno"}
+	twMe     = items.Person{Key: "slack:U000ME", Name: "Me"}
+	twThread = slackThreadUnit("T000TEAM", "C000CHAN", "1700000100.000100")
+)
+
+// taskWorkflows runs the bundled workflows over a real store from a Monday morning in America/Sao_Paulo.
+func taskWorkflows(t *testing.T) (*replay, *workflowProposer) {
+	t.Helper()
+	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "tw.db"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	r := newReplayOn(t, db, replayStart)
+	p := newWorkflowProposer(r)
+	r.te.tasksMe.set(task.Me{Keys: []string{twMe.Key}})
+	r.te.tasks.SetMe(task.Me{Keys: []string{twMe.Key}})
+	return r, p
+}
+
+func (r *replay) taskOf(id task.ID) task.Task {
+	r.t.Helper()
+	e, err := r.db.Tasks().Task(context.Background(), id)
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	return e
+}
+
+func (r *replay) sync(units ...unit.Unit) {
+	r.t.Helper()
+	if err := r.te.tasks.Sync(context.Background(), units); err != nil {
+		r.t.Fatal(err)
+	}
+}
+
+func (r *replay) nudges(person items.Person) []draft.Draft {
+	r.t.Helper()
+	ds, err := r.svc.List(context.Background(), outbox.Filter{Workflow: "slack-stalled-nudge"})
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	return slices.DeleteFunc(ds, func(d draft.Draft) bool { return d.Origin.Key != d.Unit.String()+":"+person.Key })
+}
+
+// mine is an open item of the thread the user asked, created at created, due by deadline, waiting on on.
+func (r *replay) mine(id string, created time.Time, deadline string, on items.Person) {
+	r.t.Helper()
+	it := r.item(twThread, id, items.Open, created, on)
+	it.Requester, it.Deadline = twMe, deadline
+	r.commit(it)
+}
+
+func TestNewTasksGetAKind(t *testing.T) {
+	t.Parallel()
+	r, p := taskWorkflows(t)
+	ctx := context.Background()
+	c, err := r.te.tasks.Capture(ctx, "call the bank", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.item(twThread, "i1", items.Open, r.now, twMe)
+	r.sync(twThread)
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if e := r.taskOf(c.ID); e.Prop(task.PropKind).Text != "capture" || e.Written[task.PropKind].By != task.WriterWorkflow {
+		t.Errorf("the capture's kind %+v by %s, want capture by the workflow", e.Prop(task.PropKind), e.Written[task.PropKind].By)
+	}
+	if e := r.taskOf(task.DerivedID(twThread, "i1")); e.Prop(task.PropKind).Text != "thread" || e.Written[task.PropKind].By != task.WriterPlugin {
+		t.Errorf("the thread's task kind %+v by %s, want thread by the plugin", e.Prop(task.PropKind), e.Written[task.PropKind].By)
+	}
+}
+
+func TestAutofocusStarsStaleAndPastDue(t *testing.T) {
+	t.Parallel()
+	r, p := taskWorkflows(t)
+	ctx := context.Background()
+	friday := replayStart.AddDate(0, 0, -3)
+	pastDue := replayStart.Add(-time.Hour).Format(time.RFC3339)
+	r.mine("late", friday, pastDue, twMe)
+	r.mine("stale", friday.AddDate(0, 0, -4), "", twBruno)
+	r.mine("fresh", r.now, "", twBruno)
+	r.mine("cleared", friday, pastDue, twMe)
+	r.sync(twThread)
+	off := r.taskOf(task.DerivedID(twThread, "cleared"))
+	off.SetProp(task.PropFocus, task.Value{Text: task.FocusOff}, task.WriterPerson, r.now)
+	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: off}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for item, want := range map[string]string{"late": task.FocusOn, "stale": task.FocusOn, "fresh": "", "cleared": task.FocusOff} {
+		e := r.taskOf(task.DerivedID(twThread, item))
+		if got := e.Prop(task.PropFocus).Text; got != want {
+			t.Errorf("%s: focus %q, want %q", item, got, want)
+		}
+		if want == task.FocusOn && e.Written[task.PropFocus].By != task.WriterWorkflow {
+			t.Errorf("%s: starred by %s", item, e.Written[task.PropFocus].By)
+		}
+	}
+}
+
+func TestStalledNudgeSendsOncePerPerson(t *testing.T) {
+	t.Parallel()
+	r, p := taskWorkflows(t)
+	ctx := context.Background()
+	long := replayStart.AddDate(0, 0, -7)
+	for _, id := range []string{"i1", "i2"} {
+		r.mine(id, long, "", twBruno)
+	}
+	r.sync(twThread)
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	ds := r.nudges(twBruno)
+	if len(ds) != 1 || !slices.Equal(ds[0].Items, []string{"i1", "i2"}) {
+		t.Fatalf("nudges to Bruno %+v, want one listing both his items", ds)
+	}
+	if err := approveDraft(ctx, r.svc, ds[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, failed, err := r.svc.Send(ctx); err != nil || failed > 0 {
+		t.Fatalf("send: %d failed, %v", failed, err)
+	}
+	for _, id := range []string{"i1", "i2"} {
+		if e := r.taskOf(task.DerivedID(twThread, id)); e.Prop(task.PropLastNudge).Time.IsZero() {
+			t.Errorf("%s's task has no last nudge after the nudge went", id)
+		}
+	}
+	r.now = r.now.Add(23 * time.Hour)
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if ds := r.nudges(twBruno); len(ds) != 1 {
+		t.Fatalf("within drafts.repeat_after: %d nudges", len(ds))
+	}
+	r.now = r.now.Add(2 * time.Hour)
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if ds := r.nudges(twBruno); len(ds) != 2 || !slices.Equal(ds[0].Items, []string{"i1", "i2"}) && !slices.Equal(ds[1].Items, []string{"i1", "i2"}) {
+		t.Fatalf("past drafts.repeat_after: nudges %+v, want a second one listing both", ds)
+	}
+}
+
+func TestNudgedEffectWritesLastNudge(t *testing.T) {
+	t.Parallel()
+	r, _ := taskWorkflows(t)
+	ctx := context.Background()
+	for _, id := range []string{"i1", "i2", "i3"} {
+		r.mine(id, r.now, "", twBruno)
+	}
+	r.sync(twThread)
+	d, err := r.svc.Propose(ctx, outbox.Proposal{Unit: twThread, Task: string(task.DerivedID(twThread, "i1")), Items: []string{"i1", "i2"}, Purpose: "nudge",
+		Delivery: draft.Message, Text: "any news?", Effects: []string{"task.nudged"}, Origin: draft.Origin{Kind: draft.OriginUser}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := approveDraft(ctx, r.svc, d.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, failed, err := r.svc.Send(ctx); err != nil || failed > 0 {
+		t.Fatalf("send: %d failed, %v", failed, err)
+	}
+	for id, nudged := range map[string]bool{"i1": true, "i2": true, "i3": false} {
+		e := r.taskOf(task.DerivedID(twThread, id))
+		got := e.Prop(task.PropLastNudge)
+		if nudged != !got.Time.IsZero() || nudged && (e.Written[task.PropLastNudge].By != task.WriterWorkflow || !got.Time.Equal(r.now)) {
+			t.Errorf("%s: last_nudge %v by %s, nudged %v", id, got.Time, e.Written[task.PropLastNudge].By, nudged)
+		}
+	}
+}

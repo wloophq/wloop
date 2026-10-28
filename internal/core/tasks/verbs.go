@@ -107,11 +107,9 @@ func (s *Service) transition(e task.Task, req Request, now time.Time) (task.Task
 		}
 		e.Snooze = snooze
 	case handlerWaiting:
-		w, err := waitingArgs(e, req.Args, now)
-		if err != nil {
+		if err := waitingArgs(&e, req, now); err != nil {
 			return task.Task{}, err
 		}
-		e.Waiting = w
 	}
 	if to != "" {
 		if s.d.States.Handler(string(req.Verb)) != handlerSchedule {
@@ -161,24 +159,18 @@ func scheduleArgs(e task.Task, args map[string]string, now time.Time) (task.Snoo
 	return task.Snooze{Until: until, OnActivity: onActivity, Return: ret}, nil
 }
 
-func waitingArgs(e task.Task, args map[string]string, now time.Time) (*task.WaitingOn, error) {
-	var w task.WaitingOn
-	if e.Waiting != nil {
-		w = *e.Waiting
+// waitingArgs sets the owner e waits on, on's first person, and when to check on it, resurface; either left
+// out keeps what e holds.
+func waitingArgs(e *task.Task, req Request, now time.Time) error {
+	if on := split(req.Args["on"]); len(on) > 0 {
+		e.SetProp(task.PropOwner, task.Value{Actors: []items.Person{{Key: on[0], Name: on[0]}}}, task.Writer(req.Actor), now)
 	}
-	w.Since = now
-	if on := split(args["on"]); len(on) > 0 {
-		w.On = nil
-		for _, p := range on {
-			w.On = append(w.On, items.Person{Key: p, Name: p})
-		}
-	}
-	resurface, err := parseDate("resurface", args["resurface"], now)
+	resurface, err := parseDate("resurface", req.Args["resurface"], now)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if !resurface.IsZero() {
-		w.Resurface = resurface
+		e.SetProp(task.PropCheckOn, task.Value{Time: resurface}, task.Writer(req.Actor), now)
 	}
-	return &w, nil
+	return nil
 }

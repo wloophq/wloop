@@ -52,7 +52,8 @@ func (e *Env) serveDossierTurns(ctx context.Context, svc *dossiers.Service, db *
 	pages := e.dossierPages(svc.Policy)
 	events := sqlite.New(db)
 	record := func(ctx context.Context, ev port.Event) error { return events.RecordEvents(ctx, ev) }
-	t := &dossiers.Turns{Dossiers: svc, Pages: pages, Log: logf, Events: record, Serial: e.dossierMu}
+	t := &dossiers.Turns{Dossiers: svc, Pages: pages, Log: logf, Events: record, Serial: e.dossierMu,
+		Moves: func(ctx context.Context) error { return e.applyDossierMoves(ctx, db) }}
 	calls := &dossiers.Calls{Turns: t, Asker: lazyAsker{e: e, cfg: cfg, dir: filepath.Join(e.StateDir, "dossier-calls")},
 		Caps:  dossiers.Caps{PerCallUSD: cfg.Headless.PerCallUSD, PerDayUSD: cfg.Headless.PerDayUSD, Tier: cfg.Headless.Tier},
 		Spent: storedSpend(db),

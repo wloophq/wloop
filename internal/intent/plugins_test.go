@@ -1,10 +1,12 @@
 package intent
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 	"testing"
+	"testing/fstest"
 
 	"github.com/wloophq/wloop/internal/config"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
@@ -21,6 +23,29 @@ when = 'session.managed'
 [[step]]
 use = "session.close"
 `
+
+// withBundledTasks is fsys with the bundled tasks.toml at its root, so the
+// plugins' task workflows read its properties.
+func withBundledTasks(t *testing.T, fsys fs.FS) fs.FS {
+	t.Helper()
+	src, err := fs.ReadFile(bundledDefault(t), TasksFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := fstest.MapFS{TasksFile: {Data: src}}
+	err = fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		data, err := fs.ReadFile(fsys, path)
+		m[path] = &fstest.MapFile{Data: data}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m
+}
 
 // usePlugins registers ps for the rest of t, as the composition root does.
 func usePlugins(t *testing.T, ps ...profile.PluginDir) {
@@ -52,7 +77,7 @@ func TestAPluginsProfileLayerLoadsOnlyWhenEnabled(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			cfg := config.Config{Profile: user, Plugins: config.Plugins{Other: c.sw}}
-			l, problems := Load(profile.Chain(cfg), profiles.Default, testBase(), nil)
+			l, problems := Load(profile.Chain(cfg), withBundledTasks(t, profiles.Default), testBase(), nil)
 			if len(problems) > 0 {
 				t.Fatalf("%s", problems.Error())
 			}
@@ -87,7 +112,7 @@ func TestADisabledPluginsKeysStillParse(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg.Profile = user
-	l, problems := Load(profile.Chain(cfg), profiles.Default, testBase(), nil)
+	l, problems := Load(profile.Chain(cfg), withBundledTasks(t, profiles.Default), testBase(), nil)
 	if len(problems) > 0 || !slices.Contains(workflowNames(l), "acme-stale") {
 		t.Fatalf("a profile reading a disabled plugin's facts: %v", problems)
 	}

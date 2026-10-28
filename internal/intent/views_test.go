@@ -25,15 +25,15 @@ func defaultLists() []byte {
 }
 
 // splitLists is src, the tables of tasks.toml and views.toml together,
-// as the two files: [verbs.*], [states.*] and [props.*] tables in
-// tasks.toml, the rest in views.toml.
+// as the two files: [verbs.*], [states.*], [props.*] and [owed_by] tables
+// in tasks.toml, the rest in views.toml.
 func splitLists(src string) map[string]string {
 	out := map[string]string{}
 	file := ViewsFile
 	for _, line := range strings.SplitAfter(src, "\n") {
 		if strings.HasPrefix(line, "[") {
 			file = ViewsFile
-			if strings.HasPrefix(line, "[verbs") || strings.HasPrefix(line, "[states") || strings.HasPrefix(line, "[props") {
+			if strings.HasPrefix(line, "[verbs") || strings.HasPrefix(line, "[states") || strings.HasPrefix(line, "[props") || strings.HasPrefix(line, "[owed_by") {
 				file = TasksFile
 			}
 		}
@@ -167,7 +167,7 @@ func TestTheReviewStepsAreWordedByTheProfile(t *testing.T) {
 }
 
 func TestAVerbIsOfferedWhereTheProfileSays(t *testing.T) {
-	texts, problems := loadListsWith(t, string(defaultLists()), "[verbs.delegate]\noffer = 'task.kind != \"capture\"'\n\n[verbs.done]\noffer = 'task.items_open == 0'\n")
+	texts, problems := loadListsWith(t, string(defaultLists()), "[verbs.delegate]\noffer = 'task.prop.kind != \"capture\"'\n\n[verbs.done]\noffer = 'task.items_open == 0'\n")
 	if !strings.Contains(problems, "verbs.done.offer:") {
 		t.Errorf("an offer reading a fact it cannot see loads: %s", problems)
 	}
@@ -175,8 +175,8 @@ func TestAVerbIsOfferedWhereTheProfileSays(t *testing.T) {
 	if offer == nil {
 		t.Fatal("delegate has no offer")
 	}
-	for kind, want := range map[string]bool{"capture": false, "action": true} {
-		got, err := offer.Match(workflow.Vars{Facts: workflow.Facts{"task.kind": kind}})
+	for kind, want := range map[string]bool{"capture": false, "thread": true} {
+		got, err := offer.Match(workflow.Vars{Facts: workflow.Facts{"task.prop.kind": kind}})
 		if err != nil || got != want {
 			t.Errorf("%s: offered %v, %v", kind, got, err)
 		}
@@ -187,7 +187,7 @@ func TestAVerbIsOfferedWhereTheProfileSays(t *testing.T) {
 }
 
 func TestSeenTakesNoOffer(t *testing.T) {
-	texts, problems := loadListsWith(t, string(defaultLists()), "[verbs.seen]\noffer = 'task.kind == \"message\"'\n")
+	texts, problems := loadListsWith(t, string(defaultLists()), "[verbs.seen]\noffer = 'task.prop.kind == \"capture\"'\n")
 	if !strings.Contains(problems, "verbs.seen.offer: seen takes no offer") || texts.Verbs["seen"].Offer != nil {
 		t.Errorf("%s", problems)
 	}

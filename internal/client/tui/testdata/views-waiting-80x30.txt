@@ -1,12 +1,12 @@
  Outbox 1    Next 4   [Waiting 4]   Projects 0    Someday 0    Logbook 12
 
  waiting on ana
->  3d  Design review
-   3d  Laptop order
+>  5h  Design review
+   5h  Laptop order
  waiting on bob
-   3d  Contract signature
+   5h  Contract signature
  waiting on nobody named
-   3d  Reimbursement
+   5h  Reimbursement
 
 
 

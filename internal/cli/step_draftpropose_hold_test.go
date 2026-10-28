@@ -8,7 +8,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
-	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -36,9 +35,8 @@ func TestRepeatAfterReadsTheConfigFact(t *testing.T) {
 func TestARunLeavingAPersonOnATimedHoldIsNotDone(t *testing.T) {
 	t.Parallel()
 	r := newDraftRig(t, draftWF("nudges", "purpose", "nudge", "items", "owed", "per", "person", "repeat_after", "24h"), "{{.Person.Key}}")
-	r.tasks.m["e1"] = task.Task{ID: "e1", Kind: task.KindWaiting, State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{draftThread},
-		Items:   []task.ItemRef{{Unit: draftThread, Item: "i1"}, {Unit: draftThread, Item: "i2"}},
-		Waiting: &task.WaitingOn{On: []items.Person{ana, bob}}}
+	r.tasks.m["e1"] = task.Task{ID: "e1", State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{draftThread},
+		Items: []task.ItemRef{{Unit: draftThread, Item: "i1"}, {Unit: draftThread, Item: "i2"}}}
 	r.items.set(draftThread, openItem("i1", "The deck", r.now.Add(-96*time.Hour), ana), openItem("i2", "The budget", r.now.Add(-96*time.Hour), bob))
 	runErr := func() error {
 		_, err := r.s.Run(context.Background(), r.wf.Steps[0], draftTask, workflow.Why{Workflow: r.wf.Name}, automation.RunOpts{})
@@ -48,7 +46,7 @@ func TestARunLeavingAPersonOnATimedHoldIsNotDone(t *testing.T) {
 		t.Fatalf("both free: %v", err)
 	}
 	for _, d := range r.drafts() {
-		if d.Origin.Key == "e1:"+bob.Key {
+		if d.Origin.Key == draftThread.String()+":"+bob.Key {
 			if err := discardDraft(context.Background(), r.svc, d.ID); err != nil {
 				t.Fatal(err)
 			}

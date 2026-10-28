@@ -10,8 +10,8 @@ import (
 
 const slackNudge = `summary = "Case"
 provider = "task"
-when = 'task.state == "waiting" && now >= task.nudge_due_at'
-key = ["task.settled_at", "task.waiting_on"]
+when = 'task.state == "waiting" && task.check_on > timestamp(0) && now >= task.check_on'
+key = ["task.settled_at", "task.owed_by"]
 
 [[step]]
 use = "draft.propose"

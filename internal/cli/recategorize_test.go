@@ -63,7 +63,7 @@ func (r *profileRig) write(t *testing.T, text string) {
 
 func (r *profileRig) put(t *testing.T, id task.ID, state string, c task.Category, units ...unit.Unit) {
 	t.Helper()
-	e := task.Task{ID: id, Kind: task.KindCapture, State: task.State(state), Category: c, Title: string(id), Origin: task.OriginUser,
+	e := task.Task{ID: id, State: task.State(state), Category: c, Title: string(id), Origin: task.OriginUser,
 		Units: units, Created: testNow, Updated: testNow}
 	if err := r.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)

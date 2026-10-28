@@ -3,45 +3,49 @@ package tasks
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// Nudged records a nudge sent at at on the live waiting entries ids names, or, with no ids, on every live
-// waiting entry of u. It reads them under the service's lock, so it never writes back a copy older than a
-// concurrent Sync's, and it never moves LastNudge back.
-func (s *Service) Nudged(ctx context.Context, ids []task.ID, u unit.Unit, at time.Time) error {
+// Nudged records a nudge sent at at on u about the items its draft listed: it writes the last_nudge property
+// on the task id names and on every open task that holds one of the items on u, as the workflow that nudged.
+// It reads them under the service's lock, so it never writes back a copy older than a concurrent Sync's, and
+// it never moves last_nudge back.
+func (s *Service) Nudged(ctx context.Context, id task.ID, u unit.Unit, its []string, at time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var es []task.Task
-	if len(ids) == 0 {
+	if len(its) > 0 {
 		got, err := s.d.Store.TasksOf(ctx, u)
 		if err != nil {
 			return err
 		}
-		es = got
-	}
-	for _, id := range ids {
-		e, err := s.d.Store.Task(ctx, id)
-		if errors.Is(err, ErrNoTask) {
-			continue
+		for _, e := range got {
+			if slices.ContainsFunc(e.Items, func(r task.ItemRef) bool { return r.Unit == u && slices.Contains(its, r.Item) }) {
+				es = append(es, e)
+			}
 		}
-		if err != nil {
+	}
+	if id != "" && !slices.ContainsFunc(es, func(e task.Task) bool { return e.ID == id }) {
+		e, err := s.d.Store.Task(ctx, id)
+		switch {
+		case err == nil:
+			es = append(es, e)
+		case !errors.Is(err, ErrNoTask):
 			return err
 		}
-		es = append(es, e)
 	}
 	now := s.now()
 	var cs []task.Change
 	for _, e := range es {
-		if e.Waiting == nil || !e.Open() || !at.After(e.Waiting.LastNudge) {
+		if !e.Open() || !at.After(e.Prop(task.PropLastNudge).Time) {
 			continue
 		}
-		w := *e.Waiting
-		w.LastNudge = at
-		e.Waiting, e.Updated = &w, now
+		e.SetProp(task.PropLastNudge, task.Value{Time: at}, task.WriterWorkflow, now)
+		e.Updated = now
 		cs = append(cs, task.Change{Op: task.OpUpdate, Task: e, Why: "nudged"})
 	}
 	if len(cs) == 0 {

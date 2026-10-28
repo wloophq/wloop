@@ -43,12 +43,17 @@ func newSlackFacts(db *sqlite.DB, clock port.Clock) *slackFacts {
 	return &slackFacts{db: db, clock: clock, started: map[unit.Unit]bool{}, closed: map[unit.Unit]bool{}}
 }
 
-// List is every Slack unit an open task is attached to, in unit order.
+// List is every Slack unit a task is attached to, open or done, in unit order.
 func (f *slackFacts) List(ctx context.Context, _ unit.ProviderID) ([]unit.Unit, error) {
 	es, err := f.db.Tasks().Tasks(ctx, task.Query{View: task.ViewOpen})
 	if err != nil {
 		return nil, err
 	}
+	done, err := f.db.Tasks().Tasks(ctx, task.Query{View: task.ViewLogbook})
+	if err != nil {
+		return nil, err
+	}
+	es = append(es, done...)
 	var out []unit.Unit
 	for _, e := range es {
 		for _, u := range e.Units {
@@ -97,14 +102,17 @@ func (f *slackFacts) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, er
 	if err != nil {
 		return nil, err
 	}
-	open, orphans, age := 0, 0, 0
+	open, resolved, orphans, age := 0, 0, 0, 0
 	var updated time.Time
 	for _, it := range got[u] {
 		if it.UpdatedAt.After(updated) {
 			updated = it.UpdatedAt
 		}
-		if it.State == items.Open {
+		switch it.State {
+		case items.Open:
 			open++
+		case items.Resolved:
+			resolved++
 		}
 		if !unownedItem(it, it.Unit) {
 			continue
@@ -129,6 +137,7 @@ func (f *slackFacts) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, er
 		"slack.ended":                  closed,
 		"slack.live_task":              slices.ContainsFunc(es, func(e task.Task) bool { return e.Open() && !e.Snooze.Mute && slices.Contains(e.Units, u) }),
 		"slack.items_open":             open,
+		"slack.items_resolved":         resolved,
 		"slack.items_unowned":          orphans,
 		"slack.items_unowned_age_days": age,
 		"slack.settled_at":             time.Time{},

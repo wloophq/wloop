@@ -68,3 +68,21 @@ func (r addressResolver) Resolve(ctx context.Context, address string) (string, b
 	u, err := r.e.pluginAddressUnit(ctx, r.id, address)
 	return u.Key, err == nil, err
 }
+
+// pluginTaskKind is the kind the plugin of p, the discovered one over the
+// bundled one, gives the tasks of its units: the first its manifest names.
+func (e *Env) pluginTaskKind(p unit.ProviderID) string {
+	srcs, _ := bundled.Sources()
+	for _, pl := range e.plugins {
+		if s, err := pl.Manifest.Source(); err == nil {
+			srcs = slices.DeleteFunc(srcs, func(b *manifest.Source) bool { return b.Provider == s.Provider })
+			srcs = append(srcs, s)
+		}
+	}
+	for _, s := range srcs {
+		if unit.ProviderID(s.Provider) == p && len(s.Kinds) > 0 {
+			return s.Kinds[0]
+		}
+	}
+	return ""
+}

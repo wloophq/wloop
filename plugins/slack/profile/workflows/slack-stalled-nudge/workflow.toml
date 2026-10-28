@@ -1,8 +1,8 @@
-summary = "Nudge each person a stalled Slack waiting task waits on, listing the open items they owe"
+summary = "Nudge whoever a stalled Slack task waits on, listing the open items they owe on the thread, once per person per drafts.repeat_after"
 provider = "task"
-when = '"slack" in task.unit_providers && task.nudge_due_at > timestamp(0) && task.items_owed > 0'
+when = '"slack" in task.unit_providers && task.owed_by != "me" && task.owed_by != "" && task.check_on > timestamp(0) && task.check_on <= now && task.prop.last_nudge + config.drafts.repeat_after <= now'
 order = 50
-key = ["task.settled_at", "task.waiting_on"]
+key = ["task.settled_at", "task.owed_by"]
 
 [[step]]
 use = "draft.propose"

@@ -34,11 +34,11 @@ func Fold(s string) string {
 	}, accents.Replace(strings.ToLower(s)))
 }
 
-// Texts are what a filter's free words search in a task: its title, notes, state, kind, the text and the lists
-// of text of its properties, its units, the people it waits on, its items, its cards' people, its draft and its message. The
+// Texts are what a filter's free words search in a task: its title, notes, state, the text and the lists of
+// text of its properties, its units, who owes it, its asks, its cards' people, its draft and its message. The
 // cockpit's entryHaystack lists the same texts.
 func (e TaskView) Texts() []string {
-	out := []string{e.Title, e.Notes, e.State, e.Kind}
+	out := []string{e.Title, e.Notes, e.State}
 	for _, name := range slices.Sorted(maps.Keys(e.Props)) {
 		var text string
 		var list []string
@@ -52,13 +52,11 @@ func (e TaskView) Texts() []string {
 	for i, u := range e.Units {
 		out = append(out, e.UnitLabel(i), string(u.Provider)+":"+u.Key)
 	}
-	if w := e.Waiting; w != nil {
-		for _, p := range w.On {
-			out = append(out, p.Name)
-		}
+	if e.OwedBy != "" {
+		out = append(out, e.OwedBy)
 	}
-	for _, it := range e.Items {
-		out = append(out, it.Summary)
+	for _, a := range e.Asks {
+		out = append(out, a.Summary, a.Asker)
 	}
 	for _, c := range e.Cards {
 		if h := c.Card.LastHuman; h != nil {

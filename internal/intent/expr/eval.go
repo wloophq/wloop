@@ -18,6 +18,20 @@ func (p *Program) Eval(f Facts) bool {
 	return ok
 }
 
+// Text evaluates a program CompileString compiled over facts; a fact facts
+// lacks reads as its type's zero value.
+func (p *Program) Text(facts map[string]any) (string, error) {
+	out, _, err := p.prg.Eval(activation{env: p.env, get: func(name string) any { return facts[name] }})
+	if err != nil {
+		return "", err
+	}
+	v, ok := out.Value().(string)
+	if !ok {
+		return "", fmt.Errorf("expression gave %v, not a string", out.Value())
+	}
+	return v, nil
+}
+
 // Reads are the fields the predicate names, sorted.
 func (p *Program) Reads() []string { return p.reads }
 

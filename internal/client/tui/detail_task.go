@@ -225,16 +225,8 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 	if e.Parent != "" {
 		fact("parent", e.Parent, plain)
 	}
-	if w := e.Waiting; w != nil {
-		var on []string
-		for _, p := range w.On {
-			on = append(on, p.Name)
-		}
-		text := cmp.Or(strings.Join(on, ", "), "nobody named")
-		if !w.Since.IsZero() && now.After(w.Since) {
-			text += " · " + span(now.Sub(w.Since))
-		}
-		fact("waiting", text, plain)
+	if e.OwedBy != "" {
+		fact("owed by", e.OwedBy, plain)
 	}
 	if e.Notes != "" {
 		para("notes", e.Notes)
@@ -251,8 +243,8 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 		m.draftFacts(d, fact, para)
 	}
 	m.draftLines(fact, para)
-	for _, it := range e.Items {
-		fact(cmp.Or(it.Kind, "item"), strings.TrimSuffix(it.Summary+" · "+it.State, " · "), plain)
+	for _, a := range e.Asks {
+		fact("ask", strings.TrimSuffix(a.Summary+" · "+a.Asker, " · "), plain)
 	}
 	for _, s := range e.Cards {
 		m.unitCard(s, fact, now.Location())

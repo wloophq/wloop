@@ -19,9 +19,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// repliedKinds are the kinds of task the user replies on: those about a unit's conversation.
-var repliedKinds = []task.Kind{task.KindAction, task.KindWaiting, task.KindClose, task.KindCapture}
-
 // replyRefusal is why the user cannot reply on e, "" when they can.
 func (s *Server) replyRefusal(e task.Task) string {
 	switch {
@@ -29,8 +26,8 @@ func (s *Server) replyRefusal(e task.Task) string {
 		return errOutboxUnavailable.Error()
 	case len(e.Units) == 0:
 		return "the task has no conversation to reply in"
-	case !slices.Contains(repliedKinds, e.Kind):
-		return fmt.Sprintf("a %s task takes no reply", e.Kind)
+	case !aboutUnits(e):
+		return "a project task takes no reply"
 	}
 	return ""
 }

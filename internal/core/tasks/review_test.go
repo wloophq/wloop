@@ -24,10 +24,10 @@ func (v countedView) Count(ctx context.Context, area string) (int, error) { retu
 // reviewRig has 2 in the Inbox, 1 waiting, nothing for someday, 1 starred and 1 project without a next action.
 func reviewRig(t *testing.T) *projectRig {
 	r := newProjectRig()
-	r.put(t, task.Task{ID: "i1", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "i1", Origin: task.OriginUser})
-	r.put(t, task.Task{ID: "i2", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "i2", Origin: task.OriginUser})
-	r.put(t, task.Task{ID: "w1", Kind: task.KindCapture, State: "waiting", Category: task.CategoryWaiting, Title: "w1", Origin: task.OriginUser})
-	r.put(t, task.Task{ID: "f1", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "f1", Origin: task.OriginUser, Props: task.Props{"focus": {Text: "on"}}})
+	r.put(t, task.Task{ID: "i1", State: "inbox", Category: task.CategoryInbox, Title: "i1", Origin: task.OriginUser})
+	r.put(t, task.Task{ID: "i2", State: "inbox", Category: task.CategoryInbox, Title: "i2", Origin: task.OriginUser})
+	r.put(t, task.Task{ID: "w1", State: "waiting", Category: task.CategoryWaiting, Title: "w1", Origin: task.OriginUser})
+	r.put(t, task.Task{ID: "f1", State: "next", Category: task.CategoryReady, Title: "f1", Origin: task.OriginUser, Props: task.Props{"focus": {Text: "on"}}})
 	r.project(t, "p", nil)
 	return r
 }
@@ -96,7 +96,7 @@ func TestStepDone(t *testing.T) {
 	if !stepOf(t, got, "inbox").Done || got.ID != rv.ID {
 		t.Fatalf("inbox not done in %+v", got)
 	}
-	r.put(t, task.Task{ID: "s1", Kind: task.KindCapture, State: "someday", Category: task.CategoryDeferred, Title: "s1", Origin: task.OriginUser})
+	r.put(t, task.Task{ID: "s1", State: "someday", Category: task.CategoryDeferred, Title: "s1", Origin: task.OriginUser})
 	again, err := r.svc.Review(ctx)
 	if err != nil {
 		t.Fatal(err)

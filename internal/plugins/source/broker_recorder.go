@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -111,6 +112,57 @@ func (r recorder) PutBrief(ctx context.Context, b src.Brief) error {
 	}
 	if r.b.Briefed != nil {
 		r.b.Briefed(u)
+	}
+	return errors.Join(errs...)
+}
+
+// TasksHolding gives each task that holds items of one of the units and has no brief record yet, such as one
+// reconcile made after the plugin wrote the unit's brief, the unit's plugin brief with the asks of the items
+// it holds, as PutBrief does.
+func (b *Broker) TasksHolding(ctx context.Context, units []unit.Unit) error {
+	if b.Briefs == nil || b.Now == nil || len(units) == 0 {
+		return nil
+	}
+	unitBriefs, err := b.Briefs.Records(ctx, builtin.BuildsBrief, units...)
+	if err != nil {
+		return err
+	}
+	r := recorder{b}
+	var errs []error
+	for _, u := range units {
+		rec, ok := unitBriefs[u]
+		if !ok || rec.Actor != string(task.WriterPlugin) {
+			continue
+		}
+		held, err := b.Briefs.ItemsHeld(ctx, u)
+		if err != nil {
+			return err
+		}
+		var holders []unit.Unit
+		for id, its := range held {
+			if slices.ContainsFunc(its, func(it string) bool { return it != "" }) {
+				holders = append(holders, task.UnitOf(id))
+			}
+		}
+		if len(holders) == 0 {
+			continue
+		}
+		own, err := b.Briefs.Records(ctx, builtin.BuildsBrief, holders...)
+		if err != nil {
+			return err
+		}
+		for _, id := range slices.Sorted(maps.Keys(held)) {
+			if _, has := own[task.UnitOf(id)]; has {
+				continue
+			}
+			body, ok, err := asksOf(json.RawMessage(rec.Data), held[id])
+			if err != nil {
+				return fmt.Errorf("the brief of %s: %w", u, err)
+			}
+			if ok {
+				errs = append(errs, r.putTaskBrief(ctx, id, body, b.Now()))
+			}
+		}
 	}
 	return errors.Join(errs...)
 }

@@ -740,7 +740,7 @@ func carry(ctx context.Context, cfg Config, c Command) (carried, error) {
 			}
 		}
 		e, err := d.Task(ctx, c.task)
-		if err != nil || e.Kind == "draft" {
+		if err != nil || strings.HasPrefix(e.ID, "draft:") {
 			return carried{task: e}, err
 		}
 		ds, err := d.TaskDrafts(ctx, c.task)

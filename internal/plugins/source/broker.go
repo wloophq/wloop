@@ -85,6 +85,7 @@ type BriefStore interface {
 	PutUnitBrief(ctx context.Context, u unit.Unit, version, body string, at time.Time) error
 	PutRecord(ctx context.Context, u unit.Unit, kind string, w task.Writer, data []byte, at time.Time) error
 	ItemsHeld(ctx context.Context, u unit.Unit) (map[task.ID][]string, error)
+	Records(ctx context.Context, kind string, units ...unit.Unit) (map[unit.Unit]port.Event, error)
 }
 
 // OverrideStore keeps the host's overrides of units by name

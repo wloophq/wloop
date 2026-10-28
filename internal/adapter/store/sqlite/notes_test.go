@@ -344,16 +344,23 @@ var writes = []writeCase{
 	{
 		method: "taskStore.Apply",
 		call: func(ctx context.Context, e *noteEnv) error {
-			return e.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-1", Kind: task.KindCapture,
-				State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{u7}, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}})
+			return e.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-1", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{u7}, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}})
 		},
 		topics: port.TopicTasks, units: []unit.Unit{u7, task.UnitOf("e-1")},
 	},
 	{
+		method: "taskStore.Apply",
+		name:   "a task picking up a unit back-fills the unit's gates",
+		seed:   seedGate,
+		call: func(ctx context.Context, e *noteEnv) error {
+			return e.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-1", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{u7}, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}})
+		},
+		topics: port.TopicTasks | port.TopicGates, units: []unit.Unit{u7, task.UnitOf("e-1")},
+	},
+	{
 		method: "taskStore.Recategorize",
 		seed: func(t *testing.T, e *noteEnv) {
-			if err := e.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-1", Kind: task.KindCapture,
-				State: "inbox", Category: task.CategoryWaiting, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}}); err != nil {
+			if err := e.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-1", State: "inbox", Category: task.CategoryWaiting, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}}); err != nil {
 				t.Fatal(err)
 			}
 		},

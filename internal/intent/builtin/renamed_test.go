@@ -60,6 +60,9 @@ func TestARenamedFactNamesALiveOne(t *testing.T) {
 			t.Errorf("%s renames to %q, no fact", old, n)
 		}
 	}
+	for _, p := range []string{"kind", "last_nudge"} {
+		names[PropPrefix+p] = true
+	}
 	for _, old := range v6Facts {
 		if !names[old] && !names[RenamedTo(old)] {
 			t.Errorf("the version 6 fact %s is gone: add its final name to Renamed", old)

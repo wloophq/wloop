@@ -23,7 +23,7 @@ func inState(e Task, v View) bool {
 	case ViewWaiting:
 		return e.Category == CategoryWaiting
 	case ViewProjects:
-		return e.Kind == KindProject && e.Open()
+		return e.IsProject() && e.Open()
 	case ViewSomeday:
 		return inSomeday(e)
 	case ViewLogbook:
@@ -76,7 +76,7 @@ func Select(all []Task, q Query) []Task {
 func firstActions(all []Task) map[ID]ID {
 	seq := map[ID]bool{}
 	for _, e := range all {
-		if e.Kind == KindProject && e.Sequential {
+		if e.IsProject() && e.Sequential {
 			seq[e.ID] = true
 		}
 	}

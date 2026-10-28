@@ -118,6 +118,19 @@ type    = "date"
 writers = ["person", "workflow"]
 doc     = "When to check on the task while it waits."
 
+# Who owes a task's next step: an expression over the task's facts whose
+# value is me, a person's key, or empty when nobody does; it is the fact
+# task.owed_by. Here an open gate makes it yours; otherwise an item that
+# waits on you; otherwise whoever its items wait on; otherwise its owner,
+# and you when it has none.
+
+[owed_by]
+expr = '''
+task.category in ["done", "dropped"] ? "" :
+task.gates_open > 0 || "me" in task.link_owes ? "me" :
+size(task.link_owes) > 0 ? task.link_owes[0] :
+task.prop.owner != "" ? task.prop.owner : "me"'''
+
 # The verbs. A verb's label is its button; its summary, one line on what
 # pressing it does, is the button's tooltip; input is the question a verb
 # that asks for a value puts first. from are the states a verb takes a

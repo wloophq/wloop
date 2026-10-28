@@ -425,7 +425,7 @@ func (s *Service) taskOf(ctx context.Context, u unit.Unit, def Def) (task.ID, er
 	if s.d.Tasks == nil {
 		return "", nil
 	}
-	r := coretasks.OpenRequest{Kind: task.KindCapture, Title: def.Label, Origin: task.OriginGate}
+	r := coretasks.OpenRequest{Title: def.Label, Origin: task.OriginGate}
 	if !u.IsZero() {
 		ts, err := s.d.Tasks.TasksOf(ctx, u)
 		if err != nil {

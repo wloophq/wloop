@@ -15,7 +15,7 @@ import (
 )
 
 func plainTask(n int) api.TaskView {
-	return api.TaskView{ID: fmt.Sprintf("e-%d", n), Kind: "action", State: "inbox", Title: "Review the retry", Units: []unit.Unit{uref(n)}}
+	return api.TaskView{ID: fmt.Sprintf("e-%d", n), State: "inbox", Title: "Review the retry", Units: []unit.Unit{uref(n)}}
 }
 
 func index(items []string, prefix string) int {
@@ -159,7 +159,7 @@ func TestDaemonDownShowsAQuestionMark(t *testing.T) {
 func TestTaskClickOpensItInTheCockpit(t *testing.T) {
 	r := newRig(t)
 	r.d.tasks["focus"] = []api.TaskView{plainTask(2)}
-	r.d.tasks["outbox"] = []api.TaskView{{ID: "draft:5", Kind: "draft", State: "inbox", Title: "reply: on it"}}
+	r.d.tasks["outbox"] = []api.TaskView{{ID: "draft:5", State: "inbox", Title: "reply: on it"}}
 	r.c.Refresh(context.Background())
 	it, ok := find(r.tray.menu, "acme/api#2 · Review the retry")
 	if !ok {

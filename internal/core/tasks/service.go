@@ -28,8 +28,6 @@ type Deps struct {
 	Clock port.Clock
 	// States are the profile's states and verbs; the service reads a task's category from its state.
 	States States
-	// StaleWaitingDays is how many working days a waiting entry waits before AutoFocus stars it.
-	StaleWaitingDays int
 	// Disabled are the providers whose plugin is disabled now; nil: none is.
 	Disabled func() []unit.ProviderID
 	// Authority says who may run each verb, as the profile's by does; nil, with no profile at hand: a person
@@ -40,8 +38,20 @@ type Deps struct {
 }
 
 type handlerKey struct {
-	kind    task.Kind
+	class   string
 	handler string
+}
+
+// EveryKind registers a handler for the stored tasks no class-specific handler serves.
+const EveryKind = "*"
+
+// classOf is what e's verb handlers are registered under: the origin of a task another service serves, a
+// draft or a message, else its kind property.
+func classOf(e task.Task) string {
+	if e.Origin == task.OriginDraft || e.Origin == task.OriginMessage {
+		return e.Origin
+	}
+	return e.Prop(task.PropKind).Text
 }
 
 type Service struct {
@@ -70,21 +80,26 @@ func personOnly(_ context.Context, _ string, a task.Actor, _ task.Task) (bool, b
 
 func (s *Service) now() time.Time { return s.d.Clock.Now() }
 
-// Register makes h run, on entries of kind and before any state change, the verbs whose profile handler is
-// handler, and a verb with no handler named so (a kind's own dismiss or done).
-func (s *Service) Register(kind task.Kind, handler string, h VerbHandler) {
+// Register makes h run, before any state change, on the tasks of class the verbs whose profile handler is
+// handler, and a verb with no handler named so (a kind's own dismiss or done). A class is a value of the kind
+// property, the origin task.OriginDraft or task.OriginMessage of a task another service serves, or EveryKind.
+func (s *Service) Register(class, handler string, h VerbHandler) {
 	s.reg.Lock()
 	defer s.reg.Unlock()
-	s.handlers[handlerKey{kind, handler}] = h
+	s.handlers[handlerKey{class, handler}] = h
 }
 
-// handler is the registered handler of verb on entries of kind: the one its profile handler names, else for a
-// verb with none the one its own name does.
-func (s *Service) handler(kind task.Kind, verb task.Verb) VerbHandler {
+// handler is the registered handler of verb on e: the one its profile handler names, else for a verb with
+// none the one its own name does; of e's class, else, for a stored task, of EveryKind.
+func (s *Service) handler(e task.Task, verb task.Verb) VerbHandler {
 	name := cmp.Or(s.d.States.Handler(string(verb)), string(verb))
+	class := classOf(e)
 	s.reg.RLock()
 	defer s.reg.RUnlock()
-	return s.handlers[handlerKey{kind, name}]
+	if h, ok := s.handlers[handlerKey{class, name}]; ok || class == task.OriginDraft || class == task.OriginMessage {
+		return h
+	}
+	return s.handlers[handlerKey{EveryKind, name}]
 }
 
 // Do runs req.Verb on entry id: a registered handler first, else the state change. An entry of a unit whose
@@ -102,9 +117,9 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 		if !found {
 			return Result{}, fmt.Errorf("%w: %s", ErrNoTask, id)
 		}
-		h := s.handler(e.Kind, req.Verb)
+		h := s.handler(e, req.Verb)
 		if h == nil {
-			return Result{}, fmt.Errorf("%w: %s on a %s entry", ErrVerb, req.Verb, e.Kind)
+			return Result{}, fmt.Errorf("%w: %s on a %s task", ErrVerb, req.Verb, classOf(e))
 		}
 		if gated, err := s.Allowed(ctx, e, req); err != nil || gated {
 			return s.gated(ctx, e, req, err)
@@ -131,7 +146,7 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 	if gated, err := s.Allowed(ctx, e, req); err != nil || gated {
 		return s.gated(ctx, e, req, err)
 	}
-	if h := s.handler(e.Kind, req.Verb); h != nil {
+	if h := s.handler(e, req.Verb); h != nil {
 		return h(ctx, e, req)
 	}
 	s.mu.Lock()
@@ -174,16 +189,16 @@ func (s *Service) project(ctx context.Context, e task.Task, req Request, now tim
 		if err != nil {
 			return nil, err
 		}
-		if got.Kind != task.KindProject {
+		if !got.IsProject() {
 			return nil, fmt.Errorf("%w: %s is not a project", ErrArgs, id)
 		}
 		p = got
 	case title != "":
-		p = task.Task{ID: task.NewID(), Kind: task.KindProject, Title: title,
-			Sequential: args["sequential"] == "true", Origin: task.OriginUser, Created: now, Updated: now}
+		p = task.Task{ID: task.NewID(), Title: title, Sequential: args["sequential"] == "true", Origin: task.OriginUser, Created: now, Updated: now}
 		if err := p.MoveTo(task.CategoryReady, s.d.States); err != nil {
 			return nil, err
 		}
+		p.SetProp(task.PropKind, task.Value{Text: task.KindProject}, task.WriterWorkflow, now)
 		p.SetProp(task.PropArea, e.Prop(task.PropArea), task.WriterPerson, now)
 		cs = append(cs, task.Change{Op: task.OpCreate, Task: p, Why: "project"})
 	default:
@@ -373,20 +388,18 @@ func (s *Service) Capture(ctx context.Context, title, notes string, u *unit.Unit
 	if strings.TrimSpace(title) == "" {
 		return task.Task{}, fmt.Errorf("%w: a capture needs a title", ErrArgs)
 	}
-	return s.create(ctx, task.KindCapture, title, notes, u, task.OriginUser, nil)
+	return s.create(ctx, title, notes, u, task.OriginUser, nil)
 }
 
-// Open creates an entry another service owns the content of (messages): Kind, Inbox, random id.
+// Open creates a task another service owns the content of, such as a gate's: Inbox, random id. Its kind is
+// left to the profile.
 func (s *Service) Open(ctx context.Context, r OpenRequest) (task.Task, error) {
-	if r.Kind == "" {
-		return task.Task{}, fmt.Errorf("%w: open needs a kind", ErrArgs)
-	}
-	return s.create(ctx, r.Kind, r.Title, "", r.Unit, cmp.Or(r.Origin, task.OriginMessage), r.Contexts)
+	return s.create(ctx, r.Title, "", r.Unit, cmp.Or(r.Origin, task.OriginMessage), r.Contexts)
 }
 
-func (s *Service) create(ctx context.Context, kind task.Kind, title, notes string, u *unit.Unit, origin string, contexts []string) (task.Task, error) {
+func (s *Service) create(ctx context.Context, title, notes string, u *unit.Unit, origin string, contexts []string) (task.Task, error) {
 	now := s.now()
-	e := task.Task{ID: task.NewID(), Kind: kind, Title: title, Notes: notes, Origin: origin, Created: now, Updated: now}
+	e := task.Task{ID: task.NewID(), Title: title, Notes: notes, Origin: origin, Created: now, Updated: now}
 	if err := e.MoveTo(task.CategoryInbox, s.d.States); err != nil {
 		return task.Task{}, err
 	}
@@ -503,8 +516,8 @@ func (p *pending) changes() []task.Change {
 	return out
 }
 
-// Sync reconciles the units named by a TopicItems, TopicSourceEvents or TopicCards note, then AutoFocus and
-// Wake for all, in one Apply. A unit whose plugin is disabled keeps its entries as they are. A snooze that ends
+// Sync reconciles the units named by a TopicItems, TopicSourceEvents or TopicCards note, then Wake for all,
+// in one Apply. A unit whose plugin is disabled keeps its entries as they are. A snooze that ends
 // reconciles its entry's units after waking it, so a still-muted unit snoozes it again before anything sees it
 // in the Inbox.
 func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
@@ -584,10 +597,6 @@ func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 		if ok {
 			next, why = woke, append(why, "snooze ended")
 		}
-		if f, reason, ok := task.AutoFocus(next, s.d.StaleWaitingDays, now); ok {
-			next, next.Updated = f, now
-			why = append(why, "focus "+cmp.Or(reason, "cleared"))
-		}
 		if len(why) == 0 {
 			continue
 		}
@@ -634,4 +643,30 @@ func (s *Service) Attach(ctx context.Context, id task.ID, u unit.Unit) error {
 	}
 	e.Units, e.Updated = append(slices.Clone(e.Units), u), s.now()
 	return s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e, Why: "attached " + u.String()}})
+}
+
+// UnitClosed ends the open tasks that hold u, its closure posted: each moves into the done category.
+func (s *Service) UnitClosed(ctx context.Context, u unit.Unit) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	es, err := s.d.Store.TasksOf(ctx, u)
+	if err != nil {
+		return err
+	}
+	now := s.now()
+	var cs []task.Change
+	for _, e := range es {
+		if !e.Open() || !slices.Contains(e.Units, u) {
+			continue
+		}
+		if err := e.MoveTo(task.CategoryDone, s.d.States); err != nil {
+			return err
+		}
+		e.Snooze, e.Updated = task.Snooze{}, now
+		cs = append(cs, task.Change{Op: task.OpResolve, Task: e, Why: "its unit " + u.String() + " closed"})
+	}
+	if len(cs) == 0 {
+		return nil
+	}
+	return s.d.Store.Apply(ctx, cs)
 }

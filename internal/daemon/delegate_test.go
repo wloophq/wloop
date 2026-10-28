@@ -17,9 +17,9 @@ import (
 	"github.com/wloophq/wloop/internal/readmodel"
 )
 
-// unitTask is an Inbox task of kind on units, with one item on each.
-func unitTask(id string, kind task.Kind, units ...unit.Unit) task.Task {
-	e := task.Task{ID: task.ID(id), Kind: kind, State: "inbox", Category: task.CategoryInbox, Title: "Entry " + id, Units: units}
+// unitTask is an Inbox task of origin on units, with one item on each.
+func unitTask(id, origin string, units ...unit.Unit) task.Task {
+	e := task.Task{ID: task.ID(id), Origin: origin, State: "inbox", Category: task.CategoryInbox, Title: "Entry " + id, Units: units}
 	for _, u := range units {
 		e.Items = append(e.Items, task.ItemRef{Unit: u, Item: "it-" + id})
 	}
@@ -49,8 +49,8 @@ func verbState(v api.TaskView, verb string) api.VerbState {
 func TestDelegateOnAThreadTaskRunsActWithGuidanceAndMode(t *testing.T) {
 	t.Parallel()
 	r, h, fa := newDelegateRig(t)
-	r.put(t, unitTask("e-a", task.KindAction, actThread), unitTask("e-w", task.KindWaiting, actThread),
-		unitTask("e-c", task.KindClose, actThread), unitTask("e-n", task.KindCapture))
+	r.put(t, unitTask("e-a", task.OriginDerived, actThread), unitTask("e-w", task.OriginDerived, actThread),
+		unitTask("e-c", task.OriginDerived, actThread), unitTask("e-n", task.OriginUser))
 	for _, id := range []string{"e-a", "e-w", "e-c"} {
 		var v api.TaskView
 		if code := get(t, r.s, api.TaskPath(id), &v); code != 200 || !verbState(v, "delegate").Enabled {
@@ -85,7 +85,7 @@ func TestAThreadInboxNotificationOffersDraftForMeAndReply(t *testing.T) {
 	t.Parallel()
 	r, _, _ := newDelegateRig(t)
 	r.s.deps.Outbox = &outbox.Service{Store: r.db.Drafts(), Clock: fixedClock(tasksNow)}
-	r.put(t, unitTask("e-a", task.KindAction, actThread), unitTask("e-n", task.KindCapture))
+	r.put(t, unitTask("e-a", task.OriginDerived, actThread), unitTask("e-n", task.OriginUser))
 	var v api.TaskView
 	if code := get(t, r.s, api.TaskPath("e-a"), &v); code != 200 || v.Attention == nil {
 		t.Fatalf("%d %+v", code, v.Attention)
@@ -128,7 +128,7 @@ func (f placerFunc) SessionPlace(_ context.Context, u unit.Unit) (string, error)
 func TestDelegateSaysUpfrontWhetherASessionCanRun(t *testing.T) {
 	t.Parallel()
 	r, _, fa := newDelegateRig(t)
-	r.put(t, unitTask("e-a", task.KindAction, actThread))
+	r.put(t, unitTask("e-a", task.OriginDerived, actThread))
 	modes := func() []api.RunnerState {
 		var v api.TaskView
 		if code := get(t, r.s, api.TaskPath("e-a"), &v); code != 200 {

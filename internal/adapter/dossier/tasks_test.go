@@ -17,7 +17,7 @@ import (
 // putTask stores a task holding us, in cat.
 func (e *env) putTask(t *testing.T, id task.ID, cat task.Category, us ...unit.Unit) task.Task {
 	t.Helper()
-	tk := task.Task{ID: id, Kind: task.KindAction, State: task.State(cat), Category: cat, Title: "Ship " + string(id), Units: us,
+	tk := task.Task{ID: id, State: task.State(cat), Category: cat, Title: "Ship " + string(id), Units: us,
 		Origin: task.OriginDerived, Created: e.clock.now, Updated: e.clock.now}
 	op := task.OpCreate
 	if _, err := e.db.Tasks().Task(context.Background(), id); err == nil {
@@ -178,5 +178,48 @@ func TestAMigratedEndedTasksDossierGetsNoClosingCall(t *testing.T) {
 }
 
 func TestAUnitDossierJoinsTheTaskThatPicksTheUnitUp(t *testing.T) {
-	t.Skip("carried from D1 review: W1a moves a unit's dossier into the task that attaches it")
+	te := newTurnsEnv(t)
+	ctx := context.Background()
+	te.turns.Moves = func(ctx context.Context) error {
+		moves, err := te.db.DossierMoves(ctx)
+		if err != nil {
+			return err
+		}
+		root := dossier.Root(te.state)
+		for _, m := range moves {
+			if err := os.MkdirAll(filepath.Dir(filepath.Join(root, m.To)), 0o700); err != nil {
+				return err
+			}
+			if err := os.Rename(filepath.Join(root, m.From), filepath.Join(root, m.To)); err != nil {
+				return err
+			}
+			if err := te.db.DossierMoved(ctx, m.Seq); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	d := te.openFor(t, thread)
+	if d.Owner != (dossier.Owner{Unit: thread}) {
+		t.Fatalf("a thread no task holds opened %v", d.Owner)
+	}
+	writeText(t, filepath.Join(d.Path, "log", "20261022T120000Z-session.md"), "asked about the rollout\n")
+	if v := te.check(t, thread, "turn 1"); len(v) != 0 {
+		t.Fatalf("violations %v", v)
+	}
+	const id = task.ID("t-00000000000000e8")
+	te.putTask(t, id, task.CategoryReady, thread)
+	next := te.openFor(t, thread)
+	if next.Owner != (dossier.Owner{Unit: task.UnitOf(id)}) {
+		t.Fatalf("the next turn on the thread opened %v, want its task's dossier", next.Owner)
+	}
+	if got := readText(t, filepath.Join(next.Path, "log", "20261022T120000Z-session.md")); got != "asked about the rollout\n" {
+		t.Fatalf("the task's dossier reads %q, want the thread's log", got)
+	}
+	if _, ok, err := te.svc.Get(ctx, dossier.Owner{Unit: thread}); ok || err != nil {
+		t.Fatalf("the thread keeps a dossier row of its own: %v", err)
+	}
+	if exists(d.Path) {
+		t.Fatalf("the thread's directory %s is left behind", d.Path)
+	}
 }

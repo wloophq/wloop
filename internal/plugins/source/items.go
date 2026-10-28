@@ -15,27 +15,6 @@ func rawUnit(w plugin.Unit) unit.Unit {
 	return unit.Unit{Provider: unit.ProviderID(w.Provider), Key: w.Key}
 }
 
-// Category is the task category of a proposed first state.
-func category(i items.Initial) string {
-	switch i {
-	case items.InitialNext:
-		return "ready"
-	case items.InitialInbox:
-		return "inbox"
-	}
-	return ""
-}
-
-func initial(category string) items.Initial {
-	switch category {
-	case "ready":
-		return items.InitialNext
-	case "inbox":
-		return items.InitialInbox
-	}
-	return ""
-}
-
 func wireAnchor(a unit.Anchor) src.Anchor {
 	return src.Anchor{Unit: Wire(a.Unit), Ref: a.Ref, Permalink: a.Permalink, At: a.At}
 }
@@ -108,7 +87,7 @@ func evidenceOf(e src.ItemEvidence) items.Evidence {
 func wireItem(it items.Item) src.Item {
 	out := src.Item{ID: it.ID, Unit: Wire(it.Unit), Kind: string(it.Kind), Summary: it.Summary, Context: it.Context,
 		Options: wireOptions(it.Options), Deadline: it.Deadline, URLs: slices.Clone(it.URLs), Contexts: slices.Clone(it.Contexts),
-		Category: category(it.Initial), Origin: wireAnchor(it.Origin), Requester: wirePerson(it.Requester),
+		Category: string(it.Initial), Origin: wireAnchor(it.Origin), Requester: wirePerson(it.Requester),
 		Assignees: wirePeople(it.Assignees), AssignedAt: wireAnchor(it.AssignedAt), Basis: string(it.Basis),
 		WaitingOn: wirePeople(it.WaitingOn), State: string(it.State), Resolution: string(it.Resolution),
 		Evidence: wireEvidence(it.Evidence), Confidence: string(it.Confidence), Ambiguity: it.Ambiguity,
@@ -134,7 +113,7 @@ func opOf(w src.ItemOp) items.Op {
 			o.Options = &opts
 		}
 		if f.Category != nil {
-			i := initial(*f.Category)
+			i := items.Initial(*f.Category)
 			o.Initial = &i
 		}
 		if f.Requester != nil {
@@ -166,7 +145,7 @@ func opOf(w src.ItemOp) items.Op {
 func ItemOf(w src.Item) items.Item {
 	out := items.Item{ID: w.ID, Unit: rawUnit(w.Unit), Kind: items.Kind(w.Kind), Summary: w.Summary, Context: w.Context,
 		Options: optionsOf(w.Options), Deadline: w.Deadline, URLs: slices.Clone(w.URLs), Contexts: slices.Clone(w.Contexts),
-		Initial: initial(w.Category), Origin: anchorOf(w.Origin), Requester: personOf(w.Requester), Assignees: peopleOf(w.Assignees),
+		Initial: items.Initial(w.Category), Origin: anchorOf(w.Origin), Requester: personOf(w.Requester), Assignees: peopleOf(w.Assignees),
 		AssignedAt: anchorOf(w.AssignedAt), Basis: items.Basis(w.Basis), WaitingOn: peopleOf(w.WaitingOn), State: items.State(w.State),
 		Resolution: items.Resolution(w.Resolution), Evidence: evidenceOf(w.Evidence), Confidence: items.Confidence(w.Confidence),
 		Ambiguity: w.Ambiguity, Provenance: items.Provenance(w.Provenance), Confirmed: w.Confirmed, UserAt: w.UserAt,

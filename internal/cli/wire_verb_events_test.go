@@ -51,7 +51,7 @@ func TestAVerbAPersonRunsPlansItsWorkflow(t *testing.T) {
 	}
 	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: db.Tasks(), Facts: coretasks.CardFacts{Cards: db.Cards()}, Clock: clockFunc(func() time.Time { return te.Now() })})
 	at := testNow.Add(-time.Hour)
-	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-01", Kind: task.KindCapture, State: "next", Category: task.CategoryReady,
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-01", State: "next", Category: task.CategoryReady,
 		Title: "Ship it", Origin: task.OriginUser, Created: at, Updated: at}}}); err != nil {
 		t.Fatal(err)
 	}

@@ -44,7 +44,7 @@ func applyTasks(t *testing.T, s coretasks.Store, es ...task.Task) {
 
 func capture(id task.ID, s task.State, min int) task.Task {
 	at := taskAt.Add(time.Duration(min) * time.Minute)
-	return task.Task{ID: id, Kind: task.KindCapture, State: s, Title: string(id), Origin: task.OriginUser, Created: at, Updated: at}
+	return task.Task{ID: id, State: s, Title: string(id), Origin: task.OriginUser, Created: at, Updated: at}
 }
 
 func TestTaskStoreContract(t *testing.T) {
@@ -64,8 +64,8 @@ func TestTasksRoundTrip(t *testing.T) {
 	if !got.Same(want) || !got.Updated.Equal(want.Updated) || !slices.Equal(got.Prop(task.PropContexts).List, want.Prop(task.PropContexts).List) || got.Written["focus"] != want.Written["focus"] || !slices.Equal(got.Units, want.Units) {
 		t.Fatalf("read back\n%+v\nwant\n%+v", got, want)
 	}
-	if got.Waiting.On[0].Aliases[0] != want.Waiting.On[0].Aliases[0] {
-		t.Fatalf("waiting %+v", got.Waiting)
+	if got.Prop("owner").Actors[0].Aliases[0] != want.Prop("owner").Actors[0].Aliases[0] {
+		t.Fatalf("owner %+v", got.Prop("owner"))
 	}
 }
 
@@ -124,7 +124,8 @@ func TestTasksSinceStore(t *testing.T) {
 	ctx := context.Background()
 	a, b, c := capture("e-a", task.State("next"), 0), capture("e-b", task.State("next"), 1), capture("e-c", task.State("inbox"), 2)
 	p := capture("e-p", task.State("next"), 3)
-	p.Kind, p.Sequential = task.KindProject, true
+	p.Sequential = true
+	p.SetProp(task.PropKind, task.Value{Text: task.KindProject}, task.WriterWorkflow, p.Created)
 	s1, s2 := capture("e-s1", task.State("next"), 4), capture("e-s2", task.State("next"), 5)
 	s1.Parent, s1.Position, s2.Parent, s2.Position = p.ID, 1, p.ID, 2
 	applyTasks(t, s, a, b, c, p, s1, s2)

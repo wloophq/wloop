@@ -22,17 +22,17 @@ var (
 // Full is an entry with every field set.
 func Full(id task.ID) task.Task {
 	return task.Task{
-		ID: id, Kind: task.KindWaiting, State: InState("scheduled"), Category: task.CategoryDeferred, Title: "Ana owes 2 items", Notes: "notes",
+		ID: id, State: InState("scheduled"), Category: task.CategoryDeferred, Title: "Ana owes 2 items", Notes: "notes",
 		Items: []task.ItemRef{{Unit: pr, Item: "a"}, {Unit: other, Item: "b"}},
 		Units: []unit.Unit{pr, other},
 		Props: task.Props{"focus": {Text: "on"}, "contexts": {List: []string{"@reply", "@decide"}}, "area": {Text: "OSS"},
-			"due": {Time: t0.Add(24 * time.Hour)}},
+			"due": {Time: t0.Add(24 * time.Hour)}, "owner": {Actors: []items.Person{{Key: "github:ana", Name: "Ana", Aliases: []string{"email:ana@example.com"}}}},
+			"last_nudge": {Time: t0.Add(-time.Minute)}, "check_on": {Time: t0.Add(48 * time.Hour)}},
 		Written: map[string]task.Written{"focus": {By: task.WriterWorkflow, At: t0.Add(time.Minute)},
-			"contexts": {By: task.WriterPlugin, At: t0}, "area": {By: task.WriterPerson, At: t0}, "due": {By: task.WriterPlugin, At: t0}},
+			"contexts": {By: task.WriterPlugin, At: t0}, "area": {By: task.WriterPerson, At: t0}, "due": {By: task.WriterPlugin, At: t0},
+			"owner": {By: task.WriterPerson, At: t0}, "last_nudge": {By: task.WriterWorkflow, At: t0}, "check_on": {By: task.WriterPerson, At: t0}},
 		Parent: "e-proj", Position: 3, Sequential: true,
-		Snooze: task.Snooze{Until: t0.Add(time.Hour), OnActivity: true, Return: InState("waiting"), Mute: true},
-		Waiting: &task.WaitingOn{On: []items.Person{{Key: "github:ana", Name: "Ana", Aliases: []string{"email:ana@example.com"}}},
-			Since: t0.Add(-time.Hour), LastNudge: t0.Add(-time.Minute), Resurface: t0.Add(48 * time.Hour)},
+		Snooze:  task.Snooze{Until: t0.Add(time.Hour), OnActivity: true, Return: InState("waiting"), Mute: true},
 		Changed: true, SeenAt: t0.Add(-2 * time.Hour), Origin: task.OriginDerived,
 		Created: t0.Add(-3 * time.Hour), Updated: t0,
 	}
@@ -105,7 +105,7 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 	})
 	t.Run("EntriesSince", func(t *testing.T) {
 		s := open(t)
-		a := task.Task{ID: "e-a", Kind: task.KindCapture, State: InState("inbox"), Category: task.CategoryInbox, Title: "a", Origin: task.OriginUser, Created: t0, Updated: t0}
+		a := task.Task{ID: "e-a", State: InState("inbox"), Category: task.CategoryInbox, Title: "a", Origin: task.OriginUser, Created: t0, Updated: t0}
 		b, c := a, a
 		b.ID, b.Title, b.Created = "e-b", "b", t0.Add(time.Second)
 		c.ID, c.Title, c.State, c.Category = "e-c", "c", InState("next"), task.CategoryReady
@@ -138,15 +138,16 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 		n := 0
 		for _, st := range states {
 			for _, area := range []string{"", "OSS"} {
-				for _, kind := range []task.Kind{task.KindAction, task.KindProject} {
+				for _, kind := range []string{"", task.KindProject} {
 					n++
-					e := task.Task{ID: task.ID("e-" + st.name + "-" + area + "-" + string(kind)), Kind: kind, State: task.State(st.name),
+					e := task.Task{ID: task.ID("e-" + st.name + "-" + area + "-" + kind), State: task.State(st.name),
 						Category: st.c, Origin: task.OriginUser,
 						Created: t0.Add(time.Duration(n) * time.Second), Updated: t0.Add(time.Duration(n) * time.Second)}
 					if st.name == "scheduled" {
 						e.Snooze = task.Snooze{OnActivity: true}
 					}
 					e.SetProp(task.PropArea, task.Value{Text: area}, task.WriterPerson, t0)
+					e.SetProp(task.PropKind, task.Value{Text: kind}, task.WriterWorkflow, t0)
 					e.SetProp(task.PropContexts, task.Value{List: []string{"@reply"}}, task.WriterPerson, t0)
 					if n%3 == 0 {
 						e.SetProp(task.PropFocus, task.Value{Text: task.FocusOn}, task.WriterPerson, t0)
@@ -159,7 +160,7 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 			}
 		}
 		for i := range 3 {
-			all = append(all, task.Task{ID: task.ID("e-step-" + string(rune('a'+i))), Kind: task.KindAction, State: InState("next"), Category: task.CategoryReady,
+			all = append(all, task.Task{ID: task.ID("e-step-" + string(rune('a'+i))), State: InState("next"), Category: task.CategoryReady,
 				Parent: "e-next--project", Position: 3 - i, Origin: task.OriginUser, Created: t0.Add(time.Duration(100+i) * time.Second), Updated: t0})
 		}
 		for i := range all {

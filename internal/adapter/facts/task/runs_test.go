@@ -10,8 +10,8 @@ import (
 func TestRunsLiveCountsLiveSessions(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.task(task.Task{ID: "t-a", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "a"})
-	e.task(task.Task{ID: "t-b", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "b"})
+	e.task(task.Task{ID: "t-a", State: "next", Category: task.CategoryReady, Title: "a"})
+	e.task(task.Task{ID: "t-b", State: "next", Category: task.CategoryReady, Title: "b"})
 	a, b := task.UnitOf("t-a"), task.UnitOf("t-b")
 	e.sessions = []turn.Session{
 		{ID: "s1", Handle: "h1", Unit: a},

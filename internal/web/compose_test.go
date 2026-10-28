@@ -57,7 +57,7 @@ func TestTheViewFilterMatchesTasksByTheirWords(t *testing.T) {
 			e.Title, e.UnitLabels, e.Units = "Rollout date", []string{"#ops"}, []unit.Unit{slackThread}
 		}),
 		task("e-2", "next", func(e *api.TaskView) {
-			e.Title, e.Waiting = "Review the retry", &api.WaitingView{On: []api.WaitingPerson{{Name: "Dana Souza"}}}
+			e.Title, e.OwedBy = "Review the retry", "Dana Souza"
 		}),
 		task("e-3", "next", func(e *api.TaskView) {
 			e.Title, e.UnitLabels, e.Units = "Fix flaky uploads", []string{"acme/api#8"}, []unit.Unit{prUnit}

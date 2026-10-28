@@ -58,7 +58,7 @@ func viewsPrelude(t *testing.T) string {
 }
 
 func task(id, state string, mod func(*api.TaskView)) api.TaskView {
-	e := api.TaskView{ID: id, Kind: "action", State: state, Title: "Task " + id, Units: []unit.Unit{}, Items: []api.ItemView{}, Verbs: []api.VerbState{},
+	e := api.TaskView{ID: id, State: state, Title: "Task " + id, Units: []unit.Unit{}, Verbs: []api.VerbState{},
 		Created: time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC), Updated: time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)}
 	if mod != nil {
 		mod(&e)
@@ -256,13 +256,13 @@ var outboxWindow = time.Date(2026, 10, 9, 15, 10, 0, 0, time.UTC)
 func outboxTasks() []api.TaskView {
 	return []api.TaskView{
 		task("draft:7", "inbox", func(e *api.TaskView) {
-			e.Kind, e.Title = "draft", "Reply to the deploy thread"
+			e.Title = "Reply to the deploy thread"
 			e.Gates = draftGates(api.Draft{ID: 7, Unit: "slack/T1/C1", Kind: "reply", Target: "C1", Where: `#deploys in the thread "Deploy at five"`, Text: "Deployed, all green.", State: "held", Rev: 3,
 				Deadline: &outboxWindow})
 			e.Verbs = []api.VerbState{{Verb: "approve", Enabled: true}, {Verb: "edit", Enabled: true}, {Verb: "dismiss", Enabled: true}, {Verb: "retry", Enabled: false}}
 		}),
 		task("draft:8", "inbox", func(e *api.TaskView) {
-			e.Kind, e.Title = "draft", "Nudge the reviewer"
+			e.Title = "Nudge the reviewer"
 			e.Gates = draftGates(api.Draft{ID: 8, Unit: "github/acme/api#8", Kind: "nudge", Target: "acme/api#8", Text: "Ping?", State: "failed", Error: "rate limited", Rev: 5})
 			e.Verbs = []api.VerbState{{Verb: "approve", Enabled: false}, {Verb: "edit", Enabled: true}, {Verb: "dismiss", Enabled: true}, {Verb: "retry", Enabled: true}}
 		}),

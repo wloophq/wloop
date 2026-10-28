@@ -48,7 +48,7 @@ func (ev *taskViewer) attention(ctx context.Context, e task.Task) *api.Attention
 
 // notice is e's notification before the profile's offers drop the buttons of verbs it does not offer.
 func (ev *taskViewer) notice(ctx context.Context, e task.Task) *api.Attention {
-	if e.Kind == task.KindDraft {
+	if e.Origin == task.OriginDraft {
 		return ev.draftAttention(ctx, e)
 	}
 	if e.Category != task.CategoryInbox || !ev.s.unitsEnabled(e.Units) {
@@ -88,14 +88,14 @@ func (ev *taskViewer) inboxNotice(ctx context.Context, e task.Task) (api.Categor
 	switch {
 	case ok && n.Question && question && n.Record == record:
 		return api.QuestionCategory(record), n.Token, n.Attention, true
-	case ok && !n.Question && e.Kind == task.KindAction && holdsItem(e, n.Item):
+	case ok && !n.Question && e.Origin == task.OriginDerived && holdsItem(e, n.Item):
 		a := n.Attention
 		a.Actions = ev.asVerbs(e, row, a.Actions)
 		if n.Held {
 			return api.CategoryHeld, n.Token, a, true
 		}
 		return api.CategoryInbox, n.Token, a, true
-	case served && (question || e.Kind == task.KindAction && e.Origin == task.OriginDerived):
+	case served && (question || e.Origin == task.OriginDerived):
 		return "", "", api.Attention{}, false
 	case isMsg:
 		cat, token, a := messageNotice(e, m, record)
@@ -156,7 +156,7 @@ func (ev *taskViewer) asVerbs(e task.Task, row api.Row, acts []api.AttentionActi
 	served := ev.s.servedSpecs()
 	verbOf := map[string]task.Verb{}
 	for _, sp := range served {
-		if v := task.Verb(sp.Verb); slices.Contains(bridged, v) && !ev.g.Handles(e.Kind, v) {
+		if v := task.Verb(sp.Verb); slices.Contains(bridged, v) && !ev.g.Handles(e, v) {
 			verbOf[sp.ID] = v
 		}
 	}
@@ -244,7 +244,7 @@ func messageNotice(e task.Task, m dmessage.Message, record int64) (api.Category,
 		a.Subtitle = m.Unit.Label()
 	}
 	var dismiss []api.AttentionAction
-	if e.Kind == task.KindMessage {
+	if e.Origin == task.OriginMessage {
 		dismiss = []api.AttentionAction{{ID: verbAction(task.VerbDismiss), Title: "Dismiss"}}
 	}
 	switch m.Kind {
@@ -365,7 +365,7 @@ func (ev *taskViewer) servesInbox(ctx context.Context, d draft.Draft) bool {
 	if err != nil && !errors.Is(err, coretasks.ErrNoTask) {
 		ev.s.logf("notifications: the task of draft %d: %v", d.ID, err)
 	}
-	return err == nil && e.Kind != task.KindDraft && ev.attention(ctx, e) != nil
+	return err == nil && e.Origin != task.OriginDraft && ev.attention(ctx, e) != nil
 }
 
 func draftBody(d draft.Draft) string {

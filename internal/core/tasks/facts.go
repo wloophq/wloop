@@ -15,6 +15,8 @@ type CardFacts struct {
 	Enabled func(unit.ProviderID) bool
 	// Me is the user's identity now; nil: nobody.
 	Me func() task.Me
+	// Kind is the value of the kind property a provider's plugin gives the tasks of its units; nil: none.
+	Kind func(unit.ProviderID) string
 }
 
 var _ Facts = CardFacts{}
@@ -26,6 +28,9 @@ func (f CardFacts) UnitFacts(ctx context.Context, u unit.Unit) (task.UnitFacts, 
 		return task.UnitFacts{}, false, nil
 	}
 	out := task.UnitFacts{Unit: u}
+	if f.Kind != nil {
+		out.Kind = f.Kind(u.Provider)
+	}
 	if f.Cards == nil {
 		return out, true, nil
 	}

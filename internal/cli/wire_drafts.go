@@ -84,10 +84,7 @@ func (w draftWithdrawals) Proposed(ctx context.Context, name string) ([]automati
 		case err != nil:
 			return nil, err
 		default:
-			person, _ := strings.CutPrefix(d.Origin.Key, subject.Key+":")
-			if person == d.Origin.Key {
-				person = ""
-			}
+			person := draftPerson(d.Origin.Key, d.Unit, subject)
 			pd.Facts = draftFactsOf(sub, person, d.Items)
 		}
 		out = append(out, pd)
@@ -105,4 +102,15 @@ func (w draftWithdrawals) Withdraw(ctx context.Context, id int64, reason string)
 		return nil
 	}
 	return err
+}
+
+// draftPerson is the person a per-person draft's key names after its unit, or, as drafts proposed before the
+// key named the unit, after its subject; "" for a draft of no person.
+func draftPerson(key string, u, subject unit.Unit) string {
+	for _, prefix := range []string{u.String() + ":", subject.Key + ":"} {
+		if p, ok := strings.CutPrefix(key, prefix); ok {
+			return p
+		}
+	}
+	return ""
 }

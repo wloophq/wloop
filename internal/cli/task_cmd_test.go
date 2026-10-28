@@ -23,7 +23,7 @@ func attachEnv(t *testing.T) *testEnv {
 	te.Harness.Cwd = func() string { return "/worktrees/caller" }
 	te.Rec = storeRecorder{te.Store}
 	te.serveWithTasks(t)
-	err := te.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: task.Task{ID: attachTask, Kind: task.KindCapture, State: "next",
+	err := te.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: task.Task{ID: attachTask, State: "next",
 		Category: task.CategoryReady, Title: "Retries for the webhook sender", Origin: task.OriginUser, Created: testNow, Updated: testNow}}})
 	if err != nil {
 		t.Fatal(err)

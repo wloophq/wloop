@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/timeline"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -27,7 +28,18 @@ import (
 // records project risk; briefed are the units it told were briefed.
 func briefHost(t *testing.T) (*sqlite.DB, *sourcetest.Stub, *briefedUnits) {
 	t.Helper()
-	db, err := sqlite.Open(filepath.Join(t.TempDir(), "store.db"), nil)
+	db, stub, briefed, _ := briefHostOver(t, nil)
+	return db, stub, briefed
+}
+
+// briefHostOver is briefHost over a store whose writes log notes, with its plugin kind.
+func briefHostOver(t *testing.T, log *change.Log) (*sqlite.DB, *sourcetest.Stub, *briefedUnits, *psource.Kind) {
+	t.Helper()
+	var notes sqlite.Noter
+	if log != nil {
+		notes = log
+	}
+	db, err := sqlite.Open(filepath.Join(t.TempDir(), "store.db"), notes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +62,7 @@ func briefHost(t *testing.T) (*sqlite.DB, *sourcetest.Stub, *briefedUnits) {
 		}}
 	stub := sourcetest.NewStub()
 	start(t, k, "acme", "", stub)
-	return db, stub, briefed
+	return db, stub, briefed, k
 }
 
 type briefedUnits struct {
@@ -73,7 +85,7 @@ func (b *briefedUnits) list() []unit.Unit {
 // holdTask creates task id holding u, or u's items when items are named.
 func holdTask(t *testing.T, db *sqlite.DB, id task.ID, u unit.Unit, items ...string) {
 	t.Helper()
-	tk := task.Task{ID: id, Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Title: string(id), Origin: task.OriginDerived,
+	tk := task.Task{ID: id, State: "inbox", Category: task.CategoryInbox, Title: string(id), Origin: task.OriginDerived,
 		Created: at0, Updated: at0}
 	if len(items) == 0 {
 		tk.Units = []unit.Unit{u}

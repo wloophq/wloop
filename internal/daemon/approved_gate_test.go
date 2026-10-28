@@ -45,7 +45,7 @@ func TestAnApprovedGateRunsABridgedOrReplyVerb(t *testing.T) {
 	states := proposingStates{States: taskstest.BundledStates, verb: task.VerbDelegate}
 	c.s.deps.Tasks = coretasks.New(coretasks.Deps{States: states, Authority: states.Authority, Gates: rigTaskGates{svc, gs}, Store: store,
 		Facts: coretasks.CardFacts{}, Clock: fixedClock(catalogNow)})
-	e := task.Task{ID: "e-r", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}, Origin: task.OriginDerived,
+	e := task.Task{ID: "e-r", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}, Origin: task.OriginDerived,
 		Created: catalogNow, Updated: catalogNow}
 	if err := store.Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)

@@ -14,7 +14,7 @@ import (
 func TestAttachAppendsAUnitOnceInAttachOrder(t *testing.T) {
 	r := newRig()
 	ctx := context.Background()
-	e := r.put(t, task.Task{ID: "e-1", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "ship it", Origin: task.OriginUser})
+	e := r.put(t, task.Task{ID: "e-1", State: "next", Category: task.CategoryReady, Title: "ship it", Origin: task.OriginUser})
 	post := unit.Unit{Provider: "slack", Key: "T1:C1:100.1"}
 	for _, u := range []unit.Unit{unitU, post, unitU} {
 		if err := r.svc.Attach(ctx, e.ID, u); err != nil {
@@ -29,7 +29,7 @@ func TestAttachAppendsAUnitOnceInAttachOrder(t *testing.T) {
 func TestAttachRefusesTheTaskItselfAndAMissingTask(t *testing.T) {
 	r := newRig()
 	ctx := context.Background()
-	e := r.put(t, task.Task{ID: "e-1", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "ship it", Origin: task.OriginUser})
+	e := r.put(t, task.Task{ID: "e-1", State: "next", Category: task.CategoryReady, Title: "ship it", Origin: task.OriginUser})
 	if err := r.svc.Attach(ctx, e.ID, task.UnitOf(e.ID)); !errors.Is(err, coretasks.ErrArgs) {
 		t.Fatalf("attaching the entry to itself: err = %v, want ErrArgs", err)
 	}

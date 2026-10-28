@@ -738,9 +738,13 @@ func (s *sheet) defineApproval(w *workflow.Workflow, g *mGates, slot string) {
 // answers to, which Go validates the answer against.
 const schemaArg = "schema"
 
-// withExtras is env with the brief.extra.* facts of p's brief intent when
-// slot's units have a brief.
+// withExtras is env with the task.prop.* facts of tasks.toml in the task
+// slot, and the brief.extra.* facts of p's brief intent when slot's units
+// have a brief.
 func (s *sheet) withExtras(env expr.Env, p dunit.ProviderID, slot string) expr.Env {
+	if slot == builtin.TaskSlot {
+		maps.Copy(env, s.tasks.Facts())
+	}
 	if s.extras == nil || !slices.Contains(builtin.BriefSubjects, slot) {
 		return env
 	}

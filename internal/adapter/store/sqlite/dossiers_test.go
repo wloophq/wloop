@@ -96,7 +96,7 @@ func TestDossierStoreOpenReadsItemsAndTasks(t *testing.T) {
 		t.Fatal("an open item does not keep the unit open")
 	}
 
-	e := task.Task{ID: task.NewID(), Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "t", Units: []unit.Unit{slackThread}, Origin: task.OriginUser, Created: at, Updated: at}
+	e := task.Task{ID: task.NewID(), State: "next", Category: task.CategoryReady, Title: "t", Units: []unit.Unit{slackThread}, Origin: task.OriginUser, Created: at, Updated: at}
 	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestADossierOwnerIsTheTaskHoldingTheUnit(t *testing.T) {
 		t.Fatalf("a unit no task holds: %v", got)
 	}
 	tk := func(id task.ID, cat task.Category, created time.Time, u ...unit.Unit) task.Task {
-		return task.Task{ID: id, Kind: task.KindAction, State: task.State(cat), Category: cat, Title: string(id), Units: u, Origin: task.OriginDerived, Created: created, Updated: created}
+		return task.Task{ID: id, State: task.State(cat), Category: cat, Title: string(id), Units: u, Origin: task.OriginDerived, Created: created, Updated: created}
 	}
 	closed := tk("t-closed", task.CategoryDone, at.Add(-2*time.Hour), ghPull)
 	young := tk("t-young", task.CategoryReady, at, ghPull)

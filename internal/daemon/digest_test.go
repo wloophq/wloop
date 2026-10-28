@@ -30,7 +30,7 @@ func TestDigestContents(t *testing.T) {
 	r, end := digestRig(t)
 	r.put(t,
 		at(task.Task{ID: "e-next", State: "next", Category: task.CategoryReady}, end.Add(-time.Hour)),
-		at(task.Task{ID: "e-wait", Kind: task.KindWaiting, State: "waiting", Category: task.CategoryWaiting, Waiting: &task.WaitingOn{Since: end}}, end.Add(-20*time.Hour)),
+		at(task.Task{ID: "e-wait", State: "waiting", Category: task.CategoryWaiting}, end.Add(-20*time.Hour)),
 		at(task.Task{ID: "e-old", State: "next", Category: task.CategoryReady}, end.Add(-25*time.Hour)),
 		at(task.Task{ID: "e-later", State: "next", Category: task.CategoryReady}, end.Add(time.Minute)),
 		at(task.Task{ID: "e-in", State: "inbox", Category: task.CategoryInbox}, end.Add(-time.Hour)),

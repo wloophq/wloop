@@ -80,6 +80,9 @@ type Turns struct {
 
 	// Serial, when set, is the lock every Turns of one state directory shares; nil uses the Turns' own.
 	Serial *sync.Mutex
+	// Moves applies on disk the dossier moves the store recorded, such as a unit's dossier a task took when
+	// it picked the unit up; nil applies none.
+	Moves func(ctx context.Context) error
 
 	// mu serializes the git work on every dossier: a check, a commit and a notes rewrite never interleave.
 	mu sync.Mutex
@@ -95,11 +98,16 @@ func (t *Turns) locker() *sync.Mutex {
 // Violation is a file a turn wrote against the write rules, and the rule.
 type Violation struct{ Rel, Why string }
 
-// Open opens the dossier a turn on u reads, its task's when a task holds u, first settling what was
-// written since its last commit.
+// Open opens the dossier a turn on u reads, its task's when a task holds u, first applying the moves the
+// store recorded and settling what was written since its last commit.
 func (t *Turns) Open(ctx context.Context, u unit.Unit) (dossier.Dossier, error) {
 	t.locker().Lock()
 	defer t.locker().Unlock()
+	if t.Moves != nil {
+		if err := t.Moves(ctx); err != nil {
+			return dossier.Dossier{}, fmt.Errorf("moving the dossiers: %w", err)
+		}
+	}
 	o, err := t.Dossiers.Store.Owner(ctx, u)
 	if err != nil {
 		return dossier.Dossier{}, err

@@ -124,7 +124,7 @@ Encerrando:
 - {{.Line}}: {{or .Resolution "resolvido"}}{{end}}
 ```
 
-Your own `<profile>/workflows/slack-closure/workflow.toml` with `delivery = "reaction"`, `reaction = "white_check_mark"` and `target = "item"` in its step closes with a ✅ on the resolved message instead; its `effects = ["unit.closed"]` still ends the close task. A reaction carries no text: the workflow's `text.md.tmpl` is not read, and a step that wants a text with its reaction names another file in `text`.
+Your own `<profile>/workflows/slack-closure/workflow.toml` with `delivery = "reaction"`, `reaction = "white_check_mark"` and `target = "item"` in its step closes with a ✅ on the resolved message instead; its `effects = ["unit.closed"]` still records the closure and ends the thread's tasks. A reaction carries no text: the workflow's `text.md.tmpl` is not read, and a step that wants a text with its reaction names another file in `text`.
 
 ## Narrow one to some pull requests
 
@@ -182,13 +182,13 @@ use = "notify.self"
 
 With no `[trigger]`, a workflow is evaluated on every sweep.
 
-A workflow can also look at your tasks, `provider = "entry"`, every task neither done nor in the trash of an enabled plugin, or at the Slack units a live task is attached to, `provider = "slack"`. This one tells you about a waiting task once its stalled nudge is due:
+A workflow can also look at your tasks, `provider = "entry"`, every task neither done nor in the trash of an enabled plugin, or at the Slack units a live task is attached to, `provider = "slack"`. This one tells you about a task someone else owes once its check date passed:
 
 ```toml
-summary = "Tell me when a waiting task is due a nudge"
-provider = "entry"
-when = 'task.nudge_due_at != timestamp("0001-01-01T00:00:00Z") && task.items_owed > 0'
-key = ["task.nudge_due_at"]
+summary = "Tell me when a task I am owed is due a check"
+provider = "task"
+when = 'task.owed_by != "me" && task.owed_by != "" && task.check_on > timestamp(0) && task.check_on <= now'
+key = ["task.owed_by"]
 
 [[step]]
 use = "notify.self"

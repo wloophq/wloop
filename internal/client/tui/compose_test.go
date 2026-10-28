@@ -108,7 +108,7 @@ func TestEditADraftFromItsDetail(t *testing.T) {
 	}
 
 	one := task("draft:12", "Thanks", "inbox")
-	one.Kind, one.Verbs = "draft", []api.VerbState{{Verb: "edit", Enabled: true}}
+	one.Verbs = []api.VerbState{{Verb: "edit", Enabled: true}}
 	one.Gates = draftGates(api.Draft{ID: 12, Rev: 1, Kind: "reply", Purpose: "reply", Text: "Thanks!", State: "held"})
 	m.SetTasks("outbox", []api.TaskView{one}, viewCounters())
 	m.Done(c, nil, nil)
@@ -168,7 +168,7 @@ func TestTaskDetailListsAndPicksItsDrafts(t *testing.T) {
 func TestTheFilterReadsATasksWords(t *testing.T) {
 	e := task("e7", "Rollout date", "inbox")
 	e.UnitLabels, e.Units = []string{"#ops"}, []unit.Unit{{Provider: "slack", Key: "T1/C1/1.1"}}
-	e.Items = []api.ItemView{{Summary: "Confirm the freeze with Dana"}}
+	e.Asks = []api.AskView{{Summary: "Confirm the freeze with Dana"}}
 	e.Cards = []api.CardView{{Card: card.Card{LastHuman: &card.Human{Who: items.Person{Name: "Ana Lima"}}}}}
 	e = waitingOn(e, "Bruno")
 	for q, want := range map[string]bool{"#ops": true, "freeze dana": true, "ana": true, "bruno rollout": true, "zzz": false, "": true} {

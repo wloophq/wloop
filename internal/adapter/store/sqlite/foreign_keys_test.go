@@ -31,7 +31,8 @@ func execWrite(db *DB, query string, args ...any) error {
 
 func projectTask(id task.ID) task.Task {
 	e := taskstest.Full(id)
-	e.Kind, e.Parent, e.ReviewEvery = task.KindProject, "", 36*time.Hour
+	e.Parent, e.ReviewEvery = "", 36*time.Hour
+	e.SetProp(task.PropKind, task.Value{Text: task.KindProject}, task.WriterWorkflow, e.Updated)
 	return e
 }
 
@@ -82,7 +83,8 @@ func TestRewritingATaskKeepsItsRows(t *testing.T) {
 	if props == 0 {
 		t.Fatal("the task has no property rows")
 	}
-	p.Kind, p.Title = task.KindCapture, "no longer a project"
+	p.Title = "no longer a project"
+	p.SetProp(task.PropKind, task.Value{Text: "capture"}, task.WriterWorkflow, p.Updated)
 	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: p}}); err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +92,7 @@ func TestRewritingATaskKeepsItsRows(t *testing.T) {
 		t.Errorf("the property rows of a rewritten task: %d rows, want %d", n, props)
 	}
 	got, err := db.Tasks().Task(ctx, "e-p")
-	if err != nil || got.Title != p.Title || got.Kind != task.KindCapture || len(got.Items) != len(p.Items) || got.ReviewEvery != 36*time.Hour {
+	if err != nil || got.Title != p.Title || got.Prop(task.PropKind).Text != "capture" || len(got.Items) != len(p.Items) || got.ReviewEvery != 36*time.Hour {
 		t.Errorf("rewritten task %+v, %v", got, err)
 	}
 }

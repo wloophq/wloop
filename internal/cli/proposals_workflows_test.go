@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -48,7 +49,13 @@ func (p *workflowProposer) pass(ctx context.Context) error {
 func TestTheDefaultWorkflowsReproduceTheJobsDrafts(t *testing.T) {
 	t.Parallel()
 	r := newReplay(t)
-	if d := firstDiff(r.run(newWorkflowProposer(r)), readGolden(t)); d != "" {
+	got := r.run(newWorkflowProposer(r))
+	if *update {
+		if err := os.WriteFile(replayGolden, []byte(got), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if d := firstDiff(got, readGolden(t)); d != "" {
 		t.Fatalf("the default workflows' drafts differ from the job's at %s", d)
 	}
 }

@@ -3,6 +3,7 @@ package catalog
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -43,6 +44,14 @@ func Authority(loaded func() *intentload.Loaded) func(ctx context.Context, verb 
 func TaskFacts(t task.Task, d intentload.TasksDef) workflow.Facts {
 	f := OfferFacts(t)
 	f["task.category"] = string(t.Category)
+	maps.Copy(f, PropFacts(t, d))
+	return f
+}
+
+// PropFacts are the task.prop.* facts of t's properties, typed as d
+// declares them; a property d does not declare is left out.
+func PropFacts(t task.Task, d intentload.TasksDef) workflow.Facts {
+	f := workflow.Facts{}
 	for _, p := range d.Props {
 		v, ok := t.Props[p.Name]
 		if !ok {

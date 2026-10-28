@@ -472,7 +472,7 @@ func (facts) UnitFacts(_ context.Context, u unit.Unit) (task.UnitFacts, bool, er
 
 func (r *rig) inbox() *messages.Service {
 	st := taskstest.New()
-	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: st, Items: r.ledger, Facts: facts{}, Clock: r.clock, StaleWaitingDays: 2})
+	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: st, Items: r.ledger, Facts: facts{}, Clock: r.clock})
 	gs := messagestest.NewGates(r.clock.Now, gateTasks{st, g})
 	return gs.Bind(&messages.Service{Store: messagestest.New(), Books: r.store, Turns: r.turns, Tasks: g, Intents: turnstest.Intents(), Clock: r.clock})
 }

@@ -22,7 +22,7 @@ func TestReviewDue(t *testing.T) {
 		{"never reviewed, created 2 days ago", Task{Created: now.Add(-2 * day)}, false},
 		{"never reviewed, created 9 days ago", Task{Created: now.Add(-9 * day)}, true},
 	} {
-		c.p.Kind, c.p.Category = KindProject, CategoryReady
+		c.p.Props, c.p.Category = Props{PropKind: {Text: KindProject}}, CategoryReady
 		if got := c.p.ReviewDue(now); got != c.want {
 			t.Errorf("%s: due %v, want %v", c.name, got, c.want)
 		}
@@ -33,9 +33,9 @@ func TestReviewDue(t *testing.T) {
 }
 
 func TestProjectsOf(t *testing.T) {
-	seq := Task{ID: "p-seq", Kind: KindProject, Category: CategoryReady, Sequential: true}
-	par := Task{ID: "p-par", Kind: KindProject, Category: CategoryReady}
-	empty := Task{ID: "p-empty", Kind: KindProject, Category: CategoryReady}
+	seq := Task{ID: "p-seq", Props: Props{PropKind: {Text: KindProject}}, Category: CategoryReady, Sequential: true}
+	par := Task{ID: "p-par", Props: Props{PropKind: {Text: KindProject}}, Category: CategoryReady}
+	empty := Task{ID: "p-empty", Props: Props{PropKind: {Text: KindProject}}, Category: CategoryReady}
 	all := []Task{seq, par, empty,
 		{ID: "a1", Category: CategoryWaiting, Parent: "p-seq", Position: 1},
 		{ID: "a2", Category: CategoryReady, Parent: "p-seq", Position: 2},
@@ -53,13 +53,13 @@ func TestProjectsOf(t *testing.T) {
 		}
 	}
 	now := time.Now()
-	if !NeedsReview(seq, got["p-seq"], now) || NeedsReview(Task{ID: "x", Kind: KindProject, Category: CategoryReady, Created: now}, ProjectStatus{Next: "a", Open: 1}, now) {
+	if !NeedsReview(seq, got["p-seq"], now) || NeedsReview(Task{ID: "x", Props: Props{PropKind: {Text: KindProject}}, Category: CategoryReady, Created: now}, ProjectStatus{Next: "a", Open: 1}, now) {
 		t.Error("a project without a next action needs review; one with a next action and not due does not")
 	}
-	if NeedsReview(Task{Kind: KindProject, Category: CategoryDeferred, Created: now}, ProjectStatus{}, now) {
+	if NeedsReview(Task{Props: Props{PropKind: {Text: KindProject}}, Category: CategoryDeferred, Created: now}, ProjectStatus{}, now) {
 		t.Error("a Someday project needs no next action")
 	}
-	if NeedsReview(Task{Kind: KindProject, Category: CategoryDone}, ProjectStatus{}, now) {
+	if NeedsReview(Task{Props: Props{PropKind: {Text: KindProject}}, Category: CategoryDone}, ProjectStatus{}, now) {
 		t.Error("a done project is not reviewed")
 	}
 }

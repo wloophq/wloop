@@ -164,10 +164,10 @@ func (m *Model) grouping(view string) func(api.TaskView) string {
 		}
 	case viewWaiting:
 		return func(e api.TaskView) string {
-			if e.Waiting == nil || len(e.Waiting.On) == 0 {
+			if e.OwedBy == "me" {
 				return ""
 			}
-			return e.Waiting.On[0].Name
+			return e.OwedBy
 		}
 	}
 	return nil
@@ -404,13 +404,9 @@ func window(lines []string, cur, height int) []string {
 	return lines[start:min(len(lines), start+height)]
 }
 
-// taskAge is how long the task waits: since its waiting started, else
-// since it last changed.
+// taskAge is how long the task has stood since it last changed.
 func (m *Model) taskAge(e api.TaskView, now time.Time) (string, func(string) string) {
 	since := e.Updated
-	if e.Waiting != nil && !e.Waiting.Since.IsZero() {
-		since = e.Waiting.Since
-	}
 	if since.IsZero() || !now.After(since) {
 		return "-", m.t.Dim
 	}

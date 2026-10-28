@@ -214,9 +214,8 @@ func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 	wf := draftWF("nudges", "purpose", "nudge", "items", "owed", "per", "person", "repeat_after", "24h")
 	wf.Steps[0].Args["effects"] = []any{"task.nudged"}
 	r := newDraftRig(t, wf, "@{{\"{\"}}{{.Person.Key}}{{\"}\"}}, any news?{{range .Items}}\n- {{.Line}}{{end}}")
-	r.tasks.m["e1"] = task.Task{ID: "e1", Kind: task.KindWaiting, State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{draftThread},
-		Items:   []task.ItemRef{{Unit: draftThread, Item: "i1"}, {Unit: draftThread, Item: "i2"}},
-		Waiting: &task.WaitingOn{On: []items.Person{ana, bob}}}
+	r.tasks.m["e1"] = task.Task{ID: "e1", State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{draftThread},
+		Items: []task.ItemRef{{Unit: draftThread, Item: "i1"}, {Unit: draftThread, Item: "i2"}}}
 	r.items.set(draftThread, openItem("i1", "The deck", r.now.Add(-96*time.Hour), ana), openItem("i2", "The budget", r.now.Add(-96*time.Hour), bob))
 	r.run(draftTask)
 	ds := r.drafts()
@@ -227,7 +226,7 @@ func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 	for _, d := range ds {
 		byKey[d.Origin.Key] = d
 	}
-	anas := byKey["e1:"+ana.Key]
+	anas := byKey[draftThread.String()+":"+ana.Key]
 	if anas.Text != "@{"+ana.Key+"}, any news?\n- The deck" || anas.Task != "e1" || len(anas.Effects) != 1 {
 		t.Fatalf("ana's draft %+v", anas)
 	}
@@ -240,12 +239,12 @@ func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 	if _, _, err := r.svc.Send(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.svc.Withdraw(context.Background(), byKey["e1:"+bob.Key].ID, draft.WithdrawMoot); err != nil {
+	if _, err := r.svc.Withdraw(context.Background(), byKey[draftThread.String()+":"+bob.Key].ID, draft.WithdrawMoot); err != nil {
 		t.Fatal(err)
 	}
 	r.now = r.now.Add(time.Hour)
 	r.run(draftTask)
-	if ds := r.drafts(); len(ds) != 3 || ds[0].Origin.Key != "e1:"+bob.Key {
+	if ds := r.drafts(); len(ds) != 3 || ds[0].Origin.Key != draftThread.String()+":"+bob.Key {
 		t.Fatalf("a withdrawn draft held its person, or a sent one did not: %+v", ds)
 	}
 	other := r.wf
@@ -263,7 +262,7 @@ func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 	r.wf.Name = "nudges"
 	r.now = r.now.Add(24 * time.Hour)
 	r.run(draftTask)
-	if ds := r.drafts(); len(ds) != 4 || ds[0].Origin.Key != "e1:"+ana.Key {
+	if ds := r.drafts(); len(ds) != 4 || ds[0].Origin.Key != draftThread.String()+":"+ana.Key {
 		t.Fatalf("past ana's hold, only ana is asked again: %+v", ds)
 	}
 
@@ -357,7 +356,7 @@ func TestASubjectMatchingWhenAndWithdrawWhenIsProposedOnce(t *testing.T) {
 	}
 }
 
-func TestUnitClosedClosesTheTaskAndUnwatchesAfterWarmFor(t *testing.T) {
+func TestUnitClosedEndsTheUnitsTasksOnce(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "s.db"), nil)
@@ -372,23 +371,27 @@ func TestUnitClosedClosesTheTaskAndUnwatchesAfterWarmFor(t *testing.T) {
 		closed = append(closed, d.Unit)
 		return nil
 	}}}
+	tasks := coretasks.New(coretasks.Deps{Store: db.Tasks(), Clock: clock, States: taskstest.BundledStates})
 	newSvc := func() *outbox.Service {
 		return withDraftGates(db, clock.Now, &outbox.Service{Store: db.Drafts(), Clock: clock,
 			Effects: func(unit.ProviderID) (port.Effects, error) { return okEffects{}, nil },
-			Applier: outbox.EffectApplier{Store: db.DraftEffects(), Clock: clock, Effects: effectLookup(effectDeps{Modules: []source.Module{m}})}})
+			Applier: outbox.EffectApplier{Store: db.DraftEffects(), Clock: clock, Effects: effectLookup(effectDeps{Ends: tasks, Modules: []source.Module{m}})}})
 	}
 	svc := newSvc()
-	closeOf := func(closed bool) []task.Change {
-		done := items.Item{ID: "i1", Unit: draftThread, State: items.Resolved, Requester: ana}
-		f := task.UnitFacts{Unit: draftThread, StartedByMe: true, ClosurePosted: closed}
-		cs, err := task.Reconcile(f, []items.Item{done}, task.Me{Keys: []string{ana.Key}}, nil, taskstest.BundledStates, now)
+	open := task.Task{ID: "t-00000000000000c1", State: "waiting", Category: task.CategoryWaiting, Title: "Ana's ask", Units: []unit.Unit{draftThread},
+		Origin: task.OriginDerived, Created: now, Updated: now}
+	other := task.Task{ID: "t-00000000000000c2", State: "next", Category: task.CategoryReady, Title: "elsewhere", Units: []unit.Unit{unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/2.2"}},
+		Origin: task.OriginUser, Created: now, Updated: now}
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: open}, {Op: task.OpCreate, Task: other}}); err != nil {
+		t.Fatal(err)
+	}
+	category := func(id task.ID) task.Category {
+		t.Helper()
+		e, err := db.Tasks().Task(ctx, id)
 		if err != nil {
 			t.Fatal(err)
 		}
-		return cs
-	}
-	if cs := closeOf(false); len(cs) != 1 || cs[0].Task.Kind != task.KindClose {
-		t.Fatalf("no close entry before the closure: %+v", cs)
+		return e.Category
 	}
 	plain, err := svc.Propose(ctx, outbox.Proposal{Unit: draftThread, Kind: draft.Close, Text: "Closing.", Origin: draft.Origin{Kind: draft.OriginUser}})
 	if err != nil {
@@ -405,7 +408,7 @@ func TestUnitClosedClosesTheTaskAndUnwatchesAfterWarmFor(t *testing.T) {
 	if _, _, err := svc.Send(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if len(closed) != 0 {
+	if len(closed) != 0 || category(open.ID) != task.CategoryWaiting {
 		t.Fatal("a close draft that declares no effect marked the closure")
 	}
 	if err := approveDraft(ctx, svc, react.ID); err != nil {
@@ -417,8 +420,8 @@ func TestUnitClosedClosesTheTaskAndUnwatchesAfterWarmFor(t *testing.T) {
 	if !slices.Equal(closed, []unit.Unit{draftThread}) {
 		t.Fatalf("the reaction's unit.closed closed %v", closed)
 	}
-	if cs := closeOf(true); len(cs) != 0 {
-		t.Fatalf("the close entry outlives the closure: %+v", cs)
+	if category(open.ID) != task.CategoryDone || category(other.ID) != task.CategoryReady {
+		t.Fatalf("after the closure: the unit's task in %s, another unit's in %s", category(open.ID), category(other.ID))
 	}
 	if err := newSvc().Recover(ctx); err != nil {
 		t.Fatal(err)

@@ -118,7 +118,7 @@ func TestInboxPostCreatesAMessage(t *testing.T) {
 		t.Fatalf("message %+v", m)
 	}
 	e, err := r.taskStore.Task(context.Background(), task.ID(m.TaskID))
-	if err != nil || e.Kind == task.KindMessage || e.State != task.State("inbox") {
+	if err != nil || e.Origin == task.OriginMessage || e.State != task.State("inbox") {
 		t.Fatalf("entry %+v %v", e, err)
 	}
 	books, _ := r.books.Books(context.Background(), inboxUnit)

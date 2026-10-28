@@ -17,8 +17,8 @@ func TestADisabledPluginsTasksAndDraftsLeaveTheCountsAndStayDismissable(t *testi
 	t.Parallel()
 	r := newOutboxRig(t, unit.GitHub, "slack")
 	ctx := context.Background()
-	r.put(t, task.Task{ID: "e-gh", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Title: "reply", Units: []unit.Unit{r7u}})
-	r.put(t, task.Task{ID: "e-mine", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Title: "mine"})
+	r.put(t, task.Task{ID: "e-gh", State: "inbox", Category: task.CategoryInbox, Title: "reply", Units: []unit.Unit{r7u}})
+	r.put(t, task.Task{ID: "e-mine", State: "inbox", Category: task.CategoryInbox, Title: "mine"})
 	d := r.stored(t, draft.Draft{Unit: slackUnit, Text: "hi", State: draft.Held})
 
 	inbox := r.page(t, "view=inbox")
@@ -69,7 +69,7 @@ func TestADisabledPluginsTasksAndDraftsLeaveTheCountsAndStayDismissable(t *testi
 func TestDismissDetachesADisabledPluginFromAMixedTask(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t, "slack")
-	r.put(t, task.Task{ID: "e-mixed", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Title: "both", Units: []unit.Unit{slackUnit, r7u}})
+	r.put(t, task.Task{ID: "e-mixed", State: "inbox", Category: task.CategoryInbox, Title: "both", Units: []unit.Unit{slackUnit, r7u}})
 	if got := taskIDs(r.page(t, "view=inbox").Tasks); len(got) != 1 || got[0] != "e-mixed" {
 		t.Fatalf("inbox %v", got)
 	}
@@ -101,7 +101,7 @@ func TestDismissDetachesADisabledPluginFromAMixedTask(t *testing.T) {
 			t.Errorf("still refused: %+v", vs)
 		}
 	}
-	r.put(t, task.Task{ID: "e-trashed", Kind: task.KindAction, State: "trash", Category: task.CategoryDropped, Title: "gone", Units: []unit.Unit{r7u, slackUnit}})
+	r.put(t, task.Task{ID: "e-trashed", State: "trash", Category: task.CategoryDropped, Title: "gone", Units: []unit.Unit{r7u, slackUnit}})
 	var trashed api.TaskView
 	if code := get(t, r.s, api.TaskPath("e-trashed"), &trashed); code != 200 {
 		t.Fatalf("GET: %d", code)
@@ -116,7 +116,7 @@ func TestDismissDetachesADisabledPluginFromAMixedTask(t *testing.T) {
 func TestDismissOnAMixedTaskWithNoRowDismissTrashesIt(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t, "slack")
-	r.put(t, task.Task{ID: "e-mixed", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Title: "both", Units: []unit.Unit{r7u, slackUnit}})
+	r.put(t, task.Task{ID: "e-mixed", State: "inbox", Category: task.CategoryInbox, Title: "both", Units: []unit.Unit{r7u, slackUnit}})
 	var v api.TaskView
 	if code := get(t, r.s, api.TaskPath("e-mixed"), &v); code != 200 {
 		t.Fatalf("GET: %d", code)

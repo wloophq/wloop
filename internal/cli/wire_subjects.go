@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
+	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -12,7 +13,8 @@ import (
 	"github.com/wloophq/wloop/internal/source"
 )
 
-// wireSubjects wires the entry subject's facts provider over the store, and
+// wireSubjects wires the task subject's facts provider over the store, and
+// the daemon's word on who owes a task over it, and
 // a provider that lists nothing for every plugin built without workflow
 // facts, a disabled one included, so a workflow on its subject plans
 // nothing instead of failing.
@@ -21,7 +23,11 @@ func (e *Env) wireSubjects(w *serveWiring) {
 		w.Engine.Subjects = map[unit.ProviderID]automation.Units{}
 	}
 	if w.DB != nil {
-		w.Engine.Subjects[task.Codec{}.Provider()] = e.taskFacts(w.DB, unitsEnded(w.Modules), unitsRepo(w.Modules, e.currentConfig, inventory.Placements{Store: inventory.New(w.DB)}))
+		p := e.taskFacts(w.DB, unitsEnded(w.Modules), unitsRepo(w.Modules, e.currentConfig, inventory.Placements{Store: inventory.New(w.DB)}))
+		w.Engine.Subjects[task.Codec{}.Provider()] = p
+		if w.Deps != nil {
+			w.Deps.OwedBy = catalog.OwedBy(e.loadedIntents, p.BaseFacts)
+		}
 	}
 	for _, p := range e.sourcePlugins() {
 		if !slices.ContainsFunc(w.Modules, func(m source.Module) bool { return m.ID == p.ID && m.Facts != nil }) {

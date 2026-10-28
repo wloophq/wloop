@@ -20,7 +20,7 @@ func questionTask() api.TaskView {
 		e.Title, e.Changed, e.Category = "Pick a fix", true, "inbox"
 		e.Props = map[string]json.RawMessage{"contexts": json.RawMessage(`["@decide"]`)}
 		e.Units = []unit.Unit{prUnit}
-		e.Items = []api.ItemView{{Unit: prUnit, ID: "gh:review", Summary: "Review the retry change", State: "open", Kind: "action"}}
+		e.Asks = []api.AskView{{Item: "gh:review", Summary: "Review the retry change"}}
 		subject, _ := json.Marshal(api.Message{ID: 3, Unit: prUnit, Kind: "question", Text: "Retry or revert?", Recommend: "b",
 			Options: []record.Option{{ID: "a", Label: "Retry"}, {ID: "b", Label: "Revert"}}})
 		e.Gates = []api.GateView{{ID: 3, Kind: "question", Status: "open", Intents: []api.IntentView{}, Subject: subject}}
@@ -107,7 +107,7 @@ func TestOpeningClearsChanged(t *testing.T) {
 
 func TestADraftOnATaskApprovesItsEditedText(t *testing.T) {
 	e := task("draft:11", "inbox", func(e *api.TaskView) {
-		e.Kind, e.Title = "draft", "Nudge the reviewer?"
+		e.Title = "Nudge the reviewer?"
 		e.Units = []unit.Unit{prUnit}
 		e.Gates = draftGates(api.Draft{ID: 11, Unit: "github/acme/api#8", Kind: "nudge", Target: "acme/api#8", Text: "Could you take a look?", State: "held", Rev: 2})
 		e.Verbs = []api.VerbState{{Verb: "approve", Enabled: true}, {Verb: "dismiss", Enabled: true}, {Verb: "answer", Enabled: true}}
@@ -241,7 +241,7 @@ process.stdout.write(JSON.stringify({ Approve: n("approve"), Dismiss: n("dismiss
 
 func TestATaskOffersTheIntentsThatServeIt(t *testing.T) {
 	e := task("e-3f9a", "inbox", func(e *api.TaskView) {
-		e.Title, e.Kind = "Add retries to the webhook sender", "capture"
+		e.Title, e.Props = "Add retries to the webhook sender", map[string]json.RawMessage{"kind": json.RawMessage(`"capture"`)}
 		e.Actions = []api.ActionState{{ID: "start", Label: "Begin work", Enabled: true, Note: "Starts an agent session on the task's brief"}}
 	})
 	var got struct {

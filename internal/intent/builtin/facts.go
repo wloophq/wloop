@@ -75,9 +75,6 @@ func enumOf(values ...string) map[unit.ProviderID][]string {
 // PRStates are a pull request's states as GitHub spells them.
 var PRStates = []string{"OPEN", "CLOSED", "MERGED"}
 
-// TaskKinds are a task's kinds.
-var TaskKinds = []string{string(task.KindAction), string(task.KindWaiting), string(task.KindClose), string(task.KindMessage), string(task.KindDraft), string(task.KindCapture), string(task.KindProject), string(task.KindReference)}
-
 // TurnStates are the states a turn is in, and the empty value of none.
 var TurnStates = []string{"", string(dturn.Sent), string(dturn.Started), string(dturn.Asked), string(dturn.Done), string(dturn.Settled),
 	string(dturn.Failed), string(dturn.Unrecorded), string(dturn.Dismissed), string(dturn.Replaced), string(dturn.Withdrawn)}
@@ -178,13 +175,7 @@ var otherFacts = []Fact{
 	untrusted(wf("workspace", "fingerprint", expr.String, "The worktree path and its head.")),
 	wf("workspace", "repo", expr.String, "owner/repo; empty when unknown."),
 	wf("task", "id", expr.String, "The task's id."),
-	untrusted(enum(wf("task", "kind", expr.String, "The task's kind, such as action, waiting, close, message, capture or project."), enumOf(TaskKinds...))),
 	untrusted(wf("task", "state", expr.String, "The task's state, one of the states tasks.toml declares.")),
-	untrusted(wf("task", "waiting_on", expr.List, "The person keys the task waits on, such as slack:U0123.")),
-	wf("task", "resurface_at", expr.Time, "When the task resurfaces; zero when it has no date. Test with `> timestamp(0)`."),
-	timeVarying(untrusted(wf("task", "waiting_days", expr.Int, "Working days the task has waited, in the configured location, as the waiting rules count them."))),
-	wf("task", "since_nudge", expr.Duration, "Time since the task's last nudge; very large when it was never nudged."),
-	untrusted(wf("task", "nudge_due_at", expr.Time, "When a stalled nudge is due: the resurface date when set, else tasks.stale_waiting_days working days after the task started waiting, then drafts.repeat_after after the last nudge; zero when the task is not stalled. Test with `> timestamp(0)`.")),
 	wf("task", "muted", expr.Bool, "The task is muted."),
 	wf("task", "unit", expr.String, "The task's first unit as provider:key: the unit it was captured or derived on, else its first attachment; empty for a task with none."),
 	enum(wf("task", "unit_provider", expr.String, "The provider of task.unit; empty for a task with none."), enumOf(append([]string{""}, providerIDs()...)...)),
@@ -197,14 +188,13 @@ var otherFacts = []Fact{
 	untrusted(wf("task", "link_closure_posted", expr.Bool, "A closure was posted on task.unit, from the facts the tasks receive.")),
 	untrusted(wf("task", "items_open", expr.Int, "Open items of the task's units.")),
 	untrusted(wf("task", "items_resolved", expr.Int, "Resolved items of the task's units.")),
-	untrusted(wf("task", "items_owed", expr.Int, "Open items of the task's units that the task holds.")),
 	wf("task", "settled_at", expr.Time, "The newest update of a settled draft the workflow proposed on the task, withdrawn ones included; zero when none. Test with `> timestamp(0)`."),
 	untrusted(wf("task", "fingerprint", expr.String, "The task's id, state and update time.")),
 	untrusted(enum(wf("task", "category", expr.String, "The category of the task's state: inbox, ready, active, waiting, deferred, done or dropped."), enumOf(categoryNames()...))),
 	untrusted(wf("task", "owed_by", expr.String, "Who owes the task's next step, as tasks.toml's owed_by says: me, a person's key, or empty when nobody does.")),
 	timeVarying(untrusted(wf("task", "owed_since", expr.Time, "Since when task.owed_by has owed the next step; zero when nobody does. Test with `> timestamp(0)`."))),
 	timeVarying(wf("task", "since_movement", expr.Duration, "Time since the task, or a unit linked to it, last moved: a state change, a source event, a run.")),
-	wf("task", "check_on", expr.Time, "When to check on the task, its check_on property; zero when unset. Test with `> timestamp(0)`."),
+	timeVarying(untrusted(wf("task", "check_on", expr.Time, "When to check on the task: its check_on property, else, for a task someone else owes, tasks.stale_waiting_days working days after task.owed_since; zero when neither. Test with `> timestamp(0)`."))),
 	wf("task", "gates_open", expr.Int, "The task's open gates."),
 	wf("task", "runs_live", expr.Int, "The task's runs whose session is live."),
 	untrusted(wf("task", "wake_until", expr.Time, "When the task's wake wakes it; zero when it has none, or one that waits on events or a condition only. Test with `> timestamp(0)`.")),
@@ -216,7 +206,7 @@ var otherFacts = []Fact{
 	timeVarying(untrusted(wf("task", "ask_age", expr.Duration, "The age of the task's oldest unanswered ask; zero when none is."))),
 	wf("task", "promised", expr.Time, "The date the user promised the task by, its promised property; zero when unset. Test with `> timestamp(0)`."),
 	timeVarying(untrusted(wf("task", "extraction_lag", expr.Duration, "How long the oldest message of a unit linked to the task has waited to be extracted; zero when none waits."))),
-	untrusted(wf("task", "link_owes", expr.List, "The people the task's links owe a step to, as the plugins report them, each once.")),
+	untrusted(wf("task", "link_owes", expr.List, "Who the open items the task holds wait on, each once: me for the user, else a person's key such as slack:U0123; a unit the task holds with none of its items, all the unit's open items.")),
 	wf("gate", "kind", expr.String, "The gate's kind: draft, plan, question, post, proposal, trust or step."),
 	wf("gate", "name", expr.String, "The gate's name in gates.toml; empty for a gate of no profile name."),
 	wf("gate", "status", expr.String, "The gate's status: open, approved, rejected, answered, dismissed or superseded."),
@@ -542,7 +532,12 @@ func FactProvider(name string) unit.ProviderID {
 
 // OfferFacts are the facts a verb's offer reads: a task's own, which a
 // list of tasks reads without a store.
-var OfferFacts = []string{"task.id", "task.kind", "task.state", "task.muted", "task.unit", "task.unit_provider"}
+var OfferFacts = []string{"task.id", OfferKind, "task.state", "task.muted", "task.unit", "task.unit_provider"}
+
+// OfferKind is the task's kind property as an offer reads it, typed a
+// string whatever tasks.toml declares, so an offer compiles before the
+// properties load.
+const OfferKind = PropPrefix + "kind"
 
 // OfferEnv is the env of a verb's offer in tasks.toml.
 func OfferEnv() expr.Env {
@@ -552,6 +547,8 @@ func OfferEnv() expr.Env {
 			put(env, f)
 		}
 	}
+	env[OfferKind] = expr.String
+	env.SetUntrusted(OfferKind)
 	Narrow(env, providersOfSlot("task"))
 	return env
 }

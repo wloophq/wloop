@@ -28,9 +28,9 @@ func (e *Env) newTasks(db *sqlite.DB, cfg config.Config, its coretasks.Items) *c
 		e.pluginsOff = &atomic.Pointer[[]unit.ProviderID]{}
 		off := func() []unit.ProviderID { return offProviders(cfg, e.pluginsOff.Load()) }
 		enabled := func(p unit.ProviderID) bool { return !slices.Contains(off(), p) }
-		facts := coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: e.tasksMe.get}
+		facts := coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: e.tasksMe.get, Kind: e.pluginTaskKind}
 		e.tasks = coretasks.New(coretasks.Deps{Store: db.Tasks(), Items: its, Facts: facts, Clock: clockFunc(e.Now),
-			StaleWaitingDays: cfg.Tasks.StaleWaitingDays, Disabled: off, States: profileStates{e},
+			Disabled: off, States: profileStates{e},
 			Authority: catalog.Authority(e.loadedIntents), Gates: serviceTaskGates{e, db}})
 	}
 	return e.tasks
