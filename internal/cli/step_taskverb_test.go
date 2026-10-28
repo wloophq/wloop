@@ -23,10 +23,10 @@ import (
 
 const somedayWorkflow = `summary = "Move a next action to Someday"
 provider = "entry"
-when = 'entry.state == "next"'
+when = 'task.state == "next"'
 
 [[step]]
-use = "entry.verb"
+use = "task.verb"
 verb = "someday"
 `
 
@@ -99,14 +99,14 @@ func TestTaskVerbCheckRefusesWhatTheTasksStateRefuses(t *testing.T) {
 	r.put(t, "e-01", task.Done)
 	s := newStepSet(r.te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: r.te.Rounds})
 	u := task.UnitOf("e-01")
-	refusal, err := s.Check(ctx, wfStep("entry.verb", "verb", "done"), u, workflow.Why{Workflow: "w"}, automation.CheckOpts{})
+	refusal, err := s.Check(ctx, wfStep("task.verb", "verb", "done"), u, workflow.Why{Workflow: "w"}, automation.CheckOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(refusal, "done on a done entry") {
 		t.Fatalf("refusal %q", refusal)
 	}
-	if refusal, err := s.Check(ctx, wfStep("entry.verb", "verb", "reference"), u, workflow.Why{Workflow: "w"}, automation.CheckOpts{}); err != nil || refusal != "" {
+	if refusal, err := s.Check(ctx, wfStep("task.verb", "verb", "reference"), u, workflow.Why{Workflow: "w"}, automation.CheckOpts{}); err != nil || refusal != "" {
 		t.Fatalf("reference on a done entry: %q %v", refusal, err)
 	}
 }
@@ -123,12 +123,12 @@ func TestTaskVerbLeavesClosingADerivedTaskToItsItems(t *testing.T) {
 	s := newStepSet(r.te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: r.te.Rounds})
 	why := workflow.Why{Workflow: "w"}
 	for _, v := range []string{"done", "dismiss"} {
-		refusal, err := s.Check(ctx, wfStep("entry.verb", "verb", v), task.UnitOf("e-02"), why, automation.CheckOpts{})
+		refusal, err := s.Check(ctx, wfStep("task.verb", "verb", v), task.UnitOf("e-02"), why, automation.CheckOpts{})
 		if err != nil || !strings.Contains(refusal, "closes when its items resolve") {
 			t.Errorf("%s on a derived entry: %q %v", v, refusal, err)
 		}
 	}
-	if refusal, err := s.Check(ctx, wfStep("entry.verb", "verb", "someday"), task.UnitOf("e-02"), why, automation.CheckOpts{}); err != nil || refusal != "" {
+	if refusal, err := s.Check(ctx, wfStep("task.verb", "verb", "someday"), task.UnitOf("e-02"), why, automation.CheckOpts{}); err != nil || refusal != "" {
 		t.Errorf("someday on a derived entry: %q %v", refusal, err)
 	}
 }
@@ -146,7 +146,7 @@ func TestTaskVerbRunsOnlyVerbsThatMoveAStoredTask(t *testing.T) {
 	}
 	for _, v := range []task.Verb{task.VerbApprove, task.VerbDelegate, task.VerbAnswer, task.VerbReply, task.VerbEdit, task.VerbRetry, task.VerbProject, task.VerbSeen} {
 		if slices.Contains(builtin.TaskStepVerbs, string(v)) {
-			t.Errorf("entry.verb runs %s", v)
+			t.Errorf("task.verb runs %s", v)
 		}
 	}
 }

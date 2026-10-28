@@ -176,7 +176,7 @@ func TestDraftActionHasNoKey(t *testing.T) {
 	noVerb := draft
 	noVerb.Verb = "next"
 	if err := checkScope(noVerb); err == nil {
-		t.Error("a draft action without a gtd draft verb passes")
+		t.Error("a draft action without a draft verb passes")
 	}
 	if err := checkScope(api.ActionSpec{ID: "x", Scope: "thread"}); err == nil {
 		t.Error("an unknown scope passes")

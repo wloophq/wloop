@@ -95,7 +95,7 @@ when = 'draft.delivery == "reaction"'
 mode = "send"
 ```
 
-A rule never reads a fact the [facts](/reference/facts/) page marks **Untrusted**, such as `entry.unit_started_by_me`, which the extraction reads from the thread's text. The config's block overlays the workflow's `[drafts.approval]` the same way, a `rule` list alone keeping its mode; on a workflow that has none, it overlays the block of the intent whose turns the workflow starts, and `wait` for the drafts the workflow proposes itself. One that does not merge, such as a `window` over a mode other than `delay`, holds every draft of the workflow for you, and `{{command}} doctor` names it.
+A rule never reads a fact the [facts](/reference/facts/) page marks **Untrusted**, such as `task.unit_started_by_me`, which the extraction reads from the thread's text. The config's block overlays the workflow's `[drafts.approval]` the same way, a `rule` list alone keeping its mode; on a workflow that has none, it overlays the block of the intent whose turns the workflow starts, and `wait` for the drafts the workflow proposes itself. One that does not merge, such as a `window` over a mode other than `delay`, holds every draft of the workflow for you, and `{{command}} doctor` names it.
 
 A workflow's `observe` and a draft's `dry_run` mode differ: `observe = true` plans the workflow and proposes nothing, while `drafts.approval.mode = "dry_run"` proposes each draft and stores it as what would have been sent, without sending it.
 
@@ -107,7 +107,7 @@ Encerrando:
 - {{.Line}}: {{or .Resolution "resolvido"}}{{end}}
 ```
 
-Your own `<profile>/workflows/slack-closure/workflow.toml` with `delivery = "reaction"`, `reaction = "white_check_mark"` and `target = "item"` in its step closes with a ✅ on the resolved message instead; its `effects = ["unit.closed"]` still ends the close entry. A reaction carries no text: the workflow's `text.md.tmpl` is not read, and a step that wants a text with its reaction names another file in `text`.
+Your own `<profile>/workflows/slack-closure/workflow.toml` with `delivery = "reaction"`, `reaction = "white_check_mark"` and `target = "item"` in its step closes with a ✅ on the resolved message instead; its `effects = ["unit.closed"]` still ends the close task. A reaction carries no text: the workflow's `text.md.tmpl` is not read, and a step that wants a text with its reaction names another file in `text`.
 
 ## Narrow one to some pull requests
 
@@ -165,19 +165,19 @@ use = "notify.self"
 
 With no `[trigger]`, a workflow is evaluated on every sweep.
 
-A workflow can also look at your GTD entries, `provider = "entry"`, every entry neither done nor in the trash of an enabled plugin, or at the Slack units a live entry is attached to, `provider = "slack"`. This one tells you about a waiting entry once its stalled nudge is due:
+A workflow can also look at your tasks, `provider = "entry"`, every task neither done nor in the trash of an enabled plugin, or at the Slack units a live task is attached to, `provider = "slack"`. This one tells you about a waiting task once its stalled nudge is due:
 
 ```toml
-summary = "Tell me when a waiting entry is due a nudge"
+summary = "Tell me when a waiting task is due a nudge"
 provider = "entry"
-when = 'entry.nudge_due_at != timestamp("0001-01-01T00:00:00Z") && entry.items_owed > 0'
-key = ["entry.nudge_due_at"]
+when = 'task.nudge_due_at != timestamp("0001-01-01T00:00:00Z") && task.items_owed > 0'
+key = ["task.nudge_due_at"]
 
 [[step]]
 use = "notify.self"
 ```
 
-A workflow can react to a verb you run on an entry. This one tells you whenever you mark an entry done that came from the Inbox:
+A workflow can react to a verb you run on a task. This one tells you whenever you mark a task done that came from the Inbox:
 
 ```toml
 summary = "Tell me when I finish something straight from the Inbox"
@@ -192,7 +192,7 @@ on = ["verb_done"]
 use = "notify.self"
 ```
 
-`<slot>.settled_at` is the newest draft the workflow itself proposed on the unit that was sent or discarded, so a key of `["entry.settled_at"]` opens a new run after each settlement.
+`<slot>.settled_at` is the newest draft the workflow itself proposed on the unit that was sent or discarded, so a key of `["task.settled_at"]` opens a new run after each settlement.
 
 The [workflow manifest](/reference/workflow-manifest/) lists every field and the [facts](/reference/facts/) every condition can read. `{{command}} profile check` loads it; a broken workflow disables only itself.
 

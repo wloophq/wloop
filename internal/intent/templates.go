@@ -352,7 +352,24 @@ func (s *sheet) parseText(set *template.Template, path, name string, txt dintent
 		s.add(path, "%s", msg)
 		return false
 	}
-	return true
+	return s.renamedFields(path, t.Tree, env)
+}
+
+// renamedFields adds a problem for each field of tree that a release
+// renamed, naming its new name, and says whether there was none.
+func (s *sheet) renamedFields(path string, tree *parse.Tree, env expr.Env) bool {
+	ok := true
+	walk(tree.Root, func(_ parse.Node, chain []string) {
+		name := strings.Join(chain, ".")
+		if _, known := env[name]; known || builtin.RenamedTo(name) == "" {
+			return
+		}
+		if hint := expr.DidYouMean(name, env.Names()); hint != "" {
+			s.add(path, "unknown field .%s%s", name, hint)
+			ok = false
+		}
+	})
+	return ok
 }
 
 // Why renders the why of the intent name over facts, the unit's workflow

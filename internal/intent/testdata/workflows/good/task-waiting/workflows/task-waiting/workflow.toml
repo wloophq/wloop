@@ -1,0 +1,9 @@
+summary = "Wait on the owner of an inbox task"
+provider = "entry"
+when = 'task.state == "inbox"'
+
+[[step]]
+use = "task.verb"
+verb = "waiting"
+on = "ana"
+resurface = "2026-12-01"

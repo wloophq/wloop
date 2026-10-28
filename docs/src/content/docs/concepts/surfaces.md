@@ -14,7 +14,7 @@ All three are clients of the daemon. They show the same views and offer the same
 {{command}} open <url>                   # focuses the pull request's workspace in its manager
 ```
 
-The page listens on `127.0.0.1` only and asks for the token that `open` hands over. It opens on **Focus**, with the [GTD lists](/concepts/gtd/) beside it, and the GitHub views:
+The page listens on `127.0.0.1` only and asks for the token that `open` hands over. It opens on **Focus**, with the [lists](/concepts/tasks/) beside it, and the GitHub views:
 
 | View | Shows |
 |---|---|
@@ -37,7 +37,7 @@ A row shows whom the pull request waits on (the colored strip on its left), why,
 {{command}} tui
 ```
 
-The same GTD views (Focus, Inbox, Outbox, Next, Waiting, Projects, Someday, Logbook, Review), the pull request views (Needs me, In loop, My PRs), the plan and any plugin view, updated live. The keys are the cockpit's: lowercase keys file entries, uppercase keys act on a row (`R` run now, `S` skip, `G` send with guidance, `W` answer, `C` continue, `X` dismiss, `H` pause, `M` mute, `A` take over, `O` open, `V` review, `F` address, `N` nudge). `Ctrl+K` opens the palette with every action, `?` the help, `q` quits. Actions that publish or take over ask for a `y` first. See [Keys](/reference/keys/).
+The same lists (Focus, Inbox, Outbox, Next, Waiting, Projects, Someday, Logbook, Review), the pull request views (Needs me, In loop, My PRs), the plan and any plugin view, updated live. The keys are the cockpit's: lowercase keys file tasks, uppercase keys act on a row (`R` run now, `S` skip, `G` send with guidance, `W` answer, `C` continue, `X` dismiss, `H` pause, `M` mute, `A` take over, `O` open, `V` review, `F` address, `N` nudge). `Ctrl+K` opens the palette with every action, `?` the help, `q` quits. Actions that publish or take over ask for a `y` first. See [Keys](/reference/keys/).
 
 `{{command}} status` prints the same views once, for a script or a quick look.
 
@@ -54,8 +54,8 @@ The same GTD views (Focus, Inbox, Outbox, Next, Waiting, Projects, Someday, Logb
 | Agent asks, or Agent stopped | one action per option (the recommended first), Yes and No for a confirmation, a Reply field, Continue, Open |
 | Waiting for a permission | Open |
 | First round blocked | Open |
-| In your Inbox: an entry on a unit, such as a Slack thread | Draft for me (delegates headless, when its action can), a Reply field that saves your reply to the Outbox, and a Send reply field that sends it at once; a note says where it went |
+| In your Inbox: a task on a unit, such as a Slack thread | Draft for me (delegates headless, when its action can), a Reply field that saves your reply to the Outbox, and a Send reply field that sends it at once; a note says where it went |
 
-Clicking a notification's body opens its row in the cockpit. Each Inbox entry and each proposed or failed draft notifies once; the rest goes in a daily digest at `notifications.digest_at` (`09:00`, `""` for none).
+Clicking a notification's body opens its row in the cockpit. Each task and message in the Inbox and each proposed or failed draft notifies once; the rest goes in a daily digest at `notifications.digest_at` (`09:00`, `""` for none).
 
 When notifications are off or the menu bar is not running, rounds still run at their deadline: the cockpit shows a warning and `doctor` names the fix (System Settings > Notifications > {{app}}, or `{{command}} app install`).

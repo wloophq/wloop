@@ -49,7 +49,7 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `trigger` | table |  | What plans the workflow: on or schedule; absent, every sweep. |
-| `trigger.on` | list of `opened`, `push`, `review_requested`, `review_request_removed`, `review`, `comment`, `check`, `ready`, `draft`, `merged`, `closed`, `round_sent`, `round_held`, `round_pending`, `round_skipped`, `guidance`, `round_blocked`, `round_unblocked`, `muted`, `unmuted`, `held`, `released`, `adopted`, `tracked`, `untracked`, `nudged`, `removed`, `status`, `would_review`, `would_address`, `review_ended`, `verb_next`, `verb_waiting`, `verb_schedule`, `verb_someday`, `verb_reference`, `verb_focus`, `verb_project`, `verb_approve`, `verb_delegate`, `verb_done`, `verb_dismiss`, `verb_context`, `verb_area`, `verb_answer`, `verb_reviewed`, `verb_sequential`, `verb_reply` |  | The source event kinds the workflow reacts to; verb_&lt;verb&gt;, a verb a person ran on an entry, with provider entry. |
+| `trigger.on` | list of `opened`, `push`, `review_requested`, `review_request_removed`, `review`, `comment`, `check`, `ready`, `draft`, `merged`, `closed`, `round_sent`, `round_held`, `round_pending`, `round_skipped`, `guidance`, `round_blocked`, `round_unblocked`, `muted`, `unmuted`, `held`, `released`, `adopted`, `tracked`, `untracked`, `nudged`, `removed`, `status`, `would_review`, `would_address`, `review_ended`, `verb_next`, `verb_waiting`, `verb_schedule`, `verb_someday`, `verb_reference`, `verb_focus`, `verb_project`, `verb_approve`, `verb_delegate`, `verb_done`, `verb_dismiss`, `verb_context`, `verb_area`, `verb_answer`, `verb_reviewed`, `verb_sequential`, `verb_reply` |  | The source event kinds the workflow reacts to; verb_&lt;verb&gt;, a verb a person ran on a task, with provider task. |
 | `trigger.schedule` | string |  | A cron schedule, in local time. |
 | `observe` | bool | `false` | Plans items pending and never runs them by itself; a person applies an item by hand. |
 | `limits` | table |  | How many runs the workflow may take. |
@@ -63,7 +63,7 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `step[]` | table |  | A step the run takes, in order. Required: at least one. |
-| `step[].use` | one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `entry.verb` |  | The step. |
+| `step[].use` | one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb` |  | The step. |
 | `step[].&lt;name&gt;` | string or list |  | The step's arguments. |
 
 ### Run approval
@@ -112,18 +112,18 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `draft.propose` | `items` | one of `owed`, `resolved`, `unowned`, `unowned_aged`, `all` | `all` | Which of the unit's items the draft lists. |
 | `draft.propose` | `per` | one of `unit`, `person` | `unit` | One draft per unit, or one per person it waits on. |
 | `draft.propose` | `target` | one of `unit`, `item` | `unit` | Where the draft posts: on the unit, or on each item; an intent's help.target is free text. |
-| `draft.propose` | `effects` | list of `entry.nudged`, `unit.closed`, `pr.nudged` |  | What sending the draft applies. |
+| `draft.propose` | `effects` | list of `task.nudged`, `unit.closed`, `pr.nudged` |  | What sending the draft applies. |
 | `draft.propose` | `repeat_after` | string |  | The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after. |
 | `draft.propose` | `repeat_after_sent` | string |  | The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever. |
 | `classify` | `prompt` | file | `prompt.md` | The classification's prompt, beside the manifest. |
 | `classify` | `schema` | file | `schema.json` | The JSON schema of its answer, beside the manifest. |
 | `notify.self` | `text` | file | `text.md.tmpl` | The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`. |
-| `entry.verb` | `verb` | one of `next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done`, `dismiss` |  | The verb run on the entry. Required. |
-| `entry.verb` | `until` | string |  | With schedule, the date the entry returns: RFC 3339 or YYYY-MM-DD. |
-| `entry.verb` | `on_activity` | string |  | With schedule, `true` returns the entry on new activity on its unit. |
-| `entry.verb` | `on` | string |  | With waiting, the people the entry waits on, comma-separated. |
-| `entry.verb` | `resurface` | string |  | With waiting, the date the entry resurfaces: RFC 3339 or YYYY-MM-DD. |
-| `entry.verb` | `set` | string |  | With context, the contexts, comma-separated; with area, the area. |
+| `task.verb` | `verb` | one of `next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done`, `dismiss` |  | The verb run on the task. Required. |
+| `task.verb` | `until` | string |  | With schedule, the date the task returns: RFC 3339 or YYYY-MM-DD. |
+| `task.verb` | `on_activity` | string |  | With schedule, `true` returns the task on new activity on its unit. |
+| `task.verb` | `on` | string |  | With waiting, the people the task waits on, comma-separated. |
+| `task.verb` | `resurface` | string |  | With waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD. |
+| `task.verb` | `set` | string |  | With context, the contexts, comma-separated; with area, the area. |
 
 - A guard refuses a step instead of skipping it: the item stays in the plan with the reason, and runs when the guard passes.
 - A step that fails retries with backoff, three times per key, then stays `blocked` with its error.

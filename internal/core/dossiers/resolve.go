@@ -208,7 +208,7 @@ func (a closed) check() error {
 
 func closePrompt(s snapshot, u unit.Unit, its []items.Item) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "The work on %s is over: %s tracks no open item or entry on it any more. You write the closing notes of its dossier, the working memory %s kept for it.\n", u.Label(), brand.Name, brand.Name)
+	fmt.Fprintf(&b, "The work on %s is over: %s tracks no open item or task on it any more. You write the closing notes of its dossier, the working memory %s kept for it.\n", u.Label(), brand.Name, brand.Name)
 	b.WriteString("Say what the work ended with (outcome), the URL of the final product in its natural home if the items or the files name one (deliverable_url, empty otherwise: never invent one), and rewrite notes.md so a reader who reopens the work later finds the decisions, the links and what was left open.\n")
 	var lines []string
 	for _, it := range its {

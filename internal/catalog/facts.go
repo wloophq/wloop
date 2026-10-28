@@ -56,8 +56,8 @@ type Facts struct {
 	// joins on; zero for a row served to a client.
 	Asked   Asked
 	Intents *intentload.Loaded
-	// CapturedByUser is a row of an entry the user captured; false for any
-	// other row, a derived entry's included.
+	// CapturedByUser is a row of a task the user captured; false for any
+	// other row, a derived task's included.
 	CapturedByUser bool
 	// Recommended is the execution mode recommended for the row's items ("session", "headless"), "" none;
 	// the row offers every mode's action whatever it says.
@@ -178,7 +178,7 @@ func (f Facts) Get(field string) any {
 		return f.yours()
 	case "row.review_workspace":
 		return f.Workspace.ID != "" && f.Workspace.IsReview
-	case "entry.captured_by_user":
+	case "task.captured_by_user":
 		return f.CapturedByUser
 	case "pr.nudge.who":
 		return slices.Clone(f.NudgeWho)
@@ -200,10 +200,10 @@ func (f Facts) Get(field string) any {
 
 // OfferFacts are the facts of e a verb's offer reads.
 func OfferFacts(e task.Task) workflow.Facts {
-	f := workflow.Facts{"entry.id": string(e.ID), "entry.kind": string(e.Kind), "entry.state": string(e.State),
-		"entry.muted": e.Snooze.Mute, "entry.unit": "", "entry.unit_provider": ""}
+	f := workflow.Facts{"task.id": string(e.ID), "task.kind": string(e.Kind), "task.state": string(e.State),
+		"task.muted": e.Snooze.Mute, "task.unit": "", "task.unit_provider": ""}
 	if u, ok := e.FirstUnit(); ok {
-		f["entry.unit"], f["entry.unit_provider"] = u.String(), string(u.Provider)
+		f["task.unit"], f["task.unit_provider"] = u.String(), string(u.Provider)
 	}
 	return f
 }

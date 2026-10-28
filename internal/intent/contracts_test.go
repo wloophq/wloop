@@ -10,15 +10,15 @@ import (
 
 const slackNudge = `summary = "Case"
 provider = "entry"
-when = 'entry.state == "waiting" && now >= entry.nudge_due_at'
-key = ["entry.settled_at", "entry.waiting_on"]
+when = 'task.state == "waiting" && now >= task.nudge_due_at'
+key = ["task.settled_at", "task.waiting_on"]
 
 [[step]]
 use = "draft.propose"
 purpose = "nudge"
 items = "owed"
 per = "person"
-effects = ["entry.nudged"]
+effects = ["task.nudged"]
 repeat_after = "1d"
 
 [drafts.withdraw]
@@ -33,7 +33,7 @@ func TestAWorkflowOnTasksProposesAndWithdrawsDrafts(t *testing.T) {
 		t.Fatalf("%s", problems.Error())
 	}
 	w := l.Workflows[0]
-	if w.Provider != "entry" || w.Slot != "entry" || w.Withdraw == nil || !slices.Equal(w.Steps[0].Args["effects"].([]string), []string{"entry.nudged"}) {
+	if w.Provider != "entry" || w.Slot != "task" || w.Withdraw == nil || !slices.Equal(w.Steps[0].Args["effects"].([]string), []string{"task.nudged"}) {
 		t.Fatalf("%+v", w)
 	}
 	if reads := strings.Join(w.Withdraw.Reads(), ","); !strings.Contains(reads, "draft.person_waited") {
@@ -47,7 +47,7 @@ func TestDraftProposeRefusesBadArguments(t *testing.T) {
 		{`purpose = "nudge"`, "purpose = \"nudge\"\ndelivery = \"fax\"", `step[0].delivery: "fax" is not one of`},
 		{`items = "owed"`, `items = "mine"`, `step[0].items: "mine" is not one of`},
 		{`per = "person"`, `per = "team"`, `step[0].per: "team" is not one of`},
-		{`effects = ["entry.nudged"]`, `effects = ["entry.nudged", "entry.closed"]`, `step[0].effects[1]: "entry.closed" is not one of`},
+		{`effects = ["task.nudged"]`, `effects = ["task.nudged", "task.closed"]`, `step[0].effects[1]: "task.closed" is not one of`},
 		{`repeat_after = "1d"`, `repeat_after = "soon"`, `step[0].repeat_after: "soon" is not a duration`},
 		{"when = '!draft.person_waited'", "when = '!draft.nope'", "unknown field draft.nope"},
 	} {
@@ -104,7 +104,7 @@ func TestTheManifestKeysThatReplaceIntentNameSwitchesDecode(t *testing.T) {
 provider = ["github", "slack"]
 role = "headless"
 why = "{{.pr.address.reason}}"
-drafts.allowed_effects = ["entry.nudged", "unit.closed"]
+drafts.allowed_effects = ["task.nudged", "unit.closed"]
 brief = { need = ["solution"] }`, 1), "{{.pr.slug}}", "{{.unit.ref}}") + `
 [inputs.repo]
 type = "text"

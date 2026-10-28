@@ -9,7 +9,7 @@ The interface runs on four surfaces that share one vocabulary: the web cockpit (
 3. **The daemon decides, the client renders.** Actions, their labels and their order come from the daemon. A surface never invents an action or reorders the recommended one away from first.
 4. **Dense, calm, legible.** 13px body, hairline rules, no shadows, no gradients. Density comes from tight spacing on the 2/4/6/8 steps, never from smaller text than `flag`.
 5. **Prose is sans, identifiers are mono.** Titles, agent questions and drafts read in `body`. Refs, ages, counts, timestamps, commands and event data are `code`.
-6. **One channel per layer.** On a GTD row, shape is the entry's state (the state glyph), words and glyphs are the ask (the item), and a neutral label is the source (the source chip). Color stays with waits-on and time.
+6. **One channel per layer.** On a task row, shape is the task's state (the state glyph), words and glyphs are the ask (the item), and a neutral label is the source (the source chip). Color stays with waits-on and time.
 7. **Open by construction.** Plugins, intents and workflows come and go: the profile overrides and adds intents and workflows, and new plugins bring new kinds of units. The interface defines frames and slots and fills them from the catalog; it never names a provider or an intent, and a plugin gets a mark, never a color.
 
 ## Content fundamentals
@@ -49,7 +49,7 @@ System faces only: `sans` for interface and prose, `mono` for figures and identi
 - Hairlines in `rule`, 1px; dashed for soft separators inside a list (timeline, activity) and for disabled or stale controls.
 - Radii: `radius-md` for controls and cards, `radius-lg` for tiles and panels, `radius-pill` for chips, `radius-sm` for flags and the late age.
 - No shadows. Elevation is `panel` over `bg` plus a `rule` border.
-- The waits-on strip is the one colored edge: `strip-row` on rows and the situation block, `strip-card` on cards, entries and the current rail view.
+- The waits-on strip is the one colored edge: `strip-row` on rows and the situation block, `strip-card` on cards, tasks and the current rail view.
 
 ### States
 
@@ -70,10 +70,10 @@ There is no icon set in the cockpit. Use text and a few Unicode glyphs:
 
 - `▍` in `me` before the product name.
 - `↑` `↓` after a sorted column head.
-- `★` in `late` for a starred entry.
+- `★` in `late` for a starred task.
 - `×` for close and for removing a filter chip.
 - `●` (the `dot` class) in the waiter hue beside a `who` word.
-- State glyphs for entries, drawn in CSS at `state-glyph` size: dashed circle (inbox), circle (next), half-filled circle (waiting), dotted circle (someday), circle with a dot (scheduled), square (reference), filled check (done), slashed circle (trash), `?` disc (message), `↗` square (draft). The terminal client draws them as `◌ ○ ◐ ◉ ◇ ▢ ● ⊘`.
+- State glyphs for tasks, drawn in CSS at `state-glyph` size: dashed circle (inbox), circle (next), half-filled circle (waiting), dotted circle (someday), circle with a dot (scheduled), square (reference), filled check (done), slashed circle (trash), `?` disc (message), `↗` square (draft). The terminal client draws them as `◌ ○ ◐ ◉ ◇ ▢ ● ⊘`.
 - Item kinds: `→` request, `?` question, `◇` decision, `□` todo.
 - Source marks: two uppercase letters of the provider in a `hover` tile, never a logo.
 
@@ -91,7 +91,7 @@ The menu bar notifications use four 128px PNG badges (assets group **Notificatio
 ## Further sections
 
 - **Information architecture**: the object model, the rail, the row grammar and the inspector across surfaces.
-- **Entries and sources**: the GTD layer after OmniFocus and Nirvana: state glyphs, the entry row, items, source chips, lists, perspectives and the inspector.
-- **Plugins and profiles**: the seam between a plugin's own model and the GTD layer, and the slots that place any intent's actions and any workflow's plan items.
+- **Tasks and sources**: the task layer after OmniFocus and Nirvana: state glyphs, the task row, items, source chips, lists, perspectives and the inspector.
+- **Plugins and profiles**: the seam between a plugin's own model and the task layer, and the slots that place any intent's actions and any workflow's plan items.
 
 Components marked *Proposed* in their guidelines describe the target design; the rest document the cockpit as it is.

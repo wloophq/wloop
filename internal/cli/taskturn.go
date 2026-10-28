@@ -11,16 +11,16 @@ import (
 	"github.com/wloophq/wloop/internal/turn"
 )
 
-var errTasksUnavailable = errors.New("the entries are read in the daemon alone")
+var errTasksUnavailable = errors.New("the tasks are read in the daemon alone")
 
-// taskShortID is an entry's id cut to the first six hex digits after its prefix.
+// taskShortID is a task's id cut to the first six hex digits after its prefix.
 func taskShortID(id task.ID) string {
 	s := strings.TrimPrefix(string(id), "e-")
 	return s[:min(6, len(s))]
 }
 
-// nameFacts are the name facts of u's entry, none for a unit of another
-// provider or an entry the daemon cannot read.
+// nameFacts are the name facts of u's task, none for a unit of another
+// provider or a task the daemon cannot read.
 func (e *Env) nameFacts(ctx context.Context, u unit.Unit) map[string]any {
 	id, ok := task.IDOf(u)
 	if !ok || e.tasks == nil {
@@ -30,10 +30,10 @@ func (e *Env) nameFacts(ctx context.Context, u unit.Unit) map[string]any {
 	if err != nil {
 		return map[string]any{}
 	}
-	return map[string]any{"entry.title": tk.Title, "entry.short_id": taskShortID(id)}
+	return map[string]any{"task.title": tk.Title, "task.short_id": taskShortID(id)}
 }
 
-// taskPayload is a GTD entry as its turn reads it: the user's title and
+// taskPayload is a task as its turn reads it: the user's title and
 // notes, the work's brief.
 type taskPayload struct{ task task.Task }
 
@@ -42,7 +42,7 @@ func (p taskPayload) Unit() unit.Unit { return task.UnitOf(p.task.ID) }
 func (p taskPayload) Arg() string { return p.Unit().String() }
 
 func (p taskPayload) Wording() turn.Wording {
-	return turn.Wording{Noun: "entry", This: "this entry", Ref: p.Unit().String(), Short: taskShortID(p.task.ID)}
+	return turn.Wording{Noun: "task", This: "this task", Ref: p.Unit().String(), Short: taskShortID(p.task.ID)}
 }
 
 func (p taskPayload) Fact(string) (any, bool) { return nil, false }
@@ -54,7 +54,7 @@ func (p taskPayload) Contents() string {
 	return p.task.Title + "\n\n" + p.task.Notes
 }
 
-// taskPayloads reads an entry's turn payload from the daemon's entries.
+// taskPayloads reads a task's turn payload from the daemon's tasks.
 type taskPayloads struct{ e *Env }
 
 func (r taskPayloads) Payload(ctx context.Context, req turn.Request) (turn.Payload, error) {

@@ -28,11 +28,7 @@ func segments(path string) []string { return strings.Split(path, ".") }
 func bare(s string) string { return strings.ReplaceAll(s, "[]", "") }
 
 func check(all []Key, surface Surface, doc map[string]any) []Problem {
-	rows := rowsOf(all, surface)
-	if len(rows) == 0 {
-		return nil
-	}
-	w := walker{rows: rows}
+	w := walker{rows: rowsOf(all, surface)}
 	w.table(nil, "", doc)
 	return w.problems
 }
@@ -223,7 +219,7 @@ func EnumProblem(v string, values []Value) (msg, near string) {
 		names[i] = x.Name
 	}
 	msg = fmt.Sprintf("%q is not one of %s", v, OrList(names))
-	if c := expr.Closest(v, names); c != "" && !values[slices.Index(names, c)].Releases {
+	if c := expr.Suggest(v, names); c != "" && !values[slices.Index(names, c)].Releases {
 		near = c
 		msg += fmt.Sprintf("; did you mean %q?", c)
 	}
@@ -250,7 +246,7 @@ func (w *walker) unknown(pat []string, k, path string) {
 			siblings = append(siblings, bare(s[len(pat)]))
 		}
 	}
-	near := expr.Closest(k, siblings)
+	near := expr.Suggest(k, siblings)
 	w.problems = append(w.problems, Problem{Path: path, Msg: "unknown key" + expr.DidYouMean(k, siblings), Near: near, Unknown: true})
 }
 

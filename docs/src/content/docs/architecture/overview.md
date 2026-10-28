@@ -45,7 +45,7 @@ The daemon is laid out as ports and adapters: transports call the API, the API c
 - [Layers and the dependency rule](/architecture/layers/): the packages, what each may import, the composition root and where a new piece of code goes;
 - [Ports and adapters](/architecture/ports/): each outside tool, its port, its adapters and its fake;
 - [The daemon and its clients](/architecture/daemon-and-clients/): the single writer of the store, the API roles and the transports;
-- [Plugins](/architecture/plugins/): how a source of units plugs into the GTD core;
+- [Plugins](/architecture/plugins/): how a source of units plugs into the task core;
 - [Profile first](/architecture/profile-first/): what the profile decides and what Go provides;
 - [Testing](/architecture/testing/): fakes, goldens and the architecture tests;
 - [Decision log](/architecture/decisions/): each decision in force and the test that keeps it.

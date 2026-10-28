@@ -99,7 +99,7 @@ type Loaded struct {
 	Actions map[string]BuiltinAction
 	// Tools are the MCP tools' texts from tools.toml, by tool name.
 	Tools map[string]ToolText
-	// Lists are the GTD verbs' and views' texts from gtd.toml.
+	// Lists are the verbs' texts from tasks.toml and the views' from views.toml.
 	Lists ListTexts
 	// Keys are the core keys' help from keys.toml.
 	Keys KeyTexts
@@ -186,10 +186,11 @@ func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 			actions, actionProblems := loadActions(layers, bundled)
 			tools, toolProblems := loadTools(layers, bundled)
 			listTexts, listProblems := loadLists(layers, bundled)
+			gateProblems := loadGates(layers, bundled)
 			keyTexts, keyProblems := loadKeys(layers, bundled)
 			notices, noticeProblems := loadNotices(layers, bundled)
 			l.Actions, l.Tools, l.Lists, l.Keys, l.Notices = actions, tools, listTexts, keyTexts, notices
-			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, listProblems, keyProblems, noticeProblems)
+			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, listProblems, gateProblems, keyProblems, noticeProblems)
 			l.Reverted = map[dintent.Name]Problems{}
 			for n, r := range reverted {
 				l.Reverted[n] = r.problems

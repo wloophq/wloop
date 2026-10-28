@@ -2,7 +2,7 @@
 
 ## Your task this turn
 
-The user captured the work below as an entry and asked you to start it.
+The user captured the work below as a task and asked you to start it.
 {{- if .Inputs.repo}} You work in a fresh worktree of `{{line .Inputs.repo}}`, branched from its default base.{{else}} No repository is involved: there is no checkout to change, and the work is a message to post or an answer to find.{{end}}
 {{template "unit" .}}
 {{- with .Guidance}}

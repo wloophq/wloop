@@ -558,7 +558,7 @@ body { display: block; }
 
 .signals .tone-info { color: var(--me-text); }
 
-/* Proposed: entries and sources */
+/* Proposed: tasks and sources */
 .sg { --sg-c: var(--muted); position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--state-glyph); height: var(--state-glyph); border: 1.5px solid var(--sg-c); border-radius: 50%; background: none; padding: 0; color: var(--sg-c); font: 700 var(--text-flag)/1 var(--sans); cursor: pointer; }
 .sg-inbox { border-style: dashed; }
 .sg-waiting { --sg-c: var(--strip-text, var(--author-text)); background: linear-gradient(90deg, var(--sg-c) 50%, transparent 50%); }
@@ -583,16 +583,16 @@ body { display: block; }
 .src.stale { background: none; border: 1px dashed var(--rule); }
 .src-more { font: var(--text-meta)/1.4 var(--mono); color: var(--muted); }
 
-.erow { display: grid; grid-template-columns: var(--state-glyph) 1fr auto; gap: var(--space-2) var(--space-10); align-items: start; padding: var(--space-8) var(--space-12) var(--space-8) var(--space-10); border-bottom: 1px solid var(--rule); border-left: var(--strip-card) solid var(--strip, transparent); cursor: pointer; }
-.erow:hover { background: var(--hover); }
-.erow.sel { background: var(--sel-unit); box-shadow: inset var(--strip-card) 0 0 var(--me); }
-.erow .sg { margin-top: 1px; }
-.erow-main { min-width: 0; display: grid; gap: var(--space-2); }
-.erow-line { display: flex; align-items: baseline; gap: var(--space-6); min-width: 0; }
-.erow-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.erow.done .erow-title { color: var(--muted); font-weight: 400; text-decoration: line-through; }
-.erow-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4) var(--space-8); font-size: var(--text-meta); color: var(--muted); }
-.erow-end { display: flex; align-items: center; gap: var(--space-10); white-space: nowrap; }
+.trow { display: grid; grid-template-columns: var(--state-glyph) 1fr auto; gap: var(--space-2) var(--space-10); align-items: start; padding: var(--space-8) var(--space-12) var(--space-8) var(--space-10); border-bottom: 1px solid var(--rule); border-left: var(--strip-card) solid var(--strip, transparent); cursor: pointer; }
+.trow:hover { background: var(--hover); }
+.trow.sel { background: var(--sel-unit); box-shadow: inset var(--strip-card) 0 0 var(--me); }
+.trow .sg { margin-top: 1px; }
+.trow-main { min-width: 0; display: grid; gap: var(--space-2); }
+.trow-line { display: flex; align-items: baseline; gap: var(--space-6); min-width: 0; }
+.trow-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trow.done .trow-title { color: var(--muted); font-weight: 400; text-decoration: line-through; }
+.trow-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4) var(--space-8); font-size: var(--text-meta); color: var(--muted); }
+.trow-end { display: flex; align-items: center; gap: var(--space-10); white-space: nowrap; }
 .changed { width: 7px; height: 7px; flex: none; align-self: center; border-radius: 50%; background: var(--me); }
 .ctx { font: var(--text-overline)/1.4 var(--mono); color: var(--muted); }
 .when { font: var(--text-meta)/1.4 var(--mono); color: var(--muted); }
@@ -601,9 +601,9 @@ body { display: block; }
 .star { padding: 0; font-size: var(--text-brand); line-height: 1; color: var(--muted); background: none; border: 0; cursor: pointer; }
 .star.on { color: var(--late); }
 .star.auto { color: var(--late); opacity: .7; }
-.erow.msg .erow-title { white-space: normal; }
-.erow-opts { display: flex; gap: var(--space-6); margin-top: var(--space-4); }
-.erow-opts .act + .act { margin-left: 0; }
+.trow.msg .trow-title { white-space: normal; }
+.trow-opts { display: flex; gap: var(--space-6); margin-top: var(--space-4); }
+.trow-opts .act + .act { margin-left: 0; }
 
 .items { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); font-size: var(--text-meta); }
 .item { display: grid; grid-template-columns: 16px 1fr auto; gap: 0 var(--space-6); align-items: baseline; }

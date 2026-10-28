@@ -61,13 +61,13 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `row.remove_refusal` | string | action | What refused removing the row's workspace, which a force remove overrides; empty when nothing did. |
 | `row.recommended` | string | action | The runner recommended for the row's items: session or headless; empty when none is. |
 
-### The entry (`entry.*`)
+### The task (`task.*`)
 
 | Fact | Type | Slots | Meaning |
 |---|---|---|---|
-| `entry.captured_by_user` | bool | action | The user captured the entry: origin user and kind capture; false for a derived entry, such as one from a Slack thread. |
-| `entry.title` | string | name | The entry's title. |
-| `entry.short_id` | string | name | The entry's id, short: its first six hex digits. |
+| `task.captured_by_user` | bool | action | The user captured the task: origin user and kind capture; false for a derived task, such as one from a Slack thread. |
+| `task.title` | string | name | The task's title. |
+| `task.short_id` | string | name | The task's id, short: its first six hex digits. |
 
 ### The turn (`turn.*`, `unit.*`)
 
@@ -218,33 +218,33 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `workspace.fingerprint` | string | The worktree path and its head. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `workspace.repo` | string | owner/repo; empty when unknown. |
 
-### GTD entries (`entry.*`)
+### Tasks (`task.*`)
 
-| `entry` fact (provider `entry`) | Type | Meaning |
+| `task` fact (provider `entry`) | Type | Meaning |
 |---|---|---|
-| `entry.id` | string | The entry's id. |
-| `entry.kind` | string | The entry's kind, such as action, waiting, close, message, capture or project. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `entry.state` | string | The entry's state: inbox, next, waiting, scheduled, someday, reference, done or trash. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `entry.waiting_on` | list | The person keys the entry waits on, such as slack:U0123. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `entry.resurface_at` | timestamp | When the entry resurfaces; zero when it has no date. |
-| `entry.waiting_days` | int | Working days the entry has waited, in the configured location, as the GTD rules count them. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `entry.since_nudge` | duration | Time since the entry's last nudge; very large when it was never nudged. |
-| `entry.nudge_due_at` | timestamp | When a stalled nudge is due: the resurface date when set, else gtd.stale_waiting_days working days after the entry started waiting, then drafts.repeat_after after the last nudge; zero when the entry is not stalled. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `entry.muted` | bool | The entry is muted. |
-| `entry.unit` | string | The entry's first unit as provider:key: the unit it was captured or derived on, else its first attachment; empty for an entry with none. |
-| `entry.unit_provider` | string | The provider of entry.unit; empty for an entry with none. |
-| `entry.units` | list | The entry's units as provider:key, in order: the unit it was captured or derived on, then those attached to it in attach order, then any only its items name. The entry itself is not one of them. |
-| `entry.unit_providers` | list | The providers of entry.units, each once, in order. |
-| `entry.units_ended` | bool | The entry has a unit, and every one of entry.units has ended as its plugin says (pr.ended, slack.ended); a unit of a plugin that says nothing never ends. |
-| `entry.turns` | int | Turns run on the entry itself, such as a start; turns on its units are not counted. |
-| `entry.captured_by_user` | bool | The user captured the entry: origin user and kind capture. False for an entry derived from a unit's items, such as one from a Slack thread, or opened by another service. |
-| `entry.unit_started_by_me` | bool | The viewer started entry.unit, from the facts GTD receives. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `entry.unit_closure_posted` | bool | A closure was posted on entry.unit, from the facts GTD receives. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `entry.items_open` | int | Open items of the entry's units. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `entry.items_resolved` | int | Resolved items of the entry's units. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `entry.items_owed` | int | Open items of the entry's units that the entry holds. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `entry.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the entry, withdrawn ones included; zero when none. |
-| `entry.fingerprint` | string | The entry's id, state and update time. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.id` | string | The task's id. |
+| `task.kind` | string | The task's kind, such as action, waiting, close, message, capture or project. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.state` | string | The task's state: inbox, next, waiting, scheduled, someday, reference, done or trash. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.waiting_on` | list | The person keys the task waits on, such as slack:U0123. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.resurface_at` | timestamp | When the task resurfaces; zero when it has no date. |
+| `task.waiting_days` | int | Working days the task has waited, in the configured location, as the waiting rules count them. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.since_nudge` | duration | Time since the task's last nudge; very large when it was never nudged. |
+| `task.nudge_due_at` | timestamp | When a stalled nudge is due: the resurface date when set, else tasks.stale_waiting_days working days after the task started waiting, then drafts.repeat_after after the last nudge; zero when the task is not stalled. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.muted` | bool | The task is muted. |
+| `task.unit` | string | The task's first unit as provider:key: the unit it was captured or derived on, else its first attachment; empty for a task with none. |
+| `task.unit_provider` | string | The provider of task.unit; empty for a task with none. |
+| `task.units` | list | The task's units as provider:key, in order: the unit it was captured or derived on, then those attached to it in attach order, then any only its items name. The task itself is not one of them. |
+| `task.unit_providers` | list | The providers of task.units, each once, in order. |
+| `task.units_ended` | bool | The task has a unit, and every one of task.units has ended as its plugin says (pr.ended, slack.ended); a unit of a plugin that says nothing never ends. |
+| `task.turns` | int | Turns run on the task itself, such as a start; turns on its units are not counted. |
+| `task.captured_by_user` | bool | The user captured the task: origin user and kind capture. False for a task derived from a unit's items, such as one from a Slack thread, or opened by another service. |
+| `task.unit_started_by_me` | bool | The viewer started task.unit, from the facts the tasks receive. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.unit_closure_posted` | bool | A closure was posted on task.unit, from the facts the tasks receive. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.items_open` | int | Open items of the task's units. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.items_resolved` | int | Resolved items of the task's units. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.items_owed` | int | Open items of the task's units that the task holds. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the task, withdrawn ones included; zero when none. |
+| `task.fingerprint` | string | The task's id, state and update time. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 
 ### Slack conversations (`slack.*`)
 
@@ -254,7 +254,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `slack.conversation` | string | The conversation's kind: channel, dm or group. |
 | `slack.started_by_me` | bool | The viewer started the thread. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `slack.closure_posted` | bool | A closure was posted on the unit, by the extraction or a sent draft's unit.closed. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `slack.live_entry` | bool | A live entry, neither done nor in the trash and not muted, is attached to the unit. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `slack.live_task` | bool | A live task, neither done nor in the trash and not muted, is attached to the unit. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `slack.items_open` | int | Open items whose unit is this unit. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `slack.items_unowned` | int | Open items of the unit with no assignee, nobody waited on and no basis. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `slack.items_unowned_age_days` | int | Working days, in the configured location, since the oldest unowned item appeared. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
@@ -277,10 +277,10 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 
 | `draft` fact | Type | Meaning |
 |---|---|---|
-| `draft.person_waited` | bool | The draft's person is still waited on by its entry; true for a draft of no person. |
+| `draft.person_waited` | bool | The draft's person is still waited on by its task; true for a draft of no person. |
 | `draft.items_owed` | int | Items of the draft still open and held by its person, or unowned for a draft of no person. |
 | `draft.items_assigned` | int | Items of the draft that have an owner, someone waited on, or are no longer open. |
-| `draft.unit_open` | bool | The draft's unit still exists: its entry is neither done nor in the trash, or its unit is stored. |
+| `draft.unit_open` | bool | The draft's unit still exists: its task is neither done nor in the trash, or its unit is stored. |
 
 ### Triggers (`trigger.*`)
 
@@ -303,7 +303,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `config.cleanup.manual_idle` | duration | The cleanup.manual_idle setting. |
 | `config.cleanup.stale_workspace` | duration | The cleanup.stale_workspace setting. |
 | `config.github.nudge.silent_days` | int | The github.nudge.silent_days setting, in calendar days. |
-| `config.gtd.stale_waiting_days` | int | The gtd.stale_waiting_days setting, in working days. |
+| `config.tasks.stale_waiting_days` | int | The tasks.stale_waiting_days setting, in working days. |
 | `config.drafts.repeat_after` | duration | The drafts.repeat_after setting. |
 | `config.turns.per_day` | int | The turns.per_day setting: automated turns on units whose plugin keeps no per-unit count, all workflows together. |
 
@@ -334,7 +334,7 @@ The steps a `[[step]]` may name with `use`. `{{command}} workflows steps` prints
 | `draft.propose` | any | Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`unit` or `person`), `target` (`unit` or `item`), `effects` (the effects sending it applies), `repeat_after` (the least time after a settled draft of the same person, a duration or a duration of the config such as `config.drafts.repeat_after`) and `repeat_after_sent` (the same after a sent one, or `forever`). Holds while a draft of the workflow, unit and person is open or failed; a run that leaves a person under a delay that ends with time stays pending until it ends. |
 | `classify` | any | A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). Event triggers only, cached by fingerprint, under `classify.per_day`. |
 | `notify.self` | any | A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts "pr.slug"}}`, none once the unit is gone). |
-| `entry.verb` | entry | Runs a GTD verb on the entry: `verb` (`next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done` or `dismiss`), with `until` and `on_activity` for schedule, `on` and `resurface` for waiting, and `set` for context and area. The plan blocks it while the entry's state refuses the verb, and `done` and `dismiss` on an entry derived from a unit's items, which closes when they resolve. It records no `verb_<verb>` event, which only a person's verb records, so a workflow never triggers another through it. |
+| `task.verb` | entry | Runs a verb on the task: `verb` (`next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done` or `dismiss`), with `until` and `on_activity` for schedule, `on` and `resurface` for waiting, and `set` for context and area. The plan blocks it while the task's state refuses the verb, and `done` and `dismiss` on a task derived from a unit's items, which closes when they resolve. It records no `verb_<verb>` event, which only a person's verb records, so a workflow never triggers another through it. |
 
 ## Draft effects
 
@@ -347,8 +347,8 @@ What a sent draft applies, once: the names a `draft.propose` step lists in `effe
 | `pr.round_sent` | github | Records the round-sent event on the pull request. |
 | `pr.reviewed` | github | Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted. |
 | `pr.addressed` | github | Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered. |
-| `entry.nudged` | any | Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none. |
-| `unit.closed` | any | Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin. |
+| `task.nudged` | any | Stamps the last nudge of the draft's task, or of every live waiting task of its unit when it names none. |
+| `unit.closed` | any | Records the closure of the draft's unit, which ends its close task and unwatches it after its warm period; through the unit's plugin. |
 | `pr.nudged` | github | Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft. |
 
 This page is generated from the binary's fact registry by `make docs-ref`.

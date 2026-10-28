@@ -1,6 +1,6 @@
 // Package factslack puts the Slack units the extraction stores behind the
 // engine's Units, the Slack plugin's workflow facts (Module.Facts): every
-// Slack unit a live entry is attached to, with its facts in slot slack.
+// Slack unit a live task is attached to, with its facts in slot slack.
 package factslack
 
 import (
@@ -48,7 +48,7 @@ func New(db *sqlite.DB, clock port.Clock, endedAfter time.Duration) *Provider {
 	return &Provider{db: db, clock: clock, endedAfter: endedAfter}
 }
 
-// List is every Slack unit a live entry is attached to, in unit order.
+// List is every Slack unit a live task is attached to, in unit order.
 func (p *Provider) List(ctx context.Context, _ unit.ProviderID) ([]unit.Unit, error) {
 	es, err := p.db.Tasks().Tasks(ctx, task.Query{View: task.ViewOpen})
 	if err != nil {
@@ -155,7 +155,7 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 		"slack.started_by_me":          st.StartedByViewer,
 		"slack.closure_posted":         st.ClosurePosted || st.ClosureMarked,
 		"slack.ended":                  st.ClosurePosted || st.ClosureMarked || p.quiet(newest, now),
-		"slack.live_entry":             slices.ContainsFunc(es, func(e task.Task) bool { return liveOn(e, u) }),
+		"slack.live_task":              slices.ContainsFunc(es, func(e task.Task) bool { return liveOn(e, u) }),
 		"slack.items_open":             open,
 		"slack.items_unowned":          orphans,
 		"slack.items_unowned_age_days": age,
@@ -171,7 +171,7 @@ func (p *Provider) quiet(newest string, now time.Time) bool {
 	return !at.IsZero() && now.Sub(at) >= p.endedAfter
 }
 
-// liveOn says whether e is a live, unmuted entry attached to u.
+// liveOn says whether e is a live, unmuted task attached to u.
 func liveOn(e task.Task, u unit.Unit) bool {
 	return e.Live() && !e.Snooze.Mute && slices.Contains(e.Units, u)
 }

@@ -1,0 +1,8 @@
+summary = "Close a task you captured and started work on once every unit attached to it has ended, such as its pull request merged"
+provider = "entry"
+when = 'task.captured_by_user && task.turns > 0 && task.units_ended'
+order = 53
+
+[[step]]
+use = "task.verb"
+verb = "done"

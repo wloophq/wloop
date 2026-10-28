@@ -1,9 +1,0 @@
-summary = "Wait on the owner of an inbox entry"
-provider = "entry"
-when = 'entry.state == "inbox"'
-
-[[step]]
-use = "entry.verb"
-verb = "waiting"
-on = "ana"
-resurface = "2026-12-01"

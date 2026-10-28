@@ -186,7 +186,7 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 			s.add("target.missing", "%q is not %q", t.Missing, dintent.TargetCapture)
 		}
 		if t.Missing == dintent.TargetCapture && d.Provider != (task.Codec{}).Provider() {
-			s.add("target.missing", "capture makes an entry the turn's unit, and the intent serves %s units, not entry ones", d.Provider)
+			s.add("target.missing", "capture makes a task the turn's unit, and the intent serves %s units, not %s ones", d.Provider, (task.Codec{}).Provider())
 		}
 		d.Target = dintent.Target{Missing: t.Missing, Title: s.text("target.title", t.Title, "")}
 	}

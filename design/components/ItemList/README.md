@@ -1,6 +1,6 @@
 # ItemList
 
-*Proposed.* The asks inside an entry's units, in the inspector.
+*Proposed.* The asks inside a task's units, in the inspector.
 
 Each line: kind glyph (`→` request, `?` question, `◇` decision, `□` todo), text, status, and a second line with who asked whom and since when. Resolved items strike through in `muted` with a `loop-text` check. A confirmed item carries the `confirmed` flag.
 

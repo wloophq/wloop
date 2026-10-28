@@ -26,7 +26,7 @@ func TestAPluginEffectStaysPendingWhileItsPluginIsNotBuilt(t *testing.T) {
 		t.Fatal("unit.closed applies on a provider whose plugin is not built")
 	}
 	if _, ok := off(thread, builtin.EffectTaskNudged); !ok {
-		t.Fatal("entry.nudged needs no plugin")
+		t.Fatal("task.nudged needs no plugin")
 	}
 	on := effectLookup(effectDeps{Modules: []source.Module{{ID: thread}}})
 	if _, ok := on(thread, builtin.EffectUnitClosed); !ok {

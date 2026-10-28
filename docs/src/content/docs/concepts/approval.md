@@ -61,7 +61,7 @@ A draft goes out only once its approval policy lets it:
 | `send` | is sent at once |
 | `dry_run` | is stored as what would have been sent, and never sent |
 
-A draft you write yourself (Reply on an entry or a unit, see [GTD](/concepts/gtd/), `outbox new`, or `slack send` to a thread) is `wait` too: Save to Outbox leaves it there, and Send now approves it right after proposing it, through the same publisher.
+A draft you write yourself (Reply on a task or a unit, see [Tasks and views](/concepts/tasks/), `outbox new`, or `slack send` to a thread) is `wait` too: Save to Outbox leaves it there, and Send now approves it right after proposing it, through the same publisher.
 
 Every bundled intent, workflow and rule uses `wait`. Your own intent or workflow can set another with a `[drafts.approval]` table, a workflow's drafts with `workflows.<name>.drafts.approval` in the configuration, and the drafts of a plugin's own rules (GitHub's nudge rule) with `<id>.drafts.approval`, such as `github.drafts.approval`. A turn's draft takes the `[drafts.approval]` of the workflow that started the turn, else its intent's, else `wait`; a workflow's own draft takes the workflow's, else `wait`. The configuration's `workflows.<name>.drafts.approval` is laid over that block.
 
@@ -101,8 +101,8 @@ A draft has a purpose (nudge, close, ask_owner, or any label its proposer names)
 
 | Effect | What it does once the draft is sent |
 |---|---|
-| `entry.nudged` | stamps the last nudge of the draft's entry, or of every live waiting entry of its unit |
-| `unit.closed` | records the unit's closure through its plugin: on Slack, it ends the close entry and lets the thread go unwatched after its warm period, whatever later extraction passes say |
+| `task.nudged` | stamps the last nudge of the draft's task, or of every live waiting task of its unit |
+| `unit.closed` | records the unit's closure through its plugin: on Slack, it ends the close task and lets the thread go unwatched after its warm period, whatever later extraction passes say |
 | `pr.nudged` | records the nudge on the pull request, which the next nudge's refusal reads |
 
 Nothing follows from a draft's purpose: a closing message with no `unit.closed` closes nothing. An agent's draft may declare only the effects its intent lists in `[drafts] allowed_effects`; the draft is refused otherwise, with a message naming the intent. A draft declaring an effect its unit's provider does not implement, such as `pr.nudged` on a Slack thread, is refused when it is proposed. A sent draft whose effect cannot apply, such as `unit.closed` while its plugin is off, keeps it pending until it can.

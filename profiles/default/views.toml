@@ -1,0 +1,47 @@
+# The labels of the lists of tasks, and of the review's steps. A user
+# profile's views.toml replaces the keys it sets.
+
+[views.focus]
+label = "Focus"
+
+[views.inbox]
+label = "Inbox"
+
+[views.outbox]
+label = "Outbox"
+
+[views.next]
+label = "Next"
+
+[views.waiting]
+label = "Waiting"
+
+[views.projects]
+label = "Projects"
+
+[views.someday]
+label = "Someday"
+
+[views.logbook]
+label = "Logbook"
+
+[views.review]
+label = "Review"
+
+[review.inbox]
+label = "Inbox to zero"
+
+[review.outbox]
+label = "Outbox"
+
+[review.waiting]
+label = "Waiting: nudge?"
+
+[review.projects]
+label = "Projects without a next action or past their review"
+
+[review.someday]
+label = "Someday"
+
+[review.focus]
+label = "Prune Focus"

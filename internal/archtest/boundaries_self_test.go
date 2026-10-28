@@ -198,7 +198,7 @@ const d = "classify"
 func TestBuiltinLiteralsFlagsAnEffectNameOutsideTheTables(t *testing.T) {
 	t.Parallel()
 	fset, f := parse(t, `package cli
-const a = "entry.nudged"
+const a = "task.nudged"
 const b = "unit.closed"
 const c = "draft.propose"
 `)

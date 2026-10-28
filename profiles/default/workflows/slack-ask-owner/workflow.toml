@@ -1,6 +1,6 @@
 summary = "Ask who owns the open items of a Slack unit you track that nobody owns after a working day"
 provider = "slack"
-when = 'slack.live_entry && slack.items_unowned > 0 && slack.items_unowned_age_days >= 1'
+when = 'slack.live_task && slack.items_unowned > 0 && slack.items_unowned_age_days >= 1'
 order = 52
 key = ["slack.settled_at"]
 

@@ -11,14 +11,14 @@ Two things in wloop are open-ended: sources and behavior. Plugins bring new kind
   unit + card + items         the generic shape every surface reads
      │
      ▼
-  GTD  ──  entries, lists, projects, Outbox, Review
+  tasks  ──  lists, projects, Outbox, review
      ▲
-  profile  ──  intents and workflows: actions with a GTD verb, plan items
+  profile  ──  intents and workflows: actions with a verb, plan items
 ```
 
 - **Above the seam a plugin is free.** Its perspectives can show pull request situations, Slack participants, anything its own data model knows, with its own facets and columns.
-- **At the seam it speaks one shape**: the unit, its card and its items. The GTD layer, the source chip, the unit card, the menu bar and notifications read only that shape, so a new plugin appears in them with no client change.
-- **Below the seam everything is GTD**: entries in lists, whatever produced them.
+- **At the seam it speaks one shape**: the unit, its card and its items. The task layer, the source chip, the unit card, the menu bar and notifications read only that shape, so a new plugin appears in them with no client change.
+- **Below the seam everything is a task** in a list, whatever produced it.
 
 ## What the interface reads at the seam
 
@@ -57,7 +57,7 @@ A plugin's views go under its own section of the rail, titled with the plugin's 
 
 ## Actions from the profile
 
-Every action (built-in, a bundled intent, an intent the profile overrides or adds) arrives from the daemon with an id, a label, a group, the surfaces it appears on, a scope (`unit`, `item`, `draft`), an input, and optionally the **GTD verb** it fulfills and the plugin it belongs to. The client places actions by those fields, never by id.
+Every action (built-in, a bundled intent, an intent the profile overrides or adds) arrives from the daemon with an id, a label, a group, the surfaces it appears on, a scope (`unit`, `item`, `draft`), an input, and optionally the **verb** it fulfills and the plugin it belongs to. The client places actions by those fields, never by id.
 
 | Slot | Takes | Where |
 |---|---|---|

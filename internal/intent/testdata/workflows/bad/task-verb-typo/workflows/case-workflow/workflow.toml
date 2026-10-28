@@ -1,0 +1,7 @@
+summary = "Case"
+provider = "entry"
+when = 'task.state == "next"'
+
+[[step]]
+use = "task.verb"
+verb = "somday"

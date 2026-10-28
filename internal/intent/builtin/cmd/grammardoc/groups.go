@@ -53,7 +53,7 @@ var groups = map[builtin.Surface][]group{
 		{"Workflow draft approval", []string{"workflows.*.drafts"}},
 		{"Turns and headless calls", []string{"turns", "headless", "brief", "classify"}},
 		{"Drafts and notifications", []string{"drafts", "notifications"}},
-		{"Units and GTD", []string{"items", "gtd"}},
+		{"Units and tasks", []string{"items", "tasks"}},
 		{"Cleanup", []string{"cleanup"}},
 		{"Dossiers", []string{"dossiers"}},
 		{"Daemon", []string{"sweep", "http", "mcp", "views"}},

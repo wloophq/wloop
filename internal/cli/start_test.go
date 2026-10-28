@@ -203,7 +203,7 @@ func TestStartRunsOnlyOnATaskTheUserCaptured(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if code := te.run("start", "entry:"+string(derived.ID)); code == 0 || !strings.Contains(te.err.String(), "Start runs only on an entry you captured") {
+	if code := te.run("start", "entry:"+string(derived.ID)); code == 0 || !strings.Contains(te.err.String(), "Start runs only on a task you captured") {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	if len(m.Prompts) != 0 {
@@ -288,7 +288,7 @@ func TestAHiddenStartActionStillRefusesADerivedTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	manifest := strings.Replace(string(raw), "[action]\n", "[action]\nwhen = 'entry.captured_by_user'\n", 1)
+	manifest := strings.Replace(string(raw), "[action]\n", "[action]\nwhen = 'task.captured_by_user'\n", 1)
 	manifest = regexp.MustCompile(`(?s)\[\[action.refuse\]\].*?why  = "[^"]*"\n`).ReplaceAllString(manifest, "")
 	body, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "intents", "start", "instructions.md.tmpl"))
 	if err != nil {

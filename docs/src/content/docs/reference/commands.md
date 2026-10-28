@@ -87,7 +87,7 @@ Examples:
 {{command}} act https://acme.slack.com/archives/C0123/p1700000000000100 say we ship Friday
 ```
 
-See [Inbox, entries and work units](/concepts/gtd/).
+See [Tasks and views](/concepts/tasks/).
 
 ### address
 
@@ -166,7 +166,7 @@ Start new work from a brief.
 {{command}} start [entry:<id>] [--repo <repo>] [--manager <name>] [--parent <worktree>] [guidance...]
 ```
 
-Start new work from a brief: in a fresh worktree of a repository, or with no checkout. The target is entry:&lt;id&gt;, or none to capture the brief as a new entry; words after it are guidance for the turn.
+Start new work from a brief: in a fresh worktree of a repository, or with no checkout. The target is entry:&lt;id&gt;, or none to capture the brief as a new task; words after it are guidance for the turn.
 
 | Flag | Description |
 | --- | --- |
@@ -181,7 +181,7 @@ Examples:
 {{command}} start entry:e-3f9a2c4b5d6e7f80 --repo acme/api
 ```
 
-See [Inbox, entries and work units](/concepts/gtd/).
+See [Tasks and views](/concepts/tasks/).
 
 ### take-over
 
@@ -592,16 +592,18 @@ See [Write your review profile](/guides/review-profile/).
 The JSON Schemas of the profile files, for editors.
 
 ```sh
-{{command}} profile schema [--workflow|--actions|--gtd|--keys|--config]
+{{command}} profile schema [--workflow|--actions|--tasks|--views|--gates|--keys|--config]
 ```
 
-Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml, gtd.toml, keys.toml or config.toml, for an editor. Every schema comes from the grammar the loaders check.
+Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml, tasks.toml, views.toml, gates.toml, keys.toml or config.toml, for an editor. Every schema comes from the grammar the loaders check.
 
 | Flag | Description |
 | --- | --- |
 | `--workflow` | The schema of workflow.toml |
 | `--actions` | The schema of actions.toml |
-| `--gtd` | The schema of gtd.toml |
+| `--tasks` | The schema of tasks.toml |
+| `--views` | The schema of views.toml |
+| `--gates` | The schema of gates.toml |
 | `--keys` | The schema of keys.toml |
 | `--config` | The schema of config.toml |
 

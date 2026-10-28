@@ -1,0 +1,7 @@
+summary = "Case"
+provider = "github"
+when = 'pr.state == "OPEN"'
+
+[[step]]
+use = "task.verb"
+verb = "someday"

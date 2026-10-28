@@ -20,7 +20,7 @@ func outboxFixture() []api.Draft {
 			Label: "#ops", Title: "When does the export ship?", Link: "https://acme.slack.com/archives/C1/p1700000000000100",
 			Text: "Friday, after the freeze.\nI will post the notes here.", Origin: api.DraftOrigin{Kind: "user"}, Actions: actions,
 			CreatedAt: outboxNow.Add(-5 * time.Minute)},
-		{ID: 12, Unit: "github/acme/api#7", Kind: "nudge", Purpose: "nudge", Effects: []string{"entry.nudged"}, State: "proposed", Approval: api.DraftApproval{Mode: "wait"},
+		{ID: 12, Unit: "github/acme/api#7", Kind: "nudge", Purpose: "nudge", Effects: []string{"task.nudged"}, State: "proposed", Approval: api.DraftApproval{Mode: "wait"},
 			Label: "acme/api#7", Title: "Batch export for large accounts", Link: "https://github.com/acme/api/pull/7",
 			Text: "@{github:ana}, any news on this?\n\n- Review the schema change", Names: map[string]string{"github:ana": "ana"},
 			Items:       []string{"i1"},

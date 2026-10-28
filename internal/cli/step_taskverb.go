@@ -13,12 +13,12 @@ import (
 
 func (s *stepSet) tasks() (*coretasks.Service, error) {
 	if s.e.tasks == nil {
-		return nil, errors.New("no entries service: the daemon runs the steps")
+		return nil, errors.New("no tasks service: the daemon runs the steps")
 	}
 	return s.e.tasks, nil
 }
 
-// taskRefusal is err as the reason an entry refuses a verb, "" when err
+// taskRefusal is err as the reason a task refuses a verb, "" when err
 // is not one.
 func taskRefusal(err error) string {
 	if errors.Is(err, coretasks.ErrVerb) || errors.Is(err, coretasks.ErrNoTask) || errors.Is(err, coretasks.ErrPluginDisabled) {
@@ -34,7 +34,7 @@ func (s *stepSet) taskVerbCheck(ctx context.Context, c stepCall, _ automation.Ch
 	}
 	id, ok := task.IDOf(c.u)
 	if !ok {
-		return "", fmt.Errorf("%s: %s is not an entry", c.st.Use, c.u)
+		return "", fmt.Errorf("%s: %s is not a task", c.st.Use, c.u)
 	}
 	e, err := g.Task(ctx, id)
 	if err != nil {
@@ -45,7 +45,7 @@ func (s *stepSet) taskVerbCheck(ctx context.Context, c stepCall, _ automation.Ch
 	}
 	v := task.Verb(c.arg("verb"))
 	if e.Origin == task.OriginDerived && (v == task.VerbDone || v == task.VerbDismiss) {
-		return "a derived entry closes when its items resolve", nil
+		return "a derived task closes when its items resolve", nil
 	}
 	if g.Handles(e.Kind, v) {
 		return "", nil
@@ -66,7 +66,7 @@ func (s *stepSet) taskVerbRun(ctx context.Context, c stepCall, _ automation.RunO
 	}
 	id, ok := task.IDOf(c.u)
 	if !ok {
-		return "", fmt.Errorf("%s: %s is not an entry", c.st.Use, c.u)
+		return "", fmt.Errorf("%s: %s is not a task", c.st.Use, c.u)
 	}
 	v := task.Verb(c.arg("verb"))
 	args := map[string]string{}

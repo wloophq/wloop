@@ -32,22 +32,22 @@ var subjectThread = dslack.ThreadUnit("T0001", "C0001", "1700000000.000100")
 const (
 	waitingWorkflow = `summary = "Watch waiting entries"
 provider = "entry"
-when = 'entry.state == "waiting" && entry.items_owed > 0 && entry.settled_at < now'
-key = ["entry.settled_at", "entry.waiting_on"]
+when = 'task.state == "waiting" && task.items_owed > 0 && task.settled_at < now'
+key = ["task.settled_at", "task.waiting_on"]
 
 [[step]]
 use = "notify.self"
 `
 	closeWorkflow = `summary = "Watch close entries with a resolved item"
 provider = "entry"
-when = 'entry.kind == "close" && entry.items_resolved > 0'
+when = 'task.kind == "close" && task.items_resolved > 0'
 
 [[step]]
 use = "notify.self"
 `
 	slackWorkflow = `summary = "Watch Slack units with unowned items"
 provider = "slack"
-when = 'slack.live_entry && slack.items_unowned > 0'
+when = 'slack.live_task && slack.items_unowned > 0'
 
 [[step]]
 use = "notify.self"
@@ -235,7 +235,7 @@ func TestACapturedTaskWhoseUnitsEndedPlansItsClose(t *testing.T) {
 		}
 		var out []string
 		for _, it := range p.Items {
-			if it.Workflow == "entry-results-ended" {
+			if it.Workflow == "task-results-ended" {
 				out = append(out, it.Unit.String())
 			}
 		}

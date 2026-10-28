@@ -12,7 +12,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `label` (string): The name people read. Required.
 - `summary` (string): One line on what it does: its action's tooltip, its help line, its profile listing. Required.
 - `shortcut` (string): One uppercase letter for its action, not a built-in action's.
-- `verb` (one of `approve`, `delegate`, `dismiss`): The GTD verb its action fulfils.
+- `verb` (one of `approve`, `delegate`, `dismiss`): The verb its action fulfils.
 - `user_facing` (bool, default `true`): Offered as a command, a skill and an action.
 - `skill` (bool, default `false`): Install writes it a turn skill; needs help.target.
 - `help` (table): How its command presents it.
@@ -31,7 +31,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `probe`: The probe of an agent home: a synthetic pull request in the workspace the request names, under the probe's policy.
   - `headless`: The intent a headless turn on a unit runs when its request names none.
 - `provider` (one of `entry`, `github`, `session`, `slack`, `workspace`, `any`, or a list of them): The units its turns serve: a provider id, a list of them, or any; defaults.toml provider when absent.
-  - `entry`: Facts under entry.*.
+  - `entry`: Facts under task.*.
   - `github`: Facts under pr.*.
   - `session`: Facts under session.*.
   - `slack`: Facts under slack.*.
@@ -59,8 +59,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `session.name` (template): What the workspace manager and the agent show the session as, over the name facts; defaults.toml session_name when absent, else the title. A name that session.title leads and the start time ends, as dd/mm hh:mm, lets the loop recognize its session when it lost track of it.
 - `session.close_when_done` (bool, default `false`): The session closes when its turn is done.
 - `target` (table): What a run with no unit does.
-- `target.missing` (one of `capture`): capture: a run with no unit captures its guidance as a new entry, the turn's unit; refused when absent.
-- `target.title` (template): The captured entry's title, over .guidance, with firstLine.
+- `target.missing` (one of `capture`): capture: a run with no unit captures its guidance as a new task, the turn's unit; refused when absent.
+- `target.title` (template): The captured task's title, over .guidance, with firstLine.
 
 ### How a turn runs
 
@@ -151,7 +151,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `record.states` (list of `done`, `settled`, `asked`, `failed`): The states a record may take. Required.
 - `record.artifacts` (list of `review-draft`, `triage`): The artifacts a record may carry.
 - `record.outcome` (list of `verdict`, `url`): The outcome fields a record may carry.
-- `record.attach_url` (bool, default `false`): On a turn whose unit is an entry, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the entry; needs url in record.outcome.
+- `record.attach_url` (bool, default `false`): On a turn whose unit is a task, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the task; needs url in record.outcome.
 - `record.outcome_doc` (string): What the outcome holds, for the instructions.
 - `record.history_artifact` (string): The artifact the unit's history shows.
 - `record.require[]` (table): What a record in a state must carry.
@@ -169,11 +169,11 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `pr.addressed`: Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
 - `drafts` (table): The drafts its turns' agents propose.
-- `drafts.allowed_effects` (list of `entry.nudged`, `unit.closed`, `pr.nudged`): The effects its agents may declare on their drafts.
-  - `entry.nudged`: Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none.
-  - `unit.closed`: Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin.
+- `drafts.allowed_effects` (list of `task.nudged`, `unit.closed`, `pr.nudged`): The effects its agents may declare on their drafts.
+  - `task.nudged`: Stamps the last nudge of the draft's task, or of every live waiting task of its unit when it names none.
+  - `unit.closed`: Records the closure of the draft's unit, which ends its close task and unwatches it after its warm period; through the unit's plugin.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
-- `drafts.attach_posts` (bool, default `false`): On a turn whose unit is an entry, the unit of each post its agent makes, sent at once or once approved, is attached to the entry; reactions and edits are not posts.
+- `drafts.attach_posts` (bool, default `false`): On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts.
 - `drafts.approval` (an [approval table](#approval-tables) of draft modes): The approval of its drafts; wait when absent.
 
 ## Built-in actions (`actions.toml`)
@@ -189,20 +189,26 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `<name>.input.label` (string): The input's name.
 - `<name>.input.help` (string): What to write, shown in the empty input.
 
-## GTD verbs and views (`gtd.toml`)
+## Task verbs (`tasks.toml`)
 
-- `verbs` (table): The verbs an entry offers, by verb.
+- `verbs` (table): The verbs a task offers, by verb.
 - `verbs.<name>` (table): A verb, by its name.
 - `verbs.<name>.label` (string): The name people read on its button. Required.
 - `verbs.<name>.summary` (string): One line, what pressing it does: its tooltip. Required.
-- `verbs.<name>.offer` (predicate, default `true`): When an entry offers the verb, over the entry's own facts (entry.id, entry.kind, entry.state, entry.muted, entry.unit, entry.unit_provider); where it holds not, the verb is neither listed nor run.
+- `verbs.<name>.offer` (predicate, default `true`): When a task offers the verb, over the task's own facts (task.id, task.kind, task.state, task.muted, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run.
 - `verbs.<name>.input` (string): The question a verb that asks for a value puts first (waiting, schedule, project, context, area, delegate, reply); required for those.
-- `views` (table): The lists of entries, by view.
+
+## Views and the review (`views.toml`)
+
+- `views` (table): The lists of tasks, by view.
 - `views.<name>` (table): A view, by its name.
 - `views.<name>.label` (string): The name people read in the list of views. Required.
-- `review` (table): The weekly Review's steps, by step.
-- `review.<name>` (table): A step of the Review: inbox, outbox, waiting, projects, someday or focus.
-- `review.<name>.label` (string): What the step asks of you, as the Review lists it. Required.
+- `review` (table): The review's steps, by step.
+- `review.<name>` (table): A step of the review: inbox, outbox, waiting, projects, someday or focus.
+- `review.<name>.label` (string): What the step asks of you, as the review lists it. Required.
+
+## Gates (`gates.toml`)
+
 
 ## Key help (`keys.toml`)
 
@@ -216,7 +222,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 - `summary` (string): One line, what the workflow does; its plan items' description. Required.
 - `provider` (one of `entry`, `github`, `session`, `slack`, `workspace`): The provider of the units it matches. Required.
-  - `entry`: Facts under entry.*.
+  - `entry`: Facts under task.*.
   - `github`: Facts under pr.*.
   - `session`: Facts under session.*.
   - `slack`: Facts under slack.*.
@@ -230,7 +236,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ### When it is planned
 
 - `trigger` (table): What plans the workflow: on or schedule; absent, every sweep.
-- `trigger.on` (list of `opened`, `push`, `review_requested`, `review_request_removed`, `review`, `comment`, `check`, `ready`, `draft`, `merged`, `closed`, `round_sent`, `round_held`, `round_pending`, `round_skipped`, `guidance`, `round_blocked`, `round_unblocked`, `muted`, `unmuted`, `held`, `released`, `adopted`, `tracked`, `untracked`, `nudged`, `removed`, `status`, `would_review`, `would_address`, `review_ended`, `verb_next`, `verb_waiting`, `verb_schedule`, `verb_someday`, `verb_reference`, `verb_focus`, `verb_project`, `verb_approve`, `verb_delegate`, `verb_done`, `verb_dismiss`, `verb_context`, `verb_area`, `verb_answer`, `verb_reviewed`, `verb_sequential`, `verb_reply`): The source event kinds the workflow reacts to; verb_&lt;verb&gt;, a verb a person ran on an entry, with provider entry.
+- `trigger.on` (list of `opened`, `push`, `review_requested`, `review_request_removed`, `review`, `comment`, `check`, `ready`, `draft`, `merged`, `closed`, `round_sent`, `round_held`, `round_pending`, `round_skipped`, `guidance`, `round_blocked`, `round_unblocked`, `muted`, `unmuted`, `held`, `released`, `adopted`, `tracked`, `untracked`, `nudged`, `removed`, `status`, `would_review`, `would_address`, `review_ended`, `verb_next`, `verb_waiting`, `verb_schedule`, `verb_someday`, `verb_reference`, `verb_focus`, `verb_project`, `verb_approve`, `verb_delegate`, `verb_done`, `verb_dismiss`, `verb_context`, `verb_area`, `verb_answer`, `verb_reviewed`, `verb_sequential`, `verb_reply`): The source event kinds the workflow reacts to; verb_&lt;verb&gt;, a verb a person ran on a task, with provider task.
 - `trigger.schedule` (string): A cron schedule, in local time.
 - `observe` (bool, default `false`): Plans items pending and never runs them by itself; a person applies an item by hand.
 - `limits` (table): How many runs the workflow may take.
@@ -242,7 +248,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ### Steps
 
 - `step[]` (table): A step the run takes, in order. Required: at least one.
-- `step[].use` (one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `entry.verb`): The step.
+- `step[].use` (one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`): The step.
   - `session.close`: Closes the agent session.
   - `workspace.remove`: Removes the workspace, after its guards. Never with `force`: a manifest that sets it fails to load.
   - `workspace.unregister`: Unregisters a workspace whose path is gone.
@@ -253,7 +259,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `draft.propose`: Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`unit` or `person`), `target` (`unit` or `item`), `effects` (the effects sending it applies), `repeat_after` (the least time after a settled draft of the same person, a duration or a duration of the config such as `config.drafts.repeat_after`) and `repeat_after_sent` (the same after a sent one, or `forever`). Holds while a draft of the workflow, unit and person is open or failed; a run that leaves a person under a delay that ends with time stays pending until it ends.
   - `classify`: A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). Event triggers only, cached by fingerprint, under `classify.per_day`.
   - `notify.self`: A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts "pr.slug"}}`, none once the unit is gone).
-  - `entry.verb`: Runs a GTD verb on the entry: `verb` (`next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done` or `dismiss`), with `until` and `on_activity` for schedule, `on` and `resurface` for waiting, and `set` for context and area. The plan blocks it while the entry's state refuses the verb, and `done` and `dismiss` on an entry derived from a unit's items, which closes when they resolve. It records no `verb_&lt;verb&gt;` event, which only a person's verb records, so a workflow never triggers another through it.
+  - `task.verb`: Runs a verb on the task: `verb` (`next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done` or `dismiss`), with `until` and `on_activity` for schedule, `on` and `resurface` for waiting, and `set` for context and area. The plan blocks it while the task's state refuses the verb, and `done` and `dismiss` on a task derived from a unit's items, which closes when they resolve. It records no `verb_&lt;verb&gt;` event, which only a person's verb records, so a workflow never triggers another through it.
 - `step[].<name>` (string or list): The step's arguments.
 
 ### Run approval
@@ -292,9 +298,9 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `items` (one of `owed`, `resolved`, `unowned`, `unowned_aged`, `all`, default `all`): Which of the unit's items the draft lists.
   - `per` (one of `unit`, `person`, default `unit`): One draft per unit, or one per person it waits on.
   - `target` (one of `unit`, `item`, default `unit`): Where the draft posts: on the unit, or on each item; an intent's help.target is free text.
-  - `effects` (list of `entry.nudged`, `unit.closed`, `pr.nudged`): What sending the draft applies.
-  - `entry.nudged`: Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none.
-  - `unit.closed`: Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin.
+  - `effects` (list of `task.nudged`, `unit.closed`, `pr.nudged`): What sending the draft applies.
+  - `task.nudged`: Stamps the last nudge of the draft's task, or of every live waiting task of its unit when it names none.
+  - `unit.closed`: Records the closure of the draft's unit, which ends its close task and unwatches it after its warm period; through the unit's plugin.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
   - `repeat_after` (string): The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after.
   - `repeat_after_sent` (string): The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever.
@@ -303,18 +309,18 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `schema` (file, default `schema.json`): The JSON schema of its answer, beside the manifest.
 - `notify.self`:
   - `text` (file, default `text.md.tmpl`): The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`.
-- `entry.verb`:
-  - `verb` (one of `next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done`, `dismiss`): The verb run on the entry. Required.
-  - `until` (string): With schedule, the date the entry returns: RFC 3339 or YYYY-MM-DD.
-  - `on_activity` (string): With schedule, `true` returns the entry on new activity on its unit.
-  - `on` (string): With waiting, the people the entry waits on, comma-separated.
-  - `resurface` (string): With waiting, the date the entry resurfaces: RFC 3339 or YYYY-MM-DD.
+- `task.verb`:
+  - `verb` (one of `next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done`, `dismiss`): The verb run on the task. Required.
+  - `until` (string): With schedule, the date the task returns: RFC 3339 or YYYY-MM-DD.
+  - `on_activity` (string): With schedule, `true` returns the task on new activity on its unit.
+  - `on` (string): With waiting, the people the task waits on, comma-separated.
+  - `resurface` (string): With waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD.
   - `set` (string): With context, the contexts, comma-separated; with area, the area.
 
 ## Defaults (`defaults.toml`)
 
 - `provider` (one of `entry`, `github`, `session`, `slack`, `workspace`, `any`): The provider of an intent whose manifest names none.
-  - `entry`: Facts under entry.*.
+  - `entry`: Facts under task.*.
   - `github`: Facts under pr.*.
   - `session`: Facts under session.*.
   - `slack`: Facts under slack.*.
@@ -641,15 +647,15 @@ The fields each notice reads besides `Name` and `Command`:
 - `notifications` (table): The notifications.
 - `notifications.digest_at` (string, default `09:00`): The local HH:MM of the daily digest; empty for none.
 
-### Units and GTD
+### Units and tasks
 
 - `items` (table): The items.
 - `items.heat` (table): How long a unit stays warm.
 - `items.heat.warm_for` (duration): How long a unit stays warm after its last item resolved; left out, the heat reader's default.
-- `gtd` (table): The GTD entries' settings.
-- `gtd.stale_waiting_days` (integer, default `2`): Working days after which a waiting entry goes stale.
-- `gtd.areas` (list of strings): The areas an entry is offered.
-- `gtd.contexts` (list of strings): The contexts an entry is offered.
+- `tasks` (table): The tasks' settings.
+- `tasks.stale_waiting_days` (integer, default `2`): Working days after which a waiting task goes stale.
+- `tasks.areas` (list of strings): The areas a task is offered.
+- `tasks.contexts` (list of strings): The contexts a task is offered.
 
 ### Cleanup
 

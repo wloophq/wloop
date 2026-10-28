@@ -45,7 +45,7 @@ export default defineConfig({
             'concepts/security',
             'concepts/brief',
             'concepts/profiles',
-            'concepts/gtd',
+            'concepts/tasks',
             'concepts/slack',
             'concepts/board',
           ],

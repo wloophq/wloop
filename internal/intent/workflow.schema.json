@@ -407,7 +407,7 @@
                   "description": "What sending the draft applies.",
                   "items": {
                     "enum": [
-                      "entry.nudged",
+                      "task.nudged",
                       "unit.closed",
                       "pr.nudged"
                     ],
@@ -534,7 +534,7 @@
             "if": {
               "properties": {
                 "use": {
-                  "const": "entry.verb"
+                  "const": "task.verb"
                 }
               },
               "required": [
@@ -545,15 +545,15 @@
               "additionalProperties": false,
               "properties": {
                 "on": {
-                  "description": "With waiting, the people the entry waits on, comma-separated.",
+                  "description": "With waiting, the people the task waits on, comma-separated.",
                   "type": "string"
                 },
                 "on_activity": {
-                  "description": "With schedule, `true` returns the entry on new activity on its unit.",
+                  "description": "With schedule, `true` returns the task on new activity on its unit.",
                   "type": "string"
                 },
                 "resurface": {
-                  "description": "With waiting, the date the entry resurfaces: RFC 3339 or YYYY-MM-DD.",
+                  "description": "With waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD.",
                   "type": "string"
                 },
                 "set": {
@@ -561,14 +561,14 @@
                   "type": "string"
                 },
                 "until": {
-                  "description": "With schedule, the date the entry returns: RFC 3339 or YYYY-MM-DD.",
+                  "description": "With schedule, the date the task returns: RFC 3339 or YYYY-MM-DD.",
                   "type": "string"
                 },
                 "use": {
-                  "const": "entry.verb"
+                  "const": "task.verb"
                 },
                 "verb": {
-                  "description": "The verb run on the entry. Required.",
+                  "description": "The verb run on the task. Required.",
                   "enum": [
                     "next",
                     "waiting",
@@ -604,7 +604,7 @@
               "draft.propose",
               "classify",
               "notify.self",
-              "entry.verb"
+              "task.verb"
             ],
             "type": "string"
           }
@@ -625,7 +625,7 @@
       "description": "What plans the workflow: on or schedule; absent, every sweep.",
       "properties": {
         "on": {
-          "description": "The source event kinds the workflow reacts to; verb_<verb>, a verb a person ran on an entry, with provider entry.",
+          "description": "The source event kinds the workflow reacts to; verb_<verb>, a verb a person ran on a task, with provider task.",
           "items": {
             "enum": [
               "opened",

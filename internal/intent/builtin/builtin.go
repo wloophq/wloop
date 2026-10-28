@@ -104,7 +104,7 @@ var ActionKeys = map[string]string{
 	"unblock":   "D",
 }
 
-// IntentVerbs are the gtd verbs a manifest's verb may name: those an entry
+// IntentVerbs are the verbs a manifest's verb may name: those a task
 // bridges to its unit's served action.
 var IntentVerbs = []string{string(task.VerbApprove), string(task.VerbDelegate), string(task.VerbDismiss)}
 
@@ -202,7 +202,7 @@ var EventProviders = func() map[string]unit.ProviderID {
 
 // Slots name each provider's fact slot.
 var Slots = map[unit.ProviderID]string{unit.GitHub: "pr", unit.Session: "session", unit.Workspace: "workspace",
-	unit.Task: "entry", dslack.Provider: "slack"}
+	unit.Task: "task", dslack.Provider: "slack"}
 
 // Providers are the providers an intent may serve: those of Slots, and a
 // plugin whose units have no workflow facts adds its own.

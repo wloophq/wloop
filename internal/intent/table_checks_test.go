@@ -123,9 +123,9 @@ when = 'pr.repo == "acme/api" && pr.repo_name == "api" && pr.state == "OPEN"'
 
 func TestAWorkflowNamesOnlyItsProvidersEffects(t *testing.T) {
 	t.Parallel()
-	task := `summary = "Nudge a waiting entry"
+	task := `summary = "Nudge a waiting task"
 provider = "entry"
-when = 'entry.waiting_days > 2'
+when = 'task.waiting_days > 2'
 
 [[step]]
 use = "draft.propose"
