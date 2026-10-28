@@ -164,6 +164,11 @@ func TestIsolatedConfigDisablesAutomation(t *testing.T) {
 	if err != nil || len(manifests) == 0 {
 		t.Fatalf("no workflow manifests: %v", err)
 	}
+	plugins, err := filepath.Glob(filepath.Join("..", "..", "plugins", "*", "profile", "workflows", "*", "workflow.toml"))
+	if err != nil || len(plugins) == 0 {
+		t.Fatalf("no plugin workflow manifests: %v", err)
+	}
+	manifests = append(manifests, plugins...)
 	for _, m := range manifests {
 		name := filepath.Base(filepath.Dir(m))
 		w, ok := c.Workflows[name]

@@ -17,7 +17,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
-	"github.com/wloophq/wloop/internal/slack/send"
 )
 
 // The input surfaces of the command line: an intent's own command and a
@@ -60,7 +59,7 @@ func runIntent(ctx context.Context, e *Env, d dintent.Def, args []string) error 
 	if err != nil {
 		u, uerr := e.unitTarget(ctx, args[0])
 		switch {
-		case uerr != nil && strings.Contains(args[0], "://") && !send.IsPermalink(args[0]):
+		case uerr != nil && strings.Contains(args[0], "://") && !e.pluginTakes(args[0]):
 			return err
 		case uerr != nil:
 			return uerr

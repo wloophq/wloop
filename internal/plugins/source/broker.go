@@ -53,6 +53,10 @@ type Broker struct {
 	// Rounds is a unit's round bookkeeping: its marks, sends, counts and
 	// start block; nil serves a RoundState of overrides alone.
 	Rounds func(ctx context.Context, u unit.Unit) (src.RoundState, error)
+	// Links keep the links the plugin's snapshots report; nil keeps none.
+	Links port.LinkStore
+	// Hosted are the host's services the plugin spends; nil serves none.
+	Hosted *Hosted
 }
 
 // BriefStore keeps body, the brief JSON a plugin wrote of u at version, as

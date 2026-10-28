@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
 	"net/url"
 	"slices"
 	"strconv"
@@ -14,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	slacksource "github.com/wloophq/wloop/internal/adapter/source/slack"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/lock"
@@ -24,12 +24,13 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/transport/mcp"
 	"github.com/wloophq/wloop/internal/workspace/fake"
+	"github.com/wloophq/wloop/plugins/slack"
+	dslack "github.com/wloophq/wloop/plugins/slack/domain"
 )
 
 const (
@@ -90,6 +91,9 @@ func (w *sessionWiring) logf(format string, args ...any) {
 	w.mu.Unlock()
 }
 
+// newSessionWiring serves the daemon's MCP tools as serve wires them, with
+// the real Slack plugin running over a fake Keychain and fake Slack, whose
+// calls it records.
 func newSessionWiring(t *testing.T) *sessionWiring {
 	t.Helper()
 	te := newTestEnv(t, &fake.Manager{})
@@ -100,34 +104,93 @@ func newSessionWiring(t *testing.T) *sessionWiring {
 	sessionSlack(st)
 	st.saveToken(t, fakeToken())
 	w := &sessionWiring{te: te, st: st, db: db}
+	target, err := url.Parse(st.srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target.Path = ""
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	rec := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		w.mu.Lock()
+		w.methods = append(w.methods, strings.TrimPrefix(r.URL.Path, "/api/"))
+		w.mu.Unlock()
+		proxy.ServeHTTP(rw, r)
+	}))
+	t.Cleanup(rec.Close)
+	withSlackPlugin(t, te.Env, st.pluginEnv(t, rec.URL+"/api/"))
 	for _, id := range []string{draftHandle, "term_other1"} {
 		te.registerSession(t, dturn.Session{ID: id, WorkspaceID: "ws-1"})
 	}
-	w.deps = (mcpEndpoint{slack: te.Env.slack, intents: func() *dintent.Registry { return te.loadedIntents().Registry }, texts: te.Env.toolTexts, log: w.logf}).wire(te.serveDeps(context.Background(), db, te.cfg, t.Logf, &lock.Mutex{}, nil), te.cfg)
+	ctx, cancel := context.WithCancel(context.Background())
+	stop := te.servePlugins(ctx, db, te.cfg, w.logf)
+	t.Cleanup(func() {
+		cancel()
+		stop()
+	})
+	eventually(t, "the slack plugin running", func() bool {
+		_, err := te.pluginKind.Client(string(slackPlugin))
+		return err == nil
+	})
+	w.deps = (mcpEndpoint{tools: te.pluginTools, intents: func() *dintent.Registry { return te.loadedIntents().Registry }, texts: te.Env.toolTexts, log: w.logf}).wire(te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, nil), te.cfg)
 	w.srv = w.deps.MCP.(*mcp.Server)
-	sender, ok := w.srv.Slack.(*slackSender)
-	if !ok {
-		t.Fatalf("Slack = %T", w.srv.Slack)
-	}
-	sender.kit.Client.RequestLog = func(method string, _ int) {
-		w.mu.Lock()
-		w.methods = append(w.methods, method)
-		w.mu.Unlock()
-	}
 	return w
 }
 
+// send calls slack_send_message to target as the draft session and returns
+// the Slack methods it called.
 func (w *sessionWiring) send(t *testing.T, target string) string {
 	t.Helper()
 	w.mu.Lock()
 	w.methods = nil
 	w.mu.Unlock()
-	if _, err := w.srv.Slack.Send(context.Background(), draftHandle, sendRequest(target, "a session message")); err != nil {
-		t.Fatalf("send to %s: %v", target, err)
+	if got, isErr := w.callTool(t, "", draftHandle, "slack_send_message", `{"target":"`+target+`","text":"a session message"}`); isErr {
+		t.Fatalf("send to %s: %s", target, got)
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return strings.Join(w.methods, " ")
+}
+
+// seedSlack saves facts in the running plugin's store, as its ingestion
+// would.
+func (w *sessionWiring) seedSlack(t *testing.T, facts dslack.Facts) {
+	t.Helper()
+	pdb := pluginStore(t, w.te.StateDir)
+	if err := (&slack.Store{DB: pdb.Slack()}).Save(context.Background(), nil, facts, "", testNow); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// reported has the running plugin report every unit, and waits for us.
+func (w *sessionWiring) reported(t *testing.T, us ...unit.Unit) {
+	t.Helper()
+	c, err := w.te.pluginKind.Client(string(slackPlugin))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Notify(context.Background(), nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the slack plugin's report", func() bool {
+		got, err := w.te.pluginKind.Snapshots.Reported(context.Background(), us)
+		return err == nil && len(got) == len(us)
+	})
+}
+
+// segments applies spans to conversation's segment map in the running
+// plugin's store and returns their units.
+func (w *sessionWiring) segments(t *testing.T, team, conversation string, spans []dslack.Span) []unit.Unit {
+	t.Helper()
+	pdb := pluginStore(t, w.te.StateDir)
+	us, err := (slack.Segments{Store: pdb.Segments(), Clock: clockFunc(func() time.Time { return testNow })}).Apply(context.Background(), team, conversation, spans)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []unit.Unit
+	for _, u := range us {
+		out = append(out, unit.Unit{Provider: unit.ProviderID(u.Provider), Key: u.Key})
+	}
+	return out
 }
 
 func TestSessionSendsToUntrackedPlacesAreRecorded(t *testing.T) {
@@ -144,13 +207,13 @@ func TestSessionSendsToUntrackedPlacesAreRecorded(t *testing.T) {
 	golden(t, "session_send_calls.golden", b.String())
 	var units []unit.Unit
 	for _, d := range w.drafts(t) {
-		k, err := dslack.ParseUnit(d.Unit)
-		if err != nil || d.State != draft.Sent || d.Origin != (draft.Origin{Kind: draft.OriginSession}) || d.Evidence.Ref != k.Conversation+"/"+sessPosted {
+		parts := strings.Split(d.Unit.Key, "/")
+		if len(parts) < 2 || d.State != draft.Sent || d.Origin != (draft.Origin{Kind: draft.OriginSession}) || d.Evidence.Ref != parts[1]+"/"+sessPosted {
 			t.Fatalf("draft %+v", d)
 		}
 		units = append(units, d.Unit)
 	}
-	want := []unit.Unit{dslack.ThreadUnit("T000", sessDM, sessPosted), dslack.ThreadUnit("T000", sessThreaded, sessParent), dslack.ThreadUnit("T000", sessChannel, sessPosted)}
+	want := []unit.Unit{slackThreadUnit("T000", sessDM, sessPosted), slackThreadUnit("T000", sessThreaded, sessParent), slackThreadUnit("T000", sessChannel, sessPosted)}
 	if !slices.Equal(units, want) {
 		t.Fatalf("recorded on %v, want %v", units, want)
 	}
@@ -217,7 +280,7 @@ func TestSlackDraftProposes(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
 	ctx := context.Background()
-	u := dslack.ThreadUnit("T000", sessChannel, sessParent)
+	u := slackThreadUnit("T000", sessChannel, sessParent)
 	_, err := w.te.repo.Save(ctx, dturn.Book{Unit: u, Turns: []dturn.Turn{
 		{Intent: "triage", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Done, SentAt: testNow, Workflow: "old"},
 		{Intent: "reply", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow, Workflow: "slack-replies"},
@@ -262,12 +325,8 @@ func TestSlackDraftProposes(t *testing.T) {
 func TestSessionSendToATrackedThreadIsRecorded(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
-	ctx := context.Background()
-	facts := dslack.Facts{Team: "T000", Conversations: []dslack.Conversation{{ID: sessThreaded, Name: "random", Kind: dslack.KindChannel, IsMember: true}},
-		Threads: []dslack.Thread{{Conversation: sessThreaded, TS: sessParent, Messages: []dslack.Message{{TS: sessParent, ThreadTS: sessParent, User: "U000", Text: "parent"}}}}}
-	if err := (&slacksource.Store{DB: w.db.Slack()}).Save(ctx, nil, facts, "", testNow); err != nil {
-		t.Fatal(err)
-	}
+	w.seedSlack(t, dslack.Facts{Team: "T000", Conversations: []dslack.Conversation{{ID: sessThreaded, Name: "random", Kind: dslack.KindChannel, IsMember: true}},
+		Threads: []dslack.Thread{{Conversation: sessThreaded, TS: sessParent, Messages: []dslack.Message{{TS: sessParent, ThreadTS: sessParent, User: "U000", Text: "parent"}}}}})
 	reply := "https://acme.slack.com/archives/" + sessThreaded + "/p" + strings.ReplaceAll(sessReply, ".", "")
 	calls := w.send(t, reply)
 	if want := "conversations.info conversations.replies conversations.replies chat.postMessage chat.getPermalink"; calls != want {
@@ -278,7 +337,7 @@ func TestSessionSendToATrackedThreadIsRecorded(t *testing.T) {
 		t.Fatalf("drafts %d", len(ds))
 	}
 	d := ds[0]
-	if d.Unit != dslack.ThreadUnit("T000", sessThreaded, sessParent) || d.State != draft.Sent || d.Origin.Kind != draft.OriginSession ||
+	if d.Unit != slackThreadUnit("T000", sessThreaded, sessParent) || d.State != draft.Sent || d.Origin.Kind != draft.OriginSession ||
 		d.Evidence.Ref != sessThreaded+"/"+sessPosted || !strings.Contains(d.Evidence.Permalink, "thread_ts="+sessParent) || d.Text != "a session message" {
 		t.Fatalf("draft %+v", d)
 	}
@@ -290,15 +349,10 @@ func TestSessionSendToATrackedThreadIsRecorded(t *testing.T) {
 func TestSessionSendToASegmentIsRecorded(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
-	ctx := context.Background()
-	facts := dslack.Facts{Team: "T000", Conversations: []dslack.Conversation{{ID: sessDM, Kind: dslack.KindIM, DMUser: sessUser}}}
-	if err := (&slacksource.Store{DB: w.db.Slack()}).Save(ctx, nil, facts, "", testNow); err != nil {
-		t.Fatal(err)
-	}
-	units, err := (slacksource.Segments{Store: w.db.Segments(), Clock: clockFunc(func() time.Time { return testNow })}).Apply(ctx, "T000", sessDM,
-		[]dslack.Span{{FromTS: "1700000000.000000"}})
-	if err != nil || len(units) != 1 {
-		t.Fatalf("segments %v %v", units, err)
+	w.seedSlack(t, dslack.Facts{Team: "T000", Conversations: []dslack.Conversation{{ID: sessDM, Kind: dslack.KindIM, DMUser: sessUser}}})
+	units := w.segments(t, "T000", sessDM, []dslack.Span{{FromTS: "1700000000.000000"}})
+	if len(units) != 1 {
+		t.Fatalf("segments %v", units)
 	}
 	w.send(t, sessUser)
 	ds := w.drafts(t)
@@ -311,7 +365,7 @@ func TestApprovedSlackDraftPublishesThroughTheDaemonOutbox(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
 	ctx := context.Background()
-	u := dslack.ThreadUnit("T000", sessChannel, sessParent)
+	u := slackThreadUnit("T000", sessChannel, sessParent)
 	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: u, Turns: []dturn.Turn{
 		{Intent: "reply", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
 	}}); err != nil {
@@ -340,7 +394,7 @@ func TestSlackDraftIsTiedToTheTaskTheTurnWasAskedFrom(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
 	ctx := context.Background()
-	u := dslack.ThreadUnit("T000", sessChannel, sessParent)
+	u := slackThreadUnit("T000", sessChannel, sessParent)
 	_, err := w.te.repo.Save(ctx, dturn.Book{Unit: u, Turns: []dturn.Turn{
 		{Intent: "act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow, Inputs: map[string]any{"task": "e42"}},
 	}})
@@ -370,7 +424,7 @@ func TestSlackSendToAThreadGoesThroughTheOutbox(t *testing.T) {
 		t.Fatalf("exit %d: %s %s", code, w.te.out, w.te.err)
 	}
 	ds := w.drafts(t)
-	if len(ds) != 1 || ds[0].Unit != dslack.ThreadUnit("T000", sessChannel, sessParent) || ds[0].Origin.Kind != draft.OriginUser || ds[0].State != draft.Approved {
+	if len(ds) != 1 || ds[0].Unit != slackThreadUnit("T000", sessChannel, sessParent) || ds[0].Origin.Kind != draft.OriginUser || ds[0].State != draft.Approved {
 		t.Fatalf("drafts %+v", ds)
 	}
 	if sent, _, err := w.deps.Outbox.Send(ctx); sent != 1 || err != nil {
@@ -384,7 +438,7 @@ func TestSlackSendToAThreadGoesThroughTheOutbox(t *testing.T) {
 	if code := w.te.run("slack", "send", sessChannel+"/"+sessReply, "by ref", "--yes"); code != 0 || !strings.Contains(w.te.out.String(), "draft 2 approved") {
 		t.Fatalf("a ref: exit %d: %s %s", code, w.te.out, w.te.err)
 	}
-	if ds := w.drafts(t); len(ds) != 2 || ds[1].Unit != dslack.ThreadUnit("T000", sessChannel, sessParent) {
+	if ds := w.drafts(t); len(ds) != 2 || ds[1].Unit != slackThreadUnit("T000", sessChannel, sessParent) {
 		t.Fatalf("a ref's drafts %+v", ds)
 	}
 	if code := w.te.run("slack", "send", sessChannel, "top level", "--yes"); code != 0 || len(w.drafts(t)) != 2 {
@@ -407,14 +461,10 @@ func TestSlackSendAndOutboxNewToADirectMessageRefReplyInItsSegment(t *testing.T)
 	wait := postWait
 	postWait = 10 * time.Millisecond
 	t.Cleanup(func() { postWait = wait })
-	facts := dslack.Facts{Team: "T000", Conversations: []dslack.Conversation{{ID: sessDM, Kind: dslack.KindIM, DMUser: sessUser}}}
-	if err := (&slacksource.Store{DB: w.db.Slack()}).Save(ctx, nil, facts, "", testNow); err != nil {
-		t.Fatal(err)
-	}
-	segs, err := (slacksource.Segments{Store: w.db.Segments(), Clock: clockFunc(func() time.Time { return testNow })}).Apply(ctx, "T000", sessDM,
-		[]dslack.Span{{FromTS: "1700000000.000000"}})
-	if err != nil || len(segs) != 1 {
-		t.Fatalf("segments %v %v", segs, err)
+	w.seedSlack(t, dslack.Facts{Team: "T000", Conversations: []dslack.Conversation{{ID: sessDM, Kind: dslack.KindIM, DMUser: sessUser}}})
+	segs := w.segments(t, "T000", sessDM, []dslack.Span{{FromTS: "1700000000.000000"}})
+	if len(segs) != 1 {
+		t.Fatalf("segments %v", segs)
 	}
 	ref := sessDM + "/" + sessReply
 	if code := w.te.run("slack", "send", ref, "on it", "--yes"); code != 0 || !strings.Contains(w.te.out.String(), "draft 1 approved") {
@@ -440,7 +490,7 @@ func TestSlackDraftRefusesAnEffectItsIntentDoesNotList(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
 	ctx := context.Background()
-	u := dslack.ThreadUnit("T000", sessChannel, sessParent)
+	u := slackThreadUnit("T000", sessChannel, sessParent)
 	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: u, Turns: []dturn.Turn{
 		{Intent: "reply", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
 	}}); err != nil {
@@ -469,7 +519,7 @@ func TestASlackDraftDeclaringAGitHubEffectIsRefused(t *testing.T) {
 	files["intents/nudging-act/intent.toml"] = strings.Replace(files["intents/nudging-act/intent.toml"], `allowed_effects = ["task.nudged", "unit.closed"]`, `allowed_effects = ["task.nudged", "pr.nudged"]`, 1)
 	userProfile(t, w.te, files)
 	ctx := context.Background()
-	u := dslack.ThreadUnit("T000", sessChannel, sessParent)
+	u := slackThreadUnit("T000", sessChannel, sessParent)
 	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: u, Turns: []dturn.Turn{
 		{Intent: "nudging-act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
 	}}); err != nil {
@@ -499,7 +549,10 @@ window = "10m"
 `
 	userProfile(t, w.te, files)
 	ctx := context.Background()
-	u := dslack.ThreadUnit("T000", sessChannel, sessParent)
+	u := slackThreadUnit("T000", sessChannel, sessParent)
+	w.seedSlack(t, dslack.Facts{Team: "T000", Conversations: []dslack.Conversation{{ID: sessChannel, Name: "general", Kind: dslack.KindChannel, IsMember: true}},
+		Threads: []dslack.Thread{{Conversation: sessChannel, TS: sessParent, Messages: []dslack.Message{{TS: sessParent, ThreadTS: sessParent, User: "U000", Text: "parent"}}}}})
+	w.reported(t, u)
 	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: u, Turns: []dturn.Turn{
 		{Intent: "quick-act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
 	}}); err != nil {
@@ -523,7 +576,7 @@ func TestSlackDraftFromAPullRequestTurnDraftsInThePermalinksThread(t *testing.T)
 		t.Fatal(err)
 	}
 	link := "https://acme.slack.com/archives/" + sessThreaded + "/p" + strings.ReplaceAll(sessReply, ".", "") + "?thread_ts=" + sessParent + "&cid=" + sessThreaded
-	if got, isErr := w.draftTool(t, draftHandle, `{"text":"release 1.2 is out"}`); !isErr || !strings.Contains(got, "permalink") {
+	if got, isErr := w.draftTool(t, draftHandle, `{"text":"release 1.2 is out"}`); !isErr || !strings.Contains(got, "a target it posts to") {
 		t.Fatalf("no permalink: %q", got)
 	}
 	for _, args := range []string{`{"text":"x","target":"` + link + `","items":["i1"]}`, `{"text":"x","target":"` + link + `","effects":["unit.closed"]}`} {
@@ -536,7 +589,7 @@ func TestSlackDraftFromAPullRequestTurnDraftsInThePermalinksThread(t *testing.T)
 	}
 
 	got, isErr := w.draftTool(t, draftHandle, `{"text":"release 1.2 is out","target":"`+link+`"}`)
-	if isErr || !strings.Contains(got, "once the user approves it") || !strings.Contains(got, "#random") {
+	if isErr || !strings.Contains(got, "approves it in the") || !strings.Contains(got, "#random") {
 		t.Fatalf("slack_draft = %q (error %v)", got, isErr)
 	}
 	ds := w.drafts(t)
@@ -545,7 +598,7 @@ func TestSlackDraftFromAPullRequestTurnDraftsInThePermalinksThread(t *testing.T)
 	}
 	d := ds[0]
 	wantOrigin := draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1, Intent: "address", Unit: pr.Ref{Owner: "acme", Repo: "widgets", Number: 7}.Unit()}
-	if d.Unit != dslack.ThreadUnit("T000", sessThreaded, sessParent) || d.Origin != wantOrigin || d.Target != link ||
+	if d.Unit != slackThreadUnit("T000", sessThreaded, sessParent) || d.Origin != wantOrigin || d.Target != link ||
 		d.State != draft.Proposed || d.Approval.Mode != draft.Wait || d.Would.Policy != draft.WouldWait {
 		t.Fatalf("draft %+v", d)
 	}
@@ -598,7 +651,7 @@ func TestFromAPullRequestTurnEditsAndReactionsPostAtOnceAndAreRecorded(t *testin
 	ds := w.drafts(t)
 	slices.SortFunc(ds, func(a, b draft.Draft) int { return int(a.ID - b.ID) })
 	origin := draft.Origin{Kind: draft.OriginSession, TurnSeq: 1, Intent: "address", Unit: prUnit}
-	thread := dslack.ThreadUnit("T000", sessThreaded, sessParent)
+	thread := slackThreadUnit("T000", sessThreaded, sessParent)
 	if len(ds) != 3 {
 		t.Fatalf("records %+v", ds)
 	}
@@ -630,7 +683,7 @@ func TestSlackDraftResolvesHandlesAndEmailsIntoMentions(t *testing.T) {
 		return map[string]any{"user": map[string]any{"id": sessUser, "name": "dana"}}
 	})
 	ctx := context.Background()
-	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: dslack.ThreadUnit("T000", sessChannel, sessParent), Turns: []dturn.Turn{
+	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: slackThreadUnit("T000", sessChannel, sessParent), Turns: []dturn.Turn{
 		{Intent: "reply", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
 	}}); err != nil {
 		t.Fatal(err)
@@ -646,7 +699,7 @@ func TestSlackDraftResolvesHandlesAndEmailsIntoMentions(t *testing.T) {
 func TestEveryToolIsDescribedByTheBundledProfile(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
-	if w.srv.Inbox == nil || w.srv.SlackSearch == nil || w.srv.SlackDraft == nil {
+	if w.srv.Inbox == nil || len(w.srv.Plugins) != 6 {
 		t.Fatal("the wiring serves only some tools")
 	}
 	init := rpc(t, w.srv, "", draftHandle, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}`)
@@ -686,10 +739,13 @@ func TestEveryToolIsDescribedByTheBundledProfile(t *testing.T) {
 	}
 }
 
+// TestPostingOutsideATurn posts at once from a session with no turn, whose
+// posts are recorded, and from no session, whose posts are not; neither
+// drafts.
 func TestPostingOutsideATurn(t *testing.T) {
 	t.Parallel()
 	link := "https://acme.slack.com/archives/" + sessThreaded + "/p" + strings.ReplaceAll(sessReply, ".", "") + "?thread_ts=" + sessParent + "&cid=" + sessThreaded
-	thread := dslack.ThreadUnit("T000", sessThreaded, sessParent)
+	thread := slackThreadUnit("T000", sessThreaded, sessParent)
 	session := draft.Origin{Kind: draft.OriginSession}
 	for name, handle := range map[string]string{"a session with no turn": "term_other1", "no session": ""} {
 		t.Run(name, func(t *testing.T) {
@@ -701,27 +757,26 @@ func TestPostingOutsideATurn(t *testing.T) {
 			if got, isErr := w.callTool(t, "", handle, "slack_react", `{"message":"`+link+`","emoji":"white_check_mark"}`); isErr {
 				t.Fatalf("slack_react = %q", got)
 			}
+			if n := len(w.st.srv.Calls("chat.postMessage")) + len(w.st.srv.Calls("reactions.add")); n != 2 {
+				t.Fatalf("posts %d", n)
+			}
+			records := 2
+			if handle == "" {
+				records = 0
+			}
 			for _, d := range w.drafts(t) {
 				if d.State != draft.Sent || d.Unit != thread || d.Origin != session {
 					t.Fatalf("record %+v", d)
 				}
 			}
-			if n := len(w.drafts(t)); n != 2 {
-				t.Fatalf("records %d", n)
+			if n := len(w.drafts(t)); n != records {
+				t.Fatalf("records %d, want %d", n, records)
 			}
-
-			got, isErr := w.callTool(t, "", handle, "slack_draft", `{"text":"any news?","target":"`+link+`"}`)
+			if got, isErr := w.callTool(t, "", handle, "slack_draft", `{"text":"any news?","target":"`+link+`"}`); !isErr {
+				t.Fatalf("slack_draft outside a turn = %q", got)
+			}
 			if handle == "" {
-				if !isErr || !strings.Contains(got, "slack_draft refused") {
-					t.Fatalf("slack_draft with no session = %q", got)
-				}
 				return
-			}
-			if isErr {
-				t.Fatalf("slack_draft = %q", got)
-			}
-			if d := w.drafts(t)[0]; d.State != draft.Proposed || d.Unit != thread || d.Origin != session || d.Approval.Mode != draft.Wait {
-				t.Fatalf("draft %+v", d)
 			}
 			if got, isErr := w.callTool(t, "", handle, "slack_draft", `{"text":"any news?"}`); !isErr || !strings.Contains(got, "no turn") {
 				t.Fatalf("slack_draft with no permalink = %q", got)
@@ -738,7 +793,7 @@ func TestAReactionOnAReplyPermalinkIsRecordedOnItsThread(t *testing.T) {
 	if got, isErr := w.callTool(t, "", draftHandle, "slack_react", `{"message":"`+reply+`","emoji":"eyes"}`); isErr {
 		t.Fatalf("slack_react = %q", got)
 	}
-	if ds := w.drafts(t); len(ds) != 1 || ds[0].Unit != dslack.ThreadUnit("T000", sessThreaded, sessParent) {
+	if ds := w.drafts(t); len(ds) != 1 || ds[0].Unit != slackThreadUnit("T000", sessThreaded, sessParent) {
 		t.Fatalf("records %+v", ds)
 	}
 }
@@ -788,7 +843,7 @@ func TestSlackDraftFromAPullRequestTurnStillNeedsAPermalink(t *testing.T) {
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	if got, isErr := w.draftTool(t, draftHandle, `{"text":"x","target":"`+sessChannel+`"}`); !isErr || !strings.Contains(got, "permalink") {
+	if got, isErr := w.draftTool(t, draftHandle, `{"text":"x","target":"`+sessChannel+`"}`); !isErr || !strings.Contains(got, "a target it posts to") {
 		t.Fatalf("slack_draft = %q", got)
 	}
 	if len(w.drafts(t)) != 0 {
@@ -808,7 +863,7 @@ func TestASendFromATaskTurnIsRecordedWithTheTurnAsOrigin(t *testing.T) {
 	w.send(t, sessChannel)
 	ds := w.drafts(t)
 	want := draft.Origin{Kind: draft.OriginSession, TurnSeq: 1, Intent: "act", Unit: task}
-	if len(ds) != 1 || ds[0].Unit != dslack.ThreadUnit("T000", sessChannel, sessPosted) || ds[0].State != draft.Sent || ds[0].Origin != want {
+	if len(ds) != 1 || ds[0].Unit != slackThreadUnit("T000", sessChannel, sessPosted) || ds[0].State != draft.Sent || ds[0].Origin != want {
 		t.Fatalf("drafts %+v", ds)
 	}
 }

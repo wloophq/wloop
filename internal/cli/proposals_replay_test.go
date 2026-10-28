@@ -17,7 +17,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/items"
-	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -51,7 +50,7 @@ func saoPaulo() *time.Location {
 }
 
 func rpThread(n int) unit.Unit {
-	return dslack.ThreadUnit("T000TEAM", "C000CHAN", fmt.Sprintf("1700000%03d.000100", n))
+	return slackThreadUnit("T000TEAM", "C000CHAN", fmt.Sprintf("1700000%03d.000100", n))
 }
 
 var (
@@ -91,6 +90,9 @@ type replay struct {
 	settle  []draft.ID
 	settled int
 	byKey   map[string]int
+	// slack are the Slack units' facts, which every proposer of the replay
+	// reads.
+	slack *slackFacts
 }
 
 func newReplay(t *testing.T) *replay {
@@ -112,10 +114,11 @@ func newReplayOn(t *testing.T, db *sqlite.DB, start time.Time) *replay {
 	r := &replay{t: t, te: te, db: db, now: start, start: start, known: map[draft.ID]draft.State{}, byKey: map[string]int{}}
 	te.Env.Now = func() time.Time { return r.now }
 	clock := clockFunc(func() time.Time { return r.now })
+	r.slack = newSlackFacts(db, clock)
 	ledger := te.itemsLedger(db, te.cfg, t.Logf)
 	r.svc = &outbox.Service{Store: db.Drafts(), Items: ledger, Clock: clock,
 		Effects: func(p unit.ProviderID) (port.Effects, error) {
-			if p != dslack.Provider {
+			if p != slackPlugin {
 				return nil, fmt.Errorf("%s: %w", p, outbox.ErrDisabled)
 			}
 			return okEffects{}, nil

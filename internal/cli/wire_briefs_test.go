@@ -61,7 +61,7 @@ func TestASlackOnlyDaemonBriefsSlackUnitsOnDemand(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	seedSlack(t, db)
+	runSlackPlugin(t, te, db)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, &daemon.AppState{})

@@ -13,8 +13,12 @@ import (
 
 type services struct{ b *Broker }
 
-func (services) Ask(context.Context, src.AskRequest) (src.AskResult, error) {
-	return src.AskResult{}, src.ErrUnsupported
+// Ask asks the host's agent for the plugin.
+func (s services) Ask(ctx context.Context, req src.AskRequest) (src.AskResult, error) {
+	if s.b.Hosted == nil || s.b.Hosted.Ask == nil {
+		return src.AskResult{}, src.ErrUnsupported
+	}
+	return s.b.Hosted.Ask(ctx, req)
 }
 
 func (services) Meter(context.Context, src.Sample) error { return src.ErrUnsupported }
@@ -57,7 +61,13 @@ func briefIntentOf(in brief.Intent) *src.BriefIntent {
 	return out
 }
 
-func (services) Profile(context.Context, string) ([]byte, error) { return nil, src.ErrUnsupported }
+// Profile reads path in the plugin's profile layer.
+func (s services) Profile(ctx context.Context, path string) ([]byte, error) {
+	if s.b.Hosted == nil || s.b.Hosted.Profile == nil {
+		return nil, src.ErrUnsupported
+	}
+	return s.b.Hosted.Profile(ctx, path)
+}
 
 // tree is cfg as config get reads it: its keys by their names in the file.
 func tree(cfg config.Config) (map[string]any, error) {

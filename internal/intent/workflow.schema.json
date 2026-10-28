@@ -457,7 +457,8 @@
                   "enum": [
                     "message",
                     "reaction",
-                    "comment"
+                    "comment",
+                    "edit"
                   ],
                   "type": "string"
                 },

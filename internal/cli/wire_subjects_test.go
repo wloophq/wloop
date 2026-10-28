@@ -8,9 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/config"
-
-	factslack "github.com/wloophq/wloop/internal/adapter/facts/slack"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/core/automation"
@@ -19,15 +16,16 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/items"
-	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
-var subjectThread = dslack.ThreadUnit("T0001", "C0001", "1700000000.000100")
+var subjectThread = slackThreadUnit("T0001", "C0001", "1700000000.000100")
 
 const (
 	waitingWorkflow = `summary = "Watch waiting entries"
@@ -62,14 +60,25 @@ use = "notify.self"
 )
 
 type subjectsRig struct {
-	te  *testEnv
-	db  *sqlite.DB
-	log *change.Log
-	eng *automation.Engine
+	te    *testEnv
+	db    *sqlite.DB
+	log   *change.Log
+	eng   *automation.Engine
+	snaps *psource.Snapshots
+	rev   uint64
+}
+
+// report keeps facts as the Slack plugin's last snapshot of u.
+func (r *subjectsRig) report(t *testing.T, u unit.Unit, facts ...src.Fact) {
+	t.Helper()
+	r.rev++
+	if err := r.snaps.Put(context.Background(), map[unit.Unit]src.Snapshot{u: {Unit: psource.Wire(u), Rev: r.rev, At: testNow, Facts: facts}}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // newSubjectsRig is a plan engine wired as the daemon wires it, over a store
-// and the Slack plugin's facts, with the user's workflows on the entry,
+// and the facts the Slack plugin reports, with the user's workflows on the entry,
 // slack and github subjects; github's plugin is not built. planned lists
 // the user's workflows only.
 func newSubjectsRig(t *testing.T) *subjectsRig {
@@ -94,10 +103,15 @@ func newSubjectsRig(t *testing.T) *subjectsRig {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	mods := []source.Module{{ID: dslack.Provider, Facts: factslack.New(db, clockFunc(func() time.Time { return te.Now() }), config.DefaultSlackEndedAfter)}}
+	snaps := psource.NewSnapshots(db.Snapshots())
+	s, err := te.pluginSource(slackPlugin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mods := []source.Module{{ID: slackPlugin, Facts: psource.SettledFacts{UnitFacts: psource.UnitFacts{Snapshots: snaps}, Source: s, Drafts: db.Drafts()}}}
 	ed := engineDeps{DB: db, Modules: mods, SessionFacts: noUnits{}, WorkspaceFacts: noUnits{}}
 	te.wireSubjects(&serveWiring{DB: db, Cfg: te.cfg, Modules: mods, Engine: &ed})
-	return &subjectsRig{te: te, db: db, log: log, eng: te.planEngine(ed)}
+	return &subjectsRig{te: te, db: db, log: log, eng: te.planEngine(ed), snaps: snaps}
 }
 
 func (r *subjectsRig) item(t *testing.T, u unit.Unit, id string, s items.State, waitingOn ...items.Person) items.Item {
@@ -147,6 +161,7 @@ func TestPlanEvaluatesUserWorkflowsOnTaskAndSlackSubjects(t *testing.T) {
 	r := newSubjectsRig(t)
 	owed := r.item(t, subjectThread, "i1", items.Open, items.Person{Key: "slack:U0001"})
 	r.item(t, subjectThread, "i2", items.Open)
+	r.report(t, subjectThread, src.Fact{Name: "slack.live_task", Value: src.Bool(true)}, src.Fact{Name: "slack.items_unowned", Value: src.Int(1)})
 	r.task(t, task.Task{ID: "e-01", Kind: task.KindWaiting, State: "waiting", Category: task.CategoryWaiting, Title: "w", Units: []unit.Unit{subjectThread},
 		Items:   []task.ItemRef{{Unit: owed.Unit, Item: owed.ID}},
 		Waiting: &task.WaitingOn{On: []items.Person{{Key: "slack:U0001"}}, Since: testNow.Add(-72 * time.Hour)}}, task.OpCreate)
@@ -244,10 +259,7 @@ func TestACapturedTaskWhoseUnitsEndedPlansItsClose(t *testing.T) {
 	if got := closes(); len(got) != 0 {
 		t.Fatalf("closes %v before the thread ended", got)
 	}
-	if err := r.db.Extraction().Save(ctx, sqlite.ExtractionSave{States: map[unit.Unit]sqlite.ExtractionState{
-		subjectThread: {ClosurePosted: true, At: testNow}}}); err != nil {
-		t.Fatal(err)
-	}
+	r.report(t, subjectThread, src.Fact{Name: "slack.ended", Value: src.Bool(true)})
 	if got := closes(); len(got) != 0 {
 		t.Fatalf("closes %v, an entry no turn ran on", got)
 	}

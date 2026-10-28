@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/fs"
 	"maps"
-	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -322,17 +321,21 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	}
 	seen := map[dintent.Name]string{}
 	for _, l := range layers {
-		if l.Dir == "" {
+		if l.Bundled() {
 			continue
 		}
-		entries, _ := os.ReadDir(filepath.Join(l.Dir, "intents"))
+		entries, _ := profile.ReadDir(l, "intents")
 		for _, e := range entries {
 			if !e.IsDir() {
 				continue
 			}
 			name := dintent.Name(e.Name())
-			dir := filepath.Join(l.Dir, "intents", e.Name())
+			fl, dir := layerFiles(l, path.Join("intents", e.Name()))
 			if b := bundledUnits[name]; b != nil {
+				if l.Embedded() {
+					dirProblems = append(dirProblems, Problem{File: dir, Msg: fmt.Sprintf("%s is defined already in %s", name, b.files.base("intent.toml"))})
+					continue
+				}
 				if _, skip := plain[name]; !skip && len(overrides([]string{dir})) > 0 {
 					b.files.overlay = append(b.files.overlay, dir)
 					b.source = dintent.Source{Layer: l.Name, Dir: dir, Overrides: overrides(b.files.overlay)}
@@ -351,7 +354,7 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 			units = append(units, &unit{
 				name: name, dir: dir,
 				source: dintent.Source{Layer: l.Name, Dir: dir},
-				files:  files{dir: dir},
+				files:  fl,
 			})
 		}
 	}
@@ -814,7 +817,7 @@ func (c *Cache) get() (loaded *Loaded, reloaded bool) {
 func stampOf(layers []profile.Layer) string {
 	var b strings.Builder
 	for _, l := range layers {
-		if l.Dir == "" {
+		if l.Embedded() {
 			continue
 		}
 		var n int

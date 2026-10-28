@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 // v3Store is a store built from the frozen v3 schema with seed run on it,
@@ -117,16 +115,6 @@ func TestV4CopiesTheSlackBriefBeforeDroppingItsColumn(t *testing.T) {
 		`slack|D1/1700000000.000200|brief|legacy|legacy|ok|2026-10-05T09:00:00.000000000Z|2026-10-05T09:00:00.000000000Z|{"goal":"Pick the venue"}|1|1`,
 		`slack|D1/1700000000.000300|brief|legacy|legacy|ok|2026-10-05T09:00:00.000000000Z|2026-10-05T09:00:00.000000000Z|{"goal":"Book the train"}|1|1`,
 	})
-	units := []unit.Unit{{Provider: "slack", Key: "C1/1700000000.000100"}, {Provider: "slack", Key: "D1/1700000000.000300"}, {Provider: "slack", Key: "C2/1700000000.000400"}}
-	got, err := db.Extraction().States(context.Background(), units)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for u, want := range map[unit.Unit]string{units[0]: `{"goal":"Ship the export"}`, units[1]: `{"goal":"Book the train"}`, units[2]: ""} {
-		if got[u].Brief != want {
-			t.Errorf("%s reads brief %q, want %q", u.Key, got[u].Brief, want)
-		}
-	}
 }
 
 func TestAV3ReleaseRefusesTheV4Store(t *testing.T) {

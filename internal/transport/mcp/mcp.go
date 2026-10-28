@@ -56,14 +56,9 @@ type Server struct {
 	Version string
 	// Log notes each initialize; nil logs nothing.
 	Log func(format string, args ...any)
-	// Slack, SlackRead and SlackDraft are set by internal/cli/slack*.go before the
-	// listener serves; a nil field hides its tool.
-	Slack      Slack
-	SlackRead  SlackReader
-	SlackDraft SlackDrafts
-	// SlackSearch is set with SlackRead; nil hides slack_search.
-	SlackSearch SlackSearcher
-	Inbox       Inbox // set by internal/cli/serve_messages.go; nil hides inbox_post and inbox_read
+	// Plugins are the tools the plugins' manifests declare.
+	Plugins []PluginTool
+	Inbox   Inbox // set by internal/cli/serve_messages.go; nil hides inbox_post and inbox_read
 	// Texts are the tools' descriptions, the profile's tools.toml; nil
 	// describes none.
 	Texts func() map[string]ToolText
@@ -285,23 +280,10 @@ type registered struct {
 // Server field leaves its tool out.
 func (s *Server) tools() []registered {
 	r := []registered{{turnEndTool(), true, s.turnEnd}}
-	if s.Slack != nil {
-		r = append(r, registered{slackSendTool(), false, s.slackSend}, registered{slackReactTool(), false, s.slackReact},
-			registered{slackEditTool(), false, s.slackEdit})
-	}
-	if s.SlackRead != nil {
-		r = append(r, registered{slackReadTool(), false, s.slackRead})
-	}
-	if s.SlackSearch != nil {
-		r = append(r, registered{slackSearchTool(), false, s.slackSearch})
-	}
-	if s.SlackDraft != nil {
-		r = append(r, registered{slackDraftTool(), true, s.slackDraft})
-	}
 	if s.Inbox != nil {
 		r = append(r, registered{inboxPostTool(), true, s.inboxPost}, registered{inboxReadTool(), true, s.inboxRead})
 	}
-	return r
+	return append(r, s.pluginTools()...)
 }
 
 func (s *Server) listTools() []tool {

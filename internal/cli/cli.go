@@ -250,6 +250,9 @@ type Env struct {
 	placementSources *placementSources
 	// slack is how the Slack commands and the daemon reach the Keychain, Slack and the browser.
 	slack slackEnv
+	// hosted are the services serve builds after the plugins start, which
+	// their brokers read; nil until serve starts the plugins.
+	hosted *hostedLate
 	// payloads are the enabled plugins' turn payload readers; nil outside serve.
 	payloads map[unit.ProviderID]turn.PayloadReader
 }

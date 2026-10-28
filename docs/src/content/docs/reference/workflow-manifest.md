@@ -121,7 +121,7 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `turn.start` | `stage` | one of `first`, `follow-up` |  | The pass over the unit: its first, or one after. |
 | `turn.start` | `runner` | one of `session`, `headless` |  | How the turn runs, one of the intent's runners; by default its first. |
 | `draft.propose` | `purpose` | string |  | What the draft is for, such as nudge or close. Required. |
-| `draft.propose` | `delivery` | one of `message`, `reaction`, `comment` | `message` | How the draft posts: the core's message or reaction, or a delivery a plugin declares. |
+| `draft.propose` | `delivery` | one of `message`, `reaction`, `comment`, `edit` | `message` | How the draft posts: the core's message or reaction, or a delivery a plugin declares. |
 | `draft.propose` | `text` | file | `text.md.tmpl` | The template of the draft's text, beside the manifest. |
 | `draft.propose` | `reaction` | string |  | The emoji name, with delivery reaction. |
 | `draft.propose` | `items` | one of `owed`, `resolved`, `unowned`, `unowned_aged`, `all` | `all` | Which of the unit's items the draft lists. |

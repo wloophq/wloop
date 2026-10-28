@@ -4,13 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"path"
-	"path/filepath"
 	"slices"
 	"strings"
-
-	"github.com/wloophq/wloop/profiles"
 )
 
 // The profile directories whose files resolve through the layers, a file
@@ -24,8 +20,8 @@ const (
 
 // Resolved is a profile file as the layers resolve it.
 type Resolved struct {
-	// Layer is the layer the file came from; Path is where it is, a path on
-	// disk for a directory layer, default/<rel> for the bundled one.
+	// Layer is the layer the file came from; Path is where it is, as
+	// Layer.FileName names it.
 	Layer Layer
 	Path  string
 	Body  []byte
@@ -39,7 +35,7 @@ func Resolve(layers []Layer, rel string) (Resolved, error) {
 		return Resolved{}, fmt.Errorf("%q is not a profile file: %w", rel, fs.ErrInvalid)
 	}
 	for _, l := range slices.Backward(layers) {
-		r, err := readLayer(l, rel)
+		r, err := ReadFile(l, rel)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
@@ -58,7 +54,7 @@ func Files(layers []Layer, dir string) (map[string]Resolved, error) {
 			return nil, err
 		}
 		for _, rel := range names {
-			r, err := readLayer(l, rel)
+			r, err := ReadFile(l, rel)
 			if err != nil {
 				return nil, err
 			}
@@ -68,26 +64,41 @@ func Files(layers []Layer, dir string) (map[string]Resolved, error) {
 	return out, nil
 }
 
-func readLayer(l Layer, rel string) (Resolved, error) {
-	if l.Dir == "" {
-		body, err := fs.ReadFile(profiles.Default, path.Join("default", rel))
-		return Resolved{Layer: l, Path: path.Join("default", rel), Body: body}, err
+// ReadFile reads rel, a slash path, from l. An error wraps fs.ErrNotExist
+// when l does not hold it.
+func ReadFile(l Layer, rel string) (Resolved, error) {
+	r := Resolved{Layer: l, Path: l.FileName(rel)}
+	fsys, err := l.FSys()
+	if err != nil {
+		return r, err
 	}
-	p := filepath.Join(l.Dir, filepath.FromSlash(rel))
-	body, err := os.ReadFile(p)
-	return Resolved{Layer: l, Path: p, Body: body}, err
+	r.Body, err = fs.ReadFile(fsys, rel)
+	return r, err
+}
+
+// ReadDir lists dir, a slash path, of l; a layer without dir has no entries.
+func ReadDir(l Layer, dir string) ([]fs.DirEntry, error) {
+	fsys, err := l.FSys()
+	if err != nil {
+		return nil, err
+	}
+	entries, err := fs.ReadDir(fsys, dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	return entries, err
 }
 
 // listLayer lists the regular files under dir in l, dotfiles left out; a
 // layer without dir has none.
 func listLayer(l Layer, dir string) ([]string, error) {
-	var fsys fs.FS = profiles.Default
-	root := path.Join("default", dir)
-	if l.Dir != "" {
-		fsys, root = os.DirFS(l.Dir), dir
+	fsys, err := l.FSys()
+	if err != nil {
+		return nil, err
 	}
+	root := dir
 	var out []string
-	err := fs.WalkDir(fsys, root, func(p string, d fs.DirEntry, err error) error {
+	err = fs.WalkDir(fsys, root, func(p string, d fs.DirEntry, err error) error {
 		switch {
 		case errors.Is(err, fs.ErrNotExist) && p == root:
 			return fs.SkipAll

@@ -420,7 +420,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `runner` (one of `session`, `headless`): How the turn runs, one of the intent's runners; by default its first.
 - `draft.propose`:
   - `purpose` (string): What the draft is for, such as nudge or close. Required.
-  - `delivery` (one of `message`, `reaction`, `comment`, default `message`): How the draft posts: the core's message or reaction, or a delivery a plugin declares.
+  - `delivery` (one of `message`, `reaction`, `comment`, `edit`, default `message`): How the draft posts: the core's message or reaction, or a delivery a plugin declares.
   - `text` (file, default `text.md.tmpl`): The template of the draft's text, beside the manifest.
   - `reaction` (string): The emoji name, with delivery reaction.
   - `items` (one of `owed`, `resolved`, `unowned`, `unowned_aged`, `all`, default `all`): Which of the unit's items the draft lists.
@@ -548,6 +548,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `failed` (`Error`): Slack or the daemon failed the call.
   - `problem_target_required`: A problem: target is missing.
   - `problem_limit` (`Max`: number): A problem: limit is out of range.
+  - `read` (`Text`): The messages read, rendered.
 - `slack_search`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
@@ -559,6 +560,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `problem_before`: A problem: before is not a date.
   - `problem_before_after`: A problem: before is not after after.
   - `problem_limit` (`Max`: number): A problem: limit is out of range.
+  - `found` (`Text`): The messages found, rendered.
 - `slack_draft`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
@@ -568,9 +570,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `problem_kind` (`Kinds`): A problem: kind is none of the kinds.
   - `problem_reaction_required`: A problem: a react draft has no reaction.
   - `problem_text_required`: A problem: text is missing or empty.
-  - `proposed` (`ID`: number, `Unit`, `Where`): The draft waits for the user.
-  - `approved` (`ID`: number, `Unit`, `Where`): The draft's policy approved it.
-  - `dry_run` (`ID`: number, `Unit`, `Where`): The draft's policy only stores it.
+  - `proposed` (`ID`: number, `Unit`, `Where`): The draft waits for the user, or its policy approved it.
 - `slack_react`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.

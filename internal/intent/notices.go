@@ -4,8 +4,6 @@ import (
 	"errors"
 	"io/fs"
 	"maps"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -34,11 +32,11 @@ func loadNotices(layers []profile.Layer, bundled fs.FS) (map[string]string, Prob
 	}
 	problems := mergeNotices(out, NoticesFile, src)
 	for _, l := range layers {
-		if l.Dir == "" {
+		if l.Bundled() {
 			continue
 		}
-		file := filepath.Join(l.Dir, NoticesFile)
-		src, err := os.ReadFile(file)
+		r, err := profile.ReadFile(l, NoticesFile)
+		file, src := r.Path, r.Body
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}

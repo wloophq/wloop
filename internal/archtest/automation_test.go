@@ -74,7 +74,6 @@ var coreProviderAllowlist = []providerSite{
 	{"internal/adapter/store/sqlite/registry.go", "sessionUnit", "unit.Session", 1, "the store keeps the sessions the core keeps"},
 	{"internal/adapter/store/sqlite/retain.go", "retainWorkflowEventsSQL", "unit.Session", 1, "the store keeps the sessions the core keeps"},
 	{"internal/adapter/store/sqlite/retain.go", "retainWorkflowEventsSQL", "unit.Workspace", 1, "the store keeps the workspaces the core keeps"},
-	{"internal/adapter/store/sqlite/slack.go", "slackProvider", `"slack"`, 1, "the store keeps the Slack plugin's tables"},
 	{"internal/adapter/store/sqlite/turns.go", "compareUnits", "unit.GitHub", 2, "debt: pull requests sort by owner, repository and number"},
 	{"internal/cli/actions.go", "Env.fetchPR", "unit.GitHub", 1, "debt: the GitHub viewer read outside the plugin"},
 	{"internal/cli/sweepinputs.go", "storeInputs.Viewer", "unit.GitHub", 1, "debt: the GitHub viewer read outside the plugin"},
@@ -100,7 +99,6 @@ var coreProviderAllowlist = []providerSite{
 var providerHomes = []string{
 	"internal/domain/unit",
 	"internal/domain/pr", "internal/readmodel/prrow", "internal/situation", "internal/github",
-	"internal/slack", "internal/domain/slack",
 	"internal/intent/builtin",
 	"internal/e2e",
 	// The codecs of the providers the core keeps.
@@ -427,7 +425,7 @@ var a = dunit.GitHub
 `)
 	flagged(t, "an aliased import", coreLiterals(fset, "internal/intent/x.go", f, nil, none, nil), 1, "a provider id lives in its plugin")
 	fset, f = parse(t, `package x
-import dslack "github.com/wloophq/wloop/internal/domain/slack"
+import dslack "github.com/wloophq/wloop/plugins/slack/domain"
 func open(u unit.Unit) bool { return u.Provider == dslack.Provider || u.Provider == chatPlugin }
 `)
 	_, decl := parse(t, "package x\nconst chatPlugin unit.ProviderID = \"slack\"\nvar other = \"slackish\"\n")

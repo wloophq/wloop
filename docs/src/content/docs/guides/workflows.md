@@ -99,7 +99,7 @@ A rule never reads a fact the [facts](/reference/facts/) page marks **Untrusted*
 
 A workflow's `observe` and a draft's `dry_run` mode differ: `observe = true` plans the workflow and proposes nothing, while `drafts.approval.mode = "dry_run"` proposes each draft and stores it as what would have been sent, without sending it.
 
-Their texts are `text.md.tmpl` in each workflow's directory, a [template](/reference/workflow-manifest/) over the draft's items, where `.Line` is an item's summary on one line. `<profile>/workflows/slack-closure/text.md.tmpl` closes in your words:
+Their texts are `text.md.tmpl` in each workflow's directory, which the Slack plugin's profile layer ships in `plugins/slack/profile/workflows/`, a [template](/reference/workflow-manifest/) over the draft's items, where `.Line` is an item's summary on one line. `<profile>/workflows/slack-closure/text.md.tmpl` closes in your words:
 
 ```
 Encerrando:

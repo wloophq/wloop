@@ -8,6 +8,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/config"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/plugins/bundled"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/profiles"
@@ -102,5 +103,61 @@ func TestADisabledPluginsKeysStillParse(t *testing.T) {
 	}
 	if got, ok := reg.ParseURL("https://github.com/acme/api/pull/7"); !ok || got != u {
 		t.Errorf("a disabled plugin's address: %v %t", got, ok)
+	}
+}
+
+func TestTheBundledSlackLayerLoadsWithNoPluginDirectory(t *testing.T) {
+	usePlugins(t)
+	off := false
+	slackWorkflows := []string{"slack-ask-owner", "slack-closure", "slack-stalled-nudge"}
+	for _, c := range []struct {
+		name string
+		on   *bool
+		want bool
+	}{
+		{"enabled", nil, true},
+		{"disabled", &off, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			var cfg config.Config
+			cfg.Plugins.Slack.Enabled = c.on
+			l, problems := Load(profile.Chain(cfg), bundledFS(), testBase(), nil)
+			if len(problems) > 0 {
+				t.Fatalf("%s", problems.Error())
+			}
+			names := workflowNames(l)
+			for _, w := range slackWorkflows {
+				if slices.Contains(names, w) != c.want {
+					t.Errorf("workflow %s loaded: %t, want %t", w, !c.want, c.want)
+				}
+			}
+			tools, problems := loadTools(profile.Chain(cfg), os.DirFS("../../profiles/default"))
+			if len(problems) > 0 {
+				t.Fatalf("%s", problems.Error())
+			}
+			if _, ok := tools["slack_read"]; ok != c.want {
+				t.Errorf("slack_read worded: %t, want %t", ok, c.want)
+			}
+		})
+	}
+}
+
+func TestAUserOverridesAWorkflowOfAPluginsLayer(t *testing.T) {
+	usePlugins(t)
+	user := t.TempDir()
+	dir := filepath.Join(user, "workflows", "slack-closure")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "text.md.tmpl"), []byte("Closing."), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	l, problems := Load(profile.Chain(config.Config{Profile: user}), bundledFS(), testBase(), nil)
+	if len(problems) > 0 {
+		t.Fatalf("%s", problems.Error())
+	}
+	i := slices.IndexFunc(l.Workflows, func(w workflow.Workflow) bool { return w.Name == "slack-closure" })
+	if i < 0 || !slices.Equal(l.Workflows[i].Overrides, []string{"text.md.tmpl"}) {
+		t.Fatalf("slack-closure %+v", l.Workflows)
 	}
 }

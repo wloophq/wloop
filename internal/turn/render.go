@@ -112,13 +112,14 @@ func NewCache(layers func() []profile.Layer, opts intentload.CacheOptions) (*int
 	return intentload.NewCache(layers, BundledFS(), b, CheckTemplate, opts), nil
 }
 
-// Bundled is the bundled intents alone, loaded once; callers never change it.
+// Bundled is the profile the release ships, the bundled layer and the
+// bundled plugins' layers, loaded once; callers never change it.
 var Bundled = sync.OnceValues(func() (*intentload.Loaded, error) {
 	b, err := Base()
 	if err != nil {
 		return nil, err
 	}
-	l, problems := intentload.Load(nil, BundledFS(), b, CheckTemplate)
+	l, problems := intentload.Load(profile.BundledChain(), BundledFS(), b, CheckTemplate)
 	if len(problems) > 0 {
 		return nil, problems
 	}

@@ -17,7 +17,7 @@ import (
 func partialFiles(layers []profile.Layer) (map[string]profile.Resolved, Problems) {
 	var dirs []profile.Layer
 	for _, l := range layers {
-		if l.Dir != "" {
+		if !l.Bundled() {
 			dirs = append(dirs, l)
 		}
 	}

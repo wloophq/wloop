@@ -162,8 +162,11 @@ type Deps struct {
 	// Resolve is the unit an address a person gives lands in, such as a
 	// Slack message ref; ok is false when no plugin reads it. Nil reads none.
 	Resolve func(ctx context.Context, address string) (u unit.Unit, ok bool, err error)
-	Sweep   Sweeper // nil registers no sweep job
-	Actions Actions // nil answers 503 to delegated actions
+	// PluginAction runs an action of plugin id that names no unit; nil
+	// runs none.
+	PluginAction func(ctx context.Context, id string, req api.PluginActionRequest) (json.RawMessage, error)
+	Sweep        Sweeper // nil registers no sweep job
+	Actions      Actions // nil answers 503 to delegated actions
 	// Intents is the registry as the profile defines it now, read on every
 	// rows rebuild and action; nil serves the bundled intents.
 	Intents func() *intentload.Loaded

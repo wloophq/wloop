@@ -16,7 +16,6 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/setup"
-	"github.com/wloophq/wloop/internal/slack/auth"
 )
 
 var uninstallUsage = "usage: " + brand.Command + " uninstall [--purge] [--dry-run] [--yes]"
@@ -161,7 +160,9 @@ func (e *Env) uninstallPlan(ctx context.Context, purge bool) uninstallPlan {
 	skillSteps, kept := e.skillSteps(roots)
 	p.remove = append(p.remove, skillSteps...)
 	p.kept = append(p.kept, kept...)
-	p.remove = append(p.remove, e.slackSteps(cfg)...)
+	if len(p.remove) > 0 {
+		p.remove = append(p.remove, e.slackSteps(cfg)...)
+	}
 	if purge {
 		p.purge, kept = e.purgeSteps(cfg)
 		p.kept = append(p.kept, kept...)
@@ -305,23 +306,6 @@ func (e *Env) skillSteps(roots []string) (steps []uninstallStep, kept []string) 
 		}
 	}
 	return steps, kept
-}
-
-// slackSteps revoke and delete the stored Slack tokens, as slack logout
-// does. Off macOS there is no login Keychain to hold them.
-func (e *Env) slackSteps(cfg config.Config) []uninstallStep {
-	if goos != "darwin" && e.slack.Keychain == nil {
-		return nil
-	}
-	kit := e.slack.kit(cfg.Slack, func(format string, a ...any) { fmt.Fprintf(e.Err, format+"\n", a...) })
-	_, userErr := kit.Store.Load()
-	_, appErr := kit.Store.AppToken()
-	if errors.Is(userErr, auth.ErrNotLoggedIn) && errors.Is(appErr, auth.ErrNotLoggedIn) {
-		return nil
-	}
-	return []uninstallStep{{plan: []string{"the Slack tokens in Keychain service " + kit.Store.Service + ", revoked first"}, run: func(ctx context.Context) error {
-		return e.slackLogout(ctx, kit, nil)
-	}}}
 }
 
 // purgeSteps delete the state and config directories. A review profile

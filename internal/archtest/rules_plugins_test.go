@@ -20,10 +20,7 @@ var pluginRoots = map[string][]string{
 		"internal/github",
 	},
 	"slack": {
-		"internal/adapter/source/slack",
-		"internal/adapter/facts/slack",
-		"internal/domain/slack",
-		"internal/slack",
+		"plugins/slack",
 	},
 }
 
@@ -39,6 +36,7 @@ var coreRoots = []string{
 	"internal/daemon",
 	"internal/turn",
 	"internal/brief",
+	"internal/transport",
 }
 
 // pluginOf is the plugin a package belongs to, "" for none.
@@ -195,16 +193,16 @@ func TestDaemonImportsNoPluginDomain(t *testing.T) {
 
 func TestR16FlagsAPlantedImport(t *testing.T) {
 	t.Parallel()
-	slack, gh := module+"internal/domain/slack", module+"internal/adapter/source/github"
+	slack, gh := module+"plugins/slack/domain", module+"internal/adapter/source/github"
 	r16 := func(self string, imports, testImports []string) []string {
 		return ruleR16(self, imports, testImports, nil, map[int]bool{})
 	}
 	flagged(t, "core imports slack", r16("internal/core/turns", []string{"context", module + "internal/domain/unit", slack}, nil), 1, "the core never imports a plugin (R16)")
-	flagged(t, "slack imports github", r16("internal/domain/slack", []string{gh}, nil), 1, "no plugin imports another (R16)")
+	flagged(t, "slack imports github", r16("plugins/slack/domain", []string{gh}, nil), 1, "no plugin imports another (R16)")
 	flagged(t, "core test imports slack", r16("internal/core/links", nil, []string{slack}), 1, "(R16)")
-	flagged(t, "core x-test imports a slack rows package", r16("internal/web", nil, []string{module + "internal/adapter/source/slack/rows"}), 1, "(R16)")
+	flagged(t, "core x-test imports a slack rows package", r16("internal/web", nil, []string{module + "plugins/slack/rows"}), 1, "(R16)")
 	flagged(t, "a plugin imports itself", r16("internal/adapter/source/github", []string{module + "internal/domain/pr", module + "internal/github"}, nil), 0, "")
-	flagged(t, "a plugin imports the core", r16("internal/adapter/source/slack", []string{module + "internal/core/items", module + "internal/domain/unit"}, nil), 0, "")
+	flagged(t, "a plugin imports the core", r16("plugins/slack", []string{module + "internal/core/items", module + "internal/domain/unit"}, nil), 0, "")
 	flagged(t, "outside core and plugins", r16("internal/cli", []string{slack, gh}, nil), 0, "")
 	flagged(t, "a core sibling of a plugin root", r16("internal/domain/prx", []string{slack}, nil), 1, "(R16)")
 	flagged(t, "the catalog imports the pull request domain", r16("internal/catalog", []string{module + "internal/domain/pr"}, nil), 1, "(R16)")
@@ -217,7 +215,7 @@ func TestR16ExemptsPluginTestFakes(t *testing.T) {
 	r16 := func(imports, testImports []string) []string {
 		return ruleR16("internal/core/views", imports, testImports, nil, map[int]bool{})
 	}
-	flagged(t, "a test import of a fake", r16(nil, []string{fake, module + "internal/slack/slacktest"}), 0, "")
+	flagged(t, "a test import of a fake", r16(nil, []string{fake, module + "plugins/slack/slacktest"}), 0, "")
 	flagged(t, "a test import of the plugin", r16(nil, []string{module + "internal/adapter/source/github"}), 1, "(R16)")
 	flagged(t, "a non-test import of a fake", r16([]string{fake}, []string{fake}), 1, "(R16)")
 	flagged(t, "a core fake is not a plugin", r16(nil, []string{module + "internal/core/views/viewstest"}), 0, "")
@@ -225,16 +223,16 @@ func TestR16ExemptsPluginTestFakes(t *testing.T) {
 
 func TestR16FlagsStaleDebt(t *testing.T) {
 	t.Parallel()
-	slack := module + "internal/domain/slack"
+	slack := module + "plugins/slack/domain"
 	debts := []debt{
-		{"internal/core/turns", "internal/domain/slack", "planted", false},
-		{"internal/core/links", "internal/domain/slack", "gone", false},
+		{"internal/core/turns", "plugins/slack/domain", "planted", false},
+		{"internal/core/links", "plugins/slack/domain", "gone", false},
 	}
 	used := map[int]bool{}
 	flagged(t, "a debt edge", ruleR16("internal/core/turns", []string{slack}, nil, debts, used), 0, "")
 	flagged(t, "a debt edge is per importer", ruleR16("internal/core/items", []string{slack}, nil, debts, used), 1, "(R16)")
-	flagged(t, "stale", staleDebt(debts, used), 1, "internal/core/links -> internal/domain/slack (gone) matches no import")
-	tests := []debt{{"internal/core/items", "internal/domain/slack", "fixtures", true}}
+	flagged(t, "stale", staleDebt(debts, used), 1, "internal/core/links -> plugins/slack/domain (gone) matches no import")
+	tests := []debt{{"internal/core/items", "plugins/slack/domain", "fixtures", true}}
 	flagged(t, "a test debt lets a test import", ruleR16("internal/core/items", nil, []string{slack}, tests, map[int]bool{}), 0, "")
 	flagged(t, "a test debt is no code debt", ruleR16("internal/core/items", []string{slack}, nil, tests, map[int]bool{}), 1, "(R16)")
 }

@@ -25,9 +25,9 @@ import (
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/profile"
-	"github.com/wloophq/wloop/internal/slack/slacktest"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
+	"github.com/wloophq/wloop/plugins/slack/slacktest"
 )
 
 // initGH answers gh by the start of its arguments; anything else fails.
@@ -59,6 +59,8 @@ type initTestEnv struct {
 	gh       *initGH
 	ws       *fake.Manager
 	kc       *fakeKeychain
+	// slackSt plays the browser for the Slack plugin's login.
+	slackSt *slackTestEnv
 	// onPath are the binaries the login shell finds.
 	onPath []string
 	// src holds most of the repositories the fake manager knows.
@@ -110,13 +112,12 @@ func newInitTestEnv(t *testing.T) *initTestEnv {
 		Agents:     map[string]turns.Agent{"claude": claude.Agent{}},
 		Homes:      map[string]setup.HomeKind{"claude": fakeKind{}},
 		slack: slackEnv{
-			Keychain:    te.kc,
-			LockPath:    filepath.Join(t.TempDir(), "slack.lock"),
 			Interactive: func() bool { return false },
-			Open:        func(string) error { return errors.New("no browser in tests") },
 			ReadSecret:  func() ([]byte, error) { return nil, errors.New("no secret in tests") },
 		},
 	}
+	te.slackSt = &slackTestEnv{kc: te.kc}
+	withSlackPlugin(t, te.Env, te.slackSt.pluginEnv(t, ""))
 	te.Env.intents = newEnvIntents(te.Env)
 	return te
 }
@@ -563,11 +564,10 @@ func TestInitAtATerminal(t *testing.T) {
 	srv.Handle("auth.test", func(url.Values) any {
 		return map[string]any{"team_id": "T000", "team": "Acme", "user_id": "U000", "url": "https://acme.example/"}
 	})
-	port := 0
-	te.slack.BaseURL, te.slack.LoginPort = srv.URL, &port
+	te.slackSt.open = func(u string) error { browse(t, u); return nil }
+	withSlackPlugin(t, te.Env, te.slackSt.pluginEnv(t, srv.URL))
 	te.slack.Interactive = func() bool { return true }
 	te.slack.ReadSecret = func() ([]byte, error) { return []byte("xapp-1-fakeapp"), nil }
-	te.slack.Open = func(u string) error { browse(t, u); return nil }
 	te.In = answers(
 		"",             // projects_dir: the suggestion
 		"",             // repositories: the reviewed ones
@@ -589,9 +589,8 @@ func TestInitAtATerminal(t *testing.T) {
 		cfg.Profile != filepath.Join(filepath.Dir(te.ConfigPath), "profiles", "personal") || cfg.Slack.ClientID != "123.456" {
 		t.Fatalf("config %+v", cfg)
 	}
-	st := te.slackState(cfg.Slack)
-	if !st.appToken || st.login == "" {
-		t.Fatalf("slack %+v\n%s", st, te.out)
+	if len(te.kc.items) != 2 {
+		t.Fatalf("slack keychain items %d, want the app token and the login\n%s", len(te.kc.items), te.out)
 	}
 	assertNoSlackToken(t, te.out.String()+te.err.String())
 	for _, want := range []string{"Agent: claude, the only one installed", "you reviewed in the last 30 days: acme/api, acme/web", "socket_mode_enabled: true", "Logged in to Slack as U000"} {
@@ -605,7 +604,7 @@ func TestInitAtATerminal(t *testing.T) {
 	if code := te.run(); code != 0 {
 		t.Fatalf("rerun exit %d: %s", code, te.err)
 	}
-	if !strings.Contains(te.out.String(), "is up to date") || !strings.Contains(te.out.String(), "Slack: logged in as U000") {
+	if !strings.Contains(te.out.String(), "is up to date") || !strings.Contains(te.out.String(), "Slack: logged in") || !strings.Contains(te.out.String(), "user: U000") {
 		t.Errorf("rerun out:\n%s", te.out)
 	}
 }

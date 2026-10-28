@@ -2,10 +2,12 @@ package profile
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/wloophq/wloop/internal/config"
 )
@@ -69,6 +71,7 @@ func TestChain(t *testing.T) {
 		}
 		return out
 	}
+	useBundledPlugins(t)
 	if got := strings.Join(names(Chain(config.Config{Profile: "/u"})), " "); got != "bundled= user=/u" {
 		t.Fatalf("%s", got)
 	}
@@ -122,4 +125,72 @@ func TestGuidesComposeTheConfiguredChain(t *testing.T) {
 
 func guidesOf(cfg config.Config) Guides {
 	return Guides{Tree: func() (Tree, error) { return Load(Chain(cfg), testIntents, nil) }}
+}
+
+// useBundledPlugins makes ps the bundled plugins' layers for the rest of t.
+func useBundledPlugins(t *testing.T, ps ...PluginFS) {
+	was := bundledPlugins.Load()
+	UseBundledPlugins(ps)
+	t.Cleanup(func() { bundledPlugins.Store(was) })
+}
+
+// usePlugins makes ps the found plugins for the rest of t.
+func usePlugins(t *testing.T, ps ...PluginDir) {
+	was := plugins.Load()
+	UsePlugins(ps)
+	t.Cleanup(func() { plugins.Store(was) })
+}
+
+func TestABundledPluginsLayerComesFromTheBinaryUnlessItsDirectoryHasOne(t *testing.T) {
+	embedded := fstest.MapFS{"prompts/acme.md": {Data: []byte("embedded")}}
+	useBundledPlugins(t, PluginFS{ID: "acme", Source: "plugins/acme/profile", FS: embedded})
+	onDisk := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(onDisk, PluginProfileDir, "prompts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(onDisk, PluginProfileDir, "prompts", "acme.md"), []byte("on disk"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	off := false
+	for _, c := range []struct {
+		name  string
+		found []PluginDir
+		sw    map[string]config.Plugin
+		want  string
+	}{
+		{"no directory", nil, nil, "embedded"},
+		{"a directory without a layer", []PluginDir{{ID: "acme", Dir: t.TempDir()}}, nil, "embedded"},
+		{"a directory with a layer", []PluginDir{{ID: "acme", Dir: onDisk}}, nil, "on disk"},
+		{"disabled", nil, map[string]config.Plugin{"acme": {Enabled: &off}}, ""},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			usePlugins(t, c.found...)
+			chain := Chain(config.Config{Plugins: config.Plugins{Other: c.sw}})
+			r, err := Resolve(chain, "prompts/acme.md")
+			if c.want == "" {
+				if !errors.Is(err, fs.ErrNotExist) {
+					t.Fatalf("a disabled plugin's layer: %v %q", err, r.Body)
+				}
+				return
+			}
+			if err != nil || string(r.Body) != c.want || r.Layer.Name != "plugin:acme" {
+				t.Fatalf("%v %q from %s", err, r.Body, r.Layer.Name)
+			}
+		})
+	}
+}
+
+func TestAnEmbeddedLayersFilesResolveByItsPathInTheBinary(t *testing.T) {
+	l := Layer{Name: "plugin:acme", Source: "plugins/acme/profile", FS: fstest.MapFS{"partials/x.md.tmpl": {Data: []byte("x")}}}
+	if !l.Embedded() || l.Bundled() || !l.Plugin() {
+		t.Fatalf("embedded %t, bundled %t, plugin %t", l.Embedded(), l.Bundled(), l.Plugin())
+	}
+	files, err := Files([]Layer{bundled(), l}, PartialsDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := files["partials/x.md.tmpl"]
+	if !ok || r.Path != "plugins/acme/profile/partials/x.md.tmpl" || string(r.Body) != "x" {
+		t.Fatalf("%+v", r)
+	}
 }

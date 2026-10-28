@@ -11,17 +11,18 @@ import (
 	"testing"
 	"time"
 
-	slacksource "github.com/wloophq/wloop/internal/adapter/source/slack"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/source"
+	slackstore "github.com/wloophq/wloop/plugins/slack/store"
 )
 
-// startSlackDaemon serves a daemon wired as serve wires it, with the Slack
-// module over te's fake Keychain and fake Slack and a store of its own.
+// startSlackDaemon serves a daemon wired as serve wires it, with the real
+// Slack plugin over te's fake Keychain and fake Slack, the Slack module
+// relaying to it and a store of its own.
 func startSlackDaemon(t *testing.T, te *slackTestEnv) *sqlite.DB {
 	t.Helper()
 	dir, err := os.MkdirTemp("/tmp", brand.Name)
@@ -34,15 +35,24 @@ func startSlackDaemon(t *testing.T, te *slackTestEnv) *sqlite.DB {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	kit := te.slack.kit(te.cfg.Slack, t.Logf)
-	mod, err := slacksource.Module(te.cfg, source.Deps{DB: db, Log: t.Logf, Clock: clockFunc(time.Now)},
-		slacksource.Slack{Tokens: kit.Store, Client: kit.Client})
+	ctx, cancel := context.WithCancel(context.Background())
+	stop := te.servePlugins(ctx, db, te.cfg, t.Logf)
+	t.Cleanup(func() {
+		cancel()
+		stop()
+	})
+	eventually(t, "the slack plugin running", func() bool {
+		_, err := te.pluginKind.Client(string(slackPlugin))
+		return err == nil
+	})
+	st := inventory.New(db)
+	mod, err := te.slackRelay(te.cfg, source.Deps{DB: db, Inventory: st, Log: t.Logf, Clock: clockFunc(time.Now)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	st := inventory.New(db)
 	d := withSources(withStore(daemon.Deps{Cfg: Defaults(), Version: "test", Now: time.Now, Log: t.Logf}, st), plugins, []source.Module{mod})
 	d.Ingest = nil
+	d.PluginAction = te.pluginAction
 	sock := filepath.Join(dir, "daemon.sock")
 	l, err := net.Listen("unix", sock)
 	if err != nil {
@@ -56,11 +66,23 @@ func startSlackDaemon(t *testing.T, te *slackTestEnv) *sqlite.DB {
 	return db
 }
 
+// pluginStore is the own store of the Slack plugin running under stateDir.
+func pluginStore(t *testing.T, stateDir string) *slackstore.DB {
+	t.Helper()
+	db, err := slackstore.Open(context.Background(), filepath.Join(stateDir, "plugins", string(slackPlugin)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	return db
+}
+
 func TestFollowSendsTrackForTheThread(t *testing.T) {
 	t.Parallel()
 	te := newSlackTestEnv(t)
-	slack := startSlackDaemon(t, te).Slack()
 	te.saveToken(t, fakeToken())
+	startSlackDaemon(t, te)
+	slack := pluginStore(t, te.StateDir).Slack()
 	te.srv.Handle("conversations.replies", func(v url.Values) any {
 		return map[string]any{"messages": []any{map[string]any{"type": "message", "ts": v.Get("ts"), "thread_ts": "1700000000.000100", "user": "U001"}}}
 	})
@@ -106,6 +128,7 @@ func TestFollowRefusesWhatIsNotAPermalink(t *testing.T) {
 	t.Parallel()
 	te := newSlackTestEnv(t)
 	te.saveToken(t, fakeToken())
+	startSlackDaemon(t, te)
 	if code := te.run("slack", "follow", "https://github.com/acme/api/pull/7"); code == 0 || !strings.Contains(te.err.String(), "not a Slack message ref (<conversation>/<ts>) or permalink") {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}

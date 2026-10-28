@@ -9,7 +9,10 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync/atomic"
 
 	"github.com/wloophq/wloop/internal/config"
@@ -23,11 +26,27 @@ type Layer struct {
 	// Name is bundled, user, or plugin:<id> and user:<id> for a plugin's
 	// layer and the user's over it.
 	Name string
-	// Source is "embedded" for the bundled layer.
+	// Source is "embedded" for the bundled layer, the path in the binary
+	// for a layer FS holds, else Dir.
 	Source string
-	// Dir is "" for the bundled layer.
+	// Dir is the directory of a layer on disk, "" for a layer the binary
+	// holds.
 	Dir string
+	// FS holds a plugin's layer the binary bundles; nil for the bundled
+	// layer and a layer on disk.
+	FS fs.FS
 }
+
+// Bundled says whether l is the bundled layer, which every reader takes
+// from the embedded default profile.
+func (l Layer) Bundled() bool { return l.Dir == "" && l.FS == nil }
+
+// Plugin says whether l is a plugin's own layer, not the user's over it.
+func (l Layer) Plugin() bool { return strings.HasPrefix(l.Name, pluginLayer) }
+
+// Embedded says whether the binary holds l: the bundled layer or a bundled
+// plugin's.
+func (l Layer) Embedded() bool { return l.Dir == "" }
 
 type Part struct {
 	Layer Layer
@@ -61,31 +80,64 @@ func (e MissingError) Error() string {
 
 // Chain is the bundled layer, the profile layer of each enabled plugin,
 // the user's profile when one is set, then the user's plugins/<id>/ of each
-// enabled plugin. A disabled plugin's layers are left out.
+// enabled plugin. A plugin's layer is its directory's profile/, else the
+// one the binary bundles for it. A disabled plugin's layers are left out.
 func Chain(cfg config.Config) []Layer {
 	out := []Layer{{Name: "bundled", Source: "embedded"}}
-	ps := plugins.Load()
-	if ps == nil {
-		ps = &[]PluginDir{}
+	var found []PluginDir
+	if ps := plugins.Load(); ps != nil {
+		found = *ps
 	}
-	var on []PluginDir
-	for _, p := range *ps {
-		if cfg.PluginEnabled(p.ID) {
-			on = append(on, p)
+	var bundled []PluginFS
+	if bs := bundledPlugins.Load(); bs != nil {
+		bundled = *bs
+	}
+	var on []string
+	layers := map[string]Layer{}
+	for _, p := range found {
+		if !cfg.PluginEnabled(p.ID) || slices.Contains(on, p.ID) {
+			continue
+		}
+		on = append(on, p.ID)
+		if d := filepath.Join(p.Dir, PluginProfileDir); isDir(d) {
+			layers[p.ID] = Layer{Name: PluginLayer(p.ID), Source: d, Dir: d}
 		}
 	}
-	for _, p := range on {
-		if d := filepath.Join(p.Dir, PluginProfileDir); isDir(d) {
-			out = append(out, Layer{Name: "plugin:" + p.ID, Source: d, Dir: d})
+	for _, b := range bundled {
+		if !cfg.PluginEnabled(b.ID) {
+			continue
+		}
+		if !slices.Contains(on, b.ID) {
+			on = append(on, b.ID)
+		}
+		if _, ok := layers[b.ID]; !ok {
+			layers[b.ID] = Layer{Name: PluginLayer(b.ID), Source: b.Source, FS: b.FS}
+		}
+	}
+	for _, id := range on {
+		if l, ok := layers[id]; ok {
+			out = append(out, l)
 		}
 	}
 	if cfg.Profile == "" {
 		return out
 	}
 	out = append(out, Layer{Name: "user", Source: cfg.Profile, Dir: cfg.Profile})
-	for _, p := range on {
-		if d := filepath.Join(cfg.Profile, PluginsDir, p.ID); isDir(d) {
-			out = append(out, Layer{Name: "user:" + p.ID, Source: d, Dir: d})
+	for _, id := range on {
+		if d := filepath.Join(cfg.Profile, PluginsDir, id); isDir(d) {
+			out = append(out, Layer{Name: "user:" + id, Source: d, Dir: d})
+		}
+	}
+	return out
+}
+
+// BundledChain is the profile the release ships: the bundled layer and the
+// layer of every plugin the binary bundles.
+func BundledChain() []Layer {
+	out := []Layer{{Name: "bundled", Source: "embedded"}}
+	if bs := bundledPlugins.Load(); bs != nil {
+		for _, b := range *bs {
+			out = append(out, Layer{Name: PluginLayer(b.ID), Source: b.Source, FS: b.FS})
 		}
 	}
 	return out
@@ -104,12 +156,55 @@ const (
 	PluginsDir       = "plugins"
 )
 
-var plugins atomic.Pointer[[]PluginDir]
+// PluginFS is the profile layer the binary bundles for a plugin; Source is
+// its path in the binary.
+type PluginFS struct {
+	ID, Source string
+	FS         fs.FS
+}
+
+const pluginLayer = "plugin:"
+
+// PluginLayer is the name of plugin id's own layer.
+func PluginLayer(id string) string { return pluginLayer + id }
+
+var (
+	plugins        atomic.Pointer[[]PluginDir]
+	bundledPlugins atomic.Pointer[[]PluginFS]
+)
 
 // UsePlugins makes ps the plugins whose layers Chain adds. The composition
 // root sets it once, after it discovers the plugins and before the profile
 // loads.
 func UsePlugins(ps []PluginDir) { plugins.Store(&ps) }
+
+// UseBundledPlugins makes ps the layers the binary bundles, which Chain adds
+// for an enabled plugin whose directory holds no layer or that no directory
+// on disk holds. It is set once, before the profile loads.
+func UseBundledPlugins(ps []PluginFS) { bundledPlugins.Store(&ps) }
+
+// FSys is the files of l, relative to the layer.
+func (l Layer) FSys() (fs.FS, error) {
+	switch {
+	case l.FS != nil:
+		return l.FS, nil
+	case l.Dir != "":
+		return os.DirFS(l.Dir), nil
+	}
+	return fs.Sub(profiles.Default, "default")
+}
+
+// FileName is where rel, a slash path, is in l, as a problem names it: a
+// path on disk for a layer on disk, else its path in the binary.
+func (l Layer) FileName(rel string) string {
+	switch {
+	case l.Dir != "":
+		return filepath.Join(l.Dir, filepath.FromSlash(rel))
+	case l.FS != nil:
+		return path.Join(l.Source, rel)
+	}
+	return path.Join("default", rel)
+}
 
 func isDir(path string) bool {
 	fi, err := os.Stat(path)

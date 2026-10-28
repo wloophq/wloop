@@ -41,7 +41,7 @@ Dependencies point down and inward. An adapter imports the port it implements an
 | Clients | `internal/client/...` | `internal/api`, `internal/api/client`, the domain and `internal/termfmt` |
 | Read model | `internal/readmodel`, `internal/readmodel/cards` | ports; no adapter, GitHub, brief queue, situation deriver or Orca client |
 | Daemon | `internal/daemon` | anything but the adapters, `internal/github` and the Orca client, which it reaches through ports `serve.go` wires |
-| Adapters | `internal/adapter/...`, `internal/workspace/...`, `internal/github`, `internal/ghcli`, `internal/slack`, `internal/gitx` | the ports they implement and the domain |
+| Adapters | `internal/adapter/...`, `internal/workspace/...`, `internal/github`, `internal/ghcli`, `internal/gitx` | the ports they implement and the domain |
 | Composition root | `internal/cli`, `cmd/{{command}}` | everything |
 
 Some packages sit beside the layers with rules of their own:

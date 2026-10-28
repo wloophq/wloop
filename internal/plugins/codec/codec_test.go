@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/domain/pr"
-	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/plugins/bundled"
 )
@@ -22,7 +21,7 @@ func TestTheManifestCodecsReadKeysAsTheGoCodecsDid(t *testing.T) {
 		"T01ABC/C02DEF", " ", "acme/api#3 "}
 	urls := []string{"https://github.com/acme/api/pull/12", "http://github.com/acme/api/pull/12/files", "https://github.com/acme/api/pull/0",
 		"https://github.com/acme/api/issues/3", "https://github.com/acme/api/pull/12?x=1#y", "https://gitlab.com/acme/api/pull/1"}
-	for _, old := range []unit.Codec{pr.Codec{}, dslack.Codec()} {
+	for _, old := range []unit.Codec{pr.Codec{}} {
 		got := cs[old.Provider()]
 		if got == nil {
 			t.Fatalf("no manifest codec of %s", old.Provider())

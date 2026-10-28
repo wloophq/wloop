@@ -9,10 +9,13 @@ brief_subject = true
 kinds = ["thread"]
 
 default_delivery = "message"
+config_reads = ["placement", "items.heat"]
+notify = ["tasks", "gates"]
 
 [source.codec]
 keys = ["{team}/{conversation}/{ts}", "{team}/{conversation}/seg/{segment}"]
 target = "<ref|permalink|slack:key>"
+targets = '^\s*(?:[CDG][A-Z0-9]+/[0-9]{10}\.[0-9]{6}|https?://(?i:(?:[a-z0-9-]+\.)*slack\.com)/archives/[CDG][A-Z0-9]+/p[0-9]{16}/?(?:\?\S*)?|[CGD][A-Z0-9]{2,}|#.*|@?[UW][A-Z0-9]{2,}|slack:[UW][A-Z0-9]{2,}|[^\s/]*@[^\s/]+)\s*$'
 
 [source.codec.fields]
 team = "[A-Z][A-Z0-9]+"
@@ -27,9 +30,16 @@ posts = true
 [[source.deliveries]]
 name = "reaction"
 
+[[source.deliveries]]
+name = "edit"
+
 [[source.draft_kinds]]
 name = "react"
 delivery = "reaction"
+
+[[source.draft_kinds]]
+name = "edit"
+delivery = "edit"
 
 [[source.facts]]
 name = "slack.channel"
@@ -95,3 +105,272 @@ name = "slack.fingerprint"
 type = "string"
 doc = "The unit, its newest message and the update time of its items."
 untrusted = true
+
+
+[[source.jobs]]
+name = "ingest"
+every = "1m"
+
+[[source.jobs]]
+name = "extract"
+every = "30s"
+timeout = "22m"
+
+[[source.situations]]
+name = "waits_on_viewer"
+doc = "The extraction says the conversation waits on the viewer."
+
+[[source.situations]]
+name = "needs_closure"
+doc = "The viewer started the conversation and its items resolved; it waits for a closure."
+
+[[source.situations]]
+name = "new"
+doc = "The extraction has not read the conversation yet."
+
+[[source.situations]]
+name = "waits_on_others"
+doc = "The conversation waits on someone other than the viewer."
+
+[[source.situations]]
+name = "fyi"
+doc = "The conversation asks nothing of anyone."
+
+[[source.situations]]
+name = "resolved"
+doc = "The conversation's asks resolved, and an item is still open."
+
+[[source.ui.views]]
+id = "slack"
+rows = true
+surfaces = ["web", "tui"]
+unit_sort = "channel"
+
+[[source.ui.facets]]
+id = "conversation"
+group = true
+sort = "text"
+menu = true
+
+[[source.ui.facets]]
+id = "channel"
+group = true
+sort = "text"
+menu = true
+
+[[source.commands]]
+name = "login"
+usage = "[--no-browser] | --app-token (reads standard input)"
+
+[[source.commands]]
+name = "logout"
+
+[[source.commands]]
+name = "status"
+
+[[source.tools]]
+name = "slack_send_message"
+doc = "Posts to Slack as the user, now."
+posts = "now"
+input = '{"type":"object","properties":{"target":{"type":"string"},"text":{"type":"string"},"thread":{"type":"boolean"},"broadcast":{"type":"boolean"}},"required":["target","text"],"additionalProperties":false}'
+
+[[source.tools.answers]]
+name = "not_logged_in"
+doc = "Slack is logged out."
+
+[[source.tools.answers]]
+name = "failed"
+doc = "Slack or the daemon failed the call."
+fields = [{ name = "Error" }]
+
+[[source.tools.answers]]
+name = "problem_target_required"
+doc = "A problem: target is missing."
+
+[[source.tools.answers]]
+name = "problem_text_required"
+doc = "A problem: text is missing or empty."
+
+[[source.tools.answers]]
+name = "broadcast"
+doc = "The text notifies a whole channel or group."
+
+[[source.tools.answers]]
+name = "posted"
+doc = "The message is posted: where, its permalink, \"\" when Slack gave none, and its text as posted."
+fields = [{ name = "Conversation" }, { name = "Parent" }, { name = "Permalink" }, { name = "Channel" }, { name = "TS" }, { name = "Text" }]
+
+[[source.tools]]
+name = "slack_read"
+doc = "Reads a Slack thread or conversation."
+input = '{"type":"object","properties":{"target":{"type":"string"},"limit":{"type":"integer","minimum":1}},"required":["target"],"additionalProperties":false}'
+
+[[source.tools.answers]]
+name = "not_logged_in"
+doc = "Slack is logged out."
+
+[[source.tools.answers]]
+name = "failed"
+doc = "Slack or the daemon failed the call."
+fields = [{ name = "Error" }]
+
+[[source.tools.answers]]
+name = "problem_target_required"
+doc = "A problem: target is missing."
+
+[[source.tools.answers]]
+name = "problem_limit"
+doc = "A problem: limit is out of range."
+fields = [{ name = "Max", number = true }]
+
+[[source.tools.answers]]
+name = "read"
+doc = "The messages read, rendered."
+fields = [{ name = "Text" }]
+
+[[source.tools]]
+name = "slack_search"
+doc = "Searches the Slack messages the user can read."
+input = '{"type":"object","properties":{"query":{"type":"string"},"channel":{"type":"string"},"from":{"type":"string"},"after":{"type":"string","maxLength":10},"before":{"type":"string","maxLength":10},"limit":{"type":"integer","minimum":1}},"required":["query"],"additionalProperties":false}'
+
+[[source.tools.answers]]
+name = "not_logged_in"
+doc = "Slack is logged out."
+
+[[source.tools.answers]]
+name = "failed"
+doc = "Slack or the daemon failed the call."
+fields = [{ name = "Error" }]
+
+[[source.tools.answers]]
+name = "problem_query_required"
+doc = "A problem: query is missing or empty."
+
+[[source.tools.answers]]
+name = "problem_after"
+doc = "A problem: after is not a date."
+
+[[source.tools.answers]]
+name = "problem_before"
+doc = "A problem: before is not a date."
+
+[[source.tools.answers]]
+name = "problem_before_after"
+doc = "A problem: before is not after after."
+
+[[source.tools.answers]]
+name = "problem_limit"
+doc = "A problem: limit is out of range."
+fields = [{ name = "Max", number = true }]
+
+[[source.tools.answers]]
+name = "found"
+doc = "The messages found, rendered."
+fields = [{ name = "Text" }]
+
+[[source.tools]]
+name = "slack_draft"
+doc = "Proposes a Slack message or reaction for the user's approval."
+input = '{"type":"object","properties":{"text":{"type":"string"},"kind":{"type":"string","enum":["reply","nudge","close","ask_owner","react"]},"target":{"type":"string"},"items":{"type":"array","items":{"type":"string"}},"reaction":{"type":"string"},"effects":{"type":"array","items":{"type":"string"}}},"additionalProperties":false}'
+
+[[source.tools.answers]]
+name = "not_logged_in"
+doc = "Slack is logged out."
+
+[[source.tools.answers]]
+name = "failed"
+doc = "Slack or the daemon failed the call."
+fields = [{ name = "Error" }]
+
+[[source.tools.answers]]
+name = "problem_kind"
+doc = "A problem: kind is none of the kinds."
+fields = [{ name = "Kinds" }]
+
+[[source.tools.answers]]
+name = "problem_reaction_required"
+doc = "A problem: a react draft has no reaction."
+
+[[source.tools.answers]]
+name = "problem_text_required"
+doc = "A problem: text is missing or empty."
+
+[[source.tools.answers]]
+name = "proposed"
+doc = "The draft waits for the user, or its policy approved it."
+fields = [{ name = "ID", number = true }, { name = "Unit" }, { name = "Where" }]
+
+[[source.tools]]
+name = "slack_react"
+doc = "Adds or removes a reaction on a Slack message as the user, now."
+posts = "now"
+input = '{"type":"object","properties":{"message":{"type":"string"},"emoji":{"type":"string"},"remove":{"type":"boolean"}},"required":["message","emoji"],"additionalProperties":false}'
+
+[[source.tools.answers]]
+name = "not_logged_in"
+doc = "Slack is logged out."
+
+[[source.tools.answers]]
+name = "failed"
+doc = "Slack or the daemon failed the call."
+fields = [{ name = "Error" }]
+
+[[source.tools.answers]]
+name = "problem_message"
+doc = "A problem: message is not a message ref or permalink."
+
+[[source.tools.answers]]
+name = "problem_emoji_required"
+doc = "A problem: emoji is missing or empty."
+
+[[source.tools.answers]]
+name = "reacted"
+doc = "The reaction is added; Permalink is \"\" when Slack gave none."
+fields = [{ name = "Emoji" }, { name = "Conversation" }, { name = "Message" }, { name = "Permalink" }]
+
+[[source.tools.answers]]
+name = "removed"
+doc = "The reaction is removed; Permalink is \"\" when Slack gave none."
+fields = [{ name = "Emoji" }, { name = "Conversation" }, { name = "Message" }, { name = "Permalink" }]
+
+[[source.tools.answers]]
+name = "already"
+doc = "The message already had the user's reaction; Permalink is \"\" when Slack gave none."
+fields = [{ name = "Emoji" }, { name = "Conversation" }, { name = "Message" }, { name = "Permalink" }]
+
+[[source.tools.answers]]
+name = "absent"
+doc = "The message had no such reaction of the user; Permalink is \"\" when Slack gave none."
+fields = [{ name = "Emoji" }, { name = "Conversation" }, { name = "Message" }, { name = "Permalink" }]
+
+[[source.tools]]
+name = "slack_edit"
+doc = "Replaces the text of one of the user's Slack messages, now."
+posts = "now"
+input = '{"type":"object","properties":{"message":{"type":"string"},"text":{"type":"string"}},"required":["message","text"],"additionalProperties":false}'
+
+[[source.tools.answers]]
+name = "not_logged_in"
+doc = "Slack is logged out."
+
+[[source.tools.answers]]
+name = "failed"
+doc = "Slack or the daemon failed the call."
+fields = [{ name = "Error" }]
+
+[[source.tools.answers]]
+name = "problem_message"
+doc = "A problem: message is not a message ref or permalink."
+
+[[source.tools.answers]]
+name = "problem_text_required"
+doc = "A problem: text is missing or empty."
+
+[[source.tools.answers]]
+name = "broadcast"
+doc = "The text notifies a whole channel or group."
+
+[[source.tools.answers]]
+name = "edited"
+doc = "The message is edited: where, its ref and its permalink, \"\" when Slack gave none, its new text as posted and the text it replaced."
+fields = [{ name = "Conversation" }, { name = "Message" }, { name = "Permalink" }, { name = "Text" }, { name = "Replaced" }]

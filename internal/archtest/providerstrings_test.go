@@ -194,7 +194,6 @@ func TestProviderStringsFlagAPlantedSpelling(t *testing.T) {
 		"internal/adapter/store/sqlite/migrate_v5.go":   {},
 		"internal/adapter/store/sqlite/x_test.go":       {},
 		"internal/adapter/store/sqlite/sqlitetest/x.go": {},
-		"internal/slack/x.go":                           {"github": 2},
 		"internal/github/x.go":                          {"slack": 3},
 		"internal/cli/slackdraft.go":                    {"github": 2},
 		"internal/cli/root.go":                          {},
