@@ -32,13 +32,17 @@ func (k fixedKind) Health(context.Context) (Health, error) {
 }
 func (fixedKind) Start(context.Context, StartRequest) error         { return nil }
 func (fixedKind) Stop(context.Context) error                        { return nil }
-func (fixedKind) Notify(context.Context, []Unit, []string) error    { return nil }
+func (fixedKind) Notify(context.Context, []Unit, []Topic) error     { return nil }
 func (fixedKind) Register(*grpc.Server, *goplugin.GRPCBroker) error { return nil }
 
 func TestMain(m *testing.M) {
 	switch os.Getenv(roleEnv) {
 	case "serve":
 		Serve(map[Kind]Impl{"alpha": fixedKind{reason: "from the child"}})
+		os.Exit(0)
+	case "serve-env":
+		reason := fmt.Sprintf("brand=%s path=%t home=%t", os.Getenv(BrandEnv), os.Getenv("PATH") != "", os.Getenv("HOME") != "")
+		Serve(map[Kind]Impl{"alpha": fixedKind{reason: reason}})
 		os.Exit(0)
 	case "parent":
 		os.Exit(runParent())
@@ -59,10 +63,54 @@ func runParent() int {
 	select {}
 }
 
-func childCmd() *exec.Cmd {
+func childCmd() *exec.Cmd { return roleCmd("serve") }
+
+func roleCmd(role string) *exec.Cmd {
 	cmd := exec.Command(os.Args[0], "-test.run=^$")
-	cmd.Env = append(os.Environ(), roleEnv+"=serve")
+	cmd.Env = append(os.Environ(), roleEnv+"="+role)
 	return cmd
+}
+
+func TestSpecEnvReachesThePlugin(t *testing.T) {
+	t.Setenv(BrandEnv, "fromhost")
+	cmd := roleCmd("serve-env")
+	cmd.Env = append(cmd.Env, BrandEnv+"=other")
+	p, err := Exec(Spec{ID: "alpha-plugin", Kinds: []Kind{"alpha"}, Env: []string{BrandEnv + "=acme"}, Logger: hclog.NewNullLogger()}, cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(p.Kill)
+	c, err := p.Kind("alpha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := c.Health(t.Context())
+	if err != nil || h.Reason != "brand=acme path=true home=true" {
+		t.Errorf("the plugin saw %q, %v", h.Reason, err)
+	}
+}
+
+func TestACrashedPluginReportsExited(t *testing.T) {
+	p, err := Exec(Spec{ID: "alpha-plugin", Kinds: []Kind{"alpha"}, Logger: hclog.NewNullLogger()}, childCmd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(p.Kill)
+	c, err := p.Kind("alpha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Exited() {
+		t.Fatal("a running plugin reports Exited")
+	}
+	pid := p.(*execProcess).client.ReattachConfig().Pid
+	if err := syscall.Kill(pid, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	poll(t, "Exited after the crash", p.Exited)
+	if _, err := c.Health(t.Context()); err == nil {
+		t.Error("a crashed plugin answered Health")
+	}
 }
 
 func TestVersionedPluginsNegotiate(t *testing.T) {
@@ -105,7 +153,7 @@ func TestAPluginExitsWhenItsParentDies(t *testing.T) {
 			done := make(chan struct{})
 			go func() {
 				defer close(done)
-				watchParent(t.Context(), parentPoll, func() int { return int(ppid.Load()) }, func() { gone = time.Since(start) })
+				watchParent(t.Context(), parentPoll, 40, func() int { return int(ppid.Load()) }, func() { gone = time.Since(start) })
 			}()
 			time.Sleep(3*parentPoll + parentPoll/2)
 			synctest.Wait()
@@ -119,13 +167,35 @@ func TestAPluginExitsWhenItsParentDies(t *testing.T) {
 			}
 		})
 	})
+	t.Run("a parent already gone when Serve starts", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			start := time.Now()
+			var gone time.Duration
+			ctx, cancel := context.WithTimeout(t.Context(), 3*parentPoll)
+			defer cancel()
+			watchParent(ctx, parentPoll, 40, func() int { return 1 }, func() { gone = time.Since(start) })
+			if gone != parentPoll {
+				t.Errorf("fired at %v, want %v", gone, parentPoll)
+			}
+		})
+	})
+	t.Run("the parent is the pid the host passed, else the first ppid", func(t *testing.T) {
+		for _, c := range []struct {
+			env  string
+			want int
+		}{{"40", 40}, {"", 7}, {"x", 7}, {"0", 7}} {
+			if got := parentPID(c.env, func() int { return 7 }); got != c.want {
+				t.Errorf("parentPID(%q) = %d, want %d", c.env, got, c.want)
+			}
+		}
+	})
 	t.Run("the watch stops with its context", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			done := make(chan struct{})
 			go func() {
 				defer close(done)
-				watchParent(ctx, parentPoll, func() int { return 40 }, func() { t.Error("fired") })
+				watchParent(ctx, parentPoll, 40, func() int { return 40 }, func() { t.Error("fired") })
 			}()
 			cancel()
 			<-done

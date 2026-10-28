@@ -15,7 +15,7 @@ import (
 
 type note struct {
 	units  []plugin.Unit
-	topics []string
+	topics []plugin.Topic
 }
 
 type recordingKind struct {
@@ -44,7 +44,7 @@ func (k *recordingKind) Stop(context.Context) error {
 	return nil
 }
 
-func (k *recordingKind) Notify(_ context.Context, units []plugin.Unit, topics []string) error {
+func (k *recordingKind) Notify(_ context.Context, units []plugin.Unit, topics []plugin.Topic) error {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	k.notes = append(k.notes, note{units, topics})
@@ -95,7 +95,7 @@ func TestAPluginServesSeveralKinds(t *testing.T) {
 		t.Fatal(err)
 	}
 	units := []plugin.Unit{{Provider: "acme", Key: "acme/api#1"}}
-	if err := b.Notify(ctx, units, []string{"rounds"}); err != nil {
+	if err := b.Notify(ctx, units, []plugin.Topic{plugin.TopicRounds}); err != nil {
 		t.Fatal(err)
 	}
 	if err := b.Stop(ctx); err != nil {
@@ -105,7 +105,7 @@ func TestAPluginServesSeveralKinds(t *testing.T) {
 	if !slices.Equal(ra.starts, []plugin.StartRequest{{StateDir: "/state/plugins/acme", HostBroker: 7}}) || len(rb.starts) != 0 {
 		t.Errorf("starts: alpha %v, beta %v", ra.starts, rb.starts)
 	}
-	if len(ra.notes) != 0 || len(rb.notes) != 1 || !slices.Equal(rb.notes[0].units, units) || !slices.Equal(rb.notes[0].topics, []string{"rounds"}) {
+	if len(ra.notes) != 0 || len(rb.notes) != 1 || !slices.Equal(rb.notes[0].units, units) || !slices.Equal(rb.notes[0].topics, []plugin.Topic{plugin.TopicRounds}) {
 		t.Errorf("notes: alpha %v, beta %v", ra.notes, rb.notes)
 	}
 	if ra.stops != 0 || rb.stops != 1 {
@@ -126,5 +126,44 @@ func TestAPluginServesSeveralKinds(t *testing.T) {
 	}
 	if _, err := c.Health(ctx); err == nil {
 		t.Error("a kind the plugin does not serve answered Health")
+	}
+}
+
+func TestACrashedPluginReportsExitedInProcess(t *testing.T) {
+	alpha := &recordingKind{reason: "importing alpha"}
+	l := plugintest.NewLauncher(t)
+	l.Add("acme", map[plugin.Kind]plugin.Impl{"alpha": alpha})
+	spec := plugin.Spec{ID: "acme", Kinds: []plugin.Kind{"alpha"}}
+	p, err := l.Launch(t.Context(), spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := p.Kind("alpha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Exited() {
+		t.Fatal("a running plugin reports Exited")
+	}
+	l.Crash("acme")
+	if !p.Exited() {
+		t.Error("a crashed plugin does not report Exited")
+	}
+	if _, err := c.Health(t.Context()); err == nil {
+		t.Error("a crashed plugin answered Health")
+	}
+	again, err := l.Launch(t.Context(), spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err = again.Kind("alpha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Health(t.Context()); err != nil || again.Exited() {
+		t.Errorf("the relaunched plugin: Health %v, Exited %v", err, again.Exited())
+	}
+	if n := l.Launches("acme"); n != 2 {
+		t.Errorf("Launches = %d, want 2", n)
 	}
 }

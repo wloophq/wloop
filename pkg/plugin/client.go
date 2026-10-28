@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"slices"
+	"strconv"
 
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
@@ -53,8 +54,8 @@ type Process interface {
 // ClientConfig is the go-plugin client configuration that starts spec's
 // binary through cmd: the handshake, the versioned plugin set of the kinds
 // spec names, gRPC only, and the checksum when spec has one. The process's
-// environment is cmd.Env (the host's when nil) followed by spec.Env, so a
-// key in spec.Env wins. The client is managed, so goplugin.CleanupClients
+// environment is cmd.Env (the host's when nil), then spec.Env, then
+// [ParentEnv] set to the host's pid; a later key wins. The client is managed, so goplugin.CleanupClients
 // kills it.
 func ClientConfig(spec Spec, cmd *exec.Cmd) *goplugin.ClientConfig {
 	kinds := map[Kind]Impl{}
@@ -65,7 +66,7 @@ func ClientConfig(spec Spec, cmd *exec.Cmd) *goplugin.ClientConfig {
 	if env == nil {
 		env = os.Environ()
 	}
-	cmd.Env = append(slices.Clip(env), spec.Env...)
+	cmd.Env = append(append(slices.Clip(env), spec.Env...), ParentEnv+"="+strconv.Itoa(os.Getpid()))
 	cfg := &goplugin.ClientConfig{
 		HandshakeConfig:  Handshake,
 		VersionedPlugins: VersionedPlugins(kinds),
@@ -161,11 +162,15 @@ func (c *Client) Stop(ctx context.Context) error {
 	return err
 }
 
-func (c *Client) Notify(ctx context.Context, units []Unit, topics []string) error {
+func (c *Client) Notify(ctx context.Context, units []Unit, topics []Topic) error {
 	us := make([]*pb.Unit, len(units))
 	for i, u := range units {
 		us[i] = &pb.Unit{Provider: u.Provider, Key: u.Key}
 	}
-	_, err := c.lc.Notify(ctx, &pb.NotifyRequest{Kind: string(c.kind), Units: us, Topics: topics})
+	ts := make([]string, len(topics))
+	for i, t := range topics {
+		ts[i] = string(t)
+	}
+	_, err := c.lc.Notify(ctx, &pb.NotifyRequest{Kind: string(c.kind), Units: us, Topics: ts})
 	return err
 }

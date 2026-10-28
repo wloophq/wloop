@@ -14,9 +14,10 @@ var stdoutRoots = []string{"pkg/plugin", "plugins"}
 
 // stdoutUses are the identifiers, by import path, that write to stdout.
 var stdoutUses = map[string][]string{
-	"fmt":     {"Print", "Printf", "Println"},
-	"os":      {"Stdout"},
-	"syscall": {"Stdout"},
+	"fmt":                   {"Print", "Printf", "Println"},
+	"os":                    {"Stdout"},
+	"syscall":               {"Stdout"},
+	"golang.org/x/sys/unix": {"Stdout"},
 }
 
 // ruleStdout flags each use in f of an identifier that writes to stdout.
@@ -32,6 +33,9 @@ func ruleStdout(fset *token.FileSet, path string, f *ast.File) []string {
 	}
 	var out []string
 	ast.Inspect(f, func(n ast.Node) bool {
+		if call, ok := n.(*ast.CallExpr); ok && opensFD1(call, names) {
+			out = append(out, fmt.Sprintf("%s:%d: os.NewFile(1, ...) opens stdout, which carries the plugin handshake; log through plugin.Logger (R-stdout)", path, fset.Position(call.Pos()).Line))
+		}
 		sel, ok := n.(*ast.SelectorExpr)
 		if !ok {
 			return true
@@ -48,6 +52,16 @@ func ruleStdout(fset *token.FileSet, path string, f *ast.File) []string {
 		return true
 	})
 	return out
+}
+
+func opensFD1(call *ast.CallExpr, names map[string]string) bool {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || sel.Sel.Name != "NewFile" || len(call.Args) == 0 {
+		return false
+	}
+	x, ok := sel.X.(*ast.Ident)
+	lit, isLit := call.Args[0].(*ast.BasicLit)
+	return ok && names[x.Name] == "os" && isLit && lit.Value == "1"
 }
 
 // TestPluginWritesNothingToStdout checks that no file of `pkg/plugin` or

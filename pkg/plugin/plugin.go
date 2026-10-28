@@ -36,6 +36,10 @@ var Handshake = goplugin.HandshakeConfig{
 // brand name to a plugin process; a plugin cannot import the host's brand.
 const BrandEnv = "LOOP_PLUGIN_BRAND"
 
+// ParentEnv is the environment variable through which the host passes its
+// pid, so a plugin whose host died before Serve ran still exits.
+const ParentEnv = "LOOP_PLUGIN_PARENT_PID"
+
 // Kind names a capability a plugin serves, such as "source". It is the
 // go-plugin plugin name, and the name of the kind's table in plugin.toml.
 type Kind string
@@ -46,6 +50,22 @@ type Unit struct {
 	Provider string
 	Key      string
 }
+
+// Topic names host state a kind may read, of which Notify says what changed.
+// The names are the wire's, stable across plugins built apart from the host.
+type Topic string
+
+const (
+	TopicRounds    Topic = "rounds"    // round state, its marks and the pending rounds
+	TopicGates     Topic = "gates"     // gates: drafts, plans, questions, proposals
+	TopicMarks     Topic = "marks"     // unit marks
+	TopicTasks     Topic = "tasks"     // tasks and their properties
+	TopicTurns     Topic = "turns"     // turns and their records
+	TopicSessions  Topic = "sessions"  // sessions and the workspaces they run in
+	TopicOverrides Topic = "overrides" // per-unit overrides
+	TopicViewer    Topic = "viewer"    // the viewer's login and teams
+	TopicConfig    Topic = "config"    // the loaded profile and configuration
+)
 
 // Status is what a kind's health reports.
 type Status int32
@@ -86,7 +106,7 @@ type Lifecycle interface {
 	Health(ctx context.Context) (Health, error)
 	Start(ctx context.Context, req StartRequest) error
 	Stop(ctx context.Context) error
-	Notify(ctx context.Context, units []Unit, topics []string) error
+	Notify(ctx context.Context, units []Unit, topics []Topic) error
 }
 
 // Impl is one kind a plugin binary serves: its lifecycle, and the kind's own

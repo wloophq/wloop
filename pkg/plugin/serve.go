@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -26,7 +27,7 @@ const (
 // plugin. It exits the process when the parent that started it dies, after
 // giving every kind's Stop up to five seconds: there is no reattach.
 func Serve(impls map[Kind]Impl) {
-	go watchParent(context.Background(), parentPoll, os.Getppid, func() {
+	go watchParent(context.Background(), parentPoll, parentPID(os.Getenv(ParentEnv), os.Getppid), os.Getppid, func() {
 		stopAll(impls, stopBudget)
 		os.Exit(0)
 	})
@@ -50,10 +51,18 @@ func VersionedPlugins(impls map[Kind]Impl) map[int]goplugin.PluginSet {
 	return map[int]goplugin.PluginSet{Protocol: set}
 }
 
-// watchParent calls gone once ppid no longer returns the parent it returned
-// first, checking every interval until ctx ends.
-func watchParent(ctx context.Context, every time.Duration, ppid func() int, gone func()) {
-	parent := ppid()
+// parentPID is the pid the host passed in env, or ppid's answer when the
+// plugin runs without one.
+func parentPID(env string, ppid func() int) int {
+	if pid, err := strconv.Atoi(env); err == nil && pid > 0 {
+		return pid
+	}
+	return ppid()
+}
+
+// watchParent calls gone once ppid no longer returns parent, checking every
+// interval until ctx ends.
+func watchParent(ctx context.Context, every time.Duration, parent int, ppid func() int, gone func()) {
 	tick := time.NewTicker(every)
 	defer tick.Stop()
 	for {
@@ -156,7 +165,11 @@ func (s *lifecycleServer) Notify(ctx context.Context, req *pb.NotifyRequest) (*p
 	for i, u := range req.GetUnits() {
 		units[i] = Unit{Provider: u.GetProvider(), Key: u.GetKey()}
 	}
-	if err := impl.Notify(ctx, units, req.GetTopics()); err != nil {
+	topics := make([]Topic, len(req.GetTopics()))
+	for i, t := range req.GetTopics() {
+		topics[i] = Topic(t)
+	}
+	if err := impl.Notify(ctx, units, topics); err != nil {
 		return nil, toStatus(err)
 	}
 	return &pb.NotifyResponse{}, nil

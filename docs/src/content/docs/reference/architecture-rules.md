@@ -50,6 +50,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestSpawningPackagesImportMeter` | A package that spawns a process imports the meter. |
 | `TestTheCoreNamesNoProvider` | The core spells no provider id, and that outside the core a provider id appears only in its plugin's packages, the vocabulary tables, the unit package and the composition root. |
 | `TestTheEngineImportsNoProvider` | The automation engine imports no provider's domain. |
+| `TestTheSDKImportsNoInternal` | No package under `pkg/`, tests included, imports a package under `internal/`: plugins built outside this module compile against it. |
 
 ## Allowlists
 
