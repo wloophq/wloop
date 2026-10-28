@@ -58,7 +58,6 @@ var hotPlans = []hotPlan{
 	{name: "turn tokens", query: turnTokensSQL, args: 1, want: []string{"SEARCH t USING INTEGER PRIMARY KEY"}},
 	{name: "last situation", query: lastSituationSQL, args: 3, want: []string{"events_unit_kind (provider=? AND unit_key=? AND kind=?)"}, tempSorts: []string{"USE TEMP B-TREE FOR ORDER BY"}},
 	{name: "last event", query: lastEventSQL, args: 3, want: []string{"events_unit_kind (provider=? AND unit_key=? AND kind=?)"}},
-	{name: "stored facts events", query: storedFactsEventsSQL(marks(2)), args: 4, want: []string{"events_unit_kind"}},
 	{name: "ended", query: endedSQL(marks(2)), args: 3, want: []string{"events_keyed"}},
 	{name: "events of units", query: eventsByUnitsSQL, args: 1, want: []string{"events_unit (provider=? AND unit_key=?)"}, tempSorts: []string{"USE TEMP B-TREE FOR ORDER BY"}},
 	{name: "outages", query: outagesSQL, args: 1, want: []string{"events_kind (kind=? AND at>?)"}},

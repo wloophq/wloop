@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/pkg/plugin"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 func segUnit(team, conv, id string) unit.Unit {
@@ -37,8 +40,8 @@ func init() {
 			want: []string{"SEARCH segment_map USING PRIMARY KEY (provider=? AND conversation=?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
 		hotPlan{name: "segments covering a ts", query: segmentsCovering, args: 4,
 			want: []string{"SEARCH segment_map USING PRIMARY KEY (provider=? AND conversation=?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
-		hotPlan{name: "drafts on the units of a conversation", query: draftsOfConvSQL, args: 3,
-			want: []string{"SEARCH drafts USING COVERING INDEX drafts_unit (provider=? AND unit_key>? AND unit_key<?)"}},
+		hotPlan{name: "messages of a conversation from a ts", query: messagesFromSQL, args: 2,
+			want: []string{"SEARCH slack_messages USING PRIMARY KEY (conversation=? AND ts>?)"}},
 		hotPlan{name: "a segment", query: segmentByIDSQL, args: 3,
 			want: []string{"SEARCH segment_map USING PRIMARY KEY (provider=? AND conversation=? AND segment_id=?)"}},
 	)
@@ -79,10 +82,67 @@ func BenchmarkSegments300(b *testing.B) {
 	})
 }
 
+// saveDM stores messages at tss in the DM conv of team T000AAA.
+func saveDM(t *testing.T, db *DB, conv string, tss ...string) {
+	t.Helper()
+	msgs := make([]MessageRow, len(tss))
+	for i, ts := range tss {
+		msgs[i] = MessageRow{TS: ts, User: "U0001", Text: "text"}
+	}
+	if _, err := db.Slack().Save(context.Background(), FactsRows{Team: "T000AAA", Objects: []ObjectFacts{{
+		Object:   ObjectRow{Object: conv, Conversation: conv, Kind: SlackDM, Version: "1"},
+		Messages: msgs,
+	}}}, noteAt); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// draftHome records the moves it is asked for.
+type draftHome struct{ moves [][]src.UnitMove }
+
+func (h *draftHome) RehomeDrafts(_ context.Context, moves []src.UnitMove) (int, error) {
+	h.moves = append(h.moves, moves)
+	return len(moves), nil
+}
+
+func TestRehomeDraftsGoesThroughTheBroker(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	saveDM(t, db, "D000AAA", "1700000000.000200", "1700000009.000100", "1699999999.000100")
+	saveDM(t, db, "D000BBB", "1700000000.000300")
+	at := unit.Unit{Provider: "slack", Key: "T000AAA/D000AAA/1700000000.000200"}
+	d, err := db.Drafts().Insert(ctx, draft.Draft{Unit: at, Kind: draft.Reply, Text: "hi", Origin: draft.Origin{Kind: draft.OriginSession},
+		State: draft.Sent, CreatedAt: noteAt, UpdatedAt: noteAt})
+	if err != nil {
+		t.Fatal(err)
+	}
+	home := &draftHome{}
+	rows, err := db.Segments().Rehoming(home).Apply(ctx, "slack", "T000AAA", "D000AAA",
+		[]SegmentSpan{{FromTS: "1700000000.000100", ToTS: "1700000005.000000"}, {FromTS: "1700000006.000000"}}, segUnit, noteAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	place := func(ts string) plugin.Unit { return plugin.Unit{Provider: "slack", Key: "T000AAA/D000AAA/" + ts} }
+	seg := func(id string) plugin.Unit {
+		u := segUnit("T000AAA", "D000AAA", id)
+		return plugin.Unit{Provider: string(u.Provider), Key: u.Key}
+	}
+	want := [][]src.UnitMove{{{From: place("1700000000.000200"), To: seg(rows[0].ID)}, {From: place("1700000009.000100"), To: seg(rows[1].ID)}}}
+	if !reflect.DeepEqual(home.moves, want) {
+		t.Errorf("asked the broker for %+v, want %+v", home.moves, want)
+	}
+	if got, err := db.Drafts().Get(ctx, d.ID); err != nil || got.Unit != at {
+		t.Errorf("the store moved draft %d to %v itself (%v)", d.ID, got.Unit, err)
+	}
+}
+
 func TestASegmentTakesTheDraftsRecordedInItsRangeBeforeIt(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db, _ := openTemp(t)
+	saveDM(t, db, "D000AAA", "1700000000.000200", "1700000009.000100")
+	saveDM(t, db, "D000BBB", "1700000000.000200")
 	place := func(conv, ts string) unit.Unit {
 		return unit.Unit{Provider: "slack", Key: "T000AAA/" + conv + "/" + ts}
 	}

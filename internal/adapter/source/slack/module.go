@@ -145,7 +145,11 @@ func newPlugin(cfg config.Slack, d sourcereg.Deps, s Slack) *plugin {
 		return p
 	}
 	db := d.DB.Slack()
-	segs := Segments{Store: d.DB.Segments(), Clock: d.Clock}
+	segStore := d.DB.Segments()
+	if d.Host != nil {
+		segStore = segStore.Rehoming(d.Host(dslack.Provider).Gates)
+	}
+	segs := Segments{Store: segStore, Clock: d.Clock}
 	p.watches = Watches{DB: db}
 	a := newAdmitter(cfg.Ingest)
 	a.db, a.log = db, p.logf

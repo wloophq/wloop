@@ -10,9 +10,13 @@ import (
 func retainBriefs(t *testing.T, db *DB, before string) Retained {
 	t.Helper()
 	out := Retained{}
+	cursors, err := pluginRows{db}.cursorUnits(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := db.Write(context.Background(), func(tx *Tx) error {
 		r := &retainer{ctx: context.Background(), tx: tx, out: out}
-		r.briefs(before)
+		r.briefs(before, cursors)
 		return r.err
 	}); err != nil {
 		t.Fatal(err)

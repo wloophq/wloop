@@ -11,13 +11,40 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/pkg/plugin"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // SegmentStore is the DM segment map: a conversation's ts ranges, each under an id that
 // is never renamed or reused. Ranges are inclusive at both ends; ToTS "" is open.
-type SegmentStore struct{ db *DB }
+type SegmentStore struct {
+	db   *DB
+	home DraftHome
+}
 
-func (db *DB) Segments() *SegmentStore { return &SegmentStore{db} }
+// Segments is the segment map, whose Apply moves drafts through the host's
+// own drafts until Rehoming gives it the broker.
+func (db *DB) Segments() *SegmentStore { return &SegmentStore{db: db, home: dbDraftHome{db}} }
+
+// DraftHome moves drafts between units on the host: the broker's
+// Gates.RehomeDrafts.
+type DraftHome interface {
+	RehomeDrafts(ctx context.Context, moves []src.UnitMove) (int, error)
+}
+
+// Rehoming is s moving drafts through h.
+func (s *SegmentStore) Rehoming(h DraftHome) *SegmentStore { return &SegmentStore{db: s.db, home: h} }
+
+// dbDraftHome moves drafts in the host's drafts of db.
+type dbDraftHome struct{ db *DB }
+
+func (h dbDraftHome) RehomeDrafts(ctx context.Context, moves []src.UnitMove) (int, error) {
+	byFrom := make(map[unit.Unit]unit.Unit, len(moves))
+	for _, m := range moves {
+		byFrom[unit.Unit{Provider: unit.ProviderID(m.From.Provider), Key: m.From.Key}] = unit.Unit{Provider: unit.ProviderID(m.To.Provider), Key: m.To.Key}
+	}
+	return h.db.RehomeDrafts(ctx, byFrom)
+}
 
 // SegmentSpan is a range Apply writes; ID "" asks for a new segment.
 type SegmentSpan struct{ ID, FromTS, ToTS string }
@@ -165,9 +192,12 @@ func (s *SegmentStore) Apply(ctx context.Context, provider unit.ProviderID, team
 			}
 			out[i] = SegmentRow{Team: r.Team, Conversation: conv, ID: sp.ID, FromTS: sp.FromTS, ToTS: sp.ToTS}
 		}
-		return rehomeDrafts(ctx, tx, provider, team, conv, out, unitOf)
+		return nil
 	})
 	if err != nil {
+		return nil, err
+	}
+	if err := s.rehomeDrafts(ctx, provider, team, conv, out, unitOf); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -205,47 +235,37 @@ func mintSegmentID(fromTS string, taken map[string]SegmentRow) string {
 	}
 }
 
-// draftsOfConvSQL reads the drafts on the units of a conversation: the
-// unit keys "<team>/<conv>/..." from ?2 up to ?3.
-const draftsOfConvSQL = `SELECT id, unit_key FROM drafts WHERE provider = ?1 AND unit_key >= ?2 AND unit_key < ?3`
+// messagesFromSQL reads the ts of a conversation's messages from ?2 on.
+const messagesFromSQL = `SELECT ts FROM slack_messages WHERE conversation = ?1 AND ts >= ?2 ORDER BY ts`
 
-// rehomeDrafts moves the drafts a session recorded on a direct message
-// before it was segmented, each on the thread-shaped unit of its message,
-// onto the segment of rows whose range holds that message.
-func rehomeDrafts(ctx context.Context, tx *Tx, provider unit.ProviderID, team, conv string, rows []SegmentRow, unitOf SegmentUnit) error {
-	prefix := team + "/" + conv + "/"
-	list, err := tx.QueryContext(ctx, draftsOfConvSQL, string(provider), prefix, team+"/"+conv+"0")
+// rehomeDrafts asks the host to move the drafts a session recorded on a
+// direct message before it was segmented, each on the thread-shaped unit
+// of its message, onto the segment of rows whose range holds that message.
+func (s *SegmentStore) rehomeDrafts(ctx context.Context, provider unit.ProviderID, team, conv string, rows []SegmentRow, unitOf SegmentUnit) error {
+	list, err := s.db.R().QueryContext(ctx, messagesFromSQL, conv, rows[0].FromTS)
 	if err != nil {
 		return err
 	}
-	moves := map[int64]unit.Unit{}
+	var moves []src.UnitMove
 	for list.Next() {
-		var id int64
-		var key string
-		if err := list.Scan(&id, &key); err != nil {
+		var ts string
+		if err := list.Scan(&ts); err != nil {
 			list.Close()
 			return err
 		}
-		ts := strings.TrimPrefix(key, prefix)
-		if strings.Contains(ts, "/") {
-			continue
-		}
 		for _, r := range rows {
 			if ts >= r.FromTS && (r.ToTS == "" || ts <= r.ToTS) {
-				moves[id] = unitOf(team, conv, r.ID)
+				to := unitOf(team, conv, r.ID)
+				moves = append(moves, src.UnitMove{From: plugin.Unit{Provider: string(provider), Key: team + "/" + conv + "/" + ts},
+					To: plugin.Unit{Provider: string(to.Provider), Key: to.Key}})
 				break
 			}
 		}
 	}
 	list.Close()
-	if err := list.Err(); err != nil {
+	if err := list.Err(); err != nil || len(moves) == 0 {
 		return err
 	}
-	for id, u := range moves {
-		if _, err := tx.ExecContext(ctx, `UPDATE drafts SET unit_key = ?, rev = rev + 1 WHERE id = ?`, u.Key, id); err != nil {
-			return err
-		}
-		tx.Touch(port.TopicDrafts, u)
-	}
-	return nil
+	_, err = s.home.RehomeDrafts(ctx, moves)
+	return err
 }

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -22,6 +23,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 const timeLayout = event.TimeLayout
@@ -35,9 +37,15 @@ const seeChunk = 500
 type Store struct {
 	db    *sqlite.DB
 	clock func() time.Time
+	host  src.Host
 }
 
-func New(db *sqlite.DB) *Store { return &Store{db: db, clock: time.Now} }
+// New is the store of db, whose events reach the host's event log in db
+// until UseHost gives it the broker.
+func New(db *sqlite.DB) *Store {
+	h := dbHost{sqlite.New(db)}
+	return &Store{db: db, clock: time.Now, host: src.Host{Recorder: h, History: h}}
+}
 
 // exec runs one statement in its own write transaction and touches t for
 // ref when it changed a row.
@@ -147,13 +155,8 @@ type StoredFacts struct {
 	UnfilledMerges []time.Time          // merged events lacking the merger or the commit
 }
 
-func storedFactsEventsSQL(marks string) string {
-	return `SELECT unit_key, kind, key, at FROM events
-		WHERE provider = 'github' AND unit_key IN (` + marks + `) AND (kind = ? OR (kind = ? AND key = '' AND (actor = '' OR data = '')))`
-}
-
-// StoredFacts reads the facts of refs: the stored pull requests, then their
-// pushes and unfilled merges, one query each per chunk of refs.
+// StoredFacts reads the facts of refs: the stored pull requests, then
+// their pushes and unfilled merges from the host's events.
 func (s *Store) StoredFacts(ctx context.Context, refs []github.Ref) (map[github.Ref]StoredFacts, error) {
 	prs, err := s.PRs(ctx, refs)
 	if err != nil {
@@ -164,40 +167,22 @@ func (s *Store) StoredFacts(ctx context.Context, refs []github.Ref) (map[github.
 		p, found := prs[r]
 		out[r] = StoredFacts{PR: p, Found: found}
 	}
-	for chunk := range slices.Chunk(refs, prReadChunk) {
-		marks, args := keyValues(chunk)
-		rows, err := s.db.R().QueryContext(ctx, storedFactsEventsSQL(marks), append(args, dinv.KindPush, dinv.KindMerged)...)
-		if err != nil {
-			return nil, err
-		}
-		err = func() error {
-			defer rows.Close()
-			for rows.Next() {
-				var unitKey, kind, key, raw string
-				if err := rows.Scan(&unitKey, &kind, &key, &raw); err != nil {
-					return err
-				}
-				ref := refOf(string(unit.GitHub), unitKey)
-				at, err := parseTS(raw)
-				if err != nil {
-					return err
-				}
-				f := out[ref]
-				if kind == dinv.KindPush {
-					if f.Pushes == nil {
-						f.Pushes = map[string]time.Time{}
-					}
-					f.Pushes[key] = at
-				} else {
-					f.UnfilledMerges = append(f.UnfilledMerges, at)
-				}
-				out[ref] = f
+	evs, err := s.hostEvents(ctx, refs, dinv.KindPush, dinv.KindMerged)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range evs {
+		f := out[e.PR]
+		switch {
+		case e.Kind == dinv.KindPush:
+			if f.Pushes == nil {
+				f.Pushes = map[string]time.Time{}
 			}
-			return rows.Err()
-		}()
-		if err != nil {
-			return nil, err
+			f.Pushes[e.Key] = e.At
+		case e.Key == "" && (e.Actor == "" || e.Data == ""):
+			f.UnfilledMerges = append(f.UnfilledMerges, e.At)
 		}
+		out[e.PR] = f
 	}
 	return out, nil
 }
@@ -245,15 +230,6 @@ func unitKeyOf(alias string) string {
 	return alias + `.owner || '/' || ` + alias + `.repo || '#' || ` + alias + `.number`
 }
 
-// prOfUnit is the SQL condition that the pull_requests row p is the pull
-// request of the github unit key in column col, in a form the primary key
-// serves.
-func prOfUnit(col string) string {
-	return strings.NewReplacer("K", col).Replace(`p.owner = substr(K, 1, instr(K, '/') - 1)
-	 AND p.repo = substr(K, instr(K, '/') + 1, instr(K, '#') - instr(K, '/') - 1)
-	 AND p.number = CAST(substr(K, instr(K, '#') + 1) AS INTEGER)`)
-}
-
 // Snapshot is one pull request as GitHub returned it, ready to store.
 type Snapshot struct {
 	PR     dinv.PR      // Reasons are merged with the stored ones; LastSeenAt is ignored
@@ -275,13 +251,18 @@ type stored struct {
 	detail                 *storedDetail
 }
 
-// SaveSnapshots stores snaps in one write transaction: a row is rewritten
-// only when a column differs, every ref is recorded as seen, the
-// events already stored are skipped, and a followed or unfollowed event is
-// recorded for each pull request whose scope flipped. A detail is written
-// only when it differs from the stored one, and noted only when its body
-// does. seenAt dates the sighting, a new conflict, the flips and a detail
-// without ReadAt. It returns the events added per ref that gained any.
+// SaveSnapshots stores snaps. The events, host data, go to the host
+// through the broker first: the timeline events the host does not hold
+// yet, the merges that fill a stored one, and a followed or unfollowed
+// event for each pull request whose scope flips, derived from a read of
+// the stored rows. Then one write transaction rewrites a row only when a
+// column differs, records every ref as seen, and writes a detail only when
+// it differs from the stored one, noting it only when its body does. A
+// write that fails after the broker took the events leaves the rows as they
+// were, so the next save derives the same events again and the host keeps
+// each once. seenAt dates the sighting, a new conflict, the flips and a
+// detail without ReadAt. It returns the events added per ref that gained
+// any.
 func (s *Store) SaveSnapshots(ctx context.Context, snaps []Snapshot, seenAt time.Time) (map[github.Ref]int, error) {
 	for _, snap := range snaps {
 		if err := timed(snap.Events); err != nil {
@@ -291,13 +272,56 @@ func (s *Store) SaveSnapshots(ctx context.Context, snaps []Snapshot, seenAt time
 	if len(snaps) == 0 {
 		return map[github.Ref]int{}, nil
 	}
-	var added map[github.Ref]int
-	_, err := s.db.Write(ctx, func(tx *sqlite.Tx) error {
-		added = map[github.Ref]int{}
-		refs := make([]github.Ref, len(snaps))
-		for i, snap := range snaps {
-			refs[i] = snap.PR.Ref
+	refs := make([]github.Ref, len(snaps))
+	kinds := map[string]bool{dinv.KindFollowed: true, dinv.KindUnfollowed: true}
+	for i, snap := range snaps {
+		refs[i] = snap.PR.Ref
+		for _, e := range snap.Events {
+			kinds[e.Kind] = true
 		}
+	}
+	held, err := s.hostEvents(ctx, refs, slices.Sorted(maps.Keys(kinds))...)
+	if err != nil {
+		return nil, err
+	}
+	known := map[eventID]bool{}
+	flips := flipLog{}
+	for _, e := range held {
+		known[idOf(e)] = true
+		flips.saw(e)
+	}
+	prior, err := storedRows(ctx, s.db.R(), refs)
+	if err != nil {
+		return nil, err
+	}
+	added := map[github.Ref]int{}
+	var evs []dinv.Event
+	for _, snap := range snaps {
+		ref := snap.PR.Ref
+		was := prior[ref]
+		was.followedAt = flips.followedAt[ref]
+		w, err := s.advance(snap.PR, was, seenAt)
+		if err != nil {
+			return nil, err
+		}
+		prior[ref] = w.now
+		for _, e := range snap.Events {
+			if id := idOf(e); !known[id] {
+				known[id] = true
+				added[e.PR]++
+				evs = append(evs, e)
+			}
+		}
+		evs = append(evs, snap.Merges...)
+		if w.flip != nil && flips.wants(*w.flip) {
+			evs = append(evs, *w.flip)
+			flips.saw(*w.flip)
+		}
+	}
+	if err := s.recordEvents(ctx, evs); err != nil {
+		return nil, err
+	}
+	_, err = s.db.Write(ctx, func(tx *sqlite.Tx) error {
 		prior, err := storedRows(ctx, tx, refs)
 		if err != nil {
 			return err
@@ -307,15 +331,9 @@ func (s *Store) SaveSnapshots(ctx context.Context, snaps []Snapshot, seenAt time
 			return err
 		}
 		defer upsert.Close()
-		insert, err := tx.PrepareContext(ctx, insertEventSQL)
-		if err != nil {
-			return err
-		}
-		defer insert.Close()
 		for _, snap := range snaps {
 			ref := snap.PR.Ref
-			was := prior[ref]
-			now, err := s.savePR(ctx, tx, upsert, snap.PR, was, seenAt)
+			now, err := s.savePR(ctx, upsert, tx, snap.PR, prior[ref], seenAt)
 			if err != nil {
 				return err
 			}
@@ -327,14 +345,6 @@ func (s *Store) SaveSnapshots(ctx context.Context, snaps []Snapshot, seenAt time
 				now.detail = &d
 			}
 			prior[ref] = now
-			if err := addEvents(ctx, tx, insert, snap.Events, port.TopicSourceEvents, added); err != nil {
-				return err
-			}
-			for _, m := range snap.Merges {
-				if _, err := fillMerged(ctx, tx, m); err != nil {
-					return err
-				}
-			}
 		}
 		return seeRefs(ctx, tx, refs, seenAt)
 	})
@@ -344,28 +354,81 @@ func (s *Store) SaveSnapshots(ctx context.Context, snaps []Snapshot, seenAt time
 	return added, nil
 }
 
-// savePR writes pr over was unless no column differs, and records the
-// followed or unfollowed event of a scope flip. It returns the row as now
-// stored.
-func (s *Store) savePR(ctx context.Context, tx *sqlite.Tx, upsert *sql.Stmt, pr dinv.PR, was stored, seenAt time.Time) (stored, error) {
-	mergeable, mergeableAt := nextMergeable(was.mergeable, was.mergeableAt, pr.Mergeable, seenAt)
+// eventID is what makes an event one: its pull request, kind and key, or,
+// unkeyed, its time.
+type eventID struct {
+	ref       github.Ref
+	kind, key string
+}
+
+func idOf(e dinv.Event) eventID {
+	key := e.Key
+	if key == "" {
+		key = "@" + ts(e.At)
+	}
+	return eventID{e.PR, e.Kind, key}
+}
+
+// rowWrite is what saving a snapshot over a stored row writes: the row as
+// it then stands, its columns the store computes, and the followed or
+// unfollowed event of a scope flip.
+type rowWrite struct {
+	now                    stored
+	reasons, failing       string
+	mergeable, mergeableAt string
+	flip                   *dinv.Event
+}
+
+// advance is what saving pr over was writes, seen at seenAt.
+func (s *Store) advance(pr dinv.PR, was stored, seenAt time.Time) (rowWrite, error) {
+	w := rowWrite{now: was}
+	w.mergeable, w.mergeableAt = nextMergeable(was.mergeable, was.mergeableAt, pr.Mergeable, seenAt)
 	storedReasons, err := splitList(was.reasons)
 	if err != nil {
-		return was, err
+		return w, err
 	}
 	reasons := withTracked(append(slices.Clone(pr.Reasons), storedReasons...), was.tracked)
-	failing := ""
 	if len(pr.FailingChecks) > 0 {
 		raw, err := json.Marshal(pr.FailingChecks)
 		if err != nil {
-			return was, err
+			return w, err
 		}
-		failing = string(raw)
+		w.failing = string(raw)
 	}
-	joined := joinList(reasons)
+	w.reasons = joinList(reasons)
+	ended := pr.MergedAt
+	if ended.IsZero() {
+		ended = pr.ClosedAt
+	}
+	w.now.found, w.now.reasons, w.now.mergeable, w.now.mergeableAt = true, w.reasons, w.mergeable, w.mergeableAt
+	if w.now.scope, err = scopeOf(reasons, was.ws, pr.State, ts(ended)); err != nil {
+		return w, err
+	}
+	if w.now.scope.followed == was.scope.followed {
+		return w, nil
+	}
+	at := seenAt.UTC()
+	if at.IsZero() {
+		at = s.clock().UTC()
+	}
+	e := flip(pr.Ref, was.scope, w.now.scope, at, was.followedAt)
+	if e.Kind == dinv.KindFollowed && e.At.After(w.now.followedAt) {
+		w.now.followedAt = e.At
+	}
+	w.flip = &e
+	return w, nil
+}
+
+// savePR writes pr over was unless no column differs, and returns the row
+// as now stored.
+func (s *Store) savePR(ctx context.Context, upsert *sql.Stmt, tx *sqlite.Tx, pr dinv.PR, was stored, seenAt time.Time) (stored, error) {
+	w, err := s.advance(pr, was, seenAt)
+	if err != nil {
+		return was, err
+	}
 	res, err := upsert.ExecContext(ctx, pr.Ref.Owner, pr.Ref.Repo, pr.Ref.Number, pr.Title, pr.Author, pr.State, pr.IsDraft, pr.HeadOid, pr.HeadBranch, pr.BaseBranch,
-		pr.IsFork, pr.ChecksState, pr.ReviewDecision, joinList(pr.ReviewRequests), pr.URL, ts(pr.CreatedAt), ts(pr.UpdatedAt), ts(pr.MergedAt), ts(pr.ClosedAt), joined,
-		ts(pr.BodyEditedAt), pr.ChangedFiles, failing, mergeable, mergeableAt)
+		pr.IsFork, pr.ChecksState, pr.ReviewDecision, joinList(pr.ReviewRequests), pr.URL, ts(pr.CreatedAt), ts(pr.UpdatedAt), ts(pr.MergedAt), ts(pr.ClosedAt), w.reasons,
+		ts(pr.BodyEditedAt), pr.ChangedFiles, w.failing, w.mergeable, w.mergeableAt)
 	if err != nil {
 		return was, err
 	}
@@ -374,31 +437,11 @@ func (s *Store) savePR(ctx context.Context, tx *sqlite.Tx, upsert *sql.Stmt, pr 
 		return was, err
 	}
 	topics := port.TopicPRs
-	if !was.found || joined != was.reasons {
+	if !was.found || w.reasons != was.reasons {
 		topics |= port.TopicFollow
 	}
 	tx.Touch(topics, pr.Ref.Unit())
-	ended := pr.MergedAt
-	if ended.IsZero() {
-		ended = pr.ClosedAt
-	}
-	now := was
-	now.found, now.reasons, now.mergeable, now.mergeableAt = true, joined, mergeable, mergeableAt
-	if now.scope, err = scopeOf(reasons, was.ws, pr.State, ts(ended)); err != nil {
-		return was, err
-	}
-	if now.scope.followed == was.scope.followed {
-		return now, nil
-	}
-	at := seenAt.UTC()
-	if at.IsZero() {
-		at = s.clock().UTC()
-	}
-	e := flip(pr.Ref, was.scope, now.scope, at, was.followedAt)
-	if e.Kind == dinv.KindFollowed && e.At.After(now.followedAt) {
-		now.followedAt = e.At
-	}
-	return now, insertEvents(ctx, tx, []dinv.Event{e})
+	return w.now, nil
 }
 
 const detailChunk = 500
@@ -486,18 +529,17 @@ func (s *Store) details(ctx context.Context, refs []github.Ref, withBody bool) (
 }
 
 // storedRows reads what savePR needs of each of refs, absent ones included.
-func storedRows(ctx context.Context, tx *sqlite.Tx, refs []github.Ref) (map[github.Ref]stored, error) {
+func storedRows(ctx context.Context, tx sqlite.Reader, refs []github.Ref) (map[github.Ref]stored, error) {
 	out := make(map[github.Ref]stored, len(refs))
 	for chunk := range slices.Chunk(refs, prReadChunk) {
 		marks, args := refValues(chunk)
 		rows, err := tx.QueryContext(ctx, `WITH r(owner, repo, number) AS (VALUES `+marks+`)
 			SELECT r.owner, r.repo, r.number, p.number IS NOT NULL, coalesce(p.reasons, ''), coalesce(p.mergeable, ''), coalesce(p.mergeable_at, ''),
 			 coalesce(p.ws_id, ''), coalesce(p.state, ''), coalesce(iif(p.merged_at != '', p.merged_at, p.closed_at), ''), coalesce(o.tracked, 0),
-			 coalesce((SELECT max(e.at) FROM events e WHERE e.provider = 'github' AND e.unit_key = `+unitKeyOf("r")+` AND e.kind = ?), ''),
 			 d.number IS NOT NULL, coalesce(d.version, 0), coalesce(d.read_at, ''), coalesce(d.body, '')
 			FROM r LEFT JOIN pull_requests p ON p.owner = r.owner AND p.repo = r.repo AND p.number = r.number
 			LEFT JOIN overrides o ON o.provider = 'github' AND o.unit_key = `+unitKeyOf("r")+`
-			LEFT JOIN pr_details d ON d.owner = r.owner AND d.repo = r.repo AND d.number = r.number`, append(args, dinv.KindFollowed)...)
+			LEFT JOIN pr_details d ON d.owner = r.owner AND d.repo = r.repo AND d.number = r.number`, args...)
 		if err != nil {
 			return nil, err
 		}
@@ -506,11 +548,11 @@ func storedRows(ctx context.Context, tx *sqlite.Tx, refs []github.Ref) (map[gith
 			for rows.Next() {
 				var ref github.Ref
 				var st stored
-				var ws, state, ended, followed string
+				var ws, state, ended string
 				var hasDetail bool
 				var d storedDetail
 				if err := rows.Scan(&ref.Owner, &ref.Repo, &ref.Number, &st.found, &st.reasons, &st.mergeable, &st.mergeableAt,
-					&ws, &state, &ended, &st.tracked, &followed, &hasDetail, &d.version, &d.readAt, &d.body); err != nil {
+					&ws, &state, &ended, &st.tracked, &hasDetail, &d.version, &d.readAt, &d.body); err != nil {
 					return err
 				}
 				if hasDetail {
@@ -525,9 +567,6 @@ func storedRows(ctx context.Context, tx *sqlite.Tx, refs []github.Ref) (map[gith
 					if st.scope, err = scopeOf(list, ws, state, ended); err != nil {
 						return err
 					}
-				}
-				if st.followedAt, err = parseTS(followed); err != nil {
-					return err
 				}
 				out[ref] = st
 			}
@@ -677,13 +716,20 @@ func stubRows(ctx context.Context, tx *sqlite.Tx, stubs []github.Stub) (map[gith
 	return out, nil
 }
 
+// SetReasons replaces ref's follow reasons, recording on the host first
+// the followed or unfollowed event of a scope flip.
 func (s *Store) SetReasons(ctx context.Context, ref github.Ref, reasons []string) error {
-	_, err := s.db.Write(ctx, func(tx *sqlite.Tx) error {
+	tracked, err := isTracked(ctx, s.db.R(), ref)
+	if err != nil {
+		return err
+	}
+	if err := s.recordFlipsOf(ctx, []github.Ref{ref}, time.Time{}, func(_ github.Ref, was scope) (scope, bool, error) {
+		return was.with(withTracked(reasons, tracked), was.ws), true, nil
+	}); err != nil {
+		return err
+	}
+	_, err = s.db.Write(ctx, func(tx *sqlite.Tx) error {
 		tracked, err := isTracked(ctx, tx, ref)
-		if err != nil {
-			return err
-		}
-		before, err := scopes(ctx, tx, ref)
 		if err != nil {
 			return err
 		}
@@ -692,7 +738,7 @@ func (s *Store) SetReasons(ctx context.Context, ref github.Ref, reasons []string
 		if err := touchChanged(tx, res, err, port.TopicPRs|port.TopicFollow, ref); err != nil {
 			return err
 		}
-		return s.recordScope(ctx, tx, before, time.Time{}, ref)
+		return nil
 	})
 	return err
 }
@@ -707,7 +753,7 @@ func withTracked(reasons []string, tracked bool) []string {
 	return slices.Compact(out)
 }
 
-func isTracked(ctx context.Context, tx *sqlite.Tx, ref github.Ref) (bool, error) {
+func isTracked(ctx context.Context, tx sqlite.Reader, ref github.Ref) (bool, error) {
 	var tracked bool
 	err := tx.QueryRowContext(ctx, `SELECT tracked FROM overrides WHERE provider=? AND unit_key=?`, unitArgs(ref)...).Scan(&tracked)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -739,49 +785,52 @@ func syncTracked(ctx context.Context, tx *sqlite.Tx, ref github.Ref, tracked boo
 const setWorkspaceSQL = `UPDATE pull_requests SET ws_id=?1, ws_name=?2, ws_status=?3, ws_review=?4, ws_agent=?5, ws_comment=?6, ws_main=?7, ws_manager=?11
  WHERE owner=?8 AND repo=?9 AND number=?10 AND (ws_id, ws_name, ws_status, ws_review, ws_agent, ws_comment, ws_main, ws_manager) IS NOT (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?11)`
 
+// SetWorkspace links ref to ws, recording on the host first the followed
+// or unfollowed event of a scope flip.
 func (s *Store) SetWorkspace(ctx context.Context, ref github.Ref, ws dinv.Workspace) error {
+	if err := s.recordFlipsOf(ctx, []github.Ref{ref}, time.Time{}, func(_ github.Ref, was scope) (scope, bool, error) {
+		return was.with(was.reasons, ws.ID), true, nil
+	}); err != nil {
+		return err
+	}
 	_, err := s.db.Write(ctx, func(tx *sqlite.Tx) error {
-		before, err := scopes(ctx, tx, ref)
-		if err != nil {
-			return err
-		}
 		res, err := tx.ExecContext(ctx, setWorkspaceSQL,
 			ws.ID, ws.DisplayName, ws.Status, ws.IsReview, joinStates(ws.AgentStates), ws.Comment, ws.IsMain, ref.Owner, ref.Repo, ref.Number, ws.Manager)
 		if err := touchChanged(tx, res, err, port.TopicPRs|port.TopicFollow, ref); err != nil {
 			return err
 		}
-		return s.recordScope(ctx, tx, before, time.Time{}, ref)
+		return nil
 	})
 	return err
 }
 
 // ReplaceWorkspaces makes links the set of linked pull requests in one
 // transaction, so readers never see the links blank. It writes only the links
-// that differ from the stored ones.
+// that differ from the stored ones, recording on the host first the
+// followed or unfollowed events of the scope flips.
 func (s *Store) ReplaceWorkspaces(ctx context.Context, links map[github.Ref]dinv.Workspace) error {
-	_, err := s.db.Write(ctx, func(tx *sqlite.Tx) error {
+	linked, err := workspaceLinks(ctx, s.db.R())
+	if err != nil {
+		return err
+	}
+	drop, set := linkChanges(linked, links)
+	touched := append(drop, set...)
+	if len(touched) == 0 {
+		return nil
+	}
+	if err := s.recordFlipsOf(ctx, touched, time.Time{}, func(ref github.Ref, was scope) (scope, bool, error) {
+		return was.with(was.reasons, links[ref].ID), true, nil
+	}); err != nil {
+		return err
+	}
+	_, err = s.db.Write(ctx, func(tx *sqlite.Tx) error {
 		linked, err := workspaceLinks(ctx, tx)
 		if err != nil {
 			return err
 		}
-		var drop, set []github.Ref
-		for ref := range linked {
-			if ws, ok := links[ref]; !ok || linkKey(ws) == (linkColumns{}) {
-				drop = append(drop, ref)
-			}
-		}
-		for ref, ws := range links {
-			if key := linkKey(ws); key != (linkColumns{}) && key != linked[ref] {
-				set = append(set, ref)
-			}
-		}
-		touched := append(drop, set...)
-		if len(touched) == 0 {
+		drop, set := linkChanges(linked, links)
+		if len(drop)+len(set) == 0 {
 			return nil
-		}
-		before, err := scopes(ctx, tx, touched...)
-		if err != nil {
-			return err
 		}
 		for _, ref := range drop {
 			res, err := tx.ExecContext(ctx, setWorkspaceSQL, "", "", "", false, "", "", false, ref.Owner, ref.Repo, ref.Number, "")
@@ -797,9 +846,25 @@ func (s *Store) ReplaceWorkspaces(ctx context.Context, links map[github.Ref]dinv
 				return err
 			}
 		}
-		return s.recordScope(ctx, tx, before, time.Time{}, touched...)
+		return nil
 	})
 	return err
+}
+
+// linkChanges are the linked pull requests links unlinks and those whose
+// link it sets or changes.
+func linkChanges(linked map[github.Ref]linkColumns, links map[github.Ref]dinv.Workspace) (drop, set []github.Ref) {
+	for ref := range linked {
+		if ws, ok := links[ref]; !ok || linkKey(ws) == (linkColumns{}) {
+			drop = append(drop, ref)
+		}
+	}
+	for ref, ws := range links {
+		if key := linkKey(ws); key != (linkColumns{}) && key != linked[ref] {
+			set = append(set, ref)
+		}
+	}
+	return drop, set
 }
 
 // linkColumns is the workspace columns of a pull request; the zero value is
@@ -817,7 +882,7 @@ func linkKey(ws dinv.Workspace) linkColumns {
 }
 
 // workspaceLinks reads the workspace columns of every linked pull request.
-func workspaceLinks(ctx context.Context, tx *sqlite.Tx) (map[github.Ref]linkColumns, error) {
+func workspaceLinks(ctx context.Context, tx sqlite.Reader) (map[github.Ref]linkColumns, error) {
 	rows, err := tx.QueryContext(ctx, `SELECT owner, repo, number, ws_id, ws_name, ws_status, ws_review, ws_agent, ws_comment, ws_main, ws_manager FROM pull_requests
 		WHERE ws_id IS NOT '' OR ws_name IS NOT '' OR ws_status IS NOT '' OR ws_review OR ws_agent IS NOT '' OR ws_comment IS NOT '' OR ws_main`)
 	if err != nil {
@@ -958,49 +1023,24 @@ func (s *Store) PRs(ctx context.Context, refs []github.Ref) (map[github.Ref]dinv
 }
 
 // PRsWithOverrides reads every pull request, the most recently updated
-// first, with the overrides of those that have one, in one statement.
+// first, then the overrides of those that have one.
 func (s *Store) PRsWithOverrides(ctx context.Context) ([]dinv.PR, map[github.Ref]dinv.Override, error) {
-	rows, err := s.db.R().QueryContext(ctx, `SELECT `+prColumns+`, o.provider IS NOT NULL, COALESCE(o.muted_until, ''),
-		COALESCE(o.mute_until_state, 0), COALESCE(o.hold, 0), COALESCE(o.taken_over, 0), COALESCE(o.muted_kind, ''),
-		COALESCE(o.muted_waiting_on, ''), COALESCE(o.tracked, 0), COALESCE(o.next_guidance, '')
-		FROM pull_requests pr LEFT JOIN overrides o ON o.provider = 'github' AND o.unit_key = `+unitKeyOf("pr")+`
-		ORDER BY pr.updated_at DESC, pr.owner, pr.repo, pr.number DESC`)
+	prs, err := s.ListPRs(ctx, false)
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close()
-	var prs []dinv.PR
-	overrides := map[github.Ref]dinv.Override{}
-	for rows.Next() {
-		var o dinv.Override
-		var has bool
-		var muted string
-		pr, err := scanPR(withTail{rows, []any{&has, &muted, &o.MuteUntilStateChange, &o.Hold, &o.Adopted, &o.MutedKind,
-			&o.MutedWaitingOn, &o.Tracked, &o.NextGuidance}})
-		if err != nil {
-			return nil, nil, err
-		}
-		prs = append(prs, pr)
-		if !has {
-			continue
-		}
-		if o.MutedUntil, err = parseTS(muted); err != nil {
-			return nil, nil, err
-		}
-		o.PR = pr.Ref
-		overrides[pr.Ref] = o
+	all, err := s.Overrides(ctx)
+	if err != nil {
+		return nil, nil, err
 	}
-	return prs, overrides, rows.Err()
+	overrides := map[github.Ref]dinv.Override{}
+	for _, p := range prs {
+		if o, ok := all[p.Ref]; ok {
+			overrides[p.Ref] = o
+		}
+	}
+	return prs, overrides, nil
 }
-
-// withTail scans a row whose columns go first to a scanner's destinations,
-// then to tail.
-type withTail struct {
-	row  scanner
-	tail []any
-}
-
-func (w withTail) Scan(dest ...any) error { return w.row.Scan(append(dest, w.tail...)...) }
 
 func listPRsSQL(open bool) string {
 	query := `SELECT ` + prColumns + ` FROM pull_requests pr`
@@ -1389,6 +1429,17 @@ func (s *Store) writeOverride(ctx context.Context, o dinv.Override, was *dinv.Ov
 			args = append(append(append(append([]any{}, cols...), unitArgs(o.PR)...), guard...), cols...)
 		}
 	}
+	if err := s.recordFlipsOf(ctx, []github.Ref{o.PR}, time.Time{}, func(_ github.Ref, sc scope) (scope, bool, error) {
+		if was != nil {
+			cur, err := s.Override(ctx, o.PR)
+			if err != nil || !sameGuarded(cur, *was) {
+				return sc, false, err
+			}
+		}
+		return sc.with(withTracked(sc.reasons, o.Tracked), sc.ws), true, nil
+	}); err != nil {
+		return false, err
+	}
 	_, err = s.db.Write(ctx, func(tx *sqlite.Tx) error {
 		res, err := tx.ExecContext(ctx, query, args...)
 		if err != nil {
@@ -1404,16 +1455,15 @@ func (s *Store) writeOverride(ctx context.Context, o dinv.Override, was *dinv.Ov
 		} else if was != nil {
 			return nil
 		}
-		before, err := scopes(ctx, tx, o.PR)
-		if err != nil {
-			return err
-		}
-		if err := syncTracked(ctx, tx, o.PR, o.Tracked); err != nil {
-			return err
-		}
-		return s.recordScope(ctx, tx, before, time.Time{}, o.PR)
+		return syncTracked(ctx, tx, o.PR, o.Tracked)
 	})
 	return written, err
+}
+
+// sameGuarded says a and b agree on the columns SetOverrideIf compares.
+func sameGuarded(a, b dinv.Override) bool {
+	return a.MutedUntil.Equal(b.MutedUntil) && a.MuteUntilStateChange == b.MuteUntilStateChange && a.Hold == b.Hold &&
+		a.Adopted == b.Adopted && a.MutedKind == b.MutedKind && a.MutedWaitingOn == b.MutedWaitingOn && a.Tracked == b.Tracked
 }
 
 // ClearMute clears ref's "mute until state change" when it still mutes kind

@@ -99,7 +99,21 @@ func batchSnapshots() []Snapshot {
 // upsertOne is UpsertPR as it was before SaveSnapshots: one transaction
 // that reads the stored row and the scope, upserts, and records the flip.
 func upsertOne(ctx context.Context, s *Store, pr dinv.PR) error {
-	_, err := s.db.Write(ctx, func(tx *sqlite.Tx) error {
+	ended := pr.MergedAt
+	if ended.IsZero() {
+		ended = pr.ClosedAt
+	}
+	tracked, err := isTracked(ctx, s.db.R(), pr.Ref)
+	if err != nil {
+		return err
+	}
+	if err := s.recordFlipsOf(ctx, []github.Ref{pr.Ref}, pr.LastSeenAt, func(_ github.Ref, was scope) (scope, bool, error) {
+		sc, err := scopeOf(withTracked(append(slices.Clone(pr.Reasons), was.reasons...), tracked), was.ws, pr.State, ts(ended))
+		return sc, true, err
+	}); err != nil {
+		return err
+	}
+	_, err = s.db.Write(ctx, func(tx *sqlite.Tx) error {
 		var stored, storedMergeable, storedMergeableAt string
 		err := tx.QueryRowContext(ctx, `SELECT reasons, mergeable, mergeable_at FROM pull_requests WHERE owner=? AND repo=? AND number=?`, pr.Ref.Owner, pr.Ref.Repo, pr.Ref.Number).
 			Scan(&stored, &storedMergeable, &storedMergeableAt)
@@ -117,10 +131,6 @@ func upsertOne(ctx context.Context, s *Store, pr dinv.PR) error {
 			return err
 		}
 		reasons := withTracked(append(slices.Clone(pr.Reasons), storedReasons...), tracked)
-		before, err := scopes(ctx, tx, pr.Ref)
-		if err != nil {
-			return err
-		}
 		failing := ""
 		if len(pr.FailingChecks) > 0 {
 			raw, err := json.Marshal(pr.FailingChecks)
@@ -149,7 +159,7 @@ func upsertOne(ctx context.Context, s *Store, pr dinv.PR) error {
 			topics |= port.TopicFollow
 		}
 		tx.Touch(topics, pr.Ref.Unit())
-		return s.recordScope(ctx, tx, before, pr.LastSeenAt, pr.Ref)
+		return nil
 	})
 	return err
 }
@@ -195,8 +205,8 @@ func TestSaveSnapshotsSameAsUpsertLoop(t *testing.T) {
 		added, err = batch.SaveSnapshots(ctx, batchSnapshots(), seenAt)
 		return err
 	})
-	if notes != 1 {
-		t.Fatalf("SaveSnapshots noted %d times, want once", notes)
+	if notes != 2 {
+		t.Fatalf("SaveSnapshots noted %d times, want twice: its write and the host's events", notes)
 	}
 
 	loop, loopLog := openNoted(t)
@@ -217,10 +227,8 @@ func TestSaveSnapshotsSameAsUpsertLoop(t *testing.T) {
 		if n > 0 {
 			loopAdded[pr.Ref] += n
 		}
-		for _, m := range snap.Merges {
-			if _, err := loop.FillMerged(ctx, m); err != nil {
-				t.Fatal(err)
-			}
+		if err := loop.recordEvents(ctx, snap.Merges); err != nil {
+			t.Fatal(err)
 		}
 	}
 
@@ -234,7 +242,7 @@ func TestSaveSnapshotsSameAsUpsertLoop(t *testing.T) {
 	if want := loopLog.Since(loopFrom, all); got.Topics != want.Topics || !slices.Equal(got.Units, want.Units) {
 		t.Fatalf("batch noted %+v, the loop %+v", got, want)
 	}
-	if got := batchLog.Since(from, all); got.Topics&port.TopicLoopEvents == 0 {
+	if got := batchLog.Since(from, all); got.Topics&port.TopicSourceEvents == 0 {
 		t.Fatalf("no followed or unfollowed event noted: %+v", got)
 	}
 	events := stateOf(t, batch).Events

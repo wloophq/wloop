@@ -55,6 +55,9 @@ type writeCase struct {
 	call   func(ctx context.Context, e *noteEnv) error
 	topics port.Topic
 	units  []unit.Unit
+	// notes is how many notes the call makes when it writes the core's rows
+	// and a plugin's in transactions of their own; 0 is one.
+	notes int
 }
 
 var (
@@ -446,7 +449,11 @@ func TestEveryWriteNotes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if want := min(int(c.topics), 1); n != want {
+			want := min(int(c.topics), 1)
+			if c.notes > 0 {
+				want = c.notes
+			}
+			if n != want {
 				t.Fatalf("%d notes, want %d: %+v", n, want, got)
 			}
 			if got.Topics != c.topics || got.All {

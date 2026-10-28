@@ -10,6 +10,8 @@ import (
 	"io/fs"
 	"time"
 
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/api"
@@ -195,6 +197,10 @@ type Deps struct {
 	// Units is the daemon's registry, built after the modules; Links the link store.
 	Units func() *unit.Registry
 	Links port.LinkStore
+	// Host is the broker the host serves the module of provider id: the
+	// host's events, marks and drafts the module writes and reads; nil
+	// reaches them in DB.
+	Host func(id unit.ProviderID) src.Host
 }
 
 // Build makes a source's module from the config and the shared handles.

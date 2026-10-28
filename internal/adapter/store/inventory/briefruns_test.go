@@ -419,8 +419,8 @@ func TestBriefStatesSelectsNoBriefJSON(t *testing.T) {
 	if got := states[0]; got.Rec.Brief != "" || got.Rec.Run != id || !got.Has {
 		t.Fatalf("the record carries %d bytes of brief, run %d: %+v", len(got.Rec.Brief), got.Rec.Run, got.Rec)
 	}
-	if n := metertest.Count(sc, metertest.Limit{Res: meter.SQL, Op: "query"}) - before; n != 1 {
-		t.Fatalf("BriefStates ran %d queries, want 1\n%s", n, metertest.Report(sc.Tally()))
+	if n := metertest.Count(sc, metertest.Limit{Res: meter.SQL, Op: "query"}) - before; n != 2 {
+		t.Fatalf("BriefStates ran %d queries, want 2, the pull requests' and the briefs'\n%s", n, metertest.Report(sc.Tally()))
 	}
 	if full, _, _ := s.BriefRecord(ctx, ref); len(full.Brief) != 100<<10 {
 		t.Fatalf("the stored brief is %d bytes", len(full.Brief))

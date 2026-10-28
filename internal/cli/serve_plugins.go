@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/plugins/codec"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 
@@ -32,6 +33,7 @@ import (
 	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/pkg/plugin"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // buildSources builds the module of every enabled plugin; one that fails
@@ -313,6 +315,17 @@ func (e *Env) servePlugins(ctx context.Context, store snapshot.Store, cfg config
 		cancel()
 		notifying.Wait()
 		h.Wait()
+	}
+}
+
+// moduleHost is the broker the host serves a built-in source module of
+// provider id: its events, marks and drafts are the host's, in db.
+func (e *Env) moduleHost(db *sqlite.DB) func(id unit.ProviderID) src.Host {
+	codecs := e.unitCodecs()
+	return func(id unit.ProviderID) src.Host {
+		b := &psource.Broker{ID: string(id), Units: psource.Units{Codecs: codecs}, Config: e.currentConfig,
+			Events: sqlite.New(db), Marks: db, Drafts: db}
+		return b.Host()
 	}
 }
 
