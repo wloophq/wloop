@@ -354,6 +354,9 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 		d.Brief, d.BriefStatus, d.BriefViews = briefs, briefs, briefs
 	}
 	d.Items = e.itemsLedger(db, cfg, logf)
+	if e.pluginKind != nil {
+		d.Loading = e.pluginKind.Loading
+	}
 	e.serveTurnLedger(db, cfg, logf)
 	links := e.linkDeps(db, cfg, logf, &sd)
 	d = e.serveMessages(ctx, d, db, cfg, logf)

@@ -368,7 +368,7 @@ func seedGuidance(t *testing.T, s *Store) {
 var reads = []string{
 	"UseClock",
 	"PR", "PRs", "PRsWithOverrides", "StoredFacts", "Seen", "LastEvent", "ListPRs", "Events", "EventsByPR", "UnitlessEvents", "FirstRoundBlocks",
-	"RecentActivity", "BriefStates", "Tracked", "Override", "Overrides", "Meta", "MetaPrefixed", "Viewer", "Viewers", "Turn", "LastBundledSHA",
+	"RecentActivity", "BriefStates", "Tracked", "Override", "Overrides", "UnitMutes", "Meta", "MetaPrefixed", "Viewer", "Viewers", "Turn", "LastBundledSHA",
 	"Timings", "Tags", "TagVocabulary", "BriefRuns", "BriefRun", "BriefRecord", "BriefRecords", "UnitBrief", "Ended",
 	"Details", "DetailStamps", "Reviewed",
 }

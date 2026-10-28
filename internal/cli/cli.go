@@ -20,6 +20,7 @@ import (
 	"time"
 
 	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/pkg/plugin"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
@@ -180,6 +181,8 @@ type Env struct {
 	// pluginKind is serve's source kind: the clients and the snapshots of
 	// the source plugins it runs.
 	pluginKind *psource.Kind
+	// pluginLauncher starts serve's plugins; nil starts their binaries.
+	pluginLauncher plugin.Launcher
 
 	// noJobs is serve --no-jobs: the daemon plans no round and writes no
 	// Orca card; it still writes unit cards and derived items to its store.

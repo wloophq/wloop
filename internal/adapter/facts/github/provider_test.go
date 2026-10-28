@@ -2,7 +2,6 @@ package factsgithub_test
 
 import (
 	"context"
-	"errors"
 	"maps"
 	"slices"
 	"strings"
@@ -25,7 +24,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
@@ -60,7 +58,6 @@ type world struct {
 	snap      *wsdomain.Snapshot
 	git       *fakeGit
 	branches  *fakeBranches
-	stubs     *fakeStubs
 	// factReads counts the Facts queries.
 	factReads int
 }
@@ -69,7 +66,7 @@ func newWorld() *world {
 	w := &world{now: t0, cfg: config.Defaults(), viewer: me, rows: map[pr.Ref]dinv.PR{}, details: map[pr.Ref]sweep.Facts{},
 		ended: map[unit.Unit]bool{}, overrides: map[pr.Ref]dinv.Override{}, blocks: map[pr.Ref]dinv.Event{},
 		events: map[pr.Ref][]dinv.Event{}, books: map[unit.Unit]turn.Book{}, rounds: round.New(),
-		git: &fakeGit{heads: map[string]string{}, dirty: map[string]bool{}}, branches: &fakeBranches{}, stubs: &fakeStubs{}}
+		git: &fakeGit{heads: map[string]string{}, dirty: map[string]bool{}}, branches: &fakeBranches{}}
 	w.cfg.Views = map[string]config.SinkConfig{"board": {Columns: map[string]string{config.ColumnCompleted: "Done"}}}
 	w.snap = &wsdomain.Snapshot{Gen: 1, Repos: []wsdomain.Repo{repo}, WorkspaceScope: complete, TerminalScope: complete,
 		Workspaces: []wsdomain.Workspace{{ID: "main", RepoID: "r1", Path: "/w/app", DisplayName: "app", Branch: "main", HostID: "local", IsMain: true}}}
@@ -82,7 +79,7 @@ func (w *world) provider() *factsgithub.Provider { return w.providerWith(nil) }
 // calls; nil builds one per call.
 func (w *world) providerWith(changes port.Changes) *factsgithub.Provider {
 	d := factsgithub.Deps{Inputs: w, Store: w, Snapshot: w, Books: w, Rounds: w, Git: w.git, Branches: w.branches,
-		Stubs: w.stubs, Cfg: func() config.Config { return w.cfg }, Sink: "board", Clock: clock{w},
+		Cfg: func() config.Config { return w.cfg }, Sink: "board", Clock: clock{w},
 		Intents: func() *dintent.Registry { return turnstest.Intents() }}
 	if changes != nil {
 		d.Changes = changes
@@ -249,18 +246,6 @@ func (b *fakeBranches) HasCommit(context.Context, string, string) (bool, error) 
 
 func (b *fakeBranches) IsAncestor(context.Context, string, string, string) (bool, error) {
 	return true, nil
-}
-
-type fakeStubs struct {
-	calls int
-	stubs map[pr.Ref]github.Stub
-	errs  map[pr.Ref]error
-	err   error
-}
-
-func (s *fakeStubs) StubsByRef(_ context.Context, refs []github.Ref) (map[github.Ref]github.Stub, map[github.Ref]error, error) {
-	s.calls++
-	return s.stubs, s.errs, s.err
 }
 
 // facts lists, then reads u's facts, as an evaluation does.
@@ -607,8 +592,8 @@ func TestFactsAreReadOnlyAndSendNoGitHubRequest(t *testing.T) {
 		}
 	}
 	p.Due()
-	if w.stubs.calls != 0 || len(w.recorded) != 0 {
-		t.Fatalf("reading facts sent %d GitHub reads and recorded %v", w.stubs.calls, w.recorded)
+	if len(w.recorded) != 0 {
+		t.Fatalf("reading facts recorded %v", w.recorded)
 	}
 	if c := w.rounds.Changes(); len(c.PRs) != 0 || len(c.Counts) != 0 || len(c.Notes) != 0 {
 		t.Fatalf("reading facts edited the round state: %+v", c)
@@ -773,38 +758,6 @@ func TestWaitsOnUserFollowsTheRow(t *testing.T) {
 	}
 }
 
-func TestMovedComparesStubs(t *testing.T) {
-	w := newWorld()
-	same, head, closed, missing := w.requested(1, nil), w.requested(2, nil), w.requested(3, nil), w.requested(4, nil)
-	stub := func(r pr.Ref) github.Stub {
-		row := w.rows[r]
-		return github.Stub{Ref: r, HeadOid: row.HeadOid, State: row.State, UpdatedAt: row.UpdatedAt}
-	}
-	w.stubs.stubs = map[pr.Ref]github.Stub{same: stub(same), head: stub(head), closed: stub(closed)}
-	s := w.stubs.stubs[head]
-	s.HeadOid = "moved"
-	w.stubs.stubs[head] = s
-	s = w.stubs.stubs[closed]
-	s.State = "CLOSED"
-	w.stubs.stubs[closed] = s
-	p := w.provider()
-	units := []unit.Unit{same.Unit(), head.Unit(), closed.Unit(), missing.Unit()}
-	moved, err := p.Moved(context.Background(), units)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := units[1:]; !slices.Equal(moved, want) {
-		t.Fatalf("moved = %v, want %v", moved, want)
-	}
-	if !p.Due().Equal(t0.Add(2 * time.Minute)) {
-		t.Fatalf("due = %v, want the next fast run", p.Due())
-	}
-	w.stubs.err = errors.New("budget")
-	if moved, _ := p.Moved(context.Background(), units); !slices.Equal(moved, units) {
-		t.Fatalf("a failed read moved %v", moved)
-	}
-}
-
 func TestDueMatchesTheBasesNextDue(t *testing.T) {
 	day := 24 * time.Hour
 	for _, c := range []struct {
@@ -932,45 +885,6 @@ func TestListReachesAFollowupWithoutItsWorkspace(t *testing.T) {
 	}
 	if f := facts(t, p, r.Unit()); f["pr.review.action"] != "follow-up" || f["pr.review.observed"] != true {
 		t.Fatalf("facts = %v", f)
-	}
-}
-
-func TestALaterDeadlineIsNotHiddenByAPastOne(t *testing.T) {
-	w := newWorld()
-	r := w.review(7, nil)
-	w.stubs.stubs = map[pr.Ref]github.Stub{}
-	p := w.provider()
-	if _, err := p.Moved(context.Background(), []unit.Unit{r.Unit()}); err != nil {
-		t.Fatal(err)
-	}
-	w.now = t0.Add(time.Hour)
-	if _, err := p.List(context.Background(), unit.GitHub); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := p.Moved(context.Background(), []unit.Unit{r.Unit()}); err != nil {
-		t.Fatal(err)
-	}
-	if want := w.now.Add(2 * time.Minute); !p.Due().Equal(want) {
-		t.Fatalf("due = %v, want %v", p.Due(), want)
-	}
-}
-
-func TestMovedNeverReadsAnObservedRound(t *testing.T) {
-	w := newWorld()
-	r := w.add(7, "alice", func(row *dinv.PR, f *pr.Facts) {
-		row.HeadOid = "c2"
-		f.Commits = []pr.Commit{{Oid: "c1", Parents: 1}, {Oid: "c2", Parents: 1}}
-		f.Reviews = []pr.Review{{ID: "r1", State: pr.ReviewCommented, Author: me, SubmittedAt: t0.Add(-2 * time.Hour), CommitOid: "c1"}}
-	})
-	w.books[r.Unit()] = turn.Book{Unit: r.Unit(), Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), Role: "pr.review", State: turn.Done, SentAt: t0.Add(-3 * time.Hour)}}}
-	w.stubs.err = errors.New("budget")
-	p := w.provider()
-	if f := facts(t, p, r.Unit()); f["pr.review.observed"] != true {
-		t.Fatalf("not observed: %v", f)
-	}
-	moved, err := p.Moved(context.Background(), []unit.Unit{r.Unit()})
-	if err != nil || len(moved) != 0 || w.stubs.calls != 0 {
-		t.Fatalf("moved %v, %v after %d reads", moved, err, w.stubs.calls)
 	}
 }
 

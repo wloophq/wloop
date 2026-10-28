@@ -2,6 +2,8 @@ package source
 
 import (
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
@@ -19,6 +21,8 @@ type Broker struct {
 	Snapshots *Snapshots
 	// Config is the configuration in force.
 	Config func() config.Config
+	// Note records a change in the host's change log; nil records none.
+	Note func(t port.Topic, units ...unit.Unit)
 }
 
 // Host is b as the SDK serves it to the plugin.

@@ -129,6 +129,9 @@ type Deps struct {
 	Units *unit.Registry
 	// Ingest are the sources' ingestion jobs.
 	Ingest []IngestJob
+	// Loading are the plugins that have not loaded since the daemon
+	// started, with why, by id; nil has none.
+	Loading func() map[string]string
 	// RowProviders build the read model's providers with the daemon's row
 	// deps, one per source.
 	RowProviders []func(readmodel.RowDeps) readmodel.Provider

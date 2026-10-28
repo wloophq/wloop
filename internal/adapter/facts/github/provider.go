@@ -1,7 +1,7 @@
 // Package factsgithub is the github source's workflow facts: the pull
 // requests a sweep plans over, as automation.Units, and their author
 // facts, as views.Facts. It reads the store, the workspace snapshot and the
-// local checkouts; only Moved asks GitHub.
+// local checkouts, and never asks GitHub.
 package factsgithub
 
 import (
@@ -25,7 +25,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 )
 
 // The rounds a Candidate names.
@@ -55,11 +54,6 @@ type Branches interface {
 	IsAncestor(ctx context.Context, dir, ancestor, commit string) (bool, error)
 }
 
-// StubReader reads pull requests' stubs from GitHub in one batched read.
-type StubReader interface {
-	StubsByRef(ctx context.Context, refs []github.Ref) (map[github.Ref]github.Stub, map[github.Ref]error, error)
-}
-
 // RoundState is the sweep's round state as Settle receives it.
 type RoundState interface {
 	automation.State
@@ -76,7 +70,6 @@ type Deps struct {
 	Rounds   sweep.Rounds
 	Git      sweep.LocalGit
 	Branches Branches
-	Stubs    StubReader
 	Cfg      func() config.Config
 	// Sink is the view sink whose columns the workspaces report as statuses.
 	Sink    string
@@ -109,6 +102,7 @@ type Provider struct {
 	mu   sync.Mutex
 	view *view
 	dues map[string]time.Time
+	revs revs
 }
 
 var (
@@ -119,14 +113,13 @@ var (
 	_ views.Facts          = (*Provider)(nil)
 )
 
-// The deadlines a sweep's evaluation does not recompute: a moved stub's
-// next fast run and a blind start block's day.
-const (
-	dueMoved = "moved"
-	dueBlock = "block"
-)
+// dueBlock is the deadline a sweep's evaluation does not recompute: a
+// blind start block's day.
+const dueBlock = "block"
 
-func New(d Deps) *Provider { return &Provider{d: d, dues: map[string]time.Time{}} }
+func New(d Deps) *Provider {
+	return &Provider{d: d, dues: map[string]time.Time{}, revs: revs{byUnit: map[unit.Unit]uint64{}}}
+}
 
 var errNotGitHub = errors.New("not a pull request")
 
@@ -175,10 +168,8 @@ func (p *Provider) List(ctx context.Context, id unit.ProviderID) ([]unit.Unit, e
 		}
 	}
 	p.mu.Lock()
-	for _, k := range []string{dueMoved, dueBlock} {
-		if p.dues[k].After(now) {
-			dues[k] = earliestOf(dues[k], p.dues[k])
-		}
+	if p.dues[dueBlock].After(now) {
+		dues[dueBlock] = earliestOf(dues[dueBlock], p.dues[dueBlock])
 	}
 	p.dues = dues
 	p.mu.Unlock()

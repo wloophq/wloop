@@ -50,6 +50,9 @@ type Row struct {
 	Pending  *PendingRound   `json:"pending,omitempty"`
 	Items    []RowItem       `json:"items,omitempty"`
 	Payload  json.RawMessage `json:"payload,omitempty"`
+	// Stale says the row is its plugin's last report, which the plugin no
+	// longer stands behind: it is down.
+	Stale bool `json:"stale,omitempty"`
 }
 
 // Since is a client's position in the rows: the epoch and revision it last
@@ -93,6 +96,15 @@ type RowsPage struct {
 	Rows     []Row       `json:"rows"`
 	Removed  []unit.Unit `json:"removed"`
 	Counters *Counters   `json:"counters,omitempty"`
+	// Loading are the plugins whose rows are not all here yet.
+	Loading []Loading `json:"loading,omitempty"`
+}
+
+// Loading is a plugin that has not yet imported its data and reported every
+// unit since the daemon started, and why, in the plugin's words.
+type Loading struct {
+	Plugin string `json:"plugin"`
+	Reason string `json:"reason"`
 }
 
 // RowFacts are a row's numbers for the backlog panels.

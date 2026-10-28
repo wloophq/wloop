@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"slices"
 	"strconv"
@@ -482,7 +483,21 @@ func (s *Server) handleRows(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	page.Counters = s.counters(r.Context())
+	page.Loading = s.loading()
 	writeJSON(w, page)
+}
+
+// loading are the plugins still loading, by id.
+func (s *Server) loading() []api.Loading {
+	if s.deps.Loading == nil {
+		return nil
+	}
+	got := s.deps.Loading()
+	var out []api.Loading
+	for _, id := range slices.Sorted(maps.Keys(got)) {
+		out = append(out, api.Loading{Plugin: id, Reason: got[id]})
+	}
+	return out
 }
 
 // parseUnit is the unit a unit route names, of any provider the daemon

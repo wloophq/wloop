@@ -157,7 +157,8 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 		writeTasksError(w, err)
 		return
 	}
-	page := api.TasksPage{Epoch: p.Epoch, Rev: p.Rev, Full: p.Full, Tasks: []api.TaskView{}, Removed: []string{}, Counters: wireCounters(p.Counters)}
+	page := api.TasksPage{Epoch: p.Epoch, Rev: p.Rev, Full: p.Full, Tasks: []api.TaskView{}, Removed: []string{}, Counters: wireCounters(p.Counters),
+		Loading: s.loading()}
 	vs := s.taskViews(ctx, g, false)
 	for _, e := range p.Tasks {
 		v, err := vs.view(ctx, e)

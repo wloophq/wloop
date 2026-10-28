@@ -175,6 +175,17 @@ func UnitStates(f Facts) []api.ActionState {
 	return append(out, registryActions{f.Intents}.States(f)...)
 }
 
+// WithOffers are states, then each action of offered they do not hold,
+// enabled: what a plugin offers on its unit.
+func WithOffers(states []api.ActionState, offered []string) []api.ActionState {
+	for _, a := range offered {
+		if !slices.ContainsFunc(states, func(st api.ActionState) bool { return st.ID == a }) {
+			states = append(states, api.ActionState{ID: a, Enabled: true})
+		}
+	}
+	return states
+}
+
 // requestIntent is the intent an intake action asks for.
 func requestIntent(f Facts, action string) string {
 	if action != "run_now" {

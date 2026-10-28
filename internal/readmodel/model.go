@@ -197,7 +197,7 @@ func derive(base Base, loaded []listing, at time.Time) ([]*entry, error) {
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", u, err)
 			}
-			row = withIntents(base, l.p, u, row)
+			row = withIntents(base, u, row)
 			raw, err := json.Marshal(row)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", u, err)
@@ -208,17 +208,11 @@ func derive(base Base, loaded []listing, at time.Time) ([]*entry, error) {
 	return out, nil
 }
 
-// Offerer is an optional capability of a Provider whose deriver offers the
-// catalog's actions on its rows itself.
-type Offerer interface {
-	OffersActions() bool
-}
-
-// withIntents sets the row's unit and, on a row of a provider that offers no actions itself, the intents'
-// actions it offers.
-func withIntents(base Base, p Provider, u unit.Unit, row api.Row) api.Row {
+// withIntents sets the row's unit and, on a row whose deriver set no
+// actions, the intents' actions it offers.
+func withIntents(base Base, u unit.Unit, row api.Row) api.Row {
 	row.Unit = u
-	if o, ok := p.(Offerer); ok && o.OffersActions() || base.Intents == nil {
+	if row.Actions != nil || base.Intents == nil {
 		return row
 	}
 	row.Actions = catalog.UnitStates(catalog.Facts{Row: row, Tracked: true, Open: !row.Summary.Closed, Asked: base.Asked, Intents: base.Intents})
@@ -363,7 +357,7 @@ func (m *Model) Row(ctx context.Context, u unit.Unit, asked catalog.Asked) (api.
 	b := s.base
 	b.Asked = asked
 	r, err := e.provider.Derive(b, e.in, s.at)
-	r = withIntents(b, e.provider, u, r)
+	r = withIntents(b, u, r)
 	return cloneRow(r), err == nil, err
 }
 

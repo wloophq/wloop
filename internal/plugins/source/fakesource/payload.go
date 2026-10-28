@@ -1,4 +1,4 @@
-package fakethread
+package fakesource
 
 import (
 	"context"
@@ -7,14 +7,12 @@ import (
 	"github.com/wloophq/wloop/internal/turn"
 )
 
-const payloadProvider unit.ProviderID = "thread"
-
 // Payload is a fake thread as a turn reads it.
 type Payload struct{ Key string }
 
-func (p Payload) Unit() unit.Unit { return unit.Unit{Provider: payloadProvider, Key: p.Key} }
+func (p Payload) Unit() unit.Unit { return unit.Unit{Provider: ID, Key: p.Key} }
 
-func (p Payload) Arg() string { return string(payloadProvider) + ":" + p.Key }
+func (p Payload) Arg() string { return string(ID) + ":" + p.Key }
 
 func (p Payload) Wording() turn.Wording {
 	return turn.Wording{Noun: "thread", This: "this thread", Ref: "thread " + p.Key, Short: p.Key}
