@@ -20,16 +20,13 @@
     "review": {
       "additionalProperties": {
         "additionalProperties": false,
-        "description": "A step of the review: inbox, outbox, waiting, projects, someday or focus.",
+        "description": "A step of the review: inbox, outbox, waiting, projects, someday or focus. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
         "properties": {
           "label": {
             "description": "What the step asks of you, as the review lists it. Required.",
             "type": "string"
           }
         },
-        "required": [
-          "label"
-        ],
         "type": "object"
       },
       "description": "The review's steps, by step.",
@@ -38,7 +35,7 @@
     "views": {
       "additionalProperties": {
         "additionalProperties": false,
-        "description": "A view, by its name.",
+        "description": "A view, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
         "properties": {
           "group": {
             "description": "The fact the view groups by.",
@@ -75,9 +72,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "label"
-        ],
         "type": "object"
       },
       "description": "The lists of tasks, by view.",

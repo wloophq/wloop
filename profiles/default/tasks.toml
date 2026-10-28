@@ -93,14 +93,14 @@ writers = ["plugin", "workflow"]
 doc     = "What the task is: new work, a capture, a project, a pull request or a thread."
 
 [props.area]
-type    = "enum"
+type    = "string"
 writers = ["person"]
-doc     = "The area of your life or work the task belongs to, one of the areas."
+doc     = "The area of your life or work the task belongs to; areas seeds the menu."
 
 [props.contexts]
 type    = "string[]"
 writers = ["person", "plugin"]
-doc     = "The contexts the task is listed under, such as @calls or @repo-api."
+doc     = "The contexts the task is listed under, such as @calls or @repo-api; contexts seeds the menu."
 
 [props.focus]
 type    = "enum"

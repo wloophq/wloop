@@ -42,7 +42,13 @@ func splitLists(src string) map[string]string {
 	return out
 }
 
-func loadListsWith(t *testing.T, bundled, user string) (ListTexts, string) {
+// lists are the views' texts and the verbs' of tasks.toml.
+type lists struct {
+	ListTexts
+	Verbs map[string]VerbText
+}
+
+func loadListsWith(t *testing.T, bundled, user string) (lists, string) {
 	t.Helper()
 	var layers []profile.Layer
 	if user != "" {
@@ -58,15 +64,16 @@ func loadListsWith(t *testing.T, bundled, user string) (ListTexts, string) {
 	for file, src := range splitLists(bundled) {
 		fsys[file] = &fstest.MapFile{Data: []byte(src)}
 	}
-	texts, _, problems := loadLists(layers, fsys, nil)
-	return texts, problems.Error()
+	texts, tasks, problems := loadLists(layers, fsys, nil)
+	return lists{texts, tasks.Verbs}, problems.Error()
 }
 
 func TestEveryVerbAndViewIsWorded(t *testing.T) {
-	texts, problems := BundledLists(os.DirFS("../../profiles/default"))
+	views, tasks, problems := loadLists(nil, os.DirFS("../../profiles/default"), nil)
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
+	texts := lists{views, tasks.Verbs}
 	for _, v := range builtin.TaskVerbs {
 		if w := texts.Verbs[v]; w.Label == "" || w.Summary == "" {
 			t.Errorf("verb %s: label %q, summary %q", v, w.Label, w.Summary)

@@ -57,7 +57,7 @@ use = "task.verb"
 verb = "done"
 ```
 
-A workflow sets a property of the task with the `task.set` step: `prop`, a property of `tasks.toml` whose writers include `workflow`, and `value`, read as the property's type reads it (a date as `YYYY-MM-DD`, a duration as `90m` or `2d`). The step is refused for a property a workflow does not write or a value its type does not read. The property records the workflow as its writer.
+A workflow sets a property of the task with the `task.set` step: `prop`, a property of `tasks.toml` whose writers include `workflow`, and `value`, read as the property's type reads it (a date as `YYYY-MM-DD`, midnight in your location, a duration as `90m` or `2d`). The step is refused for a property a workflow does not write or a value its type does not read. The property records the workflow as its writer.
 
 ## The plan
 

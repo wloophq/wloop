@@ -42,7 +42,7 @@
     "props": {
       "additionalProperties": {
         "additionalProperties": false,
-        "description": "A property, by its name.",
+        "description": "A property, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
         "properties": {
           "doc": {
             "description": "What the property holds, for the facts' reference and the agents.",
@@ -63,7 +63,7 @@
             "type": "string"
           },
           "values": {
-            "description": "An enum's values, in order; an enum without values takes any value.",
+            "description": "An enum's values, in order; required with type enum.",
             "items": {
               "type": "string"
             },
@@ -83,9 +83,6 @@
             "type": "array"
           }
         },
-        "required": [
-          "type"
-        ],
         "type": "object"
       },
       "description": "The task properties, by name, in the order the file declares them, a user layer's new ones after the bundled; each is the fact task.prop.<name>, typed from its type.",
@@ -98,7 +95,7 @@
     "states": {
       "additionalProperties": {
         "additionalProperties": false,
-        "description": "A state, by its name.",
+        "description": "A state, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
         "properties": {
           "category": {
             "description": "The state's category, which is all Go reads of it; required for a new state.",
@@ -118,9 +115,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "category"
-        ],
         "type": "object"
       },
       "description": "The states a task takes, by name, in the order the file declares them, a user layer's new ones after the bundled; clients list them in this order, and a task proposed in a category takes the first state of it.",
@@ -129,7 +123,7 @@
     "verbs": {
       "additionalProperties": {
         "additionalProperties": false,
-        "description": "A verb, by its name.",
+        "description": "A verb, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
         "properties": {
           "by": {
             "additionalProperties": {
@@ -199,10 +193,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "label",
-          "summary"
-        ],
         "type": "object"
       },
       "description": "The verbs a task offers, by verb.",

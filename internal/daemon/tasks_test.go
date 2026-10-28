@@ -359,12 +359,12 @@ func TestCatalogServesViewsAndVerbs(t *testing.T) {
 
 func TestTheCatalogIsWordedByTheProfile(t *testing.T) {
 	t.Parallel()
-	texts := intentload.ListTexts{
-		Verbs: map[string]intentload.VerbText{"done": {Label: "Finish", Summary: "Close it"}, "waiting": {Label: "Waiting", Summary: "Wait", Input: "On whom?"}},
-		Views: map[string]string{"next": "Now"},
-	}
+	texts := intentload.ListTexts{Views: map[string]string{"next": "Now"}}
+	tasks := intentload.TasksDef{Verbs: map[string]intentload.VerbText{"done": {Label: "Finish", Summary: "Close it"}, "waiting": {Label: "Waiting", Summary: "Wait", Input: "On whom?"}}}
 	r := newTasksRig(t, func(d *Deps) {
-		d.Intents = func() *intentload.Loaded { return &intentload.Loaded{Lists: texts, Registry: dintent.NewRegistry(nil)} }
+		d.Intents = func() *intentload.Loaded {
+			return &intentload.Loaded{Lists: texts, Tasks: tasks, Registry: dintent.NewRegistry(nil)}
+		}
 	})
 	var cat api.ViewsCatalog
 	if code := get(t, r.s, api.ViewsPath, &cat); code != 200 {
@@ -801,9 +801,9 @@ func TestAVerbTheProfileDoesNotOfferIsNeitherListedNorRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	texts := intentload.ListTexts{Verbs: map[string]intentload.VerbText{"someday": {Offer: offer}}}
+	tasks := intentload.TasksDef{Verbs: map[string]intentload.VerbText{"someday": {Offer: offer}}}
 	r := newTasksRig(t, func(d *Deps) {
-		d.Intents = func() *intentload.Loaded { return &intentload.Loaded{Lists: texts, Registry: dintent.NewRegistry(nil)} }
+		d.Intents = func() *intentload.Loaded { return &intentload.Loaded{Tasks: tasks, Registry: dintent.NewRegistry(nil)} }
 	})
 	r.put(t, task.Task{ID: "e-c", Kind: task.KindCapture, State: task.Inbox, Title: "c", Origin: task.OriginUser})
 	var v api.TaskView

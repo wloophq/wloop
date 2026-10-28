@@ -35,7 +35,7 @@ var notifiedDrafts = []draft.State{draft.Proposed, draft.Failed}
 func (ev *taskViewer) attention(ctx context.Context, e task.Task) *api.Attention {
 	a := ev.notice(ctx, e)
 	if a != nil {
-		words := ev.s.loaded().Lists
+		words := ev.s.loaded().Tasks.Verbs
 		a.Actions = slices.DeleteFunc(a.Actions, func(act api.AttentionAction) bool {
 			v, ok := strings.CutPrefix(act.ID, verbAction(""))
 			return ok && !offers(words, e, task.Verb(v))

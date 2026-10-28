@@ -18,7 +18,7 @@ func (s *Server) handleKeys(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	l := s.loaded()
-	writeJSON(w, api.KeysResponse{Bindings: keyViews(surface, s.servedSpecs(), catalog.PlanSpecs(l), coreWords{l.Keys, l.Lists})})
+	writeJSON(w, api.KeysResponse{Bindings: keyViews(surface, s.servedSpecs(), catalog.PlanSpecs(l), coreWords{l.Keys, l.Lists, l.Tasks})})
 }
 
 // coreWords are the profile's words for the core keys: their help, and a
@@ -26,6 +26,7 @@ func (s *Server) handleKeys(w http.ResponseWriter, r *http.Request) {
 type coreWords struct {
 	keys  intentload.KeyTexts
 	lists intentload.ListTexts
+	tasks intentload.TasksDef
 }
 
 func keyViews(surface keys.Surface, specs, plan []api.ActionSpec, words coreWords) []api.KeyView {
@@ -36,7 +37,7 @@ func keyViews(surface keys.Surface, specs, plan []api.ActionSpec, words coreWord
 			help := cmp.Or(words.keys.Help(string(b.Context), b.Action), bundled.keys.Help(string(b.Context), b.Action), b.Action)
 			var summary string
 			if b.Context == keys.List {
-				summary = cmp.Or(words.lists.Verbs[b.Action].Summary, bundled.lists.Verbs[b.Action].Summary)
+				summary = cmp.Or(words.tasks.Verbs[b.Action].Summary, bundled.tasks.Verbs[b.Action].Summary)
 			}
 			out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: help, Summary: summary})
 		}

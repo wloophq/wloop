@@ -257,14 +257,14 @@ func TestAZeroIntPropertyIsUnset(t *testing.T) {
 		t.Fatal(problems)
 	}
 	for _, c := range []struct{ prop, text string }{{"count", "0"}, {"size", "0s"}, {"size", "0"}} {
-		if _, err := d.Parse(c.prop, c.text); err == nil || !strings.Contains(err.Error(), "0 unsets") {
+		if _, err := d.Parse(c.prop, c.text, time.UTC); err == nil || !strings.Contains(err.Error(), "0 unsets") {
 			t.Errorf("Parse(%s, %q) = %v", c.prop, c.text, err)
 		}
 	}
-	if v, err := d.Parse("count", "3"); err != nil || v.Int != 3 {
+	if v, err := d.Parse("count", "3", time.UTC); err != nil || v.Int != 3 {
 		t.Errorf("Parse(count, 3) = %+v %v", v, err)
 	}
-	if v, err := d.Parse("count", ""); err != nil || !v.IsZero() {
+	if v, err := d.Parse("count", "", time.UTC); err != nil || !v.IsZero() {
 		t.Errorf("empty text unsets: %+v %v", v, err)
 	}
 }
@@ -290,7 +290,7 @@ func TestParseReadsEachPropertyType(t *testing.T) {
 		{"reviewers", "github:ana, github:bruno", func(v task.Value) bool { return len(v.Actors) == 2 && v.Actors[1].Key == "github:bruno" }},
 	}
 	for _, c := range cases {
-		v, err := d.Parse(c.prop, c.text)
+		v, err := d.Parse(c.prop, c.text, time.UTC)
 		if err != nil || !c.ok(v) {
 			t.Errorf("Parse(%s, %q) = %+v %v", c.prop, c.text, v, err)
 		}
@@ -302,7 +302,7 @@ func TestParseReadsEachPropertyType(t *testing.T) {
 		{"owner", "ana", "provider:id"},
 		{"nope", "x", "names no property"},
 	} {
-		if _, err := d.Parse(c.prop, c.text); err == nil || !strings.Contains(err.Error(), c.msg) {
+		if _, err := d.Parse(c.prop, c.text, time.UTC); err == nil || !strings.Contains(err.Error(), c.msg) {
 			t.Errorf("Parse(%s, %q) = %v, want %q", c.prop, c.text, err, c.msg)
 		}
 	}
@@ -347,5 +347,49 @@ func TestAnApprovalRuleReadsATrustedPropertyNeverAnAgentWrittenOne(t *testing.T)
 	writeWorkflow(t, root, "focus", strings.Replace(focusOnTask, `"high"'`, `"urgent"'`, 1)+"when = 'true'\nmode = \"wait\"\n")
 	if _, problems := Load(userLayer(root), bundled, testBase(), nil); !strings.Contains(problems.Error(), "urgent") {
 		t.Errorf("an enum property's facts take its values only: %s", problems.Error())
+	}
+}
+
+func TestADateOnlyValueIsMidnightInTheGivenLocation(t *testing.T) {
+	t.Parallel()
+	d, problems := loadTasksWith(t, defaultTasks(t), "")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	brt, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := d.Parse("check_on", "2026-10-29", brt)
+	if err != nil || !v.Time.Equal(time.Date(2026, 10, 29, 3, 0, 0, 0, time.UTC)) {
+		t.Fatalf("check_on %v %v", v.Time.UTC(), err)
+	}
+}
+
+func TestAnEnumWithoutValuesIsAProblem(t *testing.T) {
+	t.Parallel()
+	d, problems := loadTasksWith(t, defaultTasks(t), "[props.mood]\ntype = \"enum\"\nwriters = [\"person\"]\n")
+	if !strings.Contains(problems, "props.mood.values: is required with type enum") {
+		t.Errorf("problems %q", problems)
+	}
+	if _, ok := d.Prop("mood"); ok {
+		t.Error("an enum without values is declared")
+	}
+	if p, _ := d.Prop("area"); p.Type != task.PropString {
+		t.Errorf("area %+v", p)
+	}
+}
+
+func TestAnIntentRefuseReadsATaskProperty(t *testing.T) {
+	t.Parallel()
+	bundled := fstest.MapFS{TasksFile: {Data: []byte(defaultTasks(t))}}
+	for kind, want := range map[string]string{"project": "", "galaxy": "galaxy"} {
+		dir := t.TempDir()
+		refuse := "\n[[refuse]]\nwhen = 'task.prop.kind == \"" + kind + "\"'\nwhy = \"A project starts its children.\"\n"
+		writeIntent(t, dir, "begin", startLike+refuse, "Begin.")
+		_, problems := Load(userLayer(dir), bundled, testBase(), nil)
+		if got := problems.Error(); (want == "") != (got == "") || !strings.Contains(got, want) {
+			t.Errorf("kind %s: problems %q", kind, got)
+		}
 	}
 }

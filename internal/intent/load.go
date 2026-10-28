@@ -99,7 +99,7 @@ type Loaded struct {
 	Actions map[string]BuiltinAction
 	// Tools are the MCP tools' texts from tools.toml, by tool name.
 	Tools map[string]ToolText
-	// Lists are the verbs' texts from tasks.toml and the views' from views.toml.
+	// Lists are the views' texts from views.toml.
 	Lists ListTexts
 	// Tasks are the task properties, states and verbs of tasks.toml.
 	Tasks TasksDef

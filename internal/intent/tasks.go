@@ -47,7 +47,7 @@ type TasksDef struct {
 }
 
 // PropDef is a task property: the fact task.prop.<Name>. Values are an
-// enum's; an enum without values takes any value.
+// enum's, at least one.
 type PropDef struct {
 	Name    string
 	Type    task.PropType
@@ -116,7 +116,7 @@ func (d TasksDef) Facts() expr.Env {
 	for _, p := range d.Props {
 		name := builtin.PropPrefix + p.Name
 		env[name] = builtin.PropFactType(p.Type)
-		if p.Type == task.PropEnum && len(p.Values) > 0 {
+		if p.Type == task.PropEnum {
 			env.SetEnum(name, p.Values)
 		}
 		if p.Untrusted() {
@@ -137,12 +137,12 @@ const taskStateFact = "task.state"
 var errZeroUnsets = errors.New("0 unsets the property: an int or a duration property holds no 0")
 
 // Parse reads text as the value of the property name, by its type: a
-// string as is; an enum one of its values; a date YYYY-MM-DD (midnight
-// UTC) or RFC 3339; a duration as the profile writes them (90m, 2d); an
+// string as is; an enum one of its values; a date YYYY-MM-DD (midnight in
+// loc) or RFC 3339; a duration as the profile writes them (90m, 2d); an
 // int in decimal; an actor a person's key, provider:id; a list type its
 // items comma-separated. Empty text is the zero Value, which unsets the
 // property, and so is 0: Parse refuses 0 for an int or a duration.
-func (d TasksDef) Parse(name, text string) (task.Value, error) {
+func (d TasksDef) Parse(name, text string, loc *time.Location) (task.Value, error) {
 	p, ok := d.Prop(name)
 	if !ok {
 		return task.Value{}, fmt.Errorf("%s names no property of %s%s", name, TasksFile, expr.DidYouMean(name, d.propNames()))
@@ -153,7 +153,7 @@ func (d TasksDef) Parse(name, text string) (task.Value, error) {
 	}
 	switch p.Type {
 	case task.PropEnum:
-		if len(p.Values) > 0 && !slices.Contains(p.Values, text) {
+		if !slices.Contains(p.Values, text) {
 			return task.Value{}, fmt.Errorf("%s is %q, not one of %s", name, text, strings.Join(p.Values, ", "))
 		}
 		return task.Value{Text: text}, nil
@@ -167,7 +167,7 @@ func (d TasksDef) Parse(name, text string) (task.Value, error) {
 		}
 		return task.Value{Int: n}, nil
 	case task.PropDate:
-		if t, err := time.Parse(time.DateOnly, text); err == nil {
+		if t, err := time.ParseInLocation(time.DateOnly, text, loc); err == nil {
 			return task.Value{Time: t}, nil
 		}
 		t, err := time.Parse(time.RFC3339, text)
@@ -374,8 +374,11 @@ func (l *tasksLoad) mergeProps(s *sheet, props map[string]mProp) {
 		if m.Values != nil {
 			p.Values = slices.Clone(m.Values)
 		}
-		if len(p.Values) > 0 && p.Type != task.PropEnum {
+		switch {
+		case len(p.Values) > 0 && p.Type != task.PropEnum:
 			s.add(path+".values", "is read only with type enum, not %s", p.Type)
+		case len(p.Values) == 0 && p.Type == task.PropEnum:
+			s.add(path+".values", "is required with type enum: the values it takes; a property that takes any text is a string")
 		}
 		if m.Writers != nil {
 			s.eachOneOf(path+".writers", m.Writers, builtin.ValuesOf(builtin.SurfaceTasks, "props.*.writers"))

@@ -29,13 +29,13 @@ func (s *stepSet) taskSetValue(c stepCall) (task.Value, string) {
 	name := c.arg("prop")
 	p, ok := tasks.Prop(name)
 	if !ok {
-		_, err := tasks.Parse(name, c.arg("value"))
+		_, err := tasks.Parse(name, c.arg("value"), s.e.Now().Location())
 		return task.Value{}, err.Error()
 	}
 	if !slices.Contains(p.Writers, task.WriterWorkflow) {
 		return task.Value{}, fmt.Sprintf("a workflow does not write the property %s: its writers are %v", name, p.Writers)
 	}
-	v, err := tasks.Parse(name, c.arg("value"))
+	v, err := tasks.Parse(name, c.arg("value"), s.e.Now().Location())
 	if err != nil {
 		return task.Value{}, err.Error()
 	}

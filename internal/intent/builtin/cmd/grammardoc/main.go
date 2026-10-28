@@ -503,6 +503,11 @@ func schemaOf(s struct {
 	return b.Bytes(), nil
 }
 
+// layered are the surfaces whose files a user layer lays over the bundled
+// one key by key: only the merged layers tell a new entry of a map from an
+// override, so an entry's schema requires none of its keys.
+var layered = []builtin.Surface{builtin.SurfaceTasks, builtin.SurfaceViews, builtin.SurfaceGates}
+
 // object is the schema of a table's keys; a name the author chooses
 // takes any key.
 func object(n *node) map[string]any {
@@ -511,7 +516,11 @@ func object(n *node) map[string]any {
 	var required []string
 	for name, c := range n.keys {
 		if name == "*" {
-			out["additionalProperties"] = schemaOfNode(c)
+			entry := schemaOfNode(c)
+			if c.row != nil && slices.Contains(layered, c.row.In) {
+				delete(entry, "required")
+			}
+			out["additionalProperties"] = entry
 			continue
 		}
 		props[name] = schemaOfNode(c)

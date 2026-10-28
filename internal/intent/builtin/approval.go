@@ -32,10 +32,11 @@ func (e *SubjectsError) Error() string {
 }
 
 // ApprovalRule is the [drafts.approval] rule of a whose when is compiled
-// over env. A task.prop.* fact it reads must be typed in env, which only the
-// profile does, and one env marks untrusted refuses the rule as an
-// untrusted fact of the table does. It names comment delivery when its top-level conjunction holds
-// draft.delivery == "comment", the only way a rule releases a comment.
+// over env. A task.prop.* fact it reads must be typed in env, which only
+// the profile does; one env marks untrusted refuses the rule like an
+// untrusted fact of the table. It names comment delivery when its
+// top-level conjunction holds draft.delivery == "comment", the only way a
+// rule releases a comment.
 func ApprovalRule(when string, a draft.Approval, env expr.Env) (draft.Rule, error) {
 	for _, name := range DynamicFacts(when) {
 		if _, typed := env[name]; !typed || !strings.HasPrefix(name, PropPrefix) {

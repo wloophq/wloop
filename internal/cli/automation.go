@@ -245,7 +245,7 @@ func configWorkflowProblems(cfg config.Config, l *intentload.Loaded) []error {
 			}
 		}
 		for _, base := range draftBases(w, l.Registry) {
-			if _, err := configPolicy(w.Name, w.Slot, base, wc.DraftApproval()); err != nil {
+			if _, err := configPolicy(w, base, wc.DraftApproval(), extras); err != nil {
 				out = append(out, fmt.Errorf("%w; every draft of %s waits for you", err, w.Name))
 				break
 			}

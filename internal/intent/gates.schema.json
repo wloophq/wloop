@@ -6,12 +6,12 @@
     "gates": {
       "additionalProperties": {
         "additionalProperties": false,
-        "description": "A gate, by its name: the one a gate.open step, an intent's record.missing or a verb's gate opens; a gate the loop opens by kind takes the first of its kind.",
+        "description": "A gate, by its name: the one a gate.open step, an intent's record.missing or a verb's gate opens; a gate the loop opens by kind takes the first of its kind. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
         "properties": {
           "intents": {
             "additionalProperties": {
               "additionalProperties": false,
-              "description": "An intent, by its name.",
+              "description": "An intent, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
               "properties": {
                 "answer": {
                   "default": false,
@@ -34,9 +34,6 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "status"
-              ],
               "type": "object"
             },
             "description": "What you may resolve the gate with, by intent, in the order clients offer them.",
@@ -60,9 +57,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "kind"
-        ],
         "type": "object"
       },
       "description": "The gates a profile names, by name, in the order the file declares them, a user layer's new ones after the bundled.",

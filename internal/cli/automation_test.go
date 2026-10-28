@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -553,7 +554,7 @@ func TestTheConfigsDraftApprovalIsLaidOnce(t *testing.T) {
 	if out[0].DraftApproval != manifest {
 		t.Fatalf("applyConfig laid the drafts approval its resolver lays: %+v", out[0].DraftApproval)
 	}
-	if a := draftApproval(cfg, out[0]); a.Default.Mode != draft.Delay || a.Default.Window != 5*time.Minute {
+	if a := draftApproval(cfg, out[0], nil); a.Default.Mode != draft.Delay || a.Default.Window != 5*time.Minute {
 		t.Fatalf("draft approval %+v", a)
 	}
 	if manifest.Default.Mode != draft.Wait {
@@ -599,5 +600,47 @@ func TestApplyConfigOnlyWhenReadsTheTaskProperties(t *testing.T) {
 		if got, err := w.When.Match(workflow.Vars{Facts: workflow.Facts{"task.prop.priority": priority}}); err != nil || got != want {
 			t.Errorf("priority %q: %v, %v; want %v", priority, got, err, want)
 		}
+	}
+}
+
+// nudgeDraftRule is the config with one drafts approval rule on the bundled
+// slack-stalled-nudge workflow, whose units are tasks.
+func nudgeDraftRule(when, mode string) config.Config {
+	cfg := Defaults()
+	cfg.Workflows = map[string]config.WorkflowConfig{"slack-stalled-nudge": {Drafts: &config.WorkflowDrafts{Approval: &config.ApprovalConfig{
+		Mode: string(draft.Wait), Rule: []config.ApprovalRuleConfig{{When: when, Mode: mode}}}}}}
+	return cfg
+}
+
+func TestAConfigDraftWaitRuleReadsATrustedProperty(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	cfg := nudgeDraftRule(`task.prop.owner == "slack:U0AAA"`, string(draft.Wait))
+	if errs := configWorkflowProblems(cfg, te.loadedIntents()); len(errs) > 0 {
+		t.Fatalf("%v", errs)
+	}
+	file := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(file, []byte("[[workflows.slack-stalled-nudge.drafts.approval.rule]]\nwhen = 'task.prop.owner == \"slack:U0AAA\"'\nmode = \"wait\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := config.LoadFile(file, Defaults()); err != nil {
+		t.Fatalf("config.toml refuses a wait rule over a property: %v", err)
+	}
+}
+
+func TestAConfigDraftRuleReadingAnAgentWrittenPropertyIsRefused(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	cfg := nudgeDraftRule(`task.prop.risk == "low"`, string(draft.Send))
+	errs := configWorkflowProblems(cfg, te.loadedIntents())
+	if len(errs) != 1 || !strings.Contains(errs[0].Error(), "task.prop.risk") {
+		t.Fatalf("%v", errs)
+	}
+	file := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(file, []byte("[[workflows.slack-stalled-nudge.drafts.approval.rule]]\nwhen = 'task.prop.risk == \"low\"'\nmode = \"send\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := config.LoadFile(file, Defaults()); err == nil || !strings.Contains(err.Error(), "config.toml cannot see who writes it") {
+		t.Fatalf("config.toml loads a send rule over a property: %v", err)
 	}
 }

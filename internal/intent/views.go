@@ -17,10 +17,9 @@ import (
 // ViewsFile is the profile file that words the views and the review.
 const ViewsFile = "views.toml"
 
-// ListTexts are the words of the verbs, by verb, from tasks.toml, and the
-// labels of the views and of the review's steps, by id, from views.toml.
+// ListTexts are the labels of the views and of the review's steps, by id,
+// from views.toml.
 type ListTexts struct {
-	Verbs  map[string]VerbText
 	Views  map[string]string
 	Review map[string]string
 }
@@ -49,7 +48,7 @@ type mBadge struct {
 	Views []string `toml:"views"`
 }
 
-// BundledLists is the verbs' and views' texts of the bundled profile alone.
+// BundledLists is the views' texts of the bundled profile alone.
 func BundledLists(bundled fs.FS) (ListTexts, Problems) {
 	out, _, problems := loadLists(nil, bundled, nil)
 	return out, problems
@@ -62,13 +61,12 @@ func BundledLists(bundled fs.FS) (ListTexts, Problems) {
 // reads is a problem naming where its words go now. The verbs' texts are
 // the TasksDef's; gates checks the gates a verb names, nil none.
 func loadLists(layers []profile.Layer, bundled fs.FS, gates *GatesDef) (ListTexts, TasksDef, Problems) {
-	out := ListTexts{Verbs: map[string]VerbText{}, Views: map[string]string{}, Review: map[string]string{}}
+	out := ListTexts{Views: map[string]string{}, Review: map[string]string{}}
 	problems := renamedFiles(layers)
 	if bundled == nil {
-		return out, TasksDef{Verbs: out.Verbs}, problems
+		return out, TasksDef{Verbs: map[string]VerbText{}}, problems
 	}
 	tasks, taskProblems := loadTasks(layers, bundled, gates)
-	out.Verbs = tasks.Verbs
 	problems = append(problems, taskProblems...)
 	views, read := readLayered(layers, bundled, ViewsFile, func(file string, src []byte) Problems {
 		return mergeViews(out, file, src)
