@@ -565,6 +565,28 @@
               "items": {
                 "additionalProperties": false,
                 "properties": {
+                  "buckets": {
+                    "description": "The age buckets of a time facet, youngest first; only with sort = time.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "description": "The bucket's id. Required.",
+                          "type": "string"
+                        },
+                        "within": {
+                          "description": "The age its values are younger than, as a Go duration. Required.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "within"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
                   "field": {
                     "description": "What it reads: row.*, item.* or \u003cprovider\u003e.*.",
                     "type": "string"
@@ -632,7 +654,8 @@
                     "description": "Where it binds; empty is every surface.",
                     "enum": [
                       "web",
-                      "tui"
+                      "tui",
+                      "menubar"
                     ],
                     "type": "string"
                   }

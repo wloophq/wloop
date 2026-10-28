@@ -662,11 +662,8 @@ message PlanRequest {
 }
 
 message PlanResponse {
-  repeated Fact facts = 1;
-  // due is the plan's next deadline; unset with none.
-  google.protobuf.Timestamp due = 2;
-  // rank orders the units whose rounds are due, lowest first.
-  int64 rank = 3;
+  reserved 1, 2, 3;
+  reserved "facts", "due", "rank";
   repeated Round rounds = 4;
 }
 

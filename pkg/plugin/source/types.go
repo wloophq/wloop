@@ -399,13 +399,9 @@ type PendingRound struct {
 	Since, Deadline time.Time
 }
 
-// Plan is a unit's round plan: the facts the profile's workflows read, its
-// next deadline, its rank among the units due, and the rounds it would
-// launch.
+// Plan is a unit's round plan: the rounds it would launch. The workflows'
+// facts and the unit's deadline come from its snapshot.
 type Plan struct {
-	Facts  []Fact
-	Due    time.Time
-	Rank   int64
 	Rounds []Round
 }
 
