@@ -60,6 +60,6 @@ func (e *Env) pluginCommand(name string) (unit.ProviderID, bool) {
 // cliSourceDeps are the shared handles a command line process has: no
 // store or daemon services.
 func (e *Env) cliSourceDeps(cfg config.Config) source.Deps {
-	return source.Deps{GitHub: e.GitHub, WS: e.WS, Sink: e.boardSink(cfg), Clock: clockFunc(e.Now), Git: e.Git, Agents: e.Agents,
-		Log: func(format string, args ...any) { fmt.Fprintf(e.Err, format+"\n", args...) }}
+	return e.withGitHubClient(source.Deps{WS: e.WS, Sink: e.boardSink(cfg), Clock: clockFunc(e.Now), Git: e.Git, Agents: e.Agents,
+		Log: func(format string, args ...any) { fmt.Fprintf(e.Err, format+"\n", args...) }})
 }

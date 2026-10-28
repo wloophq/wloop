@@ -42,7 +42,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/ghcli"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/github/githubtest"
 	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/source"
@@ -622,8 +621,7 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 		background: &sync.WaitGroup{},
 		Out:        te.out,
 		Err:        te.err,
-		GH:         ghcli.Metered(te.gh),
-		GitHub:     githubtest.Runner(te.gh),
+		github:     githubClients{ghsource.Clients{GH: ghcli.Metered(te.gh), API: githubtest.Runner(te.gh)}},
 		Git:        gitx.Git{R: te.git},
 		Files:      checkoutFiles{ws},
 		WS:         workspace.NewSet(ws),
@@ -773,7 +771,7 @@ func (derivedRows) SearchCandidatesEach(_ context.Context, qs []string, _ string
 	return make([]dgh.CandidatePage, len(qs)), make([]error, len(qs)), nil
 }
 
-func (d derivedRows) CandidateByRef(ctx context.Context, ref github.Ref, _ string) (dgh.CandidatePage, error) {
+func (d derivedRows) CandidateByRef(ctx context.Context, ref pr.Ref, _ string) (dgh.CandidatePage, error) {
 	c := dgh.Candidate{Ref: ref, URL: ref.URL(), State: dgh.StateOpen}
 	if pr, err := githubtest.Runner(quietGH{d.f}).Basics(ctx, ref); err == nil {
 		c.State, c.Author, c.Title, c.IsDraft = pr.State, pr.Author, pr.Title, pr.IsDraft
@@ -784,7 +782,7 @@ func (d derivedRows) CandidateByRef(ctx context.Context, ref github.Ref, _ strin
 	return dgh.CandidatePage{Candidates: []dgh.Candidate{c}}, nil
 }
 
-func (d derivedRows) authored(ref github.Ref) string {
+func (d derivedRows) authored(ref pr.Ref) string {
 	d.f.mu.Lock()
 	raw := d.f.author
 	d.f.mu.Unlock()

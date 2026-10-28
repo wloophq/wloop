@@ -79,7 +79,7 @@ func TestDoctorWaitsOnItsSlowChecksAtOnce(t *testing.T) {
 	b := newBarrier(4)
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/widget", RemoteKey: "github.com/acme/widget"}}}
 	te := newTestEnv(t, slowManager{m, b})
-	te.GH = slowGH{te.gh, b}
+	te.github.GH = slowGH{te.gh, b}
 	te.Git = gitx.Git{R: slowGit{te.git, b}}
 	te.Sh = func(_ context.Context, _ string, args ...string) ([]byte, error) {
 		if len(args) > 0 && args[0] == "-lc" {

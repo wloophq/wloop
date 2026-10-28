@@ -17,12 +17,12 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/github/githubtest"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
@@ -106,7 +106,7 @@ func livePlanner(t *testing.T, sc sweepCase) roundPlanner {
 	if !ws.Snapshots() {
 		ws = workspace.NewSet(workspace.NewCached(sc.ws, sc.ws, time.Minute))
 	}
-	mod, err := ghsource.Module(cfg, source.Deps{DB: te.db, Inventory: te.Store, GitHub: te.GitHub, WS: ws, Sink: te.boardSink(cfg),
+	mod, err := ghsource.Module(cfg, source.Deps{DB: te.db, Inventory: te.Store, GitHub: te.github.API, WS: ws, Sink: te.boardSink(cfg),
 		Turns: te.Turns, Clock: clockFunc(sc.env.Now), Log: t.Logf, Git: te.Git, Agents: te.Agents,
 		Intents: func() *dintent.Registry { return te.loadedIntents().Registry }})
 	if err != nil {
@@ -244,7 +244,7 @@ func (r *startRig) run(t *testing.T, o automation.RunOpts) (string, error) {
 	return r.steps.Run(context.Background(), r.st, r.u, r.why, o)
 }
 
-func trustBlockEvent(ref github.Ref, at time.Time) dinv.Event {
+func trustBlockEvent(ref pr.Ref, at time.Time) dinv.Event {
 	b := inventory.StartBlock{Question: turns.QuestionTrust, Root: "/src/api", Folder: "/wt/rev", Round: "follow-up"}
 	return dinv.Event{PR: ref, Kind: dinv.KindRoundBlocked, Key: b.Key(at), At: at, Data: "could not start: /wt/rev is not trusted in the agent home of its terminal"}
 }
@@ -265,7 +265,7 @@ func TestTurnStartGuardsInTheBasesOrder(t *testing.T) {
 		{whyPaused, func() { sc.te.setPause(t, round.Pause{On: true}) }, func() { sc.te.setPause(t, round.Pause{}) }},
 		{"its stored detail is stale", func() { r.units.Set(r.u, "pr.stale", true) }, func() { r.units.Set(r.u, "pr.stale", false) }},
 		{errBusy.Error(), func() { sc.ws.Activity = map[string]wsdomain.Activity{"ws-rev": {Busy: true}} }, func() { sc.ws.Activity = nil }},
-		{"its review turn asks you something", func() { r.rec.questions = map[github.Ref]map[string]bool{ref: {"review": true}} }, func() { r.rec.questions = nil }},
+		{"its review turn asks you something", func() { r.rec.questions = map[pr.Ref]map[string]bool{ref: {"review": true}} }, func() { r.rec.questions = nil }},
 		{"an intake of yours asks for it", func() { r.briefs.intakes = []intake.Intake{{Unit: r.u, Intent: dturn.Intent(dintent.Review)}} }, func() { r.briefs.intakes = nil }},
 		{"round blocked: could not start", func() { r.rec.events = append(r.rec.events, trustBlockEvent(ref, testNow)) }, func() { r.rec.events = nil }},
 		{"brief not ready", func() { r.briefs.rd = intake.Readiness{Wait: intake.WaitBriefing, Attempt: 1} }, func() { r.briefs.rd = intake.Readiness{Go: true} }},

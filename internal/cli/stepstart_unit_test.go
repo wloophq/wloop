@@ -20,12 +20,12 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/plugins/source/fakesource"
 	"github.com/wloophq/wloop/internal/turn"
@@ -391,7 +391,7 @@ func TestTheRoleHolderAnswersTurnStartsGuards(t *testing.T) {
 		t.Fatalf("the holder's [[refuse]]: %q", got)
 	}
 	r.units.Set(r.u, "pr.repo", "acme/web")
-	r.rec.questions = map[github.Ref]map[string]bool{sc.ref: {"my-review": true}}
+	r.rec.questions = map[pr.Ref]map[string]bool{sc.ref: {"my-review": true}}
 	if got := r.check(t, automation.CheckOpts{}); got != "its my-review turn asks you something" {
 		t.Fatalf("the holder's open question: %q", got)
 	}

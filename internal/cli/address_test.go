@@ -14,8 +14,8 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -51,7 +51,7 @@ func TestAddressKeepsTheGuidanceWhenThePromptDoesNotLand(t *testing.T) {
 	if code := te.run("address", "https://github.com/acme/api/pull/9", "skip", "the nit"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	if got := rec.overrides[github.Ref{Owner: "acme", Repo: "api", Number: 9}].NextGuidance; got != "skip the nit" {
+	if got := rec.overrides[pr.Ref{Owner: "acme", Repo: "api", Number: 9}].NextGuidance; got != "skip the nit" {
 		t.Fatalf("guidance lost: %q", got)
 	}
 }
@@ -275,7 +275,7 @@ func TestAddressTakeOverTakesOverFirst(t *testing.T) {
 		t.Fatalf("prompts %+v", m.Prompts)
 	}
 	st := te.Store
-	if o, _ := st.Override(context.Background(), github.Ref{Owner: "acme", Repo: "api", Number: 20}); !o.Adopted {
+	if o, _ := st.Override(context.Background(), pr.Ref{Owner: "acme", Repo: "api", Number: 20}); !o.Adopted {
 		t.Fatal("not marked as taken over")
 	}
 }
@@ -382,7 +382,7 @@ func TestAddressTakeOverStopsWhenTheDaemonGoesAwayAfterTakingOver(t *testing.T) 
 func linkAuthorWorkspace(t *testing.T, te *testEnv, n int, id string) {
 	t.Helper()
 	ctx := context.Background()
-	ref := github.Ref{Owner: "acme", Repo: "api", Number: n}
+	ref := pr.Ref{Owner: "acme", Repo: "api", Number: n}
 	if err := te.Store.UpsertPR(ctx, dinv.PR{Ref: ref, Title: "Add z", Author: "jo", State: "OPEN", URL: ref.URL(), Reasons: []string{"workspace"}}); err != nil {
 		t.Fatal(err)
 	}

@@ -9,7 +9,6 @@ import (
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
@@ -49,7 +48,7 @@ func (s storedFacts) unitFacts(ctx context.Context, u unit.Unit) (turn.Stored, e
 	return st, nil
 }
 
-func (s storedFacts) prFacts(ctx context.Context, ref github.Ref) (turn.Stored, error) {
+func (s storedFacts) prFacts(ctx context.Context, ref pr.Ref) (turn.Stored, error) {
 	var st turn.Stored
 	pr, known, err := s.store.PR(ctx, ref)
 	if err != nil {

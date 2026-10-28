@@ -20,9 +20,9 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/termfmt"
 	"github.com/wloophq/wloop/internal/turn"
@@ -194,7 +194,7 @@ func runProfileShow(ctx context.Context, e *Env, args []string) error {
 
 // placeholderTurn is a turn asked for by hand on a pull request of ref's
 // repository, with nothing read from GitHub.
-func placeholderTurn(d dintent.Def, ref github.Ref) turn.Request {
+func placeholderTurn(d dintent.Def, ref pr.Ref) turn.Request {
 	inputs := map[string]any{}
 	for _, in := range d.Inputs {
 		if in.Type == "text" {
@@ -219,7 +219,7 @@ func doctorIntents(r *dintent.Registry, show bool, p unit.ProviderID) []dintent.
 
 // placeholderTurnOf is placeholderTurn with the facts the daemon read of
 // the pull request, when it did.
-func placeholderTurnOf(d dintent.Def, ref github.Ref, f *api.Facts) turn.Request {
+func placeholderTurnOf(d dintent.Def, ref pr.Ref, f *api.Facts) turn.Request {
 	r := placeholderTurn(d, ref)
 	if f != nil {
 		r.Payload = &turn.PR{Author: f.Author, Association: f.Association, Base: f.Base, Labels: f.Labels}
@@ -229,7 +229,7 @@ func placeholderTurnOf(d dintent.Def, ref github.Ref, f *api.Facts) turn.Request
 
 // briefFacts asks the daemon what the pull request's guide is matched
 // against.
-func (e *Env) briefFacts(ctx context.Context, c *client.Client, ref github.Ref) (*api.Facts, error) {
+func (e *Env) briefFacts(ctx context.Context, c *client.Client, ref pr.Ref) (*api.Facts, error) {
 	if c == nil {
 		return nil, errors.New("the daemon is not running")
 	}
@@ -269,15 +269,15 @@ func describeFacts(f api.Facts) string {
 
 var profileShowUsage = "usage: " + brand.Command + " profile show <owner/repo|pr-url> [--intent <intent>] [--show] [--color auto|always|never]"
 
-func parseRepoArg(v string) (github.Ref, error) {
+func parseRepoArg(v string) (pr.Ref, error) {
 	if strings.HasPrefix(v, "https://") {
-		return github.ParseURL(v)
+		return pr.ParseURL(v)
 	}
 	owner, repo, ok := strings.Cut(v, "/")
 	if !ok || owner == "" || repo == "" || strings.Contains(repo, "/") {
-		return github.Ref{}, errors.New(profileShowUsage)
+		return pr.Ref{}, errors.New(profileShowUsage)
 	}
-	return github.Ref{Owner: owner, Repo: repo}, nil
+	return pr.Ref{Owner: owner, Repo: repo}, nil
 }
 
 // printBlocks lists the blocks of kind with their conditions and what each

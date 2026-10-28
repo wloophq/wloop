@@ -9,14 +9,12 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/instructions"
 	"github.com/wloophq/wloop/internal/core/turns"
-	dchange "github.com/wloophq/wloop/internal/domain/github/change"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dpr "github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
 )
@@ -97,17 +95,6 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) error {
 	return nil
 }
 
-// reviewFingerprint is what the round just sent covers, so the sweep plans
-// no follow-up of the same reviews; "" when it cannot be read.
-func (e *Env) reviewFingerprint(ctx context.Context, cfg config.Config, ref github.Ref) string {
-	full, viewer, err := e.coveredPR(ctx, ref)
-	if err != nil {
-		fmt.Fprintf(e.Err, "warning: %s: reading the reviews the round covers: %v\n", ref, err)
-		return ""
-	}
-	return dchange.Reviewer(dchange.ReviewerInput{PR: full.Facts, Viewer: viewer, TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.GitHub.TrustedAuthors}).Fingerprint
-}
-
 // updateRounds applies a resume's effects to the round state.
 func (e *Env) updateRounds(ctx context.Context, apply func(st *round.Store)) error {
 	if e.Rounds == nil {
@@ -122,7 +109,7 @@ func (e *Env) updateRounds(ctx context.Context, apply func(st *round.Store)) err
 }
 
 // roundAgentHome is the agent home remembered for the pull request's rounds.
-func (e *Env) roundAgentHome(ctx context.Context, ref github.Ref) (string, error) {
+func (e *Env) roundAgentHome(ctx context.Context, ref dpr.Ref) (string, error) {
 	if e.Rounds == nil {
 		return "", nil
 	}
@@ -226,7 +213,7 @@ func (e *Env) runInPRElseMain(ctx context.Context, run roundRun) (string, bool, 
 // askedRound runs a round of d the user asked for through the daemon's
 // action: home is the caller's agent home, kept for the pull request's next
 // rounds when its project names none.
-func (e *Env) askedRound(ctx context.Context, d dintent.Def, base config.Config, ref github.Ref, guidance string, inputs map[string]any, home string) error {
+func (e *Env) askedRound(ctx context.Context, d dintent.Def, base config.Config, ref dpr.Ref, guidance string, inputs map[string]any, home string) error {
 	run, ok := workspaceRuns()[d.Workspace]
 	if !ok {
 		return fmt.Errorf("%s runs from the command line or an agent session in a %s workspace, not from the daemon", d.Name, d.Workspace)
@@ -252,9 +239,9 @@ func (e *Env) askedRound(ctx context.Context, d dintent.Def, base config.Config,
 	})
 }
 
-func githubRef(u unit.Unit) (github.Ref, error) {
+func githubRef(u unit.Unit) (dpr.Ref, error) {
 	if u.Provider != (dpr.Codec{}).Provider() {
-		return github.Ref{}, fmt.Errorf("the %s unit %s is not a pull request", u.Provider, u.Key)
+		return dpr.Ref{}, fmt.Errorf("the %s unit %s is not a pull request", u.Provider, u.Key)
 	}
 	return dpr.ParseKey(u.Key)
 }
@@ -265,13 +252,13 @@ func isPR(u unit.Unit) bool {
 	return ok
 }
 
-func prOf(u unit.Unit) github.Ref {
+func prOf(u unit.Unit) dpr.Ref {
 	ref, _ := githubRef(u)
 	return ref
 }
 
-func refsOf(units []unit.Unit) []github.Ref {
-	refs := make([]github.Ref, len(units))
+func refsOf(units []unit.Unit) []dpr.Ref {
+	refs := make([]dpr.Ref, len(units))
 	for i, u := range units {
 		refs[i] = prOf(u)
 	}

@@ -12,6 +12,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestBoundaryImports` | The catalog, the intent vocabulary's leaves, the loader and `termfmt` import only their allowed sets. |
 | `TestBrandLiteralOnlyInBrand` | The default product name appears only in `internal/brand` and the exempt metadata. |
 | `TestBuiltinNamesLiveInTheirTables` | Builtin names appear only in their table files. A released migration keeps the words that version stored, so migrate_v*.go files are history and exempt. |
+| `TestCLIImportsNoGitHubClient` | No file under `internal/cli` imports `internal/github` or `internal/ghcli`: the CLI reaches GitHub through its plugin's calls. The test files in `cliGitHubDebt` pass, and the list only shrinks. |
 | `TestClientsNameNoPlugin` | No client names a plugin: the terminal, the menu bar and the other Go clients spell no plugin's id or provider constant, and the cockpit's scripts and page quote no plugin's id. |
 | `TestCockpitScriptsNameNoPlugin` | The cockpit's scripts quote no plugin's id. |
 | `TestContractSkeletonDeclared` | The shared names other packages build on still exist. |
@@ -34,7 +35,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestNoQueryJoinsPluginAndCoreTables` | No query of `internal/adapter/store`, and no transaction (a function literal passed to `Write`, or a function taking a `*Tx`, with the functions it hands the transaction to), names both a table a source plugin owns and a core table: the plugin tables leave the core store, so a query that joins them with the core's becomes a snapshot read or a broker call, and a write of both becomes two. The migrations, history of the shared file, are exempt. |
 | `TestNothingImportsTheGate` | Nothing imports `internal/gate`: the workflow engine is the only planner of automatic rounds. |
 | `TestOnlyClaudeDesktopManagerReachesDesktop` | Only the Claude Desktop manager's package reaches Claude Desktop's control surface. |
-| `TestOnlyGitHubReachesGitHub` | Only `internal/github` reaches GitHub's API, and only it and the composition root import `ghcli`. |
+| `TestOnlyGitHubReachesGitHub` | Only `internal/github` reaches GitHub's API, and only it imports `ghcli`. |
 | `TestOnlyOrcaAdapterReachesOrca` | Only the Orca manager's package reaches Orca's control surface. |
 | `TestOnlyServeWritesTheStore` | Only `storecmd.go` opens the store as its writer, for the daemon and the store commands, and other processes use `OpenReadOnly`. |
 | `TestOnlySourcesGoNamesASource` | Only `cli/sources.go`, and for one source the files that wire it (`cli/slack*.go` and `cli/serve_slack.go` for Slack, `cli/serve_github.go` for GitHub), imports a source. |
@@ -58,6 +59,14 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 ## Allowlists
 
 The entries a rule lets pass, each with its reason. An entry that matches nothing fails its rule, so these lists only shrink. Status is the entry's triage against the architecture rules: ✅ the exception holds; 🔧 it does not, and the fix is mechanical; 🧾 it does not, and the fix is a refactor.
+
+### `TestCLIImportsNoGitHubClient`
+
+| `cliGitHubDebt` entry | Status | Reason |
+|---|---|---|
+| `internal/cli/harness_test.go` | 🧾 | the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin |
+| `internal/cli/serve_test.go` | 🧾 | the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin |
+| `internal/cli/stepstart_test.go` | 🧾 | the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin |
 
 ### `TestDraftTextComesFromTheProfile`
 

@@ -14,11 +14,10 @@ import (
 	"github.com/wloophq/wloop/internal/domain/record"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
-var r21 = github.Ref{Owner: "acme", Repo: "api", Number: 21}
+var r21 = pr.Ref{Owner: "acme", Repo: "api", Number: 21}
 
 // stoppedAddress stores an address turn of r21 whose session stopped
 // without a record, and returns its seq.
@@ -157,7 +156,7 @@ func TestResumeOfAReviewRunsInTheReviewWorkspace(t *testing.T) {
 
 // askedIntent runs a round of the intent the user asked for through the
 // daemon's action, as envActions.Intent does.
-func askedIntent(e *Env, cfg config.Config, ref github.Ref, name dintent.Name, guidance string, inputs map[string]any, home string) error {
+func askedIntent(e *Env, cfg config.Config, ref pr.Ref, name dintent.Name, guidance string, inputs map[string]any, home string) error {
 	d, ok := e.loadedIntents().Registry.Get(name)
 	if !ok {
 		return fmt.Errorf("no intent %s", name)
@@ -165,6 +164,6 @@ func askedIntent(e *Env, cfg config.Config, ref github.Ref, name dintent.Name, g
 	return e.askedRound(context.Background(), d, cfg, ref, guidance, inputs, home)
 }
 
-func nudgePR(_ context.Context, e *Env, cfg config.Config, ref github.Ref, situation string, maintainers bool, guidance, home string) error {
+func nudgePR(_ context.Context, e *Env, cfg config.Config, ref pr.Ref, situation string, maintainers bool, guidance, home string) error {
 	return askedIntent(e, cfg, ref, dintent.Nudge, guidance, map[string]any{"situation": situation, "waits_on_maintainers": maintainers}, home)
 }

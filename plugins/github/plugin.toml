@@ -503,3 +503,13 @@ untrusted = true
 [[source.commands]]
 name = "clone"
 usage = "<owner>/<name> <path>"
+
+[[source.commands]]
+name = "auth"
+
+[[source.commands]]
+name = "reviewed-repos"
+usage = "<yyyy-mm-dd>"
+
+[[source.commands]]
+name = "teams"

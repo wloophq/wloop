@@ -14,7 +14,6 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/view"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -35,7 +34,7 @@ func TestProbeResumesInItsWorkspace(t *testing.T) {
 	if err := (cliLauncher{te.Env}).Launch(ctx, first); err != nil {
 		t.Fatalf("%v\n%s", err, te.err)
 	}
-	b := te.bookOf(t, github.Ref(ref))
+	b := te.bookOf(t, pr.Ref(ref))
 	if len(b.Turns) != 1 || b.Turns[0].Intent != dturn.Intent(dintent.Probe) || b.Turns[0].Trigger != dturn.Automated || b.Turns[0].SentTo != te.sessionOf(t, "fake", "term-ws-e2e") {
 		t.Fatalf("turns %+v", b.Turns)
 	}
@@ -50,7 +49,7 @@ func TestProbeResumesInItsWorkspace(t *testing.T) {
 			t.Errorf("session command %s", cmd)
 		}
 	}
-	b = te.bookOf(t, github.Ref(ref))
+	b = te.bookOf(t, pr.Ref(ref))
 	if len(b.Turns) != 2 || b.Turns[1].ResumeOf != b.Turns[0].Seq || b.Turns[1].Trigger != dturn.Automated || b.Turns[1].SentTo != te.sessionOf(t, "fake", "term-ws-e2e") {
 		t.Fatalf("turns %+v", b.Turns)
 	}

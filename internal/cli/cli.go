@@ -53,8 +53,6 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/ghcli"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/plugins/host"
@@ -69,15 +67,15 @@ type Recorder interface {
 	Record(ctx context.Context, ev dinv.Event) error
 	// RecordUnit is Record for an event on any unit.
 	RecordUnit(ctx context.Context, ev port.Event) error
-	Overrides(ctx context.Context) (map[github.Ref]dinv.Override, error)
+	Overrides(ctx context.Context) (map[pr.Ref]dinv.Override, error)
 	// FirstRoundBlocks maps each unit whose round is blocked to its
 	// round_blocked event.
 	FirstRoundBlocks(ctx context.Context) (map[unit.Unit]port.Event, error)
-	KeepNextGuidance(ctx context.Context, ref github.Ref, guidance string) error
-	TakeNextGuidance(ctx context.Context, ref github.Ref) (string, error)
+	KeepNextGuidance(ctx context.Context, ref pr.Ref, guidance string) error
+	TakeNextGuidance(ctx context.Context, ref pr.Ref) (string, error)
 	// OpenQuestions maps each pull request to the intents whose newest turn
 	// is asked.
-	OpenQuestions(books map[unit.Unit]dturn.Book) map[github.Ref]map[string]bool
+	OpenQuestions(books map[unit.Unit]dturn.Book) map[pr.Ref]map[string]bool
 }
 
 // Rounds is the round state's repository and the pause, in the daemon's
@@ -104,8 +102,8 @@ type Env struct {
 	// In is the standard input profile add reads its text from.
 	In io.Reader
 
-	GH     ghcli.Runner
-	GitHub *github.Client
+	// github are GitHub's clients while its plugin runs in process.
+	github githubClients
 	Git    gitx.Git
 	// Files is what removals read of the file system; nil reads it directly.
 	Files workspaces.Files
@@ -261,7 +259,6 @@ type Env struct {
 }
 
 func NewEnv() *Env {
-	gh := ghcli.Metered(ghcli.New())
 	exe, err := os.Executable()
 	if err != nil {
 		exe = brand.StateDir()
@@ -276,8 +273,7 @@ func NewEnv() *Env {
 		Out:           os.Stdout,
 		Err:           os.Stderr,
 		In:            os.Stdin,
-		GH:            gh,
-		GitHub:        github.NewClient(github.Options{}),
+		github:        newGitHubClients(),
 		Git:           gitx.New(),
 		WS:            newSet(managers, Defaults().WorkspaceManagers),
 		Sh:            execSh,

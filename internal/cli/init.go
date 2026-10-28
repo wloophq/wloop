@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"maps"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -19,7 +18,6 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/turns"
-	"github.com/wloophq/wloop/internal/ghcli"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
@@ -273,9 +271,9 @@ func runInit(ctx context.Context, e *Env, args []string) error {
 func (w *initWizard) prerequisites(ctx context.Context) ([]string, error) {
 	e := w.e
 	var checks []check
-	if err := ghcli.Authenticated(ctx, e.GH); err != nil {
+	if missing, err := e.forgeAuthenticated(ctx); err != nil {
 		fix := "gh auth login"
-		if errors.Is(err, exec.ErrNotFound) {
+		if missing {
 			fix = "brew install gh && gh auth login"
 		}
 		checks = append(checks, check{markMissing, "gh authenticated", err.Error(), fix})

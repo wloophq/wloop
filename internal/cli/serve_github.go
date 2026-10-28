@@ -7,15 +7,17 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
+	"github.com/wloophq/wloop/internal/brief"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dchange "github.com/wloophq/wloop/internal/domain/github/change"
 	"github.com/wloophq/wloop/internal/domain/round"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/turn"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
@@ -29,10 +31,8 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/ghcli"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/readmodel"
-	"github.com/wloophq/wloop/internal/termfmt"
 )
 
 type storeRecorder struct{ store *inventory.Store }
@@ -43,7 +43,7 @@ func (r storeRecorder) Record(ctx context.Context, ev dinv.Event) error {
 	return r.store.RecordEvent(ctx, ev)
 }
 
-func (r storeRecorder) Overrides(ctx context.Context) (map[github.Ref]dinv.Override, error) {
+func (r storeRecorder) Overrides(ctx context.Context) (map[pr.Ref]dinv.Override, error) {
 	return r.store.Overrides(ctx)
 }
 
@@ -55,16 +55,16 @@ func (r storeRecorder) FirstRoundBlocks(ctx context.Context) (map[unit.Unit]port
 	return r.store.FirstRoundBlocks(ctx)
 }
 
-func (r storeRecorder) KeepNextGuidance(ctx context.Context, ref github.Ref, guidance string) error {
+func (r storeRecorder) KeepNextGuidance(ctx context.Context, ref pr.Ref, guidance string) error {
 	return r.store.KeepNextGuidance(ctx, ref, guidance)
 }
 
-func (r storeRecorder) TakeNextGuidance(ctx context.Context, ref github.Ref) (string, error) {
+func (r storeRecorder) TakeNextGuidance(ctx context.Context, ref pr.Ref) (string, error) {
 	return r.store.TakeNextGuidance(ctx, ref)
 }
 
-func (r storeRecorder) OpenQuestions(books map[unit.Unit]dturn.Book) map[github.Ref]map[string]bool {
-	out := map[github.Ref]map[string]bool{}
+func (r storeRecorder) OpenQuestions(books map[unit.Unit]dturn.Book) map[pr.Ref]map[string]bool {
+	out := map[pr.Ref]map[string]bool{}
 	for u, b := range books {
 		ref := prOf(u)
 		for _, i := range roleIntents(b, builtin.RoleReview, builtin.RoleAddress) {
@@ -90,48 +90,47 @@ func roleIntents(b dturn.Book, roles ...string) []dturn.Intent {
 	return out
 }
 
+// githubClients are GitHub's clients while its plugin runs in the host's
+// process.
+type githubClients struct{ ghsource.Clients }
+
+func newGitHubClients() githubClients { return githubClients{ghsource.NewClients()} }
+
 // restoreBudget sets the client's floors from cfg and seeds its budget with
 // the one the last sweep kept.
 func (e *Env) restoreBudget(ctx context.Context, db *sqlite.DB, cfg config.Config, logf func(string, ...any)) {
-	e.GitHub.SetFloors(github.DefaultFloors(cfg.GitHub.RateLimitFraction))
+	e.github.SetFloors(cfg.GitHub.RateLimitFraction)
 	limits, err := storedGitHubBudget(ctx, inventory.New(db))
 	if err != nil {
 		logf("GitHub budget: %v", err)
 		return
 	}
-	e.GitHub.Restore(limits)
+	e.github.API.Restore(limits)
 }
 
-func failedSteps(gh *github.Client) func(ctx context.Context, owner, repo string, job int64) ([]string, error) {
-	return func(ctx context.Context, owner, repo string, job int64) ([]string, error) {
-		resp, err := gh.REST(dgh.WithPriority(ctx, dgh.PriorityUser), github.Request{Path: fmt.Sprintf("repos/%s/%s/actions/jobs/%d", owner, repo, job)})
-		if err != nil {
-			return nil, err
-		}
-		var body struct {
-			Steps []struct {
-				Name       string `json:"name"`
-				Conclusion string `json:"conclusion"`
-			} `json:"steps"`
-		}
-		if err := json.Unmarshal(resp.Body, &body); err != nil {
-			return nil, err
-		}
-		var steps []string
-		for _, s := range body.Steps {
-			if s.Conclusion == "failure" {
-				steps = append(steps, termfmt.OneLine(s.Name, 120))
-			}
-		}
-		return steps, nil
-	}
+// failedSteps reads the failed steps of a check's job from GitHub.
+func (e *Env) failedSteps() func(ctx context.Context, owner, repo string, job int64) ([]string, error) {
+	return ghsource.FailedSteps(e.github.API)
+}
+
+// withGitHubClient is d with GitHub's API client.
+func (e *Env) withGitHubClient(d source.Deps) source.Deps {
+	d.GitHub = e.github.API
+	return d
+}
+
+// withGitHubBriefs is d briefing pull requests read from GitHub, under its
+// budget.
+func (e *Env) withGitHubBriefs(d brief.Deps) brief.Deps {
+	d.Source, d.Allow = brief.Source{GitHub: e.github.API}, e.github.API.Allow
+	return d
 }
 
 // briefHome runs each brief under the agent home the configuration
 // names for the pull request's repository, when that project runs the
 // brief's agent.
-func briefHome(cfg config.Config) func(github.Ref) string {
-	return func(ref github.Ref) string {
+func briefHome(cfg config.Config) func(pr.Ref) string {
+	return func(ref pr.Ref) string {
 		c := cfg.For(ref.Owner, ref.Repo)
 		if c.Agent != cfg.Agent {
 			return cfg.AgentHome
@@ -142,7 +141,7 @@ func briefHome(cfg config.Config) func(github.Ref) string {
 
 // githubPresenter are the GitHub presenter's deps over the env's client.
 func (e *Env) githubPresenter(store *inventory.Store, host src.Host, briefs *interruptFirst) present.Deps {
-	deps := present.Deps{Store: store, Host: host, Explorer: e.GitHub, Budget: e.githubBudget(), FailedSteps: failedSteps(e.GitHub)}
+	deps := present.Deps{Store: store, Host: host, Explorer: e.github.API, Budget: e.githubBudget(), FailedSteps: e.failedSteps()}
 	if briefs != nil {
 		deps.Briefs = briefs
 	}
@@ -164,7 +163,7 @@ func withGitHub(d daemon.Deps, deps present.Deps) daemon.Deps {
 // githubSource is the GitHub source a pull request is read through outside
 // the jobs: no workspaces, sink or log.
 func (e *Env) githubSource(cfg config.Config) *ghsource.Collector {
-	return &ghsource.Collector{Store: e.Store, GH: e.GitHub, Cfg: cfg, Now: e.Now}
+	return &ghsource.Collector{Store: e.Store, GH: e.github.API, Cfg: cfg, Now: e.Now}
 }
 
 // storedGitHubBudget is the GitHub budget the last sweep kept.
@@ -172,11 +171,11 @@ func storedGitHubBudget(ctx context.Context, st *inventory.Store) ([]dgh.Limit, 
 	return ghsource.StoredBudget(ctx, st)
 }
 
-func (e *Env) githubBudget() daemon.Budget { return ghsource.Budget{Limiter: e.GitHub} }
+func (e *Env) githubBudget() daemon.Budget { return ghsource.Budget{Limiter: e.github.API} }
 
 // githubIdentity is the viewer as the GitHub plugin knows them.
 func (e *Env) githubIdentity(st *inventory.Store, logf func(string, ...any)) func(context.Context) (src.Identity, error) {
-	return ghsource.Identity(st, e.GitHub, logf)
+	return ghsource.Identity(st, e.github.API, logf)
 }
 
 // forgeCalls is the forge's plugin as the round commands call it: the one
@@ -190,7 +189,26 @@ func (e *Env) forgeCalls() forgeCalls {
 			return c
 		}
 	}
-	return ghsource.Local{GH: e.GH, API: e.GitHub}
+	return e.github.Local()
+}
+
+// forgeAuthenticated asks the forge's plugin whether gh is installed and
+// logged in; missing says gh is not installed.
+func (e *Env) forgeAuthenticated(ctx context.Context) (missing bool, err error) {
+	err = e.forgeCommand(ctx, ghsource.CommandAuth)
+	var x *forgeExit
+	return errors.As(err, &x) && x.code == ghsource.ExitNoGH, err
+}
+
+// forgeReviewedRepos are the repositories, one a pull request, of what the
+// viewer reviewed since the day of since.
+func (e *Env) forgeReviewedRepos(ctx context.Context, since time.Time) ([]byte, error) {
+	return e.forgeOutput(ctx, ghsource.CommandReviewedRepos, since.UTC().Format(time.DateOnly))
+}
+
+// forgeTeams are the viewer's teams, as org/slug lines.
+func (e *Env) forgeTeams(ctx context.Context) ([]byte, error) {
+	return e.forgeOutput(ctx, ghsource.CommandTeams)
 }
 
 // forgeViewer is the viewer's login as the forge's plugin knows them.
@@ -260,19 +278,23 @@ func (e *Env) recordReviewed(st *round.Store, cfg config.Config, ref pr.Ref, ws 
 		CompletedStatus: e.column(cfg, config.ColumnCompleted), TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.GitHub.TrustedAuthors}))
 }
 
-// githubLocator is the pull request of the checkout's branch, as gh reads it.
+// reviewedMarks cover what the review round just sent saw, so the sweep
+// plans no follow-up of the same reviews; nil when they cannot be read.
+func (e *Env) reviewedMarks(ctx context.Context, cfg config.Config, ref pr.Ref) map[string]string {
+	full, viewer, err := e.coveredPR(ctx, ref)
+	if err != nil {
+		fmt.Fprintf(e.Err, "warning: %s: reading the reviews the round covers: %v\n", ref, err)
+		return nil
+	}
+	return ghsource.ReviewedMarks(dchange.ReviewerInput{PR: full.Facts, Viewer: viewer, TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.GitHub.TrustedAuthors})
+}
+
+// githubLocator is the pull request of the checkout's branch, as gh reads
+// it when asked.
 type githubLocator struct{ e *Env }
 
 func (g githubLocator) Locate(ctx context.Context, dir string) (unit.Unit, bool, error) {
-	out, err := ghcli.RunIn(ctx, g.e.GH, dir, "pr", "view", "--json", "url", "--jq", ".url")
-	if err != nil {
-		return unit.Unit{}, false, err
-	}
-	ref, err := pr.ParseURL(strings.TrimSpace(string(out)))
-	if err != nil {
-		return unit.Unit{}, false, err
-	}
-	return ref.Unit(), true, nil
+	return ghsource.Locator{GH: g.e.github.GH}.Locate(ctx, dir)
 }
 
 func (e *Env) githubLocators() []unit.Locator { return []unit.Locator{githubLocator{e}} }
@@ -328,8 +350,8 @@ func (g githubEffects) ApplyEffect(ctx context.Context, req src.EffectRequest) e
 		if g.rt != routeLaunch || !r.submitted {
 			return nil
 		}
-		if fp := e.reviewFingerprint(ctx, r.cfg, r.ref); fp != "" {
-			return e.updateRounds(ctx, func(st *round.Store) { st.SetMark(r.ref.String(), round.Reviewed, fp) })
+		if marks := e.reviewedMarks(ctx, r.cfg, r.ref); marks != nil {
+			return e.updateRounds(ctx, func(st *round.Store) { setMarks(st, r.ref.String(), marks) })
 		}
 	case ghsource.EffectAddressed:
 		if r.pr == nil {

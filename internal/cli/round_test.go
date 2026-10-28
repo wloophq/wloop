@@ -18,14 +18,13 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/view"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
 // bookOf is the pull request's turns as the daemon keeps them.
-func (te *testEnv) bookOf(t *testing.T, ref github.Ref) dturn.Book {
+func (te *testEnv) bookOf(t *testing.T, ref pr.Ref) dturn.Book {
 	t.Helper()
 	books, err := te.repo.Books(context.Background(), pr.Ref(ref).Unit())
 	if err != nil {

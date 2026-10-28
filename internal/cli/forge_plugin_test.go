@@ -17,7 +17,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/task"
-	"github.com/wloophq/wloop/internal/github"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/pkg/plugin/source/sourcetest"
 )
@@ -29,6 +28,9 @@ type forgeStub struct {
 	*sourcetest.Stub
 	login string
 	clone func(repo, path string) error
+	// answers are the other commands', by name: what each writes to its
+	// stdout, or to its stderr with exit when exit is not 0.
+	answers map[string]forgeAnswer
 
 	mu         sync.Mutex
 	commands   [][]string
@@ -50,7 +52,7 @@ func (s *forgeStub) Identity(context.Context) (src.Identity, error) {
 	return src.Identity{Viewer: src.Person{Key: "github:" + s.login, Name: "Ana Example"}}, nil
 }
 
-func (s *forgeStub) RunCLI(_ context.Context, req src.CLIRequest, _, stderr io.Writer) (int, error) {
+func (s *forgeStub) RunCLI(_ context.Context, req src.CLIRequest, stdout, stderr io.Writer) (int, error) {
 	s.mu.Lock()
 	s.commands = append(s.commands, req.Args)
 	s.mu.Unlock()
@@ -61,8 +63,21 @@ func (s *forgeStub) RunCLI(_ context.Context, req src.CLIRequest, _, stderr io.W
 		}
 		return 0, nil
 	}
+	if a, ok := s.answers[req.Args[0]]; ok {
+		if a.exit != 0 {
+			fmt.Fprintln(stderr, a.out)
+			return a.exit, nil
+		}
+		_, _ = io.WriteString(stdout, a.out)
+		return 0, nil
+	}
 	fmt.Fprintf(stderr, "unknown command %q\n", req.Args)
 	return 2, nil
+}
+
+type forgeAnswer struct {
+	out  string
+	exit int
 }
 
 func (s *forgeStub) asked() ([][]string, int) {
@@ -135,7 +150,7 @@ func TestRoundCommandsReachGitHubThroughThePlugin(t *testing.T) {
 }
 
 func TestAnUnavailableForgeIsTriedAgain(t *testing.T) {
-	for _, err := range []error{fmt.Errorf("reading: %w", src.ErrUnavailable), github.ErrRateLimited, &github.RateLimitedError{Resource: "graphql"}} {
+	for _, err := range []error{src.ErrUnavailable, fmt.Errorf("reading: %w", src.ErrUnavailable)} {
 		if _, ok := startError(err).(automation.Transient); !ok {
 			t.Errorf("startError(%v) = %#v, want transient", err, startError(err))
 		}
