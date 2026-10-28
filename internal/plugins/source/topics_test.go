@@ -29,3 +29,9 @@ func TestTopicNamesRoundTrip(t *testing.T) {
 		t.Errorf("topics no plugin reads name %v", got)
 	}
 }
+
+func TestAStoredReportNotifiesNoPlugin(t *testing.T) {
+	if got := psource.WireTopics(port.TopicPRs); len(got) != 0 {
+		t.Errorf("a stored snapshot notifies %v, so a plugin hearing it reports again", got)
+	}
+}

@@ -5,5 +5,5 @@ import "testing"
 func TestTheHostKeepsNoCopyOfGitHubsRows(t *testing.T) {
 	t.Skip("carried from X8a2 review: SaveReported (with ghsource.Reported) copies each reported pull request into the host's pull_requests, pr_details and overrides.tracked, " +
 		"and UpsertPR, SaveSnapshots, SetReasons, SetTracked, SetWorkspace and ReplaceWorkspaces still write them for review, remove and test seeding; " +
-		"X8b reads the snapshots and deletes them with the inventory's PR parts")
+		"rows, cards, items and source facts read the snapshots since X8b; X8c1 and X8c2 move the remaining readers, X8c3 deletes them with the inventory's PR parts")
 }

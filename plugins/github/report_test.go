@@ -133,3 +133,22 @@ func TestTheReportsGoAgainWhenTheirDueTimePasses(t *testing.T) {
 		<-done
 	})
 }
+
+func TestAReportRecordsNothingThatNotifiesThePluginAgain(t *testing.T) {
+	h := &fakeHost{}
+	p := started(t, &githubGraphQL{}, h)
+	ref := mine(t, p)
+	h.record(src.Event{Unit: ref.Unit(), Kind: pr.KindReview, Key: "r1", Actor: "bruno", At: testAt.Add(-time.Hour), Data: []byte("CHANGES_REQUESTED:h7")})
+	h.mu.Lock()
+	reports, events, topics := len(h.reports), len(h.events), len(h.topics)
+	h.mu.Unlock()
+	if err := p.Notify(context.Background(), []sdk.Unit{ref.Unit()}, []sdk.Topic{sdk.TopicEvents}); err != nil {
+		t.Fatal(err)
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if len(h.reports) != reports+1 || len(h.events) != events || len(h.topics) != topics {
+		t.Fatalf("one notice made %d reports, %d events and %d changes; want 1, 0 and 0",
+			len(h.reports)-reports, len(h.events)-events, len(h.topics)-topics)
+	}
+}
