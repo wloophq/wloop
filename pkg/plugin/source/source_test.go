@@ -315,13 +315,13 @@ type planner struct {
 
 func (p planner) Plan(_ context.Context, _ plugin.Unit, st source.RoundState) (source.Plan, error) {
 	p.got <- st
-	return source.Plan{Facts: p.facts, Due: t0.Add(time.Hour), Rank: 3, Rounds: rounds(p.facts)}, nil
+	return source.Plan{Rounds: rounds(p.facts)}, nil
 }
 
 func rounds(facts []source.Fact) []source.Round {
 	return []source.Round{{
 		Name: "address", Workspace: source.WorkspaceRef{Manager: "trees", ID: "w1"}, Head: "abc123", Reason: "checks failed",
-		Observed: true, TurnFacts: facts[:2], OnSent: map[string]string{"addressed.checks": "abc123"}, OnSkipped: map[string]string{"skipped": "1"},
+		Observed: true, TurnFacts: facts, OnSent: map[string]string{"addressed.checks": "abc123"}, OnSkipped: map[string]string{"skipped": "1"},
 	}}
 }
 
@@ -365,13 +365,13 @@ func TestTemporalFactsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(plan, source.Plan{Facts: facts, Due: t0.Add(time.Hour), Rank: 3, Rounds: rounds(facts)}) {
+	if !reflect.DeepEqual(plan, source.Plan{Rounds: rounds(facts)}) {
 		t.Errorf("plan\n%+v\nwant facts\n%+v", plan, facts)
 	}
 	if got := <-p.got; !reflect.DeepEqual(got, st) {
 		t.Errorf("the planner got round state %+v, want %+v", got, st)
 	}
-	for _, f := range plan.Facts {
+	for _, f := range plan.Rounds[0].TurnFacts {
 		temporal := slices.Contains([]string{"pull.waiting", "pull.first.due", "pull.stalled", "pull.quiet", "pull.never_waited", "pull.no_deadline", "pull.never_stalled"}, f.Name)
 		if f.Value.Temporal() != temporal {
 			t.Errorf("%s: Temporal = %v", f.Name, f.Value.Temporal())

@@ -4,9 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
+	"strings"
+
+	"github.com/hashicorp/go-hclog"
+	"github.com/wloophq/wloop/internal/plugins/codec"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -15,7 +23,13 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/plugins/bundled"
+	"github.com/wloophq/wloop/internal/plugins/host"
+	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/source"
+	"github.com/wloophq/wloop/pkg/plugin"
+	"github.com/wloophq/wloop/pkg/plugin/manifest"
 )
 
 // buildSources builds the module of every enabled plugin; one that fails
@@ -178,13 +192,127 @@ func disabledPlugins(ps []api.Plugin) []string {
 	return out
 }
 
-// withoutGitHub is d with nothing of GitHub's when its plugin is disabled:
-// no brief queue, intakes, explorer, budget or viewer read.
-func withoutGitHub(d daemon.Deps) daemon.Deps {
-	if d.Cfg.PluginEnabled(string(unit.GitHub)) {
-		return d
+// installed are the plugins InstallPlugins found, which NewEnv's Env runs.
+var installed []host.Plugin
+
+// InstallPlugins finds and installs the plugins, as installPlugins does,
+// for the process's Envs. The command's main calls it once, before NewEnv
+// and before anything reads the configuration or the profile.
+func InstallPlugins() error {
+	exe, err := os.Executable()
+	if err != nil {
+		exe = ""
 	}
-	d.Brief, d.BriefStatus, d.BriefViews, d.BriefsUnavailable = nil, nil, nil, ""
-	d.Intakes, d.IntakeBriefs, d.Explorer, d.Budget, d.Viewer = nil, nil, nil, nil, nil
-	return d
+	installed, err = installPlugins(config.Dir(), exe)
+	return err
+}
+
+// installPlugins finds the plugins in configDir's plugins directory and in
+// the bundled one beside exe, and installs what the configuration and the
+// profile read of every plugin, enabled or not: the bundled and found
+// plugins' vocabulary, their codecs' labels, and their profile layers,
+// which the profile loads while a plugin is enabled. A plugin whose
+// manifest or vocabulary does not fit is left out and named in the error.
+func installPlugins(configDir, exe string) ([]host.Plugin, error) {
+	found, err := host.Discover(host.Roots(configDir, exe)...)
+	errs := []error{err}
+	srcs, err := bundled.Sources()
+	if err != nil {
+		return nil, err
+	}
+	var dirs []profile.PluginDir
+	var kept []host.Plugin
+	for _, p := range found {
+		s, err := p.Manifest.Source()
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		srcs = slices.DeleteFunc(srcs, func(b *manifest.Source) bool { return b.Provider == s.Provider })
+		srcs = append(srcs, s)
+		kept = append(kept, p)
+		dirs = append(dirs, profile.PluginDir{ID: p.ID(), Dir: p.Dir})
+	}
+	v, err := builtin.Merge(srcs...)
+	errs = append(errs, err)
+	builtin.Install(v)
+	codecs := []unit.Codec{dturn.SessionCodec{}, wsdomain.Codec{}, task.Codec{}}
+	for _, s := range srcs {
+		c, err := codec.Of(s.Provider, s.Codec)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		codecs = append(codecs, c)
+	}
+	unit.UseLabels(unit.NewRegistry(codecs...))
+	profile.UsePlugins(dirs)
+	return kept, errors.Join(errs...)
+}
+
+// servePlugins runs the plugins of e that cfg enables until ctx ends or
+// the returned stop runs, which waits for them to stop; under --no-jobs it
+// runs none.
+func (e *Env) servePlugins(ctx context.Context, cfg config.Config, logf func(string, ...any)) (stop func()) {
+	snaps := psource.NewSnapshots()
+	codecs := e.unitCodecs()
+	e.pluginKind = &psource.Kind{
+		Snapshots: snaps,
+		StateDir:  func(id string) string { return filepath.Join(e.StateDir, "plugins", id) },
+		Broker: func(id string, s *manifest.Source) *psource.Broker {
+			return &psource.Broker{ID: id, Manifest: s, Snapshots: snaps, Units: psource.Units{Codecs: codecs}, Config: e.currentConfig}
+		},
+	}
+	if e.noJobs {
+		logf("plugins: --no-jobs starts none")
+		return func() {}
+	}
+	sums, err := host.ReadChecksums(filepath.Join(e.StateDir, "plugins", "checksums"))
+	if err != nil {
+		logf("plugins: %v", err)
+	}
+	runs, why, err := host.Runs(e.plugins, cfg, sums, []string{plugin.BrandEnv + "=" + brand.Name}, pluginLogger(logf))
+	if err != nil {
+		logf("%v", err)
+	}
+	for _, r := range runs {
+		logf("plugin %s: runs %s, %s", r.Manifest.ID, r.Spec.Path, why[r.Manifest.ID])
+	}
+	h := &host.Host{Launcher: host.ExecLauncher{}, Kinds: []host.Kind{e.pluginKind}, Logf: logf}
+	pctx, cancel := context.WithCancel(ctx)
+	h.Start(pctx, runs)
+	return func() {
+		cancel()
+		h.Wait()
+	}
+}
+
+// unitCodecs are the codecs of every provider: the core's and every
+// plugin's, enabled or not.
+func (e *Env) unitCodecs() *unit.Registry {
+	codecs := []unit.Codec{dturn.SessionCodec{}, wsdomain.Codec{}, task.Codec{}}
+	for _, p := range e.sourcePlugins() {
+		codecs = append(codecs, p.Codec)
+	}
+	for _, p := range e.plugins {
+		if s, err := p.Manifest.Source(); err == nil {
+			if c, err := codec.Of(s.Provider, s.Codec); err == nil {
+				codecs = append(codecs, c)
+			}
+		}
+	}
+	return unit.NewRegistry(codecs...)
+}
+
+// pluginLogger relays a plugin's log lines to the daemon's log.
+func pluginLogger(logf func(string, ...any)) hclog.Logger {
+	return hclog.New(&hclog.LoggerOptions{Output: logWriter(logf), Level: hclog.Info, JSONFormat: false})
+}
+
+// logWriter writes each line to logf.
+type logWriter func(string, ...any)
+
+func (w logWriter) Write(b []byte) (int, error) {
+	w("%s", strings.TrimRight(string(b), "\n"))
+	return len(b), nil
 }

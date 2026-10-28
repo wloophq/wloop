@@ -240,10 +240,10 @@ cmd_setup() {
 		[brief]
 		enabled = false
 
-		[github]
+		[plugins.github]
 		enabled = false
 
-		[slack]
+		[plugins.slack]
 		enabled = $slack_on
 		keychain_service = "wloop-e2e-slack"
 		post_allowlist = $(toml_list "$dm")

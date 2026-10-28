@@ -448,7 +448,7 @@ func TestDoctorPrintsOrcasColumns(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{ManagerName: "orca"})
 	te.run("doctor")
 	for _, want := range []string{
-		"views.orca.columns.working=reviewing views.orca.columns.working-fallback=in-review views.orca.columns.ready=ready-to-merge github.automated_reviewers=",
+		"views.orca.columns.working=reviewing views.orca.columns.working-fallback=in-review views.orca.columns.ready=ready-to-merge plugins.github.automated_reviewers=",
 		"  [info   ] board columns reviewing, needs-me, reviewed, in-review, ready-to-merge, in-progress, completed: not verifiable without writing",
 	} {
 		if !strings.Contains(te.out.String(), want) {

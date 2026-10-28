@@ -6,7 +6,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/domain/facet"
 	"github.com/wloophq/wloop/internal/domain/jsonschema"
-	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -37,13 +36,6 @@ func fact(name string, t expr.Type, slots []FactSlot, doc string) Fact {
 func taskName(name, doc string) Fact {
 	f := fact(name, expr.String, nam, doc)
 	f.Provider = unit.Task
-	return f
-}
-
-// prFact is a fact of github's pull request, which only github intents read.
-func prFact(name string, t expr.Type, slots []FactSlot, doc string) Fact {
-	f := fact(name, t, slots, doc)
-	f.Provider = unit.GitHub
 	return f
 }
 
@@ -82,13 +74,6 @@ func enumOf(values ...string) map[unit.ProviderID][]string {
 // PRStates are a pull request's states as GitHub spells them.
 var PRStates = []string{"OPEN", "CLOSED", "MERGED"}
 
-// Visibilities are a repository's visibilities, lowercased as the GitHub
-// adapter reads them.
-var Visibilities = []string{"public", "private", "internal"}
-
-// ReviewStates are GitHub's review states, and the empty value of no review.
-var ReviewStates = []string{"", "APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED", "PENDING"}
-
 // TaskKinds are a task's kinds.
 var TaskKinds = []string{string(task.KindAction), string(task.KindWaiting), string(task.KindClose), string(task.KindMessage), string(task.KindDraft), string(task.KindCapture), string(task.KindProject), string(task.KindReference)}
 
@@ -96,24 +81,15 @@ var TaskKinds = []string{string(task.KindAction), string(task.KindWaiting), stri
 var TurnStates = []string{"", string(dturn.Sent), string(dturn.Started), string(dturn.Asked), string(dturn.Done), string(dturn.Settled),
 	string(dturn.Failed), string(dturn.Unrecorded), string(dturn.Dismissed), string(dturn.Replaced), string(dturn.Withdrawn)}
 
-// Associations are GitHub's author associations.
-var Associations = []string{"OWNER", "MEMBER", "COLLABORATOR", "CONTRIBUTOR", "FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR", "MANNEQUIN", "NONE"}
-
 // wf is a workflow fact of slot, named <slot>.<name>.
 func wf(slot, name string, t expr.Type, doc string) Fact {
 	return Fact{Name: slot + "." + name, Type: t, Slots: []FactSlot{WorkflowSlot}, Slot: slot, Doc: doc}
 }
 
-// providerWF is a workflow fact of slot that the plugin of p computes.
-func providerWF(p unit.ProviderID, slot, name string, t expr.Type, doc string) Fact {
-	f := wf(slot, name, t, doc)
-	f.Provider = p
-	return f
-}
-
 // BriefSubjects are the workflow slots whose units may have a brief, which
-// read the brief slot's facts.
-var BriefSubjects = []string{"pr", "slack", "task"}
+// read the brief slot's facts: the task's, and those of the plugins whose
+// manifest says brief_subject.
+var BriefSubjects = []string{"task"}
 
 // BriefSlot is the slot of the facts of a unit's brief.
 const BriefSlot = "brief"
@@ -129,27 +105,7 @@ func briefWF(name string, t expr.Type, doc string) Fact {
 
 // Facts are the fields predicates read, by slot; inputs.<name> are added per
 // intent by Env. A workflow fact may share a name with an intent fact.
-var Facts = slices.Concat(intentPRFacts, ActionFacts, otherFacts)
-
-// intentPRFacts are the pull request facts of the action and turn slots.
-var intentPRFacts = []Fact{
-	prFact("pr.mine", expr.Bool, both, "The pull request's author is the viewer."),
-	dim(prFact("pr.author", expr.String, both, "The pull request's author login.")),
-	enum(prFact("pr.state", expr.String, both, "The pull request's state on GitHub: OPEN, CLOSED or MERGED."), enumOf(PRStates...)),
-	prFact("pr.slug", expr.String, both, "owner/repo#number."),
-	dim(prFact("pr.owner", expr.String, both, "The repository owner.")),
-	prFact("pr.repo", expr.String, both, "owner/repo."),
-	dim(prFact("pr.repo_name", expr.String, both, "The repository name, without its owner.")),
-	dim(prFact("pr.base", expr.String, both, "The base branch.")),
-	dim(enum(prFact("pr.association", expr.String, trn, "The author's association with the repository, from the Basics read."), map[unit.ProviderID][]string{anyProvider: Associations})),
-	prFact("pr.cross_repository", expr.Bool, both, "The head branch lives in a fork."),
-	enum(prFact("pr.visibility", expr.String, trn, "The repository's visibility: public, private or internal, from the Basics read; empty before it."), enumOf(append([]string{""}, Visibilities...)...)),
-	dim(prFact("pr.requested_teams", expr.List, trn, "The teams a review of the pull request was requested through, as <org>-<slug>.")),
-	dim(prFact("pr.labels", expr.List, trn, "The pull request's labels, from the Basics read.")),
-	dim(prFact("pr.address.reviewers", expr.List, trn, "The reviewers an address round answers; empty on any other turn.")),
-	prFact("pr.address.checks", expr.List, trn, "The failing checks an address round fixes; empty on any other turn."),
-	prFact("pr.address.conflict", expr.Bool, trn, "The head conflicts with the base and the address round resolves it; false on any other turn."),
-}
+var Facts = slices.Concat(ActionFacts, otherFacts)
 
 // otherFacts are the turn slot's own facts, the config facts of the intent
 // slots, and every workflow and approval fact.
@@ -168,55 +124,10 @@ var otherFacts = []Fact{
 	taskName("task.title", "The task's title."),
 	taskName("task.short_id", "The task's id, short: its first six hex digits."),
 	fact("session.started", expr.Time, nam, "When the session starts; a template formats it with Go's layout, as {{.session.started.Format \"02/01 15:04\"}}. Zero when unset; test with `> timestamp(0)`."),
-	fact("pr.last_review.exists", expr.Bool, trn, "The viewer reviewed the pull request before."),
-	enum(fact("pr.last_review.verdict", expr.String, trn, "The viewer's newest review state, any state; empty when none."), enumOf(ReviewStates...)),
-	enum(fact("pr.last_review.decision", expr.String, trn, "The viewer's newest non-comment verdict; empty when none."), enumOf(ReviewStates...)),
-	fact("config.github.address_reviews", expr.Bool, both, "The github.address_reviews setting for the pull request."),
-	fact("config.github.address_checks", expr.Bool, both, "The github.address_checks setting for the pull request."),
-	fact("config.github.followups_without_workspace", expr.Bool, both, "The github.followups_without_workspace setting for the pull request."),
-	fact("config.github.address_without_workspace", expr.Bool, both, "The github.address_without_workspace setting for the pull request."),
-	enum(wf("pr", "state", expr.String, "The pull request's state on GitHub: OPEN, CLOSED or MERGED."), enumOf(PRStates...)),
-	wf("pr", "merged_at", expr.Time, "When the pull request merged; zero when it did not. Test with `> timestamp(0)`."),
-	wf("pr", "closed_at", expr.Time, "When the pull request closed; zero when open. Test with `> timestamp(0)`."),
-	wf("pr", "finished_for", expr.Duration, "Working time since it ended, max(merged_at, closed_at), the rule retention uses; zero while open."),
-	wf("pr", "ended", expr.Bool, "The pull request merged or closed: the GitHub plugin's word that the unit has ended."),
-	wf("pr", "draft", expr.Bool, "The pull request is a draft."),
-	wf("pr", "head", expr.String, "The head commit's oid."),
-	wf("pr", "conflicting_for", expr.Duration, "How long the pull request has conflicted with its base, from when the inventory first saw it; zero when it does not."),
-	wf("pr", "mine", expr.Bool, "The pull request's author is the viewer."),
-	enum(wf("pr", "checks", expr.String, "The checks' rollup on the head: success, failure, pending, error or expected; empty with no checks."), enumOf("", "success", "failure", "pending", "error", "expected")),
-	wf("pr", "stalled", expr.Bool, "The checks stalled on the head."),
-	wf("pr", "age", expr.Duration, "Time since the pull request opened."),
-	wf("pr", "held", expr.Bool, "Rounds on the pull request are held."),
-	wf("pr", "adopted", expr.Bool, "The pull request was taken over into the loop."),
-	wf("pr", "muted", expr.Bool, "The pull request is muted."),
-	wf("pr", "has_workspace", expr.Bool, "A linked workspace holds the pull request."),
-	wf("pr", "stale", expr.Bool, "The stored detail is older than sweep.slow + 2 x sweep.fast."),
-	untrusted(enum(wf("pr", "open_turn", expr.String, "The state of the book's open turn; empty when none."), enumOf(TurnStates...))),
-	untrusted(wf("pr", "open_turn_seq", expr.Int, "The sequence of the book's open turn; 0 when none.")),
-	untrusted(wf("pr", "orphan_answer_id", expr.Int, "The id of an answer whose turn ended; 0 when none.")),
-	untrusted(enum(wf("pr", "review.action", expr.String, "What the review rules decide: empty, follow-up or complete."), enumOf("", "follow-up", "complete"))),
-	untrusted(wf("pr", "review.reason", expr.String, "Why the review rules decide so.")),
-	untrusted(wf("pr", "review.observed", expr.Bool, "The review rules observe without acting.")),
-	untrusted(wf("pr", "first.due", expr.Bool, "A first round is due.")),
-	untrusted(wf("pr", "first.reason", expr.String, "Why a first round is due or not.")),
-	untrusted(wf("pr", "address.due", expr.Bool, "An address round is due.")),
-	untrusted(wf("pr", "address.reason", expr.String, "Why an address round is due or not.")),
-	untrusted(wf("pr", "address.reviewers", expr.List, "The reviewers whose reviews the address round would answer.")),
-	untrusted(wf("pr", "address.checks", expr.List, "The failing checks the address round would fix.")),
-	untrusted(wf("pr", "address.conflict", expr.Bool, "The head has conflicted with the base past the conflict window, and the address round would resolve it.")),
-	untrusted(wf("pr", "address.observed", expr.Bool, "The address rules observe without acting.")),
-	wf("pr", "last_interaction_at", expr.Time, "The newest comment, review, push or review request, by anyone. Zero when unset; test with `> timestamp(0)`."),
-	timeVarying(wf("pr", "silent_days", expr.Int, "Calendar days since last_interaction_at.")),
-	untrusted(wf("pr", "waits_on_user", expr.Bool, "The row waits on the user, per situation.Derive.")),
-	wf("pr", "nudge.refusal", expr.String, "The text nudge.prepare would refuse with today; empty when a nudge may go."),
-	wf("pr", "mute.refusal", expr.String, "Why the pull request is muted, such as muted until its state changes; empty when it is not."),
-	untrusted(wf("pr", "fingerprint", expr.String, "What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips.")),
-	wf("pr", "repo", expr.String, "owner/repo."),
-	wf("pr", "repo_name", expr.String, "The repository name, without its owner."),
-	wf("pr", "owner", expr.String, "The repository owner."),
-	wf("pr", "author", expr.String, "The pull request's author login; empty when not stored."),
-	enum(wf("pr", "visibility", expr.String, "The repository's visibility: public, private or internal; empty until the pull request is read in full."), enumOf(append([]string{""}, Visibilities...)...)),
+	fact("config.plugins.github.address_reviews", expr.Bool, both, "The plugins.github.address_reviews setting for the pull request."),
+	fact("config.plugins.github.address_checks", expr.Bool, both, "The plugins.github.address_checks setting for the pull request."),
+	fact("config.plugins.github.followups_without_workspace", expr.Bool, both, "The plugins.github.followups_without_workspace setting for the pull request."),
+	fact("config.plugins.github.address_without_workspace", expr.Bool, both, "The plugins.github.address_without_workspace setting for the pull request."),
 	enum(wf("session", "state", expr.String, "active (it has a live process), dormant (no process; its manager can wake it) or closed."), enumOf("active", "dormant", "closed")),
 	wf("session", "manager", expr.String, "The workspace manager that owns the session, such as orca or claude-desktop."),
 	wf("session", "managed", expr.Bool, "The session was started by the loop (sessions.managed)."),
@@ -309,17 +220,6 @@ var otherFacts = []Fact{
 	wf("gate", "name", expr.String, "The gate's name in gates.toml; empty for a gate of no profile name."),
 	wf("gate", "status", expr.String, "The gate's status: open, approved, rejected, answered, dismissed or superseded."),
 	wf("gate", "delivery", expr.String, "A draft gate's delivery state, such as sending or failed; empty for any other gate."),
-	providerWF(dslack.Provider, "slack", "channel", expr.String, "The conversation's channel id."),
-	enum(providerWF(dslack.Provider, "slack", "conversation", expr.String, "The conversation's kind: channel, dm or group."), enumOf("channel", "dm", "group")),
-	untrusted(providerWF(dslack.Provider, "slack", "started_by_me", expr.Bool, "The viewer started the thread.")),
-	untrusted(providerWF(dslack.Provider, "slack", "closure_posted", expr.Bool, "A closure was posted on the unit, by the extraction or a sent draft's unit.closed.")),
-	untrusted(providerWF(dslack.Provider, "slack", "live_task", expr.Bool, "A live task, neither done nor in the trash and not muted, is attached to the unit.")),
-	untrusted(providerWF(dslack.Provider, "slack", "items_open", expr.Int, "Open items whose unit is this unit.")),
-	untrusted(providerWF(dslack.Provider, "slack", "items_unowned", expr.Int, "Open items of the unit with no assignee, nobody waited on and no basis.")),
-	timeVarying(untrusted(providerWF(dslack.Provider, "slack", "items_unowned_age_days", expr.Int, "Working days, in the configured location, since the oldest unowned item appeared."))),
-	timeVarying(providerWF(dslack.Provider, "slack", "ended", expr.Bool, "The Slack plugin's word that the unit has ended: a closure was posted or marked (unit.closed), or its newest stored message is older than slack.ended_after.")),
-	providerWF(dslack.Provider, "slack", "settled_at", expr.Time, "The newest update of a settled draft the workflow proposed on the unit, withdrawn ones included; zero when none. Test with `> timestamp(0)`."),
-	untrusted(providerWF(dslack.Provider, "slack", "fingerprint", expr.String, "The unit, its newest message and the update time of its items.")),
 	briefWF("goal", expr.String, "The brief's goal; empty when the unit has no brief."),
 	dim(enum(briefWF("risk", expr.String, "The brief's risk: low, medium or high."), map[unit.ProviderID][]string{anyProvider: facet.Risks})),
 	dim(enum(briefWF("kind", expr.String, "The brief's kind, from the provider's taxonomy."), map[unit.ProviderID][]string{unit.GitHub: facet.Kinds})),
@@ -345,7 +245,7 @@ var otherFacts = []Fact{
 	wf("config", "cleanup.workspace_grace", expr.Duration, "The cleanup.workspace_grace setting, in working time."),
 	wf("config", "cleanup.manual_idle", expr.Duration, "The cleanup.manual_idle setting."),
 	wf("config", "cleanup.stale_workspace", expr.Duration, "The cleanup.stale_workspace setting."),
-	wf("config", "github.nudge.silent_days", expr.Int, "The github.nudge.silent_days setting, in calendar days."),
+	wf("config", "plugins.github.nudge.silent_days", expr.Int, "The plugins.github.nudge.silent_days setting, in calendar days."),
 	wf("config", "tasks.stale_waiting_days", expr.Int, "The tasks.stale_waiting_days setting, in working days."),
 	wf("config", "drafts.repeat_after", expr.Duration, "The drafts.repeat_after setting."),
 	wf("config", "turns.per_day", expr.Int, "The turns.per_day setting: automated turns on units whose plugin keeps no per-unit count, all workflows together."),
@@ -462,7 +362,14 @@ func UnitSlots() []string {
 
 // WorkflowSlots are the slots of workflow facts: each provider's, then the
 // brief's, the draft's, the gate's, the trigger's and the config's.
-var WorkflowSlots = []string{"pr", "session", "workspace", "task", "slack", "brief", "draft", GateSlot, "trigger", "config"}
+var WorkflowSlots = slices.Concat(coreUnitSlots, nonUnitSlots)
+
+// coreUnitSlots are the slots of the core providers' units; Merge adds each
+// plugin's after them.
+var coreUnitSlots = []string{"session", "workspace", "task"}
+
+// nonUnitSlots are the workflow slots of no provider.
+var nonUnitSlots = []string{BriefSlot, DraftSlot, GateSlot, "trigger", "config"}
 
 // DraftSlot is the slot of the facts a workflow's [withdraw] when reads of
 // each draft it proposed.
@@ -576,12 +483,12 @@ const LinkSignalPrefix = "task.link_signal."
 // GateSlot is the slot of a gate's facts, which a view over gates reads.
 const GateSlot = "gate"
 
-// PREnv is the pull request's own facts of the turn slot, the ones a turn
+// TurnEnvOf is provider p's own facts of the turn slot, the ones a turn
 // reads before it is built.
-func PREnv() expr.Env {
+func TurnEnvOf(p unit.ProviderID) expr.Env {
 	env := expr.Env{}
 	for _, f := range Facts {
-		if f.Provider == unit.GitHub && slices.Contains(f.Slots, TurnSlot) {
+		if p != "" && f.Provider == p && slices.Contains(f.Slots, TurnSlot) {
 			put(env, f)
 		}
 	}

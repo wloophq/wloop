@@ -18,7 +18,8 @@ Before adding an `if` on an intent name, a draft kind or a provider, or a string
 | Partials every intent's instructions share | `profiles/default/partials/` |
 | Prompts of the loop's own calls (the headless wrapper) | `profiles/default/prompts/` |
 | What an agent reads about each MCP tool: description, parameters, answers | `profiles/default/tools.toml`; the tools in `builtin.Tools`, their answers and fields in `builtin.ToolAnswers` |
-| Facts a predicate reads | `builtin.Facts` in `internal/intent/builtin/facts.go` |
+| Facts a predicate reads | `builtin.Facts` in `internal/intent/builtin/facts.go`; a plugin's in its manifest |
+| A plugin's vocabulary: facts, effects, roles, event kinds, row kinds, deliveries, task kinds, steps, tools | the `[source]` table of `plugins/<id>/plugin.toml`, which `builtin.Merge` maps onto the tables |
 | Workflow steps | `builtin.Steps` in `internal/intent/builtin/builtin.go`, adapted in `internal/cli/steps.go` |
 | Workflow providers | `builtin.Slots` in `internal/intent/builtin/builtin.go` |
 | Roles, and what each implies (round kind, reconcile, prepare, policy, row driving) | `builtin.Roles` in `internal/intent/builtin/roles.go` |

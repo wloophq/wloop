@@ -197,8 +197,17 @@ type UIFacet struct {
 	Group bool     `toml:"group" doc:"Rows may be grouped by it."`
 	Sort  string   `toml:"sort" doc:"How its values sort." enum:"rank,text,time"`
 	Rank  []string `toml:"rank" doc:"Its values in order, with sort = rank."`
-	Match string   `toml:"match" doc:"How a filter matches a value; empty is exact." enum:"exact,suffix,prefix,team"`
-	Menu  bool     `toml:"menu" doc:"It shows in the filter menu."`
+	// Buckets group a time facet's values by age; each bucket's label lives
+	// in the profile layer.
+	Buckets []UIBucket `toml:"buckets" doc:"The age buckets of a time facet, youngest first; only with sort = time."`
+	Match   string     `toml:"match" doc:"How a filter matches a value; empty is exact." enum:"exact,suffix,prefix,team"`
+	Menu    bool       `toml:"menu" doc:"It shows in the filter menu."`
+}
+
+// UIBucket is an age bucket of a time facet: the values younger than Within.
+type UIBucket struct {
+	ID     string   `toml:"id" doc:"The bucket's id. Required."`
+	Within Duration `toml:"within" doc:"The age its values are younger than, as a Go duration. Required."`
 }
 
 // UIMenu is a menu bar section showing a view.
@@ -211,7 +220,7 @@ type UIMenu struct {
 type UIKey struct {
 	Key     string `toml:"key" doc:"The key. Required."`
 	Action  string `toml:"action" doc:"The action it runs. Required."`
-	Surface string `toml:"surface" doc:"Where it binds; empty is every surface." enum:"web,tui"`
+	Surface string `toml:"surface" doc:"Where it binds; empty is every surface." enum:"web,tui,menubar"`
 }
 
 // Duration is a Go duration spelled as text, such as "5m".
@@ -322,6 +331,15 @@ func (s *Source) validate() error {
 		}
 	}
 	named("signal", s.Signals)
+	ranked := 0
+	for _, sit := range s.Situations {
+		if sit.Rank != 0 {
+			ranked++
+		}
+	}
+	if ranked > 0 && ranked < len(s.Situations) {
+		bad("situations set rank on %d of %d; set it on all or none", ranked, len(s.Situations))
+	}
 	for _, sit := range s.Situations {
 		named("situation", []Named{{sit.Name, sit.Doc}})
 	}
@@ -446,6 +464,15 @@ func (s *Source) validateUI(bad func(string, ...any), unique func(string, string
 		}
 		unique("ui facet", f.ID)
 		facets = append(facets, f.ID)
+		if len(f.Buckets) > 0 && f.Sort != "time" {
+			bad("ui facet %q: buckets need sort = time", f.ID)
+		}
+		for _, b := range f.Buckets {
+			unique("bucket of "+f.ID, b.ID)
+			if !nameRe.MatchString(b.ID) || b.Within <= 0 {
+				bad("ui facet %q: bucket %q needs a lowercase id and a positive within", f.ID, b.ID)
+			}
+		}
 	}
 	for _, v := range ui.Views {
 		if v.UnitSort != "" && !slices.Contains(facets, v.UnitSort) {

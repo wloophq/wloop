@@ -14,7 +14,7 @@ const (
 
 // sourceImports flags a non-test file that names a source outside the one
 // registration point: an import of a source adapter anywhere but
-// internal/cli/sources.go, internal/cli/slack*.go for Slack and the sources
+// internal/cli/sources.go, the files that wire one source and the sources
 // themselves, an import of the registration package outside the composition
 // root and the sources.
 func sourceImports(file string, imports []string) []string {
@@ -37,7 +37,9 @@ func sourceImports(file string, imports []string) []string {
 }
 
 // TestOnlySourcesGoNamesASource checks that only `cli/sources.go`, and
-// `cli/slack*.go` for Slack, imports a source.
+// for one source the files that wire it (`cli/slack*.go` and
+// `cli/serve_slack.go` for Slack, `cli/serve_github.go` for GitHub), imports
+// a source.
 func TestOnlySourcesGoNamesASource(t *testing.T) {
 	t.Parallel()
 	seen := false

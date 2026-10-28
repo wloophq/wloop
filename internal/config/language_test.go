@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -36,10 +37,9 @@ func TestOldConfigKeysAreUnknown(t *testing.T) {
 		`turns = {automated_per_day = 3}`:                                          "turns.automated_per_day",
 		`classify = {daily_cap = 3}`:                                               "classify.daily_cap",
 		`brief = {max_diff_bytes = 3000}`:                                          "brief.max_diff_bytes",
-		`slack = {extraction = {max_call_usd = 1}}`:                                "slack.extraction.max_call_usd",
-		`slack = {extraction = {max_day_usd = 1}}`:                                 "slack.extraction.max_day_usd",
-		`slack = {extraction = {max_day_calls = 1}}`:                               "slack.extraction.max_day_calls",
-		`plugins = {github = {enabled = false}}`:                                   "plugins",
+		`plugins.slack = {extraction = {max_call_usd = 1}}`:                        "plugins.slack.extraction.max_call_usd",
+		`plugins.slack = {extraction = {max_day_usd = 1}}`:                         "plugins.slack.extraction.max_day_usd",
+		`plugins.slack = {extraction = {max_day_calls = 1}}`:                       "plugins.slack.extraction.max_day_calls",
 		`automated_reviewers = ["bot"]`:                                            "automated_reviewers",
 		`owners = ["acme"]`:                                                        "owners",
 		`trusted_authors = ["bot"]`:                                                "trusted_authors",
@@ -56,7 +56,7 @@ func TestOldConfigKeysAreUnknown(t *testing.T) {
 		`projects = [{match = "acme/*", trusted_authors = ["bot"]}]`:               "projects[0].trusted_authors",
 		`projects = [{match = "acme/*", followups_without_workspace = true}]`:      "projects[0].followups_without_workspace",
 		`projects = [{match = "acme/*", address_without_workspace = true}]`:        "projects[0].address_without_workspace",
-		`github = {drafts = {approval = {mode = "wait", rule = []}}}`:              "github.drafts.approval.rule",
+		`plugins.github = {gates = {approval = {mode = "wait", rule = []}}}`:       "plugins.github.gates.approval.rule",
 		`workflows = {x = {drafts = {approval = {mode = "wait", default = "x"}}}}`: "workflows.x.drafts.approval.default",
 	} {
 		var unknown *UnknownKeysError
@@ -66,12 +66,29 @@ func TestOldConfigKeysAreUnknown(t *testing.T) {
 	}
 }
 
+func TestTheOldPluginSectionsNameTheirNewKeys(t *testing.T) {
+	t.Parallel()
+	for raw, want := range map[string]map[string]string{
+		`github = {owners = ["acme"]}`:                                  {"github": "plugins.github"},
+		`slack = {client_id = "1.2"}`:                                   {"slack": "plugins.slack"},
+		`github = {drafts = {approval = {mode = "wait"}}}`:              {"github.drafts.approval": "plugins.github.gates.approval"},
+		`github = {owners = [], drafts = {approval = {mode = "wait"}}}`: {"github.drafts.approval": "plugins.github.gates.approval"},
+		`slack = {drafts = {approval = {mode = "send"}}}`:               {"slack.drafts.approval": "plugins.slack.gates.approval"},
+	} {
+		var unknown *UnknownKeysError
+		err := loadErr(t, raw)
+		if !errors.As(err, &unknown) || !maps.Equal(unknown.Near, want) {
+			t.Errorf("%s: %v, want %v", raw, err, want)
+		}
+	}
+}
+
 func TestRecordIsNoDraftApprovalMode(t *testing.T) {
 	t.Parallel()
 	for raw, path := range map[string]string{
 		`workflows = {x = {drafts = {approval = {mode = "record"}}}}`: "workflows.x.drafts.approval",
-		`github = {drafts = {approval = {mode = "record"}}}`:          "github.drafts.approval",
-		`slack = {drafts = {approval = {mode = "record"}}}`:           "slack.drafts.approval",
+		`plugins.github = {gates = {approval = {mode = "record"}}}`:   "plugins.github.gates.approval",
+		`plugins.slack = {gates = {approval = {mode = "record"}}}`:    "plugins.slack.gates.approval",
 	} {
 		err := loadErr(t, raw)
 		if err == nil || !strings.Contains(err.Error(), path) || !strings.Contains(err.Error(), `"record"`) {
@@ -107,10 +124,10 @@ match = "globex/*"
 followups_without_workspace = false
 trusted_authors = ["deps-bot[bot]"]
 
-[slack]
+[plugins.slack]
 client_id = "123.456"
 
-[slack.ingest]
+[plugins.slack.ingest]
 terms = ["deploy"]
 `
 
@@ -126,7 +143,7 @@ func TestUserConfigEditsLoad(t *testing.T) {
 	edited := strings.NewReplacer(
 		`automated_reviewers = ["review-bot[bot]"]
 followups_without_workspace = true
-address_without_workspace = true`, `github = {automated_reviewers = ["review-bot[bot]"], followups_without_workspace = true, address_without_workspace = true}`,
+address_without_workspace = true`, `plugins.github = {automated_reviewers = ["review-bot[bot]"], followups_without_workspace = true, address_without_workspace = true}`,
 		`followups_without_workspace = false
 trusted_authors = ["deps-bot[bot]"]`, `github = {followups_without_workspace = false, trusted_authors = ["deps-bot[bot]"]}`,
 	).Replace(userConfig)
@@ -140,7 +157,7 @@ trusted_authors = ["deps-bot[bot]"]`, `github = {followups_without_workspace = f
 
 func TestGitHubDraftApprovalIsTheRuleApproval(t *testing.T) {
 	t.Parallel()
-	c := loadRaw(t, `github = {drafts = {approval = {mode = "delay", window = "1h"}}}`)
+	c := loadRaw(t, `plugins.github = {gates = {approval = {mode = "delay", window = "1h"}}}`)
 	if got := c.PluginDraftApproval("github"); got != (draft.Approval{Mode: draft.Delay, Window: time.Hour}) {
 		t.Errorf("github %+v", got)
 	}
@@ -150,8 +167,8 @@ func TestGitHubDraftApprovalIsTheRuleApproval(t *testing.T) {
 		}
 	}
 	for raw, path := range map[string]string{
-		`github = {drafts = {approval = {mode = "delay"}}}`:              "github.drafts.approval",
-		`slack = {drafts = {approval = {mode = "wait", window = "1h"}}}`: "slack.drafts.approval",
+		`plugins.github = {gates = {approval = {mode = "delay"}}}`:              "plugins.github.gates.approval",
+		`plugins.slack = {gates = {approval = {mode = "wait", window = "1h"}}}`: "plugins.slack.gates.approval",
 	} {
 		if err := loadErr(t, raw); err == nil || !strings.Contains(err.Error(), path) {
 			t.Errorf("%s: %v", raw, err)

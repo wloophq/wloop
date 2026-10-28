@@ -49,7 +49,7 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `trigger` | table |  | What plans the workflow: on or schedule; absent, every sweep. |
-| `trigger.on` | list of `opened`, `push`, `review_requested`, `review_request_removed`, `review`, `comment`, `check`, `ready`, `draft`, `merged`, `closed`, `round_sent`, `round_held`, `round_pending`, `round_skipped`, `guidance`, `round_blocked`, `round_unblocked`, `muted`, `unmuted`, `held`, `released`, `adopted`, `tracked`, `untracked`, `nudged`, `removed`, `status`, `would_review`, `would_address`, `review_ended`, `verb_next`, `verb_waiting`, `verb_schedule`, `verb_someday`, `verb_reference`, `verb_focus`, `verb_project`, `verb_approve`, `verb_delegate`, `verb_done`, `verb_dismiss`, `verb_context`, `verb_area`, `verb_answer`, `verb_reviewed`, `verb_sequential`, `verb_reply`, `task.woke` |  | The source event kinds the workflow reacts to; verb_&lt;verb&gt;, a verb a person ran on a task, and task.woke, a task's wake matched, with provider task. |
+| `trigger.on` | list of `muted`, `unmuted`, `held`, `released`, `adopted`, `tracked`, `untracked`, `nudged`, `removed`, `status`, `check`, `closed`, `comment`, `draft`, `guidance`, `merged`, `opened`, `push`, `ready`, `review`, `review_ended`, `review_request_removed`, `review_requested`, `round_blocked`, `round_held`, `round_pending`, `round_sent`, `round_skipped`, `round_unblocked`, `verb_answer`, `verb_approve`, `verb_area`, `verb_context`, `verb_delegate`, `verb_dismiss`, `verb_done`, `verb_focus`, `verb_next`, `verb_project`, `verb_reference`, `verb_reply`, `verb_reviewed`, `verb_schedule`, `verb_sequential`, `verb_someday`, `verb_waiting`, `would_address`, `would_review`, `task.woke` |  | The source event kinds the workflow reacts to; verb_&lt;verb&gt;, a verb a person ran on a task, and task.woke, a task's wake matched, with provider task. |
 | `trigger.schedule` | string |  | A cron schedule, in local time. |
 | `trigger.actors` | list of `person`, `workflow`, `agent`, `plugin` |  | With on, the actors whose events plan it; every actor when absent. |
 | `trigger.depth` | integer | `3` | With on, the longest chain of workflows triggering each other the event may close; at most 5. |
@@ -121,7 +121,7 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `turn.start` | `stage` | one of `first`, `follow-up` |  | The pass over the unit: its first, or one after. |
 | `turn.start` | `runner` | one of `session`, `headless` |  | How the turn runs, one of the intent's runners; by default its first. |
 | `draft.propose` | `purpose` | string |  | What the draft is for, such as nudge or close. Required. |
-| `draft.propose` | `delivery` | one of `message`, `reaction`, `comment` | `message` | How the draft posts. |
+| `draft.propose` | `delivery` | one of `message`, `reaction`, `comment` | `message` | How the draft posts: the core's message or reaction, or a delivery a plugin declares. |
 | `draft.propose` | `text` | file | `text.md.tmpl` | The template of the draft's text, beside the manifest. |
 | `draft.propose` | `reaction` | string |  | The emoji name, with delivery reaction. |
 | `draft.propose` | `items` | one of `owed`, `resolved`, `unowned`, `unowned_aged`, `all` | `all` | Which of the unit's items the draft lists. |

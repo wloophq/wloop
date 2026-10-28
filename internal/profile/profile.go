@@ -8,6 +8,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/fs"
+	"os"
+	"path/filepath"
+	"sync/atomic"
 
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/profiles"
@@ -17,7 +20,8 @@ import (
 type Kind string
 
 type Layer struct {
-	// Name is bundled or user.
+	// Name is bundled, user, or plugin:<id> and user:<id> for a plugin's
+	// layer and the user's over it.
 	Name string
 	// Source is "embedded" for the bundled layer.
 	Source string
@@ -55,13 +59,61 @@ func (e MissingError) Error() string {
 	return fmt.Sprintf("%s profile %s not found", e.Layer, e.Dir)
 }
 
-// Chain is the bundled layer, then the user's profile when one is set.
+// Chain is the bundled layer, the profile layer of each enabled plugin,
+// the user's profile when one is set, then the user's plugins/<id>/ of each
+// enabled plugin. A disabled plugin's layers are left out.
 func Chain(cfg config.Config) []Layer {
 	out := []Layer{{Name: "bundled", Source: "embedded"}}
-	if cfg.Profile != "" {
-		out = append(out, Layer{Name: "user", Source: cfg.Profile, Dir: cfg.Profile})
+	ps := plugins.Load()
+	if ps == nil {
+		ps = &[]PluginDir{}
+	}
+	var on []PluginDir
+	for _, p := range *ps {
+		if cfg.PluginEnabled(p.ID) {
+			on = append(on, p)
+		}
+	}
+	for _, p := range on {
+		if d := filepath.Join(p.Dir, PluginProfileDir); isDir(d) {
+			out = append(out, Layer{Name: "plugin:" + p.ID, Source: d, Dir: d})
+		}
+	}
+	if cfg.Profile == "" {
+		return out
+	}
+	out = append(out, Layer{Name: "user", Source: cfg.Profile, Dir: cfg.Profile})
+	for _, p := range on {
+		if d := filepath.Join(cfg.Profile, PluginsDir, p.ID); isDir(d) {
+			out = append(out, Layer{Name: "user:" + p.ID, Source: d, Dir: d})
+		}
 	}
 	return out
+}
+
+// PluginDir is a plugin's directory, which holds its profile layer.
+type PluginDir struct {
+	ID, Dir string
+}
+
+// PluginProfileDir is a plugin directory's profile layer, and PluginsDir
+// the directory of a user profile that holds the user's layer of each
+// plugin, by id.
+const (
+	PluginProfileDir = "profile"
+	PluginsDir       = "plugins"
+)
+
+var plugins atomic.Pointer[[]PluginDir]
+
+// UsePlugins makes ps the plugins whose layers Chain adds. The composition
+// root sets it once, after it discovers the plugins and before the profile
+// loads.
+func UsePlugins(ps []PluginDir) { plugins.Store(&ps) }
+
+func isDir(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.IsDir()
 }
 
 // Sources lists one "<layer>: <file>" per part, in the text's order.

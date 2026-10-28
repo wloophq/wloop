@@ -569,11 +569,11 @@ func roundGo(r *pb.Round) Round {
 }
 
 func planPB(p Plan) *pb.PlanResponse {
-	return &pb.PlanResponse{Facts: factsPB(p.Facts), Due: ts(p.Due), Rank: p.Rank, Rounds: mapSlice(p.Rounds, roundPB)}
+	return &pb.PlanResponse{Rounds: mapSlice(p.Rounds, roundPB)}
 }
 
 func planGo(p *pb.PlanResponse) Plan {
-	return Plan{Facts: factsGo(p.GetFacts()), Due: tm(p.GetDue()), Rank: p.GetRank(), Rounds: mapSlice(p.GetRounds(), roundGo)}
+	return Plan{Rounds: mapSlice(p.GetRounds(), roundGo)}
 }
 
 func payloadRequestPB(r PayloadRequest) *pb.PayloadRequest {

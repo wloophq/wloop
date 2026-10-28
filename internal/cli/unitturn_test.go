@@ -397,7 +397,7 @@ func TestADisabledThreadPluginRunsNoTurn(t *testing.T) {
 	te.Rec = storeRecorder{te.Store}
 	te.cfg.Placement = []config.PlacementRule{{Match: "thread:*", Repo: "acme/api", Checkout: "main"}}
 	off := false
-	te.cfg.Plugins = map[string]config.Plugin{string(ingesttest.Provider): {Enabled: &off}}
+	te.cfg.Plugins.Other = map[string]config.Plugin{string(ingesttest.Provider): {Enabled: &off}}
 	withThreads(t, te)
 	te.serve(t)
 	rec := httptest.NewRecorder()

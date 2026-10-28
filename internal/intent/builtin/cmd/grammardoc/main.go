@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	_ "github.com/wloophq/wloop/internal/plugins/bundled"
 )
 
 const referenceDir = "docs/src/content/docs/reference"

@@ -81,13 +81,13 @@ var coreProviderAllowlist = []providerSite{
 	{"internal/cli/turn.go", "Env.storedViewer", "unit.GitHub", 1, "debt: the GitHub viewer read outside the plugin"},
 	{"internal/cli/cli.go", "commands", `"slack"`, 1, "the slack command, the Slack plugin's own commands"},
 	{"internal/cli/help.go", "devCommand", `"slack"`, 1, "the slack command, the Slack plugin's own commands"},
-	{"internal/cli/init_config.go", "mergeInitConfig", `"slack"`, 1, "the slack section of the config init writes"},
 	{"internal/cli/placement.go", "Env.placements", "unit.GitHub", 1, "debt: GitHub's default placement, wired outside the plugin's PlacementDefaults"},
 	{"internal/cli/placement.go", "githubPlacement.Default", "unit.GitHub", 2, "debt: GitHub's default placement reads the pull request and the viewer outside the plugin"},
 	{"internal/cli/serve.go", "serveAllDeps", "unit.GitHub", 3, "debt: the daemon's wiring of the GitHub viewer and the forge"},
 	{"internal/cli/serve.go", "trackedBooks.Books", "unit.GitHub", 1, "debt: a carded pull request without a turn still gets an empty book, so its card stays"},
 	{"internal/cli/serve_payloads.go", "Env.payloadReaders", "unit.GitHub", 1, "debt: GitHub's payload reader, wired outside the plugin's Payload"},
-	{"internal/cli/serve_plugins.go", "withoutGitHub", "unit.GitHub", 1, "debt: the GitHub facilities the daemon holds go with the GitHub plugin"},
+	{"internal/config/config.go", "Config.validateWorkflows", "unit.GitHub", 1, "debt: an intent's project settings read the pull request's turn facts, which go with the GitHub plugin (X8c2)"},
+	{"internal/config/config.go", "Config.ProjectSettingsFor", "unit.GitHub", 1, "debt: an intent's project settings read the pull request's turn facts, which go with the GitHub plugin (X8c2)"},
 	{"internal/cli/storedfacts.go", "storedFacts.Facts", "unit.GitHub", 1, "debt: the stored facts of a pull request's turn"},
 	{"internal/meter/meter.go", "GitHub", `"github"`, 1, "the meter's resource of a GitHub API request, not a unit provider"},
 }
@@ -110,7 +110,7 @@ var providerHomes = []string{
 // providerHome says whether file may spell any provider id.
 func providerHome(file string) bool {
 	dir := filepath.Dir(file)
-	if under(file, providerHomes...) || under(dir, providerHomes...) || compositionRoot(file) || file == sourceRoot {
+	if under(file, providerHomes...) || under(dir, providerHomes...) || compositionRoot(file) || file == sourceRoot || slices.Contains(serveWiring, file) {
 		return true
 	}
 	wiring, _ := filepath.Match(slackWiring, file)

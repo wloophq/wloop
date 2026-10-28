@@ -42,49 +42,15 @@ func prFacts(pr *github.PullRequest) expr.Facts {
 	return turn.PayloadFacts(p)
 }
 
-// lastReviewVerdict is the state of your newest submitted review, comments included.
-func lastReviewVerdict(reviews []pr.Review) string {
-	var state string
-	var at time.Time
-	for _, r := range reviews {
-		if r.ByViewer && !r.SubmittedAt.IsZero() && r.SubmittedAt.After(at) {
-			state, at = r.State, r.SubmittedAt
-		}
-	}
-	return state
-}
+func lastReviewVerdict(reviews []pr.Review) string { return pr.LastReviewVerdict(reviews) }
 
-// priorReview is your latest submitted review: the head it covered, and the
-// latest verdict that was not a comment. GitHub can return a review without
-// its commit; such a review gives no head.
+// priorReview is your latest submitted review, nil when there is none.
 func priorReview(reviews []pr.Review) *turn.PriorReview {
-	var p turn.PriorReview
-	reviewed := false
-	var headAt, verdictAt time.Time
-	for _, r := range reviews {
-		if !r.ByViewer || r.SubmittedAt.IsZero() {
-			continue
-		}
-		switch r.State {
-		case pr.ReviewApproved, pr.ReviewChangesRequested, pr.ReviewCommented, pr.ReviewDismissed:
-		default:
-			continue
-		}
-		reviewed = true
-		if r.CommitOid != "" && r.SubmittedAt.After(headAt) {
-			p.Head, headAt = r.CommitOid, r.SubmittedAt
-		}
-		if r.SubmittedAt.After(p.At) {
-			p.At = r.SubmittedAt
-		}
-		if r.State != pr.ReviewCommented && r.SubmittedAt.After(verdictAt) {
-			p.Verdict, verdictAt = r.State, r.SubmittedAt
-		}
-	}
-	if !reviewed {
+	p, ok := pr.PriorReview(reviews)
+	if !ok {
 		return nil
 	}
-	return &p
+	return &turn.PriorReview{Verdict: p.Verdict, Head: p.Head, At: p.At}
 }
 
 // basicsReader reads a turn's pull request with the read rounds already make.

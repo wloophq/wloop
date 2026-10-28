@@ -310,13 +310,17 @@ func TestTurnFactsCoverTheTurnSlot(t *testing.T) {
 		"pr.address.conflict": func(_ *Builder, r *Request) {
 			r.Payload.(*PR).Address = &RoundReason{Conflict: &RoundConflict{Base: "main"}}
 		},
-		"config.github.address_reviews": func(b *Builder, _ *Request) { b.Config = config.Config{GitHub: config.GitHub{AddressReviews: true}} },
-		"config.github.address_checks":  func(b *Builder, _ *Request) { b.Config = config.Config{GitHub: config.GitHub{AddressChecks: true}} },
-		"config.github.followups_without_workspace": func(b *Builder, _ *Request) {
-			b.Config = config.Config{GitHub: config.GitHub{FollowupsWithoutWorkspace: true}}
+		"config.plugins.github.address_reviews": func(b *Builder, _ *Request) {
+			b.Config = config.Config{Plugins: config.Plugins{GitHub: config.GitHub{AddressReviews: true}}}
 		},
-		"config.github.address_without_workspace": func(b *Builder, _ *Request) {
-			b.Config = config.Config{GitHub: config.GitHub{AddressWithoutWorkspace: true}}
+		"config.plugins.github.address_checks": func(b *Builder, _ *Request) {
+			b.Config = config.Config{Plugins: config.Plugins{GitHub: config.GitHub{AddressChecks: true}}}
+		},
+		"config.plugins.github.followups_without_workspace": func(b *Builder, _ *Request) {
+			b.Config = config.Config{Plugins: config.Plugins{GitHub: config.GitHub{FollowupsWithoutWorkspace: true}}}
+		},
+		"config.plugins.github.address_without_workspace": func(b *Builder, _ *Request) {
+			b.Config = config.Config{Plugins: config.Plugins{GitHub: config.GitHub{AddressWithoutWorkspace: true}}}
 		},
 	}
 	get := func(b Builder, r Request, field string) any {

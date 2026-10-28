@@ -93,6 +93,9 @@ func under(path string, roots ...string) bool {
 	return slices.ContainsFunc(roots, func(r string) bool { return path == r || strings.HasPrefix(path, r+"/") })
 }
 
+// pluginStore is a plugin's own database, which the host never reads.
+const pluginStore = "pkg/plugin/store"
+
 // TestArchitecture checks that only the store imports the SQLite driver;
 // clients import only the API, the domain and `termfmt`; the domain imports
 // only the domain; the brief reaches agents and the store only through its
@@ -109,7 +112,7 @@ func TestArchitecture(t *testing.T) {
 		for _, imp := range p.Imports {
 			dep, internal := local(imp)
 			switch {
-			case (imp == "modernc.org/sqlite" || imp == "database/sql") && !under(self, "internal/adapter/store"):
+			case (imp == "modernc.org/sqlite" || imp == "database/sql") && !under(self, "internal/adapter/store", pluginStore):
 				broken = append(broken, fmt.Sprintf("%s imports %s; only the store may (C1)", self, imp))
 			case under(self, "internal/domain") && !std(imp) && !(internal && under(dep, "internal/domain")):
 				broken = append(broken, fmt.Sprintf("%s imports %s; the domain imports only the standard library and the domain (C3)", self, imp))

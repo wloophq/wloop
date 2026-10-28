@@ -314,13 +314,13 @@ func async[T any](f func() T) func() T {
 }
 
 func (e *Env) effectiveConfig(c config.Config) string {
-	parts := []string{fmt.Sprintf("agent=%s github.review_prefix=%q", c.Agent, c.GitHub.ReviewPrefix)}
+	parts := []string{fmt.Sprintf("agent=%s plugins.github.review_prefix=%q", c.Agent, c.GitHub.ReviewPrefix)}
 	if sink := e.boardSink(c); sink != "" {
 		for _, status := range []string{config.ColumnWorking, config.ColumnWorkingFallback, config.ColumnReady} {
 			parts = append(parts, fmt.Sprintf("views.%s.columns.%s=%s", sink, status, c.Column(sink, status)))
 		}
 	}
-	parts = append(parts, fmt.Sprintf("github.automated_reviewers=%v github.owners=%v brief=%v",
+	parts = append(parts, fmt.Sprintf("plugins.github.automated_reviewers=%v plugins.github.owners=%v brief=%v",
 		c.GitHub.AutomatedReviewers, c.GitHub.Owners, c.Brief.Enabled))
 	return strings.Join(parts, " ")
 }
@@ -568,7 +568,7 @@ func (e *Env) daemonHealthChecks(ctx context.Context, cfg config.Config, c *clie
 		out = append(out, check{markMissing, "daemon warning", w, ""})
 	}
 	if h.SlowSync {
-		info := "GitHub rate limit below github.rate_limit_fraction; the fast sweep waits"
+		info := "GitHub rate limit below plugins.github.rate_limit_fraction; the fast sweep waits"
 		if !h.RateLimit.ResetAt.IsZero() {
 			info += " until " + h.RateLimit.ResetAt.Local().Format("15:04")
 		}

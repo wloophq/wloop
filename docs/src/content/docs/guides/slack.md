@@ -27,7 +27,7 @@ The manifest, also at [slack-app-manifest.yaml](/slack-app-manifest.yaml):
 In `config.toml`:
 
 ```toml
-[slack]
+[plugins.slack]
 client_id = "000000000000.000000000000"
 ```
 
@@ -39,7 +39,7 @@ Then:
 {{command}} slack status              # team, user, token expiry, whether the app token is stored
 ```
 
-`slack login` runs Slack's OAuth flow for a user token, with PKCE, and waits up to 5 minutes for the callback on `http://127.0.0.1:53682/slack/callback` (`slack.redirect_port`). The app's redirect URL must name that address; the manifest already does. `--app-token` reads the token only from standard input and refuses a value on the command line.
+`slack login` runs Slack's OAuth flow for a user token, with PKCE, and waits up to 5 minutes for the callback on `http://127.0.0.1:53682/slack/callback` (`plugins.slack.redirect_port`). The app's redirect URL must name that address; the manifest already does. `--app-token` reads the token only from standard input and refuses a value on the command line.
 
 Restart the daemon so it connects (on macOS, `launchctl kickstart -k gui/$(id -u)/io.github.{{org}}.{{name}}`). `{{command}} doctor` then reports the socket and the login.
 
@@ -48,11 +48,11 @@ Restart the daemon so it connects (on macOS, `launchctl kickstart -k gui/$(id -u
 By default, a message comes in when it mentions you, replies to you, sits in a thread you wrote in, or is in a DM. To widen it:
 
 ```toml
-[slack]
+[plugins.slack]
 client_id = "000000000000.000000000000"
 post_allowlist = ["C000", "U000"] # channel ids, or user ids for their DMs
 
-[slack.ingest]
+[plugins.slack.ingest]
 terms = ["api-outage", "billing"]
 allow_apps = ["B000"]
 ```
@@ -106,6 +106,6 @@ Write one, approve one with `a`, or from a terminal:
 {{command}} slack logout
 ```
 
-It revokes the user token at Slack and deletes both Keychain entries, even when the revoke fails. To keep Slack configured but stop the source, set `slack.enabled = false` and restart the daemon.
+It revokes the user token at Slack and deletes both Keychain entries, even when the revoke fails. To keep Slack configured but stop the source, set `plugins.slack.enabled = false` and restart the daemon.
 
 See [Slack as a source](/concepts/slack/) for how messages are admitted and turned into items, and the [configuration reference](/reference/configuration/) for every key.

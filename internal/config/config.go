@@ -16,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/duration"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
@@ -30,8 +31,6 @@ type Config struct {
 	// session's launch policy owns it.
 	WorkspaceManagers []string `json:"workspace_managers"`
 	Agent             string   `json:"agent"`
-	// GitHub is the GitHub plugin's settings.
-	GitHub GitHub `json:"github"`
 	// AgentHome is the agent's own configuration directory (CLAUDE_CONFIG_DIR
 	// for Claude Code), "" for the agent's default.
 	AgentHome string `json:"agent_home"`
@@ -55,17 +54,14 @@ type Config struct {
 	Workflows map[string]WorkflowConfig `json:"workflows"`
 	// Intents set each intent's settings by intent name.
 	Intents map[string]IntentConfig `json:"intents"`
-	// Plugins switch, by provider id, a plugin registered without a settings
-	// namespace, which has no <id>.enabled for the file to set: the
-	// composition root that registers it switches it here, as a test's
-	// plugin is. Every plugin the file knows switches with <id>.enabled.
-	Plugins map[string]Plugin `json:"-"`
+	// Plugins are the [plugins.<id>] tables: each plugin's switch and trust,
+	// and the bundled plugins' settings, which the embedding promotes.
+	Plugins `json:"plugins"`
 	// Placement is the rules that place units; the first match wins.
 	Placement []PlacementRule `json:"placement,omitempty"`
 	Tasks     Tasks           `json:"tasks"`
 	// Notifications sets the menu bar's daily digest.
 	Notifications Notifications `json:"notifications"`
-	Slack         Slack         `json:"slack"`
 	Dossiers      Dossiers      `json:"dossiers"`
 	Drafts        Drafts        `json:"drafts"`
 	Items         Items         `json:"items"`
@@ -84,8 +80,7 @@ type Turns struct {
 
 // GitHub is the GitHub plugin's settings.
 type GitHub struct {
-	// Enabled switches the plugin; nil means enabled.
-	Enabled            *bool    `json:"enabled,omitempty"`
+	Plugin
 	ReviewPrefix       string   `json:"review_prefix"`
 	AutomatedReviewers []string `json:"automated_reviewers"`
 	// Owners restricts automated follow-ups to these GitHub owners. Empty
@@ -114,12 +109,11 @@ type GitHub struct {
 	IgnoreChecks  []string `json:"ignore_checks"`
 	// AddressConflicts starts a triage round when a pull request I develop
 	// conflicts with its base past the conflict window.
-	AddressConflicts bool         `json:"address_conflicts"`
-	Scope            Scope        `json:"scope"`
-	Stalled          Stalled      `json:"stalled"`
-	Drafts           PluginDrafts `json:"drafts"`
-	Gates            PluginGates  `json:"gates"`
-	Nudge            Nudge        `json:"nudge"`
+	AddressConflicts bool        `json:"address_conflicts"`
+	Scope            Scope       `json:"scope"`
+	Stalled          Stalled     `json:"stalled"`
+	Gates            PluginGates `json:"gates"`
+	Nudge            Nudge       `json:"nudge"`
 	// RateLimitFraction is the share of the GitHub rate limit the sweeps
 	// may spend.
 	RateLimitFraction float64 `json:"rate_limit_fraction"`
@@ -428,7 +422,7 @@ const DefaultPRDailyCap = 5
 // manager: the composition root picks those.
 func Defaults() Config {
 	return Config{
-		GitHub: GitHub{
+		Plugins: Plugins{GitHub: GitHub{
 			AddressReviews:     true,
 			AddressChecks:      true,
 			AddressConflicts:   true,
@@ -437,7 +431,7 @@ func Defaults() Config {
 			Stalled:            Stalled{Review: Days(48 * time.Hour), Reply: Days(24 * time.Hour), Merge: Days(24 * time.Hour)},
 			Nudge:              Nudge{SilentDays: 30},
 			RateLimitFraction:  0.5,
-		},
+		}, Slack: Slack{EndedAfter: Days(DefaultSlackEndedAfter)}},
 		Sweep: Sweep{Fast: Days(2 * time.Minute), Slow: Days(time.Hour)},
 		Brief: Brief{Tier: turns.TierFast, MaxInputBytes: 60000},
 		MCP:   MCP{Port: DefaultMCPPort},
@@ -462,7 +456,6 @@ func Defaults() Config {
 		Drafts:   Drafts{RepeatAfter: Days(24 * time.Hour)},
 		Headless: Headless{Tier: turns.TierBalanced, PerCallUSD: 0.5, PerDayUSD: 5},
 		Turns:    Turns{PerDay: 20, PerUnitPerDay: DefaultPRDailyCap},
-		Slack:    Slack{EndedAfter: Days(DefaultSlackEndedAfter)},
 	}
 }
 
@@ -578,7 +571,7 @@ func LoadFile(file string, base Config) (Config, error) {
 }
 
 func (c Config) validateTrustedAuthors() error {
-	lists := map[string][]string{"github.trusted_authors": c.GitHub.TrustedAuthors}
+	lists := map[string][]string{"plugins.github.trusted_authors": c.GitHub.TrustedAuthors}
 	for i, p := range c.Projects {
 		lists[fmt.Sprintf("projects[%d].github.trusted_authors", i)] = p.GitHub.TrustedAuthors
 	}
@@ -595,9 +588,9 @@ func (c Config) validateCockpit() error {
 		key string
 		v   Days
 	}{
-		{"github.stalled.review", c.GitHub.Stalled.Review},
-		{"github.stalled.reply", c.GitHub.Stalled.Reply},
-		{"github.stalled.merge", c.GitHub.Stalled.Merge},
+		{"plugins.github.stalled.review", c.GitHub.Stalled.Review},
+		{"plugins.github.stalled.reply", c.GitHub.Stalled.Reply},
+		{"plugins.github.stalled.merge", c.GitHub.Stalled.Merge},
 		{"sweep.fast", c.Sweep.Fast},
 		{"sweep.slow", c.Sweep.Slow},
 	}
@@ -612,7 +605,7 @@ func (c Config) validateCockpit() error {
 		}
 	}
 	if f := c.GitHub.RateLimitFraction; f < 0 || f > 1 {
-		return fmt.Errorf("github.rate_limit_fraction must be between 0 and 1, got %v", f)
+		return fmt.Errorf("plugins.github.rate_limit_fraction must be between 0 and 1, got %v", f)
 	}
 	if c.HTTP.Port < 0 || c.HTTP.Port > 65535 {
 		return fmt.Errorf("http.port must be between 0 and 65535, got %d", c.HTTP.Port)
@@ -662,7 +655,7 @@ func (c Config) validateWorkflows() error {
 		}
 	}
 	if c.GitHub.Nudge.SilentDays < 1 {
-		return fmt.Errorf("github.nudge.silent_days must be positive, got %d", c.GitHub.Nudge.SilentDays)
+		return fmt.Errorf("plugins.github.nudge.silent_days must be positive, got %d", c.GitHub.Nudge.SilentDays)
 	}
 	if c.Classify.PerDay < 0 {
 		return fmt.Errorf("classify.per_day must not be negative, got %d", c.Classify.PerDay)
@@ -678,7 +671,7 @@ func (c Config) validateWorkflows() error {
 		if ps == nil {
 			continue
 		}
-		if _, err := expr.Compile(ps.When, builtin.PREnv()); err != nil {
+		if _, err := expr.Compile(ps.When, builtin.TurnEnvOf(unit.GitHub)); err != nil {
 			return fmt.Errorf("intents.%s.project_settings.when: %w", intent, err)
 		}
 	}
@@ -717,7 +710,7 @@ func (c Config) ProjectSettingsFor(intent string, pr expr.Facts) bool {
 	if pr == nil {
 		return false
 	}
-	p, err := expr.Compile(ps.When, builtin.PREnv())
+	p, err := expr.Compile(ps.When, builtin.TurnEnvOf(unit.GitHub))
 	return err == nil && p.Eval(pr)
 }
 

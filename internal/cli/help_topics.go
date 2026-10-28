@@ -311,7 +311,7 @@ func helpGroups(manager string) []helpGroup {
 				Names:   []string{"slack login", "slack logout"},
 				Summary: "Connect to Slack, or disconnect",
 				Usage:   []string{"slack login [--no-browser]", "slack login --app-token", "slack logout"},
-				About: "Log in to Slack in the browser; it needs slack.client_id in the config. " +
+				About: "Log in to Slack in the browser; it needs plugins.slack.client_id in the config. " +
 					"--app-token saves the app-level token read from standard input. logout revokes and deletes the tokens.",
 				Flags: []helpFlag{
 					{"--no-browser", "Print the login URL instead of opening the browser"},

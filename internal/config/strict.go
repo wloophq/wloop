@@ -63,6 +63,9 @@ func decodeStrict(file string, raw []byte, c *Config) error {
 	if len(bad) > 0 {
 		return errors.Join(bad...)
 	}
+	if err := c.takeOther(tree); err != nil {
+		return fmt.Errorf("parsing %s: %w", file, err)
+	}
 	// Config's keys are its json tags, which config get prints too.
 	asJSON, err := json.Marshal(tree)
 	if err != nil {

@@ -1,6 +1,6 @@
 summary = "Nudge whoever someone else's open pull request waits on after a long silence"
 provider = "github"
-when = 'pr.state == "OPEN" && !pr.draft && !pr.mine && !pr.adopted && !pr.waits_on_user && pr.silent_days >= config.github.nudge.silent_days'
+when = 'pr.state == "OPEN" && !pr.draft && !pr.mine && !pr.adopted && !pr.waits_on_user && pr.silent_days >= config.plugins.github.nudge.silent_days'
 order = 40
 key = ["pr.last_interaction_at"]
 

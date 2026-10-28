@@ -1,0 +1,97 @@
+id = "slack"
+kinds = ["source"]
+protocol = 1
+
+[source]
+name = "Slack"
+slot = "slack"
+brief_subject = true
+kinds = ["thread"]
+
+default_delivery = "message"
+
+[source.codec]
+keys = ["{team}/{conversation}/{ts}", "{team}/{conversation}/seg/{segment}"]
+target = "<ref|permalink|slack:key>"
+
+[source.codec.fields]
+team = "[A-Z][A-Z0-9]+"
+conversation = "[CDG][A-Z0-9]+"
+ts = '[0-9]+\.[0-9]+'
+segment = "[A-Za-z0-9_-]+"
+
+[[source.deliveries]]
+name = "message"
+posts = true
+
+[[source.deliveries]]
+name = "reaction"
+
+[[source.draft_kinds]]
+name = "react"
+delivery = "reaction"
+
+[[source.facts]]
+name = "slack.channel"
+type = "string"
+doc = "The conversation's channel id."
+
+[[source.facts]]
+name = "slack.conversation"
+type = "string"
+doc = "The conversation's kind: channel, dm or group."
+enum = ["channel", "dm", "group"]
+
+[[source.facts]]
+name = "slack.started_by_me"
+type = "bool"
+doc = "The viewer started the thread."
+untrusted = true
+
+[[source.facts]]
+name = "slack.closure_posted"
+type = "bool"
+doc = "A closure was posted on the unit, by the extraction or a sent draft's unit.closed."
+untrusted = true
+
+[[source.facts]]
+name = "slack.live_task"
+type = "bool"
+doc = "A live task, neither done nor in the trash and not muted, is attached to the unit."
+untrusted = true
+
+[[source.facts]]
+name = "slack.items_open"
+type = "int"
+doc = "Open items whose unit is this unit."
+untrusted = true
+
+[[source.facts]]
+name = "slack.items_unowned"
+type = "int"
+doc = "Open items of the unit with no assignee, nobody waited on and no basis."
+untrusted = true
+
+[[source.facts]]
+name = "slack.items_unowned_age_days"
+type = "int"
+doc = "Working days, in the configured location, since the oldest unowned item appeared."
+untrusted = true
+time_varying = true
+
+[[source.facts]]
+name = "slack.ended"
+type = "bool"
+doc = "The Slack plugin's word that the unit has ended: a closure was posted or marked (unit.closed), or its newest stored message is older than plugins.slack.ended_after."
+time_varying = true
+
+[[source.facts]]
+name = "slack.settled_at"
+type = "timestamp"
+doc = "The newest update of a settled draft the workflow proposed on the unit, withdrawn ones included; zero when none. Test with `> timestamp(0)`."
+
+[[source.facts]]
+name = "slack.fingerprint"
+type = "string"
+doc = "The unit, its newest message and the update time of its items."
+untrusted = true

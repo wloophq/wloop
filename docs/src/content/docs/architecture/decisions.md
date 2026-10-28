@@ -26,6 +26,7 @@ Each entry is a file under `docs/src/content/docs/architecture/decisions/`, with
 | [Small ports owned by their consumer](/architecture/decisions/small-ports-owned-by-their-consumer/) | A port belongs to the core package that uses it and has at most five methods. |
 | [Sources are compiled-in plugins](/architecture/decisions/sources-are-compiled-in-plugins/) | A source is a compiled-in plugin; the core imports no plugin and no plugin another. |
 | [Text an agent reads resolves through the profile](/architecture/decisions/text-an-agent-reads-resolves-through-the-profile/) | Every text an agent reads is a profile file a user profile can replace. |
+| [The plugins declare their vocabulary](/architecture/decisions/the-plugins-declare-their-vocabulary/) | The builtin tables hold the core's rows only; each plugin's facts, effects, roles and kinds come from its manifest. |
 | [The read model lives in memory](/architecture/decisions/the-read-model-lives-in-memory/) | Every write notes the change log the in-memory read model rebuilds from. |
 | [The store is the truth](/architecture/decisions/the-store-is-the-truth/) | Managers and boards receive a projection of the store and are never read back as state. |
 | [The store migrates forward](/architecture/decisions/the-store-migrates-forward/) | Every schema change is a new version with a migration, and a newer store is refused. |

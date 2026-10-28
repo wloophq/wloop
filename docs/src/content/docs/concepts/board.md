@@ -5,7 +5,7 @@ description: The two kinds of workspace, how a pull request enters and leaves th
 
 The loop acts where a local workspace exists, in Claude Desktop or in Orca. A workspace is one of two kinds, told apart by its display name:
 
-- **Review workspace**, named `REVIEW <branch>` (`github.review_prefix`): someone else's pull request that you review.
+- **Review workspace**, named `REVIEW <branch>` (`plugins.github.review_prefix`): someone else's pull request that you review.
 - **Author workspace**, any other name: a pull request you develop, whether you opened it or took it over.
 
 Renaming a review workspace in Orca turns it into an author workspace.

@@ -49,16 +49,6 @@ func cfgApproval(prefix string, modes func() []Value, what string) []Key {
 	}
 }
 
-// cfgPluginDrafts are the drafts keys of plugin id.
-func cfgPluginDrafts(id string) []Key {
-	return []Key{
-		cfgKey(id+".drafts", KindTable, "", "The drafts the plugin's own rules propose."),
-		cfgKey(id+".drafts.approval", KindTable, "", "Their approval; left out, each waits for you."),
-		cfgEnum(id+".drafts.approval.mode", DraftModes, "", "The approval mode."),
-		cfgKey(id+".drafts.approval.window", KindDur, "", "How long a delay waits before the draft goes; only with mode delay."),
-	}
-}
-
 // configGrammar is the configuration's keys.
 var configGrammar = slices.Concat(
 	[]Key{
@@ -71,31 +61,38 @@ var configGrammar = slices.Concat(
 		cfgKey("agent_models.*.*", KindText, "", "The agent's model name for the tier."),
 		cfgKey("profile", KindText, "", "The user profile layered over the bundled one: a name under the profiles directory, or a path; an intent's profile names an intent."),
 
-		cfgKey("github", KindTable, "", "The GitHub plugin's settings."),
-		cfgKey("github.enabled", KindBool, "", "Switches the GitHub plugin; left out, it is on."),
-		cfgKey("github.review_prefix", KindText, "REVIEW ", "The prefix of a review workspace's name."),
-		cfgList("github.automated_reviewers", "Logins of review bots whose reviews count as automated."),
-		cfgList("github.owners", "The GitHub owners automated follow-ups run on; empty is every owner the workspace manager knows."),
-		cfgList("github.trusted_authors", "Logins whose pull requests pass the author association check of automated rounds."),
-		cfgKey("github.followups_without_workspace", KindBool, "false", "A follow-up review recreates the review workspace the user deleted; off, the sweep only logs it."),
-		cfgKey("github.address_without_workspace", KindBool, "false", "An address round creates its author workspace when it has none; off, the sweep only records it."),
-		cfgKey("github.address_reviews", KindBool, "true", "Someone's review of a pull request you develop starts an address round."),
-		cfgList("github.address_skip_reviewers", "Logins whose reviews never start an address round."),
-		cfgKey("github.address_checks", KindBool, "true", "Failing checks on the head of a pull request you develop start an address round."),
-		cfgList("github.ignore_checks", "Checks whose failure never starts an address round."),
-		cfgKey("github.address_conflicts", KindBool, "true", "A pull request you develop that conflicts with its base past the conflict window starts an address round."),
-		cfgKey("github.scope", KindTable, "", "Whose pull requests the GitHub plugin follows."),
-		cfgList("github.scope.people", "Logins whose pull requests it follows."),
-		cfgList("github.scope.teams", "Teams whose pull requests it follows."),
-		cfgList("github.scope.repos", "Repositories whose pull requests it follows."),
-		cfgList("github.scope.watch", "Repositories it watches."),
-		cfgKey("github.stalled", KindTable, "", "When a pull request counts as stalled."),
-		cfgKey("github.stalled.review", KindDur, "2d", "Waiting on a review for this long."),
-		cfgKey("github.stalled.reply", KindDur, "1d", "Waiting on a reply for this long."),
-		cfgKey("github.stalled.merge", KindDur, "1d", "Approved and unmerged for this long."),
-		cfgKey("github.nudge", KindTable, "", "The nudges on pull requests."),
-		cfgKey("github.nudge.silent_days", KindInt, "30", "Calendar days of silence on a pull request before a nudge is due; workflows read it as config.github.nudge.silent_days."),
-		cfgKey("github.rate_limit_fraction", KindNumber, "0.5", "The share of the GitHub rate limit the sweeps may spend, a number between 0 and 1."),
+		cfgKey("plugins", KindTable, "", "Each plugin's table, by id: its switch, its trust and its settings."),
+		cfgKey("plugins.*", KindTable, "", "A plugin's table; the keys besides enabled and trust are the plugin's own, which only it reads."),
+		cfgKey("plugins.*.enabled", KindBool, "", "Switches the plugin; left out, it is on."),
+		cfgEnum("plugins.*.trust", cfgValues(trustPath), "", "path runs the plugin's binary whatever its checksum; left out, a bundled plugin runs only with the checksum its install recorded, and any other plugin does not run. Only you write it."),
+		cfgKey("plugins.*.*", KindAny, "", "A key of the plugin's own."),
+
+		cfgKey("plugins.github", KindTable, "", "The GitHub plugin's settings."),
+		cfgKey("plugins.github.enabled", KindBool, "", "Switches the GitHub plugin; left out, it is on."),
+		cfgEnum("plugins.github.trust", cfgValues(trustPath), "", "path runs the GitHub plugin's binary whatever its checksum; left out, it runs only with the checksum its install recorded."),
+		cfgKey("plugins.github.review_prefix", KindText, "REVIEW ", "The prefix of a review workspace's name."),
+		cfgList("plugins.github.automated_reviewers", "Logins of review bots whose reviews count as automated."),
+		cfgList("plugins.github.owners", "The GitHub owners automated follow-ups run on; empty is every owner the workspace manager knows."),
+		cfgList("plugins.github.trusted_authors", "Logins whose pull requests pass the author association check of automated rounds."),
+		cfgKey("plugins.github.followups_without_workspace", KindBool, "false", "A follow-up review recreates the review workspace the user deleted; off, the sweep only logs it."),
+		cfgKey("plugins.github.address_without_workspace", KindBool, "false", "An address round creates its author workspace when it has none; off, the sweep only records it."),
+		cfgKey("plugins.github.address_reviews", KindBool, "true", "Someone's review of a pull request you develop starts an address round."),
+		cfgList("plugins.github.address_skip_reviewers", "Logins whose reviews never start an address round."),
+		cfgKey("plugins.github.address_checks", KindBool, "true", "Failing checks on the head of a pull request you develop start an address round."),
+		cfgList("plugins.github.ignore_checks", "Checks whose failure never starts an address round."),
+		cfgKey("plugins.github.address_conflicts", KindBool, "true", "A pull request you develop that conflicts with its base past the conflict window starts an address round."),
+		cfgKey("plugins.github.scope", KindTable, "", "Whose pull requests the GitHub plugin follows."),
+		cfgList("plugins.github.scope.people", "Logins whose pull requests it follows."),
+		cfgList("plugins.github.scope.teams", "Teams whose pull requests it follows."),
+		cfgList("plugins.github.scope.repos", "Repositories whose pull requests it follows."),
+		cfgList("plugins.github.scope.watch", "Repositories it watches."),
+		cfgKey("plugins.github.stalled", KindTable, "", "When a pull request counts as stalled."),
+		cfgKey("plugins.github.stalled.review", KindDur, "2d", "Waiting on a review for this long."),
+		cfgKey("plugins.github.stalled.reply", KindDur, "1d", "Waiting on a reply for this long."),
+		cfgKey("plugins.github.stalled.merge", KindDur, "1d", "Approved and unmerged for this long."),
+		cfgKey("plugins.github.nudge", KindTable, "", "The nudges on pull requests."),
+		cfgKey("plugins.github.nudge.silent_days", KindInt, "30", "Calendar days of silence on a pull request before a nudge is due; workflows read it as config.plugins.github.nudge.silent_days."),
+		cfgKey("plugins.github.rate_limit_fraction", KindNumber, "0.5", "The share of the GitHub rate limit the sweeps may spend, a number between 0 and 1."),
 
 		cfgKey("projects[]", KindTable, "", "Settings for the pull requests and the work of matching repositories; the first match wins."),
 		cfgKey("projects[].match", KindText, "", "An owner/repo pattern, such as acme/* or acme/api."),
@@ -105,9 +102,9 @@ var configGrammar = slices.Concat(
 		cfgList("projects[].workspace_managers", "The managers a new worktree of the project picks from, in order."),
 		cfgKey("projects[].trust_clones", KindBool, "", "Trusts a repository of the project in the agent home at the moment the loop clones it, so its settings and hooks run as you; the match must name its owner, such as acme/*."),
 		cfgKey("projects[].github", KindTable, "", "The GitHub settings the project overrides."),
-		cfgList("projects[].github.trusted_authors", "The project's github.trusted_authors."),
-		cfgKey("projects[].github.followups_without_workspace", KindBool, "", "The project's github.followups_without_workspace."),
-		cfgKey("projects[].github.address_without_workspace", KindBool, "", "The project's github.address_without_workspace."),
+		cfgList("projects[].github.trusted_authors", "The project's plugins.github.trusted_authors."),
+		cfgKey("projects[].github.followups_without_workspace", KindBool, "", "The project's plugins.github.followups_without_workspace."),
+		cfgKey("projects[].github.address_without_workspace", KindBool, "", "The project's plugins.github.address_without_workspace."),
 
 		cfgKey("sweep", KindTable, "", "How often the sweeps run."),
 		cfgKey("sweep.fast", KindDur, "2m", "The fast sweep's interval."),
@@ -186,51 +183,44 @@ var configGrammar = slices.Concat(
 		cfgKey("turns.per_day", KindInt, "20", "Automated turns per day, all workflows together, on units whose plugin keeps no per-unit count (every provider but GitHub today)."),
 		cfgKey("turns.per_unit_per_day", KindInt, "5", "Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today); every automated turn spends one, whatever its intent declares, and a turn by hand none."),
 
-		cfgKey("slack", KindTable, "", "The Slack plugin's settings; no secret lives here."),
-		cfgKey("slack.enabled", KindBool, "", "Switches the Slack plugin; left out, it is on."),
-		cfgKey("slack.client_id", KindText, "", "The Slack app's client id; empty leaves Slack unconfigured."),
-		cfgKey("slack.redirect_port", KindInt, "", "The login callback port registered in the Slack app; 0 is 53682."),
-		cfgKey("slack.keychain_service", KindText, "", "The name of the Keychain items; empty is the brand's."),
-		cfgList("slack.post_allowlist", "When not empty, the only channel ids, or user ids naming the DM with that user, a post may go to."),
-		cfgKey("slack.request_log", KindBool, "false", "Logs one line per Slack call: method and HTTP status."),
-		cfgKey("slack.ingest", KindTable, "", "What the Slack plugin admits and how it listens."),
-		cfgList("slack.ingest.terms", "A message that holds one of them as a word, in any case, is admitted."),
-		cfgList("slack.ingest.allow_apps", "Bot ids (B...) or app ids (A...) whose messages are admitted."),
-		cfgList("slack.ingest.deny_apps", "Bot ids (B...) or app ids (A...) whose messages are not."),
-		cfgKey("slack.ingest.socket", KindBool, "", "Listens on a socket; left out, it does."),
-		cfgKey("slack.ingest.since", KindText, "", "The first start's backfill date, YYYY-MM-DD; empty is 7 days back."),
-		cfgKey("slack.extraction", KindTable, "", "The extraction job; a zero value keeps its default."),
-		cfgKey("slack.extraction.enabled", KindBool, "", "Switches the extraction job; left out, it is on."),
-		cfgEnum("slack.extraction.tier", ConfigTiers, "", "Its model tier; left out, fast."),
-		cfgKey("slack.extraction.language", KindText, "", "The language the extraction writes in; empty is English."),
-		cfgKey("slack.extraction.per_call_usd", KindNumber, "", "What one extraction call may cost, in USD; 0 is 0.10."),
-		cfgKey("slack.extraction.per_day_usd", KindNumber, "", "What extraction may cost in a day, in USD; 0 is 3."),
-		cfgKey("slack.extraction.per_day", KindInt, "", "Extraction calls per day; 0 is 500."),
-		cfgKey("slack.extraction.quiet", KindDur, "", "How long a unit stays unchanged before it runs; empty is 90s."),
-		cfgKey("slack.extraction.max_wait", KindDur, "", "The longest delay of a unit's oldest change; empty is 10m."),
-		cfgKey("slack.extraction.window_chars", KindInt, "", "The characters of conversation one call reads; 0 is 40000."),
-		cfgKey("slack.extraction.max_failures", KindInt, "", "Failed calls in a row after which the job gives up on a unit until its next change; 0 is 3."),
-		cfgKey("slack.extraction.context_messages", KindInt, "", "The read-only messages shown before a DM's window; 0 is 10, -1 turns them off."),
-		cfgKey("slack.extraction.context_chars", KindInt, "", "The characters of those messages; 0 is 4000, -1 turns them off."),
-		cfgKey("slack.extraction.escalate_over_chars", KindInt, "", "A unit whose rendered conversation is longer goes to the frontier tier; 0 or -1 is off."),
-		cfgKey("slack.ended_after", KindDur, "7d", "How long a Slack unit stays quiet, its newest stored message that old, before the plugin says it has ended (slack.ended)."),
-		cfgKey("slack.turns", KindTable, "", "What a turn on a Slack unit reads."),
-		cfgKey("slack.turns.max_chars", KindInt, "", "The characters of the unit's messages rendered into the instructions; 0 is 30000."),
+		cfgKey("plugins.slack", KindTable, "", "The Slack plugin's settings; no secret lives here."),
+		cfgKey("plugins.slack.enabled", KindBool, "", "Switches the Slack plugin; left out, it is on."),
+		cfgEnum("plugins.slack.trust", cfgValues(trustPath), "", "path runs the Slack plugin's binary whatever its checksum; left out, it runs only with the checksum its install recorded."),
+		cfgKey("plugins.slack.client_id", KindText, "", "The Slack app's client id; empty leaves Slack unconfigured."),
+		cfgKey("plugins.slack.redirect_port", KindInt, "", "The login callback port registered in the Slack app; 0 is 53682."),
+		cfgKey("plugins.slack.keychain_service", KindText, "", "The name of the Keychain items; empty is the brand's."),
+		cfgList("plugins.slack.post_allowlist", "When not empty, the only channel ids, or user ids naming the DM with that user, a post may go to."),
+		cfgKey("plugins.slack.request_log", KindBool, "false", "Logs one line per Slack call: method and HTTP status."),
+		cfgKey("plugins.slack.ingest", KindTable, "", "What the Slack plugin admits and how it listens."),
+		cfgList("plugins.slack.ingest.terms", "A message that holds one of them as a word, in any case, is admitted."),
+		cfgList("plugins.slack.ingest.allow_apps", "Bot ids (B...) or app ids (A...) whose messages are admitted."),
+		cfgList("plugins.slack.ingest.deny_apps", "Bot ids (B...) or app ids (A...) whose messages are not."),
+		cfgKey("plugins.slack.ingest.socket", KindBool, "", "Listens on a socket; left out, it does."),
+		cfgKey("plugins.slack.ingest.since", KindText, "", "The first start's backfill date, YYYY-MM-DD; empty is 7 days back."),
+		cfgKey("plugins.slack.extraction", KindTable, "", "The extraction job; a zero value keeps its default."),
+		cfgKey("plugins.slack.extraction.enabled", KindBool, "", "Switches the extraction job; left out, it is on."),
+		cfgEnum("plugins.slack.extraction.tier", ConfigTiers, "", "Its model tier; left out, fast."),
+		cfgKey("plugins.slack.extraction.language", KindText, "", "The language the extraction writes in; empty is English."),
+		cfgKey("plugins.slack.extraction.per_call_usd", KindNumber, "", "What one extraction call may cost, in USD; 0 is 0.10."),
+		cfgKey("plugins.slack.extraction.per_day_usd", KindNumber, "", "What extraction may cost in a day, in USD; 0 is 3."),
+		cfgKey("plugins.slack.extraction.per_day", KindInt, "", "Extraction calls per day; 0 is 500."),
+		cfgKey("plugins.slack.extraction.quiet", KindDur, "", "How long a unit stays unchanged before it runs; empty is 90s."),
+		cfgKey("plugins.slack.extraction.max_wait", KindDur, "", "The longest delay of a unit's oldest change; empty is 10m."),
+		cfgKey("plugins.slack.extraction.window_chars", KindInt, "", "The characters of conversation one call reads; 0 is 40000."),
+		cfgKey("plugins.slack.extraction.max_failures", KindInt, "", "Failed calls in a row after which the job gives up on a unit until its next change; 0 is 3."),
+		cfgKey("plugins.slack.extraction.context_messages", KindInt, "", "The read-only messages shown before a DM's window; 0 is 10, -1 turns them off."),
+		cfgKey("plugins.slack.extraction.context_chars", KindInt, "", "The characters of those messages; 0 is 4000, -1 turns them off."),
+		cfgKey("plugins.slack.extraction.escalate_over_chars", KindInt, "", "A unit whose rendered conversation is longer goes to the frontier tier; 0 or -1 is off."),
+		cfgKey("plugins.slack.ended_after", KindDur, "7d", "How long a Slack unit stays quiet, its newest stored message that old, before the plugin says it has ended (slack.ended)."),
+		cfgKey("plugins.slack.turns", KindTable, "", "What a turn on a Slack unit reads."),
+		cfgKey("plugins.slack.turns.max_chars", KindInt, "", "The characters of the unit's messages rendered into the instructions; 0 is 30000."),
 	},
-	cfgPluginApprovals("github", "slack"),
+	cfgPluginGates("plugins.github"),
+	cfgPluginGates("plugins.slack"),
 )
 
-// cfgPluginApprovals are the drafts and gates keys of each plugin of ids.
-func cfgPluginApprovals(ids ...string) []Key {
-	var out []Key
-	for _, id := range ids {
-		out = append(out, cfgPluginDrafts(id)...)
-	}
-	for _, id := range ids {
-		out = append(out, cfgPluginGates(id)...)
-	}
-	return out
-}
+// trustPath is the trust that runs a plugin's binary by its path.
+const trustPath = "path"
 
 // cfgPluginGates are the gates keys of plugin id.
 func cfgPluginGates(id string) []Key {

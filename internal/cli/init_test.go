@@ -235,14 +235,14 @@ agent = "claude" # the default
 [sweep]
 fast = "5m" # a shared rate limit
 
-[github.scope]
+[plugins.github.scope]
 # people I follow
 watch = ["boss"]
 repos = [
   "old/repo", # moved
 ]
 
-[slack]
+[plugins.slack]
 post_allowlist = ["C1"]
 `
 	a := initAnswers{ProjectsDir: "/src", Agent: "claude", Repos: []string{"acme/api"}, SlackClientID: "1.2"}
@@ -257,12 +257,12 @@ projects_dir = '/src'
 [sweep]
 fast = "5m" # a shared rate limit
 
-[github.scope]
+[plugins.github.scope]
 # people I follow
 watch = ["boss"]
 repos = ['acme/api']
 
-[slack]
+[plugins.slack]
 post_allowlist = ["C1"]
 client_id = '1.2'
 `
@@ -286,12 +286,12 @@ func TestMergeInitConfigWritesAFreshFile(t *testing.T) {
 profile = '/profiles/mine'
 agent = 'claude'
 
-[github.scope]
+[plugins.github.scope]
 repos = ['acme/api']
 teams = ['acme/core']
 people = ['ana']
 
-[slack]
+[plugins.slack]
 client_id = '1.2'
 `
 	if string(got) != want {
@@ -311,16 +311,16 @@ func TestMergeInitConfigWritesWhereTheFileHasTheTable(t *testing.T) {
 	a := initAnswers{Agent: "claude", Repos: []string{"acme/api"}, SlackClientID: "1.2"}
 	for name, c := range map[string]struct{ raw, want string }{
 		"a parent table": {
-			"[github]\nowners = [\"acme\"]\n\n[[projects]]\nmatch = \"acme/*\"\n",
-			"agent = 'claude'\n\n[github]\nowners = [\"acme\"]\nscope.repos = ['acme/api']\n\n[[projects]]\nmatch = \"acme/*\"\n\n[slack]\nclient_id = '1.2'\n",
+			"[plugins.github]\nowners = [\"acme\"]\n\n[[projects]]\nmatch = \"acme/*\"\n",
+			"agent = 'claude'\n\n[plugins.github]\nowners = [\"acme\"]\nscope.repos = ['acme/api']\n\n[[projects]]\nmatch = \"acme/*\"\n\n[plugins.slack]\nclient_id = '1.2'\n",
 		},
 		"dotted keys at the top": {
-			"agent = \"claude\"\ngithub.scope.watch = [\"boss\"]\nslack.client_id = \"old\"",
-			"agent = \"claude\"\ngithub.scope.watch = [\"boss\"]\nslack.client_id = '1.2'\ngithub.scope.repos = ['acme/api']",
+			"agent = \"claude\"\nplugins.github.scope.watch = [\"boss\"]\nplugins.slack.client_id = \"old\"",
+			"agent = \"claude\"\nplugins.github.scope.watch = [\"boss\"]\nplugins.slack.client_id = '1.2'\nplugins.github.scope.repos = ['acme/api']",
 		},
 		"a header with no keys": {
-			"agent = \"claude\"\n\n[github.scope] # mine\n",
-			"agent = \"claude\"\n\n[github.scope] # mine\nrepos = ['acme/api']\n\n[slack]\nclient_id = '1.2'\n",
+			"agent = \"claude\"\n\n[plugins.github.scope] # mine\n",
+			"agent = \"claude\"\n\n[plugins.github.scope] # mine\nrepos = ['acme/api']\n\n[plugins.slack]\nclient_id = '1.2'\n",
 		},
 	} {
 		got, err := mergeInitConfig([]byte(c.raw), a)
@@ -336,15 +336,15 @@ func TestMergeInitConfigWritesWhereTheFileHasTheTable(t *testing.T) {
 
 func TestMergeInitConfigRefusesToEditAnInlineTable(t *testing.T) {
 	t.Parallel()
-	raw := "github = {owners = [\"acme\"]}\n"
-	if _, err := mergeInitConfig([]byte(raw), initAnswers{Repos: []string{"acme/api"}}); err == nil || !strings.Contains(err.Error(), "github.scope.repos") {
+	raw := "plugins.github = {owners = [\"acme\"]}\n"
+	if _, err := mergeInitConfig([]byte(raw), initAnswers{Repos: []string{"acme/api"}}); err == nil || !strings.Contains(err.Error(), "plugins.github.scope.repos") {
 		t.Fatalf("err %v", err)
 	}
 	if got, err := mergeInitConfig([]byte(raw), initAnswers{}); err != nil || string(got) != raw {
 		t.Fatalf("an empty answer touched the inline table (%v):\n%s", err, got)
 	}
-	followed := "[github]\nscope = { repos = [\"acme/api\"] }\n"
-	if _, err := mergeInitConfig([]byte(followed), initAnswers{}); err == nil || !strings.Contains(err.Error(), "github.scope.repos") {
+	followed := "[plugins.github]\nscope = { repos = [\"acme/api\"] }\n"
+	if _, err := mergeInitConfig([]byte(followed), initAnswers{}); err == nil || !strings.Contains(err.Error(), "plugins.github.scope.repos") {
 		t.Fatalf("clearing a list in an inline table: %v", err)
 	}
 }

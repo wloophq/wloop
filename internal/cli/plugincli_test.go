@@ -34,7 +34,7 @@ func withCLIPlugin(t *testing.T, name string, got *[][]string) {
 
 func disablePlugin(cfg *config.Config, id unit.ProviderID) {
 	off := false
-	cfg.Plugins = map[string]config.Plugin{string(id): {Enabled: &off}}
+	cfg.Plugins.Other = map[string]config.Plugin{string(id): {Enabled: &off}}
 }
 
 func TestPluginCLIDispatch(t *testing.T) {

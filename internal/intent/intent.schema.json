@@ -256,7 +256,7 @@
       "items": {
         "enum": [
           "plan.cleared",
-          "guidance.handed",
+          "pr.guidance_handed",
           "pr.round_sent",
           "pr.reviewed",
           "pr.addressed",
@@ -663,11 +663,11 @@
     "role": {
       "description": "What binds it to a plugin's mechanism. One intent per role and provider.",
       "enum": [
+        "headless",
         "pr.review",
         "pr.address",
         "pr.nudge",
-        "probe",
-        "headless"
+        "probe"
       ],
       "type": "string"
     },

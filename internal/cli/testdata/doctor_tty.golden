@@ -4,9 +4,9 @@
 
 [bold]Config[/]                                                                                 [dim]1 ok[/][dim] · [/][dim]2 info[/]
   [green]✓[/] config            [dim]~/.config/{{name}}/config.toml[/]
-  [cyan]i[/] effective config  [dim]agent=claude github.review_prefix="REVIEW "[/]
+  [cyan]i[/] effective config  [dim]agent=claude plugins.github.review_prefix="REVIEW "[/]
                       [dim]views.orca.columns.working=reviewing views.orca.columns.ready=ready-to-merge[/]
-                      [dim]github.automated_reviewers=[lintbot-ai] brief=true[/]
+                      [dim]plugins.github.automated_reviewers=[lintbot-ai] brief=true[/]
   [cyan]i[/] turn budgets      [dim]turns.per_unit_per_day=5 (github) turns.per_day=20 (entry, session, slack,[/]
                       [dim]workspace)[/]
 

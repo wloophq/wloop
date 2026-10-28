@@ -14,7 +14,7 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | Fact | Type | Slots | Meaning |
 |---|---|---|---|
 | `pr.mine` | bool | action, turn | The pull request's author is the viewer. |
-| `pr.author` | string | action, turn | The pull request's author login. |
+| `pr.author` | string | action, turn | The pull request's author login; empty when not stored. |
 | `pr.state` | string | action, turn | The pull request's state on GitHub: OPEN, CLOSED or MERGED. |
 | `pr.slug` | string | action, turn | owner/repo#number. |
 | `pr.owner` | string | action, turn | The repository owner. |
@@ -26,9 +26,9 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `pr.visibility` | string | turn | The repository's visibility: public, private or internal, from the Basics read; empty before it. |
 | `pr.requested_teams` | list | turn | The teams a review of the pull request was requested through, as <org>-<slug>. |
 | `pr.labels` | list | turn | The pull request's labels, from the Basics read. |
-| `pr.address.reviewers` | list | turn | The reviewers an address round answers; empty on any other turn. |
-| `pr.address.checks` | list | turn | The failing checks an address round fixes; empty on any other turn. |
-| `pr.address.conflict` | bool | turn | The head conflicts with the base and the address round resolves it; false on any other turn. |
+| `pr.address.reviewers` | list | turn | The reviewers the address round answers: on its turn, those it answers, empty on any other; in a workflow, those it would answer. |
+| `pr.address.checks` | list | turn | The failing checks the address round fixes: on its turn, those it fixes, empty on any other; in a workflow, those it would fix. |
+| `pr.address.conflict` | bool | turn | The head conflicts with the base past the conflict window and the address round resolves it: on its turn, it does, false on any other; in a workflow, it would. |
 | `pr.draft` | bool | action | The pull request is a draft, from the inventory row. |
 | `pr.review_requested_me` | bool | action | A review is requested from the viewer, from the inventory row. |
 | `pr.adopted` | bool | action | The pull request was taken over into the loop. |
@@ -36,7 +36,7 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `pr.muted` | bool | action | The pull request is muted, by the server clock. |
 | `pr.nudge.who` | list | action | Whom a nudge would address, from nudge.targets. |
 | `pr.nudge.why` | string | action | Why the pull request waits on them, from nudge.targets. |
-| `pr.nudge.refusal` | string | action | The text nudge.prepare would refuse with now; empty when allowed. |
+| `pr.nudge.refusal` | string | action | The text nudge.prepare would refuse with now; empty when a nudge may go. |
 | `pr.last_review.exists` | bool | turn | The viewer reviewed the pull request before. |
 | `pr.last_review.verdict` | string | turn | The viewer's newest review state, any state; empty when none. |
 | `pr.last_review.decision` | string | turn | The viewer's newest non-comment verdict; empty when none. |
@@ -45,7 +45,7 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 
 | Fact | Type | Slots | Meaning |
 |---|---|---|---|
-| `row.kind` | string | action | The row's situation kind. |
+| `row.kind` | string | action | The row's situation kind; a plugin's row_kinds close it on its units. |
 | `row.open` | bool | action | The pull request is open: kind is not done, or, untracked, its GitHub state is open. |
 | `row.tracked` | bool | action | The pull request is in the inventory. |
 | `row.question` | bool | action | A turn waits on the user's answer. |
@@ -104,61 +104,14 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 
 | Fact | Type | Slots | Meaning |
 |---|---|---|---|
-| `config.github.address_reviews` | bool | action, turn | The github.address_reviews setting for the pull request. |
-| `config.github.address_checks` | bool | action, turn | The github.address_checks setting for the pull request. |
-| `config.github.followups_without_workspace` | bool | action, turn | The github.followups_without_workspace setting for the pull request. |
-| `config.github.address_without_workspace` | bool | action, turn | The github.address_without_workspace setting for the pull request. |
+| `config.plugins.github.address_reviews` | bool | action, turn | The plugins.github.address_reviews setting for the pull request. |
+| `config.plugins.github.address_checks` | bool | action, turn | The plugins.github.address_checks setting for the pull request. |
+| `config.plugins.github.followups_without_workspace` | bool | action, turn | The plugins.github.followups_without_workspace setting for the pull request. |
+| `config.plugins.github.address_without_workspace` | bool | action, turn | The plugins.github.address_without_workspace setting for the pull request. |
 
 ## Workflow facts
 
 A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `config.*` and `now`; a provider whose units have a brief also reads `brief.*`, and `[drafts.withdraw] when` also reads `draft.*`. `{{command}} workflows facts [github|session|slack|task|workspace]` prints them. A pull request fact has one name and one spelling in every slot: `pr.repo` is `owner/repo` and `pr.repo_name` the bare name.
-
-### Pull requests (`pr.*`)
-
-| `pr` fact (provider `github`) | Type | Meaning |
-|---|---|---|
-| `pr.state` | string | The pull request's state on GitHub: OPEN, CLOSED or MERGED. |
-| `pr.merged_at` | timestamp | When the pull request merged; zero when it did not. Test with `> timestamp(0)`. |
-| `pr.closed_at` | timestamp | When the pull request closed; zero when open. Test with `> timestamp(0)`. |
-| `pr.finished_for` | duration | Working time since it ended, max(merged_at, closed_at), the rule retention uses; zero while open. |
-| `pr.ended` | bool | The pull request merged or closed: the GitHub plugin's word that the unit has ended. |
-| `pr.draft` | bool | The pull request is a draft. |
-| `pr.head` | string | The head commit's oid. |
-| `pr.conflicting_for` | duration | How long the pull request has conflicted with its base, from when the inventory first saw it; zero when it does not. |
-| `pr.mine` | bool | The pull request's author is the viewer. |
-| `pr.checks` | string | The checks' rollup on the head: success, failure, pending, error or expected; empty with no checks. |
-| `pr.stalled` | bool | The checks stalled on the head. |
-| `pr.age` | duration | Time since the pull request opened. |
-| `pr.held` | bool | Rounds on the pull request are held. |
-| `pr.adopted` | bool | The pull request was taken over into the loop. |
-| `pr.muted` | bool | The pull request is muted. |
-| `pr.has_workspace` | bool | A linked workspace holds the pull request. |
-| `pr.stale` | bool | The stored detail is older than sweep.slow + 2 x sweep.fast. |
-| `pr.open_turn` | string | The state of the book's open turn; empty when none. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.open_turn_seq` | int | The sequence of the book's open turn; 0 when none. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.orphan_answer_id` | int | The id of an answer whose turn ended; 0 when none. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.review.action` | string | What the review rules decide: empty, follow-up or complete. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.review.reason` | string | Why the review rules decide so. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.review.observed` | bool | The review rules observe without acting. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.first.due` | bool | A first round is due. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.first.reason` | string | Why a first round is due or not. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.address.due` | bool | An address round is due. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.address.reason` | string | Why an address round is due or not. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.address.reviewers` | list | The reviewers whose reviews the address round would answer. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.address.checks` | list | The failing checks the address round would fix. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.address.conflict` | bool | The head has conflicted with the base past the conflict window, and the address round would resolve it. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.address.observed` | bool | The address rules observe without acting. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.last_interaction_at` | timestamp | The newest comment, review, push or review request, by anyone. Zero when unset; test with `> timestamp(0)`. |
-| `pr.silent_days` | int | Calendar days since last_interaction_at. |
-| `pr.waits_on_user` | bool | The row waits on the user, per situation.Derive. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.nudge.refusal` | string | The text nudge.prepare would refuse with today; empty when a nudge may go. |
-| `pr.mute.refusal` | string | Why the pull request is muted, such as muted until its state changes; empty when it is not. |
-| `pr.fingerprint` | string | What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.repo` | string | owner/repo. |
-| `pr.repo_name` | string | The repository name, without its owner. |
-| `pr.owner` | string | The repository owner. |
-| `pr.author` | string | The pull request's author login; empty when not stored. |
-| `pr.visibility` | string | The repository's visibility: public, private or internal; empty until the pull request is read in full. |
 
 ### Sessions (`session.*`)
 
@@ -263,6 +216,65 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task.extraction_lag` | duration | How long the oldest message of a unit linked to the task has waited to be extracted; zero when none waits. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `task.link_owes` | list | The people the task's links owe a step to, as the plugins report them, each once. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 
+### Pull requests (`pr.*`)
+
+| `pr` fact (provider `github`) | Type | Meaning |
+|---|---|---|
+| `pr.mine` | bool | The pull request's author is the viewer. |
+| `pr.author` | string | The pull request's author login; empty when not stored. |
+| `pr.state` | string | The pull request's state on GitHub: OPEN, CLOSED or MERGED. |
+| `pr.slug` | string | owner/repo#number. |
+| `pr.owner` | string | The repository owner. |
+| `pr.repo` | string | owner/repo. |
+| `pr.repo_name` | string | The repository name, without its owner. |
+| `pr.base` | string | The base branch. |
+| `pr.association` | string | The author's association with the repository, from the Basics read. |
+| `pr.cross_repository` | bool | The head branch lives in a fork. |
+| `pr.visibility` | string | The repository's visibility: public, private or internal, from the Basics read; empty before it. |
+| `pr.requested_teams` | list | The teams a review of the pull request was requested through, as <org>-<slug>. |
+| `pr.labels` | list | The pull request's labels, from the Basics read. |
+| `pr.address.reviewers` | list | The reviewers the address round answers: on its turn, those it answers, empty on any other; in a workflow, those it would answer. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.address.checks` | list | The failing checks the address round fixes: on its turn, those it fixes, empty on any other; in a workflow, those it would fix. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.address.conflict` | bool | The head conflicts with the base past the conflict window and the address round resolves it: on its turn, it does, false on any other; in a workflow, it would. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.draft` | bool | The pull request is a draft, from the inventory row. |
+| `pr.review_requested_me` | bool | A review is requested from the viewer, from the inventory row. |
+| `pr.adopted` | bool | The pull request was taken over into the loop. |
+| `pr.held` | bool | Rounds on the pull request are held. |
+| `pr.muted` | bool | The pull request is muted, by the server clock. |
+| `pr.nudge.who` | list | Whom a nudge would address, from nudge.targets. |
+| `pr.nudge.why` | string | Why the pull request waits on them, from nudge.targets. |
+| `pr.nudge.refusal` | string | The text nudge.prepare would refuse with now; empty when a nudge may go. |
+| `pr.last_review.exists` | bool | The viewer reviewed the pull request before. |
+| `pr.last_review.verdict` | string | The viewer's newest review state, any state; empty when none. |
+| `pr.last_review.decision` | string | The viewer's newest non-comment verdict; empty when none. |
+| `pr.merged_at` | timestamp | When the pull request merged; zero when it did not. Test with `> timestamp(0)`. |
+| `pr.closed_at` | timestamp | When the pull request closed; zero when open. Test with `> timestamp(0)`. |
+| `pr.finished_for` | duration | Working time since it ended, max(merged_at, closed_at), the rule retention uses; zero while open. |
+| `pr.ended` | bool | The pull request merged or closed: the GitHub plugin's word that the unit has ended. |
+| `pr.head` | string | The head commit's oid. |
+| `pr.conflicting_for` | duration | How long the pull request has conflicted with its base, from when the inventory first saw it; zero when it does not. |
+| `pr.checks` | string | The checks' rollup on the head: success, failure, pending, error or expected; empty with no checks. |
+| `pr.stalled` | bool | The checks stalled on the head. |
+| `pr.age` | duration | Time since the pull request opened. |
+| `pr.has_workspace` | bool | A linked workspace holds the pull request. |
+| `pr.stale` | bool | The stored detail is older than sweep.slow + 2 x sweep.fast. |
+| `pr.open_turn` | string | The state of the book's open turn; empty when none. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.open_turn_seq` | int | The sequence of the book's open turn; 0 when none. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.orphan_answer_id` | int | The id of an answer whose turn ended; 0 when none. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.review.action` | string | What the review rules decide: empty, follow-up or complete. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.review.reason` | string | Why the review rules decide so. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.review.observed` | bool | The review rules observe without acting. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.first.due` | bool | A first round is due. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.first.reason` | string | Why a first round is due or not. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.address.due` | bool | An address round is due. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.address.reason` | string | Why an address round is due or not. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.address.observed` | bool | The address rules observe without acting. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.last_interaction_at` | timestamp | The newest comment, review, push or review request, by anyone. Zero when unset; test with `> timestamp(0)`. |
+| `pr.silent_days` | int | Calendar days since last_interaction_at. |
+| `pr.waits_on_user` | bool | The row waits on the user, per situation.Derive. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.mute.refusal` | string | Why the pull request is muted, such as muted until its state changes; empty when it is not. |
+| `pr.fingerprint` | string | What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+
 ### Slack conversations (`slack.*`)
 
 | `slack` fact (provider `slack`) | Type | Meaning |
@@ -275,7 +287,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `slack.items_open` | int | Open items whose unit is this unit. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `slack.items_unowned` | int | Open items of the unit with no assignee, nobody waited on and no basis. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `slack.items_unowned_age_days` | int | Working days, in the configured location, since the oldest unowned item appeared. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `slack.ended` | bool | The Slack plugin's word that the unit has ended: a closure was posted or marked (unit.closed), or its newest stored message is older than slack.ended_after. |
+| `slack.ended` | bool | The Slack plugin's word that the unit has ended: a closure was posted or marked (unit.closed), or its newest stored message is older than plugins.slack.ended_after. |
 | `slack.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the unit, withdrawn ones included; zero when none. Test with `> timestamp(0)`. |
 | `slack.fingerprint` | string | The unit, its newest message and the update time of its items. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 
@@ -328,7 +340,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `config.cleanup.workspace_grace` | duration | The cleanup.workspace_grace setting, in working time. |
 | `config.cleanup.manual_idle` | duration | The cleanup.manual_idle setting. |
 | `config.cleanup.stale_workspace` | duration | The cleanup.stale_workspace setting. |
-| `config.github.nudge.silent_days` | int | The github.nudge.silent_days setting, in calendar days. |
+| `config.plugins.github.nudge.silent_days` | int | The plugins.github.nudge.silent_days setting, in calendar days. |
 | `config.tasks.stale_waiting_days` | int | The tasks.stale_waiting_days setting, in working days. |
 | `config.drafts.repeat_after` | duration | The drafts.repeat_after setting. |
 | `config.turns.per_day` | int | The turns.per_day setting: automated turns on units whose plugin keeps no per-unit count, all workflows together. |
@@ -371,12 +383,12 @@ What a sent draft applies, once: the names a `draft.propose` step lists in `effe
 | Effect | Unit | Does |
 |---|---|---|
 | `plan.cleared` | any | Drops the unit's pending plan items. |
-| `guidance.handed` | github | Hands the guidance queued on the pull request to the turn, and queues it back when the turn is not sent. |
+| `task.nudged` | any | Stamps the last nudge of the draft's task, or of every live waiting task of its unit when it names none. |
+| `unit.closed` | any | Records the closure of the draft's unit, which ends its close task and unwatches it after its warm period; through the unit's plugin. |
+| `pr.guidance_handed` | github | Hands the guidance queued on the pull request to the turn, and queues it back when the turn is not sent. |
 | `pr.round_sent` | github | Records the round-sent event on the pull request. |
 | `pr.reviewed` | github | Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted. |
 | `pr.addressed` | github | Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered. |
-| `task.nudged` | any | Stamps the last nudge of the draft's task, or of every live waiting task of its unit when it names none. |
-| `unit.closed` | any | Records the closure of the draft's unit, which ends its close task and unwatches it after its warm period; through the unit's plugin. |
 | `pr.nudged` | github | Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft. |
 
 This page is generated from the binary's fact registry by `make docs-ref`.

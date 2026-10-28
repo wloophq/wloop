@@ -242,7 +242,7 @@ func TestPluginsServeWhetherTheyReact(t *testing.T) {
 	ps := []source.Plugin{{ID: linear, Name: "Linear"}, {ID: wiki, Name: "Wiki"}, {ID: unit.GitHub, Name: "GitHub"}}
 	mods := []source.Module{{ID: linear, Reacts: true}, {ID: unit.GitHub}}
 	off := false
-	cfg := config.Config{Plugins: map[string]config.Plugin{string(wiki): {Enabled: &off}}}
+	cfg := config.Config{Plugins: config.Plugins{Other: map[string]config.Plugin{string(wiki): {Enabled: &off}}}}
 	got := map[unit.ProviderID]bool{}
 	for _, p := range pluginList(ps, mods, cfg) {
 		got[p.ID] = p.Reacts

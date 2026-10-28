@@ -32,7 +32,7 @@ type Effect struct {
 // The effects code applies by name.
 const (
 	EffectPlanCleared    = "plan.cleared"
-	EffectGuidanceHanded = "guidance.handed"
+	EffectGuidanceHanded = "pr.guidance_handed"
 	EffectPRRoundSent    = "pr.round_sent"
 	EffectPRReviewed     = "pr.reviewed"
 	EffectPRAddressed    = "pr.addressed"
@@ -41,16 +41,14 @@ const (
 	EffectPRNudged       = "pr.nudged"
 )
 
-// Effects is the effect vocabulary of turns and drafts.
-var Effects = []Effect{
+// Effects is the effect vocabulary of turns and drafts: the core's, then
+// each plugin's.
+var Effects = slices.Clone(coreEffects)
+
+var coreEffects = []Effect{
 	{EffectPlanCleared, "", AppliesTurn, "Drops the unit's pending plan items.", false},
-	{EffectGuidanceHanded, unit.GitHub, AppliesTurn, "Hands the guidance queued on the pull request to the turn, and queues it back when the turn is not sent.", false},
-	{EffectPRRoundSent, unit.GitHub, AppliesTurn, "Records the round-sent event on the pull request.", false},
-	{EffectPRReviewed, unit.GitHub, AppliesTurn, "Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted.", false},
-	{EffectPRAddressed, unit.GitHub, AppliesTurn, "Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered.", false},
 	{EffectTaskNudged, "", AppliesDraft, "Stamps the last nudge of the draft's task, or of every live waiting task of its unit when it names none.", false},
 	{EffectUnitClosed, "", AppliesDraft, "Records the closure of the draft's unit, which ends its close task and unwatches it after its warm period; through the unit's plugin.", true},
-	{EffectPRNudged, unit.GitHub, AppliesTurn | AppliesDraft, "Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.", false},
 }
 
 // EffectNames are the names of the draft effects: what a draft's effects, a

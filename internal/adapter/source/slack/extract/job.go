@@ -177,7 +177,7 @@ func (j *Job) Run(ctx context.Context) (summary, skipped string, err error) {
 	}
 	tier, err := turns.ParseTier(ec.TierName())
 	if err != nil {
-		return "", "", fmt.Errorf("slack.extraction.tier: %w", err)
+		return "", "", fmt.Errorf("plugins.slack.extraction.tier: %w", err)
 	}
 	team, viewer, err := j.Facts.Viewer(ctx)
 	if err != nil {

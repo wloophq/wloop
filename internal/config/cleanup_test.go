@@ -102,7 +102,7 @@ func TestLoadWorkflowConfig(t *testing.T) {
 idle = "3h"
 disposable = ["tmp"]
 
-[github.nudge]
+[plugins.github.nudge]
 silent_days = 10
 
 [classify]

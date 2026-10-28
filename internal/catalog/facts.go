@@ -186,13 +186,13 @@ func (f Facts) Get(field string) any {
 		return f.NudgeWhy
 	case "pr.nudge.refusal":
 		return f.NudgeRefusal
-	case "config.github.address_reviews":
+	case "config.plugins.github.address_reviews":
 		return f.Config.AddressReviews
-	case "config.github.address_checks":
+	case "config.plugins.github.address_checks":
 		return f.Config.AddressChecks
-	case "config.github.followups_without_workspace":
+	case "config.plugins.github.followups_without_workspace":
 		return f.Config.FollowupsWithoutWorkspace
-	case "config.github.address_without_workspace":
+	case "config.plugins.github.address_without_workspace":
 		return f.Config.AddressWithoutWorkspace
 	}
 	return nil

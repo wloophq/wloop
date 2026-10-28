@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	_ "github.com/wloophq/wloop/internal/plugins/bundled"
 )
 
 func main() {

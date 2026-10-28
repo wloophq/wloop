@@ -17,7 +17,7 @@ func TestSlackExtractionDefaults(t *testing.T) {
 }
 
 func TestSlackExtractionParses(t *testing.T) {
-	c := loadRaw(t, `[slack.extraction]
+	c := loadRaw(t, `[plugins.slack.extraction]
 enabled = false
 tier = "balanced"
 language = "Portuguese"
@@ -46,7 +46,7 @@ func TestSlackTurnsMaxChars(t *testing.T) {
 	if got := loadRaw(t, ``).Slack.Turns.Chars(); got != 30000 {
 		t.Fatalf("default %d", got)
 	}
-	if got := loadRaw(t, `slack = {turns = {max_chars = 12000}}`).Slack.Turns.Chars(); got != 12000 {
+	if got := loadRaw(t, `plugins.slack = {turns = {max_chars = 12000}}`).Slack.Turns.Chars(); got != 12000 {
 		t.Fatalf("set %d", got)
 	}
 	for _, small := range []int{1, 40, 1999} {
@@ -90,11 +90,11 @@ func TestSlackExtractionContextAndEscalation(t *testing.T) {
 	if e.ContextN() != 10 || e.ContextBudget() != 4000 || e.EscalateOver() != 0 {
 		t.Fatalf("defaults %d %d %d", e.ContextN(), e.ContextBudget(), e.EscalateOver())
 	}
-	e = loadRaw(t, `slack = {extraction = {context_messages = 3, context_chars = 900, escalate_over_chars = 6000}}`).Slack.Extraction
+	e = loadRaw(t, `plugins.slack = {extraction = {context_messages = 3, context_chars = 900, escalate_over_chars = 6000}}`).Slack.Extraction
 	if e.ContextN() != 3 || e.ContextBudget() != 900 || e.EscalateOver() != 6000 {
 		t.Fatalf("set %d %d %d", e.ContextN(), e.ContextBudget(), e.EscalateOver())
 	}
-	e = loadRaw(t, `slack = {extraction = {context_messages = -1, context_chars = -1, escalate_over_chars = -1}}`).Slack.Extraction
+	e = loadRaw(t, `plugins.slack = {extraction = {context_messages = -1, context_chars = -1, escalate_over_chars = -1}}`).Slack.Extraction
 	if e.ContextN() != 0 || e.ContextBudget() != 0 || e.EscalateOver() != 0 {
 		t.Fatalf("off %d %d %d", e.ContextN(), e.ContextBudget(), e.EscalateOver())
 	}

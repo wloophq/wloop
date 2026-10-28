@@ -552,9 +552,14 @@ func (pl *planner) conflicts(f sweep.Facts) bool {
 // facts are ref's pr facts from r at now.
 func (pl *planner) facts(ref pr.Ref, r result) workflow.Facts {
 	v, now := pl.v, pl.now
-	f := workflow.Facts{"pr.repo": ref.Owner + "/" + ref.Repo, "pr.repo_name": ref.Repo, "pr.owner": ref.Owner, "pr.author": "", "pr.visibility": "", "pr.ended": false}
+	f := workflow.Facts{"pr.repo": ref.Owner + "/" + ref.Repo, "pr.repo_name": ref.Repo, "pr.owner": ref.Owner, "pr.author": "", "pr.visibility": "", "pr.ended": false,
+		"pr.slug": ref.String(), "pr.association": "", "pr.labels": []string{}, "pr.last_review.exists": false, "pr.last_review.verdict": "",
+		"pr.last_review.decision": "", "pr.nudge.who": []string{}, "pr.nudge.why": ""}
 	if pf, read := v.factsOf(ref); read {
 		f["pr.visibility"] = pf.Visibility
+		f["pr.association"], f["pr.labels"] = pf.AuthorAssociation, nonNil(pf.Labels)
+		prior, reviewed := pr.PriorReview(pf.Reviews)
+		f["pr.last_review.exists"], f["pr.last_review.verdict"], f["pr.last_review.decision"] = reviewed, pr.LastReviewVerdict(pf.Reviews), prior.Verdict
 	}
 	row, ok := v.byRef[ref]
 	if ok {
@@ -576,6 +581,9 @@ func (pl *planner) facts(ref pr.Ref, r result) workflow.Facts {
 		}
 		f["pr.author"] = row.Author
 		f["pr.mine"] = v.viewer != "" && strings.EqualFold(row.Author, v.viewer)
+		f["pr.base"], f["pr.cross_repository"] = row.BaseBranch, row.IsFork
+		f["pr.requested_teams"] = nonNil(pr.RequestedTeams(row.ReviewRequests))
+		f["pr.review_requested_me"] = v.viewer != "" && slices.ContainsFunc(row.ReviewRequests, func(r string) bool { return strings.EqualFold(r, v.viewer) })
 		f["pr.checks"] = strings.ToLower(row.ChecksState)
 		if !row.CreatedAt.IsZero() {
 			f["pr.age"] = now.Sub(row.CreatedAt)
@@ -589,7 +597,9 @@ func (pl *planner) facts(ref pr.Ref, r result) workflow.Facts {
 			f["pr.last_interaction_at"] = at
 			f["pr.silent_days"] = calendarDays(at, now)
 		}
-		sit, refusal := v.situation(row, evs, o, now)
+		sit, nudge := v.situation(row, evs, o, now)
+		refusal := nudge.refusal
+		f["pr.nudge.who"], f["pr.nudge.why"] = nonNil(nudge.who), nudge.why
 		f["pr.stalled"] = sit.Stalled
 		f["pr.waits_on_user"] = sit.WaitingOn == "me" || (sit.WaitingOn == "author" && strings.EqualFold(row.Author, v.viewer) && v.viewer != "")
 		f["pr.nudge.refusal"] = refusal
@@ -678,7 +688,14 @@ func calendarDays(from, to time.Time) int {
 
 // situation is the row's situation without a pending round, and the text a
 // nudge would be refused with now.
-func (v *view) situation(row dinv.PR, evs []dinv.Event, o dinv.Override, now time.Time) (situation.Result, string) {
+// nudgeOf is whom a nudge on a pull request would address, why, and what
+// nudge.prepare would refuse it with.
+type nudgeOf struct {
+	who          []string
+	why, refusal string
+}
+
+func (v *view) situation(row dinv.PR, evs []dinv.Event, o dinv.Override, now time.Time) (situation.Result, nudgeOf) {
 	in := situation.Input{PR: row, Events: evs, Override: o, Viewer: v.viewer, MyTeams: v.teams, Ignore: prrow.IgnoreOf(v.cfg), Now: now, Stalled: v.cfg.GitHub.Stalled}
 	var unstarted map[string]bool
 	if b, ok := v.books[row.Ref.Unit()]; ok {
@@ -694,7 +711,7 @@ func (v *view) situation(row dinv.PR, evs []dinv.Event, o dinv.Override, now tim
 		unmuted = situation.Derive(in)
 	}
 	who, why := prrow.NudgeTargets(apiRow(unmuted), row.Author, v.viewer, prrow.IgnoreOf(v.cfg))
-	return res, prrow.NudgeRefusal(row.Ref, who, why, unmuted.Since, evs, unstarted, now)
+	return res, nudgeOf{who: who, why: why, refusal: prrow.NudgeRefusal(row.Ref, who, why, unmuted.Since, evs, unstarted, now)}
 }
 
 // apiRow is the row situation.Derive's result gives, as nudge.targets reads it.

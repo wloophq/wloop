@@ -4980,13 +4980,8 @@ func (x *PlanRequest) GetNow() *timestamppb.Timestamp {
 }
 
 type PlanResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Facts []*Fact                `protobuf:"bytes,1,rep,name=facts,proto3" json:"facts,omitempty"`
-	// due is the plan's next deadline; unset with none.
-	Due *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=due,proto3" json:"due,omitempty"`
-	// rank orders the units whose rounds are due, lowest first.
-	Rank          int64    `protobuf:"varint,3,opt,name=rank,proto3" json:"rank,omitempty"`
-	Rounds        []*Round `protobuf:"bytes,4,rep,name=rounds,proto3" json:"rounds,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Rounds        []*Round               `protobuf:"bytes,4,rep,name=rounds,proto3" json:"rounds,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -5019,27 +5014,6 @@ func (x *PlanResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use PlanResponse.ProtoReflect.Descriptor instead.
 func (*PlanResponse) Descriptor() ([]byte, []int) {
 	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{73}
-}
-
-func (x *PlanResponse) GetFacts() []*Fact {
-	if x != nil {
-		return x.Facts
-	}
-	return nil
-}
-
-func (x *PlanResponse) GetDue() *timestamppb.Timestamp {
-	if x != nil {
-		return x.Due
-	}
-	return nil
-}
-
-func (x *PlanResponse) GetRank() int64 {
-	if x != nil {
-		return x.Rank
-	}
-	return 0
 }
 
 func (x *PlanResponse) GetRounds() []*Round {
@@ -10077,12 +10051,9 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"\x04call\x18\x01 \x01(\v2\x15.wloop.source.v1.CallR\x04call\x12)\n" +
 	"\x04unit\x18\x02 \x01(\v2\x15.wloop.plugin.v1.UnitR\x04unit\x121\n" +
 	"\x05state\x18\x03 \x01(\v2\x1b.wloop.source.v1.RoundStateR\x05state\x12,\n" +
-	"\x03now\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x03now\"\xad\x01\n" +
-	"\fPlanResponse\x12+\n" +
-	"\x05facts\x18\x01 \x03(\v2\x15.wloop.source.v1.FactR\x05facts\x12,\n" +
-	"\x03due\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x03due\x12\x12\n" +
-	"\x04rank\x18\x03 \x01(\x03R\x04rank\x12.\n" +
-	"\x06rounds\x18\x04 \x03(\v2\x16.wloop.source.v1.RoundR\x06rounds\"8\n" +
+	"\x03now\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x03now\"b\n" +
+	"\fPlanResponse\x12.\n" +
+	"\x06rounds\x18\x04 \x03(\v2\x16.wloop.source.v1.RoundR\x06roundsJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03J\x04\b\x03\x10\x04R\x05factsR\x03dueR\x04rank\"8\n" +
 	"\fWorkspaceRef\x12\x18\n" +
 	"\amanager\x18\x01 \x01(\tR\amanager\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\"\xd2\x03\n" +
@@ -10820,203 +10791,201 @@ var file_wloop_source_v1_source_proto_depIdxs = []int32{
 	160, // 118: wloop.source.v1.PlanRequest.unit:type_name -> wloop.plugin.v1.Unit
 	72,  // 119: wloop.source.v1.PlanRequest.state:type_name -> wloop.source.v1.RoundState
 	161, // 120: wloop.source.v1.PlanRequest.now:type_name -> google.protobuf.Timestamp
-	10,  // 121: wloop.source.v1.PlanResponse.facts:type_name -> wloop.source.v1.Fact
-	161, // 122: wloop.source.v1.PlanResponse.due:type_name -> google.protobuf.Timestamp
-	77,  // 123: wloop.source.v1.PlanResponse.rounds:type_name -> wloop.source.v1.Round
-	76,  // 124: wloop.source.v1.Round.workspace:type_name -> wloop.source.v1.WorkspaceRef
-	10,  // 125: wloop.source.v1.Round.turn_facts:type_name -> wloop.source.v1.Fact
-	155, // 126: wloop.source.v1.Round.on_sent:type_name -> wloop.source.v1.Round.OnSentEntry
-	156, // 127: wloop.source.v1.Round.on_skipped:type_name -> wloop.source.v1.Round.OnSkippedEntry
-	2,   // 128: wloop.source.v1.PayloadRequest.call:type_name -> wloop.source.v1.Call
-	160, // 129: wloop.source.v1.PayloadRequest.unit:type_name -> wloop.plugin.v1.Unit
-	79,  // 130: wloop.source.v1.PayloadRequest.last_verdict:type_name -> wloop.source.v1.Verdict
-	161, // 131: wloop.source.v1.Verdict.at:type_name -> google.protobuf.Timestamp
-	80,  // 132: wloop.source.v1.PayloadResponse.wording:type_name -> wloop.source.v1.Wording
-	10,  // 133: wloop.source.v1.PayloadResponse.facts:type_name -> wloop.source.v1.Fact
-	2,   // 134: wloop.source.v1.ApplyEffectRequest.call:type_name -> wloop.source.v1.Call
-	160, // 135: wloop.source.v1.ApplyEffectRequest.unit:type_name -> wloop.plugin.v1.Unit
-	82,  // 136: wloop.source.v1.ApplyEffectRequest.turn:type_name -> wloop.source.v1.TurnRef
-	26,  // 137: wloop.source.v1.ApplyEffectRequest.draft:type_name -> wloop.source.v1.Draft
-	2,   // 138: wloop.source.v1.ProposalsRequest.call:type_name -> wloop.source.v1.Call
-	161, // 139: wloop.source.v1.ProposalsRequest.now:type_name -> google.protobuf.Timestamp
-	26,  // 140: wloop.source.v1.ProposalsResponse.drafts:type_name -> wloop.source.v1.Draft
-	2,   // 141: wloop.source.v1.PlacementRequest.call:type_name -> wloop.source.v1.Call
-	160, // 142: wloop.source.v1.PlacementRequest.unit:type_name -> wloop.plugin.v1.Unit
-	27,  // 143: wloop.source.v1.PlacementResponse.default:type_name -> wloop.source.v1.Placement
-	27,  // 144: wloop.source.v1.PlacementResponse.suggested:type_name -> wloop.source.v1.Placement
-	2,   // 145: wloop.source.v1.CallToolRequest.call:type_name -> wloop.source.v1.Call
-	2,   // 146: wloop.source.v1.RunCLIRequest.call:type_name -> wloop.source.v1.Call
-	146, // 147: wloop.source.v1.RunCLIRequest.config:type_name -> wloop.source.v1.Config
-	21,  // 148: wloop.source.v1.ReportRequest.snapshots:type_name -> wloop.source.v1.Snapshot
-	160, // 149: wloop.source.v1.ChangedRequest.units:type_name -> wloop.plugin.v1.Unit
-	18,  // 150: wloop.source.v1.ItemFields.options:type_name -> wloop.source.v1.ItemOptionList
-	3,   // 151: wloop.source.v1.ItemFields.urls:type_name -> wloop.source.v1.StringList
-	3,   // 152: wloop.source.v1.ItemFields.contexts:type_name -> wloop.source.v1.StringList
-	4,   // 153: wloop.source.v1.ItemFields.requester:type_name -> wloop.source.v1.Person
-	5,   // 154: wloop.source.v1.ItemFields.waiting_on:type_name -> wloop.source.v1.PersonList
-	160, // 155: wloop.source.v1.ItemOp.unit:type_name -> wloop.plugin.v1.Unit
-	6,   // 156: wloop.source.v1.ItemOp.anchor:type_name -> wloop.source.v1.Anchor
-	97,  // 157: wloop.source.v1.ItemOp.fields:type_name -> wloop.source.v1.ItemFields
-	4,   // 158: wloop.source.v1.ItemOp.assignees:type_name -> wloop.source.v1.Person
-	19,  // 159: wloop.source.v1.ItemOp.evidence:type_name -> wloop.source.v1.ItemEvidence
-	160, // 160: wloop.source.v1.ItemOp.to:type_name -> wloop.plugin.v1.Unit
-	98,  // 161: wloop.source.v1.ApplyItemsRequest.ops:type_name -> wloop.source.v1.ItemOp
-	99,  // 162: wloop.source.v1.ApplyItemsResponse.results:type_name -> wloop.source.v1.ItemResult
-	160, // 163: wloop.source.v1.QueryItemsRequest.units:type_name -> wloop.plugin.v1.Unit
-	20,  // 164: wloop.source.v1.QueryItemsResponse.items:type_name -> wloop.source.v1.Item
-	160, // 165: wloop.source.v1.Task.units:type_name -> wloop.plugin.v1.Unit
-	160, // 166: wloop.source.v1.TasksRequest.units:type_name -> wloop.plugin.v1.Unit
-	104, // 167: wloop.source.v1.TasksResponse.tasks:type_name -> wloop.source.v1.Task
-	161, // 168: wloop.source.v1.Turn.sent_at:type_name -> google.protobuf.Timestamp
-	161, // 169: wloop.source.v1.Turn.started_at:type_name -> google.protobuf.Timestamp
-	161, // 170: wloop.source.v1.Turn.ended_at:type_name -> google.protobuf.Timestamp
-	161, // 171: wloop.source.v1.Turn.answered_at:type_name -> google.protobuf.Timestamp
-	161, // 172: wloop.source.v1.Turn.at:type_name -> google.protobuf.Timestamp
-	161, // 173: wloop.source.v1.TurnRecord.at:type_name -> google.protobuf.Timestamp
-	160, // 174: wloop.source.v1.Book.unit:type_name -> wloop.plugin.v1.Unit
-	107, // 175: wloop.source.v1.Book.turns:type_name -> wloop.source.v1.Turn
-	108, // 176: wloop.source.v1.Book.records:type_name -> wloop.source.v1.TurnRecord
-	160, // 177: wloop.source.v1.BooksRequest.units:type_name -> wloop.plugin.v1.Unit
-	109, // 178: wloop.source.v1.BooksResponse.books:type_name -> wloop.source.v1.Book
-	160, // 179: wloop.source.v1.RoundStateRequest.unit:type_name -> wloop.plugin.v1.Unit
-	72,  // 180: wloop.source.v1.RoundStateResponse.state:type_name -> wloop.source.v1.RoundState
-	160, // 181: wloop.source.v1.Workspace.units:type_name -> wloop.plugin.v1.Unit
-	115, // 182: wloop.source.v1.WorkspacesResponse.repos:type_name -> wloop.source.v1.Repo
-	114, // 183: wloop.source.v1.WorkspacesResponse.workspaces:type_name -> wloop.source.v1.Workspace
-	160, // 184: wloop.source.v1.SessionResponse.unit:type_name -> wloop.plugin.v1.Unit
-	26,  // 185: wloop.source.v1.OpenGateRequest.draft:type_name -> wloop.source.v1.Draft
-	120, // 186: wloop.source.v1.OpenGateResponse.gate:type_name -> wloop.source.v1.GateRef
-	26,  // 187: wloop.source.v1.RecordSentRequest.draft:type_name -> wloop.source.v1.Draft
-	120, // 188: wloop.source.v1.RecordSentResponse.gate:type_name -> wloop.source.v1.GateRef
-	160, // 189: wloop.source.v1.UnitMove.from:type_name -> wloop.plugin.v1.Unit
-	160, // 190: wloop.source.v1.UnitMove.to:type_name -> wloop.plugin.v1.Unit
-	125, // 191: wloop.source.v1.RehomeDraftsRequest.moves:type_name -> wloop.source.v1.UnitMove
-	160, // 192: wloop.source.v1.SetOverrideRequest.unit:type_name -> wloop.plugin.v1.Unit
-	157, // 193: wloop.source.v1.SetOverrideRequest.set:type_name -> wloop.source.v1.SetOverrideRequest.SetEntry
-	158, // 194: wloop.source.v1.SetOverrideRequest.if_match:type_name -> wloop.source.v1.SetOverrideRequest.IfMatchEntry
-	160, // 195: wloop.source.v1.Event.unit:type_name -> wloop.plugin.v1.Unit
-	161, // 196: wloop.source.v1.Event.at:type_name -> google.protobuf.Timestamp
-	6,   // 197: wloop.source.v1.Event.anchor:type_name -> wloop.source.v1.Anchor
-	130, // 198: wloop.source.v1.RecordEventsRequest.events:type_name -> wloop.source.v1.Event
-	160, // 199: wloop.source.v1.SetMarksRequest.unit:type_name -> wloop.plugin.v1.Unit
-	159, // 200: wloop.source.v1.SetMarksRequest.marks:type_name -> wloop.source.v1.SetMarksRequest.MarksEntry
-	160, // 201: wloop.source.v1.PutBriefRequest.unit:type_name -> wloop.plugin.v1.Unit
-	160, // 202: wloop.source.v1.SetWakeRequest.unit:type_name -> wloop.plugin.v1.Unit
-	161, // 203: wloop.source.v1.SetWakeRequest.until:type_name -> google.protobuf.Timestamp
-	160, // 204: wloop.source.v1.ClearWakeRequest.unit:type_name -> wloop.plugin.v1.Unit
-	162, // 205: wloop.source.v1.AskResponse.duration:type_name -> google.protobuf.Duration
-	162, // 206: wloop.source.v1.MeterRequest.duration:type_name -> google.protobuf.Duration
-	146, // 207: wloop.source.v1.ConfigResponse.config:type_name -> wloop.source.v1.Config
-	160, // 208: wloop.source.v1.EventsRequest.units:type_name -> wloop.plugin.v1.Unit
-	161, // 209: wloop.source.v1.EventsRequest.since:type_name -> google.protobuf.Timestamp
-	130, // 210: wloop.source.v1.EventsResponse.events:type_name -> wloop.source.v1.Event
-	28,  // 211: wloop.source.v1.SourceService.Capabilities:input_type -> wloop.source.v1.CapabilitiesRequest
-	30,  // 212: wloop.source.v1.SourceService.Ingest:input_type -> wloop.source.v1.IngestRequest
-	32,  // 213: wloop.source.v1.SourceService.Track:input_type -> wloop.source.v1.TrackRequest
-	34,  // 214: wloop.source.v1.SourceService.Untrack:input_type -> wloop.source.v1.UntrackRequest
-	36,  // 215: wloop.source.v1.SourceService.Resolve:input_type -> wloop.source.v1.ResolveRequest
-	38,  // 216: wloop.source.v1.SourceService.Locate:input_type -> wloop.source.v1.LocateRequest
-	40,  // 217: wloop.source.v1.SourceService.Action:input_type -> wloop.source.v1.ActionRequest
-	42,  // 218: wloop.source.v1.SourceService.View:input_type -> wloop.source.v1.ViewRequest
-	44,  // 219: wloop.source.v1.SourceService.Identity:input_type -> wloop.source.v1.IdentityRequest
-	46,  // 220: wloop.source.v1.SourceService.Validate:input_type -> wloop.source.v1.ValidateRequest
-	48,  // 221: wloop.source.v1.SourceService.Where:input_type -> wloop.source.v1.WhereRequest
-	50,  // 222: wloop.source.v1.SourceService.Place:input_type -> wloop.source.v1.PlaceRequest
-	52,  // 223: wloop.source.v1.SourceService.Publish:input_type -> wloop.source.v1.PublishRequest
-	54,  // 224: wloop.source.v1.SourceService.Verify:input_type -> wloop.source.v1.VerifyRequest
-	56,  // 225: wloop.source.v1.SourceService.Landed:input_type -> wloop.source.v1.LandedRequest
-	58,  // 226: wloop.source.v1.SourceService.Checkout:input_type -> wloop.source.v1.CheckoutRequest
-	60,  // 227: wloop.source.v1.SourceService.WriteState:input_type -> wloop.source.v1.WriteStateRequest
-	62,  // 228: wloop.source.v1.SourceService.BriefInput:input_type -> wloop.source.v1.BriefInputRequest
-	64,  // 229: wloop.source.v1.SourceService.BriefRevision:input_type -> wloop.source.v1.BriefRevisionRequest
-	66,  // 230: wloop.source.v1.SourceService.BriefDescribe:input_type -> wloop.source.v1.BriefDescribeRequest
-	69,  // 231: wloop.source.v1.SourceService.BriefStale:input_type -> wloop.source.v1.BriefStaleRequest
-	74,  // 232: wloop.source.v1.SourceService.Plan:input_type -> wloop.source.v1.PlanRequest
-	78,  // 233: wloop.source.v1.SourceService.Payload:input_type -> wloop.source.v1.PayloadRequest
-	83,  // 234: wloop.source.v1.SourceService.ApplyEffect:input_type -> wloop.source.v1.ApplyEffectRequest
-	85,  // 235: wloop.source.v1.SourceService.Proposals:input_type -> wloop.source.v1.ProposalsRequest
-	87,  // 236: wloop.source.v1.SourceService.Placement:input_type -> wloop.source.v1.PlacementRequest
-	89,  // 237: wloop.source.v1.SourceService.CallTool:input_type -> wloop.source.v1.CallToolRequest
-	91,  // 238: wloop.source.v1.SourceService.RunCLI:input_type -> wloop.source.v1.RunCLIRequest
-	93,  // 239: wloop.source.v1.HostService.Report:input_type -> wloop.source.v1.ReportRequest
-	95,  // 240: wloop.source.v1.HostService.Changed:input_type -> wloop.source.v1.ChangedRequest
-	100, // 241: wloop.source.v1.HostService.ApplyItems:input_type -> wloop.source.v1.ApplyItemsRequest
-	102, // 242: wloop.source.v1.HostService.QueryItems:input_type -> wloop.source.v1.QueryItemsRequest
-	105, // 243: wloop.source.v1.HostService.Tasks:input_type -> wloop.source.v1.TasksRequest
-	110, // 244: wloop.source.v1.HostService.Books:input_type -> wloop.source.v1.BooksRequest
-	112, // 245: wloop.source.v1.HostService.RoundState:input_type -> wloop.source.v1.RoundStateRequest
-	116, // 246: wloop.source.v1.HostService.Workspaces:input_type -> wloop.source.v1.WorkspacesRequest
-	118, // 247: wloop.source.v1.HostService.Session:input_type -> wloop.source.v1.SessionRequest
-	121, // 248: wloop.source.v1.HostService.OpenGate:input_type -> wloop.source.v1.OpenGateRequest
-	123, // 249: wloop.source.v1.HostService.RecordSent:input_type -> wloop.source.v1.RecordSentRequest
-	126, // 250: wloop.source.v1.HostService.RehomeDrafts:input_type -> wloop.source.v1.RehomeDraftsRequest
-	128, // 251: wloop.source.v1.HostService.SetOverride:input_type -> wloop.source.v1.SetOverrideRequest
-	131, // 252: wloop.source.v1.HostService.RecordEvents:input_type -> wloop.source.v1.RecordEventsRequest
-	133, // 253: wloop.source.v1.HostService.SetMarks:input_type -> wloop.source.v1.SetMarksRequest
-	135, // 254: wloop.source.v1.HostService.PutBrief:input_type -> wloop.source.v1.PutBriefRequest
-	137, // 255: wloop.source.v1.HostService.SetWake:input_type -> wloop.source.v1.SetWakeRequest
-	139, // 256: wloop.source.v1.HostService.ClearWake:input_type -> wloop.source.v1.ClearWakeRequest
-	141, // 257: wloop.source.v1.HostService.Ask:input_type -> wloop.source.v1.AskRequest
-	143, // 258: wloop.source.v1.HostService.Meter:input_type -> wloop.source.v1.MeterRequest
-	145, // 259: wloop.source.v1.HostService.Config:input_type -> wloop.source.v1.ConfigRequest
-	148, // 260: wloop.source.v1.HostService.Profile:input_type -> wloop.source.v1.ProfileRequest
-	150, // 261: wloop.source.v1.HostService.Events:input_type -> wloop.source.v1.EventsRequest
-	29,  // 262: wloop.source.v1.SourceService.Capabilities:output_type -> wloop.source.v1.CapabilitiesResponse
-	31,  // 263: wloop.source.v1.SourceService.Ingest:output_type -> wloop.source.v1.IngestResponse
-	33,  // 264: wloop.source.v1.SourceService.Track:output_type -> wloop.source.v1.TrackResponse
-	35,  // 265: wloop.source.v1.SourceService.Untrack:output_type -> wloop.source.v1.UntrackResponse
-	37,  // 266: wloop.source.v1.SourceService.Resolve:output_type -> wloop.source.v1.ResolveResponse
-	39,  // 267: wloop.source.v1.SourceService.Locate:output_type -> wloop.source.v1.LocateResponse
-	41,  // 268: wloop.source.v1.SourceService.Action:output_type -> wloop.source.v1.ActionResponse
-	43,  // 269: wloop.source.v1.SourceService.View:output_type -> wloop.source.v1.ViewResponse
-	45,  // 270: wloop.source.v1.SourceService.Identity:output_type -> wloop.source.v1.IdentityResponse
-	47,  // 271: wloop.source.v1.SourceService.Validate:output_type -> wloop.source.v1.ValidateResponse
-	49,  // 272: wloop.source.v1.SourceService.Where:output_type -> wloop.source.v1.WhereResponse
-	51,  // 273: wloop.source.v1.SourceService.Place:output_type -> wloop.source.v1.PlaceResponse
-	53,  // 274: wloop.source.v1.SourceService.Publish:output_type -> wloop.source.v1.PublishResponse
-	55,  // 275: wloop.source.v1.SourceService.Verify:output_type -> wloop.source.v1.VerifyResponse
-	57,  // 276: wloop.source.v1.SourceService.Landed:output_type -> wloop.source.v1.LandedResponse
-	59,  // 277: wloop.source.v1.SourceService.Checkout:output_type -> wloop.source.v1.CheckoutResponse
-	61,  // 278: wloop.source.v1.SourceService.WriteState:output_type -> wloop.source.v1.WriteStateResponse
-	63,  // 279: wloop.source.v1.SourceService.BriefInput:output_type -> wloop.source.v1.BriefInputResponse
-	65,  // 280: wloop.source.v1.SourceService.BriefRevision:output_type -> wloop.source.v1.BriefRevisionResponse
-	67,  // 281: wloop.source.v1.SourceService.BriefDescribe:output_type -> wloop.source.v1.BriefDescribeResponse
-	70,  // 282: wloop.source.v1.SourceService.BriefStale:output_type -> wloop.source.v1.BriefStaleResponse
-	75,  // 283: wloop.source.v1.SourceService.Plan:output_type -> wloop.source.v1.PlanResponse
-	81,  // 284: wloop.source.v1.SourceService.Payload:output_type -> wloop.source.v1.PayloadResponse
-	84,  // 285: wloop.source.v1.SourceService.ApplyEffect:output_type -> wloop.source.v1.ApplyEffectResponse
-	86,  // 286: wloop.source.v1.SourceService.Proposals:output_type -> wloop.source.v1.ProposalsResponse
-	88,  // 287: wloop.source.v1.SourceService.Placement:output_type -> wloop.source.v1.PlacementResponse
-	90,  // 288: wloop.source.v1.SourceService.CallTool:output_type -> wloop.source.v1.CallToolResponse
-	92,  // 289: wloop.source.v1.SourceService.RunCLI:output_type -> wloop.source.v1.RunCLIResponse
-	94,  // 290: wloop.source.v1.HostService.Report:output_type -> wloop.source.v1.ReportResponse
-	96,  // 291: wloop.source.v1.HostService.Changed:output_type -> wloop.source.v1.ChangedResponse
-	101, // 292: wloop.source.v1.HostService.ApplyItems:output_type -> wloop.source.v1.ApplyItemsResponse
-	103, // 293: wloop.source.v1.HostService.QueryItems:output_type -> wloop.source.v1.QueryItemsResponse
-	106, // 294: wloop.source.v1.HostService.Tasks:output_type -> wloop.source.v1.TasksResponse
-	111, // 295: wloop.source.v1.HostService.Books:output_type -> wloop.source.v1.BooksResponse
-	113, // 296: wloop.source.v1.HostService.RoundState:output_type -> wloop.source.v1.RoundStateResponse
-	117, // 297: wloop.source.v1.HostService.Workspaces:output_type -> wloop.source.v1.WorkspacesResponse
-	119, // 298: wloop.source.v1.HostService.Session:output_type -> wloop.source.v1.SessionResponse
-	122, // 299: wloop.source.v1.HostService.OpenGate:output_type -> wloop.source.v1.OpenGateResponse
-	124, // 300: wloop.source.v1.HostService.RecordSent:output_type -> wloop.source.v1.RecordSentResponse
-	127, // 301: wloop.source.v1.HostService.RehomeDrafts:output_type -> wloop.source.v1.RehomeDraftsResponse
-	129, // 302: wloop.source.v1.HostService.SetOverride:output_type -> wloop.source.v1.SetOverrideResponse
-	132, // 303: wloop.source.v1.HostService.RecordEvents:output_type -> wloop.source.v1.RecordEventsResponse
-	134, // 304: wloop.source.v1.HostService.SetMarks:output_type -> wloop.source.v1.SetMarksResponse
-	136, // 305: wloop.source.v1.HostService.PutBrief:output_type -> wloop.source.v1.PutBriefResponse
-	138, // 306: wloop.source.v1.HostService.SetWake:output_type -> wloop.source.v1.SetWakeResponse
-	140, // 307: wloop.source.v1.HostService.ClearWake:output_type -> wloop.source.v1.ClearWakeResponse
-	142, // 308: wloop.source.v1.HostService.Ask:output_type -> wloop.source.v1.AskResponse
-	144, // 309: wloop.source.v1.HostService.Meter:output_type -> wloop.source.v1.MeterResponse
-	147, // 310: wloop.source.v1.HostService.Config:output_type -> wloop.source.v1.ConfigResponse
-	149, // 311: wloop.source.v1.HostService.Profile:output_type -> wloop.source.v1.ProfileResponse
-	151, // 312: wloop.source.v1.HostService.Events:output_type -> wloop.source.v1.EventsResponse
-	262, // [262:313] is the sub-list for method output_type
-	211, // [211:262] is the sub-list for method input_type
-	211, // [211:211] is the sub-list for extension type_name
-	211, // [211:211] is the sub-list for extension extendee
-	0,   // [0:211] is the sub-list for field type_name
+	77,  // 121: wloop.source.v1.PlanResponse.rounds:type_name -> wloop.source.v1.Round
+	76,  // 122: wloop.source.v1.Round.workspace:type_name -> wloop.source.v1.WorkspaceRef
+	10,  // 123: wloop.source.v1.Round.turn_facts:type_name -> wloop.source.v1.Fact
+	155, // 124: wloop.source.v1.Round.on_sent:type_name -> wloop.source.v1.Round.OnSentEntry
+	156, // 125: wloop.source.v1.Round.on_skipped:type_name -> wloop.source.v1.Round.OnSkippedEntry
+	2,   // 126: wloop.source.v1.PayloadRequest.call:type_name -> wloop.source.v1.Call
+	160, // 127: wloop.source.v1.PayloadRequest.unit:type_name -> wloop.plugin.v1.Unit
+	79,  // 128: wloop.source.v1.PayloadRequest.last_verdict:type_name -> wloop.source.v1.Verdict
+	161, // 129: wloop.source.v1.Verdict.at:type_name -> google.protobuf.Timestamp
+	80,  // 130: wloop.source.v1.PayloadResponse.wording:type_name -> wloop.source.v1.Wording
+	10,  // 131: wloop.source.v1.PayloadResponse.facts:type_name -> wloop.source.v1.Fact
+	2,   // 132: wloop.source.v1.ApplyEffectRequest.call:type_name -> wloop.source.v1.Call
+	160, // 133: wloop.source.v1.ApplyEffectRequest.unit:type_name -> wloop.plugin.v1.Unit
+	82,  // 134: wloop.source.v1.ApplyEffectRequest.turn:type_name -> wloop.source.v1.TurnRef
+	26,  // 135: wloop.source.v1.ApplyEffectRequest.draft:type_name -> wloop.source.v1.Draft
+	2,   // 136: wloop.source.v1.ProposalsRequest.call:type_name -> wloop.source.v1.Call
+	161, // 137: wloop.source.v1.ProposalsRequest.now:type_name -> google.protobuf.Timestamp
+	26,  // 138: wloop.source.v1.ProposalsResponse.drafts:type_name -> wloop.source.v1.Draft
+	2,   // 139: wloop.source.v1.PlacementRequest.call:type_name -> wloop.source.v1.Call
+	160, // 140: wloop.source.v1.PlacementRequest.unit:type_name -> wloop.plugin.v1.Unit
+	27,  // 141: wloop.source.v1.PlacementResponse.default:type_name -> wloop.source.v1.Placement
+	27,  // 142: wloop.source.v1.PlacementResponse.suggested:type_name -> wloop.source.v1.Placement
+	2,   // 143: wloop.source.v1.CallToolRequest.call:type_name -> wloop.source.v1.Call
+	2,   // 144: wloop.source.v1.RunCLIRequest.call:type_name -> wloop.source.v1.Call
+	146, // 145: wloop.source.v1.RunCLIRequest.config:type_name -> wloop.source.v1.Config
+	21,  // 146: wloop.source.v1.ReportRequest.snapshots:type_name -> wloop.source.v1.Snapshot
+	160, // 147: wloop.source.v1.ChangedRequest.units:type_name -> wloop.plugin.v1.Unit
+	18,  // 148: wloop.source.v1.ItemFields.options:type_name -> wloop.source.v1.ItemOptionList
+	3,   // 149: wloop.source.v1.ItemFields.urls:type_name -> wloop.source.v1.StringList
+	3,   // 150: wloop.source.v1.ItemFields.contexts:type_name -> wloop.source.v1.StringList
+	4,   // 151: wloop.source.v1.ItemFields.requester:type_name -> wloop.source.v1.Person
+	5,   // 152: wloop.source.v1.ItemFields.waiting_on:type_name -> wloop.source.v1.PersonList
+	160, // 153: wloop.source.v1.ItemOp.unit:type_name -> wloop.plugin.v1.Unit
+	6,   // 154: wloop.source.v1.ItemOp.anchor:type_name -> wloop.source.v1.Anchor
+	97,  // 155: wloop.source.v1.ItemOp.fields:type_name -> wloop.source.v1.ItemFields
+	4,   // 156: wloop.source.v1.ItemOp.assignees:type_name -> wloop.source.v1.Person
+	19,  // 157: wloop.source.v1.ItemOp.evidence:type_name -> wloop.source.v1.ItemEvidence
+	160, // 158: wloop.source.v1.ItemOp.to:type_name -> wloop.plugin.v1.Unit
+	98,  // 159: wloop.source.v1.ApplyItemsRequest.ops:type_name -> wloop.source.v1.ItemOp
+	99,  // 160: wloop.source.v1.ApplyItemsResponse.results:type_name -> wloop.source.v1.ItemResult
+	160, // 161: wloop.source.v1.QueryItemsRequest.units:type_name -> wloop.plugin.v1.Unit
+	20,  // 162: wloop.source.v1.QueryItemsResponse.items:type_name -> wloop.source.v1.Item
+	160, // 163: wloop.source.v1.Task.units:type_name -> wloop.plugin.v1.Unit
+	160, // 164: wloop.source.v1.TasksRequest.units:type_name -> wloop.plugin.v1.Unit
+	104, // 165: wloop.source.v1.TasksResponse.tasks:type_name -> wloop.source.v1.Task
+	161, // 166: wloop.source.v1.Turn.sent_at:type_name -> google.protobuf.Timestamp
+	161, // 167: wloop.source.v1.Turn.started_at:type_name -> google.protobuf.Timestamp
+	161, // 168: wloop.source.v1.Turn.ended_at:type_name -> google.protobuf.Timestamp
+	161, // 169: wloop.source.v1.Turn.answered_at:type_name -> google.protobuf.Timestamp
+	161, // 170: wloop.source.v1.Turn.at:type_name -> google.protobuf.Timestamp
+	161, // 171: wloop.source.v1.TurnRecord.at:type_name -> google.protobuf.Timestamp
+	160, // 172: wloop.source.v1.Book.unit:type_name -> wloop.plugin.v1.Unit
+	107, // 173: wloop.source.v1.Book.turns:type_name -> wloop.source.v1.Turn
+	108, // 174: wloop.source.v1.Book.records:type_name -> wloop.source.v1.TurnRecord
+	160, // 175: wloop.source.v1.BooksRequest.units:type_name -> wloop.plugin.v1.Unit
+	109, // 176: wloop.source.v1.BooksResponse.books:type_name -> wloop.source.v1.Book
+	160, // 177: wloop.source.v1.RoundStateRequest.unit:type_name -> wloop.plugin.v1.Unit
+	72,  // 178: wloop.source.v1.RoundStateResponse.state:type_name -> wloop.source.v1.RoundState
+	160, // 179: wloop.source.v1.Workspace.units:type_name -> wloop.plugin.v1.Unit
+	115, // 180: wloop.source.v1.WorkspacesResponse.repos:type_name -> wloop.source.v1.Repo
+	114, // 181: wloop.source.v1.WorkspacesResponse.workspaces:type_name -> wloop.source.v1.Workspace
+	160, // 182: wloop.source.v1.SessionResponse.unit:type_name -> wloop.plugin.v1.Unit
+	26,  // 183: wloop.source.v1.OpenGateRequest.draft:type_name -> wloop.source.v1.Draft
+	120, // 184: wloop.source.v1.OpenGateResponse.gate:type_name -> wloop.source.v1.GateRef
+	26,  // 185: wloop.source.v1.RecordSentRequest.draft:type_name -> wloop.source.v1.Draft
+	120, // 186: wloop.source.v1.RecordSentResponse.gate:type_name -> wloop.source.v1.GateRef
+	160, // 187: wloop.source.v1.UnitMove.from:type_name -> wloop.plugin.v1.Unit
+	160, // 188: wloop.source.v1.UnitMove.to:type_name -> wloop.plugin.v1.Unit
+	125, // 189: wloop.source.v1.RehomeDraftsRequest.moves:type_name -> wloop.source.v1.UnitMove
+	160, // 190: wloop.source.v1.SetOverrideRequest.unit:type_name -> wloop.plugin.v1.Unit
+	157, // 191: wloop.source.v1.SetOverrideRequest.set:type_name -> wloop.source.v1.SetOverrideRequest.SetEntry
+	158, // 192: wloop.source.v1.SetOverrideRequest.if_match:type_name -> wloop.source.v1.SetOverrideRequest.IfMatchEntry
+	160, // 193: wloop.source.v1.Event.unit:type_name -> wloop.plugin.v1.Unit
+	161, // 194: wloop.source.v1.Event.at:type_name -> google.protobuf.Timestamp
+	6,   // 195: wloop.source.v1.Event.anchor:type_name -> wloop.source.v1.Anchor
+	130, // 196: wloop.source.v1.RecordEventsRequest.events:type_name -> wloop.source.v1.Event
+	160, // 197: wloop.source.v1.SetMarksRequest.unit:type_name -> wloop.plugin.v1.Unit
+	159, // 198: wloop.source.v1.SetMarksRequest.marks:type_name -> wloop.source.v1.SetMarksRequest.MarksEntry
+	160, // 199: wloop.source.v1.PutBriefRequest.unit:type_name -> wloop.plugin.v1.Unit
+	160, // 200: wloop.source.v1.SetWakeRequest.unit:type_name -> wloop.plugin.v1.Unit
+	161, // 201: wloop.source.v1.SetWakeRequest.until:type_name -> google.protobuf.Timestamp
+	160, // 202: wloop.source.v1.ClearWakeRequest.unit:type_name -> wloop.plugin.v1.Unit
+	162, // 203: wloop.source.v1.AskResponse.duration:type_name -> google.protobuf.Duration
+	162, // 204: wloop.source.v1.MeterRequest.duration:type_name -> google.protobuf.Duration
+	146, // 205: wloop.source.v1.ConfigResponse.config:type_name -> wloop.source.v1.Config
+	160, // 206: wloop.source.v1.EventsRequest.units:type_name -> wloop.plugin.v1.Unit
+	161, // 207: wloop.source.v1.EventsRequest.since:type_name -> google.protobuf.Timestamp
+	130, // 208: wloop.source.v1.EventsResponse.events:type_name -> wloop.source.v1.Event
+	28,  // 209: wloop.source.v1.SourceService.Capabilities:input_type -> wloop.source.v1.CapabilitiesRequest
+	30,  // 210: wloop.source.v1.SourceService.Ingest:input_type -> wloop.source.v1.IngestRequest
+	32,  // 211: wloop.source.v1.SourceService.Track:input_type -> wloop.source.v1.TrackRequest
+	34,  // 212: wloop.source.v1.SourceService.Untrack:input_type -> wloop.source.v1.UntrackRequest
+	36,  // 213: wloop.source.v1.SourceService.Resolve:input_type -> wloop.source.v1.ResolveRequest
+	38,  // 214: wloop.source.v1.SourceService.Locate:input_type -> wloop.source.v1.LocateRequest
+	40,  // 215: wloop.source.v1.SourceService.Action:input_type -> wloop.source.v1.ActionRequest
+	42,  // 216: wloop.source.v1.SourceService.View:input_type -> wloop.source.v1.ViewRequest
+	44,  // 217: wloop.source.v1.SourceService.Identity:input_type -> wloop.source.v1.IdentityRequest
+	46,  // 218: wloop.source.v1.SourceService.Validate:input_type -> wloop.source.v1.ValidateRequest
+	48,  // 219: wloop.source.v1.SourceService.Where:input_type -> wloop.source.v1.WhereRequest
+	50,  // 220: wloop.source.v1.SourceService.Place:input_type -> wloop.source.v1.PlaceRequest
+	52,  // 221: wloop.source.v1.SourceService.Publish:input_type -> wloop.source.v1.PublishRequest
+	54,  // 222: wloop.source.v1.SourceService.Verify:input_type -> wloop.source.v1.VerifyRequest
+	56,  // 223: wloop.source.v1.SourceService.Landed:input_type -> wloop.source.v1.LandedRequest
+	58,  // 224: wloop.source.v1.SourceService.Checkout:input_type -> wloop.source.v1.CheckoutRequest
+	60,  // 225: wloop.source.v1.SourceService.WriteState:input_type -> wloop.source.v1.WriteStateRequest
+	62,  // 226: wloop.source.v1.SourceService.BriefInput:input_type -> wloop.source.v1.BriefInputRequest
+	64,  // 227: wloop.source.v1.SourceService.BriefRevision:input_type -> wloop.source.v1.BriefRevisionRequest
+	66,  // 228: wloop.source.v1.SourceService.BriefDescribe:input_type -> wloop.source.v1.BriefDescribeRequest
+	69,  // 229: wloop.source.v1.SourceService.BriefStale:input_type -> wloop.source.v1.BriefStaleRequest
+	74,  // 230: wloop.source.v1.SourceService.Plan:input_type -> wloop.source.v1.PlanRequest
+	78,  // 231: wloop.source.v1.SourceService.Payload:input_type -> wloop.source.v1.PayloadRequest
+	83,  // 232: wloop.source.v1.SourceService.ApplyEffect:input_type -> wloop.source.v1.ApplyEffectRequest
+	85,  // 233: wloop.source.v1.SourceService.Proposals:input_type -> wloop.source.v1.ProposalsRequest
+	87,  // 234: wloop.source.v1.SourceService.Placement:input_type -> wloop.source.v1.PlacementRequest
+	89,  // 235: wloop.source.v1.SourceService.CallTool:input_type -> wloop.source.v1.CallToolRequest
+	91,  // 236: wloop.source.v1.SourceService.RunCLI:input_type -> wloop.source.v1.RunCLIRequest
+	93,  // 237: wloop.source.v1.HostService.Report:input_type -> wloop.source.v1.ReportRequest
+	95,  // 238: wloop.source.v1.HostService.Changed:input_type -> wloop.source.v1.ChangedRequest
+	100, // 239: wloop.source.v1.HostService.ApplyItems:input_type -> wloop.source.v1.ApplyItemsRequest
+	102, // 240: wloop.source.v1.HostService.QueryItems:input_type -> wloop.source.v1.QueryItemsRequest
+	105, // 241: wloop.source.v1.HostService.Tasks:input_type -> wloop.source.v1.TasksRequest
+	110, // 242: wloop.source.v1.HostService.Books:input_type -> wloop.source.v1.BooksRequest
+	112, // 243: wloop.source.v1.HostService.RoundState:input_type -> wloop.source.v1.RoundStateRequest
+	116, // 244: wloop.source.v1.HostService.Workspaces:input_type -> wloop.source.v1.WorkspacesRequest
+	118, // 245: wloop.source.v1.HostService.Session:input_type -> wloop.source.v1.SessionRequest
+	121, // 246: wloop.source.v1.HostService.OpenGate:input_type -> wloop.source.v1.OpenGateRequest
+	123, // 247: wloop.source.v1.HostService.RecordSent:input_type -> wloop.source.v1.RecordSentRequest
+	126, // 248: wloop.source.v1.HostService.RehomeDrafts:input_type -> wloop.source.v1.RehomeDraftsRequest
+	128, // 249: wloop.source.v1.HostService.SetOverride:input_type -> wloop.source.v1.SetOverrideRequest
+	131, // 250: wloop.source.v1.HostService.RecordEvents:input_type -> wloop.source.v1.RecordEventsRequest
+	133, // 251: wloop.source.v1.HostService.SetMarks:input_type -> wloop.source.v1.SetMarksRequest
+	135, // 252: wloop.source.v1.HostService.PutBrief:input_type -> wloop.source.v1.PutBriefRequest
+	137, // 253: wloop.source.v1.HostService.SetWake:input_type -> wloop.source.v1.SetWakeRequest
+	139, // 254: wloop.source.v1.HostService.ClearWake:input_type -> wloop.source.v1.ClearWakeRequest
+	141, // 255: wloop.source.v1.HostService.Ask:input_type -> wloop.source.v1.AskRequest
+	143, // 256: wloop.source.v1.HostService.Meter:input_type -> wloop.source.v1.MeterRequest
+	145, // 257: wloop.source.v1.HostService.Config:input_type -> wloop.source.v1.ConfigRequest
+	148, // 258: wloop.source.v1.HostService.Profile:input_type -> wloop.source.v1.ProfileRequest
+	150, // 259: wloop.source.v1.HostService.Events:input_type -> wloop.source.v1.EventsRequest
+	29,  // 260: wloop.source.v1.SourceService.Capabilities:output_type -> wloop.source.v1.CapabilitiesResponse
+	31,  // 261: wloop.source.v1.SourceService.Ingest:output_type -> wloop.source.v1.IngestResponse
+	33,  // 262: wloop.source.v1.SourceService.Track:output_type -> wloop.source.v1.TrackResponse
+	35,  // 263: wloop.source.v1.SourceService.Untrack:output_type -> wloop.source.v1.UntrackResponse
+	37,  // 264: wloop.source.v1.SourceService.Resolve:output_type -> wloop.source.v1.ResolveResponse
+	39,  // 265: wloop.source.v1.SourceService.Locate:output_type -> wloop.source.v1.LocateResponse
+	41,  // 266: wloop.source.v1.SourceService.Action:output_type -> wloop.source.v1.ActionResponse
+	43,  // 267: wloop.source.v1.SourceService.View:output_type -> wloop.source.v1.ViewResponse
+	45,  // 268: wloop.source.v1.SourceService.Identity:output_type -> wloop.source.v1.IdentityResponse
+	47,  // 269: wloop.source.v1.SourceService.Validate:output_type -> wloop.source.v1.ValidateResponse
+	49,  // 270: wloop.source.v1.SourceService.Where:output_type -> wloop.source.v1.WhereResponse
+	51,  // 271: wloop.source.v1.SourceService.Place:output_type -> wloop.source.v1.PlaceResponse
+	53,  // 272: wloop.source.v1.SourceService.Publish:output_type -> wloop.source.v1.PublishResponse
+	55,  // 273: wloop.source.v1.SourceService.Verify:output_type -> wloop.source.v1.VerifyResponse
+	57,  // 274: wloop.source.v1.SourceService.Landed:output_type -> wloop.source.v1.LandedResponse
+	59,  // 275: wloop.source.v1.SourceService.Checkout:output_type -> wloop.source.v1.CheckoutResponse
+	61,  // 276: wloop.source.v1.SourceService.WriteState:output_type -> wloop.source.v1.WriteStateResponse
+	63,  // 277: wloop.source.v1.SourceService.BriefInput:output_type -> wloop.source.v1.BriefInputResponse
+	65,  // 278: wloop.source.v1.SourceService.BriefRevision:output_type -> wloop.source.v1.BriefRevisionResponse
+	67,  // 279: wloop.source.v1.SourceService.BriefDescribe:output_type -> wloop.source.v1.BriefDescribeResponse
+	70,  // 280: wloop.source.v1.SourceService.BriefStale:output_type -> wloop.source.v1.BriefStaleResponse
+	75,  // 281: wloop.source.v1.SourceService.Plan:output_type -> wloop.source.v1.PlanResponse
+	81,  // 282: wloop.source.v1.SourceService.Payload:output_type -> wloop.source.v1.PayloadResponse
+	84,  // 283: wloop.source.v1.SourceService.ApplyEffect:output_type -> wloop.source.v1.ApplyEffectResponse
+	86,  // 284: wloop.source.v1.SourceService.Proposals:output_type -> wloop.source.v1.ProposalsResponse
+	88,  // 285: wloop.source.v1.SourceService.Placement:output_type -> wloop.source.v1.PlacementResponse
+	90,  // 286: wloop.source.v1.SourceService.CallTool:output_type -> wloop.source.v1.CallToolResponse
+	92,  // 287: wloop.source.v1.SourceService.RunCLI:output_type -> wloop.source.v1.RunCLIResponse
+	94,  // 288: wloop.source.v1.HostService.Report:output_type -> wloop.source.v1.ReportResponse
+	96,  // 289: wloop.source.v1.HostService.Changed:output_type -> wloop.source.v1.ChangedResponse
+	101, // 290: wloop.source.v1.HostService.ApplyItems:output_type -> wloop.source.v1.ApplyItemsResponse
+	103, // 291: wloop.source.v1.HostService.QueryItems:output_type -> wloop.source.v1.QueryItemsResponse
+	106, // 292: wloop.source.v1.HostService.Tasks:output_type -> wloop.source.v1.TasksResponse
+	111, // 293: wloop.source.v1.HostService.Books:output_type -> wloop.source.v1.BooksResponse
+	113, // 294: wloop.source.v1.HostService.RoundState:output_type -> wloop.source.v1.RoundStateResponse
+	117, // 295: wloop.source.v1.HostService.Workspaces:output_type -> wloop.source.v1.WorkspacesResponse
+	119, // 296: wloop.source.v1.HostService.Session:output_type -> wloop.source.v1.SessionResponse
+	122, // 297: wloop.source.v1.HostService.OpenGate:output_type -> wloop.source.v1.OpenGateResponse
+	124, // 298: wloop.source.v1.HostService.RecordSent:output_type -> wloop.source.v1.RecordSentResponse
+	127, // 299: wloop.source.v1.HostService.RehomeDrafts:output_type -> wloop.source.v1.RehomeDraftsResponse
+	129, // 300: wloop.source.v1.HostService.SetOverride:output_type -> wloop.source.v1.SetOverrideResponse
+	132, // 301: wloop.source.v1.HostService.RecordEvents:output_type -> wloop.source.v1.RecordEventsResponse
+	134, // 302: wloop.source.v1.HostService.SetMarks:output_type -> wloop.source.v1.SetMarksResponse
+	136, // 303: wloop.source.v1.HostService.PutBrief:output_type -> wloop.source.v1.PutBriefResponse
+	138, // 304: wloop.source.v1.HostService.SetWake:output_type -> wloop.source.v1.SetWakeResponse
+	140, // 305: wloop.source.v1.HostService.ClearWake:output_type -> wloop.source.v1.ClearWakeResponse
+	142, // 306: wloop.source.v1.HostService.Ask:output_type -> wloop.source.v1.AskResponse
+	144, // 307: wloop.source.v1.HostService.Meter:output_type -> wloop.source.v1.MeterResponse
+	147, // 308: wloop.source.v1.HostService.Config:output_type -> wloop.source.v1.ConfigResponse
+	149, // 309: wloop.source.v1.HostService.Profile:output_type -> wloop.source.v1.ProfileResponse
+	151, // 310: wloop.source.v1.HostService.Events:output_type -> wloop.source.v1.EventsResponse
+	260, // [260:311] is the sub-list for method output_type
+	209, // [209:260] is the sub-list for method input_type
+	209, // [209:209] is the sub-list for extension type_name
+	209, // [209:209] is the sub-list for extension extendee
+	0,   // [0:209] is the sub-list for field type_name
 }
 
 func init() { file_wloop_source_v1_source_proto_init() }

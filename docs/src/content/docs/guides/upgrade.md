@@ -54,6 +54,13 @@ The words for tasks have new names in the profile and the configuration. Each ol
 - the workflow `entry-results-ended` is `task-results-ended`: rename an override directory of the old name in your profile, and a `[workflows.entry-results-ended]` block of `config.toml`;
 - `profile schema --gtd` is `--tasks`, `--views` or `--gates`.
 
+Each plugin's settings live in its `[plugins.<id>]` table, and each old key fails at load naming its new one:
+
+- `[github]` is `[plugins.github]` and `[slack]` is `[plugins.slack]`, key for key;
+- `github.drafts.approval` is `plugins.github.gates.approval`, and `slack.drafts.approval` is `plugins.slack.gates.approval`;
+- the facts `config.github.*` are `config.plugins.github.*`, and the effect `guidance.handed` is `pr.guidance_handed`.
+- the events of a pull request and its rounds (`opened`, `merged`, `round_sent`, `review_ended` and the others) are the GitHub plugin's, so a workflow whose trigger names one needs `provider = "github"`, and an intent reads `pr.adopted`, `pr.held`, `pr.muted`, `pr.nudge.*` and `pr.last_review.*` only on GitHub units: a manifest of another provider that names one, which never fired or read an empty value, fails at load naming the provider.
+
 ## Going back to an earlier release
 
 A release can declare that earlier releases keep reading the store after its migration, when it only adds what they ignore; such a downgrade needs nothing more. Otherwise the earlier release's daemon refuses the newer store and serves only its health, naming `{{command}} store restore`, which puts back the newest backup it can read and keeps the replaced store in `<state>/backups` as a pre-restore copy. What changed since that backup is lost: sessions, notes, ledger entries and drafts; pull requests come back from GitHub on the next sync. Restoring a backup below version 7 moves the tasks' dossiers back to `dossiers/entry/`, but not the dossiers version 7 gave to a task (a project's, a pull request's or a thread's): they stay under `dossiers/task/`, where the earlier release does not look; copy them back from a backup of the state directory.

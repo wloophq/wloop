@@ -10,7 +10,7 @@ description: How what people ask of you becomes tasks, how the lists and project
 A **unit** is a thing work happens on: a pull request, a Slack thread, a DM topic. Units come from plugins. Two are compiled in: `github` (pull requests) and `slack` (threads and DM topics). Each can be turned off:
 
 ```toml
-[slack]
+[plugins.slack]
 enabled = false
 ```
 
@@ -43,7 +43,7 @@ What a turn on a task produces is attached to it, when the turn's intent asks fo
 - With `record.attach_url = true`, a turn that records `done` with an outcome `url` naming a unit, such as a pull request, attaches that unit. The address is resolved by the plugins' units; a branch name never attaches anything.
 - With `drafts.attach_posts = true`, the unit of each post the turn's agent makes, sent at once or once approved, is attached; a draft on the task posted to a channel or a person attaches the thread its post starts. Reactions and edits are not posts.
 
-Each plugin says when one of its units has ended: a pull request merged or closed (`pr.ended`); a Slack unit with a closure posted or marked, or quiet for `slack.ended_after` (7 days) (`slack.ended`). The bundled workflow `task-results-ended` closes a task you captured, marking it done, once a turn ran on it, such as a start, and it has a unit and every one of them has ended (`task.captured_by_user && task.turns > 0 && task.link_ended`). A task you captured on a pull request to keep track of it, with no turn on the task itself, stays open. It never closes a task derived from items, which its items close.
+Each plugin says when one of its units has ended: a pull request merged or closed (`pr.ended`); a Slack unit with a closure posted or marked, or quiet for `plugins.slack.ended_after` (7 days) (`slack.ended`). The bundled workflow `task-results-ended` closes a task you captured, marking it done, once a turn ran on it, such as a start, and it has a unit and every one of them has ended (`task.captured_by_user && task.turns > 0 && task.link_ended`). A task you captured on a pull request to keep track of it, with no turn on the task itself, stays open. It never closes a task derived from items, which its items close.
 
 ## Start new work
 

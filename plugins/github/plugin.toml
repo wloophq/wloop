@@ -1,0 +1,509 @@
+id = "github"
+kinds = ["source"]
+protocol = 1
+
+[source]
+name = "GitHub"
+slot = "pr"
+brief_subject = true
+rounds = true
+payload = "PR"
+kinds = ["pull-request"]
+steps = ["turn.dismiss", "answer.refuse"]
+row_kinds = ["round_pending", "loop_waiting", "loop_stopped", "blocked", "to_address", "held", "loop_working",
+  "changes", "checks", "conflicts", "reply", "reviewer_back", "review", "no_reviewer", "merge", "draft", "muted", "done"]
+
+default_delivery = "comment"
+
+[source.codec]
+keys = ["{owner}/{repo}#{number}"]
+urls = ["https://github.com/{owner}/{repo}/pull/{number}"]
+label = "{owner}/{repo}#{number}"
+fold_case = true
+target = "<url>"
+
+[source.codec.fields]
+number = "[1-9][0-9]*"
+
+[[source.deliveries]]
+name = "comment"
+posts = true
+
+[[source.deliveries]]
+name = "reaction"
+
+[[source.draft_kinds]]
+name = "react"
+delivery = "reaction"
+
+[[source.roles]]
+name = "pr.review"
+doc = "The review round on someone else's pull request, in its review workspace: first or follow-up, reconciled with the review you published; it drives its workspace's row."
+round_kind = "review"
+reconcile = "my_review"
+workspace = "review"
+context = "pr"
+policy = "round"
+drives_row = true
+
+[[source.roles]]
+name = "pr.address"
+doc = "The address round on a pull request you develop, in its author workspace: its reviews, failing checks and conflicts; its instructions say why it is due; it drives its workspace's row."
+round_kind = "address"
+workspace = "author"
+context = "pr"
+policy = "round"
+drives_row = true
+
+[[source.roles]]
+name = "pr.nudge"
+doc = "The nudge on a pull request: nudge.prepare fills its inputs from who the pull request waits on, or refuses it."
+prepare = "nudge.prepare"
+context = "pr"
+policy = "round"
+
+[[source.roles]]
+name = "probe"
+doc = "The probe of an agent home: a synthetic pull request in the workspace the request names, under the probe's policy."
+launch = "probe"
+context = "synthetic"
+policy = "probe"
+
+[[source.events]]
+name = "opened"
+doc = "The pull request opened."
+
+[[source.events]]
+name = "push"
+doc = "A commit was pushed to the head."
+
+[[source.events]]
+name = "review_requested"
+doc = "A review was requested."
+
+[[source.events]]
+name = "review_request_removed"
+doc = "A review request was removed."
+
+[[source.events]]
+name = "review"
+doc = "A review was submitted."
+
+[[source.events]]
+name = "comment"
+doc = "Someone commented."
+
+[[source.events]]
+name = "check"
+doc = "A check on the head changed state."
+
+[[source.events]]
+name = "ready"
+doc = "The draft became ready for review."
+
+[[source.events]]
+name = "draft"
+doc = "The pull request went back to draft."
+
+[[source.events]]
+name = "merged"
+doc = "The pull request merged."
+
+[[source.events]]
+name = "closed"
+doc = "The pull request closed unmerged."
+
+[[source.events]]
+name = "round_sent"
+doc = "A round's turn was sent."
+
+[[source.events]]
+name = "round_held"
+doc = "A due round was held."
+
+[[source.events]]
+name = "round_pending"
+doc = "A round waits on you before it starts."
+
+[[source.events]]
+name = "round_skipped"
+doc = "A due round was skipped."
+
+[[source.events]]
+name = "guidance"
+doc = "The guidance a round's prompt carried."
+
+[[source.events]]
+name = "round_blocked"
+doc = "A round cannot start until you free the head branch, trust its folder or answer the agent's question."
+
+[[source.events]]
+name = "round_unblocked"
+doc = "What blocked a round cleared."
+
+[[source.events]]
+name = "would_review"
+doc = "A follow-up review the sweep observed without running, its review workspace gone."
+
+[[source.events]]
+name = "would_address"
+doc = "An address round the sweep observed without running, the pull request having no author workspace."
+
+[[source.events]]
+name = "review_ended"
+doc = "A pull request with a review turn and no review workspace closed or merged."
+
+[[source.effects]]
+name = "pr.guidance_handed"
+applies = ["turn"]
+doc = "Hands the guidance queued on the pull request to the turn, and queues it back when the turn is not sent."
+
+[[source.effects]]
+name = "pr.round_sent"
+applies = ["turn"]
+doc = "Records the round-sent event on the pull request."
+
+[[source.effects]]
+name = "pr.reviewed"
+applies = ["turn"]
+doc = "Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted."
+
+[[source.effects]]
+name = "pr.addressed"
+applies = ["turn"]
+doc = "Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered."
+
+[[source.effects]]
+name = "pr.nudged"
+applies = ["turn", "draft"]
+doc = "Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft."
+
+[[source.facts]]
+name = "pr.mine"
+type = "bool"
+doc = "The pull request's author is the viewer."
+slots = ["action", "turn"]
+
+[[source.facts]]
+name = "pr.author"
+type = "string"
+doc = "The pull request's author login; empty when not stored."
+slots = ["action", "turn"]
+dim = true
+
+[[source.facts]]
+name = "pr.state"
+type = "string"
+doc = "The pull request's state on GitHub: OPEN, CLOSED or MERGED."
+slots = ["action", "turn"]
+enum = ["OPEN", "CLOSED", "MERGED"]
+
+[[source.facts]]
+name = "pr.slug"
+type = "string"
+doc = "owner/repo#number."
+slots = ["action", "turn"]
+
+[[source.facts]]
+name = "pr.owner"
+type = "string"
+doc = "The repository owner."
+slots = ["action", "turn"]
+dim = true
+
+[[source.facts]]
+name = "pr.repo"
+type = "string"
+doc = "owner/repo."
+slots = ["action", "turn"]
+
+[[source.facts]]
+name = "pr.repo_name"
+type = "string"
+doc = "The repository name, without its owner."
+slots = ["action", "turn"]
+dim = true
+
+[[source.facts]]
+name = "pr.base"
+type = "string"
+doc = "The base branch."
+slots = ["action", "turn"]
+dim = true
+
+[[source.facts]]
+name = "pr.association"
+type = "string"
+doc = "The author's association with the repository, from the Basics read."
+slots = ["turn"]
+dim = true
+enum = ["OWNER", "MEMBER", "COLLABORATOR", "CONTRIBUTOR", "FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR", "MANNEQUIN", "NONE"]
+
+[[source.facts]]
+name = "pr.cross_repository"
+type = "bool"
+doc = "The head branch lives in a fork."
+slots = ["action", "turn"]
+
+[[source.facts]]
+name = "pr.visibility"
+type = "string"
+doc = "The repository's visibility: public, private or internal, from the Basics read; empty before it."
+slots = ["turn"]
+enum = ["", "public", "private", "internal"]
+
+[[source.facts]]
+name = "pr.requested_teams"
+type = "list"
+doc = "The teams a review of the pull request was requested through, as <org>-<slug>."
+slots = ["turn"]
+dim = true
+
+[[source.facts]]
+name = "pr.labels"
+type = "list"
+doc = "The pull request's labels, from the Basics read."
+slots = ["turn"]
+dim = true
+
+[[source.facts]]
+name = "pr.address.reviewers"
+type = "list"
+doc = "The reviewers the address round answers: on its turn, those it answers, empty on any other; in a workflow, those it would answer."
+slots = ["turn"]
+dim = true
+untrusted = true
+
+[[source.facts]]
+name = "pr.address.checks"
+type = "list"
+doc = "The failing checks the address round fixes: on its turn, those it fixes, empty on any other; in a workflow, those it would fix."
+slots = ["turn"]
+untrusted = true
+
+[[source.facts]]
+name = "pr.address.conflict"
+type = "bool"
+doc = "The head conflicts with the base past the conflict window and the address round resolves it: on its turn, it does, false on any other; in a workflow, it would."
+slots = ["turn"]
+untrusted = true
+
+[[source.facts]]
+name = "pr.draft"
+type = "bool"
+doc = "The pull request is a draft, from the inventory row."
+slots = ["action"]
+
+[[source.facts]]
+name = "pr.review_requested_me"
+type = "bool"
+doc = "A review is requested from the viewer, from the inventory row."
+slots = ["action"]
+
+[[source.facts]]
+name = "pr.adopted"
+type = "bool"
+doc = "The pull request was taken over into the loop."
+slots = ["action"]
+
+[[source.facts]]
+name = "pr.held"
+type = "bool"
+doc = "Rounds on the pull request are held."
+slots = ["action"]
+
+[[source.facts]]
+name = "pr.muted"
+type = "bool"
+doc = "The pull request is muted, by the server clock."
+slots = ["action"]
+
+[[source.facts]]
+name = "pr.nudge.who"
+type = "list"
+doc = "Whom a nudge would address, from nudge.targets."
+slots = ["action"]
+
+[[source.facts]]
+name = "pr.nudge.why"
+type = "string"
+doc = "Why the pull request waits on them, from nudge.targets."
+slots = ["action"]
+
+[[source.facts]]
+name = "pr.nudge.refusal"
+type = "string"
+doc = "The text nudge.prepare would refuse with now; empty when a nudge may go."
+slots = ["action"]
+
+[[source.facts]]
+name = "pr.last_review.exists"
+type = "bool"
+doc = "The viewer reviewed the pull request before."
+slots = ["turn"]
+
+[[source.facts]]
+name = "pr.last_review.verdict"
+type = "string"
+doc = "The viewer's newest review state, any state; empty when none."
+slots = ["turn"]
+enum = ["", "APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED", "PENDING"]
+
+[[source.facts]]
+name = "pr.last_review.decision"
+type = "string"
+doc = "The viewer's newest non-comment verdict; empty when none."
+slots = ["turn"]
+enum = ["", "APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED", "PENDING"]
+
+[[source.facts]]
+name = "pr.merged_at"
+type = "timestamp"
+doc = "When the pull request merged; zero when it did not. Test with `> timestamp(0)`."
+
+[[source.facts]]
+name = "pr.closed_at"
+type = "timestamp"
+doc = "When the pull request closed; zero when open. Test with `> timestamp(0)`."
+
+[[source.facts]]
+name = "pr.finished_for"
+type = "duration"
+doc = "Working time since it ended, max(merged_at, closed_at), the rule retention uses; zero while open."
+
+[[source.facts]]
+name = "pr.ended"
+type = "bool"
+doc = "The pull request merged or closed: the GitHub plugin's word that the unit has ended."
+
+[[source.facts]]
+name = "pr.head"
+type = "string"
+doc = "The head commit's oid."
+
+[[source.facts]]
+name = "pr.conflicting_for"
+type = "duration"
+doc = "How long the pull request has conflicted with its base, from when the inventory first saw it; zero when it does not."
+
+[[source.facts]]
+name = "pr.checks"
+type = "string"
+doc = "The checks' rollup on the head: success, failure, pending, error or expected; empty with no checks."
+enum = ["", "success", "failure", "pending", "error", "expected"]
+
+[[source.facts]]
+name = "pr.stalled"
+type = "bool"
+doc = "The checks stalled on the head."
+
+[[source.facts]]
+name = "pr.age"
+type = "duration"
+doc = "Time since the pull request opened."
+
+[[source.facts]]
+name = "pr.has_workspace"
+type = "bool"
+doc = "A linked workspace holds the pull request."
+
+[[source.facts]]
+name = "pr.stale"
+type = "bool"
+doc = "The stored detail is older than sweep.slow + 2 x sweep.fast."
+
+[[source.facts]]
+name = "pr.open_turn"
+type = "string"
+doc = "The state of the book's open turn; empty when none."
+enum = ["", "sent", "started", "asked", "done", "settled", "failed", "unrecorded", "dismissed", "replaced", "withdrawn"]
+untrusted = true
+
+[[source.facts]]
+name = "pr.open_turn_seq"
+type = "int"
+doc = "The sequence of the book's open turn; 0 when none."
+untrusted = true
+
+[[source.facts]]
+name = "pr.orphan_answer_id"
+type = "int"
+doc = "The id of an answer whose turn ended; 0 when none."
+untrusted = true
+
+[[source.facts]]
+name = "pr.review.action"
+type = "string"
+doc = "What the review rules decide: empty, follow-up or complete."
+enum = ["", "follow-up", "complete"]
+untrusted = true
+
+[[source.facts]]
+name = "pr.review.reason"
+type = "string"
+doc = "Why the review rules decide so."
+untrusted = true
+
+[[source.facts]]
+name = "pr.review.observed"
+type = "bool"
+doc = "The review rules observe without acting."
+untrusted = true
+
+[[source.facts]]
+name = "pr.first.due"
+type = "bool"
+doc = "A first round is due."
+untrusted = true
+
+[[source.facts]]
+name = "pr.first.reason"
+type = "string"
+doc = "Why a first round is due or not."
+untrusted = true
+
+[[source.facts]]
+name = "pr.address.due"
+type = "bool"
+doc = "An address round is due."
+untrusted = true
+
+[[source.facts]]
+name = "pr.address.reason"
+type = "string"
+doc = "Why an address round is due or not."
+untrusted = true
+
+[[source.facts]]
+name = "pr.address.observed"
+type = "bool"
+doc = "The address rules observe without acting."
+untrusted = true
+
+[[source.facts]]
+name = "pr.last_interaction_at"
+type = "timestamp"
+doc = "The newest comment, review, push or review request, by anyone. Zero when unset; test with `> timestamp(0)`."
+
+[[source.facts]]
+name = "pr.silent_days"
+type = "int"
+doc = "Calendar days since last_interaction_at."
+time_varying = true
+
+[[source.facts]]
+name = "pr.waits_on_user"
+type = "bool"
+doc = "The row waits on the user, per situation.Derive."
+untrusted = true
+
+[[source.facts]]
+name = "pr.mute.refusal"
+type = "string"
+doc = "Why the pull request is muted, such as muted until its state changes; empty when it is not."
+
+[[source.facts]]
+name = "pr.fingerprint"
+type = "string"
+doc = "What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips."
+untrusted = true

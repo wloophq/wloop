@@ -37,7 +37,7 @@ type Client struct {
 	Tokens  TokenSource // the user token; ConnectionsOpen takes the app token explicitly
 	Limits  *Limiter    // per method, honors Retry-After; nil uses the default tiers
 	// RequestLog, when set, gets one call per request: method and HTTP status only,
-	// never args, bodies, URLs with queries or tokens. Config slack.request_log turns it on.
+	// never args, bodies, URLs with queries or tokens. Config plugins.slack.request_log turns it on.
 	RequestLog func(method string, status int)
 	// OnRateLimited, when set, is called once per HTTP 429 with the method name.
 	OnRateLimited func(method string)

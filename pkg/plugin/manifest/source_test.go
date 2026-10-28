@@ -1,9 +1,13 @@
 package manifest
 
 import (
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/wloophq/wloop/pkg/plugin"
 )
 
 const pulls = `
@@ -252,6 +256,9 @@ func TestSourceTableRefuses(t *testing.T) {
 		{"an event resolving nothing", "[[source.events]]\nname = \"acme.done\"\ndoc = \"d\"\nresolves = \"done\"\n", "resolves"},
 		{"a menu of no view", "[[source.ui.menubar]]\nid = \"m\"\nview = \"nope\"\n", "nope"},
 		{"a web directory outside", "[source.ui]\nweb = \"../x\"\n", "web"},
+		{"buckets on a text facet", "[[source.ui.facets]]\nid = \"opened\"\nsort = \"text\"\nbuckets = [{id = \"day\", within = \"24h\"}]\n", "sort = time"},
+		{"a bucket with no age", "[[source.ui.facets]]\nid = \"opened\"\nsort = \"time\"\nbuckets = [{id = \"day\"}]\n", "positive within"},
+		{"mixed ranks", "[[source.situations]]\nname = \"review\"\ndoc = \"d\"\nrank = 2\n[[source.situations]]\nname = \"merge\"\ndoc = \"d\"\n", "all or none"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			m, err := Parse([]byte(head + c.extra))
@@ -280,5 +287,19 @@ func TestSourceTableRefuses(t *testing.T) {
 				t.Errorf("Compile = %v, want an error naming %q", err, c.want)
 			}
 		})
+	}
+}
+
+func TestTheNotifyEnumIsThePluginTopics(t *testing.T) {
+	f, ok := reflect.TypeFor[Source]().FieldByName("Notify")
+	if !ok {
+		t.Fatal("Source has no Notify")
+	}
+	var topics []string
+	for _, tp := range plugin.Topics {
+		topics = append(topics, string(tp))
+	}
+	if got := strings.Split(f.Tag.Get("enum"), ","); !slices.Equal(got, topics) {
+		t.Errorf("notify's enum %v, plugin.Topics %v", got, topics)
 	}
 }

@@ -194,8 +194,16 @@ every = "5m"
 | `group` | bool | Rows may be grouped by it. |
 | `sort` | one of `rank`, `text`, `time` | How its values sort. |
 | `rank` | list of strings | Its values in order, with sort = rank. |
+| `buckets` | array of tables | The age buckets of a time facet, youngest first; only with sort = time. |
 | `match` | one of `exact`, `suffix`, `prefix`, `team` | How a filter matches a value; empty is exact. |
 | `menu` | bool | It shows in the filter menu. |
+
+## `[[source.ui.facets.buckets]]`
+
+| Key | Kind | Meaning |
+|---|---|---|
+| `id` | string | The bucket's id. Required. |
+| `within` | duration | The age its values are younger than, as a Go duration. Required. |
 
 ## `[[source.ui.menubar]]`
 
@@ -210,7 +218,7 @@ every = "5m"
 |---|---|---|
 | `key` | string | The key. Required. |
 | `action` | string | The action it runs. Required. |
-| `surface` | one of `web`, `tui` | Where it binds; empty is every surface. |
+| `surface` | one of `web`, `tui`, `menubar` | Where it binds; empty is every surface. |
 
 ## `[[source.commands]]`
 

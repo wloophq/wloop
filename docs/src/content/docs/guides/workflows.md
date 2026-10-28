@@ -71,7 +71,7 @@ mode = "delay"
 window = "5m"
 ```
 
-`github.nudge.silent_days` (30) sets the silence before a nudge.
+`plugins.github.nudge.silent_days` (30) sets the silence before a nudge.
 
 ## Tune the Slack proposals
 

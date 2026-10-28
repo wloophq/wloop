@@ -58,8 +58,35 @@ func mayNameSource(file, dep string) bool {
 	if file == sourceRoot {
 		return under(dep, sourceAdapters)
 	}
-	wiring, _ := path.Match(slackWiring, file)
-	return wiring && under(dep, sourceAdapters+"/slack")
+	for source, files := range sourceWiring {
+		for _, pattern := range files {
+			if wiring, _ := path.Match(pattern, file); wiring && under(dep, sourceAdapters+"/"+source) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// wiresSource says whether file is a composition root file that wires
+// source id alone.
+func wiresSource(file, id string) bool {
+	for _, pattern := range sourceWiring[id] {
+		if ok, _ := path.Match(pattern, file); ok {
+			return true
+		}
+	}
+	return false
+}
+
+// serveWiring are the files of serve's wiring of one source each.
+var serveWiring = []string{"internal/cli/serve_github.go", "internal/cli/serve_slack.go"}
+
+// sourceWiring are the composition root's files that wire one source, by
+// the source's adapter directory.
+var sourceWiring = map[string][]string{
+	"slack":  {slackWiring, "internal/cli/serve_slack.go"},
+	"github": {"internal/cli/serve_github.go"},
 }
 
 // ruleR1 flags an import of a provider package outside that provider and the
@@ -201,6 +228,7 @@ var spawnExempt = map[string]string{
 	"internal/e2e":                     "the end-to-end harness",
 	"internal/client/tui":              "the user's editor, run in the foreground on a prompt's text",
 	"internal/adapter/store/storetest": "test support that reads the inventory with sqlite3 for the e2e harness",
+	"internal/plugins/host":            "plugin processes, which live as long as the daemon and meter their own calls through the broker",
 }
 
 // spawns reports whether f calls exec.Command or exec.CommandContext of

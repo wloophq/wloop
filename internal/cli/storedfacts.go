@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/brief"
@@ -20,16 +19,6 @@ import (
 type storedFacts struct {
 	store  *inventory.Store
 	briefs bool
-}
-
-func teamsOf(requests []string) []string {
-	var out []string
-	for _, r := range requests {
-		if t, ok := strings.CutPrefix(r, "team:"); ok {
-			out = append(out, strings.Replace(t, "/", "-", 1))
-		}
-	}
-	return out
 }
 
 func (s storedFacts) Facts(ctx context.Context, u unit.Unit) (turn.Stored, error) {
@@ -66,7 +55,7 @@ func (s storedFacts) prFacts(ctx context.Context, ref github.Ref) (turn.Stored, 
 	if err != nil {
 		return st, err
 	}
-	st.Teams = teamsOf(pr.ReviewRequests)
+	st.Teams = requestedTeams(pr.ReviewRequests)
 	if !s.briefs {
 		return st, nil
 	}
@@ -91,3 +80,5 @@ func (s storedFacts) prFacts(ctx context.Context, ref github.Ref) (turn.Stored, 
 		HeadMoved: known && rec.HeadOid != pr.HeadOid, OlderFormat: rec.Version != brief.Version(brief.DefaultTaxonomy)}
 	return st, nil
 }
+
+func requestedTeams(requests []string) []string { return pr.RequestedTeams(requests) }

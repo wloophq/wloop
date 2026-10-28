@@ -41,7 +41,7 @@ type Service struct {
 	Client *slack.Client
 	Log    func(format string, args ...any)
 	// PostAllowlist, when not empty, is the only set of conversations Send may post to:
-	// channel ids, or user ids naming the DM with that user. Config slack.post_allowlist.
+	// channel ids, or user ids naming the DM with that user. Config plugins.slack.post_allowlist.
 	PostAllowlist []string
 	// Stored finds the thread of a message without asking Slack; nil asks Slack.
 	Stored Stored

@@ -23,7 +23,7 @@ type Input struct {
 	Unit         unit.Unit
 	Viewer       Viewer
 	Now          time.Time // rendered with the configured zone's abbreviation
-	Language     string    // the language of every text field, config slack.extraction.language
+	Language     string    // the language of every text field, config plugins.slack.extraction.language
 	Conversation slack.Conversation
 	Messages     []slack.Message // the window, ascending; never cut inside a thread
 	NewFrom      string          // first ts after the unit's cursor; "" means all are new
