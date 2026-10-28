@@ -56,7 +56,7 @@ The words for tasks have new names in the profile and the configuration. Each ol
 
 ## Going back to an earlier release
 
-A release can declare that earlier releases keep reading the store after its migration, when it only adds what they ignore; such a downgrade needs nothing more. Otherwise the earlier release's daemon refuses the newer store and serves only its health, naming `{{command}} store restore`, which puts back the newest backup it can read and keeps the replaced store in `<state>/backups` as a pre-restore copy. What changed since that backup is lost: sessions, notes, ledger entries and drafts; pull requests come back from GitHub on the next sync.
+A release can declare that earlier releases keep reading the store after its migration, when it only adds what they ignore; such a downgrade needs nothing more. Otherwise the earlier release's daemon refuses the newer store and serves only its health, naming `{{command}} store restore`, which puts back the newest backup it can read and keeps the replaced store in `<state>/backups` as a pre-restore copy. What changed since that backup is lost: sessions, notes, ledger entries and drafts; pull requests come back from GitHub on the next sync. Restoring a backup below version 7 moves the tasks' dossiers back to `dossiers/entry/`, but not the dossiers version 7 gave to a task (a project's, a pull request's or a thread's): they stay under `dossiers/task/`, where the earlier release does not look; copy them back from a backup of the state directory.
 
 ```sh
 {{command}} store restore --list   # the backups, their schema versions and dates
