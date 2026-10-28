@@ -9,7 +9,7 @@ The daemon reads the file when it starts. It follows a change of `profile` live;
 
 ## Settings
 
-A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` switches it, read at start. `workflows.<name>` overlays a workflow's manifest field by field, as [Tune workflows](/guides/workflows/) shows; its `approval` and `drafts.approval` take `mode`, `window` and `rule`, a list of tables with `when`, `mode` and `window` (`[[workflows.<name>.approval.rule]]`): a `rule` list replaces the manifest's rules and `[]` clears them, a key left out keeps the manifest's, and a block that does not merge with the manifest's is named by `doctor`. `intents.<name>.project_settings.when` is a predicate over the pull request's [facts](/reference/facts/#intent-facts) where the intent's sessions load the checkout's own agent settings (`.claude/`, `.mcp.json`, `CLAUDE.md`); elsewhere they start with your settings alone, and an intent it does not name loads them; see [Review](/guides/review/#the-checkouts-own-agent-settings). Unless the table says otherwise, `workspace_managers` is `["claude-desktop", "orca"]` and `agent` is `"claude"`.
+A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` switches it, read at start. `workflows.<name>` overlays a workflow's manifest field by field, as [Tune workflows](/guides/workflows/) shows; its `gates.approval` takes `mode`, `window` and `rule`, a list of tables with `when`, `mode` and `window` (`[[workflows.<name>.gates.approval.rule]]`), for every gate the workflow opens, a rule for the kinds its `when` pins `gate.kind` to: a `rule` list replaces the manifest's rules and `[]` clears them, a key left out keeps the manifest's, and a block that does not merge with the manifest's is named by `doctor`. `intents.<name>.project_settings.when` is a predicate over the pull request's [facts](/reference/facts/#intent-facts) where the intent's sessions load the checkout's own agent settings (`.claude/`, `.mcp.json`, `CLAUDE.md`); elsewhere they start with your settings alone, and an intent it does not name loads them; see [Review](/guides/review/#the-checkouts-own-agent-settings). Unless the table says otherwise, `workspace_managers` is `["claude-desktop", "orca"]` and `agent` is `"claude"`.
 
 ### Agent and workspaces
 
@@ -80,8 +80,8 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `plugins.github.address_without_workspace` | bool | `false` | An address round creates its author workspace when it has none; off, the sweep only records it. |
 | `plugins.github.rate_limit_fraction` | number | `0.5` | The share of the GitHub rate limit the sweeps may spend, a number between 0 and 1. |
 | `plugins.github.gates` | table |  | The gates the plugin's own rules open. |
-| `plugins.github.gates.approval` | table |  | Their approval; left out, each waits for you. |
-| `plugins.github.gates.approval.mode` | one of `send`, `delay`, `wait`, `dry_run`, `run` |  | The approval mode. |
+| `plugins.github.gates.approval` | table |  | Their approval; left out, the default gates.toml gives a draft gate. |
+| `plugins.github.gates.approval.mode` | one of `wait`, `delay`, `send`, `dry_run`, `run` |  | The approval mode. |
 | `plugins.github.gates.approval.window` | duration |  | How long a delay waits before the gate's consequence; only with mode delay. |
 
 ### GitHub address rounds
@@ -126,8 +126,8 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `plugins.slack.turns` | table |  | What a turn on a Slack unit reads. |
 | `plugins.slack.turns.max_chars` | integer |  | The characters of the unit's messages rendered into the instructions; 0 is 30000. |
 | `plugins.slack.gates` | table |  | The gates the plugin's own rules open. |
-| `plugins.slack.gates.approval` | table |  | Their approval; left out, each waits for you. |
-| `plugins.slack.gates.approval.mode` | one of `send`, `delay`, `wait`, `dry_run`, `run` |  | The approval mode. |
+| `plugins.slack.gates.approval` | table |  | Their approval; left out, the default gates.toml gives a draft gate. |
+| `plugins.slack.gates.approval.mode` | one of `wait`, `delay`, `send`, `dry_run`, `run` |  | The approval mode. |
 | `plugins.slack.gates.approval.window` | duration |  | How long a delay waits before the gate's consequence; only with mode delay. |
 
 ### Slack ingest
@@ -169,38 +169,18 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `workflows.&lt;name&gt;.enabled` | bool |  | Switches the workflow; left out, it is on. |
 | `workflows.&lt;name&gt;.observe` | bool |  | Plans the workflow's items pending, for you to run; left out, the manifest's. |
 | `workflows.&lt;name&gt;.only_when` | predicate |  | A condition ANDed with the workflow's when. |
-| `workflows.&lt;name&gt;.approval` | table |  | The approval of the workflow's runs, over the manifest's field by field. |
-| `workflows.&lt;name&gt;.approval.mode` | one of `run`, `delay`, `wait` |  | The mode when no rule matches; left out, the manifest's. |
-| `workflows.&lt;name&gt;.approval.window` | duration |  | How long a delay waits before it goes; only with mode delay. |
-| `workflows.&lt;name&gt;.approval.rule[]` | table |  | Rules tried in order before the mode, the first match wins; set, they replace the manifest's, and [] clears them. |
-| `workflows.&lt;name&gt;.approval.rule[].when` | predicate |  | When the rule applies. |
-| `workflows.&lt;name&gt;.approval.rule[].mode` | one of `run`, `delay`, `wait` |  | The rule's mode. |
-| `workflows.&lt;name&gt;.approval.rule[].window` | duration |  | The rule's delay; only with mode delay. |
-
-### Workflow draft approval
-
-| Setting | Kind | Default | Meaning |
-|---|---|---|---|
-| `workflows.&lt;name&gt;.drafts` | table |  | The drafts the workflow proposes. |
-| `workflows.&lt;name&gt;.drafts.approval` | table |  | The approval of the workflow's drafts, over the manifest's field by field. |
-| `workflows.&lt;name&gt;.drafts.approval.mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The mode when no rule matches; left out, the manifest's. |
-| `workflows.&lt;name&gt;.drafts.approval.window` | duration |  | How long a delay waits before it goes; only with mode delay. |
-| `workflows.&lt;name&gt;.drafts.approval.rule[]` | table |  | Rules tried in order before the mode, the first match wins; set, they replace the manifest's, and [] clears them. |
-| `workflows.&lt;name&gt;.drafts.approval.rule[].when` | predicate |  | When the rule applies. |
-| `workflows.&lt;name&gt;.drafts.approval.rule[].mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The rule's mode. |
-| `workflows.&lt;name&gt;.drafts.approval.rule[].window` | duration |  | The rule's delay; only with mode delay. |
 
 ### Workflow gate approval
 
 | Setting | Kind | Default | Meaning |
 |---|---|---|---|
-| `workflows.&lt;name&gt;.gates` | table |  | The gates the workflow opens. |
-| `workflows.&lt;name&gt;.gates.approval` | table |  | The approval of the workflow's gates, over the manifest's field by field. |
-| `workflows.&lt;name&gt;.gates.approval.mode` | one of `send`, `delay`, `wait`, `dry_run`, `run` |  | The mode when no rule matches; left out, the manifest's. |
+| `workflows.&lt;name&gt;.gates` | table |  | The gates the workflow opens: its runs' plan gates, its drafts', its turns' drafts' and its gate.open steps'. |
+| `workflows.&lt;name&gt;.gates.approval` | table |  | The approval of the workflow's gates, a rule for the kinds its when pins gate.kind to, over the manifest's field by field. |
+| `workflows.&lt;name&gt;.gates.approval.mode` | one of `wait`, `delay`, `send`, `dry_run`, `run` |  | The mode when no rule matches; left out, the manifest's. |
 | `workflows.&lt;name&gt;.gates.approval.window` | duration |  | How long a delay waits before it goes; only with mode delay. |
 | `workflows.&lt;name&gt;.gates.approval.rule[]` | table |  | Rules tried in order before the mode, the first match wins; set, they replace the manifest's, and [] clears them. |
 | `workflows.&lt;name&gt;.gates.approval.rule[].when` | predicate |  | When the rule applies. |
-| `workflows.&lt;name&gt;.gates.approval.rule[].mode` | one of `send`, `delay`, `wait`, `dry_run`, `run` |  | The rule's mode. |
+| `workflows.&lt;name&gt;.gates.approval.rule[].mode` | one of `wait`, `delay`, `send`, `dry_run`, `run` |  | The rule's mode. |
 | `workflows.&lt;name&gt;.gates.approval.rule[].window` | duration |  | The rule's delay; only with mode delay. |
 
 ### Turns and headless calls

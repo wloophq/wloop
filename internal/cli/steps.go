@@ -63,6 +63,8 @@ type stepDeps struct {
 	Drafts *draftDeps
 	// Props are what task.set writes; nil refuses it.
 	Props coretasks.PropStore
+	// Gates are what gate.open opens and reads; nil refuses it.
+	Gates stepGates
 	Pub   port.Publisher
 	Log   func(format string, args ...any)
 	// Headless starts turn.start's headless turns; Turns counts the

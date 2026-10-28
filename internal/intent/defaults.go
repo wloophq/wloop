@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/task"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
@@ -40,6 +41,9 @@ type sheet struct {
 	// tasks is the profile's tasks.toml, whose verbs a workflow's trigger
 	// and task.verb steps name.
 	tasks TasksDef
+	// gates is the profile's gates.toml, whose [approval] decides what a
+	// manifest's [gates.approval] leaves out.
+	gates GatesDef
 }
 
 // pos is where path's value starts, else its nearest placed parent, else 1:1.
@@ -166,11 +170,13 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 	if m.Drafts != nil {
 		d.AllowedEffects = orEmpty(m.Drafts.AllowedEffects, nil)
 		d.AttachPosts = m.Drafts.AttachPosts
+	}
+	if m.Gates != nil {
 		env := builtin.ApprovalEnv(false, servedSlots(d)...)
 		if slices.Contains(servedSlots(d), builtin.TaskSlot) {
 			maps.Copy(env, s.taskFacts)
 		}
-		d.DraftApproval = s.draftApprovalAt("drafts.approval", m.Drafts.Approval, env)
+		d.DraftApproval = s.gateApproval(m.Gates.Approval, []gate.Kind{gate.KindDraft}, env, nil).draftPolicy(s.gates)
 	}
 	s.workspace(&d, m.Workspace)
 	d.Board = builtin.BoardOf(d.Workspace)

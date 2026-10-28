@@ -19,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/workspaces"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
@@ -120,6 +121,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	if d.DB != nil {
 		sd.Overrides = d.DB
 		sd.Props = serviceProps{e}
+		sd.Gates = serviceGates{e}
 		sd.Classify.Store = d.DB.Classifications()
 		sd.Removal.Fetched = d.DB.Fetches()
 	}
@@ -210,12 +212,10 @@ func applyConfigWith(ws []workflow.Workflow, cfg config.Config, extras func(unit
 		if wc.Observe != nil {
 			w.Observe = *wc.Observe
 		}
-		if o, ok := runOverlay(wc.Approval); ok {
-			a, err := intentload.OverlayRunApproval(w.Approval, o, workflowEnv(w, extras))
-			if err != nil {
-				w.When = workflow.Refused{Err: fmt.Errorf("workflows.%s.approval: %w", w.Name, err)}
+		if o, ok := runOverlay(wc.GateApproval()); ok {
+			if err := overlayGates(&w, o, extras); err != nil {
+				w.When = workflow.Refused{Err: fmt.Errorf("workflows.%s.gates.approval: %w", w.Name, err)}
 			}
-			w.Approval = a
 		}
 		if wc.OnlyWhen != "" {
 			w.When = workflow.All(w.When, onlyWhen(w, wc.OnlyWhen, extras))
@@ -226,9 +226,9 @@ func applyConfigWith(ws []workflow.Workflow, cfg config.Config, extras func(unit
 }
 
 // configWorkflowProblems are the config's workflows.<name> blocks that do
-// not load over the workflow they change: its only_when and its approval,
-// which stop the workflow, and its drafts.approval over each block it may
-// overlay, which holds every draft of it.
+// not load over the workflow they change: its only_when and its gates
+// approval over its runs' and gate.open's gates, which stop the workflow,
+// and over each drafts block it may overlay, which holds every draft of it.
 func configWorkflowProblems(cfg config.Config, l *intentload.Loaded) []error {
 	extras := briefExtrasOf(l)
 	var out []error
@@ -242,13 +242,14 @@ func configWorkflowProblems(cfg config.Config, l *intentload.Loaded) []error {
 				out = append(out, fmt.Errorf("workflows.%s.only_when: %w; the workflow runs nowhere", w.Name, err))
 			}
 		}
-		if o, ok := runOverlay(wc.Approval); ok {
-			if _, err := intentload.OverlayRunApproval(w.Approval, o, workflowEnv(w, extras)); err != nil {
-				out = append(out, fmt.Errorf("workflows.%s.approval: %w; the workflow runs nowhere", w.Name, err))
+		if o, ok := runOverlay(wc.GateApproval()); ok {
+			if err := overlayGates(&w, o, extras); err != nil {
+				out = append(out, fmt.Errorf("workflows.%s.gates.approval: %w; the workflow runs nowhere", w.Name, err))
 			}
 		}
+		def := intentload.DefaultDraftApproval(l.Gates)
 		for _, base := range draftBases(w, l.Registry) {
-			if _, err := configPolicy(w, base, wc.DraftApproval(), extras); err != nil {
+			if _, err := configPolicy(w, base, wc.GateApproval(), extras, def); err != nil {
 				out = append(out, fmt.Errorf("%w; every draft of %s waits for you", err, w.Name))
 				break
 			}
@@ -257,9 +258,9 @@ func configWorkflowProblems(cfg config.Config, l *intentload.Loaded) []error {
 	return out
 }
 
-// draftBases are the blocks the config's drafts.approval of w may be laid
-// over: its manifest's; without one, wait for the drafts its steps propose
-// and the block of each intent its turn.start steps name.
+// draftBases are the drafts blocks the config's gates.approval of w may be
+// laid over: its manifest's; without one, the default for the drafts its
+// steps propose and the block of each intent its turn.start steps name.
 func draftBases(w workflow.Workflow, reg *dintent.Registry) []*draft.Policy {
 	if w.DraftApproval != nil {
 		return []*draft.Policy{w.DraftApproval}
@@ -290,6 +291,36 @@ func onlyWhen(w workflow.Workflow, src string, extras func(unit.ProviderID) expr
 		return workflow.Refused{Err: fmt.Errorf("workflows.%s.only_when: %w", w.Name, err)}
 	}
 	return p
+}
+
+// overlayGates lays o, the config's gates approval of w, over the approval
+// of w's plan gates and of the gates its gate.open steps open.
+func overlayGates(w *workflow.Workflow, o intentload.ApprovalOverlay, extras func(unit.ProviderID) expr.Env) error {
+	envs := workflowEnvs(*w, extras)
+	a, err := intentload.OverlayRunApproval(w.Approval, gate.KindPlan, o, envs)
+	if err != nil {
+		return err
+	}
+	w.Approval = a
+	gates := make(map[gate.Kind]workflow.Approval, len(w.Gates))
+	for k, ga := range w.Gates {
+		if gates[k], err = intentload.OverlayRunApproval(ga, k, o, envs); err != nil {
+			return err
+		}
+	}
+	w.Gates = gates
+	return nil
+}
+
+// workflowEnvs are what a config rule of w's gates approval reads: a
+// draft's facts and its unit's for its draft gates, its unit's for the
+// others, each with the facts extras gives for its provider.
+func workflowEnvs(w workflow.Workflow, extras func(unit.ProviderID) expr.Env) intentload.ApprovalEnvs {
+	draftEnv := builtin.ApprovalEnv(true, w.Slot)
+	if extras != nil {
+		maps.Copy(draftEnv, extras(w.Provider))
+	}
+	return intentload.ApprovalEnvs{Draft: draftEnv, Unit: workflowEnv(w, extras)}
 }
 
 // workflowEnv is w's facts, with the brief.extra.* facts extras gives for

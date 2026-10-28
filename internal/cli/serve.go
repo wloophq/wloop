@@ -854,7 +854,7 @@ func (e *Env) serveTurns(ctx context.Context, db *sqlite.DB, store *inventory.St
 	e.Turns = &turns.Service{Store: repo, Registry: repo, Sessions: sessions, Launcher: cliLauncher{e}, Answers: hostAnswers{events: sqlite.New(db), viewer: store},
 		Changed: v.Changed, Clock: clock, Command: e.loopCommand(), Notices: profileNotices{e}, FastJob: fast,
 		AgentFor:      e.agentFor(served),
-		AgentSessions: agentSessions{db}, Log: logf, Intents: registryPort{e}, Gates: namedGates{e, db.Gates(e.Now)},
+		AgentSessions: agentSessions{db}, Log: logf, Intents: registryPort{e}, Gates: namedGates{e, db},
 		Prompts: transcriptPrompts(db.AgentTranscript)}
 	e.background.Go(func() {
 		lctx, scope := meter.Start(ctx, meter.Loop("views"))

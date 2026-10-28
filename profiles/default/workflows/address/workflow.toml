@@ -8,6 +8,7 @@ key = ["pr.fingerprint"]
 use = "turn.start"
 intent = "address"
 
-[approval]
+[[gates.approval.rule]]
+when = 'gate.kind == "plan"'
 mode = "delay"
 window = "60s"

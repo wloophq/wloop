@@ -317,9 +317,9 @@ use = "task.set"
 prop = "focus"
 value = "on"
 
-[approval]
+[gates.approval]
 mode = "wait"
-[[approval.rule]]
+[[gates.approval.rule]]
 `
 
 func TestAnApprovalRuleReadsATrustedPropertyNeverAnAgentWrittenOne(t *testing.T) {
@@ -335,7 +335,7 @@ func TestAnApprovalRuleReadsATrustedPropertyNeverAnAgentWrittenOne(t *testing.T)
 		writeWorkflow(t, root, "focus", focusOnTask+"when = '"+when+"'\nmode = \"run\"\n")
 		l, problems := Load(userLayer(root), bundled, testBase(), nil)
 		fact := strings.Fields(when)[0]
-		got := strings.Contains(problems.Error(), "approval.rule[0].when: reads "+fact+", which a rule that runs")
+		got := strings.Contains(problems.Error(), "gates.approval.rule[0].when: reads "+fact+", which a rule that releases a gate")
 		if got != refused {
 			t.Errorf("%s: %s", when, problems.Error())
 		}

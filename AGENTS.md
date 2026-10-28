@@ -44,7 +44,7 @@ These stay in Go and are exposed as facts for the profile to act on:
 - working-day arithmetic and `owedBy`'s fallback;
 - the GitHub round planners' due logic (`pr.first.due`, `pr.review.action`, `pr.address.due`);
 - injection markers, JSON schemas and limits;
-- the guard on draft approval: a draft's delivery is what its plugin posts it as (every GitHub draft but a reaction or an edit is a comment), a comment waits for approval unless a user rule that names comment delivery releases it, and no agent or thread text sets an approval (no rule reads an untrusted fact).
+- the gate guard: every decision waiting on the user is a gate, which only the gates service resolves, by a person, a trusted policy rule or a passed window; a draft's delivery is what its plugin posts it as, a delivery its plugin's manifest marks `posts` waits for approval unless a user rule that names that delivery releases it, and no agent or thread text resolves a gate (no rule reads an untrusted fact).
 
 Still owned by Go and being moved to the profile ([Profile first](docs/src/content/docs/architecture/profile-first.md#what-go-still-owns-today) lists them): the GitHub plugin's `github-nudge` rule and its text, the workflow providers (`builtin.Slots`), the notification titles, the digest and the menu bar's copy, the cockpit's and the terminal's chrome (prompt hints, pane titles, empty states), and the Slack renderings `slack_read` and `slack_search` return.
 
@@ -78,7 +78,7 @@ The architecture docs describe the code as it is; each rule below is a test in `
 - Only the daemon, and the `store` commands under the store's lock, write the store; clients speak `internal/api` and decide nothing. [The daemon and its clients](docs/src/content/docs/architecture/daemon-and-clients.md)
 - The core is keyed by `unit.Unit`, names no provider and imports no plugin; a source is a plugin registered in `internal/cli/sources.go`. [Plugins](docs/src/content/docs/architecture/plugins.md)
 - Go never enumerates intents; facts, steps, roles, effects, builtins and every reserved key live in their tables in `internal/intent/builtin`. [Profile first](docs/src/content/docs/architecture/profile-first.md)
-- Every post the loop proposes is a draft that a person, or their approval policy, approves (the tools an agent calls to post, react or edit on Slack at once are the exception, and each post they make is recorded as a sent draft); no agent's or thread's text approves a draft, and authority never comes from an agent.
+- Every post the loop proposes is a draft whose gate a person, or their approval policy, resolves (the tools an agent calls to post, react or edit on Slack at once are the exception, and each post they make is recorded as a gate already approved, never as a resolution); no agent's or thread's text resolves a gate, and authority never comes from an agent.
 - Every user-visible name derives from `internal/brand`.
 
 Where a new fact, step, intent, workflow, use case, adapter, plugin, API route, command, view or table goes: [Layers](docs/src/content/docs/architecture/layers.md#where-a-change-goes).

@@ -21,7 +21,7 @@ type turnBooks interface {
 type outboxManifests struct {
 	loaded func() *intentload.Loaded
 	books  turnBooks
-	// config is the config whose workflows.<name>.drafts.approval overlays a
+	// config is the config whose workflows.<name>.gates.approval overlays a
 	// workflow's block; nil reads none.
 	config func() config.Config
 }
@@ -42,6 +42,10 @@ func (b envBooks) Books(ctx context.Context, units ...unit.Unit) (map[unit.Unit]
 	return b.e.Turns.Store.Books(ctx, units...)
 }
 
+func (m outboxManifests) DefaultApproval() draft.Approval {
+	return intentload.DefaultDraftApproval(m.loaded().Gates)
+}
+
 func (m outboxManifests) IntentApproval(name string) (*draft.Policy, bool) {
 	d, ok := m.loaded().Registry.Get(dintent.Name(name))
 	return d.DraftApproval, ok
@@ -56,7 +60,8 @@ func (m outboxManifests) WorkflowApproval(name string, intent *draft.Policy) (*d
 		if m.config != nil {
 			cfg = m.config()
 		}
-		return workflowApproval(cfg, w, intent, briefExtrasOf(m.loaded())), true
+		l := m.loaded()
+		return workflowApproval(cfg, w, intent, briefExtrasOf(l), intentload.DefaultDraftApproval(l.Gates)), true
 	}
 	return nil, false
 }

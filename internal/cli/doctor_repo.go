@@ -468,8 +468,8 @@ func (e *Env) workflowLine(ctx context.Context, db workflowReads, w workflow.Wor
 		info = fmt.Sprintf("%s, %s, %d refusal(s) in the last day", w.Trigger.Kind, last, a.Refusals)
 	}
 	if w.Approval.Mode == workflow.ApprovalWait {
-		info += fmt.Sprintf("; each item waits for you to apply it; set %s in %s to run them without you",
-			workflowTask(w.Name, "approval.mode", `"run"`), e.ConfigPath)
+		info += fmt.Sprintf("; each item waits for you to apply it; add [[%s.gates.approval.rule]] with when = 'gate.kind == \"plan\"' and mode = \"run\" in %s to run them without you",
+			config.Key("workflows", w.Name), e.ConfigPath)
 	}
 	return api.DoctorCheck{Mark: mark, Info: info}, nil
 }

@@ -68,9 +68,8 @@ type mRefuse struct {
 }
 
 type mDrafts struct {
-	AllowedEffects []string   `toml:"allowed_effects"`
-	AttachPosts    bool       `toml:"attach_posts"`
-	Approval       *mApproval `toml:"approval"`
+	AllowedEffects []string `toml:"allowed_effects"`
+	AttachPosts    bool     `toml:"attach_posts"`
 }
 
 type mHelp struct {

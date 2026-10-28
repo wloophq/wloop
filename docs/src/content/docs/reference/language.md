@@ -164,23 +164,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ### Gate approval
 
 - `gates` (table): The gates its runs and drafts open.
-- `gates.approval` (table): The approval of its gates.
-- `gates.approval.mode` (one of `send`, `delay`, `wait`, `dry_run`, `run`): The mode when no rule holds.
-  - `send`: Posts at once.
-  - `delay`: Posts when the window ends unless a person stops it.
-  - `wait`: Waits for a person.
-  - `dry_run`: Stores the draft and never sends it; nobody can release it.
-  - `run`: Runs at once.
-- `gates.approval.window` (duration): With mode delay only: how long a person has to stop the gate's consequence.
-- `gates.approval.rule[]` (table): A rule; the first whose when holds gives the mode.
-- `gates.approval.rule[].when` (predicate): When the rule applies to a gate.
-- `gates.approval.rule[].mode` (one of `send`, `delay`, `wait`, `dry_run`, `run`): The rule's mode.
-  - `send`: Posts at once.
-  - `delay`: Posts when the window ends unless a person stops it.
-  - `wait`: Waits for a person.
-  - `dry_run`: Stores the draft and never sends it; nobody can release it.
-  - `run`: Runs at once.
-- `gates.approval.rule[].window` (duration): With mode delay only: how long a person has to stop the gate's consequence.
+- `gates.approval` (an [approval table](#approval-tables) of gate modes): The approval of its gates: a rule applies to the kinds its when pins gate.kind to, else to draft gates alone when it reads a draft's facts, else to every kind; what no rule or mode here decides, gates.toml's [approval] does.
 
 ### Effects and drafts
 
@@ -197,7 +181,6 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `unit.closed`: Records the closure of the draft's unit, which ends its close task and unwatches it after its warm period; through the unit's plugin.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
 - `drafts.attach_posts` (bool, default `false`): On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts.
-- `drafts.approval` (an [approval table](#approval-tables) of draft modes): The approval of its drafts; wait when absent.
 
 ## Built-in actions (`actions.toml`)
 
@@ -292,13 +275,14 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `post`: An agent's post: resolving it delivers the reply to its session.
   - `proposal`: Proposed task or item operations: resolving it applies them.
   - `trust`: A repository's first run: resolving it unblocks the run.
-  - `step`: A workflow's gate.open: resolving it is an event workflows react to.
+  - `step`: A workflow's gate.open: resolving it records the event gate_resolved on its task, which workflows react to.
 - `gates.<name>.label` (string): What the gate asks of you, as clients list it.
 - `gates.<name>.intents` (table by name): What you may resolve the gate with, by intent, in the order clients offer them.
 - `gates.<name>.intents.<name>` (table): An intent, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `gates.<name>.intents.<name>.label` (string): The name people read on its button.
 - `gates.<name>.intents.<name>.status` (one of `approved`, `rejected`, `answered`, `dismissed`, `superseded`): The status the intent resolves the gate to; required for a new intent.
 - `gates.<name>.intents.<name>.answer` (bool, default `false`): The intent takes text, such as a question's answer.
+- `approval` (an [approval table](#approval-tables) of gate modes): How a gate is decided when no manifest or configuration says: the default of each kind. A user layer's mode replaces the mode and its window, its rules replace the rules.
 
 ## Record kinds (`records.toml`)
 
@@ -369,30 +353,10 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `task.set`: Sets the task's property `prop` of tasks.toml to `value`, written by the workflow; a property the workflow may not write is refused.
 - `step[].<name>` (string or list): The step's arguments.
 
-### Run approval
-
-- `approval` (an [approval table](#approval-tables) of run modes, default mode `run`): The run approval: how a matched item runs.
-
 ### Gate approval
 
 - `gates` (table): The gates its runs and drafts open.
-- `gates.approval` (table): The approval of its gates.
-- `gates.approval.mode` (one of `send`, `delay`, `wait`, `dry_run`, `run`): The mode when no rule holds.
-  - `send`: Posts at once.
-  - `delay`: Posts when the window ends unless a person stops it.
-  - `wait`: Waits for a person.
-  - `dry_run`: Stores the draft and never sends it; nobody can release it.
-  - `run`: Runs at once.
-- `gates.approval.window` (duration): With mode delay only: how long a person has to stop the gate's consequence.
-- `gates.approval.rule[]` (table): A rule; the first whose when holds gives the mode.
-- `gates.approval.rule[].when` (predicate): When the rule applies to a gate.
-- `gates.approval.rule[].mode` (one of `send`, `delay`, `wait`, `dry_run`, `run`): The rule's mode.
-  - `send`: Posts at once.
-  - `delay`: Posts when the window ends unless a person stops it.
-  - `wait`: Waits for a person.
-  - `dry_run`: Stores the draft and never sends it; nobody can release it.
-  - `run`: Runs at once.
-- `gates.approval.rule[].window` (duration): With mode delay only: how long a person has to stop the gate's consequence.
+- `gates.approval` (an [approval table](#approval-tables) of gate modes): The approval of its gates: a rule applies to the kinds its when pins gate.kind to, else to draft gates alone when it reads a draft's facts, else to every kind; what no rule or mode here decides, gates.toml's [approval] does.
 
 ### Drafts
 
@@ -402,7 +366,6 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `drafts.withdraw.reason` (one of `assigned`, `moot`, default `moot`): The reason the withdrawn draft stores.
   - `assigned`: Its items got an owner.
   - `moot`: It no longer applies.
-- `drafts.approval` (an [approval table](#approval-tables) of draft modes, default mode `wait`): The approval of the drafts the workflow's steps and turns propose.
 
 ## Steps and their arguments
 
@@ -677,13 +640,13 @@ The fields each notice reads besides `Name` and `Command`:
 - `plugins.github.address_without_workspace` (bool, default `false`): An address round creates its author workspace when it has none; off, the sweep only records it.
 - `plugins.github.rate_limit_fraction` (number, default `0.5`): The share of the GitHub rate limit the sweeps may spend, a number between 0 and 1.
 - `plugins.github.gates` (table): The gates the plugin's own rules open.
-- `plugins.github.gates.approval` (table): Their approval; left out, each waits for you.
-- `plugins.github.gates.approval.mode` (one of `send`, `delay`, `wait`, `dry_run`, `run`): The approval mode.
-  - `send`: Posts at once.
-  - `delay`: Posts when the window ends unless a person stops it.
-  - `wait`: Waits for a person.
-  - `dry_run`: Stores the draft and never sends it; nobody can release it.
-  - `run`: Runs at once.
+- `plugins.github.gates.approval` (table): Their approval; left out, the default gates.toml gives a draft gate.
+- `plugins.github.gates.approval.mode` (one of `wait`, `delay`, `send`, `dry_run`, `run`): The approval mode.
+  - `wait`: Waits for you.
+  - `delay`: Resolves the gate to its approving intent when the window ends, unless you resolve it first.
+  - `send`: Releases the gate at once: a draft is sent, a run runs.
+  - `dry_run`: A draft gate only: stores the draft and never sends it; nobody can release it. A gate of another kind takes the next rule or its default.
+  - `run`: Releases the gate at once, as send.
 - `plugins.github.gates.approval.window` (duration): How long a delay waits before the gate's consequence; only with mode delay.
 
 ### GitHub address rounds
@@ -722,13 +685,13 @@ The fields each notice reads besides `Name` and `Command`:
 - `plugins.slack.turns` (table): What a turn on a Slack unit reads.
 - `plugins.slack.turns.max_chars` (integer): The characters of the unit's messages rendered into the instructions; 0 is 30000.
 - `plugins.slack.gates` (table): The gates the plugin's own rules open.
-- `plugins.slack.gates.approval` (table): Their approval; left out, each waits for you.
-- `plugins.slack.gates.approval.mode` (one of `send`, `delay`, `wait`, `dry_run`, `run`): The approval mode.
-  - `send`: Posts at once.
-  - `delay`: Posts when the window ends unless a person stops it.
-  - `wait`: Waits for a person.
-  - `dry_run`: Stores the draft and never sends it; nobody can release it.
-  - `run`: Runs at once.
+- `plugins.slack.gates.approval` (table): Their approval; left out, the default gates.toml gives a draft gate.
+- `plugins.slack.gates.approval.mode` (one of `wait`, `delay`, `send`, `dry_run`, `run`): The approval mode.
+  - `wait`: Waits for you.
+  - `delay`: Resolves the gate to its approving intent when the window ends, unless you resolve it first.
+  - `send`: Releases the gate at once: a draft is sent, a run runs.
+  - `dry_run`: A draft gate only: stores the draft and never sends it; nobody can release it. A gate of another kind takes the next rule or its default.
+  - `run`: Releases the gate at once, as send.
 - `plugins.slack.gates.approval.window` (duration): How long a delay waits before the gate's consequence; only with mode delay.
 
 ### Slack ingest
@@ -764,33 +727,11 @@ The fields each notice reads besides `Name` and `Command`:
 - `workflows.<name>.enabled` (bool): Switches the workflow; left out, it is on.
 - `workflows.<name>.observe` (bool): Plans the workflow's items pending, for you to run; left out, the manifest's.
 - `workflows.<name>.only_when` (predicate): A condition ANDed with the workflow's when.
-- `workflows.<name>.approval` (an [approval table](#approval-tables) of run modes): The approval of the workflow's runs, over the manifest's field by field.
-
-### Workflow draft approval
-
-- `workflows.<name>.drafts` (table): The drafts the workflow proposes.
-- `workflows.<name>.drafts.approval` (an [approval table](#approval-tables) of draft modes): The approval of the workflow's drafts, over the manifest's field by field.
 
 ### Workflow gate approval
 
-- `workflows.<name>.gates` (table): The gates the workflow opens.
-- `workflows.<name>.gates.approval` (table): The approval of the workflow's gates, over the manifest's field by field.
-- `workflows.<name>.gates.approval.mode` (one of `send`, `delay`, `wait`, `dry_run`, `run`): The mode when no rule matches; left out, the manifest's.
-  - `send`: Posts at once.
-  - `delay`: Posts when the window ends unless a person stops it.
-  - `wait`: Waits for a person.
-  - `dry_run`: Stores the draft and never sends it; nobody can release it.
-  - `run`: Runs at once.
-- `workflows.<name>.gates.approval.window` (duration): How long a delay waits before it goes; only with mode delay.
-- `workflows.<name>.gates.approval.rule[]` (table): Rules tried in order before the mode, the first match wins; set, they replace the manifest's, and [] clears them.
-- `workflows.<name>.gates.approval.rule[].when` (predicate): When the rule applies.
-- `workflows.<name>.gates.approval.rule[].mode` (one of `send`, `delay`, `wait`, `dry_run`, `run`): The rule's mode.
-  - `send`: Posts at once.
-  - `delay`: Posts when the window ends unless a person stops it.
-  - `wait`: Waits for a person.
-  - `dry_run`: Stores the draft and never sends it; nobody can release it.
-  - `run`: Runs at once.
-- `workflows.<name>.gates.approval.rule[].window` (duration): The rule's delay; only with mode delay.
+- `workflows.<name>.gates` (table): The gates the workflow opens: its runs' plan gates, its drafts', its turns' drafts' and its gate.open steps'.
+- `workflows.<name>.gates.approval` (an [approval table](#approval-tables) of gate modes): The approval of the workflow's gates, a rule for the kinds its when pins gate.kind to, over the manifest's field by field.
 
 ### Turns and headless calls
 
@@ -861,26 +802,21 @@ The fields each notice reads besides `Name` and `Command`:
 
 ## Approval tables
 
-An approval table that links here has these keys; a run approval takes the run modes, a draft approval the draft modes.
+An approval table that links here has these keys, and takes the gate modes.
 
-- `mode` (string): The mode when no rule matches.
-- `window` (duration): How long a person has before the item runs or the draft is sent; only with mode delay, which needs it.
-- `rule[]` (table): A rule tried in order; the first whose when holds gives the mode.
-- `rule[].when` (predicate): When the rule applies.
-- `rule[].mode` (string): The mode when the rule applies.
-- `rule[].window` (duration): The rule's window; only with mode delay, which needs it.
+- `mode` (string): The mode of every kind of gate when no rule holds; left out, gates.toml's default of the kind.
+- `window` (duration): With mode delay only: how long a person has to stop the gate's consequence.
+- `rule[]` (table): A rule; the first whose when holds gives the mode.
+- `rule[].when` (predicate): When the rule applies to a gate.
+- `rule[].mode` (string): The rule's mode.
+- `rule[].window` (duration): With mode delay only: how long a person has to stop the gate's consequence.
 
-The run modes:
+The gate modes:
 
-- `run`: Runs at once.
-- `delay`: Runs when the window ends unless a person stops it.
-- `wait`: Waits for a person; a matched wait rule also holds an item a guard refuses.
-
-The draft modes:
-
-- `send`: Posts at once.
-- `delay`: Posts when the window ends unless a person stops it.
-- `wait`: Waits for a person.
-- `dry_run`: Stores the draft and never sends it; nobody can release it.
+- `wait`: Waits for you.
+- `delay`: Resolves the gate to its approving intent when the window ends, unless you resolve it first.
+- `send`: Releases the gate at once: a draft is sent, a run runs.
+- `dry_run`: A draft gate only: stores the draft and never sends it; nobody can release it. A gate of another kind takes the next rule or its default.
+- `run`: Releases the gate at once, as send.
 
 This page is generated from the grammar table by `make docs-ref`.

@@ -12,6 +12,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/duration"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/jsonschema"
 	"github.com/wloophq/wloop/internal/domain/mark"
@@ -39,15 +40,13 @@ type wManifest struct {
 	Order    *int              `toml:"order"`
 	Key      []string          `toml:"key"`
 	Marks    map[string]string `toml:"marks"`
-	Approval *mApproval        `toml:"approval"`
 	Drafts   *wDrafts          `toml:"drafts"`
 	Gates    *mGates           `toml:"gates"`
 }
 
-// wDrafts is the [drafts] table: the approval of the drafts the
-// workflow's steps and turns propose, and when its open ones are withdrawn.
+// wDrafts is the [drafts] table: when the open drafts the workflow's steps
+// and turns propose are withdrawn.
 type wDrafts struct {
-	Approval *mApproval `toml:"approval"`
 	Withdraw *wWithdraw `toml:"withdraw"`
 }
 
@@ -90,7 +89,7 @@ type wUnit struct {
 // reverted and loads without it. turnProblem, when set, is why a
 // turn.start may not name an intent or run it under a runner, with the
 // argument at fault; "" when it may.
-func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env, tasks TasksDef) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems, warnings Problems) {
+func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env, tasks TasksDef, gates GatesDef) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems, warnings Problems) {
 	var units []*wUnit
 	bundledUnits := map[string]*wUnit{}
 	if bundled != nil {
@@ -145,12 +144,12 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(inten
 	}
 	broken, reverted = map[string]Problems{}, map[string]Problems{}
 	for _, u := range units {
-		u.load(turnProblem, extras, tasks)
+		u.load(turnProblem, extras, tasks, gates)
 		if len(u.problems) > 0 && len(u.files.overlay) > 0 {
 			reverted[u.name] = u.files.own(u.problems, "workflow.toml")
 			problems = append(problems, reverted[u.name]...)
 			u.files.overlay = nil
-			u.load(turnProblem, extras, tasks)
+			u.load(turnProblem, extras, tasks, gates)
 		}
 		if len(u.problems) > 0 {
 			problems = append(problems, u.problems...)
@@ -216,9 +215,9 @@ func (u *wUnit) unknownMarks(readable map[string]bool) Problems {
 	return out
 }
 
-func (u *wUnit) load(turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env, tasks TasksDef) {
+func (u *wUnit) load(turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env, tasks TasksDef, gates GatesDef) {
 	file := u.files.path("workflow.toml")
-	s := &sheet{file: file, extras: extras, tasks: tasks}
+	s := &sheet{file: file, extras: extras, tasks: tasks, gates: gates}
 	defer func() { u.problems, u.warnings = s.problems, s.warnings }()
 	if !workflowNameRe.MatchString(u.name) {
 		s.problems = append(s.problems, Problem{File: u.dir, Msg: "a workflow name is 2 to 40 lowercase letters, digits and -, starting with a letter"})
@@ -328,9 +327,8 @@ func (s *sheet) defineWorkflow(name string, m wManifest, turnProblem func(intent
 	}
 	s.defineKey(&w, m.Key, slot)
 	s.defineMarks(&w, m.Marks, slot)
-	s.defineApproval(&w, m.Approval, slot)
+	s.defineApproval(&w, m.Gates, slot)
 	if d := m.Drafts; d != nil {
-		w.DraftApproval = s.draftApprovalAt("drafts.approval", d.Approval, s.withExtras(builtin.ApprovalEnv(true, slot), w.Provider, slot))
 		s.defineWithdraw(&w, d.Withdraw, slot)
 	}
 	s.turnBudget(w, m.Limits)
@@ -527,6 +525,9 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, turnPr
 		if use == builtin.StepTaskVerb {
 			s.taskVerb(p, st.Args)
 		}
+		if use == builtin.StepGateOpen {
+			s.gateOpen(p, st.Args)
+		}
 		args := maps.Clone(raw)
 		delete(args, "use")
 		ps := builtin.CheckStep(use, args)
@@ -590,6 +591,14 @@ func (s *sheet) stepFiles(steps []workflow.Step, read func(string) ([]byte, erro
 				}
 			}
 		}
+	}
+}
+
+// gateOpen checks that gate.open names a gate of gates.toml.
+func (s *sheet) gateOpen(p string, args map[string]any) {
+	name, _ := args["name"].(string)
+	if _, ok := s.gates.Gate(name); name != "" && !ok {
+		s.add(p+".name", "names no gate of %s%s", GatesFile, expr.DidYouMean(name, s.gates.names()))
 	}
 }
 
@@ -703,12 +712,26 @@ func (s *sheet) defineMarks(w *workflow.Workflow, marks map[string]string, slot 
 	w.Marks = marks
 }
 
-func (s *sheet) defineApproval(w *workflow.Workflow, a *mApproval, slot string) {
-	var env expr.Env
-	if slot != "" {
-		env = s.withExtras(builtin.WorkflowEnv(slot), w.Provider, slot)
+// defineApproval loads the workflow's [gates.approval]: the approval of its
+// runs' plan gates, of the drafts its steps and turns propose, and of the
+// gates its gate.open steps open, each laid over gates.toml's default.
+func (s *sheet) defineApproval(w *workflow.Workflow, g *mGates, slot string) {
+	var m *mApproval
+	if g != nil {
+		m = g.Approval
 	}
-	w.Approval = s.runApproval(a, env)
+	draftEnv := s.withExtras(builtin.ApprovalEnv(true, slot), w.Provider, slot)
+	var unitEnv expr.Env
+	if slot != "" {
+		unitEnv = s.withExtras(builtin.WorkflowEnv(slot), w.Provider, slot)
+	}
+	a := s.gateApproval(m, gate.Kinds, draftEnv, unitEnv)
+	w.Approval = a.kindApproval(gate.KindPlan, s.gates)
+	w.DraftApproval = a.draftPolicy(s.gates)
+	w.Gates = map[gate.Kind]workflow.Approval{}
+	for _, k := range GateKinds {
+		w.Gates[k] = a.kindApproval(k, s.gates)
+	}
 }
 
 // schemaArg is the step argument holding the schema the step's agent

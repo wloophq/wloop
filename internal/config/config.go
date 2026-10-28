@@ -281,22 +281,15 @@ type Cleanup struct {
 type WorkflowConfig struct {
 	Enabled *bool `json:"enabled,omitempty"`
 	// Observe plans the workflow's items pending, for a person to run.
-	Observe  *bool           `json:"observe,omitempty"`
-	Approval *ApprovalConfig `json:"approval,omitempty"`
+	Observe *bool `json:"observe,omitempty"`
 	// OnlyWhen is a predicate over the workflow's facts that must hold
 	// besides its manifest's when; "" adds none.
-	OnlyWhen string          `json:"only_when,omitempty"`
-	Drafts   *WorkflowDrafts `json:"drafts,omitempty"`
-	Gates    *WorkflowGates  `json:"gates,omitempty"`
+	OnlyWhen string         `json:"only_when,omitempty"`
+	Gates    *WorkflowGates `json:"gates,omitempty"`
 }
 
 // WorkflowGates holds the approval of the gates a workflow opens.
 type WorkflowGates struct {
-	Approval *ApprovalConfig `json:"approval,omitempty"`
-}
-
-// WorkflowDrafts holds the approval of the drafts a workflow proposes.
-type WorkflowDrafts struct {
 	Approval *ApprovalConfig `json:"approval,omitempty"`
 }
 
@@ -681,17 +674,12 @@ func (c Config) validateWorkflows() error {
 		}
 		w := c.Workflows[name]
 		if w.OnlyWhen != "" {
-			if err := workflowRule("workflows."+name+".only_when", w.OnlyWhen, false); err != nil {
+			if err := workflowRule("workflows."+name+".only_when", w.OnlyWhen); err != nil {
 				return err
 			}
 		}
-		if a := w.DraftApproval(); a != nil {
-			if err := a.validateDrafts("workflows." + name + ".drafts.approval"); err != nil {
-				return err
-			}
-		}
-		if w.Approval != nil {
-			if err := w.Approval.validateRun("workflows." + name + ".approval"); err != nil {
+		if a := w.GateApproval(); a != nil {
+			if err := a.validateGates("workflows." + name + ".gates.approval"); err != nil {
 				return err
 			}
 		}

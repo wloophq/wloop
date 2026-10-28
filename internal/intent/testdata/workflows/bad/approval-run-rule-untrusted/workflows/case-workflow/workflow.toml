@@ -5,8 +5,8 @@ when = '!workspace.main'
 [[step]]
 use = "workspace.remove"
 
-[approval]
+[gates.approval]
 mode = "wait"
-[[approval.rule]]
+[[gates.approval.rule]]
 when = 'size(workspace.pendency) == 0'
 mode = "run"

@@ -11,9 +11,8 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/config"
-	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
@@ -40,15 +39,15 @@ func ruleTrustedFacts(plants []trustPlant) []string {
 	return out
 }
 
-// TestApprovalRulesReadTrustedFacts checks that no approval rule that
-// releases (a draft rule of any mode, a run rule of mode run or delay)
-// loads when it reads an untrusted fact, in each object that holds one: an
-// intent's and a workflow's [drafts.approval], a workflow's [approval],
-// and the config's workflows.<name>.drafts.approval and
-// workflows.<name>.approval. The untrusted facts are the table's, the
-// brief's extra fields, a classification's output and a task property an
-// agent or a plugin writes, so an agent or a thread's text never releases
-// a send or a run.
+// TestApprovalRulesReadTrustedFacts checks that no [gates.approval] rule
+// that releases a gate (a draft gate's rule of any mode, any other gate's
+// of mode send, run or delay) loads when it reads an untrusted fact, in
+// each object that holds one: an intent's and a workflow's manifest, for
+// its plan gates and its draft gates, and the config's
+// workflows.<name>.gates.approval. The untrusted facts are the table's,
+// the brief's extra fields, a classification's output and a task property
+// an agent or a plugin writes, so an agent or a thread's text never
+// releases a send or a run.
 func TestApprovalRulesReadTrustedFacts(t *testing.T) {
 	t.Parallel()
 	var plants []trustPlant
@@ -109,17 +108,16 @@ func plantManifests(t *testing.T) []trustPlant {
 		slot := builtin.Slots[p]
 		facts := slices.Sorted(maps.Keys(untrustedFacts(slot)))
 		name := "plant-" + string(p)
-		var run, drafts strings.Builder
+		var rules strings.Builder
 		for i, f := range facts {
-			fmt.Fprintf(&run, "[[approval.rule]]\nwhen = '%s'\nmode = %q\n", untrustedFacts(slot)[f], workflow.ApprovalRun)
-			fmt.Fprintf(&drafts, "[[drafts.approval.rule]]\nwhen = '%s'\nmode = %q\n", untrustedFacts(slot)[f], draft.Send)
-			file := filepath.Join(root, "workflows", name, "workflow.toml")
-			want = append(want,
-				planted{file, fmt.Sprintf("approval.rule[%d].when", i), "workflow " + name + " [approval]", f},
-				planted{file, fmt.Sprintf("drafts.approval.rule[%d].when", i), "workflow " + name + " [drafts.approval]", f})
+			for j, k := range []gate.Kind{gate.KindPlan, gate.KindDraft} {
+				fmt.Fprintf(&rules, "[[gates.approval.rule]]\nwhen = 'gate.kind == \"%s\" && %s'\nmode = %q\n", k, untrustedFacts(slot)[f], gate.ModeSend)
+				file := filepath.Join(root, "workflows", name, "workflow.toml")
+				want = append(want, planted{file, fmt.Sprintf("gates.approval.rule[%d].when", 2*i+j), "workflow " + name + " [gates.approval] of a " + string(k) + " gate", f})
+			}
 		}
-		manifest := fmt.Sprintf("summary = \"Plant\"\nprovider = %q\nwhen = 'true'\n\n[[step]]\nuse = %q\n\n[approval]\nmode = %q\n%s\n[drafts.approval]\nmode = %q\n%s",
-			p, builtin.StepNotifySelf, workflow.ApprovalWait, run.String(), draft.Wait, drafts.String())
+		manifest := fmt.Sprintf("summary = \"Plant\"\nprovider = %q\nwhen = 'true'\n\n[[step]]\nuse = %q\n\n[gates.approval]\nmode = %q\n%s",
+			p, builtin.StepNotifySelf, gate.ModeWait, rules.String())
 		write(t, filepath.Join(root, "workflows", name, "workflow.toml"), manifest)
 	}
 
@@ -131,10 +129,10 @@ func plantManifests(t *testing.T) []trustPlant {
 	}
 	file := filepath.Join(root, "intents", host, "intent.toml")
 	for i, f := range slices.Sorted(maps.Keys(facts)) {
-		fmt.Fprintf(&rules, "[[drafts.approval.rule]]\nwhen = '%s'\nmode = %q\n", facts[f], draft.Send)
-		want = append(want, planted{file, fmt.Sprintf("drafts.approval.rule[%d].when", i), "intent " + host + " [drafts.approval]", f})
+		fmt.Fprintf(&rules, "[[gates.approval.rule]]\nwhen = '%s'\nmode = %q\n", facts[f], gate.ModeSend)
+		want = append(want, planted{file, fmt.Sprintf("gates.approval.rule[%d].when", i), "intent " + host + " [gates.approval]", f})
 	}
-	write(t, file, base+fmt.Sprintf("\n[drafts.approval]\nmode = %q\n%s", draft.Wait, rules.String()))
+	write(t, file, base+fmt.Sprintf("\n[gates.approval]\nmode = %q\n%s", gate.ModeWait, rules.String()))
 
 	b, err := turn.Base()
 	if err != nil {
@@ -203,8 +201,8 @@ func plantConfig(t *testing.T) []trustPlant {
 	for i, f := range slices.Sorted(maps.Keys(facts)) {
 		rule := func(mode string) string { return fmt.Sprintf(`[{when = %q, mode = %q}]`, facts[f], mode) }
 		for object, raw := range map[string]string{
-			"config workflows.<name>.approval":        "workflows.w.approval.rule = " + rule(string(workflow.ApprovalRun)),
-			"config workflows.<name>.drafts.approval": "workflows.w.drafts.approval.rule = " + rule(string(draft.Send)),
+			"config workflows.<name>.gates.approval, mode run":  "workflows.w.gates.approval.rule = " + rule(string(gate.ModeRun)),
+			"config workflows.<name>.gates.approval, mode send": "workflows.w.gates.approval.rule = " + rule(string(gate.ModeSend)),
 		} {
 			file := filepath.Join(dir, fmt.Sprintf("%d-%d.toml", i, len(out)))
 			write(t, file, raw)

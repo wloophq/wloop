@@ -177,6 +177,7 @@ func newEnv(t *testing.T) *env {
 		Evidence:    outbox.EvidenceTo(e.ledger.apply),
 		Items:       e.ledger,
 		Clock:       e.clock,
+		Posts:       func(draft.Delivery) bool { return false },
 		RepeatAfter: 24 * time.Hour,
 	}
 	e.job = &Job{Outbox: e.svc, Clock: e.clock, RepeatAfter: 24 * time.Hour,

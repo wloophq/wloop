@@ -5,6 +5,6 @@ when = 'session.managed && session.agent_state == "done"'
 [[step]]
 use = "session.close"
 
-[approval]
+[gates.approval]
 mode = "delay"
 window = "soon"

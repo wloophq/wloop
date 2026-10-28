@@ -9,7 +9,7 @@ Each entry is a file under `docs/src/content/docs/architecture/decisions/`, with
 
 | Decision | What it holds |
 |---|---|
-| [A draft is what its proposer declares](/architecture/decisions/a-draft-is-what-its-proposer-declares/) | A draft carries its purpose, delivery and effects; nothing follows from its kind, and a comment waits for a person. |
+| [A draft is what its proposer declares](/architecture/decisions/a-draft-is-what-its-proposer-declares/) | A draft carries its purpose, delivery and effects; nothing follows from its kind, and a draft that posts waits for a person. |
 | [A provider is asked what it can do](/architecture/decisions/a-provider-is-asked-what-it-can-do/) | A plugin declares its capabilities, and a provider id appears only in its plugin and the tables. |
 | [Architecture rules are tests](/architecture/decisions/architecture-rules-are-tests/) | Each architecture rule is a test with a self-test, and its reference page is generated. |
 | [Authority comes from you](/architecture/decisions/authority-comes-from-you/) | Endorsing, approving, taking over and removing come only from your surfaces, never from an agent. |
@@ -21,6 +21,7 @@ Each entry is a file under `docs/src/content/docs/architecture/decisions/`, with
 | [One daemon writes the store](/architecture/decisions/one-daemon-writes-the-store/) | Only the daemon, and the store commands under its lock, write the store. |
 | [One engine plans automatic work, and planning writes nothing](/architecture/decisions/one-engine-plans-automatic-work-and-planning-writes-nothing/) | Workflows are the only planner of automatic work, and evaluating a plan writes nothing. |
 | [One grammar for the profile language](/architecture/decisions/one-grammar-for-the-profile-language/) | Every reserved key of the profile and the configuration is a row of builtin.Grammar. |
+| [Only the gates service resolves a gate](/architecture/decisions/only-the-gates-service-resolves-a-gate/) | Every decision waiting on you is a gate, closed only by you, a trusted policy rule or a passed window. |
 | [Ports and adapters, dependencies inward](/architecture/decisions/ports-and-adapters-dependencies-inward/) | The domain and the core import inward only; adapters implement the core's ports. |
 | [Small ports owned by their consumer](/architecture/decisions/small-ports-owned-by-their-consumer/) | A port belongs to the core package that uses it and has at most five methods. |
 | [Sources are compiled-in plugins](/architecture/decisions/sources-are-compiled-in-plugins/) | A source is a compiled-in plugin; the core imports no plugin and no plugin another. |

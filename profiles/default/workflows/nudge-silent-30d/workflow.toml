@@ -8,5 +8,6 @@ key = ["pr.last_interaction_at"]
 use = "turn.start"
 intent = "nudge"
 
-[approval]
+[[gates.approval.rule]]
+when = 'gate.kind == "plan"'
 mode = "wait"

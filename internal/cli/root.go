@@ -359,6 +359,7 @@ func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (b
 		},
 		Ended: ended,
 		Repo:  repo,
+		Gates: db.Gates(e.Now),
 		Turns: func(ctx context.Context, u unit.Unit) (int, error) {
 			books, err := sqlite.New(db).Books(ctx, u)
 			return len(books[u].Turns), err

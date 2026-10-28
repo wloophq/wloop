@@ -222,8 +222,10 @@ func checkCoreFiles(t *testing.T, self string, p pkg) {
 	}
 }
 
-// ruleNoGate flags an import of the round gate, which the workflows replaced:
-// two automation mechanisms never live side by side.
+// ruleNoGate flags an import of internal/gate, the round gate the workflows
+// replaced, so two automation mechanisms never live side by side; the
+// gates of internal/core/gates, the decisions waiting on the user, are
+// another thing.
 func ruleNoGate(self string, imports []string) []string {
 	var out []string
 	for _, imp := range imports {
@@ -234,8 +236,9 @@ func ruleNoGate(self string, imports []string) []string {
 	return out
 }
 
-// TestNothingImportsTheGate checks that nothing imports `internal/gate`: the
-// workflow engine is the only planner of automatic rounds.
+// TestNothingImportsTheGate checks that nothing imports `internal/gate`, the
+// old round gate: the workflow engine is the only planner of automatic
+// rounds.
 func TestNothingImportsTheGate(t *testing.T) {
 	t.Parallel()
 	for _, p := range packages(t) {

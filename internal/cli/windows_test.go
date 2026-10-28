@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
@@ -28,11 +29,11 @@ func withoutWindows(cfg config.Config) config.Config {
 		}
 		wc := cfg.Workflows[w.Name]
 		a := config.ApprovalConfig{}
-		if wc.Approval != nil {
-			a = *wc.Approval
+		if wc.GateApproval() != nil {
+			a = *wc.GateApproval()
 		}
-		a.Mode, a.Window = string(workflow.ApprovalRun), nil
-		wc.Approval = &a
+		a.Rule = append([]config.ApprovalRuleConfig{{When: `gate.kind == "plan"`, Mode: string(gate.ModeRun)}}, a.Rule...)
+		wc.Gates = &config.WorkflowGates{Approval: &a}
 		cfg.Workflows[w.Name] = wc
 	}
 	return cfg

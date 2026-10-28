@@ -42,6 +42,7 @@ type Vocabulary struct {
 	briefSubjects      []string
 	workflowSlots      []string
 	deliveries         []string
+	pluginDeliveries   map[string]bool
 	events             map[string]unit.ProviderID
 	answering          map[unit.ProviderID]map[string]map[string]string
 	payloads           map[string]unit.ProviderID
@@ -63,6 +64,18 @@ type DraftKinds struct {
 // PluginDraftKinds are each merged plugin's draft kinds, by provider; the
 // host derives a draft's delivery from its kind through them.
 var PluginDraftKinds = map[unit.ProviderID]DraftKinds{}
+
+// pluginDeliveries are the deliveries the merged plugins declare, each
+// with whether a draft of it reaches people, as a manifest's posts says.
+var pluginDeliveries = map[string]bool{}
+
+// DeliveryPosts says whether a draft of delivery d reaches people: a
+// delivery a merged plugin declares posts unless no plugin marks it
+// posts, and one none declares always does.
+func DeliveryPosts(d string) bool {
+	posts, declared := pluginDeliveries[d]
+	return posts || !declared
+}
 
 // ToolProviders are the merged plugins' tools, by name, to the plugin that
 // declares each; a core tool is not one of them.
@@ -116,6 +129,7 @@ func Install(v *Vocabulary) {
 	WorkflowSlots, DraftDeliveries, EventProviders, AnsweringEvents = v.workflowSlots, v.deliveries, v.events, v.answering
 	PayloadProviders, RoundProviders, PluginTaskKinds = v.payloads, v.rounds, v.taskKinds
 	Tools, ToolAnswers, ToolProviders, PluginDraftKinds = v.tools, v.toolAnswers, v.toolProviders, v.draftKinds
+	pluginDeliveries = v.pluginDeliveries
 }
 
 // fits says why v, provider p's vocabulary among all, cannot merge.
@@ -232,6 +246,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	briefSubjects := slices.Clone(coreBriefSubjects)
 	unitSlots := slices.Clone(coreUnitSlots)
 	deliveries := slices.Clone(coreDeliveries)
+	pluginDelivs := map[string]bool{}
 	events := coreEventProviders()
 	answering := map[unit.ProviderID]map[string]map[string]string{}
 	payloads := map[string]unit.ProviderID{}
@@ -303,6 +318,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 			if !slices.Contains(deliveries, d.Name) {
 				deliveries = append(deliveries, d.Name)
 			}
+			pluginDelivs[d.Name] = pluginDelivs[d.Name] || d.Posts
 		}
 		if len(v.RowKinds) > 0 {
 			rowKinds[id] = slices.Clone(v.RowKinds)
@@ -327,7 +343,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	}
 	return &Vocabulary{facts: facts, actionFacts: actionFacts, effects: effects, roles: roles, steps: stepsWith(steps),
 		slots: slots, briefSubjects: briefSubjects, workflowSlots: slices.Concat(unitSlots, nonUnitSlots),
-		deliveries: deliveries, events: events, answering: answering, payloads: payloads, rounds: rounds, taskKinds: taskKinds,
+		deliveries: deliveries, pluginDeliveries: pluginDelivs, events: events, answering: answering, payloads: payloads, rounds: rounds, taskKinds: taskKinds,
 		tools: tools, toolAnswers: answers, toolProviders: toolProviders, draftKinds: draftKinds}
 }
 

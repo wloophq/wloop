@@ -73,7 +73,8 @@ type Def struct {
 	Bundled      bool
 	// Provider is the manifest's provider; default "github".
 	Provider unit.ProviderID
-	// DraftApproval is the manifest's [drafts.approval] block; nil when absent.
+	// DraftApproval is the approval of its turns' drafts, from the manifest's
+	// [gates.approval]; nil when that names none for a draft gate.
 	DraftApproval *draft.Policy
 	// Runners are turn.Runner values; default ["session"].
 	Runners []string

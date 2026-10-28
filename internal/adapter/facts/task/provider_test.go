@@ -12,10 +12,12 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/core/automation"
+	"github.com/wloophq/wloop/internal/core/gates"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/card"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -66,6 +68,7 @@ func newEnv(t *testing.T) *env {
 		Ended:    func(_ context.Context, u unit.Unit) (bool, error) { return e.ended[u], nil },
 		Turns:    func(_ context.Context, u unit.Unit) (int, error) { return e.turns[u], nil },
 		Repo:     func(_ context.Context, u unit.Unit) (string, error) { return e.repos[u], nil },
+		Gates:    db.Gates(func() time.Time { return e.clock.now }),
 		Clock:    e.clock,
 	})
 	return e
@@ -426,5 +429,30 @@ func TestTaskCapturedByUser(t *testing.T) {
 		if got := e.facts(id)["task.captured_by_user"]; got != want {
 			t.Errorf("%s: captured_by_user %v, want %v", id, got, want)
 		}
+	}
+}
+
+func TestGatesOpenCountsTheTasksOpenGates(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	e.task(task.Task{ID: "t-00000000000000a1", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "a"})
+	e.task(task.Task{ID: "t-00000000000000b2", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "b"})
+	gs := e.db.Gates(func() time.Time { return e.clock.now })
+	open := func(id task.ID, subject string) gate.Gate {
+		g, err := gs.Open(ctx, gate.Gate{Task: id, Unit: task.UnitOf(id), Kind: gate.KindQuestion, Name: "question", Subject: subject, Intents: []string{"answer", "dismiss"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return g
+	}
+	open("t-00000000000000a1", "1")
+	closed := open("t-00000000000000a1", "2")
+	open("t-00000000000000a1", "3")
+	open("t-00000000000000b2", "4")
+	if _, err := gs.Resolve(ctx, closed.ID, gates.Resolution{Status: gate.Dismissed, Intent: "dismiss", By: task.ActorPerson}); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.facts("t-00000000000000a1")["task.gates_open"]; got != 2 {
+		t.Fatalf("task.gates_open = %v, want 2: its open gates, not the closed one nor another task's", got)
 	}
 }

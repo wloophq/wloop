@@ -194,55 +194,6 @@
           },
           "type": "array"
         },
-        "approval": {
-          "additionalProperties": false,
-          "description": "The approval of its drafts; wait when absent.",
-          "properties": {
-            "mode": {
-              "description": "The approval when no rule holds.",
-              "enum": [
-                "send",
-                "delay",
-                "wait",
-                "dry_run"
-              ],
-              "type": "string"
-            },
-            "rule": {
-              "description": "A rule; the first whose when holds gives the mode.",
-              "items": {
-                "additionalProperties": false,
-                "properties": {
-                  "mode": {
-                    "description": "The rule's approval.",
-                    "enum": [
-                      "send",
-                      "delay",
-                      "wait",
-                      "dry_run"
-                    ],
-                    "type": "string"
-                  },
-                  "when": {
-                    "description": "When the approval rule applies to a draft.",
-                    "type": "string"
-                  },
-                  "window": {
-                    "description": "With mode delay only: how long a person has to stop the draft.",
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              },
-              "type": "array"
-            },
-            "window": {
-              "description": "With mode delay only: how long a person has to stop the draft.",
-              "type": "string"
-            }
-          },
-          "type": "object"
-        },
         "attach_posts": {
           "default": false,
           "description": "On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts.",
@@ -272,14 +223,14 @@
       "properties": {
         "approval": {
           "additionalProperties": false,
-          "description": "The approval of its gates.",
+          "description": "The approval of its gates: a rule applies to the kinds its when pins gate.kind to, else to draft gates alone when it reads a draft's facts, else to every kind; what no rule or mode here decides, gates.toml's [approval] does.",
           "properties": {
             "mode": {
-              "description": "The mode when no rule holds.",
+              "description": "The mode of every kind of gate when no rule holds; left out, gates.toml's default of the kind.",
               "enum": [
-                "send",
-                "delay",
                 "wait",
+                "delay",
+                "send",
                 "dry_run",
                 "run"
               ],
@@ -293,9 +244,9 @@
                   "mode": {
                     "description": "The rule's mode.",
                     "enum": [
-                      "send",
-                      "delay",
                       "wait",
+                      "delay",
+                      "send",
                       "dry_run",
                       "run"
                     ],

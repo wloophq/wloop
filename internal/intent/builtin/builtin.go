@@ -7,6 +7,7 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -114,7 +115,7 @@ const (
 	ActionSlot   FactSlot = "action"
 	TurnSlot     FactSlot = "turn"
 	WorkflowSlot FactSlot = "workflow"
-	// ApprovalSlot holds the draft's own facts a [drafts.approval] rule
+	// ApprovalSlot holds the draft's own facts a draft gate's rule
 	// reads besides its unit's.
 	ApprovalSlot FactSlot = "approval"
 	// NameSlot holds the facts a manifest's session.name reads.
@@ -140,7 +141,7 @@ type Fact struct {
 	Enum map[unit.ProviderID][]string
 	// Untrusted says that a third party's text, read by the extraction, the
 	// proposing turn itself or an agent's brief sets the fact's value, so
-	// no [drafts.approval] rule may read it.
+	// no rule of a draft gate, nor one that releases a gate, may read it.
 	Untrusted bool
 	// TimeVarying says that the fact changes as time passes with nothing
 	// else changing, so no workflow key may hold it.
@@ -206,7 +207,7 @@ func coreEventProviders() map[string]unit.ProviderID { return map[string]unit.Pr
 // LoopEventKinds are the event kinds the loop records on a unit of any
 // provider, which a workflow's trigger.on names.
 var LoopEventKinds = []string{EventMuted, EventUnmuted, EventHeld, EventReleased, EventAdopted, EventTracked, EventUntracked, "nudged",
-	EventRemoved, "status"}
+	EventRemoved, "status", gate.EventResolved}
 
 // The loop's event kinds the host records itself.
 const (

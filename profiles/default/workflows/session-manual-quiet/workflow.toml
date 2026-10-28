@@ -10,5 +10,6 @@ use = "session.close"
 per_run = 10
 per_day = 100
 
-[approval]
+[[gates.approval.rule]]
+when = 'gate.kind == "plan"'
 mode = "wait"

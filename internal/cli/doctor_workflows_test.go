@@ -118,7 +118,7 @@ func TestDoctorReportsWorkflows(t *testing.T) {
 	for name, want := range map[string]api.DoctorCheck{
 		"workflow session-pr-finished": {Mark: api.DoctorOK, Info: "sweep, last ran 2h ago, 2 refusal(s) in the last day"},
 		"workflow session-manual-quiet": {Mark: api.DoctorOK, Info: "sweep, never ran, 0 refusal(s) in the last day; each item waits for you to apply it" +
-			`; set workflows.session-manual-quiet.approval.mode = "run" in ` + te.ConfigPath + " to run them without you"},
+			`; add [[workflows.session-manual-quiet.gates.approval.rule]] with when = 'gate.kind == "plan"' and mode = "run" in ` + te.ConfigPath + " to run them without you"},
 		"workflow workspace-review-finished": {Mark: api.DoctorInfo, Info: "observe, sweep, 1 item(s) planned and none run; see " + brand.Command + " plan --workflow workspace-review-finished" +
 			`; set workflows.workspace-review-finished.observe = false in ` + te.ConfigPath + " to run them"},
 		"workflow workspace-duplicate": {Mark: api.DoctorInfo, Info: "observe, sweep, 0 item(s) planned and none run; see " + brand.Command + " plan --workflow workspace-duplicate" +
@@ -191,13 +191,13 @@ func TestDoctorWarnsOnAnUnknownWorkflowConfig(t *testing.T) {
 func TestDoctorReportsARunOverlayThatDoesNotMerge(t *testing.T) {
 	t.Parallel()
 	te, db := workflowDoctorEnv(t)
-	te.cfg.Workflows["session-manual-quiet"] = config.WorkflowConfig{Approval: &config.ApprovalConfig{Window: new(config.Days(5 * time.Minute))}}
+	te.cfg.Workflows["session-manual-quiet"] = config.WorkflowConfig{Gates: &config.WorkflowGates{Approval: &config.ApprovalConfig{Window: new(config.Days(5 * time.Minute))}}}
 	rep, err := te.doctorWith(db)(context.Background(), api.DoctorQuery{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	got, ok := checkNamed(rep.Workflows, "config workflows")
-	if !ok || got.Mark != api.DoctorMissing || !strings.Contains(got.Info, "workflows.session-manual-quiet.approval") || !strings.Contains(got.Info, "runs nowhere") {
+	if !ok || got.Mark != api.DoctorMissing || !strings.Contains(got.Info, "workflows.session-manual-quiet.gates.approval") || !strings.Contains(got.Info, "runs nowhere") {
 		t.Fatalf("%+v in %+v", got, rep.Workflows)
 	}
 }

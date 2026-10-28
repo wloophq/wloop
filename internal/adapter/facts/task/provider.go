@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -38,6 +39,11 @@ type Items interface {
 // Drafts lists the Outbox drafts (outbox.Store).
 type Drafts interface {
 	List(ctx context.Context, f outbox.Filter) ([]draft.Draft, error)
+}
+
+// Gates reads a task's gates (gates.Reader).
+type Gates interface {
+	OfTask(ctx context.Context, id task.ID) ([]gate.Gate, error)
 }
 
 // Settings are the config values the facts read.
@@ -65,6 +71,8 @@ type Deps struct {
 	// Repo is the repository of a unit, owner/name: its placement's, else its plugin's; "" none, and nil none
 	// at all.
 	Repo func(ctx context.Context, u unit.Unit) (string, error)
+	// Gates are read for task.gates_open; nil: always zero.
+	Gates Gates
 	// Turns counts the turns run on a unit; nil: none.
 	Turns func(ctx context.Context, u unit.Unit) (int, error)
 	// Clock's location is where working days are counted.
@@ -245,6 +253,9 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 		}
 		f["task.turns"] = n
 	}
+	if f["task.gates_open"], err = p.gatesOpen(ctx, e.ID); err != nil {
+		return nil, err
+	}
 	us := unitsOf(e)
 	if len(us) == 0 {
 		return f, nil
@@ -419,4 +430,18 @@ func workdaysSince(since, now time.Time, loc *time.Location) int {
 		n++
 	}
 	return n
+}
+
+func (p *Provider) gatesOpen(ctx context.Context, id task.ID) (int, error) {
+	if p.d.Gates == nil {
+		return 0, nil
+	}
+	gs, err := p.d.Gates.OfTask(ctx, id)
+	n := 0
+	for _, g := range gs {
+		if g.Status == gate.Open {
+			n++
+		}
+	}
+	return n, err
 }

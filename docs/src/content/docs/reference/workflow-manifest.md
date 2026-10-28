@@ -30,7 +30,7 @@ stage = "follow-up"
 
 ## Fields
 
-The loader refuses any other key, naming a close one when one exists. Without `[trigger]` a workflow is planned on every sweep; `on` plans it from a durable cursor of events, so an event seen while the daemon was down is handled once, and `schedule` on a cron in local time. The configuration's `workflows.<name>` overlays `observe`, `enabled`, `only_when`, `[approval]` and `[drafts.approval]`, field by field: `mode` and `window` replace those fields and `rule` replaces the rules (`[]` clears them); over a workflow without `[drafts.approval]`, the config's drafts block overlays the intent's for its turns' drafts. The config loads what holds alone; a block that fails once merged is named by `doctor`.
+The loader refuses any other key, naming a close one when one exists. Without `[trigger]` a workflow is planned on every sweep; `on` plans it from a durable cursor of events, so an event seen while the daemon was down is handled once, and `schedule` on a cron in local time. The configuration's `workflows.<name>` overlays `observe`, `enabled`, `only_when` and `[gates.approval]`, field by field: `mode` and `window` replace those fields and `rule` replaces the rules (`[]` clears them); over a workflow whose `[gates.approval]` names no draft gate, the config's block overlays the intent's for its turns' drafts. The config loads what holds alone; a block that fails once merged is named by `doctor`.
 
 ### What it matches
 
@@ -68,29 +68,17 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | `step[].use` | one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`, `gate.open`, `task.set` |  | The step. |
 | `step[].&lt;name&gt;` | string or list |  | The step's arguments. |
 
-### Run approval
-
-| Key | Kind | Default | Meaning |
-|---|---|---|---|
-| `approval` | table |  | The run approval: how a matched item runs. |
-| `approval.mode` | one of `run`, `delay`, `wait` | `run` | The mode when no rule matches. |
-| `approval.window` | duration |  | How long a person has before the item runs; only with mode delay, which needs it. |
-| `approval.rule[]` | table |  | A rule tried in order; the first whose when holds gives the mode. |
-| `approval.rule[].when` | predicate |  | When the rule applies. |
-| `approval.rule[].mode` | one of `run`, `delay`, `wait` |  | The mode when the rule applies. |
-| `approval.rule[].window` | duration |  | The rule's window; only with mode delay, which needs it. |
-
 ### Gate approval
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `gates` | table |  | The gates its runs and drafts open. |
-| `gates.approval` | table |  | The approval of its gates. |
-| `gates.approval.mode` | one of `send`, `delay`, `wait`, `dry_run`, `run` |  | The mode when no rule holds. |
+| `gates.approval` | table |  | The approval of its gates: a rule applies to the kinds its when pins gate.kind to, else to draft gates alone when it reads a draft's facts, else to every kind; what no rule or mode here decides, gates.toml's [approval] does. |
+| `gates.approval.mode` | one of `wait`, `delay`, `send`, `dry_run`, `run` |  | The mode of every kind of gate when no rule holds; left out, gates.toml's default of the kind. |
 | `gates.approval.window` | duration |  | With mode delay only: how long a person has to stop the gate's consequence. |
 | `gates.approval.rule[]` | table |  | A rule; the first whose when holds gives the mode. |
 | `gates.approval.rule[].when` | predicate |  | When the rule applies to a gate. |
-| `gates.approval.rule[].mode` | one of `send`, `delay`, `wait`, `dry_run`, `run` |  | The rule's mode. |
+| `gates.approval.rule[].mode` | one of `wait`, `delay`, `send`, `dry_run`, `run` |  | The rule's mode. |
 | `gates.approval.rule[].window` | duration |  | With mode delay only: how long a person has to stop the gate's consequence. |
 
 ### Drafts
@@ -101,13 +89,6 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | `drafts.withdraw` | table |  | When an open draft the workflow proposed is withdrawn. |
 | `drafts.withdraw.when` | predicate |  | When an open draft the workflow proposed is withdrawn, over the unit's facts and the draft's. |
 | `drafts.withdraw.reason` | one of `assigned`, `moot` | `moot` | The reason the withdrawn draft stores. |
-| `drafts.approval` | table |  | The approval of the drafts the workflow's steps and turns propose. |
-| `drafts.approval.mode` | one of `send`, `delay`, `wait`, `dry_run` | `wait` | The mode when no rule matches. |
-| `drafts.approval.window` | duration |  | How long a person has before the draft is sent; only with mode delay, which needs it. |
-| `drafts.approval.rule[]` | table |  | A rule tried in order; the first whose when holds gives the mode. |
-| `drafts.approval.rule[].when` | predicate |  | When the rule applies. |
-| `drafts.approval.rule[].mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The mode when the rule applies. |
-| `drafts.approval.rule[].window` | duration |  | The rule's window; only with mode delay, which needs it. |
 
 ## Steps
 
@@ -150,28 +131,26 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 
 ## Approval
 
-`[approval]` says how a matched item runs, and `[[approval.rule]]` overrides it for the items a rule's `when` holds for, the first match winning:
+`[gates.approval]` says how the gates the workflow opens are decided: the plan gate of each matched item, the drafts its steps and turns propose, and the gates its `gate.open` steps open. `[[gates.approval.rule]]` overrides its `mode` for the gates a rule's `when` holds for, the first match winning; a rule applies to the kinds its `when` pins `gate.kind` to, to draft gates alone when it reads a draft's facts, else to every kind, and one that reads `gate.kind` alone decides every gate of its kind. For an item:
 
-- `mode = "run"`, the default, runs it at once;
+- `mode = "run"` (or `"send"`) runs it at once, the default of `gates.toml` for a plan gate;
 - `mode = "delay"` with a `window` runs it when the window ends unless you act;
-- `mode = "wait"` keeps it `pending` until you apply or dismiss it, as the workspace workflows' rule does for a workspace with unsaved work, with the reason shown.
+- `mode = "wait"` keeps it `pending` until you apply or dismiss it, as the workspace workflows' rule does for a workspace with unsaved work, with the reason shown;
+- `mode = "dry_run"` is a draft gate's only: a rule that pins `gate.kind` to `plan` with it fails to load.
 
-The bundled `turn.start` workflows set `mode = "delay"` and `window = "60s"`. A rule that runs an item (`run` or `delay`) never reads an untrusted fact, `trigger.event.data` included; a `wait` rule may, and the workflow's `when` reads any fact. `observe = true` plans items and never runs them on its own: you apply one by hand. Dismissing or skipping an item is final for its key; holding, pausing or starting the round by hand drops the item without marking it.
+The bundled `turn.start` workflows hold their runs `60s` with a rule pinned to `gate.kind == "plan"`, `mode = "delay"` and `window = "60s"`, which leaves their turns' drafts to the intent. A rule that releases a gate (`send`, `run` or `delay`) never reads an untrusted fact, `trigger.event.data` included; a `wait` rule may, and the workflow's `when` reads any fact. `observe = true` plans items and never runs them on its own: you apply one by hand. Dismissing or skipping an item is final for its key; holding, pausing or starting the round by hand drops the item without marking it.
 
 ## Draft approval
 
-`[drafts.approval]` tries its rules in order and gives a draft the mode of the first whose `when` holds, else `mode`:
+For a draft, `[gates.approval]` tries its rules in order and gives it the mode of the first whose `when` holds, else `mode`:
 
 ```toml
-[drafts.approval]
-mode = "wait"
-
-[[drafts.approval.rule]]
-when = 'draft.purpose == "thanks" && slack.conversation == "dm"'
+[[gates.approval.rule]]
+when = 'draft.delivery == "message" && draft.purpose == "thanks" && slack.conversation == "dm"'
 mode = "send"
 ```
 
-It covers the drafts of the turns the workflow starts and of its `draft.propose` steps; without it, a turn's drafts follow the intent's, and a step's wait for you. A rule's `when` reads the [draft approval facts](/reference/facts/#draft-approval-facts) and the unit's facts, never `brief.*`, `trigger.*`, `config.*` or `handled()`. `draft.purpose` is the `draft.propose` step's `purpose`; for a draft of a turn the workflow started it reads as empty, since the turn's agent names it. A rule that sends on its own (`send` or `delay`) applies to a comment draft only when `draft.delivery == "comment"` is a term of its `when`'s top-level `&&`, and `mode` alone never releases a comment. `dry_run` stores the draft and never sends it. `[drafts.withdraw] when` withdraws an open draft the workflow's `draft.propose` proposed, with its `reason`.
+It covers the drafts of the turns the workflow starts and of its `draft.propose` steps; when it names no draft gate, a turn's drafts follow the intent's, and a step's take `gates.toml`'s default, which waits for you. A rule's `when` reads the [draft approval facts](/reference/facts/#draft-approval-facts) and the unit's facts, never `brief.*`, `trigger.*`, `config.*` or `handled()`. `draft.purpose` is the `draft.propose` step's `purpose`; for a draft of a turn the workflow started it reads as empty, since the turn's agent names it. A rule that sends on its own (`send`, `run` or `delay`) applies to a draft whose delivery posts, as its plugin's manifest marks it, only when `draft.delivery == "<delivery>"` is a term of its `when`'s top-level `&&`, and `mode` alone never releases a comment or a message. `dry_run` stores the draft and never sends it. `[drafts.withdraw] when` withdraws an open draft the workflow's `draft.propose` proposed, with its `reason`.
 
 ## Predicates
 
