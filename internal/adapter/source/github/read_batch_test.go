@@ -63,7 +63,7 @@ func TestReadBatchBudget(t *testing.T) {
 		t.Fatalf("fetched %d with %d events, want 30 with at least 1500", rep.Fetched, rep.Events)
 	}
 	metertest.Within(t, sc, metertest.Budget{
-		{Res: meter.SQL, Op: "query"}: 4,
+		{Res: meter.SQL, Op: "query"}: 5,
 		{Res: meter.Tx}:               2,
 		{Res: meter.Tx, Op: "write"}:  2,
 	})

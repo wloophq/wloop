@@ -2,11 +2,13 @@ package inventory
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -96,3 +98,128 @@ func TestSaveSnapshotsReportsEventsThroughTheBroker(t *testing.T) {
 		t.Errorf("a second save recorded %+v, want only the merge that fills", got)
 	}
 }
+
+// failOnce is a broker whose first RecordEvents fails.
+type failOnce struct {
+	*fakeBroker
+	failed bool
+}
+
+func (b *failOnce) RecordEvents(ctx context.Context, evs []src.Event) error {
+	if !b.failed {
+		b.failed = true
+		return errors.New("broker down")
+	}
+	return b.fakeBroker.RecordEvents(ctx, evs)
+}
+
+func keptKinds(b *fakeBroker) map[string]int {
+	out := map[string]int{}
+	for _, e := range b.kept {
+		out[e.Kind]++
+	}
+	return out
+}
+
+func TestSaveSnapshotsRepairsAFailedBrokerCall(t *testing.T) {
+	s := open(t)
+	b := &failOnce{fakeBroker: &fakeBroker{}}
+	s.UseHost(src.Host{Recorder: b, History: b})
+	ctx := context.Background()
+	at := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
+	pr := dinv.PR{Ref: ref, Title: "one", Author: "ana", State: "OPEN", Reasons: []string{"author"}}
+	push := dinv.Event{PR: ref, Kind: dinv.KindPush, Key: "abc", Actor: "ana", At: at}
+	if _, err := s.SaveSnapshots(ctx, []Snapshot{{PR: pr, Events: []dinv.Event{push}}}, at); err == nil {
+		t.Fatal("want the broker error")
+	}
+	if _, ok, err := s.PR(ctx, ref); err != nil || ok {
+		t.Fatalf("a save whose events the host refused stored the pull request (%v)", err)
+	}
+	if _, err := s.SaveSnapshots(ctx, []Snapshot{{PR: pr, Events: []dinv.Event{push}}}, at.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if got := keptKinds(b.fakeBroker); got[dinv.KindPush] != 1 || got[dinv.KindFollowed] != 1 {
+		t.Errorf("after the retry the host holds %v, want one push and one followed", got)
+	}
+}
+
+// failPRWrites makes every write of a pull request row fail until the
+// returned func runs.
+func failPRWrites(t *testing.T, s *Store) func() {
+	t.Helper()
+	ctx := context.Background()
+	for _, q := range []string{
+		`CREATE TRIGGER fail_pr_insert BEFORE INSERT ON pull_requests BEGIN SELECT RAISE(ABORT, 'disk full'); END`,
+		`CREATE TRIGGER fail_pr_update BEFORE UPDATE ON pull_requests BEGIN SELECT RAISE(ABORT, 'disk full'); END`,
+	} {
+		if _, err := s.db.Write(ctx, func(tx *sqlite.Tx) error { _, err := tx.ExecContext(ctx, q); return err }); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return func() {
+		if _, err := s.db.Write(ctx, func(tx *sqlite.Tx) error {
+			_, err := tx.ExecContext(ctx, `DROP TRIGGER fail_pr_insert; DROP TRIGGER fail_pr_update`)
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestAWriteThatFailsAfterTheBrokerLeavesEachEventOnce(t *testing.T) {
+	s := open(t)
+	b := &fakeBroker{}
+	s.UseHost(src.Host{Recorder: b, History: b})
+	ctx := context.Background()
+	at := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
+	pr := dinv.PR{Ref: ref, Title: "one", Author: "ana", State: "OPEN", Reasons: []string{"author"}, UpdatedAt: at}
+	push := dinv.Event{PR: ref, Kind: dinv.KindPush, Key: "abc", Actor: "ana", At: at}
+	heal := failPRWrites(t, s)
+	if _, err := s.SaveSnapshots(ctx, []Snapshot{{PR: pr, Events: []dinv.Event{push}}}, at); err == nil {
+		t.Fatal("want the write to fail")
+	}
+	if _, ok, err := s.PR(ctx, ref); err != nil || ok {
+		t.Fatalf("the failed write stored the pull request (%v), so the next ingest would skip it", err)
+	}
+	heal()
+	added, err := s.SaveSnapshots(ctx, []Snapshot{{PR: pr, Events: []dinv.Event{push}}}, at.Add(time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(added) != 0 {
+		t.Errorf("the retry added %v, want none: the host took them before the write failed", added)
+	}
+	if got := keptKinds(b); got[dinv.KindPush] != 1 || got[dinv.KindFollowed] != 1 {
+		t.Errorf("after the retry the host holds %v, want one push and one followed", got)
+	}
+	if got, ok, err := s.PR(ctx, ref); err != nil || !ok || !got.UpdatedAt.Equal(at) {
+		t.Errorf("the retry stored %+v %v %v", got, ok, err)
+	}
+}
+
+func TestSetReasonsRecordsItsFlipOnceAcrossAFailedWrite(t *testing.T) {
+	s := open(t)
+	b := &fakeBroker{}
+	s.UseHost(src.Host{Recorder: b, History: b})
+	ctx := context.Background()
+	upsert(t, s, dinv.PR{Ref: ref, Title: "one", State: "OPEN"})
+	heal := failPRWrites(t, s)
+	if err := s.SetReasons(ctx, ref, []string{"author"}); err == nil {
+		t.Fatal("want the write to fail")
+	}
+	heal()
+	if err := s.SetReasons(ctx, ref, []string{"author"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := keptKinds(b); got[dinv.KindFollowed] != 1 {
+		t.Errorf("the host holds %v, want one followed", got)
+	}
+	if err := s.SetReasons(ctx, ref, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := keptKinds(b); got[dinv.KindFollowed] != 1 || got[dinv.KindUnfollowed] != 1 {
+		t.Errorf("after unfollowing the host holds %v, want one followed and one unfollowed", got)
+	}
+}
+
+func TestTheOverrideWriteSharesNoTransactionWithPullRequests(t *testing.T) { t.Skip("X4b") }

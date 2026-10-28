@@ -3,7 +3,6 @@ package inventory
 import (
 	"context"
 	"encoding/json"
-	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -100,22 +99,6 @@ func (s *Store) hostEvents(ctx context.Context, refs []github.Ref, kinds ...stri
 	out := make([]dinv.Event, len(got))
 	for i, e := range got {
 		out[i] = dinv.Event{PR: refOf(e.Unit.Provider, e.Unit.Key), Kind: e.Kind, Key: e.Key, Actor: e.Actor, At: e.At, Data: string(e.Data)}
-	}
-	return out, nil
-}
-
-// lastFollowed is the time of the newest followed event of each of refs
-// that has one.
-func (s *Store) lastFollowed(ctx context.Context, refs []github.Ref) (map[github.Ref]time.Time, error) {
-	evs, err := s.hostEvents(ctx, refs, dinv.KindFollowed)
-	if err != nil {
-		return nil, err
-	}
-	out := map[github.Ref]time.Time{}
-	for _, e := range evs {
-		if e.At.After(out[e.PR]) {
-			out[e.PR] = e.At
-		}
 	}
 	return out, nil
 }

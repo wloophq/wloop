@@ -18,12 +18,57 @@ func f(db any, marks string) {
 	query(db, joined)
 	query(db, "SELECT kind FROM events WHERE unit_key IN ("+marks+")")
 }
+func built(db any) {
+	q := "SELECT p.title FROM pull_requests p"
+	q += " JOIN unit_marks m ON m.unit_key = p.number"
+	query(db, q)
+}
 func query(any, string) {}
+`
+
+const sharesATransaction = `package x
+const insertEvent = "INSERT INTO events (kind) VALUES (?)"
+func (s *Store) save(ctx any) error {
+	return s.db.Write(ctx, func(tx *sqlite.Tx) error {
+		tx.ExecContext(ctx, "UPDATE pull_requests SET title = ?")
+		return addEvent(ctx, tx)
+	})
+}
+func addEvent(ctx any, tx *sqlite.Tx) error {
+	tx.ExecContext(ctx, insertEvent)
+	return nil
+}
+func (s *Store) apart(ctx any) error {
+	if err := s.db.Write(ctx, func(tx *sqlite.Tx) error {
+		tx.ExecContext(ctx, "UPDATE pull_requests SET title = ?")
+		return nil
+	}); err != nil {
+		return err
+	}
+	return s.db.Write(ctx, func(tx *sqlite.Tx) error { return addEvent(ctx, tx) })
+}
+func (s *Store) allowed(ctx any) error {
+	return s.db.Write(ctx, func(tx *sqlite.Tx) error {
+		tx.ExecContext(ctx, "UPDATE pull_requests SET title = ?")
+		return addEvent(ctx, tx)
+	})
+}
 `
 
 func TestRSQLJoinFlagsAPluginTableJoinedWithACoreTable(t *testing.T) {
 	t.Parallel()
 	fset, f := parse(t, joinsPluginAndCore)
-	core := []string{"events", "unit_cards", "view_applied", "links"}
-	flagged(t, "joins", ruleSQLJoin(fset, map[string]*ast.File{"internal/adapter/store/x/x.go": f}, core), 3, "(R-sqljoin)")
+	core := []string{"events", "unit_cards", "view_applied", "links", "unit_marks"}
+	flagged(t, "joins", ruleSQLJoin(fset, map[string]*ast.File{"internal/adapter/store/x/x.go": f}, core, nil, map[int]bool{}), 4, "a query names")
+}
+
+func TestRSQLJoinFlagsATransactionWritingAPluginTableAndACoreTable(t *testing.T) {
+	t.Parallel()
+	fset, f := parse(t, sharesATransaction)
+	allow := []sqlJoinAllowed{{"internal/adapter/store/x/x.go", "allowed", "planted"}}
+	used := map[int]bool{}
+	flagged(t, "transactions", ruleSQLJoin(fset, map[string]*ast.File{"internal/adapter/store/x/x.go": f}, []string{"events"}, allow, used), 1, "a transaction of save")
+	if !used[0] {
+		t.Error("the allowlisted transaction was not matched")
+	}
 }

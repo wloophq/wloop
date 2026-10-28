@@ -99,9 +99,21 @@ func batchSnapshots() []Snapshot {
 // upsertOne is UpsertPR as it was before SaveSnapshots: one transaction
 // that reads the stored row and the scope, upserts, and records the flip.
 func upsertOne(ctx context.Context, s *Store, pr dinv.PR) error {
-	var flips []flipping
-	_, err := s.db.Write(ctx, func(tx *sqlite.Tx) error {
-		flips = nil
+	ended := pr.MergedAt
+	if ended.IsZero() {
+		ended = pr.ClosedAt
+	}
+	tracked, err := isTracked(ctx, s.db.R(), pr.Ref)
+	if err != nil {
+		return err
+	}
+	if err := s.recordFlipsOf(ctx, []github.Ref{pr.Ref}, pr.LastSeenAt, func(_ github.Ref, was scope) (scope, bool, error) {
+		sc, err := scopeOf(withTracked(append(slices.Clone(pr.Reasons), was.reasons...), tracked), was.ws, pr.State, ts(ended))
+		return sc, true, err
+	}); err != nil {
+		return err
+	}
+	_, err = s.db.Write(ctx, func(tx *sqlite.Tx) error {
 		var stored, storedMergeable, storedMergeableAt string
 		err := tx.QueryRowContext(ctx, `SELECT reasons, mergeable, mergeable_at FROM pull_requests WHERE owner=? AND repo=? AND number=?`, pr.Ref.Owner, pr.Ref.Repo, pr.Ref.Number).
 			Scan(&stored, &storedMergeable, &storedMergeableAt)
@@ -119,10 +131,6 @@ func upsertOne(ctx context.Context, s *Store, pr dinv.PR) error {
 			return err
 		}
 		reasons := withTracked(append(slices.Clone(pr.Reasons), storedReasons...), tracked)
-		before, err := scopes(ctx, tx, pr.Ref)
-		if err != nil {
-			return err
-		}
 		failing := ""
 		if len(pr.FailingChecks) > 0 {
 			raw, err := json.Marshal(pr.FailingChecks)
@@ -151,13 +159,9 @@ func upsertOne(ctx context.Context, s *Store, pr dinv.PR) error {
 			topics |= port.TopicFollow
 		}
 		tx.Touch(topics, pr.Ref.Unit())
-		flips, err = s.scopeFlips(ctx, tx, before, pr.LastSeenAt, pr.Ref)
-		return err
+		return nil
 	})
-	if err != nil {
-		return err
-	}
-	return s.recordFlips(ctx, flips)
+	return err
 }
 
 type storedState struct {

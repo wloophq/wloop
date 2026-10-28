@@ -30,7 +30,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestNoDraftKindComparisons` | Go names no draft kind, compares no draft's purpose with a value nor keys a table by it, and compares its delivery only in the publishers and the Outbox: a draft is what its proposer declares. |
 | `TestNoIntentEnumerations` | Go compares, switches on or lists no intent name outside allowlisted files. |
 | `TestNoProviderKindsInAPI` | A provider's kinds live in its own package, never in the API. |
-| `TestNoQueryJoinsPluginAndCoreTables` | No query of `internal/adapter/store` names both a table a source plugin owns and a core table: the plugin tables leave the core store, so a query that joins them with the core's becomes a snapshot read or a broker call. The migrations, history of the shared file, are exempt. |
+| `TestNoQueryJoinsPluginAndCoreTables` | No query of `internal/adapter/store`, and no transaction (a function literal passed to `Write`, or a function taking a `*Tx`, with the functions it hands the transaction to), names both a table a source plugin owns and a core table: the plugin tables leave the core store, so a query that joins them with the core's becomes a snapshot read or a broker call, and a write of both becomes two. The migrations, history of the shared file, are exempt. |
 | `TestNothingImportsTheGate` | Nothing imports `internal/gate`: the workflow engine is the only planner of automatic rounds. |
 | `TestOnlyClaudeDesktopManagerReachesDesktop` | Only the Claude Desktop manager's package reaches Claude Desktop's control surface. |
 | `TestOnlyGitHubReachesGitHub` | Only `internal/github` reaches GitHub's API, and only it and the composition root import `ghcli`. |
@@ -96,6 +96,12 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/core/turns/turnstest/intents.go` | ✅ | the test registry of today's intents |
 | `internal/core/turns/turnstest/store.go` | ✅ | test fixtures of today's intents |
 | `internal/turn/scenarios.go` | ✅ | eval fixtures |
+
+### `TestNoQueryJoinsPluginAndCoreTables`
+
+| `sqlJoinAllowlist` entry | Status | Reason |
+|---|---|---|
+| `internal/adapter/store/inventory/store.go` `writeOverride` | 🧾 | the overrides row, whose mute columns are the core's, and the pull request's reasons are written in one transaction until X4b's SetOverride writes the host's columns through the broker |
 
 ### `TestOnlyTheDraftStepProposes`
 

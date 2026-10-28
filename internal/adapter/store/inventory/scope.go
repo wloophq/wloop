@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +18,8 @@ import (
 
 type scope struct {
 	reasons  []string
+	ws       string
+	open     bool
 	followed bool
 	ended    time.Time
 }
@@ -28,13 +31,19 @@ func scopeOf(reasons []string, ws, state, ended string) (scope, error) {
 	if err != nil {
 		return scope{}, err
 	}
-	open := state == dgh.StateOpen
-	return scope{reasons: reasons, followed: open && dinv.PR{Reasons: reasons, Workspace: dinv.Workspace{ID: ws}}.Followed(), ended: end}, nil
+	return scope{reasons: reasons, ws: ws, open: state == dgh.StateOpen, ended: end}.with(reasons, ws), nil
+}
+
+// with is sc with reasons and the workspace ws.
+func (sc scope) with(reasons []string, ws string) scope {
+	sc.reasons, sc.ws = reasons, ws
+	sc.followed = sc.open && dinv.PR{Reasons: reasons, Workspace: dinv.Workspace{ID: ws}}.Followed()
+	return sc
 }
 
 // scopes reads the scope of each of refs, or of every pull request when refs
 // is empty.
-func scopes(ctx context.Context, tx *sqlite.Tx, refs ...github.Ref) (map[github.Ref]scope, error) {
+func scopes(ctx context.Context, tx sqlite.Reader, refs ...github.Ref) (map[github.Ref]scope, error) {
 	query, args := `SELECT owner, repo, number, reasons, ws_id, state, iif(merged_at != '', merged_at, closed_at) FROM pull_requests`, []any(nil)
 	if len(refs) > 0 {
 		var marks string
@@ -64,54 +73,88 @@ func scopes(ctx context.Context, tx *sqlite.Tx, refs ...github.Ref) (map[github.
 	return out, rows.Err()
 }
 
-// flipping is a pull request whose followed state flipped in a write.
-type flipping struct {
-	ref      github.Ref
-	was, now scope
-	at       time.Time
+// flipLog is what the host holds of pull requests' scope flips: the kind
+// of each one's last flip and the time of its last followed event.
+type flipLog struct {
+	last       map[github.Ref]string
+	lastAt     map[github.Ref]time.Time
+	followedAt map[github.Ref]time.Time
 }
 
-// scopeFlips are the pull requests among refs, every one when empty,
-// whose followed state flipped since before, at seen, else now.
-func (s *Store) scopeFlips(ctx context.Context, tx *sqlite.Tx, before map[github.Ref]scope, seen time.Time, refs ...github.Ref) ([]flipping, error) {
-	after, err := scopes(ctx, tx, refs...)
+// saw adds e to the log when it is a flip.
+func (l *flipLog) saw(e dinv.Event) {
+	if e.Kind != dinv.KindFollowed && e.Kind != dinv.KindUnfollowed {
+		return
+	}
+	if l.last == nil {
+		l.last, l.lastAt, l.followedAt = map[github.Ref]string{}, map[github.Ref]time.Time{}, map[github.Ref]time.Time{}
+	}
+	if !e.At.Before(l.lastAt[e.PR]) {
+		l.last[e.PR], l.lastAt[e.PR] = e.Kind, e.At
+	}
+	if e.Kind == dinv.KindFollowed && e.At.After(l.followedAt[e.PR]) {
+		l.followedAt[e.PR] = e.At
+	}
+}
+
+// wants says whether e, a flip, is one the host lacks: a flip of the kind
+// the host's last one already has is a retry of a write that failed after
+// the host took it.
+func (l *flipLog) wants(e dinv.Event) bool { return l.last[e.PR] != e.Kind }
+
+// flipLogOf reads the host's flips of refs.
+func (s *Store) flipLogOf(ctx context.Context, refs []github.Ref) (flipLog, error) {
+	evs, err := s.hostEvents(ctx, refs, dinv.KindFollowed, dinv.KindUnfollowed)
 	if err != nil {
-		return nil, err
+		return flipLog{}, err
 	}
-	var out []flipping
-	at := seen.UTC()
-	for ref, now := range after {
-		was := before[ref]
-		if now.followed == was.followed {
-			continue
-		}
-		if at.IsZero() {
-			at = s.clock().UTC()
-		}
-		out = append(out, flipping{ref, was, now, at})
+	var l flipLog
+	for _, e := range evs {
+		l.saw(e)
 	}
-	return out, nil
+	return l, nil
 }
 
-// recordFlips records the followed or unfollowed event of each of flips on
-// the host, an unfollow dated after the last followed event.
-func (s *Store) recordFlips(ctx context.Context, flips []flipping) error {
-	if len(flips) == 0 {
-		return nil
-	}
-	var unfollowed []github.Ref
-	for _, f := range flips {
-		if f.was.followed {
-			unfollowed = append(unfollowed, f.ref)
-		}
-	}
-	last, err := s.lastFollowed(ctx, unfollowed)
+// recordFlipsOf records on the host, before the write that makes them, the
+// flip of each of refs the write turns from its stored scope, zero when it
+// has no row, into what change says, at at, else now; change says false
+// for a ref the write leaves.
+func (s *Store) recordFlipsOf(ctx context.Context, refs []github.Ref, at time.Time, change func(github.Ref, scope) (scope, bool, error)) error {
+	before, err := scopes(ctx, s.db.R(), refs...)
 	if err != nil {
 		return err
 	}
-	evs := make([]dinv.Event, len(flips))
-	for i, f := range flips {
-		evs[i] = flip(f.ref, f.was, f.now, f.at, last[f.ref])
+	var flipped []github.Ref
+	after := map[github.Ref]scope{}
+	for _, ref := range refs {
+		was := before[ref]
+		now, ok, err := change(ref, was)
+		if err != nil {
+			return err
+		}
+		if ok && now.followed != was.followed {
+			flipped = append(flipped, ref)
+			after[ref] = now
+		}
+	}
+	if len(flipped) == 0 {
+		return nil
+	}
+	slices.SortFunc(flipped, compareRefs)
+	log, err := s.flipLogOf(ctx, flipped)
+	if err != nil {
+		return err
+	}
+	at = at.UTC()
+	if at.IsZero() {
+		at = s.clock().UTC()
+	}
+	var evs []dinv.Event
+	for _, ref := range flipped {
+		e := flip(ref, before[ref], after[ref], at, log.followedAt[ref])
+		if log.wants(e) {
+			evs = append(evs, e)
+		}
 	}
 	return s.recordEvents(ctx, evs)
 }
