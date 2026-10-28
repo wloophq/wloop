@@ -67,7 +67,7 @@ type rig struct {
 func newRig() *rig {
 	r := &rig{store: taskstest.New(), items: &fakeItems{byUnit: map[unit.Unit][]items.Item{}, reads: map[unit.Unit]int{}},
 		facts: &fakeFacts{facts: map[unit.Unit]task.UnitFacts{}, off: map[unit.ProviderID]bool{}}, clock: &clock{t0}}
-	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates, StaleWaitingDays: 2})
+	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority, StaleWaitingDays: 2})
 	return r
 }
 

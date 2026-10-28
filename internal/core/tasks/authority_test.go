@@ -79,7 +79,7 @@ func profileRig(t *testing.T, d intentload.TasksDef) *rig {
 	t.Helper()
 	r := newRig()
 	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock,
-		States: profileStates{TasksDef: d}})
+		States: profileStates{TasksDef: d}, Authority: profileStates{TasksDef: d}.Authority})
 	return r
 }
 
@@ -135,9 +135,12 @@ func TestNoActorMeansForbidden(t *testing.T) {
 	if err := r.svc.Accepts(e, task.VerbDone, task.ActorWorkflow); err != nil {
 		t.Errorf("a workflow on done: %v", err)
 	}
-	none := coretasks.New(coretasks.Deps{Store: r.store, States: struct{ coretasks.States }{taskstest.BundledStates}})
-	if err := none.Accepts(e, task.VerbDone, task.ActorPerson); !errors.Is(err, coretasks.ErrForbidden) {
-		t.Errorf("with no authority at all: %v", err)
+	none := coretasks.New(coretasks.Deps{Store: r.store, States: taskstest.BundledStates})
+	if err := none.Accepts(e, task.VerbSomeday, task.ActorPerson); err != nil {
+		t.Errorf("a person with no profile's authority at hand: %v", err)
+	}
+	if err := none.Accepts(e, task.VerbDone, task.ActorWorkflow); !errors.Is(err, coretasks.ErrForbidden) {
+		t.Errorf("a workflow with no profile's authority at hand: %v", err)
 	}
 }
 
@@ -184,8 +187,9 @@ func TestAGatedVerbOpensTheGateItsVerbNames(t *testing.T) {
 	confirm := gate.Gate{Name: "close-check", Kind: gate.KindProposal, Intents: []string{"approve", "reject"}}
 	r := newRig()
 	gs := gatestest.NewStore(func() time.Time { return t0 })
+	states := profileStates{TasksDef: d, gates: map[string]gate.Gate{"close-check": confirm}}
 	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, Gates: gs,
-		States: profileStates{TasksDef: d, gates: map[string]gate.Gate{"close-check": confirm}}})
+		States: states, Authority: states.Authority})
 	e := r.put(t, task.Task{ID: "t-1", Kind: task.KindCapture, State: "next", Origin: task.OriginUser})
 
 	res, err := r.svc.Do(ctx, e.ID, coretasks.Request{Verb: task.VerbDone, Actor: task.ActorWorkflow, Source: "tidy", Args: map[string]string{"why": "merged"}})

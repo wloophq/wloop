@@ -33,7 +33,8 @@ type Deps struct {
 	StaleWaitingDays int
 	// Disabled are the providers whose plugin is disabled now; nil: none is.
 	Disabled func() []unit.ProviderID
-	// Authority says who may run each verb; nil: States', when it is an Authorizer, else no actor may.
+	// Authority says who may run each verb, as the profile's by does; nil, with no profile at hand: a person
+	// may run every verb and no other actor any.
 	Authority Authority
 	// Gates opens the gate a gated verb opens; nil: a gated verb fails.
 	Gates gates.Store
@@ -58,10 +59,14 @@ type Service struct {
 
 func New(d Deps) *Service {
 	s := &Service{d: d, handlers: map[handlerKey]VerbHandler{}, views: map[task.View]viewSource{}, authority: d.Authority}
-	if a, ok := d.States.(Authorizer); ok && s.authority == nil {
-		s.authority = a.Authority
+	if s.authority == nil {
+		s.authority = personOnly
 	}
 	return s
+}
+
+func personOnly(_ context.Context, _ string, a task.Actor, _ task.Task) (bool, bool, error) {
+	return a == task.ActorPerson, false, nil
 }
 
 func (s *Service) now() time.Time { return s.d.Clock.Now() }

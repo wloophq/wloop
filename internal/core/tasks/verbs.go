@@ -65,9 +65,6 @@ func (s *Service) accepts(e task.Task, v task.Verb) error {
 // allowed says whether a may run v on e, and whether running it opens v's gate instead, as the profile's
 // authority says.
 func (s *Service) allowed(ctx context.Context, e task.Task, v task.Verb, a task.Actor) (gated bool, err error) {
-	if s.authority == nil {
-		return false, fmt.Errorf("%w: %s may not run %s: no authority", ErrForbidden, a, v)
-	}
 	allow, gate, err := s.authority(ctx, string(v), a, e)
 	switch {
 	case err != nil:

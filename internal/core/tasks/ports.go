@@ -143,11 +143,6 @@ type States interface {
 	Gate(verb string) (gate.Gate, bool)
 }
 
-// Authorizer is States that also says who may run a verb: the service runs on it when Deps.Authority is nil.
-type Authorizer interface {
-	Authority(ctx context.Context, verb string, a task.Actor, t task.Task) (allow, gate bool, err error)
-}
-
 // Recategorizer rewrites the stored tasks' categories from their states, as of reads them, noting the tasks
 // it moved. Unknown are the states tasks hold that of does not know; their tasks keep their category.
 type Recategorizer interface {

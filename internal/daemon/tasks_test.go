@@ -68,7 +68,7 @@ func newTasksRig(t *testing.T, edit func(*Deps)) *tasksRig {
 		}
 		enabled := d.PluginEnabled
 		r.ledger.Enabled = enabled
-		r.g = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: db.Tasks(), Items: r.ledger,
+		r.g = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority, Store: db.Tasks(), Items: r.ledger,
 			Facts: coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: func() task.Me { return meID }},
 			Me:    meID, Clock: fixedClock(tasksNow), StaleWaitingDays: 2, Disabled: disabledOf(enabled)})
 		d.Tasks = r.g

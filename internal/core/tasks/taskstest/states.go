@@ -94,7 +94,8 @@ func (bundledStates) Handler(verb string) string {
 
 func (bundledStates) Gate(string) (gate.Gate, bool) { return gate.Gate{}, false }
 
-// Authority lets a person run every bundled verb and a workflow those whose by.workflow is true.
+// Authority is the bundled profile's by, a coretasks.Authority: a person runs every bundled verb, a workflow those
+// whose by.workflow is true.
 func (bundledStates) Authority(_ context.Context, verb string, a task.Actor, _ task.Task) (bool, bool, error) {
 	switch a {
 	case task.ActorPerson:

@@ -64,7 +64,7 @@ func newTaskRig(t *testing.T, files map[string]string) *taskRig {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	te.tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: db.Tasks(), Facts: coretasks.CardFacts{Cards: db.Cards()}, Clock: clockFunc(func() time.Time { return te.Now() })})
+	te.tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority, Store: db.Tasks(), Facts: coretasks.CardFacts{Cards: db.Cards()}, Clock: clockFunc(func() time.Time { return te.Now() })})
 	return &taskRig{te: te, db: db}
 }
 
@@ -163,7 +163,7 @@ func TestTaskVerbLeavesClosingADerivedTaskToItsItems(t *testing.T) {
 
 func TestTaskVerbRunsOnlyVerbsThatMoveAStoredTask(t *testing.T) {
 	t.Parallel()
-	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates})
+	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority})
 	for _, v := range task.Verbs {
 		moves := false
 		for _, s := range []task.State{"inbox", "next", "waiting", "scheduled", "someday", "reference", "done", "trash"} {
