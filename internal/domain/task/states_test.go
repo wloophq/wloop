@@ -1,6 +1,12 @@
 package task_test
 
-import "github.com/wloophq/wloop/internal/domain/task"
+import (
+	"testing"
+	"time"
+
+	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/task"
+)
 
 // bundled are the bundled profile's states, in its order.
 type bundledStates struct{}
@@ -32,4 +38,24 @@ func (bundledStates) FirstOf(c task.Category) string {
 		}
 	}
 	return ""
+}
+
+func must[T any](t *testing.T, v T, err error) T {
+	t.Helper()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
+func reconciled(t *testing.T, f task.UnitFacts, its []items.Item, me task.Me, have []task.Task, st task.States, now time.Time) []task.Change {
+	t.Helper()
+	cs, err := task.Reconcile(f, its, me, have, st, now)
+	return must(t, cs, err)
+}
+
+func activity(t *testing.T, f task.UnitFacts, have []task.Task, st task.States, now time.Time) []task.Change {
+	t.Helper()
+	cs, err := task.Activity(f, have, st, now)
+	return must(t, cs, err)
 }

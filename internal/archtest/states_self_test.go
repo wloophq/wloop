@@ -28,6 +28,9 @@ func TestGoNamesNoStateFlagsPlantedStatesAndCategories(t *testing.T) {
 	if got := stateLiteralHits(fset, "internal/domain/task/other.go", sinfo, sf); len(got) != 2 {
 		t.Fatalf("category constants declared outside schema.go: want 2 hits, got %q", got)
 	}
+	extra := plantedTaskSchema + "const Next State = \"next\"\n"
+	xf, xinfo, _ := planted(t, fset, taskPkg, "schema.go", extra, nil)
+	flagged(t, "a state constant in schema.go", stateLiteralHits(fset, "internal/domain/task/schema.go", xinfo, xf), 1, `"next" is a task.State`)
 	src := `package x
 import "github.com/wloophq/wloop/internal/domain/task"
 const Next task.State = "next"
@@ -36,13 +39,15 @@ func f(e task.Task, s string) bool {
 	e.Category = "ready"
 	switch e.State { case "someday": return true }
 	if e.State == "" || e.Category == task.CategoryDone || s == "done" { return false }
+	const n = "doing"
+	if e.State == n { return true }
 	return e.State == task.State(s)
 }
 `
 	f, info, _ := planted(t, fset, module+"internal/x", "x.go", src, map[string]*types.Package{taskPkg: tp})
 	hits := stateLiteralHits(fset, "internal/x/x.go", info, f)
-	flagged(t, "planted literals", hits, 4, "is a task.")
-	for _, want := range []string{`"next" is a task.State`, `"waiting" is a task.State`, `"ready" is a task.Category`, `"someday" is a task.State`} {
+	flagged(t, "planted literals", hits, 5, "is a task.")
+	for _, want := range []string{`"next" is a task.State`, `"waiting" is a task.State`, `"ready" is a task.Category`, `"someday" is a task.State`, `"doing" is a task.State`} {
 		flagged(t, want, filter(hits, want), 1, want)
 	}
 

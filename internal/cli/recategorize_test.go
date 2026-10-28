@@ -61,10 +61,10 @@ func (r *profileRig) write(t *testing.T, text string) {
 	}
 }
 
-func (r *profileRig) put(t *testing.T, id task.ID, state string, c task.Category) {
+func (r *profileRig) put(t *testing.T, id task.ID, state string, c task.Category, units ...unit.Unit) {
 	t.Helper()
 	e := task.Task{ID: id, Kind: task.KindCapture, State: task.State(state), Category: c, Title: string(id), Origin: task.OriginUser,
-		Created: testNow, Updated: testNow}
+		Units: units, Created: testNow, Updated: testNow}
 	if err := r.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,8 @@ func (r *profileRig) category(t *testing.T, id task.ID) task.Category {
 func TestAProfileChangingAStatesCategoryRecategorizesTasks(t *testing.T) {
 	r := newProfileRig(t, "")
 	ctx := context.Background()
-	r.put(t, "t-w", "waiting", task.CategoryWaiting)
+	pr := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
+	r.put(t, "t-w", "waiting", task.CategoryWaiting, pr)
 	r.put(t, "t-n", "next", task.CategoryReady)
 	g := r.te.newTasks(r.db, r.te.cfg, nil)
 	if unknown, err := g.Recategorize(ctx); err != nil || len(unknown) != 0 || r.category(t, "t-w") != task.CategoryWaiting {
@@ -96,7 +97,7 @@ func TestAProfileChangingAStatesCategoryRecategorizesTasks(t *testing.T) {
 	if c := r.category(t, "t-w"); c != task.CategoryReady {
 		t.Errorf("a waiting task is %s, want ready", c)
 	}
-	if c := r.log.Since(from, port.TopicTasks); !slices.Equal(c.Units, []unit.Unit{task.UnitOf("t-w")}) {
+	if c := r.log.Since(from, port.TopicTasks); !slices.Equal(c.Units, []unit.Unit{pr, task.UnitOf("t-w")}) {
 		t.Errorf("noted %+v", c)
 	}
 	got, err := g.Tasks(ctx, task.Query{View: task.ViewNext})

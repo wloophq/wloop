@@ -36,7 +36,7 @@ type want struct {
 // (f.Mute nil) an entry with Snooze.Mute returns to Snooze.Return. A muted entry never enters Inbox on its own.
 // Due: items.Item.Deadline in RFC 3339 is taken as is; "YYYY-MM-DD" is 18:00 in now's location that day;
 // anything else is none.
-func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st States, now time.Time) []Change {
+func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st States, now time.Time) ([]Change, error) {
 	mute := activeMute(f, now)
 	wants := wanted(f, its, me)
 	byID := map[ID]Task{}
@@ -51,13 +51,23 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st States, now
 		seen[w.id] = true
 		old, ok := byID[w.id]
 		if !ok {
-			e := w.task(f, st, now)
-			e = applyMute(e, mute, st)
+			e, err := w.task(f, st, now)
+			if err == nil {
+				e, err = applyMute(e, mute, st)
+			}
+			if err != nil {
+				return nil, err
+			}
 			out = append(out, Change{Op: OpCreate, Task: e, Why: "derived from " + f.Unit.String()})
 			continue
 		}
-		e, op, why := w.update(old, f, st, now)
-		e = applyMute(e, mute, st)
+		e, op, why, err := w.update(old, f, st, now)
+		if err == nil {
+			e, err = applyMute(e, mute, st)
+		}
+		if err != nil {
+			return nil, err
+		}
 		if !e.Same(old) {
 			e.Updated = now
 			out = append(out, Change{Op: op, Task: e, Why: why})
@@ -74,7 +84,9 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st States, now
 		e.Items = nil
 		op, why := OpUpdate, "no item calls for it"
 		if e.Open() {
-			e.MoveTo(CategoryDone, st)
+			if err := e.MoveTo(CategoryDone, st); err != nil {
+				return nil, err
+			}
 			op, why = OpResolve, "its items resolved"
 			e.Snooze = Snooze{}
 		}
@@ -83,7 +95,7 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st States, now
 			out = append(out, Change{Op: op, Task: e, Why: why})
 		}
 	}
-	return out
+	return out, nil
 }
 
 func derivedFrom(e Task, f UnitFacts) bool {
@@ -181,10 +193,12 @@ func (w want) since(now time.Time) time.Time {
 	return s
 }
 
-func (w want) task(f UnitFacts, st States, now time.Time) Task {
+func (w want) task(f UnitFacts, st States, now time.Time) (Task, error) {
 	e := Task{ID: w.id, Kind: w.kind, Title: w.title, Items: w.refs(), Units: units(f, w),
 		Origin: OriginDerived, Created: now, Updated: now}
-	e.MoveTo(w.initial, st)
+	if err := e.MoveTo(w.initial, st); err != nil {
+		return e, err
+	}
 	e.SetProp(PropDue, Value{Time: w.deadline(now.Location())}, WriterPlugin, now)
 	if w.kind == KindAction {
 		e.SetProp(PropContexts, Value{List: slices.Clone(w.items[0].Contexts)}, WriterPlugin, now)
@@ -193,7 +207,7 @@ func (w want) task(f UnitFacts, st States, now time.Time) Task {
 		e.Waiting = &WaitingOn{On: []items.Person{*w.person}, Since: w.since(now)}
 		e.SetProp(PropContexts, Value{List: contextsOf(w.items)}, WriterPlugin, now)
 	}
-	return e
+	return e, nil
 }
 
 func contextsOf(its []items.Item) []string {
@@ -220,7 +234,7 @@ func units(f UnitFacts, w want) []unit.Unit {
 
 // update refreshes what the items own of old and keeps what the user set; a held entry that gains an
 // open item it did not hold returns to Inbox.
-func (w want) update(old Task, f UnitFacts, st States, now time.Time) (Task, ChangeOp, string) {
+func (w want) update(old Task, f UnitFacts, st States, now time.Time) (Task, ChangeOp, string, error) {
 	e := old
 	refs := w.refs()
 	e.Title, e.Items = w.title, refs
@@ -239,11 +253,13 @@ func (w want) update(old Task, f UnitFacts, st States, now time.Time) (Task, Cha
 		}
 	}
 	if !old.Open() && reopened(old.Items, refs) {
-		e.MoveTo(CategoryInbox, st)
+		if err := e.MoveTo(CategoryInbox, st); err != nil {
+			return e, "", "", err
+		}
 		e.Changed, e.Snooze = true, Snooze{}
-		return e, OpReinbox, "an item reopened"
+		return e, OpReinbox, "an item reopened", nil
 	}
-	return e, OpUpdate, "items changed"
+	return e, OpUpdate, "items changed", nil
 }
 
 func reopened(held, now []ItemRef) bool {

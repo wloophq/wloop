@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -46,8 +48,19 @@ type States interface {
 	FirstOf(c Category) string
 }
 
-// MoveTo moves the task into category c, in the first state st declares of it.
-func (e *Task) MoveTo(c Category, st States) { e.State, e.Category = State(st.FirstOf(c)), c }
+// ErrNoStateOf is a move into a category the profile declares no state of.
+var ErrNoStateOf = errors.New("the profile declares no state of the category")
+
+// MoveTo moves the task into category c, in the first state st declares of it; ErrNoStateOf, naming c, when
+// st declares none, and the task is left as it was.
+func (e *Task) MoveTo(c Category, st States) error {
+	s := st.FirstOf(c)
+	if s == "" {
+		return fmt.Errorf("%w %s", ErrNoStateOf, c)
+	}
+	e.State, e.Category = State(s), c
+	return nil
+}
 
 // Become moves the task to state s, in the category st declares of it; an undeclared state keeps the
 // task's category.

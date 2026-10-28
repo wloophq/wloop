@@ -383,7 +383,11 @@ func TestUnitClosedClosesTheTaskAndUnwatchesAfterWarmFor(t *testing.T) {
 	closeOf := func(closed bool) []task.Change {
 		done := items.Item{ID: "i1", Unit: draftThread, State: items.Resolved, Requester: ana}
 		f := task.UnitFacts{Unit: draftThread, StartedByMe: true, ClosurePosted: closed}
-		return task.Reconcile(f, []items.Item{done}, task.Me{Keys: []string{ana.Key}}, nil, taskstest.BundledStates, now)
+		cs, err := task.Reconcile(f, []items.Item{done}, task.Me{Keys: []string{ana.Key}}, nil, taskstest.BundledStates, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cs
 	}
 	if cs := closeOf(false); len(cs) != 1 || cs[0].Task.Kind != task.KindClose {
 		t.Fatalf("no close entry before the closure: %+v", cs)

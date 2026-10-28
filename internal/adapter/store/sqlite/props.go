@@ -54,7 +54,7 @@ func (s PropStore) SetProp(ctx context.Context, id task.ID, name string, v task.
 		case !v.IsZero() && oldBody == string(body) && oldWriter == string(w):
 			return nil
 		}
-		q, args := upsertPropSQL, []any{string(id), name, string(body), string(w), formatTime(s.now())}
+		q, args := upsertPropSQL, []any{string(id), name, string(body), string(w), eventTime(s.now())}
 		if v.IsZero() {
 			q, args = `DELETE FROM task_props WHERE task_id = ? AND name = ?`, []any{string(id), name}
 		}

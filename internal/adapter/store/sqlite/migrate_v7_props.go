@@ -87,7 +87,7 @@ func v7UserProps(ctx context.Context, tx *sql.Tx) error {
 		if t.IsZero() {
 			return s
 		}
-		return formatTime(t)
+		return eventTime(t)
 	}
 	err := eachRow(ctx, tx, `SELECT id, origin, area, focus_on, focus_auto, focus_at, deadline, updated FROM tasks ORDER BY id`, nil,
 		func(r *sql.Rows) error {

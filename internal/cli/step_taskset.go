@@ -70,3 +70,29 @@ func (s *stepSet) gateOpenCheck(context.Context, stepCall, automation.CheckOpts)
 func (s *stepSet) gateOpenRun(context.Context, stepCall, automation.RunOpts) (string, error) {
 	return "", errGateOpenG2
 }
+
+// serviceProps writes the properties through the daemon's tasks service, under the lock its other writes take.
+type serviceProps struct{ e *Env }
+
+func (p serviceProps) service() (*coretasks.Service, error) {
+	if p.e.tasks == nil {
+		return nil, errors.New("no tasks service: the daemon runs the steps")
+	}
+	return p.e.tasks, nil
+}
+
+func (p serviceProps) SetProp(ctx context.Context, id task.ID, name string, v task.Value, w task.Writer) error {
+	g, err := p.service()
+	if err != nil {
+		return err
+	}
+	return g.SetProp(ctx, id, name, v, w)
+}
+
+func (p serviceProps) PropsOf(ctx context.Context, id task.ID) (task.Props, error) {
+	g, err := p.service()
+	if err != nil {
+		return nil, err
+	}
+	return g.PropsOf(ctx, id)
+}

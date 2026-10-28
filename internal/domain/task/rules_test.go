@@ -59,7 +59,7 @@ func apply(have []task.Task, cs []task.Change) []task.Task {
 
 func reconcile(t *testing.T, f task.UnitFacts, its []items.Item, have []task.Task, at time.Time) []task.Task {
 	t.Helper()
-	return apply(have, task.Reconcile(f, its, me, have, bundled, at))
+	return apply(have, reconciled(t, f, its, me, have, bundled, at))
 }
 
 func only(t *testing.T, es []task.Task) task.Task {
@@ -185,7 +185,7 @@ func TestDismissedStaysDismissedUntilReopen(t *testing.T) {
 	its := []items.Item{item("a", owedBy(ana)), item("b", owedBy(ana))}
 	e := only(t, reconcile(t, facts(), its, nil, now))
 	e.State, e.Category = "trash", task.CategoryDropped
-	if cs := task.Reconcile(facts(), its, me, []task.Task{e}, bundled, now); len(cs) != 0 {
+	if cs := reconciled(t, facts(), its, me, []task.Task{e}, bundled, now); len(cs) != 0 {
 		t.Fatalf("changes %+v", cs)
 	}
 	resolved(&its[0])
@@ -204,7 +204,7 @@ func TestReconcileIsIdempotent(t *testing.T) {
 	mute := func(f *task.UnitFacts) { f.Mute = &task.Mute{Until: now.Add(48 * time.Hour)}; f.Cares = true }
 	its := []items.Item{item("a"), item("b", owedBy(ana)), item("c", owedBy(bob), func(it *items.Item) { it.Deadline = "2026-10-30" })}
 	first := reconcile(t, facts(mute), its, nil, now)
-	cs := task.Reconcile(facts(mute), its, me, first, bundled, now.Add(time.Minute))
+	cs := reconciled(t, facts(mute), its, me, first, bundled, now.Add(time.Minute))
 	if len(cs) != 0 {
 		t.Fatalf("second run changes %+v", cs)
 	}
@@ -252,7 +252,7 @@ func TestMuteUntilStateChangeWakesOnActivity(t *testing.T) {
 		f := facts(func(f *task.UnitFacts) { f.Mute = &task.Mute{UntilStateChange: change} })
 		e := only(t, reconcile(t, f, its, nil, now))
 		f.LastHuman = now.Add(time.Hour)
-		cs := task.Activity(f, []task.Task{e}, bundled, now.Add(2*time.Hour))
+		cs := activity(t, f, []task.Task{e}, bundled, now.Add(2*time.Hour))
 		if !change {
 			if len(cs) != 0 {
 				t.Fatalf("activity moved a muted entry: %+v", cs)
@@ -262,7 +262,7 @@ func TestMuteUntilStateChangeWakesOnActivity(t *testing.T) {
 		if len(cs) != 1 || cs[0].Task.Category != task.CategoryInbox || !cs[0].Task.Changed {
 			t.Fatalf("activity: %+v", cs)
 		}
-		if again := task.Reconcile(f, its, me, []task.Task{cs[0].Task}, bundled, now.Add(3*time.Hour)); len(again) != 0 {
+		if again := reconciled(t, f, its, me, []task.Task{cs[0].Task}, bundled, now.Add(3*time.Hour)); len(again) != 0 {
 			t.Fatalf("the woken entry was muted again: %+v", again)
 		}
 	}
@@ -343,7 +343,7 @@ func TestActivityReinboxesWithChangedMark(t *testing.T) {
 		{ID: "e-fresh", State: "waiting", Category: task.CategoryWaiting, SeenAt: now},
 	}
 	var got []task.ID
-	for _, c := range task.Activity(f, have, bundled, now) {
+	for _, c := range activity(t, f, have, bundled, now) {
 		if c.Task.Category != task.CategoryInbox || !c.Task.Changed || c.Op != task.OpReinbox || c.Task.Snooze != (task.Snooze{}) {
 			t.Errorf("change %+v", c)
 		}
@@ -359,7 +359,7 @@ func TestOwnActivityDoesNotReinbox(t *testing.T) {
 	have := []task.Task{{ID: "e-wait", State: "waiting", Category: task.CategoryWaiting, SeenAt: seen, Created: now.Add(-48 * time.Hour)}}
 	for _, last := range []time.Time{{}, seen.Add(-time.Minute)} {
 		f := facts(func(f *task.UnitFacts) { f.LastHuman = last })
-		if cs := task.Activity(f, have, bundled, now); len(cs) != 0 {
+		if cs := activity(t, f, have, bundled, now); len(cs) != 0 {
 			t.Fatalf("last human %v: changes %+v", last, cs)
 		}
 	}
@@ -368,22 +368,22 @@ func TestOwnActivityDoesNotReinbox(t *testing.T) {
 func TestEmptyKeyIsNeverMe(t *testing.T) {
 	blank := task.Me{Keys: []string{"", "github:me"}}
 	it := item("a", func(it *items.Item) { it.WaitingOn, it.Requester = []items.Person{{Name: "someone"}}, items.Person{} })
-	if cs := task.Reconcile(facts(), []items.Item{it}, blank, nil, bundled, now); len(cs) != 0 {
+	if cs := reconciled(t, facts(), []items.Item{it}, blank, nil, bundled, now); len(cs) != 0 {
 		t.Fatalf("an unknown person counted as me: %+v", cs)
 	}
 }
 
 func TestWakeReturnsToItsState(t *testing.T) {
 	e := task.Task{State: "scheduled", Category: task.CategoryDeferred, Snooze: task.Snooze{Until: now, Return: task.State("next")}}
-	got, ok := task.Wake(e, bundled, now)
+	got, ok, _ := task.Wake(e, bundled, now)
 	if !ok || got.Category != task.CategoryReady || got.Snooze != (task.Snooze{}) {
 		t.Fatalf("woke %+v %v", got, ok)
 	}
-	if _, ok := task.Wake(e, bundled, now.Add(-time.Second)); ok {
+	if _, ok, _ := task.Wake(e, bundled, now.Add(-time.Second)); ok {
 		t.Fatal("woke early")
 	}
 	e.Snooze = task.Snooze{OnActivity: true}
-	if _, ok := task.Wake(e, bundled, now); ok {
+	if _, ok, _ := task.Wake(e, bundled, now); ok {
 		t.Fatal("woke an entry with no date")
 	}
 }
@@ -391,10 +391,10 @@ func TestWakeReturnsToItsState(t *testing.T) {
 func TestMutedUnitActivitySparesUserSchedule(t *testing.T) {
 	f := facts(func(f *task.UnitFacts) { f.Mute, f.LastHuman = &task.Mute{Until: now.Add(time.Hour)}, now })
 	have := []task.Task{{ID: "e-mine", State: "scheduled", Category: task.CategoryDeferred, Snooze: task.Snooze{OnActivity: true, Return: task.State("next")}, Created: now.Add(-time.Hour)}}
-	if cs := task.Activity(f, have, bundled, now); len(cs) != 0 {
+	if cs := activity(t, f, have, bundled, now); len(cs) != 0 {
 		t.Fatalf("activity on a muted unit moved %+v", cs)
 	}
-	if cs := task.Reconcile(f, nil, me, have, bundled, now); len(cs) != 0 {
+	if cs := reconciled(t, f, nil, me, have, bundled, now); len(cs) != 0 {
 		t.Fatalf("the mute took over a user's schedule: %+v", cs)
 	}
 }

@@ -82,25 +82,74 @@ func stateTyped(info *types.Info, e ast.Expr) (string, bool) {
 	return n.Obj().Name(), slices.Contains(stateTypes, name)
 }
 
+// stateLiteralHits are the constant expressions of f typed task.State or task.Category: a literal, a named
+// constant or a conversion of one. The Category constants of internal/domain/task, the closed set, may be
+// read anywhere, and declared, with Categories, only in schema.go.
 func stateLiteralHits(fset *token.FileSet, rel string, info *types.Info, f *ast.File) []string {
 	var out []string
 	declares := rel == "internal/domain/task/schema.go"
 	ast.Inspect(f, func(n ast.Node) bool {
-		if d, ok := n.(*ast.GenDecl); ok && declares && (d.Tok == token.CONST || d.Tok == token.VAR) {
+		if d, ok := n.(*ast.GenDecl); ok && declares && closedSetDecl(info, d) {
 			return false
 		}
-		lit, ok := n.(*ast.BasicLit)
-		if !ok || lit.Kind != token.STRING {
+		e, ok := n.(ast.Expr)
+		if !ok {
 			return true
 		}
-		typ, ok := stateTyped(info, lit)
-		if v, err := strconv.Unquote(lit.Value); ok && err == nil && v != "" {
-			out = append(out, fmt.Sprintf("%s:%d: the literal %s is a task.%s; read the category, bind the state from the profile",
-				rel, fset.Position(lit.Pos()).Line, lit.Value, typ))
+		tv, ok := info.Types[e]
+		if !ok || tv.Value == nil {
+			return true
 		}
-		return true
+		typ, ok := stateTyped(info, e)
+		if !ok || tv.Value.ExactString() == `""` || closedSetConst(info, e) {
+			return true
+		}
+		out = append(out, fmt.Sprintf("%s:%d: %s is a task.%s constant; read the category, bind the state from the profile",
+			rel, fset.Position(e.Pos()).Line, tv.Value.ExactString(), typ))
+		return false
 	})
 	return out
+}
+
+// closedSetConst says whether e names a Category constant of internal/domain/task.
+func closedSetConst(info *types.Info, e ast.Expr) bool {
+	var id *ast.Ident
+	switch x := ast.Unparen(e).(type) {
+	case *ast.Ident:
+		id = x
+	case *ast.SelectorExpr:
+		id = x.Sel
+	default:
+		return false
+	}
+	c, ok := info.Uses[id].(*types.Const)
+	return ok && c.Pkg() != nil && c.Pkg().Path() == taskPkg && types.TypeString(c.Type(), nil) == taskPkg+".Category"
+}
+
+// closedSetDecl says whether d declares the closed set: a const block of task.Category constants, or the
+// Categories var.
+func closedSetDecl(info *types.Info, d *ast.GenDecl) bool {
+	if len(d.Specs) == 0 {
+		return false
+	}
+	for _, sp := range d.Specs {
+		vs, ok := sp.(*ast.ValueSpec)
+		if !ok {
+			return false
+		}
+		for _, name := range vs.Names {
+			obj := info.Defs[name]
+			switch {
+			case obj == nil:
+				return false
+			case d.Tok == token.CONST && types.TypeString(obj.Type(), nil) == taskPkg+".Category":
+			case d.Tok == token.VAR && name.Name == "Categories":
+			default:
+				return false
+			}
+		}
+	}
+	return true
 }
 
 var (
@@ -135,4 +184,11 @@ func stateSQLHits(fset *token.FileSet, rel string, f *ast.File, states []string)
 		return true
 	})
 	return out
+}
+
+// TestGoNamesNoBundledProperty checks that Go names no property of the bundled tasks.toml: the constants
+// PropFocus, PropArea, PropContexts, PropDue, FocusOn and FocusOff of internal/domain/task/props.go go once the
+// lists, the counters and the automatic star are the profile's.
+func TestGoNamesNoBundledProperty(t *testing.T) {
+	t.Skip("carried from M2 review: W2b removes the Go-named bundled properties")
 }

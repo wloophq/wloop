@@ -52,8 +52,7 @@ type WaitingOn struct {
 type Task struct {
 	ID   ID
 	Kind Kind
-	// State is the task's state; Category is its category, which every rule reads. A rule that moves a task
-	// sets Category and leaves State empty, and the service gives it the profile's first state of Category.
+	// State is the task's state; Category is its category, which every rule reads.
 	State    State
 	Category Category
 	Title    string

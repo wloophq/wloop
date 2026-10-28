@@ -89,14 +89,6 @@ func taskTime(s string) (time.Time, error) {
 	return time.Parse(event.TimeLayout, s)
 }
 
-// propTime reads a property's write time, which PropStore and Apply stamp in their layouts.
-func propTime(s string) (time.Time, error) {
-	if s == "" {
-		return time.Time{}, nil
-	}
-	return time.Parse(time.RFC3339Nano, s)
-}
-
 func scanTask(row scanner) (task.Task, error) {
 	var e task.Task
 	var snoozeUntil, waiting, seenAt, created, updated, reviewed string
@@ -187,7 +179,7 @@ func loadTasks(ctx context.Context, q querier, where string, args ...any) ([]tas
 			if err := json.Unmarshal([]byte(body), &v); err != nil {
 				return fmt.Errorf("property %s of %s: %w", name, id, err)
 			}
-			t, err := propTime(when)
+			t, err := taskTime(when)
 			if err != nil {
 				return fmt.Errorf("property %s of %s: %w", name, id, err)
 			}
@@ -519,11 +511,13 @@ var _ coretasks.Recategorizer = taskStore{}
 const (
 	heldStatesSQL    = `SELECT state, category FROM tasks GROUP BY state, category ORDER BY state, category`
 	recategorizeSQL  = `UPDATE tasks SET category = ?, rev = ? WHERE state = ? AND category != ?`
-	recategorizedSQL = `SELECT id FROM tasks WHERE state = ? AND rev = ?`
+	recategorizedSQL = `SELECT 'task', id FROM tasks WHERE state = ?1 AND rev = ?2
+		UNION SELECT u.provider, u.unit_key FROM task_units u JOIN tasks t ON t.id = u.task_id WHERE t.state = ?1 AND t.rev = ?2
+		UNION SELECT i.provider, i.unit_key FROM task_items i JOIN tasks t ON t.id = i.task_id WHERE t.state = ?1 AND t.rev = ?2`
 )
 
 // Recategorize gives every stored task the category of its state as of reads it, moving the tasks it changes to
-// a new rev and noting them; a state of says nothing of is unknown, and its tasks keep their category.
+// a new rev and noting each one's unit and the units Apply notes for it; a state of says nothing of is unknown, and its tasks keep their category.
 func (s taskStore) Recategorize(ctx context.Context, of func(state string) (task.Category, bool)) ([]string, error) {
 	var unknown []string
 	_, err := s.db.Write(ctx, func(tx *Tx) error {
@@ -570,11 +564,11 @@ func (s taskStore) Recategorize(ctx context.Context, of func(state string) (task
 				return fmt.Errorf("recategorizing %s: %w", p.state, err)
 			}
 			if err := eachRow(ctx, tx, recategorizedSQL, []any{p.state, rev}, func(r *sql.Rows) error {
-				var id string
-				if err := r.Scan(&id); err != nil {
+				var u unit.Unit
+				if err := r.Scan(&u.Provider, &u.Key); err != nil {
 					return err
 				}
-				tx.Touch(port.TopicTasks, task.UnitOf(task.ID(id)))
+				tx.Touch(port.TopicTasks, u)
 				return nil
 			}); err != nil {
 				return err

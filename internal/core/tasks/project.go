@@ -168,7 +168,9 @@ func (p *projects) attach(ctx context.Context, e task.Task, req Request) (Result
 			}
 			proj = task.Task{ID: task.NewID(), Kind: task.KindProject, Title: title, Slug: slug,
 				Sequential: req.Args["sequential"] == "true", Origin: task.OriginUser, Created: now, Updated: now}
-			proj.MoveTo(task.CategoryReady, p.s.d.States)
+			if err := proj.MoveTo(task.CategoryReady, p.s.d.States); err != nil {
+				return nil, err
+			}
 			proj.SetProp(task.PropArea, e.Prop(task.PropArea), task.WriterPerson, now)
 			created = proj
 			cs = append(cs, task.Change{Op: task.OpCreate, Task: proj, Why: "project"})

@@ -141,7 +141,9 @@ func (s *Service) project(ctx context.Context, e task.Task, args map[string]stri
 	case title != "":
 		p = task.Task{ID: task.NewID(), Kind: task.KindProject, Title: title,
 			Sequential: args["sequential"] == "true", Origin: task.OriginUser, Created: now, Updated: now}
-		p.MoveTo(task.CategoryReady, s.d.States)
+		if err := p.MoveTo(task.CategoryReady, s.d.States); err != nil {
+			return nil, err
+		}
 		p.SetProp(task.PropArea, e.Prop(task.PropArea), task.WriterPerson, now)
 		cs = append(cs, task.Change{Op: task.OpCreate, Task: p, Why: "project"})
 	default:
@@ -277,7 +279,9 @@ func (s *Service) Open(ctx context.Context, r OpenRequest) (task.Task, error) {
 func (s *Service) create(ctx context.Context, kind task.Kind, title, notes string, u *unit.Unit, origin string, contexts []string) (task.Task, error) {
 	now := s.now()
 	e := task.Task{ID: task.NewID(), Kind: kind, Title: title, Notes: notes, Origin: origin, Created: now, Updated: now}
-	e.MoveTo(task.CategoryInbox, s.d.States)
+	if err := e.MoveTo(task.CategoryInbox, s.d.States); err != nil {
+		return task.Task{}, err
+	}
 	e.SetProp(task.PropContexts, task.Value{List: slices.Clone(contexts)}, task.WriterPlugin, now)
 	if u != nil && !u.IsZero() {
 		e.Units = []unit.Unit{*u}
@@ -310,7 +314,9 @@ func (s *Service) Close(ctx context.Context, id task.ID, to task.Category) error
 		return nil
 	}
 	now := s.now()
-	e.MoveTo(to, s.d.States)
+	if err := e.MoveTo(to, s.d.States); err != nil {
+		return err
+	}
 	e.Snooze, e.Updated = task.Snooze{}, now
 	return s.d.Store.Apply(ctx, []task.Change{{Op: task.OpResolve, Task: e, Why: "closed"}})
 }
@@ -405,7 +411,10 @@ func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 	enabled := map[unit.Unit]bool{}
 	units = slices.Clone(units)
 	for _, e := range open {
-		woke, ok := task.Wake(e, s.d.States, now)
+		woke, ok, err := task.Wake(e, s.d.States, now)
+		if err != nil {
+			return fmt.Errorf("waking %s: %w", e.ID, err)
+		}
 		if !ok {
 			continue
 		}
@@ -441,10 +450,17 @@ func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 		if err != nil {
 			return err
 		}
-		for _, c := range task.Reconcile(f, its, s.d.Me, p.of(have, u), s.d.States, now) {
+		cs, err := task.Reconcile(f, its, s.d.Me, p.of(have, u), s.d.States, now)
+		if err != nil {
+			return fmt.Errorf("the tasks of %s: %w", u, err)
+		}
+		for _, c := range cs {
 			p.put(c)
 		}
-		for _, c := range task.Activity(f, p.of(have, u), s.d.States, now) {
+		if cs, err = task.Activity(f, p.of(have, u), s.d.States, now); err != nil {
+			return fmt.Errorf("the activity on %s: %w", u, err)
+		}
+		for _, c := range cs {
 			p.put(c)
 		}
 	}
@@ -453,7 +469,11 @@ func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 			continue
 		}
 		next, why := e, []string{}
-		if woke, ok := task.Wake(next, s.d.States, now); ok {
+		woke, ok, err := task.Wake(next, s.d.States, now)
+		if err != nil {
+			return fmt.Errorf("waking %s: %w", e.ID, err)
+		}
+		if ok {
 			next, why = woke, append(why, "snooze ended")
 		}
 		if f, reason, ok := task.AutoFocus(next, s.d.StaleWaitingDays, now); ok {
