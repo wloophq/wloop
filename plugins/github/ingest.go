@@ -59,8 +59,9 @@ type running struct {
 	// loop is the loop's name, as the items it asks of the user name it.
 	loop string
 
-	dueMu   sync.Mutex
-	due     time.Time
+	dueMu sync.Mutex
+	// dues are when each pull request's report changes with time alone.
+	dues    map[pr.Ref]time.Time
 	dueWake chan struct{}
 }
 
@@ -80,7 +81,8 @@ func (p *Plugin) brand() string {
 
 // start builds what a started plugin runs over db and the host's broker.
 func (p *Plugin) start(ctx context.Context, db *store.DB, host src.Host) *running {
-	r := &running{now: p.now, db: db, host: host, dirty: map[pr.Ref]bool{}, loop: p.brand(), dueWake: make(chan struct{}, 1)}
+	r := &running{now: p.now, db: db, host: host, dirty: map[pr.Ref]bool{}, loop: p.brand(), dues: map[pr.Ref]time.Time{},
+		dueWake: make(chan struct{}, 1)}
 	if host.Recorder != nil && host.History != nil {
 		db.UseHost(eventHost{host})
 	}
@@ -253,7 +255,6 @@ func (r *running) snapshots(ctx context.Context, refs []pr.Ref) ([]src.Snapshot,
 		return nil, err
 	}
 	at := r.now()
-	var due time.Time
 	var out []src.Snapshot
 	for _, ref := range refs {
 		p, ok := rows[ref]
@@ -280,11 +281,8 @@ func (r *running) snapshots(ctx context.Context, refs []pr.Ref) ([]src.Snapshot,
 		s := derived.Report()
 		s.Unit, s.Rev, s.At, s.Data = ref.Unit(), rev, at, raw
 		out = append(out, s)
-		if t := derived.Due(); !t.IsZero() && (due.IsZero() || t.Before(due)) {
-			due = t
-		}
+		r.dueAt(ref, derived.Due())
 	}
-	r.dueAt(due)
 	return out, nil
 }
 
@@ -394,18 +392,15 @@ func (r *running) nextRev(ctx context.Context) (uint64, error) {
 	return next, r.db.SetMeta(ctx, metaRev, strconv.FormatUint(next, 10))
 }
 
-// dueAt asks for a report of every pull request at t, when a report
-// changes with time alone; zero asks for none.
-func (r *running) dueAt(t time.Time) {
-	if t.IsZero() {
-		return
-	}
+// dueAt asks for a report of ref at t, when its report changes with time
+// alone; zero asks for none.
+func (r *running) dueAt(ref pr.Ref, t time.Time) {
 	r.dueMu.Lock()
-	if !r.due.IsZero() && !t.Before(r.due) {
-		r.dueMu.Unlock()
-		return
+	if t.IsZero() {
+		delete(r.dues, ref)
+	} else {
+		r.dues[ref] = t
 	}
-	r.due = t
 	r.dueMu.Unlock()
 	select {
 	case r.dueWake <- struct{}{}:
@@ -413,12 +408,17 @@ func (r *running) dueAt(t time.Time) {
 	}
 }
 
-// watchDue runs report each time a report's due instant passes, until ctx
-// ends.
-func (r *running) watchDue(ctx context.Context, report func(context.Context) error) {
+// watchDue runs report with the pull requests whose due instant passed,
+// each time one does, until ctx ends.
+func (r *running) watchDue(ctx context.Context, report func(context.Context, []pr.Ref) error) {
 	for {
 		r.dueMu.Lock()
-		due := r.due
+		var due time.Time
+		for _, t := range r.dues {
+			if due.IsZero() || t.Before(due) {
+				due = t
+			}
+		}
 		r.dueMu.Unlock()
 		var fire <-chan time.Time
 		var t *time.Timer
@@ -442,10 +442,18 @@ func (r *running) watchDue(ctx context.Context, report func(context.Context) err
 		if !fired {
 			continue
 		}
+		now := r.now()
+		var refs []pr.Ref
 		r.dueMu.Lock()
-		r.due = time.Time{}
+		for ref, at := range r.dues {
+			if !at.After(now) {
+				refs = append(refs, ref)
+				delete(r.dues, ref)
+			}
+		}
 		r.dueMu.Unlock()
-		if err := report(ctx); err != nil && ctx.Err() == nil {
+		slices.SortFunc(refs, pr.Compare)
+		if err := report(ctx, refs); err != nil && ctx.Err() == nil {
 			logf("report at its due time: %v", err)
 		}
 	}

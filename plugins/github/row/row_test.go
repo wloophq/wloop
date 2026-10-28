@@ -210,6 +210,9 @@ func TestCardDone(t *testing.T) {
 		if slices.ContainsFunc(c.Signals, func(s src.CardSignal) bool { return s.Tone == ToneBad }) {
 			t.Errorf("%s: signals %+v", tc.state, c.Signals)
 		}
+		if !r.Due().IsZero() {
+			t.Errorf("%s: due %v", tc.state, r.Due())
+		}
 		if got := r.Items(); len(got) != 0 {
 			t.Errorf("%s: items %+v", tc.state, got)
 		}

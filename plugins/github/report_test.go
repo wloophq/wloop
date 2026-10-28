@@ -2,6 +2,8 @@ package github
 
 import (
 	"context"
+	"slices"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -101,33 +103,46 @@ func TestAnAddressTurnInTheBooksEndsTheReviewToAddress(t *testing.T) {
 	}
 }
 
-func TestTheReportsGoAgainWhenTheirDueTimePasses(t *testing.T) {
+func TestEachPullRequestIsReportedAgainOnlyWhenItsOwnDueTimePasses(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		r := &running{now: time.Now, dueWake: make(chan struct{}, 1)}
-		var reports []time.Time
+		r := &running{now: time.Now, dues: map[pr.Ref]time.Time{}, dueWake: make(chan struct{}, 1)}
+		type report struct {
+			at   time.Time
+			refs []pr.Ref
+		}
+		var mu sync.Mutex
+		var reports []report
 		ctx, cancel := context.WithCancel(context.Background())
 		done := make(chan struct{})
 		go func() {
 			defer close(done)
-			r.watchDue(ctx, func(context.Context) error {
-				reports = append(reports, time.Now())
+			r.watchDue(ctx, func(_ context.Context, refs []pr.Ref) error {
+				mu.Lock()
+				defer mu.Unlock()
+				reports = append(reports, report{time.Now(), refs})
 				return nil
 			})
 		}()
 		start := time.Now()
-		r.dueAt(start.Add(3 * time.Hour))
-		r.dueAt(start.Add(time.Hour))
-		r.dueAt(start.Add(2 * time.Hour))
+		stalls, waits, ended := pr.Ref{Owner: "acme", Repo: "api", Number: 1}, pr.Ref{Owner: "acme", Repo: "api", Number: 2},
+			pr.Ref{Owner: "acme", Repo: "api", Number: 3}
+		r.dueAt(stalls, start.Add(time.Hour))
+		r.dueAt(waits, start.Add(3*time.Hour))
+		r.dueAt(ended, start.Add(2*time.Hour))
+		r.dueAt(ended, time.Time{})
+		time.Sleep(10 * time.Hour)
 		synctest.Wait()
-		time.Sleep(time.Hour)
-		synctest.Wait()
-		if len(reports) != 1 || !reports[0].Equal(start.Add(time.Hour)) {
-			t.Fatalf("reports at %v, want one at the earliest due", reports)
+		mu.Lock()
+		got := slices.Clone(reports)
+		mu.Unlock()
+		want := []report{{start.Add(time.Hour), []pr.Ref{stalls}}, {start.Add(3 * time.Hour), []pr.Ref{waits}}}
+		if len(got) != len(want) {
+			t.Fatalf("reports %+v, want %+v", got, want)
 		}
-		time.Sleep(5 * time.Hour)
-		synctest.Wait()
-		if len(reports) != 1 {
-			t.Fatalf("reports at %v, want none with nothing due", reports)
+		for i := range want {
+			if !got[i].at.Equal(want[i].at) || !slices.Equal(got[i].refs, want[i].refs) {
+				t.Errorf("report %d: %+v, want %+v", i, got[i], want[i])
+			}
 		}
 		cancel()
 		<-done

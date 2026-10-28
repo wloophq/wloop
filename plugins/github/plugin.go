@@ -110,7 +110,12 @@ func (p *Plugin) Start(ctx context.Context, req src.StartRequest) error {
 	lctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	p.stop = cancel
 	p.loading.Go(func() { r.load(lctx) })
-	p.watching.Go(func() { r.watchDue(lctx, func(ctx context.Context) error { return r.report(ctx, true) }) })
+	p.watching.Go(func() {
+		r.watchDue(lctx, func(ctx context.Context, refs []pr.Ref) error {
+			r.mark(refs...)
+			return r.report(ctx, false)
+		})
+	})
 	return nil
 }
 
