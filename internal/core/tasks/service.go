@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -37,7 +36,7 @@ type Deps struct {
 	// may run every verb and no other actor any.
 	Authority Authority
 	// Gates opens the gate a gated verb opens; nil: a gated verb fails.
-	Gates gates.Store
+	Gates Gates
 }
 
 type handlerKey struct {
@@ -107,7 +106,7 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 		if h == nil {
 			return Result{}, fmt.Errorf("%w: %s on a %s entry", ErrVerb, req.Verb, e.Kind)
 		}
-		if gated, err := s.allowed(ctx, e, req.Verb, req.actor()); err != nil || gated {
+		if gated, err := s.Allowed(ctx, e, req); err != nil || gated {
 			return s.gated(ctx, e, req, err)
 		}
 		return h(ctx, e, req)
@@ -121,15 +120,15 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 		if req.Verb != task.VerbDismiss || !errors.Is(err, ErrPluginDisabled) {
 			return Result{}, err
 		}
-		if _, err := s.allowed(ctx, e, req.Verb, req.actor()); err != nil {
-			return Result{}, err
+		if gated, err := s.Allowed(ctx, e, req); err != nil || gated {
+			return s.gated(ctx, e, req, err)
 		}
 		return s.dismissOff(ctx, id, req, enabled)
 	}
 	if err := s.declared(e, req.Verb); err != nil {
 		return Result{}, err
 	}
-	if gated, err := s.allowed(ctx, e, req.Verb, req.actor()); err != nil || gated {
+	if gated, err := s.Allowed(ctx, e, req); err != nil || gated {
 		return s.gated(ctx, e, req, err)
 	}
 	if h := s.handler(e.Kind, req.Verb); h != nil {
@@ -242,7 +241,7 @@ func (s *Service) dismissOff(ctx context.Context, id task.ID, req Request, enabl
 	now := s.now()
 	next, why := e, "detached"
 	if len(off) == 0 || e.Origin == task.OriginDerived || !slices.ContainsFunc(e.Units, func(u unit.Unit) bool { return !isOff(u) }) {
-		if next, err = s.transition(e, Request{Verb: task.VerbDismiss}, now); err != nil {
+		if next, err = s.transition(e, req, now); err != nil {
 			return Result{}, err
 		}
 		why = string(task.VerbDismiss)
@@ -276,7 +275,7 @@ func (s *Service) verbEvents(e task.Task, req Request, now time.Time) []port.Eve
 	if s.d.States.Handler(string(req.Verb)) == handlerSeen {
 		return nil
 	}
-	return []port.Event{{Unit: task.UnitOf(e.ID), Kind: task.VerbEventKind(req.Verb), Actor: string(req.actor()) + ":" + req.Source,
+	return []port.Event{{Unit: task.UnitOf(e.ID), Kind: task.VerbEventKind(req.Verb), Actor: string(req.Actor) + ":" + req.Source,
 		Data: workflow.ChainData(string(e.State), req.Chain), At: now}}
 }
 
@@ -295,10 +294,41 @@ func (s *Service) gated(ctx context.Context, e task.Task, req Request, err error
 		return Result{}, err
 	}
 	g.Task, g.Unit, g.Subject = e.ID, task.UnitOf(e.ID), string(subject)
+	held, err := s.d.Gates.OfTask(ctx, e.ID)
+	if err != nil {
+		return Result{}, err
+	}
+	if slices.ContainsFunc(held, func(o gate.Gate) bool { return o.Status == gate.Open && o.Name == g.Name && o.Subject == g.Subject }) {
+		return Result{Task: e}, nil
+	}
 	if _, err := s.d.Gates.Open(ctx, g); err != nil {
 		return Result{}, err
 	}
 	return Result{Task: e}, nil
+}
+
+// Allowed says whether req's actor may run req's verb on t, and whether running it opens the verb's gate
+// instead, as the profile's authority says: ErrForbidden for a request with no actor or one the verb's by
+// leaves out. A request an approved gate of t proposed (ProposedVerb) is allowed without the by.
+func (s *Service) Allowed(ctx context.Context, t task.Task, req Request) (gated bool, err error) {
+	if req.Actor == "" {
+		return false, fmt.Errorf("%w: %s names no actor", ErrForbidden, req.Verb)
+	}
+	if req.Approved == 0 {
+		return s.allowed(ctx, t, req.Verb, req.Actor)
+	}
+	if s.d.Gates == nil {
+		return false, fmt.Errorf("%w: gate %d: no gates are served", ErrForbidden, req.Approved)
+	}
+	g, err := s.d.Gates.Get(ctx, req.Approved)
+	if err != nil {
+		return false, err
+	}
+	p, ok := ProposedVerb(g)
+	if g.Status != gate.Approved || g.Task != t.ID || !ok || p.Verb != req.Verb {
+		return false, fmt.Errorf("%w: gate %d does not approve %s on %s", ErrForbidden, req.Approved, req.Verb, t.ID)
+	}
+	return false, nil
 }
 
 // proposal is the verb a gate a gated verb opened proposes, as its Subject keeps it.
@@ -307,14 +337,14 @@ type proposal struct {
 	Args map[string]string `json:"args,omitempty"`
 }
 
-// ProposedVerb is the request a gate a gated verb opened proposes, run as the person who approves it; false
-// for a gate no verb opened.
+// ProposedVerb is the request a gate a gated verb opened proposes, run as the person who approved it: Do runs
+// it once the gate is approved, without the verb's by; false for a gate no verb opened.
 func ProposedVerb(g gate.Gate) (Request, bool) {
 	var p proposal
 	if json.Unmarshal([]byte(g.Subject), &p) != nil || p.Verb == "" {
 		return Request{}, false
 	}
-	return Request{Verb: p.Verb, Args: p.Args, Actor: task.ActorPerson, Source: "gate"}, true
+	return Request{Verb: p.Verb, Args: p.Args, Actor: task.ActorPerson, Source: "gate", Approved: g.ID}, true
 }
 
 // writable refuses an entry with a unit whose plugin is disabled; ok caches the answers per unit.

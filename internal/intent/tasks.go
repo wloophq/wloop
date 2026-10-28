@@ -609,8 +609,7 @@ func (l *tasksLoad) check(gates *GatesDef) Problems {
 			}
 		}
 	}
-	env := builtin.WorkflowEnv(builtin.TaskSlot)
-	maps.Copy(env, l.def.Facts())
+	env := ByEnv(l.def)
 	for _, at := range slices.Sorted(maps.Keys(l.preds)) {
 		r := l.preds[at]
 		pred, err := expr.CompileWorkflow(r.name, env)
@@ -631,6 +630,22 @@ func (l *tasksLoad) check(gates *GatesDef) Problems {
 		l.def.Verbs[verb] = v
 	}
 	return out
+}
+
+// ByFacts are the facts a verb's by reads besides the task.prop.* of
+// tasks.toml: the task's own, which the authority reads off the task with
+// no facts provider at hand.
+var ByFacts = []string{"task.id", "task.kind", "task.state", "task.category", "task.muted", "task.unit", "task.unit_provider"}
+
+// ByEnv is the env a verb's by compiles over: ByFacts and d's properties.
+func ByEnv(d TasksDef) expr.Env {
+	all := builtin.WorkflowEnv(builtin.TaskSlot)
+	env := expr.Env{}
+	for _, name := range ByFacts {
+		env[name] = all[name]
+	}
+	maps.Copy(env, d.Facts())
+	return env
 }
 
 // declared is the keys of the map table section of s's file in their

@@ -239,6 +239,10 @@ func (s *Server) runTaskVerb(w http.ResponseWriter, r *http.Request, verb string
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown verb %q; one of %s", verb, verbNames()))
 		return
 	}
+	actor, ok := requestActor(w, r)
+	if !ok {
+		return
+	}
 	ctx := context.WithoutCancel(r.Context())
 	e, err := g.Task(ctx, task.ID(r.PathValue("id")))
 	if err != nil {
@@ -255,21 +259,45 @@ func (s *Server) runTaskVerb(w http.ResponseWriter, r *http.Request, verb string
 			return
 		}
 	}
-	if v == task.VerbReply && !g.Handles(e.Kind, v) {
-		s.runReply(ctx, w, g, e, req)
+	creq := coretasks.Request{Verb: v, Args: req.Args, Source: req.Source, Actor: actor}
+	reply := v == task.VerbReply && !g.Handles(e.Kind, v)
+	b, bridged := s.bridge(ctx, g, e, v)
+	if reply || bridged {
+		gated, err := g.Allowed(ctx, e, creq)
+		if err != nil || gated {
+			res, err := g.Do(ctx, e.ID, creq)
+			s.writeTaskResult(ctx, w, g, res, err)
+			return
+		}
+	}
+	if reply {
+		s.runReply(ctx, w, g, e, req, actor)
 		return
 	}
-	if b, ok := s.bridge(ctx, g, e, v); ok {
+	if bridged {
 		st, ok := b.runs()
 		if !ok {
 			writeError(w, http.StatusConflict, b.reason())
 			return
 		}
-		s.runBridge(w, r, g, e, v, b.unit, st, req)
+		s.runBridge(w, r, g, e, v, b.unit, st, req, actor)
 		return
 	}
-	res, err := g.Do(ctx, e.ID, coretasks.Request{Verb: v, Args: req.Args, Source: req.Source, Actor: task.ActorPerson})
+	res, err := g.Do(ctx, e.ID, creq)
 	s.writeTaskResult(ctx, w, g, res, err)
+}
+
+// requestActor is who runs the verb a request asks for: an agent when the request comes from a session, the
+// person otherwise; false when its session header is not a handle, refused on w.
+func requestActor(w http.ResponseWriter, r *http.Request) (task.Actor, bool) {
+	h, ok := callerHandle(w, r, false)
+	switch {
+	case !ok:
+		return "", false
+	case h != "":
+		return task.ActorAgent, true
+	}
+	return task.ActorPerson, true
 }
 
 // offers says whether the profile offers verb on e; a verb with no offer is
@@ -394,7 +422,7 @@ func rankOffered(served []api.ActionSpec, row api.Row, verb task.Verb) bridgeAct
 
 // runBridge runs st on u as POST /api/units/<provider>/<key>/<action> would, with the row's basis, the
 // task's items on u, and the guidance and mode of the task's args.
-func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coretasks.Service, e task.Task, verb task.Verb, u unit.Unit, st api.ActionState, req api.TaskRequest) {
+func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coretasks.Service, e task.Task, verb task.Verb, u unit.Unit, st api.ActionState, req api.TaskRequest, actor task.Actor) {
 	mode := req.Args["mode"]
 	if err := s.bridgeMode(st.ID, mode); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -452,7 +480,7 @@ func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coretasks.
 		}
 	}
 	ctx := context.WithoutCancel(r.Context())
-	s.recordVerb(ctx, g, e, coretasks.Request{Verb: verb, Source: req.Source, Actor: task.ActorPerson})
+	s.recordVerb(ctx, g, e, coretasks.Request{Verb: verb, Source: req.Source, Actor: actor})
 	now, err := g.Task(ctx, e.ID)
 	if err != nil {
 		now = e

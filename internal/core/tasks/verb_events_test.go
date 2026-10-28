@@ -21,7 +21,7 @@ func TestAVerbRecordsItsEvent(t *testing.T) {
 	r := newRig()
 	e := r.put(t, task.Task{ID: "e-x", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Origin: task.OriginUser})
 	r.clock.t = t0.Add(time.Hour)
-	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Verb: task.VerbDone, Source: "cockpit"}); err != nil {
+	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone, Source: "cockpit"}); err != nil {
 		t.Fatal(err)
 	}
 	want := []port.Event{{Unit: task.UnitOf(e.ID), Kind: "verb_done", Actor: "person:cockpit", Data: "next", At: r.clock.t}}
@@ -33,10 +33,10 @@ func TestAVerbRecordsItsEvent(t *testing.T) {
 func TestARefusedOrSeenVerbRecordsNothing(t *testing.T) {
 	r := newRig()
 	e := r.put(t, task.Task{ID: "e-x", Kind: task.KindCapture, State: "trash", Category: task.CategoryDropped, Origin: task.OriginUser, Changed: true})
-	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Verb: task.VerbDone}); !errors.Is(err, coretasks.ErrVerb) {
+	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone}); !errors.Is(err, coretasks.ErrVerb) {
 		t.Fatalf("done on a trashed entry: %v", err)
 	}
-	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Verb: task.VerbSeen}); err != nil {
+	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSeen}); err != nil {
 		t.Fatal(err)
 	}
 	if got := verbEvents(r.store.Events); len(got) > 0 {
@@ -57,7 +57,7 @@ func TestAHandledVerbRecordsItsEvent(t *testing.T) {
 func TestRecordVerbRecordsAVerbAnotherServiceRan(t *testing.T) {
 	r := newRig()
 	e := r.put(t, task.Task{ID: "e-x", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Origin: task.OriginUser})
-	if err := r.svc.RecordVerb(context.Background(), e, coretasks.Request{Verb: task.VerbDelegate, Source: "tui"}); err != nil {
+	if err := r.svc.RecordVerb(context.Background(), e, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDelegate, Source: "tui"}); err != nil {
 		t.Fatal(err)
 	}
 	want := []port.Event{{Unit: task.UnitOf(e.ID), Kind: "verb_delegate", Actor: "person:tui", Data: "inbox", At: t0}}
@@ -69,7 +69,7 @@ func TestRecordVerbRecordsAVerbAnotherServiceRan(t *testing.T) {
 func TestAVerbThatChangesNothingRecordsNothing(t *testing.T) {
 	r := newRig()
 	e := r.put(t, task.Task{ID: "e-x", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Origin: task.OriginUser, Props: task.Props{"area": {Text: "OSS"}}, Written: map[string]task.Written{"area": {By: task.WriterPerson}}})
-	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Verb: task.VerbArea, Args: map[string]string{"set": "OSS"}}); err != nil {
+	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbArea, Args: map[string]string{"set": "OSS"}}); err != nil {
 		t.Fatal(err)
 	}
 	if got := verbEvents(r.store.Events); len(got) > 0 {

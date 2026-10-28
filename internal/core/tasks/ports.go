@@ -3,7 +3,6 @@
 package tasks
 
 import (
-	"cmp"
 	"context"
 	"errors"
 
@@ -93,18 +92,26 @@ type ViewSource interface {
 // one on a stored entry records the verb with Service.RecordVerb once it succeeded.
 type VerbHandler func(ctx context.Context, e task.Task, req Request) (Result, error)
 
-// Request is a verb to run. Actor is who runs it, a person when empty;
-// Source where it came from (the cockpit, a workflow's name). Chain is the
-// chain of workflows that led to it, which its event carries on.
+// Request is a verb to run. Actor is who runs it, required; Source where it
+// came from (the cockpit, a workflow's name). Chain is the chain of
+// workflows that led to it, which its event carries on. Approved is the
+// approved gate a gated run of the verb opened, which ProposedVerb sets and
+// no route copies: the person's approval stands for the verb's by.
 type Request struct {
-	Verb   task.Verb
-	Args   map[string]string
-	Source string
-	Actor  task.Actor
-	Chain  workflow.Chain
+	Verb     task.Verb
+	Args     map[string]string
+	Source   string
+	Actor    task.Actor
+	Chain    workflow.Chain
+	Approved int64
 }
 
-func (r Request) actor() task.Actor { return cmp.Or(r.Actor, task.ActorPerson) }
+// Gates are the gates a gated verb opens and reads back: one open gate per proposal.
+type Gates interface {
+	Open(ctx context.Context, g gate.Gate) (gate.Gate, error)
+	Get(ctx context.Context, id int64) (gate.Gate, error)
+	OfTask(ctx context.Context, id task.ID) ([]gate.Gate, error)
+}
 
 type Result struct {
 	Task  task.Task

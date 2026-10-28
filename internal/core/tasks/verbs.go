@@ -34,7 +34,7 @@ func (s *Service) Accepts(t task.Task, v task.Verb, a task.Actor) error {
 	if err := s.accepts(t, v); err != nil {
 		return err
 	}
-	_, err := s.allowed(context.Background(), t, v, a)
+	_, err := s.Allowed(context.Background(), t, Request{Verb: v, Actor: a})
 	return err
 }
 
@@ -95,11 +95,11 @@ func (s *Service) transition(e task.Task, req Request, now time.Time) (task.Task
 		if e.Starred() {
 			v = task.FocusOff
 		}
-		e.SetProp(task.PropFocus, task.Value{Text: v}, task.Writer(req.actor()), now)
+		e.SetProp(task.PropFocus, task.Value{Text: v}, task.Writer(req.Actor), now)
 	case handlerContext:
-		e.SetProp(task.PropContexts, task.Value{List: split(req.Args["set"])}, task.Writer(req.actor()), now)
+		e.SetProp(task.PropContexts, task.Value{List: split(req.Args["set"])}, task.Writer(req.Actor), now)
 	case handlerArea:
-		e.SetProp(task.PropArea, task.Value{Text: strings.TrimSpace(req.Args["set"])}, task.Writer(req.actor()), now)
+		e.SetProp(task.PropArea, task.Value{Text: strings.TrimSpace(req.Args["set"])}, task.Writer(req.Actor), now)
 	case handlerSchedule:
 		snooze, err := scheduleArgs(e, req.Args, now)
 		if err != nil {

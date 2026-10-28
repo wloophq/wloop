@@ -56,7 +56,7 @@ func TestAVerbAPersonRunsPlansItsWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, v := range []task.Verb{task.VerbDone, task.VerbReference, task.VerbDone} {
-		if _, err := g.Do(ctx, "e-01", coretasks.Request{Verb: v, Source: "cockpit"}); err != nil {
+		if _, err := g.Do(ctx, "e-01", coretasks.Request{Actor: task.ActorPerson, Verb: v, Source: "cockpit"}); err != nil {
 			t.Fatalf("%s: %v", v, err)
 		}
 	}

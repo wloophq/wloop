@@ -74,7 +74,7 @@ func TestServiceOverSqliteReinboxesOnActivity(t *testing.T) {
 	}
 	action, waiting := task.DerivedID(task.KindAction, u, "a"), task.DerivedID(task.KindWaiting, u, anaKey.Key)
 	r.clock.t = taskAt.Add(time.Hour)
-	if _, err := r.svc.Do(ctx, action, coretasks.Request{Verb: task.VerbSchedule, Args: map[string]string{"on_activity": "true"}}); err != nil {
+	if _, err := r.svc.Do(ctx, action, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSchedule, Args: map[string]string{"on_activity": "true"}}); err != nil {
 		t.Fatal(err)
 	}
 	r.facts.facts[u] = task.UnitFacts{LastHuman: taskAt.Add(2 * time.Hour)}
@@ -89,7 +89,7 @@ func TestServiceOverSqliteReinboxesOnActivity(t *testing.T) {
 		}
 	}
 	r.facts.off = true
-	if _, err := r.svc.Do(ctx, action, coretasks.Request{Verb: task.VerbDone}); err == nil {
+	if _, err := r.svc.Do(ctx, action, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone}); err == nil {
 		t.Fatal("a disabled plugin's entry moved")
 	}
 }
