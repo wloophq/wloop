@@ -119,3 +119,56 @@ func TestACrashBeforeTheRenameDoesNotImportTwice(t *testing.T) {
 		t.Errorf("the import file is left: %v", err)
 	}
 }
+
+func TestTwoHandlesOfAStoreWriteWithoutABusyError(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	dir := t.TempDir()
+	opts := store.Options{Migrations: []store.Migration{{Version: 1, Up: exec(`CREATE TABLE counter (n INTEGER NOT NULL); INSERT INTO counter VALUES (0)`)}}}
+	var dbs []*sql.DB
+	for range 2 {
+		db, err := store.Open(ctx, dir, opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { db.Close() })
+		dbs = append(dbs, db)
+	}
+	const each = 50
+	errs := make(chan error, len(dbs))
+	for _, db := range dbs {
+		go func() {
+			for range each {
+				err := func() error {
+					tx, err := db.BeginTx(ctx, nil)
+					if err != nil {
+						return err
+					}
+					defer tx.Rollback()
+					var n int
+					if err := tx.QueryRowContext(ctx, `SELECT n FROM counter`).Scan(&n); err != nil {
+						return err
+					}
+					if _, err := tx.ExecContext(ctx, `UPDATE counter SET n = ?`, n+1); err != nil {
+						return err
+					}
+					return tx.Commit()
+				}()
+				if err != nil {
+					errs <- err
+					return
+				}
+			}
+			errs <- nil
+		}()
+	}
+	for range dbs {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
+		}
+	}
+	var n int
+	if err := dbs[0].QueryRowContext(ctx, `SELECT n FROM counter`).Scan(&n); err != nil || n != len(dbs)*each {
+		t.Fatalf("counter %d (%v), want %d: a read-then-write lost an update or failed", n, err, len(dbs)*each)
+	}
+}
