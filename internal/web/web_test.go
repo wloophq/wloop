@@ -230,7 +230,7 @@ func TestTheScriptsParse(t *testing.T) {
 	if err != nil {
 		t.Skip("node is not on PATH")
 	}
-	for _, name := range []string{"app.js", "dash.js", "keys.js", "palette.js", "routes.js", "views.js", "detail.js"} {
+	for _, name := range []string{"app.js", "dash.js", "keys.js", "palette.js", "routes.js", "views.js", "task.js", "review.js", "detail.js"} {
 		if out, err := exec.Command(node, "--check", "static/"+name).CombinedOutput(); err != nil {
 			t.Errorf("%s: %v: %s", name, err, out)
 		}

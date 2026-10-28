@@ -88,8 +88,8 @@ const route = { view: "next", area: "", ctx: [], task: "", q: "invoice" };
 	if got.Head != "2 of 3" {
 		t.Errorf("the heading counts %q, want 2 of 3", got.Head)
 	}
-	if !slices.Equal(got.Groups, []string{"@reply (2)"}) {
-		t.Errorf("groups %v", got.Groups)
+	if len(got.Groups) != 0 {
+		t.Errorf("a view that groups by nothing shows groups %v", got.Groups)
 	}
 	if got.Filtered == nil || got.Filtered["area"] != "OSS" {
 		t.Errorf("the last read is the OSS one: %v", got.Filtered)

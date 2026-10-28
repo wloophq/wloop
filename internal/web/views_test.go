@@ -46,12 +46,12 @@ const noViews = "const loadTasks = async () => {};\n"
 // noUpdate stands in for update.js where a test runs app.js's loading alone.
 const noUpdate = "const checkBuild = () => {};\n"
 
-// viewsScripts are routes.js, views.js and detail.js.
+// viewsScripts are routes.js, views.js, task.js and detail.js.
 func viewsScripts(t *testing.T) string {
-	return staticJS(t, "routes.js") + staticJS(t, "views.js") + staticJS(t, "detail.js")
+	return staticJS(t, "routes.js") + staticJS(t, "views.js") + staticJS(t, "task.js") + staticJS(t, "detail.js")
 }
 
-// viewsPrelude is plugins.js, routes.js, views.js and detail.js over a tree h.
+// viewsPrelude is plugins.js, routes.js, views.js, task.js and detail.js over a tree h.
 func viewsPrelude(t *testing.T) string {
 	return treeJS + pluginsJS(t) + viewsScripts(t)
 }
@@ -122,41 +122,6 @@ process.stdout.write(JSON.stringify({
 	}
 	if got.Before != "needs-me" || got.Enabled != "needs-me" || got.CoreStay != "waiting" {
 		t.Errorf("before load %q, plugin on %q, core %q", got.Before, got.Enabled, got.CoreStay)
-	}
-}
-
-func TestGroupingPerView(t *testing.T) {
-	tasks := []api.TaskView{
-		task("e-1", "next", func(e *api.TaskView) { e.Contexts = []string{"@reply"} }),
-		task("e-2", "next", func(e *api.TaskView) { e.Contexts = []string{"@decide", "@reply"} }),
-		task("e-3", "next", nil),
-		task("e-4", "next", func(e *api.TaskView) { e.Contexts = []string{"@reply"} }),
-	}
-	waiting := []api.TaskView{
-		task("w-1", "waiting", func(e *api.TaskView) { e.Waiting = &api.WaitingView{On: []api.WaitingPerson{{Name: "bob"}}} }),
-		task("w-2", "waiting", func(e *api.TaskView) { e.Waiting = &api.WaitingView{On: []api.WaitingPerson{{Name: "alice"}}} }),
-		task("w-3", "waiting", func(e *api.TaskView) { e.Waiting = &api.WaitingView{On: []api.WaitingPerson{{Name: "bob"}}} }),
-	}
-	logbook := []api.TaskView{task("d-1", "done", nil), task("r-1", "reference", nil), task("d-2", "done", nil)}
-	type group struct {
-		Label string   `json:"label"`
-		IDs   []string `json:"ids"`
-	}
-	var got map[string][]group
-	nodeRun(t, viewsPrelude(t), nil, `
-const g = (v, es) => viewGroups(v, es).map((x) => ({ label: x.label, ids: x.tasks.map((e) => e.id) }));
-process.stdout.write(JSON.stringify({ next: g("next", input.next), waiting: g("waiting", input.waiting), logbook: g("logbook", input.logbook), inbox: g("inbox", input.next) }));`,
-		map[string]any{"next": tasks, "waiting": waiting, "logbook": logbook}, &got)
-	want := map[string][]group{
-		"next":    {{"@decide", []string{"e-2"}}, {"@reply", []string{"e-1", "e-4"}}, {"No context", []string{"e-3"}}},
-		"waiting": {{"alice", []string{"w-2"}}, {"bob", []string{"w-1", "w-3"}}},
-		"logbook": {{"Reference", []string{"r-1"}}, {"Done", []string{"d-1", "d-2"}}},
-		"inbox":   {{"", []string{"e-1", "e-2", "e-3", "e-4"}}},
-	}
-	for v, w := range want {
-		if !slices.EqualFunc(got[v], w, func(a, b group) bool { return a.Label == b.Label && slices.Equal(a.IDs, b.IDs) }) {
-			t.Errorf("%s groups %+v, want %+v", v, got[v], w)
-		}
 	}
 }
 

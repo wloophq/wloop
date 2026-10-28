@@ -4,7 +4,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/domain/card"
@@ -17,7 +16,7 @@ var prUnit = unit.Unit{Provider: "github", Key: "acme/api#8"}
 
 func questionTask() api.TaskView {
 	return task("e-1", "inbox", func(e *api.TaskView) {
-		e.Title, e.Contexts, e.Changed = "Pick a fix", []string{"@decide"}, true
+		e.Title, e.Contexts, e.Changed, e.Category = "Pick a fix", []string{"@decide"}, true, "inbox"
 		e.Units = []unit.Unit{prUnit}
 		e.Items = []api.ItemView{{Unit: prUnit, ID: "gh:review", Summary: "Review the retry change", State: "open", Kind: "action"}}
 		e.Message = &api.Message{ID: 3, TaskID: "e-1", Unit: prUnit, Kind: "question", Text: "Retry or revert?", State: "open", Recommend: "b",
@@ -38,53 +37,11 @@ detailEnv.post = async (path, body) => { posts.push({ path, body }); return { ta
 detailEnv.notice = () => {}; detailEnv.changed = () => {}; detailEnv.render = () => {};
 `
 
-func TestTaskDetailSections(t *testing.T) {
-	e := questionTask()
-	var got struct {
-		Before, After string
-		Questions     int
-		Cards         int
-		LogBefore     bool
-		LogAfter      bool
-		Asked         []string
-	}
-	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
-(async () => {
-  await loadDetailPane({ task: "e-1" });
-  const before = taskPane(detailState.task);
-  await byFocus(before, "detail:agent-log").attrs.onclick();
-  const after = taskPane(detailState.task);
-  process.stdout.write(JSON.stringify({
-    Before: text(before), After: text(after), Questions: byClass(before, "d-question").length, Cards: byClass(before, "d-card").length,
-    LogBefore: byClass(before, "timeline").length > 0, LogAfter: byClass(after, "timeline").length > 0, Asked: asked,
-  }));
-})();`, map[string]any{"answers": map[string]any{
-		"/api/tasks/e-1":                   e,
-		"/api/units/github/acme%2Fapi%238": map[string]any{"events": []map[string]any{{"kind": "turn_started", "at": "2026-10-20T10:00:00Z"}}},
-	}}, &got)
-	for _, s := range []string{"Pick a fix", "inbox", "@decide", "Review the retry change", "Retry or revert?", "Revert (recommended)", "Retry flaky uploads", "your review is requested", "checks failing", "Agent log"} {
-		if !strings.Contains(got.Before, s) {
-			t.Errorf("the detail lacks %q: %s", s, got.Before)
-		}
-	}
-	if got.Questions != 1 || got.Cards != 1 {
-		t.Errorf("%d question cards and %d unit cards, want 1 and 1", got.Questions, got.Cards)
-	}
-	if got.LogBefore || strings.Contains(got.Before, "turn started") {
-		t.Error("the turn log shows before Agent log is clicked")
-	}
-	if !got.LogAfter || !strings.Contains(got.After, "turn started") {
-		t.Errorf("Agent log did not open the turn log: %s", got.After)
-	}
-	if want := []string{"/api/tasks/e-1", "/api/drafts?task=e-1&state=proposed%2Capproved%2Csending%2Csent%2Cfailed", "/api/units/github/acme%2Fapi%238"}; !slices.Equal(got.Asked, want) {
-		t.Errorf("asked %v, want %v", got.Asked, want)
-	}
-}
-
 func TestUnitDetailRoute(t *testing.T) {
 	mine := task("e-1", "next", func(e *api.TaskView) { e.Units = []unit.Unit{prUnit} })
 	other := task("e-2", "next", func(e *api.TaskView) { e.Units = []unit.Unit{{Provider: "github", Key: "acme/api#80"}} })
 	waiting := task("e-3", "waiting", func(e *api.TaskView) { e.Units = []unit.Unit{prUnit} })
+	shipped := task("e-4", "done", func(e *api.TaskView) { e.Units, e.Category = []unit.Unit{prUnit}, "done" })
 	page := func(es ...api.TaskView) api.TasksPage {
 		return api.TasksPage{Full: true, Tasks: es, Removed: []string{}}
 	}
@@ -98,12 +55,14 @@ func TestUnitDetailRoute(t *testing.T) {
 	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
 function hashString(x) { return routeHash(x.view, x.pr, new URLSearchParams(x.task ? { task: x.task } : {})); }
 function readHash() { return { view: "next" }; }
+tasksState.catalog = input.cat;
 (async () => {
   const route = readRoute("#unit=github/acme%2Fapi%238");
   await loadDetailPane(route);
   const box = unitExtras(input.detail);
   process.stdout.write(JSON.stringify({ Text: text(box), Tasks: detailState.unitTasks.map((e) => e.id), Route: route }));
-})();`, map[string]any{"detail": detail, "answers": map[string]any{
+})();`, map[string]any{"detail": detail, "cat": viewsCatalog(), "answers": map[string]any{
+		"/api/tasks?view=logbook": page(shipped),
 		"/api/tasks?view=inbox":   page(),
 		"/api/tasks?view=next":    page(mine, other),
 		"/api/tasks?view=waiting": page(waiting),
@@ -143,56 +102,10 @@ func TestOpeningClearsChanged(t *testing.T) {
 	}
 }
 
-func TestQuestionCardAnswers(t *testing.T) {
-	confirm := questionTask()
-	confirm.ID = "e-9"
-	confirm.Message = &api.Message{ID: 9, TaskID: "e-9", Kind: "question", Text: "Merge it?", Confirm: true, State: "open"}
-	var got struct {
-		Bodies  []string
-		Classes []bool
-		Digit   []string
-	}
-	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
-(async () => {
-  const card = questionCard(input.q);
-  await byFocus(card, "question:a").attrs.onclick();
-  await byFocus(card, "question:b").attrs.onclick();
-  const yes = questionCard(input.c);
-  await byFocus(yes, "question:yes").attrs.onclick();
-  detailState.answer = "only the uploads";
-  await byFocus(card, "question:a").attrs.onclick();
-  detailState.task = input.q;
-  const el = { closest: (s) => (s === ".d-question" ? {} : null) };
-  const q = detailPane.questionAt(el);
-  process.stdout.write(JSON.stringify({
-    Bodies: posts.map((p) => p.path + " " + JSON.stringify(p.body)),
-    Classes: [byClass(card, "d-question").length === 1, card.attrs.class === "d-question"],
-    Digit: [q.task.id, q.question.recommend, ...q.question.options.map((o) => o.id)],
-  }));
-})();`, map[string]any{"q": questionTask(), "c": confirm, "answers": map[string]any{}}, &got)
-	want := []string{
-		`/api/tasks/e-1/answer {"source":"cockpit","args":{"option_id":"a"}}`,
-		`/api/tasks/e-1/answer {"source":"cockpit","args":{"option_id":"b"}}`,
-		`/api/tasks/e-9/answer {"source":"cockpit","args":{"yes":"true"}}`,
-		`/api/tasks/e-1/answer {"source":"cockpit","args":{"option_id":"a","guidance":"only the uploads"}}`,
-	}
-	if !slices.Equal(got.Bodies, want) {
-		t.Errorf("posts\n%v\nwant\n%v", got.Bodies, want)
-	}
-	if !got.Classes[1] {
-		t.Error("the question card lacks .d-question, so digit keys cannot answer it")
-	}
-	if !slices.Equal(got.Digit, []string{"e-1", "b", "a", "b"}) {
-		t.Errorf("questionAt %v", got.Digit)
-	}
-}
-
-func TestProposalShowsItsDraft(t *testing.T) {
+func TestADraftOnATaskApprovesItsEditedText(t *testing.T) {
 	e := task("e-5", "inbox", func(e *api.TaskView) {
 		e.Kind, e.Title = "message", "Nudge the reviewer?"
 		e.Units = []unit.Unit{prUnit}
-		e.Message = &api.Message{ID: 5, TaskID: "e-5", Kind: "proposal", Text: "The review waits for 3 days; nudge?", State: "open",
-			Options: []record.Option{{ID: "accept", Label: "Accept"}, {ID: "reject", Label: "Reject"}}}
 		e.Draft = &api.Draft{ID: 11, Unit: "github/acme/api#8", Kind: "nudge", Target: "acme/api#8", Text: "Could you take a look?", State: "proposed", Rev: 2}
 		e.Verbs = []api.VerbState{{Verb: "approve", Enabled: true}, {Verb: "dismiss", Enabled: true}, {Verb: "answer", Enabled: true}}
 	})
@@ -206,28 +119,28 @@ func TestProposalShowsItsDraft(t *testing.T) {
 	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
 (async () => {
   await loadDetailPane({ task: "e-5" });
-  const pane = taskPane(detailState.task);
+  const pane = taskPage(detailState.task);
   posts.length = 0;
   await byFocus(pane, "detail:approve:e-5").attrs.onclick();
   const posted = posts.map((p) => p.path);
   const show = (p) => p.path + " " + JSON.stringify(p.body);
   posts.length = 0;
   byFocus(pane, "detail:open:approve:e-5").attrs.onclick();
-  const editing = taskPane(detailState.task);
+  const editing = taskPage(detailState.task);
   byFocus(editing, "detail:draft-text:e-5").attrs.oninput({ target: { value: "Could you review the retry change today?" } });
-  await byFocus(taskPane(detailState.task), "detail:approve:e-5").attrs.onclick();
+  await byFocus(taskPage(detailState.task), "detail:approve:e-5").attrs.onclick();
   const edited = posts.map(show);
   posts.length = 0;
-  byFocus(taskPane(detailState.task), "detail:open:approve:e-5").attrs.onclick();
-  byFocus(taskPane(detailState.task), "detail:draft-text:e-5").attrs.oninput({ target: { value: "Ping on the retry change" } });
+  byFocus(taskPage(detailState.task), "detail:open:approve:e-5").attrs.onclick();
+  byFocus(taskPage(detailState.task), "detail:draft-text:e-5").attrs.oninput({ target: { value: "Ping on the retry change" } });
   await detailPane.act("approve", {});
   const keyed = posts.map(show);
-  process.stdout.write(JSON.stringify({ Text: text(pane), Kinds: [byClass(pane, "d-question").length, byClass(pane, "d-draft").length], Posted: posted, Edited: edited, Keyed: keyed }));
+  process.stdout.write(JSON.stringify({ Text: text(pane), Kinds: [byClass(pane, "d-gates").length, byClass(pane, "d-draft").length], Posted: posted, Edited: edited, Keyed: keyed }));
 })();`, map[string]any{"answers": map[string]any{"/api/tasks/e-5": e}}, &got)
 	if !slices.Equal(got.Kinds, []int{1, 1}) {
-		t.Errorf("question and draft cards %v, want one of each", got.Kinds)
+		t.Errorf("gates sections and draft cards %v, want the draft among the gates", got.Kinds)
 	}
-	for _, s := range []string{"The review waits for 3 days; nudge?", "Could you take a look?", "acme/api#8"} {
+	for _, s := range []string{"Could you take a look?", "acme/api#8"} {
 		if !strings.Contains(got.Text, s) {
 			t.Errorf("the detail lacks %q", s)
 		}
@@ -311,34 +224,11 @@ const pane = h("div", {}, ...verbButtons(input.task));
 	}
 }
 
-func TestAQuestionCardShowsItsAnswersAndWhetherTheAgentReadThem(t *testing.T) {
-	q := questionTask()
-	read := time.Date(2026, 10, 22, 12, 5, 0, 0, time.UTC)
-	q.Message.State = "answered"
-	q.Message.Answers = []api.TurnAnswer{
-		{ID: 1, OptionID: "b", Text: "and say why", Message: 3, ReadAt: &read},
-		{ID: 2, Text: "one more thing", Message: 3},
-		{ID: 3, Yes: true, Message: 3},
-	}
-	var got []string
-	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
-const card = questionCard(input.q);
-process.stdout.write(JSON.stringify(byClass(card, "d-answer").map(text)));`, map[string]any{"q": q, "answers": map[string]any{}}, &got)
-	want := []string{
-		"Revert, and say why: read by the agent",
-		"one more thing: not read by the agent yet",
-		"yes: not read by the agent yet",
-	}
-	if !slices.Equal(got, want) {
-		t.Errorf("answers\n%q\nwant\n%q", got, want)
-	}
-}
-
 func TestAVerbTheTaskDoesNotOfferHasNoButton(t *testing.T) {
 	var got struct{ Approve, Dismiss, Done int }
 	e := task("e-4", "inbox", func(e *api.TaskView) { e.Verbs = []api.VerbState{{Verb: "done", Enabled: true}} })
 	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
-const pane = h("div", {}, ...taskPane(input.task));
+const pane = h("div", {}, ...taskPage(input.task));
 const n = (verb) => byFocus(pane, "detail:" + verb + ":e-4") ? 1 : 0;
 process.stdout.write(JSON.stringify({ Approve: n("approve"), Dismiss: n("dismiss"), Done: n("done") }));`, map[string]any{"task": e, "answers": map[string]any{}}, &got)
 	if got.Approve != 0 || got.Dismiss != 0 || got.Done != 1 {
@@ -361,7 +251,7 @@ func TestATaskOffersTheIntentsThatServeIt(t *testing.T) {
 	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
 (async () => {
   await loadDetailPane({ task: "e-3f9a" });
-  const pane = taskPane(detailState.task);
+  const pane = taskPage(detailState.task);
   await byFocus(pane, "detail:start:e-3f9a").attrs.onclick();
   process.stdout.write(JSON.stringify({ Text: text(pane), Posts: posts }));
 })();`, map[string]any{"answers": map[string]any{"/api/tasks/e-3f9a": e}}, &got)

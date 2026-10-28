@@ -31,7 +31,7 @@ func TestTaskHashOpensTheTask(t *testing.T) {
 		Back           string
 		Old            string
 	}
-	nodeRun(t, routesPrelude(t)+treeJS+staticJS(t, "detail.js"), nil, `
+	nodeRun(t, routesPrelude(t)+treeJS+staticJS(t, "task.js")+staticJS(t, "detail.js"), nil, `
 tasksState.catalog = input;
 tasksState.key = viewQueryKey("next", "", []);
 tasksState.tasks = [{ id: "e-1", state: "next", title: "Write the release notes", contexts: [], units: [] }];

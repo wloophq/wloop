@@ -2,10 +2,7 @@
 
 const CHORD_MS = 1000;
 const KEY_CONTEXTS = ["question", "plan", "review", "list", "global"];
-const TASK_VERBS = new Set(["next", "waiting", "schedule", "someday", "reference", "focus", "project", "approve", "delegate", "done", "dismiss", "reviewed", "sequential"]);
 const CORE_ACTIONS = /^(move:|detail:|nav:|area:|answer:|step:|palette$|help$|filter$|open-source$|capture$|quit$)/;
-// A served action's key is one uppercase letter, or its plan context's own key.
-const servedAction = (b) => !!b.served || /^[A-Z]$/.test(b.key) || (b.context === "plan" && !CORE_ACTIONS.test(b.action) && !TASK_VERBS.has(b.action));
 const NAMED_KEYS = { Enter: "Enter", Escape: "Esc", Esc: "Esc", Backspace: "Backspace", Tab: "Tab" };
 
 // VERB_ASKS are the verbs that ask for a value first, the question from
@@ -20,7 +17,6 @@ const VERB_ASKS = {
   delegate: { args: (v) => (v ? { guidance: v } : {}) },
   reply: { args: (v) => (v ? { text: v } : null) },
 };
-const keyVerb = (name) => TASK_VERBS.has(name) || !!VERB_ASKS[name];
 
 // eventKey is the canonical name of a key event, as the served bindings
 // spell it; "" when no binding can match. Shift+digit reads the physical
@@ -94,6 +90,11 @@ function createKeys(env) {
   let bindings = [];
   let chord = null;
   const now = env.now || (() => Date.now());
+  // taskVerbs are the verbs the catalog serves.
+  const taskVerbs = () => new Set(env.verbs ? env.verbs() : []);
+  const keyVerb = (name) => taskVerbs().has(name);
+  // A served action's key is one uppercase letter, or its plan context's own key.
+  const servedAction = (b) => !!b.served || /^[A-Z]$/.test(b.key) || (b.context === "plan" && !CORE_ACTIONS.test(b.action) && !keyVerb(b.action));
 
   const isPrefix = (key) => bindings.some((b) => b.key.startsWith(key + " "));
   // reserved mirrors keys.Reserved: a core key, a chord prefix, a lowercase
@@ -176,6 +177,11 @@ function createKeys(env) {
   async function answer(n, target) {
     const q = env.questionAt && env.questionAt(target);
     if (!q) return false;
+    if (q.gate) {
+      const intent = (q.gate.intents || [])[n - 1];
+      if (intent && env.resolveGate) await env.resolveGate(q.task, q.gate, intent.id);
+      return true;
+    }
     const pick = questionOptions(q.question)[n - 1];
     if (!pick) return true;
     if (q.task) await taskVerb(q.task, "answer", pick);
@@ -252,7 +258,7 @@ function createKeys(env) {
     const item = (b, label) => ({ label: label || b.help || b.action, key: b.key || "", run: () => run(b, {}) });
     const listBinding = (action, served) => bindings.find((b) => b.action === action && b.context === "list" && servedAction(b) === served);
     if (isTask(sel)) {
-      for (const v of (sel.verbs || []).filter((x) => x.enabled && keyVerb(x.verb))) {
+      for (const v of (sel.verbs || []).filter((x) => x.enabled && keyVerb(x.verb) && (listBinding(x.verb, false) || VERB_ASKS[x.verb]))) {
         const b = listBinding(v.verb, false) || { key: "", action: v.verb, context: "list" };
         items.push(item(b, b.help || v.verb));
       }
@@ -404,6 +410,8 @@ function appEnv() {
     fetch: (...a) => fetch(...a),
     selected: () => detailPane.selected() || selectedRow(),
     act: (verb, args, task) => detailPane.act(verb, args, task),
+    verbs: () => ((tasksState.catalog && tasksState.catalog.verbs) || []).map((v) => v.verb),
+    resolveGate: (task, gate, intent) => detailPane.resolve(task, gate, intent),
     rowOf,
     spec: (id) => state.specs.byId[id],
     unitAction: (row, id, extra) => act(row, id, extra),
@@ -414,7 +422,7 @@ function appEnv() {
     viewContext: () => keyContextOf(readHash().view),
     step: (action) => reviewKey(action),
     questionAt: (el) => {
-      if (readHash().task) return detailPane.questionAt(el);
+      if (readHash().task) return detailPane.gateAt(el);
       const d = state.detail;
       if (!el || !el.closest || !el.closest(".d-question") || !d || !d.row.question || d.row.question.state !== "asked") return null;
       return { row: d.row, question: d.row.question };

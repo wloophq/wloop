@@ -1,8 +1,8 @@
 "use strict";
 
-// reviewState is the weekly Review on screen: the daemon's Review, the step
-// shown and its tasks, which also stand in tasksState so the task keys and
-// the detail act on them.
+// reviewState is the review on screen: the daemon's Review, the step shown
+// and its tasks, which also stand in tasksState so the task keys and the
+// detail act on them.
 const reviewState = { review: null, step: "", error: "" };
 
 const reviewEnv = {
@@ -16,8 +16,16 @@ const reviewEnv = {
   },
 };
 
+// reviewSteps are the views the catalog's review walks, in its order, each
+// with the label, count and done mark of the Review's step that shows it.
 function reviewSteps() {
-  return (reviewState.review && reviewState.review.steps) || [];
+  const served = (reviewState.review && reviewState.review.steps) || [];
+  const views = (tasksState.catalog && tasksState.catalog.review) || [];
+  if (!views.length) return served;
+  return views.map((v) => {
+    const s = served.find((x) => x.view === v || x.id === v) || {};
+    return { id: s.id || v, view: v, label: s.label || viewLabel(v), count: s.count !== undefined ? s.count : ((tasksState.counters || {}).views || {})[v] || 0, done: !!s.done };
+  });
 }
 
 // reviewFirstOpen is the first step not done after index from (wrapping),
@@ -35,7 +43,7 @@ function reviewCurrent() {
 }
 
 function reviewTasksURL(step) {
-  return "/api/tasks?" + new URLSearchParams(step.query || { view: step.view }).toString();
+  return tasksURL(step.view, "", [], "");
 }
 
 // loadReview reads the Review and the tasks of the step shown, the first
@@ -113,10 +121,10 @@ function reviewStepItem(s) {
     h("span", { class: "count" }, String(s.count))));
 }
 
-// reviewPanel is the Review: its steps with their counts, then the step
+// reviewPanel is the review: its steps with their counts, then the step
 // shown with its tasks.
 function reviewPanel(open) {
-  const parts = [h("div", { class: "tools gtd-tools" }, h("h2", { class: "gtd-head" }, "Weekly review"))];
+  const parts = [h("div", { class: "tools tasks-tools" }, h("h2", { class: "tasks-head" }, viewLabel(REVIEW)))];
   if (reviewState.error) parts.push(h("p", { class: "plan-error" }, reviewState.error));
   const steps = reviewSteps();
   if (!reviewState.review) {
@@ -140,7 +148,6 @@ function reviewPanel(open) {
     parts.push(h("p", { class: "empty" }, "Nothing here."));
     return parts;
   }
-  const item = step.view === "outbox" ? outboxItem : taskItem;
-  parts.push(h("ol", { class: "entries" }, ...tasksState.tasks.map((e) => item(e, open))));
+  parts.push(h("ol", { class: "task-list" }, ...tasksState.tasks.map((e) => listItem(e, open))));
   return parts;
 }

@@ -44,6 +44,7 @@ func slackTask() api.TaskView {
 		e.Units = []unit.Unit{slackUnit}
 		e.UnitLabels = []string{"#general"}
 		e.Items = []api.ItemView{{Unit: slackUnit, ID: "e1", Summary: "Ana owes the doc", State: "open", Kind: "request"}}
+		e.Asks = []api.AskView{{Item: "e1", Summary: "Ana owes the doc", Asker: "Ana"}}
 		e.Cards = []api.CardView{{Card: card.Card{Unit: slackUnit, Label: "#general", Title: "Deploy plan", State: "waits_on_others",
 			Signals: []card.Signal{{Key: "last activity", Value: "2026-10-23 14:15 UTC", Tone: "info", At: at}},
 			WaitsOn: []items.Person{{Key: "group:S0001", Name: "@team-a"}}}}}

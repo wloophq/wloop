@@ -91,6 +91,7 @@ func TestReviewStepsWeb(t *testing.T) {
 	project.ReviewDue, project.OpenActions, project.ReviewEvery = true, 0, "168h0m0s"
 	nodeRun(t, viewsPrelude(t)+staticJS(t, "review.js"), nil, `
 const gets = [], posts = [], focused = [];
+tasksState.catalog = { views: [{ id: "review", label: "Weekly review" }] };
 reviewEnv.getJSON = async (url) => {
   gets.push(url);
   if (url === "/api/review") return input.review;

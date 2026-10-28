@@ -1,7 +1,8 @@
 "use strict";
 
-const DEFAULT_VIEW = "focus";
-const tasksState = { catalog: null, catalogError: "", key: "", page: null, tasks: [], counters: null, filtered: null, filterSeq: 0, error: "" };
+// REVIEW is the key context the review's keys work in, and the view that walks the review.
+const REVIEW = "review";
+const tasksState = { catalog: null, catalogError: "", key: "", page: null, tasks: [], gates: [], counters: null, filtered: null, filterSeq: 0, error: "" };
 
 function coreViews(cat = tasksState.catalog) {
   return (cat && cat.views) || [];
@@ -11,13 +12,17 @@ function isCoreView(id, cat = tasksState.catalog) {
   return coreViews(cat).some((v) => v.id === id);
 }
 
+function viewSpec(id, cat = tasksState.catalog) {
+  return coreViews(cat).find((v) => v.id === id) || null;
+}
+
 // resolveView is the view a route shows: a core view, a served plugin
-// view or a plugin's own web view; Focus otherwise. Before anything is
-// loaded every view stands.
+// view or a plugin's own web view; the catalog's first view otherwise.
+// Before anything is loaded every view stands.
 function resolveView(view, cat, served, plugin) {
   if (view && ((!cat && !served.length) || isCoreView(view, cat) || served.some((v) => v.id === view) || plugin(view))) return view;
   if (!cat && served.length) return served[0].id;
-  return DEFAULT_VIEW;
+  return (coreViews(cat)[0] || served[0] || { id: "" }).id;
 }
 
 // viewNav is the rail: the core views with their counters, then each plugin
@@ -114,25 +119,16 @@ function viewQueryKey(view, area, ctx) {
   return [view, view === "inbox" ? "" : area || "", (ctx || []).join(",")].join("|");
 }
 
-// viewSort orders a merged list as the store does: Logbook puts Reference
-// first, then the newest; every other view the oldest first.
-function viewSort(view, tasks) {
-  const t = (s) => Date.parse(s || "") || 0;
-  if (view === "outbox") return tasks;
-  if (view === "logbook") {
-    return [...tasks].sort((a, b) => Number(b.state === "reference") - Number(a.state === "reference") || t(b.updated) - t(a.updated));
-  }
-  return [...tasks].sort((a, b) => t(a.created) - t(b.created));
-}
-
-// applyTasksPage folds a page of view into the list; a page of another
-// query, epoch or a full page replaces it, an older one is dropped.
-function applyTasksPage(key, view, page) {
+// applyTasksPage folds a page into the list; a page of another query,
+// epoch or a full page replaces it, an older one is dropped. A changed task
+// keeps its place and a new one comes last.
+function applyTasksPage(key, page) {
   const cur = tasksState.page;
   const same = tasksState.key === key && cur && cur.epoch === page.epoch;
   if (same && !page.full && page.rev < cur.rev) return;
   if (!same || page.full) {
     tasksState.tasks = page.tasks || [];
+    tasksState.gates = page.gates || [];
   } else {
     const gone = new Set(page.removed || []);
     const fresh = new Map((page.tasks || []).map((e) => [e.id, e]));
@@ -141,7 +137,8 @@ function applyTasksPage(key, view, page) {
       fresh.delete(e.id);
       return next || e;
     });
-    tasksState.tasks = viewSort(view, [...kept, ...fresh.values()]);
+    tasksState.tasks = [...kept, ...fresh.values()];
+    if (page.gates) tasksState.gates = page.gates;
   }
   tasksState.key = key;
   tasksState.page = { epoch: page.epoch || "", rev: page.rev || 0 };
@@ -166,7 +163,7 @@ async function loadTasks(given) {
 }
 
 async function loadTaskList(route) {
-  if (route.view === "review" && isCoreView(route.view)) return loadReview();
+  if (route.view === REVIEW && isCoreView(route.view)) return loadReview();
   if (!isCoreView(route.view)) {
     try {
       tasksState.counters = await getJSON(countersURL(route.area));
@@ -179,7 +176,7 @@ async function loadTaskList(route) {
   const cur = tasksState.page;
   const since = tasksState.key === key && cur && cur.epoch ? `${cur.epoch}:${cur.rev}` : "";
   try {
-    applyTasksPage(key, route.view, await getJSON(tasksURL(route.view, route.area, route.ctx, since)));
+    applyTasksPage(key, await getJSON(tasksURL(route.view, route.area, route.ctx, since)));
     tasksState.error = "";
     if (route.view === "inbox" && route.area) await areaCounters(route.area);
   } catch (err) {
@@ -198,24 +195,39 @@ async function areaCounters(area) {
   }
 }
 
-// viewGroups splits a view's list: Next by context, Waiting by person,
-// Logbook into Reference then Done; other views are one group.
-function viewGroups(view, tasks) {
-  const by = (keyOf, label) => {
-    const groups = new Map();
-    for (const e of tasks) {
-      const k = keyOf(e);
-      if (!groups.has(k)) groups.set(k, []);
-      groups.get(k).push(e);
-    }
-    return [...groups.keys()].sort((a, b) => (a === "") - (b === "") || a.localeCompare(b)).map((k) => ({ key: k, label: label(k), tasks: groups.get(k) }));
-  };
-  if (view === "next") return by((e) => (e.contexts || [])[0] || "", (k) => k || "No context");
-  if (view === "waiting") return by((e) => (((e.waiting || {}).on || [])[0] || {}).name || "", (k) => k || "Someone");
-  if (view === "logbook") {
-    return [["reference", "Reference"], ["done", "Done"]].map(([s, label]) => ({ key: s, label, tasks: tasks.filter((e) => e.state === s) })).filter((g) => g.tasks.length);
+// groupValue reads fact, a task fact such as task.category or task.prop.size, from a task as the wire serves it:
+// its first value when it holds several.
+function groupValue(fact, e) {
+  const name = String(fact || "").replace(/^task\./, "");
+  let v;
+  if (name.startsWith("prop.")) v = (e.props || {})[name.slice(5)];
+  else if (name === "waiting_on") v = ((e.waiting || {}).on || []).map((p) => p.name || p.key);
+  else v = e[name];
+  if (Array.isArray(v)) v = v[0];
+  if (v && typeof v === "object") v = v.name || v.key;
+  return v === undefined || v === null ? "" : String(v);
+}
+
+// viewGroups splits a view's list by the fact its spec groups by; a view
+// that names none is one group. Groups of a state or a category follow the
+// catalog's states, with their labels; others sort by value. The empty
+// value comes last.
+function viewGroups(spec, tasks, cat = tasksState.catalog) {
+  const fact = (spec && spec.group) || "";
+  if (!fact) return [{ key: "", label: "", tasks }];
+  const states = (cat && cat.states) || [];
+  const name = fact.replace(/^task\./, "");
+  const order = name === "state" ? states.map((s) => s.name) : name === "category" ? [...new Set(states.map((s) => s.category))] : [];
+  const label = (k) => (!k ? "None" : name === "state" ? stateLabel(k) : k);
+  const groups = new Map();
+  for (const e of tasks) {
+    const k = groupValue(fact, e);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(e);
   }
-  return [{ key: "", label: "", tasks }];
+  const rank = (k) => (order.includes(k) ? order.indexOf(k) : order.length);
+  return [...groups.keys()].sort((a, b) => (a === "") - (b === "") || rank(a) - rank(b) || a.localeCompare(b))
+    .map((k) => ({ key: k, label: label(k), tasks: groups.get(k) }));
 }
 
 function unitLabel(u) {
@@ -231,7 +243,7 @@ function taskItem(e, open) {
   const go = () => writeHash({ task: e.id, pr: "" });
   const waiting = ((e.waiting || {}).on || []).map((p) => p.name).filter(Boolean);
   return h("li", {
-    class: "entry" + (e.id === open ? " sel" : "") + (e.changed ? " changed" : ""),
+    class: "task-row" + (e.id === open ? " sel" : "") + (e.changed ? " changed" : ""),
     tabindex: 0,
     "data-focus": "task:" + e.id,
     "aria-selected": e.id === open ? "true" : "false",
@@ -243,7 +255,7 @@ function taskItem(e, open) {
       }
     },
   },
-    h("div", { class: "e-line" },
+    h("div", { class: "task-line" },
       e.focus ? h("span", { class: "star", title: e.focus_auto ? `Starred: ${e.focus_auto}` : "Starred" }, "★") : null,
       h("span", { class: "title" }, e.title || e.id),
       e.changed ? h("span", { class: "flag" }, "changed") : null),
@@ -284,9 +296,19 @@ function localDate(t) {
   return isNaN(d) ? "" : d.toLocaleDateString("en-CA");
 }
 
+// isDraftTask says whether e is a draft's own task, which shows its draft.
+function isDraftTask(e) {
+  return !!e.draft && e.id === "draft:" + e.draft.id;
+}
+
+// listItem is a task's row: a draft's own task shows the draft to approve.
+function listItem(e, open) {
+  return isDraftTask(e) ? outboxItem(e, open) : taskItem(e, open);
+}
+
 function outboxItem(e, open) {
-  return h("li", { class: "entry outbox" + (e.id === open ? " sel" : ""), "data-focus": "task:" + e.id, tabindex: 0 },
-    h("div", { class: "e-line" }, h("a", { href: "#" + viewHash({ task: e.id, pr: "" }), class: "title" }, e.title || e.id)),
+  return h("li", { class: "task-row outbox" + (e.id === open ? " sel" : ""), "data-focus": "task:" + e.id, tabindex: 0 },
+    h("div", { class: "task-line" }, h("a", { href: "#" + viewHash({ task: e.id, pr: "" }), class: "title" }, e.title || e.id)),
     e.draft ? draftCard(e, "outbox") : null);
 }
 
@@ -318,16 +340,6 @@ function contextChips(route) {
   });
 }
 
-const VIEW_EMPTY = {
-  focus: "Nothing starred. Star a task to keep it here.",
-  inbox: "Inbox zero.",
-  outbox: "No drafts wait for approval.",
-  next: "No next actions.",
-  waiting: "Waiting on nobody.",
-  projects: "No open projects.",
-  someday: "Nothing for someday.",
-  logbook: "Nothing done or filed yet.",
-};
 
 // taskHaystack is what the filter's free words search in a task, the texts the daemon's counters search
 // (api.TaskView.Texts): its title, notes, state, kind, area, project and contexts, its units, the people
@@ -376,25 +388,29 @@ function taskList(route, open) {
   const loaded = tasksState.key === viewQueryKey(route.view, route.area, route.ctx);
   const ts = filterTerms(route.q);
   const shown = loaded ? tasksState.tasks.filter((e) => taskMatches(e, ts)) : [];
-  const parts = [h("div", { class: "tools gtd-tools" }, h("h2", { class: "gtd-head" }, label), areaPicker(route), contextChips(route),
+  const parts = [h("div", { class: "tools tasks-tools" }, h("h2", { class: "tasks-head" }, label), areaPicker(route), contextChips(route),
     loaded ? h("span", { class: "lens-count" }, `${shown.length} of ${tasksState.tasks.length}`) : null)];
   if (tasksState.error) parts.push(h("p", { class: "plan-error" }, tasksState.error));
   if (!loaded) {
     parts.push(h("p", { class: "empty" }, "Loading."));
     return parts;
   }
+  const spec = viewSpec(route.view);
+  if (spec && spec.over === "gates") {
+    parts.push(tasksState.gates.length ? h("div", { class: "gate-list" }, ...tasksState.gates.map((g) => gateCard(taskById(g.task), g))) : h("p", { class: "empty" }, `Nothing in ${label}.`));
+    return parts;
+  }
   if (!tasksState.tasks.length) {
-    parts.push(h("p", { class: "empty" }, VIEW_EMPTY[route.view] || "Nothing here."));
+    parts.push(h("p", { class: "empty" }, `Nothing in ${label}.`));
     return parts;
   }
   if (!shown.length) {
     parts.push(h("p", { class: "empty" }, `Nothing here matches "${route.q}".`));
     return parts;
   }
-  const item = route.view === "outbox" ? outboxItem : taskItem;
-  for (const g of viewGroups(route.view, shown)) {
+  for (const g of viewGroups(spec, shown)) {
     if (g.label) parts.push(h("h3", { class: "plan-head" }, `${g.label} (${g.tasks.length})`));
-    parts.push(h("ol", { class: "entries" }, ...g.tasks.map((e) => item(e, open))));
+    parts.push(h("ol", { class: "task-list" }, ...g.tasks.map((e) => listItem(e, open))));
   }
   return parts;
 }
@@ -408,11 +424,11 @@ function renderTasks(route) {
   const box = document.getElementById("tasks");
   const on = isCoreView(route.view);
   box.hidden = !on;
-  if (route.view !== "review") reviewState.step = "";
+  if (route.view !== REVIEW) reviewState.step = "";
   if (!on) {
     box.replaceChildren();
     return;
   }
   box.setAttribute("aria-label", viewLabel(route.view));
-  box.replaceChildren(...(route.view === "review" ? reviewPanel(route.task) : taskList(route, route.task)));
+  box.replaceChildren(...(route.view === REVIEW ? reviewPanel(route.task) : taskList(route, route.task)));
 }

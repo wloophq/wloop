@@ -1,9 +1,10 @@
 "use strict";
 
-// UNIT_TASK_VIEWS are the lists a unit's detail reads its open tasks from.
-const UNIT_TASK_VIEWS = ["inbox", "next", "waiting", "someday"];
-const MESSAGE_HEAD = { question: "Question", agent_post: "Message from the agent", proposal: "Proposal" };
-const SKIP_VERB_BUTTONS = new Set(["seen", "answer", "edit", "retry", "approve", "dismiss", "delegate", "reply"]);
+// SKIP_VERB_BUTTONS are the verbs the page offers elsewhere: seen when it opens, reply in the composer, and
+// a draft's in its card.
+const SKIP_VERB_BUTTONS = new Set(["seen", "answer", "reply", "edit", "retry"]);
+// CLOSED_CATEGORIES are the categories of a state a task leaves the lists for.
+const CLOSED_CATEGORIES = new Set(["done", "dropped"]);
 // DRAFT_VERBS are the task verbs of a draft's actions.
 const DRAFT_VERBS = { "draft.approve": "approve", "draft.edit": "edit", "draft.discard": "dismiss", "draft.retry": "retry" };
 
@@ -12,11 +13,9 @@ function draftWord(id) {
   const sp = typeof state === "object" && state.specs && state.specs.byId ? state.specs.byId[id] : null;
   return (sp && sp.label) || verbLabel(DRAFT_VERBS[id]);
 }
-const TASK_DRAFT_STATES = "proposed,approved,sending,sent,failed";
 
 const detailState = {
-  id: "", task: null, error: "", seenFor: "", log: null, logOpen: false, logError: "", editing: new Map(), answer: "", unitKey: "", unitTasks: [],
-  guidance: "", drafts: [], draftsError: "", compose: { key: "", text: "", reaction: "" },
+  id: "", task: null, error: "", seenFor: "", editing: new Map(), unitKey: "", unitTasks: [], compose: { key: "", text: "", reaction: "" },
 };
 
 // detailEnv is what the pane reaches of the page; tests replace it.
@@ -76,10 +75,7 @@ async function taskAct(task, verb, args) {
   try {
     const out = await detailEnv.post(taskPath(task.id, verb), verbBody(args));
     detailEnv.notice(`${verb}: ${task.title || task.id}${out && out.lines && out.lines.length ? ". " + out.lines.join(" ") : ""}`);
-    if (verb === "approve" || verb === "answer") {
-      detailState.editing.delete(task.id);
-      detailState.answer = "";
-    }
+    if (verb === "approve") detailState.editing.delete(task.id);
     detailEnv.changed();
     return out || {};
   } catch (err) {
@@ -141,32 +137,32 @@ const detailPane = {
   selected: () => taskById(detailEnv.focused()) || detailState.task,
   act: (verb, args, task) => actOn(task || detailPane.selected(), verb, args),
   load: (route) => loadDetailPane(route),
-  questionAt: (el) => {
+  gateAt: (el) => {
     const e = detailState.task;
-    const m = e && e.message;
-    if (!el || !el.closest || !el.closest(".d-question") || !m || m.state !== "open") return null;
-    return { task: e, question: { kind: m.confirm ? "confirm" : m.kind, options: m.options || [], recommend: m.recommend || "" } };
+    const card = e && el && el.closest ? el.closest(".d-gate") : null;
+    const g = card && (e.gates || []).find((x) => String(x.id) === card.getAttribute("data-gate"));
+    return g ? { task: e, gate: g } : null;
   },
+  resolve: (task, gate, intent) => resolveGate(task, gate, intent),
 };
 
 async function loadDetailPane(route) {
   if (!route.task) {
-    Object.assign(detailState, { id: "", task: null, error: "", seenFor: "", log: null, logOpen: false, logError: "", answer: "", guidance: "", drafts: [], draftsError: "" });
+    Object.assign(detailState, { id: "", task: null, error: "", seenFor: "" });
     return loadUnitTasks(route.unit);
   }
   const id = route.task;
-  if (detailState.id !== id) Object.assign(detailState, { id, task: null, error: "", seenFor: "", log: null, logOpen: false, logError: "", answer: "", guidance: "", drafts: [], draftsError: "" });
+  if (detailState.id !== id) Object.assign(detailState, { id, task: null, error: "", seenFor: "" });
   try {
     const e = await detailEnv.getJSON(taskPath(id));
     if (detailState.id !== id) return;
     detailState.task = e;
     detailState.error = "";
-    await loadTaskDrafts(e);
-    if (e.state === "inbox" && detailState.seenFor !== id) {
+    await loadTaskPage(e);
+    if (e.category === "inbox" && detailState.seenFor !== id) {
       detailState.seenFor = id;
       detailEnv.post(taskPath(id, "seen"), { source: "cockpit" }).catch(() => {});
     }
-    if (detailState.logOpen) await loadAgentLog();
   } catch (err) {
     if (detailState.id !== id) return;
     detailState.task = null;
@@ -174,61 +170,27 @@ async function loadDetailPane(route) {
   }
 }
 
-// loadTaskDrafts reads the drafts made for e, but for a draft's own task, which shows its draft.
-async function loadTaskDrafts(e) {
-  if (e.kind === "draft") {
-    detailState.drafts = [];
-    return;
-  }
-  try {
-    const out = await detailEnv.getJSON("/api/drafts?" + new URLSearchParams({ task: e.id, state: TASK_DRAFT_STATES }).toString());
-    if (detailState.id !== e.id) return;
-    detailState.drafts = out.drafts || [];
-    detailState.draftsError = "";
-  } catch (err) {
-    detailState.draftsError = `Could not load the drafts: ${err.message}`;
-  }
-}
-
-// loadUnitTasks reads the open tasks that hold the unit key.
+// loadUnitTasks reads the open tasks that hold the unit key, from every view of tasks.
 async function loadUnitTasks(key) {
   detailState.unitKey = key || "";
   if (!key) {
     detailState.unitTasks = [];
     return;
   }
-  const pages = await Promise.allSettled(UNIT_TASK_VIEWS.map((v) => detailEnv.getJSON(tasksURL(v, "", [], ""))));
+  const views = coreViews().filter((v) => (v.over || "tasks") === "tasks");
+  const pages = await Promise.allSettled(views.map((v) => detailEnv.getJSON(tasksURL(v.id, "", [], ""))));
   if (detailState.unitKey !== key) return;
   const seen = new Set();
   const out = [];
   for (const p of pages) {
     if (p.status !== "fulfilled") continue;
     for (const e of p.value.tasks || []) {
-      if (seen.has(e.id) || !(e.units || []).some((u) => `${u.provider}:${u.key}` === key)) continue;
+      if (seen.has(e.id) || CLOSED_CATEGORIES.has(e.category) || !(e.units || []).some((u) => `${u.provider}:${u.key}` === key)) continue;
       seen.add(e.id);
       out.push(e);
     }
   }
   detailState.unitTasks = out;
-}
-
-async function loadAgentLog() {
-  const e = detailState.task;
-  const u = e && (e.units || [])[0];
-  if (!u) return;
-  try {
-    const d = await detailEnv.getJSON("/api/units/" + [u.provider, u.key].map(encodeURIComponent).join("/"));
-    detailState.log = { events: d.events || [], unit: u };
-    detailState.logError = "";
-  } catch (err) {
-    detailState.logError = `Could not load the agent log: ${err.message}`;
-  }
-}
-
-async function openAgentLog() {
-  detailState.logOpen = !detailState.logOpen;
-  if (detailState.logOpen && !detailState.log) await loadAgentLog();
-  detailEnv.render();
 }
 
 // verbState is how verb stands on e; null when e does not offer it.
@@ -274,7 +236,8 @@ function verbLabel(verb) {
 }
 
 function verbButtons(e) {
-  return (e.verbs || []).filter((v) => !SKIP_VERB_BUTTONS.has(v.verb)).map((v) => verbButton(e, v.verb, verbLabel(v.verb), () => {
+  const skip = (verb) => SKIP_VERB_BUTTONS.has(verb) || (!!e.draft && Object.values(DRAFT_VERBS).includes(verb));
+  return (e.verbs || []).filter((v) => !skip(v.verb)).map((v) => verbButton(e, v.verb, verbLabel(v.verb), () => {
     const args = askedArgs(v.verb);
     if (args) taskAct(e, v.verb, args);
   }));
@@ -309,69 +272,6 @@ function draftCard(e, scope) {
     d.error ? h("p", { class: "err" }, d.error) : null,
     wouldLine(d) ? h("p", { class: "would" }, wouldLine(d)) : null,
     h("div", { class: "d-actions" }, ...buttons));
-}
-
-// draftTask is the Outbox task of draft d, its verbs read from the draft's actions, for draftCard.
-function draftTask(d, title) {
-  const verbs = (d.actions || []).filter((a) => DRAFT_VERBS[a.id]).map((a) => ({ verb: DRAFT_VERBS[a.id], enabled: !!a.enabled, reason: a.reason || "" }));
-  return { id: "draft:" + d.id, title, verbs, draft: d };
-}
-
-// taskDrafts are the drafts made for e, each with its card.
-function taskDrafts(e) {
-  const shown = e.draft ? e.draft.id : null;
-  const ds = detailState.drafts.filter((d) => d.id !== shown);
-  if (!ds.length && !detailState.draftsError) return null;
-  return h("section", { class: "d-drafts", "aria-label": "Drafts" },
-    h("h2", { class: "d-sub" }, "Drafts"),
-    detailState.draftsError ? h("p", { class: "plan-error" }, detailState.draftsError) : null,
-    ...ds.map((d) => draftCard(draftTask(d, e.title || e.id), "drafts")));
-}
-
-const MODE_NAMES = { headless: "draft headless", session: "run a session" };
-
-// delegateMode is the delegate's state in mode: the verb's own when the daemon sends no runners, else the
-// runner's, off when the action does not run on it.
-function delegateMode(st, mode) {
-  if (!st.enabled || !st.runners) return st;
-  const m = st.runners.find((x) => x.runner === mode);
-  return m || { enabled: false, reason: `This action does not ${MODE_NAMES[mode] || mode}` };
-}
-
-// delegateBox hands the task to an agent with optional guidance: headless, which drafts what it needs
-// into the Outbox, or a session, off with its reason when the unit has nowhere to run one.
-function delegateBox(e) {
-  const st = verbState(e, "delegate");
-  if (!(e.verbs || []).some((v) => v.verb === "delegate")) return null;
-  const run = async (mode) => {
-    const args = { mode };
-    if (detailState.guidance.trim()) args.guidance = detailState.guidance.trim();
-    if (await taskAct(e, "delegate", args)) {
-      detailState.guidance = "";
-      detailEnv.render();
-    }
-  };
-  return h("section", { class: "d-delegate", "aria-label": verbLabel("delegate") },
-    h("h2", { class: "d-sub" }, verbLabel("delegate")),
-    st.enabled ? null : h("p", { class: "empty" }, st.reason || "Not offered here"),
-    h("textarea", { rows: 2, "aria-label": "Guidance", placeholder: verbQuestion("delegate"), disabled: !st.enabled, "data-focus": "detail:guidance",
-      oninput: (ev) => { detailState.guidance = ev.target.value; } }, detailState.guidance),
-    h("div", { class: "d-actions" },
-      modeButton(e, st, "headless", "Draft for me", () => run("headless"), true),
-      modeButton(e, st, "session", "Hand to an agent", () => run("session"), false)),
-    st.enabled && !delegateMode(st, "session").enabled ? h("p", { class: "empty" }, "Hand to an agent: " + delegateMode(st, "session").reason) : null);
-}
-
-function modeButton(e, st, mode, label, run, primary) {
-  const m = delegateMode(st, mode);
-  return h("button", {
-    type: "button",
-    class: "act" + (m.enabled ? "" : " off") + (primary ? " primary" : ""),
-    disabled: !m.enabled,
-    title: m.enabled ? undefined : m.reason,
-    "data-focus": `detail:${mode}:delegate:${e.id}`,
-    onclick: run,
-  }, label);
 }
 
 // composeFor is the composer's text for key, empty when it last held another key's.
@@ -418,15 +318,6 @@ function composer(key, opts) {
     h("div", { class: "d-actions" }, button("Save to Outbox", false, true), button("Send now", true, false)));
 }
 
-// taskComposer replies on the task's first unit through the reply verb.
-function taskComposer(e) {
-  if (!(e.verbs || []).some((v) => v.verb === "reply")) return null;
-  const st = verbState(e, "reply");
-  const u = (e.units || [])[0];
-  return composer("task:" + e.id, { scope: "detail:reply", placeholder: verbQuestion("reply"), reason: st.enabled ? "" : st.reason || "Not offered here", reacts: !!u && providerReacts(u.provider),
-    post: (args) => taskAct(e, "reply", args) });
-}
-
 // unitComposer replies on a unit through POST /api/drafts.
 function unitComposer(u) {
   if (!u || !u.provider) return null;
@@ -441,35 +332,6 @@ function unitComposer(u) {
       return null;
     }
   } });
-}
-
-// questionCard shows the task's message with its options; .d-question
-// lets the digit keys answer it.
-function questionCard(e) {
-  const m = e.message;
-  const open = m.state === "open";
-  const opts = m.options || [];
-  const answer = (args) => taskAct(e, "answer", detailState.answer ? { ...args, guidance: detailState.answer } : args);
-  const choices = !open ? [] : m.confirm ? [
-    h("button", { type: "button", class: "act primary", "data-focus": "question:yes", onclick: () => answer({ yes: true }) }, "Yes"),
-    h("button", { type: "button", class: "act", "data-focus": "question:no", onclick: () => answer({ no: true }) }, "No"),
-  ] : [...opts.filter((o) => o.id === m.recommend), ...opts.filter((o) => o.id !== m.recommend)].map((o) => h("button", {
-    type: "button", class: "act" + (o.id === m.recommend ? " primary" : ""), title: o.consequence || undefined, "data-focus": "question:" + o.id, onclick: () => answer({ option_id: o.id }),
-  }, o.id === m.recommend ? `${o.label} (recommended)` : o.label));
-  return h("section", { class: "d-question", "aria-label": MESSAGE_HEAD[m.kind] || "Message" },
-    h("h2", { class: "d-sub" }, MESSAGE_HEAD[m.kind] || "Message", open ? "" : ` (${m.state})`),
-    h("p", { class: "summary" }, m.text),
-    (m.answers || []).length ? h("ul", { class: "d-answers", "aria-label": "Answers" }, ...m.answers.map((a) => answerItem(m, a))) : null,
-    open ? h("textarea", { rows: 2, "aria-label": "Answer", placeholder: opts.length || m.confirm ? "A note with your choice (optional)" : "Your answer", "data-focus": "question:text", oninput: (ev) => { detailState.answer = ev.target.value; } }, detailState.answer) : null,
-    open ? h("div", { class: "d-actions" }, ...choices,
-      !opts.length && !m.confirm ? h("button", { type: "button", class: "act primary", "data-focus": "question:send", onclick: () => detailState.answer.trim() && answer({}) }, "Send") : null) : null);
-}
-
-// answerItem is one answer to m as the user gave it, and whether the agent read it.
-function answerItem(m, a) {
-  const option = (m.options || []).find((o) => o.id === a.option_id);
-  const said = [a.option_id ? (option ? option.label : a.option_id) : "", a.yes ? "yes" : a.no ? "no" : "", (a.text || "").trim()].filter(Boolean).join(", ");
-  return h("li", { class: "d-answer" }, said, ": ", h("span", { class: "muted" }, a.read_at ? "read by the agent" : "not read by the agent yet"));
 }
 
 function personName(p) {
@@ -525,49 +387,6 @@ function itemsBlock(items) {
       h("span", {}, it.summary || it.id), " ", h("span", { class: "pill" }, it.state || ""))))];
 }
 
-function agentLog() {
-  const log = detailState.log;
-  if (detailState.logError) return h("p", { class: "plan-error" }, detailState.logError);
-  if (!log) return h("p", { class: "empty" }, "Loading the agent log.");
-  if (!log.events.length) return h("p", { class: "empty" }, "No agent activity on this unit.");
-  return h("ol", { class: "timeline" }, ...log.events.map((ev) => h("li", { class: "ev-" + ev.kind },
-    h("time", { datetime: ev.at }, stamp(ev.at)),
-    h("div", {}, h("span", { class: "kind" }, String(ev.kind || "").replaceAll("_", " ")), ev.actor ? h("span", { class: "who" }, " " + ev.actor) : null))));
-}
-
-// taskPane is the detail of a task: its head, verbs, items, question,
-// draft and cards; the agent log waits for a click.
-function taskPane(e) {
-  const waiting = ((e.waiting || {}).on || []).map((p) => p.name).filter(Boolean);
-  return [
-    h("div", { class: "d-head" },
-      h("button", { type: "button", class: "close", "aria-label": "Close detail", "data-focus": "detail:close", onclick: () => detailEnv.close() }, "×"),
-      h("h1", {}, e.focus ? "★ " : "", e.title || e.id),
-      h("div", { class: "meta" },
-        h("span", { class: "pill" }, e.state), e.kind && e.kind !== e.state ? [" ", h("span", { class: "pill" }, e.kind)] : null,
-        e.changed ? [" ", h("span", { class: "flag" }, "changed")] : null,
-        e.area ? [" area ", e.area] : null,
-        e.project_title ? [" in ", e.project_title] : null)),
-    (e.contexts || []).length ? h("div", { class: "d-contexts" }, ...e.contexts.map((c) => h("span", { class: "pill" }, c))) : null,
-    e.notes ? h("p", { class: "d-notes" }, e.notes) : null,
-    waiting.length ? h("div", {}, "Waiting on ", h("strong", {}, waiting.join(", ")), e.waiting.since ? ` since ${stamp(e.waiting.since)}` : "") : null,
-    e.deadline ? h("div", {}, "Due ", stamp(e.deadline)) : null,
-    h("div", { class: "d-actions" }, ...verbButtons(e), ...taskIntentButtons(e),
-      e.message || e.draft ? null : verbButton(e, "approve", verbLabel("approve"), () => taskAct(e, "approve", {})),
-      e.draft ? null : verbButton(e, "dismiss", verbLabel("dismiss"), () => taskAct(e, "dismiss", {}))),
-    itemsBlock(e.items),
-    e.message ? questionCard(e) : null,
-    e.draft ? draftCard(e, "detail") : null,
-    delegateBox(e),
-    taskComposer(e),
-    taskDrafts(e),
-    ...(e.cards || []).map(unitCard),
-    (e.units || []).length ? h("div", { class: "d-log" },
-      h("button", { type: "button", class: "act", "aria-expanded": String(detailState.logOpen), "data-focus": "detail:agent-log", onclick: () => openAgentLog() }, "Agent log"),
-      detailState.logOpen ? agentLog() : null) : null,
-  ];
-}
-
 // unitExtras are a unit detail's card and open tasks.
 function unitExtras(d) {
   const key = detailState.unitKey;
@@ -577,7 +396,7 @@ function unitExtras(d) {
     d && (d.items || []).length ? itemsBlock(d.items) : null,
     d && d.row ? unitComposer(d.row.unit) : null,
     tasks.length ? [h("h2", { class: "d-sub" }, "Tasks"),
-      h("ul", { class: "d-entries" }, ...tasks.map((e) => h("li", {},
+      h("ul", { class: "d-tasks" }, ...tasks.map((e) => h("li", {},
         h("a", { href: "#" + viewHash({ task: e.id, pr: "" }), "data-focus": "unit-task:" + e.id }, e.title || e.id), " ", h("span", { class: "pill" }, e.state))))] : null);
 }
 
@@ -586,7 +405,7 @@ function unitExtras(d) {
 function renderTaskDetail(box, route) {
   if (!route.task) return false;
   const e = detailState.task && detailState.task.id === route.task ? detailState.task : null;
-  const parts = e ? taskPane(e) : [
+  const parts = e ? taskPage(e) : [
     h("div", { class: "d-head" },
       h("button", { type: "button", class: "close", "aria-label": "Close detail", "data-focus": "detail:close", onclick: () => detailEnv.close() }, "×"),
       h("p", { class: detailState.error ? "plan-error" : "empty" }, detailState.error ? `Could not load the task: ${detailState.error}` : "Loading the task.")),

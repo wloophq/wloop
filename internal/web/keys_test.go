@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -99,6 +100,7 @@ function harness(o = {}) {
     hint: (h) => { log.hints.push(h); },
     later: (fn) => { log.timers.push(fn); },
     act: o.act,
+    verbs: () => o.verbs || VERBS,
   };
   const keys = createKeys(env);
   keys.setBindings(BINDINGS);
@@ -123,12 +125,23 @@ func keysRun(t *testing.T, prelude, main string, in, out any) {
 	}
 	b.WriteString(jsFunction(t, appJS(t), "safeURL"))
 	b.WriteString("\nconst BINDINGS = " + string(raw) + ";\n")
+	b.WriteString("const VERBS = " + mustJS(t, servedVerbs(t)) + ";\n")
 	b.WriteString(staticJS(t, "palette.js"))
 	b.WriteString("\n")
 	b.WriteString(strings.Replace(staticJS(t, "keys.js"), `"use strict";`, "", 1))
 	b.WriteString(keysHarness)
 	b.WriteString("\n(async () => {\n" + main + "\n})().then((r) => process.stdout.write(JSON.stringify(r)), (e) => { console.error(e); process.exit(1); });\n")
 	nodeScript(t, b.String(), in, out)
+}
+
+// servedVerbs are the verbs GET /api/views serves with the bundled profile.
+func servedVerbs(t *testing.T) []string {
+	t.Helper()
+	words, problems := intentload.BundledLists(os.DirFS("../../profiles/default"))
+	if len(problems) > 0 {
+		t.Fatal(problems)
+	}
+	return slices.Sorted(maps.Keys(words.Verbs))
 }
 
 func taskFixture() map[string]any {
