@@ -37,6 +37,8 @@ var coreRoots = []string{
 	"internal/catalog",
 	"internal/keys",
 	"internal/daemon",
+	"internal/turn",
+	"internal/brief",
 }
 
 // pluginOf is the plugin a package belongs to, "" for none.
@@ -72,7 +74,13 @@ var pluginDebt = []debt{
 	{"internal/daemon", "internal/domain/pr", daemonTestsDebt, true},
 	{"internal/daemon", "internal/github", daemonTestsDebt, true},
 	{"internal/daemon", "internal/readmodel/prrow", daemonTestsDebt, true},
+	{"internal/brief", "internal/domain/github", briefQueueDebt, false},
+	{"internal/brief", "internal/domain/inventory", briefQueueDebt, false},
+	{"internal/brief", "internal/domain/pr", briefQueueDebt, false},
+	{"internal/brief", "internal/github", briefQueueDebt, false},
 }
+
+const briefQueueDebt = "debt: the brief queue briefs GitHub's pull requests in process until X8c2 moves its brief source into the GitHub plugin"
 
 const daemonTestsDebt = "debt: the daemon's tests serve the GitHub plugin in process until X8c3 runs it as a binary"
 

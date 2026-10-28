@@ -12,7 +12,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/config"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	dpr "github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -279,10 +278,10 @@ func TestTurnFactsCoverTheTurnSlot(t *testing.T) {
 		"pr.mine":                 func(_ *Builder, r *Request) { r.Payload.(*PR).Author = "Me" },
 		"pr.author":               func(_ *Builder, r *Request) { r.Payload.(*PR).Author = "bob" },
 		"pr.state":                func(_ *Builder, r *Request) { r.Payload.(*PR).State = "OPEN" },
-		"pr.slug":                 func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "acme", Repo: "api", Number: 8}.Unit() },
-		"pr.owner":                func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "other", Repo: "api", Number: 7}.Unit() },
-		"pr.repo":                 func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "acme", Repo: "web", Number: 7}.Unit() },
-		"pr.repo_name":            func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "acme", Repo: "web", Number: 7}.Unit() },
+		"pr.slug":                 func(_ *Builder, r *Request) { r.Unit = testRef{Owner: "acme", Repo: "api", Number: 8}.Unit() },
+		"pr.owner":                func(_ *Builder, r *Request) { r.Unit = testRef{Owner: "other", Repo: "api", Number: 7}.Unit() },
+		"pr.repo":                 func(_ *Builder, r *Request) { r.Unit = testRef{Owner: "acme", Repo: "web", Number: 7}.Unit() },
+		"pr.repo_name":            func(_ *Builder, r *Request) { r.Unit = testRef{Owner: "acme", Repo: "web", Number: 7}.Unit() },
 		"pr.base":                 func(_ *Builder, r *Request) { r.Payload.(*PR).Base = "main" },
 		"pr.association":          func(_ *Builder, r *Request) { r.Payload.(*PR).Association = "MEMBER" },
 		"pr.cross_repository":     func(_ *Builder, r *Request) { r.Payload.(*PR).CrossRepository = true },
@@ -291,7 +290,7 @@ func TestTurnFactsCoverTheTurnSlot(t *testing.T) {
 		"pr.requested_teams":      func(b *Builder, _ *Request) { b.Facts = &facts{st: Stored{Teams: []string{"acme-platform"}}} },
 		"turn.trigger":            func(_ *Builder, r *Request) { r.Trigger = Automated },
 		"turn.automated":          func(_ *Builder, r *Request) { r.Trigger = Automated },
-		"unit.ref":                func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "acme", Repo: "api", Number: 8}.Unit() },
+		"unit.ref":                func(_ *Builder, r *Request) { r.Unit = testRef{Owner: "acme", Repo: "api", Number: 8}.Unit() },
 		"turn.owned":              func(_ *Builder, r *Request) { r.Owned = true },
 		"turn.needs_take_over":    func(_ *Builder, r *Request) { r.Owned = true },
 		"turn.resume":             func(_ *Builder, r *Request) { r.Resume = scenario(t, "address/resume/continue").Context.Resume },

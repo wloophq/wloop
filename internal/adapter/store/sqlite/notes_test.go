@@ -120,6 +120,13 @@ var writes = []writeCase{
 		topics: port.TopicGates, units: []unit.Unit{term1},
 	},
 	{
+		method: "DB.PutUnitBrief",
+		call: func(ctx context.Context, e *noteEnv) error {
+			return e.db.PutUnitBrief(ctx, u7, "x1", `{"goal":"g"}`, noteAt)
+		},
+		topics: port.TopicBriefs, units: []unit.Unit{u7},
+	},
+	{
 		method: "DB.DossierMoved",
 		call:   func(ctx context.Context, e *noteEnv) error { return e.db.DossierMoved(ctx, 1) },
 	},

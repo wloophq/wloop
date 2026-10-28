@@ -18,7 +18,6 @@ type fakeOnDemand struct {
 	mu     sync.Mutex
 	coming bool
 	wants  []unit.Unit
-	noted  func(unit.Unit)
 }
 
 func (f *fakeOnDemand) Want(_ context.Context, u unit.Unit) (bool, error) {
@@ -27,8 +26,6 @@ func (f *fakeOnDemand) Want(_ context.Context, u unit.Unit) (bool, error) {
 	f.wants = append(f.wants, u)
 	return f.coming, nil
 }
-
-func (f *fakeOnDemand) Watch(noted func(unit.Unit)) { f.noted = noted }
 
 func TestASlackUnitIsBriefedOnDemand(t *testing.T) {
 	r := newRig(t, 0)
@@ -53,7 +50,7 @@ func TestASlackUnitIsBriefedOnDemand(t *testing.T) {
 		thread: {Brief: `{"goal":"Ship the export","kind":"request","risk":"low","tags":["domain:billing"]}`, At: t0}}}); err != nil {
 		t.Fatal(err)
 	}
-	src.noted(thread)
+	r.q.Noted(thread)
 	closes(t, changed)
 	got, err := r.q.Ready(ctx, thread, true, nil)
 	if err != nil || got.State != Ready || got.Brief == nil || got.Brief.Goal != "Ship the export" || got.Brief.Kind != "request" || got.Run == 0 {

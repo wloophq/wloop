@@ -94,7 +94,7 @@ func (b *briefs) Revision(ctx context.Context, u unit.Unit) (brief.At, error) {
 	if err != nil {
 		return brief.At{}, err
 	}
-	return brief.At{Revision: st[u].LastTS, Parts: json.RawMessage(`{}`)}, nil
+	return brief.At{Revision: st[u].LastTS, Parts: json.RawMessage(`{}`), Attempt: st[u].LastTS}, nil
 }
 
 func (b *briefs) Describe(brief.UnitInput) string { return "a Slack conversation" }
@@ -102,5 +102,3 @@ func (b *briefs) Describe(brief.UnitInput) string { return "a Slack conversation
 // Stale is false: the extraction writes the brief again when the
 // conversation moves.
 func (b *briefs) Stale(brief.Written, brief.At, string, time.Time) bool { return false }
-
-func (b *briefs) AttemptKey(version string, cur brief.At) string { return version + " " + cur.Revision }

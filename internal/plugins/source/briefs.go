@@ -32,7 +32,7 @@ func (b Briefs) Revision(ctx context.Context, u unit.Unit) (brief.At, error) {
 		return brief.At{}, err
 	}
 	r, err := c.BriefRevision(ctx, Wire(u))
-	return brief.At{Revision: r.Revision, Parts: r.Parts}, err
+	return atOf(r), err
 }
 
 // Describe is in's one line; "" when the plugin cannot say.
@@ -52,13 +52,16 @@ func (b Briefs) Stale(w brief.Written, cur brief.At, version string, now time.Ti
 		return false
 	}
 	stale, err := c.BriefStale(context.Background(), src.BriefStaleRequest{
-		Written: src.BriefWritten{At: src.BriefRevision{Revision: w.At.Revision, Parts: w.At.Parts}, Version: w.Version, Error: w.Error,
+		Written: src.BriefWritten{At: revisionOf(w.At), Version: w.Version, Error: w.Error,
 			Failures: w.Failures, AttemptedAt: w.AttemptedAt, AttemptOf: w.AttemptOf},
-		Current: src.BriefRevision{Revision: cur.Revision, Parts: cur.Parts}, Version: version, Now: now})
+		Current: revisionOf(cur), Version: version, Now: now})
 	return err == nil && stale
 }
 
-// AttemptKey is the plugin's attempt of a unit at cur, under version.
-func (b Briefs) AttemptKey(version string, cur brief.At) string {
-	return version + "@" + cur.Revision
+func atOf(r src.BriefRevision) brief.At {
+	return brief.At{Revision: r.Revision, Parts: r.Parts, Attempt: r.Attempt}
+}
+
+func revisionOf(a brief.At) src.BriefRevision {
+	return src.BriefRevision{Revision: a.Revision, Parts: a.Parts, Attempt: a.Attempt}
 }

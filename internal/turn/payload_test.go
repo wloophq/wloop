@@ -109,7 +109,7 @@ func TestBuildNamesAProviderWithoutReader(t *testing.T) {
 
 func TestIntentOfAnotherProviderIsRefused(t *testing.T) {
 	reads := &threadReads{}
-	b := Builder{Intents: threadIntents(t), Payloads: map[unit.ProviderID]PayloadReader{"thread": reads, unit.GitHub: GitHub{PRs: &fakePRs{}}}, Guides: guides{}}
+	b := Builder{Intents: threadIntents(t), Payloads: map[unit.ProviderID]PayloadReader{"thread": reads, unit.GitHub: fakeGitHub{&fakePRs{}}}, Guides: guides{}}
 	for _, r := range []Request{{Intent: Intent(dintent.Review), Unit: thread1}, {Intent: "discuss", Unit: ref7.Unit()}} {
 		_, err := b.Build(context.Background(), r)
 		if err == nil || !strings.Contains(err.Error(), "github") || !strings.Contains(err.Error(), "thread") {
@@ -240,7 +240,7 @@ func TestAnAnyIntentBuildsOnEveryProvider(t *testing.T) {
 		t.Fatal(problems)
 	}
 	b := Builder{Intents: func() *intentload.Loaded { return l }, Guides: guides{},
-		Payloads: map[unit.ProviderID]PayloadReader{"thread": &threadReads{}, unit.GitHub: GitHub{PRs: &fakePRs{}}}}
+		Payloads: map[unit.ProviderID]PayloadReader{"thread": &threadReads{}, unit.GitHub: fakeGitHub{&fakePRs{}}}}
 	for _, u := range []unit.Unit{thread1, ref7.Unit()} {
 		c, err := b.Build(context.Background(), Request{Intent: "anywhere", Unit: u})
 		if err != nil || c.Unit != u {
