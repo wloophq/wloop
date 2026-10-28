@@ -395,6 +395,9 @@ CREATE TABLE gates (
   deadline TEXT NOT NULL DEFAULT '', default_intent TEXT NOT NULL DEFAULT '',
   opened_at TEXT NOT NULL, closed_at TEXT NOT NULL DEFAULT ''
 );
+CREATE INDEX gates_due ON gates (status, deadline);
+CREATE INDEX gates_task ON gates (task_id);
+CREATE INDEX gates_unit ON gates (provider, unit_key);
 
 CREATE TABLE task_position (
   only INTEGER PRIMARY KEY CHECK (only = 1),

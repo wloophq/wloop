@@ -37,6 +37,8 @@ Schema version 4 keys briefs and tags by unit; the Slack conversations keep the 
 
 Schema version 6 links each answer to the Inbox message it answers and records when the agent read it. An answer given before it counts as read unless it was still waiting for its session to stop; one no message matches keeps reading through its turn. Releases at version 4 or 5 keep working on a version 6 store.
 
+Schema version 7 records each decision waiting on you as a gate, open or decided: every draft, with a delayed draft's send time; a round waiting for approval, with the window after which it runs; a round held until you trust its repository; every question, agent post and item proposal. An answer names the gate of the question it answers, so a question open before the upgrade still reaches its session.
+
 ## Your configuration and profile
 
 A key or a value the new release does not know, in `config.toml` or in a manifest of your profile, fails at load with the key's path, and a close name when one exists; no old spelling is read, and a key that moved gets the same error as a typo. `{{command}} doctor` and `{{command}} profile check` list each one. The configuration is `config.toml`; a configuration directory that holds only the former `config.json` fails at load, naming `config.toml` and the page with the script that converts one. The [profile language](/reference/language/) lists every reserved word, and the [configuration](/reference/configuration/) every key.

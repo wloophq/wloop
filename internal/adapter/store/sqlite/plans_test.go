@@ -8,7 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
 
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -88,6 +90,15 @@ var hotPlans = []hotPlan{
 	{name: "open work of a project's dossier", query: projectOpenSQL, args: 1, want: []string{"projects_slug (slug=?)"}},
 	{name: "the current review run", query: currentRunSQL, want: []string{"review_runs_open (finished_at=?)"}},
 	{name: "a workflow's plan items", query: `SELECT ` + itemColumns + ` FROM plan_items WHERE workflow = ? ORDER BY id`, args: 1, want: []string{"plan_items_workflow (workflow=?)"}},
+	{name: "due gates", query: gatesDueSQL, args: 2, want: []string{"gates_due (status=? AND deadline<?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
+	{name: "a task's gates", query: gatesOfTaskSQL, args: 1, want: []string{"gates_task (task_id=?)"}},
+	gatesWherePlan("open gates", gates.Query{}, "gates_due (status=?)", "USE TEMP B-TREE FOR ORDER BY"),
+	gatesWherePlan("gates of a unit", gates.Query{Unit: unit.Unit{Provider: "slack", Key: "T1/C1/1.1"}}, "gates_unit (provider=? AND unit_key=?)", ""),
+}
+
+func gatesWherePlan(name string, q gates.Query, want, tempSort string) hotPlan {
+	query, args := gatesWhereSQL(q)
+	return hotPlan{name: name, query: query, args: len(args), want: []string{want}, tempSort: tempSort}
 }
 
 var tempBTree = regexp.MustCompile(`USE TEMP B-TREE[^\n]*`)

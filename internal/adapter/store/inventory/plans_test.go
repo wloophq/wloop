@@ -134,6 +134,7 @@ var indexesPlannedElsewhere = []string{
 	"projects_slug", "review_runs_open",
 	"links_to",
 	"drafts_state", "drafts_unit", "drafts_task", "drafts_rule", "drafts_workflow",
+	"gates_due", "gates_task", "gates_unit",
 }
 
 func TestNoUnusedIndex(t *testing.T) {
