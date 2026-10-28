@@ -15,7 +15,7 @@ The Outbox, the approval policies and the refusals below are workflow controls. 
 
 Every protection in {{name}} assumes that the processes running as your user are on your side. An agent session with a shell is such a process.
 
-- The daemon's Unix socket (`<state>/daemon.sock`, mode 0600 in a 0700 directory) serves the CLI with no further authentication. Any process running as you can start rounds, answer questions and approve Outbox drafts through it, and write a reply that goes out at once as you (the `reply` entry verb and `POST /api/drafts` with send now).
+- The daemon's Unix socket (`<state>/daemon.sock`, mode 0600 in a 0700 directory) serves the CLI with no further authentication. Any process running as you can start rounds, answer questions and approve Outbox drafts through it, and write a reply that goes out at once as you (the `reply` verb and `POST /api/drafts` with send now).
 - The Slack tokens live in your login Keychain, in items created through `/usr/bin/security`. Any process running as you can read them with the same command, without a prompt, and post to Slack as you, just as it can run `gh` as you on GitHub.
 - `{{command}} outbox approve`, `outbox retry` and `outbox new --send` refuse when they detect an agent session's environment, and ask at a terminal unless `--yes`. `slack send` has no such refusal. That is a guard against mistakes, not a security boundary.
 - An agent that follows injected instructions has everything you have: your `gh` token, your SSH keys, your Keychain and your files.
@@ -41,12 +41,12 @@ The [approval window](/concepts/approval/) comes before a round starts, not befo
 
 ## Starting new work
 
-`{{command}} start` gives an agent the brief of an entry you captured and, with `--repo`, a fresh worktree of that repository. It adds two powers:
+`{{command}} start` gives an agent the brief of a task you captured and, with `--repo`, a fresh worktree of that repository. It adds two powers:
 
 - **An agent chooses which repository to clone.** A repository no workspace manager knows is cloned into the project's `projects_dir`. That stays harmless until the clone is trusted: Claude Code loads an untrusted folder's settings and hooks only after you accept its trust dialog, so the start blocks on trust as any round does.
 - **`trust_clones` trusts a clone as it is made.** With `trust_clones = true` on a `projects[]` entry, a repository of that project is trusted in the agent home in the same call that clones it, so its hooks and settings run as you. The `match` must name an owner (`acme/*`, never `*`); a folder that already existed, or one cloned earlier, is never trusted this way. A clone whose trust fails is removed, so the start's retry clones it again.
 
-The residual risk is accepted: an injected brief can make an agent clone and trust a repository of an owner you listed. Two limits remain. Start runs only on entries you captured (`entry.captured_by_user`); an entry derived from a Slack thread carries other people's text and is refused. And the trusted owners are the ones you list, your own organization.
+The residual risk is accepted: an injected brief can make an agent clone and trust a repository of an owner you listed. Two limits remain. Start runs only on tasks you captured (`task.captured_by_user`); a task derived from a Slack thread carries other people's text and is refused. And the trusted owners are the ones you list, your own organization.
 
 ## What agents read from Slack
 

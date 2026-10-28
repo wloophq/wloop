@@ -87,10 +87,8 @@ func TestCheckReadsKinds(t *testing.T) {
 	wants(t, check(testRows, SurfaceWorkflow, map[string]any{"drafts": map[string]any{"approval": map[string]any{"window": "1d", "mode": "delay"}}}))
 }
 
-func TestASurfaceWithNoRowsIsNotChecked(t *testing.T) {
-	if ps := check(testRows, SurfaceLabels, map[string]any{"anything": 1}); ps != nil {
-		t.Fatalf("%v", ps)
-	}
+func TestASurfaceWithNoRowsRefusesEveryKey(t *testing.T) {
+	wants(t, check(testRows, SurfaceLabels, map[string]any{"anything": 1}), "anything: unknown key")
 }
 
 func TestEveryPredKeyHasTheQuotingHint(t *testing.T) {

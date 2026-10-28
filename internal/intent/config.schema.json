@@ -328,32 +328,6 @@
       },
       "type": "object"
     },
-    "gtd": {
-      "additionalProperties": false,
-      "description": "The GTD entries' settings.",
-      "properties": {
-        "areas": {
-          "description": "The areas an entry is offered.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "contexts": {
-          "description": "The contexts an entry is offered.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "stale_waiting_days": {
-          "default": 2,
-          "description": "Working days after which a waiting entry goes stale.",
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    },
     "headless": {
       "additionalProperties": false,
       "description": "The headless turns' caps; a cost of zero leaves it uncapped.",
@@ -751,6 +725,32 @@
           "default": "1h",
           "description": "The slow sweep's interval.",
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "tasks": {
+      "additionalProperties": false,
+      "description": "The tasks' settings.",
+      "properties": {
+        "areas": {
+          "description": "The areas a task is offered.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "contexts": {
+          "description": "The contexts a task is offered.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "stale_waiting_days": {
+          "default": 2,
+          "description": "Working days after which a waiting task goes stale.",
+          "type": "integer"
         }
       },
       "type": "object"

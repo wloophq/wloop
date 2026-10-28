@@ -9,12 +9,12 @@ func TestRepeatAfterIsADurationOrADurationOfTheConfig(t *testing.T) {
 	t.Parallel()
 	for _, arg := range []string{"repeat_after", "repeat_after_sent"} {
 		for v, problem := range map[string]string{
-			"config.drafts.repeat_after":    "",
-			"2d":                            "",
-			"config.gtd.stale_waiting_days": "is not a duration of the config slot",
-			"config.nope":                   "is not a duration of the config slot",
-			"soon":                          "is not a duration",
-			"0s":                            "longer than zero",
+			"config.drafts.repeat_after":      "",
+			"2d":                              "",
+			"config.tasks.stale_waiting_days": "is not a duration of the config slot",
+			"config.nope":                     "is not a duration of the config slot",
+			"soon":                            "is not a duration",
+			"0s":                              "longer than zero",
 		} {
 			root := t.TempDir()
 			writeWorkflow(t, root, "asks", `summary = "Ask who owns"

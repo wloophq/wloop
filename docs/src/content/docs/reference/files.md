@@ -18,7 +18,7 @@ description: Where the configuration, the state, the logs and the installed piec
 
 | Path | Holds |
 |---|---|
-| `store.db` | the SQLite store, which only the daemon opens: the inventory and the history of every pull request, your holds and mutes, the round state and the pause, the turns with their instructions, records and answers, the agent sessions, the GTD entries, the Inbox messages, the Outbox drafts, the items and the admitted Slack messages. Open it read-only while the daemon runs |
+| `store.db` | the SQLite store, which only the daemon opens: the inventory and the history of every pull request, your holds and mutes, the round state and the pause, the turns with their instructions, records and answers, the agent sessions, the tasks, the Inbox messages, the Outbox drafts, the items and the admitted Slack messages. Open it read-only while the daemon runs |
 | `mcp.key` | the secret of the MCP endpoint (mode 0600) |
 | `daemon.sock` | the socket the CLI talks to |
 | `daemon.lock` | keeps a second daemon from starting |
@@ -50,7 +50,7 @@ Each dossier is a local git repository the daemon commits after every turn, neve
 | Status | When |
 |---|---|
 | active | the unit or project has open work; never archived or purged |
-| resolved | no open item or entry is left |
+| resolved | no open item or task is left |
 | archived | `dossiers.archive_after` (30 days) after it resolved, as a tarball under `.archive/` |
 | purged | `dossiers.purge_after` (400 days) after the archive |
 

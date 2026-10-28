@@ -54,7 +54,7 @@ type engineDeps struct {
 	Pub port.Publisher
 	Log func(format string, args ...any)
 	// Subjects are facts providers of the core-kept subjects beyond the
-	// session and workspace ones, such as entry, by provider.
+	// session and workspace ones, such as task, by provider.
 	Subjects map[unit.ProviderID]automation.Units
 	// Withdrawals are the drafts the workflows proposed; nil withdraws none.
 	Withdrawals automation.Withdrawals
@@ -342,7 +342,7 @@ func configFacts(cfg config.Config) workflow.Facts {
 		"config.cleanup.manual_idle":      time.Duration(c.ManualIdle),
 		"config.cleanup.stale_workspace":  time.Duration(c.StaleWorkspace),
 		"config.github.nudge.silent_days": cfg.GitHub.Nudge.SilentDays,
-		"config.gtd.stale_waiting_days":   cfg.Tasks.StaleWaitingDays,
+		"config.tasks.stale_waiting_days": cfg.Tasks.StaleWaitingDays,
 		"config.drafts.repeat_after":      time.Duration(cfg.Drafts.RepeatAfter),
 		"config.turns.per_day":            cfg.Turns.PerDay,
 	}

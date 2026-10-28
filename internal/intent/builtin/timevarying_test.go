@@ -3,7 +3,7 @@ package builtin
 import "testing"
 
 func TestTimeVaryingFactsAreMarkedInTheTable(t *testing.T) {
-	for _, name := range []string{"pr.silent_days", "entry.waiting_days", "slack.items_unowned_age_days"} {
+	for _, name := range []string{"pr.silent_days", "task.waiting_days", "slack.items_unowned_age_days"} {
 		if !TimeVarying(name) {
 			t.Errorf("%s changes as time passes, the table does not say so", name)
 		}

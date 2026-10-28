@@ -23,7 +23,7 @@ func TestRepeatAfterReadsTheConfigFact(t *testing.T) {
 			t.Errorf("%s: %v, %v; want %v", v, got, err, want)
 		}
 	}
-	for _, v := range []string{"config.gtd.stale_waiting_days", "config.nope", "soon", "-1h", "0s"} {
+	for _, v := range []string{"config.tasks.stale_waiting_days", "config.nope", "soon", "-1h", "0s"} {
 		if _, err := repeatDuration(v, cfg); err == nil {
 			t.Errorf("%s read as a duration", v)
 		}

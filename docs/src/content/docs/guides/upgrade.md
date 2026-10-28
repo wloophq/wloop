@@ -43,6 +43,15 @@ A key or a value the new release does not know, in `config.toml` or in a manifes
 
 `slack_react` and `slack_edit` take the message as `message`, a ref (`<conversation>/<ts>`) or a permalink, where they took `permalink`: an agent's call with `permalink` is refused as a bad argument. Their answer for a missing or unreadable message is `problem_message`, where it was `problem_permalink`, so a profile whose `tools.toml` words `problem_permalink` fails at load until it is renamed.
 
+The words for tasks have new names in the profile and the configuration. Each old name fails at load with a problem naming the new one:
+
+- `gtd.toml` is not read: its `[verbs]` go in `tasks.toml`, its `[views]` and `[review]` in `views.toml`;
+- the `[gtd]` table of `config.toml` is `[tasks]` (`tasks.stale_waiting_days`, `tasks.areas`, `tasks.contexts`);
+- the facts `entry.*` are `task.*`, `slack.live_entry` is `slack.live_task` and `config.gtd.*` is `config.tasks.*`;
+- the step `entry.verb` is `task.verb`, and the effect `entry.nudged` is `task.nudged`;
+- the workflow `entry-results-ended` is `task-results-ended`: rename an override directory of the old name in your profile;
+- `profile schema --gtd` is `--tasks`, `--views` or `--gates`.
+
 ## Going back to an earlier release
 
 A release can declare that earlier releases keep reading the store after its migration, when it only adds what they ignore; such a downgrade needs nothing more. Otherwise the earlier release's daemon refuses the newer store and serves only its health, naming `{{command}} store restore`, which puts back the newest backup it can read and keeps the replaced store in `<state>/backups` as a pre-restore copy. What changed since that backup is lost: sessions, notes, ledger entries and drafts; pull requests come back from GitHub on the next sync.

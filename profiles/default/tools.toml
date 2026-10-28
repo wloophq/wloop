@@ -66,7 +66,7 @@ ledger_refused = "{{.Count}} refused: {{.Why}}"
 ledger_refusal = "ledger[{{.Index}}] {{.Reason}}"
 
 [inbox_post]
-description = "Post a message to the user's {{.Name}} Inbox during your turn, without ending it: a question or a note the user answers later. At most {{.PostsPerTurn}} of your messages wait at once. It posts only; it cannot move, list or close Inbox entries."
+description = "Post a message to the user's {{.Name}} Inbox during your turn, without ending it: a question or a note the user answers later. At most {{.PostsPerTurn}} of your messages wait at once. It posts only; it cannot move, list or close Inbox tasks."
 
 [inbox_post.params]
 "text" = "the message"
@@ -78,7 +78,7 @@ description = "Post a message to the user's {{.Name}} Inbox during your turn, wi
 
 [inbox_post.answers]
 refused = "inbox_post refused: {{.Error}}."
-bad_arguments = "Nothing was posted: the arguments are not an object with text, and options, recommend and confirm when needed; inbox_post posts a message and cannot move, list or close entries{{with .Error}} ({{.}}){{end}}."
+bad_arguments = "Nothing was posted: the arguments are not an object with text, and options, recommend and confirm when needed; inbox_post posts a message and cannot move, list or close tasks{{with .Error}} ({{.}}){{end}}."
 fix_these = """Nothing was posted; fix these and call inbox_post again:
 {{.Problems}}"""
 text_required = "Nothing was posted: text is required."
@@ -180,7 +180,7 @@ problem_before_after = "before: a date after after"
 problem_limit = "limit: an integer from 1 to {{.Max}}"
 
 [slack_draft]
-description = "Propose a Slack message, or a reaction, to be posted as the user once they approve it in the {{.Name}} Outbox. It posts nothing itself. Target a message, by its ref (<conversation>/<ts>) or permalink, to reply in its thread, even one your turn is not on. From a turn on a GTD entry, a #channel, channel id or user id target works too. Name people as @{slack:<user id>}; a typed <@<user id>>, an @handle or an email that names one person becomes that mention, any other mention, channel or special token posts as text, and a broadcast or group mention is refused."
+description = "Propose a Slack message, or a reaction, to be posted as the user once they approve it in the {{.Name}} Outbox. It posts nothing itself. Target a message, by its ref (<conversation>/<ts>) or permalink, to reply in its thread, even one your turn is not on. From a turn on a task, a #channel, channel id or user id target works too. Name people as @{slack:<user id>}; a typed <@<user id>>, an @handle or an email that names one person becomes that mention, any other mention, channel or special token posts as text, and a broadcast or group mention is refused."
 
 [slack_draft.params]
 "text" = "the message, in Markdown; empty for a reaction"

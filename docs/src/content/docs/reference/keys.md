@@ -3,9 +3,9 @@ title: Keys
 description: The keys of the cockpit and the terminal client.
 ---
 
-The same keys work in the web cockpit and the terminal client, on the selected entry or row. Lowercase keys and digits belong to the core; actions of the loop, of plugins and of intents use uppercase letters.
+The same keys work in the web cockpit and the terminal client, on the selected task or row. Lowercase keys and digits belong to the core; actions of the loop, of plugins and of intents use uppercase letters.
 
-## Entries
+## Tasks
 
 | Key | Action |
 |---|---|
@@ -20,7 +20,7 @@ The same keys work in the web cockpit and the terminal client, on the selected e
 | `p` | make a project or attach to one |
 | `a` | approve the draft or proposal |
 | `d` | delegate to an agent (asks for optional guidance; in the terminal, Tab hands it to a session) |
-| `r` | reply in the entry's conversation, saved to the Outbox (in the terminal, Tab sends it now) |
+| `r` | reply in the task's conversation, saved to the Outbox (in the terminal, Tab sends it now) |
 | `i` | edit a draft's text (terminal) |
 | `e` | done |
 | `Backspace` | dismiss |

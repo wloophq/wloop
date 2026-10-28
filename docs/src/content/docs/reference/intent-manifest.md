@@ -31,7 +31,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `label` | string |  | The name people read. Required. |
 | `summary` | string |  | One line on what it does: its action's tooltip, its help line, its profile listing. Required. |
 | `shortcut` | string |  | One uppercase letter for its action, not a built-in action's. |
-| `verb` | one of `approve`, `delegate`, `dismiss` |  | The GTD verb its action fulfils. |
+| `verb` | one of `approve`, `delegate`, `dismiss` |  | The verb its action fulfils. |
 | `user_facing` | bool | `true` | Offered as a command, a skill and an action. |
 | `skill` | bool | `false` | Install writes it a turn skill; needs help.target. |
 | `help` | table |  | How its command presents it. |
@@ -67,8 +67,8 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `session.name` | template |  | What the workspace manager and the agent show the session as, over the name facts; defaults.toml session_name when absent, else the title. A name that session.title leads and the start time ends, as dd/mm hh:mm, lets the loop recognize its session when it lost track of it. |
 | `session.close_when_done` | bool | `false` | The session closes when its turn is done. |
 | `target` | table |  | What a run with no unit does. |
-| `target.missing` | one of `capture` |  | capture: a run with no unit captures its guidance as a new entry, the turn's unit; refused when absent. |
-| `target.title` | template |  | The captured entry's title, over .guidance, with firstLine. |
+| `target.missing` | one of `capture` |  | capture: a run with no unit captures its guidance as a new task, the turn's unit; refused when absent. |
+| `target.title` | template |  | The captured task's title, over .guidance, with firstLine. |
 
 ### How a turn runs
 
@@ -174,7 +174,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `record.states` | list of `done`, `settled`, `asked`, `failed` |  | The states a record may take. Required. |
 | `record.artifacts` | list of `review-draft`, `triage` |  | The artifacts a record may carry. |
 | `record.outcome` | list of `verdict`, `url` |  | The outcome fields a record may carry. |
-| `record.attach_url` | bool | `false` | On a turn whose unit is an entry, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the entry; needs url in record.outcome. |
+| `record.attach_url` | bool | `false` | On a turn whose unit is a task, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the task; needs url in record.outcome. |
 | `record.outcome_doc` | string |  | What the outcome holds, for the instructions. |
 | `record.history_artifact` | string |  | The artifact the unit's history shows. |
 | `record.require[]` | table |  | What a record in a state must carry. |
@@ -188,8 +188,8 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 |---|---|---|---|
 | `effects` | list of `plan.cleared`, `guidance.handed`, `pr.round_sent`, `pr.reviewed`, `pr.addressed`, `pr.nudged` |  | What sending the turn applies. |
 | `drafts` | table |  | The drafts its turns' agents propose. |
-| `drafts.allowed_effects` | list of `entry.nudged`, `unit.closed`, `pr.nudged` |  | The effects its agents may declare on their drafts. |
-| `drafts.attach_posts` | bool | `false` | On a turn whose unit is an entry, the unit of each post its agent makes, sent at once or once approved, is attached to the entry; reactions and edits are not posts. |
+| `drafts.allowed_effects` | list of `task.nudged`, `unit.closed`, `pr.nudged` |  | The effects its agents may declare on their drafts. |
+| `drafts.attach_posts` | bool | `false` | On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts. |
 | `drafts.approval` | table |  | The approval of its drafts; wait when absent. |
 | `drafts.approval.mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The approval when no rule holds. |
 | `drafts.approval.window` | duration |  | With mode delay only: how long a person has to stop the draft. |
@@ -228,7 +228,7 @@ The policy of the drafts the intent's turns propose: the first rule whose `when`
 
 ## Providers
 
-`provider` names the units the intent works on: a turn is built only on a unit of that provider, and the catalog offers the action only on its rows; `any` serves every provider. When several intents share a `verb`, the entry's key runs the one of highest rank the row enables: an intent of the unit's own provider before one of `any`, and yours before a bundled one within each. So a `provider = "slack"` intent with `verb = "delegate"` replaces the bundled `act` on Slack entries. An intent whose provider is not `github` cannot read the `pr.*` facts, and its templates cannot read `.PR`. Every template reads the unit's wording from the provider: `{{.Wording.Noun}}` ("pull request", "Slack thread"), `{{.Wording.This}}`, `{{.Wording.Short}}`, and the fact `unit.ref` (`acme/api#7`).
+`provider` names the units the intent works on: a turn is built only on a unit of that provider, and the catalog offers the action only on its rows; `any` serves every provider. When several intents share a `verb`, the task's key runs the one of highest rank the row enables: an intent of the unit's own provider before one of `any`, and yours before a bundled one within each. So a `provider = "slack"` intent with `verb = "delegate"` replaces the bundled `act` on Slack tasks. An intent whose provider is not `github` cannot read the `pr.*` facts, and its templates cannot read `.PR`. Every template reads the unit's wording from the provider: `{{.Wording.Noun}}` ("pull request", "Slack thread"), `{{.Wording.This}}`, `{{.Wording.Short}}`, and the fact `unit.ref` (`acme/api#7`).
 
 ## Roles
 

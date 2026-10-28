@@ -32,7 +32,7 @@ type group struct {
 var intentGroups = []group{
 	{"The pull request (`pr.*`)", []string{"pr"}},
 	{"The row (`row.*`)", []string{"row"}},
-	{"The entry (`entry.*`)", []string{"entry"}},
+	{"The task (`task.*`)", []string{"task"}},
 	{"The turn (`turn.*`, `unit.*`)", []string{"turn", "unit"}},
 	{"A name (`session.*`, `workspace.*`; slot `name`)", []string{"session", "workspace"}},
 	{"A draft's actions (`draft.*`)", []string{"draft"}},
@@ -42,7 +42,7 @@ var intentGroups = []group{
 // workflowGroups title the workflow facts' subsections, one per slot of
 // builtin.WorkflowSlots.
 var workflowGroups = map[string]string{
-	"pr": "Pull requests", "session": "Sessions", "workspace": "Workspaces", "entry": "GTD entries", "slack": "Slack conversations",
+	"pr": "Pull requests", "session": "Sessions", "workspace": "Workspaces", "task": "Tasks", "slack": "Slack conversations",
 	"brief": "Briefs", "draft": "Drafts", "trigger": "Triggers", "config": "The configuration",
 }
 
@@ -199,7 +199,7 @@ func page() (string, error) {
 		out = append(out, "### "+g.title, "", intentTable(parts[i]))
 	}
 	out = append(out, "## Workflow facts", "",
-		"A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `config.*` and `now`; a provider whose units have a brief also reads `brief.*`, and `[drafts.withdraw] when` also reads `draft.*`. `{{command}} workflows facts [entry|github|session|slack|workspace]` prints them. A pull request fact has one name and one spelling in every slot: `pr.repo` is `owner/repo` and `pr.repo_name` the bare name.",
+		"A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `config.*` and `now`; a provider whose units have a brief also reads `brief.*`, and `[drafts.withdraw] when` also reads `draft.*`. `{{command}} workflows facts ["+providerChoice()+"]` prints them. A pull request fact has one name and one spelling in every slot: `pr.repo` is `owner/repo` and `pr.repo_name` the bare name.",
 		"")
 	sections, err := workflowSections(builtin.Facts, workflowGroups)
 	if err != nil {
@@ -219,4 +219,13 @@ func page() (string, error) {
 		"This page is generated from the binary's fact registry by `make docs-ref`.",
 	)
 	return strings.Join(out, "\n") + "\n", nil
+}
+
+// providerChoice is the providers workflows facts takes, as a|b|c.
+func providerChoice() string {
+	names := make([]string, len(builtin.Providers))
+	for i, p := range builtin.Providers {
+		names[i] = string(p)
+	}
+	return strings.Join(names, "|")
 }

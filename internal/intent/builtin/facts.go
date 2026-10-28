@@ -25,7 +25,7 @@ func fact(name string, t expr.Type, slots []FactSlot, doc string) Fact {
 	return Fact{Name: name, Type: t, Slots: slots, Doc: doc}
 }
 
-// taskName is a name fact of a GTD entry, which only entry intents read.
+// taskName is a name fact of a task, which only task intents read.
 func taskName(name, doc string) Fact {
 	f := fact(name, expr.String, nam, doc)
 	f.Provider = unit.Task
@@ -81,7 +81,7 @@ var Visibilities = []string{"public", "private", "internal"}
 // ReviewStates are GitHub's review states, and the empty value of no review.
 var ReviewStates = []string{"", "APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED", "PENDING"}
 
-// TaskKinds and TaskStates are a GTD entry's kinds and states.
+// TaskKinds and TaskStates are a task's kinds and states.
 var (
 	TaskKinds  = []string{string(task.KindAction), string(task.KindWaiting), string(task.KindClose), string(task.KindMessage), string(task.KindDraft), string(task.KindCapture), string(task.KindProject), string(task.KindReference)}
 	TaskStates = []string{string(task.Inbox), string(task.Next), string(task.Waiting), string(task.Scheduled), string(task.Someday), string(task.Reference), string(task.Done), string(task.Trash)}
@@ -108,7 +108,7 @@ func providerWF(p unit.ProviderID, slot, name string, t expr.Type, doc string) F
 
 // BriefSubjects are the workflow slots whose units may have a brief, which
 // read the brief slot's facts.
-var BriefSubjects = []string{"pr", "slack", "entry"}
+var BriefSubjects = []string{"pr", "slack", "task"}
 
 // BriefSlot is the slot of the facts of a unit's brief.
 const BriefSlot = "brief"
@@ -160,8 +160,8 @@ var otherFacts = []Fact{
 	fact("unit.label", expr.String, nam, "The unit as people read it: a pull request as owner/repo#12, any other unit as provider:key."),
 	fact("session.title", expr.String, nam, "The manifest's session.title."),
 	fact("workspace.name", expr.String, nam, "The name of the worktree created for the unit; empty when the turn creates none or before it is named."),
-	taskName("entry.title", "The entry's title."),
-	taskName("entry.short_id", "The entry's id, short: its first six hex digits."),
+	taskName("task.title", "The task's title."),
+	taskName("task.short_id", "The task's id, short: its first six hex digits."),
 	fact("session.started", expr.Time, nam, "When the session starts; a template formats it with Go's layout, as {{.session.started.Format \"02/01 15:04\"}}."),
 	fact("pr.last_review.exists", expr.Bool, trn, "The viewer reviewed the pull request before."),
 	enum(fact("pr.last_review.verdict", expr.String, trn, "The viewer's newest review state, any state; empty when none."), enumOf(ReviewStates...)),
@@ -260,34 +260,34 @@ var otherFacts = []Fact{
 	untrusted(wf("workspace", "quiet_for", expr.Duration, "Time since last_activity.")),
 	untrusted(wf("workspace", "fingerprint", expr.String, "The worktree path and its head.")),
 	wf("workspace", "repo", expr.String, "owner/repo; empty when unknown."),
-	wf("entry", "id", expr.String, "The entry's id."),
-	untrusted(enum(wf("entry", "kind", expr.String, "The entry's kind, such as action, waiting, close, message, capture or project."), enumOf(TaskKinds...))),
-	untrusted(enum(wf("entry", "state", expr.String, "The entry's state: inbox, next, waiting, scheduled, someday, reference, done or trash."), enumOf(TaskStates...))),
-	untrusted(wf("entry", "waiting_on", expr.List, "The person keys the entry waits on, such as slack:U0123.")),
-	wf("entry", "resurface_at", expr.Time, "When the entry resurfaces; zero when it has no date."),
-	timeVarying(untrusted(wf("entry", "waiting_days", expr.Int, "Working days the entry has waited, in the configured location, as the GTD rules count them."))),
-	wf("entry", "since_nudge", expr.Duration, "Time since the entry's last nudge; very large when it was never nudged."),
-	untrusted(wf("entry", "nudge_due_at", expr.Time, "When a stalled nudge is due: the resurface date when set, else gtd.stale_waiting_days working days after the entry started waiting, then drafts.repeat_after after the last nudge; zero when the entry is not stalled.")),
-	wf("entry", "muted", expr.Bool, "The entry is muted."),
-	wf("entry", "unit", expr.String, "The entry's first unit as provider:key: the unit it was captured or derived on, else its first attachment; empty for an entry with none."),
-	enum(wf("entry", "unit_provider", expr.String, "The provider of entry.unit; empty for an entry with none."), enumOf(append([]string{""}, providerIDs()...)...)),
-	wf("entry", "units", expr.List, "The entry's units as provider:key, in order: the unit it was captured or derived on, then those attached to it in attach order, then any only its items name. The entry itself is not one of them."),
-	wf("entry", "unit_providers", expr.List, "The providers of entry.units, each once, in order."),
-	timeVarying(wf("entry", "units_ended", expr.Bool, "The entry has a unit, and every one of entry.units has ended as its plugin says (pr.ended, slack.ended); a unit of a plugin that says nothing never ends.")),
-	wf("entry", "turns", expr.Int, "Turns run on the entry itself, such as a start; turns on its units are not counted."),
-	wf("entry", "captured_by_user", expr.Bool, "The user captured the entry: origin user and kind capture. False for an entry derived from a unit's items, such as one from a Slack thread, or opened by another service."),
-	untrusted(wf("entry", "unit_started_by_me", expr.Bool, "The viewer started entry.unit, from the facts GTD receives.")),
-	untrusted(wf("entry", "unit_closure_posted", expr.Bool, "A closure was posted on entry.unit, from the facts GTD receives.")),
-	untrusted(wf("entry", "items_open", expr.Int, "Open items of the entry's units.")),
-	untrusted(wf("entry", "items_resolved", expr.Int, "Resolved items of the entry's units.")),
-	untrusted(wf("entry", "items_owed", expr.Int, "Open items of the entry's units that the entry holds.")),
-	wf("entry", "settled_at", expr.Time, "The newest update of a settled draft the workflow proposed on the entry, withdrawn ones included; zero when none."),
-	untrusted(wf("entry", "fingerprint", expr.String, "The entry's id, state and update time.")),
+	wf("task", "id", expr.String, "The task's id."),
+	untrusted(enum(wf("task", "kind", expr.String, "The task's kind, such as action, waiting, close, message, capture or project."), enumOf(TaskKinds...))),
+	untrusted(enum(wf("task", "state", expr.String, "The task's state: inbox, next, waiting, scheduled, someday, reference, done or trash."), enumOf(TaskStates...))),
+	untrusted(wf("task", "waiting_on", expr.List, "The person keys the task waits on, such as slack:U0123.")),
+	wf("task", "resurface_at", expr.Time, "When the task resurfaces; zero when it has no date."),
+	timeVarying(untrusted(wf("task", "waiting_days", expr.Int, "Working days the task has waited, in the configured location, as the waiting rules count them."))),
+	wf("task", "since_nudge", expr.Duration, "Time since the task's last nudge; very large when it was never nudged."),
+	untrusted(wf("task", "nudge_due_at", expr.Time, "When a stalled nudge is due: the resurface date when set, else tasks.stale_waiting_days working days after the task started waiting, then drafts.repeat_after after the last nudge; zero when the task is not stalled.")),
+	wf("task", "muted", expr.Bool, "The task is muted."),
+	wf("task", "unit", expr.String, "The task's first unit as provider:key: the unit it was captured or derived on, else its first attachment; empty for a task with none."),
+	enum(wf("task", "unit_provider", expr.String, "The provider of task.unit; empty for a task with none."), enumOf(append([]string{""}, providerIDs()...)...)),
+	wf("task", "units", expr.List, "The task's units as provider:key, in order: the unit it was captured or derived on, then those attached to it in attach order, then any only its items name. The task itself is not one of them."),
+	wf("task", "unit_providers", expr.List, "The providers of task.units, each once, in order."),
+	timeVarying(wf("task", "units_ended", expr.Bool, "The task has a unit, and every one of task.units has ended as its plugin says (pr.ended, slack.ended); a unit of a plugin that says nothing never ends.")),
+	wf("task", "turns", expr.Int, "Turns run on the task itself, such as a start; turns on its units are not counted."),
+	wf("task", "captured_by_user", expr.Bool, "The user captured the task: origin user and kind capture. False for a task derived from a unit's items, such as one from a Slack thread, or opened by another service."),
+	untrusted(wf("task", "unit_started_by_me", expr.Bool, "The viewer started task.unit, from the facts the tasks receive.")),
+	untrusted(wf("task", "unit_closure_posted", expr.Bool, "A closure was posted on task.unit, from the facts the tasks receive.")),
+	untrusted(wf("task", "items_open", expr.Int, "Open items of the task's units.")),
+	untrusted(wf("task", "items_resolved", expr.Int, "Resolved items of the task's units.")),
+	untrusted(wf("task", "items_owed", expr.Int, "Open items of the task's units that the task holds.")),
+	wf("task", "settled_at", expr.Time, "The newest update of a settled draft the workflow proposed on the task, withdrawn ones included; zero when none."),
+	untrusted(wf("task", "fingerprint", expr.String, "The task's id, state and update time.")),
 	providerWF(dslack.Provider, "slack", "channel", expr.String, "The conversation's channel id."),
 	enum(providerWF(dslack.Provider, "slack", "conversation", expr.String, "The conversation's kind: channel, dm or group."), enumOf("channel", "dm", "group")),
 	untrusted(providerWF(dslack.Provider, "slack", "started_by_me", expr.Bool, "The viewer started the thread.")),
 	untrusted(providerWF(dslack.Provider, "slack", "closure_posted", expr.Bool, "A closure was posted on the unit, by the extraction or a sent draft's unit.closed.")),
-	untrusted(providerWF(dslack.Provider, "slack", "live_entry", expr.Bool, "A live entry, neither done nor in the trash and not muted, is attached to the unit.")),
+	untrusted(providerWF(dslack.Provider, "slack", "live_task", expr.Bool, "A live task, neither done nor in the trash and not muted, is attached to the unit.")),
 	untrusted(providerWF(dslack.Provider, "slack", "items_open", expr.Int, "Open items whose unit is this unit.")),
 	untrusted(providerWF(dslack.Provider, "slack", "items_unowned", expr.Int, "Open items of the unit with no assignee, nobody waited on and no basis.")),
 	timeVarying(untrusted(providerWF(dslack.Provider, "slack", "items_unowned_age_days", expr.Int, "Working days, in the configured location, since the oldest unowned item appeared."))),
@@ -300,10 +300,10 @@ var otherFacts = []Fact{
 	dim(enum(briefWF("size", expr.String, "The brief's size; GitHub briefs only."), map[unit.ProviderID][]string{anyProvider: facet.Sizes})),
 	briefWF("tags", expr.List, "The brief's normalized key:value tags."),
 	briefWF("missing", expr.List, "The brief intent's extra fields the unit's brief lacks: new or changed since it was written."),
-	wf("draft", "person_waited", expr.Bool, "The draft's person is still waited on by its entry; true for a draft of no person."),
+	wf("draft", "person_waited", expr.Bool, "The draft's person is still waited on by its task; true for a draft of no person."),
 	wf("draft", "items_owed", expr.Int, "Items of the draft still open and held by its person, or unowned for a draft of no person."),
 	wf("draft", "items_assigned", expr.Int, "Items of the draft that have an owner, someone waited on, or are no longer open."),
-	wf("draft", "unit_open", expr.Bool, "The draft's unit still exists: its entry is neither done nor in the trash, or its unit is stored."),
+	wf("draft", "unit_open", expr.Bool, "The draft's unit still exists: its task is neither done nor in the trash, or its unit is stored."),
 	enum(approvalFact("delivery", expr.String, "How the unit's plugin posts the draft: message, reaction or comment. A plugin that posts every text as a comment makes each draft that is not a reaction a comment, whatever its proposer asked for."), enumOf(DraftDeliveries...)),
 	approvalFact("proposer", expr.String, "What proposed the draft: workflow:<name> for a workflow's draft.propose, intent:<name> for a turn's or a session's, rule:<name> for a plugin rule's."),
 	approvalFact("effects", expr.List, "The effects the draft applies once sent when the loop named them, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names them. A workflow's rules and the configuration's read it; an intent's do not."),
@@ -320,7 +320,7 @@ var otherFacts = []Fact{
 	wf("config", "cleanup.manual_idle", expr.Duration, "The cleanup.manual_idle setting."),
 	wf("config", "cleanup.stale_workspace", expr.Duration, "The cleanup.stale_workspace setting."),
 	wf("config", "github.nudge.silent_days", expr.Int, "The github.nudge.silent_days setting, in calendar days."),
-	wf("config", "gtd.stale_waiting_days", expr.Int, "The gtd.stale_waiting_days setting, in working days."),
+	wf("config", "tasks.stale_waiting_days", expr.Int, "The tasks.stale_waiting_days setting, in working days."),
 	wf("config", "drafts.repeat_after", expr.Duration, "The drafts.repeat_after setting."),
 	wf("config", "turns.per_day", expr.Int, "The turns.per_day setting: automated turns on units whose plugin keeps no per-unit count, all workflows together."),
 }
@@ -436,7 +436,7 @@ func UnitSlots() []string {
 
 // WorkflowSlots are the slots of workflow facts: each provider's, then the
 // brief's, the draft's, the trigger's and the config's.
-var WorkflowSlots = []string{"pr", "session", "workspace", "entry", "slack", "brief", "draft", "trigger", "config"}
+var WorkflowSlots = []string{"pr", "session", "workspace", "task", "slack", "brief", "draft", "trigger", "config"}
 
 // DraftSlot is the slot of the facts a workflow's [withdraw] when reads of
 // each draft it proposed.
@@ -574,11 +574,11 @@ func FactProvider(name string) unit.ProviderID {
 	return ""
 }
 
-// OfferFacts are the facts a verb's offer reads: an entry's own, which a
-// list of entries reads without a store.
-var OfferFacts = []string{"entry.id", "entry.kind", "entry.state", "entry.muted", "entry.unit", "entry.unit_provider"}
+// OfferFacts are the facts a verb's offer reads: a task's own, which a
+// list of tasks reads without a store.
+var OfferFacts = []string{"task.id", "task.kind", "task.state", "task.muted", "task.unit", "task.unit_provider"}
 
-// OfferEnv is the env of a verb's offer in gtd.toml.
+// OfferEnv is the env of a verb's offer in tasks.toml.
 func OfferEnv() expr.Env {
 	env := expr.Env{}
 	for _, f := range Facts {
@@ -586,6 +586,6 @@ func OfferEnv() expr.Env {
 			put(env, f)
 		}
 	}
-	Narrow(env, providersOfSlot("entry"))
+	Narrow(env, providersOfSlot("task"))
 	return env
 }

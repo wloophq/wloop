@@ -3,7 +3,7 @@ title: Plugins
 description: How a source of units plugs into the core, what it contributes, and the boundary that keeps the core free of it.
 ---
 
-The core of {{name}} is a GTD system over opaque units: entries, the Inbox, the Outbox, projects, the Review, the turns, the workflows and the read model work on `unit.Unit{Provider, Key}` and never on a pull request or a Slack thread. Where units come from is a plugin's business. The plugins are compiled in, `github` and `slack`, with no plugin framework and no plugins loaded at run time.
+The core of {{name}} is a task system over opaque units: tasks, the Inbox, the Outbox, projects, the review, the turns, the workflows and the read model work on `unit.Unit{Provider, Key}` and never on a pull request or a Slack thread. Where units come from is a plugin's business. The plugins are compiled in, `github` and `slack`, with no plugin framework and no plugins loaded at run time.
 
 ## A plugin
 
@@ -15,8 +15,8 @@ A module must have its codec, an ingestion job with an interval and its rows; a 
 |---|---|---|
 | Units and their changes | `Ingest` (an `ingest.Job` over its `port.Source` and `port.SourceStore`), `Slow`, `Run` (a long-running stream, restarted after 30 s), `Jobs` | runs them as daemon jobs; a source never writes, ingest saves through the source's store |
 | Rows | `Rows`, a read model provider | serves them to every surface with the rest of the read model |
-| Items and cards | `Items` (deterministic, no I/O), `Card`, `Identity`, `UnitEvents` | turns items into GTD entries; renders the card on every surface; resolves linked items from unit events |
-| Workflow facts | `Facts`, an `automation.Units` | the engine evaluates workflows over the plugin's units; a fact that names a signal, such as `pr.head`, is what a workflow's mark records; `<slot>.ended` (`builtin.EndedFact`), such as `pr.ended` or `slack.ended`, is the plugin's word that a unit has ended, which the entries it is attached to read as `entry.units_ended` |
+| Items and cards | `Items` (deterministic, no I/O), `Card`, `Identity`, `UnitEvents` | turns items into tasks; renders the card on every surface; resolves linked items from unit events |
+| Workflow facts | `Facts`, an `automation.Units` | the engine evaluates workflows over the plugin's units; a fact that names a signal, such as `pr.head`, is what a workflow's mark records; `<slot>.ended` (`builtin.EndedFact`), such as `pr.ended` or `slack.ended`, is the plugin's word that a unit has ended, which the tasks it is attached to read as `task.units_ended` |
 | Marks | its planner's own mark names, written through the store | stores them per unit, retains them with the unit, and lets `handled()` read them |
 | What a turn reads about a unit | `Payload`, a `turn.PayloadReader` | renders it into the turn's instructions |
 | Where its work runs | `PlacementDefaults`, `PlacementHints` | the placement service decides the repository and checkout |
@@ -36,7 +36,7 @@ The UI comes in three tiers: the card, which every surface renders the same way 
 
 ## A disabled plugin
 
-`<id>.enabled = false` (`github.enabled`, `slack.enabled`) leaves the module unbuilt: no ingestion, rows, jobs, facts, items, actions, notifications, MCP tools or publisher. Its codec stays, cards render from the stored snapshot, and every write to one of its units answers `409 {"error": "<id> is disabled"}` before the handler runs. On an entry, Dismiss still works: it detaches the disabled plugin's units and their items, and an item's link to such a unit is stored and left out while the plugin is off ([GTD](/concepts/gtd/)). The core works with no plugin enabled.
+`<id>.enabled = false` (`github.enabled`, `slack.enabled`) leaves the module unbuilt: no ingestion, rows, jobs, facts, items, actions, notifications, MCP tools or publisher. Its codec stays, cards render from the stored snapshot, and every write to one of its units answers `409 {"error": "<id> is disabled"}` before the handler runs. On a task, Dismiss still works: it detaches the disabled plugin's units and their items, and an item's link to such a unit is stored and left out while the plugin is off ([Tasks and views](/concepts/tasks/)). The core works with no plugin enabled.
 
 ## The boundary
 

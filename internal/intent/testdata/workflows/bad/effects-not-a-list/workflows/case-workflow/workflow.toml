@@ -1,6 +1,6 @@
 summary = "Case"
 provider = "entry"
-when = 'entry.items_resolved > 0'
+when = 'task.items_resolved > 0'
 
 [[step]]
 use = "draft.propose"

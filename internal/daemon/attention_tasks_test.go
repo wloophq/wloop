@@ -602,7 +602,7 @@ func storedViews() []string {
 func TestANotificationOffersOnlyTheVerbsTheProfileOffers(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "gtd.toml"), []byte("[verbs.dismiss]\noffer = 'entry.kind != \"draft\"'\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "tasks.toml"), []byte("[verbs.dismiss]\noffer = 'task.kind != \"draft\"'\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	cache := cacheOver(t, dir)

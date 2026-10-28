@@ -205,17 +205,17 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `notifications` | table |  | The notifications. |
 | `notifications.digest_at` | string | `09:00` | The local HH:MM of the daily digest; empty for none. |
 
-### Units and GTD
+### Units and tasks
 
 | Setting | Kind | Default | Meaning |
 |---|---|---|---|
 | `items` | table |  | The items. |
 | `items.heat` | table |  | How long a unit stays warm. |
 | `items.heat.warm_for` | duration |  | How long a unit stays warm after its last item resolved; left out, the heat reader's default. |
-| `gtd` | table |  | The GTD entries' settings. |
-| `gtd.stale_waiting_days` | integer | `2` | Working days after which a waiting entry goes stale. |
-| `gtd.areas` | list of strings |  | The areas an entry is offered. |
-| `gtd.contexts` | list of strings |  | The contexts an entry is offered. |
+| `tasks` | table |  | The tasks' settings. |
+| `tasks.stale_waiting_days` | integer | `2` | Working days after which a waiting task goes stale. |
+| `tasks.areas` | list of strings |  | The areas a task is offered. |
+| `tasks.contexts` | list of strings |  | The contexts a task is offered. |
 
 ### Cleanup
 

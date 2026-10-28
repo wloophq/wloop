@@ -1,0 +1,41 @@
+{
+  "$id": "https://github.com/wloophq/wloop/tasks.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "verbs": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "A verb, by its name.",
+        "properties": {
+          "input": {
+            "description": "The question a verb that asks for a value puts first (waiting, schedule, project, context, area, delegate, reply); required for those.",
+            "type": "string"
+          },
+          "label": {
+            "description": "The name people read on its button. Required.",
+            "type": "string"
+          },
+          "offer": {
+            "default": "true",
+            "description": "When a task offers the verb, over the task's own facts (task.id, task.kind, task.state, task.muted, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run.",
+            "type": "string"
+          },
+          "summary": {
+            "description": "One line, what pressing it does: its tooltip. Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "summary"
+        ],
+        "type": "object"
+      },
+      "description": "The verbs a task offers, by verb.",
+      "type": "object"
+    }
+  },
+  "title": "Task verbs (tasks.toml)",
+  "type": "object"
+}

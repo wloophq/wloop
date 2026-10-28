@@ -151,7 +151,7 @@ func TestTaskFactsAreTheSlotsFacts(t *testing.T) {
 	f := e.facts("e-01")
 	var want, got []string
 	for _, d := range builtin.Facts {
-		if d.Slot == "entry" {
+		if d.Slot == "task" {
 			want = append(want, d.Name)
 		}
 	}
@@ -163,7 +163,7 @@ func TestTaskFactsAreTheSlotsFacts(t *testing.T) {
 	if !slices.Equal(got, want) {
 		t.Fatalf("facts %v, want the entry slot's %v", got, want)
 	}
-	env := builtin.WorkflowEnv("entry")
+	env := builtin.WorkflowEnv("task")
 	for k, v := range f {
 		if typeOf(v) != env[k] {
 			t.Errorf("%s = %#v, want a %s", k, v, env[k])
@@ -206,19 +206,19 @@ func TestTaskFactsReadTheTaskItsItemsAndItsUnitsCard(t *testing.T) {
 	}
 	f := e.facts("e-01")
 	want := workflow.Facts{
-		"entry.id": "e-01", "entry.kind": "waiting", "entry.state": "waiting",
-		"entry.waiting_days": 3, "entry.since_nudge": 80 * time.Hour,
-		"entry.unit": "chat:T1/C1/100.1", "entry.unit_provider": "chat",
-		"entry.unit_started_by_me": true, "entry.unit_closure_posted": true,
-		"entry.items_open": 2, "entry.items_resolved": 1, "entry.items_owed": 1, "entry.muted": false,
-		"entry.nudge_due_at": monday.Add(-8 * time.Hour),
+		"task.id": "e-01", "task.kind": "waiting", "task.state": "waiting",
+		"task.waiting_days": 3, "task.since_nudge": 80 * time.Hour,
+		"task.unit": "chat:T1/C1/100.1", "task.unit_provider": "chat",
+		"task.unit_started_by_me": true, "task.unit_closure_posted": true,
+		"task.items_open": 2, "task.items_resolved": 1, "task.items_owed": 1, "task.muted": false,
+		"task.nudge_due_at": monday.Add(-8 * time.Hour),
 	}
 	for k, v := range want {
 		if got := f[k]; !equal(got, v) {
 			t.Errorf("%s = %#v, want %#v", k, got, v)
 		}
 	}
-	if got := f["entry.waiting_on"].([]string); !slices.Equal(got, []string{"chat:U1", "chat:U2"}) {
+	if got := f["task.waiting_on"].([]string); !slices.Equal(got, []string{"chat:U1", "chat:U2"}) {
 		t.Errorf("waiting_on %v", got)
 	}
 }
@@ -260,11 +260,11 @@ func TestTaskDueIsTheNextNudgeOrResurfaceTime(t *testing.T) {
 	if got, want := list(), time.Date(2026, 3, 4, 10, 0, 0, 0, brt); !got.Equal(want) {
 		t.Fatalf("due %v, want e-01's two working days %v", got, want)
 	}
-	if f := e.facts("e-02"); !f["entry.nudge_due_at"].(time.Time).Equal(monday.Add(5 * time.Hour)) {
-		t.Errorf("e-02 at its resurface date: nudge_due_at %v", f["entry.nudge_due_at"])
+	if f := e.facts("e-02"); !f["task.nudge_due_at"].(time.Time).Equal(monday.Add(5 * time.Hour)) {
+		t.Errorf("e-02 at its resurface date: nudge_due_at %v", f["task.nudge_due_at"])
 	}
-	if f := e.facts("e-01"); !f["entry.nudge_due_at"].(time.Time).IsZero() {
-		t.Errorf("e-01 is not due yet: nudge_due_at %v", f["entry.nudge_due_at"])
+	if f := e.facts("e-01"); !f["task.nudge_due_at"].(time.Time).IsZero() {
+		t.Errorf("e-01 is not due yet: nudge_due_at %v", f["task.nudge_due_at"])
 	}
 }
 
@@ -310,14 +310,14 @@ func TestTaskSettledAtIsTheWorkflowsOwn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := scoped["entry.settled_at"].(time.Time); !got.Equal(monday.Add(-2 * time.Hour)) {
+	if got := scoped["task.settled_at"].(time.Time); !got.Equal(monday.Add(-2 * time.Hour)) {
 		t.Errorf("nudge-a settled_at %v, want its withdrawn draft's", got)
 	}
-	if got := f["entry.settled_at"].(time.Time); !got.IsZero() {
+	if got := f["task.settled_at"].(time.Time); !got.IsZero() {
 		t.Errorf("Scope wrote the unit's facts: %v", got)
 	}
-	if fresh, _ := e.p.Scope(ctx, "nudge-c", task.UnitOf("e-01"), f); !fresh["entry.settled_at"].(time.Time).IsZero() {
-		t.Errorf("a workflow with no drafts: %v", fresh["entry.settled_at"])
+	if fresh, _ := e.p.Scope(ctx, "nudge-c", task.UnitOf("e-01"), f); !fresh["task.settled_at"].(time.Time).IsZero() {
+		t.Errorf("a workflow with no drafts: %v", fresh["task.settled_at"])
 	}
 }
 
@@ -327,7 +327,7 @@ func TestATaskThatLeftItsListStillHasEventFacts(t *testing.T) {
 	e.task(task.Task{ID: "e-05", Kind: task.KindAction, State: task.Done, Title: "d", Units: []unit.Unit{chatA}})
 	e.task(task.Task{ID: "e-04", Kind: task.KindAction, State: task.Someday, Title: "m", Units: []unit.Unit{mailX}})
 	f, err := e.p.EventFacts(context.Background(), task.UnitOf("e-05"))
-	if err != nil || f["entry.state"] != "done" || f["entry.unit"] != chatA.String() {
+	if err != nil || f["task.state"] != "done" || f["task.unit"] != chatA.String() {
 		t.Fatalf("event facts of a done entry: %v %v", f, err)
 	}
 	for _, id := range []task.ID{"e-04", "e-99"} {
@@ -350,17 +350,17 @@ func TestTaskFactsSpanEveryUnitInOrder(t *testing.T) {
 		Items: []task.ItemRef{{Unit: owed.Unit, Item: owed.ID}, {Unit: onDoc.Unit, Item: onDoc.ID}}}
 	e.task(en)
 	f := e.facts("e-01")
-	if f["entry.unit"] != chatA.String() || f["entry.unit_provider"] != "chat" {
-		t.Errorf("the first unit: %v %v", f["entry.unit"], f["entry.unit_provider"])
+	if f["task.unit"] != chatA.String() || f["task.unit_provider"] != "chat" {
+		t.Errorf("the first unit: %v %v", f["task.unit"], f["task.unit_provider"])
 	}
-	if got := f["entry.units"].([]string); !slices.Equal(got, []string{chatA.String(), chatB.String(), docY.String()}) {
+	if got := f["task.units"].([]string); !slices.Equal(got, []string{chatA.String(), chatB.String(), docY.String()}) {
 		t.Errorf("units %v, want the attached ones in order, then the one only an item names", got)
 	}
-	if got := f["entry.unit_providers"].([]string); !slices.Equal(got, []string{"chat", "doc"}) {
+	if got := f["task.unit_providers"].([]string); !slices.Equal(got, []string{"chat", "doc"}) {
 		t.Errorf("unit_providers %v", got)
 	}
-	if f["entry.items_open"] != 3 || f["entry.items_resolved"] != 1 || f["entry.items_owed"] != 2 {
-		t.Errorf("items open %v, resolved %v, owed %v; want 3, 1, 2 over every unit", f["entry.items_open"], f["entry.items_resolved"], f["entry.items_owed"])
+	if f["task.items_open"] != 3 || f["task.items_resolved"] != 1 || f["task.items_owed"] != 2 {
+		t.Errorf("items open %v, resolved %v, owed %v; want 3, 1, 2 over every unit", f["task.items_open"], f["task.items_resolved"], f["task.items_owed"])
 	}
 }
 
@@ -369,15 +369,15 @@ func TestTaskUnitsEndedWhenEveryUnitEnded(t *testing.T) {
 	e := newEnv(t)
 	e.task(task.Task{ID: "e-01", Kind: task.KindCapture, State: task.Next, Title: "none"})
 	e.task(task.Task{ID: "e-02", Kind: task.KindCapture, State: task.Next, Title: "two", Units: []unit.Unit{chatA, chatB}})
-	if f := e.facts("e-01"); f["entry.units_ended"] != false {
+	if f := e.facts("e-01"); f["task.units_ended"] != false {
 		t.Error("an entry with no unit has its units ended")
 	}
 	e.ended[chatA] = true
-	if f := e.facts("e-02"); f["entry.units_ended"] != false {
+	if f := e.facts("e-02"); f["task.units_ended"] != false {
 		t.Error("an entry with a unit still going has its units ended")
 	}
 	e.ended[chatB] = true
-	if f := e.facts("e-02"); f["entry.units_ended"] != true {
+	if f := e.facts("e-02"); f["task.units_ended"] != true {
 		t.Error("an entry whose every unit ended has not")
 	}
 }
@@ -387,12 +387,12 @@ func TestTaskTurnsCountsTheTurnsOnTheTaskItself(t *testing.T) {
 	e := newEnv(t)
 	e.task(task.Task{ID: "e-01", Kind: task.KindCapture, State: task.Next, Title: "tracked", Units: []unit.Unit{chatA}})
 	e.turns[chatA] = 3
-	if f := e.facts("e-01"); f["entry.turns"] != 0 {
-		t.Errorf("entry.turns %v, want the turns on its unit left out", f["entry.turns"])
+	if f := e.facts("e-01"); f["task.turns"] != 0 {
+		t.Errorf("task.turns %v, want the turns on its unit left out", f["task.turns"])
 	}
 	e.turns[task.UnitOf("e-01")] = 2
-	if f := e.facts("e-01"); f["entry.turns"] != 2 {
-		t.Errorf("entry.turns %v, want 2", f["entry.turns"])
+	if f := e.facts("e-01"); f["task.turns"] != 2 {
+		t.Errorf("task.turns %v, want 2", f["task.turns"])
 	}
 }
 
@@ -403,7 +403,7 @@ func TestTaskCapturedByUser(t *testing.T) {
 	e.task(task.Task{ID: "e-02", Kind: task.KindAction, State: task.Inbox, Title: "derived", Origin: task.OriginDerived, Units: []unit.Unit{chatA}})
 	e.task(task.Task{ID: "e-03", Kind: task.KindMessage, State: task.Inbox, Title: "a message", Origin: task.OriginMessage, Units: []unit.Unit{chatA}})
 	for id, want := range map[task.ID]bool{"e-01": true, "e-02": false, "e-03": false} {
-		if got := e.facts(id)["entry.captured_by_user"]; got != want {
+		if got := e.facts(id)["task.captured_by_user"]; got != want {
 			t.Errorf("%s: captured_by_user %v, want %v", id, got, want)
 		}
 	}

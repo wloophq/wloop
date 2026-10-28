@@ -1,9 +1,9 @@
 label     = "Start"
 summary   = "Start new work from a brief: in a fresh worktree of a repository, or with no checkout"
 provider  = "entry"
-workspace = { repo_input = "repo", repo_optional = true, name = '{{slug .entry.title}}-{{.entry.short_id}}' }
+workspace = { repo_input = "repo", repo_optional = true, name = '{{slug .task.title}}-{{.task.short_id}}' }
 runners   = ["session"]
-session   = { strategy = "new", title = "start", name = '{{or .workspace.name .entry.title}}' }
+session   = { strategy = "new", title = "start", name = '{{or .workspace.name .task.title}}' }
 brief     = { render = false, wait = false }
 
 [target]
@@ -11,11 +11,11 @@ missing = "capture"
 title   = '{{firstLine .guidance}}'
 
 [help]
-target   = "entry:<id>, or none to capture the brief as a new entry"
+target   = "entry:<id>, or none to capture the brief as a new task"
 summary  = "Start new work from a brief"
 group    = "pull requests"
 examples = ["--repo acme/api add retries to the webhook sender; done when a failed delivery is retried three times", "entry:e-3f9a2c4b5d6e7f80 --repo acme/api"]
-docs     = "concepts/gtd"
+docs     = "concepts/tasks"
 
 [guidance]
 help = "the brief: what to build or say, and how to know it is done"
@@ -30,11 +30,11 @@ persist = true
 attach_posts = true
 
 [action]
-note = "Starts an agent session on the entry's brief"
+note = "Starts an agent session on the task's brief"
 
 [[action.refuse]]
-when = '!entry.captured_by_user'
-why  = "Start runs only on an entry you captured"
+when = '!task.captured_by_user'
+why  = "Start runs only on a task you captured"
 
 [headline]
 resumed = "start work on {{.unit.ref}}"

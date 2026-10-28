@@ -797,7 +797,7 @@ func TestBridgeRelaysARefusalAsJSONOnly(t *testing.T) {
 
 func TestAVerbTheProfileDoesNotOfferIsNeitherListedNorRun(t *testing.T) {
 	t.Parallel()
-	offer, err := expr.CompileWorkflow(`entry.kind != "capture"`, builtin.OfferEnv())
+	offer, err := expr.CompileWorkflow(`task.kind != "capture"`, builtin.OfferEnv())
 	if err != nil {
 		t.Fatal(err)
 	}

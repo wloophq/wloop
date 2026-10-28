@@ -94,7 +94,7 @@ window = "2h"
 	if a := draftApproval(cfg, workflow.Workflow{Name: "slack-ask-owner", Slot: "slack"}).Default; a.Mode != draft.Send {
 		t.Errorf("the config's block over no manifest block: %+v", a)
 	}
-	if p := draftApproval(cfg, workflow.Workflow{Name: "slack-stalled-nudge", Slot: "entry"}); p.Default.Mode != draft.Wait || len(p.Rules) != 0 {
+	if p := draftApproval(cfg, workflow.Workflow{Name: "slack-stalled-nudge", Slot: "task"}); p.Default.Mode != draft.Wait || len(p.Rules) != 0 {
 		t.Errorf("a workflow the config leaves alone: %+v", p)
 	}
 	te := newTestEnv(t, nil)
@@ -262,7 +262,7 @@ func TestAUserWorkflowThatFailsToLoadKeepsItsDrafts(t *testing.T) {
 // releases a draft in a DM.
 const slackThanks = `summary = "Thank in a DM"
 provider = "slack"
-when = 'slack.live_entry'
+when = 'slack.live_task'
 
 [[step]]
 use = "draft.propose"

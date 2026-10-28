@@ -11,7 +11,7 @@ Each entry is a file under `docs/src/content/docs/architecture/decisions/`, with
 |---|---|
 | [A draft is what its proposer declares](/architecture/decisions/a-draft-is-what-its-proposer-declares/) | A draft carries its purpose, delivery and effects; nothing follows from its kind, and a comment waits for a person. |
 | [A provider is asked what it can do](/architecture/decisions/a-provider-is-asked-what-it-can-do/) | A plugin declares its capabilities, and a provider id appears only in its plugin and the tables. |
-| [A verb a person runs is an event](/architecture/decisions/a-verb-a-person-runs-is-an-event/) | Every verb a person runs on an entry records one verb event, and a verb a workflow runs records none. |
+| [A verb a person runs is an event](/architecture/decisions/a-verb-a-person-runs-is-an-event/) | Every verb a person runs on a task records one verb event, and a verb a workflow runs records none. |
 | [Architecture rules are tests](/architecture/decisions/architecture-rules-are-tests/) | Each architecture rule is a test with a self-test, and its reference page is generated. |
 | [Authority comes from you](/architecture/decisions/authority-comes-from-you/) | Endorsing, approving, taking over and removing come only from your surfaces, never from an agent. |
 | [Behavior lives in the profile](/architecture/decisions/behavior-lives-in-the-profile/) | Behavior is profile files; Go provides a closed vocabulary and never enumerates intents. |

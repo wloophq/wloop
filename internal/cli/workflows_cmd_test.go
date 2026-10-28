@@ -88,10 +88,24 @@ func TestProfileSchemaPrintsTheWorkflowSchemaOnRequest(t *testing.T) {
 
 func TestProfileSchemaPrintsTheActionsListsAndConfigSchemas(t *testing.T) {
 	t.Parallel()
-	for flag, want := range map[string][]byte{"--actions": intentload.ActionsSchema, "--gtd": intentload.ListsSchema, "--keys": intentload.KeysSchema, "--config": intentload.ConfigSchema} {
+	for flag, want := range map[string][]byte{"--actions": intentload.ActionsSchema, "--tasks": intentload.TasksSchema, "--views": intentload.ViewsSchema,
+		"--gates": intentload.GatesSchema, "--keys": intentload.KeysSchema, "--config": intentload.ConfigSchema} {
 		te := newTestEnv(t, &fake.Manager{})
 		if code := te.run("profile", "schema", flag); code != 0 || !bytes.Equal(te.out.Bytes(), want) {
 			t.Errorf("%s: exit %d: %s", flag, code, te.err)
+		}
+	}
+}
+
+func TestProfileSchemaGtdFlagIsRefused(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	if code := te.run("profile", "schema", "--gtd"); code == 0 || te.out.Len() > 0 {
+		t.Fatalf("exit %d: %s", code, te.out)
+	}
+	for _, flag := range []string{"--gtd is no longer a schema", "--tasks", "--views", "--gates"} {
+		if !strings.Contains(te.err.String(), flag) {
+			t.Errorf("the refusal names no %s: %s", flag, te.err)
 		}
 	}
 }

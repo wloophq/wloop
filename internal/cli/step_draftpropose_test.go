@@ -210,7 +210,7 @@ func TestDraftProposeRendersTheProfileTextWithItemsAsData(t *testing.T) {
 func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 	t.Parallel()
 	wf := draftWF("nudges", "purpose", "nudge", "items", "owed", "per", "person", "repeat_after", "24h")
-	wf.Steps[0].Args["effects"] = []any{"entry.nudged"}
+	wf.Steps[0].Args["effects"] = []any{"task.nudged"}
 	r := newDraftRig(t, wf, "@{{\"{\"}}{{.Person.Key}}{{\"}\"}}, any news?{{range .Items}}\n- {{.Line}}{{end}}")
 	r.tasks.m["e1"] = task.Task{ID: "e1", Kind: task.KindWaiting, State: task.Waiting, Units: []unit.Unit{draftThread},
 		Items:   []task.ItemRef{{Unit: draftThread, Item: "i1"}, {Unit: draftThread, Item: "i2"}},

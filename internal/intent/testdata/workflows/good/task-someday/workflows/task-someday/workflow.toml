@@ -1,0 +1,7 @@
+summary = "Move a stale next action to Someday"
+provider = "entry"
+when = 'task.state == "next"'
+
+[[step]]
+use = "task.verb"
+verb = "someday"

@@ -1,0 +1,1 @@
+testdata/workflows/bad/task-verb-schedule-no-date/workflows/case-workflow/workflow.toml:7:8: step[0].verb: schedule needs until or on_activity = "true"

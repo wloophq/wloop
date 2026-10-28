@@ -186,7 +186,7 @@
           "description": "The effects its agents may declare on their drafts.",
           "items": {
             "enum": [
-              "entry.nudged",
+              "task.nudged",
               "unit.closed",
               "pr.nudged"
             ],
@@ -245,7 +245,7 @@
         },
         "attach_posts": {
           "default": false,
-          "description": "On a turn whose unit is an entry, the unit of each post its agent makes, sent at once or once approved, is attached to the entry; reactions and edits are not posts.",
+          "description": "On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts.",
           "type": "boolean"
         }
       },
@@ -489,7 +489,7 @@
         },
         "attach_url": {
           "default": false,
-          "description": "On a turn whose unit is an entry, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the entry; needs url in record.outcome.",
+          "description": "On a turn whose unit is a task, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the task; needs url in record.outcome.",
           "type": "boolean"
         },
         "history_artifact": {
@@ -670,14 +670,14 @@
       "description": "What a run with no unit does.",
       "properties": {
         "missing": {
-          "description": "capture: a run with no unit captures its guidance as a new entry, the turn's unit; refused when absent.",
+          "description": "capture: a run with no unit captures its guidance as a new task, the turn's unit; refused when absent.",
           "enum": [
             "capture"
           ],
           "type": "string"
         },
         "title": {
-          "description": "The captured entry's title, over .guidance, with firstLine.",
+          "description": "The captured task's title, over .guidance, with firstLine.",
           "type": "string"
         }
       },
@@ -689,7 +689,7 @@
       "type": "boolean"
     },
     "verb": {
-      "description": "The GTD verb its action fulfils.",
+      "description": "The verb its action fulfils.",
       "enum": [
         "approve",
         "delegate",

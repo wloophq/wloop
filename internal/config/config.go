@@ -62,7 +62,7 @@ type Config struct {
 	Plugins map[string]Plugin `json:"-"`
 	// Placement is the rules that place units; the first match wins.
 	Placement []PlacementRule `json:"placement,omitempty"`
-	Tasks     Tasks           `json:"gtd"`
+	Tasks     Tasks           `json:"tasks"`
 	// Notifications sets the menu bar's daily digest.
 	Notifications Notifications `json:"notifications"`
 	Slack         Slack         `json:"slack"`
@@ -161,7 +161,7 @@ type Dossiers struct {
 	CompactAtKB  int64 `json:"compact_at_kb"` // log/ size that triggers compaction
 }
 
-// Tasks holds the entries' settings: when a waiting entry goes stale, and the areas and contexts offered.
+// Tasks holds the tasks' settings: when a waiting task goes stale, and the areas and contexts offered.
 type Tasks struct {
 	StaleWaitingDays int      `json:"stale_waiting_days"` // working days
 	Areas            []string `json:"areas"`

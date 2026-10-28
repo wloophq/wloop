@@ -981,8 +981,8 @@ func TestABrokenDefaultsSessionNameIsReportedInDefaults(t *testing.T) {
 const startLike = `label = "Start"
 summary = "Start new work from a brief"
 provider = "entry"
-workspace = { repo_input = "repo", repo_optional = true, name = '{{slug .entry.title}}-{{.entry.short_id}}' }
-session = { strategy = "new", title = "start", name = '{{or .workspace.name .entry.title}}' }
+workspace = { repo_input = "repo", repo_optional = true, name = '{{slug .task.title}}-{{.task.short_id}}' }
+session = { strategy = "new", title = "start", name = '{{or .workspace.name .task.title}}' }
 
 [target]
 missing = "capture"
@@ -1016,7 +1016,7 @@ func TestAStartIntentNamesItsWorkspaceSessionAndTask(t *testing.T) {
 	if d.Target.Missing != dintent.TargetCapture {
 		t.Fatalf("target = %+v", d.Target)
 	}
-	facts := map[string]any{"entry.title": "Add retries to the Webhook sender!", "entry.short_id": "3f9a2c"}
+	facts := map[string]any{"task.title": "Add retries to the Webhook sender!", "task.short_id": "3f9a2c"}
 	ws, err := l.WorkspaceName("begin", facts)
 	if err != nil || ws != "add-retries-to-the-webhook-sender-3f9a2c" {
 		t.Fatalf("WorkspaceName = %q, %v", ws, err)
@@ -1038,8 +1038,8 @@ func TestStartKeysAreChecked(t *testing.T) {
 	for name, c := range map[string]struct{ from, to, want string }{
 		"repo_optional needs repo_input": {`workspace = { repo_input = "repo", repo_optional = true,`, `workspace = { repo = "acme/api", repo_optional = true,`, "workspace.repo_optional"},
 		"target.missing names capture":   {`missing = "capture"`, `missing = "skip"`, "target.missing"},
-		"workspace.name reads its facts": {`{{slug .entry.title}}`, `{{.pr.slug}}`, "workspace.name"},
-		"capture needs an entry intent":  {`provider = "entry"`, `provider = "github"`, "target.missing"},
+		"workspace.name reads its facts": {`{{slug .task.title}}`, `{{.pr.slug}}`, "workspace.name"},
+		"capture needs a task intent":    {`provider = "entry"`, `provider = "github"`, "target.missing"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()

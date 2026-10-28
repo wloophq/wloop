@@ -21,7 +21,7 @@ var workflowGrammar = slices.Concat([]Key{
 	{Path: "marks.*", In: SurfaceWorkflow, Kind: KindFact, Doc: "The fact whose value the mark stores."},
 	{Path: "observe", In: SurfaceWorkflow, Kind: KindBool, Default: "false", Doc: "Plans items pending and never runs them by itself; a person applies an item by hand."},
 	{Path: "trigger", In: SurfaceWorkflow, Kind: KindTable, Doc: "What plans the workflow: on or schedule; absent, every sweep."},
-	{Path: "trigger.on", In: SurfaceWorkflow, Kind: KindList, Elem: KindEnum, Values: named(slices.Concat(inventory.EventKinds, task.VerbEventKinds)...), Doc: "The source event kinds the workflow reacts to; verb_<verb>, a verb a person ran on an entry, with provider entry."},
+	{Path: "trigger.on", In: SurfaceWorkflow, Kind: KindList, Elem: KindEnum, Values: named(slices.Concat(inventory.EventKinds, task.VerbEventKinds)...), Doc: "The source event kinds the workflow reacts to; verb_<verb>, a verb a person ran on a task, with provider task."},
 	{Path: "trigger.schedule", In: SurfaceWorkflow, Kind: KindText, Doc: "A cron schedule, in local time."},
 	{Path: "step[]", In: SurfaceWorkflow, Kind: KindTable, Required: true, Doc: "A step the run takes, in order. Required: at least one."},
 	{Path: "step[].use", In: SurfaceWorkflow, Kind: KindEnum, Values: stepValues, Required: true, Doc: "The step."},

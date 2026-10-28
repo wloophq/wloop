@@ -528,7 +528,7 @@ func TestTaskSettingsDefaultsAndParsing(t *testing.T) {
 		t.Fatalf("defaults %+v", d)
 	}
 	path := filepath.Join(t.TempDir(), "config.toml")
-	raw := `gtd = {stale_waiting_days = 3, areas = ["OSS", "Hiring"], contexts = ["@decide", "@reply"]}`
+	raw := `tasks = {stale_waiting_days = 3, areas = ["OSS", "Hiring"], contexts = ["@decide", "@reply"]}`
 	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -537,7 +537,7 @@ func TestTaskSettingsDefaultsAndParsing(t *testing.T) {
 		t.Fatal(err)
 	}
 	if g := c.Tasks; g.StaleWaitingDays != 3 || strings.Join(g.Areas, ",") != "OSS,Hiring" || strings.Join(g.Contexts, ",") != "@decide,@reply" {
-		t.Fatalf("gtd %+v", g)
+		t.Fatalf("tasks %+v", g)
 	}
 }
 
@@ -699,5 +699,17 @@ func TestALoneConfigJSONIsRefused(t *testing.T) {
 	}
 	if c, err := LoadFile(file, tools()); err != nil || c.Agent != "echo" {
 		t.Fatalf("with both files: agent %q, %v", c.Agent, err)
+	}
+}
+
+func TestGtdConfigSectionNamesTasks(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("[gtd]\nstale_waiting_days = 3\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := LoadFile(path, tools())
+	var unknown *UnknownKeysError
+	if !errors.As(err, &unknown) || !slices.Equal(unknown.Keys, []string{"gtd"}) || !strings.Contains(err.Error(), `gtd: did you mean "tasks"?`) {
+		t.Fatalf("err %v", err)
 	}
 }

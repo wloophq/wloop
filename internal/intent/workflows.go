@@ -112,6 +112,10 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(inten
 				continue
 			}
 			dir := filepath.Join(l.Dir, "workflows", e.Name())
+			if n := builtin.RenamedTo(e.Name()); n != "" && bundledUnits[n] != nil {
+				problems = append(problems, Problem{File: dir, Msg: e.Name() + " was renamed" + expr.DidYouMean(e.Name(), []string{n})})
+				continue
+			}
 			if b := bundledUnits[e.Name()]; b != nil {
 				if len(overrides([]string{dir})) > 0 {
 					b.files.overlay = append(b.files.overlay, dir)
@@ -544,12 +548,12 @@ func (s *sheet) stepFiles(steps []workflow.Step, read func(string) ([]byte, erro
 	}
 }
 
-// taskVerb checks entry.verb's arguments: a verb, only the arguments it
+// taskVerb checks task.verb's arguments: a verb, only the arguments it
 // takes, and a date or on_activity for schedule.
 func (s *sheet) taskVerb(p string, args map[string]any) {
 	verb, _ := args["verb"].(string)
 	if verb == "" {
-		s.add(p+".verb", "is required: the verb run on the entry")
+		s.add(p+".verb", "is required: the verb run on the task")
 		return
 	}
 	if !slices.Contains(builtin.TaskStepVerbs, verb) {

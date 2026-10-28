@@ -151,15 +151,15 @@ func TestSlackFactsReadTheExtractionTheConversationAndTheItems(t *testing.T) {
 	f := e.facts(thread)
 	for k, v := range map[string]any{
 		"slack.channel": "C0001", "slack.conversation": "channel", "slack.started_by_me": true, "slack.closure_posted": false,
-		"slack.live_entry": true, "slack.items_open": 3, "slack.items_unowned": 2, "slack.items_unowned_age_days": 1,
+		"slack.live_task": true, "slack.items_open": 3, "slack.items_unowned": 2, "slack.items_unowned_age_days": 1,
 	} {
 		if f[k] != v {
 			t.Errorf("thread %s = %#v, want %#v", k, f[k], v)
 		}
 	}
 	g := e.facts(other)
-	if g["slack.closure_posted"] != true || g["slack.live_entry"] != false || g["slack.items_unowned_age_days"] != 0 {
-		t.Errorf("other: closure_posted %v, live_entry %v (muted), age %v", g["slack.closure_posted"], g["slack.live_entry"], g["slack.items_unowned_age_days"])
+	if g["slack.closure_posted"] != true || g["slack.live_task"] != false || g["slack.items_unowned_age_days"] != 0 {
+		t.Errorf("other: closure_posted %v, live_task %v (muted), age %v", g["slack.closure_posted"], g["slack.live_task"], g["slack.items_unowned_age_days"])
 	}
 	sqlitetest.Exec(t, e.db, `UPDATE extraction_cursors SET closure_marked = 1 WHERE unit_key = ?`, thread.Key)
 	if f := e.facts(thread); f["slack.closure_posted"] != true {

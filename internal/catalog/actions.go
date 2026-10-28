@@ -28,7 +28,7 @@ const (
 // SourceBuiltin is the Source of an action spec Go declares.
 const SourceBuiltin = "builtin"
 
-// The origins of an action spec, in the order a shared gtd verb ranks them.
+// The origins of an action spec, in the order a shared verb ranks them.
 const (
 	OriginBuiltin = iota
 	OriginBundled
@@ -47,7 +47,7 @@ func Origin(s api.ActionSpec) int {
 	return OriginBundled
 }
 
-// Rank orders the specs whose gtd verb an entry runs on a unit of provider, the lowest first: the built-in
+// Rank orders the specs whose verb a task runs on a unit of provider, the lowest first: the built-in
 // actions, then the intents of the unit's own provider, then those of any provider, a user's intent before
 // a bundled one within each.
 func Rank(s api.ActionSpec, provider unit.ProviderID) int {
@@ -238,7 +238,7 @@ var builtinActions = []builtinAction{
 	draftAction("draft.retry", "retry", nil),
 }
 
-// draftAction is an Outbox action: no row offers it, the draft's entry does (DraftStates).
+// draftAction is an Outbox action: no row offers it, the draft's task does (DraftStates).
 func draftAction(id, verb string, input *api.InputSpec) builtinAction {
 	spec := api.ActionSpec{ID: id, Group: "draft", Scope: ScopeDraft, Verb: verb, Input: input,
 		Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceCLI}}
