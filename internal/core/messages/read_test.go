@@ -12,10 +12,18 @@ import (
 	"github.com/wloophq/wloop/internal/domain/turn"
 )
 
+// answerOf answers message id through its open gate, else again with no gate open.
 func answerOf(t *testing.T, r *rig, id int64, a messages.Answer) {
 	t.Helper()
 	a.Source = turn.Cockpit
-	if _, err := r.svc.Answer(context.Background(), id, a); err != nil {
+	m := r.message(t, id)
+	if !m.Open() {
+		if _, err := r.svc.Reanswer(context.Background(), id, a); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	if _, err := r.answer(m, a); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -145,7 +153,7 @@ func TestANewerAnswerToTheQuestionReplacesTheQueuedOne(t *testing.T) {
 	if len(b.Answers) != 2 || b.Answers[0].Route != turn.Refused || b.Answers[1].Route != turn.Queued || b.Answers[1].Message != q.ID {
 		t.Fatalf("answers %+v", b.Answers)
 	}
-	if m := r.message(t, q.ID); m.State != message.Answered || m.Answer != "Publish (option publish)" {
+	if m := r.message(t, q.ID); m.Open() || m.Answer != "Publish (option publish)" {
 		t.Fatalf("message %+v", m)
 	}
 }
@@ -164,7 +172,7 @@ func TestAQuestionWhoseTurnMovedOnTakesNoAnswer(t *testing.T) {
 	if _, ok, err := r.svc.Question(context.Background(), r7); err != nil || ok {
 		t.Fatalf("a done turn's question: %v %v", ok, err)
 	}
-	if _, err := r.svc.Answer(context.Background(), q.ID, messages.Answer{OptionID: "publish", Source: turn.Cockpit}); !errors.Is(err, messages.ErrClosed) {
+	if _, err := r.svc.Reanswer(context.Background(), q.ID, messages.Answer{OptionID: "publish", Source: turn.Cockpit}); !errors.Is(err, messages.ErrClosed) {
 		t.Fatalf("answer to a done turn's question: %v", err)
 	}
 }
@@ -183,7 +191,7 @@ func TestAnEarlierQuestionOfTheTurnTakesNoAnswerMeantForTheNewerOne(t *testing.T
 	if second.ID == first.ID {
 		t.Fatal("the newer question reused the first message")
 	}
-	if _, err := r.svc.Answer(context.Background(), first.ID, messages.Answer{OptionID: "delete", Source: turn.Cockpit}); !errors.Is(err, messages.ErrClosed) {
+	if _, err := r.svc.Reanswer(context.Background(), first.ID, messages.Answer{OptionID: "delete", Source: turn.Cockpit}); !errors.Is(err, messages.ErrClosed) {
 		t.Fatalf("the earlier question took the answer: %v", err)
 	}
 	if got, ok, err := r.svc.Question(context.Background(), r7); err != nil || !ok || got.ID != second.ID {

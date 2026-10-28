@@ -229,46 +229,7 @@ var intakeRouteActions = map[string]func(s *Server, ctx context.Context, i intak
 	},
 }
 
-// turnActions act on the pull request's turn book alone, so they need no
-// inventory row. The ones that may type or launch hold the loop mutex: the
-// launcher runs round code that expects it held.
-var turnActions = map[string]func(s *Server, ctx context.Context, u unit.Unit, req api.ActionRequest, out io.Writer) error{
-	"answer": (*Server).answer,
-	"continue": func(s *Server, ctx context.Context, u unit.Unit, _ api.ActionRequest, out io.Writer) error {
-		ctx = s.readAhead(ctx, u, false)
-		s.deps.LoopMu.Lock()
-		defer s.deps.LoopMu.Unlock()
-		if err := s.deps.Turns.Continue(ctx, u); err != nil {
-			return err
-		}
-		fmt.Fprintln(out, "the agent continues on "+u.Label())
-		return nil
-	},
-	"dismiss": func(s *Server, ctx context.Context, u unit.Unit, _ api.ActionRequest, out io.Writer) error {
-		if err := s.deps.Turns.Dismiss(ctx, u); err != nil {
-			return err
-		}
-		fmt.Fprintln(out, "question on "+u.Label()+" dismissed")
-		return nil
-	},
-}
-
 var answerSources = []turn.Source{turn.Cockpit, turn.Notification, turn.TUI, turn.Terminal}
-
-// answer answers the unit's open question message, as the Inbox answers it.
-func (s *Server) answer(ctx context.Context, u unit.Unit, req api.ActionRequest, out io.Writer) error {
-	if s.deps.Messages == nil {
-		return errors.New("the Inbox is not wired")
-	}
-	m, ok, err := s.deps.Messages.Question(ctx, u)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return fmt.Errorf("%w on %s", turn.ErrNoQuestion, u.Label())
-	}
-	return s.answerMessage(ctx, m, req, out)
-}
 
 // isBuiltin tells a built-in action the daemon runs itself, an intent of
 // a row gate of l among them; any other action a unit's row offers that no
@@ -276,10 +237,9 @@ func (s *Server) answer(ctx context.Context, u unit.Unit, req api.ActionRequest,
 func isBuiltin(l *intentload.Loaded, name string) bool {
 	_, isHold := holdActions[name]
 	_, isDelegated := delegatedActions[name]
-	_, isTurn := turnActions[name]
 	_, isIntake := intakeRouteActions[name]
 	_, isGate := catalog.RowGateIntent(l, name)
-	return isHold || isDelegated || followActions[name] || isTurn || isIntake || isGate || name == "brief_refresh"
+	return isHold || isDelegated || followActions[name] || isIntake || isGate || name == "brief_refresh"
 }
 
 func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
@@ -336,8 +296,17 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := context.WithoutCancel(r.Context())
+	if g, ok := questionIntent(l, name); ok {
+		var out bytes.Buffer
+		if err := s.actOnGate(ctx, g, u, req, actor, &out); err != nil {
+			writeActionError(w, err)
+			return
+		}
+		writeJSON(w, api.ActionResult{OK: true, Output: lines(out.String())})
+		return
+	}
 	row := api.Row{Unit: u}
-	if _, ok := turnActions[name]; !ok && (plugin || s.forge(u)) {
+	if plugin || s.forge(u) {
 		if intakeIntent(l, name) && !slices.Contains(intakeSources, req.Source) {
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("source %q is not one of %s", req.Source, strings.Join(intakeSources, ", ")))
 			return
@@ -579,12 +548,6 @@ func (s *Server) act(ctx context.Context, name string, u unit.Unit, req api.Acti
 	}
 	if isDelegated && s.deps.Actions == nil {
 		return errActionsUnavailable
-	}
-	if act, ok := turnActions[name]; ok {
-		if s.deps.Turns == nil {
-			return errTurnsUnavailable
-		}
-		return act(s, ctx, u, req, out)
 	}
 	if g, ok := catalog.RowGateIntent(l, name); ok {
 		if catalog.RunsHeld(l, name) {

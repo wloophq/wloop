@@ -21,13 +21,13 @@ import (
 
 const (
 	endUsage    = "usage: turn end <pr-url>|<provider>:<key> --turn <id> --file <path>"
-	answerUsage = "usage: turn answer <pr-url>|<provider>:<key> [--message <id>]"
+	answerUsage = "usage: turn answer <pr-url>|<provider>:<key> [--message <id> | --gate <id>]"
 )
 
 // Agent is the part of AgentAPI the agent's commands call.
 type Agent interface {
 	EndTurn(ctx context.Context, handle string, r api.TurnEndRequest) (api.TurnEnded, error)
-	TurnAnswer(ctx context.Context, handle, arg string, message int64) (api.TurnText, error)
+	TurnAnswer(ctx context.Context, handle, arg string, message, gate int64) (api.TurnText, error)
 }
 
 // End stores the record in the file for the turn it names, and deletes the
@@ -102,6 +102,7 @@ func Answer(ctx context.Context, env func(string) string, args []string, out, er
 	fs := flag.NewFlagSet("turn answer", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	message := fs.Int64("message", 0, "the id of the Inbox message to read; every unread answer without it")
+	gate := fs.Int64("gate", 0, "the id of the gate whose message to read, in place of --message")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -110,7 +111,7 @@ func Answer(ctx context.Context, env func(string) string, args []string, out, er
 	} else if fs.NArg() > 0 {
 		raw = ""
 	}
-	if raw == "" || *message < 0 {
+	if raw == "" || *message < 0 || *gate < 0 || *message != 0 && *gate != 0 {
 		fmt.Fprintln(errw, answerUsage)
 		return 2
 	}
@@ -119,7 +120,7 @@ func Answer(ctx context.Context, env func(string) string, args []string, out, er
 		fmt.Fprintln(errw, brand.Command+" turn answer:", err)
 		return 1
 	}
-	got, err := c.TurnAnswer(ctx, handle(env, h), arg, *message)
+	got, err := c.TurnAnswer(ctx, handle(env, h), arg, *message, *gate)
 	if errors.Is(err, client.ErrDown) {
 		fmt.Fprintf(errw, brand.Name+"'s daemon is not running; start it with `%s`, then run this command again\n", client.Kickstart())
 		return 1

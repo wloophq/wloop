@@ -471,8 +471,24 @@ func (facts) UnitFacts(_ context.Context, u unit.Unit) (task.UnitFacts, bool, er
 }
 
 func (r *rig) inbox() *messages.Service {
-	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: taskstest.New(), Items: r.ledger, Facts: facts{}, Clock: r.clock, StaleWaitingDays: 2})
-	return &messages.Service{Store: messagestest.New(), Books: r.store, Turns: r.turns, Tasks: g, Intents: turnstest.Intents(), Clock: r.clock}
+	st := taskstest.New()
+	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: st, Items: r.ledger, Facts: facts{}, Clock: r.clock, StaleWaitingDays: 2})
+	gs := messagestest.NewGates(r.clock.Now, gateTasks{st, g})
+	return gs.Bind(&messages.Service{Store: messagestest.New(), Books: r.store, Turns: r.turns, Tasks: g, Intents: turnstest.Intents(), Clock: r.clock})
+}
+
+// gateTasks give a gate the task of its unit from the store, and open one through the tasks service.
+type gateTasks struct {
+	store *taskstest.Store
+	svc   *coretasks.Service
+}
+
+func (g gateTasks) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
+	return g.store.TasksOf(ctx, u)
+}
+
+func (g gateTasks) Open(ctx context.Context, r coretasks.OpenRequest) (task.Task, error) {
+	return g.svc.Open(ctx, r)
 }
 
 func asked() record.Record {
@@ -524,7 +540,7 @@ func TestHeadlessAnswerRunsAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 	q := questions(t, m)[0]
-	route, err := m.Answer(ctx, q.ID, messages.Answer{OptionID: "mon", Source: turn.Cockpit})
+	route, err := m.Gates.(*messagestest.Gates).Answer(ctx, q, messages.Answer{OptionID: "mon", Source: turn.Cockpit})
 	if err != nil || route.Route != turn.Resumed {
 		t.Fatalf("route %+v %v", route, err)
 	}

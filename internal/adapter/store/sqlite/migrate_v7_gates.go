@@ -56,6 +56,30 @@ func v7Gates(ctx context.Context, tx *sql.Tx) error {
 		string(gate.KindQuestion), string(gate.KindPost), string(gate.KindProposal)); err != nil {
 		return fmt.Errorf("the gates of the answers: %w", err)
 	}
+	if err := v7GateSubjects(ctx, tx); err != nil {
+		return fmt.Errorf("the messages' and the item proposals' state: %w", err)
+	}
+	return nil
+}
+
+// v7GateSubjects leaves the messages and the item proposals without a state, once their gates hold it: a
+// message closed in version 6, or whose item proposal was decided, keeps a closed_at.
+func v7GateSubjects(ctx context.Context, tx *sql.Tx) error {
+	for _, q := range []string{
+		`UPDATE messages SET closed_at = created_at WHERE closed_at = '' AND (state != 'open' OR origin_kind = 'ledger'
+  AND EXISTS (SELECT 1 FROM item_proposals p WHERE p.id = messages.proposal AND p.state != 'open'))`,
+		`DROP INDEX messages_open`,
+		`DROP INDEX messages_task`,
+		`ALTER TABLE messages DROP COLUMN state`,
+		`CREATE INDEX messages_open ON messages (closed_at, id)`,
+		`DROP INDEX item_proposals_open`,
+		`DROP INDEX item_proposals_state`,
+		`ALTER TABLE item_proposals DROP COLUMN state`,
+	} {
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("%s: %w", q, err)
+		}
+	}
 	return nil
 }
 

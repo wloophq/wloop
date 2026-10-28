@@ -17,7 +17,7 @@ acme/api#7  Batch export
              1. Comment only
              2. Publish APPROVE (recommended)
              3. Hold the draft
-  keys       G guide  V review  W answer  C continue  X dismiss  A take over
+  keys       W answer  C continue  X dismiss  G guide  V review  A take over
              H pause  M mute  O open
   not now    F address · N nudge
 
@@ -27,4 +27,4 @@ acme/api#7  Batch export
 
 
 warning: app: notifications are off
-G guide  V review  W answer  C continue  X dismiss  A take over  ? keys  q quit
+W answer  C continue  X dismiss  G guide  V review  A take over  ? keys  q quit

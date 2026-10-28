@@ -31,10 +31,12 @@ type AnswerRequest struct {
 	// posted during turn Turn, whose answer never resumes a turn.
 	Message, Turn int64
 	Posted        bool
+	// Gate is the gate whose resolution the answer is.
+	Gate int64
 }
 
 func (r AnswerRequest) answer(seq int64) turn.Answer {
-	return turn.Answer{TurnSeq: seq, Text: r.Text, OptionID: r.OptionID, Yes: r.Yes, No: r.No, Source: r.Source, Message: r.Message}
+	return turn.Answer{TurnSeq: seq, Text: r.Text, OptionID: r.OptionID, Yes: r.Yes, No: r.No, Source: r.Source, Message: r.Message, Gate: r.Gate}
 }
 
 type AnswerResult struct {

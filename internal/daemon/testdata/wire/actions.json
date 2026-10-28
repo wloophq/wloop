@@ -66,6 +66,19 @@
     },
     "actions": [
       {
+        "id": "answer",
+        "enabled": true
+      },
+      {
+        "id": "continue",
+        "enabled": true
+      },
+      {
+        "id": "dismiss",
+        "enabled": true,
+        "note": "Close the question; the pull request goes back to whoever it waits on"
+      },
+      {
         "id": "guide",
         "enabled": true,
         "note": "Kept for the next automatic round"
@@ -94,19 +107,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": true
-      },
-      {
-        "id": "continue",
-        "enabled": true
-      },
-      {
-        "id": "dismiss",
-        "enabled": true,
-        "note": "Close the question; the pull request goes back to whoever it waits on"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -133,7 +133,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "question": {
       "record_id": 1,
       "state": "asked",
@@ -268,6 +268,19 @@
     },
     "actions": [
       {
+        "id": "answer",
+        "enabled": true
+      },
+      {
+        "id": "continue",
+        "enabled": true
+      },
+      {
+        "id": "dismiss",
+        "enabled": true,
+        "note": "Close the question; the pull request goes back to whoever it waits on"
+      },
+      {
         "id": "guide",
         "enabled": true,
         "note": "Kept for the next automatic round"
@@ -296,19 +309,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": true
-      },
-      {
-        "id": "continue",
-        "enabled": true
-      },
-      {
-        "id": "dismiss",
-        "enabled": true,
-        "note": "Close the question; the pull request goes back to whoever it waits on"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -335,7 +335,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "question": {
       "record_id": 1,
       "state": "asked",
@@ -479,24 +479,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -523,7 +505,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -668,24 +650,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -712,7 +676,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -848,24 +812,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -892,7 +838,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1037,24 +983,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -1081,7 +1009,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1217,24 +1145,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -1262,7 +1172,7 @@
         "refusal": "brief_refresh.why"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1367,24 +1277,6 @@
     },
     "actions": [
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#8",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#8",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#8",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "unmute",
         "enabled": true
       },
@@ -1398,7 +1290,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "me",
       "repo": "acme/api",
@@ -1512,24 +1404,6 @@
     },
     "actions": [
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#8",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#8",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#8",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "open",
         "enabled": true
       },
@@ -1544,7 +1418,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "me",
       "repo": "acme/api",
@@ -1651,24 +1525,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/web#4",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/web#4",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/web#4",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": false,
         "reason": "It is yours already",
@@ -1683,7 +1539,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "me",
       "repo": "acme/web",
@@ -1801,24 +1657,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -1856,7 +1694,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1987,24 +1825,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -2031,7 +1851,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2173,24 +1993,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -2217,7 +2019,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2353,24 +2155,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -2405,7 +2189,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2550,24 +2334,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -2604,7 +2370,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2746,24 +2512,6 @@
         "confirm": "Nudge the maintainers (no reviewer requested) on acme/api#10? An agent posts one comment under your name."
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#10",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#10",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#10",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": false,
         "reason": "It is yours already",
@@ -2791,7 +2539,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "me",
       "repo": "acme/api",
@@ -2919,24 +2667,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#9",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#9",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#9",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#9? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -2963,7 +2693,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3098,24 +2828,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "pause",
         "enabled": true
       },
@@ -3137,7 +2849,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3283,24 +2995,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -3327,7 +3021,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3473,24 +3167,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -3517,7 +3193,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "pending": {
       "intent": "follow-up",
       "reason": "ana replied",
@@ -3671,24 +3347,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -3715,7 +3373,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "pending": {
       "intent": "follow-up",
       "reason": "ana replied",
@@ -3886,24 +3544,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -3938,7 +3578,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -4053,6 +3693,19 @@
     },
     "actions": [
       {
+        "id": "answer",
+        "enabled": true
+      },
+      {
+        "id": "continue",
+        "enabled": true
+      },
+      {
+        "id": "dismiss",
+        "enabled": true,
+        "note": "Close the question; the pull request goes back to whoever it waits on"
+      },
+      {
         "id": "guide",
         "enabled": true,
         "note": "Kept for the next automatic round"
@@ -4081,19 +3734,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": true
-      },
-      {
-        "id": "continue",
-        "enabled": true
-      },
-      {
-        "id": "dismiss",
-        "enabled": true,
-        "note": "Close the question; the pull request goes back to whoever it waits on"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -4120,7 +3760,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "question": {
       "record_id": 1,
       "state": "unrecorded",
@@ -4267,24 +3907,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -4311,7 +3933,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -4437,24 +4059,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/web#3",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/web#3",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/web#3",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/web#3? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -4468,7 +4072,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "zoe",
       "repo": "acme/web",
@@ -4585,24 +4189,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -4629,7 +4215,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "payload": {
       "author": "ana",
       "repo": "acme/api",

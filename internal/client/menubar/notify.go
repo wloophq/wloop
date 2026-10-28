@@ -114,8 +114,8 @@ func notification(e api.TaskView) (Notification, posted) {
 	a := *e.Attention
 	n := Notification{ID: a.ID, Title: a.Title, Subtitle: a.Subtitle, Body: a.Body, Image: Image(a.Image)}
 	p := posted{task: e.ID, subtitle: a.Subtitle, units: e.Units, basis: map[string]string{}}
-	if e.Message != nil {
-		p.options = e.Message.Options
+	if m, _, ok := e.MessageOf(); ok {
+		p.options = m.Options
 	}
 	for _, x := range a.Actions {
 		if Category(a.Category) == api.CategoryOutbox && !slices.Contains(draftButtons, x.ID) {

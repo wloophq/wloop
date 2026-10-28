@@ -5,16 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/gates"
+	coreitems "github.com/wloophq/wloop/internal/core/items"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // newGates is the daemon's one gates service, built on first use: the
@@ -26,7 +29,8 @@ func (e *Env) newGates(db *sqlite.DB, logf func(string, ...any)) *gates.Service 
 		e.gateReader = st
 		e.gates = gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{e.loadedIntents}, Tasks: gateTasks{db.Tasks(), e},
 			Policy: profilePolicy{e.loadedIntents}, Clock: clockFunc(e.Now), Log: logf, Events: sqlite.New(db),
-			Publisher: outboxPublisher{e}, Releaser: daemonConsequences{e}, Unblocker: daemonConsequences{e}})
+			Publisher: outboxPublisher{e}, Releaser: daemonConsequences{e}, Unblocker: daemonConsequences{e},
+			Deliverer: daemonConsequences{e}, Decider: daemonConsequences{e}})
 	}
 	return e.gates
 }
@@ -44,15 +48,19 @@ func (p outboxPublisher) Publish(ctx context.Context, g gate.Gate) error {
 	return p.e.outbox.Publish(ctx, g)
 }
 
-// gateConsequences apply a resolved plan gate to its plan item and a
-// resolved trust gate to its round's start block.
+// gateConsequences apply a resolved plan gate to its plan item, a
+// resolved trust gate to its round's start block, a question or post gate
+// to its session and a proposal gate to what it proposes.
 type gateConsequences interface {
 	gates.Releaser
 	gates.Unblocker
+	gates.Deliverer
+	gates.Decider
 }
 
-// daemonConsequences are the daemon's consequences of the plan and trust
-// gates, read at each resolution: the daemon is built after the gates.
+// daemonConsequences are the daemon's consequences of the plan, trust,
+// question, post and proposal gates, read at each resolution: the daemon
+// is built after the gates.
 type daemonConsequences struct{ e *Env }
 
 var errNoDaemonYet = errors.New("the daemon is not built: the gate's consequence waits")
@@ -69,6 +77,20 @@ func (c daemonConsequences) Unblock(ctx context.Context, g gate.Gate) error {
 		return errNoDaemonYet
 	}
 	return c.e.consequences.Unblock(ctx, g)
+}
+
+func (c daemonConsequences) Deliver(ctx context.Context, g gate.Gate) error {
+	if c.e.consequences == nil {
+		return errNoDaemonYet
+	}
+	return c.e.consequences.Deliver(ctx, g)
+}
+
+func (c daemonConsequences) Decide(ctx context.Context, g gate.Gate) error {
+	if c.e.consequences == nil {
+		return errNoDaemonYet
+	}
+	return c.e.consequences.Decide(ctx, g)
 }
 
 // draftGates are the gates the drafts and the plan items of db wait on, through the daemon's gates service.
@@ -218,4 +240,22 @@ func (g openGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error
 		return nil, nil
 	}
 	return g.e.gateReader.Where(ctx, q)
+}
+
+// proposalText words an item proposal of the ledger as the profile's first proposal gate does, as it loads now.
+func proposalText(loaded func() *intentload.Loaded, logf func(string, ...any)) func(coreitems.Proposal) string {
+	return func(p coreitems.Proposal) string {
+		def, ok := loaded().Gates.FirstOf(gate.KindProposal)
+		if !ok {
+			return ""
+		}
+		slot := string(builtin.ProposalSlot) + "."
+		facts := map[string]any{slot + "op": string(p.Op.Op), slot + "item": p.Item, slot + "unit": p.Unit.Label(),
+			slot + "reason": strings.TrimSpace(p.Reason), slot + "provenance": string(p.Provenance)}
+		text, err := def.Words(intentload.ProposalFacts(func(name string) any { return facts[name] }))
+		if err != nil && logf != nil {
+			logf("gates.toml: the words of item proposal %d: %v", p.ID, err)
+		}
+		return text
+	}
 }

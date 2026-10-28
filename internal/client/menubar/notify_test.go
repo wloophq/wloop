@@ -51,12 +51,13 @@ func waitTask(n int, token string) api.TaskView {
 func questionTask(n int) api.TaskView {
 	e := plainTask(n)
 	e.Kind, e.Title = "message", "Publish the review?"
-	e.Message = &api.Message{ID: int64(n), TaskID: e.ID, Unit: uref(n), Kind: "question", Text: "Publish the review?", Recommend: "publish", State: "open",
+	subject, _ := json.Marshal(api.Message{ID: int64(n), Unit: uref(n), Kind: "question", Text: "Publish the review?", Recommend: "publish",
 		Options: []record.Option{
 			{ID: "comment", Label: "Comment only", Consequence: "posts a comment"},
 			{ID: "publish", Label: "Publish APPROVE", Consequence: "approves", Publishes: true},
 			{ID: "hold", Label: "Hold the draft", Consequence: "nothing is posted"},
-		}}
+		}})
+	e.Gates = []api.GateView{{ID: int64(n), Kind: "question", Status: "open", Intents: []api.IntentView{}, Subject: subject}}
 	e.Attention = &api.Attention{ID: api.NotificationID("Q5", e.ID, "5"), Category: "Q5", Title: "Agent asks", Subtitle: uref(n).Key, Image: "ask",
 		Body: "the draft approves; publish it?",
 		Actions: []api.AttentionAction{

@@ -294,6 +294,12 @@ function draftOf(e) {
   return g ? g.subject : null;
 }
 
+// messageOf is the message of e's first open question, post or proposal gate, its subject; null when e carries none.
+function messageOf(e) {
+  const g = ((e && e.gates) || []).find((x) => x.status === "open" && ["question", "post", "proposal"].includes(x.kind) && x.subject && typeof x.subject === "object");
+  return g ? g.subject : null;
+}
+
 // isDraftTask says whether e is a draft's own task, which shows its draft.
 function isDraftTask(e) {
   const d = draftOf(e);
@@ -344,7 +350,7 @@ function contextChips(route) {
 // units, the people it waits on, its items, its cards' people, its draft and its message.
 function taskHaystack(e) {
   const d = draftOf(e) || {};
-  const m = e.message || {};
+  const m = messageOf(e) || {};
   const props = Object.values(e.props || {}).flatMap((v) => typeof v === "string" ? [v] : Array.isArray(v) && v.every((x) => typeof x === "string") ? v : []);
   return [e.title, e.notes, e.state, e.kind, ...props,
     ...(e.units || []).flatMap((u, i) => [(e.unit_labels || [])[i] || unitLabel(u), `${u.provider}:${u.key}`]),

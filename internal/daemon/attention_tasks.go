@@ -11,7 +11,9 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dmessage "github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -170,15 +172,48 @@ func (ev *taskViewer) asVerbs(e task.Task, row api.Row, acts []api.AttentionActi
 	return out
 }
 
+// message is the message of e's oldest open question, post or proposal gate.
 func (ev *taskViewer) message(ctx context.Context, e task.Task) (dmessage.Message, bool) {
-	if e.Kind != task.KindMessage || ev.s.deps.Messages == nil {
+	if ev.s.deps.Messages == nil || ev.s.deps.GateReader == nil {
 		return dmessage.Message{}, false
 	}
-	m, ok, err := ev.s.deps.Messages.Store.ByTask(ctx, string(e.ID))
+	gs, err := ev.s.deps.GateReader.OfTask(ctx, e.ID)
 	if err != nil {
-		ev.s.logf("notifications: the message of %s: %v", e.ID, err)
+		ev.s.logf("notifications: the gates of %s: %v", e.ID, err)
+		return dmessage.Message{}, false
 	}
-	return m, ok && err == nil
+	for _, g := range gs {
+		if g.Status != gate.Open {
+			continue
+		}
+		if m, ok := ev.s.messageOf(ctx, g); ok && m.Open() {
+			return m, true
+		}
+		if m, ok := ev.missingMessage(ctx, g); ok {
+			return m, true
+		}
+	}
+	return dmessage.Message{}, false
+}
+
+// missingMessage is the question missing gate g asks, as a message of its turn worded by the gate; false
+// for any other gate.
+func (ev *taskViewer) missingMessage(ctx context.Context, g gate.Gate) (dmessage.Message, bool) {
+	id, ok := turns.MissingTurn(g.Subject)
+	if !ok || g.Kind != gate.KindQuestion || ev.s.deps.Messages.Books == nil {
+		return dmessage.Message{}, false
+	}
+	books, err := ev.s.deps.Messages.Books.Books(ctx, g.Unit)
+	if err != nil {
+		ev.s.logf("notifications: the turns of %s: %v", g.Unit.Label(), err)
+		return dmessage.Message{}, false
+	}
+	b := books[g.Unit]
+	t, ok := b.ByID(id)
+	if !ok {
+		return dmessage.Message{}, false
+	}
+	return dmessage.Message{Unit: g.Unit, Kind: dmessage.Question, Text: ev.s.gateWords(g), Origin: dmessage.Origin{Kind: dmessage.OriginTurn, TurnSeq: t.Seq}}, true
 }
 
 // recordOf is the turn record a question message asks from: its turn's last record, 0 when the turn holds
@@ -208,18 +243,21 @@ func messageNotice(e task.Task, m dmessage.Message, record int64) (api.Category,
 	if a.Subtitle == "" {
 		a.Subtitle = m.Unit.Label()
 	}
-	dismiss := api.AttentionAction{ID: verbAction(task.VerbDismiss), Title: "Dismiss"}
+	var dismiss []api.AttentionAction
+	if e.Kind == task.KindMessage {
+		dismiss = []api.AttentionAction{{ID: verbAction(task.VerbDismiss), Title: "Dismiss"}}
+	}
 	switch m.Kind {
 	case dmessage.Question:
 		a.Title = "Agent asks"
-		a.Actions = append(choices(m), api.AttentionAction{ID: "answer:text", Title: "Reply", TextInput: true}, dismiss)
+		a.Actions = slices.Concat(choices(m), []api.AttentionAction{{ID: "answer:text", Title: "Reply", TextInput: true}}, dismiss)
 		return api.QuestionCategory(max(record, 0)), strconv.FormatInt(max(record, 0), 10), a
 	case dmessage.Proposal:
 		a.Title = "Proposal"
-		a.Actions = append(choices(m), dismiss)
+		a.Actions = slices.Concat([]api.AttentionAction{{ID: verbAction(task.VerbApprove), Title: "Approve"}}, dismiss)
 	default:
 		a.Title = "Agent posts"
-		a.Actions = []api.AttentionAction{{ID: "answer:text", Title: "Reply", TextInput: true}, dismiss}
+		a.Actions = slices.Concat([]api.AttentionAction{{ID: "answer:text", Title: "Reply", TextInput: true}}, dismiss)
 	}
 	return api.CategoryInbox, hashToken(strconv.FormatInt(m.ID, 10), m.Text), a
 }

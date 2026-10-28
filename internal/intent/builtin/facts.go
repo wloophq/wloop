@@ -106,7 +106,7 @@ func briefWF(name string, t expr.Type, doc string) Fact {
 
 // Facts are the fields predicates read, by slot; inputs.<name> are added per
 // intent by Env. A workflow fact may share a name with an intent fact.
-var Facts = slices.Concat(ActionFacts, otherFacts)
+var Facts = slices.Concat(ActionFacts, otherFacts, proposalFacts)
 
 // otherFacts are the turn slot's own facts, the config facts of the intent
 // slots, and every workflow and approval fact.

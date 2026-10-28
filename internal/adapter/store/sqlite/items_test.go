@@ -3,12 +3,18 @@ package sqlite
 import (
 	"context"
 	"reflect"
+	"slices"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/gates"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/message"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -22,21 +28,6 @@ func init() {
 			},
 			topics: port.TopicItems, units: []unit.Unit{slackThread},
 		},
-		writeCase{
-			method: "itemStore.SetProposal",
-			seed: func(t *testing.T, e *noteEnv) {
-				op := items.Op{Op: items.OpReopen, Unit: ghPull, Item: "i1", Anchor: unit.Anchor{Unit: ghPull, Ref: "m:1"}}
-				p := coreitems.Proposal{Unit: ghPull, Item: "i1", Op: op, Provenance: items.Turn, State: coreitems.ProposalOpen, At: noteAt}
-				if err := e.db.Items().Commit(context.Background(), coreitems.Commit{Proposals: []coreitems.Proposal{p}}); err != nil {
-					t.Fatal(err)
-				}
-			},
-			call: func(ctx context.Context, e *noteEnv) error {
-				_, err := e.db.Items().SetProposal(ctx, 1, coreitems.ProposalRejected)
-				return err
-			},
-			topics: port.TopicItems, units: []unit.Unit{ghPull},
-		},
 	)
 	hotPlans = append(hotPlans,
 		hotPlan{name: "items of a unit", query: itemsOfUnitSQL, args: 2, want: []string{"SEARCH items USING PRIMARY KEY (provider=? AND unit_key=?)"},
@@ -45,9 +36,6 @@ func init() {
 			tempSort: "USE TEMP B-TREE FOR LAST 2 TERMS OF ORDER BY"},
 		hotPlan{name: "item ops of a unit", query: itemOpsSQL, args: 3, want: []string{"SEARCH item_ops USING INDEX item_ops_unit (provider=? AND unit_key=? AND at>?)"},
 			tempSort: "USE TEMP B-TREE FOR ORDER BY"},
-		hotPlan{name: "open proposals", query: proposalsOfState, args: 1, want: []string{"item_proposals_state (state=?)"}},
-		hotPlan{name: "an open proposal by its dedupe key", query: `SELECT id FROM item_proposals WHERE dedupe = ? AND state = 'open'`, args: 1,
-			want: []string{"item_proposals_open (dedupe=?)"}},
 	)
 }
 
@@ -114,29 +102,80 @@ func TestItemsStoreRoundTrips(t *testing.T) {
 	if err != nil || len(open) != 1 || open[0].ID == 0 || open[0].Unit != slackThread || !open[0].At.Equal(at) {
 		t.Fatalf("proposals %+v %v", open, err)
 	}
-	if err := s.Commit(ctx, coreitems.Commit{Proposals: []coreitems.Proposal{{Unit: slackThread, Item: "i1", Op: op, Provenance: items.Turn, State: coreitems.ProposalOpen, At: at}}}); err != nil {
+	settle := coreitems.Commit{Items: []items.Item{sampleItem(ghPull, "i9", at)}, Proposals: []coreitems.Proposal{{ID: open[0].ID, Unit: slackThread, State: coreitems.ProposalAccepted}}}
+	if err := s.Commit(ctx, settle); err != nil {
 		t.Fatal(err)
 	}
 	if again, _ := s.Proposals(ctx, coreitems.ProposalOpen); len(again) != 1 {
-		t.Errorf("a duplicate open proposal: %+v", again)
+		t.Errorf("a commit decided a proposal its gate holds: %+v", again)
 	}
-	p, err := s.SetProposal(ctx, open[0].ID, coreitems.ProposalRejected)
-	if err != nil || p.State != coreitems.ProposalRejected {
-		t.Fatalf("%+v %v", p, err)
+}
+
+func TestAProposalTakesItsStateFromItsGate(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
+	s := db.Items()
+	var ps []coreitems.Proposal
+	for _, it := range []string{"i1", "i2", "i3"} {
+		ps = append(ps, coreitems.Proposal{Unit: slackThread, Item: it, Op: items.Op{Op: items.OpReopen, Unit: slackThread, Item: it, Anchor: unit.Anchor{Unit: slackThread, Ref: "m:" + it}},
+			Provenance: items.Turn, At: at})
 	}
-	if _, err := s.SetProposal(ctx, open[0].ID, coreitems.ProposalAccepted); err == nil {
-		t.Error("settled a proposal twice")
+	if err := s.Commit(ctx, coreitems.Commit{Proposals: ps}); err != nil {
+		t.Fatal(err)
 	}
-	settle := coreitems.Commit{Items: []items.Item{sampleItem(ghPull, "i9", at)}, Proposals: []coreitems.Proposal{{ID: open[0].ID, Unit: slackThread, State: coreitems.ProposalAccepted}}}
-	if err := s.Commit(ctx, settle); err == nil {
-		t.Error("a commit settled a proposal that is not open")
+	gs := db.Gates(func() time.Time { return at })
+	open := func(subject string) int64 {
+		g, err := gs.Open(ctx, gate.Gate{Kind: gate.KindProposal, Unit: slackThread, Subject: subject, Intents: []string{"approve", "reject"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return g.ID
 	}
-	if got, _ := s.Load(ctx, []unit.Unit{ghPull}); len(got[ghPull]) != 0 {
-		t.Error("the refused commit wrote its items")
+	early := open(gate.ProposalSubject(1))
+	if _, err := gs.Resolve(ctx, early, gates.Resolution{Status: gate.Superseded, By: task.ActorWorkflow}); err != nil {
+		t.Fatal(err)
 	}
-	if _, err := s.SetProposal(ctx, 99, coreitems.ProposalRejected); err == nil {
-		t.Error("set an unknown proposal")
+	m, err := inventoryMessage(ctx, db, message.Message{Unit: slackThread, Kind: message.Proposal, Origin: message.Origin{Kind: message.OriginLedger, Proposal: 1}, CreatedAt: at})
+	if err != nil {
+		t.Fatal(err)
 	}
+	if _, err := gs.Resolve(ctx, open(strconv.FormatInt(m, 10)), gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gs.Resolve(ctx, open(gate.ProposalSubject(2)), gates.Resolution{Status: gate.Rejected, Intent: "reject", By: task.ActorPerson}); err != nil {
+		t.Fatal(err)
+	}
+	all, err := s.Proposals(ctx, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var states []coreitems.ProposalState
+	for _, p := range all {
+		states = append(states, p.State)
+	}
+	if !slices.Equal(states, []coreitems.ProposalState{coreitems.ProposalAccepted, coreitems.ProposalRejected, coreitems.ProposalOpen}) {
+		t.Fatalf("states %v", states)
+	}
+	if open, _ := s.Proposals(ctx, coreitems.ProposalOpen); len(open) != 1 || open[0].Item != "i3" {
+		t.Fatalf("open %+v", open)
+	}
+}
+
+// inventoryMessage inserts m into db's messages as the inventory stores it, and returns its id.
+func inventoryMessage(ctx context.Context, db *DB, m message.Message) (int64, error) {
+	var id int64
+	_, err := db.Write(ctx, func(tx *Tx) error {
+		res, err := tx.ExecContext(ctx, `INSERT INTO messages (provider, unit_key, kind, text, origin_kind, proposal, created_at) VALUES (?, ?, ?, '', ?, ?, ?)`,
+			string(m.Unit.Provider), m.Unit.Key, string(m.Kind), m.Origin.Kind, m.Origin.Proposal, formatTime(m.CreatedAt))
+		if err != nil {
+			return err
+		}
+		id, err = res.LastInsertId()
+		return err
+	})
+	return id, err
 }
 
 func TestQueryByProviderAndState(t *testing.T) {

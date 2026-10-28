@@ -10,8 +10,8 @@ import (
 
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/messages"
-	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
@@ -27,12 +27,11 @@ func TestAskedRecordBecomesAMessage(t *testing.T) {
 	m := r.only(t)
 	q := question()
 	if m.Kind != message.Question || m.Unit != r7 || m.Text != q.Text || !slices.Equal(m.Options, q.Options) || m.Recommend != "publish" || m.Confirm ||
-		m.Origin != (message.Origin{Kind: message.OriginTurn, TurnSeq: 1, Session: "term_1"}) || m.State != message.Open {
+		m.Origin != (message.Origin{Kind: message.OriginTurn, TurnSeq: 1, Session: "term_1"}) || !m.Open() {
 		t.Fatalf("message %+v", m)
 	}
-	e := r.task(t, m.TaskID)
-	if e.Kind != task.KindMessage || e.State != task.State("inbox") || e.Origin != task.OriginMessage || e.Title != q.Text || !slices.Equal(e.Units, []unit.Unit{r7}) {
-		t.Fatalf("entry %+v", e)
+	if g := r.gateOf(t, m); g.Kind != gate.KindQuestion || g.Status != gate.Open || g.Unit != r7 || string(g.Task) != m.TaskID {
+		t.Fatalf("gate %+v of %+v", g, m)
 	}
 
 	confirm := newRig(t)
@@ -44,44 +43,37 @@ func TestAskedRecordBecomesAMessage(t *testing.T) {
 	}
 }
 
-func TestAskedTurnIsOneTask(t *testing.T) {
-	r := newRig(t)
-	r.asked(t, r7)
-	r.items.byUnit[r7] = []items.Item{{ID: "gh:review", Unit: r7, Kind: "request", Summary: "review it", State: "open",
-		WaitingOn: []items.Person{{Key: "github:me"}}, CreatedAt: t0}}
-	ctx := context.Background()
-	for range 2 {
-		r.reconcile(t, r7)
-		if err := r.tasks.Sync(ctx, []unit.Unit{r7}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	var questions []task.Task
-	for _, e := range r.inbox(t) {
-		if e.Kind == task.KindMessage {
-			questions = append(questions, e)
-		}
-	}
-	if len(questions) != 1 || questions[0].ID != task.ID(r.only(t).TaskID) {
-		t.Fatalf("question entries %+v", questions)
-	}
-}
-
-func TestStoppedTurnBecomesAMessage(t *testing.T) {
-	for _, c := range []struct {
-		state record.State
-		want  string
-	}{
-		{record.Failed, "The agent's turn failed: the build broke"},
-		{record.UnrecordedState, "The agent ended its turn without a record: the build broke"},
-	} {
-		t.Run(string(c.state), func(t *testing.T) {
+func TestAStoppedTurnOpensItsMissingGateNotAMessage(t *testing.T) {
+	for _, st := range []record.State{record.Failed, record.UnrecordedState} {
+		t.Run(string(st), func(t *testing.T) {
 			r := newRig(t)
 			r.started(r7)
-			r.record(t, r7, 1, record.Record{State: c.state, Summary: "the build broke", Resume: "rerun it"})
+			r.record(t, r7, 1, record.Record{State: st, Summary: "the build broke", Resume: "rerun it"})
+			b := r.book(t, r7)
+			b.Turns[0].State = turn.State(st)
+			r.books.Put(b)
+			for range 2 {
+				r.reconcile(t, r7)
+			}
+			if open := r.open(t); len(open) != 0 {
+				t.Fatalf("open %+v", open)
+			}
+			if g := r.openGates(t, gate.KindQuestion); len(g) != 1 || g[0].Name != "missing-record" || g[0].Subject != turns.MissingSubject("abc") {
+				t.Fatalf("gates %+v", g)
+			}
+			if _, err := r.resolve(message.Message{}, "", messages.Answer{}); err == nil {
+				t.Fatal("resolved a gate of no message")
+			}
+			g := r.openGates(t, gate.KindQuestion)[0]
+			if err := r.gates.Resolve(context.Background(), g.ID, gatesResolution("dismiss")); err != nil {
+				t.Fatal(err)
+			}
+			if b := r.book(t, r7); b.Turns[0].State != turn.Dismissed {
+				t.Fatalf("turn %s", b.Turns[0].State)
+			}
 			r.reconcile(t, r7)
-			if m := r.only(t); m.Text != c.want || m.Kind != message.Question || m.Options != nil {
-				t.Fatalf("message %+v", m)
+			if g := r.openGates(t, gate.KindQuestion); len(g) != 0 {
+				t.Fatalf("gates after the dismissal %+v", g)
 			}
 		})
 	}
@@ -100,8 +92,8 @@ func TestReaskedTurnUpdatesItsMessage(t *testing.T) {
 	if m.ID != first.ID || m.TaskID != first.TaskID || m.Text != again.Text {
 		t.Fatalf("re-asked %+v, first %+v", m, first)
 	}
-	if n := len(r.inbox(t)); n != 1 {
-		t.Fatalf("inbox holds %d entries", n)
+	if g := r.openGates(t, gate.KindQuestion); len(g) != 1 {
+		t.Fatalf("gates %+v", g)
 	}
 }
 
@@ -109,29 +101,27 @@ func TestTurnEventsCloseTheMessage(t *testing.T) {
 	for _, c := range []struct {
 		name   string
 		event  func(t *testing.T, r *rig)
-		state  message.State
 		answer string
-		task   task.State
 	}{
 		{"answered", func(t *testing.T, r *rig) {
 			r.live()
 			if _, err := r.turns.Answer(context.Background(), turns.AnswerRequest{Unit: r7, OptionID: "publish", Source: turn.Cockpit}); err != nil {
 				t.Fatal(err)
 			}
-		}, message.Answered, "Publish (option publish)", task.State("done")},
+		}, "Publish (option publish)"},
 		{"question_dismissed", func(t *testing.T, r *rig) {
 			if err := r.turns.Dismiss(context.Background(), r7); err != nil {
 				t.Fatal(err)
 			}
-		}, message.Dismissed, "", task.State("trash")},
+		}, ""},
 		{"replaced", func(t *testing.T, r *rig) {
 			b := r.book(t, r7)
 			b.Send(turn.Turn{Intent: b.Turns[0].Intent, ID: "def", Trigger: turn.ByHand, SentTo: "term_2", SentAt: r.clock.Now()})
 			r.books.Put(b)
-		}, message.Superseded, "", task.State("trash")},
+		}, ""},
 		{"done", func(t *testing.T, r *rig) {
 			r.record(t, r7, 1, record.Record{State: record.Done, Summary: "published", Outcome: &record.Outcome{Verdict: "APPROVE", URL: "https://example.com/r"}})
-		}, message.Superseded, "", task.State("trash")},
+		}, ""},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			r := newRig(t)
@@ -141,11 +131,11 @@ func TestTurnEventsCloseTheMessage(t *testing.T) {
 			c.event(t, r)
 			r.reconcile(t, r7)
 			got := r.message(t, m.ID)
-			if got.State != c.state || got.Answer != c.answer || got.ClosedAt.IsZero() {
+			if got.Open() || got.Answer != c.answer {
 				t.Fatalf("closed %+v", got)
 			}
-			if e := r.task(t, m.TaskID); e.State != c.task {
-				t.Fatalf("entry %s, want %s", e.State, c.task)
+			if g := r.gateOf(t, m); g.Status != gate.Superseded || g.By != task.ActorWorkflow {
+				t.Fatalf("gate %+v", g)
 			}
 			if open := r.open(t); len(open) != 0 {
 				t.Fatalf("open %+v", open)
@@ -170,11 +160,11 @@ func TestTurnEventsCloseTheMessage(t *testing.T) {
 		r.books.Put(b)
 		r.reconcile(t, r7)
 		back := r.only(t)
-		if back.ID == first.ID || back.Origin.TurnSeq != 1 || r.message(t, first.ID).State != message.Superseded {
+		if back.ID == first.ID || back.Origin.TurnSeq != 1 || r.message(t, first.ID).Open() {
 			t.Fatalf("after the withdraw %+v, first %+v", back, r.message(t, first.ID))
 		}
-		if n := len(r.inbox(t)); n != 1 {
-			t.Fatalf("inbox holds %d entries", n)
+		if g := r.openGates(t, gate.KindQuestion); len(g) != 1 || g[0].Subject != subject(back) {
+			t.Fatalf("gates %+v", g)
 		}
 	})
 }
@@ -205,27 +195,43 @@ func TestReconcileRepairsAMissedEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	lost.reconcile(t, r7)
-	if got := lost.only(t); got.ID != m.ID || got.TaskID == "" || len(got.Options) != 2 {
-		t.Fatalf("a message left without its entry was not repaired: %+v", got)
+	if got := lost.only(t); got.ID != m.ID || got.TaskID == "" || len(got.Options) != 2 || lost.gateOf(t, got).Status != gate.Open {
+		t.Fatalf("a message left without its gate was not repaired: %+v", got)
 	}
 }
 
-func TestDismissingAQuestionMessageDismissesTheTurn(t *testing.T) {
+func TestDismissingAQuestionGateDismissesTheTurn(t *testing.T) {
 	r := newRig(t)
 	r.asked(t, r7)
 	r.reconcile(t, r7)
 	m := r.only(t)
-	if err := r.svc.Dismiss(context.Background(), m.ID); err != nil {
+	if _, err := r.resolve(m, "dismiss", messages.Answer{}); err != nil {
 		t.Fatal(err)
 	}
 	if b := r.book(t, r7); b.Turns[0].State != turn.Dismissed {
 		t.Fatalf("turn %s", b.Turns[0].State)
 	}
-	if got := r.message(t, m.ID); got.State != message.Dismissed || r.task(t, m.TaskID).State != task.State("trash") {
+	if got := r.message(t, m.ID); got.Open() || r.gateOf(t, m).Status != gate.Dismissed {
 		t.Fatalf("message %+v", got)
 	}
-	if err := r.svc.Dismiss(context.Background(), m.ID); !errors.Is(err, messages.ErrClosed) {
-		t.Fatalf("dismissing again: %v", err)
+	if len(r.open(t)) != 0 || len(r.openGates(t, gate.KindQuestion)) != 0 {
+		t.Fatal("the dismissed question came back")
+	}
+}
+
+func TestContinuingAQuestionGateResumesTheTurn(t *testing.T) {
+	r := newRig(t)
+	r.asked(t, r7)
+	r.reconcile(t, r7)
+	m := r.only(t)
+	if _, err := r.resolve(m, "continue", messages.Answer{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.launch.launches) != 1 || r.launch.launches[0].ResumeOf != 1 || r.launch.launches[0].Answer != "" {
+		t.Fatalf("launches %+v", r.launch.launches)
+	}
+	if got := r.message(t, m.ID); got.Open() {
+		t.Fatalf("message %+v", got)
 	}
 }
 
@@ -235,14 +241,15 @@ func TestAnsweringAStaleQuestionIsRefused(t *testing.T) {
 	r.reconcile(t, r7)
 	m := r.only(t)
 	r.record(t, r7, 1, record.Record{State: record.Done, Summary: "published", Outcome: &record.Outcome{Verdict: "APPROVE", URL: "https://example.com/r"}})
-	if _, err := r.svc.Answer(context.Background(), m.ID, messages.Answer{OptionID: "publish", Source: turn.Cockpit}); !errors.Is(err, turn.ErrNoQuestion) {
+	if _, err := r.answer(m, messages.Answer{OptionID: "publish", Source: turn.Cockpit}); !errors.Is(err, turn.ErrNoQuestion) {
 		t.Fatalf("answer to a done turn: %v", err)
-	}
-	if got := r.message(t, m.ID); got.State != message.Superseded {
-		t.Fatalf("the stale message is %s", got.State)
 	}
 	if len(r.book(t, r7).Answers) != 0 {
 		t.Fatal("the stale answer was stored")
+	}
+	r.reconcile(t, r7)
+	if got := r.message(t, m.ID); got.Open() {
+		t.Fatalf("the stale message is open: %+v", got)
 	}
 }
 
@@ -273,7 +280,7 @@ func TestAgentPostAnswerRouting(t *testing.T) {
 			r.live()
 			m := post(t, r, "Which column?", opts...)
 			c.arrange(r)
-			got, err := r.svc.Answer(context.Background(), m.ID, messages.Answer{OptionID: "old", Text: "and drop the index", Source: turn.TUI})
+			got, err := r.answer(m, messages.Answer{OptionID: "old", Text: "and drop the index", Source: turn.TUI})
 			if err != nil || got.Route != c.route {
 				t.Fatalf("%+v %v", got, err)
 			}
@@ -284,13 +291,14 @@ func TestAgentPostAnswerRouting(t *testing.T) {
 				t.Fatalf("launched %+v", r.launch.launches)
 			}
 			b := r.book(t, r7)
+			g := r.gateOf(t, m)
 			if len(b.Answers) != 1 || b.Answers[0].Route != c.route || b.Answers[0].Source != turn.TUI || b.Turns[0].State != turn.Started ||
-				b.Answers[0].Message != m.ID || !b.Answers[0].Posted || b.Answers[0].OptionID != "old" || b.Answers[0].Text != "and drop the index" {
+				b.Answers[0].Message != m.ID || b.Answers[0].Gate != g.ID || !b.Answers[0].Posted || b.Answers[0].OptionID != "old" || b.Answers[0].Text != "and drop the index" {
 				t.Fatalf("book %+v %+v", b.Answers, b.Turns)
 			}
 			closed := r.message(t, m.ID)
-			if closed.State != message.Answered || closed.Answer != "Old column (option old). and drop the index" || r.task(t, m.TaskID).State != task.State("done") {
-				t.Fatalf("message %+v", closed)
+			if closed.Open() || closed.Answer != "Old column (option old). and drop the index" || g.Status != gate.Answered {
+				t.Fatalf("message %+v, gate %+v", closed, g)
 			}
 			if c.route == turn.Queued {
 				r.sess.SetAgents()
@@ -302,22 +310,6 @@ func TestAgentPostAnswerRouting(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestAgentPostAnswerRefusesWhatItDoesNotTake(t *testing.T) {
-	r := newRig(t)
-	r.started(r7)
-	r.live()
-	m := post(t, r, "Which column?", record.Option{ID: "old", Label: "Old", Consequence: "keeps"}, record.Option{ID: "new", Label: "New", Consequence: "moves"})
-	for _, a := range []messages.Answer{{OptionID: "other"}, {Yes: true}, {}} {
-		var invalid turns.InvalidAnswer
-		if _, err := r.svc.Answer(context.Background(), m.ID, a); !errors.As(err, &invalid) {
-			t.Fatalf("%+v: %v", a, err)
-		}
-	}
-	if got := r.message(t, m.ID); got.State != message.Open || len(r.book(t, r7).Answers) != 0 {
-		t.Fatalf("a refused answer moved %+v", got)
 	}
 }
 
@@ -336,7 +328,7 @@ func TestPostNeedsAStartedTurn(t *testing.T) {
 	if _, err := r2.svc.Post(context.Background(), messages.PostRequest{Session: "term_1", Text: "pick", Options: []record.Option{{ID: "A b", Label: "x", Consequence: "y"}}}); !errors.As(err, &problems) {
 		t.Fatalf("bad options: %v", err)
 	}
-	if len(r2.open(t)) != 0 {
+	if len(r2.open(t)) != 0 || len(r2.openGates(t, gate.KindPost)) != 0 {
 		t.Fatal("a refused post was stored")
 	}
 }
@@ -354,8 +346,7 @@ func TestPostIsCappedPerTurn(t *testing.T) {
 	if n := len(r.open(t)); n != 3 {
 		t.Fatalf("open %d", n)
 	}
-	first := r.open(t)[0]
-	if err := r.svc.Dismiss(context.Background(), first.ID); err != nil {
+	if _, err := r.resolve(r.open(t)[0], "dismiss", messages.Answer{}); err != nil {
 		t.Fatal(err)
 	}
 	post(t, r, "room again")
@@ -373,40 +364,11 @@ func TestLedgerProposalBecomesAMessage(t *testing.T) {
 	}
 	m := r.only(t)
 	if m.Kind != message.Proposal || m.Origin != (message.Origin{Kind: message.OriginLedger, Proposal: 4}) || m.Unit != r7 ||
-		len(m.Options) != 2 || m.Options[0].ID != messages.OptionAccept || m.Options[1].ID != messages.OptionReject {
+		m.Options != nil || m.Text != "Proposed resolve of item i2: the thread says it is done" {
 		t.Fatalf("message %+v", m)
 	}
-	if e := r.task(t, m.TaskID); e.Kind != task.KindMessage || e.State != task.State("inbox") {
-		t.Fatalf("entry %+v", e)
-	}
-	if n := len(r.inbox(t)); n != 1 {
-		t.Fatalf("inbox %d", n)
-	}
-}
-
-func TestAcceptingAProposalDecidesIt(t *testing.T) {
-	for _, c := range []struct {
-		answer messages.Answer
-		accept bool
-	}{
-		{messages.Answer{OptionID: messages.OptionAccept}, true},
-		{messages.Answer{OptionID: messages.OptionReject}, false},
-	} {
-		r := newRig(t)
-		r.ledger.proposals = []coreitems.Proposal{{ID: 4, Unit: r7, Item: "i2", Op: items.Op{Op: items.OpResolve, Item: "i2"}, State: coreitems.ProposalOpen}}
-		if err := r.svc.ReconcileProposals(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		m := r.only(t)
-		if _, err := r.svc.Answer(context.Background(), m.ID, c.answer); err != nil {
-			t.Fatal(err)
-		}
-		if !slices.Equal(r.ledger.decided, []decision{{4, c.accept}}) {
-			t.Fatalf("decided %+v", r.ledger.decided)
-		}
-		if got := r.message(t, m.ID); got.State != message.Answered || got.Answer != c.answer.OptionID || r.task(t, m.TaskID).State != task.State("done") {
-			t.Fatalf("message %+v", got)
-		}
+	if g := r.openGates(t, gate.KindProposal); len(g) != 1 || g[0].Subject != subject(m) {
+		t.Fatalf("gates %+v", g)
 	}
 }
 
@@ -418,13 +380,11 @@ func TestDecidedProposalClosesItsMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := r.only(t)
-	if _, err := r.ledger.Decide(ctx, 4, true); err != nil {
-		t.Fatal(err)
-	}
+	r.ledger.proposals[0].State = coreitems.ProposalAccepted
 	if err := r.svc.ReconcileProposals(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.message(t, m.ID); got.State != message.Answered || got.Answer != messages.OptionAccept || r.task(t, m.TaskID).State != task.State("done") {
+	if got := r.message(t, m.ID); got.Open() || r.gateOf(t, m).Status != gate.Superseded {
 		t.Fatalf("message %+v", got)
 	}
 }
@@ -432,14 +392,13 @@ func TestDecidedProposalClosesItsMessage(t *testing.T) {
 func TestProposeDedupesAndAttaches(t *testing.T) {
 	r := newRig(t)
 	ctx := context.Background()
-	req := messages.ProposeRequest{Unit: r7, Text: "Nudge the reviewer?", Options: []record.Option{{ID: "yes", Label: "Yes", Consequence: "nudges"}},
-		Origin: message.Origin{Kind: message.OriginWorkflow, Workflow: "nudge"}}
+	req := messages.ProposeRequest{Unit: r7, Text: "Nudge the reviewer?", Origin: message.Origin{Kind: message.OriginWorkflow, Workflow: "nudge"}}
 	a, err := r.svc.Propose(ctx, req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	b, err := r.svc.Propose(ctx, req)
-	if err != nil || b.ID != a.ID || b.TaskID != a.TaskID || len(r.inbox(t)) != 1 {
+	if err != nil || b.ID != a.ID || b.TaskID != a.TaskID || len(r.openGates(t, gate.KindProposal)) != 1 {
 		t.Fatalf("second propose %+v %v", b, err)
 	}
 	capture, err := r.tasks.Capture(ctx, "follow up", "", &r8)
@@ -448,42 +407,22 @@ func TestProposeDedupesAndAttaches(t *testing.T) {
 	}
 	attached, err := r.svc.Propose(ctx, messages.ProposeRequest{Unit: r8, TaskID: string(capture.ID), Text: "Close it?",
 		Origin: message.Origin{Kind: message.OriginCore, Workflow: "close"}})
-	if err != nil || attached.TaskID != string(capture.ID) || len(r.inbox(t)) != 2 {
-		t.Fatalf("attached %+v %v, inbox %d", attached, err, len(r.inbox(t)))
+	if err != nil || attached.TaskID != string(capture.ID) || r.gateOf(t, attached).Task != capture.ID {
+		t.Fatalf("attached %+v %v", attached, err)
 	}
-	var answered []message.Message
-	r.svc.OnAnswer = func(_ context.Context, m message.Message, _ messages.Answer) error {
-		answered = append(answered, m)
+	var answered []messages.Answer
+	r.svc.OnAnswer = func(_ context.Context, _ message.Message, a messages.Answer) error {
+		answered = append(answered, a)
 		return nil
 	}
-	if _, err := r.svc.Answer(ctx, attached.ID, messages.Answer{Text: "yes, close it"}); err != nil {
+	if _, err := r.resolve(attached, "approve", messages.Answer{}); err != nil {
 		t.Fatal(err)
 	}
-	if len(answered) != 1 || r.task(t, string(capture.ID)).State != task.State("inbox") {
-		t.Fatalf("answered %+v; an attached entry another owner holds was closed", answered)
+	if len(answered) != 1 || !answered[0].Yes || r.task(t, string(capture.ID)).State != task.State("inbox") {
+		t.Fatalf("answered %+v; the task the proposal is on was closed", answered)
 	}
 	if _, err := r.svc.Propose(ctx, messages.ProposeRequest{Unit: r7, Text: "x", Origin: message.Origin{Kind: message.OriginLedger}}); err == nil {
 		t.Fatal("a ledger origin was taken by Propose")
-	}
-}
-
-func TestDisabledPluginKeepsTheMessageOpen(t *testing.T) {
-	r := newRig(t)
-	r.asked(t, r7)
-	r.reconcile(t, r7)
-	m := r.only(t)
-	r.facts.off[unit.GitHub] = true
-	r.record(t, r7, 1, record.Record{State: record.Done, Summary: "published", Outcome: &record.Outcome{Verdict: "APPROVE", URL: "https://example.com/r"}})
-	if err := r.svc.Reconcile(context.Background(), r7); err == nil {
-		t.Fatal("closing the entry of a disabled plugin did not fail")
-	}
-	if got := r.message(t, m.ID); got.State != message.Open || r.task(t, m.TaskID).State != task.State("inbox") {
-		t.Fatalf("message %+v", got)
-	}
-	r.facts.off[unit.GitHub] = false
-	r.reconcile(t, r7)
-	if got := r.message(t, m.ID); got.State != message.Superseded {
-		t.Fatalf("message %+v", got)
 	}
 }
 
@@ -513,18 +452,17 @@ func TestReconcileCostsLittle(t *testing.T) {
 
 func TestAnAgentPostClosesWhenItsTurnEnds(t *testing.T) {
 	r := newRig(t)
-	ctx := context.Background()
 	r.started(r7)
 	r.live()
 	p := post(t, r, "Which column?")
 	r.record(t, r7, 1, askedRecord(question()))
 	r.reconcile(t, r7)
 	got := r.message(t, p.ID)
-	if got.State != message.Superseded || r.task(t, p.TaskID).State != task.State("trash") {
+	if got.Open() || r.gateOf(t, p).Status != gate.Superseded {
 		t.Fatalf("the post of an ended turn is %+v", got)
 	}
-	if _, err := r.svc.Answer(ctx, p.ID, messages.Answer{Text: "old"}); !errors.Is(err, messages.ErrClosed) {
-		t.Fatalf("answer to a closed post: %v", err)
+	if _, err := r.answer(p, messages.Answer{Text: "old"}); err == nil {
+		t.Fatal("a closed post took an answer")
 	}
 	q := r.only(t)
 	if q.Kind != message.Question {
@@ -538,16 +476,14 @@ func TestAnAgentPostClosesWhenItsTurnEnds(t *testing.T) {
 
 func TestAnAgentPostOfAnEndedTurnRefusesAnAnswerBeforeReconcile(t *testing.T) {
 	r := newRig(t)
-	ctx := context.Background()
 	r.started(r7)
 	r.live()
 	p := post(t, r, "Which column?")
 	r.record(t, r7, 1, askedRecord(question()))
 	r.clock.advance(time.Second)
-	if _, err := r.svc.Answer(ctx, p.ID, messages.Answer{Text: "old"}); !errors.Is(err, messages.ErrClosed) {
+	if _, err := r.answer(p, messages.Answer{Text: "old"}); !errors.Is(err, messages.ErrClosed) {
 		t.Fatalf("answer to the post of an asked turn: %v", err)
 	}
-	r.reconcile(t, r7)
 	if q := r.only(t); q.Kind != message.Question {
 		t.Fatalf("open %+v", q)
 	}
@@ -556,38 +492,14 @@ func TestAnAgentPostOfAnEndedTurnRefusesAnAnswerBeforeReconcile(t *testing.T) {
 	}
 }
 
-func TestReaskRetitlesTheTask(t *testing.T) {
-	r := newRig(t)
-	ctx := context.Background()
-	r.asked(t, r7)
-	r.reconcile(t, r7)
-	first := r.only(t)
-	page, err := r.taskStore.TasksSince(ctx, task.Query{View: task.ViewInbox}, coretasks.Since{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	again := question()
-	again.Text = "Hold the review instead?"
-	r.record(t, r7, 1, askedRecord(again))
-	r.reconcile(t, r7)
-	if e := r.task(t, first.TaskID); e.Title != again.Text {
-		t.Fatalf("entry title %q", e.Title)
-	}
-	next, err := r.taskStore.TasksSince(ctx, task.Query{View: task.ViewInbox}, coretasks.Since{Epoch: page.Epoch, Rev: page.Rev})
-	if err != nil || next.Full || len(next.Tasks) != 1 || next.Tasks[0].Title != again.Text {
-		t.Fatalf("page %+v %v", next, err)
-	}
-}
-
 func TestCleanDropsBidiOverrides(t *testing.T) {
 	r := newRig(t)
 	r.ledger.proposals = []coreitems.Proposal{{ID: 4, Unit: r7, Item: "i2", Op: items.Op{Op: items.OpResolve, Item: "i2"},
-		Reason: "done\u202e\u2066 here", State: coreitems.ProposalOpen}}
+		Reason: "done‮⁦ here", State: coreitems.ProposalOpen}}
 	if err := r.svc.ReconcileProposals(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	m := r.only(t)
-	if strings.ContainsAny(m.Text, "\u202e\u2066") || strings.ContainsAny(r.task(t, m.TaskID).Title, "\u202e\u2066") {
+	if m := r.only(t); strings.ContainsAny(m.Text, "‮⁦") {
 		t.Fatalf("text %q", m.Text)
 	}
 }
@@ -610,10 +522,10 @@ func TestAnAgentPostWhoseTurnEndsMidAnswerIsClosed(t *testing.T) {
 	r.live()
 	p := post(t, r, "Which column?")
 	r.svc.Turns = racingTurns{Turns: r.turns, r: r, t: t}
-	if _, err := r.svc.Answer(context.Background(), p.ID, messages.Answer{Text: "old"}); !errors.Is(err, messages.ErrClosed) {
+	if _, err := r.answer(p, messages.Answer{Text: "old"}); !errors.Is(err, messages.ErrClosed) {
 		t.Fatalf("answer racing the turn's end: %v", err)
 	}
-	if got := r.message(t, p.ID); got.State != message.Superseded {
+	if got := r.message(t, p.ID); got.Open() {
 		t.Fatalf("post %+v", got)
 	}
 	if q := r.only(t); q.Kind != message.Question {
@@ -621,39 +533,22 @@ func TestAnAgentPostWhoseTurnEndsMidAnswerIsClosed(t *testing.T) {
 	}
 }
 
-// failingRetitle fails the next Retitle once.
-type failingRetitle struct {
-	messages.Tasks
-	fail bool
-}
-
-func (f *failingRetitle) Retitle(ctx context.Context, id task.ID, title string) error {
-	if f.fail {
-		f.fail = false
-		return errors.New("store busy")
-	}
-	return f.Tasks.Retitle(ctx, id, title)
-}
-
-func TestFailedRetitleIsRetried(t *testing.T) {
-	r := newRig(t)
-	flaky := &failingRetitle{Tasks: r.tasks}
-	r.svc.Tasks = flaky
-	r.asked(t, r7)
-	r.reconcile(t, r7)
-	first := r.only(t)
-	again := question()
-	again.Text = "Hold the review instead?"
-	r.record(t, r7, 1, askedRecord(again))
-	flaky.fail = true
-	if err := r.svc.Reconcile(context.Background(), r7); err == nil {
-		t.Fatal("the failed retitle was not reported")
-	}
-	r.reconcile(t, r7)
-	if e := r.task(t, first.TaskID); e.Title != again.Text {
-		t.Fatalf("entry title %q after the retry", e.Title)
-	}
-	if m := r.only(t); m.Text != again.Text {
-		t.Fatalf("message %q", m.Text)
+func TestAGateAnswerReadsBackAsItsAnswer(t *testing.T) {
+	m := message.Message{Kind: message.Question, Options: question().Options}
+	c := message.Message{Kind: message.Question, Confirm: true}
+	for _, x := range []struct {
+		m message.Message
+		a messages.Answer
+	}{
+		{m, messages.Answer{OptionID: "publish"}},
+		{m, messages.Answer{OptionID: "hold", Text: "until Friday\nthen publish"}},
+		{m, messages.Answer{Text: "publish it twice"}},
+		{c, messages.Answer{Yes: true}},
+		{c, messages.Answer{No: true, Text: "not yet"}},
+		{c, messages.Answer{Text: "maybe"}},
+	} {
+		if got := messages.AnswerOf(x.m, messages.GateAnswer(x.a)); got != x.a {
+			t.Errorf("%+v read back as %+v", x.a, got)
+		}
 	}
 }

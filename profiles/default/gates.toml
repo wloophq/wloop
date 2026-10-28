@@ -45,11 +45,19 @@ label = "The agent asks"
 
 [gates.question.intents.answer]
 label = "Answer"
+summary = "Reply to the agent's open question with your text; the agent resumes from your answer."
 status = "answered"
 answer = true
 
+[gates.question.intents.continue]
+label = "Continue"
+summary = "Let the agent resume without an answer, deciding the open question itself. Answer gives it your reply instead."
+status = "answered"
+
 [gates.question.intents.dismiss]
 label = "Dismiss"
+summary = "Close the agent's open question without resuming it; the pull request goes back to whoever it waits on."
+note = "Close the question; the pull request goes back to whoever it waits on"
 status = "dismissed"
 
 [gates.post]
@@ -68,6 +76,7 @@ status = "dismissed"
 [gates.proposal]
 kind = "proposal"
 label = "Apply this proposal?"
+text = "Proposed {{.proposal.op}} of item {{.proposal.item}} on {{.proposal.unit}}{{with .proposal.reason}}: {{.}}{{end}} (from {{.proposal.provenance}}; you confirmed the item)"
 
 [gates.proposal.intents.approve]
 label = "Approve"
@@ -107,18 +116,26 @@ status = "approved"
 label = "Dismiss"
 status = "dismissed"
 
-# A run that ended without the record its intent requires.
+# A run that failed or ended without its record, of an intent whose
+# record.missing names it.
 [gates.missing-record]
 kind = "question"
-label = "The run ended without its record"
+label = "The run stopped: it failed or ended without its record"
 
-[gates.missing-record.intents.continue]
-label = "Continue"
+[gates.missing-record.intents.answer]
+label = "Answer"
+summary = "Resume the run with your text."
 status = "answered"
 answer = true
 
+[gates.missing-record.intents.continue]
+label = "Continue"
+summary = "Resume the run as it was, without your text."
+status = "answered"
+
 [gates.missing-record.intents.dismiss]
 label = "Dismiss"
+summary = "Close the stopped run without resuming it."
 status = "dismissed"
 
 # How a gate is decided when no workflow, intent or configuration says: a

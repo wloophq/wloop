@@ -29,9 +29,9 @@ func (s *Store) find(m message.Message) int {
 		case message.OriginLedger:
 			return r.Origin.Kind == message.OriginLedger && r.Origin.Proposal == m.Origin.Proposal
 		case message.OriginCore, message.OriginWorkflow:
-			return r.State == message.Open && r.Unit == m.Unit && r.Origin.Kind == m.Origin.Kind && r.Origin.Workflow == m.Origin.Workflow
+			return r.Open() && r.Unit == m.Unit && r.Origin.Kind == m.Origin.Kind && r.Origin.Workflow == m.Origin.Workflow
 		case message.OriginTurn:
-			return r.State == message.Open && r.Unit == m.Unit && r.Origin.Kind == m.Origin.Kind && r.Origin.TurnSeq == m.Origin.TurnSeq && r.Kind == m.Kind
+			return r.Open() && r.Unit == m.Unit && r.Origin.Kind == m.Origin.Kind && r.Origin.TurnSeq == m.Origin.TurnSeq && r.Kind == m.Kind
 		}
 		return false
 	})
@@ -44,9 +44,6 @@ func (s *Store) Upsert(_ context.Context, m message.Message) (message.Message, e
 	if i < 0 {
 		if m.ID != 0 {
 			return message.Message{}, fmt.Errorf("no message %d", m.ID)
-		}
-		if m.State == "" {
-			m.State = message.Open
 		}
 		m.ID = int64(len(s.rows) + 1)
 		m.Options = slices.Clone(m.Options)
@@ -79,33 +76,19 @@ func (s *Store) Message(_ context.Context, id int64) (message.Message, bool, err
 	return s.rows[i], true, nil
 }
 
-func (s *Store) ByTask(_ context.Context, task string) (message.Message, bool, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for i := len(s.rows) - 1; i >= 0; i-- {
-		if s.rows[i].TaskID == task {
-			return s.rows[i], true, nil
-		}
-	}
-	return message.Message{}, false, nil
-}
-
 func (s *Store) Open(context.Context) ([]message.Message, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var out []message.Message
 	for _, r := range s.rows {
-		if r.State == message.Open {
+		if r.Open() {
 			out = append(out, r)
 		}
 	}
 	return out, nil
 }
 
-func (s *Store) Close(_ context.Context, id int64, st message.State, answer string, at time.Time) error {
-	if st == message.Open || st == "" {
-		return fmt.Errorf("closing message %d as %q", id, st)
-	}
+func (s *Store) Close(_ context.Context, id int64, answer string, at time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	i := slices.IndexFunc(s.rows, func(r message.Message) bool { return r.ID == id })
@@ -113,9 +96,9 @@ func (s *Store) Close(_ context.Context, id int64, st message.State, answer stri
 		return fmt.Errorf("no message %d", id)
 	}
 	switch r := &s.rows[i]; {
-	case r.State == message.Open:
-		r.State, r.Answer, r.ClosedAt = st, answer, at.UTC()
-	case r.State == message.Answered && st == message.Answered:
+	case r.Open():
+		r.Answer, r.ClosedAt = answer, at.UTC()
+	case r.Answer != "" && answer != "":
 		r.Answer = answer
 	}
 	return nil

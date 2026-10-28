@@ -253,8 +253,10 @@ type TurnAnswer struct {
 	Route    string    `json:"route"`
 	Session  string    `json:"session,omitempty"`
 	At       time.Time `json:"at"`
-	// Message is the Inbox message answered, 0 for none; Posted says the agent posted it.
+	// Message is the Inbox message answered, 0 for none; Posted says the agent posted it. Gate is the gate the
+	// answer resolved, 0 for one given with no gate open.
 	Message int64 `json:"message_id,omitempty"`
+	Gate    int64 `json:"gate_id,omitempty"`
 	Posted  bool  `json:"posted,omitempty"`
 	// NoticedAt is when the session was told of the answer, ReadAt when the agent read it; each absent until then.
 	NoticedAt *time.Time `json:"noticed_at,omitempty"`

@@ -47,7 +47,7 @@ func wireTurn(t turn.Turn) api.Turn {
 
 func wireAnswer(a turn.Answer) api.TurnAnswer {
 	w := api.TurnAnswer{ID: a.ID, TurnSeq: a.TurnSeq, Text: a.Text, OptionID: a.OptionID, Yes: a.Yes, No: a.No,
-		Source: string(a.Source), Route: string(a.Route), Session: a.Session, At: a.At, Message: a.Message, Posted: a.Posted}
+		Source: string(a.Source), Route: string(a.Route), Session: a.Session, At: a.At, Message: a.Message, Gate: a.Gate, Posted: a.Posted}
 	if !a.NoticedAt.IsZero() {
 		w.NoticedAt = &a.NoticedAt
 	}

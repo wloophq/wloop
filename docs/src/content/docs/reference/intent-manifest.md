@@ -182,7 +182,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `record.require[].artifact` | string |  | The artifact it must carry. |
 | `record.require[].fields` | list of strings |  | The outcome fields it must carry. |
 | `record.requires` | string |  | The record kind, of records.toml, a run of the intent owes; a run that ends without it opens the gate missing names. Left out, a run owes no record. Not record.require, what a record in a state carries. |
-| `record.missing` | string |  | The gate, of gates.toml, a run that ends without the record requires names opens. Required with requires. |
+| `record.missing` | string |  | The gate, of gates.toml, a run opens when it fails or ends without its record, which an answer resumes; left out, such a run opens none. Required with requires. |
 
 ### Gate approval
 

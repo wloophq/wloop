@@ -23,6 +23,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/items"
@@ -53,6 +54,7 @@ func newNotifyRig(t *testing.T) *notifyRig {
 	c.s.deps.Tasks, c.s.deps.Items, c.s.deps.Cards = r.g, r.ledger, c.db.Cards()
 	c.s.deps.Messages = &messages.Service{Store: inventory.NewMessages(c.db), Books: c.repo, Turns: c.s.deps.Turns, Tasks: r.g,
 		Intents: turnstest.Intents(), Clock: fixedClock(catalogNow)}
+	serveMessageGates(c.s, c.db.Tasks(), r.g)
 	c.s.registerMessages()
 	return r
 }
@@ -83,6 +85,9 @@ func (r *notifyRig) settle(t *testing.T, u unit.Unit) api.Row {
 		t.Fatal(err)
 	}
 	if err := r.g.Sync(ctx, []unit.Unit{u}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.s.deps.Messages.Reconcile(ctx, u); err != nil {
 		t.Fatal(err)
 	}
 	return row
@@ -408,7 +413,7 @@ func TestAskedTurnNotifiesOnce(t *testing.T) {
 		t.Fatalf("%d notifications: %+v", len(got), got)
 	}
 	for _, e := range got {
-		if e.Kind != string(task.KindMessage) || e.Message == nil || e.Attention.Category != string(api.QuestionCategory(row.Question.RecordID)) {
+		if _, _, asks := e.MessageOf(); !asks || e.Attention.Category != string(api.QuestionCategory(row.Question.RecordID)) {
 			t.Fatalf("%+v", e)
 		}
 	}
@@ -451,6 +456,7 @@ func TestLiveTasksNotifyAsTheRows(t *testing.T) {
 	s.deps.Tasks, s.deps.Items = g, ledger
 	s.deps.Messages = &messages.Service{Store: inventory.NewMessages(f.DB), Books: f.Turns, Turns: s.deps.Turns, Tasks: g,
 		Intents: turnstest.Intents(), Clock: fixedClock(f.Now)}
+	serveMessageGates(s, f.DB.Tasks(), g)
 	s.registerMessages()
 	var rows []api.Row
 	if code := get(t, s, api.Rows, &rows); code != 200 {
@@ -571,9 +577,13 @@ func TestAStaleQuestionMessageDoesNotNotifyTwice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stale := dmessage.Message{TaskID: string(e.ID), Unit: r7u, Kind: dmessage.Question, Text: "an older question", State: dmessage.Open,
+	stale := dmessage.Message{TaskID: string(e.ID), Unit: r7u, Kind: dmessage.Question, Text: "an older question",
 		Origin: dmessage.Origin{Kind: dmessage.OriginTurn, TurnSeq: 99}, CreatedAt: catalogNow}
-	if _, err := r.s.deps.Messages.Store.Upsert(ctx, stale); err != nil {
+	m, err := r.s.deps.Messages.Store.Upsert(ctx, stale)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.s.deps.Gates.Open(ctx, gate.Gate{Kind: gate.KindQuestion, Task: e.ID, Unit: r7u, Subject: strconv.FormatInt(m.ID, 10)}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if got := r.notified(t); len(got) != 1 || got[string(e.ID)].Attention != nil {

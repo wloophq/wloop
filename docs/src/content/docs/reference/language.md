@@ -160,7 +160,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `record.require[].artifact` (string): The artifact it must carry.
 - `record.require[].fields` (list of strings): The outcome fields it must carry.
 - `record.requires` (string): The record kind, of records.toml, a run of the intent owes; a run that ends without it opens the gate missing names. Left out, a run owes no record. Not record.require, what a record in a state carries.
-- `record.missing` (string): The gate, of gates.toml, a run that ends without the record requires names opens. Required with requires.
+- `record.missing` (string): The gate, of gates.toml, a run opens when it fails or ends without its record, which an answer resumes; left out, such a run opens none. Required with requires.
 
 ### Gate approval
 
@@ -278,6 +278,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `trust`: A repository's first run: resolving it unblocks the run.
   - `step`: A workflow's gate.open: resolving it records the event gate_resolved on its task, which workflows react to.
 - `gates.<name>.label` (string): What the gate asks of you, as clients list it.
+- `gates.<name>.text` (template): The words of the gate's subject when the loop writes them, over the proposal facts: the first proposal gate words an item proposal of the ledger with it.
 - `gates.<name>.intents` (table by name): What you may resolve the gate with, by intent, in the order clients offer them.
 - `gates.<name>.intents.<name>` (table): An intent, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `gates.<name>.intents.<name>.label` (string): The name people read on its button.

@@ -85,15 +85,6 @@ const (
 	BasisHeld    = "held:"
 )
 
-func questionOffer(id string) func(f Facts) (api.ActionState, bool) {
-	return func(f Facts) (api.ActionState, bool) {
-		if !f.Question {
-			return off(id)
-		}
-		return on(id)
-	}
-}
-
 // blockSurfaces are where the actions on a start block show: the CLI has
 // its own trust command.
 var blockSurfaces = []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceMenubar, SurfaceNotification}
@@ -105,10 +96,6 @@ func everywhere(extra ...string) []string {
 // builtinActions is the catalog's Go table; the intents' actions go after
 // the start group.
 var builtinActions = []builtinAction{
-	{api.ActionSpec{ID: "answer", Group: "turn", Key: "W", Verb: "answer", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification},
-		Input: &api.InputSpec{Kind: "answer", Required: true}}, questionOffer("answer")},
-	{api.ActionSpec{ID: "continue", Group: "turn", Key: "C", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification}}, questionOffer("continue")},
-	{api.ActionSpec{ID: "dismiss", Group: "turn", Key: "X", Verb: "dismiss", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification}}, questionOffer("dismiss")},
 	{api.ActionSpec{ID: "take_over", Group: "control", Key: "A", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceCLI, SurfaceExplore}}, func(f Facts) (api.ActionState, bool) {
 		if !f.Open || f.Override.Adopted {
 			return absent()

@@ -402,8 +402,9 @@ CREATE TABLE placements (
   PRIMARY KEY (provider, unit_key)
 );
 
--- messages.answer is the answer as the Inbox lists it; a turn's question and an agent post keep
--- theirs in turn_answers (message_id) too, and a proposal only here.
+-- A message is the subject of a question, post or proposal gate, whose status is its state; closed_at is
+-- when that gate closed. messages.answer is the answer as stored; a turn's question and an agent post keep
+-- theirs in turn_answers (message_id, gate_id) too, and a proposal only here.
 CREATE TABLE messages (
   id INTEGER PRIMARY KEY,
   task_id TEXT NOT NULL DEFAULT '',
@@ -412,11 +413,10 @@ CREATE TABLE messages (
   options TEXT NOT NULL DEFAULT '[]', recommend TEXT NOT NULL DEFAULT '', confirm INTEGER NOT NULL DEFAULT 0,
   origin_kind TEXT NOT NULL, turn_seq INTEGER NOT NULL DEFAULT 0, session TEXT NOT NULL DEFAULT '',
   workflow TEXT NOT NULL DEFAULT '', proposal INTEGER NOT NULL DEFAULT 0,
-  state TEXT NOT NULL, answer TEXT NOT NULL DEFAULT '',
+  answer TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL, closed_at TEXT NOT NULL DEFAULT ''
 );
-CREATE INDEX messages_open ON messages (state, id);
-CREATE INDEX messages_task ON messages (task_id);
+CREATE INDEX messages_open ON messages (closed_at, id);
 CREATE UNIQUE INDEX messages_proposal ON messages (proposal) WHERE origin_kind = 'ledger';
 
 CREATE TABLE unit_cards (
@@ -509,11 +509,8 @@ CREATE TABLE item_proposals (
   id INTEGER PRIMARY KEY,
   provider TEXT NOT NULL, unit_key TEXT NOT NULL, item TEXT NOT NULL,
   op TEXT NOT NULL, provenance TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '',
-  dedupe TEXT NOT NULL, state TEXT NOT NULL, at TEXT NOT NULL
+  dedupe TEXT NOT NULL, at TEXT NOT NULL
 );
-
-CREATE UNIQUE INDEX item_proposals_open ON item_proposals (dedupe) WHERE state = 'open';
-CREATE INDEX item_proposals_state ON item_proposals (state, id);
 
 CREATE TABLE segment_map (
   provider TEXT NOT NULL, conversation TEXT NOT NULL, segment_id TEXT NOT NULL,

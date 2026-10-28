@@ -17,7 +17,7 @@
   [2m         [22m  1. Comment only
   [2m         [22m  2. Publish APPROVE (recommended)
   [2m         [22m  3. Hold the draft
-  [2mkeys     [22m  [1mG[22m [2mguide[22m  [1mV[22m [2mreview[22m  [1mW[22m [2manswer[22m  [1mC[22m [2mcontinue[22m  [1mX[22m [2mdismiss[22m  [1mA[22m [2mtake over[22m
+  [2mkeys     [22m  [1mW[22m [2manswer[22m  [1mC[22m [2mcontinue[22m  [1mX[22m [2mdismiss[22m  [1mG[22m [2mguide[22m  [1mV[22m [2mreview[22m  [1mA[22m [2mtake over[22m
              [1mH[22m [2mpause[22m  [1mM[22m [2mmute[22m  [1mO[22m [2mopen[22m
   [2mnot now  [22m  [2mF address · N nudge[22m
 
@@ -27,4 +27,4 @@
 
 
 [33mwarning: app: notifications are off[39m
-[1mG[22m [2mguide[22m  [1mV[22m [2mreview[22m  [1mW[22m [2manswer[22m  [1mC[22m [2mcontinue[22m  [1mX[22m [2mdismiss[22m  [1mA[22m [2mtake over[22m  [1m?[22m [2mkeys[22m  [1mq[22m [2mquit[22m
+[1mW[22m [2manswer[22m  [1mC[22m [2mcontinue[22m  [1mX[22m [2mdismiss[22m  [1mG[22m [2mguide[22m  [1mV[22m [2mreview[22m  [1mA[22m [2mtake over[22m  [1m?[22m [2mkeys[22m  [1mq[22m [2mquit[22m

@@ -465,6 +465,13 @@ func (s *Server) handleTurnAnswer(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "the Inbox is not wired")
 		return
 	}
+	if raw := r.URL.Query().Get("gate"); raw != "" {
+		var ok bool
+		if id, ok = s.gateMessage(r.Context(), raw); !ok || id == 0 {
+			writeError(w, http.StatusNotFound, "gate: no question or post gate "+raw)
+			return
+		}
+	}
 	convs, err := s.deps.Messages.Read(r.Context(), messages.ReadRequest{Session: handle, Unit: u, Message: id})
 	switch {
 	case errors.Is(err, messages.ErrNoMessage), errors.Is(err, messages.ErrNoTurn):

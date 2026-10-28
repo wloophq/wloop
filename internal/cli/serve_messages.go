@@ -20,7 +20,8 @@ func (e *Env) serveMessages(ctx context.Context, d daemon.Deps, db *sqlite.DB, c
 	tasks := e.newTasks(db, cfg, ledger)
 	if e.messages == nil {
 		e.messages = &messages.Service{Store: inventory.NewMessages(db), Books: openPRBooks{sqlite.New(db), inventory.New(db)}, Turns: e.Turns,
-			Ledger: ledger, Tasks: tasks, Intents: registryPort{e}, Clock: clockFunc(e.Now), Log: logf}
+			Ledger: ledger, Tasks: tasks, Gates: draftGates{e, db, logf}, Intents: registryPort{e}, Clock: clockFunc(e.Now), Log: logf,
+			ProposalText: proposalText(e.loadedIntents, logf)}
 	}
 	d.Tasks, d.Messages = tasks, e.messages
 	d.Gates = e.newGates(db, logf)

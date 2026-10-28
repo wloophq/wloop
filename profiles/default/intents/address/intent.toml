@@ -70,5 +70,6 @@ differs_on = ["self_review"]
 [record]
 when      = '!turn.needs_take_over'
 states    = ["done", "asked", "failed"]
+missing   = "missing-record"
 artifacts = ["triage"]
 history_artifact = "triage"

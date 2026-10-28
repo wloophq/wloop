@@ -83,6 +83,23 @@ func gateActions(l *intentload.Loaded) []builtinAction {
 		id := spec.ID
 		var offer func(f Facts) (api.ActionState, bool)
 		switch {
+		case g.Kind == gate.KindQuestion:
+			spec.Group, spec.Surfaces = "turn", []string{SurfaceDetail, SurfaceTUI, SurfaceNotification}
+			switch {
+			case g.Role == builtin.GateTakesText:
+				spec.Input = &api.InputSpec{Kind: "answer", Required: true, Label: g.Intent.Label}
+				if g.First {
+					spec.Verb = "answer"
+				}
+			case g.Role == builtin.GateRefuses && g.First:
+				spec.Verb = "dismiss"
+			}
+			offer = func(f Facts) (api.ActionState, bool) {
+				if !f.Question {
+					return absent()
+				}
+				return on(id)
+			}
 		case g.Kind == gate.KindTrust && g.First && g.Role == builtin.GateApproves:
 			spec.Surfaces = blockSurfaces
 			offer = func(f Facts) (api.ActionState, bool) {

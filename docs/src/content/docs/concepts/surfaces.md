@@ -58,6 +58,6 @@ The same lists (Focus, Inbox, Outbox, Next, Waiting, Projects, Someday, Logbook,
 | First round blocked | Open |
 | In your Inbox: a task on a unit, such as a Slack thread | Draft for me (delegates headless, when its action can), a Reply field that saves your reply to the Outbox, and a Send reply field that sends it at once; a note says where it went |
 
-Clicking a notification's body opens its row in the cockpit. Each task and message in the Inbox and each proposed or failed draft notifies once; the rest goes in a daily digest at `notifications.digest_at` (`09:00`, `""` for none).
+Clicking a notification's body opens its row in the cockpit. Each task in the Inbox, with the question, post or proposal its open gate asks, and each proposed or failed draft notifies once; the rest goes in a daily digest at `notifications.digest_at` (`09:00`, `""` for none).
 
 When notifications are off or the menu bar is not running, rounds still run at their deadline: the cockpit shows a warning and `doctor` names the fix (System Settings > Notifications > {{app}}, or `{{command}} app install`).

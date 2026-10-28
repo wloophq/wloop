@@ -118,6 +118,10 @@
           "label": {
             "description": "What the gate asks of you, as clients list it.",
             "type": "string"
+          },
+          "text": {
+            "description": "The words of the gate's subject when the loop writes them, over the proposal facts: the first proposal gate words an item proposal of the ledger with it.",
+            "type": "string"
           }
         },
         "type": "object"

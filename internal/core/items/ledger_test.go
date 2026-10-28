@@ -230,12 +230,8 @@ func TestDecideProposal(t *testing.T) {
 	if got := itemOf(t, l, thread, "i1").Summary; got != "a" {
 		t.Errorf("rejected changed it: %q", got)
 	}
-	all, _ := l.Proposals(ctx, "")
-	if len(all) != 2 || all[0].State != ProposalAccepted || all[1].State != ProposalRejected {
-		t.Errorf("%+v", all)
-	}
-	if _, err := l.Decide(ctx, p1.ID, true); !errors.Is(err, ErrNoProposal) {
-		t.Errorf("deciding twice: %v", err)
+	if _, err := l.Decide(ctx, 99, true); !errors.Is(err, ErrNoProposal) {
+		t.Errorf("deciding no proposal: %v", err)
 	}
 }
 

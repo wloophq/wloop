@@ -50,9 +50,14 @@ func TestAGatedVerbOpensItsGateThroughTheService(t *testing.T) {
 	r.write(t, tasksTOML)
 	ctx := context.Background()
 	r.put(t, "t-0000000000000001", "next", task.CategoryReady)
+	decided := &recordedDecisions{}
+	r.te.Env.consequences = decided
 	g := r.te.newTasks(r.db, r.te.cfg, nil)
 	if _, err := g.Do(ctx, "t-0000000000000001", coretasks.Request{Verb: task.VerbDone, Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
 		t.Fatal(err)
+	}
+	if len(decided.gates) != 1 || decided.gates[0].Status != gate.Approved {
+		t.Fatalf("the released gate's decisions %+v", decided.gates)
 	}
 	got, err := r.db.Gates(func() time.Time { return testNow }).OfTask(ctx, "t-0000000000000001")
 	if err != nil {
@@ -61,4 +66,15 @@ func TestAGatedVerbOpensItsGateThroughTheService(t *testing.T) {
 	if len(got) != 1 || got[0].Status != gate.Approved || got[0].By != task.ActorWorkflow || got[0].Rule != "gates.toml approval.rule[0]" {
 		t.Fatalf("a policy that releases proposals releases the gate at open: %+v", got)
 	}
+}
+
+// recordedDecisions record the proposal gates decided and apply no other consequence.
+type recordedDecisions struct{ gates []gate.Gate }
+
+func (r *recordedDecisions) Release(context.Context, gate.Gate) error { return nil }
+func (r *recordedDecisions) Unblock(context.Context, gate.Gate) error { return nil }
+func (r *recordedDecisions) Deliver(context.Context, gate.Gate) error { return nil }
+func (r *recordedDecisions) Decide(_ context.Context, g gate.Gate) error {
+	r.gates = append(r.gates, g)
+	return nil
 }

@@ -37,6 +37,7 @@ var intentGroups = []group{
 	{"The turn (`turn.*`, `unit.*`)", []string{"turn", "unit"}},
 	{"A name (`session.*`, `workspace.*`; slot `name`)", []string{"session", "workspace"}},
 	{"A draft's actions (`draft.*`)", []string{"draft"}},
+	{"An item proposal's gate (`proposal.*`; slot `proposal`)", []string{"proposal"}},
 	{"The configuration (`config.*`)", []string{"config"}},
 }
 

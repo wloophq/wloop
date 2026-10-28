@@ -135,7 +135,8 @@ func (s *Service) Conversation(ctx context.Context, m message.Message) (message.
 }
 
 // Question is the question message of the unit's turn while that turn asks: the open one, after reconciling
-// it with the unit's book, or the one already answered, which a newer answer replaces or adds to.
+// it with the unit's book, or the one already answered, which a newer answer given with no gate open
+// replaces or adds to.
 func (s *Service) Question(ctx context.Context, u unit.Unit) (message.Message, bool, error) {
 	if err := s.Reconcile(ctx, u); err != nil {
 		return message.Message{}, false, err
@@ -163,7 +164,7 @@ func (s *Service) Question(ctx context.Context, u unit.Unit) (message.Message, b
 		return message.Message{}, false, nil
 	}
 	m, found, err := s.Store.Message(ctx, id)
-	if err != nil || !found || m.State != message.Answered {
+	if err != nil || !found || m.Open() || m.Answer == "" {
 		return message.Message{}, false, err
 	}
 	return m, true, nil

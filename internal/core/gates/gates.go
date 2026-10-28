@@ -416,7 +416,8 @@ func statusIntent(g gate.Gate, def Def, want gate.Status) (Intent, bool) {
 }
 
 // taskOf is the task holding u: u's own when it is a task, else the first
-// task that holds it, else a new capture task named by the gate's label.
+// open task that holds it, else a new capture task named by the gate's
+// label: a gate on a done or dropped task would wait where no list shows it.
 func (s *Service) taskOf(ctx context.Context, u unit.Unit, def Def) (task.ID, error) {
 	if id, ok := task.IDOf(u); ok {
 		return id, nil
@@ -430,8 +431,8 @@ func (s *Service) taskOf(ctx context.Context, u unit.Unit, def Def) (task.ID, er
 		if err != nil {
 			return "", err
 		}
-		if len(ts) > 0 {
-			return ts[0].ID, nil
+		if i := slices.IndexFunc(ts, func(t task.Task) bool { return t.Category != task.CategoryDone && t.Category != task.CategoryDropped }); i >= 0 {
+			return ts[i].ID, nil
 		}
 		r.Unit = &u
 	}

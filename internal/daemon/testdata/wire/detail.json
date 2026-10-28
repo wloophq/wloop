@@ -46,6 +46,19 @@
     "actions": [
       {
         "enabled": true,
+        "id": "answer"
+      },
+      {
+        "enabled": true,
+        "id": "continue"
+      },
+      {
+        "enabled": true,
+        "id": "dismiss",
+        "note": "Close the question; the pull request goes back to whoever it waits on"
+      },
+      {
+        "enabled": true,
         "id": "review",
         "warning": "Starts a new round; the agent's open question is replaced"
       },
@@ -66,19 +79,6 @@
         "id": "nudge",
         "reason": "acme/api#7 waits on the review loop (publish?); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "enabled": true,
-        "id": "answer"
-      },
-      {
-        "enabled": true,
-        "id": "continue"
-      },
-      {
-        "enabled": true,
-        "id": "dismiss",
-        "note": "Close the question; the pull request goes back to whoever it waits on"
       },
       {
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace.",
@@ -232,7 +232,7 @@
         "status": "reviewing"
       }
     },
-    "specs_version": "63090c070e02",
+    "specs_version": "227a48f3fadc",
     "summary": {
       "closed": false,
       "line": "muted",

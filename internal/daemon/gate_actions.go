@@ -101,6 +101,9 @@ func (s *Server) openRowGate(ctx context.Context, k gate.Kind, u unit.Unit) (gat
 // the cap held, and its first taking text keeps the guidance for the next
 // round; any other intent is refused.
 func (s *Server) actOnGate(ctx context.Context, g catalog.GateIntent, u unit.Unit, req api.ActionRequest, by task.Actor, out io.Writer) error {
+	if g.Kind == gate.KindQuestion {
+		return s.actOnQuestion(ctx, g, u, req, by, out)
+	}
 	open, it, ok, err := s.openRowGate(ctx, g.Kind, u)
 	if err != nil {
 		return err

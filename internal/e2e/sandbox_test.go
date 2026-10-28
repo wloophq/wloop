@@ -540,9 +540,7 @@ func (s *sandbox) busyAnswer(t *testing.T) {
 		return false, fmt.Sprintf("records %+v", b.Records)
 	})
 	const note = "synthetic note 7f3a"
-	if out := s.l.answerWith(t, r, api.ActionRequest{Yes: true, Guidance: note, Source: string(turn.TUI)}); !strings.Contains(out, api.AnswerQueued) {
-		t.Fatalf("the answer to the sleeping agent was not queued: %q", out)
-	}
+	s.l.answerWith(t, r, api.ActionRequest{Yes: true, Guidance: note, Source: string(turn.TUI)})
 	if a, ok := tuiAnswer(bookOf(t, r.URL()), seq); !ok || a.Route != turn.Queued {
 		t.Fatalf("the stored answer reads %+v, want queued", a)
 	}

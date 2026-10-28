@@ -1423,8 +1423,8 @@ process.stdout.write(JSON.stringify(out));`, in, &got)
 			t.Errorf("%s is drawn though the row does not offer it: %+v", id, b)
 		}
 	}
-	if got["blocked"]["continue"] == nil || !got["blocked"]["continue"].Disabled {
-		t.Error("a disabled continue is not disabled")
+	if got["blocked"]["continue"] != nil {
+		t.Errorf("continue is drawn on a row with no question gate: %+v", got["blocked"]["continue"])
 	}
 }
 

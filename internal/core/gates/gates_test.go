@@ -260,14 +260,19 @@ func TestAnIntentsStatusComesFromGatesToml(t *testing.T) {
 
 type tasksFake struct {
 	held   map[unit.Unit]task.ID
+	done   map[unit.Unit]task.ID
 	opened []coretasks.OpenRequest
 }
 
 func (f *tasksFake) TasksOf(_ context.Context, u unit.Unit) ([]task.Task, error) {
-	if id, ok := f.held[u]; ok {
-		return []task.Task{{ID: id}}, nil
+	var out []task.Task
+	if id, ok := f.done[u]; ok {
+		out = append(out, task.Task{ID: id, Category: task.CategoryDone})
 	}
-	return nil, nil
+	if id, ok := f.held[u]; ok {
+		out = append(out, task.Task{ID: id, Category: task.CategoryReady})
+	}
+	return out, nil
 }
 
 func (f *tasksFake) Open(_ context.Context, r coretasks.OpenRequest) (task.Task, error) {
@@ -294,6 +299,20 @@ func TestOpenGivesAGateTheTaskOfItsUnitOrACaptureTask(t *testing.T) {
 	}
 	if _, err := svc.Open(ctx, gate.Gate{Name: "missing-gate"}, nil); !errors.Is(err, gates.ErrNoDef) {
 		t.Fatalf("an undeclared gate = %v, want ErrNoDef", err)
+	}
+}
+
+func TestAGateSkipsTheClosedTasksOfItsUnit(t *testing.T) {
+	store := gatestest.NewStore(fixedNow)
+	thread := unit.Unit{Provider: "slack", Key: "T1/C1/1.2"}
+	tk := &tasksFake{held: map[unit.Unit]task.ID{acme: "t-00000000000000aa"}, done: map[unit.Unit]task.ID{acme: "t-00000000000000dd", thread: "t-00000000000000de"}}
+	svc := gates.New(gates.Deps{Store: store, Reader: store, Profile: bundled, Tasks: tk, Clock: clock{fixedNow}})
+	ctx := context.Background()
+	if g, err := svc.Open(ctx, gate.Gate{Kind: gate.KindQuestion, Unit: acme}, nil); err != nil || g.Task != "t-00000000000000aa" {
+		t.Fatalf("gate beside a done task = %+v, %v", g, err)
+	}
+	if g, err := svc.Open(ctx, gate.Gate{Kind: gate.KindQuestion, Unit: thread}, nil); err != nil || g.Task != "t-00000000000000ff" || len(tk.opened) != 1 {
+		t.Fatalf("gate on a unit only a done task holds = %+v, %v, opened %v", g, err, tk.opened)
 	}
 }
 
