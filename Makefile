@@ -8,9 +8,10 @@ BRAND_TEST_LDFLAGS := -X $(MODULE)/internal/brand.Name=zzbrand -X "$(MODULE)/int
 
 .PHONY: build build-targets vet-darwin vet-tags dev-install test lint fmt-check fmt fuzz clean eval-instructions test-brand scan-brand print-brand-ldflags docs-ref docs proto
 
-build: ## Build the binary into ./bin
+build: ## Build the binary and the GitHub plugin's into ./bin
 	@mkdir -p bin
 	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY) ./cmd/$(BINARY)
+	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY)-plugin-github ./plugins/github/cmd/$(BINARY)-plugin-github
 
 build-targets: ## Build every package for each release target
 	for t in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64; do \
