@@ -17,10 +17,9 @@ import (
 // ViewsFile is the profile file that words the views and the review.
 const ViewsFile = "views.toml"
 
-// ListTexts are the words of the verbs, by verb, from tasks.toml, and the
-// labels of the views and of the review's steps, by id, from views.toml.
+// ListTexts are the labels of the views and of the review's steps, by id,
+// from views.toml.
 type ListTexts struct {
-	Verbs  map[string]VerbText
 	Views  map[string]string
 	Review map[string]string
 }
@@ -49,29 +48,26 @@ type mBadge struct {
 	Views []string `toml:"views"`
 }
 
-// BundledLists is the verbs' and views' texts of the bundled profile alone.
+// BundledLists is the views' texts of the bundled profile alone.
 func BundledLists(bundled fs.FS) (ListTexts, Problems) {
-	return loadLists(nil, bundled)
+	out, _, problems := loadLists(nil, bundled, nil)
+	return out, problems
 }
 
 // loadLists reads tasks.toml and views.toml from bundled and the user's
 // layers: a higher layer's key replaces a lower one's, and a user's text
 // that is empty or names nothing keeps the lower one. A bundled FS without
 // a file, or nil, words nothing of it. A user's file the profile no longer
-// reads is a problem naming where its words go now.
-func loadLists(layers []profile.Layer, bundled fs.FS) (ListTexts, Problems) {
-	out := ListTexts{Verbs: map[string]VerbText{}, Views: map[string]string{}, Review: map[string]string{}}
+// reads is a problem naming where its words go now. The verbs' texts are
+// the TasksDef's; gates checks the gates a verb names, nil none.
+func loadLists(layers []profile.Layer, bundled fs.FS, gates *GatesDef) (ListTexts, TasksDef, Problems) {
+	out := ListTexts{Views: map[string]string{}, Review: map[string]string{}}
 	problems := renamedFiles(layers)
 	if bundled == nil {
-		return out, problems
+		return out, TasksDef{Verbs: map[string]VerbText{}}, problems
 	}
-	tasks, read := readLayered(layers, bundled, TasksFile, func(file string, src []byte) Problems {
-		return mergeTasks(out, file, src)
-	})
-	problems = append(problems, tasks...)
-	if read {
-		problems = append(problems, missingVerbs(out)...)
-	}
+	tasks, taskProblems := loadTasks(layers, bundled, gates)
+	problems = append(problems, taskProblems...)
 	views, read := readLayered(layers, bundled, ViewsFile, func(file string, src []byte) Problems {
 		return mergeViews(out, file, src)
 	})
@@ -79,7 +75,7 @@ func loadLists(layers []profile.Layer, bundled fs.FS) (ListTexts, Problems) {
 	if read {
 		problems = append(problems, missingViews(out)...)
 	}
-	return out, problems
+	return out, tasks, problems
 }
 
 // readLayered calls merge on name in bundled, then in each user layer that

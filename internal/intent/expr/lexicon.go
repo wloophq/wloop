@@ -14,10 +14,21 @@ import (
 // An Env also carries the closed values of its string facts, as keys under
 // metaPrefix, so a clone or a merge of the Env keeps them.
 const (
-	metaPrefix = "\x00"
-	enumMeta   = metaPrefix + "enum\x00"
-	meta       = Type(-1)
+	metaPrefix    = "\x00"
+	enumMeta      = metaPrefix + "enum\x00"
+	untrustedMeta = metaPrefix + "untrusted\x00"
+	meta          = Type(-1)
 )
+
+// SetUntrusted marks the fact name as one an agent or a third party may
+// set, which no releasing approval rule reads.
+func (e Env) SetUntrusted(name string) { e[untrustedMeta+name] = meta }
+
+// Untrusted says whether SetUntrusted marked the fact name.
+func (e Env) Untrusted(name string) bool {
+	_, ok := e[untrustedMeta+name]
+	return ok
+}
 
 // SetEnum declares the closed values of the string fact name: a predicate
 // that compares it with a literal outside them does not compile.

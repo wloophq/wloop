@@ -1,7 +1,126 @@
-# The words of the verbs a task offers. A verb's label is its button; its
-# summary, one line on what pressing it does, is the button's tooltip;
-# input is the question a verb that asks for a value puts first. A user
-# profile's tasks.toml replaces the keys it sets.
+# The task properties and states, and the words of the verbs a task
+# offers. A user profile's tasks.toml replaces the keys it sets and adds
+# its own properties and states after these, in the order it writes them.
+
+# The states a task takes, in the order clients list them. The category is
+# all the loop reads of a state: a task proposed in a category takes the
+# first state of it here.
+
+[states.inbox]
+category = "inbox"
+label    = "Inbox"
+
+[states.next]
+category = "ready"
+label    = "Next"
+
+[states.waiting]
+category = "waiting"
+label    = "Waiting"
+
+[states.scheduled]
+category = "deferred"
+label    = "Scheduled"
+
+[states.someday]
+category = "deferred"
+label    = "Someday"
+
+[states.done]
+category = "done"
+label    = "Done"
+
+[states.reference]
+category = "done"
+label    = "Reference"
+
+[states.trash]
+category = "dropped"
+label    = "Trash"
+
+# The task properties, each the fact task.prop.<name>. Writers are who may
+# write one: a property an agent or a plugin writes is untrusted, so no
+# approval rule that releases a send or a run reads it. An int or a
+# duration of 0 means unset.
+
+[props.priority]
+type    = "enum"
+values  = ["low", "normal", "high"]
+writers = ["person", "agent"]
+doc     = "How much the task matters next to the others."
+
+[props.due]
+type    = "date"
+writers = ["person", "plugin"]
+doc     = "When the task is due: the date you set, or the deadline its source derives."
+
+[props.promised]
+type    = "date"
+writers = ["person"]
+doc     = "The date you promised the task by, such as an answer by Friday."
+
+[props.size]
+type    = "duration"
+writers = ["person", "agent"]
+doc     = "How much of your attention the task takes."
+
+[props.effort]
+type    = "enum"
+values  = ["xs", "s", "m", "l", "xl"]
+writers = ["agent"]
+doc     = "How much work the agent's brief estimates for the task."
+
+[props.risk]
+type    = "enum"
+values  = ["low", "medium", "high"]
+writers = ["person", "agent"]
+doc     = "How much could go wrong doing the task."
+
+[props.owner]
+type    = "actor"
+writers = ["person"]
+doc     = "Who owns the task."
+
+[props.asker]
+type    = "actor"
+writers = ["plugin", "agent"]
+doc     = "Who asked for the task."
+
+[props.kind]
+type    = "enum"
+values  = ["start", "capture", "project", "pull-request", "thread"]
+writers = ["plugin", "workflow"]
+doc     = "What the task is: new work, a capture, a project, a pull request or a thread."
+
+[props.area]
+type    = "string"
+writers = ["person"]
+doc     = "The area of your life or work the task belongs to; areas seeds the menu."
+
+[props.contexts]
+type    = "string[]"
+writers = ["person", "plugin"]
+doc     = "The contexts the task is listed under, such as @calls or @repo-api; contexts seeds the menu."
+
+[props.focus]
+type    = "enum"
+values  = ["on", "off"]
+writers = ["person", "workflow"]
+doc     = "Whether the task is starred in Focus."
+
+[props.last_nudge]
+type    = "date"
+writers = ["workflow"]
+doc     = "When a workflow last nudged whoever the task waits on."
+
+[props.check_on]
+type    = "date"
+writers = ["person", "workflow"]
+doc     = "When to check on the task while it waits."
+
+# The verbs. A verb's label is its button; its summary, one line on what
+# pressing it does, is the button's tooltip; input is the question a verb
+# that asks for a value puts first.
 
 [verbs.next]
 label   = "Next"

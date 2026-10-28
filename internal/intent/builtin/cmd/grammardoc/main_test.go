@@ -49,3 +49,28 @@ func TestARowGoesToItsLongestKey(t *testing.T) {
 		t.Errorf("grouped = %v", got)
 	}
 }
+
+func TestALayeredFileSchemaRequiresNoEntryKey(t *testing.T) {
+	entry := func(doc map[string]any, path ...string) map[string]any {
+		for _, p := range path {
+			doc = doc["properties"].(map[string]any)[p].(map[string]any)
+		}
+		return doc["additionalProperties"].(map[string]any)
+	}
+	tasks := object(tree(builtin.SurfaceTasks))
+	gates := object(tree(builtin.SurfaceGates))
+	views := object(tree(builtin.SurfaceViews))
+	for name, e := range map[string]map[string]any{
+		"props.*": entry(tasks, "props"), "states.*": entry(tasks, "states"), "verbs.*": entry(tasks, "verbs"),
+		"gates.*": entry(gates, "gates"), "gates.*.intents.*": entry(entry(gates, "gates"), "intents"),
+		"views.*": entry(views, "views"),
+	} {
+		if r, ok := e["required"]; ok {
+			t.Errorf("%s requires %v", name, r)
+		}
+	}
+	intent := object(tree(builtin.SurfaceIntent))
+	if _, ok := intent["required"]; !ok {
+		t.Error("a file that is not layered key by key lost its required keys")
+	}
+}

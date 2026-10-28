@@ -99,8 +99,12 @@ type Loaded struct {
 	Actions map[string]BuiltinAction
 	// Tools are the MCP tools' texts from tools.toml, by tool name.
 	Tools map[string]ToolText
-	// Lists are the verbs' texts from tasks.toml and the views' from views.toml.
+	// Lists are the views' texts from views.toml.
 	Lists ListTexts
+	// Tasks are the task properties, states and verbs of tasks.toml.
+	Tasks TasksDef
+	// Gates are the gates of gates.toml.
+	Gates GatesDef
 	// Keys are the core keys' help from keys.toml.
 	Keys KeyTexts
 	// Notices are what the loop tells a session, from notices.toml, by notice name.
@@ -176,20 +180,20 @@ func (u *unit) broken() bool { return len(u.sheet.problems) > 0 }
 func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check TemplateCheck) (*Loaded, Problems) {
 	reverted := brokenOverlays{}
 	partials := revertedPartials{}
+	gates, gateProblems := loadGates(layers, bundled)
+	listTexts, tasks, listProblems := loadLists(layers, bundled, &gates)
 	for {
 		set, problems := withPartials(base, layers, partials)
-		l, broken := load(layers, bundled, set, check, reverted)
+		l, broken := load(layers, bundled, set, check, reverted, tasks)
 		if partials.breaking(layers, append(problems, l.Problems...)) {
 			continue
 		}
 		if len(broken) == 0 {
 			actions, actionProblems := loadActions(layers, bundled)
 			tools, toolProblems := loadTools(layers, bundled)
-			listTexts, listProblems := loadLists(layers, bundled)
-			gateProblems := loadGates(layers, bundled)
 			keyTexts, keyProblems := loadKeys(layers, bundled)
 			notices, noticeProblems := loadNotices(layers, bundled)
-			l.Actions, l.Tools, l.Lists, l.Keys, l.Notices = actions, tools, listTexts, keyTexts, notices
+			l.Actions, l.Tools, l.Lists, l.Keys, l.Notices, l.Gates = actions, tools, listTexts, keyTexts, notices, gates
 			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, listProblems, gateProblems, keyProblems, noticeProblems)
 			l.Reverted = map[dintent.Name]Problems{}
 			for n, r := range reverted {
@@ -297,7 +301,7 @@ func profilesOf(also []dintent.AlsoProfile) []string {
 
 // load is one pass of Load; the intents in plain are read without their
 // overlay. It returns the overlaid intents that broke.
-func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check TemplateCheck, plain brokenOverlays) (*Loaded, brokenOverlays) {
+func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check TemplateCheck, plain brokenOverlays, tasks TasksDef) (*Loaded, brokenOverlays) {
 	var units []*unit
 	var dirProblems Problems
 	bundledUnits := map[dintent.Name]*unit{}
@@ -354,7 +358,7 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	defaults, defaultProblems := readDefaults(layers, bundled)
 	dirProblems = append(dirProblems, defaultProblems...)
 	for _, u := range units {
-		u.load(base, defaults)
+		u.load(base, defaults, tasks.Facts())
 		if u.defined && !u.broken() && check != nil && u.tmpl != nil {
 			u.sheet.problems = append(u.sheet.problems, check(u.def, u.tmpl)...)
 		}
@@ -366,6 +370,7 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 		Broken:       map[dintent.Name]Problems{},
 		Problems:     dirProblems,
 		EmptyRefusal: defaults.Refusal,
+		Tasks:        tasks,
 		layers:       layers,
 	}
 	var defs []dintent.Def
@@ -387,16 +392,22 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	}
 	l.Registry = dintent.NewRegistry(defs)
 	var wfProblems, wfWarnings Problems
-	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems, wfWarnings = loadWorkflows(layers, bundled, l.turnProblem, l.briefExtras)
+	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems, wfWarnings = loadWorkflows(layers, bundled, l.turnProblem, l.profileFacts)
 	l.Problems = append(l.Problems, wfProblems...)
 	l.Warnings = append(l.Warnings, wfWarnings...)
 	return l, broken
 }
 
-// briefExtras are the brief.extra.* facts of p's brief intent.
-func (l *Loaded) briefExtras(p dunit.ProviderID) expr.Env {
+// profileFacts are the facts the profile declares for p's units: the
+// brief.extra.* facts of p's brief intent and, of a task, the task.prop.*
+// facts of tasks.toml.
+func (l *Loaded) profileFacts(p dunit.ProviderID) expr.Env {
 	d, _ := l.Registry.Builder(builtin.BuildsBrief, p)
-	return builtin.ExtraFacts(d.Extra)
+	env := builtin.ExtraFacts(d.Extra)
+	if builtin.Slots[p] == builtin.TaskSlot {
+		maps.Copy(env, l.Tasks.Facts())
+	}
+	return env
 }
 
 func (l *Loaded) turnProblem(name, runner string) (arg, msg string) {
@@ -436,9 +447,9 @@ func (l *Loaded) Rules(intent string) (dintent.RecordRules, error) {
 	return l.Registry.Rules(intent)
 }
 
-func (u *unit) load(base *template.Template, defaults manifestDefaults) {
+func (u *unit) load(base *template.Template, defaults manifestDefaults, taskFacts expr.Env) {
 	file := u.files.path("intent.toml")
-	s := &sheet{file: file, defaults: defaults}
+	s := &sheet{file: file, defaults: defaults, taskFacts: taskFacts}
 	u.sheet = s
 	if !nameRe.MatchString(string(u.name)) {
 		s.problems = append(s.problems, Problem{File: u.dir, Msg: "an intent name is 2 to 24 lowercase letters, digits and -, starting with a letter"})

@@ -224,7 +224,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 |---|---|---|
 | `task.id` | string | The task's id. |
 | `task.kind` | string | The task's kind, such as action, waiting, close, message, capture or project. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `task.state` | string | The task's state: inbox, next, waiting, scheduled, someday, reference, done or trash. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.state` | string | The task's state, one of the states tasks.toml declares. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `task.waiting_on` | list | The person keys the task waits on, such as slack:U0123. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `task.resurface_at` | timestamp | When the task resurfaces; zero when it has no date. Test with `> timestamp(0)`. |
 | `task.waiting_days` | int | Working days the task has waited, in the configured location, as the waiting rules count them. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |

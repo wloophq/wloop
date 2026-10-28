@@ -77,7 +77,7 @@ func (s *sheet) parseMain(d dintent.Def, base *template.Template, file string, b
 		ok = s.parseText(set, "workspace.name", WorkspaceNameName, w.Name, names) && ok
 	}
 	ok = s.parseText(set, "target.title", TargetTitleName, d.Target.Title, targetEnv) && ok
-	unit := unitEnv(d)
+	unit := unitEnv(d, s.taskFacts)
 	text("why", WhyName, d.Why, unit)
 	for i, r := range d.Refuse {
 		text(fmt.Sprintf("refuse[%d].why", i), RefuseWhyName(i), r.Why, unit)
@@ -379,7 +379,7 @@ func (l *Loaded) Why(name dintent.Name, facts map[string]any) (string, error) {
 	if !ok || d.Why.Src == "" {
 		return "", nil
 	}
-	return l.render(name, WhyName, unitEnv(d), facts)
+	return l.render(name, WhyName, unitEnv(d, l.Tasks.Facts()), facts)
 }
 
 // SessionName renders the session.name of the intent name over facts, its
@@ -440,7 +440,7 @@ func (l *Loaded) Refusal(name dintent.Name, facts map[string]any) (string, error
 		if i >= len(p.Refuse) || p.Refuse[i] == nil || !p.Refuse[i].Eval(mapFacts(facts)) {
 			continue
 		}
-		why, err := l.render(name, RefuseWhyName(i), unitEnv(d), facts)
+		why, err := l.render(name, RefuseWhyName(i), unitEnv(d, l.Tasks.Facts()), facts)
 		if strings.TrimSpace(why) == "" {
 			why = cmp.Or(l.EmptyRefusal, RefuseWhyName(i))
 		}

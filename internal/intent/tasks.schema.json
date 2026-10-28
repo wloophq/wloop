@@ -42,14 +42,14 @@
     "props": {
       "additionalProperties": {
         "additionalProperties": false,
-        "description": "A property, by its name.",
+        "description": "A property, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
         "properties": {
           "doc": {
             "description": "What the property holds, for the facts' reference and the agents.",
             "type": "string"
           },
           "type": {
-            "description": "The property's type. Required.",
+            "description": "The property's type; required for a new property. An int or a duration of 0 means unset: a value of 0 is refused.",
             "enum": [
               "string",
               "string[]",
@@ -63,7 +63,7 @@
             "type": "string"
           },
           "values": {
-            "description": "An enum's values, in order.",
+            "description": "An enum's values, in order; required with type enum.",
             "items": {
               "type": "string"
             },
@@ -83,12 +83,9 @@
             "type": "array"
           }
         },
-        "required": [
-          "type"
-        ],
         "type": "object"
       },
-      "description": "The task properties, by name; each is the fact task.prop.<name>.",
+      "description": "The task properties, by name, in the order the file declares them, a user layer's new ones after the bundled; each is the fact task.prop.<name>, typed from its type.",
       "type": "object"
     },
     "stale_waiting_days": {
@@ -98,10 +95,10 @@
     "states": {
       "additionalProperties": {
         "additionalProperties": false,
-        "description": "A state, by its name.",
+        "description": "A state, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
         "properties": {
           "category": {
-            "description": "The state's category, which is all Go reads of it. Required.",
+            "description": "The state's category, which is all Go reads of it; required for a new state.",
             "enum": [
               "inbox",
               "ready",
@@ -118,18 +115,15 @@
             "type": "string"
           }
         },
-        "required": [
-          "category"
-        ],
         "type": "object"
       },
-      "description": "The states a task takes, by name, in the order clients list them.",
+      "description": "The states a task takes, by name, in the order the file declares them, a user layer's new ones after the bundled; clients list them in this order, and a task proposed in a category takes the first state of it.",
       "type": "object"
     },
     "verbs": {
       "additionalProperties": {
         "additionalProperties": false,
-        "description": "A verb, by its name.",
+        "description": "A verb, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
         "properties": {
           "by": {
             "additionalProperties": {
@@ -140,7 +134,7 @@
             "type": "object"
           },
           "from": {
-            "description": "The states the verb moves a task from; every state when absent.",
+            "description": "The states the verb moves a task from, each a state of states; every state when absent.",
             "items": {
               "type": "string"
             },
@@ -195,14 +189,10 @@
             "type": "string"
           },
           "to": {
-            "description": "The state the verb moves a task to; absent, the verb moves none.",
+            "description": "The state the verb moves a task to, a state of states; absent, the verb moves none.",
             "type": "string"
           }
         },
-        "required": [
-          "label",
-          "summary"
-        ],
         "type": "object"
       },
       "description": "The verbs a task offers, by verb.",

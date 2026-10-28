@@ -43,7 +43,7 @@ func webBindings(t *testing.T) []api.KeyView {
 
 func TestKeysFixtureHoldsTheCoreWebMap(t *testing.T) {
 	help, _ := intentload.BundledKeys(os.DirFS("../../profiles/default"))
-	words, _ := intentload.BundledLists(os.DirFS("../../profiles/default"))
+	words, _ := intentload.BundledTasks(os.DirFS("../../profiles/default"))
 	var want, got []api.KeyView
 	for _, b := range keys.Core {
 		if slices.Contains(b.Surfaces, keys.Web) {
@@ -137,7 +137,7 @@ func keysRun(t *testing.T, prelude, main string, in, out any) {
 // servedVerbs are the verbs GET /api/views serves with the bundled profile.
 func servedVerbs(t *testing.T) []string {
 	t.Helper()
-	words, problems := intentload.BundledLists(os.DirFS("../../profiles/default"))
+	words, problems := intentload.BundledTasks(os.DirFS("../../profiles/default"))
 	if len(problems) > 0 {
 		t.Fatal(problems)
 	}

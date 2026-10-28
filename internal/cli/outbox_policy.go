@@ -56,7 +56,7 @@ func (m outboxManifests) WorkflowApproval(name string, intent *draft.Policy) (*d
 		if m.config != nil {
 			cfg = m.config()
 		}
-		return workflowApproval(cfg, w, intent), true
+		return workflowApproval(cfg, w, intent, briefExtrasOf(m.loaded())), true
 	}
 	return nil, false
 }

@@ -298,10 +298,10 @@ func helpGroups(manager string) []helpGroup {
 			{
 				Names:   []string{"profile schema"},
 				Summary: "The JSON Schemas of the profile files, for editors",
-				Usage:   []string{"profile schema [--workflow|--actions|--tasks|--views|--gates|--keys|--config]"},
-				About:   "Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml, tasks.toml, views.toml, gates.toml, keys.toml or config.toml, for an editor. Every schema comes from the grammar the loaders check.",
+				Usage:   []string{"profile schema [--workflow|--actions|--tasks|--views|--gates|--records|--keys|--config]"},
+				About:   "Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml, tasks.toml, views.toml, gates.toml, records.toml, keys.toml or config.toml, for an editor. Every schema comes from the grammar the loaders check.",
 				Flags: []helpFlag{{"--workflow", "The schema of workflow.toml"}, {"--actions", "The schema of actions.toml"}, {"--tasks", "The schema of tasks.toml"},
-					{"--views", "The schema of views.toml"}, {"--gates", "The schema of gates.toml"}, {"--keys", "The schema of keys.toml"}, {"--config", "The schema of config.toml"}},
+					{"--views", "The schema of views.toml"}, {"--gates", "The schema of gates.toml"}, {"--records", "The schema of records.toml"}, {"--keys", "The schema of keys.toml"}, {"--config", "The schema of config.toml"}},
 				Examples: []string{"profile schema > intent.schema.json", "profile schema --config > config.schema.json"},
 				Docs:     "reference/language",
 			},

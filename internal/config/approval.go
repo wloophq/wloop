@@ -115,7 +115,9 @@ func (a ApprovalConfig) validateRun(key string) error {
 }
 
 // validateDrafts checks a draft approval overlay at key as validateRun
-// does a run one; every draft rule refuses an untrusted fact.
+// does a run one; every draft rule refuses an untrusted fact. A rule that
+// reads task.prop.* is checked where the profile is loaded, which says who
+// writes the property, unless it releases: config.toml refuses that here.
 func (a ApprovalConfig) validateDrafts(key string) error {
 	if err := a.validateOverlay(key, draftModes); err != nil {
 		return err
@@ -125,6 +127,12 @@ func (a ApprovalConfig) validateDrafts(key string) error {
 		at := fmt.Sprintf("%s.rule[%d]", key, i)
 		if err := r.validate(at, draftModes); err != nil {
 			return err
+		}
+		if prop, ok := onlyProps(r.When); ok {
+			if (draft.Approval{Mode: draft.ApprovalMode(r.Mode)}).Releases() {
+				return fmt.Errorf("%s.when reads %s: config.toml cannot see who writes it, the profile declares it, so a rule that sends here may not read it; a wait rule may", at, prop)
+			}
+			continue
 		}
 		if _, err := builtin.ApprovalRule(r.When, draft.Approval{Mode: draft.ApprovalMode(r.Mode), Window: time.Duration(r.Window)}, env); err != nil {
 			return fmt.Errorf("%s.when: %w", at, err)
@@ -172,6 +180,9 @@ func (r ApprovalRuleConfig) validate(at string, modes []string) error {
 // the profile is loaded.
 func workflowRule(at, src string, releases bool) error {
 	if names := builtin.DynamicFacts(src); len(names) > 0 {
+		if prop, ok := onlyProps(src); ok && releases {
+			return fmt.Errorf("%s reads %s: config.toml cannot see who writes it, the profile declares it, so a rule that runs here may not read it; a wait rule may", at, prop)
+		}
 		if releases {
 			return fmt.Errorf("%s reads %s, which a rule that runs may not: a third party's text or an agent sets its value; a wait rule may read it", at, names[0])
 		}
@@ -189,6 +200,21 @@ func workflowRule(at, src string, releases bool) error {
 		}
 	}
 	return nil
+}
+
+// onlyProps is the first task.prop.* fact src names when every fact only
+// the profile types that it names is a task property.
+func onlyProps(src string) (string, bool) {
+	names := builtin.DynamicFacts(src)
+	for _, n := range names {
+		if !strings.HasPrefix(n, builtin.PropPrefix) {
+			return "", false
+		}
+	}
+	if len(names) == 0 {
+		return "", false
+	}
+	return names[0], true
 }
 
 // DraftApprovalWarnings name each rule of a workflows.<name>.drafts.approval

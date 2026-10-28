@@ -7,7 +7,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 
 | Test | Rule |
 |---|---|
-| `TestApprovalRulesReadTrustedFacts` | No approval rule that releases (a draft rule of any mode, a run rule of mode run or delay) loads when it reads an untrusted fact, in each object that holds one: an intent's and a workflow's [drafts.approval], a workflow's [approval], and the config's workflows.<name>.drafts.approval and workflows.<name>.approval. The untrusted facts are the table's, the brief's extra fields and a classification's output, so an agent or a thread's text never releases a send or a run. |
+| `TestApprovalRulesReadTrustedFacts` | No approval rule that releases (a draft rule of any mode, a run rule of mode run or delay) loads when it reads an untrusted fact, in each object that holds one: an intent's and a workflow's [drafts.approval], a workflow's [approval], and the config's workflows.<name>.drafts.approval and workflows.<name>.approval. The untrusted facts are the table's, the brief's extra fields, a classification's output and a task property an agent or a plugin writes, so an agent or a thread's text never releases a send or a run. |
 | `TestArchitecture` | Only the store imports the SQLite driver; clients import only the API, the domain and `termfmt`; the domain imports only the domain; the brief reaches agents and the store only through its ports; the API imports only the domain; only `intent/expr` imports cel-go; a core interface has at most five methods. |
 | `TestBoundaryImports` | The catalog, the intent vocabulary's leaves, the loader and `termfmt` import only their allowed sets. |
 | `TestBrandLiteralOnlyInBrand` | The default product name appears only in `internal/brand` and the exempt metadata. |

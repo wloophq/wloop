@@ -116,7 +116,7 @@ func (s *Server) handleViews(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	for _, v := range builtin.TaskVerbs {
-		t, b := texts.Verbs[v], bundled.Verbs[v]
+		t, b := s.loaded().Tasks.Verbs[v], bundledWords().tasks.Verbs[v]
 		cat.Verbs = append(cat.Verbs, api.VerbSpec{Verb: v, Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
 			Input: cmp.Or(t.Input, b.Input), Key: verbKey(task.Verb(v))})
 	}
@@ -237,7 +237,7 @@ func (s *Server) runTaskVerb(w http.ResponseWriter, r *http.Request, verb string
 		return
 	}
 	v := task.Verb(verb)
-	if !offers(s.loaded().Lists, e, v) {
+	if !offers(s.loaded().Tasks.Verbs, e, v) {
 		writeError(w, http.StatusConflict, fmt.Sprintf("%s is not offered on this task: the profile's tasks.toml says where it is", v))
 		return
 	}
@@ -265,8 +265,8 @@ func (s *Server) runTaskVerb(w http.ResponseWriter, r *http.Request, verb string
 
 // offers says whether the profile offers verb on e; a verb with no offer is
 // offered everywhere.
-func offers(words intentload.ListTexts, e task.Task, verb task.Verb) bool {
-	p := words.Verbs[string(verb)].Offer
+func offers(verbs map[string]intentload.VerbText, e task.Task, verb task.Verb) bool {
+	p := verbs[string(verb)].Offer
 	if p == nil {
 		return true
 	}
@@ -707,7 +707,7 @@ func (ev *taskViewer) cards(ctx context.Context, e task.Task, v *api.TaskView) e
 // a handler, run as the unit's action, or the state change.
 func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
 	out := make([]api.VerbState, 0, len(builtin.TaskVerbs))
-	words := ev.s.loaded().Lists
+	words := ev.s.loaded().Tasks.Verbs
 	off := ""
 	for _, u := range e.Units {
 		if !ev.s.pluginEnabled(u.Provider) {

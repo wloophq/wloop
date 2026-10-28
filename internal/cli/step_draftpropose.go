@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"path"
 	"slices"
 	"strings"
@@ -22,6 +23,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/profile"
 	slacksend "github.com/wloophq/wloop/internal/slack/send"
 )
@@ -219,7 +221,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 		return nil, err
 	}
 	now := deps.Now()
-	policy := draftApproval(deps.Config(), w)
+	policy := draftApproval(deps.Config(), w, briefExtrasOf(s.e.loadedIntents()))
 	var subject *draft.Subject
 	if w.Withdraw != nil || len(policy.Rules) > 0 {
 		read, err := subjectFacts(ctx, s.d.Units, c.u, w.Name)
@@ -408,8 +410,8 @@ func itemIDs(its []items.Item) []string {
 
 // draftApproval is the approval policy of the drafts w's steps propose:
 // workflowApproval's over no intent, else wait.
-func draftApproval(cfg config.Config, w workflow.Workflow) draft.Policy {
-	if p := workflowApproval(cfg, w, nil); p != nil {
+func draftApproval(cfg config.Config, w workflow.Workflow, extras func(unit.ProviderID) expr.Env) draft.Policy {
+	if p := workflowApproval(cfg, w, nil, extras); p != nil {
 		return *p
 	}
 	return draft.Policy{Default: draft.Approval{Mode: draft.Wait}}
@@ -420,24 +422,29 @@ func draftApproval(cfg config.Config, w workflow.Workflow) draft.Policy {
 // workflows.<name>.drafts.approval laid over the manifest's
 // [drafts.approval], else over intent, field by field; nil when none is
 // set.
-func workflowApproval(cfg config.Config, w workflow.Workflow, intent *draft.Policy) *draft.Policy {
+func workflowApproval(cfg config.Config, w workflow.Workflow, intent *draft.Policy, extras func(unit.ProviderID) expr.Env) *draft.Policy {
 	base := cmp.Or(w.DraftApproval, intent)
-	if p, _ := configPolicy(w.Name, w.Slot, base, cfg.Workflows[w.Name].DraftApproval()); p != nil {
+	if p, _ := configPolicy(w, base, cfg.Workflows[w.Name].DraftApproval(), extras); p != nil {
 		return p
 	}
 	return base
 }
 
-// configPolicy is a, the config's drafts approval of workflow name, laid
-// over base, its rules compiled over the unit slot's facts; nil when a is.
-// One that does not load is refused, with the error, and holds every draft.
-func configPolicy(name, slot string, base *draft.Policy, a *config.ApprovalConfig) (*draft.Policy, error) {
+// configPolicy is a, the config's drafts approval of w, laid over base,
+// its rules compiled over the unit slot's facts and those extras gives for
+// w's provider (nil gives none); nil when a is. One that does not load is
+// refused, with the error, and holds every draft.
+func configPolicy(w workflow.Workflow, base *draft.Policy, a *config.ApprovalConfig, extras func(unit.ProviderID) expr.Env) (*draft.Policy, error) {
 	if a == nil {
 		return nil, nil
 	}
-	p, err := intentload.OverlayDraftApproval(base, overlay(*a), builtin.ApprovalEnv(true, slot))
+	env := builtin.ApprovalEnv(true, w.Slot)
+	if extras != nil {
+		maps.Copy(env, extras(w.Provider))
+	}
+	p, err := intentload.OverlayDraftApproval(base, overlay(*a), env)
 	if err != nil {
-		return draft.Fixed(draft.Approval{Mode: draft.Wait}), fmt.Errorf("workflows.%s.drafts.approval: %w", name, err)
+		return draft.Fixed(draft.Approval{Mode: draft.Wait}), fmt.Errorf("workflows.%s.drafts.approval: %w", w.Name, err)
 	}
 	return &p, nil
 }

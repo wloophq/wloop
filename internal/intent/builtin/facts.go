@@ -270,7 +270,7 @@ var otherFacts = []Fact{
 	wf("workspace", "repo", expr.String, "owner/repo; empty when unknown."),
 	wf("task", "id", expr.String, "The task's id."),
 	untrusted(enum(wf("task", "kind", expr.String, "The task's kind, such as action, waiting, close, message, capture or project."), enumOf(TaskKinds...))),
-	untrusted(enum(wf("task", "state", expr.String, "The task's state: inbox, next, waiting, scheduled, someday, reference, done or trash."), enumOf(TaskStates...))),
+	untrusted(enum(wf("task", "state", expr.String, "The task's state, one of the states tasks.toml declares."), enumOf(TaskStates...))),
 	untrusted(wf("task", "waiting_on", expr.List, "The person keys the task waits on, such as slack:U0123.")),
 	wf("task", "resurface_at", expr.Time, "When the task resurfaces; zero when it has no date. Test with `> timestamp(0)`."),
 	timeVarying(untrusted(wf("task", "waiting_days", expr.Int, "Working days the task has waited, in the configured location, as the waiting rules count them."))),
@@ -550,6 +550,27 @@ const ExtraPrefix = "brief.extra."
 // PropPrefix names a task property of tasks.toml as a fact, typed from its
 // declaration.
 const PropPrefix = "task.prop."
+
+// PropFactType is the type of the fact task.prop.<name> of a property of
+// type t: an enum, an actor and a string read as a string (an actor as its
+// key), a list type as a list. An int or a duration of 0 reads as unset.
+func PropFactType(t task.PropType) expr.Type {
+	switch t {
+	case task.PropInt:
+		return expr.Int
+	case task.PropDate:
+		return expr.Time
+	case task.PropDuration:
+		return expr.Duration
+	case task.PropStrings, task.PropActors:
+		return expr.List
+	}
+	return expr.String
+}
+
+// TaskSlot is the slot of a task's facts, which the task.prop.* facts of
+// the profile's tasks.toml extend.
+var TaskSlot = Slots[unit.Task]
 
 // LinkSignalPrefix names a signal the plugins report per link, such as
 // stalled, aggregated over the task's links as a bool fact.

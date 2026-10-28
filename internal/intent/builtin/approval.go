@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -31,11 +32,16 @@ func (e *SubjectsError) Error() string {
 }
 
 // ApprovalRule is the [drafts.approval] rule of a whose when is compiled
-// over env. It names comment delivery when its top-level conjunction holds
-// draft.delivery == "comment", the only way a rule releases a comment.
+// over env. A task.prop.* fact it reads must be typed in env, which only
+// the profile does; one env marks untrusted refuses the rule like an
+// untrusted fact of the table. It names comment delivery when its
+// top-level conjunction holds draft.delivery == "comment", the only way a
+// rule releases a comment.
 func ApprovalRule(when string, a draft.Approval, env expr.Env) (draft.Rule, error) {
-	if names := DynamicFacts(when); len(names) > 0 {
-		return draft.Rule{}, &UntrustedError{Fact: names[0]}
+	for _, name := range DynamicFacts(when) {
+		if _, typed := env[name]; !typed || !strings.HasPrefix(name, PropPrefix) {
+			return draft.Rule{}, &UntrustedError{Fact: name}
+		}
 	}
 	p, err := expr.CompileWorkflow(when, env)
 	if err != nil {
@@ -46,7 +52,7 @@ func ApprovalRule(when string, a draft.Approval, env expr.Env) (draft.Rule, erro
 	}
 	var subjects []string
 	for _, name := range p.Reads() {
-		if IsUntrusted(name) {
+		if IsUntrusted(name) || env.Untrusted(name) {
 			return draft.Rule{}, &UntrustedError{Fact: name}
 		}
 		f, ok := workflowFact(name)
@@ -104,12 +110,15 @@ func (c condition) Source() string {
 
 var (
 	quotedText  = regexp.MustCompile(`"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'`)
-	dynamicName = regexp.MustCompile(`(?:^|[^\w.])((?:` + regexp.QuoteMeta(ExtraPrefix) + `|` + regexp.QuoteMeta(ClassifyPrefix) + `)[A-Za-z_]\w*)`)
+	dynamicName = regexp.MustCompile(`(?:^|[^\w.])((?:` + regexp.QuoteMeta(ExtraPrefix) + `|` + regexp.QuoteMeta(ClassifyPrefix) + `|` + regexp.QuoteMeta(PropPrefix) + `)[A-Za-z_]\w*)`)
 )
 
-// DynamicFacts are the brief.extra.* and classify.* facts src names outside
-// its string literals: facts the profile declares, untrusted whatever their
-// name, which a check without the profile cannot type.
+// DynamicFacts are the brief.extra.*, classify.* and task.prop.* facts src
+// names outside its string literals: facts the profile declares, which a
+// check without the profile cannot type, so it refuses them in a rule that
+// releases. A brief's extra field and a classification's output are
+// untrusted whatever their name; a property is untrusted when an agent or a
+// plugin writes it, which only the profile says.
 func DynamicFacts(src string) []string {
 	var out []string
 	for _, m := range dynamicName.FindAllStringSubmatch(quotedText.ReplaceAllString(src, `""`), -1) {

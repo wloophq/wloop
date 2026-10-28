@@ -88,13 +88,13 @@ window = "2h"
 	}
 	rule := draft.Rule{When: draftWhen(func(map[string]any) bool { return true }), Approval: draft.Approval{Mode: draft.Wait}}
 	manifest := &draft.Policy{Default: draft.Approval{Mode: draft.Wait}, Rules: []draft.Rule{rule}}
-	if p := draftApproval(cfg, workflow.Workflow{Name: "slack-closure", Slot: "slack", DraftApproval: manifest}); p.Default != (draft.Approval{Mode: draft.Delay, Window: 2 * time.Hour}) || len(p.Rules) != 1 {
+	if p := draftApproval(cfg, workflow.Workflow{Name: "slack-closure", Slot: "slack", DraftApproval: manifest}, nil); p.Default != (draft.Approval{Mode: draft.Delay, Window: 2 * time.Hour}) || len(p.Rules) != 1 {
 		t.Errorf("the config's mode and window keep the manifest's rules: %+v", p)
 	}
-	if a := draftApproval(cfg, workflow.Workflow{Name: "slack-ask-owner", Slot: "slack"}).Default; a.Mode != draft.Send {
+	if a := draftApproval(cfg, workflow.Workflow{Name: "slack-ask-owner", Slot: "slack"}, nil).Default; a.Mode != draft.Send {
 		t.Errorf("the config's block over no manifest block: %+v", a)
 	}
-	if p := draftApproval(cfg, workflow.Workflow{Name: "slack-stalled-nudge", Slot: "task"}); p.Default.Mode != draft.Wait || len(p.Rules) != 0 {
+	if p := draftApproval(cfg, workflow.Workflow{Name: "slack-stalled-nudge", Slot: "task"}, nil); p.Default.Mode != draft.Wait || len(p.Rules) != 0 {
 		t.Errorf("a workflow the config leaves alone: %+v", p)
 	}
 	te := newTestEnv(t, nil)
@@ -306,7 +306,7 @@ window = "1h"
 	if err != nil {
 		t.Fatal(err)
 	}
-	pol := draftApproval(cfg, w)
+	pol := draftApproval(cfg, w, nil)
 	d := draft.Draft{Delivery: draft.Message, Purpose: "thanks", Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: w.Name}}
 	for name, c := range map[string]struct {
 		facts map[string]any
@@ -319,7 +319,7 @@ window = "1h"
 			t.Errorf("%s: %+v %v", name, got, err)
 		}
 	}
-	if got, _ := draftApproval(Defaults(), w).Decide(d, draft.Subject{Slot: "slack", Facts: map[string]any{"slack.conversation": "dm"}}, time.Time{}); got.Approval.Mode != draft.Send {
+	if got, _ := draftApproval(Defaults(), w, nil).Decide(d, draft.Subject{Slot: "slack", Facts: map[string]any{"slack.conversation": "dm"}}, time.Time{}); got.Approval.Mode != draft.Send {
 		t.Errorf("without the config, the manifest's rule: %+v", got)
 	}
 	m := outboxManifests{loaded: te.loadedIntents, config: func() config.Config { return cfg }}
@@ -341,7 +341,7 @@ mode = "send"
 		t.Fatalf("a rule over one subject's facts loads: %v", err)
 	}
 	w := workflow.Workflow{Name: "slack-thanks", Slot: "slack"}
-	pol := draftApproval(cfg, w)
+	pol := draftApproval(cfg, w, nil)
 	if got, err := pol.Decide(draft.Draft{Delivery: draft.Message}, draft.Subject{Slot: "slack"}, time.Time{}); err != nil || got.Approval.Mode != draft.Wait || len(pol.Rules) != 0 {
 		t.Fatalf("%+v %v", got, err)
 	}
