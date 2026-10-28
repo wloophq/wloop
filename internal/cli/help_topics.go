@@ -184,7 +184,7 @@ func helpGroups(manager string) []helpGroup {
 				},
 				Examples: []string{"task new --title \"Add retries to the webhook sender\" --brief-file brief.md --prop priority=high --repo acme/api",
 					"task attach task:t-3f9a2c4b5d6e7f80"},
-				Docs:     "concepts/tasks",
+				Docs: "concepts/tasks",
 			},
 			{
 				Names:   []string{"explore"},
