@@ -15,7 +15,9 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
@@ -62,8 +64,41 @@ func loopEvent(kind string) port.Event {
 	return port.Event{Unit: u7, Kind: kind, Key: "k", At: noteAt}
 }
 
+func noteGates(e *noteEnv) GateStore { return e.db.Gates(func() time.Time { return noteAt }) }
+
+func seedGate(t *testing.T, e *noteEnv) {
+	if _, err := noteGates(e).Open(context.Background(), gate.Gate{Unit: u7, Kind: gate.KindDraft, Name: "draft", Subject: "1"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // writes is every exported write method of the sqlite store types.
 var writes = []writeCase{
+	{
+		method: "GateStore.Open",
+		call: func(ctx context.Context, e *noteEnv) error {
+			_, err := noteGates(e).Open(ctx, gate.Gate{Unit: u7, Kind: gate.KindDraft, Name: "draft", Subject: "1"})
+			return err
+		},
+		topics: port.TopicGates, units: []unit.Unit{u7},
+	},
+	{
+		method: "GateStore.Resolve",
+		seed:   seedGate,
+		call: func(ctx context.Context, e *noteEnv) error {
+			_, err := noteGates(e).Resolve(ctx, 1, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson})
+			return err
+		},
+		topics: port.TopicGates, units: []unit.Unit{u7},
+	},
+	{
+		method: "GateStore.RecordSent",
+		call: func(ctx context.Context, e *noteEnv) error {
+			_, err := noteGates(e).RecordSent(ctx, gate.Gate{Unit: term1, Kind: gate.KindPost, Name: "post", By: task.ActorAgent})
+			return err
+		},
+		topics: port.TopicGates, units: []unit.Unit{term1},
+	},
 	{
 		method: "DB.DossierMoved",
 		call:   func(ctx context.Context, e *noteEnv) error { return e.db.DossierMoved(ctx, 1) },
@@ -312,6 +347,7 @@ var reads = []string{
 	"Fetches.Last",
 	"DB.AgentTranscript", "DB.WorkflowActivity",
 	"DB.Tasks", "taskStore.Tasks", "taskStore.TasksSince", "taskStore.Task", "taskStore.TasksOf", "taskStore.Counts", "DB.Props",
+	"DB.Gates", "GateStore.Get", "GateStore.OfTask", "GateStore.Where", "GateStore.Due",
 }
 
 // notesAll are the write methods that note Change.All.
@@ -402,7 +438,7 @@ func TestEveryWriteNotes(t *testing.T) {
 func TestEveryExportedMethodIsReadOrNoted(t *testing.T) {
 	t.Parallel()
 	db, _ := openTemp(t)
-	types := []reflect.Type{reflect.TypeOf(db), reflect.TypeOf(New(db)), reflect.TypeOf(NewRounds(db))}
+	types := []reflect.Type{reflect.TypeOf(db), reflect.TypeOf(New(db)), reflect.TypeOf(NewRounds(db)), reflect.TypeOf(db.Gates(nil))}
 	types = append(types, accessorTypes(db)...)
 	known := map[string]bool{}
 	for _, m := range reads {

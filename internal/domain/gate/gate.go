@@ -4,6 +4,7 @@
 package gate
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -46,7 +47,8 @@ const (
 // capture task the messages service creates, titled with the message's text.
 //
 // Subject names the subject in its own table (a draft id, a plan item key,
-// a message id), as the kind reads it. Intents are the names a person may
+// a message id), as the kind reads it; a proposal gate on an item proposal
+// no message mirrors names it as ProposalSubject. Intents are the names a person may
 // resolve the gate with, in the order clients offer them; Intent is the one
 // it was resolved with, its Status the one gates.toml gives that intent.
 // Deadline is zero for a gate that waits for ever; one that passes resolves
@@ -70,3 +72,7 @@ type Gate struct {
 	OpenedAt time.Time
 	ClosedAt time.Time
 }
+
+// ProposalSubject is the Subject of a gate on item proposal id when no
+// message mirrors it, so it never reads as a message id.
+func ProposalSubject(id int64) string { return "proposal/" + strconv.FormatInt(id, 10) }
