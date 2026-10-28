@@ -44,7 +44,7 @@ func (r *recorder) note(format string, args ...any) {
 
 func (r *recorder) OpenGate(_ context.Context, req source.GateRequest) (source.GateRef, error) {
 	r.note("open %s %s %s", req.Session, req.Draft.Kind, req.Draft.Text)
-	return source.GateRef{Gate: "g-1", Draft: 4}, nil
+	return source.GateRef{Gate: "g-1", Draft: 4, State: "approved"}, nil
 }
 
 func (r *recorder) RecordSent(_ context.Context, d source.Draft, session, tool string) (source.GateRef, error) {
@@ -152,16 +152,17 @@ func snapshot() source.Snapshot {
 			Confidence: "high", Ambiguity: "none", Provenance: "derived", Confirmed: true, TaskKey: pr.Key,
 			UserAt: t0, CreatedAt: t0, UpdatedAt: t0.Add(time.Hour),
 		}},
-		Facts:      []source.Fact{{Name: "pull.state", Value: source.String("OPEN")}, {Name: "pull.waiting", Value: source.Since(t0)}},
-		Signals:    []source.Signal{{Name: "stalled", On: true, Since: t0}, {Name: "ready"}},
-		Owes:       []source.Person{bru},
-		Offers:     []source.Offer{{Action: "pull.merge", Args: json.RawMessage(`{"method":"squash"}`)}},
-		Extraction: &source.ExtractionHealth{Pending: 3, BudgetHit: true, Oldest: t0},
-		Contexts:   []string{"@repo-api"},
-		Due:        t0.Add(48 * time.Hour),
-		Links:      []source.Link{{URL: "https://chat.example/archives/C1/p1", Kind: "mentions", Item: "pull:review", Evidence: anchor}},
-		Facets:     map[string]string{"repo": "acme/api", "author": "ana"},
-		Views:      []string{"needs-me", "all"},
+		Facts:       []source.Fact{{Name: "pull.state", Value: source.String("OPEN")}, {Name: "pull.waiting", Value: source.Since(t0)}},
+		Signals:     []source.Signal{{Name: "stalled", On: true, Since: t0}, {Name: "ready"}},
+		Owes:        []source.Person{bru},
+		Offers:      []source.Offer{{Action: "pull.merge", Args: json.RawMessage(`{"method":"squash"}`)}},
+		Extraction:  &source.ExtractionHealth{Pending: 3, BudgetHit: true, Oldest: t0},
+		Contexts:    []string{"@repo-api"},
+		Due:         t0.Add(48 * time.Hour),
+		Links:       []source.Link{{URL: "https://chat.example/archives/C1/p1", Kind: "mentions", Item: "pull:review", Evidence: anchor}},
+		Facets:      map[string]string{"repo": "acme/api", "author": "ana"},
+		Views:       []string{"needs-me", "all"},
+		FacetValues: map[string][]string{"waits-on": {"me", "ana"}},
 	}
 }
 
@@ -234,7 +235,7 @@ func (s tooler) CallTool(ctx context.Context, call source.ToolCall) (source.Tool
 		"effects": se.AllowedEffects, "answer": ans.Text, "model": ans.Model, "cost": *ans.CostUSD, "item": res[0].Item,
 		"priority": source.CallOf(ctx).Priority, "wake": errors.Is(wakeErr, source.ErrUnsupported),
 		"event": evs[0].Key, "host": string(cfg.Host), "prompt": string(prompt),
-		"gate": gate.Gate, "draft": gate.Draft, "moved": moved, "written": written,
+		"gate": gate.Gate, "draft": gate.Draft, "state": gate.State, "moved": moved, "written": written,
 	})
 	return source.ToolResult{Answer: "read", Fields: out}, nil
 }
@@ -265,7 +266,7 @@ func TestBrokerCallbackReachesTheHost(t *testing.T) {
 	}
 	want := map[string]any{"effects": []any{"pull.nudged"}, "answer": "yes", "model": "small-1", "cost": 0.02, "item": "icreate",
 		"priority": float64(source.PriorityBackground), "wake": true, "event": "review:9", "host": `{"sweep":{"fast":"1m"}}`, "prompt": "profile prompts/extract.md",
-		"gate": "g-1", "draft": float64(4), "moved": float64(1), "written": false}
+		"gate": "g-1", "draft": float64(4), "state": "approved", "moved": float64(1), "written": false}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("tool result %v, want %v", got, want)
 	}

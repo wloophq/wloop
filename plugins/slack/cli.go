@@ -26,12 +26,30 @@ const (
 	CommandStatus = "status"
 )
 
+// CommandEval is the command the running plugin serves, through the
+// daemon: it reads the plugin's store and asks the host's agent.
+const CommandEval = "eval"
+
 // exitUsage is the exit code of a command line the plugin does not take.
 const exitUsage = 2
 
 // RunCLI runs login, logout or status with no daemon and no store: they
-// read and write only the Keychain and call Slack.
+// read and write only the Keychain and call Slack. The running plugin runs
+// eval instead, and only it.
 func (s *Plugin) RunCLI(ctx context.Context, req src.CLIRequest, stdout, stderr io.Writer) (int, error) {
+	eval := len(req.Args) > 0 && req.Args[0] == CommandEval
+	p, err := s.running()
+	switch {
+	case err == nil && !eval:
+		return 1, errors.New("the running Slack plugin runs only slack eval; login, logout and status run the plugin binary")
+	case err == nil:
+		if err := p.eval(ctx, req.Args[1:], stdout, stderr); err != nil {
+			return 1, err
+		}
+		return 0, nil
+	case eval:
+		return 1, errors.New("slack eval runs in the running daemon's Slack plugin")
+	}
 	cfg, err := config.Parse(req.Config, brand())
 	if err != nil {
 		return 1, err

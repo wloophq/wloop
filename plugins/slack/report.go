@@ -321,11 +321,17 @@ func (p *plugin) snapshot(u unit.Unit, in *slackrows.Input, tasks []src.Task, no
 		s.Card = &c
 	}
 	for id, vs := range row.Facets {
-		if len(vs) > 0 {
+		switch {
+		case len(vs) == 1:
 			if s.Facets == nil {
 				s.Facets = map[string]string{}
 			}
 			s.Facets[id] = vs[0]
+		case len(vs) > 1:
+			if s.FacetValues == nil {
+				s.FacetValues = map[string][]string{}
+			}
+			s.FacetValues[id] = slices.Clone(vs)
 		}
 	}
 	for _, it := range in.Items() {

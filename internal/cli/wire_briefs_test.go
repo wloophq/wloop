@@ -3,51 +3,14 @@ package cli
 import (
 	"context"
 	"path/filepath"
-	"slices"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
-	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/daemon"
-	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
-
-// extractingSource is an on-demand BriefSource whose job asks the brief
-// intent's fields itself.
-type extractingSource struct {
-	brief.GitHubSource
-	intent func() brief.Intent
-}
-
-func (s *extractingSource) UseIntent(intent func() brief.Intent)          { s.intent = intent }
-func (s *extractingSource) Want(context.Context, unit.Unit) (bool, error) { return true, nil }
-func (s *extractingSource) Watch(func(unit.Unit))                         {}
-
-func TestAnExtractingSourceGetsItsProvidersBriefIntentWithoutAQueue(t *testing.T) {
-	te := newTestEnv(t, &fake.Manager{})
-	userProfile(t, te, map[string]string{
-		"intents/thread-brief/intent.toml": `label = "Brief"
-summary = "A thread's brief"
-builds = "brief"
-provider = "slack"
-prompt = "prompts/brief.md"
-schema = "schema.json"
-`,
-		"intents/thread-brief/schema.json": `{"type":"object","properties":{"urgency":{"type":"string"}}}`,
-	})
-	src := &extractingSource{}
-	te.Env.wireBriefs(&serveWiring{Modules: []source.Module{{ID: "slack", Briefs: src}}, Engine: &engineDeps{}, Log: func(string, ...any) {}})
-	if src.intent == nil {
-		t.Fatal("no brief intent")
-	}
-	if got := src.intent().Schema.Missing(brief.Brief{}); !slices.Equal(got, []string{"urgency"}) {
-		t.Fatalf("the extraction's fields: %v", got)
-	}
-}
 
 func TestASlackOnlyDaemonBriefsSlackUnitsOnDemand(t *testing.T) {
 	t.Parallel()

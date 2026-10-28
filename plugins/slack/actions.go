@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/slack/send"
@@ -18,8 +19,6 @@ const (
 	// ActionThread names the thread unit of a message: the parent's thread
 	// when it names a reply.
 	ActionThread = "thread"
-	// ActionEval runs a slack eval command line.
-	ActionEval = "eval"
 )
 
 // SendArgs are ActionSend's arguments; DryRun posts nothing and says where
@@ -46,22 +45,14 @@ type ThreadArgs struct {
 	Message string `json:"message"`
 }
 
-// EvalArgs are ActionEval's arguments: the command line after "slack eval".
-type EvalArgs struct {
-	Args []string `json:"args"`
-}
-
-// EvalResult is what an eval command wrote.
-type EvalResult struct {
-	Output string `json:"output"`
-	Log    string `json:"log,omitempty"`
-}
-
 // Action runs one of the plugin's actions.
 func (s *Plugin) Action(ctx context.Context, req src.ActionRequest) (json.RawMessage, error) {
 	p, err := s.running()
 	if err != nil {
 		return nil, err
+	}
+	if slices.Contains([]string{ActionSend, ActionThread}, req.Action) && req.Actor != src.ActorPerson {
+		return nil, fmt.Errorf("slack %s is the person's command; an agent drafts with slack_draft or posts with the slack_* tools", req.Action)
 	}
 	switch req.Action {
 	case ActionSend:
@@ -91,26 +82,8 @@ func (s *Plugin) Action(ctx context.Context, req src.ActionRequest) (json.RawMes
 			return nil, err
 		}
 		return json.Marshal(u.Wire())
-	case ActionEval:
-		var a EvalArgs
-		if err := decodeArgs(req.Args, &a); err != nil {
-			return nil, err
-		}
-		var out, log bytes.Buffer
-		err := p.eval(ctx, a.Args, &out, &log)
-		if err != nil {
-			return nil, fmt.Errorf("%w%s", err, logTail(log.String()))
-		}
-		return json.Marshal(EvalResult{Output: out.String(), Log: log.String()})
 	}
 	return nil, fmt.Errorf("%w: no action %q", src.ErrNotFound, req.Action)
-}
-
-func logTail(s string) string {
-	if s == "" {
-		return ""
-	}
-	return "\n" + s
 }
 
 func decodeArgs(raw json.RawMessage, v any) error {

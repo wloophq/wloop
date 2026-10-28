@@ -14,7 +14,7 @@ Each fixture is one conversation as {{name}} stores it. A run puts each through 
 3. a **blind reader** writes the same briefing from the items alone;
 4. a **judge** compares the two briefings and gives a severity (`none`, `minor`, `major`, `critical`) and the causes of each gap (`missing_item`, `spurious_item`, `wrong_assignee`, `wrong_waiting_on`, `wrong_state`, `wrong_resolution`, `missing_link`, `vague_summary`, `missing_context`, `wrong_verdict`, `other`).
 
-Each command runs in the Slack plugin through the running daemon, which reads the plugin's store and asks its agent. The extractor runs on the fast tier; the oracle, the blind reader and the judge on the frontier tier. Every stage's answer is cached under the output directory by the key of its inputs, so a rerun pays only for what changed.
+Each command runs in the Slack plugin through the running daemon, which reads the plugin's store and asks its agent; its output reaches the terminal as the plugin writes it. The extractor runs on the fast tier; the oracle, the blind reader and the judge on the frontier tier. Every stage's answer is cached under the output directory by the key of its inputs, so a rerun pays only for what changed.
 
 ## Commands
 

@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -165,8 +166,11 @@ type Deps struct {
 	// PluginAction runs an action of plugin id that names no unit; nil
 	// runs none.
 	PluginAction func(ctx context.Context, id string, req api.PluginActionRequest) (json.RawMessage, error)
-	Sweep        Sweeper // nil registers no sweep job
-	Actions      Actions // nil answers 503 to delegated actions
+	// PluginRun runs a command line of running plugin id, writing as it
+	// goes; nil runs none.
+	PluginRun func(ctx context.Context, id string, args []string, stdout, stderr io.Writer) (exit int, err error)
+	Sweep     Sweeper // nil registers no sweep job
+	Actions   Actions // nil answers 503 to delegated actions
 	// Intents is the registry as the profile defines it now, read on every
 	// rows rebuild and action; nil serves the bundled intents.
 	Intents func() *intentload.Loaded

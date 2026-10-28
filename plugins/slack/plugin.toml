@@ -297,7 +297,17 @@ doc = "A problem: text is missing or empty."
 
 [[source.tools.answers]]
 name = "proposed"
-doc = "The draft waits for the user, or its policy approved it."
+doc = "The draft waits for the user's approval."
+fields = [{ name = "ID", number = true }, { name = "Unit" }, { name = "Where" }]
+
+[[source.tools.answers]]
+name = "approved"
+doc = "The draft's policy approved it, and it will be posted."
+fields = [{ name = "ID", number = true }, { name = "Unit" }, { name = "Where" }]
+
+[[source.tools.answers]]
+name = "dry_run"
+doc = "The draft's approval is a dry run: it is stored and never posted."
 fields = [{ name = "ID", number = true }, { name = "Unit" }, { name = "Where" }]
 
 [[source.tools]]

@@ -327,6 +327,17 @@ func TestUserGroupsAreNamedNotShownByID(t *testing.T) {
 	if got := r.Facets[slackrows.FacetChannel]; !slices.Equal(got, []string{"general"}) {
 		t.Errorf("channel facet %v", got)
 	}
+	in, err := f.p.rowsSource().Load(context.Background(), []unit.Unit{u})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap, _ := f.p.snapshot(u, in[u], nil, f.now)
+	if got := snap.FacetValues[slackrows.FacetWaitsOn]; !slices.Equal(got, []string{"@team-a", dslack.UnknownGroup}) {
+		t.Errorf("reported waits-on facet %v", got)
+	}
+	if got := snap.Facets[slackrows.FacetChannel]; got != "general" {
+		t.Errorf("reported channel facet %q", got)
+	}
 	c := f.card(t, u)
 	if len(c.WaitsOn) != 2 || c.WaitsOn[0].Name != "@team-a" || c.WaitsOn[1].Name != dslack.UnknownGroup {
 		t.Errorf("card waits on %+v", c.WaitsOn)

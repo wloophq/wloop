@@ -1,6 +1,7 @@
 package source_test
 
 import (
+	"cmp"
 	"context"
 	"strings"
 	"testing"
@@ -34,23 +35,26 @@ func (s gateSessions) BookOf(context.Context, string) (dturn.Book, bool, error) 
 
 type gateDrafts struct {
 	proposed, sent []outbox.Proposal
+	// policy is the state the approval policy leaves a proposed draft in.
+	policy draft.State
 }
 
 func (d *gateDrafts) Propose(_ context.Context, p outbox.Proposal) (draft.Draft, error) {
 	d.proposed = append(d.proposed, p)
-	return draft.Draft{ID: draft.ID(len(d.proposed))}, nil
+	return draft.Draft{ID: draft.ID(len(d.proposed)), State: cmp.Or(d.policy, draft.Proposed)}, nil
 }
 
 func (d *gateDrafts) RecordSent(_ context.Context, p outbox.Proposal, _ draft.Evidence) (draft.Draft, error) {
 	d.sent = append(d.sent, p)
-	return draft.Draft{ID: draft.ID(len(d.sent))}, nil
+	return draft.Draft{ID: draft.ID(len(d.sent)), State: draft.Sent}, nil
 }
 
 func (d *gateDrafts) PublisherOf(dr draft.Draft) unit.ProviderID { return dr.Unit.Provider }
 
 // gatesOver is the gates of plugin acme, whose tool post_now posts at once,
-// with session live and session gone closed, both on the turn of a reply
-// intent on acme's unit t1 that allows the effect unit.closed.
+// with session live on the turn of a reply intent on acme's unit t1 that
+// allows the effect unit.closed, session bare live with no turn, and
+// session gone closed.
 func gatesOver(t *testing.T) (src.Gates, *gateDrafts) {
 	t.Helper()
 	c, err := codec.Of("acme", manifest.Codec{Keys: []string{"{thread}"}})
@@ -65,7 +69,7 @@ func gatesOver(t *testing.T) (src.Gates, *gateDrafts) {
 	b := &psource.Broker{ID: "acme", Units: psource.Units{Codecs: unit.NewRegistry(c)},
 		Manifest: &manifest.Source{Tools: []manifest.Tool{{Name: "post_now", Posts: "now"}, {Name: "read_only"}}},
 		Hosted: &psource.Hosted{Drafts: ds,
-			Sessions: gateSessions{sessions: map[string]dturn.Session{"live": {ID: "live"}, "gone": {ID: "gone", ClosedAt: at}}, book: book},
+			Sessions: gateSessions{sessions: map[string]dturn.Session{"live": {ID: "live"}, "bare": {ID: "bare"}, "gone": {ID: "gone", ClosedAt: at}}, book: book},
 			Intents: func() *dintent.Registry {
 				return dintent.NewRegistry([]dintent.Def{{Name: "reply", AllowedEffects: []string{"unit.closed"}}})
 			}}}
@@ -147,5 +151,82 @@ func TestADirectPostRecordsAsASentDraftOfTheSessionsTurn(t *testing.T) {
 	}
 	if p := ds.sent[0]; p.Origin.Kind != draft.OriginSession || p.Origin.TurnSeq != 7 {
 		t.Fatalf("recorded %+v, want the session's turn as its origin", p)
+	}
+}
+
+func TestAPostWithNoSessionRecordsAsASentDraftOfNoTurn(t *testing.T) {
+	t.Parallel()
+	for _, session := range []string{"", "bare"} {
+		g, ds := gatesOver(t)
+		d := src.Draft{Unit: plugin.Unit{Provider: "acme", Key: "t2"}, Purpose: "reply", Delivery: "message", Text: "hi"}
+		ref, err := g.RecordSent(context.Background(), d, session, "post_now")
+		if err != nil {
+			t.Fatalf("session %q: %v", session, err)
+		}
+		if p := ds.sent[0]; p.Origin != (draft.Origin{Kind: draft.OriginSession}) || ref.State != string(draft.Sent) {
+			t.Fatalf("session %q: recorded %+v as %q, want the session origin, sent", session, p, ref.State)
+		}
+	}
+	g, ds := gatesOver(t)
+	if _, err := g.RecordSent(context.Background(), src.Draft{Unit: plugin.Unit{Provider: "acme", Key: "t2"}, Text: "hi"}, "", "read_only"); err == nil ||
+		len(ds.sent) != 0 {
+		t.Fatalf("a tool that does not post at once with no session: %v, %+v", err, ds.sent)
+	}
+}
+
+func TestASessionWithNoTurnDraftsOnThePluginsUnitWithTheSessionAsOrigin(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	own := plugin.Unit{Provider: "acme", Key: "t2"}
+	g, ds := gatesOver(t)
+	ref, err := g.OpenGate(ctx, src.GateRequest{Draft: src.Draft{Unit: own, Kind: "reply", Text: "any news?"}, Session: "bare"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := ds.proposed[0]; p.Origin != (draft.Origin{Kind: draft.OriginSession}) || p.Unit.Key != "t2" || len(p.Items) != 0 || p.Task != "" ||
+		ref.State != string(draft.Proposed) {
+		t.Fatalf("proposed %+v as %q, want t2 with the session origin", p, ref.State)
+	}
+	for name, req := range map[string]src.GateRequest{
+		"items":            {Draft: src.Draft{Unit: own, Kind: "reply", Text: "hi", Items: []string{"i1"}}, Session: "bare"},
+		"effects":          {Draft: src.Draft{Unit: own, Kind: "reply", Text: "hi", Effects: []string{"unit.closed"}}, Session: "bare"},
+		"another's unit":   {Draft: src.Draft{Unit: plugin.Unit{Provider: "github", Key: "o/r#1"}, Kind: "reply", Text: "hi"}, Session: "bare"},
+		"a closed session": {Draft: src.Draft{Unit: own, Kind: "reply", Text: "hi"}, Session: "gone"},
+	} {
+		g, ds := gatesOver(t)
+		if _, err := g.OpenGate(ctx, req); err == nil || len(ds.proposed) != 0 {
+			t.Fatalf("%s: %v, proposed %+v", name, err, ds.proposed)
+		}
+	}
+}
+
+func TestAGateAnswersTheStateThePolicyLeftItsDraftIn(t *testing.T) {
+	t.Parallel()
+	for _, st := range []draft.State{draft.Proposed, draft.Approved, draft.Discarded} {
+		g, ds := gatesOver(t)
+		ds.policy = st
+		ref, err := g.OpenGate(context.Background(), src.GateRequest{Draft: src.Draft{Unit: plugin.Unit{Provider: "acme", Key: "t1"}, Kind: "reply", Text: "hi"},
+			Session: "live"})
+		if err != nil || ref.State != string(st) {
+			t.Fatalf("policy %s: ref %+v, %v", st, ref, err)
+		}
+	}
+}
+
+func TestAToolThatPostsAtOnceIsRefusedForASessionThatIsNotLive(t *testing.T) {
+	t.Parallel()
+	at := time.Date(2026, 10, 28, 9, 0, 0, 0, time.UTC)
+	tools := psource.Tools{ID: "acme", Kind: &psource.Kind{},
+		Manifest: &manifest.Source{Tools: []manifest.Tool{{Name: "post_now", Posts: "now"}, {Name: "read_only"}}},
+		Sessions: gateSessions{sessions: map[string]dturn.Session{"live": {ID: "live"}, "gone": {ID: "gone", ClosedAt: at}}}}
+	for _, session := range []string{"gone", "nobody"} {
+		if _, err := tools.Call(context.Background(), "post_now", nil, session, ""); err == nil || !strings.Contains(err.Error(), "not live") {
+			t.Fatalf("post_now for session %q: %v, want a refusal before the plugin runs", session, err)
+		}
+	}
+	for _, c := range []struct{ tool, session string }{{"post_now", "live"}, {"post_now", ""}, {"read_only", "gone"}} {
+		if _, err := tools.Call(context.Background(), c.tool, nil, c.session, ""); err == nil || strings.Contains(err.Error(), "not live") {
+			t.Fatalf("%s for session %q: %v, want the call to reach the plugin, which is not running", c.tool, c.session, err)
+		}
 	}
 }

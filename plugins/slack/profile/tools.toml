@@ -91,7 +91,9 @@ failed = "Nothing was drafted: {{.Error}}"
 problem_kind = "kind: one of {{.Kinds}}"
 problem_reaction_required = "reaction: required for a react draft"
 problem_text_required = "text: required, not empty"
-proposed = "Proposed draft {{.ID}} on {{.Unit}}: it will be posted to {{or .Where \"its conversation\"}} once the user, or their approval policy, approves it in the {{.Name}} Outbox; nothing was posted yet."
+proposed = "Proposed draft {{.ID}} on {{.Unit}}: it will be posted to {{or .Where \"its conversation\"}} once the user approves it in the {{.Name}} Outbox; nothing was posted."
+approved = "Draft {{.ID}} on {{.Unit}} is approved by its policy and will be posted to {{or .Where \"its conversation\"}}; nothing was posted yet."
+dry_run = "Draft {{.ID}} on {{.Unit}} is a dry run: its approval stores drafts and never sends them, so it will not be posted to {{or .Where \"its conversation\"}}."
 
 [slack_react]
 description = "Add a reaction to a Slack message as the user, or remove one, at once and without their approval, such as swapping an hourglass for a check mark on a status reply. When it is unclear whether the user wants it, ask them first."

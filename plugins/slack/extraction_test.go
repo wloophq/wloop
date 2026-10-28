@@ -281,3 +281,45 @@ func TestUntrackedFollowDoesNotKeepTheWatch(t *testing.T) {
 		t.Fatalf("an untracked follow kept the extraction watch: %+v", o)
 	}
 }
+
+func TestAFirstTurnsBriefWantReadsAWaitingThreadWithTheBriefIntentsFields(t *testing.T) {
+	f := newFixture(t)
+	f.host.Configured = src.Config{BriefIntent: &src.BriefIntent{ExtraSchema: json.RawMessage(`{"type":"object","properties":{"approach":{"type":"string"}}}`),
+		FieldVersions: map[string]string{"approach": "f1-abc"}}}
+	var schemas []string
+	f.host.AskFunc = func(_ context.Context, req src.AskRequest) (src.AskResult, error) {
+		schemas = append(schemas, string(req.Schema))
+		return src.AskResult{Text: string(extractionAnswer(t, ts(1), nil)), Model: "scripted"}, nil
+	}
+	f.login(t)
+	f.now = tsAt(1)
+	f.seed(t, dslack.Facts{
+		Conversations: []dslack.Conversation{{ID: chan1, Name: "general", Kind: dslack.KindChannel, IsMember: true}},
+		Threads:       []dslack.Thread{{Conversation: chan1, TS: ts(1), Messages: []dslack.Message{{TS: ts(1), User: other, Text: "<@U0001> review please"}}}},
+	})
+	thread := dslack.ThreadUnit(team, chan1, ts(1))
+	running := &Plugin{p: f.p}
+	ctx := context.Background()
+	if want, err := running.BriefWant(ctx, thread.Wire()); err != nil || want {
+		t.Fatalf("a want before anything is waiting: %v %v", want, err)
+	}
+	f.now = tsAt(1).Add(10 * time.Second)
+	if _, _, err := f.p.job.Run(ctx); err != nil || len(schemas) != 0 {
+		t.Fatalf("a pass before quiet_for: %v, %d asks", err, len(schemas))
+	}
+	if want, err := running.BriefWant(ctx, thread.Wire()); err != nil || !want {
+		t.Fatalf("a thread waiting to be read: %v %v", want, err)
+	}
+	if _, _, err := f.p.job.Run(ctx); err != nil || len(schemas) != 1 {
+		t.Fatalf("the wanted pass: %v, %d asks", err, len(schemas))
+	}
+	if !strings.Contains(schemas[0], `"approach"`) {
+		t.Fatalf("the extraction asked for no brief field of the intent: %s", schemas[0])
+	}
+	if bs := f.host.Briefs(); len(bs) != 1 || unit.Of(bs[0].Unit) != thread {
+		t.Fatalf("briefs %+v", bs)
+	}
+	if _, err := (&Plugin{}).BriefWant(ctx, thread.Wire()); err == nil {
+		t.Fatal("a plugin that is not running answered a want")
+	}
+}

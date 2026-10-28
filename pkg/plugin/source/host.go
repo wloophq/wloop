@@ -224,6 +224,9 @@ type Session struct {
 type GateRef struct {
 	Gate  string
 	Draft int64
+	// State is the draft's state once the host's approval policy saw it:
+	// "proposed", "approved", or "discarded" under dry run.
+	State string
 }
 
 // Event is an event on a unit, for the timelines of its tasks.

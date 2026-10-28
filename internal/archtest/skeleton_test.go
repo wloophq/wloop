@@ -22,7 +22,7 @@ var skeleton = map[string][]string{
 	"internal/core/port": {"Heat", "HeatActive", "HeatWarm", "HeatCold", "HeatReader", "TopicLinks", "TopicItems",
 		"TopicCards", "TopicTasks", "TopicDrafts", "Linker", "LinkStore", "Effects", "Validator",
 		"Topic", "TopicPending", "TopicGates", "TopicWakes", "TopicTimeline", "TopicRuns"},
-	"internal/adapter/store/sqlite": {"SchemaVersion", "DB.PutPluginBrief", "PropStore", "PropStore.SetProp",
+	"internal/adapter/store/sqlite": {"SchemaVersion", "DB.PutUnitBrief", "PropStore", "PropStore.SetProp",
 		"PropStore.PropsOf", "DB.Props", "v7Props", "v7Gates", "v7Briefs", "v7Kinds", "v7Wakes", "v7PRTasks", "v7Dossiers",
 		"v7PluginStores", "v7Snapshots"},
 	"internal/domain/link": {"Kind", "Kind.Valid", "Origin", "Facts", "Link", "EventKind", "Event"},

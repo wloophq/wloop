@@ -58,11 +58,14 @@ func (g gates) OpenGate(ctx context.Context, req src.GateRequest) (src.GateRef, 
 	if err != nil {
 		return src.GateRef{}, err
 	}
+	p.Unit = u
 	b, t, err := g.turnOf(ctx, req.Session)
+	if errors.Is(err, errNoTurn) {
+		return g.openOutside(ctx, p, req.Session)
+	}
 	if err != nil {
 		return src.GateRef{}, err
 	}
-	p.Unit = u
 	if u != b.Unit {
 		switch {
 		case len(p.Items) > 0:
@@ -95,12 +98,46 @@ func (g gates) OpenGate(ctx context.Context, req src.GateRequest) (src.GateRef, 
 	return g.open(ctx, p)
 }
 
+// openOutside proposes p for a live session with no turn: on one of the
+// plugin's own units, answering no item and declaring no effect, its
+// origin the session.
+func (g gates) openOutside(ctx context.Context, p outbox.Proposal, session string) (src.GateRef, error) {
+	switch {
+	case p.Unit.Provider != unit.ProviderID(g.b.ID):
+		return src.GateRef{}, fmt.Errorf("%w: plugin %s drafts for it only on its own units", errNoTurn, g.b.ID)
+	case len(p.Items) > 0:
+		return src.GateRef{}, fmt.Errorf("%w: its drafts answer no items", errNoTurn)
+	case len(p.Effects) > 0:
+		return src.GateRef{}, fmt.Errorf("%w: its drafts declare no effects", errNoTurn)
+	}
+	if err := liveSession(ctx, g.b.Hosted.Sessions, session); err != nil {
+		return src.GateRef{}, err
+	}
+	p.Origin = draft.Origin{Kind: draft.OriginSession}
+	return g.open(ctx, p)
+}
+
 func (g gates) open(ctx context.Context, p outbox.Proposal) (src.GateRef, error) {
 	d, err := g.b.Hosted.Drafts.Propose(ctx, p)
 	if err != nil {
 		return src.GateRef{}, err
 	}
-	return src.GateRef{Gate: "draft", Draft: int64(d.ID)}, nil
+	return src.GateRef{Gate: "draft", Draft: int64(d.ID), State: string(d.State)}, nil
+}
+
+// liveSession refuses a session the host does not know or that has closed.
+func liveSession(ctx context.Context, sessions SessionBooks, id string) error {
+	if sessions == nil {
+		return src.ErrUnsupported
+	}
+	s, ok, err := sessions.Session(ctx, id)
+	switch {
+	case err != nil:
+		return err
+	case !ok || !s.ClosedAt.IsZero():
+		return fmt.Errorf("session %q is not live", id)
+	}
+	return nil
 }
 
 var errNoTurn = errors.New("the session has no turn")
@@ -152,29 +189,28 @@ func sessionOrigin(b dturn.Book, t *dturn.Turn, u unit.Unit, kind draft.OriginKi
 
 // RecordSent records a post one of the plugin's tools made at once, on the
 // plugin's unit it landed in, as a sent draft whose origin is the session's
-// newest turn. A tool the manifest does not mark posts = "now", or a
+// newest turn, or the session itself when it has none or the call named
+// no session. A tool the manifest does not mark posts = "now", or a named
 // session that is not live, is refused.
 func (g gates) RecordSent(ctx context.Context, d src.Draft, session, tool string) (src.GateRef, error) {
 	h := g.b.Hosted
 	if h == nil || h.Drafts == nil || h.Sessions == nil {
 		return src.GateRef{}, src.ErrUnsupported
 	}
-	if g.b.Manifest == nil || !slices.ContainsFunc(g.b.Manifest.Tools, func(t manifest.Tool) bool { return t.Name == tool && t.Posts == "now" }) {
+	if !postsNow(g.b.Manifest, tool) {
 		return src.GateRef{}, fmt.Errorf("tool %s of plugin %s does not post at once", tool, g.b.ID)
 	}
-	s, ok, err := h.Sessions.Session(ctx, session)
-	switch {
-	case err != nil:
-		return src.GateRef{}, err
-	case !ok || !s.ClosedAt.IsZero():
-		return src.GateRef{}, fmt.Errorf("session %q is not live", session)
+	if session != "" {
+		if err := liveSession(ctx, h.Sessions, session); err != nil {
+			return src.GateRef{}, err
+		}
 	}
 	u, err := g.b.Units.Own(g.b.ID, d.Unit)
 	if err != nil {
 		return src.GateRef{}, err
 	}
 	origin := draft.Origin{Kind: draft.OriginSession}
-	if b, t, err := g.turnOf(ctx, session); err == nil {
+	if b, t, err := g.turnOf(ctx, session); session != "" && err == nil {
 		origin = sessionOrigin(b, t, u, draft.OriginSession)
 	}
 	p := outbox.Proposal{Unit: u, Purpose: d.Purpose, Delivery: draft.Delivery(d.Delivery), Target: d.Target, Text: d.Text, Reaction: d.Reaction,
@@ -183,7 +219,12 @@ func (g gates) RecordSent(ctx context.Context, d src.Draft, session, tool string
 	if err != nil {
 		return src.GateRef{}, err
 	}
-	return src.GateRef{Gate: "draft", Draft: int64(sent.ID)}, nil
+	return src.GateRef{Gate: "draft", Draft: int64(sent.ID), State: string(sent.State)}, nil
+}
+
+// postsNow says the manifest marks tool posts = "now".
+func postsNow(m *manifest.Source, tool string) bool {
+	return m != nil && slices.ContainsFunc(m.Tools, func(t manifest.Tool) bool { return t.Name == tool && t.Posts == "now" })
 }
 
 // RehomeDrafts moves the drafts of each move's From onto its To, both the

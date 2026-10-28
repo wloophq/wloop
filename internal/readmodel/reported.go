@@ -246,6 +246,9 @@ func (p *Reported) Derive(base Base, in any, at time.Time) (api.Row, error) {
 	for id, v := range s.Facets {
 		r.Facets[id] = []string{v}
 	}
+	for id, vs := range s.FacetValues {
+		r.Facets[id] = slices.Clone(vs)
+	}
 	for _, it := range s.Items {
 		r.Items = append(r.Items, api.RowItem{ID: it.ID, Kind: it.Kind, Summary: it.Summary, State: it.State,
 			WaitingOn: personKeys(it.WaitingOn), Since: it.CreatedAt})

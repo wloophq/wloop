@@ -120,7 +120,7 @@ func serve(ctx context.Context, e *Env, args []string) error {
 	e.Rec = storeRecorder{store}
 	e.interrupted = new(atomic.Bool)
 	e.Rounds = sqlite.NewRounds(db)
-	endpoint := mcpEndpoint{port: *mcpPort, log: logf, tools: e.pluginTools, key: e.mcpKey,
+	endpoint := mcpEndpoint{port: *mcpPort, log: logf, tools: e.pluginTools(db), key: e.mcpKey,
 		intents: func() *dintent.Registry {
 			if l := e.loadedIntents(); l != nil {
 				return l.Registry
@@ -347,6 +347,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	d.PluginPresenter = e.pluginPresenter
 	d.Items = e.itemsLedger(db, cfg, logf)
 	d.PluginAction = e.pluginAction
+	d.PluginRun = e.pluginRun
 	if e.pluginKind != nil {
 		d.Loading = e.pluginKind.Loading
 	}

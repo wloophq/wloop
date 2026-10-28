@@ -35,7 +35,9 @@ const (
 
 	slackActionSend   = "send"
 	slackActionThread = "thread"
-	slackActionEval   = "eval"
+
+	// slackEvalCommand runs in the running plugin, through the daemon.
+	slackEvalCommand = "eval"
 )
 
 // slackEnv is how the Slack commands reach the terminal; tests replace each.
@@ -320,13 +322,14 @@ func (e *Env) slackEval(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	var res struct{ Output, Log string }
-	if err := c.PluginAction(ctx, string(slackPlugin), slackActionEval, map[string][]string{"args": args}, &res); err != nil {
+	exit, err := c.PluginRun(ctx, string(slackPlugin), append([]string{slackEvalCommand}, args...), e.Out, e.Err)
+	if err != nil {
 		return err
 	}
-	fmt.Fprint(e.Err, res.Log)
-	_, err = fmt.Fprint(e.Out, res.Output)
-	return err
+	if exit != 0 {
+		return exitCode(exit)
+	}
+	return nil
 }
 
 // absPathFlags is args with the value of each flag of names made absolute,

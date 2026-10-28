@@ -498,3 +498,12 @@ func TestSlackLoginRunsWithoutTheDaemon(t *testing.T) {
 		})
 	}
 }
+
+func TestEvalRunsOnlyInTheRunningPlugin(t *testing.T) {
+	t.Parallel()
+	var out, errOut bytes.Buffer
+	if _, err := (&Plugin{}).RunCLI(context.Background(), src.CLIRequest{Args: []string{CommandEval, "score"}}, &out, &errOut); err == nil ||
+		!strings.Contains(err.Error(), "running daemon") {
+		t.Fatalf("eval in CLI mode: %v", err)
+	}
+}

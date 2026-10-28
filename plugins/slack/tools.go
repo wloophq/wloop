@@ -418,7 +418,8 @@ func (t tools) draft(ctx context.Context, raw json.RawMessage) src.ToolResult {
 
 // propose opens the gate of d for the session: on the unit of the
 // session's turn, or on the unit of its message target when that is
-// another, which answers none of the turn's items and declares no effect.
+// another or the session has no turn, which answers none of the turn's
+// items and declares no effect.
 func (t tools) propose(ctx context.Context, s *send.Service, d draft.Draft) (src.ToolResult, error) {
 	p := t.p
 	if d.Text != "" {
@@ -436,9 +437,7 @@ func (t tools) propose(ctx context.Context, s *send.Service, d draft.Draft) (src
 	if err != nil {
 		return src.ToolResult{}, err
 	}
-	if sess.Unit == (src.Session{}).Unit {
-		return src.ToolResult{}, errNoDraftTurn
-	}
+	noTurn := sess.Unit == (src.Session{}).Unit
 	turnUnit := unit.Of(sess.Unit)
 	d.Unit = turnUnit
 	if send.IsMessage(d.Target) {
@@ -446,7 +445,7 @@ func (t tools) propose(ctx context.Context, s *send.Service, d draft.Draft) (src
 		if err != nil {
 			return src.ToolResult{}, err
 		}
-		if ok && u != turnUnit {
+		if ok && (noTurn || u != turnUnit) {
 			switch {
 			case len(d.Items) > 0:
 				return src.ToolResult{}, errors.New("items: a draft outside the turn's Slack unit answers none of its items")
@@ -455,6 +454,9 @@ func (t tools) propose(ctx context.Context, s *send.Service, d draft.Draft) (src
 			}
 			d.Unit = u
 		}
+	}
+	if noTurn && d.Unit == turnUnit {
+		return src.ToolResult{}, errNoDraftTurn
 	}
 	d.Purpose, d.Delivery = draft.ShapeOf(d.Kind)
 	ref, err := h.Gates.OpenGate(ctx, src.GateRequest{Draft: WireDraft(d), Session: t.session})
@@ -465,7 +467,19 @@ func (t tools) propose(ctx context.Context, s *send.Service, d draft.Draft) (src
 	if pub, err := p.publisher(); err == nil {
 		where, _ = pub.Where(ctx, d)
 	}
-	return answer("proposed", fields{"ID": ref.Draft, "Unit": d.Unit.String(), "Where": where}, false), nil
+	return answer(proposedAnswer(draft.State(ref.State)), fields{"ID": ref.Draft, "Unit": d.Unit.String(), "Where": where}, false), nil
+}
+
+// proposedAnswer is slack_draft's answer for a draft the approval policy
+// left in state st.
+func proposedAnswer(st draft.State) string {
+	switch st {
+	case draft.Approved:
+		return "approved"
+	case draft.Discarded:
+		return "dry_run"
+	}
+	return "proposed"
 }
 
 // The purposes of the posts a session makes itself.

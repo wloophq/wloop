@@ -570,7 +570,9 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `problem_kind` (`Kinds`): A problem: kind is none of the kinds.
   - `problem_reaction_required`: A problem: a react draft has no reaction.
   - `problem_text_required`: A problem: text is missing or empty.
-  - `proposed` (`ID`: number, `Unit`, `Where`): The draft waits for the user, or its policy approved it.
+  - `proposed` (`ID`: number, `Unit`, `Where`): The draft waits for the user's approval.
+  - `approved` (`ID`: number, `Unit`, `Where`): The draft's policy approved it, and it will be posted.
+  - `dry_run` (`ID`: number, `Unit`, `Where`): The draft's approval is a dry run: it is stored and never posted.
 - `slack_react`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.

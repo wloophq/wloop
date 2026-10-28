@@ -131,7 +131,7 @@ func newSessionWiring(t *testing.T) *sessionWiring {
 		_, err := te.pluginKind.Client(string(slackPlugin))
 		return err == nil
 	})
-	w.deps = (mcpEndpoint{tools: te.pluginTools, intents: func() *dintent.Registry { return te.loadedIntents().Registry }, texts: te.Env.toolTexts, log: w.logf}).wire(te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, nil), te.cfg)
+	w.deps = (mcpEndpoint{tools: te.pluginTools(db), intents: func() *dintent.Registry { return te.loadedIntents().Registry }, texts: te.Env.toolTexts, log: w.logf}).wire(te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, nil), te.cfg)
 	w.srv = w.deps.MCP.(*mcp.Server)
 	return w
 }
@@ -566,6 +566,40 @@ window = "10m"
 	}
 }
 
+func TestSlackDraftTellsTheAgentWhatItsApprovalPolicyDid(t *testing.T) {
+	t.Parallel()
+	for mode, c := range map[string]struct {
+		state draft.State
+		says  string
+	}{
+		"wait":    {draft.Proposed, "once the user approves it"},
+		"send":    {draft.Approved, "is approved by its policy"},
+		"dry_run": {draft.Discarded, "is a dry run"},
+	} {
+		t.Run(mode, func(t *testing.T) {
+			t.Parallel()
+			w := newSessionWiring(t)
+			files := bundledIntentAs(t, "act", "policy-act")
+			m := strings.Replace(files["intents/policy-act/intent.toml"], "role    = \"headless\"\n", "", 1)
+			files["intents/policy-act/intent.toml"] = m + "\n[drafts.approval]\nmode = \"" + mode + "\"\n"
+			userProfile(t, w.te, files)
+			u := slackThreadUnit("T000", sessChannel, sessParent)
+			if _, err := w.te.repo.Save(context.Background(), dturn.Book{Unit: u, Turns: []dturn.Turn{
+				{Intent: "policy-act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
+			}}); err != nil {
+				t.Fatal(err)
+			}
+			got, isErr := w.draftTool(t, draftHandle, `{"text":"on it"}`)
+			if isErr || !strings.Contains(got, c.says) {
+				t.Fatalf("slack_draft = %q, want it to say %q; broken %v", got, c.says, w.te.loadedIntents().Broken)
+			}
+			if ds := w.drafts(t); len(ds) != 1 || ds[0].State != c.state {
+				t.Fatalf("drafts %+v, want one %s", ds, c.state)
+			}
+		})
+	}
+}
+
 func TestSlackDraftFromAPullRequestTurnDraftsInThePermalinksThread(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
@@ -747,9 +781,10 @@ func TestPostingOutsideATurn(t *testing.T) {
 	link := "https://acme.slack.com/archives/" + sessThreaded + "/p" + strings.ReplaceAll(sessReply, ".", "") + "?thread_ts=" + sessParent + "&cid=" + sessThreaded
 	thread := slackThreadUnit("T000", sessThreaded, sessParent)
 	session := draft.Origin{Kind: draft.OriginSession}
-	for name, handle := range map[string]string{"a session with no turn": "term_other1", "no session": ""} {
+	for name, handle := range map[string]string{"a session with no turn": "term_other1", "no session": "", "a closed session": "term_closed1"} {
 		t.Run(name, func(t *testing.T) {
 			w := newSessionWiring(t)
+			w.te.registerSession(t, dturn.Session{ID: "term_closed1", WorkspaceID: "ws-1", ClosedAt: testNow})
 			w.st.srv.Handle("reactions.add", func(url.Values) any { return map[string]any{} })
 			if got, isErr := w.callTool(t, "", handle, "slack_send_message", `{"target":"`+link+`","text":"release 1.2 is out"}`); isErr {
 				t.Fatalf("slack_send_message = %q", got)
@@ -757,26 +792,27 @@ func TestPostingOutsideATurn(t *testing.T) {
 			if got, isErr := w.callTool(t, "", handle, "slack_react", `{"message":"`+link+`","emoji":"white_check_mark"}`); isErr {
 				t.Fatalf("slack_react = %q", got)
 			}
-			if n := len(w.st.srv.Calls("chat.postMessage")) + len(w.st.srv.Calls("reactions.add")); n != 2 {
-				t.Fatalf("posts %d", n)
-			}
-			records := 2
-			if handle == "" {
-				records = 0
-			}
 			for _, d := range w.drafts(t) {
 				if d.State != draft.Sent || d.Unit != thread || d.Origin != session {
 					t.Fatalf("record %+v", d)
 				}
 			}
-			if n := len(w.drafts(t)); n != records {
-				t.Fatalf("records %d, want %d", n, records)
+			if n := len(w.drafts(t)); n != 2 {
+				t.Fatalf("records %d", n)
 			}
-			if got, isErr := w.callTool(t, "", handle, "slack_draft", `{"text":"any news?","target":"`+link+`"}`); !isErr {
-				t.Fatalf("slack_draft outside a turn = %q", got)
-			}
-			if handle == "" {
+
+			got, isErr := w.callTool(t, "", handle, "slack_draft", `{"text":"any news?","target":"`+link+`"}`)
+			if handle != "term_other1" {
+				if !isErr || !strings.Contains(got, "slack_draft refused") {
+					t.Fatalf("slack_draft with no session = %q", got)
+				}
 				return
+			}
+			if isErr {
+				t.Fatalf("slack_draft = %q", got)
+			}
+			if d := w.drafts(t)[0]; d.State != draft.Proposed || d.Unit != thread || d.Origin != session || d.Approval.Mode != draft.Wait {
+				t.Fatalf("draft %+v", d)
 			}
 			if got, isErr := w.callTool(t, "", handle, "slack_draft", `{"text":"any news?"}`); !isErr || !strings.Contains(got, "no turn") {
 				t.Fatalf("slack_draft with no permalink = %q", got)

@@ -2,7 +2,9 @@ package cli
 
 import (
 	"context"
+	"io"
 	"net"
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
@@ -14,6 +16,8 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
+	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/source"
@@ -53,6 +57,7 @@ func startSlackDaemon(t *testing.T, te *slackTestEnv) *sqlite.DB {
 	d := withSources(withStore(daemon.Deps{Cfg: Defaults(), Version: "test", Now: time.Now, Log: t.Logf}, st), plugins, []source.Module{mod})
 	d.Ingest = nil
 	d.PluginAction = te.pluginAction
+	d.PluginRun = te.pluginRun
 	sock := filepath.Join(dir, "daemon.sock")
 	l, err := net.Listen("unix", sock)
 	if err != nil {
@@ -122,6 +127,49 @@ func TestFollowSendsTrackForTheThread(t *testing.T) {
 		t.Fatalf("conversations.replies calls %d, want one per ref or permalink without thread_ts", n)
 	}
 	assertNoSlackToken(t, te.out.String()+te.err.String())
+}
+
+func TestAnAgentSessionCannotRunThePersonsSlackSend(t *testing.T) {
+	t.Parallel()
+	te := newSlackTestEnv(t)
+	te.saveToken(t, fakeToken())
+	te.fakeChannel()
+	startSlackDaemon(t, te)
+	hc := &http.Client{Transport: client.UnixTransport(te.Socket)}
+	for _, handle := range []string{"term_agent1", ""} {
+		req, err := http.NewRequest(http.MethodPost, "http://"+brand.Name+api.PluginActionPath(string(slackPlugin), slackActionSend),
+			strings.NewReader(`{"args":{"target":"C0000000001","text":"hi"}}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set(api.Header, api.Version)
+		if handle != "" {
+			req.Header.Set(api.SessionHeader, handle)
+		}
+		resp, err := hc.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		posts := len(te.srv.Calls("chat.postMessage"))
+		switch {
+		case handle != "" && (resp.StatusCode == http.StatusOK || !strings.Contains(string(body), "person's command") || posts != 0):
+			t.Fatalf("an agent's slack send: %d %s, %d posts", resp.StatusCode, body, posts)
+		case handle == "" && (resp.StatusCode != http.StatusOK || posts != 1):
+			t.Fatalf("the person's slack send: %d %s, %d posts", resp.StatusCode, body, posts)
+		}
+	}
+}
+
+func TestSlackEvalRunsInTheRunningPlugin(t *testing.T) {
+	t.Parallel()
+	te := newSlackTestEnv(t)
+	te.saveToken(t, fakeToken())
+	startSlackDaemon(t, te)
+	if code := te.run("slack", "eval", "score"); code == 0 || !strings.Contains(te.err.String(), "--out is required") {
+		t.Fatalf("slack eval score with no flags: exit %d, %s%s", code, te.out, te.err)
+	}
 }
 
 func TestFollowRefusesWhatIsNotAPermalink(t *testing.T) {

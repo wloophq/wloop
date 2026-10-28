@@ -116,7 +116,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/doctor.go` `github` `1` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
 | `internal/config/config.go` `github` `7` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
 | `internal/config/plugins.go` `github` `1` | 🧾 | GitHub's settings are a field of the configuration until its plugin reads its table through the broker (X8a2) |
-| `internal/config/plugins.go` `slack` `1` | 🧾 | Slack's settings are a field of the configuration until its plugin reads its table through the broker (X7) |
+| `internal/config/plugins.go` `slack` `1` | 🧾 | Slack's settings are a field of the configuration while init and doctor read them there, until they ask the plugin (X9) |
 | `internal/intent/builtin/builtin.go` `slack` `1` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
 | `internal/intent/builtin/cmd/factsdoc/main.go` `slack` `1` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
 | `internal/intent/builtin/cmd/grammardoc/groups.go` `github` `8` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
