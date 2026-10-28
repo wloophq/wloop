@@ -10,7 +10,6 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
-	"github.com/wloophq/wloop/internal/github"
 )
 
 // DetailVersion is the shape of Detail this release reads; a stored detail
@@ -94,8 +93,8 @@ func FactsOf(p dinv.PR, d Detail, viewer string) pr.Facts {
 
 // GitHubOf is p as a by-ref read would have returned it to the sweep: its
 // FactsOf and, for a same-repository head, the base repository's owner.
-func GitHubOf(p dinv.PR, d Detail, viewer string) *github.PullRequest {
-	out := &github.PullRequest{Facts: FactsOf(p, d, viewer)}
+func GitHubOf(p dinv.PR, d Detail, viewer string) *pr.PullRequest {
+	out := &pr.PullRequest{Facts: FactsOf(p, d, viewer)}
 	if !p.IsFork {
 		out.HeadRepositoryOwner = p.Ref.Owner
 	}

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wloophq/wloop/internal/domain/pr"
+
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/workspaces"
 	"github.com/wloophq/wloop/internal/daemon"
@@ -66,7 +68,7 @@ func (a envActions) Remove(ctx context.Context, u unit.Unit, c daemon.Call) erro
 // finishedWorkspace is the workspace id names, or without one the only local
 // workspace of the pull request: linked to it, else on its branch when the
 // pull request comes from the same repository.
-func (e *Env) finishedWorkspace(ctx context.Context, ref github.Ref, pr *github.PullRequest, id string) (wsdomain.Workspace, error) {
+func (e *Env) finishedWorkspace(ctx context.Context, ref github.Ref, pr *pr.PullRequest, id string) (wsdomain.Workspace, error) {
 	repos, err := e.WS.Repos(ctx)
 	if err != nil {
 		return wsdomain.Workspace{}, err

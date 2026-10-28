@@ -18,7 +18,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/github"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/profile"
@@ -26,14 +25,14 @@ import (
 )
 
 // turnPR is a pull request as a turn reads it.
-func turnPR(pr *github.PullRequest) *turn.PR {
+func turnPR(pr *pr.PullRequest) *turn.PR {
 	return &turn.PR{Title: pr.Title, Author: pr.Author, State: pr.State, Association: pr.AuthorAssociation, Head: pr.HeadRefOid, Base: pr.BaseRefName, Labels: pr.Labels,
 		CrossRepository: pr.IsCrossRepository, Visibility: pr.Visibility, Prior: priorReview(pr.Reviews), ReviewRequested: pr.ViewerRequested, LastReviewVerdict: lastReviewVerdict(pr.Reviews)}
 }
 
 // prFacts resolves pr's facts for a predicate over the pull request; nil
 // without one.
-func prFacts(pr *github.PullRequest) expr.Facts {
+func prFacts(pr *pr.PullRequest) expr.Facts {
 	if pr == nil {
 		return nil
 	}
@@ -56,7 +55,7 @@ func priorReview(reviews []pr.Review) *turn.PriorReview {
 // basicsReader reads a turn's pull request with the read rounds already make.
 type basicsReader struct{ e *Env }
 
-func (b basicsReader) PR(ctx context.Context, ref github.Ref) (turn.PR, error) {
+func (b basicsReader) PR(ctx context.Context, ref pr.Ref) (turn.PR, error) {
 	pr, err := b.e.basics(ctx, ref)
 	if err != nil {
 		return turn.PR{}, err
@@ -199,7 +198,7 @@ func (e *Env) viewerLogin(ctx context.Context) (string, error) {
 		login, err = e.storedViewer(ctx)
 	}
 	if err != nil || login == "" {
-		if login, err = e.GitHub.Viewer(ctx); err != nil {
+		if login, err = e.forgeViewer(ctx); err != nil {
 			return "", err
 		}
 	}
@@ -358,7 +357,7 @@ func (e *Env) lastVerdict(b dturn.Book, intent turn.Intent) (dturn.Published, bo
 
 // openPR reads the pull request a round is about and refuses one that is
 // not open.
-func (e *Env) openPR(ctx context.Context, ref github.Ref) (*github.PullRequest, error) {
+func (e *Env) openPR(ctx context.Context, ref pr.Ref) (*pr.PullRequest, error) {
 	pr, err := e.basics(ctx, ref)
 	if err != nil {
 		return nil, err

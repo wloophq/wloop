@@ -4,16 +4,17 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/wloophq/wloop/internal/domain/pr"
+
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 )
 
 // addressWorkspace is the author workspace a triage round on ref runs in,
 // created by authorWorkspace when the PR, being mine, has none; action says
 // what was done, "" when it existed.
-func (e *Env) addressWorkspace(ctx context.Context, cfg config.Config, ref github.Ref, pr *github.PullRequest, mine func() (bool, error)) (ws wsdomain.Workspace, action string, err error) {
+func (e *Env) addressWorkspace(ctx context.Context, cfg config.Config, ref pr.Ref, pr *pr.PullRequest, mine func() (bool, error)) (ws wsdomain.Workspace, action string, err error) {
 	repos, err := e.WS.Repos(ctx)
 	if err != nil {
 		return ws, "", err

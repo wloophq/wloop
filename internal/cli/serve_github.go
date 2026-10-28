@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -27,6 +28,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/ghcli"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
@@ -172,6 +174,33 @@ func (e *Env) githubBudget() daemon.Budget { return ghsource.Budget{Limiter: e.G
 // githubIdentity is the viewer as the GitHub plugin knows them.
 func (e *Env) githubIdentity(st *inventory.Store, logf func(string, ...any)) func(context.Context) (src.Identity, error) {
 	return ghsource.Identity(st, e.GitHub, logf)
+}
+
+// forgeCalls is the forge's plugin as the round commands call it: the one
+// set on e, else the running plugin's client, else GitHub's in process.
+func (e *Env) forgeCalls() forgeCalls {
+	if e.forge != nil {
+		return e.forge
+	}
+	if e.pluginKind != nil {
+		if c, err := e.pluginKind.Client(string(unit.GitHub)); err == nil {
+			return c
+		}
+	}
+	return ghsource.Local{GH: e.GH, API: e.GitHub}
+}
+
+// forgeViewer is the viewer's login as the forge's plugin knows them.
+func (e *Env) forgeViewer(ctx context.Context) (string, error) {
+	id, err := e.forgeCalls().Identity(ctx)
+	if err != nil {
+		return "", err
+	}
+	login := readmodel.Login(unit.GitHub, id)
+	if login == "" {
+		return "", errors.New("the forge's plugin knows no viewer")
+	}
+	return login, nil
 }
 
 // githubLocator is the pull request of the checkout's branch, as gh reads it.

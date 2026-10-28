@@ -499,3 +499,7 @@ name = "pr.fingerprint"
 type = "string"
 doc = "What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips."
 untrusted = true
+
+[[source.commands]]
+name = "clone"
+usage = "<owner>/<name> <path>"

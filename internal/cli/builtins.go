@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/domain/pr"
+
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
 	"github.com/wloophq/wloop/internal/config"
@@ -15,7 +17,6 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/turn"
@@ -51,8 +52,8 @@ const (
 type sentRound struct {
 	env       *Env
 	ctx       context.Context
-	ref       github.Ref
-	pr        *github.PullRequest
+	ref       pr.Ref
+	pr        *pr.PullRequest
 	cfg       config.Config
 	inputs    map[string]any
 	id        string
@@ -150,7 +151,7 @@ type roundRun struct {
 	def dintent.Def
 	cfg config.Config
 	r   turn.Request
-	pr  *github.PullRequest
+	pr  *pr.PullRequest
 	// resumeOf is the turn a resume continues, 0 for a new round.
 	resumeOf int64
 	// st is the round state of a round asked for by hand; nil on a resume.

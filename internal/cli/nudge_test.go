@@ -15,7 +15,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -87,7 +86,7 @@ func TestNudgeWorkspaceOrder(t *testing.T) {
 	t.Parallel()
 	cfg := Defaults()
 	repos := nudgeManager().RepoList
-	pr := &github.PullRequest{Facts: pr.Facts{HeadRefName: "feat/x", State: dgh.StateOpen}}
+	pr := &pr.PullRequest{Facts: pr.Facts{HeadRefName: "feat/x", State: dgh.StateOpen}}
 	onHead := mainWS
 	onHead.Branch = "feat/x"
 	remoteMain := mainWS

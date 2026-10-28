@@ -267,7 +267,7 @@ func TestFindAuthorWorkspacePrefersAWorktreeOverTheMainCheckout(t *testing.T) {
 	yes := func() (bool, error) { return true, nil }
 	no := func() (bool, error) { return false, nil }
 	repos := []wsdomain.Repo{{ID: "r1", RemoteKey: "github.com/acme/api"}}
-	pr := &github.PullRequest{Facts: pr.Facts{Ref: github.Ref{Owner: "acme", Repo: "api", Number: 20}, HeadRefName: "feat/theirs"}}
+	pr := &pr.PullRequest{Facts: pr.Facts{Ref: github.Ref{Owner: "acme", Repo: "api", Number: 20}, HeadRefName: "feat/theirs"}}
 	for name, worktree := range map[string]wsdomain.Workspace{
 		"on the branch": {ID: "wt", RepoID: "r1", HostID: "local", Branch: "feat/theirs"},
 		"linked":        {ID: "wt", RepoID: "r1", HostID: "local", Branch: "other", LinkedPR: 20},

@@ -19,6 +19,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+
 	"github.com/wloophq/wloop/internal/brand"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	"github.com/wloophq/wloop/internal/ghcli"
@@ -214,14 +216,22 @@ type Response struct {
 }
 
 var (
-	ErrRateLimited  = errors.New("GitHub rate limited")
-	ErrUnavailable  = errors.New("GitHub unreachable")
-	ErrUnauthorized = errors.New("GitHub token refused")
-	ErrEmpty        = errors.New("GitHub returned an empty response")
+	ErrRateLimited  error = &unavailable{"GitHub rate limited"}
+	ErrUnavailable  error = &unavailable{"GitHub unreachable"}
+	ErrUnauthorized       = errors.New("GitHub token refused")
+	ErrEmpty              = errors.New("GitHub returned an empty response")
 	// errTimedOut is one attempt outliving Options.Timeout while the caller's
 	// context is still live, or a query GitHub stopped for time.
 	errTimedOut = errors.New("GitHub timed out")
 )
+
+// unavailable is a failure on GitHub's side or on the way to it, which the
+// source protocol calls src.ErrUnavailable.
+type unavailable struct{ msg string }
+
+func (e *unavailable) Error() string { return e.msg }
+
+func (e *unavailable) Is(target error) bool { return target == src.ErrUnavailable }
 
 // StatusError is a response GitHub answered with a status the call does not
 // take as an answer.

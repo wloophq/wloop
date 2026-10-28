@@ -24,16 +24,9 @@ type Ref = pr.Ref
 
 func ParseURL(raw string) (Ref, error) { return pr.ParseURL(raw) }
 
-// PullRequest is a pull request as a read returned it: the facts the decide
-// rules read and the head repository's owner.
-type PullRequest struct {
-	pr.Facts
-	HeadRepositoryOwner string
-}
-
 // Snapshot is one pull request as the inventory sees it.
 type Snapshot struct {
-	PullRequest
+	pr.PullRequest
 	URL            string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
@@ -531,9 +524,9 @@ func (r rawCheck) check() pr.Check {
 	return c
 }
 
-func (r rawPR) pullRequest() *PullRequest {
+func (r rawPR) pullRequest() *pr.PullRequest {
 	owner, repo, _ := strings.Cut(r.Repository.NameWithOwner, "/")
-	out := &PullRequest{Facts: pr.Facts{
+	out := &pr.PullRequest{Facts: pr.Facts{
 		Ref:               Ref{Owner: owner, Repo: repo, Number: r.Number},
 		State:             r.State,
 		IsDraft:           r.IsDraft,
@@ -1137,7 +1130,7 @@ func (c *Client) FindByBranch(ctx context.Context, queries []BranchQuery) (map[B
 	return out, nil
 }
 
-func (c *Client) Basics(ctx context.Context, r Ref) (*PullRequest, error) {
+func (c *Client) Basics(ctx context.Context, r Ref) (*pr.PullRequest, error) {
 	q := fmt.Sprintf(`query {
   viewer { login }
   %s

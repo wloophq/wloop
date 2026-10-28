@@ -10,12 +10,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/domain/pr"
+
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
@@ -256,20 +257,20 @@ func TestAReviewSessionLoadsProjectSettingsOnlyWhereTheConfigSays(t *testing.T) 
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.Intents = map[string]config.IntentConfig{"review": {ProjectSettings: &config.ProjectSettings{When: `pr.visibility == "private"`}}}
-	pr := func(visibility string) *github.PullRequest {
-		p := &github.PullRequest{}
+	read := func(visibility string) *pr.PullRequest {
+		p := &pr.PullRequest{}
 		p.Ref, p.Visibility = r7, visibility
 		return p
 	}
 	for _, c := range []struct {
 		intent dintent.Name
-		pr     *github.PullRequest
+		pr     *pr.PullRequest
 		off    bool
 	}{
-		{dintent.Review, pr("private"), false},
-		{dintent.Review, pr("public"), true},
+		{dintent.Review, read("private"), false},
+		{dintent.Review, read("public"), true},
 		{dintent.Review, nil, true},
-		{dintent.Address, pr("public"), false},
+		{dintent.Address, read("public"), false},
 	} {
 		raw, err := te.agentCommand(context.Background(), te.cfg, "/wt", roundOptions{trusted: true, intent: c.intent, pr: c.pr})
 		if err != nil {
