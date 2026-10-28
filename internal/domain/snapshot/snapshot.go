@@ -8,8 +8,8 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// Stored is a unit's last snapshot: the plugin's report as JSON, the rev the plugin gave it, and when the
-// host received it.
+// Stored is a unit's last snapshot: the plugin's report as JSON, the rev the plugin gave it, and the
+// time the plugin stamped on the report.
 type Stored struct {
 	Unit unit.Unit
 	Rev  uint64
