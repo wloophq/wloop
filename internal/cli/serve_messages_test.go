@@ -130,11 +130,15 @@ func TestOpenQuestionsBecomeMessages(t *testing.T) {
 		t.Fatalf("units %v", units)
 	}
 	gs, err := d.GateReader.Where(context.Background(), gates.Query{Kind: gate.KindQuestion})
-	if err != nil || len(gs) != 2 {
-		t.Fatalf("gates %+v %v", gs, err)
+	if err != nil {
+		t.Fatal(err)
 	}
 	for _, m := range open {
-		if !slices.ContainsFunc(gs, func(g gate.Gate) bool { return g.Subject == strconv.FormatInt(m.ID, 10) && string(g.Task) == m.TaskID }) {
+		onMessage := func(g gate.Gate) bool { return g.Subject == strconv.FormatInt(m.ID, 10) }
+		if n := len(slices.DeleteFunc(slices.Clone(gs), func(g gate.Gate) bool { return !onMessage(g) })); n != 1 {
+			t.Fatalf("message %d has %d gates in %+v", m.ID, n, gs)
+		}
+		if !slices.ContainsFunc(gs, func(g gate.Gate) bool { return onMessage(g) && string(g.Task) == m.TaskID }) {
 			t.Fatalf("message %+v has no gate on its task in %+v", m, gs)
 		}
 	}
