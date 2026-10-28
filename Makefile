@@ -6,7 +6,7 @@ GOLANGCI_LINT_VERSION := v2.15.0
 GOLANGCI_LINT := bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 BRAND_TEST_LDFLAGS := -X $(MODULE)/internal/brand.Name=zzbrand -X "$(MODULE)/internal/brand.Command=gh zzbrand" -X $(MODULE)/internal/brand.App=Zzbrand -X $(MODULE)/internal/brand.Org=zzbrandhq
 
-.PHONY: build build-targets vet-darwin vet-tags dev-install test lint fmt-check fmt fuzz clean eval-instructions test-brand scan-brand print-brand-ldflags docs-ref docs
+.PHONY: build build-targets vet-darwin vet-tags dev-install test lint fmt-check fmt fuzz clean eval-instructions test-brand scan-brand print-brand-ldflags docs-ref docs proto
 
 build: ## Build the binary into ./bin
 	@mkdir -p bin
@@ -75,6 +75,10 @@ docs-ref: ## Regenerate the reference pages of the documentation site, the profi
 	@p=$$(go run ./internal/archtest/cmd/rulesdoc) && printf '%s\n' "$$p" > docs/src/content/docs/reference/architecture-rules.md
 	@go run ./internal/intent/builtin/cmd/grammardoc
 	@go run ./internal/archtest/cmd/decisionsdoc
+
+proto: ## Lint the plugin protocol and regenerate its Go code into pkg/plugin, with the tools go.mod pins
+	go tool buf lint proto
+	go tool buf generate proto --template proto/buf.gen.yaml
 
 docs: ## Build the documentation site into docs/dist
 	cd docs && npm ci && npm run build

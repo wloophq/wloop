@@ -19,4 +19,5 @@ func TestRGrammarFlagsAKeyOutsideTheTableAndAForeignDecoder(t *testing.T) {
 	words := map[string]bool{"label": true}
 	flagged(t, "a loader", ruleGrammarKeys(fset, "internal/intent/x.go", f, words), 1, "toml key colour has no row")
 	flagged(t, "a foreign package", ruleGrammarKeys(fset, "internal/cli/x.go", f, words), 4, "(R-grammar)")
+	flagged(t, "the plugin SDK", ruleGrammarKeys(fset, "pkg/plugin/manifest/x.go", f, words), 0, "")
 }

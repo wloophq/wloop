@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package wloop.plugin.v1;
+
+option go_package = "github.com/wloophq/wloop/pkg/plugin/pb";
+
+// PluginService is the lifecycle every kind a plugin binary serves answers.
+// One binary may serve several kinds over one connection, so every request
+// names the kind it is for.
+service PluginService {
+  // Health tells whether the kind is serving, and why not when it is not.
+  rpc Health(HealthRequest) returns (HealthResponse);
+  // Start begins the kind's background work. The host calls it once per
+  // process, before any other call of the kind but Health.
+  rpc Start(StartRequest) returns (StartResponse);
+  // Stop ends the kind's background work; the host kills the process after it.
+  rpc Stop(StopRequest) returns (StopResponse);
+  // Notify tells the kind that host state it reads changed for these units;
+  // a kind that computes from that state reports those units again.
+  rpc Notify(NotifyRequest) returns (NotifyResponse);
+}
+
+// Unit names a unit of work by its provider and the provider's key.
+message Unit {
+  string provider = 1;
+  string key = 2;
+}
+
+message HealthRequest {
+  string kind = 1;
+}
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  // STATUS_LOADING: the kind has not yet imported its data or reported every unit.
+  STATUS_LOADING = 1;
+  STATUS_SERVING = 2;
+  // STATUS_DEGRADED: the kind serves, but a source it reads is failing.
+  STATUS_DEGRADED = 3;
+}
+
+message HealthResponse {
+  Status status = 1;
+  // reason says why a kind is loading or degraded; empty while serving.
+  string reason = 2;
+}
+
+message StartRequest {
+  string kind = 1;
+  // state_dir is the plugin's own state directory, which only it reads.
+  string state_dir = 2;
+  // host_broker is the go-plugin broker id on which the host serves the
+  // kind's host services; zero when the host serves none for the kind.
+  uint32 host_broker = 3;
+}
+
+message StartResponse {}
+
+message StopRequest {
+  string kind = 1;
+}
+
+message StopResponse {}
+
+message NotifyRequest {
+  string kind = 1;
+  repeated Unit units = 2;
+  // topics name the host state that changed, such as round state.
+  repeated string topics = 3;
+}
+
+message NotifyResponse {}
