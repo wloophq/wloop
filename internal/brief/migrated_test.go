@@ -22,7 +22,7 @@ import (
 func TestAMigratedPRBriefIsNotDueAgain(t *testing.T) {
 	ctx := context.Background()
 	version := Version(DefaultTaxonomy)
-	edited := t0.Add(-48 * time.Hour)
+	edited := time.Date(2026, 10, 12, 9, 0, 0, 123456789, time.FixedZone("BRT", -3*3600))
 	okRef, gaveRef := github.Ref{Owner: "acme", Repo: "api", Number: 1}, github.Ref{Owner: "acme", Repo: "api", Number: 2}
 	pr := func(ref github.Ref) dinv.PR {
 		return dinv.PR{Ref: ref, State: "OPEN", HeadOid: "h1", BodyEditedAt: edited, ChangedFiles: 3, Reasons: []string{"repo"},
@@ -85,10 +85,10 @@ func TestAMigratedPRBriefIsNotDueAgain(t *testing.T) {
 func TestAnAttemptStoredInVersion6StillMatchesAfterTheUpgrade(t *testing.T) {
 	ctx := context.Background()
 	version := Version(DefaultTaxonomy)
-	edited := t0.Add(-48 * time.Hour)
+	edited := time.Date(2026, 10, 12, 9, 0, 0, 123456789, time.FixedZone("BRT", -3*3600))
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 2}
 	ts := func(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05.000000000Z") }
-	stored := fmt.Sprintf("%s %s %s %d", version, "h1", edited.UTC().Format(time.RFC3339), 3)
+	stored := version + " h1 2026-10-12T12:00:00Z 3"
 	attempted := t0.Add(-10 * time.Minute)
 	db := sqlitetest.Migrated(t, filepath.Join(t.TempDir(), "state", "store.db"), 6,
 		fmt.Sprintf(`INSERT INTO brief_runs (id, provider, unit_key, intent, trigger, version, attempt_of, revision, input, started_at, ended_at, outcome, error)

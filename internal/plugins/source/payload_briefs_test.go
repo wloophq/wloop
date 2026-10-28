@@ -178,7 +178,11 @@ func TestBriefWatchCallsBackThroughTheBroker(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			return &psource.Broker{ID: id, Manifest: s, Snapshots: snaps, Units: psource.Units{Codecs: unit.NewRegistry(c)},
+			other, err := codec.Of("other", s.Codec)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return &psource.Broker{ID: id, Manifest: s, Snapshots: snaps, Units: psource.Units{Codecs: unit.NewRegistry(c, other)},
 				Config: func() config.Config { return config.Config{} }, Briefs: db, Briefed: q.Noted, Now: func() time.Time { return at0 }}
 		}}
 	stub := sourcetest.NewStub()
@@ -201,7 +205,7 @@ func TestBriefWatchCallsBackThroughTheBroker(t *testing.T) {
 		t.Fatalf("the written brief reads %+v %v", rd, err)
 	}
 	for name, b := range map[string]src.Brief{
-		"another provider's unit": {Unit: plugin.Unit{Provider: "slack", Key: "T/C/1"}, Version: "x1", Body: body},
+		"another provider's unit": {Unit: plugin.Unit{Provider: "other", Key: "t1"}, Version: "x1", Body: body},
 		"a body that is no brief": {Unit: plugin.Unit{Provider: "acme", Key: "t2"}, Version: "x1", Body: json.RawMessage(`"text"`)},
 		"a task that is not one":  {Unit: plugin.Unit{Provider: "acme", Key: "t2"}, Task: "t 1", Version: "x1", Body: body},
 	} {
@@ -209,4 +213,8 @@ func TestBriefWatchCallsBackThroughTheBroker(t *testing.T) {
 			t.Errorf("%s: kept", name)
 		}
 	}
+}
+
+func TestAPutBriefOnATaskThatDoesNotHoldTheUnitIsRefused(t *testing.T) {
+	t.Skip("T1: review of X5b; PutBrief checks the task id's form, not that the task holds the unit, once the brief is the task's record")
 }
