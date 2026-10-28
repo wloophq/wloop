@@ -903,3 +903,45 @@ func TestASendFromATaskTurnIsRecordedWithTheTurnAsOrigin(t *testing.T) {
 		t.Fatalf("drafts %+v", ds)
 	}
 }
+
+func TestASlackMessageOfAWorkflowThatSendsWaitsUnlessARuleNamesIt(t *testing.T) {
+	t.Parallel()
+	flow := `summary = "Ask the owners"
+provider = "slack"
+when = 'slack.live_task'
+key = ["slack.settled_at"]
+
+[[step]]
+use = "draft.propose"
+purpose = "ask_owner"
+items = "unowned_aged"
+`
+	for name, c := range map[string]struct {
+		approval string
+		state    draft.State
+	}{
+		"a mode that names no delivery":  {"[gates.approval]\nmode = \"send\"\n", draft.Proposed},
+		"a rule that names its delivery": {"[[gates.approval.rule]]\nwhen = 'draft.delivery == \"message\"'\nmode = \"send\"\n", draft.Approved},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			w := newSessionWiring(t)
+			files := bundledIntentAs(t, "act", "flow-act")
+			files["intents/flow-act/intent.toml"] = strings.Replace(files["intents/flow-act/intent.toml"], "role    = \"headless\"\n", "", 1)
+			files["workflows/ask-flow/workflow.toml"] = flow + "\n" + c.approval
+			userProfile(t, w.te, files)
+			u := slackThreadUnit("T000", sessChannel, sessParent)
+			if _, err := w.te.repo.Save(context.Background(), dturn.Book{Unit: u, Turns: []dturn.Turn{
+				{Intent: "flow-act", Workflow: "ask-flow", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
+			}}); err != nil {
+				t.Fatal(err)
+			}
+			if got, isErr := w.draftTool(t, draftHandle, `{"text":"who owns this?"}`); isErr {
+				t.Fatalf("slack_draft = %q; broken %v", got, w.te.loadedIntents().Broken)
+			}
+			if ds := w.drafts(t); len(ds) != 1 || ds[0].State != c.state {
+				t.Fatalf("drafts %+v, want one %s", ds, c.state)
+			}
+		})
+	}
+}

@@ -59,9 +59,17 @@ type fixture struct {
 	cons  *gatestest.Consequences
 }
 
+var opened = time.Date(2026, 3, 2, 9, 0, 0, 0, time.UTC)
+
+func fixedNow() time.Time { return opened }
+
 func newFixture(t *testing.T, p gates.Policy, prof profile) fixture {
 	t.Helper()
-	now := func() time.Time { return time.Now() }
+	return newFixtureAt(t, p, prof, fixedNow)
+}
+
+func newFixtureAt(t *testing.T, p gates.Policy, prof profile, now func() time.Time) fixture {
+	t.Helper()
 	store := gatestest.NewStore(now)
 	cons := &gatestest.Consequences{}
 	svc := gates.New(gates.Deps{
@@ -191,7 +199,7 @@ func TestAPolicyRuleReleasesAPlanGate(t *testing.T) {
 
 func TestAGateWithAPassedDeadlineResolvesToItsDefault(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		f := newFixture(t, nil, bundled)
+		f := newFixtureAt(t, nil, bundled, time.Now)
 		ctx := context.Background()
 		start := time.Now()
 		g := f.open(t, gate.Gate{Kind: gate.KindPlan, Unit: acme, Subject: "review/first"}, policy{dec: gates.Decision{Mode: gate.ModeDelay, Window: time.Minute}})
@@ -266,9 +274,9 @@ func (f *tasksFake) Open(_ context.Context, r coretasks.OpenRequest) (task.Task,
 }
 
 func TestOpenGivesAGateTheTaskOfItsUnitOrACaptureTask(t *testing.T) {
-	store := gatestest.NewStore(time.Now)
+	store := gatestest.NewStore(fixedNow)
 	tk := &tasksFake{held: map[unit.Unit]task.ID{acme: "t-00000000000000aa"}}
-	svc := gates.New(gates.Deps{Store: store, Reader: store, Profile: bundled, Tasks: tk, Clock: clock{time.Now}})
+	svc := gates.New(gates.Deps{Store: store, Reader: store, Profile: bundled, Tasks: tk, Clock: clock{fixedNow}})
 	ctx := context.Background()
 	held, err := svc.Open(ctx, gate.Gate{Kind: gate.KindQuestion, Unit: acme}, nil)
 	if err != nil || held.Task != "t-00000000000000aa" || len(tk.opened) != 0 {
