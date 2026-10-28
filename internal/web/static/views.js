@@ -288,9 +288,16 @@ function localDate(t) {
   return isNaN(d) ? "" : d.toLocaleDateString("en-CA");
 }
 
+// draftOf is the draft of e's draft gate, its subject; null when e carries none.
+function draftOf(e) {
+  const g = ((e && e.gates) || []).find((x) => x.kind === "draft" && x.subject && typeof x.subject === "object");
+  return g ? g.subject : null;
+}
+
 // isDraftTask says whether e is a draft's own task, which shows its draft.
 function isDraftTask(e) {
-  return !!e.draft && e.id === "draft:" + e.draft.id;
+  const d = draftOf(e);
+  return !!d && e.id === "draft:" + d.id;
 }
 
 // listItem is a task's row: a draft's own task shows the draft to approve.
@@ -301,7 +308,7 @@ function listItem(e, open) {
 function outboxItem(e, open) {
   return h("li", { class: "task-row outbox" + (e.id === open ? " sel" : ""), "data-focus": "task:" + e.id, tabindex: 0 },
     h("div", { class: "task-line" }, h("a", { href: "#" + viewHash({ task: e.id, pr: "" }), class: "title" }, e.title || e.id)),
-    e.draft ? draftCard(e, "outbox") : null);
+    draftOf(e) ? draftCard(e, "outbox") : null);
 }
 
 function viewHash(change) {
@@ -336,7 +343,7 @@ function contextChips(route) {
 // (api.TaskView.Texts): its title, notes, state, kind, the text and the lists of text of its properties, its
 // units, the people it waits on, its items, its cards' people, its draft and its message.
 function taskHaystack(e) {
-  const d = e.draft || {};
+  const d = draftOf(e) || {};
   const m = e.message || {};
   const props = Object.values(e.props || {}).flatMap((v) => typeof v === "string" ? [v] : Array.isArray(v) && v.every((x) => typeof x === "string") ? v : []);
   return [e.title, e.notes, e.state, e.kind, ...props,

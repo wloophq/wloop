@@ -19,6 +19,8 @@ const (
 		WHERE (provider, unit_key) IN (SELECT value->>0, value->>1 FROM json_each(?1))
 		AND (?2 = '[]' OR kind IN (SELECT value FROM json_each(?2))) AND at >= ?3 ORDER BY at, id`
 	rehomeDraftSQL = `UPDATE drafts SET unit_key = ?, rev = rev + 1 WHERE provider = ? AND unit_key = ?`
+	// rehomeDraftGatesSQL moves the gates of the drafts it moves along, so a draft's gate stays on its unit.
+	rehomeDraftGatesSQL = `UPDATE gates SET unit_key = ? WHERE kind = 'draft' AND provider = ? AND unit_key = ?`
 )
 
 // RecordSourceEvents stores the events a source plugin observed on its
@@ -139,6 +141,16 @@ func (db *DB) RehomeDrafts(ctx context.Context, moves map[unit.Unit]unit.Unit) (
 			if n > 0 {
 				moved += int(n)
 				tx.Touch(port.TopicDrafts, to)
+			}
+			res, err = tx.ExecContext(ctx, rehomeDraftGatesSQL, to.Key, string(from.Provider), from.Key)
+			if err != nil {
+				return err
+			}
+			if n, err := res.RowsAffected(); err != nil || n > 0 {
+				if err != nil {
+					return err
+				}
+				tx.Touch(port.TopicGates, to)
 			}
 		}
 		return nil

@@ -441,11 +441,10 @@ CREATE TABLE drafts (
   reaction TEXT NOT NULL DEFAULT '', original TEXT NOT NULL DEFAULT '', edited INTEGER NOT NULL DEFAULT 0,
   origin_kind TEXT NOT NULL, turn_seq INTEGER NOT NULL DEFAULT 0, intent TEXT NOT NULL DEFAULT '',
   workflow TEXT NOT NULL DEFAULT '', rule TEXT NOT NULL DEFAULT '', rule_key TEXT NOT NULL DEFAULT '',
-  approval_mode TEXT NOT NULL DEFAULT '', approval_window INTEGER NOT NULL DEFAULT 0, deadline TEXT NOT NULL DEFAULT '',
+  -- held, queued, sending, sent, failed or dropped: its delivery; its gate holds whether it may be posted
   state TEXT NOT NULL,
   evidence_ref TEXT NOT NULL DEFAULT '', evidence_permalink TEXT NOT NULL DEFAULT '', evidence_at TEXT NOT NULL DEFAULT '',
   error TEXT NOT NULL DEFAULT '', reason TEXT NOT NULL DEFAULT '',
-  would_policy TEXT NOT NULL DEFAULT '', would_reason TEXT NOT NULL DEFAULT '', would_outcome TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, sending_at TEXT NOT NULL DEFAULT '',
   rev INTEGER NOT NULL DEFAULT 0,
   purpose TEXT NOT NULL DEFAULT '', delivery TEXT NOT NULL DEFAULT '', effects TEXT NOT NULL DEFAULT '[]',

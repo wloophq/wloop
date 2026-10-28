@@ -9,44 +9,39 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 var ctx = context.Background()
 
-func TestConcurrentDecisionsConflict(t *testing.T) {
+func TestConcurrentDecisionsResolveTheGateOnce(t *testing.T) {
 	e := newEnv()
 	d := e.propose(reply("hi"))
 	var wg sync.WaitGroup
-	arrived, start := make(chan struct{}), make(chan struct{})
-	e.store.beforeUpdate = func(draft.Draft) {
-		arrived <- struct{}{}
-		<-start
-	}
 	errs := make([]error, 2)
-	wg.Add(2)
-	go func() { defer wg.Done(); _, errs[0] = e.svc.Approve(ctx, d.ID, nil) }()
-	go func() { defer wg.Done(); _, errs[1] = e.svc.Discard(ctx, d.ID, "user") }()
-	<-arrived
-	<-arrived
-	close(start)
+	for i, intent := range []string{"approve", "discard"} {
+		wg.Go(func() { errs[i] = e.decide(d.ID, intent) })
+	}
 	wg.Wait()
-	ok, conflicts := 0, 0
+	ok, resolved := 0, 0
 	for _, err := range errs {
 		switch {
 		case err == nil:
 			ok++
-		case errors.Is(err, ErrConflict):
-			conflicts++
+		case errors.Is(err, gates.ErrResolved):
+			resolved++
 		default:
 			t.Errorf("unexpected error %v", err)
 		}
 	}
-	if ok != 1 || conflicts != 1 {
-		t.Fatalf("ok %d conflicts %d, want 1 and 1 (%v)", ok, conflicts, errs)
+	got, g := e.get(d.ID), e.gate(d.ID)
+	if ok != 1 || resolved != 1 || g.Status == gate.Approved && got.State != draft.Queued || g.Status == gate.Rejected && got.State != draft.Dropped {
+		t.Fatalf("ok %d resolved %d, draft %s gate %s (%v)", ok, resolved, got.State, g.Status, errs)
 	}
 }
 
@@ -66,7 +61,7 @@ func TestEditKeepsTheOriginal(t *testing.T) {
 	}
 
 	failed := e.propose(reply("will fail"))
-	if _, err := e.svc.Approve(ctx, failed.ID, nil); err != nil {
+	if _, err := e.approve(failed.ID, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := e.svc.Edit(ctx, failed.ID, "x"); !errors.Is(err, draft.ErrTransition) {
@@ -86,7 +81,7 @@ func TestOnlyApprovedDraftsArePublished(t *testing.T) {
 	e := newEnv()
 	e.propose(reply("stays"))
 	b := e.propose(reply("goes"))
-	if _, err := e.svc.Approve(ctx, b.ID, nil); err != nil {
+	if _, err := e.approve(b.ID, nil); err != nil {
 		t.Fatal(err)
 	}
 	e.store.beforeUpdate = func(d draft.Draft) {
@@ -113,7 +108,7 @@ func TestOnlyApprovedDraftsArePublished(t *testing.T) {
 func TestFailedDraftIsNeverRetriedAutomatically(t *testing.T) {
 	e := newEnv()
 	d := e.propose(reply("x"))
-	e.svc.Approve(ctx, d.ID, nil)
+	e.approve(d.ID, nil)
 	e.fx.failWith = errBoom
 	if _, failed, _ := e.svc.Send(ctx); failed != 1 {
 		t.Fatalf("failed %d", failed)
@@ -134,12 +129,12 @@ func TestFailedDraftIsNeverRetriedAutomatically(t *testing.T) {
 func TestRetryByHandPublishesOnce(t *testing.T) {
 	e := newEnv()
 	d := e.propose(reply("x"))
-	e.svc.Approve(ctx, d.ID, nil)
+	e.approve(d.ID, nil)
 	e.fx.failWith = errBoom
 	e.svc.Send(ctx)
 	e.fx.failWith = nil
 	got, err := e.svc.Retry(ctx, d.ID, false)
-	if err != nil || got.State != draft.Approved || got.Error != "" {
+	if err != nil || got.State != draft.Queued || got.Error != "" {
 		t.Fatalf("retry %+v %v", got, err)
 	}
 	e.svc.Send(ctx)
@@ -159,7 +154,7 @@ func TestRetryOfUnconfirmedPostNeedsConfirm(t *testing.T) {
 	for _, cause := range []string{NotConfirmed, "may have been posted: timeout"} {
 		e := newEnv()
 		d := e.propose(reply("x"))
-		e.svc.Approve(ctx, d.ID, nil)
+		e.approve(d.ID, nil)
 		e.fx.failWith = errors.New(cause)
 		e.svc.Send(ctx)
 		if _, err := e.svc.Retry(ctx, d.ID, false); !errors.Is(err, ErrNeedsConfirm) {
@@ -168,7 +163,7 @@ func TestRetryOfUnconfirmedPostNeedsConfirm(t *testing.T) {
 		if e.get(d.ID).State != draft.Failed {
 			t.Fatalf("%s: state %s", cause, e.get(d.ID).State)
 		}
-		if got, err := e.svc.Retry(ctx, d.ID, true); err != nil || got.State != draft.Approved {
+		if got, err := e.svc.Retry(ctx, d.ID, true); err != nil || got.State != draft.Queued {
 			t.Fatalf("%s: retry with confirm %+v %v", cause, got, err)
 		}
 	}
@@ -178,13 +173,13 @@ func TestDisabledPluginRefusesApproval(t *testing.T) {
 	e := newEnv()
 	d := e.propose(reply("x"))
 	other := e.propose(reply("y"))
-	e.svc.Approve(ctx, other.ID, nil)
+	e.approve(other.ID, nil)
 	e.fx.failWith = errBoom
 	e.svc.Send(ctx)
 	e.fx.failWith = nil
 
 	e.disabled["slack"] = true
-	if _, err := e.svc.Approve(ctx, d.ID, nil); !errors.Is(err, ErrDisabled) || !strings.Contains(err.Error(), "slack") {
+	if _, err := e.approve(d.ID, nil); !errors.Is(err, ErrDisabled) || !strings.Contains(err.Error(), "slack") {
 		t.Fatalf("approve: %v", err)
 	}
 	if _, err := e.svc.Retry(ctx, other.ID, true); !errors.Is(err, ErrDisabled) || !strings.Contains(err.Error(), "slack") {
@@ -194,7 +189,7 @@ func TestDisabledPluginRefusesApproval(t *testing.T) {
 		t.Fatalf("propose: %v", err)
 	}
 	e.svc.Send(ctx)
-	if len(e.fx.published) != 1 || e.get(d.ID).State != draft.Proposed || e.get(other.ID).State != draft.Failed {
+	if len(e.fx.published) != 1 || e.get(d.ID).State != draft.Held || e.get(other.ID).State != draft.Failed {
 		t.Fatalf("published %v, states %s %s", e.fx.published, e.get(d.ID).State, e.get(other.ID).State)
 	}
 }
@@ -202,7 +197,7 @@ func TestDisabledPluginRefusesApproval(t *testing.T) {
 func TestApprovedDraftOfADisabledPluginFailsAtSend(t *testing.T) {
 	e := newEnv()
 	d := e.propose(reply("x"))
-	e.svc.Approve(ctx, d.ID, nil)
+	e.approve(d.ID, nil)
 	e.disabled["slack"] = true
 	if _, failed, _ := e.svc.Send(ctx); failed != 1 {
 		t.Fatalf("failed %d", failed)
@@ -215,7 +210,7 @@ func TestApprovedDraftOfADisabledPluginFailsAtSend(t *testing.T) {
 func sending(e *env, text string) draft.Draft {
 	d := e.propose(reply(text))
 	d.State, d.SendingAt = draft.Sending, t0
-	d, err := e.store.Update(ctx, d, draft.Proposed)
+	d, err := e.store.Update(ctx, d, draft.Held)
 	if err != nil {
 		panic(err)
 	}
@@ -240,7 +235,7 @@ func TestRecoverKeepsVerifysPointer(t *testing.T) {
 func TestConflictAfterPublishIsSurfaced(t *testing.T) {
 	e := newEnv()
 	d := e.propose(reply("x"))
-	e.svc.Approve(ctx, d.ID, nil)
+	e.approve(d.ID, nil)
 	e.fx.during = func(p draft.Draft) {
 		cur, _ := e.store.Get(ctx, p.ID)
 		cur.State, cur.Error = draft.Failed, NotConfirmed
@@ -264,14 +259,14 @@ func TestConflictAfterPublishIsSurfaced(t *testing.T) {
 func TestStaleClaimDoesNotPostOldText(t *testing.T) {
 	e := newEnv()
 	d := e.propose(reply("old"))
-	e.svc.Approve(ctx, d.ID, nil)
+	e.approve(d.ID, nil)
 	calls := 0
 	effects := e.svc.Effects
 	e.svc.Effects = func(p unit.ProviderID) (port.Effects, error) {
 		if calls++; calls == 1 {
 			cur, _ := e.store.Get(ctx, d.ID)
 			cur.Text = "new"
-			if _, err := e.store.Update(ctx, cur, draft.Approved); err != nil {
+			if _, err := e.store.Update(ctx, cur, draft.Queued); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -363,7 +358,7 @@ func TestProposeValidatesTheTarget(t *testing.T) {
 	e.fx.refuse = nil
 	d := e.propose(p)
 	e.fx.refuse = errors.New("channel archived")
-	if _, err := e.svc.Approve(ctx, d.ID, nil); err == nil || e.get(d.ID).State != draft.Proposed {
+	if _, err := e.approve(d.ID, nil); err == nil || e.get(d.ID).State != draft.Held {
 		t.Fatalf("approve after the target went away: %v", err)
 	}
 }
@@ -383,7 +378,7 @@ func TestAutoProposalsDoNotStack(t *testing.T) {
 	if err != nil || other.ID == first.ID {
 		t.Fatalf("other person: %+v %v", other, err)
 	}
-	e.svc.Discard(ctx, first.ID, "user")
+	e.decide(first.ID, "discard")
 	if again, err := e.svc.Propose(ctx, auto("stalled-nudge:e1:slack:U000AAA")); err != nil || again.ID == first.ID {
 		t.Fatalf("after discard: %+v %v", again, err)
 	}
@@ -420,18 +415,18 @@ func (f *fixedPolicy) For(ctx context.Context, u unit.Unit, o draft.Origin) (dra
 func TestProposeDefaultsToAlways(t *testing.T) {
 	e := newEnv()
 	d := e.propose(reply("x"))
-	if d.Approval != (draft.Approval{Mode: draft.Wait}) || d.State != draft.Proposed || !d.Deadline.IsZero() {
+	if e.approval(d.ID) != (draft.Approval{Mode: draft.Wait}) || d.State != draft.Held {
 		t.Fatalf("%+v", d)
 	}
 	pol := &fixedPolicy{p: *window(10 * time.Minute)}
 	e.svc.Policies = pol
 	w := e.propose(reply("y"))
-	if w.Approval != pol.p.Default || !w.Deadline.Equal(t0.Add(10*time.Minute)) || w.State != draft.Proposed || len(pol.seen) != 1 {
+	if e.approval(w.ID) != pol.p.Default || !e.gate(w.ID).Deadline.Equal(t0.Add(10*time.Minute)) || w.State != draft.Held || len(pol.seen) != 1 {
 		t.Fatalf("window %+v", w)
 	}
 	p := reply("z")
 	p.Policy = draft.Fixed(draft.Approval{Mode: draft.Wait})
-	if got := e.propose(p); got.Approval.Mode != draft.Wait || len(pol.seen) != 1 {
+	if got := e.propose(p); e.approval(got.ID).Mode != draft.Wait || len(pol.seen) != 1 {
 		t.Fatalf("explicit approval %+v, policies asked %d times", got, len(pol.seen))
 	}
 	p.Policy = draft.Fixed(draft.Approval{Mode: draft.Delay})
@@ -440,51 +435,28 @@ func TestProposeDefaultsToAlways(t *testing.T) {
 	}
 }
 
-func TestWouldRecordsPolicyAndOutcome(t *testing.T) {
+func TestApprovingWithTextPostsThatText(t *testing.T) {
 	e := newEnv()
-	e.svc.Items = fakeItems{thread: {{ID: "i1", Confidence: items.High}, {ID: "i2", Confidence: items.High}}}
-	over := func() Proposal { p := reply("done"); p.Items = []string{"i1", "i2"}; return p }
-	asIs, edited, gone := e.propose(over()), e.propose(over()), e.propose(over())
-	for _, d := range []draft.Draft{asIs, edited, gone} {
-		if d.Would.Policy != draft.WouldRelease || d.Would.Outcome != "" {
-			t.Fatalf("at proposal %+v", d.Would)
-		}
-	}
-	e.svc.Approve(ctx, asIs.ID, nil)
+	asIs, edited, gone := e.propose(reply("done")), e.propose(reply("done")), e.propose(reply("done"))
+	e.approve(asIs.ID, nil)
 	text := "done, thanks"
-	e.svc.Approve(ctx, edited.ID, &text)
-	e.svc.Discard(ctx, gone.ID, "")
-	for id, want := range map[draft.ID]draft.Outcome{asIs.ID: draft.OutcomeAsIs, edited.ID: draft.OutcomeEdited, gone.ID: draft.OutcomeDiscarded} {
-		if got := e.get(id).Would; got.Policy != draft.WouldRelease || got.Outcome != want {
-			t.Errorf("draft %d would %+v, want outcome %s", id, got, want)
-		}
-	}
-	if got := e.get(edited.ID); got.Text != text || got.Original != "done" || !got.Edited {
+	e.approve(edited.ID, &text)
+	e.decide(gone.ID, "discard")
+	if got := e.get(edited.ID); got.Text != text || got.Original != "done" || !got.Edited || got.State != draft.Queued {
 		t.Errorf("approve with text %+v", got)
 	}
-	if got := e.get(gone.ID); got.Reason != "user" {
-		t.Errorf("discard reason %q", got.Reason)
+	if got := e.get(asIs.ID); got.Edited || got.State != draft.Queued {
+		t.Errorf("approve as is %+v", got)
 	}
-}
-
-func TestWouldHoldsOnDoubt(t *testing.T) {
-	e := newEnv()
-	e.svc.Items = fakeItems{thread: {{ID: "i1", Confidence: items.High}, {ID: "i2", Confidence: items.Low}}}
-	low := reply("x")
-	low.Items = []string{"i1", "i2"}
-	comment := reply("note")
-	comment.Kind = draft.Comment
-	user := reply("mine")
-	user.Origin = draft.Origin{Kind: draft.OriginUser}
-	for name, p := range map[string]Proposal{"low": low, "comment": comment, "user": user} {
-		if d := e.propose(p); d.Would.Policy != draft.WouldWait || d.Would.Reason == "" {
-			t.Errorf("%s: %+v", name, d.Would)
-		}
+	if got := e.get(gone.ID); got.Reason != "user" || got.State != draft.Dropped {
+		t.Errorf("discard %+v", got)
 	}
-	high := reply("x")
-	high.Items = []string{"i1"}
-	if d := e.propose(high); d.Would.Policy != draft.WouldRelease {
-		t.Errorf("high: %+v", d.Would)
+	if _, err := e.svc.Prepare(ctx, asIs.ID, e.get(asIs.ID).Rev, nil); !errors.Is(err, ErrConflict) {
+		t.Errorf("preparing a queued draft: %v", err)
+	}
+	held := e.propose(reply("later"))
+	if _, err := e.svc.Prepare(ctx, held.ID, held.Rev+1, nil); !errors.Is(err, ErrConflict) {
+		t.Errorf("preparing at a stale rev: %v", err)
 	}
 }
 
@@ -505,7 +477,7 @@ func TestSentDraftBecomesItemEvidence(t *testing.T) {
 	p := reply("closing")
 	p.Kind, p.Items = draft.Close, []string{"i1", "i2"}
 	d := e.propose(p)
-	e.svc.Approve(ctx, d.ID, nil)
+	e.approve(d.ID, nil)
 	e.clock.now = t0.Add(time.Minute)
 	if sent, _, err := e.svc.Send(ctx); sent != 1 || err != nil {
 		t.Fatalf("send %d %v", sent, err)
@@ -537,7 +509,6 @@ func TestRecordSentSkipsPublish(t *testing.T) {
 	e.svc.Evidence = EvidenceTo(ap.apply)
 	ran := 0
 	e.svc.OnSent = []func(context.Context, draft.Draft) error{func(context.Context, draft.Draft) error { ran++; return nil }}
-	e.svc.Items = fakeItems{thread: {{ID: "i1", Confidence: items.High}}}
 	p := reply("posted by the session")
 	p.Items = []string{"i1"}
 	p.Origin = draft.Origin{Kind: draft.OriginSession, TurnSeq: 9}
@@ -545,7 +516,7 @@ func TestRecordSentSkipsPublish(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.State != draft.Sent || d.Would != (draft.Would{}) || d.Evidence.Ref != "9.9" || d.Evidence.At.IsZero() {
+	if d.State != draft.Sent || d.Evidence.Ref != "9.9" || d.Evidence.At.IsZero() {
 		t.Fatalf("%+v", d)
 	}
 	if len(e.fx.published) != 0 || len(ap.ops) != 1 || ap.ops[0].Anchor.Ref != "draft:1" || ran != 1 {
@@ -563,7 +534,7 @@ func TestHookErrorsDoNotUndoTheSend(t *testing.T) {
 	ran := false
 	e.svc.OnSent = []func(context.Context, draft.Draft) error{func(context.Context, draft.Draft) error { ran = true; return nil }}
 	d := e.propose(reply("x"))
-	e.svc.Approve(ctx, d.ID, nil)
+	e.approve(d.ID, nil)
 	sent, _, err := e.svc.Send(ctx)
 	if sent != 1 || !errors.Is(err, errBoom) || !ran || e.get(d.ID).State != draft.Sent {
 		t.Fatalf("sent %d err %v onsent %v state %s", sent, err, ran, e.get(d.ID).State)
@@ -578,9 +549,9 @@ func TestOutboxLogHasNoText(t *testing.T) {
 	c := e.propose(reply(secret + " c"))
 	edited := secret + " edited"
 	e.svc.Edit(ctx, a.ID, edited)
-	e.svc.Approve(ctx, a.ID, &edited)
-	e.svc.Approve(ctx, b.ID, nil)
-	e.svc.Discard(ctx, c.ID, "user")
+	e.approve(a.ID, &edited)
+	e.approve(b.ID, nil)
+	e.decide(c.ID, "discard")
 	e.fx.failWith = errors.New("refused: " + secret)
 	e.svc.Send(ctx)
 	e.svc.Retry(ctx, a.ID, true)
@@ -601,7 +572,7 @@ func TestOutboxLogHasNoText(t *testing.T) {
 
 func TestNotFound(t *testing.T) {
 	e := newEnv()
-	if _, err := e.svc.Approve(ctx, 42, nil); !errors.Is(err, ErrNotFound) {
+	if _, err := e.svc.Prepare(ctx, 42, 0, nil); !errors.Is(err, ErrNotFound) {
 		t.Fatal(err)
 	}
 }

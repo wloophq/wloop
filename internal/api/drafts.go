@@ -1,33 +1,17 @@
 package api
 
 import (
-	"net/url"
-	"strconv"
+	"encoding/json"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// The Outbox's routes: Drafts lists drafts (query parameters state, a comma list, and task) and, posted a
-// DraftCreate, holds a draft the user wrote; DraftDetail reads one and DraftActionPath runs one of
-// DraftActions on it with a DraftAction body.
-const (
-	Drafts          = "/api/drafts"
-	DraftDetail     = Drafts + "/{id}"
-	DraftActionPath = DraftDetail + "/{action}"
-)
-
-// DraftActions are the actions DraftActionPath takes.
-var DraftActions = []string{"approve", "edit", "discard", "retry"}
-
-// DraftPath is the path of draft id, followed by the segments of rest.
-func DraftPath(id int64, rest ...string) string {
-	p := Drafts + "/" + strconv.FormatInt(id, 10)
-	for _, r := range rest {
-		p += "/" + url.PathEscape(r)
-	}
-	return p
-}
+// Drafts lists drafts (query parameters state, a comma list, id, a comma list of draft ids, and task; with
+// none, the Outbox's: those whose gate is open, and those whose gate approved them and whose delivery failed)
+// and, posted a DraftCreate, holds a draft the user wrote. A draft's decision is its gate's, resolved through
+// GatePath; a draft gate's Subject is its Draft.
+const Drafts = "/api/drafts"
 
 type DraftsResponse struct {
 	Drafts []Draft `json:"drafts"`
@@ -51,17 +35,20 @@ type Draft struct {
 	Reaction string `json:"reaction"`
 	Original string `json:"original"`
 	// Replaced is the text a sent edit replaced.
-	Replaced  string        `json:"replaced,omitempty"`
-	Edited    bool          `json:"edited"`
-	Origin    DraftOrigin   `json:"origin"`
-	Approval  DraftApproval `json:"approval"`
-	Deadline  *time.Time    `json:"deadline"`
-	State     string        `json:"state"`
-	Error     string        `json:"error"`
-	Reason    string        `json:"reason"`
-	Permalink string        `json:"permalink"`
-	Would     DraftWould    `json:"would"`
-	// Actions are the draft actions of the catalog as they stand on the draft.
+	Replaced string      `json:"replaced,omitempty"`
+	Edited   bool        `json:"edited"`
+	Origin   DraftOrigin `json:"origin"`
+	// State is where its delivery stands: held while its gate is open, queued, sending, sent, failed or dropped.
+	State     string `json:"state"`
+	Error     string `json:"error"`
+	Reason    string `json:"reason"`
+	Permalink string `json:"permalink"`
+	// Gate is the draft's gate, 0 for none; Deadline is when its window resolves it, nil for none; Intents are
+	// its open gate's intents by the status each resolves it to (approved, rejected), the first of each.
+	Gate     int64             `json:"gate,omitempty"`
+	Deadline *time.Time        `json:"deadline"`
+	Intents  map[string]string `json:"intents,omitempty"`
+	// Actions are the draft actions of the catalog as they stand on the draft: its delivery's, edit and retry.
 	Actions []ActionState `json:"actions"`
 	// Rev is the stored draft's version; approve and retry send the one they showed.
 	Rev       int64     `json:"rev"`
@@ -89,17 +76,6 @@ type DraftOrigin struct {
 	Unit string `json:"unit,omitempty"`
 }
 
-type DraftApproval struct {
-	Mode   string `json:"mode"`
-	Window string `json:"window"` // a duration as duration.Format writes it ("10m", "2h", "1d"), "" none
-}
-
-type DraftWould struct {
-	Policy  string `json:"policy"`
-	Reason  string `json:"reason"`
-	Outcome string `json:"outcome"`
-}
-
 // The kinds of draft the user writes: a reply in the unit's conversation (a comment on a pull request) and
 // a reaction to it.
 const (
@@ -124,12 +100,26 @@ type DraftCreate struct {
 	Source string `json:"source"`
 }
 
-type DraftAction struct {
-	Text   *string `json:"text,omitempty"`
-	Reason string  `json:"reason,omitempty"`
-	// Confirm lets retry post a draft that may have been posted already.
-	Confirm bool `json:"confirm,omitempty"`
-	// Rev is the draft's version the caller showed (a new draft's is 0); a draft changed since answers 409.
-	// Approve and retry take it; approve posts Text when given, else the text at Rev.
-	Rev *int64 `json:"rev,omitempty"`
+// DraftOf is the draft of e's first draft gate, its subject; false when e has none.
+func (e TaskView) DraftOf() (Draft, bool) {
+	for _, g := range e.Gates {
+		if g.Kind != GateKindDraft || len(g.Subject) == 0 {
+			continue
+		}
+		var d Draft
+		if json.Unmarshal(g.Subject, &d) == nil {
+			return d, true
+		}
+	}
+	return Draft{}, false
 }
+
+// DraftGate is d as the gate it waits on serves it: its subject d, its delivery d's state.
+func DraftGate(d Draft) GateView {
+	v := GateView{ID: d.Gate, Kind: GateKindDraft, Delivery: d.State, Intents: []IntentView{}}
+	v.Subject, _ = json.Marshal(d)
+	return v
+}
+
+// GateKindDraft is the Kind of a draft's gate.
+const GateKindDraft = "draft"

@@ -30,6 +30,8 @@ var Renamed = []Rename{
 	{"pr.guidance_handed", "turn.guidance_handed"},
 	{"pr.round_sent", "turn.round_sent"},
 	{"config.github.", "config.plugins.github."},
+	{"draft.approve", "gates.draft.intents.approve"},
+	{"draft.discard", "gates.draft.intents.discard"},
 }
 
 // RenamedKeys are the configuration keys a release renamed or moved, each

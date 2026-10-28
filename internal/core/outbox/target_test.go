@@ -53,7 +53,7 @@ func TestADraftOnATaskIsPublishedByTheProviderOfItsTarget(t *testing.T) {
 	if got := e.svc.PublisherOf(d); got != "chat" {
 		t.Fatalf("PublisherOf = %s", got)
 	}
-	if _, err := e.svc.Approve(ctx, d.ID, nil); err != nil {
+	if _, err := e.approve(d.ID, nil); err != nil {
 		t.Fatal(err)
 	}
 	if sent, failed, err := e.svc.Send(ctx); sent != 1 || failed != 0 || err != nil {
@@ -70,7 +70,7 @@ func TestADraftOnATaskStuckSendingIsVerifiedByItsTargetsProvider(t *testing.T) {
 	chat.found = true
 	d := e.propose(onTask("#general"))
 	d.State = draft.Sending
-	if _, err := e.store.Update(ctx, d, draft.Proposed); err != nil {
+	if _, err := e.store.Update(ctx, d, draft.Held); err != nil {
 		t.Fatal(err)
 	}
 	if err := e.svc.Recover(ctx); err != nil {
@@ -100,7 +100,7 @@ func TestAProviderThatPublishesKeepsItsDraftsWhateverTheirTarget(t *testing.T) {
 	if got := e.svc.PublisherOf(d); got != unit.GitHub {
 		t.Fatalf("PublisherOf = %s", got)
 	}
-	if _, err := e.svc.Approve(ctx, d.ID, nil); err != nil {
+	if _, err := e.approve(d.ID, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := e.svc.Send(ctx); err != nil {

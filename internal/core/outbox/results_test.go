@@ -55,7 +55,7 @@ func TestASentPostAttachesItsUnitToTheTurnsTask(t *testing.T) {
 	r := &postResults{intents: []string{"begin"}}
 	e.svc.Results = r
 	d := e.propose(fromTask(reply("shipped")))
-	if _, err := e.svc.Approve(ctx, d.ID, nil); err != nil {
+	if _, err := e.approve(d.ID, nil); err != nil {
 		t.Fatal(err)
 	}
 	if len(r.attached) != 0 {
@@ -121,7 +121,7 @@ func TestADraftOnTheTaskAttachesTheUnitItsPostLandedIn(t *testing.T) {
 	p.Unit = task.UnitOf("e-1")
 	p.Origin = draft.Origin{Kind: draft.OriginSession, TurnSeq: 3, Intent: "begin"}
 	d := e.propose(p)
-	if _, err := e.svc.Approve(ctx, d.ID, nil); err != nil {
+	if _, err := e.approve(d.ID, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := e.svc.Send(ctx); err != nil {

@@ -1,5 +1,5 @@
 {
-  "version": "4aab1c74eeb1",
+  "version": "db6e01d39c26",
   "specs": [
     {
       "id": "run_now",
@@ -462,21 +462,6 @@
       "plugin": "github"
     },
     {
-      "id": "draft.approve",
-      "label": "Approve",
-      "summary": "Send this draft as it stands.",
-      "group": "draft",
-      "surfaces": [
-        "row",
-        "detail",
-        "tui",
-        "cli"
-      ],
-      "source": "builtin",
-      "scope": "draft",
-      "verb": "approve"
-    },
-    {
       "id": "draft.edit",
       "label": "Edit",
       "summary": "Change the draft's text; it waits for your approval again.",
@@ -495,21 +480,6 @@
       "source": "builtin",
       "scope": "draft",
       "verb": "edit"
-    },
-    {
-      "id": "draft.discard",
-      "label": "Discard",
-      "summary": "Drop this draft for good; nothing is sent.",
-      "group": "draft",
-      "surfaces": [
-        "row",
-        "detail",
-        "tui",
-        "cli"
-      ],
-      "source": "builtin",
-      "scope": "draft",
-      "verb": "dismiss"
     },
     {
       "id": "draft.retry",

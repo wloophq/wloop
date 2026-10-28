@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -13,7 +14,9 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	intentload "github.com/wloophq/wloop/internal/intent"
@@ -73,7 +76,7 @@ func (s *Server) handleGates(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]api.GateView, len(gs))
 	for i, g := range gs {
-		out[i] = gateView(g, s.loaded().Gates)
+		out[i] = s.gateView(r.Context(), g)
 	}
 	writeJSON(w, out)
 }
@@ -100,21 +103,35 @@ func (s *Server) handleGate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := context.WithoutCancel(r.Context())
-	res := gates.Resolution{Intent: r.PathValue("intent"), Answer: req.Args["answer"], By: actor}
-	if err := s.deps.Gates.Resolve(ctx, id, res); err != nil {
-		writeGateError(w, err)
-		return
-	}
 	g, err := rd.Get(ctx, id)
 	if err != nil {
 		writeGateError(w, err)
 		return
 	}
-	writeJSON(w, gateView(g, s.loaded().Gates))
+	intent := r.PathValue("intent")
+	if g.Kind == gate.KindDraft && s.deps.Outbox != nil {
+		err = s.resolveDraftGateAt(ctx, g, intent, req.Args, actor)
+	} else {
+		err = s.deps.Gates.Resolve(ctx, id, gates.Resolution{Intent: intent, Answer: req.Args["answer"], By: actor})
+	}
+	if err != nil {
+		writeGateError(w, err)
+		return
+	}
+	if g, err = rd.Get(ctx, id); err != nil {
+		writeGateError(w, err)
+		return
+	}
+	writeJSON(w, s.gateView(ctx, g))
 }
 
 func writeGateError(w http.ResponseWriter, err error) {
+	var off pluginOff
+	var none noPublisher
 	switch {
+	case errors.As(err, &off), errors.As(err, &none), errors.Is(err, outbox.ErrConflict), errors.Is(err, outbox.ErrInvalid),
+		errors.Is(err, outbox.ErrNotFound), errors.As(err, new(badRequest)):
+		writeDraftError(w, err)
 	case errors.Is(err, gates.ErrRefused):
 		writeError(w, http.StatusForbidden, err.Error())
 	case errors.Is(err, gates.ErrIntent):
@@ -126,6 +143,27 @@ func writeGateError(w http.ResponseWriter, err error) {
 	default:
 		writeError(w, http.StatusInternalServerError, err.Error())
 	}
+}
+
+// gateView is g as clients offer it: a draft gate with its draft as its subject and its delivery.
+func (s *Server) gateView(ctx context.Context, g gate.Gate) api.GateView {
+	if o := s.deps.Outbox; o != nil && g.Kind == gate.KindDraft {
+		if id, err := strconv.ParseInt(g.Subject, 10, 64); err == nil {
+			if d, err := o.Store.Get(ctx, draft.ID(id)); err == nil {
+				return s.draftGateView(g, s.draftView(ctx, d, g))
+			}
+		}
+	}
+	return gateView(g, s.loaded().Gates)
+}
+
+// draftGateView is draft gate g with dv, its draft, as its subject, and its delivery.
+func (s *Server) draftGateView(g gate.Gate, dv api.Draft) api.GateView {
+	v := gateView(gate.Gate{ID: g.ID, Task: g.Task, Unit: g.Unit, Kind: g.Kind, Name: g.Name, Status: g.Status, Intents: g.Intents,
+		Deadline: g.Deadline, Default: g.Default}, s.loaded().Gates)
+	v.Subject, _ = json.Marshal(dv)
+	v.Delivery = dv.State
+	return v
 }
 
 // gateView is g as clients offer it, worded by gates.toml.
@@ -166,11 +204,45 @@ func (ev *taskViewer) openGates(ctx context.Context, e task.Task, v *api.TaskVie
 	if err != nil {
 		return err
 	}
-	d := ev.s.loaded().Gates
 	for _, g := range gs {
 		if g.Status == gate.Open {
-			v.Gates = append(v.Gates, gateView(g, d))
+			v.Gates = append(v.Gates, ev.s.gateView(ctx, g))
 		}
 	}
 	return nil
+}
+
+// resolveDraftGateAt resolves draft gate g with intent as actor, under draftMu: an approval readies its draft at the
+// args' rev, the draft's own when absent, with the args' text when present, and is refused while its plugin is off.
+func (s *Server) resolveDraftGateAt(ctx context.Context, g gate.Gate, intent string, args map[string]string, actor task.Actor) error {
+	s.draftMu.Lock()
+	defer s.draftMu.Unlock()
+	id, err := strconv.ParseInt(g.Subject, 10, 64)
+	if err != nil {
+		return fmt.Errorf("draft gate %d names no draft: %q", g.ID, g.Subject)
+	}
+	d, err := s.deps.Outbox.Store.Get(ctx, draft.ID(id))
+	if err != nil {
+		return err
+	}
+	rev := d.Rev
+	if raw, ok := args["rev"]; ok {
+		if rev, err = strconv.ParseInt(raw, 10, 64); err != nil || rev < 0 {
+			return badRequest{fmt.Sprintf("rev is the draft's revision, not %q", raw)}
+		}
+	}
+	var text *string
+	if t, ok := args["text"]; ok {
+		text = &t
+	}
+	if st, _ := s.intentStatus(g, intent); st == gate.Approved {
+		if p := s.deps.Outbox.PublisherOf(d); !s.pluginEnabled(p) {
+			return pluginOff{p}
+		}
+	}
+	err = s.resolveDraftGate(ctx, g, intent, rev, text, actor)
+	if errors.Is(err, outbox.ErrDisabled) {
+		err = noPublisher{s.deps.Outbox.PublisherOf(d), err}
+	}
+	return err
 }

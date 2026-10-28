@@ -323,16 +323,16 @@ func (m *Model) taskVerb(verb string, read uint64) (Command, bool) {
 	}
 	c := Command{Unit: taskUnit(e.ID), Label: taskLabel(e), Action: verb, task: e.ID, verb: verb}
 	switch {
-	case e.Draft != nil && (verb == "approve" || verb == "dismiss" || verb == "retry"):
+	case draftOn(e) != nil && (verb == "approve" || verb == "dismiss" || verb == "retry"):
 		return m.draftVerb(c, e, read)
 	case verb == "edit":
 		shown := m.shownDetail(e)
-		if shown.Draft == nil || !m.detailOpen(e) {
+		if draftOn(shown) == nil || !m.detailOpen(e) {
 			m.status = "open a draft, or pick one with its digit, to edit it"
 			return Command{}, false
 		}
-		c.task = "draft:" + strconv.FormatInt(shown.Draft.ID, 10)
-		return m.editPrompt(c, *shown.Draft, read)
+		c.task = "draft:" + strconv.FormatInt(draftOn(shown).ID, 10)
+		return m.editPrompt(c, *draftOn(shown), read)
 	case verb == "delegate":
 		return m.delegatePrompt(e, c, m.bridgedConfirm(e, verb), read)
 	case verb == "reply":
@@ -372,16 +372,16 @@ func (m *Model) draftVerb(c Command, e api.TaskView, read uint64) (Command, bool
 		return Command{}, false
 	}
 	shown := m.shownDetail(e)
-	if shown.Draft == nil {
+	if draftOn(shown) == nil {
 		m.status = "no draft on screen to " + c.verb
 		return Command{}, false
 	}
-	c.args = map[string]string{"rev": strconv.FormatInt(shown.Draft.Rev, 10)}
+	c.args = map[string]string{"rev": strconv.FormatInt(draftOn(shown).Rev, 10)}
 	if c.verb == "retry" {
 		m.confirm(c, "post again to "+target+"?", read)
 		return Command{}, false
 	}
-	c.args["text"] = shown.Draft.Text
+	c.args["text"] = draftOn(shown).Text
 	m.confirm(c, "post to "+target+"?", read)
 	return Command{}, false
 }

@@ -277,7 +277,7 @@ func TestDryRunOnAPlanGateIsRefused(t *testing.T) {
 
 func TestGateFactsComeFromTheGate(t *testing.T) {
 	t.Parallel()
-	f := GateFacts(gate.Gate{ID: 4, Kind: gate.KindQuestion, Name: "question", Status: gate.Answered})
+	f := GateFacts(gate.Gate{ID: 4, Kind: gate.KindQuestion, Name: "question", Status: gate.Answered}, "")
 	for k, v := range map[string]any{"gate.kind": "question", "gate.name": "question", "gate.status": "answered", "gate.delivery": ""} {
 		if f[k] != v {
 			t.Errorf("%s = %v, want %v", k, f[k], v)
@@ -300,7 +300,7 @@ func TestGateFactsComeFromTheGate(t *testing.T) {
 	if problems != "" {
 		t.Fatal(problems)
 	}
-	if m, _, at, err := d.Approval.Decide(GateFacts(gate.Gate{Kind: gate.KindPlan, Name: "plan"})); err != nil || m != gate.ModeRun || at != "gates.toml approval.rule[0]" {
+	if m, _, at, err := d.Approval.Decide(GateFacts(gate.Gate{Kind: gate.KindPlan, Name: "plan"}, "")); err != nil || m != gate.ModeRun || at != "gates.toml approval.rule[0]" {
 		t.Fatalf("gates.toml decides a plan gate by its facts: %s %s %v", m, at, err)
 	}
 }

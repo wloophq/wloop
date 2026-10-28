@@ -48,10 +48,33 @@ func v7Gates(ctx context.Context, tx *sql.Tx) error {
 			return fmt.Errorf("the gates of the %s: %w", s.name, err)
 		}
 	}
+	if err := v7DraftDelivery(ctx, tx); err != nil {
+		return fmt.Errorf("the drafts' delivery: %w", err)
+	}
 	if _, err := tx.ExecContext(ctx, `UPDATE turn_answers SET gate_id = coalesce((SELECT g.id FROM gates g
 		WHERE g.kind IN (?, ?, ?) AND g.subject = CAST(turn_answers.message_id AS TEXT)), 0) WHERE message_id != 0`,
 		string(gate.KindQuestion), string(gate.KindPost), string(gate.KindProposal)); err != nil {
 		return fmt.Errorf("the gates of the answers: %w", err)
+	}
+	return nil
+}
+
+// v7DraftDelivery leaves a draft only its delivery, once its gate holds its approval: the approval states
+// become the delivery ones, and the approval's columns go.
+func v7DraftDelivery(ctx context.Context, tx *sql.Tx) error {
+	for _, q := range []string{
+		`UPDATE drafts SET state = CASE state WHEN 'proposed' THEN 'held' WHEN 'approved' THEN 'queued' WHEN 'discarded' THEN 'dropped'
+  ELSE state END`,
+		`ALTER TABLE drafts DROP COLUMN approval_mode`,
+		`ALTER TABLE drafts DROP COLUMN approval_window`,
+		`ALTER TABLE drafts DROP COLUMN deadline`,
+		`ALTER TABLE drafts DROP COLUMN would_policy`,
+		`ALTER TABLE drafts DROP COLUMN would_reason`,
+		`ALTER TABLE drafts DROP COLUMN would_outcome`,
+	} {
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("%s: %w", q, err)
+		}
 	}
 	return nil
 }
@@ -150,6 +173,8 @@ func (m *gateMigration) drafts(ctx context.Context) error {
 			g.Status, g.Intent, g.By, g.Rule = gate.Rejected, words.no, task.ActorWorkflow, v6DryRun
 		case r.state == "discarded":
 			g.Status, g.Intent, g.By = gate.Rejected, words.no, task.ActorPerson
+		case r.state == "sent" && r.mode == "":
+			g.Status, g.Intent, g.By = gate.Approved, words.yes, task.ActorAgent
 		case r.outcome == v6Released && r.mode == v6DelayApproval:
 			g.Status, g.Intent, g.By, g.Rule = gate.Approved, words.yes, task.ActorWorkflow, windowRule
 		case r.outcome == v6Released:

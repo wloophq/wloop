@@ -93,8 +93,6 @@ func (s *Server) routes() []route {
 		{"GET " + api.CountersPath, s.handleCounters},
 		{"GET " + api.Drafts, s.handleDrafts},
 		{"POST " + api.Drafts, s.handleDraftCreate},
-		{"GET " + api.DraftDetail, s.handleDraft},
-		{"POST " + api.DraftActionPath, s.handleDraftAction},
 		{"GET " + api.DigestPath, s.handleDigest},
 		{"GET " + api.ReviewPath, s.handleReview},
 		{"POST " + api.ReviewStepDone, s.handleReviewStepDone},

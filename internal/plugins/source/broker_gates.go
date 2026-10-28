@@ -190,7 +190,8 @@ func sessionOrigin(b dturn.Book, t *dturn.Turn, u unit.Unit, kind draft.OriginKi
 // RecordSent records a post one of the plugin's tools made at once, on the
 // plugin's unit it landed in, as a sent draft whose origin is the session's
 // newest turn, or the session itself when it has none or the call named
-// no session. A tool the manifest does not mark posts = "now", or a named
+// no session, with a draft gate already approved by the agent, its rule the
+// tool. A tool the manifest does not mark posts = "now", or a named
 // session that is not live, is refused.
 func (g gates) RecordSent(ctx context.Context, d src.Draft, session, tool string) (src.GateRef, error) {
 	h := g.b.Hosted
@@ -214,7 +215,7 @@ func (g gates) RecordSent(ctx context.Context, d src.Draft, session, tool string
 		origin = sessionOrigin(b, t, u, draft.OriginSession)
 	}
 	p := outbox.Proposal{Unit: u, Purpose: d.Purpose, Delivery: draft.Delivery(d.Delivery), Target: d.Target, Text: d.Text, Reaction: d.Reaction,
-		Replaced: d.Replaced, Origin: origin}
+		Replaced: d.Replaced, Origin: origin, Tool: tool}
 	sent, err := h.Drafts.RecordSent(ctx, p, draft.Evidence(d.Evidence))
 	if err != nil {
 		return src.GateRef{}, err

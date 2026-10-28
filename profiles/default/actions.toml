@@ -121,11 +121,6 @@ why     = "intake {{.row.intake_seq}} is a turn by hand, which only its session 
 label   = "Cancel"
 summary = "Drop this intake: the turn it waits on never starts."
 
-["draft.approve"]
-label   = "Approve"
-summary = "Send this draft as it stands."
-why     = "{{if eq .draft.refusal \"plugin_off\"}}{{.draft.provider}} is disabled{{else if eq .draft.refusal \"state\"}}the draft is {{.draft.state}}{{else}}{{.draft.provider}} posts nothing{{end}}"
-
 ["draft.edit"]
 label   = "Edit"
 summary = "Change the draft's text; it waits for your approval again."
@@ -133,11 +128,6 @@ why     = "{{if eq .draft.refusal \"plugin_off\"}}{{.draft.provider}} is disable
 
 ["draft.edit".input]
 label = "Text"
-
-["draft.discard"]
-label   = "Discard"
-summary = "Drop this draft for good; nothing is sent."
-why     = "{{if eq .draft.refusal \"plugin_off\"}}{{.draft.provider}} is disabled{{else if eq .draft.refusal \"state\"}}the draft is {{.draft.state}}{{else}}{{.draft.provider}} posts nothing{{end}}"
 
 ["draft.retry"]
 label   = "Retry"

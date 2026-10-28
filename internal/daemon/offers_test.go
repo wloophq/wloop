@@ -35,6 +35,7 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
@@ -407,8 +408,8 @@ func TestEverySpecHasADispatchAndBack(t *testing.T) {
 	for _, spec := range catalogOf(bundledActions()) {
 		ids[spec.ID] = true
 		if spec.Scope == catalog.ScopeDraft {
-			if !slices.Contains(api.DraftActions, strings.TrimPrefix(spec.ID, "draft.")) {
-				t.Errorf("%s has no draft route", spec.ID)
+			if _, ok := draftVerbs[task.Verb(spec.Verb)]; !ok {
+				t.Errorf("%s runs no draft verb", spec.ID)
 			}
 			continue
 		}

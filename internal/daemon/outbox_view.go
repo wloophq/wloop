@@ -11,16 +11,15 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 const draftPrefix = "draft:"
 
-// outboxStates are the drafts the Outbox shows: those waiting on the user, and those a restart has yet to settle.
-var outboxStates = []draft.State{draft.Proposed, draft.Failed, draft.Sending}
-
-// outboxView serves the Outbox: one virtual task per draft of an enabled plugin, newest first, never stored.
+// outboxView serves the Outbox: one virtual task per draft of an enabled plugin whose gate is open, or whose gate
+// approved it and whose delivery failed or a restart has yet to settle, newest first, never stored.
 type outboxView struct{ s *Server }
 
 func (v outboxView) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) {
@@ -32,8 +31,9 @@ func (v outboxView) Tasks(ctx context.Context, q task.Query) ([]task.Task, error
 		return nil, err
 	}
 	out := make([]task.Task, 0, len(ds))
-	for _, d := range ds {
-		e, err := draftTask(d, v.s.unitLabel(d.Unit), v.s.loaded().Tasks)
+	for _, p := range ds {
+		d := p.Draft
+		e, err := draftTask(d, p.Gate, v.s.unitLabel(d.Unit), v.s.loaded().Tasks)
 		if err != nil {
 			v.s.logf("outbox: draft %d: %v", d.ID, err)
 			continue
@@ -43,9 +43,9 @@ func (v outboxView) Tasks(ctx context.Context, q task.Query) ([]task.Task, error
 	return out, nil
 }
 
-func (v outboxView) drafts(ctx context.Context) ([]draft.Draft, error) {
-	ds, err := v.s.deps.Outbox.List(ctx, outbox.Filter{States: outboxStates})
-	return slices.DeleteFunc(ds, func(d draft.Draft) bool { return !v.s.pluginEnabled(d.Unit.Provider) }), err
+func (v outboxView) drafts(ctx context.Context) ([]outbox.Pending, error) {
+	ps, err := v.s.deps.Outbox.Outbox(ctx)
+	return slices.DeleteFunc(ps, func(p outbox.Pending) bool { return !v.s.pluginEnabled(p.Draft.Unit.Provider) }), err
 }
 
 func (v outboxView) Task(ctx context.Context, id task.ID) (task.Task, bool, error) {
@@ -60,7 +60,11 @@ func (v outboxView) Task(ctx context.Context, id task.ID) (task.Task, bool, erro
 	if err != nil {
 		return task.Task{}, false, err
 	}
-	e, err := draftTask(d, v.s.unitLabel(d.Unit), v.s.loaded().Tasks)
+	g, _, err := v.s.deps.Outbox.GateOf(ctx, d)
+	if err != nil {
+		return task.Task{}, false, err
+	}
+	e, err := draftTask(d, g, v.s.unitLabel(d.Unit), v.s.loaded().Tasks)
 	return e, err == nil, err
 }
 
@@ -80,19 +84,22 @@ func draftIDOf(id task.ID) (draft.ID, bool) {
 
 // draftCategories are the task categories that tell where a draft stands.
 var draftCategories = map[draft.State]task.Category{
-	draft.Proposed: task.CategoryInbox, draft.Failed: task.CategoryInbox,
-	draft.Approved: task.CategoryReady, draft.Sending: task.CategoryReady,
-	draft.Sent: task.CategoryDone, draft.Discarded: task.CategoryDropped,
+	draft.Held: task.CategoryInbox, draft.Failed: task.CategoryInbox,
+	draft.Queued: task.CategoryReady, draft.Sending: task.CategoryReady,
+	draft.Sent: task.CategoryDone, draft.Dropped: task.CategoryDropped,
 }
 
-func draftTask(d draft.Draft, where string, st task.States) (task.Task, error) {
+// draftTask is d's virtual task; g is its gate, whose window is the task's due date.
+func draftTask(d draft.Draft, g gate.Gate, where string, st task.States) (task.Task, error) {
 	e := task.Task{ID: task.ID(draftPrefix + strconv.FormatInt(int64(d.ID), 10)), Kind: task.KindDraft,
 		Title: draftTitle(d, where), Units: []unit.Unit{d.Unit}, Origin: task.OriginDraft,
 		Created: d.CreatedAt, Updated: d.UpdatedAt}
 	if err := e.MoveTo(draftCategories[d.State], st); err != nil {
 		return task.Task{}, err
 	}
-	e.SetProp(task.PropDue, task.Value{Time: d.Deadline}, task.WriterPlugin, d.UpdatedAt)
+	if g.Status == gate.Open {
+		e.SetProp(task.PropDue, task.Value{Time: g.Deadline}, task.WriterPlugin, d.UpdatedAt)
+	}
 	for _, it := range d.Items {
 		e.Items = append(e.Items, task.ItemRef{Unit: d.Unit, Item: it})
 	}
@@ -107,7 +114,9 @@ func draftTitle(d draft.Draft, where string) string {
 	return fmt.Sprintf("%s on %s: %s", d.Purpose, where, first)
 }
 
-// withDraft sets a draft task's draft on v, and its verbs from the draft's actions: the others are refused.
+// withDraft sets a draft task's gate on v, its subject the draft, and its verbs: approve and dismiss while its gate
+// is open, dismiss also while its delivery may still go, edit and retry as the draft's actions stand; the others
+// are refused.
 func (s *Server) withDraft(ctx context.Context, e task.Task, v *api.TaskView) error {
 	if e.Kind != task.KindDraft || s.deps.Outbox == nil {
 		return nil
@@ -120,20 +129,36 @@ func (s *Server) withDraft(ctx context.Context, e task.Task, v *api.TaskView) er
 	if err != nil {
 		return err
 	}
-	dv := s.draftView(ctx, d)
-	v.Draft = &dv
+	g, _, err := s.deps.Outbox.GateOf(ctx, d)
+	if err != nil {
+		return err
+	}
+	dv := s.draftView(ctx, d, g)
+	if g.ID != 0 {
+		v.Gates = []api.GateView{s.draftGateView(g, dv)}
+	}
 	actions := map[string]api.ActionState{}
 	for _, st := range dv.Actions {
 		actions[strings.TrimPrefix(st.ID, "draft.")] = st
 	}
+	facts := s.draftFacts(d)
+	open := g.Status == gate.Open
 	for i, vs := range v.Verbs {
 		action, ok := draftVerbs[task.Verb(vs.Verb)]
-		if !ok {
+		switch {
+		case !ok:
 			v.Verbs[i] = api.VerbState{Verb: vs.Verb, Reason: "a draft takes approve, edit, dismiss and retry"}
-			continue
+		case action == "approve":
+			v.Verbs[i] = api.VerbState{Verb: vs.Verb, Enabled: open && !facts.Disabled && !facts.NoPublisher, Reason: actions["edit"].Reason}
+		case action == "discard":
+			v.Verbs[i] = api.VerbState{Verb: vs.Verb, Enabled: open || d.State == draft.Queued || d.State == draft.Failed, Reason: actions["edit"].Reason}
+		default:
+			st := actions[action]
+			v.Verbs[i] = api.VerbState{Verb: vs.Verb, Enabled: st.Enabled, Reason: st.Reason}
 		}
-		st := actions[action]
-		v.Verbs[i] = api.VerbState{Verb: vs.Verb, Enabled: st.Enabled, Reason: st.Reason}
+		if v.Verbs[i].Enabled {
+			v.Verbs[i].Reason = ""
+		}
 	}
 	return nil
 }

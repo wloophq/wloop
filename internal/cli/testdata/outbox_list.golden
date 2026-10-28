@@ -1,4 +1,4 @@
 4	close	sending	thread/C1 0001	thread:C1 0001		2026-10-09T15:03:00Z	Left sending by a crash.
-3	reply	proposed	thread/C1 0001	thread:C1 0001		2026-10-09T15:02:00Z	Closing this.
+3	reply	held	thread/C1 0001	thread:C1 0001		2026-10-09T15:02:00Z	Closing this.
 2	nudge	failed	thread/C1 0001	thread:C1 0001		2026-10-09T15:01:00Z	Any news on this?
-1	reply	proposed	thread/C1 0001	thread:C1 0001		2026-10-09T15:00:00Z	Thanks, merging now.
+1	reply	held	thread/C1 0001	thread:C1 0001		2026-10-09T15:00:00Z	Thanks, merging now.

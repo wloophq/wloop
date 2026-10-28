@@ -3,11 +3,13 @@ package sqlite
 import (
 	"context"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -76,5 +78,29 @@ func TestSourceEventsAreKeptOnceAndFilled(t *testing.T) {
 	}
 	if got, err := s.UnitEvents(ctx, []unit.Unit{u7}, []string{"push"}, noteAt.Add(time.Second)); err != nil || len(got) != 0 {
 		t.Errorf("pushes since a second later %+v %v, want none", got, err)
+	}
+}
+
+func TestARehomedDraftKeepsItsGate(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	dm := unit.Unit{Provider: "slack", Key: "T000AAA/D000AAA/1700000000.000200"}
+	seg := unit.Unit{Provider: "slack", Key: "T000AAA/D000AAA/seg/1700000000000100"}
+	d, err := db.Drafts().Insert(ctx, draft.Draft{Unit: dm, Kind: draft.Reply, Text: "hi", Origin: draft.Origin{Kind: draft.OriginTurn},
+		State: draft.Held, CreatedAt: noteAt, UpdatedAt: noteAt})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gs := db.Gates(func() time.Time { return noteAt })
+	g, err := gs.Open(ctx, gate.Gate{Kind: gate.KindDraft, Name: "draft", Unit: dm, Subject: strconv.FormatInt(int64(d.ID), 10)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.RehomeDrafts(ctx, map[unit.Unit]unit.Unit{dm: seg}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := gs.Get(ctx, g.ID); err != nil || got.Unit != seg {
+		t.Fatalf("the draft moved to %s, its gate is on %s %v", seg, got.Unit, err)
 	}
 }

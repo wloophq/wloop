@@ -11,6 +11,8 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
@@ -205,7 +207,7 @@ func stateStyle(t termfmt.Term, state string) func(string) string {
 	switch state {
 	case "failed":
 		return t.Red
-	case "sending", "approved":
+	case "sending", "queued":
 		return t.Yellow
 	case "sent":
 		return t.Green
@@ -226,12 +228,21 @@ func writeOutboxPlain(w io.Writer, ds []api.Draft) {
 	}
 }
 
-// draftCommands are the commands d takes now, from its actions.
+// outboxCommands are the outbox subcommands of a draft's actions: its gate's decisions, and its delivery's.
+var outboxCommands = []string{"approve", "edit", "discard", "retry"}
+
+// draftCommands are the commands d takes now: approve and discard while its gate waits, then its actions.
 func draftCommands(d api.Draft) []string {
 	var out []string
+	if d.Intents[string(gate.Approved)] != "" {
+		out = append(out, fmt.Sprintf("%s outbox approve %d", brand.Command, d.ID))
+	}
+	if d.Intents[string(gate.Rejected)] != "" || d.State == string(draft.Queued) || d.State == string(draft.Failed) {
+		out = append(out, fmt.Sprintf("%s outbox discard %d", brand.Command, d.ID))
+	}
 	for _, a := range d.Actions {
 		verb, ok := strings.CutPrefix(a.ID, "draft.")
-		if !a.Enabled || !ok || !slices.Contains(api.DraftActions, verb) {
+		if !a.Enabled || !ok || !slices.Contains(outboxCommands, verb) {
 			continue
 		}
 		line := fmt.Sprintf("%s outbox %s %d", brand.Command, verb, d.ID)
@@ -302,8 +313,8 @@ func writeDraftView(w io.Writer, t termfmt.Term, d api.Draft, now time.Time) {
 	if d.Error != "" {
 		field("Error", d.Error)
 	}
-	if d.State == "discarded" && d.Reason != "" {
-		field("Discarded", d.Reason)
+	if d.State == string(draft.Dropped) && d.Reason != "" {
+		field("Dropped", d.Reason)
 	}
 	if d.Permalink != "" {
 		field("Posted", d.Permalink)

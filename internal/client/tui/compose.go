@@ -7,10 +7,20 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 )
 
-// draftVerbs are the task verbs of a draft's actions.
-var draftVerbs = map[string]string{"draft.approve": "approve", "draft.edit": "edit", "draft.discard": "dismiss", "draft.retry": "retry"}
+// draftVerbs are the task verbs of a draft's delivery actions.
+var draftVerbs = map[string]string{"draft.edit": "edit", "draft.retry": "retry"}
+
+// draftOn is the draft of e's draft gate, nil when it has none.
+func draftOn(e api.TaskView) *api.Draft {
+	if d, ok := e.DraftOf(); ok {
+		return &d
+	}
+	return nil
+}
 
 // SetDrafts shows the drafts made for task id while its detail is open.
 func (m *Model) SetDrafts(id string, ds []api.Draft) {
@@ -29,8 +39,8 @@ func (m *Model) listedDrafts() []api.Draft {
 		return nil
 	}
 	shown := int64(0)
-	if m.opened != nil && m.opened.Draft != nil {
-		shown = m.opened.Draft.ID
+	if m.opened != nil && draftOn(*m.opened) != nil {
+		shown = draftOn(*m.opened).ID
 	}
 	return slices.DeleteFunc(slices.Clone(m.drafts), func(d api.Draft) bool { return d.ID == shown })
 }
@@ -68,13 +78,30 @@ func (m *Model) pickedDraft() (api.Draft, bool) {
 
 // draftTask is the Outbox task of d, its verbs read from the draft's actions.
 func draftTask(d api.Draft, title string) api.TaskView {
-	e := api.TaskView{ID: "draft:" + strconv.FormatInt(d.ID, 10), Kind: "draft", Title: title, Draft: &d}
+	e := api.TaskView{ID: "draft:" + strconv.FormatInt(d.ID, 10), Kind: "draft", Title: title}
+	e.Gates = []api.GateView{api.DraftGate(d)}
+	held, why := d.Intents[string(gate.Approved)] != "", ""
+	for _, a := range d.Actions {
+		if a.ID == "draft.edit" && !a.Enabled {
+			why = a.Reason
+		}
+	}
+	drops := held || d.State == string(draft.Queued) || d.State == string(draft.Failed)
+	e.Verbs = append(e.Verbs, api.VerbState{Verb: "approve", Enabled: held, Reason: reasonUnless(held, why)},
+		api.VerbState{Verb: "dismiss", Enabled: drops, Reason: reasonUnless(drops, why)})
 	for _, a := range d.Actions {
 		if v, ok := draftVerbs[a.ID]; ok {
 			e.Verbs = append(e.Verbs, api.VerbState{Verb: v, Enabled: a.Enabled, Reason: a.Reason})
 		}
 	}
 	return e
+}
+
+func reasonUnless(enabled bool, why string) string {
+	if enabled {
+		return ""
+	}
+	return why
 }
 
 // pickedVerb runs verb on the picked draft as on an Outbox task: approve and retry after a y with the
@@ -121,7 +148,7 @@ func (m *Model) editPrompt(c Command, d api.Draft, read uint64) (Command, bool) 
 		m.edit = &EditRequest{Label: "edit", Text: d.Text, submit: submit}
 		return Command{}, false
 	}
-	m.prompt = &prompt{action: "edit", label: "edit the draft to " + draftTarget(api.TaskView{Draft: &d}) + " (Ctrl+E: editor)", text: []rune(d.Text),
+	m.prompt = &prompt{action: "edit", label: "edit the draft to " + draftTarget(draftTask(d, "")) + " (Ctrl+E: editor)", text: []rune(d.Text),
 		read: read, submit: submit, editor: true}
 	return Command{}, false
 }

@@ -1,4 +1,4 @@
-[cyan]#12[/]  [bold]nudge[/]  [dim]proposed[/]
+[cyan]#12[/]  [bold]nudge[/]  [dim]held[/]
 [link https://github.com/acme/api/pull/7][bold]acme/api#7 · Batch export for large accounts[/][/]
 [dim]https://github.com/acme/api/pull/7[/]
 
@@ -13,5 +13,5 @@
 [dim]Approval  [/]  wait
 
 [dim]{{command}} outbox approve 12[/]
-[dim]{{command}} outbox edit 12 <markdown>[/]
 [dim]{{command}} outbox discard 12[/]
+[dim]{{command}} outbox edit 12 <markdown>[/]

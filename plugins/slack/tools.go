@@ -470,13 +470,13 @@ func (t tools) propose(ctx context.Context, s *send.Service, d draft.Draft) (src
 	return answer(proposedAnswer(draft.State(ref.State)), fields{"ID": ref.Draft, "Unit": d.Unit.String(), "Where": where}, false), nil
 }
 
-// proposedAnswer is slack_draft's answer for a draft the approval policy
-// left in state st.
+// proposedAnswer is slack_draft's answer for a draft its gate left in
+// state st: queued when a rule approved it, dropped by a dry run.
 func proposedAnswer(st draft.State) string {
 	switch st {
-	case draft.Approved:
+	case draft.Queued:
 		return "approved"
-	case draft.Discarded:
+	case draft.Dropped:
 		return "dry_run"
 	}
 	return "proposed"

@@ -41,7 +41,7 @@ type gateDrafts struct {
 
 func (d *gateDrafts) Propose(_ context.Context, p outbox.Proposal) (draft.Draft, error) {
 	d.proposed = append(d.proposed, p)
-	return draft.Draft{ID: draft.ID(len(d.proposed)), State: cmp.Or(d.policy, draft.Proposed)}, nil
+	return draft.Draft{ID: draft.ID(len(d.proposed)), State: cmp.Or(d.policy, draft.Held)}, nil
 }
 
 func (d *gateDrafts) RecordSent(_ context.Context, p outbox.Proposal, _ draft.Evidence) (draft.Draft, error) {
@@ -184,7 +184,7 @@ func TestASessionWithNoTurnDraftsOnThePluginsUnitWithTheSessionAsOrigin(t *testi
 		t.Fatal(err)
 	}
 	if p := ds.proposed[0]; p.Origin != (draft.Origin{Kind: draft.OriginSession}) || p.Unit.Key != "t2" || len(p.Items) != 0 || p.Task != "" ||
-		ref.State != string(draft.Proposed) {
+		ref.State != string(draft.Held) {
 		t.Fatalf("proposed %+v as %q, want t2 with the session origin", p, ref.State)
 	}
 	for name, req := range map[string]src.GateRequest{
@@ -202,7 +202,7 @@ func TestASessionWithNoTurnDraftsOnThePluginsUnitWithTheSessionAsOrigin(t *testi
 
 func TestAGateAnswersTheStateThePolicyLeftItsDraftIn(t *testing.T) {
 	t.Parallel()
-	for _, st := range []draft.State{draft.Proposed, draft.Approved, draft.Discarded} {
+	for _, st := range []draft.State{draft.Held, draft.Queued, draft.Dropped} {
 		g, ds := gatesOver(t)
 		ds.policy = st
 		ref, err := g.OpenGate(context.Background(), src.GateRequest{Draft: src.Draft{Unit: plugin.Unit{Provider: "acme", Key: "t1"}, Kind: "reply", Text: "hi"},

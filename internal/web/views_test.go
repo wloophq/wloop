@@ -251,18 +251,19 @@ process.stdout.write(JSON.stringify({ Row: text(tr), Card: text(c), Keys: Object
 	}
 }
 
+var outboxWindow = time.Date(2026, 10, 9, 15, 10, 0, 0, time.UTC)
+
 func outboxTasks() []api.TaskView {
 	return []api.TaskView{
 		task("draft:7", "inbox", func(e *api.TaskView) {
 			e.Kind, e.Title = "draft", "Reply to the deploy thread"
-			e.Draft = &api.Draft{ID: 7, Unit: "slack/T1/C1", Kind: "reply", Target: "C1", Where: `#deploys in the thread "Deploy at five"`, Text: "Deployed, all green.", State: "proposed", Rev: 3,
-				Would: api.DraftWould{Policy: "release", Reason: "a reply from a turn"}}
+			e.Gates = draftGates(api.Draft{ID: 7, Unit: "slack/T1/C1", Kind: "reply", Target: "C1", Where: `#deploys in the thread "Deploy at five"`, Text: "Deployed, all green.", State: "held", Rev: 3,
+				Deadline: &outboxWindow})
 			e.Verbs = []api.VerbState{{Verb: "approve", Enabled: true}, {Verb: "edit", Enabled: true}, {Verb: "dismiss", Enabled: true}, {Verb: "retry", Enabled: false}}
 		}),
 		task("draft:8", "inbox", func(e *api.TaskView) {
 			e.Kind, e.Title = "draft", "Nudge the reviewer"
-			e.Draft = &api.Draft{ID: 8, Unit: "github/acme/api#8", Kind: "nudge", Target: "acme/api#8", Text: "Ping?", State: "failed", Error: "rate limited", Rev: 5,
-				Would: api.DraftWould{Policy: "hold", Reason: "low confidence"}}
+			e.Gates = draftGates(api.Draft{ID: 8, Unit: "github/acme/api#8", Kind: "nudge", Target: "acme/api#8", Text: "Ping?", State: "failed", Error: "rate limited", Rev: 5})
 			e.Verbs = []api.VerbState{{Verb: "approve", Enabled: false}, {Verb: "edit", Enabled: true}, {Verb: "dismiss", Enabled: true}, {Verb: "retry", Enabled: true}}
 		}),
 	}
@@ -300,8 +301,8 @@ const buttons = cards.map(buttonLabels);
   await byFocus(first, "outbox:retry:draft:8").attrs.onclick();
   process.stdout.write(JSON.stringify({ text: text(first), buttons, posts, editing: buttonLabels(byClass(editing, "d-draft")[0]) }));
 })();`, map[string]any{"cat": viewsCatalog(), "tasks": outboxTasks()}, &got)
-	for _, s := range []string{`To #deploys in the thread "Deploy at five"`, "Deployed, all green.", "Auto-send would release: a reply from a turn",
-		"To acme/api#8 (destination unknown)", "Ping?", "rate limited", "Auto-send would hold: low confidence"} {
+	for _, s := range []string{`To #deploys in the thread "Deploy at five"`, "Deployed, all green.", "Sends at ",
+		"To acme/api#8 (destination unknown)", "Ping?", "rate limited"} {
 		if !strings.Contains(got.Text, s) {
 			t.Errorf("the outbox lacks %q: %s", s, got.Text)
 		}

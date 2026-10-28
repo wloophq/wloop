@@ -80,21 +80,23 @@ func KindOf(purpose string, d Delivery) Kind {
 	return Reply
 }
 
-type State string // "proposed", "approved", "sending", "sent", "failed", "discarded"
+// State is where a draft's delivery stands, as the host keeps it; whether
+// it may be posted at all is its gate's decision.
+type State string
 
 const (
-	Proposed  State = "proposed"
-	Approved  State = "approved"
-	Sending   State = "sending"
-	Sent      State = "sent"
-	Failed    State = "failed"
-	Discarded State = "discarded"
+	Held    State = "held"
+	Queued  State = "queued"
+	Sending State = "sending"
+	Sent    State = "sent"
+	Failed  State = "failed"
+	Dropped State = "dropped"
 )
 
-var States = []State{Proposed, Approved, Sending, Sent, Failed, Discarded}
+var States = []State{Held, Queued, Sending, Sent, Failed, Dropped}
 
 // Open are the states in which a draft may still be posted.
-var Open = []State{Proposed, Approved, Sending}
+var Open = []State{Held, Queued, Sending}
 
 type OriginKind string // "turn", "session", "auto", "user"
 
@@ -123,29 +125,6 @@ type Evidence struct {
 	At        time.Time
 }
 
-type WouldPolicy string // "release", "wait"
-
-const (
-	WouldRelease WouldPolicy = "release"
-	WouldWait    WouldPolicy = "wait"
-)
-
-type Outcome string // "", "as_is", "edited", "discarded", "released" (approved by its policy), "dry_run" (stored, never sent)
-
-const (
-	OutcomeAsIs      Outcome = "as_is"
-	OutcomeEdited    Outcome = "edited"
-	OutcomeDiscarded Outcome = "discarded"
-	OutcomeReleased  Outcome = "released"
-	OutcomeDryRun    Outcome = "dry_run"
-)
-
-type Would struct {
-	Policy  WouldPolicy // what auto-send would have done, fixed at proposal
-	Reason  string      // why, one line
-	Outcome Outcome     // what the user (or the policy) did, set at approve or discard
-}
-
 type Draft struct {
 	ID       ID
 	Unit     unit.Unit
@@ -162,14 +141,11 @@ type Draft struct {
 	Original string   // Text as proposed
 	Edited   bool     // Text != Original
 	Origin   Origin
-	Approval Approval  // fixed at proposal
-	Deadline time.Time // Approval.Mode "delay": when Tick approves it; zero otherwise
 	State    State
 	Evidence Evidence // State "sent" only
 	Error    string   // State "failed" only, never a token
-	Reason   string   // State "discarded": "user", "assigned", "dry_run", ...
-	Would    Would
-	Rev      int64 // the stored row's version; every Update bumps it
+	Reason   string   // State "dropped": "user", "assigned", "moot", "dry_run", ...
+	Rev      int64    // the stored row's version; every Update bumps it
 	// EffectsAppliedAt is when the Effects of a sent draft were applied;
 	// zero while they are not.
 	EffectsAppliedAt time.Time
@@ -181,8 +157,8 @@ type Draft struct {
 var ErrTransition = errors.New("draft: transition not allowed")
 
 // Can says why d cannot move to s, nil when it can:
-// proposed->approved|discarded; approved->sending|failed|discarded;
-// sending->sent|failed; failed->approved (by hand only)|discarded.
+// held->queued|failed|dropped; queued->sending|failed|dropped;
+// sending->sent|failed; failed->queued (by hand only)|dropped.
 func (d Draft) Can(s State) error {
 	if !slices.Contains(transitions[d.State], s) {
 		return fmt.Errorf("%w: %s -> %s", ErrTransition, d.State, s)
@@ -191,10 +167,10 @@ func (d Draft) Can(s State) error {
 }
 
 var transitions = map[State][]State{
-	Proposed: {Approved, Discarded},
-	Approved: {Sending, Failed, Discarded},
-	Sending:  {Sent, Failed},
-	Failed:   {Approved, Discarded},
+	Held:    {Queued, Failed, Dropped},
+	Queued:  {Sending, Failed, Dropped},
+	Sending: {Sent, Failed},
+	Failed:  {Queued, Dropped},
 }
 
 // The reasons a workflow withdraws a draft it proposed, as Reason of the
@@ -203,36 +179,3 @@ const (
 	WithdrawAssigned = "assigned"
 	WithdrawMoot     = "moot"
 )
-
-type ApprovalMode string // "wait" (default), "delay", "send", "dry_run"
-
-const (
-	Wait   ApprovalMode = "wait"
-	Delay  ApprovalMode = "delay"
-	Send   ApprovalMode = "send"
-	DryRun ApprovalMode = "dry_run"
-)
-
-// ApprovalModes are the draft approval's modes.
-var ApprovalModes = []ApprovalMode{Send, Delay, Wait, DryRun}
-
-// Releases says whether m sends a draft with no person approving it.
-func (m ApprovalMode) Releases() bool { return m == Send || m == Delay }
-
-type Approval struct {
-	Mode   ApprovalMode
-	Window time.Duration // Mode "delay" only, > 0
-}
-
-// Validate refuses an unknown mode, a window <= 0 with delay, a window set without delay.
-func (a Approval) Validate() error {
-	switch {
-	case !slices.Contains(ApprovalModes, a.Mode):
-		return fmt.Errorf("unknown draft approval mode %q", a.Mode)
-	case a.Mode == Delay && a.Window <= 0:
-		return errors.New("draft approval delay needs a positive window")
-	case a.Mode != Delay && a.Window != 0:
-		return fmt.Errorf("draft approval %s takes no window", a.Mode)
-	}
-	return nil
-}

@@ -17,6 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/core/outbox/outboxtest"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -349,8 +350,15 @@ func TestGitHubNudgeDraftsThroughTheOutbox(t *testing.T) {
 	p.Events, p.Now = f.Inventory, func() time.Time { return f.Now }
 	gh.viewer, gh.now = seededViewer, f.Now
 	p.Viewer = func(ctx context.Context) (string, error) { return f.Inventory.Viewer(ctx, unit.GitHub) }
-	svc := &outbox.Service{Store: f.DB.Drafts(), Clock: fixedClock(f.Now),
-		Effects: func(unit.ProviderID) (port.Effects, error) { return p, nil }}
+	gs := outboxtest.NewGates(func() time.Time { return f.Now })
+	svc := gs.Bind(&outbox.Service{Store: f.DB.Drafts(), Clock: fixedClock(f.Now),
+		Effects: func(unit.ProviderID) (port.Effects, error) { return p, nil }})
+	approve := func(id draft.ID) (draft.Draft, error) {
+		if err := gs.Approve(ctx, id); err != nil {
+			return draft.Draft{}, err
+		}
+		return f.DB.Drafts().Get(ctx, id)
+	}
 	issueOf := func(u unit.Unit) string {
 		ref, _ := pr.ParseKey(u.Key)
 		return "/repos/" + ref.Owner + "/" + ref.Repo + "/issues/" + strconv.Itoa(ref.Number)
@@ -361,7 +369,7 @@ func TestGitHubNudgeDraftsThroughTheOutbox(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.State != draft.Proposed || gh.posts() != 0 {
+	if d.State != draft.Held || gh.posts() != 0 {
 		t.Fatalf("proposing posted: %+v, %d posts", d.State, gh.posts())
 	}
 	if _, err := svc.Propose(ctx, sentProp); !errors.Is(err, outbox.ErrDuplicate) {
@@ -370,7 +378,7 @@ func TestGitHubNudgeDraftsThroughTheOutbox(t *testing.T) {
 	if sent, failed, err := svc.Send(ctx); sent+failed != 0 || err != nil {
 		t.Fatalf("sent an unapproved draft: %d %d %v", sent, failed, err)
 	}
-	if _, err := svc.Approve(ctx, d.ID, nil); err != nil {
+	if _, err := approve(d.ID); err != nil {
 		t.Fatal(err)
 	}
 	if sent, _, err := svc.Send(ctx); sent != 1 || err != nil {
@@ -396,11 +404,11 @@ func TestGitHubNudgeDraftsThroughTheOutbox(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if crashed, err = svc.Approve(ctx, crashed.ID, nil); err != nil {
+	if crashed, err = approve(crashed.ID); err != nil {
 		t.Fatal(err)
 	}
 	crashed.State, crashed.SendingAt = draft.Sending, f.Now
-	if crashed, err = f.DB.Drafts().Update(ctx, crashed, draft.Approved); err != nil {
+	if crashed, err = f.DB.Drafts().Update(ctx, crashed, draft.Queued); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := p.Publish(ctx, crashed); err != nil {
@@ -422,7 +430,7 @@ func TestGitHubNudgeDraftsThroughTheOutbox(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.Approve(ctx, failing.ID, nil); err != nil {
+	if _, err := approve(failing.ID); err != nil {
 		t.Fatal(err)
 	}
 	gh.fail = http.StatusBadGateway
@@ -441,7 +449,7 @@ func TestGitHubNudgeDraftsThroughTheOutbox(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.Approve(ctx, refused.ID, nil); err != nil {
+	if _, err := approve(refused.ID); err != nil {
 		t.Fatal(err)
 	}
 	refusedRef, _ := pr.ParseKey(props[3].Unit.Key)

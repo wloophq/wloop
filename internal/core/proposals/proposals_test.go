@@ -10,6 +10,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -46,7 +47,7 @@ func TestGitHubUnitGetsOneNudgeDraft(t *testing.T) {
 	}
 	d := all[0]
 	want := draft.Origin{Kind: draft.OriginAuto, Rule: "github-nudge", Key: pull.String()}
-	if d.Origin != want || d.Approval != (draft.Approval{Mode: draft.Wait}) || d.State != draft.Proposed || d.Task != "" {
+	if g := e.gateOf(d); d.Origin != want || g.Status != gate.Open || !g.Deadline.IsZero() || d.State != draft.Held || d.Task != "" {
 		t.Fatalf("the plugin's self-declared origin or approval leaked: %+v", d)
 	}
 }
@@ -88,7 +89,7 @@ func TestPluginRulesDraftsTakeTheirPluginsApproval(t *testing.T) {
 	src := &githubSource{out: []outbox.Proposal{ghNudge(pull)}}
 	e.job.Sources = []Source{{Provider: unit.GitHub, Proposals: src.Proposals}}
 	e.run()
-	if g := e.list("github-nudge")[0]; g.Approval != (draft.Approval{Mode: draft.Delay, Window: time.Hour}) || !g.Deadline.Equal(t0.Add(time.Hour)) {
+	if g := e.gateOf(e.list("github-nudge")[0]); g.Status != gate.Open || !g.Deadline.Equal(t0.Add(time.Hour)) {
 		t.Fatalf("configured rule %+v", g)
 	}
 }
@@ -98,7 +99,7 @@ func TestProposalsSkipDisabledPlugins(t *testing.T) {
 	src := &githubSource{out: []outbox.Proposal{ghNudge(pull)}}
 	e.job.Sources = []Source{{Provider: unit.GitHub, Proposals: src.Proposals}}
 	e.run()
-	open := e.list("github-nudge", draft.Proposed)
+	open := e.list("github-nudge", draft.Held)
 	e.disabled[unit.GitHub] = true
 	e.facts[pull] = task.UnitFacts{Unit: pull, ClosurePosted: true}
 	e.clock.set(t0.Add(72 * time.Hour))
@@ -106,10 +107,10 @@ func TestProposalsSkipDisabledPlugins(t *testing.T) {
 		t.Fatalf("acted on a disabled plugin: %s", sum)
 	}
 	for _, d := range open {
-		if got, _ := e.drafts.Get(ctx, d.ID); got.State != draft.Proposed {
+		if got, _ := e.drafts.Get(ctx, d.ID); got.State != draft.Held {
 			t.Fatalf("draft %d is %s", d.ID, got.State)
 		}
-		if _, err := e.svc.Approve(ctx, d.ID, nil); !errors.Is(err, outbox.ErrDisabled) {
+		if _, err := e.svc.Prepare(ctx, d.ID, d.Rev, nil); !errors.Is(err, outbox.ErrDisabled) {
 			t.Fatalf("approve on a disabled plugin: %v", err)
 		}
 	}
@@ -126,7 +127,7 @@ func TestDiscardedProposalIsNotProposedAgain(t *testing.T) {
 		e, _ := setup(t)
 		e.run()
 		d := e.drafts.all()[0]
-		if _, err := e.svc.Discard(ctx, d.ID, ""); err != nil {
+		if err := e.gates.Discard(ctx, d.ID); err != nil {
 			t.Fatal(err)
 		}
 		e.clock.set(t0.Add(23 * time.Hour))
@@ -143,7 +144,7 @@ func TestDiscardedProposalIsNotProposedAgain(t *testing.T) {
 		e.run()
 		d := e.drafts.all()[0]
 		d.State, d.Error = draft.Failed, "not posted"
-		if _, err := e.drafts.Update(ctx, d, draft.Proposed); err != nil {
+		if _, err := e.drafts.Update(ctx, d, draft.Held); err != nil {
 			t.Fatal(err)
 		}
 		e.clock.set(t0.Add(30 * 24 * time.Hour))
@@ -175,7 +176,7 @@ func TestEmptyPluginPassKeepsItsDrafts(t *testing.T) {
 	e.run()
 	src.out = nil
 	e.run()
-	if all := e.drafts.all(); len(all) != 1 || all[0].State != draft.Proposed {
+	if all := e.drafts.all(); len(all) != 1 || all[0].State != draft.Held {
 		t.Fatalf("%+v", all)
 	}
 }
@@ -229,9 +230,9 @@ func TestPluginNudgeWithdrawnWhenTheUnitCloses(t *testing.T) {
 	}
 	for _, d := range e.drafts.all() {
 		switch {
-		case d.Unit == pull && (d.State != draft.Discarded || d.Reason != ReasonMoot):
+		case d.Unit == pull && (d.State != draft.Dropped || d.Reason != ReasonMoot):
 			t.Fatalf("merged PR's nudge %s %q", d.State, d.Reason)
-		case d.Unit == other && d.State != draft.Proposed:
+		case d.Unit == other && d.State != draft.Held:
 			t.Fatalf("open PR's nudge %s", d.State)
 		}
 	}

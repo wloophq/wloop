@@ -117,7 +117,7 @@ func TestSlackDraftOnARefPostsInItsThreadOnceApproved(t *testing.T) {
 	if len(ds) != 1 || ds[0].Unit != slackThreadUnit("T000", sessThreaded, sessParent) || ds[0].Target != ref {
 		t.Fatalf("drafts %+v", ds)
 	}
-	if _, err := w.deps.Outbox.Approve(ctx, ds[0].ID, nil); err != nil {
+	if err := approveDraft(ctx, w.deps.Outbox, ds[0].ID); err != nil {
 		t.Fatal(err)
 	}
 	if sent, _, err := w.deps.Outbox.Send(ctx); sent != 1 || err != nil {

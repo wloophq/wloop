@@ -74,7 +74,7 @@ func withApplier(e *env) *effectLog {
 func (e *env) sendNow(t *testing.T, p Proposal) draft.Draft {
 	t.Helper()
 	d := e.propose(p)
-	if _, err := e.svc.Approve(ctx, d.ID, nil); err != nil {
+	if _, err := e.approve(d.ID, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := e.svc.Send(ctx); err != nil && !errors.Is(err, errBoom) && !errors.Is(err, ErrUnknownEffect) {
@@ -106,8 +106,8 @@ func TestASentDraftAppliesItsEffectsOnce(t *testing.T) {
 	if got := l.names(); len(got) != 2 {
 		t.Fatalf("applied again: %v", got)
 	}
-	stored, err := e.store.Insert(ctx, draft.Draft{Unit: thread, Purpose: "reply", Delivery: draft.Message, Text: "an effect nobody implements now",
-		State: draft.Approved, Effects: []string{"unknown.effect"}, CreatedAt: t0, UpdatedAt: t0})
+	stored, err := e.insertApproved(draft.Draft{Unit: thread, Purpose: "reply", Delivery: draft.Message, Text: "an effect nobody implements now",
+		State: draft.Queued, Effects: []string{"unknown.effect"}, CreatedAt: t0, UpdatedAt: t0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,12 +215,15 @@ func TestACommentDraftWaitsForAPersonWhateverItsMode(t *testing.T) {
 		p := Proposal{Unit: thread, Purpose: "nudge", Delivery: draft.CommentDelivery, Text: "any news?", Policy: draft.Fixed(mode),
 			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "my-followups", Rule: "my-followups", Key: string(mode.Mode)}}
 		d := e.propose(p)
-		if d.State != draft.Proposed || d.Approval.Mode != draft.Wait || !d.Deadline.IsZero() || d.Would.Policy != draft.WouldWait {
+		if d.State != draft.Held || e.approval(d.ID).Mode != draft.Wait {
 			t.Fatalf("%s: %+v", mode.Mode, d)
 		}
 	}
 	e.clock.now = t0.Add(time.Hour)
-	if n, err := e.svc.Tick(ctx); n != 0 || err != nil {
-		t.Fatalf("tick approved %d %v", n, err)
+	if err := e.tick(); err != nil {
+		t.Fatal(err)
+	}
+	if ds, _ := e.svc.List(ctx, Filter{States: []draft.State{draft.Held}}); len(ds) != 2 {
+		t.Fatalf("held %+v", ds)
 	}
 }

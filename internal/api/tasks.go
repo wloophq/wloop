@@ -124,7 +124,6 @@ type TaskView struct {
 	Actions   []ActionState `json:"actions,omitempty"`
 	Attention *Attention    `json:"attention,omitempty"`
 	Message   *Message      `json:"message,omitempty"`
-	Draft     *Draft        `json:"draft,omitempty"`
 	Created   time.Time     `json:"created"`
 	Updated   time.Time     `json:"updated"`
 
@@ -163,7 +162,8 @@ type AskView struct {
 
 // GateView is a gate as clients offer it: Task and Unit what it is on ("" when none), Text its words from
 // gates.toml, Intents what a person may resolve it with, in order, Default the intent its Deadline resolves it
-// with, Delivery a draft gate's delivery state (sending, failed), Subject its subject as its kind serves it.
+// with, Delivery a draft gate's delivery state (held, queued, sending, sent, failed, dropped), Subject its subject as
+// its kind serves it: a draft gate's is its Draft.
 type GateView struct {
 	ID       int64           `json:"id"`
 	Task     string          `json:"task,omitempty"`

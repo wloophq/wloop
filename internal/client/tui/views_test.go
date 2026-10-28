@@ -74,8 +74,8 @@ func viewTasks() map[string][]api.TaskView {
 	captured := task("e3", "Buy cables", "inbox")
 	draft := task("draft:11", "Reply in the release thread", "outbox")
 	draft.Kind, draft.Verbs = "draft", verbs("approve", "dismiss")
-	draft.Draft = &api.Draft{ID: 11, Rev: 4, Kind: "reply", Purpose: "reply", Target: "C0REL", Where: "#releases thread", Text: "Ship it tonight.\nRollback plan in the doc.",
-		State: "pending", Approval: api.DraftApproval{Mode: "wait"}, Origin: api.DraftOrigin{Kind: "turn"}}
+	draft.Gates = draftGates(api.Draft{ID: 11, Rev: 4, Kind: "reply", Purpose: "reply", Target: "C0REL", Where: "#releases thread", Text: "Ship it tonight.\nRollback plan in the doc.",
+		State: "pending", Origin: api.DraftOrigin{Kind: "turn"}})
 	return map[string][]api.TaskView{
 		"focus":  {focus},
 		"inbox":  {asked, captured},
@@ -267,15 +267,15 @@ func TestOutboxApprovesTheTextOnScreen(t *testing.T) {
 	m.SetDetail(e.ID, e, nil)
 	edited := e
 	edited.Updated = e.Updated.Add(time.Minute)
-	edited.Draft = ptr(*e.Draft)
-	edited.Draft.Text = "Ship it now, no rollback."
-	edited.Draft.Rev = 5
+	ed := *draftOn(e)
+	ed.Text, ed.Rev = "Ship it now, no rollback.", 5
+	edited.Gates = draftGates(ed)
 	m.SetTasks("outbox", []api.TaskView{edited}, viewCounters())
 	if _, ok := press(m, Key{Rune: 'a'}); ok || m.prompt == nil || !m.prompt.confirm {
 		t.Fatalf("a did not ask: %+v", m.prompt)
 	}
 	c, ok := press(m, Key{Rune: 'y'})
-	if want := map[string]string{"text": e.Draft.Text, "rev": "4"}; !ok || c.verb != "approve" || !reflect.DeepEqual(c.args, want) {
+	if want := map[string]string{"text": draftOn(e).Text, "rev": "4"}; !ok || c.verb != "approve" || !reflect.DeepEqual(c.args, want) {
 		t.Fatalf("approved %+v %v, want the text on screen", c, ok)
 	}
 }
@@ -726,8 +726,9 @@ func squash(s string) string {
 func TestOutboxRetrySendsTheRevOnScreen(t *testing.T) {
 	m := viewsModel(t)
 	e := viewTasks()["outbox"][0]
-	e.Draft = ptr(*e.Draft)
-	e.Draft.State = "failed"
+	failed := *draftOn(e)
+	failed.State = "failed"
+	e.Gates = draftGates(failed)
 	e.Verbs = []api.VerbState{{Verb: "retry", Enabled: true}}
 	m.SetTasks("outbox", []api.TaskView{e}, viewCounters())
 	chord(m, "go")

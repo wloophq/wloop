@@ -19,7 +19,7 @@ func TestADisabledPluginsTasksAndDraftsLeaveTheCountsAndStayDismissable(t *testi
 	ctx := context.Background()
 	r.put(t, task.Task{ID: "e-gh", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Title: "reply", Units: []unit.Unit{r7u}})
 	r.put(t, task.Task{ID: "e-mine", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Title: "mine"})
-	d := r.stored(t, draft.Draft{Unit: slackUnit, Text: "hi", State: draft.Proposed})
+	d := r.stored(t, draft.Draft{Unit: slackUnit, Text: "hi", State: draft.Held})
 
 	inbox := r.page(t, "view=inbox")
 	if got := taskIDs(inbox.Tasks); len(got) != 1 || got[0] != "e-mine" {
@@ -61,7 +61,7 @@ func TestADisabledPluginsTasksAndDraftsLeaveTheCountsAndStayDismissable(t *testi
 	if code, body := r.verb(t, d.ID, "dismiss", `{}`); code != 200 {
 		t.Fatalf("dismiss the draft: %d %s", code, body)
 	}
-	if got, _ := r.o.Store.Get(ctx, d.ID); got.State != draft.Discarded {
+	if got, _ := r.o.Store.Get(ctx, d.ID); got.State != draft.Dropped {
 		t.Fatalf("draft %+v", got)
 	}
 }
@@ -137,7 +137,7 @@ func TestDismissOnAMixedTaskRunsItsEnabledUnitsAction(t *testing.T) {
 func TestTheDraftsRouteDiscardsADisabledPluginsDraft(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t, "slack")
-	d := r.stored(t, draft.Draft{Unit: slackUnit, Text: "hi", State: draft.Proposed})
+	d := r.stored(t, draft.Draft{Unit: slackUnit, Text: "hi", State: draft.Held})
 	var list api.DraftsResponse
 	if code := get(t, r.s, api.Drafts, &list); code != 200 || len(list.Drafts) != 1 {
 		t.Fatalf("GET: %d %+v", code, list)
@@ -151,7 +151,7 @@ func TestTheDraftsRouteDiscardsADisabledPluginsDraft(t *testing.T) {
 		t.Fatalf("edit: %d %s", code, body)
 	}
 	code, got, body := r.act(t, d.ID, "discard", `{}`)
-	if code != 200 || got.State != string(draft.Discarded) {
+	if code != 200 || got.State != string(draft.Dropped) {
 		t.Fatalf("discard: %d %s", code, body)
 	}
 }

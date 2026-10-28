@@ -8,9 +8,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/gates/gatestest"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -117,10 +120,6 @@ type validating struct {
 
 func (v validating) Validate(ctx context.Context, d draft.Draft) error { return v.refuse }
 
-type fakeItems map[unit.Unit][]items.Item
-
-func (f fakeItems) Items(ctx context.Context, u unit.Unit) ([]items.Item, error) { return f[u], nil }
-
 var (
 	thread = unit.Unit{Provider: "slack", Key: "C000AAA/1.2"}
 	pull   = unit.Unit{Provider: unit.GitHub, Key: "o/r#1"}
@@ -130,6 +129,8 @@ var (
 type env struct {
 	svc      *Service
 	store    *memStore
+	gates    *gatestest.Store
+	decider  *gates.Service
 	fx       *fakeEffects
 	clock    *fakeClock
 	disabled map[unit.ProviderID]bool
@@ -139,8 +140,11 @@ type env struct {
 
 func newEnv() *env {
 	e := &env{store: &memStore{}, fx: &fakeEffects{}, clock: &fakeClock{now: t0}, disabled: map[unit.ProviderID]bool{}}
+	e.gates = gatestest.NewStore(e.clock.Now)
+	e.decider = gates.New(gates.Deps{Store: e.gates, Reader: e.gates, Profile: draftProfile{}, Clock: e.clock, Publisher: publishTo{e}})
 	e.svc = &Service{
 		Store: e.store,
+		Gates: testGates{e.decider, e.gates},
 		Effects: func(p unit.ProviderID) (port.Effects, error) {
 			if e.disabled[p] {
 				return nil, fmt.Errorf("%s: %w", p, ErrDisabled)
@@ -166,6 +170,65 @@ func (e *env) propose(p Proposal) draft.Draft {
 	return d
 }
 
+// gate is the gate of draft id.
+func (e *env) gate(id draft.ID) gate.Gate {
+	g, ok, err := e.svc.GateOf(context.Background(), e.get(id))
+	if err != nil || !ok {
+		panic(fmt.Sprintf("draft %d has no gate: %v", id, err))
+	}
+	return g
+}
+
+// decide resolves draft id's gate with intent as a person.
+func (e *env) decide(id draft.ID, intent string) error {
+	return e.decider.Resolve(context.Background(), e.gate(id).ID, gates.Resolution{Intent: intent, By: task.ActorPerson})
+}
+
+// approve approves draft id's gate as a person, as the daemon does: the draft prepared at its rev, then its gate.
+func (e *env) approve(id draft.ID, text *string) (draft.Draft, error) {
+	g := e.gate(id)
+	d, err := e.svc.Prepare(context.Background(), id, e.get(id).Rev, text)
+	if err != nil {
+		return d, err
+	}
+	if err := e.decider.Resolve(context.Background(), g.ID, gates.Resolution{Intent: "approve", By: task.ActorPerson}); err != nil {
+		return draft.Draft{}, err
+	}
+	return e.get(id), nil
+}
+
+// approval is how draft id's gate decided it as it opened: wait while it
+// is open, delay while its window runs, send when a rule approved it, dry_run
+// when one rejected it.
+func (e *env) approval(id draft.ID) draft.Approval {
+	g := e.gate(id)
+	switch {
+	case g.Status == gate.Open && !g.Deadline.IsZero():
+		return draft.Approval{Mode: draft.Delay, Window: g.Deadline.Sub(g.OpenedAt)}
+	case g.Status == gate.Approved && g.By == task.ActorWorkflow && g.Rule != gates.RuleWindow:
+		return draft.Approval{Mode: draft.Send}
+	case g.Status == gate.Rejected && g.By == task.ActorWorkflow:
+		return draft.Approval{Mode: draft.DryRun}
+	}
+	return draft.Approval{Mode: draft.Wait}
+}
+
+// insertApproved stores d with a gate a person approved, as a draft an
+// earlier daemon queued.
+func (e *env) insertApproved(d draft.Draft) (draft.Draft, error) {
+	d, err := e.store.Insert(context.Background(), d)
+	if err != nil {
+		return d, err
+	}
+	g := gateOf(d)
+	g.Name, g.Intents, g.Intent, g.By = "draft", []string{"approve", "discard"}, "approve", task.ActorPerson
+	_, err = e.gates.RecordSent(context.Background(), g)
+	return d, err
+}
+
+// tick resolves the gates whose window passed.
+func (e *env) tick() error { return e.decider.Tick(context.Background(), e.clock.Now()) }
+
 func (e *env) get(id draft.ID) draft.Draft {
 	d, err := e.store.Get(context.Background(), id)
 	if err != nil {
@@ -179,3 +242,25 @@ func reply(text string) Proposal {
 }
 
 var errBoom = errors.New("boom")
+
+type draftProfile struct{}
+
+var draftDef = gates.Def{Name: "draft", Kind: gate.KindDraft, Label: "Send this draft?", Intents: []gates.Intent{
+	{Name: "approve", Status: gate.Approved}, {Name: "discard", Status: gate.Rejected}}}
+
+func (draftProfile) Gate(name string) (gates.Def, bool) { return draftDef, name == draftDef.Name }
+
+func (draftProfile) FirstOf(k gate.Kind) (gates.Def, bool) { return draftDef, k == gate.KindDraft }
+
+type publishTo struct{ e *env }
+
+func (p publishTo) Publish(ctx context.Context, g gate.Gate) error { return p.e.svc.Publish(ctx, g) }
+
+type testGates struct {
+	*gates.Service
+	r gates.Reader
+}
+
+func (g testGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
+	return g.r.Where(ctx, q)
+}

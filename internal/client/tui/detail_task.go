@@ -247,7 +247,7 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 	} else if msg := e.Message; msg != nil {
 		fact("message", msg.Text, plain)
 	}
-	if d := e.Draft; d != nil {
+	if d := draftOn(e); d != nil {
 		m.draftFacts(d, fact, para)
 	}
 	m.draftLines(fact, para)
@@ -325,7 +325,7 @@ func (m *Model) verbHelp(e api.TaskView) (on []helpItem, off []string) {
 			continue
 		}
 		h := helpItem{b.Key, strings.ToLower(cmp.Or(m.verbLabel(v.Verb), b.Help))}
-		if !v.Enabled && v.Verb == "edit" && e.Draft == nil && len(m.listedDrafts()) == 0 {
+		if !v.Enabled && v.Verb == "edit" && draftOn(e) == nil && len(m.listedDrafts()) == 0 {
 			continue
 		}
 		if v.Enabled {

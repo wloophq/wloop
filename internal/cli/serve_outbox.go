@@ -33,19 +33,23 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 			targets = append(targets, m.ID)
 		}
 	}
-	e.outbox = &outbox.Service{Store: db.Drafts(), Effects: publishers(pubs, cfg), Targets: targets, Policies: e.outboxPolicies(), Facts: e.draftFacts,
+	e.outbox = &outbox.Service{Store: db.Drafts(), Gates: draftGates{e, db, logf}, Effects: publishers(pubs, cfg), Targets: targets, Policies: e.outboxPolicies(), Facts: e.draftFacts,
 		Posts:  deliveryPosts,
 		Broken: e.brokenWorkflows,
 		Evidence: outbox.EvidenceTo(func(ctx context.Context, prov items.Provenance, ops []items.Op) error {
 			_, err := ledger.Apply(ctx, prov, ops)
 			return err
 		}),
-		Items: ledger, Clock: clockFunc(e.Now), Log: logf,
+		Clock: clockFunc(e.Now), Log: logf,
 		Applier: outbox.EffectApplier{Store: db.DraftEffects(), Clock: clockFunc(e.Now),
 			Effects: effectLookup(effectDeps{Nudges: e.newTasks(db, cfg, ledger), Modules: mods, Appliers: e.draftAppliers()})},
 		Results: e.newTaskResults(e.newTasks(db, cfg, ledger), mods)}
 	e.hosted.setOutbox(e.outbox)
 	d.Outbox, d.SendDrafts = e.outbox, !e.noJobs
+	if d.Gates == nil {
+		d.Gates = e.newGates(db, logf)
+		d.GateReader = e.gateReader
+	}
 	return d
 }
 
