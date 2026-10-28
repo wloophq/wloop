@@ -16,6 +16,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -77,7 +78,12 @@ func (s settings) PluginTrust(id string) string { return s.trust[id] }
 
 // sourceKind is the source adapter over fresh snapshots.
 func sourceKind(t *testing.T) *psource.Kind {
-	snaps := psource.NewSnapshots()
+	db, err := sqlite.Open(filepath.Join(t.TempDir(), "store.db"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	snaps := psource.NewSnapshots(db.Snapshots())
 	return &psource.Kind{
 		Snapshots: snaps,
 		StateDir:  func(string) string { return t.TempDir() },
@@ -139,7 +145,7 @@ func TestHostStartsAnEnabledPlugin(t *testing.T) {
 		t.Fatal(err)
 	}
 	one := unit.Unit{Provider: "acme", Key: "one"}
-	if _, ok := k.Snapshots.Last(one); !ok || k.Snapshots.Stale(one) {
+	if _, ok, _ := k.Snapshots.Last(t.Context(), one); !ok || k.Snapshots.Stale(one) {
 		t.Errorf("acme's report reached the host: %t, stale %t", ok, k.Snapshots.Stale(one))
 	}
 	if l.Launches("acme") != 1 || l.Launches("wiki") != 0 {
@@ -283,7 +289,7 @@ func TestACrashedPluginRestartsWithBackoffAndItsUnitsGoStale(t *testing.T) {
 			t.Errorf("a down plugin's client: %v", err)
 		}
 		eventually(t, "a restart", func() bool { return l.Launches("acme") == 2 && !k.Snapshots.Stale(one) })
-		if snap, ok := k.Snapshots.Last(one); !ok || snap.Rev != 1 {
+		if snap, ok, _ := k.Snapshots.Last(t.Context(), one); !ok || snap.Rev != 1 {
 			t.Errorf("a stale unit lost its last snapshot: %v %t", snap, ok)
 		}
 		eventually(t, "a report after the restart", ingest)

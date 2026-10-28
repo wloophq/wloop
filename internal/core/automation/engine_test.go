@@ -288,7 +288,7 @@ func TestEvaluateWritesNothing(t *testing.T) {
 		t.Errorf("Plan.Gen = %d, want %d", p.Gen, gen)
 	}
 	for _, c := range r.trace {
-		if c == "units.refresh" || c == "units.settle" || c == "units.moved" {
+		if c == "units.refresh" || c == "units.settle" {
 			t.Errorf("Evaluate called %s", c)
 		}
 	}
@@ -890,7 +890,7 @@ func TestSweepPlansWithoutTheLockAndActsUnderIt(t *testing.T) {
 	r := newRig(t, sweepWF("close", idle, "session.close"))
 	r.put(s1, "a")
 	r.sweep()
-	for _, c := range []string{"units.list", "units.facts", "steps.check", "ledger.save", "units.moved", "units.refresh"} {
+	for _, c := range []string{"units.list", "units.facts", "steps.check", "ledger.save", "units.revs", "units.refresh"} {
 		if !slices.Contains(r.trace, c) || slices.Contains(r.trace, "locked:"+c) {
 			t.Errorf("%s ran under the lock: %v", c, r.trace)
 		}
@@ -902,17 +902,31 @@ func TestSweepPlansWithoutTheLockAndActsUnderIt(t *testing.T) {
 	}
 }
 
-// noteOnMoved runs fn when the sweep asks Moved, after the plan is saved and
-// before it takes the loop lock.
+// noteOnMoved runs fn when the sweep checks the run items' revs, after the
+// plan is saved and before it takes the loop lock.
 func noteOnMoved(t *testing.T, r *rig, fn func()) {
 	t.Helper()
 	r.units = automationtest.NewUnits(automationtest.Trace(func(c string) {
 		r.trace = append(r.trace, r.loop.tag()+c)
-		if c == "units.moved" {
+		if c == "units.revs" && freshCheck(r.trace) == len(r.trace)-1 {
 			fn()
 		}
 	}))
 	r.restart()
+}
+
+// freshCheck is the index in trace of the sweep's check of the run items'
+// revs, the first after it saved the plan; -1 for none.
+func freshCheck(trace []string) int {
+	saved := slices.Index(trace, "ledger.save")
+	if saved < 0 {
+		return -1
+	}
+	at := slices.Index(trace[saved:], "units.revs")
+	if at < 0 {
+		return -1
+	}
+	return saved + at
 }
 
 func TestAUnitNotedAfterThePlanIsRevalidated(t *testing.T) {

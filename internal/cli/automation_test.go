@@ -266,8 +266,8 @@ func TestUnitsRouteByProvider(t *testing.T) {
 	if got := set.Due(); !got.Equal(testNow.Add(time.Minute)) {
 		t.Fatalf("due %v", got)
 	}
-	if moved, err := set.Moved(context.Background(), []unit.Unit{pr, s}); err != nil || !slices.Equal(moved, []unit.Unit{s}) {
-		t.Fatalf("moved %v %v", moved, err)
+	if revs, err := set.Revs(context.Background(), []unit.Unit{pr, s}); err != nil || len(revs) != 2 || revs[s] != 1 || revs[pr] != 0 {
+		t.Fatalf("revs %v %v", revs, err)
 	}
 	var refreshed []string
 	gh.OnRefresh(func(context.Context) error { refreshed = append(refreshed, "github"); return nil })

@@ -19,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/daemon"
+	"github.com/wloophq/wloop/internal/domain/snapshot"
 	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -253,8 +254,8 @@ func installPlugins(configDir, exe string) ([]host.Plugin, error) {
 // servePlugins runs the plugins of e that cfg enables until ctx ends or
 // the returned stop runs, which waits for them to stop; under --no-jobs it
 // runs none.
-func (e *Env) servePlugins(ctx context.Context, cfg config.Config, logf func(string, ...any)) (stop func()) {
-	snaps := psource.NewSnapshots()
+func (e *Env) servePlugins(ctx context.Context, store snapshot.Store, cfg config.Config, logf func(string, ...any)) (stop func()) {
+	snaps := psource.NewSnapshots(store)
 	codecs := e.unitCodecs()
 	e.pluginKind = &psource.Kind{
 		Snapshots: snaps,

@@ -20,6 +20,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/readmodel"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/situation"
 )
 
@@ -368,7 +369,7 @@ func (x *input) turnFact(base readmodel.Base) (f TurnFact, ok bool) {
 	case !base.AgentsOK || x.sessionErr:
 		f.Unread = true
 	case x.session != nil:
-		f.Waiting = sessionWaiting(*x.session, base.Agents)
+		f.Waiting = overlay.SessionWaiting(*x.session, base.Agents)
 	}
 	return f, true
 }

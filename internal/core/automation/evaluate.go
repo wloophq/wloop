@@ -40,6 +40,10 @@ type planned struct {
 	// decided again; it does not run on the facts it was planned with.
 	carried bool
 	retryAt time.Time
+	// rev is the rev of the unit's report its facts came from; hasRev is
+	// false when its provider reports none.
+	rev    uint64
+	hasRev bool
 }
 
 type evaluation struct {
@@ -51,6 +55,8 @@ type evaluation struct {
 	passed []port.Event
 	// decided are the fresh events this evaluation decided, marked once saved.
 	decided []eventOf
+	// due is the earliest deadline of a temporal fact the evaluation read.
+	due time.Time
 }
 
 type candidate struct {
@@ -70,6 +76,8 @@ type planner struct {
 	config  workflow.Facts
 	facts   map[factsRead]workflow.Facts
 	factErr map[factsRead]error
+	revs    map[unit.Unit]uint64
+	due     time.Time
 	marks   map[unit.Unit]map[string]string
 	lists   map[unit.ProviderID][]unit.Unit
 	seen    map[string]bool
@@ -105,7 +113,7 @@ func (e *Engine) evaluate(ctx context.Context, t workflow.TriggerKind, apply boo
 	})
 	batches, errs := e.batches(ctx, ws, now, apply)
 	p := &planner{e: e, ctx: ctx, now: now, pause: pause, facts: map[factsRead]workflow.Facts{},
-		factErr: map[factsRead]error{}, marks: map[unit.Unit]map[string]string{}, lists: map[unit.ProviderID][]unit.Unit{}, seen: map[string]bool{},
+		factErr: map[factsRead]error{}, revs: map[unit.Unit]uint64{}, marks: map[unit.Unit]map[string]string{}, lists: map[unit.ProviderID][]unit.Unit{}, seen: map[string]bool{},
 		perRun: map[string]int{}, perUnit: map[unitOf]int{}, errs: errs, apply: apply}
 	if e.Config != nil {
 		p.config = e.Config()
@@ -119,7 +127,7 @@ func (e *Engine) evaluate(ctx context.Context, t workflow.TriggerKind, apply boo
 			ev.workflows = append(ev.workflows, b.w.Name)
 		}
 	}
-	ev.items, ev.passed, ev.decided = p.out, p.passed, p.decided
+	ev.items, ev.passed, ev.decided, ev.due = p.out, p.passed, p.decided, p.due
 	for _, pl := range p.out {
 		ev.plan.Items = append(ev.plan.Items, pl.item)
 	}
@@ -250,13 +258,39 @@ func (p *planner) unitFacts(w workflow.Workflow, u unit.Unit) (workflow.Facts, e
 	if err, ok := p.factErr[r]; ok {
 		return nil, err
 	}
-	f, err := p.e.unitFacts(p.ctx, w, u)
+	if err := p.rev(u); err != nil {
+		p.factErr[r] = err
+		return nil, err
+	}
+	f, err := p.e.reportedFacts(p.ctx, w, u)
 	if err != nil {
 		p.factErr[r] = err
 		return nil, err
 	}
+	f, due := workflow.Resolve(f, p.now)
+	p.due = earliest(p.due, due)
 	p.facts[r] = f
 	return f, nil
+}
+
+// rev reads u's rev, once, before its facts, so a report after the read
+// counts as a move.
+func (p *planner) rev(u unit.Unit) error {
+	r, ok := p.e.Units.(Revisioner)
+	if !ok {
+		return nil
+	}
+	if _, read := p.revs[u]; read {
+		return nil
+	}
+	revs, err := r.Revs(p.ctx, []unit.Unit{u})
+	if err != nil {
+		return fmt.Errorf("reading its rev: %w", err)
+	}
+	if rev, ok := revs[u]; ok {
+		p.revs[u] = rev
+	}
+	return nil
 }
 
 func (p *planner) unitMarks(u unit.Unit) (map[string]string, error) {
@@ -326,6 +360,7 @@ func (p *planner) decide(w workflow.Workflow, c candidate, stored map[string]wor
 	if ran {
 		pl.item.Attempts, pl.item.Error = run.Attempts, run.Error
 	}
+	pl.rev, pl.hasRev = p.revs[c.u]
 	prev, had := stored[id]
 	if had {
 		pl.prevDecision = prev.Decision

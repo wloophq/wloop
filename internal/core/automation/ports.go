@@ -55,10 +55,13 @@ type Owner interface {
 	Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error)
 }
 
-// Freshener is an optional capability of Units, asked before the loop lock:
-// the units whose source object moved since their facts were read.
-type Freshener interface {
-	Moved(ctx context.Context, units []unit.Unit) ([]unit.Unit, error)
+// Revisioner is an optional capability of Units: the rev of each unit's
+// last report from its source, which grows with every change the source
+// reports; a unit with none is absent. The engine reads a unit's rev before
+// its facts, and a run planned on them does not run once the unit was
+// reported again.
+type Revisioner interface {
+	Revs(ctx context.Context, units []unit.Unit) (map[unit.Unit]uint64, error)
 }
 
 // Seener is an optional capability of Units: the generation of the

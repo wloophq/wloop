@@ -133,7 +133,8 @@ type Vars struct {
 }
 
 // Facts are a unit's facts by dotted name; values are bool, int, string,
-// []string, time.Duration or time.Time. "<slot>.repo" is "owner/repo" or ""
+// []string, time.Duration or time.Time, or a Temporal a provider reports,
+// which the engine resolves to one of those before a predicate reads it. "<slot>.repo" is "owner/repo" or ""
 // and is what the pause's Repos reads.
 type Facts map[string]any
 

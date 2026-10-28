@@ -219,7 +219,7 @@ func TestV7RenameLeavesNoEntryReference(t *testing.T) {
 				if n := strings1(t, db, `SELECT count(*) FROM `+table+` WHERE `+c.name+` = 'entry'`); n[0] != "0" {
 					t.Errorf("%s.%s names the entry provider", table, c.name)
 				}
-				if n := strings1(t, db, `SELECT count(*) FROM `+table+` WHERE `+c.name+` = ?`, string(unit.Task)); !(c.name == "provider" && (table == "drafts" || table == "links" || table == "gates")) && n[0] == "0" {
+				if n := strings1(t, db, `SELECT count(*) FROM `+table+` WHERE `+c.name+` = ?`, string(unit.Task)); !(c.name == "provider" && (table == "drafts" || table == "links" || table == "gates" || table == "unit_snapshots")) && n[0] == "0" {
 					t.Errorf("%s.%s lost its task row", table, c.name)
 				}
 			}

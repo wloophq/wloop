@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/config"
-	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/workday"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 )
 
 type Kind string
@@ -69,20 +69,9 @@ type Input struct {
 	Stalled  config.Stalled
 	// Turn is the pull request's newest review or address turn, else its
 	// newest turn; nil without one.
-	Turn *TurnFacts
+	Turn *overlay.Turn
 	// SessionWaiting means Orca shows the session of Turn waiting.
 	SessionWaiting bool
-}
-
-// TurnFacts is what the loop's store says of a turn.
-type TurnFacts struct {
-	Intent dintent.Name
-	// Role is the role the turn's intent held.
-	Role           string
-	State, Summary string
-	// At is when the turn reached its state; AnsweredAt is when an answer
-	// was typed or resumed after its last record, zero without one.
-	At, AnsweredAt time.Time
 }
 
 type Result struct {
@@ -117,15 +106,13 @@ func Derive(in Input) Result {
 	if e, ok := last(dinv.KindMuted); ok {
 		mutedAt = e.At
 	}
-	muted := Result{Kind: KindMuted, WaitingOn: "nobody", Since: mutedAt, Reason: "muted"}
-	if o := in.Override; !o.MutedUntil.IsZero() && in.Now.Before(o.MutedUntil) {
-		return muted
-	}
-	if o := in.Override; o.MuteUntilStateChange {
-		in.Override.MuteUntilStateChange = false
+	o := in.Override
+	if mute := (overlay.Mute{Until: o.MutedUntil, UntilStateChange: o.MuteUntilStateChange, Kind: o.MutedKind, WaitingOn: o.MutedWaitingOn,
+		At: mutedAt}); !mute.Until.IsZero() || mute.UntilStateChange {
+		in.Override.MutedUntil, in.Override.MuteUntilStateChange = time.Time{}, false
 		r := Derive(in)
-		if string(r.Kind) == o.MutedKind && sameWaitingOn(r.WaitingOn, o.MutedWaitingOn) {
-			return muted
+		if mute.Holds(overlayOf(r), in.Now) {
+			return resultOf(mute.Muted())
 		}
 		return r
 	}
@@ -147,8 +134,10 @@ func Derive(in Input) Result {
 	if w, ok := last(dinv.KindWouldAddress); ok && pr.Workspace.ID == "" && !addressedSince(in, evs, w.At) {
 		return Result{Kind: KindToAddress, WaitingOn: "me", Since: w.At, Reason: cut("review to address, no workspace: " + w.Data)}
 	}
-	if r, ok := turnSituation(in); ok {
-		return r
+	if in.Turn != nil {
+		if s, ok := in.Turn.Situation(in.SessionWaiting); ok {
+			return resultOf(s)
+		}
 	}
 	if pr.Workspace.IsReview {
 		if slices.Contains(pr.Workspace.AgentStates, turn.AgentWaiting) {
@@ -298,15 +287,6 @@ func waitingOn(in Input, logins []string) string {
 	return strings.Join(logins, ", ")
 }
 
-func sameWaitingOn(a, b string) bool {
-	set := func(s string) []string {
-		v := strings.Split(s, ", ")
-		slices.Sort(v)
-		return v
-	}
-	return slices.Equal(set(a), set(b))
-}
-
 // sameDay compares calendar days in now's location: the cap that held a
 // round counts rounds per local day.
 func sameDay(t, now time.Time) bool {
@@ -333,38 +313,14 @@ func firstNonZero(ts ...time.Time) time.Time {
 
 // ReasonMax bounds a reason that comes from an agent or a CI, so a row and
 // a notification stay one line.
-const ReasonMax = 200
+const ReasonMax = overlay.ReasonMax
 
-// turnSituation is the situation the loop's turn decides; ok is false when the
-// turn leaves it to GitHub and Orca's agent states.
-func turnSituation(in Input) (Result, bool) {
-	t := in.Turn
-	if t == nil || (t.Role != builtin.RoleReview && t.Role != builtin.RoleAddress) {
-		return Result{}, false
-	}
-	at := func(k Kind, reason string) (Result, bool) {
-		return Result{Kind: k, WaitingOn: "me", Since: t.At, Reason: cut(reason)}, true
-	}
-	switch t.State {
-	case "asked":
-		if t.AnsweredAt.After(t.At) {
-			return at(KindLoopWorking, "your answer was sent")
-		}
-		return at(KindLoopWaiting, t.Summary)
-	case "failed":
-		return at(KindLoopStopped, t.Summary)
-	case "unrecorded":
-		if t.Summary == "" {
-			return at(KindLoopStopped, "the agent ended its turn without a record")
-		}
-		return at(KindLoopStopped, "the agent ended its turn without a record: "+t.Summary)
-	case "started":
-		if in.SessionWaiting {
-			return at(KindLoopWaiting, "waiting for a permission in the terminal")
-		}
-		return at(KindLoopWorking, string(t.Intent)+" round in progress")
-	}
-	return Result{}, false
+func overlayOf(r Result) overlay.Situation {
+	return overlay.Situation{Kind: string(r.Kind), WaitingOn: r.WaitingOn, Since: r.Since, Reason: r.Reason, Stalled: r.Stalled}
+}
+
+func resultOf(s overlay.Situation) Result {
+	return Result{Kind: Kind(s.Kind), WaitingOn: s.WaitingOn, Since: s.Since, Reason: s.Reason, Stalled: s.Stalled}
 }
 
 func failingReason(checks []dinv.FailingCheck) string {
@@ -383,12 +339,7 @@ func failingReason(checks []dinv.FailingCheck) string {
 }
 
 // cut keeps s within ReasonMax runes.
-func cut(s string) string {
-	if r := []rune(s); len(r) > ReasonMax {
-		return strings.TrimRight(string(r[:ReasonMax-1]), " ") + "…"
-	}
-	return s
-}
+func cut(s string) string { return overlay.Cut(s) }
 
 // NudgeWindow bounds how long after a nudge is asked for its comment can
 // be posted: the agent reads the pull request first.

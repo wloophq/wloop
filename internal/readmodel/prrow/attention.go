@@ -28,29 +28,6 @@ const (
 
 var actionReply = api.AttentionAction{ID: "answer:text", Title: "Reply", TextInput: true}
 
-// questionOf is the question view of a turn that waits on the user, from
-// its last record; ok is false for any other turn.
-func questionOf(t *turn.Turn, last *turn.Record) (*api.QuestionView, bool) {
-	if t.State != turn.Asked && !t.State.Stopped() {
-		return nil, false
-	}
-	q := &api.QuestionView{State: string(t.State)}
-	if last == nil {
-		return q, true
-	}
-	q.RecordID = last.ID
-	if rq := last.Record.Question; rq != nil {
-		q.Kind, q.Text, q.Options, q.Recommend, q.Publishes = rq.Kind, rq.Text, slices.Clone(rq.Options), rq.Recommend, rq.Publishes
-	}
-	if o := last.Record.Outcome; o != nil {
-		q.Verdict, q.Blocking, q.NonBlocking = o.Verdict, o.Blocking, o.NonBlocking
-	}
-	if last.Record.State == record.UnrecordedState {
-		q.LastMessage = last.Record.Resume
-	}
-	return q, true
-}
-
 // NoticeCase is what a needs-me row notifies of.
 type NoticeCase string
 

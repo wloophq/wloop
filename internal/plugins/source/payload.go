@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/plugins/source/value"
 	"github.com/wloophq/wloop/internal/turn"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
@@ -41,7 +42,7 @@ func (p Payloads) Payload(ctx context.Context, r turn.Request) (turn.Payload, er
 	facts := make(map[string]any, len(res.Facts))
 	now := p.Now()
 	for _, f := range res.Facts {
-		facts[f.Name] = Resolve(f.Value, now)
+		facts[f.Name] = value.Resolve(f.Value, now)
 	}
 	return payload{unit: r.Unit, res: res, facts: facts}, nil
 }

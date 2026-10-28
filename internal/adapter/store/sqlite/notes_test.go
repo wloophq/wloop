@@ -22,6 +22,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/domain/snapshot"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -75,6 +76,13 @@ func seedGate(t *testing.T, e *noteEnv) {
 
 // writes is every exported write method of the sqlite store types.
 var writes = []writeCase{
+	{
+		method: "snapshotStore.Put",
+		call: func(ctx context.Context, e *noteEnv) error {
+			return e.db.Snapshots().Put(ctx, []snapshot.Stored{{Unit: u7, Rev: 1, JSON: []byte(`{}`)}}, []unit.Unit{term1})
+		},
+		topics: port.TopicPRs, units: []unit.Unit{u7, term1},
+	},
 	{
 		method: "GateStore.Open",
 		call: func(ctx context.Context, e *noteEnv) error {
@@ -348,6 +356,7 @@ func noteItem(d workflow.Decision) workflow.Item {
 // reads are the exported methods of the sqlite store types that note
 // nothing: reads, and the handle's own plumbing.
 var reads = []string{
+	"DB.Snapshots", "snapshotStore.Get", "snapshotStore.Revs", "snapshotStore.Units",
 	"DB.Close", "DB.R", "reader.QueryContext", "reader.QueryRowContext", "DB.Read", "DB.Snapshot", "DB.Write", "DB.Intakes", "DB.Usage", "DB.HeadlessSpent", "DB.AutomatedTurns", "DB.DossierSpent", "DB.UnitEventKeys", "DB.DossierMoves",
 	"Store.Books", "Store.BookOf", "Store.UnitsOf", "Store.Open", "Store.WithTurns", "Store.Applied", "Store.Session", "Store.Sessions",
 	"Store.LastStops", "Store.SessionOf", "Store.SessionOfHandle",

@@ -1,0 +1,259 @@
+{
+  "unit": {
+    "provider": "snapshot.Unit.Provider",
+    "key": "snapshot.Unit.Key"
+  },
+  "rev": 5,
+  "at": "2026-10-28T09:00:06Z",
+  "data": {
+    "n": 8
+  },
+  "situation": {
+    "kind": "snapshot.Situation.Kind",
+    "waiting_on": "snapshot.Situation.WaitingOn",
+    "since": "2026-10-28T09:00:13Z",
+    "reason": "snapshot.Situation.Reason",
+    "stalled": {
+      "kind": 16,
+      "bool": true,
+      "int": 18,
+      "string": "snapshot.Situation.Stalled.String",
+      "list": [
+        "snapshot.Situation.Stalled.List[0]"
+      ],
+      "duration": 22,
+      "time": "2026-10-28T09:00:23Z",
+      "threshold": 24,
+      "unit": 25
+    }
+  },
+  "card": {
+    "label": "snapshot.Card.Label",
+    "title": "snapshot.Card.Title",
+    "state": "snapshot.Card.State",
+    "outcome": "snapshot.Card.Outcome",
+    "signals": [
+      {
+        "key": "snapshot.Card.Signals[0].Key",
+        "value": "snapshot.Card.Signals[0].Value",
+        "tone": "snapshot.Card.Signals[0].Tone",
+        "at": "2026-10-28T09:00:37Z"
+      }
+    ],
+    "last_human": {
+      "who": {
+        "key": "snapshot.Card.LastHuman.Who.Key",
+        "name": "snapshot.Card.LastHuman.Who.Name",
+        "aliases": [
+          "snapshot.Card.LastHuman.Who.Aliases[0]"
+        ]
+      },
+      "what": "snapshot.Card.LastHuman.What",
+      "at": "2026-10-28T09:00:46Z",
+      "link": "snapshot.Card.LastHuman.Link"
+    },
+    "why": "snapshot.Card.Why",
+    "waits_on": [
+      {
+        "key": "snapshot.Card.WaitsOn[0].Key",
+        "name": "snapshot.Card.WaitsOn[0].Name",
+        "aliases": [
+          "snapshot.Card.WaitsOn[0].Aliases[0]"
+        ]
+      }
+    ],
+    "since": "2026-10-28T09:00:55Z",
+    "link": "snapshot.Card.Link",
+    "turns_link": "snapshot.Card.TurnsLink",
+    "started_by_me": true,
+    "closure_posted": true,
+    "cares": true
+  },
+  "items": [
+    {
+      "id": "snapshot.Items[0].ID",
+      "unit": {
+        "provider": "snapshot.Items[0].Unit.Provider",
+        "key": "snapshot.Items[0].Unit.Key"
+      },
+      "kind": "snapshot.Items[0].Kind",
+      "summary": "snapshot.Items[0].Summary",
+      "context": "snapshot.Items[0].Context",
+      "options": [
+        {
+          "label": "snapshot.Items[0].Options[0].Label",
+          "argued_by": [
+            {
+              "key": "snapshot.Items[0].Options[0].ArguedBy[0].Key",
+              "name": "snapshot.Items[0].Options[0].ArguedBy[0].Name",
+              "aliases": [
+                "snapshot.Items[0].Options[0].ArguedBy[0].Aliases[0]"
+              ]
+            }
+          ]
+        }
+      ],
+      "deadline": "snapshot.Items[0].Deadline",
+      "urls": [
+        "snapshot.Items[0].URLs[0]"
+      ],
+      "contexts": [
+        "snapshot.Items[0].Contexts[0]"
+      ],
+      "category": "snapshot.Items[0].Category",
+      "origin": {
+        "unit": {
+          "provider": "snapshot.Items[0].Origin.Unit.Provider",
+          "key": "snapshot.Items[0].Origin.Unit.Key"
+        },
+        "ref": "snapshot.Items[0].Origin.Ref",
+        "permalink": "snapshot.Items[0].Origin.Permalink",
+        "at": "2026-10-28T09:01:31Z"
+      },
+      "requester": {
+        "key": "snapshot.Items[0].Requester.Key",
+        "name": "snapshot.Items[0].Requester.Name",
+        "aliases": [
+          "snapshot.Items[0].Requester.Aliases[0]"
+        ]
+      },
+      "assignees": [
+        {
+          "key": "snapshot.Items[0].Assignees[0].Key",
+          "name": "snapshot.Items[0].Assignees[0].Name",
+          "aliases": [
+            "snapshot.Items[0].Assignees[0].Aliases[0]"
+          ]
+        }
+      ],
+      "assigned_at": {
+        "unit": {
+          "provider": "snapshot.Items[0].AssignedAt.Unit.Provider",
+          "key": "snapshot.Items[0].AssignedAt.Unit.Key"
+        },
+        "ref": "snapshot.Items[0].AssignedAt.Ref",
+        "permalink": "snapshot.Items[0].AssignedAt.Permalink",
+        "at": "2026-10-28T09:01:49Z"
+      },
+      "basis": "snapshot.Items[0].Basis",
+      "waiting_on": [
+        {
+          "key": "snapshot.Items[0].WaitingOn[0].Key",
+          "name": "snapshot.Items[0].WaitingOn[0].Name",
+          "aliases": [
+            "snapshot.Items[0].WaitingOn[0].Aliases[0]"
+          ]
+        }
+      ],
+      "state": "snapshot.Items[0].State",
+      "resolution": "snapshot.Items[0].Resolution",
+      "evidence": {
+        "kind": "snapshot.Items[0].Evidence.Kind",
+        "anchor": {
+          "unit": {
+            "provider": "snapshot.Items[0].Evidence.Anchor.Unit.Provider",
+            "key": "snapshot.Items[0].Evidence.Anchor.Unit.Key"
+          },
+          "ref": "snapshot.Items[0].Evidence.Anchor.Ref",
+          "permalink": "snapshot.Items[0].Evidence.Anchor.Permalink",
+          "at": "2026-10-28T09:02:07Z"
+        }
+      },
+      "trail": [
+        {
+          "kind": "snapshot.Items[0].Trail[0].Kind",
+          "anchor": {
+            "unit": {
+              "provider": "snapshot.Items[0].Trail[0].Anchor.Unit.Provider",
+              "key": "snapshot.Items[0].Trail[0].Anchor.Unit.Key"
+            },
+            "ref": "snapshot.Items[0].Trail[0].Anchor.Ref",
+            "permalink": "snapshot.Items[0].Trail[0].Anchor.Permalink",
+            "at": "2026-10-28T09:02:17Z"
+          }
+        }
+      ],
+      "confidence": "snapshot.Items[0].Confidence",
+      "ambiguity": "snapshot.Items[0].Ambiguity",
+      "provenance": "snapshot.Items[0].Provenance",
+      "confirmed": true,
+      "task_key": "snapshot.Items[0].TaskKey",
+      "user_at": "2026-10-28T09:02:23Z",
+      "created_at": "2026-10-28T09:02:24Z",
+      "updated_at": "2026-10-28T09:02:25Z"
+    }
+  ],
+  "facts": [
+    {
+      "name": "snapshot.Facts[0].Name",
+      "value": {
+        "kind": 150,
+        "bool": true,
+        "int": 152,
+        "string": "snapshot.Facts[0].Value.String",
+        "list": [
+          "snapshot.Facts[0].Value.List[0]"
+        ],
+        "duration": 156,
+        "time": "2026-10-28T09:02:37Z",
+        "threshold": 158,
+        "unit": 159
+      }
+    }
+  ],
+  "signals": [
+    {
+      "name": "snapshot.Signals[0].Name",
+      "on": true,
+      "since": "2026-10-28T09:02:44Z"
+    }
+  ],
+  "owes": [
+    {
+      "key": "snapshot.Owes[0].Key",
+      "name": "snapshot.Owes[0].Name",
+      "aliases": [
+        "snapshot.Owes[0].Aliases[0]"
+      ]
+    }
+  ],
+  "offers": [
+    {
+      "action": "snapshot.Offers[0].Action",
+      "args": {
+        "n": 174
+      }
+    }
+  ],
+  "extraction": {
+    "pending": 177,
+    "budget_hit": true,
+    "oldest": "2026-10-28T09:02:59Z"
+  },
+  "contexts": [
+    "snapshot.Contexts[0]"
+  ],
+  "due": "2026-10-28T09:03:02Z",
+  "links": [
+    {
+      "url": "snapshot.Links[0].URL",
+      "kind": "snapshot.Links[0].Kind",
+      "item": "snapshot.Links[0].Item",
+      "evidence": {
+        "unit": {
+          "provider": "snapshot.Links[0].Evidence.Unit.Provider",
+          "key": "snapshot.Links[0].Evidence.Unit.Key"
+        },
+        "ref": "snapshot.Links[0].Evidence.Ref",
+        "permalink": "snapshot.Links[0].Evidence.Permalink",
+        "at": "2026-10-28T09:03:14Z"
+      }
+    }
+  ],
+  "facets": {
+    "snapshot.Facets.key": "snapshot.Facets.value"
+  },
+  "views": [
+    "snapshot.Views[0]"
+  ]
+}

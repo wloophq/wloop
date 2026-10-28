@@ -115,7 +115,6 @@ var (
 	_ automation.Units     = (*Provider)(nil)
 	_ automation.Refresher = (*Provider)(nil)
 	_ automation.Settler   = (*Provider)(nil)
-	_ automation.Freshener = (*Provider)(nil)
 	_ automation.Dueer     = (*Provider)(nil)
 	_ views.Facts          = (*Provider)(nil)
 )

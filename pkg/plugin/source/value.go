@@ -7,8 +7,8 @@ import (
 
 // Fact is one workflow fact of a unit.
 type Fact struct {
-	Name  string
-	Value Value
+	Name  string `json:"name,omitempty"`
+	Value Value  `json:"value,omitzero"`
 }
 
 // ValueKind is what a [Value] holds.
@@ -45,15 +45,15 @@ const (
 // temporal value whose Time is zero resolves to its type's zero (a zero
 // duration, false) and has no deadline.
 type Value struct {
-	Kind      ValueKind
-	Bool      bool
-	Int       int64
-	String    string
-	List      []string
-	Duration  time.Duration
-	Time      time.Time
-	Threshold time.Duration
-	Unit      TimeUnit
+	Kind      ValueKind     `json:"kind,omitempty"`
+	Bool      bool          `json:"bool,omitempty"`
+	Int       int64         `json:"int,omitempty"`
+	String    string        `json:"string,omitempty"`
+	List      []string      `json:"list,omitempty"`
+	Duration  time.Duration `json:"duration,omitempty"`
+	Time      time.Time     `json:"time,omitzero"`
+	Threshold time.Duration `json:"threshold,omitempty"`
+	Unit      TimeUnit      `json:"unit,omitempty"`
 }
 
 func Bool(b bool) Value              { return Value{Kind: KindBool, Bool: b} }

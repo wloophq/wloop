@@ -16,7 +16,7 @@ import (
 )
 
 // Units is an in-memory facts provider for every provider, with all the
-// optional capabilities: Refresher, Settler, Gainer, Owner, Freshener, Seener, Dueer.
+// optional capabilities: Refresher, Settler, Gainer, Owner, Revisioner, Seener, Dueer.
 type Units struct {
 	o options
 
@@ -29,6 +29,7 @@ type Units struct {
 	owners    map[unit.Unit][]unit.Unit
 	ownerErrs map[unit.Unit]error
 	moved     map[unit.Unit]bool
+	revs      map[unit.Unit]uint64
 	due       time.Time
 	seen      port.Generation
 	onRefresh func(context.Context) error
@@ -39,7 +40,7 @@ type Units struct {
 func NewUnits(opts ...Option) *Units {
 	return &Units{o: build(opts), facts: map[unit.Unit]workflow.Facts{}, ended: map[unit.Unit]workflow.Facts{}, errs: map[unit.Unit]error{},
 		listErr: map[unit.ProviderID]error{}, gains: map[unit.Unit]workflow.Gain{},
-		owners: map[unit.Unit][]unit.Unit{}, ownerErrs: map[unit.Unit]error{}, moved: map[unit.Unit]bool{}}
+		owners: map[unit.Unit][]unit.Unit{}, ownerErrs: map[unit.Unit]error{}, moved: map[unit.Unit]bool{}, revs: map[unit.Unit]uint64{}}
 }
 
 // Put sets u's facts, listing u under its provider.
@@ -120,7 +121,8 @@ func (f *Units) FailOwners(u unit.Unit, err error) {
 	f.ownerErrs[u] = err
 }
 
-// SetMoved makes Moved report us, until the next SetMoved.
+// SetMoved makes every read of us's revs see a new report, until the next
+// SetMoved.
 func (f *Units) SetMoved(us ...unit.Unit) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -238,16 +240,28 @@ func (f *Units) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error) {
 	return slices.Clone(f.owners[u]), nil
 }
 
-// Moved is a read, but the engine asks it only in Sweep; a strict fake counts it.
-func (f *Units) Moved(ctx context.Context, units []unit.Unit) ([]unit.Unit, error) {
-	f.o.write("units.moved")
+// Report has u's source report it again: its rev grows.
+func (f *Units) Report(_ *testing.T, u unit.Unit) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	var out []unit.Unit
+	f.revs[u]++
+}
+
+// Revs are the units' revs; a unit SetMoved names is reported again at
+// every read.
+func (f *Units) Revs(ctx context.Context, units []unit.Unit) (map[unit.Unit]uint64, error) {
+	f.o.read("units.revs")
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := map[unit.Unit]uint64{}
 	for _, u := range units {
-		if f.moved[u] {
-			out = append(out, u)
+		if _, ok := f.facts[u]; !ok {
+			continue
 		}
+		if f.moved[u] {
+			f.revs[u]++
+		}
+		out[u] = f.revs[u]
 	}
 	return out, nil
 }

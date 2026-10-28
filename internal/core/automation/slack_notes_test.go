@@ -19,9 +19,9 @@ func TestSlackNotesCostGitHubNothing(t *testing.T) {
 	if got := r.ran("notify.self"); !slices.Equal(got, []unit.Unit{p1}) {
 		t.Errorf("ran %v; a Slack note dropped the pull request's run", got)
 	}
-	moved := slices.Index(r.trace, "units.moved")
+	moved := freshCheck(r.trace)
 	if moved < 0 {
-		t.Fatalf("no Moved in %v", r.trace)
+		t.Fatalf("no rev check before the lock in %v", r.trace)
 	}
 	for _, c := range r.trace[moved+1:] {
 		if c == "units.facts" || c == "locked:units.facts" {
