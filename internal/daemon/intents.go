@@ -60,9 +60,9 @@ func intentDef(l *intentload.Loaded, name string) (dintent.Def, error) {
 }
 
 // intakeIntent tells an action an intake takes: an intent whose manifest
-// says intake, or run_now.
+// says intake, or the plan gate's intent that runs a held round.
 func intakeIntent(l *intentload.Loaded, name string) bool {
-	if name == "run_now" {
+	if catalog.RunsHeld(l, name) {
 		return true
 	}
 	d, ok := l.Registry.Get(dintent.Name(name))

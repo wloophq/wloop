@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/port"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -67,6 +68,7 @@ type Service struct {
 	Backoff  func(failures int) time.Duration              // nil: 1 s doubling to 5 minutes
 	Paused   func(ctx context.Context, ref unit.Unit) bool // true keeps ref's items queued, unapplied
 	Facts    Facts                                         // nil projects the turns alone
+	Gates    Gates                                         // nil reads no gate open
 	Changes  port.Changes                                  // nil, like a set Facts, reconciles every pull request every time
 	Debounce time.Duration                                 // 0 flushes at once on a wake; production sets FlushDebounce
 
@@ -216,7 +218,7 @@ func (s *Service) Reconcile(ctx context.Context) (rewritten int, err error) {
 }
 
 func (s *Service) reconcileTopics() port.Topic {
-	return port.TopicTurns | port.TopicConfig | port.TopicFollow
+	return port.TopicTurns | port.TopicConfig | port.TopicFollow | port.TopicGates
 }
 
 type sinkRead struct {
@@ -387,13 +389,39 @@ func (s *Service) desired(ctx context.Context, b turn.Book, applied map[view.Key
 	if f != nil && f.Finished() && (ri.Status != view.None || f.ReviewWorkspace) {
 		ri.Status, ri.Unread = view.Completed, false
 	}
+	waits := s.waitsOnMe(ctx, b.Unit, facts)
 	var out []view.Item
 	for _, it := range []view.Item{ri, view.Author(b, author, last, f)} {
-		if it.Status != view.None {
-			out = append(out, it)
+		if it.Status == view.None {
+			continue
 		}
+		if waits && it.Status != view.Completed {
+			it.Status, it.Unread = view.NeedsMe, true
+		}
+		out = append(out, it)
 	}
 	return out
+}
+
+// waitsOnMe says whether a gate of u is open, read once per call.
+func (s *Service) waitsOnMe(ctx context.Context, u unit.Unit, c *factsCache) bool {
+	if s.Gates == nil {
+		return false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.open == nil {
+		open, err := s.Gates.Where(ctx, gates.Query{})
+		if err != nil {
+			s.logf("views: open gates: %v", err)
+			return false
+		}
+		c.open = map[unit.Unit]bool{}
+		for _, g := range open {
+			c.open[g.Unit] = true
+		}
+	}
+	return c.open[u]
 }
 
 // authorFacts reads the facts once, and again with the checkout when the
@@ -422,10 +450,12 @@ type factsKey struct {
 	needLocal bool
 }
 
-// factsCache shares one read of a unit's facts among the sinks of a call.
+// factsCache shares one read of a unit's facts, and one of the open gates,
+// among the sinks of a call.
 type factsCache struct {
-	mu sync.Mutex
-	m  map[factsKey]*view.AuthorFacts
+	mu   sync.Mutex
+	m    map[factsKey]*view.AuthorFacts
+	open map[unit.Unit]bool
 }
 
 func (s *Service) newFacts() *factsCache { return &factsCache{m: map[factsKey]*view.AuthorFacts{}} }

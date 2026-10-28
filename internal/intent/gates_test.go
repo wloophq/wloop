@@ -190,7 +190,7 @@ func TestGateIntentsKeepTheirDeclaredOrderAcrossLayers(t *testing.T) {
 label = "Later"
 status = "dismissed"
 
-[gates.plan.intents.run]
+[gates.plan.intents.run_now]
 label = "Go"
 
 [gates.plan.intents.again]
@@ -205,7 +205,7 @@ status = "approved"
 	for _, in := range g.Intents {
 		names = append(names, in.Name)
 	}
-	if want := []string{"run", "skip", "later", "again"}; !slices.Equal(names, want) || g.Intents[0].Label != "Go" {
+	if want := []string{"run_now", "skip", "guide", "later", "again"}; !slices.Equal(names, want) || g.Intents[0].Label != "Go" {
 		t.Fatalf("intents %v (%+v), want %v", names, g.Intents, want)
 	}
 }

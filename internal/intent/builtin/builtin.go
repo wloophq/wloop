@@ -91,19 +91,57 @@ var ReservedNames = []string{
 var ActionKeys = map[string]string{
 	"open":      "O",
 	"take_over": "A",
-	"skip":      "S",
 	"pause":     "H",
 	"resume":    "H",
-	"run_now":   "R",
 	"mute":      "M",
 	"unmute":    "M",
 	"answer":    "W",
 	"continue":  "C",
 	"dismiss":   "X",
-	"guide":     "G",
-	"trust_run": "T",
-	"unblock":   "D",
 }
+
+// GateRole is what an intent of a gate does, which its status and answer
+// say: approves the gate, takes text, or refuses it.
+type GateRole string
+
+const (
+	GateApproves  GateRole = "approves"
+	GateTakesText GateRole = "takes text"
+	GateRefuses   GateRole = "refuses"
+)
+
+// GateRoleOf is the role of an intent resolving to status, taking text when
+// answer; "" for any other.
+func GateRoleOf(status gate.Status, answer bool) GateRole {
+	switch {
+	case answer:
+		return GateTakesText
+	case status == gate.Approved:
+		return GateApproves
+	case status == gate.Rejected || status == gate.Dismissed:
+		return GateRefuses
+	}
+	return ""
+}
+
+// GateKey is the key of the row action an intent of a row's open gate of
+// Kind takes when it has Role: the first intent of each role takes it.
+type GateKey struct {
+	Kind gate.Kind
+	Role GateRole
+	Key  string
+}
+
+// GateKeys are the keys of the row actions of the gates a row offers: a
+// pending round's plan gate and a start block's trust gate.
+var GateKeys = []GateKey{
+	{gate.KindPlan, GateApproves, "R"}, {gate.KindPlan, GateTakesText, "G"}, {gate.KindPlan, GateRefuses, "S"},
+	{gate.KindTrust, GateApproves, "T"}, {gate.KindTrust, GateRefuses, "D"},
+}
+
+// RowGateKinds are the kinds of the gates whose intents a row offers as its
+// actions.
+var RowGateKinds = []gate.Kind{gate.KindPlan, gate.KindTrust}
 
 // IntentVerbs are the verbs a manifest's verb may name: those a task
 // bridges to its unit's served action.

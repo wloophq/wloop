@@ -153,16 +153,16 @@ func TestAPendingRoundCarriesItsWindow(t *testing.T) {
 	t.Parallel()
 	_, _, all := migratedGates(t)
 	g := gateOf(t, all, gate.KindPlan, "p1")
-	if g.Status != gate.Open || g.Name != "plan" || g.Unit != gatesPR || g.Task != taskB || g.Default != "run" ||
+	if g.Status != gate.Open || g.Name != "plan" || g.Unit != gatesPR || g.Task != taskB || g.Default != "run_now" ||
 		!g.Deadline.Equal(mustTime(t, "2026-10-28T10:00:00Z")) || !g.OpenedAt.Equal(mustTime(t, "2026-10-28T09:00:00Z")) ||
-		!slices.Equal(g.Intents, []string{"run", "skip"}) {
+		!slices.Equal(g.Intents, []string{"run_now", "skip", "guide"}) {
 		t.Fatalf("the pending round's gate %+v", g)
 	}
 	if w := gateOf(t, all, gate.KindPlan, "p4"); w.Status != gate.Open || !w.Deadline.IsZero() || w.Default != "" || w.Task != taskA {
 		t.Fatalf("a pending item that waits %+v", w)
 	}
 	trust := gateOf(t, all, gate.KindTrust, "p3")
-	if trust.Status != gate.Open || trust.Name != "trust" || trust.Unit != gatesPR || trust.Task != taskB || !slices.Equal(trust.Intents, []string{"trust", "dismiss"}) {
+	if trust.Status != gate.Open || trust.Name != "trust" || trust.Unit != gatesPR || trust.Task != taskB || !slices.Equal(trust.Intents, []string{"trust_run", "unblock"}) {
 		t.Fatalf("the start block's gate %+v", trust)
 	}
 	for _, g := range all {

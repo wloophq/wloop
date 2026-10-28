@@ -33,7 +33,7 @@ func unitAction(l *intentload.Loaded, name string, u unit.Unit, forge bool, foll
 	if sourceFollowed(name, u, follows) {
 		return nil
 	}
-	if isBuiltin(name) {
+	if isBuiltin(l, name) {
 		return notFound{fmt.Sprintf("no pull request %s: %s acts on pull requests only", u.Label(), name)}
 	}
 	d, err := intentDef(l, name)
@@ -66,7 +66,7 @@ func taskIntentActions(l *intentload.Loaded, e task.Task) []api.ActionState {
 // it takes it or names no task.
 func (s *Server) taskRefusal(ctx context.Context, l *intentload.Loaded, name string, u unit.Unit) (string, error) {
 	id, ok := task.IDOf(u)
-	if !ok || isBuiltin(name) {
+	if !ok || isBuiltin(l, name) {
 		return "", nil
 	}
 	if s.deps.Tasks == nil {

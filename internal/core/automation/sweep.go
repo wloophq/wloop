@@ -30,6 +30,8 @@ func (t *tally) add(r result) {
 		t.transient++
 	case outcomeFailed:
 		t.failed++
+	case outcomeDropped:
+		t.dropped++
 	}
 }
 
@@ -338,7 +340,7 @@ func (e *Engine) schedule(ctx context.Context, ev *evaluation) error {
 			due = earliest(due, pl.retryAt)
 		}
 	}
-	pending, err := e.Ledger.Items(ctx, Filter{Decisions: []workflow.Decision{workflow.DecisionPending}})
+	pending, err := e.Ledger.Items(ctx, Filter{Decisions: e.dueDecisions()})
 	if err != nil {
 		return err
 	}
@@ -376,7 +378,7 @@ func summarize(ev *evaluation, t tally) string {
 		n[it.Decision]++
 	}
 	s := fmt.Sprintf("%d item(s): %d ran, %d failed, %d refused, %d pending, %d blocked, %d skipped",
-		len(ev.plan.Items), t.ran, t.failed, t.refused, n[workflow.DecisionPending]+t.deferred,
+		len(ev.plan.Items), t.ran, t.failed, t.refused, n[workflow.DecisionPending]+n[workflow.DecisionDeferred]+t.deferred,
 		n[workflow.DecisionBlocked], n[workflow.DecisionSkipped])
 	if t.dropped > 0 {
 		s += fmt.Sprintf(", %d dropped", t.dropped)

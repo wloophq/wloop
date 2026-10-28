@@ -18,14 +18,18 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/gates/gatestest"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/workspaces"
 	wt "github.com/wloophq/wloop/internal/core/workspaces/workspacestest"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/jsonschema"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -190,7 +194,11 @@ func TestPendingRunsKeepTheGateMeterScope(t *testing.T) {
 	}
 	job.End()
 	clock.Advance(2 * time.Minute)
-	if err := eng.DueRun(ctx); err != nil {
+	due, err := ledger.Items(ctx, automation.Filter{Decisions: []workflow.Decision{workflow.DecisionPending}})
+	if err != nil || len(due) != 1 {
+		t.Fatalf("pending %v %v", due, err)
+	}
+	if err := eng.Release(ctx, gate.Gate{ID: 1, Kind: gate.KindPlan, Subject: due[0].ID, Status: gate.Approved, By: task.ActorWorkflow, Rule: gates.RuleWindow}); err != nil {
 		t.Fatal(err)
 	}
 	if len(steps.Ran()) != 1 {
@@ -232,12 +240,24 @@ func TestPendingRoundsServeTheReadModel(t *testing.T) {
 	if err := ledger.Save(context.Background(), automation.PlanWrite{Workflows: []string{"review-follow-up", "session-manual"}, Items: items}); err != nil {
 		t.Fatal(err)
 	}
-	te.engine = &automation.Engine{Ledger: ledger}
+	st := gatestest.NewStore(func() time.Time { return testNow.Add(time.Second) })
+	svc := gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{te.loadedIntents}, Clock: clockFunc(func() time.Time { return testNow.Add(time.Second) })})
+	te.engine = &automation.Engine{Ledger: ledger, Gates: draftGatesOver{svc, st}}
+	var opened gate.Gate
+	for _, it := range items {
+		g, err := svc.Open(context.Background(), gate.Gate{Kind: gate.KindPlan, Unit: it.Unit, Subject: it.ID}, waitsForYou{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if it.Unit == pr {
+			opened = g
+		}
+	}
 	got, err := te.pendingRounds(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[unit.Unit]round.Pending{pr: {Intent: "follow-up", Reason: "runs when its window ends", Since: testNow, Deadline: deadline}}
+	want := map[unit.Unit]round.Pending{pr: {Intent: "follow-up", Reason: "runs when its window ends", Since: opened.OpenedAt, Deadline: opened.Deadline}}
 	if len(got) != 1 || got[pr] != want[pr] {
 		t.Fatalf("pending %+v", got)
 	}
@@ -644,4 +664,14 @@ func TestAConfigDraftRuleReadingAnAgentWrittenPropertyIsRefused(t *testing.T) {
 	if _, err := config.LoadFile(file, Defaults()); err == nil || !strings.Contains(err.Error(), "config.toml cannot see who writes it") {
 		t.Fatalf("config.toml loads a send rule over a property: %v", err)
 	}
+}
+
+// draftGatesOver are a gates service and its reader as the engine's gates.
+type draftGatesOver struct {
+	*gates.Service
+	r gates.Reader
+}
+
+func (g draftGatesOver) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
+	return g.r.Where(ctx, q)
 }

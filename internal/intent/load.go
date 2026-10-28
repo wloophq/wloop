@@ -678,6 +678,9 @@ func newClaims() *claims {
 	for k, id := range ids {
 		keys[k] = "the built-in action " + id
 	}
+	for _, g := range builtin.GateKeys {
+		keys[g.Key] = fmt.Sprintf("the %s gate's intent that %s", g.Kind, g.Role)
+	}
 	return &claims{keys: keys, flags: map[string]meaning{}, drivers: map[string]dintent.Name{}, roles: map[roleClaim]dintent.Name{}}
 }
 

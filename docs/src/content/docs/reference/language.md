@@ -281,6 +281,9 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `gates.<name>.intents` (table by name): What you may resolve the gate with, by intent, in the order clients offer them.
 - `gates.<name>.intents.<name>` (table): An intent, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `gates.<name>.intents.<name>.label` (string): The name people read on its button.
+- `gates.<name>.intents.<name>.summary` (string): What resolving the gate with the intent does, as help and palettes show it.
+- `gates.<name>.intents.<name>.note` (template): What the intent would do on a row that offers it, over the action facts.
+- `gates.<name>.intents.<name>.confirm` (template): The dialog that confirms the intent on a row, over the action facts; empty asks nothing.
 - `gates.<name>.intents.<name>.status` (one of `approved`, `rejected`, `answered`, `dismissed`, `superseded`): The status the intent resolves the gate to; required for a new intent.
 - `gates.<name>.intents.<name>.answer` (bool, default `false`): The intent takes text, such as a question's answer.
 - `approval` (an [approval table](#approval-tables) of gate modes): How a gate is decided when no manifest or configuration says: the default of each kind. A user layer's mode replaces the mode and its window, its rules replace the rules.

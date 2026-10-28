@@ -46,8 +46,7 @@
     "input": {
       "kind": "text",
       "required": true,
-      "label": "Guidance",
-      "placeholder": "what the next round should look at"
+      "label": "Guide"
     },
     "source": "builtin"
   },

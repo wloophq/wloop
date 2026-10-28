@@ -41,6 +41,9 @@ const (
 	DecisionPending Decision = "pending"
 	DecisionBlocked Decision = "blocked"
 	DecisionSkipped Decision = "skipped"
+	// DecisionDeferred is an item whose step started asynchronously: it runs
+	// again at its Deadline until a run is done. No person decides it.
+	DecisionDeferred Decision = "deferred"
 )
 
 type TriggerKind string

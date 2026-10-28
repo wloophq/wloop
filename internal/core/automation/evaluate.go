@@ -451,7 +451,8 @@ func (p *planner) rules(pl *planned, vars workflow.Vars, run workflow.Run, ran b
 		wait("waits for you")
 		return
 	}
-	carried := had && prev.Decision == workflow.DecisionPending && prev.Default == workflow.OutcomeRun
+	deferred := had && prev.Decision == workflow.DecisionDeferred
+	carried := deferred || had && prev.Decision == workflow.DecisionPending && prev.Default == workflow.OutcomeRun
 	if !carried && window <= 0 {
 		decide(workflow.DecisionRun, "")
 		return
@@ -466,6 +467,11 @@ func (p *planner) rules(pl *planned, vars workflow.Vars, run workflow.Run, ran b
 			pl.guided = true
 			return
 		}
+	}
+	if deferred {
+		decide(workflow.DecisionDeferred, prev.Reason)
+		it.Default, it.Deadline = workflow.OutcomeRun, prev.Deadline
+		return
 	}
 	decide(workflow.DecisionPending, "runs when its window ends")
 	it.Default, it.Deadline = workflow.OutcomeRun, p.now.Add(window)

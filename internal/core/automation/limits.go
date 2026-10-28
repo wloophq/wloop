@@ -68,10 +68,11 @@ type unitOf struct {
 	u        unit.Unit
 }
 
-// runsAlone says whether an item runs without the user: decided run, or
-// pending, not observed, with default run. Only those take a slot.
+// runsAlone says whether an item runs without the user: decided run,
+// deferred, or pending, not observed, with default run. Only those take a
+// slot.
 func runsAlone(it workflow.Item) bool {
-	return it.Decision == workflow.DecisionRun ||
+	return it.Decision == workflow.DecisionRun || it.Decision == workflow.DecisionDeferred ||
 		it.Decision == workflow.DecisionPending && it.Default == workflow.OutcomeRun && !it.Observe
 }
 

@@ -38,6 +38,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/views"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/event"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -128,7 +129,7 @@ func TestServeDegradedUntilTheConfigLoads(t *testing.T) {
 	broken.Store(false)
 	eventually(t, "the restart with collection", func() bool {
 		h, err := c.Health(ctx)
-		return err == nil && slices.Equal(jobNames(h), []string{"due", "extract:slack", "fast", "ingest:github", "ingest:slack", "retain", "slow", "sweep", "usage"})
+		return err == nil && slices.Equal(jobNames(h), []string{"extract:slack", "fast", "ingest:github", "ingest:slack", "retain", "slow", "sweep", "usage"})
 	})
 	cancel()
 	select {
@@ -1138,6 +1139,12 @@ func TestPendingRoundsReachTheReadModel(t *testing.T) {
 	}
 	d := te.serveDeps(ctx, storeDB, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
 	d.Startup = nil
+	g, err := te.newGates(storeDB, nil).Open(ctx, gate.Gate{Kind: gate.KindPlan, Unit: r7.Unit(), Subject: it.ID},
+		workflowPolicy{w: workflow.Workflow{Approval: workflow.Approval{Mode: workflow.ApprovalDelay, Window: 4 * time.Minute}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline = g.Deadline
 	req := httptest.NewRequest("GET", api.Rows, nil)
 	req.Header.Set(api.Header, api.Version)
 	rec := httptest.NewRecorder()

@@ -24,8 +24,10 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
@@ -42,20 +44,27 @@ func (p enginePlan) Items(ctx context.Context, f automation.Filter) ([]workflow.
 	return p.Ledger.Items(ctx, f)
 }
 
-// planPending are the engine's pending turn.start items as the rows'
-// pending rounds.
+// planPending are the engine's turn.start items that wait on their plan
+// gates as the rows' pending rounds.
 type planPending struct{ e *automation.Engine }
 
 func (p planPending) Pending(ctx context.Context) (map[unit.Unit]round.Pending, error) {
-	items, err := p.e.Pending(ctx)
+	ws, err := p.e.Waiting(ctx, nil)
 	out := map[unit.Unit]round.Pending{}
-	for _, it := range items {
-		if slices.ContainsFunc(it.Steps, func(st workflow.Step) bool { return st.Use == builtin.StepTurnStart }) {
-			out[it.Unit] = round.Pending{Intent: "follow-up", Reason: it.Reason, Since: it.At, Deadline: it.Deadline}
+	for _, w := range ws {
+		if slices.ContainsFunc(w.Item.Steps, func(st workflow.Step) bool { return st.Use == builtin.StepTurnStart }) {
+			out[w.Item.Unit] = round.Pending{Intent: "follow-up", Reason: w.Item.Reason, Since: w.Gate.OpenedAt, Deadline: w.Gate.Deadline}
 		}
 	}
 	return out, err
 }
+
+// relay is the rig's server as its gates' consequences, which it builds
+// after them.
+type relay struct{ r *planRig }
+
+func (l relay) Release(ctx context.Context, g gate.Gate) error { return l.r.s.Release(ctx, g) }
+func (l relay) Unblock(ctx context.Context, g gate.Gate) error { return l.r.s.Unblock(ctx, g) }
 
 // storeGuidance is the guidance the user keeps for a pull request's next
 // round, in the inventory's override.
@@ -79,6 +88,8 @@ func (g storeGuidance) Keep(ctx context.Context, u unit.Unit, guidance string) e
 // session by an observe workflow.
 type planRig struct {
 	s     *Server
+	gates *gates.Service
+	gr    gates.Reader
 	db    *sqlite.DB
 	log   *change.Log
 	units *automationtest.Units
@@ -104,6 +115,7 @@ func newPlanRig(t *testing.T, opts ...func(*Deps)) *planRig {
 	r.s = newServerOn(t, db, log, func(d *Deps) {
 		r.clock = automationtest.NewClock(d.Now())
 		d.Now = r.clock.Now
+		r.serveGates(d)
 		r.eng = r.engine(d)
 		d.Plan, d.Sweep, d.Pending = enginePlan{r.eng}, r.eng, planPending{r.eng}
 		for _, o := range opts {
@@ -111,6 +123,40 @@ func newPlanRig(t *testing.T, opts ...func(*Deps)) *planRig {
 		}
 	})
 	return r
+}
+
+// serveGates serves d the gates of the rig's store, the plan gates the
+// engine opens among them, which the rig's server releases.
+func (r *planRig) serveGates(d *Deps) {
+	st := r.db.Gates(r.clock.Now)
+	r.gates = gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{(&Server{}).loaded().Gates}, Clock: r.clock,
+		Releaser: relay{r}, Unblocker: relay{r}})
+	r.gr = st
+	d.Gates, d.GateReader = r.gates, st
+}
+
+// tick resolves the gates whose window passed, as the daemon's gates job does.
+func (r *planRig) tick(t *testing.T) {
+	t.Helper()
+	if err := r.gates.Tick(context.Background(), r.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// planGate is the open plan gate of it.
+func (r *planRig) planGate(t *testing.T, it workflow.Item) gate.Gate {
+	t.Helper()
+	open, err := r.gr.Where(context.Background(), gates.Query{Kind: gate.KindPlan, Unit: it.Unit})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, g := range open {
+		if g.Subject == it.ID {
+			return g
+		}
+	}
+	t.Fatalf("no open plan gate on %s", it.ID)
+	return gate.Gate{}
 }
 
 // engine is an engine over the rig's store as a daemon restart builds it.
@@ -133,6 +179,7 @@ func (r *planRig) engine(d *Deps) *automation.Engine {
 			p, err := d.Pauses.Pause(ctx)
 			return automation.Pause{On: p.On, Repos: p.Repos}, err
 		},
+		Gates: rigGates{r.gates, r.gr},
 	}
 }
 
@@ -475,9 +522,7 @@ func TestPauseStopsApplyButThePlanKeepsFilling(t *testing.T) {
 		t.Fatalf("observe item %+v", it)
 	}
 	r.clock.Advance(time.Hour)
-	if err := r.s.deps.Plan.DueRun(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	r.tick(t)
 	if len(r.steps.Ran()) != 0 {
 		t.Fatalf("ran while paused: %+v", r.steps.Ran())
 	}
@@ -490,6 +535,7 @@ func TestAPendingItemSurvivesADaemonRestart(t *testing.T) {
 	want := r.pending7(t)
 	again := newServerOn(t, r.db, r.log, func(d *Deps) {
 		d.Now = r.clock.Now
+		r.serveGates(d)
 		r.eng = r.engine(d)
 		d.Plan, d.Sweep, d.Pending = enginePlan{r.eng}, r.eng, planPending{r.eng}
 	})
@@ -499,54 +545,33 @@ func TestAPendingItemSurvivesADaemonRestart(t *testing.T) {
 		t.Fatalf("after a restart %+v, want %+v", res.Items, want)
 	}
 	r.clock.Set(want.Deadline.Add(time.Second))
-	runDue(t, r.s)
+	r.tick(t)
 	if ran := r.steps.Ran(); len(ran) != 1 || ran[0].Unit != u7 {
 		t.Fatalf("ran %+v", ran)
 	}
 }
 
-// runDue runs the server's due job once.
-func runDue(t *testing.T, s *Server) {
-	t.Helper()
-	j, ok := s.jobs["due"]
-	if !ok {
-		t.Fatal("no due job")
-	}
-	j.once(context.Background(), t.Logf, func(string, string) {})
-	if st := j.status(); st.LastErr != "" {
-		t.Fatalf("due job: %s", st.LastErr)
-	}
-}
-
-func TestTheDueJobRunsAnExpiredItemOnce(t *testing.T) {
+func TestTheGatesTickRunsAnExpiredRoundOnce(t *testing.T) {
 	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	it := r.pending7(t)
-	runDue(t, r.s)
+	if g := r.planGate(t, it); !g.Deadline.Equal(it.Deadline) || g.Default != "run_now" {
+		t.Fatalf("the round's gate = %+v, want its window until %s", g, it.Deadline)
+	}
+	r.tick(t)
 	if len(r.steps.Ran()) != 0 {
 		t.Fatalf("ran before its window ended: %+v", r.steps.Ran())
 	}
 	r.clock.Set(it.Deadline.Add(time.Second))
-	runDue(t, r.s)
-	runDue(t, r.s)
-	if ran := r.steps.Ran(); len(ran) != 1 || ran[0].Unit != u7 {
-		t.Fatalf("ran %+v", ran)
+	r.tick(t)
+	r.tick(t)
+	r.sweep(t)
+	if ran := r.steps.Ran(); len(ran) != 1 || ran[0].Unit != u7 || ran[0].Run.ByHand {
+		t.Fatalf("ran %+v, want one automatic run", ran)
 	}
 	if run, ok := r.marked(t, it); !ok || run.Status != workflow.RunDone {
 		t.Fatalf("run %+v %v", run, ok)
-	}
-}
-
-func TestTheDueJobNeedsASweep(t *testing.T) {
-	t.Parallel()
-	r := newPlanRig(t)
-	if _, ok := r.s.jobs["due"]; !ok {
-		t.Fatal("no due job beside the sweep")
-	}
-	s := newServerOn(t, r.db, r.log, func(d *Deps) { d.Plan = enginePlan{r.eng} })
-	if _, ok := s.jobs["due"]; ok {
-		t.Fatal("a due job without a sweep")
 	}
 }
 
@@ -617,15 +642,15 @@ func (l *interleaved) Save(ctx context.Context, p automation.PlanWrite, evs ...p
 	return l.Ledger.Save(ctx, p, evs...)
 }
 
-func TestTheDueJobRunningAnItemDuringASweepRunsItOnce(t *testing.T) {
+func TestTheGatesTickRunningARoundDuringASweepRunsItOnce(t *testing.T) {
 	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	it := r.pending7(t)
 	r.clock.Set(it.Deadline.Add(time.Second))
-	r.eng.Ledger = &interleaved{Ledger: r.db.Ledger(), between: func() { runDue(t, r.s) }}
+	r.eng.Ledger = &interleaved{Ledger: r.db.Ledger(), between: func() { r.tick(t) }}
 	r.sweep(t)
-	runDue(t, r.s)
+	r.tick(t)
 	if ran := r.steps.Ran(); len(ran) != 1 {
 		t.Fatalf("ran %d times: %+v", len(ran), ran)
 	}
@@ -649,7 +674,7 @@ func TestADismissDuringASweepStaysDismissed(t *testing.T) {
 		t.Fatalf("the dismissed item came back: %+v", items)
 	}
 	r.clock.Set(it.Deadline.Add(time.Second))
-	runDue(t, r.s)
+	r.tick(t)
 	r.sweep(t)
 	if ran := r.steps.Ran(); len(ran) != 0 {
 		t.Fatalf("a dismissed item ran: %+v", ran)
@@ -688,16 +713,16 @@ func TestTheDueJobLoadsTheRoundStateOnlyForADueItem(t *testing.T) {
 	r := newPlanRig(t)
 	st := &countingState{}
 	r.eng.State = st
-	runDue(t, r.s)
+	r.tick(t)
 	r.sweep(t)
 	loads := st.loads
 	it := r.pending7(t)
-	runDue(t, r.s)
+	r.tick(t)
 	if st.loads != loads {
 		t.Fatalf("the due job loaded the round state with nothing due: %d loads", st.loads-loads)
 	}
 	r.clock.Set(it.Deadline.Add(time.Second))
-	runDue(t, r.s)
+	r.tick(t)
 	if st.loads != loads+1 || len(r.steps.Ran()) != 1 {
 		t.Fatalf("loads %d, ran %+v", st.loads-loads, r.steps.Ran())
 	}

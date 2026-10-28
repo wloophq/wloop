@@ -26,7 +26,7 @@ Every approval is a `[gates.approval]` table, in an intent's manifest, a workflo
 
 ## The approval window
 
-An automatic review, address or nudge round is first a pending item. The row moves to Needs me as "round soon" with a countdown, and on macOS the menu bar counts it and a notification `Round in 60 s · owner/repo #n` appears. Until the window ends you can:
+An automatic review, address or nudge round is first a pending item that waits on its `plan` gate; any workflow item that waits for you, or for its window, does too, and its gate is closed as superseded once the item leaves the plan. A workflow in observe mode opens no gate, and a step deferred while it runs asynchronously is no decision. The row moves to Needs me as "round soon" with a countdown, and on macOS the menu bar counts it and a notification `Round in 60 s · owner/repo #n` appears. Until the window ends you can:
 
 | Do | How | Effect |
 |---|---|---|
@@ -35,7 +35,9 @@ An automatic review, address or nudge round is first a pending item. The row mov
 | Run now | Run now, `R` in the terminal client, `{{command}} plan apply <url>` | the round is sent at once |
 | Steer | the guidance box and Run now in the cockpit, or the notification's Guide field | the round is sent at once with your text as its guidance |
 
-With no answer, the round runs when the window ends. The window is a rule of the workflow's `[gates.approval]` pinned to `gate.kind == "plan"` with `mode = "delay"`, `60s` in the bundled review and address workflows; a rule of `workflows.<name>.gates.approval` in the config pinned the same way changes it, and one with `mode = "run"` sends that workflow's rounds at once. A pending item survives a restart: one whose window ended while the daemon was down runs once when it starts.
+Skip, Run now and Guide are the `skip`, `run_now` and `guide` intents of the `plan` gate in `gates.toml`, which words them; the row offers them while the gate is open, and `{{command}} plan apply` and `plan dismiss` on a waiting item resolve its gate too. With no round pending, Run now runs a round the daily cap held and Guide keeps your text for the next round. A round whose start the agent blocked on its question, such as trusting its folder, waits on a `trust` gate, opened when the block is recorded and closed once it lifts: Trust folder and run and Dismiss block are its `trust_run` and `unblock` intents, and no approval rule resolves it. An Orca card stays in Needs me while a gate of its unit is open.
+
+With no answer, the round runs when the window ends: the window is its gate's deadline, and the gate resolves to its default `run_now`, recorded with the rule `window`. The window is a rule of the workflow's `[gates.approval]` pinned to `gate.kind == "plan"` with `mode = "delay"`, `60s` in the bundled review and address workflows; a rule of `workflows.<name>.gates.approval` in the config pinned the same way changes it, and one with `mode = "run"` sends that workflow's rounds at once. A pending item survives a restart: one whose window ended while the daemon was down runs once when it starts.
 
 Guidance is not lost when its round does not go out (a pause, a cap, a busy workspace): it is kept for the next round of that pull request, and the cockpit's detail shows it as "Next round guidance". Rounds you ask for (`review`, `address`, `plan apply`) do not wait.
 

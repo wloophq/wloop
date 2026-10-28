@@ -232,6 +232,9 @@ type Env struct {
 	// reads them.
 	gates      *gates.Service
 	gateReader gates.Reader
+	// consequences apply the resolved plan and trust gates: the daemon
+	// serve built, nil before it.
+	consequences gateConsequences
 	// headlessSwept is set once the headless turns a stop cut short were ended, so a later serve of
 	// this process never ends a run it started.
 	headlessSwept bool

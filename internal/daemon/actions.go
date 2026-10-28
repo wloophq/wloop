@@ -14,13 +14,14 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
@@ -184,9 +185,6 @@ func queued(b turn.Book) bool {
 var delegatedActions = map[string]delegated{
 	"open":         {call: Actions.Open},
 	"take_over":    {loop: true, event: builtin.EventAdopted, call: Actions.Adopt},
-	"run_now":      {loop: true, full: true, event: builtin.EventRoundSent, data: "run now", call: Actions.Run},
-	"trust_run":    {loop: true, full: true, event: builtin.EventRoundSent, data: "trusted its folder and ran", call: unblocking(Unblocker.TrustAndRun)},
-	"unblock":      {loop: true, event: builtin.EventRoundUnblocked, data: "dismissed by you", call: unblocking(Unblocker.Unblock)},
 	"remove":       {loop: true, event: builtin.EventRemoved, remove: true, call: Actions.Remove},
 	"remove_force": {loop: true, event: builtin.EventRemoved, remove: true, force: true, call: Actions.Remove},
 }
@@ -203,9 +201,6 @@ var holdActions = map[string]struct {
 
 // followActions go to the unit's source, which keeps its follows.
 var followActions = map[string]bool{"track": true, "untrack": true}
-
-// roundActions act on the pending round of the unit's plan.
-var roundActions = map[string]bool{"skip": true, "guide": true}
 
 // intakeRouteActions change the open intake of the pull request.
 var intakeRouteActions = map[string]func(s *Server, ctx context.Context, i intake.Intake) (string, error){
@@ -265,15 +260,16 @@ func (s *Server) answer(ctx context.Context, u unit.Unit, req api.ActionRequest,
 	return s.answerMessage(ctx, m, req, out)
 }
 
-// isBuiltin tells a built-in action the daemon runs itself; any other
-// action a unit's row offers that no intent names is its plugin's.
-func isBuiltin(name string) bool {
+// isBuiltin tells a built-in action the daemon runs itself, an intent of
+// a row gate of l among them; any other action a unit's row offers that no
+// intent names is its plugin's.
+func isBuiltin(l *intentload.Loaded, name string) bool {
 	_, isHold := holdActions[name]
 	_, isDelegated := delegatedActions[name]
-	isRound := roundActions[name] || followActions[name]
 	_, isTurn := turnActions[name]
 	_, isIntake := intakeRouteActions[name]
-	return isHold || isDelegated || isRound || isTurn || isIntake || name == "brief_refresh"
+	_, isGate := catalog.RowGateIntent(l, name)
+	return isHold || isDelegated || followActions[name] || isTurn || isIntake || isGate || name == "brief_refresh"
 }
 
 func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
@@ -292,7 +288,7 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 	}
 	name := r.PathValue("action")
 	l := s.loaded()
-	plugin := !isBuiltin(name) && !isIntent(l, name)
+	plugin := !isBuiltin(l, name) && !isIntent(l, name)
 	if plugin && !s.pluginActs(r.Context(), u, name) {
 		writeError(w, http.StatusNotFound, "no action "+strconv.Quote(name))
 		return
@@ -340,13 +336,17 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		u = row.Unit
-		if name == "run_now" && strings.HasPrefix(st.Basis, catalog.BasisPending) {
-			line, err := s.runPending(ctx, u, req)
-			if err != nil {
+		if g, ok := catalog.RowGateIntent(l, name); ok && (!catalog.RunsHeld(l, name) || strings.HasPrefix(st.Basis, catalog.BasisPending)) {
+			actor, ok := requestActor(w, r)
+			if !ok {
+				return
+			}
+			var out bytes.Buffer
+			if err := s.actOnGate(ctx, g, u, req, actor, &out); err != nil {
 				writeActionError(w, err)
 				return
 			}
-			writeJSON(w, api.ActionResult{OK: true, Output: []string{line}})
+			writeJSON(w, api.ActionResult{OK: true, Output: lines(out.String())})
 			return
 		}
 	}
@@ -476,19 +476,6 @@ func (s *Server) changeIntakeOf(w http.ResponseWriter, ctx context.Context, u un
 	writeJSON(w, api.ActionResult{OK: true, Output: []string{done}})
 }
 
-// runPending sends the pending round of the pull request as the user's approval;
-// one that went out since the row offered it is a conflict, never a held run.
-func (s *Server) runPending(ctx context.Context, u unit.Unit, req api.ActionRequest) (string, error) {
-	if s.deps.Plan != nil {
-		a := workflow.ActionApply
-		if strings.TrimSpace(req.Guidance) != "" {
-			a = workflow.ActionGuide
-		}
-		return s.actOnRound(ctx, u, a, req.Guidance)
-	}
-	return "", conflict{msg: "the row changed: the pending round already went out"}
-}
-
 // writeActionError answers an action's error with its status.
 func writeActionError(w http.ResponseWriter, err error) {
 	var bad badRequest
@@ -521,6 +508,8 @@ func writeActionError(w http.ResponseWriter, err error) {
 		writeRefusal(w, refused)
 	case errors.As(err, &missing):
 		writeError(w, http.StatusNotFound, missing.msg)
+	case errors.Is(err, gates.ErrRefused), errors.Is(err, gates.ErrIntent), errors.Is(err, gates.ErrNoGate), errors.Is(err, gates.ErrResolved):
+		writeGateError(w, err)
 	case errors.Is(err, errActionsUnavailable), errors.Is(err, errTurnsUnavailable), errors.Is(err, errPlanUnavailable), errors.Is(err, turns.ErrNoIntents):
 		writeError(w, http.StatusServiceUnavailable, err.Error())
 	default:
@@ -548,7 +537,7 @@ func (s *Server) checkActionInputs(l *intentload.Loaded, name string, req *api.A
 	if len(req.Inputs) == 0 {
 		return nil
 	}
-	if isBuiltin(name) {
+	if isBuiltin(l, name) {
 		return badRequest{name + " takes no inputs"}
 	}
 	d, err := intentDef(l, name)
@@ -564,9 +553,10 @@ func (s *Server) checkActionInputs(l *intentload.Loaded, name string, req *api.A
 }
 
 func (s *Server) act(ctx context.Context, name string, u unit.Unit, req api.ActionRequest, out io.Writer) error {
+	l := s.loaded()
 	_, isDelegated := delegatedActions[name]
-	if !isBuiltin(name) {
-		if isIntent(s.loaded(), name) {
+	if !isBuiltin(l, name) {
+		if isIntent(l, name) {
 			return s.actIntent(ctx, name, u, req, out)
 		}
 		return s.pluginAction(ctx, name, u, req, out)
@@ -580,15 +570,14 @@ func (s *Server) act(ctx context.Context, name string, u unit.Unit, req api.Acti
 		}
 		return act(s, ctx, u, req, out)
 	}
-	if roundActions[name] {
-		if s.deps.Plan == nil {
-			return errPlanUnavailable
+	if g, ok := catalog.RowGateIntent(l, name); ok {
+		if catalog.RunsHeld(l, name) {
+			if s.deps.Actions == nil {
+				return errActionsUnavailable
+			}
+			return s.delegate(ctx, runHeld, u, Call{Guidance: req.Guidance, AgentHome: req.AgentHome, Out: out})
 		}
-		line, err := s.actOnRound(ctx, u, workflow.Action(name), req.Guidance)
-		if err == nil && line != "" {
-			fmt.Fprintln(out, line)
-		}
-		return err
+		return s.actOnGate(ctx, g, u, req, task.ActorPerson, out)
 	}
 	if followActions[name] {
 		if !sourceFollowed(name, u, s.deps.Follows) {
@@ -600,19 +589,26 @@ func (s *Server) act(ctx context.Context, name string, u unit.Unit, req api.Acti
 		return s.applyHold(ctx, name, u)
 	}
 	d := delegatedActions[name]
+	call := Call{Guidance: req.Guidance, AgentHome: req.AgentHome, Out: out}
+	if d.remove {
+		call.Force = req.Force || d.force
+	}
+	return s.delegate(ctx, d, u, call)
+}
+
+// delegate runs d on u with call: under the loop when it writes to it, the
+// pending round dropped first when it sends one, its event recorded after.
+func (s *Server) delegate(ctx context.Context, d delegated, u unit.Unit, call Call) error {
 	if d.loop && !LoopHeld(ctx) {
 		ctx = s.readAhead(ctx, u, d.full)
 		s.deps.LoopMu.Lock()
 		defer s.deps.LoopMu.Unlock()
+		ctx = withLoopHeld(ctx)
 	}
 	if d.event == builtin.EventRoundSent {
 		if err := s.dropPending(ctx, u, askedByYou); err != nil {
 			return err
 		}
-	}
-	call := Call{Guidance: req.Guidance, AgentHome: req.AgentHome, Out: out}
-	if d.remove {
-		call.Force = req.Force || d.force
 	}
 	if err := d.call(s.deps.Actions, ctx, u, call); err != nil {
 		return err

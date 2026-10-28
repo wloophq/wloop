@@ -6,6 +6,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/keys"
 )
 
@@ -58,7 +59,7 @@ func CheckPluginKeys(id unit.ProviderID, ui *api.PluginUI) error {
 	}
 	claimed := map[keys.Surface]map[string]string{}
 	toggles := map[string]string{}
-	for _, b := range builtinActions {
+	for _, b := range append(gateKeyActions(), builtinActions...) {
 		if b.spec.Toggle != "" {
 			toggles[b.spec.ID] = b.spec.Toggle
 		}
@@ -96,4 +97,14 @@ func CheckPluginKeys(id unit.ProviderID, ui *api.PluginUI) error {
 		}
 	}
 	return nil
+}
+
+// gateKeyActions are the keys builtin.GateKeys gives the row gates'
+// intents, as the actions that hold them.
+func gateKeyActions() []builtinAction {
+	out := make([]builtinAction, len(builtin.GateKeys))
+	for i, g := range builtin.GateKeys {
+		out[i].spec = api.ActionSpec{ID: fmt.Sprintf("the %s gate's intent that %s", g.Kind, g.Role), Key: g.Key, Surfaces: everywhere()}
+	}
+	return out
 }

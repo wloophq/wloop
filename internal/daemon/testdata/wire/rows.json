@@ -2,12 +2,6 @@
   {
     "actions": [
       {
-        "enabled": false,
-        "id": "guide",
-        "reason": "the daemon plans no automatic round; see doctor",
-        "refusal": "guide.why"
-      },
-      {
         "enabled": true,
         "id": "review",
         "warning": "Starts a new round; the agent's open question is replaced"
@@ -195,7 +189,7 @@
         "status": "reviewing"
       }
     },
-    "specs_version": "db6e01d39c26",
+    "specs_version": "63090c070e02",
     "summary": {
       "closed": false,
       "line": "muted",
@@ -317,7 +311,7 @@
         "status": ""
       }
     },
-    "specs_version": "db6e01d39c26",
+    "specs_version": "63090c070e02",
     "summary": {
       "closed": true,
       "line": "merged",

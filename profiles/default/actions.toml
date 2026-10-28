@@ -3,35 +3,6 @@
 # facts. An empty note, warning or confirm shows nothing; why may not be
 # empty.
 
-[run_now]
-label   = "Run now"
-summary = "Start the round waiting on this pull request now, without waiting for its delay or the daily budget. Skip drops it instead."
-confirm = "{{if and .row.capped (not .row.pending)}}Run the held round on {{.pr.slug}} now? It does not count against the cap.{{end}}"
-
-[skip]
-label   = "Skip"
-summary = "Drop the round waiting on this pull request without running it. Run now starts it instead."
-
-[guide]
-label   = "Guide"
-summary = "Tell the agent what its round should look at; your text goes with the round waiting now, or with the next one when none waits."
-note    = "{{if not .row.pending}}Kept for the next automatic round{{end}}"
-why     = "the daemon plans no automatic round; see doctor"
-
-[guide.input]
-label = "Guidance"
-help  = "what the next round should look at"
-
-[trust_run]
-label   = "Trust folder and run"
-summary = "Trust the folder the agent was blocked on in your agent homes, then run the round. Dismiss block lifts the block without trusting it."
-note    = "Trust {{.row.trust_folder}} in {{join .row.trust_homes \", \"}}, then run the round"
-
-[unblock]
-label   = "Dismiss block"
-summary = "Lift the block without trusting the folder; the round waits for its next trigger. Trust folder and run trusts it and runs now."
-note    = "Lift the block without trusting; the round waits for a new trigger"
-
 [answer]
 label   = "Answer"
 summary = "Reply to the agent's open question with your text; the agent resumes from your answer."

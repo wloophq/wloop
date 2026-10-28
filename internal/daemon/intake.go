@@ -640,10 +640,10 @@ func (s *Server) expireSessionIntakesLocked(ctx context.Context) error {
 	return nil
 }
 
-// intentOf is the intent an intake action asks for: run_now's is the one
-// the row's action state names.
+// intentOf is the intent an intake action asks for: the held round's is
+// the one the row's action state names.
 func (s *Server) intentOf(action string, row api.Row) (turn.Intent, error) {
-	if action != "run_now" {
+	if !catalog.RunsHeld(s.loaded(), action) {
 		return turn.Intent(action), nil
 	}
 	if st, ok := offerOf(row, action); ok && st.Intent != "" {

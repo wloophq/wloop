@@ -511,9 +511,6 @@ func New(d Deps) *Server {
 	}
 	if sw := d.Sweep; sw != nil {
 		s.jobs["sweep"] = s.sweepJob(sw)
-		if d.Plan != nil {
-			s.jobs["due"] = s.dueJob(d.Plan)
-		}
 	}
 	if b := d.Brief; b != nil {
 		s.jobs["brief"] = newJob("brief", time.Duration(d.Cfg.Sweep.Slow), briefTimeout, s.background(func(ctx context.Context) (string, string, error) {

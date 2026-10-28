@@ -3,7 +3,9 @@ package views
 import (
 	"context"
 
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/view"
 )
@@ -29,4 +31,10 @@ type Facts interface {
 	// Author returns the facts of u's pull request, with the checkout's when
 	// needLocal; nil when u has none.
 	Author(ctx context.Context, u unit.Unit, needLocal bool) (*view.AuthorFacts, error)
+}
+
+// Gates are the decisions waiting on the user; a unit's cards wait on them
+// while one of its gates is open.
+type Gates interface {
+	Where(ctx context.Context, q gates.Query) ([]gate.Gate, error)
 }

@@ -1,5 +1,5 @@
 {
-  "version": "db6e01d39c26",
+  "version": "63090c070e02",
   "specs": [
     {
       "id": "run_now",
@@ -52,8 +52,7 @@
       "input": {
         "kind": "text",
         "required": true,
-        "label": "Guidance",
-        "placeholder": "what the next round should look at"
+        "label": "Guide"
       },
       "source": "builtin",
       "scope": "unit"

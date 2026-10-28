@@ -31,6 +31,7 @@ import (
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/source"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 var _ workspaces.FetchLog = (*sqlite.Fetches)(nil)
@@ -452,25 +453,57 @@ func (l roundStates) Load(ctx context.Context) (automation.State, error) {
 	return &roundState{st: st, rounds: l.steps.d.Rounds, steps: l.steps}, nil
 }
 
-// pendingRounds are the engine's pending turn.start items as the read model
-// lists pending automatic rounds.
+// pendingRounds are the open plan gates of the engine's turn.start items as
+// the read model lists pending automatic rounds.
 func (e *Env) pendingRounds(ctx context.Context) (map[unit.Unit]round.Pending, error) {
+	rs, err := e.roundsWaiting(ctx, nil)
+	out := map[unit.Unit]round.Pending{}
+	for _, r := range rs {
+		if _, ok := out[r.u]; !ok {
+			out[r.u] = r.Pending
+		}
+	}
+	return out, err
+}
+
+// waitingRound is a round that waits on its plan gate, on u.
+type waitingRound struct {
+	round.Pending
+	u unit.Unit
+}
+
+// roundsWaiting are the turn.start items of u, of every unit when u is nil,
+// that wait on an open plan gate, as the rounds they hold: since the gate
+// opened, until its window ends.
+func (e *Env) roundsWaiting(ctx context.Context, u *unit.Unit) ([]waitingRound, error) {
 	if e.engine == nil {
 		return nil, nil
 	}
-	items, err := e.engine.Pending(ctx)
+	ws, err := e.engine.Waiting(ctx, u)
 	if err != nil {
 		return nil, err
 	}
-	out := map[unit.Unit]round.Pending{}
-	for _, it := range items {
-		i := slices.IndexFunc(it.Steps, isTurnStart)
+	var out []waitingRound
+	for _, w := range ws {
+		i := slices.IndexFunc(w.Item.Steps, isTurnStart)
 		if i < 0 {
 			continue
 		}
-		out[it.Unit] = round.Pending{Intent: e.startOf(it.Steps[i], it.Unit.Provider).kindName(), Reason: it.Reason, Since: it.At, Deadline: it.Deadline}
+		out = append(out, waitingRound{u: w.Item.Unit, Pending: round.Pending{Intent: e.startOf(w.Item.Steps[i], w.Item.Unit.Provider).kindName(),
+			Reason: w.Item.Reason, Since: w.Gate.OpenedAt, Deadline: w.Gate.Deadline}})
 	}
 	return out, nil
+}
+
+// pendingOf are the rounds u's open plan gates hold, as a plugin's round
+// state reads them.
+func (e *Env) pendingOf(ctx context.Context, u unit.Unit) ([]src.PendingRound, error) {
+	rs, err := e.roundsWaiting(ctx, &u)
+	out := make([]src.PendingRound, len(rs))
+	for i, r := range rs {
+		out[i] = src.PendingRound{Intent: r.Intent, Reason: r.Reason, Since: r.Since, Deadline: r.Deadline}
+	}
+	return out, err
 }
 
 // enginePending is pendingRounds as the read model's port.
@@ -488,10 +521,10 @@ func (m meteredEngine) Sweep(ctx context.Context, loop sync.Locker) (string, str
 	return m.Engine.Sweep(ctx, meteredLock{ctx: ctx, l: loop})
 }
 
-func (m meteredEngine) DueRun(ctx context.Context) error {
+func (m meteredEngine) Release(ctx context.Context, g gate.Gate) error {
 	ctx, scope := meter.Start(ctx, meter.Loop("gate"))
 	defer scope.End()
-	return m.Engine.DueRun(ctx)
+	return m.Engine.Release(ctx, g)
 }
 
 func (m meteredEngine) Act(ctx context.Context, id string, a workflow.Action, guidance string) (workflow.Item, error) {
@@ -611,6 +644,8 @@ func (s *unitSet) Refresh(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
+// Settle settles each provider, then gives each start block its trust gate
+// and closes the gates of the blocks lifted.
 func (s *unitSet) Settle(ctx context.Context, st automation.State) error {
 	var errs []error
 	for _, id := range s.order {
@@ -618,6 +653,11 @@ func (s *unitSet) Settle(ctx context.Context, st automation.State) error {
 			if err := r.Settle(ctx, st); err != nil {
 				errs = append(errs, fmt.Errorf("%s: %w", id, err))
 			}
+		}
+	}
+	if s.blocks != nil {
+		if err := s.blocks.e.syncTrustGates(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("trust gates: %w", err))
 		}
 	}
 	return errors.Join(errs...)

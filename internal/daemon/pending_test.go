@@ -61,7 +61,7 @@ func TestRunActionWithNothingPendingRunsTheHeldRound(t *testing.T) {
 func TestGuideWithoutAPlanIsRefused(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
-	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/guide", `{"guidance":"x"}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "plans no automatic round") {
+	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/guide", `{"guidance":"x"}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "no guide on acme/api#7") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 }

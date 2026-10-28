@@ -468,7 +468,7 @@ func TestApplyByHandIsConfirmed(t *testing.T) {
 	}
 }
 
-func TestADeferredStepStaysPendingUntilItsResultIsStored(t *testing.T) {
+func TestADeferredStepStaysDeferredUntilItsResultIsStored(t *testing.T) {
 	w := eventWF("triage", unit.GitHub, "pr", always, "review")
 	w.Steps = []workflow.Step{{Use: "classify", Reach: workflow.ReachLocal}}
 	r := newRig(t, w)
@@ -478,7 +478,7 @@ func TestADeferredStepStaysPendingUntilItsResultIsStored(t *testing.T) {
 	r.steps.Defer("classify", p1, "classifying")
 	r.sweep()
 	it := r.mustItem("triage", p1)
-	if it.Decision != workflow.DecisionPending || it.Reason != "classifying" {
+	if it.Decision != workflow.DecisionDeferred || it.Reason != "classifying" {
 		t.Fatalf("a deferred item is %+v", it)
 	}
 	gen := r.log.Gen()
@@ -488,7 +488,7 @@ func TestADeferredStepStaysPendingUntilItsResultIsStored(t *testing.T) {
 	}
 	r.clock.Advance(time.Minute)
 	r.sweep()
-	if it := r.mustItem("triage", p1); it.Decision != workflow.DecisionPending {
+	if it := r.mustItem("triage", p1); it.Decision != workflow.DecisionDeferred {
 		t.Fatalf("still classifying, the item is %+v", it)
 	}
 	r.steps.Defer("classify", p1, "")
@@ -748,19 +748,24 @@ func TestPeekedGuidanceRunsAndIsTakenOnlyInRun(t *testing.T) {
 	}
 }
 
-func TestPendingServesTheReadModel(t *testing.T) {
+func TestWaitingServesTheReadModel(t *testing.T) {
 	w := windowed(sweepWF("review", always, "turn.start"), 5*time.Minute)
 	w.Provider, w.Slot = unit.GitHub, "pr"
 	r := newRig(t, w, sweepWF("close", idle, "session.close"))
+	gated(r)
 	r.put(p1, "h1")
 	r.put(s1, "a")
 	r.sweep()
-	got, err := r.e.Pending(context.Background())
+	got, err := r.e.Waiting(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 1 || got[0].Unit != p1 || got[0].Steps[0].Use != "turn.start" || !got[0].Deadline.Equal(t0.Add(5*time.Minute)) || !got[0].At.Equal(t0) {
-		t.Errorf("Pending = %+v", got)
+	if len(got) != 1 || got[0].Item.Unit != p1 || got[0].Item.Steps[0].Use != "turn.start" || got[0].Gate.Subject != got[0].Item.ID ||
+		!got[0].Gate.Deadline.Equal(t0.Add(5*time.Minute)) || !got[0].Gate.OpenedAt.Equal(t0) {
+		t.Errorf("Waiting = %+v", got)
+	}
+	if mine, err := r.e.Waiting(context.Background(), &s1); err != nil || len(mine) != 0 {
+		t.Errorf("Waiting on %s = %+v %v", s1, mine, err)
 	}
 }
 
