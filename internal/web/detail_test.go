@@ -369,7 +369,7 @@ func TestATaskOffersTheIntentsThatServeIt(t *testing.T) {
 		t.Errorf("the detail lacks the action's label: %s", got.Text)
 	}
 	last := len(got.Posts) - 1
-	if last < 0 || got.Posts[last].Path != "/api/units/entry/e-3f9a/start" || got.Posts[last].Body["source"] != "cockpit" {
+	if last < 0 || got.Posts[last].Path != "/api/units/"+string(unit.Task)+"/e-3f9a/start" || got.Posts[last].Body["source"] != "cockpit" {
 		t.Fatalf("posts %+v", got.Posts)
 	}
 }

@@ -94,7 +94,7 @@ func TestPluginSectionsFollowTheCatalog(t *testing.T) {
 		t.Fatalf("menu %q, want In loop below the core sections and no Needs me", got)
 	}
 	r.d.mu.Lock()
-	r.d.plugins = []api.Plugin{{ID: unit.GitHub}, {ID: "thread", Enabled: true, UI: &api.PluginUI{Menubar: []api.MenubarSection{{Label: "Threads", View: "loop"}, {Label: "Odd", View: "x&entry=e-1"}}}}}
+	r.d.plugins = []api.Plugin{{ID: unit.GitHub}, {ID: "thread", Enabled: true, UI: &api.PluginUI{Menubar: []api.MenubarSection{{Label: "Threads", View: "loop"}, {Label: "Odd", View: "x&task=e-1"}}}}}
 	r.d.mu.Unlock()
 	r.c.apply(context.Background(), api.Change{Health: true})
 	got = titles(r.tray.menu)
@@ -102,7 +102,7 @@ func TestPluginSectionsFollowTheCatalog(t *testing.T) {
 		t.Fatalf("menu with github disabled %q", got)
 	}
 	r.d.mu.Lock()
-	r.d.rows["x&entry=e-1"] = []api.Row{reviewRow(1), reviewRow(2), reviewRow(3), reviewRow(4), reviewRow(5), reviewRow(6)}
+	r.d.rows["x&task=e-1"] = []api.Row{reviewRow(1), reviewRow(2), reviewRow(3), reviewRow(4), reviewRow(5), reviewRow(6)}
 	r.d.mu.Unlock()
 	r.c.Refresh(context.Background())
 	odd := index(titles(r.tray.menu), "Odd (6)")
@@ -110,7 +110,7 @@ func TestPluginSectionsFollowTheCatalog(t *testing.T) {
 		t.Fatalf("menu %q", titles(r.tray.menu))
 	}
 	r.tray.menu[odd+6].Action()
-	waitFor(t, func() bool { return slices.Equal(r.openedURLs(), []string{"cockpit#view=x%26entry%3De-1"}) })
+	waitFor(t, func() bool { return slices.Equal(r.openedURLs(), []string{"cockpit#view=x%26task%3De-1"}) })
 }
 
 func TestAStoreTheDaemonCannotOpenShowsWhyAndTheCommand(t *testing.T) {

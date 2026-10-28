@@ -22,7 +22,7 @@ const (
 )
 
 // taskProvider names a task in the busy map, which is keyed by unit.
-const taskProvider unit.ProviderID = "entry"
+const taskProvider = unit.Task
 
 func taskUnit(id string) unit.Unit { return unit.Unit{Provider: taskProvider, Key: id} }
 
