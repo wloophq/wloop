@@ -526,7 +526,7 @@ func historyOf(t *testing.T, db *sql.DB, id string) {
 func ownTask(t *testing.T, db *sql.DB, id string) {
 	t.Helper()
 	for _, q := range []string{
-		`INSERT INTO tasks (id, kind, state, origin, created, updated, rev) VALUES (?1, 'close', 'inbox', 'derived', 't', 't', 1)`,
+		`INSERT INTO tasks (id, state, origin, created, updated, rev) VALUES (?1, 'inbox', 'derived', 't', 't', 1)`,
 		`INSERT INTO task_units (task_id, provider, unit_key, ord) VALUES (?1, 'slack', 'C1/2', 0)`,
 		`INSERT INTO task_props (task_id, name, value, writer, at) VALUES (?1, 'contexts', '{"list":["@reply"]}', 'plugin', 't')`,
 		`INSERT INTO unit_marks (provider, unit_key, mark, value) VALUES ('task', ?1, 'w/settled', 'v')`,
@@ -571,7 +571,7 @@ func TestDropTaskAfterRekeyDeletesOnlyTheTasksOwnRows(t *testing.T) {
 	db := rawDB(t, storeAt(t, current))
 	ownTask(t, db, gone)
 	historyOf(t, db, gone)
-	if _, err := db.Exec(`INSERT INTO tasks (id, kind, state, origin, created, updated, rev) VALUES (?, 'action', 'next', 'user', 't', 't', 2)`, keep); err != nil {
+	if _, err := db.Exec(`INSERT INTO tasks (id, state, origin, created, updated, rev) VALUES (?, 'next', 'user', 't', 't', 2)`, keep); err != nil {
 		t.Fatal(err)
 	}
 	history := []string{"events", "plan_items", "turns", "sessions"}
@@ -663,7 +663,7 @@ func dossierOf(t *testing.T, db *sql.DB, id string) {
 
 func bareTask(t *testing.T, db *sql.DB, id string) {
 	t.Helper()
-	if _, err := db.Exec(`INSERT INTO tasks (id, kind, state, origin, created, updated, rev) VALUES (?, 'action', 'next', 'user', 't', 't', 1)`, id); err != nil {
+	if _, err := db.Exec(`INSERT INTO tasks (id, state, origin, created, updated, rev) VALUES (?, 'next', 'user', 't', 't', 1)`, id); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -739,7 +739,6 @@ func TestDropTaskKeepsAnAliasOfTheDroppedTask(t *testing.T) {
 	bareTask(t, db, gone)
 	bareTask(t, db, keep)
 	for _, q := range []string{
-		`CREATE TABLE task_aliases (old_id TEXT PRIMARY KEY, new_id TEXT NOT NULL)`,
 		`INSERT INTO task_aliases (old_id, new_id) VALUES ('` + gone + `', '` + keep + `')`,
 	} {
 		if _, err := db.Exec(q); err != nil {

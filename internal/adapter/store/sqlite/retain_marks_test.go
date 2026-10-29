@@ -10,7 +10,7 @@ func TestRetainDropsTheMarksOfEndedTasksAndVanishedSlackUnits(t *testing.T) {
 	t.Parallel()
 	db, _ := openTemp(t)
 	for id, c := range map[string]string{"e-open": "waiting", "e-done": "done", "e-trash": "dropped", "e-ref": "deferred"} {
-		exec(t, db, `INSERT INTO tasks (id, kind, state, category, origin, created, updated, rev) VALUES (?, 'action', ?, ?, 'user', ?, ?, 1)`, id, "s-"+id, c, at(past), at(past))
+		exec(t, db, `INSERT INTO tasks (id, state, category, origin, created, updated, rev) VALUES (?, ?, ?, 'user', ?, ?, 1)`, id, "s-"+id, c, at(past), at(past))
 	}
 	exec(t, db, `INSERT INTO extraction_cursors (provider, unit_key, at) VALUES ('slack', 'T1/C1/1.1', ?)`, at(past))
 	exec(t, db, `INSERT INTO items (provider, unit_key, id, body, state, provenance, created_at, updated_at) VALUES ('slack', 'T1/C1/2.2', 'i1', '{}', 'open', 'extracted', ?, ?)`, at(past), at(past))

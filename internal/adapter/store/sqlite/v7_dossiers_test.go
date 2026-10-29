@@ -87,7 +87,7 @@ func TestAMigratedEndedTasksDossierGetsNoClosingCall(t *testing.T) {
 			('entry/e-`+hexEnded+`', 'entry/e-`+hexEnded+`#', 'active'), ('entry/e-`+hexPull+`', 'entry/e-`+hexPull+`#', 'active')`,
 	)
 	migrateV6(t, path)
-	want := []string{"task/t-" + hexPull + " active ", "task/t-" + hexEnded + " resolved 2026-10-04T09:00:00Z"}
+	want := []string{"task/t-" + hexPull + " active ", "task/t-" + hexEnded + " resolved 2026-10-04T09:00:00.000000000Z"}
 	if got := strings1(t, rawDB(t, path), `SELECT owner || ' ' || status || ' ' || resolved_at FROM dossiers ORDER BY owner`); !slices.Equal(got, want) {
 		t.Fatalf("dossiers %q, want %q", got, want)
 	}

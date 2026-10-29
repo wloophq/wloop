@@ -69,6 +69,7 @@ func TestV7PropsMovesUserFields(t *testing.T) {
 	want := map[string]task.Written{
 		"area":     {By: task.WriterPerson, At: v6Updated},
 		"focus":    {By: task.WriterWorkflow, At: v6FocusAt},
+		"autostar": {By: task.WriterWorkflow, At: v6FocusAt},
 		"due":      {By: task.WriterPlugin, At: v6Updated},
 		"contexts": {By: task.WriterPlugin, At: v6Updated},
 		"kind":     {By: task.WriterPlugin, At: v6Updated},
