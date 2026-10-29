@@ -103,7 +103,7 @@ func (s *Server) gatesIn(ctx context.Context, view string) ([]gateIn, error) {
 		if g.draft != nil {
 			delivery = string(g.draft.State)
 		}
-		in, err := catalog.GateView(def, view, g.gate, intentload.GateFacts(g.gate, delivery))
+		in, err := catalog.GateViewAt(def, view, g.gate, intentload.GateFacts(g.gate, delivery), s.deps.Now())
 		if err != nil {
 			return nil, err
 		}

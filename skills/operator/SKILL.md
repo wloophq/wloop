@@ -86,7 +86,7 @@ cockpit and the menu bar show:
 | `outbox` | drafts waiting on approval, and approved ones whose delivery is under way or failed |
 
 The menu bar's badge adds up the views the profile's `[badge]` names, Inbox
-and Needs me by default. A user's `views.toml` changes, adds or removes views.
+and Needs me by default. A user's `views.toml` changes the bundled views or adds its own.
 
 ## Diagnosing
 

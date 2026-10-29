@@ -434,6 +434,8 @@ type Server struct {
 	life     context.Context
 	stopLife context.CancelFunc
 	driving  sync.WaitGroup
+	// ran holds every goroutine Run starts that may outlive it, a job past the shutdown grace.
+	ran sync.WaitGroup
 	// streamClock times the plugins' stream restarts.
 	streamClock jobClock
 	// draftClock times the draft sender's waits.
@@ -834,11 +836,11 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	errc := make(chan error, len(servers))
 	for i, ln := range listeners {
-		go func() {
+		s.ran.Go(func() {
 			if err := servers[i].Serve(ln); !errors.Is(err, http.ErrServerClosed) {
 				errc <- err
 			}
-		}()
+		})
 	}
 
 	jctx, stopJobs := context.WithCancel(ctx)
@@ -939,7 +941,7 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 	}
 	jobsDone := make(chan struct{})
-	go func() { wg.Wait(); s.driving.Wait(); close(jobsDone) }()
+	s.ran.Go(func() { wg.Wait(); s.driving.Wait(); close(jobsDone) })
 	select {
 	case <-jobsDone:
 	case <-sctx.Done():
@@ -953,6 +955,10 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	return serveErr
 }
+
+// Wait blocks until every goroutine Run started has returned, those it left running past the shutdown
+// grace included; the owner of the stores they read waits here before closing them.
+func (s *Server) Wait() { s.ran.Wait() }
 
 // listenMCP listens on the MCP port. A port it cannot take fails the start:
 // every agent session sends its key to that port, so whoever holds it would

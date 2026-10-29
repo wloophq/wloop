@@ -29,8 +29,13 @@ func ViewAt(def intentload.ViewsDef, id string, _ task.Task, f workflow.Facts, n
 
 // GateView says whether gate g, whose facts f holds, is in view id of def. A view over tasks, one that lists
 // nothing and one def does not declare hold no gate.
-func GateView(def intentload.ViewsDef, id string, _ gate.Gate, f workflow.Facts) (bool, error) {
-	return match(def, id, task.OverGates, f, time.Now())
+func GateView(def intentload.ViewsDef, id string, g gate.Gate, f workflow.Facts) (bool, error) {
+	return GateViewAt(def, id, g, f, time.Now())
+}
+
+// GateViewAt is GateView with now the time the view's when reads as now.
+func GateViewAt(def intentload.ViewsDef, id string, _ gate.Gate, f workflow.Facts, now time.Time) (bool, error) {
+	return match(def, id, task.OverGates, f, now)
 }
 
 func match(def intentload.ViewsDef, id, over string, f workflow.Facts, now time.Time) (bool, error) {

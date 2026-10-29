@@ -16,6 +16,9 @@ import (
 	"github.com/wloophq/wloop/internal/turn"
 )
 
+// lensNow is the time the views read as now.
+var lensNow = time.Date(2026, 3, 2, 9, 0, 0, 0, time.UTC)
+
 // lensFacts are the facts of a task of category c with the given facts besides, its owed_by as l's profile says.
 func lensFacts(t *testing.T, l *intentload.Loaded, c task.Category, more workflow.Facts) workflow.Facts {
 	t.Helper()
@@ -36,7 +39,7 @@ func inViews(t *testing.T, l *intentload.Loaded, f workflow.Facts) []string {
 	t.Helper()
 	var out []string
 	for _, v := range l.Views.Views {
-		in, err := View(l.Views, v.ID, task.Task{}, f)
+		in, err := ViewAt(l.Views, v.ID, task.Task{}, f, lensNow)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -86,7 +89,7 @@ func TestAViewIsTheProfilesPredicate(t *testing.T) {
 	if got := inViews(t, l, low); !slices.Equal(got, []string{"inbox"}) {
 		t.Errorf("the bundled inbox: %v", got)
 	}
-	if in, err := GateView(l.Views, "inbox", gate.Gate{}, low); err != nil || in {
+	if in, err := GateViewAt(l.Views, "inbox", gate.Gate{}, low, lensNow); err != nil || in {
 		t.Errorf("a view over tasks holds a gate: %v %v", in, err)
 	}
 }
@@ -117,7 +120,7 @@ func TestEveryOpenGateShowsInABundledView(t *testing.T) {
 		g := gate.Gate{Kind: k, Status: gate.Open}
 		var over []string
 		for _, v := range l.Views.Views {
-			if in, err := GateView(l.Views, v.ID, g, intentload.GateFacts(g, "held")); err != nil {
+			if in, err := GateViewAt(l.Views, v.ID, g, intentload.GateFacts(g, "held"), lensNow); err != nil {
 				t.Fatal(err)
 			} else if in {
 				over = append(over, v.ID)
@@ -144,7 +147,7 @@ func TestOutboxKeepsAFailedApprovedDraft(t *testing.T) {
 		{gate.Rejected, "dropped", false},
 	} {
 		g := gate.Gate{Kind: gate.KindDraft, Status: c.status}
-		if in, err := GateView(l.Views, "outbox", g, intentload.GateFacts(g, c.delivery)); err != nil || in != c.want {
+		if in, err := GateViewAt(l.Views, "outbox", g, intentload.GateFacts(g, c.delivery), lensNow); err != nil || in != c.want {
 			t.Errorf("a %s draft gate delivery %s: in the outbox %v, %v", c.status, c.delivery, in, err)
 		}
 	}
@@ -206,7 +209,7 @@ func TestTheBundledViewsListWhatTheGoViewsListed(t *testing.T) {
 				e.Asleep = st.Name == "scheduled"
 				f := TaskFacts(e, l.Tasks)
 				for id, was := range old {
-					got, err := View(l.Views, id, e, f)
+					got, err := ViewAt(l.Views, id, e, f, lensNow)
 					if err != nil || got != was(e) {
 						t.Errorf("%s in state %s (star %v, project %v): %v, Go's view said %v (%v)", id, st.Name, star, project, got, was(e), err)
 					}

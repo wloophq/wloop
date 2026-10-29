@@ -157,6 +157,7 @@ func TestServeRecoversBeforeSending(t *testing.T) {
 		if err := <-done; err != nil {
 			t.Errorf("run: %v", err)
 		}
+		srv.Wait()
 	})
 	defer stop()
 	c := client.New(d.Socket)
