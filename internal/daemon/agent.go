@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/messages"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/turns"
@@ -472,6 +473,8 @@ func (s *Server) handleTurnAnswer(w http.ResponseWriter, r *http.Request) {
 	}
 	got, err := s.deps.Messages.ReadTask(r.Context(), messages.ReadRequest{Session: handle, Unit: u, Message: id})
 	switch {
+	case errors.Is(err, messages.ErrNotTheTasks):
+		writeError(w, http.StatusForbidden, s.notice(builtin.NoticeChatNotYours, map[string]any{"Unit": u.Address()}))
 	case errors.Is(err, messages.ErrNoMessage), errors.Is(err, messages.ErrNoTurn):
 		writeError(w, http.StatusNotFound, err.Error())
 	case err != nil:

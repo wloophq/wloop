@@ -117,6 +117,8 @@ func (s *Server) taskRead(ctx context.Context, handle string, arguments json.Raw
 		return s.answer(ctx, taskReadName, "no_turn", fields{"Error": err.Error()}, true)
 	case errors.Is(err, messages.ErrNoMessage):
 		return s.answer(ctx, taskReadName, "no_gate", fields{"ID": a.Gate}, true)
+	case errors.Is(err, messages.ErrNotTheTasks):
+		return s.answer(ctx, taskReadName, "not_the_tasks", fields{"Error": err.Error()}, true)
 	case err != nil:
 		return s.answer(ctx, taskReadName, "read_failed", fields{"Error": err.Error()}, true)
 	}

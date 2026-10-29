@@ -88,6 +88,7 @@ var ToolAnswers = func() []ToolAnswer {
 
 		answer("task_read", "no_turn", "The session has no turn.", str("Error")),
 		answer("task_read", "no_gate", "No answer of the session's resolved gate ID.", num("ID")),
+		answer("task_read", "not_the_tasks", "The session's turns are on no unit of the task it would read.", str("Error")),
 		answer("task_read", "read_failed", "The task could not be read.", str("Error")),
 		answer("task_read", "nothing", "Nothing to read: the session's turns are on no task, and no answer of gate ID, or of any gate when ID is 0, waits.", num("ID")),
 		answer("task_read", "read", "What was read: the task, its brief record's data, its open gates, the chat since the last read and the conversations, each \"\" when empty.",

@@ -188,3 +188,35 @@ func TestAChatWithNoLiveSessionStartsAChatTurnOnTheTask(t *testing.T) {
 		t.Fatalf("turns %+v", b.Turns)
 	}
 }
+
+func TestASessionOfAnotherTaskCannotReadAChat(t *testing.T) {
+	te := attachEnv(t)
+	ctx := context.Background()
+	other := task.ID("t-00000000000000b2")
+	if err := te.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: other, Kind: task.KindCapture, State: "next",
+		Category: task.CategoryReady, Title: "Rotate the keys", Origin: task.OriginUser, Created: testNow, Updated: testNow}}}); err != nil {
+		t.Fatal(err)
+	}
+	inSession(te, "term_1")
+	if code := te.run("task", "attach", "task:"+string(attachTask)); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	mine := te.sessionOf(t, "orca", "term_1")
+	inSession(te, "term_2")
+	if code := te.run("task", "attach", "task:"+string(other)); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	if _, err := client.New(te.Socket).Chat(ctx, string(attachTask), api.ChatRequest{Text: "Take the timeout case first."}); err != nil {
+		t.Fatal(err)
+	}
+	te.out.Reset()
+	te.err.Reset()
+	if code := te.run("turn", "answer", "task:"+string(attachTask)); code == 0 || strings.Contains(te.out.String(), "timeout") ||
+		!strings.Contains(te.err.String(), "no turn on task:"+string(attachTask)) {
+		t.Fatalf("another task's session: exit %d\n%s%s", code, te.out, te.err)
+	}
+	got, err := te.messages.ReadTask(ctx, messages.ReadRequest{Session: mine})
+	if err != nil || len(got.Chat) != 1 {
+		t.Fatalf("the task's own agent read %+v %v", got.Chat, err)
+	}
+}

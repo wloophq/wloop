@@ -2,6 +2,7 @@ package messages_test
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"sync"
@@ -308,5 +309,27 @@ func TestAChatToASessionWithoutTheMCPServerNamesTheCommand(t *testing.T) {
 	typed := r.sess.Typed()
 	if len(typed) != 1 || !strings.Contains(typed[0].Line, "Capable=false") || !strings.Contains(typed[0].Line, "Unit="+task.UnitOf(e.ID).Address()) {
 		t.Fatalf("typed %+v", typed)
+	}
+}
+
+func TestASessionOfAnotherTaskReadsNoChat(t *testing.T) {
+	r, _ := chatRig(t)
+	ctx := context.Background()
+	a := r.capture(t, "Retry the webhook", nil)
+	b := r.capture(t, "Rotate the keys", nil)
+	ownA, ownB := task.UnitOf(a.ID), task.UnitOf(b.ID)
+	r.books.Put(turn.Book{Unit: ownA, Turns: []turn.Turn{{Seq: 1, Intent: "chat", ID: "c1", Session: "term_1", SentTo: "term_1", State: turn.Started, SentAt: t0}}})
+	r.books.Put(turn.Book{Unit: ownB, Turns: []turn.Turn{{Seq: 2, Intent: "chat", ID: "c2", Session: "term_2", SentTo: "term_2", State: turn.Started, SentAt: t0}}})
+	r.reg.Put(turn.Session{ID: "term_1", WorkspaceID: "ws", Unit: ownA, StartedAt: t0})
+	if _, err := r.svc.Chat(ctx, messages.ChatRequest{Task: a.ID, Text: "Take the timeout case first."}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.svc.ReadTask(ctx, messages.ReadRequest{Session: "term_2", Unit: ownA})
+	if !errors.Is(err, messages.ErrNotTheTasks) || len(got.Chat) != 0 {
+		t.Fatalf("another task's session read %+v %v", got.Chat, err)
+	}
+	mine, err := r.svc.ReadTask(ctx, messages.ReadRequest{Session: "term_1"})
+	if err != nil || len(mine.Chat) != 1 {
+		t.Fatalf("the task's own agent read %+v %v", mine.Chat, err)
 	}
 }

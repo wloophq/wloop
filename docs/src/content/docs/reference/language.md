@@ -491,6 +491,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `fix_these` (`Problems`): The arguments have problems, one per line.
   - `no_turn` (`Error`): The session has no turn.
   - `no_gate` (`ID`: number): No answer of the session's resolved gate ID.
+  - `not_the_tasks` (`Error`): The session's turns are on no unit of the task it would read.
   - `read_failed` (`Error`): The task could not be read.
   - `nothing` (`ID`: number): Nothing to read: the session's turns are on no task, and no answer of gate ID, or of any gate when ID is 0, waits.
   - `read` (`Task`, `Brief`, `Gates`, `Chat`, `Conversations`): What was read: the task, its brief record's data, its open gates, the chat since the last read and the conversations, each "" when empty.
@@ -572,6 +573,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
 - `<name>` (template): A notice, by its name: a template over its fields, `Name` and `Command`.
   - `answered`: Typed into an idle session, or the reason that blocks its stop while it works: the user answered Gate of the session's turn, 0 for an answer stored before answers named their gate, of the unit named as the loop's commands read it.
   - `chat`: Typed into a live session of a task when the user writes on the task's chat, or the reason that blocks its next stop while its agent works: the task's id, its own unit as the loop's commands read it, and Capable, whether the session loaded the MCP server. The notice carries no message: the agent reads it with task_read, or with the turn answer command.
+  - `chat_not_yours`: Why turn answer refuses a session that has no turn on the task it names, or on a unit the task holds: the unit as the command reads it.
   - `chat_typed`: Tells the person that their chat message reached a live session of the task.
   - `chat_queued`: Tells the person that their chat message waits for the busy agent of a live session of the task, which is told of it when it stops.
   - `chat_started`: Tells the person that their chat message started a turn of Intent, Resumed when it resumes the task's last session.
@@ -590,6 +592,7 @@ The fields each notice reads besides `Name` and `Command`:
 
   - `answered` (`Gate`: number, `Unit`)
   - `chat` (`Task`, `Unit`, `Capable`)
+  - `chat_not_yours` (`Unit`)
   - `chat_typed`
   - `chat_queued`
   - `chat_started` (`Intent`, `Resumed`)

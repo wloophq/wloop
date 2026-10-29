@@ -100,6 +100,7 @@ fix_these = """Nothing was read; fix these and call task_read again:
 {{.Problems}}"""
 no_turn = "Nothing was read: {{.Error}}; task_read reads the task of this session's {{.Name}} turns."
 no_gate = "Nothing was read: no answer of this session's resolved gate {{.ID}}."
+not_the_tasks = "Nothing was read: {{.Error}}; task_read reads only the task this session works on."
 read_failed = "{{.Name}} could not read the task: {{.Error}}"
 nothing = "{{if .ID}}Gate {{.ID}} has no answer yet.{{else}}Nothing you have not read.{{end}}"
 read = """{{with .Task}}{{.}}

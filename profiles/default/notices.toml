@@ -9,6 +9,8 @@ record_owed = "This {{.Name}} turn on {{.Unit}} has no record. Call the `turn_en
 
 attach_needs_session = "`{{.Command}} task attach {{.Task}}` makes the agent session it runs in a run of the task, and it runs in no session a workspace manager started ({{.Managers}}). Run it from the agent session to attach, inside one of them."
 
+chat_not_yours = "This session has no turn on {{.Unit}}: it reads the answers and the chat of the tasks it works on only, and nothing was read."
+
 chat_typed = "Sent to the task's live session; its agent reads it now."
 
 chat_queued = "Sent to the task's live session; its agent is busy and is told of it when it stops."

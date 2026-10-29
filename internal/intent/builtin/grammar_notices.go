@@ -7,6 +7,8 @@ var Notices = []ToolAnswer{
 		Fields: []AnswerField{num("Gate"), str("Unit")}},
 	{Name: NoticeChat, Doc: "Typed into a live session of a task when the user writes on the task's chat, or the reason that blocks its next stop while its agent works: the task's id, its own unit as the loop's commands read it, and Capable, whether the session loaded the MCP server. The notice carries no message: the agent reads it with task_read, or with the turn answer command.",
 		Fields: []AnswerField{str("Task"), str("Unit"), {Name: "Capable"}}},
+	{Name: NoticeChatNotYours, Doc: "Why turn answer refuses a session that has no turn on the task it names, or on a unit the task holds: the unit as the command reads it.",
+		Fields: []AnswerField{str("Unit")}},
 	{Name: NoticeChatTyped, Doc: "Tells the person that their chat message reached a live session of the task."},
 	{Name: NoticeChatQueued, Doc: "Tells the person that their chat message waits for the busy agent of a live session of the task, which is told of it when it stops."},
 	{Name: NoticeChatStarted, Doc: "Tells the person that their chat message started a turn of Intent, Resumed when it resumes the task's last session.",
@@ -31,6 +33,7 @@ const (
 	NoticeAttachNeedsSession   = "attach_needs_session"
 	NoticeChat                 = "chat"
 	NoticeChatTyped            = "chat_typed"
+	NoticeChatNotYours         = "chat_not_yours"
 	NoticeChatQueued           = "chat_queued"
 	NoticeChatStarted          = "chat_started"
 	NoticeDraftSent            = "draft_sent"

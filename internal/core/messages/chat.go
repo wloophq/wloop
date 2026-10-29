@@ -291,17 +291,27 @@ func (s *Service) ReadTask(ctx context.Context, r ReadRequest) (TaskRead, error)
 	if err != nil {
 		return TaskRead{}, err
 	}
+	var e task.Task
+	onTask := false
+	if s.ChatDeps.Log != nil {
+		if e, onTask, err = s.taskOfUnit(ctx, b.Unit); err != nil {
+			return TaskRead{}, err
+		}
+		if onTask {
+			if ok, err := s.worksOn(ctx, r.Session, e); err != nil {
+				return TaskRead{}, err
+			} else if !ok {
+				return TaskRead{}, fmt.Errorf("%w: %s", ErrNotTheTasks, e.ID)
+			}
+		}
+	}
 	convs, err := s.Read(ctx, ReadRequest{Session: r.Session, Unit: b.Unit, Message: r.Message, Gate: r.Gate})
 	if err != nil {
 		return TaskRead{}, err
 	}
 	out := TaskRead{Answers: convs}
-	if s.ChatDeps.Log == nil {
+	if !onTask {
 		return out, nil
-	}
-	e, ok, err := s.taskOfUnit(ctx, b.Unit)
-	if err != nil || !ok {
-		return out, err
 	}
 	out.Task = e
 	if brief, ok, err := s.ChatDeps.Log.Brief(ctx, e); err != nil {
@@ -321,6 +331,27 @@ func (s *Service) ReadTask(ctx context.Context, r ReadRequest) (TaskRead, error)
 		}
 	}
 	return out, nil
+}
+
+// ErrNotTheTasks refuses a read of a task's chat to a session with no turn on the task or a unit it holds.
+var ErrNotTheTasks = errors.New("this session has no turn on the task")
+
+// worksOn says whether session has a turn on e's own unit or on one e holds: the sessions a chat goes to.
+func (s *Service) worksOn(ctx context.Context, session string, e task.Task) (bool, error) {
+	if session == "" {
+		return false, nil
+	}
+	units := append([]unit.Unit{task.UnitOf(e.ID)}, e.Units...)
+	books, err := s.Books.Books(ctx, units...)
+	if err != nil {
+		return false, err
+	}
+	for _, u := range units {
+		if slices.ContainsFunc(books[u].Turns, func(t turn.Turn) bool { return t.Session == session || t.SentTo == session }) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // taskOfUnit is the task u is: the task of a task's own unit, else the first open task u is on.
