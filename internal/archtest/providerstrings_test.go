@@ -41,7 +41,7 @@ var providerStringAllowlist = []providerString{
 	{"internal/intent/builtin/facts.go", "github", 1, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
 	{"internal/intent/builtin/grammar_config.go", "github", 25, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
 	{"internal/config/plugins.go", "github", 1, "debt: GitHub's settings are a field of the configuration until its plugin reads its table through the broker (X8a2)"},
-	{"internal/config/plugins.go", "slack", 1, "debt: Slack's settings are a field of the configuration while init and doctor read them there, until they ask the plugin (X9)"},
+	{"internal/config/plugins.go", "slack", 1, "debt: Slack's settings are a field of the configuration while init and doctor read them there, until the plugins declare their config keys (issue 62)"},
 	{"internal/intent/builtin/renamed.go", "github", 7, "the renames name the keys of the configuration a release moved"},
 	{"internal/intent/builtin/renamed.go", "slack", 9, "the renames name the keys of the configuration a release moved"},
 	{"internal/intent/builtin/grammar_config.go", "slack", 30, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},

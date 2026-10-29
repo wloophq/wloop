@@ -20,8 +20,15 @@ import (
 var engineBans = []string{"internal/domain/pr", "internal/domain/turn", "internal/domain/view",
 	"internal/domain/workspace", "internal/domain/round", "internal/adapter"}
 
-var providerIDs = map[string]bool{string(unit.GitHub): true, string(unit.Session): true, string(unit.Workspace): true,
-	string(unit.Task): true, "slack": true}
+// providerIDs are the core's providers and the bundled plugins', as their
+// manifests name them.
+var providerIDs = func() map[string]bool {
+	ids := map[string]bool{string(unit.Session): true, string(unit.Workspace): true, string(unit.Task): true}
+	for _, id := range pluginIDs() {
+		ids[id] = true
+	}
+	return ids
+}()
 
 // providerConsts are the unit provider constants the core may not spell.
 var providerConsts = map[string]bool{"GitHub": true, "Session": true, "Workspace": true, "Task": true}
@@ -80,8 +87,6 @@ var coreProviderAllowlist = []providerSite{
 	{"internal/cli/serve.go", "serveAllDeps", "unit.GitHub", 1, "debt: the daemon's wiring of the GitHub viewer and the forge"},
 	{"internal/cli/serve.go", "trackedBooks.Books", "unit.GitHub", 1, "debt: a carded pull request without a turn still gets an empty book, so its card stays"},
 	{"internal/cli/serve_payloads.go", "Env.payloadReaders", "unit.GitHub", 1, "debt: GitHub's payload reader, wired outside the plugin's Payload"},
-	{"internal/config/config.go", "Config.validateWorkflows", "unit.GitHub", 1, "debt: an intent's project settings compile against the pull request's turn facts, though the intents live in the GitHub plugin's layer (X10)"},
-	{"internal/config/config.go", "Config.ProjectSettingsFor", "unit.GitHub", 1, "debt: an intent's project settings compile against the pull request's turn facts, though the intents live in the GitHub plugin's layer (X10)"},
 	{"internal/cli/storedfacts.go", "storedFacts.Facts", "unit.GitHub", 1, "debt: the stored facts of a pull request's turn"},
 	{"internal/meter/meter.go", "GitHub", `"github"`, 1, "the meter's resource of a GitHub API request, not a unit provider"},
 }

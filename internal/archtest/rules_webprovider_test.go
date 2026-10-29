@@ -7,7 +7,10 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
+
+	"github.com/wloophq/wloop/internal/plugins/bundled"
 )
 
 const webStatic = "internal/web/static"
@@ -27,13 +30,26 @@ func ruleWebProvider(file, src string, plugins []string) []string {
 }
 
 func pluginIDs() []string {
-	ids := make([]string, 0, len(pluginRoots))
-	for id := range pluginRoots {
-		ids = append(ids, id)
+	ids, err := bundledIDs()
+	if err != nil {
+		panic(err)
 	}
-	slices.Sort(ids)
 	return ids
 }
+
+// bundledIDs are the ids of the bundled plugins' manifests, sorted.
+var bundledIDs = sync.OnceValues(func() ([]string, error) {
+	ms, err := bundled.Manifests()
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, len(ms))
+	for i, m := range ms {
+		ids[i] = m.ID
+	}
+	slices.Sort(ids)
+	return ids, nil
+})
 
 // TestCockpitScriptsNameNoPlugin checks that the cockpit's scripts quote no
 // plugin's id.

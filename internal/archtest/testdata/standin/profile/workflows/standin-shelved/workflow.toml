@@ -1,0 +1,9 @@
+summary = "Propose a memo on a stand-in note shelved for a day"
+provider = "standin"
+when = 'standin.shelf != "" && standin.shelved_for > duration("24h")'
+order = 90
+
+[[step]]
+use = "draft.propose"
+purpose = "memo"
+delivery = "memo"

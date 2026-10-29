@@ -1,0 +1,51 @@
+id = "standin"
+kinds = ["source"]
+protocol = 1
+
+[source]
+name = "Stand-in"
+slot = "standin"
+kinds = ["note"]
+default_delivery = "memo"
+
+[source.codec]
+keys = ["{shelf}/{id}"]
+target = "<shelf>/<id>"
+targets = '^\s*[a-z]+/[0-9]+\s*$'
+
+[source.codec.fields]
+shelf = "[a-z]+"
+id = "[0-9]+"
+
+[[source.deliveries]]
+name = "memo"
+posts = true
+
+[[source.facts]]
+name = "standin.shelf"
+type = "string"
+doc = "The shelf the note sits on."
+
+[[source.facts]]
+name = "standin.shelved_for"
+type = "duration"
+doc = "How long the note has sat on its shelf."
+time_varying = true
+
+[[source.signals]]
+name = "shelved"
+doc = "The note sits on a shelf."
+
+[[source.tools]]
+name = "standin_note"
+doc = "Keeps a note in the stand-in's own store."
+input = '{"type":"object","properties":{"text":{"type":"string"}},"required":["text"],"additionalProperties":false}'
+
+[[source.tools.answers]]
+name = "problem_text_required"
+doc = "A problem: text is missing or empty."
+
+[[source.tools.answers]]
+name = "noted"
+doc = "The note is kept: its text and how many notes the store holds."
+fields = [{ name = "Text" }, { name = "Count", number = true }]

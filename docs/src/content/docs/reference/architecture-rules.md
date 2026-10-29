@@ -7,6 +7,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 
 | Test | Rule |
 |---|---|
+| `TestAStandInSourcePluginRunsWithNoEditOutsideItsDirectory` | A source plugin whose code, manifest and profile layer all live in internal/archtest/testdata/standin, and which no other file of the repository names, runs in the daemon from the user's plugins directory through the real launcher: its manifest's fact, temporal fact, delivery, task kind and signal merge into the host's tables, its profile layer's workflow matches the unit it reports, its own store opens, and its MCP tool answers in the words of its layer's tools.toml. |
 | `TestApprovalRulesReadTrustedFacts` | No [gates.approval] rule that releases a gate (a draft gate's rule of any mode, any other gate's of mode send, run or delay) loads when it reads an untrusted fact, in each object that holds one: an intent's and a workflow's manifest, for its plan gates and its draft gates, and the config's workflows.<name>.gates.approval. The untrusted facts are the table's, the brief's extra fields, a classification's output and a task property an agent or a plugin writes, so an agent or a thread's text never releases a send or a run. |
 | `TestArchitecture` | Only the store imports the SQLite driver; clients import only the API, the domain and `termfmt`; the domain imports only the domain; the brief reaches agents and the store only through its ports; the API imports only the domain; only `intent/expr` imports cel-go; a core interface has at most five methods. |
 | `TestBoundaryImports` | The catalog, the intent vocabulary's leaves, the loader and `termfmt` import only their allowed sets. |
@@ -24,9 +25,9 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestDraftTextComesFromTheProfile` | No Go code outside its allowlist writes a draft's text from prose of its own: the Text of an outbox.Proposal, a draft.Draft or a plugin's source.Draft is never a string constant, a format, or what a function of the same package builds from string literals. A draft's text comes from a profile template or from whoever wrote it. |
 | `TestEveryDecisionNamesATestThatExists` | Every entry of the decision log names on its Enforced by line at least one test, and only tests the repository declares. |
 | `TestEveryRuleTestStatesItsRule` | Every rule test, a test that does not call flagged, states its rule in a doc comment. |
-| `TestGitHubPluginImportsOnlyTheSDK` | No package under `plugins/github`, tests included, imports a package under `internal/` or a package of another plugin: the GitHub plugin builds against the SDK and its own packages alone. |
 | `TestGoNamesNoBundledProperty` | Go names no property of the bundled tasks.toml: the constants PropFocus, PropArea, PropContexts, PropDue, FocusOn and FocusOff of internal/domain/task/props.go go once the lists, the counters and the automatic star are the profile's. |
 | `TestGoNamesNoState` | Go reads a task's category and never names a state: no Go literal is converted to, assigned to or compared with a task.State or a task.Category outside internal/intent and the version 7 migration, but the Category constants and Categories of internal/domain/task/schema.go, which declare the closed set; and no SQL text under internal/adapter/store compares the state column with a state the bundled profile declares, nor inlines a category, which it binds as a parameter. |
+| `TestHostImportsNoPlugin` | No host package's code imports a plugin's package, so the host binary links no plugin. A test-only package, whose path ends in "test" and which only tests and other test-only packages import, such as `ghreporttest`, may run a plugin's code for the host's tests; the root `plugins` package, which the host reads the bundled manifests and profile layers from, imports only the standard library. Test files are left to R16. |
 | `TestLoopCodeImportsNoPR` | Loop code is keyed by `unit.Unit` and imports the pull request domain only in allowlisted files. |
 | `TestManifestKeysAreInTheGrammar` | Every toml key the module decodes is a word of builtin.Grammar and that only internal/intent, internal/profile, internal/frontmatter and internal/config decode a profile file's or the configuration's TOML, so no key is read outside the table the loaders check, the schemas and the reference pages derive from. The configuration's keys are checked against the table by internal/config's TestEveryConfigKeyIsInTheGrammar. The plugin SDK under `pkg/plugin`, which reads a plugin's `plugin.toml`, is outside the rule. |
 | `TestMeterIsALeaf` | `internal/meter` imports only the standard library. |
@@ -46,13 +47,13 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestOnlyTheGatesServiceResolvesAGate` | Outside the gates service, the sqlite gates store and the version 7 migration no code calls Resolve on a gates.Store or writes gates.status in SQL: every decision is closed by the service, which accepts only a person, a trusted policy rule or a passed window. |
 | `TestOnlyTheStoreTouchesSQL` | Only the sqlite package opens the database, and SQL text appears only under `internal/adapter/store`. |
 | `TestPluginWritesNothingToStdout` | No file of `pkg/plugin` or `plugins/` writes to stdout: go-plugin reads a plugin's handshake from it, so a plugin logs to stderr only. |
+| `TestPluginsImportOnlyTheSDK` | No package under `plugins/`, nor the stand-in plugin's, imports a package under `internal/` or a package of another plugin, tests included: every plugin builds against the SDK and its own packages alone. |
 | `TestProseIsEmbeddedOnlyFromProfiles` | Prose files are embedded only from `profiles/` and a plugin's profile layer, `plugins/<id>/profile/`, except the allowlisted ones. |
 | `TestProviderIdentityThroughAPluginPackageOnlyShrinks` | Code outside a provider's homes tells a pull request from another unit through the GitHub plugin's package only where pluginIdentityAllowlist lists it. |
 | `TestProviderIdsInStringsOutsideThePluginsOnlyShrink` | A plugin's id spelled inside a Go string outside its plugin (an SQL literal 'github', a config key "plugins.slack.enabled", a struct tag) appears only in the store's migrations, which hold data already written, and in the files of a counted allowlist that only shrinks. |
 | `TestProvidersStayInAdaptersAndTheRoot` | Only a provider and the composition root import a provider's packages, provider names appear only in adapters and the root's allowlist, and only adapters parse an agent's state. |
 | `TestReadModelImports` | The read model reaches its inputs only through ports. |
 | `TestServeRunsThroughTheHarness` | A test of internal/cli starts serve's jobs only through the harness, so none outlives the test's files. |
-| `TestSlackPluginImportsOnlyTheSDK` | No package under `plugins/slack`, tests included, imports a package under `internal/`: the Slack plugin builds against the SDK alone. |
 | `TestSpawningPackagesImportMeter` | A package that spawns a process imports the meter. |
 | `TestTheCoreNamesNoProvider` | The core spells no provider id, and that outside the core a provider id appears only in its plugin's packages, the vocabulary tables, the unit package and the composition root. |
 | `TestTheEngineImportsNoProvider` | The automation engine imports no provider's domain. |
@@ -120,7 +121,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/doctor.go` `github` `1` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
 | `internal/config/config.go` `github` `7` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
 | `internal/config/plugins.go` `github` `1` | 🧾 | GitHub's settings are a field of the configuration until its plugin reads its table through the broker (X8a2) |
-| `internal/config/plugins.go` `slack` `1` | 🧾 | Slack's settings are a field of the configuration while init and doctor read them there, until they ask the plugin (X9) |
+| `internal/config/plugins.go` `slack` `1` | 🧾 | Slack's settings are a field of the configuration while init and doctor read them there, until the plugins declare their config keys (issue 62) |
 | `internal/intent/builtin/builtin.go` `slack` `1` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
 | `internal/intent/builtin/cmd/factsdoc/main.go` `slack` `1` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
 | `internal/intent/builtin/cmd/grammardoc/groups.go` `github` `8` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
@@ -180,8 +181,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/storedfacts.go` `storedFacts.Facts` `unit.GitHub` `1` | 🧾 | the stored facts of a pull request's turn |
 | `internal/cli/turn.go` `Env.storedViewer` `unit.GitHub` `1` | 🧾 | the GitHub viewer read outside the plugin |
 | `internal/client/tui/views.go` `taskProvider` `unit.Task` `1` | 🧾 | the TUI keys its busy map by the task provider; K2 keys it by the served unit |
-| `internal/config/config.go` `Config.ProjectSettingsFor` `unit.GitHub` `1` | 🧾 | an intent's project settings compile against the pull request's turn facts, though the intents live in the GitHub plugin's layer (X10) |
-| `internal/config/config.go` `Config.validateWorkflows` `unit.GitHub` `1` | 🧾 | an intent's project settings compile against the pull request's turn facts, though the intents live in the GitHub plugin's layer (X10) |
 | `internal/core/intake/intake.go` `SourceSession` `"session"` `1` | ✅ | the intake source a managed session asks from, which shares the session provider's spelling |
 | `internal/core/turns/headless.go` `taskInput` `"task"` `1` | ✅ | the headless turn's task input, which shares the task provider's spelling |
 | `internal/meter/meter.go` `GitHub` `"github"` `1` | ✅ | the meter's resource of a GitHub API request, not a unit provider |

@@ -477,12 +477,12 @@ const LinkSignalPrefix = "task.link_signal."
 // GateSlot is the slot of a gate's facts, which a view over gates reads.
 const GateSlot = "gate"
 
-// TurnEnvOf is provider p's own facts of the turn slot, the ones a turn
+// TurnEnv is every provider's own facts of the turn slot, the ones a turn
 // reads before it is built.
-func TurnEnvOf(p unit.ProviderID) expr.Env {
+func TurnEnv() expr.Env {
 	env := expr.Env{}
 	for _, f := range Facts {
-		if p != "" && f.Provider == p && slices.Contains(f.Slots, TurnSlot) {
+		if f.Provider != "" && slices.Contains(f.Slots, TurnSlot) {
 			put(env, f)
 		}
 	}
