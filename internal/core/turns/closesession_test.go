@@ -473,3 +473,20 @@ func TestDismissTurnRefusesItsPendingAnswers(t *testing.T) {
 		t.Fatalf("events %+v", store.Events())
 	}
 }
+
+func TestAnAnswerToTheSameGateIsDeliveredOnce(t *testing.T) {
+	ctx := context.Background()
+	e := newCloseEnv(t, cleanupCase{sess: quietSession("term_1"), turns: doneTurn("term_1", turn.Asked)})
+	if err := e.s.CloseSession(ctx, "term_1", "asked and quiet"); err != nil {
+		t.Fatal(err)
+	}
+	req := turns.AnswerRequest{Unit: ref(6), Text: "go ahead", Gate: 4}
+	first, err := e.s.Answer(ctx, req)
+	if err != nil || first.Route != turn.Resumed {
+		t.Fatalf("Answer = %+v, %v", first, err)
+	}
+	again, err := e.s.Answer(ctx, req)
+	if err != nil || again.Route != first.Route || len(e.rec.launches) != 1 {
+		t.Fatalf("the same gate's answer again = %+v, %v; launches %+v", again, err, e.rec.launches)
+	}
+}

@@ -5,7 +5,7 @@ description: The text and qualifiers the filter box takes, and how grouping and 
 
 The filter box at the top of the cockpit (`/` focuses it) narrows every view to the pull requests whose number, repository, title, author, head branch, workspace, board column, reason, card comment, brief goal or brief tag holds every word typed, ignoring case and accents. Pasting a pull request URL opens it.
 
-In the lists (Inbox, Next, Waiting, Someday, Projects, Outbox, Logbook) the same words narrow the tasks: their title, notes, state, kind, items, the people they wait on or come from, their channel or repository, project, area, contexts, and the text of their message or draft, ignoring case and the accents of Portuguese and Spanish. Qualifiers apply to the pull request views only. The terminal's `/` filter does the same.
+In the task views (Inbox, Needs me, Waiting, Someday, Projects, Outbox, Logbook and the others of your `views.toml`) the same words narrow the tasks: their title, notes, state, kind, items, the people they wait on or come from, their channel or repository, project, area, contexts, and the text of their message or draft, ignoring case and the accents of Portuguese and Spanish. Qualifiers apply to the pull request views only. The terminal's `/` filter does the same.
 
 The counts follow the filter in every view. The rail (the tabs in the terminal) counts what each view shows under the filter, the bar above a list reads "N of M" (what the filter shows of the view), and the group headings, the area picker and the context chips count the matches. With no free words, the counts of the lists are those of the whole views.
 

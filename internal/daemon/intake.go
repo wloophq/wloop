@@ -752,6 +752,14 @@ func (s *Server) acceptAction(w http.ResponseWriter, r *http.Request, name strin
 	writeJSON(w, api.ActionResult{OK: true, Intake: &wi})
 }
 
+// afterFunc arms f after d through Deps.AfterFunc, else time.AfterFunc.
+func (s *Server) afterFunc(d time.Duration, f func()) func() bool {
+	if s.deps.AfterFunc != nil {
+		return s.deps.AfterFunc(d, f)
+	}
+	return time.AfterFunc(d, f).Stop
+}
+
 // turnByHandIntake runs a turn by hand through an intake, waiting up to
 // sessionWait for it to start, and for its start to end once it began; one
 // not started by then stays open for the same session's next call to join,
@@ -769,10 +777,10 @@ func (s *Server) turnByHandIntake(w http.ResponseWriter, ctx context.Context, d 
 	}
 	wctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	timer := time.AfterFunc(s.sessionWait, cancel)
-	defer timer.Stop()
+	stop := s.afterFunc(s.sessionWait, cancel)
+	defer stop()
 	i, err := s.acceptSession(ctx, intake.Request{Unit: u, Intent: turn.Intent(req.Intent), Source: sourceSession, Payload: payload, Guidance: req.Guidance,
-		CanJoin: joinsSession(handle, d, req.Inputs)}, func() { timer.Stop() })
+		CanJoin: joinsSession(handle, d, req.Inputs)}, func() { stop() })
 	if err != nil {
 		writeAgentError(w, err)
 		return

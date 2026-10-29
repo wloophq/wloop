@@ -274,7 +274,7 @@ func TestPlanAsksTheQueryAndActsWithTheRequest(t *testing.T) {
 
 func TestDigestAsksTheDay(t *testing.T) {
 	socket := serve(t, func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(api.Digest{Day: r.URL.Path + "?" + r.URL.RawQuery, Tasks: []string{"e-1"}})
+		json.NewEncoder(w).Encode(api.Digest{Day: r.URL.Path + "?" + r.URL.RawQuery, Tasks: []string{"t-1"}})
 	})
 	d, err := New(socket).Digest(context.Background(), "2026-10-08")
 	if err != nil || d.Day != api.DigestPath+"?day=2026-10-08" || len(d.Tasks) != 1 {
@@ -301,9 +301,9 @@ func TestViewsRouteServesTheCatalog(t *testing.T) {
 		case "/api/views":
 			fmt.Fprint(w, `{"views":[{"id":"inbox","label":"Inbox"}],"areas":["OSS"],"contexts":[],"verbs":[]}`)
 		case "/api/tasks":
-			fmt.Fprint(w, `{"epoch":"e","rev":2,"full":true,"tasks":[{"id":"e-1","title":"Call the bank","units":[],"items":[],"verbs":[],"contexts":[]}],"removed":[]}`)
-		case "/api/tasks/e-1/done":
-			fmt.Fprint(w, `{"task":{"id":"e-1","state":"done"}}`)
+			fmt.Fprint(w, `{"epoch":"e","rev":2,"full":true,"tasks":[{"id":"t-1","title":"Call the bank","units":[],"items":[],"verbs":[],"contexts":[]}],"removed":[]}`)
+		case "/api/tasks/t-1/done":
+			fmt.Fprint(w, `{"task":{"id":"t-1","state":"done"}}`)
 		default:
 			http.NotFound(w, r)
 		}
@@ -318,7 +318,7 @@ func TestViewsRouteServesTheCatalog(t *testing.T) {
 	if err != nil || len(page.Tasks) != 1 || page.Tasks[0].Title != "Call the bank" {
 		t.Fatalf("page %+v %v", page, err)
 	}
-	res, err := c.TaskDo(ctx, "e-1", "done", api.TaskRequest{Source: "cli"})
+	res, err := c.TaskDo(ctx, "t-1", "done", api.TaskRequest{Source: "cli"})
 	if err != nil || res.Task.State != "done" {
 		t.Fatalf("result %+v %v", res, err)
 	}

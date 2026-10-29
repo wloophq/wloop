@@ -115,7 +115,7 @@ const (
 	VerbAnswer    Verb = "answer"
 	VerbEdit      Verb = "edit" // drafts only, registered by the outbox
 	VerbRetry     Verb = "retry"
-	VerbReply     Verb = "reply" // a draft the user writes on the entry's unit, served by the daemon
+	VerbReply     Verb = "reply" // a draft the user writes on the task's unit, served by the daemon
 )
 
 // View is a view's id, as the profile's views.toml names it.

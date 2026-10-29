@@ -83,6 +83,11 @@ func (m *memStore) Commit(_ context.Context, c Commit) error {
 		}
 	}
 	m.log = append(m.log, c.Log...)
+	for _, id := range c.Decided {
+		if i := slices.IndexFunc(m.proposals, func(p Proposal) bool { return p.ID == id }); i >= 0 {
+			m.proposals[i].Decided = true
+		}
+	}
 	for _, p := range c.Proposals {
 		if p.ID != 0 {
 			continue

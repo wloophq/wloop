@@ -9,15 +9,15 @@ import (
 func TestRetainDropsTheMarksOfEndedTasksAndVanishedSlackUnits(t *testing.T) {
 	t.Parallel()
 	db, _ := openTemp(t)
-	for id, c := range map[string]string{"e-open": "waiting", "e-done": "done", "e-trash": "dropped", "e-ref": "deferred"} {
+	for id, c := range map[string]string{"t-open": "waiting", "t-done": "done", "t-trash": "dropped", "t-ref": "deferred"} {
 		exec(t, db, `INSERT INTO tasks (id, state, category, origin, created, updated, rev) VALUES (?, ?, ?, 'user', ?, ?, 1)`, id, "s-"+id, c, at(past), at(past))
 	}
 	reportSlack(t, db, "T1/C1/1.1", false)
 	reportSlack(t, db, "T1/C1/9.9", true)
 	exec(t, db, `INSERT INTO items (provider, unit_key, id, body, state, provenance, created_at, updated_at) VALUES ('slack', 'T1/C1/2.2', 'i1', '{}', 'open', 'extracted', ?, ?)`, at(past), at(past))
-	exec(t, db, `INSERT INTO task_units (task_id, provider, unit_key, ord) VALUES ('e-open', 'slack', 'T1/C1/3.3', 0)`)
+	exec(t, db, `INSERT INTO task_units (task_id, provider, unit_key, ord) VALUES ('t-open', 'slack', 'T1/C1/3.3', 0)`)
 	marks := map[string][]string{
-		"task":  {"e-open", "e-done", "e-trash", "e-ref", "e-gone"},
+		"task":  {"t-open", "t-done", "t-trash", "t-ref", "t-gone"},
 		"slack": {"T1/C1/1.1", "T1/C1/2.2", "T1/C1/3.3", "T1/C1/9.9"},
 		"chat":  {"kept"},
 	}
@@ -31,13 +31,13 @@ func TestRetainDropsTheMarksOfEndedTasksAndVanishedSlackUnits(t *testing.T) {
 		t.Errorf("retained %v, want %v", got, want)
 	}
 	left := column(t, db, `SELECT provider || ':' || unit_key FROM unit_marks ORDER BY 1`)
-	if want := []string{"chat:kept", "slack:T1/C1/1.1", "slack:T1/C1/2.2", "slack:T1/C1/3.3", "task:e-open", "task:e-ref"}; !slices.Equal(left, want) {
+	if want := []string{"chat:kept", "slack:T1/C1/1.1", "slack:T1/C1/2.2", "slack:T1/C1/3.3", "task:t-open", "task:t-ref"}; !slices.Equal(left, want) {
 		t.Errorf("marks left %q, want %q", left, want)
 	}
 	if again := retain(t, db, Retention{SubjectMarks: true}); len(again) != 0 {
 		t.Errorf("a second pass retained %v", again)
 	}
 	if !DefaultRetention.SubjectMarks {
-		t.Error("the retain job keeps the marks of ended entries")
+		t.Error("the retain job keeps the marks of ended tasks")
 	}
 }

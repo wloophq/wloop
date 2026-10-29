@@ -148,7 +148,9 @@ func (l *Ledger) Proposals(ctx context.Context, state ProposalState) ([]Proposal
 }
 
 // Decide applies proposal id's decision, which its gate holds: accept applies its Op as user, a rejection
-// changes nothing. ErrNoProposal is an id no proposal has.
+// changes nothing. A decision applies once: deciding a proposal a decision was applied to changes nothing, as
+// when a gate's consequence runs again after a crash. An accepted Op the ledger refuses leaves the proposal
+// undecided. ErrNoProposal is an id no proposal has.
 func (l *Ledger) Decide(ctx context.Context, id int64, accept bool) (Result, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -161,17 +163,26 @@ func (l *Ledger) Decide(ctx context.Context, id int64, accept bool) (Result, err
 		return Result{}, fmt.Errorf("%w: %d", ErrNoProposal, id)
 	}
 	p := all[i]
+	if p.Decided {
+		return emptyResult(), nil
+	}
 	if err := l.refuseDisabled(p.Unit); err != nil {
 		return Result{}, err
 	}
+	units := []unit.Unit{p.Unit}
 	if !accept {
-		return emptyResult(), nil
+		units = nil
 	}
-	b, err := l.begin(ctx, []unit.Unit{p.Unit})
+	b, err := l.begin(ctx, units)
 	if err != nil {
 		return Result{}, err
 	}
-	b.apply(ctx, 0, p.Op, items.User)
+	if accept {
+		b.apply(ctx, 0, p.Op, items.User)
+	}
+	if len(b.res.Refused) == 0 {
+		b.decided = append(b.decided, p.ID)
+	}
 	return b.commit(ctx)
 }
 
@@ -220,6 +231,8 @@ type Proposal struct {
 	Reason     string           `json:"reason"`
 	State      ProposalState    `json:"state"`
 	At         time.Time        `json:"at"`
+	// Decided says a decision of it was applied.
+	Decided bool `json:"decided,omitempty"`
 }
 
 // Reader is the read half of Store.
@@ -239,6 +252,9 @@ type Commit struct {
 	Items     []items.Item
 	Log       []LogEntry
 	Proposals []Proposal
+	// Decided are the proposals a decision this commit applies was made on, at DecidedAt.
+	Decided   []int64
+	DecidedAt time.Time
 }
 
 // Outcomes of an op in the log.

@@ -9,7 +9,7 @@ import (
 
 // SettledAt is the newest UpdatedAt of the drafts of ds that workflow
 // proposed on subject and that settled, sent or dropped (withdrawn ones
-// included; a failed draft may still be approved again); zero when none. A draft is on an entry subject when it serves that entry, and on
+// included; a failed draft may still be approved again); zero when none. A draft is on a task subject when it serves that task, and on
 // any other subject when it is on that unit.
 func SettledAt(ds []Draft, workflow string, subject unit.Unit) time.Time {
 	var out time.Time

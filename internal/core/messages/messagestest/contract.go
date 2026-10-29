@@ -30,10 +30,10 @@ func questionsKeyByTurn(t *testing.T, s message.Store) {
 	if err != nil || first.ID == 0 || !first.Open() || !first.CreatedAt.Equal(at) {
 		t.Fatalf("insert %+v %v", first, err)
 	}
-	q.Text, q.TaskID = "Publish now?", "e-1"
+	q.Text, q.TaskID = "Publish now?", "t-1"
 	q.Options = []record.Option{{ID: "a", Label: "A", Consequence: "does a"}}
 	again, err := s.Upsert(ctx, q)
-	if err != nil || again.ID != first.ID || again.Text != "Publish now?" || again.TaskID != "e-1" || len(again.Options) != 1 || !again.CreatedAt.Equal(at) {
+	if err != nil || again.ID != first.ID || again.Text != "Publish now?" || again.TaskID != "t-1" || len(again.Options) != 1 || !again.CreatedAt.Equal(at) {
 		t.Fatalf("re-ask: %+v %v", again, err)
 	}
 	other := q
@@ -108,9 +108,9 @@ func idUpdates(t *testing.T, s message.Store) {
 	ctx := context.Background()
 	post := message.Message{Unit: u, Kind: message.AgentPost, Text: "fyi", Origin: message.Origin{Kind: message.OriginAgent, TurnSeq: 1}, CreatedAt: at}
 	x, _ := s.Upsert(ctx, post)
-	x.TaskID = "e-9"
+	x.TaskID = "t-9"
 	y, err := s.Upsert(ctx, x)
-	if err != nil || y.ID != x.ID || y.TaskID != "e-9" {
+	if err != nil || y.ID != x.ID || y.TaskID != "t-9" {
 		t.Fatalf("update by id %+v %v", y, err)
 	}
 	if open, _ := s.Open(ctx); len(open) != 1 {

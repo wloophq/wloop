@@ -110,20 +110,31 @@ func Start(t testing.TB, w World) *Runtime {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(sockDir) })
-	sock := filepath.Join(sockDir, "s")
+	r, stop, err := Serve(t.TempDir(), filepath.Join(sockDir, "s"), w)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = stop() })
+	return r
+}
+
+// Serve serves w on a unix socket at sock, and writes into dir the
+// orca-runtime.json that names it, as Orca does in its user data directory;
+// stop closes the socket.
+func Serve(dir, sock string, w World) (r *Runtime, stop func() error, err error) {
 	ln, err := net.Listen("unix", sock)
 	if err != nil {
-		t.Fatal(err)
+		return nil, nil, err
 	}
-	t.Cleanup(func() { ln.Close() })
-	r := &Runtime{dir: t.TempDir(), world: w}
+	r = &Runtime{dir: dir, world: w}
 	meta, err := json.Marshal(map[string]any{"runtimeId": runtimeID, "authToken": token,
 		"transports": []map[string]string{{"kind": "unix", "endpoint": sock}}})
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		err = os.WriteFile(filepath.Join(dir, "orca-runtime.json"), meta, 0o600)
 	}
-	if err := os.WriteFile(filepath.Join(r.dir, "orca-runtime.json"), meta, 0o600); err != nil {
-		t.Fatal(err)
+	if err != nil {
+		ln.Close()
+		return nil, nil, err
 	}
 	go func() {
 		for {
@@ -134,7 +145,7 @@ func Start(t testing.TB, w World) *Runtime {
 			go r.serve(conn)
 		}
 	}()
-	return r
+	return r, ln.Close, nil
 }
 
 // Manager is a metered manager on the runtime; its CLI runs only the commands the

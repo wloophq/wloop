@@ -241,6 +241,9 @@ type Deps struct {
 	// SessionWait is how long a turn by hand waits for its brief; 0 is
 	// brief.SessionWait.
 	SessionWait time.Duration
+	// AfterFunc arms the timer that ends a turn by hand's session wait and
+	// returns its stop; nil is time.AfterFunc.
+	AfterFunc func(d time.Duration, f func()) (stop func() bool)
 	// LoopMu serializes every loop write: sweep, review, take over, address, run.
 	// Shared across restarts of the server in one process; nil makes one.
 	LoopMu *lock.Mutex

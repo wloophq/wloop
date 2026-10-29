@@ -762,7 +762,7 @@ func (q quietGH) Run(ctx context.Context, args ...string) ([]byte, error) {
 // and AdminAPI wired as serve wires them, and points te's command line at it.
 func (te *testEnv) serve(t *testing.T) { te.serveWith(t, nil) }
 
-// serveWithTasks serves te's daemon with the GTD entries on te's store.
+// serveWithTasks serves te's daemon with the tasks on te's store.
 func (te *testEnv) serveWithTasks(t *testing.T) {
 	mods, err := buildSources(plugins, te.cfg, moduleDeps{Inventory: te.Store, Turns: te.Turns, Clock: clockFunc(te.Now)}, bundledUI)
 	if err != nil {

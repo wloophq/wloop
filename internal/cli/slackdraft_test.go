@@ -839,15 +839,15 @@ func TestSlackDraftFromATaskTurnPostsToItsTargetThroughSlack(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
 	ctx := context.Background()
-	task := unit.Unit{Provider: unit.Task, Key: "e1"}
-	seedTask(t, w.db, "e1")
+	task := unit.Unit{Provider: unit.Task, Key: "t1"}
+	seedTask(t, w.db, "t1")
 	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: task, Turns: []dturn.Turn{
 		{Intent: "act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
 	}}); err != nil {
 		t.Fatal(err)
 	}
 	if got, isErr := w.draftTool(t, draftHandle, `{"text":"the new search is live"}`); !isErr {
-		t.Fatalf("a draft with no target on an entry turn: %q", got)
+		t.Fatalf("a draft with no target on a task turn: %q", got)
 	}
 	got, isErr := w.draftTool(t, draftHandle, `{"text":"the new search is live","target":"`+sessChannel+`"}`)
 	if isErr || !strings.Contains(got, "#general") {
@@ -892,8 +892,8 @@ func TestSlackDraftFromAPullRequestTurnStillNeedsAPermalink(t *testing.T) {
 func TestASendFromATaskTurnIsRecordedWithTheTurnAsOrigin(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
-	task := unit.Unit{Provider: unit.Task, Key: "e1"}
-	seedTask(t, w.db, "e1")
+	task := unit.Unit{Provider: unit.Task, Key: "t1"}
+	seedTask(t, w.db, "t1")
 	if _, err := w.te.repo.Save(context.Background(), dturn.Book{Unit: task, Turns: []dturn.Turn{
 		{Intent: "act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
 	}}); err != nil {

@@ -10,7 +10,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
-// ProjectsContract is the suite every ProjectStore passes; open gives an empty entry store and the project
+// ProjectsContract is the suite every ProjectStore passes; open gives an empty task store and the project
 // store over it.
 func ProjectsContract(t *testing.T, open func(t *testing.T) (coretasks.Store, coretasks.ProjectStore)) {
 	ctx := context.Background()
@@ -24,7 +24,7 @@ func ProjectsContract(t *testing.T, open func(t *testing.T) (coretasks.Store, co
 
 	t.Run("project fields round-trip", func(t *testing.T) {
 		s, _ := open(t)
-		p := project("e-p1", "next")
+		p := project("t-p1", "next")
 		apply(t, s, p)
 		got, err := s.Task(ctx, p.ID)
 		if err != nil {

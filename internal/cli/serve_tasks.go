@@ -23,7 +23,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
-// newTasks is the daemon's one entries service, built on first use; its unit facts come from the stored cards.
+// newTasks is the daemon's one tasks service, built on first use; its unit facts come from the stored cards.
 func (e *Env) newTasks(db *sqlite.DB, cfg config.Config, its coretasks.Items) *coretasks.Service {
 	if e.tasks == nil {
 		e.tasksMe = &identity{}
@@ -106,7 +106,7 @@ func offProviders(cfg config.Config, built *[]unit.ProviderID) []unit.ProviderID
 	return out
 }
 
-// serveTasks serves the entries on d: the user's identity from every built module's Identity, and the units a
+// serveTasks serves the tasks on d: the user's identity from every built module's Identity, and the units a
 // full Sync covers. The daemon's Sync worker also runs under --no-jobs, since it only reads and writes the store.
 func (e *Env) serveTasks(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []pluginModule, logf func(string, ...any)) daemon.Deps {
 	ledger := e.itemsLedger(db, cfg, logf)
@@ -188,7 +188,7 @@ func (i *identity) set(me task.Me) (grew bool) {
 	return grew
 }
 
-// syncUnits are the units with an open item or a live entry.
+// syncUnits are the units with an open item or a live task.
 func syncUnits(ctx context.Context, tasks coretasks.Reader, ledger *coreitems.Ledger) ([]unit.Unit, error) {
 	open, err := ledger.Query(ctx, coreitems.Query{State: items.Open})
 	if err != nil {

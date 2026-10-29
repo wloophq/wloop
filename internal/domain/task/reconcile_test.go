@@ -65,7 +65,7 @@ func reconcile(t *testing.T, f task.UnitFacts, its []items.Item, have []task.Tas
 func only(t *testing.T, es []task.Task) task.Task {
 	t.Helper()
 	if len(es) != 1 {
-		t.Fatalf("%d entries, want 1: %+v", len(es), es)
+		t.Fatalf("%d tasks, want 1: %+v", len(es), es)
 	}
 	return es[0]
 }
@@ -74,7 +74,7 @@ func TestOpenItemOwedByMeIsAnAction(t *testing.T) {
 	its := []items.Item{item("i1", func(it *items.Item) { it.Contexts = []string{"@reply"} })}
 	e := only(t, reconcile(t, facts(), its, nil, now))
 	if e.Category != task.CategoryInbox || !slices.Equal(e.Prop("contexts").List, []string{"@reply"}) || e.Origin != task.OriginDerived {
-		t.Fatalf("entry %+v", e)
+		t.Fatalf("task %+v", e)
 	}
 	if !slices.Equal(e.Items, []task.ItemRef{{Unit: pr, Item: "i1"}}) || !slices.Equal(e.Units, []unit.Unit{pr}) {
 		t.Fatalf("refs %+v units %+v", e.Items, e.Units)
@@ -104,7 +104,7 @@ func TestOthersItemsIgnoredWithoutCare(t *testing.T) {
 	others := func(it *items.Item) { it.WaitingOn, it.Requester = []items.Person{ana}, bob }
 	its := []items.Item{item("a", others)}
 	if es := reconcile(t, facts(), its, nil, now); len(es) != 0 {
-		t.Fatalf("entries %+v", es)
+		t.Fatalf("tasks %+v", es)
 	}
 	cares := func(f *task.UnitFacts) { f.Cares = true }
 	if e := only(t, reconcile(t, facts(cares), its, nil, now)); e.Category != task.CategoryWaiting {
@@ -115,7 +115,7 @@ func TestOthersItemsIgnoredWithoutCare(t *testing.T) {
 func TestOnlyItemsCreateTasks(t *testing.T) {
 	f := facts(func(f *task.UnitFacts) { f.StartedByMe, f.Cares, f.LastHuman = true, true, now })
 	if es := reconcile(t, f, nil, nil, now); len(es) != 0 {
-		t.Fatalf("entries %+v", es)
+		t.Fatalf("tasks %+v", es)
 	}
 }
 

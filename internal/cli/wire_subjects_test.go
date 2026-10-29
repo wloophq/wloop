@@ -27,7 +27,7 @@ import (
 var subjectThread = slackThreadUnit("T0001", "C0001", "1700000000.000100")
 
 const (
-	waitingWorkflow = `summary = "Watch waiting entries"
+	waitingWorkflow = `summary = "Watch waiting tasks"
 provider = "task"
 when = 'task.state == "waiting" && task.owed_by != "me" && task.owed_by != "" && task.settled_at < now'
 key = ["task.settled_at", "task.owed_by"]
@@ -35,7 +35,7 @@ key = ["task.settled_at", "task.owed_by"]
 [[step]]
 use = "notify.self"
 `
-	closeWorkflow = `summary = "Watch close entries with a resolved item"
+	closeWorkflow = `summary = "Watch close tasks with a resolved item"
 provider = "task"
 when = 'task.state == "inbox" && task.items_resolved > 0'
 
@@ -77,7 +77,7 @@ func (r *subjectsRig) report(t *testing.T, u unit.Unit, facts ...src.Fact) {
 }
 
 // newSubjectsRig is a plan engine wired as the daemon wires it, over a store
-// and the facts the Slack plugin reports, with the user's workflows on the entry,
+// and the facts the Slack plugin reports, with the user's workflows on the task,
 // slack and github subjects; github's plugin is not built. planned lists
 // the user's workflows only.
 func newSubjectsRig(t *testing.T) *subjectsRig {
@@ -161,13 +161,13 @@ func TestPlanEvaluatesUserWorkflowsOnTaskAndSlackSubjects(t *testing.T) {
 	owed := r.item(t, subjectThread, "i1", items.Open, items.Person{Key: "slack:U0001"})
 	r.item(t, subjectThread, "i2", items.Open)
 	r.report(t, subjectThread, src.Fact{Name: "slack.live_task", Value: src.Bool(true)}, src.Fact{Name: "slack.items_unowned", Value: src.Int(1)})
-	r.task(t, task.Task{ID: "e-01", State: "waiting", Category: task.CategoryWaiting, Title: "w", Units: []unit.Unit{subjectThread},
+	r.task(t, task.Task{ID: "t-01", State: "waiting", Category: task.CategoryWaiting, Title: "w", Units: []unit.Unit{subjectThread},
 		Items: []task.ItemRef{{Unit: owed.Unit, Item: owed.ID}}}, task.OpCreate)
-	want := []string{"my-slack " + subjectThread.String(), "my-waiting task:e-01"}
+	want := []string{"my-slack " + subjectThread.String(), "my-waiting task:t-01"}
 	if got := r.planned(t); !slices.Equal(got, want) {
 		t.Fatalf("planned %v, want %v", got, want)
 	}
-	if _, err := r.db.Drafts().Insert(context.Background(), draft.Draft{Unit: subjectThread, Task: "e-01", Kind: draft.Nudge, Purpose: "nudge",
+	if _, err := r.db.Drafts().Insert(context.Background(), draft.Draft{Unit: subjectThread, Task: "t-01", Kind: draft.Nudge, Purpose: "nudge",
 		Delivery: draft.Message, Text: "x", Original: "x", Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "my-waiting", Rule: "my-waiting"},
 		State: draft.Sent, CreatedAt: testNow.Add(time.Hour), UpdatedAt: testNow.Add(time.Hour)}); err != nil {
 		t.Fatal(err)
@@ -191,14 +191,14 @@ func TestTheSweepWakesOnTaskItemAndDraftChanges(t *testing.T) {
 	}
 	var it items.Item
 	woke("a new item", func() { it = r.item(t, subjectThread, "i1", items.Open) })
-	close := task.Task{ID: "e-01", State: "inbox", Category: task.CategoryInbox, Title: "c", Units: []unit.Unit{subjectThread}}
-	woke("a new entry", func() { r.task(t, close, task.OpCreate) })
-	if got := r.planned(t); slices.Contains(got, "my-close task:e-01") {
+	close := task.Task{ID: "t-01", State: "inbox", Category: task.CategoryInbox, Title: "c", Units: []unit.Unit{subjectThread}}
+	woke("a new task", func() { r.task(t, close, task.OpCreate) })
+	if got := r.planned(t); slices.Contains(got, "my-close task:t-01") {
 		t.Fatalf("nothing resolved yet: %v", got)
 	}
 	woke("a resolved item", func() { r.item(t, it.Unit, it.ID, items.Resolved) })
-	if got := r.planned(t); !slices.Contains(got, "my-close task:e-01") {
-		t.Fatalf("the next pass after the item resolved plans the close entry: %v", got)
+	if got := r.planned(t); !slices.Contains(got, "my-close task:t-01") {
+		t.Fatalf("the next pass after the item resolved plans the close task: %v", got)
 	}
 	woke("a draft", func() {
 		if _, err := r.db.Drafts().Insert(ctx, draft.Draft{Unit: subjectThread, Kind: draft.Close, Purpose: "close", Delivery: draft.Message, Text: "x", Original: "x",
@@ -226,7 +226,7 @@ func TestADisabledSlackPluginListsNoUnits(t *testing.T) {
 		}
 	}
 	if us, err := te.planEngine(ed).Units.List(context.Background(), task.Codec{}.Provider()); err != nil || len(us) > 0 {
-		t.Errorf("entries of an empty store: %v, %v", us, err)
+		t.Errorf("tasks of an empty store: %v, %v", us, err)
 	}
 }
 
@@ -234,8 +234,8 @@ func TestACapturedTaskWhoseUnitsEndedPlansItsClose(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newSubjectsRig(t)
-	r.task(t, task.Task{ID: "e-01", State: "next", Category: task.CategoryReady, Title: "ship it", Units: []unit.Unit{subjectThread}}, task.OpCreate)
-	derived := task.Task{ID: "e-02", State: "inbox", Category: task.CategoryInbox, Title: "close", Units: []unit.Unit{subjectThread},
+	r.task(t, task.Task{ID: "t-01", State: "next", Category: task.CategoryReady, Title: "ship it", Units: []unit.Unit{subjectThread}}, task.OpCreate)
+	derived := task.Task{ID: "t-02", State: "inbox", Category: task.CategoryInbox, Title: "close", Units: []unit.Unit{subjectThread},
 		Origin: task.OriginDerived, Created: testNow, Updated: testNow}
 	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: derived}}); err != nil {
 		t.Fatal(err)
@@ -259,13 +259,13 @@ func TestACapturedTaskWhoseUnitsEndedPlansItsClose(t *testing.T) {
 	}
 	r.report(t, subjectThread, src.Fact{Name: "slack.ended", Value: src.Bool(true)})
 	if got := closes(); len(got) != 0 {
-		t.Fatalf("closes %v, an entry no turn ran on", got)
+		t.Fatalf("closes %v, a task no turn ran on", got)
 	}
-	start := dturn.Book{Unit: task.UnitOf("e-01"), Turns: []dturn.Turn{{Intent: "start", ID: "s1", Trigger: dturn.ByHand, State: dturn.Done, SentAt: testNow}}}
+	start := dturn.Book{Unit: task.UnitOf("t-01"), Turns: []dturn.Turn{{Intent: "start", ID: "s1", Trigger: dturn.ByHand, State: dturn.Done, SentAt: testNow}}}
 	if _, err := sqlite.New(r.db).Save(ctx, start); err != nil {
 		t.Fatal(err)
 	}
-	if got := closes(); !slices.Equal(got, []string{"task:e-01"}) {
-		t.Fatalf("closes %v, want the captured entry only", got)
+	if got := closes(); !slices.Equal(got, []string{"task:t-01"}) {
+		t.Fatalf("closes %v, want the captured task only", got)
 	}
 }

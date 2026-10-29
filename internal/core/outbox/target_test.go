@@ -23,7 +23,7 @@ func (t taking) Takes(target string) bool { return t.takes(target) }
 var taskUnit = unit.Unit{Provider: unit.Task, Key: "e1"}
 
 // byTarget wires a chat publisher that takes "#" targets, a plain one for
-// pull requests, and no publisher for entries.
+// pull requests, and no publisher for tasks.
 func byTarget(e *env) (chat, prs *fakeEffects) {
 	chat, prs = &fakeEffects{}, &fakeEffects{}
 	pubs := map[unit.ProviderID]port.Effects{

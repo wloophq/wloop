@@ -53,7 +53,7 @@ func (s *Service) declared(e task.Task, v task.Verb) error {
 		return fmt.Errorf("%w: unknown verb %q", ErrArgs, v)
 	}
 	if len(from) > 0 && !slices.Contains(from, string(e.State)) {
-		return fmt.Errorf("%w: %s on a %s entry", ErrVerb, v, e.State)
+		return fmt.Errorf("%w: %s on a %s task", ErrVerb, v, e.State)
 	}
 	return nil
 }
@@ -65,7 +65,7 @@ func (s *Service) accepts(e task.Task, v task.Verb) error {
 		return err
 	}
 	if h := s.d.States.Handler(string(v)); h != "" && !slices.Contains(ownHandlers, h) {
-		return fmt.Errorf("%w: %s on a %s entry", ErrVerb, v, e.State)
+		return fmt.Errorf("%w: %s on a %s task", ErrVerb, v, e.State)
 	}
 	return nil
 }
@@ -83,7 +83,7 @@ func (s *Service) allowed(ctx context.Context, e task.Task, v task.Verb, a task.
 		}
 		return true, nil
 	case !allow:
-		return false, fmt.Errorf("%w: %s may not run %s on this entry", ErrForbidden, a, v)
+		return false, fmt.Errorf("%w: %s may not run %s on this task", ErrForbidden, a, v)
 	}
 	return false, nil
 }

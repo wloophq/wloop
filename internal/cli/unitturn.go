@@ -46,7 +46,7 @@ type unitRun struct {
 
 // unitRound sends a round of d the user asked for on u, a unit of a
 // provider other than GitHub, in the workspace its placement names; the
-// turn keeps the call's items and entry for its drafts.
+// turn keeps the call's items and task for its drafts.
 func (e *Env) unitRound(ctx context.Context, d dintent.Def, u unit.Unit, c daemon.Call) error {
 	cfg, err := e.loadConfig()
 	if err != nil {

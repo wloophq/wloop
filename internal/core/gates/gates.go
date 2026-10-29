@@ -5,7 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/port"
@@ -110,9 +112,47 @@ type Deps struct {
 }
 
 // Service opens the gates and is the only code that resolves one.
-type Service struct{ d Deps }
+type Service struct {
+	d Deps
 
-func New(d Deps) *Service { return &Service{d: d} }
+	mu sync.Mutex
+	// running are the gates whose consequence runs now, which the tick does
+	// not replay.
+	running map[int64]bool
+	// cut are the gates whose at-most-once consequence a stopped daemon cut.
+	cut map[int64]gate.Gate
+}
+
+func New(d Deps) *Service {
+	return &Service{d: d, running: map[int64]bool{}, cut: map[int64]gate.Gate{}}
+}
+
+// Cut are the resolved gates whose at-most-once consequence began and was
+// cut by a daemon that stopped, so it may not have run, by ID.
+func (s *Service) Cut() []gate.Gate {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := slices.Collect(maps.Values(s.cut))
+	slices.SortFunc(out, func(a, b gate.Gate) int { return cmp.Compare(a.ID, b.ID) })
+	return out
+}
+
+// claim marks gate id's consequence as running here; false when it runs already.
+func (s *Service) claim(id int64) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.running[id] {
+		return false
+	}
+	s.running[id] = true
+	return true
+}
+
+func (s *Service) release(id int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.running, id)
+}
 
 func (s *Service) logf(format string, args ...any) {
 	if s.d.Log != nil {
@@ -225,7 +265,9 @@ func (s *Service) RecordSent(ctx context.Context, g gate.Gate) (gate.Gate, error
 }
 
 // Tick resolves every open gate whose Deadline is not after now to its
-// Default, with the rule window.
+// Default, with the rule window, then runs the consequence of each resolved
+// gate whose consequence never ran, as when the daemon stopped between the
+// gate's resolution and its consequence.
 func (s *Service) Tick(ctx context.Context, now time.Time) error {
 	due, err := s.d.Store.Due(ctx, now)
 	if err != nil {
@@ -237,7 +279,28 @@ func (s *Service) Tick(ctx context.Context, now time.Time) error {
 			errs = append(errs, fmt.Errorf("gate %d: %w", g.ID, err))
 		}
 	}
-	return errors.Join(errs...)
+	return errors.Join(append(errs, s.noteCut(ctx), s.replay(ctx))...)
+}
+
+// replay runs the consequence of every resolved gate whose consequence never
+// ran and does not run now. A consequence that fails is logged: what ran of
+// it before the daemon stopped may have settled its subject already.
+func (s *Service) replay(ctx context.Context) error {
+	unapplied, err := s.d.Store.Unapplied(ctx)
+	if err != nil {
+		return err
+	}
+	for _, g := range unapplied {
+		if !s.claim(g.ID) {
+			continue
+		}
+		s.logf("gate %d resolved %s: running its consequence, which had not run", g.ID, g.Status)
+		if err := s.applied(ctx, g); err != nil {
+			s.logf("%v", err)
+		}
+		s.release(g.ID)
+	}
+	return nil
 }
 
 // NextDeadline is the earliest Deadline of an open gate, zero when none
@@ -309,11 +372,79 @@ func (s *Service) released(g gate.Gate, def Def, dec Decision) (Resolution, bool
 }
 
 func (s *Service) close(ctx context.Context, g gate.Gate, r Resolution) (gate.Gate, error) {
+	if !s.claim(g.ID) {
+		return gate.Gate{}, fmt.Errorf("%w: %d resolves now", ErrResolved, g.ID)
+	}
+	defer s.release(g.ID)
 	closed, err := s.d.Store.Resolve(ctx, g.ID, r)
 	if err != nil {
 		return closed, err
 	}
-	return closed, s.apply(ctx, closed)
+	return closed, s.applied(ctx, closed)
+}
+
+// applied runs g's consequence and marks it run, failed or not: a failure is
+// a person's to retry. A consequence its context cut stays unmarked, for the
+// tick to run again, but one its port runs Once, marked before it runs.
+func (s *Service) applied(ctx context.Context, g gate.Gate) error {
+	if o, ok := s.port(g.Kind).(Once); ok && o.Once(g) {
+		return s.once(ctx, g)
+	}
+	err := s.apply(ctx, g)
+	if ctx.Err() != nil {
+		return err
+	}
+	if merr := s.d.Store.Applied(ctx, g.ID); merr != nil {
+		err = errors.Join(err, fmt.Errorf("marking gate %d's consequence run: %w", g.ID, merr))
+	}
+	return err
+}
+
+// once marks g's consequence run, then runs it: begun until it ends when
+// the store keeps that, so a stop that cuts it leaves it to report.
+func (s *Service) once(ctx context.Context, g gate.Gate) error {
+	b, begun := s.d.Store.(Begun)
+	mark := s.d.Store.Applied
+	if begun {
+		mark = b.Begin
+	}
+	if err := mark(ctx, g.ID); err != nil {
+		return fmt.Errorf("marking gate %d's consequence run: %w", g.ID, err)
+	}
+	err := s.apply(ctx, g)
+	if !begun || ctx.Err() != nil {
+		return err
+	}
+	if eerr := b.End(ctx, g.ID); eerr != nil {
+		err = errors.Join(err, fmt.Errorf("marking gate %d's consequence ended: %w", g.ID, eerr))
+	}
+	return err
+}
+
+// noteCut keeps, for Cut, each gate whose at-most-once consequence began,
+// never ended and does not run now, and ends it, so it is reported once.
+func (s *Service) noteCut(ctx context.Context) error {
+	b, ok := s.d.Store.(Begun)
+	if !ok {
+		return nil
+	}
+	begun, err := b.Begun(ctx)
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, g := range begun {
+		if !s.claim(g.ID) {
+			continue
+		}
+		s.logf("gate %d resolved %s on %s: the daemon stopped while its consequence ran, which may not have run", g.ID, g.Status, g.Unit)
+		s.mu.Lock()
+		s.cut[g.ID] = g
+		s.mu.Unlock()
+		errs = append(errs, b.End(ctx, g.ID))
+		s.release(g.ID)
+	}
+	return errors.Join(errs...)
 }
 
 // decide is p's decision on g; with no policy, or one that fails, g waits.
@@ -334,6 +465,24 @@ func (s *Service) decide(ctx context.Context, g gate.Gate, p Policy) Decision {
 		return Decision{Mode: gate.ModeWait}
 	}
 	return dec
+}
+
+// port is the consequence port of gates of kind k, nil when none is wired.
+func (s *Service) port(k gate.Kind) any {
+	var p any
+	switch k {
+	case gate.KindDraft:
+		p = s.d.Publisher
+	case gate.KindPlan:
+		p = s.d.Releaser
+	case gate.KindQuestion, gate.KindPost:
+		p = s.d.Deliverer
+	case gate.KindProposal:
+		p = s.d.Decider
+	case gate.KindTrust:
+		p = s.d.Unblocker
+	}
+	return p
 }
 
 // apply runs the consequence g's kind names.

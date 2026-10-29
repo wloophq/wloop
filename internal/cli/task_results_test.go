@@ -58,7 +58,7 @@ func TestTaskResultsResolveAddressesAndReadTheManifest(t *testing.T) {
 	ctx := context.Background()
 	store := taskstest.New()
 	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: store, Clock: clockFunc(func() time.Time { return testNow })})
-	if err := store.Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-1", State: "next", Category: task.CategoryReady, Title: "ship it", Origin: task.OriginUser}}}); err != nil {
+	if err := store.Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-1", State: "next", Category: task.CategoryReady, Title: "ship it", Origin: task.OriginUser}}}); err != nil {
 		t.Fatal(err)
 	}
 	reg := dintent.NewRegistry([]dintent.Def{{Name: "begin", AttachPosts: true}, {Name: "reply"}})
@@ -73,10 +73,10 @@ func TestTaskResultsResolveAddressesAndReadTheManifest(t *testing.T) {
 	if !r.AttachesPosts("begin") || r.AttachesPosts("reply") || r.AttachesPosts("missing") {
 		t.Fatal("AttachesPosts does not read the manifest's drafts.attach_posts")
 	}
-	if err := r.Attach(ctx, "e-1", u); err != nil {
+	if err := r.Attach(ctx, "t-1", u); err != nil {
 		t.Fatal(err)
 	}
-	if e, _ := store.Task(ctx, "e-1"); !slices.Equal(e.Units, []unit.Unit{u}) {
+	if e, _ := store.Task(ctx, "t-1"); !slices.Equal(e.Units, []unit.Unit{u}) {
 		t.Fatalf("units %v", e.Units)
 	}
 }

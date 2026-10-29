@@ -10,7 +10,7 @@ import (
 func TestTheFakeAppliesADraftOnce(t *testing.T) {
 	t.Parallel()
 	a := &Applier{}
-	d := draft.Draft{ID: 4, State: draft.Sent, Effects: []string{"entry.nudged"}}
+	d := draft.Draft{ID: 4, State: draft.Sent, Effects: []string{"task.nudged"}}
 	a.SetPending(d)
 	for range 2 {
 		if err := a.Apply(context.Background(), d); err != nil {

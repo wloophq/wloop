@@ -33,7 +33,7 @@ type SendRequest struct {
 	// PerSession replaces, on a start by hand, only the open turns of the
 	// intent on the starting session, as the role says.
 	PerSession bool
-	// Items and Task are the unit's item ids and the GTD entry the turn was asked about, kept with
+	// Items and Task are the unit's item ids and the task the turn was asked about, kept with
 	// the turn so its drafts are tied to them.
 	Items []string
 	Task  string

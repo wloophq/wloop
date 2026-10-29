@@ -123,7 +123,7 @@ func TestTaskPostCreatesAMessage(t *testing.T) {
 	}
 	e, err := r.taskStore.Task(context.Background(), task.ID(m.TaskID))
 	if err != nil || e.Origin == task.OriginMessage || e.State != task.State("inbox") {
-		t.Fatalf("entry %+v %v", e, err)
+		t.Fatalf("task %+v %v", e, err)
 	}
 	books, _ := r.books.Books(context.Background(), inboxUnit)
 	if st := books[inboxUnit].Turns[0].State; st != turn.Started {
@@ -164,7 +164,7 @@ func TestTaskPostCannotMoveTasks(t *testing.T) {
 		return all
 	}
 	before := snapshot()
-	for _, key := range []string{"state", "entry", "move", "list"} {
+	for _, key := range []string{"state", "task", "move", "list"} {
 		args := fmt.Sprintf(`{"text":"move it","%s":%q}`, key, string(capture.ID))
 		got := r.post(t, "term_1", args)
 		if !got.Result.IsError || !strings.Contains(got.Result.Content[0].Text, "cannot move") {
@@ -172,7 +172,7 @@ func TestTaskPostCannotMoveTasks(t *testing.T) {
 		}
 	}
 	if after := snapshot(); !reflect.DeepEqual(before, after) {
-		t.Fatalf("entries changed:\n%+v\n%+v", before, after)
+		t.Fatalf("tasks changed:\n%+v\n%+v", before, after)
 	}
 	if n := len(r.open(t)); n != 1 {
 		t.Fatalf("open %d", n)

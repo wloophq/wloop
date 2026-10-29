@@ -147,6 +147,10 @@ func TestAProposalTakesItsStateFromItsGate(t *testing.T) {
 	if _, err := gs.Resolve(ctx, open(gate.ProposalSubject(2)), gates.Resolution{Status: gate.Rejected, Intent: "reject", By: task.ActorPerson}); err != nil {
 		t.Fatal(err)
 	}
+	// A gate a reconcile opened for the message while its decision was applied, then superseded as it closed.
+	if _, err := gs.Resolve(ctx, open(strconv.FormatInt(m, 10)), gates.Resolution{Status: gate.Superseded, By: task.ActorWorkflow}); err != nil {
+		t.Fatal(err)
+	}
 	all, err := s.Proposals(ctx, "")
 	if err != nil {
 		t.Fatal(err)

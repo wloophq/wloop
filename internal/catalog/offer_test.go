@@ -10,7 +10,7 @@ import (
 )
 
 func TestOfferFactsFillEveryFactAnOfferReads(t *testing.T) {
-	got := slices.Sorted(maps.Keys(OfferFacts(task.Task{ID: "e-01"})))
+	got := slices.Sorted(maps.Keys(OfferFacts(task.Task{ID: "t-01"})))
 	if want := slices.Sorted(slices.Values(builtin.OfferFacts)); !slices.Equal(got, want) {
 		t.Errorf("facts %v, want %v", got, want)
 	}

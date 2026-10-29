@@ -18,7 +18,7 @@ description: Where the configuration, the state, the logs and the installed piec
 
 | Path | Holds |
 |---|---|
-| `store.db` | the SQLite store, which only the daemon opens: the history of every unit, what each plugin last reported of it, your holds and mutes, the round state and the pause, the turns with their instructions, records and answers, the agent sessions, the tasks, the Inbox messages, the Outbox drafts and the items. Open it read-only while the daemon runs |
+| `store.db` | the SQLite store, which only the daemon opens: the history of every unit, what each plugin last reported of it, your holds, the round state and the pause, the turns with their instructions, records and answers, the agent sessions, the tasks with their properties, wakes and gates, the messages, the drafts and the items. Open it read-only while the daemon runs |
 | `plugins/bundled/<id>/` | the bundled plugins `install` placed: each one's manifest, profile layer and binary |
 | `plugins/checksums` | the SHA-256 of each bundled plugin's binary, as `install` recorded it (`<hex>  <id>` lines); the daemon runs a bundled plugin only with it |
 | `plugins/<id>/plugin.db` | a plugin's own store: GitHub's pull requests, Slack's admitted messages and extraction state. The plugin opens it; `import.db` is what the store's migration to version 7 exported for the plugin, renamed `import.db.done` once imported |

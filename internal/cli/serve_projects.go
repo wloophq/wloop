@@ -11,7 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
-// serveProjects runs the project verbs and the weekly Review on g, the projects' dossiers kept by ds.
+// serveProjects runs the project verbs and the Review on g, the projects' dossiers kept by ds.
 func serveProjects(g *coretasks.Service, db *sqlite.DB, ds *dossiers.Service) {
 	if g == nil || db == nil {
 		return

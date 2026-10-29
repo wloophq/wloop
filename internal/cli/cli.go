@@ -229,8 +229,8 @@ type Env struct {
 	background *sync.WaitGroup
 	// items is the daemon's one items ledger; every writer of items shares it.
 	items *coreitems.Ledger
-	// tasks and messages are the daemon's entries and Inbox messages, built once per daemon; tasksMe is the
-	// user's identity the entries reconcile with.
+	// tasks and messages are the daemon's tasks and Inbox messages, built once per daemon; tasksMe is the
+	// user's identity the tasks reconcile with.
 	tasks   *coretasks.Service
 	tasksMe *identity
 	// wakes match the tasks' wakes, built with tasks; wakeFacts are a task's facts their conditions read, once

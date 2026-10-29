@@ -255,7 +255,7 @@ func TestSyncRunsUnderNoJobs(t *testing.T) {
 	waitHealth(t, te.Env, "the daemon", func(api.Health) bool { return true })
 	c := client.New(te.Socket)
 	var page api.TasksPage
-	eventually(t, "the item's entry in the Inbox", func() bool {
+	eventually(t, "the item's task in the Inbox", func() bool {
 		page, err = c.TasksSince(ctx, client.TaskQuery{View: "inbox"}, api.Since{})
 		return err == nil && len(page.Tasks) == 1
 	})
@@ -305,7 +305,7 @@ func TestDisabledPluginTasksRefuseOnARealServe(t *testing.T) {
 	}
 	u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
-	e := task.Task{ID: "e-00000000000000aa", State: "inbox", Category: task.CategoryInbox, Title: "review it", Units: []unit.Unit{u},
+	e := task.Task{ID: "t-00000000000000aa", State: "inbox", Category: task.CategoryInbox, Title: "review it", Units: []unit.Unit{u},
 		Items: []task.ItemRef{{Unit: u, Item: "gh:review"}}, Origin: task.OriginDerived, Created: at, Updated: at}
 	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)
@@ -322,10 +322,10 @@ func TestDisabledPluginTasksRefuseOnARealServe(t *testing.T) {
 	waitHealth(t, te.Env, "the daemon", func(api.Health) bool { return true })
 	code, body := socketDo(t, te.Socket, http.MethodGet, api.TasksPath+"?view=inbox", "")
 	if code != 200 || strings.Contains(body, string(e.ID)) || !strings.Contains(body, `"badge":0`) {
-		t.Fatalf("the disabled plugin's entry is listed: %d %s", code, body)
+		t.Fatalf("the disabled plugin's task is listed: %d %s", code, body)
 	}
 	if code, body := socketDo(t, te.Socket, http.MethodGet, api.TaskPath(string(e.ID)), ""); code != 200 || strings.Count(body, `"enabled":true`) != 1 {
-		t.Fatalf("the read-only entry: %d %s", code, body)
+		t.Fatalf("the read-only task: %d %s", code, body)
 	}
 	for _, verb := range []string{"next", "approve", "delegate", "done"} {
 		if code, body := socketDo(t, te.Socket, http.MethodPost, api.TaskPath(string(e.ID), verb), `{"source":"cli"}`); code != 409 || !strings.Contains(body, `"plugin":"github"`) {

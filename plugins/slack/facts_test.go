@@ -118,8 +118,8 @@ func TestSlackLiveTaskReadsTheHostsTasks(t *testing.T) {
 	t.Parallel()
 	f := newFactsFixture(t)
 	f.listed(t, factsThread, factsOther, factsDM)
-	f.host.SetTasks(hostTask("e-01", "next", factsThread, unit.Unit{Provider: "chat", Key: "x"}), hostTask("e-02", "waiting", factsDM),
-		hostTask("e-03", "done", factsOther), hostTask("e-04", "dropped", factsOther), hostTask("e-05", "deferred", factsOther))
+	f.host.SetTasks(hostTask("t-01", "next", factsThread, unit.Unit{Provider: "chat", Key: "x"}), hostTask("t-02", "waiting", factsDM),
+		hostTask("t-03", "done", factsOther), hostTask("t-04", "dropped", factsOther), hostTask("t-05", "deferred", factsOther))
 	for u, want := range map[unit.Unit]bool{factsThread: true, factsDM: true, factsOther: false} {
 		if got, _ := f.facts(t, u); got["slack.live_task"] != want {
 			t.Errorf("%s live_task %v, want %v", u, got["slack.live_task"], want)
@@ -171,7 +171,7 @@ func TestSlackFactsReadTheExtractionTheConversationAndTheItems(t *testing.T) {
 	f.item(factsThread, "i2", items.Open, monday.Add(-time.Hour))
 	f.item(factsThread, "i3", items.Open, monday.Add(-200*time.Hour), items.Person{Key: "slack:U0001"})
 	f.item(factsThread, "i4", items.Resolved, monday.Add(-200*time.Hour))
-	f.host.SetTasks(hostTask("e-01", "next", factsThread))
+	f.host.SetTasks(hostTask("t-01", "next", factsThread))
 	got, _ := f.facts(t, factsThread)
 	for k, v := range map[string]any{
 		"slack.channel": "C0001", "slack.conversation": "channel", "slack.started_by_me": true, "slack.closure_posted": false,

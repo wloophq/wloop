@@ -350,6 +350,8 @@ CREATE TABLE task_props (
 ) WITHOUT ROWID;
 
 -- A gate's task_id is NULL while no task holds its unit. intents is a JSON list.
+-- applied_at is when its consequence ran; a resolved gate without it runs it again at the gates' next tick.
+-- begun_at is when an at-most-once consequence began, '' once it ended; one a stopped daemon cut keeps it.
 CREATE TABLE gates (
   id INTEGER PRIMARY KEY,
   task_id TEXT REFERENCES tasks (id),
@@ -358,7 +360,9 @@ CREATE TABLE gates (
   status TEXT NOT NULL, intents TEXT NOT NULL, intent TEXT NOT NULL DEFAULT '', answer TEXT NOT NULL DEFAULT '',
   by_actor TEXT NOT NULL DEFAULT '', rule TEXT NOT NULL DEFAULT '',
   deadline TEXT NOT NULL DEFAULT '', default_intent TEXT NOT NULL DEFAULT '',
-  opened_at TEXT NOT NULL, closed_at TEXT NOT NULL DEFAULT ''
+  opened_at TEXT NOT NULL, closed_at TEXT NOT NULL DEFAULT '',
+  applied_at TEXT NOT NULL DEFAULT '',
+  begun_at TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX gates_due ON gates (status, deadline);
 CREATE INDEX gates_task ON gates (task_id);
@@ -480,9 +484,11 @@ CREATE TABLE item_ops (
 
 CREATE INDEX item_ops_unit ON item_ops (provider, unit_key, at);
 
+-- decided_at is when a gate's decision of the proposal was applied, so a replayed decision applies nothing.
 CREATE TABLE item_proposals (
   id INTEGER PRIMARY KEY,
   provider TEXT NOT NULL, unit_key TEXT NOT NULL, item TEXT NOT NULL,
   op TEXT NOT NULL, provenance TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '',
-  dedupe TEXT NOT NULL, at TEXT NOT NULL
+  dedupe TEXT NOT NULL, at TEXT NOT NULL,
+  decided_at TEXT NOT NULL DEFAULT ''
 );

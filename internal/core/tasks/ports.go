@@ -23,7 +23,7 @@ type Reader interface {
 	// ahead of the store; else the tasks written after since's Rev, whatever their category. Removed is empty
 	// and Counters zero: the service fills them.
 	TasksSince(ctx context.Context, q task.Query, since Since) (Page, error)
-	Task(ctx context.Context, id task.ID) (task.Task, error) // ErrNoTask; ErrVerb is a verb the entry's state refuses, naming both
+	Task(ctx context.Context, id task.ID) (task.Task, error) // ErrNoTask; ErrVerb is a verb the task's state refuses, naming both
 	TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error)
 }
 
@@ -100,7 +100,7 @@ type ViewSource interface {
 }
 
 // VerbHandler runs a verb another service owns (answer/approve/dismiss on messages, approve/dismiss on drafts);
-// one on a stored entry records the verb with Service.RecordVerb once it succeeded.
+// one on a stored task records the verb with Service.RecordVerb once it succeeded.
 type VerbHandler func(ctx context.Context, e task.Task, req Request) (Result, error)
 
 // Request is a verb to run. Actor is who runs it, required; Source where it
@@ -137,11 +137,11 @@ type OpenRequest struct {
 }
 
 var (
-	ErrNoTask = errors.New("no such entry")
-	ErrVerb   = errors.New("the entry's state refuses the verb")
+	ErrNoTask = errors.New("no such task")
+	ErrVerb   = errors.New("the task's state refuses the verb")
 	// ErrArgs is a request the service cannot read: an unknown verb or view, or a missing or bad argument.
-	ErrArgs = errors.New("bad entry request")
-	// ErrPluginDisabled refuses a change to an entry whose unit's plugin is disabled.
+	ErrArgs = errors.New("bad task request")
+	// ErrPluginDisabled refuses a change to a task whose unit's plugin is disabled.
 	ErrPluginDisabled = errors.New("the unit's plugin is disabled")
 	// ErrForbidden refuses a verb its actor may not run on the task, as the profile's by says.
 	ErrForbidden = errors.New("the actor may not run the verb")

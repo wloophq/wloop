@@ -72,7 +72,7 @@ func classOf(e task.Task) string {
 
 type Service struct {
 	d Deps
-	// mu serializes the service's read-modify-write of entries.
+	// mu serializes the service's read-modify-write of tasks.
 	mu hookedMutex
 	// beforeApply, set by tests only, runs in Do between reading the task and writing it.
 	beforeApply func()
@@ -125,8 +125,8 @@ func (s *Service) handler(e task.Task, verb task.Verb) VerbHandler {
 	return s.handlers[handlerKey{EveryKind, name}]
 }
 
-// Do runs req.Verb on entry id: a registered handler first, else the state change. An entry of a unit whose
-// plugin is disabled refuses every verb with ErrPluginDisabled but dismiss, which moves a derived entry, or one
+// Do runs req.Verb on task id: a registered handler first, else the state change. A task of a unit whose
+// plugin is disabled refuses every verb with ErrPluginDisabled but dismiss, which moves a derived task, or one
 // whose units are all of disabled plugins, to the Trash whole, and detaches a disabled plugin's units from any other.
 func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, error) {
 	if _, _, ok := s.d.States.Move(string(req.Verb)); !ok {
@@ -354,8 +354,8 @@ func (s *Service) project(ctx context.Context, e task.Task, req Request, now tim
 	return append(cs, task.Change{Op: task.OpUpdate, Task: e, Why: "project"}), nil
 }
 
-// dismissOff dismisses entry id, which has a unit or an item of a disabled plugin, with no handler: it detaches
-// the disabled plugins' units and the items on them, and the entry keeps its state. A derived entry, whose id the
+// dismissOff dismisses task id, which has a unit or an item of a disabled plugin, with no handler: it detaches
+// the disabled plugins' units and the items on them, and the task keeps its state. A derived task, whose id the
 // unit it came from names, or one with no unit of an enabled plugin moves to the Trash whole. enabled caches the
 // answers per unit.
 func (s *Service) dismissOff(ctx context.Context, id task.ID, req Request, enabled map[unit.Unit]bool) (Result, error) {
@@ -495,7 +495,7 @@ func ProposedVerb(g gate.Gate) (Request, bool) {
 	return Request{Verb: p.Verb, Args: p.Args, Actor: task.ActorPerson, Source: "gate", Approved: g.ID}, true
 }
 
-// writable refuses an entry with a unit whose plugin is disabled; ok caches the answers per unit.
+// writable refuses a task with a unit whose plugin is disabled; ok caches the answers per unit.
 func (s *Service) writable(ctx context.Context, e task.Task, ok map[unit.Unit]bool) error {
 	for _, u := range e.Units {
 		enabled, seen := ok[u]
@@ -516,7 +516,7 @@ func (s *Service) writable(ctx context.Context, e task.Task, ok map[unit.Unit]bo
 	return nil
 }
 
-// Capture files a new entry in the Inbox.
+// Capture files a new task in the Inbox.
 func (s *Service) Capture(ctx context.Context, title, notes string, u *unit.Unit) (task.Task, error) {
 	if strings.TrimSpace(title) == "" {
 		return task.Task{}, fmt.Errorf("%w: a capture needs a title", ErrArgs)
@@ -558,7 +558,7 @@ func (s *Service) create(ctx context.Context, title, notes string, u *unit.Unit,
 	return e, nil
 }
 
-// Close moves an entry opened by Open or Capture into the done or the dropped category; a derived entry, or one
+// Close moves a task opened by Open or Capture into the done or the dropped category; a derived task, or one
 // whose unit's plugin is disabled, refuses it.
 func (s *Service) Close(ctx context.Context, id task.ID, to task.Category) error {
 	if to != task.CategoryDone && to != task.CategoryDropped {
@@ -571,7 +571,7 @@ func (s *Service) Close(ctx context.Context, id task.ID, to task.Category) error
 		return err
 	}
 	if e.Origin == task.OriginDerived {
-		return fmt.Errorf("%w: close on a derived entry", ErrVerb)
+		return fmt.Errorf("%w: close on a derived task", ErrVerb)
 	}
 	if err := s.writable(ctx, e, nil); err != nil {
 		return err
@@ -587,7 +587,7 @@ func (s *Service) Close(ctx context.Context, id task.ID, to task.Category) error
 	return s.d.Store.Apply(ctx, []task.Change{{Op: task.OpResolve, Task: e, Why: "closed"}})
 }
 
-// Retitle renames an entry opened by Open or Capture, as one change; a derived entry refuses it.
+// Retitle renames a task opened by Open or Capture, as one change; a derived task refuses it.
 func (s *Service) Retitle(ctx context.Context, id task.ID, title string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -596,7 +596,7 @@ func (s *Service) Retitle(ctx context.Context, id task.ID, title string) error {
 		return err
 	}
 	if e.Origin == task.OriginDerived {
-		return fmt.Errorf("%w: retitle on a derived entry", ErrVerb)
+		return fmt.Errorf("%w: retitle on a derived task", ErrVerb)
 	}
 	if e.Title == title {
 		return nil
@@ -605,7 +605,7 @@ func (s *Service) Retitle(ctx context.Context, id task.ID, title string) error {
 	return s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e, Why: "retitled"}})
 }
 
-// pending folds the changes of one Sync by entry, in first-seen order.
+// pending folds the changes of one Sync by task, in first-seen order.
 type pending struct {
 	order []task.ID
 	byID  map[task.ID]task.Change
@@ -644,7 +644,7 @@ func (p *pending) overlay(es []task.Task) []task.Task {
 	return out
 }
 
-// of is es with this Sync's changes over them, plus the entries it created that belong to u.
+// of is es with this Sync's changes over them, plus the tasks it created that belong to u.
 func (p *pending) of(es []task.Task, u unit.Unit) []task.Task {
 	return slices.DeleteFunc(p.overlay(es), func(e task.Task) bool { return !belongs(e, u) })
 }
@@ -736,10 +736,10 @@ func (s *Service) Recategorize(ctx context.Context) ([]string, error) {
 	return r.Recategorize(ctx, s.d.States.CategoryOf)
 }
 
-// Attach adds u to entry id's units, after those it holds; a unit it holds already changes nothing.
+// Attach adds u to task id's units, after those it holds; a unit it holds already changes nothing.
 func (s *Service) Attach(ctx context.Context, id task.ID, u unit.Unit) error {
 	if u.IsZero() || u == task.UnitOf(id) {
-		return fmt.Errorf("%w: attach %s to entry %s", ErrArgs, u, id)
+		return fmt.Errorf("%w: attach %s to task %s", ErrArgs, u, id)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()

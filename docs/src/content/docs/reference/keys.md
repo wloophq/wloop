@@ -20,7 +20,7 @@ The same keys work in the web cockpit and the terminal client, on the selected t
 | `p` | make a project or attach to one |
 | `a` | approve the draft or proposal |
 | `d` | delegate to an agent (asks for optional guidance; in the terminal, Tab hands it to a session) |
-| `r` | reply in the task's conversation, saved to the Outbox (in the terminal, Tab sends it now) |
+| `r` | reply in the task's conversation: sent now or held for your approval, as the reply verb's `send` in `tasks.toml` says (`now` in the bundled profile); in the terminal, Tab does the other |
 | `i` | edit a draft's text (terminal) |
 | `e` | done |
 | `Backspace` | dismiss |
@@ -32,7 +32,7 @@ The same keys work in the web cockpit and the terminal client, on the selected t
 
 | Key | Action |
 |---|---|
-| `g f`, `g i`, `g o`, `g n`, `g w`, `g p`, `g r` | Focus, Inbox, Outbox, Next, Waiting, Projects, Review: each view's `key` in `views.toml`, and a view of yours adds its own (`g`, a space and a key no core key uses) |
+| `g i`, `g m`, `g w`, `g c`, `g n`, `g b`, `g t`, `g u`, `g a`, `g z`, `g f`, `g p`, `g d`, `g o`, `g r` | Inbox, Needs me, Waiting, Chase, Fits now, Blocked by me, Stalled, In loop, Approved, Snoozed, Focus, Projects, Done, Outbox, Review: each view's `key` in `views.toml`, and a view of yours adds its own (`g`, a space and a key no core key uses) |
 | `g g` | the GitHub views: a plugin's own chord, which its UI declares (`key`), served while the plugin is enabled; a view's key in `views.toml` takes it first |
 | `Shift+1`..`9` | switch area |
 | `/` | filter |

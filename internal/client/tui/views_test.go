@@ -143,7 +143,7 @@ func TestStartsOnFocus(t *testing.T) {
 			at = i
 		}
 		if narrow := m.Render(120, 20, now)[0]; strings.Contains(narrow, "Needs me") || !strings.Contains(narrow, "Logbook 12") {
-			t.Fatalf("a narrow tab line keeps the GTD views whole and drops the others: %q", narrow)
+			t.Fatalf("a narrow tab line keeps the core views whole and drops the others: %q", narrow)
 		}
 
 		d := &fakeDaemon{rows: oneRow(), viewsCat: ptr(viewsCatalog()), tasks: viewTasks(), counters: viewCounters()}
@@ -582,7 +582,7 @@ func TestPaletteAndHelp(t *testing.T) {
 		t.Fatalf("area %q", m.area)
 	}
 	if _, area, _ := m.TaskQuery(); area != "home" {
-		t.Fatalf("the entries do not follow the area: %q", area)
+		t.Fatalf("the tasks do not follow the area: %q", area)
 	}
 
 	press(m, Key{Rune: '?'})
@@ -644,7 +644,7 @@ func TestOpeningSendsSeen(t *testing.T) {
 	chord(m, "gi")
 	c, ok := press(m, Key{Name: KeyEnter})
 	if !ok || !c.seen {
-		t.Fatalf("Enter on a changed Inbox entry: %+v", c)
+		t.Fatalf("Enter on a changed Inbox task: %+v", c)
 	}
 	d := &fakeDaemon{tasks: viewTasks()}
 	if got, err := carry(context.Background(), Config{Daemon: d}, c); err != nil || got.task.ID != "e2" {
@@ -659,7 +659,7 @@ func TestOpeningSendsSeen(t *testing.T) {
 	}
 	press(m, Key{Name: KeyEsc}, Key{Name: KeyDown})
 	if c, _ := press(m, Key{Name: KeyEnter}); c.seen || c.task != "e3" {
-		t.Fatalf("an unchanged entry: %+v", c)
+		t.Fatalf("an unchanged task: %+v", c)
 	}
 }
 

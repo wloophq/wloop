@@ -3,7 +3,7 @@ title: Tasks and views
 description: How what people ask of you becomes tasks, how the lists and projects hold them, and how the review walks through them.
 ---
 
-{{name}} keeps your work as **tasks**. A task is something you act on, wait for, read later or decide about. It points at the **items** and the **units** it comes from.
+{{name}} keeps your work as **tasks**. A task is something you act on, wait for, read later or decide about. It points at the **items** and the **units** it comes from. The lists follow the method David Allen describes in *Getting Things Done*®.
 
 ## Units and items
 
@@ -23,7 +23,7 @@ An **item** is one thing someone needs from someone inside a unit: a `request`, 
 - The GitHub plugin derives items from what it reads, with no model call: a review requested of you, reviews to address, failing checks, a conflict, the fix you wait for. A pull request you follow that asks none of these has one item, `gh:follow`, that waits on whoever the pull request waits on: you when its agent waits with no question or a round waits on you, the loop while it works on it, else its author or reviewers, and nobody when it waits on no one but you, such as your own draft; such a task is owed by nobody. A pending, held or blocked round is a gate, never an item.
 - The Slack plugin extracts them from conversations with one model call per unit (see [Slack as a source](/concepts/slack/)).
 
-Once you create or correct an item it is **confirmed**: extraction never overwrites it again. A later extraction that disagrees becomes a proposal in the Inbox, with Accept and Reject.
+Once you create or correct an item it is **confirmed**: extraction never overwrites it again. A later extraction that disagrees becomes a proposal, a gate on the unit's task, with Approve and Reject (see [Messages](#messages)).
 
 ## From items to tasks
 
@@ -184,11 +184,11 @@ The live session is any session whose unit is the task or one it holds, a pull r
 
 ## The Outbox
 
-Every post an agent or a rule proposes is a draft first, in the Outbox, until its approval policy lets it out. See [What waits for you](/concepts/approval/#the-outbox). Default workflows, and the GitHub plugin's rule, also add drafts on their own, at each sweep. A draft a workflow proposes on a task goes to the unit its first item is on, else to its first unit:
+Every post an agent or a rule proposes is a draft first, held by its draft gate until its approval policy lets it out, and listed in the Outbox. See [What waits for you](/concepts/approval/#the-outbox). Default workflows, and the GitHub plugin's rule, also add drafts on their own, at each sweep. A draft a workflow proposes on a task goes to the unit its first item is on, else to its first unit:
 
 | Workflow or rule | Proposes |
 |---|---|
-| `slack-stalled-nudge` | a nudge to each person a waiting task with a Slack unit waits on, once it is past its resurface date or stale and not nudged within `drafts.repeat_after` (1d) |
+| `slack-stalled-nudge` | a nudge to each person who owes a task with a Slack unit, once its check date passed and it was not nudged within `drafts.repeat_after` (1d) |
 | `slack-closure` | a closing message for a Slack unit you started whose items resolved |
 | `slack-ask-owner` | a question for a Slack unit's open items with no owner after a working day; it always waits for you |
 | `github-nudge` | the GitHub plugin's nudge |

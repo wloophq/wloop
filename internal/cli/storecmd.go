@@ -168,7 +168,7 @@ func (e *Env) migrateInDaemon(ctx context.Context, path string, logf func(string
 	return nil
 }
 
-// dossierMoveFix is what finishes the move of the entries' dossiers to the tasks' when it stopped.
+// dossierMoveFix is what finishes the move of the dossiers of the tasks before version 7 to their new directories when it stopped.
 func dossierMoveFix(stateDir string) string {
 	root := dossier.Root(stateDir)
 	return fmt.Sprintf("move each %s to %s, and each %s to %s, resolving a name both sides hold; %s retries the move at every start",
@@ -260,7 +260,7 @@ func pendingDossierMoves(ctx context.Context, stateDir string, db *sqlite.DB) []
 	return out
 }
 
-// leftoverEntryDossiers names the directories of entries' dossiers a store at version 7 or later left
+// leftoverEntryDossiers names the directories of the dossiers of the tasks before version 7 that a store at version 7 or later left
 // behind, with the paths their move would take that exist already.
 func leftoverEntryDossiers(stateDir string) []check {
 	var out []check
@@ -271,7 +271,7 @@ func leftoverEntryDossiers(stateDir string) []check {
 		if err != nil {
 			continue
 		}
-		info := src + " holds dossiers of entries, which are tasks now"
+		info := src + " holds dossiers of the tasks before version 7"
 		for _, ent := range ents {
 			name := ent.Name()
 			if rest, ok := strings.CutPrefix(name, taskIDPrefixes["entry"]); ok {
@@ -287,14 +287,14 @@ func leftoverEntryDossiers(stateDir string) []check {
 	return out
 }
 
-// taskRenamedAt is the schema version that made the entries tasks, and taskIDPrefixes the prefix of a
+// taskRenamedAt is the schema version that gave the tasks their name, and taskIDPrefixes the prefix of a
 // task's id under each provider name a task had.
 const taskRenamedAt = 7
 
 var taskIDPrefixes = map[string]string{"entry": "e-", "task": "t-"}
 
 // renameTaskDossiers moves the tasks' dossier directories along with a store that moved from version
-// from to to across the rename of entries to tasks, either way.
+// from to to across the version that renamed them, either way.
 func (e *Env) renameTaskDossiers(from, to uint32) error {
 	switch {
 	case from < taskRenamedAt && to >= taskRenamedAt:

@@ -68,11 +68,11 @@ func TestTheDaemonAsksCapabilitiesNotProviderIDs(t *testing.T) {
 func TestASessionOnAUnitWithItsOwnCheckoutAsksNoPlacer(t *testing.T) {
 	t.Parallel()
 	r, _, _ := newDelegateRig(t)
-	r.put(t, unitTask("e-a", task.OriginDerived, actThread))
+	r.put(t, unitTask("t-a", task.OriginDerived, actThread))
 	r.s.deps.Placer = placerFunc(func(unit.Unit) (string, error) { return "", errors.New("no workspace manager is enabled") })
 	modes := func() []api.RunnerState {
 		var v api.TaskView
-		if code := get(t, r.s, api.TaskPath("e-a"), &v); code != 200 {
+		if code := get(t, r.s, api.TaskPath("t-a"), &v); code != 200 {
 			t.Fatalf("%d", code)
 		}
 		return verbState(v, "delegate").Runners

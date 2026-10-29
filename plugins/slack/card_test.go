@@ -241,7 +241,7 @@ func TestCardBeforeExtraction(t *testing.T) {
 		t.Fatalf("card %+v", c)
 	}
 	if c.StartedByMe || c.ClosurePosted || c.Cares || c.LastHuman == nil {
-		t.Fatalf("gtd fields %+v", c)
+		t.Fatalf("the card's flags %+v", c)
 	}
 }
 

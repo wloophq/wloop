@@ -9,7 +9,7 @@ description: The daemon, its clients, the ports to the outside tools, and the ru
 
 | Actor | Gives {{name}} | Gets from {{name}} |
 |---|---|---|
-| You | answers, guidance, holds, review and take-over requests | questions, drafts, counts, notifications, the cockpit |
+| You | tasks, answers, guidance, holds, review and take-over requests | tasks and their gates (questions, drafts, rounds to run), counts, notifications, the cockpit |
 | GitHub | pull requests, reviews, checks and the rate budget, read over its API with the token of `gh` | the comments of drafts you approved, posted by the GitHub plugin |
 | Agents (Claude Code) | turn records and hook events | instructions; they publish reviews, push and reply on GitHub under your name |
 | Orca | the workspace list, terminals, agent activity, card placement | workspaces created, linked, renamed and removed; sessions started, woken and typed into; board writes |
@@ -34,7 +34,7 @@ The same binary is every piece:
 - **the CLI**, the **terminal client** (`tui`) and the **menu bar** (`app`), which call the API over the socket;
 - **the web cockpit**, which calls the same API over HTTP;
 - **the agent hooks** (`hook session-start`, `hook stop`, `hook prompt`), which call the agent side of the API with a 2-second budget and never block an agent by failing;
-- **agent sessions**, which call `turn_end` and the Slack tools over MCP, identified by the `X-Loop-Session` header, never by a tool argument. The registration's `headersHelper`, `{{command}} hook mcp-headers`, runs in the session's environment and sets the header to the process handle a manager put there (`ORCA_TERMINAL_HANDLE` in Orca, `CLAUDE_CODE_HOST_SESSION_ID` in Claude Desktop); the daemon resolves it to the session. A `${VAR}` header would not do: Claude Desktop sends it empty.
+- **agent sessions**, which call `turn_end`, `task_post`, `task_read` and the Slack tools over MCP, identified by the `X-Loop-Session` header, never by a tool argument. The registration's `headersHelper`, `{{command}} hook mcp-headers`, runs in the session's environment and sets the header to the process handle a manager put there (`ORCA_TERMINAL_HANDLE` in Orca, `CLAUDE_CODE_HOST_SESSION_ID` in Claude Desktop); the daemon resolves it to the session. A `${VAR}` header would not do: Claude Desktop sends it empty.
 
 The daemon also spawns headless agent calls (the brief, headless turns, the Slack extraction, profile dry runs); those are its children, not clients.
 
@@ -52,7 +52,7 @@ The daemon is laid out as ports and adapters: transports call the API, the API c
 
 Four properties hold across them:
 
-- **The store is the truth.** Turn state, questions, answers and history live only in the store. Orca's board is a view sink: it receives the same projection as every other view, fails alone and is reconciled on start. Any workspace or session can be recreated from stored context, in any manager that hosts its agent.
+- **The store is the truth.** Tasks, gates, turn state, answers and history live only in the store. Orca's board is a view sink: it receives the same projection as every other view, fails alone and is reconciled on start. Any workspace or session can be recreated from stored context, in any manager that hosts its agent.
 - **Every change leaves a trail.** Each command writes its domain events in the same transaction as its state change, so a turn's timeline can be read from events alone.
-- **Authority comes from you.** Agents report facts; only your surfaces endorse a verdict, approve a draft, take over or remove a workspace.
+- **Authority comes from you.** Agents report facts; only you, through your surfaces or an approval rule of yours, resolve a gate, endorse a verdict, take over or remove a workspace.
 - **Down means down.** With the daemon stopped, every client fails within a second and names the fix; only the hooks allow and go on. On start the daemon reconciles turns, sessions and cards before it serves clients.

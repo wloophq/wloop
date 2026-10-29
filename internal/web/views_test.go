@@ -31,7 +31,7 @@ function stamp(t) { return String(t); }
 // viewsCatalog is GET /api/views with the core views the daemon serves.
 func viewsCatalog() api.ViewsCatalog {
 	return api.ViewsCatalog{
-		Views: []api.TaskViewSpec{{ID: "focus", Label: "Focus"}, {ID: "inbox", Label: "Inbox"}, {ID: "outbox", Label: "Outbox"}, {ID: "next", Label: "Next"},
+		Views: []api.TaskViewSpec{{ID: "focus", Label: "Focus"}, {ID: "inbox", Label: "Inbox"}, {ID: "outbox", Label: "Outbox"}, {ID: "fits-now", Label: "Fits now"},
 			{ID: "waiting", Label: "Waiting"}, {ID: "projects", Label: "Projects"}, {ID: "someday", Label: "Someday"}, {ID: "logbook", Label: "Logbook"}},
 		Areas:    []string{"OSS", "Hiring"},
 		Contexts: []string{"@decide", "@reply"},
@@ -40,7 +40,7 @@ func viewsCatalog() api.ViewsCatalog {
 	}
 }
 
-var coreViewIDs = []string{"focus", "inbox", "outbox", "next", "waiting", "projects", "someday", "logbook"}
+var coreViewIDs = []string{"focus", "inbox", "outbox", "fits-now", "waiting", "projects", "someday", "logbook"}
 
 // noViews stands in for views.js where a test runs app.js's loading alone.
 const noViews = "const loadTasks = async () => {};\n"
@@ -73,7 +73,7 @@ func TestNavListsCoreThenPluginViews(t *testing.T) {
 		Core   []bool   `json:"core"`
 		Counts []any    `json:"counts"`
 	}
-	counters := api.Counters{Views: map[string]int{"focus": 1, "inbox": 4, "outbox": 2, "next": 7, "waiting": 3, "projects": 0, "someday": 5, "logbook": 9}}
+	counters := api.Counters{Views: map[string]int{"focus": 1, "inbox": 4, "outbox": 2, "fits-now": 7, "waiting": 3, "projects": 0, "someday": 5, "logbook": 9}}
 	nodeRun(t, catalogPrelude(t)+viewsPrelude(t), nil, `
 const nav = viewNav(input.cat, catalog.views, ["fake-board"], input.counters);
 process.stdout.write(JSON.stringify({ ids: nav.map((v) => v.id), core: nav.map((v) => v.core), counts: nav.filter((v) => v.core).map((v) => v.count) }));`,
@@ -183,8 +183,8 @@ function writeHash() {}
   process.stdout.write(JSON.stringify({
     urls, asked,
     keys: [viewQueryKey("inbox", "OSS", []), viewQueryKey("inbox", "", [])],
-    route: readRoute(routeHash("next", "", new URLSearchParams({ area: "OSS" }))),
-    hash: routeHash("next", "", new URLSearchParams({ area: "OSS" })),
+    route: readRoute(routeHash("fits-now", "", new URLSearchParams({ area: "OSS" }))),
+    hash: routeHash("fits-now", "", new URLSearchParams({ area: "OSS" })),
     picker: text(areaPicker({ view: "inbox", area: "OSS", ctx: [], q: "" })),
   }));
 })();`, map[string]any{"cat": viewsCatalog(), "views": coreViewIDs}, &got)
@@ -196,7 +196,7 @@ function writeHash() {}
 	if got.Keys[0] == got.Keys[1] {
 		t.Errorf("query keys %v: every view depends on the area", got.Keys)
 	}
-	if got.Route["area"] != "OSS" || got.Hash != "view=next&area=OSS" {
+	if got.Route["area"] != "OSS" || got.Hash != "view=fits-now&area=OSS" {
 		t.Errorf("the area is not kept in the hash: %q -> %v", got.Hash, got.Route)
 	}
 	if want := []string{"/api/views", "/api/tasks?view=inbox&area=OSS", "/api/tasks?view=focus&area=OSS", "/api/counters?area=OSS"}; !slices.Equal(got.Asked, want) {

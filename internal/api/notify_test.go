@@ -7,12 +7,12 @@ func TestNotificationIDRoundTrips(t *testing.T) {
 		cat         Category
 		task, token string
 	}{
-		{CategoryInbox, "e-0123456789abcdef", "k3f9"},
+		{CategoryInbox, "t-0123456789abcdef", "k3f9"},
 		{CategoryOutbox, "draft:12", "20261008T100000.000000000"},
-		{CategoryHeld, "e-0123456789abcdef", "2026-10-08"},
+		{CategoryHeld, "t-0123456789abcdef", "2026-10-08"},
 		{CategoryDigest, "-", "2026-10-08"},
-		{CategoryNote, "e-1", "x"},
-		{QuestionCategory(42), "e-1", "42"},
+		{CategoryNote, "t-1", "x"},
+		{QuestionCategory(42), "t-1", "42"},
 	} {
 		id := NotificationID(c.cat, c.task, c.token)
 		cat, task, ok := ParseNotificationID(id)

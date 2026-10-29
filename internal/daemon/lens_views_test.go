@@ -22,7 +22,7 @@ func TestBadgeCountsTheProfilesViews(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, nil)
 	r.put(t, mixedTasks()...)
-	r.put(t, task.Task{ID: "e-9", State: "inbox", Category: task.CategoryInbox})
+	r.put(t, task.Task{ID: "t-9", State: "inbox", Category: task.CategoryInbox})
 	p := r.page(t, "view=inbox")
 	if c := p.Counters; c.Badge != c.Views["inbox"]+c.Views["needs-me"] || c.Badge == 0 {
 		t.Fatalf("the bundled badge %d, views %v", c.Badge, c.Views)
@@ -43,7 +43,7 @@ func TestBadgeCountsTheProfilesViews(t *testing.T) {
 	l.Views.Badge = []string{"someday", "logbook"}
 	mine := newTasksRig(t, func(d *Deps) { d.Intents = func() *intentload.Loaded { return &l } })
 	mine.put(t, mixedTasks()...)
-	mine.put(t, task.Task{ID: "e-done", State: "done", Category: task.CategoryDone})
+	mine.put(t, task.Task{ID: "t-done", State: "done", Category: task.CategoryDone})
 	var c api.Counters
 	get(t, mine.s, api.CountersPath, &c)
 	if c.Badge != 2 || c.Badge != c.Views["someday"]+c.Views["logbook"] {
@@ -54,16 +54,16 @@ func TestBadgeCountsTheProfilesViews(t *testing.T) {
 func TestCountersRepushOnGatesAndWakes(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, nil)
-	r.put(t, task.Task{ID: "e-done", State: "done", Category: task.CategoryDone}, task.Task{ID: "e-next", State: "next", Category: task.CategoryReady})
+	r.put(t, task.Task{ID: "t-done", State: "done", Category: task.CategoryDone}, task.Task{ID: "t-next", State: "next", Category: task.CategoryReady})
 	sub := r.subscribe(t)
-	if _, err := r.db.Gates(func() time.Time { return tasksNow }).Open(context.Background(), gate.Gate{Task: "e-done", Kind: gate.KindQuestion, Name: "question", Subject: "q1"}); err != nil {
+	if _, err := r.db.Gates(func() time.Time { return tasksNow }).Open(context.Background(), gate.Gate{Task: "t-done", Kind: gate.KindQuestion, Name: "question", Subject: "q1"}); err != nil {
 		t.Fatal(err)
 	}
 	c := nextChange(t, sub)
 	if c.Counters.Views["needs-me"] != 2 {
 		t.Fatalf("after a gate opened on a done task: %+v", c.Counters)
 	}
-	if err := r.db.Wakes().Put(context.Background(), wake.Wake{Task: "e-next", Until: tasksNow.Add(time.Hour), Return: "next"}); err != nil {
+	if err := r.db.Wakes().Put(context.Background(), wake.Wake{Task: "t-next", Until: tasksNow.Add(time.Hour), Return: "next"}); err != nil {
 		t.Fatal(err)
 	}
 	if c = nextChange(t, sub); c.Counters.Views["snoozed"] != 1 {
@@ -77,18 +77,18 @@ func TestNeedsMeOrdersASequentialProjectsNextActionFirst(t *testing.T) {
 	r.serveProjects()
 	at := func(m int) time.Time { return tasksNow.Add(time.Duration(m) * time.Minute) }
 	r.put(t,
-		task.Task{ID: "e-x", State: "next", Category: task.CategoryReady, Created: at(-60), Updated: at(-60)},
-		task.Task{ID: "e-p", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "next", Category: task.CategoryReady, Sequential: true, Created: at(-50), Updated: at(-50)},
-		task.Task{ID: "e-a2", State: "next", Category: task.CategoryReady, Parent: "e-p", Position: 2, Created: at(-40), Updated: at(-40)},
-		task.Task{ID: "e-a1", State: "next", Category: task.CategoryReady, Parent: "e-p", Position: 1, Created: at(-30), Updated: at(-30)},
+		task.Task{ID: "t-x", State: "next", Category: task.CategoryReady, Created: at(-60), Updated: at(-60)},
+		task.Task{ID: "t-p", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "next", Category: task.CategoryReady, Sequential: true, Created: at(-50), Updated: at(-50)},
+		task.Task{ID: "t-a2", State: "next", Category: task.CategoryReady, Parent: "t-p", Position: 2, Created: at(-40), Updated: at(-40)},
+		task.Task{ID: "t-a1", State: "next", Category: task.CategoryReady, Parent: "t-p", Position: 1, Created: at(-30), Updated: at(-30)},
 	)
-	if got := taskIDs(r.page(t, "view=needs-me").Tasks); !slices.Equal(got, []string{"e-a1", "e-x", "e-p", "e-a2"}) {
+	if got := taskIDs(r.page(t, "view=needs-me").Tasks); !slices.Equal(got, []string{"t-a1", "t-x", "t-p", "t-a2"}) {
 		t.Fatalf("needs me %v", got)
 	}
-	if rec := post(t, r.s, api.TaskPath("e-a1", "done"), `{"source":"cockpit"}`); rec.Code != 200 {
+	if rec := post(t, r.s, api.TaskPath("t-a1", "done"), `{"source":"cockpit"}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if got := taskIDs(r.page(t, "view=needs-me").Tasks); !slices.Equal(got, []string{"e-a2", "e-x", "e-p"}) {
+	if got := taskIDs(r.page(t, "view=needs-me").Tasks); !slices.Equal(got, []string{"t-a2", "t-x", "t-p"}) {
 		t.Fatalf("after the first action: %v", got)
 	}
 }

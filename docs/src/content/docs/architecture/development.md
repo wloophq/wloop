@@ -66,6 +66,6 @@ To try a local build, replace the installed binary with a new file (copy it next
 5. On the next pending round, choose Guide, type a sentence and send. Expect the round to start at once, carrying the sentence.
 6. On the next one, choose Pause. Expect the row paused and no round sent.
 7. Click the body of a notification. Expect the cockpit on that row.
-8. Open the menu: up to five entries under each view the badge counts (the bundled Inbox and Needs me), Open cockpit, Sweep now, Pause automatic rounds (then Resume), the sync line, Quit.
+8. Open the menu: up to five tasks under each view the badge counts (the bundled Inbox and Needs me), Open cockpit, Sweep now, Pause automatic rounds (then Resume), the sync line, Quit.
 9. Quit. Expect the item gone and the daemon still running; the menu bar starts again at the next login or with `launchctl kickstart`.
 10. Turn notifications off in System Settings. Expect `doctor` to report it within a minute and the cockpit to show the warning.

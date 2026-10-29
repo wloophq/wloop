@@ -24,6 +24,7 @@ func v7(ctx context.Context, tx *sql.Tx) error {
 		{"wakes", v7Wakes},
 		{"pr tasks", v7PRTasks},
 		{"dossiers", v7Dossiers},
+		{"applied", v7Applied},
 		{"plugin stores", v7PluginStores},
 	} {
 		if err := s.up(ctx, tx); err != nil {

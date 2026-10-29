@@ -25,7 +25,7 @@ func TestAHeadlessDraftDeclaringAnEffectItsIntentDoesNotListIsRefused(t *testing
 	intents := r.svc.Intents
 	r.svc.Intents = func(n turn.Intent) (dintent.Def, bool) {
 		d, ok := intents(n)
-		d.AllowedEffects = []string{"entry.nudged", "unit.closed"}
+		d.AllowedEffects = []string{"task.nudged", "unit.closed"}
 		return d, ok
 	}
 	got, err := r.svc.Run(context.Background(), headless.Request{Unit: thread})

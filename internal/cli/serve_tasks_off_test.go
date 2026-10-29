@@ -27,7 +27,7 @@ func TestAPluginRefusedAtBuildCountsAsOff(t *testing.T) {
 	ctx := context.Background()
 	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
 	u := unit.Unit{Provider: "slack", Key: "C1/1.1"}
-	e := task.Task{ID: "e-00000000000000ab", State: "inbox", Category: task.CategoryInbox, Title: "reply", Units: []unit.Unit{u},
+	e := task.Task{ID: "t-00000000000000ab", State: "inbox", Category: task.CategoryInbox, Title: "reply", Units: []unit.Unit{u},
 		Origin: task.OriginUser, Created: at, Updated: at}
 	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)
@@ -39,6 +39,6 @@ func TestAPluginRefusedAtBuildCountsAsOff(t *testing.T) {
 		t.Fatalf("counts %+v %v", c, err)
 	}
 	if _, err := d.Tasks.Do(ctx, e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbNext}); !errors.Is(err, coretasks.ErrPluginDisabled) {
-		t.Fatalf("next on a refused plugin's entry: %v", err)
+		t.Fatalf("next on a refused plugin's task: %v", err)
 	}
 }

@@ -24,6 +24,12 @@ type Store interface {
 	Resolve(ctx context.Context, id int64, r Resolution) (gate.Gate, error)
 	// Due are the open gates whose Deadline is set and not after now.
 	Due(ctx context.Context, now time.Time) ([]gate.Gate, error)
+	// Applied marks resolved gate id's consequence as run; an open gate is
+	// refused.
+	Applied(ctx context.Context, id int64) error
+	// Unapplied are the resolved gates whose consequence has not run: a
+	// superseded gate and a recorded send have none.
+	Unapplied(ctx context.Context) ([]gate.Gate, error)
 }
 
 // Reader reads the gates, open and closed. Its lists are ordered by ID,
@@ -83,6 +89,25 @@ type (
 		Unblock(ctx context.Context, g gate.Gate) error
 	}
 )
+
+// Once is optional on a consequence port: a gate it answers true for is
+// marked run before its consequence runs, so a daemon that stops during the
+// consequence never runs it again, and may leave it not run. For a
+// consequence that acts in the user's name and keeps no record a second
+// run could read, such as a round or a verb.
+type Once interface {
+	Once(g gate.Gate) bool
+}
+
+// Begun is optional on a Store: it keeps an at-most-once consequence begun
+// until it ends, so one a stopped daemon cut can be reported.
+type Begun interface {
+	// Begin marks resolved gate id's consequence run, and begun until End.
+	Begin(ctx context.Context, id int64) error
+	End(ctx context.Context, id int64) error
+	// Begun are the resolved gates whose consequence began and never ended.
+	Begun(ctx context.Context) ([]gate.Gate, error)
+}
 
 // Sent records a post an agent made at once with a tool as a gate already
 // approved. It is no resolution: no agent resolves an open gate.

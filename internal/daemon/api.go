@@ -16,6 +16,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/meter"
@@ -219,6 +220,9 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		if w := appWarning(*app); w != "" {
 			h.Warnings = append(h.Warnings, w)
 		}
+	}
+	if s.deps.Gates != nil {
+		h.Warnings = append(h.Warnings, cutWarnings(s.deps.Gates.Cut())...)
 	}
 	if s.deps.EffectWarnings != nil {
 		h.Warnings = append(h.Warnings, s.deps.EffectWarnings()...)
@@ -561,4 +565,18 @@ func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
+}
+
+// cutWarnings name each gate whose consequence, which runs at most once, a
+// stopped daemon cut: the person decides whether it ran.
+func cutWarnings(cut []gate.Gate) []string {
+	out := make([]string, 0, len(cut))
+	for _, g := range cut {
+		on := g.Unit.Label()
+		if g.Task != "" {
+			on = string(g.Task)
+		}
+		out = append(out, fmt.Sprintf("the %s gate %d on %s was %s, and the daemon stopped while its consequence ran: it may not have run; check it, and act again if it did not", g.Kind, g.ID, on, g.Status))
+	}
+	return out
 }

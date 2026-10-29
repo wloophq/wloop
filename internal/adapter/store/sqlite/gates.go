@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -24,6 +25,7 @@ type GateStore struct {
 
 var (
 	_ gates.Store  = GateStore{}
+	_ gates.Begun  = GateStore{}
 	_ gates.Reader = GateStore{}
 	_ gates.Sent   = GateStore{}
 )
@@ -35,9 +37,10 @@ const gateColumns = `id, task_id, provider, unit_key, kind, name, subject, statu
 	by_actor, rule, deadline, default_intent, opened_at, closed_at`
 
 const (
-	gateOfIDSQL    = `SELECT ` + gateColumns + ` FROM gates WHERE id = ?`
-	gatesOfTaskSQL = `SELECT ` + gateColumns + ` FROM gates WHERE task_id = ? ORDER BY id`
-	gatesDueSQL    = `SELECT ` + gateColumns + ` FROM gates WHERE status = ? AND deadline != '' AND deadline <= ? ORDER BY id`
+	gateOfIDSQL       = `SELECT ` + gateColumns + ` FROM gates WHERE id = ?`
+	gatesOfTaskSQL    = `SELECT ` + gateColumns + ` FROM gates WHERE task_id = ? ORDER BY id`
+	gatesDueSQL       = `SELECT ` + gateColumns + ` FROM gates WHERE status = ? AND deadline != '' AND deadline <= ? ORDER BY id`
+	gatesUnappliedSQL = `SELECT ` + gateColumns + ` FROM gates WHERE status NOT IN (?, ?) AND applied_at = '' ORDER BY id`
 )
 
 // gatesWhereSQL is the statement and arguments that read the gates q matches.
@@ -81,11 +84,66 @@ func (s GateStore) Open(ctx context.Context, g gate.Gate) (gate.Gate, error) {
 	return s.insert(ctx, g)
 }
 
-// RecordSent stores g closed as approved, opened and closed now.
+// RecordSent stores g closed as approved, opened and closed now, its
+// consequence applied: the tool posted it.
 func (s GateStore) RecordSent(ctx context.Context, g gate.Gate) (gate.Gate, error) {
 	at := s.now()
 	g.Status, g.OpenedAt, g.ClosedAt = gate.Approved, at, at
-	return s.insert(ctx, g)
+	g, err := s.insert(ctx, g)
+	if err != nil {
+		return gate.Gate{}, err
+	}
+	return g, s.Applied(ctx, g.ID)
+}
+
+// Applied marks resolved gate id's consequence as run.
+func (s GateStore) Applied(ctx context.Context, id int64) error {
+	_, err := s.db.Write(ctx, func(tx *Tx) error {
+		res, err := tx.ExecContext(ctx, `UPDATE gates SET applied_at = ? WHERE id = ? AND status != ?`, eventTime(s.now()), id, string(gate.Open))
+		if err != nil {
+			return err
+		}
+		if n, err := res.RowsAffected(); err != nil || n == 0 {
+			return cmp.Or(err, fmt.Errorf("gate %d is open or missing: no consequence ran", id))
+		}
+		return nil
+	})
+	return err
+}
+
+// Begin marks resolved gate id's consequence run, and begun until End.
+func (s GateStore) Begin(ctx context.Context, id int64) error {
+	_, err := s.db.Write(ctx, func(tx *Tx) error {
+		at := eventTime(s.now())
+		res, err := tx.ExecContext(ctx, `UPDATE gates SET applied_at = ?, begun_at = ? WHERE id = ? AND status != ?`, at, at, id, string(gate.Open))
+		if err != nil {
+			return err
+		}
+		if n, err := res.RowsAffected(); err != nil || n == 0 {
+			return cmp.Or(err, fmt.Errorf("gate %d is open or missing: no consequence ran", id))
+		}
+		return nil
+	})
+	return err
+}
+
+// End marks gate id's begun consequence ended.
+func (s GateStore) End(ctx context.Context, id int64) error {
+	_, err := s.db.Write(ctx, func(tx *Tx) error {
+		_, err := tx.ExecContext(ctx, `UPDATE gates SET begun_at = '' WHERE id = ?`, id)
+		return err
+	})
+	return err
+}
+
+// Begun are the resolved gates whose consequence began and never ended.
+func (s GateStore) Begun(ctx context.Context) ([]gate.Gate, error) {
+	return s.list(ctx, `SELECT `+gateColumns+` FROM gates WHERE begun_at != '' ORDER BY id`)
+}
+
+// Unapplied are the resolved gates whose consequence has not run.
+func (s GateStore) Unapplied(ctx context.Context) ([]gate.Gate, error) {
+	return s.list(ctx, gatesUnappliedSQL, string(gate.Open), string(gate.Superseded))
 }
 
 func (s GateStore) insert(ctx context.Context, g gate.Gate) (gate.Gate, error) {

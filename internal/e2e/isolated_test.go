@@ -500,23 +500,59 @@ func TestIsolatedSetupWritesTheMCPKeyAndExposesIt(t *testing.T) {
 }
 
 func TestIsolatedWorkflowsRunOnASnapshotTakenWithJobs(t *testing.T) {
-	dir := setupIsolated(t, shortDir(t), "w1", 4, "--workflows", "task-check-on,task-wake")
-	c, err := config.LoadFile(filepath.Join(dir, "config", brand.StateDir(), "config.toml"), cli.Defaults())
-	if err != nil {
-		t.Fatal(err)
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("snapshot needs sqlite3")
 	}
-	for name, w := range c.Workflows {
-		if want := name == "task-check-on" || name == "task-wake"; w.Enabled == nil || *w.Enabled != want {
-			t.Errorf("workflow %s enabled %v, want %v", name, w.Enabled, want)
-		}
-	}
-	mustIsolated(t, "snapshot", "--jobs", dir, walStore(t, map[string]string{"viewer:github": "octo"}, false))
-	mustIsolated(t, "start", dir)
-	mustIsolated(t, "stop", dir)
-
 	none := setupIsolated(t, shortDir(t), "w2", 5)
 	out, err := isolated(t, "snapshot", "--jobs", none, walStore(t, map[string]string{"viewer:github": "octo"}, false))
 	refusedWith(t, out, err, "--workflows")
 	out, err = isolated(t, "setup", filepath.Join(shortDir(t), "w3"), fakeDaemon(t), isolatedDM, "--workflows", "task-nope")
 	refusedWith(t, out, err, "no bundled workflow task-nope")
+
+	bin := buildRelease(t)
+	dir := filepath.Join(shortDir(t), "w1")
+	mustIsolated(t, "setup", dir, bin, isolatedDM, "4", "--workflows", "task-kind,task-wake")
+	t.Cleanup(func() { isolated(t, "stop", dir) })
+	file := filepath.Join(dir, "config", brand.StateDir(), "config.toml")
+	c, err := config.LoadFile(file, cli.Defaults())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, w := range c.Workflows {
+		if want := name == "task-kind" || name == "task-wake"; w.Enabled == nil || *w.Enabled != want {
+			t.Errorf("workflow %s enabled %v, want %v", name, w.Enabled, want)
+		}
+	}
+	raw, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file, withFreePorts(t, raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	mustIsolated(t, "snapshot", "--jobs", dir, v6StoreWith(t))
+	mustIsolated(t, "run", dir, filepath.Join(dir, "bin", brand.Name), "store", "migrate", "--yes")
+	mustIsolated(t, "start", dir)
+	var id string
+	for deadline := time.Now().Add(90 * time.Second); id == "" && time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
+		if out, err := isolated(t, "run", dir, filepath.Join(dir, "bin", brand.Name), "task", "new", "--title", "Write the runbook"); err == nil {
+			id = strings.TrimPrefix(strings.TrimSpace(out[strings.LastIndex(out, "task:"):]), "task:")
+		}
+	}
+	if id == "" {
+		t.Fatal("task new never reached the daemon")
+	}
+	store := "file:" + filepath.Join(dir, "state", brand.StateDir(), "store.db") + "?mode=ro"
+	query := fmt.Sprintf("SELECT value || ' ' || writer FROM task_props WHERE task_id = '%s' AND name = 'kind'", id)
+	var got string
+	for deadline := time.Now().Add(90 * time.Second); time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
+		raw, _ := exec.Command("sqlite3", store, query).CombinedOutput()
+		if got = strings.TrimSpace(string(raw)); got != "" {
+			break
+		}
+	}
+	if got != `{"text":"capture"} workflow` {
+		log, _ := os.ReadFile(filepath.Join(dir, "daemon.log"))
+		t.Fatalf("task-kind wrote %q on %s, want the kind capture by the workflow:\n%s", got, id, log)
+	}
 }

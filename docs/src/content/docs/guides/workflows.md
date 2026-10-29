@@ -182,7 +182,7 @@ use = "notify.self"
 
 With no `[trigger]`, a workflow is evaluated on every sweep.
 
-A workflow can also look at your tasks, `provider = "task"`, every task neither done nor in the trash of an enabled plugin, or at the Slack units a live task is attached to, `provider = "slack"`. This one tells you about a task someone else owes once its check date passed:
+A workflow can also look at your tasks, `provider = "task"`, every open task (its category neither `done` nor `dropped`) of an enabled plugin, or at the Slack units a live task is attached to, `provider = "slack"`. This one tells you about a task someone else owes once its check date passed:
 
 ```toml
 summary = "Tell me when a task I am owed is due a check"

@@ -32,7 +32,7 @@ The bundled guides, `intent=review.md`, `intent=address.md` and `intent=nudge.md
 
 ## Intents
 
-An **intent** is a kind of turn: `review`, `address`, `nudge`, `act`, the `probe`, or one your profile adds. Each is a manifest, `intent.toml`, plus the turn's instructions template, `instructions.md.tmpl`. From the manifest {{name}} builds:
+An **intent** is a kind of turn: `review`, `address`, `nudge`, `act`, `start`, `chat`, `attach`, the `brief`, the `probe`, or one your profile adds. Each is a manifest, `intent.toml`, plus the turn's instructions template, `instructions.md.tmpl`. From the manifest {{name}} builds:
 
 - a command: `{{command}} <intent> <url> [flags] [guidance...]`, listed by `{{command}} --help`; an intent that serves another provider takes that provider's unit, such as a Slack message ref (`<conversation>/<ts>`), a permalink or `slack:<key>`;
 - a way to run it by hand from any agent session: `{{command}} instructions <intent>`, or the bundled skills such as `/{{name}}-review <url>`;
@@ -46,6 +46,10 @@ A turn of any intent records, asks, takes answers and resumes the same way. A us
 | `address` | `F` | the author workspace | triages the reviews and failing checks of a pull request you develop |
 | `nudge` | `N` | the pull request's workspace, else the repository's main checkout | asks whoever the pull request waits on for the next step, in one comment |
 | `act` | | headless, or a session | resolves the open items of a unit and proposes the replies as drafts |
+| `start` | | a fresh worktree of the repository you name, else no checkout | starts new work on a task from its brief (`{{command}} start`) |
+| `chat` | | the task's last session when it can resume, else a new one | talks with an agent about a task, when you write on its chat and no session of it is live |
+| `attach` | | the session it is run from | makes an agent session started outside the loop a run of a task (`{{command}} task attach`) |
+| `brief` | | headless | writes a unit's brief (see [The brief](/concepts/brief/)) |
 | `probe` | | a workspace you name | a self-test of an agent home (`{{command}} probe`) |
 
 See [Add your own intent](/guides/custom-intent/) and the [intent manifest](/reference/intent-manifest/).

@@ -53,7 +53,7 @@ type Service struct {
 	// Gates opens the gate an intent's record.missing names when a turn of it
 	// ends without the record it requires; nil opens none.
 	Gates Gates
-	// Results attaches a done record's outcome url to the turn's entry when
+	// Results attaches a done record's outcome url to the turn's task when
 	// its intent's record.attach_url says so; nil attaches nothing.
 	Results Results
 	// Usage is where EndHeadless writes a headless turn's usage; nil writes none.

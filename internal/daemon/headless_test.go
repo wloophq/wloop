@@ -88,7 +88,7 @@ func TestGitHubDelegateRunsReviewWithActLoaded(t *testing.T) {
 	if st, ok := c.s.offeredFor(row, task.VerbDelegate).runs(); !ok || st.ID != string(dintent.Review) {
 		t.Fatalf("delegate runs %q (%v), want review", st.ID, ok)
 	}
-	rec := post(t, c.s, api.TaskPath("e-r", "delegate"), `{"source":"cockpit"}`)
+	rec := post(t, c.s, api.TaskPath("t-r", "delegate"), `{"source":"cockpit"}`)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "review accepted as intake") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
@@ -139,7 +139,7 @@ func TestActRunsOneModeDecisionWhateverTheCaller(t *testing.T) {
 	rec := httptest.NewRecorder()
 	s.handleAction(rec, bridged)
 	if rec.Code != 202 || len(h.got) != 2 || len(fa.calls) != 0 {
-		t.Fatalf("the generic action path, as the GTD bridge calls it: %d %s, started %d, session calls %v", rec.Code, rec.Body, len(h.got), fa.calls)
+		t.Fatalf("the generic action path, as the task verbs' bridge calls it: %d %s, started %d, session calls %v", rec.Code, rec.Body, len(h.got), fa.calls)
 	}
 	if rec := post(t, s, threadAct, `{"mode":"session","guidance":"look"}`); rec.Code != 200 || len(fa.calls) != 1 || !strings.HasPrefix(fa.calls[0], "act ") || len(h.got) != 2 {
 		t.Fatalf("session mode: %d %s, calls %v, started %d", rec.Code, rec.Body, fa.calls, len(h.got))
@@ -154,17 +154,17 @@ func TestTheBridgeDelegatesActHeadlessWithTheTasksItems(t *testing.T) {
 	s, h := newThreadActServer(t)
 	store := taskstest.New()
 	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: store, Facts: coretasks.CardFacts{}, Clock: fixedClock(catalogNow)})
-	e := task.Task{ID: "e-t", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{actThread}, Items: []task.ItemRef{{Unit: actThread, Item: "i1"}},
+	e := task.Task{ID: "t-t", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{actThread}, Items: []task.ItemRef{{Unit: actThread, Item: "i1"}},
 		Origin: task.OriginDerived, Created: catalogNow, Updated: catalogNow}
 	if err := store.Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
 	rec := httptest.NewRecorder()
-	s.runBridge(rec, apiRequest("POST", api.TaskPath("e-t", "delegate"), nil), g, e, task.VerbDelegate, actThread, api.ActionState{ID: string(dintent.Act), Enabled: true}, api.TaskRequest{Source: "cockpit"}, task.ActorPerson)
+	s.runBridge(rec, apiRequest("POST", api.TaskPath("t-t", "delegate"), nil), g, e, task.VerbDelegate, actThread, api.ActionState{ID: string(dintent.Act), Enabled: true}, api.TaskRequest{Source: "cockpit"}, task.ActorPerson)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "act started headless as turn 42") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if len(h.got) != 1 || !slices.Equal(h.got[0].Items, []string{"i1"}) || h.got[0].Task != "e-t" {
+	if len(h.got) != 1 || !slices.Equal(h.got[0].Items, []string{"i1"}) || h.got[0].Task != "t-t" {
 		t.Fatalf("started %+v", h.got)
 	}
 	if len(store.Events) != 1 || store.Events[0].Kind != "verb_delegate" || store.Events[0].Actor != "person:cockpit" {

@@ -80,7 +80,7 @@ const (
 	Effects   Provenance = "effects"
 )
 
-type Initial string // "", "inbox", "next": the plugin's proposed first GTD state; "" is inbox
+type Initial string // "", "inbox", "next": the plugin's proposed first task state; "" is inbox
 
 const (
 	InitialInbox Initial = "inbox"
@@ -136,8 +136,8 @@ type Item struct {
 	Options    []Option    `json:"options,omitempty"`
 	Deadline   string      `json:"deadline,omitempty"`
 	URLs       []string    `json:"urls,omitempty"`
-	Contexts   []string    `json:"contexts,omitempty"` // proposed GTD contexts ("@decide", "@repo-api"); entries copy them, the user edits there
-	Initial    Initial     `json:"initial,omitempty"`  // proposed first GTD state, honored for a new entry
+	Contexts   []string    `json:"contexts,omitempty"` // proposed contexts ("@decide", "@repo-api"); tasks copy them, the user edits there
+	Initial    Initial     `json:"initial,omitempty"`  // proposed first task state, honored for a new task
 	Origin     unit.Anchor `json:"origin"`
 	Requester  Person      `json:"requester"`
 	Assignees  []Person    `json:"assignees,omitempty"`

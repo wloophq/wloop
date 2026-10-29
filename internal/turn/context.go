@@ -170,7 +170,7 @@ type Request struct {
 	BriefMissing string
 	// Why is the workflow that started the turn; nil for a turn started by hand.
 	Why *workflow.Why
-	// Items and Task are the unit's item ids and the GTD entry the turn was asked about.
+	// Items and Task are the unit's item ids and the task the turn was asked about.
 	Items []string
 	Task  string
 }

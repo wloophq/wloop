@@ -135,6 +135,31 @@ var writes = []writeCase{
 		topics: port.TopicGates, units: []unit.Unit{u7},
 	},
 	{
+		method: "GateStore.Applied",
+		seed: func(t *testing.T, e *noteEnv) {
+			seedGate(t, e)
+			if _, err := noteGates(e).Resolve(context.Background(), 1, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson}); err != nil {
+				t.Fatal(err)
+			}
+		},
+		call: func(ctx context.Context, e *noteEnv) error { return noteGates(e).Applied(ctx, 1) },
+	},
+	{
+		method: "GateStore.Begin",
+		seed: func(t *testing.T, e *noteEnv) {
+			seedGate(t, e)
+			if _, err := noteGates(e).Resolve(context.Background(), 1, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson}); err != nil {
+				t.Fatal(err)
+			}
+		},
+		call: func(ctx context.Context, e *noteEnv) error { return noteGates(e).Begin(ctx, 1) },
+	},
+	{
+		method: "GateStore.End",
+		seed:   seedGate,
+		call:   func(ctx context.Context, e *noteEnv) error { return noteGates(e).End(ctx, 1) },
+	},
+	{
 		method: "GateStore.RecordSent",
 		call: func(ctx context.Context, e *noteEnv) error {
 			_, err := noteGates(e).RecordSent(ctx, gate.Gate{Unit: term1, Kind: gate.KindPost, Name: "post", By: task.ActorAgent})
@@ -367,18 +392,18 @@ var writes = []writeCase{
 	{
 		method: "taskStore.Apply",
 		call: func(ctx context.Context, e *noteEnv) error {
-			return e.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-1", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{u7}, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}})
+			return e.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-1", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{u7}, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}})
 		},
-		topics: port.TopicTasks, units: []unit.Unit{u7, task.UnitOf("e-1")},
+		topics: port.TopicTasks, units: []unit.Unit{u7, task.UnitOf("t-1")},
 	},
 	{
 		method: "taskStore.Apply",
 		name:   "a task picking up a unit back-fills the unit's gates",
 		seed:   seedGate,
 		call: func(ctx context.Context, e *noteEnv) error {
-			return e.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-1", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{u7}, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}})
+			return e.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-1", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{u7}, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}})
 		},
-		topics: port.TopicTasks | port.TopicGates, units: []unit.Unit{u7, task.UnitOf("e-1")},
+		topics: port.TopicTasks | port.TopicGates, units: []unit.Unit{u7, task.UnitOf("t-1")},
 	},
 	{
 		method: "taskStore.Recategorize",
@@ -427,7 +452,7 @@ var reads = []string{
 	"Fetches.Last",
 	"DB.AgentTranscript", "DB.WorkflowActivity",
 	"DB.Tasks", "taskStore.Tasks", "taskStore.TasksSince", "taskStore.Task", "taskStore.TasksOf", "DB.Props",
-	"DB.Gates", "GateStore.Get", "GateStore.OfTask", "GateStore.Where", "GateStore.Due",
+	"DB.Gates", "GateStore.Get", "GateStore.OfTask", "GateStore.Where", "GateStore.Due", "GateStore.Unapplied", "GateStore.Begun",
 	"DB.Wakes", "WakeStore.Of", "WakeStore.Due", "WakeStore.Watching", "WakeStore.UnitWakes",
 }
 

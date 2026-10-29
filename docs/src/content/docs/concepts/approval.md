@@ -1,13 +1,13 @@
 ---
 title: What waits for you
-description: The approval window of automatic rounds, the ambiguity gate inside a round, and the Outbox of drafts.
+description: The gates that wait for you, the approval window of automatic rounds, the ambiguity gate inside a round, and the drafts' gates the Outbox lists.
 ---
 
 Every decision that waits for you is a **gate**: a draft to send, a round to run, an agent's question or post, a proposal, a repository's first run, a workflow's `gate.open`. Three mechanisms keep the loop from acting where you would not:
 
 1. the **approval window** announces every automatic round before it goes out;
 2. the **ambiguity gate** stops a round that is unsure and asks you before publishing;
-3. the **Outbox** holds every draft that an agent or a rule proposes to post, until its gate lets it out.
+3. a **draft gate** holds every draft that an agent or a rule proposes to post until it lets the draft out; the **Outbox** lists them.
 
 ## Gates
 
@@ -16,6 +16,8 @@ A gate has a kind (`draft`, `plan`, `question`, `post`, `proposal`, `trust` or `
 A gate opens on the task its unit is on: the unit's own task, else the first open task that holds it, else a new captured task; a done or dropped task never takes a new gate. A question, post or proposal gate whose task closes moves to another the next time its unit is reconciled. A proposal gate of a verb its profile holds behind a gate runs that verb as you once you approve it, through the same path your own request takes, so a delegate or an approve still runs its unit's action.
 
 A gate is resolved only three ways: by you, through a client; by a trusted policy rule, a rule of a `[gates.approval]` table of your profile or configuration; or by its window, when a `delay` gate's deadline passes and it takes its default intent, recorded with the rule `window`. An agent's session, even one that runs `{{command}}`, never resolves a gate, and no agent's or thread's text picks a rule. A post an agent makes at once with a Slack tool is recorded as a gate already approved, which is no resolution.
+
+A gate's resolution is written before its consequence runs, and the gate records when its consequence ran. When the daemon stops in between, its gates' first tick after the start runs each consequence that had not run, and every later tick does the same. A consequence runs once: a draft already queued or sent is not queued again, a proposal whose decision was applied applies nothing more, and an answer already given to its session is not given again. A round the daily cap held and a verb a gate held, which act in your name and leave no record a second run could read, are marked run before they run: a daemon that stops during one never runs it twice, and may leave it not run; its health then warns, naming the gate, so you check whether it ran and act again if it did not. A consequence that ran and failed stays failed, for you to retry: no tick retries it.
 
 Every approval is a `[gates.approval]` table, in an intent's manifest, a workflow's, `config.toml`'s `workflows.<name>.gates.approval` and `plugins.<id>.gates.approval`. Its rules are tried before its `mode`; a rule applies to the kinds of gate its `when` pins `gate.kind` to, to draft gates alone when it reads a draft's facts, else to every kind. A rule whose `when` reads `gate.kind` alone decides every gate of its kind, as that kind's mode. A rule that reaches draft gates but reads a fact no draft gate's rule may read, an untrusted one or a second unit's, fails to load rather than being left to the other kinds, since a later rule would then decide the draft; pin it to the kinds it means, such as `gate.kind == "plan"`. What no table decides, `gates.toml`'s `[approval]` does: the bundled one starts a run at once and holds every other gate for you.
 

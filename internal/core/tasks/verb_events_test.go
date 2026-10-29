@@ -19,7 +19,7 @@ func verbEvents(evs []port.Event) []port.Event {
 
 func TestAVerbRecordsItsEvent(t *testing.T) {
 	r := newRig()
-	e := r.put(t, task.Task{ID: "e-x", State: "next", Category: task.CategoryReady, Origin: task.OriginUser})
+	e := r.put(t, task.Task{ID: "t-x", State: "next", Category: task.CategoryReady, Origin: task.OriginUser})
 	r.clock.t = t0.Add(time.Hour)
 	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone, Source: "cockpit"}); err != nil {
 		t.Fatal(err)
@@ -32,9 +32,9 @@ func TestAVerbRecordsItsEvent(t *testing.T) {
 
 func TestARefusedOrSeenVerbRecordsNothing(t *testing.T) {
 	r := newRig()
-	e := r.put(t, task.Task{ID: "e-x", State: "trash", Category: task.CategoryDropped, Origin: task.OriginUser, Changed: true})
+	e := r.put(t, task.Task{ID: "t-x", State: "trash", Category: task.CategoryDropped, Origin: task.OriginUser, Changed: true})
 	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone}); !errors.Is(err, coretasks.ErrVerb) {
-		t.Fatalf("done on a trashed entry: %v", err)
+		t.Fatalf("done on a trashed task: %v", err)
 	}
 	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSeen}); err != nil {
 		t.Fatal(err)
@@ -46,7 +46,7 @@ func TestARefusedOrSeenVerbRecordsNothing(t *testing.T) {
 
 func TestAHandledVerbRecordsItsEvent(t *testing.T) {
 	r := newProjectRig()
-	e := r.put(t, task.Task{ID: "e-x", State: "inbox", Category: task.CategoryInbox, Origin: task.OriginUser, Title: "Draft the API"})
+	e := r.put(t, task.Task{ID: "t-x", State: "inbox", Category: task.CategoryInbox, Origin: task.OriginUser, Title: "Draft the API"})
 	r.do(t, e.ID, task.VerbProject, map[string]string{"title": "Ship the v2 API"})
 	got := verbEvents(r.store.Events)
 	if len(got) != 1 || got[0].Kind != "verb_project" || got[0].Unit != task.UnitOf(e.ID) || got[0].Data != "inbox" {
@@ -56,7 +56,7 @@ func TestAHandledVerbRecordsItsEvent(t *testing.T) {
 
 func TestRecordVerbRecordsAVerbAnotherServiceRan(t *testing.T) {
 	r := newRig()
-	e := r.put(t, task.Task{ID: "e-x", State: "inbox", Category: task.CategoryInbox, Origin: task.OriginUser})
+	e := r.put(t, task.Task{ID: "t-x", State: "inbox", Category: task.CategoryInbox, Origin: task.OriginUser})
 	if err := r.svc.RecordVerb(context.Background(), e, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDelegate, Source: "tui"}); err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestRecordVerbRecordsAVerbAnotherServiceRan(t *testing.T) {
 
 func TestAVerbThatChangesNothingRecordsNothing(t *testing.T) {
 	r := newRig()
-	e := r.put(t, task.Task{ID: "e-x", State: "next", Category: task.CategoryReady, Origin: task.OriginUser, Props: task.Props{"area": {Text: "OSS"}}, Written: map[string]task.Written{"area": {By: task.WriterPerson}}})
+	e := r.put(t, task.Task{ID: "t-x", State: "next", Category: task.CategoryReady, Origin: task.OriginUser, Props: task.Props{"area": {Text: "OSS"}}, Written: map[string]task.Written{"area": {By: task.WriterPerson}}})
 	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbArea, Args: map[string]string{"set": "OSS"}}); err != nil {
 		t.Fatal(err)
 	}

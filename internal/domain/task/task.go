@@ -31,7 +31,7 @@ func DerivedID(u unit.Unit, item string) ID {
 	return ID("t-" + hex.EncodeToString(sum[:])[:16])
 }
 
-// NewID is a random entry id.
+// NewID is a random task id.
 func NewID() ID {
 	var b [8]byte
 	_, _ = rand.Read(b[:])
@@ -76,7 +76,7 @@ func (e *Task) Become(s State, st States) {
 // Snoozed says whether the task is deferred under a wake.
 func (e Task) Snoozed() bool { return e.Category == CategoryDeferred && e.Asleep }
 
-// FirstUnit is the unit the entry is about: its first unit, else its
+// FirstUnit is the unit the task is about: its first unit, else its
 // first item's.
 func (e Task) FirstUnit() (unit.Unit, bool) {
 	if len(e.Units) > 0 {

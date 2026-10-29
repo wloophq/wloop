@@ -12,7 +12,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
@@ -291,31 +290,29 @@ func TestAPendingRunNowIgnoresAnOpenIntake(t *testing.T) {
 
 func TestASessionAskWithADifferentInputDoesNotJoin(t *testing.T) {
 	t.Parallel()
-	synctest.Test(t, func(t *testing.T) {
-		s, _, hand := newByHandServer(t, intaketest.NewBriefs(waitBriefing), 50*time.Millisecond)
-		byHand := func(body string) *httptest.ResponseRecorder {
-			rec := httptest.NewRecorder()
-			req := apiRequest("POST", api.AgentTurnsByHand, strings.NewReader(body))
-			req.Header.Set(api.SessionHeader, "term-1")
-			s.Handler().ServeHTTP(rec, req)
-			return rec
-		}
-		if rec := byHand(`{"intent":"address","cwd":"/w"}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "not ready yet") {
-			t.Fatalf("%d %s", rec.Code, rec.Body)
-		}
-		open, _ := s.deps.Intakes.Open(context.Background())
-		if len(open) != 1 {
-			t.Fatalf("open %+v", open)
-		}
-		rec := byHand(`{"intent":"address","cwd":"/w","inputs":{"self_review":true}}`)
-		want := fmt.Sprintf("intake %d already asks for this pull request's address without --self-review", open[0].Seq)
-		if rec.Code != 409 || !strings.Contains(rec.Body.String(), want) {
-			t.Fatalf("%d %s", rec.Code, rec.Body)
-		}
-		if again, _ := s.deps.Intakes.Open(context.Background()); len(again) != 1 || len(hand.list()) != 0 {
-			t.Fatalf("open %+v, calls %v", again, hand.list())
-		}
-	})
+	s, _, hand := newByHandServer(t, intaketest.NewBriefs(waitBriefing), 50*time.Millisecond)
+	byHand := func(body string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		req := apiRequest("POST", api.AgentTurnsByHand, strings.NewReader(body))
+		req.Header.Set(api.SessionHeader, "term-1")
+		s.Handler().ServeHTTP(rec, req)
+		return rec
+	}
+	if rec := byHand(`{"intent":"address","cwd":"/w"}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "not ready yet") {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	open, _ := s.deps.Intakes.Open(context.Background())
+	if len(open) != 1 {
+		t.Fatalf("open %+v", open)
+	}
+	rec := byHand(`{"intent":"address","cwd":"/w","inputs":{"self_review":true}}`)
+	want := fmt.Sprintf("intake %d already asks for this pull request's address without --self-review", open[0].Seq)
+	if rec.Code != 409 || !strings.Contains(rec.Body.String(), want) {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	if again, _ := s.deps.Intakes.Open(context.Background()); len(again) != 1 || len(hand.list()) != 0 {
+		t.Fatalf("open %+v, calls %v", again, hand.list())
+	}
 }
 
 func TestASweepTurnWithoutTheInputFailsTheIntake(t *testing.T) {

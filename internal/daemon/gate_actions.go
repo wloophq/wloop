@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/automation"
@@ -59,6 +61,21 @@ func (s *Server) Release(ctx context.Context, g gate.Gate) error {
 		ctx = withLoopHeld(ctx)
 	}
 	return s.deps.Plan.Release(ctx, g)
+}
+
+// Once says a gate's consequence runs at most once: a round the daily cap
+// held, and a verb a gate held, act in the user's name and leave nothing a
+// second run reads.
+func (s *Server) Once(g gate.Gate) bool {
+	switch g.Kind {
+	case gate.KindPlan:
+		_, held := round.HeldDay(g.Subject)
+		return held
+	case gate.KindProposal:
+		_, ok := coretasks.ProposedVerb(g)
+		return ok
+	}
+	return false
 }
 
 // Unblock is a resolved trust gate's consequence on the start block of its

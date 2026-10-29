@@ -158,7 +158,7 @@ func (f *fakeDaemon) Task(_ context.Context, id string) (api.TaskView, error) {
 			}
 		}
 	}
-	return api.TaskView{}, errors.New("no entry " + id)
+	return api.TaskView{}, errors.New("no task " + id)
 }
 
 func (f *fakeDaemon) TaskDo(_ context.Context, id, verb string, req api.TaskRequest) (api.TaskResult, error) {

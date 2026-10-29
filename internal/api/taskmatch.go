@@ -36,7 +36,7 @@ func Fold(s string) string {
 
 // Texts are what a filter's free words search in a task: its title, notes, state, the text and the lists of
 // text of its properties, its units, who owes it, its asks, its cards' people, its draft and its message. The
-// cockpit's entryHaystack lists the same texts.
+// cockpit's taskHaystack lists the same texts.
 func (e TaskView) Texts() []string {
 	out := []string{e.Title, e.Notes, e.State}
 	for _, name := range slices.Sorted(maps.Keys(e.Props)) {

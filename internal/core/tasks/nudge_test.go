@@ -30,7 +30,7 @@ func TestNudgedStampsForwardOnly(t *testing.T) {
 	r := newRig()
 	id := waitingOnAna(t, r)
 	at := t0.Add(time.Hour)
-	if err := r.svc.Nudged(ctx, "e-gone", unitU, []string{"a"}, at); err != nil {
+	if err := r.svc.Nudged(ctx, "t-gone", unitU, []string{"a"}, at); err != nil {
 		t.Fatal(err)
 	}
 	if e := r.task(t, id); !e.Prop(task.PropLastNudge).Time.Equal(at) || e.Written[task.PropLastNudge].By != task.WriterWorkflow {

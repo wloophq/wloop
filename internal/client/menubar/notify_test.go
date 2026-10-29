@@ -187,7 +187,7 @@ func TestLeavingInboxWithdraws(t *testing.T) {
 	r.d.tasks["inbox"] = []api.TaskView{waitTask(5, "a"), heldTask(4, now)}
 	r.c.Refresh(ctx)
 	if len(r.notes.posted) != 6 || r.notes.posted[5].ID != waitTask(5, "a").Attention.ID {
-		t.Fatalf("an entry back in the Inbox was not posted, or a held one twice a day: %+v", r.notes.posted[5:])
+		t.Fatalf("a task back in the Inbox was not posted, or a held one twice a day: %+v", r.notes.posted[5:])
 	}
 }
 
@@ -642,7 +642,7 @@ func TestAHeldTaskAlreadyPostedDoesNotAskForPermission(t *testing.T) {
 	before = r.notes.permissionCalls()
 	r.c.Refresh(context.Background())
 	if without := r.notes.permissionCalls() - before; withHeld != without {
-		t.Fatalf("a held entry posted already asked for permission: %d calls, %d without it", withHeld, without)
+		t.Fatalf("a held task posted already asked for permission: %d calls, %d without it", withHeld, without)
 	}
 }
 
@@ -698,7 +698,7 @@ func TestAQuestionCategoryStaysWhileAnotherNotificationUsesIt(t *testing.T) {
 		t.Fatal("kept Q0 after its last notification")
 	}
 	if c.Withdraw([]string{api.NotificationID(api.CategoryInbox, "e-3", "x")}) {
-		t.Fatal("an Inbox entry's withdrawal changed the categories")
+		t.Fatal("an Inbox task's withdrawal changed the categories")
 	}
 }
 
@@ -708,7 +708,7 @@ func TestMenubarNotifiesFromTheSet(t *testing.T) {
 	r.c.Refresh(context.Background())
 	r.c.Refresh(context.Background())
 	if n := len(r.notes.snapshot()); n != 1 {
-		t.Fatalf("posted %d notifications for one entry over two refreshes", n)
+		t.Fatalf("posted %d notifications for one task over two refreshes", n)
 	}
 }
 
@@ -724,7 +724,7 @@ func TestMenubarNotificationsFollowTheInbox(t *testing.T) {
 	}
 	inbox(added)
 	if len(r.notes.postedIDs()) != 1 {
-		t.Fatalf("an entry added posted %v", r.notes.postedIDs())
+		t.Fatalf("a task added posted %v", r.notes.postedIDs())
 	}
 	inbox(added)
 	if len(r.notes.postedIDs()) != 1 {
@@ -732,7 +732,7 @@ func TestMenubarNotificationsFollowTheInbox(t *testing.T) {
 	}
 	inbox()
 	if w := r.notes.withdrawnIDs(); len(w) != 1 || w[0] != added.Attention.ID {
-		t.Fatalf("the entry leaving withdrew %v", w)
+		t.Fatalf("the task leaving withdrew %v", w)
 	}
 }
 

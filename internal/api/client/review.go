@@ -7,7 +7,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 )
 
-// Review is the current weekly Review.
+// Review is the current Review.
 func (c *Client) Review(ctx context.Context) (api.Review, error) {
 	var r api.Review
 	err := c.do(ctx, ReadTimeout, http.MethodGet, api.ReviewPath, nil, &r)

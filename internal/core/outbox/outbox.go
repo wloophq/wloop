@@ -96,7 +96,7 @@ type Policies interface {
 // workflow when it is set.
 type Facts func(ctx context.Context, u unit.Unit, workflow string) (draft.Subject, error)
 
-// Results attaches to an entry the unit of each post a turn on it makes.
+// Results attaches to a task the unit of each post a turn on it makes.
 type Results interface {
 	// AttachesPosts says whether the turns of intent attach their posts.
 	AttachesPosts(intent string) bool
@@ -132,7 +132,7 @@ type Service struct {
 	RepeatAfter time.Duration
 	// Applier applies a sent draft's Effects; nil applies none.
 	Applier Applier
-	// Results attaches a sent post to its turn's entry; nil attaches none.
+	// Results attaches a sent post to its turn's task; nil attaches none.
 	Results Results
 }
 
@@ -658,7 +658,7 @@ func (s *Service) afterSent(ctx context.Context, d draft.Draft) error {
 		}
 	}
 	if err := s.attachPost(ctx, d); err != nil {
-		s.logf("draft %d: its unit was not attached to its entry", d.ID)
+		s.logf("draft %d: its unit was not attached to its task", d.ID)
 		errs = append(errs, fmt.Errorf("attaching draft %d: %w", d.ID, err))
 	}
 	for _, hook := range s.OnSent {
@@ -670,7 +670,7 @@ func (s *Service) afterSent(ctx context.Context, d draft.Draft) error {
 	return errors.Join(errs...)
 }
 
-// attachPost attaches the unit of d, a post, to the entry its turn is on
+// attachPost attaches the unit of d, a post, to the task its turn is on
 // when the turn's intent attaches its posts.
 func (s *Service) attachPost(ctx context.Context, d draft.Draft) error {
 	if s.Results == nil || !slices.Contains(posts, d.Delivery) || d.Origin.Intent == "" {
@@ -691,7 +691,7 @@ func (s *Service) attachPost(ctx context.Context, d draft.Draft) error {
 	return s.Results.Attach(ctx, id, posted)
 }
 
-// landed is the unit the post of d, a draft on an entry sent to a target of
+// landed is the unit the post of d, a draft on a task sent to a target of
 // another provider, landed in; false when its publisher cannot say.
 func (s *Service) landed(ctx context.Context, d draft.Draft) (unit.Unit, bool, error) {
 	fx, err := s.effects(s.PublisherOf(d))

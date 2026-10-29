@@ -45,15 +45,15 @@ func TestAnApprovedGateRunsABridgedOrReplyVerb(t *testing.T) {
 	states := proposingStates{States: taskstest.BundledStates, verb: task.VerbDelegate}
 	c.s.deps.Tasks = coretasks.New(coretasks.Deps{States: states, Authority: states.Authority, Gates: rigTaskGates{svc, gs}, Store: store,
 		Facts: coretasks.CardFacts{}, Clock: fixedClock(catalogNow)})
-	e := task.Task{ID: "e-r", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}, Origin: task.OriginDerived,
+	e := task.Task{ID: "t-r", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}, Origin: task.OriginDerived,
 		Created: catalogNow, Updated: catalogNow}
 	if err := store.Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
-	if rec := post(t, c.s, api.TaskPath("e-r", "delegate"), `{"source":"cockpit"}`); rec.Code != 200 {
+	if rec := post(t, c.s, api.TaskPath("t-r", "delegate"), `{"source":"cockpit"}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	open, err := gs.OfTask(ctx, "e-r")
+	open, err := gs.OfTask(ctx, "t-r")
 	if err != nil || len(open) != 1 || open[0].Status != gate.Open {
 		t.Fatalf("gates %+v %v", open, err)
 	}
@@ -67,7 +67,7 @@ func TestAnApprovedGateRunsABridgedOrReplyVerb(t *testing.T) {
 	if err != nil || len(intakes) != 1 || intakes[0].Unit != r7u || string(intakes[0].Intent) != "review" {
 		t.Fatalf("the approved delegate did not run through the bridge: %+v %v", intakes, err)
 	}
-	if after, _ := gs.OfTask(ctx, "e-r"); len(after) != 1 || after[0].Status != gate.Approved {
+	if after, _ := gs.OfTask(ctx, "t-r"); len(after) != 1 || after[0].Status != gate.Approved {
 		t.Fatalf("an approved delegate opened another gate: %+v", after)
 	}
 	if len(store.Events) != 1 || store.Events[0].Kind != "verb_delegate" || store.Events[0].Actor != "person:cockpit" {

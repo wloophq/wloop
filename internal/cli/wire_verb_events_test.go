@@ -14,7 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
-const doneWorkflow = `summary = "React to an entry marked done"
+const doneWorkflow = `summary = "React to a task marked done"
 provider = "task"
 when = 'trigger.event.kind == "verb_done"'
 key = ["trigger.event.id"]
@@ -51,12 +51,12 @@ func TestAVerbAPersonRunsPlansItsWorkflow(t *testing.T) {
 	}
 	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: db.Tasks(), Facts: coretasks.CardFacts{Cards: db.Cards()}, Clock: clockFunc(func() time.Time { return te.Now() })})
 	at := testNow.Add(-time.Hour)
-	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-01", State: "next", Category: task.CategoryReady,
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-01", State: "next", Category: task.CategoryReady,
 		Title: "Ship it", Origin: task.OriginUser, Created: at, Updated: at}}}); err != nil {
 		t.Fatal(err)
 	}
 	for _, v := range []task.Verb{task.VerbDone, task.VerbReference, task.VerbDone} {
-		if _, err := g.Do(ctx, "e-01", coretasks.Request{Actor: task.ActorPerson, Verb: v, Source: "cockpit"}); err != nil {
+		if _, err := g.Do(ctx, "t-01", coretasks.Request{Actor: task.ActorPerson, Verb: v, Source: "cockpit"}); err != nil {
 			t.Fatalf("%s: %v", v, err)
 		}
 	}
@@ -70,7 +70,7 @@ func TestAVerbAPersonRunsPlansItsWorkflow(t *testing.T) {
 	}
 	var left []string
 	for _, it := range p.Items {
-		if it.Workflow == "my-done" && it.Unit == task.UnitOf("e-01") && it.Why.Event != nil {
+		if it.Workflow == "my-done" && it.Unit == task.UnitOf("t-01") && it.Why.Event != nil {
 			left = append(left, it.Why.Event.Data)
 		}
 	}

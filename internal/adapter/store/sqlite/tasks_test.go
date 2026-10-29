@@ -22,7 +22,7 @@ var taskAt = time.Date(2026, 10, 20, 13, 0, 0, 0, time.UTC)
 func openTasks(t *testing.T) (coretasks.Store, *change.Log) {
 	t.Helper()
 	log := change.NewLog(change.DefaultWindow, nil)
-	db, err := sqlite.Open(filepath.Join(t.TempDir(), "entries.db"), log)
+	db, err := sqlite.Open(filepath.Join(t.TempDir(), "tasks.db"), log)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestTaskStoreContract(t *testing.T) {
 func TestTasksRoundTrip(t *testing.T) {
 	t.Parallel()
 	s, _ := openTasks(t)
-	want := taskstest.Full("e-00000000000000aa")
+	want := taskstest.Full("t-00000000000000aa")
 	applyTasks(t, s, want)
 	got, err := s.Task(context.Background(), want.ID)
 	if err != nil {
@@ -74,10 +74,10 @@ func TestApplyNotesTasks(t *testing.T) {
 	s, log := openTasks(t)
 	ctx := context.Background()
 	u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
-	e := capture("e-1", task.State("inbox"), 0)
+	e := capture("t-1", task.State("inbox"), 0)
 	e.Units = []unit.Unit{u}
 	from := log.Gen()
-	ev := port.Event{Unit: u, Kind: "entry_test", Key: "k", At: taskAt}
+	ev := port.Event{Unit: u, Kind: "task_test", Key: "k", At: taskAt}
 	if err := s.Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}, ev); err != nil {
 		t.Fatal(err)
 	}
@@ -86,11 +86,11 @@ func TestApplyNotesTasks(t *testing.T) {
 		t.Fatalf("%d notes: %+v", log.Gen()-from, got)
 	}
 	from = log.Gen()
-	bad := []task.Change{{Op: task.OpCreate, Task: capture("e-2", task.State("inbox"), 1)}, {Op: task.OpCreate, Task: task.Task{}}}
+	bad := []task.Change{{Op: task.OpCreate, Task: capture("t-2", task.State("inbox"), 1)}, {Op: task.OpCreate, Task: task.Task{}}}
 	if err := s.Apply(ctx, bad); err == nil {
-		t.Fatal("an entry without an id was written")
+		t.Fatal("a task without an id was written")
 	}
-	if _, err := s.Task(ctx, "e-2"); !errors.Is(err, coretasks.ErrNoTask) || log.Gen() != from {
+	if _, err := s.Task(ctx, "t-2"); !errors.Is(err, coretasks.ErrNoTask) || log.Gen() != from {
 		t.Fatalf("a failed apply wrote or noted: %v, %d notes", err, log.Gen()-from)
 	}
 }
@@ -99,7 +99,7 @@ func TestEmptyApplyNotesNothing(t *testing.T) {
 	t.Parallel()
 	s, log := openTasks(t)
 	ctx := context.Background()
-	e := capture("e-1", task.State("inbox"), 0)
+	e := capture("t-1", task.State("inbox"), 0)
 	applyTasks(t, s, e)
 	before, err := s.TasksSince(ctx, task.Query{}, coretasks.Since{})
 	if err != nil {
@@ -122,11 +122,11 @@ func TestTasksSinceStore(t *testing.T) {
 	t.Parallel()
 	s, _ := openTasks(t)
 	ctx := context.Background()
-	a, b, c := capture("e-a", task.State("next"), 0), capture("e-b", task.State("next"), 1), capture("e-c", task.State("done"), 2)
+	a, b, c := capture("t-a", task.State("next"), 0), capture("t-b", task.State("next"), 1), capture("t-c", task.State("done"), 2)
 	applyTasks(t, s, a, b, c)
 	q := task.Query{}
 	first, err := s.TasksSince(ctx, q, coretasks.Since{})
-	if err != nil || !first.Full || !slices.Equal(taskIDs(first.Tasks), []task.ID{"e-a", "e-b"}) {
+	if err != nil || !first.Full || !slices.Equal(taskIDs(first.Tasks), []task.ID{"t-a", "t-b"}) {
 		t.Fatalf("first page %v %v", taskIDs(first.Tasks), err)
 	}
 	a.Title, b.State, b.Category = "a2", task.State("done"), task.CategoryDone
@@ -135,7 +135,7 @@ func TestTasksSinceStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if page.Full || !slices.Equal(taskIDs(page.Tasks), []task.ID{"e-a", "e-b"}) || len(page.Removed) != 0 {
+	if page.Full || !slices.Equal(taskIDs(page.Tasks), []task.ID{"t-a", "t-b"}) || len(page.Removed) != 0 {
 		t.Fatalf("page tasks %v removed %v full %v", taskIDs(page.Tasks), page.Removed, page.Full)
 	}
 	other, err := s.TasksSince(ctx, task.Query{All: true}, coretasks.Since{Epoch: "another", Rev: page.Rev})
@@ -158,13 +158,13 @@ func taskIDs(es []task.Task) []task.ID {
 
 func TestVerbEventsWriteWithOrWithoutAChange(t *testing.T) {
 	t.Parallel()
-	db, err := sqlite.Open(filepath.Join(t.TempDir(), "entries.db"), change.NewLog(change.DefaultWindow, nil))
+	db, err := sqlite.Open(filepath.Join(t.TempDir(), "tasks.db"), change.NewLog(change.DefaultWindow, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
 	ctx := context.Background()
-	e := capture("e-1", task.State("next"), 0)
+	e := capture("t-1", task.State("next"), 0)
 	applyTasks(t, db.Tasks(), e)
 	done := e
 	done.State, done.Category = "done", task.CategoryDone
