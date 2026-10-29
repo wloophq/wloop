@@ -2,6 +2,7 @@ package tui
 
 import (
 	"cmp"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"slices"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/record"
 	dtask "github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/termfmt"
@@ -22,9 +24,11 @@ type askCard struct {
 	recommend string
 	confirm   bool
 	// task is the task whose answer verb takes the answer; row the row
-	// whose answer action does, when no task does.
+	// whose answer action does, when no task does; gate the task's open
+	// gate whose intents the digits pick, when no question does.
 	task string
 	row  *api.Row
+	gate *api.GateView
 }
 
 // openTask opens the detail of e and asks the daemon for it, marking it
@@ -32,12 +36,12 @@ type askCard struct {
 func (m *Model) openTask(e api.TaskView, read uint64) (Command, bool) {
 	m.detailID, m.opened, m.detailStale, m.detailRead = e.ID, nil, false, read
 	c := Command{Unit: taskUnit(e.ID), Label: taskLabel(e), Action: "detail", task: e.ID, fetch: true}
-	if v, _ := m.viewOnScreen(); v.ID == viewInbox && e.Changed && !m.seen[e.ID] {
+	if e.Category == string(dtask.CategoryInbox) && e.Changed && !m.seen[e.ID] {
 		if m.seen == nil {
 			m.seen = map[string]bool{}
 		}
 		m.seen[e.ID] = true
-		c.seen = true
+		c.seen, c.seenVerb = true, m.verbOf(handlerSeen)
 	}
 	return c, true
 }
@@ -75,8 +79,9 @@ func (m *Model) shownDetail(e api.TaskView) api.TaskView {
 	return e
 }
 
-// questionCard is the open question of e: the message of its open gate, else the
-// question its first unit's row asks.
+// questionCard is the open question of e: the message of its open gate when it
+// offers choices, else the question its first unit's row asks, else its first
+// open gate but a draft's, whose intents the digits pick.
 func (m *Model) questionCard(e api.TaskView) (askCard, bool) {
 	if msg, _, ok := e.MessageOf(); ok && (len(msg.Options) > 0 || msg.Confirm) {
 		return askCard{text: msg.Text, options: msg.Options, recommend: msg.Recommend, confirm: msg.Confirm, task: e.ID}, true
@@ -87,7 +92,21 @@ func (m *Model) questionCard(e api.TaskView) (askCard, bool) {
 			return c, true
 		}
 	}
+	for _, g := range e.Gates {
+		if g.Status == string(gate.Open) && g.Kind != string(gate.KindDraft) && len(g.Intents) > 0 {
+			return askCard{text: gateText(g), task: e.ID, gate: &g}, true
+		}
+	}
 	return askCard{}, false
+}
+
+// gateText is what a gate asks: its words, else its message's text, else its name.
+func gateText(g api.GateView) string {
+	var msg api.Message
+	if len(g.Subject) > 0 && json.Unmarshal(g.Subject, &msg) == nil && msg.Text != "" && g.Text == "" {
+		return msg.Text
+	}
+	return cmp.Or(g.Text, g.Name, g.Kind)
 }
 
 func rowCard(r api.Row) askCard {
@@ -116,6 +135,16 @@ func (m *Model) activeCard() (askCard, bool) {
 
 // answers are the card's answers in the order its digits pick them.
 func (c askCard) answers() []string {
+	if c.gate != nil {
+		out := make([]string, len(c.gate.Intents))
+		for i, x := range c.gate.Intents {
+			out[i] = cmp.Or(x.Label, x.ID)
+			if x.ID == c.gate.Default && !c.gate.Deadline.IsZero() {
+				out[i] += " (at " + c.gate.Deadline.Local().Format("15:04") + ")"
+			}
+		}
+		return out
+	}
 	if c.confirm {
 		return []string{"yes", "no"}
 	}
@@ -162,6 +191,9 @@ func (m *Model) answer(c askCard, n int, read uint64) (Command, bool) {
 		}
 		return m.finish(cmd, st, read)
 	}
+	if c.gate != nil {
+		return m.resolveGate(c, c.gate.Intents[n-1], read)
+	}
 	args := map[string]string{}
 	switch {
 	case c.confirm && n == 1:
@@ -173,11 +205,32 @@ func (m *Model) answer(c askCard, n int, read uint64) (Command, bool) {
 		args["option_id"], args["guidance"] = o.ID, o.Answer()
 	}
 	e, _ := m.selectedTask()
-	return m.send(Command{Unit: taskUnit(c.task), Label: taskLabel(e), Action: "answer", task: c.task, verb: "answer", args: args})
+	verb := m.verbOf(handlerAnswer)
+	return m.send(Command{Unit: taskUnit(c.task), Label: taskLabel(e), Action: verb, task: c.task, verb: verb, args: args})
+}
+
+// resolveGate resolves the card's gate with intent x, asking first for the
+// answer of an intent that takes one.
+func (m *Model) resolveGate(c askCard, x api.IntentView, read uint64) (Command, bool) {
+	e, _ := m.selectedTask()
+	label := cmp.Or(x.Label, x.ID)
+	cmd := Command{Unit: taskUnit(c.task), Label: taskLabel(e), Action: label, task: c.task, gate: c.gate.ID, intent: x.ID}
+	if !x.Answer {
+		return m.send(cmd)
+	}
+	m.prompt = &prompt{action: x.ID, label: label + ": " + c.text, read: read, editor: true, submit: func(text string) (Command, bool) {
+		if text == "" {
+			m.status = label + " " + cmd.Label + " cancelled: nothing typed"
+			return Command{}, false
+		}
+		cmd.args = map[string]string{"answer": text}
+		return m.send(cmd)
+	}}
+	return Command{}, false
 }
 
 // taskDetail is the task, its facts, the question card, the draft, its
-// items, one card per unit and the keys it offers.
+// asks, its open gates, its runs, one card per unit and the keys it offers.
 func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 	t := m.t
 	lines := []string{t.Bold(termfmt.Cut(oneLine(cmp.Or(e.Title, e.ID)), width))}
@@ -203,7 +256,7 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 			fact("", p, plain)
 		}
 	}
-	state := []string{e.State}
+	state := []string{m.stateLabel(e.State)}
 	star, _ := m.viewsCat.PropOf(string(dtask.RoleStar))
 	if m.viewsCat.Starred(e) {
 		state = append(state, star.Name)
@@ -232,12 +285,13 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 	if e.Notes != "" {
 		para("notes", e.Notes)
 	}
-	if c, ok := m.questionCard(e); ok {
-		fact("asks", cmp.Or(c.text, "the agent stopped"), t.Yellow)
-		for i, a := range c.answers() {
+	card, carded := m.questionCard(e)
+	if carded && card.gate == nil {
+		fact("asks", cmp.Or(card.text, "the agent stopped"), t.Yellow)
+		for i, a := range card.answers() {
 			fact("", fmt.Sprintf("%d. %s", i+1, a), plain)
 		}
-	} else if msg, _, ok := e.MessageOf(); ok {
+	} else if msg, _, ok := e.MessageOf(); ok && !carded {
 		fact("message", msg.Text, plain)
 	}
 	if d := draftOn(e); d != nil {
@@ -246,6 +300,16 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 	m.draftLines(fact, para)
 	for _, a := range e.Asks {
 		fact("ask", strings.TrimSuffix(a.Summary+" · "+a.Asker, " · "), plain)
+		for _, q := range a.Quotes {
+			fact("", "> "+q, t.Dim)
+		}
+		if a.Permalink != "" {
+			fact("", a.Permalink, t.Dim)
+		}
+	}
+	m.gateFacts(e, card, carded, fact)
+	for _, r := range e.Runs {
+		m.runFacts(r, fact)
 	}
 	for _, s := range e.Cards {
 		m.unitCard(s, fact, now.Location())
@@ -254,6 +318,58 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 		fact("", "loading…", t.Dim)
 	}
 	return append(lines, m.taskKeys(e, width, col)...)
+}
+
+// gateFacts adds e's open gates but its draft's and the question the card
+// shows: what each asks, and its intents, numbered for the digits on the
+// gate the card holds.
+func (m *Model) gateFacts(e api.TaskView, card askCard, carded bool, fact func(label, text string, style func(string) string)) {
+	t := m.t
+	_, asked, isMsg := e.MessageOf()
+	for _, g := range e.Gates {
+		if g.Status != string(gate.Open) || g.Kind == string(gate.KindDraft) || (isMsg && carded && card.gate == nil && g.ID == asked.ID) {
+			continue
+		}
+		fact("gate", gateText(g), t.Yellow)
+		if carded && card.gate != nil && card.gate.ID == g.ID {
+			for i, a := range card.answers() {
+				fact("", fmt.Sprintf("%d. %s", i+1, a), plain)
+			}
+			continue
+		}
+		var intents []string
+		for _, x := range g.Intents {
+			intents = append(intents, cmp.Or(x.Label, x.ID))
+		}
+		if len(intents) > 0 {
+			fact("", strings.Join(intents, " · "), t.Dim)
+		}
+	}
+}
+
+// runFacts adds a run of the task: its intent and state, where it runs and
+// the command that resumes its session.
+func (m *Model) runFacts(r api.RunView, fact func(label, text string, style func(string) string)) {
+	t := m.t
+	head := []string{r.Intent, r.State}
+	if r.SessionState != "" {
+		head = append(head, "session "+r.SessionState)
+	}
+	fact("run", strings.Join(slices.DeleteFunc(head, func(s string) bool { return s == "" }), " · "), plain)
+	if where := strings.Join(slices.DeleteFunc([]string{r.Manager, r.Workspace, r.Session}, func(s string) bool { return s == "" }), " · "); where != "" {
+		fact("", where, t.Dim)
+	}
+	if r.Resume != "" {
+		fact("", "resume: "+r.Resume, t.Dim)
+	}
+}
+
+// stateLabel is the catalog's label of a state, else its name.
+func (m *Model) stateLabel(name string) string {
+	if i := slices.IndexFunc(m.viewsCat.States, func(st api.StateSpec) bool { return st.Name == name }); i >= 0 {
+		return cmp.Or(m.viewsCat.States[i].Label, name)
+	}
+	return name
 }
 
 // unitCard adds one unit's stored card.
@@ -318,7 +434,7 @@ func (m *Model) verbHelp(e api.TaskView) (on []helpItem, off []string) {
 			continue
 		}
 		h := helpItem{b.Key, strings.ToLower(cmp.Or(m.verbLabel(v.Verb), b.Help))}
-		if !v.Enabled && v.Verb == "edit" && draftOn(e) == nil && len(m.listedDrafts()) == 0 {
+		if !v.Enabled && m.viewsCat.HandlerOf(v.Verb) == handlerEdit && draftOn(e) == nil && len(m.listedDrafts()) == 0 {
 			continue
 		}
 		if v.Enabled {

@@ -73,7 +73,7 @@ func TestTheNotificationOffersTheServedReplyFirst(t *testing.T) {
 		}
 		e := api.TaskView{ID: "e-8", Attention: &api.Attention{ID: "n1", Category: string(api.CategoryInbox), Title: "In your Inbox",
 			Actions: []api.AttentionAction{{ID: first, Title: "first", TextInput: true, Placeholder: "p1", Button: "b1"}, {ID: other, Title: "second", TextInput: true}}}}
-		n, _ := notification(e)
+		n, _ := notification(e, nil)
 		if len(n.Actions) != 2 || n.Actions[0].ID != first || n.Actions[0].Placeholder != "p1" || n.Actions[0].Button != "b1" {
 			t.Fatalf("%s first: %+v", first, n.Actions)
 		}

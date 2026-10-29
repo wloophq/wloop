@@ -593,6 +593,9 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `send_reply_button`: The button of a notification's input that sends a reply at once.
   - `answer_placeholder`: The placeholder of a notification's input that answers an agent.
   - `answer_button`: The button of a notification's input that answers an agent.
+  - `digest_title`: The title of the daily digest notification.
+  - `digest_new`: The digest's first line: Count, the tasks of the badge's views that moved since the last digest.
+  - `digest_view`: The digest's line for one view the badge counts: View, its label, and Count, its tasks.
   - `record_owed`: The reason that blocks the stop of a session whose turn has no record: the unit, the turn's id and the directory a record file goes in.
   - `attach_needs_session`: Why task attach refuses to run outside an agent session a workspace manager started: the task named as the command reads it, and the enabled workspace managers as displayed.
 
@@ -612,6 +615,9 @@ The fields each notice reads besides `Name` and `Command`:
   - `send_reply_button`
   - `answer_placeholder`
   - `answer_button`
+  - `digest_title`
+  - `digest_new` (`Count`: number)
+  - `digest_view` (`View`, `Count`: number)
   - `record_owed` (`Unit`, `Turn`, `ScratchDir`)
   - `attach_needs_session` (`Task`, `Managers`)
 

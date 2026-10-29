@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"hash/fnv"
@@ -32,9 +33,10 @@ const stampToken = "20060102T150405.000000000"
 // notifiedDrafts are the drafts that notify: proposed, or failed and waiting on a retry.
 var notifiedDrafts = []draft.State{draft.Held, draft.Failed}
 
-// attention is e's notification, nil when it posts none: an Inbox task notifies once, a draft of the Outbox
-// once unless it serves an Inbox task, whose id the draft then keys. A draft is never approved from a
-// notification, which shows its text cut. Nothing of a disabled plugin notifies.
+// attention is e's notification, nil when it posts none: an Inbox task notifies once, a task anywhere else once
+// while a question, post or proposal gate is open on it, a draft of the Outbox once unless it serves a task that
+// notifies, whose id the draft then keys. A draft is never approved from a notification, which shows its text
+// cut. Nothing of a disabled plugin notifies.
 func (ev *taskViewer) attention(ctx context.Context, e task.Task) *api.Attention {
 	a := ev.notice(ctx, e)
 	if a != nil {
@@ -73,7 +75,10 @@ func (ev *taskViewer) notice(ctx context.Context, e task.Task) *api.Attention {
 	if e.Origin == task.OriginDraft {
 		return ev.draftAttention(ctx, e)
 	}
-	if e.Category != task.CategoryInbox || !ev.s.unitsEnabled(e.Units) {
+	if !ev.s.unitsEnabled(e.Units) {
+		return nil
+	}
+	if _, gated := ev.message(ctx, e); e.Category != task.CategoryInbox && !gated {
 		return nil
 	}
 	cat, token, a, ok := ev.inboxNotice(ctx, e)
@@ -120,7 +125,7 @@ func (ev *taskViewer) inboxNotice(ctx context.Context, e task.Task) (api.Categor
 	case served && (question || e.Origin == task.OriginDerived):
 		return "", "", api.Attention{}, false
 	case isMsg:
-		cat, token, a := messageNotice(e, m, record)
+		cat, token, a := ev.s.messageNotice(e, m, record)
 		return cat, token, a, true
 	}
 	a := api.Attention{Title: "In your Inbox", Subtitle: unitsLabel(e.Units), Body: e.Title, Actions: ev.inboxActions(ctx, e)}
@@ -262,15 +267,17 @@ func (ev *taskViewer) recordOf(ctx context.Context, m dmessage.Message) int64 {
 	return 0
 }
 
-// messageNotice is a message task's notification from the message alone.
-func messageNotice(e task.Task, m dmessage.Message, record int64) (api.Category, string, api.Attention) {
+// messageNotice is a message task's notification from the message alone; its dismiss and approve buttons run the
+// verbs whose handlers drop and approve, worded as the profile words them.
+func (s *Server) messageNotice(e task.Task, m dmessage.Message, record int64) (api.Category, string, api.Attention) {
 	a := api.Attention{Subtitle: unitsLabel(e.Units), Body: m.Text, Image: "ask"}
 	if a.Subtitle == "" {
 		a.Subtitle = m.Unit.Label()
 	}
 	var dismiss []api.AttentionAction
 	if e.Origin == task.OriginMessage {
-		dismiss = []api.AttentionAction{{ID: verbAction(task.VerbDismiss), Title: "Dismiss"}}
+		v, label := s.handlerVerb(handlerDrop)
+		dismiss = []api.AttentionAction{{ID: verbAction(v), Title: label}}
 	}
 	switch m.Kind {
 	case dmessage.Question:
@@ -279,12 +286,30 @@ func messageNotice(e task.Task, m dmessage.Message, record int64) (api.Category,
 		return api.QuestionCategory(max(record, 0)), strconv.FormatInt(max(record, 0), 10), a
 	case dmessage.Proposal:
 		a.Title = "Proposal"
-		a.Actions = slices.Concat([]api.AttentionAction{{ID: verbAction(task.VerbApprove), Title: "Approve"}}, dismiss)
+		v, label := s.handlerVerb(handlerApprove)
+		a.Actions = slices.Concat([]api.AttentionAction{{ID: verbAction(v), Title: label}}, dismiss)
 	default:
 		a.Title = "Agent posts"
 		a.Actions = slices.Concat([]api.AttentionAction{{ID: "answer:text", Title: "Reply", TextInput: true}}, dismiss)
 	}
 	return api.CategoryInbox, hashToken(strconv.FormatInt(m.ID, 10), m.Text), a
+}
+
+// The handlers of the verbs a notification's buttons run besides a reply.
+const (
+	handlerDrop    = "drop"
+	handlerApprove = "approve"
+)
+
+// handlerVerb is the verb whose handler is h and its label, as the profile words them; h itself when no verb runs it.
+func (s *Server) handlerVerb(h string) (task.Verb, string) {
+	l := s.loaded().Tasks
+	for _, v := range builtin.TaskVerbs {
+		if l.Handler(v) == h {
+			return task.Verb(v), cmp.Or(l.Verbs[v].Label, bundledWords().tasks.Verbs[v].Label, v)
+		}
+	}
+	return task.Verb(h), h
 }
 
 // choices are a message's one-tap answers, the recommended one first.
@@ -377,7 +402,8 @@ func (ev *taskViewer) draftAttention(ctx context.Context, e task.Task) *api.Atte
 	if d.State == draft.Failed {
 		a.Title = "Draft failed"
 	}
-	a.Actions = []api.AttentionAction{{ID: "open", Title: "Open"}, {ID: verbAction(task.VerbDismiss), Title: "Discard"}}
+	drop, _ := ev.s.handlerVerb(handlerDrop)
+	a.Actions = []api.AttentionAction{{ID: "open", Title: "Open"}, {ID: verbAction(drop), Title: "Discard"}}
 	a.ID = api.NotificationID(api.CategoryOutbox, string(e.ID), d.UpdatedAt.UTC().Format(stampToken))
 	return &a
 }

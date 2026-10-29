@@ -17,7 +17,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/domain/record"
-	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -32,9 +31,11 @@ type posted struct {
 	options  []record.Option
 }
 
-// draftButtons are the only buttons a draft's notification offers: a draft
-// is approved where its whole text shows.
-var draftButtons = []string{"open", api.TaskActionPrefix + string(task.VerbDismiss)}
+// draftButtons are the only buttons a draft's notification offers, open and
+// the verb that discards it: a draft is approved where its whole text shows.
+func (c *Controller) draftButtons() []string {
+	return []string{"open", api.TaskActionPrefix + c.verbOf(handlerDrop)}
+}
 
 // notify posts the attention of the tasks that are new, and withdraws the
 // notifications of tasks that left the Inbox and of drafts that left the
@@ -44,8 +45,9 @@ func (c *Controller) notify() {
 	postedDaily := false
 	live := map[string]bool{}
 	notes := map[string]posted{}
+	buttons := c.draftButtons()
 	for _, e := range c.notifying() {
-		n, p := notification(e)
+		n, p := notification(e, buttons)
 		if _, dup := notes[n.ID]; dup {
 			continue
 		}
@@ -110,7 +112,7 @@ func (c *Controller) notifying() []api.TaskView {
 
 // notification is the task's attention as the daemon gave it, with what
 // its buttons answer.
-func notification(e api.TaskView) (Notification, posted) {
+func notification(e api.TaskView, draftButtons []string) (Notification, posted) {
 	a := *e.Attention
 	n := Notification{ID: a.ID, Title: a.Title, Subtitle: a.Subtitle, Body: a.Body, Image: Image(a.Image)}
 	p := posted{task: e.ID, subtitle: a.Subtitle, units: e.Units, basis: map[string]string{}}
@@ -202,7 +204,7 @@ func (c *Controller) answer(ctx context.Context, r Response, tk string) error {
 	if r.No {
 		args["no"] = "true"
 	}
-	res, err := c.cfg.Daemon.TaskDo(ctx, tk, string(task.VerbAnswer), api.TaskRequest{Args: args, Source: AnswerSource})
+	res, err := c.cfg.Daemon.TaskDo(ctx, tk, c.verbOf(handlerAnswer), api.TaskRequest{Args: args, Source: AnswerSource})
 	if err != nil {
 		c.notifyNote(r.ID, tk, "Answer not sent", err.Error())
 		return err
@@ -224,7 +226,7 @@ func (c *Controller) reply(ctx context.Context, r Response, task string) error {
 	if r.Send {
 		args["send"], title = "now", "Reply sent"
 	}
-	res, err := c.cfg.Daemon.TaskDo(ctx, task, "reply", api.TaskRequest{Args: args, Source: AnswerSource})
+	res, err := c.cfg.Daemon.TaskDo(ctx, task, c.verbOf(handlerReply), api.TaskRequest{Args: args, Source: AnswerSource})
 	if err != nil {
 		c.notifyNote(r.ID, task, "Reply not saved", err.Error())
 		return err
@@ -240,7 +242,7 @@ func (c *Controller) reply(ctx context.Context, r Response, task string) error {
 func (c *Controller) served(ctx context.Context, r Response, cat Category, task string) error {
 	var err error
 	if verb, ok := strings.CutPrefix(r.Identifier, api.TaskActionPrefix); ok {
-		if cat == api.CategoryOutbox && !slices.Contains(draftButtons, r.Identifier) {
+		if cat == api.CategoryOutbox && !slices.Contains(c.draftButtons(), r.Identifier) {
 			return errors.New("a draft's notification offers no " + r.Identifier)
 		}
 		var args map[string]string

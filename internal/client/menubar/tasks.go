@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"slices"
+	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
@@ -19,6 +21,7 @@ func (c *Controller) pullTasks(ctx context.Context) error {
 		return err
 	}
 	var views []api.TaskViewSpec
+	var loading []api.Loading
 	tasks := map[string][]api.TaskView{}
 	for _, v := range cat.Views {
 		if !v.Badge {
@@ -33,9 +36,50 @@ func (c *Controller) pullTasks(ctx context.Context) error {
 			c.counters = &counters
 		}
 		views, tasks[v.ID] = append(views, v), page.Tasks
+		for _, l := range page.Loading {
+			if !slices.Contains(loading, l) {
+				loading = append(loading, l)
+			}
+		}
 	}
-	c.taskViews, c.tasks = views, tasks
+	c.taskViews, c.tasks, c.tasksLoading = views, tasks, loading
+	c.mu.Lock()
+	c.cat = cat
+	c.mu.Unlock()
 	return nil
+}
+
+// verbOf is the served verb that runs handler, handler itself before the catalog was read.
+func (c *Controller) verbOf(handler string) string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if v, ok := c.cat.VerbOf(handler); ok {
+		return v
+	}
+	return handler
+}
+
+// The handlers of the task verbs a notification's buttons run: answer its question, write its reply,
+// discard its draft.
+const (
+	handlerAnswer = "answer"
+	handlerReply  = "reply"
+	handlerDrop   = "drop"
+)
+
+// loadingItems say which plugins are still loading their units, and why.
+func (c *Controller) loadingItems() []MenuItem {
+	var items []MenuItem
+	for _, l := range append(slices.Clone(c.tasksLoading), c.rowsLoading...) {
+		title := strings.TrimSuffix("Loading "+l.Plugin+": "+l.Reason, ": ")
+		if !slices.ContainsFunc(items, func(it MenuItem) bool { return it.Title == title }) {
+			items = append(items, MenuItem{Title: title})
+		}
+	}
+	if len(items) > 0 {
+		items = append(items, MenuItem{Separator: true})
+	}
+	return items
 }
 
 func (c *Controller) viewTasks(v string) []api.TaskView { return c.tasks[v] }

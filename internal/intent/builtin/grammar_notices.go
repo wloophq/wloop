@@ -21,6 +21,11 @@ var Notices = []ToolAnswer{
 	{Name: NoticeSendReplyButton, Doc: "The button of a notification's input that sends a reply at once."},
 	{Name: NoticeAnswerPlaceholder, Doc: "The placeholder of a notification's input that answers an agent."},
 	{Name: NoticeAnswerButton, Doc: "The button of a notification's input that answers an agent."},
+	{Name: NoticeDigestTitle, Doc: "The title of the daily digest notification."},
+	{Name: NoticeDigestNew, Doc: "The digest's first line: Count, the tasks of the badge's views that moved since the last digest.",
+		Fields: []AnswerField{num("Count")}},
+	{Name: NoticeDigestView, Doc: "The digest's line for one view the badge counts: View, its label, and Count, its tasks.",
+		Fields: []AnswerField{str("View"), num("Count")}},
 	{Name: "record_owed", Doc: "The reason that blocks the stop of a session whose turn has no record: the unit, the turn's id and the directory a record file goes in.",
 		Fields: []AnswerField{str("Unit"), str("Turn"), str("ScratchDir")}},
 	{Name: NoticeAttachNeedsSession, Doc: "Why task attach refuses to run outside an agent session a workspace manager started: the task named as the command reads it, and the enabled workspace managers as displayed.",
@@ -44,6 +49,9 @@ const (
 	NoticeSendReplyButton      = "send_reply_button"
 	NoticeAnswerPlaceholder    = "answer_placeholder"
 	NoticeAnswerButton         = "answer_button"
+	NoticeDigestTitle          = "digest_title"
+	NoticeDigestNew            = "digest_new"
+	NoticeDigestView           = "digest_view"
 )
 
 // NoticeOf is the notice name, false when there is none.

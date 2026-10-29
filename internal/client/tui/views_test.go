@@ -18,15 +18,19 @@ import (
 )
 
 func viewsCatalog() api.ViewsCatalog {
-	views := []api.TaskViewSpec{{ID: "focus", Label: "Focus"}, {ID: "inbox", Label: "Inbox"}, {ID: "outbox", Label: "Outbox"},
-		{ID: "next", Label: "Next"}, {ID: "waiting", Label: "Waiting"}, {ID: "projects", Label: "Projects"},
+	views := []api.TaskViewSpec{{ID: "focus", Label: "Focus"}, {ID: "inbox", Label: "Inbox"}, {ID: "outbox", Label: "Outbox", Over: "gates"},
+		{ID: "next", Label: "Next", Group: "task.prop.contexts"}, {ID: "waiting", Label: "Waiting", Group: "task.owed_by"}, {ID: "projects", Label: "Projects"},
 		{ID: "someday", Label: "Someday"}, {ID: "logbook", Label: "Logbook"}}
-	verbs := []api.VerbSpec{{Verb: "next", Label: "Next", Key: "x"}, {Verb: "waiting", Label: "Waiting", Key: "w", Input: "Waiting on whom"},
-		{Verb: "schedule", Label: "Schedule", Key: "s", Input: "Until when"}, {Verb: "someday", Label: "Someday", Key: "y"},
-		{Verb: "reference", Label: "Reference", Key: "l"}, {Verb: "focus", Label: "Focus", Key: "f"},
-		{Verb: "project", Label: "Project", Key: "p"}, {Verb: "approve", Label: "Approve", Key: "a"},
-		{Verb: "delegate", Label: "Delegate", Key: "d", Input: "what should the agent look at"}, {Verb: "reply", Label: "Reply", Input: "Reply, saved to the Outbox"}, {Verb: "done", Label: "Done", Key: "e"},
-		{Verb: "dismiss", Handler: "drop", Label: "Dismiss", Key: "Backspace"}, {Verb: "seen", Label: "Seen"}}
+	verbs := []api.VerbSpec{{Verb: "next", Label: "Next", Key: "x"}, {Verb: "waiting", Handler: "waiting", Label: "Waiting", Key: "w", Input: "Waiting on whom"},
+		{Verb: "schedule", Handler: "schedule", Label: "Schedule", Key: "s", Input: "Until when"}, {Verb: "someday", Label: "Someday", Key: "y"},
+		{Verb: "reference", Handler: "finish", Label: "Reference", Key: "l"}, {Verb: "focus", Handler: "focus", Label: "Focus", Key: "f"},
+		{Verb: "project", Handler: "project", Label: "Project", Key: "p", Input: "Project title"}, {Verb: "approve", Handler: "approve", Label: "Approve", Key: "a"},
+		{Verb: "delegate", Handler: "delegate", Label: "Delegate", Key: "d", Input: "what should the agent look at"},
+		{Verb: "reply", Handler: "reply", Label: "Reply", Input: "Reply, saved to the Outbox"}, {Verb: "done", Handler: "finish", Label: "Done", Key: "e"},
+		{Verb: "dismiss", Handler: "drop", Label: "Dismiss", Key: "Backspace"}, {Verb: "seen", Handler: "seen", Label: "Seen"},
+		{Verb: "answer", Handler: "answer", Label: "Answer"}, {Verb: "edit", Handler: "edit", Label: "Edit", Key: "i"},
+		{Verb: "retry", Handler: "retry", Label: "Retry"}, {Verb: "reviewed", Handler: "reviewed", Label: "Reviewed"},
+		{Verb: "sequential", Handler: "sequential", Label: "Sequential"}}
 	props := []api.PropSpec{{Name: "focus", Type: "enum", Values: []string{"on", "off"}, Role: "star"}, {Name: "contexts", Type: "string[]", Role: "contexts"},
 		{Name: "area", Type: "string", Role: "area"}, {Name: "due", Type: "date", Role: "deadline"}}
 	return api.ViewsCatalog{Views: views, Areas: []string{"work", "home"}, Contexts: []string{"computer", "calls"}, Verbs: verbs, Props: props}
@@ -46,13 +50,17 @@ func verbs(enabled ...string) []api.VerbState {
 	return out
 }
 
+// categoryOf are the bundled states' categories.
+var categoryOf = map[string]string{"inbox": "inbox", "next": "ready", "waiting": "waiting", "scheduled": "deferred", "someday": "deferred",
+	"reference": "done", "done": "done", "trash": "dropped"}
+
 func task(id, title, state string, contexts ...string) api.TaskView {
 	var props map[string]json.RawMessage
 	if len(contexts) > 0 {
 		b, _ := json.Marshal(contexts)
 		props = map[string]json.RawMessage{"contexts": b}
 	}
-	return api.TaskView{ID: id, State: state, Title: title, Props: props,
+	return api.TaskView{ID: id, State: state, Category: categoryOf[state], Title: title, Props: props,
 		Verbs: verbs(allVerbs...), Created: now.Add(-30 * time.Hour), Updated: now.Add(-5 * time.Hour)}
 }
 
@@ -378,7 +386,7 @@ func TestVerbKeysSendTaskVerbs(t *testing.T) {
 		t.Run(c.verb, func(t *testing.T) {
 			m := viewsModel(t)
 			got, ok := press(m, c.key)
-			if _, asks := verbAsks[c.verb]; asks || c.verb == "delegate" || c.verb == "reply" {
+			if _, asks := m.verbAsk(c.verb); asks || c.verb == "delegate" || c.verb == "reply" {
 				if ok || m.prompt == nil {
 					t.Fatalf("%s sent before asking: %+v", c.verb, got)
 				}

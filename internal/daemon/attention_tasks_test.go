@@ -106,8 +106,8 @@ func (r *notifyRig) notified(t *testing.T) map[string]api.TaskView {
 			if e.Attention == nil {
 				continue
 			}
-			if v != "inbox" && v != "outbox" && v != "focus" {
-				t.Errorf("%s entry %s (%s) notifies %+v", v, e.ID, e.State, e.Attention)
+			if v != "inbox" && v != "outbox" && v != "focus" && len(e.Gates) == 0 {
+				t.Errorf("%s entry %s (%s) with no open gate notifies %+v", v, e.ID, e.State, e.Attention)
 			}
 			out[e.ID] = e
 		}
@@ -287,8 +287,8 @@ func attentions(t *testing.T, r *tasksRig) map[string]*api.Attention {
 	for _, v := range storedViews() {
 		for _, e := range r.page(t, "view="+v).Tasks {
 			if e.Attention != nil {
-				if v != "inbox" && v != "outbox" && v != "focus" {
-					t.Errorf("%s entry %s notifies %+v", v, e.ID, e.Attention)
+				if v != "inbox" && v != "outbox" && v != "focus" && len(e.Gates) == 0 {
+					t.Errorf("%s entry %s with no open gate notifies %+v", v, e.ID, e.Attention)
 				}
 				out[e.ID] = e.Attention
 			}

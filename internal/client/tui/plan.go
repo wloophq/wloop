@@ -331,6 +331,11 @@ func (m *Model) planDetail(it api.PlanItem, width int, now time.Time) []string {
 	if it.Error != "" {
 		fact("error", fmt.Sprintf("attempt %d: %s", it.Attempts, it.Error), t.Red)
 	}
+	for _, st := range it.Actions {
+		if st.Enabled && st.Note != "" {
+			fact(strings.ToLower(m.planSpecLabel(st)), st.Note, t.Dim)
+		}
+	}
 	return append(lines, m.itemKeys(it, width, col)...)
 }
 
@@ -350,6 +355,17 @@ func mib(n int64) string {
 		return fmt.Sprintf("%.1f GiB", float64(n)/(1<<30))
 	}
 	return fmt.Sprintf("%.1f MiB", float64(n)/(1<<20))
+}
+
+// planSpecLabel names an item's action as it is offered: its state's label, else its spec's.
+func (m *Model) planSpecLabel(st api.ActionState) string {
+	if st.Label != "" {
+		return st.Label
+	}
+	if i := slices.IndexFunc(m.planSpecs, func(s api.ActionSpec) bool { return s.ID == st.ID }); i >= 0 {
+		return cmp.Or(m.planSpecs[i].Label, st.ID)
+	}
+	return st.ID
 }
 
 // itemKeys lists the item's keyed actions as offered does a row's.

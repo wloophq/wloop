@@ -9,6 +9,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // handleDigest serves the daily digest of the query parameter day: the counters, and the tasks of the views the
@@ -30,9 +31,9 @@ func (s *Server) handleDigest(w http.ResponseWriter, r *http.Request) {
 	}
 	start := end.AddDate(0, 0, -1)
 	ctx := r.Context()
-	d := api.Digest{Day: day, Title: "Daily digest"}
+	d := api.Digest{Day: day, Title: s.notice(builtin.NoticeDigestTitle, nil)}
 	def := s.loaded().Views
-	var labels, counts []string
+	var counts []string
 	c, err := g.Counts(ctx, "")
 	if err != nil {
 		writeTasksError(w, err)
@@ -41,8 +42,7 @@ func (s *Server) handleDigest(w http.ResponseWriter, r *http.Request) {
 	d.Counts = wireCounters(c)
 	for _, id := range def.Badge {
 		v, _ := def.View(id)
-		labels = append(labels, v.Label)
-		counts = append(counts, fmt.Sprintf("%d in %s", d.Counts.Views[id], v.Label))
+		counts = append(counts, s.notice(builtin.NoticeDigestView, map[string]any{"View": v.Label, "Count": d.Counts.Views[id]}))
 		es, err := g.Tasks(ctx, task.Query{View: task.View(id)})
 		if err != nil {
 			writeTasksError(w, err)
@@ -54,7 +54,7 @@ func (s *Server) handleDigest(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	d.Body = strings.Join(append([]string{fmt.Sprintf("%d new in %s", len(d.Tasks), strings.Join(labels, " or "))}, counts...), " · ")
+	d.Body = strings.Join(append([]string{s.notice(builtin.NoticeDigestNew, map[string]any{"Count": len(d.Tasks)})}, counts...), " · ")
 	writeJSON(w, d)
 }
 

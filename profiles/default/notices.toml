@@ -32,3 +32,9 @@ send_reply_button = "Send"
 answer_placeholder = "Your answer to the agent"
 
 answer_button = "Send"
+
+digest_title = "Daily digest"
+
+digest_new = "{{.Count}} new since the last digest"
+
+digest_view = "{{.Count}} in {{.View}}"

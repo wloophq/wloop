@@ -152,4 +152,4 @@ description: The words the code, the configuration, the facts and these pages us
 - **Board column**: the column of an Orca card, which {{name}} writes from the turn's state and never reads back. `views.orca.columns` maps each state to a column of your board. See [Workspaces and board columns](/concepts/board/).
 - **Sink**: a destination that receives the projection of every unit's view, such as Orca's board. A sink fails alone and is reconciled on start.
 - **Placement**: the rule that says where a unit's work runs: the repository, the checkout, the role and whether the workspace is shared. `placement` in the configuration lists the rules. A card's placement is the column you see it in. See [the configuration](/reference/configuration/).
-- **Notification**: a macOS alert for a pending round, a held round, a question or a blocked first round, with its actions. The rest goes in the daily digest at `notifications.digest_at`.
+- **Notification**: a macOS alert for a pending round, a held round, a question, post or proposal gate open on a task, or a blocked first round, with its actions. The rest goes in the daily digest at `notifications.digest_at`.
