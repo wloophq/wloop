@@ -44,13 +44,25 @@ esac
 func buildGitHubPlugin(t *testing.T) string {
 	t.Helper()
 	bin := filepath.Join(t.TempDir(), "plugin")
-	cmd := exec.Command("go", "build", "-o", bin, "./plugins/github/cmd/"+brand.PluginBinary(string(unit.GitHub)))
+	cmd := exec.Command("go", "build", "-o", bin, "./"+gitHubPluginMain(t))
 	cmd.Dir = filepath.Join("..", "..")
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("go build: %v\n%s", err, out)
 	}
 	return bin
+}
+
+// gitHubPluginMain is the plugin's main package, the one directory under
+// plugins/github/cmd; its name carries the default brand, not the one built.
+func gitHubPluginMain(t *testing.T) string {
+	t.Helper()
+	dir := filepath.Join("plugins", "github", "cmd")
+	entries, err := os.ReadDir(filepath.Join("..", "..", dir))
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("%s: %v %d entries", dir, err, len(entries))
+	}
+	return filepath.Join(dir, entries[0].Name())
 }
 
 // enterpriseGitHub serves te's fake GitHub over HTTP as GitHub Enterprise
