@@ -212,7 +212,7 @@ every = "5m"
 | Key | Kind | Meaning |
 |---|---|---|
 | `id` | string | The bucket's id. Required. |
-| `within` | duration | The age its values are younger than, as a Go duration. Required. |
+| `within` | duration | The age its values are younger than, as a Go duration; negative for a value that far in the future. Required but on the last bucket, which then catches the rest. |
 
 ## `[[source.ui.menubar]]`
 

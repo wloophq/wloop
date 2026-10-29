@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/source/github/present"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brief"
@@ -48,7 +50,7 @@ func TestOfferedIssuesNoQueryWhenFresh(t *testing.T) {
 func TestDetailAtMostTwoQueries(t *testing.T) {
 	t.Parallel()
 	s := newNotedServer(t, func(d *Deps) {
-		withBriefs(d, brief.New(brief.Deps{Store: d.Records.(present.Records).Store, Now: d.Now, Taxonomy: func(github.Ref) string { return brief.DefaultTaxonomy }}))
+		withBriefs(d, brief.New(brief.Deps{Store: d.Records.(present.Records).Store, PRs: inventorytest.Of(d.Records.(present.Records).Store), Now: d.Now, Taxonomy: func(github.Ref) string { return brief.DefaultTaxonomy }}))
 	})
 	warm(t, s)
 	ctx, sc := metertest.Start(t, context.Background())
@@ -92,7 +94,7 @@ func TestExploreBaseDeriverFromSnapshot(t *testing.T) {
 	s := newNotedServer(t, func(d *Deps) {
 		d.Turns = &turns.Service{Intents: turnstest.Intents(), Store: books, Registry: turnstest.NewRegistry(turnstest.Strict(t)),
 			Sessions: turnstest.NewSessions(), Clock: fixedClock(d.Now())}
-		githubOf(d).Explorer = &fakeExplorer{page: dgh.CandidatePage{Total: 2, Candidates: cands}}
+		exploreOn(d, &fakeExplorer{page: dgh.CandidatePage{Total: 2, Candidates: cands}})
 	})
 	warm(t, s)
 	before := books.calls
@@ -109,13 +111,13 @@ func seedLapsed(t *testing.T, s *Server) github.Ref {
 	t.Helper()
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 31}
 	ctx := context.Background()
-	if err := s.store().UpsertPR(ctx, dinv.PR{Ref: ref, Title: "Lapsed", Author: "ana", State: dgh.StateOpen, URL: ref.URL()}); err != nil {
+	if err := inventorytest.Of(s.store()).UpsertPR(ctx, dinv.PR{Ref: ref, Title: "Lapsed", Author: "ana", State: dgh.StateOpen, URL: ref.URL()}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.store().AppendEvents(ctx, []dinv.Event{{PR: ref, Kind: dinv.KindPush, Key: "h", Actor: "ana", At: s.deps.Now().Add(-time.Hour)}}); err != nil {
 		t.Fatal(err)
 	}
-	if pr, ok, _ := s.store().PR(ctx, ref); !ok || !pr.Lapsed() {
+	if pr, ok, _ := inventorytest.Of(s.store()).PR(ctx, ref); !ok || !pr.Lapsed() {
 		t.Fatalf("not lapsed: %+v", pr)
 	}
 	return ref

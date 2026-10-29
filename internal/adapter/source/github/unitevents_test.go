@@ -5,12 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/config"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/link"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
-	sourcereg "github.com/wloophq/wloop/internal/source"
 )
 
 func TestGitHubUnitEvents(t *testing.T) {
@@ -31,7 +29,7 @@ func TestGitHubUnitEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 	u := ref.Unit()
-	got, err := unitEvents{st}.UnitEvents(ctx, u, now)
+	got, err := UnitEvents{st}.UnitEvents(ctx, u, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,21 +49,10 @@ func TestGitHubUnitEvents(t *testing.T) {
 		}
 	}
 	outside := github.Ref{Owner: "acme", Repo: "api", Number: 999}.Unit()
-	if got, err := (unitEvents{st}).UnitEvents(ctx, outside, time.Time{}); err != nil || got != nil {
+	if got, err := (UnitEvents{st}).UnitEvents(ctx, outside, time.Time{}); err != nil || got != nil {
 		t.Fatalf("a pull request outside the inventory = %v, %v", got, err)
 	}
-	if got, err := (unitEvents{st}).UnitEvents(ctx, unit.Unit{Provider: "slack", Key: "C1/1"}, now); err == nil || got != nil {
+	if got, err := (UnitEvents{st}).UnitEvents(ctx, unit.Unit{Provider: "slack", Key: "C1/1"}, now); err == nil || got != nil {
 		t.Fatalf("a slack unit = %v, %v", got, err)
 	}
 }
-
-func TestTheModuleServesItsUnitEvents(t *testing.T) {
-	m, err := Module(config.Defaults(), sourcereg.Deps{Inventory: openStore(t), Clock: stopped{}, Log: t.Logf})
-	if err != nil || m.UnitEvents == nil {
-		t.Fatalf("module: UnitEvents %v, %v", m.UnitEvents, err)
-	}
-}
-
-type stopped struct{}
-
-func (stopped) Now() time.Time { return now }

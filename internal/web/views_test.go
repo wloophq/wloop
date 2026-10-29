@@ -222,7 +222,7 @@ process.stdout.write(JSON.stringify({ triage: chips("triage"), gates: chips("app
 
 func TestFakeProviderRowRenders(t *testing.T) {
 	src := appJS(t)
-	prelude := lensPrelude(t) + jsConst(t, src, "focusSlot") + jsConst(t, src, "CARD_GROUPS") + jsConst(t, src, "STRIP_TITLE") + jsConst(t, src, "TAG_CHIPS") + treeJS +
+	prelude := lensPrelude(t) + jsConst(t, src, "FOCUS_PAIRS") + jsFunction(t, src, "focusSlot") + jsFunction(t, src, "waitField") + jsConst(t, src, "CARD_GROUPS") + jsConst(t, src, "TAG_CHIPS") + treeJS +
 		`state.busy = new Set(); state.openSlot = ""; state.specs = { version: "v", byId: {} };
 const CSS = { escape: (s) => s }; const document = { querySelector: () => null };
 const providerName = (id) => id;

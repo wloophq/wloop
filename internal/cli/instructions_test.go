@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -250,8 +252,8 @@ func TestTakeOverByHandWritesTheDaemonsStore(t *testing.T) {
 	if code := te.run("instructions", "address", ref.URL(), "--take-over"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	if o, err := te.Store.Override(context.Background(), ref); err != nil || !o.Adopted {
-		t.Fatalf("override %+v %v", o, err)
+	if !adoptedByPlugin(t, te, ref) {
+		t.Fatal("not taken over")
 	}
 }
 
@@ -345,7 +347,7 @@ func TestNudgeByHandStartsItsTurn(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	te.gh.basics = openBasics
 	ctx := context.Background()
-	if err := te.Store.UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h1", Reasons: []string{"repo"}, URL: r7.URL()}); err != nil {
+	if err := inventorytest.Of(te.Store).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h1", Reasons: []string{"repo"}, URL: r7.URL()}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := te.Store.AppendEvents(ctx, []dinv.Event{{PR: r7, Kind: dinv.KindPush, Key: "h1", Actor: "ana", At: testNow.Add(-72 * time.Hour)}}); err != nil {

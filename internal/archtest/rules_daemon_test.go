@@ -81,9 +81,9 @@ func TestR8FlagsAPlantedImport(t *testing.T) {
 		module + "internal/domain/github", module + "internal/readmodel/prrow", module + "internal/workspace", module + "internal/brief"}
 	flagged(t, "allowed", ruleR8("internal/daemon", ok), 0, "")
 	bad := append(ok, module+"internal/adapter/store/inventory", module+"internal/adapter/store/sqlite", module+"internal/github",
-		module+"internal/github/githubtest", module+"internal/adapter/source/github", module+"internal/workspace/orca")
-	flagged(t, "the daemon", ruleR8("internal/daemon", bad), 6, "(R8)")
-	flagged(t, "a daemon subpackage", ruleR8("internal/daemon/feed", bad), 6, "(R8)")
+		module+"internal/adapter/source/github", module+"internal/workspace/orca")
+	flagged(t, "the daemon", ruleR8("internal/daemon", bad), 5, "(R8)")
+	flagged(t, "a daemon subpackage", ruleR8("internal/daemon/feed", bad), 5, "(R8)")
 	flagged(t, "the composition root", ruleR8("internal/cli", bad), 0, "")
 	flagged(t, "a sibling of the daemon", ruleR8("internal/daemonx", bad), 0, "")
 
@@ -109,24 +109,10 @@ type Pair interface{ Small; context.Context }
 // Enterprise Server paths.
 var githubAPI = regexp.MustCompile(`api\.github\.com|/api/graphql|/api/v3\b`)
 
-// ruleR10Imports flags an import of internal/ghcli outside internal/github.
-func ruleR10Imports(self string, imports []string) []string {
-	if under(self, "internal/github", "internal/ghcli") {
-		return nil
-	}
-	var out []string
-	for _, imp := range imports {
-		if dep, internal := local(imp); internal && under(dep, "internal/ghcli") {
-			out = append(out, fmt.Sprintf("%s imports %s; only internal/github reads the gh token (R10)", self, imp))
-		}
-	}
-	return out
-}
-
-// ruleR10Literals flags, outside internal/github, a string literal naming a
-// GitHub API endpoint.
+// ruleR10Literals flags, in the host, a string literal naming a GitHub
+// API endpoint.
 func ruleR10Literals(fset *token.FileSet, file string, f *ast.File) []string {
-	if under(path.Dir(file), "internal/github") {
+	if !under(path.Dir(file), "internal") {
 		return nil
 	}
 	var out []string
@@ -136,31 +122,17 @@ func ruleR10Literals(fset *token.FileSet, file string, f *ast.File) []string {
 			return true
 		}
 		if s, err := strconv.Unquote(lit.Value); err == nil && githubAPI.MatchString(s) {
-			out = append(out, fmt.Sprintf("%s: %q names GitHub's API; only internal/github reaches it (R10)", fset.Position(lit.Pos()), s))
+			out = append(out, fmt.Sprintf("%s: %q names GitHub's API; only the GitHub plugin reaches it (R10)", fset.Position(lit.Pos()), s))
 		}
 		return true
 	})
 	return out
 }
 
-// TestOnlyGitHubReachesGitHub checks that only `internal/github` reaches
-// GitHub's API, and only it imports `ghcli`.
+// TestOnlyGitHubReachesGitHub checks that nothing in the host names
+// GitHub's API: the GitHub plugin reaches it, with its own credentials.
 func TestOnlyGitHubReachesGitHub(t *testing.T) {
 	t.Parallel()
-	seen := false
-	for _, p := range packages(t) {
-		self, ok := local(p.ImportPath)
-		if !ok {
-			continue
-		}
-		seen = seen || self == "internal/ghcli"
-		for _, b := range ruleR10Imports(self, p.Imports) {
-			t.Error(b)
-		}
-	}
-	if !seen {
-		t.Error("internal/ghcli is missing from the package list")
-	}
 	forEachFile(t, false, func(fset *token.FileSet, file string, f *ast.File) {
 		for _, b := range ruleR10Literals(fset, file, f) {
 			t.Error(b)
@@ -168,16 +140,8 @@ func TestOnlyGitHubReachesGitHub(t *testing.T) {
 	})
 }
 
-func TestR10FlagsAPlantedImport(t *testing.T) {
+func TestR10FlagsAPlantedLiteral(t *testing.T) {
 	t.Parallel()
-	imports := []string{"net/http", module + "internal/github", module + "internal/ghcli"}
-	for _, self := range []string{"internal/github", "internal/github/githubtest", "internal/ghcli"} {
-		flagged(t, self, ruleR10Imports(self, imports), 0, "")
-	}
-	for _, self := range []string{"internal/adapter/source/github", "internal/daemon", "internal/brief", "internal/cli", "internal/clix"} {
-		flagged(t, self, ruleR10Imports(self, imports), 1, "(R10)")
-	}
-
 	fset, f := parse(t, `package ghsource
 const a = "https://api.github.com/graphql"
 const b = "https://ghe.example.com/api/graphql"
@@ -185,7 +149,7 @@ const c = "https://ghe.example.com/api/v3/repos"
 const d = "https://github.com/acme/api/pull/7"
 const e = "/api/units/github/acme"
 `)
-	flagged(t, "a collector", ruleR10Literals(fset, "internal/adapter/source/github/collect.go", f), 3, "(R10)")
-	flagged(t, "the client", ruleR10Literals(fset, "internal/github/client.go", f), 0, "")
-	flagged(t, "a client test helper", ruleR10Literals(fset, "internal/github/githubtest/runner.go", f), 0, "")
+	flagged(t, "a host adapter", ruleR10Literals(fset, "internal/adapter/source/github/collect.go", f), 3, "(R10)")
+	flagged(t, "the host's alias of a pull request", ruleR10Literals(fset, "internal/github/github.go", f), 3, "(R10)")
+	flagged(t, "the plugin", ruleR10Literals(fset, "plugins/github/api/client.go", f), 0, "")
 }

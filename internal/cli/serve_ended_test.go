@@ -5,6 +5,11 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
+
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+	"github.com/wloophq/wloop/internal/readmodel"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
@@ -36,7 +41,7 @@ func TestAQuestionOfAPullRequestThatEndsLeavesTheInbox(t *testing.T) {
 		if state == "MERGED" {
 			p.MergedAt = testNow
 		}
-		if err := store.UpsertPR(ctx, p); err != nil {
+		if err := inventorytest.Of(store).UpsertPR(ctx, p); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -44,6 +49,9 @@ func TestAQuestionOfAPullRequestThatEndsLeavesTheInbox(t *testing.T) {
 	save(2, "OPEN")
 	save(4, "CLOSED")
 	te := newTestEnv(t, &fake.Manager{})
+	te.Env.reports = func(*inventory.Store) readmodel.Reports {
+		return ghreporttest.Inventory{Store: store, Now: func() time.Time { return testNow }}
+	}
 	d := servedMessages(t, te, db, log)
 	open := waitOpen(t, d, func(ms []message.Message) bool {
 		return len(ms) == 3 && !slices.ContainsFunc(ms, func(m message.Message) bool { return m.TaskID == "" })

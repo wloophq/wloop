@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
@@ -54,12 +56,12 @@ func TestStatusRecomputesOnlyOnBriefOrPRNotes(t *testing.T) {
 		t.Fatalf("after the briefs were stored: %+v", st)
 	}
 
-	pr, _, err := r.st.PR(ctx, refN(2))
+	pr, _, err := inventorytest.Of(r.st).PR(ctx, refN(2))
 	if err != nil {
 		t.Fatal(err)
 	}
 	pr.ChangedFiles += RefreshFiles + 1
-	if err := r.st.UpsertPR(ctx, pr); err != nil {
+	if err := inventorytest.Of(r.st).UpsertPR(ctx, pr); err != nil {
 		t.Fatal(err)
 	}
 	mctx, sc = metertest.Start(t, ctx)
@@ -78,12 +80,12 @@ func TestStatusRecomputesOnTheMinute(t *testing.T) {
 	if _, err := r.q.Run(ctx); err != nil {
 		t.Fatal(err)
 	}
-	pr, _, err := r.st.PR(ctx, refN(2))
+	pr, _, err := inventorytest.Of(r.st).PR(ctx, refN(2))
 	if err != nil {
 		t.Fatal(err)
 	}
 	pr.BodyEditedAt = r.now
-	if err := r.st.UpsertPR(ctx, pr); err != nil {
+	if err := inventorytest.Of(r.st).UpsertPR(ctx, pr); err != nil {
 		t.Fatal(err)
 	}
 	if st := statusOf(t, ctx, r.q); st.Failed != 1 || st.Ready != 1 {

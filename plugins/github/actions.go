@@ -6,9 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	sdk "github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
-	"github.com/wloophq/wloop/plugins/github/api"
 	"github.com/wloophq/wloop/plugins/github/plan"
 	"github.com/wloophq/wloop/plugins/github/pr"
 )
@@ -27,12 +25,6 @@ const (
 	// pull request's basics as the host read them, which the store keeps
 	// until its next read when it holds none of it.
 	ActionAdopt = "pr.adopt"
-	// ActionBudget answers the API's budget, its limits as JSON.
-	ActionBudget = "github.budget"
-	// ActionForward sends an api.Exchange, its args, with the plugin's
-	// credentials and answers the api.Answer. Only the host's own code
-	// calls it, with no actor and no unit; any other request is refused.
-	ActionForward = "github.forward"
 )
 
 // Action runs one of the actions the host calls.
@@ -76,21 +68,6 @@ func (p *Plugin) Action(ctx context.Context, req src.ActionRequest) (json.RawMes
 			}
 		}
 		return nil, r.adopt(ctx, ref, basics)
-	case ActionBudget:
-		return json.Marshal(r.client.Budget())
-	case ActionForward:
-		if req.Actor != "" || req.Unit != (sdk.Unit{}) {
-			return nil, fmt.Errorf("%w: %s is the host's own", src.ErrUnsupported, req.Action)
-		}
-		var x api.Exchange
-		if err := json.Unmarshal(req.Args, &x); err != nil {
-			return nil, fmt.Errorf("%w: %s: %v", src.ErrUnfit, req.Action, err)
-		}
-		a, err := r.client.Forward(ctx, x)
-		if err != nil {
-			return nil, err
-		}
-		return json.Marshal(a)
 	}
 	return nil, fmt.Errorf("%w: no action %s", src.ErrUnsupported, req.Action)
 }

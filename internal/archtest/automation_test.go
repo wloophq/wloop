@@ -64,7 +64,6 @@ var coreProviderAllowlist = []providerSite{
 	{"internal/adapter/store/inventory/store.go", "refOf", "unit.GitHub", 1, "debt: the inventory keeps GitHub's pull request tables"},
 	{"internal/adapter/store/inventory/store.go", "Store.Ended", "unit.GitHub", 1, "debt: the inventory keeps GitHub's pull request tables"},
 	{"internal/adapter/store/inventory/store.go", "Store.FirstRoundBlocks", "unit.GitHub", 1, "debt: the inventory keeps GitHub's pull request tables"},
-	{"internal/adapter/store/inventory/store.go", "Store.Tracked", "unit.GitHub", 1, "debt: the inventory keeps GitHub's pull request tables"},
 	{"internal/adapter/store/inventory/store.go", "Store.UnitlessEvents", "unit.Session", 1, "the store keeps the sessions the core keeps"},
 	{"internal/adapter/store/inventory/timings.go", "Store.activeRefs", "unit.GitHub", 1, "debt: the inventory keeps GitHub's pull request tables"},
 	{"internal/adapter/store/sqlite/marks.go", "marksTopic", "unit.GitHub", 1, "debt: a round mark notes GitHub's rounds topic"},

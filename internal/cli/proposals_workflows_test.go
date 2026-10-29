@@ -12,7 +12,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/intent/builtin"
-	"github.com/wloophq/wloop/internal/source"
 )
 
 // workflowProposer is the sweep engine as serve wires it, running the
@@ -27,7 +26,7 @@ func newWorkflowProposer(r *replay) *workflowProposer {
 	r.t.Helper()
 	te := r.te
 	clock := clockFunc(func() time.Time { return r.now })
-	mods := []source.Module{{ID: slackPlugin, Facts: r.slack, OnPosted: map[string]outbox.Effect{builtin.EffectUnitClosed: r.slack.markClosed}}}
+	mods := []pluginModule{{ID: slackPlugin, Facts: r.slack, OnPosted: map[string]outbox.Effect{builtin.EffectUnitClosed: r.slack.markClosed}}}
 	ledger := te.itemsLedger(r.db, te.cfg, r.t.Logf)
 	r.svc.Applier = outbox.EffectApplier{Store: r.db.DraftEffects(), Clock: clock,
 		Effects: effectLookup(effectDeps{Nudges: te.newTasks(r.db, te.cfg, ledger), Modules: mods, Appliers: te.draftAppliers()})}

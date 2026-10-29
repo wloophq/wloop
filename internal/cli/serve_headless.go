@@ -19,13 +19,12 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
 // serveHeadless serves headless turns on d: their usage goes to turn_usage, an answer to a headless turn's
 // question runs it again, and the headless turns a stop cut short end failed before any new one starts.
-func (e *Env) serveHeadless(ctx context.Context, d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []source.Module, logf func(string, ...any)) daemon.Deps {
+func (e *Env) serveHeadless(ctx context.Context, d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []pluginModule, logf func(string, ...any)) daemon.Deps {
 	if e.Turns == nil || db == nil {
 		return d
 	}

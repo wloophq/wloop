@@ -117,14 +117,13 @@ func screenOf(m *Model, w, h int) string { return strings.Join(m.Render(w, h, no
 
 func TestStartsOnFocus(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		registerBoard(t)
 		m := viewsModel(t)
 		m.SetPlugins(boardPlugins(true))
 		if v, ok := m.viewOnScreen(); !ok || v.ID != "focus" {
 			t.Fatalf("started on view %d", m.view)
 		}
 		tabs := m.Render(220, 20, now)[0]
-		order := []string{"[Focus 1]", "Inbox 2", "Outbox 1", "Next 4", "Waiting 4", "Projects 0", "Someday 0", "Logbook 12", "Needs me 0", "Plan 0", "Board"}
+		order := []string{"[Focus 1]", "Inbox 2", "Outbox 1", "Next 4", "Waiting 4", "Projects 0", "Someday 0", "Logbook 12", "Needs me 0", "Plan 0"}
 		at := -1
 		for _, want := range order {
 			i := strings.Index(tabs, want)
@@ -150,7 +149,6 @@ func TestStartsOnFocus(t *testing.T) {
 func ptr[T any](v T) *T { return &v }
 
 func TestDisabledPluginHasNoTUIView(t *testing.T) {
-	registerBoard(t)
 	specs := servedSpecs(t)
 	specs.Specs = slices.DeleteFunc(specs.Specs, func(s api.ActionSpec) bool { return s.Plugin == string(unit.GitHub) })
 	m := NewModel()
@@ -165,7 +163,7 @@ func TestDisabledPluginHasNoTUIView(t *testing.T) {
 		m.SetTasks(v, es, viewCounters())
 	}
 	screen := screenOf(m, 220, 30)
-	for _, gone := range []string{"Needs me", "Board", "V review", "F address"} {
+	for _, gone := range []string{"Needs me", "V review", "F address"} {
 		if strings.Contains(screen, gone) {
 			t.Errorf("a disabled plugin's %q is shown:\n%s", gone, screen)
 		}
@@ -692,7 +690,6 @@ func (f *fakeDaemon) asks() []taskAsk {
 
 func TestTheCatalogSurvivesAFailedPluginsRead(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		registerBoard(t)
 		d := &fakeDaemon{rows: oneRow(), plugins: boardPlugins(true), pluginsErr: errFake("plugins down")}
 		term, done := start(t, d)
 		eventually(t, "the catalog's views", func() bool {
@@ -701,9 +698,14 @@ func TestTheCatalogSurvivesAFailedPluginsRead(t *testing.T) {
 		})
 		d.mu.Lock()
 		d.pluginsErr = nil
+		before := d.pluginReads
 		d.mu.Unlock()
 		d.announce()
-		eventually(t, "the plugins read again", func() bool { return strings.Contains(term.screen(), "Board") })
+		eventually(t, "the plugins read again", func() bool {
+			d.mu.Lock()
+			defer d.mu.Unlock()
+			return d.pluginReads > before
+		})
 		d.mu.Lock()
 		reads := d.catalogReads
 		d.mu.Unlock()
@@ -801,4 +803,10 @@ func TestAVerbAsksTheProfilesQuestion(t *testing.T) {
 	if m.prompt == nil || !strings.Contains(m.prompt.label, "what should the agent look at") {
 		t.Fatalf("delegate prompt %+v", m.prompt)
 	}
+}
+
+const boardProvider unit.ProviderID = "fake"
+
+func boardPlugins(enabled bool) []api.Plugin {
+	return []api.Plugin{{ID: unit.GitHub, Enabled: true}, {ID: boardProvider, Enabled: enabled}}
 }

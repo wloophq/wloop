@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/agent/echo"
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/adapter/view/testsink"
@@ -33,7 +32,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/plugins/source/fakesource"
-	"github.com/wloophq/wloop/internal/source"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -112,7 +111,7 @@ func TestEchoAgentRunsWithoutClaudeOrOrca(t *testing.T) {
 		Display: "Fake", Binary: "true", SessionVar: fake.HandleVar, Sink: "fake",
 		Columns: map[string]string{config.ColumnWorking: "doing", config.ColumnWorkingFallback: "doing-too", config.ColumnNeedsMe: "asks", config.ColumnReviewed: "done", config.ColumnReady: "shippable", config.ColumnInProgress: "started", config.ColumnInReview: "checking", config.ColumnCompleted: "closed"},
 		New:     func() workspace.Manager { return ws },
-		Ports: func(context.Context, workspace.Manager, *inventory.Store, config.Config, *change.Log) (managerSessions, []views.Sink, error) {
+		Ports: func(context.Context, workspace.Manager, prrow.ReportedPRs, config.Config, *change.Log) (managerSessions, []views.Sink, error) {
 			return handleSessions{"fake", sessions}, []views.Sink{{ViewSink: sink, Placements: sink}}, nil
 		},
 	}}
@@ -292,10 +291,10 @@ func TestEchoAgentRunsWithoutClaudeOrOrca(t *testing.T) {
 func slicesEqual(a, b []string) bool { return strings.Join(a, "\x00") == strings.Join(b, "\x00") }
 
 // threadTurnModule is threadModule with the fake thread's turn payload.
-func threadTurnModule(th unit.Unit) source.Plugin {
+func threadTurnModule(th unit.Unit) compiledPlugin {
 	p := threadModule(th)
 	build := p.Build
-	p.Build = func(cfg config.Config, d source.Deps) (source.Module, error) {
+	p.Build = func(cfg config.Config, d moduleDeps) (pluginModule, error) {
 		m, err := build(cfg, d)
 		m.Payload = fakesource.Payloads{}
 		return m, err
@@ -332,7 +331,7 @@ func TestEchoAgentRunsAThreadTurn(t *testing.T) {
 	te.Managers = map[string]ManagerEntry{"fake": {
 		Display: "Fake", Binary: "true", SessionVar: fake.HandleVar, Sink: "fake",
 		New: func() workspace.Manager { return ws },
-		Ports: func(context.Context, workspace.Manager, *inventory.Store, config.Config, *change.Log) (managerSessions, []views.Sink, error) {
+		Ports: func(context.Context, workspace.Manager, prrow.ReportedPRs, config.Config, *change.Log) (managerSessions, []views.Sink, error) {
 			return handleSessions{"fake", sessions}, []views.Sink{{ViewSink: sink, Placements: sink}}, nil
 		},
 	}}

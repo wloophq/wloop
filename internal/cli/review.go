@@ -12,7 +12,7 @@ import (
 	"sync"
 
 	"github.com/wloophq/wloop/internal/config"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -203,14 +203,11 @@ func (e *Env) repoIn(ctx context.Context, m workspace.Manager, repo wsdomain.Rep
 	return r, err
 }
 
-// noteWorkspace links a workspace a round created to its pull request in the
-// inventory, so the views find its card before the next collection.
-func (e *Env) noteWorkspace(ctx context.Context, ref pr.Ref, ws wsdomain.Workspace, review bool) {
-	if e.Store == nil {
-		return
-	}
-	if err := e.Store.SetWorkspace(ctx, ref, dinv.Workspace{Manager: ws.Manager, ID: ws.ID, DisplayName: ws.DisplayName, IsReview: review, IsMain: ws.IsMain}); err != nil {
-		fmt.Fprintf(e.Err, "warning: %s: linking %s in the inventory: %v\n", ref, ws.DisplayName, err)
+// noteWorkspace tells the GitHub plugin that a round created a workspace
+// for its pull request, so it links them before its next collection.
+func (e *Env) noteWorkspace(_ context.Context, ref pr.Ref, _ wsdomain.Workspace, _ bool) {
+	if e.changes != nil {
+		e.changes.Note(port.TopicAgents, ref.Unit())
 	}
 }
 

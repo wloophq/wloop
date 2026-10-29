@@ -13,7 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/github"
 )
 
-// PRReader reads a pull request the inventory holds.
+// PRReader reads a pull request the GitHub plugin reported.
 type PRReader interface {
 	PR(ctx context.Context, ref github.Ref) (dinv.PR, bool, error)
 }

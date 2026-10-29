@@ -6,7 +6,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/source"
 )
 
 // foldCodec is a forge whose person keys compare without case.
@@ -28,7 +27,7 @@ func TestTheItemsOwedByAPersonCompareKeysThroughTheirCodec(t *testing.T) {
 func TestTheDraftStepComparesKeysThroughTheModulesCodecs(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, nil)
-	w := &serveWiring{DB: te.db, Cfg: te.cfg, Modules: []source.Module{{ID: "forge", Codec: foldCodec{}}}, Log: t.Logf, Engine: &engineDeps{}}
+	w := &serveWiring{DB: te.db, Cfg: te.cfg, Modules: []pluginModule{{ID: "forge", Codec: foldCodec{}}}, Log: t.Logf, Engine: &engineDeps{}}
 	te.wireDrafts(w)
 	if c := w.Engine.Drafts.Codecs; c == nil || !c.KeysEqual("forge", "Octocat", "octocat") {
 		t.Fatalf("codecs %v do not fold the forge's keys", c)

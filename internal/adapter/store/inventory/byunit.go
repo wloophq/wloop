@@ -14,18 +14,6 @@ import (
 // unit; a unit that is no pull request reads as the zero reference.
 type ByUnit struct{ *Store }
 
-func (s ByUnit) PRs(ctx context.Context, units []unit.Unit) (map[unit.Unit]dinv.PR, error) {
-	got, err := s.Store.PRs(ctx, unitRefs(units))
-	if err != nil {
-		return nil, err
-	}
-	out := make(map[unit.Unit]dinv.PR, len(got))
-	for ref, p := range got {
-		out[ref.Unit()] = p
-	}
-	return out, nil
-}
-
 func (s ByUnit) Overrides(ctx context.Context) (map[unit.Unit]dinv.Override, error) {
 	got, err := s.Store.Overrides(ctx)
 	if err != nil {
@@ -41,14 +29,6 @@ func (s ByUnit) Overrides(ctx context.Context) (map[unit.Unit]dinv.Override, err
 func unitRef(u unit.Unit) github.Ref {
 	ref, _ := pr.RefOf(u)
 	return ref
-}
-
-func unitRefs(units []unit.Unit) []github.Ref {
-	refs := make([]github.Ref, len(units))
-	for i, u := range units {
-		refs[i] = unitRef(u)
-	}
-	return refs
 }
 
 // RecordEvent records ev on its unit's pull request, none for another unit.

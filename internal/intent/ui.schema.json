@@ -1,0 +1,107 @@
+{
+  "$id": "https://github.com/wloophq/wloop/ui.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "events": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "One event kind's words.",
+        "properties": {
+          "label": {
+            "description": "The event in a few words. Required.",
+            "type": "string"
+          },
+          "loop": {
+            "description": "The event is the loop's doing, which the activity's loop filter keeps.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "type": "object"
+      },
+      "description": "How each event kind the plugin declares shows on a timeline, by kind.",
+      "type": "object"
+    },
+    "facets": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "One facet's words.",
+        "properties": {
+          "buckets": {
+            "additionalProperties": {
+              "description": "One bucket's text.",
+              "type": "string"
+            },
+            "description": "How each age bucket of a time facet shows, by bucket id.",
+            "type": "object"
+          },
+          "empty": {
+            "description": "What a row with no value shows.",
+            "type": "string"
+          },
+          "label": {
+            "description": "The facet's name, as the filter menu and the groups show it. Required.",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {
+              "description": "One value's text.",
+              "type": "string"
+            },
+            "description": "How each value shows, by value; a value it does not name shows as itself.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "type": "object"
+      },
+      "description": "The words of the plugin's facets, by facet id.",
+      "type": "object"
+    },
+    "menubar": {
+      "additionalProperties": {
+        "description": "One section's heading.",
+        "type": "string"
+      },
+      "description": "The heading of each menu bar section, by section id.",
+      "type": "object"
+    },
+    "situations": {
+      "additionalProperties": {
+        "description": "One situation's words.",
+        "type": "string"
+      },
+      "description": "How each situation the plugin derives shows, by kind, in a few words.",
+      "type": "object"
+    },
+    "views": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "One view's words.",
+        "properties": {
+          "label": {
+            "description": "The view's name, as navigation lists it. Required.",
+            "type": "string"
+          },
+          "unit": {
+            "description": "What one of the view's rows is, such as \"Pull request\", the unit column's heading; empty for a view whose rows mix kinds.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "type": "object"
+      },
+      "description": "The words of the plugin's views, by view id.",
+      "type": "object"
+    }
+  },
+  "title": "A plugin's views, facets and situations (ui.toml)",
+  "type": "object"
+}

@@ -13,7 +13,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
-	"github.com/wloophq/wloop/internal/client/rowset"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/termfmt"
@@ -127,10 +126,6 @@ type Model struct {
 	// closed are the sessions closed in the last day, newest first.
 	closed []api.ClosedSession
 
-	// plugins are the enabled plugins' views, after the plan; set is the
-	// rows as they read them, nil until one asks.
-	plugins []PluginView
-	set     *rowset.Set
 	// served are the plugins the daemon serves, enabled or not.
 	served []api.Plugin
 
@@ -188,7 +183,7 @@ func (m *Model) Stay(why string) { m.quit, m.status = false, why }
 // SetData replaces the rows and keeps the selected pull request while it is
 // still in the view, else the same place in the list.
 func (m *Model) SetData(rows []api.Row, h api.Health) {
-	m.rows, m.health, m.loaded, m.err, m.set = rows, h, true, "", nil
+	m.rows, m.health, m.loaded, m.err = rows, h, true, ""
 	m.keepSelection()
 }
 
@@ -322,13 +317,6 @@ func (m *Model) Key(k Key) (c Command, ok bool) {
 		m.quit = true
 	case k.Name == KeyTab:
 		m.cycle()
-	case m.view >= m.pluginBase():
-		if v, ok := m.plugin(); ok {
-			if name := bindingName(k); name == "?" || name == "Ctrl+K" || m.prefix(name) {
-				return m.dispatch(k)
-			}
-			return m.pluginKey(v, k)
-		}
 	case k.Name == KeyUp:
 		m.move(-1)
 	case k.Name == KeyDown:

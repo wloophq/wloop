@@ -19,6 +19,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
@@ -55,7 +57,7 @@ func feedServer(t *testing.T) (*Server, *change.Log, *turns.Service) {
 	t.Cleanup(func() { db.Close() })
 	st := inventory.New(db)
 	st.UseClock(func() time.Time { return agentNow })
-	if err := st.UpsertPR(context.Background(), feedPR()); err != nil {
+	if err := inventorytest.Of(st).UpsertPR(context.Background(), feedPR()); err != nil {
 		t.Fatal(err)
 	}
 	repo := sqlite.New(db)
@@ -235,7 +237,7 @@ func TestIdleCyclePublishesNoRowChange(t *testing.T) {
 		runFeeds(t, s)
 		msgs := listen(t, s, nil)
 		fast := newJob("fast", time.Hour, time.Minute, func(ctx context.Context) (string, string, error) {
-			return sweepOutcome(sweepReport{Queries: 1}, s.store().UpsertPR(ctx, feedPR()))
+			return sweepOutcome(sweepReport{Queries: 1}, inventorytest.Of(s.store()).UpsertPR(ctx, feedPR()))
 		})
 		fast.onEnd = s.jobEnded
 		fast.once(context.Background(), func(string, ...any) {}, s.jobDone)

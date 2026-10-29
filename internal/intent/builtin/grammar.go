@@ -22,6 +22,7 @@ const (
 	SurfaceRecords  Surface = "records"  // records.toml
 	SurfaceKeys     Surface = "keys"     // keys.toml
 	SurfaceNotices  Surface = "notices"  // notices.toml
+	SurfaceUI       Surface = "ui"       // a plugin layer's ui.toml
 	SurfaceBlock    Surface = "block"    // a judgment block's front matter
 	SurfaceConfig   Surface = "config"   // config.toml
 )
@@ -75,7 +76,7 @@ type Value struct {
 }
 
 // Grammar is every reserved key of the language.
-var Grammar = slices.Concat(intentGrammar, workflowGrammar, stepGrammar, actionsGrammar, configGrammar, profileGrammar, toolsGrammar, tasksGrammar, viewsGrammar, gatesGrammar, recordsGrammar, keysGrammar, noticesGrammar,
+var Grammar = slices.Concat(intentGrammar, workflowGrammar, stepGrammar, actionsGrammar, configGrammar, profileGrammar, toolsGrammar, tasksGrammar, viewsGrammar, gatesGrammar, recordsGrammar, keysGrammar, noticesGrammar, uiGrammar,
 	gateApprovalRows(SurfaceIntent), gateApprovalRows(SurfaceWorkflow))
 
 // Problem is a key Check refuses, at its dotted path in the document.

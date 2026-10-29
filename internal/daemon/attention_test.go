@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -182,10 +184,10 @@ func TestOnlyNeedsMeRowsCarryAnAttentionItem(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
 	f.open(40, "ana", fixtureNow.Add(-time.Hour), func(pr *dinv.PR) { pr.Reasons = nil })
-	f.st.SetWorkspace(ctx, ref(40), dinv.Workspace{ID: "w40", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWaiting}})
+	inventorytest.Of(f.st).SetWorkspace(ctx, ref(40), dinv.Workspace{ID: "w40", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWaiting}})
 	f.open(41, "ana", fixtureNow.Add(-time.Hour), func(pr *dinv.PR) { pr.Reasons = []string{"involved"} })
-	f.st.SetOverride(ctx, dinv.Override{PR: ref(41), MutedUntil: fixtureNow.Add(time.Hour)})
-	f.st.SetWorkspace(ctx, ref(41), dinv.Workspace{ID: "w41", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWaiting}})
+	inventorytest.Of(f.st).SetOverride(ctx, dinv.Override{PR: ref(41), MutedUntil: fixtureNow.Add(time.Hour)})
+	inventorytest.Of(f.st).SetWorkspace(ctx, ref(41), dinv.Workspace{ID: "w41", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWaiting}})
 	for _, r := range f.rows("?view=all") {
 		inNeedsMe := slices.Contains(r.Views, api.ViewNeedsMe)
 		if a := rowAttention(t, f.s, r); (a != nil) != inNeedsMe {
@@ -205,7 +207,7 @@ func TestNudgeComputedOnce(t *testing.T) {
 	f.open(51, "fer", at, requests("robo"))
 	f.open(52, "ana", at, requests("fer"))
 	f.open(53, "ana", at, func(pr *dinv.PR) { pr.State = "MERGED" })
-	f.st.SetOverride(context.Background(), dinv.Override{PR: ref(54), MutedUntil: fixtureNow.Add(time.Hour)})
+	inventorytest.Of(f.st).SetOverride(context.Background(), dinv.Override{PR: ref(54), MutedUntil: fixtureNow.Add(time.Hour)})
 	f.open(54, "fer", at, requests("bob"))
 	got := map[int]api.ActionState{}
 	for _, r := range f.rows("?view=all") {

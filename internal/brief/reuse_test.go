@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/github"
 )
 
@@ -46,12 +48,12 @@ func (r *rig) editedBody(t *testing.T, head string) {
 	t.Helper()
 	r.now = r.now.Add(time.Minute)
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 1}
-	pr, _, err := r.st.PR(context.Background(), ref)
+	pr, _, err := inventorytest.Of(r.st).PR(context.Background(), ref)
 	if err != nil {
 		t.Fatal(err)
 	}
 	pr.BodyEditedAt, pr.HeadOid = r.now, head
-	if err := r.st.UpsertPR(context.Background(), pr); err != nil {
+	if err := inventorytest.Of(r.st).UpsertPR(context.Background(), pr); err != nil {
 		t.Fatal(err)
 	}
 	r.now = r.now.Add(BodyQuiet + time.Minute)

@@ -432,7 +432,9 @@ func runProfileCheck(e *Env, args []string) error {
 		dir = d
 	}
 	out, errOut := e.term(color), e.termOf(e.Err, color)
-	layer := []profile.Layer{{Name: "user", Source: dir, Dir: dir}}
+	cfg, _ := e.loadConfig()
+	cfg.Profile = dir
+	layer := profile.Chain(cfg)
 	b, err := turn.Base()
 	if err != nil {
 		return err
@@ -461,7 +463,7 @@ func runProfileCheck(e *Env, args []string) error {
 		}
 		return fmt.Errorf("%s: %d problem(s)", dir, len(problems))
 	}
-	tree, err := profile.Load(layer, loaded.Registry, loaded.BrokenNames())
+	tree, err := profile.Load([]profile.Layer{{Name: "user", Source: dir, Dir: dir}}, loaded.Registry, loaded.BrokenNames())
 	if err != nil {
 		return err
 	}

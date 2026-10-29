@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/brief"
@@ -180,7 +182,7 @@ func TestBriefWatchCallsBackThroughTheBroker(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	q := brief.New(brief.Deps{Store: inventory.New(db), Enabled: true, Now: func() time.Time { return at0 }, Log: t.Logf})
+	q := brief.New(brief.Deps{Store: inventory.New(db), PRs: inventorytest.Of(inventory.New(db)), Enabled: true, Now: func() time.Time { return at0 }, Log: t.Logf})
 	snaps := psource.NewSnapshots(db.Snapshots())
 	k := &psource.Kind{Snapshots: snaps, StateDir: func(string) string { return t.TempDir() },
 		Broker: func(id string, s *manifest.Source) *psource.Broker {
@@ -236,7 +238,7 @@ func TestAFirstTurnAsksThePluginForItsBrief(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	k := kindOver(t, &change.Log{})
 	start(t, k, "acme", "", &briefer{Stub: sourcetest.NewStub()})
-	q := brief.New(brief.Deps{Store: inventory.New(db), Enabled: true, Now: func() time.Time { return at0 }, Log: t.Logf})
+	q := brief.New(brief.Deps{Store: inventory.New(db), PRs: inventorytest.Of(inventory.New(db)), Enabled: true, Now: func() time.Time { return at0 }, Log: t.Logf})
 	q.Register("acme", psource.Briefs{ID: "acme", Kind: k})
 	ctx := context.Background()
 	rd, err := q.Ready(ctx, unit.Unit{Provider: "acme", Key: "t1"}, true, nil)

@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
@@ -23,7 +24,6 @@ import (
 	factworkspace "github.com/wloophq/wloop/internal/adapter/facts/workspace"
 	"github.com/wloophq/wloop/internal/adapter/gitcheck"
 	"github.com/wloophq/wloop/internal/adapter/orca"
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
@@ -122,8 +122,8 @@ func desktopManager(stateDir, userHome string) ManagerEntry {
 }
 
 // desktopPorts points the cached manager's reloads at ctx; Desktop has no board.
-func desktopPorts(string) func(context.Context, workspace.Manager, *inventory.Store, config.Config, *change.Log) (managerSessions, []views.Sink, error) {
-	return func(ctx context.Context, ws workspace.Manager, _ *inventory.Store, _ config.Config, _ *change.Log) (managerSessions, []views.Sink, error) {
+func desktopPorts(string) func(context.Context, workspace.Manager, prrow.ReportedPRs, config.Config, *change.Log) (managerSessions, []views.Sink, error) {
+	return func(ctx context.Context, ws workspace.Manager, _ prrow.ReportedPRs, _ config.Config, _ *change.Log) (managerSessions, []views.Sink, error) {
 		a, err := acd.Ports(ws)
 		if err != nil {
 			return nil, nil, err
@@ -155,7 +155,7 @@ func (e *Env) sessionFacts() automation.Units {
 	if e.Turns == nil || e.Store == nil || snap == nil {
 		return nil
 	}
-	d := factsession.Deps{Turns: e.Turns, Snapshot: snap, States: unitStates{e.Store}, Repo: unitRepo, Transcript: e.transcriptOf, ClosedByManager: e.closedByManager,
+	d := factsession.Deps{Turns: e.Turns, Snapshot: snap, States: unitStates{e.reportedPRs()}, Repo: unitRepo, Transcript: e.transcriptOf, ClosedByManager: e.closedByManager,
 		Cfg: e.currentConfig, Clock: clockFunc(func() time.Time { return e.Now() })}
 	if e.changes != nil {
 		d.Changes = e.changes
@@ -244,14 +244,14 @@ func orcaManager(identities map[string]string) ManagerEntry {
 
 // orcaPorts also points the cached manager's reloads at ctx and notes each moved
 // workspace's units under TopicAgents in changes.
-func orcaPorts(ctx context.Context, ws workspace.Manager, store *inventory.Store, cfg config.Config, changes *change.Log) (managerSessions, []views.Sink, error) {
+func orcaPorts(ctx context.Context, ws workspace.Manager, prs prrow.ReportedPRs, cfg config.Config, changes *change.Log) (managerSessions, []views.Sink, error) {
 	links := func(ctx context.Context) (map[unit.Unit]orca.Link, error) {
-		prs, err := store.ListPRs(ctx, true)
+		open, err := prs.List(ctx, true)
 		if err != nil {
 			return nil, err
 		}
 		out := map[unit.Unit]orca.Link{}
-		for _, p := range prs {
+		for _, p := range open {
 			if p.Workspace.ID != "" && cmp.Or(p.Workspace.Manager, ws.Name()) == ws.Name() {
 				out[p.Ref.Unit()] = orca.Link{WorkspaceID: p.Workspace.ID, Review: p.Workspace.IsReview}
 			}
@@ -383,16 +383,16 @@ func (e *Env) me() task.Me {
 
 // unitStates are the states of the pull requests among units, as the
 // GitHub plugin last reported them.
-type unitStates struct{ store *inventory.Store }
+type unitStates struct{ prs prrow.ReportedPRs }
 
 func (s unitStates) States(ctx context.Context, units []unit.Unit) (map[unit.Unit]string, error) {
-	prs, err := inventory.ByUnit{Store: s.store}.PRs(ctx, units)
+	data, err := s.prs.Data(ctx, units)
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[unit.Unit]string, len(prs))
-	for u, p := range prs {
-		out[u] = p.State
+	out := make(map[unit.Unit]string, len(data))
+	for u, d := range data {
+		out[u] = d.PR.State
 	}
 	return out, nil
 }

@@ -110,6 +110,9 @@ type Loaded struct {
 	Keys KeyTexts
 	// Notices are what the loop tells a session, from notices.toml, by notice name.
 	Notices map[string]string
+	// UI are each plugin's words of its manifest's views, facets and
+	// situations, from its layers' ui.toml, by plugin id.
+	UI map[string]UITexts
 	// EmptyRefusal is what a [[refuse]] case whose why renders empty says,
 	// from defaults.toml.
 	EmptyRefusal string
@@ -196,8 +199,9 @@ func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 			tools, toolProblems := loadTools(layers, bundled)
 			keyTexts, keyProblems := loadKeys(layers, bundled)
 			notices, noticeProblems := loadNotices(layers, bundled)
-			l.Actions, l.Tools, l.Lists, l.Keys, l.Notices, l.Gates = actions, tools, listTexts, keyTexts, notices, gates
-			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, listProblems, gateProblems, keyProblems, noticeProblems)
+			ui, uiProblems := loadUI(layers)
+			l.Actions, l.Tools, l.Lists, l.Keys, l.Notices, l.Gates, l.UI = actions, tools, listTexts, keyTexts, notices, gates, ui
+			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, listProblems, gateProblems, keyProblems, noticeProblems, uiProblems)
 			l.Reverted = map[dintent.Name]Problems{}
 			for n, r := range reverted {
 				l.Reverted[n] = r.problems
@@ -362,12 +366,14 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 				dirProblems = append(dirProblems, Problem{File: dir, Msg: fmt.Sprintf("%s is defined already in %s", name, seen[name])})
 				continue
 			}
-			seen[name] = dir
-			units = append(units, &unit{
-				name: name, dir: dir,
-				source: dintent.Source{Layer: l.Name, Dir: dir},
-				files:  fl,
-			})
+			u := &unit{name: name, dir: dir, source: dintent.Source{Layer: l.Name, Dir: dir}, files: fl}
+			if l.Plugin() {
+				u.bundled = true
+				bundledUnits[name] = u
+			} else {
+				seen[name] = dir
+			}
+			units = append(units, u)
 		}
 	}
 	defaults, defaultProblems := readDefaults(layers, bundled)

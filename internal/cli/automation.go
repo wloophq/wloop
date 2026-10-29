@@ -30,7 +30,6 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/meter"
-	"github.com/wloophq/wloop/internal/source"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
@@ -41,7 +40,7 @@ var _ workspaces.FetchLog = (*sqlite.Fetches)(nil)
 // providers and the plugins' round planners.
 type engineDeps struct {
 	DB             *sqlite.DB
-	Modules        []source.Module
+	Modules        []pluginModule
 	SessionFacts   automation.Units
 	WorkspaceFacts automation.Units
 	// Snapshot overrides the Env's workspace snapshot for the removal's

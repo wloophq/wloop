@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/core/intake"
@@ -46,12 +48,12 @@ func TestAMigratedPRBriefIsNotDueAgain(t *testing.T) {
 	)
 	st := inventory.New(db)
 	for _, ref := range []github.Ref{okRef, gaveRef} {
-		if err := st.UpsertPR(ctx, pr(ref)); err != nil {
+		if err := inventorytest.Of(st).UpsertPR(ctx, pr(ref)); err != nil {
 			t.Fatal(err)
 		}
 	}
 	run := &fakeRunner{fail: map[string]error{}}
-	q := New(Deps{Store: st, Source: &fakeSource{fail: map[string]error{}}, Runner: run, Taxonomy: func(github.Ref) string { return DefaultTaxonomy },
+	q := New(Deps{Store: st, PRs: inventorytest.Of(st), Source: &fakeSource{fail: map[string]error{}}, Runner: run, Taxonomy: func(github.Ref) string { return DefaultTaxonomy },
 		Home: func(github.Ref) string { return "" }, Tier: turns.TierFast, MaxDiffBytes: 1000, Retry: time.Hour, Enabled: true,
 		Now: func() time.Time { return t0 }, Log: func(string, ...any) {}})
 	for range 2 {
@@ -99,7 +101,7 @@ func TestAnAttemptStoredInVersion6StillMatchesAfterTheUpgrade(t *testing.T) {
 	)
 	st := inventory.New(db)
 	pr := dinv.PR{Ref: ref, State: "OPEN", HeadOid: "h1", BodyEditedAt: edited, ChangedFiles: 3, Reasons: []string{"repo"}, UpdatedAt: t0.Add(-time.Hour)}
-	if err := st.UpsertPR(ctx, pr); err != nil {
+	if err := inventorytest.Of(st).UpsertPR(ctx, pr); err != nil {
 		t.Fatal(err)
 	}
 	rec, ok, err := st.BriefRecord(ctx, ref)
@@ -110,7 +112,7 @@ func TestAnAttemptStoredInVersion6StillMatchesAfterTheUpgrade(t *testing.T) {
 		t.Fatalf("the attempt now is %q, the stored one %q", got, stored)
 	}
 	run := &fakeRunner{fail: map[string]error{}}
-	q := New(Deps{Store: st, Source: &fakeSource{fail: map[string]error{}}, Runner: run, Taxonomy: func(github.Ref) string { return DefaultTaxonomy },
+	q := New(Deps{Store: st, PRs: inventorytest.Of(st), Source: &fakeSource{fail: map[string]error{}}, Runner: run, Taxonomy: func(github.Ref) string { return DefaultTaxonomy },
 		Home: func(github.Ref) string { return "" }, Tier: turns.TierFast, MaxDiffBytes: 1000, Retry: time.Hour, Enabled: true,
 		Now: func() time.Time { return t0 }, Log: func(string, ...any) {}})
 	for range 2 {

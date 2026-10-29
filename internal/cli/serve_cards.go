@@ -8,7 +8,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel"
 	cardsjob "github.com/wloophq/wloop/internal/readmodel/cards"
-	"github.com/wloophq/wloop/internal/source"
 )
 
 // withCards is d serving the stored cards, stale for a disabled plugin or
@@ -16,7 +15,7 @@ import (
 // card or items and over the plugins the host runs, whose cards are their
 // reports'. The job runs under --no-jobs too: it reads and writes only the
 // store.
-func (e *Env) withCards(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []source.Module, logf func(string, ...any)) daemon.Deps {
+func (e *Env) withCards(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []pluginModule, logf func(string, ...any)) daemon.Deps {
 	d.Cards = cardsjob.Served(db.Cards(), e.cardsFresh(d.PluginEnabled))
 	providers := map[unit.ProviderID]cardsjob.Provider{}
 	for _, m := range mods {

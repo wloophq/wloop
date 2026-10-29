@@ -96,7 +96,7 @@ func (e *Env) basics(ctx context.Context, ref pr.Ref) (*pr.PullRequest, error) {
 	if r.basicsErr != nil || e.Store == nil {
 		return r.basics, r.basicsErr
 	}
-	row, ok, err := e.Store.PR(ctx, ref)
+	row, ok, err := e.reportedPRs().PR(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -113,14 +113,14 @@ func (e *Env) storedOpenPR(ctx context.Context, ref pr.Ref) (pull *pr.PullReques
 	if e.Store == nil {
 		return nil, false, nil
 	}
-	row, ok, err := e.Store.PR(ctx, ref)
+	row, ok, err := e.reportedPRs().PR(ctx, ref)
 	if err != nil || !ok {
 		return nil, false, err
 	}
 	if row.State != dgh.StateOpen {
 		return nil, true, fmt.Errorf("%s is %s", ref.URL(), row.State)
 	}
-	details, err := e.Store.Details(ctx, []pr.Ref{ref})
+	details, err := e.reportedPRs().Details(ctx, []pr.Ref{ref})
 	if err != nil {
 		return nil, true, err
 	}
@@ -164,11 +164,11 @@ func (e *Env) coveredPR(ctx context.Context, ref pr.Ref) (*pr.PullRequest, strin
 	if e.Store == nil {
 		return nil, "", errNoStore
 	}
-	row, ok, err := e.Store.PR(ctx, ref)
+	row, ok, err := e.reportedPRs().PR(ctx, ref)
 	if err != nil {
 		return nil, "", err
 	}
-	details, err := e.Store.Details(ctx, []pr.Ref{ref})
+	details, err := e.reportedPRs().Details(ctx, []pr.Ref{ref})
 	if err != nil {
 		return nil, "", err
 	}

@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/brand"
@@ -55,7 +57,7 @@ func startIntakeDaemon(t *testing.T, actions daemon.Actions, briefs intake.Brief
 	}
 	t.Cleanup(func() { db.Close() })
 	st := inventory.New(db)
-	if err := st.UpsertPR(context.Background(), dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h2",
+	if err := inventorytest.Of(st).UpsertPR(context.Background(), dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h2",
 		ReviewRequests: []string{"me"}, Reasons: []string{"review-requested"}, URL: r7.URL()}); err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +153,7 @@ func TestReviewNoBriefStartsAtOnce(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	te.Socket = d.socket
 	te.LoadConfig = nil
-	if err := d.store.SetOverride(context.Background(), dinv.Override{PR: r7, Adopted: true}); err != nil {
+	if err := inventorytest.Of(d.store).SetOverride(context.Background(), dinv.Override{PR: r7, Adopted: true}); err != nil {
 		t.Fatal(err)
 	}
 	if code := te.run("address", r7.URL(), "--no-brief", "skip the nit"); code != 0 {
@@ -197,7 +199,7 @@ func TestIntakeCommands(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	te.Socket = d.socket
 	te.LoadConfig = nil
-	if err := d.store.SetOverride(context.Background(), dinv.Override{PR: r7, Adopted: true}); err != nil {
+	if err := inventorytest.Of(d.store).SetOverride(context.Background(), dinv.Override{PR: r7, Adopted: true}); err != nil {
 		t.Fatal(err)
 	}
 	if code := te.run("review", r7.URL(), "--no-wait"); code != 0 {

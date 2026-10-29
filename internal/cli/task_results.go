@@ -15,13 +15,12 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
-	"github.com/wloophq/wloop/internal/source"
 )
 
 // unitsEnded says whether a unit has ended by its plugin's ended fact
 // (builtin.EndedFact); a unit whose plugin has no such fact, or whose facts
 // are gone, has not.
-func unitsEnded(mods []source.Module) func(ctx context.Context, u unit.Unit) (bool, error) {
+func unitsEnded(mods []pluginModule) func(ctx context.Context, u unit.Unit) (bool, error) {
 	return func(ctx context.Context, u unit.Unit) (bool, error) {
 		name, ok := builtin.EndedFact(u.Provider)
 		if !ok {
@@ -75,7 +74,7 @@ func (r taskResults) AttachesPosts(intent string) bool {
 
 // newTaskResults attaches through g, resolving addresses with the codecs of
 // mods.
-func (e *Env) newTaskResults(g *coretasks.Service, mods []source.Module) taskResults {
+func (e *Env) newTaskResults(g *coretasks.Service, mods []pluginModule) taskResults {
 	codecs := make([]unit.Codec, 0, len(mods))
 	for _, m := range mods {
 		if m.Codec != nil {
@@ -87,7 +86,7 @@ func (e *Env) newTaskResults(g *coretasks.Service, mods []source.Module) taskRes
 
 // unitsRepo is the repository of a unit: its placement override's, else the one the placement rules give it,
 // else the repo fact of its plugin's facts; "" when none names one.
-func unitsRepo(mods []source.Module, cfg func() config.Config, overrides placement.Overrides) func(ctx context.Context, u unit.Unit) (string, error) {
+func unitsRepo(mods []pluginModule, cfg func() config.Config, overrides placement.Overrides) func(ctx context.Context, u unit.Unit) (string, error) {
 	return func(ctx context.Context, u unit.Unit) (string, error) {
 		if overrides != nil {
 			p, ok, err := overrides.Override(ctx, u)

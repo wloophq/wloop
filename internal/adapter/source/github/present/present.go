@@ -22,7 +22,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/explore"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -41,22 +40,10 @@ const (
 	ActionNudgePrepare = "nudge.prepare"
 )
 
-// Explorer searches GitHub for Explore.
-type Explorer interface {
-	explore.Searcher
-	IsUser(ctx context.Context, login string) (bool, error)
-}
-
 // Briefs are the brief queue's views of pull requests.
 type Briefs interface {
 	Views(ctx context.Context, prs ...dinv.PR) (map[pr.Ref]*brief.View, error)
 	RefreshIfStale(ctx context.Context, p dinv.PR) error
-}
-
-// Budget is GitHub's rate-limited budget.
-type Budget interface {
-	Low() bool
-	RateLimit() api.RateLimit
 }
 
 // Deps are what the presenter reads and writes: the plugin's store, the
@@ -68,20 +55,14 @@ type Deps struct {
 	Reports readmodel.Reports
 	// Host is the broker: the host's overrides and round state.
 	Host src.Host
-	// Explorer nil answers Explore as unavailable; Briefs nil shows no
-	// brief; Budget nil reads as plenty.
-	Explorer Explorer
-	Briefs   Briefs
-	Budget   Budget
-	// FailedSteps names the failed steps of a GitHub Actions job; nil
-	// names none.
-	FailedSteps func(ctx context.Context, owner, repo string, job int64) ([]string, error)
+	// Briefs nil shows no brief.
+	Briefs Briefs
 	// Plugin runs an action of the running GitHub plugin, which serves the
 	// nudge's prepare; nil serves none.
 	Plugin func(ctx context.Context, req src.ActionRequest) (json.RawMessage, error)
-	// ExploreAttempt bounds one search and ExploreRetryPause separates
-	// its two tries; zero is the default.
-	ExploreAttempt, ExploreRetryPause time.Duration
+	// View reads a view of the running GitHub plugin, which searches for
+	// Explore and reads the failed steps of the checks; nil serves none.
+	View func(ctx context.Context, req src.ViewRequest) (json.RawMessage, error)
 }
 
 // Host is what the daemon serves the presenter beside the broker: the
@@ -105,26 +86,12 @@ type Presenter struct {
 	// overrides serializes the presenter's override writes, which also
 	// compare and set.
 	overrides sync.Mutex
-	exploring sync.Mutex
-	users     sync.Map // lowercase login -> whether GitHub knows it as a user
-	steps     stepCache
 	// situationsFailing keeps the first failure of a streak logged only.
 	situationsFailing atomic.Bool
 }
 
-const (
-	exploreAttempt    = 25 * time.Second
-	exploreRetryPause = 2 * time.Second
-)
-
 // New is the presenter over d, served by the host h.
 func New(d Deps, h Host) *Presenter {
-	if d.ExploreAttempt <= 0 {
-		d.ExploreAttempt = exploreAttempt
-	}
-	if d.ExploreRetryPause <= 0 {
-		d.ExploreRetryPause = exploreRetryPause
-	}
 	if h.Logf == nil {
 		h.Logf = func(string, ...any) {}
 	}

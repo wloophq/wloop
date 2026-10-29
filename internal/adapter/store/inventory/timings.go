@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"slices"
-	"strings"
 	"time"
 
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -12,8 +11,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 )
-
-const prsChunk = 300
 
 // MetaTimingsSince is the meta key of when timing records began.
 const MetaTimingsSince = "timings_since"
@@ -50,16 +47,8 @@ func (s *Store) Timings(ctx context.Context, since time.Time) (dinv.TimingsData,
 	if err != nil {
 		return d, err
 	}
-	known, err := s.prsByRef(ctx, refs)
-	if err != nil {
-		return d, err
-	}
 	for _, ref := range refs {
-		p, ok := known[ref]
-		if !ok {
-			p = dinv.PR{Ref: ref}
-		}
-		d.PRs = append(d.PRs, p)
+		d.PRs = append(d.PRs, dinv.PR{Ref: ref})
 	}
 	if d.Events, err = s.EventsByPR(ctx, refs); err != nil {
 		return d, err
@@ -72,36 +61,6 @@ func (s *Store) Timings(ctx context.Context, since time.Time) (dinv.TimingsData,
 	}
 	d.PRFiles, err = s.prFiles(ctx, at)
 	return d, err
-}
-
-func (s *Store) prsByRef(ctx context.Context, refs []github.Ref) (map[github.Ref]dinv.PR, error) {
-	out := make(map[github.Ref]dinv.PR, len(refs))
-	for chunk := range slices.Chunk(refs, prsChunk) {
-		var where []string
-		var args []any
-		for _, r := range chunk {
-			where = append(where, `(owner=? AND repo=? AND number=?)`)
-			args = append(args, r.Owner, r.Repo, r.Number)
-		}
-		rows, err := s.db.R().QueryContext(ctx, `SELECT `+prColumns+` FROM pull_requests pr WHERE `+strings.Join(where, " OR "), args...)
-		if err != nil {
-			return nil, err
-		}
-		for rows.Next() {
-			p, err := scanPR(rows)
-			if err != nil {
-				rows.Close()
-				return nil, err
-			}
-			out[p.Ref] = p
-		}
-		err = rows.Err()
-		rows.Close()
-		if err != nil {
-			return nil, err
-		}
-	}
-	return out, nil
 }
 
 // activeIn selects the github rows, keyed by unit, of the pull requests

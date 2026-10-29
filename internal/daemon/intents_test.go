@@ -15,6 +15,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/catalog"
@@ -42,7 +44,7 @@ var askAuthorFixture = filepath.Join("..", "intent", "testdata", "good", "ask-au
 // cacheOver is the registry cache over the bundled intents and dir's.
 func cacheOver(t *testing.T, dir string) *intentload.Cache {
 	t.Helper()
-	c, err := turnpkg.NewCache(func() []profile.Layer { return []profile.Layer{{Name: "user", Dir: dir}} }, intentload.CacheOptions{})
+	c, err := turnpkg.NewCache(func() []profile.Layer { return append(profile.BundledChain(), profile.Layer{Name: "user", Dir: dir}) }, intentload.CacheOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +61,7 @@ func copyIntents(t *testing.T, src, dst string) {
 
 func adopt(t *testing.T, s *Server, ref github.Ref) {
 	t.Helper()
-	if err := s.store().SetOverride(context.Background(), dinv.Override{PR: ref, Adopted: true}); err != nil {
+	if err := inventorytest.Of(s.store()).SetOverride(context.Background(), dinv.Override{PR: ref, Adopted: true}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -107,7 +109,7 @@ func TestIntentActionsComeFromManifests(t *testing.T) {
 		t.Fatalf("on someone else's pull request: %+v %v", st, ok)
 	}
 	ctx := context.Background()
-	if err := s.store().UpsertPR(ctx, dinv.PR{Ref: r10, Title: "Mine", Author: "me", State: "OPEN", HeadOid: "h1", Reasons: []string{"author"}, URL: r10.URL()}); err != nil {
+	if err := inventorytest.Of(s.store()).UpsertPR(ctx, dinv.PR{Ref: r10, Title: "Mine", Author: "me", State: "OPEN", HeadOid: "h1", Reasons: []string{"author"}, URL: r10.URL()}); err != nil {
 		t.Fatal(err)
 	}
 	if st, ok := offerOf(rowOf(t, s, r10), "ask-author"); ok {
@@ -434,7 +436,7 @@ func TestHeldRunNowPicksTheIntentByTheWorkspaceRule(t *testing.T) {
 	}
 	s, _ := newIntakeServer(t, nil, nil)
 	holdByCap(t, s)
-	if err := s.store().SetWorkspace(context.Background(), r7, dinv.Workspace{ID: "w7", DisplayName: "feat-batch"}); err != nil {
+	if err := inventorytest.Of(s.store()).SetWorkspace(context.Background(), r7, dinv.Workspace{ID: "w7", DisplayName: "feat-batch"}); err != nil {
 		t.Fatal(err)
 	}
 	if in := ask(t, s, "run_now", `{"source":"cockpit"}`); in.Intent != "address" {

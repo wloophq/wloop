@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/source/github/present"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
@@ -103,9 +105,6 @@ func (s *Server) trackReads(read func(context.Context, unit.Unit) (port.TrackRea
 	githubTestOf(&s.deps).read.Store(&read)
 }
 
-// github is the GitHub presenter's deps of s.
-func (s *Server) github() *present.Deps { return githubOf(&s.deps) }
-
 // withStore is d with every store role on st and the GitHub plugin's
 // presenter over it.
 func withStore(d Deps, st *inventory.Store) Deps {
@@ -157,7 +156,7 @@ func prRows(st *inventory.Store, b prrow.Briefs) []func(readmodel.RowDeps) readm
 		if kept, ok := keptReports.Load(st); ok {
 			reports = kept.(readmodel.Reports)
 		}
-		return prrow.New(prrow.Source{RowDeps: rd, Reports: reports, Store: st, Briefs: b})
+		return prrow.New(prrow.Source{RowDeps: rd, Reports: reports, Store: st, Briefs: b, Catalog: psource.BundledCatalog(string(unit.GitHub))})
 	}}
 }
 
@@ -219,17 +218,17 @@ func newServerOn(t *testing.T, stDB *sqlite.DB, log *change.Log, change func(*De
 	now := time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC) // Thursday
 	st.UseClock(func() time.Time { return now })
 	r7 := github.Ref{Owner: "acme", Repo: "api", Number: 7}
-	st.UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h2", ChecksState: "SUCCESS", ReviewRequests: []string{"me"}, Reasons: []string{"review-requested"}, URL: "https://github.com/acme/api/pull/7"})
+	inventorytest.Of(st).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h2", ChecksState: "SUCCESS", ReviewRequests: []string{"me"}, Reasons: []string{"review-requested"}, URL: "https://github.com/acme/api/pull/7"})
 	st.AppendEvents(ctx, []dinv.Event{
 		{PR: r7, Kind: dinv.KindPush, Key: "h2", Actor: "ana", At: now.Add(-50 * time.Hour)},
 		{PR: r7, Kind: dinv.KindReviewRequest, Key: "me", Actor: "ana", At: now.Add(-49 * time.Hour)},
 	})
 	r8 := github.Ref{Owner: "acme", Repo: "api", Number: 8}
-	st.UpsertPR(ctx, dinv.PR{Ref: r8, Title: "Done", Author: "me", State: "MERGED", Reasons: []string{"author"}})
+	inventorytest.Of(st).UpsertPR(ctx, dinv.PR{Ref: r8, Title: "Done", Author: "me", State: "MERGED", Reasons: []string{"author"}})
 	d := withStore(Deps{Pauses: sqlite.NewRounds(stDB), Activity: stDB, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return now },
 		Identity: viewerIs("me", "acme/search"),
 		Log:      func(string, ...any) {}}, st)
-	githubOf(&d).Explorer = openOnGitHub{}
+	exploreOn(&d, openOnGitHub{})
 	if log != nil {
 		d.Changes = log
 	}
@@ -404,7 +403,7 @@ func TestAReviewToAddressWithoutAWorkspaceShowsInNeedsMeUntilARoundRuns(t *testi
 	ctx := context.Background()
 	now := s.deps.Now()
 	r9 := github.Ref{Owner: "acme", Repo: "api", Number: 9}
-	s.store().UpsertPR(ctx, dinv.PR{Ref: r9, Title: "Mine", Author: "me", State: "OPEN", HeadOid: "h9", ChecksState: "SUCCESS", Reasons: []string{"author"}})
+	inventorytest.Of(s.store()).UpsertPR(ctx, dinv.PR{Ref: r9, Title: "Mine", Author: "me", State: "OPEN", HeadOid: "h9", ChecksState: "SUCCESS", Reasons: []string{"author"}})
 	s.store().AppendEvents(ctx, []dinv.Event{
 		{PR: r9, Kind: dinv.KindReview, Key: "r1", Actor: "bob", At: now.Add(-2 * time.Hour), Data: "CHANGES_REQUESTED:h9"},
 		{PR: r9, Kind: dinv.KindWouldAddress, Key: "2026-10-08T08:00:00Z", At: now.Add(-time.Hour), Data: "reviewed by bob"},
@@ -575,11 +574,7 @@ func TestHealthWarnsOfNoNotifierOnlyWhenOneIsExpected(t *testing.T) {
 // given.
 func seedRateLimit(t *testing.T, s *Server, remaining, limit int, resetAt time.Time) {
 	t.Helper()
-	c := github.NewClient(github.Options{Host: "github.com", Now: s.deps.Now,
-		Token: func(context.Context) (string, error) { return "", errors.New("no token in tests") }})
-	c.Restore([]dgh.Limit{{Resource: dgh.ResourceGraphQL, Remaining: remaining, Limit: limit, ResetAt: resetAt}})
-	s.deps.Budget = ghsource.Budget{Limiter: c}
-	s.github().Budget = ghsource.Budget{Limiter: c}
+	s.deps.Budget = fakeBudget{rl: api.RateLimit{Remaining: remaining, Limit: limit, ResetAt: resetAt}, now: s.deps.Now}
 }
 
 func TestHealthSlowSyncFollowsTheRateLimit(t *testing.T) {
@@ -814,99 +809,27 @@ func TestDetailWithoutTheBriefWhenItCannotBeRead(t *testing.T) {
 	}
 }
 
-func TestChecksDetailNamesTheFailedStepsOnce(t *testing.T) {
+func TestChecksDetailIsTheGitHubPluginsView(t *testing.T) {
 	t.Parallel()
-	calls := 0
+	var asked []string
 	s := newServerWith(t, func(d *Deps) {
-		githubOf(d).FailedSteps = func(_ context.Context, owner, repo string, job int64) ([]string, error) {
-			calls++
-			if owner != "acme" || repo != "api" || job != 114268776435 {
-				t.Errorf("asked for %s/%s job %d", owner, repo, job)
+		githubOf(d).View = func(_ context.Context, req src.ViewRequest) (json.RawMessage, error) {
+			asked = append(asked, req.View+" "+string(req.Query))
+			if strings.Contains(string(req.Query), `"number":99`) {
+				return nil, fmt.Errorf("%w: acme/api#99 is not in the inventory", src.ErrNotFound)
 			}
-			return []string{"Lint PR title"}, nil
+			return json.RawMessage(`[{"name":"Build and test","steps":["Lint PR title"]}]`), nil
 		}
 	})
-	ctx := context.Background()
-	pr, _, _ := s.store().PR(ctx, r7)
-	pr.ChecksState = "FAILURE"
-	pr.FailingChecks = []dinv.FailingCheck{
-		{Name: "Build and test", URL: "https://github.com/acme/api/actions/runs/38071193224/job/114268776435"},
-		{Name: "Preview site", Summary: "Build ou deploy do preview falhou"},
-	}
-	if err := s.store().UpsertPR(ctx, pr); err != nil {
-		t.Fatal(err)
-	}
 	var got []api.CheckDetail
-	for range 2 {
-		if code := get(t, s, "/api/units/github/acme%2Fapi%237/checks", &got); code != 200 {
-			t.Fatalf("%d", code)
-		}
+	if code := get(t, s, "/api/units/github/acme%2Fapi%237/checks", &got); code != 200 || len(got) != 1 || !slices.Equal(got[0].Steps, []string{"Lint PR title"}) {
+		t.Fatalf("%d %+v", code, got)
 	}
-	if calls != 1 || len(got) != 2 || !slices.Equal(got[0].Steps, []string{"Lint PR title"}) || got[1].Summary == "" || got[1].Steps != nil {
-		t.Fatalf("calls %d, got %+v", calls, got)
+	if len(asked) != 1 || asked[0] != `checks {"number":7,"owner":"acme","repo":"api"}` {
+		t.Fatalf("asked %q", asked)
 	}
 	if code := get(t, s, "/api/units/github/acme%2Fapi%2399/checks", nil); code != 404 {
 		t.Fatalf("unknown pull request: %d", code)
-	}
-}
-
-func TestChecksDetailAsksAtMostFiveJobsAndRemembersAFailureForAWhile(t *testing.T) {
-	t.Parallel()
-	var mu sync.Mutex
-	var asked []string
-	clock := time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC)
-	s := newServerWith(t, func(d *Deps) {
-		d.Now = func() time.Time {
-			mu.Lock()
-			defer mu.Unlock()
-			return clock
-		}
-		githubOf(d).FailedSteps = func(_ context.Context, owner, repo string, job int64) ([]string, error) {
-			mu.Lock()
-			defer mu.Unlock()
-			asked = append(asked, fmt.Sprintf("%s/%s %d", owner, repo, job))
-			if job == 1 {
-				return nil, errors.New("HTTP 403")
-			}
-			return []string{"step"}, nil
-		}
-	})
-	ctx := context.Background()
-	pr, _, _ := s.store().PR(ctx, r7)
-	pr.ChecksState = "FAILURE"
-	pr.FailingChecks = nil
-	for job := 1; job <= 6; job++ {
-		pr.FailingChecks = append(pr.FailingChecks, dinv.FailingCheck{Name: fmt.Sprint("job ", job), URL: fmt.Sprintf("https://github.com/acme/api-fork/actions/runs/9/job/%d", job)})
-	}
-	pr.FailingChecks = append(pr.FailingChecks, dinv.FailingCheck{Name: "huge", URL: "https://github.com/acme/api/actions/runs/9/job/99999999999999999999"})
-	if err := s.store().UpsertPR(ctx, pr); err != nil {
-		t.Fatal(err)
-	}
-	calls := func() []string {
-		mu.Lock()
-		defer mu.Unlock()
-		out := slices.Clone(asked)
-		slices.Sort(out)
-		asked = nil
-		return out
-	}
-	var got []api.CheckDetail
-	if code := get(t, s, "/api/units/github/acme%2Fapi%237/checks", &got); code != 200 || len(got) != 7 {
-		t.Fatalf("%d %+v", code, got)
-	}
-	if c := calls(); len(c) != 5 || c[0] != "acme/api-fork 1" {
-		t.Fatalf("first load asked %v", c)
-	}
-	get(t, s, "/api/units/github/acme%2Fapi%237/checks", &got)
-	if c := calls(); !slices.Equal(c, []string{"acme/api-fork 6"}) {
-		t.Fatalf("second load asked %v: a failure or a success was asked again", c)
-	}
-	mu.Lock()
-	clock = clock.Add(10*time.Minute + time.Second)
-	mu.Unlock()
-	get(t, s, "/api/units/github/acme%2Fapi%237/checks", &got)
-	if c := calls(); !slices.Equal(c, []string{"acme/api-fork 1"}) {
-		t.Fatalf("after the retry delay asked %v", c)
 	}
 }
 

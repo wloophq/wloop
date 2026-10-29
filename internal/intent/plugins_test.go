@@ -77,6 +77,7 @@ func TestAPluginsProfileLayerLoadsOnlyWhenEnabled(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			cfg := config.Config{Profile: user, Plugins: config.Plugins{Other: c.sw}}
+			cfg.Plugins.GitHub.Enabled = &off
 			l, problems := Load(profile.Chain(cfg), withBundledTasks(t, profiles.Default), testBase(), nil)
 			if len(problems) > 0 {
 				t.Fatalf("%s", problems.Error())
@@ -146,6 +147,7 @@ func TestTheBundledSlackLayerLoadsWithNoPluginDirectory(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			var cfg config.Config
 			cfg.Plugins.Slack.Enabled = c.on
+			cfg.Plugins.GitHub.Enabled = &off
 			l, problems := Load(profile.Chain(cfg), bundledFS(), testBase(), nil)
 			if len(problems) > 0 {
 				t.Fatalf("%s", problems.Error())
@@ -177,7 +179,10 @@ func TestAUserOverridesAWorkflowOfAPluginsLayer(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "text.md.tmpl"), []byte("Closing."), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	l, problems := Load(profile.Chain(config.Config{Profile: user}), bundledFS(), testBase(), nil)
+	cfg := config.Config{Profile: user}
+	off := false
+	cfg.Plugins.GitHub.Enabled = &off
+	l, problems := Load(profile.Chain(cfg), bundledFS(), testBase(), nil)
 	if len(problems) > 0 {
 		t.Fatalf("%s", problems.Error())
 	}

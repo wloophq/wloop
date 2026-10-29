@@ -32,13 +32,7 @@ func (r reporter) Report(ctx context.Context, snapshots []src.Snapshot) error {
 	if err := r.b.Snapshots.Put(ctx, byUnit); err != nil {
 		return err
 	}
-	if err := r.b.replaceLinks(ctx, byUnit); err != nil {
-		return err
-	}
-	if r.b.Reported != nil {
-		return r.b.Reported(ctx, byUnit)
-	}
-	return nil
+	return r.b.replaceLinks(ctx, byUnit)
 }
 
 // Changed records in the change log that the plugin's units changed, as

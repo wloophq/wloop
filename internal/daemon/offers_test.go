@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/source/github/present"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
@@ -95,13 +97,13 @@ func newCatalogRig(t *testing.T) catalogRig {
 	st := inventory.New(db)
 	st.UseClock(func() time.Time { return catalogNow })
 	ctx := context.Background()
-	st.UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h2", ReviewRequests: []string{"me"},
+	inventorytest.Of(st).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h2", ReviewRequests: []string{"me"},
 		Reasons: []string{"review-requested"}, URL: r7.URL()})
 	st.AppendEvents(ctx, []dinv.Event{
 		{PR: r7, Kind: dinv.KindPush, Key: "h2", Actor: "ana", At: catalogNow.Add(-50 * time.Hour)},
 		{PR: r7, Kind: dinv.KindReviewRequest, Key: "me", Actor: "ana", At: catalogNow.Add(-49 * time.Hour)},
 	})
-	st.UpsertPR(ctx, dinv.PR{Ref: github.Ref{Owner: "acme", Repo: "api", Number: 8}, Title: "Done", Author: "me", State: "MERGED", Reasons: []string{"author"}})
+	inventorytest.Of(st).UpsertPR(ctx, dinv.PR{Ref: github.Ref{Owner: "acme", Repo: "api", Number: 8}, Title: "Done", Author: "me", State: "MERGED", Reasons: []string{"author"}})
 	repo := sqlite.New(db)
 	sessions := turnstest.NewSessions()
 	plan := newPendingPlan(catalogNow)
@@ -116,7 +118,7 @@ func newCatalogRig(t *testing.T) catalogRig {
 		Sessions: sessions,
 		StateDir: t.TempDir(),
 	}, st)
-	githubOf(&d).Explorer = knownOnGitHub{mineRef: {Ref: mineRef, URL: mineRef.URL(), Title: "Mine", Author: "me", State: dgh.StateOpen}}
+	exploreOn(&d, knownOnGitHub{mineRef: {Ref: mineRef, URL: mineRef.URL(), Title: "Mine", Author: "me", State: dgh.StateOpen}})
 	withBriefs(&d, stubBriefs{})
 	d.Plan, d.Pending = plan, plan
 	s := New(d)
@@ -141,7 +143,7 @@ func (c catalogRig) events(t *testing.T, evs ...dinv.Event) {
 
 func (c catalogRig) override(t *testing.T, o dinv.Override) {
 	t.Helper()
-	if err := c.st.SetOverride(context.Background(), o); err != nil {
+	if err := inventorytest.Of(c.st).SetOverride(context.Background(), o); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -210,10 +212,10 @@ var catalogFixtures = []catalogFixture{
 		c.override(t, dinv.Override{PR: github.Ref{Owner: "acme", Repo: "api", Number: 8}, MutedUntil: catalogNow.Add(time.Hour)})
 	}},
 	{"done_with_workspace", github.Ref{Owner: "acme", Repo: "api", Number: 8}, func(t *testing.T, c catalogRig) {
-		c.st.SetWorkspace(context.Background(), github.Ref{Owner: "acme", Repo: "api", Number: 8}, dinv.Workspace{ID: "w8", DisplayName: "feat-done"})
+		inventorytest.Of(c.st).SetWorkspace(context.Background(), github.Ref{Owner: "acme", Repo: "api", Number: 8}, dinv.Workspace{ID: "w8", DisplayName: "feat-done"})
 	}},
 	{"mine_no_reviewer", r10, func(t *testing.T, c catalogRig) {
-		c.st.UpsertPR(context.Background(), dinv.PR{Ref: r10, Title: "Mine", Author: "me", State: "OPEN", HeadOid: "h1", Reasons: []string{"author"}, URL: r10.URL()})
+		inventorytest.Of(c.st).UpsertPR(context.Background(), dinv.PR{Ref: r10, Title: "Mine", Author: "me", State: "OPEN", HeadOid: "h1", Reasons: []string{"author"}, URL: r10.URL()})
 		c.events(t, dinv.Event{PR: r10, Kind: dinv.KindPush, Key: "h1", Actor: "me", At: catalogNow.Add(-72 * time.Hour)})
 	}},
 	{"others_adopted", r7, func(t *testing.T, c catalogRig) { c.override(t, dinv.Override{PR: r7, Adopted: true}) }},
@@ -226,7 +228,7 @@ var catalogFixtures = []catalogFixture{
 	{"intake_waiting_cli", r7, func(t *testing.T, c catalogRig) { c.intake(t, sourceCLI) }},
 	{"intake_waiting_session", r7, func(t *testing.T, c catalogRig) { c.intake(t, sourceSession) }},
 	{"forceable_refusal", r7, func(t *testing.T, c catalogRig) {
-		c.st.SetWorkspace(context.Background(), r7, dinv.Workspace{ID: "w7", DisplayName: "REVIEW batch", IsReview: true})
+		inventorytest.Of(c.st).SetWorkspace(context.Background(), r7, dinv.Workspace{ID: "w7", DisplayName: "REVIEW batch", IsReview: true})
 		c.s.forceable.Store(forceableKey(r7.Unit()), "the workspace holds uncommitted files")
 	}},
 	{"user_hold", r7, func(t *testing.T, c catalogRig) { c.override(t, dinv.Override{PR: r7, Hold: true}) }},
@@ -396,7 +398,7 @@ func TestAReviewOfAnUntrackedPullRequestIsAccepted(t *testing.T) {
 
 func TestAnUntrackedPullRequestWithoutAnExplorerIs503(t *testing.T) {
 	t.Parallel()
-	s := newServerWith(t, func(d *Deps) { d.Actions, githubOf(d).Explorer = &fakeActions{}, nil })
+	s := newServerWith(t, func(d *Deps) { d.Actions, githubOf(d).View = &fakeActions{}, nil })
 	rec := post(t, s, "/api/units/github/acme%2Fweb%233/review", `{"source":"cli"}`)
 	if rec.Code != 503 || !strings.Contains(rec.Body.String(), "cannot read acme/web#3 from GitHub") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)

@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -25,7 +27,7 @@ func linkWorkspaces(t *testing.T, st *inventory.Store, refs ...github.Ref) {
 	for _, r := range refs {
 		links[r] = dinv.Workspace{ID: "ws-" + r.String(), DisplayName: "feat " + r.String(), Status: "completed"}
 	}
-	if err := st.ReplaceWorkspaces(context.Background(), links); err != nil {
+	if err := inventorytest.Of(st).ReplaceWorkspaces(context.Background(), links); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -195,7 +197,7 @@ func TestApprovedViewHoldsOpenPullRequestsThatWaitOnNothingOfMine(t *testing.T) 
 		links[ref(n)] = dinv.Workspace{ID: fmt.Sprint("ws-", n), DisplayName: fmt.Sprint("REVIEW ", n), IsReview: n != 43}
 	}
 	links[ref(42)] = dinv.Workspace{ID: "ws-42", DisplayName: "feat 42"}
-	if err := f.st.ReplaceWorkspaces(context.Background(), links); err != nil {
+	if err := inventorytest.Of(f.st).ReplaceWorkspaces(context.Background(), links); err != nil {
 		t.Fatal(err)
 	}
 	got := numbers(f.rows("?view=" + api.ViewApproved))

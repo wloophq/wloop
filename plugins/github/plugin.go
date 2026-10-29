@@ -5,7 +5,6 @@ package github
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -242,10 +241,6 @@ func (p *Plugin) viewer(ctx context.Context, r *running) (string, error) {
 	}
 	out, err := p.gh().Run(ctx, "api", "user", "--jq", ".login")
 	return strings.TrimSpace(string(out)), err
-}
-
-func (p *Plugin) View(_ context.Context, req src.ViewRequest) (json.RawMessage, error) {
-	return nil, fmt.Errorf("%w: no view %s", src.ErrUnsupported, req.View)
 }
 
 // RunCLI runs one of the commands plugin.toml declares, with gh.

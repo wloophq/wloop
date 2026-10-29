@@ -20,7 +20,6 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
@@ -108,7 +107,7 @@ func newSubjectsRig(t *testing.T) *subjectsRig {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mods := []source.Module{{ID: slackPlugin, Facts: psource.SettledFacts{UnitFacts: psource.UnitFacts{Snapshots: snaps}, Source: s, Drafts: db.Drafts()}}}
+	mods := []pluginModule{{ID: slackPlugin, Facts: psource.SettledFacts{UnitFacts: psource.UnitFacts{Snapshots: snaps}, Source: s, Drafts: db.Drafts()}}}
 	ed := engineDeps{DB: db, Modules: mods, SessionFacts: noUnits{}, WorkspaceFacts: noUnits{}}
 	te.wireSubjects(&serveWiring{DB: db, Cfg: te.cfg, Modules: mods, Engine: &ed})
 	return &subjectsRig{te: te, db: db, log: log, eng: te.planEngine(ed), snaps: snaps}

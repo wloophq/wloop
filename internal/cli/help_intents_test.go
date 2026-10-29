@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -31,7 +30,7 @@ states = ["done", "failed"]
 func TestTheHelpTopicsOfIntentsComeFromTheirManifests(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	review, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "intents", "review", "intent.toml"))
+	review, err := readBundled("intents/review/intent.toml")
 	if err != nil {
 		t.Fatal(err)
 	}

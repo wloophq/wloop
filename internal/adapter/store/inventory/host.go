@@ -6,9 +6,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/port"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
@@ -56,49 +54,5 @@ func (h dbHost) Events(ctx context.Context, q src.EventQuery) ([]src.Event, erro
 	return out, nil
 }
 
-// wireEvent is e as the broker carries it.
-func wireEvent(e dinv.Event) src.Event {
-	u := e.PR.Unit()
-	out := src.Event{Unit: plugin.Unit{Provider: string(u.Provider), Key: u.Key}, Kind: e.Kind, Key: e.Key, Actor: e.Actor, At: e.At}
-	if e.Data != "" {
-		out.Data = json.RawMessage(e.Data)
-	}
-	return out
-}
-
-// recordEvents records evs on the host through the broker.
-func (s *Store) recordEvents(ctx context.Context, evs []dinv.Event) error {
-	if len(evs) == 0 {
-		return nil
-	}
-	if err := timed(evs); err != nil {
-		return err
-	}
-	wire := make([]src.Event, len(evs))
-	for i, e := range evs {
-		wire[i] = wireEvent(e)
-	}
-	return s.host.RecordEvents(ctx, wire)
-}
-
-// hostEvents reads the host's events of refs of kinds, every kind when
-// empty, through the broker.
-func (s *Store) hostEvents(ctx context.Context, refs []github.Ref, kinds ...string) ([]dinv.Event, error) {
-	if len(refs) == 0 {
-		return nil, nil
-	}
-	units := make([]plugin.Unit, len(refs))
-	for i, r := range refs {
-		u := r.Unit()
-		units[i] = plugin.Unit{Provider: string(u.Provider), Key: u.Key}
-	}
-	got, err := s.host.Events(ctx, src.EventQuery{Units: units, Kinds: kinds})
-	if err != nil {
-		return nil, err
-	}
-	out := make([]dinv.Event, len(got))
-	for i, e := range got {
-		out[i] = dinv.Event{PR: refOf(e.Unit.Provider, e.Unit.Key), Kind: e.Kind, Key: e.Key, Actor: e.Actor, At: e.At, Data: string(e.Data)}
-	}
-	return out, nil
-}
+// Host is the broker the store records its events through.
+func (s *Store) Host() src.Host { return s.host }

@@ -207,10 +207,13 @@ type UIFacet struct {
 	Menu    bool       `toml:"menu" doc:"It shows in the filter menu."`
 }
 
-// UIBucket is an age bucket of a time facet: the values younger than Within.
+// UIBucket is an age bucket of a time facet: the values younger than
+// Within, the first bucket that covers one winning. A negative Within reads
+// a value in the future; the last bucket may leave it unset to catch the
+// rest.
 type UIBucket struct {
 	ID     string   `toml:"id" doc:"The bucket's id. Required."`
-	Within Duration `toml:"within" doc:"The age its values are younger than, as a Go duration. Required."`
+	Within Duration `toml:"within" doc:"The age its values are younger than, as a Go duration; negative for a value that far in the future. Required but on the last bucket, which then catches the rest."`
 }
 
 // UIMenu is a menu bar section showing a view.
@@ -243,6 +246,8 @@ func (d Duration) MarshalText() ([]byte, error) { return []byte(time.Duration(d)
 var (
 	slotRe = regexp.MustCompile(`^[a-z][a-z0-9_]{0,31}$`)
 	nameRe = regexp.MustCompile(`^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*)*$`)
+	// bucketRe also takes an age such as 1d.
+	bucketRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 )
 
 // FactTypes are the types a fact declares.
@@ -476,10 +481,13 @@ func (s *Source) validateUI(bad func(string, ...any), unique func(string, string
 		if len(f.Buckets) > 0 && f.Sort != "time" {
 			bad("ui facet %q: buckets need sort = time", f.ID)
 		}
-		for _, b := range f.Buckets {
+		for i, b := range f.Buckets {
 			unique("bucket of "+f.ID, b.ID)
-			if !nameRe.MatchString(b.ID) || b.Within <= 0 {
-				bad("ui facet %q: bucket %q needs a lowercase id and a positive within", f.ID, b.ID)
+			if !bucketRe.MatchString(b.ID) {
+				bad("ui facet %q: bucket %q needs a lowercase id", f.ID, b.ID)
+			}
+			if b.Within == 0 && i < len(f.Buckets)-1 {
+				bad("ui facet %q: bucket %q needs a within; only the last bucket catches the rest", f.ID, b.ID)
 			}
 		}
 	}

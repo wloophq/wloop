@@ -323,20 +323,6 @@ func TestTheFastJobReportsWhatItRead(t *testing.T) {
 	}
 }
 
-func TestTheForwardIsTheHostsOwn(t *testing.T) {
-	t.Parallel()
-	p := started(t, &githubGraphQL{}, &fakeHost{})
-	args, _ := json.Marshal(map[string]any{"method": "GET", "path": "user"})
-	for _, actor := range []string{src.ActorPerson, src.ActorAgent} {
-		if _, err := p.Action(context.Background(), src.ActionRequest{Action: ActionForward, Args: args, Actor: actor}); !errors.Is(err, src.ErrUnsupported) {
-			t.Errorf("a forward a %s asked for: %v", actor, err)
-		}
-	}
-	if _, err := p.Action(context.Background(), src.ActionRequest{Unit: ref7.Unit(), Action: ActionForward, Args: args}); !errors.Is(err, src.ErrUnsupported) {
-		t.Errorf("a forward named as a unit's action: %v", err)
-	}
-}
-
 func TestTheCheckoutIsTheStoredHeadAndBase(t *testing.T) {
 	t.Parallel()
 	p := started(t, &githubGraphQL{states: map[int]string{7: "OPEN"}}, &fakeHost{})

@@ -7,7 +7,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
-	"github.com/wloophq/wloop/internal/source"
 )
 
 func TestEveryDraftEffectHasAnImplementation(t *testing.T) {
@@ -34,7 +33,7 @@ func TestAPluginEffectStaysPendingWhileItsPluginIsNotBuilt(t *testing.T) {
 	if _, ok := off(thread, builtin.EffectTaskNudged); !ok {
 		t.Fatal("task.nudged needs no plugin")
 	}
-	on := effectLookup(effectDeps{Modules: []source.Module{{ID: thread}}})
+	on := effectLookup(effectDeps{Modules: []pluginModule{{ID: thread}}})
 	if _, ok := on(thread, builtin.EffectUnitClosed); !ok {
 		t.Fatal("unit.closed on a built plugin that records no closure")
 	}

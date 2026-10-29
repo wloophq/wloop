@@ -77,7 +77,7 @@ func (q *Queue) readyPR(ctx context.Context, ref github.Ref, first bool) (Readin
 		rd.Cause = intake.CauseOff
 		return rd, nil
 	}
-	p, inInventory, err := q.d.Store.PR(ctx, ref)
+	p, inInventory, err := q.prs().PR(ctx, ref)
 	if err != nil {
 		return Readiness{}, err
 	}
@@ -157,7 +157,7 @@ func (q *Queue) peekPR(ctx context.Context, ref github.Ref, first bool) (Readine
 		rd.Cause = intake.CauseOff
 		return rd, nil
 	}
-	p, inInventory, err := q.d.Store.PR(ctx, ref)
+	p, inInventory, err := q.prs().PR(ctx, ref)
 	if err != nil {
 		return Readiness{}, err
 	}
@@ -216,7 +216,7 @@ func (q *Queue) attempt(ref github.Ref, rec dinv.BriefRecord, cur string) int {
 
 // Attempt is the attempt a first turn of ref waits on, as Ready counts it.
 func (q *Queue) Attempt(ctx context.Context, ref github.Ref) (int, error) {
-	p, ok, err := q.d.Store.PR(ctx, ref)
+	p, ok, err := q.prs().PR(ctx, ref)
 	if err != nil {
 		return 0, err
 	}

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -175,7 +177,7 @@ func TestHeldRunNowOnAnAdoptedPullRequestIsTheAuthors(t *testing.T) {
 	te := newTestEnv(t, myPRManager())
 	te.gh.basics = addressBasics(t, obj{"__typename": "User", "login": "jo"})
 	te.Rec = storeRecorder{te.Store}
-	gh, err := te.github.API.Basics(ctx, r21)
+	gh, err := te.forgeBasics(ctx, r21)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +192,7 @@ func TestHeldRunNowOnAnAdoptedPullRequestIsTheAuthors(t *testing.T) {
 	if got := role(); got != catalog.RoleReview {
 		t.Fatalf("someone else's pull request: role %s", got)
 	}
-	if err := te.Store.SetOverride(ctx, dinv.Override{PR: r21, Adopted: true}); err != nil {
+	if err := inventorytest.Of(te.Store).SetOverride(ctx, dinv.Override{PR: r21, Adopted: true}); err != nil {
 		t.Fatal(err)
 	}
 	if got := role(); got != catalog.RoleAuthor {

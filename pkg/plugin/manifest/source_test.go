@@ -257,7 +257,7 @@ func TestSourceTableRefuses(t *testing.T) {
 		{"a menu of no view", "[[source.ui.menubar]]\nid = \"m\"\nview = \"nope\"\n", "nope"},
 		{"a web directory outside", "[source.ui]\nweb = \"../x\"\n", "web"},
 		{"buckets on a text facet", "[[source.ui.facets]]\nid = \"opened\"\nsort = \"text\"\nbuckets = [{id = \"day\", within = \"24h\"}]\n", "sort = time"},
-		{"a bucket with no age", "[[source.ui.facets]]\nid = \"opened\"\nsort = \"time\"\nbuckets = [{id = \"day\"}]\n", "positive within"},
+		{"a bucket with no age before the last", "[[source.ui.facets]]\nid = \"opened\"\nsort = \"time\"\nbuckets = [{id = \"day\"}, {id = \"older\"}]\n", "only the last bucket"},
 		{"a repeated mark", "[[source.marks]]\nname = \"acme.seen\"\ndoc = \"d\"\n[[source.marks]]\nname = \"acme.seen\"\ndoc = \"d\"\n", "twice"},
 		{"a mark without its doc", "[[source.marks]]\nname = \"acme.seen\"\n", "doc is required"},
 		{"mixed ranks", "[[source.situations]]\nname = \"review\"\ndoc = \"d\"\nrank = 2\n[[source.situations]]\nname = \"merge\"\ndoc = \"d\"\n", "all or none"},

@@ -17,6 +17,7 @@ import (
 type forgeCalls interface {
 	Identity(ctx context.Context) (src.Identity, error)
 	Action(ctx context.Context, req src.ActionRequest) (json.RawMessage, error)
+	View(ctx context.Context, req src.ViewRequest) (json.RawMessage, error)
 	RunCLI(ctx context.Context, req src.CLIRequest, stdout, stderr io.Writer) (int, error)
 }
 

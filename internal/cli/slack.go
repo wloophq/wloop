@@ -21,7 +21,6 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/source"
 )
 
 const slackPlugin unit.ProviderID = "slack"
@@ -75,7 +74,7 @@ func runSlack(ctx context.Context, e *Env, args []string) error {
 
 // sourcePlugins are the compiled-in plugins with the Slack module relaying
 // to e's Slack plugin process.
-func (e *Env) sourcePlugins() []source.Plugin {
+func (e *Env) sourcePlugins() []compiledPlugin {
 	out := slices.Clone(plugins)
 	for i := range out {
 		switch out[i].ID {

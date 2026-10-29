@@ -5,12 +5,11 @@ import (
 
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
 // servePayloads registers the turn payload readers of the enabled sources.
-func (e *Env) servePayloads(mods []source.Module) {
+func (e *Env) servePayloads(mods []pluginModule) {
 	e.payloads = map[unit.ProviderID]turn.PayloadReader{}
 	for _, m := range mods {
 		if m.Payload != nil {

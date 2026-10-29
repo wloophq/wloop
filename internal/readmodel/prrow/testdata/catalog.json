@@ -1,5 +1,5 @@
 {
-  "version": "74130d9c100c",
+  "version": "a52c87d9042e",
   "views": [
     {
       "id": "needs-me",
@@ -570,6 +570,105 @@
       "kind": "done",
       "label": "closed",
       "rank": 17
+    }
+  ],
+  "events": [
+    {
+      "provider": "github",
+      "kind": "opened",
+      "label": "opened"
+    },
+    {
+      "provider": "github",
+      "kind": "push",
+      "label": "pushed"
+    },
+    {
+      "provider": "github",
+      "kind": "review_requested",
+      "label": "review requested"
+    },
+    {
+      "provider": "github",
+      "kind": "review_request_removed",
+      "label": "review request removed"
+    },
+    {
+      "provider": "github",
+      "kind": "review",
+      "label": "reviewed"
+    },
+    {
+      "provider": "github",
+      "kind": "comment",
+      "label": "commented"
+    },
+    {
+      "provider": "github",
+      "kind": "check",
+      "label": "checks"
+    },
+    {
+      "provider": "github",
+      "kind": "ready",
+      "label": "ready for review"
+    },
+    {
+      "provider": "github",
+      "kind": "draft",
+      "label": "back to draft"
+    },
+    {
+      "provider": "github",
+      "kind": "merged",
+      "label": "merged"
+    },
+    {
+      "provider": "github",
+      "kind": "closed",
+      "label": "closed"
+    },
+    {
+      "provider": "github",
+      "kind": "round_sent",
+      "label": "round sent",
+      "loop": true
+    },
+    {
+      "provider": "github",
+      "kind": "round_held",
+      "label": "round held",
+      "loop": true
+    },
+    {
+      "provider": "github",
+      "kind": "round_pending",
+      "label": "round pending",
+      "loop": true
+    },
+    {
+      "provider": "github",
+      "kind": "round_skipped",
+      "label": "round skipped",
+      "loop": true
+    },
+    {
+      "provider": "github",
+      "kind": "guidance",
+      "label": "guidance",
+      "loop": true
+    },
+    {
+      "provider": "github",
+      "kind": "round_blocked",
+      "label": "round blocked",
+      "loop": true
+    },
+    {
+      "provider": "github",
+      "kind": "round_unblocked",
+      "label": "round unblocked",
+      "loop": true
     }
   ]
 }

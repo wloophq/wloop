@@ -525,7 +525,7 @@ func (s *Store) BriefRecords(ctx context.Context, refs ...github.Ref) (map[githu
 	if len(refs) == 0 {
 		return out, s.readBriefRecords(ctx, out, briefRecordQuery)
 	}
-	for chunk := range slices.Chunk(refs, prReadChunk) {
+	for chunk := range slices.Chunk(refs, briefReadChunk) {
 		marks := strings.TrimSuffix(strings.Repeat("?,", len(chunk)), ",")
 		args := make([]any, 0, len(chunk))
 		for _, r := range chunk {
@@ -572,7 +572,7 @@ var briefStateQuery = `SELECT p.unit_key, ` + fmt.Sprintf(briefFields, "''") + `
 // update first: the pull requests, then the brief states, a read each that
 // never reads a brief's JSON.
 func (s *Store) BriefStates(ctx context.Context) ([]BriefState, error) {
-	prs, err := s.ListPRs(ctx, true)
+	prs, err := s.openPRs(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -619,3 +619,5 @@ func (s *Store) UnitBrief(ctx context.Context, u unit.Unit) (UnitBrief, bool, er
 	}
 	return b, err == nil, err
 }
+
+const briefReadChunk = 400

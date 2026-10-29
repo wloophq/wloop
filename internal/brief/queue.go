@@ -73,7 +73,6 @@ const (
 
 type Store interface {
 	BriefStates(ctx context.Context) ([]inventory.BriefState, error)
-	PR(ctx context.Context, ref github.Ref) (dinv.PR, bool, error)
 	BriefRecords(ctx context.Context, refs ...github.Ref) (map[github.Ref]dinv.BriefRecord, error)
 	BriefRecord(ctx context.Context, ref github.Ref) (dinv.BriefRecord, bool, error)
 	TagVocabulary(ctx context.Context, owner string, keys []string, limit int) (map[string][]tag.Count, error)
@@ -95,7 +94,10 @@ type RunStore interface {
 const VocabularySize = 30
 
 type Deps struct {
-	Store  Store
+	Store Store
+	// PRs are the pull requests the GitHub plugin last reported; nil knows
+	// none.
+	PRs    PRReader
 	Source interface {
 		Facts(ctx context.Context, ref github.Ref) (Input, error)
 		Diff(ctx context.Context, ref github.Ref, max int) (diff string, cut bool, err error)
@@ -307,7 +309,7 @@ func (q *Queue) source(p unit.ProviderID) BriefSource {
 		return s
 	}
 	if p == (dpr.Codec{}).Provider() {
-		return GitHubSource{Store: q.d.Store, Source: q.d.Source, MaxDiffBytes: q.d.MaxDiffBytes, Retry: q.d.Retry}
+		return GitHubSource{Store: q.prs(), Source: q.d.Source, MaxDiffBytes: q.d.MaxDiffBytes, Retry: q.d.Retry}
 	}
 	return nil
 }
@@ -361,7 +363,7 @@ func backoff(retry time.Duration, failures int) time.Duration {
 
 // ghUnavailable is a GitHub error no pull request gets past.
 func ghUnavailable(err error) bool {
-	return errors.Is(err, github.ErrUnauthorized) || errors.Is(err, dgh.ErrBudget)
+	return errors.Is(err, dgh.ErrBudget)
 }
 
 // priority is what a run's GitHub reads spend: only a run a turn waits on
@@ -961,4 +963,17 @@ func (q *Queue) RefreshIfStale(ctx context.Context, pr dinv.PR) error {
 		q.spawn(ctx, pr, TriggerRefresh, q.timeout(true), false)
 	}
 	return nil
+}
+
+// noPRs knows no pull request.
+type noPRs struct{}
+
+func (noPRs) PR(context.Context, github.Ref) (dinv.PR, bool, error) { return dinv.PR{}, false, nil }
+
+// prs are the pull requests the queue reads.
+func (q *Queue) prs() PRReader {
+	if q.d.PRs == nil {
+		return noPRs{}
+	}
+	return q.d.PRs
 }

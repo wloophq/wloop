@@ -29,6 +29,17 @@ type CatalogResponse struct {
 	Views      []ViewSpec      `json:"views"`
 	Facets     []FacetSpec     `json:"facets"`
 	Situations []SituationSpec `json:"situations"`
+	// Events are the words of the plugins' event kinds.
+	Events []EventSpec `json:"events,omitempty"`
+}
+
+// EventSpec is how a plugin's event kind shows on a timeline; Loop says
+// it is the loop's doing.
+type EventSpec struct {
+	Provider string `json:"provider"`
+	Kind     string `json:"kind"`
+	Label    string `json:"label"`
+	Loop     bool   `json:"loop,omitempty"`
 }
 
 type ViewSpec struct {

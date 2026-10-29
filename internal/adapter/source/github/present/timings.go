@@ -16,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
@@ -302,6 +303,9 @@ func (p *Presenter) timings(ctx context.Context, days int) (api.TimingsReport, e
 	if err != nil {
 		return api.TimingsReport{}, err
 	}
+	if err := p.reportedPRsOf(ctx, &d); err != nil {
+		return api.TimingsReport{}, err
+	}
 	var id src.Identity
 	if p.h.Viewer != nil {
 		if id, err = p.h.Viewer(ctx); err != nil {
@@ -313,4 +317,23 @@ func (p *Presenter) timings(ctx context.Context, days int) (api.TimingsReport, e
 		reports = reportsOf(set.Loaded.Registry)
 	}
 	return timings(d, since, now, me{login: readmodel.Login(unit.GitHub, id), teams: id.Teams}, reports), nil
+}
+
+// reportedPRsOf fills the pull requests of d as the GitHub plugin last
+// reported them; one it reported none of keeps its ref alone.
+func (p *Presenter) reportedPRsOf(ctx context.Context, d *dinv.TimingsData) error {
+	refs := make([]pr.Ref, len(d.PRs))
+	for i, x := range d.PRs {
+		refs[i] = x.Ref
+	}
+	known, err := prrow.ReportedPRs{Reports: p.d.Reports}.PRs(ctx, refs)
+	if err != nil {
+		return err
+	}
+	for i, x := range d.PRs {
+		if k, ok := known[x.Ref]; ok {
+			d.PRs[i] = k
+		}
+	}
+	return nil
 }

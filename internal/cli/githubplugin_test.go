@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	ghpr "github.com/wloophq/wloop/plugins/github/pr"
+
 	factsgithub "github.com/wloophq/wloop/internal/adapter/facts/github"
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
@@ -61,7 +63,6 @@ func (te *testEnv) githubPluginOf() *src.Client {
 		Paused: te.Env.roundsPaused, Rounds: te.Env.storedRoundState, Books: sqlite.New(te.db).Books,
 		Hosted: &psource.Hosted{Profile: pluginProfile(string(unit.GitHub), te.Env.currentConfig)}}
 	b = te.Env.withGitHubBroker(b, string(unit.GitHub), te.db)
-	b.Reported = ghsource.Reported(te.Store)
 	now := te.Now
 	c := sourcetest.Launch(t, string(unit.GitHub), &ghplugin.Plugin{API: apitest.Options(quietGH{te.gh}), GH: quietGH{te.gh}, Now: func() time.Time { return now() },
 		Git: ghreporttest.GitOf(factsgithub.LocalGit(te.Env.Git), te.Env.Git)}, b.Host())
@@ -113,19 +114,38 @@ func linkWorkspaces(t *testing.T, te *testEnv) {
 // commands as the host reads them without one.
 type testForge struct{ te *testEnv }
 
+// Identity is the viewer the fake GitHub names, read as the plugin reads it.
 func (f testForge) Identity(ctx context.Context) (src.Identity, error) {
-	return f.te.github.Local().Identity(ctx)
+	login, err := apitest.Runner(f.te.gh).Viewer(ctx)
+	if err != nil {
+		return src.Identity{}, err
+	}
+	return src.Identity{Viewer: src.Person{Key: string(unit.GitHub) + ":" + login, Name: login}}, nil
 }
 
+// Action reads the basics from the fake GitHub as the plugin does; the
+// actions that keep plugin state run in the in-process plugin.
 func (f testForge) Action(ctx context.Context, req src.ActionRequest) (json.RawMessage, error) {
-	if req.Action == ghsource.ActionRefresh || req.Action == ghsource.ActionAdopt {
+	if req.Action != ghsource.ActionBasics {
 		return f.te.githubPluginOf().Action(ctx, req)
 	}
-	return f.te.github.Local().Action(ctx, req)
+	ref, err := ghpr.ParseKey(req.Unit.Key)
+	if err != nil {
+		return nil, err
+	}
+	basics, err := apitest.Runner(f.te.gh).Basics(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(basics)
+}
+
+func (f testForge) View(ctx context.Context, req src.ViewRequest) (json.RawMessage, error) {
+	return f.te.githubPluginOf().View(ctx, req)
 }
 
 func (f testForge) RunCLI(ctx context.Context, req src.CLIRequest, stdout, stderr io.Writer) (int, error) {
-	return f.te.github.Local().RunCLI(ctx, req, stdout, stderr)
+	return (&ghplugin.Plugin{GH: f.te.gh}).RunCLI(ctx, req, stdout, stderr)
 }
 
 // serveGitHubPlugin runs the real GitHub plugin as serve's own plugin, over
@@ -150,4 +170,40 @@ func (te *testEnv) serveGitHubPlugin(db *sqlite.DB, ghs ghplugingh.Runner) {
 		stop()
 	})
 	eventually(t, "the GitHub plugin runs", func() bool { _, err := te.pluginKind.Client(string(unit.GitHub)); return err == nil })
+}
+
+// bundledGitHubManifest is the GitHub plugin's bundled manifest.
+func bundledGitHubManifest(t *testing.T) *manifest.Manifest {
+	t.Helper()
+	ms, err := bundled.Manifests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range ms {
+		if m.ID == string(unit.GitHub) {
+			return m
+		}
+	}
+	t.Fatal("no bundled github manifest")
+	return nil
+}
+
+// ghForge is the GitHub plugin's commands run with gh, as a command line
+// process with no running plugin would run them through its binary.
+type ghForge struct{ gh ghplugingh.Runner }
+
+func (ghForge) Identity(context.Context) (src.Identity, error) {
+	return src.Identity{}, src.ErrUnavailable
+}
+
+func (ghForge) Action(context.Context, src.ActionRequest) (json.RawMessage, error) {
+	return nil, src.ErrUnavailable
+}
+
+func (ghForge) View(context.Context, src.ViewRequest) (json.RawMessage, error) {
+	return nil, src.ErrUnavailable
+}
+
+func (f ghForge) RunCLI(ctx context.Context, req src.CLIRequest, stdout, stderr io.Writer) (int, error) {
+	return (&ghplugin.Plugin{GH: f.gh}).RunCLI(ctx, req, stdout, stderr)
 }

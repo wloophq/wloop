@@ -1,21 +1,21 @@
 package turn
 
 import (
-	"io/fs"
 	"testing"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/profile"
 )
 
 // bundledFile is the bundled intent file name of intent.
 func bundledFile(t *testing.T, intent, name string) string {
 	t.Helper()
-	b, err := fs.ReadFile(BundledFS(), "intents/"+intent+"/"+name)
+	r, err := profile.Resolve(profile.BundledChain(), "intents/"+intent+"/"+name)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return string(b)
+	return string(r.Body)
 }
 
 func TestAUserIntentTakingARoleTakesTheBundledHoldersKeys(t *testing.T) {

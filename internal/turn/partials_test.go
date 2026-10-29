@@ -27,7 +27,7 @@ func userPartials(t *testing.T, files map[string]string) []profile.Layer {
 			t.Fatal(err)
 		}
 	}
-	return []profile.Layer{{Name: "bundled", Source: "embedded"}, {Name: "user", Source: dir, Dir: dir}}
+	return append(profile.BundledChain(), profile.Layer{Name: "user", Source: dir, Dir: dir})
 }
 
 func loadWith(t *testing.T, layers []profile.Layer) (*intentload.Loaded, intentload.Problems) {

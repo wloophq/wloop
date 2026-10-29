@@ -28,13 +28,12 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/situation"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
-func withIdentity(p source.Plugin, who items.Person) source.Plugin {
+func withIdentity(p compiledPlugin, who items.Person) compiledPlugin {
 	build := p.Build
-	p.Build = func(cfg config.Config, d source.Deps) (source.Module, error) {
+	p.Build = func(cfg config.Config, d moduleDeps) (pluginModule, error) {
 		m, err := build(cfg, d)
 		m.Identity = func(context.Context) (items.Person, error) { return who, nil }
 		return m, err
@@ -52,7 +51,7 @@ func TestMeFromEveryEnabledModule(t *testing.T) {
 	defer db.Close()
 	st := inventory.New(db)
 	ctx := context.Background()
-	gh := plugins[slices.IndexFunc(plugins, func(p source.Plugin) bool { return p.ID == unit.GitHub })]
+	gh := plugins[slices.IndexFunc(plugins, func(p compiledPlugin) bool { return p.ID == unit.GitHub })]
 	thread := withIdentity(threadModule(unit.Unit{Provider: "thread", Key: "C1 0001"}), items.Person{Key: "slack:U000AAA", Aliases: []string{"email:me@example.test"}})
 	off := thread
 	off.ID = "off"
@@ -60,7 +59,7 @@ func TestMeFromEveryEnabledModule(t *testing.T) {
 	cfg := Defaults()
 	no := false
 	cfg.Plugins.Other = map[string]config.Plugin{"off": {Enabled: &no}}
-	mods, err := buildSources([]source.Plugin{gh, thread, off}, cfg, source.Deps{DB: db, Inventory: st, Clock: clockFunc(te.Now)})
+	mods, err := buildSources([]compiledPlugin{gh, thread, off}, cfg, moduleDeps{DB: db, Inventory: st, Clock: clockFunc(te.Now)}, bundledUI)
 	if err != nil {
 		t.Fatal(err)
 	}

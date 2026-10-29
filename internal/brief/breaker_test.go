@@ -10,6 +10,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/turns"
@@ -40,7 +42,7 @@ func (r *rig) wantAndSettle(t *testing.T, refs ...github.Ref) {
 
 func TestBreakerOpensAndClosesOnATrial(t *testing.T) {
 	r := newRig(t, 3)
-	r.st.UpsertPR(context.Background(), dinv.PR{Ref: refN(4), State: "OPEN", HeadOid: "h1"})
+	inventorytest.Of(r.st).UpsertPR(context.Background(), dinv.PR{Ref: refN(4), State: "OPEN", HeadOid: "h1"})
 	for i := 1; i <= 3; i++ {
 		r.run.fail[fmt.Sprintf("acme/api#%d", i)] = unavailable
 	}
@@ -213,7 +215,7 @@ func TestABlipAfterARecoveryRetriesAgain(t *testing.T) {
 		r.wantAndSettle(t, refN(1))
 	}
 	delete(r.run.fail, "acme/api#2")
-	p, _, _ := r.st.PR(context.Background(), refN(2))
+	p, _, _ := inventorytest.Of(r.st).PR(context.Background(), refN(2))
 	r.q.claim(p.Ref)
 	if err := r.q.brief(context.Background(), p, TriggerBackground, time.Minute); err != nil {
 		t.Fatal(err)
@@ -280,7 +282,7 @@ func TestAPerPRFailureEndsTheRunOfGlobalOnes(t *testing.T) {
 	}
 	r.q.d.Allow = nil
 	for i := 1; i <= 5; i++ {
-		p, _, _ := r.st.PR(context.Background(), refN(i))
+		p, _, _ := inventorytest.Of(r.st).PR(context.Background(), refN(i))
 		if !r.q.claim(p.Ref) {
 			t.Fatal("claimed")
 		}
@@ -295,7 +297,7 @@ func TestTwoTimeoutsOfOnePRDoNotMakeAThirdGlobal(t *testing.T) {
 	r := newRig(t, 2)
 	r.q.d.CallTimeout, r.src.block = 20*time.Millisecond, true
 	for _, n := range []int{1, 1, 2} {
-		p, _, _ := r.st.PR(context.Background(), refN(n))
+		p, _, _ := inventorytest.Of(r.st).PR(context.Background(), refN(n))
 		r.q.claim(p.Ref)
 		r.q.brief(context.Background(), p, TriggerBackground, r.q.timeout(false))
 	}
@@ -324,9 +326,9 @@ func TestAFirstTurnServesAsTheTrial(t *testing.T) {
 	r.q.Run(context.Background())
 	delete(r.run.fail, "acme/api#1")
 	ctx := context.Background()
-	p, _, _ := r.st.PR(ctx, refN(2))
+	p, _, _ := inventorytest.Of(r.st).PR(ctx, refN(2))
 	p.Reasons = nil
-	r.st.UpsertPR(ctx, p)
+	inventorytest.Of(r.st).UpsertPR(ctx, p)
 	if rd := r.ready(t, refN(2), true); rd.State != Without {
 		t.Fatalf("before the cool: %+v", rd)
 	}

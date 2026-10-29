@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -31,7 +32,6 @@ import (
 	"github.com/wloophq/wloop/internal/plugins/bundled"
 	"github.com/wloophq/wloop/internal/plugins/host"
 	"github.com/wloophq/wloop/internal/profile"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/pkg/plugin"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -39,8 +39,8 @@ import (
 
 // buildSources builds the module of every enabled plugin; one that fails
 // to build is left out and named in the error.
-func buildSources(ps []source.Plugin, cfg config.Config, sd source.Deps) ([]source.Module, error) {
-	var mods []source.Module
+func buildSources(ps []compiledPlugin, cfg config.Config, sd moduleDeps, ui uiOf) ([]pluginModule, error) {
+	var mods []pluginModule
 	var errs []error
 	for _, p := range ps {
 		if !cfg.PluginEnabled(string(p.ID)) {
@@ -51,7 +51,8 @@ func buildSources(ps []source.Plugin, cfg config.Config, sd source.Deps) ([]sour
 			err = m.Valid()
 		}
 		if err == nil {
-			err = catalog.CheckPluginKeys(m.ID, m.UI)
+			pu, _ := ui(m.ID)
+			err = catalog.CheckPluginKeys(m.ID, pu)
 		}
 		if err == nil && m.ID != p.ID {
 			err = fmt.Errorf("source %s: the plugin built a module of %s", p.ID, m.ID)
@@ -70,7 +71,7 @@ func buildSources(ps []source.Plugin, cfg config.Config, sd source.Deps) ([]sour
 // one's included; the built modules' ingestion jobs, slow jobs, rows,
 // streams, jobs and health run in the daemon; Track reads a unit through
 // its source.
-func withSources(d daemon.Deps, ps []source.Plugin, mods []source.Module) daemon.Deps {
+func withSources(d daemon.Deps, ps []compiledPlugin, mods []pluginModule, ui uiOf) daemon.Deps {
 	codecs := []unit.Codec{dturn.SessionCodec{}, wsdomain.Codec{}, task.Codec{}}
 	for _, p := range ps {
 		codecs = append(codecs, p.Codec)
@@ -94,7 +95,8 @@ func withSources(d daemon.Deps, ps []source.Plugin, mods []source.Module) daemon
 		if m.Slow != nil {
 			slow = append(slow, m.Slow)
 		}
-		d.Runtimes = append(d.Runtimes, runtimeOf(m))
+		_, web := ui(m.ID)
+		d.Runtimes = append(d.Runtimes, runtimeOf(m, web))
 	}
 	d.Units = unit.NewRegistry(codecs...)
 	if len(tracks) > 0 {
@@ -129,13 +131,13 @@ func withSources(d daemon.Deps, ps []source.Plugin, mods []source.Module) daemon
 			return unit.Unit{}, false, nil
 		}
 	}
-	d.Plugins = pluginList(ps, mods, d.Cfg)
+	d.Plugins = pluginList(ps, mods, d.Cfg, ui)
 	d.PluginEnabled = pluginSwitch(ps, mods, d.Cfg)
 	return d
 }
 
-func runtimeOf(m source.Module) daemon.PluginRuntime {
-	rt := daemon.PluginRuntime{ID: m.ID, Run: m.Run, Health: m.Health, WebAssets: m.WebAssets}
+func runtimeOf(m pluginModule, web fs.FS) daemon.PluginRuntime {
+	rt := daemon.PluginRuntime{ID: m.ID, Run: m.Run, Health: m.Health, WebAssets: web}
 	for _, j := range m.Jobs {
 		rt.Jobs = append(rt.Jobs, daemon.PluginJob{Name: j.Name, Every: j.Every, Timeout: j.Timeout, Run: j.Run})
 	}
@@ -155,10 +157,10 @@ func withoutPluginJobs(rts []daemon.PluginRuntime) []daemon.PluginRuntime {
 // pluginSwitch is the daemon's PluginEnabled: nil while every compiled-in
 // plugin is enabled. A plugin is on when its config enables it and its
 // module was built.
-func pluginSwitch(ps []source.Plugin, mods []source.Module, cfg config.Config) func(unit.ProviderID) bool {
+func pluginSwitch(ps []compiledPlugin, mods []pluginModule, cfg config.Config) func(unit.ProviderID) bool {
 	off := map[unit.ProviderID]bool{}
 	for _, p := range ps {
-		if !cfg.PluginEnabled(string(p.ID)) || !slices.ContainsFunc(mods, func(m source.Module) bool { return m.ID == p.ID }) {
+		if !cfg.PluginEnabled(string(p.ID)) || !slices.ContainsFunc(mods, func(m pluginModule) bool { return m.ID == p.ID }) {
 			off[p.ID] = true
 		}
 	}
@@ -170,8 +172,8 @@ func pluginSwitch(ps []source.Plugin, mods []source.Module, cfg config.Config) f
 
 // pluginList is every compiled-in plugin as GET /api/plugins serves it: a
 // disabled one, or one refused at build, with no UI.
-func pluginList(ps []source.Plugin, mods []source.Module, cfg config.Config) []api.Plugin {
-	built := map[unit.ProviderID]source.Module{}
+func pluginList(ps []compiledPlugin, mods []pluginModule, cfg config.Config, ui uiOf) []api.Plugin {
+	built := map[unit.ProviderID]pluginModule{}
 	for _, m := range mods {
 		built[m.ID] = m
 	}
@@ -179,7 +181,8 @@ func pluginList(ps []source.Plugin, mods []source.Module, cfg config.Config) []a
 	for _, p := range ps {
 		ap := api.Plugin{ID: p.ID, Name: p.Name}
 		if m, ok := built[p.ID]; ok && cfg.PluginEnabled(string(p.ID)) {
-			ap.Enabled, ap.UI, ap.Reacts, ap.Capabilities = true, m.UI, m.Reacts, m.Capabilities()
+			pu, _ := ui(p.ID)
+			ap.Enabled, ap.UI, ap.Reacts, ap.Capabilities = true, pu, m.Reacts, m.Capabilities()
 		}
 		out = append(out, ap)
 	}
@@ -292,7 +295,6 @@ func (e *Env) servePlugins(ctx context.Context, db *sqlite.DB, cfg config.Config
 		Logf:   logf,
 		Meters: meters,
 	}
-	e.viaGitHubPlugin()
 	if e.noJobs {
 		logf("plugins: --no-jobs starts none")
 		return func() {}

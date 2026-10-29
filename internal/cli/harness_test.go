@@ -18,10 +18,14 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
+	"github.com/wloophq/wloop/plugins/github/api/apitest"
+	ghpr "github.com/wloophq/wloop/plugins/github/pr"
+
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
 	factsgithub "github.com/wloophq/wloop/internal/adapter/facts/github"
 	"github.com/wloophq/wloop/internal/adapter/gitcheck"
-	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/source/github/present"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
@@ -42,14 +46,11 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/ghcli"
-	"github.com/wloophq/wloop/internal/github/githubtest"
 	"github.com/wloophq/wloop/internal/gitx"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -608,7 +609,7 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 		background:     &sync.WaitGroup{},
 		Out:            te.out,
 		Err:            te.err,
-		github:         githubClients{Clients: ghsource.Clients{GH: ghcli.Metered(te.gh), API: githubtest.Runner(te.gh)}},
+		budget:         &githubBudget{},
 		Git:            gitx.Git{R: te.git},
 		Files:          checkoutFiles{ws},
 		WS:             workspace.NewSet(ws),
@@ -666,9 +667,10 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 	te.Rounds = sqlite.NewRounds(db)
 	te.Store = inventory.New(db)
 	te.Env.reports = func(st *inventory.Store) readmodel.Reports {
-		return ghreporttest.Inventory{Store: st, Now: func() time.Time { return te.Env.Now() }, Config: func() config.Config { return te.cfg },
+		derived := ghreporttest.Inventory{Store: st, Now: func() time.Time { return te.Env.Now() }, Config: func() config.Config { return te.cfg },
 			Plan: &ghreporttest.InventoryPlan{Facts: storeInputs{st}, Rounds: te.Rounds, Books: te.repo, Snapshot: liveSnapshot{te.Env},
 				Git: ghreporttest.GitOf(factsgithub.LocalGit(te.Env.Git), te.Env.Git)}}
+		return layeredReports{kept: psource.NewSnapshots(db.Snapshots()), derived: derived}
 	}
 	te.repo, te.sink = sqlite.New(db), testsink.New("test")
 	te.reg = &testRegistry{Registry: te.repo, Handles: te.repo, noMCP: map[string]bool{}}
@@ -759,65 +761,13 @@ func (q quietGH) Run(ctx context.Context, args ...string) ([]byte, error) {
 	return out, err
 }
 
-// derivedRows reads a pull request the inventory lacks from the fake
-// GitHub's basics, with the author the authored search names when the basics
-// name none; an open one by nobody when there are no basics.
-type derivedRows struct{ f *fakeGH }
-
-func (derivedRows) SearchCandidates(context.Context, string, string, int) (dgh.CandidatePage, error) {
-	return dgh.CandidatePage{}, nil
-}
-
-func (derivedRows) SearchCandidatesEach(_ context.Context, qs []string, _ string, _ int) ([]dgh.CandidatePage, []error, error) {
-	return make([]dgh.CandidatePage, len(qs)), make([]error, len(qs)), nil
-}
-
-func (d derivedRows) CandidateByRef(ctx context.Context, ref pr.Ref, _ string) (dgh.CandidatePage, error) {
-	c := dgh.Candidate{Ref: ref, URL: ref.URL(), State: dgh.StateOpen}
-	if pr, err := githubtest.Runner(quietGH{d.f}).Basics(ctx, ref); err == nil {
-		c.State, c.Author, c.Title, c.IsDraft = pr.State, pr.Author, pr.Title, pr.IsDraft
-	}
-	if c.Author == "" {
-		c.Author = d.authored(ref)
-	}
-	return dgh.CandidatePage{Candidates: []dgh.Candidate{c}}, nil
-}
-
-func (d derivedRows) authored(ref pr.Ref) string {
-	d.f.mu.Lock()
-	raw := d.f.author
-	d.f.mu.Unlock()
-	var res struct {
-		Data struct {
-			Open struct {
-				Nodes []struct {
-					Number     int
-					Repository struct{ NameWithOwner string }
-					Author     struct{ Login string }
-				}
-			}
-		}
-	}
-	if json.Unmarshal([]byte(raw), &res) != nil {
-		return ""
-	}
-	for _, n := range res.Data.Open.Nodes {
-		if n.Number == ref.Number && strings.EqualFold(n.Repository.NameWithOwner, ref.Owner+"/"+ref.Repo) {
-			return n.Author.Login
-		}
-	}
-	return ""
-}
-
-func (derivedRows) IsUser(context.Context, string) (bool, error) { return true, nil }
-
 // serve runs te's daemon over a socket, with the actions, the turns by hand
 // and AdminAPI wired as serve wires them, and points te's command line at it.
 func (te *testEnv) serve(t *testing.T) { te.serveWith(t, nil) }
 
 // serveWithTasks serves te's daemon with the GTD entries on te's store.
 func (te *testEnv) serveWithTasks(t *testing.T) {
-	mods, err := buildSources(plugins, te.cfg, source.Deps{Inventory: te.Store, Turns: te.Turns, Clock: clockFunc(te.Now)})
+	mods, err := buildSources(plugins, te.cfg, moduleDeps{Inventory: te.Store, Turns: te.Turns, Clock: clockFunc(te.Now)}, bundledUI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -832,8 +782,8 @@ func (te *testEnv) serveWith(t *testing.T, with func(daemon.Deps) daemon.Deps) {
 	d := withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(mu), LoopMu: mu, Facts: te.prFacts(te.cfg),
 		DryRunTurn: te.dryRunTurn, Doctor: te.doctorState,
 		Cfg: te.cfg, Version: "test", Now: te.Now, Identity: viewerIs("me"), Log: t.Logf}, te.Store)
-	d = withGitHub(d, present.Deps{Store: te.Store, Reports: te.Env.reports(te.Store), Host: te.moduleHost(te.db)(unit.GitHub), Explorer: derivedRows{te.gh},
-		Plugin: te.pluginPrepare()})
+	d = withGitHub(d, present.Deps{Store: te.Store, Reports: te.Env.reports(te.Store), Host: te.moduleHost(te.db)(unit.GitHub),
+		Plugin: te.pluginPrepare(), View: te.harnessView})
 	d = te.Env.serveMessages(context.Background(), d, te.db, te.cfg, t.Logf)
 	if with != nil {
 		d = with(d)
@@ -947,7 +897,7 @@ func (i storeInputs) Viewer(ctx context.Context) (string, error) {
 }
 
 func (i storeInputs) Rows(ctx context.Context) ([]dinv.PR, error) {
-	return i.store.ListPRs(ctx, false)
+	return inventorytest.Of(i.store).ListPRs(ctx, false)
 }
 
 // Facts reads the details of rows in one query; a detail of another version
@@ -957,7 +907,7 @@ func (i storeInputs) Facts(ctx context.Context, rows []dinv.PR, viewer string) (
 	for n, row := range rows {
 		refs[n] = row.Ref
 	}
-	details, err := i.store.Details(ctx, refs)
+	details, err := inventorytest.Of(i.store).Details(ctx, refs)
 	if err != nil {
 		return nil, err
 	}
@@ -982,5 +932,98 @@ func (i storeInputs) Ended(ctx context.Context, kind string, units []unit.Unit) 
 	for ref, ok := range ended {
 		out[ref.Unit()] = ok
 	}
+	return out, nil
+}
+
+// derivedCandidate reads a pull request the inventory lacks from the fake
+// GitHub's basics, with the author the authored search names when the basics
+// name none; an open one by nobody when there are no basics.
+func derivedCandidate(ctx context.Context, f *fakeGH, ref pr.Ref) dgh.CandidatePage {
+	c := dgh.Candidate{Ref: ref, URL: ref.URL(), State: dgh.StateOpen}
+	if p, err := apitest.Runner(quietGH{f}).Basics(ctx, ghpr.Ref{Owner: ref.Owner, Repo: ref.Repo, Number: ref.Number}); err == nil {
+		c.State, c.Author, c.Title, c.IsDraft = p.State, p.Author, p.Title, p.IsDraft
+	}
+	if c.Author == "" {
+		c.Author = authored(f, ref)
+	}
+	return dgh.CandidatePage{Candidates: []dgh.Candidate{c}}
+}
+
+func authored(f *fakeGH, ref pr.Ref) string {
+	f.mu.Lock()
+	raw := f.author
+	f.mu.Unlock()
+	var res struct {
+		Data struct {
+			Open struct {
+				Nodes []struct {
+					Number     int
+					Repository struct{ NameWithOwner string }
+					Author     struct{ Login string }
+				}
+			}
+		}
+	}
+	if json.Unmarshal([]byte(raw), &res) != nil {
+		return ""
+	}
+	for _, n := range res.Data.Open.Nodes {
+		if n.Number == ref.Number && strings.EqualFold(n.Repository.NameWithOwner, ref.Owner+"/"+ref.Repo) {
+			return n.Author.Login
+		}
+	}
+	return ""
+}
+
+// harnessView is the GitHub plugin's views as the harness serves them: a
+// pull request read from the fake GitHub, the others the forge's.
+func (te *testEnv) harnessView(ctx context.Context, req src.ViewRequest) (json.RawMessage, error) {
+	if req.View == "candidate" {
+		var q struct {
+			Owner, Repo string
+			Number      int
+		}
+		if err := json.Unmarshal(req.Query, &q); err != nil {
+			return nil, err
+		}
+		return json.Marshal(derivedCandidate(ctx, te.gh, pr.Ref{Owner: q.Owner, Repo: q.Repo, Number: q.Number}))
+	}
+	return te.Env.forgeCalls().View(ctx, req)
+}
+
+// layeredReports are the reports a plugin the test runs kept, over those
+// derived from the test's inventory.
+type layeredReports struct{ kept, derived readmodel.Reports }
+
+func (r layeredReports) Units(ctx context.Context, p unit.ProviderID) ([]unit.Unit, error) {
+	a, err := r.derived.Units(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	b, err := r.kept.Units(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	for _, u := range b {
+		if !slices.Contains(a, u) {
+			a = append(a, u)
+		}
+	}
+	return a, nil
+}
+
+func (r layeredReports) Reported(ctx context.Context, units []unit.Unit) (map[unit.Unit]src.Snapshot, error) {
+	out, err := r.derived.Reported(ctx, units)
+	if err != nil {
+		return nil, err
+	}
+	kept, err := r.kept.Reported(ctx, units)
+	if err != nil {
+		return nil, err
+	}
+	if out == nil {
+		out = map[unit.Unit]src.Snapshot{}
+	}
+	maps.Copy(out, kept)
 	return out, nil
 }

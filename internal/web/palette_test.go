@@ -13,7 +13,7 @@ type paletteItem struct {
 func TestPaletteShowsEveryKey(t *testing.T) {
 	row := map[string]any{
 		"unit": map[string]string{"provider": "github", "key": "acme/api#8"}, "label": "acme/api#8",
-		"actions": []map[string]any{{"id": "hold", "enabled": true, "label": "Hold"}, {"id": "release", "enabled": false}, {"id": "dismiss", "enabled": true, "label": "Dismiss the turn"}, {"id": "act", "enabled": true, "label": "Act"}},
+		"actions": []map[string]any{{"id": "pause", "enabled": true, "label": "Pause"}, {"id": "resume", "enabled": false}, {"id": "dismiss", "enabled": true, "label": "Dismiss the turn"}, {"id": "act", "enabled": true, "label": "Act"}},
 	}
 	var got struct {
 		Title string        `json:"title"`
@@ -57,14 +57,14 @@ return { title: pal.title, items: strip(pal.items), help: k.log.help, bindings: 
 		{"to Next", "x"}, {"to Waiting", "w"}, {"schedule or snooze", "s"}, {"to Someday", "y"}, {"to Reference", "l"},
 		{"toggle Focus", "f"}, {"make a project or attach to one", "p"}, {"approve the draft or proposal", "a"},
 		{"delegate to an agent", "d"}, {"done", "e"}, {"dismiss", "Backspace"},
-		{"Hold", "H"}, {"Dismiss the turn", "X"}, {"Act", ""}, {"open the source", "o"},
+		{"Pause", "H"}, {"Dismiss the turn", "X"}, {"Act", ""}, {"open the source", "o"},
 		{"capture", "n"}, {"Inbox", "g i"}, {"GitHub", "g g"}, {"filter", "/"}, {"help", "?"}, {"Area...", ""},
 	} {
 		if !has(want.Label, want.Key) {
 			t.Errorf("the palette lacks %q on %q: %+v", want.Label, want.Key, got.Items)
 		}
 	}
-	if has("Release", "H") || has("seen", "") {
+	if has("Resume", "H") || has("seen", "") {
 		t.Errorf("the palette offers what the selection does not: %+v", got.Items)
 	}
 	if len(got.Unit) != 2 {

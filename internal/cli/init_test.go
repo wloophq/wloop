@@ -17,7 +17,6 @@ import (
 	"github.com/pelletier/go-toml/v2"
 
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
-	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/brand/brandtest"
 	"github.com/wloophq/wloop/internal/config"
@@ -93,7 +92,7 @@ func newInitTestEnv(t *testing.T) *initTestEnv {
 	cfgPath := filepath.Join(t.TempDir(), "config", "config.toml")
 	te.Env = &Env{
 		Out: te.out, Err: te.err, In: strings.NewReader(""),
-		github: githubClients{Clients: ghsource.Clients{GH: te.gh}}, WS: workspace.NewSet(te.ws),
+		budget: &githubBudget{}, forge: ghForge{te.gh}, WS: workspace.NewSet(te.ws),
 		Sh: func(_ context.Context, name string, args ...string) ([]byte, error) {
 			if name == shellPath() && len(args) == 2 && args[0] == "-lc" {
 				var out []string

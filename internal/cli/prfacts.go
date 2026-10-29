@@ -18,8 +18,8 @@ func (e *Env) prFacts(cfg config.Config) func(ctx context.Context, u unit.Unit) 
 		if read, err := e.forgeBasics(ctx, ref); err == nil {
 			p := turnPR(read)
 			f.Author, f.Association, f.Base, f.Labels = p.Author, p.Association, p.Base, p.Labels
-		} else if e.Store != nil {
-			p, ok, serr := e.Store.PR(ctx, ref)
+		} else {
+			p, ok, serr := e.reportedPRs().PR(ctx, ref)
 			if serr != nil {
 				return f, serr
 			}
@@ -31,7 +31,7 @@ func (e *Env) prFacts(cfg config.Config) func(ctx context.Context, u unit.Unit) 
 		if e.Store == nil {
 			return f, nil
 		}
-		st, err := storedFacts{store: e.Store, briefs: cfg.Brief.Enabled}.Facts(ctx, ref.Unit())
+		st, err := storedFacts{store: e.Store, prs: e.reportedPRs(), briefs: cfg.Brief.Enabled}.Facts(ctx, ref.Unit())
 		if err != nil {
 			return f, err
 		}

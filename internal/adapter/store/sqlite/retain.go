@@ -117,6 +117,21 @@ func (r Retained) String() string {
 	return strings.Join(parts, ", ")
 }
 
+// endedPRsSQL selects the unit key of every pull request a version 6 row
+// holds merged or closed before its parameter; endedReportsSQL those the
+// GitHub plugin last reported so.
+var (
+	endedPRsSQL     = `SELECT owner || '/' || repo || '#' || number FROM pull_requests WHERE state != 'OPEN' AND ` + endedAt + ` != '' AND ` + endedAt + ` < ?`
+	endedReportsSQL = `SELECT unit_key FROM unit_snapshots WHERE provider = 'github' AND json_extract(snapshot, '$.data.pr.State') IN ('MERGED', 'CLOSED')
+		AND max(` + reportedDay("MergedAt") + `, ` + reportedDay("ClosedAt") + `) BETWEEN 1721426 AND julianday(?)`
+)
+
+// reportedDay is the Julian day of the time field of a reported pull
+// request, 0 for none.
+func reportedDay(field string) string {
+	return `coalesce(julianday(json_extract(snapshot, '$.data.pr.` + field + `')), 0)`
+}
+
 // endedAt is when a pull request row ended, empty for one that has not;
 // times in event.TimeLayout sort as text.
 const endedAt = `max(merged_at, closed_at)`
@@ -134,7 +149,6 @@ const (
 	retainPartsSQL        = `DELETE FROM instruction_parts WHERE sha NOT IN
 		(SELECT j.value FROM turn_instructions r, json_each(r.parts) j WHERE r.parts != '')`
 	retainViewRowsSQL     = `DELETE FROM view_applied WHERE provider = 'github' AND unit_key IN ` + endedUnits
-	endedPRsSQL           = `SELECT owner, repo, number FROM pull_requests WHERE state != 'OPEN' AND ` + endedAt + ` != '' AND ` + endedAt + ` < ?`
 	retainPlanItemsSQL    = `DELETE FROM plan_items WHERE decision NOT IN ('pending', 'deferred') AND saved_at < ?` + untaskedPlanItems
 	retainWorkflowRunsSQL = `DELETE FROM workflow_runs WHERE status = 'done' AND at < ?`
 	retainSessionRunsSQL  = `DELETE FROM workflow_runs WHERE provider = 'session' AND at < ? AND unit_key NOT IN (SELECT session_id FROM sessions)`
@@ -442,29 +456,63 @@ func keyList(refs []pr.Ref) string {
 // and fetches, the Slack extraction's cursors.
 type pluginRows struct{ db *DB }
 
-// endedPRs are the pull requests merged or closed before before.
+// endedPRs are the pull requests merged or closed before before, as the
+// GitHub plugin last reported them or a row of the version 6 tables holds
+// them.
 func (p pluginRows) endedPRs(ctx context.Context, before string) ([]pr.Ref, error) {
-	rows, err := p.db.R().QueryContext(ctx, endedPRsSQL, before)
+	legacy, err := p.keys(ctx, endedPRsSQL, before)
+	if err != nil {
+		return nil, err
+	}
+	reported, err := p.keys(ctx, endedReportsSQL, before)
+	if err != nil {
+		return nil, err
+	}
+	var out []pr.Ref
+	for _, key := range append(legacy, reported...) {
+		ref, err := pr.ParseKey(key)
+		if err != nil {
+			return nil, err
+		}
+		if !slices.Contains(out, ref) {
+			out = append(out, ref)
+		}
+	}
+	return out, nil
+}
+
+// keys are the first column of query's rows.
+func (p pluginRows) keys(ctx context.Context, query string, args ...any) ([]string, error) {
+	rows, err := p.db.R().QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []pr.Ref
+	var out []string
 	for rows.Next() {
-		var ref pr.Ref
-		if err := rows.Scan(&ref.Owner, &ref.Repo, &ref.Number); err != nil {
+		var key string
+		if err := rows.Scan(&key); err != nil {
 			return nil, err
 		}
-		out = append(out, ref)
+		out = append(out, key)
 	}
 	return out, rows.Err()
 }
 
-// prKeys is the bound JSON list of every stored pull request's unit key.
+// prKeys is the bound JSON list of the unit key of every pull request the
+// GitHub plugin reported and has not dropped, or a row of the version 6
+// tables holds.
 func (p pluginRows) prKeys(ctx context.Context) (string, error) {
-	var list string
-	err := p.db.R().QueryRowContext(ctx, `SELECT COALESCE(json_group_array(owner || '/' || repo || '#' || number), '[]') FROM pull_requests`).Scan(&list)
-	return list, err
+	legacy, err := p.keys(ctx, `SELECT owner || '/' || repo || '#' || number FROM pull_requests`)
+	if err != nil {
+		return "", err
+	}
+	reported, err := p.keys(ctx, `SELECT unit_key FROM unit_snapshots WHERE provider = 'github' AND NOT coalesce(json_extract(snapshot, '$.gone'), 0)`)
+	if err != nil {
+		return "", err
+	}
+	raw, err := json.Marshal(append(append([]string{}, legacy...), reported...))
+	return string(raw), err
 }
 
 // cursorUnits is the bound JSON list of the extraction cursors' units.

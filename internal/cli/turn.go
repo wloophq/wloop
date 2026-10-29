@@ -211,7 +211,7 @@ func (e *Env) turnBuilder(cfg config.Config) turn.Builder {
 		Viewer: e.viewerLogin, Config: cfg, Command: e.loopCommand(), ManagerBinary: e.controlBinary(cfg), Items: e.itemsReader(), Dossiers: e.dossierReader()}
 	switch {
 	case e.Store != nil:
-		b.Facts = storedFacts{store: e.Store, briefs: cfg.Brief.Enabled}
+		b.Facts = storedFacts{store: e.Store, prs: e.reportedPRs(), briefs: cfg.Brief.Enabled}
 	case e.facts != nil:
 		b.Facts = e.facts
 	}

@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"slices"
@@ -321,8 +322,8 @@ func TestRetainEndedPR(t *testing.T) {
 	if n := metertest.Count(sc, metertest.Limit{Res: meter.Tx}); n != 2 {
 		t.Errorf("%d transactions, want 2, the core's and the plugin's\n%s", n, metertest.Report(sc.Tally()))
 	}
-	if n, want := metertest.Count(sc, metertest.Limit{Res: meter.SQL}), int64(1+len(endedTables)+len(endedPluginTables)+1); n != want {
-		t.Errorf("a pass that removes an ended pull request issued %d statements, want the SELECT, one DELETE per table and optimize: %d\n%s", n, want, metertest.Report(sc.Tally()))
+	if n, want := metertest.Count(sc, metertest.Limit{Res: meter.SQL}), int64(2+len(endedTables)+len(endedPluginTables)+1); n != want {
+		t.Errorf("a pass that removes an ended pull request issued %d statements, want the two SELECTs, the version 6 rows' and the reports', one DELETE per table and optimize: %d\n%s", n, want, metertest.Report(sc.Tally()))
 	}
 	if len(got) != len(prTables) {
 		t.Errorf("retained %v, want one row in each of %d tables", got, len(prTables))
@@ -466,5 +467,39 @@ func TestAnEventKeepsItsActor(t *testing.T) {
 	}
 	if got := rowsOf(t, db, `SELECT kind || '|' || actor FROM events ORDER BY kind`); !slices.Equal(got, []string{"comment|rita", workflow.KindStepRan + "|close"}) {
 		t.Errorf("events %q", got)
+	}
+}
+
+// reportSnapshot keeps the GitHub plugin's report of ref in state, ended at
+// ended, zero for open.
+func reportSnapshot(t *testing.T, db *DB, ref pr.Ref, state string, ended time.Time, gone bool) {
+	t.Helper()
+	raw, err := json.Marshal(map[string]any{"gone": gone, "data": map[string]any{"pr": map[string]any{"State": state, "MergedAt": ended, "ClosedAt": ended}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exec(t, db, `INSERT INTO unit_snapshots (provider, unit_key, snapshot, rev, at) VALUES ('github', ?, ?, 1, ?)`, ref.String(), string(raw), at(retainNow))
+}
+
+// TestRetentionReadsTheGitHubPluginsReports: with no copy of the pull
+// requests in the host, retention reads which ended and which exist from
+// the GitHub plugin's reports.
+func TestRetentionReadsTheGitHubPluginsReports(t *testing.T) {
+	t.Parallel()
+	db, _ := openTemp(t)
+	gone, kept, open, dropped := pr.Ref{Owner: "acme", Repo: "api", Number: 1}, pr.Ref{Owner: "acme", Repo: "api", Number: 2}, pr.Ref{Owner: "acme", Repo: "web", Number: 1}, pr.Ref{Owner: "acme", Repo: "web", Number: 2}
+	reportSnapshot(t, db, gone, "MERGED", retainNow.Add(-401*day), false)
+	reportSnapshot(t, db, kept, "CLOSED", retainNow.Add(-399*day), false)
+	reportSnapshot(t, db, open, "OPEN", time.Time{}, false)
+	reportSnapshot(t, db, dropped, "OPEN", time.Time{}, true)
+	for _, ref := range []pr.Ref{gone, kept, open, dropped} {
+		exec(t, db, `INSERT INTO turns (provider, unit_key, intent, turn_id, state, sent_at, ended_at) VALUES ('github', ?, 'review', 'r', 'done', ?, ?)`, ref.String(), at(past), at(past))
+	}
+	got := retain(t, db, Retention{EndedPRs: 400 * day, UnitlessLoopRows: 30 * day})
+	if got["turns"] != 1 || got[UnitlessLoopRowsKey] != 1 {
+		t.Errorf("retained %v, want the ended pull request's turn and the dropped one's", got)
+	}
+	if keys := rowsOf(t, db, `SELECT unit_key FROM turns ORDER BY unit_key`); !slices.Equal(keys, []string{kept.String(), open.String()}) {
+		t.Errorf("turns of %v left", keys)
 	}
 }

@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -274,8 +276,7 @@ func TestAddressTakeOverTakesOverFirst(t *testing.T) {
 	if h, _, _, _ := promptOf(t, m.Prompts[0].Text); h != "Take over acme/api#20 and address it, asked for by you." {
 		t.Fatalf("prompts %+v", m.Prompts)
 	}
-	st := te.Store
-	if o, _ := st.Override(context.Background(), pr.Ref{Owner: "acme", Repo: "api", Number: 20}); !o.Adopted {
+	if !adoptedByPlugin(t, te, pr.Ref{Owner: "acme", Repo: "api", Number: 20}) {
 		t.Fatal("not marked as taken over")
 	}
 }
@@ -383,10 +384,10 @@ func linkAuthorWorkspace(t *testing.T, te *testEnv, n int, id string) {
 	t.Helper()
 	ctx := context.Background()
 	ref := pr.Ref{Owner: "acme", Repo: "api", Number: n}
-	if err := te.Store.UpsertPR(ctx, dinv.PR{Ref: ref, Title: "Add z", Author: "jo", State: "OPEN", URL: ref.URL(), Reasons: []string{"workspace"}}); err != nil {
+	if err := inventorytest.Of(te.Store).UpsertPR(ctx, dinv.PR{Ref: ref, Title: "Add z", Author: "jo", State: "OPEN", URL: ref.URL(), Reasons: []string{"workspace"}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := te.Store.SetWorkspace(ctx, ref, dinv.Workspace{ID: id}); err != nil {
+	if err := inventorytest.Of(te.Store).SetWorkspace(ctx, ref, dinv.Workspace{ID: id}); err != nil {
 		t.Fatal(err)
 	}
 }

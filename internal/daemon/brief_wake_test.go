@@ -9,6 +9,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/storetest"
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/core/change"
@@ -108,7 +110,7 @@ func TestFastWithADirtyRefWakesTheQueueOnce(t *testing.T) {
 func TestHealthAtMostFourQueries(t *testing.T) {
 	t.Parallel()
 	f := storetest.Seeded(t, storetest.Live)
-	q := brief.New(brief.Deps{Store: f.Inventory, Taxonomy: func(github.Ref) string { return brief.DefaultTaxonomy },
+	q := brief.New(brief.Deps{Store: f.Inventory, PRs: inventorytest.Of(f.Inventory), Taxonomy: func(github.Ref) string { return brief.DefaultTaxonomy },
 		Retry: time.Hour, Changes: f.Log, Now: func() time.Time { return f.Now }, Log: t.Logf})
 	s := newServerWith(t, func(d *Deps) {
 		*d = withStore(*d, f.Inventory)

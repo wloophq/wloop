@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/change"
@@ -173,13 +175,13 @@ func newRig(t *testing.T, n int) *rig {
 	t.Cleanup(func() { stDB.Close() })
 	for i := 1; i <= n; i++ {
 		ref := github.Ref{Owner: "acme", Repo: "api", Number: i}
-		if err := st.UpsertPR(context.Background(), dinv.PR{Ref: ref, State: "OPEN", HeadOid: "h1", ChangedFiles: 3, Reasons: []string{"repo"},
+		if err := inventorytest.Of(st).UpsertPR(context.Background(), dinv.PR{Ref: ref, State: "OPEN", HeadOid: "h1", ChangedFiles: 3, Reasons: []string{"repo"},
 			UpdatedAt: t0.Add(-time.Duration(i) * time.Minute)}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	r := &rig{st: st, src: &fakeSource{fail: map[string]error{}}, run: &fakeRunner{fail: map[string]error{}}, now: t0, changes: changes, db: stDB}
-	r.q = New(Deps{Store: st, Source: r.src, Runner: r.run, Taxonomy: func(github.Ref) string { return DefaultTaxonomy },
+	r.q = New(Deps{Store: st, PRs: inventorytest.Of(st), Source: r.src, Runner: r.run, Taxonomy: func(github.Ref) string { return DefaultTaxonomy },
 		Home: func(github.Ref) string { return "" }, Tier: turns.TierFast, MaxDiffBytes: 1000, Retry: time.Hour, Enabled: true,
 		Now: func() time.Time { return r.now }, Log: func(f string, a ...any) {
 			r.mu.Lock()
@@ -214,7 +216,7 @@ func TestQueueRefreshesOnBodyEditOrManyNewFiles(t *testing.T) {
 	ctx := context.Background()
 	r.q.Run(ctx)
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 1}
-	pr, _, _ := r.st.PR(ctx, ref)
+	pr, _, _ := inventorytest.Of(r.st).PR(ctx, ref)
 	rec, ok, _ := r.st.BriefRecord(ctx, ref)
 	v := Version(DefaultTaxonomy)
 	if Due(pr, rec, ok, v, t0, time.Hour) {
@@ -246,7 +248,7 @@ func TestABriefFromBeforeTheFileCountIsNotRedoneForIt(t *testing.T) {
 	ctx := context.Background()
 	r.q.Run(ctx)
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 1}
-	pr, _, _ := r.st.PR(ctx, ref)
+	pr, _, _ := inventorytest.Of(r.st).PR(ctx, ref)
 	rec, ok, _ := r.st.BriefRecord(ctx, ref)
 	rec.ChangedFiles = 0
 	pr.ChangedFiles = 40
@@ -327,9 +329,9 @@ func TestQueueKeepsTheLastGoodBriefOnFailure(t *testing.T) {
 	ctx := context.Background()
 	r.q.Run(ctx)
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 1}
-	pr, _, _ := r.st.PR(ctx, ref)
+	pr, _, _ := inventorytest.Of(r.st).PR(ctx, ref)
 	pr.BodyEditedAt = t0.Add(time.Minute)
-	r.st.UpsertPR(ctx, pr)
+	inventorytest.Of(r.st).UpsertPR(ctx, pr)
 	r.run.fail["acme/api#1"] = fmt.Errorf("%w: no goal", ErrInvalid)
 	r.now = t0.Add(time.Minute + BodyQuiet)
 	r.q.Run(ctx)
@@ -343,7 +345,7 @@ func TestQueueSkipsOutOfScopeAndWaitsForTheBudget(t *testing.T) {
 	r := newRig(t, 1)
 	ctx := context.Background()
 	out := github.Ref{Owner: "acme", Repo: "api", Number: 50}
-	r.st.UpsertPR(ctx, dinv.PR{Ref: out, State: "OPEN"})
+	inventorytest.Of(r.st).UpsertPR(ctx, dinv.PR{Ref: out, State: "OPEN"})
 	low := true
 	r.q.d.Allow = func(p dgh.Priority) bool { return p == dgh.PriorityUser || !low }
 	if summary, _ := r.q.Run(ctx); r.run.calls != 0 || !strings.Contains(summary, "budget") {
@@ -475,9 +477,9 @@ func TestStatusCountsAMovedPullRequestAsPending(t *testing.T) {
 	ctx := context.Background()
 	r.q.Run(ctx)
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 1}
-	pr, _, _ := r.st.PR(ctx, ref)
+	pr, _, _ := inventorytest.Of(r.st).PR(ctx, ref)
 	pr.BodyEditedAt = t0.Add(time.Minute)
-	r.st.UpsertPR(ctx, pr)
+	inventorytest.Of(r.st).UpsertPR(ctx, pr)
 	r.now = t0.Add(time.Minute + BodyQuiet)
 	if st, _ := r.q.Status(ctx); st.Ready != 0 || st.Pending != 1 {
 		t.Fatalf("%+v", st)
@@ -494,13 +496,13 @@ func TestQueueRetriesAFailedPullRequestAtOnceWhenItChanges(t *testing.T) {
 		r.q.Run(ctx)
 	}
 	calls := r.run.calls
-	pr, _, _ := r.st.PR(ctx, ref)
+	pr, _, _ := inventorytest.Of(r.st).PR(ctx, ref)
 	for _, change := range []func(*dinv.PR){
 		func(p *dinv.PR) { p.HeadOid = "h2" },
 		func(p *dinv.PR) { p.BodyEditedAt = r.now },
 	} {
 		change(&pr)
-		r.st.UpsertPR(ctx, pr)
+		inventorytest.Of(r.st).UpsertPR(ctx, pr)
 		r.now = r.now.Add(time.Minute)
 		r.q.Run(ctx)
 		if r.run.calls != calls+1 {
@@ -629,7 +631,7 @@ func TestForgetKeepsTheRuns(t *testing.T) {
 	if err := r.q.Forget(ctx, ref); err != nil {
 		t.Fatal(err)
 	}
-	pr, _, _ := r.st.PR(ctx, ref)
+	pr, _, _ := inventorytest.Of(r.st).PR(ctx, ref)
 	if v, err := viewOf(ctx, r.q, pr); err != nil || v.State != "pending" || v.Brief != nil {
 		t.Fatalf("the brief is still in use: %+v %v", v, err)
 	}
@@ -678,7 +680,7 @@ func TestRunRecordsTheTimings(t *testing.T) {
 		t.Fatalf("runs %+v", runs)
 	}
 	got, _, _ := r.st.BriefRun(ctx, runs[0].ID)
-	pr, _, _ := r.st.PR(ctx, github.Ref{Owner: "acme", Repo: "api", Number: 1})
+	pr, _, _ := inventorytest.Of(r.st).PR(ctx, github.Ref{Owner: "acme", Repo: "api", Number: 1})
 	v := Version(DefaultTaxonomy)
 	want := dinv.BriefRun{ID: got.ID, PR: pr.Ref, Trigger: TriggerBackground, Version: v, AttemptOf: attemptOf(pr, v), HeadOid: "h1", ChangedFiles: 3,
 		StartedAt: t0, EndedAt: t0.Add(12800 * time.Millisecond), InputMS: ptr[int64](1800), CallMS: ptr[int64](11000), AgentMS: ptr[int64](10400),
@@ -807,7 +809,7 @@ func TestAnUnreportedCostStaysNull(t *testing.T) {
 func TestUnavailableGitHubRecordsItsOutcome(t *testing.T) {
 	r := newRig(t, BreakerAfter)
 	for i := 1; i <= BreakerAfter; i++ {
-		r.src.fail[fmt.Sprintf("acme/api#%d", i)] = fmt.Errorf("%w: GitHub HTTP 401: Bad credentials", github.ErrUnauthorized)
+		r.src.fail[fmt.Sprintf("acme/api#%d", i)] = fmt.Errorf("%w: GitHub HTTP 401: Bad credentials", dgh.ErrBudget)
 	}
 	r.q.Run(context.Background())
 	runs := runsOf(t, r.st)
@@ -881,7 +883,7 @@ func TestWantedRunsCarryPriorityUser(t *testing.T) {
 			t.Error("a wanted run read the diff after the facts")
 		}
 	}
-	p, _, _ := r.st.PR(context.Background(), refN(1))
+	p, _, _ := inventorytest.Of(r.st).PR(context.Background(), refN(1))
 	if !r.q.claim(p.Ref) {
 		t.Fatal("not claimed")
 	}
@@ -899,7 +901,7 @@ func TestAWantedRunCancelsTheDiffWhenTheFactsFail(t *testing.T) {
 	r.src.fail["acme/api#1"] = errors.New("GitHub HTTP 404: Not Found")
 	r.src.diffCalled, r.src.diffBlock = make(chan struct{}, 1), true
 	r.src.takes = func() { <-r.src.diffCalled }
-	p, _, _ := r.st.PR(context.Background(), refN(1))
+	p, _, _ := inventorytest.Of(r.st).PR(context.Background(), refN(1))
 	if !r.q.claim(p.Ref) {
 		t.Fatal("not claimed")
 	}

@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -65,7 +67,7 @@ func TestTurnShowStaysJSONWhenPiped(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	te.gh.basics = openBasics
 	ctx := context.Background()
-	if err := te.Store.UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h1", Reasons: []string{"repo"}, URL: r7.URL()}); err != nil {
+	if err := inventorytest.Of(te.Store).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h1", Reasons: []string{"repo"}, URL: r7.URL()}); err != nil {
 		t.Fatal(err)
 	}
 	agentDaemon(t, te)

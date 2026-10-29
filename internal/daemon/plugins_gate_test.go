@@ -155,7 +155,10 @@ func TestUnitScopedPostsOnDisabledPluginAre409(t *testing.T) {
 		}},
 		{"explore", func(t *testing.T) (*httptest.ResponseRecorder, bool) {
 			ex := &countingExplorer{}
-			s := newServerWith(t, func(d *Deps) { githubOf(d).Explorer, d.PluginEnabled = ex, githubOff })
+			s := newServerWith(t, func(d *Deps) {
+				exploreOn(d, ex)
+				d.PluginEnabled = githubOff
+			})
 			rec := post(t, s, api.PluginViewPath(unit.GitHub, present.ViewExplore), `{"query":"is:open"}`)
 			return rec, ex.n.Load() > 0
 		}},

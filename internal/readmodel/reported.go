@@ -85,6 +85,13 @@ func (p *Reported) Facets() []api.FacetSpec {
 	return p.src.Catalog.Facets()
 }
 
+func (p *Reported) Events() []api.EventSpec {
+	if ep, ok := p.src.Catalog.(EventPresenter); ok {
+		return ep.Events()
+	}
+	return nil
+}
+
 func (p *Reported) Situations() []api.SituationSpec {
 	if p.src.Catalog == nil {
 		return nil

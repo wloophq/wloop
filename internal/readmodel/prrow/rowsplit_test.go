@@ -11,6 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/domain/unit"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand/brandtest"
 	"github.com/wloophq/wloop/internal/plugins/source/fakesource"
@@ -138,7 +141,7 @@ var (
 )
 
 func TestSituationsServeTheirLabels(t *testing.T) {
-	c := readmodel.BuildCatalog(New(Source{}))
+	c := readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))}))
 	if len(c.Situations) != len(kindOrder) {
 		t.Fatalf("%d situations, want %d", len(c.Situations), len(kindOrder))
 	}
@@ -152,7 +155,7 @@ func TestSituationsServeTheirLabels(t *testing.T) {
 func TestCatalogServesTheGitHubViews(t *testing.T) {
 	want := []struct{ id, label string }{{"needs-me", "Needs me"}, {"stalled", "Stalled"}, {"mine", "My PRs"}, {"loop", "In loop"}, {"plan", "Plan"},
 		{"approved", "Approved"}, {"dash", "Backlog"}, {"done", "Done"}, {"all", "All"}, {"explore", "Explore"}, {"recent", "Recent"}}
-	c := readmodel.BuildCatalog(New(Source{}))
+	c := readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))}))
 	if len(c.Views) != len(want) {
 		t.Fatalf("%d views: %+v", len(c.Views), c.Views)
 	}
@@ -170,7 +173,7 @@ func TestCatalogServesTheGitHubViews(t *testing.T) {
 	if !slices.Equal(tui, []string{"needs-me", "mine", "loop", "plan"}) {
 		t.Errorf("terminal views %v", tui)
 	}
-	if c.Version == "" || c.Version != readmodel.BuildCatalog(New(Source{})).Version {
+	if c.Version == "" || c.Version != readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))})).Version {
 		t.Errorf("version %q is not stable", c.Version)
 	}
 }
@@ -194,7 +197,7 @@ func TestFacetValuesMatchTheCockpit(t *testing.T) {
 		t.Fatal(err)
 	}
 	specs := map[string]api.FacetSpec{}
-	for _, f := range FacetSpecs() {
+	for _, f := range psource.BundledCatalog(string(unit.GitHub)).Facets() {
 		specs[f.ID] = f
 	}
 	rows := deriveCases(t, fixtureNow)
@@ -245,7 +248,7 @@ func TestFacetValuesMatchTheCockpit(t *testing.T) {
 	}
 	if *update {
 		writeJSON(t, "testdata/rows.json", rows)
-		writeJSON(t, "testdata/catalog.json", readmodel.BuildCatalog(New(Source{})))
+		writeJSON(t, "testdata/catalog.json", readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))})))
 	}
 }
 
@@ -262,7 +265,7 @@ func writeJSON(t *testing.T, path string, v any) {
 }
 
 func TestRowsGoldenIsCurrent(t *testing.T) {
-	for path, v := range map[string]any{"testdata/rows.json": deriveCases(t, fixtureNow), "testdata/catalog.json": readmodel.BuildCatalog(New(Source{}))} {
+	for path, v := range map[string]any{"testdata/rows.json": deriveCases(t, fixtureNow), "testdata/catalog.json": readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))}))} {
 		want, err := json.MarshalIndent(v, "", "  ")
 		if err != nil {
 			t.Fatal(err)
@@ -303,7 +306,7 @@ func TestFacetsDoNotDependOnTheClock(t *testing.T) {
 }
 
 func TestProviderFacetsStayWithTheirRows(t *testing.T) {
-	c := readmodel.BuildCatalog(New(Source{}), fakesource.New().Rows())
+	c := readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))}), fakesource.New().Rows())
 	i := slices.IndexFunc(c.Facets, func(f api.FacetSpec) bool { return f.ID == fakesource.FacetChannel })
 	if i < 0 || c.Facets[i].Provider != "thread" {
 		t.Fatalf("channel facet: %+v", c.Facets)

@@ -47,7 +47,6 @@ import (
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/procgroup"
 	"github.com/wloophq/wloop/internal/readmodel"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/transport/mcp"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace"
@@ -156,7 +155,7 @@ func serve(ctx context.Context, e *Env, args []string) error {
 		if cfgErr == nil {
 			e.cfg.Rebase(cfg)
 			gctx, stop := context.WithCancel(ctx)
-			e.restoreBudget(gctx, cfg, logf)
+			e.afterGitHubJob(gctx)
 			deps := endpoint.wire(serveDeps(gctx, e, db, cfg, logf, loopMu, appState), cfg)
 			deps.ConfigWarning = e.cfg.Warning
 			deps.EffectWarnings = e.effectProblems.list
@@ -279,7 +278,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 			briefs, intakeBriefs = &interruptFirst{done: e.interruptedFlag(), Queue: queue}, brief.Intakes{Q: queue}
 		}
 	}
-	sd := e.withGitHubClient(source.Deps{DB: db, Inventory: store, Host: host, Reports: e.sourceReports(store), WS: e.WS, Sink: e.boardSink(cfg), Turns: e.Turns,
+	sd := (moduleDeps{Catalog: func(id unit.ProviderID) readmodel.Presenter { return e.pluginCatalog(id) }, DB: db, Inventory: store, Host: host, Reports: e.sourceReports(store), WS: e.WS, Sink: e.boardSink(cfg), Turns: e.Turns,
 		Changes: e.changes, Clock: clockFunc(e.Now), Log: logf, Git: e.Git, Agents: e.Agents,
 		Intents: func() *dintent.Registry {
 			if l := e.loadedIntents(); l != nil {
@@ -310,7 +309,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 
 		Usage:       e.usageJob(db, logf),
 		Retain:      e.retainJob(db),
-		Budget:      e.githubBudget(),
+		Budget:      e.budget,
 		Turns:       e.Turns,
 		Sessions:    sessions,
 		Agents:      lastAgents(sessions),
@@ -339,8 +338,6 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 
 		NotifierStart: notifierStart(),
 
-		FailedSteps: e.failedSteps(),
-
 		TurnByHand: e.byHand(loopMu),
 		Startup:    e.startupOnce(cfg, logf),
 		Homes:      e.liveHomes(cfg),
@@ -361,11 +358,11 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	e.serveTurnLedger(db, cfg, logf)
 	links := e.linkDeps(db, cfg, logf, &sd)
 	d = e.serveMessages(ctx, d, db, cfg, logf)
-	mods, err := buildSources(e.sourcePlugins(), cfg, sd)
+	mods, err := buildSources(e.sourcePlugins(), cfg, sd, e.pluginUI)
 	if err != nil {
 		logf("sources: %v", err)
 	}
-	d = e.withCards(withSources(d, plugins, mods), db, cfg, mods, logf)
+	d = e.withCards(withSources(d, plugins, mods, e.pluginUI), db, cfg, mods, logf)
 	e.resolve = d.Resolve
 	e.hosted.setResolve(d.Resolve)
 	d = e.serveTasks(d, db, cfg, mods, logf)
@@ -400,8 +397,8 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 
 // briefsItself says a module's units are briefed by the queue's own calls,
 // which the queue's loop makes; an OnDemand source's job writes its briefs.
-func briefsItself(mods []source.Module) bool {
-	return slices.ContainsFunc(mods, func(m source.Module) bool {
+func briefsItself(mods []pluginModule) bool {
+	return slices.ContainsFunc(mods, func(m pluginModule) bool {
 		_, onDemand := m.Briefs.(brief.OnDemand)
 		return m.Briefs != nil && !onDemand
 	})
@@ -474,7 +471,7 @@ func (p servedPlan) Release(ctx context.Context, g gate.Gate) error { return p.e
 
 // authorFacts is the facts provider of the first module that serves the
 // views' author facts; nil without one.
-func authorFacts(mods []source.Module) views.Facts {
+func authorFacts(mods []pluginModule) views.Facts {
 	for _, m := range mods {
 		if f, ok := m.Facts.(views.Facts); ok {
 			return f
@@ -995,7 +992,7 @@ func (e *Env) servedPorts(ctx context.Context, db *sqlite.DB, store *inventory.S
 			managers = append(managers, typeOnly{m})
 			continue
 		}
-		sessions, ms, err := k.Ports(ctx, m, store, cfg, e.changes)
+		sessions, ms, err := k.Ports(ctx, m, e.reportedPRs(), cfg, e.changes)
 		if err != nil {
 			logf("workspace manager %q: %v; "+noSessionsAdapter, m.Name(), err)
 			managers = append(managers, typeOnly{m})
@@ -1065,7 +1062,7 @@ func serveUntilConfigLoads(ctx context.Context, e *Env, db *sqlite.DB, logf func
 	cfg := e.defaultConfig()
 	dctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	e.restoreBudget(dctx, cfg, logf)
+	e.afterGitHubJob(dctx)
 	deps := endpoint.wire(serveDeps(dctx, e, db, cfg, logf, loopMu, app), cfg)
 	deps.Collector, deps.Ingest = nil, nil
 	deps.Runtimes = withoutPluginJobs(deps.Runtimes)
@@ -1114,6 +1111,7 @@ func (e *Env) briefQueue(cfg config.Config, store *inventory.Store, logf func(st
 	d := e.withGitHubBriefs(brief.Deps{
 		Enabled:      cfg.Brief.Enabled,
 		Store:        store,
+		PRs:          e.reportedPRs(),
 		Taxonomy:     func(pr.Ref) string { return brief.DefaultTaxonomy },
 		Home:         briefHome(cfg),
 		Tier:         cfg.Brief.Tier,

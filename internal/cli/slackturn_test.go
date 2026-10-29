@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/agent/echo"
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/adapter/view/testsink"
@@ -32,7 +31,7 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/source"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -151,12 +150,12 @@ func runSlackPlugin(t *testing.T, te *testEnv, db *sqlite.DB) {
 func withSlackTurns(t *testing.T, te *testEnv) {
 	t.Helper()
 	runSlackPlugin(t, te, te.db)
-	m, err := te.slackRelay(te.cfg, source.Deps{DB: te.db, Inventory: te.Store, Clock: clockFunc(te.Now)})
+	m, err := te.slackRelay(te.cfg, moduleDeps{DB: te.db, Inventory: te.Store, Clock: clockFunc(te.Now)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	te.servePayloads([]source.Module{m})
-	te.servePlacement([]source.Module{m})
+	te.servePayloads([]pluginModule{m})
+	te.servePlacement([]pluginModule{m})
 }
 
 func TestSharedWorkspaceKeepsSlackSessionsApart(t *testing.T) {
@@ -235,7 +234,7 @@ func TestSlackTurnEndToEnd(t *testing.T) {
 	te.Managers = map[string]ManagerEntry{"fake": {
 		Display: "Fake", Binary: "true", SessionVar: fake.HandleVar, Sink: "fake",
 		New: func() workspace.Manager { return ws },
-		Ports: func(context.Context, workspace.Manager, *inventory.Store, config.Config, *change.Log) (managerSessions, []views.Sink, error) {
+		Ports: func(context.Context, workspace.Manager, prrow.ReportedPRs, config.Config, *change.Log) (managerSessions, []views.Sink, error) {
 			return handleSessions{"fake", sessions}, []views.Sink{{ViewSink: sink, Placements: sink}}, nil
 		},
 	}}

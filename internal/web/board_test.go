@@ -1108,7 +1108,7 @@ func buttonPrelude(t *testing.T) string {
 const state = { busy: new Set(), guidance: {}, actionError: "", actionDetail: "", specs: { version: "", byId: {} } };
 const render = () => {}, setNotice = () => {}, scheduleLoad = () => {};
 const document = { getElementById: () => null };
-` + keyJS(t) + jsConst(t, appJS(t), "API_VERSION") + jsConst(t, appJS(t), "focusSlot") + "\n" + jsConst(t, appJS(t), "CARD_GROUPS") + `
+` + keyJS(t) + jsConst(t, appJS(t), "API_VERSION") + jsConst(t, appJS(t), "FOCUS_PAIRS") + jsFunction(t, appJS(t), "focusSlot") + "\n" + jsConst(t, appJS(t), "CARD_GROUPS") + `
 let confirmed = [], prompts = [], fetched = [], promptAnswer = null, confirmAnswer = false;
 const confirm = (text) => { confirmed.push(text); return confirmAnswer; };
 const prompt = (text, def) => { prompts.push([text, def]); return promptAnswer; };

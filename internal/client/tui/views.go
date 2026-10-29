@@ -109,12 +109,12 @@ func (m *Model) TaskQuery() (view, area string, ok bool) {
 }
 
 // groupOf is the views Tab cycles through from view i: the task views, or
-// the unit views (the catalog's rows views, the plan and the plugin views).
+// the unit views (the catalog's rows views and the plan).
 func (m *Model) groupOf(i int) []int {
 	var out []int
-	inViews := i >= m.viewsBase() && i < m.pluginBase()
+	inViews := i >= m.viewsBase()
 	for j := range m.viewCount() {
-		if (j >= m.viewsBase() && j < m.pluginBase()) == inViews {
+		if (j >= m.viewsBase()) == inViews {
 			out = append(out, j)
 		}
 	}

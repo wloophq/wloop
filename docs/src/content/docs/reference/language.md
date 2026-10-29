@@ -607,6 +607,29 @@ The fields each notice reads besides `Name` and `Command`:
   - `record_owed` (`Unit`, `Turn`, `ScratchDir`)
   - `attach_needs_session` (`Task`, `Managers`)
 
+## A plugin's views, facets and situations (`ui.toml`)
+
+- `views` (table): The words of the plugin's views, by view id.
+- `views.<name>` (table): One view's words.
+- `views.<name>.label` (string): The view's name, as navigation lists it. Required.
+- `views.<name>.unit` (string): What one of the view's rows is, such as "Pull request", the unit column's heading; empty for a view whose rows mix kinds.
+- `facets` (table): The words of the plugin's facets, by facet id.
+- `facets.<name>` (table): One facet's words.
+- `facets.<name>.label` (string): The facet's name, as the filter menu and the groups show it. Required.
+- `facets.<name>.empty` (string): What a row with no value shows.
+- `facets.<name>.values` (table): How each value shows, by value; a value it does not name shows as itself.
+- `facets.<name>.values.<name>` (string): One value's text.
+- `facets.<name>.buckets` (table): How each age bucket of a time facet shows, by bucket id.
+- `facets.<name>.buckets.<name>` (string): One bucket's text.
+- `situations` (table): How each situation the plugin derives shows, by kind, in a few words.
+- `situations.<name>` (string): One situation's words.
+- `events` (table): How each event kind the plugin declares shows on a timeline, by kind.
+- `events.<name>` (table): One event kind's words.
+- `events.<name>.label` (string): The event in a few words. Required.
+- `events.<name>.loop` (bool): The event is the loop's doing, which the activity's loop filter keeps.
+- `menubar` (table): The heading of each menu bar section, by section id.
+- `menubar.<name>` (string): One section's heading.
+
 ## Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)
 
 - `override` (bool, default `false`): Drops the blocks before it whose path is an ancestor of its own.

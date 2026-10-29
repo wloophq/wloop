@@ -20,7 +20,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -33,7 +32,7 @@ func outboxDaemon(t *testing.T, te *testEnv, interactive bool) *sqlite.DB {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	mods, err := buildSources([]source.Plugin{publishing(&recordingPublisher{})}, te.cfg, source.Deps{DB: db, Clock: clockFunc(te.Now)})
+	mods, err := buildSources([]compiledPlugin{publishing(&recordingPublisher{})}, te.cfg, moduleDeps{DB: db, Clock: clockFunc(te.Now)}, bundledUI)
 	if err != nil {
 		t.Fatal(err)
 	}

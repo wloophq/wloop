@@ -20,7 +20,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -45,7 +44,7 @@ func TestAUnitHasEndedWhenItsPluginsEndedFactSaysSo(t *testing.T) {
 	quiet := slackThreadUnit("T000AAA", "C000AAA", "2.2")
 	gone := slackThreadUnit("T000AAA", "C000AAA", "3.3")
 	pr := unit.Unit{Provider: unit.GitHub, Key: "acme/api#9"}
-	mods := []source.Module{{ID: slackPlugin, Facts: endedFacts{fact: "slack.ended", ended: map[unit.Unit]bool{post: true, quiet: false}}}}
+	mods := []pluginModule{{ID: slackPlugin, Facts: endedFacts{fact: "slack.ended", ended: map[unit.Unit]bool{post: true, quiet: false}}}}
 	ended := unitsEnded(mods)
 	for u, want := range map[unit.Unit]bool{post: true, quiet: false, gone: false, pr: false, {Provider: "chat", Key: "x"}: false} {
 		got, err := ended(context.Background(), u)

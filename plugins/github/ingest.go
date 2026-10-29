@@ -68,6 +68,7 @@ type running struct {
 
 	git   plan.Git
 	lists listings
+	views presenting
 }
 
 func (p *Plugin) now() time.Time {

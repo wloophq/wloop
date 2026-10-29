@@ -28,9 +28,6 @@ func (m *Model) Render(width, height int, now time.Time) []string {
 	if width < 20 || height < 5 {
 		return pad([]string{termfmt.Fit(brand.Name+": terminal too small", width)}, height)
 	}
-	if v, ok := m.plugin(); ok {
-		return m.renderPlugin(v, width, height)
-	}
 	lines := []string{m.tabs(width)}
 	if height >= 7 {
 		lines = append(lines, "")
@@ -89,10 +86,6 @@ func pad(lines []string, n int) []string {
 	return lines[:n]
 }
 
-// pluginViewsGroup groups the plugins' own views; no provider id has its
-// shape.
-const pluginViewsGroup = " plugins"
-
 // tabs names the views with their counts, the current one bold, and the
 // daemon's flags at the right edge when they fit: the group on screen
 // whole, then each other group that fits whole, task views first.
@@ -122,9 +115,6 @@ func (m *Model) tabs(width int) string {
 		add(cmp.Or(v.Provider, first), tab{fmt.Sprintf("%s %d", v.Label, len(m.in(v.ID))), i})
 	}
 	add(first, tab{fmt.Sprintf("%s %d", planLabel, len(m.plan)), m.planView()})
-	for i, v := range m.plugins {
-		add(pluginViewsGroup, tab{v.Label(), m.pluginBase() + i})
-	}
 	mine := 0
 	for i, g := range groups {
 		if slices.ContainsFunc(g, func(x tab) bool { return x.view == m.view }) {

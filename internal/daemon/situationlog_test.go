@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
 	"github.com/wloophq/wloop/internal/core/turns"
@@ -85,7 +87,7 @@ func TestSituationsAreRecordedOnChange(t *testing.T) {
 	if got := situationsOf(t, s, situationR8); got != nil {
 		t.Fatalf("a merged pull request got situations %v", got)
 	}
-	if err := s.store().SetOverride(context.Background(), dinv.Override{PR: situationR7, MutedUntil: s.deps.Now().Add(time.Hour)}); err != nil {
+	if err := inventorytest.Of(s.store()).SetOverride(context.Background(), dinv.Override{PR: situationR7, MutedUntil: s.deps.Now().Add(time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
 	if err := keepOnce(t, s); err != nil {

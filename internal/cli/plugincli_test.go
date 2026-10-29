@@ -11,7 +11,6 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -22,8 +21,8 @@ const cliPlugin unit.ProviderID = "fakecli"
 func withCLIPlugin(t *testing.T, name string, got *[][]string) {
 	t.Helper()
 	saved := plugins
-	plugins = append(slices.Clone(saved), source.Plugin{ID: cliPlugin, Codec: pr.Codec{}, Build: func(config.Config, source.Deps) (source.Module, error) {
-		return source.Module{ID: cliPlugin, CLI: &source.CLI{Name: name, Usage: name + " thread <url>", Run: func(_ context.Context, args []string, out, _ io.Writer) error {
+	plugins = append(slices.Clone(saved), compiledPlugin{ID: cliPlugin, Codec: pr.Codec{}, Build: func(config.Config, moduleDeps) (pluginModule, error) {
+		return pluginModule{ID: cliPlugin, CLI: &pluginCLI{Name: name, Usage: name + " thread <url>", Run: func(_ context.Context, args []string, out, _ io.Writer) error {
 			*got = append(*got, args)
 			_, err := fmt.Fprintln(out, "plugin ran")
 			return err

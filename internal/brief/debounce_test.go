@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/change"
@@ -18,12 +20,12 @@ const validBrief = `{"goal":"g","kind":"fix","size":"s","risk":"low"}`
 func (r *rig) editBody(t *testing.T, n int, at time.Time) {
 	t.Helper()
 	ctx := context.Background()
-	p, _, err := r.st.PR(ctx, refN(n))
+	p, _, err := inventorytest.Of(r.st).PR(ctx, refN(n))
 	if err != nil {
 		t.Fatal(err)
 	}
 	p.BodyEditedAt = at
-	if err := r.st.UpsertPR(ctx, p); err != nil {
+	if err := inventorytest.Of(r.st).UpsertPR(ctx, p); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -97,7 +99,7 @@ func TestAListingAfterAVersionChangeStartsNoRuns(t *testing.T) {
 		saveRun(t, r.st, refN(i), validBrief, "")
 	}
 	for i := 1; i <= 20; i++ {
-		p, _, _ := r.st.PR(ctx, refN(i))
+		p, _, _ := inventorytest.Of(r.st).PR(ctx, refN(i))
 		if _, err := viewOf(ctx, r.q, p); err != nil {
 			t.Fatal(err)
 		}
@@ -166,7 +168,7 @@ func TestViewRefreshesAStaleBriefOnce(t *testing.T) {
 	r := newRig(t, 1)
 	ctx := context.Background()
 	saveRun(t, r.st, refN(1), validBrief, "")
-	p, _, _ := r.st.PR(ctx, refN(1))
+	p, _, _ := inventorytest.Of(r.st).PR(ctx, refN(1))
 	unblock, entered := make(chan struct{}), make(chan struct{})
 	r.run.takes = func() {
 		close(entered)

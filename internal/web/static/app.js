@@ -31,14 +31,12 @@ const REVIEW_LABEL = { APPROVED: "approved", CHANGES_REQUESTED: "changes request
 
 const SIZES = ["xs", "s", "m", "l", "xl"];
 const RISKS = ["low", "medium", "high"];
-const STRIP_LEGEND = [["me", "you"], ["author", "author"], ["reviewer", "reviewer"], ["loop", "loop"], ["nobody", "nobody"]];
-const STRIP_TITLE = { me: "Waits on you", author: "Waits on the author", reviewer: "Waits on a reviewer", loop: "Waits on the loop", nobody: "Waits on nobody" };
 const TAG_CHIPS = 3;
 
 // catalog is the daemon's served presentation (GET /api/catalog): its views
 // for the web, the lens's fields built from its facets, and the situations'
 // labels in rank order.
-const catalog = { version: "", views: [], fields: [], kinds: new Map(), kindOrder: [] };
+const catalog = { version: "", views: [], fields: [], kinds: new Map(), kindOrder: [], events: new Map(), loopEvents: new Set() };
 
 // MATCH is how a facet's match compares a row's value v with a query q.
 const MATCH = {
@@ -54,6 +52,18 @@ function applyCatalog(c) {
   catalog.kinds = new Map(sits.map((x) => [`${x.provider}:${x.kind}`, x.label]));
   catalog.kindOrder = [...new Set(sits.map((x) => x.kind))];
   catalog.fields = (c.facets || []).map(fieldOf);
+  catalog.events = new Map((c.events || []).map((e) => [e.kind, e.label]));
+  catalog.loopEvents = new Set((c.events || []).filter((e) => e.loop).map((e) => e.kind));
+}
+
+// eventLabel is an event kind in a few words: its plugin's, else the core's.
+function eventLabel(kind) {
+  return catalog.events.get(kind) || EVENT_LABEL[kind] || kind.replaceAll("_", " ");
+}
+
+// loopEvent says whether an event kind is the loop's doing.
+function loopEvent(kind) {
+  return LOOP_EVENTS.has(kind) || catalog.loopEvents.has(kind);
 }
 
 function kindLabel(kind, provider) {
@@ -134,20 +144,15 @@ function sm(r) {
 }
 
 const EVENT_LABEL = {
-  opened: "opened", push: "pushed", review_requested: "review requested", review_request_removed: "review request removed",
-  review: "reviewed", comment: "commented", check: "checks", ready: "ready for review", draft: "back to draft",
-  merged: "merged", closed: "closed",
-  round_pending: "round pending", round_sent: "round sent", round_skipped: "round skipped", round_held: "round held",
-  round_blocked: "round blocked", round_unblocked: "round unblocked",
   held: "paused", released: "resumed", muted: "muted", unmuted: "unmuted", adopted: "adopted", status: "board",
-  removed: "workspace removed", nudged: "nudged", tracked: "tracked", untracked: "untracked", answered: "answered", guidance: "guidance",
+  removed: "workspace removed", nudged: "nudged", tracked: "tracked", untracked: "untracked", answered: "answered",
   turn_sent: "turn sent", turn_started: "turn started", turn_ended: "turn ended", turn_resumed: "turn resumed",
   turn_withdrawn: "turn withdrawn", question_dismissed: "question dismissed",
   turn_delivered: "turn delivered", answer_routed: "answer routed", late_record: "late record",
   stop_blocked: "stop blocked", turn_stopped: "turn stopped", guide_trimmed: "guide trimmed", dossier_restored: "dossier file restored", dossier_granted: "dossier granted to the session", dossier_call: "dossier compaction, US$", brief_waiting: "waiting for the brief", intake_accepted: "request accepted", intake_briefing: "request waits for the brief", intake_starting: "request starting", intake_started: "request started", intake_failed: "request failed", intake_canceled: "request canceled", intake_guidance: "request guidance replaced",
   workflow_step_ran: "step ran",
 };
-const LOOP_EVENTS = new Set(["round_pending", "round_sent", "round_skipped", "round_held", "round_blocked", "round_unblocked", "held", "released", "muted", "unmuted", "adopted", "status", "removed", "nudged", "tracked", "untracked", "answered", "guidance", "turn_sent", "turn_started", "turn_ended", "turn_resumed", "turn_withdrawn", "question_dismissed", "turn_delivered", "answer_routed", "late_record", "stop_blocked", "turn_stopped", "guide_trimmed", "dossier_restored", "dossier_granted", "dossier_call", "brief_waiting", "intake_accepted", "intake_briefing", "intake_starting", "intake_started", "intake_failed", "intake_canceled", "intake_guidance", "workflow_step_ran"]);
+const LOOP_EVENTS = new Set(["held", "released", "muted", "unmuted", "adopted", "status", "removed", "nudged", "tracked", "untracked", "answered", "turn_sent", "turn_started", "turn_ended", "turn_resumed", "turn_withdrawn", "question_dismissed", "turn_delivered", "answer_routed", "late_record", "stop_blocked", "turn_stopped", "guide_trimmed", "dossier_restored", "dossier_granted", "dossier_call", "brief_waiting", "intake_accepted", "intake_briefing", "intake_starting", "intake_started", "intake_failed", "intake_canceled", "intake_guidance", "workflow_step_ran"]);
 const LOOP_ONLY_KEY = "loop.activity.loopOnly";
 const DETAIL_WIDTH_KEY = "loop.detailWidth";
 const DETAIL_WIDTH_MIN = 300;
@@ -347,7 +352,7 @@ function matches(r, ts) {
 
 function matchesActivity(it, ts) {
   const e = it.event;
-  const fields = [it.title, eventRef(it), it.author, e.actor, EVENT_LABEL[e.kind] || e.kind, e.data].map(fold);
+  const fields = [it.title, eventRef(it), it.author, e.actor, eventLabel(e.kind), e.data].map(fold);
   return ts.every((t) => fields.some((f) => f.includes(t)));
 }
 
@@ -477,6 +482,11 @@ function waitingLabel(row) {
   return (sm(row).waits_on || "").split(", ").map((w) => resolveWho(row, w)).join(", ");
 }
 
+// waitField is the served facet whose value colors a row's strip.
+function waitField() {
+  return catalog.fields.find((f) => f.id === "wait");
+}
+
 // waitCat is the class of whom a row waits on its strip shows: me, the
 // loop, a reviewer, the author, or nobody.
 function waitCat(row) {
@@ -496,7 +506,8 @@ function isMine(author) {
 function stripTitle(row) {
   const cat = waitCat(row);
   const who = cat === "author" || cat === "reviewer" ? ` (${waitingLabel(row)})` : "";
-  return [`${STRIP_TITLE[cat] || cat}${who}: ${rowKindLabel(row)}`, sm(row).reason].filter(Boolean).join(". ");
+  const f = waitField();
+  return [`${f && f.show ? f.show(cat) : cat}${who}: ${rowKindLabel(row)}`, sm(row).reason].filter(Boolean).join(". ");
 }
 
 function isMuted(o) {
@@ -882,9 +893,11 @@ function lensChips(lens, applied) {
 }
 
 function stripLegend() {
-  return h("span", { class: "legend", title: "The strip on the left of each pull request is the color of whom it waits on" },
-    h("span", { class: "lens-label" }, "Waits on:"),
-    STRIP_LEGEND.map(([cat, label]) => h("span", { class: "lg w-" + cat }, h("span", { class: "sw", "aria-hidden": "true" }), label)));
+  const f = waitField();
+  if (!f || !f.rank) return null;
+  return h("span", { class: "legend", title: "The strip on the left of each row is the color of whom it waits on" },
+    h("span", { class: "lens-label" }, `${f.label}:`),
+    f.rank.map((cat) => h("span", { class: "lg w-" + cat }, h("span", { class: "sw", "aria-hidden": "true" }), f.show ? f.show(cat) : cat)));
 }
 
 function lensSelect(id, label, value, options, onchange) {
@@ -1050,7 +1063,16 @@ function renderRail() {
   }));
 }
 
-const focusSlot = (name) => ({ resume: "pause", unmute: "mute", skip: "open", run_now: "review", untrack: "track" })[name] || name;
+// focusSlot is the slot an action keeps focus in when a render swaps it for
+// its counterpart: a toggle's pair, or a round's start, which an approving
+// gate intent and an intent that starts a round on request share.
+const FOCUS_PAIRS = { resume: "pause", unmute: "mute", untrack: "track" };
+function focusSlot(name) {
+  const sp = state.specs.byId[name];
+  if (sp && sp.group === "start" && sp.intake) return "start";
+  if (sp && sp.group === "start" && sp.verb === "dismiss") return "open";
+  return FOCUS_PAIRS[name] || name;
+}
 
 const CARD_GROUPS = new Set(["turn", "intake", "brief"]);
 
@@ -1457,7 +1479,7 @@ function renderActivity(lens) {
     list.replaceChildren();
     return;
   }
-  const items = state.activity.filter((it) => (!activityLoopOnly || LOOP_EVENTS.has(it.event.kind)) && activityPasses(it, lens));
+  const items = state.activity.filter((it) => (!activityLoopOnly || loopEvent(it.event.kind)) && activityPasses(it, lens));
   const out = [h("li", { class: "a-tools" },
     h("label", {},
       h("input", { type: "checkbox", checked: activityLoopOnly, "data-focus": "activity:loop-only", onchange: (e) => setLoopOnly(e.target.checked) }),
@@ -1479,7 +1501,7 @@ function renderActivity(lens) {
     const data = eventData(e);
     const requested = REQUEST_EVENTS.has(e.kind) && e.data;
     out.push(h("li", {
-      class: `a-ev ev-${e.kind}` + (LOOP_EVENTS.has(e.kind) ? " loop" : "") + (key === pr && id === activitySelected ? " sel" : ""),
+      class: `a-ev ev-${e.kind}` + (loopEvent(e.kind) ? " loop" : "") + (key === pr && id === activitySelected ? " sel" : ""),
       tabindex: 0,
       "data-focus": id,
       onclick: open,
@@ -1492,7 +1514,7 @@ function renderActivity(lens) {
     },
       h("time", { datetime: e.at, title: stamp(e.at) }, clock(e.at)),
       h("div", {},
-        h("span", { class: "kind" }, EVENT_LABEL[e.kind] || e.kind.replaceAll("_", " ")),
+        h("span", { class: "kind" }, eventLabel(e.kind)),
         requested ? h("span", { class: "who" }, " from " + requestedFrom(e.data)) : null,
         e.actor ? h("span", { class: "who" }, (requested ? " by " : " ") + actorLabel(e.actor)) : null,
         " ", h("span", { class: "ref" }, eventRef(it)),
@@ -1513,7 +1535,9 @@ function activityEmptyNote(q) {
 
 function guidanceLabel(r) {
   if (r.question) return r.question.state === "asked" && questionChoices(r, r.question).length ?"Or answer in your own words" : "Answer in your own words";
-  return r.pending ? "Guidance for the pending round; Run now sends it at once" : "Guidance for the next round (optional)";
+  const start = Object.values(state.specs.byId).find((sp) => sp.group === "start" && sp.verb === "approve");
+  if (!r.pending) return "Guidance for the next round (optional)";
+  return start ? `Guidance for the pending round; ${start.label} sends it at once` : "Guidance for the pending round";
 }
 
 function guidanceBox(key, placeholder) {
@@ -1965,7 +1989,7 @@ function renderDetail() {
     h("h2", { class: "d-sub" }, "Timeline"),
     h("ol", { class: "timeline" }, events.map((e) => h("li", { class: "ev-" + e.kind },
       h("time", { datetime: e.at }, stamp(e.at)),
-      h("div", {}, h("span", { class: "kind" }, EVENT_LABEL[e.kind] || e.kind.replaceAll("_", " ")), e.actor ? h("span", { class: "who" }, " " + e.actor) : null),
+      h("div", {}, h("span", { class: "kind" }, eventLabel(e.kind)), e.actor ? h("span", { class: "who" }, " " + e.actor) : null),
       e.data ? h("span", { class: "data" }, e.data) : null))));
 
   if (box.querySelector(".d-acts") && (!guidance || guidance.parentNode === box)) {

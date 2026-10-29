@@ -20,7 +20,6 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/daemon"
-	"github.com/wloophq/wloop/internal/source"
 	slackstore "github.com/wloophq/wloop/plugins/slack/store"
 )
 
@@ -50,11 +49,11 @@ func startSlackDaemon(t *testing.T, te *slackTestEnv) *sqlite.DB {
 		return err == nil
 	})
 	st := inventory.New(db)
-	mod, err := te.slackRelay(te.cfg, source.Deps{DB: db, Inventory: st, Log: t.Logf, Clock: clockFunc(time.Now)})
+	mod, err := te.slackRelay(te.cfg, moduleDeps{DB: db, Inventory: st, Log: t.Logf, Clock: clockFunc(time.Now)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := withSources(withStore(daemon.Deps{Cfg: Defaults(), Version: "test", Now: time.Now, Log: t.Logf}, st), plugins, []source.Module{mod})
+	d := withSources(withStore(daemon.Deps{Cfg: Defaults(), Version: "test", Now: time.Now, Log: t.Logf}, st), plugins, []pluginModule{mod}, bundledUI)
 	d.Ingest = nil
 	d.PluginAction = te.pluginAction
 	d.PluginRun = te.pluginRun

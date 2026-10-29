@@ -31,6 +31,9 @@ func BuildCatalog(providers ...Provider) api.CatalogResponse {
 		}
 		c.Facets = append(c.Facets, pr.Facets()...)
 		c.Situations = append(c.Situations, pr.Situations()...)
+		if ep, ok := pr.(EventPresenter); ok {
+			c.Events = append(c.Events, ep.Events()...)
+		}
 	}
 	raw, _ := json.Marshal(c)
 	sum := sha256.Sum256(raw)

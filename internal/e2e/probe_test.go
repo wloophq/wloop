@@ -13,7 +13,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
-	"github.com/wloophq/wloop/internal/github"
 )
 
 // loopRepo is the repository the probe's workspaces are made in.
@@ -37,7 +36,7 @@ func probeHome(t *testing.T, l *live, i int, home string) {
 		t.Fatal(err)
 	}
 	l.own(res.Session)
-	gh, err := github.ParseURL(res.PR)
+	gh, err := pr.ParseURL(res.PR)
 	if err != nil {
 		t.Fatal(err)
 	}

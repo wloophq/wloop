@@ -35,8 +35,8 @@ func (a envActions) Remove(ctx context.Context, u unit.Unit, c daemon.Call) erro
 		return err
 	}
 	linked := ""
-	if a.store != nil {
-		stored, ok, err := a.store.PR(ctx, ref)
+	{
+		stored, ok, err := a.e.reportedPRs().PR(ctx, ref)
 		if err != nil {
 			return err
 		}
@@ -58,10 +58,10 @@ func (a envActions) Remove(ctx context.Context, u unit.Unit, c daemon.Call) erro
 		return err
 	}
 	fmt.Fprintf(e.Out, "removed %s (%s)\n", w.DisplayName, w.Path)
-	if linked == "" || linked != w.ID {
-		return nil
+	if linked == w.ID && e.changes != nil {
+		e.changes.Note(port.TopicAgents, u)
 	}
-	return a.store.SetWorkspace(ctx, ref, dinv.Workspace{})
+	return nil
 }
 
 // finishedWorkspace is the workspace id names, or without one the only local

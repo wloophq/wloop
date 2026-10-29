@@ -27,7 +27,6 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -69,10 +68,10 @@ func (p *recordingPublisher) seen() []string {
 }
 
 // publishing is the thread plugin with pub as its Publisher.
-func publishing(pub *recordingPublisher) source.Plugin {
+func publishing(pub *recordingPublisher) compiledPlugin {
 	p := threadModule(threadUnit)
 	build := p.Build
-	p.Build = func(cfg config.Config, d source.Deps) (source.Module, error) {
+	p.Build = func(cfg config.Config, d moduleDeps) (pluginModule, error) {
 		m, err := build(cfg, d)
 		m.Publisher = pub
 		return m, err
@@ -138,7 +137,7 @@ func TestServeRecoversBeforeSending(t *testing.T) {
 	ready := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "approved", State: draft.Queued})
 	cfg := te.cfg
 	cfg.HTTP.Port = 0
-	mods, err := buildSources([]source.Plugin{publishing(pub)}, cfg, source.Deps{DB: db, Clock: clockFunc(te.Now)})
+	mods, err := buildSources([]compiledPlugin{publishing(pub)}, cfg, moduleDeps{DB: db, Clock: clockFunc(te.Now)}, bundledUI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +198,7 @@ func TestOutboxEffectsFollowThePlugins(t *testing.T) {
 	off := false
 	cfg.Slack.Enabled = &off
 	pub := &recordingPublisher{}
-	mods, err := buildSources([]source.Plugin{publishing(pub)}, cfg, source.Deps{DB: te.db, Clock: clockFunc(te.Now)})
+	mods, err := buildSources([]compiledPlugin{publishing(pub)}, cfg, moduleDeps{DB: te.db, Clock: clockFunc(te.Now)}, bundledUI)
 	if err != nil {
 		t.Fatal(err)
 	}

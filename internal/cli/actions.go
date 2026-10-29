@@ -292,8 +292,8 @@ func (a envActions) Open(ctx context.Context, u unit.Unit, c daemon.Call) error 
 	}
 	ref := prOf(u)
 	url := ref.URL()
-	if a.store != nil {
-		pr, ok, err := a.store.PR(ctx, ref)
+	{
+		pr, ok, err := a.e.reportedPRs().PR(ctx, ref)
 		if err != nil {
 			return err
 		}
@@ -457,14 +457,14 @@ func (e *Env) fetchPR(ctx context.Context, _ config.Config, ref pr.Ref, viewer s
 	if err := e.refreshPR(ctx, ref); err != nil {
 		return nil, "", fmt.Errorf("read %s: %w", ref, err)
 	}
-	row, ok, err := e.Store.PR(ctx, ref)
+	row, ok, err := e.reportedPRs().PR(ctx, ref)
 	if err == nil && !ok {
 		err = fmt.Errorf("read %s: the GitHub plugin reported no pull request", ref)
 	}
 	if err != nil {
 		return nil, "", err
 	}
-	details, err := e.Store.Details(ctx, []pr.Ref{ref})
+	details, err := e.reportedPRs().Details(ctx, []pr.Ref{ref})
 	if err != nil {
 		return nil, "", err
 	}

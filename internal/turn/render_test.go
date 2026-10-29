@@ -13,6 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/instructions"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/profile"
+	"github.com/wloophq/wloop/plugins"
 	"github.com/wloophq/wloop/profiles"
 )
 
@@ -233,6 +234,14 @@ func TestTemplatesAreAgentNeutral(t *testing.T) {
 	}
 	for _, name := range moved {
 		raw, _ := fs.ReadFile(profiles.Default, name)
+		check(name, raw)
+	}
+	ofPlugins, err := fs.Glob(plugins.Profiles, "*/profile/intents/*/instructions.md.tmpl")
+	if err != nil || len(ofPlugins) < 3 {
+		t.Fatalf("%v %v", ofPlugins, err)
+	}
+	for _, name := range ofPlugins {
+		raw, _ := fs.ReadFile(plugins.Profiles, name)
 		check(name, raw)
 	}
 }

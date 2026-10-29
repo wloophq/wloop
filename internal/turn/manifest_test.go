@@ -159,7 +159,7 @@ func userIntent(t *testing.T, name, manifest, tmpl string) (*intentload.Loaded, 
 	if err != nil {
 		t.Fatal(err)
 	}
-	return intentload.Load([]profile.Layer{{Name: "user", Source: dir, Dir: dir}}, BundledFS(), b, CheckTemplate)
+	return intentload.Load(append(profile.BundledChain(), profile.Layer{Name: "user", Source: dir, Dir: dir}), BundledFS(), b, CheckTemplate)
 }
 
 const askAuthor = `label = "Ask author"

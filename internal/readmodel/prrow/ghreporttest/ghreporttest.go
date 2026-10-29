@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory"
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/sweep"
@@ -113,20 +115,11 @@ func PluginPR(p dinv.PR) ghpr.PR {
 	return out
 }
 
-// Store is what Inventory reads of a host test's inventory.
-type Store interface {
-	ListPRs(ctx context.Context, open bool) ([]dinv.PR, error)
-	EventsByPR(ctx context.Context, refs []pr.Ref) (map[pr.Ref][]dinv.Event, error)
-	Overrides(ctx context.Context) (map[pr.Ref]dinv.Override, error)
-	Viewer(ctx context.Context, provider unit.ProviderID) (string, error)
-	Meta(ctx context.Context, key string) (string, error)
-}
-
 // Inventory are the reports of the pull requests a host test's inventory
 // holds, each derived when read, as the plugin would report them now: the
 // viewer and teams the inventory keeps, unless Env names them.
 type Inventory struct {
-	Store Store
+	Store *inventory.Store
 	Env   Env
 	// Now nil is Env.Now.
 	Now func() time.Time
@@ -160,7 +153,7 @@ func (i Inventory) Units(ctx context.Context, p unit.ProviderID) ([]unit.Unit, e
 	if p != unit.GitHub {
 		return nil, nil
 	}
-	prs, err := i.Store.ListPRs(ctx, false)
+	prs, err := inventorytest.Of(i.Store).ListPRs(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +260,7 @@ func (i Inventory) Rows(ctx context.Context) ([]row.Row, error) {
 
 // inputs are the env and the inputs of the pull requests of units i holds.
 func (i Inventory) inputs(ctx context.Context, units []unit.Unit) (Env, []Input, error) {
-	prs, err := i.Store.ListPRs(ctx, false)
+	prs, err := inventorytest.Of(i.Store).ListPRs(ctx, false)
 	if err != nil {
 		return Env{}, nil, err
 	}

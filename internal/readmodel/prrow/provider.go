@@ -49,6 +49,9 @@ type Source struct {
 	Reports readmodel.Reports
 	Store   Store
 	Briefs  Briefs
+	// Catalog is the plugin's views, facets and situations; nil serves
+	// none.
+	Catalog readmodel.Presenter
 }
 
 // Provider is the github provider of the read model: one row per pull
