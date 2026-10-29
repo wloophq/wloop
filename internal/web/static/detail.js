@@ -307,6 +307,11 @@ function replyArgs(c, send) {
   return args;
 }
 
+// replySendsNow says whether the reply verb's served send posts a reply at once.
+function replySendsNow() {
+  return verbTask(handlerVerb("reply")).send === "now";
+}
+
 // composer writes a reply in the unit's conversation, or a reaction where the unit takes one: Save to
 // Outbox holds it for approval, Send now approves it at once. post runs the args; a result clears it.
 function composer(key, opts) {
@@ -332,7 +337,8 @@ function composer(key, opts) {
       oninput: (ev) => { c.text = ev.target.value; } }, c.text),
     opts.reacts ? h("input", { type: "text", class: "d-reaction", "aria-label": "Reaction", placeholder: "or a reaction, such as eyes", disabled: !!off, value: c.reaction,
       "data-focus": `${opts.scope}:reaction`, oninput: (ev) => { c.reaction = ev.target.value; } }) : null,
-    h("div", { class: "d-actions" }, button("Save to Outbox", false, true), button("Send now", true, false)));
+    h("div", { class: "d-actions" }, ...(replySendsNow() ? [button("Send now", true, true), button("Save to Outbox", false, false)]
+      : [button("Save to Outbox", false, true), button("Send now", true, false)])));
 }
 
 // unitComposer replies on a unit through POST /api/drafts.

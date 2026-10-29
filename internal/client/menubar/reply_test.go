@@ -64,3 +64,18 @@ func TestDraftForMeDelegatesHeadless(t *testing.T) {
 		t.Fatalf("verbs %+v", v)
 	}
 }
+
+func TestTheNotificationOffersTheServedReplyFirst(t *testing.T) {
+	for _, first := range []string{api.AttentionSendReply, api.AttentionReply} {
+		other := api.AttentionReply
+		if first == api.AttentionReply {
+			other = api.AttentionSendReply
+		}
+		e := api.TaskView{ID: "e-8", Attention: &api.Attention{ID: "n1", Category: string(api.CategoryInbox), Title: "In your Inbox",
+			Actions: []api.AttentionAction{{ID: first, Title: "first", TextInput: true, Placeholder: "p1", Button: "b1"}, {ID: other, Title: "second", TextInput: true}}}}
+		n, _ := notification(e)
+		if len(n.Actions) != 2 || n.Actions[0].ID != first || n.Actions[0].Placeholder != "p1" || n.Actions[0].Button != "b1" {
+			t.Fatalf("%s first: %+v", first, n.Actions)
+		}
+	}
+}

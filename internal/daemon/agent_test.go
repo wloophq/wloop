@@ -29,7 +29,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	dmessage "github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -56,9 +55,9 @@ func agentServer(t *testing.T) (*Server, *turns.Service) {
 	s := New(withStore(Deps{Turns: svc, Activity: db, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return agentNow },
 		Identity: viewerIs("me"),
 		Messages: &messages.Service{Store: inventory.NewMessages(db), Books: repo, Turns: svc, Tasks: inbox, Intents: turnstest.Intents(), Clock: agentClock{}},
-		ReadText: func(_ context.Context, convs []dmessage.Conversation, id int64) string {
+		ReadText: func(_ context.Context, got messages.TaskRead, id int64) string {
 			var texts []string
-			for _, c := range convs {
+			for _, c := range got.Answers {
 				for _, a := range c.Answers {
 					texts = append(texts, fmt.Sprintf("%d:%s", c.Message.ID, a.Text))
 				}

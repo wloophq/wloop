@@ -80,6 +80,11 @@ func TestAReplyThatNamesNoSendTakesItsVerbsSend(t *testing.T) {
 	if d := r.drafts(t)[0]; d.State != draft.Queued {
 		t.Fatalf("the bundled send now did not send: %+v", d)
 	}
+	r.s.deps.Intents = draftReplies(t)
+	rec = post(t, r.s, api.TaskPath("e-1", "reply"), `{"source":"cockpit","args":{"text":"Later"}}`)
+	if res := taskResult(t, rec.Body.Bytes()); rec.Code != 200 || len(res.Lines) != 1 || res.Lines[0] != "Draft 2 saved for your approval." {
+		t.Fatalf("a profile with send draft: %d %s", rec.Code, rec.Body)
+	}
 }
 
 func TestReplySendNowApprovesThroughTheOutbox(t *testing.T) {

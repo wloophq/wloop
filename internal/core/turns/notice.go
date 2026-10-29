@@ -21,7 +21,8 @@ const (
 	// NoticeAnswered tells that the user answered a gate of the session's turn: Gate, 0 for an answer that
 	// names none, and Unit.
 	NoticeAnswered = "answered"
-	// NoticeChat tells a live session of a task that the user wrote on the task's chat: Task.
+	// NoticeChat tells a live session of a task that the user wrote on the task's chat: Task, Unit, the task's
+	// own unit as the loop's commands read it, and Capable, whether the session loaded the loop's MCP server.
 	NoticeChat = "chat"
 	// NoticeRecordOwed blocks a stop whose turn has no record: Unit, Turn and ScratchDir.
 	NoticeRecordOwed = "record_owed"

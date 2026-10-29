@@ -470,15 +470,15 @@ func (s *Server) handleTurnAnswer(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	convs, err := s.deps.Messages.Read(r.Context(), messages.ReadRequest{Session: handle, Unit: u, Message: id})
+	got, err := s.deps.Messages.ReadTask(r.Context(), messages.ReadRequest{Session: handle, Unit: u, Message: id})
 	switch {
 	case errors.Is(err, messages.ErrNoMessage), errors.Is(err, messages.ErrNoTurn):
 		writeError(w, http.StatusNotFound, err.Error())
 	case err != nil:
 		writeAgentError(w, err)
 	case s.deps.ReadText != nil:
-		writeJSON(w, api.TurnText{Text: s.deps.ReadText(r.Context(), convs, gateID)})
+		writeJSON(w, api.TurnText{Text: s.deps.ReadText(r.Context(), got, gateID)})
 	default:
-		writeJSON(w, api.TurnText{Text: fmt.Sprint(convs)})
+		writeJSON(w, api.TurnText{Text: fmt.Sprint(got.Answers, got.Chat)})
 	}
 }

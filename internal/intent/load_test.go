@@ -29,6 +29,19 @@ func testBase() *template.Template {
 
 func bundledFS() fs.FS { return os.DirFS("testdata/bundled") }
 
+// withChat is fsys with the bundled fixture's chat intent, which tasks.toml's [chat] names.
+func withChat(t *testing.T, fsys fstest.MapFS) fstest.MapFS {
+	t.Helper()
+	for _, f := range []string{"intent.toml", "instructions.md.tmpl"} {
+		b, err := os.ReadFile(filepath.Join("testdata/bundled/intents/chat", f))
+		if err != nil {
+			t.Fatal(err)
+		}
+		fsys["intents/chat/"+f] = &fstest.MapFile{Data: b}
+	}
+	return fsys
+}
+
 // testDefaults is the bundled profile's defaults.toml.
 const testDefaults = "provider = \"github\"\n"
 
@@ -444,7 +457,7 @@ func TestTheBundledLayerIsReadOnce(t *testing.T) {
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
-	if _, ok := l.Registry.Get("ghost"); ok || len(l.Registry.All()) != 4 {
+	if _, ok := l.Registry.Get("ghost"); ok || len(l.Registry.All()) != 5 {
 		t.Fatalf("a layer with no Dir was read: %d intents", len(l.Registry.All()))
 	}
 }
@@ -543,8 +556,8 @@ func TestCacheReloadsOnANewerMtime(t *testing.T) {
 	if c.Get() == second {
 		t.Fatal("did not reload on a new block")
 	}
-	if calls != 15 {
-		t.Fatalf("check ran %d times, want 5 intents x 3 loads", calls)
+	if calls != 18 {
+		t.Fatalf("check ran %d times, want 6 intents x 3 loads", calls)
 	}
 }
 

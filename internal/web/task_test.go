@@ -314,7 +314,7 @@ done({
   Primary: cls(compose, "primary")[0].textContent,
   Posts: posts, Empty: empty,
 });`, pageAnswers(t), &got)
-	if !slices.Equal(got.Buttons, []string{"Send", "Save as draft"}) || got.Primary != "Send" {
+	if !slices.Equal(got.Buttons, []string{"Send", "Save as draft", "Send reply"}) || got.Primary != "Send" {
 		t.Errorf("composer buttons %v, primary %q", got.Buttons, got.Primary)
 	}
 	want := []any{
@@ -416,23 +416,27 @@ reviewEnv.notice = () => {}; reviewEnv.render = () => {}; reviewEnv.focusStep = 
 }
 
 func TestComposerSendIsTheDefault(t *testing.T) {
-	cat := taskCatalog()
-	for i, v := range cat.Verbs {
-		if v.Handler == "reply" {
-			cat.Verbs[i].Verb = "respond"
+	for _, send := range []string{"now", "draft"} {
+		cat := taskCatalog()
+		for i, v := range cat.Verbs {
+			if v.Handler == "reply" {
+				cat.Verbs[i].Verb, cat.Verbs[i].Send = "respond", send
+			}
 		}
-	}
-	answers := pageAnswers(t)
-	e := pageTask(t)
-	e.Verbs = []api.VerbState{{Verb: "finish", Enabled: true}, {Verb: "respond", Enabled: true}}
-	answers["/api/tasks/"+e.ID] = e
-	var got struct {
-		Primary string
-		Posts   []any
-	}
-	runTaskPageOn(t, cat, `
+		answers := pageAnswers(t)
+		e := pageTask(t)
+		e.Verbs = []api.VerbState{{Verb: "finish", Enabled: true}, {Verb: "respond", Enabled: true}}
+		answers["/api/tasks/"+e.ID] = e
+		var got struct {
+			Primary string
+			Replies []string
+			Default string
+			Posts   []any
+		}
+		runTaskPageOn(t, cat, `
 let box = await page("t-0123456789abcdef");
 const compose = cls(box, "d-compose")[0];
+const buttons = walk(compose, (x) => x.tag === "button");
 focus(box, "task:compose:text").on.input({ target: { value: "Take the timeout case first." } });
 focus(box, "task:compose:text").on.keydown({ key: "Enter", ctrlKey: true });
 await new Promise((r) => setTimeout(r, 0));
@@ -440,16 +444,22 @@ box = await page("t-0123456789abcdef");
 focus(box, "task:compose:text").on.input({ target: { value: "Plain enter is a newline." } });
 focus(box, "task:compose:text").on.keydown({ key: "Enter" });
 focus(box, "task:compose:text").on.input({ target: { value: "We ship Friday." } });
-await focus(box, "task:compose:draft").on.click();
-done({ Primary: cls(compose, "primary")[0].textContent, Posts: posts });`, answers, &got)
-	if got.Primary != "Send" {
-		t.Errorf("the composer's primary is %q", got.Primary)
-	}
-	want := []any{
-		map[string]any{"path": "/api/tasks/t-0123456789abcdef/chat", "body": map[string]any{"text": "Take the timeout case first."}},
-		map[string]any{"path": "/api/tasks/t-0123456789abcdef/respond", "body": map[string]any{"source": "cockpit", "args": map[string]any{"kind": "reply", "send": "draft", "text": "We ship Friday."}}},
-	}
-	if mustJS(t, got.Posts) != mustJS(t, want) {
-		t.Errorf("posts %v, want %v", got.Posts, want)
+const def = walk(cls(box, "d-compose")[0], (x) => x.tag === "button" && String(x.className).includes("default"))[0];
+await def.on.click();
+done({ Primary: cls(compose, "primary")[0].textContent, Replies: buttons.slice(1).map((b) => b.textContent), Default: def.textContent, Posts: posts });`, answers, &got)
+		wantReplies, wantDefault := []string{"Send reply", "Save as draft"}, "Send reply"
+		if send == "draft" {
+			wantReplies, wantDefault = []string{"Save as draft", "Send reply"}, "Save as draft"
+		}
+		if got.Primary != "Send" || !slices.Equal(got.Replies, wantReplies) || got.Default != wantDefault {
+			t.Errorf("send %s: primary %q, replies %v, default %q", send, got.Primary, got.Replies, got.Default)
+		}
+		want := []any{
+			map[string]any{"path": "/api/tasks/t-0123456789abcdef/chat", "body": map[string]any{"text": "Take the timeout case first."}},
+			map[string]any{"path": "/api/tasks/t-0123456789abcdef/respond", "body": map[string]any{"source": "cockpit", "args": map[string]any{"kind": "reply", "send": send, "text": "We ship Friday."}}},
+		}
+		if mustJS(t, got.Posts) != mustJS(t, want) {
+			t.Errorf("send %s: posts %v, want %v", send, got.Posts, want)
+		}
 	}
 }

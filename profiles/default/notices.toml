@@ -3,7 +3,7 @@
 
 answered = "The user answered {{if .Gate}}gate {{.Gate}} of your {{.Name}} turn{{else}}a question of your {{.Name}} turn{{end}}. Read the answer with the `task_read` tool of the {{.Name}} MCP server{{if .Gate}}, gate {{.Gate}}{{end}} (load it with ToolSearch if it is deferred), or run `{{.Command}} turn answer {{.Unit}}{{if .Gate}} --gate {{.Gate}}{{end}}`, then act on it."
 
-chat = "The user wrote to you on the {{.Name}} task {{.Task}}. Read it with the `task_read` tool of the {{.Name}} MCP server (load it with ToolSearch if it is deferred), then act on it."
+chat = "The user wrote to you on the {{.Name}} task {{.Task}}. {{if .Capable}}Read it with the `task_read` tool of the {{.Name}} MCP server (load it with ToolSearch if it is deferred), or run `{{.Command}} turn answer {{.Unit}}`{{else}}Read it by running `{{.Command}} turn answer {{.Unit}}`{{end}}, then act on it."
 
 record_owed = "This {{.Name}} turn on {{.Unit}} has no record. Call the `turn_end` tool of the {{.Name}} MCP server with turn {{.Turn}} (load it with ToolSearch if it is deferred), or, without that tool, write {{.ScratchDir}}/turn-{{.Turn}}.json and run `{{.Command}} turn end {{.Unit}} --turn {{.Turn}} --file {{.ScratchDir}}/turn-{{.Turn}}.json`, then end your turn. If the turn could not be done, record state failed with what broke."
 

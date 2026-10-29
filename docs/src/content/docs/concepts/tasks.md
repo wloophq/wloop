@@ -109,7 +109,7 @@ The words of the verbs come from the profile's `tasks.toml`, and those of the vi
 
 Approve (`a`) and delegate (`d`) move nothing themselves: on an action task with units they run that unit's action, such as Run now, a review or address round, or Act. Delegate also runs on a waiting, closure or captured task that has a unit, and takes optional guidance and a mode: `headless` (Draft for me, which proposes drafts for the task) or `session` (Hand to an agent). Without a mode the action picks its own, headless when it can. The task says upfront whether a session can run on its unit, and why not when it cannot; a unit with no placement runs its session in a neutral directory with no checkout. A session started from a task keeps the task and its items, so the drafts it proposes serve that task.
 
-Reply (`r`) writes a draft of your own on the task's first unit, a reply in its conversation (a comment on a pull request) or a reaction, tied to the task and its items. Send posts it at once, as your approval of it; Save as draft holds it on its gate for your approval. A reply that names neither takes the verb's `send` in `tasks.toml`, `now` in the bundled profile; the composer, the TUI and the notifications always name one. The verb is the one whose `handler` is `reply`, whatever the profile calls it. From a terminal, `{{command}} outbox new <unit|message> <markdown>` writes one on any unit. The full key list is on the [Keys](/reference/keys/) page.
+Reply (`r`) writes a draft of your own on the task's first unit, a reply in its conversation (a comment on a pull request) or a reaction, tied to the task and its items. Send posts it at once, as your approval of it; Save as draft holds it on its gate for your approval. The verb's `send` in `tasks.toml` (`now` in the bundled profile) picks which is the default: the daemon serves it in the catalog, and the task page's composer, the unit composer, the terminal prompt (Enter does the default, Tab the other) and a notification's order of Reply and Send reply all follow it. A reply that names neither takes it too. The verb is the one whose `handler` is `reply`, whatever the profile calls it. From a terminal, `{{command}} outbox new <unit|message> <markdown>` writes one on any unit. The full key list is on the [Keys](/reference/keys/) page.
 
 ## Messages
 
@@ -122,14 +122,16 @@ What you write in the task page's composer and Send goes to the task's agent, ke
 ```
 you ── Send ──▶ message event on the task
                   │
-                  ├─ a session of the task is live ──▶ notice typed: "the user wrote on task T"
-                  │                                     agent ── task_read ──▶ the chat since its last read
+                  ├─ a session of the task is live, its agent idle ──▶ notice typed: "the user wrote on task T"
+                  │                                                     agent ── task_read ──▶ the chat since its last read
+                  ├─ a session of the task is live, its agent busy ──▶ the notice blocks its next stop
                   │
-                  └─ none is live ──▶ a turn of [chat] intent, the message as its guidance,
-                                      resuming the last run on the task that had a session
+                  └─ none is live ──▶ a turn of [chat] intent, every message its agents have not read
+                                      as its guidance, oldest first, resuming the last run on the task
+                                      that had a session
 ```
 
-The live session is any session whose unit is the task or one it holds, a pull request or a thread included, so a task the loop derived from a Slack thread you never captured takes a chat the same way. The notice carries no text: the agent reads it with `task_read`, which marks it read. With no live session, `[chat] intent` in `tasks.toml` names the intent of the turn, `chat` in the bundled profile: a session on the task, in a worktree of the task's repository when it has one, else with no checkout. A message that starts a turn counts as read. An agent's session cannot write on a task's chat.
+The live session is any session whose unit is the task or one it holds, a pull request or a thread included, so a task the loop derived from a Slack thread you never captured takes a chat the same way. The notice carries no text: the agent reads it with `task_read`, which marks it read, or, in a session that did not load {{name}}'s MCP server, with `{{command}} turn answer task:<id>`, which the notice then names alone. A message to an agent that is working or waiting on a permission is never typed over it: its next stop is blocked once with the notice. With no live session, `[chat] intent` in `tasks.toml` names the intent of the turn, `chat` in the bundled profile: a session on the task, in a worktree of the task's repository when it has one, else with no checkout. A message that starts a turn counts as read. An agent's session cannot write on a task's chat.
 
 ## The Outbox
 

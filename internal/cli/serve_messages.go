@@ -24,6 +24,7 @@ func (e *Env) serveMessages(ctx context.Context, d daemon.Deps, db *sqlite.DB, c
 			ProposalText: proposalText(e.loadedIntents, logf),
 			ChatDeps:     messages.ChatDeps{Sessions: e.Turns, Log: chatLog{db}, Units: db.Tasks(), Intent: e.chatIntent}}
 	}
+	e.Turns.Chats = e.messages.Chats()
 	d.Tasks, d.Messages = tasks, e.messages
 	d.Gates = e.newGates(db, logf)
 	d.GateReader = e.gateReader

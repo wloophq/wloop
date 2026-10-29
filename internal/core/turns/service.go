@@ -31,6 +31,8 @@ type Service struct {
 	Clock   port.Clock
 	// Command is how messages name the binary.
 	Command string
+	// Chats are the chat messages a session's stop tells of; nil tells of none.
+	Chats Chats
 	// Notices words what the loop tells a session; nil names each notice and its data.
 	Notices Notices
 	// FastJob is the configured interval of the fast job Reconcile runs on.

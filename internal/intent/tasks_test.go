@@ -382,7 +382,7 @@ func TestAnEnumWithoutValuesIsAProblem(t *testing.T) {
 
 func TestAnIntentRefuseReadsATaskProperty(t *testing.T) {
 	t.Parallel()
-	bundled := fstest.MapFS{TasksFile: {Data: []byte(defaultTasks(t))}}
+	bundled := withChat(t, fstest.MapFS{TasksFile: {Data: []byte(defaultTasks(t))}})
 	for kind, want := range map[string]string{"project": "", "galaxy": "galaxy"} {
 		dir := t.TempDir()
 		refuse := "\n[[refuse]]\nwhen = 'task.prop.kind == \"" + kind + "\"'\nwhy = \"A project starts its children.\"\n"
@@ -401,5 +401,20 @@ func TestAByPredicateNamesOnlyFactsTheAuthorityReads(t *testing.T) {
 	}
 	if _, problems := loadTasksWith(t, defaultTasks(t), "[verbs.done]\nby = { agent = 'task.kind == \"capture\" && task.prop.risk == \"low\"' }\n"); problems != "" {
 		t.Errorf("a by over the task's own facts and its properties: %s", problems)
+	}
+}
+
+func TestAnUnknownChatIntentFailsToLoad(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, TasksFile), []byte("[chat]\nintent = \"chatty\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, problems := Load(userLayer(dir), bundledFS(), testBase(), nil)
+	if got := problems.Error(); !strings.Contains(got, "tasks.toml: chat.intent: unknown intent \"chatty\"") {
+		t.Fatalf("problems %q", got)
+	}
+	if _, problems := Load(nil, bundledFS(), testBase(), nil); len(problems) > 0 {
+		t.Fatalf("the bundled chat intent: %s", problems.Error())
 	}
 }

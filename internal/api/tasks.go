@@ -96,14 +96,17 @@ type PropSpec struct {
 // VerbSpec is a verb a task offers: Handler is what it runs besides its move, as the profile names it ("" for
 // none), From the states it moves a task from (every state when empty), To the state it moves it to ("" for none).
 type VerbSpec struct {
-	Verb    string   `json:"verb"`
-	Handler string   `json:"handler,omitempty"`
-	Label   string   `json:"label"`
-	Summary string   `json:"summary,omitempty"`
-	Input   string   `json:"input,omitempty"` // the question a verb that asks for a value puts first
-	Key     string   `json:"key"`
-	From    []string `json:"from,omitempty"`
-	To      string   `json:"to,omitempty"`
+	Verb    string `json:"verb"`
+	Handler string `json:"handler,omitempty"`
+	Label   string `json:"label"`
+	Summary string `json:"summary,omitempty"`
+	Input   string `json:"input,omitempty"` // the question a verb that asks for a value puts first
+	// Send is what a reply of a verb whose handler is reply does by default: "now" sends it, "draft" holds it
+	// for approval; every client's reply composer starts on it.
+	Send string   `json:"send,omitempty"`
+	Key  string   `json:"key"`
+	From []string `json:"from,omitempty"`
+	To   string   `json:"to,omitempty"`
 }
 
 type TaskView struct {

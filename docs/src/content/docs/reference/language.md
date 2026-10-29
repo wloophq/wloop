@@ -571,7 +571,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
 
 - `<name>` (template): A notice, by its name: a template over its fields, `Name` and `Command`.
   - `answered`: Typed into an idle session, or the reason that blocks its stop while it works: the user answered Gate of the session's turn, 0 for an answer stored before answers named their gate, of the unit named as the loop's commands read it.
-  - `chat`: Typed into a live session of a task when the user writes on the task's chat: the task's id. The notice carries no message: the agent reads it with task_read.
+  - `chat`: Typed into a live session of a task when the user writes on the task's chat, or the reason that blocks its next stop while its agent works: the task's id, its own unit as the loop's commands read it, and Capable, whether the session loaded the MCP server. The notice carries no message: the agent reads it with task_read, or with the turn answer command.
   - `chat_typed`: Tells the person that their chat message reached a live session of the task.
   - `chat_started`: Tells the person that their chat message started a turn of Intent, Resumed when it resumes the task's last session.
   - `draft_sent`: Tells the person that the reply they sent at once, Draft, is approved and goes out.
@@ -588,7 +588,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
 The fields each notice reads besides `Name` and `Command`:
 
   - `answered` (`Gate`: number, `Unit`)
-  - `chat` (`Task`)
+  - `chat` (`Task`, `Unit`, `Capable`)
   - `chat_typed`
   - `chat_started` (`Intent`, `Resumed`)
   - `draft_sent` (`Draft`: number)

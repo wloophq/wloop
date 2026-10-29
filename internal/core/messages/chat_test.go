@@ -247,3 +247,66 @@ func TestReadTaskReadsTheChatOnce(t *testing.T) {
 		t.Fatalf("read again %+v %v", again.Chat, err)
 	}
 }
+
+func TestAChatThatStartsATurnCarriesTheEarlierUnreadChats(t *testing.T) {
+	r, _ := chatRig(t)
+	ctx := context.Background()
+	e := r.capture(t, "Retry the webhook", nil)
+	own := task.UnitOf(e.ID)
+	r.reg.Put(turn.Session{ID: "term_1", WorkspaceID: "ws", Unit: own, StartedAt: t0.Add(-time.Hour)})
+	if got, err := r.svc.Chat(ctx, messages.ChatRequest{Task: e.ID, Text: "First the timeout."}); err != nil || got.Route != messages.ChatTyped {
+		t.Fatalf("chat went %+v %v", got, err)
+	}
+	r.reg.Put(turn.Session{ID: "term_1", WorkspaceID: "ws", Unit: own, StartedAt: t0.Add(-time.Hour), ClosedAt: t0})
+	got, err := r.svc.Chat(ctx, messages.ChatRequest{Task: e.ID, Text: "Then the backoff."})
+	if err != nil || got.Route != messages.ChatStarted || len(r.launch.launches) != 1 {
+		t.Fatalf("chat went %+v %v, launched %+v", got, err, r.launch.launches)
+	}
+	if g := r.launch.launches[0].Guidance; g != "First the timeout.\n\nThen the backoff." {
+		t.Fatalf("guidance %q", g)
+	}
+	if _, err := r.svc.Chat(ctx, messages.ChatRequest{Task: e.ID, Text: "And the docs."}); err != nil {
+		t.Fatal(err)
+	}
+	if g := r.launch.launches[1].Guidance; g != "And the docs." {
+		t.Fatalf("a chat the last turn carried came again: %q", g)
+	}
+}
+
+func TestAChatToABusySessionWaitsForItsStop(t *testing.T) {
+	r, _ := chatRig(t)
+	ctx := context.Background()
+	r.turns.Chats = r.svc.Chats()
+	e := r.capture(t, "Retry the webhook", nil)
+	own := task.UnitOf(e.ID)
+	r.books.Put(turn.Book{Unit: own, Turns: []turn.Turn{{Seq: 1, Intent: "attach", ID: "a1", Session: "term_1", SentTo: "term_1", State: turn.Started, SentAt: t0}}})
+	r.reg.Put(turn.Session{ID: "term_1", Pane: "tab-1:leaf-1", WorkspaceID: "ws", AgentSession: "s1", Unit: own, StartedAt: t0.Add(-time.Hour), MCPAt: t0.Add(-time.Hour)})
+	r.busy()
+	got, err := r.svc.Chat(ctx, messages.ChatRequest{Task: e.ID, Text: "Take the timeout case first."})
+	if err != nil || got.Route != messages.ChatQueued || got.Session != "term_1" {
+		t.Fatalf("chat went %+v %v", got, err)
+	}
+	if typed := r.sess.Typed(); len(typed) != 0 {
+		t.Fatalf("a busy agent was typed into: %+v", typed)
+	}
+	stop, err := r.turns.Stop(ctx, turns.StopRequest{Session: "term_1", AgentSession: "s1", PromptID: "p1"})
+	if err != nil || !stop.Block || !strings.Contains(stop.Reason, "chat") || !strings.Contains(stop.Reason, "Capable=true") {
+		t.Fatalf("stop %+v %v", stop, err)
+	}
+	if stop, err := r.turns.Stop(ctx, turns.StopRequest{Session: "term_1", AgentSession: "s1", PromptID: "p2"}); err != nil || stop.Block {
+		t.Fatalf("a chat told once blocked again: %+v %v", stop, err)
+	}
+}
+
+func TestAChatToASessionWithoutTheMCPServerNamesTheCommand(t *testing.T) {
+	r, _ := chatRig(t)
+	e := r.capture(t, "Retry the webhook", nil)
+	r.reg.Put(turn.Session{ID: "term_1", WorkspaceID: "ws", Unit: task.UnitOf(e.ID), StartedAt: t0})
+	if _, err := r.svc.Chat(context.Background(), messages.ChatRequest{Task: e.ID, Text: "Look."}); err != nil {
+		t.Fatal(err)
+	}
+	typed := r.sess.Typed()
+	if len(typed) != 1 || !strings.Contains(typed[0].Line, "Capable=false") || !strings.Contains(typed[0].Line, "Unit="+task.UnitOf(e.ID).Address()) {
+		t.Fatalf("typed %+v", typed)
+	}
+}

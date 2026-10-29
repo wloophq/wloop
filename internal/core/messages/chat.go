@@ -23,14 +23,19 @@ import (
 // KindChat is the event kind of a message the user wrote on a task's chat: its Data is {"text": ...}.
 const KindChat = "message"
 
-// ChatRead is the mark on a task's own unit of the newest chat message its agents read or were started with.
-const ChatRead = "chat.read"
+// The marks on a task's own unit of its chat: ChatRead, the newest message its agents read or were started
+// with; ChatTold, the newest one a notice told an agent of.
+const (
+	ChatRead = "chat.read"
+	ChatTold = "chat.told"
+)
 
 // Sessions reach a task's agent, as turns.Service does: the live session of its units, typed a notice that
-// the user wrote, else a new turn that resumes the last run of the task's own unit.
+// the user wrote unless its agent is busy, else a new turn that resumes the last run of the task's own unit.
 type Sessions interface {
 	LiveOn(ctx context.Context, units ...unit.Unit) (turn.Session, bool, error)
-	TellChat(ctx context.Context, sess turn.Session, id string) (bool, error)
+	Busy(ctx context.Context, sess turn.Session) (bool, error)
+	TellChat(ctx context.Context, sess turn.Session, task unit.Unit) (bool, error)
 	LastRun(ctx context.Context, u unit.Unit) (turn.Turn, bool, error)
 	Launch(ctx context.Context, l turns.Launch) error
 }
@@ -73,7 +78,9 @@ type ChatRequest struct {
 
 // How a chat message reached the task's agent.
 const (
-	ChatTyped   = "typed"
+	ChatTyped = "typed"
+	// ChatQueued waits for the busy agent's next stop, which the notice blocks.
+	ChatQueued  = "queued"
 	ChatStarted = "started"
 	ChatResumed = "resumed"
 )
@@ -94,9 +101,10 @@ type ChatRefusal struct{ Why string }
 func (r ChatRefusal) Error() string { return r.Why }
 
 // Chat keeps the message on the task's own unit, then delivers it: a live session of any of the task's
-// units is typed the notice that a message waits, which the agent reads with the task's read tool; with
-// none, a turn of the chat intent starts on the task's own unit with the message as its guidance,
-// resuming the last run there that had a session.
+// units is typed the notice that a message waits, which the agent reads with the task's read tool, or, while
+// its agent is busy, is told at its next stop; with none, a turn of the chat intent starts on the task's own
+// unit with every message its agents have not read as its guidance, oldest first, resuming the last run
+// there that had a session.
 func (s *Service) Chat(ctx context.Context, r ChatRequest) (ChatResult, error) {
 	c := s.ChatDeps
 	if c.Sessions == nil || c.Log == nil {
@@ -131,15 +139,24 @@ func (s *Service) Chat(ctx context.Context, r ChatRequest) (ChatResult, error) {
 		return out, err
 	}
 	if live {
-		out.Route, out.Session = ChatTyped, sess.ID
-		submitted, err := c.Sessions.TellChat(ctx, sess, string(e.ID))
+		out.Session = sess.ID
+		busy, err := c.Sessions.Busy(ctx, sess)
+		if err != nil {
+			return out, err
+		}
+		if busy {
+			out.Route = ChatQueued
+			return out, nil
+		}
+		out.Route = ChatTyped
+		submitted, err := c.Sessions.TellChat(ctx, sess, own)
 		if err != nil {
 			return out, err
 		}
 		if !submitted {
 			return out, ChatRefusal{"the message is on the task, and its notice reached the agent's terminal unsubmitted; look at its terminal"}
 		}
-		return out, nil
+		return out, s.markChat(ctx, own, ChatTold, out.Seq)
 	}
 	out.Intent = r.Intent
 	if out.Intent == "" && c.Intent != nil {
@@ -156,13 +173,53 @@ func (s *Service) Chat(ctx context.Context, r ChatRequest) (ChatResult, error) {
 	if ok {
 		out.Route, out.ResumeOf = ChatResumed, last.Seq
 	}
-	if err := c.Sessions.Launch(ctx, turns.Launch{Unit: own, Intent: turn.Intent(out.Intent), ResumeOf: out.ResumeOf, Guidance: text, Trigger: turn.ByHand}); err != nil {
+	unread, err := s.unreadChat(ctx, e.ID)
+	if err != nil {
 		return out, err
 	}
-	return out, s.markChatRead(ctx, own, out.Seq)
+	texts := make([]string, 0, len(unread))
+	for _, ev := range unread {
+		texts = append(texts, chatText(ev))
+	}
+	guidance := strings.Join(texts, "\n\n")
+	if err := c.Sessions.Launch(ctx, turns.Launch{Unit: own, Intent: turn.Intent(out.Intent), ResumeOf: out.ResumeOf, Guidance: guidance, Trigger: turn.ByHand}); err != nil {
+		return out, err
+	}
+	return out, s.markChat(ctx, own, ChatRead, out.Seq)
 }
 
-func (s *Service) markChatRead(ctx context.Context, own unit.Unit, seq int64) error {
+// chatText is the text of chat message ev.
+func chatText(ev timeline.Event) string {
+	var m struct {
+		Text string `json:"text"`
+	}
+	_ = json.Unmarshal([]byte(ev.Data), &m)
+	return m.Text
+}
+
+// unreadChat are the messages on task id's chat its agents have not read, oldest first.
+func (s *Service) unreadChat(ctx context.Context, id task.ID) ([]timeline.Event, error) {
+	own := task.UnitOf(id)
+	marks, err := s.ChatDeps.Log.Marks(ctx, own)
+	if err != nil {
+		return nil, err
+	}
+	evs, err := s.ChatDeps.Log.Of(ctx, id, timeline.Filter{Kinds: []string{KindChat}})
+	if err != nil {
+		return nil, err
+	}
+	var out []timeline.Event
+	for _, ev := range evs {
+		if ev.Unit == own && !mark.Handled(marks[ChatRead], ev.Seq) {
+			out = append(out, ev)
+		}
+	}
+	slices.Reverse(out)
+	return out, nil
+}
+
+// markChat moves the mark name of the chat on own up to seq; reading counts as told.
+func (s *Service) markChat(ctx context.Context, own unit.Unit, name string, seq int64) error {
 	if seq == 0 {
 		return nil
 	}
@@ -171,7 +228,49 @@ func (s *Service) markChatRead(ctx context.Context, own unit.Unit, seq int64) er
 		return err
 	}
 	v, _ := mark.New(seq)
-	return s.ChatDeps.Log.SetMarks(ctx, own, map[string]string{ChatRead: mark.Merge(marks[ChatRead], v)})
+	set := map[string]string{name: mark.Merge(marks[name], v)}
+	if name == ChatRead {
+		set[ChatTold] = mark.Merge(marks[ChatTold], v)
+	}
+	return s.ChatDeps.Log.SetMarks(ctx, own, set)
+}
+
+// Chats are the chats no notice told an agent of, which a session's stop tells of.
+func (s *Service) Chats() turns.Chats { return waitingChats{s} }
+
+type waitingChats struct{ s *Service }
+
+func (w waitingChats) Waiting(ctx context.Context, u unit.Unit) (unit.Unit, bool, error) {
+	if w.s.ChatDeps.Log == nil {
+		return unit.Unit{}, false, nil
+	}
+	e, ok, err := w.s.taskOfUnit(ctx, u)
+	if err != nil || !ok {
+		return unit.Unit{}, false, err
+	}
+	own := task.UnitOf(e.ID)
+	newest, err := w.s.ChatDeps.Log.Of(ctx, e.ID, timeline.Filter{Kinds: []string{KindChat}, Limit: 1})
+	if err != nil || len(newest) == 0 || newest[0].Unit != own {
+		return unit.Unit{}, false, err
+	}
+	marks, err := w.s.ChatDeps.Log.Marks(ctx, own)
+	if err != nil {
+		return unit.Unit{}, false, err
+	}
+	seq := newest[0].Seq
+	return own, !mark.Handled(marks[ChatRead], seq) && !mark.Handled(marks[ChatTold], seq), nil
+}
+
+func (w waitingChats) Noticed(ctx context.Context, own unit.Unit) error {
+	id, ok := task.IDOf(own)
+	if !ok {
+		return nil
+	}
+	newest, err := w.s.ChatDeps.Log.Of(ctx, id, timeline.Filter{Kinds: []string{KindChat}, Limit: 1})
+	if err != nil || len(newest) == 0 {
+		return err
+	}
+	return w.s.markChat(ctx, own, ChatTold, newest[0].Seq)
 }
 
 // TaskRead is what an agent reads of the task its session works on: the task, its brief, its open gates,
@@ -213,23 +312,11 @@ func (s *Service) ReadTask(ctx context.Context, r ReadRequest) (TaskRead, error)
 	if out.Gates, err = s.Gates.Where(ctx, gates.Query{Task: e.ID, Statuses: []gate.Status{gate.Open}}); err != nil {
 		return out, err
 	}
-	own := task.UnitOf(e.ID)
-	marks, err := s.ChatDeps.Log.Marks(ctx, own)
-	if err != nil {
+	if out.Chat, err = s.unreadChat(ctx, e.ID); err != nil {
 		return out, err
 	}
-	evs, err := s.ChatDeps.Log.Of(ctx, e.ID, timeline.Filter{Kinds: []string{KindChat}})
-	if err != nil {
-		return out, err
-	}
-	for _, ev := range evs {
-		if ev.Unit == own && !mark.Handled(marks[ChatRead], ev.Seq) {
-			out.Chat = append(out.Chat, ev)
-		}
-	}
-	slices.Reverse(out.Chat)
 	if len(out.Chat) > 0 {
-		if err := s.markChatRead(ctx, own, out.Chat[len(out.Chat)-1].Seq); err != nil {
+		if err := s.markChat(ctx, task.UnitOf(e.ID), ChatRead, out.Chat[len(out.Chat)-1].Seq); err != nil {
 			return out, err
 		}
 	}

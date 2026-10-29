@@ -128,15 +128,18 @@ func (ev *taskViewer) inboxNotice(ctx context.Context, e task.Task) (api.Categor
 }
 
 // inboxActions are Draft for me when the task's delegate runs an action that drafts headless, and Reply and
-// Send reply when the task takes a reply.
+// Send reply when the task takes a reply, the one the reply verb's send picks first.
 func (ev *taskViewer) inboxActions(ctx context.Context, e task.Task) []api.AttentionAction {
 	out := []api.AttentionAction{}
 	if ev.s.draftsHeadless(ctx, ev.g, e) {
 		out = append(out, api.AttentionAction{ID: api.AttentionDraftForMe, Title: "Draft for me"})
 	}
 	if ev.s.replyRefusal(e) == "" {
-		out = append(out, api.AttentionAction{ID: api.AttentionReply, Title: "Reply", TextInput: true},
-			api.AttentionAction{ID: api.AttentionSendReply, Title: "Send reply", TextInput: true})
+		replies := []api.AttentionAction{{ID: api.AttentionReply, Title: "Reply", TextInput: true}, {ID: api.AttentionSendReply, Title: "Send reply", TextInput: true}}
+		if ev.s.replySend(ev.s.replyVerb()) == sendNow {
+			slices.Reverse(replies)
+		}
+		out = append(out, replies...)
 	}
 	return out
 }

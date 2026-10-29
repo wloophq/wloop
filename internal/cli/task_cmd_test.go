@@ -132,7 +132,7 @@ func TestAChatReachesTheTasksLiveSessionAndItsTaskRead(t *testing.T) {
 		t.Fatalf("chat %+v %v", res, err)
 	}
 	typed := sessions.Typed()[sent:]
-	if len(typed) != 1 || typed[0].Handle != id || !strings.Contains(typed[0].Line, "task_read") || !strings.Contains(typed[0].Line, string(attachTask)) ||
+	if len(typed) != 1 || typed[0].Handle != id || !strings.Contains(typed[0].Line, "turn answer task:"+string(attachTask)) || !strings.Contains(typed[0].Line, string(attachTask)) ||
 		strings.Contains(typed[0].Line, "timeout") {
 		t.Fatalf("typed %+v", typed)
 	}
@@ -144,8 +144,16 @@ func TestAChatReachesTheTasksLiveSessionAndItsTaskRead(t *testing.T) {
 	if again, err := te.messages.ReadTask(ctx, messages.ReadRequest{Session: id}); err != nil || len(again.Chat) != 0 {
 		t.Fatalf("read again %+v %v", again.Chat, err)
 	}
+	if _, err := client.New(te.Socket).Chat(ctx, string(attachTask), api.ChatRequest{Text: "Then the backoff."}); err != nil {
+		t.Fatal(err)
+	}
+	te.out.Reset()
+	if code := te.run("turn", "answer", "task:"+string(attachTask)); code != 0 || !strings.Contains(te.out.String(), "Then the backoff.") ||
+		strings.Contains(te.out.String(), "timeout") {
+		t.Fatalf("turn answer: exit %d\n%s%s", code, te.out, te.err)
+	}
 	evs, err := timeline.Merged{Log: te.db, Holdings: te.db}.Of(ctx, attachTask, timeline.Filter{Kinds: []string{messages.KindChat}})
-	if err != nil || len(evs) != 1 {
+	if err != nil || len(evs) != 2 {
 		t.Fatalf("timeline %+v %v", evs, err)
 	}
 	if _, err := client.New(te.Socket).Chat(ctx, string(attachTask), api.ChatRequest{Text: " "}); err == nil {

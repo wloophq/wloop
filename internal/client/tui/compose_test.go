@@ -227,3 +227,27 @@ func TestADraftKeyRunsTheHandlerOfItsVerb(t *testing.T) {
 		t.Fatalf("the verb whose handler is edit asked %+v", p)
 	}
 }
+
+func TestReplyStartsOnTheServedSend(t *testing.T) {
+	for _, send := range []string{"now", "draft"} {
+		m := viewsModel(t)
+		cat := viewsCatalog()
+		for i, v := range cat.Verbs {
+			if v.Verb == "reply" {
+				cat.Verbs[i].Send = send
+			}
+		}
+		m.SetViews(cat)
+		press(m, Key{Rune: 'r'})
+		c, ok := press(m, append(typed("Shipped"), Key{Name: KeyEnter})...)
+		if send == "now" {
+			if ok || m.prompt == nil || !m.prompt.confirm {
+				t.Fatalf("send now: Enter did not ask for a y: %+v", m.prompt)
+			}
+			c, ok = press(m, Key{Rune: 'y'})
+		}
+		if want := map[string]string{"text": "Shipped", "send": send}; !ok || !reflect.DeepEqual(c.args, want) {
+			t.Fatalf("send %s: %+v %v", send, c, ok)
+		}
+	}
+}

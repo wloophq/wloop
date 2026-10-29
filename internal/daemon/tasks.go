@@ -116,7 +116,7 @@ func (s *Server) handleViews(w http.ResponseWriter, r *http.Request) {
 	for _, v := range builtin.TaskVerbs {
 		t, b := s.loaded().Tasks.Verbs[v], bundledWords().tasks.Verbs[v]
 		cat.Verbs = append(cat.Verbs, api.VerbSpec{Verb: v, Handler: s.loaded().Tasks.Handler(v), Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
-			Input: cmp.Or(t.Input, b.Input), Key: verbKey(task.Verb(v))})
+			Input: cmp.Or(t.Input, b.Input), Send: s.replySend(v), Key: verbKey(task.Verb(v))})
 	}
 	writeJSON(w, cat)
 }

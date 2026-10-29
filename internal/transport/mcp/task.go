@@ -124,11 +124,11 @@ func (s *Server) taskRead(ctx context.Context, handle string, arguments json.Raw
 	return s.answer(ctx, taskReadName, name, f, false)
 }
 
-// ReadText is what task_read answers for convs alone, read of gate id or of every unread answer when 0; the
-// agent's command prints the same.
-func (s *Server) ReadText(ctx context.Context, convs []message.Conversation, id int64) string {
+// ReadText is what task_read answers for got, read of gate id or of every unread answer when 0; the agent's
+// command prints the same.
+func (s *Server) ReadText(ctx context.Context, got messages.TaskRead, id int64) string {
 	ctx = s.withTexts(ctx)
-	name, f := s.readTask(ctx, messages.TaskRead{Answers: convs}, id)
+	name, f := s.readTask(ctx, got, id)
 	return s.say(ctx, taskReadName, name, f)
 }
 

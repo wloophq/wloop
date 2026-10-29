@@ -45,6 +45,31 @@ func (s *Server) replies(v task.Verb) bool {
 	return s.loaded().Tasks.Handler(string(v)) == handlerReply
 }
 
+// replySend is what a reply of verb v does when it names no send, as the profile says, "draft" by default;
+// "" for a verb whose handler is not reply.
+func (s *Server) replySend(v string) string {
+	if !s.replies(task.Verb(v)) {
+		return ""
+	}
+	return cmp.Or(s.loaded().Tasks.Verbs[v].Send, sendDraft)
+}
+
+// The reply sends: sendNow sends a reply at once, sendDraft holds it for approval.
+const (
+	sendNow   = "now"
+	sendDraft = "draft"
+)
+
+// replyVerb is the profile's verb whose handler is reply, "" when none is.
+func (s *Server) replyVerb() string {
+	for _, v := range builtin.TaskVerbs {
+		if s.replies(task.Verb(v)) {
+			return v
+		}
+	}
+	return ""
+}
+
 // runReply holds the reply the task's args carry as a user draft on its first unit, for the task and its
 // items there; send "now" approves it at once and "draft" holds it, and with no send the verb's profile
 // send says which.
@@ -53,7 +78,7 @@ func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretas
 		writeTasksError(w, fmt.Errorf("%w: %s", coretasks.ErrVerb, why))
 		return
 	}
-	send, err := sendArg(cmp.Or(req.Args["send"], s.loaded().Tasks.Verbs[string(v)].Send))
+	send, err := sendArg(cmp.Or(req.Args["send"], s.replySend(string(v))))
 	if err != nil {
 		writeTasksError(w, err)
 		return
