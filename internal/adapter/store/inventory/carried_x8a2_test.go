@@ -52,6 +52,9 @@ func TestTheHostKeepsNoCopyOfGitHubsRows(t *testing.T) {
 		if loc := hostCopyWrites.FindIndex(raw); loc != nil {
 			t.Errorf("%s writes %q: the host keeps no copy of the GitHub plugin's rows", path, raw[loc[0]:loc[1]])
 		}
+		if strings.Contains(string(raw), `"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"`) {
+			t.Errorf("%s imports inventorytest, which writes the version 6 tables for tests only", path)
+		}
 		return nil
 	})
 	if err != nil {

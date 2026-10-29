@@ -191,3 +191,22 @@ func TestAUserOverridesAWorkflowOfAPluginsLayer(t *testing.T) {
 		t.Fatalf("slack-closure %+v", l.Workflows)
 	}
 }
+
+func TestAUserOverridesAnIntentOfAPluginsLayer(t *testing.T) {
+	plugin, user := t.TempDir(), t.TempDir()
+	writeIntent(t, plugin, "greet", minimal, "{{.Headline}}")
+	writeFile(t, filepath.Join(user, "intents", "greet", "instructions.md.tmpl"), "mine")
+	layers := []profile.Layer{
+		{Name: "bundled", Source: "embedded"},
+		{Name: profile.PluginLayer("acme"), Source: plugin, Dir: plugin},
+		userLayer(user)[1],
+	}
+	l, problems := Load(layers, fstest.MapFS{DefaultsFile: {Data: []byte(testDefaults)}}, testBase(), nil)
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	d, ok := l.Registry.Get("greet")
+	if !ok || !d.Bundled || d.Summary != "Ask the author one question" || d.Source.Layer != "user" || !slices.Equal(d.Source.Overrides, []string{"instructions.md.tmpl"}) {
+		t.Fatalf("%+v", d)
+	}
+}
