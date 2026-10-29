@@ -505,6 +505,10 @@
             "then": {
               "additionalProperties": false,
               "properties": {
+                "by": {
+                  "description": "With a verb whose handler is promise, the time the task is promised by: HH:MM, YYYY-MM-DD or RFC 3339; empty clears it.",
+                  "type": "string"
+                },
                 "on": {
                   "description": "With a verb whose handler is waiting, the people the task waits on, comma-separated.",
                   "type": "string"

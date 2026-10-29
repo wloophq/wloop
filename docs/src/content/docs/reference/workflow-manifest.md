@@ -120,6 +120,7 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `task.verb` | `on` | string |  | With a verb whose handler is waiting, the people the task waits on, comma-separated. |
 | `task.verb` | `resurface` | string |  | With a verb whose handler is waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD. |
 | `task.verb` | `set` | string |  | With a verb whose handler is context, the contexts, comma-separated; with area, the area. |
+| `task.verb` | `by` | string |  | With a verb whose handler is promise, the time the task is promised by: HH:MM, YYYY-MM-DD or RFC 3339; empty clears it. |
 | `gate.open` | `name` | string |  | The gate, of gates.toml, the step opens. Required. |
 | `task.set` | `prop` | string |  | The property, of tasks.toml, the step sets. Required. |
 | `task.set` | `value` | string |  | The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD or as a duration after now such as +2d, a duration, a list comma-separated. Required. |

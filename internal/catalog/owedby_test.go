@@ -27,9 +27,13 @@ func TestOwedByIsTheProfilesExpression(t *testing.T) {
 		"an item that waits on me": {workflow.Facts{"task.category": "inbox", "task.link_owes": []string{"slack:U0ANA", "me"}}, "me"},
 		"the items' owers":         {workflow.Facts{"task.category": "waiting", "task.link_owes": []string{"slack:U0ANA", "slack:U0BRUNO"}}, "slack:U0ANA"},
 		"the owner":                {workflow.Facts{"task.category": "waiting", "task.link_owes": []string{}, "task.prop.owner": "slack:U0BRUNO"}, "slack:U0BRUNO"},
-		"nobody named":             {workflow.Facts{"task.category": "ready", "task.link_owes": []string{}}, "me"},
-		"a done task":              {workflow.Facts{"task.category": "done", "task.link_owes": []string{"me"}}, ""},
-		"a done task's open gate":  {workflow.Facts{"task.category": "done", "task.gates_open": 1}, "me"},
+		"the owner a person handed it to, over an item that waits on me": {workflow.Facts{"task.category": "waiting", "task.link_owes": []string{"me"},
+			"task.prop.owner": "slack:U0BRUNO", "task.prop_by.owner": "person"}, "slack:U0BRUNO"},
+		"an owner no person set, under an item that waits on me": {workflow.Facts{"task.category": "waiting", "task.link_owes": []string{"me"},
+			"task.prop.owner": "slack:U0BRUNO", "task.prop_by.owner": "plugin"}, "me"},
+		"nobody named":            {workflow.Facts{"task.category": "ready", "task.link_owes": []string{}}, "me"},
+		"a done task":             {workflow.Facts{"task.category": "done", "task.link_owes": []string{"me"}}, ""},
+		"a done task's open gate": {workflow.Facts{"task.category": "done", "task.gates_open": 1}, "me"},
 	} {
 		if got, err := owed(ctx, c.f); err != nil || got != c.want {
 			t.Errorf("%s: owed by %q, %v; want %q", name, got, err, c.want)

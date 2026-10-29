@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/gates"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
@@ -33,6 +34,8 @@ type triageRig struct {
 func newTriageRig(t *testing.T) *triageRig {
 	t.Helper()
 	r := newTaskRig(t, nil)
+	r.te.tasksMe = &identity{}
+	r.te.tasksMe.set(task.Me{Keys: []string{"slack:U000ME"}})
 	r.te.newGates(r.db, t.Logf)
 	mods := []pluginModule{{ID: slackPlugin, Publisher: okEffects{}, Reacts: true}}
 	r.te.serveOutbox(daemon.Deps{}, r.db, r.te.cfg, mods, t.Logf)
@@ -45,7 +48,7 @@ func newTriageRig(t *testing.T) *triageRig {
 	return tr
 }
 
-// ask stores task id in the Inbox, holding Ana's ask on a Slack thread of its own.
+// ask stores task id in the Inbox, holding Ana's ask to you on a Slack thread of its own.
 func (r *triageRig) ask(t *testing.T, id task.ID, ts string) unit.Unit {
 	t.Helper()
 	ctx := context.Background()
@@ -234,5 +237,47 @@ func TestStartOpeningAPROpensReviewTheDiff(t *testing.T) {
 	sweep()
 	if gs := reviews(); len(gs) != 1 {
 		t.Fatalf("the review of the same pull request opened again: %+v", gs)
+	}
+}
+
+func TestHandToOnAnAskToYouWaitsOnThatPersonThenChasesThem(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newTriageRig(t)
+	r.ask(t, "t-1", "1.1")
+
+	r.verb(t, "t-1", "hand-to", map[string]string{"on": "slack:U000BRUNO"})
+	r.sweep(t)
+
+	views := func() (string, []string) {
+		t.Helper()
+		got, err := r.db.Tasks().Task(ctx, "t-1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		f, err := r.te.lens().Facts(ctx, got)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var in []string
+		for _, v := range []string{"needs-me", "waiting", "chase"} {
+			ok, err := catalog.ViewAt(r.te.loadedIntents().Views, v, got, f, r.te.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if ok {
+				in = append(in, v)
+			}
+		}
+		owed, _ := f["task.owed_by"].(string)
+		return owed, in
+	}
+	if owed, in := views(); owed != "slack:U000BRUNO" || !slices.Equal(in, []string{"waiting"}) {
+		t.Fatalf("handed to Bruno: owed by %q, in %v; want Bruno's, in waiting", owed, in)
+	}
+
+	r.te.Now = func() time.Time { return testNow.Add(7 * 24 * time.Hour) }
+	if owed, in := views(); owed != "slack:U000BRUNO" || !slices.Equal(in, []string{"waiting", "chase"}) {
+		t.Errorf("past its check date: owed by %q, in %v; want Bruno's, in waiting and chase", owed, in)
 	}
 }
