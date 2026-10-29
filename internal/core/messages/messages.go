@@ -851,8 +851,9 @@ func (s *Service) Reanswer(ctx context.Context, id int64, a Answer) (turns.Answe
 
 // Decide is a resolved proposal gate's consequence: an item proposal is accepted when the gate is approved
 // and rejected otherwise, a workflow's or core rule's goes to OnAnswer, and its message closes. A ledger
-// proposal is decided under the lock ReconcileProposals holds, which would close its message unanswered; one
-// whose operations the ledger refuses stays open on a new gate, and Decide returns ErrNotApplied.
+// proposal is decided under the lock ReconcileProposals holds, even when the reconcile already closed its
+// message as its gate decided; one whose operations the ledger refuses stays open on a new gate, and Decide
+// returns ErrNotApplied.
 func (s *Service) Decide(ctx context.Context, g gate.Gate) error {
 	approved := g.Status == gate.Approved
 	if id, ok := proposalOf(g.Subject); ok {
@@ -866,6 +867,11 @@ func (s *Service) Decide(ctx context.Context, g gate.Gate) error {
 		return s.notApplied(ctx, gate.Gate{Kind: gate.KindProposal, Unit: g.Unit, Task: g.Task, Subject: g.Subject}, res)
 	}
 	m, err := s.subject(ctx, g)
+	if errors.Is(err, ErrClosed) {
+		if lm, ok := s.ledgerMessage(ctx, g); ok {
+			m, err = lm, nil
+		}
+	}
 	if err != nil {
 		return err
 	}
@@ -905,7 +911,25 @@ func (s *Service) decideLedger(ctx context.Context, m message.Message, approved 
 	if len(res.Refused) > 0 {
 		return res, nil
 	}
+	if cur, ok, err := s.Store.Message(ctx, m.ID); err != nil || !ok || !cur.Open() {
+		return res, err
+	}
 	return res, s.close(ctx, m, intent)
+}
+
+// ledgerMessage is the ledger proposal's message g is the gate of when ReconcileProposals closed it: g's
+// status is written before its consequence runs, and the proposal reads decided from it, so the reconcile can
+// close the message first; deciding the ledger is still the consequence's.
+func (s *Service) ledgerMessage(ctx context.Context, g gate.Gate) (message.Message, bool) {
+	id, err := strconv.ParseInt(g.Subject, 10, 64)
+	if err != nil {
+		return message.Message{}, false
+	}
+	m, ok, err := s.Store.Message(ctx, id)
+	if err != nil || !ok || m.Kind != message.Proposal || m.Origin.Kind != message.OriginLedger {
+		return message.Message{}, false
+	}
+	return m, true
 }
 
 // ErrNotApplied is an approved proposal whose operations the ledger refused: it stays open, on a new gate.

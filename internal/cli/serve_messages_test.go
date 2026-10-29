@@ -360,3 +360,73 @@ func ps(t *testing.T, ledger *coreitems.Ledger) []coreitems.Proposal {
 	}
 	return open
 }
+
+// reconcilingFirst reconciles the proposals before each consequence, as the messages worker can between a
+// gate's status write and its consequence.
+type reconcilingFirst struct{ messageConsequences }
+
+func (c reconcilingFirst) Decide(ctx context.Context, g gate.Gate) error {
+	if err := c.m.ReconcileProposals(ctx); err != nil {
+		return err
+	}
+	return c.messageConsequences.Decide(ctx, g)
+}
+
+func TestAProposalDecidedWhileTheProposalsReconcileStaysDecided(t *testing.T) {
+	for _, c := range []struct {
+		intent string
+		state  coreitems.ProposalState
+	}{{"approve", coreitems.ProposalAccepted}, {"reject", coreitems.ProposalRejected}} {
+		t.Run(c.intent, func(t *testing.T) {
+			t.Parallel()
+			log := change.NewLog(change.DefaultWindow, t.Logf)
+			db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), log)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { db.Close() })
+			te := newTestEnv(t, &fake.Manager{})
+			d := servedMessages(t, te, db, log)
+			te.Env.consequences = reconcilingFirst{messageConsequences{d.Messages}}
+			ledger := te.Env.itemsLedger(db, te.cfg, t.Logf)
+			ctx := context.Background()
+			u := ghUnit(7)
+			kind, summary, changed := items.Todo, "ship the fix", "ship the fix today"
+			anchor := unit.Anchor{Unit: u, Ref: "turn:1"}
+			if _, err := ledger.Apply(ctx, items.User, []items.Op{{Op: items.OpCreate, Unit: u, Item: "i1", Anchor: anchor, Fields: &items.Fields{Kind: &kind, Summary: &summary}}}); err != nil {
+				t.Fatal(err)
+			}
+			if res, err := ledger.Apply(ctx, items.Extracted, []items.Op{{Op: items.OpUpdate, Unit: u, Item: "i1", Anchor: anchor, Fields: &items.Fields{Summary: &changed}}}); err != nil || len(res.Proposed) != 1 {
+				t.Fatalf("%+v %v", res, err)
+			}
+			m := waitOpen(t, d, func(ms []message.Message) bool { return len(ms) == 1 && ms[0].TaskID != "" })[0]
+			gs, err := d.GateReader.Where(ctx, gates.Query{Kind: gate.KindProposal, Unit: u})
+			if err != nil || len(gs) != 1 {
+				t.Fatalf("gates %+v %v", gs, err)
+			}
+			if err := d.Gates.Resolve(ctx, gs[0].ID, gates.Resolution{Intent: c.intent, By: task.ActorPerson}); err != nil {
+				t.Fatal(err)
+			}
+			if got, _, _ := d.Messages.Store.Message(ctx, m.ID); got.Open() {
+				t.Fatalf("message %+v", got)
+			}
+			if ps, _ := ledger.Proposals(ctx, c.state); len(ps) != 1 {
+				all, _ := ledger.Proposals(ctx, "")
+				t.Fatalf("%s proposals %+v of %+v", c.state, ps, all)
+			}
+			want := map[string]string{"approve": changed, "reject": summary}[c.intent]
+			if its, err := ledger.Items(ctx, u); err != nil || len(its) != 1 || its[0].Summary != want {
+				t.Fatalf("items %+v %v, want the summary %q", its, err, want)
+			}
+			if err := d.Messages.ReconcileProposals(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if open, _ := d.Messages.Store.Open(ctx); len(open) != 0 {
+				t.Fatalf("the decided proposal is asked again: %+v", open)
+			}
+			if open, _ := d.GateReader.Where(ctx, gates.Query{Kind: gate.KindProposal, Unit: u}); len(open) != 0 {
+				t.Fatalf("open gates %+v", open)
+			}
+		})
+	}
+}
