@@ -2,9 +2,12 @@ package e2e
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -90,6 +93,7 @@ func TestIsolatedDaemonRunsThePlugins(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw = []byte(strings.Replace(string(raw), `"`+e2eKeychain+`"`, fmt.Sprintf(`"keychain-test-%d"`, time.Now().UnixNano()), 1))
+	raw = withFreePorts(t, raw)
 	if err := os.WriteFile(file, raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -117,6 +121,31 @@ func TestIsolatedDaemonRunsThePlugins(t *testing.T) {
 			t.Errorf("%s opened no store of its own: %v", id, err)
 		}
 	}
+}
+
+// withFreePorts points the isolated config's HTTP and MCP ports at ports
+// free now: another isolated daemon on this machine may hold its index's.
+func withFreePorts(t *testing.T, config []byte) []byte {
+	t.Helper()
+	n := 0
+	out := regexp.MustCompile(`(?m)^port = \d+$`).ReplaceAllStringFunc(string(config), func(string) string {
+		n++
+		return "port = " + strconv.Itoa(freePort(t))
+	})
+	if n != 2 {
+		t.Fatalf("the isolated config has %d ports, want the HTTP and the MCP one:\n%s", n, config)
+	}
+	return []byte(out)
+}
+
+func freePort(t *testing.T) int {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port
 }
 
 func containsAll(s string, parts []string) bool {
@@ -169,6 +198,7 @@ func TestASnapshotsPluginsImportAndReport(t *testing.T) {
 	}
 	// The e2e Keychain item may hold a live token; the daemon here reads one no machine has.
 	raw = []byte(strings.Replace(string(raw), `"`+e2eKeychain+`"`, fmt.Sprintf(`"keychain-test-%d"`, time.Now().UnixNano()), 1))
+	raw = withFreePorts(t, raw)
 	if err := os.WriteFile(file, raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
