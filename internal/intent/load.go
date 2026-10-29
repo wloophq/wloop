@@ -98,8 +98,8 @@ type Loaded struct {
 	Actions map[string]BuiltinAction
 	// Tools are the MCP tools' texts from tools.toml, by tool name.
 	Tools map[string]ToolText
-	// Lists are the views' texts from views.toml.
-	Lists ListTexts
+	// Views are the views, the review and the badge of views.toml.
+	Views ViewsDef
 	// Tasks are the task properties, states and verbs of tasks.toml.
 	Tasks TasksDef
 	// Gates are the gates of gates.toml.
@@ -185,7 +185,7 @@ func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	reverted := brokenOverlays{}
 	partials := revertedPartials{}
 	gates, gateProblems := loadGates(layers, bundled)
-	listTexts, tasks, listProblems := loadLists(layers, bundled, &gates)
+	views, tasks, listProblems := loadViews(layers, bundled, &gates)
 	records, recordProblems := loadRecords(layers, bundled, &tasks)
 	listProblems = append(listProblems, recordProblems...)
 	for {
@@ -200,7 +200,7 @@ func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 			keyTexts, keyProblems := loadKeys(layers, bundled)
 			notices, noticeProblems := loadNotices(layers, bundled)
 			ui, uiProblems := loadUI(layers)
-			l.Actions, l.Tools, l.Lists, l.Keys, l.Notices, l.Gates, l.UI = actions, tools, listTexts, keyTexts, notices, gates, ui
+			l.Actions, l.Tools, l.Views, l.Keys, l.Notices, l.Gates, l.UI = actions, tools, views, keyTexts, notices, gates, ui
 			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, listProblems, gateProblems, keyProblems, noticeProblems, uiProblems)
 			l.Reverted = map[dintent.Name]Problems{}
 			for n, r := range reverted {

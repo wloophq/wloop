@@ -52,16 +52,6 @@ func TestProjectsOf(t *testing.T) {
 			t.Errorf("%s: %+v, want %+v", id, got[id], w)
 		}
 	}
-	now := time.Now()
-	if !NeedsReview(seq, got["p-seq"], now) || NeedsReview(Task{ID: "x", Props: Props{PropKind: {Text: KindProject}}, Category: CategoryReady, Created: now}, ProjectStatus{Next: "a", Open: 1}, now) {
-		t.Error("a project without a next action needs review; one with a next action and not due does not")
-	}
-	if NeedsReview(Task{Props: Props{PropKind: {Text: KindProject}}, Category: CategoryDeferred, Created: now}, ProjectStatus{}, now) {
-		t.Error("a Someday project needs no next action")
-	}
-	if NeedsReview(Task{Props: Props{PropKind: {Text: KindProject}}, Category: CategoryDone}, ProjectStatus{}, now) {
-		t.Error("a done project is not reviewed")
-	}
 }
 
 func TestPlace(t *testing.T) {

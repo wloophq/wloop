@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -335,5 +336,40 @@ func TestUnitLabelFallsBackToTheUnitForEveryProvider(t *testing.T) {
   unitLabel({ provider: "github", key: "acme/api#7" }), unitLabel({ provider: "linear", key: "PAY-88" }), unitLabel(null)]));`, nil, &got)
 	if want := []string{"github:acme/api#7", "linear:PAY-88", ""}; !slices.Equal(got, want) {
 		t.Fatalf("labels %q, want %q", got, want)
+	}
+}
+
+// TestAViewSaysWhichPluginsAreStillLoading checks that a list of tasks shows the page's loading plugins with
+// their reasons, and a stale row its mark.
+func TestAViewSaysWhichPluginsAreStillLoading(t *testing.T) {
+	var got []string
+	nodeRun(t, viewsPrelude(t), nil, `
+function writeHash() {}
+tasksState.catalog = input.cat;
+applyTasksPage(viewQueryKey("inbox", "", []), input.page);
+process.stdout.write(JSON.stringify(byClass(h("div", {}, ...taskList({ view: "inbox", area: "", ctx: [], q: "" }, "")), "loading").map(text)));`,
+		map[string]any{"cat": api.ViewsCatalog{Views: []api.TaskViewSpec{{ID: "inbox", Label: "Inbox"}}},
+			"page": api.TasksPage{Epoch: "e", Rev: 1, Full: true, Tasks: []api.TaskView{}, Loading: []api.Loading{{Plugin: "slack", Reason: "importing threads"}}}}, &got)
+	if !slices.Equal(got, []string{"Loading slack: importing threads"}) {
+		t.Errorf("loading notes %q", got)
+	}
+}
+
+// TestATaskRowReadsItsPropertiesByRole checks that a row shows the star, the contexts, the area and the
+// deadline of the properties the catalog gives those roles, whatever their names.
+func TestATaskRowReadsItsPropertiesByRole(t *testing.T) {
+	var got string
+	nodeRun(t, viewsPrelude(t), nil, `
+function writeHash() {}
+tasksState.catalog = input.cat;
+process.stdout.write(JSON.stringify(text(taskItem(input.task, ""))));`,
+		map[string]any{"cat": api.ViewsCatalog{Props: []api.PropSpec{{Name: "pin", Type: "enum", Values: []string{"yes", "no"}, Role: "star"},
+			{Name: "where", Type: "string[]", Role: "contexts"}, {Name: "team", Type: "string", Role: "area"}}},
+			"task": task("e-1", "next", func(e *api.TaskView) {
+				e.Props = map[string]json.RawMessage{"pin": json.RawMessage(`"yes"`), "where": json.RawMessage(`["@calls"]`), "team": json.RawMessage(`"OSS"`),
+					"focus": json.RawMessage(`"on"`), "area": json.RawMessage(`"Hiring"`)}
+			})}, &got)
+	if !strings.Contains(got, "★") || !strings.Contains(got, "@calls") || !strings.Contains(got, "OSS") || strings.Contains(got, "Hiring") {
+		t.Errorf("row %q", got)
 	}
 }

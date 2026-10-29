@@ -426,7 +426,7 @@ var reads = []string{
 	"Classifications.Output", "Classifications.Spent",
 	"Fetches.Last",
 	"DB.AgentTranscript", "DB.WorkflowActivity",
-	"DB.Tasks", "taskStore.Tasks", "taskStore.TasksSince", "taskStore.Task", "taskStore.TasksOf", "taskStore.Counts", "DB.Props",
+	"DB.Tasks", "taskStore.Tasks", "taskStore.TasksSince", "taskStore.Task", "taskStore.TasksOf", "DB.Props",
 	"DB.Gates", "GateStore.Get", "GateStore.OfTask", "GateStore.Where", "GateStore.Due",
 	"DB.Wakes", "WakeStore.Of", "WakeStore.Due", "WakeStore.Watching", "WakeStore.UnitWakes",
 }

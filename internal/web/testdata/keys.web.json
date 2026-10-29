@@ -314,13 +314,6 @@
       "help": "area 9"
     },
     {
-      "key": "g f",
-      "action": "nav:focus",
-      "context": "global",
-      "owner": "core",
-      "help": "Focus"
-    },
-    {
       "key": "g i",
       "action": "nav:inbox",
       "context": "global",
@@ -328,18 +321,11 @@
       "help": "Inbox"
     },
     {
-      "key": "g o",
-      "action": "nav:outbox",
+      "key": "g m",
+      "action": "nav:needs-me",
       "context": "global",
       "owner": "core",
-      "help": "Outbox"
-    },
-    {
-      "key": "g n",
-      "action": "nav:next",
-      "context": "global",
-      "owner": "core",
-      "help": "Next"
+      "help": "Needs me"
     },
     {
       "key": "g w",
@@ -349,11 +335,32 @@
       "help": "Waiting"
     },
     {
+      "key": "g z",
+      "action": "nav:snoozed",
+      "context": "global",
+      "owner": "core",
+      "help": "Snoozed"
+    },
+    {
+      "key": "g f",
+      "action": "nav:focus",
+      "context": "global",
+      "owner": "core",
+      "help": "Focus"
+    },
+    {
       "key": "g p",
       "action": "nav:projects",
       "context": "global",
       "owner": "core",
       "help": "Projects"
+    },
+    {
+      "key": "g o",
+      "action": "nav:outbox",
+      "context": "global",
+      "owner": "core",
+      "help": "Outbox"
     },
     {
       "key": "g r",

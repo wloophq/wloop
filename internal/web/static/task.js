@@ -67,7 +67,7 @@ function taskLinks(e) {
 function taskHeader(e) {
   return h("header", { class: "d-head" },
     h("button", { type: "button", class: "close", "aria-label": "Close detail", "data-focus": "detail:close", onclick: () => detailEnv.close() }, "×"),
-    h("h1", {}, (e.props || {}).focus === "on" ? h("span", { class: "star" }, "★ ") : null, e.title || e.id),
+    h("h1", {}, starred(e) ? h("span", { class: "star" }, "★ ") : null, e.title || e.id),
     h("div", { class: "meta" },
       h("span", { class: "pill state", "data-category": e.category || "" }, stateLabel(e.state)),
       e.changed ? [" ", h("span", { class: "flag" }, "changed")] : null,

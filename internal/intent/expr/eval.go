@@ -117,7 +117,10 @@ func zero(t Type) any {
 
 const nowVar = "now"
 
-type predicate struct{ p *Program }
+type predicate struct {
+	p   *Program
+	now bool
+}
 
 // CompileWorkflow compiles a workflow's `when` over env (one unit slot,
 // trigger.* and config.*) plus now, the evaluation's time.
@@ -137,8 +140,16 @@ func CompileWorkflow(src string, env Env) (workflow.Predicate, error) {
 			reads = append(reads, r)
 		}
 	}
+	now := len(reads) < len(p.reads)
 	p.reads = reads
-	return predicate{p}, nil
+	return predicate{p, now}, nil
+}
+
+// ReadsNow says whether p, a CompileWorkflow predicate, reads now, so its
+// value can change as time passes with no fact changing.
+func ReadsNow(p workflow.Predicate) bool {
+	w, ok := p.(predicate)
+	return ok && w.now
 }
 
 func (w predicate) Reads() []string { return w.p.reads }

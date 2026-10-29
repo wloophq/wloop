@@ -143,8 +143,8 @@ func TestItemDeadlineParses(t *testing.T) {
 	}
 	for in, want := range cases {
 		its := []items.Item{item("a", func(it *items.Item) { it.Deadline = in })}
-		if e := only(t, reconcile(t, facts(), its, nil, now)); !e.Due().Equal(want) {
-			t.Errorf("%q: deadline %v, want %v", in, e.Due(), want)
+		if e := only(t, reconcile(t, facts(), its, nil, now)); !e.Prop("due").Time.Equal(want) {
+			t.Errorf("%q: deadline %v, want %v", in, e.Prop("due").Time, want)
 		}
 	}
 }

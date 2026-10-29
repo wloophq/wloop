@@ -43,9 +43,9 @@ func ProjectsContract(t *testing.T, open func(t *testing.T) (coretasks.Store, co
 		if got, _ := s.Task(ctx, p.ID); !got.ReviewedAt.Equal(t0) {
 			t.Errorf("reviewed at %v, want %v", got.ReviewedAt, t0)
 		}
-		ps, err := s.Tasks(ctx, task.Query{View: task.ViewProjects})
+		ps, err := s.Tasks(ctx, task.Query{})
 		if err != nil || len(ps) != 1 || ps[0].ID != p.ID || ps[0].ReviewEvery != 14*24*time.Hour {
-			t.Errorf("projects view %+v, %v", ps, err)
+			t.Errorf("open tasks %+v, %v", ps, err)
 		}
 	})
 

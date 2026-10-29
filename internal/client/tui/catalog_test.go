@@ -13,7 +13,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand/brandtest"
-	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/keys"
 )
 
@@ -120,13 +119,14 @@ func servedKeys(specs api.ActionsResponse) []api.KeyView {
 			out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: help.Help(string(b.Context), b.Action)})
 		}
 	}
-	lists, _ := intentload.BundledLists(os.DirFS("../../../profiles/default"))
+	def, _ := intentload.BundledViews(os.DirFS("../../../profiles/default"))
 	var views []keys.View
-	for _, id := range builtin.Views {
-		views = append(views, keys.View{ID: id, Key: lists.Keys[id]})
+	for _, v := range def.Views {
+		views = append(views, keys.View{ID: v.ID, Key: v.Key})
 	}
 	for _, b := range keys.Views(views) {
-		out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: lists.Views[strings.TrimPrefix(b.Action, "nav:")]})
+		v, _ := def.View(strings.TrimPrefix(b.Action, "nav:"))
+		out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: v.Label})
 	}
 	for _, b := range keys.Views([]keys.View{{ID: "github", Key: "g g"}}) {
 		out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "github", Help: "GitHub"})

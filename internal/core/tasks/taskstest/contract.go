@@ -39,7 +39,7 @@ func Full(id task.ID) task.Task {
 
 func position(t *testing.T, s coretasks.Store) coretasks.Since {
 	t.Helper()
-	p, err := s.TasksSince(context.Background(), task.Query{View: task.ViewInbox}, coretasks.Since{})
+	p, err := s.TasksSince(context.Background(), task.Query{}, coretasks.Since{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,98 +102,53 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 			t.Fatalf("position %+v, want %+v", after, before)
 		}
 	})
-	t.Run("EntriesSince", func(t *testing.T) {
+	t.Run("TasksSince", func(t *testing.T) {
 		s := open(t)
 		a := task.Task{ID: "e-a", State: InState("inbox"), Category: task.CategoryInbox, Title: "a", Origin: task.OriginUser, Created: t0, Updated: t0}
 		b, c := a, a
 		b.ID, b.Title, b.Created = "e-b", "b", t0.Add(time.Second)
-		c.ID, c.Title, c.State, c.Category = "e-c", "c", InState("next"), task.CategoryReady
+		c.ID, c.Title, c.State, c.Category = "e-c", "c", InState("done"), task.CategoryDone
 		apply(t, s, a, b, c)
-		q := task.Query{View: task.ViewInbox}
+		q := task.Query{}
 		first, err := s.TasksSince(ctx, q, coretasks.Since{})
-		if err != nil || !first.Full || !slices.Equal(ids(first.Tasks), []task.ID{"e-a", "e-b"}) || first.Counters.Views[task.ViewInbox] != 2 {
+		if err != nil || !first.Full || !slices.Equal(ids(first.Tasks), []task.ID{"e-a", "e-b"}) {
 			t.Fatalf("first page %+v %v", first, err)
 		}
-		a.Title, b.State, b.Category = "a2", InState("next"), task.CategoryReady
+		a.Title, b.State, b.Category = "a2", InState("done"), task.CategoryDone
 		apply(t, s, a, b)
 		page, err := s.TasksSince(ctx, q, coretasks.Since{Epoch: first.Epoch, Rev: first.Rev})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if page.Full || !slices.Equal(ids(page.Tasks), []task.ID{"e-a"}) || page.Tasks[0].Title != "a2" ||
-			!slices.Equal(page.Removed, []task.ID{"e-b"}) || page.Rev <= first.Rev || page.Counters.Views[task.ViewInbox] != 1 {
+		if page.Full || !slices.Equal(ids(page.Tasks), []task.ID{"e-a", "e-b"}) || page.Tasks[0].Title != "a2" || len(page.Removed) != 0 || page.Rev <= first.Rev {
 			t.Fatalf("page %+v", page)
 		}
-		if again, err := s.TasksSince(ctx, q, coretasks.Since{Epoch: page.Epoch, Rev: page.Rev}); err != nil || again.Full || len(again.Tasks)+len(again.Removed) != 0 {
+		if again, err := s.TasksSince(ctx, q, coretasks.Since{Epoch: page.Epoch, Rev: page.Rev}); err != nil || again.Full || len(again.Tasks) != 0 {
 			t.Fatalf("a page at the head %+v %v", again, err)
 		}
-		if p, err := s.TasksSince(ctx, q, coretasks.Since{Epoch: "other", Rev: page.Rev}); err != nil || !p.Full || !slices.Equal(ids(p.Tasks), []task.ID{"e-a"}) {
+		if p, err := s.TasksSince(ctx, task.Query{All: true}, coretasks.Since{Epoch: "other", Rev: page.Rev}); err != nil || !p.Full || !slices.Equal(ids(p.Tasks), []task.ID{"e-a", "e-c", "e-b"}) {
 			t.Fatalf("another epoch %+v %v", p, err)
 		}
 	})
-	t.Run("ViewPredicates", func(t *testing.T) {
+	t.Run("OpenOrAll", func(t *testing.T) {
 		s := open(t)
 		var all []task.Task
-		n := 0
-		for _, st := range states {
-			for _, area := range []string{"", "OSS"} {
-				for _, kind := range []string{"", task.KindProject} {
-					n++
-					e := task.Task{ID: task.ID("e-" + st.name + "-" + area + "-" + kind), State: task.State(st.name),
-						Category: st.c, Origin: task.OriginUser,
-						Created: t0.Add(time.Duration(n) * time.Second), Updated: t0.Add(time.Duration(n) * time.Second)}
-					e.SetProp(task.PropArea, task.Value{Text: area}, task.WriterPerson, t0)
-					e.SetProp(task.PropKind, task.Value{Text: kind}, task.WriterWorkflow, t0)
-					e.SetProp(task.PropContexts, task.Value{List: []string{"@reply"}}, task.WriterPerson, t0)
-					if n%3 == 0 {
-						e.SetProp(task.PropFocus, task.Value{Text: task.FocusOn}, task.WriterPerson, t0)
-					}
-					if kind == task.KindProject && n%2 == 0 {
-						e.Sequential = true
-					}
-					all = append(all, e)
-				}
-			}
-		}
-		for i := range 3 {
-			all = append(all, task.Task{ID: task.ID("e-step-" + string(rune('a'+i))), State: InState("next"), Category: task.CategoryReady,
-				Parent: "e-next--project", Position: 3 - i, Origin: task.OriginUser, Created: t0.Add(time.Duration(100+i) * time.Second), Updated: t0})
-		}
-		for i := range all {
-			if all[i].ID == "e-next--project" {
-				all[i].Sequential = true
-			}
-		}
-		if got := task.Select(all, task.Query{View: task.ViewNext}); !slices.Contains(ids(got), "e-step-c") || slices.Contains(ids(got), "e-step-a") {
-			t.Fatalf("the fixture's sequential project shows %v", ids(got))
+		for i, st := range states {
+			all = append(all, task.Task{ID: task.ID("e-" + st.name), State: task.State(st.name), Category: st.c, Origin: task.OriginUser,
+				Created: t0.Add(time.Duration(i) * time.Second), Updated: t0})
 		}
 		apply(t, s, all...)
-		for _, v := range task.StoredViews {
-			for _, area := range []string{"", "OSS"} {
-				q := task.Query{View: v, Area: area}
-				got, err := s.Tasks(ctx, q)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if want := task.Select(all, q); !slices.Equal(ids(got), ids(want)) {
-					t.Errorf("%s in %q: %v, want %v", v, area, ids(got), ids(want))
-				}
+		var open []task.ID
+		for _, e := range all {
+			if e.Open() {
+				open = append(open, e.ID)
 			}
 		}
-		for _, area := range []string{"", "OSS"} {
-			c, err := s.Counts(ctx, area)
-			if err != nil {
-				t.Fatal(err)
-			}
-			want := task.CountsOf(all, area)
-			for _, v := range task.StoredViews {
-				if c.Views[v] != want.Views[v] {
-					t.Errorf("count of %s in %q: %d, want %d", v, area, c.Views[v], want.Views[v])
-				}
-			}
-			if c.Badge != want.Badge {
-				t.Errorf("badge in %q: %d, want %d", area, c.Badge, want.Badge)
-			}
+		if got, err := s.Tasks(ctx, task.Query{}); err != nil || !slices.Equal(ids(got), open) {
+			t.Errorf("open: %v %v, want %v", ids(got), err, open)
+		}
+		if got, err := s.Tasks(ctx, task.Query{All: true}); err != nil || !slices.Equal(ids(got), ids(all)) {
+			t.Errorf("all: %v %v, want %v", ids(got), err, ids(all))
 		}
 	})
 }

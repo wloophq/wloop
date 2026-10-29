@@ -18,7 +18,7 @@ func (s *Server) handleReview(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !g.Serves(task.ViewReview) {
+	if !g.ServesReview() {
 		writeError(w, http.StatusNotFound, "the review is not served")
 		return
 	}
@@ -35,7 +35,7 @@ func (s *Server) handleReviewStepDone(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !g.Serves(task.ViewReview) {
+	if !g.ServesReview() {
 		writeError(w, http.StatusNotFound, "the review is not served")
 		return
 	}
@@ -48,11 +48,14 @@ func (s *Server) handleReviewStepDone(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) wireReview(rv coretasks.Review) api.Review {
-	texts, bundled := s.loaded().Lists, bundledWords().lists
+	labels := map[string]string{}
+	for _, st := range s.loaded().Views.Review {
+		labels[st.View] = st.Label
+	}
 	out := api.Review{ID: rv.ID, StartedAt: rv.StartedAt, Done: rv.Done, Steps: []api.ReviewStep{}}
 	for _, st := range rv.Steps {
-		label := cmp.Or(texts.Review[st.ID], bundled.Review[st.ID], st.ID)
-		out.Steps = append(out.Steps, api.ReviewStep{ID: st.ID, Label: label, View: string(st.View),
+		label := cmp.Or(labels[string(st.View)], string(st.View))
+		out.Steps = append(out.Steps, api.ReviewStep{ID: string(st.View), Label: label, View: string(st.View),
 			Query: map[string]string{"view": string(st.View)}, Count: st.Count, Done: st.Done})
 	}
 	return out

@@ -41,7 +41,8 @@ label    = "Trash"
 # The task properties, each the fact task.prop.<name>. Writers are who may
 # write one: a property an agent or a plugin writes is untrusted, so no
 # approval rule that releases a send or a run reads it. An int or a
-# duration of 0 means unset.
+# duration of 0 means unset. A role names the loop's mechanism that acts
+# on the property: the area and contexts filters, the star, the deadline.
 
 [props.priority]
 type    = "enum"
@@ -51,6 +52,7 @@ doc     = "How much the task matters next to the others."
 
 [props.due]
 type    = "date"
+role    = "deadline"
 writers = ["person", "plugin"]
 doc     = "When the task is due: the date you set, or the deadline its source derives."
 
@@ -94,17 +96,20 @@ doc     = "What the task is: new work, a capture, a project, or a kind a plugin 
 
 [props.area]
 type    = "string"
+role    = "area"
 writers = ["person"]
 doc     = "The area of your life or work the task belongs to; areas seeds the menu."
 
 [props.contexts]
 type    = "string[]"
+role    = "contexts"
 writers = ["person", "plugin"]
 doc     = "The contexts the task is listed under, such as @calls or @repo-api; contexts seeds the menu."
 
 [props.focus]
 type    = "enum"
 values  = ["on", "off"]
+role    = "star"
 writers = ["person", "workflow"]
 doc     = "Whether the task is starred in Focus."
 
@@ -126,14 +131,16 @@ doc     = "When to check on the task while it waits."
 
 # Who owes a task's next step: an expression over the task's facts whose
 # value is me, a person's key, or empty when nobody does; it is the fact
-# task.owed_by. Here an open gate makes it yours; otherwise an item that
-# waits on you; otherwise whoever its items wait on; otherwise its owner,
-# and you when it has none.
+# task.owed_by. Here an open gate makes it yours, even on a closed task;
+# otherwise nobody owes a closed task; otherwise an item that waits on
+# you; otherwise whoever its items wait on; otherwise its owner, and you
+# when it has none.
 
 [owed_by]
 expr = '''
+task.gates_open > 0 ? "me" :
 task.category in ["done", "dropped"] ? "" :
-task.gates_open > 0 || "me" in task.link_owes ? "me" :
+"me" in task.link_owes ? "me" :
 size(task.link_owes) > 0 ? task.link_owes[0] :
 task.prop.owner != "" ? task.prop.owner : "me"'''
 
@@ -186,6 +193,7 @@ to      = "someday"
 by      = { person = "true" }
 
 [verbs.reference]
+handler = "finish"
 label   = "Reference"
 summary = "Keep it as reference: nothing to do, worth finding again."
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "done"]
@@ -221,6 +229,7 @@ input   = "Guidance for the agent (optional)"
 by      = { person = "true" }
 
 [verbs.done]
+handler = "finish"
 label   = "Done"
 summary = "Mark it done: it leaves your lists for the Logbook."
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "reference"]
@@ -228,6 +237,7 @@ to      = "done"
 by      = { person = "true", workflow = "true" }
 
 [verbs.dismiss]
+handler = "drop"
 label   = "Dismiss"
 summary = "Throw it away: it goes to the trash, and a draft it carries is discarded."
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "reference", "done"]

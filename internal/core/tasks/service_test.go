@@ -65,13 +65,14 @@ type rig struct {
 	facts *fakeFacts
 	clock *clock
 	wakes *wakestest.Store
+	lens  *testLens
 }
 
 func newRig() *rig {
 	r := &rig{store: taskstest.New(), items: &fakeItems{byUnit: map[unit.Unit][]items.Item{}, reads: map[unit.Unit]int{}},
-		facts: &fakeFacts{facts: map[unit.Unit]task.UnitFacts{}, off: map[unit.ProviderID]bool{}}, clock: &clock{t0}, wakes: wakestest.NewStore()}
+		facts: &fakeFacts{facts: map[unit.Unit]task.UnitFacts{}, off: map[unit.ProviderID]bool{}}, clock: &clock{t0}, wakes: wakestest.NewStore(), lens: newTestLens()}
 	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates,
-		Authority: taskstest.BundledStates.Authority, Wakes: r.wakes})
+		Authority: taskstest.BundledStates.Authority, Wakes: r.wakes, Views: r.lens.Views, ViewEval: r.lens.Eval})
 	return r
 }
 
@@ -200,7 +201,7 @@ func TestFocusNeverMovesTheTask(t *testing.T) {
 		r.put(t, e)
 		for _, on := range []bool{true, false} {
 			res, err := r.svc.Do(context.Background(), id, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbFocus})
-			if err != nil || res.Task.State != s || res.Task.Starred() != on || res.Task.Written["focus"].By != task.WriterPerson {
+			if err != nil || res.Task.State != s || (res.Task.Prop("focus").Text == "on") != on || res.Task.Written["focus"].By != task.WriterPerson {
 				t.Fatalf("%s: %+v %v", s, res.Task, err)
 			}
 		}
@@ -252,7 +253,7 @@ func TestSyncRunsWakeInOneApplyAndLeavesFocusToTheProfile(t *testing.T) {
 	if r.store.Applies != 1 {
 		t.Fatalf("%d applies", r.store.Applies)
 	}
-	if e := r.task(t, "e-due"); e.Starred() {
+	if e := r.task(t, "e-due"); e.Prop("focus").Text == "on" {
 		t.Fatalf("due %+v", e)
 	}
 	if e := r.task(t, "e-wake"); e.Category != task.CategoryDeferred {
@@ -269,7 +270,7 @@ func TestDisabledPluginTasksStay(t *testing.T) {
 	es, _ := r.store.TasksOf(context.Background(), unitU)
 	e := es[0]
 	e.State, e.Category = "scheduled", task.CategoryDeferred
-	e.SetProp(task.PropDue, task.Value{Time: t0}, task.WriterPerson, t0)
+	e.SetProp("due", task.Value{Time: t0}, task.WriterPerson, t0)
 	r.put(t, e)
 	r.facts.off[unit.GitHub] = true
 	r.items.byUnit[unitU][0].State = "resolved"
@@ -290,8 +291,8 @@ func TestDisabledPluginTasksStay(t *testing.T) {
 	if got, err := r.svc.Task(context.Background(), e.ID); err != nil || !got.Same(e) {
 		t.Fatalf("the disabled plugin's entry is not readable: %+v %v", got, err)
 	}
-	if got, err := r.svc.Tasks(context.Background(), task.Query{View: task.ViewOpen}); err == nil || len(got) != 0 {
-		t.Fatalf("the open view is served: %v", err)
+	if got, err := r.svc.Tasks(context.Background(), task.Query{View: "open"}); err == nil || len(got) != 0 {
+		t.Fatalf("a view the profile does not list is served: %v", err)
 	}
 }
 
@@ -340,24 +341,22 @@ func (o outbox) Task(ctx context.Context, id task.ID) (task.Task, bool, error) {
 	return task.Task{}, false, nil
 }
 
-func (o outbox) Count(ctx context.Context, area string) (int, error) { return len(o.drafts), nil }
-
 func TestRegisteredViewSource(t *testing.T) {
 	ctx := context.Background()
 	r := newRig()
 	r.put(t, task.Task{ID: "e-in", State: "inbox", Category: task.CategoryInbox})
-	if es, err := r.svc.Tasks(ctx, task.Query{View: task.ViewOutbox}); err != nil || len(es) != 0 {
+	if es, err := r.svc.Tasks(ctx, task.Query{View: "drafts"}); err != nil || len(es) != 0 {
 		t.Fatalf("outbox without a source: %v %v", es, err)
 	}
-	if c, err := r.svc.Counts(ctx, ""); err != nil || c.Views[task.ViewOutbox] != 0 || c.Badge != 1 {
+	if c, err := r.svc.Counts(ctx, ""); err != nil || c.Views["drafts"] != 0 || c.Badge != 1 {
 		t.Fatalf("counts without a source: %+v %v", c, err)
 	}
 	if _, err := r.svc.Task(ctx, "draft:7"); !errors.Is(err, coretasks.ErrNoTask) {
 		t.Fatalf("a draft without a source: %v", err)
 	}
 	src := outbox{drafts: []task.Task{{ID: "draft:7", Origin: task.OriginDraft}, {ID: "draft:8"}}}
-	r.svc.RegisterView(task.ViewOutbox, "draft:", src)
-	if es, err := r.svc.Tasks(ctx, task.Query{View: task.ViewOutbox}); err != nil || len(es) != 2 {
+	r.svc.RegisterView(task.OverGates, "draft:", src)
+	if es, err := r.svc.Tasks(ctx, task.Query{View: "drafts"}); err != nil || len(es) != 2 {
 		t.Fatalf("outbox: %v %v", es, err)
 	}
 	if e, err := r.svc.Task(ctx, "draft:7"); err != nil || e.Origin != task.OriginDraft {
@@ -366,7 +365,7 @@ func TestRegisteredViewSource(t *testing.T) {
 	if _, err := r.svc.Task(ctx, "draft:9"); !errors.Is(err, coretasks.ErrNoTask) {
 		t.Fatalf("draft:9: %v", err)
 	}
-	if c, err := r.svc.Counts(ctx, ""); err != nil || c.Views[task.ViewOutbox] != 2 || c.Badge != 3 {
+	if c, err := r.svc.Counts(ctx, ""); err != nil || c.Views["drafts"] != 2 || c.Badge != 3 {
 		t.Fatalf("counts: %+v %v", c, err)
 	}
 	var ran []string
@@ -405,7 +404,7 @@ func TestRetitleUpdatesAnOpenedTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	before, _ := r.store.TasksSince(ctx, task.Query{View: task.ViewInbox}, coretasks.Since{})
+	before, _ := r.store.TasksSince(ctx, task.Query{}, coretasks.Since{})
 	r.clock.t = t0.Add(time.Minute)
 	if err := r.svc.Retitle(ctx, e.ID, "hold the round?"); err != nil {
 		t.Fatal(err)
@@ -413,7 +412,7 @@ func TestRetitleUpdatesAnOpenedTask(t *testing.T) {
 	if got := r.task(t, e.ID); got.Title != "hold the round?" || !got.Updated.Equal(t0.Add(time.Minute)) || got.Category != task.CategoryInbox {
 		t.Fatalf("entry %+v", got)
 	}
-	page, _ := r.store.TasksSince(ctx, task.Query{View: task.ViewInbox}, coretasks.Since{Epoch: before.Epoch, Rev: before.Rev})
+	page, _ := r.store.TasksSince(ctx, task.Query{}, coretasks.Since{Epoch: before.Epoch, Rev: before.Rev})
 	if page.Full || len(page.Tasks) != 1 {
 		t.Fatalf("page %+v", page)
 	}

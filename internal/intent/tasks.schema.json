@@ -48,6 +48,16 @@
             "description": "What the property holds, for the facts' reference and the agents.",
             "type": "string"
           },
+          "role": {
+            "description": "The mechanism of the loop that acts on the property; at most one property takes each role. Go names the role, never the property.",
+            "enum": [
+              "area",
+              "contexts",
+              "star",
+              "deadline"
+            ],
+            "type": "string"
+          },
           "type": {
             "description": "The property's type; required for a new property. An int or a duration of 0 means unset: a value of 0 is refused.",
             "enum": [
@@ -147,6 +157,8 @@
           "handler": {
             "description": "What the verb runs besides its move, a handler of the loop's; none when absent.",
             "enum": [
+              "finish",
+              "drop",
               "focus",
               "schedule",
               "wake",

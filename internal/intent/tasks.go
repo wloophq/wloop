@@ -69,6 +69,18 @@ type PropDef struct {
 	Values  []string
 	Writers []task.Writer
 	Doc     string
+	// Role is the mechanism that acts on the property, "" for none.
+	Role task.Role
+}
+
+// PropOf is the property that takes role r, and its values; "" when none does.
+func (d TasksDef) PropOf(r task.Role) (string, []string) {
+	for _, p := range d.Props {
+		if p.Role == r {
+			return p.Name, p.Values
+		}
+	}
+	return "", nil
 }
 
 // Untrusted says whether an agent or a plugin may write p, so no approval
@@ -333,6 +345,7 @@ type mProp struct {
 	Values  []string `toml:"values"`
 	Writers []string `toml:"writers"`
 	Doc     *string  `toml:"doc"`
+	Role    *string  `toml:"role"`
 }
 
 type mState struct {
@@ -363,6 +376,8 @@ type tasksLoad struct {
 	gates  map[string]ref
 	preds  map[string]ref
 	owed   *ref
+	// roles are the file that gave each role its property: a later layer's moves it, one file gives it once.
+	roles map[task.Role]string
 }
 
 // BundledTasks is the bundled profile's tasks.toml alone.
@@ -466,6 +481,31 @@ func (l *tasksLoad) mergeProps(s *sheet, props map[string]mProp) {
 			}
 		}
 		text(s, path+".doc", m.Doc, &p.Doc)
+		if m.Role != nil {
+			p.Role = task.Role(strings.TrimSpace(*m.Role))
+			if p.Role != "" {
+				s.oneOf(path+".role", string(p.Role), builtin.ValuesOf(builtin.SurfaceTasks, "props.*.role"))
+			}
+		}
+		if want, ok := task.RoleTypes[p.Role]; ok && p.Type != want {
+			s.add(path+".role", "%s acts on a property of type %s, not %s", p.Role, want, p.Type)
+		}
+		if p.Role == task.RoleStar && len(p.Values) < 2 {
+			s.add(path+".role", "star toggles between the property's first two values; it has %d", len(p.Values))
+		}
+		if j := slices.IndexFunc(l.def.Props, func(o PropDef) bool { return o.Role == p.Role && o.Name != name }); p.Role != "" && j >= 0 {
+			if l.roles[p.Role] == s.file {
+				s.add(path+".role", "%s is the role of props.%s too; one property takes each role", p.Role, l.def.Props[j].Name)
+			} else if len(s.problems) == n {
+				l.def.Props[j].Role = ""
+			}
+		}
+		if p.Role != "" && len(s.problems) == n {
+			if l.roles == nil {
+				l.roles = map[task.Role]string{}
+			}
+			l.roles[p.Role] = s.file
+		}
 		switch {
 		case len(s.problems) > n:
 		case i < 0:

@@ -194,7 +194,7 @@ func TestOpeningADetailFetchesItsDrafts(t *testing.T) {
 func draftGates(d api.Draft) []api.GateView { return []api.GateView{api.DraftGate(d)} }
 
 func TestADraftTaskOffersTheVerbsThatRunItsHandlers(t *testing.T) {
-	cat := api.ViewsCatalog{Verbs: []api.VerbSpec{{Verb: "approve", Handler: "approve"}, {Verb: "dismiss"},
+	cat := api.ViewsCatalog{Verbs: []api.VerbSpec{{Verb: "approve", Handler: "approve"}, {Verb: "dismiss", Handler: "drop"},
 		{Verb: "edit", Handler: "retry"}, {Verb: "retry", Handler: "edit"}}}
 	d := api.Draft{ID: 4, State: "failed", Actions: []api.ActionState{{ID: "draft.edit"}, {ID: "draft.retry", Enabled: true}}}
 	got := map[string]bool{}
@@ -212,7 +212,7 @@ func TestADraftTaskOffersTheVerbsThatRunItsHandlers(t *testing.T) {
 
 func TestADraftKeyRunsTheHandlerOfItsVerb(t *testing.T) {
 	m := viewsModel(t)
-	m.viewsCat.Verbs = []api.VerbSpec{{Verb: "approve", Handler: "approve"}, {Verb: "dismiss"},
+	m.viewsCat.Verbs = []api.VerbSpec{{Verb: "approve", Handler: "approve"}, {Verb: "dismiss", Handler: "drop"},
 		{Verb: "edit", Handler: "retry"}, {Verb: "retry", Handler: "edit"}}
 	e := m.tasks["focus"][0]
 	d := api.Draft{ID: 4, Task: e.ID, Rev: 3, Kind: "reply", Purpose: "reply", Text: "Friday works", State: "failed",

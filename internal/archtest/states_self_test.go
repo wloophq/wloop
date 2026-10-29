@@ -72,3 +72,26 @@ const (
 		t.Errorf("want 4 SQL hits, got %q", got)
 	}
 }
+
+func TestGoNamesNoBundledPropertyFlagsPlantedNames(t *testing.T) {
+	t.Parallel()
+	fset := token.NewFileSet()
+	_, _, tp := planted(t, fset, taskPkg, "props.go", `package task
+type Value struct { Text string }
+type Task struct{}
+func (Task) Prop(name string) Value { return Value{} }
+func (*Task) SetProp(name string, v Value) {}
+`, nil)
+	src := `package x
+import "github.com/wloophq/wloop/internal/domain/task"
+const area = "area"
+func f(e task.Task, name string) {
+	_ = e.Prop("focus")
+	e.SetProp(area, task.Value{})
+	_ = e.Prop("kind")
+	_ = e.Prop(name)
+}
+`
+	f, info, _ := planted(t, fset, module+"internal/x", "x.go", src, map[string]*types.Package{taskPkg: tp})
+	flagged(t, "planted names", propNameHits(fset, "internal/x/x.go", info, f, []string{"focus", "area"}), 2, "read the property of its role")
+}

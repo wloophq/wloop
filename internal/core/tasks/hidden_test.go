@@ -13,11 +13,14 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-func TestADisabledPluginsTasksLeaveTheViewsAndCountsButStayDismissable(t *testing.T) {
+// TestDisabledPluginTasksAreHidden checks that a view the profile marks hide_disabled leaves out, in its list,
+// its page and its count, the tasks whose units are all of a disabled plugin, that a view not marked keeps
+// them, and that they stay dismissable.
+func TestDisabledPluginTasksAreHidden(t *testing.T) {
 	r := newRig()
 	var off []unit.ProviderID
 	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates,
-		Disabled: func() []unit.ProviderID { return off }})
+		Disabled: func() []unit.ProviderID { return off }, Views: r.lens.Views, ViewEval: r.lens.Eval})
 	ctx := context.Background()
 	slack := unit.Unit{Provider: "slack", Key: "C1/1.1"}
 	r.put(t, task.Task{ID: "e-gh", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU}, Origin: task.OriginMessage})
@@ -45,24 +48,24 @@ func TestADisabledPluginsTasksLeaveTheViewsAndCountsButStayDismissable(t *testin
 		}
 		return c
 	}
-	if c := counts(); c.Badge != 3 || c.Views[task.ViewNext] != 1 {
+	if c := counts(); c.Badge != 3 || c.Views["ready"] != 1 {
 		t.Fatalf("enabled: %+v", c)
 	}
 	off, r.facts.off[unit.GitHub] = []unit.ProviderID{unit.GitHub}, true
-	if got := ids(task.ViewInbox); len(got) != 2 || got[0] == "e-gh" || got[1] == "e-gh" {
+	if got := ids("inbox"); len(got) != 2 || got[0] == "e-gh" || got[1] == "e-gh" {
 		t.Fatalf("inbox %v", got)
 	}
-	if got := ids(task.ViewNext); len(got) != 0 {
+	if got := ids("ready"); len(got) != 0 {
 		t.Fatalf("next %v", got)
 	}
-	if got := ids(task.ViewWaiting); len(got) != 1 {
+	if got := ids("waiting"); len(got) != 1 {
 		t.Fatalf("waiting keeps it read-only: %v", got)
 	}
 	c := counts()
-	if c.Badge != 2 || c.Views[task.ViewInbox] != 2 || c.Views[task.ViewNext] != 0 || c.Views[task.ViewWaiting] != 1 {
+	if c.Badge != 2 || c.Views["inbox"] != 2 || c.Views["ready"] != 0 || c.Views["waiting"] != 1 {
 		t.Fatalf("counts %+v", c)
 	}
-	p, err := r.svc.TasksSince(ctx, task.Query{View: task.ViewInbox}, coretasks.Since{})
+	p, err := r.svc.TasksSince(ctx, task.Query{View: "inbox"}, coretasks.Since{})
 	if err != nil || len(p.Tasks) != 2 || p.Counters.Badge != 2 {
 		t.Fatalf("page %+v %v", p, err)
 	}
@@ -80,7 +83,7 @@ func TestADisabledPluginsTasksLeaveTheViewsAndCountsButStayDismissable(t *testin
 		t.Fatalf("data kept: %+v", got)
 	}
 	off, r.facts.off[unit.GitHub] = nil, false
-	if got := ids(task.ViewNext); len(got) != 1 {
+	if got := ids("ready"); len(got) != 1 {
 		t.Fatalf("enabled again: %v", got)
 	}
 }

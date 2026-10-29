@@ -204,8 +204,9 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 		}
 	}
 	state := []string{e.State}
-	if e.PropText(dtask.PropFocus) == dtask.FocusOn {
-		state = append(state, "focus")
+	star, _ := m.viewsCat.PropOf(string(dtask.RoleStar))
+	if m.viewsCat.Starred(e) {
+		state = append(state, star.Name)
 	}
 	if e.Changed {
 		state = append(state, "changed")
@@ -218,7 +219,7 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 	}
 	fact("state", strings.Join(state, " · "), plain)
 	for _, name := range slices.Sorted(maps.Keys(e.Props)) {
-		if text := propText(e, name, now); text != "" && name != dtask.PropFocus {
+		if text := propText(e, name, now); text != "" && name != star.Name {
 			fact(name, text, plain)
 		}
 	}

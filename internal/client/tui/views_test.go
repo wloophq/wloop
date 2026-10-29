@@ -26,8 +26,10 @@ func viewsCatalog() api.ViewsCatalog {
 		{Verb: "reference", Label: "Reference", Key: "l"}, {Verb: "focus", Label: "Focus", Key: "f"},
 		{Verb: "project", Label: "Project", Key: "p"}, {Verb: "approve", Label: "Approve", Key: "a"},
 		{Verb: "delegate", Label: "Delegate", Key: "d", Input: "what should the agent look at"}, {Verb: "reply", Label: "Reply", Input: "Reply, saved to the Outbox"}, {Verb: "done", Label: "Done", Key: "e"},
-		{Verb: "dismiss", Label: "Dismiss", Key: "Backspace"}, {Verb: "seen", Label: "Seen"}}
-	return api.ViewsCatalog{Views: views, Areas: []string{"work", "home"}, Contexts: []string{"computer", "calls"}, Verbs: verbs}
+		{Verb: "dismiss", Handler: "drop", Label: "Dismiss", Key: "Backspace"}, {Verb: "seen", Label: "Seen"}}
+	props := []api.PropSpec{{Name: "focus", Type: "enum", Values: []string{"on", "off"}, Role: "star"}, {Name: "contexts", Type: "string[]", Role: "contexts"},
+		{Name: "area", Type: "string", Role: "area"}, {Name: "due", Type: "date", Role: "deadline"}}
+	return api.ViewsCatalog{Views: views, Areas: []string{"work", "home"}, Contexts: []string{"computer", "calls"}, Verbs: verbs, Props: props}
 }
 
 var allVerbs = []string{"next", "waiting", "schedule", "someday", "reference", "focus", "project", "approve", "delegate", "done", "dismiss"}
@@ -289,7 +291,7 @@ func TestGChordsSwitchViews(t *testing.T) {
 	if v, _ := m.viewOnScreen(); v.ID != "inbox" {
 		t.Fatalf("g i: view %d", m.view)
 	}
-	for keys, want := range map[string]string{"gf": "focus", "go": "outbox", "gn": "next", "gw": "waiting", "gp": "projects"} {
+	for keys, want := range map[string]string{"gf": "focus", "go": "outbox", "gw": "waiting", "gp": "projects"} {
 		chord(m, keys)
 		if v, _ := m.viewOnScreen(); v.ID != want {
 			t.Errorf("%s: view %d, want %s", keys, m.view, want)
@@ -299,9 +301,9 @@ func TestGChordsSwitchViews(t *testing.T) {
 	if m.view != 0 || m.views[0].ID != "needs-me" {
 		t.Fatalf("g g: view %d", m.view)
 	}
-	chord(m, "gz")
-	if m.view != 0 || m.status != "g z: no such key" {
-		t.Fatalf("g z: view %d, status %q", m.view, m.status)
+	chord(m, "gx")
+	if m.view != 0 || m.status != "g x: no such key" {
+		t.Fatalf("g x: view %d, status %q", m.view, m.status)
 	}
 	if press(m, Key{Rune: 'V'}); m.prompt == nil || m.prompt.action != "review" {
 		t.Fatalf("the key after a cancelled chord is not a key again: %+v", m.prompt)

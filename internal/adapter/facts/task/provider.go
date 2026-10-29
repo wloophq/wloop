@@ -134,7 +134,7 @@ func (p *Provider) enabledFor(e task.Task) bool {
 // List is every listed task, by id, and keeps the earliest time after now
 // of a check_on property or of a nudge's quiet time ending, for Due.
 func (p *Provider) List(ctx context.Context, _ unit.ProviderID) ([]unit.Unit, error) {
-	es, err := p.d.Tasks.Tasks(ctx, task.Query{View: task.ViewOpen})
+	es, err := p.d.Tasks.Tasks(ctx, task.Query{})
 	if err != nil {
 		return nil, err
 	}
@@ -274,6 +274,9 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 			f["task.wake_until"], f["task.wake_when"] = w.Until, w.When
 		}
 	}
+	if err := p.family(ctx, e, f); err != nil {
+		return nil, err
+	}
 	var err error
 	if p.d.Turns != nil {
 		n, err := p.d.Turns(ctx, task.UnitOf(e.ID))
@@ -343,6 +346,44 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 	f["task.items_open"], f["task.items_resolved"] = open, resolved
 	f["task.link_owes"] = p.linkOwes(e, us, got)
 	return f, nil
+}
+
+// family sets the facts of e's place among its parent's children and of its own children:
+// task.sequential_next, e is its sequential parent's first open child by sibling order; task.children_ready,
+// an open child of e is in the ready category; task.review_due, e is an open project whose review is due. The
+// tasks are the pass's when the service evaluates a view, else the store's open ones, read only for a task
+// with a parent or a project.
+func (p *Provider) family(ctx context.Context, e task.Task, f workflow.Facts) error {
+	if e.Parent == "" && !e.IsProject() {
+		return nil
+	}
+	f["task.review_due"] = e.IsProject() && e.Open() && e.ReviewDue(p.d.Clock.Now())
+	var all []task.Task
+	if pass, ok := coretasks.PassOf(ctx); ok {
+		all = pass.Tasks
+	} else {
+		var err error
+		if all, err = p.d.Tasks.Tasks(ctx, task.Query{}); err != nil {
+			return err
+		}
+	}
+	var first *task.Task
+	sequential := false
+	for i, o := range all {
+		switch {
+		case o.ID == e.Parent:
+			sequential = o.Sequential && o.IsProject()
+		case !o.Open():
+		case o.Parent == e.ID && o.Category == task.CategoryReady:
+			f["task.children_ready"] = true
+		}
+		if e.Parent != "" && o.Parent == e.Parent && o.Open() &&
+			(first == nil || cmp.Or(cmp.Compare(o.Position, first.Position), cmp.Compare(o.ID, first.ID)) < 0) {
+			first = &all[i]
+		}
+	}
+	f["task.sequential_next"] = sequential && first != nil && first.ID == e.ID
+	return nil
 }
 
 // repo is the repository of the first unit of us that has one.

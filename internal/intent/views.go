@@ -2,36 +2,85 @@ package intent
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"maps"
 	"slices"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/keys"
 	"github.com/wloophq/wloop/internal/profile"
 )
 
-// ViewsFile is the profile file that words the views and the review.
+// ViewsFile is the profile file that declares the views, the review and the badge.
 const ViewsFile = "views.toml"
 
-// ListTexts are the labels of the views and of the review's steps, by id,
-// from views.toml.
-type ListTexts struct {
-	Views  map[string]string
-	Review map[string]string
-	// Keys are the keys that jump to the views, by view; a view without one has none.
-	Keys map[string]string
+// ViewsDef is views.toml over every layer. Views and Review keep their
+// declared order, as TasksDef's states do: the bundled entries first, then
+// each user layer's new ones in its own order.
+type ViewsDef struct {
+	Views []ViewDef
+	// Review are the review's steps in order, each a view.
+	Review []ReviewStepDef
+	// Badge are the views whose counts the badge adds up.
+	Badge []string
 }
 
+// ViewDef is a view: what it lists (Over, task.OverTasks or task.OverGates),
+// When, which of them, compiled over their facts, nil for a view that lists
+// nothing and is a place a client draws itself, such as the review; Group the
+// fact it groups by, Sort the facts it sorts by, Key the key that jumps to it,
+// and HideDisabled whether it leaves out what a disabled plugin holds.
+type ViewDef struct {
+	ID, Label, Over, Group, Key string
+	Sort                        []SortKey
+	HideDisabled                bool
+	When                        workflow.Predicate
+}
+
+// SortKey is a fact a view sorts by, descending when Desc.
+type SortKey struct {
+	Fact string
+	Desc bool
+}
+
+// ReviewStepDef is a step of the review: the view it walks and what it asks of the user.
+type ReviewStepDef struct {
+	View, Label string
+}
+
+// View is the view id; false when the profile declares none.
+func (d ViewsDef) View(id string) (ViewDef, bool) {
+	i := slices.IndexFunc(d.Views, func(v ViewDef) bool { return v.ID == id })
+	if i < 0 {
+		return ViewDef{}, false
+	}
+	return d.Views[i], true
+}
+
+// IDs are the views' ids in order.
+func (d ViewsDef) IDs() []string {
+	out := make([]string, len(d.Views))
+	for i, v := range d.Views {
+		out[i] = v.ID
+	}
+	return out
+}
+
+// Badged says whether the badge counts view id.
+func (d ViewsDef) Badged(id string) bool { return slices.Contains(d.Badge, id) }
+
 type mViews struct {
-	Views  map[string]mViewText   `toml:"views"`
-	Review map[string]mReviewText `toml:"review"`
+	Views  map[string]mView       `toml:"views"`
+	Review map[string]mReviewStep `toml:"review"`
 	Badge  *mBadge                `toml:"badge"`
 }
 
-type mViewText struct {
+type mView struct {
 	Label        *string `toml:"label"`
 	Over         *string `toml:"over"`
 	When         *string `toml:"when"`
@@ -41,7 +90,7 @@ type mViewText struct {
 	HideDisabled *bool   `toml:"hide_disabled"`
 }
 
-type mReviewText struct {
+type mReviewStep struct {
 	Label *string `toml:"label"`
 }
 
@@ -49,35 +98,39 @@ type mBadge struct {
 	Views []string `toml:"views"`
 }
 
-// BundledLists is the views' texts of the bundled profile alone.
-func BundledLists(bundled fs.FS) (ListTexts, Problems) {
-	out, _, problems := loadLists(nil, bundled, nil)
+// BundledViews is the views of the bundled profile alone.
+func BundledViews(bundled fs.FS) (ViewsDef, Problems) {
+	out, _, problems := loadViews(nil, bundled, nil)
 	return out, problems
 }
 
-// loadLists reads tasks.toml and views.toml from bundled and the user's
-// layers: a higher layer's key replaces a lower one's, and a user's text
-// that is empty or names nothing keeps the lower one. A bundled FS without
-// a file, or nil, words nothing of it. A user's file the profile no longer
-// reads is a problem naming where its words go now. The verbs' texts are
-// the TasksDef's; gates checks the gates a verb names, nil none.
-func loadLists(layers []profile.Layer, bundled fs.FS, gates *GatesDef) (ListTexts, TasksDef, Problems) {
-	out := ListTexts{Views: map[string]string{}, Review: map[string]string{}, Keys: map[string]string{}}
+// viewsLoad is views.toml on its way to a ViewsDef over the layers; the
+// checks that need every layer's views and tasks.toml's properties wait in
+// refs, by path.
+type viewsLoad struct {
+	def  ViewsDef
+	refs map[string]ref
+}
+
+// loadViews reads tasks.toml and views.toml from bundled and the user's
+// layers: a higher layer's key replaces a lower one's. A bundled FS without
+// a file, or nil, declares nothing of it. A user's file the profile no longer
+// reads is a problem naming where its words go now. gates checks the gates a
+// verb names, nil none.
+func loadViews(layers []profile.Layer, bundled fs.FS, gates *GatesDef) (ViewsDef, TasksDef, Problems) {
 	problems := renamedFiles(layers)
 	if bundled == nil {
-		return out, TasksDef{Verbs: map[string]VerbText{}}, problems
+		return ViewsDef{}, TasksDef{Verbs: map[string]VerbText{}}, problems
 	}
 	tasks, taskProblems := loadTasks(layers, bundled, gates)
 	problems = append(problems, taskProblems...)
-	views, read := readLayered(layers, bundled, ViewsFile, func(file string, src []byte) Problems {
-		return mergeViews(out, file, src)
-	})
+	l := &viewsLoad{refs: map[string]ref{}}
+	views, read := readLayered(layers, bundled, ViewsFile, l.merge)
 	problems = append(problems, views...)
 	if read {
-		problems = append(problems, missingViews(out)...)
-		problems = append(problems, sharedViewKeys(out)...)
+		problems = append(problems, l.check(tasks)...)
 	}
-	return out, tasks, problems
+	return l.def, tasks, problems
 }
 
 // readLayered calls merge on name in bundled, then in each user layer that
@@ -129,63 +182,199 @@ func renamedFiles(layers []profile.Layer) Problems {
 	return problems
 }
 
-// mergeViews lays the views and the review of file over out.
-func mergeViews(out ListTexts, file string, src []byte) Problems {
+// merge lays file's views, review and badge over the definition so far.
+func (l *viewsLoad) merge(file string, src []byte) Problems {
 	m, problems, _, complete := decode[mViews](file, src)
 	if !complete {
 		return problems
 	}
 	s := &sheet{file: file, at: positions(src), problems: problems}
-	viewLabels := map[string]*string{}
-	for id, v := range m.Views {
-		viewLabels[id] = v.Label
-	}
-	stepLabels := map[string]*string{}
-	for id, v := range m.Review {
-		stepLabels[id] = v.Label
-	}
-	labels(s, "views", "view", viewLabels, out.Views, builtin.Views)
-	for _, id := range slices.Sorted(maps.Keys(m.Views)) {
-		if k := m.Views[id].Key; k != nil && strings.TrimSpace(*k) != "" && slices.Contains(builtin.Views, id) {
-			if err := keys.CheckView(strings.TrimSpace(*k)); err != nil {
-				s.add("views."+id+".key", "%s", err)
-				continue
-			}
-			out.Keys[id], _ = keys.Canonical(strings.TrimSpace(*k))
+	l.mergeViews(s, m.Views)
+	l.mergeReview(s, m.Review)
+	if m.Badge != nil && m.Badge.Views != nil {
+		maps.DeleteFunc(l.refs, func(at string, _ ref) bool { return strings.HasPrefix(at, "badge.") })
+		l.def.Badge = slices.Clone(m.Badge.Views)
+		for i, id := range m.Badge.Views {
+			path := fmt.Sprintf("badge.views[%d]", i)
+			l.refs[path] = ref{s, path, id}
 		}
 	}
-	labels(s, "review", "review step", stepLabels, out.Review, builtin.ReviewSteps)
 	s.addGrammar(grammar(builtin.SurfaceViews, src))
 	return s.problems
 }
 
-// sharedViewKeys are the views whose key another view has too; the view keeps none.
-func sharedViewKeys(out ListTexts) Problems {
-	var problems Problems
-	owner := map[string]string{}
-	for _, id := range slices.Sorted(maps.Keys(out.Keys)) {
-		owner[out.Keys[id]] = id
-	}
-	for _, id := range slices.Sorted(maps.Keys(out.Keys)) {
-		if k := out.Keys[id]; owner[k] != id {
-			problems = append(problems, Problem{File: ViewsFile, Field: "views." + id + ".key", Msg: k + " is the key of views." + owner[k] + " too"})
-			delete(out.Keys, id)
+func (l *viewsLoad) mergeViews(s *sheet, views map[string]mView) {
+	for _, id := range declared(s, "views", views) {
+		path, m := "views."+id, views[id]
+		i := slices.IndexFunc(l.def.Views, func(v ViewDef) bool { return v.ID == id })
+		v := ViewDef{ID: id, Over: task.OverTasks}
+		if i >= 0 {
+			v = l.def.Views[i]
+		}
+		n := len(s.problems)
+		switch {
+		case m.Label != nil:
+			text(s, path+".label", m.Label, &v.Label)
+		case i < 0:
+			s.add(path+".label", "is required")
+		}
+		if m.Over != nil {
+			s.oneOf(path+".over", *m.Over, builtin.ValuesOf(builtin.SurfaceViews, "views.*.over"))
+			v.Over = *m.Over
+		}
+		if m.When != nil {
+			delete(l.refs, path+".when")
+			if strings.TrimSpace(*m.When) != "" {
+				l.refs[path+".when"] = ref{s, path + ".when", *m.When}
+			}
+		}
+		if m.Group != nil {
+			v.Group = strings.TrimSpace(*m.Group)
+		}
+		if m.Sort != nil {
+			v.Sort = sortKeys(*m.Sort)
+		}
+		if m.Key != nil {
+			v.Key = ""
+			if k := strings.TrimSpace(*m.Key); k != "" {
+				if err := keys.CheckView(k); err != nil {
+					s.add(path+".key", "%s", err)
+				} else {
+					v.Key, _ = keys.Canonical(k)
+				}
+			}
+		}
+		if m.HideDisabled != nil {
+			v.HideDisabled = *m.HideDisabled
+		}
+		switch {
+		case len(s.problems) > n && i < 0:
+		case i < 0:
+			l.def.Views = append(l.def.Views, v)
+		default:
+			l.def.Views[i] = v
 		}
 	}
-	return problems
 }
 
-// missingViews are the views and the review's steps out words none of.
-func missingViews(out ListTexts) Problems {
-	var problems Problems
-	for _, v := range builtin.Views {
-		if _, ok := out.Views[v]; !ok {
-			problems = append(problems, Problem{File: ViewsFile, Field: "views." + v, Msg: "is missing: every view has a table"})
+func (l *viewsLoad) mergeReview(s *sheet, steps map[string]mReviewStep) {
+	for _, id := range declared(s, "review", steps) {
+		path := "review." + id
+		i := slices.IndexFunc(l.def.Review, func(st ReviewStepDef) bool { return st.View == id })
+		st := ReviewStepDef{View: id}
+		if i >= 0 {
+			st = l.def.Review[i]
+		}
+		switch m := steps[id]; {
+		case m.Label != nil:
+			text(s, path+".label", m.Label, &st.Label)
+		case i < 0:
+			s.add(path+".label", "is required")
+		}
+		l.refs[path] = ref{s, path, id}
+		switch {
+		case st.Label == "":
+		case i < 0:
+			l.def.Review = append(l.def.Review, st)
+		default:
+			l.def.Review[i] = st
 		}
 	}
-	for _, v := range builtin.ReviewSteps {
-		if _, ok := out.Review[v]; !ok {
-			problems = append(problems, Problem{File: ViewsFile, Field: "review." + v, Msg: "is missing: every review step has a table"})
+}
+
+// sortKeys reads a view's sort: facts, comma-separated, a leading - sorting one descending.
+func sortKeys(src string) []SortKey {
+	var out []SortKey
+	for _, f := range strings.Split(src, ",") {
+		f = strings.TrimSpace(f)
+		if f == "" {
+			continue
+		}
+		name, desc := strings.CutPrefix(f, "-")
+		out = append(out, SortKey{Fact: strings.TrimSpace(name), Desc: desc})
+	}
+	return out
+}
+
+// ViewEnv is the facts a view over over reads: a task's, its properties
+// typed as tasks declares them, or a gate's.
+func ViewEnv(over string, tasks TasksDef) expr.Env {
+	if over == task.OverGates {
+		return gateEnv()
+	}
+	env := expr.Env{}
+	for name, t := range builtin.WorkflowEnv(builtin.TaskSlot) {
+		if strings.HasPrefix(name, builtin.TaskSlot+".") {
+			env[name] = t
+		}
+	}
+	maps.Copy(env, tasks.Facts())
+	return env
+}
+
+// check compiles each view's when, and checks that its group and sort name
+// its facts, each review step and badge view a view, and that no two views
+// share a key.
+func (l *viewsLoad) check(tasks TasksDef) Problems {
+	var out Problems
+	ids := l.def.IDs()
+	for i := range l.def.Views {
+		v := &l.def.Views[i]
+		path := "views." + v.ID
+		env := ViewEnv(v.Over, tasks)
+		facts := slices.Sorted(maps.Keys(env))
+		v.When = nil
+		if r, ok := l.refs[path+".when"]; ok {
+			pred, err := expr.CompileWorkflow(r.name, env)
+			if err != nil {
+				msg, snippet := exprMsg(err)
+				p := r.s.problem(r.path, "%s", msg)
+				p.Snippet = snippet
+				out = append(out, p)
+			}
+			v.When = pred
+		}
+		if _, ok := env[v.Group]; v.Group != "" && !ok {
+			out = append(out, Problem{File: ViewsFile, Field: path + ".group", Msg: fmt.Sprintf("%s names no fact of a view over %s%s", v.Group, v.Over, expr.DidYouMean(v.Group, facts))})
+			v.Group = ""
+		}
+		var keep []SortKey
+		for _, k := range v.Sort {
+			if _, ok := env[k.Fact]; !ok {
+				out = append(out, Problem{File: ViewsFile, Field: path + ".sort", Msg: fmt.Sprintf("%s names no fact of a view over %s%s", k.Fact, v.Over, expr.DidYouMean(k.Fact, facts))})
+				continue
+			}
+			keep = append(keep, k)
+		}
+		v.Sort = keep
+	}
+	for _, at := range slices.Sorted(maps.Keys(l.refs)) {
+		r := l.refs[at]
+		if strings.HasSuffix(at, ".when") || slices.Contains(ids, r.name) {
+			continue
+		}
+		out = append(out, r.s.problem(r.path, "names no view of %s%s", ViewsFile, expr.DidYouMean(r.name, ids)))
+	}
+	l.def.Review = slices.DeleteFunc(l.def.Review, func(st ReviewStepDef) bool { return !slices.Contains(ids, st.View) })
+	l.def.Badge = slices.DeleteFunc(l.def.Badge, func(id string) bool { return !slices.Contains(ids, id) })
+	return append(out, l.sharedKeys()...)
+}
+
+// sharedKeys are the views whose key another view has too; the view keeps none.
+func (l *viewsLoad) sharedKeys() Problems {
+	var problems Problems
+	byID := slices.Clone(l.def.Views)
+	slices.SortFunc(byID, func(a, b ViewDef) int { return strings.Compare(a.ID, b.ID) })
+	owner := map[string]string{}
+	for _, v := range byID {
+		if v.Key != "" {
+			owner[v.Key] = v.ID
+		}
+	}
+	for _, v := range byID {
+		if v.Key != "" && owner[v.Key] != v.ID {
+			problems = append(problems, Problem{File: ViewsFile, Field: "views." + v.ID + ".key", Msg: v.Key + " is the key of views." + owner[v.Key] + " too"})
+			l.def.Views[slices.IndexFunc(l.def.Views, func(x ViewDef) bool { return x.ID == v.ID })].Key = ""
 		}
 	}
 	return problems
@@ -199,25 +388,5 @@ func text(s *sheet, path string, v *string, dst *string) {
 		s.add(path, "is required")
 	default:
 		*dst = strings.TrimSpace(*v)
-	}
-}
-
-// labels lays the label tables m of section over out, each id one of ids.
-func labels(s *sheet, section, noun string, m map[string]*string, out map[string]string, ids []string) {
-	for _, id := range slices.Sorted(maps.Keys(m)) {
-		path := section + "." + id
-		if !slices.Contains(ids, id) {
-			s.add(path, "names no %s%s", noun, expr.DidYouMean(id, ids))
-			continue
-		}
-		switch v := m[id]; {
-		case v == nil && out[id] == "":
-			s.add(path+".label", "is required")
-		case v == nil:
-		case strings.TrimSpace(*v) == "":
-			s.add(path+".label", "is required")
-		default:
-			out[id] = strings.TrimSpace(*v)
-		}
 	}
 }

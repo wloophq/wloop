@@ -88,7 +88,7 @@ func TestProjectFromTask(t *testing.T) {
 		t.Fatalf("attached entry %+v", res.Task)
 	}
 	p := r.task(t, res.Task.Parent)
-	if !p.IsProject() || p.Category != task.CategoryReady || p.Title != "Ship the v2 API" || p.Prop(task.PropArea).Text != "OSS" {
+	if !p.IsProject() || p.Category != task.CategoryReady || p.Title != "Ship the v2 API" || p.Prop("area").Text != "OSS" {
 		t.Fatalf("project %+v", p)
 	}
 	if !slices.Equal(r.dossiers.opened, []task.ID{p.ID}) {
@@ -163,41 +163,15 @@ func TestToggleSequential(t *testing.T) {
 	r.project(t, "p", nil)
 	r.action(t, "a", "p", 1, task.State("next"))
 	r.action(t, "b", "p", 2, task.State("next"))
-	next := func() ([]task.ID, int) {
-		t.Helper()
-		es, err := r.svc.Tasks(ctx, task.Query{View: task.ViewNext})
-		if err != nil {
-			t.Fatal(err)
-		}
-		c, err := r.svc.Counts(ctx, "")
-		if err != nil {
-			t.Fatal(err)
-		}
-		var ids []task.ID
-		for _, e := range es {
-			if !e.IsProject() {
-				ids = append(ids, e.ID)
-			}
-		}
-		return ids, c.Views[task.ViewNext]
-	}
-	ids, n := next()
-	if !slices.Equal(ids, []task.ID{"a", "b"}) || n != 3 {
-		t.Fatalf("parallel: next %v, count %d", ids, n)
-	}
 	if got := r.do(t, "p", task.VerbSequential, nil).Task; !got.Sequential {
 		t.Fatal("sequential did not toggle on")
-	}
-	if ids, n = next(); !slices.Equal(ids, []task.ID{"a"}) || n != 2 {
-		t.Fatalf("sequential: next %v, count %d", ids, n)
 	}
 	r.do(t, "p", task.VerbSequential, map[string]string{"set": "true"})
 	if !r.task(t, "p").Sequential {
 		t.Fatal("set true turned it off")
 	}
-	r.do(t, "p", task.VerbSequential, nil)
-	if ids, n = next(); !slices.Equal(ids, []task.ID{"a", "b"}) || n != 3 {
-		t.Fatalf("back to parallel: next %v, count %d", ids, n)
+	if r.do(t, "p", task.VerbSequential, nil); r.task(t, "p").Sequential {
+		t.Fatal("sequential did not toggle off")
 	}
 	if _, err := r.svc.Do(ctx, "a", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSequential}); !errors.Is(err, coretasks.ErrVerb) {
 		t.Errorf("sequential on an action: %v, want ErrVerb", err)
@@ -231,51 +205,6 @@ func TestMarkReviewed(t *testing.T) {
 	}
 }
 
-func TestProjectWithoutNextAction(t *testing.T) {
-	r := newProjectRig()
-	ctx := context.Background()
-	r.project(t, "p", nil)
-	r.action(t, "a", "p", 1, task.State("next"))
-	r.action(t, "b", "p", 2, task.State("next"))
-	r.project(t, "q", func(e *task.Task) { e.ReviewedAt = t0 })
-	r.action(t, "c", "q", 1, task.State("next"))
-	r.clock.t = t0.Add(time.Hour)
-	review := func() []task.ID {
-		t.Helper()
-		es, err := r.svc.Tasks(ctx, task.Query{View: task.ViewReview})
-		if err != nil {
-			t.Fatal(err)
-		}
-		var ids []task.ID
-		for _, e := range es {
-			ids = append(ids, e.ID)
-		}
-		return ids
-	}
-	if got := review(); len(got) != 0 {
-		t.Fatalf("projects with next actions under review: %v", got)
-	}
-	r.do(t, "a", task.VerbDone, nil)
-	r.do(t, "b", task.VerbDone, nil)
-	if got := review(); !slices.Equal(got, []task.ID{"p"}) {
-		t.Fatalf("review lists %v, want p", got)
-	}
-	if p := r.task(t, "p"); p.Category != task.CategoryReady {
-		t.Errorf("a project with every action done was moved to %s", p.State)
-	}
-	rv, err := r.svc.Review(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if st := rv.Steps[slices.IndexFunc(rv.Steps, func(s coretasks.ReviewStep) bool { return s.ID == "projects" })]; st.Count != 1 || st.Done {
-		t.Errorf("projects step %+v", st)
-	}
-	r.clock.t = t0.Add(8 * 24 * time.Hour)
-	if got := review(); !slices.Equal(got, []task.ID{"p", "q"}) {
-		t.Errorf("past the interval: %v, want p and q", got)
-	}
-}
-
 func TestDoneProjectResolvesItsDossier(t *testing.T) {
 	r := newProjectRig()
 	r.project(t, "p", nil)
@@ -301,30 +230,40 @@ func TestDoneProjectResolvesItsDossier(t *testing.T) {
 	}
 }
 
-func TestProjectsViewCounts(t *testing.T) {
+// TestTheAreaFiltersEveryView checks that the area narrows every view, the Inbox's too, in its list and its
+// count.
+func TestTheAreaFiltersEveryView(t *testing.T) {
 	r := newProjectRig()
 	ctx := context.Background()
-	area := func(e *task.Task, a string) { e.SetProp(task.PropArea, task.Value{Text: a}, task.WriterPerson, t0) }
+	area := func(e *task.Task, a string) { e.SetProp("area", task.Value{Text: a}, task.WriterPerson, t0) }
+	for id, a := range map[task.ID]string{"i1": "OSS", "i2": "Hiring", "i3": ""} {
+		e := task.Task{ID: id, State: "inbox", Category: task.CategoryInbox, Origin: task.OriginUser}
+		area(&e, a)
+		r.put(t, e)
+	}
 	r.project(t, "p1", func(e *task.Task) { area(e, "OSS") })
-	r.project(t, "p2", func(e *task.Task) { area(e, "OSS"); e.State, e.Category = "someday", task.CategoryDeferred })
-	r.project(t, "p3", func(e *task.Task) { area(e, "Hiring") })
-	r.project(t, "p4", func(e *task.Task) { area(e, "OSS"); e.State, e.Category = "done", task.CategoryDone })
-	for area, want := range map[string][]task.ID{"OSS": {"p1", "p2"}, "Hiring": {"p3"}, "": {"p1", "p2", "p3"}} {
-		es, err := r.svc.Tasks(ctx, task.Query{View: task.ViewProjects, Area: area})
+	for a, want := range map[string]map[task.View][]task.ID{
+		"OSS":    {"inbox": {"i1"}, "ready": {"p1"}},
+		"Hiring": {"inbox": {"i2"}, "ready": nil},
+		"":       {"inbox": {"i1", "i2", "i3"}, "ready": {"p1"}},
+	} {
+		c, err := r.svc.Counts(ctx, a)
 		if err != nil {
 			t.Fatal(err)
 		}
-		var ids []task.ID
-		for _, e := range es {
-			ids = append(ids, e.ID)
-		}
-		slices.Sort(ids)
-		c, err := r.svc.Counts(ctx, area)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !slices.Equal(ids, want) || c.Views[task.ViewProjects] != len(want) {
-			t.Errorf("area %q: %v counted %d, want %v", area, ids, c.Views[task.ViewProjects], want)
+		for v, w := range want {
+			es, err := r.svc.Tasks(ctx, task.Query{View: v, Area: a})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var ids []task.ID
+			for _, e := range es {
+				ids = append(ids, e.ID)
+			}
+			slices.Sort(ids)
+			if !slices.Equal(ids, w) || c.Views[v] != len(w) {
+				t.Errorf("area %q, %s: %v counted %d, want %v", a, v, ids, c.Views[v], w)
+			}
 		}
 	}
 }

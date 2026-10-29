@@ -1226,6 +1226,7 @@ function rowTr(r, pr, lens, copy) {
         p.head && ts.some((t) => fold(p.head).includes(t)) ? h("span", { class: "head" }, marked(p.head, ts)) : null,
         o.hold ? facet(lens, "is", "paused", h("span", { class: "flag" }, "paused"), slot + "is:paused") : null,
         isMuted(p) ? facet(lens, "is", "muted", h("span", { class: "flag" }, "muted"), slot + "is:muted") : null,
+        r.stale ? h("span", { class: "flag stale", title: "Its plugin is not reporting; this is its last report" }, "stale") : null,
         intakeChip(r))),
     h("td", { class: "c-wait" },
       h("div", { class: "who" },

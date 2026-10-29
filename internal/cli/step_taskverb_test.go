@@ -95,9 +95,9 @@ func TestTaskVerbRecordsItsEventAndAnotherWorkflowReactsInChain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if e.State != task.State("next") || !e.Starred() {
+	if e.State != task.State("next") || !(e.Prop("focus").Text == "on") {
 		items, _ := eng.Ledger.Items(ctx, automation.Filter{})
-		t.Fatalf("state %s, starred %v; items %+v", e.State, e.Starred(), items)
+		t.Fatalf("state %s, starred %v; items %+v", e.State, (e.Prop("focus").Text == "on"), items)
 	}
 	evs, err := r.db.Events().Since(ctx, 0, task.VerbEventKinds([]string{"next", "focus"}))
 	if err != nil {

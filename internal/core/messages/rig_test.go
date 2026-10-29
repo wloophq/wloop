@@ -336,11 +336,11 @@ func (r *rig) task(t *testing.T, id string) task.Task {
 
 func (r *rig) inbox(t *testing.T) []task.Task {
 	t.Helper()
-	es, err := r.tasks.Tasks(context.Background(), task.Query{View: task.ViewInbox})
+	es, err := r.taskStore.Tasks(context.Background(), task.Query{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return es
+	return slices.DeleteFunc(es, func(e task.Task) bool { return e.Category != task.CategoryInbox })
 }
 
 // only is the one open message, failing t otherwise.

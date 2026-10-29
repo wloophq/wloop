@@ -44,7 +44,7 @@ func TestTaskViewServesPropsAndParent(t *testing.T) {
 	if !got.PropTime("due").Equal(due) || !slices.Equal(got.PropList("contexts"), []string{"@reply"}) {
 		t.Errorf("props %v", got.Props)
 	}
-	p := r.page(t, "view=next")
+	p := r.page(t, "view=needs-me")
 	i := slices.IndexFunc(p.Tasks, func(v api.TaskView) bool { return v.ID == "e-p" })
 	if i < 0 || !slices.Equal(p.Tasks[i].Children, []string{"e-c", "e-d"}) {
 		t.Fatalf("the project's children in %+v", p.Tasks)
@@ -87,6 +87,10 @@ func (p *profileStates) Move(verb string) ([]string, string, bool) {
 }
 
 func (p *profileStates) Handler(verb string) string { return taskstest.BundledStates.Handler(verb) }
+
+func (p *profileStates) PropOf(r task.Role) (string, []string) {
+	return taskstest.BundledStates.PropOf(r)
+}
 
 func (p *profileStates) Gate(verb string) (gate.Gate, bool) {
 	return taskstest.BundledStates.Gate(verb)

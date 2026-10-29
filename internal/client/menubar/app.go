@@ -17,7 +17,6 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/rowset"
-	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -49,6 +48,7 @@ type Daemon interface {
 	Events(ctx context.Context, client string, since api.Since) (<-chan api.Change, error)
 	Actions(ctx context.Context) (api.ActionsResponse, error)
 	Plugins(ctx context.Context) ([]api.Plugin, error)
+	Views(ctx context.Context) (api.ViewsCatalog, error)
 }
 
 type Config struct {
@@ -92,9 +92,11 @@ type Controller struct {
 	hasHealth bool
 	sections  []api.MenubarSection
 	// plugins are the served plugins, read with the sections.
-	plugins  []api.Plugin
-	tasks    map[task.View][]api.TaskView
-	counters *api.Counters
+	plugins []api.Plugin
+	tasks   map[string][]api.TaskView
+	// taskViews are the views the menu lists first: those the profile's badge counts.
+	taskViews []api.TaskViewSpec
+	counters  *api.Counters
 }
 
 func New(cfg Config) *Controller {
@@ -107,7 +109,7 @@ func New(cfg Config) *Controller {
 	if cfg.Log == nil {
 		cfg.Log = func(string, ...any) {}
 	}
-	c := &Controller{cfg: cfg, ctx: context.Background(), sent: map[string]bool{}, daily: map[string]bool{}, tasks: map[task.View][]api.TaskView{}}
+	c := &Controller{cfg: cfg, ctx: context.Background(), sent: map[string]bool{}, daily: map[string]bool{}, tasks: map[string][]api.TaskView{}}
 	cfg.Notifier.OnResponse(func(r Response) { c.Respond(c.runCtx(), r) })
 	c.loadSent()
 	return c
@@ -386,8 +388,8 @@ func (c *Controller) menu(h api.Health) []MenuItem {
 	if len(h.WorkspaceManagers) == 1 {
 		open = "Open in " + h.WorkspaceManagers[0]
 	}
-	for _, sec := range coreSections {
-		items = append(items, c.taskSection(sec.label, sec.view)...)
+	for _, v := range c.taskViews {
+		items = append(items, c.taskSection(v.Label, v.ID)...)
 		items = append(items, MenuItem{Separator: true})
 	}
 	for _, sec := range c.sections {
@@ -395,7 +397,7 @@ func (c *Controller) menu(h api.Health) []MenuItem {
 		items = append(items, MenuItem{Separator: true})
 	}
 	items = append(items,
-		MenuItem{Title: "Open cockpit", Enabled: true, Action: c.later(func(ctx context.Context) error { return c.open("view=" + string(task.ViewInbox)) })},
+		MenuItem{Title: "Open cockpit", Enabled: true, Action: c.later(func(ctx context.Context) error { return c.open(c.firstView()) })},
 		MenuItem{Title: "Sweep now", Enabled: true, Action: c.later(func(ctx context.Context) error { return c.cfg.Daemon.Trigger(ctx, "sweep") })},
 	)
 	pause := MenuItem{Title: "Pause automatic rounds", Enabled: true, Action: c.later(func(ctx context.Context) error { return c.cfg.Daemon.SetPause(ctx, api.PauseRequest{Paused: true}) })}

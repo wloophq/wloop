@@ -41,6 +41,12 @@ type Deps struct {
 	// Baseline fills a wake Sleep puts on task t: a When that asks to wake once a fact of t changes becomes the
 	// condition over the value t has now; nil leaves every When as it is.
 	Baseline func(ctx context.Context, t task.Task, when string) (string, error)
+	// Views are the profile's views as it loads now; nil lists none.
+	Views func() Views
+	// ViewEval places a stored task in the profile's views; nil places none.
+	ViewEval ViewEval
+	// ViewSort orders a view's tasks as the profile sorts it; nil keeps their base order.
+	ViewSort ViewSort
 	// Activity is told each task Sync finds asleep with a person's activity on its unit since the user saw it,
 	// for a wake on activity; nil: none is told.
 	Activity func(ctx context.Context, id task.ID) error
@@ -71,12 +77,16 @@ type Service struct {
 	beforeApply func()
 	reg         sync.RWMutex
 	handlers    map[handlerKey]VerbHandler
-	views       map[task.View]viewSource
+	views       map[string]viewSource
 	authority   Authority
+	// runs keeps the review's runs; nil until ServeProjects serves the review.
+	runs ProjectStore
+	// review serializes the review's read-modify-write of its run.
+	review sync.Mutex
 }
 
 func New(d Deps) *Service {
-	s := &Service{d: d, handlers: map[handlerKey]VerbHandler{}, views: map[task.View]viewSource{}, authority: d.Authority}
+	s := &Service{d: d, handlers: map[handlerKey]VerbHandler{}, views: map[string]viewSource{}, authority: d.Authority}
 	if s.authority == nil {
 		s.authority = personOnly
 	}
@@ -90,18 +100,21 @@ func personOnly(_ context.Context, _ string, a task.Actor, _ task.Task) (bool, b
 func (s *Service) now() time.Time { return s.d.Clock.Now() }
 
 // Register makes h run, before any state change, on the tasks of class the verbs whose profile handler is
-// handler, and a verb with no handler named so (a kind's own dismiss or done). A class is a value of the kind
-// property, the origin task.OriginDraft or task.OriginMessage of a task another service serves, or EveryKind.
+// handler. A class is a value of the kind property, the origin task.OriginDraft or task.OriginMessage of a task
+// another service serves, or EveryKind.
 func (s *Service) Register(class, handler string, h VerbHandler) {
 	s.reg.Lock()
 	defer s.reg.Unlock()
 	s.handlers[handlerKey{class, handler}] = h
 }
 
-// handler is the registered handler of verb on e: the one its profile handler names, else for a verb with
-// none the one its own name does; of e's class, else, for a stored task, of EveryKind.
+// handler is the registered handler of verb on e, the one its profile handler names: of e's class, else, for
+// a stored task, of EveryKind; nil for a verb that names none.
 func (s *Service) handler(e task.Task, verb task.Verb) VerbHandler {
-	name := cmp.Or(s.d.States.Handler(string(verb)), string(verb))
+	name := s.d.States.Handler(string(verb))
+	if name == "" {
+		return nil
+	}
 	class := classOf(e)
 	s.reg.RLock()
 	defer s.reg.RUnlock()
@@ -318,12 +331,12 @@ func (s *Service) project(ctx context.Context, e task.Task, req Request, now tim
 			return nil, err
 		}
 		p.SetProp(task.PropKind, task.Value{Text: task.KindProject}, task.WriterWorkflow, now)
-		p.SetProp(task.PropArea, e.Prop(task.PropArea), task.WriterPerson, now)
+		p.SetRole(s.d.States, task.RoleArea, e.Role(s.d.States, task.RoleArea), task.WriterPerson, now)
 		cs = append(cs, task.Change{Op: task.OpCreate, Task: p, Why: "project"})
 	default:
 		return nil, fmt.Errorf("%w: project needs id or title", ErrArgs)
 	}
-	open, err := s.d.Store.Tasks(ctx, task.Query{View: task.ViewOpen})
+	open, err := s.d.Store.Tasks(ctx, task.Query{})
 	if err != nil {
 		return nil, err
 	}
@@ -522,7 +535,7 @@ func (s *Service) create(ctx context.Context, title, notes string, u *unit.Unit,
 	if err := e.MoveTo(task.CategoryInbox, s.d.States); err != nil {
 		return task.Task{}, err
 	}
-	e.SetProp(task.PropContexts, task.Value{List: slices.Clone(contexts)}, task.WriterPlugin, now)
+	e.SetRole(s.d.States, task.RoleContexts, task.Value{List: slices.Clone(contexts)}, task.WriterPlugin, now)
 	if u != nil && !u.IsZero() {
 		e.Units = []unit.Unit{*u}
 	}

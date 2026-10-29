@@ -6,14 +6,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"slices"
-	"sync"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
-// Review is the weekly Review as it stands: its steps in order, each with its count. ID is empty while
-// nothing was left to review when it started, so nothing was recorded.
+// Review is the review as it stands: its steps in order, each with its count. ID is empty while nothing was
+// left to review when it started, so nothing was recorded.
 type Review struct {
 	ID        string
 	StartedAt time.Time
@@ -21,147 +20,120 @@ type Review struct {
 	Done      bool
 }
 
+// ReviewStep is a step of the review: the view it walks, how many it lists, and whether it is done.
 type ReviewStep struct {
-	task.ReviewStep
+	View  task.View
 	Count int
 	Done  bool
 }
 
-// reviewSource serves the review view, the projects the Review's projects step lists, and keeps the runs.
-type reviewSource struct {
-	s     *Service
-	store ProjectStore
-	mu    sync.Mutex
+// ServesReview says whether the review is served: ServeProjects gave it a store for its runs.
+func (s *Service) ServesReview() bool {
+	s.reg.RLock()
+	defer s.reg.RUnlock()
+	return s.runs != nil
 }
 
-func (r *reviewSource) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) {
-	open, err := r.s.d.Store.Tasks(ctx, task.Query{View: task.ViewOpen})
-	if err != nil {
-		return nil, err
-	}
-	st, now := task.ProjectsOf(open), r.s.now()
-	var out []task.Task
-	for _, e := range open {
-		if task.NeedsReview(e, st[e.ID], now) && q.Matches(e) {
-			out = append(out, e)
-		}
-	}
-	task.Sort(out, task.ViewProjects)
-	return out, nil
-}
-
-func (r *reviewSource) Task(ctx context.Context, id task.ID) (task.Task, bool, error) {
-	return task.Task{}, false, nil
-}
-
-func (r *reviewSource) Count(ctx context.Context, area string) (int, error) {
-	es, err := r.Tasks(ctx, task.Query{View: task.ViewReview, Area: area})
-	return len(es), err
-}
-
-func (s *Service) review() (*reviewSource, error) {
-	src, _ := s.view(task.ViewReview)
-	r, ok := src.(*reviewSource)
-	if !ok {
+func (s *Service) reviewRuns() (ProjectStore, error) {
+	s.reg.RLock()
+	defer s.reg.RUnlock()
+	if s.runs == nil {
 		return nil, fmt.Errorf("%w: the review is not served", ErrArgs)
 	}
-	return r, nil
+	return s.runs, nil
 }
 
-// Review is the current Review, or a new one: a step whose count is 0 at its start starts done, and a new
-// Review is recorded once a step is left to do.
+// Review is the current review, or a new one: a step whose count is 0 at its start starts done, and a new
+// review is recorded once a step is left to do.
 func (s *Service) Review(ctx context.Context) (Review, error) {
-	r, err := s.review()
+	runs, err := s.reviewRuns()
 	if err != nil {
 		return Review{}, err
 	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	counts, err := r.counts(ctx)
+	s.review.Lock()
+	defer s.review.Unlock()
+	steps, counts, err := s.reviewCounts(ctx)
 	if err != nil {
 		return Review{}, err
 	}
-	run, err := r.current(ctx, counts, false)
+	run, err := s.currentRun(ctx, runs, steps, counts, false)
 	if err != nil {
 		return Review{}, err
 	}
-	return reviewOf(run, counts), nil
+	return reviewOf(run, steps, counts), nil
 }
 
-// ReviewStepDone marks step done in the current Review, recording the Review once every step is.
+// ReviewStepDone marks step, the view it walks, done in the current review, recording the review once every
+// step is.
 func (s *Service) ReviewStepDone(ctx context.Context, step string) (Review, error) {
-	r, err := s.review()
+	runs, err := s.reviewRuns()
 	if err != nil {
 		return Review{}, err
 	}
-	if !slices.ContainsFunc(task.ReviewSteps, func(x task.ReviewStep) bool { return x.ID == step }) {
+	s.review.Lock()
+	defer s.review.Unlock()
+	steps, counts, err := s.reviewCounts(ctx)
+	if err != nil {
+		return Review{}, err
+	}
+	if !slices.Contains(steps, task.View(step)) {
 		return Review{}, fmt.Errorf("%w: no review step %q", ErrArgs, step)
 	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	counts, err := r.counts(ctx)
-	if err != nil {
-		return Review{}, err
-	}
-	run, err := r.current(ctx, counts, true)
+	run, err := s.currentRun(ctx, runs, steps, counts, true)
 	if err != nil {
 		return Review{}, err
 	}
 	if !slices.Contains(run.Done, step) {
 		run.Done = append(run.Done, step)
 	}
-	if len(run.Done) == len(task.ReviewSteps) {
+	if allDone(run, steps) {
 		run.FinishedAt = s.now()
 	}
-	if err := r.store.PutRun(ctx, run); err != nil {
+	if err := runs.PutRun(ctx, run); err != nil {
 		return Review{}, err
 	}
-	return reviewOf(run, counts), nil
+	return reviewOf(run, steps, counts), nil
 }
 
-// current is the stored run with a step open, or a new one whose empty steps start done; a new run is put
-// when one of its steps is open, or when keep.
-func (r *reviewSource) current(ctx context.Context, counts map[string]int, keep bool) (task.ReviewRun, error) {
-	run, ok, err := r.store.CurrentRun(ctx)
+// reviewCounts are the review's steps and each step's count over every area.
+func (s *Service) reviewCounts(ctx context.Context) ([]task.View, map[task.View]int, error) {
+	steps := s.profileViews().Review
+	c, err := s.Counts(ctx, "")
+	if err != nil {
+		return nil, nil, err
+	}
+	return steps, c.Views, nil
+}
+
+// currentRun is the stored run with a step still open, or a new one whose empty steps start done; a new run is
+// put when one of its steps is open, or when keep.
+func (s *Service) currentRun(ctx context.Context, runs ProjectStore, steps []task.View, counts map[task.View]int, keep bool) (task.ReviewRun, error) {
+	run, ok, err := runs.CurrentRun(ctx)
 	if err != nil || ok {
 		return run, err
 	}
-	run = task.ReviewRun{StartedAt: r.s.now()}
-	for _, st := range task.ReviewSteps {
-		if counts[st.ID] == 0 {
-			run.Done = append(run.Done, st.ID)
+	run = task.ReviewRun{StartedAt: s.now()}
+	for _, st := range steps {
+		if counts[st] == 0 {
+			run.Done = append(run.Done, string(st))
 		}
 	}
-	if len(run.Done) == len(task.ReviewSteps) && !keep {
+	if allDone(run, steps) && !keep {
 		return run, nil
 	}
 	run.ID = newRunID()
-	return run, r.store.PutRun(ctx, run)
+	return run, runs.PutRun(ctx, run)
 }
 
-// counts are each step's count over every area.
-func (r *reviewSource) counts(ctx context.Context) (map[string]int, error) {
-	c, err := r.s.Counts(ctx, "")
-	if err != nil {
-		return nil, err
-	}
-	projects, err := r.Count(ctx, "")
-	if err != nil {
-		return nil, err
-	}
-	out := map[string]int{}
-	c.Views[task.ViewReview] = projects
-	for _, st := range task.ReviewSteps {
-		out[st.ID] = c.Views[st.View]
-	}
-	return out, nil
+func allDone(run task.ReviewRun, steps []task.View) bool {
+	return !slices.ContainsFunc(steps, func(st task.View) bool { return !slices.Contains(run.Done, string(st)) })
 }
 
-func reviewOf(run task.ReviewRun, counts map[string]int) Review {
+func reviewOf(run task.ReviewRun, steps []task.View, counts map[task.View]int) Review {
 	rv := Review{ID: run.ID, StartedAt: run.StartedAt, Done: true}
-	for _, st := range task.ReviewSteps {
-		done := slices.Contains(run.Done, st.ID)
-		rv.Steps = append(rv.Steps, ReviewStep{ReviewStep: st, Count: counts[st.ID], Done: done})
+	for _, st := range steps {
+		done := slices.Contains(run.Done, string(st))
+		rv.Steps = append(rv.Steps, ReviewStep{View: st, Count: counts[st], Done: done})
 		rv.Done = rv.Done && done
 	}
 	return rv

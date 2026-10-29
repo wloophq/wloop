@@ -121,7 +121,7 @@ func TestTaskNewRefusesAPropOfTheWrongType(t *testing.T) {
 			t.Errorf("--prop %s created a task: %s", c.prop, te.out)
 		}
 	}
-	all, err := te.Env.tasks.Tasks(context.Background(), task.Query{})
+	all, err := te.Env.tasks.Tasks(context.Background(), task.Query{View: "inbox"})
 	if err != nil || len(all) != 0 {
 		t.Fatalf("a refused task new left tasks: %+v %v", all, err)
 	}

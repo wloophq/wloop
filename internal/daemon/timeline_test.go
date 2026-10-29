@@ -126,7 +126,7 @@ func TestAListPageReadsTheBriefsOnce(t *testing.T) {
 		}
 	}
 	r.put(t, ts...)
-	p := r.page(t, "view=next")
+	p := r.page(t, "view=needs-me")
 	if len(p.Tasks) != n {
 		t.Fatalf("%d tasks on the page", len(p.Tasks))
 	}

@@ -24,9 +24,14 @@ const (
 	handlerWaiting  = "waiting"
 	handlerProject  = "project"
 	handlerWake     = "wake"
+	// HandlerFinish and HandlerDrop are a move and nothing else, unless a kind registers its own handler of
+	// them.
+	HandlerFinish = "finish"
+	HandlerDrop   = "drop"
 )
 
-var ownHandlers = []string{handlerSeen, handlerFocus, handlerContext, handlerArea, handlerSchedule, handlerWaiting, handlerProject, handlerWake}
+var ownHandlers = []string{handlerSeen, handlerFocus, handlerContext, handlerArea, handlerSchedule, handlerWaiting, handlerProject, handlerWake,
+	HandlerFinish, HandlerDrop}
 
 // Accepts says whether actor a may run verb v on t as its move: ErrArgs for a verb the profile does not
 // declare, ErrVerb naming the verb and the state for one t's state refuses or one whose handler the service
@@ -82,6 +87,21 @@ func (s *Service) allowed(ctx context.Context, e task.Task, v task.Verb, a task.
 	return false, nil
 }
 
+// toggleStar sets the property of the star role to its first value, starred, or to its second when it holds
+// the first; ErrVerb when the profile gives no property the star.
+func (s *Service) toggleStar(e *task.Task, req Request, now time.Time) error {
+	name, values := s.d.States.PropOf(task.RoleStar)
+	if name == "" || len(values) < 2 {
+		return fmt.Errorf("%w: %s, and no property of tasks.toml takes the star role", ErrVerb, req.Verb)
+	}
+	v := values[0]
+	if e.Prop(name).Text == values[0] {
+		v = values[1]
+	}
+	e.SetProp(name, task.Value{Text: v}, task.Writer(req.Actor), now)
+	return nil
+}
+
 // wakeChange is what a verb does to its task's wake: puts one, drops it, or neither.
 type wakeChange struct {
 	put  *wake.Wake
@@ -101,15 +121,13 @@ func (s *Service) transition(e task.Task, req Request, cur wake.Wake, now time.T
 	case handlerSeen:
 		e.Changed, e.SeenAt = false, now
 	case handlerFocus:
-		v := task.FocusOn
-		if e.Starred() {
-			v = task.FocusOff
+		if err := s.toggleStar(&e, req, now); err != nil {
+			return task.Task{}, wakeChange{}, err
 		}
-		e.SetProp(task.PropFocus, task.Value{Text: v}, task.Writer(req.Actor), now)
 	case handlerContext:
-		e.SetProp(task.PropContexts, task.Value{List: split(req.Args["set"])}, task.Writer(req.Actor), now)
+		e.SetRole(s.d.States, task.RoleContexts, task.Value{List: split(req.Args["set"])}, task.Writer(req.Actor), now)
 	case handlerArea:
-		e.SetProp(task.PropArea, task.Value{Text: strings.TrimSpace(req.Args["set"])}, task.Writer(req.Actor), now)
+		e.SetRole(s.d.States, task.RoleArea, task.Value{Text: strings.TrimSpace(req.Args["set"])}, task.Writer(req.Actor), now)
 	case handlerSchedule:
 		w, err := scheduleArgs(e, cur, req.Args, now)
 		if err != nil {

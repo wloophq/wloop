@@ -10,46 +10,161 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
 const draftPrefix = "draft:"
 
-// outboxView serves the Outbox: one virtual task per draft of an enabled plugin whose gate is open, or whose gate
-// approved it and whose delivery failed or a restart has yet to settle, newest first, never stored.
-type outboxView struct{ s *Server }
+// gatesView serves the profile's views over gates, never stored: each gate in the view stands as a task, a
+// draft gate as its draft's own task, any other as the task it is on.
+type gatesView struct{ s *Server }
 
-func (v outboxView) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) {
-	if len(q.Contexts) > 0 {
-		return nil, nil
-	}
-	ds, err := v.drafts(ctx)
+// gateIn is a gate a view over gates ranges over, and the draft of a draft gate.
+type gateIn struct {
+	gate  gate.Gate
+	draft *draft.Draft
+}
+
+func (v gatesView) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) {
+	gs, err := v.s.gatesIn(ctx, string(q.View))
 	if err != nil {
 		return nil, err
 	}
-	out := make([]task.Task, 0, len(ds))
-	for _, p := range ds {
-		d := p.Draft
-		e, err := draftTask(d, p.Gate, v.s.unitLabel(d.Unit), v.s.loaded().Tasks)
+	var out []task.Task
+	seen := map[task.ID]bool{}
+	for _, g := range gs {
+		e, ok, err := v.s.gateTask(ctx, g)
 		if err != nil {
-			v.s.logf("outbox: draft %d: %v", d.ID, err)
-			continue
+			return nil, err
 		}
-		out = append(out, e)
+		if ok && !seen[e.ID] {
+			seen[e.ID] = true
+			out = append(out, e)
+		}
 	}
 	return out, nil
 }
 
-func (v outboxView) drafts(ctx context.Context) ([]outbox.Pending, error) {
-	ps, err := v.s.deps.Outbox.Outbox(ctx)
-	return slices.DeleteFunc(ps, func(p outbox.Pending) bool { return !v.s.pluginEnabled(p.Draft.Unit.Provider) }), err
+// gateTask is the task gate g stands as in a view: a draft's own task, which takes the properties of the task
+// the gate is on that it does not set itself, so the area and contexts narrow it as they do that task; else
+// the task the gate is on; false for a gate on no task.
+func (s *Server) gateTask(ctx context.Context, g gateIn) (task.Task, bool, error) {
+	var on task.Task
+	if g.gate.Task != "" {
+		var err error
+		on, err = s.deps.Tasks.Task(ctx, g.gate.Task)
+		if err != nil && !errors.Is(err, coretasks.ErrNoTask) {
+			return task.Task{}, false, err
+		}
+	}
+	if g.draft == nil {
+		return on, on.ID != "", nil
+	}
+	e, err := draftTask(*g.draft, g.gate, s.unitLabel(g.draft.Unit), s.loaded().Tasks)
+	if err != nil {
+		s.logf("outbox: draft %d: %v", g.draft.ID, err)
+		return task.Task{}, false, nil
+	}
+	for name, v := range on.Props {
+		if _, set := e.Props[name]; !set {
+			e.SetProp(name, v, on.Written[name].By, on.Written[name].At)
+		}
+	}
+	return e, true, nil
 }
 
-func (v outboxView) Task(ctx context.Context, id task.ID) (task.Task, bool, error) {
+// gatesIn are the gates view lists, oldest first: of the open gates and the approved draft gates whose
+// delivery has not settled, those its when holds over, but those on a disabled plugin's unit when it hides
+// them.
+func (s *Server) gatesIn(ctx context.Context, view string) ([]gateIn, error) {
+	def := s.loaded().Views
+	spec, ok := def.View(view)
+	if !ok || spec.Over != task.OverGates || s.deps.GateReader == nil {
+		return nil, nil
+	}
+	cands, err := s.gateCandidates(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var out []gateIn
+	for _, g := range cands {
+		if spec.HideDisabled && !g.gate.Unit.IsZero() && !s.pluginEnabled(g.gate.Unit.Provider) {
+			continue
+		}
+		delivery := ""
+		if g.draft != nil {
+			delivery = string(g.draft.State)
+		}
+		in, err := catalog.GateView(def, view, g.gate, intentload.GateFacts(g.gate, delivery))
+		if err != nil {
+			return nil, err
+		}
+		if in {
+			out = append(out, g)
+		}
+	}
+	return out, nil
+}
+
+// gateCandidates are the open gates and the approved draft gates whose draft is queued, sending or failed, each
+// draft gate with its draft, oldest first.
+func (s *Server) gateCandidates(ctx context.Context) ([]gateIn, error) {
+	open, err := s.deps.GateReader.Where(ctx, gates.Query{})
+	if err != nil {
+		return nil, err
+	}
+	var out []gateIn
+	seen := map[int64]bool{}
+	for _, g := range open {
+		seen[g.ID] = true
+		out = append(out, gateIn{gate: g})
+	}
+	if o := s.deps.Outbox; o != nil {
+		ds, err := o.List(ctx, outbox.Filter{States: []draft.State{draft.Held, draft.Queued, draft.Sending, draft.Failed}})
+		if err != nil {
+			return nil, err
+		}
+		byID := map[draft.ID]draft.Draft{}
+		for _, d := range ds {
+			byID[d.ID] = d
+		}
+		for i := range out {
+			if out[i].gate.Kind != gate.KindDraft {
+				continue
+			}
+			if id, ok := draftIDOf(task.ID(draftPrefix + out[i].gate.Subject)); ok {
+				if d, ok := byID[id]; ok {
+					out[i].draft = &d
+				}
+			}
+		}
+		for _, d := range ds {
+			if d.State == draft.Held {
+				continue
+			}
+			g, ok, err := o.GateOf(ctx, d)
+			if err != nil {
+				return nil, err
+			}
+			if ok && !seen[g.ID] && g.Status == gate.Approved {
+				seen[g.ID] = true
+				out = append(out, gateIn{gate: g, draft: &d})
+			}
+		}
+	}
+	slices.SortStableFunc(out, func(a, b gateIn) int { return cmp.Compare(a.gate.ID, b.gate.ID) })
+	return out, nil
+}
+
+func (v gatesView) Task(ctx context.Context, id task.ID) (task.Task, bool, error) {
 	n, ok := draftIDOf(id)
 	if !ok {
 		return task.Task{}, false, nil
@@ -69,11 +184,6 @@ func (v outboxView) Task(ctx context.Context, id task.ID) (task.Task, bool, erro
 	return e, err == nil, err
 }
 
-func (v outboxView) Count(ctx context.Context, _ string) (int, error) {
-	ds, err := v.drafts(ctx)
-	return len(ds), err
-}
-
 func draftIDOf(id task.ID) (draft.ID, bool) {
 	raw, ok := strings.CutPrefix(string(id), draftPrefix)
 	if !ok {
@@ -91,14 +201,14 @@ var draftCategories = map[draft.State]task.Category{
 }
 
 // draftTask is d's virtual task; g is its gate, whose window is the task's due date.
-func draftTask(d draft.Draft, g gate.Gate, where string, st task.States) (task.Task, error) {
+func draftTask(d draft.Draft, g gate.Gate, where string, st task.Profile) (task.Task, error) {
 	e := task.Task{ID: task.ID(draftPrefix + strconv.FormatInt(int64(d.ID), 10)), Title: draftTitle(d, where), Units: []unit.Unit{d.Unit}, Origin: task.OriginDraft,
 		Created: d.CreatedAt, Updated: d.UpdatedAt}
 	if err := e.MoveTo(draftCategories[d.State], st); err != nil {
 		return task.Task{}, err
 	}
 	if g.Status == gate.Open {
-		e.SetProp(task.PropDue, task.Value{Time: g.Deadline}, task.WriterPlugin, d.UpdatedAt)
+		e.SetRole(st, task.RoleDeadline, task.Value{Time: g.Deadline}, task.WriterPlugin, d.UpdatedAt)
 	}
 	for _, it := range d.Items {
 		e.Items = append(e.Items, task.ItemRef{Unit: d.Unit, Item: it})
@@ -144,7 +254,7 @@ func (s *Server) withDraft(ctx context.Context, e task.Task, v *api.TaskView) er
 	facts := s.draftFacts(d)
 	open := g.Status == gate.Open
 	for i, vs := range v.Verbs {
-		action, ok := draftHandlers[cmp.Or(s.loaded().Tasks.Handler(vs.Verb), vs.Verb)]
+		action, ok := draftHandlers[s.loaded().Tasks.Handler(vs.Verb)]
 		switch {
 		case !ok:
 			v.Verbs[i] = api.VerbState{Verb: vs.Verb, Reason: "a draft takes approve, edit, dismiss and retry"}

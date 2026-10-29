@@ -40,8 +40,8 @@ func TestDigestContents(t *testing.T) {
 	if code := get(t, r.s, api.DigestPath+"?day=2026-10-08", &d); code != 200 {
 		t.Fatalf("%d", code)
 	}
-	if d.Day != "2026-10-08" || !slices.Equal(d.Tasks, []string{"e-next", "e-wait"}) || d.Title == "" ||
-		d.Counts.Views["inbox"] != 1 || d.Counts.Views["next"] != 3 || !strings.Contains(d.Body, "2 new") {
+	if d.Day != "2026-10-08" || !slices.Equal(slices.Sorted(slices.Values(d.Tasks)), []string{"e-in", "e-next", "e-wait"}) || d.Title == "" ||
+		d.Counts.Views["inbox"] != 1 || d.Counts.Views["needs-me"] < 3 || !strings.Contains(d.Body, "3 new in Inbox or Needs me") {
 		t.Fatalf("%+v", d)
 	}
 	if code := get(t, r.s, api.DigestPath+"?day=08/10/2026", &d); code != 400 {

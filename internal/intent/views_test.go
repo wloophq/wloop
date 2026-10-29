@@ -1,13 +1,15 @@
 package intent
 
 import (
-	"github.com/wloophq/wloop/internal/domain/workflow"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
 
+	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/profile"
 )
@@ -42,10 +44,32 @@ func splitLists(src string) map[string]string {
 	return out
 }
 
-// lists are the views' texts and the verbs' of tasks.toml.
+// lists are the views and the verbs' texts of tasks.toml.
 type lists struct {
-	ListTexts
+	ViewsDef
 	Verbs map[string]VerbText
+}
+
+// label is view id's label; "" when the profile declares none.
+func (l lists) label(id string) string {
+	v, _ := l.View(id)
+	return v.Label
+}
+
+// key is view id's key; "" when it has none.
+func (l lists) key(id string) string {
+	v, _ := l.View(id)
+	return v.Key
+}
+
+// step is the label of the review step that walks view id; "" when none does.
+func (l lists) step(id string) string {
+	for _, st := range l.Review {
+		if st.View == id {
+			return st.Label
+		}
+	}
+	return ""
 }
 
 func loadListsWith(t *testing.T, bundled, user string) (lists, string) {
@@ -64,12 +88,12 @@ func loadListsWith(t *testing.T, bundled, user string) (lists, string) {
 	for file, src := range splitLists(bundled) {
 		fsys[file] = &fstest.MapFile{Data: []byte(src)}
 	}
-	texts, tasks, problems := loadLists(layers, fsys, nil)
+	texts, tasks, problems := loadViews(layers, fsys, nil)
 	return lists{texts, tasks.Verbs}, problems.Error()
 }
 
 func TestEveryVerbAndViewIsWorded(t *testing.T) {
-	views, tasks, problems := loadLists(nil, os.DirFS("../../profiles/default"), nil)
+	views, tasks, problems := loadViews(nil, os.DirFS("../../profiles/default"), nil)
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
@@ -84,31 +108,36 @@ func TestEveryVerbAndViewIsWorded(t *testing.T) {
 			t.Errorf("verb %s asks for a value and says nothing", v)
 		}
 	}
-	for _, v := range builtin.Views {
-		if texts.Views[v] == "" {
-			t.Errorf("view %s: no label", v)
+	for _, v := range texts.Views {
+		if v.Label == "" {
+			t.Errorf("view %s: no label", v.ID)
+		}
+	}
+	for _, st := range texts.Review {
+		if st.Label == "" {
+			t.Errorf("review step %s: no label", st.View)
 		}
 	}
 }
 
 func TestListTextsComeFromTheProfile(t *testing.T) {
-	texts, problems := loadListsWith(t, string(defaultLists()), "[verbs.done]\nsummary = \"Close it\"\n\n[views.next]\nlabel = \"Now\"\n")
+	texts, problems := loadListsWith(t, string(defaultLists()), "[verbs.done]\nsummary = \"Close it\"\n\n[views.needs-me]\nlabel = \"Now\"\n")
 	if problems != "" {
 		t.Fatal(problems)
 	}
 	if got := texts.Verbs["done"]; got.Label != "Done" || got.Summary != "Close it" {
 		t.Errorf("done: %+v", got)
 	}
-	if got := texts.Views["next"]; got != "Now" {
-		t.Errorf("next view: %q", got)
+	if got := texts.label("needs-me"); got != "Now" {
+		t.Errorf("needs-me view: %q", got)
 	}
 }
 
 func TestAUserListsTableNamingNoVerbFails(t *testing.T) {
-	texts, problems := loadListsWith(t, string(defaultLists()), "[verbs.dne]\nsummary = \"x\"\n\n[views.nxt]\nlabel = \"x\"\n")
+	texts, problems := loadListsWith(t, string(defaultLists()), "[verbs.dne]\nsummary = \"x\"\n\n[views.later]\nwhen = \"true\"\n")
 	for _, want := range []string{
 		"verbs.dne: names no verb; did you mean \"done\"?",
-		"views.nxt: names no view; did you mean \"next\"?",
+		"views.later.label: is required",
 	} {
 		if !strings.Contains(problems, want) {
 			t.Errorf("no %q in:\n%s", want, problems)
@@ -126,8 +155,8 @@ func TestAnEmptyListTextKeepsTheBundledOne(t *testing.T) {
 			t.Errorf("no %q in:\n%s", want, problems)
 		}
 	}
-	if texts.Verbs["next"].Label != "Next" || texts.Views["inbox"] != "Inbox" {
-		t.Errorf("bundled texts lost: %+v %q", texts.Verbs["next"], texts.Views["inbox"])
+	if texts.Verbs["next"].Label != "Next" || texts.label("inbox") != "Inbox" {
+		t.Errorf("bundled texts lost: %+v %q", texts.Verbs["next"], texts.label("inbox"))
 	}
 }
 
@@ -152,17 +181,93 @@ func TestAVerbThatAsksNeedsItsQuestion(t *testing.T) {
 }
 
 func TestTheReviewStepsAreWordedByTheProfile(t *testing.T) {
-	texts, problems := loadListsWith(t, string(defaultLists()), "[review.waiting]\nlabel = \"Chase what waits\"\n\n[review.inbx]\nlabel = \"x\"\n")
-	if !strings.Contains(problems, "review.inbx: names no review step; did you mean \"inbox\"?") {
-		t.Errorf("%s", problems)
+	texts, problems := loadListsWith(t, string(defaultLists()), "[review.waiting]\nlabel = \"Chase what waits\"\n")
+	if problems != "" {
+		t.Fatal(problems)
 	}
-	if texts.Review["waiting"] != "Chase what waits" || texts.Review["inbox"] != "Inbox to zero" {
+	if texts.step("waiting") != "Chase what waits" || texts.step("inbox") != "Inbox to zero" {
 		t.Errorf("review %v", texts.Review)
 	}
-	for _, id := range builtin.ReviewSteps {
-		if bundled, _ := BundledLists(os.DirFS("../../profiles/default")); bundled.Review[id] == "" {
-			t.Errorf("review step %s has no label", id)
+}
+
+func TestAReviewStepNamesAView(t *testing.T) {
+	texts, problems := loadListsWith(t, string(defaultLists()), "[review.inbx]\nlabel = \"x\"\n\n[badge]\nviews = [\"inbox\", \"neds-me\"]\n")
+	for _, want := range []string{
+		"review.inbx: names no view of views.toml; did you mean \"inbox\"?",
+		"badge.views[1]: names no view of views.toml; did you mean \"needs-me\"?",
+	} {
+		if !strings.Contains(problems, want) {
+			t.Errorf("no %q in:\n%s", want, problems)
 		}
+	}
+	if slices.ContainsFunc(texts.Review, func(st ReviewStepDef) bool { return st.View == "inbx" }) || !slices.Equal(texts.Badge, []string{"inbox"}) {
+		t.Errorf("review %v, badge %v", texts.Review, texts.Badge)
+	}
+	var walked []string
+	for _, st := range texts.Review {
+		if _, ok := texts.View(st.View); !ok {
+			t.Errorf("review step %s walks no view", st.View)
+		}
+		walked = append(walked, st.View)
+	}
+	if want := []string{"inbox", "outbox", "waiting", "review-projects", "someday", "focus"}; !slices.Equal(walked, want) {
+		t.Errorf("the review walks %v, want %v", walked, want)
+	}
+}
+
+func TestAUserViewLoads(t *testing.T) {
+	user := "[views.later]\nlabel = \"Later\"\nkey = \"g y\"\nwhen = \"task.prop.priority == 'low' && task.gates_open == 0\"\ngroup = \"task.prop.area\"\nsort = \"-task.prop.due, task.id\"\n\n" +
+		"[views.asks]\nlabel = \"Asks\"\nover = \"gates\"\nwhen = \"gate.kind == 'question'\"\n\n" +
+		"[review.later]\nlabel = \"Anything to pull in?\"\n\n[badge]\nviews = [\"inbox\", \"later\"]\n"
+	texts, problems := loadListsWith(t, string(defaultLists()), user)
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	later, ok := texts.View("later")
+	if !ok || later.Label != "Later" || later.Key != "g y" || later.Over != task.OverTasks || later.Group != "task.prop.area" || later.When == nil ||
+		!slices.Equal(later.Sort, []SortKey{{Fact: "task.prop.due", Desc: true}, {Fact: "task.id"}}) {
+		t.Fatalf("later %+v", later)
+	}
+	for f, want := range map[string]bool{"low": true, "high": false} {
+		got, err := later.When.Match(workflow.Vars{Facts: workflow.Facts{"task.prop.priority": f, "task.gates_open": 0}})
+		if err != nil || got != want {
+			t.Errorf("priority %s: %v %v", f, got, err)
+		}
+	}
+	if asks, ok := texts.View("asks"); !ok || asks.Over != task.OverGates || asks.When == nil {
+		t.Errorf("asks %+v", asks)
+	}
+	if texts.step("later") == "" || !texts.Badged("later") || texts.Badged("needs-me") {
+		t.Errorf("review %v, badge %v", texts.Review, texts.Badge)
+	}
+	_, problems = loadListsWith(t, string(defaultLists()), "[views.later]\nlabel = \"Later\"\nwhen = \"gate.kind == 'draft'\"\ngroup = \"task.nope\"\n")
+	for _, want := range []string{"views.later.when:", "views.later.group: task.nope names no fact of a view over tasks"} {
+		if !strings.Contains(problems, want) {
+			t.Errorf("no %q in:\n%s", want, problems)
+		}
+	}
+}
+
+func TestViewsKeepTheirDeclaredOrderAcrossLayers(t *testing.T) {
+	user := "[views.zeta]\nlabel = \"Zeta\"\nwhen = \"true\"\n\n[views.inbox]\nlabel = \"In\"\n\n[views.alpha]\nlabel = \"Alpha\"\nwhen = \"true\"\n\n" +
+		"[review.zeta]\nlabel = \"z\"\n\n[review.alpha]\nlabel = \"a\"\n"
+	texts, problems := loadListsWith(t, string(defaultLists()), user)
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	bundled, _ := BundledViews(os.DirFS("../../profiles/default"))
+	if want := append(bundled.IDs(), "zeta", "alpha"); !slices.Equal(texts.IDs(), want) {
+		t.Errorf("views %v, want %v", texts.IDs(), want)
+	}
+	if want := []string{"inbox", "needs-me", "waiting", "snoozed", "focus", "projects", "someday", "logbook", "outbox", "review-projects", "review"}; !slices.Equal(bundled.IDs(), want) {
+		t.Errorf("bundled views %v, want %v", bundled.IDs(), want)
+	}
+	var steps []string
+	for _, st := range texts.Review {
+		steps = append(steps, st.View)
+	}
+	if want := []string{"inbox", "outbox", "waiting", "review-projects", "someday", "focus", "zeta", "alpha"}; !slices.Equal(steps, want) {
+		t.Errorf("steps %v, want %v", steps, want)
 	}
 }
 
@@ -205,12 +310,12 @@ func TestAGatedVerbNamesItsGate(t *testing.T) {
 }
 
 func TestAViewsKeyComesFromTheProfile(t *testing.T) {
-	got, problems := loadListsWith(t, string(defaultLists()), "[views.waiting]\nkey = \"g x\"\n\n[views.logbook]\nkey = \"l\"\n\n[views.focus]\nkey = \"g p\"\n")
-	if got.Keys["waiting"] != "g x" || got.Keys["inbox"] != "g i" || got.Keys["someday"] != "" || got.Keys["logbook"] != "" {
-		t.Errorf("keys %v", got.Keys)
+	got, problems := loadListsWith(t, string(defaultLists()), "[views.waiting]\nkey = \"g x\"\n\n[views.review-projects]\nkey = \"l\"\n\n[views.focus]\nkey = \"g p\"\n")
+	if got.key("waiting") != "g x" || got.key("inbox") != "g i" || got.key("review-projects") != "" || got.key("logbook") != "" {
+		t.Errorf("keys %+v", got.Views)
 	}
 	for _, want := range []string{
-		"views.logbook.key: l is not a chord",
+		"views.review-projects.key: l is not a chord",
 		"views.focus.key: g p is the key of views.projects too",
 	} {
 		if !strings.Contains(problems, want) {

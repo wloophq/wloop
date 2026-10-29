@@ -159,11 +159,11 @@ func TestV7KindsSplitsAWaitingTaskKeepingItsNudge(t *testing.T) {
 		if !e.Prop(task.PropCheckOn).Time.Equal(v6Resurface) || e.Written[task.PropCheckOn].By != task.WriterPerson {
 			t.Errorf("%s check_on %v by %s", id, e.Prop(task.PropCheckOn).Time, e.Written[task.PropCheckOn].By)
 		}
-		if !e.Starred() {
+		if !(e.Prop("focus").Text == "on") {
 			t.Errorf("%s lost its star", id)
 		}
-		if e.Prop("autostar").Text != "on" || e.Written[task.PropFocus].By != task.WriterWorkflow {
-			t.Errorf("%s autostar %q, focus by %s: want the loop's star kept as one", id, e.Prop("autostar").Text, e.Written[task.PropFocus].By)
+		if e.Prop("autostar").Text != "on" || e.Written["focus"].By != task.WriterWorkflow {
+			t.Errorf("%s autostar %q, focus by %s: want the loop's star kept as one", id, e.Prop("autostar").Text, e.Written["focus"].By)
 		}
 		if e.Prop(task.PropKind).Text != "thread" || e.Written[task.PropKind].By != task.WriterPlugin {
 			t.Errorf("%s kind %q by %s", id, e.Prop(task.PropKind).Text, e.Written[task.PropKind].By)

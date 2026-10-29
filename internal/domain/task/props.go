@@ -36,11 +36,7 @@ func (p Props) Get(name string) (Value, bool) {
 
 // The properties the loop's own rules read, as the bundled tasks.toml declares them.
 const (
-	PropFocus    = "focus"
-	PropArea     = "area"
-	PropContexts = "contexts"
-	PropDue      = "due"
-	PropKind     = "kind"
+	PropKind = "kind"
 	// PropOwner is who owns the task; the waiting verb's on names it.
 	PropOwner = "owner"
 	// PropCheckOn is when to check on a task someone else owes; the waiting verb's resurface sets it.
@@ -49,11 +45,38 @@ const (
 	PropLastNudge = "last_nudge"
 )
 
-// FocusOn stars a task in Focus; FocusOff is a star the user cleared.
+// Role is a mechanism of the loop that reads or writes a task property: the profile's tasks.toml gives it to
+// the property it acts on, so Go names the role and never the property.
+type Role string
+
+// The roles, a closed set.
 const (
-	FocusOn  = "on"
-	FocusOff = "off"
+	// RoleArea is the property the area filter of the lists and their counters reads, which the area handler
+	// sets and a new parent takes from the task it starts with: a string.
+	RoleArea Role = "area"
+	// RoleContexts is the property the contexts filter reads, which the context handler sets and a task takes
+	// from the item or the request that opens it: a string[].
+	RoleContexts Role = "contexts"
+	// RoleStar is the property the star handler toggles between its first value, starred, and its second: an
+	// enum.
+	RoleStar Role = "star"
+	// RoleDeadline is the property a task takes from its items' deadline, and a draft's task from its gate's
+	// window: a date.
+	RoleDeadline Role = "deadline"
 )
+
+// Roles are every role.
+var Roles = []Role{RoleArea, RoleContexts, RoleStar, RoleDeadline}
+
+// RoleTypes are the type of the property each role acts on.
+var RoleTypes = map[Role]PropType{RoleArea: PropString, RoleContexts: PropStrings, RoleStar: PropEnum, RoleDeadline: PropDate}
+
+// Profile is the profile as the rules read it: its states, and the property each role acts on with its
+// values, "" for a role no property takes.
+type Profile interface {
+	States
+	PropOf(r Role) (name string, values []string)
+}
 
 // Prop is the task's property name; a zero Value when it is unset.
 func (e Task) Prop(name string) Value { return e.Props[name] }
@@ -83,8 +106,18 @@ func (e *Task) SetProp(name string, v Value, by Writer, at time.Time) {
 	e.Props[name], e.Written[name] = v, Written{By: by, At: at}
 }
 
-// Starred says whether the task is starred in Focus.
-func (e Task) Starred() bool { return e.Prop(PropFocus).Text == FocusOn }
+// Role is the value of the property role acts on in p; a zero Value when no property takes it or it is unset.
+func (e Task) Role(p Profile, r Role) Value {
+	name, _ := p.PropOf(r)
+	if name == "" {
+		return Value{}
+	}
+	return e.Prop(name)
+}
 
-// Due is when the task is due; zero when it has no date.
-func (e Task) Due() time.Time { return e.Prop(PropDue).Time }
+// SetRole sets the property role acts on in p, as SetProp does; nothing when no property takes it.
+func (e *Task) SetRole(p Profile, r Role, v Value, by Writer, at time.Time) {
+	if name, _ := p.PropOf(r); name != "" {
+		e.SetProp(name, v, by, at)
+	}
+}

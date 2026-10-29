@@ -186,9 +186,66 @@ func stateSQLHits(fset *token.FileSet, rel string, f *ast.File, states []string)
 	return out
 }
 
-// TestGoNamesNoBundledProperty checks that Go names no property of the bundled tasks.toml: the constants
-// PropFocus, PropArea, PropContexts, PropDue, FocusOn and FocusOff of internal/domain/task/props.go go once the
-// lists, the counters and the automatic star are the profile's.
+// TestGoNamesNoBundledProperty checks that Go names no property the bundled tasks.toml gives a role (area,
+// contexts, star, deadline): outside internal/intent, no Go call of Prop, SetProp, PropText, PropList or
+// PropTime passes such a name as a constant. Go names the role and reads the property the profile gives it.
 func TestGoNamesNoBundledProperty(t *testing.T) {
-	t.Skip("carried from M2 review: W2b removes the Go-named bundled properties")
+	t.Parallel()
+	props := roledProps(t)
+	fset, files := typedFiles(t)
+	var hits []string
+	for _, tf := range files {
+		if !stateExempt(tf.rel) {
+			hits = append(hits, propNameHits(fset, tf.rel, tf.info, tf.file, props)...)
+		}
+	}
+	slices.Sort(hits)
+	for _, h := range hits {
+		t.Error(h)
+	}
+}
+
+// roledProps are the properties the bundled tasks.toml gives a role.
+func roledProps(t *testing.T) []string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "tasks.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for _, m := range regexp.MustCompile(`(?m)^\[props\.([\w-]+)\]\n(?:[^\[\n].*\n)*?role\s*=`).FindAllStringSubmatch(string(b), -1) {
+		out = append(out, m[1])
+	}
+	if len(out) == 0 {
+		t.Fatal("the bundled tasks.toml gives no property a role")
+	}
+	return out
+}
+
+// propAccessors are the methods that read or write a property by its name.
+var propAccessors = []string{"Prop", "SetProp", "PropText", "PropList", "PropTime"}
+
+// propNameHits are the calls of f to a property accessor whose first argument is a constant naming one of props.
+func propNameHits(fset *token.FileSet, rel string, info *types.Info, f *ast.File, props []string) []string {
+	var out []string
+	ast.Inspect(f, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok || len(call.Args) == 0 {
+			return true
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || !slices.Contains(propAccessors, sel.Sel.Name) {
+			return true
+		}
+		tv, ok := info.Types[call.Args[0]]
+		if !ok || tv.Value == nil {
+			return true
+		}
+		name, err := strconv.Unquote(tv.Value.ExactString())
+		if err == nil && slices.Contains(props, name) {
+			out = append(out, fmt.Sprintf("%s:%d: %s names the property %q; read the property of its role", rel, fset.Position(call.Pos()).Line, sel.Sel.Name, name))
+		}
+		return true
+	})
+	return out
 }

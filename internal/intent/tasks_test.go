@@ -121,6 +121,35 @@ func TestAPropertyOfAnUnknownTypeIsAProblem(t *testing.T) {
 	}
 }
 
+func TestAPropertysRoleIsTheProfiles(t *testing.T) {
+	t.Parallel()
+	d, problems := loadTasksWith(t, defaultTasks(t), "")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	for r, want := range map[task.Role]string{task.RoleArea: "area", task.RoleContexts: "contexts", task.RoleStar: "focus", task.RoleDeadline: "due"} {
+		if got, _ := d.PropOf(r); got != want {
+			t.Errorf("%s: %q, want %q", r, got, want)
+		}
+	}
+	d, problems = loadTasksWith(t, defaultTasks(t), "[props.pin]\ntype = \"enum\"\nvalues = [\"yes\", \"no\"]\nrole = \"star\"\n")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	if got, values := d.PropOf(task.RoleStar); got != "pin" || !slices.Equal(values, []string{"yes", "no"}) {
+		t.Errorf("a user's star: %q %v", got, values)
+	}
+	for src, want := range map[string]string{
+		"[props.pin]\ntype = \"enum\"\nvalues = [\"yes\", \"no\"]\nrole = \"star\"\n\n[props.flag]\ntype = \"enum\"\nvalues = [\"up\", \"down\"]\nrole = \"star\"\n": "star is the role of props.",
+		"[props.where]\ntype = \"date\"\nrole = \"area\"\n":                   "props.where.role: area acts on a property of type string, not date",
+		"[props.pin]\ntype = \"enum\"\nvalues = [\"yes\"]\nrole = \"flag\"\n": "props.pin.role",
+	} {
+		if _, problems := loadTasksWith(t, defaultTasks(t), src); !strings.Contains(problems, want) {
+			t.Errorf("%s: problems %q, want %q", src, problems, want)
+		}
+	}
+}
+
 func TestAStateOfAnUnknownCategoryIsAProblem(t *testing.T) {
 	t.Parallel()
 	d, problems := loadTasksWith(t, defaultTasks(t), "[states.blocked]\ncategory = \"stuck\"\n")

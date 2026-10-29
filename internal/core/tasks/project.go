@@ -32,8 +32,8 @@ type ProjectDeps struct {
 	Dossiers ProjectDossiers // nil keeps no dossiers
 }
 
-// endVerbs end a project, so its dossier's lifecycle starts.
-var endVerbs = []task.Verb{task.VerbDone, task.VerbDismiss, task.VerbReference}
+// endHandlers end a project, so its dossier's lifecycle starts.
+var endHandlers = []string{HandlerFinish, HandlerDrop}
 
 type projects struct {
 	s *Service
@@ -41,7 +41,7 @@ type projects struct {
 }
 
 // ServeProjects runs the project verbs on s (project with its position, sequential, reviewed), resolves an
-// ending project's dossier, and serves the review view and the Review.
+// ending project's dossier, and serves the review.
 func (s *Service) ServeProjects(d ProjectDeps) {
 	p := &projects{s: s, d: d}
 	s.Register(EveryKind, string(task.VerbProject), p.attach)
@@ -50,18 +50,12 @@ func (s *Service) ServeProjects(d ProjectDeps) {
 	})
 	s.Register(task.KindProject, string(task.VerbSequential), p.sequential)
 	s.Register(task.KindProject, string(task.VerbReviewed), p.reviewed)
-	for _, v := range endVerbs {
-		s.Register(task.KindProject, string(v), p.end)
+	for _, h := range endHandlers {
+		s.Register(task.KindProject, h, p.end)
 	}
-	s.RegisterView(task.ViewReview, "", &reviewSource{s: s, store: d.Store})
-}
-
-// Serves says whether v is served: a stored view, the outbox, or a view a ViewSource serves.
-func (s *Service) Serves(v task.View) bool {
-	if _, ok := s.view(v); ok || v == task.ViewOutbox {
-		return true
-	}
-	return slices.Contains(task.StoredViews, v)
+	s.reg.Lock()
+	s.runs = d.Store
+	s.reg.Unlock()
 }
 
 // ProjectState is a project's status at the service's now.
@@ -72,7 +66,7 @@ type ProjectState struct {
 
 // ProjectsStatus is each live project's next action, open actions and review mark, over one read of the open set.
 func (s *Service) ProjectsStatus(ctx context.Context) (map[task.ID]ProjectState, error) {
-	open, err := s.d.Store.Tasks(ctx, task.Query{View: task.ViewOpen})
+	open, err := s.d.Store.Tasks(ctx, task.Query{})
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +82,7 @@ func (s *Service) ProjectsStatus(ctx context.Context) (map[task.ID]ProjectState,
 
 // Children are the open children of every parent, in sibling order: by Position, then id.
 func (s *Service) Children(ctx context.Context) (map[task.ID][]task.ID, error) {
-	open, err := s.d.Store.Tasks(ctx, task.Query{View: task.ViewOpen})
+	open, err := s.d.Store.Tasks(ctx, task.Query{})
 	if err != nil {
 		return nil, err
 	}
@@ -163,13 +157,13 @@ func (p *projects) attach(ctx context.Context, e task.Task, req Request) (Result
 				return nil, err
 			}
 			proj.SetProp(task.PropKind, task.Value{Text: task.KindProject}, task.WriterWorkflow, now)
-			proj.SetProp(task.PropArea, e.Prop(task.PropArea), task.WriterPerson, now)
+			proj.SetRole(p.s.d.States, task.RoleArea, e.Role(p.s.d.States, task.RoleArea), task.WriterPerson, now)
 			created = proj
 			cs = append(cs, task.Change{Op: task.OpCreate, Task: proj, Why: "project"})
 		default:
 			return nil, fmt.Errorf("%w: project needs id or title", ErrArgs)
 		}
-		open, err := p.s.d.Store.Tasks(ctx, task.Query{View: task.ViewOpen})
+		open, err := p.s.d.Store.Tasks(ctx, task.Query{})
 		if err != nil {
 			return nil, err
 		}

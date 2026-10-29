@@ -407,7 +407,7 @@ func (r *replay) draftsState() string {
 	for _, d := range ds {
 		fmt.Fprintf(&b, "%d:%s;", d.ID, d.State)
 	}
-	es, err := r.db.Tasks().Tasks(context.Background(), task.Query{View: task.ViewOpen})
+	es, err := r.db.Tasks().Tasks(context.Background(), task.Query{})
 	if err != nil {
 		r.t.Fatal(err)
 	}

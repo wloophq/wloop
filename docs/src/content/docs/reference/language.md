@@ -209,8 +209,10 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `verbs.<name>.by` (table by name): Who may run the verb, by actor (person, workflow, agent, plugin); an actor left out may not.
 - `verbs.<name>.by.<name>` (string): A predicate over the task's facts that lets the actor run the verb where it holds, or "gate", which opens the gate the verb's gate names, and a person's approval runs the verb as theirs; true lets the actor run it anywhere.
 - `verbs.<name>.gate` (string): The gate, of gates.toml, a by.&lt;actor&gt; of "gate" opens; required when one does.
-- `verbs.<name>.handler` (one of `focus`, `schedule`, `wake`, `waiting`, `approve`, `delegate`, `answer`, `edit`, `retry`, `reply`, `project`, `context`, `area`, `seen`, `reviewed`, `sequential`): What the verb runs besides its move, a handler of the loop's; none when absent.
-  - `focus`: Stars the task in Focus, or takes the star off.
+- `verbs.<name>.handler` (one of `finish`, `drop`, `focus`, `schedule`, `wake`, `waiting`, `approve`, `delegate`, `answer`, `edit`, `retry`, `reply`, `project`, `context`, `area`, `seen`, `reviewed`, `sequential`): What the verb runs besides its move, a handler of the loop's; none when absent.
+  - `finish`: Moves the task to the verb's to; a project's dossier starts its lifecycle.
+  - `drop`: Moves the task to the verb's to; a kind another service serves drops its subject: a draft is discarded, a message's gate refused.
+  - `focus`: Stars the task, or takes the star off: toggles the property of role star.
   - `schedule`: Hides the task until a date or until its unit moves, then brings it back where it was.
   - `wake`: Brings a deferred task back where its wake returns it, the first ready state when it names none, and drops the wake.
   - `waiting`: Records who the task waits on and when it resurfaces.
@@ -221,8 +223,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `retry`: Sends again the task's approved draft whose delivery failed.
   - `reply`: Posts a reply or a reaction on the task's unit; the composer's verb.
   - `project`: Files the task under a parent, creating it from a title.
-  - `context`: Sets the task's contexts.
-  - `area`: Sets the task's area.
+  - `context`: Sets the task's contexts: the property of role contexts.
+  - `area`: Sets the task's area: the property of role area.
   - `seen`: Marks the task seen; clients send it when it opens.
   - `reviewed`: Marks a parent task reviewed.
   - `sequential`: Switches a parent task's children between sequential and parallel.
@@ -237,6 +239,11 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `agent`: An agent's turn; untrusted.
   - `plugin`: A source plugin; untrusted.
 - `props.<name>.doc` (string): What the property holds, for the facts' reference and the agents.
+- `props.<name>.role` (one of `area`, `contexts`, `star`, `deadline`): The mechanism of the loop that acts on the property; at most one property takes each role. Go names the role, never the property.
+  - `area`: A string: the area filter of the lists and the counters reads it, the area handler sets it, and a new parent takes it from the task it starts with.
+  - `contexts`: A string[]: the contexts filter reads it, the context handler sets it, and a task takes it from the item or the request that opens it.
+  - `star`: An enum: the star handler toggles it between its first value, starred, and its second.
+  - `deadline`: A date: a task takes it from its items' deadline, and a draft's task from its gate's window.
 - `states` (table by name): The states a task takes, by name, in the order the file declares them, a user layer's new ones after the bundled; clients list them in this order, and a task proposed in a category takes the first state of it.
 - `states.<name>` (table): A state, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `states.<name>.category` (one of `inbox`, `ready`, `active`, `waiting`, `deferred`, `done`, `dropped`): The state's category, which is all Go reads of it; required for a new state.
@@ -255,15 +262,15 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `views.<name>` (table): A view, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `views.<name>.label` (string): The name people read in the list of views. Required.
 - `views.<name>.over` (one of `tasks`, `gates`, default `tasks`): What the view lists: tasks, or gates.
-- `views.<name>.when` (predicate): Which tasks or gates the view lists, over their facts.
-- `views.<name>.group` (string): The fact the view groups by.
-- `views.<name>.sort` (string): The facts the view sorts by, comma-separated; a leading - sorts one descending.
+- `views.<name>.when` (predicate): Which tasks or gates the view lists, over their facts: a task's, its properties' (task.prop.*), or a gate's. A view with none lists nothing: a place in the clients' list of views that a client draws itself, such as the review.
+- `views.<name>.group` (string): The fact the view groups by, such as task.owed_by.
+- `views.<name>.sort` (string): The facts the view sorts by, comma-separated; a leading - sorts one descending. A view's tasks start oldest first, a parent's children in their sibling order.
 - `views.<name>.key` (string): The key that jumps to the view: `g`, a space and a key that no core key uses, such as `g i`. Its help is the view's label.
-- `views.<name>.hide_disabled` (bool, default `false`): The view hides the tasks of a disabled plugin.
+- `views.<name>.hide_disabled` (bool, default `false`): The view hides the tasks whose units are all of a disabled plugin, and the gates on a disabled plugin's units.
 - `badge` (table): The menu bar's badge.
-- `badge.views` (list of strings): The views whose counts the badge adds up.
-- `review` (table): The review's steps, by step.
-- `review.<name>` (table): A step of the review: inbox, outbox, waiting, projects, someday or focus. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
+- `badge.views` (list of strings): The views whose counts the badge adds up, each a view of views.
+- `review` (table): The review's steps, in the order the review walks them.
+- `review.<name>` (table): A step of the review, by the view it walks, which views declares. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones, and comes after the steps below it.
 - `review.<name>.label` (string): What the step asks of you, as the review lists it. Required.
 
 ## Gates (`gates.toml`)

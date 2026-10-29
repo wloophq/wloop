@@ -44,23 +44,9 @@ func TestStoreFiltersByCategory(t *testing.T) {
 	if err := s.Apply(ctx, cs); err != nil {
 		t.Fatal(err)
 	}
-	for v, want := range map[task.View][]task.ID{
-		task.ViewInbox: {"t-next"}, task.ViewWaiting: {"t-blocked"}, task.ViewNext: {"t-trash"}, task.ViewLogbook: {"t-archived"},
-	} {
-		got, err := s.Tasks(ctx, task.Query{View: v})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if ids := taskIDs(got); !slices.Equal(ids, want) {
-			t.Errorf("%s lists %v, want %v", v, ids, want)
-		}
-	}
-	c, err := s.Counts(ctx, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if c.Views[task.ViewInbox] != 1 || c.Views[task.ViewNext] != 1 || c.Views[task.ViewWaiting] != 1 || c.Views[task.ViewLogbook] != 1 {
-		t.Errorf("counters %+v", c.Views)
+	got, err := s.Tasks(ctx, task.Query{})
+	if err != nil || !slices.Equal(taskIDs(got), []task.ID{"t-blocked", "t-doing", "t-next", "t-trash"}) {
+		t.Errorf("the open tasks are %v, %v", taskIDs(got), err)
 	}
 	if open, err := db.Dossiers().Open(ctx, dossier.Owner{Unit: thread}); err != nil || open {
 		t.Errorf("a task in a done-category state keeps its unit open: %v %v", open, err)
@@ -80,9 +66,8 @@ func TestStoreFiltersByCategory(t *testing.T) {
 	if err != nil || !slices.Equal(unknown, []string{"doing"}) {
 		t.Fatalf("unknown %v, %v", unknown, err)
 	}
-	got, err := s.Tasks(ctx, task.Query{View: task.ViewNext})
-	if err != nil || !slices.Equal(taskIDs(got), []task.ID{"t-blocked", "t-trash"}) {
-		t.Fatalf("after recategorizing, next lists %v, %v", taskIDs(got), err)
+	if blocked, err := s.Task(ctx, "t-blocked"); err != nil || blocked.Category != task.CategoryReady {
+		t.Fatalf("after recategorizing, t-blocked is %+v, %v", blocked, err)
 	}
 	if doing, err := s.Task(ctx, "t-doing"); err != nil || doing.Category != task.CategoryActive {
 		t.Errorf("a task of an unknown state changed category: %+v %v", doing, err)

@@ -20,16 +20,15 @@ func (s *Server) handleKeys(w http.ResponseWriter, r *http.Request) {
 	l := s.loaded()
 	var views []api.TaskViewSpec
 	if s.deps.Tasks != nil {
-		views = s.servedViews(s.deps.Tasks)
+		views = s.servedViews()
 	}
-	writeJSON(w, api.KeysResponse{Bindings: keyViews(surface, views, s.deps.Plugins, s.servedSpecs(), catalog.PlanSpecs(l), coreWords{l.Keys, l.Lists, l.Tasks})})
+	writeJSON(w, api.KeysResponse{Bindings: keyViews(surface, views, s.deps.Plugins, s.servedSpecs(), catalog.PlanSpecs(l), coreWords{l.Keys, l.Tasks})})
 }
 
 // coreWords are the profile's words for the core keys: their help, and a
 // verb's summary.
 type coreWords struct {
 	keys  intentload.KeyTexts
-	lists intentload.ListTexts
 	tasks intentload.TasksDef
 }
 

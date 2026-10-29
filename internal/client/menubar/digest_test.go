@@ -53,7 +53,7 @@ func TestDigestOnceADay(t *testing.T) {
 		t.Fatalf("a restart the same day posted %+v, asked %q", digests(again.notes), again.d.digestDays)
 	}
 	r.c.Respond(context.Background(), Response{ID: n.ID, Action: ActionOpen})
-	if o := r.openedURLs(); !slices.Equal(o, []string{"cockpit#view=next"}) {
+	if o := r.openedURLs(); !slices.Equal(o, []string{"cockpit#view=focus"}) {
 		t.Fatalf("the digest opened %v", o)
 	}
 }

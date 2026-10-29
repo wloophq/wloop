@@ -489,15 +489,15 @@ func TestOutboxViewListsOpenDrafts(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := r.page(t, "view=outbox")
-	if got, want := taskIDs(p.Tasks), []string{fmt.Sprintf("draft:%d", b.ID), fmt.Sprintf("draft:%d", a.ID)}; !slices.Equal(got, want) {
+	if got, want := taskIDs(p.Tasks), []string{fmt.Sprintf("draft:%d", a.ID), fmt.Sprintf("draft:%d", b.ID)}; !slices.Equal(got, want) {
 		t.Fatalf("entries %v, want %v", got, want)
 	}
-	e := p.Tasks[0]
+	e := p.Tasks[1]
 	if ed, ok := e.DraftOf(); !ok || ed.ID != int64(b.ID) || e.Title != "reply on acme/api#7: two" || !slices.Equal(e.Units, []unit.Unit{r7u}) ||
 		!slices.Equal(e.UnitLabels, []string{"acme/api#7"}) {
 		t.Fatalf("entry %+v", e)
 	}
-	if p.Counters.Views["outbox"] != 2 || p.Counters.Badge < 2 {
+	if p.Counters.Views["outbox"] != 2 || p.Counters.Badge != p.Counters.Views["inbox"]+p.Counters.Views["needs-me"] {
 		t.Fatalf("counters %+v", p.Counters)
 	}
 	var c api.Counters

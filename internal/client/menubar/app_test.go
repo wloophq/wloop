@@ -60,6 +60,7 @@ type fakeDaemon struct {
 	pluginsN   int
 	pluginsErr error // Plugins answers it
 
+	views       []api.TaskViewSpec        // nil: Focus, Inbox and Outbox, each badged
 	tasks       map[string][]api.TaskView // by view
 	taskDelta   map[string]*api.TasksPage
 	counters    api.Counters
@@ -157,6 +158,19 @@ func (f *fakeDaemon) Action(_ context.Context, u unit.Unit, name string, req api
 	f.actions = append(f.actions, strings.TrimSpace(name+" "+u.Key+" "+req.Guidance))
 	f.reqs = append(f.reqs, actionCall{name, req})
 	return f.output, f.failing
+}
+
+func (f *fakeDaemon) Views(context.Context) (api.ViewsCatalog, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.err != nil {
+		return api.ViewsCatalog{}, f.err
+	}
+	if f.views != nil {
+		return api.ViewsCatalog{Views: f.views}, nil
+	}
+	return api.ViewsCatalog{Views: []api.TaskViewSpec{{ID: "focus", Label: "Focus", Badge: true}, {ID: "inbox", Label: "Inbox", Badge: true},
+		{ID: "outbox", Label: "Outbox", Over: "gates", Badge: true}}}, nil
 }
 
 func (f *fakeDaemon) Plugins(context.Context) ([]api.Plugin, error) {

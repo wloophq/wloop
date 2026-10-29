@@ -44,16 +44,17 @@ var errOutboxUnavailable = unavailable{"the Outbox is not served: the daemon run
 // mayHaveBeenPosted starts a publisher's error when the post may have reached its provider (#publisher).
 const mayHaveBeenPosted = "may have been posted"
 
-// draftHandlers are the handlers a draft task's verbs run, by the draft action each runs: names of
-// builtin.VerbHandlers, and dismiss, the kind's own, which binds by its name when no verb names it.
+// draftHandlers are the handlers a draft task's verbs run, names of builtin.VerbHandlers, by the draft action
+// each runs.
 var draftHandlers = map[string]string{
-	"approve": "approve",
-	"edit":    "edit",
-	"dismiss": "discard",
-	"retry":   "retry",
+	"approve":             "approve",
+	"edit":                "edit",
+	coretasks.HandlerDrop: "discard",
+	"retry":               "retry",
 }
 
-// registerOutbox serves the Outbox view from the drafts and makes a draft task's verbs act on its draft.
+// registerOutbox serves the views over gates, a draft gate as its draft's task, and makes a draft task's verbs
+// act on its draft.
 func (s *Server) registerOutbox() {
 	if s.deps.Tasks == nil || s.deps.Outbox == nil {
 		return
@@ -61,7 +62,7 @@ func (s *Server) registerOutbox() {
 	for handler := range draftHandlers {
 		s.deps.Tasks.Register(task.OriginDraft, handler, s.draftVerb(handler))
 	}
-	s.deps.Tasks.RegisterView(task.ViewOutbox, draftPrefix, outboxView{s})
+	s.deps.Tasks.RegisterView(task.OverGates, draftPrefix, gatesView{s})
 }
 
 // handleDrafts lists the drafts the query names, or the Outbox's: those whose gate is open, and those whose gate
