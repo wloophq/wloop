@@ -78,9 +78,6 @@ type Job struct {
 	Clock    Clock
 	Cfg      func() config.Config
 	Log      func(format string, args ...any)
-	// Vocabulary is the tag vocabulary the brief's domains reuse,
-	// tag.Vocabulary's lines; nil offers none.
-	Vocabulary func(ctx context.Context) (string, error)
 	// Briefed hears of each unit whose brief a pass wrote; nil hears none.
 	Briefed func(u unit.Unit)
 	// PutBrief keeps a unit's brief in the host, before the pass saves its
@@ -444,11 +441,6 @@ func (j *Job) process(ctx context.Context, k unit.Unit, p *pend, team, viewer st
 			return outcome{err: err}
 		}
 		in.Extra = &x
-	}
-	if j.Vocabulary != nil {
-		if in.Vocabulary, err = j.Vocabulary(ctx); err != nil {
-			return outcome{err: err}
-		}
 	}
 	for _, c := range cfg.Placement {
 		in.Contexts = append(in.Contexts, c.Match)

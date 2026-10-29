@@ -1,10 +1,15 @@
 package archtest
 
 import (
+	"encoding/json"
 	"fmt"
+	"maps"
+	"os/exec"
 	"path"
+	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -80,7 +85,7 @@ var pluginDebt = []debt{
 
 const briefQueueDebt = "debt: the brief queue keys its runs by pull request; it reads their input through the GitHub plugin's Briefer"
 
-const daemonTestsDebt = "debt: the daemon's tests serve the GitHub plugin in process (explore.Explorer, prrow) until X10 runs them over the plugin's binary"
+const daemonTestsDebt = "debt: the daemon's tests serve GitHub in process (explore.Explorer, prrow) while GitHub's rows, facts and cards stay in the host (issue 62)"
 
 // ruleR16 flags an import of a plugin package by a core package, or by a
 // package of another plugin, counting test imports; a test import of a
@@ -152,6 +157,9 @@ func TestCoreImportsNoPluginDomain(t *testing.T) {
 		for _, b := range ruleR16(self, p.Imports, slices.Concat(p.TestImports, p.XTestImports), pluginDebt, used) {
 			t.Error(b)
 		}
+	}
+	if roots := slices.Sorted(maps.Keys(pluginRoots)); !slices.Equal(roots, pluginIDs()) {
+		t.Errorf("pluginRoots name %v, the bundled manifests %v", roots, pluginIDs())
 	}
 	if cores == 0 || plugins == 0 {
 		t.Errorf("scanned %d core and %d plugin packages; the roots match nothing", cores, plugins)
@@ -235,4 +243,197 @@ func TestR16FlagsStaleDebt(t *testing.T) {
 	tests := []debt{{"internal/core/items", "plugins/slack/domain", "fixtures", true}}
 	flagged(t, "a test debt lets a test import", ruleR16("internal/core/items", nil, []string{slack}, tests, map[int]bool{}), 0, "")
 	flagged(t, "a test debt is no code debt", ruleR16("internal/core/items", []string{slack}, nil, tests, map[int]bool{}), 1, "(R16)")
+}
+
+// pluginsRoot is the directory of the bundled plugins, one plugins/<id> each;
+// its own package only embeds their manifests and profile layers.
+const pluginsRoot = "plugins"
+
+// pluginHome is the plugin directory pkgPath belongs to: plugins/<id>, the
+// stand-in's directory, or pluginsRoot for the root package; "" for a host
+// package.
+func pluginHome(pkgPath string) string {
+	switch {
+	case under(pkgPath, standinDir):
+		return standinDir
+	case pkgPath == pluginsRoot:
+		return pluginsRoot
+	case under(pkgPath, pluginsRoot):
+		return pluginDir(pkgPath)
+	}
+	return ""
+}
+
+// pluginDir is plugins/<id> of a path under plugins/<id>.
+func pluginDir(path string) string {
+	parts := strings.SplitN(path, "/", 3)
+	return parts[0] + "/" + parts[1]
+}
+
+// rulePluginSDK flags an import under internal/, or of another plugin's
+// package, by a plugin's package, which builds against the SDK and its own
+// packages alone and runs as its own process.
+func rulePluginSDK(self string, imports []string) []string {
+	home := pluginHome(self)
+	if home == "" {
+		return nil
+	}
+	var out []string
+	for _, imp := range imports {
+		dep, ok := local(imp)
+		switch {
+		case !ok:
+		case under(dep, "internal"):
+			out = append(out, fmt.Sprintf("%s imports %s; a plugin imports only the SDK, under pkg/, and no package under internal/ (R-plugin)", self, imp))
+		case pluginHome(dep) != "" && pluginHome(dep) != home:
+			out = append(out, fmt.Sprintf("%s imports %s; a plugin imports no other plugin's package (R-plugin)", self, imp))
+		}
+	}
+	return out
+}
+
+// listedPlugins are the packages under plugins/ and the stand-in's, which
+// the host's package list leaves out.
+var listedPlugins = sync.OnceValues(func() ([]pkg, error) {
+	cmd := exec.Command("go", "list", "-json", "./"+pluginsRoot+"/...", "./"+standinDir+"/...")
+	cmd.Dir = filepath.Join("..", "..")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	var all []pkg
+	dec := json.NewDecoder(strings.NewReader(string(out)))
+	for dec.More() {
+		var p pkg
+		if err := dec.Decode(&p); err != nil {
+			return nil, err
+		}
+		all = append(all, p)
+	}
+	return all, nil
+})
+
+// TestPluginsImportOnlyTheSDK checks that no package under `plugins/`, nor
+// the stand-in plugin's, imports a package under `internal/` or a package of
+// another plugin, tests included: every plugin builds against the SDK and
+// its own packages alone.
+func TestPluginsImportOnlyTheSDK(t *testing.T) {
+	t.Parallel()
+	ps, err := listedPlugins()
+	if err != nil {
+		t.Fatal(err)
+	}
+	homes := map[string]bool{}
+	for _, p := range ps {
+		self, ok := local(p.ImportPath)
+		if !ok {
+			continue
+		}
+		homes[pluginHome(self)] = true
+		for _, b := range rulePluginSDK(self, slices.Concat(p.Imports, p.TestImports, p.XTestImports)) {
+			t.Error(b)
+		}
+	}
+	for _, id := range pluginIDs() {
+		if !homes[pluginsRoot+"/"+id] {
+			t.Errorf("the bundled plugin %s has no package under %s/%s", id, pluginsRoot, id)
+		}
+	}
+	if !homes[standinDir] || !homes[pluginsRoot] {
+		t.Errorf("the package list lacks %s or %s: %v", standinDir, pluginsRoot, homes)
+	}
+}
+
+// testOnly are the host packages only tests reach: a package whose path
+// ends in "test" and that no package's code imports, other than another
+// test-only package's.
+func testOnly(ps []pkg) map[string]bool {
+	importers := map[string][]string{}
+	only := map[string]bool{}
+	for _, p := range ps {
+		self, ok := local(p.ImportPath)
+		if !ok {
+			continue
+		}
+		if strings.HasSuffix(path.Base(self), "test") {
+			only[self] = true
+		}
+		for _, imp := range p.Imports {
+			if dep, ok := local(imp); ok {
+				importers[dep] = append(importers[dep], self)
+			}
+		}
+	}
+	for changed := true; changed; {
+		changed = false
+		for p := range only {
+			if slices.ContainsFunc(importers[p], func(by string) bool { return !only[by] }) {
+				delete(only, p)
+				changed = true
+			}
+		}
+	}
+	return only
+}
+
+// ruleHostPlugin flags a host package's code that imports a plugin's
+// package; the root plugins package, which holds no plugin's code, and a
+// test-only package pass.
+func ruleHostPlugin(self string, imports []string, testOnly map[string]bool) []string {
+	if pluginHome(self) != "" || testOnly[self] {
+		return nil
+	}
+	var out []string
+	for _, imp := range imports {
+		if dep, ok := local(imp); ok && pluginHome(dep) != "" && dep != pluginsRoot {
+			out = append(out, fmt.Sprintf("%s imports %s; the host runs a plugin as its own process and never links its code; only a test-only package, whose path ends in \"test\" and which only tests reach, may (R-host)", self, imp))
+		}
+	}
+	return out
+}
+
+// ruleEmbedOnly flags an import of the root plugins package other than the
+// standard library: it embeds the bundled manifests and profile layers and
+// holds no plugin's code.
+func ruleEmbedOnly(imports []string) []string {
+	var out []string
+	for _, imp := range imports {
+		if !std(imp) {
+			out = append(out, fmt.Sprintf("%s imports %s; it only embeds the bundled plugins' manifests and profile layers (R-host)", pluginsRoot, imp))
+		}
+	}
+	return out
+}
+
+// TestHostImportsNoPlugin checks that no host package's code imports a
+// plugin's package, so the host binary links no plugin. A test-only package,
+// whose path ends in "test" and which only tests and other test-only
+// packages import, such as `ghreporttest`, may run a plugin's code for the
+// host's tests; the root `plugins` package, which the host reads the bundled
+// manifests and profile layers from, imports only the standard library.
+// Test files are left to R16.
+func TestHostImportsNoPlugin(t *testing.T) {
+	t.Parallel()
+	host := packages(t)
+	only := testOnly(host)
+	if !only["internal/readmodel/prrow/ghreporttest"] {
+		t.Errorf("ghreporttest is not test-only: %v", only)
+	}
+	for _, p := range host {
+		self, _ := local(p.ImportPath)
+		for _, b := range ruleHostPlugin(self, p.Imports, only) {
+			t.Error(b)
+		}
+	}
+	ps, err := listedPlugins()
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := slices.IndexFunc(ps, func(p pkg) bool { return p.ImportPath == module+pluginsRoot })
+	if i < 0 {
+		t.Fatalf("no package %s", pluginsRoot)
+	}
+	for _, b := range ruleEmbedOnly(ps[i].Imports) {
+		t.Error(b)
+	}
 }

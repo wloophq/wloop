@@ -16,7 +16,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/duration"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
-	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
@@ -664,7 +663,7 @@ func (c Config) validateWorkflows() error {
 		if ps == nil {
 			continue
 		}
-		if _, err := expr.Compile(ps.When, builtin.TurnEnvOf(unit.GitHub)); err != nil {
+		if _, err := expr.Compile(ps.When, builtin.TurnEnv()); err != nil {
 			return fmt.Errorf("intents.%s.project_settings.when: %w", intent, err)
 		}
 	}
@@ -687,19 +686,19 @@ func (c Config) validateWorkflows() error {
 	return nil
 }
 
-// ProjectSettingsFor says whether a session of intent on the pull request
-// whose facts pr resolves loads the checkout's own agent settings. Without
+// ProjectSettingsFor says whether a session of intent on the unit whose
+// turn facts facts resolves loads the checkout's own agent settings. Without
 // the facts, an intent that has a predicate does not.
-func (c Config) ProjectSettingsFor(intent string, pr expr.Facts) bool {
+func (c Config) ProjectSettingsFor(intent string, facts expr.Facts) bool {
 	ps := c.Intents[intent].ProjectSettings
 	if ps == nil {
 		return true
 	}
-	if pr == nil {
+	if facts == nil {
 		return false
 	}
-	p, err := expr.Compile(ps.When, builtin.TurnEnvOf(unit.GitHub))
-	return err == nil && p.Eval(pr)
+	p, err := expr.Compile(ps.When, builtin.TurnEnv())
+	return err == nil && p.Eval(facts)
 }
 
 // oneOf refuses a set value outside allowed; "" keeps the manifest's.

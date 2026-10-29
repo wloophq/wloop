@@ -505,7 +505,7 @@ See [What waits for you](/concepts/approval/).
 The facts and steps a workflow can use.
 
 ```sh
-{{command}} workflows facts [github|session|workspace]
+{{command}} workflows facts [<provider>]
 {{command}} workflows steps
 ```
 
