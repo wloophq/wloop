@@ -668,8 +668,10 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 		v.Units = []unit.Unit{}
 	}
 	v.UnitLabels = ev.s.unitLabels(v.Units)
-	if e.Snoozed() {
-		v.SnoozeUntil, v.SnoozeOnActivity, v.Muted = e.Snooze.Until, e.Snooze.OnActivity, e.Snooze.Mute
+	if w, ok, err := ev.g.WakeOf(ctx, e.ID); err != nil {
+		return api.TaskView{}, err
+	} else if ok {
+		v.Wake = &api.WakeView{Until: w.Until, When: w.When, Return: w.Return}
 	}
 	if err := ev.childrenOf(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
@@ -985,6 +987,11 @@ func (s *Server) syncTasks(ctx context.Context) {
 		if err := g.Sync(sctx, units); err != nil && ctx.Err() == nil {
 			s.logf("tasks: sync: %v", err)
 			retry = units
+		}
+		if w := s.deps.Wakes; w != nil {
+			if err := w.Sweep(sctx); err != nil && ctx.Err() == nil {
+				s.logf("tasks: wakes: %v", err)
+			}
 		}
 		scope.End()
 	wait:

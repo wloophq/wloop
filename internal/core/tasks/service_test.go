@@ -11,9 +11,11 @@ import (
 
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
+	"github.com/wloophq/wloop/internal/core/wakes/wakestest"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
 )
 
 var (
@@ -62,12 +64,14 @@ type rig struct {
 	items *fakeItems
 	facts *fakeFacts
 	clock *clock
+	wakes *wakestest.Store
 }
 
 func newRig() *rig {
 	r := &rig{store: taskstest.New(), items: &fakeItems{byUnit: map[unit.Unit][]items.Item{}, reads: map[unit.Unit]int{}},
-		facts: &fakeFacts{facts: map[unit.Unit]task.UnitFacts{}, off: map[unit.ProviderID]bool{}}, clock: &clock{t0}}
-	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority})
+		facts: &fakeFacts{facts: map[unit.Unit]task.UnitFacts{}, off: map[unit.ProviderID]bool{}}, clock: &clock{t0}, wakes: wakestest.NewStore()}
+	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates,
+		Authority: taskstest.BundledStates.Authority, Wakes: r.wakes})
 	return r
 }
 
@@ -130,8 +134,7 @@ func TestVerbTransitions(t *testing.T) {
 	for verb, want := range table {
 		for _, from := range allStates {
 			r := newRig()
-			e := r.put(t, task.Task{ID: "e-x", State: from, Origin: task.OriginUser,
-				Snooze: task.Snooze{Until: t0.Add(time.Hour), Return: task.State("next")}})
+			e := r.put(t, task.Task{ID: "e-x", State: from, Origin: task.OriginUser})
 			res, err := r.svc.Do(ctx, e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: verb, Args: args[verb]})
 			to := want[from]
 			if to == no {
@@ -172,9 +175,19 @@ func TestScheduleKeepsWhereItReturns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := task.Snooze{Until: time.Date(2026, 10, 30, 18, 0, 0, 0, brt), OnActivity: true, Return: task.State("next")}
-	if s := res.Task.Snooze; !s.Until.Equal(want.Until) || s.OnActivity != want.OnActivity || s.Return != want.Return {
-		t.Fatalf("snooze %+v", s)
+	w, ok, _ := r.wakes.Of(context.Background(), "e-x")
+	if !ok || !w.Until.Equal(time.Date(2026, 10, 30, 18, 0, 0, 0, brt)) || !slices.Equal(w.On, []string{wake.OnActivity}) || w.Return != "next" || !res.Task.Snoozed() {
+		t.Fatalf("wake %+v, task %+v", w, res.Task)
+	}
+	res, err = r.svc.Do(context.Background(), "e-x", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSchedule, Args: map[string]string{"until": "2026-11-02"}})
+	if w, _, _ := r.wakes.Of(context.Background(), "e-x"); err != nil || w.Return != "next" || len(w.On) != 0 {
+		t.Fatalf("scheduled again: %+v %v", w, err)
+	}
+	if _, err := r.svc.Do(context.Background(), "e-x", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbNext}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := r.wakes.Of(context.Background(), "e-x"); ok {
+		t.Fatal("a task moved by hand kept its wake")
 	}
 }
 
@@ -230,7 +243,7 @@ func TestSyncTouchesOnlyNotedUnits(t *testing.T) {
 func TestSyncRunsWakeInOneApplyAndLeavesFocusToTheProfile(t *testing.T) {
 	r := newRig()
 	r.put(t, task.Task{ID: "e-due", State: "next", Category: task.CategoryReady, Props: task.Props{"due": {Time: t0.Add(-time.Minute)}}})
-	r.put(t, task.Task{ID: "e-wake", State: "scheduled", Category: task.CategoryDeferred, Snooze: task.Snooze{Until: t0, Return: task.State("someday")}})
+	r.put(t, task.Task{ID: "e-wake", State: "scheduled", Category: task.CategoryDeferred, Asleep: true})
 	r.items.byUnit[unitU] = []items.Item{owed(unitU, "a")}
 	r.store.Applies, r.store.Notes = 0, 0
 	if err := r.svc.Sync(context.Background(), []unit.Unit{unitU}); err != nil {
@@ -255,7 +268,7 @@ func TestDisabledPluginTasksStay(t *testing.T) {
 	}
 	es, _ := r.store.TasksOf(context.Background(), unitU)
 	e := es[0]
-	e.State, e.Category, e.Snooze = "scheduled", task.CategoryDeferred, task.Snooze{Until: t0, Return: "next"}
+	e.State, e.Category = "scheduled", task.CategoryDeferred
 	e.SetProp(task.PropDue, task.Value{Time: t0}, task.WriterPerson, t0)
 	r.put(t, e)
 	r.facts.off[unit.GitHub] = true
@@ -367,43 +380,6 @@ func TestRegisteredViewSource(t *testing.T) {
 	if _, err := r.svc.Do(ctx, "draft:7", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbNext}); !errors.Is(err, coretasks.ErrVerb) {
 		t.Fatalf("next on a draft: %v", err)
 	}
-}
-
-func TestUserScheduleSurvivesMute(t *testing.T) {
-	ctx := context.Background()
-	r := newRig()
-	r.items.byUnit[unitU] = []items.Item{owed(unitU, "a")}
-	muteEnd := t0.Add(72 * time.Hour)
-	r.facts.facts[unitU] = task.UnitFacts{Unit: unitU, Mute: &task.Mute{Until: muteEnd}}
-	if err := r.svc.Sync(ctx, []unit.Unit{unitU}); err != nil {
-		t.Fatal(err)
-	}
-	id := task.DerivedID(unitU, "a")
-	if e := r.task(t, id); e.Category != task.CategoryDeferred || !e.Snooze.Mute {
-		t.Fatalf("muted: %+v", e)
-	}
-	mine := time.Date(2026, 12, 1, 18, 0, 0, 0, brt)
-	if _, err := r.svc.Do(ctx, id, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSchedule, Args: map[string]string{"until": "2026-12-01"}}); err != nil {
-		t.Fatal(err)
-	}
-	check := func(when string) {
-		t.Helper()
-		e := r.task(t, id)
-		if e.Category != task.CategoryDeferred || !e.Snooze.Until.Equal(mine) || e.Snooze.Mute {
-			t.Fatalf("%s: %+v", when, e)
-		}
-	}
-	r.clock.t = t0.Add(time.Hour)
-	if err := r.svc.Sync(ctx, []unit.Unit{unitU}); err != nil {
-		t.Fatal(err)
-	}
-	check("still muted")
-	r.facts.facts[unitU] = task.UnitFacts{Unit: unitU}
-	r.clock.t = muteEnd.Add(time.Hour)
-	if err := r.svc.Sync(ctx, []unit.Unit{unitU}); err != nil {
-		t.Fatal(err)
-	}
-	check("unmuted")
 }
 
 func TestCloseRefusesADisabledPlugin(t *testing.T) {

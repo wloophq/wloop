@@ -119,7 +119,7 @@ func TestSlackLiveTaskReadsTheHostsTasks(t *testing.T) {
 	f := newFactsFixture(t)
 	f.listed(t, factsThread, factsOther, factsDM)
 	f.host.SetTasks(hostTask("e-01", "next", factsThread, unit.Unit{Provider: "chat", Key: "x"}), hostTask("e-02", "waiting", factsDM),
-		hostTask("e-03", "done", factsOther), hostTask("e-04", "dropped", factsOther))
+		hostTask("e-03", "done", factsOther), hostTask("e-04", "dropped", factsOther), hostTask("e-05", "deferred", factsOther))
 	for u, want := range map[unit.Unit]bool{factsThread: true, factsDM: true, factsOther: false} {
 		if got, _ := f.facts(t, u); got["slack.live_task"] != want {
 			t.Errorf("%s live_task %v, want %v", u, got["slack.live_task"], want)

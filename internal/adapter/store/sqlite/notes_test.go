@@ -28,6 +28,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	dusage "github.com/wloophq/wloop/internal/domain/usage"
 	"github.com/wloophq/wloop/internal/domain/view"
+	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 )
@@ -77,8 +78,30 @@ func seedGate(t *testing.T, e *noteEnv) {
 	}
 }
 
+// seedWake is the task t-01 with a wake.
+func seedWake(t *testing.T, e *noteEnv) {
+	applyTask(t, e.db, "t-01")
+	if err := e.db.Wakes().Put(context.Background(), wake.Wake{Task: "t-01", Return: "next"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // writes is every exported write method of the sqlite store types.
 var writes = []writeCase{
+	{
+		method: "WakeStore.Put",
+		seed:   func(t *testing.T, e *noteEnv) { applyTask(t, e.db, "t-01") },
+		call: func(ctx context.Context, e *noteEnv) error {
+			return e.db.Wakes().Put(ctx, wake.Wake{Task: "t-01", Until: time.Date(2026, 10, 28, 9, 0, 0, 0, time.UTC)})
+		},
+		topics: port.TopicWakes, units: []unit.Unit{task.UnitOf("t-01")},
+	},
+	{
+		method: "WakeStore.Drop",
+		seed:   seedWake,
+		call:   func(ctx context.Context, e *noteEnv) error { return e.db.Wakes().Drop(ctx, "t-01") },
+		topics: port.TopicWakes, units: []unit.Unit{task.UnitOf("t-01")},
+	},
 	{
 		method: "DB.SetOverride",
 		call: func(ctx context.Context, e *noteEnv) error {
@@ -405,6 +428,7 @@ var reads = []string{
 	"DB.AgentTranscript", "DB.WorkflowActivity",
 	"DB.Tasks", "taskStore.Tasks", "taskStore.TasksSince", "taskStore.Task", "taskStore.TasksOf", "taskStore.Counts", "DB.Props",
 	"DB.Gates", "GateStore.Get", "GateStore.OfTask", "GateStore.Where", "GateStore.Due",
+	"DB.Wakes", "WakeStore.Of", "WakeStore.Due", "WakeStore.Watching", "WakeStore.UnitWakes",
 }
 
 // notesAll are the write methods that note Change.All.

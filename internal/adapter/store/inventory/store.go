@@ -470,22 +470,17 @@ func scanEvents(rows *sql.Rows) ([]dinv.Event, error) {
 }
 
 const (
-	overrideWriteColumns = `provider, unit_key, muted_until, mute_until_state, hold, taken_over, muted_kind, muted_waiting_on, tracked`
+	overrideWriteColumns = `provider, unit_key, hold, taken_over, tracked`
 	overrideColumns      = overrideWriteColumns + `, next_guidance`
 )
 
 func scanOverride(row scanner) (dinv.Override, error) {
 	var o dinv.Override
-	var provider, key, muted string
-	if err := row.Scan(&provider, &key, &muted, &o.MuteUntilStateChange, &o.Hold, &o.Adopted, &o.MutedKind, &o.MutedWaitingOn,
-		&o.Tracked, &o.NextGuidance); err != nil {
+	var provider, key string
+	if err := row.Scan(&provider, &key, &o.Hold, &o.Adopted, &o.Tracked, &o.NextGuidance); err != nil {
 		return dinv.Override{}, err
 	}
 	o.PR = refOf(provider, key)
-	var err error
-	if o.MutedUntil, err = parseTS(muted); err != nil {
-		return dinv.Override{}, err
-	}
 	return o, nil
 }
 

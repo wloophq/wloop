@@ -179,8 +179,10 @@ type catalogFixture struct {
 var catalogFixtures = []catalogFixture{
 	{"pending", r7, func(t *testing.T, c catalogRig) { c.propose(t) }},
 	{"pending_muted", r7, func(t *testing.T, c catalogRig) {
-		c.override(t, dinv.Override{PR: r7, MutedUntil: catalogNow.Add(time.Hour)})
 		c.propose(t)
+		if err := muteBy(c.st, r7, catalogNow.Add(time.Hour)); err != nil {
+			t.Fatal(err)
+		}
 	}},
 	{"held", r7, func(t *testing.T, c catalogRig) {
 		c.events(t, dinv.Event{PR: r7, Kind: dinv.KindRoundHeld, Key: "cap", At: catalogNow, Data: "daily cap"})
@@ -209,7 +211,9 @@ var catalogFixtures = []catalogFixture{
 		c.asks(t, turn.Unrecorded, record.Record{State: record.UnrecordedState, Summary: "stopped"})
 	}},
 	{"done_muted", github.Ref{Owner: "acme", Repo: "api", Number: 8}, func(t *testing.T, c catalogRig) {
-		c.override(t, dinv.Override{PR: github.Ref{Owner: "acme", Repo: "api", Number: 8}, MutedUntil: catalogNow.Add(time.Hour)})
+		if err := muteBy(c.st, github.Ref{Owner: "acme", Repo: "api", Number: 8}, catalogNow.Add(time.Hour)); err != nil {
+			t.Fatal(err)
+		}
 	}},
 	{"done_with_workspace", github.Ref{Owner: "acme", Repo: "api", Number: 8}, func(t *testing.T, c catalogRig) {
 		inventorytest.Of(c.st).SetWorkspace(context.Background(), github.Ref{Owner: "acme", Repo: "api", Number: 8}, dinv.Workspace{ID: "w8", DisplayName: "feat-done"})

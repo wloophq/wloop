@@ -3,14 +3,18 @@ package sqlite_test
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
+	"github.com/wloophq/wloop/internal/core/wakes"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
 )
 
 type taskClock struct{ t time.Time }
@@ -41,6 +45,7 @@ type taskRig struct {
 	items taskItems
 	facts *taskFacts
 	clock *taskClock
+	wakes *wakes.Service
 }
 
 var (
@@ -49,10 +54,17 @@ var (
 )
 
 func newTaskRig(t testing.TB) *taskRig {
-	store, _ := openTasks(t.(*testing.T))
+	db, err := sqlite.Open(filepath.Join(t.TempDir(), "tasks.db"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	store := db.Tasks()
 	r := &taskRig{store: store, items: taskItems{}, facts: &taskFacts{facts: map[unit.Unit]task.UnitFacts{}}, clock: &taskClock{taskAt}}
+	r.wakes = wakes.New(wakes.Deps{Store: db.Wakes(), Tasks: store, Clock: r.clock})
 	r.svc = coretasks.New(coretasks.Deps{Store: store, Items: r.items, Facts: r.facts, Me: task.Me{Keys: []string{"github:me"}},
-		Clock: r.clock, States: taskstest.BundledStates})
+		Clock: r.clock, States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority, Wakes: db.Wakes(),
+		Activity: func(ctx context.Context, id task.ID) error { return r.wakes.Event(ctx, id, wake.OnActivity, "") }})
 	return r
 }
 
@@ -82,6 +94,12 @@ func TestServiceOverSqliteKeepsClarifiedTasksOutOfTheInboxOnActivity(t *testing.
 	r.facts.facts[u] = task.UnitFacts{LastHuman: taskAt.Add(2 * time.Hour)}
 	r.clock.t = taskAt.Add(3 * time.Hour)
 	if err := r.svc.Sync(ctx, []unit.Unit{u}); err != nil {
+		t.Fatal(err)
+	}
+	if e, err := r.store.Task(ctx, action); err != nil || e.Category != task.CategoryDeferred || !e.Changed {
+		t.Fatalf("the scheduled task after a new message: %+v %v, want it asleep and changed", e, err)
+	}
+	if _, err := r.svc.Do(ctx, action, coretasks.Request{Actor: task.ActorWorkflow, Source: "task-wake", Verb: task.VerbWake}); err != nil {
 		t.Fatal(err)
 	}
 	for id, want := range map[task.ID]task.Category{action: task.CategoryReady, waiting: task.CategoryWaiting} {

@@ -28,3 +28,7 @@ type Wake struct {
 	Expires time.Time
 	Return  string
 }
+
+// OnActivity is the kind in On that a person's new activity on a unit the
+// task holds matches.
+const OnActivity = "activity"

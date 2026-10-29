@@ -77,15 +77,12 @@ func TestSequentialProjectShowsFirstAction(t *testing.T) {
 func TestViewPredicates(t *testing.T) {
 	var all []task.Task
 	for i, s := range bundledTable {
-		var sn task.Snooze
-		if s.name == "scheduled" {
-			sn = task.Snooze{OnActivity: true}
-		}
+		sn := s.name == "scheduled"
 		st := task.State(s.name)
 		all = append(all,
-			task.Task{ID: task.ID("e-" + s.name), State: st, Category: s.c, Snooze: sn, Created: at(i), Updated: at(i)},
-			task.Task{ID: task.ID("e-star-" + s.name), State: st, Category: s.c, Snooze: sn, Props: task.Props{"focus": {Text: "on"}}, Created: at(10 + i), Updated: at(10 + i)},
-			task.Task{ID: task.ID("e-proj-" + s.name), Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: st, Category: s.c, Snooze: sn, Created: at(20 + i), Updated: at(20 + i)},
+			task.Task{ID: task.ID("e-" + s.name), State: st, Category: s.c, Asleep: sn, Created: at(i), Updated: at(i)},
+			task.Task{ID: task.ID("e-star-" + s.name), State: st, Category: s.c, Asleep: sn, Props: task.Props{"focus": {Text: "on"}}, Created: at(10 + i), Updated: at(10 + i)},
+			task.Task{ID: task.ID("e-proj-" + s.name), Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: st, Category: s.c, Asleep: sn, Created: at(20 + i), Updated: at(20 + i)},
 		)
 	}
 	cases := []struct {

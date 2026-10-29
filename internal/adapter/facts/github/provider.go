@@ -50,6 +50,9 @@ type Deps struct {
 	// requests: their situations, the facts that read them alone and its
 	// planner's; nil reports none.
 	Reports readmodel.Reports
+	// Mutes are the user's mutes of pull requests, their tasks' wakes; nil
+	// mutes none.
+	Mutes readmodel.Mutes
 }
 
 // Provider is the github source's facts.
@@ -173,7 +176,7 @@ func (p *Provider) cfg() config.Config {
 
 // viewTopics are the inputs whose notes make the cached reads stale.
 const viewTopics = port.TopicPRs | port.TopicFollow | port.TopicSourceEvents | port.TopicLoopEvents | port.TopicOverrides |
-	port.TopicTurns | port.TopicRounds | port.TopicPause | port.TopicAgents | port.TopicConfig | port.TopicViewer | port.TopicMeta
+	port.TopicWakes | port.TopicTurns | port.TopicRounds | port.TopicPause | port.TopicAgents | port.TopicConfig | port.TopicViewer | port.TopicMeta
 
 // maxViewAge bounds how long reads no change log note covers, the checkouts'
 // branches, are reused.

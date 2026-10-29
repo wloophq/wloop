@@ -29,8 +29,10 @@ var _ coretasks.Store = taskStore{}
 func (db *DB) Tasks() coretasks.Store { return taskStore{db} }
 
 const taskFields = `id, state, category, title, notes, parent, position, sequential,
-	snooze_until, snooze_on_activity, snooze_return, snooze_mute, changed, seen_at, origin, created, updated,
-	review_every, reviewed_at`
+	changed, seen_at, origin, created, updated, review_every, reviewed_at`
+
+// hasWake holds a task that holds a wake.
+const hasWake = `EXISTS (SELECT 1 FROM wakes WHERE wakes.task_id = tasks.id)`
 
 // upsertTaskSQL updates an existing task in place: a REPLACE would delete
 // the row first and cascade into the rows keyed by it.
@@ -52,7 +54,7 @@ const (
 	ofUnit       = `id IN (SELECT task_id FROM task_units WHERE provider = ? AND unit_key = ?
 		UNION SELECT task_id FROM task_items WHERE provider = ? AND unit_key = ?)`
 	isOpen    = `category NOT IN (?, ?)`
-	isSomeday = `category = ? AND snooze_until = '' AND snooze_on_activity = 0 AND snooze_mute = 0`
+	isSomeday = `category = ? AND NOT ` + hasWake
 	isStarred = `id IN (SELECT task_id FROM task_props WHERE name = ? AND json_extract(value, '$.text') = ?)`
 	// isProject holds a task whose kind property is task.KindProject.
 	isProject = `id IN (SELECT task_id FROM task_props WHERE name = 'kind' AND json_extract(value, '$.text') = 'project')`
@@ -94,20 +96,20 @@ func taskTime(s string) (time.Time, error) {
 
 func scanTask(row scanner) (task.Task, error) {
 	var e task.Task
-	var snoozeUntil, seenAt, created, updated, reviewed string
-	var state, category, parent, ret string
+	var seenAt, created, updated, reviewed string
+	var state, category, parent string
 	var every int64
 	if err := row.Scan(&e.ID, &state, &category, &e.Title, &e.Notes, &parent,
-		&e.Position, &e.Sequential, &snoozeUntil, &e.Snooze.OnActivity, &ret, &e.Snooze.Mute,
-		&e.Changed, &seenAt, &e.Origin, &created, &updated, &every, &reviewed); err != nil {
+		&e.Position, &e.Sequential, &e.Changed, &seenAt, &e.Origin, &created, &updated, &every, &reviewed,
+		&e.Asleep); err != nil {
 		return task.Task{}, err
 	}
-	e.State, e.Category, e.Parent, e.Snooze.Return = task.State(state), task.Category(category), task.ID(parent), task.State(ret)
+	e.State, e.Category, e.Parent = task.State(state), task.Category(category), task.ID(parent)
 	e.ReviewEvery = time.Duration(every) * time.Second
 	for _, f := range []struct {
 		dst *time.Time
 		raw string
-	}{{&e.Snooze.Until, snoozeUntil}, {&e.SeenAt, seenAt}, {&e.Created, created}, {&e.Updated, updated}, {&e.ReviewedAt, reviewed}} {
+	}{{&e.SeenAt, seenAt}, {&e.Created, created}, {&e.Updated, updated}, {&e.ReviewedAt, reviewed}} {
 		t, err := taskTime(f.raw)
 		if err != nil {
 			return task.Task{}, fmt.Errorf("a time of task %s: %w", e.ID, err)
@@ -119,7 +121,7 @@ func scanTask(row scanner) (task.Task, error) {
 
 // loadTasks reads the tasks matching where, with their items, units and properties, oldest first.
 func loadTasks(ctx context.Context, q querier, where string, args ...any) ([]task.Task, error) {
-	rows, err := q.QueryContext(ctx, `SELECT `+taskFields+` FROM tasks WHERE `+where+taskOrder, args...)
+	rows, err := q.QueryContext(ctx, `SELECT `+taskFields+`, `+hasWake+` FROM tasks WHERE `+where+taskOrder, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +351,7 @@ func countsTx(ctx context.Context, tx *sql.Tx, area string) (task.Counters, erro
 		(SELECT COUNT(*) FROM nxt a WHERE `+inArea+`),
 		COALESCE(SUM(t.category = ? AND `+inArea+`), 0),
 		COALESCE(SUM(t.`+isProject+` AND t.`+isOpen+` AND `+inArea+`), 0),
-		COALESCE(SUM(t.category = ? AND t.snooze_until = '' AND t.snooze_on_activity = 0 AND t.snooze_mute = 0 AND `+inArea+`), 0),
+		COALESCE(SUM(t.category = ? AND NOT EXISTS (SELECT 1 FROM wakes w WHERE w.task_id = t.id) AND `+inArea+`), 0),
 		COALESCE(SUM(t.category = ? AND `+inArea+`), 0)
 		FROM tasks t LEFT JOIN areas a ON a.task_id = t.id`, args...).
 		Scan(&focus, &inbox, &next, &waiting, &projects, &someday, &logbook); err != nil {
@@ -413,6 +415,9 @@ func (s taskStore) Apply(ctx context.Context, cs []task.Change, evs ...port.Even
 			if err != nil {
 				return err
 			}
+			if len(old) == 1 {
+				e.Asleep = old[0].Asleep
+			}
 			if len(old) == 1 && old[0].Same(e) {
 				delete(changed, e.ID)
 				continue
@@ -447,6 +452,11 @@ func (s taskStore) Apply(ctx context.Context, cs []task.Change, evs ...port.Even
 			}
 			if err := writeTask(ctx, tx, e, rev); err != nil {
 				return err
+			}
+			if !e.Open() {
+				if err := dropWake(ctx, tx, e.ID); err != nil {
+					return err
+				}
 			}
 			tx.Touch(port.TopicTasks, append(taskUnits(e), task.UnitOf(e.ID))...)
 			if err := adoptUnits(ctx, tx, e); err != nil {
@@ -501,8 +511,7 @@ func writeTask(ctx context.Context, tx *Tx, e task.Task, rev uint64) error {
 	}
 	if _, err := tx.ExecContext(ctx, upsertTaskSQL,
 		string(e.ID), string(e.State), string(e.Category), e.Title, e.Notes, string(e.Parent), e.Position,
-		e.Sequential, eventTime(e.Snooze.Until), e.Snooze.OnActivity, string(e.Snooze.Return), e.Snooze.Mute,
-		e.Changed, eventTime(e.SeenAt), e.Origin, eventTime(e.Created), eventTime(e.Updated),
+		e.Sequential, e.Changed, eventTime(e.SeenAt), e.Origin, eventTime(e.Created), eventTime(e.Updated),
 		int64(e.ReviewEvery/time.Second), eventTime(e.ReviewedAt), rev); err != nil {
 		return err
 	}

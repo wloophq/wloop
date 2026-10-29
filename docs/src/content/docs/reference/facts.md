@@ -33,10 +33,9 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `pr.review_requested_me` | bool | action | A review is requested from the viewer, from the inventory row. |
 | `pr.adopted` | bool | action | The pull request was taken over into the loop. |
 | `pr.held` | bool | action | Rounds on the pull request are held. |
-| `pr.muted` | bool | action | The pull request is muted, by the server clock. |
 | `pr.nudge.who` | list | action | Whom a nudge would address, from nudge.targets. |
 | `pr.nudge.why` | string | action | Why the pull request waits on them, from nudge.targets. |
-| `pr.nudge.refusal` | string | action | The text nudge.prepare would refuse with now; empty when a nudge may go. |
+| `pr.nudge.refusal` | string | action | Why a nudge is refused now: the mute while one holds, else the text nudge.prepare would refuse with; empty when a nudge may go. |
 | `pr.last_review.exists` | bool | turn | The viewer reviewed the pull request before. |
 | `pr.last_review.verdict` | string | turn | The viewer's newest review state, any state; empty when none. |
 | `pr.last_review.decision` | string | turn | The viewer's newest non-comment verdict; empty when none. |
@@ -187,7 +186,6 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 |---|---|---|
 | `task.id` | string | The task's id. |
 | `task.state` | string | The task's state, one of the states tasks.toml declares. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
-| `task.muted` | bool | The task is muted. |
 | `task.unit` | string | The task's first unit as provider:key: the unit it was captured or derived on, else its first attachment; empty for a task with none. |
 | `task.unit_provider` | string | The provider of task.unit; empty for a task with none. |
 | `task.units` | list | The task's units as provider:key, in order: the unit it was captured or derived on, then those attached to it in attach order, then any only its items name. The task itself is not one of them. |
@@ -243,10 +241,9 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `pr.review_requested_me` | bool | A review is requested from the viewer, from the inventory row. |
 | `pr.adopted` | bool | The pull request was taken over into the loop. |
 | `pr.held` | bool | Rounds on the pull request are held. |
-| `pr.muted` | bool | The pull request is muted, by the server clock. |
 | `pr.nudge.who` | list | Whom a nudge would address, from nudge.targets. |
 | `pr.nudge.why` | string | Why the pull request waits on them, from nudge.targets. |
-| `pr.nudge.refusal` | string | The text nudge.prepare would refuse with now; empty when a nudge may go. |
+| `pr.nudge.refusal` | string | Why a nudge is refused now: the mute while one holds, else the text nudge.prepare would refuse with; empty when a nudge may go. |
 | `pr.last_review.exists` | bool | The viewer reviewed the pull request before. |
 | `pr.last_review.verdict` | string | The viewer's newest review state, any state; empty when none. |
 | `pr.last_review.decision` | string | The viewer's newest non-comment verdict; empty when none. |
@@ -275,7 +272,6 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `pr.last_interaction_at` | timestamp | The newest comment, review, push or review request, by anyone. Zero when unset; test with `> timestamp(0)`. |
 | `pr.silent_days` | int | Calendar days since last_interaction_at. |
 | `pr.waits_on_user` | bool | The row waits on the user, per situation.Derive. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
-| `pr.mute.refusal` | string | Why the pull request is muted, such as muted until its state changes; empty when it is not. |
 | `pr.fingerprint` | string | What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 
 ### Slack conversations (`slack.*`)
@@ -286,7 +282,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `slack.conversation` | string | The conversation's kind: channel, dm or group. |
 | `slack.started_by_me` | bool | The viewer started the thread. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.closure_posted` | bool | A closure was posted on the unit, by the extraction or a sent draft's unit.closed. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
-| `slack.live_task` | bool | A live task, neither done nor in the trash and not muted, is attached to the unit. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.live_task` | bool | A live task is attached to the unit: neither done, in the trash nor deferred, as a snoozed or muted task is. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.items_open` | int | Open items whose unit is this unit. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.items_resolved` | int | Resolved items whose unit is this unit. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.items_unowned` | int | Open items of the unit with no assignee, nobody waited on and no basis. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |

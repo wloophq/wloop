@@ -1,13 +1,10 @@
 package daemon
 
 import (
-	"context"
 	"encoding/json"
 	"slices"
 	"testing"
 	"time"
-
-	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
@@ -19,7 +16,6 @@ import (
 func TestRowFactsCarryChecksTurnsUsageAndWhatComesNext(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
-	ctx := context.Background()
 	created := fixtureNow.Add(-72 * time.Hour)
 	f.open(7, "ana", fixtureNow.Add(-time.Hour), func(pr *dinv.PR) {
 		pr.CreatedAt, pr.ChangedFiles, pr.ChecksState = created, 12, "FAILURE"
@@ -37,10 +33,10 @@ func TestRowFactsCarryChecksTurnsUsageAndWhatComesNext(t *testing.T) {
 	exec(`INSERT INTO turn_usage (turn_seq, model, messages, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, cost_usd, first_at, last_at) VALUES
 		(1, 'opus', 1, 1000, 200, 5000, 0, 0.42, ?, ?), (2, 'opus', 1, 300, 50, 0, 0, NULL, ?, ?)`, sent, sent, sent, sent)
 	unmute, retry := fixtureNow.Add(2*time.Hour), fixtureNow.Add(time.Hour)
-	if err := inventorytest.Of(f.st).SetOverride(ctx, dinv.Override{PR: ref(7), MutedUntil: unmute}); err != nil {
+	if err := muteBy(f.st, ref(7), unmute); err != nil {
 		t.Fatal(err)
 	}
-	if err := inventorytest.Of(f.st).SetOverride(ctx, dinv.Override{PR: ref(8), MutedUntil: fixtureNow.Add(-time.Minute)}); err != nil {
+	if err := muteBy(f.st, ref(8), fixtureNow.Add(-time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	exec(`INSERT INTO unit_briefs (provider, unit_key, retry_at) VALUES ('github', 'acme/api#7', ?), ('github', 'acme/api#8', ?)`,

@@ -192,27 +192,11 @@ var EventKinds = []string{KindOpened, KindPush, KindReviewRequest, KindReviewReq
 func BookkeepingKinds() []string { return slices.Clone(bookkeepingKinds) }
 
 type Override struct {
-	PR                   pr.Ref    `json:"pr"`
-	MutedUntil           time.Time `json:"muted_until"`
-	MuteUntilStateChange bool      `json:"mute_until_state_change"`
-	MutedKind            string    `json:"muted_kind"`       // situation kind when muted until it changes
-	MutedWaitingOn       string    `json:"muted_waiting_on"` // and who it was waiting on
-	Hold                 bool      `json:"hold"`
-	Adopted              bool      `json:"adopted"`
-	Tracked              bool      `json:"tracked"`       // added by hand; the store keeps ReasonTracked among its reasons while set
-	NextGuidance         string    `json:"next_guidance"` // and guidance for the next one
-}
-
-// MuteRefusal is why the mute refuses a turn at now: muted until the state
-// changes, or until a time; "" when it does not.
-func (o Override) MuteRefusal(now time.Time) string {
-	switch {
-	case o.MuteUntilStateChange:
-		return "muted until its state changes"
-	case o.MutedUntil.After(now):
-		return "muted until " + o.MutedUntil.Local().Format(time.DateTime)
-	}
-	return ""
+	PR           pr.Ref `json:"pr"`
+	Hold         bool   `json:"hold"`
+	Adopted      bool   `json:"adopted"`
+	Tracked      bool   `json:"tracked"`       // added by hand; the store keeps ReasonTracked among its reasons while set
+	NextGuidance string `json:"next_guidance"` // and guidance for the next one
 }
 
 // ReasonTracked is the scope reason of a pull request the user tracks.

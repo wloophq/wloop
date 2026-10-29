@@ -41,7 +41,7 @@ func TestCardFromRow(t *testing.T) {
 	if !c.Since.Equal(r.Summary.Since) || c.Since.IsZero() || c.Link != r.Link || c.Link == "" {
 		t.Errorf("since %v link %q", c.Since, c.Link)
 	}
-	if c.TurnsLink != "#unit=github/"+r.Unit.Key || !c.StartedByMe || !c.Cares || c.ClosurePosted || c.Mute != nil {
+	if c.TurnsLink != "#unit=github/"+r.Unit.Key || !c.StartedByMe || !c.Cares || c.ClosurePosted {
 		t.Errorf("card %+v", c)
 	}
 }

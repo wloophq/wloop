@@ -118,12 +118,11 @@ func TestMuteUntilStateSurvivesAPendingRound(t *testing.T) {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	row7(t, s, api.ViewAll)
-	if err := s.expireMutes(context.Background()); err != nil {
+	if err := s.keepCurrent(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	o, err := s.store().Override(context.Background(), r7)
-	if err != nil || !o.MuteUntilStateChange {
-		t.Fatalf("the pending round cleared the mute: %+v %v", o, err)
+	if _, w, ok := prTask(t, s, r7); !ok || w.When == "" {
+		t.Fatalf("the pending round cleared the mute: %+v %v", w, ok)
 	}
 }
 

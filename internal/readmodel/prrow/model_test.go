@@ -7,6 +7,7 @@ import (
 	"maps"
 	"math"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -26,8 +27,10 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/domain/workday"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/meter"
@@ -95,6 +98,7 @@ func (r *rig) model() *readmodel.Model {
 		reports = r.reports
 	}
 	src := prrow.Source{Store: r.f.Inventory, Reports: reports, Briefs: brief.New(brief.Deps{Store: r.f.Inventory, PRs: inventorytest.Of(r.f.Inventory)}),
+		Mutes: readmodel.WakeMutes(r.f.DB.Wakes().UnitWakes),
 		RowDeps: readmodel.RowDeps{Books: r.f.Turns, Sessions: r.f.Turns, Activity: r.f.DB, Intakes: r.f.DB.Intakes().Open, Intake: intakeView,
 			Settings: func() readmodel.RowSettings { return readmodel.RowSettings{Cfg: r.cfg, Loaded: r.loaded, GateOn: true} }}}
 	m := readmodel.New(r.f.Log, r.f.DB, r, readmodel.AgentsFunc(r.lastAgents), r, counting{prrow.New(src), &r.listed})
@@ -301,8 +305,9 @@ func TestRowsWithNoChangeIssueNoQuery(t *testing.T) {
 }
 
 // rebuildSQL is one rebuild at live size: one statement per input, the
-// reported units, their reports and their overrides apart.
-const rebuildSQL = 11
+// reported units, their reports, their overrides and their tasks' wakes
+// apart.
+const rebuildSQL = 12
 
 func TestRebuildAtLiveSize(t *testing.T) {
 	f := storetest.Seeded(t, storetest.Live)
@@ -479,11 +484,11 @@ func TestReadYourWrites(t *testing.T) {
 	r.rows(r.m, api.Since{})
 	ref := f.Open[5]
 	until := f.Now.Add(48 * time.Hour)
-	if err := inventorytest.Of(f.Inventory).SetOverride(context.Background(), dinv.Override{PR: ref, MutedUntil: until}); err != nil {
+	if err := mute(context.Background(), f, ref, until); err != nil {
 		t.Fatal(err)
 	}
 	row, ok, err := r.m.Row(context.Background(), ref.Unit(), catalog.Asked{})
-	if err != nil || !ok || row.Kind != api.Kind(situation.KindMuted) || !overrideOf(row).MutedUntil.Equal(until) {
+	if p, _ := prrow.PayloadOf(row); err != nil || !ok || row.Kind != api.Kind(situation.KindMuted) || p.Mute == nil || !p.Mute.Until.Equal(until) {
 		t.Fatalf("row %+v, ok %v, err %v", row, ok, err)
 	}
 }
@@ -517,6 +522,17 @@ func TestConcurrentReadersShareOneRebuild(t *testing.T) {
 	}
 }
 
+// mute mutes ref until a time: a wake on a task that holds it.
+func mute(ctx context.Context, f *storetest.Fixture, ref pr.Ref, until time.Time) error {
+	id := task.ID("t-" + strings.ReplaceAll(ref.String(), "/", "-"))
+	e := task.Task{ID: id, State: "scheduled", Category: task.CategoryDeferred, Units: []unit.Unit{ref.Unit()}, Origin: task.OriginUser,
+		Created: f.Now, Updated: f.Now}
+	if err := f.DB.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
+		return err
+	}
+	return f.DB.Wakes().Put(ctx, wake.Wake{Task: id, Until: until, Return: "next"})
+}
+
 // writer makes the n-th scripted write of a script over the seeded open
 // pull requests; the unlinked ones from index 58 lapse and come back.
 func writer(r *rig, n int) error {
@@ -526,7 +542,7 @@ func writer(r *rig, n int) error {
 	at := f.Now.Add(time.Duration(n) * time.Second)
 	switch n % 9 {
 	case 0:
-		return inventorytest.Of(f.Inventory).SetOverride(ctx, dinv.Override{PR: ref, MutedUntil: f.Now.Add(time.Duration(1+n%3) * time.Hour)})
+		return mute(ctx, f, ref, f.Now.Add(time.Duration(1+n%3)*time.Hour))
 	case 1:
 		_, err := f.Inventory.AppendEvents(ctx, []dinv.Event{{PR: ref, Kind: dinv.KindComment, Key: fmt.Sprintf("script-%d", n), Actor: viewer, At: at}})
 		return err
@@ -785,4 +801,30 @@ func TestCheckFindsAStaleRow(t *testing.T) {
 func overrideOf(r api.Row) api.Override {
 	p, _ := prrow.PayloadOf(r)
 	return p.Override
+}
+
+func TestUpcomingUnmuteReadsWakes(t *testing.T) {
+	f := storetest.Seeded(t, storetest.Live)
+	r := newRig(t, f)
+	ctx := context.Background()
+	ref := f.Open[3]
+	until := f.Now.Add(5 * time.Hour)
+	if err := mute(ctx, f, ref, until); err != nil {
+		t.Fatal(err)
+	}
+	row, ok, err := r.m.Row(ctx, ref.Unit(), catalog.Asked{})
+	if err != nil || !ok {
+		t.Fatalf("row %v %v", ok, err)
+	}
+	p, _ := prrow.PayloadOf(row)
+	if p.Facts == nil || !slices.ContainsFunc(p.Facts.Next, func(u api.Upcoming) bool { return u.What == api.UpcomingUnmute && u.At.Equal(until) }) {
+		t.Fatalf("next %+v, want the wake's until", p.Facts)
+	}
+	if err := f.DB.Wakes().Drop(ctx, task.ID("t-"+strings.ReplaceAll(ref.String(), "/", "-"))); err != nil {
+		t.Fatal(err)
+	}
+	row, _, _ = r.m.Row(ctx, ref.Unit(), catalog.Asked{})
+	if p, _ := prrow.PayloadOf(row); p.Facts != nil && slices.ContainsFunc(p.Facts.Next, func(u api.Upcoming) bool { return u.What == api.UpcomingUnmute }) {
+		t.Fatalf("a dropped wake is still next: %+v", p.Facts.Next)
+	}
 }

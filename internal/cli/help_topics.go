@@ -239,7 +239,7 @@ func helpGroups(manager string) []helpGroup {
 				Names:   []string{"mute", "unmute"},
 				Summary: "Leave or rejoin the pending views",
 				Usage:   []string{"mute <url> [--until <duration> | --until-state]", "unmute <url>"},
-				About:   "Take a pull request out of the pending views, for good, for a while, or until who it waits on changes; unmute brings it back.",
+				About:   "Snooze a pull request's task, out of the pending views, for a while or until who it waits on changes: a wake on the task; unmute wakes it now.",
 				Flags: []helpFlag{
 					{"--until <duration>", "Mute for a duration such as 2d or 36h"},
 					{"--until-state", "Mute until who the pull request waits on changes"},

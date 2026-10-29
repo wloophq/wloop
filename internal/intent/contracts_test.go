@@ -112,7 +112,7 @@ flag = "--repo"
 help = "owner/name"
 
 [[refuse]]
-when = 'pr.mute.refusal != ""'
+when = 'pr.nudge.refusal != ""'
 why = "muted"
 `
 	writeIntent(t, root, "implement", m, "{{.Headline}}")
@@ -123,7 +123,7 @@ why = "muted"
 	d, ok := l.Registry.Get("implement")
 	if !ok || d.WorkspaceRepo == nil || d.WorkspaceRepo.RepoInput != "repo" || d.Provider != "github" || len(d.Providers) != 2 ||
 		d.Role != "headless" || len(d.AllowedEffects) != 2 || d.Why.Src != "{{.pr.address.reason}}" ||
-		len(d.Refuse) != 1 || d.Refuse[0].When.Src != `pr.mute.refusal != ""` || d.Brief.Need[0] != "solution" {
+		len(d.Refuse) != 1 || d.Refuse[0].When.Src != `pr.nudge.refusal != ""` || d.Brief.Need[0] != "solution" {
 		t.Fatalf("%+v", d)
 	}
 	if got, ok := l.Registry.ByRole("headless", "slack"); !ok || got.Name != "implement" {

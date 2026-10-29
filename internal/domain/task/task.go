@@ -73,10 +73,8 @@ func (e *Task) Become(s State, st States) {
 	}
 }
 
-// Snoozed says whether the task is deferred under a snooze: a date, activity or a mute wakes it.
-func (e Task) Snoozed() bool {
-	return e.Category == CategoryDeferred && (!e.Snooze.Until.IsZero() || e.Snooze.OnActivity || e.Snooze.Mute)
-}
+// Snoozed says whether the task is deferred under a wake.
+func (e Task) Snoozed() bool { return e.Category == CategoryDeferred && e.Asleep }
 
 // FirstUnit is the unit the entry is about: its first unit, else its
 // first item's.
@@ -147,7 +145,6 @@ func (e Task) canonical() Task {
 		w.At = t(w.At)
 		c.Written[name] = w
 	}
-	c.Snooze.Until = t(e.Snooze.Until)
 	c.SeenAt, c.ReviewedAt, c.Created, c.Updated = t(e.SeenAt), t(e.ReviewedAt), t(e.Created), t(e.Updated)
 	return c
 }

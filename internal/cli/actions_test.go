@@ -25,6 +25,7 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -99,6 +100,16 @@ func TestPauseRequiresDaemon(t *testing.T) {
 	}
 }
 
+// wakeOfUnit is the wake of the task that holds ref.
+func wakeOfUnit(t *testing.T, st *inventory.Store, ref pr.Ref) wake.Wake {
+	t.Helper()
+	ws, err := st.DB().Wakes().UnitWakes(context.Background(), []unit.Unit{ref.Unit()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ws[ref.Unit()]
+}
+
 func TestMuteParsesUntil(t *testing.T) {
 	t.Parallel()
 	d := startDaemon(t, nil)
@@ -107,9 +118,8 @@ func TestMuteParsesUntil(t *testing.T) {
 	if code := te.run("mute", r7.URL(), "--until", "36h"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	o, _ := d.store.Override(context.Background(), r7)
-	if !o.MutedUntil.Equal(daemonNow.Add(36 * time.Hour)) {
-		t.Fatalf("muted until %v", o.MutedUntil)
+	if w := wakeOfUnit(t, d.store, r7); !w.Until.Equal(daemonNow.Add(36 * time.Hour)) {
+		t.Fatalf("muted until %v", w.Until)
 	}
 	if code := te.run("unmute", r7.URL()); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -117,9 +127,8 @@ func TestMuteParsesUntil(t *testing.T) {
 	if code := te.run("mute", r7.URL(), "--until-state"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	o, _ = d.store.Override(context.Background(), r7)
-	if !o.MuteUntilStateChange || !o.MutedUntil.IsZero() {
-		t.Fatalf("override %+v", o)
+	if w := wakeOfUnit(t, d.store, r7); w.When == "" || !w.Until.IsZero() {
+		t.Fatalf("wake %+v", w)
 	}
 	if code := te.run("mute", r7.URL()); code == 0 {
 		t.Fatal("mute without a duration succeeded")

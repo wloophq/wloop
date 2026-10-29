@@ -104,21 +104,21 @@ func TestTheBrokerSetsOverridesCompareAndSetAndReadsThemInTheRoundState(t *testi
 	h, db := hostOver(t)
 	ctx := context.Background()
 	own := plugin.Unit{Provider: "acme", Key: "t1"}
-	mute := map[string]string{port.OverrideMuteUntilStateChange: port.OverrideTrue, port.OverrideMutedKind: "waiting", port.OverrideMutedWaitingOn: "ana"}
-	if ok, err := h.Gates.SetOverride(ctx, own, mute, map[string]string{port.OverrideMutedKind: ""}); err != nil || !ok {
-		t.Fatalf("mute %v %v", ok, err)
+	guide := map[string]string{port.OverrideNextGuidance: "ask ana"}
+	if ok, err := h.Gates.SetOverride(ctx, own, guide, map[string]string{port.OverrideNextGuidance: ""}); err != nil || !ok {
+		t.Fatalf("guidance %v %v", ok, err)
 	}
-	if ok, err := h.Gates.SetOverride(ctx, own, map[string]string{port.OverrideMutedKind: ""}, map[string]string{port.OverrideMutedWaitingOn: "bruno"}); err != nil || ok {
+	if ok, err := h.Gates.SetOverride(ctx, own, map[string]string{port.OverrideNextGuidance: ""}, map[string]string{port.OverrideNextGuidance: "ask bruno"}); err != nil || ok {
 		t.Fatalf("a stale match wrote %v %v", ok, err)
 	}
 	st, err := h.Reader.RoundState(ctx, own)
-	if err != nil || st.Overrides[port.OverrideMutedWaitingOn] != "ana" || st.Paused {
+	if err != nil || st.Overrides[port.OverrideNextGuidance] != "ask ana" || st.Paused {
 		t.Fatalf("round state %+v %v", st, err)
 	}
 	if _, err := h.Gates.SetOverride(ctx, own, map[string]string{port.OverrideHold: port.OverrideTrue}, nil); err == nil {
 		t.Error("a plugin set the user's hold")
 	}
-	if _, err := h.Gates.SetOverride(ctx, plugin.Unit{Provider: "slack", Key: "T/C/1"}, mute, nil); err == nil {
+	if _, err := h.Gates.SetOverride(ctx, plugin.Unit{Provider: "slack", Key: "T/C/1"}, guide, nil); err == nil {
 		t.Error("a plugin set another provider's override")
 	}
 	if _, err := db.SetOverride(ctx, unit.Unit{Provider: "acme", Key: "t1"}, map[string]string{port.OverrideHold: port.OverrideTrue}, nil); err != nil {
@@ -187,7 +187,7 @@ func TestTheRoundStateCrossesTheWireWithItsBookkeeping(t *testing.T) {
 		}
 		return want, nil
 	}
-	if _, err := db.SetOverride(ctx, t1, map[string]string{port.OverrideMutedKind: "waiting", port.OverrideHold: port.OverrideTrue}, nil); err != nil {
+	if _, err := db.SetOverride(ctx, t1, map[string]string{port.OverrideNextGuidance: "ask ana", port.OverrideHold: port.OverrideTrue}, nil); err != nil {
 		t.Fatal(err)
 	}
 	stub := sourcetest.NewStub()
@@ -202,7 +202,7 @@ func TestTheRoundStateCrossesTheWireWithItsBookkeeping(t *testing.T) {
 	if got.Blocked == nil || got.Blocked.Question != "trust" || got.Blocked.Root != "/src/api" || got.Blocked.Folder != "/wt/rev" || !got.Blocked.Since.Equal(since) {
 		t.Errorf("blocked %+v", got.Blocked)
 	}
-	if got.Overrides[port.OverrideMutedKind] != "waiting" || !got.Paused {
+	if got.Overrides[port.OverrideNextGuidance] != "ask ana" || !got.Paused {
 		t.Errorf("overrides %v, paused %v; want them over the bookkeeping", got.Overrides, got.Paused)
 	}
 }

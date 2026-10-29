@@ -152,7 +152,7 @@ func TestARowIsDerivedFromItsSnapshotAndHostState(t *testing.T) {
 		r.snaps[u] = report(u.Key)
 	}
 	p := reportedProvider(t, r, &books{by: map[unit.Unit]turn.Book{}}, nil,
-		mutes{muted: {UntilStateChange: true, Kind: "review", WaitingOn: "me", At: reportedAt.Add(-time.Hour)}},
+		mutes{muted: {UntilStateChange: true, At: reportedAt.Add(-time.Hour)}},
 		[]intake.Intake{{Seq: 4, Unit: briefing}})
 	ctx := context.Background()
 	units, err := p.Listed(ctx)

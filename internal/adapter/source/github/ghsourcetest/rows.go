@@ -49,6 +49,7 @@ type Situation struct {
 	PR       dinv.PR
 	Events   []dinv.Event
 	Override dinv.Override
+	Mute     overlay.Mute
 	Turn     *prrow.TurnFact
 	Pending  *round.Pending
 	// At is when the row is derived; zero is Now.
@@ -82,7 +83,7 @@ func Cases() []Case {
 						s.PR.Reasons = nil
 					}
 					if muted {
-						s.Override.MutedUntil = Now.Add(5 * time.Hour)
+						s.Mute = overlay.Mute{Until: Now.Add(5 * time.Hour)}
 						s.add(dinv.KindMuted, Viewer, ago(time.Hour), "")
 					}
 					row, rep := DeriveReport(s)
@@ -146,7 +147,8 @@ func DeriveReport(s Situation) (api.Row, prrow.Report) {
 		at = Now
 	}
 	d := prrow.Deriver{Viewer: Viewer, Teams: []string{Team}, Now: at, Stalled: config.Defaults().GitHub.Stalled, Loaded: l, Cfg: config.Defaults(),
-		GateOn: true, BriefOn: true, Pending: map[unit.Unit]round.Pending{}, Turns: map[pr.Ref]prrow.TurnFact{}}
+		GateOn: true, BriefOn: true, Pending: map[unit.Unit]round.Pending{}, Turns: map[pr.Ref]prrow.TurnFact{},
+		Mutes: map[unit.Unit]overlay.Mute{s.PR.Ref.Unit(): s.Mute}}
 	if s.Pending != nil {
 		d.Pending[s.PR.Ref.Unit()] = *s.Pending
 	}

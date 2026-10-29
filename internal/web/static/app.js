@@ -507,8 +507,9 @@ function stripTitle(row) {
   return [`${f && f.show ? f.show(cat) : cat}${who}: ${rowKindLabel(row)}`, sm(row).reason].filter(Boolean).join(". ");
 }
 
-function isMuted(o) {
-  return o.mute_until_state_change || (isSet(o.muted_until) && Date.parse(o.muted_until) > Date.now());
+function isMuted(p) {
+  const m = p.mute;
+  return !!m && (m.until_state_change || (isSet(m.until) && Date.parse(m.until) > Date.now()));
 }
 
 // The backlog is every pull request still open; done joins it on request.
@@ -766,7 +767,7 @@ function listYAML(meta, rows) {
   for (const r of rows) {
     const p = pl(r);
     const o = p.override || {};
-    const flags = [o.hold && "paused", isMuted(o) && "muted", o.adopted && "adopted", o.tracked && "tracked"].filter(Boolean);
+    const flags = [o.hold && "paused", isMuted(p) && "muted", o.adopted && "adopted", o.tracked && "tracked"].filter(Boolean);
     const b = p.brief;
     const ws = p.workspace;
     const fields = [
@@ -1224,7 +1225,7 @@ function rowTr(r, pr, lens, copy) {
         briefTags(p.brief, lens, slot),
         p.head && ts.some((t) => fold(p.head).includes(t)) ? h("span", { class: "head" }, marked(p.head, ts)) : null,
         o.hold ? facet(lens, "is", "paused", h("span", { class: "flag" }, "paused"), slot + "is:paused") : null,
-        isMuted(o) ? facet(lens, "is", "muted", h("span", { class: "flag" }, "muted"), slot + "is:muted") : null,
+        isMuted(p) ? facet(lens, "is", "muted", h("span", { class: "flag" }, "muted"), slot + "is:muted") : null,
         intakeChip(r))),
     h("td", { class: "c-wait" },
       h("div", { class: "who" },
@@ -1963,8 +1964,8 @@ function renderDetail() {
   const old = document.getElementById("guidance");
   const caret = old && document.activeElement === old ? [old.selectionStart, old.selectionEnd] : null;
   const guidance = inCard ? null : guidanceBox(key, guidanceLabel(r));
-  const muteState = o.mute_until_state_change ? "muted until the situation changes"
-    : isMuted(o) ? `muted until ${stamp(o.muted_until)}` : "";
+  const muteState = (p.mute || {}).until_state_change ? "muted until who it waits on changes"
+    : isMuted(p) ? `muted until ${stamp(p.mute.until)}` : "";
   const events = timelineEvents(d);
 
   const top = h("div", { class: "d-top" },

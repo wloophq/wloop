@@ -39,6 +39,7 @@ var moves = map[task.Verb]struct {
 	task.VerbNext:      {append(without(todo, "next"), "reference"), "next"},
 	task.VerbWaiting:   {without(todo, "waiting"), "waiting"},
 	task.VerbSchedule:  {todo, "scheduled"},
+	task.VerbWake:      {[]string{"scheduled", "someday"}, ""},
 	task.VerbSomeday:   {without(todo, "someday"), "someday"},
 	task.VerbReference: {append(slices.Clone(todo), "done"), "reference"},
 	task.VerbDone:      {live, "done"},
@@ -78,12 +79,12 @@ func (bundledStates) Move(verb string) ([]string, string, bool) {
 }
 
 // handlers are the bundled verbs that name a handler, each the one named as the verb.
-var handlers = []task.Verb{task.VerbWaiting, task.VerbSchedule, task.VerbFocus, task.VerbProject, task.VerbApprove,
+var handlers = []task.Verb{task.VerbWaiting, task.VerbSchedule, task.VerbWake, task.VerbFocus, task.VerbProject, task.VerbApprove,
 	task.VerbDelegate, task.VerbSeen, task.VerbContext, task.VerbArea, task.VerbAnswer, task.VerbEdit, task.VerbRetry,
 	task.VerbReviewed, task.VerbSequential, task.VerbReply}
 
 // byWorkflow are the bundled verbs a workflow may run; a person may run every verb.
-var byWorkflow = []task.Verb{task.VerbDone, task.VerbDismiss, task.VerbNext, task.VerbWaiting, task.VerbSchedule, task.VerbFocus}
+var byWorkflow = []task.Verb{task.VerbDone, task.VerbDismiss, task.VerbNext, task.VerbWaiting, task.VerbSchedule, task.VerbWake, task.VerbFocus}
 
 func (bundledStates) Handler(verb string) string {
 	if slices.Contains(handlers, task.Verb(verb)) {

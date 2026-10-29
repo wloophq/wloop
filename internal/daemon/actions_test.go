@@ -36,11 +36,12 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/meter"
-	"github.com/wloophq/wloop/internal/meter/metertest"
 )
 
 type fakeActions struct {
@@ -136,7 +137,26 @@ func post(t *testing.T, s *Server, path, body string) *httptest.ResponseRecorder
 
 var r7 = github.Ref{Owner: "acme", Repo: "api", Number: 7}
 
-func TestMuteWritesOverrideAndEvent(t *testing.T) {
+// prTask is the open task that holds ref, and its wake.
+func prTask(t *testing.T, s *Server, ref github.Ref) (task.Task, wake.Wake, bool) {
+	t.Helper()
+	ctx := context.Background()
+	ts, err := s.store().DB().Tasks().TasksOf(ctx, ref.Unit())
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := slices.IndexFunc(ts, task.Task.Open)
+	if i < 0 {
+		t.Fatalf("no open task holds %s", ref)
+	}
+	w, ok, err := s.store().DB().Wakes().Of(ctx, ts[i].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ts[i], w, ok
+}
+
+func TestMutingAPRWritesAWakeAndUnmutingDropsIt(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/mute", `{}`); rec.Code != 400 {
@@ -145,9 +165,14 @@ func TestMuteWritesOverrideAndEvent(t *testing.T) {
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/mute", `{"until":"2d"}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	o, _ := s.store().Override(context.Background(), r7)
-	if o.MutedUntil.IsZero() {
-		t.Fatalf("not muted: %+v", o)
+	e, w, ok := prTask(t, s, r7)
+	if !ok || !w.Until.Equal(s.deps.Now().Add(48*time.Hour)) || w.When != "" || w.Return != "next" || e.Category != task.CategoryDeferred {
+		t.Fatalf("muted: task %+v, wake %+v %v", e, w, ok)
+	}
+	var d api.Detail
+	get(t, s, "/api/units/github/acme%2Fapi%237", &d)
+	if d.Row.Kind != "muted" {
+		t.Fatalf("the row of a muted pull request: %+v", d.Row)
 	}
 	evs, _ := s.store().Events(context.Background(), r7)
 	if evs[len(evs)-1].Kind != dinv.KindMuted {
@@ -155,6 +180,20 @@ func TestMuteWritesOverrideAndEvent(t *testing.T) {
 	}
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/mute", `{"until":"2d"}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "no mute on acme/api#7") {
 		t.Fatalf("mute a muted pull request: %d %s", rec.Code, rec.Body)
+	}
+	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/unmute", `{}`); rec.Code != 200 {
+		t.Fatalf("unmute: %d %s", rec.Code, rec.Body)
+	}
+	if e, w, ok := prTask(t, s, r7); ok || e.State != "next" {
+		t.Fatalf("unmuted: task %+v, wake %+v", e, w)
+	}
+	get(t, s, "/api/units/github/acme%2Fapi%237", &d)
+	if d.Row.Kind == "muted" {
+		t.Fatalf("the row of an unmuted pull request: %+v", d.Row)
+	}
+	evs, _ = s.store().Events(context.Background(), r7)
+	if evs[len(evs)-1].Kind != dinv.KindUnmuted {
+		t.Fatalf("last event %+v", evs[len(evs)-1])
 	}
 }
 
@@ -413,16 +452,16 @@ func TestMuteWithBothFieldsIs400(t *testing.T) {
 	}
 }
 
-func TestMuteUntilStateChangeLastsUntilTheSituationChanges(t *testing.T) {
+func TestMuteUntilStateChangeWaitsOnItsWake(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/mute", `{"until_state":true}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	o, _ := s.store().Override(ctx, r7)
-	if !o.MuteUntilStateChange || o.MutedKind != "review" || o.MutedWaitingOn != "me" {
-		t.Fatalf("override %+v", o)
+	_, w, ok := prTask(t, s, r7)
+	if !ok || !w.Until.IsZero() || !strings.HasPrefix(w.When, "size(task.link_owes) != ") {
+		t.Fatalf("wake %+v %v, want one until who the pull request owes changes", w, ok)
 	}
 	var d api.Detail
 	get(t, s, "/api/units/github/acme%2Fapi%237", &d)
@@ -431,16 +470,12 @@ func TestMuteUntilStateChangeLastsUntilTheSituationChanges(t *testing.T) {
 	}
 	s.store().AppendEvents(ctx, []dinv.Event{{PR: r7, Kind: dinv.KindReview, Key: "r1", Actor: "me", At: s.deps.Now(), Data: "CHANGES_REQUESTED:h2"}})
 	get(t, s, "/api/units/github/acme%2Fapi%237", &d)
-	if d.Row.Kind != "changes" {
-		t.Fatalf("mute outlived the state change: %+v", d.Row)
-	}
-	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/mute", `{"until_state":true}`); rec.Code != 200 {
-		t.Fatalf("%d %s", rec.Code, rec.Body)
+	if d.Row.Kind != "muted" {
+		t.Fatalf("the row unmuted before its wake matched: %+v", d.Row)
 	}
 	post(t, s, "/api/units/github/acme%2Fapi%237/unmute", `{}`)
-	o, _ = s.store().Override(ctx, r7)
-	if o.MuteUntilStateChange || o.MutedKind != "" || o.MutedWaitingOn != "" {
-		t.Fatalf("unmute left %+v", o)
+	if _, w, ok := prTask(t, s, r7); ok {
+		t.Fatalf("unmute left %+v", w)
 	}
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%2399/mute", `{"until_state":true}`); rec.Code != 409 {
 		t.Fatalf("unknown pull request: %d", rec.Code)
@@ -527,71 +562,6 @@ func TestLoopActionsWaitOnTheSharedLoopMutex(t *testing.T) {
 			t.Fatalf("%v %v", err, fa.calls)
 		}
 	})
-}
-
-func TestMuteUntilStateLapsesOnce(t *testing.T) {
-	t.Parallel()
-	s := newServer(t)
-	ctx := context.Background()
-	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/mute", `{"until_state":true}`); rec.Code != 200 {
-		t.Fatalf("%d %s", rec.Code, rec.Body)
-	}
-	s.store().AppendEvents(ctx, []dinv.Event{{PR: r7, Kind: dinv.KindReview, Key: "r1", Actor: "me", At: s.deps.Now(), Data: "CHANGES_REQUESTED:h2"}})
-	mctx, sc := metertest.Start(t, ctx)
-	rows, err := s.rows(mctx, api.ViewAll)
-	if err != nil {
-		t.Fatal(err)
-	}
-	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL, Op: "exec"}: 0, {Res: meter.Tx, Op: "write"}: 0})
-	i := slices.IndexFunc(rows, func(r api.Row) bool { return r.Unit == r7.Unit() })
-	if i < 0 || rows[i].Kind != "changes" || payload(rows[i]).Override.MuteUntilStateChange || !slices.ContainsFunc(rows[i].Actions, func(a api.ActionState) bool { return a.ID == "mute" }) {
-		t.Fatalf("the read did not show the lapsed mute's row unmuted: %+v", rows[i])
-	}
-	if o, _ := s.store().Override(ctx, r7); !o.MuteUntilStateChange {
-		t.Fatalf("a read cleared the stored mute: %+v", o)
-	}
-	mctx, sc = metertest.Start(t, ctx)
-	if err := s.readModel().Refresh(mctx); err != nil {
-		t.Fatal(err)
-	}
-	if n := metertest.Count(sc, metertest.Limit{Res: meter.Tx, Op: "write"}); n < 1 {
-		t.Fatal("the keeper wrote nothing")
-	}
-	if err := s.readModel().Refresh(ctx); err != nil {
-		t.Fatal(err)
-	}
-	o, _ := s.store().Override(ctx, r7)
-	if o.MuteUntilStateChange || o.MutedKind != "" || o.MutedWaitingOn != "" {
-		t.Fatalf("expired mute kept: %+v", o)
-	}
-	if n := countEvents(t, s, dinv.KindUnmuted); n != 1 {
-		t.Fatalf("%d unmuted events, want 1", n)
-	}
-	pr, _, _ := inventorytest.Of(s.store()).PR(ctx, r7)
-	pr.HeadOid = "h3"
-	inventorytest.Of(s.store()).UpsertPR(ctx, pr)
-	s.store().AppendEvents(ctx, []dinv.Event{{PR: r7, Kind: dinv.KindPush, Key: "h3", Actor: "ana", At: s.deps.Now().Add(time.Minute)}})
-	var d api.Detail
-	get(t, s, "/api/units/github/acme%2Fapi%237", &d)
-	if d.Row.Kind != "review" || d.Row.Summary.WaitsOn != "me" {
-		t.Fatalf("the old situation re-armed the mute: %+v", d.Row)
-	}
-	if rows, _ = s.rows(ctx, api.ViewAll); rows[slices.IndexFunc(rows, func(r api.Row) bool { return r.Unit == r7.Unit() })].Kind == "muted" {
-		t.Fatal("the row came back muted")
-	}
-}
-
-func TestExpireMutesClearsAnExpiredMute(t *testing.T) {
-	t.Parallel()
-	s := newServer(t)
-	ctx := context.Background()
-	inventorytest.Of(s.store()).SetOverride(ctx, dinv.Override{PR: r7, MuteUntilStateChange: true, MutedKind: "changes", MutedWaitingOn: "author"})
-	if err := s.expireMutes(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if o, _ := s.store().Override(ctx, r7); o.MuteUntilStateChange {
-		t.Fatalf("expired mute kept: %+v", o)
-	}
 }
 
 var r9 = github.Ref{Owner: "acme", Repo: "api", Number: 9}
@@ -972,8 +942,9 @@ func TestTheTrackCapHoldsUnderConcurrentTracks(t *testing.T) {
 func TestASlowTrackReadDoesNotBlockTheRows(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
-	ctx := context.Background()
-	inventorytest.Of(s.store()).SetOverride(ctx, dinv.Override{PR: r7, MuteUntilStateChange: true, MutedKind: "changes", MutedWaitingOn: "ana"})
+	if err := muteBy(s.store(), r7, time.Time{}); err != nil {
+		t.Fatal(err)
+	}
 	reading, release := make(chan struct{}), make(chan struct{})
 	s.trackReads(func(_ context.Context, u unit.Unit) (port.TrackRead, error) {
 		ref := refOf(u)

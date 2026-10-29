@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -53,10 +52,13 @@ type Deps struct {
 	// Reports are what the GitHub plugin last reported of its pull
 	// requests, which a row derives from.
 	Reports readmodel.Reports
-	// Host is the broker: the host's overrides and round state.
+	// Host is the broker: the host's overrides, round state and wakes.
 	Host src.Host
 	// Briefs nil shows no brief.
 	Briefs Briefs
+	// Mutes are the user's mutes of pull requests, their tasks' wakes;
+	// nil mutes none.
+	Mutes readmodel.Mutes
 	// Plugin runs an action of the running GitHub plugin, which serves the
 	// nudge's prepare; nil serves none.
 	Plugin func(ctx context.Context, req src.ActionRequest) (json.RawMessage, error)
@@ -83,9 +85,6 @@ type Host struct {
 type Presenter struct {
 	d Deps
 	h Host
-	// overrides serializes the presenter's override writes, which also
-	// compare and set.
-	overrides sync.Mutex
 	// situationsFailing keeps the first failure of a streak logged only.
 	situationsFailing atomic.Bool
 }
@@ -194,10 +193,10 @@ func marshal[T any](v T, err error) (json.RawMessage, error) {
 }
 
 // Keep is the plugin's bookkeeping on each new snapshot of the rows: the
-// situations that changed and the mutes whose situation changed.
+// situations that changed.
 func (p *Presenter) Keep(ctx context.Context, k readmodel.Kept) error {
 	p.recordSituations(ctx, k)
-	return p.expireLapsedMutes(ctx, k)
+	return nil
 }
 
 func (p *Presenter) recordEvent(ctx context.Context, u unit.Unit, kind, data string) error {

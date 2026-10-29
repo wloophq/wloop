@@ -410,12 +410,6 @@ doc = "Rounds on the pull request are held."
 slots = ["action"]
 
 [[source.facts]]
-name = "pr.muted"
-type = "bool"
-doc = "The pull request is muted, by the server clock."
-slots = ["action"]
-
-[[source.facts]]
 name = "pr.nudge.who"
 type = "list"
 doc = "Whom a nudge would address, from nudge.targets."
@@ -430,7 +424,7 @@ slots = ["action"]
 [[source.facts]]
 name = "pr.nudge.refusal"
 type = "string"
-doc = "The text nudge.prepare would refuse with now; empty when a nudge may go."
+doc = "Why a nudge is refused now: the mute while one holds, else the text nudge.prepare would refuse with; empty when a nudge may go."
 slots = ["action"]
 
 [[source.facts]]
@@ -593,11 +587,6 @@ name = "pr.waits_on_user"
 type = "bool"
 doc = "The row waits on the user, per situation.Derive."
 untrusted = true
-
-[[source.facts]]
-name = "pr.mute.refusal"
-type = "string"
-doc = "Why the pull request is muted, such as muted until its state changes; empty when it is not."
 
 [[source.facts]]
 name = "pr.fingerprint"

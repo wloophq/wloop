@@ -14,7 +14,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
-	"github.com/wloophq/wloop/internal/situation"
 )
 
 // fixtureNow is the instant every fixture row is derived at.
@@ -29,6 +28,7 @@ type rowCase struct {
 	pr       dinv.PR
 	events   []dinv.Event
 	override dinv.Override
+	mute     overlay.Mute
 	turn     *TurnFact
 	pending  *round.Pending
 	brief    *api.BriefSummary
@@ -89,12 +89,11 @@ func rowCases() []rowCase {
 			events: []dinv.Event{ev(13, dinv.KindMerged, "ana", ago(day), "")}},
 		{name: "closed without workspace", pr: open(14, "ana", func(p *dinv.PR) { p.State = "CLOSED"; p.ClosedAt = ago(day) })},
 		{name: "muted for a while", pr: open(15, "ana", func(p *dinv.PR) { p.ReviewRequests = []string{fixtureViewer} }),
-			override: dinv.Override{MutedUntil: fixtureNow.Add(5 * time.Hour)},
-			events:   []dinv.Event{ev(15, dinv.KindMuted, fixtureViewer, ago(time.Hour), "")}},
+			mute:   overlay.Mute{Until: fixtureNow.Add(5 * time.Hour)},
+			events: []dinv.Event{ev(15, dinv.KindMuted, fixtureViewer, ago(time.Hour), "")}},
 		{name: "muted until state change", pr: open(16, "ana", func(p *dinv.PR) { p.ReviewRequests = []string{fixtureViewer} }),
-			override: dinv.Override{MuteUntilStateChange: true, MutedKind: string(situation.KindReview), MutedWaitingOn: "me"}},
-		{name: "mute lapsed", pr: open(17, "ana", nil),
-			override: dinv.Override{MuteUntilStateChange: true, MutedKind: string(situation.KindReview), MutedWaitingOn: "me"}},
+			mute: overlay.Mute{UntilStateChange: true}},
+		{name: "mute spent", pr: open(17, "ana", nil)},
 		{name: "held by the cap", pr: open(18, "ana", func(p *dinv.PR) { p.Workspace = reviewWS }),
 			events: []dinv.Event{ev(18, dinv.KindRoundHeld, "", ago(time.Hour), "cap reached")}},
 		{name: "round blocked", pr: open(19, "ana", nil),
@@ -141,8 +140,10 @@ func fixtureDeriver(t *testing.T, at time.Time, cases []rowCase) Deriver {
 	t.Helper()
 	l := bundled(t)
 	d := Deriver{Viewer: fixtureViewer, Teams: []string{"acme/core"}, Now: at, Stalled: config.Defaults().GitHub.Stalled, Loaded: l, Cfg: config.Defaults(),
-		GateOn: true, BriefOn: true, Pending: map[unit.Unit]round.Pending{}, Turns: map[pr.Ref]TurnFact{}}
+		GateOn: true, BriefOn: true, Pending: map[unit.Unit]round.Pending{}, Turns: map[pr.Ref]TurnFact{},
+		Mutes: map[unit.Unit]overlay.Mute{}}
 	for _, c := range cases {
+		d.Mutes[c.pr.Ref.Unit()] = c.mute
 		if c.pending != nil {
 			d.Pending[c.pr.Ref.Unit()] = *c.pending
 		}

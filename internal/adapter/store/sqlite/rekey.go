@@ -172,7 +172,7 @@ func rekeyTask(ctx context.Context, tx *sql.Tx, from, to string) error {
 // taskStateTables hold a task's own state: dropping the task deletes its rows there. A row of any other
 // table that names the task is history, kept forever, so dropTask refuses until rekeyTask moved it; a
 // dossier is refused too, since its files would be left behind.
-var taskStateTables = []string{"tasks", "task_items", "task_units", "task_contexts", "task_props", "projects", "unit_marks", "overrides", "unit_cards"}
+var taskStateTables = []string{"tasks", "wakes", "task_items", "task_units", "task_contexts", "task_props", "projects", "unit_marks", "overrides", "unit_cards"}
 
 // keptOnDrop are the references a dropped task leaves as they are: an alias from a former id keeps
 // re-derivation idempotent after the task it named is gone.

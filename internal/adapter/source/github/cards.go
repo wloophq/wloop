@@ -100,9 +100,6 @@ func CardOf(r api.Row, s prrow.Report) (card.Card, error) {
 	if h := rc.LastHuman; h != nil {
 		c.LastHuman = &card.Human{Who: items.Person{Key: h.Who.Key, Name: h.Who.Name, Aliases: slices.Clone(h.Who.Aliases)}, What: h.What, At: h.At, Link: h.Link}
 	}
-	if m := p.Mute; m != nil {
-		c.Mute = &card.Mute{Until: m.Until, UntilStateChange: m.UntilStateChange}
-	}
 	return c, nil
 }
 

@@ -177,9 +177,10 @@ func facetsOf(viewer string, now time.Time, r map[string]any) map[string][]strin
 	f["size"] = []string{oneOf(str(brief["size"]), "xs", "s", "m", "l", "xl")}
 	f["status"] = []string{cmpOr(str(ws["status"]), "none")}
 	f["tag"] = strs(brief["tags"])
-	mutedUntil, _ := time.Parse(time.RFC3339, str(o["muted_until"]))
+	mute := obj(r["mute"])
+	mutedUntil, _ := time.Parse(time.RFC3339, str(mute["until"]))
 	flags := map[string]bool{"stalled": slices.Contains(views, "stalled"), "needs-me": slices.Contains(views, "needs-me"), "in-loop": slices.Contains(views, "loop"),
-		"approved": r["approved"] == true, "hold": o["hold"] == true, "muted": o["mute_until_state_change"] == true || mutedUntil.After(now),
+		"approved": r["approved"] == true, "hold": o["hold"] == true, "muted": mute["until_state_change"] == true || mutedUntil.After(now),
 		"adopted": o["adopted"] == true, "tracked": o["tracked"] == true}
 	f["is"] = []string{}
 	for _, k := range []string{"stalled", "needs-me", "in-loop", "approved", "hold", "muted", "adopted", "tracked"} {

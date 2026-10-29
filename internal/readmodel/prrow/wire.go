@@ -26,9 +26,7 @@ func agentStates(states []turn.AgentState) []string {
 
 // Override is the wire form of a stored override.
 func Override(o dinv.Override) api.Override {
-	return api.Override{MutedUntil: o.MutedUntil, MuteUntilStateChange: o.MuteUntilStateChange,
-		MutedKind: o.MutedKind, MutedWaitingOn: o.MutedWaitingOn, Hold: o.Hold, Adopted: o.Adopted, Tracked: o.Tracked,
-		NextGuidance: o.NextGuidance}
+	return api.Override{Hold: o.Hold, Adopted: o.Adopted, Tracked: o.Tracked, NextGuidance: o.NextGuidance}
 }
 
 func pendingOf(p round.Pending) *api.PendingRound {

@@ -657,7 +657,7 @@ func (l *tasksLoad) check(gates *GatesDef) Problems {
 // ByFacts are the facts a verb's by reads besides the task.prop.* of
 // tasks.toml: the task's own, which the authority reads off the task with
 // no facts provider at hand.
-var ByFacts = []string{"task.id", "task.state", "task.category", "task.muted", "task.unit", "task.unit_provider"}
+var ByFacts = []string{"task.id", "task.state", "task.category", "task.unit", "task.unit_provider"}
 
 // OwedFacts are the task facts owed_by.expr may not read: those its value
 // makes.

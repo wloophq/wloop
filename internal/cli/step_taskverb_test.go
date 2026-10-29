@@ -169,7 +169,7 @@ func TestTaskVerbRunsOnlyVerbsThatMoveAStoredTask(t *testing.T) {
 		for _, s := range []task.State{"inbox", "next", "waiting", "scheduled", "someday", "reference", "done", "trash"} {
 			moves = moves || g.Accepts(task.Task{State: s}, v, task.ActorWorkflow) == nil
 		}
-		want := slices.Contains([]task.Verb{task.VerbNext, task.VerbWaiting, task.VerbSchedule, task.VerbFocus, task.VerbDone, task.VerbDismiss}, v)
+		want := slices.Contains([]task.Verb{task.VerbNext, task.VerbWaiting, task.VerbSchedule, task.VerbWake, task.VerbFocus, task.VerbDone, task.VerbDismiss}, v)
 		if moves != want {
 			t.Errorf("a workflow runs %s: %v, want %v", v, moves, want)
 		}

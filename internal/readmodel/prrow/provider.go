@@ -23,7 +23,6 @@ import (
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/readmodel/overlay"
-	"github.com/wloophq/wloop/internal/situation"
 )
 
 // Store is what the rows read of the host's own state of pull requests:
@@ -52,6 +51,8 @@ type Source struct {
 	// Catalog is the plugin's views, facets and situations; nil serves
 	// none.
 	Catalog readmodel.Presenter
+	// Mutes are the user's mutes of pull requests; nil mutes none.
+	Mutes readmodel.Mutes
 }
 
 // Provider is the github provider of the read model: one row per pull
@@ -136,6 +137,7 @@ type input struct {
 	pr       dinv.PR
 	events   []dinv.Event
 	override dinv.Override
+	mute     overlay.Mute
 	turn     *TurnFact
 	// session is the started turn's session; sessionErr says it could
 	// not be read.
@@ -188,6 +190,21 @@ func (p *Provider) Load(ctx context.Context, units []unit.Unit) (map[unit.Unit]a
 		}
 		ins[u] = &input{rep: rep, pr: pr, override: o, set: set}
 		refs = append(refs, pr.Ref)
+	}
+	if p.src.Mutes != nil {
+		us := make([]unit.Unit, 0, len(ins))
+		for u := range ins {
+			us = append(us, u)
+		}
+		mutes, err := p.src.Mutes.Mutes(ctx, us)
+		if err != nil {
+			return nil, err
+		}
+		for u, m := range mutes {
+			if in, ok := ins[u]; ok {
+				in.mute = m
+			}
+		}
 	}
 	events, err := p.src.Store.EventsByPR(ctx, refs)
 	if err != nil {
@@ -353,6 +370,7 @@ func (p *Provider) Derive(base readmodel.Base, in any, at time.Time) (api.Row, e
 	if len(x.intakes) > 0 {
 		d.Intakes = map[github.Ref][]intake.Intake{ref: x.intakes}
 	}
+	d.Mutes = map[unit.Unit]overlay.Mute{x.pr.Ref.Unit(): x.mute}
 	r, pl := d.Parts(x.rep, x.events, x.override)
 	pl.Brief = x.brief
 	pl.Intake = x.intake
@@ -412,7 +430,7 @@ func Unmuted(in any) any {
 		return in
 	}
 	c := *x
-	c.override = dinv.Override{PR: x.pr.Ref}
+	c.override, c.mute = dinv.Override{PR: x.pr.Ref}, overlay.Mute{}
 	return &c
 }
 
@@ -469,19 +487,6 @@ func lastSituation(evs []dinv.Event) string {
 		}
 	}
 	return last
-}
-
-// LapsedMutes are the stored overrides whose "mute until state change"
-// lapsed: the rows of k show them unmuted.
-func LapsedMutes(k readmodel.Kept) []dinv.Override {
-	var out []dinv.Override
-	for _, b := range k.Rows {
-		x, ok := b.In.(*input)
-		if ok && MuteLapsed(x.pr, x.override, situation.Kind(b.Row.Kind)) {
-			out = append(out, x.override)
-		}
-	}
-	return out
 }
 
 // activities are the pull requests' activity; none without an activity

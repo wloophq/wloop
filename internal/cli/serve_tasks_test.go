@@ -146,17 +146,11 @@ func (r derivedRig) tasks(t *testing.T, u unit.Unit) []task.Task {
 	return es
 }
 
-func viewerItem(c ghsourcetest.Case) bool {
-	return slices.ContainsFunc(ghsource.ItemsOf(c.Row, c.Report), func(it items.Item) bool {
-		return slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return p.Key == "github:"+ghsourcetest.Viewer })
-	})
-}
-
 func TestEveryNeedsMeRowHasAnInboxOrNextTask(t *testing.T) {
 	t.Parallel()
 	cases := ghsourcetest.Cases()
 	r := newDerivedRig(t, cases)
-	needs, muted, questions := 0, 0, 0
+	needs, questions := 0, 0
 	for _, c := range cases {
 		es := r.tasks(t, c.Row.Unit)
 		in := func(states ...task.State) bool {
@@ -168,11 +162,6 @@ func TestEveryNeedsMeRowHasAnInboxOrNextTask(t *testing.T) {
 			if len(es) != 1 || es[0].State != task.State("inbox") {
 				t.Errorf("%s asked: %+v", c.Name, es)
 			}
-		case situation.Kind(c.Row.Kind) == situation.KindMuted && viewerItem(c):
-			muted++
-			if !in(task.State("scheduled")) || in(task.State("inbox"), task.State("next")) {
-				t.Errorf("%s muted: %+v", c.Name, es)
-			}
 		case slices.Contains(c.Row.Views, api.ViewNeedsMe):
 			needs++
 			if !in(task.State("inbox"), task.State("next")) {
@@ -180,10 +169,10 @@ func TestEveryNeedsMeRowHasAnInboxOrNextTask(t *testing.T) {
 			}
 		}
 	}
-	if needs == 0 || muted == 0 || questions == 0 {
-		t.Fatalf("compared %d needs-me, %d muted, %d asked rows", needs, muted, questions)
+	if needs == 0 || questions == 0 {
+		t.Fatalf("compared %d needs-me, %d asked rows", needs, questions)
 	}
-	t.Logf("%d needs-me, %d muted, %d asked rows of %d", needs, muted, questions, len(cases))
+	t.Logf("%d needs-me, %d asked rows of %d", needs, questions, len(cases))
 }
 
 func TestCardOnlyRowsHaveNoTask(t *testing.T) {

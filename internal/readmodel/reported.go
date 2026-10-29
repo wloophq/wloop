@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/plugins/source/value"
 	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -31,6 +32,25 @@ type Reports interface {
 // Mutes reads the user's mutes of units; a unit with none is absent.
 type Mutes interface {
 	Mutes(ctx context.Context, units []unit.Unit) (map[unit.Unit]overlay.Mute, error)
+}
+
+// WakeMutes are Mutes from the wakes of the units' tasks, as wakes reads
+// them by unit.
+type WakeMutes func(ctx context.Context, units []unit.Unit) (map[unit.Unit]wake.Wake, error)
+
+// Mutes are the mutes the wakes hold; a spent wake mutes nothing.
+func (f WakeMutes) Mutes(ctx context.Context, units []unit.Unit) (map[unit.Unit]overlay.Mute, error) {
+	got, err := f(ctx, units)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[unit.Unit]overlay.Mute, len(got))
+	for u, w := range got {
+		if m := overlay.MuteOf(w); m.Set() {
+			out[u] = m
+		}
+	}
+	return out, nil
 }
 
 // ReportedSource is what a source plugin's rows read: its reports and the

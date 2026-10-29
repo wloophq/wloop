@@ -2,28 +2,20 @@ package present
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-	"time"
+	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/duration"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/readmodel"
-	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
-// clearedMute is the set that clears every mute override.
-func clearedMute() map[string]string {
-	return map[string]string{port.OverrideMutedUntil: "", port.OverrideMuteUntilStateChange: "", port.OverrideMutedKind: "",
-		port.OverrideMutedWaitingOn: ""}
-}
-
-// mute mutes u for the request's duration, or until its situation, as the
-// row shows it unmuted, changes.
+// mute mutes u for the request's duration, or until who its task's items
+// wait on changes: a wake on the pull request's task.
 func (p *Presenter) mute(ctx context.Context, u unit.Unit, args api.PluginActionArgs) error {
 	req := args.Request
 	if req.Until == "" && !req.UntilState {
@@ -32,87 +24,86 @@ func (p *Presenter) mute(ctx context.Context, u unit.Unit, args api.PluginAction
 	if req.Until != "" && req.UntilState {
 		return api.Refuse(http.StatusBadRequest, "mute takes until or until_state, not both")
 	}
-	set := clearedMute()
+	if p.d.Host.Wakes == nil {
+		return api.Refuse(http.StatusServiceUnavailable, "the host keeps no wakes")
+	}
+	w := src.Wake{Unit: wire(u)}
 	data := "until state change"
 	if req.UntilState {
 		if args.Unmuted == nil {
 			return api.Refuse(http.StatusNotFound, "%s is not in the inventory", u.Label())
 		}
-		set[port.OverrideMuteUntilStateChange] = port.OverrideTrue
-		set[port.OverrideMutedKind], set[port.OverrideMutedWaitingOn] = string(args.Unmuted.Kind), args.Unmuted.Summary.WaitsOn
+		owes, err := p.owes(ctx, u)
+		if err != nil {
+			return err
+		}
+		w.When = OwesChange(owes)
 	} else {
 		d, err := duration.Parse(req.Until)
 		if err != nil {
 			return api.Refuse(http.StatusBadRequest, "mute %v", err)
 		}
-		set[port.OverrideMutedUntil] = p.h.Now().Add(d).UTC().Format(time.RFC3339Nano)
+		w.Until = p.h.Now().Add(d).UTC()
 		data = "for " + req.Until
 	}
-	if err := p.setOverride(ctx, u, set); err != nil {
+	if err := p.d.Host.Wakes.SetWake(ctx, w); err != nil {
 		return err
 	}
 	return p.recordEvent(ctx, u, dinv.KindMuted, data)
 }
 
 func (p *Presenter) unmute(ctx context.Context, u unit.Unit) error {
-	if err := p.setOverride(ctx, u, clearedMute()); err != nil {
+	if p.d.Host.Wakes == nil {
+		return api.Refuse(http.StatusServiceUnavailable, "the host keeps no wakes")
+	}
+	if err := p.d.Host.Wakes.ClearWake(ctx, wire(u), ""); err != nil {
 		return err
 	}
 	return p.recordEvent(ctx, u, dinv.KindUnmuted, "")
 }
 
-// overrideAttempts bounds the rereads of an override another writer, such
-// as a mute expiring, changed between read and write.
-const overrideAttempts = 5
-
-// setOverride writes set over u's host overrides, compare-and-set over
-// what it read.
-func (p *Presenter) setOverride(ctx context.Context, u unit.Unit, set map[string]string) error {
-	if p.d.Host.Gates == nil || p.d.Host.Reader == nil {
-		return api.Refuse(http.StatusServiceUnavailable, "the host keeps no overrides")
+// owes are who u's open items, as the plugin last reported them, wait on,
+// each once, as task.link_owes names them: me for the viewer.
+func (p *Presenter) owes(ctx context.Context, u unit.Unit) ([]string, error) {
+	rep, ok, err := p.reportOf(ctx, u)
+	if err != nil {
+		return nil, err
 	}
-	p.overrides.Lock()
-	defer p.overrides.Unlock()
-	for range overrideAttempts {
-		st, err := p.d.Host.Reader.RoundState(ctx, wire(u))
+	if !ok {
+		return nil, api.Refuse(http.StatusNotFound, "%s is not in the inventory", u.Label())
+	}
+	var viewer src.Person
+	if p.h.Viewer != nil {
+		id, err := p.h.Viewer(ctx)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		was := make(map[string]string, len(set))
-		for n := range set {
-			was[n] = st.Overrides[n]
+		viewer = id.Viewer
+	}
+	out := []string{}
+	for _, it := range rep.Items {
+		if it.State != "" && it.State != "open" {
+			continue
 		}
-		written, err := p.d.Host.Gates.SetOverride(ctx, wire(u), set, was)
-		if err != nil || written {
-			return err
+		for _, who := range it.WaitingOn {
+			k := who.Key
+			if k != "" && (k == viewer.Key || slices.Contains(viewer.Aliases, k)) {
+				k = "me"
+			}
+			if k != "" && !slices.Contains(out, k) {
+				out = append(out, k)
+			}
 		}
 	}
-	return fmt.Errorf("%s: the override kept changing while it was written", u.Label())
+	return out, nil
 }
 
-// expireLapsedMutes clears every "mute until state change" of k's rows
-// whose situation changed, while it is still the mute the row held, and
-// records the unmute.
-func (p *Presenter) expireLapsedMutes(ctx context.Context, k readmodel.Kept) error {
-	for _, o := range prrow.LapsedMutes(k) {
-		if _, err := p.expireMute(ctx, o); err != nil {
-			return err
-		}
+// OwesChange is the condition that holds once task.link_owes is no longer
+// the set owes, in any order.
+func OwesChange(owes []string) string {
+	parts := []string{"size(task.link_owes) != " + strconv.Itoa(len(owes))}
+	for _, k := range owes {
+		parts = append(parts, "!("+strconv.Quote(k)+" in task.link_owes)")
 	}
-	return nil
-}
-
-func (p *Presenter) expireMute(ctx context.Context, o dinv.Override) (cleared bool, err error) {
-	if p.d.Host.Gates == nil {
-		return false, src.ErrUnsupported
-	}
-	u := o.PR.Unit()
-	p.overrides.Lock()
-	cleared, err = p.d.Host.Gates.SetOverride(ctx, wire(u), clearedMute(),
-		map[string]string{port.OverrideMuteUntilStateChange: port.OverrideTrue, port.OverrideMutedKind: o.MutedKind, port.OverrideMutedWaitingOn: o.MutedWaitingOn})
-	p.overrides.Unlock()
-	if err != nil || !cleared {
-		return false, err
-	}
-	return true, p.recordEvent(ctx, u, dinv.KindUnmuted, "state changed")
+	return strings.Join(parts, " || ")
 }

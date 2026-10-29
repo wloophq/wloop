@@ -131,12 +131,11 @@ func TestEventsOrderBySubSecondTime(t *testing.T) {
 func TestOverrideRoundTrip(t *testing.T) {
 	s := open(t)
 	ctx := context.Background()
-	until := time.Date(2026, 10, 3, 0, 0, 0, 0, time.UTC)
-	if err := s.SetOverride(ctx, dinv.Override{PR: ref, MutedUntil: until, Hold: true}); err != nil {
+	if err := s.SetOverride(ctx, dinv.Override{PR: ref, Hold: true}); err != nil {
 		t.Fatal(err)
 	}
 	o, err := s.Override(ctx, ref)
-	if err != nil || !o.Hold || !o.MutedUntil.Equal(until) {
+	if err != nil || !o.Hold {
 		t.Fatalf("override: %+v %v", o, err)
 	}
 	all, err := s.Overrides(ctx)
@@ -145,19 +144,6 @@ func TestOverrideRoundTrip(t *testing.T) {
 	}
 	if o, err := s.Override(ctx, github.Ref{Owner: "x", Repo: "y", Number: 9}); err != nil || o.Hold || o.PR.Number != 9 {
 		t.Fatalf("absent override: %+v %v", o, err)
-	}
-}
-
-func TestOverrideKeepsTheSituationAtMuteTime(t *testing.T) {
-	s := open(t)
-	ctx := context.Background()
-	want := dinv.Override{PR: ref, MuteUntilStateChange: true, MutedKind: "review", MutedWaitingOn: "me"}
-	if err := s.SetOverride(ctx, want); err != nil {
-		t.Fatal(err)
-	}
-	o, err := s.Override(ctx, ref)
-	if err != nil || o != want {
-		t.Fatalf("override: %+v %v", o, err)
 	}
 }
 
@@ -307,15 +293,11 @@ func TestUnparsableTimestampIsAnError(t *testing.T) {
 	ctx := context.Background()
 	at := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
 	upsert(t, s, dinv.PR{Ref: ref, State: "OPEN", UpdatedAt: at})
-	if err := s.SetOverride(ctx, dinv.Override{PR: ref, MutedUntil: at}); err != nil {
-		t.Fatal(err)
-	}
 	if _, err := s.AppendEvents(ctx, []dinv.Event{{PR: ref, Kind: dinv.KindReady, At: at}}); err != nil {
 		t.Fatal(err)
 	}
 	for _, q := range []string{
 		`UPDATE pull_requests SET updated_at='2026-10-01T12:00:00Z'`,
-		`UPDATE overrides SET muted_until='yesterday'`,
 		`UPDATE events SET at='2026-10-01 12:00'`,
 	} {
 		sqlitetest.Exec(t, s.db, q)
@@ -325,12 +307,6 @@ func TestUnparsableTimestampIsAnError(t *testing.T) {
 	}
 	if _, err := s.ListPRs(ctx, false); err == nil {
 		t.Error("ListPRs: want error for unparsable updated_at")
-	}
-	if _, err := s.Override(ctx, ref); err == nil {
-		t.Error("Override: want error for unparsable muted_until")
-	}
-	if _, err := s.Overrides(ctx); err == nil {
-		t.Error("Overrides: want error for unparsable muted_until")
 	}
 	if _, err := s.EventsByPR(ctx, []github.Ref{ref}); err == nil {
 		t.Error("EventsByPR: want error for unparsable at")
@@ -886,12 +862,9 @@ func TestPRsWithOverridesMatchesTheirSeparateReads(t *testing.T) {
 		}
 	}
 	set := []dinv.Override{
-		{PR: github.Ref{Owner: "acme", Repo: "api", Number: 2}, MutedUntil: at, MuteUntilStateChange: true, Hold: true,
-			MutedKind: "review", MutedWaitingOn: "author", NextGuidance: "keep the tests"},
-		{PR: github.Ref{Owner: "acme", Repo: "api", Number: 3}, MutedUntil: at.Add(time.Hour), MuteUntilStateChange: true, Adopted: true,
-			MutedKind: "address", MutedWaitingOn: "reviewer", NextGuidance: "split the commit"},
-		{PR: github.Ref{Owner: "acme", Repo: "api", Number: 4}, MutedUntil: at.Add(2 * time.Hour), Tracked: true,
-			MutedKind: "ci", MutedWaitingOn: "me", NextGuidance: "rebase first"},
+		{PR: github.Ref{Owner: "acme", Repo: "api", Number: 2}, Hold: true, NextGuidance: "keep the tests"},
+		{PR: github.Ref{Owner: "acme", Repo: "api", Number: 3}, Adopted: true, NextGuidance: "split the commit"},
+		{PR: github.Ref{Owner: "acme", Repo: "api", Number: 4}, Tracked: true, NextGuidance: "rebase first"},
 	}
 	for _, o := range set {
 		if err := s.SetOverride(ctx, o); err != nil {
@@ -931,27 +904,30 @@ func TestPRsWithOverridesMatchesTheirSeparateReads(t *testing.T) {
 	}
 }
 
-func TestAdoptAndMuteClearWriteTheirColumnsAlone(t *testing.T) {
+func TestAdoptAndGuidanceClearWriteTheirColumnsAlone(t *testing.T) {
 	s := open(t)
 	ctx := context.Background()
-	if err := s.SetOverride(ctx, dinv.Override{PR: ref, Hold: true, MuteUntilStateChange: true, MutedKind: "waiting", MutedWaitingOn: "alice"}); err != nil {
+	if err := s.SetOverride(ctx, dinv.Override{PR: ref, Hold: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetNextGuidance(ctx, ref, "ask alice"); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SetAdopted(ctx, ref); err != nil {
 		t.Fatal(err)
 	}
-	clear := map[string]string{port.OverrideMuteUntilStateChange: "", port.OverrideMutedKind: "", port.OverrideMutedWaitingOn: ""}
-	if cleared, err := s.db.SetOverride(ctx, ref.Unit(), clear, map[string]string{port.OverrideMutedKind: "waiting", port.OverrideMutedWaitingOn: "bob"}); err != nil || cleared {
-		t.Fatalf("cleared another mute: %v %v", cleared, err)
+	clear := map[string]string{port.OverrideNextGuidance: ""}
+	if cleared, err := s.db.SetOverride(ctx, ref.Unit(), clear, map[string]string{port.OverrideNextGuidance: "ask bob"}); err != nil || cleared {
+		t.Fatalf("cleared another guidance: %v %v", cleared, err)
 	}
-	if cleared, err := s.db.SetOverride(ctx, ref.Unit(), clear, map[string]string{port.OverrideMutedKind: "waiting", port.OverrideMutedWaitingOn: "alice"}); err != nil || !cleared {
+	if cleared, err := s.db.SetOverride(ctx, ref.Unit(), clear, map[string]string{port.OverrideNextGuidance: "ask alice"}); err != nil || !cleared {
 		t.Fatalf("cleared %v %v", cleared, err)
 	}
 	o, err := s.Override(ctx, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !o.Adopted || !o.Hold || o.MuteUntilStateChange || o.MutedKind != "" || o.MutedWaitingOn != "" {
+	if !o.Adopted || !o.Hold || o.NextGuidance != "" {
 		t.Fatalf("%+v", o)
 	}
 }

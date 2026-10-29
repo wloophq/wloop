@@ -50,17 +50,18 @@ const (
 	// RowInputs are the topics a row is derived from.
 	RowInputs = TopicPRs | TopicFollow | TopicSourceEvents | TopicLoopEvents | TopicOverrides |
 		TopicTurns | TopicSessions | TopicIntakes | TopicBriefs | TopicUsage | TopicPause |
-		TopicPending | TopicAgents | TopicConfig | TopicViewer | TopicRefusals | TopicItems | TopicGates
+		TopicPending | TopicAgents | TopicConfig | TopicViewer | TopicRefusals | TopicItems | TopicGates | TopicWakes
 	// HealthInputs are the topics the health endpoint shows.
 	HealthInputs = TopicMeta | TopicPause | TopicBriefs | TopicApp | TopicJobs | TopicConfig
 	// SweepInputs leaves out LoopEvents and Rounds, the sweep's own writes
-	// that never change its plan. Entries, items and drafts wake the
-	// workflows over GTD entries and Slack units; the drafts draft.propose
+	// that never change its plan. Tasks, items and drafts wake the
+	// workflows over tasks and Slack units, and a matched wake the one that
+	// reacts to task.woke; the drafts draft.propose
 	// writes wake one more pass, which their hold makes idle. The
 	// extraction notes SourceEvents.
 	SweepInputs = TopicPRs | TopicFollow | TopicSourceEvents | TopicOverrides | TopicTurns |
 		TopicIntakes | TopicBriefs | TopicPause | TopicPending | TopicAgents | TopicConfig | TopicViewer |
-		TopicTasks | TopicItems | TopicDrafts
+		TopicTasks | TopicItems | TopicDrafts | TopicWakes
 	// BriefInputs leaves out the queue's own Briefs writes.
 	BriefInputs = TopicPRs | TopicFollow | TopicConfig
 )

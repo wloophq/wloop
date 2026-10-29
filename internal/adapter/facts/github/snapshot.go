@@ -18,6 +18,7 @@ import (
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/workspace"
 )
@@ -38,6 +39,7 @@ type view struct {
 	books     map[unit.Unit]turn.Book
 	rounds    *round.Store
 	overrides map[pr.Ref]dinv.Override
+	mutes     map[unit.Unit]overlay.Mute
 	registry  *dintent.Registry
 	activity  map[string]wsdomain.Activity
 
@@ -80,6 +82,15 @@ func (p *Provider) build(ctx context.Context, now time.Time) (*view, error) {
 	}
 	if v.overrides, err = p.d.Store.Overrides(ctx); err != nil {
 		return nil, err
+	}
+	if p.d.Mutes != nil {
+		units := make([]unit.Unit, 0, len(v.rows))
+		for _, r := range v.rows {
+			units = append(units, r.Ref.Unit())
+		}
+		if v.mutes, err = p.d.Mutes.Mutes(ctx, units); err != nil {
+			return nil, err
+		}
 	}
 	v.registry = &dintent.Registry{}
 	if p.d.Intents != nil {

@@ -370,6 +370,7 @@ func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (b
 		Props:    func(t task.Task) workflow.Facts { return catalog.PropFacts(t, e.loadedIntents().Tasks) },
 		Me:       e.me,
 		OwedBy:   catalog.OwedByOf(e.loadedIntents),
+		Wakes:    db.Wakes(),
 	})
 }
 

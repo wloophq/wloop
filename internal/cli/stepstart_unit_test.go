@@ -299,24 +299,22 @@ func TestANudgeWithoutRefuseIgnoresTheNudgeRefusal(t *testing.T) {
 func TestRefuseIsFirstMatch(t *testing.T) {
 	t.Parallel()
 	r := nudgeStartRig(t)
+	userProfile(t, r.sc.te, map[string]string{"intents/nudge/intent.toml": nudgeWithoutRefuse(t) + `
+[[refuse]]
+when = 'pr.nudge.refusal != ""'
+why  = "{{.pr.nudge.refusal}}"
+[[refuse]]
+when = 'pr.draft'
+why  = "a draft"
+`})
 	r.units.Set(r.u, "pr.nudge.refusal", "it waits on you")
-	r.units.Set(r.u, "pr.mute.refusal", "muted until its state changes")
+	r.units.Set(r.u, "pr.draft", true)
 	if got := r.check(t, automation.CheckOpts{Observe: false}); got != "it waits on you" {
 		t.Fatalf("both hold: %q, want the first refusal's", got)
 	}
 	r.units.Set(r.u, "pr.nudge.refusal", "")
-	if got := r.check(t, automation.CheckOpts{Observe: false}); got != "muted until its state changes" {
-		t.Fatalf("the mute alone: %q", got)
-	}
-}
-
-func TestMuteRefusesOnlyWithAnExplicitRefuse(t *testing.T) {
-	t.Parallel()
-	r := nudgeStartRig(t)
-	r.units.Set(r.u, "pr.mute.refusal", "muted until its state changes")
-	userProfile(t, r.sc.te, map[string]string{"intents/nudge/intent.toml": nudgeWithoutRefuse(t)})
-	if got := r.check(t, automation.CheckOpts{Observe: false}); got == "muted until its state changes" {
-		t.Fatal("an intent with no [[refuse]] read the mute")
+	if got := r.check(t, automation.CheckOpts{Observe: false}); got != "a draft" {
+		t.Fatalf("the second alone: %q", got)
 	}
 }
 

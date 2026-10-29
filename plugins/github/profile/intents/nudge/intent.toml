@@ -14,9 +14,6 @@ effects   = ["pr.nudged"]
 [[refuse]]
 when = 'pr.nudge.refusal != ""'
 why  = "{{.pr.nudge.refusal}}"
-[[refuse]]
-when = 'pr.mute.refusal != ""'
-why  = "{{.pr.mute.refusal}}"
 
 [help]
 target   = "a pull request URL"

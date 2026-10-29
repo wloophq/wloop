@@ -31,12 +31,16 @@ import (
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/card"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -51,12 +55,13 @@ func withRows(d daemon.Deps, st *inventory.Store) daemon.Deps {
 		now = st.Now
 	}
 	reports := ghreporttest.Inventory{Store: st, Now: now, Config: func() config.Config { return cfg }, Identity: d.Identity}
-	mods, err := buildSources(plugins, d.Cfg, moduleDeps{Inventory: st, Turns: d.Turns, Clock: clockFunc(time.Now), Reports: reports}, bundledUI)
+	mods, err := buildSources(plugins, d.Cfg, moduleDeps{Inventory: st, DB: st.DB(), Turns: d.Turns, Clock: clockFunc(time.Now), Reports: reports}, bundledUI)
 	if err != nil {
 		panic(err)
 	}
 	d = withSources(withStore(d, st), plugins, mods, bundledUI)
-	d = withGitHub(d, present.Deps{Store: st, Reports: reports, Host: moduleBroker(d.Units, st.DB())})
+	d = withGitHub(d, present.Deps{Store: st, Reports: reports, Host: moduleBroker(d.Units, st.DB()),
+		Mutes: readmodel.WakeMutes(st.DB().Wakes().UnitWakes)})
 	d.Ingest, d.Collector = nil, nil
 	d.Follows = func(p unit.ProviderID) bool { return p == unit.GitHub }
 	d.Track = func(_ context.Context, u unit.Unit) (port.TrackRead, error) {
@@ -308,6 +313,32 @@ func identityOf(login string, teams ...string) src.Identity {
 // moduleBroker is the broker of the GitHub module over db, as serve's
 // moduleHost builds it, with no pause.
 func moduleBroker(codecs *unit.Registry, db *sqlite.DB) src.Host {
-	b := &psource.Broker{ID: string(unit.GitHub), Units: psource.Units{Codecs: codecs}, Events: sqlite.New(db), Marks: db, Drafts: db, Overrides: db}
+	b := &psource.Broker{ID: string(unit.GitHub), Units: psource.Units{Codecs: codecs}, Events: sqlite.New(db), Marks: db, Drafts: db, Overrides: db,
+		Wakes: prTaskWakes{db: db, svc: coretasks.New(coretasks.Deps{Store: db.Tasks(), States: taskstest.BundledStates, Wakes: db.Wakes(),
+			Clock: clockFunc(time.Now)})}}
 	return b.Host()
 }
+
+// prTaskWakes are db's tasks as the mute's wakes move them; a unit no open
+// task holds gets one, in next, as each followed pull request has its task.
+type prTaskWakes struct {
+	db  *sqlite.DB
+	svc *coretasks.Service
+}
+
+func (w prTaskWakes) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
+	ts, err := w.db.Tasks().TasksOf(ctx, u)
+	if err != nil || slices.ContainsFunc(ts, task.Task.Open) {
+		return ts, err
+	}
+	now := time.Now()
+	e := task.Task{ID: task.DerivedID(u, "pr"), State: "next", Category: task.CategoryReady, Units: []unit.Unit{u}, Origin: task.OriginUser,
+		Created: now, Updated: now}
+	return append(ts, e), w.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}})
+}
+
+func (w prTaskWakes) Sleep(ctx context.Context, id task.ID, k wake.Wake) error {
+	return w.svc.Sleep(ctx, id, k)
+}
+
+func (w prTaskWakes) Rouse(ctx context.Context, id task.ID) error { return w.svc.Rouse(ctx, id) }

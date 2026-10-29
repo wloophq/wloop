@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/wake"
 )
 
 // ProjectStore keeps what the projects need beyond their tasks: the Review's runs.
@@ -273,7 +274,7 @@ func (p *projects) end(ctx context.Context, e task.Task, req Request) (Result, e
 	var was task.Task
 	got, err := p.locked(ctx, e.ID, req, func(e task.Task, now time.Time) ([]task.Change, error) {
 		was = e
-		next, err := p.s.transition(e, req, now)
+		next, _, err := p.s.transition(e, req, wake.Wake{}, now)
 		if err != nil {
 			return nil, err
 		}

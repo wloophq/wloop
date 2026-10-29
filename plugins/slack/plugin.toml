@@ -67,7 +67,7 @@ untrusted = true
 [[source.facts]]
 name = "slack.live_task"
 type = "bool"
-doc = "A live task, neither done nor in the trash and not muted, is attached to the unit."
+doc = "A live task is attached to the unit: neither done, in the trash nor deferred, as a snoozed or muted task is."
 untrusted = true
 
 [[source.facts]]

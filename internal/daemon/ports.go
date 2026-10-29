@@ -29,6 +29,11 @@ type Sweeper interface {
 	Seen() port.Generation
 }
 
+// Wakes match the tasks' wakes due, and those whose condition holds.
+type Wakes interface {
+	Sweep(ctx context.Context) error
+}
+
 // Plan is the workflows' plan and the user's actions on it.
 type Plan interface {
 	// Evaluate is what the workflows of trigger t would decide now; it

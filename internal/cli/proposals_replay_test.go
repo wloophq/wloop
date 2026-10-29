@@ -215,7 +215,7 @@ func (r *replay) scenario(at time.Time) {
 			Props: task.Props{task.PropOwner: {Actors: []items.Person{rpLegal}}}, Written: map[string]task.Written{task.PropOwner: {By: task.WriterPerson, At: r.now}}})
 		b1 := r.item(rpB, "b1", items.Open, before, rpCid)
 		r.item(rpB, "b2", items.Open, before)
-		waiting("e-b", rpB, b1, func(e *task.Task) { e.Snooze = task.Snooze{Mute: true} })
+		waiting("e-b", rpB, b1, func(e *task.Task) { e.State, e.Category = "scheduled", task.CategoryDeferred })
 		c1 := r.item(rpC, "c1", items.Open, replayStart, rpDan)
 		waiting("e-c", rpC, c1, func(e *task.Task) {
 			e.SetProp(task.PropCheckOn, task.Value{Time: day(2, 14)}, task.WriterPerson, r.now)
@@ -251,7 +251,7 @@ func (r *replay) scenario(at time.Time) {
 		r.slack.startedByMe(rpH)
 		r.task(task.Task{ID: "e-h", State: "next", Category: task.CategoryReady, Title: "h", Units: []unit.Unit{rpH}, Items: refs(h1)})
 	case is(day(7, 9)):
-		r.change("e-b", func(e *task.Task) { e.Snooze.Mute = false })
+		r.change("e-b", func(e *task.Task) { e.State, e.Category = "waiting", task.CategoryWaiting })
 		r.change("e-c", func(e *task.Task) { e.State, e.Category = "done", task.CategoryDone })
 	case is(day(8, 12)):
 		for _, id := range []task.ID{"e-a1", "e-a3"} {

@@ -98,10 +98,9 @@ func (s *Server) readModel() *readmodel.Model {
 	return s.model
 }
 
-// expireMutes runs the plugins' bookkeeping over every row the read model
-// lists, so a mute whose situation changed does not come back when the
-// situation returns.
-func (s *Server) expireMutes(ctx context.Context) error {
+// keepCurrent runs the plugins' bookkeeping over every row the read model
+// lists, such as recording the situations that changed.
+func (s *Server) keepCurrent(ctx context.Context) error {
 	k, err := s.readModel().Current(ctx)
 	if err != nil {
 		return err

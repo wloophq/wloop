@@ -112,19 +112,19 @@ func reviewOfViewer(n int, muted bool) api.Row {
 	s := ghsourcetest.Situation{PR: ghsourcetest.Open(n, ghsourcetest.Other)}
 	s.PR.ReviewRequests = []string{ghsourcetest.Viewer}
 	if muted {
-		s.Override.MuteUntilStateChange, s.Override.MutedKind, s.Override.MutedWaitingOn = true, string(situation.KindReview), "me"
+		s.Mute = overlay.Mute{UntilStateChange: true}
 	}
 	return ghsourcetest.Derive(s)
 }
 
-func TestMutedRowKeepsItemsAndCarriesMute(t *testing.T) {
+func TestMutedRowKeepsItems(t *testing.T) {
 	t.Run("pending round", func(t *testing.T) {
 		round := func(muted bool) api.Row {
 			s := ghsourcetest.Situation{PR: ghsourcetest.Open(3, ghsourcetest.Other)}
 			s.PR.ReviewRequests, s.PR.Workspace = []string{ghsourcetest.Viewer}, ghsourcetest.ReviewWorkspace
 			s.Pending = &round.Pending{Intent: "review", Reason: "new push", Since: ghsourcetest.Now.Add(-time.Minute), Deadline: ghsourcetest.Now.Add(4 * time.Minute)}
 			if muted {
-				s.Override.MutedUntil = ghsourcetest.Now.Add(time.Hour)
+				s.Mute = overlay.Mute{Until: ghsourcetest.Now.Add(time.Hour)}
 			}
 			return ghsourcetest.Derive(s)
 		}
@@ -147,26 +147,6 @@ func TestMutedRowKeepsItemsAndCarriesMute(t *testing.T) {
 	if !bytes.Equal(a, b) || len(itemsOf(plain)) != 1 || itemsOf(plain)[0].ID != "gh:review" {
 		t.Fatalf("plain %s\nmuted %s", a, b)
 	}
-	c, err := cardOf(context.Background(), muted)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if c.Mute == nil || !c.Mute.UntilStateChange {
-		t.Errorf("mute %+v", c.Mute)
-	}
-	s := ghsourcetest.Situation{PR: ghsourcetest.Open(2, ghsourcetest.Other)}
-	s.PR.ReviewRequests = []string{ghsourcetest.Viewer}
-	s.Override.MutedUntil = ghsourcetest.Now.Add(3 * time.Hour)
-	c, err = cardOf(context.Background(), ghsourcetest.Derive(s))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if c.Mute == nil || !c.Mute.Until.Equal(ghsourcetest.Now.Add(3*time.Hour)) {
-		t.Errorf("mute %+v", c.Mute)
-	}
-	if c, _ := cardOf(context.Background(), plain); c.Mute != nil {
-		t.Errorf("unmuted card carries %+v", c.Mute)
-	}
 }
 
 func TestHeldIDIsTheLocalDay(t *testing.T) {
@@ -178,7 +158,7 @@ func TestHeldIDIsTheLocalDay(t *testing.T) {
 		s.PR.Workspace = ghsourcetest.ReviewWorkspace
 		s.Events = []dinv.Event{ghsourcetest.Event(n, dinv.KindRoundHeld, "", hold, "cap reached")}
 		if !mutedAt.IsZero() {
-			s.Override.MutedUntil = at.Add(5 * time.Hour)
+			s.Mute = overlay.Mute{Until: at.Add(5 * time.Hour)}
 			s.Events = append(s.Events, ghsourcetest.Event(n, dinv.KindMuted, ghsourcetest.Viewer, mutedAt, ""))
 		}
 		return ghsourcetest.Derive(s)
@@ -369,10 +349,11 @@ func seededModel(t *testing.T, f *storetest.Fixture) *readmodel.Model {
 	if err != nil {
 		t.Fatal(err)
 	}
-	src := prrow.Source{Store: f.Inventory, Reports: ghreporttest.Inventory{Store: f.Inventory, Now: f.Inventory.Now}, RowDeps: readmodel.RowDeps{Books: f.Turns, Sessions: f.Turns, Intakes: f.DB.Intakes().Open,
-		Settings: func() readmodel.RowSettings {
-			return readmodel.RowSettings{Cfg: config.Defaults(), Loaded: l, GateOn: true}
-		}}}
+	src := prrow.Source{Store: f.Inventory, Reports: ghreporttest.Inventory{Store: f.Inventory, Now: f.Inventory.Now},
+		Mutes: readmodel.WakeMutes(f.DB.Wakes().UnitWakes), RowDeps: readmodel.RowDeps{Books: f.Turns, Sessions: f.Turns, Intakes: f.DB.Intakes().Open,
+			Settings: func() readmodel.RowSettings {
+				return readmodel.RowSettings{Cfg: config.Defaults(), Loaded: l, GateOn: true}
+			}}}
 	m := readmodel.New(f.Log, f.DB, noPending{}, nil, baseSettings{Base: readmodel.Base{Viewers: map[unit.ProviderID]string{unit.GitHub: seededViewer},
 		Specs: catalog.Specs(l)}}, prrow.New(src))
 	m.UseClock(func() time.Time { return f.Now })

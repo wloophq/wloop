@@ -84,9 +84,10 @@ func conversationOf(k dslack.Key, stored string) string {
 	return "channel"
 }
 
-// liveOn says whether t is an open task attached to u.
+// liveOn says whether t is a task attached to u that is open and awake: a
+// deferred task sleeps under its wake, as a muted or snoozed one does.
 func liveOn(t src.Task, u unit.Unit) bool {
-	return t.Category != "done" && t.Category != "dropped" && slices.Contains(t.Units, u.Wire())
+	return !slices.Contains([]string{"done", "dropped", "deferred"}, t.Category) && slices.Contains(t.Units, u.Wire())
 }
 
 // unowned says whether it is open with no assignee, nobody waited on and no

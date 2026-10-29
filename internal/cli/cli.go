@@ -47,14 +47,17 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	coreusage "github.com/wloophq/wloop/internal/core/usage"
 	"github.com/wloophq/wloop/internal/core/views"
+	"github.com/wloophq/wloop/internal/core/wakes"
 	"github.com/wloophq/wloop/internal/core/workspaces"
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/meter"
@@ -228,6 +231,10 @@ type Env struct {
 	// user's identity the entries reconcile with.
 	tasks   *coretasks.Service
 	tasksMe *identity
+	// wakes match the tasks' wakes, built with tasks; wakeFacts are a task's facts their conditions read, once
+	// serve wired the task subject.
+	wakes     *wakes.Service
+	wakeFacts func(ctx context.Context, t task.Task) (workflow.Facts, error)
 	// pluginsOff holds the plugins the daemon serves disabled, by config or build; empty until serveTasks.
 	pluginsOff *atomic.Pointer[[]unit.ProviderID]
 	messages   *messages.Service

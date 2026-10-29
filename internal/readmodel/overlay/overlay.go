@@ -5,10 +5,10 @@
 package overlay
 
 import (
-	"slices"
 	"strings"
 	"time"
 
+	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
@@ -88,31 +88,43 @@ func AsksUser(kind string) bool {
 	return kind == KindLoopWaiting || kind == KindLoopStopped || kind == KindRoundPending
 }
 
-// Mute is the user's mute of a unit: until a time, or until its situation
-// is no longer Kind waiting on WaitingOn.
+// Mute is the user's mute of a unit, its task's wake: until a time, or
+// until the task's facts change, which the wakes match.
 type Mute struct {
 	Until            time.Time
 	UntilStateChange bool
-	Kind, WaitingOn  string
 	// At is when the user muted it; zero when unknown.
 	At time.Time
 }
+
+// MuteOf is the mute wake w holds on a unit's task: until its Until, and
+// until a change while it waits on a condition or an event; a spent wake
+// mutes nothing.
+func MuteOf(w wake.Wake) Mute {
+	return Mute{Until: w.Until, UntilStateChange: w.When != "" || len(w.On) > 0}
+}
+
+// Set says whether m mutes anything at all, held or lapsed.
+func (m Mute) Set() bool { return !m.Until.IsZero() || m.UntilStateChange }
 
 // Holds says whether m mutes a unit whose situation, unmuted, is s.
 func (m Mute) Holds(s Situation, now time.Time) bool {
 	if s.Kind == KindDone {
 		return false
 	}
-	if !m.Until.IsZero() && now.Before(m.Until) {
-		return true
-	}
-	return m.UntilStateChange && s.Kind == m.Kind && sameWaitingOn(s.WaitingOn, m.WaitingOn)
+	return m.UntilStateChange || now.Before(m.Until)
 }
 
-// Lapsed says whether m's "until the state changes" lapsed: the unit is
-// open and its situation, unmuted, is no longer the muted one.
-func (m Mute) Lapsed(s Situation) bool {
-	return m.UntilStateChange && s.Kind != KindDone && (s.Kind != m.Kind || !sameWaitingOn(s.WaitingOn, m.WaitingOn))
+// Refusal is why m refuses a turn at now: muted until the state changes,
+// or until a time; "" when it does not.
+func (m Mute) Refusal(now time.Time) string {
+	switch {
+	case m.UntilStateChange:
+		return "muted until its state changes"
+	case now.Before(m.Until):
+		return "muted until " + m.Until.Local().Format(time.DateTime)
+	}
+	return ""
 }
 
 // Muted is the situation of a unit m mutes.
@@ -133,15 +145,6 @@ func (p Pending) Over(s Situation) Situation {
 		return s
 	}
 	return Situation{Kind: KindRoundPending, WaitingOn: WaitsOnMe, Since: s.Since, Reason: p.Intent + " waiting for your answer: " + p.Reason}
-}
-
-func sameWaitingOn(a, b string) bool {
-	set := func(s string) []string {
-		v := strings.Split(s, ", ")
-		slices.Sort(v)
-		return v
-	}
-	return slices.Equal(set(a), set(b))
 }
 
 // Cut keeps s within ReasonMax runes.

@@ -341,7 +341,7 @@ func TestMutedRowKeepsItsUnmutedSituation(t *testing.T) {
 		if !NeedsMe(r) || slices.Contains(r.Views, api.ViewNeedsMe) {
 			t.Errorf("%s: NeedsMe %v, views %v", c.name, NeedsMe(r), r.Views)
 		}
-		if p.Mute.UntilStateChange != c.override.MuteUntilStateChange || !p.Mute.Until.Equal(c.override.MutedUntil) {
+		if p.Mute.UntilStateChange != c.mute.UntilStateChange || !p.Mute.Until.Equal(c.mute.Until) {
 			t.Errorf("%s: mute %+v", c.name, p.Mute)
 		}
 	}
