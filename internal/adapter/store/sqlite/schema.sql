@@ -351,6 +351,7 @@ CREATE TABLE task_props (
 
 -- A gate's task_id is NULL while no task holds its unit. intents is a JSON list.
 -- applied_at is when its consequence ran; a resolved gate without it runs it again at the gates' next tick.
+-- begun_at is when an at-most-once consequence began, '' once it ended; one a stopped daemon cut keeps it.
 CREATE TABLE gates (
   id INTEGER PRIMARY KEY,
   task_id TEXT REFERENCES tasks (id),
@@ -360,7 +361,8 @@ CREATE TABLE gates (
   by_actor TEXT NOT NULL DEFAULT '', rule TEXT NOT NULL DEFAULT '',
   deadline TEXT NOT NULL DEFAULT '', default_intent TEXT NOT NULL DEFAULT '',
   opened_at TEXT NOT NULL, closed_at TEXT NOT NULL DEFAULT '',
-  applied_at TEXT NOT NULL DEFAULT ''
+  applied_at TEXT NOT NULL DEFAULT '',
+  begun_at TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX gates_due ON gates (status, deadline);
 CREATE INDEX gates_task ON gates (task_id);

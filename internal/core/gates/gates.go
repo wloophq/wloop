@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"sync"
 	"time"
@@ -118,9 +119,23 @@ type Service struct {
 	// running are the gates whose consequence runs now, which the tick does
 	// not replay.
 	running map[int64]bool
+	// cut are the gates whose at-most-once consequence a stopped daemon cut.
+	cut map[int64]gate.Gate
 }
 
-func New(d Deps) *Service { return &Service{d: d, running: map[int64]bool{}} }
+func New(d Deps) *Service {
+	return &Service{d: d, running: map[int64]bool{}, cut: map[int64]gate.Gate{}}
+}
+
+// Cut are the resolved gates whose at-most-once consequence began and was
+// cut by a daemon that stopped, so it may not have run, by ID.
+func (s *Service) Cut() []gate.Gate {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := slices.Collect(maps.Values(s.cut))
+	slices.SortFunc(out, func(a, b gate.Gate) int { return cmp.Compare(a.ID, b.ID) })
+	return out
+}
 
 // claim marks gate id's consequence as running here; false when it runs already.
 func (s *Service) claim(id int64) bool {
@@ -264,7 +279,7 @@ func (s *Service) Tick(ctx context.Context, now time.Time) error {
 			errs = append(errs, fmt.Errorf("gate %d: %w", g.ID, err))
 		}
 	}
-	return errors.Join(append(errs, s.replay(ctx))...)
+	return errors.Join(append(errs, s.noteCut(ctx), s.replay(ctx))...)
 }
 
 // replay runs the consequence of every resolved gate whose consequence never
@@ -373,10 +388,7 @@ func (s *Service) close(ctx context.Context, g gate.Gate, r Resolution) (gate.Ga
 // tick to run again, but one its port runs Once, marked before it runs.
 func (s *Service) applied(ctx context.Context, g gate.Gate) error {
 	if o, ok := s.port(g.Kind).(Once); ok && o.Once(g) {
-		if err := s.d.Store.Applied(ctx, g.ID); err != nil {
-			return fmt.Errorf("marking gate %d's consequence run: %w", g.ID, err)
-		}
-		return s.apply(ctx, g)
+		return s.once(ctx, g)
 	}
 	err := s.apply(ctx, g)
 	if ctx.Err() != nil {
@@ -386,6 +398,53 @@ func (s *Service) applied(ctx context.Context, g gate.Gate) error {
 		err = errors.Join(err, fmt.Errorf("marking gate %d's consequence run: %w", g.ID, merr))
 	}
 	return err
+}
+
+// once marks g's consequence run, then runs it: begun until it ends when
+// the store keeps that, so a stop that cuts it leaves it to report.
+func (s *Service) once(ctx context.Context, g gate.Gate) error {
+	b, begun := s.d.Store.(Begun)
+	mark := s.d.Store.Applied
+	if begun {
+		mark = b.Begin
+	}
+	if err := mark(ctx, g.ID); err != nil {
+		return fmt.Errorf("marking gate %d's consequence run: %w", g.ID, err)
+	}
+	err := s.apply(ctx, g)
+	if !begun || ctx.Err() != nil {
+		return err
+	}
+	if eerr := b.End(ctx, g.ID); eerr != nil {
+		err = errors.Join(err, fmt.Errorf("marking gate %d's consequence ended: %w", g.ID, eerr))
+	}
+	return err
+}
+
+// noteCut keeps, for Cut, each gate whose at-most-once consequence began,
+// never ended and does not run now, and ends it, so it is reported once.
+func (s *Service) noteCut(ctx context.Context) error {
+	b, ok := s.d.Store.(Begun)
+	if !ok {
+		return nil
+	}
+	begun, err := b.Begun(ctx)
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, g := range begun {
+		if !s.claim(g.ID) {
+			continue
+		}
+		s.logf("gate %d resolved %s on %s: the daemon stopped while its consequence ran, which may not have run", g.ID, g.Status, g.Unit)
+		s.mu.Lock()
+		s.cut[g.ID] = g
+		s.mu.Unlock()
+		errs = append(errs, b.End(ctx, g.ID))
+		s.release(g.ID)
+	}
+	return errors.Join(errs...)
 }
 
 // decide is p's decision on g; with no policy, or one that fails, g waits.

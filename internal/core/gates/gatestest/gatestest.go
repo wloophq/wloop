@@ -17,12 +17,13 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
-// Store is an in-memory gates.Store, gates.Reader and gates.Sent; Now stamps
-// OpenedAt and ClosedAt.
+// Store is an in-memory gates.Store, gates.Reader, gates.Sent and
+// gates.Begun; Now stamps OpenedAt and ClosedAt.
 type Store struct {
 	mu      sync.Mutex
 	gates   []gate.Gate
 	applied map[int64]bool
+	begun   map[int64]bool
 	Now     func() time.Time
 }
 
@@ -30,6 +31,7 @@ var (
 	_ gates.Store  = (*Store)(nil)
 	_ gates.Reader = (*Store)(nil)
 	_ gates.Sent   = (*Store)(nil)
+	_ gates.Begun  = (*Store)(nil)
 )
 
 func NewStore(now func() time.Time) *Store { return &Store{Now: now} }
@@ -84,6 +86,33 @@ func (s *Store) Applied(_ context.Context, id int64) error {
 	}
 	s.mark(id)
 	return nil
+}
+
+func (s *Store) Begin(ctx context.Context, id int64) error {
+	if err := s.Applied(ctx, id); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.begun == nil {
+		s.begun = map[int64]bool{}
+	}
+	s.begun[id] = true
+	return nil
+}
+
+func (s *Store) End(_ context.Context, id int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.begun, id)
+	return nil
+}
+
+func (s *Store) Begun(context.Context) ([]gate.Gate, error) {
+	s.mu.Lock()
+	begun := maps.Clone(s.begun)
+	s.mu.Unlock()
+	return s.filter(func(g gate.Gate) bool { return begun[g.ID] }), nil
 }
 
 func (s *Store) Unapplied(context.Context) ([]gate.Gate, error) {
@@ -304,6 +333,36 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 		}
 		if got, err := s.Unapplied(ctx); err != nil || len(got) != 0 {
 			t.Fatalf("unapplied after the mark %v %v", idsOf(got), err)
+		}
+	})
+	t.Run("a begun consequence is applied and begun until it ends", func(t *testing.T) {
+		st, _, _ := open(t)
+		s, ok := st.(gates.Begun)
+		if !ok {
+			t.Skip("the store keeps no begun consequence")
+		}
+		open1, _ := st.Open(ctx, draft("t-01"))
+		resolved, _ := st.Open(ctx, draft("t-01"))
+		if _, err := st.Resolve(ctx, resolved.ID, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson}); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Begin(ctx, open1.ID); err == nil {
+			t.Fatal("an open gate begun")
+		}
+		if err := s.Begin(ctx, resolved.ID); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := st.Unapplied(ctx); err != nil || len(got) != 0 {
+			t.Fatalf("unapplied %v %v: a begun consequence ran", idsOf(got), err)
+		}
+		if got, err := s.Begun(ctx); err != nil || !slices.Equal(idsOf(got), []int64{resolved.ID}) {
+			t.Fatalf("begun %v %v", idsOf(got), err)
+		}
+		if err := s.End(ctx, resolved.ID); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := s.Begun(ctx); err != nil || len(got) != 0 {
+			t.Fatalf("begun after its end %v %v", idsOf(got), err)
 		}
 	})
 	t.Run("a recorded send is approved and never open", func(t *testing.T) {

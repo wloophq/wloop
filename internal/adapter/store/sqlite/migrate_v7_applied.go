@@ -12,6 +12,7 @@ func v7Applied(ctx context.Context, tx *sql.Tx) error {
 	for _, stmt := range []string{
 		`ALTER TABLE gates ADD COLUMN applied_at TEXT NOT NULL DEFAULT ''`,
 		`UPDATE gates SET applied_at = closed_at WHERE status != 'open'`,
+		`ALTER TABLE gates ADD COLUMN begun_at TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE item_proposals ADD COLUMN decided_at TEXT NOT NULL DEFAULT ''`,
 	} {
 		if _, err := tx.ExecContext(ctx, stmt); err != nil {

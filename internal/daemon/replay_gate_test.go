@@ -2,6 +2,8 @@ package daemon
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -78,6 +80,14 @@ func TestAReplayedHeldRoundRunsOnce(t *testing.T) {
 	}
 	if runs != 1 {
 		t.Fatalf("calls %v: the held round ran %d times", fa.calls, runs)
+	}
+	var h api.Health
+	if code := get(t, s, "/api/health", &h); code != 200 {
+		t.Fatalf("health %d", code)
+	}
+	want := fmt.Sprintf("the plan gate %d on %s was approved, and the daemon stopped while its consequence ran", g.ID, r7.Unit().Label())
+	if !slices.ContainsFunc(h.Warnings, func(w string) bool { return strings.HasPrefix(w, want) }) {
+		t.Fatalf("warnings %q, want one naming the gate the stop cut", h.Warnings)
 	}
 }
 

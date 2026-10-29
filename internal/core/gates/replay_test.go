@@ -174,3 +174,46 @@ func TestAOnceConsequenceIsMarkedBeforeItRuns(t *testing.T) {
 		t.Fatalf("published %d times: a consequence run once ran again after its daemon stopped", pub.calls)
 	}
 }
+
+func TestAOnceConsequenceAStopCutIsReportedAfterTheRestart(t *testing.T) {
+	f := newFixture(t, nil, bundled)
+	pub := &oncePublisher{t: t, store: f.store}
+	deps := gates.Deps{Store: f.store, Reader: f.store, Profile: bundled, Clock: clock{fixedNow}, Publisher: pub}
+	stopped := gates.New(deps)
+	g, err := stopped.Open(context.Background(), gate.Gate{Kind: gate.KindDraft, Subject: "7", Unit: task.UnitOf("t-0000000000000001")}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_ = stopped.Resolve(ctx, g.ID, gates.Resolution{Intent: "approve", By: task.ActorPerson})
+	restarted := gates.New(deps)
+	for range 2 {
+		if err := restarted.Tick(context.Background(), opened); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if cut := restarted.Cut(); len(cut) != 1 || cut[0].ID != g.ID || pub.calls != 1 {
+		t.Fatalf("cut %+v after %d publishes: the stopped consequence is reported once and never run again", cut, pub.calls)
+	}
+	if begun, _ := f.store.Begun(context.Background()); len(begun) != 0 {
+		t.Fatalf("still begun %+v: a restart reports it again", begun)
+	}
+}
+
+func TestAOnceConsequenceThatEndsIsNotReported(t *testing.T) {
+	f := newFixture(t, nil, bundled)
+	pub := &oncePublisher{t: t, store: f.store}
+	svc := gates.New(gates.Deps{Store: f.store, Reader: f.store, Profile: bundled, Clock: clock{fixedNow}, Publisher: pub})
+	g, err := svc.Open(context.Background(), gate.Gate{Kind: gate.KindDraft, Subject: "7", Unit: task.UnitOf("t-0000000000000001")}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = svc.Resolve(context.Background(), g.ID, gates.Resolution{Intent: "approve", By: task.ActorPerson})
+	if err := svc.Tick(context.Background(), opened); err != nil {
+		t.Fatal(err)
+	}
+	if cut := svc.Cut(); len(cut) != 0 {
+		t.Fatalf("cut %+v: a consequence that ended was reported", cut)
+	}
+}

@@ -22,7 +22,7 @@ var golden = []string{
 	"drafts: id, provider, unit_key, items, task, kind, target, text, reaction, original, edited, origin_kind, turn_seq, intent, workflow, rule, rule_key, state, evidence_ref, evidence_permalink, evidence_at, error, reason, created_at, updated_at, sending_at, rev, purpose, delivery, effects, effects_applied_at, origin_provider, origin_unit_key, replaced",
 	"events: id, provider, unit_key, kind, key, actor, at, data, anchor",
 	"fetches: workspace_id, at",
-	"gates: id, task_id, provider, unit_key, kind, name, subject, status, intents, intent, answer, by_actor, rule, deadline, default_intent, opened_at, closed_at, applied_at",
+	"gates: id, task_id, provider, unit_key, kind, name, subject, status, intents, intent, answer, by_actor, rule, deadline, default_intent, opened_at, closed_at, applied_at, begun_at",
 	"instruction_parts: sha, body",
 	"intakes: seq, provider, unit_key, intent, source, request, state, brief, note, accepted_at, briefing_at, starting_at, ended_at, turn_seq, turn_id, error, log",
 	"item_ops: seq, provider, unit_key, item, op, provenance, outcome, reason, at",

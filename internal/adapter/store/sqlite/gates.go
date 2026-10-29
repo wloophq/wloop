@@ -25,6 +25,7 @@ type GateStore struct {
 
 var (
 	_ gates.Store  = GateStore{}
+	_ gates.Begun  = GateStore{}
 	_ gates.Reader = GateStore{}
 	_ gates.Sent   = GateStore{}
 )
@@ -108,6 +109,36 @@ func (s GateStore) Applied(ctx context.Context, id int64) error {
 		return nil
 	})
 	return err
+}
+
+// Begin marks resolved gate id's consequence run, and begun until End.
+func (s GateStore) Begin(ctx context.Context, id int64) error {
+	_, err := s.db.Write(ctx, func(tx *Tx) error {
+		at := eventTime(s.now())
+		res, err := tx.ExecContext(ctx, `UPDATE gates SET applied_at = ?, begun_at = ? WHERE id = ? AND status != ?`, at, at, id, string(gate.Open))
+		if err != nil {
+			return err
+		}
+		if n, err := res.RowsAffected(); err != nil || n == 0 {
+			return cmp.Or(err, fmt.Errorf("gate %d is open or missing: no consequence ran", id))
+		}
+		return nil
+	})
+	return err
+}
+
+// End marks gate id's begun consequence ended.
+func (s GateStore) End(ctx context.Context, id int64) error {
+	_, err := s.db.Write(ctx, func(tx *Tx) error {
+		_, err := tx.ExecContext(ctx, `UPDATE gates SET begun_at = '' WHERE id = ?`, id)
+		return err
+	})
+	return err
+}
+
+// Begun are the resolved gates whose consequence began and never ended.
+func (s GateStore) Begun(ctx context.Context) ([]gate.Gate, error) {
+	return s.list(ctx, `SELECT `+gateColumns+` FROM gates WHERE begun_at != '' ORDER BY id`)
 }
 
 // Unapplied are the resolved gates whose consequence has not run.

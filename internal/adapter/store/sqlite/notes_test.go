@@ -145,6 +145,21 @@ var writes = []writeCase{
 		call: func(ctx context.Context, e *noteEnv) error { return noteGates(e).Applied(ctx, 1) },
 	},
 	{
+		method: "GateStore.Begin",
+		seed: func(t *testing.T, e *noteEnv) {
+			seedGate(t, e)
+			if _, err := noteGates(e).Resolve(context.Background(), 1, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson}); err != nil {
+				t.Fatal(err)
+			}
+		},
+		call: func(ctx context.Context, e *noteEnv) error { return noteGates(e).Begin(ctx, 1) },
+	},
+	{
+		method: "GateStore.End",
+		seed:   seedGate,
+		call:   func(ctx context.Context, e *noteEnv) error { return noteGates(e).End(ctx, 1) },
+	},
+	{
 		method: "GateStore.RecordSent",
 		call: func(ctx context.Context, e *noteEnv) error {
 			_, err := noteGates(e).RecordSent(ctx, gate.Gate{Unit: term1, Kind: gate.KindPost, Name: "post", By: task.ActorAgent})
@@ -437,7 +452,7 @@ var reads = []string{
 	"Fetches.Last",
 	"DB.AgentTranscript", "DB.WorkflowActivity",
 	"DB.Tasks", "taskStore.Tasks", "taskStore.TasksSince", "taskStore.Task", "taskStore.TasksOf", "DB.Props",
-	"DB.Gates", "GateStore.Get", "GateStore.OfTask", "GateStore.Where", "GateStore.Due", "GateStore.Unapplied",
+	"DB.Gates", "GateStore.Get", "GateStore.OfTask", "GateStore.Where", "GateStore.Due", "GateStore.Unapplied", "GateStore.Begun",
 	"DB.Wakes", "WakeStore.Of", "WakeStore.Due", "WakeStore.Watching", "WakeStore.UnitWakes",
 }
 
