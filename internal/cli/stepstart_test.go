@@ -670,7 +670,7 @@ func TestAnAddressRoundSaysWhyNow(t *testing.T) {
 	sc := addressScenario(t)
 	r := newStartRig(t, sc, string(dintent.Address), roundAddress)
 	r.planner().edit(r.u.Key, roundAddress, func(r *src.Round) {
-		r.TurnFacts = []src.Fact{{Name: "pr.address.reviewers", Value: src.List("bob", "jussara-ai")}, {Name: "pr.address.checks", Value: src.List()}}
+		r.TurnFacts = []src.Fact{{Name: "pr.address.reviewers", Value: src.List("bob", "acme-bot")}, {Name: "pr.address.checks", Value: src.List()}}
 	})
 	if _, err := r.run(t, automation.RunOpts{}); err != nil {
 		t.Fatal(err)
@@ -679,7 +679,7 @@ func TestAnAddressRoundSaysWhyNow(t *testing.T) {
 		t.Fatalf("prompts %+v", sc.ws.Prompts)
 	}
 	text := turnText(t, sc.te, sc.ws.Prompts[0].Text)
-	if !strings.Contains(text, "## Why now") || !strings.Contains(text, "- @bob\n- @jussara-ai\n") {
+	if !strings.Contains(text, "## Why now") || !strings.Contains(text, "- @bob\n- @acme-bot\n") {
 		t.Fatalf("turn:\n%s", text)
 	}
 }

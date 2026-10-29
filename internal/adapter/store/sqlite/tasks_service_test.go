@@ -114,13 +114,9 @@ func TestServiceOverSqliteKeepsClarifiedTasksOutOfTheInboxOnActivity(t *testing.
 	}
 }
 
-// TestTasksCost logs what Sync and the reads cost at a realistic scale; it gates nothing.
-func TestTasksCost(t *testing.T) {
-	t.Parallel()
-	if testing.Short() {
-		t.Skip("cost measurement")
-	}
-	r := newTaskRig(t)
+// BenchmarkTasksCost is what Sync and the reads cost at a realistic scale.
+func BenchmarkTasksCost(b *testing.B) {
+	r := newTaskRig(b)
 	ctx := context.Background()
 	const units = 500
 	var all []unit.Unit
@@ -136,35 +132,36 @@ func TestTasksCost(t *testing.T) {
 			r.items[u] = append(r.items[u], it)
 		}
 	}
-	start := time.Now()
 	if err := r.svc.Sync(ctx, all); err != nil {
-		t.Fatal(err)
+		b.Fatal(err)
 	}
-	full := time.Since(start)
-	open, _ := r.store.Tasks(ctx, task.Query{})
 	r.clock.t = taskAt.Add(time.Minute)
-	start = time.Now()
-	if err := r.svc.Sync(ctx, all[:1]); err != nil {
-		t.Fatal(err)
-	}
-	one := time.Since(start)
-	start = time.Now()
-	next, err := r.store.Tasks(ctx, task.Query{All: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	list := time.Since(start)
-	start = time.Now()
 	p, err := r.store.TasksSince(ctx, task.Query{}, coretasks.Since{})
 	if err != nil {
-		t.Fatal(err)
+		b.Fatal(err)
 	}
-	page := time.Since(start)
-	start = time.Now()
-	if _, err := r.store.TasksSince(ctx, task.Query{}, coretasks.Since{Epoch: p.Epoch, Rev: p.Rev}); err != nil {
-		t.Fatal(err)
+	for name, op := range map[string]func() error{
+		"sync-all": func() error { return r.svc.Sync(ctx, all) },
+		"sync-one": func() error { return r.svc.Sync(ctx, all[:1]) },
+		"every-task": func() error {
+			_, err := r.store.Tasks(ctx, task.Query{All: true})
+			return err
+		},
+		"full-page": func() error {
+			_, err := r.store.TasksSince(ctx, task.Query{}, coretasks.Since{})
+			return err
+		},
+		"empty-delta": func() error {
+			_, err := r.store.TasksSince(ctx, task.Query{}, coretasks.Since{Epoch: p.Epoch, Rev: p.Rev})
+			return err
+		},
+	} {
+		b.Run(name, func(b *testing.B) {
+			for b.Loop() {
+				if err := op(); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
-	delta := time.Since(start)
-	t.Logf("%d units, %d open tasks: first Sync of all %v, Sync of one unit %v, every task (%d) %v, full page %v, empty delta %v",
-		units, len(open), full, one, len(next), list, page, delta)
 }

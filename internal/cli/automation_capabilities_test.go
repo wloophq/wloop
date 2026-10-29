@@ -6,10 +6,9 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 )
 
-// TestAutomationCapabilitiesAreSnapshotFields carries X3b's review finding
-// I2: the engine's optional capabilities stay in the unit set only while the
-// built-in GitHub and Slack modules implement them; a reporting plugin's
-// units read as snapshot fields, host bookkeeping or Notify.
+// TestAutomationCapabilitiesAreSnapshotFields: the unit set routes none of
+// the engine's optional capabilities; a plugin's units read as snapshot
+// fields, host bookkeeping or Notify.
 func TestAutomationCapabilitiesAreSnapshotFields(t *testing.T) {
 	var set any = (*unitSet)(nil)
 	for name, kept := range map[string]bool{
