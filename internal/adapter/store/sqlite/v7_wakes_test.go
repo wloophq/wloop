@@ -53,3 +53,32 @@ func TestV7WakesTurnsSnoozesAndMutesIntoWakes(t *testing.T) {
 		t.Fatalf("the overrides lost their other columns: %q", got)
 	}
 }
+
+func TestV7WakesGivesEachTaskOfASplitSnoozeItsWake(t *testing.T) {
+	t.Parallel()
+	const (
+		at    = "2026-10-01T09:00:00.000000000Z"
+		until = "2026-11-02T08:00:00.000000000Z"
+	)
+	waiting := `{"On":[{"key":"slack:U0ANA","name":"Ana"}],"Since":"2026-10-01T09:00:00Z","LastNudge":"0001-01-01T00:00:00Z","Resurface":"0001-01-01T00:00:00Z"}`
+	path := v6Store(t,
+		`INSERT INTO entries (id, kind, state, title, snooze_until, snooze_return, waiting, origin, created, updated, rev) VALUES
+			('e-00000000000000c1', 'waiting', 'scheduled', 'Waiting on Ana', '`+until+`', 'waiting', '`+waiting+`', 'derived', '`+at+`', '`+at+`', 1)`,
+		`INSERT INTO entry_units (entry_id, provider, unit_key, ord) VALUES ('e-00000000000000c1', 'slack', 'T1/C1/1.1', 0)`,
+		`INSERT INTO entry_items (entry_id, provider, unit_key, item) VALUES
+			('e-00000000000000c1', 'slack', 'T1/C1/1.1', 'i1'), ('e-00000000000000c1', 'slack', 'T1/C1/1.1', 'i2')`,
+		`INSERT INTO items (provider, unit_key, id, body, state, provenance, created_at, updated_at) VALUES
+			('slack', 'T1/C1/1.1', 'i1', '{"id":"i1","summary":"Ana sends the logs"}', 'open', 'agent', '2026-10-01T09:00:00Z', '2026-10-01T09:00:00Z'),
+			('slack', 'T1/C1/1.1', 'i2', '{"id":"i2","summary":"Ana reviews the plan"}', 'open', 'agent', '2026-10-02T09:00:00Z', '2026-10-02T09:00:00Z')`,
+	)
+	migrateV6(t, path)
+	raw := rawDB(t, path)
+	got := strings1(t, raw, `SELECT ti.item || ' ' || w.until || ' ' || w.return_state FROM task_items ti JOIN wakes w ON w.task_id = ti.task_id
+		ORDER BY ti.item`)
+	if want := []string{"i1 " + until + " waiting", "i2 " + until + " waiting"}; !slices.Equal(got, want) {
+		t.Fatalf("wakes of the split %q, want %q", got, want)
+	}
+	if got := strings1(t, raw, `SELECT DISTINCT task_id FROM wakes`); len(got) != 2 {
+		t.Fatalf("wakes on %q, want one on each task of the split", got)
+	}
+}

@@ -331,9 +331,9 @@ func (w prTaskWakes) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, err
 	if err != nil || slices.ContainsFunc(ts, task.Task.Open) {
 		return ts, err
 	}
-	now := time.Now()
+	made := time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
 	e := task.Task{ID: task.DerivedID(u, "pr"), State: "next", Category: task.CategoryReady, Units: []unit.Unit{u}, Origin: task.OriginUser,
-		Created: now, Updated: now}
+		Created: made, Updated: made}
 	return append(ts, e), w.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}})
 }
 
