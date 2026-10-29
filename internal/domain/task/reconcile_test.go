@@ -369,3 +369,13 @@ func TestAQuietUnitKeepsItsTaskOwedByNobody(t *testing.T) {
 		t.Fatalf("a quiet followed unit's task %+v", e)
 	}
 }
+
+func TestAKeyGoesToTheOpenTaskThatLinksItsUnit(t *testing.T) {
+	thread := unit.Unit{Provider: "slack", Key: "T1/C1/1.1"}
+	start := task.Task{ID: "t-00000000000000a3", State: "next", Category: task.CategoryReady, Title: "Ship the export",
+		Units: []unit.Unit{thread, pr}, Origin: task.OriginUser, Created: now.Add(-time.Hour)}
+	es := reconcile(t, facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true }), []items.Item{item("gh:follow", keyed, owedBy(ana))}, []task.Task{start}, now)
+	if e := only(t, es); e.ID != start.ID || len(e.Items) != 1 {
+		t.Fatalf("a task holding the pull request as a link: %+v", es)
+	}
+}

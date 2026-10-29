@@ -17,10 +17,12 @@ const itemOpen items.State = "open"
 // One task per task key (items.Item.TaskKey, else the item id) of the open items that wait on Me, or that Me
 // requested or f.Cares about and wait on others. An item a task already holds stays with that task, so a task
 // the user merged keeps its items, and every item of a key goes to the task holding one of them. A key no task
-// holds that names f.Unit goes to the oldest open task whose first unit is f.Unit; any other gets a new task,
-// DerivedID of the key, in the first state of the category its first item proposes (items.Item.Initial),
-// else the inbox for an item waiting on Me and the waiting category for one waiting on others. A new task
-// takes the item's contexts and deadline in the properties of RoleContexts and RoleDeadline, and the kind f.Kind names, as the plugin writes them.
+// holds that names f.Unit goes to the unit's own task (UnitTask) while it is open, else to the oldest open task
+// holding f.Unit as a link, such as a task you started whose pull request was attached, else to its own closed
+// one; any other gets a new task, DerivedID of the key, in the first state of the category its first item
+// proposes (items.Item.Initial), else the inbox for an item waiting on Me and the waiting category for one
+// waiting on others. A new task takes the item's contexts and deadline in the properties of RoleContexts and
+// RoleDeadline, and the kind f.Kind names, as the plugin writes them.
 //
 // A derived task none of whose items calls for it any more is resolved into the done category, except the
 // task of a key that names f.Unit: the unit's one task lives as long as its unit, so it ends through the
@@ -115,7 +117,8 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st Profile, no
 func keyOf(it items.Item) string { return cmp.Or(it.TaskKey, it.ID) }
 
 // keyHolders is the task of each task key the items its set: the task holding one of the key's items, an
-// open one first, else, for the key that names f.Unit, the oldest open task whose first unit is f.Unit.
+// open one first, else, for the key that names f.Unit, the unit's own open task (UnitTask), else the oldest
+// open task that holds f.Unit as a link, else its own closed one.
 func keyHolders(f UnitFacts, its []items.Item, holder map[ItemRef]ID, byID map[ID]Task, order []ID) map[string]ID {
 	out := map[string]ID{}
 	for _, it := range its {
@@ -138,10 +141,32 @@ func keyHolders(f UnitFacts, its []items.Item, holder map[ItemRef]ID, byID map[I
 	for _, id := range order {
 		ts = append(ts, byID[id])
 	}
-	if e, ok := UnitTask(ts, f.Unit); ok {
+	e, ok := UnitTask(ts, f.Unit)
+	if l, linked := linking(ts, f.Unit); linked && (!ok || !e.Open()) {
+		e, ok = l, true
+	}
+	if ok {
 		out[own] = e.ID
 	}
 	return out
+}
+
+// linking is the oldest open task that holds u after its first unit, such as a task you started that its pull
+// request was attached to.
+func linking(ts []Task, u unit.Unit) (Task, bool) {
+	var first *Task
+	for i, e := range ts {
+		if !e.Open() || len(e.Units) < 2 || !slices.Contains(e.Units[1:], u) {
+			continue
+		}
+		if first == nil || cmp.Or(e.Created.Compare(first.Created), strings.Compare(string(e.ID), string(first.ID))) < 0 {
+			first = &ts[i]
+		}
+	}
+	if first == nil {
+		return Task{}, false
+	}
+	return *first, true
 }
 
 // UnitTask is u's own task among ts, whatever its state: of the tasks whose first unit is u, an open one

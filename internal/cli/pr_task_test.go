@@ -217,3 +217,26 @@ func TestAGateOnAPRNoTaskHoldsLandsInNeedsMe(t *testing.T) {
 		t.Fatalf("the gate's task is %s, want out of the Inbox", got.Category)
 	}
 }
+
+func TestAStartThatAttachesItsPRKeepsOneTask(t *testing.T) {
+	t.Parallel()
+	p := newPRTaskRig(t)
+	ctx := context.Background()
+	start, err := p.r.te.tasks.Capture(ctx, "ship the export", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.r.te.tasks.Attach(ctx, start.ID, twThread); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.r.te.tasks.Attach(ctx, start.ID, ptPR1); err != nil {
+		t.Fatal(err)
+	}
+	if got := p.item(t, ptPR1, "gh:review", items.InitialNext, ptMe); got.ID != start.ID || len(got.Items) != 1 {
+		t.Fatalf("the pull request's asks went to %+v, want the start %s", got, start.ID)
+	}
+	p.pass(t)
+	if ts, err := p.r.db.Tasks().TasksOf(ctx, ptPR1); err != nil || len(ts) != 1 {
+		t.Fatalf("the pull request's tasks after a sweep %+v %v", ts, err)
+	}
+}
