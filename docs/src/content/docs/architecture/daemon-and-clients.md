@@ -27,7 +27,7 @@ The TCP port answers 404 for AgentAPI and AdminAPI, refuses an unexpected `Host`
 
 ## Transports
 
-- **The Unix socket** carries every role, for the clients on this machine.
+- **The Unix socket** carries every role, for the clients on this machine. A CLI run inside an agent session names that session on every call (`X-Loop-Session`), so the daemon applies the same authority to a shell as to the MCP tools: an agent resolves no gate, and a draft is approved by a person only.
 - **Localhost HTTP** serves the cockpit's static files (`internal/web`), UserAPI and the event stream.
 - **MCP** (`internal/transport/mcp`) serves the agent sessions on `127.0.0.1:47800` (`mcp.port`): `turn_end`, `task_post` and `task_read`, and the Slack tools when their plugin is enabled. A session is identified by the `X-Loop-Session` header its manager fills, never by a tool argument, and every call carries the per-install key in `X-Loop-Key`.
 
