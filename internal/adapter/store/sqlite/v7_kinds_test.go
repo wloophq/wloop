@@ -3,13 +3,17 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/gates"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/core/timeline"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -434,5 +438,162 @@ func TestV7KindsMarksOnlyTheLoopsStarsAutostar(t *testing.T) {
 		if e := migratedTask(t, db, hex); e.Prop("autostar").Text != "" {
 			t.Errorf("%s: a star the person set or cleared got autostar", hex)
 		}
+	}
+}
+
+const (
+	hexWaitAna   = "00000000000000c1"
+	hexWaitBruno = "00000000000000c2"
+	hexDoneOne   = "00000000000000c3"
+	hexOpenOne   = "00000000000000c4"
+	hexDoneTwo   = "00000000000000c5"
+)
+
+var sharedThread = unit.Unit{Provider: "slack", Key: "T2/C2/2.2"}
+
+// v6SharedItemFixture is a version 6 store where item i1 of a thread waits on Ana and Bruno, so the waiting
+// entry of each holds it: Ana's with the older i0, Bruno's with the newer i3, each with a nudge draft.
+func v6SharedItemFixture(t *testing.T) string {
+	t.Helper()
+	wa, wb := "e-"+hexWaitAna, "e-"+hexWaitBruno
+	on := func(key, name string) string {
+		return `{"On":[{"key":"` + key + `","name":"` + name + `"}],"Since":"2026-10-01T09:00:00Z","LastNudge":"0001-01-01T00:00:00Z","Resurface":"0001-01-01T00:00:00Z"}`
+	}
+	return v6Store(t,
+		`INSERT INTO entries (id, kind, state, title, waiting, origin, created, updated, rev) VALUES
+			('`+wa+`', 'waiting', 'waiting', 'Waiting on Ana', '`+on("slack:U0ANA", "Ana")+`', 'derived', '2026-10-01T09:00:00.000000000Z', '2026-10-01T09:00:00.000000000Z', 1),
+			('`+wb+`', 'waiting', 'waiting', 'Waiting on Bruno', '`+on("slack:U0BRUNO", "Bruno")+`', 'derived', '2026-10-02T09:00:00.000000000Z', '2026-10-02T09:00:00.000000000Z', 2)`,
+		`INSERT INTO entry_units (entry_id, provider, unit_key, ord) VALUES ('`+wa+`', 'slack', 'T2/C2/2.2', 0), ('`+wb+`', 'slack', 'T2/C2/2.2', 0)`,
+		`INSERT INTO entry_items (entry_id, provider, unit_key, item) VALUES
+			('`+wa+`', 'slack', 'T2/C2/2.2', 'i0'), ('`+wa+`', 'slack', 'T2/C2/2.2', 'i1'),
+			('`+wb+`', 'slack', 'T2/C2/2.2', 'i1'), ('`+wb+`', 'slack', 'T2/C2/2.2', 'i3')`,
+		`INSERT INTO items (provider, unit_key, id, body, state, provenance, created_at, updated_at) VALUES
+			('slack', 'T2/C2/2.2', 'i0', '{"id":"i0","summary":"Ana signs"}', 'open', 'agent', '2026-09-01T09:00:00Z', '2026-09-01T09:00:00Z'),
+			('slack', 'T2/C2/2.2', 'i1', '{"id":"i1","summary":"Ana and Bruno agree"}', 'open', 'agent', '2026-09-02T09:00:00Z', '2026-09-02T09:00:00Z'),
+			('slack', 'T2/C2/2.2', 'i3', '{"id":"i3","summary":"Bruno ships"}', 'open', 'agent', '2026-09-03T09:00:00Z', '2026-09-03T09:00:00Z')`,
+		`INSERT INTO drafts (id, provider, unit_key, entry, items, kind, origin_kind, workflow, rule, rule_key, state, created_at, updated_at, effects) VALUES
+			(80, 'slack', 'T2/C2/2.2', '`+wa+`', '["i0","i1"]', 'nudge', 'auto', 'slack-stalled-nudge', 'slack-stalled-nudge', '`+wa+`:slack:U0ANA', 'proposed', '2026-10-21T09:00:00Z', '2026-10-21T09:00:00Z', '["entry.nudged"]'),
+			(81, 'slack', 'T2/C2/2.2', '`+wb+`', '["i1","i3"]', 'nudge', 'auto', 'slack-stalled-nudge', 'slack-stalled-nudge', '`+wb+`:slack:U0BRUNO', 'proposed', '2026-10-21T09:00:00Z', '2026-10-21T09:00:00Z', '["entry.nudged"]')`,
+	)
+}
+
+type v7Items map[unit.Unit][]items.Item
+
+func (m v7Items) Items(_ context.Context, u unit.Unit) ([]items.Item, error) { return m[u], nil }
+
+type v7Facts struct{}
+
+func (v7Facts) UnitFacts(_ context.Context, u unit.Unit) (task.UnitFacts, bool, error) {
+	return task.UnitFacts{Unit: u, Cares: true, Kind: "thread"}, true, nil
+}
+
+type v7Clock struct{}
+
+func (v7Clock) Now() time.Time { return time.Date(2026, 10, 29, 9, 0, 0, 0, time.UTC) }
+
+func TestV7KindsHoldsAnItemWaitingOnTwoPeopleInOneTask(t *testing.T) {
+	t.Parallel()
+	path := v6SharedItemFixture(t)
+	db := migrateV6(t, path)
+	raw := rawDB(t, path)
+	wa, wb := "t-"+hexWaitAna, "t-"+hexWaitBruno
+	s1, s3 := string(task.DerivedID(sharedThread, "i1")), string(task.DerivedID(sharedThread, "i3"))
+	if got := strings1(t, raw, `SELECT task_id FROM task_items WHERE item = 'i1'`); !slices.Equal(got, []string{s1}) {
+		t.Fatalf("i1 is held by %q, want only %s", got, s1)
+	}
+	want := []string{wa + " " + s1, wb + " " + s1, wb + " " + s3}
+	slices.Sort(want)
+	if got := strings1(t, raw, `SELECT old_id || ' ' || new_id FROM task_aliases ORDER BY old_id, new_id`); !slices.Equal(got, want) {
+		t.Errorf("aliases %q, want %q", got, want)
+	}
+	if got := strings1(t, raw, `SELECT count(*) FROM task_aliases WHERE new_id NOT IN (SELECT id FROM tasks) OR new_id IN (SELECT old_id FROM task_aliases WHERE old_id NOT IN (SELECT id FROM tasks))`); !slices.Equal(got, []string{"0"}) {
+		t.Errorf("%q aliases lead nowhere or to another alias", got)
+	}
+	all := allGates(t, db)
+	if g := gateOf(t, all, gate.KindDraft, "81"); g.Task != task.ID(s1) || g.Status != gate.Open {
+		t.Errorf("Bruno's nudge gate %+v, want open on %s", g, s1)
+	}
+	me := items.Person{Key: "slack:U0ME"}
+	ana, bruno := items.Person{Key: "slack:U0ANA"}, items.Person{Key: "slack:U0BRUNO"}
+	item := func(id string, on ...items.Person) items.Item {
+		return items.Item{ID: id, Unit: sharedThread, Summary: id, Requester: me, WaitingOn: on, State: items.Open}
+	}
+	svc := coretasks.New(coretasks.Deps{Store: db.Tasks(), Items: v7Items{sharedThread: {item("i0", ana), item("i1", ana, bruno), item("i3", bruno)}},
+		Facts: v7Facts{}, Me: task.Me{Keys: []string{me.Key}}, Clock: v7Clock{}, States: taskstest.BundledStates})
+	if err := svc.Sync(context.Background(), []unit.Unit{sharedThread}); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings1(t, raw, `SELECT id FROM tasks WHERE category IN ('done', 'dropped')`); len(got) != 0 {
+		t.Errorf("the first sync closed %q", got)
+	}
+	if got := strings1(t, raw, `SELECT g.subject FROM gates g JOIN tasks t ON t.id = g.task_id WHERE g.status = 'open' AND t.category IN ('done', 'dropped')`); len(got) != 0 {
+		t.Errorf("open gates on closed tasks after the first sync: %q", got)
+	}
+}
+
+func TestV7KindsMovesOpenDraftGatesOffClosedTasks(t *testing.T) {
+	t.Parallel()
+	d1, o1, d2 := "e-"+hexDoneOne, "e-"+hexOpenOne, "e-"+hexDoneTwo
+	path := v6Store(t,
+		`INSERT INTO entries (id, kind, state, title, origin, created, updated, rev) VALUES
+			('`+d1+`', 'action', 'done', 'Review it', 'derived', '2026-09-01T09:00:00.000000000Z', '2026-09-01T09:00:00.000000000Z', 1),
+			('`+o1+`', 'action', 'next', 'Answer Ana', 'derived', '2026-09-02T09:00:00.000000000Z', '2026-09-02T09:00:00.000000000Z', 2),
+			('`+d2+`', 'action', 'done', 'Review the docs', 'derived', '2026-09-03T09:00:00.000000000Z', '2026-09-03T09:00:00.000000000Z', 3)`,
+		`INSERT INTO entry_units (entry_id, provider, unit_key, ord) VALUES
+			('`+d1+`', 'github', 'acme/api#11', 0), ('`+o1+`', 'github', 'acme/api#11', 0), ('`+d2+`', 'github', 'acme/api#12', 0)`,
+		`INSERT INTO drafts (id, provider, unit_key, entry, kind, origin_kind, workflow, rule, rule_key, state, created_at, updated_at) VALUES
+			(70, 'github', 'acme/api#11', '`+d1+`', 'nudge', 'auto', 'github-nudge', 'github-nudge', 'k70', 'proposed', '2026-10-21T09:00:00Z', '2026-10-21T09:00:00Z'),
+			(71, 'github', 'acme/api#12', '', 'nudge', 'auto', 'github-nudge', 'github-nudge', 'k71', 'proposed', '2026-10-21T09:00:00Z', '2026-10-21T09:00:00Z'),
+			(72, 'github', 'acme/api#13', '', 'nudge', 'auto', 'github-nudge', 'github-nudge', 'k72', 'proposed', '2026-10-21T09:00:00Z', '2026-10-21T09:00:00Z')`,
+	)
+	db := migrateV6(t, path)
+	raw := rawDB(t, path)
+	all := allGates(t, db)
+	if g := gateOf(t, all, gate.KindDraft, "70"); g.Task != task.ID("t-"+hexOpenOne) || g.Status != gate.Open {
+		t.Errorf("the gate on a done task whose unit an open task holds %+v", g)
+	}
+	for subject, want := range map[string]struct {
+		u     unit.Unit
+		title string
+	}{
+		"71": {unit.Unit{Provider: "github", Key: "acme/api#12"}, "Review the docs"},
+		"72": {unit.Unit{Provider: "github", Key: "acme/api#13"}, "github:acme/api#13"},
+	} {
+		g := gateOf(t, all, gate.KindDraft, subject)
+		if g.Task == "" || g.Status != gate.Open {
+			t.Errorf("gate %s %+v, want open on a task", subject, g)
+			continue
+		}
+		e := migratedTask(t, db, string(g.Task)[2:])
+		if !e.Open() || e.Origin != task.OriginGate || e.Category != task.CategoryInbox || e.Title != want.title ||
+			!slices.Equal(e.Units, []unit.Unit{want.u}) || e.Prop(task.PropKind).Text != "pull-request" {
+			t.Errorf("gate %s's task %+v", subject, e)
+		}
+		if got := strings1(t, raw, `SELECT task FROM drafts WHERE id = ?`, subject); !slices.Equal(got, []string{string(g.Task)}) {
+			t.Errorf("draft %s's task %q, want %s", subject, got, g.Task)
+		}
+	}
+	if got := strings1(t, raw, `SELECT count(*) FROM gates g LEFT JOIN tasks t ON t.id = g.task_id WHERE g.status = 'open' AND g.kind = 'draft'
+		AND (t.id IS NULL OR t.category IN ('done', 'dropped'))`); !slices.Equal(got, []string{"0"}) {
+		t.Errorf("%q open draft gates on no task or a closed one", got)
+	}
+}
+
+func TestATaskIsFoundByAnOldIDThroughOneAlias(t *testing.T) {
+	t.Parallel()
+	db, raw := migratedKinds(t)
+	ctx := context.Background()
+	e, err := db.Tasks().Task(ctx, messageID)
+	if err != nil || e.ID != actionID {
+		t.Fatalf("the dropped message task's id reads %s (%v), want %s", e.ID, err, actionID)
+	}
+	if e, err := db.Tasks().Task(ctx, waitID); err != nil || e.ID != waitID {
+		t.Fatalf("a split task's old id reads %s (%v), want itself", e.ID, err)
+	}
+	if _, err := raw.Exec(`INSERT INTO task_aliases (old_id, new_id) VALUES ('t-00000000000000ff', ?)`, string(messageID)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Tasks().Task(ctx, "t-00000000000000ff"); !errors.Is(err, coretasks.ErrNoTask) {
+		t.Fatalf("an alias to a gone id reads %v, want no task: aliases are one hop", err)
 	}
 }

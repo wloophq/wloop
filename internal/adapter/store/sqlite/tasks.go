@@ -280,8 +280,14 @@ func (s taskStore) TasksSince(ctx context.Context, q task.Query, since coretasks
 	return p, err
 }
 
+// Task reads task id, or, when no task has it, the task an alias of id leads to, an open one first: one hop,
+// since every alias leads to a task.
 func (s taskStore) Task(ctx context.Context, id task.ID) (task.Task, error) {
 	es, err := loadTasks(ctx, s.db.R(), `id = ?`, string(id))
+	if err == nil && len(es) == 0 {
+		es, err = loadTasks(ctx, s.db.R(), `id = (SELECT a.new_id FROM task_aliases a JOIN tasks t ON t.id = a.new_id
+			WHERE a.old_id = ? ORDER BY t.`+isOpen+` DESC, t.created, t.id LIMIT 1)`, append([]any{string(id)}, openArgs()...)...)
+	}
 	if err != nil {
 		return task.Task{}, err
 	}

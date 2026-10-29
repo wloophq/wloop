@@ -27,7 +27,7 @@ func v7Kinds(ctx context.Context, tx *sql.Tx) error {
 		return err
 	}
 	for _, step := range []func(context.Context, *sql.Tx) error{
-		v7FixedTimes, v7ItemCategories, v7AutoStars, v7WaitingProps, v7SplitWaiting, v7EndCloseAndMessageTasks, v7MissingKinds,
+		v7FixedTimes, v7ItemCategories, v7AutoStars, v7WaitingProps, v7SplitWaiting, v7MergeHolders, v7EndCloseAndMessageTasks, v7RehomeGates, v7MissingKinds,
 	} {
 		if err := step(ctx, tx); err != nil {
 			return err
@@ -290,6 +290,80 @@ func v7SplitID(ctx context.Context, tx *sql.Tx, old string, it v7HeldItem) (stri
 	return "", fmt.Errorf("splitting %s: both ids of item %s are taken", old, it.item)
 }
 
+// v7MergeHolders leaves each item one task. Version 6 made a waiting task per person an item waits on, so an
+// item waiting on several people is held by several tasks after the split. The open one first, then the
+// oldest, keeps it; each other gives it its rows and goes, aliased to it. A dropped task's own aliases, to the
+// tasks it split into, stay under its id, so every alias leads to a task.
+func v7MergeHolders(ctx context.Context, tx *sql.Tx) error {
+	var shared [][3]string
+	err := eachRow(ctx, tx, `SELECT provider, unit_key, item FROM task_items GROUP BY provider, unit_key, item HAVING count(*) > 1
+		ORDER BY provider, unit_key, item`, nil, func(r *sql.Rows) error {
+		var k [3]string
+		if err := r.Scan(&k[0], &k[1], &k[2]); err != nil {
+			return err
+		}
+		shared = append(shared, k)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	for _, k := range shared {
+		var holders []string
+		err := eachRow(ctx, tx, `SELECT t.id FROM task_items h JOIN tasks t ON t.id = h.task_id
+			WHERE h.provider = ? AND h.unit_key = ? AND h.item = ? ORDER BY t.category IN ('done', 'dropped'), t.created, t.id`,
+			[]any{k[0], k[1], k[2]}, func(r *sql.Rows) error {
+				var id string
+				if err := r.Scan(&id); err != nil {
+					return err
+				}
+				holders = append(holders, id)
+				return nil
+			})
+		if err != nil {
+			return err
+		}
+		for _, loser := range holders[1:] {
+			if err := v7Merge(ctx, tx, loser, holders[0]); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// v7Merge gives task from's rows to task to, drops from and aliases it to to, keeping from's aliases to others.
+func v7Merge(ctx context.Context, tx *sql.Tx, from, to string) error {
+	var kept []string
+	err := eachRow(ctx, tx, `SELECT new_id FROM task_aliases WHERE old_id = ? AND new_id != ?`, []any{from, to}, func(r *sql.Rows) error {
+		var id string
+		if err := r.Scan(&id); err != nil {
+			return err
+		}
+		kept = append(kept, id)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM task_aliases WHERE old_id = ?`, from); err != nil {
+		return err
+	}
+	if err := rekeyTask(ctx, tx, from, to); err != nil {
+		return fmt.Errorf("merging task %s into %s: %w", from, to, err)
+	}
+	if err := dropTask(ctx, tx, from); err != nil {
+		return err
+	}
+	for _, id := range append(kept, to) {
+		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO task_aliases (old_id, new_id) VALUES (?, ?)`, from, id); err != nil {
+			return err
+		}
+	}
+	_, err = tx.ExecContext(ctx, `DELETE FROM task_aliases WHERE old_id = new_id`)
+	return err
+}
+
 // v7Ended is a close or message task of version 6 and the unit it was about.
 type v7Ended struct {
 	id, kind, category string
@@ -330,14 +404,8 @@ func v7EndCloseAndMessageTasks(ctx context.Context, tx *sql.Tx) error {
 			}
 			continue
 		}
-		if err := rekeyTask(ctx, tx, e.id, to); err != nil {
-			return fmt.Errorf("moving %s task %s onto %s: %w", e.kind, e.id, to, err)
-		}
-		if err := dropTask(ctx, tx, e.id); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO task_aliases (old_id, new_id) VALUES (?, ?)`, e.id, to); err != nil {
-			return err
+		if err := v7Merge(ctx, tx, e.id, to); err != nil {
+			return fmt.Errorf("moving %s task %s: %w", e.kind, e.id, err)
 		}
 	}
 	return nil
@@ -383,6 +451,76 @@ func v7KeepAsGateTask(ctx context.Context, tx *sql.Tx, e v7Ended) error {
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE tasks SET title = ? WHERE id = ?`, cmp.Or(text, e.id), e.id)
 	return err
+}
+
+// v7RehomeGates moves every open gate on a done or dropped task, and every open draft gate on no task, to the
+// oldest open task holding its unit, else to a new task for the unit, as the gates service opens one: an open
+// gate there would wait where no list shows it. The new task is named after the closed task, or its unit.
+func v7RehomeGates(ctx context.Context, tx *sql.Tx) error {
+	type stray struct {
+		id, subject, kind, provider, key, from, title, opened string
+	}
+	var strays []stray
+	err := eachRow(ctx, tx, `SELECT g.id, g.subject, g.kind, g.provider, g.unit_key, coalesce(t.id, ''), coalesce(t.title, ''), g.opened_at,
+			coalesce((SELECT provider FROM task_units WHERE task_id = t.id ORDER BY ord LIMIT 1), ''),
+			coalesce((SELECT unit_key FROM task_units WHERE task_id = t.id ORDER BY ord LIMIT 1), '')
+		FROM gates g LEFT JOIN tasks t ON t.id = g.task_id
+		WHERE g.status = 'open' AND (t.category IN ('done', 'dropped') OR g.task_id IS NULL AND g.kind = 'draft')
+		ORDER BY g.id`, nil, func(r *sql.Rows) error {
+		var s stray
+		var taskProvider, taskKey string
+		if err := r.Scan(&s.id, &s.subject, &s.kind, &s.provider, &s.key, &s.from, &s.title, &s.opened, &taskProvider, &taskKey); err != nil {
+			return err
+		}
+		if (s.provider == "" || s.provider == v7Task) && taskProvider != "" {
+			s.provider, s.key = taskProvider, taskKey
+		}
+		strays = append(strays, s)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	for _, s := range strays {
+		if s.provider == "" || s.provider == v7Task {
+			continue
+		}
+		var to string
+		err := tx.QueryRowContext(ctx, `SELECT id FROM tasks WHERE category NOT IN ('done', 'dropped')
+			AND id IN (SELECT task_id FROM task_units WHERE provider = ?1 AND unit_key = ?2 UNION SELECT task_id FROM task_items WHERE provider = ?1 AND unit_key = ?2)
+			ORDER BY created, id LIMIT 1`, s.provider, s.key).Scan(&to)
+		if errors.Is(err, sql.ErrNoRows) {
+			to, err = v7GateTask(ctx, tx, s.provider, s.key, cmp.Or(s.title, s.provider+":"+s.key), s.opened)
+		}
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE gates SET task_id = ? WHERE id = ?`, to, s.id); err != nil {
+			return err
+		}
+		if s.kind == "draft" {
+			if _, err := tx.ExecContext(ctx, `UPDATE drafts SET task = ? WHERE id = ? AND task IN ('', ?)`, to, s.subject, s.from); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// v7GateTask inserts the inbox task the gates service opens for a gate on a unit no open task holds.
+func v7GateTask(ctx context.Context, tx *sql.Tx, provider, key, title, at string) (string, error) {
+	sum := sha256.Sum256([]byte("gate|" + provider + "|" + key))
+	id := v7IDPrefix + hex.EncodeToString(sum[:])[:16]
+	for _, q := range []string{
+		`INSERT INTO tasks (id, kind, state, category, title, origin, created, updated, rev)
+			VALUES (?1, '', 'inbox', 'inbox', ?4, 'gate', ?5, ?5, (SELECT coalesce(max(rev), 0) + 1 FROM tasks))`,
+		`INSERT INTO task_units (task_id, provider, unit_key, ord) VALUES (?1, ?2, ?3, 0)`,
+	} {
+		if _, err := tx.ExecContext(ctx, q, id, provider, key, title, at); err != nil {
+			return "", fmt.Errorf("a task for the gates of %s:%s: %w", provider, key, err)
+		}
+	}
+	return id, nil
 }
 
 // v7MissingKinds gives the kind property to every task without one: the kind of its unit's provider, as the
