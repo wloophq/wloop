@@ -200,6 +200,7 @@ func TestAutofocusClearsTheStarsItSetWhoseReasonIsGone(t *testing.T) {
 	r.mine("late", r.now, pastDue, twMe)
 	r.mine("mine", r.now, "", twMe)
 	r.mine("theirs", r.now, "", twMe)
+	r.mine("restarred", r.now, pastDue, twMe)
 	r.sync(twThread)
 	change := func(item string, f func(e *task.Task)) {
 		e := r.taskOf(task.DerivedID(twThread, item))
@@ -217,6 +218,10 @@ func TestAutofocusClearsTheStarsItSetWhoseReasonIsGone(t *testing.T) {
 	if err := p.pass(ctx); err != nil {
 		t.Fatal(err)
 	}
+	change("restarred", func(e *task.Task) {
+		e.SetProp(task.PropFocus, task.Value{Text: task.FocusOn}, task.WriterPerson, r.now)
+		e.SetProp(task.PropDue, task.Value{Time: replayStart.AddDate(0, 0, 3)}, task.WriterPerson, r.now)
+	})
 	change("moved", func(e *task.Task) {
 		e.SetProp(task.PropDue, task.Value{Time: replayStart.AddDate(0, 0, 3)}, task.WriterPerson, r.now)
 	})
@@ -235,7 +240,7 @@ func TestAutofocusClearsTheStarsItSetWhoseReasonIsGone(t *testing.T) {
 	if after := starred(); after >= before {
 		t.Fatalf("%d stars after the run, %d before: the run did not clear the stale one", after, before)
 	}
-	for item, want := range map[string]string{"moved": "", "late": task.FocusOn, "mine": task.FocusOn, "theirs": task.FocusOn} {
+	for item, want := range map[string]string{"moved": "", "late": task.FocusOn, "mine": task.FocusOn, "theirs": task.FocusOn, "restarred": task.FocusOn} {
 		if got := r.taskOf(task.DerivedID(twThread, item)).Prop(task.PropFocus).Text; got != want {
 			t.Errorf("%s: focus %q, want %q", item, got, want)
 		}
