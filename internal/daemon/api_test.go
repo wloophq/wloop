@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+	"github.com/wloophq/wloop/internal/catalog"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/source/github/present"
@@ -44,6 +45,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/wake"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
@@ -162,8 +164,13 @@ func prWakes(st *inventory.Store, now func() time.Time) psource.TaskWakes {
 		now = time.Now
 	}
 	svc := coretasks.New(coretasks.Deps{Store: st.DB().Tasks(), Clock: clockOf(now), States: taskstest.BundledStates,
-		Authority: taskstest.BundledStates.Authority, Wakes: st.DB().Wakes()})
+		Authority: taskstest.BundledStates.Authority, Wakes: st.DB().Wakes(), Baseline: catalog.Baseline(bundledActions, ownFacts)})
 	return testWakes{svc: svc, db: st.DB(), now: now}
+}
+
+// ownFacts are the facts a task's own fields hold.
+func ownFacts(_ context.Context, t task.Task) (workflow.Facts, error) {
+	return catalog.TaskFacts(t, bundledActions().Tasks), nil
 }
 
 type clockOf func() time.Time

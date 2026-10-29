@@ -24,7 +24,9 @@ type TaskWakes interface {
 type wakes struct{ b *Broker }
 
 // SetWake puts w on the task w names, or on every open task of w's unit when
-// it names none; a unit no open task holds has no task to wake.
+// it names none; a unit no open task holds has no task to wake. A When that
+// is a list fact alone, such as task.link_owes, wakes each task once its own
+// value of the fact changes from the one it has now.
 func (k wakes) SetWake(ctx context.Context, w src.Wake) error {
 	ts, err := k.tasks(ctx, w.Unit, w.Task)
 	if err != nil {

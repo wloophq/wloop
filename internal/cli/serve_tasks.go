@@ -36,7 +36,8 @@ func (e *Env) newTasks(db *sqlite.DB, cfg config.Config, its coretasks.Items) *c
 		e.tasks = coretasks.New(coretasks.Deps{Store: db.Tasks(), Items: its, Facts: facts, Clock: clockFunc(e.Now),
 			Disabled: off, States: profileStates{e},
 			Authority: catalog.Authority(e.loadedIntents), Gates: serviceTaskGates{e, db},
-			Wakes: db.Wakes(), Activity: func(ctx context.Context, id task.ID) error {
+			Wakes: db.Wakes(), Baseline: catalog.Baseline(e.loadedIntents, e.factsOfTask),
+			Activity: func(ctx context.Context, id task.ID) error {
 				return e.wakes.Event(ctx, id, wake.OnActivity, "")
 			}})
 	}

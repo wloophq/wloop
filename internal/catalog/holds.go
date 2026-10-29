@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -39,5 +41,29 @@ func Holds(loaded func() *intentload.Loaded, facts func(ctx context.Context, t t
 			return false, err
 		}
 		return pred.Match(workflow.Vars{Facts: f})
+	}
+}
+
+// Baseline is the core's tasks.Baseline: a wake's When that is a list fact of
+// the task alone, such as task.link_owes, asks to wake once the task's own
+// value of it changes. Baseline turns it into the condition over the value
+// facts reads of the task now, in any order; any other When stays as it is.
+func Baseline(loaded func() *intentload.Loaded, facts func(ctx context.Context, t task.Task) (workflow.Facts, error)) func(ctx context.Context, t task.Task, when string) (string, error) {
+	return func(ctx context.Context, t task.Task, when string) (string, error) {
+		env := builtin.WorkflowEnv(builtin.TaskSlot)
+		maps.Copy(env, loaded().Tasks.Facts())
+		if typ, ok := env[when]; !ok || typ != expr.List {
+			return when, nil
+		}
+		f, err := facts(ctx, t)
+		if err != nil {
+			return "", err
+		}
+		now, _ := f[when].([]string)
+		parts := []string{"size(" + when + ") != " + strconv.Itoa(len(now))}
+		for _, v := range now {
+			parts = append(parts, "!("+strconv.Quote(v)+" in "+when+")")
+		}
+		return strings.Join(parts, " || "), nil
 	}
 }

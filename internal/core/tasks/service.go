@@ -38,6 +38,9 @@ type Deps struct {
 	Gates Gates
 	// Wakes are the tasks' wakes, which schedule puts and wake reads; nil: schedule fails and no task has one.
 	Wakes Wakes
+	// Baseline fills a wake Sleep puts on task t: a When that asks to wake once a fact of t changes becomes the
+	// condition over the value t has now; nil leaves every When as it is.
+	Baseline func(ctx context.Context, t task.Task, when string) (string, error)
 	// Activity is told each task Sync finds asleep with a person's activity on its unit since the user saw it,
 	// for a wake on activity; nil: none is told.
 	Activity func(ctx context.Context, id task.ID) error
@@ -242,6 +245,11 @@ func (s *Service) Sleep(ctx context.Context, id task.ID, w wake.Wake) error {
 	w.Task, w.Return = id, string(e.State)
 	if e.Snoozed() && cur.Task == id {
 		w.Return = cur.Return
+	}
+	if s.d.Baseline != nil && w.When != "" {
+		if w.When, err = s.d.Baseline(ctx, e, w.When); err != nil {
+			return err
+		}
 	}
 	if e.Category != task.CategoryDeferred {
 		if err := e.MoveTo(task.CategoryDeferred, s.d.States); err != nil {
