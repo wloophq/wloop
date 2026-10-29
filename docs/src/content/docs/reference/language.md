@@ -202,7 +202,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `verbs.<name>` (table): A verb, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `verbs.<name>.label` (string): The name people read on its button. Required.
 - `verbs.<name>.summary` (string): One line, what pressing it does: its tooltip. Required.
-- `verbs.<name>.offer` (predicate, default `true`): When a task offers the verb, over the task's own facts (task.id, task.kind, task.state, task.muted, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run.
+- `verbs.<name>.offer` (predicate, default `true`): When a task offers the verb, over the task's own facts (task.id, task.prop.kind, task.state, task.muted, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run.
 - `verbs.<name>.input` (string): The question a verb that asks for a value puts first (waiting, schedule, project, context, area, delegate, reply); required for those.
 - `verbs.<name>.from` (list of strings): The states the verb moves a task from, each a state of states; every state when absent.
 - `verbs.<name>.to` (string): The state the verb moves a task to, a state of states; absent, the verb moves none.
