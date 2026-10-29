@@ -137,3 +137,24 @@ func (db *DB) Track(ctx context.Context, ref pr.Ref, tracked bool, at time.Time,
 	}
 	return db.SetTracked(ctx, ref, tracked)
 }
+
+// Adopted are the pull requests taken over into the loop.
+func (db *DB) Adopted(ctx context.Context) (map[pr.Ref]bool, error) {
+	rows, err := db.db.QueryContext(ctx, `SELECT unit_key FROM overrides WHERE taken_over`)
+	if err != nil {
+		return nil, err
+	}
+	keys, err := scanStrings(rows)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[pr.Ref]bool, len(keys))
+	for _, k := range keys {
+		ref, err := pr.ParseKey(k)
+		if err != nil {
+			return nil, err
+		}
+		out[ref] = true
+	}
+	return out, nil
+}

@@ -6,13 +6,14 @@ import (
 	"strings"
 	"testing"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/workspace"
@@ -100,8 +101,8 @@ func TestAnUntrustedFolderBlocksTheRoundUntilTheUserUnblocksIt(t *testing.T) {
 		t.Fatalf("out %q, want %q", out.String(), want)
 	}
 	planned, _ := r.planner().round(sc.ref.String(), roundAddress)
-	fp := planned.OnSent[round.AddressedReviews]
-	if got := sc.te.loadRounds(t).Mark(sc.ref.String(), round.AddressedReviews); fp == "" || got != fp {
+	fp := planned.OnSent[ghsource.MarkAddressedReviews]
+	if got := sc.te.loadRounds(t).Mark(sc.ref.String(), ghsource.MarkAddressedReviews); fp == "" || got != fp {
 		t.Fatalf("fingerprint %q, want the blocked round's %q", got, fp)
 	}
 }

@@ -176,7 +176,7 @@ intent = "address"
 head = "pr.head"
 ```
 
-`handled` compares by the fact's type: a string is a version, handled by the same value; a time or an int is a watermark, handled up to the stored one, which a later run never moves back. A unit with no such mark has handled nothing, and an empty fact (an empty string, a zero time) counts as handled, since there is nothing to handle. A workflow writes only its own marks. It may read any mark a loaded workflow records, and these of the GitHub plugin, on a pull request you develop: `addressed.conflict` and `addressed.checks` (the head an address round covered, read with `pr.head`) and `addressed.reviews` (the newest review it triaged, a time). The mark's name is a string literal, checked when the profile loads. A mark name has no slash, space or control character.
+`handled` compares by the fact's type: a string is a version, handled by the same value; a time or an int is a watermark, handled up to the stored one, which a later run never moves back. A unit with no such mark has handled nothing, and an empty fact (an empty string, a zero time) counts as handled, since there is nothing to handle. A workflow writes only its own marks. It may read any mark a loaded workflow records, and the marks the plugins declare, listed on the [facts](/reference/facts/#marks) page. The mark's name is a string literal, checked when the profile loads. A mark name has no slash, space or control character.
 
 ## Checking
 

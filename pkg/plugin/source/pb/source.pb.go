@@ -5789,8 +5789,14 @@ type ApplyEffectRequest struct {
 	Effect string                 `protobuf:"bytes,2,opt,name=effect,proto3" json:"effect,omitempty"`
 	Unit   *pb.Unit               `protobuf:"bytes,3,opt,name=unit,proto3" json:"unit,omitempty"`
 	// turn is set for a turn effect, draft for a draft effect.
-	Turn          *TurnRef `protobuf:"bytes,4,opt,name=turn,proto3" json:"turn,omitempty"`
-	Draft         *Draft   `protobuf:"bytes,5,opt,name=draft,proto3" json:"draft,omitempty"`
+	Turn  *TurnRef `protobuf:"bytes,4,opt,name=turn,proto3" json:"turn,omitempty"`
+	Draft *Draft   `protobuf:"bytes,5,opt,name=draft,proto3" json:"draft,omitempty"`
+	// route is how a turn effect's turn went out: session, asked or launch.
+	Route string `protobuf:"bytes,6,opt,name=route,proto3" json:"route,omitempty"`
+	// taken says the agent was seen taking the turn.
+	Taken bool `protobuf:"varint,7,opt,name=taken,proto3" json:"taken,omitempty"`
+	// inputs are the turn's inputs as a JSON object.
+	Inputs        []byte `protobuf:"bytes,8,opt,name=inputs,proto3" json:"inputs,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -5856,6 +5862,27 @@ func (x *ApplyEffectRequest) GetTurn() *TurnRef {
 func (x *ApplyEffectRequest) GetDraft() *Draft {
 	if x != nil {
 		return x.Draft
+	}
+	return nil
+}
+
+func (x *ApplyEffectRequest) GetRoute() string {
+	if x != nil {
+		return x.Route
+	}
+	return ""
+}
+
+func (x *ApplyEffectRequest) GetTaken() bool {
+	if x != nil {
+		return x.Taken
+	}
+	return false
+}
+
+func (x *ApplyEffectRequest) GetInputs() []byte {
+	if x != nil {
+		return x.Inputs
 	}
 	return nil
 }
@@ -10390,13 +10417,16 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"\aTurnRef\x12\x10\n" +
 	"\x03seq\x18\x01 \x01(\x03R\x03seq\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12\x12\n" +
-	"\x04head\x18\x03 \x01(\tR\x04head\"\xde\x01\n" +
+	"\x04head\x18\x03 \x01(\tR\x04head\"\xa2\x02\n" +
 	"\x12ApplyEffectRequest\x12)\n" +
 	"\x04call\x18\x01 \x01(\v2\x15.wloop.source.v1.CallR\x04call\x12\x16\n" +
 	"\x06effect\x18\x02 \x01(\tR\x06effect\x12)\n" +
 	"\x04unit\x18\x03 \x01(\v2\x15.wloop.plugin.v1.UnitR\x04unit\x12,\n" +
 	"\x04turn\x18\x04 \x01(\v2\x18.wloop.source.v1.TurnRefR\x04turn\x12,\n" +
-	"\x05draft\x18\x05 \x01(\v2\x16.wloop.source.v1.DraftR\x05draft\"\x15\n" +
+	"\x05draft\x18\x05 \x01(\v2\x16.wloop.source.v1.DraftR\x05draft\x12\x14\n" +
+	"\x05route\x18\x06 \x01(\tR\x05route\x12\x14\n" +
+	"\x05taken\x18\a \x01(\bR\x05taken\x12\x16\n" +
+	"\x06inputs\x18\b \x01(\fR\x06inputs\"\x15\n" +
 	"\x13ApplyEffectResponse\"k\n" +
 	"\x10ProposalsRequest\x12)\n" +
 	"\x04call\x18\x01 \x01(\v2\x15.wloop.source.v1.CallR\x04call\x12,\n" +

@@ -6,7 +6,6 @@ import (
 	"slices"
 	"time"
 
-	sdk "github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/github/nudge"
 	"github.com/wloophq/wloop/plugins/github/pr"
@@ -65,23 +64,14 @@ func (r *running) texts(ctx context.Context) (nudge.Texts, error) {
 	return nudge.ParseTexts(string(raw))
 }
 
-// ApplyEffect applies a draft's pr.nudged, which the publisher recorded as
-// it posted.
-func (p *Plugin) ApplyEffect(_ context.Context, req src.EffectRequest) error {
-	if req.Draft != nil && req.Effect == nudge.EffectNudged && slices.Contains(req.Draft.Effects, nudge.EffectNudged) {
+// ApplyEffect applies an effect of the plugin's turns, and a draft's
+// pr.nudged, which the publisher recorded as it posted.
+func (p *Plugin) ApplyEffect(ctx context.Context, req src.EffectRequest) error {
+	switch {
+	case req.Draft != nil && req.Effect == nudge.EffectNudged && slices.Contains(req.Draft.Effects, nudge.EffectNudged):
 		return nil
+	case req.Draft == nil && req.Turn != nil:
+		return p.applyTurnEffect(ctx, req)
 	}
 	return fmt.Errorf("%w: effect %s", src.ErrUnsupported, req.Effect)
-}
-
-func (p *Plugin) Plan(context.Context, sdk.Unit, src.RoundState) (src.Plan, error) {
-	return src.Plan{}, fmt.Errorf("%w: the host plans GitHub's rounds", src.ErrUnsupported)
-}
-
-func (p *Plugin) Payload(context.Context, src.PayloadRequest) (src.PayloadResult, error) {
-	return src.PayloadResult{}, fmt.Errorf("%w: the host builds GitHub's payloads", src.ErrUnsupported)
-}
-
-func (p *Plugin) Placement(context.Context, sdk.Unit, string) (src.Placements, error) {
-	return src.Placements{}, fmt.Errorf("%w: the host places GitHub's work", src.ErrUnsupported)
 }

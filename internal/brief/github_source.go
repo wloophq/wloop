@@ -102,6 +102,9 @@ func (g GitHubSource) Input(ctx context.Context, u unit.Unit) (UnitInput, error)
 	if err != nil {
 		return UnitInput{}, err
 	}
+	if g.Source == nil {
+		return UnitInput{}, fmt.Errorf("brief: %s: no source reads a pull request's input", ref)
+	}
 	in, err := g.Source.Facts(ctx, ref)
 	if err != nil {
 		return UnitInput{}, err

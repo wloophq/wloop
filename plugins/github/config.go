@@ -11,6 +11,7 @@ import (
 
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/github/collect"
+	"github.com/wloophq/wloop/plugins/github/plan"
 	"github.com/wloophq/wloop/plugins/github/scope"
 	"github.com/wloophq/wloop/plugins/github/situation"
 )
@@ -20,6 +21,8 @@ const (
 	defaultFast     = 2 * time.Minute
 	defaultSlow     = time.Hour
 	defaultFraction = 0.5
+	// defaultMaxDiffBytes is brief.max_input_bytes' default.
+	defaultMaxDiffBytes = 60000
 
 	defaultStalledReview = 48 * time.Hour
 	defaultStalledReply  = 24 * time.Hour
@@ -29,6 +32,10 @@ const (
 // needsMeColumn is the semantic status of the board column a workspace
 // waiting on the user sits in.
 const needsMeColumn = "needs-me"
+
+// completedColumn is the semantic status of the board column a finished
+// review workspace sits in.
+const completedColumn = "completed"
 
 // settings are what the plugin reads of the configuration: its
 // [plugins.github] table and the host keys its manifest's config_reads
@@ -40,6 +47,9 @@ type settings struct {
 	// reviewers an address round skips.
 	Ignore  []string
 	Stalled situation.Thresholds
+	Plan    plan.Config
+	// MaxDiffBytes bounds the diff a brief reads.
+	MaxDiffBytes int
 }
 
 type pluginTable struct {
@@ -48,6 +58,14 @@ type pluginTable struct {
 	Scope                scope.Config `json:"scope"`
 	AutomatedReviewers   []string     `json:"automated_reviewers"`
 	AddressSkipReviewers []string     `json:"address_skip_reviewers"`
+	Owners               []string     `json:"owners"`
+	TrustedAuthors       []string     `json:"trusted_authors"`
+	FollowupsWithoutWS   bool         `json:"followups_without_workspace"`
+	AddressWithoutWS     bool         `json:"address_without_workspace"`
+	AddressReviews       *bool        `json:"address_reviews"`
+	AddressChecks        *bool        `json:"address_checks"`
+	IgnoreChecks         []string     `json:"ignore_checks"`
+	AddressConflicts     *bool        `json:"address_conflicts"`
 	Stalled              struct {
 		Review string `json:"review"`
 		Reply  string `json:"reply"`
@@ -63,6 +81,17 @@ type hostKeys struct {
 	Views map[string]struct {
 		Columns map[string]string `json:"columns"`
 	} `json:"views"`
+	Brief struct {
+		MaxInputBytes int `json:"max_input_bytes"`
+	} `json:"brief"`
+	Projects []struct {
+		Match  string `json:"match"`
+		GitHub struct {
+			TrustedAuthors            []string `json:"trusted_authors"`
+			FollowupsWithoutWorkspace *bool    `json:"followups_without_workspace"`
+			AddressWithoutWorkspace   *bool    `json:"address_without_workspace"`
+		} `json:"github"`
+	} `json:"projects"`
 }
 
 // settingsOf reads cfg; a value it does not hold is its default.
@@ -99,6 +128,24 @@ func settingsOf(cfg src.Config) (settings, error) {
 		}
 	}
 	slices.Sort(out.Collect.NeedsMe)
+	out.Plan = plan.Config{ReviewPrefix: out.Collect.ReviewPrefix, Owners: t.Owners, TrustedAuthors: t.TrustedAuthors,
+		FollowupsWithoutWorkspace: t.FollowupsWithoutWS, AddressWithoutWorkspace: t.AddressWithoutWS,
+		AddressReviews: on(t.AddressReviews), AddressChecks: on(t.AddressChecks), AddressConflicts: on(t.AddressConflicts),
+		AddressSkipReviewers: t.AddressSkipReviewers, IgnoreChecks: t.IgnoreChecks, Fast: out.Fast, Slow: out.Collect.Slow}
+	for _, v := range h.Views {
+		if c := v.Columns[completedColumn]; c != "" && !slices.Contains(out.Plan.Completed, c) {
+			out.Plan.Completed = append(out.Plan.Completed, c)
+		}
+	}
+	slices.Sort(out.Plan.Completed)
+	out.MaxDiffBytes = h.Brief.MaxInputBytes
+	if out.MaxDiffBytes <= 0 {
+		out.MaxDiffBytes = defaultMaxDiffBytes
+	}
+	for _, p := range h.Projects {
+		out.Plan.Projects = append(out.Plan.Projects, plan.Project{Match: p.Match, TrustedAuthors: p.GitHub.TrustedAuthors,
+			FollowupsWithoutWorkspace: p.GitHub.FollowupsWithoutWorkspace, AddressWithoutWorkspace: p.GitHub.AddressWithoutWorkspace})
+	}
 	out.Ignore = slices.Concat(t.AutomatedReviewers, t.AddressSkipReviewers)
 	for _, th := range []struct {
 		key  string
@@ -113,6 +160,9 @@ func settingsOf(cfg src.Config) (settings, error) {
 	}
 	return out, nil
 }
+
+// on is b, true when unset: the address rounds' switches default on.
+func on(b *bool) bool { return b == nil || *b }
 
 // durationOr reads s, a Go duration or a whole number of days such as 7d,
 // the configuration's grammar; def when s is empty.

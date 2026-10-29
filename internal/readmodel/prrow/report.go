@@ -23,14 +23,59 @@ type Report struct {
 	Facets    map[string][]string
 	Card      *src.Card
 	Items     []src.Item
-	// Facts are the workflow facts that read the pull request alone.
+	// Facts are the workflow facts that read the pull request alone, and
+	// the planner's.
 	Facts []src.Fact
+	// Plan is the planner's rank of the pull request and what the board
+	// reads of its workspaces.
+	Plan Plan
+}
+
+// Plan is the planner's part of a report.
+type Plan struct {
+	Rank  Rank  `json:"rank"`
+	Board Board `json:"board"`
+}
+
+// Rank orders units as the planner plans their rounds, lowest first.
+type Rank struct {
+	Path int       `json:"path"`
+	At   time.Time `json:"at,omitzero"`
+	Idx  int       `json:"idx,omitempty"`
+}
+
+// Compare orders a before b.
+func (a Rank) Compare(b Rank) int {
+	if a.Path != b.Path {
+		return a.Path - b.Path
+	}
+	if c := a.At.Compare(b.At); c != 0 {
+		return c
+	}
+	return a.Idx - b.Idx
+}
+
+// Board is what the board reads of a pull request's workspaces: whether a
+// workspace targets it, a review one or an author one free of an address
+// round, and the author workspace an author card reads its checkout from.
+type Board struct {
+	Carded          bool      `json:"carded,omitempty"`
+	ReviewWorkspace bool      `json:"review_workspace,omitempty"`
+	AuthorWorkspace bool      `json:"author_workspace,omitempty"`
+	Checkout        *Checkout `json:"checkout,omitempty"`
+}
+
+// Checkout is a local workspace an author card reads.
+type Checkout struct {
+	ID   string `json:"id"`
+	Path string `json:"path"`
 }
 
 // reportData is the part of the plugin's snapshot data a row reads.
 type reportData struct {
-	PR  dinv.PR  `json:"pr"`
-	Row *Payload `json:"row"`
+	PR   dinv.PR  `json:"pr"`
+	Row  *Payload `json:"row"`
+	Plan *Plan    `json:"plan"`
 }
 
 // ReportOf is the report snapshot s carries; false for a snapshot with no
@@ -48,6 +93,11 @@ func ReportOf(s src.Snapshot) (Report, bool, error) {
 	}
 	out := Report{PR: d.PR, Situation: *s.Situation, Payload: *d.Row, Views: slices.Clone(s.Views), Facets: map[string][]string{},
 		Card: s.Card, Items: s.Items, Facts: s.Facts}
+	if d.Plan != nil {
+		out.Plan = *d.Plan
+	} else {
+		out.Plan.Rank.Path = 3
+	}
 	for id, v := range s.Facets {
 		out.Facets[id] = []string{v}
 	}

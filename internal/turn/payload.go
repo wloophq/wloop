@@ -2,6 +2,7 @@ package turn
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/wloophq/wloop/internal/core/instructions"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -29,6 +30,12 @@ type Wording struct {
 // Slack thread's messages; the instructions quote it as data.
 type Contents interface {
 	Contents() string
+}
+
+// DataPayload is a payload that carries its plugin's data, which the
+// templates read under the payload root the plugin's manifest names.
+type DataPayload interface {
+	Data() json.RawMessage
 }
 
 func contents(p any) string {

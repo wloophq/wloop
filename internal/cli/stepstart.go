@@ -41,18 +41,12 @@ const (
 )
 
 // plannedRound is a round of the unit's plugin plan, with what the host
-// resolves of it: its workspace, and the pull request as an in-process
-// planner read it, for its turn.
+// resolves of it: its workspace, and the pull request as the host keeps
+// what the plugin reported, for its turn.
 type plannedRound struct {
 	src.Round
 	ws   wsdomain.Workspace
 	read dinv.PlanFacts
-}
-
-// prReader is an in-process GitHub planner's read of the pull request the
-// rounds it plans are sent with.
-type prReader interface {
-	PlanFacts(ctx context.Context, u unit.Unit) (dinv.PlanFacts, error)
 }
 
 // refusalBriefNotReady starts the refusal of a round whose brief is not
@@ -213,10 +207,8 @@ func (s *stepSet) plan(ctx context.Context, u unit.Unit, name string) (plannedRo
 		return plannedRound{}, false, nil
 	}
 	out := plannedRound{Round: plan.Rounds[i], ws: s.workspaceOf(ctx, plan.Rounds[i].Workspace)}
-	if r, ok := pl.(prReader); ok {
-		if out.read, err = r.PlanFacts(ctx, u); err != nil {
-			return plannedRound{}, false, err
-		}
+	if out.read, err = s.e.keptPR(ctx, u); err != nil {
+		return plannedRound{}, false, err
 	}
 	return out, true, nil
 }

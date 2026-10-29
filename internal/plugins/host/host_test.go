@@ -418,3 +418,35 @@ func TestAnUntrustedBinaryIsRefused(t *testing.T) {
 		})
 	}
 }
+
+func TestAHostsShutdownLeavesAnotherHostsPlugin(t *testing.T) {
+	root := t.TempDir()
+	linkPlugin(t, root, "acme")
+	ps, err := host.Discover(host.Root{Dir: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runs, _, err := host.Runs(ps, settings{trust: map[string]string{"acme": host.TrustPath}}, nil, []string{childEnv + "=source"}, hclog.NewNullLogger())
+	if err != nil || len(runs) != 1 {
+		t.Fatalf("runs %v, %v", runs, err)
+	}
+	start := func() (*pids, *host.Host, context.CancelFunc) {
+		l, k := &pids{}, sourceKind(t)
+		h := &host.Host{Launcher: l, Kinds: []host.Kind{k}}
+		ctx, cancel := context.WithCancel(context.Background())
+		h.Start(ctx, runs)
+		eventually(t, "the plugin runs", func() bool { _, err := k.Client("acme"); return err == nil })
+		return l, h, cancel
+	}
+	_, first, stopFirst := start()
+	other, second, stopSecond := start()
+	t.Cleanup(func() {
+		stopSecond()
+		second.Wait()
+	})
+	stopFirst()
+	first.Wait()
+	if pid := other.all()[0]; !alive(pid) {
+		t.Fatalf("the other host's plugin %d was killed", pid)
+	}
+}

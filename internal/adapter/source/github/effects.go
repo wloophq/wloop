@@ -1,8 +1,5 @@
 package ghsource
 
-// The effects of the plugin's turns and drafts, as its manifest declares them.
-const (
-	EffectReviewed  = "pr.reviewed"
-	EffectAddressed = "pr.addressed"
-	EffectNudged    = "pr.nudged"
-)
+// EffectNudged is the GitHub plugin's draft effect the in-process
+// publisher and proposals read, as its manifest declares it.
+const EffectNudged = "pr.nudged"

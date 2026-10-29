@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
+	factsgithub "github.com/wloophq/wloop/internal/adapter/facts/github"
 	"github.com/wloophq/wloop/internal/adapter/gitcheck"
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/source/github/present"
@@ -367,19 +368,23 @@ func (s syncedInputs) Viewer(ctx context.Context) (string, error) {
 	if err := s.te.syncInventory(ctx); err != nil {
 		return "", err
 	}
-	return storeInputs{s.te.Store}.Viewer(ctx)
+	return s.te.Env.reportedInputs().Viewer(ctx)
 }
 
 func (s syncedInputs) Rows(ctx context.Context) ([]dinv.PR, error) {
-	return storeInputs{s.te.Store}.Rows(ctx)
+	return s.te.Env.reportedInputs().Rows(ctx)
 }
 
 func (s syncedInputs) Facts(ctx context.Context, rows []dinv.PR, viewer string) (map[unit.Unit]dinv.PlanFacts, error) {
-	return storeInputs{s.te.Store}.Facts(ctx, rows, viewer)
+	return s.te.Env.reportedInputs().Facts(ctx, rows, viewer)
 }
 
 func (s syncedInputs) Ended(ctx context.Context, kind string, units []unit.Unit) (map[unit.Unit]bool, error) {
-	return storeInputs{s.te.Store}.Ended(ctx, kind, units)
+	return s.te.Env.reportedInputs().Ended(ctx, kind, units)
+}
+
+func (s syncedInputs) PR(ctx context.Context, ref pr.Ref) (dinv.PR, bool, error) {
+	return s.te.Env.reportedInputs().PR(ctx, ref)
 }
 
 // fakeGit serves read commands from canned values and records the rest.
@@ -599,21 +604,22 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 		cfg: (&Env{}).defaultConfig(),
 	}
 	te.Env = &Env{
-		background: &sync.WaitGroup{},
-		Out:        te.out,
-		Err:        te.err,
-		github:     githubClients{Clients: ghsource.Clients{GH: ghcli.Metered(te.gh), API: githubtest.Runner(te.gh)}},
-		Git:        gitx.Git{R: te.git},
-		Files:      checkoutFiles{ws},
-		WS:         workspace.NewSet(ws),
-		Sh:         func(context.Context, string, ...string) ([]byte, error) { return nil, fmt.Errorf("no shell in tests") },
-		Stdout:     func(context.Context, string, ...string) ([]byte, error) { return nil, fmt.Errorf("no shell in tests") },
-		LoadConfig: func() (config.Config, error) { return te.cfg, nil },
-		ConfigPath: t.TempDir() + "/config.toml",
-		StateDir:   t.TempDir(),
-		Home:       t.TempDir(),
-		Now:        func() time.Time { return testNow },
-		Getenv:     func(string) string { return "" },
+		effectProblems: &effectProblems{},
+		background:     &sync.WaitGroup{},
+		Out:            te.out,
+		Err:            te.err,
+		github:         githubClients{Clients: ghsource.Clients{GH: ghcli.Metered(te.gh), API: githubtest.Runner(te.gh)}},
+		Git:            gitx.Git{R: te.git},
+		Files:          checkoutFiles{ws},
+		WS:             workspace.NewSet(ws),
+		Sh:             func(context.Context, string, ...string) ([]byte, error) { return nil, fmt.Errorf("no shell in tests") },
+		Stdout:         func(context.Context, string, ...string) ([]byte, error) { return nil, fmt.Errorf("no shell in tests") },
+		LoadConfig:     func() (config.Config, error) { return te.cfg, nil },
+		ConfigPath:     t.TempDir() + "/config.toml",
+		StateDir:       t.TempDir(),
+		Home:           t.TempDir(),
+		Now:            func() time.Time { return testNow },
+		Getenv:         func(string) string { return "" },
 
 		ViewDebounce: 10 * time.Millisecond,
 		Harness:      harnessOf(map[string]harness.Protocol{"claude": claude.Protocol{}}, defaultManagers()),
@@ -637,6 +643,14 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 	te.served, te.stopServed = context.WithCancel(context.Background())
 	te.Env.intents = newEnvIntents(te.Env)
 	te.Env.planReads = syncedInputs{te}
+	te.Env.payloadPlanner = func() (psource.PayloadPlanner, error) { return te.liveGitHubPlugin() }
+	te.Env.briefReader = func() (briefReader, error) { return te.liveGitHubPlugin() }
+	te.Env.pluginEffects = func(p unit.ProviderID) (effectApplier, bool) {
+		if p != unit.GitHub {
+			return nil, false
+		}
+		return te.githubPluginOf(), true
+	}
 	if ws != nil {
 		te.cfg.WorkspaceManagers = slices.Compact([]string{ws.Name(), "orca"})
 	}
@@ -652,7 +666,9 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 	te.Rounds = sqlite.NewRounds(db)
 	te.Store = inventory.New(db)
 	te.Env.reports = func(st *inventory.Store) readmodel.Reports {
-		return ghreporttest.Inventory{Store: st, Now: func() time.Time { return te.Env.Now() }, Config: func() config.Config { return te.cfg }}
+		return ghreporttest.Inventory{Store: st, Now: func() time.Time { return te.Env.Now() }, Config: func() config.Config { return te.cfg },
+			Plan: &ghreporttest.InventoryPlan{Facts: storeInputs{st}, Rounds: te.Rounds, Books: te.repo, Snapshot: liveSnapshot{te.Env},
+				Git: ghreporttest.GitOf(factsgithub.LocalGit(te.Env.Git), te.Env.Git)}}
 	}
 	te.repo, te.sink = sqlite.New(db), testsink.New("test")
 	te.reg = &testRegistry{Registry: te.repo, Handles: te.repo, noMCP: map[string]bool{}}
@@ -901,4 +917,70 @@ func (te *testEnv) pluginPrepare() func(context.Context, src.ActionRequest) (jso
 	host := b.Host()
 	viewer := func(ctx context.Context) (string, error) { return te.Store.Viewer(ctx, unit.GitHub) }
 	return ghreporttest.Prepare(func() src.Host { return host }, viewer, func() []string { return prrow.IgnoreOf(te.cfg) }, te.Now)
+}
+
+// liveGitHubPlugin is te's GitHub plugin while te's test runs; work the
+// daemon still runs past its end reaches none.
+func (te *testEnv) liveGitHubPlugin() (*src.Client, error) {
+	if err := te.t.Context().Err(); err != nil {
+		return nil, fmt.Errorf("%w: the test ended", src.ErrUnavailable)
+	}
+	return te.githubPluginOf(), nil
+}
+
+// liveSnapshot is the workspace snapshot of e's managers as they are when
+// read; none while they keep no snapshot.
+type liveSnapshot struct{ e *Env }
+
+func (l liveSnapshot) Read(ctx context.Context, want wsdomain.Part) (*wsdomain.Snapshot, error) {
+	if l.e.WS == nil || !l.e.WS.Snapshots() {
+		return nil, nil
+	}
+	return l.e.WS.Read(ctx, want)
+}
+
+// storeInputs are the sweep's pull requests as the inventory stores them.
+type storeInputs struct{ store *inventory.Store }
+
+func (i storeInputs) Viewer(ctx context.Context) (string, error) {
+	return i.store.Viewer(ctx, unit.GitHub)
+}
+
+func (i storeInputs) Rows(ctx context.Context) ([]dinv.PR, error) {
+	return i.store.ListPRs(ctx, false)
+}
+
+// Facts reads the details of rows in one query; a detail of another version
+// gives its facts with a zero ReadAt, as the collector has yet to re-read it.
+func (i storeInputs) Facts(ctx context.Context, rows []dinv.PR, viewer string) (map[unit.Unit]dinv.PlanFacts, error) {
+	refs := make([]pr.Ref, len(rows))
+	for n, row := range rows {
+		refs[n] = row.Ref
+	}
+	details, err := i.store.Details(ctx, refs)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[unit.Unit]dinv.PlanFacts, len(rows))
+	for _, row := range rows {
+		d, ok := details[row.Ref]
+		f := dinv.PlanFacts{Facts: inventory.FactsOf(row, d, viewer)}
+		if ok && d.Version == inventory.DetailVersion {
+			f.ReadAt = d.ReadAt
+		}
+		out[row.Ref.Unit()] = f
+	}
+	return out, nil
+}
+
+func (i storeInputs) Ended(ctx context.Context, kind string, units []unit.Unit) (map[unit.Unit]bool, error) {
+	ended, err := i.store.Ended(ctx, kind, refsOf(units))
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[unit.Unit]bool, len(ended))
+	for ref, ok := range ended {
+		out[ref.Unit()] = ok
+	}
+	return out, nil
 }

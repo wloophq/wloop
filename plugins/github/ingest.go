@@ -17,6 +17,8 @@ import (
 	"github.com/wloophq/wloop/plugins/github/api"
 	"github.com/wloophq/wloop/plugins/github/collect"
 	"github.com/wloophq/wloop/plugins/github/gh"
+	"github.com/wloophq/wloop/plugins/github/git"
+	"github.com/wloophq/wloop/plugins/github/plan"
 	"github.com/wloophq/wloop/plugins/github/pr"
 	"github.com/wloophq/wloop/plugins/github/row"
 	"github.com/wloophq/wloop/plugins/github/store"
@@ -63,6 +65,9 @@ type running struct {
 	// dues are when each pull request's report changes with time alone.
 	dues    map[pr.Ref]time.Time
 	dueWake chan struct{}
+
+	git   plan.Git
+	lists listings
 }
 
 func (p *Plugin) now() time.Time {
@@ -83,6 +88,10 @@ func (p *Plugin) brand() string {
 func (p *Plugin) start(ctx context.Context, db *store.DB, host src.Host) *running {
 	r := &running{now: p.now, db: db, host: host, dirty: map[pr.Ref]bool{}, loop: p.brand(), dues: map[pr.Ref]time.Time{},
 		dueWake: make(chan struct{}, 1)}
+	r.git = p.Git
+	if r.git == nil {
+		r.git = git.Exec{}
+	}
 	if host.Recorder != nil && host.History != nil {
 		db.UseHost(eventHost{host})
 	}
@@ -192,6 +201,10 @@ type Data struct {
 	Tracked       bool          `json:"tracked,omitempty"`
 	// Row is the source part of the pull request's row payload.
 	Row *row.Payload `json:"row,omitempty"`
+	// Adopted says the pull request is taken over into the loop.
+	Adopted bool `json:"adopted,omitempty"`
+	// Plan is the planner's part.
+	Plan *PlanData `json:"plan,omitempty"`
 }
 
 // report reports the pull requests whose rows changed since the last
@@ -239,26 +252,51 @@ func (r *running) report(ctx context.Context, all bool) error {
 // reportChunk bounds the snapshots of one Report call.
 const reportChunk = 200
 
+// snapshots are the reports of refs at now, the planner's facts and data
+// with them; what planning leaves behind is settled with the host.
 func (r *running) snapshots(ctx context.Context, refs []pr.Ref) ([]src.Snapshot, error) {
 	at := r.now()
-	rows, err := r.rows(ctx, refs, at)
+	rows, in, err := r.rowsWith(ctx, refs, at)
 	if err != nil {
 		return nil, err
 	}
+	pin, err := r.planInputs(ctx, refs, in.events, in.books)
+	if err != nil {
+		return nil, err
+	}
+	planner := plan.New(ctx, pin)
+	settled := map[pr.Ref]plan.Settlement{}
 	rev, err := r.nextRev(ctx)
 	if err != nil {
 		return nil, err
 	}
 	var out []src.Snapshot
 	for _, d := range rows {
+		ref := d.row.PR.Ref
+		res, err := planner.Derive(ref)
+		if err != nil {
+			return nil, err
+		}
+		d.data.Plan = &PlanData{Rank: planner.RankOf(ref, res), Board: planner.BoardOf(ref, res)}
+		if x := planner.Settle(ref, res); len(x.Marks)+len(x.Events) > 0 {
+			settled[ref] = x
+		}
 		raw, err := json.Marshal(d.data)
 		if err != nil {
 			return nil, err
 		}
 		s := d.row.Report()
-		s.Unit, s.Rev, s.At, s.Data = d.row.PR.Ref.Unit(), rev, at, raw
+		s.Unit, s.Rev, s.At, s.Data = ref.Unit(), rev, at, raw
+		s.Facts = append(s.Facts, planner.Facts(ref, res)...)
 		out = append(out, s)
-		r.dueAt(d.row.PR.Ref, d.row.Due())
+		due := d.row.Due()
+		if t := res.Due(at); !t.IsZero() && (due.IsZero() || t.Before(due)) {
+			due = t
+		}
+		r.dueAt(ref, due)
+	}
+	if err := r.settle(ctx, settled); err != nil {
+		logf("settling the rounds: %v", err)
 	}
 	return out, nil
 }
@@ -271,21 +309,27 @@ type derived struct {
 
 // rows are the source rows of the stored pull requests of refs at at.
 func (r *running) rows(ctx context.Context, refs []pr.Ref, at time.Time) ([]derived, error) {
+	out, _, err := r.rowsWith(ctx, refs, at)
+	return out, err
+}
+
+// rowsWith are rows, with what they read of the host.
+func (r *running) rowsWith(ctx context.Context, refs []pr.Ref, at time.Time) ([]derived, rowInputs, error) {
 	rows, err := r.db.PRs(ctx, refs)
 	if err != nil {
-		return nil, err
+		return nil, rowInputs{}, err
 	}
 	details, err := r.db.Details(ctx, refs)
 	if err != nil {
-		return nil, err
+		return nil, rowInputs{}, err
 	}
 	tracked, err := r.db.Tracked(ctx)
 	if err != nil {
-		return nil, err
+		return nil, rowInputs{}, err
 	}
 	in, err := r.rowInputs(ctx, refs)
 	if err != nil {
-		return nil, err
+		return nil, rowInputs{}, err
 	}
 	var out []derived
 	for _, ref := range refs {
@@ -295,9 +339,9 @@ func (r *running) rows(ctx context.Context, refs []pr.Ref, at time.Time) ([]deri
 		}
 		o, err := r.db.Override(ctx, ref)
 		if err != nil {
-			return nil, err
+			return nil, rowInputs{}, err
 		}
-		d := Data{PR: p, Tracked: slices.Contains(tracked, ref)}
+		d := Data{PR: p, Tracked: slices.Contains(tracked, ref), Adopted: o.Adopted}
 		ri := in.of(ref)
 		ri.PR, ri.Override, ri.Now = p, o, at
 		if det, ok := details[ref]; ok {
@@ -308,7 +352,7 @@ func (r *running) rows(ctx context.Context, refs []pr.Ref, at time.Time) ([]deri
 		d.Row = &x.Payload
 		out = append(out, derived{row: x, data: d})
 	}
-	return out, nil
+	return out, in, nil
 }
 
 // rowInputs are what the rows of refs read besides their pull requests:
@@ -318,6 +362,7 @@ type rowInputs struct {
 	base      row.Input
 	events    map[pr.Ref][]pr.Event
 	addressed map[pr.Ref]time.Time
+	books     map[pr.Ref]src.Book
 }
 
 func (in rowInputs) of(ref pr.Ref) row.Input {
@@ -339,7 +384,8 @@ func (r *running) rowInputs(ctx context.Context, refs []pr.Ref) (rowInputs, erro
 	cfg := r.cfg
 	r.cfgMu.Unlock()
 	out := rowInputs{base: row.Input{Viewer: viewer, Teams: teams, Ignore: cfg.Ignore, Stalled: cfg.Stalled, Loop: r.loop,
-		MaxDetailAge: cfg.Collect.Slow + 2*cfg.Fast}, events: map[pr.Ref][]pr.Event{}, addressed: map[pr.Ref]time.Time{}}
+		MaxDetailAge: cfg.Collect.Slow + 2*cfg.Fast}, events: map[pr.Ref][]pr.Event{}, addressed: map[pr.Ref]time.Time{},
+		books: map[pr.Ref]src.Book{}}
 	units := make([]sdk.Unit, len(refs))
 	for i, ref := range refs {
 		units[i] = ref.Unit()
@@ -364,6 +410,7 @@ func (r *running) rowInputs(ctx context.Context, refs []pr.Ref) (rowInputs, erro
 		}
 		for _, b := range books {
 			if ref, ok := pr.RefOf(b.Unit); ok {
+				out.books[ref] = b
 				if at, ok := addressedAt(b); ok {
 					out.addressed[ref] = at
 				}
@@ -556,6 +603,7 @@ func (p *Plugin) Ingest(ctx context.Context, req src.IngestRequest) (src.IngestR
 	var rep collect.Report
 	switch req.Job {
 	case JobFast:
+		r.lists.forget()
 		rep, err = r.col.Fast(ctx)
 	case JobSlow:
 		rep, err = r.col.Slow(ctx)

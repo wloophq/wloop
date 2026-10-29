@@ -14,12 +14,15 @@ import (
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/sweep"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/readmodel"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	ghplugin "github.com/wloophq/wloop/plugins/github"
+	"github.com/wloophq/wloop/plugins/github/plan"
 	ghpr "github.com/wloophq/wloop/plugins/github/pr"
 	"github.com/wloophq/wloop/plugins/github/row"
 	"github.com/wloophq/wloop/plugins/github/situation"
@@ -43,13 +46,17 @@ type Env struct {
 type Input struct {
 	PR     dinv.PR
 	Events []dinv.Event
-	// Adopted and Tracked are the plugin's overrides of the pull request.
-	Adopted, Tracked bool
+	// Adopted and Tracked are the plugin's overrides of the pull request;
+	// Held is the user's hold of its rounds.
+	Adopted, Tracked, Held bool
 	// AddressedAt is when its driving address turn reached its state.
 	AddressedAt time.Time
 	// Facts are its detail as the host's planner reads it; nil before a
 	// full read.
 	Facts *dinv.PlanFacts
+	// PlanFacts are its detail as the plugin's planner alone reads it; nil
+	// is Facts.
+	PlanFacts *dinv.PlanFacts
 }
 
 // Snapshot is the snapshot the plugin reports of in under env.
@@ -129,6 +136,19 @@ type Inventory struct {
 	// Identity is the viewer as the plugin names them; nil reads the viewer
 	// and teams the inventory keeps.
 	Identity func(ctx context.Context) (src.Identity, error)
+	// Plan is what the plugin's planner reads of the host; nil reports no
+	// planner facts.
+	Plan *InventoryPlan
+}
+
+// InventoryPlan are the host's state the plugin's planner reads, as a host
+// test holds it.
+type InventoryPlan struct {
+	Facts    dinv.PlanInputs
+	Rounds   sweep.Rounds
+	Books    sweep.Books
+	Snapshot sweep.Snapshot
+	Git      plan.Git
 }
 
 var _ readmodel.Reports = Inventory{}
@@ -152,6 +172,9 @@ func (i Inventory) Units(ctx context.Context, p unit.ProviderID) ([]unit.Unit, e
 }
 
 func (i Inventory) Reported(ctx context.Context, units []unit.Unit) (map[unit.Unit]src.Snapshot, error) {
+	if i.Plan != nil {
+		return i.planned(ctx, units)
+	}
 	env, ins, err := i.inputs(ctx, units)
 	if err != nil {
 		return nil, err
@@ -159,6 +182,67 @@ func (i Inventory) Reported(ctx context.Context, units []unit.Unit) (map[unit.Un
 	out := make(map[unit.Unit]src.Snapshot, len(ins))
 	for _, in := range ins {
 		out[in.PR.Ref.Unit()] = Snapshot(env, in)
+	}
+	return out, nil
+}
+
+// planned are the reports of units, the planner's facts included, which
+// reads every pull request i holds.
+func (i Inventory) planned(ctx context.Context, units []unit.Unit) (map[unit.Unit]src.Snapshot, error) {
+	all, err := i.Units(ctx, unit.GitHub)
+	if err != nil {
+		return nil, err
+	}
+	env, ins, err := i.inputs(ctx, all)
+	if err != nil {
+		return nil, err
+	}
+	overrides, err := i.Store.Overrides(ctx)
+	if err != nil {
+		return nil, err
+	}
+	prs := make([]dinv.PR, len(ins))
+	for n, x := range ins {
+		prs[n] = x.PR
+	}
+	facts, err := i.Plan.Facts.Facts(ctx, prs, env.Viewer)
+	if err != nil {
+		return nil, err
+	}
+	for n, x := range ins {
+		ins[n].Held = overrides[x.PR.Ref].Hold
+		if f, ok := facts[x.PR.Ref.Unit()]; ok {
+			ins[n].PlanFacts = &f
+		}
+	}
+	pe := PlanEnv{Git: i.Plan.Git, Config: config.Defaults()}
+	if i.Config != nil {
+		pe.Config = i.Config()
+	}
+	if i.Plan.Rounds != nil {
+		if pe.Rounds, err = i.Plan.Rounds.Load(ctx); err != nil {
+			return nil, err
+		}
+		if pe.Pause, err = i.Plan.Rounds.Pause(ctx); err != nil {
+			return nil, err
+		}
+	}
+	if i.Plan.Books != nil {
+		if pe.Books, err = i.Plan.Books.Books(ctx); err != nil {
+			return nil, err
+		}
+	}
+	if i.Plan.Snapshot != nil {
+		if pe.Snapshot, err = i.Plan.Snapshot.Read(ctx, wsdomain.PartAll); err != nil {
+			return nil, err
+		}
+	}
+	reported := Planned(env, pe, ins)
+	out := make(map[unit.Unit]src.Snapshot, len(units))
+	for _, u := range units {
+		if s, ok := reported[u]; ok {
+			out[u] = s
+		}
 	}
 	return out, nil
 }

@@ -1155,3 +1155,13 @@ func pluginPrepare(host func() src.Host, h PresenterHost) func(context.Context, 
 	}
 	return ghreporttest.Prepare(host, viewer, ignore, now)
 }
+
+func TestHealthListsTheUnappliedTurnEffects(t *testing.T) {
+	t.Parallel()
+	s := newServer(t)
+	s.deps.EffectWarnings = func() []string { return []string{"acme/api#7: the plugin applies no pr.reviewed"} }
+	var h api.Health
+	if code := get(t, s, "/api/health", &h); code != 200 || !slices.Contains(h.Warnings, "acme/api#7: the plugin applies no pr.reviewed") {
+		t.Fatalf("%d %+v", code, h.Warnings)
+	}
+}

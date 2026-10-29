@@ -17,14 +17,12 @@ import (
 // providerRowExceptions are the core rows that still key a value by a
 // plugin's id, each with why the manifest cannot hold it yet.
 var providerRowExceptions = map[string]string{
-	"brief.kind": "GitHub's brief taxonomy closes the fact on its units; plugin.toml has no key for a plugin's brief kinds until X8c2 moves the brief source",
+	"brief.kind": "GitHub's brief taxonomy closes the fact on its units; plugin.toml has no key for a plugin's brief kinds while the host's queue briefs pull requests",
 }
 
 // pluginDomainExceptions are the plugin domains builtin still imports, each
 // with why and the task that removes the import.
-var pluginDomainExceptions = map[string]string{
-	"internal/domain/round": "Marks names GitHub's round marks; X8c2 moves the mark names beside the round planner",
-}
+var pluginDomainExceptions = map[string]string{}
 
 // modulePath is the module, whose packages the imports name.
 var modulePath = reflect.TypeFor[Fact]().PkgPath()[:strings.Index(reflect.TypeFor[Fact]().PkgPath(), "/internal/")]

@@ -168,6 +168,15 @@ func effectTable() string {
 	return b.String()
 }
 
+func markTable() string {
+	var b strings.Builder
+	b.WriteString("| Mark | Unit | Covers |\n|---|---|---|\n")
+	for _, m := range builtin.Marks {
+		fmt.Fprintf(&b, "| `%s` | %s | %s |\n", m.Name, m.Provider, cell(m.Doc))
+	}
+	return b.String()
+}
+
 func provider(slot string) string {
 	for p, s := range builtin.Slots {
 		if s == slot {
@@ -218,6 +227,9 @@ func page() (string, error) {
 		"## Draft effects", "",
 		"What a sent draft applies, once: the names a `draft.propose` step lists in `effects` and an intent lists in `[drafts] allowed_effects`. A turn's own `effects` are on the [language](/reference/language/) page.",
 		"", effectTable(),
+		"## Marks", "",
+		"The marks the plugins' rounds write that a workflow's `when` may read with `handled(\"<name>\", <fact>)`, besides those a loaded workflow records. A plugin declares them in its manifest's `[[source.marks]]`.",
+		"", markTable(),
 		"This page is generated from the binary's fact registry by `make docs-ref`.",
 	)
 	return strings.Join(out, "\n") + "\n", nil

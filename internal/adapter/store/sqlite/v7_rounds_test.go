@@ -3,8 +3,6 @@ package sqlite
 import (
 	"context"
 	"testing"
-
-	"github.com/wloophq/wloop/internal/domain/round"
 )
 
 func TestV7RoundsKeepsASkippedFirstRoundAsAMark(t *testing.T) {
@@ -18,13 +16,13 @@ func TestV7RoundsKeepsASkippedFirstRoundAsAMark(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := st.Mark("acme/api#1", round.FirstSkipped); got != "1" {
+	if got := st.Mark("acme/api#1", "first.skipped"); got != "1" {
 		t.Errorf("the skipped first round: mark %q", got)
 	}
-	if got := st.Mark("acme/api#2", round.FirstSkipped); got != "" || st.AgentHome("acme/api#1") != "/h" {
+	if got := st.Mark("acme/api#2", "first.skipped"); got != "" || st.AgentHome("acme/api#1") != "/h" {
 		t.Errorf("the other pull request: mark %q, home %q", got, st.AgentHome("acme/api#1"))
 	}
-	if v6FirstSkipped != round.FirstSkipped {
-		t.Errorf("the migration writes %q, the planner reads %q", v6FirstSkipped, round.FirstSkipped)
+	if v6FirstSkipped != "first.skipped" {
+		t.Errorf("the migration writes %q, the planner reads %q", v6FirstSkipped, "first.skipped")
 	}
 }

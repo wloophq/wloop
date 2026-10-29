@@ -149,10 +149,16 @@ func (e *Env) withGitHubClient(d source.Deps) source.Deps {
 	return d
 }
 
-// withGitHubBriefs is d briefing pull requests read from GitHub, under its
-// budget.
+// withGitHubBriefs is d briefing pull requests the GitHub plugin reads,
+// under its budget.
 func (e *Env) withGitHubBriefs(d brief.Deps) brief.Deps {
-	d.Source, d.Allow = brief.Source{GitHub: e.github.API}, e.github.API.Allow
+	d.Source = newBriefInputs(func() (briefReader, error) {
+		if e.briefReader != nil {
+			return e.briefReader()
+		}
+		return e.githubPlugin()
+	})
+	d.Allow = e.github.API.Allow
 	return d
 }
 
@@ -275,38 +281,37 @@ func (e *Env) forgeBasics(ctx context.Context, ref pr.Ref) (*pr.PullRequest, err
 	return &basics, nil
 }
 
-// clearFingerprint forgets the reviews the address rounds on ref covered, so
-// a pull request taken over starts its triage from none of them.
-func (e *Env) clearFingerprint(ctx context.Context, ref pr.Ref) error {
-	if e.Rounds == nil {
-		return nil
-	}
-	st, err := e.Rounds.Load(ctx)
+// The GitHub plugin's round marks the command line's in-process GitHub
+// paths still read and write.
+const (
+	markFirstSkipped      = ghsource.MarkFirstSkipped
+	markAddressedReviews  = ghsource.MarkAddressedReviews
+	markAddressedChecks   = ghsource.MarkAddressedChecks
+	markAddressedConflict = ghsource.MarkAddressedConflict
+)
+
+// reportedPRs are the pull requests the GitHub plugin last reported.
+type reportedPRs interface {
+	dinv.PlanInputs
+	PR(ctx context.Context, ref pr.Ref) (dinv.PR, bool, error)
+}
+
+// reportedInputs are the pull requests the GitHub plugin last reported, as
+// the host's facts, holdings, placements and round sends read them.
+func (e *Env) reportedInputs() reportedPRs {
+	return ghsource.ReportedInputs{Reports: e.sourceReports(e.Store), Store: e.Store}
+}
+
+// adoptInPlugin has the GitHub plugin take ref over, its basics as read:
+// it keeps the adoption and forgets the reviews the address rounds on ref
+// covered, so the pull request starts its triage from none of them.
+func (e *Env) adoptInPlugin(ctx context.Context, ref pr.Ref, basics *pr.PullRequest) error {
+	args, err := json.Marshal(basics)
 	if err != nil {
 		return err
 	}
-	marks := ghsource.TakenOverMarks()
-	if !marksChange(st, ref.String(), marks) {
-		return nil
-	}
-	setMarks(st, ref.String(), marks)
-	return e.Rounds.Save(ctx, st)
-}
-
-func marksChange(st *round.Store, key string, marks map[string]string) bool {
-	for name, v := range marks {
-		if st.Mark(key, name) != v {
-			return true
-		}
-	}
-	return false
-}
-
-// recordAddressed marks the reviews so far and the checks and the conflict
-// of head as covered by a round asked for by hand.
-func (e *Env) recordAddressed(st *round.Store, ref pr.Ref, head string) {
-	setMarks(st, ref.String(), ghsource.AddressedMarks(e.Now()))
-	st.SetHeads(ref.String(), head, head)
+	_, err = e.forgeCalls().Action(ctx, src.ActionRequest{Unit: psource.Wire(ref.Unit()), Action: ghsource.ActionAdopt, Args: args})
+	return err
 }
 
 // recordReviewed marks the reviews of full a held review round in ws
@@ -314,17 +319,6 @@ func (e *Env) recordAddressed(st *round.Store, ref pr.Ref, head string) {
 func (e *Env) recordReviewed(st *round.Store, cfg config.Config, ref pr.Ref, ws wsdomain.Workspace, full *pr.PullRequest, viewer string) {
 	setMarks(st, ref.String(), ghsource.ReviewedMarks(dchange.ReviewerInput{PR: full.Facts, Viewer: viewer, WorkspaceStatus: ws.Status,
 		CompletedStatus: e.column(cfg, config.ColumnCompleted), TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.GitHub.TrustedAuthors}))
-}
-
-// reviewedMarks cover what the review round just sent saw, so the sweep
-// plans no follow-up of the same reviews; nil when they cannot be read.
-func (e *Env) reviewedMarks(ctx context.Context, cfg config.Config, ref pr.Ref) map[string]string {
-	full, viewer, err := e.coveredPR(ctx, ref)
-	if err != nil {
-		fmt.Fprintf(e.Err, "warning: %s: reading the reviews the round covers: %v\n", ref, err)
-		return nil
-	}
-	return ghsource.ReviewedMarks(dchange.ReviewerInput{PR: full.Facts, Viewer: viewer, TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.GitHub.TrustedAuthors})
 }
 
 // roundsPaused says whether the pause holds u's rounds: everything is
@@ -351,58 +345,24 @@ func withStore(d daemon.Deps, st *inventory.Store) daemon.Deps {
 // githubBriefs is the brief queue keyed by unit, as the daemon runs it.
 func githubBriefs(q *interruptFirst) present.BriefQueue { return present.BriefQueue{Q: q} }
 
-// githubPayloads is GitHub's turn payload, over the read rounds make.
-func (e *Env) githubPayloads() turn.PayloadReader { return ghsource.TurnPayloads{PRs: basicsReader{e}} }
-
-// nudgedWho is the input nudge.prepare fills with whom the round asks,
-// which pr.nudged records.
-const nudgedWho = "who"
-
-// githubEffects is the GitHub plugin's ApplyEffect while it runs in
-// process: the turn effects of r, a round that went out on route rt. A
-// draft's pr.nudged is the publisher's, applied as it posts.
-type githubEffects struct {
-	rt route
-	r  *sentRound
+// githubPayloads is GitHub's turn payload: the running GitHub plugin's,
+// and the pull request a host round hands the turn.
+func (e *Env) githubPayloads() turn.PayloadReader {
+	return ghsource.TurnPayloads{Plugin: psource.Payloads{ID: string(unit.GitHub), Now: e.Now, Planner: e.githubPayloadPlanner}}
 }
 
-func (g githubEffects) ApplyEffect(ctx context.Context, req src.EffectRequest) error {
-	r := g.r
-	if req.Draft != nil || r == nil {
-		return nil
+// githubPayloadPlanner is the GitHub plugin that builds a turn's payload:
+// the one a test sets, else the running one.
+func (e *Env) githubPayloadPlanner() (psource.PayloadPlanner, error) {
+	if e.payloadPlanner != nil {
+		return e.payloadPlanner()
 	}
-	e := r.env
-	switch req.Effect {
-	case ghsource.EffectNudged:
-		e.recordTurnEvent(ctx, r.ref, dinv.KindNudged, r.id, strings.Join(inputList(r.inputs[nudgedWho]), ", "))
-	case ghsource.EffectReviewed:
-		if g.rt != routeLaunch || !r.submitted {
-			return nil
-		}
-		if marks := e.reviewedMarks(ctx, r.cfg, r.ref); marks != nil {
-			return e.updateRounds(ctx, func(st *round.Store) { setMarks(st, r.ref.String(), marks) })
-		}
-	case ghsource.EffectAddressed:
-		if r.pr == nil {
-			return nil
-		}
-		return e.updateRounds(ctx, func(st *round.Store) { e.recordAddressed(st, r.ref, r.pr.HeadRefOid) })
-	}
-	return nil
+	return e.githubPlugin()
 }
 
-// turnEffects applies the effects of provider p's plugin on a turn r that
-// went out on route rt: the plugin's while it runs, else GitHub's in
-// process; false when neither does.
-func (e *Env) turnEffects(p unit.ProviderID, rt route, r *sentRound) (effectApplier, bool) {
-	if a, ok := e.runningApplier(p); ok {
-		return a, true
-	}
-	if p == unit.GitHub {
-		return githubEffects{rt: rt, r: r}, true
-	}
-	return nil, false
-}
+// turnEffects applies the effects of provider p's plugin while it runs;
+// false when it does not.
+func (e *Env) turnEffects(p unit.ProviderID) (effectApplier, bool) { return e.runningApplier(p) }
 
 // runningApplier is the effect applier of provider p's running plugin.
 func (e *Env) runningApplier(p unit.ProviderID) (effectApplier, bool) {
@@ -418,11 +378,8 @@ func (e *Env) runningApplier(p unit.ProviderID) (effectApplier, bool) {
 	return runningPlanner{kind: e.pluginKind, id: string(p)}, true
 }
 
-// draftAppliers apply the draft effects of each provider's plugin: the
-// running plugin's, else GitHub's in process.
-func (e *Env) draftAppliers() func(p unit.ProviderID) (effectApplier, bool) {
-	return func(p unit.ProviderID) (effectApplier, bool) { return e.turnEffects(p, 0, nil) }
-}
+// draftAppliers apply the draft effects of each provider's running plugin.
+func (e *Env) draftAppliers() func(p unit.ProviderID) (effectApplier, bool) { return e.runningApplier }
 
 // unitConfig is the configuration of u's repository, with the agent home of
 // the session that asked for its rounds when no project sets one.

@@ -93,7 +93,7 @@ func TestADraftsNudgedIsTheOnePublisherRecorded(t *testing.T) {
 	if err := p.ApplyEffect(context.Background(), src.EffectRequest{Effect: nudge.EffectNudged, Draft: &d}); err != nil {
 		t.Fatal(err)
 	}
-	if err := p.ApplyEffect(context.Background(), src.EffectRequest{Effect: nudge.EffectNudged, Turn: &src.TurnRef{ID: "t1"}}); !errors.Is(err, src.ErrUnsupported) {
-		t.Fatalf("a turn's pr.nudged: %v", err)
+	if err := p.ApplyEffect(context.Background(), src.EffectRequest{Effect: nudge.EffectNudged, Turn: &src.TurnRef{ID: "t1"}}); !errors.Is(err, src.ErrUnavailable) {
+		t.Fatalf("a turn's pr.nudged, the planner's to record once started: %v", err)
 	}
 }

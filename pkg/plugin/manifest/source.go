@@ -50,6 +50,7 @@ type SourceVocabulary struct {
 	DraftKinds      []DraftKind `toml:"draft_kinds" doc:"The kinds of the plugin's drafts; the host derives a draft's delivery from its kind."`
 	DefaultDelivery string      `toml:"default_delivery" doc:"The delivery of a draft whose kind names none; one of deliveries."`
 	Signals         []Named     `toml:"signals" doc:"The link signals the plugin reports, read as task.link_signal.<name>."`
+	Marks           []Named     `toml:"marks" doc:"The marks the plugin's rounds write that a workflow may read with handled(); a name has no slash, space or control character."`
 	Kinds           []string    `toml:"kinds" doc:"The task kind values the plugin's units give their tasks."`
 	Situations      []Situation `toml:"situations" doc:"The situations the plugin derives, in the order the cockpit ranks them."`
 	Steps           []string    `toml:"steps" doc:"The core workflow steps that run on the plugin's units, such as \"turn.dismiss\"."`
@@ -313,6 +314,12 @@ func (s *Source) validate() error {
 		}
 		if e.Doc == "" {
 			bad("effect %q: doc is required", e.Name)
+		}
+	}
+	for _, m := range s.Marks {
+		unique("mark", m.Name)
+		if m.Doc == "" {
+			bad("mark %q: doc is required", m.Name)
 		}
 	}
 	named := func(what string, ns []Named) {

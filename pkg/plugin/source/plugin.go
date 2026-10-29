@@ -260,7 +260,7 @@ func (s *server) Payload(ctx context.Context, r *pb.PayloadRequest) (*pb.Payload
 
 func (s *server) ApplyEffect(ctx context.Context, r *pb.ApplyEffectRequest) (*pb.ApplyEffectResponse, error) {
 	return serve[Planner](ctx, s.src, "planner", r.GetCall(), func(ctx context.Context, c Planner) (*pb.ApplyEffectResponse, error) {
-		req := EffectRequest{Effect: r.GetEffect(), Unit: unitGo(r.GetUnit())}
+		req := EffectRequest{Effect: r.GetEffect(), Unit: unitGo(r.GetUnit()), Route: r.GetRoute(), Taken: r.GetTaken(), Inputs: r.GetInputs()}
 		if t := r.GetTurn(); t != nil {
 			req.Turn = &TurnRef{Seq: t.GetSeq(), ID: t.GetId(), Head: t.GetHead()}
 		}

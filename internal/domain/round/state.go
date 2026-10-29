@@ -7,22 +7,6 @@ import (
 	"time"
 )
 
-// The marks the rounds of a pull request write, by what they covered.
-const (
-	// Reviewed is my last review and the head on a PR I review.
-	Reviewed = "reviewed"
-	// AddressedReviews is the newest review triaged on a PR I develop.
-	AddressedReviews = "addressed.reviews"
-	// AddressedChecks is the head whose failing checks a triage round covered.
-	AddressedChecks = "addressed.checks"
-	// AddressedConflict is the head whose conflict with the base a triage
-	// round covered.
-	AddressedConflict = "addressed.conflict"
-	// FirstSkipped is set when the user skipped the automatic first round;
-	// the planner plans no other one.
-	FirstSkipped = "first.skipped"
-)
-
 type PR struct {
 	// Marks are what the rounds covered, by mark name; see mark.Handled.
 	Marks  map[string]string
@@ -178,17 +162,6 @@ func (s *Store) SetAgentHome(key, dir string) {
 	s.set(key, FieldAgentHome, func(p *PR) { p.AgentHome = dir })
 }
 
-// SetHeads marks the failing checks and the conflict of the heads an
-// address round covered; an empty head leaves its mark as it was.
-func (s *Store) SetHeads(key, checksHead, conflictHead string) {
-	if checksHead != "" {
-		s.SetMark(key, AddressedChecks, checksHead)
-	}
-	if conflictHead != "" {
-		s.SetMark(key, AddressedConflict, conflictHead)
-	}
-}
-
 // RecordSent notes an automated round sent, spends one of key's turns of
 // now's day, and sets its mark to fingerprint; an empty fingerprint keeps
 // the mark as it was, for a round no review started.
@@ -211,16 +184,6 @@ func (s *Store) Count(key string, now time.Time) {
 	d.Total++
 	s.Days[day] = d
 	s.changes.Counts = append(s.changes.Counts, Count{Day: day, Key: key})
-}
-
-func (s *Store) FirstRoundSkipped(key string) bool { return s.Mark(key, FirstSkipped) != "" }
-
-func (s *Store) SkipFirstRound(key string) { s.SetMark(key, FirstSkipped, "1") }
-
-func (s *Store) ClearFirstRoundSkipped(key string) {
-	if s.FirstRoundSkipped(key) {
-		s.SetMark(key, FirstSkipped, "")
-	}
 }
 
 // Pause holds every workflow that does not observe and board moves everywhere when

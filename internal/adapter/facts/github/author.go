@@ -3,7 +3,6 @@ package factsgithub
 import (
 	"context"
 	"slices"
-	"strings"
 	"time"
 
 	dchange "github.com/wloophq/wloop/internal/domain/github/change"
@@ -12,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	dview "github.com/wloophq/wloop/internal/domain/view"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 )
 
 // Author is what the views read of u's pull request to project its author
@@ -44,19 +44,18 @@ func (p *Provider) Author(ctx context.Context, u unit.Unit, needLocal bool) (*dv
 	if since, ok := row.ConflictingSince(); ok {
 		af.ConflictingFor = now.Sub(since)
 	}
-	targets := v.targetsOf(ctx)
-	_, af.ReviewWorkspace = targets.review[ref]
-	w, found := targets.author[ref]
-	af.AuthorWorkspace = found && !af.ReviewWorkspace
-	if !found {
-		w, found = findAuthorWorkspace(v.cfg, v.repos, v.workspaces, f.Facts, v.viewer != "" && strings.EqualFold(f.Author, v.viewer))
+	if err := v.loadReports(ctx, []unit.Unit{u}); err != nil {
+		return nil, err
 	}
-	if af.AuthorWorkspace {
-		r, err := v.planner(ctx, now).derive(ref)
-		if err != nil {
-			return nil, err
-		}
-		af.AuthorWorkspace = !r.address.due && r.address.reason != whyPartial
+	var board prrow.Board
+	if rep := v.reportOf(ref); rep != nil {
+		board = rep.Plan.Board
+	}
+	af.ReviewWorkspace, af.AuthorWorkspace = board.ReviewWorkspace, board.AuthorWorkspace
+	found := board.Checkout != nil
+	var w wsdomain.Workspace
+	if found {
+		w = wsdomain.Workspace{ID: board.Checkout.ID, Path: board.Checkout.Path}
 	}
 	if !needLocal || !found {
 		return af, nil
@@ -80,13 +79,18 @@ func (p *Provider) Carded(ctx context.Context) ([]unit.Unit, error) {
 	if err != nil {
 		return nil, err
 	}
-	t := v.targetsOf(ctx)
+	all := make([]unit.Unit, 0, len(v.rows))
+	for _, r := range v.rows {
+		all = append(all, r.Ref.Unit())
+	}
+	if err := v.loadReports(ctx, all); err != nil {
+		return nil, err
+	}
 	var out []unit.Unit
-	for _, m := range []map[pr.Ref]wsdomain.Workspace{t.author, t.review} {
-		for ref := range m {
-			if u := ref.Unit(); !slices.Contains(out, u) {
-				out = append(out, u)
-			}
+	for _, u := range all {
+		ref, _ := refOf(u)
+		if rep := v.reportOf(ref); rep != nil && rep.Plan.Board.Carded {
+			out = append(out, u)
 		}
 	}
 	slices.SortFunc(out, func(a, b unit.Unit) int {

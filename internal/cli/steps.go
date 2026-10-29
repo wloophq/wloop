@@ -534,7 +534,7 @@ func (s *stepSet) target(ctx context.Context, c stepCall) (wsdomain.Workspace, w
 	}
 	info := workspaces.PRInfo{Unit: ref.Unit(), Number: ref.Number, Open: strings.EqualFold(factString(f, "workspace.pr_state"), "open")}
 	if s.e.Store != nil {
-		row, found, err := s.e.Store.PR(ctx, ref)
+		row, found, err := s.e.reportedInputs().PR(ctx, ref)
 		if err != nil {
 			return w, info, err
 		}
@@ -766,7 +766,7 @@ func (b boundRounds) SkipFirstRound(_ context.Context, u unit.Unit) error {
 	if st == nil {
 		return errNoRoundState
 	}
-	st.SkipFirstRound(u.Key)
+	st.SetMark(u.Key, markFirstSkipped, "1")
 	return nil
 }
 

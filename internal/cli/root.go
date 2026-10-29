@@ -38,7 +38,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/gitx"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace"
 	wscd "github.com/wloophq/wloop/internal/workspace/claudedesktop"
 	wsorca "github.com/wloophq/wloop/internal/workspace/orca"
@@ -185,21 +184,14 @@ func siblingFacts(f automation.Units) automation.Units {
 	return nil
 }
 
-// planners are the round planners of the plugins: each built-in module's
-// facts that plan, then each running source plugin that does.
-func (e *Env) planners(mods []source.Module) map[unit.ProviderID]roundPlanner {
+// planners are the round planners of the running source plugins.
+func (e *Env) planners() map[unit.ProviderID]roundPlanner {
 	out := map[unit.ProviderID]roundPlanner{}
-	for _, m := range mods {
-		if p, ok := m.Facts.(roundPlanner); ok {
-			out[m.ID] = p
-		}
+	if e.pluginKind == nil {
+		return out
 	}
 	for _, p := range e.plugins {
-		id := unit.ProviderID(p.ID())
-		if _, built := out[id]; built || e.pluginKind == nil {
-			continue
-		}
-		out[id] = runningPlanner{kind: e.pluginKind, id: p.ID()}
+		out[unit.ProviderID(p.ID())] = runningPlanner{kind: e.pluginKind, id: p.ID()}
 	}
 	return out
 }
@@ -309,7 +301,8 @@ func (e *Env) planBooks() coresweep.Books {
 	return e.Turns.Store
 }
 
-// planInputs are the stored pull requests the facts read.
+// planInputs are the pull requests the facts read: those the GitHub
+// plugin reported.
 func (e *Env) planInputs() dinv.PlanInputs {
 	if e.planReads != nil {
 		return e.planReads
@@ -317,7 +310,7 @@ func (e *Env) planInputs() dinv.PlanInputs {
 	if e.Store == nil {
 		return nil
 	}
-	return storeInputs{e.Store}
+	return e.reportedInputs()
 }
 
 // transcriptOf is the transcript file the hooks stored for the agent session;

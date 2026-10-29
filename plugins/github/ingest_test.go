@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -41,6 +42,8 @@ type githubGraphQL struct {
 	mu     sync.Mutex
 	states map[int]string
 	reads  []int
+	// basics answers the basics read of a pull request; "" answers none.
+	basics string
 }
 
 var prAlias = regexp.MustCompile(`(pr\d+): repository\(owner: "acme", name: "api"\) \{ pullRequest\(number: (\d+)\)`)
@@ -58,6 +61,9 @@ func (g *githubGraphQL) Run(_ context.Context, args ...string) ([]byte, error) {
 			data[m[1]] = json.RawMessage(`{"pullRequest":` + prNode(n, st) + `}`)
 		}
 	}
+	if g.basics != "" && strings.Contains(q, "pr: repository(") {
+		data["pr"] = json.RawMessage(`{"pullRequest":` + g.basics + `}`)
+	}
 	for i := range strings.Count(q, "search(") {
 		data["s"+strconv.Itoa(i)] = json.RawMessage(`{"issueCount":0,"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}`)
 	}
@@ -68,12 +74,15 @@ func (g *githubGraphQL) Run(_ context.Context, args ...string) ([]byte, error) {
 // plugin reports, its events, the configuration and a listing.
 type fakeHost struct {
 	mu      sync.Mutex
+	marks   []map[string]string
 	reports [][]src.Snapshot
 	events  []src.Event
 	topics  [][]sdk.Topic
 	listing src.Listing
 	samples []src.Sample
 	books   []src.Book
+	// profile overrides files of the plugin's profile layer, by path.
+	profile map[string]string
 }
 
 func (h *fakeHost) host() src.Host {
@@ -107,7 +116,19 @@ func (h *fakeHost) RecordEvents(_ context.Context, evs []src.Event) error {
 	return nil
 }
 
-func (*fakeHost) SetMarks(context.Context, sdk.Unit, map[string]string) error { return nil }
+func (h *fakeHost) SetMarks(_ context.Context, _ sdk.Unit, marks map[string]string) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.marks = append(h.marks, maps.Clone(marks))
+	return nil
+}
+
+// markSets are the marks the plugin set, one map a call.
+func (h *fakeHost) markSets() []map[string]string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.marks)
+}
 
 func (*fakeHost) PutBrief(context.Context, src.Brief) error { return nil }
 
@@ -164,8 +185,11 @@ func (*fakeHost) Config(context.Context) (src.Config, error) {
 	return src.Config{Plugin: json.RawMessage(`{"scope":{"people":["ana"]}}`), Host: json.RawMessage(`{"sweep":{"fast":"2m","slow":"1h"}}`)}, nil
 }
 
-// Profile reads the plugin's own profile layer.
-func (*fakeHost) Profile(_ context.Context, path string) ([]byte, error) {
+// Profile reads the plugin's own profile layer, under h.profile.
+func (h *fakeHost) Profile(_ context.Context, path string) ([]byte, error) {
+	if raw, ok := h.profile[path]; ok {
+		return []byte(raw), nil
+	}
 	return os.ReadFile(filepath.Join("profile", filepath.FromSlash(path)))
 }
 
@@ -203,7 +227,7 @@ func (h *fakeHost) kinds(ref pr.Ref) []string {
 // directory with h as its broker, and loaded.
 func started(t *testing.T, gql *githubGraphQL, h *fakeHost) *Plugin {
 	t.Helper()
-	p := &Plugin{GH: &fakeGH{answers: map[string]string{}}, API: apitest.Options(gql), Now: func() time.Time { return testAt }}
+	p := &Plugin{GH: &fakeGH{answers: map[string]string{}}, API: apitest.Options(gql), Now: func() time.Time { return testAt }, Git: noCheckouts{}}
 	ctx := context.Background()
 	if err := p.Start(ctx, src.StartRequest{StateDir: t.TempDir(), Host: h.host()}); err != nil {
 		t.Fatal(err)
@@ -388,4 +412,15 @@ func TestAnEndedPullRequestPastTheWindowIsDroppedAndNeverReportedAgain(t *testin
 	if _, ok, _ := p.store().PR(ctx, old); ok || len(h.reported(old)) != 0 {
 		t.Fatal("the slow job kept or reported a pull request past the window")
 	}
+}
+
+// noCheckouts is git over checkouts that hold no branch.
+type noCheckouts struct{}
+
+func (noCheckouts) Upstream(context.Context, string) (string, error)               { return "", nil }
+func (noCheckouts) LocalBranchTip(context.Context, string, string) (string, error) { return "", nil }
+func (noCheckouts) CheckedOutAt(context.Context, string, string) (string, error)   { return "", nil }
+func (noCheckouts) HasCommit(context.Context, string, string) (bool, error)        { return false, nil }
+func (noCheckouts) IsAncestor(context.Context, string, string, string) (bool, error) {
+	return false, nil
 }

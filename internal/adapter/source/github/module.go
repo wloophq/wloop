@@ -41,22 +41,19 @@ func Module(cfg config.Config, d sourcereg.Deps) (sourcereg.Module, error) {
 		UnitEvents: unitEvents{d.Inventory},
 		UI:         UI(),
 		Detail:     true,
-		Briefs:     brief.GitHubSource{Store: d.Inventory, Source: brief.Source{GitHub: d.GitHub}, MaxDiffBytes: cfg.Brief.MaxInputBytes, Retry: time.Duration(cfg.Sweep.Slow)},
+		Briefs:     brief.GitHubSource{Store: d.Inventory, Retry: time.Duration(cfg.Sweep.Slow)},
 	}, nil
 }
 
 // factsOf is the source's workflow facts over the shared handles.
 func factsOf(cfg config.Config, d sourcereg.Deps) *factsgithub.Provider {
 	fd := factsgithub.Deps{
-		Inputs:   factsgithub.InventoryInputs(d.Inventory),
+		Inputs:   ReportedInputs{Reports: d.Reports, Store: d.Inventory},
 		Store:    d.Inventory,
 		Snapshot: factsgithub.SnapshotOf(d.WS),
 		Git:      factsgithub.LocalGit(d.Git),
-		Branches: d.Git,
 		Cfg:      func() config.Config { return cfg },
-		Sink:     d.Sink,
 		Clock:    d.Clock,
-		Teams:    func(ctx context.Context) ([]string, error) { return MyTeams(ctx, d.Inventory) },
 		Intents:  d.Intents,
 		Reports:  d.Reports,
 	}

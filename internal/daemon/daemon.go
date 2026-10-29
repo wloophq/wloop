@@ -276,6 +276,9 @@ type Deps struct {
 	// ConfigWarning is the health warning about config.toml drifting from the
 	// running config, "" for none; nil never warns.
 	ConfigWarning func() string
+	// EffectWarnings are the turn effects that went unapplied after their
+	// turn went out; nil lists none.
+	EffectWarnings func() []string
 	// WorkspaceManager names the workspace managers in messages, such as
 	// "Claude Desktop or Orca".
 	WorkspaceManager string

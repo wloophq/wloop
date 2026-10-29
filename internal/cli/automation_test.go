@@ -10,7 +10,8 @@ import (
 	"testing"
 	"time"
 
-	factsgithub "github.com/wloophq/wloop/internal/adapter/facts/github"
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
@@ -165,7 +166,7 @@ func TestOneStateLoadPerSweep(t *testing.T) {
 	if !slices.Equal(r.mgr.Removed(), []string{"ws1"}) {
 		t.Fatalf("removed %v", r.mgr.Removed())
 	}
-	if !r.te.loadRounds(t).FirstRoundSkipped("acme/api#7") {
+	if r.te.loadRounds(t).Mark("acme/api#7", ghsource.MarkFirstSkipped) == "" {
 		t.Fatal("the removal's SkipFirstRound did not land in the saved state")
 	}
 }
@@ -327,15 +328,10 @@ func TestNewEngineAssemblesOverTheStore(t *testing.T) {
 	}
 }
 
-func TestTheGithubModuleOffersTheRounds(t *testing.T) {
+func TestOnlyRunningPluginsPlanRounds(t *testing.T) {
 	t.Parallel()
-	p := factsgithub.New(factsgithub.Deps{})
-	e := &Env{}
-	if got := e.planners([]source.Module{{ID: unit.GitHub, Facts: p}})[unit.GitHub]; got != roundPlanner(p) {
-		t.Fatalf("the github planner is %T", got)
-	}
-	if len(e.planners(nil)) != 0 {
-		t.Fatal("no module plans rounds")
+	if got := (&Env{}).planners(); len(got) != 0 {
+		t.Fatalf("planners without a running plugin: %v", got)
 	}
 }
 

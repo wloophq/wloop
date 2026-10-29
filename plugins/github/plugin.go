@@ -21,6 +21,7 @@ import (
 	"github.com/wloophq/wloop/plugins/github/api"
 	"github.com/wloophq/wloop/plugins/github/collect"
 	"github.com/wloophq/wloop/plugins/github/gh"
+	"github.com/wloophq/wloop/plugins/github/plan"
 	"github.com/wloophq/wloop/plugins/github/pr"
 	"github.com/wloophq/wloop/plugins/github/store"
 )
@@ -56,6 +57,8 @@ type Plugin struct {
 	API api.Options
 	// Now nil is the clock.
 	Now func() time.Time
+	// Git nil reads the checkouts with the git binary.
+	Git plan.Git
 
 	mu  sync.Mutex
 	run *running
@@ -163,6 +166,7 @@ func (p *Plugin) Notify(ctx context.Context, units []sdk.Unit, topics []sdk.Topi
 		return nil
 	}
 	if slices.Contains(topics, sdk.TopicWorkspaces) {
+		r.lists.forget()
 		if err := r.col.Relink(ctx); err != nil {
 			return err
 		}
@@ -170,8 +174,12 @@ func (p *Plugin) Notify(ctx context.Context, units []sdk.Unit, topics []sdk.Topi
 	if slices.Contains(topics, sdk.TopicConfig) {
 		r.reloadConfig(ctx)
 	}
-	all := slices.Contains(topics, sdk.TopicViewer) || slices.Contains(topics, sdk.TopicConfig)
-	if slices.ContainsFunc(topics, func(t sdk.Topic) bool { return t == sdk.TopicEvents || t == sdk.TopicTurns }) {
+	all := slices.ContainsFunc(topics, func(t sdk.Topic) bool {
+		return t == sdk.TopicViewer || t == sdk.TopicConfig || t == sdk.TopicWorkspaces
+	})
+	if slices.ContainsFunc(topics, func(t sdk.Topic) bool {
+		return t == sdk.TopicEvents || t == sdk.TopicTurns || t == sdk.TopicRounds || t == sdk.TopicMarks || t == sdk.TopicOverrides
+	}) {
 		if len(units) == 0 {
 			all = true
 		}

@@ -373,6 +373,9 @@ func (e *Env) recordTurnEvent(ctx context.Context, ref pr.Ref, kind, turn, data 
 // remembers the caller's agent home in it, and the round with its guidance,
 // fills in what the round sent, and reports whether the round went out.
 func (e *Env) handRound(ctx context.Context, rt route, ref pr.Ref, guidance string, d dintent.Def, keepsHome bool, send func(st *round.Store, r *sentRound) (bool, error)) error {
+	if err := e.checkEffects(d, ref.Unit()); err != nil {
+		return err
+	}
 	r := &sentRound{env: e, ctx: ctx, ref: ref, guidance: guidance}
 	runPhase(rt, d, r, guidePhase)
 	sent := false

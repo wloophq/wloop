@@ -501,7 +501,24 @@ type EffectRequest struct {
 	Unit   plugin.Unit
 	Turn   *TurnRef
 	Draft  *Draft
+	// Route is how a turn effect's turn went out: RouteSession, RouteAsked
+	// or RouteLaunch; "" for a draft effect.
+	Route string
+	// Taken says the agent was seen taking the turn.
+	Taken bool
+	// Inputs are a turn effect's turn inputs, a JSON object; nil for none.
+	Inputs json.RawMessage
 }
+
+// The routes a turn goes out on, which EffectRequest.Route names.
+const (
+	// RouteSession is a round an agent session asked for.
+	RouteSession = "session"
+	// RouteAsked is a round asked for through the daemon's action.
+	RouteAsked = "asked"
+	// RouteLaunch is a launch or a resume the turn service started.
+	RouteLaunch = "launch"
+)
 
 // ToolCall is a call of an MCP tool the manifest declares. Session is the
 // MCP session's handle and Turn the turn it serves; Reader.Session reads the

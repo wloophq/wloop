@@ -268,6 +268,15 @@ type Env struct {
 	hosted *hostedLate
 	// payloads are the enabled plugins' turn payload readers; nil outside serve.
 	payloads map[unit.ProviderID]turn.PayloadReader
+	// payloadPlanner builds GitHub's turn payloads in place of the running
+	// plugin; nil is the running plugin.
+	payloadPlanner func() (psource.PayloadPlanner, error)
+	// effectProblems are the turn effects that went unapplied, which the
+	// daemon's health lists.
+	effectProblems *effectProblems
+	// briefReader reads GitHub's brief inputs in place of the running
+	// plugin; nil is the running plugin.
+	briefReader func() (briefReader, error)
 }
 
 func NewEnv() *Env {
@@ -280,26 +289,27 @@ func NewEnv() *Env {
 	agents, homes, protocols := agentRegistries(defaultAgents())
 	home := config.Home()
 	e := &Env{
-		plugins:       installed,
-		background:    &sync.WaitGroup{},
-		Out:           os.Stdout,
-		Err:           os.Stderr,
-		In:            os.Stdin,
-		github:        newGitHubClients(),
-		Git:           gitx.New(),
-		WS:            newSet(managers, Defaults().WorkspaceManagers),
-		Sh:            execSh,
-		Stdout:        execStdout,
-		LoadConfig:    func() (config.Config, error) { return config.Load(Defaults()) },
-		IntentRecheck: intentRecheck,
-		ConfigPath:    config.Path(),
-		StateDir:      stateDir,
-		Home:          home,
-		Now:           time.Now,
-		Socket:        config.DaemonSocket(),
-		Getenv:        os.Getenv,
-		Executable:    exe,
-		Harness:       harnessOf(protocols, managers),
+		plugins:        installed,
+		background:     &sync.WaitGroup{},
+		effectProblems: &effectProblems{},
+		Out:            os.Stdout,
+		Err:            os.Stderr,
+		In:             os.Stdin,
+		github:         newGitHubClients(),
+		Git:            gitx.New(),
+		WS:             newSet(managers, Defaults().WorkspaceManagers),
+		Sh:             execSh,
+		Stdout:         execStdout,
+		LoadConfig:     func() (config.Config, error) { return config.Load(Defaults()) },
+		IntentRecheck:  intentRecheck,
+		ConfigPath:     config.Path(),
+		StateDir:       stateDir,
+		Home:           home,
+		Now:            time.Now,
+		Socket:         config.DaemonSocket(),
+		Getenv:         os.Getenv,
+		Executable:     exe,
+		Harness:        harnessOf(protocols, managers),
 
 		NativeAvailable: macos.Available,
 		RunNative: func(setup func(menubar.Tray, menubar.Notifier)) {
