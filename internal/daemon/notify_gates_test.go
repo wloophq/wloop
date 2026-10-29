@@ -62,7 +62,8 @@ func TestNotificationWordsComeFromTheProfile(t *testing.T) {
 	l := *bundledLoaded()
 	l.Notices = maps.Clone(l.Notices)
 	for name, text := range map[string]string{builtin.NoticeNotifyInbox: "Nova", builtin.NoticeNotifyQuestion: "Pergunta", builtin.NoticeNotifyYes: "Sim",
-		builtin.NoticeNotifyNo: "Não", builtin.NoticeNotifyRecommended: "{{.Label}} (sugerido)", builtin.NoticeNotifyReply: "Responder"} {
+		builtin.NoticeNotifyNo: "Não", builtin.NoticeNotifyRecommended: "{{.Label}} (sugerido)", builtin.NoticeNotifyReply: "Responder", builtin.NoticeNotifyPost: "Aviso",
+		builtin.NoticeNotifyProposal: "Proposta"} {
 		l.Notices[name] = text
 	}
 	r.s.deps.Intents = func() *intentload.Loaded { return &l }
@@ -83,7 +84,25 @@ func TestNotificationWordsComeFromTheProfile(t *testing.T) {
 	if _, err := r.s.deps.Gates.Open(ctx, gate.Gate{Kind: gate.KindQuestion, Task: "e-ask", Unit: task.UnitOf("e-ask"), Subject: strconv.FormatInt(m.ID, 10)}, nil); err != nil {
 		t.Fatal(err)
 	}
+	for i, kind := range []dmessage.Kind{dmessage.AgentPost, dmessage.Proposal} {
+		id := task.ID("e-kind-" + strconv.Itoa(i))
+		if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: id, State: "next", Category: task.CategoryReady, Title: string(id),
+			Origin: task.OriginUser, Created: catalogNow, Updated: catalogNow}}}); err != nil {
+			t.Fatal(err)
+		}
+		m, err := r.s.deps.Messages.Store.Upsert(ctx, dmessage.Message{TaskID: string(id), Unit: task.UnitOf(id), Kind: kind, Text: "note",
+			Origin: dmessage.Origin{Kind: dmessage.OriginTurn, TurnSeq: int64(i + 2)}, CreatedAt: catalogNow})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := r.s.deps.Gates.Open(ctx, gate.Gate{Kind: kind.Gate(), Task: id, Unit: task.UnitOf(id), Subject: strconv.FormatInt(m.ID, 10)}, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
 	got := r.notified(t)
+	if a, b := got["e-kind-0"].Attention, got["e-kind-1"].Attention; a == nil || b == nil || a.Title != "Aviso" || b.Title != "Proposta" {
+		t.Fatalf("a post notifies %+v and a proposal %+v", a, b)
+	}
 	if a := got["e-in"].Attention; a == nil || a.Title != "Nova" {
 		t.Fatalf("the Inbox task notifies %+v", a)
 	}

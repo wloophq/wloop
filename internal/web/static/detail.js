@@ -242,12 +242,6 @@ function verbTask(verb) {
   return ((typeof tasksState === "object" && tasksState.catalog && tasksState.catalog.verbs) || []).find((x) => x.verb === verb) || {};
 }
 
-// verbQuestion is what a verb that asks puts first: the catalog's input.
-function verbQuestion(verb) {
-  const v = verbTask(verb);
-  return v.input || v.label || verb;
-}
-
 function verbLabel(verb) {
   return verbTask(verb).label || verb;
 }
