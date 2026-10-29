@@ -252,8 +252,9 @@ type Commit struct {
 	Items     []items.Item
 	Log       []LogEntry
 	Proposals []Proposal
-	// Decided are the proposals a decision this commit applies was made on.
-	Decided []int64
+	// Decided are the proposals a decision this commit applies was made on, at DecidedAt.
+	Decided   []int64
+	DecidedAt time.Time
 }
 
 // Outcomes of an op in the log.

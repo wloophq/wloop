@@ -216,7 +216,7 @@ func (s itemStore) Commit(ctx context.Context, c coreitems.Commit) error {
 			}
 		}
 		for _, id := range c.Decided {
-			if _, err := tx.ExecContext(ctx, `UPDATE item_proposals SET decided_at = ? WHERE id = ?`, formatTime(time.Now()), id); err != nil {
+			if _, err := tx.ExecContext(ctx, `UPDATE item_proposals SET decided_at = ? WHERE id = ?`, formatTime(c.DecidedAt), id); err != nil {
 				return err
 			}
 		}

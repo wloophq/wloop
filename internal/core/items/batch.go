@@ -476,7 +476,7 @@ func (b *batch) commit(ctx context.Context) (Result, error) {
 	}
 	c.Log = b.log
 	c.Proposals = slices.Clone(b.created)
-	c.Decided = b.decided
+	c.Decided, c.DecidedAt = b.decided, b.now
 	if len(c.Items)+len(c.Log)+len(c.Proposals)+len(c.Decided) == 0 {
 		return b.res, nil
 	}
