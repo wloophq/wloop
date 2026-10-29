@@ -12,6 +12,8 @@ import (
 	"slices"
 	"strconv"
 	"time"
+
+	"github.com/wloophq/wloop/internal/backup"
 )
 
 // ErrStoreBusy is a store whose lock another process holds.
@@ -132,6 +134,9 @@ func prune(dir string, keep int, now time.Time, keepPath string) error {
 			if err := removeFile(f); err != nil && !errors.Is(err, os.ErrNotExist) {
 				errs = append(errs, err)
 			}
+		}
+		if err := os.RemoveAll(backup.PluginsOf(b.Path)); err != nil {
+			errs = append(errs, err)
 		}
 	}
 	return errors.Join(errs...)

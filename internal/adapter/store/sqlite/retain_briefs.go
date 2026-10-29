@@ -45,10 +45,14 @@ var (
 const briefRecordsKey = "brief_records"
 
 // briefs retains brief rows as of before: the bodies of runs no one reads,
-// the extraction's past daily runs no one reads, and the brief rows of a
-// unit not among cursors, the bound list of the extraction's cursors.
-func (r *retainer) briefs(before, cursors string) {
+// and, once the Slack plugin reported, the extraction's past daily runs no
+// one reads and the brief rows of a unit not among cursors, the bound list
+// of the units it reports.
+func (r *retainer) briefs(before, cursors string, reported bool) {
 	r.exec("brief_runs", port.TopicBriefs, retainBriefBodiesSQL, before)
+	if !reported {
+		return
+	}
 	r.exec("unit_briefs", port.TopicBriefs, orphanCursorBriefsSQL, cursors)
 	r.exec(briefRecordsKey, port.TopicBriefs|port.TopicLoopEvents, orphanCursorRecordsSQL, cursors)
 	r.exec("brief_runs", port.TopicBriefs, retainCursorRunsSQL, before, cursors)

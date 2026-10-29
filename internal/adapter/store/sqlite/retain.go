@@ -44,13 +44,14 @@ type Retention struct {
 	PlanItems      time.Duration // plan items not pending, last saved that long ago
 	WorkflowEvents time.Duration // the engine's events, workflow.EngineKinds
 	// UnitlessLoopRows drops the turns, records, answers, intakes, events,
-	// workflow runs and plan items of a github unit with no pull_requests
-	// row, no overrides row and nothing newer.
+	// workflow runs and plan items of a github unit the GitHub plugin does
+	// not report, with no overrides row and nothing newer.
 	UnitlessLoopRows time.Duration
 	Classifications  time.Duration // classifications and classify_days
 	Fetches          time.Duration
 	// SubjectMarks drops the marks of tasks done, in the trash or gone,
-	// and of Slack units with no extraction cursor, no item and no task.
+	// and of Slack units the Slack plugin does not report, with no item and
+	// no task.
 	SubjectMarks bool
 	VacuumPages  int // PRAGMA incremental_vacuum(VacuumPages) after each pass; 0 runs none
 }
@@ -117,24 +118,16 @@ func (r Retained) String() string {
 	return strings.Join(parts, ", ")
 }
 
-// endedPRsSQL selects the unit key of every pull request a version 6 row
-// holds merged or closed before its parameter; endedReportsSQL those the
-// GitHub plugin last reported so.
-var (
-	endedPRsSQL     = `SELECT owner || '/' || repo || '#' || number FROM pull_requests WHERE state != 'OPEN' AND ` + endedAt + ` != '' AND ` + endedAt + ` < ?`
-	endedReportsSQL = `SELECT unit_key FROM unit_snapshots WHERE provider = 'github' AND json_extract(snapshot, '$.data.pr.State') IN ('MERGED', 'CLOSED')
+// endedReportsSQL selects the unit key of every pull request the GitHub
+// plugin last reported merged or closed before its parameter.
+var endedReportsSQL = `SELECT unit_key FROM unit_snapshots WHERE provider = 'github' AND json_extract(snapshot, '$.data.pr.State') IN ('MERGED', 'CLOSED')
 		AND max(` + reportedDay("MergedAt") + `, ` + reportedDay("ClosedAt") + `) BETWEEN 1721426 AND julianday(?)`
-)
 
 // reportedDay is the Julian day of the time field of a reported pull
 // request, 0 for none.
 func reportedDay(field string) string {
 	return `coalesce(julianday(json_extract(snapshot, '$.data.pr.` + field + `')), 0)`
 }
-
-// endedAt is when a pull request row ended, empty for one that has not;
-// times in event.TimeLayout sort as text.
-const endedAt = `max(merged_at, closed_at)`
 
 const (
 	retainViewEventsSQL = `DELETE FROM events WHERE kind IN (?, ?, ?) AND at < ?` + untaskedEvents
@@ -153,12 +146,12 @@ const (
 	retainWorkflowRunsSQL = `DELETE FROM workflow_runs WHERE status = 'done' AND at < ?`
 	retainSessionRunsSQL  = `DELETE FROM workflow_runs WHERE provider = 'session' AND at < ? AND unit_key NOT IN (SELECT session_id FROM sessions)`
 	retainSessionMarksSQL = `DELETE FROM unit_marks WHERE provider = 'session' AND unit_key NOT IN (SELECT session_id FROM sessions)`
-	retainSubjectMarksSQL = `DELETE FROM unit_marks WHERE
-		(provider = 'task' AND unit_key NOT IN (SELECT id FROM tasks WHERE category NOT IN (?, ?)))
-		OR (provider = 'slack'
+	retainTaskMarksSQL    = `DELETE FROM unit_marks WHERE provider = 'task' AND unit_key NOT IN (SELECT id FROM tasks WHERE category NOT IN (?, ?))`
+	retainSlackMarksSQL   = `DELETE FROM unit_marks WHERE provider = 'slack'
 			AND (provider, unit_key) NOT IN ` + cursorUnits + `
 			AND NOT EXISTS (SELECT 1 FROM items i WHERE i.provider = 'slack' AND i.unit_key = unit_marks.unit_key)
-			AND NOT EXISTS (SELECT 1 FROM task_units u WHERE u.provider = 'slack' AND u.unit_key = unit_marks.unit_key))`
+			AND NOT EXISTS (SELECT 1 FROM task_units u WHERE u.provider = 'slack' AND u.unit_key = unit_marks.unit_key)`
+	retainFetchesSQL         = `DELETE FROM fetches WHERE at < ?`
 	retainClassificationsSQL = `DELETE FROM classifications WHERE at < ?`
 	retainClassifyDaysSQL    = `DELETE FROM classify_days WHERE day < ?`
 	unitlessUnitsSQL         = `SELECT unit_key FROM (
@@ -202,12 +195,12 @@ const untaskedUnits = `(SELECT value FROM json_each(?) WHERE value NOT IN (SELEC
 
 // endedUnits and endedRefs read the bound JSON list of the ended pull
 // requests' unit keys, or of their [owner, repo, number] triples;
-// cursorUnits reads that of the extraction cursors' [provider, unit_key]
-// pairs.
+// cursorUnits reads that of the keys of the Slack units the plugin reports
+// as [provider, unit_key] pairs.
 const (
 	endedUnits  = `(SELECT value FROM json_each(?))`
 	endedRefs   = `(SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]'), json_extract(value, '$[2]') FROM json_each(?))`
-	cursorUnits = `(SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?))`
+	cursorUnits = `(SELECT 'slack', value FROM json_each(?))`
 )
 
 type endedTable struct {
@@ -233,21 +226,13 @@ var endedTables = slices.Concat([]endedTable{
 	{"view_applied", port.TopicViews, `DELETE FROM view_applied WHERE provider = 'github' AND unit_key IN ` + untaskedUnits},
 }, briefEndedTables)
 
-// endedPluginTables are the GitHub plugin's rows of an ended pull request,
-// deleted after the core's, pull_requests last.
-var endedPluginTables = []endedTable{
-	{"pr_seen", 0, `DELETE FROM pr_seen WHERE (owner, repo, number) IN ` + endedRefs},
-	{"pr_details", port.TopicPRs, `DELETE FROM pr_details WHERE (owner, repo, number) IN ` + endedRefs},
-	{"pull_requests", port.TopicPRs | port.TopicFollow, `DELETE FROM pull_requests WHERE (owner, repo, number) IN ` + endedRefs},
-}
-
 // Retain applies p as of now in one write transaction, noting Change.All
 // with the topics of the tables it changed, then runs incremental_vacuum and
 // PRAGMA optimize outside it. EndedPRs runs first, so the rules after it see
 // the sessions and runs only an ended pull request's turns held, and a
 // second pass at the same now changes nothing and notes nothing.
 func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained, error) {
-	plugins := pluginRows{db}
+	plugins := reportedUnits{db}
 	var in retainInputs
 	var err error
 	if p.EndedPRs > 0 {
@@ -261,12 +246,12 @@ func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained,
 		}
 	}
 	if p.UnitlessLoopRows > 0 {
-		if in.prKeys, err = plugins.prKeys(ctx); err != nil {
+		if in.prKeys, in.githubReported, err = plugins.live(ctx, reportedGitHubSQL); err != nil {
 			return nil, err
 		}
 	}
 	if p.BriefBodies > 0 || p.SubjectMarks {
-		if in.cursors, err = plugins.cursorUnits(ctx); err != nil {
+		if in.slackUnits, in.slackReported, err = plugins.live(ctx, reportedSlackSQL); err != nil {
 			return nil, err
 		}
 	}
@@ -303,7 +288,7 @@ func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained,
 			r.exec("instruction_parts", port.TopicRounds, retainPartsSQL)
 		}
 		if p.BriefBodies > 0 {
-			r.briefs(cutoff(now, p.BriefBodies), in.cursors)
+			r.briefs(cutoff(now, p.BriefBodies), in.slackPairs(), in.slackReported)
 		}
 		if p.ViewRows > 0 {
 			r.exec("view_applied", port.TopicViews, retainViewRowsSQL, keyList(in.viewEnded))
@@ -321,27 +306,26 @@ func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained,
 			}
 			r.exec(WorkflowEventsKey, port.TopicLoopEvents, retainWorkflowEventsSQL, append(args, cutoff(now, p.WorkflowEvents))...)
 		}
-		if p.UnitlessLoopRows > 0 {
-			r.unitless(cutoff(now, p.UnitlessLoopRows), in.prKeys)
+		if p.UnitlessLoopRows > 0 && in.githubReported {
+			r.unitless(cutoff(now, p.UnitlessLoopRows), jsonList(in.prKeys))
 		}
 		if p.Classifications > 0 {
 			r.exec("classifications", 0, retainClassificationsSQL, cutoff(now, p.Classifications))
 			r.exec("classify_days", 0, retainClassifyDaysSQL, now.Add(-p.Classifications).UTC().Format(time.DateOnly))
 		}
 		if p.SubjectMarks {
-			r.exec("unit_marks", port.TopicMarks, retainSubjectMarksSQL, append(openArgs(), in.cursors)...)
+			r.exec("unit_marks", port.TopicMarks, retainTaskMarksSQL, openArgs()...)
+			if in.slackReported {
+				r.exec("unit_marks", port.TopicMarks, retainSlackMarksSQL, in.slackPairs())
+			}
+		}
+		if p.Fetches > 0 {
+			r.exec("fetches", 0, retainFetchesSQL, cutoff(now, p.Fetches))
 		}
 		return r.err
 	})
 	if err != nil {
 		return nil, err
-	}
-	fetches := ""
-	if p.Fetches > 0 {
-		fetches = cutoff(now, p.Fetches)
-	}
-	if err := plugins.drop(ctx, in.ended, fetches, out); err != nil {
-		return out, err
 	}
 	stmts := []string{`PRAGMA optimize`}
 	if p.VacuumPages > 0 {
@@ -434,11 +418,25 @@ func (r *retainer) unitless(before, prKeys string) {
 	}
 }
 
-// retainInputs are what a pass reads of the plugins' tables before its
-// own transaction: bound lists for the core's queries.
+// retainInputs are what a pass reads of the plugins' reports before its
+// own transaction: bound lists for the core's queries. A rule that reads
+// which units a plugin still reports runs only once it reported any, so a
+// store whose plugin has not loaded yet keeps its rows.
 type retainInputs struct {
 	ended, viewEnded []pr.Ref
-	prKeys, cursors  string
+	prKeys           []string
+	githubReported   bool
+	slackUnits       []string
+	slackReported    bool
+}
+
+// slackPairs is the bound JSON list of the reported Slack units' keys.
+func (in retainInputs) slackPairs() string { return jsonList(in.slackUnits) }
+
+// jsonList is keys as a bound JSON list.
+func jsonList(keys []string) string {
+	raw, _ := json.Marshal(keys)
+	return string(raw)
 }
 
 // keyList is the bound JSON list of refs' unit keys.
@@ -451,38 +449,29 @@ func keyList(refs []pr.Ref) string {
 	return string(raw)
 }
 
-// pluginRows are the plugins' tables as retention reads and deletes them,
-// each call in a transaction of its own: the GitHub plugin's pull requests
-// and fetches, the Slack extraction's cursors.
-type pluginRows struct{ db *DB }
+// reportedUnits are the units the plugins report, as retention reads them.
+type reportedUnits struct{ db *DB }
 
-// endedPRs are the pull requests merged or closed before before, as the
-// GitHub plugin last reported them or a row of the version 6 tables holds
-// them.
-func (p pluginRows) endedPRs(ctx context.Context, before string) ([]pr.Ref, error) {
-	legacy, err := p.keys(ctx, endedPRsSQL, before)
-	if err != nil {
-		return nil, err
-	}
+// endedPRs are the pull requests the GitHub plugin last reported merged or
+// closed before before.
+func (p reportedUnits) endedPRs(ctx context.Context, before string) ([]pr.Ref, error) {
 	reported, err := p.keys(ctx, endedReportsSQL, before)
 	if err != nil {
 		return nil, err
 	}
 	var out []pr.Ref
-	for _, key := range append(legacy, reported...) {
+	for _, key := range reported {
 		ref, err := pr.ParseKey(key)
 		if err != nil {
 			return nil, err
 		}
-		if !slices.Contains(out, ref) {
-			out = append(out, ref)
-		}
+		out = append(out, ref)
 	}
 	return out, nil
 }
 
 // keys are the first column of query's rows.
-func (p pluginRows) keys(ctx context.Context, query string, args ...any) ([]string, error) {
+func (p reportedUnits) keys(ctx context.Context, query string, args ...any) ([]string, error) {
 	rows, err := p.db.R().QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
@@ -499,59 +488,32 @@ func (p pluginRows) keys(ctx context.Context, query string, args ...any) ([]stri
 	return out, rows.Err()
 }
 
-// prKeys is the bound JSON list of the unit key of every pull request the
-// GitHub plugin reported and has not dropped, or a row of the version 6
-// tables holds.
-func (p pluginRows) prKeys(ctx context.Context) (string, error) {
-	legacy, err := p.keys(ctx, `SELECT owner || '/' || repo || '#' || number FROM pull_requests`)
-	if err != nil {
-		return "", err
-	}
-	reported, err := p.keys(ctx, `SELECT unit_key FROM unit_snapshots WHERE provider = 'github' AND NOT coalesce(json_extract(snapshot, '$.gone'), 0)`)
-	if err != nil {
-		return "", err
-	}
-	raw, err := json.Marshal(append(append([]string{}, legacy...), reported...))
-	return string(raw), err
-}
+// The reports of a plugin's units: each key and whether the plugin dropped
+// it.
+const (
+	reportedGitHubSQL = `SELECT unit_key, coalesce(json_extract(snapshot, '$.gone'), 0) FROM unit_snapshots WHERE provider = 'github'`
+	reportedSlackSQL  = `SELECT unit_key, coalesce(json_extract(snapshot, '$.gone'), 0) FROM unit_snapshots WHERE provider = 'slack'`
+)
 
-// cursorUnits is the bound JSON list of the extraction cursors' units.
-func (p pluginRows) cursorUnits(ctx context.Context) (string, error) {
-	var list string
-	err := p.db.R().QueryRowContext(ctx, `SELECT COALESCE(json_group_array(json_array(provider, unit_key)), '[]') FROM extraction_cursors`).Scan(&list)
-	return list, err
-}
-
-// drop deletes the plugins' rows of the ended pull requests and, with a
-// fetchesBefore, the fetches before it, counting them in out.
-func (p pluginRows) drop(ctx context.Context, ended []pr.Ref, fetchesBefore string, out Retained) error {
-	if len(ended) == 0 && fetchesBefore == "" {
-		return nil
+// live are the unit keys a plugin reports, as query reads them, and has not
+// dropped, and whether it reported any unit, dropped or not.
+func (p reportedUnits) live(ctx context.Context, query string) (keys []string, reported bool, err error) {
+	rows, err := p.db.R().QueryContext(ctx, query)
+	if err != nil {
+		return nil, false, err
 	}
-	_, err := p.db.Write(ctx, func(tx *Tx) error {
-		r := &retainer{ctx: ctx, tx: tx, out: Retained{}}
-		if len(ended) > 0 {
-			refs := make([][3]any, len(ended))
-			for i, ref := range ended {
-				refs[i] = [3]any{ref.Owner, ref.Repo, ref.Number}
-			}
-			list, err := json.Marshal(refs)
-			if err != nil {
-				return err
-			}
-			for _, t := range endedPluginTables {
-				r.exec(t.table, t.topics, t.query, string(list))
-			}
+	defer rows.Close()
+	keys = []string{}
+	for rows.Next() {
+		var key string
+		var gone bool
+		if err := rows.Scan(&key, &gone); err != nil {
+			return nil, false, err
 		}
-		if fetchesBefore != "" {
-			r.exec("fetches", 0, `DELETE FROM fetches WHERE at < ?`, fetchesBefore)
+		reported = true
+		if !gone {
+			keys = append(keys, key)
 		}
-		if r.err == nil {
-			for table, n := range r.out {
-				out[table] += n
-			}
-		}
-		return r.err
-	})
-	return err
+	}
+	return keys, reported, rows.Err()
 }

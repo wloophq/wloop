@@ -113,8 +113,8 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 |---|---|---|
 | `internal/adapter/store/inventory/store.go` `github` `2` | 🧾 | the inventory keeps GitHub's pull request tables (issue 62) |
 | `internal/adapter/store/inventory/timings.go` `github` `3` | 🧾 | the inventory keeps GitHub's pull request tables (issue 62) |
-| `internal/adapter/store/sqlite/retain.go` `github` `23` | 🧾 | retention drops a pull request's rows once GitHub says it ended, as the version 6 rows and the plugin's reports hold it (issue 62) |
-| `internal/adapter/store/sqlite/retain.go` `slack` `3` | 🧾 | retention tells a Slack unit gone by the Slack tables; the plugin should say (issue 62) |
+| `internal/adapter/store/sqlite/retain.go` `github` `23` | 🧾 | retention drops a pull request's rows once GitHub's reports say it ended (issue 62) |
+| `internal/adapter/store/sqlite/retain.go` `slack` `5` | 🧾 | retention tells a Slack unit gone by the Slack plugin's reports (issue 62) |
 | `internal/adapter/store/sqlite/retain_briefs.go` `github` `2` | 🧾 | retention drops a pull request's rows once GitHub says it ended (issue 62) |
 | `internal/adapter/store/sqlite/rounds.go` `github` `7` | 🧾 | the round state keeps GitHub's review rounds (issue 62) |
 | `internal/cli/doctor.go` `github` `1` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |

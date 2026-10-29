@@ -6,17 +6,29 @@ import (
 	"testing"
 )
 
+// reportSlack is the Slack plugin's report of key, gone or not.
+func reportSlack(t *testing.T, db *DB, key string, gone bool) {
+	t.Helper()
+	snapshot := `{}`
+	if gone {
+		snapshot = `{"gone":true}`
+	}
+	exec(t, db, `INSERT INTO unit_snapshots (provider, unit_key, snapshot, rev, at) VALUES ('slack', ?, ?, 1, ?)`, key, snapshot, at(retainNow))
+}
+
 // retainBriefs runs the brief retention retain.go's BriefBodies rule runs.
 func retainBriefs(t *testing.T, db *DB, before string) Retained {
 	t.Helper()
 	out := Retained{}
-	cursors, err := pluginRows{db}.cursorUnits(context.Background())
-	if err != nil {
+	var in retainInputs
+	var err error
+	if in.slackUnits, in.slackReported, err = (reportedUnits{db}).live(context.Background(), reportedSlackSQL); err != nil {
 		t.Fatal(err)
 	}
+	cursors := in.slackPairs()
 	if _, err := db.Write(context.Background(), func(tx *Tx) error {
 		r := &retainer{ctx: context.Background(), tx: tx, out: out}
-		r.briefs(before, cursors)
+		r.briefs(before, cursors, in.slackReported)
 		return r.err
 	}); err != nil {
 		t.Fatal(err)
@@ -32,7 +44,7 @@ func TestASlackBriefGoesWithItsCursor(t *testing.T) {
 			VALUES (?, 'slack', ?, 'brief', 'extraction', 'extraction', '', ?, ?, 'ok', '{"goal":"g"}')`, id, unitKey, started, started)
 	}
 	old, fresh := at(retainNow.Add(-8*day)), at(retainNow.Add(-day))
-	exec(t, db, `INSERT INTO extraction_cursors (provider, unit_key, at) VALUES ('slack', 'C1/1', ?)`, fresh)
+	reportSlack(t, db, "C1/1", false)
 	run(1, "C1/1", old)
 	run(2, "C1/1", old)
 	run(3, "C1/1", old)
@@ -66,11 +78,11 @@ func TestASlackBriefGoesWithItsCursor(t *testing.T) {
 	}
 }
 
-func TestACursorOfAPullRequestLeavesItsBriefs(t *testing.T) {
+func TestSlacksReportsLeaveAPullRequestsBriefs(t *testing.T) {
 	t.Parallel()
 	db, _ := openTemp(t)
-	old, fresh := at(retainNow.Add(-8*day)), at(retainNow.Add(-day))
-	exec(t, db, `INSERT INTO extraction_cursors (provider, unit_key, at) VALUES ('github', 'acme/api#9', ?)`, fresh)
+	old := at(retainNow.Add(-8 * day))
+	reportSlack(t, db, "C9/9", false)
 	for id, trigger := range map[int]string{1: "wanted", 2: "fields"} {
 		exec(t, db, `INSERT INTO brief_runs (id, provider, unit_key, intent, trigger, version, attempt_of, started_at, outcome, brief)
 			VALUES (?, 'github', 'acme/api#1', 'brief', ?, 'v', '', ?, 'ok', '{"goal":"g"}')`, id, trigger, old)

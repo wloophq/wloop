@@ -61,7 +61,8 @@ func TestV4MarksClosuresAndAppliedEffects(t *testing.T) {
 		t.Errorf("drafts\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 	var marked string
-	if err := db.r.QueryRow(`SELECT group_concat(unit_key) FROM (SELECT unit_key FROM extraction_cursors WHERE closure_marked = 1 ORDER BY unit_key)`).Scan(&marked); err != nil || marked != "C1/2,C1/5" {
+	slack := exported(t, filepath.Join(filepath.Dir(path), "plugins", "slack", "import.db"))
+	if err := slack.QueryRow(`SELECT group_concat(unit_key) FROM (SELECT unit_key FROM extraction_cursors WHERE closure_marked = 1 ORDER BY unit_key)`).Scan(&marked); err != nil || marked != "C1/2,C1/5" {
 		t.Errorf("closure_marked on %q %v", marked, err)
 	}
 	pending, err := db.DraftEffects().Unapplied(ctx)

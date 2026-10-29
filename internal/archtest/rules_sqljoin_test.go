@@ -15,9 +15,9 @@ import (
 	"testing"
 )
 
-// pluginTables are the tables of the source plugins that still sit in the
-// core store's file; a name ending in _ is a prefix.
-var pluginTables = []string{"pull_requests", "pr_seen", "pr_details", "fetches", "segment_map", "slack_", "extraction_"}
+// pluginTables are the tables of the source plugins, which the store
+// exported to their own and dropped; a name ending in _ is a prefix.
+var pluginTables = []string{"pull_requests", "pr_seen", "pr_details", "segment_map", "slack_", "extraction_"}
 
 // sharedTables hold both the core's rows and the plugins' (meta) or both
 // columns (overrides), so they count by the columns a query names.
