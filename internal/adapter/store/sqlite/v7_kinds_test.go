@@ -368,7 +368,8 @@ func TestV7NormalizesTrimmedEventTimes(t *testing.T) {
 		`INSERT INTO unit_briefs (provider, unit_key, run, last_run) VALUES ('github', 'acme/api#9', 1, 1)`,
 		`INSERT INTO events (provider, unit_key, kind, key, actor, at, data) VALUES
 			('github', 'acme/api#9', 'commented', 'c1', 'ana', '2026-10-23T14:36:00+02:00', ''),
-			('github', 'acme/api#9', 'commented', 'c2', 'ana', '2026-10-23T14:37:00Z', '')`,
+			('github', 'acme/api#9', 'commented', 'c2', 'ana', '2026-10-23T14:37:00Z', ''),
+			('github', 'acme/api#9', 'commented', 'c3', 'ana', '2026-10-23T14:38:00.0638-03:00', '')`,
 		`INSERT INTO entries (id, kind, state, origin, created, updated, rev) VALUES ('e-`+hexAction+`', 'capture', 'inbox', 'user', '2026-10-23T14:35:10.5Z', '2026-10-23T14:35:10.5Z', 1)`,
 	)
 	db := migrateV6(t, path)
@@ -377,11 +378,12 @@ func TestV7NormalizesTrimmedEventTimes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading the pull request's events: %v", err)
 	}
-	if len(evs) != 3 {
-		t.Fatalf("%d events, want the brief record and two comments", len(evs))
+	if len(evs) != 4 {
+		t.Fatalf("%d events, want the brief record and three comments", len(evs))
 	}
 	got := strings1(t, raw, `SELECT kind || ' ' || at FROM events ORDER BY at`)
-	if !slices.Equal(got, []string{"commented 2026-10-23T12:36:00.000000000Z", "record 2026-10-23T14:35:10.063897000Z", "commented 2026-10-23T14:37:00.000000000Z"}) {
+	if !slices.Equal(got, []string{"commented 2026-10-23T12:36:00.000000000Z", "record 2026-10-23T14:35:10.063897000Z", "commented 2026-10-23T14:37:00.000000000Z",
+		"commented 2026-10-23T17:38:00.063800000Z"}) {
 		t.Errorf("events %q", got)
 	}
 	if got := strings1(t, raw, `SELECT started_at || ' ' || ended_at FROM brief_runs`); !slices.Equal(got, []string{"2026-10-23T14:35:00.500000000Z 2026-10-23T14:35:10.063897000Z"}) {

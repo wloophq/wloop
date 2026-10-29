@@ -73,7 +73,7 @@ func v7FixedTimes(ctx context.Context, tx *sql.Tx) error {
 			continue
 		}
 		var vals []string
-		err := eachRow(ctx, tx, `SELECT DISTINCT `+c.column+` FROM `+c.table+` WHERE `+c.column+` != '' AND length(`+c.column+`) != ?`, //nolint:gosec // the names come from the table above
+		err := eachRow(ctx, tx, `SELECT DISTINCT `+c.column+` FROM `+c.table+` WHERE `+c.column+` != '' AND (length(`+c.column+`) != ? OR substr(`+c.column+`, -1) != 'Z')`, //nolint:gosec // the names come from the table above
 			[]any{fixedLen}, func(r *sql.Rows) error {
 				var v string
 				if err := r.Scan(&v); err != nil {
