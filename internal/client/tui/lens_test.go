@@ -35,6 +35,11 @@ func TestTUIListsLensViewsFromTheCatalog(t *testing.T) {
 	if v, ok := m.viewOnScreen(); !ok || v.ID != "stalled" {
 		t.Fatalf("started on %+v, want the catalog's first view", v)
 	}
+	withFocus := newModel(t)
+	withFocus.SetViews(api.ViewsCatalog{Views: []api.TaskViewSpec{{ID: "stalled", Label: "Stalled"}, {ID: "focus", Label: "Focus"}}})
+	if v, ok := withFocus.viewOnScreen(); !ok || v.ID != "stalled" {
+		t.Fatalf("started on %+v, want the catalog's first view over a later focus", v)
+	}
 	m.SetTasks("stalled", []api.TaskView{lensTask("t-1", "Ship the export", "doing"), lensTask("t-2", "Call the bank", "parked"),
 		lensTask("t-3", "Read the spec", "doing")}, api.Counters{Views: map[string]int{"stalled": 3, "mine": 1, "sends": 0}})
 	m.SetLoading([]api.Loading{{Plugin: "acme", Reason: "importing the threads"}})
