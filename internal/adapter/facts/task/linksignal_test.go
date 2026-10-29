@@ -6,6 +6,7 @@ import (
 	"time"
 
 	facttask "github.com/wloophq/wloop/internal/adapter/facts/task"
+	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -72,35 +73,58 @@ func autofocus(t *testing.T, f workflow.Facts) bool {
 	return ok
 }
 
+// stalls is whether the bundled stalled view holds a task whose facts are f.
+func stalls(t *testing.T, f workflow.Facts) bool {
+	t.Helper()
+	l, err := turn.Bundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	in, err := catalog.ViewAt(l.Views, "stalled", task.Task{}, f, monday)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return in
+}
+
 func TestASourceThatReportsSignalsKeepsItsOwnStaleness(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
 	ana := items.Person{Key: "chat:ANA"}
-	e.task(task.Task{ID: "t-pr", State: "waiting", Category: task.CategoryWaiting, Title: "pr", Units: []unit.Unit{chatA},
-		Items: []task.ItemRef{{Unit: chatA, Item: "i-pr"}}})
-	e.item(chatA, "i-pr", items.Open, monday.Add(-10*24*time.Hour), ana)
-	e.task(task.Task{ID: "t-thread", State: "waiting", Category: task.CategoryWaiting, Title: "thread", Units: []unit.Unit{chatB},
-		Items: []task.ItemRef{{Unit: chatB, Item: "i-th"}}})
-	e.item(chatB, "i-th", items.Open, monday.Add(-10*24*time.Hour), ana)
+	mailY := unit.Unit{Provider: "chat", Key: "T1/C1/300.3"}
+	for id, u := range map[task.ID]unit.Unit{"t-pr": chatA, "t-thread": chatB, "t-loop": mailY} {
+		e.task(task.Task{ID: id, State: "waiting", Category: task.CategoryWaiting, Title: string(id), Units: []unit.Unit{u},
+			Items: []task.ItemRef{{Unit: u, Item: "i-" + string(id)}}, Created: monday.Add(-10 * 24 * time.Hour), Updated: monday.Add(-10 * 24 * time.Hour)})
+		e.item(u, "i-"+string(id), items.Open, monday.Add(-10*24*time.Hour), ana)
+	}
 	e.links[chatA] = facttask.Link{Signals: map[string]bool{"stalled": false, "in_loop": false, "ready": false}}
+	e.links[mailY] = facttask.Link{Signals: map[string]bool{"in_loop": false}}
 
-	pr, thread := e.facts("t-pr"), e.facts("t-thread")
-	if got, _ := pr["task.link_signals"].([]string); !slices.Equal(got, []string{"in_loop", "ready", "stalled"}) {
-		t.Errorf("link_signals of t-pr %v", pr["task.link_signals"])
+	pr, thread, loop := e.facts("t-pr"), e.facts("t-thread"), e.facts("t-loop")
+	for name, c := range map[string]struct {
+		f       workflow.Facts
+		signals []string
+		stalls  bool
+	}{
+		"a pull request whose source says it has not stalled":        {pr, []string{"in_loop", "ready", "stalled"}, false},
+		"a quiet thread whose source reports no signal":              {thread, []string{}, true},
+		"a quiet task whose source reports in_loop and no staleness": {loop, []string{"in_loop"}, true},
+	} {
+		if got, _ := c.f["task.link_signals"].([]string); !slices.Equal(got, c.signals) {
+			t.Errorf("%s: link_signals %v, want %v", name, got, c.signals)
+		}
+		if at, _ := c.f["task.check_on"].(time.Time); at.IsZero() || !at.Before(monday) {
+			t.Errorf("%s: checks on %v, want the fallback, past", name, at)
+		}
+		if got := stalls(t, c.f); got != c.stalls {
+			t.Errorf("%s: in Stalled %v, want %v", name, got, c.stalls)
+		}
+		if got := autofocus(t, c.f); got != c.stalls {
+			t.Errorf("%s: task-autofocus stars it %v, want %v", name, got, c.stalls)
+		}
 	}
-	if got, _ := thread["task.link_signals"].([]string); len(got) != 0 {
-		t.Errorf("link_signals of t-thread %v", got)
-	}
-	if at, _ := pr["task.check_on"].(time.Time); !at.IsZero() {
-		t.Errorf("t-pr, whose source reports its own staleness, checks on %v", at)
-	}
-	if at, _ := thread["task.check_on"].(time.Time); at.IsZero() || !at.Before(monday) {
-		t.Errorf("t-thread checks on %v, want the fallback, past", at)
-	}
-	if autofocus(t, pr) {
-		t.Error("task-autofocus stars a quiet pull request someone else owes")
-	}
-	if !autofocus(t, thread) {
-		t.Error("task-autofocus leaves a quiet thread someone else owes unstarred")
+	pr["task.link_signal.stalled"] = true
+	if !stalls(t, pr) {
+		t.Error("a pull request whose source says it stalled is not in Stalled")
 	}
 }

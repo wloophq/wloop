@@ -28,12 +28,13 @@ key   = "g w"
 when  = "task.category in ['ready', 'active', 'waiting'] && task.owed_by != 'me'"
 group = "task.owed_by"
 
-# Waiting too long: a source says a link stalled, or the check date of a
-# task someone else owes passed with nothing moving since.
+# Waiting too long: a source says a link stalled, or, when no link's source
+# keeps its own staleness, the check date of a task someone else owes
+# passed with nothing moving since.
 [views.stalled]
 label         = "Stalled"
 key           = "g t"
-when          = "task.link_signal.stalled || (task.owed_by != 'me' && task.check_on > timestamp(0) && task.check_on < now && now - task.since_movement < task.check_on)"
+when          = "task.link_signal.stalled || (!('stalled' in task.link_signals) && task.owed_by != 'me' && task.check_on > timestamp(0) && task.check_on < now && now - task.since_movement < task.check_on)"
 hide_disabled = true
 
 # An agent works on it: a source's loop holds a link, or a run is live.

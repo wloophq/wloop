@@ -317,7 +317,7 @@ func (c prCase) facts(t *testing.T, l *intentload.Loaded, row api.Row) workflow.
 		t.Fatal(err)
 	}
 	f["task.owed_by"] = who
-	if facttask.FallsBack(c.owes, reported, prStaleDays) && who != "" {
+	if facttask.FallsBack(c.owes, prStaleDays) && who != "" {
 		f["task.check_on"] = task.AddWorkdays(row.Summary.Since, prStaleDays, time.UTC)
 	}
 	return f

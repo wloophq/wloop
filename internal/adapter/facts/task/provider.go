@@ -582,9 +582,8 @@ func (p *Provider) owed(ctx context.Context, e task.Task, f workflow.Facts) (wor
 	}
 	f["task.owed_since"] = since
 	links, _ := f["task.link_owes"].([]string)
-	signals, _ := f["task.link_signals"].([]string)
 	s, now := p.settings(), p.d.Clock.Now()
-	if !e.Prop(task.PropCheckOn).Time.IsZero() || !FallsBack(links, signals, s.StaleDays) {
+	if !e.Prop(task.PropCheckOn).Time.IsZero() || !FallsBack(links, s.StaleDays) {
 		return f, nil
 	}
 	if links[0] != who {
@@ -597,10 +596,9 @@ func (p *Provider) owed(ctx context.Context, e task.Task, f workflow.Facts) (wor
 }
 
 // FallsBack says whether a task with no check_on property takes the check date StaleDays working days after
-// what its links owe: they owe someone else and not the user, and no unit it links reports link signals, since a
-// source that does keeps its own staleness.
-func FallsBack(linkOwes, linkSignals []string, staleDays int) bool {
-	return staleDays > 0 && len(linkOwes) > 0 && !slices.Contains(linkOwes, "me") && len(linkSignals) == 0
+// what its links owe: they owe someone else and not the user.
+func FallsBack(linkOwes []string, staleDays int) bool {
+	return staleDays > 0 && len(linkOwes) > 0 && !slices.Contains(linkOwes, "me")
 }
 
 func (p *Provider) owedSince(ctx context.Context, e task.Task, who string) (time.Time, error) {
