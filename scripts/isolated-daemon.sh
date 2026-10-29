@@ -15,7 +15,8 @@
 # setup creates <dir> (it must not exist) with state/, config/, bin/, gh/ and
 # home/ (the user home the binary sees; HOME stays real for the Keychain),
 # copies <binary> into bin/ beside the orca, gh, codex, launchctl and claude
-# stubs, and the plugins beside it, as `make build` places them in
+# stubs and orca-stub, an Orca runtime with no worktree that it builds from
+# this checkout, and the plugins beside it, as `make build` places them in
 # plugins/<id>/, into bin/plugins/, and writes the config: brief, every
 # workflow of profiles/default/workflows/ and plugins/*/profile/workflows/
 # and the github and slack plugins off, ports 47910+<index> (HTTP) and
@@ -44,9 +45,12 @@
 # --yes`, which writes each import.db.
 #
 # pause serves --no-jobs once, stores the pause through the CLI and stops.
-# start serves in the background, logging to <dir>/daemon.log. stop signals
-# only the pid start recorded, and only while that pid is still the process
-# start launched. clean stops and deletes state/. run refuses any argument
+# start serves in the background, logging to <dir>/daemon.log, beside
+# orca-stub serving <dir>/orca, so the daemon has a reachable workspace
+# manager and its sweep runs the workflows setup turned on; the stub lists
+# nothing and refuses every write a session would need. stop signals only the
+# pids start recorded, and only while each is still the process start
+# launched. clean stops and deletes state/. run refuses any argument
 # naming the user's real state or config directory, and the binary's
 # install, uninstall and app subcommands.
 set -euo pipefail
@@ -115,7 +119,7 @@ isolation() {
 		esac
 	done
 	vars=(XDG_STATE_HOME="$dir/state" XDG_CONFIG_HOME="$dir/config"
-		ORCA_USER_DATA_PATH="$dir/no-orca" PATH="$dir/bin:$PATH"
+		ORCA_USER_DATA_PATH="$dir/orca" PATH="$dir/bin:$PATH"
 		GH_TOKEN=isolated-invalid GH_CONFIG_DIR="$dir/gh"
 		GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0 LOOP_USER_HOME="$dir/home"
 		ISOLATED_MCP_KEY="$(cat "$dir/state/$name/mcp.key" 2>/dev/null || true)")
@@ -264,6 +268,14 @@ cmd_setup() {
 			die "no plugin $p beside $binary: build it with make build, which places it in $from/$p"
 		}
 	done
+	command -v go >/dev/null || {
+		rm -rf "$dir"
+		die "setup builds orca-stub from $repo and needs go"
+	}
+	(cd "$repo" && go build -o "$dir/bin/orca-stub" ./internal/workspace/orca/orcatest/cmd/orca-stub) || {
+		rm -rf "$dir"
+		die "could not build orca-stub from $repo"
+	}
 	local stubs=(orca gh codex launchctl) stub
 	((agent)) || stubs+=(claude)
 	for stub in "${stubs[@]}"; do
@@ -432,6 +444,7 @@ drop_copy() {
 launch() {
 	local vars unsets
 	isolation
+	launch_stub
 	(exec env "${unsets[@]}" "${vars[@]}" nohup "$binary" serve "$@" </dev/null >>"$dir/daemon.log" 2>&1) &
 	local pid=$!
 	disown "$pid"
@@ -445,6 +458,37 @@ launch() {
 	printf '%s\n%s\n' "$pid" "$at" >"$dir/daemon.pid"
 }
 
+# launch_stub starts orca-stub on <dir>/orca and waits for the runtime file
+# it writes, recording its pid in <dir>/orca.pid.
+launch_stub() {
+	rm -rf "$dir/orca"
+	mkdir -m 700 "$dir/orca"
+	("$dir/bin/orca-stub" "$dir/orca" </dev/null >>"$dir/orca-stub.log" 2>&1) &
+	local pid=$! at=""
+	disown "$pid"
+	for _ in $(seq 300); do
+		[[ -f $dir/orca/orca-runtime.json ]] && at=$(started_at "$pid") && break
+		sleep 0.1
+	done
+	[[ -n $at ]] || die "orca-stub did not start; see $dir/orca-stub.log"
+	printf '%s\n%s\n' "$pid" "$at" >"$dir/orca.pid"
+}
+
+# stop_stub stops the orca-stub start recorded, while it is still that process.
+stop_stub() {
+	[[ -f $dir/orca.pid ]] || return 0
+	local pid at
+	{ read -r pid; read -r at; } <"$dir/orca.pid"
+	if [[ -n $pid && -n $at && $(started_at "$pid") == "$at" ]]; then
+		kill -TERM "$pid" 2>/dev/null || true
+		for _ in $(seq 50); do
+			[[ $(started_at "$pid") == "$at" ]] || break
+			sleep 0.1
+		done
+	fi
+	rm -f "$dir/orca.pid"
+}
+
 # launch_locked launches with the Slack socket lock when the directory has
 # the slack plugin on.
 launch_locked() {
@@ -453,6 +497,7 @@ launch_locked() {
 	fi
 	if ((slack)); then take_lock; fi
 	if ! (launch "$@"); then
+		stop_stub
 		if ((slack)); then release_lock; fi
 		exit 1
 	fi
@@ -461,6 +506,7 @@ launch_locked() {
 stop_ours() {
 	if ! running; then
 		rm -f "$dir/daemon.pid"
+		stop_stub
 		release_lock
 		echo "no daemon of $dir is running"
 		return 0
@@ -476,6 +522,7 @@ stop_ours() {
 		kill -KILL "$pid"
 	fi
 	rm -f "$dir/daemon.pid"
+	stop_stub
 	release_lock
 	echo "stopped $pid"
 }

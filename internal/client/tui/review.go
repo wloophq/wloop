@@ -18,7 +18,7 @@ const ctxReview = "review"
 // projectHandlers are the handlers of a project's verbs, which no key takes: the palette runs them.
 var projectHandlers = []string{"reviewed", "sequential"}
 
-// reviewView is the weekly Review on screen: the daemon's Review, the step
+// reviewView is the Review on screen: the daemon's Review, the step
 // shown, and whether the cursor is on that step's header rather than on one
 // of its tasks.
 type reviewView struct {

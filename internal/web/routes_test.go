@@ -33,24 +33,24 @@ func TestTaskHashOpensTheTask(t *testing.T) {
 	}
 	nodeRun(t, routesPrelude(t)+treeJS+staticJS(t, "task.js")+staticJS(t, "detail.js"), nil, `
 tasksState.catalog = input;
-tasksState.key = viewQueryKey("next", "", []);
+tasksState.key = viewQueryKey("fits-now", "", []);
 tasksState.tasks = [{ id: "e-1", state: "next", title: "Write the release notes", contexts: [], units: [] }];
-location.hash = "#view=next&entry=e-1";
+location.hash = "#view=fits-now&entry=e-1";
 const old = readHash().task;
-location.hash = "#view=next&task=e-1";
+location.hash = "#view=fits-now&task=e-1";
 const r = readHash();
 const box = { dataset: {}, hidden: true, replaceChildren() {}, contains: () => false };
 globalThis.document = { activeElement: null, body: { classList: { add() {} } } };
 const shown = renderTaskDetail(box, r);
 process.stdout.write(JSON.stringify({ View: r.view, Task: r.task, PR: r.pr, Detail: shown && !box.hidden, List: text(taskList(r, r.task)), Back: hashString({ ...r, task: "" }), Old: old }));`, viewsCatalog(), &got)
-	if got.View != "next" || got.Task != "e-1" || got.PR != "" {
-		t.Errorf("#view=next&task=e-1 reads view %q task %q unit %q", got.View, got.Task, got.PR)
+	if got.View != "fits-now" || got.Task != "e-1" || got.PR != "" {
+		t.Errorf("#view=fits-now&task=e-1 reads view %q task %q unit %q", got.View, got.Task, got.PR)
 	}
 	if !got.Detail || !strings.Contains(got.List, "Write the release notes") {
 		t.Errorf("detail open %v, list %q", got.Detail, got.List)
 	}
-	if got.Back != "view=next" {
-		t.Errorf("closing the task leaves %q, want view=next", got.Back)
+	if got.Back != "view=fits-now" {
+		t.Errorf("closing the task leaves %q, want view=fits-now", got.Back)
 	}
 	if got.Old != "" {
 		t.Errorf("the old entry= hash still opens task %q", got.Old)

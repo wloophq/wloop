@@ -107,7 +107,7 @@ func TestReviewKeysTUI(t *testing.T) {
 		t.Fatalf("the review opened on %q (query %q %q %v, head %v), want the first open step", m.rv.step, view, area, ok, m.rv.head)
 	}
 	if _, ok := m.selectedTask(); ok {
-		t.Fatal("an entry is selected while the cursor is on the step's header")
+		t.Fatal("a task is selected while the cursor is on the step's header")
 	}
 
 	c, ok := press(m, Key{Name: KeyEnter})
@@ -136,16 +136,16 @@ func TestReviewKeysTUI(t *testing.T) {
 	}
 	c, ok = press(m, Key{Rune: 'x'})
 	if !ok || c.verb != "next" || c.task != "e9" {
-		t.Fatalf("x on the step's entry: %+v %v", c, ok)
+		t.Fatalf("x on the step's task: %+v %v", c, ok)
 	}
 	m.Done(c, nil, nil)
 	c, ok = press(m, Key{Name: KeyEnter})
 	if !ok || !c.fetch || c.task != "e9" || c.reviewStep != "" {
-		t.Fatalf("Enter on an entry opens it, got %+v %v", c, ok)
+		t.Fatalf("Enter on a task opens it, got %+v %v", c, ok)
 	}
 	press(m, Key{Rune: 'k'})
 	if !m.rv.head {
-		t.Fatal("k from the first entry did not return to the header")
+		t.Fatal("k from the first task did not return to the header")
 	}
 	if c, ok := press(m, Key{Rune: ']'}); ok || m.rv.step != "projects" {
 		t.Fatalf("] sent %+v or showed %q", c, m.rv.step)

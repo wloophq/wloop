@@ -25,9 +25,9 @@ func TestTheFilterNarrowsTheViewCounts(t *testing.T) {
 		Chips    []string       `json:"chips"`
 		Filtered map[string]any `json:"filtered"`
 	}
-	whole := api.Counters{Views: map[string]int{"focus": 1, "inbox": 3, "outbox": 0, "next": 3, "waiting": 0, "projects": 0, "someday": 0, "logbook": 4},
+	whole := api.Counters{Views: map[string]int{"focus": 1, "inbox": 3, "outbox": 0, "fits-now": 3, "waiting": 0, "projects": 0, "someday": 0, "logbook": 4},
 		Areas: map[string]int{"OSS": 2, "Hiring": 1}, Contexts: map[string]int{"@decide": 1, "@reply": 2}}
-	narrowed := api.Counters{Views: map[string]int{"focus": 0, "inbox": 1, "outbox": 0, "next": 2, "waiting": 0, "projects": 0, "someday": 0, "logbook": 1},
+	narrowed := api.Counters{Views: map[string]int{"focus": 0, "inbox": 1, "outbox": 0, "fits-now": 2, "waiting": 0, "projects": 0, "someday": 0, "logbook": 1},
 		Areas: map[string]int{"OSS": 2}, Contexts: map[string]int{"@reply": 2}}
 	next := []api.TaskView{
 		task("n1", "next", func(e *api.TaskView) {
@@ -48,7 +48,7 @@ async function getJSON(url) { urls.push(url); return answer; }
 tasksState.catalog = input.cat;
 tasksState.counters = input.whole;
 const counts = (route) => viewNav(tasksState.catalog, [], [], viewCounters(route)).map((v) => v.count);
-const route = { view: "next", area: "", ctx: [], task: "", q: "invoice" };
+const route = { view: "fits-now", area: "", ctx: [], task: "", q: "invoice" };
 (async () => {
   const before = counts(route);
   answer = input.narrowed;
@@ -62,7 +62,7 @@ const route = { view: "next", area: "", ctx: [], task: "", q: "invoice" };
   const stale = counts(route);
   const cleared = counts({ ...route, q: "" });
   await loadFiltered({ ...route, area: "OSS", q: "invoice \"the client\"" });
-  tasksState.key = viewQueryKey("next", "", []);
+  tasksState.key = viewQueryKey("fits-now", "", []);
   tasksState.tasks = input.next;
   const list = taskList(route, "");
   const filtered = tasksState.filtered;
@@ -189,7 +189,7 @@ const counts = (route) => viewNav(tasksState.catalog, [], [], viewCounters(route
   fail = true;
   await loadFiltered({ area: "", q: "invoices" });
   process.stdout.write(JSON.stringify({ rail, failed: counts({ area: "", q: "invoices" }) }));
-})();`, map[string]any{"cat": viewsCatalog(), "counters": api.Counters{Views: map[string]int{"next": 2}}}, &got)
+})();`, map[string]any{"cat": viewsCatalog(), "counters": api.Counters{Views: map[string]int{"fits-now": 2}}}, &got)
 	if got.Rail[3] != 2.0 {
 		t.Errorf("rail %v", got.Rail)
 	}

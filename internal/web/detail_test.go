@@ -57,7 +57,7 @@ func TestUnitDetailRoute(t *testing.T) {
 	}
 	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
 function hashString(x) { return routeHash(x.view, x.pr, new URLSearchParams(x.task ? { task: x.task } : {})); }
-function readHash() { return { view: "next" }; }
+function readHash() { return { view: "fits-now" }; }
 tasksState.catalog = input.cat;
 (async () => {
   const route = readRoute("#unit=github/acme%2Fapi%238");
@@ -65,11 +65,11 @@ tasksState.catalog = input.cat;
   const box = unitExtras(input.detail);
   process.stdout.write(JSON.stringify({ Text: text(box), Tasks: detailState.unitTasks.map((e) => e.id), Route: route }));
 })();`, map[string]any{"detail": detail, "cat": viewsCatalog(), "answers": map[string]any{
-		"/api/tasks?view=logbook": page(shipped),
-		"/api/tasks?view=inbox":   page(),
-		"/api/tasks?view=next":    page(mine, other),
-		"/api/tasks?view=waiting": page(waiting),
-		"/api/tasks?view=someday": page(),
+		"/api/tasks?view=logbook":  page(shipped),
+		"/api/tasks?view=inbox":    page(),
+		"/api/tasks?view=fits-now": page(mine, other),
+		"/api/tasks?view=waiting":  page(waiting),
+		"/api/tasks?view=someday":  page(),
 	}}, &got)
 	if got.Route["unit"] != "github:acme/api#8" {
 		t.Fatalf("route %v", got.Route)

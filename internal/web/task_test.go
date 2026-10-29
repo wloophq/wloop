@@ -330,7 +330,7 @@ done({
 }
 
 // bundledViewIDs are the bundled profile's view ids, which no client logic may name.
-var bundledViewIDs = []string{"inbox", "next", "waiting", "snoozed", "someday", "focus", "projects", "logbook", "outbox"}
+var bundledViewIDs = []string{"inbox", "needs-me", "waiting", "snoozed", "someday", "focus", "projects", "logbook", "outbox"}
 
 func TestGroupingReadsCategoryNotStateNames(t *testing.T) {
 	tasks := []api.TaskView{
