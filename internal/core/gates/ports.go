@@ -90,6 +90,15 @@ type (
 	}
 )
 
+// Once is optional on a consequence port: a gate it answers true for is
+// marked run before its consequence runs, so a daemon that stops during the
+// consequence never runs it again, and may leave it not run. For a
+// consequence that acts in the user's name and keeps no record a second
+// run could read, such as a round or a verb.
+type Once interface {
+	Once(g gate.Gate) bool
+}
+
 // Sent records a post an agent made at once with a tool as a gate already
 // approved. It is no resolution: no agent resolves an open gate.
 type Sent interface {

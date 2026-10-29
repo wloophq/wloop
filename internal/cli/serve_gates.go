@@ -86,6 +86,12 @@ func (c daemonConsequences) Deliver(ctx context.Context, g gate.Gate) error {
 	return c.e.consequences.Deliver(ctx, g)
 }
 
+// Once is the daemon's, false while it is not built.
+func (c daemonConsequences) Once(g gate.Gate) bool {
+	o, ok := c.e.consequences.(gates.Once)
+	return ok && o.Once(g)
+}
+
 func (c daemonConsequences) Decide(ctx context.Context, g gate.Gate) error {
 	if c.e.consequences == nil {
 		return errNoDaemonYet

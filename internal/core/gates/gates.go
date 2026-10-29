@@ -370,8 +370,14 @@ func (s *Service) close(ctx context.Context, g gate.Gate, r Resolution) (gate.Ga
 
 // applied runs g's consequence and marks it run, failed or not: a failure is
 // a person's to retry. A consequence its context cut stays unmarked, for the
-// tick to run again.
+// tick to run again, but one its port runs Once, marked before it runs.
 func (s *Service) applied(ctx context.Context, g gate.Gate) error {
+	if o, ok := s.port(g.Kind).(Once); ok && o.Once(g) {
+		if err := s.d.Store.Applied(ctx, g.ID); err != nil {
+			return fmt.Errorf("marking gate %d's consequence run: %w", g.ID, err)
+		}
+		return s.apply(ctx, g)
+	}
 	err := s.apply(ctx, g)
 	if ctx.Err() != nil {
 		return err
@@ -400,6 +406,24 @@ func (s *Service) decide(ctx context.Context, g gate.Gate, p Policy) Decision {
 		return Decision{Mode: gate.ModeWait}
 	}
 	return dec
+}
+
+// port is the consequence port of gates of kind k, nil when none is wired.
+func (s *Service) port(k gate.Kind) any {
+	var p any
+	switch k {
+	case gate.KindDraft:
+		p = s.d.Publisher
+	case gate.KindPlan:
+		p = s.d.Releaser
+	case gate.KindQuestion, gate.KindPost:
+		p = s.d.Deliverer
+	case gate.KindProposal:
+		p = s.d.Decider
+	case gate.KindTrust:
+		p = s.d.Unblocker
+	}
+	return p
 }
 
 // apply runs the consequence g's kind names.

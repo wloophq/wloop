@@ -134,3 +134,43 @@ func TestTheTickLeavesAConsequenceInFlight(t *testing.T) {
 		t.Fatalf("published %d times: the tick replayed a consequence still running", pub.calls)
 	}
 }
+
+// oncePublisher publishes at most once, checking the gate is marked run when it does.
+type oncePublisher struct {
+	t     *testing.T
+	store interface {
+		Unapplied(context.Context) ([]gate.Gate, error)
+	}
+	calls int
+}
+
+func (p *oncePublisher) Once(gate.Gate) bool { return true }
+
+func (p *oncePublisher) Publish(ctx context.Context, g gate.Gate) error {
+	p.calls++
+	if left, err := p.store.Unapplied(ctx); err != nil || len(left) != 0 {
+		p.t.Errorf("gate %d runs its consequence unmarked: %+v %v", g.ID, left, err)
+	}
+	return context.Canceled
+}
+
+func TestAOnceConsequenceIsMarkedBeforeItRuns(t *testing.T) {
+	f := newFixture(t, nil, bundled)
+	pub := &oncePublisher{t: t, store: f.store}
+	svc := gates.New(gates.Deps{Store: f.store, Reader: f.store, Profile: bundled, Clock: clock{fixedNow}, Publisher: pub})
+	g, err := svc.Open(context.Background(), gate.Gate{Kind: gate.KindDraft, Subject: "7", Unit: task.UnitOf("t-0000000000000001")}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := svc.Resolve(ctx, g.ID, gates.Resolution{Intent: "approve", By: task.ActorPerson}); err == nil {
+		t.Fatal("a cut consequence resolved quietly")
+	}
+	if err := svc.Tick(context.Background(), opened); err != nil {
+		t.Fatal(err)
+	}
+	if pub.calls != 1 {
+		t.Fatalf("published %d times: a consequence run once ran again after its daemon stopped", pub.calls)
+	}
+}
