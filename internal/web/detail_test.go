@@ -213,7 +213,7 @@ process.stdout.write(JSON.stringify({
 func TestAVerbAsksTheProfilesQuestion(t *testing.T) {
 	var got struct{ Asked []string }
 	e := task("e-3", "next", func(e *api.TaskView) { e.Verbs = []api.VerbState{{Verb: "waiting", Enabled: true}} })
-	cat := api.ViewsCatalog{Verbs: []api.VerbSpec{{Verb: "waiting", Label: "Waiting", Summary: "Wait", Input: "On whom?"}}}
+	cat := api.ViewsCatalog{Verbs: []api.VerbSpec{{Verb: "waiting", Handler: "waiting", Label: "Waiting", Summary: "Wait", Input: "On whom?"}}}
 	nodeRun(t, viewsPrelude(t)+strings.Replace(staticJS(t, "keys.js"), `"use strict";`, "", 1)+detailHarness, nil, `
 tasksState.catalog = input.cat;
 detailEnv.ask = (label) => { asked.push(label); return "ana"; };
@@ -224,6 +224,22 @@ const pane = h("div", {}, ...verbButtons(input.task));
 })();`, map[string]any{"cat": cat, "task": e}, &got)
 	if len(got.Asked) != 1 || got.Asked[0] != "On whom?" {
 		t.Errorf("asked %v", got.Asked)
+	}
+}
+
+func TestARenamedVerbAsksByItsHandler(t *testing.T) {
+	var got struct {
+		Asked []string
+		Args  map[string]string
+	}
+	e := task("e-5", "next", func(e *api.TaskView) { e.Verbs = []api.VerbState{{Verb: "park", Enabled: true}} })
+	cat := api.ViewsCatalog{Verbs: []api.VerbSpec{{Verb: "park", Handler: "waiting", Label: "Park", Input: "Parked on whom?"}}}
+	nodeRun(t, viewsPrelude(t)+strings.Replace(staticJS(t, "keys.js"), `"use strict";`, "", 1)+detailHarness, nil, `
+tasksState.catalog = input.cat;
+detailEnv.ask = (label) => { asked.push(label); return "ana"; };
+process.stdout.write(JSON.stringify({ Asked: asked, Args: askedArgs("park") }));`, map[string]any{"cat": cat, "task": e}, &got)
+	if len(got.Asked) != 1 || got.Asked[0] != "Parked on whom?" || got.Args["on"] != "ana" {
+		t.Errorf("asked %v, args %v", got.Asked, got.Args)
 	}
 }
 

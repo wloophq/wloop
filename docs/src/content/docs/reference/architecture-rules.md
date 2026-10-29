@@ -181,7 +181,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/serve_payloads.go` `Env.payloadReaders` `unit.GitHub` `1` | 🧾 | GitHub's payload reader, wired outside the plugin's Payload |
 | `internal/cli/storedfacts.go` `storedFacts.Facts` `unit.GitHub` `1` | 🧾 | the stored facts of a pull request's turn |
 | `internal/cli/turn.go` `Env.storedViewer` `unit.GitHub` `1` | 🧾 | the GitHub viewer read outside the plugin |
-| `internal/client/tui/views.go` `taskProvider` `unit.Task` `1` | 🧾 | the TUI keys its busy map by the task provider; K2 keys it by the served unit |
+| `internal/client/tui/views.go` `taskProvider` `unit.Task` `1` | 🧾 | the TUI keys its busy map by unit, so a task stands as a unit of the task provider; a TaskView serves no unit, and a busy set keyed by task id removes it |
 | `internal/core/intake/intake.go` `SourceSession` `"session"` `1` | ✅ | the intake source a managed session asks from, which shares the session provider's spelling |
 | `internal/core/turns/headless.go` `taskInput` `"task"` `1` | ✅ | the headless turn's task input, which shares the task provider's spelling |
 | `internal/meter/meter.go` `GitHub` `"github"` `1` | ✅ | the meter's resource of a GitHub API request, not a unit provider |

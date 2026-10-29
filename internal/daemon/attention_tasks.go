@@ -128,7 +128,7 @@ func (ev *taskViewer) inboxNotice(ctx context.Context, e task.Task) (api.Categor
 		cat, token, a := ev.s.messageNotice(e, m, record)
 		return cat, token, a, true
 	}
-	a := api.Attention{Title: "In your Inbox", Subtitle: unitsLabel(e.Units), Body: e.Title, Actions: ev.inboxActions(ctx, e)}
+	a := api.Attention{Title: ev.s.notice(builtin.NoticeNotifyInbox, nil), Subtitle: unitsLabel(e.Units), Body: e.Title, Actions: ev.inboxActions(ctx, e)}
 	return api.CategoryInbox, hashToken(e.Title), a, true
 }
 
@@ -137,10 +137,11 @@ func (ev *taskViewer) inboxNotice(ctx context.Context, e task.Task) (api.Categor
 func (ev *taskViewer) inboxActions(ctx context.Context, e task.Task) []api.AttentionAction {
 	out := []api.AttentionAction{}
 	if ev.s.draftsHeadless(ctx, ev.g, e) {
-		out = append(out, api.AttentionAction{ID: api.AttentionDraftForMe, Title: "Draft for me"})
+		out = append(out, api.AttentionAction{ID: api.AttentionDraftForMe, Title: ev.s.notice(builtin.NoticeNotifyDraftForMe, nil)})
 	}
 	if ev.s.replyRefusal(e) == "" {
-		replies := []api.AttentionAction{{ID: api.AttentionReply, Title: "Reply", TextInput: true}, {ID: api.AttentionSendReply, Title: "Send reply", TextInput: true}}
+		replies := []api.AttentionAction{{ID: api.AttentionReply, Title: ev.s.notice(builtin.NoticeNotifyReply, nil), TextInput: true},
+			{ID: api.AttentionSendReply, Title: ev.s.notice(builtin.NoticeNotifySendReply, nil), TextInput: true}}
 		if ev.s.replySend(ev.s.replyVerb()) == sendNow {
 			slices.Reverse(replies)
 		}
@@ -281,16 +282,16 @@ func (s *Server) messageNotice(e task.Task, m dmessage.Message, record int64) (a
 	}
 	switch m.Kind {
 	case dmessage.Question:
-		a.Title = "Agent asks"
-		a.Actions = slices.Concat(choices(m), []api.AttentionAction{{ID: "answer:text", Title: "Reply", TextInput: true}}, dismiss)
+		a.Title = s.notice(builtin.NoticeNotifyQuestion, nil)
+		a.Actions = slices.Concat(s.choices(m), []api.AttentionAction{{ID: "answer:text", Title: s.notice(builtin.NoticeNotifyReply, nil), TextInput: true}}, dismiss)
 		return api.QuestionCategory(max(record, 0)), strconv.FormatInt(max(record, 0), 10), a
 	case dmessage.Proposal:
-		a.Title = "Proposal"
+		a.Title = s.notice(builtin.NoticeNotifyProposal, nil)
 		v, label := s.handlerVerb(handlerApprove)
 		a.Actions = slices.Concat([]api.AttentionAction{{ID: verbAction(v), Title: label}}, dismiss)
 	default:
-		a.Title = "Agent posts"
-		a.Actions = slices.Concat([]api.AttentionAction{{ID: "answer:text", Title: "Reply", TextInput: true}}, dismiss)
+		a.Title = s.notice(builtin.NoticeNotifyPost, nil)
+		a.Actions = slices.Concat([]api.AttentionAction{{ID: "answer:text", Title: s.notice(builtin.NoticeNotifyReply, nil), TextInput: true}}, dismiss)
 	}
 	return api.CategoryInbox, hashToken(strconv.FormatInt(m.ID, 10), m.Text), a
 }
@@ -313,10 +314,10 @@ func (s *Server) handlerVerb(h string) (task.Verb, string) {
 }
 
 // choices are a message's one-tap answers, the recommended one first.
-func choices(m dmessage.Message) []api.AttentionAction {
+func (s *Server) choices(m dmessage.Message) []api.AttentionAction {
 	var out []api.AttentionAction
 	if m.Confirm {
-		out = []api.AttentionAction{{ID: "answer:yes", Title: "Yes"}, {ID: "answer:no", Title: "No"}}
+		out = []api.AttentionAction{{ID: "answer:yes", Title: s.notice(builtin.NoticeNotifyYes, nil)}, {ID: "answer:no", Title: s.notice(builtin.NoticeNotifyNo, nil)}}
 	} else {
 		for _, o := range m.Options {
 			out = append(out, api.AttentionAction{ID: "answer:option:" + o.ID, Title: o.Label})
@@ -331,7 +332,7 @@ func choices(m dmessage.Message) []api.AttentionAction {
 		out = append([]api.AttentionAction{r}, slices.Delete(out, i, i+1)...)
 	}
 	if len(out) > 0 && m.Recommend != "" && out[0].ID == rec {
-		out[0].Title += " (recommended)"
+		out[0].Title = s.notice(builtin.NoticeNotifyRecommended, map[string]any{"Label": out[0].Title})
 	}
 	return out
 }
@@ -398,12 +399,12 @@ func (ev *taskViewer) draftAttention(ctx context.Context, e task.Task) *api.Atte
 		return nil
 	}
 	a := api.Attention{Category: string(api.CategoryOutbox), Subtitle: d.Unit.Label(), Body: draftBody(d)}
-	a.Title = "Draft to approve"
+	a.Title = ev.s.notice(builtin.NoticeNotifyDraft, nil)
 	if d.State == draft.Failed {
-		a.Title = "Draft failed"
+		a.Title = ev.s.notice(builtin.NoticeNotifyDraftFailed, nil)
 	}
 	drop, _ := ev.s.handlerVerb(handlerDrop)
-	a.Actions = []api.AttentionAction{{ID: "open", Title: "Open"}, {ID: verbAction(drop), Title: "Discard"}}
+	a.Actions = []api.AttentionAction{{ID: "open", Title: ev.s.notice(builtin.NoticeNotifyOpen, nil)}, {ID: verbAction(drop), Title: ev.s.notice(builtin.NoticeNotifyDiscard, nil)}}
 	a.ID = api.NotificationID(api.CategoryOutbox, string(e.ID), d.UpdatedAt.UTC().Format(stampToken))
 	return &a
 }

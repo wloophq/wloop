@@ -2,6 +2,8 @@ package daemon
 
 import (
 	"context"
+	"maps"
+	"slices"
 	"strconv"
 	"testing"
 
@@ -9,6 +11,8 @@ import (
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dmessage "github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/task"
+	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 func TestAQuestionGateOnATaskOutsideTheInboxNotifies(t *testing.T) {
@@ -49,5 +53,46 @@ func TestAQuestionGateOnATaskOutsideTheInboxNotifies(t *testing.T) {
 	}
 	if a := got["e-prop"].Attention; len(a.Actions) == 0 || a.Actions[0].ID != api.TaskActionPrefix+"approve" || a.Actions[0].Title != "Approve" {
 		t.Fatalf("a proposal offers %+v, want the verb that approves it, worded by the profile", a.Actions)
+	}
+}
+
+func TestNotificationWordsComeFromTheProfile(t *testing.T) {
+	t.Parallel()
+	r := newNotifyRig(t)
+	l := *bundledLoaded()
+	l.Notices = maps.Clone(l.Notices)
+	for name, text := range map[string]string{builtin.NoticeNotifyInbox: "Nova", builtin.NoticeNotifyQuestion: "Pergunta", builtin.NoticeNotifyYes: "Sim",
+		builtin.NoticeNotifyNo: "Não", builtin.NoticeNotifyRecommended: "{{.Label}} (sugerido)", builtin.NoticeNotifyReply: "Responder"} {
+		l.Notices[name] = text
+	}
+	r.s.deps.Intents = func() *intentload.Loaded { return &l }
+	ctx := context.Background()
+	for _, e := range []task.Task{
+		{ID: "e-in", State: "inbox", Category: task.CategoryInbox, Title: "plain", Origin: task.OriginUser, Created: catalogNow, Updated: catalogNow},
+		{ID: "e-ask", State: "next", Category: task.CategoryReady, Title: "ask", Origin: task.OriginUser, Created: catalogNow, Updated: catalogNow},
+	} {
+		if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m, err := r.s.deps.Messages.Store.Upsert(ctx, dmessage.Message{TaskID: "e-ask", Unit: task.UnitOf("e-ask"), Kind: dmessage.Question, Text: "ship?",
+		Confirm: true, Recommend: "yes", Origin: dmessage.Origin{Kind: dmessage.OriginTurn, TurnSeq: 1}, CreatedAt: catalogNow})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.s.deps.Gates.Open(ctx, gate.Gate{Kind: gate.KindQuestion, Task: "e-ask", Unit: task.UnitOf("e-ask"), Subject: strconv.FormatInt(m.ID, 10)}, nil); err != nil {
+		t.Fatal(err)
+	}
+	got := r.notified(t)
+	if a := got["e-in"].Attention; a == nil || a.Title != "Nova" {
+		t.Fatalf("the Inbox task notifies %+v", a)
+	}
+	a := got["e-ask"].Attention
+	var titles []string
+	for _, x := range a.Actions {
+		titles = append(titles, x.Title)
+	}
+	if a.Title != "Pergunta" || !slices.Equal(titles[:3], []string{"Sim (sugerido)", "Não", "Responder"}) {
+		t.Fatalf("the question notifies %q with %q", a.Title, titles)
 	}
 }

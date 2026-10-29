@@ -38,3 +38,33 @@ digest_title = "Daily digest"
 digest_new = "{{.Count}} new since the last digest"
 
 digest_view = "{{.Count}} in {{.View}}"
+
+# The words of the notifications: their titles and buttons.
+
+notify_inbox = "In your Inbox"
+
+notify_draft_for_me = "Draft for me"
+
+notify_reply = "Reply"
+
+notify_send_reply = "Send reply"
+
+notify_question = "Agent asks"
+
+notify_proposal = "Proposal"
+
+notify_post = "Agent posts"
+
+notify_yes = "Yes"
+
+notify_no = "No"
+
+notify_recommended = "{{.Label}} (recommended)"
+
+notify_draft = "Draft to approve"
+
+notify_draft_failed = "Draft failed"
+
+notify_open = "Open"
+
+notify_discard = "Discard"

@@ -596,6 +596,20 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `digest_title`: The title of the daily digest notification.
   - `digest_new`: The digest's first line: Count, the tasks of the badge's views that moved since the last digest.
   - `digest_view`: The digest's line for one view the badge counts: View, its label, and Count, its tasks.
+  - `notify_inbox`: The title of the notification of a task in the Inbox that says what it is itself.
+  - `notify_draft_for_me`: The button of an Inbox task's notification that delegates it to an agent headless.
+  - `notify_reply`: The button of a notification whose text input saves a reply for approval, or answers an agent.
+  - `notify_send_reply`: The button of a notification whose text input sends a reply at once.
+  - `notify_question`: The title of the notification of an agent's open question.
+  - `notify_proposal`: The title of the notification of an open proposal.
+  - `notify_post`: The title of the notification of an agent's open post.
+  - `notify_yes`: The button that answers yes to an agent's confirmation.
+  - `notify_no`: The button that answers no to an agent's confirmation.
+  - `notify_recommended`: The button of the option an agent recommends: Label, the option's label.
+  - `notify_draft`: The title of the notification of a draft that waits for your approval.
+  - `notify_draft_failed`: The title of the notification of a draft whose delivery failed.
+  - `notify_open`: The button that opens the notification's task in the cockpit.
+  - `notify_discard`: The button that discards a draft from its notification.
   - `record_owed`: The reason that blocks the stop of a session whose turn has no record: the unit, the turn's id and the directory a record file goes in.
   - `attach_needs_session`: Why task attach refuses to run outside an agent session a workspace manager started: the task named as the command reads it, and the enabled workspace managers as displayed.
 
@@ -618,6 +632,20 @@ The fields each notice reads besides `Name` and `Command`:
   - `digest_title`
   - `digest_new` (`Count`: number)
   - `digest_view` (`View`, `Count`: number)
+  - `notify_inbox`
+  - `notify_draft_for_me`
+  - `notify_reply`
+  - `notify_send_reply`
+  - `notify_question`
+  - `notify_proposal`
+  - `notify_post`
+  - `notify_yes`
+  - `notify_no`
+  - `notify_recommended` (`Label`)
+  - `notify_draft`
+  - `notify_draft_failed`
+  - `notify_open`
+  - `notify_discard`
   - `record_owed` (`Unit`, `Turn`, `ScratchDir`)
   - `attach_needs_session` (`Task`, `Managers`)
 
