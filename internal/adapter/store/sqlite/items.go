@@ -38,15 +38,17 @@ const (
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 )
 
-// proposalsSQL are the item proposals, each in the state of its newest gate: the gate of its ledger message,
-// or the one it has before its message exists. A proposal with no gate open or decided is open.
+// proposalsSQL are the item proposals, each in the state of its newest gate not superseded: the gate of its ledger
+// message, or the one it has before its message exists. A superseded gate decides nothing, such as one a reconcile
+// opened while the proposal's decision was being applied. A proposal with no gate open or decided is open.
 var proposalsSQL = fmt.Sprintf(`SELECT id, provider, unit_key, item, op, provenance, reason, state, at, decided_at != '' FROM (
 	SELECT p.*, CASE coalesce((SELECT g.status FROM gates g WHERE g.provider = p.provider AND g.unit_key = p.unit_key AND g.kind = '%s'
+		AND g.status != '%s'
 		AND g.subject IN ('%s' || p.id, (SELECT CAST(m.id AS TEXT) FROM messages m WHERE m.origin_kind = '%s' AND m.proposal = p.id))
 		ORDER BY g.id DESC LIMIT 1), '')
 	WHEN '%s' THEN '%s' WHEN '%s' THEN '%s' WHEN '%s' THEN '%s' ELSE '%s' END AS state
 	FROM item_proposals p)`,
-	gate.KindProposal, strings.TrimSuffix(gate.ProposalSubject(0), "0"), message.OriginLedger,
+	gate.KindProposal, gate.Superseded, strings.TrimSuffix(gate.ProposalSubject(0), "0"), message.OriginLedger,
 	gate.Approved, coreitems.ProposalAccepted, gate.Rejected, coreitems.ProposalRejected, gate.Dismissed, coreitems.ProposalRejected,
 	coreitems.ProposalOpen)
 
