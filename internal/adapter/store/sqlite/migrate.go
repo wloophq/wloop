@@ -24,7 +24,11 @@ type migration struct {
 	// store after this migration; 0 is to itself. A migration that only adds
 	// what an older release ignores declares that release's version.
 	compatible uint32
-	up         func(ctx context.Context, tx *sql.Tx) error
+	// before, when set, runs on the migration's connection before its
+	// transaction, with the store's directory: what it writes beside the
+	// store must be complete before the migration commits.
+	before func(ctx context.Context, conn *sql.Conn, storeDir string) error
+	up     func(ctx context.Context, tx *sql.Tx) error
 }
 
 func (m migration) label() string { return fmt.Sprintf("%04d_%s", m.to, m.name) }
@@ -65,7 +69,7 @@ var migrations = []migration{
 		`ALTER TABLE drafts ADD COLUMN replaced TEXT NOT NULL DEFAULT ''`,
 	)},
 	{to: 6, name: "answer_message", compatible: 4, up: v6Answers},
-	{to: 7, name: "tasks", foreignKeysOff: true, compatible: 7, up: v7},
+	{to: 7, name: "tasks", foreignKeysOff: true, compatible: 7, before: v7ExportPlugins, up: v7},
 }
 
 // schemaSet is a schema and the migrations that reach it, so tests can run
@@ -173,6 +177,9 @@ type MigrateOptions struct {
 	Keep int
 	// Backup, when set, is the backup's path, as a Plan named it.
 	Backup string
+	// BackedUp, when set, runs once the store's backup is written, before
+	// any migration; its error stops Migrate with the store unchanged.
+	BackedUp func(backup string) error
 	// Step, when set, hears of each migration as it commits.
 	Step func(label string, took time.Duration)
 	// Warn, when set, hears of what failed after the migrations committed
@@ -262,6 +269,11 @@ func (set schemaSet) migrate(ctx context.Context, path string, o MigrateOptions)
 	if err := backupTo(ctx, conn, p.Backup); err != nil {
 		return fail(err)
 	}
+	if o.BackedUp != nil {
+		if err := o.BackedUp(p.Backup); err != nil {
+			return fail(err)
+		}
+	}
 	defer func() { warn(prune(o.Backups, keep, now(), p.Backup)) }()
 	reached := p.From
 	for _, m := range set.pending(p.From) {
@@ -304,6 +316,15 @@ func (set schemaSet) step(ctx context.Context, conn *sql.Conn, m migration) (err
 			}
 		}()
 	}
+	if m.before != nil {
+		var file string
+		if err := conn.QueryRowContext(ctx, `SELECT file FROM pragma_database_list WHERE name = 'main'`).Scan(&file); err != nil {
+			return err
+		}
+		if err := m.before(ctx, conn, filepath.Dir(file)); err != nil {
+			return err
+		}
+	}
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -333,6 +354,20 @@ func (set schemaSet) step(ctx context.Context, conn *sql.Conn, m migration) (err
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
 		compatibleKey, strconv.FormatUint(uint64(set.compatibleAt(m.to)), 10)); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// migrationTx runs fn in a transaction of its own on a migration's
+// connection, committed when fn succeeds.
+func migrationTx(ctx context.Context, conn *sql.Conn, fn func(*sql.Tx) error) error {
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := fn(tx); err != nil {
 		return err
 	}
 	return tx.Commit()

@@ -56,7 +56,8 @@ func TestVersion2ShapesDraftsFromTheirKind(t *testing.T) {
 		t.Errorf("got\n%s", strings.Join(got, "\n"))
 	}
 	var closed string
-	if err := db.r.QueryRow(`SELECT group_concat(unit_key) FROM extraction_cursors WHERE closure_posted = 1`).Scan(&closed); err != nil || closed != "C1/4" {
+	slack := exported(t, filepath.Join(filepath.Dir(path), "plugins", "slack", "import.db"))
+	if err := slack.QueryRow(`SELECT group_concat(unit_key) FROM extraction_cursors WHERE closure_posted = 1`).Scan(&closed); err != nil || closed != "C1/4" {
 		t.Errorf("closure_posted on %q %v", closed, err)
 	}
 }

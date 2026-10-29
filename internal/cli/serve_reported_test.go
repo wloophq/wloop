@@ -58,7 +58,7 @@ func TestServeShowsAPluginsReportsAndNotifiesIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	te.plugins = []host.Plugin{{Manifest: m, Dir: t.TempDir(), Binary: brand.PluginBinary("acme"), Bundled: true}}
+	te.plugins = recordedPlugins(t, te.StateDir, host.Plugin{Manifest: m, Dir: t.TempDir(), Binary: brand.PluginBinary("acme"), Bundled: true})
 	stub := &reportingStub{Stub: sourcetest.NewStub(src.Snapshot{Unit: plugin.Unit{Provider: "acme", Key: "one"}, Rev: 1,
 		Situation: &src.Situation{Kind: "waiting", WaitingOn: "me", Reason: "ana asked"}, Card: &src.Card{Title: "deploy?"}})}
 	l := plugintest.NewLauncher(t)

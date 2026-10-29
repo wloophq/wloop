@@ -47,7 +47,7 @@ func TestLocateResolvesAWorktree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	te.plugins = []host.Plugin{{Manifest: m, Dir: t.TempDir(), Binary: brand.PluginBinary("acme"), Bundled: true}}
+	te.plugins = recordedPlugins(t, te.StateDir, host.Plugin{Manifest: m, Dir: t.TempDir(), Binary: brand.PluginBinary("acme"), Bundled: true})
 	l := plugintest.NewLauncher(t)
 	l.Add("acme", map[plugin.Kind]plugin.Impl{src.Kind: src.New(branchLocator{sourcetest.NewStub()})})
 	te.pluginLauncher = l

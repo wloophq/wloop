@@ -128,7 +128,7 @@ func withSlackPlugin(t *testing.T, e *Env, env slack.Env) {
 	l := plugintest.NewLauncher(t)
 	l.Add(string(slackPlugin), map[plugin.Kind]plugin.Impl{src.Kind: src.New(&slack.Plugin{Env: env})})
 	e.pluginLauncher = l
-	e.plugins = []host.Plugin{{Manifest: bundledSlackManifest(t), Dir: t.TempDir(), Binary: brand.PluginBinary(string(slackPlugin)), Bundled: true}}
+	e.plugins = recordedPlugins(t, e.StateDir, host.Plugin{Manifest: bundledSlackManifest(t), Dir: t.TempDir(), Binary: brand.PluginBinary(string(slackPlugin)), Bundled: true})
 }
 
 func newSlackTestEnv(t *testing.T) *slackTestEnv {

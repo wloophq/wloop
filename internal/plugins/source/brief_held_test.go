@@ -33,16 +33,14 @@ func TestATaskThatStartsHoldingAnItemGetsTheAsksOfItsItems(t *testing.T) {
 	}
 	later := task.ID("t-00000000000000c3")
 	holdTask(t, db, later, thread, "i2")
-	eventually(t, "the new task's brief record", func() bool {
+	eventually(t, "the new task's brief record and its projected risk", func() bool {
 		_, ok := briefOf(t, db, task.UnitOf(later))
-		return ok
+		p, _ := db.Props(nil).PropsOf(context.Background(), later)
+		return ok && p["risk"].Text == "low"
 	})
 	b, _ := briefOf(t, db, task.UnitOf(later))
 	asks, _ := b["asks"].([]any)
 	if len(asks) != 1 || asks[0].(map[string]any)["ask"] != "Who sends the invoice?" {
 		t.Fatalf("the task's brief %v, want the ask of its item only", b)
-	}
-	if p, _ := db.Props(nil).PropsOf(context.Background(), later); p["risk"].Text != "low" {
-		t.Errorf("the risk did not project onto the task: %v", p)
 	}
 }

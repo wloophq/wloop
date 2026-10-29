@@ -26,5 +26,6 @@ func SkillName(verb string) string { return Name + "-" + verb }
 // DocsURL is the documentation site's root, with its trailing slash.
 func DocsURL() string { return "https://" + Org + ".github.io/" + Name + "/" }
 
-// PluginBinary is the name of plugin id's binary in its directory.
-func PluginBinary(id string) string { return Command + "-plugin-" + id }
+// PluginBinary is the name of plugin id's binary in its directory, named
+// after the host's binary.
+func PluginBinary(id string) string { return Name + "-plugin-" + id }

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -79,7 +78,7 @@ func (p *Plugin) now() time.Time {
 }
 
 func (p *Plugin) brand() string {
-	if b := os.Getenv(sdk.BrandEnv); b != "" {
+	if b := sdk.Brand(); b != "" {
 		return b
 	}
 	return "the loop"

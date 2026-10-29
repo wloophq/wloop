@@ -14,6 +14,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/backup"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/dossier"
@@ -154,7 +155,7 @@ func (e *Env) migrateInDaemon(ctx context.Context, path string, logf func(string
 		return err
 	}
 	logf("store: migrating from version %d to %d; backup at %s", p.From, p.To, p.Backup)
-	if _, err := sqlite.Migrate(ctx, path, sqlite.MigrateOptions{Backups: e.backupsPath(), Now: e.Now, Backup: p.Backup,
+	if _, err := sqlite.Migrate(ctx, path, sqlite.MigrateOptions{Backups: e.backupsPath(), Now: e.Now, Backup: p.Backup, BackedUp: e.backUpPluginStores,
 		Step: func(label string, took time.Duration) { logf("store: %s ok (%s)", label, took.Round(time.Millisecond)) },
 		Warn: func(err error) { logf("store: %v", err) },
 	}); err != nil {
@@ -469,8 +470,8 @@ func (e *Env) storeMigrate(ctx context.Context, args []string) error {
 	return e.withStoreLock(ctx, func() error { return e.migrateStore(ctx, path, p.Backup) })
 }
 
-func (e *Env) migrateStore(ctx context.Context, path, backup string) error {
-	p, err := sqlite.Migrate(ctx, path, sqlite.MigrateOptions{Backups: e.backupsPath(), Now: e.Now, Backup: backup,
+func (e *Env) migrateStore(ctx context.Context, path, backupPath string) error {
+	p, err := sqlite.Migrate(ctx, path, sqlite.MigrateOptions{Backups: e.backupsPath(), Now: e.Now, Backup: backupPath, BackedUp: e.backUpPluginStores,
 		Step: func(label string, took time.Duration) {
 			fmt.Fprintf(e.Out, "  %s ... ok (%s)\n", label, took.Round(time.Millisecond))
 		},
@@ -498,6 +499,10 @@ func (e *Env) migrateStore(ctx context.Context, path, backup string) error {
 	}
 	return nil
 }
+
+// backUpPluginStores copies the plugins' stores beside the store's backup
+// at b.
+func (e *Env) backUpPluginStores(b string) error { return backup.PluginStores(e.StateDir, b) }
 
 func (e *Env) confirmStore(verb string, yes bool) error {
 	if yes {
@@ -563,7 +568,13 @@ func (e *Env) storeRestore(ctx context.Context, args []string) error {
 			return err
 		}
 		if got.Kept != "" {
+			if err := backup.PluginStores(e.StateDir, got.Kept); err != nil {
+				return err
+			}
 			fmt.Fprintf(e.Out, "kept the replaced store as %s\n", got.Kept)
+		}
+		if err := backup.RestorePluginStores(b.Path, e.StateDir); err != nil {
+			return err
 		}
 		fmt.Fprintf(e.Out, "store: restored at version %d\n", got.From.Version)
 		if err := e.renameTaskDossiers(was, got.From.Version); err != nil {

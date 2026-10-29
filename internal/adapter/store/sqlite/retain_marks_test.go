@@ -12,7 +12,8 @@ func TestRetainDropsTheMarksOfEndedTasksAndVanishedSlackUnits(t *testing.T) {
 	for id, c := range map[string]string{"e-open": "waiting", "e-done": "done", "e-trash": "dropped", "e-ref": "deferred"} {
 		exec(t, db, `INSERT INTO tasks (id, state, category, origin, created, updated, rev) VALUES (?, ?, ?, 'user', ?, ?, 1)`, id, "s-"+id, c, at(past), at(past))
 	}
-	exec(t, db, `INSERT INTO extraction_cursors (provider, unit_key, at) VALUES ('slack', 'T1/C1/1.1', ?)`, at(past))
+	reportSlack(t, db, "T1/C1/1.1", false)
+	reportSlack(t, db, "T1/C1/9.9", true)
 	exec(t, db, `INSERT INTO items (provider, unit_key, id, body, state, provenance, created_at, updated_at) VALUES ('slack', 'T1/C1/2.2', 'i1', '{}', 'open', 'extracted', ?, ?)`, at(past), at(past))
 	exec(t, db, `INSERT INTO task_units (task_id, provider, unit_key, ord) VALUES ('e-open', 'slack', 'T1/C1/3.3', 0)`)
 	marks := map[string][]string{

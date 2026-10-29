@@ -3,32 +3,41 @@
 # items or daemon.
 #
 # Usage:
-#   isolated-daemon.sh setup <dir> <binary> <dm-channel-id> [<index>] [--slack] [--agent]
+#   isolated-daemon.sh setup <dir> <binary> <dm-channel-id> [<index>] [--slack] [--agent] [--plugins <id,...>]
 #   isolated-daemon.sh env <dir>
 #   isolated-daemon.sh run <dir> <command> [<arg>...]
 #   isolated-daemon.sh snapshot <dir> <source-store>
 #   isolated-daemon.sh pause <dir>
-#   isolated-daemon.sh start <dir> [<serve arg>...]
+#   isolated-daemon.sh start <dir> [--jobs] [<serve arg>...]
 #   isolated-daemon.sh stop <dir>
 #   isolated-daemon.sh clean <dir>
 #
 # setup creates <dir> (it must not exist) with state/, config/, bin/, gh/ and
 # home/ (the user home the binary sees; HOME stays real for the Keychain),
 # copies <binary> into bin/ beside the orca, gh, codex, launchctl and claude
-# stubs, and writes the config: brief, every workflow of
-# profiles/default/workflows/ and plugins/*/profile/workflows/ and the github and slack plugins off, ports 47910+<index> (HTTP) and
+# stubs, and the plugins beside it, as `make build` places them in
+# plugins/<id>/, into bin/plugins/, and writes the config: brief, every
+# workflow of profiles/default/workflows/ and plugins/*/profile/workflows/
+# and the github and slack plugins off, ports 47910+<index> (HTTP) and
 # 47810+<index> (MCP), the e2e Keychain service and <dm-channel-id> as the
-# only channel posts may reach. --slack turns the slack plugin on; every start
-# or pause of that directory then takes <dir>/../slack-socket.lock and refuses
-# while another daemon holds it. --agent leaves claude unstubbed. The state and
+# only channel posts may reach. --plugins turns the plugins it lists on,
+# each trusted by its path since no install recorded its checksum: github
+# runs against the stubbed gh, slack with no socket. --slack turns the slack
+# plugin on with its socket; every start or pause of that directory then
+# takes <dir>/../slack-socket.lock and refuses while another daemon holds
+# it. --agent leaves claude unstubbed. The state and
 # config directory name is ISOLATED_STATE_NAME, else the binary's basename, and
 # setup refuses when the binary does not read the config it wrote. setup also
 # writes the MCP key the daemon requires (state/<name>/mcp.key, 0600); env and
 # run expose it as ISOLATED_MCP_KEY for a recipe's X-Loop-Key header.
 #
 # snapshot copies a store into <dir>'s state, never writing the source, at
-# 0600, and marks <dir> as holding a copy: start and serve then require
-# --no-jobs. The copy must carry a stored GitHub viewer.
+# 0600, with the plugins/<id>/import.db beside it, and marks <dir> as
+# holding a copy: start and serve then require --no-jobs. The copy must
+# carry a stored GitHub viewer. start --jobs serves a copy with its jobs on
+# when setup turned plugins on, so they start, import and report against
+# the stubs; a version 6 copy first takes `run <dir> <binary> store migrate
+# --yes`, which writes each import.db.
 #
 # pause serves --no-jobs once, stores the pause through the CLI and stops.
 # start serves in the background, logging to <dir>/daemon.log. stop signals
@@ -54,7 +63,7 @@ load() {
 	[[ -d $1 ]] || die "$1 is not a directory this script set up"
 	dir=$(cd "$1" && pwd)
 	[[ -f $dir/isolated.env ]] || die "$1 is not a directory this script set up"
-	slack=0 agent=0
+	slack=0 agent=0 plugins=""
 	# shellcheck source=/dev/null
 	source "$dir/isolated.env"
 }
@@ -155,14 +164,20 @@ release_lock() {
 	fi
 }
 
-# needs_no_jobs refuses a serve without --no-jobs over a copied store.
+# needs_no_jobs refuses a serve without --no-jobs over a copied store,
+# unless jobs is 1 and setup turned plugins on.
 needs_no_jobs() {
+	local jobs=$1 a
+	shift
 	[[ -f $dir/copied ]] || return 0
-	local a
 	for a in "$@"; do
 		[[ $a == --no-jobs ]] && return 0
 	done
-	die "$dir holds a copy of a store; serve it only with --no-jobs"
+	if ((jobs)); then
+		[[ -n $plugins ]] || die "--jobs serves a copied store for its plugins; set $dir up with --plugins"
+		return 0
+	fi
+	die "$dir holds a copy of a store; serve it only with --no-jobs, or with --jobs for the plugins setup turned on"
 }
 
 toml_list() {
@@ -176,17 +191,36 @@ toml_list() {
 	printf ']'
 }
 
+# plugin_on says plugin $1 is among the --plugins of setup.
+plugin_on() {
+	local p
+	for p in ${plugins[@]+"${plugins[@]}"}; do
+		[[ $p == "$1" ]] && return 0
+	done
+	return 1
+}
+
 cmd_setup() {
-	local pos=() a
-	slack=0 agent=0
-	for a in "$@"; do
+	local pos=() a list=""
+	slack=0 agent=0 plugins=()
+	while [[ $# -gt 0 ]]; do
+		a=$1
+		shift
 		case $a in
 		--slack) slack=1 ;;
 		--agent) agent=1 ;;
+		--plugins)
+			[[ $# -gt 0 ]] || usage
+			list=$1
+			shift
+			;;
+		--plugins=*) list=${a#--plugins=} ;;
 		--*) usage ;;
 		*) pos+=("$a") ;;
 		esac
 	done
+	if [[ -n $list ]]; then IFS=, read -r -a plugins <<<"$list"; fi
+	((slack)) && plugin_on slack && die "--slack runs Slack's socket and --plugins slack runs none; choose one"
 	[[ ${#pos[@]} -ge 3 && ${#pos[@]} -le 4 ]] || usage
 	local target=${pos[0]} binary=${pos[1]} dm=${pos[2]} index=${pos[3]:-0}
 	[[ ! -e $target ]] || die "$target exists; every acceptance starts from a fresh directory"
@@ -208,6 +242,16 @@ cmd_setup() {
 	local bin
 	bin="$dir/bin/$(basename "$binary")"
 	cp "$binary" "$bin"
+	local from p
+	from="$(dirname "$binary")/plugins"
+	if [[ -d $from ]]; then cp -R "$from" "$dir/bin/plugins"; fi
+	for p in ${plugins[@]+"${plugins[@]}"}; do
+		[[ $p =~ ^[a-z][a-z0-9-]*$ ]] || die "plugin id $p is not one"
+		[[ -f $dir/bin/plugins/$p/plugin.toml ]] || {
+			rm -rf "$dir"
+			die "no plugin $p beside $binary: build it with make build, which places it in $from/$p"
+		}
+	done
 	local stubs=(orca gh codex launchctl) stub
 	((agent)) || stubs+=(claude)
 	for stub in "${stubs[@]}"; do
@@ -224,8 +268,22 @@ cmd_setup() {
 	for w in "${workflows[@]}"; do
 		wf+=$'\n'"[workflows.$w]"$'\n'"enabled = false"$'\n'
 	done
-	local slack_on=false
+	local slack_on=false github_on=false
 	((slack)) && slack_on=true
+	plugin_on slack && slack_on=true
+	plugin_on github && github_on=true
+	local github_trust="" slack_trust="" slack_ingest="" others=""
+	plugin_on github && github_trust='trust = "path"'
+	if plugin_on slack; then
+		slack_trust='trust = "path"'
+		slack_ingest=$'\n[plugins.slack.ingest]\nsocket = false\n'
+	fi
+	for p in ${plugins[@]+"${plugins[@]}"}; do
+		case $p in
+		github | slack) ;;
+		*) others+=$'\n'"[plugins.$p]"$'\n'"enabled = true"$'\n'"trust = \"path\""$'\n' ;;
+		esac
+	done
 
 	cat >"$dir/config/$name/config.toml" <<-EOF
 		[http]
@@ -241,19 +299,21 @@ cmd_setup() {
 		enabled = false
 
 		[plugins.github]
-		enabled = false
+		enabled = $github_on
+		$github_trust
 
 		[plugins.slack]
 		enabled = $slack_on
+		$slack_trust
 		keychain_service = "wloop-e2e-slack"
 		post_allowlist = $(toml_list "$dm")
 		request_log = true
-		$wf
+		$slack_ingest$others$wf
 	EOF
 	chmod 600 "$dir/config/$name/config.toml"
 	mkdir -m 700 "$dir/state/$name"
 	(umask 077 && od -An -tx1 -N24 /dev/urandom | tr -d ' \n' >"$dir/state/$name/mcp.key")
-	printf 'binary=%q\nname=%q\nslack=%d\nagent=%d\n' "$bin" "$name" "$slack" "$agent" >"$dir/isolated.env"
+	printf 'binary=%q\nname=%q\nslack=%d\nagent=%d\nplugins=%q\n' "$bin" "$name" "$slack" "$agent" "$list" >"$dir/isolated.env"
 
 	local got
 	got=$(with_env "$bin" config get http.port 2>/dev/null || true)
@@ -290,7 +350,7 @@ cmd_run() {
 	local a
 	for a in "$@"; do
 		if [[ $a == serve ]]; then
-			needs_no_jobs "$@"
+			needs_no_jobs 0 "$@"
 			break
 		fi
 	done
@@ -324,6 +384,15 @@ cmd_snapshot() {
 		drop_copy "the snapshot has no meta table"
 	[[ $(sqlite3 "$dest" "SELECT count(*) FROM meta WHERE key = 'viewer:github' AND value != ''") != 0 ]] ||
 		drop_copy "the copy has no stored GitHub viewer; its rows cannot render"
+	local export id
+	for export in "$(dirname "$src")"/plugins/*/import.db; do
+		[[ -f $export ]] || continue
+		id=$(basename "$(dirname "$export")")
+		mkdir -m 700 -p "$(dirname "$dest")/plugins/$id"
+		cp "$export" "$(dirname "$dest")/plugins/$id/import.db"
+		chmod 600 "$(dirname "$dest")/plugins/$id/import.db"
+		echo "copied the $id plugin's import.db"
+	done
 	touch "$dir/copied"
 	echo "copied $(sqlite3 "$dest" "SELECT count(*) FROM sqlite_master WHERE type = 'table'") tables"
 }
@@ -406,7 +475,12 @@ cmd_start() {
 	[[ $# -ge 1 ]] || usage
 	load "$1"
 	shift
-	needs_no_jobs "$@"
+	local jobs=0
+	if [[ ${1:-} == --jobs ]]; then
+		jobs=1
+		shift
+	fi
+	needs_no_jobs "$jobs" "$@"
 	launch_locked "$@"
 	echo "started $(head -n 1 "$dir/daemon.pid")"
 }

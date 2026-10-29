@@ -14,6 +14,7 @@ package plugin
 
 import (
 	"context"
+	"os"
 
 	goplugin "github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
@@ -35,6 +36,10 @@ var Handshake = goplugin.HandshakeConfig{
 // BrandEnv is the environment variable through which the host passes its
 // brand name to a plugin process; a plugin cannot import the host's brand.
 const BrandEnv = "LOOP_PLUGIN_BRAND"
+
+// Brand is the host's brand name as the host passed it in [BrandEnv]; empty
+// when the process was started by no host, as in CLI mode run by hand.
+func Brand() string { return os.Getenv(BrandEnv) }
 
 // ParentEnv is the environment variable through which the host passes its
 // pid, so a plugin whose host died before Serve ran still exits.

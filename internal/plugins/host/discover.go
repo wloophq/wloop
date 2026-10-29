@@ -37,10 +37,16 @@ type Root struct {
 	Bundled bool
 }
 
-// Roots are where plugins are found: the user's, <config>/plugins, then the
-// bundled directory beside the daemon's binary, <exe dir>/plugins.
-func Roots(configDir, exe string) []Root {
-	out := []Root{{Dir: filepath.Join(configDir, "plugins")}}
+// InstalledDir is where install places the bundled plugins of the release
+// it runs from, under the state directory.
+func InstalledDir(stateDir string) string { return filepath.Join(stateDir, "plugins", "bundled") }
+
+// Roots are where plugins are found: the user's, <config>/plugins; the
+// bundled ones install placed, InstalledDir; then the bundled directory
+// beside the binary, <exe dir>/plugins, where a release and a development
+// build keep them.
+func Roots(configDir, stateDir, exe string) []Root {
+	out := []Root{{Dir: filepath.Join(configDir, "plugins")}, {Dir: InstalledDir(stateDir), Bundled: true}}
 	if exe != "" {
 		out = append(out, Root{Dir: filepath.Join(filepath.Dir(exe), "plugins"), Bundled: true})
 	}

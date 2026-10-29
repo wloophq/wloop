@@ -186,6 +186,8 @@ type Env struct {
 	// pluginKind is serve's source kind: the clients and the snapshots of
 	// the source plugins it runs.
 	pluginKind *psource.Kind
+	// pluginRuns are the ids of the plugins serve runs.
+	pluginRuns []string
 	// pluginLauncher starts serve's plugins; nil starts their binaries.
 	pluginLauncher plugin.Launcher
 	// reports are what the source plugins last reported, as a test derives

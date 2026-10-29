@@ -2,8 +2,13 @@ package cli
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/xml"
+	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -14,8 +19,11 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api/client"
+	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/shell"
+	"github.com/wloophq/wloop/internal/fsx"
+	"github.com/wloophq/wloop/internal/plugins/host"
 )
 
 var launchAgentLabel = client.DaemonLabel
@@ -228,4 +236,174 @@ func shellPath() string {
 		}
 	}
 	return "/bin/sh"
+}
+
+// shippedSumSuffix names the checksum a release ships beside each plugin
+// binary, as sha256sum writes it.
+const shippedSumSuffix = ".sha256"
+
+// placeBundledPlugins copies the plugins the release ships beside the
+// binary, in <exe dir>/plugins/<id>/, to host.InstalledDir, where the
+// daemon finds them whatever path it runs the binary by, and records each
+// binary's checksum, which the host requires of a bundled plugin. A binary
+// that does not match the checksum its release shipped is refused. With no
+// bundled plugin beside the binary, as under go run, it changes nothing.
+func (e *Env) placeBundledPlugins(dryRun bool) error {
+	exe, err := filepath.EvalSymlinks(e.Executable)
+	if err != nil {
+		return nil
+	}
+	from := filepath.Join(filepath.Dir(exe), "plugins")
+	to := host.InstalledDir(e.StateDir)
+	if fsx.SameFile(from, to) {
+		return nil
+	}
+	found, err := host.Discover(host.Root{Dir: from, Bundled: true})
+	if err != nil {
+		return fmt.Errorf("the bundled plugins beside %s: %w", exe, err)
+	}
+	if len(found) == 0 {
+		return nil
+	}
+	sums := host.Checksums{}
+	for _, p := range found {
+		if p.Binary == "" {
+			return fmt.Errorf("the bundled plugin %s: %s holds no binary %s", p.ID(), p.Dir, brand.PluginBinary(p.ID()))
+		}
+		sum, err := fileSHA256(p.Binary)
+		if err != nil {
+			return err
+		}
+		if err := matchShippedSum(p.Binary, sum); err != nil {
+			return err
+		}
+		sums[p.ID()] = sum
+		dest := filepath.Join(to, p.ID())
+		if dryRun {
+			fmt.Fprintf(e.Out, "would place plugin %s (sha256 %x) in %s\n", p.ID(), sum, dest)
+			continue
+		}
+		if err := replaceDir(p.Dir, dest); err != nil {
+			return fmt.Errorf("placing plugin %s: %w", p.ID(), err)
+		}
+		fmt.Fprintf(e.Out, "placed plugin %s (sha256 %x) in %s\n", p.ID(), sum, dest)
+	}
+	if dryRun {
+		return nil
+	}
+	entries, err := os.ReadDir(to)
+	if err != nil {
+		return err
+	}
+	for _, d := range entries {
+		if _, ok := sums[d.Name()]; !ok {
+			if err := os.RemoveAll(filepath.Join(to, d.Name())); err != nil {
+				return err
+			}
+		}
+	}
+	return writeChecksums(host.ChecksumsFile(e.StateDir), sums)
+}
+
+func fileSHA256(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return nil, err
+	}
+	return h.Sum(nil), nil
+}
+
+// matchShippedSum refuses bin when the checksum its release shipped beside
+// it names another sum; a binary shipped without one, as a development
+// build, passes.
+func matchShippedSum(bin string, sum []byte) error {
+	raw, err := os.ReadFile(bin + shippedSumSuffix)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	fields := strings.Fields(string(raw))
+	if len(fields) == 0 || !strings.EqualFold(fields[0], hex.EncodeToString(sum)) {
+		return fmt.Errorf("%s does not match the checksum its release shipped in %s; reinstall the release", bin, bin+shippedSumSuffix)
+	}
+	return nil
+}
+
+// replaceDir copies the tree src to dst through a sibling directory, so dst
+// is the old tree or the new one, never a mix.
+func replaceDir(src, dst string) error {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
+		return err
+	}
+	tmp := dst + ".new"
+	if err := os.RemoveAll(tmp); err != nil {
+		return err
+	}
+	err := filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		out := filepath.Join(tmp, rel)
+		if d.IsDir() {
+			return os.MkdirAll(out, 0o755)
+		}
+		fi, err := d.Info()
+		if err != nil {
+			return err
+		}
+		if !fi.Mode().IsRegular() {
+			return nil
+		}
+		return copyFileMode(path, out, fi.Mode().Perm())
+	})
+	if err != nil {
+		_ = os.RemoveAll(tmp)
+		return err
+	}
+	if err := os.RemoveAll(dst); err != nil {
+		return err
+	}
+	return os.Rename(tmp, dst)
+}
+
+func copyFileMode(src, dst string, mode fs.FileMode) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(out, in)
+	return errors.Join(err, out.Close())
+}
+
+// writeChecksums records sums at path as sha256sum writes them, one
+// "<hex>  <id>" line per plugin.
+func writeChecksums(path string, sums host.Checksums) error {
+	var b strings.Builder
+	for _, id := range slices.Sorted(maps.Keys(sums)) {
+		fmt.Fprintf(&b, "%x  %s\n", sums[id], id)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	tmp := path + ".new"
+	if err := os.WriteFile(tmp, []byte(b.String()), 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }

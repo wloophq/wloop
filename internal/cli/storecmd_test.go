@@ -122,6 +122,15 @@ func TestStoreRestorePutsTheNewestBackupBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	setStore(t, te.storePath(), `UPDATE meta SET value = 'after' WHERE key = 'mark'`)
+	pluginStore := filepath.Join(te.StateDir, "plugins", "github", "plugin.db")
+	for path, body := range map[string]string{filepath.Join(backup+".plugins", "github", "plugin.db"): "before", pluginStore: "after"} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	if code := te.runCLI("store", "restore", "--list"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -139,6 +148,11 @@ func TestStoreRestorePutsTheNewestBackupBack(t *testing.T) {
 	kept := filepath.Join(te.backupsPath(), "store-v"+schemaV+"-"+testNow.UTC().Format("20060102T150405Z")+".pre-restore.db")
 	if got := storeMarkOf(t, kept); got != "after" {
 		t.Fatalf("kept mark %q", got)
+	}
+	for path, want := range map[string]string{pluginStore: "before", filepath.Join(kept+".plugins", "github", "plugin.db"): "after"} {
+		if raw, err := os.ReadFile(path); err != nil || string(raw) != want {
+			t.Errorf("%s holds %q (%v), want the plugin store %s the restore", path, raw, err, want)
+		}
 	}
 	out := te.out.String()
 	for _, want := range []string{"restore " + backup + " (version " + schemaV + ", taken ", "what changed in " + brand.Name + " since then is lost", "kept the replaced store as " + kept, "store: restored at version " + schemaV} {

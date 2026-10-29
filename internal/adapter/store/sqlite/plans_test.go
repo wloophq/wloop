@@ -171,13 +171,9 @@ func TestHotPlans(t *testing.T) {
 // reads; its TestHotPlans covers them.
 var indexesUsedByInventory = []string{
 	"events_keyed", "events_unkeyed", "events_unit", "events_unit_kind", "events_recent", "events_kind",
-	"turns_sent_at", "turn_instructions_kind", "pr_state", "turn_records_once", "intakes_open",
+	"turns_sent_at", "turn_instructions_kind", "turn_records_once", "intakes_open",
 	"messages_open", "messages_task", "messages_proposal",
 }
-
-// indexesOfMovedTables are the indexes of the Slack tables the plugin's own
-// store took over, which no host query reads; they go with their tables.
-var indexesOfMovedTables = []string{"slack_objects_due", "slack_messages_anchor", "slack_users_email"}
 
 func TestNoUnusedIndex(t *testing.T) {
 	t.Parallel()
@@ -198,7 +194,7 @@ func TestNoUnusedIndex(t *testing.T) {
 		if err := rows.Scan(&name); err != nil {
 			t.Fatal(err)
 		}
-		if !used[name] && !slices.Contains(indexesUsedByInventory, name) && !slices.Contains(indexesOfMovedTables, name) {
+		if !used[name] && !slices.Contains(indexesUsedByInventory, name) {
 			t.Errorf("index %s is in no hot plan", name)
 		}
 	}

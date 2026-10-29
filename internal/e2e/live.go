@@ -61,6 +61,13 @@ func newLive(t *testing.T) *live {
 	if err := c.Ping(context.Background()); err != nil {
 		t.Fatalf("the installed daemon does not answer on %s: %v", socket, err)
 	}
+	h, err := c.Health(context.Background())
+	if err != nil {
+		t.Fatalf("the installed daemon's health: %v", err)
+	}
+	if !slices.ContainsFunc(h.Plugins, func(p api.PluginHealth) bool { return p.ID == "github" && p.Status != "down" }) {
+		t.Fatalf("the installed daemon runs no GitHub plugin binary (%+v); make dev-install places and records it", h.Plugins)
+	}
 	return &live{t: t, stamp: time.Now().Format("20060102-150405"), socket: socket, daemon: c,
 		orca: &wsorca.Manager{R: wsorca.Exec{}}, terminals: map[string]bool{}}
 }

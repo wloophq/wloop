@@ -34,9 +34,8 @@ func TestAnEndedPRWithATaskKeepsItsTurnsPlanItemsAndBriefs(t *testing.T) {
 	for range 2 {
 		retain(t, db, DefaultRetention)
 	}
-	plugin := []string{"pull_requests", "pr_details", "pr_seen"}
 	for table, n := range prRows(t, db, worked) {
-		if !slices.Contains(plugin, table) && n != 1 {
+		if n != 1 {
 			t.Errorf("%s keeps %d rows of the pull request a task works on, want 1", table, n)
 		}
 	}

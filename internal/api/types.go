@@ -405,6 +405,16 @@ type Health struct {
 	// Store is the store's schema version and state; nil from a daemon that
 	// predates it.
 	Store *StoreStatus `json:"store,omitempty"`
+	// Plugins are the plugins the daemon runs, by id, and how each answers.
+	Plugins []PluginHealth `json:"plugins,omitempty"`
+}
+
+// PluginHealth is a plugin the daemon runs: its status, one of loading,
+// serving, degraded or down, and why in the plugin's words.
+type PluginHealth struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+	Reason string `json:"reason,omitempty"`
 }
 
 // StoreStatus is the store as the daemon found it. A daemon whose store is

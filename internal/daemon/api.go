@@ -193,6 +193,9 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		WorkspaceManagers:  s.deps.WorkspaceManagers,
 		Store:              s.deps.Store,
 	}
+	if s.deps.PluginHealth != nil {
+		h.Plugins = s.deps.PluginHealth(r.Context())
+	}
 	if s.deps.Budget != nil {
 		h.RateLimit = s.graphQLBudget()
 		h.SlowSync = s.rateLimitLow()

@@ -63,6 +63,8 @@ func TestTimingsMaxWindowIntact(t *testing.T) {
 	active := github.Ref{Owner: "acme", Repo: "api", Number: 3}
 	for ref, ended := range map[github.Ref]time.Time{gone: now.Add(-401 * day), kept: now.Add(-399 * day)} {
 		upsert(t, s, dinv.PR{Ref: ref, Title: "T", Author: "ana", State: "MERGED", CreatedAt: ended.Add(-day), MergedAt: ended, ClosedAt: ended})
+		sqlitetest.Exec(t, s.db, `INSERT INTO unit_snapshots (provider, unit_key, snapshot, rev, at) VALUES ('github', ?, json_object('data', json_object('pr', json_object('State', 'MERGED', 'MergedAt', ?, 'ClosedAt', ?))), 1, ?)`,
+			ref.String(), ts(ended), ts(ended), ts(now))
 		if _, err := s.AppendEvents(ctx, []dinv.Event{
 			{PR: ref, Kind: dinv.KindOpened, Actor: "ana", At: ended.Add(-day)},
 			{PR: ref, Kind: dinv.KindMerged, Actor: "bob", At: ended},
@@ -81,6 +83,8 @@ func TestTimingsMaxWindowIntact(t *testing.T) {
 	}
 	in := now.Add(-100 * day)
 	upsert(t, s, dinv.PR{Ref: active, Title: "T", Author: "ana", State: "OPEN", CreatedAt: in})
+	sqlitetest.Exec(t, s.db, `INSERT INTO unit_snapshots (provider, unit_key, snapshot, rev, at) VALUES ('github', ?, json_object('data', json_object('pr', json_object('State', 'OPEN'))), 1, ?)`,
+		active.String(), ts(now))
 	if _, err := s.AppendEvents(ctx, []dinv.Event{
 		{PR: active, Kind: dinv.KindOpened, Actor: "ana", At: in},
 		{PR: active, Kind: dinv.KindReview, Key: "r1", Actor: "me", Data: "APPROVED:c1", At: in.Add(time.Hour)},
@@ -106,7 +110,7 @@ func TestTimingsMaxWindowIntact(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got["pull_requests"] != 1 || got["turns"] != 1 {
+	if got["turns"] != 1 {
 		t.Fatalf("retained %v, want the pull request ended 401 days ago", got)
 	}
 	after, err := s.Timings(ctx, since)

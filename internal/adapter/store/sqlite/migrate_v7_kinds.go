@@ -63,17 +63,25 @@ var v7FixedTimeColumns = []struct{ table, column string }{
 // v7FixedTimes rewrites every time of v7FixedTimeColumns in event.TimeLayout. A row the rewrite would make
 // repeat another under a unique key is that row recorded twice, and goes.
 func v7FixedTimes(ctx context.Context, tx *sql.Tx) error {
+	return v7FixTimes(ctx, tx, "main", nil)
+}
+
+// v7FixTimes is v7FixedTimes on schema's copies of tables, of every table when nil.
+func v7FixTimes(ctx context.Context, tx *sql.Tx, schema string, tables []string) error {
 	fixedLen := len(eventTime(time.Unix(0, 0)))
 	for _, c := range v7FixedTimeColumns {
+		if tables != nil && !slices.Contains(tables, c.table) {
+			continue
+		}
 		var n int
-		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM pragma_table_info(?) WHERE name = ?`, c.table, c.column).Scan(&n); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM pragma_table_info(?, ?) WHERE name = ?`, c.table, schema, c.column).Scan(&n); err != nil {
 			return err
 		}
 		if n == 0 {
 			continue
 		}
 		var vals []string
-		err := eachRow(ctx, tx, `SELECT DISTINCT `+c.column+` FROM `+c.table+` WHERE `+c.column+` != '' AND (length(`+c.column+`) != ? OR substr(`+c.column+`, -1) != 'Z')`, //nolint:gosec // the names come from the table above
+		err := eachRow(ctx, tx, `SELECT DISTINCT `+c.column+` FROM `+schema+`.`+c.table+` WHERE `+c.column+` != '' AND (length(`+c.column+`) != ? OR substr(`+c.column+`, -1) != 'Z')`, //nolint:gosec // the names come from the table above
 			[]any{fixedLen}, func(r *sql.Rows) error {
 				var v string
 				if err := r.Scan(&v); err != nil {
@@ -90,8 +98,8 @@ func v7FixedTimes(ctx context.Context, tx *sql.Tx) error {
 			if err != nil {
 				continue
 			}
-			for _, q := range []string{`UPDATE OR IGNORE ` + c.table + ` SET ` + c.column + ` = ?2 WHERE ` + c.column + ` = ?1`,
-				`DELETE FROM ` + c.table + ` WHERE ` + c.column + ` = ?1`} {
+			for _, q := range []string{`UPDATE OR IGNORE ` + schema + `.` + c.table + ` SET ` + c.column + ` = ?2 WHERE ` + c.column + ` = ?1`,
+				`DELETE FROM ` + schema + `.` + c.table + ` WHERE ` + c.column + ` = ?1`} {
 				if _, err := tx.ExecContext(ctx, q, v, eventTime(t)); err != nil { //nolint:gosec // the names come from the table above
 					return fmt.Errorf("rewriting %s.%s: %w", c.table, c.column, err)
 				}

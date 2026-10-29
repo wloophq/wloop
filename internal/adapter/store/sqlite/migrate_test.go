@@ -428,6 +428,11 @@ func TestBackupsArePrunedToTheNewest(t *testing.T) {
 	touch("store-v2-20261001T120000Z.pre-restore.db")
 	touch("store-v2-20261030T120000Z.pre-restore.db")
 	touch("unrelated.db")
+	for _, b := range []string{"store-v1-20261002T120000Z.db", "store-v1-20261005T120000Z.db"} {
+		if err := os.MkdirAll(filepath.Join(dir, b+".plugins", "github"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if err := prune(dir, 3, now, filepath.Join(dir, "store-v1-20261001T120000Z.db")); err != nil {
 		t.Fatal(err)
 	}
@@ -445,6 +450,12 @@ func TestBackupsArePrunedToTheNewest(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "unrelated.db")); err != nil {
 		t.Fatal("prune removed a file that is not a backup")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "store-v1-20261002T120000Z.db.plugins")); err == nil {
+		t.Error("prune left the plugin stores of a backup it removed")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "store-v1-20261005T120000Z.db.plugins")); err != nil {
+		t.Error("prune removed the plugin stores of a backup it kept")
 	}
 }
 

@@ -1,7 +1,7 @@
-// Package inventorytest keeps the pull requests a host test holds in the
-// host's old tables, the fixture the GitHub plugin's reports are derived
-// from in the host's tests; the host itself keeps no copy of them. Only
-// tests import it.
+// Package inventorytest keeps the pull requests a host test holds in tables
+// of its own in the test's store, the fixture the GitHub plugin's reports
+// are derived from in the host's tests; the host's schema has no such
+// tables. Only tests import it.
 package inventorytest
 
 import (
@@ -50,10 +50,51 @@ func Of(st *inventory.Store) *Store {
 	}
 	s, loaded := held.LoadOrStore(st, &Store{Store: st, db: st.DB(), clock: st.Now})
 	if !loaded {
+		if _, err := st.DB().Write(context.Background(), func(tx *sqlite.Tx) error {
+			_, err := tx.ExecContext(context.Background(), fixtureTables)
+			return err
+		}); err != nil {
+			panic(fmt.Sprintf("inventorytest: creating the fixture's tables: %v", err))
+		}
 		st.UsePRs(s.(*Store))
 	}
 	return s.(*Store)
 }
+
+// fixtureTables are the fixture's pull requests, their sightings and full
+// reads, in the shape the GitHub plugin keeps them.
+const fixtureTables = `
+CREATE TABLE IF NOT EXISTS pull_requests (
+  owner TEXT NOT NULL, repo TEXT NOT NULL, number INTEGER NOT NULL,
+  title TEXT NOT NULL DEFAULT '', author TEXT NOT NULL DEFAULT '',
+  state TEXT NOT NULL DEFAULT 'OPEN', is_draft INTEGER NOT NULL DEFAULT 0,
+  head_oid TEXT NOT NULL DEFAULT '', head_branch TEXT NOT NULL DEFAULT '', base_branch TEXT NOT NULL DEFAULT '',
+  is_fork INTEGER NOT NULL DEFAULT 0, checks_state TEXT NOT NULL DEFAULT '', review_decision TEXT NOT NULL DEFAULT '',
+  review_requests TEXT NOT NULL DEFAULT '',
+  url TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '', merged_at TEXT NOT NULL DEFAULT '', closed_at TEXT NOT NULL DEFAULT '',
+  body_edited_at TEXT NOT NULL DEFAULT '', changed_files INTEGER NOT NULL DEFAULT 0,
+  reasons TEXT NOT NULL DEFAULT '',
+  ws_id TEXT NOT NULL DEFAULT '', ws_name TEXT NOT NULL DEFAULT '', ws_status TEXT NOT NULL DEFAULT '', ws_review INTEGER NOT NULL DEFAULT 0, ws_agent TEXT NOT NULL DEFAULT '',
+  ws_comment TEXT NOT NULL DEFAULT '', ws_main INTEGER NOT NULL DEFAULT 0, ws_manager TEXT NOT NULL DEFAULT '',
+  failing_checks TEXT NOT NULL DEFAULT '',
+  mergeable TEXT NOT NULL DEFAULT '',
+  mergeable_at TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (owner, repo, number)
+);
+CREATE INDEX IF NOT EXISTS pr_state ON pull_requests(state, updated_at);
+CREATE TABLE IF NOT EXISTS pr_seen (
+  owner TEXT NOT NULL, repo TEXT NOT NULL, number INTEGER NOT NULL,
+  at TEXT NOT NULL,
+  PRIMARY KEY (owner, repo, number)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS pr_details (
+  owner TEXT NOT NULL, repo TEXT NOT NULL, number INTEGER NOT NULL,
+  version INTEGER NOT NULL,
+  read_at TEXT NOT NULL,
+  body TEXT NOT NULL,
+  PRIMARY KEY (owner, repo, number)
+) WITHOUT ROWID;`
 
 // held are the stores Of gave, by the inventory they hold.
 var held sync.Map
