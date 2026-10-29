@@ -1,18 +1,19 @@
 "use strict";
 
-// SKIP_VERB_BUTTONS are the verbs the page offers elsewhere: seen when it opens and a draft's in its card;
-// the verb whose handler replies is in the composer.
-const SKIP_VERB_BUTTONS = new Set(["seen", "answer", "edit", "retry"]);
+// SKIP_HANDLERS are the handlers of the verbs the page offers elsewhere: seen when it opens, answer in its
+// gate and a draft's in its card; the verb whose handler replies is in the composer.
+const SKIP_HANDLERS = new Set(["seen", "answer", "edit", "retry"]);
 // CLOSED_CATEGORIES are the categories of a state a task leaves the lists for.
 const CLOSED_CATEGORIES = new Set(["done", "dropped"]);
-// DRAFT_VERBS are the task verbs of a draft's delivery actions; DRAFT_TASK_VERBS every verb its card offers.
-const DRAFT_VERBS = { "draft.edit": "edit", "draft.retry": "retry" };
-const DRAFT_TASK_VERBS = ["approve", "dismiss", "edit", "retry"];
+// DRAFT_HANDLERS are the handlers of a draft's delivery actions; DRAFT_CARD_HANDLERS those of every verb its
+// card offers, the kind's own dismiss among them.
+const DRAFT_HANDLERS = { "draft.edit": "edit", "draft.retry": "retry" };
+const DRAFT_CARD_HANDLERS = ["approve", "drop", "edit", "retry"];
 
 // draftWord is the label of a draft's action id, from the served specs, else its verb's.
 function draftWord(id) {
   const sp = typeof state === "object" && state.specs && state.specs.byId ? state.specs.byId[id] : null;
-  return (sp && sp.label) || verbLabel(DRAFT_VERBS[id]);
+  return (sp && sp.label) || verbLabel(verbFor(DRAFT_HANDLERS[id]));
 }
 
 // gateWord is the label gates.toml gives the intent of e's draft gate that resolves it to status, else verb's.
@@ -85,7 +86,7 @@ async function taskAct(task, verb, args) {
   try {
     const out = await detailEnv.post(taskPath(task.id, verb), verbBody(args));
     detailEnv.notice(`${verb}: ${task.title || task.id}${out && out.lines && out.lines.length ? ". " + out.lines.join(" ") : ""}`);
-    if (verb === "approve") detailState.editing.delete(task.id);
+    if (verbHandler(verb) === "approve") detailState.editing.delete(task.id);
     detailEnv.changed();
     return out || {};
   } catch (err) {
@@ -129,7 +130,7 @@ function draftTarget(e) {
 
 // approveEdited approves the draft of e with the text being edited.
 async function approveEdited(e) {
-  const out = await taskAct(draftTarget(e), "approve", { text: detailState.editing.get(e.id), rev: String(draftOf(e).rev) });
+  const out = await taskAct(draftTarget(e), verbFor("approve"), { text: detailState.editing.get(e.id), rev: String(draftOf(e).rev) });
   if (out) detailState.editing.delete(e.id);
   return out;
 }
@@ -138,8 +139,9 @@ async function approveEdited(e) {
 // sends the edited text.
 function actOn(task, verb, args) {
   const d = task ? draftOf(task) : null;
-  if (task && verb === "approve" && d && detailState.editing.has(task.id)) return approveEdited(task);
-  if (task && d && task.id.startsWith("draft:") && (verb === "approve" || verb === "retry")) args = { ...args, rev: String(d.rev) };
+  const handler = verbHandler(verb);
+  if (task && handler === "approve" && d && detailState.editing.has(task.id)) return approveEdited(task);
+  if (task && d && task.id.startsWith("draft:") && (handler === "approve" || handler === "retry")) args = { ...args, rev: String(d.rev) };
   return taskAct(task, verb, args);
 }
 
@@ -172,7 +174,7 @@ async function loadDetailPane(route) {
     await loadTaskPage(e);
     if (e.category === "inbox" && detailState.seenFor !== id) {
       detailState.seenFor = id;
-      detailEnv.post(taskPath(id, "seen"), { source: "cockpit" }).catch(() => {});
+      detailEnv.post(taskPath(id, verbFor("seen")), { source: "cockpit" }).catch(() => {});
     }
   } catch (err) {
     if (detailState.id !== id) return;
@@ -231,9 +233,25 @@ function askedArgs(verb) {
   return ask.args(String(v).trim());
 }
 
-// handlerVerb is the catalog's verb whose handler is handler, "" when none is.
+// handlerVerb is the catalog's verb whose handler is handler, its own name when it names none; "" when none is.
 function handlerVerb(handler) {
-  const v = ((typeof tasksState === "object" && tasksState.catalog && tasksState.catalog.verbs) || []).find((x) => x.handler === handler);
+  const v = ((typeof tasksState === "object" && tasksState.catalog && tasksState.catalog.verbs) || []).find((x) => (x.handler || x.verb) === handler);
+  return v ? v.verb : "";
+}
+
+// verbFor is the verb that runs handler, handler itself before the catalog was read.
+function verbFor(handler) {
+  return handlerVerb(handler) || handler;
+}
+
+// verbHandler is the handler verb runs: its profile handler, else its own name, as the tasks service binds it.
+function verbHandler(verb) {
+  return verbTask(verb).handler || verb;
+}
+
+// offeredVerb is the verb e offers that runs handler, "" when it offers none.
+function offeredVerb(e, handler) {
+  const v = (e.verbs || []).find((x) => verbHandler(x.verb) === handler);
   return v ? v.verb : "";
 }
 
@@ -248,7 +266,7 @@ function verbLabel(verb) {
 
 function verbButtons(e) {
   const replies = handlerVerb("reply");
-  const skip = (verb) => SKIP_VERB_BUTTONS.has(verb) || verb === replies || (isDraftTask(e) && DRAFT_TASK_VERBS.includes(verb));
+  const skip = (verb) => SKIP_HANDLERS.has(verbHandler(verb)) || verb === replies || (isDraftTask(e) && DRAFT_CARD_HANDLERS.includes(verbHandler(verb)));
   return (e.verbs || []).filter((v) => !skip(v.verb)).map((v) => verbButton(e, v.verb, verbLabel(v.verb), () => {
     const args = askedArgs(v.verb);
     if (args) taskAct(e, v.verb, args);
@@ -266,14 +284,15 @@ function draftCard(e, scope) {
   const d = draftOf(e);
   const editing = detailState.editing.has(e.id);
   const head = `Draft ${(d.purpose || "").replaceAll("_", " ")}`.trim() + (d.state && d.state !== "held" ? ` (${d.state})` : "");
+  const [approve, drop, edit, retry] = DRAFT_CARD_HANDLERS.map((x) => offeredVerb(e, x));
   const buttons = editing ? [
-    verbButton(e, "approve", gateWord(e, "approved", "approve"), () => approveEdited(e), { scope, primary: true }),
+    verbButton(e, approve, gateWord(e, "approved", approve), () => approveEdited(e), { scope, primary: true }),
     h("button", { type: "button", class: "act", "data-focus": `${scope}:cancel:${e.id}`, onclick: () => { detailState.editing.delete(e.id); detailEnv.render(); } }, "Cancel"),
   ] : [
-    d.state === "failed" ? verbButton(e, "retry", draftWord("draft.retry"), () => taskAct(e, "retry", { rev: String(d.rev) }), { scope, primary: true })
-      : verbButton(e, "approve", gateWord(e, "approved", "approve"), () => taskAct(e, "approve", { rev: String(d.rev) }), { scope, primary: true }),
-    verbButton(e, (e.verbs || []).some((v) => v.verb === "edit") ? "edit" : "approve", draftWord("draft.edit"), () => { detailState.editing.set(e.id, d.text || ""); detailEnv.render(); }, { scope: scope + ":open" }),
-    verbButton(e, "dismiss", gateWord(e, "rejected", "dismiss"), () => taskAct(e, "dismiss", {}), { scope }),
+    d.state === "failed" ? verbButton(e, retry, draftWord("draft.retry"), () => taskAct(e, retry, { rev: String(d.rev) }), { scope, primary: true })
+      : verbButton(e, approve, gateWord(e, "approved", approve), () => taskAct(e, approve, { rev: String(d.rev) }), { scope, primary: true }),
+    verbButton(e, edit || approve, draftWord("draft.edit"), () => { detailState.editing.set(e.id, d.text || ""); detailEnv.render(); }, { scope: scope + ":open" }),
+    verbButton(e, drop, gateWord(e, "rejected", drop), () => taskAct(e, drop, {}), { scope }),
   ];
   return h("section", { class: "d-draft", "aria-label": "Draft" },
     h("div", { class: "d-sub" }, head),

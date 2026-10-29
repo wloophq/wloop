@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/duration"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -60,7 +61,9 @@ type TasksDef struct {
 	OwedBy string
 	Owed   *expr.Program
 	// ChatIntent is the intent of the turn a chat message starts on a task with no live session.
-	ChatIntent       string
+	ChatIntent string
+	// ChatAt is where the layer that set ChatIntent sets it.
+	ChatAt           dintent.Pos
 	Areas, Contexts  []string
 	StaleWaitingDays int
 }
@@ -434,6 +437,9 @@ func (l *tasksLoad) merge(file string, src []byte) Problems {
 	}
 	if m.Chat != nil {
 		text(s, "chat.intent", m.Chat.Intent, &l.def.ChatIntent)
+		if m.Chat.Intent != nil {
+			l.def.ChatAt = s.pos("chat.intent")
+		}
 	}
 	if m.Areas != nil {
 		l.def.Areas = slices.Clone(m.Areas)

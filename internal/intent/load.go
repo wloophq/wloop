@@ -3,6 +3,7 @@
 package intent
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -419,7 +420,8 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	l.Registry = dintent.NewRegistry(defs)
 	if name := l.Tasks.ChatIntent; name != "" {
 		if _, msg := l.turnProblem(name, "session"); msg != "" {
-			l.Problems = append(l.Problems, Problem{File: TasksFile, Field: "chat.intent", Msg: msg})
+			at := l.Tasks.ChatAt
+			l.Problems = append(l.Problems, Problem{File: cmp.Or(at.File, TasksFile), Line: at.Line, Col: at.Col, Field: "chat.intent", Msg: msg})
 		}
 	}
 	var wfProblems, wfWarnings Problems

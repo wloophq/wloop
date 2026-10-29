@@ -433,6 +433,8 @@ func TestAByPredicateNamesOnlyFactsTheAuthorityReads(t *testing.T) {
 	}
 }
 
+// TestAnUnknownChatIntentFailsToLoad checks that tasks.toml's [chat] intent naming no intent fails to load at the
+// file's path and the key's line, as every other load problem does, and that the bundled one loads.
 func TestAnUnknownChatIntentFailsToLoad(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -440,7 +442,7 @@ func TestAnUnknownChatIntentFailsToLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, problems := Load(userLayer(dir), bundledFS(), testBase(), nil)
-	if got := problems.Error(); !strings.Contains(got, "tasks.toml: chat.intent: unknown intent \"chatty\"") {
+	if got, want := problems.Error(), filepath.Join(dir, TasksFile)+":2:10: chat.intent: unknown intent \"chatty\""; !strings.Contains(got, want) {
 		t.Fatalf("problems %q", got)
 	}
 	if _, problems := Load(nil, bundledFS(), testBase(), nil); len(problems) > 0 {

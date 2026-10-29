@@ -35,8 +35,8 @@ func viewsCatalog() api.ViewsCatalog {
 			{ID: "waiting", Label: "Waiting"}, {ID: "projects", Label: "Projects"}, {ID: "someday", Label: "Someday"}, {ID: "logbook", Label: "Logbook"}},
 		Areas:    []string{"OSS", "Hiring"},
 		Contexts: []string{"@decide", "@reply"},
-		Verbs: []api.VerbSpec{{Verb: "approve", Label: "Approve"}, {Verb: "edit", Label: "Edit"}, {Verb: "dismiss", Label: "Discard"},
-			{Verb: "retry", Label: "Retry"}},
+		Verbs: []api.VerbSpec{{Verb: "approve", Handler: "approve", Label: "Approve"}, {Verb: "edit", Handler: "edit", Label: "Edit"}, {Verb: "dismiss", Handler: "drop", Label: "Discard"},
+			{Verb: "retry", Handler: "retry", Label: "Retry"}},
 	}
 }
 

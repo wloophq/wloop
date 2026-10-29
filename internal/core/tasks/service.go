@@ -126,8 +126,9 @@ func (s *Service) handler(e task.Task, verb task.Verb) VerbHandler {
 }
 
 // Do runs req.Verb on task id: a registered handler first, else the state change. A task of a unit whose
-// plugin is disabled refuses every verb with ErrPluginDisabled but dismiss, which moves a derived task, or one
-// whose units are all of disabled plugins, to the Trash whole, and detaches a disabled plugin's units from any other.
+// plugin is disabled refuses every verb with ErrPluginDisabled but one whose handler is drop, which moves a
+// derived task, or one whose units are all of disabled plugins, to the Trash whole, and detaches a disabled
+// plugin's units from any other.
 func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, error) {
 	if _, _, ok := s.d.States.Move(string(req.Verb)); !ok {
 		return Result{}, fmt.Errorf("%w: unknown verb %q", ErrArgs, req.Verb)
@@ -155,7 +156,7 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 	}
 	enabled := map[unit.Unit]bool{}
 	if err := s.writable(ctx, e, enabled); err != nil {
-		if req.Verb != task.VerbDismiss || !errors.Is(err, ErrPluginDisabled) {
+		if s.d.States.Handler(string(req.Verb)) != HandlerDrop || !errors.Is(err, ErrPluginDisabled) {
 			return Result{}, err
 		}
 		if gated, err := s.Allowed(ctx, e, req); err != nil || gated {
@@ -365,7 +366,7 @@ func (s *Service) dismissOff(ctx context.Context, id task.ID, req Request, enabl
 	if err != nil {
 		return Result{}, err
 	}
-	if err := s.accepts(e, task.VerbDismiss); err != nil {
+	if err := s.accepts(e, req.Verb); err != nil {
 		return Result{}, err
 	}
 	units := slices.Clone(e.Units)
@@ -392,7 +393,7 @@ func (s *Service) dismissOff(ctx context.Context, id task.ID, req Request, enabl
 		if next, _, err = s.transition(e, req, wake.Wake{}, now); err != nil {
 			return Result{}, err
 		}
-		why = string(task.VerbDismiss)
+		why = string(req.Verb)
 	} else {
 		next.Units = slices.DeleteFunc(slices.Clone(e.Units), isOff)
 		next.Items = slices.DeleteFunc(slices.Clone(e.Items), func(r task.ItemRef) bool { return isOff(r.Unit) })

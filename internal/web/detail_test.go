@@ -159,6 +159,61 @@ func TestADraftOnATaskApprovesItsEditedText(t *testing.T) {
 	}
 }
 
+// TestADraftCardRunsTheVerbsOfItsHandlers checks that the draft card and the page's seen go by the handler the
+// profile gives a verb, never by its name: under a profile whose edit and retry swap handlers and whose drop and
+// seen verbs are renamed, Retry posts the verb whose handler is retry, Discard the one whose handler is drop,
+// opening the Inbox task the one whose handler is seen, and none of them shows among the task's other verbs.
+func TestADraftCardRunsTheVerbsOfItsHandlers(t *testing.T) {
+	cat := api.ViewsCatalog{Verbs: []api.VerbSpec{{Verb: "approve", Handler: "approve"}, {Verb: "toss", Handler: "drop"},
+		{Verb: "edit", Handler: "retry"}, {Verb: "retry", Handler: "edit"}, {Verb: "look", Handler: "seen"}}}
+	e := task("draft:12", "inbox", func(e *api.TaskView) {
+		e.Category = "inbox"
+		e.Units = []unit.Unit{prUnit}
+		e.Gates = draftGates(api.Draft{ID: 12, Unit: "github/acme/api#8", Kind: "nudge", Target: "acme/api#8", Text: "Could you take a look?", State: "failed", Rev: 3})
+		e.Verbs = []api.VerbState{{Verb: "approve", Enabled: true}, {Verb: "toss", Enabled: true}, {Verb: "edit", Enabled: true},
+			{Verb: "retry", Enabled: true}, {Verb: "look", Enabled: true}}
+	})
+	var got struct {
+		Seen    []string
+		Retry   []string
+		Toss    []string
+		Editing bool
+		Others  []string
+	}
+	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
+tasksState.catalog = input.cat;
+(async () => {
+  await loadDetailPane({ task: "draft:12" });
+  const show = (p) => p.path + " " + JSON.stringify(p.body);
+  const seen = posts.map(show);
+  const pane = taskPage(detailState.task);
+  posts.length = 0;
+  await byFocus(pane, "detail:edit:draft:12").attrs.onclick();
+  const retry = posts.map(show);
+  posts.length = 0;
+  await byFocus(pane, "detail:toss:draft:12").attrs.onclick();
+  const toss = posts.map(show);
+  byFocus(pane, "detail:open:retry:draft:12").attrs.onclick();
+  const others = (detailState.task.verbs || []).map((v) => v.verb).filter((v) => byFocus(h("div", {}, ...verbButtons(detailState.task)), "detail:" + v + ":draft:12"));
+  process.stdout.write(JSON.stringify({ Seen: seen, Retry: retry, Toss: toss, Editing: detailState.editing.has("draft:12"), Others: others }));
+})();`, map[string]any{"cat": cat, "answers": map[string]any{"/api/tasks/draft:12": e}}, &got)
+	if want := []string{`/api/tasks/draft:12/look {"source":"cockpit"}`}; !slices.Equal(got.Seen, want) {
+		t.Errorf("opening the Inbox task posted %v, want %v", got.Seen, want)
+	}
+	if want := []string{`/api/tasks/draft:12/edit {"source":"cockpit","args":{"rev":"3"}}`}; !slices.Equal(got.Retry, want) {
+		t.Errorf("Retry posted %v, want %v", got.Retry, want)
+	}
+	if want := []string{`/api/tasks/draft:12/toss {"source":"cockpit"}`}; !slices.Equal(got.Toss, want) {
+		t.Errorf("Discard posted %v, want %v", got.Toss, want)
+	}
+	if !got.Editing {
+		t.Error("the verb whose handler is edit did not open the editor")
+	}
+	if len(got.Others) != 0 {
+		t.Errorf("the card's verbs show again among the task's verbs: %v", got.Others)
+	}
+}
+
 func TestCardRefOpensTheUnitInItsPluginView(t *testing.T) {
 	type link struct{ Href, Text, Target string }
 	var got map[string]struct{ Ref, Ext []link }

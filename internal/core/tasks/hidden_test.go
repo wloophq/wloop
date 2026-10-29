@@ -179,3 +179,45 @@ func TestDetachDropsItemsOfADisabledPluginWithNoUnitOnTheTask(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 }
+
+// trashStates are the bundled states with a verb trash-it whose handler is drop, as a user profile adds one.
+type trashStates struct{ coretasks.States }
+
+func (s trashStates) Move(verb string) ([]string, string, bool) {
+	if verb == "trash-it" {
+		return nil, "trash", true
+	}
+	return s.States.Move(verb)
+}
+
+func (s trashStates) Handler(verb string) string {
+	if verb == "trash-it" {
+		return coretasks.HandlerDrop
+	}
+	return s.States.Handler(verb)
+}
+
+// TestADropVerbDetachesADisabledPluginsUnitsWhateverItsName checks that a task of a disabled plugin takes
+// every verb whose handler is drop, not only the one named dismiss: it trashes a task with no unit of an
+// enabled plugin and detaches the disabled plugin's units from a mixed one.
+func TestADropVerbDetachesADisabledPluginsUnitsWhateverItsName(t *testing.T) {
+	r := newRig()
+	off := []unit.ProviderID{"slack"}
+	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock,
+		States: trashStates{taskstest.BundledStates}, Disabled: func() []unit.ProviderID { return off }})
+	r.facts.off["slack"] = true
+	ctx := context.Background()
+	slack := unit.Unit{Provider: "slack", Key: "C1/1.1"}
+	r.put(t, task.Task{ID: "t-mixed", State: "next", Category: task.CategoryReady, Units: []unit.Unit{unitU, slack}, Origin: task.OriginUser})
+	r.put(t, task.Task{ID: "t-slack", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{slack}, Origin: task.OriginUser})
+
+	if _, err := r.svc.Do(ctx, "t-mixed", coretasks.Request{Actor: task.ActorPerson, Verb: "trash-it"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.task(t, "t-mixed"); got.Category != task.CategoryReady || !slices.Equal(got.Units, []unit.Unit{unitU}) {
+		t.Fatalf("detached %+v", got)
+	}
+	if res, err := r.svc.Do(ctx, "t-slack", coretasks.Request{Actor: task.ActorPerson, Verb: "trash-it"}); err != nil || res.Task.Category != task.CategoryDropped {
+		t.Fatalf("trashed: %+v %v", res, err)
+	}
+}
