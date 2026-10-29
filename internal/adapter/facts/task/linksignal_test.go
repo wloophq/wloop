@@ -16,7 +16,7 @@ func TestALinkSignalIsTheOrOfTheLinks(t *testing.T) {
 	e.task(task.Task{ID: "t-a", State: "next", Category: task.CategoryReady, Title: "a", Units: []unit.Unit{chatA, chatB}})
 	e.task(task.Task{ID: "t-b", State: "next", Category: task.CategoryReady, Title: "b"})
 	e.links[chatA] = facttask.Link{Signals: map[string]bool{"stalled": true, "in_loop": false, "snoring": true}}
-	e.links[chatB] = facttask.Link{Signals: map[string]bool{"in_loop": true}}
+	e.links[chatB] = facttask.Link{Signals: map[string]bool{"in_loop": true, "ready": false}}
 	if len(builtin.LinkSignals) == 0 {
 		t.Fatal("no plugin declares a link signal")
 	}
