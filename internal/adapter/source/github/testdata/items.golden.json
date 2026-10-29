@@ -71,21 +71,20 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:held:2026-10-22",
+        "id": "gh:follow",
         "unit": {
           "provider": "github",
           "key": "acme/api#9"
         },
-        "kind": "decision",
-        "summary": "Decide the held round on acme/api#9: Change 9",
+        "kind": "todo",
+        "summary": "Follow acme/api#9: Change 9",
         "context": "",
         "urls": [
           "https://github.com/acme/api/pull/9"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
         "origin": {
           "unit": {
             "provider": "github",
@@ -95,8 +94,8 @@
           "permalink": "https://github.com/acme/api/pull/9"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:octocat",
+          "name": "octocat"
         },
         "assignees": [
           {
@@ -115,6 +114,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#9",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -129,21 +129,20 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:held:2026-10-22",
+        "id": "gh:follow",
         "unit": {
           "provider": "github",
           "key": "acme/api#10"
         },
-        "kind": "decision",
-        "summary": "Decide the held round on acme/api#10: Change 10",
+        "kind": "todo",
+        "summary": "Follow acme/api#10: Change 10",
         "context": "",
         "urls": [
           "https://github.com/acme/api/pull/10"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
         "origin": {
           "unit": {
             "provider": "github",
@@ -153,8 +152,8 @@
           "permalink": "https://github.com/acme/api/pull/10"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:octocat",
+          "name": "octocat"
         },
         "assignees": [
           {
@@ -173,6 +172,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#10",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -186,21 +186,20 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:held:2026-10-22",
+        "id": "gh:follow",
         "unit": {
           "provider": "github",
           "key": "acme/api#11"
         },
-        "kind": "decision",
-        "summary": "Decide the held round on acme/api#11: Change 11",
+        "kind": "todo",
+        "summary": "Follow acme/api#11: Change 11",
         "context": "",
         "urls": [
           "https://github.com/acme/api/pull/11"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
         "origin": {
           "unit": {
             "provider": "github",
@@ -210,8 +209,8 @@
           "permalink": "https://github.com/acme/api/pull/11"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:octocat",
+          "name": "octocat"
         },
         "assignees": [
           {
@@ -230,6 +229,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#11",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -244,21 +244,20 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:held:2026-10-22",
+        "id": "gh:follow",
         "unit": {
           "provider": "github",
           "key": "acme/api#12"
         },
-        "kind": "decision",
-        "summary": "Decide the held round on acme/api#12: Change 12",
+        "kind": "todo",
+        "summary": "Follow acme/api#12: Change 12",
         "context": "",
         "urls": [
           "https://github.com/acme/api/pull/12"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
         "origin": {
           "unit": {
             "provider": "github",
@@ -268,8 +267,8 @@
           "permalink": "https://github.com/acme/api/pull/12"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:octocat",
+          "name": "octocat"
         },
         "assignees": [
           {
@@ -288,6 +287,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#12",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -301,21 +301,20 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:held:2026-10-22",
+        "id": "gh:follow",
         "unit": {
           "provider": "github",
           "key": "acme/api#13"
         },
-        "kind": "decision",
-        "summary": "Decide the held round on acme/api#13: Change 13",
+        "kind": "todo",
+        "summary": "Follow acme/api#13: Change 13",
         "context": "",
         "urls": [
           "https://github.com/acme/api/pull/13"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
         "origin": {
           "unit": {
             "provider": "github",
@@ -325,8 +324,8 @@
           "permalink": "https://github.com/acme/api/pull/13"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:octocat",
+          "name": "octocat"
         },
         "assignees": [
           {
@@ -345,6 +344,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#13",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -359,21 +359,20 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:held:2026-10-22",
+        "id": "gh:follow",
         "unit": {
           "provider": "github",
           "key": "acme/api#14"
         },
-        "kind": "decision",
-        "summary": "Decide the held round on acme/api#14: Change 14",
+        "kind": "todo",
+        "summary": "Follow acme/api#14: Change 14",
         "context": "",
         "urls": [
           "https://github.com/acme/api/pull/14"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
         "origin": {
           "unit": {
             "provider": "github",
@@ -383,8 +382,8 @@
           "permalink": "https://github.com/acme/api/pull/14"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:octocat",
+          "name": "octocat"
         },
         "assignees": [
           {
@@ -403,6 +402,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#14",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -416,21 +416,20 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:held:2026-10-22",
+        "id": "gh:follow",
         "unit": {
           "provider": "github",
           "key": "acme/api#15"
         },
-        "kind": "decision",
-        "summary": "Decide the held round on acme/api#15: Change 15",
+        "kind": "todo",
+        "summary": "Follow acme/api#15: Change 15",
         "context": "",
         "urls": [
           "https://github.com/acme/api/pull/15"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
         "origin": {
           "unit": {
             "provider": "github",
@@ -440,8 +439,8 @@
           "permalink": "https://github.com/acme/api/pull/15"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:octocat",
+          "name": "octocat"
         },
         "assignees": [
           {
@@ -460,6 +459,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#15",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -474,21 +474,20 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:held:2026-10-22",
+        "id": "gh:follow",
         "unit": {
           "provider": "github",
           "key": "acme/api#16"
         },
-        "kind": "decision",
-        "summary": "Decide the held round on acme/api#16: Change 16",
+        "kind": "todo",
+        "summary": "Follow acme/api#16: Change 16",
         "context": "",
         "urls": [
           "https://github.com/acme/api/pull/16"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
         "origin": {
           "unit": {
             "provider": "github",
@@ -498,8 +497,8 @@
           "permalink": "https://github.com/acme/api/pull/16"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:octocat",
+          "name": "octocat"
         },
         "assignees": [
           {
@@ -518,6 +517,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#16",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -531,21 +531,20 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:blocked",
+        "id": "gh:follow",
         "unit": {
           "provider": "github",
           "key": "acme/api#17"
         },
-        "kind": "decision",
-        "summary": "Unblock the round on acme/api#17: Change 17",
+        "kind": "todo",
+        "summary": "Follow acme/api#17: Change 17",
         "context": "",
         "urls": [
           "https://github.com/acme/api/pull/17"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
         "origin": {
           "unit": {
             "provider": "github",
@@ -555,8 +554,8 @@
           "permalink": "https://github.com/acme/api/pull/17"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:octocat",
+          "name": "octocat"
         },
         "assignees": [
           {
@@ -575,6 +574,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#17",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -589,21 +589,20 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:blocked",
+        "id": "gh:follow",
         "unit": {
           "provider": "github",
           "key": "acme/api#18"
         },
-        "kind": "decision",
-        "summary": "Unblock the round on acme/api#18: Change 18",
+        "kind": "todo",
+        "summary": "Follow acme/api#18: Change 18",
         "context": "",
         "urls": [
           "https://github.com/acme/api/pull/18"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
         "origin": {
           "unit": {
             "provider": "github",
@@ -613,8 +612,8 @@
           "permalink": "https://github.com/acme/api/pull/18"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:octocat",
+          "name": "octocat"
         },
         "assignees": [
           {
@@ -633,6 +632,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#18",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -663,21 +663,20 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:blocked",
+        "id": "gh:follow",
         "unit": {
           "provider": "github",
           "key": "acme/api#21"
         },
-        "kind": "decision",
-        "summary": "Unblock the round on acme/api#21: Change 21",
+        "kind": "todo",
+        "summary": "Follow acme/api#21: Change 21",
         "context": "",
         "urls": [
           "https://github.com/acme/api/pull/21"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
         "origin": {
           "unit": {
             "provider": "github",
@@ -687,8 +686,8 @@
           "permalink": "https://github.com/acme/api/pull/21"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:octocat",
+          "name": "octocat"
         },
         "assignees": [
           {
@@ -707,6 +706,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#21",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -721,21 +721,20 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:blocked",
+        "id": "gh:follow",
         "unit": {
           "provider": "github",
           "key": "acme/api#22"
         },
-        "kind": "decision",
-        "summary": "Unblock the round on acme/api#22: Change 22",
+        "kind": "todo",
+        "summary": "Follow acme/api#22: Change 22",
         "context": "",
         "urls": [
           "https://github.com/acme/api/pull/22"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
         "origin": {
           "unit": {
             "provider": "github",
@@ -745,8 +744,8 @@
           "permalink": "https://github.com/acme/api/pull/22"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:octocat",
+          "name": "octocat"
         },
         "assignees": [
           {
@@ -765,6 +764,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#22",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -839,6 +839,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#25",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -897,6 +898,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#26",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -971,6 +973,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#29",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -1029,6 +1032,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#30",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -1059,33 +1063,32 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:round",
+        "id": "gh:review",
         "unit": {
           "provider": "github",
           "key": "acme/api#33"
         },
-        "kind": "decision",
-        "summary": "Decide the pending round on acme/api#33: Change 33",
+        "kind": "request",
+        "summary": "Review acme/api#33: Change 33",
         "context": "",
-        "deadline": "2026-10-22T15:04:00Z",
         "urls": [
           "https://github.com/acme/api/pull/33"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
+        "initial": "ready",
         "origin": {
           "unit": {
             "provider": "github",
             "key": "acme/api#33"
           },
-          "ref": "situation:round_pending",
+          "ref": "situation:review",
           "permalink": "https://github.com/acme/api/pull/33"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:octocat",
+          "name": "octocat"
         },
         "assignees": [
           {
@@ -1093,7 +1096,7 @@
             "name": "octocat"
           }
         ],
-        "basis": "none",
+        "basis": "explicit_mention",
         "waiting_on": [
           {
             "key": "github:octocat",
@@ -1104,6 +1107,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#33",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -1118,33 +1122,32 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:round",
+        "id": "gh:review",
         "unit": {
           "provider": "github",
           "key": "acme/api#34"
         },
-        "kind": "decision",
-        "summary": "Decide the pending round on acme/api#34: Change 34",
+        "kind": "request",
+        "summary": "Review acme/api#34: Change 34",
         "context": "",
-        "deadline": "2026-10-22T15:04:00Z",
         "urls": [
           "https://github.com/acme/api/pull/34"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
+        "initial": "ready",
         "origin": {
           "unit": {
             "provider": "github",
             "key": "acme/api#34"
           },
-          "ref": "situation:round_pending",
+          "ref": "situation:review",
           "permalink": "https://github.com/acme/api/pull/34"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:octocat",
+          "name": "octocat"
         },
         "assignees": [
           {
@@ -1152,7 +1155,7 @@
             "name": "octocat"
           }
         ],
-        "basis": "none",
+        "basis": "explicit_mention",
         "waiting_on": [
           {
             "key": "github:octocat",
@@ -1163,6 +1166,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#34",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -1176,33 +1180,32 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:round",
+        "id": "gh:review",
         "unit": {
           "provider": "github",
           "key": "acme/api#35"
         },
-        "kind": "decision",
-        "summary": "Decide the pending round on acme/api#35: Change 35",
+        "kind": "request",
+        "summary": "Review acme/api#35: Change 35",
         "context": "",
-        "deadline": "2026-10-22T15:04:00Z",
         "urls": [
           "https://github.com/acme/api/pull/35"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
+        "initial": "ready",
         "origin": {
           "unit": {
             "provider": "github",
             "key": "acme/api#35"
           },
-          "ref": "situation:round_pending",
+          "ref": "situation:review",
           "permalink": "https://github.com/acme/api/pull/35"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:octocat",
+          "name": "octocat"
         },
         "assignees": [
           {
@@ -1210,7 +1213,7 @@
             "name": "octocat"
           }
         ],
-        "basis": "none",
+        "basis": "explicit_mention",
         "waiting_on": [
           {
             "key": "github:octocat",
@@ -1221,6 +1224,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#35",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -1235,33 +1239,32 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:round",
+        "id": "gh:review",
         "unit": {
           "provider": "github",
           "key": "acme/api#36"
         },
-        "kind": "decision",
-        "summary": "Decide the pending round on acme/api#36: Change 36",
+        "kind": "request",
+        "summary": "Review acme/api#36: Change 36",
         "context": "",
-        "deadline": "2026-10-22T15:04:00Z",
         "urls": [
           "https://github.com/acme/api/pull/36"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
+        "initial": "ready",
         "origin": {
           "unit": {
             "provider": "github",
             "key": "acme/api#36"
           },
-          "ref": "situation:round_pending",
+          "ref": "situation:review",
           "permalink": "https://github.com/acme/api/pull/36"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:octocat",
+          "name": "octocat"
         },
         "assignees": [
           {
@@ -1269,7 +1272,7 @@
             "name": "octocat"
           }
         ],
-        "basis": "none",
+        "basis": "explicit_mention",
         "waiting_on": [
           {
             "key": "github:octocat",
@@ -1280,6 +1283,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#36",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -1293,33 +1297,32 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:round",
+        "id": "gh:review",
         "unit": {
           "provider": "github",
           "key": "acme/api#37"
         },
-        "kind": "decision",
-        "summary": "Decide the pending round on acme/api#37: Change 37",
+        "kind": "request",
+        "summary": "Review acme/api#37: Change 37",
         "context": "",
-        "deadline": "2026-10-22T15:04:00Z",
         "urls": [
           "https://github.com/acme/api/pull/37"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
+        "initial": "ready",
         "origin": {
           "unit": {
             "provider": "github",
             "key": "acme/api#37"
           },
-          "ref": "situation:round_pending",
+          "ref": "situation:review",
           "permalink": "https://github.com/acme/api/pull/37"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:alice",
+          "name": "alice"
         },
         "assignees": [
           {
@@ -1327,7 +1330,7 @@
             "name": "octocat"
           }
         ],
-        "basis": "none",
+        "basis": "explicit_mention",
         "waiting_on": [
           {
             "key": "github:octocat",
@@ -1338,6 +1341,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#37",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -1352,33 +1356,32 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:round",
+        "id": "gh:review",
         "unit": {
           "provider": "github",
           "key": "acme/api#38"
         },
-        "kind": "decision",
-        "summary": "Decide the pending round on acme/api#38: Change 38",
+        "kind": "request",
+        "summary": "Review acme/api#38: Change 38",
         "context": "",
-        "deadline": "2026-10-22T15:04:00Z",
         "urls": [
           "https://github.com/acme/api/pull/38"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
+        "initial": "ready",
         "origin": {
           "unit": {
             "provider": "github",
             "key": "acme/api#38"
           },
-          "ref": "situation:round_pending",
+          "ref": "situation:review",
           "permalink": "https://github.com/acme/api/pull/38"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:alice",
+          "name": "alice"
         },
         "assignees": [
           {
@@ -1386,7 +1389,7 @@
             "name": "octocat"
           }
         ],
-        "basis": "none",
+        "basis": "explicit_mention",
         "waiting_on": [
           {
             "key": "github:octocat",
@@ -1397,6 +1400,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#38",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -1410,33 +1414,32 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:round",
+        "id": "gh:review",
         "unit": {
           "provider": "github",
           "key": "acme/api#39"
         },
-        "kind": "decision",
-        "summary": "Decide the pending round on acme/api#39: Change 39",
+        "kind": "request",
+        "summary": "Review acme/api#39: Change 39",
         "context": "",
-        "deadline": "2026-10-22T15:04:00Z",
         "urls": [
           "https://github.com/acme/api/pull/39"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
+        "initial": "ready",
         "origin": {
           "unit": {
             "provider": "github",
             "key": "acme/api#39"
           },
-          "ref": "situation:round_pending",
+          "ref": "situation:review",
           "permalink": "https://github.com/acme/api/pull/39"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:alice",
+          "name": "alice"
         },
         "assignees": [
           {
@@ -1444,7 +1447,7 @@
             "name": "octocat"
           }
         ],
-        "basis": "none",
+        "basis": "explicit_mention",
         "waiting_on": [
           {
             "key": "github:octocat",
@@ -1455,6 +1458,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#39",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -1469,33 +1473,608 @@
     "in_scope": true,
     "items": [
       {
-        "id": "gh:round",
+        "id": "gh:review",
         "unit": {
           "provider": "github",
           "key": "acme/api#40"
         },
-        "kind": "decision",
-        "summary": "Decide the pending round on acme/api#40: Change 40",
+        "kind": "request",
+        "summary": "Review acme/api#40: Change 40",
         "context": "",
-        "deadline": "2026-10-22T15:04:00Z",
         "urls": [
           "https://github.com/acme/api/pull/40"
         ],
         "contexts": [
-          "@decide"
+          "@repo-api"
         ],
-        "initial": "inbox",
+        "initial": "ready",
         "origin": {
           "unit": {
             "provider": "github",
             "key": "acme/api#40"
           },
-          "ref": "situation:round_pending",
+          "ref": "situation:review",
           "permalink": "https://github.com/acme/api/pull/40"
         },
         "requester": {
-          "key": "system:\u003cbrand\u003e",
-          "name": "\u003cbrand\u003e"
+          "key": "github:alice",
+          "name": "alice"
+        },
+        "assignees": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "basis": "explicit_mention",
+        "waiting_on": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#40",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
+  },
+  {
+    "name": "loop_working/mine/in",
+    "kind": "loop_working",
+    "waits_on": "me",
+    "needs_me": false,
+    "in_scope": true,
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#41"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#41: Change 41",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/41"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#41"
+          },
+          "ref": "situation:loop_working",
+          "permalink": "https://github.com/acme/api/pull/41"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#41",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
+  },
+  {
+    "name": "loop_working/mine/in/muted",
+    "kind": "muted",
+    "unmuted_kind": "loop_working",
+    "waits_on": "nobody",
+    "needs_me": false,
+    "in_scope": true,
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#42"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#42: Change 42",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/42"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#42"
+          },
+          "ref": "situation:muted",
+          "permalink": "https://github.com/acme/api/pull/42"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#42",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
+  },
+  {
+    "name": "loop_working/mine/out",
+    "kind": "loop_working",
+    "waits_on": "me",
+    "needs_me": false,
+    "in_scope": true,
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#43"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#43: Change 43",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/43"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#43"
+          },
+          "ref": "situation:loop_working",
+          "permalink": "https://github.com/acme/api/pull/43"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#43",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
+  },
+  {
+    "name": "loop_working/mine/out/muted",
+    "kind": "muted",
+    "unmuted_kind": "loop_working",
+    "waits_on": "nobody",
+    "needs_me": false,
+    "in_scope": true,
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#44"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#44: Change 44",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/44"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#44"
+          },
+          "ref": "situation:muted",
+          "permalink": "https://github.com/acme/api/pull/44"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#44",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
+  },
+  {
+    "name": "loop_working/theirs/in",
+    "kind": "loop_working",
+    "waits_on": "me",
+    "needs_me": false,
+    "in_scope": true,
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#45"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#45: Change 45",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/45"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#45"
+          },
+          "ref": "situation:loop_working",
+          "permalink": "https://github.com/acme/api/pull/45"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#45",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
+  },
+  {
+    "name": "loop_working/theirs/in/muted",
+    "kind": "muted",
+    "unmuted_kind": "loop_working",
+    "waits_on": "nobody",
+    "needs_me": false,
+    "in_scope": true,
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#46"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#46: Change 46",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/46"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#46"
+          },
+          "ref": "situation:muted",
+          "permalink": "https://github.com/acme/api/pull/46"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#46",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
+  },
+  {
+    "name": "loop_working/theirs/out",
+    "kind": "loop_working",
+    "waits_on": "me",
+    "needs_me": false,
+    "in_scope": true,
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#47"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#47: Change 47",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/47"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#47"
+          },
+          "ref": "situation:loop_working",
+          "permalink": "https://github.com/acme/api/pull/47"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#47",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
+  },
+  {
+    "name": "loop_working/theirs/out/muted",
+    "kind": "muted",
+    "unmuted_kind": "loop_working",
+    "waits_on": "nobody",
+    "needs_me": false,
+    "in_scope": true,
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#48"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#48: Change 48",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/48"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#48"
+          },
+          "ref": "situation:muted",
+          "permalink": "https://github.com/acme/api/pull/48"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#48",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
+  },
+  {
+    "name": "loop_waiting/mine/in",
+    "kind": "loop_waiting",
+    "waits_on": "me",
+    "needs_me": true,
+    "in_scope": true,
+    "items": [
+      {
+        "id": "gh:reviewer",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#49"
+        },
+        "kind": "decision",
+        "summary": "Pick a reviewer for acme/api#49: Change 49",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/49"
+        ],
+        "contexts": [
+          "@decide"
+        ],
+        "initial": "ready",
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#49"
+          },
+          "ref": "situation:no_reviewer",
+          "permalink": "https://github.com/acme/api/pull/49"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "basis": "self_assigned",
+        "waiting_on": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#49",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
+  },
+  {
+    "name": "loop_waiting/mine/in/muted",
+    "kind": "muted",
+    "unmuted_kind": "loop_waiting",
+    "waits_on": "nobody",
+    "needs_me": true,
+    "in_scope": true,
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#50"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#50: Change 50",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/50"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#50"
+          },
+          "ref": "situation:muted",
+          "permalink": "https://github.com/acme/api/pull/50"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
         },
         "assignees": [
           {
@@ -1514,95 +2093,11 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#50",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
     ]
-  },
-  {
-    "name": "loop_working/mine/in",
-    "kind": "loop_working",
-    "waits_on": "me",
-    "needs_me": false,
-    "in_scope": true,
-    "items": []
-  },
-  {
-    "name": "loop_working/mine/in/muted",
-    "kind": "muted",
-    "unmuted_kind": "loop_working",
-    "waits_on": "nobody",
-    "needs_me": false,
-    "in_scope": true,
-    "items": []
-  },
-  {
-    "name": "loop_working/mine/out",
-    "kind": "loop_working",
-    "waits_on": "me",
-    "needs_me": false,
-    "in_scope": true,
-    "items": []
-  },
-  {
-    "name": "loop_working/mine/out/muted",
-    "kind": "muted",
-    "unmuted_kind": "loop_working",
-    "waits_on": "nobody",
-    "needs_me": false,
-    "in_scope": true,
-    "items": []
-  },
-  {
-    "name": "loop_working/theirs/in",
-    "kind": "loop_working",
-    "waits_on": "me",
-    "needs_me": false,
-    "in_scope": true,
-    "items": []
-  },
-  {
-    "name": "loop_working/theirs/in/muted",
-    "kind": "muted",
-    "unmuted_kind": "loop_working",
-    "waits_on": "nobody",
-    "needs_me": false,
-    "in_scope": true,
-    "items": []
-  },
-  {
-    "name": "loop_working/theirs/out",
-    "kind": "loop_working",
-    "waits_on": "me",
-    "needs_me": false,
-    "in_scope": true,
-    "items": []
-  },
-  {
-    "name": "loop_working/theirs/out/muted",
-    "kind": "muted",
-    "unmuted_kind": "loop_working",
-    "waits_on": "nobody",
-    "needs_me": false,
-    "in_scope": true,
-    "items": []
-  },
-  {
-    "name": "loop_waiting/mine/in",
-    "kind": "loop_waiting",
-    "waits_on": "me",
-    "needs_me": true,
-    "in_scope": true,
-    "items": []
-  },
-  {
-    "name": "loop_waiting/mine/in/muted",
-    "kind": "muted",
-    "unmuted_kind": "loop_waiting",
-    "waits_on": "nobody",
-    "needs_me": true,
-    "in_scope": true,
-    "items": []
   },
   {
     "name": "loop_waiting/mine/out",
@@ -1610,7 +2105,57 @@
     "waits_on": "me",
     "needs_me": true,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:reviewer",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#51"
+        },
+        "kind": "decision",
+        "summary": "Pick a reviewer for acme/api#51: Change 51",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/51"
+        ],
+        "contexts": [
+          "@decide"
+        ],
+        "initial": "ready",
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#51"
+          },
+          "ref": "situation:no_reviewer",
+          "permalink": "https://github.com/acme/api/pull/51"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "basis": "self_assigned",
+        "waiting_on": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#51",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "loop_waiting/mine/out/muted",
@@ -1619,7 +2164,56 @@
     "waits_on": "nobody",
     "needs_me": true,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#52"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#52: Change 52",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/52"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#52"
+          },
+          "ref": "situation:muted",
+          "permalink": "https://github.com/acme/api/pull/52"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#52",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "loop_waiting/theirs/in",
@@ -1627,7 +2221,56 @@
     "waits_on": "me",
     "needs_me": true,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#53"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#53: Change 53",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/53"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#53"
+          },
+          "ref": "situation:no_reviewer",
+          "permalink": "https://github.com/acme/api/pull/53"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#53",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "loop_waiting/theirs/in/muted",
@@ -1636,7 +2279,56 @@
     "waits_on": "nobody",
     "needs_me": true,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#54"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#54: Change 54",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/54"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#54"
+          },
+          "ref": "situation:muted",
+          "permalink": "https://github.com/acme/api/pull/54"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#54",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "loop_waiting/theirs/out",
@@ -1644,7 +2336,56 @@
     "waits_on": "me",
     "needs_me": true,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#55"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#55: Change 55",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/55"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#55"
+          },
+          "ref": "situation:no_reviewer",
+          "permalink": "https://github.com/acme/api/pull/55"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#55",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "loop_waiting/theirs/out/muted",
@@ -1653,7 +2394,56 @@
     "waits_on": "nobody",
     "needs_me": true,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#56"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#56: Change 56",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/56"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#56"
+          },
+          "ref": "situation:muted",
+          "permalink": "https://github.com/acme/api/pull/56"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#56",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "loop_stopped/mine/in",
@@ -1661,7 +2451,56 @@
     "waits_on": "me",
     "needs_me": true,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#57"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#57: Change 57",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/57"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#57"
+          },
+          "ref": "situation:loop_stopped",
+          "permalink": "https://github.com/acme/api/pull/57"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#57",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "loop_stopped/mine/in/muted",
@@ -1670,7 +2509,56 @@
     "waits_on": "nobody",
     "needs_me": true,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#58"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#58: Change 58",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/58"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#58"
+          },
+          "ref": "situation:muted",
+          "permalink": "https://github.com/acme/api/pull/58"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#58",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "loop_stopped/mine/out",
@@ -1678,7 +2566,56 @@
     "waits_on": "me",
     "needs_me": true,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#59"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#59: Change 59",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/59"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#59"
+          },
+          "ref": "situation:loop_stopped",
+          "permalink": "https://github.com/acme/api/pull/59"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#59",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "loop_stopped/mine/out/muted",
@@ -1687,7 +2624,56 @@
     "waits_on": "nobody",
     "needs_me": true,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#60"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#60: Change 60",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/60"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#60"
+          },
+          "ref": "situation:muted",
+          "permalink": "https://github.com/acme/api/pull/60"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#60",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "loop_stopped/theirs/in",
@@ -1695,7 +2681,56 @@
     "waits_on": "me",
     "needs_me": true,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#61"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#61: Change 61",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/61"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#61"
+          },
+          "ref": "situation:loop_stopped",
+          "permalink": "https://github.com/acme/api/pull/61"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#61",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "loop_stopped/theirs/in/muted",
@@ -1704,7 +2739,56 @@
     "waits_on": "nobody",
     "needs_me": true,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#62"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#62: Change 62",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/62"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#62"
+          },
+          "ref": "situation:muted",
+          "permalink": "https://github.com/acme/api/pull/62"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#62",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "loop_stopped/theirs/out",
@@ -1712,7 +2796,56 @@
     "waits_on": "me",
     "needs_me": true,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#63"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#63: Change 63",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/63"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#63"
+          },
+          "ref": "situation:loop_stopped",
+          "permalink": "https://github.com/acme/api/pull/63"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#63",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "loop_stopped/theirs/out/muted",
@@ -1721,7 +2854,56 @@
     "waits_on": "nobody",
     "needs_me": true,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#64"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#64: Change 64",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/64"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#64"
+          },
+          "ref": "situation:muted",
+          "permalink": "https://github.com/acme/api/pull/64"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:octocat",
+            "name": "octocat"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#64",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "draft/mine/in",
@@ -1729,7 +2911,56 @@
     "waits_on": "author",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#65"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#65: Change 65",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/65"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#65"
+          },
+          "ref": "situation:draft",
+          "permalink": "https://github.com/acme/api/pull/65"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#65",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "draft/mine/in/muted",
@@ -1738,7 +2969,56 @@
     "waits_on": "nobody",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#66"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#66: Change 66",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/66"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#66"
+          },
+          "ref": "situation:draft",
+          "permalink": "https://github.com/acme/api/pull/66"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "system:\u003cbrand\u003e",
+            "name": "\u003cbrand\u003e"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#66",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "draft/mine/out",
@@ -1763,7 +3043,56 @@
     "waits_on": "author",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#69"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#69: Change 69",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/69"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#69"
+          },
+          "ref": "situation:draft",
+          "permalink": "https://github.com/acme/api/pull/69"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#69",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "draft/theirs/in/muted",
@@ -1772,7 +3101,56 @@
     "waits_on": "nobody",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#70"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#70: Change 70",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/70"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#70"
+          },
+          "ref": "situation:draft",
+          "permalink": "https://github.com/acme/api/pull/70"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#70",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "draft/theirs/out",
@@ -1843,6 +3221,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#73",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -1901,6 +3280,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#74",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -1929,7 +3309,56 @@
     "waits_on": "author",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#77"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#77: Change 77",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/77"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#77"
+          },
+          "ref": "situation:checks",
+          "permalink": "https://github.com/acme/api/pull/77"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#77",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "checks/theirs/in/muted",
@@ -1938,7 +3367,56 @@
     "waits_on": "nobody",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#78"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#78: Change 78",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/78"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#78"
+          },
+          "ref": "situation:checks",
+          "permalink": "https://github.com/acme/api/pull/78"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#78",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "checks/theirs/out",
@@ -2009,6 +3487,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#81",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -2067,6 +3546,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#82",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -2141,6 +3621,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#85",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -2199,6 +3680,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#86",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -2273,6 +3755,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#89",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -2331,6 +3814,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#90",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -2359,7 +3843,56 @@
     "waits_on": "author",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#93"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#93: Change 93",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/93"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#93"
+          },
+          "ref": "situation:changes",
+          "permalink": "https://github.com/acme/api/pull/93"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#93",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "changes_by_other/theirs/in/muted",
@@ -2368,7 +3901,56 @@
     "waits_on": "nobody",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#94"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#94: Change 94",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/94"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#94"
+          },
+          "ref": "situation:changes",
+          "permalink": "https://github.com/acme/api/pull/94"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#94",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "changes_by_other/theirs/out",
@@ -2439,6 +4021,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#97",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -2497,6 +4080,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#98",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -2525,7 +4109,56 @@
     "waits_on": "author",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#101"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#101: Change 101",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/101"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#101"
+          },
+          "ref": "situation:merge",
+          "permalink": "https://github.com/acme/api/pull/101"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#101",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "merge/theirs/in/muted",
@@ -2534,7 +4167,56 @@
     "waits_on": "nobody",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#102"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#102: Change 102",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/102"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#102"
+          },
+          "ref": "situation:merge",
+          "permalink": "https://github.com/acme/api/pull/102"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#102",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "merge/theirs/out",
@@ -2605,6 +4287,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#105",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -2663,6 +4346,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#106",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -2691,7 +4375,56 @@
     "waits_on": "author",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#109"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#109: Change 109",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/109"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#109"
+          },
+          "ref": "situation:conflicts",
+          "permalink": "https://github.com/acme/api/pull/109"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#109",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "conflicts/theirs/in/muted",
@@ -2700,7 +4433,56 @@
     "waits_on": "nobody",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#110"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#110: Change 110",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/110"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#110"
+          },
+          "ref": "situation:conflicts",
+          "permalink": "https://github.com/acme/api/pull/110"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#110",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "conflicts/theirs/out",
@@ -2771,6 +4553,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#113",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -2829,6 +4612,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#114",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -2903,6 +4687,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#117",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -2961,6 +4746,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#118",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -3035,6 +4821,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#121",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -3093,6 +4880,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#122",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -3121,7 +4909,56 @@
     "waits_on": "author",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#125"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#125: Change 125",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/125"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#125"
+          },
+          "ref": "situation:reply",
+          "permalink": "https://github.com/acme/api/pull/125"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#125",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "reply_to_other/theirs/in/muted",
@@ -3130,7 +4967,56 @@
     "waits_on": "nobody",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#126"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#126: Change 126",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/126"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#126"
+          },
+          "ref": "situation:reply",
+          "permalink": "https://github.com/acme/api/pull/126"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#126",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "reply_to_other/theirs/out",
@@ -3201,6 +5087,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#129",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -3259,6 +5146,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#130",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -3333,6 +5221,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#133",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -3391,6 +5280,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#134",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -3465,6 +5355,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#137",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -3523,6 +5414,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#138",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -3551,7 +5443,56 @@
     "waits_on": "bob",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#141"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#141: Change 141",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/141"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#141"
+          },
+          "ref": "situation:reviewer_back",
+          "permalink": "https://github.com/acme/api/pull/141"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:bob",
+            "name": "bob"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:bob",
+            "name": "bob"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#141",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "reviewer_back_other/theirs/in/muted",
@@ -3560,7 +5501,56 @@
     "waits_on": "nobody",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#142"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#142: Change 142",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/142"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#142"
+          },
+          "ref": "situation:reviewer_back",
+          "permalink": "https://github.com/acme/api/pull/142"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:bob",
+            "name": "bob"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:bob",
+            "name": "bob"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#142",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "reviewer_back_other/theirs/out",
@@ -3631,6 +5621,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#145",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -3689,6 +5680,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#146",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -3763,6 +5755,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#149",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -3821,6 +5814,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#150",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -3895,6 +5889,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#153",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -3953,6 +5948,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#154",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -4027,6 +6023,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#157",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -4085,6 +6082,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#158",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -4159,6 +6157,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#161",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -4217,6 +6216,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#162",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -4245,7 +6245,56 @@
     "waits_on": "bob",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#165"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#165: Change 165",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/165"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#165"
+          },
+          "ref": "situation:review",
+          "permalink": "https://github.com/acme/api/pull/165"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:bob",
+            "name": "bob"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:bob",
+            "name": "bob"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#165",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "review_of_other/theirs/in/muted",
@@ -4254,7 +6303,56 @@
     "waits_on": "nobody",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#166"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#166: Change 166",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/166"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#166"
+          },
+          "ref": "situation:review",
+          "permalink": "https://github.com/acme/api/pull/166"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:bob",
+            "name": "bob"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:bob",
+            "name": "bob"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#166",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "review_of_other/theirs/out",
@@ -4325,6 +6423,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#169",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -4383,6 +6482,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#170",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -4411,7 +6511,56 @@
     "waits_on": "author",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#173"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#173: Change 173",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/173"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#173"
+          },
+          "ref": "situation:no_reviewer",
+          "permalink": "https://github.com/acme/api/pull/173"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#173",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "no_reviewer/theirs/in/muted",
@@ -4420,7 +6569,56 @@
     "waits_on": "nobody",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#174"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#174: Change 174",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/174"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#174"
+          },
+          "ref": "situation:no_reviewer",
+          "permalink": "https://github.com/acme/api/pull/174"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#174",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "no_reviewer/theirs/out",
@@ -4491,6 +6689,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#177",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -4549,6 +6748,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#178",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -4577,7 +6777,56 @@
     "waits_on": "bob",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#181"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#181: Change 181",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/181"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#181"
+          },
+          "ref": "situation:review",
+          "permalink": "https://github.com/acme/api/pull/181"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:bob",
+            "name": "bob"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:bob",
+            "name": "bob"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#181",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "stalled_review_of_other/theirs/in/muted",
@@ -4586,7 +6835,56 @@
     "waits_on": "nobody",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#182"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#182: Change 182",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/182"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#182"
+          },
+          "ref": "situation:review",
+          "permalink": "https://github.com/acme/api/pull/182"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:bob",
+            "name": "bob"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:bob",
+            "name": "bob"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#182",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "stalled_review_of_other/theirs/out",
@@ -4657,6 +6955,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#185",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -4715,6 +7014,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#186",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -4789,6 +7089,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#189",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -4847,6 +7148,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#190",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -4921,6 +7223,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#193",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -4979,6 +7282,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#194",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -5036,6 +7340,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#195",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -5094,6 +7399,7 @@
         "confidence": "high",
         "provenance": "derived",
         "confirmed": false,
+        "task_key": "github:acme/api#196",
         "created_at": "0001-01-01T00:00:00Z",
         "updated_at": "0001-01-01T00:00:00Z"
       }
@@ -5105,7 +7411,56 @@
     "waits_on": "author",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#197"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#197: Change 197",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/197"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#197"
+          },
+          "ref": "situation:merge",
+          "permalink": "https://github.com/acme/api/pull/197"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#197",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "approved_by_viewer/theirs/in/muted",
@@ -5114,7 +7469,56 @@
     "waits_on": "nobody",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#198"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#198: Change 198",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/198"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#198"
+          },
+          "ref": "situation:merge",
+          "permalink": "https://github.com/acme/api/pull/198"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#198",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "approved_by_viewer/theirs/out",
@@ -5122,7 +7526,56 @@
     "waits_on": "author",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#199"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#199: Change 199",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/199"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#199"
+          },
+          "ref": "situation:merge",
+          "permalink": "https://github.com/acme/api/pull/199"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#199",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   },
   {
     "name": "approved_by_viewer/theirs/out/muted",
@@ -5131,6 +7584,55 @@
     "waits_on": "nobody",
     "needs_me": false,
     "in_scope": true,
-    "items": []
+    "items": [
+      {
+        "id": "gh:follow",
+        "unit": {
+          "provider": "github",
+          "key": "acme/api#200"
+        },
+        "kind": "todo",
+        "summary": "Follow acme/api#200: Change 200",
+        "context": "",
+        "urls": [
+          "https://github.com/acme/api/pull/200"
+        ],
+        "contexts": [
+          "@repo-api"
+        ],
+        "origin": {
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#200"
+          },
+          "ref": "situation:merge",
+          "permalink": "https://github.com/acme/api/pull/200"
+        },
+        "requester": {
+          "key": "github:octocat",
+          "name": "octocat"
+        },
+        "assignees": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "basis": "none",
+        "waiting_on": [
+          {
+            "key": "github:alice",
+            "name": "alice"
+          }
+        ],
+        "state": "open",
+        "confidence": "high",
+        "provenance": "derived",
+        "confirmed": false,
+        "task_key": "github:acme/api#200",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ]
   }
 ]

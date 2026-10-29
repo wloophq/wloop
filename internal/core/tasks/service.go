@@ -741,6 +741,11 @@ func (s *Service) Attach(ctx context.Context, id task.ID, u unit.Unit) error {
 	return s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e, Why: "attached " + u.String()}})
 }
 
+// TasksOf are the stored tasks that hold u or one of its items.
+func (s *Service) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
+	return s.d.Store.TasksOf(ctx, u)
+}
+
 // UnitClosed ends the open tasks that hold u, its closure posted: each moves into the done category.
 func (s *Service) UnitClosed(ctx context.Context, u unit.Unit) error {
 	s.mu.Lock()

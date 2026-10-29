@@ -46,7 +46,7 @@ func (s *stepSet) taskVerbCheck(ctx context.Context, c stepCall, _ automation.Ch
 		return "", err
 	}
 	v := task.Verb(c.arg("verb"))
-	if e.Origin == task.OriginDerived && s.closes(v) {
+	if e.Origin == task.OriginDerived && len(e.Items) > 0 && s.closes(v) {
 		return "a derived task closes when its items resolve", nil
 	}
 	if g.Handles(e, v) {

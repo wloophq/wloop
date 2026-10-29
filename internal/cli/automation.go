@@ -674,8 +674,8 @@ func (k unitKeeping) Settle(ctx context.Context, st automation.State) error {
 		}
 	}
 	if s.blocks != nil {
-		if err := s.blocks.e.syncTrustGates(ctx); err != nil {
-			errs = append(errs, fmt.Errorf("trust gates: %w", err))
+		if err := s.blocks.e.supersedeHeldGates(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("held rounds' gates: %w", err))
 		}
 	}
 	return errors.Join(errs...)

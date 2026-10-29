@@ -299,3 +299,38 @@ func TestAnItemProposesACategory(t *testing.T) {
 		t.Fatal("a state name as the proposed category was taken")
 	}
 }
+
+func keyed(it *items.Item) { it.TaskKey = pr.String() }
+
+func TestItemsOfOneTaskKeyAreOneTask(t *testing.T) {
+	cared := facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true })
+	es := reconcile(t, cared, []items.Item{item("gh:review", keyed), item("gh:fix", keyed, owedBy(ana))}, nil, now)
+	e := only(t, es)
+	if e.ID != task.DerivedID(pr, pr.String()) || len(e.Items) != 2 || e.Units[0] != pr {
+		t.Fatalf("one task per key: %+v", e)
+	}
+	es = reconcile(t, cared, []items.Item{item("gh:review", keyed, resolved), item("gh:fix", keyed, resolved), item("gh:merge", keyed)}, es, now)
+	if e := only(t, es); e.ID != task.DerivedID(pr, pr.String()) || !e.Open() || len(e.Items) != 1 {
+		t.Fatalf("a new situation joins the task holding the key: %+v", e)
+	}
+	es = reconcile(t, cared, []items.Item{item("gh:merge", keyed, resolved)}, es, now)
+	if e := only(t, es); !e.Open() || len(e.Items) != 0 {
+		t.Fatalf("a unit's task outlives its asks: %+v", e)
+	}
+	es = reconcile(t, facts(func(f *task.UnitFacts) { f.Carded = true }), []items.Item{item("gh:merge", keyed, resolved)}, es, now)
+	if e := only(t, es); e.Category != task.CategoryDropped {
+		t.Fatalf("a unit no longer followed drops its task: %+v", e)
+	}
+}
+
+func TestAKeyNoTaskHoldsGoesToTheUnitsOwnTask(t *testing.T) {
+	own := task.Task{ID: "t-00000000000000a1", State: "next", Category: task.CategoryReady, Title: "Follow acme/api#7", Units: []unit.Unit{pr},
+		Origin: task.OriginDerived, Created: now.Add(-time.Hour)}
+	es := reconcile(t, facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true }), []items.Item{item("gh:review", keyed)}, []task.Task{own}, now)
+	if e := only(t, es); e.ID != own.ID || len(e.Items) != 1 {
+		t.Fatalf("the unit's own task takes its key: %+v", es)
+	}
+	if es := reconcile(t, facts(), nil, []task.Task{own}, now); only(t, es).Category != task.CategoryReady {
+		t.Fatalf("a task with no item is never resolved for lack of items: %+v", es)
+	}
+}

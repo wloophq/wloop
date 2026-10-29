@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/round"
@@ -47,15 +48,6 @@ func pinLocal(t *testing.T, loc *time.Location) {
 	old := time.Local
 	time.Local = loc
 	t.Cleanup(func() { time.Local = old })
-}
-
-func brt(t *testing.T) *time.Location {
-	t.Helper()
-	loc, err := time.LoadLocation("America/Sao_Paulo")
-	if err != nil {
-		t.Skip(err)
-	}
-	return loc
 }
 
 func TestItemsPerSituation(t *testing.T) {
@@ -89,9 +81,21 @@ func TestItemsPerSituation(t *testing.T) {
 // brandless names the loop's requester by placeholder, so the golden holds under any brand.
 func brandless(v []items.Item) []items.Item {
 	out := []items.Item{}
+	loop := func(p items.Person) items.Person {
+		if p.Key == "system:"+brand.Name {
+			return items.Person{Key: "system:<brand>", Name: "<brand>"}
+		}
+		return p
+	}
 	for _, it := range v {
-		if it.Requester.Key == "system:"+brand.Name {
-			it.Requester = items.Person{Key: "system:<brand>", Name: "<brand>"}
+		it.Requester = loop(it.Requester)
+		it.WaitingOn = slices.Clone(it.WaitingOn)
+		it.Assignees = slices.Clone(it.Assignees)
+		for i := range it.WaitingOn {
+			it.WaitingOn[i] = loop(it.WaitingOn[i])
+		}
+		for i := range it.Assignees {
+			it.Assignees[i] = loop(it.Assignees[i])
 		}
 		out = append(out, it)
 	}
@@ -134,7 +138,7 @@ func TestMutedRowKeepsItems(t *testing.T) {
 		}
 		a, _ := json.Marshal(itemsOf(plain))
 		b, _ := json.Marshal(itemsOf(muted))
-		if !bytes.Equal(a, b) || len(itemsOf(plain)) != 1 || itemsOf(plain)[0].ID != "gh:round" {
+		if !bytes.Equal(a, b) || len(itemsOf(plain)) != 1 || itemsOf(plain)[0].ID != "gh:review" {
 			t.Fatalf("plain %s\nmuted %s", a, b)
 		}
 	})
@@ -149,49 +153,28 @@ func TestMutedRowKeepsItems(t *testing.T) {
 	}
 }
 
-func TestHeldIDIsTheLocalDay(t *testing.T) {
-	loc := brt(t)
-	pinLocal(t, loc)
-	hold := time.Date(2026, 10, 21, 20, 0, 0, 0, loc)
-	held := func(n int, at time.Time, mutedAt time.Time) api.Row {
-		s := ghsourcetest.Situation{PR: ghsourcetest.Open(n, ghsourcetest.Other), At: at}
-		s.PR.Workspace = ghsourcetest.ReviewWorkspace
-		s.Events = []dinv.Event{ghsourcetest.Event(n, dinv.KindRoundHeld, "", hold, "cap reached")}
-		if !mutedAt.IsZero() {
-			s.Mute = overlay.Mute{Until: at.Add(5 * time.Hour)}
-			s.Events = append(s.Events, ghsourcetest.Event(n, dinv.KindMuted, ghsourcetest.Viewer, mutedAt, ""))
-		}
-		return ghsourcetest.Derive(s)
-	}
-	now := time.Date(2026, 10, 21, 22, 0, 0, 0, loc)
-	rows := []api.Row{held(1, now, time.Time{}), held(1, now, time.Date(2026, 10, 21, 21, 30, 0, 0, loc))}
-	for _, r := range rows {
-		got := itemsOf(r)
-		if len(got) != 1 || got[0].ID != "gh:held:2026-10-21" {
-			t.Errorf("%s (%s): %+v", r.Label, r.Kind, got)
-		}
-	}
-}
-
 func TestAskedTurnDerivesNoItem(t *testing.T) {
 	for _, c := range ghsourcetest.Cases() {
 		switch kindOf(c.Row) {
 		case situation.KindLoopWaiting, situation.KindLoopStopped:
-			if !loopItemsAsExpected(c.Row) {
+			if !loopItemsAsExpected(c.Row, itemsOf) {
 				t.Errorf("%s: %+v", c.Name, itemsOf(c.Row))
 			}
 		}
 	}
 }
 
-// loopItemsAsExpected: a loop row derives no item, but for an agent that waits on the viewer with no
-// question, which derives gh:wait.
-func loopItemsAsExpected(r api.Row) bool {
+// loopItemsAsExpected: a loop row asks what the plugin reported under the turn, else follows the pull request:
+// on the user when its agent waits with no question, on the loop while it works.
+func loopItemsAsExpected(r api.Row, itemsOf func(api.Row) []items.Item) bool {
 	got := itemsOf(r)
-	if situation.Kind(r.Kind) == situation.KindLoopWaiting && r.Question == nil && prrow.NeedsMe(r) {
-		return len(got) == 1 && got[0].ID == "gh:wait"
+	if len(got) == 0 || slices.ContainsFunc(got, func(it items.Item) bool { return it.TaskKey != r.Unit.String() }) {
+		return false
 	}
-	return len(got) == 0
+	if situation.Kind(r.Kind) == situation.KindLoopWaiting && r.Question == nil && prrow.NeedsMe(r) {
+		return hasViewerItem(r, itemsOf)
+	}
+	return true
 }
 
 func kindOf(r api.Row) situation.Kind {
@@ -291,7 +274,7 @@ func compareNeedsMe(t *testing.T, rows []api.Row, itemsOf func(api.Row) []items.
 	for _, r := range rows {
 		switch kindOf(r) {
 		case situation.KindLoopWaiting, situation.KindLoopStopped:
-			if !loopItemsAsExpected(r) {
+			if !loopItemsAsExpected(r, itemsOf) {
 				t.Errorf("%s asked: %+v", r.Label, itemsOf(r))
 			}
 			continue
@@ -443,22 +426,20 @@ func waitingAgent(q *api.QuestionView) api.Row {
 	return r
 }
 
-func TestAWaitingAgentWithNoQuestionIsAnItem(t *testing.T) {
-	waiting := waitingAgent
-	r := waiting(nil)
+func TestAWaitingAgentWithNoQuestionWaitsOnTheViewer(t *testing.T) {
+	r := waitingAgent(nil)
 	if situation.Kind(r.Kind) != situation.KindLoopWaiting || !prrow.NeedsMe(r) {
 		t.Fatalf("kind %s, needs me %v", r.Kind, prrow.NeedsMe(r))
 	}
 	got := itemsOf(r)
-	if len(got) != 1 || got[0].ID != "gh:wait" || got[0].Initial != items.InitialInbox || len(got[0].WaitingOn) != 1 {
+	if len(got) != 1 || got[0].ID != itemFollow || got[0].TaskKey != r.Unit.String() || !hasViewerItem(r, itemsOf) {
 		t.Fatalf("%+v", got)
-	}
-	if got := itemsOf(waiting(&api.QuestionView{State: "asked", RecordID: 3})); len(got) != 0 {
-		t.Fatalf("a question derives %+v", got)
 	}
 }
 
-func TestEveryNoticeHasItsItem(t *testing.T) {
+// TestEveryNoticeStandsForAGateOrAnAsk holds what a needs-me row notifies against what its task holds: a
+// round, held or blocked, through its gate, and every other notice an ask of the viewer on the task.
+func TestEveryNoticeStandsForAGateOrAnAsk(t *testing.T) {
 	l, err := turn.Bundled()
 	if err != nil {
 		t.Fatal(err)
@@ -475,14 +456,24 @@ func TestEveryNoticeHasItsItem(t *testing.T) {
 		}
 		seen[n.Case] = true
 		got := itemsOf(c.Row)
-		if n.Case == prrow.NoticeQuestion {
-			if len(got) != 0 {
-				t.Errorf("%s: a question derives %+v", c.Name, got)
-			}
-			continue
+		if slices.ContainsFunc(got, func(it items.Item) bool {
+			return strings.HasPrefix(it.ID, "gh:held") || it.ID == "gh:blocked" || it.ID == "gh:round" || it.ID == "gh:wait"
+		}) {
+			t.Errorf("%s: an approval is an item: %+v", c.Name, got)
 		}
-		if len(got) != 1 || !strings.HasPrefix(got[0].ID, n.Case.Item()) || got[0].Initial != items.InitialInbox {
-			t.Errorf("%s: notice %s, items %+v", c.Name, n.Case, got)
+		switch n.Case {
+		case prrow.NoticeRound, prrow.NoticeHeld:
+			if n.Case.Gate() != gate.KindPlan {
+				t.Errorf("%s: notice %s stands for %q", c.Name, n.Case, n.Case.Gate())
+			}
+		case prrow.NoticeBlocked:
+			if n.Case.Gate() != gate.KindTrust {
+				t.Errorf("%s: notice %s stands for %q", c.Name, n.Case, n.Case.Gate())
+			}
+		case prrow.NoticeWait:
+			if !hasViewerItem(c.Row, itemsOf) {
+				t.Errorf("%s: notice %s, items %+v", c.Name, n.Case, got)
+			}
 		}
 	}
 	for _, c := range []prrow.NoticeCase{prrow.NoticeHeld, prrow.NoticeBlocked, prrow.NoticeWait, prrow.NoticeQuestion} {
@@ -492,8 +483,8 @@ func TestEveryNoticeHasItsItem(t *testing.T) {
 	}
 }
 
-// TestAPermissionPromptIsTheSameWaitItemAsTheWorkspacesAgent holds the wait
-// item the host derives when a turn's waiting session sets the row's
+// TestAPermissionPromptIsTheSameWaitItemAsTheWorkspacesAgent holds the item
+// the host derives when a turn's waiting session sets the row's
 // situation to the one the plugin reports when the review workspace's agent
 // waits: the same pull request asks the same answer of the viewer.
 func TestAPermissionPromptIsTheSameWaitItemAsTheWorkspacesAgent(t *testing.T) {

@@ -1,6 +1,6 @@
-summary = "Close a task you captured and started work on once every unit attached to it has ended, such as its pull request merged"
+summary = "Close a pull request's task, or a task you captured and started work on, once every unit attached to it has ended, such as its pull request merged"
 provider = "task"
-when = 'task.captured_by_user && task.turns > 0 && task.link_ended'
+when = 'task.link_ended && (task.prop.kind == "pull-request" || task.captured_by_user && task.turns > 0)'
 order = 53
 
 [[step]]

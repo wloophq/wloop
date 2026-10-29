@@ -1,12 +1,12 @@
 package ghsource
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
@@ -111,86 +111,55 @@ const (
 )
 
 // ItemsOf are the items the plugin reported in s, under the overlays of r,
-// the pull request's row: a pending round is the user's decision, an agent
-// waiting on the user with no question the loop holds asks for an answer,
-// and the loop working or stopped asks nothing. A muted row keeps the items
-// of its unmuted situation.
+// the pull request's row, every one keyed on the pull request so they are
+// the asks of its one task. A pending round asks through its plan gate, so
+// it keeps the items of the situation under it, as a muted row keeps those
+// of its unmuted one. Where the host's turn overlays a situation the plugin
+// did not report, the pull request waits on the loop while it works and on
+// the user when it stopped or waits with no question, which its gate asks;
+// it asks nothing once done.
 func ItemsOf(r api.Row, s prrow.Report) []items.Item {
 	p, ok := prrow.PayloadOf(r)
 	if !ok || p.Viewer == "" {
 		return nil
 	}
-	kind, muted := situation.Kind(r.Kind), false
+	kind := situation.Kind(r.Kind)
 	if kind == situation.KindMuted {
-		kind, muted = situation.Kind(p.UnmutedKind), true
-		if r.Pending != nil {
-			kind = situation.KindRoundPending
-		}
+		kind = situation.Kind(p.UnmutedKind)
 	}
-	reported := func() []items.Item {
-		var out []items.Item
-		for _, it := range s.Items {
-			if it.ID == itemWait && r.Question != nil {
-				continue
-			}
-			out = append(out, psource.ItemOf(it))
-		}
-		return out
-	}
-	switch kind {
-	case situation.KindDone, situation.KindLoopWorking, situation.KindLoopStopped:
+	switch {
+	case kind == situation.KindDone:
 		return nil
-	case situation.KindRoundPending:
-		if len(p.Reasons) == 0 && !p.Workspace.IsReview {
-			return nil
-		}
-		return []items.Item{roundItem(r, p)}
-	case situation.KindLoopWaiting:
-		switch {
-		case muted:
-			return nil
-		case s.Situation.Kind == string(kind):
-			return reported()
-		case r.Question == nil && prrow.NeedsMe(r):
-			return []items.Item{waitItem(r, p)}
-		}
-		return nil
+	case kind == situation.KindRoundPending, s.Situation.Kind == string(kind):
+	case kind == situation.KindLoopWorking:
+		return []items.Item{followItem(r, p, items.Person{Key: "system:" + brand.Name, Name: brand.Name})}
+	case kind == situation.KindLoopStopped, kind == situation.KindLoopWaiting && r.Question == nil && prrow.NeedsMe(r):
+		return []items.Item{followItem(r, p, person(p.Viewer))}
 	}
-	return reported()
-}
-
-// itemWait is the id of the item of an agent waiting on the user.
-const itemWait = "gh:wait"
-
-func roundItem(r api.Row, p prrow.Payload) items.Item {
-	it := loopItem(r, p, []string{"@decide"})
-	it.ID, it.Kind = "gh:round", items.Decision
-	if pend := r.Pending; pend != nil {
-		it.Deadline = pend.Deadline.UTC().Format(time.RFC3339)
+	var out []items.Item
+	for _, it := range s.Items {
+		out = append(out, psource.ItemOf(it))
 	}
-	it.Summary = summary("Decide the pending round on", r)
-	it.Origin.Ref = "situation:" + string(situation.KindRoundPending)
-	return it
+	return out
 }
 
-// waitItem is an agent that waits on the viewer with no question the loop
-// holds, such as a permission prompt; a question is the turn's Inbox
-// message.
-func waitItem(r api.Row, p prrow.Payload) items.Item {
-	it := loopItem(r, p, []string{"@agent"})
-	it.ID, it.Kind = itemWait, items.Todo
-	it.Summary = summary("Answer the agent on", r)
-	return it
-}
-
-// loopItem is what the loop asks of the viewer on r.
-func loopItem(r api.Row, p prrow.Payload, contexts []string) items.Item {
-	viewer := person(p.Viewer)
-	return items.Item{Unit: r.Unit, Kind: items.Todo, URLs: []string{r.Link}, Contexts: contexts, Initial: items.InitialInbox,
+// followItem is the pull request's item that asks nothing but waits on on,
+// as the plugin's own follow item does.
+func followItem(r api.Row, p prrow.Payload, on items.Person) items.Item {
+	return items.Item{ID: itemFollow, Unit: r.Unit, Kind: items.Todo, URLs: []string{r.Link}, Contexts: []string{repoContext(p.Repo)},
 		Origin: unit.Anchor{Unit: r.Unit, Ref: "situation:" + string(r.Kind), Permalink: r.Link}, State: items.Open,
-		Confidence: items.High, Provenance: items.Derived, Requester: items.Person{Key: "system:" + brand.Name, Name: brand.Name},
-		Assignees: []items.Person{viewer}, WaitingOn: []items.Person{viewer}, Basis: items.NoBasis}
+		Confidence: items.High, Provenance: items.Derived, Requester: person(p.Viewer), Assignees: []items.Person{on},
+		WaitingOn: []items.Person{on}, Basis: items.NoBasis, Summary: summary("Follow", r), TaskKey: r.Unit.String()}
 }
+
+func repoContext(repo string) string {
+	_, name, _ := strings.Cut(repo, "/")
+	return "@repo-" + cmp.Or(name, repo)
+}
+
+// itemFollow is the id of the item of a followed pull request that asks
+// nothing else.
+const itemFollow = "gh:follow"
 
 func summary(verb string, r api.Row) string {
 	s := verb + " " + r.Label

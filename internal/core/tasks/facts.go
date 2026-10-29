@@ -43,7 +43,7 @@ func (f CardFacts) UnitFacts(ctx context.Context, u unit.Unit) (task.UnitFacts, 
 		return out, true, nil
 	}
 	c := snap.Card
-	out.StartedByMe, out.ClosurePosted, out.Cares = c.StartedByMe, c.ClosurePosted, c.Cares
+	out.StartedByMe, out.ClosurePosted, out.Cares, out.Carded = c.StartedByMe, c.ClosurePosted, c.Cares, true
 	var me task.Me
 	if f.Me != nil {
 		me = f.Me()

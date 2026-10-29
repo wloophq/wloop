@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/turn"
 )
 
@@ -23,9 +24,9 @@ func (r Read) Unmuted() any {
 
 // Notice is what a row notifies, as its provider derives it.
 type Notice struct {
-	// Item is the id prefix of the derived item whose task carries the
-	// notice; "" for a question, which the turn's Inbox message carries.
-	Item string
+	// Gate is the kind of the gate the notice stands for, which keys it on
+	// the unit's task; "" for one no gate stands for.
+	Gate gate.Kind
 	// Held says the notice is of a held round; Question of the open
 	// question of the turn record Record.
 	Held, Question bool

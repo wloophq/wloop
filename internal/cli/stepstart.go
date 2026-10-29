@@ -10,11 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/pr"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/automation"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
@@ -490,7 +492,23 @@ func (s *stepSet) holdByCap(ctx context.Context, c stepCall, why string) error {
 	if planned.ws.ID != "" {
 		errs = append(errs, s.e.setCard(ctx, planned.ws, "", true))
 	}
+	errs = append(errs, s.openHeldGate(ctx, c.u))
 	return errors.Join(errs...)
+}
+
+// openHeldGate opens the plan gate of u's round the daily cap held today, once: approving it runs the round by
+// hand, and no rule releases it, since the cap held it.
+func (s *stepSet) openHeldGate(ctx context.Context, u unit.Unit) error {
+	if s.d.Gates == nil {
+		return nil
+	}
+	subject := round.HeldSubject(s.e.Now())
+	open, err := s.d.Gates.Where(ctx, gates.Query{Kind: gate.KindPlan, Unit: u})
+	if err != nil || slices.ContainsFunc(open, func(g gate.Gate) bool { return g.Subject == subject }) {
+		return err
+	}
+	_, err = s.d.Gates.Open(ctx, gate.Gate{Kind: gate.KindPlan, Unit: u, Subject: subject}, waitsForYou{})
+	return err
 }
 
 // startRun checks again on current facts, then sends the round through

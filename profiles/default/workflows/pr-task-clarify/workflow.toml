@@ -1,0 +1,8 @@
+summary = "Clarify a pull request's task as it lands, so what it asks of you is in Needs me and never in the Inbox"
+provider = "task"
+when = 'task.category == "inbox" && task.prop.kind == "pull-request"'
+order = 52
+
+[[step]]
+use = "task.verb"
+verb = "next"

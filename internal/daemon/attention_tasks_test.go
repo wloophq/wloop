@@ -106,13 +106,18 @@ func (r *notifyRig) notified(t *testing.T) map[string]api.TaskView {
 			if e.Attention == nil {
 				continue
 			}
-			if v != "inbox" && v != "outbox" && v != "focus" && len(e.Gates) == 0 {
+			if v != "inbox" && v != "outbox" && v != "focus" && len(e.Gates) == 0 && !pullRequestTask(e) {
 				t.Errorf("%s entry %s (%s) with no open gate notifies %+v", v, e.ID, e.State, e.Attention)
 			}
 			out[e.ID] = e
 		}
 	}
 	return out
+}
+
+// pullRequestTask says whether e is a pull request's task, which notifies its row's notice whatever its state.
+func pullRequestTask(e api.TaskView) bool {
+	return len(e.Units) > 0 && e.Units[0].Provider == unit.GitHub
 }
 
 // newCategory is the category a row attention's category takes on a task.
@@ -599,7 +604,7 @@ func TestAnotherDerivedTaskOfANotifyingRowStaysSilent(t *testing.T) {
 	r.events(t, dinv.Event{PR: r7, Kind: dinv.KindRoundHeld, Key: "cap", At: catalogNow, Data: "daily cap"})
 	r.settle(t, r7u)
 	other := task.Task{ID: "e-other", State: "inbox", Category: task.CategoryInbox, Title: "look at it", Units: []unit.Unit{r7u},
-		Items: []task.ItemRef{{Unit: r7u, Item: "gh:attention"}}, Origin: task.OriginDerived, Created: catalogNow, Updated: catalogNow}
+		Items: []task.ItemRef{{Unit: r7u, Item: "gh:attention"}}, Origin: task.OriginDerived, Created: catalogNow.Add(time.Minute), Updated: catalogNow}
 	if err := r.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: other}}); err != nil {
 		t.Fatal(err)
 	}

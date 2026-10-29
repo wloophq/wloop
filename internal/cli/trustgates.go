@@ -10,6 +10,7 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -67,6 +68,29 @@ func (e *Env) syncTrustGates(ctx context.Context) error {
 		}
 		if err := e.gates.Supersede(ctx, g.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {
 			errs = append(errs, fmt.Errorf("closing the trust gate of %s: %w", g.Unit.Label(), err))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// supersedeHeldGates supersedes each open plan gate of a round the daily cap held on a day before today: the
+// cap counts afresh, so the round runs, or holds again, on its own.
+func (e *Env) supersedeHeldGates(ctx context.Context) error {
+	if e.gates == nil || e.gateReader == nil {
+		return nil
+	}
+	open, err := e.gateReader.Where(ctx, gates.Query{Kind: gate.KindPlan})
+	if err != nil {
+		return err
+	}
+	today := round.HeldSubject(e.Now())
+	var errs []error
+	for _, g := range open {
+		if _, held := round.HeldDay(g.Subject); !held || g.Subject == today {
+			continue
+		}
+		if err := e.gates.Supersede(ctx, g.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {
+			errs = append(errs, fmt.Errorf("closing the gate of %s's held round: %w", g.Unit.Label(), err))
 		}
 	}
 	return errors.Join(errs...)

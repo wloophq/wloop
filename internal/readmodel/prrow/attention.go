@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -39,18 +40,14 @@ const (
 	NoticeWait     NoticeCase = "wait"
 )
 
-// Item is the id prefix of the derived item whose entry carries the case's
-// notification; "" for a question, which the turn's Inbox message carries.
-func (c NoticeCase) Item() string {
+// Gate is the kind of the gate the case stands for: a plan gate holds a
+// pending or held round, a trust gate a blocked one; "" for the others.
+func (c NoticeCase) Gate() gate.Kind {
 	switch c {
-	case NoticeRound:
-		return "gh:round"
-	case NoticeHeld:
-		return "gh:held"
+	case NoticeRound, NoticeHeld:
+		return gate.KindPlan
 	case NoticeBlocked:
-		return "gh:blocked"
-	case NoticeWait:
-		return "gh:wait"
+		return gate.KindTrust
 	}
 	return ""
 }

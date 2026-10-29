@@ -550,7 +550,7 @@ func (s *Server) act(ctx context.Context, name string, u unit.Unit, req api.Acti
 		return errActionsUnavailable
 	}
 	if g, ok := catalog.RowGateIntent(l, name); ok {
-		if catalog.RunsHeld(l, name) {
+		if catalog.RunsHeld(l, name) && !s.heldGateOpen(ctx, u) {
 			if s.deps.Actions == nil {
 				return errActionsUnavailable
 			}
