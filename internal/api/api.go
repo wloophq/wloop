@@ -101,7 +101,7 @@ var Operations = []Operation{
 	{"GET", "/api/activity"},
 	{"POST", "/api/pause"},
 	{"POST", "/api/app"},
-	{"POST", "/api/workspaces/remove-done"},
+	{"POST", "/api/workspaces/remove-clean"},
 	{"GET", Intakes},
 	{"POST", IntakeWithout},
 	{"POST", IntakeCancel},

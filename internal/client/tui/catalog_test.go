@@ -36,8 +36,14 @@ func servedSpecs(t testing.TB) api.ActionsResponse {
 	return readWire[api.ActionsResponse](t, "specs.json")
 }
 
+// fixtures are the rows the daemon derives of its catalog fixtures, each in the needs-me tab.
 func fixtures(t testing.TB) map[string]api.Row {
-	return readWire[map[string]api.Row](t, "actions.json")
+	rows := readWire[map[string]api.Row](t, "actions.json")
+	for name, r := range rows {
+		r.Views = []string{"needs-me"}
+		rows[name] = r
+	}
+	return rows
 }
 
 // modelOn is a model that follows the served specs and shows the fixture row.
@@ -84,7 +90,8 @@ func newModel(t testing.TB) *Model {
 	return m
 }
 
-// servedCatalog is the catalog the daemon serves with the GitHub provider.
+// servedCatalog is the catalog the daemon serves with the GitHub provider, with two more terminal views of rows,
+// needs-me and loop, so the tests' rows fill three tabs.
 func servedCatalog(t testing.TB) api.CatalogResponse {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join("..", "..", "readmodel", "prrow", "testdata", "catalog.json"))
@@ -95,6 +102,10 @@ func servedCatalog(t testing.TB) api.CatalogResponse {
 	if err := json.Unmarshal([]byte(brandtest.Expand(string(b))), &c); err != nil {
 		t.Fatal(err)
 	}
+	tui := []string{"tui"}
+	c.Views = append([]api.ViewSpec{{ID: "needs-me", Label: "Needs me", Provider: "github", Rows: true, Surfaces: tui, Unit: "Pull request", UnitSort: "repo"},
+		{ID: "loop", Label: "In loop", Provider: "github", Rows: true, Order: 3, Surfaces: tui, Unit: "Pull request", UnitSort: "repo"}}, c.Views...)
+	slices.SortStableFunc(c.Views, func(a, b api.ViewSpec) int { return a.Order - b.Order })
 	return c
 }
 

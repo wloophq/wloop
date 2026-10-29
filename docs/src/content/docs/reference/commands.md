@@ -253,13 +253,13 @@ See [Workspaces and board columns](/concepts/board/).
 
 ### status
 
-Pull requests by view, those needing you first.
+What needs you, by view, and the tracked pull requests.
 
 ```sh
 {{command}} status [--color auto|always|never]
 ```
 
-List the daemon's pull requests by view, those needing you first. Piped, it prints one tab-separated line per pull request and view.
+List the tasks of the views the badge counts, such as Inbox and Needs me, then the pull requests you track. Piped, it prints one tab-separated line per task or pull request and view.
 
 | Flag | Description |
 | --- | --- |
@@ -282,7 +282,7 @@ The same views in the terminal, one-key actions.
 {{command}} tui
 ```
 
-The Needs me, In loop and My PRs views in the terminal, with one-key actions on the selected pull request.
+The views in the terminal, the profile's and the plugins', with one-key actions on the selected task or pull request.
 
 Examples:
 
@@ -306,7 +306,7 @@ Open the workspace of a pull request in Claude Desktop or Orca, or the pull requ
 | Flag | Description |
 | --- | --- |
 | `--print` | Print the cockpit URL with its token instead of opening it |
-| `--view <view>` | The cockpit view: needs-me, stalled, mine, loop, dash, done, all, recent, explore |
+| `--view <view>` | The cockpit view, by its id, such as needs-me or mine |
 
 Examples:
 

@@ -203,7 +203,7 @@ func facetsOf(viewer string, now time.Time, r map[string]any) map[string][]strin
 			due = append(due, at)
 		}
 	}
-	if p := obj(r["pending"]); isSetTime(str(p["deadline"])) {
+	if p := obj(r["round_gate"]); isSetTime(str(p["deadline"])) {
 		due = append(due, str(p["deadline"]))
 	}
 	if len(due) > 0 {

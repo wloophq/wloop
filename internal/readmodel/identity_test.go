@@ -67,7 +67,7 @@ func TestTeamsComeFromIdentity(t *testing.T) {
 		id: src.Identity{Viewer: src.Person{Key: "acme:ana", Name: "Ana"}, Teams: []string{"acme/core", "acme/web"}}}, broker.Host())
 	one := unit.Unit{Provider: "acme", Key: "one"}
 	m := readmodel.New(nil, nil, nil, nil, identified{client.Identity}, teamRows{units: []unit.Unit{one}})
-	page, err := m.Rows(context.Background(), api.ViewAll, api.Since{})
+	page, err := m.Rows(context.Background(), api.Since{})
 	if err != nil {
 		t.Fatal(err)
 	}

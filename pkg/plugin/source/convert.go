@@ -333,9 +333,6 @@ func roundStatePB(st RoundState) *pb.RoundState {
 		Blocked: blocked,
 		Marks:   st.Marks, SentAt: ts(st.SentAt), AgentHome: st.AgentHome, Overrides: st.Overrides,
 		Today: int64(st.Today), DayTotal: int64(st.DayTotal), Paused: st.Paused,
-		Pending: mapSlice(st.Pending, func(p PendingRound) *pb.PendingRound {
-			return &pb.PendingRound{Intent: p.Intent, Reason: p.Reason, Since: ts(p.Since), Deadline: ts(p.Deadline)}
-		}),
 	}
 }
 
@@ -343,9 +340,6 @@ func roundStateGo(st *pb.RoundState) RoundState {
 	out := RoundState{
 		SentAt: tm(st.GetSentAt()), AgentHome: st.GetAgentHome(),
 		Today: int(st.GetToday()), DayTotal: int(st.GetDayTotal()), Paused: st.GetPaused(),
-		Pending: mapSlice(st.GetPending(), func(p *pb.PendingRound) PendingRound {
-			return PendingRound{Intent: p.GetIntent(), Reason: p.GetReason(), Since: tm(p.GetSince()), Deadline: tm(p.GetDeadline())}
-		}),
 	}
 	if len(st.GetMarks()) > 0 {
 		out.Marks = st.GetMarks()

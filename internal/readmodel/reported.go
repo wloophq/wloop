@@ -262,10 +262,6 @@ func (p *Reported) Derive(base Base, in any, at time.Time) (api.Row, error) {
 	}
 	s := x.snap
 	sit := x.situation(base, at)
-	reportedKind := ""
-	if s.Situation != nil {
-		reportedKind = s.Situation.Kind
-	}
 	r := api.Row{Label: x.unit.Label(), Kind: api.Kind(sit.Kind), Views: slices.Clone(s.Views), Facets: map[string][]string{},
 		Payload: s.Data}
 	if c := s.Card; c != nil {
@@ -287,9 +283,8 @@ func (p *Reported) Derive(base Base, in any, at time.Time) (api.Row, error) {
 		r.Items = append(r.Items, api.RowItem{ID: it.ID, Kind: it.Kind, Summary: it.Summary, State: it.State,
 			WaitingOn: personKeys(it.WaitingOn), Since: it.CreatedAt})
 	}
-	if pend, ok := base.Pending[x.unit]; ok && sit.Kind != overlay.KindDone {
-		r.Pending = &api.PendingRound{Intent: pend.Intent, Reason: pend.Reason, Since: pend.Since, Deadline: pend.Deadline}
-		sit = overlay.Pending{Intent: pend.Intent, Reason: pend.Reason}.Over(sit)
+	if pend, ok := base.Plans[x.unit]; ok && sit.Kind != overlay.KindDone {
+		sit = pend.Over(sit)
 	}
 	r.Kind = api.Kind(sit.Kind)
 	r.Summary = api.Summary{WaitsOn: sit.WaitingOn, Since: sit.Since, Stalled: sit.Stalled, Reason: sit.Reason,
@@ -298,12 +293,6 @@ func (p *Reported) Derive(base Base, in any, at time.Time) (api.Row, error) {
 	case overlay.KindLoopWaiting, overlay.KindLoopWorking, overlay.KindLoopStopped:
 		if x.run != nil {
 			r.Question = x.run.Question
-		}
-	}
-	if sit.Kind != reportedKind {
-		r.Views = slices.DeleteFunc(r.Views, func(v string) bool { return v == api.ViewNeedsMe })
-		if overlay.AsksUser(sit.Kind) {
-			r.Views = append(r.Views, api.ViewNeedsMe)
 		}
 	}
 	if i := x.intake; i != nil && i.Waiting() {

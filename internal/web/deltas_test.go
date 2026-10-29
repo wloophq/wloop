@@ -13,7 +13,7 @@ let pending, queued = null, chain = Promise.resolve(), retries = 0, opened = fal
 const setTimeout = (f) => timers.push(f);
 const clearTimeout = () => {};
 const readHash = () => hash;
-const render = () => {}, refreshSpecs = async () => {}, loadExploreRecent = async () => {}, loadPlan = async () => {};
+const render = () => {}, refreshSpecs = async () => {}, loadExploreRecent = async () => {}, loadPlan = async () => {}, loadRoundGates = async () => {};
 const applyCatalog = () => {};
 const loadActivity = async () => { requests.push("activity"); };
 const loadDetail = async () => { requests.push("detail"); };

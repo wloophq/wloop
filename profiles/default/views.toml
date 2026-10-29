@@ -77,6 +77,7 @@ label         = "Approved"
 key           = "g a"
 when          = "task.link_signal.ready"
 hide_disabled = true
+remove_clean  = true
 
 # Asleep until a date, an event or a condition.
 [views.snoozed]
@@ -108,11 +109,13 @@ label = "Logbook"
 when  = "task.category == 'done'"
 sort  = "task.since_movement"
 
+# Done and still holding a workspace on disk, to remove.
 [views.done]
 label         = "Done"
 key           = "g d"
-when          = "task.category == 'done'"
+when          = "task.category == 'done' && task.link_signal.workspace"
 hide_disabled = true
+remove_clean  = true
 
 # The drafts waiting on your approval, and those approved whose delivery
 # is under way or failed, so you can send them again.

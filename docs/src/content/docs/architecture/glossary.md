@@ -144,7 +144,7 @@ description: The words the code, the configuration, the facts and these pages us
 - **MCP server**: the daemon's endpoint on `127.0.0.1:47800` (`mcp.port`) that agent sessions call to record turns and read or draft Slack.
 - **Cockpit**: the web page the daemon serves on `127.0.0.1` behind a token, opened with `{{command}} open`. See [The cockpit](/concepts/surfaces/#the-cockpit).
 - **Terminal client**: `{{command}} tui`, the same views and actions in a terminal. See [The terminal client](/concepts/surfaces/#the-terminal-client).
-- **Menu bar**: `{{command}} app` on macOS, which counts what waits on you and offers the actions of the "In loop" rows. See [The menu bar](/concepts/surfaces/#the-menu-bar-macos).
+- **Menu bar**: `{{command}} app` on macOS, which counts what waits on you and lists the tasks of the views the badge counts. See [The menu bar](/concepts/surfaces/#the-menu-bar-macos).
 - **View**: a filtered list a surface shows, such as Needs me, Stalled, Inbox or Waiting. Every client shows the views the daemon computes.
 - **Row**: one unit in a view, with the actions the daemon computes for it. A client renders them and decides nothing.
 - **Action catalog**: the actions the daemon offers on a row: the built-in ones, such as Run now, Skip and Take over, and each intent's `[action]`. Each says what it does in its `summary`; the built-in ones' words are the profile's `actions.toml`. See [the intent manifest](/reference/intent-manifest/).

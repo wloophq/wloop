@@ -14,7 +14,6 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
@@ -51,7 +50,7 @@ type Situation struct {
 	Override dinv.Override
 	Mute     overlay.Mute
 	Turn     *prrow.TurnFact
-	Pending  *round.Pending
+	Pending  *overlay.Pending
 	// At is when the row is derived; zero is Now.
 	At time.Time
 }
@@ -147,10 +146,10 @@ func DeriveReport(s Situation) (api.Row, prrow.Report) {
 		at = Now
 	}
 	d := prrow.Deriver{Viewer: Viewer, Teams: []string{Team}, Now: at, Stalled: config.Defaults().GitHub.Stalled, Loaded: l, Cfg: config.Defaults(),
-		GateOn: true, BriefOn: true, Pending: map[unit.Unit]round.Pending{}, Turns: map[pr.Ref]prrow.TurnFact{},
+		GateOn: true, BriefOn: true, Plans: map[unit.Unit]overlay.Pending{}, Turns: map[pr.Ref]prrow.TurnFact{},
 		Mutes: map[unit.Unit]overlay.Mute{s.PR.Ref.Unit(): s.Mute}}
 	if s.Pending != nil {
-		d.Pending[s.PR.Ref.Unit()] = *s.Pending
+		d.Plans[s.PR.Ref.Unit()] = *s.Pending
 	}
 	if s.Turn != nil {
 		d.Turns[s.PR.Ref] = *s.Turn
@@ -232,7 +231,7 @@ func bases() []base {
 		{name: "to_address", edit: func(s *Situation) { s.add(dinv.KindWouldAddress, "", ago(3*time.Hour), "bob asked") }},
 		{name: "round_pending", edit: func(s *Situation) {
 			s.PR.ReviewRequests, s.PR.Workspace = []string{Viewer}, ReviewWorkspace
-			s.Pending = &round.Pending{Intent: "review", Reason: "new push", Since: ago(time.Minute), Deadline: Now.Add(4 * time.Minute)}
+			s.Pending = &overlay.Pending{Intent: "review", Reason: "new push", Since: ago(time.Minute), Deadline: Now.Add(4 * time.Minute)}
 		}},
 		{name: "loop_working", edit: func(s *Situation) { s.PR.Workspace, s.Turn = ReviewWorkspace, reviewTurn("started") }},
 		{name: "loop_waiting", edit: func(s *Situation) { s.PR.Workspace, s.Turn = ReviewWorkspace, reviewTurn("asked") }},

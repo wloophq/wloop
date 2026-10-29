@@ -120,7 +120,7 @@ func newCatalogRig(t *testing.T) catalogRig {
 	}, st)
 	exploreOn(&d, knownOnGitHub{mineRef: {Ref: mineRef, URL: mineRef.URL(), Title: "Mine", Author: "me", State: dgh.StateOpen}})
 	withBriefs(&d, stubBriefs{})
-	d.Plan, d.Pending = plan, plan
+	d.Plan, d.Plans = plan, plan
 	s := New(d)
 	serveMessageGates(s, db.Tasks(), inbox)
 	s.token = ""
@@ -236,7 +236,7 @@ var catalogFixtures = []catalogFixture{
 		c.s.forceable.Store(forceableKey(r7.Unit()), "the workspace holds uncommitted files")
 	}},
 	{"user_hold", r7, func(t *testing.T, c catalogRig) { c.override(t, dinv.Override{PR: r7, Hold: true}) }},
-	{"gate_off", r7, func(_ *testing.T, c catalogRig) { c.s.deps.Plan, c.s.deps.Pending = nil, nil }},
+	{"gate_off", r7, func(_ *testing.T, c catalogRig) { c.s.deps.Plan, c.s.deps.Plans = nil, nil }},
 	{"brief_off", r7, func(_ *testing.T, c catalogRig) { withBriefs(&c.s.deps, nil) }},
 	{"run_now_join_refused", r7, func(t *testing.T, c catalogRig) {
 		c.events(t, dinv.Event{PR: r7, Kind: dinv.KindRoundHeld, Key: "cap", At: catalogNow, Data: "daily cap"})

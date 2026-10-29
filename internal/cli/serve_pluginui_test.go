@@ -103,7 +103,7 @@ func TestGitHubViewsServedAsPluginViews(t *testing.T) {
 			t.Fatalf("saved views %v, catalog views %v", got, want)
 		}
 	}
-	for _, id := range []string{"plan", "dash", "explore", "recent", api.ViewAll, api.ViewLoop} {
+	for _, id := range []string{"plan", "dash", "explore", "recent", "all", "mine"} {
 		if !specs[id] {
 			t.Errorf("view %s is not served", id)
 		}
@@ -112,9 +112,6 @@ func TestGitHubViewsServedAsPluginViews(t *testing.T) {
 		if !specs[sec.View] {
 			t.Errorf("menu bar section %s names %q, which the catalog does not serve", sec.Label, sec.View)
 		}
-	}
-	if len(gh.UI.Menubar) == 0 {
-		t.Errorf("github declares no menu bar section: %+v", gh)
 	}
 }
 

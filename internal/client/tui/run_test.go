@@ -53,6 +53,8 @@ type fakeDaemon struct {
 	pluginsErr error
 
 	viewsCat *api.ViewsCatalog
+	// gates are the open gates.
+	gates []api.GateView
 	// tasks are each view's tasks; a page since the fake's position
 	// carries taskDelta of its view instead, once.
 	tasks       map[string][]api.TaskView
@@ -285,10 +287,16 @@ func (f *fakeDaemon) Catalog(context.Context) (api.CatalogResponse, error) {
 	f.mu.Unlock()
 	tui := []string{"tui"}
 	return api.CatalogResponse{Version: "c1", Views: []api.ViewSpec{
-		{ID: api.ViewNeedsMe, Label: "Needs me", Rows: true, Surfaces: tui},
-		{ID: api.ViewMine, Label: "My PRs", Rows: true, Order: 1, Surfaces: tui},
-		{ID: api.ViewLoop, Label: "In loop", Rows: true, Order: 2, Surfaces: tui},
+		{ID: "needs-me", Label: "Needs me", Rows: true, Surfaces: tui},
+		{ID: "mine", Label: "My PRs", Rows: true, Order: 1, Surfaces: tui},
+		{ID: "loop", Label: "In loop", Rows: true, Order: 2, Surfaces: tui},
 	}}, nil
+}
+
+func (f *fakeDaemon) Gates(context.Context) ([]api.GateView, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]api.GateView{}, f.gates...), nil
 }
 
 func (f *fakeDaemon) Health(context.Context) (api.Health, error) {

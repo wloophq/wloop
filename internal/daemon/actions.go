@@ -692,7 +692,7 @@ func (s *Server) unmutedRow(ctx context.Context, u unit.Unit) (api.Row, error) {
 		return row, err
 	}
 	base := rd.Base
-	base.Pending, base.Asked = nil, catalog.Asked{}
+	base.Plans, base.Asked = nil, catalog.Asked{}
 	return rd.Derive(base, rd.Unmuted())
 }
 

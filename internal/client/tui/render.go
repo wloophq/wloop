@@ -317,9 +317,10 @@ func (m *Model) waitCell(r api.Row, w int) string {
 // days.
 func (m *Model) age(r api.Row, now time.Time) (string, func(string) string) {
 	t := m.t
+	g, pending := m.roundGate(r)
 	switch {
-	case r.Pending != nil:
-		return fmt.Sprintf("%ds", max(0, int(r.Pending.Deadline.Sub(now).Seconds()+0.999))), t.Cyan
+	case pending:
+		return fmt.Sprintf("%ds", max(0, int(g.Deadline.Sub(now).Seconds()+0.999))), t.Cyan
 	case r.Summary.Since.IsZero():
 		return "-", t.Dim
 	case r.Summary.Stalled:
@@ -354,8 +355,9 @@ func (m *Model) detail(r api.Row, width int, now time.Time) []string {
 	age, _ := m.age(r, now)
 	kind := m.kindLabel(r)
 	waiting := m.waiting(r) + " · " + kind
+	_, pending := m.roundGate(r)
 	switch {
-	case r.Pending != nil:
+	case pending:
 		waiting += " · round in " + age
 	case r.Summary.Stalled:
 		waiting += " · " + strings.TrimPrefix(age, "!") + ", stalled"

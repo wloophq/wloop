@@ -6,15 +6,6 @@ import (
 	"time"
 )
 
-// Pending is an automatic round that waits for the user's answer until
-// Deadline, then runs.
-type Pending struct {
-	Intent   string
-	Reason   string
-	Since    time.Time
-	Deadline time.Time
-}
-
 // heldPrefix starts the subject of the plan gate of a round the daily cap held.
 const heldPrefix = "held:"
 

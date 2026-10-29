@@ -15,7 +15,8 @@ import (
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
-// runStatus lists the daemon's pull requests by view.
+// runStatus lists the tasks of the views the badge counts, and the tracked
+// pull requests.
 func runStatus(ctx context.Context, e *Env, args []string) error {
 	fs := flag.NewFlagSet("status", flag.ContinueOnError)
 	fs.SetOutput(e.Err)
@@ -39,42 +40,78 @@ func runStatus(ctx context.Context, e *Env, args []string) error {
 	return daemonStatus(ctx, e, c, e.term(color))
 }
 
-var statusViews = []string{api.ViewNeedsMe, api.ViewStalled, api.ViewMine, api.ViewLoop}
-
 const sectionTracked = "tracked"
 
-// statusSection is one view's rows; reasons says whether its lines carry them.
+// statusSection is one view's lines; reasons says whether a terminal shows
+// their reasons.
 type statusSection struct {
-	name    string
-	rows    []api.Row
-	reasons bool
+	name, heading string
+	lines         []statusLine
+	reasons       bool
 }
 
+// statusLine is a task or a pull request as status lists it.
+type statusLine struct {
+	who, label, link, title, reason string
+	since                           time.Time
+	stalled                         bool
+}
+
+func taskLine(t api.TaskView) statusLine {
+	l := statusLine{who: t.OwedBy, title: t.Title, since: t.Updated}
+	if len(t.UnitLabels) > 0 {
+		l.label = t.UnitLabels[0]
+	}
+	return l
+}
+
+func rowLine(r api.Row) statusLine {
+	return statusLine{who: r.Summary.WaitsOn, label: r.Label, link: r.Link, title: r.Title, reason: r.Summary.Reason,
+		since: r.Summary.Since, stalled: r.Summary.Stalled}
+}
+
+// daemonStatus lists the tasks of the views the badge counts, in the
+// profile's order, then the tracked pull requests.
 func daemonStatus(ctx context.Context, e *Env, c *client.Client, t termfmt.Term) error {
+	cat, err := c.Views(ctx)
+	if err != nil {
+		return err
+	}
+	var sections []statusSection
+	var labels []string
+	for _, v := range cat.Views {
+		if !v.Badge {
+			continue
+		}
+		labels = append(labels, v.Label)
+		page, err := c.TasksSince(ctx, client.TaskQuery{View: v.ID}, api.Since{})
+		if err != nil {
+			return err
+		}
+		if len(page.Tasks) == 0 {
+			continue
+		}
+		sec := statusSection{name: v.ID, heading: v.Label, reasons: true}
+		for _, tk := range page.Tasks {
+			sec.lines = append(sec.lines, taskLine(tk))
+		}
+		sections = append(sections, sec)
+	}
 	rows, err := c.Rows(ctx)
 	if err != nil {
 		return err
 	}
-	byView := map[string][]api.Row{}
-	var tracked []api.Row
+	empty := len(sections) == 0
+	tracked := statusSection{name: sectionTracked, heading: sectionTracked}
 	for _, r := range rows {
 		if p, ok := prrow.PayloadOf(r); ok && p.Override.Tracked {
-			tracked = append(tracked, r)
-		}
-		for _, v := range r.Views {
-			byView[v] = append(byView[v], r)
+			tracked.lines = append(tracked.lines, rowLine(r))
 		}
 	}
-	var sections []statusSection
-	for _, v := range statusViews {
-		if len(byView[v]) > 0 {
-			sections = append(sections, statusSection{v, byView[v], true})
-		}
+	if len(tracked.lines) > 0 {
+		sections = append(sections, tracked)
 	}
-	empty := len(sections) == 0
-	if len(tracked) > 0 {
-		sections = append(sections, statusSection{sectionTracked, tracked, false})
-	}
+	emptyStatus := "nothing in " + strings.Join(labels, ", ") + "; " + brand.Command + " open shows all"
 	now := e.Now()
 	switch {
 	case !t.TTY:
@@ -90,18 +127,17 @@ func daemonStatus(ctx context.Context, e *Env, c *client.Client, t termfmt.Term)
 	return nil
 }
 
-var emptyStatus = "nothing in needs-me, stalled, mine or loop; " + brand.Command + " open shows all"
-
-func rowAge(r api.Row, now time.Time) string {
-	return shortAge(now.Sub(r.Summary.Since), r.Summary.Since.IsZero())
+func lineAge(l statusLine, now time.Time) string {
+	return shortAge(now.Sub(l.since), l.since.IsZero())
 }
 
-// writeStatusTSV writes a row per pull request and section, full values
-// tab-separated: section, waiting-on, age, owner/repo#n, title, reason.
+// writeStatusTSV writes a line per task or pull request and section, full
+// values tab-separated: section, who owes it, age, its link's label, title,
+// reason.
 func writeStatusTSV(e *Env, sections []statusSection, now time.Time) {
 	for _, s := range sections {
-		for _, r := range s.rows {
-			fields := []string{s.name, r.Summary.WaitsOn, rowAge(r, now), r.Label, r.Title, r.Summary.Reason}
+		for _, l := range s.lines {
+			fields := []string{s.name, l.who, lineAge(l, now), l.label, l.title, l.reason}
 			for i, f := range fields {
 				fields[i] = oneLine(f)
 			}
@@ -110,45 +146,44 @@ func writeStatusTSV(e *Env, sections []statusSection, now time.Time) {
 	}
 }
 
-// writeStatus lays each section out in aligned columns, the reason dimmed
-// on the line under the pull request.
+// writeStatus lays each section out in aligned columns, a reason dimmed
+// on the line under its task or pull request.
 func writeStatus(e *Env, t termfmt.Term, sections []statusSection, now time.Time) {
 	cols := []termfmt.Column{{Right: true}, {}, {Flex: true}, {Max: 24}}
 	for i, s := range sections {
 		if i > 0 {
 			fmt.Fprintln(e.Out)
 		}
-		fmt.Fprintln(e.Out, t.Bold(strings.ToUpper(strings.ReplaceAll(s.name, "-", " ")))+" "+t.Dim(fmt.Sprint(len(s.rows))))
-		cells := make([][]termfmt.Cell, len(s.rows))
+		fmt.Fprintln(e.Out, t.Bold(strings.ToUpper(s.heading))+" "+t.Dim(fmt.Sprint(len(s.lines))))
+		cells := make([][]termfmt.Cell, len(s.lines))
 		ageWidth := 0
-		for j, r := range s.rows {
-			age := rowAge(r, now)
+		for j, l := range s.lines {
+			age := lineAge(l, now)
 			ageWidth = max(ageWidth, termfmt.Cells(age))
-			url := r.Link
-			cells[j] = []termfmt.Cell{
-				{Text: age, Style: lateness(t, r, now)},
-				{Text: r.Label, Style: func(s string) string { return t.Link(url, s) }},
-				{Text: r.Title},
-				{Text: r.Summary.WaitsOn},
+			url := l.link
+			label := termfmt.Cell{Text: l.label}
+			if url != "" {
+				label.Style = func(s string) string { return t.Link(url, s) }
 			}
+			cells[j] = []termfmt.Cell{{Text: age, Style: lateness(t, l, now)}, label, {Text: l.title}, {Text: l.who}}
 		}
 		indent := 2 + ageWidth + 2
 		for j, line := range t.Columns(t.Width-2, 2, cols, cells) {
 			fmt.Fprintln(e.Out, "  "+line)
-			if r := s.rows[j]; s.reasons && r.Summary.Reason != "" {
-				fmt.Fprintln(e.Out, strings.Repeat(" ", indent)+t.Dim(termfmt.Cut(oneLine(r.Summary.Reason), t.Width-indent)))
+			if r := s.lines[j].reason; s.reasons && r != "" {
+				fmt.Fprintln(e.Out, strings.Repeat(" ", indent)+t.Dim(termfmt.Cut(oneLine(r), t.Width-indent)))
 			}
 		}
 	}
 }
 
-// lateness colors an age: red once the pull request is stalled, yellow
-// from two days, dim before.
-func lateness(t termfmt.Term, r api.Row, now time.Time) func(string) string {
+// lateness colors an age: red once stalled, yellow from two days, dim
+// before.
+func lateness(t termfmt.Term, l statusLine, now time.Time) func(string) string {
 	switch {
-	case r.Summary.Stalled:
+	case l.stalled:
 		return t.Red
-	case !r.Summary.Since.IsZero() && now.Sub(r.Summary.Since) >= 48*time.Hour:
+	case !l.since.IsZero() && now.Sub(l.since) >= 48*time.Hour:
 		return t.Yellow
 	}
 	return t.Dim

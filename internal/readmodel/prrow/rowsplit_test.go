@@ -153,17 +153,18 @@ func TestSituationsServeTheirLabels(t *testing.T) {
 }
 
 func TestCatalogServesTheGitHubViews(t *testing.T) {
-	want := []struct{ id, label string }{{"needs-me", "Needs me"}, {"stalled", "Stalled"}, {"mine", "My PRs"}, {"loop", "In loop"}, {"plan", "Plan"},
-		{"approved", "Approved"}, {"dash", "Backlog"}, {"done", "Done"}, {"all", "All"}, {"explore", "Explore"}, {"recent", "Recent"}}
+	want := []struct {
+		id, label string
+		order     int
+	}{{"mine", "My PRs", 2}, {"plan", "Plan", 4}, {"dash", "Backlog", 6}, {"all", "All", 8}, {"explore", "Explore", 9}, {"recent", "Recent", 10}}
 	c := readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))}))
 	if len(c.Views) != len(want) {
 		t.Fatalf("%d views: %+v", len(c.Views), c.Views)
 	}
 	custom := []string{"plan", "dash", "explore", "recent"}
 	for i, v := range c.Views {
-		lens := slices.Contains([]string{"needs-me", "stalled", "approved", "done"}, v.ID)
-		if v.ID != want[i].id || v.Label != want[i].label || v.Provider != "github" || v.Order != i || v.Rows == slices.Contains(custom, v.ID) ||
-			slices.Contains(v.Surfaces, "web") == lens {
+		if v.ID != want[i].id || v.Label != want[i].label || v.Provider != "github" || v.Order != want[i].order || v.Rows == slices.Contains(custom, v.ID) ||
+			!slices.Contains(v.Surfaces, "web") {
 			t.Errorf("view %d: %+v", i, v)
 		}
 	}
@@ -171,7 +172,7 @@ func TestCatalogServesTheGitHubViews(t *testing.T) {
 	for _, v := range c.ViewsOn("tui") {
 		tui = append(tui, v.ID)
 	}
-	if !slices.Equal(tui, []string{"needs-me", "mine", "loop", "plan"}) {
+	if !slices.Equal(tui, []string{"mine", "plan"}) {
 		t.Errorf("terminal views %v", tui)
 	}
 	if c.Version == "" || c.Version != readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))})).Version {
@@ -339,8 +340,8 @@ func TestMutedRowKeepsItsUnmutedSituation(t *testing.T) {
 		if situation.Kind(r.Kind) != situation.KindMuted || p.Mute == nil || p.UnmutedKind != string(situation.KindReview) || p.UnmutedWaitingOn != "me" {
 			t.Errorf("%s: kind %s, payload %+v", c.name, r.Kind, p)
 		}
-		if !NeedsMe(r) || slices.Contains(r.Views, api.ViewNeedsMe) {
-			t.Errorf("%s: NeedsMe %v, views %v", c.name, NeedsMe(r), r.Views)
+		if !NeedsMe(r) || slices.Contains(r.Facets["is"], "needs-me") {
+			t.Errorf("%s: NeedsMe %v, flags %v", c.name, NeedsMe(r), r.Facets["is"])
 		}
 		if p.Mute.UntilStateChange != c.mute.UntilStateChange || !p.Mute.Until.Equal(c.mute.Until) {
 			t.Errorf("%s: mute %+v", c.name, p.Mute)
@@ -355,7 +356,7 @@ func TestMutedRowKeepsItsUnmutedSituation(t *testing.T) {
 func TestNeedsMeAndInScopeMatchTheDeriver(t *testing.T) {
 	for _, r := range deriveCases(t, fixtureNow) {
 		p := payloadOf(t, r)
-		if in := slices.Contains(r.Views, api.ViewNeedsMe); in != (NeedsMe(r) && p.Mute == nil) {
+		if in := slices.Contains(r.Facets["is"], "needs-me"); in != (NeedsMe(r) && p.Mute == nil) {
 			t.Errorf("%s: needs-me %v, NeedsMe %v, muted %v", r.Label, in, NeedsMe(r), p.Mute != nil)
 		}
 		if want := len(p.Reasons) > 0 || p.Workspace.IsReview || p.Override.Adopted || p.Override.Tracked; InScope(r) != want {

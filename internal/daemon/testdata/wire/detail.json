@@ -243,9 +243,7 @@
       "key": "acme/api#7",
       "provider": "github"
     },
-    "views": [
-      "loop"
-    ]
+    "views": []
   },
   "turn": {
     "answers": [

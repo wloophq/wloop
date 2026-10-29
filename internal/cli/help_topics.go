@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"strings"
-
 	"github.com/wloophq/wloop/internal/brand"
 )
 
@@ -110,10 +108,10 @@ func helpGroups(manager string) []helpGroup {
 		{"WHAT WAITS ON YOU", []helpTopic{
 			{
 				Names:   []string{"status"},
-				Summary: "Pull requests by view, those needing you first",
+				Summary: "What needs you, by view, and the tracked pull requests",
 				Usage:   []string{"status [--color auto|always|never]"},
-				About: "List the daemon's pull requests by view, those needing you first. " +
-					"Piped, it prints one tab-separated line per pull request and view.",
+				About: "List the tasks of the views the badge counts, such as Inbox and Needs me, then the pull requests you track. " +
+					"Piped, it prints one tab-separated line per task or pull request and view.",
 				Flags:    []helpFlag{colorFlag},
 				Examples: []string{"status", "status | grep needs-me"},
 				Docs:     "concepts/surfaces",
@@ -122,7 +120,7 @@ func helpGroups(manager string) []helpGroup {
 				Names:    []string{"tui"},
 				Summary:  "The same views in the terminal, one-key actions",
 				Usage:    []string{"tui"},
-				About:    "The Needs me, In loop and My PRs views in the terminal, with one-key actions on the selected pull request.",
+				About:    "The views in the terminal, the profile's and the plugins', with one-key actions on the selected task or pull request.",
 				Examples: []string{"tui"},
 				Docs:     "concepts/surfaces",
 			},
@@ -134,7 +132,7 @@ func helpGroups(manager string) []helpGroup {
 					"With no URL, open the cockpit. With --print, print the cockpit URL with its token instead of opening it.",
 				Flags: []helpFlag{
 					{"--print", "Print the cockpit URL with its token instead of opening it"},
-					{"--view <view>", "The cockpit view: " + strings.Join(cockpitViews, ", ")},
+					{"--view <view>", "The cockpit view, by its id, such as needs-me or mine"},
 				},
 				Examples: []string{"open", "open " + pr, "open --print --view needs-me"},
 				Docs:     "concepts/surfaces",

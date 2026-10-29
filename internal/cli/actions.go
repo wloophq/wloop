@@ -147,22 +147,17 @@ func parseInterspersed(fs *flag.FlagSet, args []string) ([]string, error) {
 	}
 }
 
-var cockpitViews = []string{"needs-me", "stalled", "mine", "loop", "dash", "done", "all", "recent", "explore"}
-
 func runOpen(ctx context.Context, e *Env, args []string) error {
 	fs := flag.NewFlagSet("open", flag.ContinueOnError)
 	fs.SetOutput(e.Err)
 	printURL := fs.Bool("print", false, "print the cockpit URL with its token instead of opening it")
-	view := fs.String("view", "", "the cockpit view: "+strings.Join(cockpitViews, ", "))
+	view := fs.String("view", "", "the cockpit view, by its id, such as needs-me")
 	pos, err := parseInterspersed(fs, args)
 	if err != nil {
 		return err
 	}
 	if len(pos) > 1 {
-		return errors.New("usage: " + brand.Command + " open [<https://github.com/<owner>/<repo>/pull/<n>>] [--print] [--view needs-me|stalled|mine|loop|dash|done|all|recent|explore]")
-	}
-	if *view != "" && !slices.Contains(cockpitViews, *view) {
-		return fmt.Errorf("unknown view %q; one of %s", *view, strings.Join(cockpitViews, ", "))
+		return errors.New("usage: " + brand.Command + " open [<https://github.com/<owner>/<repo>/pull/<n>>] [--print] [--view <view>]")
 	}
 	var ref pr.Ref
 	if len(pos) == 1 {

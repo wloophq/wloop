@@ -228,8 +228,8 @@ func TestAStallIsTheHostsToResolveInWorkingDays(t *testing.T) {
 	if v := r.Situation.Stalled; !reflect.DeepEqual(v, src.After(friday, 2*day, src.WorkingDays)) {
 		t.Fatalf("stalled %+v", v)
 	}
-	if r.Stalled() || slices.Contains(r.Views, ViewStalled) {
-		t.Fatalf("stalled across the weekend: views %v", r.Views)
+	if r.Stalled() || slices.Contains(on(r), SignalStalled) {
+		t.Fatalf("stalled across the weekend: signals %v", on(r))
 	}
 	if due := r.Due(); !due.Equal(time.Date(2026, 10, 6, 0, 0, 0, 0, time.UTC)) {
 		t.Fatalf("due %v, want the next day", due)

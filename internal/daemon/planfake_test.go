@@ -10,11 +10,11 @@ import (
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/gates/gatestest"
 	"github.com/wloophq/wloop/internal/domain/gate"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 )
 
 // pendingPlan is a plan whose only items are the pending rounds set on it,
@@ -160,12 +160,12 @@ func (p *pendingPlan) Release(ctx context.Context, g gate.Gate) error {
 	return err
 }
 
-func (p *pendingPlan) Pending(context.Context) (map[unit.Unit]round.Pending, error) {
+func (p *pendingPlan) Plans(context.Context) (map[unit.Unit]overlay.Pending, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	out := map[unit.Unit]round.Pending{}
+	out := map[unit.Unit]overlay.Pending{}
 	for u := range p.pending {
-		out[u] = round.Pending{Intent: "follow-up", Reason: "ana replied", Since: p.now, Deadline: p.now.Add(time.Minute)}
+		out[u] = overlay.Pending{Intent: "follow-up", Reason: "ana replied", Since: p.now, Deadline: p.now.Add(time.Minute)}
 	}
 	return out, nil
 }

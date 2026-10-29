@@ -131,18 +131,18 @@ func requests(logins ...string) func(*dinv.PR) {
 	return func(pr *dinv.PR) { pr.ReviewRequests = logins }
 }
 
-func TestPRsSortStalledFirstThenOldest(t *testing.T) {
+func TestRowsAreListedByUnit(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
 	// The store lists by updated_at desc, so it never returns this order by
-	// itself; #5 (checks, 24h threshold) is stalled yet newer than #6.
+	// itself.
 	f.open(1, "ana", fixtureNow.Add(-1*time.Hour), requests("fer"))
 	f.open(2, "ana", fixtureNow.Add(-100*time.Hour), requests("fer"))
 	f.open(3, "ana", fixtureNow.Add(-5*time.Hour), requests("fer"))
 	f.open(4, "ana", fixtureNow.Add(-120*time.Hour), requests("fer"))
 	f.open(5, "ana", fixtureNow.Add(-30*time.Hour), failing)
 	f.open(6, "ana", fixtureNow.Add(-40*time.Hour), requests("fer"))
-	if got := numbers(f.rows("?view=all")); !slices.Equal(got, []int{4, 2, 5, 6, 3, 1}) {
+	if got := numbers(f.rows("?view=all")); !slices.Equal(got, []int{1, 2, 3, 4, 5, 6}) {
 		t.Fatalf("order %v", got)
 	}
 }
@@ -162,7 +162,7 @@ func TestPRsIgnoreAutomatedAndSkippedReviewers(t *testing.T) {
 	}
 }
 
-func TestPRsViews(t *testing.T) {
+func TestPRsFlagsAndViews(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
 	ctx := context.Background()
@@ -178,15 +178,15 @@ func TestPRsViews(t *testing.T) {
 		view string
 		want []int
 	}{
-		{"loop", []int{30, 31}},
-		{"needs-me", []int{31}},
-		{"mine", []int{32}},
-		{"all", []int{30, 31, 32}},
+		{"?is=in-loop", []int{30, 31}},
+		{"?is=needs-me", []int{31}},
+		{"?view=mine", []int{32}},
+		{"?view=all", []int{30, 31, 32}},
 	} {
-		got := numbers(f.rows("?view=" + tc.view))
+		got := numbers(f.rows(tc.view))
 		slices.Sort(got)
 		if !slices.Equal(got, tc.want) {
-			t.Errorf("view=%s: got %v, want %v", tc.view, got, tc.want)
+			t.Errorf("%s: got %v, want %v", tc.view, got, tc.want)
 		}
 	}
 }
@@ -206,7 +206,7 @@ func TestMyConflictingPullRequestNeedsMe(t *testing.T) {
 			t.Fatalf("%d: %s", rowNumber(r), r.Kind)
 		}
 	}
-	if got := numbers(f.rows("?view=needs-me")); !slices.Equal(got, []int{40}) {
+	if got := numbers(f.rows("?is=needs-me")); !slices.Equal(got, []int{40}) {
 		t.Fatalf("needs-me %v", got)
 	}
 }
@@ -225,9 +225,9 @@ func TestClosedAndMergedPullRequestsAreInNoOpenView(t *testing.T) {
 		inventorytest.Of(f.st).SetWorkspace(ctx, ref(n), dinv.Workspace{ID: "w" + strconv.Itoa(n), IsReview: true, AgentStates: []turn.AgentState{turn.AgentWaiting}})
 		inventorytest.Of(f.st).SetOverride(ctx, dinv.Override{PR: ref(n), Adopted: true})
 	}
-	for _, view := range []string{api.ViewNeedsMe, api.ViewStalled, api.ViewMine, api.ViewLoop} {
-		if got := numbers(f.rows("?view=" + view)); len(got) != 0 {
-			t.Errorf("view=%s lists closed pull requests %v", view, got)
+	for _, q := range []string{"?is=needs-me", "?is=stalled", "?is=in-loop", "?view=mine"} {
+		if got := numbers(f.rows(q)); len(got) != 0 {
+			t.Errorf("%s lists closed pull requests %v", q, got)
 		}
 	}
 }
@@ -262,7 +262,7 @@ func TestViewerCachedForTTLAndStaleOnFailure(t *testing.T) {
 		}
 		return identityOf("fer"), nil
 	}
-	needsMe := func() int { return len(f.rows("?view=needs-me")) }
+	needsMe := func() int { return len(f.rows("?is=needs-me")) }
 	if needsMe() != 1 || needsMe() != 1 || calls != 1 {
 		t.Fatalf("first fetch: %d calls", calls)
 	}
@@ -326,7 +326,7 @@ func TestPostJobs(t *testing.T) {
 	}
 }
 
-func TestLoopAndMineViewsDoNotNeedAScopeReason(t *testing.T) {
+func TestInLoopNeedsMeAndMineDoNotNeedAScopeReason(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
 	ctx := context.Background()
@@ -343,14 +343,14 @@ func TestLoopAndMineViewsDoNotNeedAScopeReason(t *testing.T) {
 		view string
 		want []int
 	}{
-		{"loop", []int{40, 41}},
-		{"needs-me", []int{41}},
-		{"mine", []int{42}},
+		{"?is=in-loop", []int{40, 41}},
+		{"?is=needs-me", []int{41}},
+		{"?view=mine", []int{42}},
 	} {
-		got := numbers(f.rows("?view=" + tc.view))
+		got := numbers(f.rows(tc.view))
 		slices.Sort(got)
 		if !slices.Equal(got, tc.want) {
-			t.Errorf("view=%s: got %v, want %v", tc.view, got, tc.want)
+			t.Errorf("%s: got %v, want %v", tc.view, got, tc.want)
 		}
 	}
 }
@@ -412,7 +412,7 @@ func TestATurnThatWaitsOnMeIsInNeedsMe(t *testing.T) {
 	if err := inventorytest.Of(f.st).ReplaceWorkspaces(ctx, map[github.Ref]dinv.Workspace{ref(21): author, ref(23): parked}); err != nil {
 		t.Fatal(err)
 	}
-	rows := f.rows("?view=" + api.ViewNeedsMe)
+	rows := f.rows("?is=needs-me")
 	got := numbers(rows)
 	slices.Sort(got)
 	if !slices.Equal(got, []int{20, 21, 22}) {
@@ -437,11 +437,11 @@ func TestAnAskedReviewOutsideTheScopeIsInNeedsMe(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.turn(repo, 444, turn.Intent(dintent.Review), turn.Asked, "term-444")
-	rows := f.rows("?view=" + api.ViewNeedsMe)
+	rows := f.rows("?is=needs-me")
 	if len(rows) != 1 || rows[0].Unit != ref(444).Unit() || rows[0].Kind != "loop_waiting" || rows[0].Summary.Reason != "keep it?" {
 		t.Fatalf("%+v", rows)
 	}
-	if got := numbers(f.rows("?view=" + api.ViewStalled)); len(got) != 0 {
+	if got := numbers(f.rows("?is=stalled")); len(got) != 0 {
 		t.Fatalf("a loop workspace counted as the area: stalled %v", got)
 	}
 }
@@ -471,7 +471,7 @@ func TestATrackedPullRequestIsInScopeLikeAnyOther(t *testing.T) {
 		f.open(n, "zoe", old, outside, dinv.Event{Kind: dinv.KindReviewRequest, Key: "bob", Actor: "zoe", At: old})
 	}
 	inventorytest.Of(f.st).SetOverride(ctx, dinv.Override{PR: ref(60), Tracked: true})
-	rows := f.rows("?view=stalled")
+	rows := f.rows("?is=stalled")
 	if len(rows) != 1 || rows[0].Unit != ref(60).Unit() || !slices.Equal(payload(rows[0]).Reasons, []string{dinv.ReasonTracked}) {
 		t.Fatalf("stalled: %+v", rows)
 	}
@@ -555,7 +555,7 @@ func TestReadPathSpawnsNothing(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := numbers(f.rows("?view=" + api.ViewNeedsMe)); len(got) != 0 {
+	if got := numbers(f.rows("?is=needs-me")); len(got) != 0 {
 		t.Fatalf("needs-me %v with every agent working", got)
 	}
 	var d api.Detail
@@ -569,7 +569,7 @@ func TestReadPathSpawnsNothing(t *testing.T) {
 	agents[0].State = turn.AgentWaiting
 	mu.Unlock()
 	log.Note(port.TopicAgents, ref(20).Unit())
-	if got := numbers(f.rows("?view=" + api.ViewNeedsMe)); !slices.Equal(got, []int{20}) {
+	if got := numbers(f.rows("?is=needs-me")); !slices.Equal(got, []int{20}) {
 		t.Fatalf("needs-me %v after the agents note, want [20]", got)
 	}
 	if n := sessions.reads.Load(); n != 0 {
@@ -588,7 +588,7 @@ func TestNoSnapshotMarksWaitingUnread(t *testing.T) {
 	if err := repo.SaveSession(ctx, turn.Session{ID: "term-22", Pane: "t:1", WorkspaceID: "w3"}, port.Event{Kind: turns.KindSessionLaunched, Key: "term-22", At: fixtureNow}); err != nil {
 		t.Fatal(err)
 	}
-	if got := numbers(f.rows("?view=" + api.ViewNeedsMe)); len(got) != 0 {
+	if got := numbers(f.rows("?is=needs-me")); len(got) != 0 {
 		t.Fatalf("needs-me %v while the agents are unknown", got)
 	}
 	facts, err := turnFacts(f.s, ctx, f.s.loaded().Registry)
@@ -631,12 +631,12 @@ func TestTeamChangeReachesRowsInsideTheViewerTTL(t *testing.T) {
 	f.s.token = ""
 	stopOnCleanup(t, f.s)
 	f.open(13, "bob", fixtureNow.Add(-time.Hour), requests("team:acme/web"))
-	if got := numbers(f.rows("?view=needs-me")); len(got) != 0 {
+	if got := numbers(f.rows("?is=needs-me")); len(got) != 0 {
 		t.Fatalf("needs-me before joining acme/web: %v", got)
 	}
 	setTeams("acme/search", "acme/web")
 	f.advance(time.Minute)
-	if got := numbers(f.rows("?view=needs-me")); !slices.Equal(got, []int{13}) {
+	if got := numbers(f.rows("?is=needs-me")); !slices.Equal(got, []int{13}) {
 		t.Fatalf("needs-me after joining acme/web: got %v, want [13]", got)
 	}
 }

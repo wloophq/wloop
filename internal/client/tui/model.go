@@ -13,6 +13,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/termfmt"
@@ -96,9 +97,12 @@ type Model struct {
 	views   []View
 	catalog api.CatalogResponse
 	rows    []api.Row
-	health  api.Health
-	loaded  bool
-	sel     unit.Unit
+	// plans are the open plan gates with a deadline, by unit: the automatic
+	// rounds that wait on them.
+	plans  map[string]api.GateView
+	health api.Health
+	loaded bool
+	sel    unit.Unit
 	// at is the selection's index, kept when the selected pull request
 	// leaves the view.
 	at     int
@@ -193,6 +197,23 @@ func (m *Model) Stay(why string) { m.quit, m.status = false, why }
 func (m *Model) SetData(rows []api.Row, h api.Health) {
 	m.rows, m.health, m.loaded, m.err = rows, h, true, ""
 	m.keepSelection()
+}
+
+// SetGates takes the open gates: a plan gate with a deadline is an
+// automatic round its unit's row counts down to.
+func (m *Model) SetGates(gs []api.GateView) {
+	m.plans = map[string]api.GateView{}
+	for _, g := range gs {
+		if g.Kind == string(gate.KindPlan) && g.Unit != "" && !g.Deadline.IsZero() {
+			m.plans[g.Unit] = g
+		}
+	}
+}
+
+// roundGate is the open plan gate r's automatic round waits on.
+func (m *Model) roundGate(r api.Row) (api.GateView, bool) {
+	g, ok := m.plans[r.Unit.String()]
+	return g, ok
 }
 
 // SetCatalog takes the terminal's row views and the kinds' labels from the

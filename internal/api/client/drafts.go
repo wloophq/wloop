@@ -57,6 +57,13 @@ func (c *Client) Draft(ctx context.Context, id int64) (api.Draft, error) {
 	return res.Drafts[0], nil
 }
 
+// Gates are the open gates.
+func (c *Client) Gates(ctx context.Context) ([]api.GateView, error) {
+	var gs []api.GateView
+	err := c.do(ctx, ReadTimeout, http.MethodGet, api.GatesPath, nil, &gs)
+	return gs, err
+}
+
 // ResolveGate resolves gate id with intent, its args carrying an answer, or a draft gate's text and rev.
 func (c *Client) ResolveGate(ctx context.Context, id int64, intent string, req api.TaskRequest) (api.GateView, error) {
 	var g api.GateView

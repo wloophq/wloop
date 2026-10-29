@@ -10,18 +10,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-const (
-	ViewNeedsMe = "needs-me"
-	ViewStalled = "stalled"
-	ViewMine    = "mine"
-	ViewLoop    = "loop"
-	ViewAll     = "all"
-	ViewDone    = "done"
-	// ViewApproved holds open pull requests that wait on nothing of mine,
-	// whose workspace may go before the merge.
-	ViewApproved = "approved"
-)
-
 // Kind is a row's provider-scoped situation; its labels come from
 // CatalogResponse.Situations.
 type Kind string
@@ -46,7 +34,6 @@ type Row struct {
 	// Question is the open question or stop of the turn the situation
 	// comes from.
 	Question *QuestionView   `json:"question,omitempty"`
-	Pending  *PendingRound   `json:"pending,omitempty"`
 	Items    []RowItem       `json:"items,omitempty"`
 	Payload  json.RawMessage `json:"payload,omitempty"`
 	// Stale says the row is its plugin's last report, which the plugin no
@@ -313,15 +300,6 @@ type Event struct {
 // IsZero reports an override that sets nothing.
 func (o Override) IsZero() bool {
 	return o == Override{}
-}
-
-// PendingRound is an automatic round waiting for the user's answer; a
-// client counts down to Deadline itself.
-type PendingRound struct {
-	Intent   string    `json:"intent"`
-	Reason   string    `json:"reason"`
-	Since    time.Time `json:"since"`
-	Deadline time.Time `json:"deadline"`
 }
 
 type BriefSummary struct {
@@ -608,7 +586,12 @@ type ExploreResult struct {
 	Recent     []string    `json:"recent"`
 }
 
-type RemoveDoneResult struct {
+// RemoveCleanRequest names the view whose tasks' clean workspaces to remove.
+type RemoveCleanRequest struct {
+	View string `json:"view"`
+}
+
+type RemoveCleanResult struct {
 	Removed []Named `json:"removed"`
 	Kept    []Kept  `json:"kept"`
 }

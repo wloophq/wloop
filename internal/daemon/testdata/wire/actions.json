@@ -17,9 +17,7 @@
       "reason": "publish?",
       "line": "agent asks"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-08T09:30:00Z"
@@ -219,9 +217,7 @@
       "reason": "push?",
       "line": "agent asks"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-08T09:30:00Z"
@@ -402,9 +398,7 @@
       "reason": "round blocked: no workspace",
       "line": "round blocked"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-08T10:00:00Z"
@@ -562,9 +556,7 @@
       "reason": "round blocked: could not start: /src/api is not trusted in /home/.claude-work",
       "line": "round blocked"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-08T10:00:00Z"
@@ -733,10 +725,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -895,9 +884,7 @@
       "reason": "round blocked: could not start: /src/api/wt is not trusted in the agent home of its terminal",
       "line": "round blocked"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-08T10:00:00Z"
@@ -1066,10 +1053,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -1350,9 +1334,7 @@
       "reason": "merged",
       "line": "merged"
     },
-    "views": [
-      "done"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "0001-01-01T00:00:00Z"
@@ -1566,11 +1548,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me",
-      "stalled",
-      "loop"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -1741,10 +1719,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -1898,9 +1873,7 @@
       "reason": "automatic round held: daily cap",
       "line": "held (cap)"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-08T10:00:00Z"
@@ -2066,10 +2039,7 @@
       "reason": "review requested, no review on the head",
       "line": "briefing… (attempt 1)"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -2245,10 +2215,7 @@
       "reason": "review requested, no review on the head",
       "line": "briefing… (attempt 1)"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -2427,7 +2394,6 @@
       "line": "no reviewer requested"
     },
     "views": [
-      "stalled",
       "mine"
     ],
     "facets": {
@@ -2580,9 +2546,7 @@
       "reason": "no reviewer requested",
       "line": "no reviewer requested"
     },
-    "views": [
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-05T10:00:00Z"
@@ -2741,8 +2705,6 @@
       "line": "review requested, no review on the head"
     },
     "views": [
-      "needs-me",
-      "stalled",
       "mine"
     ],
     "facets": {
@@ -2902,10 +2864,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -3064,9 +3023,7 @@
       "reason": "follow-up waiting for your answer: ana replied",
       "line": "round soon"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -3180,12 +3137,6 @@
       }
     ],
     "specs_version": "d989fdf6b655",
-    "pending": {
-      "intent": "follow-up",
-      "reason": "ana replied",
-      "since": "2026-10-08T10:00:00Z",
-      "deadline": "2026-10-08T10:01:00Z"
-    },
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3360,12 +3311,6 @@
       }
     ],
     "specs_version": "d989fdf6b655",
-    "pending": {
-      "intent": "follow-up",
-      "reason": "ana replied",
-      "since": "2026-10-08T10:00:00Z",
-      "deadline": "2026-10-08T10:01:00Z"
-    },
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3438,9 +3383,7 @@
       "reason": "automatic round held: daily cap",
       "line": "briefing… (attempt 1)"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-08T10:00:00Z"
@@ -3620,9 +3563,7 @@
       "reason": "the agent ended its turn without a record: stopped",
       "line": "agent stopped"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-08T09:30:00Z"
@@ -3802,10 +3743,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -4081,10 +4019,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"

@@ -78,7 +78,7 @@ func TestNavListsCoreThenPluginViews(t *testing.T) {
 const nav = viewNav(input.cat, catalog.views, ["fake-board"], input.counters);
 process.stdout.write(JSON.stringify({ ids: nav.map((v) => v.id), core: nav.map((v) => v.core), counts: nav.filter((v) => v.core).map((v) => v.count) }));`,
 		map[string]any{"cat": viewsCatalog(), "counters": counters}, &got)
-	plugin := []string{"mine", "loop", "plan", "dash", "all", "explore", "recent"}
+	plugin := []string{"mine", "plan", "dash", "all", "explore", "recent"}
 	want := slices.Concat(coreViewIDs, plugin, []string{"fake-board"})
 	if !slices.Equal(got.IDs, want) {
 		t.Fatalf("nav %v, want %v", got.IDs, want)

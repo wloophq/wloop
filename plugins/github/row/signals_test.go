@@ -19,7 +19,7 @@ func on(r Row) []string {
 	return out
 }
 
-func TestTheSignalsAreWhatTheRowsViewsSay(t *testing.T) {
+func TestTheSignalsOfEachFixture(t *testing.T) {
 	fs := append(fixtures(),
 		fixture{name: "stalled outside the scope", pr: open(40, "ana", func(p *pr.PR) {
 			p.Reasons, p.ReviewRequests, p.CreatedAt = nil, []string{fixtureViewer}, ago(60*day)
@@ -27,30 +27,25 @@ func TestTheSignalsAreWhatTheRowsViewsSay(t *testing.T) {
 		fixture{name: "closed in a review workspace", pr: open(41, "ana", func(p *pr.PR) {
 			p.State, p.ClosedAt, p.Workspace = "CLOSED", ago(day), pr.Workspace{ID: "ws-r", IsReview: true}
 		})})
-	seen := map[string]bool{}
-	for _, f := range fs {
-		r := Derive(input(f))
-		got := on(r)
-		for _, c := range []struct {
-			signal string
-			want   bool
-		}{
-			{SignalStalled, slices.Contains(r.Views, ViewStalled)},
-			{SignalInLoop, slices.Contains(r.Views, ViewLoop) && r.PR.State == "OPEN"},
-			{SignalReady, slices.Contains(r.Views, ViewApproved)},
-		} {
-			if slices.Contains(got, c.signal) != c.want {
-				t.Errorf("%s: %s is %v, want %v (views %v)", f.name, c.signal, !c.want, c.want, r.Views)
-			}
-			seen[c.signal] = seen[c.signal] || c.want
-		}
-		if f.name == "stalled outside the scope" && (!r.Stalled() || slices.Contains(got, SignalStalled)) {
-			t.Errorf("a stalled pull request with no reason to follow it: stalled %v, signals %v", r.Stalled(), got)
-		}
+	want := map[string][]string{
+		"mine without reviewer":        {SignalStalled},
+		"mine draft":                   {SignalWorkspace},
+		"mine checks failing":          {SignalStalled},
+		"mine changes asked":           {SignalStalled},
+		"mine can merge":               {SignalReady, SignalWorkspace},
+		"reply due on theirs":          {SignalStalled},
+		"reviewer back":                {SignalStalled},
+		"merged":                       {SignalWorkspace},
+		"held by the cap":              {SignalInLoop, SignalWorkspace},
+		"workspace agent waiting":      {SignalInLoop, SignalWorkspace},
+		"tracked":                      {SignalStalled},
+		"approved review head":         {SignalInLoop, SignalReady, SignalWorkspace},
+		"old stalled review":           {SignalStalled},
+		"closed in a review workspace": {SignalWorkspace},
 	}
-	for _, s := range []string{SignalStalled, SignalInLoop, SignalReady} {
-		if !seen[s] {
-			t.Errorf("no fixture has %s on", s)
+	for _, f := range fs {
+		if got := on(Derive(input(f))); !slices.Equal(got, want[f.name]) {
+			t.Errorf("%s: signals on %q, want %q", f.name, got, want[f.name])
 		}
 	}
 }

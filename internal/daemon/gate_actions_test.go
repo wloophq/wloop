@@ -12,6 +12,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/gates/gatestest"
 	"github.com/wloophq/wloop/internal/core/turns"
@@ -27,10 +28,10 @@ func TestRunNowResolvesThePlanGate(t *testing.T) {
 	r.sweep(t)
 	it := r.pending7(t)
 	g := r.planGate(t, it)
-	row, _ := row7(t, r.s, api.ViewAll)
+	row, _ := row7(t, r.s, "")
 	st, ok := offerOf(row, "run_now")
-	if !ok || !st.Enabled || row.Pending == nil || !row.Pending.Deadline.Equal(g.Deadline) {
-		t.Fatalf("the row of the pending round offers %+v %v, pending %+v; want run_now until the gate's deadline %s", st, ok, row.Pending, g.Deadline)
+	if !ok || !st.Enabled || row.Kind != "round_pending" || st.Basis != catalog.BasisPending+g.OpenedAt.UTC().Format(time.RFC3339Nano) {
+		t.Fatalf("the row of the pending round offers %+v %v, kind %s; want run_now on the gate opened at %s", st, ok, row.Kind, g.OpenedAt)
 	}
 	path := "/api/units/github/acme%2Fapi%237/run_now"
 	body := fmt.Sprintf(`{"source":"cockpit","basis":%q}`, st.Basis)
@@ -53,8 +54,8 @@ func TestRunNowResolvesThePlanGate(t *testing.T) {
 	if run, ok := r.marked(t, it); !ok || run.Status != workflow.RunDone {
 		t.Fatalf("run %+v %v", run, ok)
 	}
-	if row, _ := row7(t, r.s, api.ViewAll); row.Pending != nil {
-		t.Fatalf("the round still shows pending: %+v", row.Pending)
+	if row, _ := row7(t, r.s, ""); row.Kind == "round_pending" {
+		t.Fatalf("the round still shows pending: %+v", row)
 	}
 	if rec := post(t, r.s, path, `{"source":"cockpit"}`); rec.Code == http.StatusOK {
 		t.Fatalf("a second run_now with nothing pending or held: %d %s", rec.Code, rec.Body)

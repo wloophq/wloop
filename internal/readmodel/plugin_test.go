@@ -88,7 +88,7 @@ func TestAStalePluginsRowsKeepTheLastSnapshot(t *testing.T) {
 	m := readmodel.New(log, nil, nil, nil, nil, readmodel.NewReported(readmodel.ReportedSource{ID: "acme", Reports: snaps, Stale: snaps.Stale}))
 	row := func(what string) (api.Row, uint64) {
 		t.Helper()
-		page, err := m.Rows(ctx, api.ViewAll, api.Since{})
+		page, err := m.Rows(ctx, api.Since{})
 		if err != nil || len(page.Rows) != 1 {
 			t.Fatalf("%s: rows %+v, %v", what, page.Rows, err)
 		}
@@ -114,7 +114,7 @@ func TestAReportedRowOffersThePluginsActions(t *testing.T) {
 	r := &reports{snaps: map[unit.Unit]src.Snapshot{one: {Unit: psource.Wire(one), Rev: 1,
 		Situation: &src.Situation{Kind: "waiting"}, Offers: []src.Offer{{Action: "acme.snooze"}, {Action: "acme.snooze"}}}}}
 	m := readmodel.New(change.NewLog(change.DefaultWindow, nil), nil, nil, nil, nil, readmodel.NewReported(readmodel.ReportedSource{ID: "acme", Reports: r}))
-	page, err := m.Rows(context.Background(), api.ViewAll, api.Since{})
+	page, err := m.Rows(context.Background(), api.Since{})
 	if err != nil || len(page.Rows) != 1 {
 		t.Fatalf("rows %+v, %v", page.Rows, err)
 	}

@@ -56,8 +56,8 @@ func PayloadOf(r api.Row) (Payload, bool) {
 	return p, true
 }
 
-// NeedsMe is the exact needs-me predicate of Deriver.views, evaluated on UnmutedKind and
-// UnmutedWaitingOn when the row is muted; views adds needs-me only when it holds and the row is not muted.
+// NeedsMe is the needs-me predicate of the row's situation, evaluated on UnmutedKind and UnmutedWaitingOn
+// when the row is muted; the row's needs-me flag holds only when it holds and the row is not muted.
 func NeedsMe(r api.Row) bool {
 	p, ok := PayloadOf(r)
 	if !ok {

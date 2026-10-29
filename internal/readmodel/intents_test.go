@@ -32,7 +32,7 @@ func TestRowsOfAnyProviderOfferTheIntentsServingIt(t *testing.T) {
 	m := readmodel.New(nil, nil, nil, nil, intentSettings{base}, p)
 	m.UseClock(func() time.Time { return at })
 	ctx := context.Background()
-	page, err := m.Rows(ctx, api.ViewAll, api.Since{})
+	page, err := m.Rows(ctx, api.Since{})
 	if err != nil {
 		t.Fatal(err)
 	}

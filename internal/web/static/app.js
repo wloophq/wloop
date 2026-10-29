@@ -163,7 +163,7 @@ const ARTIFACT_LINES = 40;
 const PR_URL = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([\w.-]+)\/pull\/(\d+)(?:[/?#]\S*)?$/;
 const folded = new WeakMap();
 
-const state = { specs: { version: "", byId: {} }, planSpecs: {}, plan: { items: [], closed: [], error: "", loaded: false }, collapsed: new Set(), collapsedFor: "", rows: [], epoch: "", rev: 0, activity: [], health: null, detail: null, checks: {}, checksLoading: new Set(), busy: new Set(), guidance: {}, conn: "connecting", authLost: false,
+const state = { roundGates: new Map(), specs: { version: "", byId: {} }, planSpecs: {}, plan: { items: [], closed: [], error: "", loaded: false }, collapsed: new Set(), collapsedFor: "", rows: [], epoch: "", rev: 0, activity: [], health: null, detail: null, checks: {}, checksLoading: new Set(), busy: new Set(), guidance: {}, conn: "connecting", authLost: false,
   explore: { result: null, busy: false, error: "", recent: [], sel: "", status: {} } };
 let lastFocus = null;
 
@@ -449,8 +449,14 @@ function left(deadline, now = Date.now()) {
   return `in ${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
 }
 
+// roundGate is the open plan gate an automatic round of the row waits on, until its deadline.
+function roundGate(row) {
+  return state.roundGates.get(keyOf(row));
+}
+
 function countdown(row) {
-  return h("span", { class: "age countdown", "data-deadline": row.pending.deadline, title: `sends at ${stamp(row.pending.deadline)}` }, left(row.pending.deadline));
+  const deadline = roundGate(row).deadline;
+  return h("span", { class: "age countdown", "data-deadline": deadline, title: `sends at ${stamp(deadline)}` }, left(deadline));
 }
 
 function tickCountdowns() {
@@ -519,9 +525,9 @@ function inView(row, view, withDone) {
   return view === "all" || (row.views || []).includes(view);
 }
 
-// isStalled is the daemon's stalled view: past its threshold and in scope.
+// isStalled is the row's stalled flag: past its threshold and in scope.
 function isStalled(r) {
-  return (r.views || []).includes("stalled");
+  return rowFlags(r).includes("stalled");
 }
 
 function rowFlags(r) {
@@ -534,10 +540,11 @@ function sinceTime(r) {
 }
 
 // upcoming are a row's next instants: the daemon's list, or else the
-// deadline of its pending round.
+// deadline of the plan gate its automatic round waits on.
 function upcoming(r) {
   const next = ((pl(r).facts || {}).next || []).filter((e) => isSet(e.at));
-  if (r.pending && isSet(r.pending.deadline) && !next.some((e) => e.what === "gate")) next.push({ at: r.pending.deadline, what: "gate" });
+  const g = roundGate(r);
+  if (g && !next.some((e) => e.what === "gate")) next.push({ at: g.deadline, what: "gate" });
   return next;
 }
 
@@ -608,12 +615,11 @@ function readLens() {
   return { view, q, ts: terms(q), quals, filters: filtersOf(quals), group: g, sort: s, layout, tk, done };
 }
 
-// A board needs groups: the Stalled board keeps its lanes, the others group
-// by whom a row waits on.
+// A board needs groups: by whom a row waits on.
 function effectiveGroup(lens) {
   if (lens.group) return lens.group;
   if (lens.layout !== "board") return "";
-  return lens.view === "stalled" ? "lane" : catalog.strip;
+  return catalog.strip;
 }
 
 function cmp(a, b) {
@@ -915,12 +921,10 @@ function renderLens(lens, res) {
     tools.dataset.sig = "";
     return;
   }
-  const removable = lens.view === "done" || lens.view === "approved";
-  const n = removable ? state.rows.filter((r) => inView(r, lens.view)).length : 0;
   const keys = tagKeys(state.rows);
   const current = tagKeyField(lens.group);
   if (current && !keys.includes(current.tagKey)) keys.push(current.tagKey);
-  const sig = JSON.stringify([lens.view, lens.q, lens.group, lens.sort, lens.layout, res && res.shown, res && res.total, n, !!state.removingDone, state.health && state.health.viewer, keys]);
+  const sig = JSON.stringify([lens.view, lens.q, lens.group, lens.sort, lens.layout, res && res.shown, res && res.total, state.health && state.health.viewer, keys]);
   if (tools.dataset.sig === sig) return;
   tools.dataset.sig = sig;
   const filtered = !!lens.q.trim();
@@ -936,7 +940,7 @@ function renderLens(lens, res) {
     onclick: () => writeHash({ layout }),
   }, label);
   const items = [
-    lensSelect("group", "Group", lens.group, [["", board ? (lens.view === "stalled" ? "Board lanes" : "Waiting on (board)") : "None"],
+    lensSelect("group", "Group", lens.group, [["", board ? "Waiting on (board)" : "None"],
       ...catalog.fields.filter((f) => f.group && f.menu).map((f) => [f.id, f.label]),
       ...keys.map((k) => [`tag:${k}`, `Tag ${k}`])], setGroup),
     lensSelect("sort", "Sort", field, [["", "Waiting longest"], ...catalog.fields.filter((f) => f.sort).map((f) => [f.id, f.label])],
@@ -959,49 +963,8 @@ function renderLens(lens, res) {
       type: "button", class: "act", "data-focus": "lens:copy-list", title: "Copy the pull requests shown here, in this order, as YAML, to paste for an agent",
       onclick: () => copyList(lens.view),
     }, "Copy list"),
-    removable ? h("button", {
-      type: "button", class: "act", "data-focus": "lens:remove-done", disabled: n === 0 || state.removingDone || filtered,
-      title: filtered ? "Clear the filters first: this acts on the whole view" : undefined,
-      onclick: () => removeAllClean(n, lens.view),
-    }, "Remove all clean") : null,
   ];
   tools.replaceChildren(...items.filter(Boolean));
-}
-
-async function removeAllClean(n, view) {
-  const what = view === "approved" ? "approved pull request" : "finished pull request";
-  if (!confirm(`Remove the workspaces of ${n} ${what}${n === 1 ? "" : "s"}? Their checkouts are deleted and their terminals are closed. A workspace whose agent works or waits, or that holds uncommitted files, unpushed commits or ignored files outside build and dependency folders, is kept.`)) return;
-  state.removingDone = true;
-  state.actionError = "";
-  state.actionDetail = "";
-  render();
-  try {
-    const res = await fetch("/api/workspaces/remove-done", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json", "X-Loop-API": API_VERSION },
-      body: JSON.stringify({ view }),
-    });
-    const out = await res.json().catch(() => ({}));
-    if (!res.ok || out.error) throw new Error(apiError(out, `HTTP ${res.status}`, res.status));
-    const removed = (out.removed || []).map(labelOf);
-    const kept = (out.kept || []).map((k) => `${labelOf(k)} (${k.reason})`);
-    const details = (out.kept || []).filter((k) => k.detail).map((k) => `${labelOf(k)}: ${k.detail}`);
-    const text = [
-      `Removed ${removed.length}${removed.length ? ": " + removed.join(", ") : ""}.`,
-      kept.length ? `Kept ${kept.length}: ${kept.join("; ")}.` : "",
-    ].filter(Boolean).join(" ");
-    setNotice(text);
-    document.getElementById("notice").title = text;
-    if (details.length) {
-      state.actionError = `Kept ${details.length} with details`;
-      state.actionSource = "";
-      state.actionDetail = details.join("\n");
-    }
-  } catch (err) {
-    state.actionError = `remove all clean failed: ${err.message}`;
-  }
-  state.removingDone = false;
-  scheduleLoad();
 }
 
 async function setPaused(paused) {
@@ -1232,7 +1195,7 @@ function rowTr(r, pr, lens, copy) {
       h("div", { class: "who" },
         facet(lens, catalog.strip, waitCat(r), h("span", { class: "dot", "aria-hidden": "true" }, "●"), slot + catalog.strip), " ", whoFacets(r, lens, slot)),
       facet(lens, "kind", r.kind, h("span", { class: "pill" }, rowKindLabel(r)), slot + "kind")),
-    h("td", { class: "c-for" }, r.pending ? countdown(r) : h("span", { class: "age", title: stamp(sm(r).since) }, age(sm(r).since))),
+    h("td", { class: "c-for" }, roundGate(r) ? countdown(r) : h("span", { class: "age", title: stamp(sm(r).since) }, age(sm(r).since))),
     h("td", { class: "c-why" }, sm(r).reason),
     h("td", { class: "c-where" }, where(r, scope, lens)),
     h("td", { class: "c-act" }, actionButtons(r, "row", { scope })));
@@ -1540,7 +1503,7 @@ function activityEmptyNote(q) {
 function guidanceLabel(r) {
   if (r.question) return r.question.state === "asked" && questionChoices(r, r.question).length ?"Or answer in your own words" : "Answer in your own words";
   const start = Object.values(state.specs.byId).find((sp) => sp.group === "start" && sp.verb === "approve");
-  if (!r.pending) return "Guidance for the next round (optional)";
+  if (!roundGate(r)) return "Guidance for the next round (optional)";
   return start ? `Guidance for the pending round; ${start.label} sends it at once` : "Guidance for the pending round";
 }
 
@@ -1978,7 +1941,7 @@ function renderDetail() {
         " ", h("a", { href: safeURL(r.link), target: "_blank", rel: "noopener noreferrer", class: "ext", "data-focus": "detail:link" }, providerName(unitOf(r).provider)),
         p.author ? [" by ", h("span", { class: "who" }, p.author)] : null)),
     h("div", { class: "d-sit " + waitClass(r) + (sm(r).stalled ? " late" : "") },
-      h("div", { class: "d-clock" }, r.pending ? countdown(r) : h("span", { class: "age" }, age(sm(r).since)), h("span", { class: "pill" }, rowKindLabel(r))),
+      h("div", { class: "d-clock" }, roundGate(r) ? countdown(r) : h("span", { class: "age" }, age(sm(r).since)), h("span", { class: "pill" }, rowKindLabel(r))),
       h("div", {}, "Waiting on ", h("strong", {}, waitingLabel(r)), isSet(sm(r).since) ? ` since ${stamp(sm(r).since)}` : ""),
       h("div", { class: "why" }, sm(r).reason),
       sm(r).line && sm(r).line !== sm(r).reason ? h("div", { class: "line" }, sm(r).line) : null,
@@ -2561,7 +2524,7 @@ async function load() {
     state.error = "";
     state.authLost = false;
   }
-  await Promise.all([loadActivity(), loadDetail(), loadExploreRecent(), loadPlan(), loadTasks()]);
+  await Promise.all([loadActivity(), loadDetail(), loadExploreRecent(), loadPlan(), loadRoundGates(), loadTasks()]);
   await refreshSpecs([...state.rows, ...(state.detail ? [state.detail.row] : [])]);
   render();
 }
@@ -2674,6 +2637,7 @@ async function applyChange(c) {
     c.units.length && view === "recent" ? loadActivity() : null,
     (pr && c.units.some((u) => u.toLowerCase() === pr.toLowerCase())) || (c.tasks && (route.task || pr)) ? loadDetail() : null,
     loadPlan(),
+    loadRoundGates(),
     c.tasks ? loadTasks(route) : null,
   ]);
   await refreshSpecs([...state.rows, ...(state.detail ? [state.detail.row] : [])]);

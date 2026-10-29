@@ -11,6 +11,7 @@ import (
 	"time"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+	rmoverlay "github.com/wloophq/wloop/internal/readmodel/overlay"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
@@ -253,11 +254,11 @@ func TestPendingRoundsServeTheReadModel(t *testing.T) {
 			opened = g
 		}
 	}
-	got, err := te.pendingRounds(context.Background())
+	got, err := enginePlans{te.Env}.Plans(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[unit.Unit]round.Pending{pr: {Intent: "follow-up", Reason: "runs when its window ends", Since: opened.OpenedAt, Deadline: opened.Deadline}}
+	want := map[unit.Unit]rmoverlay.Pending{pr: {Intent: "follow-up", Reason: "runs when its window ends", Since: opened.OpenedAt, Deadline: opened.Deadline}}
 	if len(got) != 1 || got[pr] != want[pr] {
 		t.Fatalf("pending %+v", got)
 	}

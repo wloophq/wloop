@@ -66,7 +66,7 @@ func TestAReportCarriesTheSourceRowOfItsPullRequest(t *testing.T) {
 	if s.Card == nil || s.Card.Title != "Change 7" || !s.Card.StartedByMe || len(s.Items) != 1 || s.Items[0].ID != "gh:address" {
 		t.Fatalf("card %+v, items %+v", s.Card, s.Items)
 	}
-	if s.Facets["repo"] != "acme/api" || len(s.Views) == 0 || s.Views[0] != "needs-me" {
+	if s.Facets["repo"] != "acme/api" || !slices.Equal(s.Views, []string{"mine"}) {
 		t.Fatalf("facets %v, views %v", s.Facets, s.Views)
 	}
 	var stalled *src.Signal

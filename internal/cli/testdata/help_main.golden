@@ -19,7 +19,7 @@ PULL REQUESTS
   remove                 Delete the workspace of a merged or closed one
 
 WHAT WAITS ON YOU
-  status                 Pull requests by view, those needing you first
+  status                 What needs you, by view, and the tracked pull requests
   tui                    The same views in the terminal, one-key actions
   open                   The cockpit, a workspace or a pull request
   outbox                 Drafts waiting for your approval, and yours

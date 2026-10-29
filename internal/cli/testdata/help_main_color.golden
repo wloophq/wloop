@@ -19,7 +19,7 @@ A work loop for the reviews and pull requests that reach you.
   [cyan]remove[/]                 Delete the workspace of a merged or closed one
 
 [bold]WHAT WAITS ON YOU[/]
-  [cyan]status[/]                 Pull requests by view, those needing you first
+  [cyan]status[/]                 What needs you, by view, and the tracked pull requests
   [cyan]tui[/]                    The same views in the terminal, one-key actions
   [cyan]open[/]                   The cockpit, a workspace or a pull request
   [cyan]outbox[/]                 Drafts waiting for your approval, and yours

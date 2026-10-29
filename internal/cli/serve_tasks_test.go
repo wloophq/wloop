@@ -27,7 +27,6 @@ import (
 	"github.com/wloophq/wloop/internal/daemon"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/items"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	roverlay "github.com/wloophq/wloop/internal/readmodel/overlay"
@@ -167,7 +166,7 @@ func TestEveryNeedsMeRowHasAnInboxOrNextTask(t *testing.T) {
 			if len(es) != 1 || es[0].State != task.State("inbox") {
 				t.Errorf("%s asked: %+v", c.Name, es)
 			}
-		case slices.Contains(c.Row.Views, api.ViewNeedsMe):
+		case slices.Contains(c.Row.Facets["is"], "needs-me"):
 			needs++
 			if !in(task.State("inbox"), task.State("next")) {
 				t.Errorf("%s needs me: %+v", c.Name, es)
@@ -447,7 +446,7 @@ func TestAPendingRoundIsAPlanGateNotAnItem(t *testing.T) {
 	t.Parallel()
 	for _, c := range ghsourcetest.Cases() {
 		k := situation.Kind(c.Row.Kind)
-		if k != situation.KindRoundPending && k != situation.KindHeldByCap && k != situation.KindBlocked && c.Row.Pending == nil {
+		if k != situation.KindRoundPending && k != situation.KindHeldByCap && k != situation.KindBlocked {
 			continue
 		}
 		for _, it := range ghsource.ItemsOf(c.Row, c.Report) {
@@ -460,7 +459,7 @@ func TestAPendingRoundIsAPlanGateNotAnItem(t *testing.T) {
 	s := ghsourcetest.Situation{PR: ghsourcetest.Open(901, ghsourcetest.Other)}
 	s.PR.ReviewRequests, s.PR.Workspace = []string{ghsourcetest.Viewer}, ghsourcetest.ReviewWorkspace
 	_, before := l.derive(s)
-	s.Pending = &round.Pending{Intent: "review", Reason: "new push", Since: ghsourcetest.Now.Add(-time.Minute), Deadline: ghsourcetest.Now.Add(4 * time.Minute)}
+	s.Pending = &roverlay.Pending{Intent: "review", Reason: "new push", Since: ghsourcetest.Now.Add(-time.Minute), Deadline: ghsourcetest.Now.Add(4 * time.Minute)}
 	its, after := l.derive(s)
 	if len(before) != 1 || len(after) != 1 || after[0].ID != before[0].ID || !slices.Equal(after[0].Items, before[0].Items) {
 		t.Fatalf("before the round %+v, pending %+v", before, after)

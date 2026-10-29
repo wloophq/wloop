@@ -420,15 +420,21 @@ function taskList(route, open) {
   const loaded = tasksState.key === viewQueryKey(route.view, route.area, route.ctx);
   const ts = filterTerms(route.q);
   const shown = loaded ? tasksState.tasks.filter((e) => taskMatches(e, ts)) : [];
+  const spec = viewSpec(route.view);
+  const n = loaded ? tasksState.tasks.length : 0;
   const parts = [h("div", { class: "tools tasks-tools" }, h("h2", { class: "tasks-head" }, label), areaPicker(route), contextChips(route),
-    loaded ? h("span", { class: "lens-count" }, `${shown.length} of ${tasksState.tasks.length}`) : null)];
+    loaded ? h("span", { class: "lens-count" }, `${shown.length} of ${tasksState.tasks.length}`) : null,
+    spec && spec.remove_clean ? h("button", {
+      type: "button", class: "act", "data-focus": "tasks:remove-clean", disabled: n === 0 || removeState.busy,
+      title: "Remove the workspaces of this view's tasks whose checkouts hold nothing unpublished",
+      onclick: () => removeAllClean(n, route.view),
+    }, "Remove all clean") : null)];
   if (tasksState.error) parts.push(h("p", { class: "plan-error" }, tasksState.error));
   if (loaded) parts.push(...loadingNotes(tasksState.loading));
   if (!loaded) {
     parts.push(h("p", { class: "empty" }, "Loading."));
     return parts;
   }
-  const spec = viewSpec(route.view);
   if (spec && spec.over === "gates") {
     parts.push(tasksState.gates.length ? h("div", { class: "gate-list" }, ...tasksState.gates.map((g) => gateCard(taskById(g.task), g))) : h("p", { class: "empty" }, `Nothing in ${label}.`));
     return parts;
@@ -457,6 +463,55 @@ function loadingNotes(loading) {
 // viewLabel is the profile's word for a core view.
 function viewLabel(view) {
   return (coreViews().find((v) => v.id === view) || {}).label || view;
+}
+
+// loadRoundGates keeps the open plan gates with a deadline by unit: the automatic rounds a row counts down to.
+async function loadRoundGates() {
+  try {
+    const gs = await getJSON("/api/gates");
+    state.roundGates = new Map((gs || []).filter((g) => g.kind === "plan" && g.unit && isSet(g.deadline)).map((g) => [g.unit, g]));
+  } catch {
+    // The rows still show their situation; only the countdown waits for the next load.
+  }
+}
+
+const removeState = { busy: false };
+
+// removeAllClean removes the clean workspaces the n tasks of a view that offers it hold, and says what it removed
+// and what it kept, with why.
+async function removeAllClean(n, view) {
+  if (!confirm(`Remove the workspaces of the ${n} task${n === 1 ? "" : "s"} in ${viewLabel(view)}? Their checkouts are deleted and their terminals are closed. A workspace whose agent works or waits, or that holds uncommitted files, unpushed commits or ignored files outside build and dependency folders, is kept.`)) return;
+  removeState.busy = true;
+  state.actionError = "";
+  state.actionDetail = "";
+  render();
+  try {
+    const res = await fetch("/api/workspaces/remove-clean", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", "X-Loop-API": API_VERSION },
+      body: JSON.stringify({ view }),
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok || out.error) throw new Error(apiError(out, `HTTP ${res.status}`, res.status));
+    const removed = (out.removed || []).map(labelOf);
+    const kept = (out.kept || []).map((k) => `${labelOf(k)} (${k.reason})`);
+    const details = (out.kept || []).filter((k) => k.detail).map((k) => `${labelOf(k)}: ${k.detail}`);
+    const text = [
+      `Removed ${removed.length}${removed.length ? ": " + removed.join(", ") : ""}.`,
+      kept.length ? `Kept ${kept.length}: ${kept.join("; ")}.` : "",
+    ].filter(Boolean).join(" ");
+    setNotice(text);
+    document.getElementById("notice").title = text;
+    if (details.length) {
+      state.actionError = `Kept ${details.length} with details`;
+      state.actionSource = "";
+      state.actionDetail = details.join("\n");
+    }
+  } catch (err) {
+    state.actionError = `remove all clean failed: ${err.message}`;
+  }
+  removeState.busy = false;
+  scheduleLoad({ all: true, tasks: true });
 }
 
 function renderTasks(route) {

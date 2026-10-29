@@ -23,7 +23,7 @@ import (
 // Rows is the read model as the job reads it.
 type Rows interface {
 	Row(ctx context.Context, u unit.Unit, asked catalog.Asked) (api.Row, bool, error)
-	Rows(ctx context.Context, view string, since api.Since) (api.RowsPage, error)
+	Rows(ctx context.Context, since api.Since) (api.RowsPage, error)
 }
 
 // Provider is what one enabled plugin derives from its rows; a nil field is
@@ -133,7 +133,7 @@ type revRow struct {
 func (j *Job) sweep(ctx context.Context, rows Rows, all bool, pending map[unit.Unit]uint64) {
 	batch := map[unit.Unit]revRow{}
 	if all {
-		page, err := rows.Rows(ctx, api.ViewAll, api.Since{})
+		page, err := rows.Rows(ctx, api.Since{})
 		if err != nil {
 			j.logf("cards: rows: %v", err)
 		}

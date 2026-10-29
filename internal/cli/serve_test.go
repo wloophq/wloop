@@ -1155,8 +1155,21 @@ func TestPendingRoundsReachTheReadModel(t *testing.T) {
 		t.Fatalf("%v: %s", err, rec.Body)
 	}
 	i := slices.IndexFunc(page.Rows, func(r api.Row) bool { return r.Unit == r7.Unit() })
-	if i < 0 || page.Rows[i].Pending == nil || !page.Rows[i].Pending.Deadline.Equal(deadline) || page.Rows[i].Pending.Intent != "follow-up" {
+	if i < 0 || page.Rows[i].Kind != "round_pending" || !strings.HasPrefix(page.Rows[i].Summary.Reason, "follow-up ") {
 		t.Fatalf("rows %s", rec.Body)
+	}
+	req = httptest.NewRequest("GET", api.GatesPath, nil)
+	req.Header.Set(api.Header, api.Version)
+	rec = httptest.NewRecorder()
+	daemon.New(d).Handler().ServeHTTP(rec, req)
+	var gs []api.GateView
+	if err := json.Unmarshal(rec.Body.Bytes(), &gs); err != nil {
+		t.Fatalf("%v: %s", err, rec.Body)
+	}
+	if !slices.ContainsFunc(gs, func(v api.GateView) bool {
+		return v.Kind == string(gate.KindPlan) && v.Unit == r7.Unit().String() && v.Deadline.Equal(deadline)
+	}) {
+		t.Fatalf("gates %s", rec.Body)
 	}
 }
 
@@ -1173,8 +1186,8 @@ func TestThePlanAPIIsServedFromAnEngineOfItsOwn(t *testing.T) {
 	if !ok || p.plan == nil || p.plan == te.engine || p.eng.Engine != te.engine || d.Sweep != daemon.Sweeper(p.eng) {
 		t.Fatalf("plan %T, sweep %T", d.Plan, d.Sweep)
 	}
-	if _, ok := d.Pending.(enginePending); !ok {
-		t.Fatalf("pending %T", d.Pending)
+	if _, ok := d.Plans.(enginePlans); !ok {
+		t.Fatalf("plans %T", d.Plans)
 	}
 	if f := te.viewFacts().p.Load(); f == nil {
 		t.Fatal("the views read no github facts")

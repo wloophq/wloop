@@ -63,6 +63,11 @@
             ],
             "type": "string"
           },
+          "remove_clean": {
+            "default": false,
+            "description": "The view offers to remove at once the workspaces its tasks' links hold whose checkouts hold nothing that is not published, as each link's remove action does; the rest are kept, with why.",
+            "type": "boolean"
+          },
           "sort": {
             "description": "The facts the view sorts by, comma-separated; a leading - sorts one descending. A view's tasks start oldest first, a parent's children in their sibling order.",
             "type": "string"

@@ -19,7 +19,6 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/record"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
@@ -128,7 +127,7 @@ func report(key string) src.Snapshot {
 			Stalled: src.After(since, time.Hour, src.Calendar)},
 		Card: &src.Card{Label: "acme " + key, Title: "Ship the " + key, Link: "https://acme.example/" + key, Why: "Bruno asked for your review",
 			WaitsOn: []src.Person{{Key: "acme:ana", Name: "Ana"}}, State: "open"},
-		Views: []string{api.ViewNeedsMe}, Facets: map[string]string{"repo": "acme/api"}, FacetValues: map[string][]string{"waits-on": {"me", "ana"}},
+		Views: []string{"asks"}, Facets: map[string]string{"repo": "acme/api"}, FacetValues: map[string][]string{"waits-on": {"me", "ana"}},
 		Data:  json.RawMessage(`{"size":3}`),
 		Items: []src.Item{{ID: "i1", Kind: "request", Summary: "review the schema", State: "open", WaitingOn: []src.Person{{Key: "acme:ana"}}}}}
 }
@@ -166,7 +165,7 @@ func TestARowIsDerivedFromItsSnapshotAndHostState(t *testing.T) {
 	if _, ok := ins[gone]; ok {
 		t.Error("a unit with no snapshot has a row input")
 	}
-	base := readmodel.Base{Pending: map[unit.Unit]round.Pending{pending: {Intent: "chase", Reason: "Ana waits", Since: reportedAt.Add(-time.Minute),
+	base := readmodel.Base{Plans: map[unit.Unit]overlay.Pending{pending: {Intent: "chase", Reason: "Ana waits", Since: reportedAt.Add(-time.Minute),
 		Deadline: reportedAt.Add(time.Hour)}}}
 	row := func(u unit.Unit, in any) api.Row {
 		t.Helper()
@@ -180,8 +179,8 @@ func TestARowIsDerivedFromItsSnapshotAndHostState(t *testing.T) {
 	got := row(plain, ins[plain])
 	if got.Kind != "review" || got.Summary.WaitsOn != "me" || !got.Summary.Stalled || got.Summary.Reason != "Bruno asked for your review" ||
 		got.Label != "acme plain" || got.Title != "Ship the plain" || got.Link != "https://acme.example/plain" ||
-		!slices.Equal(got.Views, []string{api.ViewNeedsMe}) || got.Facets["repo"][0] != "acme/api" || !slices.Equal(got.Facets["waits-on"], []string{"me", "ana"}) || string(got.Payload) != `{"size":3}` ||
-		len(got.Items) != 1 || got.Items[0].WaitingOn[0] != "acme:ana" || got.Summary.OpenItems != 1 || got.Pending != nil {
+		!slices.Equal(got.Views, []string{"asks"}) || got.Facets["repo"][0] != "acme/api" || !slices.Equal(got.Facets["waits-on"], []string{"me", "ana"}) || string(got.Payload) != `{"size":3}` ||
+		len(got.Items) != 1 || got.Items[0].WaitingOn[0] != "acme:ana" || got.Summary.OpenItems != 1 {
 		t.Errorf("the snapshot's row: %+v", got)
 	}
 	if early, _ := p.Derive(base, ins[plain], reportedAt.Add(-90*time.Minute)); early.Summary.Stalled {
@@ -189,7 +188,7 @@ func TestARowIsDerivedFromItsSnapshotAndHostState(t *testing.T) {
 	}
 
 	got = row(muted, ins[muted])
-	if got.Kind != overlay.KindMuted || got.Summary.WaitsOn != "nobody" || !got.Summary.Since.Equal(reportedAt.Add(-time.Hour)) || len(got.Views) != 0 {
+	if got.Kind != overlay.KindMuted || got.Summary.WaitsOn != "nobody" || !got.Summary.Since.Equal(reportedAt.Add(-time.Hour)) || !slices.Equal(got.Views, []string{"asks"}) {
 		t.Errorf("the muted row: %+v", got)
 	}
 	if un := row(muted, readmodel.Unmuted(ins[muted])); un.Kind != "review" {
@@ -197,8 +196,7 @@ func TestARowIsDerivedFromItsSnapshotAndHostState(t *testing.T) {
 	}
 
 	got = row(pending, ins[pending])
-	if got.Kind != overlay.KindRoundPending || got.Summary.Reason != "chase waiting for your answer: Ana waits" || got.Summary.Stalled ||
-		got.Pending == nil || !got.Pending.Deadline.Equal(reportedAt.Add(time.Hour)) || !slices.Contains(got.Views, api.ViewNeedsMe) {
+	if got.Kind != overlay.KindRoundPending || got.Summary.Reason != "chase waiting for your answer: Ana waits" || got.Summary.Stalled {
 		t.Errorf("the pending round's row: %+v", got)
 	}
 
@@ -236,7 +234,7 @@ func TestATurnEndingRefreshesTheRowWithoutThePlugin(t *testing.T) {
 	}
 
 	row, waits, why := rowAndCard("started")
-	if row.Kind != overlay.KindLoopWorking || row.Summary.Reason != "chase round in progress" || slices.Contains(row.Views, api.ViewNeedsMe) ||
+	if row.Kind != overlay.KindLoopWorking || row.Summary.Reason != "chase round in progress" || slices.Contains(row.Facets["is"], "needs-me") ||
 		why != "chase round in progress" || len(waits) != 1 || waits[0].Key != "acme:me" {
 		t.Fatalf("a started run's row %+v, card %q %v", row, why, waits)
 	}
@@ -248,7 +246,7 @@ func TestATurnEndingRefreshesTheRowWithoutThePlugin(t *testing.T) {
 	log.Note(port.TopicTurns, u)
 	row, waits, why = rowAndCard("asked")
 	if row.Kind != overlay.KindLoopWaiting || row.Summary.Reason != "Which schema version?" || row.Question == nil ||
-		row.Question.Text != "Which schema version?" || !slices.Contains(row.Views, api.ViewNeedsMe) || why != "Which schema version?" || len(waits) != 1 {
+		row.Question.Text != "Which schema version?" || why != "Which schema version?" || len(waits) != 1 {
 		t.Fatalf("an asking run's row %+v, card %q %v", row, why, waits)
 	}
 

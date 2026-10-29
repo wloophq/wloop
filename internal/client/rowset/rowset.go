@@ -60,14 +60,23 @@ func (s *Set) Row(u unit.Unit) (api.Row, bool) {
 	return r, ok
 }
 
-// View is the rows of view in the order the daemon lists them.
+// All are the set's rows in the order the daemon lists them.
+func (s *Set) All() []api.Row {
+	return s.list(func(api.Row) bool { return true })
+}
+
+// View is the rows of plugin view view in the order the daemon lists them.
 func (s *Set) View(view string) []api.Row {
+	return s.list(func(r api.Row) bool { return r.In(view) })
+}
+
+func (s *Set) list(in func(api.Row) bool) []api.Row {
 	out := make([]api.Row, 0, len(s.rows))
 	for _, r := range s.rows {
-		if r.In(view) {
+		if in(r) {
 			out = append(out, r)
 		}
 	}
-	slices.SortFunc(out, api.CompareRows)
+	slices.SortFunc(out, func(a, b api.Row) int { return api.CompareUnits(a.Unit, b.Unit) })
 	return out
 }

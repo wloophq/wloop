@@ -12,9 +12,10 @@ import (
 
 // The link signals plugin.toml declares.
 const (
-	SignalStalled = "stalled"
-	SignalInLoop  = "in_loop"
-	SignalReady   = "ready"
+	SignalStalled   = "stalled"
+	SignalInLoop    = "in_loop"
+	SignalReady     = "ready"
+	SignalWorkspace = "workspace"
 )
 
 // Report is the row's snapshot but its unit, rev, time and data.
@@ -33,14 +34,16 @@ func (r Row) Report() src.Snapshot {
 
 // Signals are the row's link signals: stalled, an open pull request in
 // scope whose situation lasted past its threshold; in_loop, an open one a
-// review workspace holds; ready, one whose work is approved.
+// review workspace holds; ready, one whose work is approved; workspace, one
+// a workspace of which remains, open or not.
 func (r Row) Signals() []src.Signal {
 	open := r.PR.State == "OPEN"
 	stalled := src.Signal{Name: SignalStalled, On: open && r.Stalled() && len(r.Payload.Reasons) > 0}
 	if stalled.On {
 		stalled.Since = r.stallsAt()
 	}
-	return []src.Signal{stalled, {Name: SignalInLoop, On: open && r.Payload.Workspace.IsReview}, {Name: SignalReady, On: r.Payload.Approved}}
+	return []src.Signal{stalled, {Name: SignalInLoop, On: open && r.Payload.Workspace.IsReview}, {Name: SignalReady, On: r.Payload.Approved},
+		{Name: SignalWorkspace, On: r.Payload.Workspace.ID != ""}}
 }
 
 // stallsAt is the first instant the row's situation is stalled; zero when

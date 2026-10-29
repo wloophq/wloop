@@ -356,7 +356,6 @@ func TestTemporalFactsRoundTrip(t *testing.T) {
 	}
 	st := source.RoundState{
 		Marks: map[string]string{"reviewed": "abc123"}, SentAt: t0, AgentHome: "home-a", Today: 1, DayTotal: 4, Paused: true,
-		Pending:   []source.PendingRound{{Intent: "review", Reason: "held", Since: t0, Deadline: t0.Add(time.Hour)}},
 		Overrides: map[string]string{"next_guidance": "check the retries"},
 		Blocked:   &source.Blocked{Question: "Which branch?", Root: "/w/api", Folder: "api", Since: t0},
 	}

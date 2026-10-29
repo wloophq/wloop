@@ -35,6 +35,11 @@ func row(n int, title string, kind api.Kind, views ...string) api.Row {
 	return offering(r, "run_now", "skip", "guide", "review", "address", "pause", "mute", "open")
 }
 
+// planGate is the open plan gate an automatic round of r waits on until deadline.
+func planGate(r api.Row, deadline time.Time) api.GateView {
+	return api.GateView{ID: 1, Unit: r.Unit.String(), Kind: "plan", Status: "open", Deadline: deadline}
+}
+
 func rows() []api.Row {
 	return []api.Row{
 		row(7, "Batch export", "review", "needs-me"),
@@ -142,8 +147,8 @@ func TestMuteHoldSkipRunAndGuide(t *testing.T) {
 	m := newModel(t)
 	held := row(4, "Held", "held", "needs-me")
 	pending := row(3, "Pending", "round_pending", "needs-me")
-	pending.Pending = &api.PendingRound{Intent: "follow-up", Deadline: now.Add(40 * time.Second)}
 	m.SetData([]api.Row{pending, held}, api.Health{})
+	m.SetGates([]api.GateView{planGate(pending, now.Add(40*time.Second))})
 
 	if c, ok := press(m, Key{Rune: 'R'}); !ok || c.Action != "run_now" || c.Unit != ref(3).Unit() {
 		t.Fatalf("run the pending round: %+v", c)
@@ -582,7 +587,7 @@ func TestPastingAPullRequestURLSelectsIt(t *testing.T) {
 	}
 	m.SetData(rs, api.Health{})
 	press(m, Key{Rune: '/'}, Key{Name: KeyPaste, Text: "https://github.com/acme/api/pull/9/files"}, Key{Name: KeyEnter})
-	if m.views[m.view].ID != api.ViewLoop || m.sel != ref(9).Unit() || len(m.filter) != 0 {
+	if m.views[m.view].ID != "loop" || m.sel != ref(9).Unit() || len(m.filter) != 0 {
 		t.Fatalf("view %s, selection %v, filter %q", m.views[m.view].ID, m.sel, string(m.filter))
 	}
 	press(m, Key{Rune: '/'}, Key{Name: KeyPaste, Text: "https://github.com/acme/api/pull/99"}, Key{Name: KeyEnter})

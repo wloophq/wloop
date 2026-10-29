@@ -12,9 +12,9 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/turns"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 )
 
 // Entry is one unit's row as served: JSON is Row encoded, Rev the revision
@@ -51,8 +51,9 @@ type Base struct {
 	// Intents are the loaded intents whose actions a row of a provider other than GitHub offers; nil offers
 	// none.
 	Intents *intentload.Loaded
-	Pending map[unit.Unit]round.Pending
-	Agents  []turns.AgentObservation
+	// Plans are the automatic rounds the open plan gates hold, by unit.
+	Plans  map[unit.Unit]overlay.Pending
+	Agents []turns.AgentObservation
 	// AgentsOK is false when the agents are unknown, so no session can be
 	// told waiting.
 	AgentsOK bool
@@ -91,9 +92,9 @@ type Snapshotter interface {
 	Snapshot(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
-// Pending is the set of pending automatic rounds.
-type Pending interface {
-	Pending(ctx context.Context) (map[unit.Unit]round.Pending, error)
+// Plans are the automatic rounds the open plan gates hold, by unit.
+type Plans interface {
+	Plans(ctx context.Context) (map[unit.Unit]overlay.Pending, error)
 }
 
 // Agents is the agents' last known states; ok is false when they are

@@ -34,11 +34,12 @@ type ViewsDef struct {
 // When, which of them, compiled over their facts, nil for a view that lists
 // nothing and is a place a client draws itself, such as the review; Group the
 // fact it groups by, Sort the facts it sorts by, Key the key that jumps to it,
-// and HideDisabled whether it leaves out what a disabled plugin holds.
+// HideDisabled whether it leaves out what a disabled plugin holds, and
+// RemoveClean whether it offers to remove its tasks' clean workspaces.
 type ViewDef struct {
 	ID, Label, Over, Group, Key string
 	Sort                        []SortKey
-	HideDisabled                bool
+	HideDisabled, RemoveClean   bool
 	When                        workflow.Predicate
 }
 
@@ -88,6 +89,7 @@ type mView struct {
 	Sort         *string `toml:"sort"`
 	Key          *string `toml:"key"`
 	HideDisabled *bool   `toml:"hide_disabled"`
+	RemoveClean  *bool   `toml:"remove_clean"`
 }
 
 type mReviewStep struct {
@@ -246,6 +248,9 @@ func (l *viewsLoad) mergeViews(s *sheet, views map[string]mView) {
 		}
 		if m.HideDisabled != nil {
 			v.HideDisabled = *m.HideDisabled
+		}
+		if m.RemoveClean != nil {
+			v.RemoveClean = *m.RemoveClean
 		}
 		switch {
 		case len(s.problems) > n && i < 0:

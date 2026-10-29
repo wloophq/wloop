@@ -645,25 +645,17 @@ message BriefWantResponse {
   bool coming = 1;
 }
 
-message PendingRound {
-  string intent = 1;
-  string reason = 2;
-  google.protobuf.Timestamp since = 3;
-  google.protobuf.Timestamp deadline = 4;
-}
-
 // RoundState is the host's round bookkeeping of one unit.
 message RoundState {
   map<string, string> marks = 1;
   google.protobuf.Timestamp sent_at = 2;
   string agent_home = 3;
-  reserved 4;
+  reserved 4, 8;
   // today counts the unit's automatic rounds today, day_total every unit's.
   int64 today = 5;
   int64 day_total = 6;
   // paused says the unit's rounds are held, by the user or a pause.
   bool paused = 7;
-  repeated PendingRound pending = 8;
   // overrides are the unit's host overrides, by name.
   map<string, string> overrides = 9;
   // blocked is set while a round's start is blocked on a question.

@@ -384,7 +384,7 @@ func (p *Provider) Derive(base readmodel.Base, in any, at time.Time) (api.Row, e
 // minute at, with no turn and no intake of any pull request.
 func DeriverAt(base readmodel.Base, set readmodel.RowSettings, briefOn bool, at time.Time) Deriver {
 	return Deriver{Viewer: base.Viewers[unit.GitHub], Teams: base.Teams[unit.GitHub], Ignore: IgnoreOf(set.Cfg), Now: at, Stalled: set.Cfg.GitHub.Stalled,
-		Pending: base.Pending, Loaded: set.Loaded, Specs: base.Specs, Cfg: set.Cfg, GateOn: set.GateOn, BriefOn: briefOn,
+		Plans: base.Plans, Loaded: set.Loaded, Specs: base.Specs, Cfg: set.Cfg, GateOn: set.GateOn, BriefOn: briefOn,
 		Forceable: set.Forceable, SpecsVersion: cmp.Or(base.SpecsVersion, catalog.VersionOf(set.Loaded)), Asked: base.Asked}
 }
 

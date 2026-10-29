@@ -119,8 +119,8 @@ func gateActions(l *intentload.Loaded) []builtinAction {
 		case g.First && g.Role == builtin.GateApproves:
 			spec.Verb, spec.Intake = "approve", true
 			offer = func(f Facts) (api.ActionState, bool) {
-				if p := f.Row.Pending; p != nil {
-					return api.ActionState{ID: id, Enabled: true, Primary: true, Basis: BasisPending + p.Since.UTC().Format(time.RFC3339Nano)}, true
+				if !f.PendingSince.IsZero() {
+					return api.ActionState{ID: id, Enabled: true, Primary: true, Basis: BasisPending + f.PendingSince.UTC().Format(time.RFC3339Nano)}, true
 				}
 				if f.HeldByCap {
 					return api.ActionState{ID: id, Enabled: true, Primary: true, Basis: BasisHeld + f.Row.Summary.Reason, Intent: requestIntent(f, id)}, true
@@ -133,7 +133,7 @@ func gateActions(l *intentload.Loaded) []builtinAction {
 			first := g.First
 			offer = func(f Facts) (api.ActionState, bool) {
 				switch {
-				case f.Row.Pending != nil:
+				case !f.PendingSince.IsZero():
 					return on(id)
 				case first && f.Tracked && f.Open && f.GateOn:
 					return on(id)
@@ -145,7 +145,7 @@ func gateActions(l *intentload.Loaded) []builtinAction {
 				spec.Verb = "dismiss"
 			}
 			offer = func(f Facts) (api.ActionState, bool) {
-				if f.Row.Pending == nil {
+				if f.PendingSince.IsZero() {
 					return absent()
 				}
 				return on(id)
