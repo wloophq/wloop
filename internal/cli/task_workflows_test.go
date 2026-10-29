@@ -190,3 +190,54 @@ func TestNudgedEffectWritesLastNudge(t *testing.T) {
 		}
 	}
 }
+
+func TestAutofocusClearsTheStarsItSetWhoseReasonIsGone(t *testing.T) {
+	t.Parallel()
+	r, p := taskWorkflows(t)
+	ctx := context.Background()
+	pastDue := replayStart.Add(-time.Hour).Format(time.RFC3339)
+	r.mine("moved", r.now, pastDue, twMe)
+	r.mine("late", r.now, pastDue, twMe)
+	r.mine("mine", r.now, "", twMe)
+	r.mine("theirs", r.now, "", twMe)
+	r.sync(twThread)
+	change := func(item string, f func(e *task.Task)) {
+		e := r.taskOf(task.DerivedID(twThread, item))
+		f(&e)
+		if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	change("mine", func(e *task.Task) {
+		e.SetProp(task.PropFocus, task.Value{Text: task.FocusOn}, task.WriterPerson, r.now)
+	})
+	change("theirs", func(e *task.Task) {
+		e.SetProp(task.PropFocus, task.Value{Text: task.FocusOn}, task.WriterWorkflow, r.now)
+	})
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	change("moved", func(e *task.Task) {
+		e.SetProp(task.PropDue, task.Value{Time: replayStart.AddDate(0, 0, 3)}, task.WriterPerson, r.now)
+	})
+	starred := func() int {
+		es, err := r.db.Tasks().Tasks(ctx, task.Query{View: task.ViewFocus})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(es)
+	}
+	before := starred()
+	r.now = r.now.Add(time.Hour)
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if after := starred(); after >= before {
+		t.Fatalf("%d stars after the run, %d before: the run did not clear the stale one", after, before)
+	}
+	for item, want := range map[string]string{"moved": "", "late": task.FocusOn, "mine": task.FocusOn, "theirs": task.FocusOn} {
+		if got := r.taskOf(task.DerivedID(twThread, item)).Prop(task.PropFocus).Text; got != want {
+			t.Errorf("%s: focus %q, want %q", item, got, want)
+		}
+	}
+}

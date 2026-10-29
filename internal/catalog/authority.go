@@ -8,6 +8,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // Authority is the profile's word on who runs the task verbs, the core's
@@ -49,7 +50,8 @@ func TaskFacts(t task.Task, d intentload.TasksDef) workflow.Facts {
 }
 
 // PropFacts are the task.prop.* facts of t's properties, typed as d
-// declares them; a property d does not declare is left out.
+// declares them, and the task.prop_by.* of who wrote each; a property d
+// does not declare is left out.
 func PropFacts(t task.Task, d intentload.TasksDef) workflow.Facts {
 	f := workflow.Facts{}
 	for _, p := range d.Props {
@@ -57,7 +59,8 @@ func PropFacts(t task.Task, d intentload.TasksDef) workflow.Facts {
 		if !ok {
 			continue
 		}
-		f["task.prop."+p.Name] = propFact(p.Type, v)
+		f[builtin.PropPrefix+p.Name] = propFact(p.Type, v)
+		f[builtin.PropByPrefix+p.Name] = string(t.Written[p.Name].By)
 	}
 	return f
 }

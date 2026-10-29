@@ -108,6 +108,12 @@ values  = ["on", "off"]
 writers = ["person", "workflow"]
 doc     = "Whether the task is starred in Focus."
 
+[props.autostar]
+type    = "enum"
+values  = ["on"]
+writers = ["workflow"]
+doc     = "The task-autofocus workflow starred the task, so task-autofocus-clear may take its star off."
+
 [props.last_nudge]
 type    = "date"
 writers = ["workflow"]

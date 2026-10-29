@@ -125,15 +125,19 @@ func newTask(id ID, f UnitFacts, it items.Item, initial Category, st States, now
 }
 
 // update refreshes what the items ws own of old, which holds them or is their derived task, and keeps what
-// the user set. An item old does not hold opened again: a done task moves back into the ready category, and
-// any task is marked Changed.
+// the user set: old holds of f.Unit's items exactly ws, so an item that resolves leaves it. An item old does
+// not hold opened again: a done task moves back into the ready category, and any task is marked Changed.
 func update(old Task, f UnitFacts, ws []items.Item, st States, now time.Time) (Task, string, error) {
 	e := old
-	e.Items = slices.Clone(old.Items)
+	e.Items = slices.DeleteFunc(slices.Clone(old.Items), func(r ItemRef) bool { return r.Unit == f.Unit })
 	reopened := false
 	for _, it := range ws {
-		if r := refOf(f, it); !slices.Contains(e.Items, r) {
-			e.Items, reopened = append(e.Items, r), true
+		r := refOf(f, it)
+		if !slices.Contains(old.Items, r) {
+			reopened = true
+		}
+		if !slices.Contains(e.Items, r) {
+			e.Items = append(e.Items, r)
 		}
 		e.Units = mergeUnits(e.Units, unitsOf(f, it))
 	}

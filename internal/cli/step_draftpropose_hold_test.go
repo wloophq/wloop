@@ -8,6 +8,8 @@ import (
 
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
+	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -59,5 +61,29 @@ func TestARunLeavingAPersonOnATimedHoldIsNotDone(t *testing.T) {
 	r.now = r.now.Add(25 * time.Hour)
 	if err := runErr(); err != nil {
 		t.Fatalf("past bob's hold he is proposed and only ana's open draft holds: %v", err)
+	}
+}
+
+// TestAHeldNudgeUnderTheOldTaskKeyHoldsItsPerson: a per-person draft proposed while the key named the task,
+// <task>:<person>, holds a new proposal to that person on the same thread.
+func TestAHeldNudgeUnderTheOldTaskKeyHoldsItsPerson(t *testing.T) {
+	t.Parallel()
+	r := newDraftRig(t, draftWF("nudges", "purpose", "nudge", "items", "owed", "per", "person", "repeat_after", "24h"), "{{.Person.Key}}")
+	r.tasks.m["e1"] = task.Task{ID: "e1", State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{draftThread},
+		Items: []task.ItemRef{{Unit: draftThread, Item: "i1"}, {Unit: draftThread, Item: "i2"}}}
+	r.items.set(draftThread, openItem("i1", "The deck", r.now.Add(-96*time.Hour), ana), openItem("i2", "The budget", r.now.Add(-96*time.Hour), bob))
+	if _, err := r.svc.Propose(context.Background(), outbox.Proposal{Unit: draftThread, Task: "e1", Items: []string{"i1"}, Purpose: "nudge",
+		Delivery: draft.Message, Text: "@ana?", Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "nudges", Rule: "nudges", Key: "e1:" + ana.Key}}); err != nil {
+		t.Fatal(err)
+	}
+	r.run(draftTask)
+	var anas int
+	for _, d := range r.drafts() {
+		if draftPerson(d.Origin.Key, d.Unit, draftTask) == ana.Key {
+			anas++
+		}
+	}
+	if anas != 1 {
+		t.Fatalf("%d drafts to Ana, want the old-key one only", anas)
 	}
 }

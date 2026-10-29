@@ -330,6 +330,19 @@ func TestAReopenedItemMarksChangedAndStaysOutOfTheInbox(t *testing.T) {
 	if got := only(t, reconcile(t, facts(), its, []task.Task{dropped}, now.Add(time.Hour))); got.Category != task.CategoryDropped {
 		t.Fatalf("an item reopened on a dropped task: %+v", got)
 	}
+	two := []items.Item{item("a", owedBy(ana)), item("b", owedBy(ana))}
+	both := only(t, reconcile(t, facts(), two[:1], nil, now))
+	both.Items = append(both.Items, task.ItemRef{Unit: pr, Item: "b"})
+	resolved(&two[0])
+	held := only(t, reconcile(t, facts(), two, []task.Task{both}, now))
+	if held.Category != task.CategoryWaiting || !slices.Equal(held.Items, []task.ItemRef{{Unit: pr, Item: "b"}}) {
+		t.Fatalf("a two-item task, one item resolved: %+v", held)
+	}
+	two[0].State = "open"
+	got = only(t, reconcile(t, facts(), two, []task.Task{held}, now.Add(time.Hour)))
+	if got.Category != task.CategoryWaiting || !got.Changed || len(got.Items) != 2 {
+		t.Fatalf("an item reopened on a two-item task: %+v", got)
+	}
 	marked := done
 	marked.Items = []task.ItemRef{{Unit: pr, Item: "a"}}
 	if cs := reconciled(t, facts(), its, me, []task.Task{marked}, bundled, now); len(cs) != 0 {

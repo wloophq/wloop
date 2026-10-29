@@ -256,7 +256,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			}
 		}
 		if cd.refusal == "" {
-			cd.refusal, cd.timed, err = holdOf(ctx, ob, cd.p, a, now)
+			cd.refusal, cd.timed, err = holdOf(ctx, ob, cd.p, person.Key, a, now)
 			if err != nil {
 				return nil, err
 			}
@@ -455,18 +455,22 @@ func configPolicy(w workflow.Workflow, base *draft.Policy, a *config.ApprovalCon
 	return &p, nil
 }
 
-// holdOf says why a draft of the same workflow, subject and person holds p:
+// holdOf says why a draft of the same workflow, unit and person holds p, its person read off the draft's key
+// in either shape draftPerson reads, or, with no person, of the same key:
 // one open or failed, one sent within repeat_after_sent (or ever, with
 // forever), one otherwise settled within hold; timed when only the time
 // since a settled draft holds it. A withdrawn draft holds nothing.
-func holdOf(ctx context.Context, ob draftOutbox, p outbox.Proposal, a draftArgs, now time.Time) (string, bool, error) {
-	prior, err := ob.List(ctx, outbox.Filter{Unit: &p.Unit, Rule: p.Origin.Rule, Key: p.Origin.Key})
+func holdOf(ctx context.Context, ob draftOutbox, p outbox.Proposal, person string, a draftArgs, now time.Time) (string, bool, error) {
+	prior, err := ob.List(ctx, outbox.Filter{Unit: &p.Unit, Rule: p.Origin.Rule})
 	if err != nil {
 		return "", false, err
 	}
 	refusal, timed := "", false
 	for _, d := range prior {
 		if d.Origin.Kind != draft.OriginAuto || d.Origin.Workflow != p.Origin.Workflow {
+			continue
+		}
+		if person == "" && d.Origin.Key != p.Origin.Key || person != "" && draftPerson(d.Origin.Key, d.Unit, draftSubjectUnit(d)) != person {
 			continue
 		}
 		held := fmt.Sprintf("held by draft %d (%s)", d.ID, d.State)

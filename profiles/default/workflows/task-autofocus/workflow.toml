@@ -7,3 +7,8 @@ order = 54
 use = "task.set"
 prop = "focus"
 value = "on"
+
+[[step]]
+use = "task.set"
+prop = "autostar"
+value = "on"

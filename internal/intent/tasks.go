@@ -163,12 +163,15 @@ func (d TasksDef) Untrusted(name string) bool {
 
 // Facts are the task.prop.<name> facts of the declared properties, typed
 // from their types, an enum's closed to its values and an untrusted one
-// marked so; and task.state closed to the declared states.
+// marked so, with task.prop_by.<name>, who last wrote each; and
+// task.state closed to the declared states.
 func (d TasksDef) Facts() expr.Env {
 	env := expr.Env{}
 	for _, p := range d.Props {
 		name := builtin.PropPrefix + p.Name
 		env[name] = builtin.PropFactType(p.Type)
+		env[builtin.PropByPrefix+p.Name] = expr.String
+		env.SetEnum(builtin.PropByPrefix+p.Name, append([]string{""}, writerNames()...))
 		if p.Type == task.PropEnum {
 			env.SetEnum(name, p.Values)
 		}
@@ -714,4 +717,12 @@ func missingVerbs(verbs map[string]VerbText) Problems {
 		}
 	}
 	return problems
+}
+
+func writerNames() []string {
+	out := make([]string, len(task.Writers))
+	for i, w := range task.Writers {
+		out[i] = string(w)
+	}
+	return out
 }

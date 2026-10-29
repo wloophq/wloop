@@ -446,6 +446,10 @@ const ExtraPrefix = "brief.extra."
 // declaration.
 const PropPrefix = "task.prop."
 
+// PropByPrefix names who last wrote a task property as a fact,
+// task.prop_by.<name>: person, workflow, agent or plugin, empty while unset.
+const PropByPrefix = "task.prop_by."
+
 // PropFactType is the type of the fact task.prop.<name> of a property of
 // type t: an enum, an actor and a string read as a string (an actor as its
 // key), a list type as a list. An int or a duration of 0 reads as unset.

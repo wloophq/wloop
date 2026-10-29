@@ -72,10 +72,7 @@ func (w draftWithdrawals) Proposed(ctx context.Context, name string) ([]automati
 		if d.Origin.Kind != draft.OriginAuto || d.Origin.Workflow == "" || w.d.Enabled != nil && !w.d.Enabled(d.Unit.Provider) {
 			continue
 		}
-		subject := d.Unit
-		if d.Task != "" {
-			subject = task.UnitOf(task.ID(d.Task))
-		}
+		subject := draftSubjectUnit(d)
 		pd := automation.ProposedDraft{ID: int64(d.ID), Workflow: d.Origin.Workflow, Subject: subject}
 		sub, err := w.d.subject(ctx, subject)
 		switch {
@@ -113,4 +110,12 @@ func draftPerson(key string, u, subject unit.Unit) string {
 		}
 	}
 	return ""
+}
+
+// draftSubjectUnit is the subject a draft was proposed on: its task, else its unit.
+func draftSubjectUnit(d draft.Draft) unit.Unit {
+	if d.Task != "" {
+		return task.UnitOf(task.ID(d.Task))
+	}
+	return d.Unit
 }
