@@ -290,6 +290,9 @@ type Env struct {
 	// briefReader reads GitHub's brief inputs in place of the running
 	// plugin; nil is the running plugin.
 	briefReader func() (briefReader, error)
+	// identityReader reads the viewer GitHub names in place of the running
+	// plugin; nil is the running plugin.
+	identityReader func() (identityReader, error)
 }
 
 // owning is e with the state an Env owns, which its copies share: the

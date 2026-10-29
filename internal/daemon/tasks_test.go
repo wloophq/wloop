@@ -79,7 +79,7 @@ func newTasksRig(t *testing.T, edit func(*Deps)) *tasksRig {
 		if d.Intents != nil {
 			loaded = func() *intentload.Loaded { return cmp.Or(d.Intents(), bundledLoaded()) }
 		}
-		r.g = coretasks.New(withLens(coretasks.Deps{States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority, Store: db.Tasks(), Items: r.ledger,
+		r.g = coretasks.New(withLens(coretasks.Deps{States: loadedHandlers{taskstest.BundledStates, loaded}, Authority: taskstest.BundledStates.Authority, Store: db.Tasks(), Items: r.ledger,
 			Facts: coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: func() task.Me { return meID }},
 			Me:    meID, Clock: fixedClock(tasksNow), Disabled: disabledOf(enabled), Wakes: db.Wakes(),
 			Activity: func(ctx context.Context, id task.ID) error { return r.wakes.Event(ctx, id, wake.OnActivity, "") }}, loaded, lensFacts(db, loaded, tasksNow)))
@@ -88,6 +88,15 @@ func newTasksRig(t *testing.T, edit func(*Deps)) *tasksRig {
 	stopOnCleanup(t, r.s)
 	return r
 }
+
+// loadedHandlers are the bundled states with the handlers of the loaded profile, which a test's tasks.toml may
+// give another verb.
+type loadedHandlers struct {
+	coretasks.States
+	loaded func() *intentload.Loaded
+}
+
+func (l loadedHandlers) Handler(verb string) string { return l.loaded().Tasks.Handler(verb) }
 
 func disabledOf(enabled func(unit.ProviderID) bool) func() []unit.ProviderID {
 	return func() []unit.ProviderID {

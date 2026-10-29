@@ -20,6 +20,8 @@ import (
 // call: the queue's Facts and Diff of one ref share that call.
 type briefInputs struct {
 	plugin func() (briefReader, error)
+	// calls are the plugin calls in flight, which the Env's stop waits on.
+	calls *sync.WaitGroup
 
 	mu       sync.Mutex
 	inflight map[pr.Ref]*briefRead
@@ -52,8 +54,8 @@ type briefParts struct {
 	DiffError string `json:"diff_error"`
 }
 
-func newBriefInputs(plugin func() (briefReader, error)) *briefInputs {
-	return &briefInputs{plugin: plugin, inflight: map[pr.Ref]*briefRead{}}
+func newBriefInputs(calls *sync.WaitGroup, plugin func() (briefReader, error)) *briefInputs {
+	return &briefInputs{plugin: plugin, calls: calls, inflight: map[pr.Ref]*briefRead{}}
 }
 
 // read is ref's read the other of Facts and Diff left, or a new one.
@@ -66,7 +68,7 @@ func (b *briefInputs) read(ctx context.Context, ref pr.Ref, facts bool) *briefRe
 	if !ok {
 		r = &briefRead{done: make(chan struct{})}
 		b.inflight[ref] = r
-		go b.call(context.WithoutCancel(ctx), ref, r)
+		b.calls.Go(func() { b.call(context.WithoutCancel(ctx), ref, r) })
 	}
 	if facts {
 		r.facts = true

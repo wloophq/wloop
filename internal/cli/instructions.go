@@ -303,10 +303,11 @@ func (e *Env) roundReady() error {
 	return profile.Guides{Tree: e.loadedIntents().Tree}.Check()
 }
 
-// agentClient is a client of the daemon that names, with each call for the
-// calling agent session, the manager that runs it.
+// agentClient is a client of the daemon that names, with each call, the
+// calling agent session and the manager that runs it.
 func (e *Env) agentClient() *client.Client {
 	c := client.New(e.Socket)
 	c.Manager, _ = e.Harness.Manager(e.Getenv)
+	c.Handle = e.sessionHandle()
 	return c
 }

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -88,7 +89,7 @@ func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretas
 			c.Items = append(c.Items, ref.Item)
 		}
 	}
-	d, err := s.writeUserDraft(ctx, c)
+	d, err := s.writeUserDraft(ctx, c, actor)
 	if err != nil {
 		writeTasksError(w, taskDraftError(err))
 		return
@@ -149,7 +150,11 @@ func (s *Server) handleDraftCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	d, err := s.writeUserDraft(ctx, c)
+	actor, ok := requestActor(w, r)
+	if !ok {
+		return
+	}
+	d, err := s.writeUserDraft(ctx, c, actor)
 	if err != nil {
 		writeDraftError(w, err)
 		return
@@ -164,7 +169,10 @@ func (s *Server) handleDraftCreate(w http.ResponseWriter, r *http.Request) {
 
 // writeUserDraft proposes the draft the user wrote, under the wait policy whatever the unit's, and approves its
 // gate right away when c.Send: the same approval and publish path a draft takes from the Outbox.
-func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate) (draft.Draft, error) {
+func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate, actor task.Actor) (draft.Draft, error) {
+	if c.Send && actor != task.ActorPerson {
+		return draft.Draft{}, fmt.Errorf("%w: a draft sent at once is approved by a person, not by %s", gates.ErrRefused, cmp.Or(string(actor), "no one"))
+	}
 	source := turn.Source(c.Source)
 	if source == "" {
 		source = turn.Cockpit
@@ -196,7 +204,7 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate) (draft.D
 		return d, err
 	}
 	s.logf("draft %d sent at once by the user from the %s", d.ID, source)
-	got, err := s.decideDraft(ctx, d, gate.Approved, nil, task.ActorPerson)
+	got, err := s.decideDraft(ctx, d, gate.Approved, nil, actor)
 	if err != nil {
 		return d, fmt.Errorf("draft %d is in the Outbox, not approved: %w", d.ID, err)
 	}

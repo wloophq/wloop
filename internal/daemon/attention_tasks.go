@@ -199,7 +199,8 @@ func (ev *taskViewer) inboxActions(ctx context.Context, e task.Task) []api.Atten
 
 // draftsHeadless says whether e's delegate runs one enabled action that runs headless.
 func (s *Server) draftsHeadless(ctx context.Context, g *coretasks.Service, e task.Task) bool {
-	b, ok := s.bridge(ctx, g, e, task.VerbDelegate)
+	delegate, _ := s.handlerVerb(handlerDelegate)
+	b, ok := s.bridge(ctx, g, e, delegate)
 	if !ok {
 		return false
 	}
@@ -230,7 +231,7 @@ func (ev *taskViewer) asVerbs(e task.Task, row api.Row, acts []api.AttentionActi
 	served := ev.s.servedSpecs()
 	verbOf := map[string]task.Verb{}
 	for _, sp := range served {
-		if v := task.Verb(sp.Verb); slices.Contains(bridged, v) && !ev.g.Handles(e, v) {
+		if v := task.Verb(sp.Verb); slices.Contains(bridged, ev.s.handlerOf(v)) && !ev.g.Handles(e, v) {
 			verbOf[sp.ID] = v
 		}
 	}
@@ -339,10 +340,15 @@ func (s *Server) messageNotice(e task.Task, m dmessage.Message, record int64) (a
 	return api.CategoryInbox, hashToken(strconv.FormatInt(m.ID, 10), m.Text), a
 }
 
-// The handlers of the verbs a notification's buttons run besides a reply.
+// The handlers of the verbs the daemon runs or bridges itself.
 const (
-	handlerDrop    = "drop"
-	handlerApprove = "approve"
+	handlerDrop       = "drop"
+	handlerApprove    = "approve"
+	handlerDelegate   = "delegate"
+	handlerFinish     = "finish"
+	handlerProject    = "project"
+	handlerReviewed   = "reviewed"
+	handlerSequential = "sequential"
 )
 
 // handlerVerb is the verb whose handler is h and its label, as the profile words them; h itself when no verb runs it.

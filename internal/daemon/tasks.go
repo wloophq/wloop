@@ -50,21 +50,25 @@ const syncInputs = port.TopicItems | port.TopicSourceEvents | port.TopicCards
 // their wakes.
 const taskInputs = port.TopicTasks | port.TopicGates | port.TopicWakes | port.TopicDrafts
 
-// bridged are the verbs a task with units runs as its unit's action when no handler takes them.
-var bridged = []task.Verb{task.VerbApprove, task.VerbDelegate, task.VerbDismiss}
+// bridged are the handlers whose verbs a task with units runs as its unit's action when no handler takes them.
+var bridged = []string{handlerApprove, handlerDelegate, handlerDrop}
+
+// handlerOf is the handler the profile gives verb v.
+func (s *Server) handlerOf(v task.Verb) string { return s.loaded().Tasks.Handler(string(v)) }
 
 // aboutUnits says whether e is about its units' conversation: a stored task, not a project.
 func aboutUnits(e task.Task) bool {
 	return !e.IsProject() && e.Origin != task.OriginDraft && e.Origin != task.OriginMessage
 }
 
-// bridges says whether verb on e runs as its first unit's action, a handler aside: every verb of bridged on a
-// task its unit's items made, and delegate on any other task about its units.
-func bridges(e task.Task, verb task.Verb) bool {
-	if len(e.Units) == 0 || !slices.Contains(bridged, verb) {
+// bridges says whether verb on e runs as its first unit's action, a handler aside: every verb of a bridged
+// handler on a task its unit's items made, and the delegate verb on any other task about its units.
+func (s *Server) bridges(e task.Task, verb task.Verb) bool {
+	h := s.handlerOf(verb)
+	if len(e.Units) == 0 || !slices.Contains(bridged, h) {
 		return false
 	}
-	return e.Origin == task.OriginDerived || verb == task.VerbDelegate && aboutUnits(e)
+	return e.Origin == task.OriginDerived || h == handlerDelegate && aboutUnits(e)
 }
 
 var errTasksUnavailable = errors.New("the tasks are not served: the daemon runs without a store")
@@ -258,7 +262,7 @@ func (s *Server) runTaskVerb(w http.ResponseWriter, r *http.Request, verb string
 		return
 	}
 	for _, u := range e.Units {
-		if v != task.VerbDismiss && s.refusePlugin(w, u) {
+		if s.handlerOf(v) != handlerDrop && s.refusePlugin(w, u) {
 			return
 		}
 	}
@@ -407,7 +411,7 @@ func (b bridgeAction) reason() string {
 // bridge is what verb runs on e as its unit's action: ok false when a handler takes the verb or bridges says
 // it does not run as one. A dismiss the row offers no action for is the state change.
 func (s *Server) bridge(ctx context.Context, g *coretasks.Service, e task.Task, verb task.Verb) (bridgeAction, bool) {
-	if !bridges(e, verb) || g.Handles(e, verb) || !s.pluginEnabled(e.Units[0].Provider) {
+	if !s.bridges(e, verb) || g.Handles(e, verb) || !s.pluginEnabled(e.Units[0].Provider) {
 		return bridgeAction{}, false
 	}
 	u := e.Units[0]
@@ -419,7 +423,7 @@ func (s *Server) bridge(ctx context.Context, g *coretasks.Service, e task.Task, 
 	if found {
 		b = s.offeredFor(rd.Row, verb)
 	}
-	if verb == task.VerbDismiss && len(b.top) == 0 {
+	if s.handlerOf(verb) == handlerDrop && len(b.top) == 0 {
 		return bridgeAction{}, false
 	}
 	return b, true
@@ -929,7 +933,7 @@ func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
 		}
 		st := api.VerbState{Verb: name}
 		switch {
-		case off != "" && verb != task.VerbDismiss:
+		case off != "" && ev.s.handlerOf(verb) != handlerDrop:
 			st.Reason = off
 		case ev.resolvesGate(ctx, e, verb):
 			st.Enabled = true
@@ -938,14 +942,14 @@ func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
 		case ev.s.replies(verb):
 			st.Reason = ev.s.replyRefusal(e)
 			st.Enabled = st.Reason == ""
-		case bridges(e, verb) && ev.s.pluginEnabled(e.Units[0].Provider) && (verb != task.VerbDismiss || len(offered(row, verb).top) > 0):
+		case ev.s.bridges(e, verb) && ev.s.pluginEnabled(e.Units[0].Provider) && (ev.s.handlerOf(verb) != handlerDrop || len(offered(row, verb).top) > 0):
 			b := offered(row, verb)
 			b.unit = e.Units[0]
 			var runs api.ActionState
 			runs, st.Enabled = b.runs()
 			if !st.Enabled {
 				st.Reason = b.reason()
-			} else if verb == task.VerbDelegate {
+			} else if ev.s.handlerOf(verb) == handlerDelegate {
 				st.Runners = ev.s.delegateModes(ctx, b.unit, runs.ID)
 			}
 		default:

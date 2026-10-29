@@ -429,6 +429,30 @@ func TestOutboxCLIUsesGates(t *testing.T) {
 	}
 }
 
+func TestAnAgentSessionsShellResolvesNoGate(t *testing.T) {
+	te := newTestEnv(t, &fake.Manager{})
+	db := outboxDaemon(t, te, true)
+	held := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "drop me", State: draft.Held})
+	te.Harness.SessionEnvs["fake"] = fake.SessionEnv{}
+	te.Getenv = func(k string) string {
+		if k == fake.HandleVar {
+			return "term_1"
+		}
+		return ""
+	}
+	if code := te.run("outbox", "discard", "1"); code == 0 {
+		t.Fatalf("an agent's shell discarded a held draft: %s", te.out)
+	}
+	d := te.draftState(t, db, held.ID)
+	if g, ok, err := te.outbox.GateOf(context.Background(), d); err != nil || !ok || g.Status != gate.Open || d.State != draft.Held {
+		t.Fatalf("after an agent's discard: draft %+v, gate %+v %v", d, g, err)
+	}
+	te.Getenv = func(string) string { return "" }
+	if code := te.run("outbox", "discard", "1"); code != 0 || te.draftState(t, db, held.ID).State != draft.Dropped {
+		t.Fatalf("a person's discard: exit %d: %s", code, te.err)
+	}
+}
+
 func TestOutboxCLIFindsDraftVerbsByHandler(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	userProfile(t, te, map[string]string{"tasks.toml": `[verbs.edit]

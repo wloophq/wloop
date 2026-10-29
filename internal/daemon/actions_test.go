@@ -19,7 +19,6 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
-	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/lock"
@@ -529,18 +528,22 @@ func TestQuickActionsSkipTheLoopMutex(t *testing.T) {
 	}
 }
 
+// eventLog is an EventLog in memory.
+type eventLog struct{ events []port.Event }
+
+func (l *eventLog) RecentActivity(context.Context, int) ([]port.Activity, error) { return nil, nil }
+
+func (l *eventLog) RecordEvent(_ context.Context, ev port.Event) error {
+	l.events = append(l.events, ev)
+	return nil
+}
+
 func TestLoopActionsWaitOnTheSharedLoopMutex(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
-		stDB, err := sqlitetest.Open(t.TempDir()+"/inv.db", nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		st := inventory.New(stDB)
-		t.Cleanup(func() { stDB.Close() })
 		var loop lock.Mutex
 		fa := &fakeActions{}
-		s := New(withStore(Deps{Activity: stDB, Actions: fa, LoopMu: &loop, Log: func(string, ...any) {}}, st))
+		s := New(Deps{Actions: fa, LoopMu: &loop, Events: &eventLog{}, Log: func(string, ...any) {}})
 		loop.Lock()
 		unlock := sync.OnceFunc(loop.Unlock)
 		done := make(chan error, 1)

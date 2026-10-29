@@ -151,10 +151,21 @@ func (e *Env) githubPlugin() (*src.Client, error) {
 	return e.pluginKind.Client(string(unit.GitHub))
 }
 
+type identityReader interface {
+	Identity(ctx context.Context) (src.Identity, error)
+}
+
+func (e *Env) viewerReader() (identityReader, error) {
+	if e.identityReader != nil {
+		return e.identityReader()
+	}
+	return e.githubPlugin()
+}
+
 // withGitHubBriefs is d briefing pull requests the GitHub plugin reads,
 // under its budget.
 func (e *Env) withGitHubBriefs(d brief.Deps) brief.Deps {
-	d.Source = newBriefInputs(func() (briefReader, error) {
+	d.Source = newBriefInputs(e.background, func() (briefReader, error) {
 		if e.briefReader != nil {
 			return e.briefReader()
 		}
@@ -515,7 +526,7 @@ func (e *Env) withGitHubBroker(b *psource.Broker, id string, db *sqlite.DB) *pso
 			note(t, units...)
 		}
 		if t&port.TopicViewer != 0 {
-			go e.keepGitHubIdentity(context.Background(), st)
+			e.background.Go(func() { e.keepGitHubIdentity(context.Background(), st) })
 		}
 	}
 	return b
@@ -523,7 +534,7 @@ func (e *Env) withGitHubBroker(b *psource.Broker, id string, db *sqlite.DB) *pso
 
 // keepGitHubIdentity keeps the viewer the running GitHub plugin names in st.
 func (e *Env) keepGitHubIdentity(ctx context.Context, st *inventory.Store) {
-	c, err := e.githubPlugin()
+	c, err := e.viewerReader()
 	if err != nil {
 		return
 	}

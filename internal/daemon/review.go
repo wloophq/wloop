@@ -71,12 +71,13 @@ func (ev *taskViewer) project(ctx context.Context, e task.Task, v *api.TaskView)
 			continue
 		}
 		var err error
+		h := ev.s.handlerOf(verb)
 		switch {
-		case verb == task.VerbProject && e.IsProject():
+		case h == handlerProject && e.IsProject():
 			err = errors.New("a project cannot join a project")
-		case verb == task.VerbProject, e.IsProject() && slices.Contains([]task.Verb{task.VerbDone, task.VerbDismiss, task.VerbReference}, verb):
+		case h == handlerProject, e.IsProject() && slices.Contains([]string{handlerFinish, handlerDrop}, h):
 			err = ev.g.Accepts(e, verb, task.ActorPerson)
-		case e.IsProject() && (verb == task.VerbReviewed || verb == task.VerbSequential) && !e.Open():
+		case e.IsProject() && (h == handlerReviewed || h == handlerSequential) && !e.Open():
 			err = fmt.Errorf("%s on a %s project", verb, e.State)
 		}
 		if err != nil {

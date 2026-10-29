@@ -43,6 +43,9 @@ type Client struct {
 	// Manager names the workspace manager of the agent session the client
 	// calls for, "" when unknown; it goes with every call that names a handle.
 	Manager string
+	// Handle is the agent session handle every call names when it names
+	// none of its own, "" for a person's.
+	Handle string
 }
 
 // DaemonLabel is the launchd label of the daemon's LaunchAgent.
@@ -188,7 +191,7 @@ func (c *Client) Trigger(ctx context.Context, job string) error {
 }
 
 func (c *Client) do(ctx context.Context, timeout time.Duration, method, path string, in, out any) error {
-	return c.doAs(ctx, timeout, "", method, path, in, out)
+	return c.doAs(ctx, timeout, c.Handle, method, path, in, out)
 }
 
 // doAs is do on behalf of the agent session handle, "" for none.

@@ -98,6 +98,6 @@ func (c *Client) Attach(ctx context.Context, handle, id string, req api.AttachRe
 // Chat writes req on task id's chat, as the person: its live session is told, else a turn starts with it.
 func (c *Client) Chat(ctx context.Context, id string, req api.ChatRequest) (api.TaskResult, error) {
 	var res api.TaskResult
-	err := c.doAs(ctx, actionTimeout, "", http.MethodPost, api.TaskPath(id, "chat"), req, &res)
+	err := c.do(ctx, actionTimeout, http.MethodPost, api.TaskPath(id, "chat"), req, &res)
 	return res, err
 }

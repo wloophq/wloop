@@ -200,3 +200,23 @@ func TestDraftCreateRefusesATargetOutsideItsUnit(t *testing.T) {
 		t.Fatalf("drafts %+v", ds)
 	}
 }
+
+func TestAnAgentSessionSendsNoDraftAtOnce(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	r.put(t, unitTask("t-1", task.OriginDerived, r7u))
+	rec := agentCall(t, r.s.Handler(), "POST", api.Drafts, "term_1", `{"unit":{"provider":"github","key":"acme/api#7"},"text":"Done","send":true,"source":"cockpit"}`)
+	if rec.Code != 403 {
+		t.Fatalf("drafts send from a session: %d %s", rec.Code, rec.Body)
+	}
+	rec = agentCall(t, r.s.Handler(), "POST", api.TaskPath("t-1", "reply"), "term_1", `{"source":"cockpit","args":{"text":"Done","send":"now"}}`)
+	if rec.Code != 403 {
+		t.Fatalf("reply now from a session: %d %s", rec.Code, rec.Body)
+	}
+	if ds := r.drafts(t); len(ds) != 0 {
+		t.Fatalf("a session's send left drafts %+v", ds)
+	}
+	if _, _, err := r.o.Send(context.Background()); err != nil || len(r.fx.seen()) != 0 {
+		t.Fatalf("published %v %v", r.fx.seen(), err)
+	}
+}

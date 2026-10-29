@@ -3,6 +3,8 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -150,5 +152,35 @@ func TestTheDraftsRouteDiscardsADisabledPluginsDraft(t *testing.T) {
 	code, got, body := r.act(t, d.ID, "discard", `{}`)
 	if code != 200 || got.State != string(draft.Dropped) {
 		t.Fatalf("discard: %d %s", code, body)
+	}
+}
+
+func TestADisabledPluginsTaskTakesTheVerbWhoseHandlerIsDrop(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	swapped := "[verbs.dismiss]\nhandler = \"finish\"\n\n[verbs.done]\nhandler = \"drop\"\n"
+	if err := os.WriteFile(filepath.Join(dir, "tasks.toml"), []byte(swapped), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cache := cacheOver(t, dir)
+	r := newTasksRig(t, func(d *Deps) {
+		d.Intents = cache.Get
+		d.PluginEnabled = func(p unit.ProviderID) bool { return p != unit.GitHub }
+	})
+	r.put(t, task.Task{ID: "t-gh", State: "inbox", Category: task.CategoryInbox, Title: "reply", Units: []unit.Unit{r7u}})
+	var v api.TaskView
+	if code := get(t, r.s, api.TaskPath("t-gh"), &v); code != 200 {
+		t.Fatalf("GET: %d", code)
+	}
+	for _, vs := range v.Verbs {
+		if vs.Enabled != (vs.Verb == "done") {
+			t.Errorf("%+v", vs)
+		}
+	}
+	if rec := post(t, r.s, api.TaskPath("t-gh", "dismiss"), `{"source":"cockpit"}`); rec.Code != 409 {
+		t.Fatalf("the verb whose handler is finish: %d %s", rec.Code, rec.Body)
+	}
+	if rec := post(t, r.s, api.TaskPath("t-gh", "done"), `{"source":"cockpit"}`); rec.Code != 200 {
+		t.Fatalf("the verb whose handler is drop: %d %s", rec.Code, rec.Body)
 	}
 }
