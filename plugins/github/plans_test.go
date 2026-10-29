@@ -234,6 +234,20 @@ func TestTheBriefRevisionIsTheStoredHeadEditAndFiles(t *testing.T) {
 	}
 }
 
+func TestTheBriefInputLineIsTheProfileLayersTemplate(t *testing.T) {
+	h := &fakeHost{profile: map[string]string{wordingFile: "noun = \"change\"\nthis = \"this change\"\nbrief_input = \"{{.ChangedFiles}} files{{if .Cut}}, partial{{end}}\"\n"}}
+	p := started(t, &githubGraphQL{}, h)
+	ctx := context.Background()
+	in := src.BriefInput{Bytes: 120, Cut: true, Parts: json.RawMessage(`{"changed_files":3}`)}
+	if d, err := p.BriefDescribe(ctx, in); err != nil || d != "3 files, partial" {
+		t.Fatalf("describe %q %v, want the user's template", d, err)
+	}
+	h.profile[wordingFile] = "noun = \"change\"\nthis = \"this change\"\n"
+	if d, err := p.BriefDescribe(ctx, in); err == nil {
+		t.Fatalf("describe %q with no brief_input, want an error", d)
+	}
+}
+
 func TestBriefStaleIsTheQueuesRule(t *testing.T) {
 	p := started(t, &githubGraphQL{}, &fakeHost{})
 	ctx := context.Background()

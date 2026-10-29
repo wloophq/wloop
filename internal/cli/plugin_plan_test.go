@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -36,10 +37,12 @@ type stubPlanner struct {
 	*sourcetest.Stub
 	// unsupported answers every effect with src.ErrUnsupported.
 	unsupported bool
-	mu          sync.Mutex
-	rounds      map[string][]src.Round
-	states      []src.RoundState
-	effects     []src.EffectRequest
+	// fail answers every effect with it, when set.
+	fail    error
+	mu      sync.Mutex
+	rounds  map[string][]src.Round
+	states  []src.RoundState
+	effects []src.EffectRequest
 }
 
 func newStubPlanner(rounds map[string][]src.Round) *stubPlanner {
@@ -64,7 +67,7 @@ func (p *stubPlanner) ApplyEffect(_ context.Context, req src.EffectRequest) erro
 	if p.unsupported {
 		return fmt.Errorf("%w: effect %s", src.ErrUnsupported, req.Effect)
 	}
-	return nil
+	return p.fail
 }
 
 func (p *stubPlanner) Proposals(context.Context, time.Time) ([]src.Draft, error) { return nil, nil }
@@ -254,6 +257,23 @@ func TestAnEffectThePluginDoesNotApplyIsAHealthProblemOfASentTurn(t *testing.T) 
 	}
 	if got := sc.env.effectProblems.list(); len(got) != 0 {
 		t.Fatalf("a turn whose effect applied keeps the problem %q", got)
+	}
+}
+
+func TestAnEffectThatFailsAfterTheSendIsAHealthProblem(t *testing.T) {
+	t.Parallel()
+	sc := followupScenario(t)
+	sc.te.gh.basics = openBasics
+	p := newStubPlanner(nil)
+	p.fail = errors.New("the store is locked")
+	c := sourcetest.Launch(t, string(unit.GitHub), p, src.Host{})
+	sc.env.pluginEffects = func(id unit.ProviderID) (effectApplier, bool) { return c, id == unit.GitHub }
+	launch := turns.Launch{Unit: sc.ref.Unit(), Intent: dturn.Intent(dintent.Review), Trigger: dturn.ByHand}
+	if err := (cliLauncher{sc.env}).Launch(context.Background(), launch); err != nil {
+		t.Fatalf("a turn that went out failed its launch: %v", err)
+	}
+	if got := sc.env.effectProblems.list(); len(got) != 1 || !strings.Contains(got[0], "pr.reviewed") || !strings.Contains(got[0], "the store is locked") {
+		t.Fatalf("health problems %q, want the failed pr.reviewed", got)
 	}
 }
 

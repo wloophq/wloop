@@ -81,6 +81,8 @@ type fakeHost struct {
 	listing src.Listing
 	samples []src.Sample
 	books   []src.Book
+	// profile overrides files of the plugin's profile layer, by path.
+	profile map[string]string
 }
 
 func (h *fakeHost) host() src.Host {
@@ -183,8 +185,11 @@ func (*fakeHost) Config(context.Context) (src.Config, error) {
 	return src.Config{Plugin: json.RawMessage(`{"scope":{"people":["ana"]}}`), Host: json.RawMessage(`{"sweep":{"fast":"2m","slow":"1h"}}`)}, nil
 }
 
-// Profile reads the plugin's own profile layer.
-func (*fakeHost) Profile(_ context.Context, path string) ([]byte, error) {
+// Profile reads the plugin's own profile layer, under h.profile.
+func (h *fakeHost) Profile(_ context.Context, path string) ([]byte, error) {
+	if raw, ok := h.profile[path]; ok {
+		return []byte(raw), nil
+	}
 	return os.ReadFile(filepath.Join("profile", filepath.FromSlash(path)))
 }
 

@@ -153,9 +153,9 @@ func (e *Env) checkEffects(d dintent.Def, u unit.Unit) error {
 
 // applySentEffects applies the turn effects of d once r went out on route
 // rt: the host's sent phase, then, through ApplyEffect, those of the plugin
-// of r's unit. The turn is out whatever they answer: a failed effect is
-// logged, and one its plugin does not apply is a health problem the
-// daemon shows until the next turn of the unit applies it.
+// of r's unit. The turn is out whatever they answer: an effect that fails,
+// or that its plugin does not apply, is a health problem the daemon shows
+// until the next turn of the unit applies it.
 func (e *Env) applySentEffects(ctx context.Context, rt route, d dintent.Def, r *sentRound) {
 	runPhase(rt, d, r, sentPhase)
 	u := r.ref.Unit()
@@ -189,7 +189,7 @@ func (e *Env) applySentEffects(ctx context.Context, rt route, d dintent.Def, r *
 		case errors.Is(err, src.ErrUnsupported):
 			e.effectProblems.set(u, name, fmt.Sprintf("%s: the plugin applies no %s, which the turn that went out names: %v", u.Label(), name, err))
 		case err != nil:
-			e.effectProblems.set(u, name, "")
+			e.effectProblems.set(u, name, fmt.Sprintf("%s: applying %s to the turn that went out: %v", u.Label(), name, err))
 			fmt.Fprintf(e.Err, "warning: %s: applying %s: %v\n", r.ref, name, err)
 		default:
 			e.effectProblems.set(u, name, "")
