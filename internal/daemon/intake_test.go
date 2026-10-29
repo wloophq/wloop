@@ -18,7 +18,6 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
-	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/intake/intaketest"
@@ -313,25 +312,52 @@ func (b *byHandCalls) list() []string {
 	return slices.Clone(b.calls)
 }
 
+// armedTimer is a session wait the test fires: Arm records the wait asked and hands the test its function.
+type armedTimer struct{ armed chan armed }
+
+type armed struct {
+	wait time.Duration
+	fire func()
+}
+
+func (a armedTimer) AfterFunc(d time.Duration, f func()) func() bool {
+	a.armed <- armed{d, f}
+	return func() bool { return true }
+}
+
 func TestTurnByHandWaitsUpToSessionWait(t *testing.T) {
 	t.Parallel()
 	const wait = 100 * time.Millisecond
 	briefs := intaketest.NewBriefs(waitBriefing)
-	s, hand, _ := newClockedByHandServer(t, briefs, wait)
-	start := time.Now()
-	rec := byHandAs(t, s, "term-1", "review")
+	timer := armedTimer{armed: make(chan armed, 1)}
+	hand := &byHandCalls{}
+	s, _ := newIntakeServer(t, briefs, func(d *Deps) {
+		byHandDeps(hand, wait)(d)
+		d.AfterFunc = timer.AfterFunc
+	})
+	done := make(chan *httptest.ResponseRecorder, 1)
+	go func() { done <- byHandAs(t, s, "term-1", "review") }()
+	got := <-timer.armed
+	if got.wait != wait {
+		t.Fatalf("the session wait is %v, want %v", got.wait, wait)
+	}
+	select {
+	case rec := <-done:
+		t.Fatalf("answered before its wait ended: %d %s", rec.Code, rec.Body)
+	default:
+	}
+	got.fire()
+	rec := <-done
 	if rec.Code != 409 || !strings.Contains(rec.Body.String(), "the brief of acme/api#7 is not ready yet (briefing, attempt 1); run this command again in a minute") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
-	}
-	if took := time.Since(start); took < wait {
-		t.Fatalf("answered after %v", took)
 	}
 	if len(hand.list()) != 0 {
 		t.Fatalf("started without its brief: %v", hand.list())
 	}
 	briefs.Answer(intake.Readiness{Go: true})
-	s.sessionWait = brief.SessionWait
-	rec = byHandAs(t, s, "term-1", "review")
+	go func() { done <- byHandAs(t, s, "term-1", "review") }()
+	<-timer.armed
+	rec = <-done
 	var res api.ByHandResult
 	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &res) != nil || res.Text != "the instructions" {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
