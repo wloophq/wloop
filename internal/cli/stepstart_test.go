@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -14,8 +15,10 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -700,5 +703,45 @@ func TestAnyTurnOnAPullRequestSpendsTheDailyCap(t *testing.T) {
 	r.save(t)
 	if refusal := r.check(t, automation.CheckOpts{Observe: false}); refusal != "turns.per_unit_per_day reached (1)" {
 		t.Fatalf("refusal %q; broken %v", refusal, sc.env.loadedIntents().Broken)
+	}
+}
+
+// heldGates are the gates a held round opens, by unit.
+type heldGates struct{ open []gate.Gate }
+
+func (g *heldGates) Open(_ context.Context, gt gate.Gate, p gates.Policy) (gate.Gate, error) {
+	d, err := p.Decide(context.Background(), gt)
+	if err != nil || d.Mode != gate.ModeWait {
+		return gate.Gate{}, fmt.Errorf("a held round's gate decided %+v %v; only a person runs it", d, err)
+	}
+	gt.ID, gt.Status = int64(len(g.open)+1), gate.Open
+	g.open = append(g.open, gt)
+	return gt, nil
+}
+
+func (g *heldGates) Where(_ context.Context, q gates.Query) ([]gate.Gate, error) {
+	return slices.DeleteFunc(slices.Clone(g.open), func(gt gate.Gate) bool { return gt.Kind != q.Kind || gt.Unit != q.Unit }), nil
+}
+
+func TestAHeldRoundIsAPlanGate(t *testing.T) {
+	t.Parallel()
+	sc := followupScenario(t)
+	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
+	hg := &heldGates{}
+	r.steps.d.Gates = hg
+	sc.te.cfg.Turns.PerUnitPerDay = 1
+	st := r.load(t)
+	st.Count(sc.ref.String(), testNow)
+	r.save(t)
+	refusal := r.check(t, automation.CheckOpts{})
+	for range 2 {
+		r.load(t)
+		if err := r.steps.Note(context.Background(), r.st, r.u, r.why, refusal); err != nil {
+			t.Fatal(err)
+		}
+		r.save(t)
+	}
+	if len(hg.open) != 1 || hg.open[0].Kind != gate.KindPlan || hg.open[0].Unit != r.u || hg.open[0].Subject != round.HeldSubject(testNow) {
+		t.Fatalf("the held round's gates %+v, want one plan gate on %s for the day", hg.open, r.u)
 	}
 }

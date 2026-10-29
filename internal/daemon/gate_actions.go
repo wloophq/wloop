@@ -14,6 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -34,8 +35,18 @@ var unblocks = map[bool]delegated{
 }
 
 // Release is a resolved plan gate's consequence: the plan carries it onto
-// the item the gate names, under the loop lock.
+// the item the gate names, under the loop lock; an approved gate of a round
+// the daily cap held runs that round by hand.
 func (s *Server) Release(ctx context.Context, g gate.Gate) error {
+	if _, held := round.HeldDay(g.Subject); held {
+		if g.Status != gate.Approved && g.Status != gate.Answered {
+			return nil
+		}
+		if s.deps.Actions == nil {
+			return errActionsUnavailable
+		}
+		return s.delegate(ctx, runHeld, g.Unit, Call{Guidance: g.Answer, Out: io.Discard})
+	}
 	if s.deps.Plan == nil {
 		return errPlanUnavailable
 	}
@@ -240,4 +251,18 @@ func (s *Server) resolveItemGate(ctx context.Context, g gate.Gate, action, guida
 		r.Answer = guidance
 	}
 	return s.deps.Gates.Resolve(ctx, g.ID, r)
+}
+
+// heldGateOpen says whether the plan gate of u's round the daily cap held is open, so running the round
+// resolves it.
+func (s *Server) heldGateOpen(ctx context.Context, u unit.Unit) bool {
+	if s.deps.GateReader == nil {
+		return false
+	}
+	open, err := s.deps.GateReader.Where(ctx, gates.Query{Kind: gate.KindPlan, Unit: u})
+	if err != nil {
+		s.logf("the gates of %s: %v", u.Label(), err)
+		return false
+	}
+	return slices.ContainsFunc(open, func(g gate.Gate) bool { _, held := round.HeldDay(g.Subject); return held })
 }

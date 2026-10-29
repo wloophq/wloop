@@ -17,6 +17,7 @@ import (
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -145,11 +146,20 @@ func TestTaskVerbLeavesClosingADerivedTaskToItsItems(t *testing.T) {
 	r := newTaskRig(t, nil)
 	at := testNow.Add(-time.Hour)
 	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-02", State: "waiting", Category: task.CategoryWaiting,
-		Title: "Waiting on the reviewer", Origin: task.OriginDerived, Created: at, Updated: at}}}); err != nil {
+		Title: "Waiting on the reviewer", Origin: task.OriginDerived, Items: []task.ItemRef{{Unit: verbPR, Item: "gh:review"}}, Units: []unit.Unit{verbPR},
+		Created: at, Updated: at}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-03", State: "next", Category: task.CategoryReady,
+		Title: "Follow the merged pull request", Origin: task.OriginDerived, Resolved: []task.ItemRef{{Unit: verbPR, Item: "gh:review"}}, Units: []unit.Unit{verbPR},
+		Created: at, Updated: at}}}); err != nil {
 		t.Fatal(err)
 	}
 	s := newStepSet(r.te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: r.te.Rounds})
 	why := workflow.Why{Workflow: "w"}
+	if refusal, err := s.Check(ctx, wfStep("task.verb", "verb", "done"), task.UnitOf("e-03"), why, automation.CheckOpts{}); err != nil || refusal != "" {
+		t.Errorf("done on a derived task whose items all resolved, such as a merged pull request's: %q %v", refusal, err)
+	}
 	for _, v := range []string{"done", "dismiss"} {
 		refusal, err := s.Check(ctx, wfStep("task.verb", "verb", v), task.UnitOf("e-02"), why, automation.CheckOpts{})
 		if err != nil || !strings.Contains(refusal, "closes when its items resolve") {
@@ -175,3 +185,5 @@ func TestTaskVerbRunsOnlyVerbsThatMoveAStoredTask(t *testing.T) {
 		}
 	}
 }
+
+var verbPR = unit.Unit{Provider: unit.GitHub, Key: "acme/api#5"}

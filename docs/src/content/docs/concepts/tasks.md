@@ -20,7 +20,7 @@ A task with a unit of a plugin that is off refuses every verb but Dismiss, with 
 
 An **item** is one thing someone needs from someone inside a unit: a `request`, a `question`, a `decision` or a `todo`. It is open or resolved, and says who asked, who must act next and where it came from.
 
-- The GitHub plugin derives items from what it reads, with no model call: a review requested of you, reviews to address, failing checks, a conflict, a pending or blocked round, an agent that asked.
+- The GitHub plugin derives items from what it reads, with no model call: a review requested of you, reviews to address, failing checks, a conflict, the fix you wait for. A pull request you follow that asks none of these has one item, `gh:follow`, that waits on whoever the pull request waits on: you when its agent waits with no question or a round waits on you, the loop while it works on it, else its author or reviewers, and nobody when it waits on no one but you, such as your own draft; such a task is owed by nobody. A pending, held or blocked round is a gate, never an item.
 - The Slack plugin extracts them from conversations with one model call per unit (see [Slack as a source](/concepts/slack/)).
 
 Once you create or correct an item it is **confirmed**: extraction never overwrites it again. A later extraction that disagrees becomes a proposal in the Inbox, with Accept and Reject.
@@ -28,21 +28,25 @@ Once you create or correct an item it is **confirmed**: extraction never overwri
 ## From items to tasks
 
 - Each open item that waits on you becomes a task in the Inbox; one you requested, or of a unit you care about, that waits on someone else becomes a task in Waiting. An item a task already holds stays with it, so a task you merged keeps its items.
+- A plugin decides how its items group into tasks: each item carries a task key, its own id unless the plugin sets one. Every item of a key is an ask of one task. The GitHub plugin keys every item of a pull request on the pull request, so each pull request you follow is one task, the pull request its first unit, and a situation change (a review, then changes to address, then the merge) changes the task's asks, never the task. A key no task holds that names the unit goes to the unit's own task, the task whose first unit it is, open or not: a done one comes back into Next, marked changed, so an open pull request never gets a second task. A gate on a pull request whose task is done reopens that task too.
+- A pull request's task lives as long as the pull request: it does not close when it asks nothing for a while, such as while the loop works on it. It ends through the bundled `task-results-ended` workflow once the pull request merged or closed, and is dropped when you stop following it (its `unfollowed` property says when); following it again brings it back to Next, marked changed. A pull request task you dropped yourself stays dropped. The bundled `pr-task-clarify` workflow moves a pull request's task that lands in the Inbox to Next, so what it asks of you is in Needs me.
 - A plugin proposes the category a new task starts in (`inbox` or `ready`), never a state name: the task takes the first state of that category in `tasks.toml`. It also gives the task the `kind` its manifest names for its units, such as `thread`; the bundled `task-kind` workflow gives a task you made with no unit the kind `capture`.
 - When the items of a task resolve, the task moves to Done. A task you clarified never comes back to the Inbox: an item that reopens moves a done task back to Next, marked changed, and only marks an open one changed. A task you dropped stays dropped.
 - Closing a thread you started is the `slack-closure` workflow's draft on the thread, once its items resolved; sending it, through its `unit.closed` effect, ends the tasks that hold the thread.
 
 ## Who owes the next step
 
-`owed_by.expr` in `tasks.toml` is an expression over a task's facts whose value is `me`, a person's key, or empty when nobody owes it; it is the fact `task.owed_by`, and the task's `owed_by` on the wire. The bundled one makes it yours when the task has an open gate or an item that waits on you, otherwise whoever its items wait on (`task.link_owes`), otherwise its `owner` property, and yours when it has none:
+`owed_by.expr` in `tasks.toml` is an expression over a task's facts whose value is `me`, a person's key, or empty when nobody owes it; it is the fact `task.owed_by`, and the task's `owed_by` on the wire. The bundled one makes it yours when the task has an open gate or an item that waits on you, otherwise whoever its items wait on (`task.link_owes`), otherwise its `owner` property, nobody when its units have open items and none waits on anyone, such as a quiet pull request you follow, and yours when it has none:
 
 ```toml
 [owed_by]
 expr = '''
+task.gates_open > 0 ? "me" :
 task.category in ["done", "dropped"] ? "" :
-task.gates_open > 0 || "me" in task.link_owes ? "me" :
+"me" in task.link_owes ? "me" :
 size(task.link_owes) > 0 ? task.link_owes[0] :
-task.prop.owner != "" ? task.prop.owner : "me"'''
+task.prop.owner != "" ? task.prop.owner :
+task.items_open > 0 ? "" : "me"'''
 ```
 
 `task.owed_since` is since when: the oldest of its items that wait on whoever owes it, else, for you, its oldest open gate, else the task's creation. `task.check_on` is the task's `check_on` property, else, when the items the task holds wait on someone else and not on you, `tasks.stale_waiting_days` working days after the oldest of them; a gate open on the task, its own nudge's draft included, leaves it as it is. The bundled `slack-stalled-nudge` workflow nudges whoever owes a Slack task once its check date passed, listing every open item that person owes on the thread, one draft per person and thread, at most once per `drafts.repeat_after`: sending it writes `last_nudge` on every task that holds one of the items. The bundled `task-autofocus` workflow stars a task past its due date, and one whose items wait on others past its check date with no nudge since; a star you cleared stays cleared. It marks the stars it sets with the `autostar` property, and `task-autofocus-clear` takes off such a star once neither reason holds; a star you set is never taken off.
@@ -66,7 +70,7 @@ What a turn on a task produces is attached to it, when the turn's intent asks fo
 - With `record.attach_url = true`, a turn that records `done` with an outcome `url` naming a unit, such as a pull request, attaches that unit. The address is resolved by the plugins' units; a branch name never attaches anything.
 - With `drafts.attach_posts = true`, the unit of each post the turn's agent makes, sent at once or once approved, is attached; a draft on the task posted to a channel or a person attaches the thread its post starts. Reactions and edits are not posts.
 
-Each plugin says when one of its units has ended: a pull request merged or closed (`pr.ended`); a Slack unit with a closure posted or marked, or quiet for `plugins.slack.ended_after` (7 days) (`slack.ended`). The bundled workflow `task-results-ended` closes a task you captured, marking it done, once a turn ran on it, such as a start, and it has a unit and every one of them has ended (`task.captured_by_user && task.turns > 0 && task.link_ended`). A task you captured on a pull request to keep track of it, with no turn on the task itself, stays open. It never closes a task derived from items, which its items close.
+Each plugin says when one of its units has ended: a pull request merged or closed (`pr.ended`); a Slack unit with a closure posted or marked, or quiet for `plugins.slack.ended_after` (7 days) (`slack.ended`). The bundled workflow `task-results-ended` marks done a pull request's task, and a task you captured once a turn ran on it, such as a start, when it has a unit and every one of them has ended and no gate waits on you there (`task.link_ended && task.gates_open == 0 && (task.prop.kind == "pull-request" || task.captured_by_user && task.turns > 0)`): a pull request's task that also holds a thread still open stays open. A task a gate opens on a unit no task holds takes the kind the unit's plugin gives its tasks, so a gate on a pull request with no task, such as a merged one, makes it the pull request's task, out of the Inbox. A task you captured on a pull request to keep track of it, with no turn on the task itself, stays open. No workflow closes a derived task while it holds an item that calls for it.
 
 ## The timeline and the records
 

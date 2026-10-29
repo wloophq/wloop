@@ -91,7 +91,7 @@ func wireItem(it items.Item) src.Item {
 		Assignees: wirePeople(it.Assignees), AssignedAt: wireAnchor(it.AssignedAt), Basis: string(it.Basis),
 		WaitingOn: wirePeople(it.WaitingOn), State: string(it.State), Resolution: string(it.Resolution),
 		Evidence: wireEvidence(it.Evidence), Confidence: string(it.Confidence), Ambiguity: it.Ambiguity,
-		Provenance: string(it.Provenance), Confirmed: it.Confirmed, UserAt: it.UserAt, CreatedAt: it.CreatedAt, UpdatedAt: it.UpdatedAt}
+		Provenance: string(it.Provenance), Confirmed: it.Confirmed, TaskKey: it.TaskKey, UserAt: it.UserAt, CreatedAt: it.CreatedAt, UpdatedAt: it.UpdatedAt}
 	for _, e := range it.Trail {
 		out.Trail = append(out.Trail, wireEvidence(e))
 	}
@@ -148,7 +148,7 @@ func ItemOf(w src.Item) items.Item {
 		Initial: items.Initial(w.Category), Origin: anchorOf(w.Origin), Requester: personOf(w.Requester), Assignees: peopleOf(w.Assignees),
 		AssignedAt: anchorOf(w.AssignedAt), Basis: items.Basis(w.Basis), WaitingOn: peopleOf(w.WaitingOn), State: items.State(w.State),
 		Resolution: items.Resolution(w.Resolution), Evidence: evidenceOf(w.Evidence), Confidence: items.Confidence(w.Confidence),
-		Ambiguity: w.Ambiguity, Provenance: items.Provenance(w.Provenance), Confirmed: w.Confirmed, UserAt: w.UserAt,
+		Ambiguity: w.Ambiguity, Provenance: items.Provenance(w.Provenance), Confirmed: w.Confirmed, TaskKey: w.TaskKey, UserAt: w.UserAt,
 		CreatedAt: w.CreatedAt, UpdatedAt: w.UpdatedAt}
 	for _, e := range w.Trail {
 		out.Trail = append(out.Trail, evidenceOf(e))

@@ -231,6 +231,13 @@ func (g gateTasks) Open(ctx context.Context, r coretasks.OpenRequest) (task.Task
 	return g.e.tasks.Open(ctx, r)
 }
 
+func (g gateTasks) ReopenOwn(ctx context.Context, u unit.Unit) (task.ID, bool, error) {
+	if g.e.tasks == nil {
+		return "", false, errNoTasksService
+	}
+	return g.e.tasks.ReopenOwn(ctx, u)
+}
+
 // openGates are the daemon's gates as the views read them, none before
 // serve built them.
 type openGates struct{ e *Env }

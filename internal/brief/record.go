@@ -68,6 +68,40 @@ func (r *Records) ProjectHeld(ctx context.Context, u unit.Unit, data []byte, w t
 	return r.Project(ctx, ids, data, w)
 }
 
+// ProjectUnheld sets, on every task holding u that holds none of the properties u's brief record data sets,
+// those properties as w wrote them: a task that starts holding a briefed pull request takes its brief's
+// properties once, and a value already there, a person's included, stays.
+func (r *Records) ProjectUnheld(ctx context.Context, u unit.Unit, data []byte, w task.Writer) error {
+	if r == nil || r.Projection == nil {
+		return nil
+	}
+	reader, ok := r.Props.(interface {
+		PropsOf(ctx context.Context, id task.ID) (task.Props, error)
+	})
+	if !ok {
+		return nil
+	}
+	ids, err := r.Holders.TasksHolding(ctx, u)
+	if err != nil {
+		return err
+	}
+	props := r.Projection().Props(data, w)
+	var fresh []task.ID
+	for _, id := range ids {
+		have, err := reader.PropsOf(ctx, id)
+		if errors.Is(err, coretasks.ErrNoTask) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if !slices.ContainsFunc(slices.Collect(maps.Keys(props)), func(name string) bool { _, set := have[name]; return set }) {
+			fresh = append(fresh, id)
+		}
+	}
+	return r.Project(ctx, fresh, data, w)
+}
+
 // Project sets, on each task of ids, the properties data sets as w wrote
 // it; a task gone since is skipped.
 func (r *Records) Project(ctx context.Context, ids []task.ID, data []byte, w task.Writer) error {

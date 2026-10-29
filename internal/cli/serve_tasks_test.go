@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"net"
 	"net/http"
@@ -24,9 +25,13 @@ import (
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/daemon"
+	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	roverlay "github.com/wloophq/wloop/internal/readmodel/overlay"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/situation"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -175,25 +180,41 @@ func TestEveryNeedsMeRowHasAnInboxOrNextTask(t *testing.T) {
 	t.Logf("%d needs-me, %d asked rows of %d", needs, questions, len(cases))
 }
 
-func TestCardOnlyRowsHaveNoTask(t *testing.T) {
+// TestEveryFollowedPRHasOneTask derives every situation's row through the real ledger and Sync: each open
+// pull request the user follows, or that needs them, has exactly one task, with the pull request as its first
+// unit and every item it derived as its asks.
+func TestEveryFollowedPRHasOneTask(t *testing.T) {
 	t.Parallel()
 	cases := ghsourcetest.Cases()
 	r := newDerivedRig(t, cases)
-	seen := map[string]int{}
+	followed, quiet := 0, 0
 	for _, c := range cases {
-		if r.asked[c.Row.Unit] || len(ghsource.ItemsOf(c.Row, c.Report)) > 0 {
+		es := r.tasks(t, c.Row.Unit)
+		if len(es) > 1 {
+			t.Errorf("%s has %d tasks: %+v", c.Name, len(es), es)
 			continue
 		}
-		base, _, _ := strings.Cut(c.Name, "/")
-		seen[base]++
-		if es := r.tasks(t, c.Row.Unit); len(es) != 0 {
-			t.Errorf("%s derives no item, has entries %+v", c.Name, es)
+		open := situation.Kind(c.Row.Kind) != situation.KindDone
+		if !open || !prrow.InScope(c.Row) && !prrow.NeedsMe(c.Row) {
+			continue
+		}
+		followed++
+		if len(es) != 1 || !es[0].Open() || es[0].Units[0] != c.Row.Unit {
+			t.Errorf("%s (%s): tasks %+v", c.Name, c.Row.Kind, es)
+			continue
+		}
+		its := ghsource.ItemsOf(c.Row, c.Report)
+		for _, it := range its {
+			if !slices.Contains(es[0].Items, task.ItemRef{Unit: c.Row.Unit, Item: it.ID}) {
+				t.Errorf("%s: the task holds %+v, not %s", c.Name, es[0].Items, it.ID)
+			}
+		}
+		if !slices.ContainsFunc(its, func(it items.Item) bool { return it.ID != "gh:follow" }) {
+			quiet++
 		}
 	}
-	for _, base := range []string{"loop_working", "draft", "approved_by_viewer"} {
-		if seen[base] == 0 {
-			t.Errorf("no %s row derives nothing: %v", base, seen)
-		}
+	if followed == 0 || quiet == 0 {
+		t.Fatalf("%d followed rows, %d of them asking nothing", followed, quiet)
 	}
 }
 
@@ -320,5 +341,176 @@ func TestDisabledPluginTasksRefuseOnARealServe(t *testing.T) {
 	}
 	if code, body := socketDo(t, te.Socket, http.MethodPost, api.TasksPath, `{"title":"call the bank"}`); code != 200 {
 		t.Errorf("a plain capture: %d %s", code, body)
+	}
+}
+
+// prLife derives one pull request's situations in turn through the real ledger and Sync, as the cards job
+// and the tasks worker do.
+type prLife struct {
+	t      *testing.T
+	db     *sqlite.DB
+	svc    *coretasks.Service
+	ledger *coreitems.Ledger
+	rev    int
+}
+
+func newPRLife(t *testing.T) *prLife {
+	t.Helper()
+	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	clock := clockFunc(func() time.Time { return ghsourcetest.Now })
+	me := task.Me{Keys: []string{"github:" + ghsourcetest.Viewer}}
+	l := &coreitems.Ledger{Store: db.Items(), Clock: clock}
+	svc := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: db.Tasks(), Items: l, Me: me, Clock: clock,
+		Facts: coretasks.CardFacts{Cards: db.Cards(), Me: func() task.Me { return me }}})
+	return &prLife{t: t, db: db, svc: svc, ledger: l}
+}
+
+// derive stores s's card and items and syncs its unit; it returns the items and the unit's tasks.
+func (l *prLife) derive(s ghsourcetest.Situation) ([]items.Item, []task.Task) {
+	l.t.Helper()
+	ctx := context.Background()
+	row, rep := ghsourcetest.DeriveReport(s)
+	cd, err := ghsource.CardOf(row, rep)
+	if err != nil {
+		l.t.Fatal(err)
+	}
+	if _, err := l.db.Cards().Save(ctx, cd, ghsourcetest.Now); err != nil {
+		l.t.Fatal(err)
+	}
+	l.rev++
+	its := ghsource.ItemsOf(row, rep)
+	if _, err := l.ledger.Reconcile(ctx, row.Unit, its, unit.Anchor{Unit: row.Unit, Ref: "row:" + strconv.Itoa(l.rev)}, cmp.Or(cd.Outcome, items.Superseded)); err != nil {
+		l.t.Fatal(err)
+	}
+	if err := l.svc.Sync(ctx, []unit.Unit{row.Unit}); err != nil {
+		l.t.Fatal(err)
+	}
+	es, err := l.db.Tasks().TasksOf(ctx, row.Unit)
+	if err != nil {
+		l.t.Fatal(err)
+	}
+	return its, es
+}
+
+func TestASituationChangeKeepsTheSameTask(t *testing.T) {
+	t.Parallel()
+	l := newPRLife(t)
+	s := ghsourcetest.Situation{PR: ghsourcetest.Open(900, ghsourcetest.Other)}
+	s.PR.ReviewRequests = []string{ghsourcetest.Viewer}
+	s.Events = []dinv.Event{ghsourcetest.Event(900, dinv.KindReviewRequest, ghsourcetest.Other, ghsourcetest.Now.Add(-3*time.Hour), ghsourcetest.Viewer)}
+	_, es := l.derive(s)
+	if len(es) != 1 || !es[0].Open() {
+		t.Fatalf("the review request's tasks %+v", es)
+	}
+	id := es[0].ID
+	steps := []struct {
+		name string
+		edit func(*ghsourcetest.Situation)
+		want string
+	}{
+		{"the loop reviews it", func(s *ghsourcetest.Situation) {
+			s.PR.Workspace = ghsourcetest.ReviewWorkspace
+			s.Turn = &prrow.TurnFact{Facts: roverlay.Turn{Intent: "review", Role: "pr.review", State: "started", At: ghsourcetest.Now.Add(-time.Minute)}, Session: "s1"}
+		}, "gh:follow"},
+		{"the viewer asked for changes", func(s *ghsourcetest.Situation) {
+			s.Turn, s.PR.ReviewRequests = nil, nil
+			s.Events = append(s.Events, ghsourcetest.Event(900, dinv.KindReview, ghsourcetest.Viewer, ghsourcetest.Now.Add(-time.Hour), "CHANGES_REQUESTED:h1"))
+		}, "gh:fix"},
+		{"it merged", func(s *ghsourcetest.Situation) {
+			s.PR.State, s.PR.MergedAt = "MERGED", ghsourcetest.Now
+			s.Events = append(s.Events, ghsourcetest.Event(900, dinv.KindMerged, ghsourcetest.Other, ghsourcetest.Now, ""))
+		}, ""},
+	}
+	for _, st := range steps {
+		st.edit(&s)
+		its, es := l.derive(s)
+		if len(es) != 1 || es[0].ID != id || !es[0].Open() {
+			t.Fatalf("%s: tasks %+v, want the one open task %s", st.name, es, id)
+		}
+		if st.want == "" {
+			if len(its) != 0 || len(es[0].Items) != 0 {
+				t.Fatalf("%s: items %+v, task holds %+v", st.name, its, es[0].Items)
+			}
+			continue
+		}
+		if len(its) != 1 || its[0].ID != st.want || !slices.Equal(es[0].Items, []task.ItemRef{{Unit: s.PR.Ref.Unit(), Item: st.want}}) {
+			t.Fatalf("%s: items %+v, task holds %+v, want %s", st.name, its, es[0].Items, st.want)
+		}
+	}
+}
+
+func TestAPendingRoundIsAPlanGateNotAnItem(t *testing.T) {
+	t.Parallel()
+	for _, c := range ghsourcetest.Cases() {
+		k := situation.Kind(c.Row.Kind)
+		if k != situation.KindRoundPending && k != situation.KindHeldByCap && k != situation.KindBlocked && c.Row.Pending == nil {
+			continue
+		}
+		for _, it := range ghsource.ItemsOf(c.Row, c.Report) {
+			if it.ID == "gh:round" || it.ID == "gh:blocked" || strings.HasPrefix(it.ID, "gh:held") || it.ID == "gh:wait" {
+				t.Errorf("%s: %s is an item", c.Name, it.ID)
+			}
+		}
+	}
+	l := newPRLife(t)
+	s := ghsourcetest.Situation{PR: ghsourcetest.Open(901, ghsourcetest.Other)}
+	s.PR.ReviewRequests, s.PR.Workspace = []string{ghsourcetest.Viewer}, ghsourcetest.ReviewWorkspace
+	_, before := l.derive(s)
+	s.Pending = &round.Pending{Intent: "review", Reason: "new push", Since: ghsourcetest.Now.Add(-time.Minute), Deadline: ghsourcetest.Now.Add(4 * time.Minute)}
+	its, after := l.derive(s)
+	if len(before) != 1 || len(after) != 1 || after[0].ID != before[0].ID || !slices.Equal(after[0].Items, before[0].Items) {
+		t.Fatalf("before the round %+v, pending %+v", before, after)
+	}
+	if len(its) != 1 || its[0].ID != "gh:review" {
+		t.Fatalf("the pending round's items %+v", its)
+	}
+}
+
+func TestUntrackingAPRDropsItsTask(t *testing.T) {
+	t.Parallel()
+	l := newPRLife(t)
+	s := ghsourcetest.Situation{PR: ghsourcetest.Open(902, ghsourcetest.Other)}
+	s.PR.Reasons, s.Override.Tracked = nil, true
+	_, es := l.derive(s)
+	if len(es) != 1 || !es[0].Open() {
+		t.Fatalf("the tracked pull request's tasks %+v", es)
+	}
+	id := es[0].ID
+	s.Override.Tracked = false
+	_, es = l.derive(s)
+	if len(es) != 1 || es[0].ID != id || es[0].Category != task.CategoryDropped {
+		t.Fatalf("after untracking: %+v, want %s dropped", es, id)
+	}
+}
+
+func TestRefollowingAPRReopensItsTask(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	l := newPRLife(t)
+	s := ghsourcetest.Situation{PR: ghsourcetest.Open(903, ghsourcetest.Other)}
+	s.PR.Reasons, s.Override.Tracked = nil, true
+	_, es := l.derive(s)
+	id := es[0].ID
+	s.Override.Tracked = false
+	l.derive(s)
+	s.Override.Tracked = true
+	_, es = l.derive(s)
+	if len(es) != 1 || es[0].ID != id || !es[0].Open() || !es[0].Changed {
+		t.Fatalf("followed again: %+v, want %s open and changed", es, id)
+	}
+	e := es[0]
+	e.State, e.Category = "trash", task.CategoryDropped
+	if err := l.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e, Why: "dismissed"}}); err != nil {
+		t.Fatal(err)
+	}
+	s.Override.Tracked = false
+	l.derive(s)
+	s.Override.Tracked = true
+	if _, es = l.derive(s); len(es) != 1 || es[0].Category != task.CategoryDropped {
+		t.Fatalf("a task the person dropped while following: %+v, want it dropped", es)
 	}
 }

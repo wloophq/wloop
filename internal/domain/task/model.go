@@ -73,6 +73,7 @@ type UnitFacts struct {
 	StartedByMe   bool
 	ClosurePosted bool
 	Cares         bool      // followed/watched by the user, or the user's own unit
+	Carded        bool      // the unit's card is stored, so Cares says what its plugin reported
 	LastHuman     time.Time // newest human event not by the user (card.LastHuman when !Who.Is(Me))
 	// Kind is the value of the kind property the unit's plugin gives the tasks of its units, such as thread;
 	// "" gives none.

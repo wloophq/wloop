@@ -118,7 +118,8 @@ func (r recorder) PutBrief(ctx context.Context, b src.Brief) error {
 
 // TasksHolding gives each task that holds items of one of the units and has no brief record yet, such as one
 // reconcile made after the plugin wrote the unit's brief, the unit's plugin brief with the asks of the items
-// it holds, as PutBrief does.
+// it holds, as PutBrief does. A unit's brief the host wrote, such as a pull request's, stays the unit's: a
+// task that starts holding the unit takes its properties alone (brief.Records.ProjectUnheld).
 func (b *Broker) TasksHolding(ctx context.Context, units []unit.Unit) error {
 	if b.Briefs == nil || b.Now == nil || len(units) == 0 {
 		return nil
@@ -131,7 +132,11 @@ func (b *Broker) TasksHolding(ctx context.Context, units []unit.Unit) error {
 	var errs []error
 	for _, u := range units {
 		rec, ok := unitBriefs[u]
-		if !ok || rec.Actor != string(task.WriterPlugin) {
+		if !ok {
+			continue
+		}
+		if rec.Actor != string(task.WriterPlugin) {
+			errs = append(errs, b.BriefRecords.ProjectUnheld(ctx, u, []byte(rec.Data), task.Writer(rec.Actor)))
 			continue
 		}
 		held, err := b.Briefs.ItemsHeld(ctx, u)

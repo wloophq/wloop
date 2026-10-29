@@ -111,7 +111,8 @@
           ],
           "state": "open",
           "confidence": "high",
-          "provenance": "derived"
+          "provenance": "derived",
+          "task_key": "github:acme/api#1"
         }
       ],
       "facts": [
@@ -428,7 +429,8 @@
           ],
           "state": "open",
           "confidence": "high",
-          "provenance": "derived"
+          "provenance": "derived",
+          "task_key": "github:acme/api#2"
         }
       ],
       "facts": [
@@ -704,6 +706,52 @@
         "turns_link": "#unit=github/acme/api#3",
         "cares": true
       },
+      "items": [
+        {
+          "id": "gh:follow",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#3"
+          },
+          "kind": "todo",
+          "summary": "Follow acme/api#3: change bob",
+          "urls": [
+            "https://github.com/acme/api/pull/3"
+          ],
+          "contexts": [
+            "@repo-api"
+          ],
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#3"
+            },
+            "ref": "situation:review",
+            "permalink": "https://github.com/acme/api/pull/3"
+          },
+          "requester": {
+            "key": "github:me-login",
+            "name": "me-login"
+          },
+          "assignees": [
+            {
+              "key": "github:carol",
+              "name": "carol"
+            }
+          ],
+          "basis": "none",
+          "waiting_on": [
+            {
+              "key": "github:carol",
+              "name": "carol"
+            }
+          ],
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived",
+          "task_key": "github:acme/api#3"
+        }
+      ],
       "facts": [
         {
           "name": "pr.repo",
@@ -1020,7 +1068,8 @@
           ],
           "state": "open",
           "confidence": "high",
-          "provenance": "derived"
+          "provenance": "derived",
+          "task_key": "github:acme/api#4"
         }
       ],
       "facts": [
@@ -1297,6 +1346,40 @@
         "started_by_me": true,
         "cares": true
       },
+      "items": [
+        {
+          "id": "gh:follow",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#5"
+          },
+          "kind": "todo",
+          "summary": "Follow acme/api#5: change me-login",
+          "urls": [
+            "https://github.com/acme/api/pull/5"
+          ],
+          "contexts": [
+            "@repo-api"
+          ],
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#5"
+            },
+            "ref": "situation:draft",
+            "permalink": "https://github.com/acme/api/pull/5"
+          },
+          "requester": {
+            "key": "github:me-login",
+            "name": "me-login"
+          },
+          "basis": "none",
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived",
+          "task_key": "github:acme/api#5"
+        }
+      ],
       "facts": [
         {
           "name": "pr.repo",
@@ -1627,7 +1710,8 @@
           ],
           "state": "open",
           "confidence": "high",
-          "provenance": "derived"
+          "provenance": "derived",
+          "task_key": "github:acme/api#6"
         }
       ],
       "facts": [
@@ -1983,7 +2067,8 @@
           ],
           "state": "open",
           "confidence": "high",
-          "provenance": "derived"
+          "provenance": "derived",
+          "task_key": "github:acme/api#7"
         }
       ],
       "facts": [
@@ -2330,7 +2415,8 @@
           ],
           "state": "open",
           "confidence": "high",
-          "provenance": "derived"
+          "provenance": "derived",
+          "task_key": "github:acme/api#8"
         }
       ],
       "facts": [
@@ -2659,7 +2745,8 @@
           ],
           "state": "open",
           "confidence": "high",
-          "provenance": "derived"
+          "provenance": "derived",
+          "task_key": "github:acme/api#9"
         }
       ],
       "facts": [
@@ -2988,7 +3075,8 @@
           ],
           "state": "open",
           "confidence": "high",
-          "provenance": "derived"
+          "provenance": "derived",
+          "task_key": "github:acme/api#10"
         }
       ],
       "facts": [
@@ -3283,6 +3371,52 @@
         "turns_link": "#unit=github/acme/api#11",
         "cares": true
       },
+      "items": [
+        {
+          "id": "gh:follow",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#11"
+          },
+          "kind": "todo",
+          "summary": "Follow acme/api#11: change ana",
+          "urls": [
+            "https://github.com/acme/api/pull/11"
+          ],
+          "contexts": [
+            "@repo-api"
+          ],
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#11"
+            },
+            "ref": "situation:no_reviewer",
+            "permalink": "https://github.com/acme/api/pull/11"
+          },
+          "requester": {
+            "key": "github:me-login",
+            "name": "me-login"
+          },
+          "assignees": [
+            {
+              "key": "github:ana",
+              "name": "ana"
+            }
+          ],
+          "basis": "none",
+          "waiting_on": [
+            {
+              "key": "github:ana",
+              "name": "ana"
+            }
+          ],
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived",
+          "task_key": "github:acme/api#11"
+        }
+      ],
       "facts": [
         {
           "name": "pr.repo",
@@ -4074,20 +4208,19 @@
       },
       "items": [
         {
-          "id": "gh:held:2026-10-14",
+          "id": "gh:follow",
           "unit": {
             "provider": "github",
             "key": "acme/api#18"
           },
-          "kind": "decision",
-          "summary": "Decide the held round on acme/api#18: change ana",
+          "kind": "todo",
+          "summary": "Follow acme/api#18: change ana",
           "urls": [
             "https://github.com/acme/api/pull/18"
           ],
           "contexts": [
-            "@decide"
+            "@repo-api"
           ],
-          "category": "inbox",
           "origin": {
             "unit": {
               "provider": "github",
@@ -4097,8 +4230,8 @@
             "permalink": "https://github.com/acme/api/pull/18"
           },
           "requester": {
-            "key": "system:the loop",
-            "name": "the loop"
+            "key": "github:me-login",
+            "name": "me-login"
           },
           "assignees": [
             {
@@ -4115,7 +4248,8 @@
           ],
           "state": "open",
           "confidence": "high",
-          "provenance": "derived"
+          "provenance": "derived",
+          "task_key": "github:acme/api#18"
         }
       ],
       "facts": [
@@ -4386,20 +4520,19 @@
       },
       "items": [
         {
-          "id": "gh:blocked",
+          "id": "gh:follow",
           "unit": {
             "provider": "github",
             "key": "acme/api#19"
           },
-          "kind": "decision",
-          "summary": "Unblock the round on acme/api#19: change ana",
+          "kind": "todo",
+          "summary": "Follow acme/api#19: change ana",
           "urls": [
             "https://github.com/acme/api/pull/19"
           ],
           "contexts": [
-            "@decide"
+            "@repo-api"
           ],
-          "category": "inbox",
           "origin": {
             "unit": {
               "provider": "github",
@@ -4409,8 +4542,8 @@
             "permalink": "https://github.com/acme/api/pull/19"
           },
           "requester": {
-            "key": "system:the loop",
-            "name": "the loop"
+            "key": "github:me-login",
+            "name": "me-login"
           },
           "assignees": [
             {
@@ -4427,7 +4560,8 @@
           ],
           "state": "open",
           "confidence": "high",
-          "provenance": "derived"
+          "provenance": "derived",
+          "task_key": "github:acme/api#19"
         }
       ],
       "facts": [
@@ -4738,7 +4872,8 @@
           ],
           "state": "open",
           "confidence": "high",
-          "provenance": "derived"
+          "provenance": "derived",
+          "task_key": "github:acme/api#20"
         }
       ],
       "facts": [
@@ -5014,20 +5149,19 @@
       },
       "items": [
         {
-          "id": "gh:wait",
+          "id": "gh:follow",
           "unit": {
             "provider": "github",
             "key": "acme/api#25"
           },
           "kind": "todo",
-          "summary": "Answer the agent on acme/api#25: change ana",
+          "summary": "Follow acme/api#25: change ana",
           "urls": [
             "https://github.com/acme/api/pull/25"
           ],
           "contexts": [
-            "@agent"
+            "@repo-api"
           ],
-          "category": "inbox",
           "origin": {
             "unit": {
               "provider": "github",
@@ -5037,8 +5171,8 @@
             "permalink": "https://github.com/acme/api/pull/25"
           },
           "requester": {
-            "key": "system:the loop",
-            "name": "the loop"
+            "key": "github:me-login",
+            "name": "me-login"
           },
           "assignees": [
             {
@@ -5055,7 +5189,8 @@
           ],
           "state": "open",
           "confidence": "high",
-          "provenance": "derived"
+          "provenance": "derived",
+          "task_key": "github:acme/api#25"
         }
       ],
       "facts": [
@@ -5336,6 +5471,52 @@
         "turns_link": "#unit=github/acme/api#26",
         "cares": true
       },
+      "items": [
+        {
+          "id": "gh:follow",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#26"
+          },
+          "kind": "todo",
+          "summary": "Follow acme/api#26: change ana",
+          "urls": [
+            "https://github.com/acme/api/pull/26"
+          ],
+          "contexts": [
+            "@repo-api"
+          ],
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#26"
+            },
+            "ref": "situation:review",
+            "permalink": "https://github.com/acme/api/pull/26"
+          },
+          "requester": {
+            "key": "github:me-login",
+            "name": "me-login"
+          },
+          "assignees": [
+            {
+              "key": "github:carol",
+              "name": "carol"
+            }
+          ],
+          "basis": "none",
+          "waiting_on": [
+            {
+              "key": "github:carol",
+              "name": "carol"
+            }
+          ],
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived",
+          "task_key": "github:acme/api#26"
+        }
+      ],
       "facts": [
         {
           "name": "pr.repo",
@@ -5616,6 +5797,52 @@
         "turns_link": "#unit=github/acme/api#27",
         "cares": true
       },
+      "items": [
+        {
+          "id": "gh:follow",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#27"
+          },
+          "kind": "todo",
+          "summary": "Follow acme/api#27: change bob",
+          "urls": [
+            "https://github.com/acme/api/pull/27"
+          ],
+          "contexts": [
+            "@repo-api"
+          ],
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#27"
+            },
+            "ref": "situation:no_reviewer",
+            "permalink": "https://github.com/acme/api/pull/27"
+          },
+          "requester": {
+            "key": "github:me-login",
+            "name": "me-login"
+          },
+          "assignees": [
+            {
+              "key": "github:bob",
+              "name": "bob"
+            }
+          ],
+          "basis": "none",
+          "waiting_on": [
+            {
+              "key": "github:bob",
+              "name": "bob"
+            }
+          ],
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived",
+          "task_key": "github:acme/api#27"
+        }
+      ],
       "facts": [
         {
           "name": "pr.repo",
@@ -5893,6 +6120,52 @@
         "turns_link": "#unit=github/acme/api#28",
         "cares": true
       },
+      "items": [
+        {
+          "id": "gh:follow",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#28"
+          },
+          "kind": "todo",
+          "summary": "Follow acme/api#28: change ana",
+          "urls": [
+            "https://github.com/acme/api/pull/28"
+          ],
+          "contexts": [
+            "@repo-api"
+          ],
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#28"
+            },
+            "ref": "situation:merge",
+            "permalink": "https://github.com/acme/api/pull/28"
+          },
+          "requester": {
+            "key": "github:me-login",
+            "name": "me-login"
+          },
+          "assignees": [
+            {
+              "key": "github:ana",
+              "name": "ana"
+            }
+          ],
+          "basis": "none",
+          "waiting_on": [
+            {
+              "key": "github:ana",
+              "name": "ana"
+            }
+          ],
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived",
+          "task_key": "github:acme/api#28"
+        }
+      ],
       "facts": [
         {
           "name": "pr.repo",
@@ -6229,7 +6502,8 @@
           ],
           "state": "open",
           "confidence": "high",
-          "provenance": "derived"
+          "provenance": "derived",
+          "task_key": "github:acme/api#31"
         }
       ],
       "facts": [

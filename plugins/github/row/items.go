@@ -1,21 +1,18 @@
 package row
 
 import (
+	"slices"
 	"strings"
-	"time"
 
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/github/pr"
 	"github.com/wloophq/wloop/plugins/github/situation"
 )
 
-// The ids of the items whose tasks carry a notification, which the host
-// keys its notices by.
-const (
-	ItemHeld    = "gh:held"
-	ItemBlocked = "gh:blocked"
-	ItemWait    = "gh:wait"
-)
+// ItemFollow is the item of a followed pull request that asks nothing
+// else: it waits on whoever the pull request waits on, or on the loop, so
+// the pull request keeps its one task.
+const ItemFollow = "gh:follow"
 
 // The fields of a derived item.
 const (
@@ -27,20 +24,29 @@ const (
 	contextDecide, contextAgent, contextRepoStart = "@decide", "@agent", "@repo-"
 )
 
-// Items are the pull request's items from its source row: what waits on
-// the viewer when the row needs them or is the viewer's own to merge,
-// staff or answer, and what waits on others in scope.
+// Items are the pull request's items from its source row, every one keyed
+// on the pull request so they are the asks of its one task: what waits on
+// the viewer when the row needs them or is the viewer's own to merge, staff
+// or answer, what waits on others in scope, and otherwise, while the pull
+// request is open and followed, ItemFollow. A held or blocked round asks
+// through its gate, never an item.
 func (r Row) Items() []src.Item {
-	if r.Payload.Viewer == "" {
+	if r.Payload.Viewer == "" || r.Kind() == situation.KindDone {
 		return nil
 	}
+	out := r.asks()
+	if len(out) == 0 && (r.InScope() || r.needsMe()) {
+		out = []src.Item{r.followItem()}
+	}
+	for i := range out {
+		out[i].TaskKey = r.taskKey()
+	}
+	return out
+}
+
+func (r Row) asks() []src.Item {
 	switch r.Kind() {
-	case situation.KindLoopWaiting:
-		if r.needsMe() {
-			return []src.Item{r.waitItem()}
-		}
-		return nil
-	case situation.KindDone, situation.KindLoopWorking:
+	case situation.KindLoopWaiting, situation.KindLoopWorking, situation.KindHeldByCap, situation.KindBlocked:
 		return nil
 	}
 	if r.needsMe() || r.ownNext() {
@@ -53,6 +59,12 @@ func (r Row) Items() []src.Item {
 		return []src.Item{it}
 	}
 	return nil
+}
+
+// TaskKey is the key every item of the pull request carries: its unit.
+func (r Row) taskKey() string {
+	u := r.PR.Ref.Unit()
+	return u.Provider + ":" + u.Key
 }
 
 func (r Row) needsMe() bool { return NeedsMe(r.Kind(), r.Situation.WaitingOn, r.Payload) }
@@ -71,12 +83,6 @@ func (r Row) viewerItem() src.Item {
 	it := r.item(kindTodo, categoryInbox, r.repoContext())
 	it.Requester, it.Assignees, it.WaitingOn, it.Basis = Person(p.Author), []src.Person{viewer}, []src.Person{viewer}, basisNone
 	switch {
-	case kind == situation.KindHeldByCap:
-		it.ID, it.Kind, it.Contexts, it.Requester = HeldID(r.Situation.Since), kindDecision, []string{contextDecide}, r.loop()
-		it.Summary = r.summary("Decide the held round on")
-	case kind == situation.KindBlocked:
-		it.ID, it.Kind, it.Contexts, it.Requester = ItemBlocked, kindDecision, []string{contextDecide}, r.loop()
-		it.Summary = r.summary("Unblock the round on")
 	case mine && kind == situation.KindReply:
 		it.ID, it.Kind, it.Category, it.Basis = "gh:review", kindRequest, categoryReady, basisSelf
 		it.Summary = r.summary("Answer the review on")
@@ -100,14 +106,24 @@ func (r Row) viewerItem() src.Item {
 	return it
 }
 
-// waitItem is an agent that waits on the viewer with no question the loop
-// holds, such as a permission prompt; a question is the turn's Inbox
-// message, which the host drops it for.
-func (r Row) waitItem() src.Item {
+// followItem waits on the viewer when the pull request needs them, such as
+// an agent waiting with no question the loop holds or a round its gate
+// holds; on the loop while it works on it; otherwise on whoever else the
+// pull request waits on, and on nobody when that is no one, such as the
+// viewer's own draft.
+func (r Row) followItem() src.Item {
+	it := r.item(kindTodo, "", r.repoContext())
+	it.ID, it.Requester, it.Basis = ItemFollow, Person(r.Payload.Viewer), basisNone
 	viewer := Person(r.Payload.Viewer)
-	it := r.item(kindTodo, categoryInbox, []string{contextAgent})
-	it.ID, it.Requester, it.Assignees, it.WaitingOn, it.Basis = ItemWait, r.loop(), []src.Person{viewer}, []src.Person{viewer}, basisNone
-	it.Summary = r.summary("Answer the agent on")
+	on := slices.DeleteFunc(People(r.Situation.WaitingOn, r.Payload), func(p src.Person) bool { return p.Key == viewer.Key })
+	switch {
+	case r.needsMe():
+		on = []src.Person{viewer}
+	case r.Kind() == situation.KindLoopWorking:
+		on = []src.Person{r.loop()}
+	}
+	it.Assignees, it.WaitingOn = on, on
+	it.Summary = r.summary("Follow")
 	return it
 }
 
@@ -179,15 +195,6 @@ func (r Row) repoContext() []string {
 }
 
 func (r Row) loop() src.Person { return src.Person{Key: "system:" + r.in.Loop, Name: r.in.Loop} }
-
-// HeldID names a hold by its local day, the day the situation counts holds
-// in, so the next day's hold is a new decision.
-func HeldID(since time.Time) string {
-	if since.IsZero() {
-		return ItemHeld
-	}
-	return ItemHeld + ":" + since.Local().Format(time.DateOnly)
-}
 
 func (r Row) summary(verb string) string {
 	s := verb + " " + r.PR.Ref.String()

@@ -78,10 +78,13 @@ func (ev *taskViewer) notice(ctx context.Context, e task.Task) *api.Attention {
 	if !ev.s.unitsEnabled(e.Units) {
 		return nil
 	}
-	if _, gated := ev.message(ctx, e); e.Category != task.CategoryInbox && !gated {
-		return nil
+	cat, token, a, ok := ev.unitNotice(ctx, e)
+	if !ok {
+		if _, gated := ev.message(ctx, e); e.Category != task.CategoryInbox && !gated {
+			return nil
+		}
+		cat, token, a, ok = ev.inboxNotice(ctx, e)
 	}
-	cat, token, a, ok := ev.inboxNotice(ctx, e)
 	if !ok {
 		return nil
 	}
@@ -100,10 +103,64 @@ func (s *Server) unitsEnabled(units []unit.Unit) bool {
 
 func verbAction(v task.Verb) string { return api.TaskActionPrefix + string(v) }
 
-// inboxNotice is what an Inbox task notifies; ok is false when it notifies nothing. A question's message and
-// a task derived from a pull request's items notify only through the row's notice, when the task is the one
-// that notice stands for (the question's message, the derived item of a round, a hold, a block or a waiting
-// agent), so they notify what the row did and only once. Any other task notifies what it says of itself.
+// unitNotice is what the own task of a unit the read model serves notifies while it is open and not deferred,
+// which a mute holds: the unit's row notice, keyed on the task and on the gate the notice stands for (the
+// round's plan gate, the block's trust gate, the question's record), so the task notifies what the row did
+// and only once. ok is false when the task's first unit is not served, or its row notifies nothing.
+func (ev *taskViewer) unitNotice(ctx context.Context, e task.Task) (api.Category, string, api.Attention, bool) {
+	n, row, served, ok := ev.rowNotice(ctx, e)
+	if !served || !ok || !e.Open() || e.Category == task.CategoryDeferred || !ev.unitsOwn(ctx, e) {
+		return "", "", api.Attention{}, false
+	}
+	if n.Question {
+		if m, isMsg := ev.message(ctx, e); !isMsg || m.Kind != dmessage.Question || ev.recordOf(ctx, m) != n.Record {
+			return "", "", api.Attention{}, false
+		}
+		return api.QuestionCategory(n.Record), n.Token, n.Attention, true
+	}
+	a := n.Attention
+	a.Actions = ev.asVerbs(e, row, a.Actions)
+	token := n.Token
+	if g, ok := ev.openGate(ctx, e, n.Gate); ok {
+		token = "g" + strconv.FormatInt(int64(g.ID), 10)
+	}
+	if n.Held {
+		return api.CategoryHeld, token, a, true
+	}
+	return api.CategoryInbox, token, a, true
+}
+
+// unitsOwn says whether e is its first unit's own task (task.UnitTask), the one task its row's notice stands
+// for.
+func (ev *taskViewer) unitsOwn(ctx context.Context, e task.Task) bool {
+	ts, err := ev.g.TasksOf(ctx, e.Units[0])
+	if err != nil {
+		ev.s.logf("notifications: the tasks of %s: %v", e.Units[0].Label(), err)
+		return false
+	}
+	own, ok := task.UnitTask(ts, e.Units[0])
+	return ok && own.ID == e.ID
+}
+
+// openGate is e's oldest open gate of kind k; false when k is empty or none is open.
+func (ev *taskViewer) openGate(ctx context.Context, e task.Task, k gate.Kind) (gate.Gate, bool) {
+	if k == "" || ev.s.deps.GateReader == nil {
+		return gate.Gate{}, false
+	}
+	gs, err := ev.s.deps.GateReader.OfTask(ctx, e.ID)
+	if err != nil {
+		ev.s.logf("notifications: the gates of %s: %v", e.ID, err)
+		return gate.Gate{}, false
+	}
+	i := slices.IndexFunc(gs, func(g gate.Gate) bool { return g.Status == gate.Open && g.Kind == k })
+	if i < 0 {
+		return gate.Gate{}, false
+	}
+	return gs[i], true
+}
+
+// inboxNotice is what an Inbox task no row notice stands for notifies; ok is false when it notifies nothing. A
+// question's message, and a task derived from a unit the read model serves, notify only through the row.
 func (ev *taskViewer) inboxNotice(ctx context.Context, e task.Task) (api.Category, string, api.Attention, bool) {
 	m, isMsg := ev.message(ctx, e)
 	question := isMsg && m.Kind == dmessage.Question
@@ -111,20 +168,10 @@ func (ev *taskViewer) inboxNotice(ctx context.Context, e task.Task) (api.Categor
 	if question {
 		record = ev.recordOf(ctx, m)
 	}
-	n, row, served, ok := ev.rowNotice(ctx, e)
-	switch {
-	case ok && n.Question && question && n.Record == record:
-		return api.QuestionCategory(record), n.Token, n.Attention, true
-	case ok && !n.Question && e.Origin == task.OriginDerived && holdsItem(e, n.Item):
-		a := n.Attention
-		a.Actions = ev.asVerbs(e, row, a.Actions)
-		if n.Held {
-			return api.CategoryHeld, n.Token, a, true
-		}
-		return api.CategoryInbox, n.Token, a, true
-	case served && (question || e.Origin == task.OriginDerived):
+	if _, _, served, _ := ev.rowNotice(ctx, e); served && (question || e.Origin == task.OriginDerived) {
 		return "", "", api.Attention{}, false
-	case isMsg:
+	}
+	if isMsg {
 		cat, token, a := ev.s.messageNotice(e, m, record)
 		return cat, token, a, true
 	}
@@ -175,10 +222,6 @@ func (ev *taskViewer) rowNotice(ctx context.Context, e task.Task) (n readmodel.N
 	}
 	n, ok = rd.Notice()
 	return n, rd.Row, true, ok
-}
-
-func holdsItem(e task.Task, prefix string) bool {
-	return prefix != "" && slices.ContainsFunc(e.Items, func(r task.ItemRef) bool { return strings.HasPrefix(r.Item, prefix) })
 }
 
 // asVerbs names an action the task's verb runs, as the bridge would pick it, by that verb: the task's

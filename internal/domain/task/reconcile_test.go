@@ -299,3 +299,83 @@ func TestAnItemProposesACategory(t *testing.T) {
 		t.Fatal("a state name as the proposed category was taken")
 	}
 }
+
+func keyed(it *items.Item) { it.TaskKey = pr.String() }
+
+func TestItemsOfOneTaskKeyAreOneTask(t *testing.T) {
+	cared := facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true })
+	es := reconcile(t, cared, []items.Item{item("gh:review", keyed), item("gh:fix", keyed, owedBy(ana))}, nil, now)
+	e := only(t, es)
+	if e.ID != task.DerivedID(pr, pr.String()) || len(e.Items) != 2 || e.Units[0] != pr {
+		t.Fatalf("one task per key: %+v", e)
+	}
+	es = reconcile(t, cared, []items.Item{item("gh:review", keyed, resolved), item("gh:fix", keyed, resolved), item("gh:merge", keyed)}, es, now)
+	if e := only(t, es); e.ID != task.DerivedID(pr, pr.String()) || !e.Open() || len(e.Items) != 1 {
+		t.Fatalf("a new situation joins the task holding the key: %+v", e)
+	}
+	es = reconcile(t, cared, []items.Item{item("gh:merge", keyed, resolved)}, es, now)
+	if e := only(t, es); !e.Open() || len(e.Items) != 0 {
+		t.Fatalf("a unit's task outlives its asks: %+v", e)
+	}
+	es = reconcile(t, facts(func(f *task.UnitFacts) { f.Carded = true }), []items.Item{item("gh:merge", keyed, resolved)}, es, now)
+	if e := only(t, es); e.Category != task.CategoryDropped {
+		t.Fatalf("a unit no longer followed drops its task: %+v", e)
+	}
+}
+
+func TestAKeyNoTaskHoldsGoesToTheUnitsOwnTask(t *testing.T) {
+	own := task.Task{ID: "t-00000000000000a1", State: "next", Category: task.CategoryReady, Title: "Follow acme/api#7", Units: []unit.Unit{pr},
+		Origin: task.OriginDerived, Created: now.Add(-time.Hour)}
+	es := reconcile(t, facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true }), []items.Item{item("gh:review", keyed)}, []task.Task{own}, now)
+	if e := only(t, es); e.ID != own.ID || len(e.Items) != 1 {
+		t.Fatalf("the unit's own task takes its key: %+v", es)
+	}
+	if es := reconcile(t, facts(), nil, []task.Task{own}, now); only(t, es).Category != task.CategoryReady {
+		t.Fatalf("a task with no item is never resolved for lack of items: %+v", es)
+	}
+}
+
+func TestAnOpenPRsDoneTaskTakesItsItemsBack(t *testing.T) {
+	done := task.Task{ID: "t-00000000000000a2", State: "done", Category: task.CategoryDone, Title: "Review acme/api#7", Units: []unit.Unit{pr},
+		Origin: task.OriginDerived, Created: now.Add(-48 * time.Hour), Updated: now.Add(-24 * time.Hour)}
+	es := reconcile(t, facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true }), []items.Item{item("gh:follow", keyed, owedBy(ana))}, []task.Task{done}, now)
+	if e := only(t, es); e.ID != done.ID || e.Category != task.CategoryReady || !e.Changed || len(e.Items) != 1 {
+		t.Fatalf("an open pull request whose task is done: %+v", es)
+	}
+}
+
+func TestFollowingAUnitAgainReopensTheTaskReconcileDropped(t *testing.T) {
+	cared := facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true })
+	es := reconcile(t, cared, []items.Item{item("gh:follow", keyed, owedBy(ana))}, nil, now)
+	es = reconcile(t, facts(func(f *task.UnitFacts) { f.Carded = true }), []items.Item{item("gh:follow", keyed, owedBy(ana), resolved)}, es, now)
+	if e := only(t, es); e.Category != task.CategoryDropped {
+		t.Fatalf("untracked: %+v", e)
+	}
+	es = reconcile(t, cared, []items.Item{item("gh:follow", keyed, owedBy(ana))}, es, now)
+	if e := only(t, es); e.Category != task.CategoryReady || !e.Changed || !e.Prop(task.PropUnfollowed).Time.IsZero() {
+		t.Fatalf("followed again: %+v", e)
+	}
+	dropped := only(t, es)
+	dropped.State, dropped.Category = "trash", task.CategoryDropped
+	if e := only(t, reconcile(t, cared, []items.Item{item("gh:follow", keyed, owedBy(ana))}, []task.Task{dropped}, now)); e.Category != task.CategoryDropped {
+		t.Fatalf("a task the person dropped came back: %+v", e)
+	}
+}
+
+func TestAQuietUnitKeepsItsTaskOwedByNobody(t *testing.T) {
+	quiet := item("gh:follow", keyed, func(it *items.Item) { it.WaitingOn, it.Requester = nil, meP })
+	e := only(t, reconcile(t, facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true }), []items.Item{quiet}, nil, now))
+	if e.Category != task.CategoryWaiting || len(e.Items) != 1 {
+		t.Fatalf("a quiet followed unit's task %+v", e)
+	}
+}
+
+func TestAKeyGoesToTheOpenTaskThatLinksItsUnit(t *testing.T) {
+	thread := unit.Unit{Provider: "slack", Key: "T1/C1/1.1"}
+	start := task.Task{ID: "t-00000000000000a3", State: "next", Category: task.CategoryReady, Title: "Ship the export",
+		Units: []unit.Unit{thread, pr}, Origin: task.OriginUser, Created: now.Add(-time.Hour)}
+	es := reconcile(t, facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true }), []items.Item{item("gh:follow", keyed, owedBy(ana))}, []task.Task{start}, now)
+	if e := only(t, es); e.ID != start.ID || len(e.Items) != 1 {
+		t.Fatalf("a task holding the pull request as a link: %+v", es)
+	}
+}

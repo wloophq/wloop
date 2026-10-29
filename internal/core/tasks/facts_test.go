@@ -45,7 +45,7 @@ func TestFactsFromCard(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("%v %v", ok, err)
 	}
-	want := task.UnitFacts{Unit: unitU, StartedByMe: true, ClosurePosted: true, Cares: true, LastHuman: t0.Add(-time.Hour)}
+	want := task.UnitFacts{Unit: unitU, StartedByMe: true, ClosurePosted: true, Cares: true, Carded: true, LastHuman: t0.Add(-time.Hour)}
 	if got != want {
 		t.Fatalf("got %+v, want %+v", got, want)
 	}

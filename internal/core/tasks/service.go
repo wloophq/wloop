@@ -14,6 +14,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/wake"
@@ -520,22 +521,34 @@ func (s *Service) Capture(ctx context.Context, title, notes string, u *unit.Unit
 	if strings.TrimSpace(title) == "" {
 		return task.Task{}, fmt.Errorf("%w: a capture needs a title", ErrArgs)
 	}
-	return s.create(ctx, title, notes, u, task.OriginUser, nil)
+	return s.create(ctx, title, notes, u, task.OriginUser, nil, "")
 }
 
-// Open creates a task another service owns the content of, such as a gate's: Inbox, random id. Its kind is
-// left to the profile.
+// Open creates a task another service owns the content of, such as a gate's: Inbox, random id. A task on a
+// unit takes the kind its plugin gives its units' tasks (UnitFacts.Kind), as the plugin writes it, so the
+// profile's rules for that kind apply to it; any other's kind is left to the profile.
 func (s *Service) Open(ctx context.Context, r OpenRequest) (task.Task, error) {
-	return s.create(ctx, r.Title, "", r.Unit, cmp.Or(r.Origin, task.OriginMessage), r.Contexts)
+	var kind string
+	if r.Unit != nil && !r.Unit.IsZero() && s.d.Facts != nil {
+		f, ok, err := s.d.Facts.UnitFacts(ctx, *r.Unit)
+		if err != nil {
+			return task.Task{}, err
+		}
+		if ok {
+			kind = f.Kind
+		}
+	}
+	return s.create(ctx, r.Title, "", r.Unit, cmp.Or(r.Origin, task.OriginMessage), r.Contexts, kind)
 }
 
-func (s *Service) create(ctx context.Context, title, notes string, u *unit.Unit, origin string, contexts []string) (task.Task, error) {
+func (s *Service) create(ctx context.Context, title, notes string, u *unit.Unit, origin string, contexts []string, kind string) (task.Task, error) {
 	now := s.now()
 	e := task.Task{ID: task.NewID(), Title: title, Notes: notes, Origin: origin, Created: now, Updated: now}
 	if err := e.MoveTo(task.CategoryInbox, s.d.States); err != nil {
 		return task.Task{}, err
 	}
 	e.SetRole(s.d.States, task.RoleContexts, task.Value{List: slices.Clone(contexts)}, task.WriterPlugin, now)
+	e.SetProp(task.PropKind, task.Value{Text: kind}, task.WriterPlugin, now)
 	if u != nil && !u.IsZero() {
 		e.Units = []unit.Unit{*u}
 	}
@@ -739,6 +752,36 @@ func (s *Service) Attach(ctx context.Context, id task.ID, u unit.Unit) error {
 	}
 	e.Units, e.Updated = append(slices.Clone(e.Units), u), s.now()
 	return s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e, Why: "attached " + u.String()}})
+}
+
+// TasksOf are the stored tasks that hold u or one of its items.
+func (s *Service) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
+	return s.d.Store.TasksOf(ctx, u)
+}
+
+// ReopenOwn is u's own task when u's items key on u (task.UnitTask), moved back into the ready category,
+// Changed, when it is done; ok is false when u's items key on no unit task or no task holds it. A dropped
+// task stays dropped.
+func (s *Service) ReopenOwn(ctx context.Context, u unit.Unit) (task.ID, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	its, err := s.d.Items.Items(ctx, u)
+	if err != nil || !slices.ContainsFunc(its, func(it items.Item) bool { return it.TaskKey == u.String() }) {
+		return "", false, err
+	}
+	ts, err := s.d.Store.TasksOf(ctx, u)
+	if err != nil {
+		return "", false, err
+	}
+	e, ok := task.UnitTask(ts, u)
+	if !ok || e.Category != task.CategoryDone {
+		return e.ID, ok, nil
+	}
+	if err := e.MoveTo(task.CategoryReady, s.d.States); err != nil {
+		return "", false, err
+	}
+	e.Changed, e.Updated = true, s.now()
+	return e.ID, true, s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e, Why: "a gate opened on " + u.String()}})
 }
 
 // UnitClosed ends the open tasks that hold u, its closure posted: each moves into the done category.

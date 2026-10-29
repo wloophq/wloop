@@ -129,12 +129,18 @@ type    = "date"
 writers = ["person", "workflow"]
 doc     = "When to check on the task while it waits."
 
+[props.unfollowed]
+type    = "date"
+writers = ["plugin"]
+doc     = "When the task of a unit you stopped following was dropped; following the unit again brings it back."
+
 # Who owes a task's next step: an expression over the task's facts whose
 # value is me, a person's key, or empty when nobody does; it is the fact
 # task.owed_by. Here an open gate makes it yours, even on a closed task;
 # otherwise nobody owes a closed task; otherwise an item that waits on
-# you; otherwise whoever its items wait on; otherwise its owner, and you
-# when it has none.
+# you; otherwise whoever its items wait on; otherwise its owner; nobody
+# when its units' open items wait on no one, such as a quiet pull request;
+# and you when it has none.
 
 [owed_by]
 expr = '''
@@ -142,7 +148,8 @@ task.gates_open > 0 ? "me" :
 task.category in ["done", "dropped"] ? "" :
 "me" in task.link_owes ? "me" :
 size(task.link_owes) > 0 ? task.link_owes[0] :
-task.prop.owner != "" ? task.prop.owner : "me"'''
+task.prop.owner != "" ? task.prop.owner :
+task.items_open > 0 ? "" : "me"'''
 
 # The verbs. A verb's label is its button; its summary, one line on what
 # pressing it does, is the button's tooltip; input is the question a verb
