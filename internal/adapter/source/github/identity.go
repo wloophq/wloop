@@ -17,8 +17,8 @@ type viewerStore interface {
 	Viewer(ctx context.Context, provider unit.ProviderID) (string, error)
 }
 
-// identity is the user as GitHub knows them: the stored viewer login.
-func identity(st viewerStore) func(context.Context) (items.Person, error) {
+// IdentityOf is the user as GitHub knows them: the stored viewer login.
+func IdentityOf(st viewerStore) func(context.Context) (items.Person, error) {
 	return func(ctx context.Context) (items.Person, error) {
 		login, err := st.Viewer(ctx, unit.GitHub)
 		if err != nil {

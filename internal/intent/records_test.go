@@ -105,17 +105,21 @@ func TestRequiresWithoutMissingIsAProblem(t *testing.T) {
 }
 
 func TestEveryBundledIntentThatRequiresARecordNamesItsGate(t *testing.T) {
-	entries, err := os.ReadDir("../../profiles/default/intents")
+	files, err := filepath.Glob("../../profiles/default/intents/*/intent.toml")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, e := range entries {
-		b, err := os.ReadFile(filepath.Join("../../profiles/default/intents", e.Name(), "intent.toml"))
+	ofPlugins, err := filepath.Glob("../../plugins/*/profile/intents/*/intent.toml")
+	if err != nil || len(ofPlugins) == 0 {
+		t.Fatalf("%v %v", ofPlugins, err)
+	}
+	for _, f := range append(files, ofPlugins...) {
+		b, err := os.ReadFile(f)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if strings.Contains(string(b), "\nrequires") && !strings.Contains(string(b), "\nmissing") {
-			t.Errorf("%s requires a record and names no gate", e.Name())
+			t.Errorf("%s requires a record and names no gate", f)
 		}
 	}
 }

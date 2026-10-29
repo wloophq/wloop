@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
@@ -68,7 +70,7 @@ func startDaemon(t *testing.T, actions daemon.Actions) *testDaemon {
 	st := inventory.New(stDB)
 	t.Cleanup(func() { stDB.Close() })
 	ctx := context.Background()
-	if err := st.UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h2",
+	if err := inventorytest.Of(st).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h2",
 		ReviewRequests: []string{"me"}, Reasons: []string{"review-requested"}, URL: r7.URL()}); err != nil {
 		t.Fatal(err)
 	}

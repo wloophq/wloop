@@ -2,11 +2,14 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
@@ -20,6 +23,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // newLiveServer is a server over a store seeded at live size, with the
@@ -39,6 +43,7 @@ func newLiveServer(t *testing.T) (*Server, *storetest.Fixture) {
 		Log:      func(string, ...any) {},
 		Turns:    &turns.Service{Intents: turnstest.Intents(), Store: f.Turns, Registry: f.Turns, Sessions: sessions, Clock: fixedClock(now)},
 		Sessions: sessions, Agents: snapshotOf(sessions), Items: &coreitems.Ledger{Store: f.DB.Items()}, Cards: f.DB.Cards()}, f.Inventory)
+	githubOf(&d).View = func(context.Context, src.ViewRequest) (json.RawMessage, error) { return json.RawMessage(`[]`), nil }
 	s := New(d)
 	s.token = ""
 	stopOnCleanup(t, s)
@@ -54,7 +59,7 @@ func TestGetPathWritesNothing(t *testing.T) {
 	s, f := newLiveServer(t)
 	ctx := context.Background()
 	ref := f.Open[0]
-	if err := f.Inventory.SetOverride(ctx, dinv.Override{PR: ref, MuteUntilStateChange: true, MutedKind: "gone", MutedWaitingOn: "nobody"}); err != nil {
+	if err := inventorytest.Of(f.Inventory).SetOverride(ctx, dinv.Override{PR: ref, MuteUntilStateChange: true, MutedKind: "gone", MutedWaitingOn: "nobody"}); err != nil {
 		t.Fatal(err)
 	}
 	fill := strings.NewReplacer("{provider}", string(unit.GitHub), "{key}", url.PathEscape(ref.String()), "{seq}", "1")
@@ -135,7 +140,7 @@ func TestChangedSituationsOneTx(t *testing.T) {
 	before := map[string]int{}
 	for _, ref := range refs {
 		before[ref.String()] = len(situationsOf(t, s, ref))
-		if err := f.Inventory.SetOverride(ctx, dinv.Override{PR: ref, MutedUntil: f.Now.Add(time.Hour)}); err != nil {
+		if err := inventorytest.Of(f.Inventory).SetOverride(ctx, dinv.Override{PR: ref, MutedUntil: f.Now.Add(time.Hour)}); err != nil {
 			t.Fatal(err)
 		}
 	}

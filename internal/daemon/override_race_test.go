@@ -5,6 +5,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/core/port"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/github"
@@ -17,7 +19,7 @@ func TestMuteExpiryAndTakeOverKeepBothWrites(t *testing.T) {
 	for n := 1; n <= 100; n++ {
 		ref := github.Ref{Owner: "acme", Repo: "api", Number: n}
 		muted := dinv.Override{PR: ref, MuteUntilStateChange: true, MutedKind: "waiting", MutedWaitingOn: "alice"}
-		if err := s.store().SetOverride(ctx, muted); err != nil {
+		if err := inventorytest.Of(s.store()).SetOverride(ctx, muted); err != nil {
 			t.Fatal(err)
 		}
 		var wg sync.WaitGroup
@@ -32,7 +34,7 @@ func TestMuteExpiryAndTakeOverKeepBothWrites(t *testing.T) {
 		}()
 		go func() {
 			defer wg.Done()
-			if err := s.store().SetAdopted(ctx, ref); err != nil {
+			if err := inventorytest.Of(s.store()).SetAdopted(ctx, ref); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -53,7 +55,7 @@ func TestOverrideActionAndTakeOverKeepBothWrites(t *testing.T) {
 	ctx := context.Background()
 	for n := 1; n <= 100; n++ {
 		ref := github.Ref{Owner: "acme", Repo: "api", Number: n}
-		if err := s.store().SetOverride(ctx, dinv.Override{PR: ref, Tracked: true}); err != nil {
+		if err := inventorytest.Of(s.store()).SetOverride(ctx, dinv.Override{PR: ref, Tracked: true}); err != nil {
 			t.Fatal(err)
 		}
 		var wg sync.WaitGroup
@@ -66,7 +68,7 @@ func TestOverrideActionAndTakeOverKeepBothWrites(t *testing.T) {
 		}()
 		go func() {
 			defer wg.Done()
-			if err := s.store().SetAdopted(ctx, ref); err != nil {
+			if err := inventorytest.Of(s.store()).SetAdopted(ctx, ref); err != nil {
 				t.Error(err)
 			}
 		}()

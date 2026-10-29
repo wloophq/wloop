@@ -10,7 +10,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
-	"github.com/wloophq/wloop/internal/source"
 )
 
 // wireSubjects wires the task subject's facts provider over the store, and
@@ -30,7 +29,7 @@ func (e *Env) wireSubjects(w *serveWiring) {
 		}
 	}
 	for _, p := range e.sourcePlugins() {
-		if !slices.ContainsFunc(w.Modules, func(m source.Module) bool { return m.ID == p.ID && m.Facts != nil }) {
+		if !slices.ContainsFunc(w.Modules, func(m pluginModule) bool { return m.ID == p.ID && m.Facts != nil }) {
 			w.Engine.Subjects[p.ID] = noUnits{}
 		}
 	}

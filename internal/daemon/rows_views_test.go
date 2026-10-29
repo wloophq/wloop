@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel"
-	"github.com/wloophq/wloop/internal/readmodel/prrow"
 )
 
 // viewRows are threadRows in a view of their own.
@@ -58,7 +59,7 @@ func TestRowsServeAPluginView(t *testing.T) {
 		t.Fatalf("catalog: %d", code)
 	}
 	web := cat.ViewsOn("web")
-	n := len(prrow.ViewSpecs())
+	n := len(psource.BundledCatalog(string(unit.GitHub)).Views())
 	if len(web) != n+2 || web[n].ID != "threads" || web[n+1].ID != "board" || web[0].Provider != "github" {
 		t.Fatalf("web views %+v", web)
 	}

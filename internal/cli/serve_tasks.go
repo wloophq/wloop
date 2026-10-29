@@ -18,7 +18,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/source"
 )
 
 // newTasks is the daemon's one entries service, built on first use; its unit facts come from the stored cards.
@@ -87,7 +86,7 @@ func offProviders(cfg config.Config, built *[]unit.ProviderID) []unit.ProviderID
 
 // serveTasks serves the entries on d: the user's identity from every built module's Identity, and the units a
 // full Sync covers. The daemon's Sync worker also runs under --no-jobs, since it only reads and writes the store.
-func (e *Env) serveTasks(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []source.Module, logf func(string, ...any)) daemon.Deps {
+func (e *Env) serveTasks(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []pluginModule, logf func(string, ...any)) daemon.Deps {
 	ledger := e.itemsLedger(db, cfg, logf)
 	g := e.newTasks(db, cfg, ledger)
 	var off []unit.ProviderID
@@ -114,7 +113,7 @@ func (e *Env) serveTasks(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods [
 
 // meOf is the user over every module with an Identity: each one's key and aliases. A module that cannot say
 // yet is left out and named in the error.
-func meOf(ctx context.Context, mods []source.Module) (task.Me, error) {
+func meOf(ctx context.Context, mods []pluginModule) (task.Me, error) {
 	var me task.Me
 	var errs []error
 	var codecs []unit.Codec

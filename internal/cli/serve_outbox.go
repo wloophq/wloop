@@ -15,14 +15,13 @@ import (
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
-	"github.com/wloophq/wloop/internal/source"
 )
 
 // serveOutbox serves the drafts on d: published by each built module's Publisher, pinned to their turn's unit,
 // approved by the manifests' policies, their evidence written to the items ledger, their effects applied once
 // each is sent. The sender runs only with
 // jobs, so serve --no-jobs publishes nothing.
-func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []source.Module, logf func(string, ...any)) daemon.Deps {
+func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []pluginModule, logf func(string, ...any)) daemon.Deps {
 	ledger := e.itemsLedger(db, cfg, logf)
 	pin := outboxManifests{loaded: e.loadedIntents, books: envBooks{e}}
 	pubs := map[unit.ProviderID]port.Effects{}

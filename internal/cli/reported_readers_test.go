@@ -6,7 +6,8 @@ import (
 	"slices"
 	"testing"
 
-	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	wt "github.com/wloophq/wloop/internal/core/workspaces/workspacestest"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -17,7 +18,6 @@ import (
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
-	"github.com/wloophq/wloop/internal/source"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	ghplugin "github.com/wloophq/wloop/plugins/github"
 )
@@ -55,7 +55,7 @@ func reportAgainstHostCopy(t *testing.T, te *testEnv, reported dinv.PR, copy *di
 		t.Fatal(err)
 	}
 	if copy != nil {
-		if err := te.Store.UpsertPR(ctx, *copy); err != nil {
+		if err := inventorytest.Of(te.Store).UpsertPR(ctx, *copy); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -123,7 +123,7 @@ func TestTheGitHubFactsListThePullRequestsThePluginReported(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, nil)
 	reportAgainstHostCopy(t, te, dinv.PR{Ref: reportedRef, Author: "bruno", State: "OPEN", Reasons: []string{"requested"}}, nil)
-	mod, err := ghsource.Module(te.cfg, source.Deps{Inventory: te.Store, Reports: te.Env.sourceReports(te.Store), Clock: clockFunc(te.Now)})
+	mod, err := githubHostModule(te.cfg, moduleDeps{Inventory: te.Store, Reports: te.Env.sourceReports(te.Store), Clock: clockFunc(te.Now)})
 	if err != nil {
 		t.Fatal(err)
 	}

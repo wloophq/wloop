@@ -1,0 +1,20 @@
+# The words of the views, facets and situations the Slack plugin's manifest
+# declares. A user profile's plugins/slack/ui.toml replaces the keys it sets.
+
+[views.slack]
+label = "Slack"
+unit = "Conversation"
+
+[facets.conversation]
+label = "Conversation"
+
+[facets.channel]
+label = "Channel"
+
+[situations]
+waits_on_viewer = "waits on you"
+needs_closure = "needs closing"
+new = "new"
+waits_on_others = "waits on others"
+fyi = "for your information"
+resolved = "resolved"

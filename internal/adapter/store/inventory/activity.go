@@ -48,7 +48,7 @@ func (s *Store) RecentActivity(ctx context.Context, limit int) ([]dinv.ActivityE
 				refs = append(refs, a.PR)
 			}
 		}
-		prs, err := s.PRs(ctx, refs)
+		prs, err := s.reportedPRs(ctx, refs)
 		if err != nil {
 			return nil, err
 		}

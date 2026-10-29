@@ -266,6 +266,7 @@ var sections = []struct {
 	{builtin.SurfaceLabels, "Block headings (`labels.toml`)"},
 	{builtin.SurfaceTools, "MCP tool descriptions (`tools.toml`)"},
 	{builtin.SurfaceNotices, "What the loop tells a session (`notices.toml`)"},
+	{builtin.SurfaceUI, "A plugin's views, facets and situations (`ui.toml`)"},
 	{builtin.SurfaceBlock, "Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)"},
 	{builtin.SurfaceConfig, "Configuration (`config.toml`)"},
 }
@@ -436,6 +437,7 @@ var schemas = []struct {
 	{"gates.schema.json", "Gates (gates.toml)", builtin.SurfaceGates},
 	{"records.schema.json", "Record kinds (records.toml)", builtin.SurfaceRecords},
 	{"keys.schema.json", "Key help (keys.toml)", builtin.SurfaceKeys},
+	{"ui.schema.json", "A plugin's views, facets and situations (ui.toml)", builtin.SurfaceUI},
 	{"config.schema.json", "Configuration (config.toml)", builtin.SurfaceConfig},
 }
 

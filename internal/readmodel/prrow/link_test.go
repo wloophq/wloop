@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/storetest"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -14,12 +16,12 @@ func TestRowCarriesServerLinkAndLabel(t *testing.T) {
 	ctx := context.Background()
 	f := storetest.Seeded(t, storetest.Live)
 	ref := f.Open[0]
-	stored, ok, err := f.Inventory.PR(ctx, ref)
+	stored, ok, err := inventorytest.Of(f.Inventory).PR(ctx, ref)
 	if err != nil || !ok {
 		t.Fatalf("%s: %v %v", ref, ok, err)
 	}
 	stored.URL = "https://ghe.example.com/" + ref.Owner + "/" + ref.Repo + "/pull/" + "7"
-	if err := f.Inventory.UpsertPR(ctx, stored); err != nil {
+	if err := inventorytest.Of(f.Inventory).UpsertPR(ctx, stored); err != nil {
 		t.Fatal(err)
 	}
 	r := newRig(t, f)

@@ -15,10 +15,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
-	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/daemon"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -53,7 +54,7 @@ func (f *recordingActions) Open(_ context.Context, u unit.Unit, c daemon.Call) e
 func (f *recordingActions) Adopt(ctx context.Context, u unit.Unit, c daemon.Call) error {
 	r := prOf(u)
 	if f.store != nil {
-		if err := f.store.SetAdopted(ctx, r); err != nil {
+		if err := inventorytest.Of(f.store).SetAdopted(ctx, r); err != nil {
 			return err
 		}
 	}
@@ -293,17 +294,6 @@ func (unfocusable) Focus(context.Context, string) error {
 	return errors.New("no terminal and no README")
 }
 
-func openStore(t *testing.T) *inventory.Store {
-	t.Helper()
-	stDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "inv.db"), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	st := inventory.New(stDB)
-	t.Cleanup(func() { stDB.Close() })
-	return st
-}
-
 func TestOpenFallsBackToTheBrowser(t *testing.T) {
 	t.Parallel()
 	for name, c := range map[string]struct {
@@ -326,13 +316,13 @@ func TestOpenFallsBackToTheBrowser(t *testing.T) {
 				opened = append(opened, name+" "+strings.Join(args, " "))
 				return nil, nil
 			}
-			st := openStore(t)
+			st := te.Store
 			ctx := context.Background()
-			if err := st.UpsertPR(ctx, dinv.PR{Ref: r7, State: "OPEN", URL: r7.URL()}); err != nil {
+			if err := inventorytest.Of(st).UpsertPR(ctx, dinv.PR{Ref: r7, State: "OPEN", URL: r7.URL()}); err != nil {
 				t.Fatal(err)
 			}
 			if c.ws != "" {
-				if err := st.SetWorkspace(ctx, r7, dinv.Workspace{ID: c.ws}); err != nil {
+				if err := inventorytest.Of(st).SetWorkspace(ctx, r7, dinv.Workspace{ID: c.ws}); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -357,12 +347,12 @@ func TestOpenFocusesAMainCheckout(t *testing.T) {
 		t.Fatalf("opened %s %v", name, args)
 		return nil, nil
 	}
-	st := openStore(t)
+	st := te.Store
 	ctx := context.Background()
-	if err := st.UpsertPR(ctx, dinv.PR{Ref: r7, State: "OPEN", URL: r7.URL()}); err != nil {
+	if err := inventorytest.Of(st).UpsertPR(ctx, dinv.PR{Ref: r7, State: "OPEN", URL: r7.URL()}); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SetWorkspace(ctx, r7, dinv.Workspace{ID: "main-api", DisplayName: "api"}); err != nil {
+	if err := inventorytest.Of(st).SetWorkspace(ctx, r7, dinv.Workspace{ID: "main-api", DisplayName: "api"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := (envActions{te.Env, st}).Open(ctx, r7.Unit(), daemon.Call{Out: io.Discard}); err != nil {

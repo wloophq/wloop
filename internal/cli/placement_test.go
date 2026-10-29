@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
@@ -191,7 +193,7 @@ func TestGitHubDefaultPlacement(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, p := range []dinv.PR{{Ref: r7, Author: "someone", State: dgh.StateOpen, LastSeenAt: testNow}, {Ref: r8, Author: "me", State: dgh.StateOpen, LastSeenAt: testNow}} {
-		if err := te.Store.UpsertPR(ctx, p); err != nil {
+		if err := inventorytest.Of(te.Store).UpsertPR(ctx, p); err != nil {
 			t.Fatal(err)
 		}
 	}

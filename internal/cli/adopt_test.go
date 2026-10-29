@@ -67,8 +67,8 @@ func TestTakeOverMarksTheInventory(t *testing.T) {
 	st := te.Store
 	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 20}
 	ctx := context.Background()
-	if o, err := st.Override(ctx, ref); err != nil || !o.Adopted {
-		t.Fatalf("not adopted: %+v %v", o, err)
+	if !adoptedByPlugin(t, te, ref) {
+		t.Fatal("not adopted")
 	}
 	evs, _ := st.Events(ctx, ref)
 	if n := slices.IndexFunc(evs, func(e dinv.Event) bool { return e.Kind == dinv.KindAdopted }); n < 0 ||

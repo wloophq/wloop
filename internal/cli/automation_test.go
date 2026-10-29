@@ -38,7 +38,6 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/meter"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -352,7 +351,7 @@ func threeProviders(t *testing.T) (sweepCase, engineDeps) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	return sc, engineDeps{DB: db, Modules: []source.Module{{ID: unit.GitHub, Facts: gh}}}
+	return sc, engineDeps{DB: db, Modules: []pluginModule{{ID: unit.GitHub, Facts: gh}}}
 }
 
 func everyUnit(p unit.ProviderID, slot string) workflow.Workflow {

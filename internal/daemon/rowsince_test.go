@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/storetest"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brief"
@@ -27,7 +29,7 @@ import (
 func liveServer(t *testing.T) (*Server, *storetest.Fixture) {
 	t.Helper()
 	s, f := newLiveServer(t)
-	withBriefs(&s.deps, brief.New(brief.Deps{Store: f.Inventory, Taxonomy: func(github.Ref) string { return brief.DefaultTaxonomy },
+	withBriefs(&s.deps, brief.New(brief.Deps{Store: f.Inventory, PRs: inventorytest.Of(f.Inventory), Taxonomy: func(github.Ref) string { return brief.DefaultTaxonomy },
 		Retry: time.Hour, Changes: f.Log, Now: func() time.Time { return f.Now }, Log: t.Logf}))
 	return s, f
 }
@@ -57,7 +59,7 @@ func TestRowsSinceReturnsOnlyChanged(t *testing.T) {
 		t.Fatalf("full page: full %v, %d rows", full.Full, len(full.Rows))
 	}
 	ref := f.Open[0]
-	if err := f.Inventory.SetOverride(context.Background(), dinv.Override{PR: ref, Hold: true}); err != nil {
+	if err := inventorytest.Of(f.Inventory).SetOverride(context.Background(), dinv.Override{PR: ref, Hold: true}); err != nil {
 		t.Fatal(err)
 	}
 	delta, deltaBytes := rowsPage(t, s, "?since="+sinceOf(full))
@@ -81,7 +83,7 @@ func TestRowsSinceCarriesAChangedRow(t *testing.T) {
 	s := newServer(t)
 	before, _ := rowsPage(t, s, "")
 	r7 := github.Ref{Owner: "acme", Repo: "api", Number: 7}
-	if err := s.store().SetOverride(context.Background(), dinv.Override{PR: r7, MutedUntil: s.deps.Now().Add(time.Hour)}); err != nil {
+	if err := inventorytest.Of(s.store()).SetOverride(context.Background(), dinv.Override{PR: r7, MutedUntil: s.deps.Now().Add(time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
 	after, _ := rowsPage(t, s, "?since="+sinceOf(before))
@@ -163,7 +165,7 @@ func TestZeroOverrideOmitted(t *testing.T) {
 	if o, ok := override(); ok {
 		t.Fatalf("a row with no override carries %s", o)
 	}
-	if err := s.store().SetOverride(context.Background(), dinv.Override{PR: r7, Hold: true}); err != nil {
+	if err := inventorytest.Of(s.store()).SetOverride(context.Background(), dinv.Override{PR: r7, Hold: true}); err != nil {
 		t.Fatal(err)
 	}
 	var o api.Override

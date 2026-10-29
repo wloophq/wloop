@@ -60,14 +60,30 @@ func TestCockpitHasTheDoneView(t *testing.T) {
 	}
 }
 
+// TestCockpitLabelsABlockedFirstRound: the GitHub plugin's layer words its
+// round events as the loop's, and the cockpit shows the served words.
 func TestCockpitLabelsABlockedFirstRound(t *testing.T) {
-	rec := httptest.NewRecorder()
-	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
-	body := rec.Body.String()
-	for _, want := range []string{`blocked: "round blocked"`, `round_blocked: "round blocked"`, `round_unblocked: "round unblocked"`, `"round_blocked", "round_unblocked"`} {
-		if !strings.Contains(body, want) {
-			t.Errorf("app.js lacks %s", want)
+	raw, err := os.ReadFile("../../plugins/github/profile/ui.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"[events.round_blocked]\nlabel = \"round blocked\"\nloop = true", "[events.round_unblocked]\nlabel = \"round unblocked\"\nloop = true"} {
+		if !strings.Contains(string(raw), want) {
+			t.Errorf("the GitHub layer lacks %q", want)
 		}
+	}
+	var got struct {
+		Label string `json:"label"`
+		Loop  bool   `json:"loop"`
+	}
+	nodeRun(t, jsBlock(t, appJS(t), "EVENT_LABEL")+jsConst(t, appJS(t), "LOOP_EVENTS")+jsConst(t, appJS(t), "catalog"), []string{"applyCatalog", "fieldOf", "eventLabel", "loopEvent"},
+		`applyCatalog({ events: [{ provider: "github", kind: "round_blocked", label: "round blocked", loop: true }] });
+process.stdout.write(JSON.stringify({ label: eventLabel("round_blocked"), loop: loopEvent("round_blocked") }));`, nil, &got)
+	if got.Label != "round blocked" || !got.Loop {
+		t.Fatalf("%+v", got)
+	}
+	if strings.Contains(appJS(t), "round_blocked") {
+		t.Error("app.js names a GitHub event kind")
 	}
 }
 
@@ -175,7 +191,7 @@ func TestCockpitHasExplore(t *testing.T) {
 	h := Handler("")
 	for path, wants := range map[string][]string{
 		"/static/app.js": {"function renderExplore", "function explore(", `viewOfExplore("explore")`, `viewOfExplore("explore.recent")`, "function actOnCandidate", `actionButtons(c, "explore"`, `"/api/actions"`, "function loadSpecs",
-			`"-reviewed-by:@me"`, `"draft:false"`, "function candidateItem", `p.get("x")`, "r.read", "r.empty", "EXPLORE_SORTS", "candidateWait(c, row,", "stalled_review_hours", "Active in the last 30 days"},
+			"function candidateItem", `p.get("x")`, "r.read", "r.empty", "exploreSearch().sorts", "candidateWait(c, row,", "stalled_review_hours"},
 		"/":               {`id="explore"`, `id="explore-form"`, `id="explore-q"`, `id="explore-guidance"`, `id="explore-results"`},
 		"/static/app.css": {".cand", ".chip", ".explore-act", ".cand .wait.late"},
 	} {

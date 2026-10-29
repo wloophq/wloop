@@ -22,6 +22,7 @@ import (
 	"github.com/wloophq/wloop/internal/brief"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/pkg/plugin"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
@@ -104,8 +105,8 @@ type Env struct {
 	// In is the standard input profile add reads its text from.
 	In io.Reader
 
-	// github are GitHub's clients while its plugin runs in process.
-	github githubClients
+	// budget is the GitHub plugin's budget as it last named it.
+	budget *githubBudget
 	Git    gitx.Git
 	// Files is what removals read of the file system; nil reads it directly.
 	Files workspaces.Files
@@ -295,7 +296,7 @@ func NewEnv() *Env {
 		Out:            os.Stdout,
 		Err:            os.Stderr,
 		In:             os.Stdin,
-		github:         newGitHubClients(),
+		budget:         &githubBudget{},
 		Git:            gitx.New(),
 		WS:             newSet(managers, Defaults().WorkspaceManagers),
 		Sh:             execSh,
@@ -386,7 +387,7 @@ type ManagerEntry struct {
 	New     func() workspace.Manager
 	// Ports are the processes and sinks on ws; reloads ws starts on its own run under
 	// ctx, and its changes are noted in changes, which may be nil.
-	Ports func(ctx context.Context, ws workspace.Manager, store *inventory.Store, cfg config.Config, changes *change.Log) (managerSessions, []views.Sink, error)
+	Ports func(ctx context.Context, ws workspace.Manager, prs prrow.ReportedPRs, cfg config.Config, changes *change.Log) (managerSessions, []views.Sink, error)
 	// Homes lists agent homes the manager keeps for kind under userHome.
 	Homes func(userHome, kind string) []string
 	// Available is nil when the manager is installed and this release can

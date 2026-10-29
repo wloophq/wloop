@@ -1,0 +1,223 @@
+# The words of the views, facets, situations and menu bar sections the
+# GitHub plugin's manifest declares. A user profile's plugins/github/ui.toml
+# replaces the keys it sets.
+
+[views.needs-me]
+label = "Needs me"
+unit = "Pull request"
+
+[views.stalled]
+label = "Stalled"
+unit = "Pull request"
+
+[views.mine]
+label = "My PRs"
+unit = "Pull request"
+
+[views.loop]
+label = "In loop"
+unit = "Pull request"
+
+[views.plan]
+label = "Plan"
+
+[views.approved]
+label = "Approved"
+unit = "Pull request"
+
+[views.dash]
+label = "Backlog"
+
+[views.done]
+label = "Done"
+unit = "Pull request"
+
+[views.all]
+label = "All"
+
+[views.explore]
+label = "Explore"
+
+[views.explore.search]
+default_sort = "updated-asc"
+presets = [
+  { query = "user-review-requested:@me", label = "Asked of me" },
+  { query = "review-requested:@me -user-review-requested:@me", label = "Asked of my teams" },
+]
+filters = [
+  { term = "-reviewed-by:@me", label = "Not reviewed by me" },
+  { term = "draft:false", label = "Ready for review" },
+  { term = "review-requested:@me", label = "Requested from me or my teams" },
+  { window = 30, label = "Active in the last 30 days" },
+]
+sorts = [
+  { sort = "updated-asc", label = "Waiting longest", shown = "waiting longest" },
+  { sort = "created-asc", label = "Oldest opened", shown = "oldest opened" },
+  { sort = "updated-desc", label = "Recently updated", shown = "most recently updated" },
+]
+decisions = { APPROVED = "approved", CHANGES_REQUESTED = "changes requested", REVIEW_REQUIRED = "review required" }
+no_decision = "no review required"
+
+[views.recent]
+label = "Recent"
+
+[facets.repo]
+label = "Repo"
+
+[facets.author]
+label = "Author"
+
+[facets.wait]
+label = "Waits on (role)"
+values = { author = "Waiting on the author", loop = "In loop", me = "Waiting on me", nobody = "Waiting on nobody", reviewer = "Waiting on a reviewer" }
+
+[facets.waits-on]
+label = "Waits on (person)"
+
+[facets.kind]
+label = "Situation"
+values = { blocked = "round blocked", changes = "changes asked", checks = "checks failing", conflicts = "merge conflicts", done = "closed", draft = "draft", held = "held (cap)", loop_stopped = "agent stopped", loop_waiting = "agent asks", loop_working = "agent working", merge = "can merge", muted = "muted", no_reviewer = "no reviewer", reply = "reply due", review = "review", reviewer_back = "reviewer due", round_pending = "round soon", to_address = "to address" }
+
+[facets.type]
+label = "Type"
+empty = "no brief"
+
+[facets.risk]
+label = "Risk"
+empty = "no brief"
+
+[facets.size]
+label = "Size"
+empty = "no brief"
+values = { l = "L", m = "M", s = "S", xl = "XL", xs = "XS" }
+
+[facets.status]
+label = "Workspace"
+empty = "no workspace"
+
+[facets.tag]
+label = "Tag"
+
+[facets.is]
+label = "Flags"
+
+[facets.ci]
+label = "Checks"
+empty = "no checks data"
+
+[facets.opened]
+label = "Opened"
+empty = "no opening date"
+values = { "1d" = "0-1 days", "2w" = "1-2 weeks", "3d" = "1-3 days", "4w" = "2-4 weeks", "7d" = "3-7 days", older = "over 4 weeks" }
+buckets = { "1d" = "0-1 days", "3d" = "1-3 days", "7d" = "3-7 days", "2w" = "1-2 weeks", "4w" = "2-4 weeks", older = "over 4 weeks" }
+
+[facets.scope]
+label = "In scope as"
+
+[facets.age]
+label = "Waiting for"
+buckets = { "1d" = "0-1 days", "3d" = "1-3 days", "7d" = "3-7 days", "2w" = "1-2 weeks", "4w" = "2-4 weeks", older = "over 4 weeks" }
+
+[facets.lane]
+label = "Board lane"
+values = { author = "Waiting on author", loop = "In loop", me = "Needs me", merge = "Can merge", reviewer = "Waiting on reviewer" }
+
+[facets.due]
+label = "Due"
+buckets = { later = "later", due = "due", past = "past" }
+
+[situations]
+round_pending = "round soon"
+loop_waiting = "agent asks"
+loop_stopped = "agent stopped"
+blocked = "round blocked"
+to_address = "to address"
+held = "held (cap)"
+loop_working = "agent working"
+changes = "changes asked"
+checks = "checks failing"
+conflicts = "merge conflicts"
+reply = "reply due"
+reviewer_back = "reviewer due"
+review = "review"
+no_reviewer = "no reviewer"
+merge = "can merge"
+draft = "draft"
+muted = "muted"
+done = "closed"
+
+[events.opened]
+label = "opened"
+
+[events.push]
+label = "pushed"
+
+[events.review_requested]
+label = "review requested"
+data = "requested"
+
+[events.review_request_removed]
+label = "review request removed"
+data = "requested"
+
+[events.review]
+label = "reviewed"
+data = "first_field"
+
+[events.comment]
+label = "commented"
+
+[events.check]
+label = "checks"
+
+[events.ready]
+label = "ready for review"
+
+[events.draft]
+label = "back to draft"
+
+[events.merged]
+label = "merged"
+data = "short_sha"
+
+[events.closed]
+label = "closed"
+
+[events.round_pending]
+label = "round pending"
+loop = true
+
+[events.round_sent]
+label = "round sent"
+loop = true
+
+[events.round_skipped]
+label = "round skipped"
+loop = true
+
+[events.round_held]
+label = "round held"
+loop = true
+
+[events.round_blocked]
+label = "round blocked"
+loop = true
+
+[events.round_unblocked]
+label = "round unblocked"
+loop = true
+
+[events.guidance]
+label = "guidance"
+loop = true
+
+[detail.profile_chain]
+label = "Review profile"
+title = "The review profile layers a round here reads, lowest first; the profile show command lists the files"
+
+[detail.next_guidance]
+label = "Next round guidance"
+title = "Guidance waiting for the next round: given with no round pending, or kept from a round that did not go out or whose prompt was not seen landing. The next round, Review or Address included, takes it unless you give other guidance"
+
+[menubar]
+loop = "In loop"

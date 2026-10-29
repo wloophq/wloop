@@ -10,14 +10,16 @@ import (
 	"testing"
 )
 
-// githubClients are the packages that reach GitHub: its API client and gh.
-var githubClients = []string{"internal/github", "internal/ghcli"}
+// githubClients are the packages that reach GitHub: the GitHub plugin's
+// API client and gh.
+var githubClients = []string{"plugins/github/api", "plugins/github/gh"}
 
 // cliGitHubDebt are the test files of internal/cli that still import a
 // GitHub client, with why.
 var cliGitHubDebt = map[string]string{
-	"internal/cli/harness_test.go": "debt: the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin",
-	"internal/cli/serve_test.go":   "debt: the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin",
+	"internal/cli/githubplugin_test.go":  "the test's forge reads the fake GitHub as the plugin does, standing in for its binary",
+	"internal/cli/harness_test.go":       "the harness reads a pull request the inventory lacks from the fake GitHub as the plugin does",
+	"internal/cli/plugin_binary_test.go": "the test serves a fake GitHub to the plugin's binary",
 }
 
 // ruleCLIGitHubClient flags, in a file under internal/cli, an import of a
@@ -42,7 +44,7 @@ func ruleCLIGitHubClient(file string, imports []string, debts map[string]string,
 }
 
 // TestCLIImportsNoGitHubClient checks that no file under `internal/cli`
-// imports `internal/github` or `internal/ghcli`: the CLI reaches GitHub
+// imports the GitHub plugin's API client or gh: the CLI reaches GitHub
 // through its plugin's calls. The test files in `cliGitHubDebt` pass, and
 // the list only shrinks.
 func TestCLIImportsNoGitHubClient(t *testing.T) {

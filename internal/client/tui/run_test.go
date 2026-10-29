@@ -69,6 +69,7 @@ type fakeDaemon struct {
 	taskReads    []string
 	keysFetched  int
 	catalogReads int
+	pluginReads  int
 
 	review      *api.Review
 	reviewReads int
@@ -88,6 +89,7 @@ type taskDo struct {
 func (f *fakeDaemon) Plugins(context.Context) ([]api.Plugin, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.pluginReads++
 	return slices.Clone(f.plugins), f.pluginsErr
 }
 

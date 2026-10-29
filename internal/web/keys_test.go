@@ -12,7 +12,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/catalog"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/turn"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/keys"
@@ -406,7 +408,7 @@ globalThis.fetch = async (url, init) => { calls.push({ url, body: JSON.parse(ini
 func TestPluginKeyRunsUnitAction(t *testing.T) {
 	row := map[string]any{
 		"unit": map[string]string{"provider": "github", "key": "acme/api#8"}, "label": "acme/api#8", "link": "https://github.com/acme/api/pull/8",
-		"actions": []map[string]any{{"id": "hold", "enabled": true}, {"id": "release", "enabled": false}, {"id": "dismiss", "enabled": true}},
+		"actions": []map[string]any{{"id": "pause", "enabled": true}, {"id": "resume", "enabled": false}, {"id": "dismiss", "enabled": true}},
 	}
 	var got struct {
 		ByKey  []any    `json:"byKey"`
@@ -418,7 +420,7 @@ func TestPluginKeyRunsUnitAction(t *testing.T) {
 const k = harness({ selected: input.task, rows: [input.row], unitAction: (row, id, extra) => act(row, id, extra) });
 await k.press("H", { shift: true });
 const byKey = calls.splice(0);
-await act(input.row, "hold");
+await act(input.row, "pause");
 const byRow = calls.splice(0);
 await k.press("X", { shift: true });
 await k.press("M", { shift: true });
@@ -426,7 +428,7 @@ return { byKey, byRow, posts: k.log.posts, others: calls };`, map[string]any{"ta
 	if len(got.ByKey) != 1 || !reflect.DeepEqual(got.ByKey, got.ByRow) {
 		t.Fatalf("key %v, row %v", got.ByKey, got.ByRow)
 	}
-	if !strings.Contains(mustJSON(t, got.ByKey), `"url":"/api/units/github/acme%2Fapi%238/hold"`) {
+	if !strings.Contains(mustJSON(t, got.ByKey), `"url":"/api/units/github/acme%2Fapi%238/pause"`) {
 		t.Fatalf("%v", got.ByKey)
 	}
 	if len(got.Others) != 1 || !strings.Contains(mustJSON(t, got.Others), "/api/units/github/acme%2Fapi%238/dismiss") || len(got.Posts) != 0 {
@@ -741,5 +743,23 @@ return { nav: k.log.nav, help };`, map[string]any{"catalog": catalog, "served": 
 }
 
 func TestKeysFixtureHoldsTheServedSpecKeys(t *testing.T) {
-	t.Skip("K1b review F1: the fixture's spec part binds H to hold/release where the daemon serves pause/resume; regenerate it whole and move TestPluginKeyRunsUnitAction and TestPaletteShowsEveryKey to the served ids (owner: the task that owns the spec keys)")
+	l, err := turn.Bundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{}
+	for _, s := range catalog.Specs(l) {
+		if s.Key != "" && slices.Contains(keys.SurfacesOf(s.Surfaces), keys.Web) {
+			want[s.ID] = s.Key
+		}
+	}
+	got := map[string]string{}
+	for _, b := range webBindings(t) {
+		if b.Context == string(keys.List) && (b.Owner != "core" || want[b.Action] != "") {
+			got[b.Action] = b.Key
+		}
+	}
+	if !maps.Equal(got, want) {
+		t.Fatalf("the fixture's spec keys %v, served %v: go test ./internal/daemon -run TestTheWebKeysFixtureIsWhatTheDaemonServes -update-keys rewrites it", got, want)
+	}
 }

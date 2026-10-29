@@ -21,21 +21,20 @@ import (
 	"github.com/wloophq/wloop/internal/plugins/codec"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // slackModule is the Slack plugin's module outside an Env: what needs no
 // running plugin.
-func slackModule(config.Config, source.Deps) (source.Module, error) {
+func slackModule(config.Config, moduleDeps) (pluginModule, error) {
 	m, _, err := (&Env{}).relayBase(slackPlugin)
 	return m, err
 }
 
 // slackRelay is the Slack plugin's module: the daemon's jobs, rows, facts
 // and capabilities relay to the plugin process serve runs.
-func (e *Env) slackRelay(_ config.Config, d source.Deps) (source.Module, error) {
+func (e *Env) slackRelay(_ config.Config, d moduleDeps) (pluginModule, error) {
 	m, err := e.relayModule(slackPlugin, d)
 	m.Reacts = m.Publisher != nil
 	return m, err
@@ -45,14 +44,14 @@ func (e *Env) slackRelay(_ config.Config, d source.Deps) (source.Module, error) 
 // its first manifest job is the ingestion job and the others the daemon's
 // jobs, each named <job>:<id>. Outside serve it builds only what needs no
 // running plugin.
-func (e *Env) relayModule(id unit.ProviderID, d source.Deps) (source.Module, error) {
+func (e *Env) relayModule(id unit.ProviderID, d moduleDeps) (pluginModule, error) {
 	m, s, err := e.relayBase(id)
 	if err != nil || e.pluginKind == nil {
 		return m, err
 	}
 	r := relay{id: id, kind: e.pluginKind, now: e.Now}
 	for _, j := range s.Jobs[1:] {
-		m.Jobs = append(m.Jobs, source.Job{Name: j.Name + ":" + string(id), Every: time.Duration(j.Every), Timeout: time.Duration(j.Timeout),
+		m.Jobs = append(m.Jobs, pluginJob{Name: j.Name + ":" + string(id), Every: time.Duration(j.Every), Timeout: time.Duration(j.Timeout),
 			Run: func(ctx context.Context) (string, string, error) { return r.ingest(ctx, j.Name) }})
 	}
 	rp := reportedPlugin{id: id, src: s}
@@ -69,7 +68,7 @@ func (e *Env) relayModule(id unit.ProviderID, d source.Deps) (source.Module, err
 	r.units = units
 	compiled, err := s.Codec.Compile()
 	if err != nil {
-		return source.Module{}, err
+		return pluginModule{}, err
 	}
 	m.Track, m.Untrack, m.Identity, m.Health = r.track, r.untrack, r.identity, r.health
 	m.Resolve = func(ctx context.Context, address string) (unit.Unit, bool, error) {
@@ -90,20 +89,20 @@ func (e *Env) relayModule(id unit.ProviderID, d source.Deps) (source.Module, err
 
 // relayBase is plugin id's module as it needs no running plugin: its
 // codec, its ingestion job and no rows; and the plugin's [source] table.
-func (e *Env) relayBase(id unit.ProviderID) (source.Module, *manifest.Source, error) {
+func (e *Env) relayBase(id unit.ProviderID) (pluginModule, *manifest.Source, error) {
 	s, err := e.pluginSource(id)
 	if err != nil {
-		return source.Module{}, nil, err
+		return pluginModule{}, nil, err
 	}
 	c, err := codec.Of(s.Provider, s.Codec)
 	if err != nil {
-		return source.Module{}, nil, err
+		return pluginModule{}, nil, err
 	}
 	if len(s.Jobs) == 0 {
-		return source.Module{}, nil, fmt.Errorf("plugin %s: its manifest declares no ingestion job", id)
+		return pluginModule{}, nil, fmt.Errorf("plugin %s: its manifest declares no ingestion job", id)
 	}
 	r := relay{id: id, kind: e.pluginKind, now: e.Now}
-	m := source.Module{ID: id, Codec: c, Ingest: ingest.Job{Every: time.Duration(s.Jobs[0].Every), Prepare: r.prepare(s.Jobs[0].Name, c)},
+	m := pluginModule{ID: id, Codec: c, Ingest: ingest.Job{Every: time.Duration(s.Jobs[0].Every), Prepare: r.prepare(s.Jobs[0].Name, c)},
 		Rows: func(readmodel.RowDeps) readmodel.Provider { return noRows{id} }}
 	return m, s, nil
 }

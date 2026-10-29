@@ -3,17 +3,14 @@ package cli
 import (
 	"context"
 	"slices"
-	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
-	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel"
 	rowoverlay "github.com/wloophq/wloop/internal/readmodel/overlay"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 )
 
@@ -25,7 +22,7 @@ type reportedPlugin struct {
 
 // reportedPlugins are the plugins of e that cfg enables and the host runs,
 // none of them served by a built module; none outside serve.
-func (e *Env) reportedPlugins(cfg config.Config, mods []source.Module) []reportedPlugin {
+func (e *Env) reportedPlugins(cfg config.Config, mods []pluginModule) []reportedPlugin {
 	if e.pluginKind == nil {
 		return nil
 	}
@@ -36,7 +33,7 @@ func (e *Env) reportedPlugins(cfg config.Config, mods []source.Module) []reporte
 			continue
 		}
 		id := unit.ProviderID(p.ID())
-		if slices.ContainsFunc(mods, func(m source.Module) bool { return m.ID == id }) {
+		if slices.ContainsFunc(mods, func(m pluginModule) bool { return m.ID == id }) {
 			continue
 		}
 		out = append(out, reportedPlugin{id: id, src: s})
@@ -49,7 +46,7 @@ func (e *Env) reportedPlugins(cfg config.Config, mods []source.Module) []reporte
 func (e *Env) reportedSource(p reportedPlugin, store *inventory.Store, rd readmodel.RowDeps) readmodel.ReportedSource {
 	snaps := e.pluginKind.Snapshots
 	return readmodel.ReportedSource{RowDeps: rd, ID: p.id, Reports: snaps, Mutes: storeMutes{store}, Stale: snaps.Stale,
-		Catalog: manifestCatalog{p}}
+		Catalog: e.pluginCatalog(p.id)}
 }
 
 // wireReported serves the units of every plugin the host runs: rows and
@@ -85,48 +82,4 @@ func (m storeMutes) Mutes(ctx context.Context, units []unit.Unit) (map[unit.Unit
 		out[u] = rowoverlay.Mute{Until: x.Until, UntilStateChange: x.UntilStateChange, Kind: x.Kind, WaitingOn: x.WaitingOn}
 	}
 	return out, nil
-}
-
-// manifestCatalog is a plugin's views, facets and situations as its
-// manifest declares them, each labeled by its id.
-type manifestCatalog struct{ p reportedPlugin }
-
-func (c manifestCatalog) Views() []api.ViewSpec {
-	if c.p.src.UI == nil {
-		return nil
-	}
-	var out []api.ViewSpec
-	for _, v := range c.p.src.UI.Views {
-		out = append(out, api.ViewSpec{ID: v.ID, Label: v.ID, Provider: string(c.p.id), Rows: v.Rows, Order: v.Order,
-			Surfaces: slices.Clone(v.Surfaces), UnitSort: v.UnitSort})
-	}
-	return out
-}
-
-func (c manifestCatalog) Facets() []api.FacetSpec {
-	if c.p.src.UI == nil {
-		return nil
-	}
-	var out []api.FacetSpec
-	for _, f := range c.p.src.UI.Facets {
-		spec := api.FacetSpec{ID: f.ID, Label: f.ID, Provider: string(c.p.id), Group: f.Group, Sort: f.Sort, Rank: slices.Clone(f.Rank),
-			Match: f.Match, Menu: f.Menu}
-		for _, b := range f.Buckets {
-			spec.Buckets = append(spec.Buckets, api.Bucket{ID: b.ID, Label: b.ID, Within: time.Duration(b.Within).String()})
-		}
-		out = append(out, spec)
-	}
-	return out
-}
-
-func (c manifestCatalog) Situations() []api.SituationSpec {
-	var out []api.SituationSpec
-	for i, s := range c.p.src.Situations {
-		rank := s.Rank
-		if rank == 0 {
-			rank = i
-		}
-		out = append(out, api.SituationSpec{Provider: string(c.p.id), Kind: api.Kind(s.Name), Label: s.Name, Rank: rank})
-	}
-	return out
 }

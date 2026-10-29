@@ -2,6 +2,7 @@ package present
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"slices"
 	"time"
@@ -37,7 +38,7 @@ func (p *Presenter) unitRow(ctx context.Context, q api.UnitRowQuery) (api.Row, e
 	}
 	base.Asked = asked
 	d := p.deriverAt(base, at)
-	c, err := p.readUntracked(ctx, q.Unit, d.Viewer)
+	c, err := p.readUntracked(ctx, q.Unit)
 	if err != nil {
 		return api.Row{}, err
 	}
@@ -139,17 +140,18 @@ func (p *Presenter) deriverAt(base readmodel.Base, at time.Time) prrow.Deriver {
 	return prrow.DeriverAt(base, p.h.Settings(), p.h.BriefOn, at)
 }
 
-// inventoryPR is the inventory's pull request of the unit under any case.
+// inventoryPR is the reported pull request of the unit under any case.
 func (p *Presenter) inventoryPR(ctx context.Context, u unit.Unit) (dinv.PR, bool, error) {
 	ref, ok := pr.RefOf(u)
 	if !ok {
 		return dinv.PR{}, false, nil
 	}
-	pull, ok, err := p.d.Store.PR(ctx, ref)
+	reported := prrow.ReportedPRs{Reports: p.d.Reports}
+	pull, ok, err := reported.PR(ctx, ref)
 	if err != nil || ok {
 		return pull, ok, err
 	}
-	all, err := p.d.Store.ListPRs(ctx, false)
+	all, err := reported.List(ctx, false)
 	if err != nil {
 		return dinv.PR{}, false, err
 	}
@@ -160,17 +162,18 @@ func (p *Presenter) inventoryPR(ctx context.Context, u unit.Unit) (dinv.PR, bool
 }
 
 // readUntracked reads from GitHub a pull request the inventory does not hold.
-func (p *Presenter) readUntracked(ctx context.Context, u unit.Unit, viewer string) (dgh.Candidate, error) {
+func (p *Presenter) readUntracked(ctx context.Context, u unit.Unit) (dgh.Candidate, error) {
 	ref, ok := pr.RefOf(u)
 	if !ok {
 		return dgh.Candidate{}, src.ErrNotFound
 	}
-	if p.d.Explorer == nil {
-		return dgh.Candidate{}, api.Refuse(http.StatusServiceUnavailable, "cannot read %s from GitHub", u.Label())
-	}
-	page, err := p.d.Explorer.CandidateByRef(dgh.WithPriority(ctx, dgh.PriorityBackground), ref, viewer)
-	if err != nil {
-		return dgh.Candidate{}, api.Refuse(http.StatusBadGateway, "cannot read %s from GitHub: %v", u.Label(), err)
+	var page dgh.CandidatePage
+	if err := p.pluginView(ctx, pluginViewCandidate, map[string]any{"owner": ref.Owner, "repo": ref.Repo, "number": ref.Number}, &page); err != nil {
+		status := http.StatusBadGateway
+		if errors.Is(err, src.ErrUnavailable) {
+			status = http.StatusServiceUnavailable
+		}
+		return dgh.Candidate{}, api.Refuse(status, "cannot read %s from GitHub: %v", u.Label(), err)
 	}
 	if len(page.Candidates) == 0 {
 		return dgh.Candidate{}, api.Refuse(http.StatusNotFound, "%s: GitHub knows no such pull request", u.Label())

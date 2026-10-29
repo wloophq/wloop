@@ -206,13 +206,14 @@ every = "5m"
 | `buckets` | array of tables | The age buckets of a time facet, youngest first; only with sort = time. |
 | `match` | one of `exact`, `suffix`, `prefix`, `team` | How a filter matches a value; empty is exact. |
 | `menu` | bool | It shows in the filter menu. |
+| `strip` | bool | Each row's strip is colored by its value, and its rank is the strip's legend; at most one facet. |
 
 ## `[[source.ui.facets.buckets]]`
 
 | Key | Kind | Meaning |
 |---|---|---|
 | `id` | string | The bucket's id. Required. |
-| `within` | duration | The age its values are younger than, as a Go duration. Required. |
+| `within` | duration | The age its values are younger than, as a Go duration; negative for a value that far in the future. Required but on the last bucket, which then catches the rest. |
 
 ## `[[source.ui.menubar]]`
 

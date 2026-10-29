@@ -29,6 +29,60 @@ type CatalogResponse struct {
 	Views      []ViewSpec      `json:"views"`
 	Facets     []FacetSpec     `json:"facets"`
 	Situations []SituationSpec `json:"situations"`
+	// Events are the words of the plugins' event kinds.
+	Events []EventSpec `json:"events,omitempty"`
+	// Details are the words of the fields of the plugins' unit details.
+	Details []DetailSpec `json:"details,omitempty"`
+}
+
+// DetailSpec is how a field of a plugin's unit detail shows: the field of
+// the detail, else of the row's payload override, that holds its value.
+type DetailSpec struct {
+	Provider string `json:"provider"`
+	Field    string `json:"field"`
+	Label    string `json:"label"`
+	Title    string `json:"title,omitempty"`
+}
+
+// SearchSpec is a custom view's search: the queries it runs at a press, the
+// terms it toggles, the orders it offers and how a result's decision reads.
+type SearchSpec struct {
+	DefaultSort string            `json:"default_sort,omitempty"`
+	Presets     []SearchPreset    `json:"presets,omitempty"`
+	Filters     []SearchFilter    `json:"filters,omitempty"`
+	Sorts       []SearchSort      `json:"sorts,omitempty"`
+	Decisions   map[string]string `json:"decisions,omitempty"`
+	NoDecision  string            `json:"no_decision,omitempty"`
+}
+
+type SearchPreset struct {
+	Query string `json:"query"`
+	Label string `json:"label"`
+}
+
+// SearchFilter toggles Term, or keeps Window days of recent activity.
+type SearchFilter struct {
+	Term   string `json:"term,omitempty"`
+	Window int    `json:"window,omitempty"`
+	Label  string `json:"label"`
+}
+
+type SearchSort struct {
+	Sort  string `json:"sort"`
+	Label string `json:"label"`
+	Shown string `json:"shown,omitempty"`
+}
+
+// EventSpec is how a plugin's event kind shows on a timeline; Loop says
+// it is the loop's doing.
+type EventSpec struct {
+	Provider string `json:"provider"`
+	Kind     string `json:"kind"`
+	Label    string `json:"label"`
+	Loop     bool   `json:"loop,omitempty"`
+	// Data is how its data shows: "" as it is, "none", "first_field",
+	// "short_sha" or "requested".
+	Data string `json:"data,omitempty"`
 }
 
 type ViewSpec struct {
@@ -42,6 +96,8 @@ type ViewSpec struct {
 	Unit string `json:"unit,omitempty"`
 	// UnitSort is the facet the unit column sorts by, such as "repo"; "" sorts by "repo".
 	UnitSort string `json:"unit_sort,omitempty"`
+	// Search is a custom view's search; nil for none.
+	Search *SearchSpec `json:"search,omitempty"`
 }
 
 type FacetSpec struct {
@@ -56,6 +112,9 @@ type FacetSpec struct {
 	Match    string            `json:"match,omitempty"` // "exact" (default), "suffix" (repo), "prefix" (tag), "team"
 	Menu     bool              `json:"menu"`
 	Buckets  []Bucket          `json:"buckets,omitempty"` // Sort "time" only: the client buckets now - value
+	// Strip says each row's strip is colored by the facet's first value,
+	// its rank the strip's legend.
+	Strip bool `json:"strip,omitempty"`
 }
 
 type Bucket struct {

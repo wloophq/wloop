@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
@@ -84,7 +86,7 @@ func (f *follows) admit(ctx context.Context, u unit.Unit, state string, save fun
 		return err
 	}
 	if state == "" {
-		stored, ok, err := f.store.PR(ctx, known)
+		stored, ok, err := inventorytest.Of(f.store).PR(ctx, known)
 		if err != nil {
 			return err
 		}
@@ -100,7 +102,7 @@ func (f *follows) admit(ctx context.Context, u unit.Unit, state string, save fun
 			return err
 		}
 	}
-	changed, err := f.store.SetTracked(ctx, known, true)
+	changed, err := inventorytest.Of(f.store).SetTracked(ctx, known, true)
 	if err != nil || !changed {
 		return err
 	}
@@ -116,7 +118,7 @@ func (f *follows) Untrack(ctx context.Context, u unit.Unit) error {
 	if !ok {
 		return api.Refuse(http.StatusBadRequest, "%s is not tracked", u.Label())
 	}
-	tracked, err := f.store.Tracked(ctx)
+	tracked, err := inventorytest.Of(f.store).Tracked(ctx)
 	if err != nil {
 		return err
 	}
@@ -124,7 +126,7 @@ func (f *follows) Untrack(ctx context.Context, u unit.Unit) error {
 	if i < 0 {
 		return api.Refuse(http.StatusBadRequest, "%s is not tracked", u.Label())
 	}
-	changed, err := f.store.SetTracked(ctx, tracked[i], false)
+	changed, err := inventorytest.Of(f.store).SetTracked(ctx, tracked[i], false)
 	if err != nil || !changed {
 		return err
 	}
@@ -134,7 +136,7 @@ func (f *follows) Untrack(ctx context.Context, u unit.Unit) error {
 // slot is the tracked pull request that matches ref under any case, and
 // refuses a new one past trackMax.
 func (f *follows) slot(ctx context.Context, ref github.Ref) (github.Ref, bool, error) {
-	tracked, err := f.store.Tracked(ctx)
+	tracked, err := inventorytest.Of(f.store).Tracked(ctx)
 	if err != nil {
 		return ref, false, err
 	}

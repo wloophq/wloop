@@ -284,13 +284,13 @@ func TestStartTakesACheckoutWhoseOriginIsAnSSHAlias(t *testing.T) {
 
 func TestAHiddenStartActionStillRefusesADerivedTask(t *testing.T) {
 	te, m, _, _ := startEnv(t)
-	raw, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "intents", "start", "intent.toml"))
+	raw, err := readBundled("intents/start/intent.toml")
 	if err != nil {
 		t.Fatal(err)
 	}
 	manifest := strings.Replace(string(raw), "[action]\n", "[action]\nwhen = 'task.captured_by_user'\n", 1)
 	manifest = regexp.MustCompile(`(?s)\[\[action.refuse\]\].*?why  = "[^"]*"\n`).ReplaceAllString(manifest, "")
-	body, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "intents", "start", "instructions.md.tmpl"))
+	body, err := readBundled("intents/start/instructions.md.tmpl")
 	if err != nil {
 		t.Fatal(err)
 	}

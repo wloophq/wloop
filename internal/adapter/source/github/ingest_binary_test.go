@@ -20,8 +20,6 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 
-	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
@@ -128,13 +126,12 @@ func TestTheGitHubBinaryIngestsAndReportsAFollowedPullRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st := inventory.New(db)
 	snaps := psource.NewSnapshots(db.Snapshots())
 	m := bundledGitHub(t)
 	kind := &psource.Kind{Snapshots: snaps, StateDir: func(id string) string { return filepath.Join(dir, "state", id) },
 		Broker: func(id string, s *manifest.Source) *psource.Broker {
 			return &psource.Broker{ID: id, Manifest: s, Snapshots: snaps, Units: psource.Units{Codecs: unit.NewRegistry(codecs[unit.GitHub])},
-				Config: config.Defaults, Events: sqlite.New(db), Marks: db, Drafts: db, Overrides: db, Reported: ghsource.Reported(st)}
+				Config: config.Defaults, Events: sqlite.New(db), Marks: db, Drafts: db, Overrides: db}
 		}}
 	proc, err := host.ExecLauncher{}.Launch(context.Background(), plugin.Spec{ID: m.ID, Path: bin, Kinds: m.Kinds,
 		Env:      []string{"PATH=" + ghDir, "GH_HOST=" + srv.URL, "GH_CONFIG_DIR=" + dir, plugin.BrandEnv + "=" + brand.Name},
@@ -178,9 +175,9 @@ func TestTheGitHubBinaryIngestsAndReportsAFollowedPullRequest(t *testing.T) {
 		rep.Payload.Repo != "acme/api" || !slices.Contains(rep.Payload.Reasons, "tracked") || len(snap.Signals) != 3 || len(snap.Facts) == 0 {
 		t.Fatalf("the reported row %+v %v %v of %+v", rep, ok, err, snap)
 	}
-	row, ok, err := st.PR(ctx, ref)
+	row, ok, err := prrow.ReportedPRs{Reports: snaps}.PR(ctx, ref)
 	if err != nil || !ok || row.Title != "Batch export" || row.HeadOid != "h2" || !slices.Contains(row.Reasons, "tracked") {
-		t.Fatalf("the host keeps %+v %v %v", row, ok, err)
+		t.Fatalf("the host reads %+v %v %v", row, ok, err)
 	}
 	if evs, err := sqlite.New(db).UnitEvents(ctx, []unit.Unit{ref.Unit()}, []string{"tracked", "followed"}, time.Time{}); err != nil || len(evs) != 2 {
 		t.Fatalf("the host's events %+v %v, want the track and its flip", evs, err)

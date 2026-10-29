@@ -9,6 +9,7 @@ import (
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
@@ -17,6 +18,7 @@ import (
 // the current brief with its tags and the files it read.
 type storedFacts struct {
 	store  *inventory.Store
+	prs    prrow.ReportedPRs
 	briefs bool
 }
 
@@ -50,7 +52,7 @@ func (s storedFacts) unitFacts(ctx context.Context, u unit.Unit) (turn.Stored, e
 
 func (s storedFacts) prFacts(ctx context.Context, ref pr.Ref) (turn.Stored, error) {
 	var st turn.Stored
-	pr, known, err := s.store.PR(ctx, ref)
+	pr, known, err := s.prs.PR(ctx, ref)
 	if err != nil {
 		return st, err
 	}

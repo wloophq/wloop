@@ -4,6 +4,8 @@ import (
 	"slices"
 	"testing"
 
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+
 	"github.com/wloophq/wloop/internal/api"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/jsonschema"
@@ -23,9 +25,10 @@ var extraIntents = dintent.NewRegistry([]dintent.Def{
 
 func TestAnExtraEnumIsAFacet(t *testing.T) {
 	loaded := &intentload.Loaded{Registry: extraIntents}
-	p := New(Source{RowDeps: readmodel.RowDeps{Settings: func() readmodel.RowSettings { return readmodel.RowSettings{Loaded: loaded} }}})
+	cat := psource.BundledCatalog(string(unit.GitHub))
+	p := New(Source{RowDeps: readmodel.RowDeps{Settings: func() readmodel.RowSettings { return readmodel.RowSettings{Loaded: loaded} }}, Catalog: cat})
 	specs := p.Facets()
-	if len(specs) != len(FacetSpecs())+2 {
+	if len(specs) != len(cat.Facets())+2 {
 		t.Fatalf("%d facets", len(specs))
 	}
 	approach, areas := specs[len(specs)-2], specs[len(specs)-1]

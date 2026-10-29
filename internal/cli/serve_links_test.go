@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/config"
@@ -22,7 +21,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/link"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -34,11 +32,11 @@ func TestServeResolvesLinkedItems(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	var built source.Deps
+	var built moduleDeps
 	saved := plugins
-	plugins = []source.Plugin{{ID: unit.GitHub, Codec: pr.Codec{}, Build: func(cfg config.Config, sd source.Deps) (source.Module, error) {
+	plugins = []compiledPlugin{{ID: unit.GitHub, Codec: pr.Codec{}, Build: func(cfg config.Config, sd moduleDeps) (pluginModule, error) {
 		built = sd
-		return ghsource.Module(cfg, sd)
+		return githubHostModule(cfg, sd)
 	}}}
 	defer func() { plugins = saved }()
 

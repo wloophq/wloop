@@ -13,6 +13,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -177,16 +179,15 @@ func TestFetchPRRefreshesThroughThePlugin(t *testing.T) {
 	te.gh.basics = openBasics
 	ctx := context.Background()
 	te.Env.forge = te.githubPluginOf()
-	te.Env.github.API = nil
-	if _, ok, err := te.Store.PR(ctx, r7); err != nil || ok {
+	if _, ok, err := inventorytest.Of(te.Store).PR(ctx, r7); err != nil || ok {
 		t.Fatalf("stored before the fetch: %v %v", ok, err)
 	}
 	full, viewer, err := te.fetchPR(ctx, te.cfg, r7, "me")
 	if err != nil || viewer != "me" || full.Title != "Add x" || full.HeadRefOid != "c2" || full.HeadRefName != "feat/x" {
 		t.Fatalf("fetched %+v as %q: %v", full, viewer, err)
 	}
-	if row, ok, err := te.Store.PR(ctx, r7); err != nil || !ok || row.HeadOid != "c2" {
-		t.Fatalf("the store keeps %+v %v %v, want the row the plugin reported", row, ok, err)
+	if row, ok, err := te.reportedPRs().PR(ctx, r7); err != nil || !ok || row.HeadOid != "c2" {
+		t.Fatalf("the host reads %+v %v %v, want the row the plugin reported", row, ok, err)
 	}
 	te.gh.basics = ""
 	if _, _, err := te.fetchPR(ctx, te.cfg, pr.Ref{Owner: "acme", Repo: "api", Number: 8}, "me"); err == nil {

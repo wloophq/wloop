@@ -112,7 +112,7 @@ func launchGitHubBinary(t *testing.T, te *testEnv) *src.Client {
 			b := &psource.Broker{ID: id, Manifest: s, Units: psource.Units{Codecs: te.unitCodecs()}, Snapshots: psource.NewSnapshots(te.db.Snapshots()),
 				Config: te.currentConfig, Events: sqlite.New(te.db), Marks: te.db, Drafts: te.db, Overrides: te.db, Workspaces: te.Env.workspaceListing,
 				Paused: te.Env.roundsPaused, Rounds: te.Env.storedRoundState, Books: sqlite.New(te.db).Books,
-				Hosted: &psource.Hosted{Profile: pluginProfile(id, te.Env.currentConfig)}, Reported: ghsource.Reported(te.Store)}
+				Hosted: &psource.Hosted{Profile: pluginProfile(id, te.Env.currentConfig)}}
 			return b
 		}}
 	proc, err := host.ExecLauncher{}.Launch(context.Background(), plugin.Spec{ID: m.ID, Path: bin, Kinds: m.Kinds,

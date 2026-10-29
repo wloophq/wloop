@@ -7,10 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
@@ -41,7 +44,7 @@ func (f fixedReports) Reported(_ context.Context, units []unit.Unit) (map[unit.U
 // reportOf is the snapshot of p with detail d read at readAt in version v.
 func reportOf(t *testing.T, p dinv.PR, d *inventory.Detail, v int, readAt time.Time) src.Snapshot {
 	t.Helper()
-	raw, err := json.Marshal(reportedData{PR: p, Detail: d, DetailVersion: v, DetailReadAt: readAt})
+	raw, err := json.Marshal(prrow.ReportedData{PR: p, Detail: d, DetailVersion: v, DetailReadAt: readAt})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +61,7 @@ func TestReportedInputsReadTheRowsAndFullReadsThePluginReported(t *testing.T) {
 	}
 	fresh, old := pr.Ref{Owner: "acme", Repo: "api", Number: 7}, pr.Ref{Owner: "acme", Repo: "api", Number: 8}
 	gone, empty := pr.Ref{Owner: "acme", Repo: "api", Number: 9}, pr.Ref{Owner: "acme", Repo: "api", Number: 10}
-	if err := st.UpsertPR(ctx, dinv.PR{Ref: fresh, Title: "the host's copy", Author: "bruno", State: "CLOSED"}); err != nil {
+	if err := inventorytest.Of(st).UpsertPR(ctx, dinv.PR{Ref: fresh, Title: "the host's copy", Author: "bruno", State: "CLOSED"}); err != nil {
 		t.Fatal(err)
 	}
 	review := pr.Review{ID: "r1", State: pr.ReviewApproved, Author: "ana", SubmittedAt: now.Add(-time.Hour), CommitOid: "h7"}

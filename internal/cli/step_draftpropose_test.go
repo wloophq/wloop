@@ -27,7 +27,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -367,7 +366,7 @@ func TestUnitClosedEndsTheUnitsTasksOnce(t *testing.T) {
 	now := time.Date(2026, 10, 14, 15, 0, 0, 0, time.UTC)
 	clock := clockFunc(func() time.Time { return now })
 	var closed []unit.Unit
-	m := source.Module{ID: slackPlugin, OnPosted: map[string]outbox.Effect{builtin.EffectUnitClosed: func(_ context.Context, d draft.Draft) error {
+	m := pluginModule{ID: slackPlugin, OnPosted: map[string]outbox.Effect{builtin.EffectUnitClosed: func(_ context.Context, d draft.Draft) error {
 		closed = append(closed, d.Unit)
 		return nil
 	}}}
@@ -375,7 +374,7 @@ func TestUnitClosedEndsTheUnitsTasksOnce(t *testing.T) {
 	newSvc := func() *outbox.Service {
 		return withDraftGates(db, clock.Now, &outbox.Service{Store: db.Drafts(), Clock: clock,
 			Effects: func(unit.ProviderID) (port.Effects, error) { return okEffects{}, nil },
-			Applier: outbox.EffectApplier{Store: db.DraftEffects(), Clock: clock, Effects: effectLookup(effectDeps{Ends: tasks, Modules: []source.Module{m}})}})
+			Applier: outbox.EffectApplier{Store: db.DraftEffects(), Clock: clock, Effects: effectLookup(effectDeps{Ends: tasks, Modules: []pluginModule{m}})}})
 	}
 	svc := newSvc()
 	open := task.Task{ID: "t-00000000000000c1", State: "waiting", Category: task.CategoryWaiting, Title: "Ana's ask", Units: []unit.Unit{draftThread},

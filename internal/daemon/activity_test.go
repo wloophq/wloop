@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -129,7 +131,7 @@ func TestActivitySkipsEventsOutsideTheInventoryAndMarksMine(t *testing.T) {
 	s := newServer(t)
 	ctx := context.Background()
 	mine := github.Ref{Owner: "acme", Repo: "api", Number: 9}
-	s.store().UpsertPR(ctx, dinv.PR{Ref: mine, Title: "Mine", Author: "Me", State: "OPEN"})
+	inventorytest.Of(s.store()).UpsertPR(ctx, dinv.PR{Ref: mine, Title: "Mine", Author: "Me", State: "OPEN"})
 	orphan := github.Ref{Owner: "acme", Repo: "gone", Number: 1}
 	if _, err := s.store().AppendEvents(ctx, []dinv.Event{
 		{PR: mine, Kind: dinv.KindPush, Key: "m1", Actor: "me", At: s.deps.Now().Add(time.Second)},
@@ -159,7 +161,7 @@ func TestActivityBudget(t *testing.T) {
 	var evs []dinv.Event
 	for n := 100; n < 316; n++ {
 		ref := github.Ref{Owner: "acme", Repo: "api", Number: n}
-		if err := s.store().UpsertPR(ctx, dinv.PR{Ref: ref, Title: "T", Author: "ana", State: "OPEN"}); err != nil {
+		if err := inventorytest.Of(s.store()).UpsertPR(ctx, dinv.PR{Ref: ref, Title: "T", Author: "ana", State: "OPEN"}); err != nil {
 			t.Fatal(err)
 		}
 		evs = append(evs, dinv.Event{PR: ref, Kind: dinv.KindPush, Key: "p", Actor: "ana", At: s.deps.Now().Add(time.Duration(n) * time.Second)})

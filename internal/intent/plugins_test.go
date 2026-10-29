@@ -77,6 +77,7 @@ func TestAPluginsProfileLayerLoadsOnlyWhenEnabled(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			cfg := config.Config{Profile: user, Plugins: config.Plugins{Other: c.sw}}
+			cfg.Plugins.GitHub.Enabled = &off
 			l, problems := Load(profile.Chain(cfg), withBundledTasks(t, profiles.Default), testBase(), nil)
 			if len(problems) > 0 {
 				t.Fatalf("%s", problems.Error())
@@ -146,6 +147,7 @@ func TestTheBundledSlackLayerLoadsWithNoPluginDirectory(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			var cfg config.Config
 			cfg.Plugins.Slack.Enabled = c.on
+			cfg.Plugins.GitHub.Enabled = &off
 			l, problems := Load(profile.Chain(cfg), bundledFS(), testBase(), nil)
 			if len(problems) > 0 {
 				t.Fatalf("%s", problems.Error())
@@ -177,12 +179,34 @@ func TestAUserOverridesAWorkflowOfAPluginsLayer(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "text.md.tmpl"), []byte("Closing."), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	l, problems := Load(profile.Chain(config.Config{Profile: user}), bundledFS(), testBase(), nil)
+	cfg := config.Config{Profile: user}
+	off := false
+	cfg.Plugins.GitHub.Enabled = &off
+	l, problems := Load(profile.Chain(cfg), bundledFS(), testBase(), nil)
 	if len(problems) > 0 {
 		t.Fatalf("%s", problems.Error())
 	}
 	i := slices.IndexFunc(l.Workflows, func(w workflow.Workflow) bool { return w.Name == "slack-closure" })
 	if i < 0 || !slices.Equal(l.Workflows[i].Overrides, []string{"text.md.tmpl"}) {
 		t.Fatalf("slack-closure %+v", l.Workflows)
+	}
+}
+
+func TestAUserOverridesAnIntentOfAPluginsLayer(t *testing.T) {
+	plugin, user := t.TempDir(), t.TempDir()
+	writeIntent(t, plugin, "greet", minimal, "{{.Headline}}")
+	writeFile(t, filepath.Join(user, "intents", "greet", "instructions.md.tmpl"), "mine")
+	layers := []profile.Layer{
+		{Name: "bundled", Source: "embedded"},
+		{Name: profile.PluginLayer("acme"), Source: plugin, Dir: plugin},
+		userLayer(user)[1],
+	}
+	l, problems := Load(layers, fstest.MapFS{DefaultsFile: {Data: []byte(testDefaults)}}, testBase(), nil)
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	d, ok := l.Registry.Get("greet")
+	if !ok || !d.Bundled || d.Summary != "Ask the author one question" || d.Source.Layer != "user" || !slices.Equal(d.Source.Overrides, []string{"instructions.md.tmpl"}) {
+		t.Fatalf("%+v", d)
 	}
 }

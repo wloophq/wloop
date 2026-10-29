@@ -160,11 +160,11 @@ func TestProfileCheckFitsANarrowTerminal(t *testing.T) {
 func TestProfileCheckNamesTheBundledFilesAProfileOverrides(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	nudge, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "intents", "nudge", "instructions.md.tmpl"))
+	nudge, err := readBundled("intents/nudge/instructions.md.tmpl")
 	if err != nil {
 		t.Fatal(err)
 	}
-	wf, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "workflows", "review-first-round", "workflow.toml"))
+	wf, err := readBundled("workflows/review-first-round/workflow.toml")
 	if err != nil {
 		t.Fatal(err)
 	}

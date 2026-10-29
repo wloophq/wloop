@@ -6,20 +6,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
+	"io"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
+	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brief"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dchange "github.com/wloophq/wloop/internal/domain/github/change"
 	"github.com/wloophq/wloop/internal/domain/round"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
-	"github.com/wloophq/wloop/internal/source"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/turn"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
@@ -27,6 +29,7 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/ingest"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/daemon"
@@ -93,40 +96,50 @@ func roleIntents(b dturn.Book, roles ...string) []dturn.Intent {
 	return out
 }
 
-// githubClients are GitHub's clients while its plugin runs in the host's
-// process.
-type githubClients struct {
-	ghsource.Clients
-	// viaPlugin makes serve send the API's requests through the GitHub
-	// plugin.
-	viaPlugin bool
+// githubBudget is the budget of the GitHub plugin's API as it last
+// named it, which the daemon's health and the brief queue read with no
+// call.
+type githubBudget struct{ last atomic.Pointer[namedBudget] }
+
+type namedBudget struct {
+	low bool
+	rl  api.RateLimit
 }
 
-func newGitHubClients() githubClients {
-	return githubClients{Clients: ghsource.NewClients(), viaPlugin: true}
+// Low says the budget refuses background reads.
+func (b *githubBudget) Low() bool {
+	l := b.last.Load()
+	return l != nil && l.low
 }
 
-// restoreBudget sets the client's floors from cfg and seeds its budget with
-// the one the GitHub plugin keeps, when it runs.
-func (e *Env) restoreBudget(ctx context.Context, cfg config.Config, logf func(string, ...any)) {
-	e.github.SetFloors(cfg.GitHub.RateLimitFraction)
-	if err := e.syncGitHubBudget(ctx); err != nil && !errors.Is(err, src.ErrUnavailable) && !errors.Is(err, src.ErrUnsupported) {
-		logf("GitHub budget: %v", err)
+// RateLimit is the GraphQL bucket, which the searches and the sweeps spend.
+func (b *githubBudget) RateLimit() api.RateLimit {
+	if l := b.last.Load(); l != nil {
+		return l.rl
 	}
+	return api.RateLimit{}
 }
 
-// syncGitHubBudget seeds the client's budget with the one the running
-// GitHub plugin keeps, which its own reads spent.
+// allow says whether a read of p may spend the budget now: a user's
+// always may.
+func (b *githubBudget) allow(p dgh.Priority) bool { return p == dgh.PriorityUser || !b.Low() }
+
+// syncGitHubBudget keeps the budget the running GitHub plugin names.
 func (e *Env) syncGitHubBudget(ctx context.Context) error {
-	raw, err := e.forgeCalls().Action(ctx, src.ActionRequest{Action: ghsource.ActionBudget})
+	raw, err := e.forgeCalls().View(ctx, src.ViewRequest{View: ghsource.ViewBudget})
 	if err != nil {
 		return err
 	}
-	var limits map[dgh.Resource]dgh.Limit
-	if err := json.Unmarshal(raw, &limits); err != nil {
+	var b struct {
+		Low       bool      `json:"low"`
+		Remaining int       `json:"remaining"`
+		Limit     int       `json:"limit"`
+		ResetAt   time.Time `json:"reset_at"`
+	}
+	if err := json.Unmarshal(raw, &b); err != nil {
 		return fmt.Errorf("the GitHub plugin's budget: %w", err)
 	}
-	e.github.API.Restore(slices.Collect(maps.Values(limits)))
+	e.budget.last.Store(&namedBudget{low: b.Low, rl: api.RateLimit{Remaining: b.Remaining, Limit: b.Limit, ResetAt: b.ResetAt}})
 	return nil
 }
 
@@ -138,17 +151,6 @@ func (e *Env) githubPlugin() (*src.Client, error) {
 	return e.pluginKind.Client(string(unit.GitHub))
 }
 
-// failedSteps reads the failed steps of a check's job from GitHub.
-func (e *Env) failedSteps() func(ctx context.Context, owner, repo string, job int64) ([]string, error) {
-	return ghsource.FailedSteps(e.github.API)
-}
-
-// withGitHubClient is d with GitHub's API client.
-func (e *Env) withGitHubClient(d source.Deps) source.Deps {
-	d.GitHub = e.github.API
-	return d
-}
-
 // withGitHubBriefs is d briefing pull requests the GitHub plugin reads,
 // under its budget.
 func (e *Env) withGitHubBriefs(d brief.Deps) brief.Deps {
@@ -158,7 +160,7 @@ func (e *Env) withGitHubBriefs(d brief.Deps) brief.Deps {
 		}
 		return e.githubPlugin()
 	})
-	d.Allow = e.github.API.Allow
+	d.Allow = e.budget.allow
 	return d
 }
 
@@ -177,9 +179,12 @@ func briefHome(cfg config.Config) func(pr.Ref) string {
 
 // githubPresenter are the GitHub presenter's deps over the env's client.
 func (e *Env) githubPresenter(store *inventory.Store, host src.Host, briefs *interruptFirst) present.Deps {
-	deps := present.Deps{Store: store, Reports: e.sourceReports(store), Host: host, Explorer: e.github.API, Budget: e.githubBudget(), FailedSteps: e.failedSteps(),
+	deps := present.Deps{Store: store, Reports: e.sourceReports(store), Host: host,
 		Plugin: func(ctx context.Context, req src.ActionRequest) (json.RawMessage, error) {
 			return e.forgeCalls().Action(ctx, req)
+		},
+		View: func(ctx context.Context, req src.ViewRequest) (json.RawMessage, error) {
+			return e.forgeCalls().View(ctx, req)
 		}}
 	if briefs != nil {
 		deps.Briefs = briefs
@@ -198,8 +203,6 @@ func withGitHub(d daemon.Deps, deps present.Deps) daemon.Deps {
 	d.Repo = present.Repo
 	return d
 }
-
-func (e *Env) githubBudget() daemon.Budget { return ghsource.Budget{Limiter: e.github.API} }
 
 // githubIdentity is the viewer as the GitHub plugin last named them, which
 // st keeps for the in-process rows and facts; asked of the plugin while st
@@ -223,7 +226,8 @@ func (e *Env) githubIdentity(st *inventory.Store, logf func(string, ...any)) fun
 }
 
 // forgeCalls is the forge's plugin as the round commands call it: the one
-// set on e, else the running plugin's client, else GitHub's in process.
+// set on e, else the running plugin's client, else its binary run in CLI
+// mode, which serves its commands alone.
 func (e *Env) forgeCalls() forgeCalls {
 	if e.forge != nil {
 		return e.forge
@@ -233,7 +237,36 @@ func (e *Env) forgeCalls() forgeCalls {
 			return c
 		}
 	}
-	return e.github.Local()
+	return binaryForge{e}
+}
+
+// binaryForge is the GitHub plugin's binary, run in CLI mode for each
+// command; what only the running plugin answers is unavailable.
+type binaryForge struct{ e *Env }
+
+func (binaryForge) Identity(context.Context) (src.Identity, error) {
+	return src.Identity{}, fmt.Errorf("the GitHub plugin does not run: %w", src.ErrUnavailable)
+}
+
+func (binaryForge) Action(_ context.Context, req src.ActionRequest) (json.RawMessage, error) {
+	return nil, fmt.Errorf("the GitHub plugin does not run, so %s waits: %w", req.Action, src.ErrUnavailable)
+}
+
+func (binaryForge) View(_ context.Context, req src.ViewRequest) (json.RawMessage, error) {
+	return nil, fmt.Errorf("the GitHub plugin does not run, so %s waits: %w", req.View, src.ErrUnavailable)
+}
+
+func (f binaryForge) RunCLI(ctx context.Context, req src.CLIRequest, stdout, stderr io.Writer) (int, error) {
+	cfg, err := f.e.loadConfig()
+	if err != nil {
+		return 0, err
+	}
+	err = f.e.runPluginBinaryTo(ctx, cfg, string(unit.GitHub), req.Args, req.Stdin, stdout)
+	var code exitCode
+	if errors.As(err, &code) {
+		return int(code), nil
+	}
+	return 0, err
 }
 
 // forgeAuthenticated asks the forge's plugin whether gh is installed and
@@ -298,6 +331,12 @@ type reportedPRs interface {
 
 // reportedInputs are the pull requests the GitHub plugin last reported, as
 // the host's facts, holdings, placements and round sends read them.
+// reportedPRs are the pull requests the running GitHub plugin last
+// reported.
+func (e *Env) reportedPRs() prrow.ReportedPRs {
+	return prrow.ReportedPRs{Reports: e.sourceReports(e.Store)}
+}
+
 func (e *Env) reportedInputs() reportedPRs {
 	return ghsource.ReportedInputs{Reports: e.sourceReports(e.Store), Store: e.Store}
 }
@@ -407,8 +446,8 @@ const (
 // the host's process over what the GitHub plugin reports; its ingestion,
 // its slow sweep, its tracks and its checkouts are the plugin's, which serve
 // runs. Outside serve it reads nothing.
-func (e *Env) githubModule(build source.Build) source.Build {
-	return func(cfg config.Config, d source.Deps) (source.Module, error) {
+func (e *Env) githubModule(build moduleBuild) moduleBuild {
+	return func(cfg config.Config, d moduleDeps) (pluginModule, error) {
 		m, err := build(cfg, d)
 		if err != nil || e.pluginKind == nil {
 			return m, err
@@ -419,7 +458,7 @@ func (e *Env) githubModule(build source.Build) source.Build {
 
 // relayGitHub is m with its ingestion, slow sweep, tracks, checkouts,
 // publisher and proposals relayed to the GitHub plugin serve runs.
-func (e *Env) relayGitHub(cfg config.Config, m source.Module) (source.Module, error) {
+func (e *Env) relayGitHub(cfg config.Config, m pluginModule) (pluginModule, error) {
 	r := relay{id: unit.GitHub, kind: e.pluginKind, now: e.Now, units: psource.Units{Codecs: e.unitCodecs()}}
 	every := time.Duration(cmp.Or(cfg.Sweep.Fast, config.Defaults().Sweep.Fast))
 	m.Ingest = ingest.Job{Every: every, Prepare: func(ctx context.Context, now time.Time) (ingest.Plan, string, error) {
@@ -439,17 +478,16 @@ func (e *Env) relayGitHub(cfg config.Config, m source.Module) (source.Module, er
 	m.Checkouts = pluginCheckouts{psource.Checkouts{ID: string(unit.GitHub), Units: r.units, Kind: e.pluginKind}}
 	s, err := e.pluginSource(unit.GitHub)
 	if err != nil {
-		return source.Module{}, err
+		return pluginModule{}, err
 	}
 	m.Publisher = psource.Publisher{ID: string(unit.GitHub), Source: s, Units: r.units, Kind: e.pluginKind}
 	m.Proposals = psource.Proposals{ID: string(unit.GitHub), Units: r.units, Kind: e.pluginKind}.Proposals
 	return m, nil
 }
 
-// afterGitHubJob seeds the host's GitHub client with the budget the
-// plugin's job left.
+// afterGitHubJob keeps the budget the plugin's job left.
 func (e *Env) afterGitHubJob(ctx context.Context) {
-	if err := e.syncGitHubBudget(ctx); err != nil && !errors.Is(err, src.ErrUnavailable) && !errors.Is(err, src.ErrUnsupported) {
+	if err := e.syncGitHubBudget(ctx); err != nil && ctx.Err() == nil && !errors.Is(err, src.ErrUnavailable) && !errors.Is(err, src.ErrUnsupported) {
 		e.warnf("GitHub budget: %v", err)
 	}
 }
@@ -457,21 +495,19 @@ func (e *Env) afterGitHubJob(ctx context.Context) {
 // pluginCheckouts are a plugin's checkouts as a module serves them.
 type pluginCheckouts struct{ c psource.Checkouts }
 
-func (p pluginCheckouts) Checkout(ctx context.Context, u unit.Unit) (source.Checkout, bool, error) {
+func (p pluginCheckouts) Checkout(ctx context.Context, u unit.Unit) (unitCheckout, bool, error) {
 	c, ok, err := p.c.Checkout(ctx, u)
-	return source.Checkout{Repo: c.Repo, Branch: c.Branch, Head: c.Head}, ok, err
+	return unitCheckout{Repo: c.Repo, Branch: c.Branch, Head: c.Head}, ok, err
 }
 
 // withGitHubBroker is b, the broker of plugin id, with what only the GitHub
-// plugin is served: the store keeps the pull requests it reports and the
-// viewer it names, for the rows, facts and presenter that still run in the
-// host's process.
+// plugin is served: the store keeps the viewer it names, which the rows
+// and facts read with no call.
 func (e *Env) withGitHubBroker(b *psource.Broker, id string, db *sqlite.DB) *psource.Broker {
 	if id != string(unit.GitHub) {
 		return b
 	}
 	st := inventory.New(db)
-	b.Reported = ghsource.Reported(st)
 	note := b.Note
 	b.Note = func(t port.Topic, units ...unit.Unit) {
 		if note != nil {
@@ -504,22 +540,6 @@ func (e *Env) keepGitHubIdentity(ctx context.Context, st *inventory.Store) {
 func (e *Env) githubLoaded(ctx context.Context, db *sqlite.DB) {
 	e.afterGitHubJob(ctx)
 	e.keepGitHubIdentity(ctx, inventory.New(db))
-}
-
-// viaGitHubPlugin points e's GitHub client at the running GitHub plugin,
-// which sends every request with its credentials, unless a test set the
-// client.
-func (e *Env) viaGitHubPlugin() {
-	if !e.github.viaPlugin {
-		return
-	}
-	e.github.API = ghsource.PluginClient(func(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
-		c, err := e.githubPlugin()
-		if err != nil {
-			return nil, err
-		}
-		return c.Action(ctx, src.ActionRequest{Action: ghsource.ActionForward, Args: args})
-	}, e.Now)
 }
 
 // workspaceListing is the host's workspaces of repo, "owner/name", every
@@ -616,4 +636,58 @@ func (r lateReports) Reported(ctx context.Context, units []unit.Unit) (map[unit.
 		return nil, nil
 	}
 	return r.e.pluginKind.Snapshots.Reported(ctx, units)
+}
+
+// githubHostModule is the GitHub source as it runs in the host's process: the pull
+// requests the GitHub plugin reports, served as prrow's rows. Its ingestion
+// job reads nothing and it publishes nothing: the composition root makes
+// the plugin's job, publisher and proposals its own.
+func githubHostModule(cfg config.Config, d moduleDeps) (pluginModule, error) {
+	var briefs prrow.Briefs
+	if d.Briefs != nil {
+		briefs = d.Briefs
+	}
+	var cat readmodel.Presenter = psource.BundledCatalog(string(unit.GitHub))
+	if d.Catalog != nil {
+		cat = d.Catalog(unit.GitHub)
+	}
+	return pluginModule{
+		ID:     unit.GitHub,
+		Codec:  pr.Codec{},
+		Ingest: githubIdleJob(cfg),
+		Rows: func(rd readmodel.RowDeps) readmodel.Provider {
+			return prrow.New(prrow.Source{RowDeps: rd, Reports: d.Reports, Store: d.Inventory, Briefs: briefs, Catalog: cat})
+		},
+		Facts:      githubFactsOf(cfg, d),
+		Slow:       func(context.Context) (string, string, error) { return "skipped", "the GitHub plugin does not run", nil },
+		Items:      ghsource.Cards{Reports: d.Reports}.Items,
+		Card:       ghsource.Cards{Reports: d.Reports}.Card,
+		Identity:   ghsource.IdentityOf(d.Inventory),
+		UnitEvents: ghsource.UnitEvents{Store: d.Inventory},
+		Detail:     true,
+		Briefs:     brief.GitHubSource{Store: prrow.ReportedPRs{Reports: d.Reports}, Retry: time.Duration(cfg.Sweep.Slow)},
+	}, nil
+}
+
+func githubFactsOf(cfg config.Config, d moduleDeps) automation.Units {
+	fd := ghsource.FactsDeps{Reports: d.Reports, Store: d.Inventory, WS: d.WS, Git: d.Git, Cfg: cfg, Clock: d.Clock, Intents: d.Intents}
+	if d.Changes != nil {
+		fd.Changes = d.Changes
+	}
+	if d.DB != nil {
+		fd.Rounds = sqlite.NewRounds(d.DB)
+	}
+	if d.Turns != nil {
+		fd.Books = d.Turns.Store
+	}
+	return ghsource.FactsOf(fd)
+}
+
+// githubIdleJob is the ingestion job of a module whose plugin does not run: it
+// reads nothing.
+func githubIdleJob(cfg config.Config) ingest.Job {
+	return ingest.Job{Every: time.Duration(cmp.Or(cfg.Sweep.Fast, config.Defaults().Sweep.Fast)),
+		Prepare: func(context.Context, time.Time) (ingest.Plan, string, error) {
+			return ingest.Plan{}, "the GitHub plugin does not run", nil
+		}}
 }

@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/adapter/store/storetest"
 	"github.com/wloophq/wloop/internal/api"
@@ -92,7 +94,7 @@ func (r *rig) model() *readmodel.Model {
 	if r.reports != nil {
 		reports = r.reports
 	}
-	src := prrow.Source{Store: r.f.Inventory, Reports: reports, Briefs: brief.New(brief.Deps{Store: r.f.Inventory}),
+	src := prrow.Source{Store: r.f.Inventory, Reports: reports, Briefs: brief.New(brief.Deps{Store: r.f.Inventory, PRs: inventorytest.Of(r.f.Inventory)}),
 		RowDeps: readmodel.RowDeps{Books: r.f.Turns, Sessions: r.f.Turns, Activity: r.f.DB, Intakes: r.f.DB.Intakes().Open, Intake: intakeView,
 			Settings: func() readmodel.RowSettings { return readmodel.RowSettings{Cfg: r.cfg, Loaded: r.loaded, GateOn: true} }}}
 	m := readmodel.New(r.f.Log, r.f.DB, r, readmodel.AgentsFunc(r.lastAgents), r, counting{prrow.New(src), &r.listed})
@@ -453,7 +455,7 @@ func TestRebuildPublishesOnlyChangedRows(t *testing.T) {
 	eventually(t, "the note's rebuild", func() bool { return r.listed.Load() > rebuilds })
 
 	ref := f.Open[3]
-	if err := f.Inventory.SetOverride(context.Background(), dinv.Override{PR: ref, Hold: true}); err != nil {
+	if err := inventorytest.Of(f.Inventory).SetOverride(context.Background(), dinv.Override{PR: ref, Hold: true}); err != nil {
 		t.Fatal(err)
 	}
 	var c api.Change
@@ -477,7 +479,7 @@ func TestReadYourWrites(t *testing.T) {
 	r.rows(r.m, api.Since{})
 	ref := f.Open[5]
 	until := f.Now.Add(48 * time.Hour)
-	if err := f.Inventory.SetOverride(context.Background(), dinv.Override{PR: ref, MutedUntil: until}); err != nil {
+	if err := inventorytest.Of(f.Inventory).SetOverride(context.Background(), dinv.Override{PR: ref, MutedUntil: until}); err != nil {
 		t.Fatal(err)
 	}
 	row, ok, err := r.m.Row(context.Background(), ref.Unit(), catalog.Asked{})
@@ -490,7 +492,7 @@ func TestConcurrentReadersShareOneRebuild(t *testing.T) {
 	f := storetest.Seeded(t, storetest.Live)
 	r := newRig(t, f)
 	r.rows(r.m, api.Since{})
-	if err := f.Inventory.SetOverride(context.Background(), dinv.Override{PR: f.Open[0], Hold: true}); err != nil {
+	if err := inventorytest.Of(f.Inventory).SetOverride(context.Background(), dinv.Override{PR: f.Open[0], Hold: true}); err != nil {
 		t.Fatal(err)
 	}
 	before := r.listed.Load()
@@ -524,7 +526,7 @@ func writer(r *rig, n int) error {
 	at := f.Now.Add(time.Duration(n) * time.Second)
 	switch n % 9 {
 	case 0:
-		return f.Inventory.SetOverride(ctx, dinv.Override{PR: ref, MutedUntil: f.Now.Add(time.Duration(1+n%3) * time.Hour)})
+		return inventorytest.Of(f.Inventory).SetOverride(ctx, dinv.Override{PR: ref, MutedUntil: f.Now.Add(time.Duration(1+n%3) * time.Hour)})
 	case 1:
 		_, err := f.Inventory.AppendEvents(ctx, []dinv.Event{{PR: ref, Kind: dinv.KindComment, Key: fmt.Sprintf("script-%d", n), Actor: viewer, At: at}})
 		return err
@@ -534,12 +536,12 @@ func writer(r *rig, n int) error {
 	case 3:
 		return f.Inventory.RecordEvent(ctx, dinv.Event{PR: ref, Kind: dinv.KindNudged, Key: fmt.Sprintf("script-%d", n), At: at, Data: "@user-03"})
 	case 4:
-		return f.Inventory.SetOverride(ctx, dinv.Override{PR: ref, Hold: n%2 == 0, Adopted: true})
+		return inventorytest.Of(f.Inventory).SetOverride(ctx, dinv.Override{PR: ref, Hold: n%2 == 0, Adopted: true})
 	case 5:
 		r.propose(ref.Unit(), round.Pending{Intent: "follow-up", Reason: fmt.Sprintf("script %d", n), Since: at, Deadline: at.Add(time.Minute)})
 		return nil
 	case 6:
-		p, ok, err := f.Inventory.PR(ctx, ref)
+		p, ok, err := inventorytest.Of(f.Inventory).PR(ctx, ref)
 		if err != nil || !ok {
 			return fmt.Errorf("%s: %v %v", ref, ok, err)
 		}
@@ -547,11 +549,11 @@ func writer(r *rig, n int) error {
 		if n%3 == 0 {
 			p.State, p.MergedAt, p.ClosedAt = "MERGED", at, at
 		}
-		return f.Inventory.UpsertPR(ctx, p)
+		return inventorytest.Of(f.Inventory).UpsertPR(ctx, p)
 	case 7:
-		return f.Inventory.SetReasons(ctx, f.Open[58+(n/9)%4], nil)
+		return inventorytest.Of(f.Inventory).SetReasons(ctx, f.Open[58+(n/9)%4], nil)
 	default:
-		return f.Inventory.SetReasons(ctx, f.Open[58+(n/9+2)%4], []string{"review-requested"})
+		return inventorytest.Of(f.Inventory).SetReasons(ctx, f.Open[58+(n/9+2)%4], []string{"review-requested"})
 	}
 }
 
@@ -700,7 +702,7 @@ func TestClockFlipsStalledAndRenudge(t *testing.T) {
 		{Ref: waits, Title: "Waits", Author: "ana", State: "OPEN", HeadOid: "h1", ReviewRequests: []string{viewer}, Reasons: []string{"review-requested"}},
 		{Ref: nudged, Title: "Nudged", Author: viewer, State: "OPEN", HeadOid: "h2", ReviewRequests: []string{"bia"}, Reasons: []string{"author"}},
 	} {
-		if err := f.Inventory.UpsertPR(ctx, p); err != nil {
+		if err := inventorytest.Of(f.Inventory).UpsertPR(ctx, p); err != nil {
 			t.Fatal(err)
 		}
 	}

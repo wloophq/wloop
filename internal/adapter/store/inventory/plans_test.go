@@ -60,7 +60,6 @@ var hotPlans = []hotPlan{
 	{name: "events of units", query: eventsByUnitsSQL, args: 1, want: []string{"events_unit (provider=? AND unit_key=?)"}, tempSorts: []string{"USE TEMP B-TREE FOR ORDER BY"}},
 	{name: "outages", query: outagesSQL, args: 1, want: []string{"events_kind (kind=? AND at>?)"}},
 	{name: "latest bundle", query: latestBundleSQL, args: 2, want: []string{"turn_instructions_kind (kind=? AND repo=?)"}},
-	{name: "open pull requests", query: listPRsSQL(true), want: []string{"pr_state (state=?)"}, tempSorts: []string{"USE TEMP B-TREE FOR LAST 3 TERMS OF ORDER BY"}},
 	{name: "tag vocabulary", query: tagVocabularySQL(2), args: 4, want: []string{"events_kind (kind=?)"}, tempSorts: []string{"USE TEMP B-TREE FOR GROUP BY", "USE TEMP B-TREE FOR ORDER BY"}},
 }
 
@@ -130,6 +129,9 @@ var indexesPlannedElsewhere = []string{
 	"tasks_state", "tasks_rev", "tasks_category", "task_items_unit", "task_units_unit",
 	"projects_slug", "review_runs_open",
 	"links_to",
+	// pr_state is of the version 6 pull_requests, which the host no longer
+	// reads.
+	"pr_state",
 	"drafts_state", "drafts_unit", "drafts_task", "drafts_rule", "drafts_workflow",
 	"gates_due", "gates_task", "gates_unit",
 }

@@ -294,10 +294,6 @@ type Deps struct {
 	// event subscribers as they come; nil raises none.
 	Notices Notices
 
-	// FailedSteps names the failed steps of a GitHub Actions job; nil names
-	// none.
-	FailedSteps func(ctx context.Context, owner, repo string, jobID int64) ([]string, error)
-
 	// MCP serves agents' MCP sessions on 127.0.0.1:MCPPort; nil listens on
 	// no MCP port.
 	MCP http.Handler

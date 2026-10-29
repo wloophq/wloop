@@ -9,6 +9,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -210,7 +212,7 @@ func TestStartSleepsUntilTheEarliestDeadline(t *testing.T) {
 			ctx := context.Background()
 			run := dinv.BriefRun{PR: refN(1), Trigger: TriggerBackground, StartedAt: t0.Add(-time.Minute), EndedAt: t0, Outcome: OutcomeFailed, Error: "boom"}
 			_, v := s.q.version(refN(1))
-			p, _, _ := s.st.PR(ctx, refN(1))
+			p, _, _ := inventorytest.Of(s.st).PR(ctx, refN(1))
 			run.AttemptOf, run.Version = attemptOf(p, v), v
 			id, err := s.st.StartBriefRun(ctx, run)
 			if err != nil {

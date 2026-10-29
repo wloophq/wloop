@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
@@ -162,7 +164,7 @@ func TestDoctorRepoWithAPullRequestUsesItsTags(t *testing.T) {
 	os.MkdirAll(filepath.Dir(block), 0o700)
 	os.WriteFile(block, []byte("Behavior must not change."), 0o600)
 	te.cfg.Profile, te.cfg.Brief.Enabled = user, true
-	if err := te.Store.UpsertPR(context.Background(), dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", BaseBranch: "main", URL: r7.URL()}); err != nil {
+	if err := inventorytest.Of(te.Store).UpsertPR(context.Background(), dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", BaseBranch: "main", URL: r7.URL()}); err != nil {
 		t.Fatal(err)
 	}
 	seedBriefOf(t, te.Store, r7, "change:refac")
@@ -190,7 +192,7 @@ func TestTheDaemonsFactsCarryTheBriefTextToTheCommandLine(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.Brief.Enabled = true
 	ctx := context.Background()
-	if err := te.Store.UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", BaseBranch: "main", URL: r7.URL()}); err != nil {
+	if err := inventorytest.Of(te.Store).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", BaseBranch: "main", URL: r7.URL()}); err != nil {
 		t.Fatal(err)
 	}
 	seedBriefOf(t, te.Store, r7)

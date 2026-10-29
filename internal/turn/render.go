@@ -184,7 +184,9 @@ func instructionsOf(d dintent.Def, l *intentload.Loaded, devDir string) (*templa
 	switch {
 	case d.Bundled && !slices.Contains(d.Source.Overrides, "instructions.md.tmpl"):
 		if raw, err = os.ReadFile(filepath.Join(devDir, filepath.FromSlash(rel))); errors.Is(err, fs.ErrNotExist) {
-			raw, err = fs.ReadFile(BundledFS(), rel)
+			var r profile.Resolved
+			r, err = profile.Resolve(profile.BundledChain(), rel)
+			raw = r.Body
 		}
 	default:
 		raw, err = os.ReadFile(filepath.Join(d.Source.Dir, "instructions.md.tmpl"))

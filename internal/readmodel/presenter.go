@@ -8,3 +8,9 @@ type Presenter interface {
 	Facets() []api.FacetSpec
 	Situations() []api.SituationSpec
 }
+
+// EventPresenter is optional on a Presenter: the words of its event kinds.
+type EventPresenter interface {
+	Events() []api.EventSpec
+	Details() []api.DetailSpec
+}

@@ -11,34 +11,14 @@ function apiError(out, fallback, status) {
   return out.fix ? `${msg}; run: ${out.fix}` : msg;
 }
 
-const EXPLORE_FILTERS = [
-  { term: "-reviewed-by:@me", label: "Not reviewed by me" },
-  { term: "draft:false", label: "Ready for review" },
-  { term: "review-requested:@me", label: "Requested from me or my teams" },
-  { window: 30, label: "Active in the last 30 days" },
-];
-const EXPLORE_PRESETS = [
-  { query: "user-review-requested:@me", label: "Asked of me" },
-  { query: "review-requested:@me -user-review-requested:@me", label: "Asked of my teams" },
-];
-const DEFAULT_SORT = "updated-asc";
-const EXPLORE_SORTS = [
-  { sort: DEFAULT_SORT, label: "Waiting longest", shown: "waiting longest" },
-  { sort: "created-asc", label: "Oldest opened", shown: "oldest opened" },
-  { sort: "updated-desc", label: "Recently updated", shown: "most recently updated" },
-];
-const REVIEW_LABEL = { APPROVED: "approved", CHANGES_REQUESTED: "changes requested", REVIEW_REQUIRED: "review required" };
-
 const SIZES = ["xs", "s", "m", "l", "xl"];
 const RISKS = ["low", "medium", "high"];
-const STRIP_LEGEND = [["me", "you"], ["author", "author"], ["reviewer", "reviewer"], ["loop", "loop"], ["nobody", "nobody"]];
-const STRIP_TITLE = { me: "Waits on you", author: "Waits on the author", reviewer: "Waits on a reviewer", loop: "Waits on the loop", nobody: "Waits on nobody" };
 const TAG_CHIPS = 3;
 
 // catalog is the daemon's served presentation (GET /api/catalog): its views
 // for the web, the lens's fields built from its facets, and the situations'
 // labels in rank order.
-const catalog = { version: "", views: [], fields: [], kinds: new Map(), kindOrder: [] };
+const catalog = { version: "", views: [], fields: [], strip: "", kinds: new Map(), kindOrder: [], events: new Map(), eventData: new Map(), loopEvents: new Set(), details: [], search: null };
 
 // MATCH is how a facet's match compares a row's value v with a query q.
 const MATCH = {
@@ -54,6 +34,33 @@ function applyCatalog(c) {
   catalog.kinds = new Map(sits.map((x) => [`${x.provider}:${x.kind}`, x.label]));
   catalog.kindOrder = [...new Set(sits.map((x) => x.kind))];
   catalog.fields = (c.facets || []).map(fieldOf);
+  catalog.events = new Map((c.events || []).map((e) => [e.kind, e.label]));
+  catalog.eventData = new Map((c.events || []).filter((e) => e.data).map((e) => [e.kind, e.data]));
+  catalog.loopEvents = new Set((c.events || []).filter((e) => e.loop).map((e) => e.kind));
+  catalog.strip = ((c.facets || []).find((f) => f.strip) || {}).id || "";
+  catalog.details = c.details || [];
+  catalog.search = ((c.views || []).find((v) => v.search) || {}).search || null;
+}
+
+// exploreSearch is the served Explore search: its presets, filters, sorts
+// and the review decisions' words.
+function exploreSearch() {
+  return catalog.search || { presets: [], filters: [], sorts: [], decisions: {}, no_decision: "", default_sort: "" };
+}
+
+function reviewDecision(decision) {
+  const s = exploreSearch();
+  return (s.decisions || {})[decision] || s.no_decision || "";
+}
+
+// eventLabel is an event kind in a few words: its plugin's, else the core's.
+function eventLabel(kind) {
+  return catalog.events.get(kind) || EVENT_LABEL[kind] || kind.replaceAll("_", " ");
+}
+
+// loopEvent says whether an event kind is the loop's doing.
+function loopEvent(kind) {
+  return LOOP_EVENTS.has(kind) || catalog.loopEvents.has(kind);
 }
 
 function kindLabel(kind, provider) {
@@ -134,20 +141,15 @@ function sm(r) {
 }
 
 const EVENT_LABEL = {
-  opened: "opened", push: "pushed", review_requested: "review requested", review_request_removed: "review request removed",
-  review: "reviewed", comment: "commented", check: "checks", ready: "ready for review", draft: "back to draft",
-  merged: "merged", closed: "closed",
-  round_pending: "round pending", round_sent: "round sent", round_skipped: "round skipped", round_held: "round held",
-  round_blocked: "round blocked", round_unblocked: "round unblocked",
   held: "paused", released: "resumed", muted: "muted", unmuted: "unmuted", adopted: "adopted", status: "board",
-  removed: "workspace removed", nudged: "nudged", tracked: "tracked", untracked: "untracked", answered: "answered", guidance: "guidance",
+  removed: "workspace removed", nudged: "nudged", tracked: "tracked", untracked: "untracked", answered: "answered",
   turn_sent: "turn sent", turn_started: "turn started", turn_ended: "turn ended", turn_resumed: "turn resumed",
   turn_withdrawn: "turn withdrawn", question_dismissed: "question dismissed",
   turn_delivered: "turn delivered", answer_routed: "answer routed", late_record: "late record",
   stop_blocked: "stop blocked", turn_stopped: "turn stopped", guide_trimmed: "guide trimmed", dossier_restored: "dossier file restored", dossier_granted: "dossier granted to the session", dossier_call: "dossier compaction, US$", brief_waiting: "waiting for the brief", intake_accepted: "request accepted", intake_briefing: "request waits for the brief", intake_starting: "request starting", intake_started: "request started", intake_failed: "request failed", intake_canceled: "request canceled", intake_guidance: "request guidance replaced",
   workflow_step_ran: "step ran",
 };
-const LOOP_EVENTS = new Set(["round_pending", "round_sent", "round_skipped", "round_held", "round_blocked", "round_unblocked", "held", "released", "muted", "unmuted", "adopted", "status", "removed", "nudged", "tracked", "untracked", "answered", "guidance", "turn_sent", "turn_started", "turn_ended", "turn_resumed", "turn_withdrawn", "question_dismissed", "turn_delivered", "answer_routed", "late_record", "stop_blocked", "turn_stopped", "guide_trimmed", "dossier_restored", "dossier_granted", "dossier_call", "brief_waiting", "intake_accepted", "intake_briefing", "intake_starting", "intake_started", "intake_failed", "intake_canceled", "intake_guidance", "workflow_step_ran"]);
+const LOOP_EVENTS = new Set(["held", "released", "muted", "unmuted", "adopted", "status", "removed", "nudged", "tracked", "untracked", "answered", "turn_sent", "turn_started", "turn_ended", "turn_resumed", "turn_withdrawn", "question_dismissed", "turn_delivered", "answer_routed", "late_record", "stop_blocked", "turn_stopped", "guide_trimmed", "dossier_restored", "dossier_granted", "dossier_call", "brief_waiting", "intake_accepted", "intake_briefing", "intake_starting", "intake_started", "intake_failed", "intake_canceled", "intake_guidance", "workflow_step_ran"]);
 const LOOP_ONLY_KEY = "loop.activity.loopOnly";
 const DETAIL_WIDTH_KEY = "loop.detailWidth";
 const DETAIL_WIDTH_MIN = 300;
@@ -347,7 +349,7 @@ function matches(r, ts) {
 
 function matchesActivity(it, ts) {
   const e = it.event;
-  const fields = [it.title, eventRef(it), it.author, e.actor, EVENT_LABEL[e.kind] || e.kind, e.data].map(fold);
+  const fields = [it.title, eventRef(it), it.author, e.actor, eventLabel(e.kind), e.data].map(fold);
   return ts.every((t) => fields.some((f) => f.includes(t)));
 }
 
@@ -477,10 +479,15 @@ function waitingLabel(row) {
   return (sm(row).waits_on || "").split(", ").map((w) => resolveWho(row, w)).join(", ");
 }
 
+// waitField is the served facet whose value colors a row's strip.
+function waitField() {
+  return catalog.fields.find((f) => f.id === catalog.strip);
+}
+
 // waitCat is the class of whom a row waits on its strip shows: me, the
 // loop, a reviewer, the author, or nobody.
 function waitCat(row) {
-  return facetValues(row, "wait")[0] || "nobody";
+  return facetValues(row, catalog.strip)[0] || "nobody";
 }
 
 function waitClass(row) {
@@ -496,7 +503,8 @@ function isMine(author) {
 function stripTitle(row) {
   const cat = waitCat(row);
   const who = cat === "author" || cat === "reviewer" ? ` (${waitingLabel(row)})` : "";
-  return [`${STRIP_TITLE[cat] || cat}${who}: ${rowKindLabel(row)}`, sm(row).reason].filter(Boolean).join(". ");
+  const f = waitField();
+  return [`${f && f.show ? f.show(cat) : cat}${who}: ${rowKindLabel(row)}`, sm(row).reason].filter(Boolean).join(". ");
 }
 
 function isMuted(o) {
@@ -604,7 +612,7 @@ function readLens() {
 function effectiveGroup(lens) {
   if (lens.group) return lens.group;
   if (lens.layout !== "board") return "";
-  return lens.view === "stalled" ? "lane" : "wait";
+  return lens.view === "stalled" ? "lane" : catalog.strip;
 }
 
 function cmp(a, b) {
@@ -798,7 +806,7 @@ function candidatesYAML(meta, cands) {
       ["author", yamlString(c.author)],
       ["draft", c.draft ? "true" : ""],
       ["size", yamlString(`+${c.additions} -${c.deletions}, ${c.changed_files} file${c.changed_files === 1 ? "" : "s"}`)],
-      ["review", yamlString(REVIEW_LABEL[c.review_decision] || "no review required")],
+      ["review", yamlString(reviewDecision(c.review_decision))],
       ["checks", yamlString(c.checks ? c.checks.toLowerCase() : "none")],
       ["asks", asks.length ? `[${asks.map(yamlString).join(", ")}]` : ""],
       ["my_review", c.my_review ? yamlString(c.my_review.toLowerCase()) : ""],
@@ -882,9 +890,11 @@ function lensChips(lens, applied) {
 }
 
 function stripLegend() {
-  return h("span", { class: "legend", title: "The strip on the left of each pull request is the color of whom it waits on" },
-    h("span", { class: "lens-label" }, "Waits on:"),
-    STRIP_LEGEND.map(([cat, label]) => h("span", { class: "lg w-" + cat }, h("span", { class: "sw", "aria-hidden": "true" }), label)));
+  const f = waitField();
+  if (!f || !f.rank) return null;
+  return h("span", { class: "legend", title: "The strip on the left of each row is the color of whom it waits on" },
+    h("span", { class: "lens-label" }, `${f.label}:`),
+    f.rank.map((cat) => h("span", { class: "lg w-" + cat }, h("span", { class: "sw", "aria-hidden": "true" }), f.show ? f.show(cat) : cat)));
 }
 
 function lensSelect(id, label, value, options, onchange) {
@@ -1050,7 +1060,16 @@ function renderRail() {
   }));
 }
 
-const focusSlot = (name) => ({ resume: "pause", unmute: "mute", skip: "open", run_now: "review", untrack: "track" })[name] || name;
+// focusSlot is the slot an action keeps focus in when a render swaps it for
+// its counterpart: a toggle's pair, or a round's start, which an approving
+// gate intent and an intent that starts a round on request share.
+const FOCUS_PAIRS = { resume: "pause", unmute: "mute", untrack: "track" };
+function focusSlot(name) {
+  const sp = state.specs.byId[name];
+  if (sp && sp.group === "start" && sp.intake) return "start";
+  if (sp && sp.group === "start" && sp.verb === "dismiss") return "open";
+  return FOCUS_PAIRS[name] || name;
+}
 
 const CARD_GROUPS = new Set(["turn", "intake", "brief"]);
 
@@ -1209,7 +1228,7 @@ function rowTr(r, pr, lens, copy) {
         intakeChip(r))),
     h("td", { class: "c-wait" },
       h("div", { class: "who" },
-        facet(lens, "wait", waitCat(r), h("span", { class: "dot", "aria-hidden": "true" }, "●"), slot + "wait"), " ", whoFacets(r, lens, slot)),
+        facet(lens, catalog.strip, waitCat(r), h("span", { class: "dot", "aria-hidden": "true" }, "●"), slot + catalog.strip), " ", whoFacets(r, lens, slot)),
       facet(lens, "kind", r.kind, h("span", { class: "pill" }, rowKindLabel(r)), slot + "kind")),
     h("td", { class: "c-for" }, r.pending ? countdown(r) : h("span", { class: "age", title: stamp(sm(r).since) }, age(sm(r).since))),
     h("td", { class: "c-why" }, sm(r).reason),
@@ -1259,7 +1278,7 @@ function renderTable(res, pr, lens) {
     if (!grouped) return h("tbody", {}, rows);
     const id = `g-${i}`;
     return h("tbody", { id },
-      h("tr", { class: "g-head" + (g.field === "wait" ? " w-" + g.key : "") },
+      h("tr", { class: "g-head" + (g.field === catalog.strip ? " w-" + g.key : "") },
         h("th", { scope: "rowgroup", colspan: 6 },
           h("button", { type: "button", class: "g-toggle", "aria-expanded": String(!collapsed), "aria-controls": id, "data-focus": `group:${key}`, onclick: () => toggleCollapsed(key) },
             `${collapsed ? "▸" : "▾"} ${g.label}`),
@@ -1269,7 +1288,7 @@ function renderTable(res, pr, lens) {
   }));
 }
 
-const SORT_COLUMNS = { "c-pr": "repo", "c-wait": "wait", "c-for": "age", "c-why": "kind", "c-where": "status" };
+const SORT_COLUMNS = { "c-pr": "repo", "c-for": "age", "c-why": "kind", "c-where": "status" };
 
 // unitColumn is how the list names its unit column in view: by the view's
 // provider, "Item" when its rows mix providers.
@@ -1295,7 +1314,7 @@ function renderSortHeaders(lens) {
   const { field, desc } = parseSort(lens.sort);
   const unitSort = unitColumn(lens.view).sort;
   for (const th of document.querySelectorAll("#table thead th")) {
-    const id = th.className === "c-pr" ? unitSort : SORT_COLUMNS[th.className];
+    const id = th.className === "c-pr" ? unitSort : th.className === "c-wait" ? catalog.strip : SORT_COLUMNS[th.className];
     if (id) th.setAttribute("aria-sort", id === field ? (desc ? "descending" : "ascending") : "none");
   }
 }
@@ -1370,7 +1389,7 @@ function emptyNote(view, q) {
 
 function renderBoard(groups, pr, lens) {
   document.getElementById("board").replaceChildren(...groups.map((g) => h("section", { class: "lane", "aria-label": g.label },
-    h("h2", { class: "lane-head" + (g.field === "wait" ? " w-" + g.key : "") }, h("span", {}, g.label),
+    h("h2", { class: "lane-head" + (g.field === catalog.strip ? " w-" + g.key : "") }, h("span", {}, g.label),
       h("span", { class: "lane-tools" }, onlyThis(g, lens), h("span", { class: "count" }, g.rows.length))),
     h("ol", { class: "cards" }, g.rows.map((r) => card(r, pr, multiCopy(g.field) ? g.key : ""))))));
 }
@@ -1434,19 +1453,24 @@ function actorLabel(actor) {
   return viewer && actor.toLowerCase() === viewer.toLowerCase() ? "me" : actor;
 }
 
-const REQUEST_EVENTS = new Set(["review_requested", "review_request_removed"]);
-
 function requestedFrom(reviewer) {
   return reviewer.startsWith("team:") ? reviewer.slice("team:".length) : actorLabel(reviewer);
 }
 
+// EVENT_DATA shows an event's data the way its plugin's catalog says:
+// whole by default, a field or a short sha, or nothing when it names whom
+// a review was requested from, which the row shows on its own.
+const EVENT_DATA = {
+  none: () => "",
+  first_field: (d) => d.split(":")[0],
+  short_sha: (d) => d.slice(0, 7),
+  requested: () => "",
+};
+
 function eventData(e) {
-  if (!e.data || REQUEST_EVENTS.has(e.kind)) return "";
-  switch (e.kind) {
-    case "review": return e.data.split(":")[0];
-    case "merged": return e.data.slice(0, 7);
-  }
-  return e.data;
+  if (!e.data) return "";
+  const show = EVENT_DATA[catalog.eventData.get(e.kind)];
+  return show ? show(e.data) : e.data;
 }
 
 function renderActivity(lens) {
@@ -1457,7 +1481,7 @@ function renderActivity(lens) {
     list.replaceChildren();
     return;
   }
-  const items = state.activity.filter((it) => (!activityLoopOnly || LOOP_EVENTS.has(it.event.kind)) && activityPasses(it, lens));
+  const items = state.activity.filter((it) => (!activityLoopOnly || loopEvent(it.event.kind)) && activityPasses(it, lens));
   const out = [h("li", { class: "a-tools" },
     h("label", {},
       h("input", { type: "checkbox", checked: activityLoopOnly, "data-focus": "activity:loop-only", onchange: (e) => setLoopOnly(e.target.checked) }),
@@ -1477,9 +1501,9 @@ function renderActivity(lens) {
       writeHash({ pr: key });
     };
     const data = eventData(e);
-    const requested = REQUEST_EVENTS.has(e.kind) && e.data;
+    const requested = catalog.eventData.get(e.kind) === "requested" && e.data;
     out.push(h("li", {
-      class: `a-ev ev-${e.kind}` + (LOOP_EVENTS.has(e.kind) ? " loop" : "") + (key === pr && id === activitySelected ? " sel" : ""),
+      class: `a-ev ev-${e.kind}` + (loopEvent(e.kind) ? " loop" : "") + (key === pr && id === activitySelected ? " sel" : ""),
       tabindex: 0,
       "data-focus": id,
       onclick: open,
@@ -1492,7 +1516,7 @@ function renderActivity(lens) {
     },
       h("time", { datetime: e.at, title: stamp(e.at) }, clock(e.at)),
       h("div", {},
-        h("span", { class: "kind" }, EVENT_LABEL[e.kind] || e.kind.replaceAll("_", " ")),
+        h("span", { class: "kind" }, eventLabel(e.kind)),
         requested ? h("span", { class: "who" }, " from " + requestedFrom(e.data)) : null,
         e.actor ? h("span", { class: "who" }, (requested ? " by " : " ") + actorLabel(e.actor)) : null,
         " ", h("span", { class: "ref" }, eventRef(it)),
@@ -1513,7 +1537,9 @@ function activityEmptyNote(q) {
 
 function guidanceLabel(r) {
   if (r.question) return r.question.state === "asked" && questionChoices(r, r.question).length ?"Or answer in your own words" : "Answer in your own words";
-  return r.pending ? "Guidance for the pending round; Run now sends it at once" : "Guidance for the next round (optional)";
+  const start = Object.values(state.specs.byId).find((sp) => sp.group === "start" && sp.verb === "approve");
+  if (!r.pending) return "Guidance for the next round (optional)";
+  return start ? `Guidance for the pending round; ${start.label} sends it at once` : "Guidance for the pending round";
 }
 
 function guidanceBox(key, placeholder) {
@@ -1907,6 +1933,16 @@ function setupDetailResize() {
   window.addEventListener("resize", layout);
 }
 
+// detailFacts are the row's plugin's own detail fields, as its catalog
+// words them, read from the detail or the row's override.
+function detailFacts(r, d, o) {
+  const provider = unitOf(r).provider;
+  return catalog.details.filter((x) => x.provider === provider).map((x) => {
+    const v = d[x.field] ?? o[x.field];
+    return v ? [h("dt", x.title ? { title: x.title } : {}, x.label), h("dd", {}, v)] : null;
+  });
+}
+
 function renderDetail() {
   const box = document.getElementById("detail");
   if (renderTaskDetail(box, readHash())) return;
@@ -1950,8 +1986,7 @@ function renderDetail() {
       h("dt", {}, "In scope as"), h("dd", {}, (p.reasons || []).join(", ") || "out of scope"),
       h("dt", {}, "Workspace"), h("dd", {}, p.workspace && p.workspace.display_name ? where(r, "detail") : "none"),
       h("dt", {}, "Controls"), h("dd", {}, [o.hold ? "paused" : "", muteState, o.adopted ? "adopted" : ""].filter(Boolean).join(", ") || "none"),
-      d.profile_chain ? [h("dt", { title: "The review profile layers a round here reads, lowest first; {{command}} profile show shows the files" }, "Review profile"), h("dd", {}, d.profile_chain)] : null,
-      o.next_guidance ? [h("dt", { title: "Guidance waiting for the next round: given with no round pending, or kept from a round that did not go out or whose prompt was not seen landing. The next round, Review or Address included, takes it unless you give other guidance" }, "Next round guidance"), h("dd", {}, o.next_guidance)] : null),
+      detailFacts(r, d, o)),
     questionBlock(d),
     unitExtras(d),
     trimmedNote(d),
@@ -1965,7 +2000,7 @@ function renderDetail() {
     h("h2", { class: "d-sub" }, "Timeline"),
     h("ol", { class: "timeline" }, events.map((e) => h("li", { class: "ev-" + e.kind },
       h("time", { datetime: e.at }, stamp(e.at)),
-      h("div", {}, h("span", { class: "kind" }, EVENT_LABEL[e.kind] || e.kind.replaceAll("_", " ")), e.actor ? h("span", { class: "who" }, " " + e.actor) : null),
+      h("div", {}, h("span", { class: "kind" }, eventLabel(e.kind)), e.actor ? h("span", { class: "who" }, " " + e.actor) : null),
       e.data ? h("span", { class: "data" }, e.data) : null))));
 
   if (box.querySelector(".d-acts") && (!guidance || guidance.parentNode === box)) {
@@ -2021,7 +2056,7 @@ function toggledQuery(text, term) {
 
 function querySort(text) {
   const sorts = text.split(/\s+/).filter((w) => w.startsWith("sort:"));
-  return sorts.length ? sorts[sorts.length - 1].slice("sort:".length) : DEFAULT_SORT;
+  return sorts.length ? sorts[sorts.length - 1].slice("sort:".length) : exploreSearch().default_sort;
 }
 
 function withSort(text, sort) {
@@ -2118,7 +2153,7 @@ function exploreStatus() {
   const r = ex.result;
   if (!r) return "A search runs only when you press Enter or Search; each one spends about 1 point of GitHub's hourly budget.";
   const shown = r.candidates.length;
-  const order = EXPLORE_SORTS.find((s) => s.sort === querySort(r.query || ""));
+  const order = (exploreSearch().sorts || []).find((s) => s.sort === querySort(r.query || ""));
   const more = r.total > shown ? `, the ${order ? `${shown} ${order.shown}` : `first ${shown}`} of ${r.total}; narrow the search for the rest` : "";
   const cost = r.rate_limit && r.rate_limit.limit ? ` · cost ${r.cost}, ${r.rate_limit.remaining} of ${r.rate_limit.limit} left` : "";
   const read = r.read ? `${r.read} · ` : "";
@@ -2131,7 +2166,7 @@ function candidateItem(c, sel) {
   const row = rowByKey(key);
   const facts = [
     `+${c.additions} -${c.deletions} · ${c.changed_files} file${c.changed_files === 1 ? "" : "s"}`,
-    REVIEW_LABEL[c.review_decision] || "no review required",
+    reviewDecision(c.review_decision),
     c.checks ? `checks ${c.checks.toLowerCase()}` : "no checks",
     `${c.comments} comment${c.comments === 1 ? "" : "s"}`,
   ];
@@ -2225,17 +2260,17 @@ function renderExplore(view) {
   document.getElementById("explore-go").disabled = ex.busy;
   document.getElementById("explore-chips").replaceChildren(
     h("span", { class: "chip-head" }, "Run"),
-    ...EXPLORE_PRESETS.map((p) => chip({
+    ...(exploreSearch().presets || []).map((p) => chip({
       title: p.query, disabled: ex.busy, "data-focus": `explore:preset:${p.query}`, onclick: () => explore(p.query),
     }, p.label)),
     h("span", { class: "chip-head" }, "Filters"),
-    ...EXPLORE_FILTERS.map((f) => f.window ? chip({
+    ...(exploreSearch().filters || []).map((f) => f.window ? chip({
       title: "updated:>=", "aria-pressed": String(hasWindow(input.value)), "data-focus": "explore:filter:window", onclick: () => toggleWindow(f.window),
     }, f.label) : chip({
       "aria-pressed": String(hasTerm(input.value, f.term)), "data-focus": `explore:filter:${f.term}`, onclick: () => toggleTerm(f.term),
     }, f.label)),
     h("span", { class: "chip-head" }, "Order"),
-    ...EXPLORE_SORTS.map((o) => chip({
+    ...(exploreSearch().sorts || []).map((o) => chip({
       title: `sort:${o.sort}`, "aria-pressed": String(querySort(input.value) === o.sort), "data-focus": `explore:sort:${o.sort}`, onclick: () => pickSort(o.sort),
     }, o.label)),
     ex.recent.length ? h("span", { class: "chip-head" }, "Recent") : null,

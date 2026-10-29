@@ -16,6 +16,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
@@ -81,7 +83,7 @@ func (f *fakeActions) Adopt(ctx context.Context, u unit.Unit, c Call) error {
 	if err := f.record(ctx, "adopt "+r.String(), c); err != nil || f.store == nil {
 		return err
 	}
-	return f.store.SetAdopted(ctx, r)
+	return inventorytest.Of(f.store).SetAdopted(ctx, r)
 }
 func (f *fakeActions) Intent(ctx context.Context, name string, u unit.Unit, c Call) error {
 	r := refOf(u)
@@ -565,9 +567,9 @@ func TestMuteUntilStateLapsesOnce(t *testing.T) {
 	if n := countEvents(t, s, dinv.KindUnmuted); n != 1 {
 		t.Fatalf("%d unmuted events, want 1", n)
 	}
-	pr, _, _ := s.store().PR(ctx, r7)
+	pr, _, _ := inventorytest.Of(s.store()).PR(ctx, r7)
 	pr.HeadOid = "h3"
-	s.store().UpsertPR(ctx, pr)
+	inventorytest.Of(s.store()).UpsertPR(ctx, pr)
 	s.store().AppendEvents(ctx, []dinv.Event{{PR: r7, Kind: dinv.KindPush, Key: "h3", Actor: "ana", At: s.deps.Now().Add(time.Minute)}})
 	var d api.Detail
 	get(t, s, "/api/units/github/acme%2Fapi%237", &d)
@@ -583,7 +585,7 @@ func TestExpireMutesClearsAnExpiredMute(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
-	s.store().SetOverride(ctx, dinv.Override{PR: r7, MuteUntilStateChange: true, MutedKind: "changes", MutedWaitingOn: "author"})
+	inventorytest.Of(s.store()).SetOverride(ctx, dinv.Override{PR: r7, MuteUntilStateChange: true, MutedKind: "changes", MutedWaitingOn: "author"})
 	if err := s.expireMutes(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -606,7 +608,7 @@ func seedWaitingOnAna(t *testing.T, s *Server) {
 	t.Helper()
 	ctx := context.Background()
 	now := s.deps.Now()
-	if err := s.store().UpsertPR(ctx, dinv.PR{Ref: r9, Title: "Cache warmup", Author: "ana", State: "OPEN", HeadOid: "h1",
+	if err := inventorytest.Of(s.store()).UpsertPR(ctx, dinv.PR{Ref: r9, Title: "Cache warmup", Author: "ana", State: "OPEN", HeadOid: "h1",
 		Reasons: []string{"repo"}, URL: r9.URL()}); err != nil {
 		t.Fatal(err)
 	}
@@ -649,9 +651,9 @@ func TestNudgeAsksTheMaintainersOfMyPullRequestWithNoReviewer(t *testing.T) {
 	s := newServer(t)
 	seedWaitingOnAna(t, s)
 	ctx := context.Background()
-	pr, _, _ := s.store().PR(ctx, r9)
+	pr, _, _ := inventorytest.Of(s.store()).PR(ctx, r9)
 	pr.Author = "me"
-	if err := s.store().UpsertPR(ctx, pr); err != nil {
+	if err := inventorytest.Of(s.store()).UpsertPR(ctx, pr); err != nil {
 		t.Fatal(err)
 	}
 	fa := &fakeActions{}
@@ -704,7 +706,7 @@ func TestNudgeRefusesABotAuthor(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
-	if err := s.store().UpsertPR(ctx, dinv.PR{Ref: r9, Title: "Bump x", Author: "dependabot[bot]", State: "OPEN", HeadOid: "h1", Reasons: []string{"repo"}}); err != nil {
+	if err := inventorytest.Of(s.store()).UpsertPR(ctx, dinv.PR{Ref: r9, Title: "Bump x", Author: "dependabot[bot]", State: "OPEN", HeadOid: "h1", Reasons: []string{"repo"}}); err != nil {
 		t.Fatal(err)
 	}
 	fa := &fakeActions{}
@@ -742,7 +744,7 @@ func TestNudgeRefusesWhileTheLoopWorks(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	seedWaitingOnAna(t, s)
-	if err := s.store().SetWorkspace(context.Background(), r9, dinv.Workspace{ID: "w", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWorking}}); err != nil {
+	if err := inventorytest.Of(s.store()).SetWorkspace(context.Background(), r9, dinv.Workspace{ID: "w", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWorking}}); err != nil {
 		t.Fatal(err)
 	}
 	fa := &fakeActions{}
@@ -793,7 +795,7 @@ func TestTrackAddsAReasonAndUntrackDropsOnlyThatOne(t *testing.T) {
 	s := newServer(t)
 	ctx := context.Background()
 	reasons := func() []string {
-		pr, _, _ := s.store().PR(ctx, r7)
+		pr, _, _ := inventorytest.Of(s.store()).PR(ctx, r7)
 		return pr.Reasons
 	}
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/track", `{}`); rec.Code != 200 {
@@ -821,7 +823,7 @@ func TestTrackRefusesPastTheCap(t *testing.T) {
 	s := newServer(t)
 	ctx := context.Background()
 	for n := 1; n <= trackMax; n++ {
-		s.store().SetOverride(ctx, dinv.Override{PR: github.Ref{Owner: "acme", Repo: "big", Number: n}, Tracked: true})
+		inventorytest.Of(s.store()).SetOverride(ctx, dinv.Override{PR: github.Ref{Owner: "acme", Repo: "big", Number: n}, Tracked: true})
 	}
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/track", `{}`); rec.Code != 400 || !strings.Contains(rec.Body.String(), "untrack one first") || !strings.Contains(rec.Body.String(), "acme/big#50") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -852,13 +854,13 @@ func TestActionsUseTheInventorysName(t *testing.T) {
 	if o, _ := s.store().Override(ctx, r7); !o.Tracked || !slices.Equal(fa.calls, []string{"review acme/api#7 g"}) {
 		t.Fatalf("override %+v, calls %v", o, fa.calls)
 	}
-	if got, _ := s.store().Tracked(ctx); !slices.Equal(got, []github.Ref{r7}) {
+	if got, _ := inventorytest.Of(s.store()).Tracked(ctx); !slices.Equal(got, []github.Ref{r7}) {
 		t.Fatalf("tracked %v", got)
 	}
 	if rec := post(t, s, "/api/units/github/ACME%2Fapi%237/track", `{}`); rec.Code != 409 {
 		t.Fatalf("tracking again under another case: %d %s", rec.Code, rec.Body)
 	}
-	if got, _ := s.store().Tracked(ctx); !slices.Equal(got, []github.Ref{r7}) {
+	if got, _ := inventorytest.Of(s.store()).Tracked(ctx); !slices.Equal(got, []github.Ref{r7}) {
 		t.Fatalf("tracked twice: %v", got)
 	}
 }
@@ -883,7 +885,7 @@ func TestTrackAnswersWhyItCouldNotRead(t *testing.T) {
 		if rec.Code != c.code || !strings.Contains(rec.Body.String(), c.says) {
 			t.Errorf("%v: %d %s", c.err, rec.Code, rec.Body)
 		}
-		if got, _ := s.store().Tracked(context.Background()); len(got) != 0 {
+		if got, _ := inventorytest.Of(s.store()).Tracked(context.Background()); len(got) != 0 {
 			t.Errorf("%v: tracked unread: %v", c.err, got)
 		}
 	}
@@ -936,7 +938,7 @@ func TestOverrideWritersDoNotLoseUpdates(t *testing.T) {
 	s := newServer(t)
 	ctx := context.Background()
 	for range 20 {
-		s.store().SetOverride(ctx, dinv.Override{PR: r7})
+		inventorytest.Of(s.store()).SetOverride(ctx, dinv.Override{PR: r7})
 		var wg sync.WaitGroup
 		for _, action := range []string{"pause", "track"} {
 			wg.Go(func() { post(t, s, "/api/units/github/acme%2Fapi%237/"+action, `{}`) })
@@ -953,7 +955,7 @@ func TestTheTrackCapHoldsUnderConcurrentTracks(t *testing.T) {
 	s := newServer(t)
 	ctx := context.Background()
 	for n := 1; n < trackMax; n++ {
-		s.store().SetOverride(ctx, dinv.Override{PR: github.Ref{Owner: "acme", Repo: "big", Number: n}, Tracked: true})
+		inventorytest.Of(s.store()).SetOverride(ctx, dinv.Override{PR: github.Ref{Owner: "acme", Repo: "big", Number: n}, Tracked: true})
 	}
 	codes := make([]int, 2)
 	var wg sync.WaitGroup
@@ -962,7 +964,7 @@ func TestTheTrackCapHoldsUnderConcurrentTracks(t *testing.T) {
 	}
 	wg.Wait()
 	slices.Sort(codes)
-	if got, _ := s.store().Tracked(ctx); len(got) != trackMax || !slices.Equal(codes, []int{200, 400}) {
+	if got, _ := inventorytest.Of(s.store()).Tracked(ctx); len(got) != trackMax || !slices.Equal(codes, []int{200, 400}) {
 		t.Fatalf("%d tracked, codes %v", len(got), codes)
 	}
 }
@@ -971,7 +973,7 @@ func TestASlowTrackReadDoesNotBlockTheRows(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
-	s.store().SetOverride(ctx, dinv.Override{PR: r7, MuteUntilStateChange: true, MutedKind: "changes", MutedWaitingOn: "ana"})
+	inventorytest.Of(s.store()).SetOverride(ctx, dinv.Override{PR: r7, MuteUntilStateChange: true, MutedKind: "changes", MutedWaitingOn: "ana"})
 	reading, release := make(chan struct{}), make(chan struct{})
 	s.trackReads(func(_ context.Context, u unit.Unit) (port.TrackRead, error) {
 		ref := refOf(u)
@@ -1007,7 +1009,7 @@ func TestANudgeThatTracksAsksWhomTheFreshReadNames(t *testing.T) {
 	old := s.deps.Now().Add(-72 * time.Hour)
 	s.trackReads(func(context.Context, unit.Unit) (port.TrackRead, error) {
 		return port.TrackRead{Unit: web.Unit(), State: dgh.StateOpen, Save: func(ctx context.Context) error {
-			s.store().UpsertPR(ctx, dinv.PR{Ref: web, Title: "Other", Author: "zoe", State: "OPEN", HeadOid: "h1",
+			inventorytest.Of(s.store()).UpsertPR(ctx, dinv.PR{Ref: web, Title: "Other", Author: "zoe", State: "OPEN", HeadOid: "h1",
 				ChecksState: "SUCCESS", ReviewRequests: []string{"bob", "renovate[bot]"}, URL: web.URL()})
 			_, err := s.store().AppendEvents(ctx, []dinv.Event{
 				{PR: web, Kind: dinv.KindPush, Key: "h1", Actor: "zoe", At: old},
@@ -1049,7 +1051,7 @@ func TestARefusedTrackStoresNothing(t *testing.T) {
 		s.trackReads(func(context.Context, unit.Unit) (port.TrackRead, error) {
 			if c.race {
 				for n := 1; n <= trackMax; n++ {
-					s.store().SetOverride(ctx, dinv.Override{PR: github.Ref{Owner: "acme", Repo: "big", Number: n}, Tracked: true})
+					inventorytest.Of(s.store()).SetOverride(ctx, dinv.Override{PR: github.Ref{Owner: "acme", Repo: "big", Number: n}, Tracked: true})
 				}
 			}
 			return port.TrackRead{Unit: web.Unit(), State: c.state, Save: func(context.Context) error { saved = true; return nil }}, nil
@@ -1085,7 +1087,7 @@ func TestUntrackingWhatOnlyTheTrackHeldTakesItOutOfAll(t *testing.T) {
 	web := github.Ref{Owner: "acme", Repo: "web", Number: 3}
 	s.trackReads(func(context.Context, unit.Unit) (port.TrackRead, error) {
 		return port.TrackRead{Unit: web.Unit(), State: dgh.StateOpen, Save: func(ctx context.Context) error {
-			return s.store().UpsertPR(ctx, dinv.PR{Ref: web, Title: "Other", Author: "zoe", State: "OPEN", URL: web.URL()})
+			return inventorytest.Of(s.store()).UpsertPR(ctx, dinv.PR{Ref: web, Title: "Other", Author: "zoe", State: "OPEN", URL: web.URL()})
 		}}, nil
 	})
 	listed := func() bool {

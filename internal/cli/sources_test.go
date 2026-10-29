@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -37,7 +39,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -50,11 +51,11 @@ func withRows(d daemon.Deps, st *inventory.Store) daemon.Deps {
 		now = st.Now
 	}
 	reports := ghreporttest.Inventory{Store: st, Now: now, Config: func() config.Config { return cfg }, Identity: d.Identity}
-	mods, err := buildSources(plugins, d.Cfg, source.Deps{Inventory: st, Turns: d.Turns, Clock: clockFunc(time.Now), Reports: reports})
+	mods, err := buildSources(plugins, d.Cfg, moduleDeps{Inventory: st, Turns: d.Turns, Clock: clockFunc(time.Now), Reports: reports}, bundledUI)
 	if err != nil {
 		panic(err)
 	}
-	d = withSources(withStore(d, st), plugins, mods)
+	d = withSources(withStore(d, st), plugins, mods, bundledUI)
 	d = withGitHub(d, present.Deps{Store: st, Reports: reports, Host: moduleBroker(d.Units, st.DB())})
 	d.Ingest, d.Collector = nil, nil
 	d.Follows = func(p unit.ProviderID) bool { return p == unit.GitHub }
@@ -75,7 +76,7 @@ func setTracked(ctx context.Context, st *inventory.Store, u unit.Unit, tracked b
 	if err != nil {
 		return err
 	}
-	_, err = st.SetTracked(ctx, ref, tracked)
+	_, err = inventorytest.Of(st).SetTracked(ctx, ref, tracked)
 	return err
 }
 
@@ -106,11 +107,11 @@ func (threadRows) Derive(_ readmodel.Base, in any, _ time.Time) (api.Row, error)
 }
 
 // threadModule is a fake plugin of the thread provider serving th's row.
-func threadModule(th unit.Unit) source.Plugin {
-	return source.Plugin{ID: ingesttest.Provider, Codec: ingesttest.Codec(), Build: func(_ config.Config, d source.Deps) (source.Module, error) {
+func threadModule(th unit.Unit) compiledPlugin {
+	return compiledPlugin{ID: ingesttest.Provider, Codec: ingesttest.Codec(), Build: func(_ config.Config, d moduleDeps) (pluginModule, error) {
 		reg := ingest.Registration{Source: ingesttest.Source{C: ingesttest.NewClient(ingesttest.NewService("viewer"), 100)},
 			Store: ingesttest.NewStore(d.Changes), Codec: ingesttest.Codec()}
-		return source.Module{
+		return pluginModule{
 			ID:    ingesttest.Provider,
 			Codec: ingesttest.Codec(),
 			Ingest: ingest.Job{Every: time.Minute, Prepare: func(context.Context, time.Time) (ingest.Plan, string, error) {
@@ -129,7 +130,7 @@ func TestAModuleRegistersItsCodecJobAndRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	serve := func(ps []source.Plugin) *daemon.Server {
+	serve := func(ps []compiledPlugin) *daemon.Server {
 		saved := plugins
 		plugins = ps
 		defer func() { plugins = saved }()
@@ -166,9 +167,9 @@ func TestAModuleRegistersItsCodecJobAndRows(t *testing.T) {
 }
 
 // carded is p's module with a card and a derived item per row.
-func carded(p source.Plugin) source.Plugin {
+func carded(p compiledPlugin) compiledPlugin {
 	build := p.Build
-	p.Build = func(cfg config.Config, d source.Deps) (source.Module, error) {
+	p.Build = func(cfg config.Config, d moduleDeps) (pluginModule, error) {
 		m, err := build(cfg, d)
 		m.Card = func(_ context.Context, r api.Row) (card.Card, error) {
 			return card.Card{Unit: r.Unit, Title: r.Title, State: "thread"}, nil
@@ -189,10 +190,10 @@ type liveThread struct {
 	changes atomic.Pointer[change.Log]
 }
 
-func (l *liveThread) plugin(th unit.Unit) source.Plugin {
+func (l *liveThread) plugin(th unit.Unit) compiledPlugin {
 	p := threadModule(th)
 	build := p.Build
-	p.Build = func(cfg config.Config, d source.Deps) (source.Module, error) {
+	p.Build = func(cfg config.Config, d moduleDeps) (pluginModule, error) {
 		m, err := build(cfg, d)
 		l.changes.Store(d.Changes)
 		m.Rows = func(readmodel.RowDeps) readmodel.Provider {
@@ -272,7 +273,7 @@ func TestCardsJobResolvesTheItemsOfALapsedPR(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := inventory.New(seed).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", URL: r7.URL()}); err != nil {
+	if err := inventorytest.Of(inventory.New(seed)).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", URL: r7.URL()}); err != nil {
 		t.Fatal(err)
 	}
 	stale := items.Item{ID: "th:ask", Unit: r7.Unit(), Kind: items.Request, Summary: "review", Requester: items.Person{Key: "github:ana"},
@@ -284,7 +285,7 @@ func TestCardsJobResolvesTheItemsOfALapsedPR(t *testing.T) {
 	seed.Close()
 	var builds atomic.Int32
 	saved := plugins
-	plugins = []source.Plugin{carded(countedGitHub(&builds))}
+	plugins = []compiledPlugin{carded(countedGitHub(&builds))}
 	defer func() { plugins = saved }()
 	stop := serveNoJobs(t, te)
 	defer stop()

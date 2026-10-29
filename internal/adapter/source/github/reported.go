@@ -2,53 +2,16 @@ package ghsource
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel"
-	src "github.com/wloophq/wloop/pkg/plugin/source"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 )
-
-// reportedData is the data of the GitHub plugin's snapshot of a pull
-// request, in the plugin's shape.
-type reportedData struct {
-	PR            dinv.PR           `json:"pr"`
-	Detail        *inventory.Detail `json:"detail"`
-	DetailVersion int               `json:"detail_version"`
-	DetailReadAt  time.Time         `json:"detail_read_at"`
-	Tracked       bool              `json:"tracked"`
-	Adopted       bool              `json:"adopted"`
-}
-
-// Reported keeps the pull requests the GitHub plugin reports in st, the
-// rows the in-process rows, facts and presenter read.
-func Reported(st *inventory.Store) func(ctx context.Context, snaps map[unit.Unit]src.Snapshot) error {
-	return func(ctx context.Context, snaps map[unit.Unit]src.Snapshot) error {
-		rows := make([]inventory.Reported, 0, len(snaps))
-		for u, s := range snaps {
-			if s.Gone || len(s.Data) == 0 {
-				continue
-			}
-			var d reportedData
-			if err := json.Unmarshal(s.Data, &d); err != nil {
-				return fmt.Errorf("the snapshot of %s: %w", u.Label(), err)
-			}
-			r := inventory.Reported{PR: d.PR, Detail: d.Detail, Tracked: d.Tracked, Adopted: d.Adopted}
-			if r.Detail != nil {
-				r.Detail.Version, r.Detail.ReadAt = d.DetailVersion, d.DetailReadAt
-			}
-			rows = append(rows, r)
-		}
-		return st.SaveReported(ctx, rows)
-	}
-}
 
 // ReportedInputs are the pull requests the GitHub plugin last reported, as
 // the facts, the holdings and a round's send read them: each row and its
@@ -59,6 +22,8 @@ type ReportedInputs struct {
 	Store   *inventory.Store
 }
 
+func (r ReportedInputs) reported() prrow.ReportedPRs { return prrow.ReportedPRs{Reports: r.Reports} }
+
 var _ dinv.PlanInputs = ReportedInputs{}
 
 func (r ReportedInputs) Viewer(ctx context.Context) (string, error) {
@@ -67,7 +32,7 @@ func (r ReportedInputs) Viewer(ctx context.Context) (string, error) {
 
 // Rows are every reported pull request, in ref order.
 func (r ReportedInputs) Rows(ctx context.Context) ([]dinv.PR, error) {
-	data, err := r.data(ctx, nil)
+	data, err := r.reported().Data(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +51,7 @@ func (r ReportedInputs) Facts(ctx context.Context, rows []dinv.PR, viewer string
 	for i, row := range rows {
 		units[i] = row.Ref.Unit()
 	}
-	data, err := r.data(ctx, units)
+	data, err := r.reported().Data(ctx, units)
 	if err != nil {
 		return nil, err
 	}
@@ -124,44 +89,7 @@ func (r ReportedInputs) Ended(ctx context.Context, kind string, units []unit.Uni
 	return out, nil
 }
 
-// data are the reported data of units, of every reported unit when nil.
-func (r ReportedInputs) data(ctx context.Context, units []unit.Unit) (map[unit.Unit]reportedData, error) {
-	if r.Reports == nil {
-		return nil, nil
-	}
-	if units == nil {
-		var err error
-		if units, err = r.Reports.Units(ctx, unit.GitHub); err != nil {
-			return nil, err
-		}
-	}
-	snaps, err := r.Reports.Reported(ctx, units)
-	if err != nil {
-		return nil, err
-	}
-	out := make(map[unit.Unit]reportedData, len(snaps))
-	for u, s := range snaps {
-		if s.Gone || len(s.Data) == 0 {
-			continue
-		}
-		var d reportedData
-		if err := json.Unmarshal(s.Data, &d); err != nil {
-			return nil, fmt.Errorf("the snapshot of %s: %w", u.Label(), err)
-		}
-		if d.PR.Ref.Number == 0 {
-			continue
-		}
-		out[u] = d
-	}
-	return out, nil
-}
-
 // PR is ref as the plugin last reported it; false when it reported none.
 func (r ReportedInputs) PR(ctx context.Context, ref pr.Ref) (dinv.PR, bool, error) {
-	data, err := r.data(ctx, []unit.Unit{ref.Unit()})
-	if err != nil {
-		return dinv.PR{}, false, err
-	}
-	d, ok := data[ref.Unit()]
-	return d.PR, ok, nil
+	return r.reported().PR(ctx, ref)
 }

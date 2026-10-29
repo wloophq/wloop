@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/event"
@@ -209,7 +210,7 @@ func seedPRs(ctx context.Context, f *Fixture, s Sizes, l layout) error {
 			p.State, p.ClosedAt = dgh.StateClosed, end
 			lifecycle = append(lifecycle, dinv.Event{PR: ref, Kind: dinv.KindClosed, Actor: author, At: end})
 		}
-		if err := f.Inventory.UpsertPR(ctx, p); err != nil {
+		if err := inventorytest.Of(f.Inventory).UpsertPR(ctx, p); err != nil {
 			return fmt.Errorf("pull request %s: %w", ref, err)
 		}
 	}
@@ -238,7 +239,7 @@ func seedWorkspaces(ctx context.Context, f *Fixture, s Sizes, l layout) error {
 		if i < s.AgentLinkedPRs {
 			ws.AgentStates = []turn.AgentState{[]turn.AgentState{turn.AgentWorking, turn.AgentWaiting, turn.AgentDone}[i%3]}
 		}
-		if err := f.Inventory.SetWorkspace(ctx, l.refs[i], ws); err != nil {
+		if err := inventorytest.Of(f.Inventory).SetWorkspace(ctx, l.refs[i], ws); err != nil {
 			return fmt.Errorf("workspace of %s: %w", l.refs[i], err)
 		}
 	}

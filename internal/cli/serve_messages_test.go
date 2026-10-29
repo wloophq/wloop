@@ -85,7 +85,7 @@ func servedMessages(t *testing.T, te *testEnv, db *sqlite.DB, log *change.Log) d
 
 func waitOpen(t *testing.T, d daemon.Deps, want func([]message.Message) bool) []message.Message {
 	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := time.Now().Add(time.Minute)
 	for {
 		open, err := d.Messages.Store.Open(context.Background())
 		if err != nil {

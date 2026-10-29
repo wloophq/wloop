@@ -5,12 +5,11 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/plugins/bundled"
-	"github.com/wloophq/wloop/internal/source"
 )
 
 // plugins are the compiled-in plugins; this is the only file that names
 // one.
-var plugins = []source.Plugin{{ID: unit.GitHub, Name: "GitHub", Codec: bundledCodec(unit.GitHub), Build: ghsource.Module},
+var plugins = []compiledPlugin{{ID: unit.GitHub, Name: "GitHub", Codec: bundledCodec(unit.GitHub), Build: githubHostModule},
 	{ID: slackPlugin, Name: "Slack", Codec: bundledCodec(slackPlugin), Build: slackModule}}
 
 // bundledCodec is the codec bundled plugin id's manifest declares.

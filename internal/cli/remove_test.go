@@ -13,6 +13,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/port"
+
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 
 	"github.com/wloophq/wloop/internal/daemon"
@@ -437,14 +441,15 @@ func TestRemovePrintsTheToolsMessageOnASecondLine(t *testing.T) {
 	}
 }
 
-func TestRemoveActsOnTheLinkedWorkspaceAndUnlinksIt(t *testing.T) {
+func TestRemoveActsOnTheLinkedWorkspaceAndTellsThePlugin(t *testing.T) {
 	t.Parallel()
 	m, te := finishedScenario(t, "MERGED")
+	te.changes = change.NewLog(change.DefaultWindow, nil)
 	ctx := context.Background()
-	if err := te.Store.UpsertPR(ctx, dinv.PR{Ref: r12, Title: "Done", State: "MERGED", Reasons: []string{"author"}}); err != nil {
+	if err := inventorytest.Of(te.Store).UpsertPR(ctx, dinv.PR{Ref: r12, Title: "Done", State: "MERGED", Reasons: []string{"author"}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := te.Store.SetWorkspace(ctx, r12, dinv.Workspace{ID: doneWS, DisplayName: "REVIEW feat/done"}); err != nil {
+	if err := inventorytest.Of(te.Store).SetWorkspace(ctx, r12, dinv.Workspace{ID: doneWS, DisplayName: "REVIEW feat/done"}); err != nil {
 		t.Fatal(err)
 	}
 	var out strings.Builder
@@ -454,8 +459,8 @@ func TestRemoveActsOnTheLinkedWorkspaceAndUnlinksIt(t *testing.T) {
 	if !slices.Equal(m.Writes, []string{"remove ws-done"}) {
 		t.Fatalf("writes %v", m.Writes)
 	}
-	if p, _, _ := te.Store.PR(ctx, r12); p.Workspace.ID != "" {
-		t.Fatalf("still linked to %+v", p.Workspace)
+	if c := te.changes.Since(0, port.TopicAgents); !slices.Contains(c.Units, r12.Unit()) {
+		t.Fatalf("the plugin is not told the workspace went: %+v", c)
 	}
 }
 
@@ -463,10 +468,10 @@ func TestAForcedRemoveRefusesTheLinkedMainCheckout(t *testing.T) {
 	t.Parallel()
 	m, te := finishedScenario(t, "MERGED")
 	ctx := context.Background()
-	if err := te.Store.UpsertPR(ctx, dinv.PR{Ref: r12, Title: "Done", State: "MERGED", Reasons: []string{"author"}}); err != nil {
+	if err := inventorytest.Of(te.Store).UpsertPR(ctx, dinv.PR{Ref: r12, Title: "Done", State: "MERGED", Reasons: []string{"author"}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := te.Store.SetWorkspace(ctx, r12, dinv.Workspace{ID: "main", DisplayName: "api", IsMain: true}); err != nil {
+	if err := inventorytest.Of(te.Store).SetWorkspace(ctx, r12, dinv.Workspace{ID: "main", DisplayName: "api", IsMain: true}); err != nil {
 		t.Fatal(err)
 	}
 	var out strings.Builder
@@ -481,11 +486,11 @@ func TestRemovingAnotherWorkspaceKeepsTheLink(t *testing.T) {
 	t.Parallel()
 	m, te := finishedScenario(t, "MERGED")
 	ctx := context.Background()
-	if err := te.Store.UpsertPR(ctx, dinv.PR{Ref: r12, Title: "Done", State: "MERGED", Reasons: []string{"author"}}); err != nil {
+	if err := inventorytest.Of(te.Store).UpsertPR(ctx, dinv.PR{Ref: r12, Title: "Done", State: "MERGED", Reasons: []string{"author"}}); err != nil {
 		t.Fatal(err)
 	}
 	linked := dinv.Workspace{ID: "ws-elsewhere", DisplayName: "REVIEW feat/elsewhere"}
-	if err := te.Store.SetWorkspace(ctx, r12, linked); err != nil {
+	if err := inventorytest.Of(te.Store).SetWorkspace(ctx, r12, linked); err != nil {
 		t.Fatal(err)
 	}
 	if err := (envActions{e: te.Env, store: te.Store}).Remove(ctx, r12.Unit(), daemon.Call{Out: io.Discard, WorkspaceID: doneWS}); err != nil {
@@ -494,7 +499,7 @@ func TestRemovingAnotherWorkspaceKeepsTheLink(t *testing.T) {
 	if !slices.Equal(m.Writes, []string{"remove ws-done"}) {
 		t.Fatalf("writes %v", m.Writes)
 	}
-	if p, _, _ := te.Store.PR(ctx, r12); p.Workspace.ID != linked.ID {
+	if p, _, _ := inventorytest.Of(te.Store).PR(ctx, r12); p.Workspace.ID != linked.ID {
 		t.Fatalf("the link to %s became %+v after removing %s", linked.ID, p.Workspace, doneWS)
 	}
 }

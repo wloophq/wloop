@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
@@ -94,7 +96,7 @@ func (f *fixture) open(n int, author string, pushed time.Time, edit func(*dinv.P
 	if edit != nil {
 		edit(&pr)
 	}
-	if err := f.st.UpsertPR(ctx, pr); err != nil {
+	if err := inventorytest.Of(f.st).UpsertPR(ctx, pr); err != nil {
 		f.t.Fatal(err)
 	}
 	evs = append(evs, dinv.Event{PR: pr.Ref, Kind: dinv.KindPush, Key: pr.HeadOid, Actor: author, At: pushed})
@@ -169,9 +171,9 @@ func TestPRsViews(t *testing.T) {
 	f.open(31, "ana", at, nil)
 	f.open(32, "ana", at, nil)
 	f.open(33, "ana", at, func(pr *dinv.PR) { pr.Reasons = nil })
-	f.st.SetWorkspace(ctx, ref(30), dinv.Workspace{ID: "w30", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWorking}})
-	f.st.SetWorkspace(ctx, ref(31), dinv.Workspace{ID: "w31", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWaiting}})
-	f.st.SetOverride(ctx, dinv.Override{PR: ref(32), Adopted: true})
+	inventorytest.Of(f.st).SetWorkspace(ctx, ref(30), dinv.Workspace{ID: "w30", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWorking}})
+	inventorytest.Of(f.st).SetWorkspace(ctx, ref(31), dinv.Workspace{ID: "w31", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWaiting}})
+	inventorytest.Of(f.st).SetOverride(ctx, dinv.Override{PR: ref(32), Adopted: true})
 	for _, tc := range []struct {
 		view string
 		want []int
@@ -220,8 +222,8 @@ func TestClosedAndMergedPullRequestsAreInNoOpenView(t *testing.T) {
 	})
 	f.open(52, "ana", fixtureNow.Add(-30*24*time.Hour), func(pr *dinv.PR) { pr.State, pr.ClosedAt = "CLOSED", at })
 	for _, n := range []int{50, 51, 52} {
-		f.st.SetWorkspace(ctx, ref(n), dinv.Workspace{ID: "w" + strconv.Itoa(n), IsReview: true, AgentStates: []turn.AgentState{turn.AgentWaiting}})
-		f.st.SetOverride(ctx, dinv.Override{PR: ref(n), Adopted: true})
+		inventorytest.Of(f.st).SetWorkspace(ctx, ref(n), dinv.Workspace{ID: "w" + strconv.Itoa(n), IsReview: true, AgentStates: []turn.AgentState{turn.AgentWaiting}})
+		inventorytest.Of(f.st).SetOverride(ctx, dinv.Override{PR: ref(n), Adopted: true})
 	}
 	for _, view := range []string{api.ViewNeedsMe, api.ViewStalled, api.ViewMine, api.ViewLoop} {
 		if got := numbers(f.rows("?view=" + view)); len(got) != 0 {
@@ -334,9 +336,9 @@ func TestLoopAndMineViewsDoNotNeedAScopeReason(t *testing.T) {
 	f.open(41, "ana", at, outOfScope)
 	f.open(42, "ana", at, outOfScope)
 	f.open(43, "ana", at, func(pr *dinv.PR) { pr.Reasons, pr.ReviewRequests = nil, []string{"fer"} })
-	f.st.SetWorkspace(ctx, ref(40), dinv.Workspace{ID: "w40", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWorking}})
-	f.st.SetWorkspace(ctx, ref(41), dinv.Workspace{ID: "w41", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWaiting}})
-	f.st.SetOverride(ctx, dinv.Override{PR: ref(42), Adopted: true})
+	inventorytest.Of(f.st).SetWorkspace(ctx, ref(40), dinv.Workspace{ID: "w40", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWorking}})
+	inventorytest.Of(f.st).SetWorkspace(ctx, ref(41), dinv.Workspace{ID: "w41", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWaiting}})
+	inventorytest.Of(f.st).SetOverride(ctx, dinv.Override{PR: ref(42), Adopted: true})
 	for _, tc := range []struct {
 		view string
 		want []int
@@ -407,7 +409,7 @@ func TestATurnThatWaitsOnMeIsInNeedsMe(t *testing.T) {
 	}
 	parked := dinv.Workspace{ID: "w4", DisplayName: "feat", Status: "needs-me", Comment: "triage asks: keep it?"}
 	author := dinv.Workspace{ID: "w2", DisplayName: "other", Status: "in-review"}
-	if err := f.st.ReplaceWorkspaces(ctx, map[github.Ref]dinv.Workspace{ref(21): author, ref(23): parked}); err != nil {
+	if err := inventorytest.Of(f.st).ReplaceWorkspaces(ctx, map[github.Ref]dinv.Workspace{ref(21): author, ref(23): parked}); err != nil {
 		t.Fatal(err)
 	}
 	rows := f.rows("?view=" + api.ViewNeedsMe)
@@ -431,7 +433,7 @@ func TestAnAskedReviewOutsideTheScopeIsInNeedsMe(t *testing.T) {
 	repo := f.withTurns()
 	f.open(444, "bruno", fixtureNow.Add(-time.Hour), func(pr *dinv.PR) { pr.Reasons = nil })
 	ws := dinv.Workspace{ID: "w", DisplayName: "REVIEW fix/billing", Status: "reviewing", IsReview: true, AgentStates: []turn.AgentState{turn.AgentDone}}
-	if err := f.st.ReplaceWorkspaces(ctx, map[github.Ref]dinv.Workspace{ref(444): ws}); err != nil {
+	if err := inventorytest.Of(f.st).ReplaceWorkspaces(ctx, map[github.Ref]dinv.Workspace{ref(444): ws}); err != nil {
 		t.Fatal(err)
 	}
 	f.turn(repo, 444, turn.Intent(dintent.Review), turn.Asked, "term-444")
@@ -468,7 +470,7 @@ func TestATrackedPullRequestIsInScopeLikeAnyOther(t *testing.T) {
 	for _, n := range []int{60, 61} {
 		f.open(n, "zoe", old, outside, dinv.Event{Kind: dinv.KindReviewRequest, Key: "bob", Actor: "zoe", At: old})
 	}
-	f.st.SetOverride(ctx, dinv.Override{PR: ref(60), Tracked: true})
+	inventorytest.Of(f.st).SetOverride(ctx, dinv.Override{PR: ref(60), Tracked: true})
 	rows := f.rows("?view=stalled")
 	if len(rows) != 1 || rows[0].Unit != ref(60).Unit() || !slices.Equal(payload(rows[0]).Reasons, []string{dinv.ReasonTracked}) {
 		t.Fatalf("stalled: %+v", rows)
@@ -495,11 +497,11 @@ func TestRowIsStableAcrossAMinute(t *testing.T) {
 	f.open(71, "fer", old, failing)
 	f.open(72, "bob", old, nil, dinv.Event{Kind: dinv.KindReviewRequest, Key: "fer", Actor: "bob", At: old},
 		dinv.Event{Kind: dinv.KindMuted, Actor: "fer", At: old.Add(time.Hour)})
-	if err := f.st.SetOverride(ctx, dinv.Override{PR: ref(72), MutedUntil: fixtureNow.Add(24 * time.Hour)}); err != nil {
+	if err := inventorytest.Of(f.st).SetOverride(ctx, dinv.Override{PR: ref(72), MutedUntil: fixtureNow.Add(24 * time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
 	f.open(73, "bob", old, nil, dinv.Event{Kind: dinv.KindReviewRequest, Key: "fer", Actor: "bob", At: old})
-	if err := f.st.SetOverride(ctx, dinv.Override{PR: ref(73), MutedUntil: fixtureNow.Add(24 * time.Hour)}); err != nil {
+	if err := inventorytest.Of(f.st).SetOverride(ctx, dinv.Override{PR: ref(73), MutedUntil: fixtureNow.Add(24 * time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
 	encode := func() string {
@@ -621,7 +623,7 @@ func TestUnknownAgentsKeepAMuteUntilStateChange(t *testing.T) {
 		t.Fatalf("row %s, want the agent asking", asks.Kind)
 	}
 	mute := dinv.Override{PR: ref(22), MuteUntilStateChange: true, MutedKind: string(asks.Kind), MutedWaitingOn: asks.Summary.WaitsOn}
-	if err := f.st.SetOverride(ctx, mute); err != nil {
+	if err := inventorytest.Of(f.st).SetOverride(ctx, mute); err != nil {
 		t.Fatal(err)
 	}
 	unmuted := func() int {

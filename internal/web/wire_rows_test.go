@@ -23,7 +23,7 @@ func servedCatalog(t *testing.T) string {
 // catalogFuncs are the functions that build the lens's fields from the
 // catalog and read a row's facets.
 var catalogFuncs = []string{"applyCatalog", "kindLabel", "rowKindLabel", "fieldOf", "facetValues", "bucketsOf", "facetTime", "goDuration", "bucketOf", "dueNow",
-	"pl", "sm", "fieldRank", "fieldShow"}
+	"pl", "sm", "fieldRank", "fieldShow", "exploreSearch", "reviewDecision"}
 
 // catalogPrelude declares the catalog and the functions it needs, and
 // applies the served catalog.

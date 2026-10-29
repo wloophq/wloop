@@ -12,7 +12,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestBoundaryImports` | The catalog, the intent vocabulary's leaves, the loader and `termfmt` import only their allowed sets. |
 | `TestBrandLiteralOnlyInBrand` | The default product name appears only in `internal/brand` and the exempt metadata. |
 | `TestBuiltinNamesLiveInTheirTables` | Builtin names appear only in their table files. A released migration keeps the words that version stored, so migrate_v*.go files are history and exempt. |
-| `TestCLIImportsNoGitHubClient` | No file under `internal/cli` imports `internal/github` or `internal/ghcli`: the CLI reaches GitHub through its plugin's calls. The test files in `cliGitHubDebt` pass, and the list only shrinks. |
+| `TestCLIImportsNoGitHubClient` | No file under `internal/cli` imports the GitHub plugin's API client or gh: the CLI reaches GitHub through its plugin's calls. The test files in `cliGitHubDebt` pass, and the list only shrinks. |
 | `TestClientsNameNoPlugin` | No client names a plugin: the terminal, the menu bar and the other Go clients spell no plugin's id or provider constant, and the cockpit's scripts and page quote no plugin's id. |
 | `TestCockpitScriptsNameNoPlugin` | The cockpit's scripts quote no plugin's id. |
 | `TestContractSkeletonDeclared` | The shared names other packages build on still exist. |
@@ -36,7 +36,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestNoQueryJoinsPluginAndCoreTables` | No query of `internal/adapter/store`, and no transaction (a function literal passed to `Write`, or a function taking a `*Tx`, with the functions it hands the transaction to), names both a table a source plugin owns and a core table: the plugin tables leave the core store, so a query that joins them with the core's becomes a snapshot read or a broker call, and a write of both becomes two. The migrations, history of the shared file, are exempt. |
 | `TestNothingImportsTheGate` | Nothing imports `internal/gate`, the old round gate: the workflow engine is the only planner of automatic rounds. |
 | `TestOnlyClaudeDesktopManagerReachesDesktop` | Only the Claude Desktop manager's package reaches Claude Desktop's control surface. |
-| `TestOnlyGitHubReachesGitHub` | Only `internal/github` reaches GitHub's API, and only it imports `ghcli`. |
+| `TestOnlyGitHubReachesGitHub` | Nothing in the host names GitHub's API: the GitHub plugin reaches it, with its own credentials. |
 | `TestOnlyOrcaAdapterReachesOrca` | Only the Orca manager's package reaches Orca's control surface. |
 | `TestOnlyServeWritesTheStore` | Only `storecmd.go` opens the store as its writer, for the daemon and the store commands, and other processes use `OpenReadOnly`. |
 | `TestOnlySourcesGoNamesASource` | Only `cli/sources.go`, and for one source the files that wire it (`cli/slack*.go` and `cli/serve_slack.go` for Slack, `cli/serve_github.go` for GitHub), imports a source. |
@@ -66,8 +66,9 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 
 | `cliGitHubDebt` entry | Status | Reason |
 |---|---|---|
-| `internal/cli/harness_test.go` | 🧾 | the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin |
-| `internal/cli/serve_test.go` | 🧾 | the test builds GitHub's in-process clients over a fake gh until X8a2 moves them into the plugin |
+| `internal/cli/githubplugin_test.go` | ✅ | the test's forge reads the fake GitHub as the plugin does, standing in for its binary |
+| `internal/cli/harness_test.go` | ✅ | the harness reads a pull request the inventory lacks from the fake GitHub as the plugin does |
+| `internal/cli/plugin_binary_test.go` | ✅ | the test serves a fake GitHub to the plugin's binary |
 
 ### `TestNoIntentEnumerations`
 
@@ -110,9 +111,9 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 
 | `providerStringAllowlist` entry | Status | Reason |
 |---|---|---|
-| `internal/adapter/store/inventory/store.go` `github` `4` | 🧾 | the inventory keeps GitHub's pull request tables (issue 62) |
+| `internal/adapter/store/inventory/store.go` `github` `2` | 🧾 | the inventory keeps GitHub's pull request tables (issue 62) |
 | `internal/adapter/store/inventory/timings.go` `github` `3` | 🧾 | the inventory keeps GitHub's pull request tables (issue 62) |
-| `internal/adapter/store/sqlite/retain.go` `github` `21` | 🧾 | retention drops a pull request's rows once GitHub says it ended (issue 62) |
+| `internal/adapter/store/sqlite/retain.go` `github` `23` | 🧾 | retention drops a pull request's rows once GitHub says it ended, as the version 6 rows and the plugin's reports hold it (issue 62) |
 | `internal/adapter/store/sqlite/retain.go` `slack` `3` | 🧾 | retention tells a Slack unit gone by the Slack tables; the plugin should say (issue 62) |
 | `internal/adapter/store/sqlite/retain_briefs.go` `github` `2` | 🧾 | retention drops a pull request's rows once GitHub says it ended (issue 62) |
 | `internal/adapter/store/sqlite/rounds.go` `github` `7` | 🧾 | the round state keeps GitHub's review rounds (issue 62) |
@@ -159,7 +160,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/adapter/store/inventory/briefruns.go` `githubBriefs` `"github"` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/adapter/store/inventory/store.go` `Store.Ended` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/adapter/store/inventory/store.go` `Store.FirstRoundBlocks` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
-| `internal/adapter/store/inventory/store.go` `Store.Tracked` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/adapter/store/inventory/store.go` `Store.UnitlessEvents` `unit.Session` `1` | ✅ | the store keeps the sessions the core keeps |
 | `internal/adapter/store/inventory/store.go` `refOf` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/adapter/store/inventory/timings.go` `Store.activeRefs` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
@@ -180,8 +180,8 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/storedfacts.go` `storedFacts.Facts` `unit.GitHub` `1` | 🧾 | the stored facts of a pull request's turn |
 | `internal/cli/turn.go` `Env.storedViewer` `unit.GitHub` `1` | 🧾 | the GitHub viewer read outside the plugin |
 | `internal/client/tui/views.go` `taskProvider` `unit.Task` `1` | 🧾 | the TUI keys its busy map by the task provider; K2 keys it by the served unit |
-| `internal/config/config.go` `Config.ProjectSettingsFor` `unit.GitHub` `1` | 🧾 | an intent's project settings read the pull request's turn facts, which go with the GitHub plugin's profile layer (X8c3) |
-| `internal/config/config.go` `Config.validateWorkflows` `unit.GitHub` `1` | 🧾 | an intent's project settings read the pull request's turn facts, which go with the GitHub plugin's profile layer (X8c3) |
+| `internal/config/config.go` `Config.ProjectSettingsFor` `unit.GitHub` `1` | 🧾 | an intent's project settings compile against the pull request's turn facts, though the intents live in the GitHub plugin's layer (X10) |
+| `internal/config/config.go` `Config.validateWorkflows` `unit.GitHub` `1` | 🧾 | an intent's project settings compile against the pull request's turn facts, though the intents live in the GitHub plugin's layer (X10) |
 | `internal/core/intake/intake.go` `SourceSession` `"session"` `1` | ✅ | the intake source a managed session asks from, which shares the session provider's spelling |
 | `internal/core/turns/headless.go` `taskInput` `"task"` `1` | ✅ | the headless turn's task input, which shares the task provider's spelling |
 | `internal/meter/meter.go` `GitHub` `"github"` `1` | ✅ | the meter's resource of a GitHub API request, not a unit provider |

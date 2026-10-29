@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"io/fs"
 	"regexp"
 	"slices"
 	"strings"
@@ -30,7 +29,6 @@ import (
 	"github.com/wloophq/wloop/internal/plugins/source/fakesource"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace/fake"
-	"github.com/wloophq/wloop/profiles"
 )
 
 var thread2 = unit.Unit{Provider: ingesttest.Provider, Key: "1700000000.2"}
@@ -272,7 +270,7 @@ func TestRoundsReadTheManifestKeys(t *testing.T) {
 // nudgeWithoutRefuse is the bundled nudge's manifest with no [[refuse]].
 func nudgeWithoutRefuse(t *testing.T) string {
 	t.Helper()
-	b, err := fs.ReadFile(profiles.Default, "default/intents/nudge/intent.toml")
+	b, err := readBundled("intents/nudge/intent.toml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -351,7 +349,7 @@ func bundledIntentAs(t *testing.T, from, as string) map[string]string {
 	t.Helper()
 	files := map[string]string{}
 	for _, name := range []string{"intent.toml", "instructions.md.tmpl"} {
-		b, err := fs.ReadFile(profiles.Default, "default/intents/"+from+"/"+name)
+		b, err := readBundled("intents/" + from + "/" + name)
 		if err != nil {
 			t.Fatal(err)
 		}

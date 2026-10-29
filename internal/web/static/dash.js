@@ -129,8 +129,8 @@ function dashKpis(rows, lens) {
 }
 
 function dashWaitOption(rows, lens, pal) {
-  const counts = dashTally(rows, lens, "wait");
-  return dashBars(fieldRank("wait").filter((k) => counts.get(k)).map((k) => dashItem(lens, "wait", k, counts.get(k), pal[k], fieldShow("wait", k))), pal);
+  const counts = dashTally(rows, lens, catalog.strip);
+  return dashBars(fieldRank(catalog.strip).filter((k) => counts.get(k)).map((k) => dashItem(lens, catalog.strip, k, counts.get(k), pal[k], fieldShow(catalog.strip, k))), pal);
 }
 
 function dashPeopleOption(rows, lens, pal) {
@@ -368,8 +368,8 @@ function dashCostOption(rows, lens, pal) {
   const files = new Map();
   for (const r of rows) {
     const n = Number(((pl(r).facts || {}).changed_files)) || 0;
-    if (!n || !passesFilters(r, lens.filters, "wait")) continue;
-    for (const c of facetValues(r, "wait")) files.set(c, (files.get(c) || 0) + n);
+    if (!n || !passesFilters(r, lens.filters, catalog.strip)) continue;
+    for (const c of facetValues(r, catalog.strip)) files.set(c, (files.get(c) || 0) + n);
   }
   const turns = (r) => ((pl(r).facts || {}).turns || {});
   const shown = rows.filter((r) => passesFilters(r, lens.filters));
@@ -377,7 +377,7 @@ function dashCostOption(rows, lens, pal) {
   const spend = shown.filter((r) => (turns(r)[metric] || 0) > 0)
     .sort((a, b) => turns(b)[metric] - turns(a)[metric] || cmp(labelOf(a), labelOf(b))).slice(0, DASH_TOP);
   if (!files.size && !spend.length) return null;
-  const load = fieldRank("wait").filter((k) => files.get(k)).map((k) => ({ ...dashItem(lens, "wait", k, files.get(k), pal[k], fieldShow("wait", k)), tooltip: { formatter: `${fieldShow("wait", k)}: ${files.get(k)} changed files` } }));
+  const load = fieldRank(catalog.strip).filter((k) => files.get(k)).map((k) => ({ ...dashItem(lens, catalog.strip, k, files.get(k), pal[k], fieldShow(catalog.strip, k)), tooltip: { formatter: `${fieldShow(catalog.strip, k)}: ${files.get(k)} changed files` } }));
   const cost = spend.map((r) => {
     const t = turns(r);
     return { name: labelOf(r), value: metric === "cost_usd" ? dashRound(t.cost_usd) : t.tokens, pr: keyOf(r), itemStyle: { color: pal[waitCat(r)] },

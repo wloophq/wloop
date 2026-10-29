@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand/brandtest"
 	"github.com/wloophq/wloop/internal/brief"
@@ -70,11 +72,11 @@ func TestWireShape(t *testing.T) {
 	ctx := context.Background()
 	st := s.store()
 	r7 := github.Ref{Owner: "acme", Repo: "api", Number: 7}
-	if err := st.SetWorkspace(ctx, r7, dinv.Workspace{ID: "w1", DisplayName: "REVIEW batch", Status: "reviewing", IsReview: true,
+	if err := inventorytest.Of(st).SetWorkspace(ctx, r7, dinv.Workspace{ID: "w1", DisplayName: "REVIEW batch", Status: "reviewing", IsReview: true,
 		AgentStates: []turn.AgentState{turn.AgentWorking}, Comment: "r2 held"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SetOverride(ctx, dinv.Override{PR: r7, Hold: true, Tracked: true, NextGuidance: "look at the tests",
+	if err := inventorytest.Of(st).SetOverride(ctx, dinv.Override{PR: r7, Hold: true, Tracked: true, NextGuidance: "look at the tests",
 		MutedUntil: time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC)}); err != nil {
 		t.Fatal(err)
 	}

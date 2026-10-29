@@ -370,75 +370,20 @@
       "help": "GitHub"
     },
     {
-      "key": "R",
-      "action": "run_now",
-      "context": "list",
-      "owner": "core",
-      "help": "Run now"
-    },
-    {
-      "key": "S",
-      "action": "skip",
-      "context": "list",
-      "owner": "core",
-      "help": "Skip"
-    },
-    {
-      "key": "G",
-      "action": "guide",
-      "context": "list",
-      "owner": "core",
-      "help": "Guide"
-    },
-    {
-      "key": "T",
-      "action": "trust_run",
-      "context": "list",
-      "owner": "core",
-      "help": "Trust folder and run"
-    },
-    {
-      "key": "D",
-      "action": "unblock",
-      "context": "list",
-      "owner": "core",
-      "help": "Dismiss block"
-    },
-    {
-      "key": "V",
-      "action": "review",
-      "context": "list",
-      "owner": "intent:review",
-      "help": "Review"
-    },
-    {
-      "key": "F",
-      "action": "address",
-      "context": "list",
-      "owner": "intent:address",
-      "help": "Address"
-    },
-    {
-      "key": "N",
-      "action": "nudge",
-      "context": "list",
-      "owner": "intent:nudge",
-      "help": "Nudge"
-    },
-    {
       "key": "W",
       "action": "answer",
       "context": "list",
       "owner": "core",
       "help": "Answer",
-      "summary": "Answer the question it asks."
+      "summary": "Reply to the agent's open question with your text; the agent resumes from your answer."
     },
     {
       "key": "C",
       "action": "continue",
       "context": "list",
       "owner": "core",
-      "help": "Continue"
+      "help": "Continue",
+      "summary": "Let the agent resume without an answer, deciding the open question itself. Answer gives it your reply instead."
     },
     {
       "key": "X",
@@ -446,84 +391,159 @@
       "context": "list",
       "owner": "core",
       "help": "Dismiss",
-      "summary": "Throw it away: it goes to the trash, and a draft it carries is discarded."
+      "summary": "Close the agent's open question without resuming it; the pull request goes back to whoever it waits on."
+    },
+    {
+      "key": "R",
+      "action": "run_now",
+      "context": "list",
+      "owner": "core",
+      "help": "Run now",
+      "summary": "Start the round waiting on this pull request now, without waiting for its delay or the daily budget. Skip drops it instead."
+    },
+    {
+      "key": "S",
+      "action": "skip",
+      "context": "list",
+      "owner": "core",
+      "help": "Skip",
+      "summary": "Drop the round waiting on this pull request without running it. Run now starts it instead."
+    },
+    {
+      "key": "G",
+      "action": "guide",
+      "context": "list",
+      "owner": "core",
+      "help": "Guide",
+      "summary": "Tell the agent what its round should look at; your text goes with the round waiting now, or with the next one when none waits."
+    },
+    {
+      "key": "T",
+      "action": "trust_run",
+      "context": "list",
+      "owner": "core",
+      "help": "Trust folder and run",
+      "summary": "Trust the folder the agent was blocked on in your agent homes, then run the round. Dismiss block lifts the block without trusting it."
+    },
+    {
+      "key": "D",
+      "action": "unblock",
+      "context": "list",
+      "owner": "core",
+      "help": "Dismiss block",
+      "summary": "Lift the block without trusting the folder; the round waits for its next trigger. Trust folder and run trusts it and runs now."
+    },
+    {
+      "key": "V",
+      "action": "review",
+      "context": "list",
+      "owner": "intent:review",
+      "help": "Review",
+      "summary": "Start or continue a review round on someone else's pull request, in a dedicated workspace"
+    },
+    {
+      "key": "F",
+      "action": "address",
+      "context": "list",
+      "owner": "intent:address",
+      "help": "Address",
+      "summary": "Triage the reviews and failing checks of a pull request you develop, in its workspace, changing its code where they call for it; Act only settles open items and drafts replies"
+    },
+    {
+      "key": "N",
+      "action": "nudge",
+      "context": "list",
+      "owner": "intent:nudge",
+      "help": "Nudge",
+      "summary": "Ask whoever the pull request waits on for the next step, in a comment; guidance is the topic"
     },
     {
       "key": "A",
       "action": "take_over",
       "context": "list",
-      "owner": "core",
-      "help": "Take over"
+      "owner": "github",
+      "help": "Take over",
+      "summary": "Make someone else's pull request yours to develop: from then on it counts as one of yours, and Address works on it."
     },
     {
       "key": "H",
-      "action": "hold",
+      "action": "pause",
       "context": "list",
       "owner": "core",
-      "help": "Hold"
+      "help": "Pause",
+      "summary": "Stop automatic rounds on this pull request until you resume it, and drop the one waiting; it stays in your lists. Mute hides it instead."
     },
     {
       "key": "H",
-      "action": "release",
+      "action": "resume",
       "context": "list",
       "owner": "core",
-      "help": "Release"
+      "help": "Resume",
+      "summary": "Let automatic rounds run on this pull request again."
     },
     {
       "key": "M",
       "action": "mute",
       "context": "list",
       "owner": "core",
-      "help": "Mute"
+      "help": "Mute",
+      "summary": "Take this pull request out of the lists that wait on you, for a while or until who it waits on changes; review and address rounds still run, unannounced, and no nudge goes out automatically. Pause stops the rounds instead."
     },
     {
       "key": "M",
       "action": "unmute",
       "context": "list",
       "owner": "core",
-      "help": "Unmute"
+      "help": "Unmute",
+      "summary": "Bring this pull request back into the lists that wait on you."
     },
     {
       "key": "O",
       "action": "open",
       "context": "list",
       "owner": "core",
-      "help": "Open"
+      "help": "Open",
+      "summary": "Open the pull request's workspace in its workspace manager, or the pull request itself when it has none."
     },
     {
       "key": "Enter",
       "action": "plan_apply",
       "context": "plan",
       "owner": "core",
-      "help": "Apply"
+      "help": "Apply",
+      "summary": "Run this plan item now, with the same guards as the sweep. Dismiss drops it instead."
     },
     {
       "key": "X",
       "action": "plan_dismiss",
       "context": "plan",
       "owner": "core",
-      "help": "Dismiss"
+      "help": "Dismiss",
+      "summary": "Drop this plan item for good; it does not run."
     },
     {
       "key": "G",
       "action": "guide",
       "context": "plan",
       "owner": "core",
-      "help": "Guide"
+      "help": "Guide",
+      "summary": "Tell the agent what its round should look at; your text goes with the round waiting now, or with the next one when none waits."
     },
     {
       "key": "T",
       "action": "trust_run",
       "context": "plan",
       "owner": "core",
-      "help": "Trust folder and run"
+      "help": "Trust folder and run",
+      "summary": "Trust the folder the agent was blocked on in your agent homes, then run the round. Dismiss block lifts the block without trusting it."
     },
     {
       "key": "D",
       "action": "unblock",
       "context": "plan",
       "owner": "core",
-      "help": "Dismiss block"
+      "help": "Dismiss block",
+      "summary": "Lift the block without trusting the folder; the round waits for its next trigger. Trust folder and run trusts it and runs now."
     }
   ]
 }

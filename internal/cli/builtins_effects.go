@@ -13,7 +13,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
-	"github.com/wloophq/wloop/internal/source"
 )
 
 // effectNudges stamps a sent nudge on its tasks (*coretasks.Service).
@@ -31,7 +30,7 @@ type effectDeps struct {
 	Nudges effectNudges // nil stamps nothing
 	// Ends ends a closed unit's tasks after its plugin recorded the closure; nil ends none.
 	Ends    effectEnds
-	Modules []source.Module
+	Modules []pluginModule
 	// Appliers apply each provider's plugin effects; nil applies none.
 	Appliers func(p unit.ProviderID) (effectApplier, bool)
 }

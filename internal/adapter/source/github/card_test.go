@@ -104,7 +104,7 @@ func TestCardRefusesAnotherProvider(t *testing.T) {
 func TestIdentity(t *testing.T) {
 	ctx := context.Background()
 	f := storetest.Empty(t)
-	id := identity(f.Inventory)
+	id := IdentityOf(f.Inventory)
 	if _, err := id(ctx); err == nil {
 		t.Fatal("no error without a viewer")
 	}

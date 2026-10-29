@@ -205,12 +205,18 @@ type UIFacet struct {
 	Buckets []UIBucket `toml:"buckets" doc:"The age buckets of a time facet, youngest first; only with sort = time."`
 	Match   string     `toml:"match" doc:"How a filter matches a value; empty is exact." enum:"exact,suffix,prefix,team"`
 	Menu    bool       `toml:"menu" doc:"It shows in the filter menu."`
+	// Strip colors each row's strip by the facet's first value, its legend
+	// the facet's rank; at most one facet of a plugin is the strip's.
+	Strip bool `toml:"strip" doc:"Each row's strip is colored by its value, and its rank is the strip's legend; at most one facet."`
 }
 
-// UIBucket is an age bucket of a time facet: the values younger than Within.
+// UIBucket is an age bucket of a time facet: the values younger than
+// Within, the first bucket that covers one winning. A negative Within reads
+// a value in the future; the last bucket may leave it unset to catch the
+// rest.
 type UIBucket struct {
 	ID     string   `toml:"id" doc:"The bucket's id. Required."`
-	Within Duration `toml:"within" doc:"The age its values are younger than, as a Go duration. Required."`
+	Within Duration `toml:"within" doc:"The age its values are younger than, as a Go duration; negative for a value that far in the future. Required but on the last bucket, which then catches the rest."`
 }
 
 // UIMenu is a menu bar section showing a view.
@@ -243,6 +249,8 @@ func (d Duration) MarshalText() ([]byte, error) { return []byte(time.Duration(d)
 var (
 	slotRe = regexp.MustCompile(`^[a-z][a-z0-9_]{0,31}$`)
 	nameRe = regexp.MustCompile(`^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*)*$`)
+	// bucketRe also takes an age such as 1d.
+	bucketRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 )
 
 // FactTypes are the types a fact declares.
@@ -466,6 +474,7 @@ func (s *Source) validateUI(bad func(string, ...any), unique func(string, string
 		unique("ui view", v.ID)
 		views = append(views, v.ID)
 	}
+	strips := 0
 	var facets []string
 	for _, f := range ui.Facets {
 		if !nameRe.MatchString(f.ID) {
@@ -476,12 +485,24 @@ func (s *Source) validateUI(bad func(string, ...any), unique func(string, string
 		if len(f.Buckets) > 0 && f.Sort != "time" {
 			bad("ui facet %q: buckets need sort = time", f.ID)
 		}
-		for _, b := range f.Buckets {
-			unique("bucket of "+f.ID, b.ID)
-			if !nameRe.MatchString(b.ID) || b.Within <= 0 {
-				bad("ui facet %q: bucket %q needs a lowercase id and a positive within", f.ID, b.ID)
+		if f.Strip {
+			strips++
+			if len(f.Rank) == 0 {
+				bad("ui facet %q: the strip's facet needs a rank, its legend", f.ID)
 			}
 		}
+		for i, b := range f.Buckets {
+			unique("bucket of "+f.ID, b.ID)
+			if !bucketRe.MatchString(b.ID) {
+				bad("ui facet %q: bucket %q needs a lowercase id", f.ID, b.ID)
+			}
+			if b.Within == 0 && i < len(f.Buckets)-1 {
+				bad("ui facet %q: bucket %q needs a within; only the last bucket catches the rest", f.ID, b.ID)
+			}
+		}
+	}
+	if strips > 1 {
+		bad("ui: %d facets are the strip's; at most one is", strips)
 	}
 	for _, v := range ui.Views {
 		if v.UnitSort != "" && !slices.Contains(facets, v.UnitSort) {

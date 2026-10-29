@@ -41,6 +41,78 @@ doc = "The head whose failing checks an address round covered: `handled(\"addres
 name = "addressed.conflict"
 doc = "The head whose conflict with the base an address round covered: `handled(\"addressed.conflict\", pr.head)`."
 
+[[source.situations]]
+name = "round_pending"
+doc = "A round waits on you before it starts."
+
+[[source.situations]]
+name = "loop_waiting"
+doc = "The agent of the round asks you a question."
+
+[[source.situations]]
+name = "loop_stopped"
+doc = "The agent of the round stopped before it ended its turn."
+
+[[source.situations]]
+name = "blocked"
+doc = "A round cannot start until you free the head branch, trust its folder or answer the agent's question."
+
+[[source.situations]]
+name = "to_address"
+doc = "An address round is due on your pull request."
+
+[[source.situations]]
+name = "held"
+doc = "A due round is held by the daily cap."
+
+[[source.situations]]
+name = "loop_working"
+doc = "The agent of a round works on the pull request."
+
+[[source.situations]]
+name = "changes"
+doc = "Changes were asked of the author."
+
+[[source.situations]]
+name = "checks"
+doc = "The checks on the head fail."
+
+[[source.situations]]
+name = "conflicts"
+doc = "The head conflicts with the base."
+
+[[source.situations]]
+name = "reply"
+doc = "Someone waits for the author's reply."
+
+[[source.situations]]
+name = "reviewer_back"
+doc = "A reviewer is due to look again."
+
+[[source.situations]]
+name = "review"
+doc = "A review is requested and not given."
+
+[[source.situations]]
+name = "no_reviewer"
+doc = "No reviewer is requested."
+
+[[source.situations]]
+name = "merge"
+doc = "The pull request is approved and can merge."
+
+[[source.situations]]
+name = "draft"
+doc = "The pull request is a draft."
+
+[[source.situations]]
+name = "muted"
+doc = "You muted the pull request."
+
+[[source.situations]]
+name = "done"
+doc = "The pull request merged or closed."
+
 [source.codec]
 keys = ["{owner}/{repo}#{number}"]
 urls = ["https://github.com/{owner}/{repo}/pull/{number}"]
@@ -532,6 +604,239 @@ name = "pr.fingerprint"
 type = "string"
 doc = "What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips."
 untrusted = true
+
+[[source.ui.views]]
+id = "needs-me"
+rows = true
+order = 0
+surfaces = ["web", "tui"]
+unit_sort = "repo"
+
+[[source.ui.views]]
+id = "stalled"
+rows = true
+order = 1
+surfaces = ["web"]
+unit_sort = "repo"
+
+[[source.ui.views]]
+id = "mine"
+rows = true
+order = 2
+surfaces = ["web", "tui"]
+unit_sort = "repo"
+
+[[source.ui.views]]
+id = "loop"
+rows = true
+order = 3
+surfaces = ["web", "tui", "menubar"]
+unit_sort = "repo"
+
+[[source.ui.views]]
+id = "plan"
+order = 4
+surfaces = ["web", "tui"]
+
+[[source.ui.views]]
+id = "approved"
+rows = true
+order = 5
+surfaces = ["web"]
+unit_sort = "repo"
+
+[[source.ui.views]]
+id = "dash"
+order = 6
+surfaces = ["web"]
+
+[[source.ui.views]]
+id = "done"
+rows = true
+order = 7
+surfaces = ["web"]
+unit_sort = "repo"
+
+[[source.ui.views]]
+id = "all"
+rows = true
+order = 8
+surfaces = ["web"]
+
+[[source.ui.views]]
+id = "explore"
+order = 9
+surfaces = ["web"]
+
+[[source.ui.views]]
+id = "recent"
+order = 10
+surfaces = ["web"]
+
+[[source.ui.facets]]
+id = "repo"
+group = true
+sort = "text"
+match = "suffix"
+menu = true
+
+[[source.ui.facets]]
+id = "author"
+group = true
+sort = "rank"
+rank = ["me"]
+menu = true
+
+[[source.ui.facets]]
+id = "wait"
+group = true
+sort = "rank"
+rank = ["me", "loop", "reviewer", "author", "nobody"]
+menu = true
+strip = true
+
+[[source.ui.facets]]
+id = "waits-on"
+match = "team"
+menu = true
+
+[[source.ui.facets]]
+id = "kind"
+group = true
+sort = "rank"
+rank = ["round_pending", "loop_waiting", "loop_stopped", "blocked", "to_address", "held", "loop_working", "changes", "checks", "conflicts", "reply", "reviewer_back", "review", "no_reviewer", "merge", "draft", "muted", "done"]
+menu = true
+
+[[source.ui.facets]]
+id = "type"
+group = true
+sort = "text"
+menu = true
+
+[[source.ui.facets]]
+id = "risk"
+group = true
+sort = "rank"
+rank = ["high", "medium", "low"]
+menu = true
+
+[[source.ui.facets]]
+id = "size"
+group = true
+sort = "rank"
+rank = ["xs", "s", "m", "l", "xl"]
+menu = true
+
+[[source.ui.facets]]
+id = "status"
+group = true
+sort = "text"
+menu = true
+
+[[source.ui.facets]]
+id = "tag"
+match = "prefix"
+menu = true
+
+[[source.ui.facets]]
+id = "is"
+menu = true
+
+[[source.ui.facets]]
+id = "ci"
+group = true
+rank = ["failure", "pending", "success"]
+menu = true
+
+[[source.ui.facets]]
+id = "opened"
+group = true
+sort = "time"
+rank = ["1d", "3d", "7d", "2w", "4w", "older"]
+menu = true
+
+[[source.ui.facets.buckets]]
+id = "1d"
+within = "24h"
+
+[[source.ui.facets.buckets]]
+id = "3d"
+within = "72h"
+
+[[source.ui.facets.buckets]]
+id = "7d"
+within = "168h"
+
+[[source.ui.facets.buckets]]
+id = "2w"
+within = "336h"
+
+[[source.ui.facets.buckets]]
+id = "4w"
+within = "672h"
+
+[[source.ui.facets.buckets]]
+id = "older"
+
+[[source.ui.facets]]
+id = "scope"
+menu = true
+
+[[source.ui.facets]]
+id = "age"
+sort = "time"
+menu = true
+
+[[source.ui.facets.buckets]]
+id = "1d"
+within = "24h"
+
+[[source.ui.facets.buckets]]
+id = "3d"
+within = "72h"
+
+[[source.ui.facets.buckets]]
+id = "7d"
+within = "168h"
+
+[[source.ui.facets.buckets]]
+id = "2w"
+within = "336h"
+
+[[source.ui.facets.buckets]]
+id = "4w"
+within = "672h"
+
+[[source.ui.facets.buckets]]
+id = "older"
+
+[[source.ui.facets]]
+id = "lane"
+group = true
+rank = ["me", "reviewer", "author", "merge", "loop"]
+
+[[source.ui.facets]]
+id = "due"
+sort = "time"
+
+[[source.ui.facets.buckets]]
+id = "later"
+within = "-24h"
+
+[[source.ui.facets.buckets]]
+id = "due"
+within = "1ms"
+
+[[source.ui.facets.buckets]]
+id = "past"
+
+[[source.ui.menubar]]
+id = "loop"
+view = "loop"
+
+[[source.ui.keys]]
+key = "g g"
+action = "nav"
 
 [[source.jobs]]
 name = "fast"

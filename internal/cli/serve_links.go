@@ -15,7 +15,6 @@ import (
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/meter"
-	"github.com/wloophq/wloop/internal/source"
 )
 
 // linksRuntime names the resolver among the daemon's runtimes.
@@ -34,7 +33,7 @@ type linkWiring struct {
 
 // linkDeps fills sd's registry and link store; the registry is the daemon's
 // once serve registers the resolver.
-func (e *Env) linkDeps(db *sqlite.DB, cfg config.Config, logf func(string, ...any), sd *source.Deps) *linkWiring {
+func (e *Env) linkDeps(db *sqlite.DB, cfg config.Config, logf func(string, ...any), sd *moduleDeps) *linkWiring {
 	w := &linkWiring{e: e, db: db, cfg: cfg, logf: logf, store: db.Links()}
 	sd.Units, sd.Links = w.units.Load, w.store
 	return w
@@ -43,7 +42,7 @@ func (e *Env) linkDeps(db *sqlite.DB, cfg config.Config, logf func(string, ...an
 // serve is d with the resolver as a runtime: woken by the source events and
 // links noted on units, it resolves the open items linked to them. It runs
 // only when an enabled plugin reads unit events.
-func (w *linkWiring) serve(d daemon.Deps, mods []source.Module) daemon.Deps {
+func (w *linkWiring) serve(d daemon.Deps, mods []pluginModule) daemon.Deps {
 	w.units.Store(d.Units)
 	events := map[unit.ProviderID]links.EventReader{}
 	for _, m := range mods {

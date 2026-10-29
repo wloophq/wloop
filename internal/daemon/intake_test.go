@@ -13,6 +13,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
@@ -83,7 +85,7 @@ func newIntakeServer(t *testing.T, briefs intake.Briefs, change func(*Deps)) (*S
 	}
 	t.Cleanup(func() { db.Close() })
 	st := inventory.New(db)
-	if err := st.UpsertPR(context.Background(), dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h2", URL: r7.URL(), ReviewRequests: []string{"me"}, Reasons: []string{"review-requested"}}); err != nil {
+	if err := inventorytest.Of(st).UpsertPR(context.Background(), dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h2", URL: r7.URL(), ReviewRequests: []string{"me"}, Reasons: []string{"review-requested"}}); err != nil {
 		t.Fatal(err)
 	}
 	fa := &lockedActions{a: fakeActions{out: "review sent\n"}}
@@ -227,7 +229,7 @@ func TestWithoutAndCancelEndpoints(t *testing.T) {
 	if got := intakeOf(t, s, review.Seq); got.Brief != intake.BriefWithout || !slices.Equal(fa.calls(), []string{"review acme/api#7 "}) {
 		t.Fatalf("intake %+v, calls %v", got, fa.calls())
 	}
-	s.store().SetOverride(context.Background(), dinv.Override{PR: r7, Adopted: true})
+	inventorytest.Of(s.store()).SetOverride(context.Background(), dinv.Override{PR: r7, Adopted: true})
 	address := ask(t, s, "address", `{"source":"cockpit"}`)
 	waitFor(t, func() bool { return intakeOf(t, s, address.Seq).State == intake.Briefing })
 	if rec := post(t, s, fmt.Sprintf("/api/intakes/%d/cancel", address.Seq), ""); rec.Code != 200 {

@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
@@ -48,11 +50,10 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/view"
 	"github.com/wloophq/wloop/internal/domain/workflow"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
-	"github.com/wloophq/wloop/internal/source"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/transport/mcp"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 	wsorca "github.com/wloophq/wloop/internal/workspace/orca"
@@ -436,7 +437,7 @@ func seedPR(t *testing.T, te *testEnv, p dinv.PR) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	if err := inventory.New(db).UpsertPR(context.Background(), p); err != nil {
+	if err := inventorytest.Of(inventory.New(db)).UpsertPR(context.Background(), p); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -772,32 +773,31 @@ func TestAgentForFollowsTheReloadedConfig(t *testing.T) {
 // budgetStub is a GitHub plugin whose API budget is one GraphQL bucket.
 type budgetStub struct {
 	*forgeStub
-	limit dgh.Limit
+	low   bool
+	limit api.RateLimit
 }
 
-func (b budgetStub) Action(_ context.Context, req src.ActionRequest) (json.RawMessage, error) {
-	if req.Action != ghsource.ActionBudget {
+func (b budgetStub) View(_ context.Context, req src.ViewRequest) (json.RawMessage, error) {
+	if req.View != ghsource.ViewBudget {
 		return nil, src.ErrUnsupported
 	}
-	return json.Marshal(map[dgh.Resource]dgh.Limit{dgh.ResourceGraphQL: b.limit})
+	return json.Marshal(map[string]any{"low": b.low, "remaining": b.limit.Remaining, "limit": b.limit.Limit, "reset_at": b.limit.ResetAt})
 }
 
-func TestServeRestoresTheBudgetTheGitHubPluginKeeps(t *testing.T) {
+func TestServeKeepsTheBudgetTheGitHubPluginNames(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	at := te.Now()
-	spent := dgh.Limit{Resource: dgh.ResourceGraphQL, Limit: 5000, Remaining: 3000, ResetAt: at.Add(time.Hour).UTC()}
-	te.Env.forge = sourcetest.Launch(t, "github", budgetStub{forgeStub: &forgeStub{Stub: sourcetest.NewStub(), login: "ana"}, limit: spent}, src.Host{})
-	te.Env.github.API = github.NewClient(github.Options{Host: "github.com", Now: func() time.Time { return at },
-		Token: func(context.Context) (string, error) { return "t", nil }})
-	cfg := te.cfg
-	cfg.GitHub.RateLimitFraction = 0.7
-	te.Env.restoreBudget(context.Background(), cfg, t.Logf)
-	if got := te.Env.github.API.Budget()[dgh.ResourceGraphQL]; got.Remaining != 3000 || got.Limit != 5000 || !got.ResetAt.Equal(spent.ResetAt) {
-		t.Fatalf("restored %+v", got)
+	spent := api.RateLimit{Limit: 5000, Remaining: 3000, ResetAt: te.Now().Add(time.Hour).UTC()}
+	te.Env.forge = sourcetest.Launch(t, "github", budgetStub{forgeStub: &forgeStub{Stub: sourcetest.NewStub(), login: "ana"}, low: true, limit: spent}, src.Host{})
+	if te.Env.budget.Low() || te.Env.budget.RateLimit() != (api.RateLimit{}) {
+		t.Fatal("a budget before the plugin named one")
 	}
-	if te.Env.github.API.Allow(dgh.PriorityBackground) || !te.Env.github.API.Allow(dgh.PriorityUser) {
-		t.Fatal("60 % left under a 0.7 floor: background must wait, the user may read")
+	te.Env.afterGitHubJob(context.Background())
+	if got := te.Env.budget.RateLimit(); got.Remaining != 3000 || got.Limit != 5000 || !got.ResetAt.Equal(spent.ResetAt) {
+		t.Fatalf("kept %+v", got)
+	}
+	if !te.Env.budget.Low() || te.Env.budget.allow(dgh.PriorityBackground) || !te.Env.budget.allow(dgh.PriorityUser) {
+		t.Fatal("a low budget: background must wait, the user may read")
 	}
 }
 
@@ -878,7 +878,7 @@ func TestOrcaSinkGetsTheSectionsColumns(t *testing.T) {
 	cfg := (&Env{}).defaultConfig()
 	cfg.Views["orca"].Columns["needs-me"] = "waiting-me"
 	cfg.Views["orca"].Columns["working"] = "doing"
-	_, sinks, err := orcaPorts(context.Background(), &wsorca.Manager{}, nil, cfg, nil)
+	_, sinks, err := orcaPorts(context.Background(), &wsorca.Manager{}, prrow.ReportedPRs{}, cfg, nil)
 	if err != nil || len(sinks) != 1 {
 		t.Fatalf("sinks %v, %v", sinks, err)
 	}
@@ -1092,8 +1092,8 @@ func TestServeWiresAuthorFactsIntoViews(t *testing.T) {
 	board := testsink.New("board").WithAuthorColumns()
 	te.ports = sinksOf(board)
 	saved := plugins
-	plugins = []source.Plugin{{ID: unit.GitHub, Codec: pr.Codec{}, Build: func(cfg config.Config, sd source.Deps) (source.Module, error) {
-		m, err := ghsource.Module(cfg, sd)
+	plugins = []compiledPlugin{{ID: unit.GitHub, Codec: pr.Codec{}, Build: func(cfg config.Config, sd moduleDeps) (pluginModule, error) {
+		m, err := githubHostModule(cfg, sd)
 		m.Facts = readyFacts{automationtest.NewUnits()}
 		return m, err
 	}}}
@@ -1127,7 +1127,7 @@ func TestPendingRoundsReachTheReadModel(t *testing.T) {
 	}
 	t.Cleanup(func() { storeDB.Close() })
 	ctx := context.Background()
-	if err := inventory.New(storeDB).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", URL: r7.URL(), Reasons: []string{"review-requested"}}); err != nil {
+	if err := inventorytest.Of(inventory.New(storeDB)).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", URL: r7.URL(), Reasons: []string{"review-requested"}}); err != nil {
 		t.Fatal(err)
 	}
 	deadline := testNow.Add(4 * time.Minute)
@@ -1227,7 +1227,7 @@ func TestTheServedPlanEvaluatesOverTheRealStepsWithoutWriting(t *testing.T) {
 	t.Cleanup(func() { storeDB.Close() })
 	ctx := context.Background()
 	st := inventory.New(storeDB)
-	if err := st.UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "c2", ChecksState: "SUCCESS",
+	if err := inventorytest.Of(st).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "c2", ChecksState: "SUCCESS",
 		ReviewRequests: []string{"me"}, Reasons: []string{"review-requested"}, URL: r7.URL()}); err != nil {
 		t.Fatal(err)
 	}
@@ -1263,7 +1263,6 @@ func TestTheServedPlanEvaluatesOverTheRealStepsWithoutWriting(t *testing.T) {
 func TestDaemonReadsSpawnNoGh(t *testing.T) {
 	t.Parallel()
 	_, te := scenario(t)
-	te.github.GH = noGH{t}
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -1299,10 +1298,6 @@ func TestDaemonReadsSpawnNoGh(t *testing.T) {
 		if p.reads && metertest.Count(sc, metertest.Limit{Res: meter.GitHub, Op: "graphql"}) == 0 {
 			t.Errorf("%s sent no GraphQL request through the client\n%s", p.name, metertest.Report(sc.End()))
 		}
-	}
-	d.FailedSteps(ctx, "acme", "api", 1)
-	if n := metertest.Count(all, metertest.Limit{Res: meter.GitHub, Op: "rest"}); n == 0 {
-		t.Error("failed steps sent no REST request through the client")
 	}
 	if n := all.Tally().Total(meter.GitHub).Spawns; n != 0 {
 		t.Fatalf("%d GitHub spawns\n%s", n, metertest.Report(all.Tally()))
