@@ -63,6 +63,7 @@ type fakeDaemon struct {
 	counterAsks [][]string
 	drafts      []api.Draft
 	taskDos     []taskDo
+	resolves    []gateResolve
 	// doLag holds TaskDo's reply after the verb is recorded, as a slow daemon does.
 	doLag        time.Duration
 	captures     []string
@@ -79,6 +80,12 @@ type fakeDaemon struct {
 type taskAsk struct {
 	view, area string
 	since      api.Since
+}
+
+type gateResolve struct {
+	id             int64
+	intent, source string
+	args           map[string]string
 }
 
 type taskDo struct {
@@ -159,6 +166,13 @@ func (f *fakeDaemon) TaskDo(_ context.Context, id, verb string, req api.TaskRequ
 	f.mu.Unlock()
 	time.Sleep(lag)
 	return api.TaskResult{Lines: []string{verb + " done"}}, nil
+}
+
+func (f *fakeDaemon) ResolveGate(_ context.Context, id int64, intent string, req api.TaskRequest) (api.GateView, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.resolves = append(f.resolves, gateResolve{id, intent, req.Source, req.Args})
+	return api.GateView{ID: id, Status: "approved"}, nil
 }
 
 func (f *fakeDaemon) TaskDrafts(_ context.Context, task string) ([]api.Draft, error) {

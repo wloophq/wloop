@@ -21,6 +21,25 @@ var Notices = []ToolAnswer{
 	{Name: NoticeSendReplyButton, Doc: "The button of a notification's input that sends a reply at once."},
 	{Name: NoticeAnswerPlaceholder, Doc: "The placeholder of a notification's input that answers an agent."},
 	{Name: NoticeAnswerButton, Doc: "The button of a notification's input that answers an agent."},
+	{Name: NoticeDigestTitle, Doc: "The title of the daily digest notification."},
+	{Name: NoticeDigestNew, Doc: "The digest's first line: Count, the tasks of the badge's views that moved since the last digest.",
+		Fields: []AnswerField{num("Count")}},
+	{Name: NoticeDigestView, Doc: "The digest's line for one view the badge counts: View, its label, and Count, its tasks.",
+		Fields: []AnswerField{str("View"), num("Count")}},
+	{Name: NoticeNotifyInbox, Doc: "The title of the notification of a task in the Inbox that says what it is itself."},
+	{Name: NoticeNotifyDraftForMe, Doc: "The button of an Inbox task's notification that delegates it to an agent headless."},
+	{Name: NoticeNotifyReply, Doc: "The button of a notification whose text input saves a reply for approval, or answers an agent."},
+	{Name: NoticeNotifySendReply, Doc: "The button of a notification whose text input sends a reply at once."},
+	{Name: NoticeNotifyQuestion, Doc: "The title of the notification of an agent's open question."},
+	{Name: NoticeNotifyProposal, Doc: "The title of the notification of an open proposal."},
+	{Name: NoticeNotifyPost, Doc: "The title of the notification of an agent's open post."},
+	{Name: NoticeNotifyYes, Doc: "The button that answers yes to an agent's confirmation."},
+	{Name: NoticeNotifyNo, Doc: "The button that answers no to an agent's confirmation."},
+	{Name: NoticeNotifyRecommended, Doc: "The button of the option an agent recommends: Label, the option's label.", Fields: []AnswerField{str("Label")}},
+	{Name: NoticeNotifyDraft, Doc: "The title of the notification of a draft that waits for your approval."},
+	{Name: NoticeNotifyDraftFailed, Doc: "The title of the notification of a draft whose delivery failed."},
+	{Name: NoticeNotifyOpen, Doc: "The button that opens the notification's task in the cockpit."},
+	{Name: NoticeNotifyDiscard, Doc: "The button that discards a draft from its notification."},
 	{Name: "record_owed", Doc: "The reason that blocks the stop of a session whose turn has no record: the unit, the turn's id and the directory a record file goes in.",
 		Fields: []AnswerField{str("Unit"), str("Turn"), str("ScratchDir")}},
 	{Name: NoticeAttachNeedsSession, Doc: "Why task attach refuses to run outside an agent session a workspace manager started: the task named as the command reads it, and the enabled workspace managers as displayed.",
@@ -44,6 +63,23 @@ const (
 	NoticeSendReplyButton      = "send_reply_button"
 	NoticeAnswerPlaceholder    = "answer_placeholder"
 	NoticeAnswerButton         = "answer_button"
+	NoticeDigestTitle          = "digest_title"
+	NoticeDigestNew            = "digest_new"
+	NoticeDigestView           = "digest_view"
+	NoticeNotifyInbox          = "notify_inbox"
+	NoticeNotifyDraftForMe     = "notify_draft_for_me"
+	NoticeNotifyReply          = "notify_reply"
+	NoticeNotifySendReply      = "notify_send_reply"
+	NoticeNotifyQuestion       = "notify_question"
+	NoticeNotifyProposal       = "notify_proposal"
+	NoticeNotifyPost           = "notify_post"
+	NoticeNotifyYes            = "notify_yes"
+	NoticeNotifyNo             = "notify_no"
+	NoticeNotifyRecommended    = "notify_recommended"
+	NoticeNotifyDraft          = "notify_draft"
+	NoticeNotifyDraftFailed    = "notify_draft_failed"
+	NoticeNotifyOpen           = "notify_open"
+	NoticeNotifyDiscard        = "notify_discard"
 )
 
 // NoticeOf is the notice name, false when there is none.

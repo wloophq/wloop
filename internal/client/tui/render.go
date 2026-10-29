@@ -18,6 +18,9 @@ var quitHelp = helpItem{"q", "quit"}
 
 var keysHelp = helpItem{"?", "keys"}
 
+// staleMark marks a row its plugin last reported before it went down.
+const staleMark = "(stale)"
+
 // factLabel is the width of the detail pane's labels.
 const factLabel = 9
 
@@ -48,6 +51,9 @@ func (m *Model) Render(width, height int, now time.Time) []string {
 	if m.view == m.planView() {
 		lines = pad(m.renderPlan(lines, width, body, now), height-2)
 		return append(lines, m.statusLine(width), m.bottom(width))
+	}
+	if l, ok := m.loadingLine(m.rowsLoading, width); ok {
+		lines, body = append(lines, l), body-1
 	}
 	rows := m.visible()
 	cur := m.cursor(rows)
@@ -247,6 +253,9 @@ func (m *Model) list(rows []api.Row, cur, width, height int, now time.Time) []st
 			{Text: age, Style: style},
 			{Text: shortRef(r.Label, refMax), Style: func(s string) string { return t.Link(url, s) }},
 			{Text: r.Title},
+		}
+		if r.Stale {
+			c[2] = termfmt.Cell{Text: staleMark + " " + r.Title}
 		}
 		if brief {
 			c = append(c, termfmt.Cell{Text: sizeRisk(r), Style: t.Dim})

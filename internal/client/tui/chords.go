@@ -25,19 +25,17 @@ const shiftDigits = "!@#$%^&*("
 // coreActions are the served core actions that are not task verbs.
 var coreActions = []string{"move:", "detail:", "nav:", "area:", "answer:", "step:", "palette", "help", "filter", "open-source", "capture", "quit"}
 
-// verbAsks are the verbs that ask for a value on the bottom line first,
-// the question from the catalog; args turns the answer into the verb's
-// arguments, ok false when the answer is not usable.
-var verbAsks = map[string]struct {
-	args func(string) (map[string]string, bool)
-}{
-	"waiting": {func(v string) (map[string]string, bool) {
+// handlerAsks are the handlers whose verbs ask for a value on the bottom
+// line first, the question the verb's served input; args turns the answer
+// into the handler's arguments, ok false when the answer is not usable.
+var handlerAsks = map[string]func(string) (map[string]string, bool){
+	"waiting": func(v string) (map[string]string, bool) {
 		if v == "" {
 			return nil, true
 		}
 		return map[string]string{"on": v}, true
-	}},
-	"schedule": {func(v string) (map[string]string, bool) {
+	},
+	"schedule": func(v string) (map[string]string, bool) {
 		switch {
 		case v == "":
 			return nil, false
@@ -45,13 +43,34 @@ var verbAsks = map[string]struct {
 			return map[string]string{"on_activity": "true"}, true
 		}
 		return map[string]string{"until": v}, true
-	}},
-	"project": {func(v string) (map[string]string, bool) {
+	},
+	"project": func(v string) (map[string]string, bool) {
 		if v == "" {
 			return nil, false
 		}
 		return map[string]string{"title": v}, true
-	}},
+	},
+	"context": func(v string) (map[string]string, bool) { return map[string]string{"set": v}, true },
+	"area":    func(v string) (map[string]string, bool) { return map[string]string{"set": v}, true },
+}
+
+// verbAsk is how verb turns the value it asks for into its arguments; ok is
+// false for a verb that asks for none.
+func (m *Model) verbAsk(verb string) (args func(string) (map[string]string, bool), ok bool) {
+	i := slices.IndexFunc(m.viewsCat.Verbs, func(v api.VerbSpec) bool { return v.Verb == verb })
+	if i < 0 || m.viewsCat.Verbs[i].Input == "" {
+		return nil, false
+	}
+	args, ok = handlerAsks[m.viewsCat.Verbs[i].Handler]
+	return args, ok
+}
+
+// verbOf is the served verb that runs handler, handler itself when none does.
+func (m *Model) verbOf(handler string) string {
+	if v, ok := m.viewsCat.VerbOf(handler); ok {
+		return v
+	}
+	return handler
 }
 
 // SetKeys replaces the bindings of the terminal the keys follow.
@@ -71,14 +90,14 @@ func bindingName(k Key) string {
 
 var namedKeys = map[string]string{KeyEnter: "Enter", KeyEsc: "Esc", KeyBackspace: "Backspace", KeyTab: "Tab", KeyCtrlK: "Ctrl+K"}
 
-// served tells a binding of a served action from a core one: one
+// servedKey tells a binding of a served action from a core one: one
 // uppercase letter, or a plan action that is neither a core action nor a
 // verb.
-func served(b api.KeyView) bool {
+func (m *Model) servedKey(b api.KeyView) bool {
 	if len(b.Key) == 1 && b.Key[0] >= 'A' && b.Key[0] <= 'Z' {
 		return true
 	}
-	return b.Context == ctxPlan && !coreAction(b.Action) && !isVerb(b.Action)
+	return b.Context == ctxPlan && !coreAction(b.Action) && !m.isVerb(b.Action)
 }
 
 func coreAction(action string) bool {
@@ -87,13 +106,14 @@ func coreAction(action string) bool {
 	})
 }
 
-func isVerb(action string) bool {
-	return slices.Contains([]string{"next", "waiting", "schedule", "someday", "reference", "focus", "project", "approve", "delegate", "done", "dismiss", "reply", "edit"}, action)
+// isVerb says whether action is a verb the catalog serves.
+func (m *Model) isVerb(action string) bool {
+	return slices.ContainsFunc(m.viewsCat.Verbs, func(v api.VerbSpec) bool { return v.Verb == action })
 }
 
 // binding is the first binding of action in context.
 func (m *Model) binding(action, context string) (api.KeyView, bool) {
-	i := slices.IndexFunc(m.keys, func(b api.KeyView) bool { return b.Action == action && b.Context == context && !served(b) })
+	i := slices.IndexFunc(m.keys, func(b api.KeyView) bool { return b.Action == action && b.Context == context && !m.servedKey(b) })
 	if i < 0 {
 		return api.KeyView{}, false
 	}
@@ -144,7 +164,7 @@ func (m *Model) dispatch(k Key) (Command, bool) {
 		}
 	}
 	slices.SortStableFunc(found, func(a, b api.KeyView) int {
-		return cmp.Or(cmp.Compare(slices.Index(contexts, a.Context), slices.Index(contexts, b.Context)), boolRank(served(b))-boolRank(served(a)))
+		return cmp.Or(cmp.Compare(slices.Index(contexts, a.Context), slices.Index(contexts, b.Context)), boolRank(m.servedKey(b))-boolRank(m.servedKey(a)))
 	})
 	if len(found) == 0 && m.prefix(name) {
 		m.chord = name
@@ -185,7 +205,7 @@ func (m *Model) runBinding(b api.KeyView, k Key) (c Command, ok, took bool) {
 		}
 		c, ok = m.planAction(Key{Rune: k.Rune, Name: k.Name, Read: k.Read})
 		return c, ok, true
-	case served(b):
+	case m.servedKey(b):
 		if b.Context != ctxList {
 			return Command{}, false, false
 		}
@@ -247,7 +267,7 @@ func (m *Model) runBinding(b api.KeyView, k Key) (c Command, ok, took bool) {
 	case a == "open-source":
 		c, ok = m.openSource()
 		return c, ok, true
-	case isVerb(a):
+	case m.isVerb(a):
 		if !inViews {
 			return Command{}, false, false
 		}
@@ -334,7 +354,7 @@ func (m *Model) taskVerb(verb string, read uint64) (Command, bool) {
 		}
 		c.task = "draft:" + strconv.FormatInt(draftOn(shown).ID, 10)
 		return m.editPrompt(c, *draftOn(shown), read)
-	case verb == "delegate":
+	case handler == handlerDelegate:
 		return m.delegatePrompt(e, c, m.bridgedConfirm(e, verb), read)
 	case handler == handlerReply:
 		return m.replyPrompt(e, c, read)
@@ -343,12 +363,12 @@ func (m *Model) taskVerb(verb string, read uint64) (Command, bool) {
 		m.confirm(c, confirm, read)
 		return Command{}, false
 	}
-	ask, asks := verbAsks[verb]
+	ask, asks := m.verbAsk(verb)
 	if !asks {
 		return m.send(c)
 	}
 	m.prompt = &prompt{action: verb, label: m.verbQuestion(verb) + " for " + taskLabel(e), read: read, submit: func(text string) (Command, bool) {
-		args, ok := ask.args(text)
+		args, ok := ask(text)
 		if !ok {
 			m.status = verb + " " + c.Label + " cancelled: nothing usable typed"
 			return Command{}, false
@@ -388,10 +408,13 @@ func (m *Model) draftVerb(c Command, e api.TaskView, read uint64) (Command, bool
 	return Command{}, false
 }
 
+// bridgedHandlers are the handlers of the verbs that run their unit's action.
+var bridgedHandlers = []string{handlerApprove, handlerDelegate, ownDismiss}
+
 // bridgedConfirm is the confirm of the unit action verb runs on e: the
 // first of its units whose row offers an enabled action of that verb.
 func (m *Model) bridgedConfirm(e api.TaskView, verb string) string {
-	if !slices.Contains([]string{"approve", "delegate", "dismiss"}, verb) {
+	if !slices.Contains(bridgedHandlers, m.viewsCat.HandlerOf(verb)) {
 		return ""
 	}
 	for _, u := range e.Units {
@@ -506,7 +529,7 @@ func (m *Model) paletteItems() []paletteItem {
 				switch {
 				case v.Enabled && ok:
 					items = append(items, paletteItem{label: cmp.Or(m.verbLabel(v.Verb), b.Help), key: b.Key, about: b.Summary, run: runKey(b)})
-				case v.Enabled && slices.Contains(projectVerbs, v.Verb):
+				case v.Enabled && slices.Contains(projectHandlers, m.viewsCat.HandlerOf(v.Verb)):
 					verb := v.Verb
 					items = append(items, paletteItem{label: cmp.Or(m.verbLabel(verb), verb), run: func(read uint64) (Command, bool) { return m.taskVerb(verb, read) }})
 				}

@@ -214,11 +214,11 @@ func TestPaletteRunsTheProjectVerbs(t *testing.T) {
 	var run func(uint64) (Command, bool)
 	for _, it := range m.paletteItems() {
 		labels = append(labels, it.label)
-		if it.label == "reviewed" {
+		if it.label == "Reviewed" {
 			run = it.run
 		}
 	}
-	if !slices.Contains(labels, "sequential") || run == nil {
+	if !slices.Contains(labels, "Sequential") || run == nil {
 		t.Fatalf("palette %v", labels)
 	}
 	if c, ok := run(0); !ok || c.verb != "reviewed" || c.task != "e-p" {

@@ -71,7 +71,7 @@ These texts and decisions are still in Go, and are moving to the profile:
 - the GitHub plugin's `github-nudge` rule (`plugins/github/nudge`), whose texts are its profile layer's `prompts/github-nudge.tmpl`;
 - the workflow providers, pull requests, sessions, workspaces, tasks and Slack units (`builtin.Slots`);
 - the set of verbs is a Go list (`task.Verbs`), as are the verbs that ask for a value first (`builtin.TaskVerbInputs`); a verb's move, its handler and who may run it come from `tasks.toml`, and Go reads a property through the role `tasks.toml` gives it, never by its name;
-- notification titles, the digest and the menu bar's copy;
+- the menu bar's copy, such as the notes on what became of an answer (a notification's titles and buttons and the digest's words are `notices.toml`'s);
 - the cockpit's and the terminal's chrome: the hints a prompt gives on its keys (Tab, Ctrl+E), the titles and empty states of the panes, the modes of the delegate and reply prompts (draft for me, hand to an agent, send now), and the reason shown when a task does not offer a verb;
 - the renderings of Slack messages that `slack_read` and `slack_search` return (the Slack plugin's `plugins/slack`), the JSON-RPC errors of the MCP endpoint, and the error texts a mechanism returns through a tool's `failed` answer.
 

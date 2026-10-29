@@ -24,8 +24,14 @@ const (
 	ownDismiss     = "drop"
 )
 
-// handlerReply is the handler of the verb that writes a reply on the task's unit.
-const handlerReply = "reply"
+// The handlers of the verbs that write a reply on the task's unit, hand it to an agent, mark it seen and
+// answer its question.
+const (
+	handlerReply    = "reply"
+	handlerDelegate = "delegate"
+	handlerSeen     = "seen"
+	handlerAnswer   = "answer"
+)
 
 // draftVerbHandlers are the handlers a draft's verbs run.
 var draftVerbHandlers = []string{handlerApprove, ownDismiss, handlerRetry, handlerEdit}
@@ -179,16 +185,16 @@ func (m *Model) editPrompt(c Command, d api.Draft, read uint64) (Command, bool) 
 // (headless when it can); Tab hands it to an agent in a session instead, unless the task has nowhere
 // to run one, which the label says.
 func (m *Model) delegatePrompt(e api.TaskView, c Command, confirm string, read uint64) (Command, bool) {
-	name, q := taskLabel(e), m.verbQuestion("delegate")
+	name, q := taskLabel(e), m.verbQuestion(c.verb)
 	labels := map[string]string{
 		"":        "delegate " + name + ": " + q + " (Tab: hand to an agent)",
 		"session": "hand " + name + " to an agent: " + q + " (Tab: draft for me)",
 	}
-	off := sessionOff(e)
+	off := sessionOff(e, c.verb)
 	if off != "" {
 		labels[""] = "delegate " + name + ": " + q + " (no agent session: " + off + ")"
 	}
-	p := &prompt{action: "delegate", label: labels[""], read: read, editor: true}
+	p := &prompt{action: c.verb, label: labels[""], read: read, editor: true}
 	mode := ""
 	p.tab = func(p *prompt) {
 		if off != "" {
@@ -220,9 +226,9 @@ func (m *Model) delegatePrompt(e api.TaskView, c Command, confirm string, read u
 
 // sessionOff is why the task's delegate cannot hand it to an agent in a session, "" when it can or the
 // daemon says nothing of its modes.
-func sessionOff(e api.TaskView) string {
+func sessionOff(e api.TaskView, verb string) string {
 	for _, v := range e.Verbs {
-		if v.Verb != "delegate" {
+		if v.Verb != verb {
 			continue
 		}
 		for _, md := range v.Runners {
@@ -246,7 +252,7 @@ func (m *Model) replyPrompt(e api.TaskView, c Command, read uint64) (Command, bo
 		true:  m.verbQuestion(c.verb) + ", on " + name + ", sent now (Tab: hold for approval; Ctrl+E: editor)",
 	}
 	send := m.verbSend(c.verb) == "now"
-	p := &prompt{action: "reply", label: labels[send], read: read, editor: true}
+	p := &prompt{action: c.verb, label: labels[send], read: read, editor: true}
 	p.tab = func(p *prompt) {
 		send = !send
 		p.label = labels[send]

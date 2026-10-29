@@ -2,6 +2,7 @@ package tui
 
 import (
 	"cmp"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -13,32 +14,35 @@ import (
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
-// The task views a list groups.
-const (
-	viewFocus   = "focus"
-	viewInbox   = "inbox"
-	viewOutbox  = "outbox"
-	viewNext    = "next"
-	viewWaiting = "waiting"
-)
-
 // taskProvider names a task in the busy map, which is keyed by unit.
 const taskProvider = unit.Task
 
 func taskUnit(id string) unit.Unit { return unit.Unit{Provider: taskProvider, Key: id} }
 
-// SetViews takes the core views of GET /api/views. The first time, before the
-// user moved to a view, it shows Focus.
+// SetViews takes the profile's views of GET /api/views. The first time, before
+// the user moved to a view, it shows the first.
 func (m *Model) SetViews(c api.ViewsCatalog) {
 	current := m.viewKey()
-	if !m.navigated {
-		current = "view:" + viewFocus
+	if !m.navigated && len(c.Views) > 0 {
+		current = "view:" + c.Views[0].ID
 	}
 	m.viewsCat, m.taskViews = c, nil
 	for _, v := range c.Views {
 		m.taskViews = append(m.taskViews, View{ID: v.ID, Label: v.Label})
 	}
 	m.goTo(current)
+}
+
+// SetLoading takes the plugins the last page of tasks said are still loading.
+func (m *Model) SetLoading(ls []api.Loading) { m.tasksLoading = ls }
+
+// viewSpec is the served spec of task view id.
+func (m *Model) viewSpec(id string) api.TaskViewSpec {
+	i := slices.IndexFunc(m.viewsCat.Views, func(v api.TaskViewSpec) bool { return v.ID == id })
+	if i < 0 {
+		return api.TaskViewSpec{ID: id}
+	}
+	return m.viewsCat.Views[i]
 }
 
 // SetTasks replaces the tasks of view, as its last page left them, and
@@ -101,7 +105,7 @@ func (m *Model) viewOnScreen() (View, bool) {
 // is false outside the task views.
 func (m *Model) TaskQuery() (view, area string, ok bool) {
 	v, ok := m.viewOnScreen()
-	if ok && v.ID == viewReview {
+	if ok && v.ID == ctxReview {
 		st, shown := m.reviewStep()
 		return st.View, "", shown
 	}
@@ -129,8 +133,8 @@ func (m *Model) cycle() {
 }
 
 // visibleTasks are the tasks of the task view on screen the filter
-// keeps, in the order the list shows them: grouped by context in Next and
-// by person in Waiting.
+// keeps, in the order the list shows them: grouped by the fact the view's
+// spec groups by.
 func (m *Model) visibleTasks() []api.TaskView {
 	v, ok := m.viewOnScreen()
 	if !ok {
@@ -144,7 +148,7 @@ func (m *Model) visibleTasks() []api.TaskView {
 		}
 	}
 	if key := m.grouping(view); key != nil {
-		order := m.groupOrder(out, key)
+		order := m.groupOrder(view, out, key)
 		slices.SortStableFunc(out, func(a, b api.TaskView) int {
 			return cmp.Compare(slices.Index(order, key(a)), slices.Index(order, key(b)))
 		})
@@ -152,30 +156,55 @@ func (m *Model) visibleTasks() []api.TaskView {
 	return out
 }
 
-// grouping is the key a view groups its tasks by, nil when it does not.
+// grouping is the key a view groups its tasks by, the fact its spec names,
+// nil when it names none.
 func (m *Model) grouping(view string) func(api.TaskView) string {
-	switch view {
-	case viewNext:
-		return func(e api.TaskView) string {
-			if cs := m.contexts(e); len(cs) > 0 {
-				return cs[0]
-			}
-			return ""
-		}
-	case viewWaiting:
-		return func(e api.TaskView) string {
-			if e.OwedBy == "me" {
-				return ""
-			}
-			return e.OwedBy
-		}
+	fact := m.viewSpec(view).Group
+	if fact == "" {
+		return nil
 	}
-	return nil
+	return func(e api.TaskView) string { return m.groupValue(fact, e) }
 }
 
-// groupOrder is the groups of tasks in the order they show: the served
+// groupValue is e's value of fact: a field of the task as the wire names
+// it, or task.prop.<name> a property, the first of a list.
+func (m *Model) groupValue(fact string, e api.TaskView) string {
+	name := strings.TrimPrefix(fact, "task.")
+	var raw json.RawMessage
+	if prop, ok := strings.CutPrefix(name, "prop."); ok {
+		raw = e.Props[prop]
+	} else {
+		b, _ := json.Marshal(e)
+		var fields map[string]json.RawMessage
+		_ = json.Unmarshal(b, &fields)
+		raw = fields[name]
+	}
+	var v any
+	if json.Unmarshal(raw, &v) != nil {
+		return ""
+	}
+	if l, ok := v.([]any); ok {
+		if len(l) == 0 {
+			return ""
+		}
+		v = l[0]
+	}
+	switch x := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return x
+	case map[string]any:
+		return fmt.Sprint(cmp.Or(x["name"], x["key"], ""))
+	}
+	return fmt.Sprint(v)
+}
+
+// groupOrder is the groups of tasks in the order they show: a state's or a
+// category's in the served states' order, a context's in the served
 // contexts' order, then the others by name, the empty group last.
-func (m *Model) groupOrder(tasks []api.TaskView, key func(api.TaskView) string) []string {
+func (m *Model) groupOrder(view string, tasks []api.TaskView, key func(api.TaskView) string) []string {
+	order := m.groupRanks(view)
 	seen := map[string]bool{}
 	var known, other []string
 	empty := false
@@ -185,16 +214,14 @@ func (m *Model) groupOrder(tasks []api.TaskView, key func(api.TaskView) string) 
 		case seen[k]:
 		case k == "":
 			empty = true
-		case slices.Contains(m.viewsCat.Contexts, k):
+		case slices.Contains(order, k):
 			known = append(known, k)
 		default:
 			other = append(other, k)
 		}
 		seen[k] = true
 	}
-	slices.SortFunc(known, func(a, b string) int {
-		return cmp.Compare(slices.Index(m.viewsCat.Contexts, a), slices.Index(m.viewsCat.Contexts, b))
-	})
+	slices.SortFunc(known, func(a, b string) int { return cmp.Compare(slices.Index(order, a), slices.Index(order, b)) })
 	slices.Sort(other)
 	out := append(known, other...)
 	if empty {
@@ -203,17 +230,44 @@ func (m *Model) groupOrder(tasks []api.TaskView, key func(api.TaskView) string) 
 	return out
 }
 
-// groupHead names a group of view.
-func groupHead(view, key string) string {
-	switch {
-	case view == viewNext && key == "":
-		return "no context"
-	case view == viewNext:
-		return "@" + key
-	case key == "":
-		return "waiting on nobody named"
+// groupRanks are the values of view's group fact in the order the catalog
+// serves them, none for a fact the catalog does not order.
+func (m *Model) groupRanks(view string) []string {
+	var out []string
+	switch name := strings.TrimPrefix(m.viewSpec(view).Group, "task."); name {
+	case "state", "category":
+		for _, st := range m.viewsCat.States {
+			v := st.Name
+			if name == "category" {
+				v = st.Category
+			}
+			if !slices.Contains(out, v) {
+				out = append(out, v)
+			}
+		}
+	default:
+		if p, ok := m.viewsCat.PropOf(string(dtask.RoleContexts)); ok && name == "prop."+p.Name {
+			out = m.viewsCat.Contexts
+		}
 	}
-	return "waiting on " + key
+	return out
+}
+
+// groupHead names a group of view: a state by its label, a context with an
+// @, any other value as it is.
+func (m *Model) groupHead(view, key string) string {
+	name := strings.TrimPrefix(m.viewSpec(view).Group, "task.")
+	switch {
+	case key == "":
+		return "none"
+	case name == "state":
+		if i := slices.IndexFunc(m.viewsCat.States, func(st api.StateSpec) bool { return st.Name == key }); i >= 0 {
+			return cmp.Or(m.viewsCat.States[i].Label, key)
+		}
+	case slices.Contains(m.groupRanks(view), key) && name != "category":
+		return "@" + key
+	}
+	return key
 }
 
 // taskMatches reports whether every word of query is in one of the
@@ -302,6 +356,9 @@ func (m *Model) sourceLink(e api.TaskView) string {
 // renderTasks draws the task view on screen: its tasks, the open
 // detail below them.
 func (m *Model) renderTasks(lines []string, v View, width, body int, now time.Time) []string {
+	if l, ok := m.loadingLine(m.tasksLoading, width); ok {
+		lines, body = append(lines, l), body-1
+	}
 	tasks := m.visibleTasks()
 	if len(tasks) == 0 {
 		text := "Nothing in " + v.Label + " right now."
@@ -339,11 +396,24 @@ func (m *Model) renderTasks(lines []string, v View, width, body int, now time.Ti
 	return lines
 }
 
+// loadingLine says which plugins are still loading and why; ok is false when
+// none is.
+func (m *Model) loadingLine(ls []api.Loading, width int) (string, bool) {
+	if len(ls) == 0 {
+		return "", false
+	}
+	parts := make([]string, len(ls))
+	for i, l := range ls {
+		parts[i] = strings.TrimSuffix(l.Plugin+": "+l.Reason, ": ")
+	}
+	return "  " + m.t.Dim(termfmt.Cut(termfmt.Clean("loading "+strings.Join(parts, " · ")), width-2)), true
+}
+
 // taskList lays the tasks out in columns, with a head line before each
 // group, and shows the height of them around the cursor.
 func (m *Model) taskList(view string, tasks []api.TaskView, cur, width, height int, now time.Time) []string {
 	t := m.t
-	if view == viewOutbox {
+	if m.viewSpec(view).Over == dtask.OverGates {
 		return m.outboxList(tasks, cur, width, height, now)
 	}
 	cols := []termfmt.Column{{Right: true}, {Flex: true}}
@@ -369,7 +439,7 @@ func (m *Model) taskList(view string, tasks []api.TaskView, cur, width, height i
 	var at []int
 	for i, e := range tasks {
 		if key != nil && (i == 0 || key(tasks[i-1]) != key(e)) {
-			out, at = append(out, " "+t.Bold(termfmt.Cut(groupHead(view, key(e)), width-1))), append(at, -1)
+			out, at = append(out, " "+t.Bold(termfmt.Cut(m.groupHead(view, key(e)), width-1))), append(at, -1)
 		}
 		out, at = append(out, m.taskLine(e, laid[i], i == cur, width)), append(at, i)
 	}

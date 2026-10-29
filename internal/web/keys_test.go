@@ -104,6 +104,7 @@ function harness(o = {}) {
     later: (fn) => { log.timers.push(fn); },
     act: o.act,
     verbs: () => o.verbs || VERBS,
+    verbSpecs: () => o.verbSpecs || VERB_SPECS,
   };
   const keys = createKeys(env);
   keys.setBindings(BINDINGS);
@@ -129,6 +130,7 @@ func keysRun(t *testing.T, prelude, main string, in, out any) {
 	b.WriteString(jsFunction(t, appJS(t), "safeURL"))
 	b.WriteString("\nconst BINDINGS = " + string(raw) + ";\n")
 	b.WriteString("const VERBS = " + mustJS(t, servedVerbs(t)) + ";\n")
+	b.WriteString("const VERB_SPECS = " + mustJS(t, servedVerbSpecs(t)) + ";\n")
 	b.WriteString(staticJS(t, "palette.js"))
 	b.WriteString("\n")
 	b.WriteString(strings.Replace(staticJS(t, "keys.js"), `"use strict";`, "", 1))
@@ -145,6 +147,20 @@ func servedVerbs(t *testing.T) []string {
 		t.Fatal(problems)
 	}
 	return slices.Sorted(maps.Keys(words.Verbs))
+}
+
+// servedVerbSpecs are the bundled verbs as the catalog serves them: their handler and the question they ask.
+func servedVerbSpecs(t *testing.T) []api.VerbSpec {
+	t.Helper()
+	words, problems := intentload.BundledTasks(os.DirFS("../../profiles/default"))
+	if len(problems) > 0 {
+		t.Fatal(problems)
+	}
+	var out []api.VerbSpec
+	for _, v := range slices.Sorted(maps.Keys(words.Verbs)) {
+		out = append(out, api.VerbSpec{Verb: v, Handler: words.Handler(v), Label: words.Verbs[v].Label, Input: words.Verbs[v].Input})
+	}
+	return out
 }
 
 func taskFixture() map[string]any {
@@ -232,6 +248,23 @@ return k.log;`, map[string]any{"task": taskFixture(), "key": c.key, "answers": a
 			}
 		})
 	}
+	t.Run("a renamed verb asks by its handler", func(t *testing.T) {
+		e := taskFixture()
+		e["verbs"] = []map[string]any{{"verb": "park", "enabled": true}}
+		var got struct {
+			Posts []posted `json:"posts"`
+			Asked []string `json:"asked"`
+		}
+		keysRun(t, "", `
+const k = harness({ selected: input.task, answers: ["dana"], verbs: ["park"], verbSpecs: [{ verb: "park", handler: "waiting", input: "Parked on whom?" }] });
+k.keys.setBindings([...BINDINGS, { key: "w", action: "park", context: "list" }]);
+await k.press("w");
+return k.log;`, map[string]any{"task": e}, &got)
+		if len(got.Posts) != 1 || got.Posts[0].URL != "/api/tasks/e-1/park" || !reflect.DeepEqual(got.Posts[0].Body["args"], map[string]any{"on": "dana"}) ||
+			!slices.Equal(got.Asked, []string{"Parked on whom?"}) {
+			t.Fatalf("%+v", got)
+		}
+	})
 	t.Run("backing out sends nothing", func(t *testing.T) {
 		var got struct {
 			Posts []posted `json:"posts"`

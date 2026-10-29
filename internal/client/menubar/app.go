@@ -97,6 +97,11 @@ type Controller struct {
 	// taskViews are the views the menu lists first: those the profile's badge counts.
 	taskViews []api.TaskViewSpec
 	counters  *api.Counters
+	// tasksLoading and rowsLoading are the plugins the last pages of tasks and of rows said are still
+	// loading.
+	tasksLoading, rowsLoading []api.Loading
+	// cat is the served catalog of views and verbs, under mu.
+	cat api.ViewsCatalog
 }
 
 func New(cfg Config) *Controller {
@@ -338,12 +343,14 @@ func (c *Controller) pullRows(ctx context.Context) error {
 		return err
 	}
 	if c.set.Apply(page) {
+		c.rowsLoading = page.Loading
 		return nil
 	}
 	if page, err = c.cfg.Daemon.RowsSince(ctx, api.Since{}); err != nil {
 		return err
 	}
 	c.set.Apply(page)
+	c.rowsLoading = page.Loading
 	return nil
 }
 
@@ -388,6 +395,7 @@ func (c *Controller) menu(h api.Health) []MenuItem {
 	if len(h.WorkspaceManagers) == 1 {
 		open = "Open in " + h.WorkspaceManagers[0]
 	}
+	items = append(items, c.loadingItems()...)
 	for _, v := range c.taskViews {
 		items = append(items, c.taskSection(v.Label, v.ID)...)
 		items = append(items, MenuItem{Separator: true})
@@ -426,8 +434,12 @@ func (c *Controller) rowItem(view string, r api.Row, open string) MenuItem {
 	if !api.PluginCan(c.plugins, r.Unit.Provider, api.CapabilityDetail) && strings.HasPrefix(r.Link, "https://") {
 		action = func(context.Context) error { return c.cfg.OpenURL(r.Link) }
 	}
+	title := r.Label + " · " + label(r)
+	if r.Stale {
+		title += " " + staleMark
+	}
 	return MenuItem{
-		Title:    r.Label + " · " + label(r),
+		Title:    title,
 		Enabled:  true,
 		Action:   c.later(action),
 		Children: c.rowActions(r, open),
@@ -478,6 +490,9 @@ func actionTooltip(spec api.ActionSpec, st api.ActionState) string {
 }
 
 func label(r api.Row) string { return r.Summary.Line }
+
+// staleMark marks a row its plugin last reported before it went down.
+const staleMark = "(stale)"
 
 func (c *Controller) syncLine(h api.Health) string {
 	line := "Not synced yet"

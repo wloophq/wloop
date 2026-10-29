@@ -61,6 +61,8 @@ type fakeDaemon struct {
 	pluginsErr error // Plugins answers it
 
 	views       []api.TaskViewSpec        // nil: Focus, Inbox and Outbox, each badged
+	verbSpecs   []api.VerbSpec            // nil: bundledVerbs
+	loading     []api.Loading             // every page of tasks says so
 	tasks       map[string][]api.TaskView // by view
 	taskDelta   map[string]*api.TasksPage
 	counters    api.Counters
@@ -121,7 +123,8 @@ func (f *fakeDaemon) TasksSince(_ context.Context, q client.TaskQuery, since api
 	if since != (api.Since{}) {
 		return api.TasksPage{Epoch: "e1", Rev: uint64(f.taskReads), Tasks: []api.TaskView{}, Removed: []string{}, Counters: f.counters}, nil
 	}
-	return api.TasksPage{Epoch: "e1", Rev: uint64(f.taskReads), Full: true, Tasks: slices.Clone(f.tasks[q.View]), Removed: []string{}, Counters: f.counters}, nil
+	return api.TasksPage{Epoch: "e1", Rev: uint64(f.taskReads), Full: true, Tasks: slices.Clone(f.tasks[q.View]), Removed: []string{}, Counters: f.counters,
+		Loading: f.loading}, nil
 }
 
 func (f *fakeDaemon) Task(_ context.Context, id string) (api.TaskView, error) {
@@ -166,12 +169,20 @@ func (f *fakeDaemon) Views(context.Context) (api.ViewsCatalog, error) {
 	if f.err != nil {
 		return api.ViewsCatalog{}, f.err
 	}
+	verbs := f.verbSpecs
+	if verbs == nil {
+		verbs = bundledVerbs
+	}
 	if f.views != nil {
-		return api.ViewsCatalog{Views: f.views}, nil
+		return api.ViewsCatalog{Views: f.views, Verbs: verbs}, nil
 	}
 	return api.ViewsCatalog{Views: []api.TaskViewSpec{{ID: "focus", Label: "Focus", Badge: true}, {ID: "inbox", Label: "Inbox", Badge: true},
-		{ID: "outbox", Label: "Outbox", Over: "gates", Badge: true}}}, nil
+		{ID: "outbox", Label: "Outbox", Over: "gates", Badge: true}}, Verbs: verbs}, nil
 }
+
+// bundledVerbs are the verbs a notification's buttons run, as the bundled profile serves them.
+var bundledVerbs = []api.VerbSpec{{Verb: "answer", Handler: "answer", Label: "Answer"}, {Verb: "reply", Handler: "reply", Label: "Reply"},
+	{Verb: "dismiss", Handler: "drop", Label: "Dismiss"}, {Verb: "approve", Handler: "approve", Label: "Approve"}}
 
 func (f *fakeDaemon) Plugins(context.Context) ([]api.Plugin, error) {
 	f.mu.Lock()

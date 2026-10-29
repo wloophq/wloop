@@ -5,9 +5,9 @@ const KEY_CONTEXTS = ["question", "plan", "review", "list", "global"];
 const CORE_ACTIONS = /^(move:|detail:|nav:|area:|answer:|step:|palette$|help$|filter$|open-source$|capture$|quit$)/;
 const NAMED_KEYS = { Enter: "Enter", Escape: "Esc", Esc: "Esc", Backspace: "Backspace", Tab: "Tab" };
 
-// VERB_ASKS are the verbs that ask for a value first, the question from
-// the catalog; args turns the answer into the verb's arguments, null when
-// the answer is not usable.
+// VERB_ASKS are, by handler, how a verb that asks for a value first turns
+// the answer into its arguments, null when the answer is not usable; the
+// question is the served verb's input.
 const VERB_ASKS = {
   waiting: { args: (v) => (v ? { on: v } : {}) },
   schedule: { args: (v) => (!v ? null : v.toLowerCase() === "activity" ? { on_activity: "true" } : { until: v }) },
@@ -17,6 +17,14 @@ const VERB_ASKS = {
   delegate: { args: (v) => (v ? { guidance: v } : {}) },
   reply: { args: (v) => (v ? { text: v } : null) },
 };
+
+// servedAsk is how the served verb named verb, among specs, asks for its
+// value: its input and its handler's args; null for a verb that asks none.
+function servedAsk(verb, specs) {
+  const spec = (specs || []).find((v) => v.verb === verb);
+  const ask = spec && spec.input ? VERB_ASKS[spec.handler] : null;
+  return ask ? { label: spec.input, args: ask.args } : null;
+}
 
 // eventKey is the canonical name of a key event, as the served bindings
 // spell it; "" when no binding can match. Shift+digit reads the physical
@@ -138,9 +146,9 @@ function createKeys(env) {
       return true;
     }
     let args = {};
-    const ask = VERB_ASKS[name];
+    const ask = servedAsk(name, env.verbSpecs ? env.verbSpecs() : []);
     if (ask) {
-      const v = await env.ask({ label: typeof verbQuestion === "function" ? verbQuestion(name) : name });
+      const v = await env.ask({ label: ask.label });
       if (v === null || v === undefined) return true;
       args = ask.args(String(v).trim());
       if (!args) return true;
@@ -258,7 +266,7 @@ function createKeys(env) {
     const item = (b, label) => ({ label: label || b.help || b.action, key: b.key || "", run: () => run(b, {}) });
     const listBinding = (action, served) => bindings.find((b) => b.action === action && b.context === "list" && servedAction(b) === served);
     if (isTask(sel)) {
-      for (const v of (sel.verbs || []).filter((x) => x.enabled && keyVerb(x.verb) && (listBinding(x.verb, false) || VERB_ASKS[x.verb]))) {
+      for (const v of (sel.verbs || []).filter((x) => x.enabled && keyVerb(x.verb) && (listBinding(x.verb, false) || servedAsk(x.verb, env.verbSpecs ? env.verbSpecs() : [])))) {
         const b = listBinding(v.verb, false) || { key: "", action: v.verb, context: "list" };
         items.push(item(b, b.help || v.verb));
       }
@@ -411,6 +419,7 @@ function appEnv() {
     selected: () => detailPane.selected() || selectedRow(),
     act: (verb, args, task) => detailPane.act(verb, args, task),
     verbs: () => ((tasksState.catalog && tasksState.catalog.verbs) || []).map((v) => v.verb),
+    verbSpecs: () => (tasksState.catalog && tasksState.catalog.verbs) || [],
     resolveGate: (task, gate, intent) => detailPane.resolve(task, gate, intent),
     rowOf,
     spec: (id) => state.specs.byId[id],

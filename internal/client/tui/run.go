@@ -34,6 +34,7 @@ type Daemon interface {
 	Task(ctx context.Context, id string) (api.TaskView, error)
 	TaskDo(ctx context.Context, id, verb string, req api.TaskRequest) (api.TaskResult, error)
 	TaskDrafts(ctx context.Context, task string) ([]api.Draft, error)
+	ResolveGate(ctx context.Context, id int64, intent string, req api.TaskRequest) (api.GateView, error)
 	CreateTask(ctx context.Context, req api.TaskCreate) (api.TaskView, error)
 	Keys(ctx context.Context, surface string) (api.KeysResponse, error)
 	Review(ctx context.Context) (api.Review, error)
@@ -76,9 +77,11 @@ type Config struct {
 }
 
 type loaded struct {
-	rows   []api.Row
-	health api.Health
-	specs  *api.ActionsResponse
+	rows []api.Row
+	// rowsLoading are the plugins the last page of rows said are loading.
+	rowsLoading []api.Loading
+	health      api.Health
+	specs       *api.ActionsResponse
 	// catalog and plugins are the served catalog and plugins when this
 	// load read them.
 	catalog *api.CatalogResponse
@@ -112,6 +115,7 @@ type tasksRead struct {
 	view     string
 	tasks    []api.TaskView
 	counters api.Counters
+	loading  []api.Loading
 }
 
 // filteredRead are the counters of area narrowed to the tasks the
@@ -282,6 +286,7 @@ func (m *Model) apply(r loaded) {
 		m.SetKeys(r.keys.Bindings)
 	}
 	m.SetData(r.rows, r.health)
+	m.rowsLoading = r.rowsLoading
 	if r.counters != nil {
 		m.SetCounters(*r.counters)
 	}
@@ -290,6 +295,7 @@ func (m *Model) apply(r loaded) {
 	}
 	if e := r.tasks; e != nil {
 		m.SetTasks(e.view, e.tasks, e.counters)
+		m.SetLoading(e.loading)
 	}
 	if f := r.filtered; f != nil {
 		m.SetFilteredCounters(f.area, f.counters)
@@ -453,36 +459,37 @@ func (q *query) get() (client.TaskQuery, bool) {
 }
 
 // pull brings the set up to the daemon: a delta from where it stands, or
-// every row when the daemon cannot give one.
-func pull(ctx context.Context, d Daemon, set *rowset.Set) error {
+// every row when the daemon cannot give one; loading are the plugins the
+// page says are loading.
+func pull(ctx context.Context, d Daemon, set *rowset.Set) (loading []api.Loading, err error) {
 	page, err := d.RowsSince(ctx, set.Since())
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if set.Apply(page) {
-		return nil
+		return page.Loading, nil
 	}
 	if page, err = d.RowsSince(ctx, api.Since{}); err != nil {
-		return err
+		return nil, err
 	}
 	set.Apply(page)
-	return nil
+	return page.Loading, nil
 }
 
 // pullTasks brings the tasks of q up to the daemon as pull does rows.
-func pullTasks(ctx context.Context, d Daemon, q client.TaskQuery, set *taskSet) (api.Counters, error) {
+func pullTasks(ctx context.Context, d Daemon, q client.TaskQuery, set *taskSet) (api.TasksPage, error) {
 	page, err := d.TasksSince(ctx, q, set.since)
 	if err != nil {
-		return api.Counters{}, err
+		return api.TasksPage{}, err
 	}
 	if set.apply(page) {
-		return page.Counters, nil
+		return page, nil
 	}
 	if page, err = d.TasksSince(ctx, q, api.Since{}); err != nil {
-		return api.Counters{}, err
+		return api.TasksPage{}, err
 	}
 	set.apply(page)
-	return page.Counters, nil
+	return page, nil
 }
 
 // onceReads are the reads a load makes once, and again only after a failure.
@@ -498,6 +505,7 @@ func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loa
 	needHealth, needRows, needPlan := true, true, true
 	var plan []api.PlanItem
 	var err error
+	var rowsLoading []api.Loading
 	sets := map[string]*taskSet{}
 	var pulled, counted string
 	for {
@@ -509,7 +517,10 @@ func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loa
 		needRows = due.rows.Swap(false) || needRows
 		err = nil
 		if needRows {
-			err = pull(ctx, d, &set)
+			var ls []api.Loading
+			if ls, err = pull(ctx, d, &set); err == nil {
+				rowsLoading = ls
+			}
 			at.set(set.Since())
 			needRows = err != nil
 		}
@@ -532,7 +543,7 @@ func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loa
 			needPlan = planErr != nil
 		}
 		rows := set.View(api.ViewAll)
-		r := loaded{rows: rows, health: h, err: err, plan: planRead, closed: closed, planErr: planErr}
+		r := loaded{rows: rows, rowsLoading: rowsLoading, health: h, err: err, plan: planRead, closed: closed, planErr: planErr}
 		if err == nil {
 			r.specsErr = have.read(ctx, d, rows, len(plan) > 0, &r)
 			if shown.reviewing() {
@@ -623,13 +634,13 @@ func readTasks(ctx context.Context, d Daemon, onViews bool, due *wants, shown *q
 		set = &taskSet{}
 		sets[key] = set
 	}
-	c, err := pullTasks(ctx, d, q, set)
+	p, err := pullTasks(ctx, d, q, set)
 	if err != nil {
 		due.tasks.Store(true)
 		return nil, err
 	}
 	*pulled = key
-	return &tasksRead{view: q.View, tasks: set.list(), counters: c}, nil
+	return &tasksRead{view: q.View, tasks: set.list(), counters: p.Counters, loading: p.Loading}, nil
 }
 
 // readFiltered reads the counters the filter narrows when the filter has
@@ -735,7 +746,7 @@ func carry(ctx context.Context, cfg Config, c Command) (carried, error) {
 	switch {
 	case c.fetch:
 		if c.seen {
-			if _, err := d.TaskDo(ctx, c.task, "seen", api.TaskRequest{Source: Source}); err != nil {
+			if _, err := d.TaskDo(ctx, c.task, c.seenVerb, api.TaskRequest{Source: Source}); err != nil {
 				return carried{}, err
 			}
 		}
@@ -754,6 +765,12 @@ func carry(ctx context.Context, cfg Config, c Command) (carried, error) {
 	case c.open != "" || c.openFind:
 		lines, e, err := openLink(ctx, cfg, c)
 		return carried{lines: lines, task: e}, err
+	case c.gate != 0:
+		g, err := d.ResolveGate(ctx, c.gate, c.intent, api.TaskRequest{Args: c.args, Source: Source})
+		if err != nil {
+			return carried{}, err
+		}
+		return carried{lines: []string{c.Action + ": " + g.Status}}, nil
 	case c.verb != "":
 		res, err := d.TaskDo(ctx, c.task, c.verb, api.TaskRequest{Args: c.args, Source: Source})
 		return carried{lines: res.Lines, task: res.Task}, err

@@ -11,13 +11,12 @@ import (
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
-const (
-	viewReview = "review"
-	ctxReview  = "review"
-)
+// ctxReview is the key context of the review, a mode of the terminal that walks the catalog's review steps; the
+// served view of that name is where it sits among the views.
+const ctxReview = "review"
 
-// projectVerbs are a project's verbs, which no key takes: the palette runs them.
-var projectVerbs = []string{"reviewed", "sequential"}
+// projectHandlers are the handlers of a project's verbs, which no key takes: the palette runs them.
+var projectHandlers = []string{"reviewed", "sequential"}
 
 // reviewView is the weekly Review on screen: the daemon's Review, the step
 // shown, and whether the cursor is on that step's header rather than on one
@@ -30,7 +29,7 @@ type reviewView struct {
 
 func (m *Model) inReview() bool {
 	v, ok := m.viewOnScreen()
-	return ok && v.ID == viewReview
+	return ok && v.ID == ctxReview
 }
 
 // SetReview takes the Review the daemon serves; with no step shown, or one
@@ -72,7 +71,7 @@ func firstOpenStep(steps []api.ReviewStep, from int) string {
 // listView is the view whose tasks a task view lists: the step's on the
 // Review.
 func (m *Model) listView(v View) string {
-	if v.ID != viewReview {
+	if v.ID != ctxReview {
 		return v.ID
 	}
 	st, _ := m.reviewStep()
@@ -109,7 +108,7 @@ func (m *Model) reviewAction(action string) (c Command, ok, took bool) {
 		if !m.rv.review.Done {
 			m.showStep(firstOpenStep(steps, at))
 		}
-		c, ok = m.send(Command{Unit: taskUnit(viewReview), Label: st.Label, Action: "review", reviewStep: st.ID})
+		c, ok = m.send(Command{Unit: taskUnit(ctxReview), Label: st.Label, Action: "review", reviewStep: st.ID})
 		return c, ok, true
 	}
 	return Command{}, false, false

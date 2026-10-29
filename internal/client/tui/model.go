@@ -36,12 +36,13 @@ type Command struct {
 	PlanID string
 
 	// task is the task the command is about: verb runs on it with args,
-	// fetch reads its detail, after a seen when seen is set.
-	task  string
-	verb  string
-	args  map[string]string
-	fetch bool
-	seen  bool
+	// fetch reads its detail, after the verb seenVerb when seen is set.
+	task     string
+	verb     string
+	args     map[string]string
+	fetch    bool
+	seen     bool
+	seenVerb string
 	// capture is the title of a task to capture.
 	capture string
 	// open is a link to open; openFind looks it up from the task's cards.
@@ -49,6 +50,9 @@ type Command struct {
 	openFind bool
 	// reviewStep is a Review step to mark done.
 	reviewStep string
+	// gate is a gate of task to resolve with intent, args carrying its answer.
+	gate   int64
+	intent string
 }
 
 // prompt is the bottom line asking for text, or, with confirm set, for a
@@ -135,7 +139,11 @@ type Model struct {
 	viewsCat    api.ViewsCatalog
 	tasks       map[string][]api.TaskView
 	tasksLoaded bool
-	counters    api.Counters
+	// tasksLoading and rowsLoading are the plugins the last page of tasks
+	// and of rows said are still loading, and why.
+	tasksLoading []api.Loading
+	rowsLoading  []api.Loading
+	counters     api.Counters
 	// filtered are the counts of the tasks the filter's words keep, as
 	// last read.
 	filtered *api.Counters

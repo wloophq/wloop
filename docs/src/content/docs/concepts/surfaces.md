@@ -39,13 +39,13 @@ A task's page shows, in order: its header (title, state, the properties your pro
 {{command}} tui
 ```
 
-The same lists (Focus, Inbox, Outbox, Next, Waiting, Projects, Someday, Logbook, Review), the pull request views (Needs me, In loop, My PRs), the plan and any plugin view, updated live. The keys are the cockpit's: lowercase keys file tasks, uppercase keys act on a row (`R` run now, `S` skip, `G` send with guidance, `W` answer, `C` continue, `X` dismiss, `H` pause, `M` mute, `A` take over, `O` open, `V` review, `F` address, `N` nudge). `Ctrl+K` opens the palette with every action, `?` the help, `q` quits. Actions that publish or take over ask for a `y` first. See [Keys](/reference/keys/).
+The views of your profile's `views.toml`, in its order and starting on the first (the bundled Inbox, Needs me, Waiting, Snoozed, Focus, Projects, Someday, Logbook, Outbox, Review), the pull request views, the plan and any plugin view, updated live. A list groups its tasks by the fact its view names in `group`, a state or a category in the order of your states. A task's detail shows its asks with the quotes they came from, its open gates with their intents (`1` to `9` pick one; an intent that takes an answer asks for it first), and its runs with where they run and the command that resumes them. A verb's key runs the verb your profile serves, and a verb that asks for a value asks the question its `input` sets. While a plugin has not reported every unit since the daemon started, a line names it and why; a row its plugin last reported before it went down shows `(stale)`. The keys are the cockpit's: lowercase keys file tasks, uppercase keys act on a row (`R` run now, `S` skip, `G` send with guidance, `W` answer, `C` continue, `X` dismiss, `H` pause, `M` mute, `A` take over, `O` open, `V` review, `F` address, `N` nudge). `Ctrl+K` opens the palette with every action, `?` the help, `q` quits. Actions that publish or take over ask for a `y` first. See [Keys](/reference/keys/).
 
 `{{command}} status` prints the same views once, for a script or a quick look.
 
 ## The menu bar (macOS)
 
-`{{command}} app`, which the LaunchAgent starts from `{{app}}.app`, puts an item in the menu bar. It shows `PR <n>`, your Inbox plus your Outbox, or `PR ?` while the daemon does not answer. Its menu lists up to five entries of Focus, Inbox and Outbox, the "In loop" section with Run now, Skip, Pause or Resume and Open on each row, then Open cockpit, Sweep now, Pause automatic rounds (or Resume), the sync line and Quit. Quit stops the menu bar; the daemon keeps running.
+`{{command}} app`, which the LaunchAgent starts from `{{app}}.app`, puts an item in the menu bar. It shows `PR <n>`, the count of the views your profile's `[badge]` names (the bundled Inbox and Needs me), or `PR ?` while the daemon does not answer. Its menu names the plugins still loading, lists up to five tasks of each badge view, the "In loop" section with Run now, Skip, Pause or Resume and Open on each row, then Open cockpit (on the first badge view), Sweep now, Pause automatic rounds (or Resume), the sync line and Quit. Quit stops the menu bar; the daemon keeps running.
 
 ## Notifications (macOS)
 
@@ -58,6 +58,6 @@ The same lists (Focus, Inbox, Outbox, Next, Waiting, Projects, Someday, Logbook,
 | First round blocked | Open |
 | In your Inbox: a task on a unit, such as a Slack thread | Draft for me (delegates headless, when its action can), a Reply field that saves your reply to the Outbox, and a Send reply field that sends it at once; a note says where it went |
 
-Clicking a notification's body opens its row in the cockpit. Each task in the Inbox, with the question, post or proposal its open gate asks, and each proposed or failed draft notifies once; the rest goes in a daily digest at `notifications.digest_at` (`09:00`, `""` for none).
+Clicking a notification's body opens its row in the cockpit. Each task in the Inbox, each task anywhere else while a question, post or proposal gate is open on it, and each proposed or failed draft notifies once; a button that runs a task verb runs the verb your profile gives that handler. The rest goes in a daily digest at `notifications.digest_at` (`09:00`, `""` for none): how many tasks of the badge views moved since the last one, and each badge view's count, worded by `digest_title`, `digest_new` and `digest_view` in `notices.toml`. A notification's titles and buttons are the `notify_*` keys of `notices.toml`.
 
 When notifications are off or the menu bar is not running, rounds still run at their deadline: the cockpit shows a warning and `doctor` names the fix (System Settings > Notifications > {{app}}, or `{{command}} app install`).

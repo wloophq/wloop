@@ -224,9 +224,9 @@ function verbButton(e, verb, label, run, extra = {}) {
 
 // askedArgs asks the value a verb needs first; null when the user backed out.
 function askedArgs(verb) {
-  const ask = typeof VERB_ASKS === "object" ? VERB_ASKS[verb] : null;
+  const ask = typeof servedAsk === "function" ? servedAsk(verb, (typeof tasksState === "object" && tasksState.catalog && tasksState.catalog.verbs) || []) : null;
   if (!ask) return {};
-  const v = detailEnv.ask(verbQuestion(verb));
+  const v = detailEnv.ask(ask.label);
   if (v === null || v === undefined) return null;
   return ask.args(String(v).trim());
 }
@@ -240,12 +240,6 @@ function handlerVerb(handler) {
 // verbTask is the catalog's word for verb: its label and summary.
 function verbTask(verb) {
   return ((typeof tasksState === "object" && tasksState.catalog && tasksState.catalog.verbs) || []).find((x) => x.verb === verb) || {};
-}
-
-// verbQuestion is what a verb that asks puts first: the catalog's input.
-function verbQuestion(verb) {
-  const v = verbTask(verb);
-  return v.input || v.label || verb;
 }
 
 function verbLabel(verb) {

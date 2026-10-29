@@ -1,11 +1,11 @@
  [2mFocus 1[22m    [2mInbox 2[22m    [2mOutbox 1[22m    [2mNext 4[22m   [7m[1m Waiting 4 [22m[27m   [2mProjects 0[22m    [2mSomeday 0[22m    [2mLogbook 12[22m
 
- [1mwaiting on ana[22m
+ [1mana[22m
 [7m>  [2m5h[22m  Design review                                                                                                    [27m
    [2m5h[22m  Laptop order
- [1mwaiting on bob[22m
+ [1mbob[22m
    [2m5h[22m  Contract signature
- [1mwaiting on nobody named[22m
+ [1mnone[22m
    [2m5h[22m  Reimbursement
 
 
