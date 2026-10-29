@@ -39,7 +39,7 @@ func (s *Service) LiveOn(ctx context.Context, units ...unit.Unit) (turn.Session,
 // Busy says whether sess's agent is working or waiting on a permission, as an answer's route reads it: a
 // chat to it waits for its next stop.
 func (s *Service) Busy(ctx context.Context, sess turn.Session) (bool, error) {
-	if sess.WorkspaceID == "" {
+	if sess.WorkspaceID == "" && sess.Pane == "" {
 		return false, nil
 	}
 	s.refresh()

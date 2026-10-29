@@ -64,8 +64,13 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		writeTasksError(w, err)
 		return
 	}
-	line := s.notice(builtin.NoticeChatTyped, nil)
-	if res.Route != messages.ChatTyped {
+	var line string
+	switch res.Route {
+	case messages.ChatTyped:
+		line = s.notice(builtin.NoticeChatTyped, nil)
+	case messages.ChatQueued:
+		line = s.notice(builtin.NoticeChatQueued, nil)
+	default:
 		line = s.notice(builtin.NoticeChatStarted, map[string]any{"Intent": res.Intent, "Resumed": res.Route == messages.ChatResumed})
 	}
 	now, err := g.Task(ctx, e.ID)

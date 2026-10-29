@@ -11,6 +11,8 @@ attach_needs_session = "`{{.Command}} task attach {{.Task}}` makes the agent ses
 
 chat_typed = "Sent to the task's live session; its agent reads it now."
 
+chat_queued = "Sent to the task's live session; its agent is busy and is told of it when it stops."
+
 chat_started = "Sent: no session of the task was live, so a {{.Intent}} turn starts with your message{{if .Resumed}}, resuming the task's last session{{end}}."
 
 draft_sent = "Draft {{.Draft}} approved; it goes out in a moment."

@@ -156,6 +156,16 @@ func TestAChatReachesTheTasksLiveSessionAndItsTaskRead(t *testing.T) {
 	if err != nil || len(evs) != 2 {
 		t.Fatalf("timeline %+v %v", evs, err)
 	}
+	sess, _, err := te.Turns.Registry.Session(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessions.SetAgents(turns.AgentObservation{WorkspaceID: sess.WorkspaceID, Pane: sess.Pane, State: dturn.AgentWorking})
+	sent = len(sessions.Typed())
+	res, err = client.New(te.Socket).Chat(ctx, string(attachTask), api.ChatRequest{Text: "And the jitter."})
+	if err != nil || len(res.Lines) != 1 || !strings.Contains(res.Lines[0], "busy") || len(sessions.Typed()) != sent {
+		t.Fatalf("chat to a busy agent %+v %v, typed %+v", res, err, sessions.Typed()[sent:])
+	}
 	if _, err := client.New(te.Socket).Chat(ctx, string(attachTask), api.ChatRequest{Text: " "}); err == nil {
 		t.Fatal("an empty message was taken")
 	}
