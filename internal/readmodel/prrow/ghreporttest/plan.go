@@ -51,6 +51,10 @@ func Planned(env Env, pe PlanEnv, ins []Input) map[unit.Unit]src.Snapshot {
 			panic(fmt.Sprintf("ghreporttest: %v", err))
 		}
 		d.Plan = &ghplugin.PlanData{Rank: pl.RankOf(ref, res), Board: pl.BoardOf(ref, res)}
+		if f := cmp.Or(x.PlanFacts, x.Facts); f != nil {
+			det := DetailOf(*f)
+			d.Detail, d.DetailVersion, d.DetailReadAt = &det, det.Version, det.ReadAt
+		}
 		raw, err := json.Marshal(d)
 		if err != nil {
 			panic(fmt.Sprintf("ghreporttest: %v", err))

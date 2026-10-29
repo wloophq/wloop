@@ -13,8 +13,6 @@ import (
 	"sync"
 	"time"
 
-	goplugin "github.com/hashicorp/go-plugin"
-
 	"github.com/wloophq/wloop/pkg/plugin"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 )
@@ -70,11 +68,11 @@ func (h *Host) Start(ctx context.Context, runs []Run) {
 	}
 }
 
-// Wait waits for every plugin Start ran to stop, then kills any plugin
-// process left: there is no reattach.
+// Wait waits for every plugin Start ran to stop; each run kills the
+// process it launched before it returns, so none is left: there is no
+// reattach. It leaves the plugin processes of another host alone.
 func (h *Host) Wait() {
 	h.wg.Wait()
-	goplugin.CleanupClients()
 }
 
 func (h *Host) supervise(ctx context.Context, r Run) {

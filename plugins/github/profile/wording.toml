@@ -2,3 +2,7 @@
 # the pull request's owner/repo#number.
 noun = "pull request"
 this = "this pull request"
+
+# How a brief's prompt names the pull request it briefs: ChangedFiles, Bytes
+# (the diff's size) and Cut (the diff was cut) fill it.
+brief_input = "a pull request of {{.ChangedFiles}} changed files, its diff {{.Bytes}} bytes{{if .Cut}}, cut{{end}}"

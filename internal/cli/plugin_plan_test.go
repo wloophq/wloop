@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -229,7 +228,7 @@ func TestAPluginEffectRunsThroughApplyEffect(t *testing.T) {
 	}
 }
 
-func TestAnEffectThePluginDoesNotApplyFailsTheLaunch(t *testing.T) {
+func TestAnEffectThePluginDoesNotApplyIsAHealthProblemOfASentTurn(t *testing.T) {
 	t.Parallel()
 	sc := followupScenario(t)
 	sc.te.gh.basics = openBasics
@@ -237,12 +236,35 @@ func TestAnEffectThePluginDoesNotApplyFailsTheLaunch(t *testing.T) {
 	p.unsupported = true
 	c := sourcetest.Launch(t, string(unit.GitHub), p, src.Host{})
 	sc.env.pluginEffects = func(id unit.ProviderID) (effectApplier, bool) { return c, id == unit.GitHub }
-	err := (cliLauncher{sc.env}).Launch(context.Background(), turns.Launch{Unit: sc.ref.Unit(), Intent: dturn.Intent(dintent.Review), Trigger: dturn.ByHand})
-	if !errors.Is(err, src.ErrUnsupported) || !strings.Contains(err.Error(), "pr.reviewed") {
-		t.Fatalf("launch = %v, want the unsupported effect", err)
+	launch := turns.Launch{Unit: sc.ref.Unit(), Intent: dturn.Intent(dintent.Review), Trigger: dturn.ByHand}
+	if err := (cliLauncher{sc.env}).Launch(context.Background(), launch); err != nil {
+		t.Fatalf("a turn that went out failed its launch: %v", err)
 	}
-	if len(p.applied()) != 1 {
-		t.Fatalf("applied %+v", p.applied())
+	if len(p.applied()) != 1 || len(sc.ws.Prompts) != 1 {
+		t.Fatalf("applied %+v, prompts %d", p.applied(), len(sc.ws.Prompts))
+	}
+	if got := sc.env.effectProblems.list(); len(got) != 1 || !strings.Contains(got[0], "pr.reviewed") {
+		t.Fatalf("health problems %q, want the unapplied pr.reviewed", got)
+	}
+	p.mu.Lock()
+	p.unsupported = false
+	p.mu.Unlock()
+	if err := (cliLauncher{sc.env}).Launch(context.Background(), launch); err != nil {
+		t.Fatal(err)
+	}
+	if got := sc.env.effectProblems.list(); len(got) != 0 {
+		t.Fatalf("a turn whose effect applied keeps the problem %q", got)
+	}
+}
+
+func TestATurnWhoseEffectsNoPluginAppliesIsNotSent(t *testing.T) {
+	t.Parallel()
+	sc := followupScenario(t)
+	sc.te.gh.basics = openBasics
+	sc.env.pluginEffects = func(unit.ProviderID) (effectApplier, bool) { return nil, false }
+	err := (cliLauncher{sc.env}).Launch(context.Background(), turns.Launch{Unit: sc.ref.Unit(), Intent: dturn.Intent(dintent.Review), Trigger: dturn.ByHand})
+	if err == nil || !strings.Contains(err.Error(), "pr.reviewed") || len(sc.ws.Prompts) != 0 {
+		t.Fatalf("launch = %v, prompts %d; want refused before the send", err, len(sc.ws.Prompts))
 	}
 }
 

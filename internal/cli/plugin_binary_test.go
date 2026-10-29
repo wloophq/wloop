@@ -129,8 +129,7 @@ func TestARoundPlansLaunchesAndSendsThroughTheGitHubBinary(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the fake gh is a shell script")
 	}
-	// Not parallel: a parallel test's host.Host.Wait kills every go-plugin
-	// process of the test binary, this test's plugin among them.
+	t.Parallel()
 	sc := followupScenario(t)
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	te := sc.te

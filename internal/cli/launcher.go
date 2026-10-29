@@ -86,12 +86,16 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) error {
 			return err
 		}
 	}
+	if err := e.checkEffects(d, ref.Unit()); err != nil {
+		return err
+	}
 	id, submitted, err := run(e, ctx, roundRun{def: d, cfg: cfg, r: r, pr: pr, resumeOf: l.ResumeOf})
 	if err != nil {
 		return err
 	}
 	sr := &sentRound{env: e, ctx: ctx, ref: ref, pr: pr, cfg: cfg, inputs: r.Inputs, id: id, submitted: submitted, guidance: r.Guidance}
-	return e.applySentEffects(ctx, routeLaunch, d, sr)
+	e.applySentEffects(ctx, routeLaunch, d, sr)
+	return nil
 }
 
 // roundAgentHome is the agent home remembered for the pull request's rounds.
@@ -219,7 +223,7 @@ func (e *Env) askedRound(ctx context.Context, d dintent.Def, base config.Config,
 		id, submitted, err := run(e, ctx, roundRun{def: d, cfg: cfg, r: r, pr: pr, st: st, rememberHome: remember})
 		sr.pr, sr.cfg, sr.inputs, sr.id, sr.submitted = pr, cfg, inputs, id, submitted
 		if err == nil {
-			err = e.applySentEffects(ctx, routeAsked, d, sr)
+			e.applySentEffects(ctx, routeAsked, d, sr)
 		}
 		return submitted, err
 	})

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"text/template"
 	"time"
 	"unicode/utf8"
 
@@ -174,14 +175,31 @@ func revisionPR(rev src.BriefRevision) (pr.PR, error) {
 }
 
 // BriefDescribe is in, one line, as the prompt's header names it.
-func (p *Plugin) BriefDescribe(_ context.Context, in src.BriefInput) (string, error) {
+func (p *Plugin) BriefDescribe(ctx context.Context, in src.BriefInput) (string, error) {
+	r, err := p.running()
+	if err != nil {
+		return "", err
+	}
+	w, err := r.words(ctx)
+	if err != nil {
+		return "", err
+	}
+	if w.BriefInput == "" {
+		return "", fmt.Errorf("the profile layer's %s names no brief_input", wordingFile)
+	}
+	t, err := template.New("brief_input").Option("missingkey=error").Parse(w.BriefInput)
+	if err != nil {
+		return "", fmt.Errorf("the profile layer's %s brief_input: %w", wordingFile, err)
+	}
 	var parts BriefParts
 	_ = json.Unmarshal(in.Parts, &parts)
-	cut := ""
-	if in.Cut {
-		cut = ", cut"
-	}
-	return fmt.Sprintf("a pull request of %d changed files, its diff %d bytes%s", parts.ChangedFiles, in.Bytes, cut), nil
+	var b strings.Builder
+	err = t.Execute(&b, struct {
+		ChangedFiles int
+		Bytes        int64
+		Cut          bool
+	}{parts.ChangedFiles, in.Bytes, in.Cut})
+	return b.String(), err
 }
 
 // BriefStale is the queue's rule: a failed attempt is due when the pull

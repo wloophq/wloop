@@ -48,7 +48,7 @@ func Module(cfg config.Config, d sourcereg.Deps) (sourcereg.Module, error) {
 // factsOf is the source's workflow facts over the shared handles.
 func factsOf(cfg config.Config, d sourcereg.Deps) *factsgithub.Provider {
 	fd := factsgithub.Deps{
-		Inputs:   factsgithub.InventoryInputs(d.Inventory),
+		Inputs:   ReportedInputs{Reports: d.Reports, Store: d.Inventory},
 		Store:    d.Inventory,
 		Snapshot: factsgithub.SnapshotOf(d.WS),
 		Git:      factsgithub.LocalGit(d.Git),

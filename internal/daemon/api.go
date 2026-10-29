@@ -225,6 +225,9 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 			h.Warnings = append(h.Warnings, w)
 		}
 	}
+	if s.deps.EffectWarnings != nil {
+		h.Warnings = append(h.Warnings, s.deps.EffectWarnings()...)
+	}
 	if h.Notifier = s.hub.has(notifierClient); !h.Notifier && s.deps.NotifierStart != "" {
 		h.Warnings = append(h.Warnings, "menu bar not running: notifications are off; "+s.deps.NotifierStart)
 	}

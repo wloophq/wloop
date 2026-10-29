@@ -178,7 +178,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/serve.go` `trackedBooks.Books` `unit.GitHub` `1` | 🧾 | a carded pull request without a turn still gets an empty book, so its card stays |
 | `internal/cli/serve_payloads.go` `Env.payloadReaders` `unit.GitHub` `1` | 🧾 | GitHub's payload reader, wired outside the plugin's Payload |
 | `internal/cli/storedfacts.go` `storedFacts.Facts` `unit.GitHub` `1` | 🧾 | the stored facts of a pull request's turn |
-| `internal/cli/sweepinputs.go` `storeInputs.Viewer` `unit.GitHub` `1` | 🧾 | the GitHub viewer read outside the plugin |
 | `internal/cli/turn.go` `Env.storedViewer` `unit.GitHub` `1` | 🧾 | the GitHub viewer read outside the plugin |
 | `internal/client/tui/views.go` `taskProvider` `unit.Task` `1` | 🧾 | the TUI keys its busy map by the task provider; K2 keys it by the served unit |
 | `internal/config/config.go` `Config.ProjectSettingsFor` `unit.GitHub` `1` | 🧾 | an intent's project settings read the pull request's turn facts, which go with the GitHub plugin's profile layer (X8c3) |

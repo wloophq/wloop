@@ -25,7 +25,7 @@ func (e *Env) placements(cfg config.Config) *coreplacement.Service {
 	s := &coreplacement.Service{
 		Map:      cfg.PlacementMap,
 		Hints:    map[unit.ProviderID]placement.Hints{},
-		Defaults: map[unit.ProviderID]placement.Defaults{unit.GitHub: githubPlacement{e.Store}},
+		Defaults: map[unit.ProviderID]placement.Defaults{unit.GitHub: githubPlacement{store: e.Store, reports: e.reportedInputs()}},
 	}
 	if e.Store != nil {
 		s.Overrides = inventory.Placements{Store: e.Store}
@@ -52,7 +52,10 @@ func (e *Env) shared(ctx context.Context, cfg config.Config, u unit.Unit) (bool,
 
 // githubPlacement is the GitHub default: the pull request's repository, in
 // a workspace of its own, as its author or a reviewer by the stored author.
-type githubPlacement struct{ store *inventory.Store }
+type githubPlacement struct {
+	store   *inventory.Store
+	reports reportedPRs
+}
 
 func (g githubPlacement) Default(ctx context.Context, u unit.Unit, _ string) (placement.Placement, bool, error) {
 	ref, err := pr.ParseKey(u.Key)
@@ -67,7 +70,7 @@ func (g githubPlacement) Default(ctx context.Context, u unit.Unit, _ string) (pl
 	if err != nil {
 		return placement.Placement{}, false, err
 	}
-	stored, ok, err := g.store.PR(ctx, ref)
+	stored, ok, err := g.reports.PR(ctx, ref)
 	if err != nil {
 		return placement.Placement{}, false, err
 	}

@@ -8,6 +8,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/wloophq/wloop/internal/domain/pr"
 
@@ -125,13 +126,8 @@ func runPhase(rt route, d dintent.Def, r *sentRound, p phase) {
 	}
 }
 
-// applySentEffects applies the turn effects of d once r went out on route
-// rt: the host's sent phase, then, through ApplyEffect, those of the plugin
-// of r's unit. A failed effect is logged, as the round is out; an effect no
-// plugin applies is an error, which the round's caller reports.
-func (e *Env) applySentEffects(ctx context.Context, rt route, d dintent.Def, r *sentRound) error {
-	runPhase(rt, d, r, sentPhase)
-	u := r.ref.Unit()
+// pluginEffects are the turn effects of d the plugin of u applies.
+func pluginEffects(d dintent.Def, u unit.Unit) []string {
 	var names []string
 	for _, name := range d.Effects {
 		hosts := slices.ContainsFunc(onSent, func(h onSentEffect) bool { return h.name == name })
@@ -139,12 +135,40 @@ func (e *Env) applySentEffects(ctx context.Context, rt route, d dintent.Def, r *
 			names = append(names, name)
 		}
 	}
+	return names
+}
+
+// checkEffects refuses, before a turn of d on u goes out, one whose plugin
+// effects no running plugin applies.
+func (e *Env) checkEffects(d dintent.Def, u unit.Unit) error {
+	names := pluginEffects(d, u)
 	if len(names) == 0 {
 		return nil
 	}
+	if _, ok := e.turnEffects(u.Provider); !ok {
+		return fmt.Errorf("%s: no running plugin applies %s; the turn was not sent", u.Label(), strings.Join(names, ", "))
+	}
+	return nil
+}
+
+// applySentEffects applies the turn effects of d once r went out on route
+// rt: the host's sent phase, then, through ApplyEffect, those of the plugin
+// of r's unit. The turn is out whatever they answer: a failed effect is
+// logged, and one its plugin does not apply is a health problem the
+// daemon shows until the next turn of the unit applies it.
+func (e *Env) applySentEffects(ctx context.Context, rt route, d dintent.Def, r *sentRound) {
+	runPhase(rt, d, r, sentPhase)
+	u := r.ref.Unit()
+	names := pluginEffects(d, u)
+	if len(names) == 0 {
+		return
+	}
 	a, ok := e.turnEffects(u.Provider)
 	if !ok {
-		return fmt.Errorf("%s: no plugin applies %s", r.ref, strings.Join(names, ", "))
+		for _, name := range names {
+			e.effectProblems.set(u, name, fmt.Sprintf("%s: no running plugin applied %s to the turn that went out", u.Label(), name))
+		}
+		return
 	}
 	head := ""
 	if r.pr != nil {
@@ -157,19 +181,54 @@ func (e *Env) applySentEffects(ctx context.Context, rt route, d dintent.Def, r *
 			fmt.Fprintf(e.Err, "warning: %s: the turn's inputs: %v\n", r.ref, err)
 		}
 	}
-	var errs []error
 	for _, name := range names {
 		req := src.EffectRequest{Effect: name, Unit: psource.Wire(u), Turn: &src.TurnRef{ID: r.id, Head: head}, Route: rt.wire(), Taken: r.submitted,
 			Inputs: inputs}
 		err := a.ApplyEffect(context.WithoutCancel(ctx), req)
 		switch {
 		case errors.Is(err, src.ErrUnsupported):
-			errs = append(errs, fmt.Errorf("%s: the plugin applies no %s: %w", r.ref, name, err))
+			e.effectProblems.set(u, name, fmt.Sprintf("%s: the plugin applies no %s, which the turn that went out names: %v", u.Label(), name, err))
 		case err != nil:
+			e.effectProblems.set(u, name, "")
 			fmt.Fprintf(e.Err, "warning: %s: applying %s: %v\n", r.ref, name, err)
+		default:
+			e.effectProblems.set(u, name, "")
 		}
 	}
-	return errors.Join(errs...)
+}
+
+// effectProblems are the turn effects that went unapplied, by unit and
+// effect, which the daemon's health lists.
+type effectProblems struct {
+	mu sync.Mutex
+	m  map[string]string
+}
+
+func (p *effectProblems) set(u unit.Unit, effect, text string) {
+	if p == nil {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	key := u.String() + " " + effect
+	if text == "" {
+		delete(p.m, key)
+		return
+	}
+	if p.m == nil {
+		p.m = map[string]string{}
+	}
+	p.m[key] = text
+}
+
+// list is every problem, sorted.
+func (p *effectProblems) list() []string {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return slices.Sorted(maps.Values(p.m))
 }
 
 // roundRun is a round of an intent about to go out in the workspace its

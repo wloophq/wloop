@@ -154,9 +154,9 @@ func (e *Env) turnByHand(ctx context.Context, h handTurn, text io.Writer) error 
 			return false, err
 		}
 		sr.pr, sr.cfg, sr.inputs, sr.id = pr, cfg, h.inputs, sent.ID
-		err = e.applySentEffects(ctx, routeSession, d, sr)
+		e.applySentEffects(ctx, routeSession, d, sr)
 		e.recordGuidance(ctx, ref, sr.guidance)
-		return true, err
+		return true, nil
 	})
 }
 
@@ -373,6 +373,9 @@ func (e *Env) recordTurnEvent(ctx context.Context, ref pr.Ref, kind, turn, data 
 // remembers the caller's agent home in it, and the round with its guidance,
 // fills in what the round sent, and reports whether the round went out.
 func (e *Env) handRound(ctx context.Context, rt route, ref pr.Ref, guidance string, d dintent.Def, keepsHome bool, send func(st *round.Store, r *sentRound) (bool, error)) error {
+	if err := e.checkEffects(d, ref.Unit()); err != nil {
+		return err
+	}
 	r := &sentRound{env: e, ctx: ctx, ref: ref, guidance: guidance}
 	runPhase(rt, d, r, guidePhase)
 	sent := false
@@ -394,10 +397,10 @@ func (e *Env) handRound(ctx context.Context, rt route, ref pr.Ref, guidance stri
 	if err != nil {
 		return err
 	}
-	if sent, err = send(st, r); err != nil && !sent {
+	if sent, err = send(st, r); err != nil {
 		return err
 	}
-	return errors.Join(rounds.Save(ctx, st), err)
+	return rounds.Save(ctx, st)
 }
 
 // locators know the unit a checkout holds: each source plugin's this

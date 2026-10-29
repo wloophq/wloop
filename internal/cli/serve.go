@@ -159,6 +159,7 @@ func serve(ctx context.Context, e *Env, args []string) error {
 			e.restoreBudget(gctx, cfg, logf)
 			deps := endpoint.wire(serveDeps(gctx, e, db, cfg, logf, loopMu, appState), cfg)
 			deps.ConfigWarning = e.cfg.Warning
+			deps.EffectWarnings = e.effectProblems.list
 			srv := daemon.New(deps)
 			e.Briefing, e.consequences = srv, srv
 			err := srv.Run(ctx)

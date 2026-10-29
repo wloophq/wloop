@@ -290,6 +290,18 @@ const (
 	markAddressedConflict = ghsource.MarkAddressedConflict
 )
 
+// reportedPRs are the pull requests the GitHub plugin last reported.
+type reportedPRs interface {
+	dinv.PlanInputs
+	PR(ctx context.Context, ref pr.Ref) (dinv.PR, bool, error)
+}
+
+// reportedInputs are the pull requests the GitHub plugin last reported, as
+// the host's facts, holdings, placements and round sends read them.
+func (e *Env) reportedInputs() reportedPRs {
+	return ghsource.ReportedInputs{Reports: e.sourceReports(e.Store), Store: e.Store}
+}
+
 // adoptInPlugin has the GitHub plugin take ref over, its basics as read:
 // it keeps the adoption and forgets the reviews the address rounds on ref
 // covered, so the pull request starts its triage from none of them.

@@ -72,24 +72,38 @@ func (p *Plugin) Payload(ctx context.Context, req src.PayloadRequest) (src.Paylo
 
 // wording is how the profile layer words a pull request.
 func (r *running) wording(ctx context.Context) (src.Wording, error) {
-	if r.host.Services == nil {
-		return src.Wording{}, fmt.Errorf("%w: no profile layer to word a pull request", src.ErrUnavailable)
-	}
-	raw, err := r.host.Services.Profile(ctx, wordingFile)
+	w, err := r.words(ctx)
 	if err != nil {
-		return src.Wording{}, fmt.Errorf("the profile layer's %s: %w", wordingFile, err)
-	}
-	var w struct {
-		Noun string `toml:"noun"`
-		This string `toml:"this"`
-	}
-	if err := toml.Unmarshal(raw, &w); err != nil {
-		return src.Wording{}, fmt.Errorf("the profile layer's %s: %w", wordingFile, err)
+		return src.Wording{}, err
 	}
 	if w.Noun == "" || w.This == "" {
 		return src.Wording{}, errors.New("the profile layer's " + wordingFile + " names no noun or this")
 	}
 	return src.Wording{Noun: w.Noun, This: w.This}, nil
+}
+
+// words are the profile layer's words of a pull request.
+type words struct {
+	Noun       string `toml:"noun"`
+	This       string `toml:"this"`
+	BriefInput string `toml:"brief_input"`
+}
+
+// words reads the profile layer's wording file, when used, so an edit of
+// the user's layer takes at once.
+func (r *running) words(ctx context.Context) (words, error) {
+	if r.host.Services == nil {
+		return words{}, fmt.Errorf("%w: no profile layer to word a pull request", src.ErrUnavailable)
+	}
+	raw, err := r.host.Services.Profile(ctx, wordingFile)
+	if err != nil {
+		return words{}, fmt.Errorf("the profile layer's %s: %w", wordingFile, err)
+	}
+	var w words
+	if err := toml.Unmarshal(raw, &w); err != nil {
+		return words{}, fmt.Errorf("the profile layer's %s: %w", wordingFile, err)
+	}
+	return w, nil
 }
 
 func payloadOf(ref pr.Ref, f pr.Facts) Payload {

@@ -73,7 +73,6 @@ var coreProviderAllowlist = []providerSite{
 	{"internal/adapter/store/sqlite/retain.go", "retainWorkflowEventsSQL", "unit.Workspace", 1, "the store keeps the workspaces the core keeps"},
 	{"internal/adapter/store/sqlite/turns.go", "compareUnits", "unit.GitHub", 2, "debt: pull requests sort by owner, repository and number"},
 	{"internal/cli/actions.go", "Env.fetchPR", "unit.GitHub", 1, "debt: the GitHub viewer read outside the plugin"},
-	{"internal/cli/sweepinputs.go", "storeInputs.Viewer", "unit.GitHub", 1, "debt: the GitHub viewer read outside the plugin"},
 	{"internal/cli/turn.go", "Env.storedViewer", "unit.GitHub", 1, "debt: the GitHub viewer read outside the plugin"},
 	{"internal/cli/cli.go", "commands", `"slack"`, 1, "the slack command, the Slack plugin's own commands"},
 	{"internal/cli/help.go", "devCommand", `"slack"`, 1, "the slack command, the Slack plugin's own commands"},

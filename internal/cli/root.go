@@ -301,7 +301,8 @@ func (e *Env) planBooks() coresweep.Books {
 	return e.Turns.Store
 }
 
-// planInputs are the stored pull requests the facts read.
+// planInputs are the pull requests the facts read: those the GitHub
+// plugin reported.
 func (e *Env) planInputs() dinv.PlanInputs {
 	if e.planReads != nil {
 		return e.planReads
@@ -309,7 +310,7 @@ func (e *Env) planInputs() dinv.PlanInputs {
 	if e.Store == nil {
 		return nil
 	}
-	return storeInputs{e.Store}
+	return e.reportedInputs()
 }
 
 // transcriptOf is the transcript file the hooks stored for the agent session;
