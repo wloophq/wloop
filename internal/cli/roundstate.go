@@ -64,14 +64,10 @@ func (e *Env) roundBlock(ctx context.Context, u unit.Unit) (*src.Blocked, error)
 }
 
 // roundStateOf is u's round state as a plan reads it: the bookkeeping of st,
-// the rounds its open plan gates hold, the host overrides o holds, and
-// whether u's rounds are paused.
+// the host overrides o holds, and whether u's rounds are paused.
 func (e *Env) roundStateOf(ctx context.Context, u unit.Unit, st *round.Store, o overrideReader) (src.RoundState, error) {
 	out, err := e.roundBookkeeping(ctx, u, st)
 	if err != nil {
-		return src.RoundState{}, err
-	}
-	if out.Pending, err = e.pendingOf(ctx, u); err != nil {
 		return src.RoundState{}, err
 	}
 	out.Overrides = map[string]string{}

@@ -35,6 +35,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/readmodel"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 )
 
 // enginePlan is an engine as the daemon's Plan.
@@ -48,12 +49,12 @@ func (p enginePlan) Items(ctx context.Context, f automation.Filter) ([]workflow.
 // gates as the rows' pending rounds.
 type planPending struct{ e *automation.Engine }
 
-func (p planPending) Pending(ctx context.Context) (map[unit.Unit]round.Pending, error) {
+func (p planPending) Plans(ctx context.Context) (map[unit.Unit]overlay.Pending, error) {
 	ws, err := p.e.Waiting(ctx, nil)
-	out := map[unit.Unit]round.Pending{}
+	out := map[unit.Unit]overlay.Pending{}
 	for _, w := range ws {
 		if slices.ContainsFunc(w.Item.Steps, func(st workflow.Step) bool { return st.Use == builtin.StepTurnStart }) {
-			out[w.Item.Unit] = round.Pending{Intent: "follow-up", Reason: w.Item.Reason, Since: w.Gate.OpenedAt, Deadline: w.Gate.Deadline}
+			out[w.Item.Unit] = overlay.Pending{Intent: "follow-up", Reason: w.Item.Reason, Since: w.Gate.OpenedAt, Deadline: w.Gate.Deadline}
 		}
 	}
 	return out, err
@@ -117,7 +118,7 @@ func newPlanRig(t *testing.T, opts ...func(*Deps)) *planRig {
 		d.Now = r.clock.Now
 		r.serveGates(d)
 		r.eng = r.engine(d)
-		d.Plan, d.Sweep, d.Pending = enginePlan{r.eng}, r.eng, planPending{r.eng}
+		d.Plan, d.Sweep, d.Plans = enginePlan{r.eng}, r.eng, planPending{r.eng}
 		for _, o := range opts {
 			o(d)
 		}
@@ -537,7 +538,7 @@ func TestAPendingItemSurvivesADaemonRestart(t *testing.T) {
 		d.Now = r.clock.Now
 		r.serveGates(d)
 		r.eng = r.engine(d)
-		d.Plan, d.Sweep, d.Pending = enginePlan{r.eng}, r.eng, planPending{r.eng}
+		d.Plan, d.Sweep, d.Plans = enginePlan{r.eng}, r.eng, planPending{r.eng}
 	})
 	r.s = again
 	res := r.plan(t, "?workflow=review-follow-up")
@@ -601,17 +602,17 @@ func TestPendingRoundsComeFromThePlan(t *testing.T) {
 	deadline := time.Date(2026, 10, 8, 10, 5, 0, 0, time.UTC)
 	r.s = newServerOn(t, r.db, r.log, func(d *Deps) {
 		d.Plan = enginePlan{r.eng}
-		d.Pending = fixedPending{u7: {Intent: "follow-up", Reason: "ana replied", Deadline: deadline}}
+		d.Plans = fixedPending{u7: {Intent: "follow-up", Reason: "ana replied", Deadline: deadline}}
 	})
-	row, ok := row7(t, r.s, api.ViewAll)
-	if !ok || row.Pending == nil || !row.Pending.Deadline.Equal(deadline) {
+	row, ok := row7(t, r.s, "")
+	if !ok || row.Kind != "round_pending" || !slices.Contains(row.Facets["due"], deadline.Format(time.RFC3339Nano)) {
 		t.Fatalf("%+v", row)
 	}
 }
 
-type fixedPending map[unit.Unit]round.Pending
+type fixedPending map[unit.Unit]overlay.Pending
 
-func (f fixedPending) Pending(context.Context) (map[unit.Unit]round.Pending, error) { return f, nil }
+func (f fixedPending) Plans(context.Context) (map[unit.Unit]overlay.Pending, error) { return f, nil }
 
 // countingBriefs counts the brief runs and touches.
 type countingBriefs struct {

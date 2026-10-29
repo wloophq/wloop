@@ -49,13 +49,17 @@ func TestCockpitHasTheRecentView(t *testing.T) {
 	}
 }
 
-func TestCockpitHasTheDoneView(t *testing.T) {
-	rec := httptest.NewRecorder()
-	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
-	body := rec.Body.String()
-	for _, want := range []string{"/api/workspaces/remove-done", `removed: "workspace removed"`, "Remove all clean", `h("details"`, "out.detail", "k.detail"} {
-		if !strings.Contains(body, want) {
-			t.Errorf("app.js lacks %s", want)
+func TestCockpitOffersRemoveAllCleanOnAViewThatAsks(t *testing.T) {
+	for file, wants := range map[string][]string{
+		"app.js":   {`removed: "workspace removed"`, `h("details"`, "out.detail"},
+		"views.js": {"/api/workspaces/remove-clean", "spec.remove_clean", "Remove all clean", "k.detail"},
+	} {
+		rec := httptest.NewRecorder()
+		Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/"+file, nil))
+		for _, want := range wants {
+			if !strings.Contains(rec.Body.String(), want) {
+				t.Errorf("%s lacks %s", file, want)
+			}
 		}
 	}
 }

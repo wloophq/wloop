@@ -98,7 +98,7 @@ func TestGitHubNudgeDraftsMatchTheNudgeOffer(t *testing.T) {
 		u := unit.Unit{Provider: unit.ProviderID(d.Unit.Provider), Key: d.Unit.Key}
 		byUnit[u] = append(byUnit[u], d)
 	}
-	page, err := m.Rows(ctx, api.ViewAll, api.Since{})
+	page, err := m.Rows(ctx, api.Since{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestGitHubNudgeDraftsMatchTheNudgeOffer(t *testing.T) {
 			t.Fatalf("reading %s: %v %v", r.Unit.Label(), ok, err)
 		}
 		base := rd.Base
-		base.Pending, base.Asked = nil, catalog.Asked{}
+		base.Plans, base.Asked = nil, catalog.Asked{}
 		unmuted, err := rd.Derive(base, prrow.Unmuted(rd.In))
 		if err != nil {
 			t.Fatal(err)

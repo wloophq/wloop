@@ -112,11 +112,12 @@ func (d Deriver) Attention(r api.Row, in any) *api.Attention {
 
 func (d Deriver) notice(r api.Row, started bool) (Notice, bool) {
 	ref := refOf(r)
+	pend, pending := d.pending(r)
 	switch {
-	case r.Pending != nil:
-		return Notice{Case: NoticeRound, Token: r.Pending.Since.UTC().Format(stampToken), Attention: api.Attention{
+	case pending:
+		return Notice{Case: NoticeRound, Token: pend.Since.UTC().Format(stampToken), Attention: api.Attention{
 			Title: "Round pending", Subtitle: prLabel(ref),
-			Body:  r.Pending.Intent + ": " + r.Pending.Reason + " · waiting " + span(d.Now.Sub(r.Summary.Since)) + " · " + r.Title,
+			Body:  pend.Intent + ": " + pend.Reason + " · waiting " + span(d.Now.Sub(r.Summary.Since)) + " · " + r.Title,
 			Image: "round", Actions: d.notificationActions(r),
 		}}, true
 	case situation.Kind(r.Kind) == situation.KindHeldByCap:

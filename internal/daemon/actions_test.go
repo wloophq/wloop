@@ -1062,11 +1062,11 @@ func TestUntrackingWhatOnlyTheTrackHeldTakesItOutOfAll(t *testing.T) {
 		}}, nil
 	})
 	listed := func() bool {
-		rows, err := s.rows(ctx, api.ViewAll)
+		page, err := s.readModel().Rows(ctx, api.Since{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		return slices.ContainsFunc(rows, func(r api.Row) bool { return r.Unit == web.Unit() })
+		return slices.ContainsFunc(page.Rows, func(r api.Row) bool { return r.Unit == web.Unit() })
 	}
 	if rec := post(t, s, "/api/units/github/acme%2Fweb%233/track", `{}`); rec.Code != 200 || !listed() {
 		t.Fatalf("tracked: %d %s, listed %v", rec.Code, rec.Body, listed())

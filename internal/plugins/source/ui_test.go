@@ -44,10 +44,10 @@ func TestGitHubsCatalogIsItsManifestWordedByItsLayer(t *testing.T) {
 
 func TestAPluginsUIIsItsManifestsWordedByItsLayer(t *testing.T) {
 	ui := bundledCatalog(t, "github").PluginUI()
-	if ui == nil || ui.Key != "g g" || len(ui.Menubar) != 1 || ui.Menubar[0] != (api.MenubarSection{Label: "In loop", View: api.ViewLoop}) {
+	if ui == nil || ui.Key != "g g" || len(ui.Menubar) != 0 {
 		t.Fatalf("ui %+v", ui)
 	}
-	if len(ui.Views) == 0 || ui.Views[0] != (api.SavedView{ID: api.ViewNeedsMe, Label: "Needs me", View: api.ViewNeedsMe}) {
+	if len(ui.Views) == 0 || ui.Views[0] != (api.SavedView{ID: "mine", Label: "My PRs", View: "mine"}) {
 		t.Fatalf("views %+v", ui.Views)
 	}
 	if (psource.Catalog{}).PluginUI() != nil {

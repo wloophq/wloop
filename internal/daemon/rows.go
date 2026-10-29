@@ -12,7 +12,6 @@ import (
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/port"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/profile"
@@ -84,12 +83,6 @@ func (s *Server) viewerFresh(c *viewerCache, now time.Time) bool {
 		return now.Sub(c.at) < viewerTTL
 	}
 	return s.deps.Changes.Since(c.gen, port.TopicViewer).Empty()
-}
-
-// rows are the read model's rows of view.
-func (s *Server) rows(ctx context.Context, view string) ([]api.Row, error) {
-	page, err := s.readModel().Rows(ctx, view, api.Since{})
-	return page.Rows, err
 }
 
 // readModel is built at the first read, once the deps are settled.
@@ -196,12 +189,11 @@ func (s *Server) newModel() *readmodel.Model {
 	if s.intakes != nil {
 		rd.Intakes = s.rowIntakes
 	}
-	pending := s.pending()
 	providers := make([]readmodel.Provider, 0, len(d.RowProviders))
 	for _, rows := range d.RowProviders {
 		providers = append(providers, rows(rd))
 	}
-	m := readmodel.New(changes, d.Snapshot, pending, d.Agents, modelSettings{s}, providers...)
+	m := readmodel.New(changes, d.Snapshot, d.Plans, d.Agents, modelSettings{s}, providers...)
 	m.UseClock(func() time.Time { return s.deps.Now() })
 	m.UseLog(s.logf)
 	m.UseKeeper(s.keepRows)
@@ -223,18 +215,6 @@ func (s *Server) rowSettings() readmodel.RowSettings {
 func (s *Server) gateOn() bool {
 	return s.deps.Plan != nil
 }
-
-// pending are the plan's pending automatic rounds; none without a plan.
-func (s *Server) pending() readmodel.Pending {
-	if s.deps.Pending != nil {
-		return s.deps.Pending
-	}
-	return noPending{}
-}
-
-type noPending struct{}
-
-func (noPending) Pending(context.Context) (map[unit.Unit]round.Pending, error) { return nil, nil }
 
 type modelSettings struct{ s *Server }
 

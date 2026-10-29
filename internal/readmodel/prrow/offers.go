@@ -64,6 +64,9 @@ func (d Deriver) FactsOf(pr dinv.PR, evs []dinv.Event, m overlay.Mute, r api.Row
 	if t, ok := d.Turns[pr.Ref]; ok {
 		f.Question = t.Question != nil
 	}
+	if pend, ok := d.pending(r); ok {
+		f.PendingSince = pend.Since
+	}
 	if d.Forceable != nil {
 		f.Forceable = d.Forceable(pr.Ref.Unit())
 	}

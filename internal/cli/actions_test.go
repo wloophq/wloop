@@ -271,20 +271,6 @@ func TestOpenViewOpensTheCockpitOnThatView(t *testing.T) {
 	}
 }
 
-func TestOpenRejectsAnUnknownView(t *testing.T) {
-	t.Parallel()
-	te, opened := cockpitEnv(t)
-	if code := te.run("open", "--print", "--view", "later"); code == 0 {
-		t.Fatalf("accepted an unknown view: %s", te.out)
-	}
-	if !strings.Contains(te.err.String(), "later") {
-		t.Fatalf("stderr: %s", te.err)
-	}
-	if te.out.Len() != 0 || len(*opened) != 0 {
-		t.Fatalf("stdout %q, opened %v", te.out, *opened)
-	}
-}
-
 func TestOpenPrintNeedsTheDaemon(t *testing.T) {
 	t.Parallel()
 	te, _ := cockpitEnv(t)

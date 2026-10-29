@@ -427,9 +427,10 @@ func TestCockpitSpeaksTheAPIVersion(t *testing.T) {
 	}
 }
 
-// get serves path and decodes its answer into out. The rows of a view,
-// path api.Rows with the query parameter view, are filtered here, as every
-// client filters the rows it reads.
+// get serves path and decodes its answer into out. The rows of path
+// api.Rows are filtered here: with the query parameter view to the rows of
+// that plugin view (all for every row), with is to the open rows with that
+// flag of their is facet (closed for the closed rows).
 func get(t *testing.T, s *Server, path string, out any) int {
 	t.Helper()
 	rec := httptest.NewRecorder()
@@ -439,7 +440,7 @@ func get(t *testing.T, s *Server, path string, out any) int {
 		var page api.RowsPage
 		if rows, ok := out.(*[]api.Row); ok && strings.HasPrefix(path, api.Rows) {
 			into = &page
-			defer func() { *rows = viewOf(t, path, page.Rows) }()
+			defer func() { *rows = flagged(t, path, page.Rows) }()
 		}
 		if err := json.Unmarshal(rec.Body.Bytes(), into); err != nil {
 			t.Fatalf("%s: %v: %s", path, err, rec.Body)
@@ -448,31 +449,36 @@ func get(t *testing.T, s *Server, path string, out any) int {
 	return rec.Code
 }
 
-func viewOf(t *testing.T, path string, rows []api.Row) []api.Row {
+func flagged(t *testing.T, path string, rows []api.Row) []api.Row {
 	t.Helper()
 	u, err := url.Parse(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	view := u.Query().Get("view")
-	if view == "" {
-		return rows
-	}
-	return slices.DeleteFunc(rows, func(r api.Row) bool { return !r.In(view) })
+	view, flag := u.Query().Get("view"), u.Query().Get("is")
+	return slices.DeleteFunc(rows, func(r api.Row) bool {
+		switch {
+		case view != "" && view != "all" && !r.In(view):
+			return true
+		case flag == "closed":
+			return !r.Summary.Closed
+		}
+		return flag != "" && (r.Summary.Closed || !slices.Contains(r.Facets["is"], flag))
+	})
 }
 
 func TestPRsViewNeedsMe(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	var rows []api.Row
-	if code := get(t, s, "/api/rows?view=needs-me", &rows); code != 200 {
+	if code := get(t, s, "/api/rows?is=needs-me", &rows); code != 200 {
 		t.Fatalf("%d", code)
 	}
 	if len(rows) != 1 || rows[0].Summary.WaitsOn != "me" || rows[0].Kind != "review" || !rows[0].Summary.Stalled {
 		t.Fatalf("%+v", rows)
 	}
-	if !slices.Contains(rows[0].Views, "stalled") {
-		t.Fatalf("views: %v", rows[0].Views)
+	if !slices.Contains(rows[0].Facets["is"], "stalled") {
+		t.Fatalf("flags: %v", rows[0].Facets["is"])
 	}
 }
 
@@ -489,7 +495,7 @@ func TestAReviewToAddressWithoutAWorkspaceShowsInNeedsMeUntilARoundRuns(t *testi
 	})
 	row := func() (api.Row, bool) {
 		var rows []api.Row
-		if code := get(t, s, "/api/rows?view=needs-me", &rows); code != 200 {
+		if code := get(t, s, "/api/rows?is=needs-me", &rows); code != 200 {
 			t.Fatalf("%d", code)
 		}
 		for _, r := range rows {
@@ -953,7 +959,7 @@ func TestBriefRefreshActionTriggersTheJob(t *testing.T) {
 func TestPauseOfARepositoryHoldsOnlyItAndResumingLessThanEverythingIsRefused(t *testing.T) {
 	t.Parallel()
 	plan := newPendingPlan(time.Time{})
-	s := newServerWith(t, func(d *Deps) { d.Plan, d.Pending = plan, plan })
+	s := newServerWith(t, func(d *Deps) { d.Plan, d.Plans = plan, plan })
 	plan.propose(r7.Unit())
 	if rec := post(t, s, "/api/pause", `{"paused":true,"repos":["acme/other"]}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -1110,7 +1116,7 @@ func TestCatalogRouteServesTheProviders(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &c); err != nil || rec.Code != http.StatusOK {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if len(c.Views) != 11 || c.Views[0].ID != api.ViewNeedsMe || len(c.Situations) != 18 || c.Version == "" {
+	if len(c.Views) != 6 || c.Views[0].ID != "mine" || len(c.Situations) != 18 || c.Version == "" {
 		t.Fatalf("catalog %+v", c)
 	}
 }

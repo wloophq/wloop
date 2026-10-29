@@ -49,15 +49,9 @@ type Row struct {
 	in        Input
 }
 
-// The views of plugin rows the host serves.
-const (
-	ViewNeedsMe  = "needs-me"
-	ViewStalled  = "stalled"
-	ViewMine     = "mine"
-	ViewLoop     = "loop"
-	ViewApproved = "approved"
-	ViewDone     = "done"
-)
+// ViewMine is the plugin's view of the viewer's own or adopted open pull
+// requests.
+const ViewMine = "mine"
 
 // Derive is in's source row at in.Now.
 func Derive(in Input) Row {
@@ -114,31 +108,12 @@ func NeedsMe(kind situation.Kind, waitingOn string, p Payload) bool {
 	return needs && (len(p.Reasons) > 0 || p.Workspace.IsReview || asks)
 }
 
-// views puts a pull request outside the scope (no reasons) only where the
-// loop or an adoption put it: loop, mine, and needs-me for a review
-// workspace's question or an author workspace whose agent waits for me.
+// views are the plugin views the row is in.
 func (r Row) views() []string {
-	out := []string{}
-	p, kind := r.Payload, r.Kind()
-	if NeedsMe(kind, r.Situation.WaitingOn, p) {
-		out = append(out, ViewNeedsMe)
+	if (r.Mine() || r.Payload.Override.Adopted) && r.Kind() != situation.KindDone {
+		return []string{ViewMine}
 	}
-	if r.Stalled() && len(p.Reasons) > 0 {
-		out = append(out, ViewStalled)
-	}
-	if (MineAuthor(p) || p.Override.Adopted) && kind != situation.KindDone {
-		out = append(out, ViewMine)
-	}
-	if p.Workspace.IsReview {
-		out = append(out, ViewLoop)
-	}
-	if p.Approved {
-		out = append(out, ViewApproved)
-	}
-	if kind == situation.KindDone && p.Workspace.ID != "" {
-		out = append(out, ViewDone)
-	}
-	return out
+	return []string{}
 }
 
 // approved says the work on the pull request is approved: in a review

@@ -9,7 +9,6 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel/overlay"
@@ -30,7 +29,7 @@ type rowCase struct {
 	override dinv.Override
 	mute     overlay.Mute
 	turn     *TurnFact
-	pending  *round.Pending
+	pending  *overlay.Pending
 	brief    *api.BriefSummary
 	intake   *api.Intake
 	activity *turn.Activity
@@ -101,7 +100,7 @@ func rowCases() []rowCase {
 		{name: "to address", pr: open(20, fixtureViewer, nil),
 			events: []dinv.Event{ev(20, dinv.KindWouldAddress, "", ago(3*time.Hour), "carol asked")}},
 		{name: "round pending", pr: open(21, "ana", func(p *dinv.PR) { p.ReviewRequests = []string{fixtureViewer}; p.Workspace = reviewWS }),
-			pending: &round.Pending{Intent: "review", Reason: "new push", Since: ago(time.Minute), Deadline: fixtureNow.Add(4 * time.Minute)}},
+			pending: &overlay.Pending{Intent: "review", Reason: "new push", Since: ago(time.Minute), Deadline: fixtureNow.Add(4 * time.Minute)}},
 		{name: "agent asks", pr: open(22, "ana", func(p *dinv.PR) { p.Workspace = reviewWS }),
 			turn: &TurnFact{Facts: overlay.Turn{Intent: "review", Role: "pr.review", State: "asked", Summary: "which branch?", At: ago(30 * time.Minute)}}},
 		{name: "agent working", pr: open(23, "ana", func(p *dinv.PR) { p.Workspace = reviewWS; p.Reasons = nil }),
@@ -140,12 +139,12 @@ func fixtureDeriver(t *testing.T, at time.Time, cases []rowCase) Deriver {
 	t.Helper()
 	l := bundled(t)
 	d := Deriver{Viewer: fixtureViewer, Teams: []string{"acme/core"}, Now: at, Stalled: config.Defaults().GitHub.Stalled, Loaded: l, Cfg: config.Defaults(),
-		GateOn: true, BriefOn: true, Pending: map[unit.Unit]round.Pending{}, Turns: map[pr.Ref]TurnFact{},
+		GateOn: true, BriefOn: true, Plans: map[unit.Unit]overlay.Pending{}, Turns: map[pr.Ref]TurnFact{},
 		Mutes: map[unit.Unit]overlay.Mute{}}
 	for _, c := range cases {
 		d.Mutes[c.pr.Ref.Unit()] = c.mute
 		if c.pending != nil {
-			d.Pending[c.pr.Ref.Unit()] = *c.pending
+			d.Plans[c.pr.Ref.Unit()] = *c.pending
 		}
 		if c.turn != nil {
 			d.Turns[c.pr.Ref] = *c.turn

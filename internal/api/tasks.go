@@ -68,7 +68,7 @@ type ViewsCatalog struct {
 
 // TaskViewSpec is a view of views.toml: Over is what it lists (tasks or gates), Group the fact it groups by,
 // Key the key that jumps to it, Badge whether the badge counts it, HideDisabled whether it hides the tasks of a
-// disabled plugin.
+// disabled plugin, RemoveClean whether it offers to remove its tasks' clean workspaces (RemoveCleanPath).
 type TaskViewSpec struct {
 	ID           string `json:"id"`
 	Label        string `json:"label"`
@@ -77,6 +77,7 @@ type TaskViewSpec struct {
 	Key          string `json:"key,omitempty"`
 	Badge        bool   `json:"badge,omitempty"`
 	HideDisabled bool   `json:"hide_disabled,omitempty"`
+	RemoveClean  bool   `json:"remove_clean,omitempty"`
 }
 
 // StateSpec is a state of tasks.toml and the category Go reads of it.

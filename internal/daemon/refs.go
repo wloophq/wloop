@@ -40,8 +40,8 @@ func (s *Server) pluginActs(ctx context.Context, u unit.Unit, name string) bool 
 	return ok
 }
 
-func removeDoneResult() api.RemoveDoneResult {
-	return api.RemoveDoneResult{Removed: []api.Named{}, Kept: []api.Kept{}}
+func removeCleanResult() api.RemoveCleanResult {
+	return api.RemoveCleanResult{Removed: []api.Named{}, Kept: []api.Kept{}}
 }
 
 // unitOfAddress is the unit raw names through the codecs: <provider>:<key>

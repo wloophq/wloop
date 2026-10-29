@@ -16,6 +16,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/web"
@@ -64,7 +65,7 @@ func (s *Server) routes() []route {
 		{"GET /api/activity", s.handleActivity},
 		{"POST /api/pause", s.handlePause},
 		{"POST /api/app", s.handleApp},
-		{"POST /api/workspaces/remove-done", s.handleRemoveDone},
+		{"POST /api/workspaces/remove-clean", s.handleRemoveClean},
 		{"GET " + api.Intakes, s.handleIntake},
 		{"POST " + api.IntakeWithout, s.handleIntakeWithout},
 		{"POST " + api.IntakeCancel, s.handleIntakeCancel},
@@ -275,54 +276,70 @@ func (s *Server) handleActivity(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, items)
 }
 
-// handleRemoveDone removes the workspace of every row of the Done view, or
-// the Approved one, whose checkout holds nothing that is not on GitHub.
-func (s *Server) handleRemoveDone(w http.ResponseWriter, r *http.Request) {
+// handleRemoveClean removes the workspaces of the tasks of a view that
+// offers it (remove_clean): each link of a task whose remove action is on,
+// when its checkout holds nothing that is not published; the rest are kept,
+// with why.
+func (s *Server) handleRemoveClean(w http.ResponseWriter, r *http.Request) {
 	if s.deps.Actions == nil {
 		writeError(w, http.StatusServiceUnavailable, errActionsUnavailable.Error())
 		return
 	}
-	var req struct {
-		View string `json:"view"`
+	g, ok := s.tasks(w)
+	if !ok {
+		return
 	}
-	if r.ContentLength != 0 {
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid body: "+err.Error())
-			return
-		}
+	var req api.RemoveCleanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid body: "+err.Error())
+		return
 	}
-	view := cmp.Or(req.View, api.ViewDone)
-	if view != api.ViewDone && view != api.ViewApproved {
-		writeError(w, http.StatusBadRequest, "view is done or approved")
+	if v, ok := s.loaded().Views.View(req.View); !ok || !v.RemoveClean {
+		writeError(w, http.StatusBadRequest, "view "+strconv.Quote(req.View)+" does not offer to remove clean workspaces")
 		return
 	}
 	ctx := context.WithoutCancel(r.Context())
-	rows, err := s.rows(ctx, view)
+	ts, err := g.Tasks(ctx, task.Query{View: task.View(req.View)})
+	if err != nil {
+		writeTasksError(w, err)
+		return
+	}
+	page, err := s.readModel().Rows(ctx, api.Since{})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	res := removeDoneResult()
-	for _, row := range rows {
-		u := row.Unit
-		if !s.forge(u) || !s.pluginEnabled(u.Provider) {
-			continue
-		}
-		var out bytes.Buffer
-		if err := s.act(ctx, "remove", u, api.ActionRequest{}, &out); err != nil {
-			kept := api.Kept{Named: named(u), Reason: err.Error()}
-			var refused Refusal
-			if errors.As(err, &refused) {
-				kept.Detail, kept.Source, kept.Forceable = refused.Detail, refused.Source, refused.Forceable
-				s.logDetail("remove", u, refused)
+	removable := map[unit.Unit]bool{}
+	for _, row := range page.Rows {
+		removable[row.Unit] = slices.ContainsFunc(row.Actions, func(a api.ActionState) bool { return a.ID == actionRemove && a.Enabled })
+	}
+	res := removeCleanResult()
+	done := map[unit.Unit]bool{}
+	for _, t := range ts {
+		for _, u := range t.Units {
+			if done[u] || !removable[u] || !s.forge(u) || !s.pluginEnabled(u.Provider) {
+				continue
 			}
-			res.Kept = append(res.Kept, kept)
-			continue
+			done[u] = true
+			var out bytes.Buffer
+			if err := s.act(ctx, actionRemove, u, api.ActionRequest{}, &out); err != nil {
+				kept := api.Kept{Named: named(u), Reason: err.Error()}
+				var refused Refusal
+				if errors.As(err, &refused) {
+					kept.Detail, kept.Source, kept.Forceable = refused.Detail, refused.Source, refused.Forceable
+					s.logDetail(actionRemove, u, refused)
+				}
+				res.Kept = append(res.Kept, kept)
+				continue
+			}
+			res.Removed = append(res.Removed, named(u))
 		}
-		res.Removed = append(res.Removed, named(u))
 	}
 	writeJSON(w, res)
 }
+
+// actionRemove is the built-in action that removes a unit's workspace.
+const actionRemove = "remove"
 
 func (s *Server) handlePause(w http.ResponseWriter, r *http.Request) {
 	if s.deps.Pauses == nil {
@@ -474,7 +491,7 @@ func (s *Server) handleRows(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	page, err := s.readModel().Rows(r.Context(), api.ViewAll, since)
+	page, err := s.readModel().Rows(r.Context(), since)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

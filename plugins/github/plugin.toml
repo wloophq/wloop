@@ -29,6 +29,10 @@ doc = "A review workspace holds the pull request: the loop reviews it."
 name = "ready"
 doc = "The work on the pull request is approved: my review approved its head, or my own can merge."
 
+[[source.signals]]
+name = "workspace"
+doc = "A workspace of the pull request remains on disk, a review or an author one, whatever the pull request's state."
+
 [[source.marks]]
 name = "addressed.reviews"
 doc = "The newest review an address round triaged on a pull request you develop, a time: `handled(\"addressed.reviews\", <time>)`."
@@ -594,22 +598,6 @@ type = "string"
 doc = "What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips."
 untrusted = true
 
-# needs-me, stalled, approved and done stay off the cockpit, whose lens
-# views of the same ids list the tasks across sources.
-[[source.ui.views]]
-id = "needs-me"
-rows = true
-order = 0
-surfaces = ["tui"]
-unit_sort = "repo"
-
-[[source.ui.views]]
-id = "stalled"
-rows = true
-order = 1
-surfaces = []
-unit_sort = "repo"
-
 [[source.ui.views]]
 id = "mine"
 rows = true
@@ -618,35 +606,14 @@ surfaces = ["web", "tui"]
 unit_sort = "repo"
 
 [[source.ui.views]]
-id = "loop"
-rows = true
-order = 3
-surfaces = ["web", "tui", "menubar"]
-unit_sort = "repo"
-
-[[source.ui.views]]
 id = "plan"
 order = 4
 surfaces = ["web", "tui"]
 
 [[source.ui.views]]
-id = "approved"
-rows = true
-order = 5
-surfaces = []
-unit_sort = "repo"
-
-[[source.ui.views]]
 id = "dash"
 order = 6
 surfaces = ["web"]
-
-[[source.ui.views]]
-id = "done"
-rows = true
-order = 7
-surfaces = []
-unit_sort = "repo"
 
 [[source.ui.views]]
 id = "all"
@@ -820,10 +787,6 @@ within = "1ms"
 
 [[source.ui.facets.buckets]]
 id = "past"
-
-[[source.ui.menubar]]
-id = "loop"
-view = "loop"
 
 [[source.ui.keys]]
 key = "g g"

@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
@@ -45,9 +46,9 @@ func TestBuiltinTextsComeFromTheProfile(t *testing.T) {
 	}{
 		{"held run_now", "run_now", func(f *Facts) { f.HeldByCap = true },
 			api.ActionState{Confirm: "Run the held round on " + slug + " now? It does not count against the cap."}},
-		{"pending run_now", "run_now", func(f *Facts) { f.HeldByCap, f.Row.Pending = true, &api.PendingRound{} }, api.ActionState{}},
+		{"pending run_now", "run_now", func(f *Facts) { f.HeldByCap, f.PendingSince = true, time.Unix(1, 0) }, api.ActionState{}},
 		{"guide without a pending round", "guide", func(*Facts) {}, api.ActionState{Note: "Kept for the next automatic round"}},
-		{"guide on a pending round", "guide", func(f *Facts) { f.Row.Pending = &api.PendingRound{} }, api.ActionState{}},
+		{"guide on a pending round", "guide", func(f *Facts) { f.PendingSince = time.Unix(1, 0) }, api.ActionState{}},
 		{"trust_run", "trust_run", func(f *Facts) {
 			f.StartBlocked, f.TrustFolder, f.TrustHomes = true, "/src/api", []string{"~/.claude", "~/.codex"}
 		}, api.ActionState{Note: "Trust /src/api in ~/.claude, ~/.codex, then run the round"}},
@@ -103,7 +104,7 @@ func TestTheRowGatesIntentsAreOfferedWhereTheirActionsWere(t *testing.T) {
 	}{
 		{"nothing pending", func(*Facts) {}, []string{"guide"}, []string{"run_now", "skip", "trust_run", "unblock"}},
 		{"held", func(f *Facts) { f.HeldByCap = true }, []string{"run_now", "guide"}, []string{"skip"}},
-		{"pending", func(f *Facts) { f.Row.Pending = &api.PendingRound{} }, []string{"run_now", "guide", "skip"}, []string{"trust_run"}},
+		{"pending", func(f *Facts) { f.PendingSince = time.Unix(1, 0) }, []string{"run_now", "guide", "skip"}, []string{"trust_run"}},
 		{"the gate off", func(f *Facts) { f.GateOn = false }, nil, []string{"guide"}},
 		{"blocked", func(f *Facts) { f.StartBlocked = true }, []string{"unblock"}, []string{"trust_run"}},
 		{"blocked on a folder", func(f *Facts) {

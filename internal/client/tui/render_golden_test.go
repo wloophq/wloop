@@ -28,7 +28,6 @@ func goldenModel(t *testing.T, color bool) *Model {
 	setPR(&asked, func(p *prView) { p.Workspace = api.Workspace{DisplayName: "REVIEW batch-export", Status: "reviewing"} })
 
 	pending := row(3, "Retry webhooks with backoff", "round_pending", "needs-me")
-	pending.Pending = &api.PendingRound{Deadline: now.Add(42 * time.Second)}
 	pending.Summary.Reason = "new commits since the last review"
 
 	stalled := row(1365, "Remove hardcoded credentials from the common constants fallbacks", "changes", "needs-me", "mine")
@@ -51,6 +50,7 @@ func goldenModel(t *testing.T, color bool) *Model {
 	busy.Summary.Since = now.Add(-12 * time.Minute)
 
 	m := modelWith(t, asked, pending, stalled, failing, busy)
+	m.SetGates([]api.GateView{planGate(pending, now.Add(42*time.Second))})
 	m.SetColor(color)
 	m.busy[busy.Unit] = "review"
 	m.health.Paused = true

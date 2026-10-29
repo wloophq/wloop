@@ -5,6 +5,7 @@ package catalog
 
 import (
 	"slices"
+	"time"
 
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -28,6 +29,9 @@ type Facts struct {
 	Author    string
 	Workspace api.Workspace
 	Override  api.Override
+	// PendingSince is when the open plan gate an automatic round of the row
+	// waits on opened; zero for none.
+	PendingSince time.Time
 	// HeldByCap is a row whose automatic round the daily cap held.
 	HeldByCap bool
 	Tracked   bool
@@ -156,7 +160,7 @@ func (f Facts) Get(field string) any {
 	case "row.question":
 		return f.Question
 	case "row.pending":
-		return f.Row.Pending != nil
+		return !f.PendingSince.IsZero()
 	case "row.capped":
 		return f.HeldByCap
 	case "row.intake":

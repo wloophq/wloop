@@ -10,6 +10,8 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/situation"
 )
 
@@ -19,17 +21,26 @@ func policyRef(n int) pr.Ref { return pr.Ref{Owner: "acme", Repo: "api", Number:
 
 func pendingRow(n int) api.Row {
 	return api.Row{Unit: policyRef(n).Unit(), Title: "PR " + strconv.Itoa(n), Kind: api.Kind(situation.KindRoundPending),
-		Pending: &api.PendingRound{Intent: "follow-up", Reason: "ana replied", Since: policyNow, Deadline: policyNow.Add(60 * time.Second)}, Summary: api.Summary{WaitsOn: "me", Reason: "follow-up waiting for your answer: ana replied", Since: policyNow.Add(-20 * time.Minute)}}
+		Summary: api.Summary{WaitsOn: "me", Reason: "follow-up waiting for your answer: ana replied", Since: policyNow.Add(-20 * time.Minute)}}
+}
+
+// roundOn is the automatic round of pull request n's open plan gate, opened at since, until deadline.
+func roundOn(n int, since, deadline time.Time) map[unit.Unit]overlay.Pending {
+	return map[unit.Unit]overlay.Pending{policyRef(n).Unit(): {Intent: "follow-up", Reason: "ana replied", Since: since, Deadline: deadline}}
 }
 
 // offering is r with the actions a gated row of the inventory offers.
 func offering(d Deriver, r api.Row) api.Row {
-	r.Actions = catalog.States(catalog.Facts{PR: refOf(r).Unit(), Owner: refOf(r).Owner, Repo: refOf(r).Repo, Row: r, Tracked: true, Open: situation.Kind(r.Kind) != situation.KindDone, HeldByCap: situation.Kind(r.Kind) == situation.KindHeldByCap, GateOn: true, Intents: d.Loaded})
+	f := catalog.Facts{PR: refOf(r).Unit(), Owner: refOf(r).Owner, Repo: refOf(r).Repo, Row: r, Tracked: true, Open: situation.Kind(r.Kind) != situation.KindDone, HeldByCap: situation.Kind(r.Kind) == situation.KindHeldByCap, GateOn: true, Intents: d.Loaded}
+	if p, ok := d.pending(r); ok {
+		f.PendingSince = p.Since
+	}
+	r.Actions = catalog.States(f)
 	return r
 }
 
 func TestAttentionKeepsTodaysPolicy(t *testing.T) {
-	d := Deriver{Now: policyNow, Loaded: bundled(t)}
+	d := Deriver{Now: policyNow, Loaded: bundled(t), Plans: roundOn(1, policyNow, policyNow.Add(60*time.Second))}
 
 	n := d.Attention(offering(d, pendingRow(1)), nil)
 	if n == nil || n.Category != "ROUND" || n.Title != "Round pending" || n.Subtitle != "acme/api #1" || n.Image != "round" ||
@@ -37,10 +48,8 @@ func TestAttentionKeepsTodaysPolicy(t *testing.T) {
 		!slices.Equal(actionsOf(n), []string{"run_now Run now", "skip Skip", "guide Guide [text]", "pause Pause", "open Open"}) {
 		t.Fatalf("pending %+v", n)
 	}
-	again := pendingRow(1)
-	again.Pending.Since = policyNow.Add(time.Minute)
-	again.Pending.Deadline = policyNow.Add(90 * time.Second)
-	if m := d.Attention(again, nil); m.ID == n.ID || m.Title != "Round pending" {
+	d.Plans = roundOn(1, policyNow.Add(time.Minute), policyNow.Add(90*time.Second))
+	if m := d.Attention(pendingRow(1), nil); m.ID == n.ID || m.Title != "Round pending" {
 		t.Fatalf("a proposal again: %+v after %+v", m, n)
 	}
 

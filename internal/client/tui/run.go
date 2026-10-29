@@ -35,6 +35,7 @@ type Daemon interface {
 	TaskDo(ctx context.Context, id, verb string, req api.TaskRequest) (api.TaskResult, error)
 	TaskDrafts(ctx context.Context, task string) ([]api.Draft, error)
 	ResolveGate(ctx context.Context, id int64, intent string, req api.TaskRequest) (api.GateView, error)
+	Gates(ctx context.Context) ([]api.GateView, error)
 	CreateTask(ctx context.Context, req api.TaskCreate) (api.TaskView, error)
 	Keys(ctx context.Context, surface string) (api.KeysResponse, error)
 	Review(ctx context.Context) (api.Review, error)
@@ -78,6 +79,8 @@ type Config struct {
 
 type loaded struct {
 	rows []api.Row
+	// gates are the open gates when this load read them.
+	gates []api.GateView
 	// rowsLoading are the plugins the last page of rows said are loading.
 	rowsLoading []api.Loading
 	health      api.Health
@@ -286,6 +289,9 @@ func (m *Model) apply(r loaded) {
 		m.SetKeys(r.keys.Bindings)
 	}
 	m.SetData(r.rows, r.health)
+	if r.gates != nil {
+		m.SetGates(r.gates)
+	}
 	m.rowsLoading = r.rowsLoading
 	if r.counters != nil {
 		m.SetCounters(*r.counters)
@@ -542,9 +548,12 @@ func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loa
 			}
 			needPlan = planErr != nil
 		}
-		rows := set.View(api.ViewAll)
+		rows := set.All()
 		r := loaded{rows: rows, rowsLoading: rowsLoading, health: h, err: err, plan: planRead, closed: closed, planErr: planErr}
 		if err == nil {
+			if gs, e := d.Gates(ctx); e == nil {
+				r.gates = gs
+			}
 			r.specsErr = have.read(ctx, d, rows, len(plan) > 0, &r)
 			if shown.reviewing() {
 				if rv, e := d.Review(ctx); e != nil {

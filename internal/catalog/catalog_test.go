@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"text/template"
+	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -142,7 +143,7 @@ func TestActionFactsCoverTheActionSlot(t *testing.T) {
 		"pr.adopted":                            func(f *Facts) { f.Override.Adopted = true },
 		"pr.held":                               func(f *Facts) { f.Override.Hold = true },
 		"row.question":                          func(f *Facts) { f.Question = true },
-		"row.pending":                           func(f *Facts) { f.Row.Pending = &api.PendingRound{} },
+		"row.pending":                           func(f *Facts) { f.PendingSince = time.Unix(1, 0) },
 		"row.capped":                            func(f *Facts) { f.HeldByCap = true },
 		"row.intake":                            func(f *Facts) { f.Intakes = []Intake{{Intake: api.Intake{Seq: 1}}} },
 		"row.intake_seq":                        func(f *Facts) { f.Intakes = []Intake{{Intake: api.Intake{Seq: 4}}} },

@@ -194,7 +194,7 @@ func (f *fakeDaemon) Plugins(context.Context) ([]api.Plugin, error) {
 	if f.plugins != nil {
 		return f.plugins, f.err
 	}
-	return []api.Plugin{{ID: unit.GitHub, Enabled: true, Capabilities: []string{api.CapabilityDetail}, UI: &api.PluginUI{Menubar: []api.MenubarSection{{Label: "In loop", View: api.ViewLoop}}}}}, f.err
+	return []api.Plugin{{ID: unit.GitHub, Enabled: true, Capabilities: []string{api.CapabilityDetail}, UI: &api.PluginUI{Menubar: []api.MenubarSection{{Label: "In loop", View: "loop"}}}}}, f.err
 }
 
 func (f *fakeDaemon) snapshotVerbs() []verbCall {
@@ -987,7 +987,7 @@ func TestMenuLabelIsTheSummaryLine(t *testing.T) {
 func TestMenuListsAThreadRow(t *testing.T) {
 	r := newRig(t)
 	thread := api.Row{Unit: unit.Unit{Provider: "thread", Key: "C1/171.1"}, Link: "https://chat.example/C1/171.1", Label: "#general", Title: "Deploy window?",
-		Kind: "waiting", Views: []string{api.ViewLoop}, Summary: api.Summary{WaitsOn: "me", Since: now, Reason: "ana asked you", Line: "ana asked you"}}
+		Kind: "waiting", Views: []string{"loop"}, Summary: api.Summary{WaitsOn: "me", Since: now, Reason: "ana asked you", Line: "ana asked you"}}
 	r.d.rows["loop"] = []api.Row{thread}
 	r.c.Refresh(context.Background())
 	it, ok := find(r.tray.menu, "#general")

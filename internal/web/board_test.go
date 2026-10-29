@@ -535,7 +535,8 @@ var lensFuncs = append(slices.Clone(queryFuncs), "haystack", "matches", "inView"
 
 func lensPrelude(t *testing.T) string {
 	src := appJS(t)
-	return filterPrelude(t) + jsConst(t, src, "SIZES") + jsConst(t, src, "RISKS") + jsConst(t, src, "rowValuesCache") + `const state = { health: { viewer: "me" } };` + "\n"
+	return filterPrelude(t) + jsConst(t, src, "SIZES") + jsConst(t, src, "RISKS") + jsConst(t, src, "rowValuesCache") + `const state = { health: { viewer: "me" } };
+const roundGate = (r) => r.round_gate;` + "\n"
 }
 
 func TestWaitCatIsTheStripAndAgreesWithTheLabel(t *testing.T) {
@@ -621,7 +622,6 @@ func TestPipelineFiltersSortsAndGroups(t *testing.T) {
 		{"view": "needs-me", "q": "", "sort": "age-desc"},
 		{"view": "needs-me", "q": "", "group": "wait"},
 		{"view": "needs-me", "q": "", "group": "repo", "sort": "age"},
-		{"view": "stalled", "q": "", "layout": "board"},
 		{"view": "needs-me", "q": "", "layout": "board"},
 		{"view": "needs-me", "q": "", "group": "size"},
 	}
@@ -669,16 +669,15 @@ process.stdout.write(JSON.stringify(input.map((l) => {
 	for i, want := range map[int][]string{
 		11: {"me=[2 4]", "loop=[5]", "reviewer=[1]", "author=[3]"},
 		12: {"acme/api=[1 5]", "acme/web=[2]", "acme/widgets=[3 4]"},
-		13: {"me=[2 4]", "reviewer=[]", "author=[]", "merge=[]", "loop=[]"},
-		14: {"me=[2 4]", "loop=[5]", "reviewer=[1]", "author=[3]"},
-		15: {"xs=[5]", "s=[1]", "m=[4]", "l=[2]", "none=[3]"},
+		13: {"me=[2 4]", "loop=[5]", "reviewer=[1]", "author=[3]"},
+		14: {"xs=[5]", "s=[1]", "m=[4]", "l=[2]", "none=[3]"},
 	} {
 		if g := keys(got[i]); !slices.Equal(g, want) {
 			t.Errorf("lens %v: groups %v, want %v", lenses[i], g, want)
 		}
 	}
-	if got[15].Groups[4].Label != "no brief" || got[11].Groups[0].Label != "Waiting on me" {
-		t.Errorf("labels %+v %+v", got[15].Groups[4], got[11].Groups[0])
+	if got[14].Groups[4].Label != "no brief" || got[11].Groups[0].Label != "Waiting on me" {
+		t.Errorf("labels %+v %+v", got[14].Groups[4], got[11].Groups[0])
 	}
 }
 
@@ -743,6 +742,7 @@ process.stdout.write(JSON.stringify(log));`
 func TestQuestionBlockRenders(t *testing.T) {
 	src := appJS(t)
 	prelude := `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
+const roundGate = () => undefined;
 const state = { busy: new Set(), guidance: { "github:acme/api#7": " check the CI first " }, health: { viewer: "me" }, specs: { byId: { answer: { id: "answer", input: { kind: "answer" } } } } };
 const posts = [];
 async function fetch(url, init) { posts.push({ url, body: JSON.parse(init.body) }); return { ok: true, status: 200, json: async () => ({ ok: true }) }; }
@@ -851,6 +851,7 @@ const document = { getElementById: () => null };
 func TestQuestionCardSendsTheChoiceWithTheNoteOrTheTextAlone(t *testing.T) {
 	src := appJS(t)
 	prelude := `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
+const roundGate = () => undefined;
 const state = { busy: new Set(), guidance: {}, health: { viewer: "me" }, specs: { byId: { answer: { id: "answer", input: { kind: "answer" } } } } };
 const posts = [];
 async function fetch(url, init) { posts.push(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => ({ ok: true }) }; }
@@ -1538,7 +1539,7 @@ const getJSON = async (url) => {
   if (url === "/api/actions") { fetches.push(url); if (actionsFail) throw new Error("boom"); return { version: listed, specs: [{ id: "open", label: "Open", surfaces: ["row"] }] }; }
   throw new Error(url);
 };
-const loadActivity = async () => {}, loadExploreRecent = async () => {}, loadPlan = async () => {}, render = () => {};
+const loadActivity = async () => {}, loadExploreRecent = async () => {}, loadPlan = async () => {}, loadRoundGates = async () => {}, render = () => {};
 const loadDetail = async () => { state.detail = { row: row(detailVersion) }; };
 `, []string{"specsStale", "loadSpecs", "refreshSpecs", "actionStates", "actionTitle", "actionButton", "actionButtons", "load"}, `(async () => {
   const versions = [];
@@ -1601,7 +1602,7 @@ const getJSON = async (url) => {
   if (url === "/api/actions") { fetches.push(url); return { version: "v1", specs: [{ id: "track", label: "Track", surfaces: ["explore"] }] }; }
   throw new Error(url);
 };
-const loadActivity = async () => {}, loadExploreRecent = async () => {}, loadPlan = async () => {}, loadDetail = async () => {}, render = () => {};
+const loadActivity = async () => {}, loadExploreRecent = async () => {}, loadPlan = async () => {}, loadRoundGates = async () => {}, loadDetail = async () => {}, render = () => {};
 `, []string{"specsStale", "loadSpecs", "refreshSpecs", "load"}, `(async () => {
   await load();
   await load();

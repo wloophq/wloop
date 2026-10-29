@@ -9,15 +9,17 @@ import (
 
 // The link signals the GitHub plugin's manifest declares.
 const (
-	signalStalled = "stalled"
-	signalInLoop  = "in_loop"
-	signalReady   = "ready"
+	signalStalled   = "stalled"
+	signalInLoop    = "in_loop"
+	signalReady     = "ready"
+	signalWorkspace = "workspace"
 )
 
 // Signals are the link signals of r, a GitHub row derived under the host's
 // overlays: stalled, an open pull request in scope whose situation lasted
 // past its threshold; in_loop, an open one a review workspace holds; ready,
-// an open one whose work is approved and no host state overlays. None of
+// an open one whose work is approved and no host state overlays; workspace,
+// one a workspace of which remains, open or not. None of
 // another provider's row.
 func Signals(r api.Row) map[string]bool {
 	p, ok := PayloadOf(r)
@@ -26,9 +28,10 @@ func Signals(r api.Row) map[string]bool {
 	}
 	open := !r.Summary.Closed
 	return map[string]bool{
-		signalStalled: open && r.Summary.Stalled && len(p.Reasons) > 0,
-		signalInLoop:  open && p.Workspace.IsReview,
-		signalReady:   open && p.Approved,
+		signalStalled:   open && r.Summary.Stalled && len(p.Reasons) > 0,
+		signalInLoop:    open && p.Workspace.IsReview,
+		signalReady:     open && p.Approved,
+		signalWorkspace: p.Workspace.ID != "",
 	}
 }
 

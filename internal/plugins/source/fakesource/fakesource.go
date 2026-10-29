@@ -45,14 +45,10 @@ func (t Thread) Unit() unit.Unit { return unit.Unit{Provider: ID, Key: t.Key} }
 
 // Snapshot is the thread as its plugin reports it.
 func (t Thread) Snapshot() src.Snapshot {
-	s := src.Snapshot{Unit: plugin.Unit{Provider: string(ID), Key: t.Key}, Rev: 1,
+	return src.Snapshot{Unit: plugin.Unit{Provider: string(ID), Key: t.Key}, Rev: 1,
 		Situation: &src.Situation{Kind: string(t.Kind), WaitingOn: t.WaitsOn, Since: t.Since, Reason: t.Reason, Stalled: src.Bool(t.Stalled)},
 		Card:      &src.Card{Label: "#" + t.Channel, Title: t.Title, Link: "https://chat.example/" + t.Key},
 		Facets:    map[string]string{FacetChannel: t.Channel}, Views: []string{}}
-	if t.WaitsOn == "me" {
-		s.Views = append(s.Views, api.ViewNeedsMe)
-	}
-	return s
 }
 
 // Source holds the threads' last reports.

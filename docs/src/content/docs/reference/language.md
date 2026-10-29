@@ -269,6 +269,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `views.<name>.sort` (string): The facts the view sorts by, comma-separated; a leading - sorts one descending. A view's tasks start oldest first, a parent's children in their sibling order.
 - `views.<name>.key` (string): The key that jumps to the view: `g`, a space and a key that no core key uses, such as `g i`. Its help is the view's label.
 - `views.<name>.hide_disabled` (bool, default `false`): The view hides the tasks whose units are all of a disabled plugin, and the gates on a disabled plugin's units.
+- `views.<name>.remove_clean` (bool, default `false`): The view offers to remove at once the workspaces its tasks' links hold whose checkouts hold nothing that is not published, as each link's remove action does; the rest are kept, with why.
 - `badge` (table): The menu bar's badge.
 - `badge.views` (list of strings): The views whose counts the badge adds up, each a view of views.
 - `review` (table): The review's steps, in the order the review walks them.

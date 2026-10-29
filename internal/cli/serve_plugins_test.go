@@ -162,7 +162,7 @@ func TestPluginsDefaultEnabled(t *testing.T) {
 func TestStatusNamesDisabledPlugins(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	te.Socket = serveJSON(t, map[string]any{"GET /api/health": api.Health{}, "GET /api/rows": api.RowsPage{Full: true, Rows: []api.Row{}},
+	te.Socket = serveJSON(t, map[string]any{"GET /api/health": api.Health{}, "GET /api/rows": api.RowsPage{Full: true, Rows: []api.Row{}}, "GET " + api.ViewsPath: api.ViewsCatalog{},
 		"GET " + api.Plugins: []api.Plugin{{ID: unit.GitHub}, {ID: "thread", Enabled: true}}})
 	if code := te.run("status"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -171,7 +171,7 @@ func TestStatusNamesDisabledPlugins(t *testing.T) {
 		t.Fatalf("stderr:\n%s", got)
 	}
 	te.err.Reset()
-	te.Socket = serveJSON(t, map[string]any{"GET /api/health": api.Health{}, "GET /api/rows": api.RowsPage{Full: true, Rows: []api.Row{}}})
+	te.Socket = serveJSON(t, map[string]any{"GET /api/health": api.Health{}, "GET /api/rows": api.RowsPage{Full: true, Rows: []api.Row{}}, "GET " + api.ViewsPath: api.ViewsCatalog{}})
 	if code := te.run("status"); code != 0 || strings.Contains(te.err.String(), "disabled plugins") {
 		t.Fatalf("a daemon with every plugin on: %d %s", code, te.err)
 	}

@@ -17,9 +17,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-14T02:00:00Z"
@@ -190,9 +188,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-13T13:00:00Z"
@@ -509,7 +505,6 @@
       "line": "no reviewer requested"
     },
     "views": [
-      "stalled",
       "mine"
     ],
     "facets": {
@@ -826,8 +821,6 @@
       "line": "checks failing: lint, unit"
     },
     "views": [
-      "needs-me",
-      "stalled",
       "mine"
     ],
     "facets": {
@@ -992,8 +985,6 @@
       "line": "changes requested by carol"
     },
     "views": [
-      "needs-me",
-      "stalled",
       "mine"
     ],
     "facets": {
@@ -1158,8 +1149,7 @@
       "line": "approved and green"
     },
     "views": [
-      "mine",
-      "approved"
+      "mine"
     ],
     "facets": {
       "age": [
@@ -1327,7 +1317,6 @@
       "line": "merge conflicts with main"
     },
     "views": [
-      "needs-me",
       "mine"
     ],
     "facets": {
@@ -1484,9 +1473,7 @@
       "reason": "me-login commented, no reply",
       "line": "me-login commented, no reply"
     },
-    "views": [
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-09T15:00:00Z"
@@ -1642,9 +1629,7 @@
       "reason": "no reviewer requested",
       "line": "no reviewer requested"
     },
-    "views": [
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-08T16:00:00Z"
@@ -1807,7 +1792,6 @@
       "line": "me-login replied, dave has not returned"
     },
     "views": [
-      "stalled",
       "mine"
     ],
     "facets": {
@@ -1970,10 +1954,7 @@
       "reason": "merged",
       "line": "merged"
     },
-    "views": [
-      "loop",
-      "done"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-13T15:00:00Z"
@@ -2518,9 +2499,7 @@
       "reason": "no reviewer requested",
       "line": "no reviewer requested"
     },
-    "views": [
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-05T10:00:00Z"
@@ -2676,10 +2655,7 @@
       "reason": "automatic round held: cap reached",
       "line": "held (cap)"
     },
-    "views": [
-      "needs-me",
-      "loop"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-14T14:00:00Z"
@@ -2849,9 +2825,7 @@
       "reason": "round blocked: no access",
       "line": "round blocked"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-14T13:00:00Z"
@@ -3008,7 +2982,6 @@
       "line": "review to address, no workspace: carol asked"
     },
     "views": [
-      "needs-me",
       "mine"
     ],
     "facets": {
@@ -3165,10 +3138,7 @@
       "reason": "review waiting for your answer: new push",
       "line": "round soon"
     },
-    "views": [
-      "needs-me",
-      "loop"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-03T06:00:00Z"
@@ -3291,12 +3261,6 @@
       }
     ],
     "specs_version": "",
-    "pending": {
-      "intent": "review",
-      "reason": "new push",
-      "since": "2026-10-14T14:59:00Z",
-      "deadline": "2026-10-14T15:04:00Z"
-    },
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3354,10 +3318,7 @@
       "reason": "which branch?",
       "line": "agent asks"
     },
-    "views": [
-      "needs-me",
-      "loop"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-14T14:30:00Z"
@@ -3519,9 +3480,7 @@
       "reason": "review round in progress",
       "line": "agent working"
     },
-    "views": [
-      "loop"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-14T14:50:00Z"
@@ -3678,7 +3637,6 @@
       "line": "agent stopped"
     },
     "views": [
-      "needs-me",
       "mine"
     ],
     "facets": {
@@ -3840,10 +3798,7 @@
       "reason": "the agent asked you something",
       "line": "agent asks"
     },
-    "views": [
-      "needs-me",
-      "loop"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "0001-01-01T00:00:00Z"
@@ -4159,9 +4114,7 @@
       "reason": "no reviewer requested",
       "line": "no reviewer requested"
     },
-    "views": [
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-09-30T00:00:00Z"
@@ -4324,10 +4277,7 @@
       "reason": "approved and green",
       "line": "approved and green"
     },
-    "views": [
-      "loop",
-      "approved"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-13T15:00:00Z"
@@ -4489,10 +4439,7 @@
       "reason": "review requested, no review on the head",
       "line": "briefing… (attempt 2; timeout)"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-09-28T22:00:00Z"
@@ -4818,10 +4765,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-08-15T15:00:00Z"

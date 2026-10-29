@@ -37,7 +37,7 @@ const (
 type Model struct {
 	changes   port.Changes
 	snap      Snapshotter
-	pending   Pending
+	plans     Plans
 	agents    Agents
 	settings  Settings
 	providers []Provider
@@ -91,11 +91,11 @@ type entry struct {
 }
 
 // New builds a model over the providers. A nil changes rebuilds on every
-// read; nil pending, agents or settings leave their Base fields zero.
-func New(changes port.Changes, snap Snapshotter, pending Pending, agents Agents, settings Settings, providers ...Provider) *Model {
+// read; nil plans, agents or settings leave their Base fields zero.
+func New(changes port.Changes, snap Snapshotter, plans Plans, agents Agents, settings Settings, providers ...Provider) *Model {
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)
-	return &Model{changes: changes, snap: snap, pending: pending, agents: agents, settings: settings, providers: providers,
+	return &Model{changes: changes, snap: snap, plans: plans, agents: agents, settings: settings, providers: providers,
 		epoch: hex.EncodeToString(b), now: time.Now, logf: func(string, ...any) {}}
 }
 
@@ -141,12 +141,12 @@ func (m *Model) base(ctx context.Context) (Base, error) {
 			return Base{}, err
 		}
 	}
-	if m.pending != nil {
-		p, err := m.pending.Pending(ctx)
+	if m.plans != nil {
+		p, err := m.plans.Plans(ctx)
 		if err != nil {
 			return Base{}, err
 		}
-		b.Pending = p
+		b.Plans = p
 	}
 	if m.agents != nil {
 		b.Agents, b.AgentsOK = m.agents.Agents()
@@ -307,11 +307,11 @@ func (s *snapshot) trim() {
 	}
 }
 
-// Rows is the view's rows: all of them when since is zero, of another
+// Rows are the rows: all of them when since is zero, of another
 // epoch, ahead of Rev or behind the tombstones, else those that changed
 // after since and the units that left. The rows are copies the caller may
 // change.
-func (m *Model) Rows(ctx context.Context, view string, since api.Since) (api.RowsPage, error) {
+func (m *Model) Rows(ctx context.Context, since api.Since) (api.RowsPage, error) {
 	s, err := m.sync(ctx)
 	if err != nil {
 		return api.RowsPage{}, err
@@ -322,11 +322,7 @@ func (m *Model) Rows(ctx context.Context, view string, since api.Since) (api.Row
 		if !page.Full && e.Rev <= since.Rev {
 			continue
 		}
-		if e.Row.In(view) {
-			page.Rows = append(page.Rows, cloneRow(e.Row))
-		} else if !page.Full {
-			page.Removed = append(page.Removed, e.Unit)
-		}
+		page.Rows = append(page.Rows, cloneRow(e.Row))
 	}
 	if !page.Full {
 		for u, rev := range s.gone {
@@ -336,7 +332,7 @@ func (m *Model) Rows(ctx context.Context, view string, since api.Since) (api.Row
 		}
 		slices.SortFunc(page.Removed, api.CompareUnits)
 	}
-	slices.SortStableFunc(page.Rows, api.CompareRows)
+	slices.SortStableFunc(page.Rows, func(a, b api.Row) int { return api.CompareUnits(a.Unit, b.Unit) })
 	return page, nil
 }
 
@@ -681,10 +677,6 @@ func cloneRow(r api.Row) api.Row {
 			f[k] = slices.Clone(v)
 		}
 		r.Facets = f
-	}
-	if r.Pending != nil {
-		p := *r.Pending
-		r.Pending = &p
 	}
 	if r.Question != nil {
 		q := *r.Question

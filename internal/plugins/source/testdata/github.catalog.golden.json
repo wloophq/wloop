@@ -1,28 +1,6 @@
 {
   "views": [
     {
-      "id": "needs-me",
-      "label": "Needs me",
-      "provider": "github",
-      "rows": true,
-      "order": 0,
-      "surfaces": [
-        "tui"
-      ],
-      "unit": "Pull request",
-      "unit_sort": "repo"
-    },
-    {
-      "id": "stalled",
-      "label": "Stalled",
-      "provider": "github",
-      "rows": true,
-      "order": 1,
-      "surfaces": [],
-      "unit": "Pull request",
-      "unit_sort": "repo"
-    },
-    {
       "id": "mine",
       "label": "My PRs",
       "provider": "github",
@@ -31,20 +9,6 @@
       "surfaces": [
         "web",
         "tui"
-      ],
-      "unit": "Pull request",
-      "unit_sort": "repo"
-    },
-    {
-      "id": "loop",
-      "label": "In loop",
-      "provider": "github",
-      "rows": true,
-      "order": 3,
-      "surfaces": [
-        "web",
-        "tui",
-        "menubar"
       ],
       "unit": "Pull request",
       "unit_sort": "repo"
@@ -61,16 +25,6 @@
       ]
     },
     {
-      "id": "approved",
-      "label": "Approved",
-      "provider": "github",
-      "rows": true,
-      "order": 5,
-      "surfaces": [],
-      "unit": "Pull request",
-      "unit_sort": "repo"
-    },
-    {
       "id": "dash",
       "label": "Backlog",
       "provider": "github",
@@ -79,16 +33,6 @@
       "surfaces": [
         "web"
       ]
-    },
-    {
-      "id": "done",
-      "label": "Done",
-      "provider": "github",
-      "rows": true,
-      "order": 7,
-      "surfaces": [],
-      "unit": "Pull request",
-      "unit_sort": "repo"
     },
     {
       "id": "all",

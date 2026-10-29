@@ -34,7 +34,7 @@ func (d Deriver) facetValues(r api.Row, p Payload, reported map[string][]string)
 		FacetIs:      rowFlags(r, p),
 		FacetAge:     {stamp(r.Summary.Since)},
 		FacetLane:    {boardLane(r, p)},
-		FacetDue:     dueTimes(r, p),
+		FacetDue:     d.dueTimes(r, p),
 	})
 	maps.Copy(out, extraValues(registryOf(d.Loaded), brief.Extra))
 	for id, vs := range out {
@@ -119,9 +119,9 @@ func waitCats(r api.Row, p Payload) []string {
 // stalled rows that have a review workspace.
 func boardLane(r api.Row, p Payload) string {
 	switch {
-	case slices.Contains(r.Views, api.ViewNeedsMe):
+	case rowNeedsMe(r, p):
 		return "me"
-	case slices.Contains(r.Views, api.ViewLoop):
+	case p.Workspace.IsReview:
 		return "loop"
 	}
 	switch situation.Kind(r.Kind) {
@@ -139,8 +139,8 @@ func boardLane(r api.Row, p Payload) string {
 func rowFlags(r api.Row, p Payload) []string {
 	o := p.Override
 	on := map[string]bool{
-		"stalled": slices.Contains(r.Views, api.ViewStalled), "needs-me": slices.Contains(r.Views, api.ViewNeedsMe),
-		"in-loop": slices.Contains(r.Views, api.ViewLoop), "approved": p.Approved, "paused": o.Hold, "muted": p.Mute != nil,
+		"stalled": r.Summary.Stalled && len(p.Reasons) > 0, "needs-me": rowNeedsMe(r, p),
+		"in-loop": p.Workspace.IsReview, "approved": p.Approved, "paused": o.Hold, "muted": p.Mute != nil,
 		"adopted": o.Adopted, "tracked": o.Tracked,
 	}
 	var out []string
@@ -155,10 +155,10 @@ func rowFlags(r api.Row, p Payload) []string {
 // dueTimes are every instant the row waits for, past or not: the gate's
 // deadline, the end of a mute, the brief's retry and the facts' next
 // instants, the soonest first.
-func dueTimes(r api.Row, p Payload) []string {
+func (d Deriver) dueTimes(r api.Row, p Payload) []string {
 	var at []time.Time
-	if r.Pending != nil {
-		at = append(at, r.Pending.Deadline)
+	if pend, ok := d.pending(r); ok {
+		at = append(at, pend.Deadline)
 	}
 	if p.Mute != nil {
 		at = append(at, p.Mute.Until)

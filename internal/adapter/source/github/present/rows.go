@@ -83,7 +83,7 @@ func (p *Presenter) storedRead(ctx context.Context, u unit.Unit, asked catalog.A
 	}
 	base.Asked = asked
 	if unmuted {
-		base.Pending = nil
+		base.Plans = nil
 	}
 	d := p.deriverAt(base, at)
 	if !unmuted && p.d.Mutes != nil {

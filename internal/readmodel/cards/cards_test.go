@@ -56,14 +56,12 @@ func (f *fakeRows) Row(_ context.Context, u unit.Unit, _ catalog.Asked) (api.Row
 	return r, ok, nil
 }
 
-func (f *fakeRows) Rows(_ context.Context, view string, _ api.Since) (api.RowsPage, error) {
+func (f *fakeRows) Rows(_ context.Context, _ api.Since) (api.RowsPage, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	page := api.RowsPage{Rev: f.rev, Full: true}
 	for _, r := range f.rows {
-		if r.In(view) {
-			page.Rows = append(page.Rows, r)
-		}
+		page.Rows = append(page.Rows, r)
 	}
 	slices.SortFunc(page.Rows, func(a, b api.Row) int { return api.CompareUnits(a.Unit, b.Unit) })
 	return page, nil

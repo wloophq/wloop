@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	rmoverlay "github.com/wloophq/wloop/internal/readmodel/overlay"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/brief"
@@ -30,7 +32,6 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/meter"
-	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 var _ workspaces.FetchLog = (*sqlite.Fetches)(nil)
@@ -453,64 +454,30 @@ func (l roundStates) Load(ctx context.Context) (automation.State, error) {
 	return &roundState{st: st, rounds: l.steps.d.Rounds, steps: l.steps}, nil
 }
 
-// pendingRounds are the open plan gates of the engine's turn.start items as
-// the read model lists pending automatic rounds.
-func (e *Env) pendingRounds(ctx context.Context) (map[unit.Unit]round.Pending, error) {
-	rs, err := e.roundsWaiting(ctx, nil)
-	out := map[unit.Unit]round.Pending{}
-	for _, r := range rs {
-		if _, ok := out[r.u]; !ok {
-			out[r.u] = r.Pending
-		}
-	}
-	return out, err
-}
+// enginePlans are the automatic rounds the engine's open plan gates hold, by
+// unit, as the read model lays them over the rows: a turn.start item that
+// waits on its plan gate, since the gate opened, until its window ends.
+type enginePlans struct{ e *Env }
 
-// waitingRound is a round that waits on its plan gate, on u.
-type waitingRound struct {
-	round.Pending
-	u unit.Unit
-}
-
-// roundsWaiting are the turn.start items of u, of every unit when u is nil,
-// that wait on an open plan gate, as the rounds they hold: since the gate
-// opened, until its window ends.
-func (e *Env) roundsWaiting(ctx context.Context, u *unit.Unit) ([]waitingRound, error) {
+func (p enginePlans) Plans(ctx context.Context) (map[unit.Unit]rmoverlay.Pending, error) {
+	e := p.e
 	if e.engine == nil {
 		return nil, nil
 	}
-	ws, err := e.engine.Waiting(ctx, u)
+	ws, err := e.engine.Waiting(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	var out []waitingRound
+	out := map[unit.Unit]rmoverlay.Pending{}
 	for _, w := range ws {
 		i := slices.IndexFunc(w.Item.Steps, isTurnStart)
-		if i < 0 {
+		if _, seen := out[w.Item.Unit]; i < 0 || seen {
 			continue
 		}
-		out = append(out, waitingRound{u: w.Item.Unit, Pending: round.Pending{Intent: e.startOf(w.Item.Steps[i], w.Item.Unit.Provider).kindName(),
-			Reason: w.Item.Reason, Since: w.Gate.OpenedAt, Deadline: w.Gate.Deadline}})
+		out[w.Item.Unit] = rmoverlay.Pending{Intent: e.startOf(w.Item.Steps[i], w.Item.Unit.Provider).kindName(),
+			Reason: w.Item.Reason, Since: w.Gate.OpenedAt, Deadline: w.Gate.Deadline}
 	}
 	return out, nil
-}
-
-// pendingOf are the rounds u's open plan gates hold, as a plugin's round
-// state reads them.
-func (e *Env) pendingOf(ctx context.Context, u unit.Unit) ([]src.PendingRound, error) {
-	rs, err := e.roundsWaiting(ctx, &u)
-	out := make([]src.PendingRound, len(rs))
-	for i, r := range rs {
-		out[i] = src.PendingRound{Intent: r.Intent, Reason: r.Reason, Since: r.Since, Deadline: r.Deadline}
-	}
-	return out, err
-}
-
-// enginePending is pendingRounds as the read model's port.
-type enginePending struct{ e *Env }
-
-func (p enginePending) Pending(ctx context.Context) (map[unit.Unit]round.Pending, error) {
-	return p.e.pendingRounds(ctx)
 }
 
 // meteredEngine runs the user's and the deadline's runs under the gate

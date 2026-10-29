@@ -438,7 +438,7 @@ func withEngine(d daemon.Deps, e *Env, ed engineDeps) daemon.Deps {
 	pd := ed
 	pd.WorkspaceFacts, pd.Withdrawals = siblingFacts(ed.WorkspaceFacts), nil
 	d.Plan = servedPlan{eng: eng, plan: e.planEngine(pd)}
-	d.Pending = enginePending{e}
+	d.Plans = enginePlans{e}
 	return d
 }
 
@@ -1070,7 +1070,7 @@ func serveUntilConfigLoads(ctx context.Context, e *Env, db *sqlite.DB, logf func
 	deps.Collector, deps.Ingest = nil, nil
 	deps.Runtimes = withoutPluginJobs(deps.Runtimes)
 	deps.Brief, deps.Intakes, deps.IntakeBriefs = nil, nil, nil
-	deps.Plan, deps.Pending = nil, nil
+	deps.Plan, deps.Plans = nil, nil
 	if !e.noJobs {
 		deps.Sweep = daemon.SweepFunc(func(context.Context) (string, string, error) {
 			if _, err := e.readConfig(); err != nil {

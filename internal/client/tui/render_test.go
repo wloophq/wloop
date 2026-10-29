@@ -84,11 +84,11 @@ func TestRenderStripsControlCharacters(t *testing.T) {
 func TestRenderShowsTheViewCountdownAndHelp(t *testing.T) {
 	m := newModel(t)
 	pending := row(3, "Pending round", "round_pending", "needs-me")
-	pending.Pending = &api.PendingRound{Deadline: now.Add(42 * time.Second)}
 	stalled := row(8, "Stalled one", "changes", "needs-me", "mine")
 	stalled.Summary.Stalled = true
 	stalled.Summary.Since = now.Add(-50 * time.Hour)
 	m.SetData([]api.Row{pending, stalled}, api.Health{Warnings: []string{"app: notifications are off"}})
+	m.SetGates([]api.GateView{planGate(pending, now.Add(42*time.Second)), {ID: 2, Unit: stalled.Unit.String(), Kind: "question", Status: "open"}})
 	screen := strings.Join(m.Render(120, 10, now), "\n")
 	for _, want := range []string{"[Needs me 2]", "My PRs 1", "In loop 0", "acme/api#3  Pending round", "42s", "!2d", "round soon", "changes asked", "warning: app: notifications are off", "V review", "q quit"} {
 		if !strings.Contains(screen, want) {

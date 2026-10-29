@@ -29,7 +29,6 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/github"
 )
@@ -132,7 +131,6 @@ func TestWireTypesCoverTheirSources(t *testing.T) {
 		{dinv.Workspace{}, api.Workspace{}},
 		{dinv.Override{}, api.Override{}},
 		{dinv.Event{}, api.Event{}},
-		{round.Pending{}, api.PendingRound{}},
 		{brief.Summary{}, api.BriefSummary{}},
 		{brief.View{}, api.BriefView{}},
 		{brief.Brief{}, api.Brief{}},

@@ -2,35 +2,15 @@
 # GitHub plugin's manifest declares. A user profile's plugins/github/ui.toml
 # replaces the keys it sets.
 
-[views.needs-me]
-label = "Needs me"
-unit = "Pull request"
-
-[views.stalled]
-label = "Stalled"
-unit = "Pull request"
-
 [views.mine]
 label = "My PRs"
-unit = "Pull request"
-
-[views.loop]
-label = "In loop"
 unit = "Pull request"
 
 [views.plan]
 label = "Plan"
 
-[views.approved]
-label = "Approved"
-unit = "Pull request"
-
 [views.dash]
 label = "Backlog"
-
-[views.done]
-label = "Done"
-unit = "Pull request"
 
 [views.all]
 label = "All"

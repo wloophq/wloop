@@ -184,8 +184,9 @@ type Deps struct {
 	Intents func() *intentload.Loaded
 	// Plan is the workflows' plan; nil answers 503 to the plan routes.
 	Plan Plan
-	// Pending are the pending automatic rounds the rows show; nil shows none.
-	Pending readmodel.Pending
+	// Plans are the automatic rounds the open plan gates hold, which the rows
+	// show; nil shows none.
+	Plans   readmodel.Plans
 	Changes *change.Log // nil notes nothing
 	// Snapshot pins the read model's loads to one read transaction; nil
 	// loads without one.

@@ -19,7 +19,6 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
@@ -36,7 +35,8 @@ type Deriver struct {
 	Ignore  []string
 	Now     time.Time
 	Stalled config.Stalled
-	Pending map[unit.Unit]round.Pending
+	// Plans are the automatic rounds the open plan gates hold, by unit.
+	Plans map[unit.Unit]overlay.Pending
 	// Mutes are the user's mutes of pull requests, their tasks' wakes.
 	Mutes map[unit.Unit]overlay.Mute
 	Turns map[github.Ref]TurnFact
@@ -156,9 +156,8 @@ func (d Deriver) Parts(rep Report, evs []dinv.Event, o dinv.Override) (api.Row, 
 	case situation.KindLoopWaiting, situation.KindLoopStopped, situation.KindLoopWorking:
 		r.Question = f.Question
 	}
-	if pend, ok := d.Pending[pr.Ref.Unit()]; ok && res.Kind != overlay.KindDone {
-		r.Pending = pendingOf(pend)
-		over := overlay.Pending{Intent: pend.Intent, Reason: pend.Reason}.Over(overlay.Situation{Kind: string(r.Kind),
+	if pend, ok := d.Plans[pr.Ref.Unit()]; ok && res.Kind != overlay.KindDone {
+		over := pend.Over(overlay.Situation{Kind: string(r.Kind),
 			WaitingOn: r.Summary.WaitsOn, Since: r.Summary.Since, Reason: r.Summary.Reason, Stalled: r.Summary.Stalled})
 		r.Kind = api.Kind(over.Kind)
 		r.Summary.WaitsOn, r.Summary.Since, r.Summary.Reason, r.Summary.Stalled = over.WaitingOn, over.Since, over.Reason, over.Stalled
@@ -172,7 +171,7 @@ func (d Deriver) Parts(rep Report, evs []dinv.Event, o dinv.Override) (api.Row, 
 	p.Facts = d.facts(rep.Payload.Facts, r, p)
 	overlaid := string(r.Kind) != rep.Situation.Kind
 	p.Approved = rep.Payload.Approved && !overlaid
-	r.Views = d.views(rep.Views, overlaid, r, p)
+	r.Views = d.views(rep.Views, r, p)
 	unmutedRow := api.Row{Kind: api.Kind(unmuted.Kind), Summary: api.Summary{WaitsOn: unmuted.WaitingOn, Reason: unmuted.Reason, Since: unmuted.Since}}
 	r.Actions = catalog.States(d.FactsOf(pr, evs, m, r, p, unmutedRow))
 	r.SpecsVersion = d.SpecsVersion
@@ -215,8 +214,8 @@ func (d Deriver) facts(reported *api.RowFacts, r api.Row, p Payload) *api.RowFac
 		*f = *reported
 		f.Checks.Failing = slices.Clone(reported.Checks.Failing)
 	}
-	if r.Pending != nil {
-		f.Next = d.upcoming(f.Next, r.Pending.Deadline, api.UpcomingGate)
+	if pend, ok := d.pending(r); ok {
+		f.Next = d.upcoming(f.Next, pend.Deadline, api.UpcomingGate)
 	}
 	if p.Mute != nil {
 		f.Next = d.upcoming(f.Next, p.Mute.Until, api.UpcomingUnmute)
@@ -258,34 +257,36 @@ func nonNil(v []string) []string {
 	return v
 }
 
-// views are the views the plugin put the row in, laid over with the
-// host's state: an overlay that set the row's situation decides needs-me
-// and leaves it out of approved, the stalled view follows the host's clock,
-// and a pull request the user took over is the user's.
-func (d Deriver) views(reported []string, overlaid bool, r api.Row, p Payload) []string {
-	drop := []string{api.ViewStalled}
-	if overlaid {
-		drop = append(drop, api.ViewNeedsMe, api.ViewApproved)
-	}
-	out := slices.DeleteFunc(slices.Clone(reported), func(v string) bool { return slices.Contains(drop, v) })
+// pending is the automatic round the open plan gate of r's pull request
+// holds; false for none, or once the pull request is done.
+func (d Deriver) pending(r api.Row) (overlay.Pending, bool) {
+	p, ok := d.Plans[r.Unit]
+	return p, ok && situation.Kind(r.Kind) != situation.KindDone
+}
+
+// viewMine is the GitHub plugin's view of the viewer's own or adopted open
+// pull requests.
+const viewMine = "mine"
+
+// views are the plugin views the plugin put the row in, and mine for a
+// pull request the user took over.
+func (d Deriver) views(reported []string, r api.Row, p Payload) []string {
+	out := slices.Clone(reported)
 	if out == nil {
 		out = []string{}
 	}
-	kind := situation.Kind(r.Kind)
-	add := func(v string, on bool) {
-		if on && !slices.Contains(out, v) {
-			out = append(out, v)
-		}
+	if p.Override.Adopted && situation.Kind(r.Kind) != situation.KindDone && !slices.Contains(out, viewMine) {
+		out = append(out, viewMine)
 	}
-	add(api.ViewNeedsMe, overlaid && needsMe(kind, r.Summary.WaitsOn, p) && kind != situation.KindMuted)
-	add(api.ViewStalled, r.Summary.Stalled && len(p.Reasons) > 0)
-	add(api.ViewMine, p.Override.Adopted && kind != situation.KindDone)
-	slices.SortStableFunc(out, func(a, b string) int { return slices.Index(viewOrder, a) - slices.Index(viewOrder, b) })
 	return out
 }
 
-// viewOrder is the order of a row's views.
-var viewOrder = []string{api.ViewNeedsMe, api.ViewStalled, api.ViewMine, api.ViewLoop, api.ViewApproved, api.ViewDone}
+// rowNeedsMe says the row, after the host's overlays, waits on the user:
+// the needs-me predicate of its situation, never while muted.
+func rowNeedsMe(r api.Row, p Payload) bool {
+	kind := situation.Kind(r.Kind)
+	return kind != situation.KindMuted && needsMe(kind, r.Summary.WaitsOn, p)
+}
 
 func mineAuthor(p Payload) bool { return p.Viewer != "" && strings.EqualFold(p.Author, p.Viewer) }
 

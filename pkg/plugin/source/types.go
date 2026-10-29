@@ -393,8 +393,7 @@ type RoundState struct {
 	// Today counts the unit's automatic rounds today, DayTotal every unit's.
 	Today, DayTotal int
 	// Paused says the unit's rounds are held, by the user or a pause.
-	Paused  bool
-	Pending []PendingRound
+	Paused bool
 	// Overrides are the unit's host overrides, by name.
 	Overrides map[string]string
 	// Blocked is set while a round's start is blocked on a question.
@@ -405,12 +404,6 @@ type RoundState struct {
 type Blocked struct {
 	Question, Root, Folder string
 	Since                  time.Time
-}
-
-// PendingRound is an automatic round waiting on the user until Deadline.
-type PendingRound struct {
-	Intent, Reason  string
-	Since, Deadline time.Time
 }
 
 // Plan is a unit's round plan: the rounds it would launch. The workflows'

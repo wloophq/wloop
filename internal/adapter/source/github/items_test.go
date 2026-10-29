@@ -21,7 +21,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/items"
-	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel"
@@ -126,7 +125,7 @@ func TestMutedRowKeepsItems(t *testing.T) {
 		round := func(muted bool) api.Row {
 			s := ghsourcetest.Situation{PR: ghsourcetest.Open(3, ghsourcetest.Other)}
 			s.PR.ReviewRequests, s.PR.Workspace = []string{ghsourcetest.Viewer}, ghsourcetest.ReviewWorkspace
-			s.Pending = &round.Pending{Intent: "review", Reason: "new push", Since: ghsourcetest.Now.Add(-time.Minute), Deadline: ghsourcetest.Now.Add(4 * time.Minute)}
+			s.Pending = &overlay.Pending{Intent: "review", Reason: "new push", Since: ghsourcetest.Now.Add(-time.Minute), Deadline: ghsourcetest.Now.Add(4 * time.Minute)}
 			if muted {
 				s.Mute = overlay.Mute{Until: ghsourcetest.Now.Add(time.Hour)}
 			}
@@ -283,7 +282,7 @@ func compareNeedsMe(t *testing.T, rows []api.Row, itemsOf func(api.Row) []items.
 			continue
 		}
 		compared++
-		want := slices.Contains(r.Views, api.ViewNeedsMe) || ownNext(r)
+		want := slices.Contains(r.Facets["is"], "needs-me") || ownNext(r)
 		if got := hasViewerItem(r, itemsOf); want != got {
 			t.Errorf("%s (%s, waits on %s): needs-me or own next %v, viewer item %v", r.Label, r.Kind, r.Summary.WaitsOn, want, got)
 		}
@@ -300,13 +299,13 @@ func TestNeedsMeDifferential(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := seededModel(t, f)
-	page, err := m.Rows(context.Background(), api.ViewAll, api.Since{})
+	page, err := m.Rows(context.Background(), api.Since{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	needs := 0
 	for _, r := range page.Rows {
-		if slices.Contains(r.Views, api.ViewNeedsMe) {
+		if slices.Contains(r.Facets["is"], "needs-me") {
 			needs++
 		}
 	}
@@ -337,15 +336,11 @@ func seededModel(t *testing.T, f *storetest.Fixture) *readmodel.Model {
 			Settings: func() readmodel.RowSettings {
 				return readmodel.RowSettings{Cfg: config.Defaults(), Loaded: l, GateOn: true}
 			}}}
-	m := readmodel.New(f.Log, f.DB, noPending{}, nil, baseSettings{Base: readmodel.Base{Viewers: map[unit.ProviderID]string{unit.GitHub: seededViewer},
+	m := readmodel.New(f.Log, f.DB, nil, nil, baseSettings{Base: readmodel.Base{Viewers: map[unit.ProviderID]string{unit.GitHub: seededViewer},
 		Specs: catalog.Specs(l)}}, prrow.New(src))
 	m.UseClock(func() time.Time { return f.Now })
 	return m
 }
-
-type noPending struct{}
-
-func (noPending) Pending(context.Context) (map[unit.Unit]round.Pending, error) { return nil, nil }
 
 type baseSettings struct{ Base readmodel.Base }
 
@@ -447,7 +442,7 @@ func TestEveryNoticeStandsForAGateOrAnAsk(t *testing.T) {
 	d := prrow.Deriver{Now: ghsourcetest.Now, Loaded: l}
 	seen := map[prrow.NoticeCase]bool{}
 	for _, c := range append(ghsourcetest.Cases(), ghsourcetest.Case{Name: "waiting agent", Row: waitingAgent(nil)}) {
-		if !slices.Contains(c.Row.Views, api.ViewNeedsMe) {
+		if !slices.Contains(c.Row.Facets["is"], "needs-me") {
 			continue
 		}
 		n, ok := d.Notice(c.Row, nil)

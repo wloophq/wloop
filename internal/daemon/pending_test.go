@@ -8,15 +8,15 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 )
 
 // r7 (acme/api#7) is declared in actions_test.go.
 
-func row7(t *testing.T, s *Server, view string) (api.Row, bool) {
+func row7(t *testing.T, s *Server, flag string) (api.Row, bool) {
 	t.Helper()
 	var rows []api.Row
-	get(t, s, "/api/rows?view="+view, &rows)
+	get(t, s, "/api/rows?is="+flag, &rows)
 	for _, r := range rows {
 		if r.Unit == r7.Unit() {
 			return r, true
@@ -28,15 +28,15 @@ func row7(t *testing.T, s *Server, view string) (api.Row, bool) {
 func withPending(t *testing.T) *Server {
 	t.Helper()
 	return newServerWith(t, func(d *Deps) {
-		d.Pending = fixedPending{r7.Unit(): round.Pending{Intent: "follow-up", Reason: "ana replied", Since: d.Now(), Deadline: d.Now().Add(time.Minute)}}
+		d.Plans = fixedPending{r7.Unit(): overlay.Pending{Intent: "follow-up", Reason: "ana replied", Since: d.Now(), Deadline: d.Now().Add(time.Minute)}}
 	})
 }
 
 func TestPendingRoundShowsInNeedsMe(t *testing.T) {
 	t.Parallel()
 	s := withPending(t)
-	row, ok := row7(t, s, api.ViewNeedsMe)
-	if !ok || row.Kind != "round_pending" || row.Pending == nil || row.Summary.WaitsOn != "me" {
+	row, ok := row7(t, s, "needs-me")
+	if !ok || row.Kind != "round_pending" || row.Summary.WaitsOn != "me" {
 		t.Fatalf("%+v", row)
 	}
 	if !strings.Contains(row.Summary.Reason, "follow-up") || !strings.Contains(row.Summary.Reason, "ana replied") {
@@ -117,7 +117,7 @@ func TestMuteUntilStateSurvivesAPendingRound(t *testing.T) {
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/mute", `{"until_state":true}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	row7(t, s, api.ViewAll)
+	row7(t, s, "")
 	if err := s.keepCurrent(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -132,11 +132,11 @@ func TestMutedPullRequestWithAPendingRoundStaysOutOfNeedsMe(t *testing.T) {
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/mute", `{"until":"2d"}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if _, ok := row7(t, s, api.ViewNeedsMe); ok {
+	if _, ok := row7(t, s, "needs-me"); ok {
 		t.Fatal("a muted pull request is in needs-me")
 	}
-	row, ok := row7(t, s, api.ViewAll)
-	if !ok || row.Kind != "muted" || row.Pending == nil {
+	row, ok := row7(t, s, "")
+	if !ok || row.Kind != "muted" || len(row.Facets["due"]) == 0 {
 		t.Fatalf("%+v", row)
 	}
 }

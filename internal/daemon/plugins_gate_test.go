@@ -182,14 +182,15 @@ func TestIntakesUnavailableWithGitHubOnIs503(t *testing.T) {
 	}
 }
 
-func TestRemoveDoneSkipsADisabledPluginsUnits(t *testing.T) {
+func TestRemoveCleanSkipsADisabledPluginsUnits(t *testing.T) {
 	t.Parallel()
 	for _, enabled := range []func(unit.ProviderID) bool{nil, githubOff} {
 		actions := &fakeActions{}
-		s := newServerWith(t, func(d *Deps) { d.Actions, d.PluginEnabled = actions, enabled })
-		linkWorkspaces(t, s.store(), github.Ref{Owner: "acme", Repo: "api", Number: 8})
-		rec := post(t, s, "/api/workspaces/remove-done", `{}`)
-		var res api.RemoveDoneResult
+		r8 := github.Ref{Owner: "acme", Repo: "api", Number: 8}
+		s := cleanRig(t, func(d *Deps) { d.Actions, d.PluginEnabled = actions, enabled }, r8).s
+		linkWorkspaces(t, s.store(), r8)
+		rec := post(t, s, "/api/workspaces/remove-clean", `{"view":"done"}`)
+		var res api.RemoveCleanResult
 		if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &res) != nil {
 			t.Fatalf("%d %s", rec.Code, rec.Body)
 		}

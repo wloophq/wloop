@@ -82,12 +82,6 @@ func (t Turn) Situation(sessionWaiting bool) (Situation, bool) {
 	return Situation{}, false
 }
 
-// AsksUser says whether an overlay's situation kind asks the user to act:
-// the agent asks or stopped, or a round waits for an answer.
-func AsksUser(kind string) bool {
-	return kind == KindLoopWaiting || kind == KindLoopStopped || kind == KindRoundPending
-}
-
 // Mute is the user's mute of a unit, its task's wake: until a time, or
 // until the task's facts change, which the wakes match.
 type Mute struct {

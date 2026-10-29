@@ -106,8 +106,8 @@ func (r reader) Books(ctx context.Context, units []plugin.Unit) ([]src.Book, err
 }
 
 // RoundState is the host's round bookkeeping of one of the plugin's own
-// units, the rounds its open plan gates hold, its overrides, and whether its
-// rounds are paused: by its hold or a wider pause.
+// units, its overrides, and whether its rounds are paused: by its hold or a
+// wider pause.
 func (r reader) RoundState(ctx context.Context, w plugin.Unit) (src.RoundState, error) {
 	if r.b.Overrides == nil {
 		return src.RoundState{}, src.ErrUnsupported
@@ -119,11 +119,6 @@ func (r reader) RoundState(ctx context.Context, w plugin.Unit) (src.RoundState, 
 	var st src.RoundState
 	if r.b.Rounds != nil {
 		if st, err = r.b.Rounds(ctx, u); err != nil {
-			return src.RoundState{}, err
-		}
-	}
-	if r.b.Pending != nil {
-		if st.Pending, err = r.b.Pending(ctx, u); err != nil {
 			return src.RoundState{}, err
 		}
 	}

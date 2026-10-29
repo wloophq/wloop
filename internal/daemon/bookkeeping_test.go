@@ -88,7 +88,7 @@ func TestGetPathWritesNothing(t *testing.T) {
 func TestNoMuteNoWork(t *testing.T) {
 	t.Parallel()
 	s, _ := newLiveServer(t)
-	if _, err := s.rows(context.Background(), api.ViewAll); err != nil {
+	if _, err := s.readModel().Rows(context.Background(), api.Since{}); err != nil {
 		t.Fatal(err)
 	}
 	for range 2 {
@@ -161,7 +161,7 @@ func TestCheckReportsAStaleRowInDoctorAndHealth(t *testing.T) {
 	s, f := newLiveServer(t)
 	log := &lineLog{}
 	s.deps.Log = log.logf
-	if _, err := s.rows(context.Background(), api.ViewAll); err != nil {
+	if _, err := s.readModel().Rows(context.Background(), api.Since{}); err != nil {
 		t.Fatal(err)
 	}
 	var rep api.DoctorReport

@@ -6,7 +6,6 @@ import (
 
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/situation"
@@ -104,8 +103,8 @@ func gridMutes() []gridMute {
 		{change, string(situation.KindNoReviewer), "author"}}
 }
 
-func gridPendings() []*round.Pending {
-	return []*round.Pending{nil, {Intent: "follow-up", Reason: "new commits", Since: h(1), Deadline: h(300)}}
+func gridPendings() []*overlay.Pending {
+	return []*overlay.Pending{nil, {Intent: "follow-up", Reason: "new commits", Since: h(1), Deadline: h(300)}}
 }
 
 func (t *gridTurn) String() string {
@@ -115,7 +114,7 @@ func (t *gridTurn) String() string {
 	return fmt.Sprintf("%s %s %q answered=%t", t.role, t.state, t.summary, t.answered)
 }
 
-func gridCase(s gridSource, t *gridTurn, waiting bool, o gridMute, p *round.Pending) string {
+func gridCase(s gridSource, t *gridTurn, waiting bool, o gridMute, p *overlay.Pending) string {
 	pend := "no round"
 	if p != nil {
 		pend = "round " + p.Intent

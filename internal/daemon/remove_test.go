@@ -12,10 +12,14 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 )
 
@@ -32,7 +36,7 @@ func linkWorkspaces(t *testing.T, st *inventory.Store, refs ...github.Ref) {
 	}
 }
 
-func TestDoneViewListsFinishedPullRequestsWithAWorkspace(t *testing.T) {
+func TestTheWorkspaceSignalSaysAWorkspaceRemainsWhateverThePullRequestsState(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
 	at := fixtureNow.Add(-time.Hour)
@@ -40,14 +44,55 @@ func TestDoneViewListsFinishedPullRequestsWithAWorkspace(t *testing.T) {
 	f.open(31, "fer", at, merged)
 	f.open(32, "fer", at, nil)
 	linkWorkspaces(t, f.st, ref(30), ref(32))
-	if got := numbers(f.rows("?view=" + api.ViewDone)); !slices.Equal(got, []int{30}) {
-		t.Fatalf("done %v", got)
-	}
-	for _, v := range []string{api.ViewNeedsMe, api.ViewStalled} {
-		if slices.Contains(numbers(f.rows("?view="+v)), 30) {
-			t.Fatalf("a done row in %s", v)
+	var got []int
+	for _, r := range f.rows("") {
+		if prrow.Signals(r)["workspace"] {
+			got = append(got, rowNumber(r))
 		}
 	}
+	slices.Sort(got)
+	if !slices.Equal(got, []int{30, 32}) {
+		t.Fatalf("workspace on %v", got)
+	}
+}
+
+// cleanRig is a tasks rig whose Done, which offers to remove clean workspaces, lists every done task, with a
+// done task holding each of refs, each a merged pull request.
+func cleanRig(t *testing.T, edit func(*Deps), refs ...github.Ref) *tasksRig {
+	t.Helper()
+	l := *bundledLoaded()
+	l.Views.Views = slices.Clone(l.Views.Views)
+	logbook, _ := l.Views.View("logbook")
+	for i := range l.Views.Views {
+		if l.Views.Views[i].ID == "done" {
+			l.Views.Views[i].When = logbook.When
+		}
+	}
+	r := newTasksRig(t, func(d *Deps) {
+		d.Intents = func() *intentload.Loaded { return &l }
+		if edit != nil {
+			edit(d)
+		}
+	})
+	for _, ref := range refs {
+		if err := inventorytest.Of(r.s.store()).UpsertPR(context.Background(), dinv.PR{Ref: ref, Title: "PR " + ref.String(), Author: "me", State: "MERGED"}); err != nil {
+			t.Fatal(err)
+		}
+		r.put(t, task.Task{ID: task.ID("t-" + strconv.Itoa(ref.Number)), State: "done", Category: task.CategoryDone, Units: []unit.Unit{ref.Unit()}})
+	}
+	return r
+}
+
+func removeClean(t *testing.T, s *Server, body string) (int, api.RemoveCleanResult) {
+	t.Helper()
+	rec := post(t, s, "/api/workspaces/remove-clean", body)
+	var res api.RemoveCleanResult
+	if rec.Code == 200 {
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return rec.Code, res
 }
 
 func TestRemoveActionRecordsTheEvent(t *testing.T) {
@@ -80,25 +125,18 @@ func TestARefusedRemoveIs409WithTheReason(t *testing.T) {
 	}
 }
 
-func TestRemoveDoneRemovesTheCleanOnesAndSaysWhyItKeptTheRest(t *testing.T) {
+func TestRemoveCleanRemovesTheCleanOnesOfAViewsTasksAndSaysWhyItKeptTheRest(t *testing.T) {
 	t.Parallel()
-	f := newFixture(t)
-	at := fixtureNow.Add(-time.Hour)
-	f.open(30, "fer", at, merged)
-	f.open(31, "fer", at, merged)
-	f.open(32, "fer", at, nil)
-	linkWorkspaces(t, f.st, ref(30), ref(31), ref(32))
-	f.open(33, "fer", at, merged)
-	linkWorkspaces(t, f.st, ref(30), ref(31), ref(32), ref(33))
 	actions := &fakeActions{refuse: map[github.Ref]string{ref(31): "3 commits not pushed"}, broken: map[github.Ref]error{ref(33): errors.New("orca: worktree rm: timeout")}}
-	f.s.deps.Actions = actions
-	rec := post(t, f.s, "/api/workspaces/remove-done", `{}`)
-	if rec.Code != 200 {
-		t.Fatalf("%d %s", rec.Code, rec.Body)
-	}
-	var res api.RemoveDoneResult
-	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+	r := cleanRig(t, func(d *Deps) { d.Actions = actions }, ref(30), ref(31), ref(33), ref(34))
+	if err := inventorytest.Of(r.s.store()).UpsertPR(context.Background(), dinv.PR{Ref: ref(32), Title: "PR 32", Author: "me", State: "OPEN"}); err != nil {
 		t.Fatal(err)
+	}
+	r.put(t, task.Task{ID: "t-32", State: "next", Category: task.CategoryReady, Units: []unit.Unit{ref(32).Unit()}})
+	linkWorkspaces(t, r.s.store(), ref(30), ref(31), ref(32), ref(33))
+	code, res := removeClean(t, r.s, `{"view":"done"}`)
+	if code != 200 {
+		t.Fatalf("%d", code)
 	}
 	slices.SortFunc(res.Kept, func(a, b api.Kept) int { return strings.Compare(a.Label, b.Label) })
 	if !slices.Equal(res.Removed, []api.Named{{Unit: ref(30).Unit(), Label: "acme/api#30"}}) || len(res.Kept) != 2 || res.Kept[0].Unit != ref(31).Unit() || res.Kept[0].Reason != "3 commits not pushed" ||
@@ -107,6 +145,11 @@ func TestRemoveDoneRemovesTheCleanOnesAndSaysWhyItKeptTheRest(t *testing.T) {
 	}
 	if !slices.Equal(actions.calls, []string{"remove acme/api#30"}) {
 		t.Fatalf("calls %v", actions.calls)
+	}
+	for _, body := range []string{`{"view":"logbook"}`, `{"view":"nowhere"}`, `{}`} {
+		if code, _ := removeClean(t, r.s, body); code != 400 {
+			t.Errorf("%s: %d, want 400 for a view that does not offer it", body, code)
+		}
 	}
 }
 
@@ -127,7 +170,7 @@ func removedEvents(t *testing.T, s *Server, ref github.Ref) int {
 
 func TestARefusalCarriesTheToolsOwnMessage(t *testing.T) {
 	t.Parallel()
-	s := newServer(t)
+	s := cleanRig(t, nil, github.Ref{Owner: "acme", Repo: "api", Number: 8}).s
 	var logged strings.Builder
 	s.deps.Log = func(format string, args ...any) { fmt.Fprintf(&logged, format+"\n", args...) }
 	r8 := github.Ref{Owner: "acme", Repo: "api", Number: 8}
@@ -143,8 +186,8 @@ func TestARefusalCarriesTheToolsOwnMessage(t *testing.T) {
 	if !strings.Contains(logged.String(), stuck.Detail) {
 		t.Fatalf("log %q", logged.String())
 	}
-	rec = post(t, s, "/api/workspaces/remove-done", `{}`)
-	var res api.RemoveDoneResult
+	rec = post(t, s, "/api/workspaces/remove-clean", `{"view":"done"}`)
+	var res api.RemoveCleanResult
 	json.Unmarshal(rec.Body.Bytes(), &res)
 	if len(res.Kept) != 1 || res.Kept[0].Reason != stuck.Reason || res.Kept[0].Detail != stuck.Detail {
 		t.Fatalf("%s", rec.Body)
@@ -153,7 +196,7 @@ func TestARefusalCarriesTheToolsOwnMessage(t *testing.T) {
 
 func TestForceReachesTheActionAndForceableTheCaller(t *testing.T) {
 	t.Parallel()
-	s := newServer(t)
+	s := cleanRig(t, nil, github.Ref{Owner: "acme", Repo: "api", Number: 8}).s
 	r8 := github.Ref{Owner: "acme", Repo: "api", Number: 8}
 	actions := &fakeActions{broken: map[github.Ref]error{r8: Refusal{Reason: "its terminals could not be stopped", Detail: "PTY", Forceable: true}}}
 	s.deps.Actions = actions
@@ -168,8 +211,8 @@ func TestForceReachesTheActionAndForceableTheCaller(t *testing.T) {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	post(t, s, "/api/units/github/acme%2Fapi%238/remove", `{"force":true}`)
-	rec = post(t, s, "/api/workspaces/remove-done", `{}`)
-	var res api.RemoveDoneResult
+	rec = post(t, s, "/api/workspaces/remove-clean", `{"view":"done"}`)
+	var res api.RemoveCleanResult
 	json.Unmarshal(rec.Body.Bytes(), &res)
 	if !slices.Equal(actions.forced, []bool{false, true, false}) {
 		t.Fatalf("forced %v", actions.forced)
@@ -200,7 +243,7 @@ func TestApprovedViewHoldsOpenPullRequestsThatWaitOnNothingOfMine(t *testing.T) 
 	if err := inventorytest.Of(f.st).ReplaceWorkspaces(context.Background(), links); err != nil {
 		t.Fatal(err)
 	}
-	got := numbers(f.rows("?view=" + api.ViewApproved))
+	got := numbers(f.rows("?is=approved"))
 	slices.Sort(got)
 	if !slices.Equal(got, []int{40, 42}) {
 		t.Fatalf("approved %v", got)

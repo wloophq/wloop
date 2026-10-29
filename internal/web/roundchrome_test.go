@@ -21,6 +21,7 @@ func TestTheRoundChromeReadsTheServedGateIntents(t *testing.T) {
   look: { id: "look", label: "Look", group: "start", intake: true },
   pause: { id: "pause", label: "Pause", group: "control" },
 } } };
+const roundGate = (r) => r.round;
 `
 	var got struct {
 		Slots   []string `json:"slots"`
@@ -29,7 +30,7 @@ func TestTheRoundChromeReadsTheServedGateIntents(t *testing.T) {
 	}
 	nodeRun(t, prelude, []string{"focusSlot", "guidanceLabel"}, `process.stdout.write(JSON.stringify({
   slots: ["go_now", "look", "drop", "pause", "resume"].map(focusSlot),
-  pending: guidanceLabel({ pending: {} }),
+  pending: guidanceLabel({ round: {} }),
   next: guidanceLabel({}),
 }));`, nil, &got)
 	if want := []string{"start", "start", "open", "pause", "pause"}; strings.Join(got.Slots, ",") != strings.Join(want, ",") {
