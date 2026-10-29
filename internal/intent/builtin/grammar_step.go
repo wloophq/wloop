@@ -35,7 +35,7 @@ var stepGrammar = []Key{
 	required(stepKey(StepGateOpen, "name", KindText, "", "The gate, of gates.toml, the step opens. Required.")),
 
 	required(stepKey(StepTaskSet, "prop", KindText, "", "The property, of tasks.toml, the step sets. Required.")),
-	required(stepKey(StepTaskSet, "value", KindText, "", "The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD, a duration, a list comma-separated. Required.")),
+	required(stepKey(StepTaskSet, "value", KindText, "", "The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD or as a duration after now such as +2d, a duration, a list comma-separated. Required.")),
 }
 
 func required(k Key) Key {

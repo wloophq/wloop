@@ -205,6 +205,7 @@ var otherFacts = []Fact{
 	timeVarying(untrusted(wf("task", "ask_age", expr.Duration, "The age of the task's oldest unanswered ask; zero when none is."))),
 	wf("task", "promised", expr.Time, "The date the user promised the task by, its promised property; zero when unset. Test with `> timestamp(0)`."),
 	timeVarying(untrusted(wf("task", "extraction_lag", expr.Duration, "How long the oldest message of a unit linked to the task has waited to be extracted; zero when none waits."))),
+	untrusted(wf("task", "link_signals", expr.List, "The link signals the units the task links report, on or off, each once, by name: the profile reads whether a source keeps its own staleness, such as 'stalled' in task.link_signals.")),
 	untrusted(wf("task", "link_owes", expr.List, "Who the open items the task holds wait on, each once: me for the user, else a person's key such as slack:U0123; a unit the task holds with none of its items, all the unit's open items.")),
 	wf("gate", "kind", expr.String, "The gate's kind: draft, plan, question, post, proposal, trust or step."),
 	wf("gate", "name", expr.String, "The gate's name in gates.toml; empty for a gate of no profile name."),

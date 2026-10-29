@@ -3,10 +3,10 @@
 # items or daemon.
 #
 # Usage:
-#   isolated-daemon.sh setup <dir> <binary> <dm-channel-id> [<index>] [--slack] [--agent] [--plugins <id,...>]
+#   isolated-daemon.sh setup <dir> <binary> <dm-channel-id> [<index>] [--slack] [--agent] [--plugins <id,...>] [--workflows <name,...>]
 #   isolated-daemon.sh env <dir>
 #   isolated-daemon.sh run <dir> <command> [<arg>...]
-#   isolated-daemon.sh snapshot <dir> <source-store>
+#   isolated-daemon.sh snapshot [--jobs] <dir> <source-store>
 #   isolated-daemon.sh pause <dir>
 #   isolated-daemon.sh start <dir> [--jobs] [<serve arg>...]
 #   isolated-daemon.sh stop <dir>
@@ -25,7 +25,8 @@
 # runs against the stubbed gh, slack with no socket. --slack turns the slack
 # plugin on with its socket; every start or pause of that directory then
 # takes <dir>/../slack-socket.lock and refuses while another daemon holds
-# it. --agent leaves claude unstubbed. The state and
+# it. --agent leaves claude unstubbed. --workflows turns on the bundled
+# workflows it names, each of which must exist. The state and
 # config directory name is ISOLATED_STATE_NAME, else the binary's basename, and
 # setup refuses when the binary does not read the config it wrote. setup also
 # writes the MCP key the daemon requires (state/<name>/mcp.key, 0600); env and
@@ -34,7 +35,10 @@
 # snapshot copies a store into <dir>'s state, never writing the source, at
 # 0600, with the plugins/<id>/import.db beside it, and marks <dir> as
 # holding a copy: start and serve then require --no-jobs. The copy must
-# carry a stored GitHub viewer. start --jobs serves a copy with its jobs on
+# carry a stored GitHub viewer. snapshot --jobs marks the copy as one whose
+# jobs may run, so start and serve run the plugins and workflows setup turned
+# on against it without --no-jobs; setup must have turned some on. start
+# --jobs serves a copy with its jobs on
 # when setup turned plugins on, so they start, import and report against
 # the stubs; a version 6 copy first takes `run <dir> <binary> store migrate
 # --yes`, which writes each import.db.
@@ -63,7 +67,7 @@ load() {
 	[[ -d $1 ]] || die "$1 is not a directory this script set up"
 	dir=$(cd "$1" && pwd)
 	[[ -f $dir/isolated.env ]] || die "$1 is not a directory this script set up"
-	slack=0 agent=0 plugins=""
+	slack=0 agent=0 plugins="" workflows=""
 	# shellcheck source=/dev/null
 	source "$dir/isolated.env"
 }
@@ -170,6 +174,7 @@ needs_no_jobs() {
 	local jobs=$1 a
 	shift
 	[[ -f $dir/copied ]] || return 0
+	[[ $(cat "$dir/copied") == jobs ]] && return 0
 	for a in "$@"; do
 		[[ $a == --no-jobs ]] && return 0
 	done
@@ -201,7 +206,7 @@ plugin_on() {
 }
 
 cmd_setup() {
-	local pos=() a list=""
+	local pos=() a list="" wlist="" on=()
 	slack=0 agent=0 plugins=()
 	while [[ $# -gt 0 ]]; do
 		a=$1
@@ -215,11 +220,18 @@ cmd_setup() {
 			shift
 			;;
 		--plugins=*) list=${a#--plugins=} ;;
+		--workflows)
+			[[ $# -gt 0 ]] || usage
+			wlist=$1
+			shift
+			;;
+		--workflows=*) wlist=${a#--workflows=} ;;
 		--*) usage ;;
 		*) pos+=("$a") ;;
 		esac
 	done
 	if [[ -n $list ]]; then IFS=, read -r -a plugins <<<"$list"; fi
+	if [[ -n $wlist ]]; then IFS=, read -r -a on <<<"$wlist"; fi
 	((slack)) && plugin_on slack && die "--slack runs Slack's socket and --plugins slack runs none; choose one"
 	[[ ${#pos[@]} -ge 3 && ${#pos[@]} -le 4 ]] || usage
 	local target=${pos[0]} binary=${pos[1]} dm=${pos[2]} index=${pos[3]:-0}
@@ -264,9 +276,17 @@ cmd_setup() {
 		[[ -f $manifest ]] && workflows+=("$(basename "$(dirname "$manifest")")")
 	done
 	[[ ${#workflows[@]} -gt 0 ]] || die "no workflow under $repo/profiles/default/workflows"
-	local wf="" w
+	local wf="" w enabled
+	for w in ${on[@]+"${on[@]}"}; do
+		[[ " ${workflows[*]} " == *" $w "* ]] || {
+			rm -rf "$dir"
+			die "no bundled workflow $w"
+		}
+	done
 	for w in "${workflows[@]}"; do
-		wf+=$'\n'"[workflows.$w]"$'\n'"enabled = false"$'\n'
+		enabled=false
+		[[ " ${on[*]-} " == *" $w "* ]] && enabled=true
+		wf+=$'\n'"[workflows.$w]"$'\n'"enabled = $enabled"$'\n'
 	done
 	local slack_on=false github_on=false
 	((slack)) && slack_on=true
@@ -313,7 +333,7 @@ cmd_setup() {
 	chmod 600 "$dir/config/$name/config.toml"
 	mkdir -m 700 "$dir/state/$name"
 	(umask 077 && od -An -tx1 -N24 /dev/urandom | tr -d ' \n' >"$dir/state/$name/mcp.key")
-	printf 'binary=%q\nname=%q\nslack=%d\nagent=%d\nplugins=%q\n' "$bin" "$name" "$slack" "$agent" "$list" >"$dir/isolated.env"
+	printf 'binary=%q\nname=%q\nslack=%d\nagent=%d\nplugins=%q\nworkflows=%q\n' "$bin" "$name" "$slack" "$agent" "$list" "$wlist" >"$dir/isolated.env"
 
 	local got
 	got=$(with_env "$bin" config get http.port 2>/dev/null || true)
@@ -358,9 +378,16 @@ cmd_run() {
 }
 
 cmd_snapshot() {
+	local jobs=0
+	if [[ ${1:-} == --jobs ]]; then
+		jobs=1
+		shift
+	fi
 	[[ $# -eq 2 ]] || usage
 	load "$1"
 	local src=$2
+	((jobs == 0)) || [[ -n $plugins || -n $workflows ]] ||
+		die "--jobs runs the plugins and workflows setup turned on; set $dir up with --plugins or --workflows"
 	[[ -f $src ]] || die "no store at $src"
 	command -v sqlite3 >/dev/null || die "snapshot needs sqlite3"
 	! running || die "stop the daemon of $dir first"
@@ -393,7 +420,7 @@ cmd_snapshot() {
 		chmod 600 "$(dirname "$dest")/plugins/$id/import.db"
 		echo "copied the $id plugin's import.db"
 	done
-	touch "$dir/copied"
+	if ((jobs)); then echo jobs >"$dir/copied"; else touch "$dir/copied"; fi
 	echo "copied $(sqlite3 "$dest" "SELECT count(*) FROM sqlite_master WHERE type = 'table'") tables"
 }
 

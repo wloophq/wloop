@@ -122,7 +122,7 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `task.verb` | `set` | string |  | With a verb whose handler is context, the contexts, comma-separated; with area, the area. |
 | `gate.open` | `name` | string |  | The gate, of gates.toml, the step opens. Required. |
 | `task.set` | `prop` | string |  | The property, of tasks.toml, the step sets. Required. |
-| `task.set` | `value` | string |  | The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD, a duration, a list comma-separated. Required. |
+| `task.set` | `value` | string |  | The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD or as a duration after now such as +2d, a duration, a list comma-separated. Required. |
 
 - A guard refuses a step instead of skipping it: the item stays in the plan with the reason, and runs when the guard passes.
 - A step that fails retries with backoff, three times per key, then stays `blocked` with its error.

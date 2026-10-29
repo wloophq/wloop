@@ -249,6 +249,9 @@ type Env struct {
 	// consequences apply the resolved plan and trust gates: the daemon
 	// serve built, nil before it.
 	consequences gateConsequences
+	// linkStates holds the daemon serve built, whose read model gives the task facts their links' states; nil
+	// outside serve, and empty until serve built the daemon.
+	linkStates *atomic.Pointer[daemon.Server]
 	// headlessSwept is set once the headless turns a stop cut short were ended, so a later serve of
 	// this process never ends a run it started.
 	headlessSwept bool

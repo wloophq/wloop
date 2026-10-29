@@ -78,7 +78,7 @@ func TestNavListsCoreThenPluginViews(t *testing.T) {
 const nav = viewNav(input.cat, catalog.views, ["fake-board"], input.counters);
 process.stdout.write(JSON.stringify({ ids: nav.map((v) => v.id), core: nav.map((v) => v.core), counts: nav.filter((v) => v.core).map((v) => v.count) }));`,
 		map[string]any{"cat": viewsCatalog(), "counters": counters}, &got)
-	plugin := []string{"needs-me", "stalled", "mine", "loop", "plan", "approved", "dash", "done", "all", "explore", "recent"}
+	plugin := []string{"mine", "loop", "plan", "dash", "all", "explore", "recent"}
 	want := slices.Concat(coreViewIDs, plugin, []string{"fake-board"})
 	if !slices.Equal(got.IDs, want) {
 		t.Fatalf("nav %v, want %v", got.IDs, want)
@@ -111,18 +111,18 @@ const served = catalog.views;
 const nav = viewNav(input.cat, [], [], null);
 process.stdout.write(JSON.stringify({
   ids: nav.map((v) => v.id),
-  view: resolveView("needs-me", input.cat, [], () => false),
-  before: resolveView("needs-me", null, [], () => false),
-  enabled: resolveView("needs-me", input.cat, served, () => false),
+  view: resolveView("mine", input.cat, [], () => false),
+  before: resolveView("mine", null, [], () => false),
+  enabled: resolveView("mine", input.cat, served, () => false),
   core_stay: resolveView("waiting", input.cat, [], () => false),
 }));`, map[string]any{"cat": viewsCatalog()}, &got)
 	if !slices.Equal(got.IDs, coreViewIDs) {
 		t.Errorf("nav with the GitHub plugin off %v, want the core views alone", got.IDs)
 	}
 	if got.View != "focus" {
-		t.Errorf("#view=needs-me with the plugin off shows %q, want focus", got.View)
+		t.Errorf("#view=mine with the plugin off shows %q, want focus", got.View)
 	}
-	if got.Before != "needs-me" || got.Enabled != "needs-me" || got.CoreStay != "waiting" {
+	if got.Before != "mine" || got.Enabled != "mine" || got.CoreStay != "waiting" {
 		t.Errorf("before load %q, plugin on %q, core %q", got.Before, got.Enabled, got.CoreStay)
 	}
 }

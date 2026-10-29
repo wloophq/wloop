@@ -59,7 +59,12 @@ func TestRowsServeAPluginView(t *testing.T) {
 		t.Fatalf("catalog: %d", code)
 	}
 	web := cat.ViewsOn("web")
-	n := len(psource.BundledCatalog(string(unit.GitHub)).Views())
+	n := 0
+	for _, v := range psource.BundledCatalog(string(unit.GitHub)).Views() {
+		if slices.Contains(v.Surfaces, "web") {
+			n++
+		}
+	}
 	if len(web) != n+2 || web[n].ID != "threads" || web[n+1].ID != "board" || web[0].Provider != "github" {
 		t.Fatalf("web views %+v", web)
 	}

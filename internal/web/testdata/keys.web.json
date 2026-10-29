@@ -335,6 +335,27 @@
       "help": "Waiting"
     },
     {
+      "key": "g t",
+      "action": "nav:stalled",
+      "context": "global",
+      "owner": "core",
+      "help": "Stalled"
+    },
+    {
+      "key": "g u",
+      "action": "nav:in-loop",
+      "context": "global",
+      "owner": "core",
+      "help": "In loop"
+    },
+    {
+      "key": "g a",
+      "action": "nav:approved",
+      "context": "global",
+      "owner": "core",
+      "help": "Approved"
+    },
+    {
       "key": "g z",
       "action": "nav:snoozed",
       "context": "global",
@@ -354,6 +375,13 @@
       "context": "global",
       "owner": "core",
       "help": "Projects"
+    },
+    {
+      "key": "g d",
+      "action": "nav:done",
+      "context": "global",
+      "owner": "core",
+      "help": "Done"
     },
     {
       "key": "g o",

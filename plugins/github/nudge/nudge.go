@@ -185,15 +185,20 @@ type Host struct {
 	Asleep    bool
 }
 
-// Stalled says whether r is one the github-nudge rule considers: stalled
-// in scope, and not one its card alone shows (a draft, approved by the
-// viewer, done).
+// Stalled says whether r is one the github-nudge rule considers: its
+// stalled signal is on, and it is not one its card alone shows (a draft,
+// approved by the viewer, done).
 func Stalled(r row.Row) bool {
 	switch r.Kind() {
 	case situation.KindDraft, situation.KindDone:
 		return false
 	}
-	return r.Stalled() && len(r.Payload.Reasons) > 0 && !r.Payload.Approved
+	return signal(r, row.SignalStalled) && !signal(r, row.SignalReady)
+}
+
+// signal says whether r's signal name is on.
+func signal(r row.Row, name string) bool {
+	return slices.ContainsFunc(r.Signals(), func(s src.Signal) bool { return s.Name == name && s.On })
 }
 
 // Propose is the nudge draft of r, whom it asks, when r is stalled, the

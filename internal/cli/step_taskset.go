@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/domain/duration"
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
@@ -35,7 +37,15 @@ func (s *stepSet) taskSetValue(c stepCall) (task.Value, string) {
 	if !slices.Contains(p.Writers, task.WriterWorkflow) {
 		return task.Value{}, fmt.Sprintf("a workflow does not write the property %s: its writers are %v", name, p.Writers)
 	}
-	v, err := tasks.Parse(name, c.arg("value"), s.e.Now().Location())
+	value := c.arg("value")
+	if after, relative := strings.CutPrefix(value, "+"); relative && p.Type == task.PropDate {
+		d, err := duration.Parse(after)
+		if err != nil || d <= 0 {
+			return task.Value{}, fmt.Sprintf("%s: %q is not a duration after now, such as +2d", name, value)
+		}
+		return task.Value{Time: s.e.Now().Add(d)}, ""
+	}
+	v, err := tasks.Parse(name, value, s.e.Now().Location())
 	if err != nil {
 		return task.Value{}, err.Error()
 	}

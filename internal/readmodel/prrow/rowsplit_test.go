@@ -161,8 +161,9 @@ func TestCatalogServesTheGitHubViews(t *testing.T) {
 	}
 	custom := []string{"plan", "dash", "explore", "recent"}
 	for i, v := range c.Views {
+		lens := slices.Contains([]string{"needs-me", "stalled", "approved", "done"}, v.ID)
 		if v.ID != want[i].id || v.Label != want[i].label || v.Provider != "github" || v.Order != i || v.Rows == slices.Contains(custom, v.ID) ||
-			!slices.Contains(v.Surfaces, "web") {
+			slices.Contains(v.Surfaces, "web") == lens {
 			t.Errorf("view %d: %+v", i, v)
 		}
 	}

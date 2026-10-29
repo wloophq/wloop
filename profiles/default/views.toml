@@ -28,6 +28,29 @@ key   = "g w"
 when  = "task.category in ['ready', 'active', 'waiting'] && task.owed_by != 'me'"
 group = "task.owed_by"
 
+# Waiting too long: a source says a link stalled, or, when no link's source
+# keeps its own staleness, the check date of a task someone else owes
+# passed with nothing moving since.
+[views.stalled]
+label         = "Stalled"
+key           = "g t"
+when          = "task.link_signal.stalled || (!('stalled' in task.link_signals) && task.owed_by != 'me' && task.check_on > timestamp(0) && task.check_on < now && now - task.since_movement < task.check_on)"
+hide_disabled = true
+
+# An agent works on it: a source's loop holds a link, or a run is live.
+[views.in-loop]
+label         = "In loop"
+key           = "g u"
+when          = "task.link_signal.in_loop || task.runs_live > 0"
+hide_disabled = true
+
+# The work is approved: a source says a link is ready.
+[views.approved]
+label         = "Approved"
+key           = "g a"
+when          = "task.link_signal.ready"
+hide_disabled = true
+
 # Asleep until a date, an event or a condition.
 [views.snoozed]
 label         = "Snoozed"
@@ -52,9 +75,17 @@ label         = "Someday"
 when          = "task.state == 'someday'"
 hide_disabled = true
 
+# Done, the latest first.
 [views.logbook]
 label = "Logbook"
 when  = "task.category == 'done'"
+sort  = "task.since_movement"
+
+[views.done]
+label         = "Done"
+key           = "g d"
+when          = "task.category == 'done'"
+hide_disabled = true
 
 # The drafts waiting on your approval, and those approved whose delivery
 # is under way or failed, so you can send them again.

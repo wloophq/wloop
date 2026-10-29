@@ -587,7 +587,7 @@
                   "const": "task.set"
                 },
                 "value": {
-                  "description": "The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD, a duration, a list comma-separated. Required.",
+                  "description": "The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD or as a duration after now such as +2d, a duration, a list comma-separated. Required.",
                   "type": "string"
                 }
               },

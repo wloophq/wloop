@@ -371,7 +371,21 @@ func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (b
 		Me:       e.me,
 		OwedBy:   catalog.OwedByOf(e.loadedIntents),
 		Wakes:    db.Wakes(),
+		Links:    e.linkState,
 	})
+}
+
+// linkState is what the daemon's read model holds of u for the task facts; nothing before the daemon is built.
+func (e *Env) linkState(ctx context.Context, u unit.Unit) (facttask.Link, error) {
+	if e.linkStates == nil {
+		return facttask.Link{}, nil
+	}
+	srv := e.linkStates.Load()
+	if srv == nil {
+		return facttask.Link{}, nil
+	}
+	signals, moved, _, err := srv.LinkState(ctx, u)
+	return facttask.Link{Signals: signals, Moved: moved}, err
 }
 
 // me is the user's identity the tasks reconcile with; nobody before the tasks service is built.

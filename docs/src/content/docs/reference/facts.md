@@ -215,7 +215,11 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task.ask_age` | duration | The age of the task's oldest unanswered ask; zero when none is. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.promised` | timestamp | The date the user promised the task by, its promised property; zero when unset. Test with `> timestamp(0)`. |
 | `task.extraction_lag` | duration | How long the oldest message of a unit linked to the task has waited to be extracted; zero when none waits. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.link_signals` | list | The link signals the units the task links report, on or off, each once, by name: the profile reads whether a source keeps its own staleness, such as 'stalled' in task.link_signals. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.link_owes` | list | Who the open items the task holds wait on, each once: me for the user, else a person's key such as slack:U0123; a unit the task holds with none of its items, all the unit's open items. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.link_signal.stalled` | bool | The pull request's situation lasted past its stalled threshold, in working days. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.link_signal.in_loop` | bool | A review workspace holds the pull request: the loop reviews it. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.link_signal.ready` | bool | The work on the pull request is approved: my review approved its head, or my own can merge. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 
 ### Pull requests (`pr.*`)
 

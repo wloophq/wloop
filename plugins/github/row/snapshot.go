@@ -31,13 +31,16 @@ func (r Row) Report() src.Snapshot {
 	return s
 }
 
-// Signals are the row's link signals.
+// Signals are the row's link signals: stalled, an open pull request in
+// scope whose situation lasted past its threshold; in_loop, an open one a
+// review workspace holds; ready, one whose work is approved.
 func (r Row) Signals() []src.Signal {
-	stalled := src.Signal{Name: SignalStalled, On: r.Stalled()}
+	open := r.PR.State == "OPEN"
+	stalled := src.Signal{Name: SignalStalled, On: open && r.Stalled() && len(r.Payload.Reasons) > 0}
 	if stalled.On {
 		stalled.Since = r.stallsAt()
 	}
-	return []src.Signal{stalled, {Name: SignalInLoop, On: r.Payload.Workspace.IsReview}, {Name: SignalReady, On: r.Payload.Approved}}
+	return []src.Signal{stalled, {Name: SignalInLoop, On: open && r.Payload.Workspace.IsReview}, {Name: SignalReady, On: r.Payload.Approved}}
 }
 
 // stallsAt is the first instant the row's situation is stalled; zero when

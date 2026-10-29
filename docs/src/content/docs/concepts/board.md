@@ -20,7 +20,7 @@ Renaming a review workspace in Orca turns it into an author workspace.
 | `{{command}} take-over <url>` | author; an existing review workspace is renamed to the branch name |
 | `{{command}} remove <url>`, or Remove in the cockpit | leaves the loop |
 
-`remove` deletes the workspace when its checkout holds nothing that is not on GitHub, and refuses otherwise with the list of what is at stake; `--force` deletes it with what it holds, for good. Deleting a review workspace by hand only frees its checkout: the pull request stays followed (see [workflows](/concepts/workflows/#automatic-rounds)). The cockpit's Done view lists the workspaces of merged or closed pull requests, with Remove on each and "Remove all clean" for the lot.
+`remove` deletes the workspace when its checkout holds nothing that is not on GitHub, and refuses otherwise with the list of what is at stake; `--force` deletes it with what it holds, for good. Deleting a review workspace by hand only frees its checkout: the pull request stays followed (see [workflows](/concepts/workflows/#automatic-rounds)). The cockpit's Done view lists the done tasks, across sources.
 
 ## Who moves cards
 

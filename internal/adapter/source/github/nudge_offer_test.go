@@ -156,12 +156,12 @@ func TestGitHubNudgeDraftsMatchTheNudgeOffer(t *testing.T) {
 	t.Logf("%d stalled rows: %d proposals, %d refused", stalled, enabled, refused)
 }
 
-// nudgeable says whether the host's row is stalled and not one the card
-// alone shows (draft, approved by the viewer, on hold, muted), as the
-// github-nudge rule read it while it ran in the host.
+// nudgeable says whether the host's row has its stalled signal on and is
+// not one the card alone shows (draft, approved by the viewer, on hold,
+// muted), as the plugin's github-nudge rule reads the plugin's signal.
 func nudgeable(row api.Row) bool {
 	p, ok := prrow.PayloadOf(row)
-	if !ok || !slices.Contains(row.Views, api.ViewStalled) {
+	if !ok || !prrow.Signals(row)["stalled"] {
 		return false
 	}
 	switch situation.Kind(row.Kind) {

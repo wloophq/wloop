@@ -24,6 +24,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/domain/workflow"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // Tasks reads the tasks (coretasks.Store).
@@ -87,6 +88,17 @@ type Deps struct {
 	OwedBy func(ctx context.Context, f workflow.Facts) (string, error)
 	// Wakes are the tasks' wakes, for task.wake_until and task.wake_when; nil: none has one.
 	Wakes Wakes
+	// Links are what a unit's plugin reports of it, under the host's overlays, for task.link_signal.* and
+	// task.since_movement; nil: every signal off and no unit ever moved.
+	Links func(ctx context.Context, u unit.Unit) (Link, error)
+}
+
+// Link is what the facts read of one unit a task links.
+type Link struct {
+	// Signals are the link signals on or off, by name; one no plugin declares is ignored.
+	Signals map[string]bool
+	// Moved is when the unit last moved: its situation began or a run on it changed it; zero when unknown.
+	Moved time.Time
 }
 
 // Wakes reads a task's wake; false when it has none.
@@ -261,6 +273,10 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.promised":            e.Prop("promised").Time,
 		"task.extraction_lag":      time.Duration(0),
 		"task.link_owes":           []string{},
+		"task.link_signals":        []string{},
+	}
+	for _, name := range builtin.LinkSignals {
+		f[builtin.LinkSignalPrefix+name] = false
 	}
 	if p.d.Props != nil {
 		maps.Copy(f, p.d.Props(e))
@@ -298,6 +314,9 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		f["task.runs_live"] = n
 	}
 	us := unitsOf(e)
+	if err := p.links(ctx, e, us, f); err != nil {
+		return nil, err
+	}
 	if len(us) == 0 {
 		return f, nil
 	}
@@ -346,6 +365,39 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 	f["task.items_open"], f["task.items_resolved"] = open, resolved
 	f["task.link_owes"] = p.linkOwes(e, us, got)
 	return f, nil
+}
+
+// links sets task.link_signal.<name>, on when the signal is on for any of us, task.link_signals, the declared
+// signals any of us reports, and task.since_movement, the time
+// since the newest of e's own last change and its units' last moves.
+func (p *Provider) links(ctx context.Context, e task.Task, us []unit.Unit, f workflow.Facts) error {
+	moved := e.Updated
+	reported := []string{}
+	defer func() { slices.Sort(reported); f["task.link_signals"] = reported }()
+	if p.d.Links != nil {
+		for _, u := range us {
+			l, err := p.d.Links(ctx, u)
+			if err != nil {
+				return err
+			}
+			for name, on := range l.Signals {
+				if _, declared := f[builtin.LinkSignalPrefix+name]; !declared {
+					continue
+				}
+				f[builtin.LinkSignalPrefix+name] = f[builtin.LinkSignalPrefix+name] == true || on
+				if !slices.Contains(reported, name) {
+					reported = append(reported, name)
+				}
+			}
+			if l.Moved.After(moved) {
+				moved = l.Moved
+			}
+		}
+	}
+	if !moved.IsZero() {
+		f["task.since_movement"] = max(p.d.Clock.Now().Sub(moved), 0)
+	}
+	return nil
 }
 
 // family sets the facts of e's place among its parent's children and of its own children:
@@ -531,7 +583,7 @@ func (p *Provider) owed(ctx context.Context, e task.Task, f workflow.Facts) (wor
 	f["task.owed_since"] = since
 	links, _ := f["task.link_owes"].([]string)
 	s, now := p.settings(), p.d.Clock.Now()
-	if !e.Prop(task.PropCheckOn).Time.IsZero() || s.StaleDays <= 0 || len(links) == 0 || slices.Contains(links, "me") {
+	if !e.Prop(task.PropCheckOn).Time.IsZero() || !FallsBack(links, s.StaleDays) {
 		return f, nil
 	}
 	if links[0] != who {
@@ -541,6 +593,12 @@ func (p *Provider) owed(ctx context.Context, e task.Task, f workflow.Facts) (wor
 	}
 	f["task.check_on"] = task.AddWorkdays(since, s.StaleDays, now.Location())
 	return f, nil
+}
+
+// FallsBack says whether a task with no check_on property takes the check date StaleDays working days after
+// what its links owe: they owe someone else and not the user.
+func FallsBack(linkOwes []string, staleDays int) bool {
+	return staleDays > 0 && len(linkOwes) > 0 && !slices.Contains(linkOwes, "me")
 }
 
 func (p *Provider) owedSince(ctx context.Context, e task.Task, who string) (time.Time, error) {

@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/turn"
 )
@@ -22,7 +23,11 @@ var lensNow = time.Date(2026, 3, 2, 9, 0, 0, 0, time.UTC)
 // lensFacts are the facts of a task of category c with the given facts besides, its owed_by as l's profile says.
 func lensFacts(t *testing.T, l *intentload.Loaded, c task.Category, more workflow.Facts) workflow.Facts {
 	t.Helper()
-	f := workflow.Facts{"task.category": string(c), "task.gates_open": 0, "task.link_owes": []string{}, "task.wake_until": time.Time{}, "task.wake_when": ""}
+	f := workflow.Facts{"task.category": string(c), "task.gates_open": 0, "task.link_owes": []string{}, "task.wake_until": time.Time{}, "task.wake_when": "",
+		"task.check_on": time.Time{}, "task.since_movement": time.Duration(0), "task.runs_live": 0}
+	for _, name := range builtin.LinkSignals {
+		f[builtin.LinkSignalPrefix+name] = false
+	}
 	for k, v := range more {
 		f[k] = v
 	}
@@ -63,7 +68,7 @@ func TestAViewIsTheProfilesPredicate(t *testing.T) {
 		"a someday one":         {lensFacts(t, l, task.CategoryDeferred, workflow.Facts{"task.state": "someday"}), []string{"someday"}},
 		"a starred project":     {lensFacts(t, l, task.CategoryReady, workflow.Facts{"task.prop.focus": "on", "task.prop.kind": "project", "task.children_ready": true}), []string{"needs-me", "focus", "projects"}},
 		"a project to review":   {lensFacts(t, l, task.CategoryReady, workflow.Facts{"task.prop.kind": "project"}), []string{"needs-me", "projects", "review-projects"}},
-		"a done one":            {lensFacts(t, l, task.CategoryDone, nil), []string{"logbook"}},
+		"a done one":            {lensFacts(t, l, task.CategoryDone, nil), []string{"logbook", "done"}},
 		"a dropped starred one": {lensFacts(t, l, task.CategoryDropped, workflow.Facts{"task.prop.focus": "on"}), nil},
 	} {
 		if got := inViews(t, l, c.f); !slices.Equal(got, c.want) {
@@ -97,11 +102,11 @@ func TestAViewIsTheProfilesPredicate(t *testing.T) {
 func TestAQuestionGateOnADoneTaskShowsInNeedsMe(t *testing.T) {
 	l := bundled(t)
 	asked := lensFacts(t, l, task.CategoryDone, workflow.Facts{"task.gates_open": 1})
-	if got := inViews(t, l, asked); !slices.Equal(got, []string{"needs-me", "logbook"}) {
+	if got := inViews(t, l, asked); !slices.Equal(got, []string{"needs-me", "logbook", "done"}) {
 		t.Errorf("a done task with an open question is in %v", got)
 	}
 	answered := lensFacts(t, l, task.CategoryDone, nil)
-	if got := inViews(t, l, answered); !slices.Equal(got, []string{"logbook"}) {
+	if got := inViews(t, l, answered); !slices.Equal(got, []string{"logbook", "done"}) {
 		t.Errorf("once answered it is in %v", got)
 	}
 }
@@ -164,7 +169,7 @@ func TestOnlyAViewOverATasksOwnFieldsIsPaged(t *testing.T) {
 			paged = append(paged, v.ID)
 		}
 	}
-	if want := []string{"inbox", "focus", "projects", "someday", "logbook"}; !slices.Equal(paged, want) {
+	if want := []string{"inbox", "focus", "projects", "someday", "done"}; !slices.Equal(paged, want) {
 		t.Errorf("paged views %v, want %v", paged, want)
 	}
 	dir := t.TempDir()

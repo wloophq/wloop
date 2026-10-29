@@ -199,18 +199,18 @@ const state = { loaded: true, rows: [], activityLoaded: true, activity: [{ event
   activityEmptyNote("https://github.com/acme/web/pull/3"),
   (activityLoopOnly = true, activityEmptyNote("")),
   (activityLoopOnly = false, state.activity = [], activityEmptyNote("zzz")),
-  emptyNote("stalled", "zzz"),
-  emptyNote("stalled", "waits-on:bob zzz"),
-  emptyNote("stalled", ""),
+  emptyNote("mine", "zzz"),
+  emptyNote("mine", "waits-on:bob zzz"),
+  emptyNote("mine", ""),
 ]));`, nil, &got)
 	want := [][]any{
 		{`Nothing in Recent matches "zzz".`},
 		{"acme/web#3 is not in the inventory. ", map[string]any{"button": "Explore it"}, " ", map[string]any{"a": "Open it on GitHub"}},
 		{"No loop events in the recent activity."},
 		{"Nothing happened in the inventory yet."},
-		{`Nothing in Stalled matches "zzz".`},
-		{`Nothing in Stalled matches "waits-on:bob zzz".`, " ", map[string]any{"button": "Clear filters"}},
-		{"Nothing in Stalled right now."},
+		{`Nothing in My PRs matches "zzz".`},
+		{`Nothing in My PRs matches "waits-on:bob zzz".`, " ", map[string]any{"button": "Clear filters"}},
+		{"Nothing in My PRs right now."},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got  %#v\nwant %#v", got, want)

@@ -58,6 +58,7 @@ type env struct {
 	turns    map[unit.Unit]int
 	repos    map[unit.Unit]string
 	sessions []turn.Session
+	links    map[unit.Unit]facttask.Link
 }
 
 func newEnv(t *testing.T) *env {
@@ -67,7 +68,7 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	e := &env{t: t, db: db, clock: &clock{now: monday}, s: facttask.Settings{StaleDays: 2, RenudgeAfter: 72 * time.Hour}, ended: map[unit.Unit]bool{}, turns: map[unit.Unit]int{}, repos: map[unit.Unit]string{}}
+	e := &env{t: t, db: db, clock: &clock{now: monday}, s: facttask.Settings{StaleDays: 2, RenudgeAfter: 72 * time.Hour}, ended: map[unit.Unit]bool{}, turns: map[unit.Unit]int{}, repos: map[unit.Unit]string{}, links: map[unit.Unit]facttask.Link{}}
 	e.p = facttask.New(facttask.Deps{
 		Tasks: db.Tasks(), Items: db.Items(), Drafts: db.Drafts(),
 		Cards:    coretasks.CardFacts{Cards: db.Cards()},
@@ -83,6 +84,9 @@ func newEnv(t *testing.T) *env {
 		Me:       func() task.Me { return task.Me{Keys: []string{"chat:ME"}} },
 		OwedBy:   catalog.OwedByOf(func() *intentload.Loaded { return &intentload.Loaded{Tasks: bundledTasks} }),
 		Wakes:    db.Wakes(),
+		Links: func(_ context.Context, u unit.Unit) (facttask.Link, error) {
+			return e.links[u], nil
+		},
 	})
 	return e
 }

@@ -11,9 +11,11 @@ import (
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
-// untilOwesChange is the When of a mute until the state changes: the fact
-// alone, which the host holds to each task's value of it at mute time.
-const untilOwesChange = "task.link_owes"
+// untilStateChange is the When of a mute until the state changes: who the
+// task's links wait on, and whether a review workspace holds one or its work
+// is approved, facts alone, which the host holds to each task's values of
+// them at mute time. The stalled signal is left out: time alone turns it on.
+const untilStateChange = "task.link_owes, task.link_signal.in_loop, task.link_signal.ready"
 
 // mute mutes u for the request's duration, or until who its task's items
 // wait on changes: a wake on the pull request's tasks.
@@ -34,7 +36,7 @@ func (p *Presenter) mute(ctx context.Context, u unit.Unit, args api.PluginAction
 		if args.Unmuted == nil {
 			return api.Refuse(http.StatusNotFound, "%s is not in the inventory", u.Label())
 		}
-		w.When = untilOwesChange
+		w.When = untilStateChange
 	} else {
 		d, err := duration.Parse(req.Until)
 		if err != nil {

@@ -120,6 +120,7 @@ func serve(ctx context.Context, e *Env, args []string) error {
 	store.UseClock(e.Now)
 	e.Rec = storeRecorder{store}
 	e.interrupted = new(atomic.Bool)
+	e.linkStates = new(atomic.Pointer[daemon.Server])
 	e.Rounds = sqlite.NewRounds(db)
 	endpoint := mcpEndpoint{port: *mcpPort, log: logf, tools: e.pluginTools(db), key: e.mcpKey,
 		intents: func() *dintent.Registry {
@@ -161,6 +162,7 @@ func serve(ctx context.Context, e *Env, args []string) error {
 			deps.EffectWarnings = e.effectProblems.list
 			srv := daemon.New(deps)
 			e.Briefing, e.consequences = srv, srv
+			e.linkStates.Store(srv)
 			err := srv.Run(ctx)
 			stop()
 			return err

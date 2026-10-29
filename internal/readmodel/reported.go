@@ -314,6 +314,19 @@ func (p *Reported) Derive(base Base, in any, at time.Time) (api.Row, error) {
 	return r, nil
 }
 
+// Signals are the link signals the plugin reported of the unit.
+func (p *Reported) Signals(_ Base, _ api.Row, in any, _ time.Time) map[string]bool {
+	x, ok := in.(*reported)
+	if !ok {
+		return nil
+	}
+	out := make(map[string]bool, len(x.snap.Signals))
+	for _, g := range x.snap.Signals {
+		out[g.Name] = out[g.Name] || g.On
+	}
+	return out
+}
+
 // offered are the intents' actions on r, then the actions the plugin
 // offers on the unit.
 func offered(base Base, r api.Row, offers []src.Offer) []api.ActionState {
