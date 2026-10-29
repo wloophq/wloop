@@ -191,8 +191,19 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	listed := map[task.ID]bool{}
+	for _, e := range p.Tasks {
+		listed[e.ID] = true
+	}
 	for _, g := range gs {
-		page.Gates = append(page.Gates, s.gateView(ctx, g.gate))
+		e, ok, err := s.gateTask(ctx, g)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if ok && listed[e.ID] {
+			page.Gates = append(page.Gates, s.gateView(ctx, g.gate))
+		}
 	}
 	writeJSON(w, page)
 }

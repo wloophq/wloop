@@ -142,3 +142,32 @@ func TestADraftOnAnUnheldUnitCountsOnlyInTheOutbox(t *testing.T) {
 		t.Fatalf("counters %+v", c)
 	}
 }
+
+// TestTheOutboxPageAndCountAgreeUnderAFilter checks that the area and the contexts narrow the Outbox's gates as
+// they narrow its tasks, and the area its count, which the contexts leave as the chips count them apart: a
+// draft stands as a task that takes the properties of the task its gate is on.
+func TestTheOutboxPageAndCountAgreeUnderAFilter(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	st := r.db.Gates(r.clock.Now)
+	svc := gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{r.s.loaded().Gates}, Clock: r.clock, Tasks: openTasks{r.db.Tasks(), r.g}})
+	r.o.Gates, r.s.deps.Gates = rigGates{svc, st}, svc
+	r8u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#8"}
+	r.put(t, task.Task{ID: "t-oss", State: "next", Category: task.CategoryReady, Units: []unit.Unit{r7u},
+		Props: task.Props{"area": {Text: "OSS"}, "contexts": {List: []string{"@reply"}}}},
+		task.Task{ID: "t-hiring", State: "next", Category: task.CategoryReady, Units: []unit.Unit{r8u}, Props: task.Props{"area": {Text: "Hiring"}}})
+	r.propose(t, r7u, "on the OSS task", draft.Wait)
+	r.propose(t, r8u, "on the Hiring task", draft.Wait)
+	for _, c := range []struct {
+		query        string
+		listed, area int
+	}{
+		{"view=outbox", 2, 2}, {"view=outbox&area=OSS", 1, 1}, {"view=outbox&area=Hiring", 1, 1},
+		{"view=outbox&context=@reply", 1, 2}, {"view=outbox&area=Hiring&context=@reply", 0, 1},
+	} {
+		p := r.page(t, c.query)
+		if len(p.Gates) != c.listed || len(p.Tasks) != c.listed || p.Counters.Views["outbox"] != c.area {
+			t.Errorf("%s: %d gates, %d tasks, count %d; want %d listed, %d counted", c.query, len(p.Gates), len(p.Tasks), p.Counters.Views["outbox"], c.listed, c.area)
+		}
+	}
+}
