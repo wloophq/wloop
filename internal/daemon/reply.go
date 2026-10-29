@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -17,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // replyRefusal is why the user cannot reply on e, "" when they can.
@@ -32,14 +34,48 @@ func (s *Server) replyRefusal(e task.Task) string {
 	return ""
 }
 
+// handlerReply is the verb handler that writes the composer's reply.
+const handlerReply = "reply"
+
+// replies says whether v is a verb whose handler writes a reply.
+func (s *Server) replies(v task.Verb) bool {
+	return s.loaded().Tasks.Handler(string(v)) == handlerReply
+}
+
+// replySend is what a reply of verb v does when it names no send, as the profile says, "draft" by default;
+// "" for a verb whose handler is not reply.
+func (s *Server) replySend(v string) string {
+	if !s.replies(task.Verb(v)) {
+		return ""
+	}
+	return cmp.Or(s.loaded().Tasks.Verbs[v].Send, sendDraft)
+}
+
+// The reply sends: sendNow sends a reply at once, sendDraft holds it for approval.
+const (
+	sendNow   = "now"
+	sendDraft = "draft"
+)
+
+// replyVerb is the profile's verb whose handler is reply, "" when none is.
+func (s *Server) replyVerb() string {
+	for _, v := range builtin.TaskVerbs {
+		if s.replies(task.Verb(v)) {
+			return v
+		}
+	}
+	return ""
+}
+
 // runReply holds the reply the task's args carry as a user draft on its first unit, for the task and its
-// items there; send "now" approves it at once.
-func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretasks.Service, e task.Task, req api.TaskRequest, actor task.Actor) {
+// items there; send "now" approves it at once and "draft" holds it, and with no send the verb's profile
+// send says which.
+func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretasks.Service, e task.Task, v task.Verb, req api.TaskRequest, actor task.Actor) {
 	if why := s.replyRefusal(e); why != "" {
 		writeTasksError(w, fmt.Errorf("%w: %s", coretasks.ErrVerb, why))
 		return
 	}
-	send, err := sendArg(req.Args["send"])
+	send, err := sendArg(cmp.Or(req.Args["send"], s.replySend(string(v))))
 	if err != nil {
 		writeTasksError(w, err)
 		return
@@ -57,7 +93,7 @@ func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretas
 		writeTasksError(w, taskDraftError(err))
 		return
 	}
-	s.recordVerb(ctx, g, e, coretasks.Request{Verb: task.VerbReply, Source: req.Source, Actor: actor})
+	s.recordVerb(ctx, g, e, coretasks.Request{Verb: v, Source: req.Source, Actor: actor})
 	now, err := g.Task(ctx, e.ID)
 	if err != nil {
 		now = e
@@ -67,25 +103,25 @@ func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretas
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, api.TaskResult{Task: view, Lines: []string{userDraftLine(d)}})
+	writeJSON(w, api.TaskResult{Task: view, Lines: []string{s.userDraftLine(d)}})
 }
 
 func sendArg(raw string) (bool, error) {
 	switch raw {
-	case "":
+	case "", "draft":
 		return false, nil
 	case "now":
 		return true, nil
 	}
-	return false, fmt.Errorf("%w: send is \"now\" or nothing, not %q", coretasks.ErrArgs, raw)
+	return false, fmt.Errorf("%w: send is \"now\" or \"draft\", not %q", coretasks.ErrArgs, raw)
 }
 
-// userDraftLine says where a user's draft went.
-func userDraftLine(d draft.Draft) string {
+// userDraftLine says where a user's draft went, as the profile words it.
+func (s *Server) userDraftLine(d draft.Draft) string {
 	if d.State == draft.Queued {
-		return fmt.Sprintf("draft %d approved; it goes out in a moment", d.ID)
+		return s.notice(builtin.NoticeDraftSent, map[string]any{"Draft": int64(d.ID)})
 	}
-	return fmt.Sprintf("draft %d saved to the Outbox for your approval", d.ID)
+	return s.notice(builtin.NoticeDraftSaved, map[string]any{"Draft": int64(d.ID)})
 }
 
 func (s *Server) handleDraftCreate(w http.ResponseWriter, r *http.Request) {

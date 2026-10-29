@@ -115,6 +115,30 @@ Examples:
 
 See [Address reviews on your pull request](/guides/address/).
 
+### chat
+
+Talk with an agent about a task.
+
+```sh
+{{command}} chat <task:key> [--repo <repo>] [--manager <name>] [--parent <worktree>] [guidance...]
+```
+
+Talk with an agent about a task: in the task's last session when it can resume, else in a new one, in a worktree of the task's repository or with no checkout. The target is task:&lt;id&gt;; words after it are guidance for the turn.
+
+| Flag | Description |
+| --- | --- |
+| `--repo <repo>` | Owner/name of the repository to work in; without it the session has no checkout |
+| `--manager <name>` | The workspace manager that creates the worktree, instead of the configured ones |
+| `--parent <worktree>` | The worktree the new one goes under, where its manager keeps parents; the one the command runs in by default |
+
+Examples:
+
+```sh
+{{command}} chat task:t-3f9a2c4b5d6e7f80 what is left before we can ship this?
+```
+
+See [Tasks and views](/concepts/tasks/).
+
 ### nudge
 
 Ask whoever it waits on for the next step.
@@ -1064,10 +1088,10 @@ Record how a turn ended; read your answer.
 
 ```sh
 {{command}} turn end <url> --turn <id> --file <path>
-{{command}} turn answer <url> [--message <id> | --gate <id>]
+{{command}} turn answer <url> [--gate <id>]
 ```
 
-end records how this session's turn ended, from a JSON file, when the session has no {{name}} MCP tool; the file is deleted once stored. answer prints the user's answers to this session's Inbox messages that it has not read, or, with `--message`, every answer to that message, or with `--gate`, to the message of that gate, and marks them read.
+end records how this session's turn ended, from a JSON file, when the session has no {{name}} MCP tool; the file is deleted once stored. answer prints the user's answers to this session's gates that it has not read, or, with `--gate`, every answer that resolved that gate, and marks them read.
 
 | Flag | Description |
 | --- | --- |

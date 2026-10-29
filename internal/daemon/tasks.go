@@ -118,7 +118,7 @@ func (s *Server) handleViews(w http.ResponseWriter, r *http.Request) {
 	for _, v := range builtin.TaskVerbs {
 		t, b := s.loaded().Tasks.Verbs[v], bundledWords().tasks.Verbs[v]
 		cat.Verbs = append(cat.Verbs, api.VerbSpec{Verb: v, Handler: s.loaded().Tasks.Handler(v), Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
-			Input: cmp.Or(t.Input, b.Input), Key: verbKey(task.Verb(v))})
+			Input: cmp.Or(t.Input, b.Input), Send: s.replySend(v), Key: verbKey(task.Verb(v))})
 	}
 	writeJSON(w, cat)
 }
@@ -269,7 +269,7 @@ func (s *Server) doTaskVerb(w http.ResponseWriter, r *http.Request, g *coretasks
 			return
 		}
 	}
-	reply := v == task.VerbReply && !g.Handles(e, v)
+	reply := s.replies(v) && !g.Handles(e, v)
 	b, bridged := s.bridge(ctx, g, e, v)
 	if reply || bridged {
 		gated, err := g.Allowed(ctx, e, creq)
@@ -280,7 +280,7 @@ func (s *Server) doTaskVerb(w http.ResponseWriter, r *http.Request, g *coretasks
 		}
 	}
 	if reply {
-		s.runReply(ctx, w, g, e, req, creq.Actor)
+		s.runReply(ctx, w, g, e, v, req, creq.Actor)
 		return
 	}
 	if bridged {
@@ -902,7 +902,7 @@ func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
 			st.Enabled = true
 		case ev.g.Handles(e, verb):
 			st.Enabled = true
-		case verb == task.VerbReply:
+		case ev.s.replies(verb):
 			st.Reason = ev.s.replyRefusal(e)
 			st.Enabled = st.Reason == ""
 		case bridges(e, verb) && ev.s.pluginEnabled(e.Units[0].Provider) && (verb != task.VerbDismiss || len(offered(row, verb).top) > 0):

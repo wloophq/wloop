@@ -90,6 +90,10 @@ func mergeTools(out map[string]ToolText, file string, src []byte) Problems {
 	names := builtin.ValueNames(builtin.Tools)
 	s := &sheet{file: file, at: positions(src), problems: problems}
 	for _, name := range slices.Sorted(maps.Keys(m)) {
+		if to := builtin.RenamedTo(name); to != "" && slices.Contains(names, to) {
+			s.add(name, "names no tool: it is %s now", to)
+			continue
+		}
 		if !slices.Contains(names, name) {
 			s.add(name, "names no tool%s", expr.DidYouMean(name, names))
 			continue

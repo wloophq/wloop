@@ -29,7 +29,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	dmessage "github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -56,9 +55,9 @@ func agentServer(t *testing.T) (*Server, *turns.Service) {
 	s := New(withStore(Deps{Turns: svc, Activity: db, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return agentNow },
 		Identity: viewerIs("me"),
 		Messages: &messages.Service{Store: inventory.NewMessages(db), Books: repo, Turns: svc, Tasks: inbox, Intents: turnstest.Intents(), Clock: agentClock{}},
-		ReadText: func(_ context.Context, convs []dmessage.Conversation, id int64) string {
+		ReadText: func(_ context.Context, got messages.TaskRead, id int64) string {
 			var texts []string
-			for _, c := range convs {
+			for _, c := range got.Answers {
 				for _, a := range c.Answers {
 					texts = append(texts, fmt.Sprintf("%d:%s", c.Message.ID, a.Text))
 				}
@@ -342,11 +341,11 @@ func TestTurnAnswerReadsTheUnreadAnswersOfTheCallersTurns(t *testing.T) {
 	if code, text := read("term_1", path); code != 200 || text != "message 0: " {
 		t.Fatalf("read twice: %d %q", code, text)
 	}
-	if code, _ := read("term_1", path+"&message=42"); code != http.StatusNotFound {
-		t.Fatalf("a message of no turn of the session: %d", code)
+	if code, _ := read("term_1", path+"&gate=42"); code != http.StatusNotFound {
+		t.Fatalf("a gate of no turn of the session: %d", code)
 	}
-	if code, _ := read("term_1", path+"&message=x"); code != http.StatusBadRequest {
-		t.Fatalf("a bad message id: %d", code)
+	if code, _ := read("term_1", path+"&gate=x"); code != http.StatusBadRequest {
+		t.Fatalf("a bad gate id: %d", code)
 	}
 }
 

@@ -29,7 +29,6 @@ import (
 
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
-	dmessage "github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/placement"
 	"github.com/wloophq/wloop/internal/domain/task"
 
@@ -302,9 +301,9 @@ type Deps struct {
 	// MCP serves agents' MCP sessions on 127.0.0.1:MCPPort; nil listens on
 	// no MCP port.
 	MCP http.Handler
-	// ReadText words the answers an agent's turn answer command reads, as inbox_read does, read of message
-	// id or of every unread answer when 0; nil prints them bare.
-	ReadText func(ctx context.Context, convs []dmessage.Conversation, id int64) string
+	// ReadText words what an agent's turn answer command reads, as task_read does, read of gate id or of every
+	// unread answer when 0; nil prints the answers and the chat bare.
+	ReadText func(ctx context.Context, got messages.TaskRead, id int64) string
 	MCPPort  int
 
 	// Startup reconciles the store and the views; Run holds

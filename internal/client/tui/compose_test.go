@@ -80,7 +80,7 @@ func TestCtrlEHandsThePromptToTheEditor(t *testing.T) {
 		t.Fatalf("edit %+v, prompt %+v", e, m.prompt)
 	}
 	c, ok := m.Edited(e, "First line\r\n\nSecond line\x07\n", nil)
-	if want := map[string]string{"text": "First line\n\nSecond line"}; !ok || c.verb != "reply" || !reflect.DeepEqual(c.args, want) {
+	if want := map[string]string{"text": "First line\n\nSecond line", "send": "draft"}; !ok || c.verb != "reply" || !reflect.DeepEqual(c.args, want) {
 		t.Fatalf("%+v %v", c, ok)
 	}
 	if _, ok := m.Edited(e, "", errors.New("vi exited 1")); ok || !strings.Contains(m.status, "the editor failed: vi exited 1") {
@@ -225,5 +225,29 @@ func TestADraftKeyRunsTheHandlerOfItsVerb(t *testing.T) {
 	m.pickedVerb(e, d, "retry", 0)
 	if p := m.prompt; p == nil || p.confirm || p.action != "edit" || p.cmd.verb != "" && p.cmd.verb != "retry" {
 		t.Fatalf("the verb whose handler is edit asked %+v", p)
+	}
+}
+
+func TestReplyStartsOnTheServedSend(t *testing.T) {
+	for _, send := range []string{"now", "draft"} {
+		m := viewsModel(t)
+		cat := viewsCatalog()
+		for i, v := range cat.Verbs {
+			if v.Verb == "reply" {
+				cat.Verbs[i].Send = send
+			}
+		}
+		m.SetViews(cat)
+		press(m, Key{Rune: 'r'})
+		c, ok := press(m, append(typed("Shipped"), Key{Name: KeyEnter})...)
+		if send == "now" {
+			if ok || m.prompt == nil || !m.prompt.confirm {
+				t.Fatalf("send now: Enter did not ask for a y: %+v", m.prompt)
+			}
+			c, ok = press(m, Key{Rune: 'y'})
+		}
+		if want := map[string]string{"text": "Shipped", "send": send}; !ok || !reflect.DeepEqual(c.args, want) {
+			t.Fatalf("send %s: %+v %v", send, c, ok)
+		}
 	}
 }

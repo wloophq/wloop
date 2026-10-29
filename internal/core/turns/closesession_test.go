@@ -156,7 +156,7 @@ func TestAnAnswerTypedIntoASessionIsTheLoops(t *testing.T) {
 	if during != "its turn is sent" {
 		t.Fatalf("CloseRefusal while the answer was typed = %q", during)
 	}
-	if got, _, _ := reg.Session(ctx, "term_1"); got.TypedLine != "answered Message=0 Unit=https://github.com/acme/api/pull/6" || !got.TypedAt.Equal(t0) {
+	if got, _, _ := reg.Session(ctx, "term_1"); got.TypedLine != "answered Gate=0 Unit=https://github.com/acme/api/pull/6" || !got.TypedAt.Equal(t0) {
 		t.Fatalf("session %+v", got)
 	}
 }

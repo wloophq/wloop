@@ -533,7 +533,7 @@ func TestAnswerRoutes(t *testing.T) {
 		sess.Put("ws", turns.Terminal{Session: "term_1", Key: "tab-1", LastOutput: t0.Add(-5 * time.Minute)})
 		return s, store, reg, sess, rec
 	}
-	notice := "answered Message=9 Unit=https://github.com/acme/api/pull/7"
+	notice := "answered Gate=4 Unit=https://github.com/acme/api/pull/7"
 	for _, c := range []struct {
 		name      string
 		arrange   func(setup)
@@ -588,7 +588,7 @@ func TestAnswerRoutes(t *testing.T) {
 				c.arrange(setup{s, store, reg, sess})
 			}
 			req := c.req
-			req.Unit, req.Message = r7, 9
+			req.Unit, req.Message, req.Gate = r7, 9, 4
 			got, err := s.Answer(ctx, req)
 			if c.refused != refusal(err, "no turn started") || (!c.refused && err != nil) {
 				t.Fatalf("err %v", err)

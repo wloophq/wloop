@@ -180,7 +180,7 @@
           },
           "send": {
             "default": "draft",
-            "description": "With reply: now sends the reply at once, draft proposes it in the Outbox.",
+            "description": "On a verb whose handler is reply: what a reply that names no send does. now sends it at once, as the person approving it; draft holds it on its gate for approval. The composer's Save as draft always holds it.",
             "enum": [
               "now",
               "draft"

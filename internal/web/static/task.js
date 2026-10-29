@@ -270,15 +270,16 @@ async function sendChat(e) {
   }
 }
 
-// saveDraft holds the composer's text as a reply in the task's conversation,
-// for approval.
-async function saveDraft(e) {
+// replyWith writes the composer's text as a reply in the task's conversation,
+// through the verb whose handler replies: send "now" posts it, "draft" holds
+// it for approval.
+async function replyWith(e, verb, send) {
   const text = taskState.text.trim();
   if (!text) {
     detailEnv.notice("Write a message first", true);
     return null;
   }
-  const out = await taskAct(e, "reply", { kind: "reply", text });
+  const out = await taskAct(e, verb, { kind: "reply", text, send });
   if (out) {
     taskState.text = "";
     detailEnv.render();
@@ -286,16 +287,30 @@ async function saveDraft(e) {
   return out;
 }
 
+// taskComposer writes to the task's agent: Send, the default that Ctrl+Enter
+// runs, posts to its chat. Send reply and Save as draft write the text as a
+// reply, the one the reply verb's served send names first and marked default.
 function taskComposer(e) {
-  const reply = verbState(e, "reply");
+  const verb = handlerVerb("reply");
+  const reply = verb ? verbState(e, verb) : null;
+  const on = !!(reply && reply.enabled);
+  const replyButton = (label, send, focus, first) => h("button", { type: "button", class: "act" + (first ? " default" : "") + (on ? "" : " off"), disabled: !on,
+    title: reply ? (on ? verbTask(verb).summary : reply.reason) || undefined : "Not offered here",
+    "data-focus": focus, onclick: () => replyWith(e, verb, send) }, label);
+  const now = verbTask(verb).send === "now";
+  const replies = [replyButton("Send reply", "now", "task:compose:reply", now), replyButton("Save as draft", "draft", "task:compose:draft", !now)];
+  if (!now) replies.reverse();
   return h("section", { class: "d-compose", "aria-label": "Message" },
     h("textarea", { rows: 3, "aria-label": "Message", placeholder: "Write to the agent", "data-focus": "task:compose:text",
-      oninput: (ev) => { taskState.text = ev.target.value; } }, taskState.text),
+      oninput: (ev) => { taskState.text = ev.target.value; },
+      onkeydown: (ev) => {
+        if (ev.key !== "Enter" || !(ev.ctrlKey || ev.metaKey)) return;
+        if (ev.preventDefault) ev.preventDefault();
+        sendChat(e);
+      } }, taskState.text),
     h("div", { class: "d-actions" },
       h("button", { type: "button", class: "act primary", "data-focus": "task:compose:send", onclick: () => sendChat(e) }, "Send"),
-      h("button", { type: "button", class: "act" + (reply && reply.enabled ? "" : " off"), disabled: !(reply && reply.enabled),
-        title: reply ? (reply.enabled ? verbTask("reply").summary : reply.reason) || undefined : "Not offered here",
-        "data-focus": "task:compose:draft", onclick: () => saveDraft(e) }, "Save as draft")));
+      ...replies));
 }
 
 function taskChildren(e) {

@@ -284,7 +284,7 @@ func TestAgentPostAnswerRouting(t *testing.T) {
 			if err != nil || got.Route != c.route {
 				t.Fatalf("%+v %v", got, err)
 			}
-			if typed := r.sess.Typed(); len(typed) != c.typed || (c.typed == 1 && typed[0].Line != "answered Message=1 Unit=https://github.com/acme/api/pull/7") {
+			if typed := r.sess.Typed(); len(typed) != c.typed || (c.typed == 1 && typed[0].Line != "answered Gate=1 Unit=https://github.com/acme/api/pull/7") {
 				t.Fatalf("typed %+v", typed)
 			}
 			if len(r.launch.launches) != 0 {
@@ -305,7 +305,7 @@ func TestAgentPostAnswerRouting(t *testing.T) {
 				if err := r.turns.DeliverStopped(context.Background(), "term_1"); err != nil {
 					t.Fatal(err)
 				}
-				if typed := r.sess.Typed(); len(typed) != 1 || typed[0].Line != "answered Message=1 Unit=https://github.com/acme/api/pull/7" {
+				if typed := r.sess.Typed(); len(typed) != 1 || typed[0].Line != "answered Gate=1 Unit=https://github.com/acme/api/pull/7" {
 					t.Fatalf("delivered %+v", typed)
 				}
 			}

@@ -1,8 +1,34 @@
-# What the loop tells an agent's session. Each is a template over its fields, Name and Command; the
-# reference lists the fields of each.
+# What the loop tells an agent's session, and the lines it tells the person about what they wrote.
+# Each is a template over its fields, Name and Command; the reference lists the fields of each.
 
-answered = "The user answered {{if .Message}}your {{.Name}} Inbox message {{.Message}}{{else}}a question of your {{.Name}} turn{{end}}. Read the answer with the `inbox_read` tool of the {{.Name}} MCP server{{if .Message}}, message {{.Message}}{{end}} (load it with ToolSearch if it is deferred), or run `{{.Command}} turn answer {{.Unit}}{{if .Message}} --message {{.Message}}{{end}}`, then act on it."
+answered = "The user answered {{if .Gate}}gate {{.Gate}} of your {{.Name}} turn{{else}}a question of your {{.Name}} turn{{end}}. Read the answer with the `task_read` tool of the {{.Name}} MCP server{{if .Gate}}, gate {{.Gate}}{{end}} (load it with ToolSearch if it is deferred), or run `{{.Command}} turn answer {{.Unit}}{{if .Gate}} --gate {{.Gate}}{{end}}`, then act on it."
+
+chat = "The user wrote to you on the {{.Name}} task {{.Task}}. {{if .Capable}}Read it with the `task_read` tool of the {{.Name}} MCP server (load it with ToolSearch if it is deferred), or run `{{.Command}} turn answer {{.Unit}}`{{else}}Read it by running `{{.Command}} turn answer {{.Unit}}`{{end}}, then act on it."
 
 record_owed = "This {{.Name}} turn on {{.Unit}} has no record. Call the `turn_end` tool of the {{.Name}} MCP server with turn {{.Turn}} (load it with ToolSearch if it is deferred), or, without that tool, write {{.ScratchDir}}/turn-{{.Turn}}.json and run `{{.Command}} turn end {{.Unit}} --turn {{.Turn}} --file {{.ScratchDir}}/turn-{{.Turn}}.json`, then end your turn. If the turn could not be done, record state failed with what broke."
 
 attach_needs_session = "`{{.Command}} task attach {{.Task}}` makes the agent session it runs in a run of the task, and it runs in no session a workspace manager started ({{.Managers}}). Run it from the agent session to attach, inside one of them."
+
+chat_not_yours = "This session has no turn on {{.Unit}}: it reads the answers and the chat of the tasks it works on only, and nothing was read."
+
+chat_typed = "Sent to the task's live session; its agent reads it now."
+
+chat_queued = "Sent to the task's live session; its agent is busy and is told of it when it stops."
+
+chat_started = "Sent: no session of the task was live, so a {{.Intent}} turn starts with your message{{if .Resumed}}, resuming the task's last session{{end}}."
+
+draft_sent = "Draft {{.Draft}} approved; it goes out in a moment."
+
+draft_saved = "Draft {{.Draft}} saved for your approval."
+
+reply_placeholder = "Your reply, saved for your approval"
+
+reply_button = "Save"
+
+send_reply_placeholder = "Your reply, sent now"
+
+send_reply_button = "Send"
+
+answer_placeholder = "Your answer to the agent"
+
+answer_button = "Send"

@@ -411,6 +411,11 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 		l.Programs[u.name] = u.programs
 	}
 	l.Registry = dintent.NewRegistry(defs)
+	if name := l.Tasks.ChatIntent; name != "" {
+		if _, msg := l.turnProblem(name, "session"); msg != "" {
+			l.Problems = append(l.Problems, Problem{File: TasksFile, Field: "chat.intent", Msg: msg})
+		}
+	}
 	var wfProblems, wfWarnings Problems
 	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems, wfWarnings = loadWorkflows(layers, bundled, l.turnProblem, l.profileFacts, l.Tasks, l.Gates)
 	l.Problems = append(l.Problems, wfProblems...)

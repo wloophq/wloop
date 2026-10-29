@@ -135,7 +135,7 @@ func (s *Server) render(name, src string, data map[string]any) (string, bool) {
 		s.logOnce("mcp: tools.toml %s: %v", name, err)
 		return "", false
 	}
-	return b.String(), true
+	return strings.Trim(b.String(), "\n"), true
 }
 
 // walkParams calls f on every parameter under sc, by its path: a property

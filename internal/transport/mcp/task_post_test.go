@@ -53,7 +53,7 @@ type inboxRig struct {
 	tasks     *coretasks.Service
 }
 
-// inboxSession serves inbox_post over the messages service, with a started turn on term_1.
+// inboxSession serves task_post over the messages service, with a started turn on term_1.
 func inboxSession(t *testing.T, handle string) *inboxRig {
 	t.Helper()
 	r := &inboxRig{books: turnstest.NewStore(), msgs: messagestest.New(), taskStore: taskstest.New()}
@@ -62,7 +62,7 @@ func inboxSession(t *testing.T, handle string) *inboxRig {
 	r.tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: r.taskStore, Items: noItems{}, Facts: enabledFacts{}, Clock: fixedClock{}})
 	svc := messagestest.NewGates(fixedClock{}.Now, rigTasks{r.taskStore, r.tasks}).Bind(&messages.Service{Store: r.msgs, Books: r.books, Tasks: r.tasks,
 		Intents: turnstest.Intents(), Clock: fixedClock{}})
-	r.srv = &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800, Inbox: svc}
+	r.srv = &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800, Tasks: svc}
 	r.sid = call(t, r.srv, "", handle, initialize).Header().Get("Mcp-Session-Id")
 	if r.sid == "" {
 		t.Fatal("no session id")
@@ -71,7 +71,7 @@ func inboxSession(t *testing.T, handle string) *inboxRig {
 }
 
 func postCall(args string) string {
-	return `{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"inbox_post","arguments":` + args + `}}`
+	return `{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"task_post","arguments":` + args + `}}`
 }
 
 func (r *inboxRig) post(t *testing.T, handle, args string) toolResult {
@@ -88,20 +88,20 @@ func (r *inboxRig) open(t *testing.T) []message.Message {
 	return open
 }
 
-func TestInboxPostListedOnlyWhenWired(t *testing.T) {
+func TestTaskPostListedOnlyWhenWired(t *testing.T) {
 	list := `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`
 	r := inboxSession(t, "term_1")
-	if names := listedTools(t, call(t, r.srv, r.sid, "term_1", list)); !slices.Contains(names, "inbox_post") {
+	if names := listedTools(t, call(t, r.srv, r.sid, "term_1", list)); !slices.Contains(names, "task_post") {
 		t.Fatalf("tools %v", names)
 	}
 	bare := &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800}
 	sid := call(t, bare, "", "term_1", initialize).Header().Get("Mcp-Session-Id")
-	if names := listedTools(t, call(t, bare, sid, "term_1", list)); slices.Contains(names, "inbox_post") {
-		t.Fatalf("listed without an Inbox: %v", names)
+	if names := listedTools(t, call(t, bare, sid, "term_1", list)); slices.Contains(names, "task_post") {
+		t.Fatalf("listed without the tasks: %v", names)
 	}
 }
 
-func TestInboxPostCreatesAMessage(t *testing.T) {
+func TestTaskPostCreatesAMessage(t *testing.T) {
 	r := inboxSession(t, "term_1")
 	got := r.post(t, "term_1", `{"text":"Keep the old column?","options":[{"id":"keep","label":"Keep","consequence":"no migration"},{"id":"drop","label":"Drop","consequence":"migrates"}],"recommend":"keep"}`)
 	open := r.open(t)
@@ -109,7 +109,11 @@ func TestInboxPostCreatesAMessage(t *testing.T) {
 		t.Fatalf("%+v; open %+v", got.Result, open)
 	}
 	m := open[0]
-	want := fmt.Sprintf("Posted to the Inbox as message %[1]d. When the user answers it, %[2]s tells this session that message %[1]d was answered; read the answer with inbox_read.", m.ID, brand.Name)
+	g, _, err := r.srv.Tasks.GateOf(context.Background(), m)
+	if err != nil || g.ID == 0 {
+		t.Fatalf("message %d has no gate: %v", m.ID, err)
+	}
+	want := fmt.Sprintf("Posted on the task, waiting on gate %[1]d. When the user answers it, %[2]s tells this session that gate %[1]d was answered; read the answer with task_read.", g.ID, brand.Name)
 	if got.Result.Content[0].Text != want {
 		t.Fatalf("result %q", got.Result.Content[0].Text)
 	}
@@ -127,7 +131,7 @@ func TestInboxPostCreatesAMessage(t *testing.T) {
 	}
 }
 
-func TestInboxPostNeedsAHandle(t *testing.T) {
+func TestTaskPostNeedsAHandle(t *testing.T) {
 	for _, h := range []string{"", unexpanded} {
 		r := inboxSession(t, h)
 		got := r.post(t, h, `{"text":"hello"}`)
@@ -144,7 +148,7 @@ func TestInboxPostNeedsAHandle(t *testing.T) {
 	}
 }
 
-func TestInboxPostCannotMoveTasks(t *testing.T) {
+func TestTaskPostCannotMoveTasks(t *testing.T) {
 	r := inboxSession(t, "term_1")
 	r.post(t, "term_1", `{"text":"first"}`)
 	ctx := context.Background()
@@ -180,13 +184,13 @@ func TestInboxPostCannotMoveTasks(t *testing.T) {
 	var schema struct {
 		AdditionalProperties *bool `json:"additionalProperties"`
 	}
-	raw, _ := json.Marshal(inboxPostTool().InputSchema)
+	raw, _ := json.Marshal(taskPostTool().InputSchema)
 	if err := json.Unmarshal(raw, &schema); err != nil || schema.AdditionalProperties == nil || *schema.AdditionalProperties {
 		t.Fatalf("the schema is not closed: %s", raw)
 	}
 }
 
-func TestInboxPostIsCapped(t *testing.T) {
+func TestTaskPostIsCapped(t *testing.T) {
 	r := inboxSession(t, "term_1")
 	for i := range 3 {
 		if got := r.post(t, "term_1", fmt.Sprintf(`{"text":"note %d"}`, i)); got.Result.IsError {
@@ -194,7 +198,7 @@ func TestInboxPostIsCapped(t *testing.T) {
 		}
 	}
 	got := r.post(t, "term_1", `{"text":"one more"}`)
-	if !got.Result.IsError || !strings.Contains(got.Result.Content[0].Text, "3 open Inbox messages") {
+	if !got.Result.IsError || !strings.Contains(got.Result.Content[0].Text, "3 open posts") {
 		t.Fatalf("%+v", got.Result)
 	}
 	if n := len(r.open(t)); n != 3 {
@@ -202,7 +206,7 @@ func TestInboxPostIsCapped(t *testing.T) {
 	}
 }
 
-func TestInboxPostRefusesABadMessage(t *testing.T) {
+func TestTaskPostRefusesABadMessage(t *testing.T) {
 	r := inboxSession(t, "term_1")
 	for _, args := range []string{`{}`, `{"text":"  "}`, `{"text":"pick","options":[{"id":"A b","label":"x","consequence":"y"},{"id":"b","label":"x","consequence":"y"}]}`, `[1]`} {
 		if got := r.post(t, "term_1", args); !got.Result.IsError || !strings.HasPrefix(got.Result.Content[0].Text, "Nothing was posted") {

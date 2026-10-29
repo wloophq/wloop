@@ -97,6 +97,9 @@ func (s *Service) stop(ctx context.Context, r StopRequest) (StopAnswer, *unit.Un
 	var changed *unit.Unit
 	switch turn.DecideStop(facts) {
 	case turn.Allow:
+		if a, ok := s.chatBlock(ctx, u, r.Session); ok {
+			return a, nil, evs, nil
+		}
 		return StopAnswer{}, nil, evs, nil
 	case turn.AckAndAllow:
 		ackRecords(&b, t.Seq, &stop)
@@ -142,6 +145,11 @@ func (s *Service) stop(ctx context.Context, r StopRequest) (StopAnswer, *unit.Un
 		}
 		evs = append(evs, ended)
 		changed = &b.Unit
+	}
+	if !ans.Block {
+		if a, ok := s.chatBlock(ctx, u, r.Session); ok {
+			ans, stop.Blocked = a, true
+		}
 	}
 	if err := s.Registry.LogStop(ctx, stop, stopped); err != nil {
 		return StopAnswer{}, changed, evs, err

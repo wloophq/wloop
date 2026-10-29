@@ -47,6 +47,9 @@ var Renamed = []Rename{
 	{"answer", "gates.question.intents.answer"},
 	{"continue", "gates.question.intents.continue"},
 	{"dismiss", "gates.question.intents.dismiss"},
+	{"session.unread_answers", "session.unread_gates"},
+	{"inbox_post", "task_post"},
+	{"inbox_read", "task_read"},
 }
 
 // RenamedKeys are the configuration keys a release renamed or moved, each

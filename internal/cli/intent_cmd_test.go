@@ -408,7 +408,7 @@ func TestProfileSchemaPrintsTheManifestSchema(t *testing.T) {
 func TestDoctorLoadsTheIntents(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	if got := te.intentChecks(); len(got) != 1 || got[0].mark != markOK || got[0].info != "act address nudge review start" {
+	if got := te.intentChecks(); len(got) != 1 || got[0].mark != markOK || got[0].info != "act address chat nudge review start" {
 		t.Fatalf("checks %+v", got)
 	}
 	userProfile(t, te, map[string]string{

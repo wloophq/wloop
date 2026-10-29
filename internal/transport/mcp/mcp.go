@@ -58,7 +58,7 @@ type Server struct {
 	Log func(format string, args ...any)
 	// Plugins are the tools the plugins' manifests declare.
 	Plugins []PluginTool
-	Inbox   Inbox // set by internal/cli/serve_messages.go; nil hides inbox_post and inbox_read
+	Tasks   Tasks // set by internal/cli/serve.go; nil hides task_post and task_read
 	// Texts are the tools' descriptions, the profile's tools.toml; nil
 	// describes none.
 	Texts func() map[string]ToolText
@@ -280,8 +280,8 @@ type registered struct {
 // Server field leaves its tool out.
 func (s *Server) tools() []registered {
 	r := []registered{{turnEndTool(), true, s.turnEnd}}
-	if s.Inbox != nil {
-		r = append(r, registered{inboxPostTool(), true, s.inboxPost}, registered{inboxReadTool(), true, s.inboxRead})
+	if s.Tasks != nil {
+		r = append(r, registered{taskPostTool(), true, s.taskPost}, registered{taskReadTool(), true, s.taskRead})
 	}
 	return append(r, s.pluginTools()...)
 }

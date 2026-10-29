@@ -144,8 +144,8 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `session.closes_when_done` | bool | The newest turn's intent closes its session when done. |
 | `session.idle_since` | timestamp | When the current idle period started. Zero when unset; test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `session.idle_for` | duration | Time since idle_since. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
-| `session.unread_answers` | int | Answers the user gave to the session's turns whose notice reached the session and that its agent has not read with inbox_read. |
-| `session.unread_since` | timestamp | When the notice of the oldest of unread_answers reached the session; zero when none. Test with `> timestamp(0)`. |
+| `session.unread_gates` | int | Gates of the session's turns the user answered, whose notice reached the session and whose answer its agent has not read with task_read. |
+| `session.unread_since` | timestamp | When the notice of the oldest unread answer of unread_gates reached the session; zero when none. Test with `> timestamp(0)`. |
 | `session.unread_for` | duration | Time since unread_since; 0 when none. |
 | `session.pr_state` | string | The state of the book's pull request: OPEN, CLOSED or MERGED; empty when none. |
 | `session.duplicate` | bool | Another listed session resumes the same agent session; the focused one, one the user prompted, and else the oldest are never duplicates. |

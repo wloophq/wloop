@@ -231,7 +231,7 @@ func TestLedgerProposalsReachTheInboxOnARealStore(t *testing.T) {
 	}
 }
 
-func TestTheMCPEndpointPostsToTheInbox(t *testing.T) {
+func TestTheMCPEndpointPostsOnTheTask(t *testing.T) {
 	t.Parallel()
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -255,10 +255,10 @@ func TestTheMCPEndpointPostsToTheInbox(t *testing.T) {
 		return rec
 	}
 	sid := rpc("", `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}`).Header().Get("Mcp-Session-Id")
-	if list := rpc(sid, `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`).Body.String(); !strings.Contains(list, `"inbox_post"`) {
+	if list := rpc(sid, `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`).Body.String(); !strings.Contains(list, `"task_post"`) {
 		t.Fatalf("tools %s", list)
 	}
-	got := rpc(sid, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"inbox_post","arguments":{"text":"hi"}}}`).Body.String()
+	got := rpc(sid, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"task_post","arguments":{"text":"hi"}}}`).Body.String()
 	if !strings.Contains(got, "no started turn") || !strings.Contains(got, `"isError":true`) {
 		t.Fatalf("a post with no turn: %s", got)
 	}

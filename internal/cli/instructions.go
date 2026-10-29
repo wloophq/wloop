@@ -293,7 +293,7 @@ func runTurn(ctx context.Context, e *Env, args []string) int {
 			return 0
 		}
 	}
-	fmt.Fprintln(e.Err, "usage: turn end <pr-url> --turn <id> --file <path> | turn answer <pr-url> [--message <id>] | turn show <pr-url> [--json] [--color auto|always|never]")
+	fmt.Fprintln(e.Err, "usage: turn end <pr-url> --turn <id> --file <path> | turn answer <pr-url> [--gate <id>] | turn show <pr-url> [--json] [--color auto|always|never]")
 	return 2
 }
 

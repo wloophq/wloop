@@ -53,8 +53,10 @@ type TasksDef struct {
 	States []StateDef
 	Verbs  map[string]VerbText
 	// OwedBy is owed_by.expr as written; Owed is it compiled over OwedByEnv, nil when the profile has none.
-	OwedBy           string
-	Owed             *expr.Program
+	OwedBy string
+	Owed   *expr.Program
+	// ChatIntent is the intent of the turn a chat message starts on a task with no live session.
+	ChatIntent       string
 	Areas, Contexts  []string
 	StaleWaitingDays int
 }
@@ -410,6 +412,9 @@ func (l *tasksLoad) merge(file string, src []byte) Problems {
 	if m.OwedBy != nil {
 		text(s, "owed_by.expr", m.OwedBy.Expr, &l.def.OwedBy)
 		l.owed = &ref{s, "owed_by.expr", l.def.OwedBy}
+	}
+	if m.Chat != nil {
+		text(s, "chat.intent", m.Chat.Intent, &l.def.ChatIntent)
 	}
 	if m.Areas != nil {
 		l.def.Areas = slices.Clone(m.Areas)

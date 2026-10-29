@@ -13,7 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-type Kind string // question (end of turn), agent_post (inbox_post), proposal (ledger proposals, workflow decisions; never for a draft)
+type Kind string // question (end of turn), agent_post (task_post), proposal (ledger proposals, workflow decisions; never for a draft)
 
 const (
 	Question  Kind = "question"

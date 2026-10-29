@@ -30,7 +30,7 @@ func TestAReplyTypedInTheNotificationGoesToTheOutboxOrOut(t *testing.T) {
 	for _, v := range r.d.snapshotVerbs() {
 		got = append(got, fmt.Sprintf("%s %s %v %s", v.id, v.verb, v.req.Args, v.req.Source))
 	}
-	want := []string{"e-8 reply map[text:Friday works] notification", "e-8 reply map[send:now text:Shipped] notification"}
+	want := []string{"e-8 reply map[send:draft text:Friday works] notification", "e-8 reply map[send:now text:Shipped] notification"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("replies %q\nwant    %q", got, want)
 	}
@@ -62,5 +62,20 @@ func TestDraftForMeDelegatesHeadless(t *testing.T) {
 	v := r.d.snapshotVerbs()
 	if len(v) != 1 || v[0].id != "e-8" || v[0].verb != "delegate" || v[0].req.Args["mode"] != "headless" || v[0].req.Source != source {
 		t.Fatalf("verbs %+v", v)
+	}
+}
+
+func TestTheNotificationOffersTheServedReplyFirst(t *testing.T) {
+	for _, first := range []string{api.AttentionSendReply, api.AttentionReply} {
+		other := api.AttentionReply
+		if first == api.AttentionReply {
+			other = api.AttentionSendReply
+		}
+		e := api.TaskView{ID: "e-8", Attention: &api.Attention{ID: "n1", Category: string(api.CategoryInbox), Title: "In your Inbox",
+			Actions: []api.AttentionAction{{ID: first, Title: "first", TextInput: true, Placeholder: "p1", Button: "b1"}, {ID: other, Title: "second", TextInput: true}}}}
+		n, _ := notification(e)
+		if len(n.Actions) != 2 || n.Actions[0].ID != first || n.Actions[0].Placeholder != "p1" || n.Actions[0].Button != "b1" {
+			t.Fatalf("%s first: %+v", first, n.Actions)
+		}
 	}
 }

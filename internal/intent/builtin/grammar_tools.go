@@ -9,15 +9,15 @@ import (
 // one table each.
 var Tools = []Value{
 	{Name: "turn_end", Doc: "Records how the session's turn ended."},
-	{Name: "inbox_post", Doc: "Posts a question or a note to the user's Inbox during a turn."},
-	{Name: "inbox_read", Doc: "Reads the user's answers to the session's Inbox messages, and marks them read."},
+	{Name: "task_post", Doc: "Posts a question or a note on the session's task during a turn, waiting on a gate."},
+	{Name: "task_read", Doc: "Reads the session's task: the task, its brief, its open gates, the chat since the last read and the user's answers, and marks them read."},
 }
 
 // ToolData is what every tools.toml text reads.
 type ToolData struct {
 	// Name is the product's name, Command its command.
 	Name, Command string
-	// PostsPerTurn is how many inbox_post messages of a turn wait at once.
+	// PostsPerTurn is how many task_post messages of a turn wait at once.
 	PostsPerTurn int
 }
 
@@ -63,7 +63,7 @@ func answer(tool, name, doc string, fields ...AnswerField) ToolAnswer {
 // ToolAnswers are the texts each tool answers with, which tools.toml words
 // under [<tool>.answers].
 var ToolAnswers = func() []ToolAnswer {
-	out := answersOf([]string{"turn_end", "inbox_post", "inbox_read"})
+	out := answersOf([]string{"turn_end", "task_post", "task_read"})
 	return append(out,
 		answer("turn_end", "problem_extra_arguments", "A problem: arguments besides turn and record.", str("Keys")),
 		answer("turn_end", "problem_turn_type", "A problem: turn is not a string."),
@@ -80,22 +80,28 @@ var ToolAnswers = func() []ToolAnswer {
 		answer("turn_end", "ledger_refused", "A part of the ledger's outcome: ops refused, and why.", num("Count"), str("Why")),
 		answer("turn_end", "ledger_refusal", "Why one op was refused.", num("Index"), str("Reason")),
 
-		answer("inbox_post", "text_required", "The text is missing."),
-		answer("inbox_post", "capped", "The turn has too many messages waiting.", str("Error")),
-		answer("inbox_post", "not_in_turn", "The session has no started turn.", str("Error")),
-		answer("inbox_post", "post_failed", "The message could not be posted.", str("Error")),
-		answer("inbox_post", "posted", "The message is in the Inbox.", num("ID")),
+		answer("task_post", "text_required", "The text is missing."),
+		answer("task_post", "capped", "The turn has too many posts waiting.", str("Error")),
+		answer("task_post", "not_in_turn", "The session has no started turn.", str("Error")),
+		answer("task_post", "post_failed", "The message could not be posted.", str("Error")),
+		answer("task_post", "posted", "The message is on the task, waiting on gate Gate.", num("Gate")),
 
-		answer("inbox_read", "no_turn", "The session has no turn.", str("Error")),
-		answer("inbox_read", "no_message", "The message is not one of the session's.", num("ID")),
-		answer("inbox_read", "read_failed", "The Inbox could not be read.", str("Error")),
-		answer("inbox_read", "nothing", "No answer to read: of message ID, or of any message when ID is 0.", num("ID")),
-		answer("inbox_read", "read", "The answers read: the conversations, one after another.", str("Conversations")),
-		answer("inbox_read", "conversation", "A part of read: a message, its kind (question or agent_post), its text and options, and its answers.",
-			num("ID"), str("Kind"), str("Text"), str("Options"), str("Answers")),
-		answer("inbox_read", "turn_answers", "A part of read: answers to the session's turns stored before each answer named its message.", str("Answers")),
-		answer("inbox_read", "option", "A part of conversation: one option of the message.", str("ID"), str("Label")),
-		answer("inbox_read", "answer", "A part of conversation: one answer, with its option and the option's label, yes or no, its text and when it was given.",
+		answer("task_read", "no_turn", "The session has no turn.", str("Error")),
+		answer("task_read", "no_gate", "No answer of the session's resolved gate ID.", num("ID")),
+		answer("task_read", "not_the_tasks", "The session's turns are on no unit of the task it would read.", str("Error")),
+		answer("task_read", "read_failed", "The task could not be read.", str("Error")),
+		answer("task_read", "nothing", "Nothing to read: the session's turns are on no task, and no answer of gate ID, or of any gate when ID is 0, waits.", num("ID")),
+		answer("task_read", "read", "What was read: the task, its brief record's data, its open gates, the chat since the last read and the conversations, each \"\" when empty.",
+			str("Task"), str("Brief"), str("Gates"), str("Chat"), str("Conversations")),
+		answer("task_read", "task", "A part of read: the task's id, title and state.", str("ID"), str("Title"), str("State")),
+		answer("task_read", "gate", "A part of read: one open gate of the task, its kind, its name in gates.toml and the intents that resolve it.",
+			num("ID"), str("Kind"), str("Name"), str("Intents")),
+		answer("task_read", "chat_message", "A part of read: one message the user wrote on the task's chat, and when.", str("Text"), str("At")),
+		answer("task_read", "conversation", "A part of read: a message, the gate its answers resolved (0 for one stored before answers named their gate), its kind (question or agent_post), its text and options, and its answers.",
+			num("Gate"), str("Kind"), str("Text"), str("Options"), str("Answers")),
+		answer("task_read", "turn_answers", "A part of read: answers to the session's turns stored before each answer named its message.", str("Answers")),
+		answer("task_read", "option", "A part of conversation: one option of the message.", str("ID"), str("Label")),
+		answer("task_read", "answer", "A part of conversation: one answer, with its option and the option's label, yes or no, its text and when it was given.",
 			str("Option"), str("Label"), str("Choice"), str("Text"), str("At")),
 	)
 }()

@@ -55,8 +55,8 @@ a draft to approve, a pending round. The user resolves it from the cockpit
 continues without an answer, `d` dismisses). {{name}} types an answer into the
 agent's session as its next prompt (a long one tells the agent to run
 `{{command}} turn answer <url>`), or starts a new session that resumes the turn
-when the old one is gone; an agent reads the answers to what it posted with
-`inbox_read`. Do not answer for the user and do not type into that agent's
+when the old one is gone; an agent reads the answers to what it posted, and
+what you wrote on its task's chat, with `task_read`. Do not answer for the user and do not type into that agent's
 terminal.
 
 ## Reading `{{command}} status`

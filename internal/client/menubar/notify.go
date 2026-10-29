@@ -124,7 +124,7 @@ func notification(e api.TaskView) (Notification, posted) {
 		if x.Basis != "" {
 			p.basis[x.ID] = x.Basis
 		}
-		n.Actions = append(n.Actions, NotificationAction{ID: x.ID, Title: x.Title, TextInput: x.TextInput})
+		n.Actions = append(n.Actions, NotificationAction{ID: x.ID, Title: x.Title, TextInput: x.TextInput, Placeholder: x.Placeholder, Button: x.Button})
 	}
 	n.Category = displayCategory(Category(a.Category), n.Actions)
 	return n, p
@@ -139,7 +139,7 @@ func displayCategory(cat Category, actions []NotificationAction) Category {
 	}
 	h := fnv.New64a()
 	for _, a := range actions {
-		fmt.Fprintf(h, "%s\x00%s\x00%t\x00", a.ID, a.Title, a.TextInput)
+		fmt.Fprintf(h, "%s\x00%s\x00%t\x00%s\x00%s\x00", a.ID, a.Title, a.TextInput, a.Placeholder, a.Button)
 	}
 	return cat + "." + Category(strconv.FormatUint(h.Sum64(), 36))
 }
@@ -219,7 +219,7 @@ func (c *Controller) reply(ctx context.Context, r Response, task string) error {
 		c.notifyNote(r.ID, task, "Reply not saved", "Nothing was typed.")
 		return nil
 	}
-	args := map[string]string{"text": r.Text}
+	args := map[string]string{"text": r.Text, "send": "draft"}
 	title := "Reply saved to the Outbox"
 	if r.Send {
 		args["send"], title = "now", "Reply sent"

@@ -11,6 +11,7 @@ GET STARTED
 PULL REQUESTS
   act                    Resolve a unit's open items, replies as drafts
   address                Triage the reviews and failing checks of yours
+  chat                   Talk with an agent about a task
   nudge                  Ask whoever it waits on for the next step
   review                 Review someone else's pull request in its own worktree
   start                  Start new work from a brief

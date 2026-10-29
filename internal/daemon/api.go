@@ -83,7 +83,7 @@ func (s *Server) routes() []route {
 		{"POST " + api.TaskVerb, s.handleTaskVerb},
 		{"GET " + api.TimelinePath, s.handleTimeline},
 		{"GET " + api.RunsPath, s.handleRuns},
-		{"POST " + api.ChatPath, owedBy("U2")},
+		{"POST " + api.ChatPath, s.handleChat},
 		{"POST " + api.AttachPath, s.handleAttach},
 		{"GET " + api.GatesPath, s.handleGates},
 		{"POST " + api.GatePath, s.handleGate},
@@ -150,15 +150,6 @@ func writeJSON(w http.ResponseWriter, v any) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write(append(body, '\n'))
-}
-
-// notImplemented answers 501 for a route of the task model's contract that task owes.
-func notImplemented(w http.ResponseWriter, task string) {
-	writeError(w, http.StatusNotImplemented, "not implemented: "+task)
-}
-
-func owedBy(task string) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) { notImplemented(w, task) }
 }
 
 func writeError(w http.ResponseWriter, code int, msg string) {

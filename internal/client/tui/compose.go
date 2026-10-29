@@ -24,6 +24,9 @@ const (
 	ownDismiss     = "dismiss"
 )
 
+// handlerReply is the handler of the verb that writes a reply on the task's unit.
+const handlerReply = "reply"
+
 // draftVerbHandlers are the handlers a draft's verbs run.
 var draftVerbHandlers = []string{handlerApprove, ownDismiss, handlerRetry, handlerEdit}
 
@@ -234,16 +237,16 @@ func sessionOff(e api.TaskView) string {
 	return ""
 }
 
-// replyPrompt asks for a reply in the task's conversation, saved to the Outbox; Tab sends it at once,
-// after a y, and Ctrl+E writes it in the editor.
+// replyPrompt asks for a reply in the task's conversation, sent now or held for approval as the verb's
+// served send says; Tab switches to the other, a send waits for a y, and Ctrl+E writes it in the editor.
 func (m *Model) replyPrompt(e api.TaskView, c Command, read uint64) (Command, bool) {
 	name := taskLabel(e)
 	labels := map[bool]string{
-		false: m.verbQuestion("reply") + ", on " + name + " (Tab: send now; Ctrl+E: editor)",
-		true:  "reply on " + name + ", sent now (Tab: save to the Outbox; Ctrl+E: editor)",
+		false: m.verbQuestion(c.verb) + ", on " + name + ", held for approval (Tab: send now; Ctrl+E: editor)",
+		true:  m.verbQuestion(c.verb) + ", on " + name + ", sent now (Tab: hold for approval; Ctrl+E: editor)",
 	}
-	send := false
-	p := &prompt{action: "reply", label: labels[false], read: read, editor: true}
+	send := m.verbSend(c.verb) == "now"
+	p := &prompt{action: "reply", label: labels[send], read: read, editor: true}
 	p.tab = func(p *prompt) {
 		send = !send
 		p.label = labels[send]
@@ -253,7 +256,7 @@ func (m *Model) replyPrompt(e api.TaskView, c Command, read uint64) (Command, bo
 			m.status = "reply " + c.Label + " cancelled: nothing typed"
 			return Command{}, false
 		}
-		c.args = map[string]string{"text": text}
+		c.args = map[string]string{"text": text, "send": "draft"}
 		if !send {
 			return m.send(c)
 		}

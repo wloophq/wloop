@@ -99,3 +99,18 @@ process.stdout.write(JSON.stringify({ Text: out }));`, map[string]any{"tasks": e
 		t.Errorf("no match: %s", got.Text[1])
 	}
 }
+
+func TestUnitComposerStartsOnTheServedSend(t *testing.T) {
+	var got map[string]string
+	nodeRun(t, viewsPrelude(t)+detailHarness+composeHarness, nil, `
+const out = {};
+for (const send of ["now", "draft"]) {
+  tasksState.catalog = { verbs: [{ verb: "respond", handler: "reply", label: "Reply", send }] };
+  const box = unitExtras({ row: { unit: input.unit }, items: [] });
+  out[send] = ["send", "save"].filter((b) => String(byFocus(box, "unit:reply:" + b).attrs.class).includes("primary")).join(",");
+}
+process.stdout.write(JSON.stringify(out));`, map[string]any{"unit": slackThread}, &got)
+	if got["now"] != "send" || got["draft"] != "save" {
+		t.Fatalf("primary by served send %v", got)
+	}
+}

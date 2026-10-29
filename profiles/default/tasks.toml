@@ -282,6 +282,12 @@ by      = { person = "true" }
 [verbs.reply]
 handler = "reply"
 label   = "Reply"
-summary = "Write a reply on its unit; it waits in the Outbox for your approval."
-input   = "Reply, saved to the Outbox for your approval"
+summary = "Write a reply on its unit; Send posts it now, Save as draft holds it for your approval."
+input   = "Your reply"
+send    = "now"
 by      = { person = "true" }
+
+# What you write on a task's chat reaches its live session; with none, it
+# starts a turn of this intent, resuming the task's last session.
+[chat]
+intent = "chat"

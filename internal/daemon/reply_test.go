@@ -43,11 +43,11 @@ func TestReplySavesAUserDraftToTheOutbox(t *testing.T) {
 		!slices.ContainsFunc(v.Verbs, func(s api.VerbState) bool { return s.Verb == "reply" && s.Enabled }) {
 		t.Fatalf("%d %+v", code, v.Verbs)
 	}
-	rec := post(t, r.s, api.TaskPath("e-1", "reply"), `{"source":"tui","args":{"text":"On it, thanks"}}`)
+	rec := post(t, r.s, api.TaskPath("e-1", "reply"), `{"source":"tui","args":{"text":"On it, thanks","send":"draft"}}`)
 	if rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if res := taskResult(t, rec.Body.Bytes()); len(res.Lines) != 1 || !strings.Contains(res.Lines[0], "saved to the Outbox") || res.Task.ID != "e-1" {
+	if res := taskResult(t, rec.Body.Bytes()); len(res.Lines) != 1 || res.Lines[0] != "Draft 1 saved for your approval." || res.Task.ID != "e-1" {
 		t.Fatalf("result %+v", res)
 	}
 	ds := r.drafts(t)
@@ -66,6 +66,24 @@ func TestReplySavesAUserDraftToTheOutbox(t *testing.T) {
 	evs, err := r.db.Events().Since(context.Background(), 0, []string{task.VerbEventKind(task.VerbReply)})
 	if err != nil || len(evs) != 1 || evs[0].Unit != task.UnitOf("e-1") {
 		t.Fatalf("reply events %+v %v", evs, err)
+	}
+}
+
+func TestAReplyThatNamesNoSendTakesItsVerbsSend(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	r.put(t, unitTask("e-1", task.OriginDerived, r7u))
+	rec := post(t, r.s, api.TaskPath("e-1", "reply"), `{"source":"cockpit","args":{"text":"Shipped"}}`)
+	if res := taskResult(t, rec.Body.Bytes()); rec.Code != 200 || len(res.Lines) != 1 || res.Lines[0] != "Draft 1 approved; it goes out in a moment." {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	if d := r.drafts(t)[0]; d.State != draft.Queued {
+		t.Fatalf("the bundled send now did not send: %+v", d)
+	}
+	r.s.deps.Intents = draftReplies(t)
+	rec = post(t, r.s, api.TaskPath("e-1", "reply"), `{"source":"cockpit","args":{"text":"Later"}}`)
+	if res := taskResult(t, rec.Body.Bytes()); rec.Code != 200 || len(res.Lines) != 1 || res.Lines[0] != "Draft 2 saved for your approval." {
+		t.Fatalf("a profile with send draft: %d %s", rec.Code, rec.Body)
 	}
 }
 

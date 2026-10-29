@@ -25,15 +25,15 @@ func defaultLists() []byte {
 }
 
 // splitLists is src, the tables of tasks.toml and views.toml together,
-// as the two files: [verbs.*], [states.*], [props.*] and [owed_by] tables
-// in tasks.toml, the rest in views.toml.
+// as the two files: [verbs.*], [states.*], [props.*], [owed_by] and [chat]
+// tables in tasks.toml, the rest in views.toml.
 func splitLists(src string) map[string]string {
 	out := map[string]string{}
 	file := ViewsFile
 	for _, line := range strings.SplitAfter(src, "\n") {
 		if strings.HasPrefix(line, "[") {
 			file = ViewsFile
-			if strings.HasPrefix(line, "[verbs") || strings.HasPrefix(line, "[states") || strings.HasPrefix(line, "[props") || strings.HasPrefix(line, "[owed_by") {
+			if strings.HasPrefix(line, "[verbs") || strings.HasPrefix(line, "[states") || strings.HasPrefix(line, "[props") || strings.HasPrefix(line, "[owed_by") || strings.HasPrefix(line, "[chat]") {
 				file = TasksFile
 			}
 		}

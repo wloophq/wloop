@@ -371,7 +371,7 @@ func TestVerbKeysSendTaskVerbs(t *testing.T) {
 		{Key{Rune: 'a'}, "approve", "", nil},
 		{Key{Rune: 'd'}, "delegate", "", nil},
 		{Key{Rune: 'd'}, "delegate", "keep it short", map[string]string{"guidance": "keep it short"}},
-		{Key{Rune: 'r'}, "reply", "On it", map[string]string{"text": "On it"}},
+		{Key{Rune: 'r'}, "reply", "On it", map[string]string{"text": "On it", "send": "draft"}},
 		{Key{Rune: 'e'}, "done", "", nil},
 		{Key{Name: KeyBackspace}, "dismiss", "", nil},
 	} {

@@ -350,6 +350,16 @@ func (m *Model) verbQuestion(verb string) string {
 	return verb
 }
 
+// verbSend is what a reply of verb does by default, as the daemon serves it.
+func (m *Model) verbSend(verb string) string {
+	for _, v := range m.viewsCat.Verbs {
+		if v.Verb == verb {
+			return v.Send
+		}
+	}
+	return ""
+}
+
 func (m *Model) verbLabel(verb string) string {
 	for _, v := range m.viewsCat.Verbs {
 		if v.Verb == verb {

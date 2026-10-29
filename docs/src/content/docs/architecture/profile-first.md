@@ -23,7 +23,7 @@ The embedded `profiles/default/` is the lowest layer of every profile. Each enab
 | The gates: each one's kind, words and the intents it is resolved with | `profiles/default/gates.toml` | a `gates.toml` whose keys replace the bundled ones and whose new gates and intents come after the bundled ones |
 | The labels of the views, the keys that jump to them, and the labels of the review's steps | `profiles/default/views.toml` | a `views.toml` whose keys replace the bundled ones |
 | The help line of each core key, by context, then action | `profiles/default/keys.toml` | a `keys.toml` whose keys replace the bundled ones |
-| What the loop tells a session: the notice that the user answered an Inbox message, and the reason a stop is blocked while the turn owes a record | `profiles/default/notices.toml` | a `notices.toml` whose keys replace the bundled ones |
+| What the loop tells a session, and the person about what they wrote: the notice that the user answered a gate or wrote on the task's chat, the reason a stop is blocked while the turn owes a record, where a reply went, the words of a notification's text inputs | `profiles/default/notices.toml` | a `notices.toml` whose keys replace the bundled ones |
 
 A file of yours replaces the bundled file of the same path; a manifest of yours replaces the bundled manifest whole. An intent becomes a command, a skill and an action on rows; a workflow is everything {{name}} does without being asked. A broken user intent or workflow disables only itself (a broken override leaves the bundled one in force), and evaluating the plan writes nothing. See [Profiles](/concepts/profiles/) and [The sweep and workflows](/concepts/workflows/).
 

@@ -235,7 +235,7 @@ func (m mcpEndpoint) wire(d daemon.Deps, cfg config.Config) daemon.Deps {
 		srv.Plugins = m.tools(cfg)
 	}
 	if d.Messages != nil {
-		srv.Inbox = d.Messages
+		srv.Tasks = d.Messages
 	}
 	d.MCP = srv
 	return d

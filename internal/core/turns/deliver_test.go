@@ -72,7 +72,7 @@ func TestAQueuedAnswerIsTypedWhenItsSessionStops(t *testing.T) {
 	if err := s.DeliverStopped(ctx, "term_1"); err != nil {
 		t.Fatal(err)
 	}
-	if typed := sess.Typed(); len(typed) != 1 || typed[0] != (turnstest.Typed{Handle: "term_1", Line: "answered Message=0 Unit=https://github.com/acme/api/pull/7"}) {
+	if typed := sess.Typed(); len(typed) != 1 || typed[0] != (turnstest.Typed{Handle: "term_1", Line: "answered Gate=0 Unit=https://github.com/acme/api/pull/7"}) {
 		t.Fatalf("typed %+v", typed)
 	}
 	b := bookOf(t, store, r7)
@@ -115,7 +115,7 @@ func TestTheSweepDeliversAQueuedAnswerOnceTheAgentIsIdle(t *testing.T) {
 	if err := sweep(t, s); err != nil {
 		t.Fatal(err)
 	}
-	if typed := sess.Typed(); len(typed) != 1 || typed[0].Line != "answered Message=0 Unit=https://github.com/acme/api/pull/7" || routes(t, store)[0] != turn.Typed {
+	if typed := sess.Typed(); len(typed) != 1 || typed[0].Line != "answered Gate=0 Unit=https://github.com/acme/api/pull/7" || routes(t, store)[0] != turn.Typed {
 		t.Fatalf("typed %+v, routes %v", typed, routes(t, store))
 	}
 }
@@ -143,7 +143,7 @@ func TestANewerAnswerReplacesTheQueuedOne(t *testing.T) {
 	if err := s.DeliverStopped(context.Background(), "term_1"); err != nil {
 		t.Fatal(err)
 	}
-	if typed := sess.Typed(); len(typed) != 1 || typed[0].Line != "answered Message=0 Unit=https://github.com/acme/api/pull/7" {
+	if typed := sess.Typed(); len(typed) != 1 || typed[0].Line != "answered Gate=0 Unit=https://github.com/acme/api/pull/7" {
 		t.Fatalf("typed %+v", typed)
 	}
 }

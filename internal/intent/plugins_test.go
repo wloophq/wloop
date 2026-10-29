@@ -25,26 +25,26 @@ use = "session.close"
 `
 
 // withBundledTasks is fsys with the bundled tasks.toml at its root, so the
-// plugins' task workflows read its properties.
+// plugins' task workflows read its properties, and the chat intent it names.
 func withBundledTasks(t *testing.T, fsys fs.FS) fs.FS {
 	t.Helper()
-	src, err := fs.ReadFile(bundledDefault(t), TasksFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	m := fstest.MapFS{TasksFile: {Data: src}}
-	err = fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+	m := fstest.MapFS{}
+	copyInto := func(src fs.FS, keep func(string) bool) {
+		err := fs.WalkDir(src, ".", func(path string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() || !keep(path) {
+				return err
+			}
+			data, err := fs.ReadFile(src, path)
+			m[path] = &fstest.MapFile{Data: data}
 			return err
+		})
+		if err != nil {
+			t.Fatal(err)
 		}
-		data, err := fs.ReadFile(fsys, path)
-		m[path] = &fstest.MapFile{Data: data}
-		return err
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
-	return m
+	copyInto(bundledDefault(t), func(path string) bool { return path == TasksFile })
+	copyInto(fsys, func(string) bool { return true })
+	return withChat(t, m)
 }
 
 // usePlugins registers ps for the rest of t, as the composition root does.
