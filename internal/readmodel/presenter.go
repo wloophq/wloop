@@ -12,4 +12,5 @@ type Presenter interface {
 // EventPresenter is optional on a Presenter: the words of its event kinds.
 type EventPresenter interface {
 	Events() []api.EventSpec
+	Details() []api.DetailSpec
 }

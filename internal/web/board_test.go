@@ -234,7 +234,7 @@ func TestExploreChipsFollowTheText(t *testing.T) {
 
 func TestExploreSortChipsFollowTheText(t *testing.T) {
 	var got []any
-	nodeRun(t, jsConst(t, appJS(t), "DEFAULT_SORT"), []string{"querySort", "withSort"}, `process.stdout.write(JSON.stringify([
+	nodeRun(t, catalogPrelude(t), []string{"querySort", "withSort"}, `process.stdout.write(JSON.stringify([
   withSort("org:acme", "created-asc"),
   withSort("org:acme  sort:created-asc label:x", "updated-desc"),
   withSort("sort:updated-desc @zoe sort:created-asc", "updated-asc"),
@@ -375,13 +375,17 @@ func TestAReviewRequestIsReadyForSlack(t *testing.T) {
 }
 
 func TestExplorePresetsAskForMyTeamsInOneClick(t *testing.T) {
+	var got []map[string]string
+	nodeRun(t, catalogPrelude(t), nil, `process.stdout.write(JSON.stringify(exploreSearch().presets));`, nil, &got)
+	want := []map[string]string{
+		{"query": "user-review-requested:@me", "label": "Asked of me"},
+		{"query": "review-requested:@me -user-review-requested:@me", "label": "Asked of my teams"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("presets %v, want %v", got, want)
+	}
 	src := appJS(t)
-	for _, want := range []string{
-		`{ query: "user-review-requested:@me", label: "Asked of me" }`,
-		`{ query: "review-requested:@me -user-review-requested:@me", label: "Asked of my teams" }`,
-		"EXPLORE_PRESETS.map((p) =>",
-		"onclick: () => explore(p.query)",
-	} {
+	for _, want := range []string{"(exploreSearch().presets || []).map((p) =>", "onclick: () => explore(p.query)"} {
 		if !strings.Contains(src, want) {
 			t.Errorf("app.js lacks %s", want)
 		}
@@ -451,7 +455,7 @@ func TestCopiedExploreCandidatesSayWhatTheCardsSay(t *testing.T) {
 		}},
 	}
 	var got string
-	nodeRun(t, keyJS(t)+`const REVIEW_LABEL = { APPROVED: "approved" }; const state = { rows: [] };
+	nodeRun(t, keyJS(t)+catalogPrelude(t)+`const state = { rows: [] };
 const rowByKey = () => undefined;`,
 		[]string{"safeURL", "candidateURL", "yamlString", "candidatesYAML"},
 		`process.stdout.write(JSON.stringify(candidatesYAML(input.meta, input.cands)));`, in, &got)

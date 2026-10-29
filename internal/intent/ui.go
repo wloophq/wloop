@@ -21,18 +21,59 @@ type UITexts struct {
 	Situations map[string]string  `toml:"situations"`
 	Events     map[string]UIEvent `toml:"events"`
 	Menubar    map[string]string  `toml:"menubar"`
+	Detail     map[string]UIField `toml:"detail"`
+}
+
+// UIField is how a field of a unit's detail shows.
+type UIField struct {
+	Label string `toml:"label"`
+	Title string `toml:"title"`
+}
+
+// UISearch is a custom view's search: the queries it runs at a press, the
+// terms it toggles, the orders it offers and how a result's decision reads.
+type UISearch struct {
+	DefaultSort string            `toml:"default_sort"`
+	Presets     []UISearchPreset  `toml:"presets"`
+	Filters     []UISearchFilter  `toml:"filters"`
+	Sorts       []UISearchSort    `toml:"sorts"`
+	Decisions   map[string]string `toml:"decisions"`
+	NoDecision  string            `toml:"no_decision"`
+}
+
+// UISearchPreset is a query run at a press.
+type UISearchPreset struct {
+	Query string `toml:"query"`
+	Label string `toml:"label"`
+}
+
+// UISearchFilter toggles a term, or with Window a recent-activity window in
+// days.
+type UISearchFilter struct {
+	Term   string `toml:"term"`
+	Window int    `toml:"window"`
+	Label  string `toml:"label"`
+}
+
+// UISearchSort is an order a search offers.
+type UISearchSort struct {
+	Sort  string `toml:"sort"`
+	Label string `toml:"label"`
+	Shown string `toml:"shown"`
 }
 
 // UIView is a view's words.
 type UIView struct {
-	Label string `toml:"label"`
-	Unit  string `toml:"unit"`
+	Label  string    `toml:"label"`
+	Unit   string    `toml:"unit"`
+	Search *UISearch `toml:"search"`
 }
 
 // UIEvent is an event kind's words.
 type UIEvent struct {
 	Label string `toml:"label"`
 	Loop  bool   `toml:"loop"`
+	Data  string `toml:"data"`
 }
 
 // UIFacet is a facet's words.
@@ -97,6 +138,9 @@ func mergeUI(into, over UITexts) UITexts {
 		if b.Unit != "" {
 			a.Unit = b.Unit
 		}
+		if b.Search != nil {
+			a.Search = b.Search
+		}
 		return a
 	})
 	into.Facets = mergeMap(into.Facets, over.Facets, func(a, b UIFacet) UIFacet {
@@ -112,6 +156,7 @@ func mergeUI(into, over UITexts) UITexts {
 	})
 	into.Events = mergeMap(into.Events, over.Events, func(_, y UIEvent) UIEvent { return y })
 	into.Situations = mergeMap(into.Situations, over.Situations, func(_, y string) string { return y })
+	into.Detail = mergeMap(into.Detail, over.Detail, func(_, y UIField) UIField { return y })
 	into.Menubar = mergeMap(into.Menubar, over.Menubar, func(_, y string) string { return y })
 	return into
 }

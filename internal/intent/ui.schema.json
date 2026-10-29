@@ -3,11 +3,44 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "properties": {
+    "detail": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "One field's words.",
+        "properties": {
+          "label": {
+            "description": "The field's name. Required.",
+            "type": "string"
+          },
+          "title": {
+            "description": "What the field means, as its tooltip shows it.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "type": "object"
+      },
+      "description": "How a field of the plugin's unit detail shows, by field.",
+      "type": "object"
+    },
     "events": {
       "additionalProperties": {
         "additionalProperties": false,
         "description": "One event kind's words.",
         "properties": {
+          "data": {
+            "description": "How the event's data shows on a timeline.",
+            "enum": [
+              "",
+              "none",
+              "first_field",
+              "short_sha",
+              "requested"
+            ],
+            "type": "string"
+          },
           "label": {
             "description": "The event in a few words. Required.",
             "type": "string"
@@ -87,6 +120,102 @@
           "label": {
             "description": "The view's name, as navigation lists it. Required.",
             "type": "string"
+          },
+          "search": {
+            "additionalProperties": false,
+            "description": "A custom view's search: the queries it runs at a press, the terms it toggles and the orders it offers.",
+            "properties": {
+              "decisions": {
+                "additionalProperties": {
+                  "description": "One decision's words.",
+                  "type": "string"
+                },
+                "description": "How a result's decision reads, by value.",
+                "type": "object"
+              },
+              "default_sort": {
+                "description": "The order a query with none is read in.",
+                "type": "string"
+              },
+              "filters": {
+                "description": "A term the query toggles, or a window of recent activity.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "label": {
+                      "description": "Its words. Required.",
+                      "type": "string"
+                    },
+                    "term": {
+                      "description": "The term toggled in the query.",
+                      "type": "string"
+                    },
+                    "window": {
+                      "description": "Days of recent activity the filter keeps, in place of a term.",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "label"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "no_decision": {
+                "description": "What a result with no decision reads.",
+                "type": "string"
+              },
+              "presets": {
+                "description": "A query run at a press.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "label": {
+                      "description": "Its words. Required.",
+                      "type": "string"
+                    },
+                    "query": {
+                      "description": "The query, in the source's search syntax. Required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "query"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "sorts": {
+                "description": "An order the search offers.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "label": {
+                      "description": "Its words on its button. Required.",
+                      "type": "string"
+                    },
+                    "shown": {
+                      "description": "How a result names the order, such as \"waiting longest\".",
+                      "type": "string"
+                    },
+                    "sort": {
+                      "description": "The order's value in the query. Required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "sort"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
           },
           "unit": {
             "description": "What one of the view's rows is, such as \"Pull request\", the unit column's heading; empty for a view whose rows mix kinds.",

@@ -23,6 +23,14 @@ func (p *Provider) Events() []api.EventSpec {
 	return nil
 }
 
+// Details are the words of the GitHub plugin's detail fields.
+func (p *Provider) Details() []api.DetailSpec {
+	if ep, ok := p.src.Catalog.(readmodel.EventPresenter); ok {
+		return ep.Details()
+	}
+	return nil
+}
+
 // Situations are the GitHub kinds with their labels, ranked as the
 // cockpit orders them.
 func (p *Provider) Situations() []api.SituationSpec {

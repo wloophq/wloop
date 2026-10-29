@@ -693,6 +693,7 @@ group = true
 sort = "rank"
 rank = ["me", "loop", "reviewer", "author", "nobody"]
 menu = true
+strip = true
 
 [[source.ui.facets]]
 id = "waits-on"

@@ -257,6 +257,8 @@ func TestSourceTableRefuses(t *testing.T) {
 		{"a menu of no view", "[[source.ui.menubar]]\nid = \"m\"\nview = \"nope\"\n", "nope"},
 		{"a web directory outside", "[source.ui]\nweb = \"../x\"\n", "web"},
 		{"buckets on a text facet", "[[source.ui.facets]]\nid = \"opened\"\nsort = \"text\"\nbuckets = [{id = \"day\", within = \"24h\"}]\n", "sort = time"},
+		{"two strips", "[[source.ui.facets]]\nid = \"a\"\nstrip = true\nrank = [\"x\"]\n[[source.ui.facets]]\nid = \"b\"\nstrip = true\nrank = [\"x\"]\n", "at most one"},
+		{"a strip with no rank", "[[source.ui.facets]]\nid = \"a\"\nstrip = true\n", "needs a rank"},
 		{"a bucket with no age before the last", "[[source.ui.facets]]\nid = \"opened\"\nsort = \"time\"\nbuckets = [{id = \"day\"}, {id = \"older\"}]\n", "only the last bucket"},
 		{"a repeated mark", "[[source.marks]]\nname = \"acme.seen\"\ndoc = \"d\"\n[[source.marks]]\nname = \"acme.seen\"\ndoc = \"d\"\n", "twice"},
 		{"a mark without its doc", "[[source.marks]]\nname = \"acme.seen\"\n", "doc is required"},

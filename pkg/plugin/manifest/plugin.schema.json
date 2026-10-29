@@ -656,6 +656,10 @@
                       "time"
                     ],
                     "type": "string"
+                  },
+                  "strip": {
+                    "description": "Each row's strip is colored by its value, and its rank is the strip's legend; at most one facet.",
+                    "type": "boolean"
                   }
                 },
                 "required": [

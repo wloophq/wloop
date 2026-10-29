@@ -92,6 +92,13 @@ func (p *Reported) Events() []api.EventSpec {
 	return nil
 }
 
+func (p *Reported) Details() []api.DetailSpec {
+	if ep, ok := p.src.Catalog.(EventPresenter); ok {
+		return ep.Details()
+	}
+	return nil
+}
+
 func (p *Reported) Situations() []api.SituationSpec {
 	if p.src.Catalog == nil {
 		return nil

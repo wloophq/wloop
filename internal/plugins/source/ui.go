@@ -2,6 +2,7 @@ package source
 
 import (
 	"cmp"
+	"maps"
 	"slices"
 	"strconv"
 	"sync"
@@ -47,7 +48,7 @@ func (c Catalog) Views() []api.ViewSpec {
 	for _, v := range c.ui().Views {
 		w := t.Views[v.ID]
 		out = append(out, api.ViewSpec{ID: v.ID, Label: cmp.Or(w.Label, v.ID), Provider: c.Source.Provider, Rows: v.Rows, Order: v.Order,
-			Surfaces: slices.Clone(v.Surfaces), Unit: w.Unit, UnitSort: v.UnitSort})
+			Surfaces: slices.Clone(v.Surfaces), Unit: w.Unit, UnitSort: v.UnitSort, Search: searchOf(w.Search)})
 	}
 	return out
 }
@@ -58,7 +59,7 @@ func (c Catalog) Facets() []api.FacetSpec {
 	for _, f := range c.ui().Facets {
 		w := t.Facets[f.ID]
 		spec := api.FacetSpec{ID: f.ID, Label: cmp.Or(w.Label, f.ID), Provider: c.Source.Provider, Group: f.Group, Sort: f.Sort,
-			Rank: slices.Clone(f.Rank), Empty: w.Empty, Match: f.Match, Menu: f.Menu}
+			Rank: slices.Clone(f.Rank), Empty: w.Empty, Match: f.Match, Menu: f.Menu, Strip: f.Strip}
 		if len(w.Values) > 0 {
 			spec.Labels = w.Values
 		}
@@ -100,8 +101,40 @@ func (c Catalog) Events() []api.EventSpec {
 	var out []api.EventSpec
 	for _, e := range c.Source.Events {
 		if w, ok := t.Events[e.Name]; ok {
-			out = append(out, api.EventSpec{Provider: c.Source.Provider, Kind: e.Name, Label: w.Label, Loop: w.Loop})
+			out = append(out, api.EventSpec{Provider: c.Source.Provider, Kind: e.Name, Label: w.Label, Loop: w.Loop, Data: w.Data})
 		}
+	}
+	return out
+}
+
+// Details are the words of the fields of the plugin's unit detail, in
+// field order.
+func (c Catalog) Details() []api.DetailSpec {
+	if c.Source == nil {
+		return nil
+	}
+	t := c.texts()
+	var out []api.DetailSpec
+	for _, f := range slices.Sorted(maps.Keys(t.Detail)) {
+		out = append(out, api.DetailSpec{Provider: c.Source.Provider, Field: f, Label: t.Detail[f].Label, Title: t.Detail[f].Title})
+	}
+	return out
+}
+
+// searchOf is a view's search as clients read it.
+func searchOf(s *intentload.UISearch) *api.SearchSpec {
+	if s == nil {
+		return nil
+	}
+	out := &api.SearchSpec{DefaultSort: s.DefaultSort, Decisions: s.Decisions, NoDecision: s.NoDecision}
+	for _, p := range s.Presets {
+		out.Presets = append(out.Presets, api.SearchPreset{Query: p.Query, Label: p.Label})
+	}
+	for _, f := range s.Filters {
+		out.Filters = append(out.Filters, api.SearchFilter{Term: f.Term, Window: f.Window, Label: f.Label})
+	}
+	for _, o := range s.Sorts {
+		out.Sorts = append(out.Sorts, api.SearchSort{Sort: o.Sort, Label: o.Label, Shown: o.Shown})
 	}
 	return out
 }

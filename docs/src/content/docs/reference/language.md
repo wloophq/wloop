@@ -613,6 +613,22 @@ The fields each notice reads besides `Name` and `Command`:
 - `views.<name>` (table): One view's words.
 - `views.<name>.label` (string): The view's name, as navigation lists it. Required.
 - `views.<name>.unit` (string): What one of the view's rows is, such as "Pull request", the unit column's heading; empty for a view whose rows mix kinds.
+- `views.<name>.search` (table): A custom view's search: the queries it runs at a press, the terms it toggles and the orders it offers.
+- `views.<name>.search.default_sort` (string): The order a query with none is read in.
+- `views.<name>.search.presets[]` (table): A query run at a press.
+- `views.<name>.search.presets[].query` (string): The query, in the source's search syntax. Required.
+- `views.<name>.search.presets[].label` (string): Its words. Required.
+- `views.<name>.search.filters[]` (table): A term the query toggles, or a window of recent activity.
+- `views.<name>.search.filters[].term` (string): The term toggled in the query.
+- `views.<name>.search.filters[].window` (integer): Days of recent activity the filter keeps, in place of a term.
+- `views.<name>.search.filters[].label` (string): Its words. Required.
+- `views.<name>.search.sorts[]` (table): An order the search offers.
+- `views.<name>.search.sorts[].sort` (string): The order's value in the query. Required.
+- `views.<name>.search.sorts[].label` (string): Its words on its button. Required.
+- `views.<name>.search.sorts[].shown` (string): How a result names the order, such as "waiting longest".
+- `views.<name>.search.decisions` (table): How a result's decision reads, by value.
+- `views.<name>.search.decisions.<name>` (string): One decision's words.
+- `views.<name>.search.no_decision` (string): What a result with no decision reads.
 - `facets` (table): The words of the plugin's facets, by facet id.
 - `facets.<name>` (table): One facet's words.
 - `facets.<name>.label` (string): The facet's name, as the filter menu and the groups show it. Required.
@@ -627,6 +643,16 @@ The fields each notice reads besides `Name` and `Command`:
 - `events.<name>` (table): One event kind's words.
 - `events.<name>.label` (string): The event in a few words. Required.
 - `events.<name>.loop` (bool): The event is the loop's doing, which the activity's loop filter keeps.
+- `events.<name>.data` (one of ``, `none`, `first_field`, `short_sha`, `requested`): How the event's data shows on a timeline.
+  - ``: Its data as it is.
+  - `none`: No data.
+  - `first_field`: Its data up to the first colon.
+  - `short_sha`: The first seven characters of a commit id.
+  - `requested`: Whom it asks or stops asking: shown as from that person or team, not as data.
+- `detail` (table): How a field of the plugin's unit detail shows, by field.
+- `detail.<name>` (table): One field's words.
+- `detail.<name>.label` (string): The field's name. Required.
+- `detail.<name>.title` (string): What the field means, as its tooltip shows it.
 - `menubar` (table): The heading of each menu bar section, by section id.
 - `menubar.<name>` (string): One section's heading.
 

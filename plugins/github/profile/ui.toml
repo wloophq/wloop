@@ -38,6 +38,26 @@ label = "All"
 [views.explore]
 label = "Explore"
 
+[views.explore.search]
+default_sort = "updated-asc"
+presets = [
+  { query = "user-review-requested:@me", label = "Asked of me" },
+  { query = "review-requested:@me -user-review-requested:@me", label = "Asked of my teams" },
+]
+filters = [
+  { term = "-reviewed-by:@me", label = "Not reviewed by me" },
+  { term = "draft:false", label = "Ready for review" },
+  { term = "review-requested:@me", label = "Requested from me or my teams" },
+  { window = 30, label = "Active in the last 30 days" },
+]
+sorts = [
+  { sort = "updated-asc", label = "Waiting longest", shown = "waiting longest" },
+  { sort = "created-asc", label = "Oldest opened", shown = "oldest opened" },
+  { sort = "updated-desc", label = "Recently updated", shown = "most recently updated" },
+]
+decisions = { APPROVED = "approved", CHANGES_REQUESTED = "changes requested", REVIEW_REQUIRED = "review required" }
+no_decision = "no review required"
+
 [views.recent]
 label = "Recent"
 
@@ -134,12 +154,15 @@ label = "pushed"
 
 [events.review_requested]
 label = "review requested"
+data = "requested"
 
 [events.review_request_removed]
 label = "review request removed"
+data = "requested"
 
 [events.review]
 label = "reviewed"
+data = "first_field"
 
 [events.comment]
 label = "commented"
@@ -155,6 +178,7 @@ label = "back to draft"
 
 [events.merged]
 label = "merged"
+data = "short_sha"
 
 [events.closed]
 label = "closed"
@@ -186,6 +210,14 @@ loop = true
 [events.guidance]
 label = "guidance"
 loop = true
+
+[detail.profile_chain]
+label = "Review profile"
+title = "The review profile layers a round here reads, lowest first; the profile show command lists the files"
+
+[detail.next_guidance]
+label = "Next round guidance"
+title = "Guidance waiting for the next round: given with no round pending, or kept from a round that did not go out or whose prompt was not seen landing. The next round, Review or Address included, takes it unless you give other guidance"
 
 [menubar]
 loop = "In loop"

@@ -115,7 +115,61 @@
       "order": 9,
       "surfaces": [
         "web"
-      ]
+      ],
+      "search": {
+        "default_sort": "updated-asc",
+        "presets": [
+          {
+            "query": "user-review-requested:@me",
+            "label": "Asked of me"
+          },
+          {
+            "query": "review-requested:@me -user-review-requested:@me",
+            "label": "Asked of my teams"
+          }
+        ],
+        "filters": [
+          {
+            "term": "-reviewed-by:@me",
+            "label": "Not reviewed by me"
+          },
+          {
+            "term": "draft:false",
+            "label": "Ready for review"
+          },
+          {
+            "term": "review-requested:@me",
+            "label": "Requested from me or my teams"
+          },
+          {
+            "window": 30,
+            "label": "Active in the last 30 days"
+          }
+        ],
+        "sorts": [
+          {
+            "sort": "updated-asc",
+            "label": "Waiting longest",
+            "shown": "waiting longest"
+          },
+          {
+            "sort": "created-asc",
+            "label": "Oldest opened",
+            "shown": "oldest opened"
+          },
+          {
+            "sort": "updated-desc",
+            "label": "Recently updated",
+            "shown": "most recently updated"
+          }
+        ],
+        "decisions": {
+          "APPROVED": "approved",
+          "CHANGES_REQUESTED": "changes requested",
+          "REVIEW_REQUIRED": "review required"
+        },
+        "no_decision": "no review required"
+      }
     },
     {
       "id": "recent",
@@ -169,7 +223,8 @@
         "nobody": "Waiting on nobody",
         "reviewer": "Waiting on a reviewer"
       },
-      "menu": true
+      "menu": true,
+      "strip": true
     },
     {
       "id": "waits-on",

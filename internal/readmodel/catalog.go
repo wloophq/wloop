@@ -33,6 +33,7 @@ func BuildCatalog(providers ...Provider) api.CatalogResponse {
 		c.Situations = append(c.Situations, pr.Situations()...)
 		if ep, ok := pr.(EventPresenter); ok {
 			c.Events = append(c.Events, ep.Events()...)
+			c.Details = append(c.Details, ep.Details()...)
 		}
 	}
 	raw, _ := json.Marshal(c)
