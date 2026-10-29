@@ -55,8 +55,9 @@ type Process interface {
 // binary through cmd: the handshake, the versioned plugin set of the kinds
 // spec names, gRPC only, and the checksum when spec has one. The process's
 // environment is cmd.Env (the host's when nil), then spec.Env, then
-// [ParentEnv] set to the host's pid; a later key wins. The client is managed, so goplugin.CleanupClients
-// kills it.
+// [ParentEnv] set to the host's pid; a later key wins. The client is
+// unmanaged: go-plugin would keep a managed one until CleanupClients, and the
+// host kills each client itself.
 func ClientConfig(spec Spec, cmd *exec.Cmd) *goplugin.ClientConfig {
 	kinds := map[Kind]Impl{}
 	for _, k := range spec.Kinds {
@@ -72,7 +73,6 @@ func ClientConfig(spec Spec, cmd *exec.Cmd) *goplugin.ClientConfig {
 		VersionedPlugins: VersionedPlugins(kinds),
 		Cmd:              cmd,
 		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
-		Managed:          true,
 		SkipHostEnv:      true,
 		Logger:           spec.Logger,
 	}

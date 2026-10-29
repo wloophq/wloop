@@ -3,7 +3,7 @@
 # items or daemon.
 #
 # Usage:
-#   isolated-daemon.sh setup <dir> <binary> <dm-channel-id> [<index>] [--slack] [--agent] [--plugins <id,...>] [--workflows <name,...>]
+#   isolated-daemon.sh setup <dir> <binary> <dm-channel-id> [<index>] [--slack] [--agent] [--plugins <id,...>] [--real-gh <owner/repo,...>] [--workflows <name,...>]
 #   isolated-daemon.sh env <dir>
 #   isolated-daemon.sh run <dir> <command> [<arg>...]
 #   isolated-daemon.sh snapshot [--jobs] <dir> <source-store>
@@ -26,7 +26,14 @@
 # runs against the stubbed gh, slack with no socket. --slack turns the slack
 # plugin on with its socket; every start or pause of that directory then
 # takes <dir>/../slack-socket.lock and refuses while another daemon holds
-# it. --agent leaves claude unstubbed. --workflows turns on the bundled
+# it. Each of --slack and --plugins trusts the plugin it turns on by its
+# path. --real-gh turns the github plugin on against the user's own gh:
+# gh is not stubbed and GH_TOKEN and GH_CONFIG_DIR keep the user's values,
+# and the config sets the plugin's owners to the owners of the repositories
+# it lists and its scope repos to them. The plugin still reads the user's
+# own pull requests and the reviews requested of them wherever they are;
+# automated rounds stay within the owners, and every post waits on its gate.
+# --agent leaves claude unstubbed. --workflows turns on the bundled
 # workflows it names, each of which must exist. The state and
 # config directory name is ISOLATED_STATE_NAME, else the binary's basename, and
 # setup refuses when the binary does not read the config it wrote. setup also
@@ -71,7 +78,7 @@ load() {
 	[[ -d $1 ]] || die "$1 is not a directory this script set up"
 	dir=$(cd "$1" && pwd)
 	[[ -f $dir/isolated.env ]] || die "$1 is not a directory this script set up"
-	slack=0 agent=0 plugins="" workflows=""
+	slack=0 agent=0 plugins="" workflows="" realgh=""
 	# shellcheck source=/dev/null
 	source "$dir/isolated.env"
 }
@@ -120,9 +127,9 @@ isolation() {
 	done
 	vars=(XDG_STATE_HOME="$dir/state" XDG_CONFIG_HOME="$dir/config"
 		ORCA_USER_DATA_PATH="$dir/orca" PATH="$dir/bin:$PATH"
-		GH_TOKEN=isolated-invalid GH_CONFIG_DIR="$dir/gh"
 		GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0 LOOP_USER_HOME="$dir/home"
 		ISOLATED_MCP_KEY="$(cat "$dir/state/$name/mcp.key" 2>/dev/null || true)")
+	[[ -n ${realgh:-} ]] || vars+=(GH_TOKEN=isolated-invalid GH_CONFIG_DIR="$dir/gh")
 }
 
 with_env() {
@@ -210,8 +217,8 @@ plugin_on() {
 }
 
 cmd_setup() {
-	local pos=() a list="" wlist="" on=()
-	slack=0 agent=0 plugins=()
+	local pos=() a list="" wlist="" on=() repos=() r owners=()
+	slack=0 agent=0 plugins=() realgh=""
 	while [[ $# -gt 0 ]]; do
 		a=$1
 		shift
@@ -230,12 +237,30 @@ cmd_setup() {
 			shift
 			;;
 		--workflows=*) wlist=${a#--workflows=} ;;
+		--real-gh)
+			[[ $# -gt 0 ]] || usage
+			realgh=$1
+			shift
+			;;
+		--real-gh=*) realgh=${a#--real-gh=} ;;
 		--*) usage ;;
 		*) pos+=("$a") ;;
 		esac
 	done
 	if [[ -n $list ]]; then IFS=, read -r -a plugins <<<"$list"; fi
 	if [[ -n $wlist ]]; then IFS=, read -r -a on <<<"$wlist"; fi
+	if [[ -n $realgh ]]; then
+		IFS=, read -r -a repos <<<"$realgh"
+		for r in "${repos[@]}"; do
+			[[ $r =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || die "--real-gh: $r is not owner/repo"
+			[[ " ${owners[*]-} " == *" ${r%%/*} "* ]] || owners+=("${r%%/*}")
+		done
+		plugin_on github || plugins+=(github)
+		list=$(
+			IFS=,
+			echo "${plugins[*]}"
+		)
+	fi
 	((slack)) && plugin_on slack && die "--slack runs Slack's socket and --plugins slack runs none; choose one"
 	[[ ${#pos[@]} -ge 3 && ${#pos[@]} -le 4 ]] || usage
 	local target=${pos[0]} binary=${pos[1]} dm=${pos[2]} index=${pos[3]:-0}
@@ -276,7 +301,8 @@ cmd_setup() {
 		rm -rf "$dir"
 		die "could not build orca-stub from $repo"
 	}
-	local stubs=(orca gh codex launchctl) stub
+	local stubs=(orca codex launchctl) stub
+	[[ -n $realgh ]] || stubs+=(gh)
 	((agent)) || stubs+=(claude)
 	for stub in "${stubs[@]}"; do
 		printf '#!/bin/sh\necho refused >&2\nexit 1\n' >"$dir/bin/$stub"
@@ -304,8 +330,13 @@ cmd_setup() {
 	((slack)) && slack_on=true
 	plugin_on slack && slack_on=true
 	plugin_on github && github_on=true
-	local github_trust="" slack_trust="" slack_ingest="" others=""
+	local github_trust="" github_scope="" slack_trust="" slack_ingest="" others=""
 	plugin_on github && github_trust='trust = "path"'
+	if [[ -n $realgh ]]; then
+		github_trust+=$'\n'"owners = $(toml_list "${owners[@]}")"
+		github_scope=$'\n[plugins.github.scope]\n'"repos = $(toml_list "${repos[@]}")"$'\n'
+	fi
+	((slack)) && slack_trust='trust = "path"'
 	if plugin_on slack; then
 		slack_trust='trust = "path"'
 		slack_ingest=$'\n[plugins.slack.ingest]\nsocket = false\n'
@@ -333,6 +364,7 @@ cmd_setup() {
 		[plugins.github]
 		enabled = $github_on
 		$github_trust
+		$github_scope
 
 		[plugins.slack]
 		enabled = $slack_on
@@ -345,7 +377,7 @@ cmd_setup() {
 	chmod 600 "$dir/config/$name/config.toml"
 	mkdir -m 700 "$dir/state/$name"
 	(umask 077 && od -An -tx1 -N24 /dev/urandom | tr -d ' \n' >"$dir/state/$name/mcp.key")
-	printf 'binary=%q\nname=%q\nslack=%d\nagent=%d\nplugins=%q\nworkflows=%q\n' "$bin" "$name" "$slack" "$agent" "$list" "$wlist" >"$dir/isolated.env"
+	printf 'binary=%q\nname=%q\nslack=%d\nagent=%d\nplugins=%q\nworkflows=%q\nrealgh=%q\n' "$bin" "$name" "$slack" "$agent" "$list" "$wlist" "$realgh" >"$dir/isolated.env"
 
 	local got
 	got=$(with_env "$bin" config get http.port 2>/dev/null || true)

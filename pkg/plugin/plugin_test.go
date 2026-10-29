@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -111,6 +112,25 @@ func TestACrashedPluginReportsExited(t *testing.T) {
 	if _, err := c.Health(t.Context()); err == nil {
 		t.Error("a crashed plugin answered Health")
 	}
+}
+
+func TestAKilledCrashedPluginLeavesNoClientBehind(t *testing.T) {
+	if ClientConfig(Spec{}, childCmd()).Managed {
+		t.Error("the client is managed: go-plugin keeps every managed client until CleanupClients, which the host never calls")
+	}
+	base := runtime.NumGoroutine()
+	for range 3 {
+		p, err := Exec(Spec{ID: "alpha-plugin", Kinds: []Kind{"alpha"}, Logger: hclog.NewNullLogger()}, childCmd())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := syscall.Kill(p.(*execProcess).client.ReattachConfig().Pid, syscall.SIGKILL); err != nil {
+			t.Fatal(err)
+		}
+		poll(t, "Exited after the crash", p.Exited)
+		p.Kill()
+	}
+	poll(t, "the crashed plugins' goroutines to end", func() bool { return runtime.NumGoroutine() <= base })
 }
 
 func TestVersionedPluginsNegotiate(t *testing.T) {

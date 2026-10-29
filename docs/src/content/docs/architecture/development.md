@@ -24,6 +24,10 @@ make proto        # lint proto/ and regenerate the plugin protocol's Go code
 
 Uninstall the Homebrew cask first (`brew uninstall --cask {{command}}`), or put `~/.local/bin` ahead of the Homebrew directory in your `PATH`, so the shell runs the same binary as the daemon. To go back to a release, install the cask and run `{{command}} install` and `{{command}} app install` with it.
 
+### An isolated daemon
+
+`scripts/isolated-daemon.sh` runs a build in a directory of its own, with its own state, config, Orca stub and Keychain service, so it never reaches your daemon, your store, your Orca workspaces or your agents. `setup` stubs `gh`, `orca`, `claude`, `codex` and `launchctl`. `--plugins <id,...>` turns plugins on, and `--slack` turns on Slack with its socket; either way, each plugin it turns on is trusted by its path. `--real-gh <owner/repo,...>` turns the GitHub plugin on against your own `gh`: it leaves `gh`, `GH_TOKEN` and `GH_CONFIG_DIR` as they are and sets `[plugins.github] owners` to those repositories' owners and `scope.repos` to the repositories. The plugin still reads your own pull requests and the reviews requested of you in any repository, since its searches always include them. Automated rounds stay within the owners, and every post waits on its gate (`TestIsolatedSetupRealGhScopesGitHubAndLeavesGhUnstubbed`). The script's header lists every command.
+
 ## Changing the store's schema
 
 `internal/adapter/store/sqlite/schema.sql` is the current schema, which a new store runs; `migrations` in `migrate.go` take an existing store there, one version each. To change the schema:

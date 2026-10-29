@@ -87,6 +87,7 @@ func (h *Host) supervise(ctx context.Context, r Run) {
 				h.stop(ctx, r, p)
 				return
 			}
+			p.Kill()
 			err = errProcessEnded
 			if time.Since(started) >= h.or(h.MaxBackoff, DefaultMaxBackoff) {
 				delay = h.or(h.MinBackoff, DefaultMinBackoff)

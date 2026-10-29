@@ -29,7 +29,7 @@ func ServeHost(c *plugin.Client, h Host) (*HostServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	hs := &HostServer{id: id, srv: grpc.NewServer()}
+	hs := &HostServer{id: id, srv: grpc.NewServer(grpc.WaitForHandlers(true))}
 	pb.RegisterHostServiceServer(hs.srv, &hostServer{h: h})
 	hs.wg.Go(func() { _ = hs.srv.Serve(l) })
 	return hs, nil
@@ -38,7 +38,7 @@ func ServeHost(c *plugin.Client, h Host) (*HostServer, error) {
 // ID is the broker id the plugin dials.
 func (s *HostServer) ID() uint32 { return s.id }
 
-// Close stops serving and waits for the server to end.
+// Close stops serving and waits for the server and the calls it serves to end.
 func (s *HostServer) Close() {
 	s.srv.Stop()
 	s.wg.Wait()

@@ -157,11 +157,16 @@ func TestHostStartsAnEnabledPlugin(t *testing.T) {
 type fakeProcess struct {
 	mu     sync.Mutex
 	exited bool
+	killed bool
 }
 
 func (p *fakeProcess) Kind(plugin.Kind) (*plugin.Client, error) { return new(plugin.Client), nil }
 func (p *fakeProcess) Protocol() int                            { return plugin.Protocol }
-func (p *fakeProcess) Kill()                                    { p.crash() }
+func (p *fakeProcess) Kill() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.exited, p.killed = true, true
+}
 func (p *fakeProcess) crash() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -193,6 +198,21 @@ func (l *fakeLauncher) last() *fakeProcess {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.procs[len(l.procs)-1]
+}
+
+// unkilled counts the processes launched whose client was never killed.
+func (l *fakeLauncher) unkilled() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	n := 0
+	for _, p := range l.procs {
+		p.mu.Lock()
+		if !p.killed {
+			n++
+		}
+		p.mu.Unlock()
+	}
+	return n
 }
 
 func (l *fakeLauncher) launches() []time.Time {
@@ -316,6 +336,28 @@ func linkPlugin(t *testing.T, root, id string) string {
 }
 
 // pids records the processes an ExecLauncher started.
+func TestACrashedPluginsClientIsKilledBeforeItsRestart(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		l := &fakeLauncher{}
+		h := &host.Host{Launcher: l, Kinds: []host.Kind{&fakeKind{}}, MinBackoff: time.Second, Poll: 100 * time.Millisecond}
+		ctx, cancel := context.WithCancel(t.Context())
+		h.Start(ctx, []host.Run{runOf(t, "acme")})
+		nextLaunch(l, 0)
+		for i := range 3 {
+			l.last().crash()
+			nextLaunch(l, i+1)
+		}
+		if n := l.unkilled(); n != 1 {
+			t.Errorf("%d clients left unkilled after three crashes, want the running one", n)
+		}
+		cancel()
+		h.Wait()
+		if n := l.unkilled(); n != 0 {
+			t.Errorf("%d clients left unkilled after the stop", n)
+		}
+	})
+}
+
 type pids struct {
 	host.ExecLauncher
 	mu  sync.Mutex
