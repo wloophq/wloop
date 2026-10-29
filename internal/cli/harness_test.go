@@ -604,23 +604,20 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 			untracked: map[string]int{}, unpushed: map[string]int{}, ignored: map[string][]string{}, fetchFails: map[string]bool{}, onRemote: map[string]bool{}, tips: map[string]string{}, worktrees: map[string]string{}, objects: map[string]bool{}},
 		cfg: (&Env{}).defaultConfig(),
 	}
-	te.Env = &Env{
-		effectProblems: &effectProblems{},
-		background:     &sync.WaitGroup{},
-		Out:            te.out,
-		Err:            te.err,
-		budget:         &githubBudget{},
-		Git:            gitx.Git{R: te.git},
-		Files:          checkoutFiles{ws},
-		WS:             workspace.NewSet(ws),
-		Sh:             func(context.Context, string, ...string) ([]byte, error) { return nil, fmt.Errorf("no shell in tests") },
-		Stdout:         func(context.Context, string, ...string) ([]byte, error) { return nil, fmt.Errorf("no shell in tests") },
-		LoadConfig:     func() (config.Config, error) { return te.cfg, nil },
-		ConfigPath:     t.TempDir() + "/config.toml",
-		StateDir:       t.TempDir(),
-		Home:           t.TempDir(),
-		Now:            func() time.Time { return testNow },
-		Getenv:         func(string) string { return "" },
+	te.Env = (&Env{
+		Out:        te.out,
+		Err:        te.err,
+		Git:        gitx.Git{R: te.git},
+		Files:      checkoutFiles{ws},
+		WS:         workspace.NewSet(ws),
+		Sh:         func(context.Context, string, ...string) ([]byte, error) { return nil, fmt.Errorf("no shell in tests") },
+		Stdout:     func(context.Context, string, ...string) ([]byte, error) { return nil, fmt.Errorf("no shell in tests") },
+		LoadConfig: func() (config.Config, error) { return te.cfg, nil },
+		ConfigPath: t.TempDir() + "/config.toml",
+		StateDir:   t.TempDir(),
+		Home:       t.TempDir(),
+		Now:        func() time.Time { return testNow },
+		Getenv:     func(string) string { return "" },
 
 		ViewDebounce: 10 * time.Millisecond,
 		Harness:      harnessOf(map[string]harness.Protocol{"claude": claude.Protocol{}}, defaultManagers()),
@@ -639,7 +636,7 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 			t.Error("unexpected headless agent call")
 			return nil, fmt.Errorf("no agent in tests")
 		}}},
-	}
+	}).owning()
 	te.Env.forge = testForge{te}
 	te.served, te.stopServed = context.WithCancel(context.Background())
 	te.Env.intents = newEnvIntents(te.Env)

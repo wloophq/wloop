@@ -90,9 +90,9 @@ func newInitTestEnv(t *testing.T) *initTestEnv {
 		onPath: []string{"git", "claude"},
 	}
 	cfgPath := filepath.Join(t.TempDir(), "config", "config.toml")
-	te.Env = &Env{
+	te.Env = (&Env{
 		Out: te.out, Err: te.err, In: strings.NewReader(""),
-		budget: &githubBudget{}, forge: ghForge{te.gh}, WS: workspace.NewSet(te.ws),
+		forge: ghForge{te.gh}, WS: workspace.NewSet(te.ws),
 		Sh: func(_ context.Context, name string, args ...string) ([]byte, error) {
 			if name == shellPath() && len(args) == 2 && args[0] == "-lc" {
 				var out []string
@@ -115,7 +115,7 @@ func newInitTestEnv(t *testing.T) *initTestEnv {
 			Interactive: func() bool { return false },
 			ReadSecret:  func() ([]byte, error) { return nil, errors.New("no secret in tests") },
 		},
-	}
+	}).owning()
 	te.slackSt = &slackTestEnv{kc: te.kc}
 	withSlackPlugin(t, te.Env, te.slackSt.pluginEnv(t, ""))
 	te.Env.intents = newEnvIntents(te.Env)

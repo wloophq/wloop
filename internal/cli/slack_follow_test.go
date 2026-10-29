@@ -183,3 +183,10 @@ func TestFollowRefusesWhatIsNotAPermalink(t *testing.T) {
 		t.Fatal("follow without a permalink succeeded")
 	}
 }
+
+func TestAPluginLoadedUnderAHandBuiltEnvRunsOnItsBackgroundWork(t *testing.T) {
+	te := newSlackTestEnv(t)
+	startSlackDaemon(t, te)
+	eventually(t, "the slack plugin loaded", func() bool { return len(te.pluginKind.Loading()) == 0 })
+	te.Env.background.Wait()
+}

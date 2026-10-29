@@ -280,6 +280,17 @@ type Env struct {
 	briefReader func() (briefReader, error)
 }
 
+// owning is e with the state an Env owns, which its copies share: the
+// work it starts in the background and waits for, its unapplied turn
+// effects and the GitHub plugin's budget. Every Env that serves is built
+// through it.
+func (e *Env) owning() *Env {
+	e.background = &sync.WaitGroup{}
+	e.effectProblems = &effectProblems{}
+	e.budget = &githubBudget{}
+	return e
+}
+
 func NewEnv() *Env {
 	exe, err := os.Executable()
 	if err != nil {
@@ -289,28 +300,25 @@ func NewEnv() *Env {
 	managers := defaultManagers()
 	agents, homes, protocols := agentRegistries(defaultAgents())
 	home := config.Home()
-	e := &Env{
-		plugins:        installed,
-		background:     &sync.WaitGroup{},
-		effectProblems: &effectProblems{},
-		Out:            os.Stdout,
-		Err:            os.Stderr,
-		In:             os.Stdin,
-		budget:         &githubBudget{},
-		Git:            gitx.New(),
-		WS:             newSet(managers, Defaults().WorkspaceManagers),
-		Sh:             execSh,
-		Stdout:         execStdout,
-		LoadConfig:     func() (config.Config, error) { return config.Load(Defaults()) },
-		IntentRecheck:  intentRecheck,
-		ConfigPath:     config.Path(),
-		StateDir:       stateDir,
-		Home:           home,
-		Now:            time.Now,
-		Socket:         config.DaemonSocket(),
-		Getenv:         os.Getenv,
-		Executable:     exe,
-		Harness:        harnessOf(protocols, managers),
+	e := (&Env{
+		plugins:       installed,
+		Out:           os.Stdout,
+		Err:           os.Stderr,
+		In:            os.Stdin,
+		Git:           gitx.New(),
+		WS:            newSet(managers, Defaults().WorkspaceManagers),
+		Sh:            execSh,
+		Stdout:        execStdout,
+		LoadConfig:    func() (config.Config, error) { return config.Load(Defaults()) },
+		IntentRecheck: intentRecheck,
+		ConfigPath:    config.Path(),
+		StateDir:      stateDir,
+		Home:          home,
+		Now:           time.Now,
+		Socket:        config.DaemonSocket(),
+		Getenv:        os.Getenv,
+		Executable:    exe,
+		Harness:       harnessOf(protocols, managers),
 
 		NativeAvailable: macos.Available,
 		RunNative: func(setup func(menubar.Tray, menubar.Notifier)) {
@@ -323,7 +331,7 @@ func NewEnv() *Env {
 		Homes:      homes,
 		Usage:      defaultUsage(home),
 		Managers:   managers,
-	}
+	}).owning()
 	e.intents = newEnvIntents(e)
 	return e
 }

@@ -138,7 +138,7 @@ func newSlackTestEnv(t *testing.T) *slackTestEnv {
 	te.cfg.Slack.KeychainService = "loop-test-slack"
 	off := false
 	te.cfg.Slack.Ingest.Socket = &off
-	te.Env = &Env{
+	te.Env = (&Env{
 		Out:        te.out,
 		Err:        te.err,
 		In:         strings.NewReader(""),
@@ -148,7 +148,7 @@ func newSlackTestEnv(t *testing.T) *slackTestEnv {
 		Home:       t.TempDir(),
 		Now:        func() time.Time { return testNow },
 		Sh:         func(context.Context, string, ...string) ([]byte, error) { return nil, errors.New("no shell in tests") },
-	}
+	}).owning()
 	withSlackPlugin(t, te.Env, te.pluginEnv(t, te.srv.URL))
 	return te
 }
