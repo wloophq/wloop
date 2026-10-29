@@ -127,3 +127,89 @@ func containsAll(s string, parts []string) bool {
 	}
 	return true
 }
+
+// v6StoreWith is a version 6 store, from its frozen schema, holding a
+// pull request, a Slack message and the GitHub viewer.
+func v6StoreWith(t *testing.T) string {
+	t.Helper()
+	schema, err := filepath.Abs(filepath.Join("..", "adapter", "store", "sqlite", "testdata", "schema-v6.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "source", "store.db")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	script := ".read " + schema + "\n" + `PRAGMA user_version = 6;
+INSERT INTO meta (key, value) VALUES ('compatible_version', '4'), ('viewer:github', 'ana');
+INSERT INTO pull_requests (owner, repo, number, title, state) VALUES ('acme', 'api', 7, 'Fix the build', 'OPEN');
+INSERT INTO slack_messages (conversation, ts, text) VALUES ('C1', '1.1', 'hello');
+`
+	cmd := exec.Command("sqlite3", path)
+	cmd.Stdin = strings.NewReader(script)
+	if raw, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("a version 6 store: %v\n%s", err, raw)
+	}
+	return path
+}
+
+func TestASnapshotsPluginsImportAndReport(t *testing.T) {
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("snapshot needs sqlite3")
+	}
+	bin := buildRelease(t, "github", "slack")
+	src := v6StoreWith(t)
+	dir := filepath.Join(shortDir(t), "c5")
+	mustIsolated(t, "setup", dir, bin, isolatedDM, "6", "--plugins", "github,slack")
+	t.Cleanup(func() { isolated(t, "stop", dir) })
+	file := filepath.Join(dir, "config", brand.StateDir(), "config.toml")
+	raw, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The e2e Keychain item may hold a live token; the daemon here reads one no machine has.
+	raw = []byte(strings.Replace(string(raw), `"`+e2eKeychain+`"`, fmt.Sprintf(`"keychain-test-%d"`, time.Now().UnixNano()), 1))
+	if err := os.WriteFile(file, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	beside := filepath.Join(filepath.Dir(src), "plugins", "acme", "import.db")
+	if err := os.MkdirAll(filepath.Dir(beside), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(beside, []byte("an export"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	mustIsolated(t, "snapshot", dir, src)
+	if raw, err := os.ReadFile(filepath.Join(dir, "state", brand.StateDir(), "plugins", "acme", "import.db")); err != nil || string(raw) != "an export" {
+		t.Errorf("snapshot did not copy the import.db beside the store: %q %v", raw, err)
+	}
+	if out, err := isolated(t, "start", dir); err == nil {
+		t.Errorf("a copy served with its jobs on, without --jobs: %s", out)
+	}
+	mustIsolated(t, "run", dir, filepath.Join(dir, "bin", brand.Name), "store", "migrate", "--yes")
+	mustIsolated(t, "start", dir, "--jobs")
+	state := filepath.Join(dir, "state", brand.StateDir())
+	want := []string{"plugin github: loaded", "plugin slack: loaded"}
+	var got string
+	for deadline := time.Now().Add(90 * time.Second); time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
+		b, _ := os.ReadFile(filepath.Join(dir, "daemon.log"))
+		got = string(b)
+		if containsAll(got, want) {
+			break
+		}
+	}
+	for _, w := range want {
+		if !strings.Contains(got, w) {
+			t.Errorf("the daemon's log lacks %q:\n%s", w, got)
+		}
+	}
+	for id, table := range map[string]string{"github": "pull_requests", "slack": "slack_messages"} {
+		if _, err := os.Stat(filepath.Join(state, "plugins", id, "import.db.done")); err != nil {
+			t.Errorf("%s did not import its export: %v", id, err)
+		}
+		out, err := exec.Command("sqlite3", "file:"+filepath.Join(state, "plugins", id, "plugin.db")+"?mode=ro", "SELECT count(*) FROM "+table).CombinedOutput()
+		if err != nil || strings.TrimSpace(string(out)) != "1" {
+			t.Errorf("%s's store holds %q rows of %s (%v), want the snapshot's one", id, out, table, err)
+		}
+	}
+}

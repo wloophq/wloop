@@ -8,7 +8,7 @@
 #   isolated-daemon.sh run <dir> <command> [<arg>...]
 #   isolated-daemon.sh snapshot <dir> <source-store>
 #   isolated-daemon.sh pause <dir>
-#   isolated-daemon.sh start <dir> [<serve arg>...]
+#   isolated-daemon.sh start <dir> [--jobs] [<serve arg>...]
 #   isolated-daemon.sh stop <dir>
 #   isolated-daemon.sh clean <dir>
 #
@@ -32,8 +32,12 @@
 # run expose it as ISOLATED_MCP_KEY for a recipe's X-Loop-Key header.
 #
 # snapshot copies a store into <dir>'s state, never writing the source, at
-# 0600, and marks <dir> as holding a copy: start and serve then require
-# --no-jobs. The copy must carry a stored GitHub viewer.
+# 0600, with the plugins/<id>/import.db beside it, and marks <dir> as
+# holding a copy: start and serve then require --no-jobs. The copy must
+# carry a stored GitHub viewer. start --jobs serves a copy with its jobs on
+# when setup turned plugins on, so they start, import and report against
+# the stubs; a version 6 copy first takes `run <dir> <binary> store migrate
+# --yes`, which writes each import.db.
 #
 # pause serves --no-jobs once, stores the pause through the CLI and stops.
 # start serves in the background, logging to <dir>/daemon.log. stop signals
@@ -59,7 +63,7 @@ load() {
 	[[ -d $1 ]] || die "$1 is not a directory this script set up"
 	dir=$(cd "$1" && pwd)
 	[[ -f $dir/isolated.env ]] || die "$1 is not a directory this script set up"
-	slack=0 agent=0
+	slack=0 agent=0 plugins=""
 	# shellcheck source=/dev/null
 	source "$dir/isolated.env"
 }
@@ -160,14 +164,20 @@ release_lock() {
 	fi
 }
 
-# needs_no_jobs refuses a serve without --no-jobs over a copied store.
+# needs_no_jobs refuses a serve without --no-jobs over a copied store,
+# unless jobs is 1 and setup turned plugins on.
 needs_no_jobs() {
+	local jobs=$1 a
+	shift
 	[[ -f $dir/copied ]] || return 0
-	local a
 	for a in "$@"; do
 		[[ $a == --no-jobs ]] && return 0
 	done
-	die "$dir holds a copy of a store; serve it only with --no-jobs"
+	if ((jobs)); then
+		[[ -n $plugins ]] || die "--jobs serves a copied store for its plugins; set $dir up with --plugins"
+		return 0
+	fi
+	die "$dir holds a copy of a store; serve it only with --no-jobs, or with --jobs for the plugins setup turned on"
 }
 
 toml_list() {
@@ -303,7 +313,7 @@ cmd_setup() {
 	chmod 600 "$dir/config/$name/config.toml"
 	mkdir -m 700 "$dir/state/$name"
 	(umask 077 && od -An -tx1 -N24 /dev/urandom | tr -d ' \n' >"$dir/state/$name/mcp.key")
-	printf 'binary=%q\nname=%q\nslack=%d\nagent=%d\n' "$bin" "$name" "$slack" "$agent" >"$dir/isolated.env"
+	printf 'binary=%q\nname=%q\nslack=%d\nagent=%d\nplugins=%q\n' "$bin" "$name" "$slack" "$agent" "$list" >"$dir/isolated.env"
 
 	local got
 	got=$(with_env "$bin" config get http.port 2>/dev/null || true)
@@ -340,7 +350,7 @@ cmd_run() {
 	local a
 	for a in "$@"; do
 		if [[ $a == serve ]]; then
-			needs_no_jobs "$@"
+			needs_no_jobs 0 "$@"
 			break
 		fi
 	done
@@ -374,6 +384,15 @@ cmd_snapshot() {
 		drop_copy "the snapshot has no meta table"
 	[[ $(sqlite3 "$dest" "SELECT count(*) FROM meta WHERE key = 'viewer:github' AND value != ''") != 0 ]] ||
 		drop_copy "the copy has no stored GitHub viewer; its rows cannot render"
+	local export id
+	for export in "$(dirname "$src")"/plugins/*/import.db; do
+		[[ -f $export ]] || continue
+		id=$(basename "$(dirname "$export")")
+		mkdir -m 700 -p "$(dirname "$dest")/plugins/$id"
+		cp "$export" "$(dirname "$dest")/plugins/$id/import.db"
+		chmod 600 "$(dirname "$dest")/plugins/$id/import.db"
+		echo "copied the $id plugin's import.db"
+	done
 	touch "$dir/copied"
 	echo "copied $(sqlite3 "$dest" "SELECT count(*) FROM sqlite_master WHERE type = 'table'") tables"
 }
@@ -456,7 +475,12 @@ cmd_start() {
 	[[ $# -ge 1 ]] || usage
 	load "$1"
 	shift
-	needs_no_jobs "$@"
+	local jobs=0
+	if [[ ${1:-} == --jobs ]]; then
+		jobs=1
+		shift
+	fi
+	needs_no_jobs "$jobs" "$@"
 	launch_locked "$@"
 	echo "started $(head -n 1 "$dir/daemon.pid")"
 }

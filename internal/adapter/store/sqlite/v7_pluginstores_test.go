@@ -50,6 +50,9 @@ func TestV7PluginStoresExportsAndDrops(t *testing.T) {
 	counts := map[string]int{}
 	for _, p := range v7Exports {
 		for _, e := range p.tables {
+			if e.ddl != "" {
+				continue
+			}
 			counts[e.table] = rowCount(t, before, `SELECT count(*) FROM `+e.table)
 		}
 	}
@@ -147,4 +150,55 @@ func rowCount(t *testing.T, db *sql.DB, q string, args ...any) int {
 		t.Fatalf("%s: %v", q, err)
 	}
 	return n
+}
+
+// TestAnExportIsDurableBeforeTheCoreDropsItsTables: the export commits to
+// import.db, checked against the core's rows, before the migration's own
+// transaction drops the tables; a failure between the two leaves both
+// copies, and the next migration keeps the complete export.
+func TestAnExportIsDurableBeforeTheCoreDropsItsTables(t *testing.T) {
+	t.Parallel()
+	path := v6PluginsFixture(t)
+	state := filepath.Dir(path)
+	failDropIn(t, state)
+	if _, err := current.migrate(t.Context(), path, migrateOpts(path)); err == nil {
+		t.Fatal("the migration went through its injected fault")
+	}
+	if v := versionOf(t, path); v != 6 {
+		t.Fatalf("the failed migration left the store at version %d", v)
+	}
+	core := rawDB(t, path)
+	if n := rowCount(t, core, `SELECT count(*) FROM pull_requests`); n != 2 {
+		t.Errorf("the core holds %d pull requests after the failure, want both", n)
+	}
+	core.Close()
+	exports := map[string]os.FileInfo{}
+	for id, table := range map[string]string{"github": "pull_requests", "slack": "slack_messages"} {
+		file := filepath.Join(state, "plugins", id, "import.db")
+		db := exported(t, file)
+		if n := rowCount(t, db, `SELECT count(*) FROM `+table); n != 2 {
+			t.Errorf("%s's export holds %d rows of %s after the failure, want 2", id, n, table)
+		}
+		db.Close()
+		fi, err := os.Stat(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		exports[id] = fi
+		if _, err := os.Stat(file + ".tmp"); err == nil {
+			t.Errorf("%s's export left its temporary file", id)
+		}
+	}
+
+	healDrop(state)
+	migrateV6(t, path)
+	for id, before := range exports {
+		after, err := os.Stat(filepath.Join(state, "plugins", id, "import.db"))
+		if err != nil || !after.ModTime().Equal(before.ModTime()) || after.Size() != before.Size() {
+			t.Errorf("the second migration rewrote %s's complete export: %v", id, err)
+		}
+	}
+	if got := strings1(t, rawDB(t, path), `SELECT name FROM sqlite_schema WHERE name = 'pull_requests'`); len(got) > 0 {
+		t.Error("the second migration left the core's pull requests")
+	}
 }

@@ -5,10 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -26,11 +24,11 @@ type migration struct {
 	// store after this migration; 0 is to itself. A migration that only adds
 	// what an older release ignores declares that release's version.
 	compatible uint32
-	// files are databases the migration writes beside the store, by the
-	// schema name it attaches each as, at paths relative to the store's
-	// directory: SQLite attaches only outside a transaction.
-	files map[string]string
-	up    func(ctx context.Context, tx *sql.Tx) error
+	// before, when set, runs on the migration's connection before its
+	// transaction, with the store's directory: what it writes beside the
+	// store must be complete before the migration commits.
+	before func(ctx context.Context, conn *sql.Conn, storeDir string) error
+	up     func(ctx context.Context, tx *sql.Tx) error
 }
 
 func (m migration) label() string { return fmt.Sprintf("%04d_%s", m.to, m.name) }
@@ -71,7 +69,7 @@ var migrations = []migration{
 		`ALTER TABLE drafts ADD COLUMN replaced TEXT NOT NULL DEFAULT ''`,
 	)},
 	{to: 6, name: "answer_message", compatible: 4, up: v6Answers},
-	{to: 7, name: "tasks", foreignKeysOff: true, compatible: 7, files: v7ExportFiles(), up: v7},
+	{to: 7, name: "tasks", foreignKeysOff: true, compatible: 7, before: v7ExportPlugins, up: v7},
 }
 
 // schemaSet is a schema and the migrations that reach it, so tests can run
@@ -318,15 +316,15 @@ func (set schemaSet) step(ctx context.Context, conn *sql.Conn, m migration) (err
 			}
 		}()
 	}
-	detach, err := attachFiles(ctx, conn, m.files)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if d := detach(); d != nil && err == nil {
-			err = d
+	if m.before != nil {
+		var file string
+		if err := conn.QueryRowContext(ctx, `SELECT file FROM pragma_database_list WHERE name = 'main'`).Scan(&file); err != nil {
+			return err
 		}
-	}()
+		if err := m.before(ctx, conn, filepath.Dir(file)); err != nil {
+			return err
+		}
+	}
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -361,45 +359,18 @@ func (set schemaSet) step(ctx context.Context, conn *sql.Conn, m migration) (err
 	return tx.Commit()
 }
 
-// attachFiles attaches files on conn, each created 0600 in a 0700
-// directory under the store's own before SQLite writes it; detach undoes
-// it.
-func attachFiles(ctx context.Context, conn *sql.Conn, files map[string]string) (detach func() error, err error) {
-	var attached []string
-	detach = func() error {
-		var errs []error
-		for _, name := range attached {
-			_, err := conn.ExecContext(context.WithoutCancel(ctx), `DETACH DATABASE `+name)
-			errs = append(errs, err)
-		}
-		return errors.Join(errs...)
+// migrationTx runs fn in a transaction of its own on a migration's
+// connection, committed when fn succeeds.
+func migrationTx(ctx context.Context, conn *sql.Conn, fn func(*sql.Tx) error) error {
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
 	}
-	if len(files) == 0 {
-		return detach, nil
+	defer tx.Rollback()
+	if err := fn(tx); err != nil {
+		return err
 	}
-	var dir string
-	if err := conn.QueryRowContext(ctx, `SELECT file FROM pragma_database_list WHERE name = 'main'`).Scan(&dir); err != nil {
-		return detach, err
-	}
-	dir = filepath.Dir(dir)
-	for _, name := range slices.Sorted(maps.Keys(files)) {
-		path := filepath.Join(dir, files[name])
-		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-			return detach, errors.Join(err, detach())
-		}
-		f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, storeMode)
-		if err != nil {
-			return detach, errors.Join(err, detach())
-		}
-		if err := errors.Join(f.Chmod(storeMode), f.Close()); err != nil {
-			return detach, errors.Join(err, detach())
-		}
-		if _, err := conn.ExecContext(ctx, `ATTACH DATABASE ? AS `+name, path); err != nil {
-			return detach, errors.Join(err, detach())
-		}
-		attached = append(attached, name)
-	}
-	return detach, nil
+	return tx.Commit()
 }
 
 type rowsQueryer interface {
