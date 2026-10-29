@@ -57,7 +57,7 @@ func TestGateOpenStepOpensAProfileGate(t *testing.T) {
 	}
 
 	r2 := newTaskRig(t, map[string]string{"workflows/my-auto-diff/workflow.toml": approved})
-	if err := r2.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-02", Kind: task.KindCapture, State: "next",
+	if err := r2.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-02", State: "next",
 		Title: "Approve me", Origin: task.OriginUser, Created: testNow, Updated: testNow}}}); err != nil {
 		t.Fatal(err)
 	}

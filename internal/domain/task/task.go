@@ -24,9 +24,10 @@ const (
 	OriginGate    = "gate"
 )
 
-// DerivedID is the id of the entry of kind derived from u's items for group, so a re-derivation finds it again.
-func DerivedID(kind Kind, u unit.Unit, group string) ID {
-	sum := sha256.Sum256([]byte(string(kind) + "|" + string(u.Provider) + "|" + u.Key + "|" + group))
+// DerivedID is the id of the task item of u calls for, so a re-derivation finds it again. It hashes as the
+// action entries of schema version 6 did, so the tasks they became keep matching their items.
+func DerivedID(u unit.Unit, item string) ID {
+	sum := sha256.Sum256([]byte("action|" + string(u.Provider) + "|" + u.Key + "|" + item))
 	return ID("t-" + hex.EncodeToString(sum[:])[:16])
 }
 
@@ -89,9 +90,12 @@ func (e Task) FirstUnit() (unit.Unit, bool) {
 	return unit.Unit{}, false
 }
 
-// CapturedByUser says whether the user captured the entry, rather than the
-// loop deriving it from a third party's message or draft.
-func (e Task) CapturedByUser() bool { return e.Origin == OriginUser && e.Kind == KindCapture }
+// CapturedByUser says whether the user made the task, rather than the loop
+// deriving it from a source's items or opening it for a gate.
+func (e Task) CapturedByUser() bool { return e.Origin == OriginUser }
+
+// IsProject says whether the task is a project, as its kind property says.
+func (e Task) IsProject() bool { return e.Prop(PropKind).Text == KindProject }
 
 // Same says whether e and o hold the same values, Updated aside.
 func (e Task) Same(o Task) bool {
@@ -112,6 +116,11 @@ func (e Task) canonical() Task {
 	sortRefs(c.Items)
 	if len(c.Items) == 0 {
 		c.Items = nil
+	}
+	c.Resolved = slices.Clone(e.Resolved)
+	sortRefs(c.Resolved)
+	if len(c.Resolved) == 0 {
+		c.Resolved = nil
 	}
 	c.Units = slices.Clone(e.Units)
 	slices.SortFunc(c.Units, func(a, b unit.Unit) int { return cmp.Compare(a.String(), b.String()) })
@@ -140,20 +149,6 @@ func (e Task) canonical() Task {
 	}
 	c.Snooze.Until = t(e.Snooze.Until)
 	c.SeenAt, c.ReviewedAt, c.Created, c.Updated = t(e.SeenAt), t(e.ReviewedAt), t(e.Created), t(e.Updated)
-	if e.Waiting != nil {
-		w := *e.Waiting
-		w.On = slices.Clone(w.On)
-		if len(w.On) == 0 {
-			w.On = nil
-		}
-		for i := range w.On {
-			if len(w.On[i].Aliases) == 0 {
-				w.On[i].Aliases = nil
-			}
-		}
-		w.Since, w.LastNudge, w.Resurface = t(w.Since), t(w.LastNudge), t(w.Resurface)
-		c.Waiting = &w
-	}
 	return c
 }
 

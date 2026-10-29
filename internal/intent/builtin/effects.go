@@ -46,8 +46,8 @@ var coreEffects = []Effect{
 	{EffectPlanCleared, "", AppliesTurn, "Drops the unit's pending plan items.", false},
 	{EffectGuidanceHanded, "", AppliesTurn, "Hands the guidance queued on the unit to the turn, and queues it back when the turn is not sent.", false},
 	{EffectRoundSent, "", AppliesTurn, "Records the round-sent event on the unit when a person sends the turn.", false},
-	{EffectTaskNudged, "", AppliesDraft, "Stamps the last nudge of the draft's task, or of every live waiting task of its unit when it names none.", false},
-	{EffectUnitClosed, "", AppliesDraft, "Records the closure of the draft's unit, which ends its close task and unwatches it after its warm period; through the unit's plugin.", true},
+	{EffectTaskNudged, "", AppliesDraft, "Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists.", false},
+	{EffectUnitClosed, "", AppliesDraft, "Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit.", true},
 }
 
 // EffectNames are the names of the draft effects: what a draft's effects, a

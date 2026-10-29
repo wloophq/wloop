@@ -92,7 +92,7 @@ func (m *Model) pickedDraft() (api.Draft, bool) {
 // draftTask is the Outbox task of d, its verbs read from the draft's gate and actions, each the verb of cat that
 // runs its handler.
 func draftTask(cat api.ViewsCatalog, d api.Draft, title string) api.TaskView {
-	e := api.TaskView{ID: "draft:" + strconv.FormatInt(d.ID, 10), Kind: "draft", Title: title}
+	e := api.TaskView{ID: "draft:" + strconv.FormatInt(d.ID, 10), Title: title}
 	e.Gates = []api.GateView{api.DraftGate(d)}
 	held, why := d.Intents[string(gate.Approved)] != "", ""
 	for _, a := range d.Actions {

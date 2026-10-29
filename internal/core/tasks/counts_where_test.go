@@ -11,12 +11,12 @@ import (
 func TestCountsWhereCountsOnlyTheKeptTasksOfEachView(t *testing.T) {
 	ctx := context.Background()
 	r := newRig()
-	r.put(t, task.Task{ID: "in-a", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "invoice Ana"})
-	r.put(t, task.Task{ID: "in-b", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "call Bob"})
-	r.put(t, task.Task{ID: "nx-a", Kind: task.KindAction, State: "next", Category: task.CategoryReady, Title: "invoice OSS", Props: task.Props{"area": {Text: "OSS"}, "contexts": {List: []string{"@reply"}}}})
-	r.put(t, task.Task{ID: "nx-b", Kind: task.KindAction, State: "next", Category: task.CategoryReady, Title: "review Hiring", Props: task.Props{"area": {Text: "Hiring"}, "contexts": {List: []string{"@reply"}}}})
-	r.put(t, task.Task{ID: "dn-a", Kind: task.KindAction, State: "done", Category: task.CategoryDone, Title: "invoice sent"})
-	r.svc.RegisterView(task.ViewOutbox, "draft:", outbox{drafts: []task.Task{{ID: "draft:1", Kind: task.KindDraft, Title: "invoice reply"}, {ID: "draft:2", Kind: task.KindDraft, Title: "hello"}}})
+	r.put(t, task.Task{ID: "in-a", State: "inbox", Category: task.CategoryInbox, Title: "invoice Ana"})
+	r.put(t, task.Task{ID: "in-b", State: "inbox", Category: task.CategoryInbox, Title: "call Bob"})
+	r.put(t, task.Task{ID: "nx-a", State: "next", Category: task.CategoryReady, Title: "invoice OSS", Props: task.Props{"area": {Text: "OSS"}, "contexts": {List: []string{"@reply"}}}})
+	r.put(t, task.Task{ID: "nx-b", State: "next", Category: task.CategoryReady, Title: "review Hiring", Props: task.Props{"area": {Text: "Hiring"}, "contexts": {List: []string{"@reply"}}}})
+	r.put(t, task.Task{ID: "dn-a", State: "done", Category: task.CategoryDone, Title: "invoice sent"})
+	r.svc.RegisterView(task.ViewOutbox, "draft:", outbox{drafts: []task.Task{{ID: "draft:1", Title: "invoice reply"}, {ID: "draft:2", Title: "hello"}}})
 	invoice := func(e task.Task) (bool, error) { return strings.Contains(e.Title, "invoice"), nil }
 	c, err := r.svc.CountsWhere(ctx, "", invoice)
 	if err != nil {

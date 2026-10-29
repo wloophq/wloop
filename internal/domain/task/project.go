@@ -45,7 +45,7 @@ func ProjectsOf(all []Task) map[ID]ProjectStatus {
 	out := map[ID]ProjectStatus{}
 	seq := map[ID]bool{}
 	for _, e := range all {
-		if e.Kind == KindProject {
+		if e.IsProject() {
 			out[e.ID] = ProjectStatus{}
 			seq[e.ID] = e.Sequential
 		}
@@ -75,7 +75,7 @@ func ProjectsOf(all []Task) map[ID]ProjectStatus {
 
 // NeedsReview says whether the Review lists project p: open, and due or, unless in Someday, without a next action.
 func NeedsReview(p Task, st ProjectStatus, now time.Time) bool {
-	if p.Kind != KindProject || !p.Open() {
+	if !p.IsProject() || !p.Open() {
 		return false
 	}
 	return p.ReviewDue(now) || (st.Next == "" && !inSomeday(p))

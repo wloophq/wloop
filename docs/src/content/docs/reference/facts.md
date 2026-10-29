@@ -186,13 +186,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task` fact (provider `task`) | Type | Meaning |
 |---|---|---|
 | `task.id` | string | The task's id. |
-| `task.kind` | string | The task's kind, such as action, waiting, close, message, capture or project. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.state` | string | The task's state, one of the states tasks.toml declares. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
-| `task.waiting_on` | list | The person keys the task waits on, such as slack:U0123. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
-| `task.resurface_at` | timestamp | When the task resurfaces; zero when it has no date. Test with `> timestamp(0)`. |
-| `task.waiting_days` | int | Working days the task has waited, in the configured location, as the waiting rules count them. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
-| `task.since_nudge` | duration | Time since the task's last nudge; very large when it was never nudged. |
-| `task.nudge_due_at` | timestamp | When a stalled nudge is due: the resurface date when set, else tasks.stale_waiting_days working days after the task started waiting, then drafts.repeat_after after the last nudge; zero when the task is not stalled. Test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.muted` | bool | The task is muted. |
 | `task.unit` | string | The task's first unit as provider:key: the unit it was captured or derived on, else its first attachment; empty for a task with none. |
 | `task.unit_provider` | string | The provider of task.unit; empty for a task with none. |
@@ -205,14 +199,13 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task.link_closure_posted` | bool | A closure was posted on task.unit, from the facts the tasks receive. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.items_open` | int | Open items of the task's units. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.items_resolved` | int | Resolved items of the task's units. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
-| `task.items_owed` | int | Open items of the task's units that the task holds. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the task, withdrawn ones included; zero when none. Test with `> timestamp(0)`. |
 | `task.fingerprint` | string | The task's id, state and update time. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.category` | string | The category of the task's state: inbox, ready, active, waiting, deferred, done or dropped. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.owed_by` | string | Who owes the task's next step, as tasks.toml's owed_by says: me, a person's key, or empty when nobody does. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.owed_since` | timestamp | Since when task.owed_by has owed the next step; zero when nobody does. Test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.since_movement` | duration | Time since the task, or a unit linked to it, last moved: a state change, a source event, a run. |
-| `task.check_on` | timestamp | When to check on the task, its check_on property; zero when unset. Test with `> timestamp(0)`. |
+| `task.check_on` | timestamp | When to check on the task: its check_on property, else, when the items it holds wait on someone else and not on you, tasks.stale_waiting_days working days after the oldest of them; zero when neither. Test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.gates_open` | int | The task's open gates. |
 | `task.runs_live` | int | The task's runs whose session is live. |
 | `task.wake_until` | timestamp | When the task's wake wakes it; zero when it has none, or one that waits on events or a condition only. Test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
@@ -224,7 +217,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task.ask_age` | duration | The age of the task's oldest unanswered ask; zero when none is. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.promised` | timestamp | The date the user promised the task by, its promised property; zero when unset. Test with `> timestamp(0)`. |
 | `task.extraction_lag` | duration | How long the oldest message of a unit linked to the task has waited to be extracted; zero when none waits. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
-| `task.link_owes` | list | The people the task's links owe a step to, as the plugins report them, each once. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.link_owes` | list | Who the open items the task holds wait on, each once: me for the user, else a person's key such as slack:U0123; a unit the task holds with none of its items, all the unit's open items. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 
 ### Pull requests (`pr.*`)
 
@@ -295,6 +288,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `slack.closure_posted` | bool | A closure was posted on the unit, by the extraction or a sent draft's unit.closed. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.live_task` | bool | A live task, neither done nor in the trash and not muted, is attached to the unit. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.items_open` | int | Open items whose unit is this unit. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.items_resolved` | int | Resolved items whose unit is this unit. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.items_unowned` | int | Open items of the unit with no assignee, nobody waited on and no basis. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.items_unowned_age_days` | int | Working days, in the configured location, since the oldest unowned item appeared. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.ended` | bool | The Slack plugin's word that the unit has ended: a closure was posted or marked (unit.closed), or its newest stored message is older than plugins.slack.ended_after. |
@@ -395,8 +389,8 @@ What a sent draft applies, once: the names a `draft.propose` step lists in `effe
 | `plan.cleared` | any | Drops the unit's pending plan items. |
 | `turn.guidance_handed` | any | Hands the guidance queued on the unit to the turn, and queues it back when the turn is not sent. |
 | `turn.round_sent` | any | Records the round-sent event on the unit when a person sends the turn. |
-| `task.nudged` | any | Stamps the last nudge of the draft's task, or of every live waiting task of its unit when it names none. |
-| `unit.closed` | any | Records the closure of the draft's unit, which ends its close task and unwatches it after its warm period; through the unit's plugin. |
+| `task.nudged` | any | Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists. |
+| `unit.closed` | any | Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. |
 | `pr.reviewed` | github | Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted. |
 | `pr.addressed` | github | Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered. |
 | `pr.nudged` | github | Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft. |

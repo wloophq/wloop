@@ -59,7 +59,7 @@ func (s *Server) registerOutbox() {
 		return
 	}
 	for handler := range draftHandlers {
-		s.deps.Tasks.Register(task.KindDraft, handler, s.draftVerb(handler))
+		s.deps.Tasks.Register(task.OriginDraft, handler, s.draftVerb(handler))
 	}
 	s.deps.Tasks.RegisterView(task.ViewOutbox, draftPrefix, outboxView{s})
 }

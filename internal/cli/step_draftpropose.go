@@ -236,7 +236,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 		cd := draftCandidate{person: person.Key}
 		key := sub.unit.String()
 		if a.per == "person" {
-			key = sub.subject.Key + ":" + person.Key
+			key += ":" + person.Key
 		}
 		cd.p = outbox.Proposal{Unit: sub.unit, Items: itemIDs(its), Purpose: a.purpose, Delivery: a.delivery, Reaction: a.reaction,
 			Effects: a.effects, RepeatAfter: a.repeatAfter, Policy: &policy, Subject: subject,
@@ -256,7 +256,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			}
 		}
 		if cd.refusal == "" {
-			cd.refusal, cd.timed, err = holdOf(ctx, ob, cd.p, a, now)
+			cd.refusal, cd.timed, err = holdOf(ctx, ob, cd.p, person.Key, a, now)
 			if err != nil {
 				return nil, err
 			}
@@ -308,25 +308,19 @@ func (d *draftDeps) subject(ctx context.Context, u unit.Unit) (draftSubject, err
 	return sub, nil
 }
 
-// people are the persons a per-person step proposes to: those the entry
-// waits on, else those the unit's open items wait on; one empty person
+// people are the persons a per-person step proposes to: those the open
+// items of the subject wait on, a task's those it holds; one empty person
 // for a per-subject step.
 func (s draftSubject) people(per string) []items.Person {
 	if per != "person" {
 		return []items.Person{{}}
 	}
 	var out []items.Person
-	if e := s.task; e != nil {
-		if e.Waiting != nil {
-			for _, p := range e.Waiting.On {
-				if strings.Contains(p.Key, ":") {
-					out = append(out, p)
-				}
-			}
-		}
-		return out
+	its := s.items
+	if s.task != nil {
+		its = s.held()
 	}
-	for _, it := range s.items {
+	for _, it := range its {
 		for _, p := range it.WaitingOn {
 			if it.State == items.Open && !slices.ContainsFunc(out, func(q items.Person) bool { return q.Key == p.Key }) {
 				out = append(out, p)
@@ -336,7 +330,24 @@ func (s draftSubject) people(per string) []items.Person {
 	return out
 }
 
-// held are the open items of the subject: those its entry holds, or every
+// owedPool are the open items a draft to person may list as owed: those
+// the subject holds, and of a task's unit those waiting on person that
+// other tasks hold, so one nudge covers what person owes there.
+func (s draftSubject) owedPool(person items.Person) []items.Item {
+	out := s.held()
+	if s.task == nil || person.Key == "" {
+		return out
+	}
+	for _, it := range s.items {
+		if it.State == items.Open && it.Unit == s.unit && !slices.ContainsFunc(out, func(h items.Item) bool { return h.ID == it.ID }) &&
+			slices.ContainsFunc(it.WaitingOn, func(w items.Person) bool { return w.Key == person.Key }) {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
+// held are the open items of the subject: those its task holds, or every
 // open item of its unit.
 func (s draftSubject) held() []items.Item {
 	var out []items.Item
@@ -352,7 +363,7 @@ func selectItems(s draftSubject, which string, person items.Person, now time.Tim
 	var out []items.Item
 	switch which {
 	case "owed":
-		return owedBy(person, s.held(), codecs)
+		return owedBy(person, s.owedPool(person), codecs)
 	case "resolved":
 		for _, it := range s.items {
 			if it.State == items.Resolved && it.Unit == s.unit {
@@ -444,18 +455,22 @@ func configPolicy(w workflow.Workflow, base *draft.Policy, a *config.ApprovalCon
 	return &p, nil
 }
 
-// holdOf says why a draft of the same workflow, subject and person holds p:
+// holdOf says why a draft of the same workflow, unit and person holds p, its person read off the draft's key
+// in either shape draftPerson reads, or, with no person, of the same key:
 // one open or failed, one sent within repeat_after_sent (or ever, with
 // forever), one otherwise settled within hold; timed when only the time
 // since a settled draft holds it. A withdrawn draft holds nothing.
-func holdOf(ctx context.Context, ob draftOutbox, p outbox.Proposal, a draftArgs, now time.Time) (string, bool, error) {
-	prior, err := ob.List(ctx, outbox.Filter{Unit: &p.Unit, Rule: p.Origin.Rule, Key: p.Origin.Key})
+func holdOf(ctx context.Context, ob draftOutbox, p outbox.Proposal, person string, a draftArgs, now time.Time) (string, bool, error) {
+	prior, err := ob.List(ctx, outbox.Filter{Unit: &p.Unit, Rule: p.Origin.Rule})
 	if err != nil {
 		return "", false, err
 	}
 	refusal, timed := "", false
 	for _, d := range prior {
 		if d.Origin.Kind != draft.OriginAuto || d.Origin.Workflow != p.Origin.Workflow {
+			continue
+		}
+		if person == "" && d.Origin.Key != p.Origin.Key || person != "" && draftPerson(d.Origin.Key, d.Unit, draftSubjectUnit(d)) != person {
 			continue
 		}
 		held := fmt.Sprintf("held by draft %d (%s)", d.ID, d.State)
@@ -499,11 +514,12 @@ func draftFactsOf(sub draftSubject, person string, ids []string) workflow.Facts 
 	}
 	waited := person == ""
 	if !waited && sub.task != nil {
-		e := sub.task
-		waited = e.Category == task.CategoryWaiting && e.Waiting != nil && slices.ContainsFunc(e.Waiting.On, func(p items.Person) bool { return p.Key == person })
+		waited = slices.ContainsFunc(sub.owedPool(items.Person{Key: person}), func(it items.Item) bool {
+			return slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return p.Key == person })
+		})
 	}
 	held, owned := 0, 0
-	heldNow := sub.held()
+	heldNow := sub.owedPool(items.Person{Key: person})
 	for _, it := range mine {
 		if len(it.Assignees)+len(it.WaitingOn) > 0 || it.State != items.Open {
 			owned++

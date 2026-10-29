@@ -16,14 +16,21 @@ import (
 	"github.com/wloophq/wloop/internal/source"
 )
 
-// effectNudges stamps a sent nudge on its waiting entries (*coretasks.Service).
+// effectNudges stamps a sent nudge on its tasks (*coretasks.Service).
 type effectNudges interface {
-	Nudged(ctx context.Context, ids []task.ID, u unit.Unit, at time.Time) error
+	Nudged(ctx context.Context, id task.ID, u unit.Unit, its []string, at time.Time) error
+}
+
+// effectEnds ends the tasks of a unit whose closure was posted (*coretasks.Service).
+type effectEnds interface {
+	UnitClosed(ctx context.Context, u unit.Unit) error
 }
 
 // effectDeps are what the draft effects act through.
 type effectDeps struct {
-	Nudges  effectNudges // nil stamps nothing
+	Nudges effectNudges // nil stamps nothing
+	// Ends ends a closed unit's tasks after its plugin recorded the closure; nil ends none.
+	Ends    effectEnds
 	Modules []source.Module
 	// Appliers apply each provider's plugin effects; nil applies none.
 	Appliers func(p unit.ProviderID) (effectApplier, bool)
@@ -41,21 +48,17 @@ func draftEffects(d effectDeps) map[string]outbox.Effect {
 // noPluginClosure is unit.closed on a unit whose built plugin records no closure.
 func noPluginClosure(context.Context, draft.Draft) error { return nil }
 
-// taskNudged stamps the draft's entry, or every live waiting entry of its
-// unit when it names none.
+// taskNudged stamps the last nudge on the draft's task and on every open
+// task holding one of the items it listed.
 func (d effectDeps) taskNudged(ctx context.Context, dr draft.Draft) error {
 	if d.Nudges == nil {
 		return nil
-	}
-	var ids []task.ID
-	if dr.Task != "" {
-		ids = []task.ID{task.ID(dr.Task)}
 	}
 	at := dr.Evidence.At
 	if at.IsZero() {
 		at = dr.UpdatedAt
 	}
-	return d.Nudges.Nudged(ctx, ids, dr.Unit, at)
+	return d.Nudges.Nudged(ctx, task.ID(dr.Task), dr.Unit, dr.Items, at)
 }
 
 // effectLookup finds an effect for a draft of provider p: its built
@@ -63,6 +66,23 @@ func (d effectDeps) taskNudged(ctx context.Context, dr draft.Draft) error {
 // the effect belongs to another provider, or applies through a plugin that
 // p has not built or that does not run.
 func effectLookup(d effectDeps) outbox.EffectLookup {
+	find := pluginEffect(d)
+	return func(p unit.ProviderID, name string) (outbox.Effect, bool) {
+		fx, ok := find(p, name)
+		if !ok || name != builtin.EffectUnitClosed || d.Ends == nil {
+			return fx, ok
+		}
+		return func(ctx context.Context, dr draft.Draft) error {
+			if err := fx(ctx, dr); err != nil {
+				return err
+			}
+			return d.Ends.UnitClosed(ctx, dr.Unit)
+		}, true
+	}
+}
+
+// pluginEffect finds an effect as effectLookup does, before the core acts on it.
+func pluginEffect(d effectDeps) outbox.EffectLookup {
 	core := draftEffects(d)
 	return func(p unit.ProviderID, name string) (outbox.Effect, bool) {
 		i := slices.IndexFunc(builtin.Effects, func(e builtin.Effect) bool { return e.Name == name })

@@ -41,6 +41,12 @@ const (
 	PropContexts = "contexts"
 	PropDue      = "due"
 	PropKind     = "kind"
+	// PropOwner is who owns the task; the waiting verb's on names it.
+	PropOwner = "owner"
+	// PropCheckOn is when to check on a task someone else owes; the waiting verb's resurface sets it.
+	PropCheckOn = "check_on"
+	// PropLastNudge is when a nudge last went to whoever owes the task; the task.nudged effect writes it.
+	PropLastNudge = "last_nudge"
 )
 
 // FocusOn stars a task in Focus; FocusOff is a star the user cleared.

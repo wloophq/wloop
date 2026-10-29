@@ -16,6 +16,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/domain/dossier"
 	"github.com/wloophq/wloop/internal/domain/event"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -53,6 +54,8 @@ const (
 	isOpen    = `category NOT IN (?, ?)`
 	isSomeday = `category = ? AND snooze_until = '' AND snooze_on_activity = 0 AND snooze_mute = 0`
 	isStarred = `id IN (SELECT task_id FROM task_props WHERE name = ? AND json_extract(value, '$.text') = ?)`
+	// isProject holds a task whose kind property is task.KindProject.
+	isProject = `id IN (SELECT task_id FROM task_props WHERE name = 'kind' AND json_extract(value, '$.text') = 'project')`
 )
 
 func openArgs() []any { return []any{string(task.CategoryDone), string(task.CategoryDropped)} }
@@ -70,10 +73,10 @@ func candidates(v task.View) (string, []any) {
 	case task.ViewSomeday:
 		return isSomeday, []any{string(task.CategoryDeferred)}
 	case task.ViewNext:
-		return `category = ? OR (parent != '' AND ` + isOpen + `) OR (kind = 'project' AND sequential = 1)`,
+		return `category = ? OR (parent != '' AND ` + isOpen + `) OR (sequential = 1 AND ` + isProject + `)`,
 			append([]any{string(task.CategoryReady)}, openArgs()...)
 	case task.ViewProjects:
-		return `kind = 'project' AND ` + isOpen, openArgs()
+		return isProject + ` AND ` + isOpen, openArgs()
 	case task.ViewLogbook:
 		return `category = ?`, []any{string(task.CategoryDone)}
 	case task.ViewOpen:
@@ -99,7 +102,7 @@ func scanTask(row scanner) (task.Task, error) {
 		&e.Changed, &seenAt, &e.Origin, &created, &updated, &every, &reviewed); err != nil {
 		return task.Task{}, err
 	}
-	e.Kind, e.State, e.Category, e.Parent, e.Snooze.Return = task.Kind(kind), task.State(state), task.Category(category), task.ID(parent), task.State(ret)
+	e.State, e.Category, e.Parent, e.Snooze.Return = task.State(state), task.Category(category), task.ID(parent), task.State(ret)
 	e.ReviewEvery = time.Duration(every) * time.Second
 	for _, f := range []struct {
 		dst *time.Time
@@ -110,12 +113,6 @@ func scanTask(row scanner) (task.Task, error) {
 			return task.Task{}, fmt.Errorf("a time of task %s: %w", e.ID, err)
 		}
 		*f.dst = t
-	}
-	if waiting != "" {
-		e.Waiting = &task.WaitingOn{}
-		if err := json.Unmarshal([]byte(waiting), e.Waiting); err != nil {
-			return task.Task{}, fmt.Errorf("the waiting of task %s: %w", e.ID, err)
-		}
 	}
 	return e, nil
 }
@@ -141,15 +138,20 @@ func loadTasks(ctx context.Context, q querier, where string, args ...any) ([]tas
 		return out, err
 	}
 	sub := `(SELECT id FROM tasks WHERE ` + where + `)`
-	err = eachRow(ctx, q, `SELECT task_id, provider, unit_key, item FROM task_items WHERE task_id IN `+sub+
+	err = eachRow(ctx, q, `SELECT task_id, provider, unit_key, item, resolved FROM task_items WHERE task_id IN `+sub+
 		` ORDER BY task_id, provider, unit_key, item`, args, func(r *sql.Rows) error {
 		var id string
 		var ref task.ItemRef
-		if err := r.Scan(&id, &ref.Unit.Provider, &ref.Unit.Key, &ref.Item); err != nil {
+		var resolved bool
+		if err := r.Scan(&id, &ref.Unit.Provider, &ref.Unit.Key, &ref.Item, &resolved); err != nil {
 			return err
 		}
 		e := &out[at[task.ID(id)]]
-		e.Items = append(e.Items, ref)
+		if resolved {
+			e.Resolved = append(e.Resolved, ref)
+		} else {
+			e.Items = append(e.Items, ref)
+		}
 		return nil
 	})
 	if err != nil {
@@ -312,7 +314,7 @@ func (s taskStore) Counts(ctx context.Context, area string) (task.Counters, erro
 // nextIDs selects the tasks Next lists: of the ready category, and of a sequential project only its open action
 // with the lowest Position (then id), as task.Select does over the candidates of ViewNext. Its arguments are
 // nextArgs; area is each task's area property.
-const nextIDs = `WITH seq AS (SELECT id FROM tasks WHERE kind = 'project' AND sequential = 1),
+const nextIDs = `WITH seq AS (SELECT id FROM tasks WHERE sequential = 1 AND ` + isProject + `),
 first AS (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY parent ORDER BY position, id) AS n
 	FROM tasks WHERE parent IN seq AND ` + isOpen + `) WHERE n = 1),
 areas AS (SELECT task_id, json_extract(value, '$.text') AS area FROM task_props WHERE name = ?),
@@ -340,7 +342,7 @@ func countsTx(ctx context.Context, tx *sql.Tx, area string) (task.Counters, erro
 		COALESCE(SUM(t.category = ?), 0),
 		(SELECT COUNT(*) FROM nxt a WHERE `+inArea+`),
 		COALESCE(SUM(t.category = ? AND `+inArea+`), 0),
-		COALESCE(SUM(t.kind = 'project' AND t.`+isOpen+` AND `+inArea+`), 0),
+		COALESCE(SUM(t.`+isProject+` AND t.`+isOpen+` AND `+inArea+`), 0),
 		COALESCE(SUM(t.category = ? AND t.snooze_until = '' AND t.snooze_on_activity = 0 AND t.snooze_mute = 0 AND `+inArea+`), 0),
 		COALESCE(SUM(t.category = ? AND `+inArea+`), 0)
 		FROM tasks t LEFT JOIN areas a ON a.task_id = t.id`, args...).
@@ -441,10 +443,40 @@ func (s taskStore) Apply(ctx context.Context, cs []task.Change, evs ...port.Even
 				return err
 			}
 			tx.Touch(port.TopicTasks, append(taskUnits(e), task.UnitOf(e.ID))...)
+			if err := adoptUnits(ctx, tx, e); err != nil {
+				return err
+			}
 		}
 		return writeEvents(ctx, tx, evs)
 	})
 	return err
+}
+
+// adoptUnits gives open task e what waited on its units for a task to hold them: the gates opened on a unit
+// before any task held it, and the unit's own dossier, whose directory move dossier_moves records.
+func adoptUnits(ctx context.Context, tx *Tx, e task.Task) error {
+	if !e.Open() {
+		return nil
+	}
+	for _, u := range taskUnits(e) {
+		if u.Provider == task.UnitOf(e.ID).Provider {
+			continue
+		}
+		res, err := tx.ExecContext(ctx, `UPDATE gates SET task_id = ? WHERE task_id IS NULL AND provider = ? AND unit_key = ?`,
+			string(e.ID), string(u.Provider), u.Key)
+		if err != nil {
+			return err
+		}
+		if n, err := res.RowsAffected(); err != nil {
+			return err
+		} else if n > 0 {
+			tx.Touch(port.TopicGates, u, task.UnitOf(e.ID))
+		}
+		if err := giveDossier(ctx, tx.Tx, dossier.Owner{Unit: u}.String(), dossier.Owner{Unit: u}.String(), string(e.ID)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func taskUnits(e task.Task) []unit.Unit {
@@ -456,30 +488,27 @@ func taskUnits(e task.Task) []unit.Unit {
 }
 
 func writeTask(ctx context.Context, tx *Tx, e task.Task, rev uint64) error {
-	waiting := ""
-	if e.Waiting != nil {
-		b, err := json.Marshal(e.Waiting)
-		if err != nil {
-			return err
-		}
-		waiting = string(b)
-	}
 	for _, table := range []string{"task_items", "task_units", "task_props"} {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE task_id = ?`, string(e.ID)); err != nil {
 			return err
 		}
 	}
 	if _, err := tx.ExecContext(ctx, upsertTaskSQL,
-		string(e.ID), string(e.Kind), string(e.State), string(e.Category), e.Title, e.Notes, string(e.Parent), e.Position,
-		e.Sequential, eventTime(e.Snooze.Until), e.Snooze.OnActivity, string(e.Snooze.Return), e.Snooze.Mute, waiting,
+		string(e.ID), e.Prop(task.PropKind).Text, string(e.State), string(e.Category), e.Title, e.Notes, string(e.Parent), e.Position,
+		e.Sequential, eventTime(e.Snooze.Until), e.Snooze.OnActivity, string(e.Snooze.Return), e.Snooze.Mute, "",
 		e.Changed, eventTime(e.SeenAt), e.Origin, eventTime(e.Created), eventTime(e.Updated),
 		int64(e.ReviewEvery/time.Second), eventTime(e.ReviewedAt), rev); err != nil {
 		return err
 	}
-	for _, r := range e.Items {
-		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO task_items (task_id, provider, unit_key, item) VALUES (?, ?, ?, ?)`,
-			string(e.ID), string(r.Unit.Provider), r.Unit.Key, r.Item); err != nil {
-			return err
+	for _, rs := range []struct {
+		refs     []task.ItemRef
+		resolved bool
+	}{{e.Items, false}, {e.Resolved, true}} {
+		for _, r := range rs.refs {
+			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO task_items (task_id, provider, unit_key, item, resolved) VALUES (?, ?, ?, ?, ?)`,
+				string(e.ID), string(r.Unit.Provider), r.Unit.Key, r.Item, rs.resolved); err != nil {
+				return err
+			}
 		}
 	}
 	for i, u := range e.Units {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // Facts are what decides the actions a row offers; the action slot of
@@ -203,7 +204,7 @@ func (f Facts) Get(field string) any {
 
 // OfferFacts are the facts of e a verb's offer reads.
 func OfferFacts(e task.Task) workflow.Facts {
-	f := workflow.Facts{"task.id": string(e.ID), "task.kind": string(e.Kind), "task.state": string(e.State),
+	f := workflow.Facts{"task.id": string(e.ID), builtin.OfferKind: e.Prop(task.PropKind).Text, "task.state": string(e.State),
 		"task.muted": e.Snooze.Mute, "task.unit": "", "task.unit_provider": ""}
 	if u, ok := e.FirstUnit(); ok {
 		f["task.unit"], f["task.unit_provider"] = u.String(), string(u.Provider)

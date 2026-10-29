@@ -18,7 +18,7 @@ func TestAUserScheduleEndingUnderAMuteStaysScheduled(t *testing.T) {
 	if err := r.svc.Sync(ctx, []unit.Unit{unitU}); err != nil {
 		t.Fatal(err)
 	}
-	id := task.DerivedID(task.KindAction, unitU, "a")
+	id := task.DerivedID(unitU, "a")
 	if _, err := r.svc.Do(ctx, id, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSchedule, Args: map[string]string{"until": t0.Add(time.Hour).Format(time.RFC3339)}}); err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestActivityMovesOnlyItsUnitsTasks(t *testing.T) {
 	if err := r.svc.Sync(ctx, []unit.Unit{unitU, unitV}); err != nil {
 		t.Fatal(err)
 	}
-	if e := r.task(t, task.DerivedID(task.KindAction, unitU, "a")); e.Category != task.CategoryDeferred || e.Changed {
+	if e := r.task(t, task.DerivedID(unitU, "a")); e.Category != task.CategoryDeferred || e.Changed {
 		t.Fatalf("activity on V moved U's entry: %+v", e)
 	}
 }

@@ -57,6 +57,19 @@ func (k *Kind) Notify(ctx context.Context, changes port.Changes, from port.Gener
 }
 
 func (k *Kind) notify(ctx context.Context, c port.Change) {
+	if c.Topics&port.TopicTasks != 0 && !c.All {
+		for id, b := range k.brokers() {
+			var own []unit.Unit
+			for _, u := range c.Units {
+				if u.Provider == unit.ProviderID(id) {
+					own = append(own, u)
+				}
+			}
+			if err := b.TasksHolding(ctx, own); err != nil && ctx.Err() == nil && k.Logf != nil {
+				k.Logf("plugin %s: the briefs of the tasks holding %v: %v", id, own, err)
+			}
+		}
+	}
 	for _, s := range k.subscribers(WireTopics(c.Topics)) {
 		var units []plugin.Unit
 		if !c.All {

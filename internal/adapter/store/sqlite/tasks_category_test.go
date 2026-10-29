@@ -20,7 +20,7 @@ var userStates = map[string]task.Category{"next": task.CategoryInbox, "blocked":
 	"archived": task.CategoryDone, "trash": task.CategoryReady}
 
 func inUserState(id task.ID, state string, units ...unit.Unit) task.Task {
-	return task.Task{ID: id, Kind: task.KindCapture, State: task.State(state), Category: userStates[state], Title: string(id),
+	return task.Task{ID: id, State: task.State(state), Category: userStates[state], Title: string(id),
 		Units: units, Origin: task.OriginUser, Created: taskAt, Updated: taskAt}
 }
 

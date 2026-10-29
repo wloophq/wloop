@@ -92,8 +92,7 @@ var draftCategories = map[draft.State]task.Category{
 
 // draftTask is d's virtual task; g is its gate, whose window is the task's due date.
 func draftTask(d draft.Draft, g gate.Gate, where string, st task.States) (task.Task, error) {
-	e := task.Task{ID: task.ID(draftPrefix + strconv.FormatInt(int64(d.ID), 10)), Kind: task.KindDraft,
-		Title: draftTitle(d, where), Units: []unit.Unit{d.Unit}, Origin: task.OriginDraft,
+	e := task.Task{ID: task.ID(draftPrefix + strconv.FormatInt(int64(d.ID), 10)), Title: draftTitle(d, where), Units: []unit.Unit{d.Unit}, Origin: task.OriginDraft,
 		Created: d.CreatedAt, Updated: d.UpdatedAt}
 	if err := e.MoveTo(draftCategories[d.State], st); err != nil {
 		return task.Task{}, err
@@ -119,7 +118,7 @@ func draftTitle(d draft.Draft, where string) string {
 // is open, dismiss also while its delivery may still go, edit and retry as the draft's actions stand; the others
 // are refused.
 func (s *Server) withDraft(ctx context.Context, e task.Task, v *api.TaskView) error {
-	if e.Kind != task.KindDraft || s.deps.Outbox == nil {
+	if e.Origin != task.OriginDraft || s.deps.Outbox == nil {
 		return nil
 	}
 	n, ok := draftIDOf(e.ID)

@@ -294,7 +294,7 @@ func TestOpenGivesAGateTheTaskOfItsUnitOrACaptureTask(t *testing.T) {
 	if err != nil || free.Task != "t-00000000000000ff" {
 		t.Fatalf("gate on a unit no task holds = %+v, %v", free, err)
 	}
-	if len(tk.opened) != 1 || tk.opened[0].Kind != task.KindCapture || tk.opened[0].Unit == nil || *tk.opened[0].Unit != thread || tk.opened[0].Title != "The agent asks" {
+	if len(tk.opened) != 1 || tk.opened[0].Unit == nil || *tk.opened[0].Unit != thread || tk.opened[0].Title != "The agent asks" {
 		t.Fatalf("capture = %+v, want a capture task on the thread titled by the gate", tk.opened)
 	}
 	if _, err := svc.Open(ctx, gate.Gate{Name: "missing-gate"}, nil); !errors.Is(err, gates.ErrNoDef) {

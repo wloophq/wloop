@@ -399,7 +399,7 @@ func TestAByPredicateNamesOnlyFactsTheAuthorityReads(t *testing.T) {
 	if !strings.Contains(problems, "verbs.done.by.agent") || !strings.Contains(problems, "task.repo") {
 		t.Errorf("a by naming a fact the authority does not read loads:\n%s", problems)
 	}
-	if _, problems := loadTasksWith(t, defaultTasks(t), "[verbs.done]\nby = { agent = 'task.kind == \"capture\" && task.prop.risk == \"low\"' }\n"); problems != "" {
+	if _, problems := loadTasksWith(t, defaultTasks(t), "[verbs.done]\nby = { agent = 'task.prop.kind == \"capture\" && task.prop.risk == \"low\"' }\n"); problems != "" {
 		t.Errorf("a by over the task's own facts and its properties: %s", problems)
 	}
 }

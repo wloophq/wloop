@@ -31,9 +31,6 @@ type ProjectDeps struct {
 	Dossiers ProjectDossiers // nil keeps no dossiers
 }
 
-// actionKinds are the kinds of entry the project verb attaches to a project.
-var actionKinds = []task.Kind{task.KindAction, task.KindWaiting, task.KindClose, task.KindMessage, task.KindCapture, task.KindReference}
-
 // endVerbs end a project, so its dossier's lifecycle starts.
 var endVerbs = []task.Verb{task.VerbDone, task.VerbDismiss, task.VerbReference}
 
@@ -46,9 +43,7 @@ type projects struct {
 // ending project's dossier, and serves the review view and the Review.
 func (s *Service) ServeProjects(d ProjectDeps) {
 	p := &projects{s: s, d: d}
-	for _, k := range actionKinds {
-		s.Register(k, string(task.VerbProject), p.attach)
-	}
+	s.Register(EveryKind, string(task.VerbProject), p.attach)
 	s.Register(task.KindProject, string(task.VerbProject), func(ctx context.Context, e task.Task, req Request) (Result, error) {
 		return Result{}, fmt.Errorf("%w: a project cannot join a project", ErrVerb)
 	})
@@ -83,7 +78,7 @@ func (s *Service) ProjectsStatus(ctx context.Context) (map[task.ID]ProjectState,
 	st, now := task.ProjectsOf(open), s.now()
 	out := make(map[task.ID]ProjectState, len(st))
 	for _, e := range open {
-		if e.Kind == task.KindProject {
+		if e.IsProject() {
 			out[e.ID] = ProjectState{ProjectStatus: st[e.ID], Due: e.Open() && e.ReviewDue(now)}
 		}
 	}
@@ -156,16 +151,17 @@ func (p *projects) attach(ctx context.Context, e task.Task, req Request) (Result
 			if err != nil {
 				return nil, err
 			}
-			if got.Kind != task.KindProject || !got.Open() {
+			if !got.IsProject() || !got.Open() {
 				return nil, fmt.Errorf("%w: %s is not a live project", ErrArgs, id)
 			}
 			proj = got
 		case title != "":
-			proj = task.Task{ID: task.NewID(), Kind: task.KindProject, Title: title,
-				Sequential: req.Args["sequential"] == "true", Origin: task.OriginUser, Created: now, Updated: now}
+			proj = task.Task{ID: task.NewID(), Title: title, Sequential: req.Args["sequential"] == "true", Origin: task.OriginUser,
+				Created: now, Updated: now}
 			if err := proj.MoveTo(task.CategoryReady, p.s.d.States); err != nil {
 				return nil, err
 			}
+			proj.SetProp(task.PropKind, task.Value{Text: task.KindProject}, task.WriterWorkflow, now)
 			proj.SetProp(task.PropArea, e.Prop(task.PropArea), task.WriterPerson, now)
 			created = proj
 			cs = append(cs, task.Change{Op: task.OpCreate, Task: proj, Why: "project"})

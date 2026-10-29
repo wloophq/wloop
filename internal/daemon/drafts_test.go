@@ -493,7 +493,7 @@ func TestOutboxViewListsOpenDrafts(t *testing.T) {
 		t.Fatalf("entries %v, want %v", got, want)
 	}
 	e := p.Tasks[0]
-	if ed, ok := e.DraftOf(); e.Kind != "draft" || !ok || ed.ID != int64(b.ID) || e.Title != "reply on acme/api#7: two" || !slices.Equal(e.Units, []unit.Unit{r7u}) ||
+	if ed, ok := e.DraftOf(); !ok || ed.ID != int64(b.ID) || e.Title != "reply on acme/api#7: two" || !slices.Equal(e.Units, []unit.Unit{r7u}) ||
 		!slices.Equal(e.UnitLabels, []string{"acme/api#7"}) {
 		t.Fatalf("entry %+v", e)
 	}
@@ -878,7 +878,7 @@ func TestADraftOnATaskActsThroughThePublisherOfItsTarget(t *testing.T) {
 		return nil, fmt.Errorf("%w: %s", outbox.ErrDisabled, p)
 	}
 	r.o.Targets = []unit.ProviderID{unit.GitHub}
-	r.put(t, task.Task{ID: "e1", Kind: task.KindAction, State: "next", Category: task.CategoryReady, Title: "a task"})
+	r.put(t, task.Task{ID: "e1", State: "next", Category: task.CategoryReady, Title: "a task"})
 	d := r.stored(t, draft.Draft{Unit: unit.Unit{Provider: unit.Task, Key: "e1"}, Target: "#general", Text: "hi", State: draft.Held})
 	var got api.Draft
 	if code := r.getDraft(t, d.ID, &got); code != 200 {

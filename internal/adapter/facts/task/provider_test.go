@@ -2,15 +2,19 @@ package facttask_test
 
 import (
 	"context"
+	"io/fs"
 	"path/filepath"
 	"slices"
 	"sort"
 	"testing"
 	"time"
 
+	intentload "github.com/wloophq/wloop/internal/intent"
+
 	facttask "github.com/wloophq/wloop/internal/adapter/facts/task"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
+	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/gates"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
@@ -25,6 +29,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
+	"github.com/wloophq/wloop/profiles"
 )
 
 var brt = time.FixedZone("BRT", -3*60*60)
@@ -73,9 +78,24 @@ func newEnv(t *testing.T) *env {
 		Gates:    db.Gates(func() time.Time { return e.clock.now }),
 		Sessions: func(context.Context) ([]turn.Session, error) { return e.sessions, nil },
 		Clock:    e.clock,
+		Props:    func(t task.Task) workflow.Facts { return catalog.PropFacts(t, bundledTasks) },
+		Me:       func() task.Me { return task.Me{Keys: []string{"chat:ME"}} },
+		OwedBy:   catalog.OwedByOf(func() *intentload.Loaded { return &intentload.Loaded{Tasks: bundledTasks} }),
 	})
 	return e
 }
+
+var bundledTasks = func() intentload.TasksDef {
+	sub, err := fs.Sub(profiles.Default, "default")
+	if err != nil {
+		panic(err)
+	}
+	d, problems := intentload.BundledTasks(sub)
+	if len(problems) > 0 {
+		panic(problems.Error())
+	}
+	return d
+}()
 
 func (e *env) task(en task.Task) task.Task {
 	e.t.Helper()
@@ -118,9 +138,9 @@ func (e *env) facts(id task.ID) workflow.Facts {
 	return f
 }
 
+// waiting is a waiting task on u holding its, created at since.
 func waiting(id task.ID, u unit.Unit, since time.Time, its ...items.Item) task.Task {
-	en := task.Task{ID: id, Kind: task.KindWaiting, State: "waiting", Category: task.CategoryWaiting, Title: "w", Units: []unit.Unit{u},
-		Waiting: &task.WaitingOn{On: []items.Person{{Key: "chat:U1"}}, Since: since}}
+	en := task.Task{ID: id, State: "waiting", Category: task.CategoryWaiting, Title: "w", Units: []unit.Unit{u}, Created: since, Updated: since}
 	for _, it := range its {
 		en.Items = append(en.Items, task.ItemRef{Unit: it.Unit, Item: it.ID})
 	}
@@ -131,12 +151,12 @@ func TestTaskListsTheOpenTasksOfEnabledPlugins(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
 	e.task(waiting("e-01", chatA, monday))
-	e.task(task.Task{ID: "e-02", Kind: task.KindAction, State: "next", Category: task.CategoryReady, Title: "a", Units: []unit.Unit{chatB}})
-	e.task(task.Task{ID: "e-03", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "c"})
-	e.task(task.Task{ID: "e-04", Kind: task.KindAction, State: "someday", Category: task.CategoryDeferred, Title: "m", Units: []unit.Unit{mailX}})
-	e.task(task.Task{ID: "e-05", Kind: task.KindAction, State: "done", Category: task.CategoryDone, Title: "d", Units: []unit.Unit{chatA}})
-	e.task(task.Task{ID: "e-06", Kind: task.KindAction, State: "trash", Category: task.CategoryDropped, Title: "t", Units: []unit.Unit{chatA}})
-	e.task(task.Task{ID: "e-07", Kind: task.KindReference, State: "reference", Category: task.CategoryDone, Title: "r", Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-02", State: "next", Category: task.CategoryReady, Title: "a", Units: []unit.Unit{chatB}})
+	e.task(task.Task{ID: "e-03", State: "inbox", Category: task.CategoryInbox, Title: "c"})
+	e.task(task.Task{ID: "e-04", State: "someday", Category: task.CategoryDeferred, Title: "m", Units: []unit.Unit{mailX}})
+	e.task(task.Task{ID: "e-05", State: "done", Category: task.CategoryDone, Title: "d", Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-06", State: "trash", Category: task.CategoryDropped, Title: "t", Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-07", State: "reference", Category: task.CategoryDone, Title: "r", Units: []unit.Unit{chatA}})
 	got, err := e.p.List(context.Background(), unit.Task)
 	if err != nil {
 		t.Fatal(err)
@@ -201,33 +221,62 @@ func TestTaskFactsReadTheTaskItsItemsAndItsUnitsCard(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	e := newEnv(t)
-	owed := e.item(chatA, "i1", items.Open, monday.Add(-48*time.Hour), items.Person{Key: "chat:U1"})
+	owed := e.item(chatA, "i1", items.Open, time.Date(2026, 2, 25, 9, 0, 0, 0, brt), items.Person{Key: "chat:U1"}, items.Person{Key: "chat:ME"})
 	e.item(chatA, "i2", items.Open, monday.Add(-48*time.Hour))
 	e.item(chatA, "i3", items.Resolved, monday.Add(-48*time.Hour))
 	e.item(chatB, "i4", items.Open, monday.Add(-48*time.Hour))
-	en := waiting("e-01", chatA, time.Date(2026, 2, 25, 9, 0, 0, 0, brt), owed)
-	en.Waiting.LastNudge = monday.Add(-80 * time.Hour)
-	en.Waiting.On = append(en.Waiting.On, items.Person{Key: "chat:U2"})
+	en := waiting("e-01", chatA, monday.Add(-time.Hour), owed)
+	en.SetProp(task.PropLastNudge, task.Value{Time: monday.Add(-80 * time.Hour)}, task.WriterWorkflow, monday)
 	e.task(en)
 	if _, err := e.db.Cards().Save(ctx, card.Card{Unit: chatA, Title: "t", State: "thread", StartedByMe: true, ClosurePosted: true}, monday); err != nil {
 		t.Fatal(err)
 	}
 	f := e.facts("e-01")
 	want := workflow.Facts{
-		"task.id": "e-01", "task.kind": "waiting", "task.state": "waiting",
-		"task.waiting_days": 3, "task.since_nudge": 80 * time.Hour,
+		"task.id": "e-01", "task.state": "waiting",
 		"task.unit": "chat:T1/C1/100.1", "task.unit_provider": "chat",
 		"task.link_started_by_me": true, "task.link_closure_posted": true,
-		"task.items_open": 2, "task.items_resolved": 1, "task.items_owed": 1, "task.muted": false,
-		"task.nudge_due_at": monday.Add(-8 * time.Hour),
+		"task.items_open": 2, "task.items_resolved": 1, "task.muted": false,
+		"task.prop.last_nudge": monday.Add(-80 * time.Hour), "task.owed_by": "me",
+		"task.owed_since": time.Date(2026, 2, 25, 9, 0, 0, 0, brt), "task.check_on": time.Time{},
 	}
 	for k, v := range want {
 		if got := f[k]; !equal(got, v) {
 			t.Errorf("%s = %#v, want %#v", k, got, v)
 		}
 	}
-	if got := f["task.waiting_on"].([]string); !slices.Equal(got, []string{"chat:U1", "chat:U2"}) {
-		t.Errorf("waiting_on %v", got)
+	if got := f["task.link_owes"].([]string); !slices.Equal(got, []string{"chat:U1", "me"}) {
+		t.Errorf("link_owes %v", got)
+	}
+}
+
+func TestTheOwedFactsFollowWhoOwesTheTask(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	friday := time.Date(2026, 2, 27, 9, 0, 0, 0, brt)
+	theirs := e.item(chatA, "i1", items.Open, friday, items.Person{Key: "chat:U1"})
+	e.task(waiting("e-01", chatA, monday, theirs))
+	f := e.facts("e-01")
+	if f["task.owed_by"] != "chat:U1" || !equal(f["task.owed_since"], friday) || !equal(f["task.check_on"], time.Date(2026, 3, 3, 9, 0, 0, 0, brt)) {
+		t.Errorf("owed by %v since %v, check on %v; want chat:U1 since friday, check on tuesday", f["task.owed_by"], f["task.owed_since"], f["task.check_on"])
+	}
+	checked := waiting("e-02", chatB, monday)
+	checked.SetProp(task.PropOwner, task.Value{Actors: []items.Person{{Key: "chat:U9"}}}, task.WriterPerson, monday)
+	checked.SetProp(task.PropCheckOn, task.Value{Time: monday.Add(5 * time.Hour)}, task.WriterPerson, monday)
+	e.task(checked)
+	if f := e.facts("e-02"); f["task.owed_by"] != "chat:U9" || !equal(f["task.check_on"], monday.Add(5*time.Hour)) || !equal(f["task.owed_since"], monday) {
+		t.Errorf("a task its owner owes: by %v, check on %v, since %v", f["task.owed_by"], f["task.check_on"], f["task.owed_since"])
+	}
+	if _, err := e.db.Gates(func() time.Time { return monday }).Open(context.Background(), gate.Gate{Task: "e-01", Unit: chatA, Kind: gate.KindDraft, Name: "draft", Subject: "1"}); err != nil {
+		t.Fatal(err)
+	}
+	if f := e.facts("e-01"); f["task.owed_by"] != "me" || !equal(f["task.check_on"], time.Date(2026, 3, 3, 9, 0, 0, 0, brt)) {
+		t.Errorf("with a gate open: owed by %v, check on %v; want me, the check date its items keep", f["task.owed_by"], f["task.check_on"])
+	}
+	mine := e.item(chatB, "i2", items.Open, friday, items.Person{Key: "chat:ME"})
+	e.task(task.Task{ID: "e-03", State: "next", Category: task.CategoryReady, Title: "m", Units: []unit.Unit{chatB}, Items: []task.ItemRef{{Unit: chatB, Item: mine.ID}}})
+	if f := e.facts("e-03"); f["task.owed_by"] != "me" || !equal(f["task.check_on"], time.Time{}) {
+		t.Errorf("my task: by %v, check on %v", f["task.owed_by"], f["task.check_on"])
 	}
 }
 
@@ -239,16 +288,14 @@ func equal(a, b any) bool {
 	return a == b
 }
 
-func TestTaskDueIsTheNextNudgeOrResurfaceTime(t *testing.T) {
+func TestTaskDueIsTheNextCheckOrTheEndOfANudgesQuiet(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	i1 := e.item(chatA, "i1", items.Open, monday)
-	e.task(waiting("e-01", chatA, monday, i1))
 	soon := waiting("e-02", chatB, monday)
-	soon.Waiting.Resurface = monday.Add(5 * time.Hour)
+	soon.SetProp(task.PropCheckOn, task.Value{Time: monday.Add(5 * time.Hour)}, task.WriterPerson, monday)
 	e.task(soon)
 	nudged := waiting("e-03", chatA, monday.Add(-10*24*time.Hour))
-	nudged.Waiting.LastNudge = monday.Add(-71 * time.Hour)
+	nudged.SetProp(task.PropLastNudge, task.Value{Time: monday.Add(-71 * time.Hour)}, task.WriterWorkflow, monday)
 	e.task(nudged)
 	list := func() time.Time {
 		t.Helper()
@@ -258,21 +305,11 @@ func TestTaskDueIsTheNextNudgeOrResurfaceTime(t *testing.T) {
 		return e.p.Due()
 	}
 	if got, want := list(), monday.Add(time.Hour); !got.Equal(want) {
-		t.Fatalf("due %v, want e-03's renudge %v", got, want)
+		t.Fatalf("due %v, want e-03's quiet end %v", got, want)
 	}
 	e.clock.now = monday.Add(time.Hour)
 	if got, want := list(), monday.Add(5*time.Hour); !got.Equal(want) {
-		t.Fatalf("due %v, want e-02's resurface %v", got, want)
-	}
-	e.clock.now = monday.Add(5 * time.Hour)
-	if got, want := list(), time.Date(2026, 3, 4, 10, 0, 0, 0, brt); !got.Equal(want) {
-		t.Fatalf("due %v, want e-01's two working days %v", got, want)
-	}
-	if f := e.facts("e-02"); !f["task.nudge_due_at"].(time.Time).Equal(monday.Add(5 * time.Hour)) {
-		t.Errorf("e-02 at its resurface date: nudge_due_at %v", f["task.nudge_due_at"])
-	}
-	if f := e.facts("e-01"); !f["task.nudge_due_at"].(time.Time).IsZero() {
-		t.Errorf("e-01 is not due yet: nudge_due_at %v", f["task.nudge_due_at"])
+		t.Fatalf("due %v, want e-02's check %v", got, want)
 	}
 }
 
@@ -281,9 +318,9 @@ func TestATasksOwnerIsItsUnit(t *testing.T) {
 	e := newEnv(t)
 	i1 := e.item(chatB, "i1", items.Open, monday)
 	e.task(waiting("e-01", chatA, monday))
-	e.task(task.Task{ID: "e-02", Kind: task.KindAction, State: "next", Category: task.CategoryReady, Title: "a", Items: []task.ItemRef{{Unit: i1.Unit, Item: i1.ID}}})
-	e.task(task.Task{ID: "e-03", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "c"})
-	e.task(task.Task{ID: "e-04", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "c", Units: []unit.Unit{chatB, chatA}})
+	e.task(task.Task{ID: "e-02", State: "next", Category: task.CategoryReady, Title: "a", Items: []task.ItemRef{{Unit: i1.Unit, Item: i1.ID}}})
+	e.task(task.Task{ID: "e-03", State: "inbox", Category: task.CategoryInbox, Title: "c"})
+	e.task(task.Task{ID: "e-04", State: "next", Category: task.CategoryReady, Title: "c", Units: []unit.Unit{chatB, chatA}})
 	for id, want := range map[task.ID][]unit.Unit{"e-01": {chatA}, "e-02": {chatB}, "e-03": nil, "e-04": {chatB, chatA}, "e-99": nil} {
 		got, err := e.p.Owners(context.Background(), task.UnitOf(id))
 		if err != nil || !slices.Equal(got, want) {
@@ -332,8 +369,8 @@ func TestTaskSettledAtIsTheWorkflowsOwn(t *testing.T) {
 func TestATaskThatLeftItsListStillHasEventFacts(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.task(task.Task{ID: "e-05", Kind: task.KindAction, State: "done", Category: task.CategoryDone, Title: "d", Units: []unit.Unit{chatA}})
-	e.task(task.Task{ID: "e-04", Kind: task.KindAction, State: "someday", Category: task.CategoryDeferred, Title: "m", Units: []unit.Unit{mailX}})
+	e.task(task.Task{ID: "e-05", State: "done", Category: task.CategoryDone, Title: "d", Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-04", State: "someday", Category: task.CategoryDeferred, Title: "m", Units: []unit.Unit{mailX}})
 	f, err := e.p.EventFacts(context.Background(), task.UnitOf("e-05"))
 	if err != nil || f["task.state"] != "done" || f["task.unit"] != chatA.String() {
 		t.Fatalf("event facts of a done entry: %v %v", f, err)
@@ -354,7 +391,7 @@ func TestTaskFactsSpanEveryUnitInOrder(t *testing.T) {
 	owed := e.item(chatB, "i2", items.Open, monday, items.Person{Key: "chat:U1"})
 	e.item(chatB, "i3", items.Resolved, monday)
 	onDoc := e.item(docY, "i4", items.Open, monday)
-	en := task.Task{ID: "e-01", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "ship it", Units: []unit.Unit{chatA, chatB},
+	en := task.Task{ID: "e-01", State: "next", Category: task.CategoryReady, Title: "ship it", Units: []unit.Unit{chatA, chatB},
 		Items: []task.ItemRef{{Unit: owed.Unit, Item: owed.ID}, {Unit: onDoc.Unit, Item: onDoc.ID}}}
 	e.task(en)
 	f := e.facts("e-01")
@@ -367,16 +404,16 @@ func TestTaskFactsSpanEveryUnitInOrder(t *testing.T) {
 	if got := f["task.unit_providers"].([]string); !slices.Equal(got, []string{"chat", "doc"}) {
 		t.Errorf("unit_providers %v", got)
 	}
-	if f["task.items_open"] != 3 || f["task.items_resolved"] != 1 || f["task.items_owed"] != 2 {
-		t.Errorf("items open %v, resolved %v, owed %v; want 3, 1, 2 over every unit", f["task.items_open"], f["task.items_resolved"], f["task.items_owed"])
+	if f["task.items_open"] != 3 || f["task.items_resolved"] != 1 {
+		t.Errorf("items open %v, resolved %v; want 3, 1 over every unit", f["task.items_open"], f["task.items_resolved"])
 	}
 }
 
 func TestTaskUnitsEndedWhenEveryUnitEnded(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.task(task.Task{ID: "e-01", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "none"})
-	e.task(task.Task{ID: "e-02", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "two", Units: []unit.Unit{chatA, chatB}})
+	e.task(task.Task{ID: "e-01", State: "next", Category: task.CategoryReady, Title: "none"})
+	e.task(task.Task{ID: "e-02", State: "next", Category: task.CategoryReady, Title: "two", Units: []unit.Unit{chatA, chatB}})
 	if f := e.facts("e-01"); f["task.link_ended"] != false {
 		t.Error("an entry with no unit has its units ended")
 	}
@@ -393,8 +430,8 @@ func TestTaskUnitsEndedWhenEveryUnitEnded(t *testing.T) {
 func TestTaskRepoIsTheFirstRepositoryOfItsUnits(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.task(task.Task{ID: "e-01", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "none"})
-	e.task(task.Task{ID: "e-02", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "two", Units: []unit.Unit{chatA, chatB}})
+	e.task(task.Task{ID: "e-01", State: "next", Category: task.CategoryReady, Title: "none"})
+	e.task(task.Task{ID: "e-02", State: "next", Category: task.CategoryReady, Title: "two", Units: []unit.Unit{chatA, chatB}})
 	e.repos[chatB] = "acme/api"
 	if f := e.facts("e-01"); f["task.repo"] != "" {
 		t.Errorf("a task with no unit is of %q", f["task.repo"])
@@ -411,7 +448,7 @@ func TestTaskRepoIsTheFirstRepositoryOfItsUnits(t *testing.T) {
 func TestTaskTurnsCountsTheTurnsOnTheTaskItself(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.task(task.Task{ID: "e-01", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "tracked", Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-01", State: "next", Category: task.CategoryReady, Title: "tracked", Units: []unit.Unit{chatA}})
 	e.turns[chatA] = 3
 	if f := e.facts("e-01"); f["task.turns"] != 0 {
 		t.Errorf("task.turns %v, want the turns on its unit left out", f["task.turns"])
@@ -425,9 +462,9 @@ func TestTaskTurnsCountsTheTurnsOnTheTaskItself(t *testing.T) {
 func TestTaskCapturedByUser(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.task(task.Task{ID: "e-01", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "mine"})
-	e.task(task.Task{ID: "e-02", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Title: "derived", Origin: task.OriginDerived, Units: []unit.Unit{chatA}})
-	e.task(task.Task{ID: "e-03", Kind: task.KindMessage, State: "inbox", Category: task.CategoryInbox, Title: "a message", Origin: task.OriginMessage, Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-01", State: "inbox", Category: task.CategoryInbox, Title: "mine"})
+	e.task(task.Task{ID: "e-02", State: "inbox", Category: task.CategoryInbox, Title: "derived", Origin: task.OriginDerived, Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-03", State: "inbox", Category: task.CategoryInbox, Title: "a message", Origin: task.OriginMessage, Units: []unit.Unit{chatA}})
 	for id, want := range map[task.ID]bool{"e-01": true, "e-02": false, "e-03": false} {
 		if got := e.facts(id)["task.captured_by_user"]; got != want {
 			t.Errorf("%s: captured_by_user %v, want %v", id, got, want)
@@ -438,8 +475,8 @@ func TestTaskCapturedByUser(t *testing.T) {
 func TestGatesOpenCountsTheTasksOpenGates(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
-	e.task(task.Task{ID: "t-00000000000000a1", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "a"})
-	e.task(task.Task{ID: "t-00000000000000b2", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "b"})
+	e.task(task.Task{ID: "t-00000000000000a1", State: "inbox", Category: task.CategoryInbox, Title: "a"})
+	e.task(task.Task{ID: "t-00000000000000b2", State: "inbox", Category: task.CategoryInbox, Title: "b"})
 	gs := e.db.Gates(func() time.Time { return e.clock.now })
 	open := func(id task.ID, subject string) gate.Gate {
 		g, err := gs.Open(ctx, gate.Gate{Task: id, Unit: task.UnitOf(id), Kind: gate.KindQuestion, Name: "question", Subject: subject, Intents: []string{"answer", "dismiss"}})

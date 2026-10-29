@@ -23,7 +23,7 @@ var tasksGrammar = []Key{
 	{Path: "verbs.*", In: SurfaceTasks, Kind: KindTable, Doc: "A verb, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones."},
 	{Path: "verbs.*.label", In: SurfaceTasks, Kind: KindText, Required: true, Doc: "The name people read on its button. Required."},
 	{Path: "verbs.*.summary", In: SurfaceTasks, Kind: KindText, Required: true, Doc: "One line, what pressing it does: its tooltip. Required."},
-	{Path: "verbs.*.offer", In: SurfaceTasks, Kind: KindPred, Default: "true", Doc: "When a task offers the verb, over the task's own facts (task.id, task.kind, task.state, task.muted, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run."},
+	{Path: "verbs.*.offer", In: SurfaceTasks, Kind: KindPred, Default: "true", Doc: "When a task offers the verb, over the task's own facts (task.id, task.prop.kind, task.state, task.muted, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run."},
 	{Path: "verbs.*.input", In: SurfaceTasks, Kind: KindText, Doc: "The question a verb that asks for a value puts first (waiting, schedule, project, context, area, delegate, reply); required for those."},
 	{Path: "verbs.*.from", In: SurfaceTasks, Kind: KindList, Elem: KindText, Doc: "The states the verb moves a task from, each a state of states; every state when absent."},
 	{Path: "verbs.*.to", In: SurfaceTasks, Kind: KindText, Doc: "The state the verb moves a task to, a state of states; absent, the verb moves none."},

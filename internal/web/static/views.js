@@ -193,7 +193,6 @@ function groupValue(fact, e) {
   const name = String(fact || "").replace(/^task\./, "");
   let v;
   if (name.startsWith("prop.")) v = (e.props || {})[name.slice(5)];
-  else if (name === "waiting_on") v = ((e.waiting || {}).on || []).map((p) => p.name || p.key);
   else v = e[name];
   if (Array.isArray(v)) v = v[0];
   if (v && typeof v === "object") v = v.name || v.key;
@@ -233,7 +232,7 @@ function shortDate(t) {
 
 function taskItem(e, open) {
   const go = () => writeHash({ task: e.id, pr: "" });
-  const waiting = ((e.waiting || {}).on || []).map((p) => p.name).filter(Boolean);
+  const owed = e.owed_by && e.owed_by !== "me" ? e.owed_by : "";
   const props = e.props || {};
   return h("li", {
     class: "task-row" + (e.id === open ? " sel" : "") + (e.changed ? " changed" : ""),
@@ -257,7 +256,7 @@ function taskItem(e, open) {
       props.area ? h("span", { class: "pill area" }, props.area) : null,
       props.due ? h("span", { class: "due" }, "due " + shortDate(props.due)) : null,
       e.snooze_until ? h("span", { class: "due" }, "until " + shortDate(e.snooze_until)) : null,
-      waiting.length ? h("span", { class: "who" }, "on " + waiting.join(", ")) : null,
+      owed ? h("span", { class: "who" }, "on " + owed) : null,
       ...(e.units || []).map((u, i) => h("span", { class: "ref" }, (e.unit_labels || [])[i] || unitLabel(u)))),
     projectFacts(e));
 }
@@ -270,13 +269,14 @@ function everyLabel(d) {
   return hours % 24 === 0 ? `${hours / 24}d` : `${hours}h`;
 }
 
-// projectFacts are a project's next action, open actions and review.
+// projectFacts are a project's open children and review.
 function projectFacts(e) {
-  if (e.kind !== "project") return null;
+  if ((e.props || {}).kind !== "project") return null;
+  const open = (e.children || []).length;
   return h("div", { class: "meta project-facts" },
     e.review_due ? h("span", { class: "flag" }, "review due") : null,
-    e.next_action ? h("span", { class: "next" }, "next: " + (e.next_action_title || e.next_action)) : h("span", { class: "pill" }, "no next action"),
-    h("span", { class: "pill" }, `${e.open_actions || 0} open`),
+    open ? null : h("span", { class: "pill" }, "no next action"),
+    h("span", { class: "pill" }, `${open} open`),
     e.sequential ? h("span", { class: "pill" }, "sequential") : null,
     e.review_every ? h("span", { class: "who" }, "every " + everyLabel(e.review_every)) : null,
     e.reviewed_at ? h("span", { class: "who" }, "reviewed " + localDate(e.reviewed_at)) : null);
@@ -346,16 +346,16 @@ function contextChips(route) {
 
 
 // taskHaystack is what the filter's free words search in a task, the texts the daemon's counters search
-// (api.TaskView.Texts): its title, notes, state, kind, the text and the lists of text of its properties, its
-// units, the people it waits on, its items, its cards' people, its draft and its message.
+// (api.TaskView.Texts): its title, notes, state, the text and the lists of text of its properties, its units,
+// who owes it, its asks, its cards' people, its draft and its message.
 function taskHaystack(e) {
   const d = draftOf(e) || {};
   const m = messageOf(e) || {};
   const props = Object.values(e.props || {}).flatMap((v) => typeof v === "string" ? [v] : Array.isArray(v) && v.every((x) => typeof x === "string") ? v : []);
-  return [e.title, e.notes, e.state, e.kind, ...props,
+  return [e.title, e.notes, e.state, ...props,
     ...(e.units || []).flatMap((u, i) => [(e.unit_labels || [])[i] || unitLabel(u), `${u.provider}:${u.key}`]),
-    ...((e.waiting || {}).on || []).map((p) => p.name),
-    ...(e.items || []).map((it) => it.summary),
+    e.owed_by || "",
+    ...(e.asks || []).flatMap((a) => [a.summary, a.asker]),
     ...(e.cards || []).flatMap((c) => [((c.card || {}).last_human || {}).who ? personName(c.card.last_human.who) : "", ...((c.card || {}).waits_on || []).map(personName)]),
     d.target, d.where, d.text, d.reaction, d.unit, m.text].map((x) => foldText(x));
 }

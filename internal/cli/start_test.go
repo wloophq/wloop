@@ -199,7 +199,7 @@ func TestStartWithoutARepositoryRunsInTheNeutralRepository(t *testing.T) {
 func TestStartRunsOnlyOnATaskTheUserCaptured(t *testing.T) {
 	te, m, _, _ := startEnv(t)
 	ctx := context.Background()
-	derived, err := te.Env.tasks.Open(ctx, coretasks.OpenRequest{Kind: task.KindMessage, Title: "ship the export", Origin: task.OriginMessage})
+	derived, err := te.Env.tasks.Open(ctx, coretasks.OpenRequest{Title: "ship the export", Origin: task.OriginMessage})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,7 +296,7 @@ func TestAHiddenStartActionStillRefusesADerivedTask(t *testing.T) {
 	}
 	userProfile(t, te, map[string]string{"intents/start/intent.toml": manifest, "intents/start/instructions.md.tmpl": string(body)})
 	te.serveWithTasks(t)
-	derived, err := te.Env.tasks.Open(context.Background(), coretasks.OpenRequest{Kind: task.KindMessage, Title: "ship the export", Origin: task.OriginMessage})
+	derived, err := te.Env.tasks.Open(context.Background(), coretasks.OpenRequest{Title: "ship the export", Origin: task.OriginMessage})
 	if err != nil {
 		t.Fatal(err)
 	}

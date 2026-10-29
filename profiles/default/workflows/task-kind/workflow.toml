@@ -1,0 +1,9 @@
+summary = "Give a task you made with no unit, and no kind yet, the kind capture"
+provider = "task"
+when = 'task.captured_by_user && size(task.units) == 0 && !(task.prop.kind in ["start", "capture", "project"])'
+order = 55
+
+[[step]]
+use = "task.set"
+prop = "kind"
+value = "capture"

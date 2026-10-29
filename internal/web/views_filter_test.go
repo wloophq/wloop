@@ -129,17 +129,16 @@ func TestTheCockpitAndTheDaemonMatchTheSameTasks(t *testing.T) {
 			e.Title, e.Notes = "Ação rápida", "see the runbook"
 			e.Props = map[string]json.RawMessage{"area": json.RawMessage(`"OSS"`), "contexts": json.RawMessage(`["@reply"]`), "owner": json.RawMessage(`"Launch"`)}
 			e.Units, e.UnitLabels = []unit.Unit{gh, {Provider: "slack", Key: "T1/C9"}}, []string{"", "#deploys thread"}
-			e.Waiting = &api.WaitingView{On: []api.WaitingPerson{{Name: "Bruna"}}}
-			e.Items = []api.ItemView{{Summary: "answer the question"}}
+			e.OwedBy = "Bruna"
+			e.Asks = []api.AskView{{Summary: "answer the question"}}
 		}),
 		task("b", "inbox", func(e *api.TaskView) {
-			e.Kind = "capture"
+			e.Props = map[string]json.RawMessage{"kind": json.RawMessage(`"capture"`)}
 			e.Cards = []api.CardView{{Card: card.Card{LastHuman: &card.Human{Who: items.Person{Key: "github:octocat"}}, WaitsOn: []items.Person{{Name: "Dora"}}}}}
 			subject, _ := json.Marshal(api.Message{ID: 2, Text: "Which window?"})
 			e.Gates = []api.GateView{{ID: 2, Kind: "question", Status: "open", Intents: []api.IntentView{}, Subject: subject}}
 		}),
 		task("c", "inbox", func(e *api.TaskView) {
-			e.Kind = "draft"
 			e.Gates = draftGates(api.Draft{Unit: "slack/T1/C1", Target: "C0REL", Where: "#releases", Text: "Ship it", Reaction: "eyes"})
 		}),
 		task("d", "next", func(e *api.TaskView) { e.Title = "Škoda deal with Erdős" }),

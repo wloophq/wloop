@@ -107,47 +107,42 @@ type VerbSpec struct {
 }
 
 type TaskView struct {
-	ID               string       `json:"id"`
-	Kind             string       `json:"kind"`
-	State            string       `json:"state"`
-	Category         string       `json:"category,omitempty"`
-	Title            string       `json:"title"`
-	Notes            string       `json:"notes,omitempty"`
-	SnoozeUntil      time.Time    `json:"snooze_until,omitzero"`
-	SnoozeOnActivity bool         `json:"snooze_on_activity,omitempty"`
-	Muted            bool         `json:"muted,omitempty"`
-	Waiting          *WaitingView `json:"waiting,omitempty"`
-	Changed          bool         `json:"changed,omitempty"`
-	Units            []unit.Unit  `json:"units"`
-	UnitLabels       []string     `json:"unit_labels,omitempty"` // Units as a person reads them, in order
-	Items            []ItemView   `json:"items"`
-	Cards            []CardView   `json:"cards,omitempty"` // detail only
-	Verbs            []VerbState  `json:"verbs"`
+	ID               string      `json:"id"`
+	State            string      `json:"state"`
+	Category         string      `json:"category,omitempty"`
+	Title            string      `json:"title"`
+	Notes            string      `json:"notes,omitempty"`
+	SnoozeUntil      time.Time   `json:"snooze_until,omitzero"`
+	SnoozeOnActivity bool        `json:"snooze_on_activity,omitempty"`
+	Muted            bool        `json:"muted,omitempty"`
+	Changed          bool        `json:"changed,omitempty"`
+	Units            []unit.Unit `json:"units"`
+	UnitLabels       []string    `json:"unit_labels,omitempty"` // Units as a person reads them, in order
+	Cards            []CardView  `json:"cards,omitempty"`       // detail only
+	Verbs            []VerbState `json:"verbs"`
 	// Actions are the intents that serve the task's own unit, such as start.
 	Actions   []ActionState `json:"actions,omitempty"`
 	Attention *Attention    `json:"attention,omitempty"`
 	Created   time.Time     `json:"created"`
 	Updated   time.Time     `json:"updated"`
 
-	// A project's: its next action's id, its open actions, and its review.
-	Sequential      bool      `json:"sequential,omitempty"`
-	NextAction      string    `json:"next_action,omitempty"`
-	NextActionTitle string    `json:"next_action_title,omitempty"`
-	OpenActions     int       `json:"open_actions,omitempty"`
-	ReviewEvery     string    `json:"review_every,omitempty"` // a Go duration
-	ReviewedAt      time.Time `json:"reviewed_at,omitzero"`
-	ReviewDue       bool      `json:"review_due,omitempty"`
+	// A project's: whether it takes its children one at a time, and its review.
+	Sequential  bool      `json:"sequential,omitempty"`
+	ReviewEvery string    `json:"review_every,omitempty"` // a Go duration
+	ReviewedAt  time.Time `json:"reviewed_at,omitzero"`
+	ReviewDue   bool      `json:"review_due,omitempty"`
 
 	// Props are the task's properties by name, each in its type's JSON: a string, a number, an RFC 3339 time,
 	// a Go duration string, a list of strings, or a list of people for an actor.
 	Props map[string]json.RawMessage `json:"props,omitempty"`
 	// OwedBy is who owes the task's next step, as the profile's owed_by says: "me" or a person's key.
-	OwedBy string      `json:"owed_by,omitempty"`
-	Asks   []AskView   `json:"asks,omitempty"`
-	Gates  []GateView  `json:"gates,omitempty"` // the open ones
-	Runs   []RunView   `json:"runs,omitempty"`  // detail only
-	Brief  *RecordView `json:"brief,omitempty"`
-	Wake   *WakeView   `json:"wake,omitempty"`
+	OwedBy string `json:"owed_by,omitempty"`
+	// Asks are the items the task holds, detail only.
+	Asks  []AskView   `json:"asks,omitempty"`
+	Gates []GateView  `json:"gates,omitempty"` // the open ones
+	Runs  []RunView   `json:"runs,omitempty"`  // detail only
+	Brief *RecordView `json:"brief,omitempty"`
+	Wake  *WakeView   `json:"wake,omitempty"`
 	// Parent is the parent task's id; Children are its children's, in sibling order.
 	Parent   string   `json:"parent,omitempty"`
 	Children []string `json:"children,omitempty"`
@@ -258,18 +253,6 @@ type WakeView struct {
 	Until  time.Time `json:"until,omitzero"`
 	When   string    `json:"when,omitempty"`
 	Return string    `json:"return,omitempty"`
-}
-
-type WaitingView struct {
-	On        []WaitingPerson `json:"on"`
-	Since     time.Time       `json:"since"`
-	LastNudge time.Time       `json:"last_nudge,omitzero"`
-	Resurface time.Time       `json:"resurface,omitzero"`
-}
-
-type WaitingPerson struct {
-	Name string `json:"name"`
-	Link string `json:"link,omitempty"`
 }
 
 type ItemView struct {

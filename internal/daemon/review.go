@@ -64,23 +64,23 @@ func (s *Server) wireReview(rv coretasks.Review) api.Review {
 func (ev *taskViewer) project(ctx context.Context, e task.Task, v *api.TaskView) error {
 	for i, st := range v.Verbs {
 		verb := task.Verb(st.Verb)
-		if !st.Enabled || !ev.g.Handles(e.Kind, verb) {
+		if !st.Enabled || !ev.g.Handles(e, verb) {
 			continue
 		}
 		var err error
 		switch {
-		case verb == task.VerbProject && e.Kind == task.KindProject:
+		case verb == task.VerbProject && e.IsProject():
 			err = errors.New("a project cannot join a project")
-		case verb == task.VerbProject, e.Kind == task.KindProject && slices.Contains([]task.Verb{task.VerbDone, task.VerbDismiss, task.VerbReference}, verb):
+		case verb == task.VerbProject, e.IsProject() && slices.Contains([]task.Verb{task.VerbDone, task.VerbDismiss, task.VerbReference}, verb):
 			err = ev.g.Accepts(e, verb, task.ActorPerson)
-		case e.Kind == task.KindProject && (verb == task.VerbReviewed || verb == task.VerbSequential) && !e.Open():
+		case e.IsProject() && (verb == task.VerbReviewed || verb == task.VerbSequential) && !e.Open():
 			err = fmt.Errorf("%s on a %s project", verb, e.State)
 		}
 		if err != nil {
 			v.Verbs[i] = api.VerbState{Verb: st.Verb, Reason: err.Error()}
 		}
 	}
-	if e.Kind != task.KindProject {
+	if !e.IsProject() {
 		return nil
 	}
 	if ev.status == nil {
@@ -91,7 +91,7 @@ func (ev *taskViewer) project(ctx context.Context, e task.Task, v *api.TaskView)
 		ev.status = st
 	}
 	st := ev.status[e.ID]
-	v.Sequential, v.NextAction, v.NextActionTitle, v.OpenActions = e.Sequential, string(st.Next), st.NextTitle, st.Open
+	v.Sequential = e.Sequential
 	v.ReviewEvery, v.ReviewedAt, v.ReviewDue = e.ReviewInterval().String(), e.ReviewedAt, st.Due
 	return nil
 }

@@ -154,7 +154,7 @@ func TestTheBridgeDelegatesActHeadlessWithTheTasksItems(t *testing.T) {
 	s, h := newThreadActServer(t)
 	store := taskstest.New()
 	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: store, Facts: coretasks.CardFacts{}, Clock: fixedClock(catalogNow)})
-	e := task.Task{ID: "e-t", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{actThread}, Items: []task.ItemRef{{Unit: actThread, Item: "i1"}},
+	e := task.Task{ID: "e-t", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{actThread}, Items: []task.ItemRef{{Unit: actThread, Item: "i1"}},
 		Origin: task.OriginDerived, Created: catalogNow, Updated: catalogNow}
 	if err := store.Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)

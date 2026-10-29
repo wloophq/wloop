@@ -1,4 +1,4 @@
-// Package task holds the GTD entries and their pure rules.
+// Package task holds the tasks and their pure rules.
 package task
 
 import (
@@ -12,21 +12,12 @@ import (
 // Category, never its name.
 type State string
 
-type Kind string
+// KindProject is the value of the kind property the project verb gives the
+// parent it creates, and the one it attaches tasks to.
+const KindProject = "project"
 
-const (
-	KindAction    Kind = "action" // derived from items
-	KindWaiting   Kind = "waiting"
-	KindClose     Kind = "close"
-	KindMessage   Kind = "message" // one per message
-	KindDraft     Kind = "draft"   // virtual entry "draft:<id>", Origin "draft", served by the outbox ViewSource, never stored
-	KindCapture   Kind = "capture"
-	KindProject   Kind = "project"
-	KindReference Kind = "reference"
-)
-
-// ID is "t-" + 16 hex. Derived tasks: sha256(kind|provider|unit_key|group)[:16], so a re-derivation is idempotent;
-// captures, projects, messages: random. Draft tasks: "draft:<draft id>".
+// ID is "t-" + 16 hex. A task an item calls for: DerivedID, so a re-derivation is idempotent; captures and
+// projects: random. Draft tasks: "draft:<draft id>".
 type ID string
 
 // ItemRef names an items.Item.ID of a unit.
@@ -42,22 +33,17 @@ type Snooze struct {
 	Mute       bool  // set from UnitFacts.Mute; cleared when the mute ends
 }
 
-type WaitingOn struct {
-	On        []items.Person
-	Since     time.Time
-	LastNudge time.Time
-	Resurface time.Time // "if no reply by D, propose a nudge"
-}
-
 type Task struct {
-	ID   ID
-	Kind Kind
+	ID ID
 	// State is the task's state; Category is its category, which every rule reads.
 	State    State
 	Category Category
 	Title    string
 	Notes    string
 	Items    []ItemRef
+	// Resolved are the items the task held that no longer call for it, such as one resolved: they keep the
+	// task as their holder, so an item that opens again comes back to it.
+	Resolved []ItemRef
 	Units    []unit.Unit // attached units; their cards render in the detail
 	// Props are the task's properties; Written says who wrote each, and when.
 	Props      Props
@@ -66,8 +52,7 @@ type Task struct {
 	Position   int // order among its parent's children
 	Sequential bool
 	Snooze     Snooze
-	Waiting    *WaitingOn // KindWaiting only
-	Changed    bool       // "changed since you saw it"; cleared by the seen verb
+	Changed    bool // "changed since you saw it"; cleared by the seen verb
 	SeenAt     time.Time
 	Origin     string // "derived", "user", "message", "draft"
 
@@ -100,6 +85,9 @@ type UnitFacts struct {
 	Cares         bool      // followed/watched by the user, or the user's own unit
 	LastHuman     time.Time // newest human event not by the user (card.LastHuman when !Who.Is(Me))
 	Mute          *Mute     // the plugin's mute of the unit; nil none
+	// Kind is the value of the kind property the unit's plugin gives the tasks of its units, such as thread;
+	// "" gives none.
+	Kind string
 }
 
 type ChangeOp string
@@ -108,7 +96,6 @@ const (
 	OpCreate  ChangeOp = "create"
 	OpUpdate  ChangeOp = "update"
 	OpResolve ChangeOp = "resolve"
-	OpReinbox ChangeOp = "reinbox"
 )
 
 type Change struct {

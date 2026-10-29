@@ -73,7 +73,7 @@ func only(t *testing.T, es []task.Task) task.Task {
 func TestOpenItemOwedByMeIsAnAction(t *testing.T) {
 	its := []items.Item{item("i1", func(it *items.Item) { it.Contexts = []string{"@reply"} })}
 	e := only(t, reconcile(t, facts(), its, nil, now))
-	if e.Kind != task.KindAction || e.Category != task.CategoryInbox || !slices.Equal(e.Prop("contexts").List, []string{"@reply"}) || e.Origin != task.OriginDerived {
+	if e.Category != task.CategoryInbox || !slices.Equal(e.Prop("contexts").List, []string{"@reply"}) || e.Origin != task.OriginDerived {
 		t.Fatalf("entry %+v", e)
 	}
 	if !slices.Equal(e.Items, []task.ItemRef{{Unit: pr, Item: "i1"}}) || !slices.Equal(e.Units, []unit.Unit{pr}) {
@@ -85,21 +85,6 @@ func TestOpenItemOwedByMeIsAnAction(t *testing.T) {
 	got := only(t, reconcile(t, facts(), its, []task.Task{e}, now.Add(time.Hour)))
 	if got.Category != task.CategoryReady || got.Title != "do it better" || !slices.Equal(got.Prop("contexts").List, []string{"@decide"}) {
 		t.Fatalf("after the item changed: %+v", got)
-	}
-}
-
-func TestDerivedItemLandsWhereThePluginSays(t *testing.T) {
-	its := []items.Item{
-		item("next", func(it *items.Item) { it.Initial = "next" }),
-		item("inbox", func(it *items.Item) { it.Initial = "inbox" }),
-		item("none"),
-	}
-	got := map[string]task.State{}
-	for _, e := range reconcile(t, facts(), its, nil, now) {
-		got[e.Items[0].Item] = e.State
-	}
-	if want := map[string]task.State{"next": task.State("next"), "inbox": task.State("inbox"), "none": task.State("inbox")}; !mapsEqual(got, want) {
-		t.Fatalf("states %v, want %v", got, want)
 	}
 }
 
@@ -115,19 +100,6 @@ func mapsEqual[K comparable, V comparable](a, b map[K]V) bool {
 	return true
 }
 
-func TestItemsToOnePersonCollapse(t *testing.T) {
-	its := []items.Item{item("a", owedBy(ana)), item("b", owedBy(ana)), item("c", owedBy(ana))}
-	e := only(t, reconcile(t, facts(), its, nil, now))
-	if e.Kind != task.KindWaiting || e.Category != task.CategoryWaiting || len(e.Items) != 3 || e.Waiting == nil || e.Waiting.On[0].Key != ana.Key {
-		t.Fatalf("entry %+v", e)
-	}
-	its = append(its, item("d", owedBy(bob)))
-	es := reconcile(t, facts(), its, []task.Task{e}, now)
-	if len(es) != 2 || es[1].Waiting.On[0].Key != bob.Key || len(es[1].Items) != 1 {
-		t.Fatalf("entries %+v", es)
-	}
-}
-
 func TestOthersItemsIgnoredWithoutCare(t *testing.T) {
 	others := func(it *items.Item) { it.WaitingOn, it.Requester = []items.Person{ana}, bob }
 	its := []items.Item{item("a", others)}
@@ -135,42 +107,8 @@ func TestOthersItemsIgnoredWithoutCare(t *testing.T) {
 		t.Fatalf("entries %+v", es)
 	}
 	cares := func(f *task.UnitFacts) { f.Cares = true }
-	if e := only(t, reconcile(t, facts(cares), its, nil, now)); e.Kind != task.KindWaiting {
+	if e := only(t, reconcile(t, facts(cares), its, nil, now)); e.Category != task.CategoryWaiting {
 		t.Fatalf("with care: %+v", e)
-	}
-}
-
-func TestCloseActionForMyResolvedUnit(t *testing.T) {
-	mine := func(f *task.UnitFacts) { f.StartedByMe = true }
-	its := []items.Item{item("a", resolved), item("b", owedBy(ana), resolved)}
-	e := only(t, reconcile(t, facts(mine), its, nil, now))
-	if e.Kind != task.KindClose || e.Category != task.CategoryInbox {
-		t.Fatalf("entry %+v", e)
-	}
-	posted := func(f *task.UnitFacts) { f.ClosurePosted = true }
-	if got := only(t, reconcile(t, facts(mine, posted), its, []task.Task{e}, now)); got.Category != task.CategoryDone {
-		t.Fatalf("after the closure: %+v", got)
-	}
-	if es := reconcile(t, facts(mine), its[:1:1], nil, now); len(es) != 1 {
-		t.Fatalf("one resolved item: %+v", es)
-	}
-	if es := reconcile(t, facts(mine), append(its, item("c")), nil, now); len(es) != 1 || es[0].Kind != task.KindAction {
-		t.Fatalf("an open item left: %+v", es)
-	}
-}
-
-func TestResolvedItemsResolveTheTask(t *testing.T) {
-	its := []items.Item{item("a", owedBy(ana)), item("b", owedBy(ana))}
-	e := only(t, reconcile(t, facts(), its, nil, now))
-	resolved(&its[0])
-	e = only(t, reconcile(t, facts(), its, []task.Task{e}, now))
-	if e.Category != task.CategoryWaiting || !slices.Equal(e.Items, []task.ItemRef{{Unit: pr, Item: "b"}}) {
-		t.Fatalf("one resolved: %+v", e)
-	}
-	resolved(&its[1])
-	e = only(t, reconcile(t, facts(), its, []task.Task{e}, now))
-	if e.Category != task.CategoryDone || len(e.Items) != 0 {
-		t.Fatalf("all resolved: %+v", e)
 	}
 }
 
@@ -178,25 +116,6 @@ func TestOnlyItemsCreateTasks(t *testing.T) {
 	f := facts(func(f *task.UnitFacts) { f.StartedByMe, f.Cares, f.LastHuman = true, true, now })
 	if es := reconcile(t, f, nil, nil, now); len(es) != 0 {
 		t.Fatalf("entries %+v", es)
-	}
-}
-
-func TestDismissedStaysDismissedUntilReopen(t *testing.T) {
-	its := []items.Item{item("a", owedBy(ana)), item("b", owedBy(ana))}
-	e := only(t, reconcile(t, facts(), its, nil, now))
-	e.State, e.Category = "trash", task.CategoryDropped
-	if cs := reconciled(t, facts(), its, me, []task.Task{e}, bundled, now); len(cs) != 0 {
-		t.Fatalf("changes %+v", cs)
-	}
-	resolved(&its[0])
-	e = only(t, reconcile(t, facts(), its, []task.Task{e}, now))
-	if e.Category != task.CategoryDropped {
-		t.Fatalf("after a resolve: %+v", e)
-	}
-	its[0].State = "open"
-	e = only(t, reconcile(t, facts(), its, []task.Task{e}, now))
-	if e.Category != task.CategoryInbox || len(e.Items) != 2 {
-		t.Fatalf("after the reopen: %+v", e)
 	}
 }
 
@@ -233,7 +152,7 @@ func TestItemDeadlineParses(t *testing.T) {
 func TestMutedUnitTaskIsSnoozed(t *testing.T) {
 	until := now.Add(72 * time.Hour)
 	mute := func(f *task.UnitFacts) { f.Mute = &task.Mute{Until: until} }
-	its := []items.Item{item("a", func(it *items.Item) { it.Initial = "next" })}
+	its := []items.Item{item("a", func(it *items.Item) { it.Initial = items.InitialNext })}
 	e := only(t, reconcile(t, facts(mute), its, nil, now))
 	want := task.Snooze{Until: until, Return: task.State("next"), Mute: true}
 	if e.Category != task.CategoryDeferred || e.Snooze != want {
@@ -259,7 +178,7 @@ func TestMuteUntilStateChangeWakesOnActivity(t *testing.T) {
 			}
 			continue
 		}
-		if len(cs) != 1 || cs[0].Task.Category != task.CategoryInbox || !cs[0].Task.Changed {
+		if len(cs) != 1 || cs[0].Task.Category != task.CategoryInbox || !cs[0].Task.Changed || cs[0].Task.Snoozed() {
 			t.Fatalf("activity: %+v", cs)
 		}
 		if again := reconciled(t, f, its, me, []task.Task{cs[0].Task}, bundled, now.Add(3*time.Hour)); len(again) != 0 {
@@ -282,86 +201,6 @@ func TestUnmuteRestoresTheState(t *testing.T) {
 	lapsed := func(f *task.UnitFacts) { f.Mute = &task.Mute{Until: now.Add(-time.Minute)} }
 	if es := reconcile(t, facts(lapsed), its, nil, now); es[0].Category != task.CategoryWaiting {
 		t.Fatalf("a lapsed mute: %+v", es[0])
-	}
-}
-
-func TestDeadlineStars(t *testing.T) {
-	e := task.Task{State: "next", Category: task.CategoryReady, Props: task.Props{"due": {Time: now}}}
-	got, why, ok := task.AutoFocus(e, 2, now)
-	if !ok || why != task.FocusDeadline || !got.Starred() || got.Written["focus"] != (task.Written{By: task.WriterWorkflow, At: now}) {
-		t.Fatalf("focus %+v %q %v", got, why, ok)
-	}
-	e.SetProp("due", task.Value{Time: now.Add(time.Minute)}, task.WriterPlugin, now)
-	if _, _, ok := task.AutoFocus(e, 2, now); ok {
-		t.Fatal("a future deadline starred")
-	}
-	e.Props["focus"], e.Written = got.Props["focus"], got.Written
-	e.SetProp("due", task.Value{Time: now.Add(time.Minute)}, task.WriterPlugin, now)
-	if got, _, ok := task.AutoFocus(e, 2, now); !ok || got.Starred() {
-		t.Fatalf("a moved deadline kept its star: %+v %v", got, ok)
-	}
-	e = task.Task{State: "next", Category: task.CategoryReady}
-	e.SetProp("due", task.Value{Time: now.Add(-time.Hour)}, task.WriterPlugin, now)
-	e.SetProp("focus", task.Value{Text: "off"}, task.WriterPerson, now.Add(-time.Minute))
-	if _, _, ok := task.AutoFocus(e, 2, now); ok {
-		t.Fatal("a star the user cleared came back")
-	}
-}
-
-func TestStaleCountsWorkingDays(t *testing.T) {
-	friday := time.Date(2026, 10, 16, 10, 0, 0, 0, brt)
-	e := task.Task{State: "waiting", Category: task.CategoryWaiting, Kind: task.KindWaiting, Waiting: &task.WaitingOn{On: []items.Person{ana}, Since: friday}}
-	tuesday := time.Date(2026, 10, 20, 10, 1, 0, 0, brt)
-	if _, why, ok := task.AutoFocus(e, 2, tuesday); !ok || why != task.FocusStale {
-		t.Fatalf("tuesday: %q %v", why, ok)
-	}
-	if _, _, ok := task.AutoFocus(e, 2, tuesday.AddDate(0, 0, -1)); ok {
-		t.Fatal("monday starred")
-	}
-	e.Waiting.LastNudge = friday.Add(time.Hour)
-	if _, _, ok := task.AutoFocus(e, 2, tuesday); ok {
-		t.Fatal("a nudged entry starred")
-	}
-}
-
-func TestUserStarsAreNotCleared(t *testing.T) {
-	e := task.Task{State: "next", Category: task.CategoryReady}
-	e.SetProp("focus", task.Value{Text: "on"}, task.WriterPerson, now)
-	if got, _, ok := task.AutoFocus(e, 2, now); ok || !got.Starred() {
-		t.Fatalf("focus %+v %v", got, ok)
-	}
-}
-
-func TestActivityReinboxesWithChangedMark(t *testing.T) {
-	seen := now.Add(-time.Hour)
-	f := facts(func(f *task.UnitFacts) { f.LastHuman = now })
-	have := []task.Task{
-		{ID: "e-sched", State: "scheduled", Category: task.CategoryDeferred, Snooze: task.Snooze{OnActivity: true, Return: task.State("next")}, SeenAt: seen},
-		{ID: "e-date", State: "scheduled", Category: task.CategoryDeferred, Snooze: task.Snooze{Until: now.Add(time.Hour), Return: task.State("next")}, SeenAt: seen},
-		{ID: "e-wait", State: "waiting", Category: task.CategoryWaiting, SeenAt: seen},
-		{ID: "e-next", State: "next", Category: task.CategoryReady, SeenAt: seen},
-		{ID: "e-fresh", State: "waiting", Category: task.CategoryWaiting, SeenAt: now},
-	}
-	var got []task.ID
-	for _, c := range activity(t, f, have, bundled, now) {
-		if c.Task.Category != task.CategoryInbox || !c.Task.Changed || c.Op != task.OpReinbox || c.Task.Snooze != (task.Snooze{}) {
-			t.Errorf("change %+v", c)
-		}
-		got = append(got, c.Task.ID)
-	}
-	if want := []task.ID{"e-sched", "e-date", "e-wait"}; !slices.Equal(got, want) {
-		t.Fatalf("reinboxed %v, want %v", got, want)
-	}
-}
-
-func TestOwnActivityDoesNotReinbox(t *testing.T) {
-	seen := now.Add(-time.Hour)
-	have := []task.Task{{ID: "e-wait", State: "waiting", Category: task.CategoryWaiting, SeenAt: seen, Created: now.Add(-48 * time.Hour)}}
-	for _, last := range []time.Time{{}, seen.Add(-time.Minute)} {
-		f := facts(func(f *task.UnitFacts) { f.LastHuman = last })
-		if cs := activity(t, f, have, bundled, now); len(cs) != 0 {
-			t.Fatalf("last human %v: changes %+v", last, cs)
-		}
 	}
 }
 
@@ -396,5 +235,151 @@ func TestMutedUnitActivitySparesUserSchedule(t *testing.T) {
 	}
 	if cs := reconciled(t, f, nil, me, have, bundled, now); len(cs) != 0 {
 		t.Fatalf("the mute took over a user's schedule: %+v", cs)
+	}
+}
+
+func TestReconcileMakesOneTaskPerDelegatedItem(t *testing.T) {
+	its := []items.Item{item("a", owedBy(ana)), item("b", owedBy(ana)), item("c", owedBy(bob)), item("d")}
+	es := reconcile(t, facts(), its, nil, now)
+	if len(es) != 4 {
+		t.Fatalf("%d tasks for four items, want one each: %+v", len(es), es)
+	}
+	for _, e := range es {
+		want := task.CategoryWaiting
+		if e.Items[0].Item == "d" {
+			want = task.CategoryInbox
+		}
+		if len(e.Items) != 1 || e.ID != task.DerivedID(pr, e.Items[0].Item) || e.Category != want || e.Title != "do "+e.Items[0].Item {
+			t.Errorf("task %+v, want one item in %s", e, want)
+		}
+	}
+	resolved(&its[0])
+	es = reconcile(t, facts(), its, es, now.Add(time.Hour))
+	for _, e := range es {
+		want := task.CategoryWaiting
+		switch e.ID {
+		case task.DerivedID(pr, "a"):
+			want = task.CategoryDone
+		case task.DerivedID(pr, "d"):
+			want = task.CategoryInbox
+		}
+		if e.Category != want {
+			t.Errorf("after a resolved: %s in %s, want %s", e.ID, e.Category, want)
+		}
+	}
+	merged := es[slices.IndexFunc(es, func(e task.Task) bool { return e.ID == task.DerivedID(pr, "b") })]
+	merged.Items = append(slices.Clone(merged.Items), task.ItemRef{Unit: pr, Item: "c"})
+	rest := slices.DeleteFunc(slices.Clone(es), func(e task.Task) bool { return e.ID == task.DerivedID(pr, "c") })
+	rest[slices.IndexFunc(rest, func(e task.Task) bool { return e.ID == merged.ID })] = merged
+	if cs := reconciled(t, facts(), its, me, rest, bundled, now.Add(2*time.Hour)); len(cs) != 0 {
+		t.Fatalf("a task holding two items split them again: %+v", cs)
+	}
+}
+
+func TestReconcileMakesNoCloseTasks(t *testing.T) {
+	mine := func(f *task.UnitFacts) { f.StartedByMe = true }
+	its := []items.Item{item("a", resolved), item("b", owedBy(ana), resolved)}
+	if cs := reconciled(t, facts(mine), its, me, nil, bundled, now); len(cs) != 0 {
+		t.Fatalf("a unit I started, its items resolved, made %+v", cs)
+	}
+	open := []items.Item{item("a", owedBy(ana))}
+	e := only(t, reconcile(t, facts(mine), open, nil, now))
+	resolved(&open[0])
+	got := only(t, reconcile(t, facts(mine), open, []task.Task{e}, now))
+	if got.ID != e.ID || got.Category != task.CategoryDone {
+		t.Fatalf("the resolved item's task: %+v", got)
+	}
+}
+
+func TestAReopenedItemMarksChangedAndStaysOutOfTheInbox(t *testing.T) {
+	its := []items.Item{item("a", owedBy(ana))}
+	e := only(t, reconcile(t, facts(), its, nil, now))
+	for _, held := range []struct {
+		state string
+		c     task.Category
+	}{{"waiting", task.CategoryWaiting}, {"scheduled", task.CategoryDeferred}, {"next", task.CategoryReady}} {
+		open := e
+		open.State, open.Category, open.Snooze = task.State(held.state), held.c, task.Snooze{}
+		if held.c == task.CategoryDeferred {
+			open.Snooze = task.Snooze{Until: now.Add(48 * time.Hour), Return: "waiting"}
+		}
+		resolved(&its[0])
+		closed := only(t, reconcile(t, facts(), its, []task.Task{open}, now))
+		closed.State, closed.Category, closed.Snooze = open.State, open.Category, open.Snooze
+		its[0].State = "open"
+		got := only(t, reconcile(t, facts(), its, []task.Task{closed}, now.Add(time.Hour)))
+		if got.Category != held.c || !got.Changed || got.Snooze != open.Snooze || len(got.Items) != 1 {
+			t.Fatalf("an item reopened on a %s task: %+v", held.state, got)
+		}
+		f := facts(func(f *task.UnitFacts) { f.LastHuman = now.Add(2 * time.Hour) })
+		for _, c := range activity(t, f, []task.Task{open}, bundled, now.Add(3*time.Hour)) {
+			if c.Task.Category == task.CategoryInbox || !c.Task.Changed {
+				t.Fatalf("a new message on a %s task: %+v", held.state, c.Task)
+			}
+		}
+	}
+	resolved(&its[0])
+	done := only(t, reconcile(t, facts(), its, []task.Task{e}, now))
+	its[0].State = "open"
+	got := only(t, reconcile(t, facts(), its, []task.Task{done}, now.Add(time.Hour)))
+	if got.Category != task.CategoryReady || !got.Changed {
+		t.Fatalf("an item reopened on a done task: %+v", got)
+	}
+	dropped := done
+	dropped.State, dropped.Category = "trash", task.CategoryDropped
+	if got := only(t, reconcile(t, facts(), its, []task.Task{dropped}, now.Add(time.Hour))); got.Category != task.CategoryDropped {
+		t.Fatalf("an item reopened on a dropped task: %+v", got)
+	}
+	two := []items.Item{item("a", owedBy(ana)), item("b", owedBy(ana))}
+	both := only(t, reconcile(t, facts(), two[:1], nil, now))
+	both.Items = append(both.Items, task.ItemRef{Unit: pr, Item: "b"})
+	resolved(&two[0])
+	held := only(t, reconcile(t, facts(), two, []task.Task{both}, now))
+	if held.Category != task.CategoryWaiting || !slices.Equal(held.Items, []task.ItemRef{{Unit: pr, Item: "b"}}) {
+		t.Fatalf("a two-item task, one item resolved: %+v", held)
+	}
+	two[0].State = "open"
+	got = only(t, reconcile(t, facts(), two, []task.Task{held}, now.Add(time.Hour)))
+	if got.Category != task.CategoryWaiting || !got.Changed || len(got.Items) != 2 {
+		t.Fatalf("an item reopened on a two-item task: %+v", got)
+	}
+	merged := []items.Item{item("a", owedBy(ana)), item("b", owedBy(ana))}
+	holder := only(t, reconcile(t, facts(), merged[:1], nil, now))
+	holder.Items = append(holder.Items, task.ItemRef{Unit: pr, Item: "b"})
+	tombstone := task.Task{ID: task.DerivedID(pr, "b"), State: "trash", Category: task.CategoryDropped, Units: []unit.Unit{pr}, Origin: task.OriginDerived}
+	resolved(&merged[1])
+	afterResolve := reconcile(t, facts(), merged, []task.Task{holder, tombstone}, now)
+	merged[1].State = "open"
+	cs := reconciled(t, facts(), merged, me, afterResolve, bundled, now.Add(time.Hour))
+	if len(cs) != 1 || cs[0].Task.ID != holder.ID || !cs[0].Task.Changed || cs[0].Task.Category != task.CategoryWaiting || len(cs[0].Task.Items) != 2 {
+		t.Fatalf("an item merged into a task, resolved then reopened: %+v", cs)
+	}
+	marked := done
+	marked.Items, marked.Resolved = []task.ItemRef{{Unit: pr, Item: "a"}}, nil
+	if cs := reconciled(t, facts(), its, me, []task.Task{marked}, bundled, now); len(cs) != 0 {
+		t.Fatalf("a task the user finished while its item is open came back: %+v", cs)
+	}
+}
+
+func TestAnItemProposesACategory(t *testing.T) {
+	its := []items.Item{
+		item("ready", func(it *items.Item) { it.Initial = items.InitialNext }),
+		item("inbox", func(it *items.Item) { it.Initial = items.InitialInbox }),
+		item("none"),
+		item("theirs", owedBy(ana), func(it *items.Item) { it.Initial = items.InitialNext }),
+	}
+	got := map[string]task.State{}
+	for _, e := range reconcile(t, facts(func(f *task.UnitFacts) { f.Kind = "pull-request" }), its, nil, now) {
+		got[e.Items[0].Item] = e.State
+		if k := e.Prop(task.PropKind); k.Text != "pull-request" || e.Written[task.PropKind].By != task.WriterPlugin {
+			t.Errorf("%s: kind %+v", e.ID, k)
+		}
+	}
+	want := map[string]task.State{"ready": "next", "inbox": "inbox", "none": "inbox", "theirs": "next"}
+	if !mapsEqual(got, want) {
+		t.Fatalf("states %v, want %v", got, want)
+	}
+	if _, err := task.Reconcile(facts(), []items.Item{item("x", func(it *items.Item) { it.Initial = "next" })}, me, nil, bundled, now); err == nil {
+		t.Fatal("a state name as the proposed category was taken")
 	}
 }

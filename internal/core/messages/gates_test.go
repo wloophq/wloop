@@ -20,7 +20,7 @@ import (
 func TestAQuestionOpensAGateNotATask(t *testing.T) {
 	r := newRig(t)
 	ctx := context.Background()
-	held, err := r.tasks.Open(ctx, coretasks.OpenRequest{Kind: task.KindAction, Title: "review acme/api#7", Unit: &r7, Origin: task.OriginUser})
+	held, err := r.tasks.Open(ctx, coretasks.OpenRequest{Title: "review acme/api#7", Unit: &r7, Origin: task.OriginUser})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestAMessageOnNoUnitGetsACaptureTask(t *testing.T) {
 		t.Fatalf("gate %+v of %+v", g, m)
 	}
 	e := r.task(t, string(g.Task))
-	if e.Kind != task.KindCapture || e.Title != "Archive the stale projects?" || e.Origin != task.OriginGate || len(e.Units) != 0 {
+	if e.Title != "Archive the stale projects?" || e.Origin != task.OriginGate || len(e.Units) != 0 {
 		t.Fatalf("task %+v", e)
 	}
 	again, err := r.svc.Propose(ctx, messages.ProposeRequest{Text: "Archive the stale projects?", Origin: message.Origin{Kind: message.OriginCore, Workflow: "stale-projects"}})
@@ -194,7 +194,7 @@ func TestARefusedOrphanAnswerAsksAgainThroughTheMissingGate(t *testing.T) {
 func TestAMissingGateMovesOffAClosedTask(t *testing.T) {
 	r := newRig(t)
 	ctx := context.Background()
-	held, err := r.tasks.Open(ctx, coretasks.OpenRequest{Kind: task.KindAction, Title: "review acme/api#7", Unit: &r7, Origin: task.OriginUser})
+	held, err := r.tasks.Open(ctx, coretasks.OpenRequest{Title: "review acme/api#7", Unit: &r7, Origin: task.OriginUser})
 	if err != nil {
 		t.Fatal(err)
 	}

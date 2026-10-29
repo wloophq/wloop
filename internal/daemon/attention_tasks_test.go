@@ -50,7 +50,7 @@ func newNotifyRig(t *testing.T) *notifyRig {
 	r.ledger.Enabled = enabled
 	r.g = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: c.db.Tasks(), Items: r.ledger,
 		Facts: coretasks.CardFacts{Cards: c.db.Cards(), Enabled: enabled, Me: func() task.Me { return meID }},
-		Me:    meID, Clock: fixedClock(catalogNow), StaleWaitingDays: 2})
+		Me:    meID, Clock: fixedClock(catalogNow)})
 	c.s.deps.Tasks, c.s.deps.Items, c.s.deps.Cards = r.g, r.ledger, c.db.Cards()
 	c.s.deps.Messages = &messages.Service{Store: inventory.NewMessages(c.db), Books: c.repo, Turns: c.s.deps.Turns, Tasks: r.g,
 		Intents: turnstest.Intents(), Clock: fixedClock(catalogNow)}
@@ -192,7 +192,7 @@ func TestTaskAttentionMatchesRowAttention(t *testing.T) {
 			}
 			if old == nil {
 				for id, e := range got {
-					t.Errorf("entry %s (%s) notifies %+v where the row did not", id, e.Kind, e.Attention)
+					t.Errorf("entry %s (%s) notifies %+v where the row did not", id, e.State, e.Attention)
 				}
 				return
 			}
@@ -238,7 +238,7 @@ func (f *fakeOutbox) List(_ context.Context, fl outbox.Filter) ([]draft.Draft, e
 }
 
 func (f *fakeOutbox) task(d draft.Draft) task.Task {
-	return task.Task{ID: task.ID("draft:" + strconv.FormatInt(int64(d.ID), 10)), Kind: task.KindDraft, State: "inbox", Category: task.CategoryInbox, Title: d.Text,
+	return task.Task{ID: task.ID("draft:" + strconv.FormatInt(int64(d.ID), 10)), State: "inbox", Category: task.CategoryInbox, Title: d.Text,
 		Units: []unit.Unit{d.Unit}, Origin: task.OriginDraft, Created: d.CreatedAt, Updated: d.UpdatedAt}
 }
 
@@ -328,7 +328,7 @@ func TestOnlyInboxAndOutboxNotify(t *testing.T) {
 	r.put(t,
 		task.Task{ID: "e-in", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}},
 		task.Task{ID: "e-next", State: "next", Category: task.CategoryReady, Units: []unit.Unit{r7u}},
-		task.Task{ID: "e-wait", Kind: task.KindWaiting, State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{r7u}, Waiting: &task.WaitingOn{Since: tasksNow}},
+		task.Task{ID: "e-wait", State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{r7u}},
 		task.Task{ID: "e-muted", State: "scheduled", Category: task.CategoryDeferred, Units: []unit.Unit{r7u}, Snooze: task.Snooze{Until: tasksNow.Add(time.Hour), Return: task.State("inbox"), Mute: true}},
 		task.Task{ID: "e-someday", State: "someday", Category: task.CategoryDeferred},
 		task.Task{ID: "e-done", State: "done", Category: task.CategoryDone},
@@ -368,7 +368,7 @@ func TestOutboxDraftNotifiesOnce(t *testing.T) {
 func TestProposalAndDraftNotifyOnce(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, nil)
-	r.put(t, task.Task{ID: "e-prop", Kind: task.KindMessage, State: "inbox", Category: task.CategoryInbox, Title: "nudge ana?", Units: []unit.Unit{r7u}, Origin: task.OriginMessage})
+	r.put(t, task.Task{ID: "e-prop", State: "inbox", Category: task.CategoryInbox, Title: "nudge ana?", Units: []unit.Unit{r7u}, Origin: task.OriginMessage})
 	before := attentions(t, r)["e-prop"]
 	withOutbox(r, proposed(1, "e-prop"))
 	got := attentions(t, r)
@@ -452,7 +452,7 @@ func TestLiveTasksNotifyAsTheRows(t *testing.T) {
 	ledger := &coreitems.Ledger{Store: f.DB.Items(), Clock: fixedClock(f.Now)}
 	me := task.Me{Keys: []string{"github:user-01"}}
 	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: f.DB.Tasks(), Items: ledger, Facts: coretasks.CardFacts{Cards: f.DB.Cards(), Me: func() task.Me { return me }},
-		Me: me, Clock: fixedClock(f.Now), StaleWaitingDays: 2})
+		Me: me, Clock: fixedClock(f.Now)})
 	s.deps.Tasks, s.deps.Items = g, ledger
 	s.deps.Messages = &messages.Service{Store: inventory.NewMessages(f.DB), Books: f.Turns, Turns: s.deps.Turns, Tasks: g,
 		Intents: turnstest.Intents(), Clock: fixedClock(f.Now)}
@@ -573,7 +573,7 @@ func TestAStaleQuestionMessageDoesNotNotifyTwice(t *testing.T) {
 	r.asks(t, turn.Asked, draftQuestion("publish?"))
 	r.settle(t, r7u)
 	ctx := context.Background()
-	e, err := r.g.Open(ctx, coretasks.OpenRequest{Kind: task.KindMessage, Title: "an older question", Unit: &r7u, Origin: task.OriginMessage})
+	e, err := r.g.Open(ctx, coretasks.OpenRequest{Title: "an older question", Unit: &r7u, Origin: task.OriginMessage})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -596,7 +596,7 @@ func TestAnotherDerivedTaskOfANotifyingRowStaysSilent(t *testing.T) {
 	r := newNotifyRig(t)
 	r.events(t, dinv.Event{PR: r7, Kind: dinv.KindRoundHeld, Key: "cap", At: catalogNow, Data: "daily cap"})
 	r.settle(t, r7u)
-	other := task.Task{ID: "e-other", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Title: "look at it", Units: []unit.Unit{r7u},
+	other := task.Task{ID: "e-other", State: "inbox", Category: task.CategoryInbox, Title: "look at it", Units: []unit.Unit{r7u},
 		Items: []task.ItemRef{{Unit: r7u, Item: "gh:attention"}}, Origin: task.OriginDerived, Created: catalogNow, Updated: catalogNow}
 	if err := r.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: other}}); err != nil {
 		t.Fatal(err)
@@ -620,7 +620,7 @@ func storedViews() []string {
 func TestANotificationOffersOnlyTheVerbsTheProfileOffers(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "tasks.toml"), []byte("[verbs.dismiss]\noffer = 'task.kind != \"draft\"'\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "tasks.toml"), []byte("[verbs.dismiss]\noffer = '!task.id.startsWith(\"draft:\")'\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	cache := cacheOver(t, dir)

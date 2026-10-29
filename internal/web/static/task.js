@@ -65,7 +65,6 @@ function taskLinks(e) {
 }
 
 function taskHeader(e) {
-  const waiting = ((e.waiting || {}).on || []).map((p) => p.name).filter(Boolean);
   return h("header", { class: "d-head" },
     h("button", { type: "button", class: "close", "aria-label": "Close detail", "data-focus": "detail:close", onclick: () => detailEnv.close() }, "×"),
     h("h1", {}, (e.props || {}).focus === "on" ? h("span", { class: "star" }, "★ ") : null, e.title || e.id),
@@ -74,7 +73,6 @@ function taskHeader(e) {
       e.changed ? [" ", h("span", { class: "flag" }, "changed")] : null,
       e.owed_by ? [" owed by ", h("strong", {}, e.owed_by)] : null,
       e.wake && e.wake.until ? [" wakes ", stamp(e.wake.until)] : null),
-    waiting.length ? h("div", {}, "Waiting on ", h("strong", {}, waiting.join(", ")), e.waiting.since ? ` since ${stamp(e.waiting.since)}` : "") : null,
     e.notes ? h("p", { class: "d-notes" }, e.notes) : null,
     taskProps(e),
     taskLinks(e),

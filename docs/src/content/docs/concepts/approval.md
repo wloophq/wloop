@@ -123,7 +123,7 @@ A draft has a purpose (nudge, close, ask_owner, or any label its proposer names)
 | Effect | What it does once the draft is sent |
 |---|---|
 | `task.nudged` | stamps the last nudge of the draft's task, or of every live waiting task of its unit |
-| `unit.closed` | records the unit's closure through its plugin: on Slack, it ends the close task and lets the thread go unwatched after its warm period, whatever later extraction passes say |
+| `unit.closed` | records the unit's closure through its plugin, which on Slack lets the thread go unwatched after its warm period whatever later extraction passes say, then ends the open tasks that hold the unit |
 | `pr.nudged` | records the nudge on the pull request, which the next nudge's refusal reads |
 
 Nothing follows from a draft's purpose: a closing message with no `unit.closed` closes nothing. An agent's draft may declare only the effects its intent lists in `[drafts] allowed_effects`; the draft is refused otherwise, with a message naming the intent. A draft declaring an effect its unit's provider does not implement, such as `pr.nudged` on a Slack thread, is refused when it is proposed. A sent draft whose effect cannot apply, such as `unit.closed` while its plugin is off, keeps it pending until it can.

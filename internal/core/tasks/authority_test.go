@@ -87,7 +87,7 @@ func profileRig(t *testing.T, d intentload.TasksDef) *rig {
 
 func TestAVerbsTransitionComesFromTheProfile(t *testing.T) {
 	r := profileRig(t, tasksToml(t, verbEdit{"someday", `to      = "someday"`, `to      = "waiting"`}))
-	e := r.put(t, task.Task{ID: "t-1", Kind: task.KindCapture, State: "next", Origin: task.OriginUser})
+	e := r.put(t, task.Task{ID: "t-1", State: "next", Origin: task.OriginUser})
 	res, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSomeday})
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +95,7 @@ func TestAVerbsTransitionComesFromTheProfile(t *testing.T) {
 	if res.Task.State != "waiting" || res.Task.Category != task.CategoryWaiting {
 		t.Errorf("someday moved the task to %s (%s), want waiting as the profile's to says", res.Task.State, res.Task.Category)
 	}
-	r.put(t, task.Task{ID: "t-2", Kind: task.KindCapture, State: "done", Origin: task.OriginUser})
+	r.put(t, task.Task{ID: "t-2", State: "done", Origin: task.OriginUser})
 	if _, err := r.svc.Do(context.Background(), "t-2", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSomeday}); !errors.Is(err, coretasks.ErrVerb) {
 		t.Errorf("someday from done, which its from leaves out: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestAVerbsTransitionComesFromTheProfile(t *testing.T) {
 
 func TestAnAgentMayCloseWhenTheProfileSaysSo(t *testing.T) {
 	ctx := context.Background()
-	e := task.Task{ID: "t-1", Kind: task.KindCapture, State: "next", Origin: task.OriginUser}
+	e := task.Task{ID: "t-1", State: "next", Origin: task.OriginUser}
 	bundled := profileRig(t, tasksToml(t))
 	bundled.put(t, e)
 	if _, err := bundled.svc.Do(ctx, e.ID, coretasks.Request{Verb: task.VerbDone, Actor: task.ActorAgent}); !errors.Is(err, coretasks.ErrForbidden) {
@@ -125,7 +125,7 @@ func TestAnAgentMayCloseWhenTheProfileSaysSo(t *testing.T) {
 
 func TestNoActorMeansForbidden(t *testing.T) {
 	r := profileRig(t, tasksToml(t))
-	e := r.put(t, task.Task{ID: "t-1", Kind: task.KindCapture, State: "next", Origin: task.OriginUser})
+	e := r.put(t, task.Task{ID: "t-1", State: "next", Origin: task.OriginUser})
 	for _, a := range []task.Actor{task.ActorAgent, task.ActorPlugin} {
 		if err := r.svc.Accepts(e, task.VerbDone, a); !errors.Is(err, coretasks.ErrForbidden) {
 			t.Errorf("%s on done, which names no by.%s: %v", a, a, err)
@@ -166,9 +166,9 @@ func TestAPersonMayRunEveryBundledVerb(t *testing.T) {
 }
 
 func TestAByPredicateAllowsPerKind(t *testing.T) {
-	r := profileRig(t, tasksToml(t, verbEdit{"someday", `by      = { person = "true" }`, `by      = { person = "true", workflow = 'task.kind == "capture"' }`}))
-	capture := r.put(t, task.Task{ID: "t-1", Kind: task.KindCapture, State: "next", Origin: task.OriginUser})
-	action := r.put(t, task.Task{ID: "t-2", Kind: task.KindAction, State: "next", Origin: task.OriginUser})
+	r := profileRig(t, tasksToml(t, verbEdit{"someday", `by      = { person = "true" }`, `by      = { person = "true", workflow = 'task.prop.kind == "capture"' }`}))
+	capture := r.put(t, task.Task{ID: "t-1", State: "next", Origin: task.OriginUser, Props: task.Props{task.PropKind: {Text: "capture"}}})
+	action := r.put(t, task.Task{ID: "t-2", State: "next", Origin: task.OriginUser})
 	if err := r.svc.Accepts(capture, task.VerbSomeday, task.ActorWorkflow); err != nil {
 		t.Errorf("a workflow on a capture's someday: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestAGatedVerbOpensTheGateItsVerbNames(t *testing.T) {
 	states := profileStates{TasksDef: d, gates: map[string]gate.Gate{"close-check": confirm}}
 	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, Gates: gs,
 		States: states, Authority: states.Authority})
-	e := r.put(t, task.Task{ID: "t-1", Kind: task.KindCapture, State: "next", Origin: task.OriginUser})
+	e := r.put(t, task.Task{ID: "t-1", State: "next", Origin: task.OriginUser})
 
 	res, err := r.svc.Do(ctx, e.ID, coretasks.Request{Verb: task.VerbDone, Actor: task.ActorWorkflow, Source: "tidy", Args: map[string]string{"why": "merged"}})
 	if err != nil {
@@ -245,7 +245,7 @@ func personGated(t *testing.T, verb string) (*rig, *gatestest.Store) {
 func TestApprovingAPersonGatedVerbClosesTheTask(t *testing.T) {
 	ctx := context.Background()
 	r, gs := personGated(t, "done")
-	e := r.put(t, task.Task{ID: "t-1", Kind: task.KindCapture, State: "next", Origin: task.OriginUser})
+	e := r.put(t, task.Task{ID: "t-1", State: "next", Origin: task.OriginUser})
 	if _, err := r.svc.Do(ctx, e.ID, coretasks.Request{Verb: task.VerbDone, Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestApprovingAPersonGatedVerbClosesTheTask(t *testing.T) {
 	if got, _ := gs.OfTask(ctx, e.ID); len(got) != 1 || r.task(t, e.ID).Category != task.CategoryDone {
 		t.Errorf("category %s, gates %+v: the approval should close the task and open no gate", r.task(t, e.ID).Category, got)
 	}
-	other := r.put(t, task.Task{ID: "t-2", Kind: task.KindCapture, State: "next", Origin: task.OriginUser})
+	other := r.put(t, task.Task{ID: "t-2", State: "next", Origin: task.OriginUser})
 	if _, err := r.svc.Do(ctx, other.ID, req); !errors.Is(err, coretasks.ErrForbidden) {
 		t.Errorf("another task's approval closed t-2: %v", err)
 	}
@@ -272,7 +272,7 @@ func TestApprovingAPersonGatedVerbClosesTheTask(t *testing.T) {
 func TestAGatedVerbOpensOneGateWhileItIsOpen(t *testing.T) {
 	ctx := context.Background()
 	r, gs := personGated(t, "done")
-	e := r.put(t, task.Task{ID: "t-1", Kind: task.KindCapture, State: "next", Origin: task.OriginUser})
+	e := r.put(t, task.Task{ID: "t-1", State: "next", Origin: task.OriginUser})
 	for range 2 {
 		if _, err := r.svc.Do(ctx, e.ID, coretasks.Request{Verb: task.VerbDone, Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
 			t.Fatal(err)
@@ -296,7 +296,7 @@ func TestAGatedDismissOnADisabledPluginsTaskOpensTheGate(t *testing.T) {
 	ctx := context.Background()
 	r, gs := personGated(t, "dismiss")
 	r.facts.off[unit.GitHub] = true
-	e := r.put(t, task.Task{ID: "t-1", Kind: task.KindAction, State: "next", Origin: task.OriginUser, Units: []unit.Unit{unitU}})
+	e := r.put(t, task.Task{ID: "t-1", State: "next", Origin: task.OriginUser, Units: []unit.Unit{unitU}})
 	if _, err := r.svc.Do(ctx, e.ID, coretasks.Request{Verb: task.VerbDismiss, Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +307,7 @@ func TestAGatedDismissOnADisabledPluginsTaskOpensTheGate(t *testing.T) {
 
 func TestAVerbWithNoActorIsRefused(t *testing.T) {
 	r := newRig()
-	e := r.put(t, task.Task{ID: "t-1", Kind: task.KindCapture, State: "next", Origin: task.OriginUser})
+	e := r.put(t, task.Task{ID: "t-1", State: "next", Origin: task.OriginUser})
 	allowAll := coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates,
 		Authority: func(context.Context, string, task.Actor, task.Task) (bool, bool, error) { return true, false, nil }})
 	if _, err := allowAll.Do(context.Background(), e.ID, coretasks.Request{Verb: task.VerbDone, Source: "somewhere"}); !errors.Is(err, coretasks.ErrForbidden) || !strings.Contains(err.Error(), "names no actor") {
@@ -326,7 +326,7 @@ func TestAVerbRunsTheHandlerItsProfileNames(t *testing.T) {
 	r := profileRig(t, tasksToml(t,
 		verbEdit{"area", `handler = "area"`, `handler = "context"`},
 		verbEdit{"answer", `handler = "answer"`, `handler = "approve"`}))
-	e := r.put(t, task.Task{ID: "t-1", Kind: task.KindCapture, State: "next", Origin: task.OriginUser})
+	e := r.put(t, task.Task{ID: "t-1", State: "next", Origin: task.OriginUser})
 	res, err := r.svc.Do(ctx, e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbArea, Args: map[string]string{"set": "@calls, @home"}})
 	if err != nil {
 		t.Fatal(err)
@@ -335,25 +335,25 @@ func TestAVerbRunsTheHandlerItsProfileNames(t *testing.T) {
 		t.Errorf("area with the context handler set contexts %q", got)
 	}
 	var ran []task.Verb
-	r.svc.Register(task.KindMessage, "approve", func(_ context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
+	r.svc.Register(task.OriginMessage, "approve", func(_ context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
 		ran = append(ran, req.Verb)
 		return coretasks.Result{Task: e}, nil
 	})
-	m := r.put(t, task.Task{ID: "t-2", Kind: task.KindMessage, State: "inbox", Origin: task.OriginMessage})
+	m := r.put(t, task.Task{ID: "t-2", State: "inbox", Origin: task.OriginMessage})
 	if _, err := r.svc.Do(ctx, m.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbAnswer}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := r.svc.Do(ctx, m.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbApprove}); err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(ran, []task.Verb{task.VerbAnswer, task.VerbApprove}) || !r.svc.Handles(task.KindMessage, task.VerbAnswer) {
+	if !slices.Equal(ran, []task.Verb{task.VerbAnswer, task.VerbApprove}) || !r.svc.Handles(task.Task{Origin: task.OriginMessage}, task.VerbAnswer) {
 		t.Errorf("the approve handler ran %v", ran)
 	}
 }
 
 func TestWorkflowVerbsRecordEventsWithTheirActor(t *testing.T) {
 	r := newRig()
-	e := r.put(t, task.Task{ID: "t-1", Kind: task.KindCapture, State: "inbox", Origin: task.OriginUser})
+	e := r.put(t, task.Task{ID: "t-1", State: "inbox", Origin: task.OriginUser})
 	chain := workflow.Chain{}.Then("triage")
 	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Verb: task.VerbNext, Actor: task.ActorWorkflow, Source: "triage", Chain: chain}); err != nil {
 		t.Fatal(err)

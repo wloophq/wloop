@@ -6,8 +6,11 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/wloophq/wloop/internal/catalog"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -364,7 +367,18 @@ func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (b
 		},
 		Sessions: sqlite.New(db).Sessions,
 		Clock:    clockFunc(func() time.Time { return e.Now() }),
+		Props:    func(t task.Task) workflow.Facts { return catalog.PropFacts(t, e.loadedIntents().Tasks) },
+		Me:       e.me,
+		OwedBy:   catalog.OwedByOf(e.loadedIntents),
 	})
+}
+
+// me is the user's identity the tasks reconcile with; nobody before the tasks service is built.
+func (e *Env) me() task.Me {
+	if e.tasksMe == nil {
+		return task.Me{}
+	}
+	return e.tasksMe.get()
 }
 
 // unitStates are the states of the pull requests among units, as the

@@ -102,7 +102,7 @@ func newDerivedRig(t *testing.T, cases []ghsourcetest.Case) derivedRig {
 	clock := clockFunc(func() time.Time { return ghsourcetest.Now })
 	ledger := &coreitems.Ledger{Store: db.Items(), Clock: clock}
 	me := task.Me{Keys: []string{"github:" + ghsourcetest.Viewer}}
-	svc := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: db.Tasks(), Items: ledger, Me: me, Clock: clock, StaleWaitingDays: 2,
+	svc := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: db.Tasks(), Items: ledger, Me: me, Clock: clock,
 		Facts: coretasks.CardFacts{Cards: db.Cards(), Me: func() task.Me { return me }}})
 	r := derivedRig{db: db, svc: svc, asked: map[unit.Unit]bool{}}
 	var units []unit.Unit
@@ -122,7 +122,7 @@ func newDerivedRig(t *testing.T, cases []ghsourcetest.Case) derivedRig {
 		}
 		if asked(c.Row) {
 			r.asked[u] = true
-			if _, err := svc.Open(ctx, coretasks.OpenRequest{Kind: task.KindMessage, Title: "the agent asks", Unit: &u}); err != nil {
+			if _, err := svc.Open(ctx, coretasks.OpenRequest{Title: "the agent asks", Unit: &u}); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -166,7 +166,7 @@ func TestEveryNeedsMeRowHasAnInboxOrNextTask(t *testing.T) {
 		switch {
 		case r.asked[c.Row.Unit]:
 			questions++
-			if len(es) != 1 || es[0].Kind != task.KindMessage || es[0].State != task.State("inbox") {
+			if len(es) != 1 || es[0].State != task.State("inbox") {
 				t.Errorf("%s asked: %+v", c.Name, es)
 			}
 		case situation.Kind(c.Row.Kind) == situation.KindMuted && viewerItem(c):
@@ -251,7 +251,7 @@ func TestSyncRunsUnderNoJobs(t *testing.T) {
 		page, err = c.TasksSince(ctx, client.TaskQuery{View: "inbox"}, api.Since{})
 		return err == nil && len(page.Tasks) == 1
 	})
-	if e := page.Tasks[0]; e.Kind != "action" || !slices.Equal(e.Units, []unit.Unit{u}) || page.Counters.Badge != 1 {
+	if e := page.Tasks[0]; !slices.Equal(e.Units, []unit.Unit{u}) || page.Counters.Badge != 1 {
 		t.Fatalf("%+v", page)
 	}
 	res, err := c.TaskDo(ctx, page.Tasks[0].ID, "next", api.TaskRequest{Source: "cli"})
@@ -297,7 +297,7 @@ func TestDisabledPluginTasksRefuseOnARealServe(t *testing.T) {
 	}
 	u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
-	e := task.Task{ID: "e-00000000000000aa", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Title: "review it", Units: []unit.Unit{u},
+	e := task.Task{ID: "e-00000000000000aa", State: "inbox", Category: task.CategoryInbox, Title: "review it", Units: []unit.Unit{u},
 		Items: []task.ItemRef{{Unit: u, Item: "gh:review"}}, Origin: task.OriginDerived, Created: at, Updated: at}
 	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)

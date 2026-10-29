@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"maps"
-	"math"
 	"slices"
 	"sync"
 	"time"
@@ -49,11 +48,10 @@ type Gates interface {
 
 // Settings are the config values the facts read.
 type Settings struct {
-	// StaleDays is tasks.stale_waiting_days: working days a waiting task
-	// waits before its nudge; 0 waits for its resurface date only.
+	// StaleDays is tasks.stale_waiting_days: working days after task.owed_since that a task someone else owes
+	// is due a check, when it has no check_on property; 0 checks on the property only.
 	StaleDays int
-	// RenudgeAfter is drafts.repeat_after: how long a nudge keeps the
-	// task quiet.
+	// RenudgeAfter is drafts.repeat_after: how long a nudge keeps the task quiet.
 	RenudgeAfter time.Duration
 }
 
@@ -80,11 +78,17 @@ type Deps struct {
 	Sessions func(ctx context.Context) ([]turn.Session, error)
 	// Clock's location is where working days are counted.
 	Clock port.Clock
+	// Props are the task.prop.* facts of a task, typed as tasks.toml declares them; nil: none.
+	Props func(t task.Task) workflow.Facts
+	// Me is the user's identity, whom task.link_owes names me; nil: nobody.
+	Me func() task.Me
+	// OwedBy is who owes a task's next step over its other facts, as the profile says; nil: nobody.
+	OwedBy func(ctx context.Context, f workflow.Facts) (string, error)
 }
 
 // Provider is the task subject's facts provider. It names the task's own
-// unit as the subject's owner and wakes the sweep at the next nudge-due or
-// resurface time.
+// unit as the subject's owner and wakes the sweep at the next check_on, or
+// at the end of a nudge's quiet time.
 type Provider struct {
 	d Deps
 
@@ -100,9 +104,6 @@ var (
 )
 
 func New(d Deps) *Provider { return &Provider{d: d} }
-
-// never is task.since_nudge of a task never nudged.
-const never = time.Duration(math.MaxInt64)
 
 func (p *Provider) enabled(id unit.ProviderID) bool { return p.d.Enabled == nil || p.d.Enabled(id) }
 
@@ -122,8 +123,8 @@ func (p *Provider) enabledFor(e task.Task) bool {
 	return !ok || p.enabled(u.Provider)
 }
 
-// List is every listed task, by id, and keeps the earliest nudge-due or
-// resurface time after now for Due.
+// List is every listed task, by id, and keeps the earliest time after now
+// of a check_on property or of a nudge's quiet time ending, for Due.
 func (p *Provider) List(ctx context.Context, _ unit.ProviderID) ([]unit.Unit, error) {
 	es, err := p.d.Tasks.Tasks(ctx, task.Query{View: task.ViewOpen})
 	if err != nil {
@@ -137,7 +138,7 @@ func (p *Provider) List(ctx context.Context, _ unit.ProviderID) ([]unit.Unit, er
 			continue
 		}
 		out = append(out, task.UnitOf(e.ID))
-		for _, t := range []time.Time{nudgeDue(e, s, now.Location()), resurface(e)} {
+		for _, t := range []time.Time{e.Prop(task.PropCheckOn).Time, quietUntil(e, s)} {
 			if t.After(now) && (due.IsZero() || t.Before(due)) {
 				due = t
 			}
@@ -150,7 +151,7 @@ func (p *Provider) List(ctx context.Context, _ unit.ProviderID) ([]unit.Unit, er
 	return out, nil
 }
 
-// Due is the earliest nudge-due or resurface time the last List saw ahead.
+// Due is the earliest time the last List saw ahead.
 func (p *Provider) Due() time.Time {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -189,17 +190,30 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 	if err != nil {
 		return nil, err
 	}
-	now, s := p.d.Clock.Now(), p.settings()
-	loc := now.Location()
+	f, err := p.base(ctx, e)
+	if err != nil {
+		return nil, err
+	}
+	return p.owed(ctx, e, f)
+}
+
+// BaseFacts are the facts of task e but those its owed_by makes, OwedFacts, over which owed_by.expr is
+// evaluated.
+func (p *Provider) BaseFacts(ctx context.Context, e task.Task) (workflow.Facts, error) {
+	f, err := p.base(ctx, e)
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range []string{"task.owed_by", "task.owed_since", "task.check_on"} {
+		delete(f, name)
+	}
+	return f, nil
+}
+
+func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error) {
 	f := workflow.Facts{
 		"task.id":                  string(e.ID),
-		"task.kind":                string(e.Kind),
 		"task.state":               string(e.State),
-		"task.waiting_on":          []string{},
-		"task.resurface_at":        resurface(e),
-		"task.waiting_days":        0,
-		"task.since_nudge":         never,
-		"task.nudge_due_at":        time.Time{},
 		"task.muted":               e.Snooze.Mute,
 		"task.unit":                "",
 		"task.unit_provider":       "",
@@ -212,14 +226,13 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 		"task.link_closure_posted": false,
 		"task.items_open":          0,
 		"task.items_resolved":      0,
-		"task.items_owed":          0,
 		"task.settled_at":          time.Time{},
 		"task.fingerprint":         string(e.ID) + "|" + string(e.State) + "|" + e.Updated.UTC().Format(time.RFC3339Nano),
 		"task.category":            string(e.Category),
 		"task.owed_by":             "",
 		"task.owed_since":          time.Time{},
 		"task.since_movement":      time.Duration(0),
-		"task.check_on":            time.Time{},
+		"task.check_on":            e.Prop(task.PropCheckOn).Time,
 		"task.gates_open":          0,
 		"task.runs_live":           0,
 		"task.wake_until":          time.Time{},
@@ -229,26 +242,14 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 		"task.review_due":          false,
 		"task.children_ready":      false,
 		"task.ask_age":             time.Duration(0),
-		"task.promised":            time.Time{},
+		"task.promised":            e.Prop("promised").Time,
 		"task.extraction_lag":      time.Duration(0),
 		"task.link_owes":           []string{},
 	}
-	if w := e.Waiting; w != nil {
-		keys := make([]string, 0, len(w.On))
-		for _, p := range w.On {
-			keys = append(keys, p.Key)
-		}
-		f["task.waiting_on"] = keys
-		if e.Category == task.CategoryWaiting && !w.Since.IsZero() {
-			f["task.waiting_days"] = workdaysSince(w.Since, now, loc)
-		}
-		if !w.LastNudge.IsZero() {
-			f["task.since_nudge"] = now.Sub(w.LastNudge)
-		}
+	if p.d.Props != nil {
+		maps.Copy(f, p.d.Props(e))
 	}
-	if due := nudgeDue(e, s, loc); !due.IsZero() && !due.After(now) {
-		f["task.nudge_due_at"] = due
-	}
+	var err error
 	if p.d.Turns != nil {
 		n, err := p.d.Turns(ctx, task.UnitOf(e.ID))
 		if err != nil {
@@ -256,9 +257,11 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 		}
 		f["task.turns"] = n
 	}
-	if f["task.gates_open"], err = p.gatesOpen(ctx, e.ID); err != nil {
+	gs, err := p.gates(ctx, e.ID)
+	if err != nil {
 		return nil, err
 	}
+	f["task.gates_open"] = len(gs)
 	if p.d.Sessions != nil {
 		n, err := p.runsLive(ctx, task.UnitOf(e.ID))
 		if err != nil {
@@ -301,7 +304,7 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 	if err != nil {
 		return nil, err
 	}
-	var open, resolved, owed int
+	var open, resolved int
 	for _, u := range us {
 		for _, it := range got[u] {
 			switch it.State {
@@ -311,9 +314,9 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 				resolved++
 			}
 		}
-		owed += len(held(e, got[u]))
 	}
-	f["task.items_open"], f["task.items_resolved"], f["task.items_owed"] = open, resolved, owed
+	f["task.items_open"], f["task.items_resolved"] = open, resolved
+	f["task.link_owes"] = p.linkOwes(e, us, got)
 	return f, nil
 }
 
@@ -401,59 +404,123 @@ func held(e task.Task, its []items.Item) []items.Item {
 	return out
 }
 
-func resurface(e task.Task) time.Time {
-	if e.Waiting == nil {
+// quietUntil is when the quiet time of e's last nudge ends; zero when it was never nudged.
+func quietUntil(e task.Task, s Settings) time.Time {
+	at := e.Prop(task.PropLastNudge).Time
+	if at.IsZero() {
 		return time.Time{}
 	}
-	return e.Waiting.Resurface
+	return at.Add(s.RenudgeAfter)
 }
 
-// nudgeDue is when waiting task e is due a nudge: its resurface date when
-// set, else StaleDays working days after it started waiting, and no sooner
-// than RenudgeAfter after its last nudge; zero when it waits on nobody or
-// has no date to wait for.
-func nudgeDue(e task.Task, s Settings, loc *time.Location) time.Time {
-	w := e.Waiting
-	if w == nil || e.Category != task.CategoryWaiting || len(w.On) == 0 {
-		return time.Time{}
+// linkOwes are who the open items e holds wait on, each once, me for the user; of a unit e holds no item of,
+// every open item of the unit.
+func (p *Provider) linkOwes(e task.Task, us []unit.Unit, got map[unit.Unit][]items.Item) []string {
+	var me task.Me
+	if p.d.Me != nil {
+		me = p.d.Me()
 	}
-	due := w.Resurface
-	if due.IsZero() {
-		if s.StaleDays <= 0 || w.Since.IsZero() {
-			return time.Time{}
+	out := []string{}
+	for _, u := range us {
+		its := held(e, got[u])
+		if !slices.ContainsFunc(e.Items, func(r task.ItemRef) bool { return r.Unit == u }) {
+			its = slices.DeleteFunc(slices.Clone(got[u]), func(it items.Item) bool { return it.State != items.Open })
 		}
-		due = task.AddWorkdays(w.Since, s.StaleDays, loc)
-	}
-	if !w.LastNudge.IsZero() {
-		if again := w.LastNudge.Add(s.RenudgeAfter); again.After(due) {
-			due = again
+		for _, it := range its {
+			for _, who := range it.WaitingOn {
+				k := who.Key
+				if who.Is(me) {
+					k = "me"
+				}
+				if k != "" && !slices.Contains(out, k) {
+					out = append(out, k)
+				}
+			}
 		}
 	}
-	return due
+	return out
 }
 
-// workdaysSince is the most working days n with since moved n working days
-// no later than now.
-func workdaysSince(since, now time.Time, loc *time.Location) int {
-	n := 0
-	for !task.AddWorkdays(since, n+1, loc).After(now) {
-		n++
+// owed sets the facts e's owed_by makes over f, its other facts: task.owed_by, as the profile says;
+// task.owed_since, the oldest of the open items e holds waiting on whoever owes it, else for me its oldest
+// open gate, else e's creation; and task.check_on, its check_on property, else, when what e holds waits on
+// someone else and not on me, StaleDays working days after the oldest of those items. The check date reads
+// the items alone, so a gate e's own nudge opens leaves it as it was.
+func (p *Provider) owed(ctx context.Context, e task.Task, f workflow.Facts) (workflow.Facts, error) {
+	if p.d.OwedBy == nil {
+		return f, nil
 	}
-	return n
+	who, err := p.d.OwedBy(ctx, f)
+	if err != nil {
+		return nil, err
+	}
+	f["task.owed_by"] = who
+	if who == "" {
+		return f, nil
+	}
+	since, err := p.owedSince(ctx, e, who)
+	if err != nil {
+		return nil, err
+	}
+	f["task.owed_since"] = since
+	links, _ := f["task.link_owes"].([]string)
+	s, now := p.settings(), p.d.Clock.Now()
+	if !e.Prop(task.PropCheckOn).Time.IsZero() || s.StaleDays <= 0 || len(links) == 0 || slices.Contains(links, "me") {
+		return f, nil
+	}
+	if links[0] != who {
+		if since, err = p.owedSince(ctx, e, links[0]); err != nil {
+			return nil, err
+		}
+	}
+	f["task.check_on"] = task.AddWorkdays(since, s.StaleDays, now.Location())
+	return f, nil
 }
 
-func (p *Provider) gatesOpen(ctx context.Context, id task.ID) (int, error) {
+func (p *Provider) owedSince(ctx context.Context, e task.Task, who string) (time.Time, error) {
+	var me task.Me
+	if p.d.Me != nil {
+		me = p.d.Me()
+	}
+	got, err := p.d.Items.Load(ctx, unitsOf(e))
+	if err != nil {
+		return time.Time{}, err
+	}
+	var since time.Time
+	earlier := func(t time.Time) {
+		if !t.IsZero() && (since.IsZero() || t.Before(since)) {
+			since = t
+		}
+	}
+	for _, its := range got {
+		for _, it := range held(e, its) {
+			if slices.ContainsFunc(it.WaitingOn, func(w items.Person) bool { return w.Key == who || who == "me" && w.Is(me) }) {
+				earlier(it.CreatedAt)
+			}
+		}
+	}
+	if since.IsZero() && who == "me" {
+		gs, err := p.gates(ctx, e.ID)
+		if err != nil {
+			return time.Time{}, err
+		}
+		for _, g := range gs {
+			earlier(g.OpenedAt)
+		}
+	}
+	if since.IsZero() {
+		since = e.Created
+	}
+	return since, nil
+}
+
+// gates are the open gates of task id.
+func (p *Provider) gates(ctx context.Context, id task.ID) ([]gate.Gate, error) {
 	if p.d.Gates == nil {
-		return 0, nil
+		return nil, nil
 	}
 	gs, err := p.d.Gates.OfTask(ctx, id)
-	n := 0
-	for _, g := range gs {
-		if g.Status == gate.Open {
-			n++
-		}
-	}
-	return n, err
+	return slices.DeleteFunc(gs, func(g gate.Gate) bool { return g.Status != gate.Open }), err
 }
 
 // runsLive counts the sessions of u with a live process.

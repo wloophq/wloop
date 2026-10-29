@@ -3,10 +3,12 @@ package catalog
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // Authority is the profile's word on who runs the task verbs, the core's
@@ -43,12 +45,22 @@ func Authority(loaded func() *intentload.Loaded) func(ctx context.Context, verb 
 func TaskFacts(t task.Task, d intentload.TasksDef) workflow.Facts {
 	f := OfferFacts(t)
 	f["task.category"] = string(t.Category)
+	maps.Copy(f, PropFacts(t, d))
+	return f
+}
+
+// PropFacts are the task.prop.* facts of t's properties, typed as d
+// declares them, and the task.prop_by.* of who wrote each; a property d
+// does not declare is left out.
+func PropFacts(t task.Task, d intentload.TasksDef) workflow.Facts {
+	f := workflow.Facts{}
 	for _, p := range d.Props {
 		v, ok := t.Props[p.Name]
 		if !ok {
 			continue
 		}
-		f["task.prop."+p.Name] = propFact(p.Type, v)
+		f[builtin.PropPrefix+p.Name] = propFact(p.Type, v)
+		f[builtin.PropByPrefix+p.Name] = string(t.Written[p.Name].By)
 	}
 	return f
 }

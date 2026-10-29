@@ -1,13 +1,13 @@
 package tui
 
 import (
-	"cmp"
 	"fmt"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	dtask "github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
@@ -230,22 +230,20 @@ func (m *Model) reviewHelp() []helpItem {
 	return append(items, helpItem{"]", "next step"}, helpItem{"[", "previous step"})
 }
 
-// projectFacts are a project's review mark, next action, open actions and
-// interval; none for another kind.
+// projectFacts are a project's review mark, open children, with no next
+// action when it has none, and interval; none for another kind.
 func projectFacts(e api.TaskView) []string {
-	if e.Kind != "project" {
+	if e.PropText(dtask.PropKind) != dtask.KindProject {
 		return nil
 	}
 	var out []string
 	if e.ReviewDue {
 		out = append(out, "review due")
 	}
-	if e.NextAction == "" {
+	if len(e.Children) == 0 {
 		out = append(out, "no next action")
-	} else {
-		out = append(out, "next: "+cmp.Or(e.NextActionTitle, e.NextAction))
 	}
-	out = append(out, fmt.Sprintf("%d open", e.OpenActions))
+	out = append(out, fmt.Sprintf("%d open", len(e.Children)))
 	if d, err := time.ParseDuration(e.ReviewEvery); err == nil && d > 0 {
 		out = append(out, "every "+everyLabel(d))
 	}

@@ -16,8 +16,7 @@ import (
 func putTask(t *testing.T, db *DB, id task.ID, units ...unit.Unit) {
 	t.Helper()
 	when := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	if err := db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: task.Task{ID: id, Kind: task.KindAction,
-		State: "done", Category: task.CategoryDone, Title: "Ship it", Origin: task.OriginUser, Units: units, Created: when, Updated: when}}}); err != nil {
+	if err := db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: task.Task{ID: id, State: "done", Category: task.CategoryDone, Title: "Ship it", Origin: task.OriginUser, Units: units, Created: when, Updated: when}}}); err != nil {
 		t.Fatal(err)
 	}
 }

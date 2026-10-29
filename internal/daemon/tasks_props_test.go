@@ -27,7 +27,7 @@ func TestTaskViewServesPropsAndParent(t *testing.T) {
 	child.SetProp("contexts", task.Value{List: []string{"@reply"}}, task.WriterPerson, tasksNow)
 	child.SetProp("size", task.Value{Dur: 30 * time.Minute}, task.WriterPerson, tasksNow)
 	second := task.Task{ID: "e-d", State: "waiting", Category: task.CategoryWaiting, Title: "d", Parent: "e-p", Position: 2}
-	r.put(t, task.Task{ID: "e-p", Kind: task.KindProject, State: "next", Category: task.CategoryReady, Title: "P"}, second, child)
+	r.put(t, task.Task{ID: "e-p", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "next", Category: task.CategoryReady, Title: "P"}, second, child)
 	var got api.TaskView
 	if code := get(t, r.s, api.TaskPath("e-c"), &got); code != 200 {
 		t.Fatalf("GET the task: %d", code)

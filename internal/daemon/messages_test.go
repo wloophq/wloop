@@ -307,7 +307,7 @@ func TestDismissingAMessageTaskOfAnEarlierVersionDismissesItsQuestion(t *testing
 	r := newMessageRig(t)
 	ctx := context.Background()
 	r.asked(r8u, turn.Intent(dintent.Review), turn.Asked, publishQuestion)
-	e, err := r.s.deps.Tasks.Open(ctx, coretasks.OpenRequest{Kind: task.KindMessage, Title: "Publish?", Unit: ptr(r8u.Unit()), Origin: task.OriginMessage})
+	e, err := r.s.deps.Tasks.Open(ctx, coretasks.OpenRequest{Title: "Publish?", Unit: ptr(r8u.Unit()), Origin: task.OriginMessage})
 	if err != nil {
 		t.Fatal(err)
 	}

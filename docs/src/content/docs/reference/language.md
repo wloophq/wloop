@@ -178,8 +178,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
 - `drafts` (table): The drafts its turns' agents propose.
 - `drafts.allowed_effects` (list of `task.nudged`, `unit.closed`, `pr.nudged`): The effects its agents may declare on their drafts.
-  - `task.nudged`: Stamps the last nudge of the draft's task, or of every live waiting task of its unit when it names none.
-  - `unit.closed`: Records the closure of the draft's unit, which ends its close task and unwatches it after its warm period; through the unit's plugin.
+  - `task.nudged`: Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists.
+  - `unit.closed`: Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
 - `drafts.attach_posts` (bool, default `false`): On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts.
 
@@ -202,7 +202,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `verbs.<name>` (table): A verb, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `verbs.<name>.label` (string): The name people read on its button. Required.
 - `verbs.<name>.summary` (string): One line, what pressing it does: its tooltip. Required.
-- `verbs.<name>.offer` (predicate, default `true`): When a task offers the verb, over the task's own facts (task.id, task.kind, task.state, task.muted, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run.
+- `verbs.<name>.offer` (predicate, default `true`): When a task offers the verb, over the task's own facts (task.id, task.prop.kind, task.state, task.muted, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run.
 - `verbs.<name>.input` (string): The question a verb that asks for a value puts first (waiting, schedule, project, context, area, delegate, reply); required for those.
 - `verbs.<name>.from` (list of strings): The states the verb moves a task from, each a state of states; every state when absent.
 - `verbs.<name>.to` (string): The state the verb moves a task to, a state of states; absent, the verb moves none.
@@ -395,8 +395,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `per` (one of `unit`, `person`, default `unit`): One draft per unit, or one per person it waits on.
   - `target` (one of `unit`, `item`, default `unit`): Where the draft posts: on the unit, or on each item; an intent's help.target is free text.
   - `effects` (list of `task.nudged`, `unit.closed`, `pr.nudged`): What sending the draft applies.
-  - `task.nudged`: Stamps the last nudge of the draft's task, or of every live waiting task of its unit when it names none.
-  - `unit.closed`: Records the closure of the draft's unit, which ends its close task and unwatches it after its warm period; through the unit's plugin.
+  - `task.nudged`: Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists.
+  - `unit.closed`: Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
   - `repeat_after` (string): The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after.
   - `repeat_after_sent` (string): The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever.

@@ -407,7 +407,7 @@ func (s *Service) closeMessage(ctx context.Context, m message.Message, answer st
 		case errors.Is(err, coretasks.ErrNoTask):
 		case err != nil:
 			return err
-		case e.Kind == task.KindMessage:
+		case e.Origin == task.OriginMessage:
 			if err := s.Tasks.Close(ctx, e.ID, to); err != nil {
 				return fmt.Errorf("closing the task of message %d: %w", m.ID, err)
 			}

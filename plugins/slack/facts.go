@@ -21,12 +21,15 @@ func unitFacts(u unit.Unit, in *slackrows.Input, tasks []src.Task, endedAfter ti
 	if msgs := in.Messages(); len(msgs) > 0 {
 		newest = msgs[len(msgs)-1].TS
 	}
-	open, orphans, age := 0, 0, 0
+	open, resolved, orphans, age := 0, 0, 0, 0
 	var updated, next time.Time
 	for _, it := range in.Items() {
 		updated = later(updated, it.UpdatedAt)
-		if it.State == items.Open {
+		switch it.State {
+		case items.Open:
 			open++
+		case items.Resolved:
+			resolved++
 		}
 		if !unowned(it) {
 			continue
@@ -54,6 +57,7 @@ func unitFacts(u unit.Unit, in *slackrows.Input, tasks []src.Task, endedAfter ti
 		{Name: "slack.ended", Value: ended},
 		{Name: "slack.live_task", Value: src.Bool(slices.ContainsFunc(tasks, func(t src.Task) bool { return liveOn(t, u) }))},
 		{Name: "slack.items_open", Value: src.Int(int64(open))},
+		{Name: "slack.items_resolved", Value: src.Int(int64(resolved))},
 		{Name: "slack.items_unowned", Value: src.Int(int64(orphans))},
 		{Name: "slack.items_unowned_age_days", Value: src.Int(int64(age))},
 		{Name: "slack.settled_at", Value: src.Time(time.Time{})},

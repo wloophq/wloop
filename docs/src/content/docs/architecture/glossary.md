@@ -131,7 +131,7 @@ description: The words the code, the configuration, the facts and these pages us
 - **Context**: a label on a task such as `@decide`, from `tasks.contexts`.
 - **Area**: a part of your life or work, from `tasks.areas`. Switching area filters every view but the Inbox.
 - **Snooze**: scheduling a task until a date, until activity on one of its units, or both.
-- **Changed**: the mark on a task that new activity by someone else brought back to the Inbox. Opening or moving the task clears it.
+- **Changed**: the mark on a task that new activity by someone else, or an item that reopened, touched since you saw it; the task stays where it is. Opening or moving the task clears it.
 - **Project**: an outcome that takes more than one action, parallel or sequential, with a review interval and a dossier. See [Projects](/concepts/tasks/#projects).
 - **The review**: the periodic walk through six filtered views, from Inbox to zero to pruning Focus. A review round is a turn of the `review` intent. See [The review](/concepts/tasks/#the-review).
 - **Logbook**: the view of `reference` and `done` tasks.

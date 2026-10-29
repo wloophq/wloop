@@ -43,7 +43,7 @@ func randomTasks(r *rand.Rand, n int) []task.Task {
 	var projects []task.ID
 	for i := range n {
 		at := taskAt.Add(time.Duration(r.IntN(10000)) * time.Minute)
-		e := task.Task{ID: task.ID(fmt.Sprintf("e-%016x", i)), Kind: task.KindCapture, State: countStates[r.IntN(len(countStates))],
+		e := task.Task{ID: task.ID(fmt.Sprintf("e-%016x", i)), State: countStates[r.IntN(len(countStates))],
 			Title: fmt.Sprint(i), Origin: task.OriginUser, Created: at, Updated: at}
 		e.Become(e.State, taskstest.BundledStates)
 		if e.State == "scheduled" && r.IntN(2) == 0 {
@@ -62,7 +62,8 @@ func randomTasks(r *rand.Rand, n int) []task.Task {
 		e.SetProp(task.PropContexts, task.Value{List: cxs}, task.WriterPerson, at)
 		switch {
 		case r.IntN(8) == 0:
-			e.Kind, e.Sequential = task.KindProject, r.IntN(2) == 0
+			e.Sequential = r.IntN(2) == 0
+			e.SetProp(task.PropKind, task.Value{Text: task.KindProject}, task.WriterWorkflow, at)
 			projects = append(projects, e.ID)
 		case len(projects) > 0 && r.IntN(2) == 0:
 			e.Parent, e.Position = projects[r.IntN(len(projects))], r.IntN(5)

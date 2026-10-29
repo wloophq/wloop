@@ -16,8 +16,10 @@ func ProjectsContract(t *testing.T, open func(t *testing.T) (coretasks.Store, co
 	ctx := context.Background()
 	project := func(id task.ID, st string) task.Task {
 		c, _ := BundledStates.CategoryOf(st)
-		return task.Task{ID: id, Kind: task.KindProject, State: InState(st), Category: c, Title: "P " + string(id), Origin: task.OriginUser, Sequential: true,
+		p := task.Task{ID: id, State: InState(st), Category: c, Title: "P " + string(id), Origin: task.OriginUser, Sequential: true,
 			ReviewEvery: 14 * 24 * time.Hour, ReviewedAt: t0.Add(-time.Hour), Created: t0, Updated: t0}
+		p.SetProp(task.PropKind, task.Value{Text: task.KindProject}, task.WriterWorkflow, t0)
+		return p
 	}
 
 	t.Run("project fields round-trip", func(t *testing.T) {

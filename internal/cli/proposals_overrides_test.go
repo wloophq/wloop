@@ -17,7 +17,7 @@ import (
 )
 
 // firstDayClosure runs the default workflows over the scenario's first tick and
-// returns the closure the seeded close entry gets.
+// returns the closure its resolved thread gets.
 func firstDayClosure(t *testing.T, r *replay) draft.Draft {
 	t.Helper()
 	p := newWorkflowProposer(r)

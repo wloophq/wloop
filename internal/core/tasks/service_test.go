@@ -67,7 +67,7 @@ type rig struct {
 func newRig() *rig {
 	r := &rig{store: taskstest.New(), items: &fakeItems{byUnit: map[unit.Unit][]items.Item{}, reads: map[unit.Unit]int{}},
 		facts: &fakeFacts{facts: map[unit.Unit]task.UnitFacts{}, off: map[unit.ProviderID]bool{}}, clock: &clock{t0}}
-	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority, StaleWaitingDays: 2})
+	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority})
 	return r
 }
 
@@ -130,7 +130,7 @@ func TestVerbTransitions(t *testing.T) {
 	for verb, want := range table {
 		for _, from := range allStates {
 			r := newRig()
-			e := r.put(t, task.Task{ID: "e-x", Kind: task.KindCapture, State: from, Origin: task.OriginUser,
+			e := r.put(t, task.Task{ID: "e-x", State: from, Origin: task.OriginUser,
 				Snooze: task.Snooze{Until: t0.Add(time.Hour), Return: task.State("next")}})
 			res, err := r.svc.Do(ctx, e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: verb, Args: args[verb]})
 			to := want[from]
@@ -227,7 +227,7 @@ func TestSyncTouchesOnlyNotedUnits(t *testing.T) {
 	}
 }
 
-func TestSyncRunsFocusAndWakeInOneApply(t *testing.T) {
+func TestSyncRunsWakeInOneApplyAndLeavesFocusToTheProfile(t *testing.T) {
 	r := newRig()
 	r.put(t, task.Task{ID: "e-due", State: "next", Category: task.CategoryReady, Props: task.Props{"due": {Time: t0.Add(-time.Minute)}}})
 	r.put(t, task.Task{ID: "e-wake", State: "scheduled", Category: task.CategoryDeferred, Snooze: task.Snooze{Until: t0, Return: task.State("someday")}})
@@ -239,7 +239,7 @@ func TestSyncRunsFocusAndWakeInOneApply(t *testing.T) {
 	if r.store.Applies != 1 {
 		t.Fatalf("%d applies", r.store.Applies)
 	}
-	if e := r.task(t, "e-due"); !e.Starred() || e.Written["focus"].By != task.WriterWorkflow {
+	if e := r.task(t, "e-due"); e.Starred() {
 		t.Fatalf("due %+v", e)
 	}
 	if e := r.task(t, "e-wake"); e.Category != task.CategoryDeferred {
@@ -270,7 +270,7 @@ func TestDisabledPluginTasksStay(t *testing.T) {
 	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone}); !errors.Is(err, coretasks.ErrPluginDisabled) {
 		t.Fatalf("a verb on a disabled plugin's entry: %v", err)
 	}
-	inbox := r.put(t, task.Task{ID: "e-msg", Kind: task.KindMessage, State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU}, Origin: task.OriginMessage})
+	inbox := r.put(t, task.Task{ID: "e-msg", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU}, Origin: task.OriginMessage})
 	if got, err := r.svc.Task(context.Background(), inbox.ID); err != nil || got.ID != inbox.ID {
 		t.Fatalf("the disabled plugin's inbox entry is not readable: %v %v", got, err)
 	}
@@ -285,11 +285,11 @@ func TestDisabledPluginTasksStay(t *testing.T) {
 func TestOpenAndCloseOwnedTasks(t *testing.T) {
 	r := newRig()
 	ctx := context.Background()
-	e, err := r.svc.Open(ctx, coretasks.OpenRequest{Kind: task.KindMessage, Title: "run the round?", Unit: &unitU})
+	e, err := r.svc.Open(ctx, coretasks.OpenRequest{Title: "run the round?", Unit: &unitU})
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, _ := r.svc.Open(ctx, coretasks.OpenRequest{Kind: task.KindMessage, Title: "again"})
+	other, _ := r.svc.Open(ctx, coretasks.OpenRequest{Title: "again"})
 	if e.ID == other.ID || len(e.ID) != 18 || e.Category != task.CategoryInbox || e.Origin != task.OriginMessage || !slices.Equal(e.Units, []unit.Unit{unitU}) {
 		t.Fatalf("opened %+v", e)
 	}
@@ -303,11 +303,11 @@ func TestOpenAndCloseOwnedTasks(t *testing.T) {
 	if err := r.svc.Sync(ctx, []unit.Unit{unitU}); err != nil {
 		t.Fatal(err)
 	}
-	derived := task.DerivedID(task.KindAction, unitU, "a")
+	derived := task.DerivedID(unitU, "a")
 	if err := r.svc.Close(ctx, derived, task.CategoryDone); !errors.Is(err, coretasks.ErrVerb) {
 		t.Fatalf("close on a derived entry: %v", err)
 	}
-	if c, err := r.svc.Capture(ctx, "call Ana", "", nil); err != nil || c.Kind != task.KindCapture || c.Category != task.CategoryInbox {
+	if c, err := r.svc.Capture(ctx, "call Ana", "", nil); err != nil || c.Origin != task.OriginUser || c.Category != task.CategoryInbox {
 		t.Fatalf("capture %+v %v", c, err)
 	}
 }
@@ -342,12 +342,12 @@ func TestRegisteredViewSource(t *testing.T) {
 	if _, err := r.svc.Task(ctx, "draft:7"); !errors.Is(err, coretasks.ErrNoTask) {
 		t.Fatalf("a draft without a source: %v", err)
 	}
-	src := outbox{drafts: []task.Task{{ID: "draft:7", Kind: task.KindDraft, Origin: task.OriginDraft}, {ID: "draft:8", Kind: task.KindDraft}}}
+	src := outbox{drafts: []task.Task{{ID: "draft:7", Origin: task.OriginDraft}, {ID: "draft:8"}}}
 	r.svc.RegisterView(task.ViewOutbox, "draft:", src)
 	if es, err := r.svc.Tasks(ctx, task.Query{View: task.ViewOutbox}); err != nil || len(es) != 2 {
 		t.Fatalf("outbox: %v %v", es, err)
 	}
-	if e, err := r.svc.Task(ctx, "draft:7"); err != nil || e.Kind != task.KindDraft {
+	if e, err := r.svc.Task(ctx, "draft:7"); err != nil || e.Origin != task.OriginDraft {
 		t.Fatalf("draft:7 %+v %v", e, err)
 	}
 	if _, err := r.svc.Task(ctx, "draft:9"); !errors.Is(err, coretasks.ErrNoTask) {
@@ -357,7 +357,7 @@ func TestRegisteredViewSource(t *testing.T) {
 		t.Fatalf("counts: %+v %v", c, err)
 	}
 	var ran []string
-	r.svc.Register(task.KindDraft, string(task.VerbApprove), func(ctx context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
+	r.svc.Register(task.OriginDraft, string(task.VerbApprove), func(ctx context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
 		ran = append(ran, fmt.Sprint(e.ID, " ", req.Verb))
 		return coretasks.Result{Task: e}, nil
 	})
@@ -378,7 +378,7 @@ func TestUserScheduleSurvivesMute(t *testing.T) {
 	if err := r.svc.Sync(ctx, []unit.Unit{unitU}); err != nil {
 		t.Fatal(err)
 	}
-	id := task.DerivedID(task.KindAction, unitU, "a")
+	id := task.DerivedID(unitU, "a")
 	if e := r.task(t, id); e.Category != task.CategoryDeferred || !e.Snooze.Mute {
 		t.Fatalf("muted: %+v", e)
 	}
@@ -409,7 +409,7 @@ func TestUserScheduleSurvivesMute(t *testing.T) {
 func TestCloseRefusesADisabledPlugin(t *testing.T) {
 	r := newRig()
 	ctx := context.Background()
-	e, err := r.svc.Open(ctx, coretasks.OpenRequest{Kind: task.KindMessage, Title: "run the round?", Unit: &unitU})
+	e, err := r.svc.Open(ctx, coretasks.OpenRequest{Title: "run the round?", Unit: &unitU})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -425,7 +425,7 @@ func TestCloseRefusesADisabledPlugin(t *testing.T) {
 func TestRetitleUpdatesAnOpenedTask(t *testing.T) {
 	r := newRig()
 	ctx := context.Background()
-	e, err := r.svc.Open(ctx, coretasks.OpenRequest{Kind: task.KindMessage, Title: "run the round?", Unit: &unitU})
+	e, err := r.svc.Open(ctx, coretasks.OpenRequest{Title: "run the round?", Unit: &unitU})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -448,7 +448,7 @@ func TestRetitleUpdatesAnOpenedTask(t *testing.T) {
 	if err := r.svc.Sync(ctx, []unit.Unit{unitU}); err != nil {
 		t.Fatal(err)
 	}
-	if err := r.svc.Retitle(ctx, task.DerivedID(task.KindAction, unitU, "a"), "x"); !errors.Is(err, coretasks.ErrVerb) {
+	if err := r.svc.Retitle(ctx, task.DerivedID(unitU, "a"), "x"); !errors.Is(err, coretasks.ErrVerb) {
 		t.Fatalf("retitle of a derived entry: %v", err)
 	}
 }

@@ -3,6 +3,7 @@ package items
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -53,7 +54,9 @@ const (
 	NoBasis         Basis = "none"
 )
 
-type EvidenceKind string // "message", "reaction", "external_claim", "unit_event", "sent_draft"
+// EvidenceKind is what an item's evidence is: one of the core's kinds below, or one its plugin declares,
+// spelled as a name (lower case letters, digits and underscores, starting with a letter).
+type EvidenceKind string
 
 const (
 	EvidenceMessage       EvidenceKind = "message"
@@ -80,11 +83,14 @@ const (
 	Effects   Provenance = "effects"
 )
 
-type Initial string // "", "inbox", "next": the plugin's proposed first GTD state; "" is inbox
+// Initial is the category a plugin proposes an item's new task starts in, never a state name: the task
+// takes the profile's first state of it. "" leaves it to the rules.
+type Initial string
 
 const (
 	InitialInbox Initial = "inbox"
-	InitialNext  Initial = "next"
+	// InitialNext proposes the ready category, where the bundled Next state sits.
+	InitialNext Initial = "ready"
 )
 
 // Limits of an item's text and lists.
@@ -153,8 +159,8 @@ type Item struct {
 	Options    []Option    `json:"options,omitempty"`
 	Deadline   string      `json:"deadline,omitempty"`
 	URLs       []string    `json:"urls,omitempty"`
-	Contexts   []string    `json:"contexts,omitempty"` // proposed GTD contexts ("@decide", "@repo-api"); entries copy them, the user edits there
-	Initial    Initial     `json:"initial,omitempty"`  // proposed first GTD state, honored for a new entry
+	Contexts   []string    `json:"contexts,omitempty"` // proposed contexts ("@decide", "@repo-api"); tasks copy them, the user edits there
+	Initial    Initial     `json:"initial,omitempty"`  // proposed category of a new task
 	Origin     unit.Anchor `json:"origin"`
 	Requester  Person      `json:"requester"`
 	Assignees  []Person    `json:"assignees,omitempty"`
@@ -301,12 +307,13 @@ var (
 	kinds       = []Kind{Request, Question, Decision, Todo}
 	resolutions = []Resolution{Done, Answered, Fixed, Delegated, Declined, Dismissed, Superseded, Moot}
 	bases       = []Basis{ExplicitMention, DMAddressee, ReplyContext, SelfAssigned, Reassigned, GroupAsk, NoBasis}
-	evidences   = []EvidenceKind{EvidenceMessage, EvidenceReaction, EvidenceExternalClaim, EvidenceUnitEvent, EvidenceSentDraft}
 	confidences = []Confidence{High, Low}
 	initials    = []Initial{"", InitialInbox, InitialNext}
 )
 
 const maxID = 100
+
+var evidenceName = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 
 type checker struct{ p Problems }
 
@@ -376,8 +383,8 @@ func (c *checker) people(field string, ps []Person) {
 }
 
 func (c *checker) evidence(e *Evidence, u unit.Unit) {
-	if !slices.Contains(evidences, e.Kind) {
-		c.bad("evidence.kind", "unknown %q", e.Kind)
+	if !evidenceName.MatchString(string(e.Kind)) {
+		c.bad("evidence.kind", "%q is not a kind's name", e.Kind)
 	}
 	c.anchor("evidence.anchor", e.Anchor, u)
 }

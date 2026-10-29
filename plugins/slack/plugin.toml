@@ -77,6 +77,12 @@ doc = "Open items whose unit is this unit."
 untrusted = true
 
 [[source.facts]]
+name = "slack.items_resolved"
+type = "int"
+doc = "Resolved items whose unit is this unit."
+untrusted = true
+
+[[source.facts]]
 name = "slack.items_unowned"
 type = "int"
 doc = "Open items of the unit with no assignee, nobody waited on and no basis."

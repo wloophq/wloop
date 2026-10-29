@@ -50,7 +50,7 @@ func waitTask(n int, token string) api.TaskView {
 
 func questionTask(n int) api.TaskView {
 	e := plainTask(n)
-	e.Kind, e.Title = "message", "Publish the review?"
+	e.Title = "Publish the review?"
 	subject, _ := json.Marshal(api.Message{ID: int64(n), Unit: uref(n), Kind: "question", Text: "Publish the review?", Recommend: "publish",
 		Options: []record.Option{
 			{ID: "comment", Label: "Comment only", Consequence: "posts a comment"},
@@ -69,7 +69,7 @@ func questionTask(n int) api.TaskView {
 
 func draftTask(n int) api.TaskView {
 	id := fmt.Sprintf("draft:%d", n)
-	return api.TaskView{ID: id, Kind: "draft", State: "inbox", Title: "reply: on it", Units: []unit.Unit{uref(n)},
+	return api.TaskView{ID: id, State: "inbox", Title: "reply: on it", Units: []unit.Unit{uref(n)},
 		Attention: &api.Attention{ID: api.NotificationID(api.CategoryOutbox, id, now.UTC().Format(stamp)), Category: "OUTBOX", Title: "Draft to approve",
 			Subtitle: uref(n).Key, Body: "reply: on it", Actions: []api.AttentionAction{{ID: "open", Title: "Open"}, {ID: "task:dismiss", Title: "Discard"}}}}
 }

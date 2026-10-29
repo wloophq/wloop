@@ -52,16 +52,18 @@ const taskInputs = port.TopicTasks | port.TopicDrafts
 // bridged are the verbs a task with units runs as its unit's action when no handler takes them.
 var bridged = []task.Verb{task.VerbApprove, task.VerbDelegate, task.VerbDismiss}
 
-// delegableKinds are the kinds of task with units whose delegate runs as their unit's action; an action task
-// bridges every verb of bridged.
-var delegableKinds = []task.Kind{task.KindAction, task.KindWaiting, task.KindClose, task.KindCapture}
+// aboutUnits says whether e is about its units' conversation: a stored task, not a project.
+func aboutUnits(e task.Task) bool {
+	return !e.IsProject() && e.Origin != task.OriginDraft && e.Origin != task.OriginMessage
+}
 
-// bridges says whether verb on e runs as its first unit's action, a handler aside.
+// bridges says whether verb on e runs as its first unit's action, a handler aside: every verb of bridged on a
+// task its unit's items made, and delegate on any other task about its units.
 func bridges(e task.Task, verb task.Verb) bool {
 	if len(e.Units) == 0 || !slices.Contains(bridged, verb) {
 		return false
 	}
-	return e.Kind == task.KindAction || verb == task.VerbDelegate && slices.Contains(delegableKinds, e.Kind)
+	return e.Origin == task.OriginDerived || verb == task.VerbDelegate && aboutUnits(e)
 }
 
 var errTasksUnavailable = errors.New("the tasks are not served: the daemon runs without a store")
@@ -245,7 +247,7 @@ var gateVerbRoles = map[string]builtin.GateRole{"approve": builtin.GateApproves,
 // handler takes runs it, a reply or a bridged verb runs on the task's unit.
 func (s *Server) doTaskVerb(w http.ResponseWriter, r *http.Request, g *coretasks.Service, e task.Task, creq coretasks.Request, req api.TaskRequest) {
 	ctx, v := context.WithoutCancel(r.Context()), creq.Verb
-	if role, ok := gateVerbRoles[s.loaded().Tasks.Handler(string(v))]; ok && creq.Approved == 0 && !g.Handles(e.Kind, v) {
+	if role, ok := gateVerbRoles[s.loaded().Tasks.Handler(string(v))]; ok && creq.Approved == 0 && !g.Handles(e, v) {
 		if gated, err := g.Allowed(ctx, e, creq); err != nil || gated {
 			res, err := g.Do(ctx, e.ID, creq)
 			s.writeTaskResult(ctx, w, g, res, err)
@@ -267,7 +269,7 @@ func (s *Server) doTaskVerb(w http.ResponseWriter, r *http.Request, g *coretasks
 			return
 		}
 	}
-	reply := v == task.VerbReply && !g.Handles(e.Kind, v)
+	reply := v == task.VerbReply && !g.Handles(e, v)
 	b, bridged := s.bridge(ctx, g, e, v)
 	if reply || bridged {
 		gated, err := g.Allowed(ctx, e, creq)
@@ -380,7 +382,7 @@ func (b bridgeAction) reason() string {
 // bridge is what verb runs on e as its unit's action: ok false when a handler takes the verb or bridges says
 // it does not run as one. A dismiss the row offers no action for is the state change.
 func (s *Server) bridge(ctx context.Context, g *coretasks.Service, e task.Task, verb task.Verb) (bridgeAction, bool) {
-	if !bridges(e, verb) || g.Handles(e.Kind, verb) || !s.pluginEnabled(e.Units[0].Provider) {
+	if !bridges(e, verb) || g.Handles(e, verb) || !s.pluginEnabled(e.Units[0].Provider) {
 		return bridgeAction{}, false
 	}
 	u := e.Units[0]
@@ -659,9 +661,9 @@ func (s *Server) taskViews(_ context.Context, g *coretasks.Service, detail bool)
 }
 
 func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, error) {
-	v := api.TaskView{ID: string(e.ID), Kind: string(e.Kind), State: string(e.State), Category: string(e.Category), Title: e.Title,
+	v := api.TaskView{ID: string(e.ID), State: string(e.State), Category: string(e.Category), Title: e.Title,
 		Notes: e.Notes, Parent: string(e.Parent), Props: propsView(ev.s.loaded().Tasks, e.Props), Changed: e.Changed,
-		Units: slices.Clone(e.Units), Items: []api.ItemView{}, Created: e.Created, Updated: e.Updated}
+		Units: slices.Clone(e.Units), Created: e.Created, Updated: e.Updated}
 	if v.Units == nil {
 		v.Units = []unit.Unit{}
 	}
@@ -669,20 +671,16 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 	if e.Snoozed() {
 		v.SnoozeUntil, v.SnoozeOnActivity, v.Muted = e.Snooze.Until, e.Snooze.OnActivity, e.Snooze.Mute
 	}
-	if e.Waiting != nil {
-		w := &api.WaitingView{On: []api.WaitingPerson{}, Since: e.Waiting.Since, LastNudge: e.Waiting.LastNudge, Resurface: e.Waiting.Resurface}
-		for _, p := range e.Waiting.On {
-			w.On = append(w.On, api.WaitingPerson{Name: cmp.Or(p.Name, p.Key)})
-		}
-		v.Waiting = w
-	}
 	if err := ev.childrenOf(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
-	if err := ev.items(ctx, e, &v); err != nil {
+	if err := ev.owedBy(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
 	if ev.detail {
+		if err := ev.asks(ctx, e, &v); err != nil {
+			return api.TaskView{}, err
+		}
 		if err := ev.cards(ctx, e, &v); err != nil {
 			return api.TaskView{}, err
 		}
@@ -742,7 +740,7 @@ func (ev *taskViewer) brief(ctx context.Context, e task.Task, v *api.TaskView) e
 
 // childrenOf sets the open children of a project, or of any task in a detail, from one read per page.
 func (ev *taskViewer) childrenOf(ctx context.Context, e task.Task, v *api.TaskView) error {
-	if e.Kind != task.KindProject && !ev.detail {
+	if !e.IsProject() && !ev.detail {
 		return nil
 	}
 	if ev.children == nil {
@@ -789,26 +787,66 @@ func propsView(def intentload.TasksDef, props task.Props) map[string]json.RawMes
 	return out
 }
 
-func (ev *taskViewer) items(ctx context.Context, e task.Task, v *api.TaskView) error {
+// owedBy sets who owes e's next step, for a stored task.
+func (ev *taskViewer) owedBy(ctx context.Context, e task.Task, v *api.TaskView) error {
+	if ev.s.deps.OwedBy == nil || e.Origin == task.OriginDraft {
+		return nil
+	}
+	who, err := ev.s.deps.OwedBy(ctx, e)
+	v.OwedBy = who
+	return err
+}
+
+// asks are the items e holds, as their askers put them, each with the quotes its brief record keeps of it.
+func (ev *taskViewer) asks(ctx context.Context, e task.Task, v *api.TaskView) error {
+	if ev.s.deps.Items == nil {
+		return nil
+	}
+	quotes := briefQuotes(v.Brief)
 	byUnit := map[unit.Unit][]items.Item{}
 	for _, ref := range e.Items {
-		iv := api.ItemView{Unit: ref.Unit, ID: ref.Item}
-		if ev.detail && ev.s.deps.Items != nil {
-			its, ok := byUnit[ref.Unit]
-			if !ok {
-				var err error
-				if its, err = ev.s.deps.Items.Items(ctx, ref.Unit); err != nil {
-					return err
-				}
-				byUnit[ref.Unit] = its
+		its, ok := byUnit[ref.Unit]
+		if !ok {
+			var err error
+			if its, err = ev.s.deps.Items.Items(ctx, ref.Unit); err != nil {
+				return err
 			}
-			if i := slices.IndexFunc(its, func(it items.Item) bool { return it.ID == ref.Item }); i >= 0 {
-				iv.Summary, iv.State, iv.Kind = its[i].Summary, string(its[i].State), string(its[i].Kind)
-			}
+			byUnit[ref.Unit] = its
 		}
-		v.Items = append(v.Items, iv)
+		i := slices.IndexFunc(its, func(it items.Item) bool { return it.ID == ref.Item })
+		if i < 0 {
+			continue
+		}
+		it := its[i]
+		v.Asks = append(v.Asks, api.AskView{Item: it.ID, Summary: it.Summary, Asker: cmp.Or(it.Requester.Name, it.Requester.Key),
+			Permalink: it.Origin.Permalink, Quotes: quotes[it.ID]})
 	}
 	return nil
+}
+
+// briefQuotes are the quotes a brief record's asks keep, by the item each ask is about.
+func briefQuotes(rec *api.RecordView) map[string][]string {
+	if rec == nil {
+		return nil
+	}
+	var body struct {
+		Asks []struct {
+			Item   string `json:"item"`
+			Quotes []struct {
+				Text string `json:"text"`
+			} `json:"quotes"`
+		} `json:"asks"`
+	}
+	if json.Unmarshal(rec.Data, &body) != nil {
+		return nil
+	}
+	out := map[string][]string{}
+	for _, a := range body.Asks {
+		for _, q := range a.Quotes {
+			out[a.Item] = append(out[a.Item], q.Text)
+		}
+	}
+	return out
 }
 
 func (ev *taskViewer) cards(ctx context.Context, e task.Task, v *api.TaskView) error {
@@ -862,7 +900,7 @@ func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
 			st.Reason = off
 		case ev.resolvesGate(ctx, e, verb):
 			st.Enabled = true
-		case ev.g.Handles(e.Kind, verb):
+		case ev.g.Handles(e, verb):
 			st.Enabled = true
 		case verb == task.VerbReply:
 			st.Reason = ev.s.replyRefusal(e)
@@ -1063,7 +1101,7 @@ func (s *Server) unitLabel(u unit.Unit) string { return s.unitLabels([]unit.Unit
 // e's kind takes it, and e has an open gate that takes its role.
 func (ev *taskViewer) resolvesGate(ctx context.Context, e task.Task, verb task.Verb) bool {
 	role, ok := gateVerbRoles[ev.s.loaded().Tasks.Handler(string(verb))]
-	if !ok || ev.g.Handles(e.Kind, verb) {
+	if !ok || ev.g.Handles(e, verb) {
 		return false
 	}
 	_, _, ok, err := ev.s.taskGate(ctx, e, role, api.ActionRequest{})

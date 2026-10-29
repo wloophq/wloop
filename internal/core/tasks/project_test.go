@@ -58,7 +58,7 @@ func (r *projectRig) do(t *testing.T, id task.ID, verb task.Verb, args map[strin
 
 func (r *projectRig) project(t *testing.T, id task.ID, mod func(*task.Task)) task.Task {
 	t.Helper()
-	p := task.Task{ID: id, Kind: task.KindProject, State: "next", Category: task.CategoryReady, Title: "Project " + string(id), Origin: task.OriginUser, Created: t0, Updated: t0}
+	p := task.Task{ID: id, Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "next", Category: task.CategoryReady, Title: "Project " + string(id), Origin: task.OriginUser, Created: t0, Updated: t0}
 	if mod != nil {
 		mod(&p)
 	}
@@ -67,7 +67,7 @@ func (r *projectRig) project(t *testing.T, id task.ID, mod func(*task.Task)) tas
 
 func (r *projectRig) action(t *testing.T, id task.ID, project task.ID, pos int, st task.State) task.Task {
 	t.Helper()
-	return r.put(t, task.Task{ID: id, Kind: task.KindCapture, State: st, Title: "Action " + string(id), Origin: task.OriginUser,
+	return r.put(t, task.Task{ID: id, State: st, Title: "Action " + string(id), Origin: task.OriginUser,
 		Parent: project, Position: pos, Created: t0.Add(time.Duration(pos) * time.Minute), Updated: t0})
 }
 
@@ -82,20 +82,20 @@ func positions(t *testing.T, r *projectRig, ids ...task.ID) map[task.ID]int {
 
 func TestProjectFromTask(t *testing.T) {
 	r := newProjectRig()
-	e := r.put(t, task.Task{ID: "e-cap", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "Write the RFC", Props: task.Props{"area": {Text: "OSS"}}, Origin: task.OriginUser})
+	e := r.put(t, task.Task{ID: "e-cap", State: "inbox", Category: task.CategoryInbox, Title: "Write the RFC", Props: task.Props{"area": {Text: "OSS"}}, Origin: task.OriginUser})
 	res := r.do(t, e.ID, task.VerbProject, map[string]string{"title": "Ship the v2 API"})
 	if res.Task.ID != e.ID || res.Task.Parent == "" || res.Task.Position != 1 || res.Task.Category != task.CategoryInbox {
 		t.Fatalf("attached entry %+v", res.Task)
 	}
 	p := r.task(t, res.Task.Parent)
-	if p.Kind != task.KindProject || p.Category != task.CategoryReady || p.Title != "Ship the v2 API" || p.Prop(task.PropArea).Text != "OSS" {
+	if !p.IsProject() || p.Category != task.CategoryReady || p.Title != "Ship the v2 API" || p.Prop(task.PropArea).Text != "OSS" {
 		t.Fatalf("project %+v", p)
 	}
 	if !slices.Equal(r.dossiers.opened, []task.ID{p.ID}) {
 		t.Errorf("dossiers opened %v", r.dossiers.opened)
 	}
 
-	other := r.put(t, task.Task{ID: "e-cap2", Kind: task.KindAction, State: "next", Category: task.CategoryReady, Title: "x", Origin: task.OriginDerived})
+	other := r.put(t, task.Task{ID: "e-cap2", State: "next", Category: task.CategoryReady, Title: "x", Origin: task.OriginDerived})
 	res = r.do(t, other.ID, task.VerbProject, map[string]string{"title": "Ship the v2 API!"})
 	if p2 := r.task(t, res.Task.Parent); p2.ID == p.ID || !slices.Equal(r.dossiers.opened, []task.ID{p.ID, p2.ID}) {
 		t.Errorf("a second project of the same name: %+v", p2)
@@ -109,7 +109,7 @@ func TestProjectFromTask(t *testing.T) {
 	}
 
 	r.dossiers.fail = errors.New("disk full")
-	third := r.put(t, task.Task{ID: "e-cap3", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "y", Origin: task.OriginUser})
+	third := r.put(t, task.Task{ID: "e-cap3", State: "inbox", Category: task.CategoryInbox, Title: "y", Origin: task.OriginUser})
 	res = r.do(t, third.ID, task.VerbProject, map[string]string{"title": "Broken disk"})
 	if res.Task.Parent == "" || len(res.Lines) == 0 {
 		t.Errorf("a failed dossier still files the project and says so: %+v", res)
@@ -122,8 +122,8 @@ func TestAttachAndReorder(t *testing.T) {
 	r.action(t, "a", "p", 1, task.State("next"))
 	r.action(t, "b", "p", 2, task.State("next"))
 	r.action(t, "gone", "p", 7, task.State("trash"))
-	c := r.put(t, task.Task{ID: "c", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "c", Origin: task.OriginUser})
-	d := r.put(t, task.Task{ID: "d", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "d", Origin: task.OriginUser})
+	c := r.put(t, task.Task{ID: "c", State: "inbox", Category: task.CategoryInbox, Title: "c", Origin: task.OriginUser})
+	d := r.put(t, task.Task{ID: "d", State: "next", Category: task.CategoryReady, Title: "d", Origin: task.OriginUser})
 
 	if got := r.do(t, c.ID, task.VerbProject, map[string]string{"id": "p"}).Task; got.Parent != "p" || got.Position != 3 {
 		t.Fatalf("attached at %d of %q, want 3 of p", got.Position, got.Parent)
@@ -175,7 +175,7 @@ func TestToggleSequential(t *testing.T) {
 		}
 		var ids []task.ID
 		for _, e := range es {
-			if e.Kind != task.KindProject {
+			if !e.IsProject() {
 				ids = append(ids, e.ID)
 			}
 		}

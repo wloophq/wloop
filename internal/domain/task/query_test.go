@@ -56,11 +56,11 @@ func TestContextsCombineWithAnd(t *testing.T) {
 
 func TestSequentialProjectShowsFirstAction(t *testing.T) {
 	all := []task.Task{
-		{ID: "e-seq", Kind: task.KindProject, State: "next", Category: task.CategoryReady, Sequential: true, Created: at(0)},
+		{ID: "e-seq", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "next", Category: task.CategoryReady, Sequential: true, Created: at(0)},
 		{ID: "e-s3", State: "next", Category: task.CategoryReady, Parent: "e-seq", Position: 3, Created: at(1)},
 		{ID: "e-s1", State: "next", Category: task.CategoryReady, Parent: "e-seq", Position: 1, Created: at(2)},
 		{ID: "e-s2", State: "next", Category: task.CategoryReady, Parent: "e-seq", Position: 2, Created: at(3)},
-		{ID: "e-par", Kind: task.KindProject, State: "someday", Category: task.CategoryDeferred, Created: at(4)},
+		{ID: "e-par", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "someday", Category: task.CategoryDeferred, Created: at(4)},
 		{ID: "e-p1", State: "next", Category: task.CategoryReady, Parent: "e-par", Position: 1, Created: at(5)},
 		{ID: "e-p2", State: "next", Category: task.CategoryReady, Parent: "e-par", Position: 2, Created: at(6)},
 	}
@@ -85,7 +85,7 @@ func TestViewPredicates(t *testing.T) {
 		all = append(all,
 			task.Task{ID: task.ID("e-" + s.name), State: st, Category: s.c, Snooze: sn, Created: at(i), Updated: at(i)},
 			task.Task{ID: task.ID("e-star-" + s.name), State: st, Category: s.c, Snooze: sn, Props: task.Props{"focus": {Text: "on"}}, Created: at(10 + i), Updated: at(10 + i)},
-			task.Task{ID: task.ID("e-proj-" + s.name), Kind: task.KindProject, State: st, Category: s.c, Snooze: sn, Created: at(20 + i), Updated: at(20 + i)},
+			task.Task{ID: task.ID("e-proj-" + s.name), Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: st, Category: s.c, Snooze: sn, Created: at(20 + i), Updated: at(20 + i)},
 		)
 	}
 	cases := []struct {

@@ -34,7 +34,7 @@ func TestCaptureIsTaskCreateWithATitle(t *testing.T) {
 	t.Parallel()
 	r := newCreateRig(t, nil)
 	v := created(t, r, `{"title":"call the bank"}`)
-	if v.Kind != "capture" || v.State != "inbox" || v.Title != "call the bank" || v.Notes != "" || v.Brief != nil || len(v.Props) != 0 {
+	if v.State != "inbox" || v.Title != "call the bank" || v.Notes != "" || v.Brief != nil || len(v.Props) != 0 {
 		t.Fatalf("a capture %+v", v)
 	}
 	if p := r.page(t, "view=inbox"); len(p.Tasks) != 1 || p.Tasks[0].ID != v.ID {

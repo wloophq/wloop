@@ -1,0 +1,14 @@
+summary = "Star in Focus an open task past its due date, or one whose items wait on others past its check date with no nudge since"
+provider = "task"
+when = '!(task.prop.focus in ["on", "off"]) && (task.prop.due > timestamp(0) && task.prop.due <= now || size(task.link_owes) > 0 && !("me" in task.link_owes) && task.check_on > timestamp(0) && task.check_on <= now && task.prop.last_nudge < task.check_on)'
+order = 54
+
+[[step]]
+use = "task.set"
+prop = "focus"
+value = "on"
+
+[[step]]
+use = "task.set"
+prop = "autostar"
+value = "on"

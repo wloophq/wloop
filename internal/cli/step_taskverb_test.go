@@ -71,7 +71,7 @@ func newTaskRig(t *testing.T, files map[string]string) *taskRig {
 func (r *taskRig) put(t *testing.T, id task.ID, state task.State) {
 	t.Helper()
 	at := testNow.Add(-time.Hour)
-	if err := r.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: task.Task{ID: id, Kind: task.KindCapture, State: state,
+	if err := r.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: task.Task{ID: id, State: state,
 		Title: "Ship it", Origin: task.OriginUser, Created: at, Updated: at}}}); err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestTaskVerbLeavesClosingADerivedTaskToItsItems(t *testing.T) {
 	ctx := context.Background()
 	r := newTaskRig(t, nil)
 	at := testNow.Add(-time.Hour)
-	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-02", Kind: task.KindWaiting, State: "waiting", Category: task.CategoryWaiting,
+	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-02", State: "waiting", Category: task.CategoryWaiting,
 		Title: "Waiting on the reviewer", Origin: task.OriginDerived, Created: at, Updated: at}}}); err != nil {
 		t.Fatal(err)
 	}

@@ -80,7 +80,7 @@ func decided(t *testing.T, o *outbox.Service, d draft.Draft) draft.Approval {
 // seedTask stores a task id, the task a turn's draft serves, so its gate is on it.
 func seedTask(t *testing.T, db *sqlite.DB, id task.ID) {
 	t.Helper()
-	e := task.Task{ID: id, Kind: task.KindAction, State: "next", Category: task.CategoryReady, Title: "a task", Origin: task.OriginUser,
+	e := task.Task{ID: id, State: "next", Category: task.CategoryReady, Title: "a task", Origin: task.OriginUser,
 		Created: testNow, Updated: testNow}
 	if err := db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)

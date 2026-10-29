@@ -42,9 +42,10 @@ const (
 // Gate is one decision.
 //
 // Task is "" while no task holds the gate's unit: the store keeps NULL. The
-// gate sets it when its unit has a task; otherwise the reconcile of W1a
-// back-fills it once a task takes the unit; a message on a zero unit gets a
-// capture task the messages service creates, titled with the message's text.
+// gate sets it when its unit has a task; otherwise the task store back-fills
+// it when it writes the first open task that holds the unit; a message on a
+// zero unit gets a capture task the messages service creates, titled with
+// the message's text.
 //
 // Subject names the subject in its own table (a draft id, a plan item key,
 // a message id), as the kind reads it; a proposal gate on an item proposal

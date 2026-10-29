@@ -30,15 +30,15 @@ var subjectThread = slackThreadUnit("T0001", "C0001", "1700000000.000100")
 const (
 	waitingWorkflow = `summary = "Watch waiting entries"
 provider = "task"
-when = 'task.state == "waiting" && task.items_owed > 0 && task.settled_at < now'
-key = ["task.settled_at", "task.waiting_on"]
+when = 'task.state == "waiting" && task.owed_by != "me" && task.owed_by != "" && task.settled_at < now'
+key = ["task.settled_at", "task.owed_by"]
 
 [[step]]
 use = "notify.self"
 `
 	closeWorkflow = `summary = "Watch close entries with a resolved item"
 provider = "task"
-when = 'task.kind == "close" && task.items_resolved > 0'
+when = 'task.state == "inbox" && task.items_resolved > 0'
 
 [[step]]
 use = "notify.self"
@@ -162,9 +162,8 @@ func TestPlanEvaluatesUserWorkflowsOnTaskAndSlackSubjects(t *testing.T) {
 	owed := r.item(t, subjectThread, "i1", items.Open, items.Person{Key: "slack:U0001"})
 	r.item(t, subjectThread, "i2", items.Open)
 	r.report(t, subjectThread, src.Fact{Name: "slack.live_task", Value: src.Bool(true)}, src.Fact{Name: "slack.items_unowned", Value: src.Int(1)})
-	r.task(t, task.Task{ID: "e-01", Kind: task.KindWaiting, State: "waiting", Category: task.CategoryWaiting, Title: "w", Units: []unit.Unit{subjectThread},
-		Items:   []task.ItemRef{{Unit: owed.Unit, Item: owed.ID}},
-		Waiting: &task.WaitingOn{On: []items.Person{{Key: "slack:U0001"}}, Since: testNow.Add(-72 * time.Hour)}}, task.OpCreate)
+	r.task(t, task.Task{ID: "e-01", State: "waiting", Category: task.CategoryWaiting, Title: "w", Units: []unit.Unit{subjectThread},
+		Items: []task.ItemRef{{Unit: owed.Unit, Item: owed.ID}}}, task.OpCreate)
 	want := []string{"my-slack " + subjectThread.String(), "my-waiting task:e-01"}
 	if got := r.planned(t); !slices.Equal(got, want) {
 		t.Fatalf("planned %v, want %v", got, want)
@@ -193,7 +192,7 @@ func TestTheSweepWakesOnTaskItemAndDraftChanges(t *testing.T) {
 	}
 	var it items.Item
 	woke("a new item", func() { it = r.item(t, subjectThread, "i1", items.Open) })
-	close := task.Task{ID: "e-01", Kind: task.KindClose, State: "inbox", Category: task.CategoryInbox, Title: "c", Units: []unit.Unit{subjectThread}}
+	close := task.Task{ID: "e-01", State: "inbox", Category: task.CategoryInbox, Title: "c", Units: []unit.Unit{subjectThread}}
 	woke("a new entry", func() { r.task(t, close, task.OpCreate) })
 	if got := r.planned(t); slices.Contains(got, "my-close task:e-01") {
 		t.Fatalf("nothing resolved yet: %v", got)
@@ -236,8 +235,8 @@ func TestACapturedTaskWhoseUnitsEndedPlansItsClose(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newSubjectsRig(t)
-	r.task(t, task.Task{ID: "e-01", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "ship it", Units: []unit.Unit{subjectThread}}, task.OpCreate)
-	derived := task.Task{ID: "e-02", Kind: task.KindClose, State: "inbox", Category: task.CategoryInbox, Title: "close", Units: []unit.Unit{subjectThread},
+	r.task(t, task.Task{ID: "e-01", State: "next", Category: task.CategoryReady, Title: "ship it", Units: []unit.Unit{subjectThread}}, task.OpCreate)
+	derived := task.Task{ID: "e-02", State: "inbox", Category: task.CategoryInbox, Title: "close", Units: []unit.Unit{subjectThread},
 		Origin: task.OriginDerived, Created: testNow, Updated: testNow}
 	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: derived}}); err != nil {
 		t.Fatal(err)

@@ -179,7 +179,7 @@ func newRig(t *testing.T) *rig {
 		ledger: &fakeLedger{}, clock: &clock{t: t0}, launch: &launcher{}}
 	r.turns = &turns.Service{Intents: turnstest.Intents(), Store: r.books, Registry: r.reg, Sessions: r.sess, Launcher: r.launch, Answers: r.launch,
 		Clock: r.clock, Command: "loop", FastJob: 2 * time.Minute}
-	r.tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: r.taskStore, Items: r.items, Facts: r.facts, Clock: r.clock, StaleWaitingDays: 2})
+	r.tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: r.taskStore, Items: r.items, Facts: r.facts, Clock: r.clock})
 	r.gateStore = gatestest.NewStore(r.clock.Now)
 	r.svc = &messages.Service{Store: r.msgs, Books: r.books, Turns: r.turns, Ledger: r.ledger, Tasks: r.tasks, Intents: turnstest.Intents(),
 		Clock: r.clock, Log: t.Logf, ProposalText: func(p coreitems.Proposal) string {

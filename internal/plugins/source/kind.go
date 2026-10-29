@@ -57,6 +57,7 @@ type attached struct {
 	// notified is what Notify reaches: the client.
 	notified notifier
 	server   *src.HostServer
+	broker   *Broker
 	// notify are the topics the plugin's manifest subscribes to.
 	notify []plugin.Topic
 	cancel context.CancelFunc
@@ -104,7 +105,8 @@ func (k *Kind) Start(ctx context.Context, m *manifest.Manifest, c *plugin.Client
 	if err != nil {
 		return err
 	}
-	server, err := src.ServeHost(c, k.Broker(m.ID, s).Host())
+	broker := k.Broker(m.ID, s)
+	server, err := src.ServeHost(c, broker.Host())
 	if err != nil {
 		return err
 	}
@@ -112,7 +114,7 @@ func (k *Kind) Start(ctx context.Context, m *manifest.Manifest, c *plugin.Client
 		server.Close()
 		return fmt.Errorf("start %s: %w", m.ID, err)
 	}
-	a := &attached{client: src.NewClient(c), server: server, done: make(chan struct{})}
+	a := &attached{client: src.NewClient(c), server: server, broker: broker, done: make(chan struct{})}
 	a.notified = a.client
 	for _, n := range s.Notify {
 		a.notify = append(a.notify, plugin.Topic(n))
@@ -224,6 +226,19 @@ func (k *Kind) Client(id string) (*src.Client, error) {
 
 // subscribers are the running plugins whose manifest subscribes to a topic
 // of ts, each with those topics, sorted by id.
+// brokers are the brokers of the running plugins, by id.
+func (k *Kind) brokers() map[string]*Broker {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	out := map[string]*Broker{}
+	for id, a := range k.running {
+		if a.broker != nil {
+			out[id] = a.broker
+		}
+	}
+	return out
+}
+
 func (k *Kind) subscribers(ts []plugin.Topic) []subscriber {
 	k.mu.Lock()
 	defer k.mu.Unlock()

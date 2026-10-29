@@ -49,10 +49,12 @@ type VerbText struct {
 // A zero task.Value unsets a property, so an int or a duration property
 // holds no 0: 0 means unset, and Parse refuses it.
 type TasksDef struct {
-	Props            []PropDef
-	States           []StateDef
-	Verbs            map[string]VerbText
+	Props  []PropDef
+	States []StateDef
+	Verbs  map[string]VerbText
+	// OwedBy is owed_by.expr as written; Owed is it compiled over OwedByEnv, nil when the profile has none.
 	OwedBy           string
+	Owed             *expr.Program
 	Areas, Contexts  []string
 	StaleWaitingDays int
 }
@@ -161,12 +163,15 @@ func (d TasksDef) Untrusted(name string) bool {
 
 // Facts are the task.prop.<name> facts of the declared properties, typed
 // from their types, an enum's closed to its values and an untrusted one
-// marked so; and task.state closed to the declared states.
+// marked so, with task.prop_by.<name>, who last wrote each; and
+// task.state closed to the declared states.
 func (d TasksDef) Facts() expr.Env {
 	env := expr.Env{}
 	for _, p := range d.Props {
 		name := builtin.PropPrefix + p.Name
 		env[name] = builtin.PropFactType(p.Type)
+		env[builtin.PropByPrefix+p.Name] = expr.String
+		env.SetEnum(builtin.PropByPrefix+p.Name, append([]string{""}, writerNames()...))
 		if p.Type == task.PropEnum {
 			env.SetEnum(name, p.Values)
 		}
@@ -355,6 +360,7 @@ type tasksLoad struct {
 	states map[string]ref
 	gates  map[string]ref
 	preds  map[string]ref
+	owed   *ref
 }
 
 // BundledTasks is the bundled profile's tasks.toml alone.
@@ -403,6 +409,7 @@ func (l *tasksLoad) merge(file string, src []byte) Problems {
 	l.mergeVerbs(s, m.Verbs)
 	if m.OwedBy != nil {
 		text(s, "owed_by.expr", m.OwedBy.Expr, &l.def.OwedBy)
+		l.owed = &ref{s, "owed_by.expr", l.def.OwedBy}
 	}
 	if m.Areas != nil {
 		l.def.Areas = slices.Clone(m.Areas)
@@ -609,6 +616,16 @@ func (l *tasksLoad) check(gates *GatesDef) Problems {
 			}
 		}
 	}
+	if r := l.owed; r != nil && strings.TrimSpace(r.name) != "" {
+		prog, err := expr.CompileString(r.name, OwedByEnv(l.def))
+		if err != nil {
+			msg, snippet := exprMsg(err)
+			p := r.s.problem(r.path, "%s", msg)
+			p.Snippet = snippet
+			out = append(out, p)
+		}
+		l.def.Owed = prog
+	}
 	env := ByEnv(l.def)
 	for _, at := range slices.Sorted(maps.Keys(l.preds)) {
 		r := l.preds[at]
@@ -635,7 +652,22 @@ func (l *tasksLoad) check(gates *GatesDef) Problems {
 // ByFacts are the facts a verb's by reads besides the task.prop.* of
 // tasks.toml: the task's own, which the authority reads off the task with
 // no facts provider at hand.
-var ByFacts = []string{"task.id", "task.kind", "task.state", "task.category", "task.muted", "task.unit", "task.unit_provider"}
+var ByFacts = []string{"task.id", "task.state", "task.category", "task.muted", "task.unit", "task.unit_provider"}
+
+// OwedFacts are the task facts owed_by.expr may not read: those its value
+// makes.
+var OwedFacts = []string{"task.owed_by", "task.owed_since", "task.check_on"}
+
+// OwedByEnv is the env owed_by.expr compiles over: the task's workflow
+// facts but OwedFacts, and d's properties.
+func OwedByEnv(d TasksDef) expr.Env {
+	env := builtin.WorkflowEnv(builtin.TaskSlot)
+	for _, name := range OwedFacts {
+		delete(env, name)
+	}
+	maps.Copy(env, d.Facts())
+	return env
+}
 
 // ByEnv is the env a verb's by compiles over: ByFacts and d's properties.
 func ByEnv(d TasksDef) expr.Env {
@@ -685,4 +717,12 @@ func missingVerbs(verbs map[string]VerbText) Problems {
 		}
 	}
 	return problems
+}
+
+func writerNames() []string {
+	out := make([]string, len(task.Writers))
+	for i, w := range task.Writers {
+		out[i] = string(w)
+	}
+	return out
 }

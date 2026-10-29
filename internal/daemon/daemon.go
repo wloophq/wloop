@@ -31,6 +31,7 @@ import (
 
 	dmessage "github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/placement"
+	"github.com/wloophq/wloop/internal/domain/task"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
@@ -334,6 +335,8 @@ type Deps struct {
 	// Inbox messages, whose tasks' verbs it registers on Tasks.
 	Tasks    *coretasks.Service
 	Messages *messages.Service
+	// OwedBy is who owes a task's next step, as the profile says, for TaskView.OwedBy; nil leaves it empty.
+	OwedBy func(ctx context.Context, t task.Task) (string, error)
 	// Timeline reads a task's timeline; nil answers 503 to its route. TaskRecords are the records units
 	// keep, a task's brief among them; nil serves no Brief.
 	Timeline    timeline.Reader

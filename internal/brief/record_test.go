@@ -32,7 +32,7 @@ func TestABriefIsARecordAndProjectsRiskAndEffort(t *testing.T) {
 	ctx := context.Background()
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 1}
 	id := task.ID("t-0123456789abcdef")
-	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: id, Kind: task.KindAction, State: "next",
+	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: id, State: "next",
 		Category: task.CategoryReady, Title: "Review the export", Origin: task.OriginUser, Units: []unit.Unit{ref.Unit()}, Created: t0, Updated: t0}}}); err != nil {
 		t.Fatal(err)
 	}

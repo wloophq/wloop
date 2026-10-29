@@ -17,7 +17,7 @@ func TestServicePropContract(t *testing.T) {
 	taskstest.PropContract(t, func(t *testing.T) (coretasks.PropStore, func(task.ID)) {
 		r := newRig()
 		return r.svc, func(id task.ID) {
-			r.put(t, task.Task{ID: id, Kind: task.KindCapture, State: "inbox", Title: "Call Ana", Origin: task.OriginUser})
+			r.put(t, task.Task{ID: id, State: "inbox", Title: "Call Ana", Origin: task.OriginUser})
 		}
 	})
 }
@@ -28,7 +28,7 @@ func TestServicePropContract(t *testing.T) {
 func TestATaskSetDuringAVerbIsKept(t *testing.T) {
 	t.Parallel()
 	r := newRig()
-	r.put(t, task.Task{ID: "t-1", Kind: task.KindCapture, State: "inbox", Title: "a", Origin: task.OriginUser})
+	r.put(t, task.Task{ID: "t-1", State: "inbox", Title: "a", Origin: task.OriginUser})
 	svc := coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates})
 	read, waiting, setDone := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	var once, waited sync.Once

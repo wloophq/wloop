@@ -356,6 +356,7 @@ CREATE INDEX tasks_category ON tasks (category);
 CREATE TABLE task_items (
   task_id TEXT NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,
   provider TEXT NOT NULL, unit_key TEXT NOT NULL, item TEXT NOT NULL,
+  resolved INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (task_id, provider, unit_key, item)
 ) WITHOUT ROWID;
 CREATE INDEX task_items_unit ON task_items (provider, unit_key);

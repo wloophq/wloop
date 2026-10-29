@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"reflect"
 	"slices"
 	"strings"
@@ -87,8 +88,8 @@ func TestReviewStepsWeb(t *testing.T) {
 	doneInbox := reviewFixture()
 	doneInbox["steps"].([]any)[0].(map[string]any)["done"] = true
 	project := task("e-p", "next", nil)
-	project.Kind, project.Title = "project", "Ship the v2 API"
-	project.ReviewDue, project.OpenActions, project.ReviewEvery = true, 0, "168h0m0s"
+	project.Props, project.Title = map[string]json.RawMessage{"kind": json.RawMessage(`"project"`)}, "Ship the v2 API"
+	project.ReviewDue, project.ReviewEvery = true, "168h0m0s"
 	nodeRun(t, viewsPrelude(t), nil, `
 const gets = [], posts = [], focused = [];
 reviewEnv.getJSON = async (url) => {
@@ -149,14 +150,14 @@ func TestProjectFactsShowTheNextActionAndTheLocalDay(t *testing.T) {
 		Without string `json:"without"`
 	}
 	p := task("e-p", "next", nil)
-	p.Kind, p.Title, p.NextAction, p.NextActionTitle, p.OpenActions, p.ReviewEvery = "project", "Ship", "e-a", "Draft the plan", 2, "168h0m0s"
+	p.Props, p.Title, p.Children, p.ReviewEvery = map[string]json.RawMessage{"kind": json.RawMessage(`"project"`)}, "Ship", []string{"e-a", "e-b"}, "168h0m0s"
 	p.ReviewedAt = time.Date(2026, 10, 23, 2, 30, 0, 0, time.UTC)
 	q := task("e-q", "next", nil)
-	q.Kind, q.Title = "project", "Idle"
+	q.Props, q.Title = map[string]json.RawMessage{"kind": json.RawMessage(`"project"`)}, "Idle"
 	nodeRun(t, viewsPrelude(t), nil, `
 process.env.TZ = "America/Sao_Paulo";
 process.stdout.write(JSON.stringify({ with: text(taskItem(input.p, "")), without: text(taskItem(input.q, "")) }));`, map[string]any{"p": p, "q": q}, &got)
-	for _, s := range []string{"next: Draft the plan", "2 open", "every 7d", "reviewed 2026-10-22"} {
+	for _, s := range []string{"2 open", "every 7d", "reviewed 2026-10-22"} {
 		if !strings.Contains(got.With, s) {
 			t.Errorf("the project lacks %q: %s", s, got.With)
 		}
