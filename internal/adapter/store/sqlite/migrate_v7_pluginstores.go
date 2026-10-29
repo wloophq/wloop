@@ -152,12 +152,15 @@ func v7WriteExport(ctx context.Context, conn *sql.Conn, p v7PluginExport, path s
 		}
 	}
 	if err := migrationTx(ctx, conn, func(tx *sql.Tx) error {
+		tables := make([]string, 0, len(p.tables))
 		for _, e := range p.tables {
 			if err := v7Export1(ctx, tx, p.schema, e); err != nil {
 				return fmt.Errorf("%s: %w", e.table, err)
 			}
+			tables = append(tables, e.table)
 		}
-		return nil
+		// The export runs before v7Kinds rewrites the core's times, and a plugin reads one layout.
+		return v7FixTimes(ctx, tx, p.schema, tables)
 	}); err != nil {
 		return err
 	}
