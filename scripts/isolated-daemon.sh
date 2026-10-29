@@ -458,9 +458,11 @@ launch() {
 	printf '%s\n%s\n' "$pid" "$at" >"$dir/daemon.pid"
 }
 
-# launch_stub starts orca-stub on <dir>/orca and waits for the runtime file
-# it writes, recording its pid in <dir>/orca.pid.
+# launch_stub starts orca-stub on <dir>/orca, after stopping one an earlier
+# start left, and waits for the runtime file it writes, recording its pid in
+# <dir>/orca.pid.
 launch_stub() {
+	stop_stub
 	rm -rf "$dir/orca"
 	mkdir -m 700 "$dir/orca"
 	("$dir/bin/orca-stub" "$dir/orca" </dev/null >>"$dir/orca-stub.log" 2>&1) &

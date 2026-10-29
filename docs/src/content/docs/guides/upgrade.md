@@ -86,7 +86,7 @@ A reply that names no `send` takes its verb's `send` in `tasks.toml`, which the 
 Each plugin's settings live in its `[plugins.<id>]` table, and each old key fails at load naming its new one:
 
 - `[github]` is `[plugins.github]` and `[slack]` is `[plugins.slack]`, key for key;
-- `github.drafts.approval` is `plugins.github.gates.approval`, and `slack.drafts.approval` is `plugins.slack.gates.approval`;
+- `github.drafts.approval` is `plugins.github.gates.approval`, `slack.drafts.approval` is `plugins.slack.gates.approval`, and `plugins.<id>.drafts.approval` is `plugins.<id>.gates.approval`;
 - the facts `config.github.*` are `config.plugins.github.*`;
 - the effects `guidance.handed` and `pr.guidance_handed` are `turn.guidance_handed`, and `pr.round_sent` is `turn.round_sent`;
 - the events of a pull request and its rounds (`opened`, `merged`, `round_sent`, `review_ended` and the others) are the GitHub plugin's, so a workflow whose trigger names one needs `provider = "github"`, and an intent reads `pr.adopted`, `pr.held`, `pr.nudge.*` and `pr.last_review.*` only on GitHub units: a manifest of another provider that names one, which never fired or read an empty value, fails at load naming the provider.
