@@ -182,6 +182,13 @@ func TestTaskAttentionMatchesRowAttention(t *testing.T) {
 			r := newNotifyRig(t)
 			f.seed(t, r.catalogRig)
 			row := r.settle(t, f.ref.Unit())
+			if f.name == "pending_muted" {
+				// A mute holds the tasks the pull request has when it is set: mute again once its items made theirs.
+				if err := muteBy(r.st, f.ref, catalogNow.Add(time.Hour)); err != nil {
+					t.Fatal(err)
+				}
+				row = r.settle(t, f.ref.Unit())
+			}
 			got := r.notified(t)
 			old := rowAttention(t, r.s, row)
 			if f.name == "pending_muted" {
@@ -329,7 +336,7 @@ func TestOnlyInboxAndOutboxNotify(t *testing.T) {
 		task.Task{ID: "e-in", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}},
 		task.Task{ID: "e-next", State: "next", Category: task.CategoryReady, Units: []unit.Unit{r7u}},
 		task.Task{ID: "e-wait", State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{r7u}},
-		task.Task{ID: "e-muted", State: "scheduled", Category: task.CategoryDeferred, Units: []unit.Unit{r7u}, Snooze: task.Snooze{Until: tasksNow.Add(time.Hour), Return: task.State("inbox"), Mute: true}},
+		task.Task{ID: "e-muted", State: "scheduled", Category: task.CategoryDeferred, Units: []unit.Unit{r7u}},
 		task.Task{ID: "e-someday", State: "someday", Category: task.CategoryDeferred},
 		task.Task{ID: "e-done", State: "done", Category: task.CategoryDone},
 	)

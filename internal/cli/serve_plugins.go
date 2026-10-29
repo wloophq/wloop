@@ -284,7 +284,7 @@ func (e *Env) servePlugins(ctx context.Context, db *sqlite.DB, cfg config.Config
 		Broker: func(id string, s *manifest.Source) *psource.Broker {
 			return e.withGitHubBroker(&psource.Broker{ID: id, Manifest: s, Snapshots: snaps, Units: psource.Units{Codecs: codecs}, Config: e.currentConfig,
 				Note: note, Briefs: db, BriefRecords: e.briefRecords(db), Briefed: e.heardBrief, Now: e.Now, BriefIntent: briefIntents,
-				Events: sqlite.New(db), Marks: db, Drafts: db, Overrides: db, Paused: e.roundsPaused, Rounds: e.storedRoundState, Pending: e.pendingOf,
+				Events: sqlite.New(db), Marks: db, Drafts: db, Overrides: db, Wakes: envWakes{e, db}, Paused: e.roundsPaused, Rounds: e.storedRoundState, Pending: e.pendingOf,
 				Links: db.Links(), Hosted: hosted(id), Meters: meters, Workspaces: e.workspaceListing, Books: sqlite.New(db).Books}, id, db)
 		},
 		Loaded: func(id string) {
@@ -346,7 +346,7 @@ func (e *Env) moduleHost(db *sqlite.DB) func(id unit.ProviderID) src.Host {
 	codecs := e.unitCodecs()
 	return func(id unit.ProviderID) src.Host {
 		b := &psource.Broker{ID: string(id), Units: psource.Units{Codecs: codecs}, Config: e.currentConfig,
-			Events: sqlite.New(db), Marks: db, Drafts: db, Overrides: db, Paused: e.roundsPaused, Rounds: e.storedRoundState, Pending: e.pendingOf}
+			Events: sqlite.New(db), Marks: db, Drafts: db, Overrides: db, Wakes: envWakes{e, db}, Paused: e.roundsPaused, Rounds: e.storedRoundState, Pending: e.pendingOf}
 		return b.Host()
 	}
 }

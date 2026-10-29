@@ -5,9 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
-	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 type userStates map[string]task.Category
@@ -51,10 +49,5 @@ func TestMovingIntoACategoryWithNoStateIsAnError(t *testing.T) {
 	}
 	if e.State != "triage" || e.Category != task.CategoryInbox {
 		t.Fatalf("a refused move changed the task: %+v", e)
-	}
-	f := task.UnitFacts{Unit: unit.Unit{Provider: "github", Key: "acme/api#7"}, Mute: &task.Mute{}}
-	it := items.Item{ID: "i1", Unit: f.Unit, State: "open", Summary: "s", WaitingOn: []items.Person{{Key: "github:me"}}}
-	if _, err := task.Reconcile(f, []items.Item{it}, task.Me{Keys: []string{"github:me"}}, nil, st, now); !errors.Is(err, task.ErrNoStateOf) {
-		t.Fatalf("a mute into a profile with no deferred state: %v", err)
 	}
 }

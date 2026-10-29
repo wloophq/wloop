@@ -489,7 +489,6 @@ func TestRowHeadIsOneLineOfText(t *testing.T) {
 func TestRowIsStableAcrossAMinute(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
-	ctx := context.Background()
 	old := fixtureNow.Add(-3 * time.Hour)
 	edge := fixtureNow.Add(-48*time.Hour + 30*time.Second)
 	f.open(74, "ana", edge, nil, dinv.Event{Kind: dinv.KindReviewRequest, Key: "fer", Actor: "ana", At: edge})
@@ -497,11 +496,11 @@ func TestRowIsStableAcrossAMinute(t *testing.T) {
 	f.open(71, "fer", old, failing)
 	f.open(72, "bob", old, nil, dinv.Event{Kind: dinv.KindReviewRequest, Key: "fer", Actor: "bob", At: old},
 		dinv.Event{Kind: dinv.KindMuted, Actor: "fer", At: old.Add(time.Hour)})
-	if err := inventorytest.Of(f.st).SetOverride(ctx, dinv.Override{PR: ref(72), MutedUntil: fixtureNow.Add(24 * time.Hour)}); err != nil {
+	if err := muteBy(f.st, ref(72), fixtureNow.Add(24*time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	f.open(73, "bob", old, nil, dinv.Event{Kind: dinv.KindReviewRequest, Key: "fer", Actor: "bob", At: old})
-	if err := inventorytest.Of(f.st).SetOverride(ctx, dinv.Override{PR: ref(73), MutedUntil: fixtureNow.Add(24 * time.Hour)}); err != nil {
+	if err := muteBy(f.st, ref(73), fixtureNow.Add(24*time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	encode := func() string {
@@ -598,97 +597,6 @@ func TestNoSnapshotMarksWaitingUnread(t *testing.T) {
 	}
 	if fact := facts[ref(22)]; !fact.Unread || fact.Waiting {
 		t.Fatalf("started turn with unknown agents: %+v", fact)
-	}
-}
-
-func TestUnknownAgentsKeepAMuteUntilStateChange(t *testing.T) {
-	t.Parallel()
-	f := newFixture(t)
-	ctx := context.Background()
-	repo := f.withTurns()
-	var mu sync.Mutex
-	agents, known := []turns.AgentObservation{{WorkspaceID: "w3", Pane: "t:1", State: turn.AgentWaiting}}, true
-	f.s.deps.Agents = readmodel.AgentsFunc(func() ([]turns.AgentObservation, bool) {
-		mu.Lock()
-		defer mu.Unlock()
-		return slices.Clone(agents), known
-	})
-	f.open(22, "fer", fixtureNow.Add(-time.Hour), requests("carla"))
-	f.turn(repo, 22, turn.Intent(dintent.Address), turn.Started, "term-22")
-	if err := repo.SaveSession(ctx, turn.Session{ID: "term-22", Pane: "t:1", WorkspaceID: "w3"}, port.Event{Kind: turns.KindSessionLaunched, Key: "term-22", At: fixtureNow}); err != nil {
-		t.Fatal(err)
-	}
-	asks := f.rows("?view=all")[0]
-	if asks.Kind != "loop_waiting" {
-		t.Fatalf("row %s, want the agent asking", asks.Kind)
-	}
-	mute := dinv.Override{PR: ref(22), MuteUntilStateChange: true, MutedKind: string(asks.Kind), MutedWaitingOn: asks.Summary.WaitsOn}
-	if err := inventorytest.Of(f.st).SetOverride(ctx, mute); err != nil {
-		t.Fatal(err)
-	}
-	unmuted := func() int {
-		evs, err := f.st.Events(ctx, ref(22))
-		if err != nil {
-			t.Fatal(err)
-		}
-		n := 0
-		for _, e := range evs {
-			if e.Kind == dinv.KindUnmuted {
-				n++
-			}
-		}
-		return n
-	}
-	refresh := func() {
-		t.Helper()
-		if err := f.s.readModel().Refresh(ctx); err != nil {
-			t.Fatal(err)
-		}
-	}
-	kept := func(when string) {
-		t.Helper()
-		o, err := f.st.Override(ctx, ref(22))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !o.MuteUntilStateChange || unmuted() != 0 {
-			t.Fatalf("%s: override %+v, %d unmuted events", when, o, unmuted())
-		}
-	}
-
-	mu.Lock()
-	agents, known = nil, false
-	mu.Unlock()
-	if rows := f.rows("?view=all"); len(rows) != 1 || rows[0].Kind != "muted" {
-		t.Fatalf("rows while the agents are unknown: %+v", rows)
-	}
-	kept("a rows read")
-	refresh()
-	kept("the keeper's refresh")
-	if err := f.s.expireMutes(ctx); err != nil {
-		t.Fatal(err)
-	}
-	kept("expireMutes")
-
-	mu.Lock()
-	agents, known = []turns.AgentObservation{{WorkspaceID: "w3", Pane: "t:1", State: turn.AgentWaiting}}, true
-	mu.Unlock()
-	if rows := f.rows("?view=all"); len(rows) != 1 || rows[0].Kind != "muted" {
-		t.Fatalf("rows once the agent is seen asking again: %+v", rows)
-	}
-	refresh()
-	kept("the agents known again")
-
-	mu.Lock()
-	agents[0].State = turn.AgentWorking
-	mu.Unlock()
-	refresh()
-	o, err := f.st.Override(ctx, ref(22))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if o.MuteUntilStateChange || unmuted() != 1 {
-		t.Fatalf("a known state change kept the mute: %+v, %d unmuted events", o, unmuted())
 	}
 }
 

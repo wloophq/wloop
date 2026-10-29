@@ -51,9 +51,7 @@ CREATE INDEX events_kind ON events(kind, at);
 
 CREATE TABLE overrides (
   provider TEXT NOT NULL, unit_key TEXT NOT NULL,
-  muted_until TEXT NOT NULL DEFAULT '', mute_until_state INTEGER NOT NULL DEFAULT 0,
   hold INTEGER NOT NULL DEFAULT 0, taken_over INTEGER NOT NULL DEFAULT 0,
-  muted_kind TEXT NOT NULL DEFAULT '', muted_waiting_on TEXT NOT NULL DEFAULT '',
   next_guidance TEXT NOT NULL DEFAULT '',
   tracked INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (provider, unit_key)
@@ -340,8 +338,6 @@ CREATE TABLE tasks (
   state TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
   parent TEXT NOT NULL DEFAULT '', position INTEGER NOT NULL DEFAULT 0,
   sequential INTEGER NOT NULL DEFAULT 0,
-  snooze_until TEXT NOT NULL DEFAULT '', snooze_on_activity INTEGER NOT NULL DEFAULT 0,
-  snooze_return TEXT NOT NULL DEFAULT '', snooze_mute INTEGER NOT NULL DEFAULT 0,
   changed INTEGER NOT NULL DEFAULT 0, seen_at TEXT NOT NULL DEFAULT '',
   origin TEXT NOT NULL, created TEXT NOT NULL, updated TEXT NOT NULL,
   rev INTEGER NOT NULL,
@@ -357,6 +353,14 @@ CREATE INDEX tasks_category ON tasks (category);
 CREATE TABLE task_aliases (
   old_id TEXT NOT NULL, new_id TEXT NOT NULL,
   PRIMARY KEY (old_id, new_id)
+) WITHOUT ROWID;
+
+-- wakes are a task's one wake: on and actors are JSON lists of strings, until and expires times ('' for
+-- none), cond a predicate over the task's facts, return_state the state the wake returns the task to.
+CREATE TABLE wakes (
+  task_id TEXT PRIMARY KEY REFERENCES tasks (id) ON DELETE CASCADE,
+  until TEXT NOT NULL DEFAULT '', on_kinds TEXT NOT NULL DEFAULT '[]', actors TEXT NOT NULL DEFAULT '[]',
+  cond TEXT NOT NULL DEFAULT '', expires TEXT NOT NULL DEFAULT '', return_state TEXT NOT NULL DEFAULT ''
 ) WITHOUT ROWID;
 
 CREATE TABLE task_items (

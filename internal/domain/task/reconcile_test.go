@@ -120,7 +120,7 @@ func TestOnlyItemsCreateTasks(t *testing.T) {
 }
 
 func TestReconcileIsIdempotent(t *testing.T) {
-	mute := func(f *task.UnitFacts) { f.Mute = &task.Mute{Until: now.Add(48 * time.Hour)}; f.Cares = true }
+	mute := func(f *task.UnitFacts) { f.Cares = true }
 	its := []items.Item{item("a"), item("b", owedBy(ana)), item("c", owedBy(bob), func(it *items.Item) { it.Deadline = "2026-10-30" })}
 	first := reconcile(t, facts(mute), its, nil, now)
 	cs := reconciled(t, facts(mute), its, me, first, bundled, now.Add(time.Minute))
@@ -149,92 +149,11 @@ func TestItemDeadlineParses(t *testing.T) {
 	}
 }
 
-func TestMutedUnitTaskIsSnoozed(t *testing.T) {
-	until := now.Add(72 * time.Hour)
-	mute := func(f *task.UnitFacts) { f.Mute = &task.Mute{Until: until} }
-	its := []items.Item{item("a", func(it *items.Item) { it.Initial = items.InitialNext })}
-	e := only(t, reconcile(t, facts(mute), its, nil, now))
-	want := task.Snooze{Until: until, Return: task.State("next"), Mute: true}
-	if e.Category != task.CategoryDeferred || e.Snooze != want {
-		t.Fatalf("new entry %+v", e)
-	}
-	plain := only(t, reconcile(t, facts(), its, nil, now))
-	got := only(t, reconcile(t, facts(mute), its, []task.Task{plain}, now))
-	if got.Category != task.CategoryDeferred || got.Snooze != want {
-		t.Fatalf("existing entry %+v", got)
-	}
-}
-
-func TestMuteUntilStateChangeWakesOnActivity(t *testing.T) {
-	its := []items.Item{item("a")}
-	for _, change := range []bool{true, false} {
-		f := facts(func(f *task.UnitFacts) { f.Mute = &task.Mute{UntilStateChange: change} })
-		e := only(t, reconcile(t, f, its, nil, now))
-		f.LastHuman = now.Add(time.Hour)
-		cs := activity(t, f, []task.Task{e}, bundled, now.Add(2*time.Hour))
-		if !change {
-			if len(cs) != 0 {
-				t.Fatalf("activity moved a muted entry: %+v", cs)
-			}
-			continue
-		}
-		if len(cs) != 1 || cs[0].Task.Category != task.CategoryInbox || !cs[0].Task.Changed || cs[0].Task.Snoozed() {
-			t.Fatalf("activity: %+v", cs)
-		}
-		if again := reconciled(t, f, its, me, []task.Task{cs[0].Task}, bundled, now.Add(3*time.Hour)); len(again) != 0 {
-			t.Fatalf("the woken entry was muted again: %+v", again)
-		}
-	}
-}
-
-func TestUnmuteRestoresTheState(t *testing.T) {
-	mute := func(f *task.UnitFacts) { f.Mute = &task.Mute{} }
-	its := []items.Item{item("a", owedBy(ana))}
-	e := only(t, reconcile(t, facts(mute), its, nil, now))
-	if e.Category != task.CategoryDeferred {
-		t.Fatalf("muted: %+v", e)
-	}
-	e = only(t, reconcile(t, facts(), its, []task.Task{e}, now))
-	if e.Category != task.CategoryWaiting || e.Snooze != (task.Snooze{}) {
-		t.Fatalf("unmuted: %+v", e)
-	}
-	lapsed := func(f *task.UnitFacts) { f.Mute = &task.Mute{Until: now.Add(-time.Minute)} }
-	if es := reconcile(t, facts(lapsed), its, nil, now); es[0].Category != task.CategoryWaiting {
-		t.Fatalf("a lapsed mute: %+v", es[0])
-	}
-}
-
 func TestEmptyKeyIsNeverMe(t *testing.T) {
 	blank := task.Me{Keys: []string{"", "github:me"}}
 	it := item("a", func(it *items.Item) { it.WaitingOn, it.Requester = []items.Person{{Name: "someone"}}, items.Person{} })
 	if cs := reconciled(t, facts(), []items.Item{it}, blank, nil, bundled, now); len(cs) != 0 {
 		t.Fatalf("an unknown person counted as me: %+v", cs)
-	}
-}
-
-func TestWakeReturnsToItsState(t *testing.T) {
-	e := task.Task{State: "scheduled", Category: task.CategoryDeferred, Snooze: task.Snooze{Until: now, Return: task.State("next")}}
-	got, ok, _ := task.Wake(e, bundled, now)
-	if !ok || got.Category != task.CategoryReady || got.Snooze != (task.Snooze{}) {
-		t.Fatalf("woke %+v %v", got, ok)
-	}
-	if _, ok, _ := task.Wake(e, bundled, now.Add(-time.Second)); ok {
-		t.Fatal("woke early")
-	}
-	e.Snooze = task.Snooze{OnActivity: true}
-	if _, ok, _ := task.Wake(e, bundled, now); ok {
-		t.Fatal("woke an entry with no date")
-	}
-}
-
-func TestMutedUnitActivitySparesUserSchedule(t *testing.T) {
-	f := facts(func(f *task.UnitFacts) { f.Mute, f.LastHuman = &task.Mute{Until: now.Add(time.Hour)}, now })
-	have := []task.Task{{ID: "e-mine", State: "scheduled", Category: task.CategoryDeferred, Snooze: task.Snooze{OnActivity: true, Return: task.State("next")}, Created: now.Add(-time.Hour)}}
-	if cs := activity(t, f, have, bundled, now); len(cs) != 0 {
-		t.Fatalf("activity on a muted unit moved %+v", cs)
-	}
-	if cs := reconciled(t, f, nil, me, have, bundled, now); len(cs) != 0 {
-		t.Fatalf("the mute took over a user's schedule: %+v", cs)
 	}
 }
 
@@ -299,20 +218,17 @@ func TestAReopenedItemMarksChangedAndStaysOutOfTheInbox(t *testing.T) {
 		c     task.Category
 	}{{"waiting", task.CategoryWaiting}, {"scheduled", task.CategoryDeferred}, {"next", task.CategoryReady}} {
 		open := e
-		open.State, open.Category, open.Snooze = task.State(held.state), held.c, task.Snooze{}
-		if held.c == task.CategoryDeferred {
-			open.Snooze = task.Snooze{Until: now.Add(48 * time.Hour), Return: "waiting"}
-		}
+		open.State, open.Category, open.Asleep = task.State(held.state), held.c, held.c == task.CategoryDeferred
 		resolved(&its[0])
 		closed := only(t, reconcile(t, facts(), its, []task.Task{open}, now))
-		closed.State, closed.Category, closed.Snooze = open.State, open.Category, open.Snooze
+		closed.State, closed.Category, closed.Asleep = open.State, open.Category, open.Asleep
 		its[0].State = "open"
 		got := only(t, reconcile(t, facts(), its, []task.Task{closed}, now.Add(time.Hour)))
-		if got.Category != held.c || !got.Changed || got.Snooze != open.Snooze || len(got.Items) != 1 {
+		if got.Category != held.c || !got.Changed || got.Asleep != open.Asleep || len(got.Items) != 1 {
 			t.Fatalf("an item reopened on a %s task: %+v", held.state, got)
 		}
 		f := facts(func(f *task.UnitFacts) { f.LastHuman = now.Add(2 * time.Hour) })
-		for _, c := range activity(t, f, []task.Task{open}, bundled, now.Add(3*time.Hour)) {
+		for _, c := range activity(f, []task.Task{open}, now.Add(3*time.Hour)) {
 			if c.Task.Category == task.CategoryInbox || !c.Task.Changed {
 				t.Fatalf("a new message on a %s task: %+v", held.state, c.Task)
 			}

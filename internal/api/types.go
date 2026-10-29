@@ -295,14 +295,10 @@ type Workspace struct {
 // Override is what the user set on a unit; the zero Override leaves the
 // wire.
 type Override struct {
-	MutedUntil           time.Time `json:"muted_until"`
-	MuteUntilStateChange bool      `json:"mute_until_state_change"`
-	MutedKind            string    `json:"muted_kind"`
-	MutedWaitingOn       string    `json:"muted_waiting_on"`
-	Hold                 bool      `json:"hold"`
-	Adopted              bool      `json:"adopted"`
-	Tracked              bool      `json:"tracked"`
-	NextGuidance         string    `json:"next_guidance"`
+	Hold         bool   `json:"hold"`
+	Adopted      bool   `json:"adopted"`
+	Tracked      bool   `json:"tracked"`
+	NextGuidance string `json:"next_guidance"`
 }
 
 type Event struct {
@@ -316,7 +312,7 @@ type Event struct {
 
 // IsZero reports an override that sets nothing.
 func (o Override) IsZero() bool {
-	return o.MutedUntil.IsZero() && o == Override{MutedUntil: o.MutedUntil}
+	return o == Override{}
 }
 
 // PendingRound is an automatic round waiting for the user's answer; a

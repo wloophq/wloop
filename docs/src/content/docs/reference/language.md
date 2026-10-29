@@ -202,16 +202,17 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `verbs.<name>` (table): A verb, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `verbs.<name>.label` (string): The name people read on its button. Required.
 - `verbs.<name>.summary` (string): One line, what pressing it does: its tooltip. Required.
-- `verbs.<name>.offer` (predicate, default `true`): When a task offers the verb, over the task's own facts (task.id, task.prop.kind, task.state, task.muted, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run.
+- `verbs.<name>.offer` (predicate, default `true`): When a task offers the verb, over the task's own facts (task.id, task.prop.kind, task.state, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run.
 - `verbs.<name>.input` (string): The question a verb that asks for a value puts first (waiting, schedule, project, context, area, delegate, reply); required for those.
 - `verbs.<name>.from` (list of strings): The states the verb moves a task from, each a state of states; every state when absent.
 - `verbs.<name>.to` (string): The state the verb moves a task to, a state of states; absent, the verb moves none.
 - `verbs.<name>.by` (table by name): Who may run the verb, by actor (person, workflow, agent, plugin); an actor left out may not.
 - `verbs.<name>.by.<name>` (string): A predicate over the task's facts that lets the actor run the verb where it holds, or "gate", which opens the gate the verb's gate names, and a person's approval runs the verb as theirs; true lets the actor run it anywhere.
 - `verbs.<name>.gate` (string): The gate, of gates.toml, a by.&lt;actor&gt; of "gate" opens; required when one does.
-- `verbs.<name>.handler` (one of `focus`, `schedule`, `waiting`, `approve`, `delegate`, `answer`, `edit`, `retry`, `reply`, `project`, `context`, `area`, `seen`, `reviewed`, `sequential`): What the verb runs besides its move, a handler of the loop's; none when absent.
+- `verbs.<name>.handler` (one of `focus`, `schedule`, `wake`, `waiting`, `approve`, `delegate`, `answer`, `edit`, `retry`, `reply`, `project`, `context`, `area`, `seen`, `reviewed`, `sequential`): What the verb runs besides its move, a handler of the loop's; none when absent.
   - `focus`: Stars the task in Focus, or takes the star off.
   - `schedule`: Hides the task until a date or until its unit moves, then brings it back where it was.
+  - `wake`: Brings a deferred task back where its wake returns it, the first ready state when it names none, and drops the wake.
   - `waiting`: Records who the task waits on and when it resurfaces.
   - `approve`: Resolves the task's open gate as approved, or runs its unit's approve action.
   - `delegate`: Starts a turn on the task, headless or in a session.

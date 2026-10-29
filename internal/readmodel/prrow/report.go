@@ -115,29 +115,23 @@ func (r Report) source(now time.Time) overlay.Situation {
 }
 
 // SituationOf is the situation of the report at now under the host's
-// overlays: the run that drives its row, then the user's mute o, whose
+// overlays: the run that drives its row, then the user's mute m, whose
 // time is its newest muted event among evs; unmuted is it without the
 // mute.
-func SituationOf(r Report, f *TurnFact, o dinv.Override, evs []dinv.Event, now time.Time) (res, unmuted overlay.Situation) {
+func SituationOf(r Report, f *TurnFact, m overlay.Mute, evs []dinv.Event, now time.Time) (res, unmuted overlay.Situation) {
 	sit := r.source(now)
 	if f != nil && sit.Kind != overlay.KindDone {
-		waiting := f.Waiting
-		if f.Unread && o.MuteUntilStateChange {
-			// An unread session cannot show that the muted state changed.
-			waiting = o.MutedKind == overlay.KindLoopWaiting
-		}
-		if s, ok := f.Facts.Situation(waiting); ok {
+		if s, ok := f.Facts.Situation(f.Waiting); ok {
 			sit = s
 		}
 	}
 	unmuted = sit
-	m := overlay.Mute{Until: o.MutedUntil, UntilStateChange: o.MuteUntilStateChange, Kind: o.MutedKind, WaitingOn: o.MutedWaitingOn}
 	for _, e := range evs {
 		if e.Kind == dinv.KindMuted && !e.At.Before(m.At) {
 			m.At = e.At
 		}
 	}
-	if (!m.Until.IsZero() || m.UntilStateChange) && m.Holds(sit, now) {
+	if m.Set() && m.Holds(sit, now) {
 		return m.Muted(), unmuted
 	}
 	return sit, unmuted

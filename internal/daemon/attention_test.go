@@ -186,7 +186,9 @@ func TestOnlyNeedsMeRowsCarryAnAttentionItem(t *testing.T) {
 	f.open(40, "ana", fixtureNow.Add(-time.Hour), func(pr *dinv.PR) { pr.Reasons = nil })
 	inventorytest.Of(f.st).SetWorkspace(ctx, ref(40), dinv.Workspace{ID: "w40", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWaiting}})
 	f.open(41, "ana", fixtureNow.Add(-time.Hour), func(pr *dinv.PR) { pr.Reasons = []string{"involved"} })
-	inventorytest.Of(f.st).SetOverride(ctx, dinv.Override{PR: ref(41), MutedUntil: fixtureNow.Add(time.Hour)})
+	if err := muteBy(f.st, ref(41), fixtureNow.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
 	inventorytest.Of(f.st).SetWorkspace(ctx, ref(41), dinv.Workspace{ID: "w41", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWaiting}})
 	for _, r := range f.rows("?view=all") {
 		inNeedsMe := slices.Contains(r.Views, api.ViewNeedsMe)
@@ -207,7 +209,9 @@ func TestNudgeComputedOnce(t *testing.T) {
 	f.open(51, "fer", at, requests("robo"))
 	f.open(52, "ana", at, requests("fer"))
 	f.open(53, "ana", at, func(pr *dinv.PR) { pr.State = "MERGED" })
-	inventorytest.Of(f.st).SetOverride(context.Background(), dinv.Override{PR: ref(54), MutedUntil: fixtureNow.Add(time.Hour)})
+	if err := muteBy(f.st, ref(54), fixtureNow.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
 	f.open(54, "fer", at, requests("bob"))
 	got := map[int]api.ActionState{}
 	for _, r := range f.rows("?view=all") {

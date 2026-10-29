@@ -12,21 +12,24 @@ import (
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 )
 
 func TestRowFactsPutTheGateDeadlineInOrder(t *testing.T) {
 	now := time.Date(2026, 10, 14, 15, 0, 0, 0, time.UTC)
 	r := pr.Ref{Owner: "acme", Repo: "api", Number: 7}
-	d := Deriver{Now: now, Loaded: bundled(t), Pending: map[unit.Unit]round.Pending{r.Unit(): {Intent: "follow-up", Deadline: now.Add(3 * time.Minute)}}}
+	d := Deriver{Now: now, Loaded: bundled(t), Pending: map[unit.Unit]round.Pending{r.Unit(): {Intent: "follow-up", Deadline: now.Add(3 * time.Minute)}},
+		Mutes: map[unit.Unit]overlay.Mute{r.Unit(): {Until: now.Add(time.Minute)}}}
 	p := dinv.PR{Ref: r, State: "OPEN", Reasons: []string{"involved"}}
-	_, pl := d.Parts(reportOf(t, ghreporttest.Input{PR: p}), nil, dinv.Override{PR: r, MutedUntil: now.Add(time.Minute)})
+	_, pl := d.Parts(reportOf(t, ghreporttest.Input{PR: p}), nil, dinv.Override{PR: r})
 	got := pl.Facts
 	want := []api.Upcoming{{At: now.Add(time.Minute), What: api.UpcomingUnmute}, {At: now.Add(3 * time.Minute), What: api.UpcomingGate}}
 	if got == nil || !slices.EqualFunc(got.Next, want, sameUpcoming) {
 		t.Fatalf("%+v", got)
 	}
 	d.Pending[r.Unit()] = round.Pending{Deadline: now}
+	d.Mutes = nil
 	if _, pl := d.Parts(reportOf(t, ghreporttest.Input{PR: p}), nil, dinv.Override{PR: r}); pl.Facts.Next != nil {
 		t.Fatalf("a deadline at now is not next: %+v", pl.Facts.Next)
 	}

@@ -26,11 +26,6 @@ type Human struct {
 	Link string       `json:"link,omitempty"`
 }
 
-type Mute struct {
-	Until            time.Time `json:"until,omitzero"`
-	UntilStateChange bool      `json:"until_state_change,omitempty"`
-}
-
 type Card struct {
 	Unit          unit.Unit        `json:"unit"`
 	Label         string           `json:"label,omitempty"` // the unit as a person reads it, such as "owner/repo#12" or "#channel"
@@ -47,7 +42,6 @@ type Card struct {
 	StartedByMe   bool             `json:"started_by_me"`  // github: the viewer authored the PR; slack: the viewer started the thread
 	ClosurePosted bool             `json:"closure_posted"` // github: merged or closed; slack: a closing reply was posted
 	Cares         bool             `json:"cares"`          // the user follows it (github: in scope, adopted or tracked)
-	Mute          *Mute            `json:"mute,omitempty"` // github: the row's mute; it snoozes the unit's entries until Until or the next state change
 }
 
 // Snapshot is a stored card; Stale: its plugin is disabled.

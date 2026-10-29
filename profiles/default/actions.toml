@@ -19,7 +19,7 @@ summary = "Let automatic rounds run on this pull request again."
 
 [mute]
 label   = "Mute"
-summary = "Take this pull request out of the lists that wait on you, for a while or until who it waits on changes; review and address rounds still run, unannounced, and no nudge goes out automatically. Pause stops the rounds instead."
+summary = "Snooze this pull request's task, out of the lists that wait on you, for a while or until who it waits on changes; review and address rounds still run, unannounced, and no nudge goes out automatically. Pause stops the rounds instead."
 
 [mute.input]
 label = "Mute for"
@@ -27,7 +27,7 @@ help  = "2d, 36h"
 
 [unmute]
 label   = "Unmute"
-summary = "Bring this pull request back into the lists that wait on you."
+summary = "Wake this pull request's task now, back into the lists that wait on you."
 
 [track]
 label   = "Track"

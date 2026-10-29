@@ -229,15 +229,14 @@ func TestTheOverrideWriteSharesNoTransactionWithPullRequests(t *testing.T) {
 	upsert(t, s, dinv.PR{Ref: ref, Title: "one", State: "OPEN"})
 	heal := failPRWrites(t, s)
 	defer heal()
-	until := time.Date(2026, 10, 30, 9, 0, 0, 0, time.UTC)
-	if err := s.SetOverride(ctx, dinv.Override{PR: ref, MutedUntil: until, Tracked: true}); err == nil {
+	if err := s.SetOverride(ctx, dinv.Override{PR: ref, Hold: true, Tracked: true}); err == nil {
 		t.Fatal("want the pull request's reasons to fail")
 	}
 	host, err := s.db.Override(ctx, ref.Unit())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if host[port.OverrideMutedUntil] != until.Format(time.RFC3339Nano) {
+	if host[port.OverrideHold] != port.OverrideTrue {
 		t.Errorf("the host's columns %v went down with the pull request's write", host)
 	}
 	if o, err := s.Override(ctx, ref); err != nil || o.Tracked {

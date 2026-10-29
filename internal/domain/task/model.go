@@ -26,13 +26,6 @@ type ItemRef struct {
 	Item string
 }
 
-type Snooze struct {
-	Until      time.Time // zero: no date
-	OnActivity bool
-	Return     State // state the entry gets back at Until; "" the first inbox state
-	Mute       bool  // set from UnitFacts.Mute; cleared when the mute ends
-}
-
 type Task struct {
 	ID ID
 	// State is the task's state; Category is its category, which every rule reads.
@@ -51,10 +44,12 @@ type Task struct {
 	Parent     ID  // "" none
 	Position   int // order among its parent's children
 	Sequential bool
-	Snooze     Snooze
-	Changed    bool // "changed since you saw it"; cleared by the seen verb
-	SeenAt     time.Time
-	Origin     string // "derived", "user", "message", "draft"
+	// Asleep says the task holds a wake (wake.Wake), as the store reads it; writing a task leaves its wake as
+	// it is.
+	Asleep  bool
+	Changed bool // "changed since you saw it"; cleared by the seen verb
+	SeenAt  time.Time
+	Origin  string // "derived", "user", "message", "draft"
 
 	Created, Updated time.Time
 
@@ -72,11 +67,6 @@ type Written struct {
 // Me is the user's identity over the enabled plugins (items.Identity; Person.Is(Me)).
 type Me = items.Identity
 
-type Mute struct {
-	Until            time.Time // zero: no date
-	UntilStateChange bool      // until the unit's state changes
-}
-
 // UnitFacts are what the rules need beyond the items, from the plugin's card.
 type UnitFacts struct {
 	Unit          unit.Unit
@@ -84,7 +74,6 @@ type UnitFacts struct {
 	ClosurePosted bool
 	Cares         bool      // followed/watched by the user, or the user's own unit
 	LastHuman     time.Time // newest human event not by the user (card.LastHuman when !Who.Is(Me))
-	Mute          *Mute     // the plugin's mute of the unit; nil none
 	// Kind is the value of the kind property the unit's plugin gives the tasks of its units, such as thread;
 	// "" gives none.
 	Kind string
@@ -110,6 +99,7 @@ const (
 	VerbNext      Verb = "next"
 	VerbWaiting   Verb = "waiting"
 	VerbSchedule  Verb = "schedule"
+	VerbWake      Verb = "wake"
 	VerbSomeday   Verb = "someday"
 	VerbReference Verb = "reference"
 	VerbFocus     Verb = "focus"

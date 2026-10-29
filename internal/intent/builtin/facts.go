@@ -176,7 +176,6 @@ var otherFacts = []Fact{
 	wf("workspace", "repo", expr.String, "owner/repo; empty when unknown."),
 	wf("task", "id", expr.String, "The task's id."),
 	untrusted(wf("task", "state", expr.String, "The task's state, one of the states tasks.toml declares.")),
-	wf("task", "muted", expr.Bool, "The task is muted."),
 	wf("task", "unit", expr.String, "The task's first unit as provider:key: the unit it was captured or derived on, else its first attachment; empty for a task with none."),
 	enum(wf("task", "unit_provider", expr.String, "The provider of task.unit; empty for a task with none."), enumOf(append([]string{""}, providerIDs()...)...)),
 	wf("task", "units", expr.List, "The task's units as provider:key, in order: the unit it was captured or derived on, then those attached to it in attach order, then any only its items name. The task itself is not one of them."),
@@ -536,7 +535,7 @@ func FactProvider(name string) unit.ProviderID {
 
 // OfferFacts are the facts a verb's offer reads: a task's own, which a
 // list of tasks reads without a store.
-var OfferFacts = []string{"task.id", OfferKind, "task.state", "task.muted", "task.unit", "task.unit_provider"}
+var OfferFacts = []string{"task.id", OfferKind, "task.state", "task.unit", "task.unit_provider"}
 
 // OfferKind is the task's kind property as an offer reads it, typed a
 // string whatever tasks.toml declares, so an offer compiles before the

@@ -319,6 +319,8 @@ func TestRetryingAnOldHeadlessTurnFindsItsTask(t *testing.T) {
 
 // notTaskColumns are the columns whose name or JSON default looks like a task reference's and that hold none.
 var notTaskColumns = map[string]string{
+	"wakes.on_kinds":             "the event kinds a wake waits on",
+	"wakes.actors":               "the actors whose events a wake waits on",
 	"pause.repos":                "the owner/repo names a pause holds",
 	"brief_runs.input":           "the provider's own parts of what a brief run read, history",
 	"intakes.log":                "an intake's log lines, history",

@@ -16,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
@@ -35,6 +36,14 @@ type Deps struct {
 	Authority Authority
 	// Gates opens the gate a gated verb opens; nil: a gated verb fails.
 	Gates Gates
+	// Wakes are the tasks' wakes, which schedule puts and wake reads; nil: schedule fails and no task has one.
+	Wakes Wakes
+	// Baseline fills a wake Sleep puts on task t: a When that asks to wake once a fact of t changes becomes the
+	// condition over the value t has now; nil leaves every When as it is.
+	Baseline func(ctx context.Context, t task.Task, when string) (string, error)
+	// Activity is told each task Sync finds asleep with a person's activity on its unit since the user saw it,
+	// for a wake on activity; nil: none is told.
+	Activity func(ctx context.Context, id task.ID) error
 }
 
 type handlerKey struct {
@@ -156,15 +165,23 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 	}
 	now := s.now()
 	var cs []task.Change
+	var wc wakeChange
 	if s.d.States.Handler(string(req.Verb)) == handlerProject {
 		cs, err = s.project(ctx, e, req, now)
 	} else {
+		var cur wake.Wake
+		if cur, err = s.wakeOf(ctx, e.ID); err != nil {
+			return Result{}, err
+		}
 		var next task.Task
-		next, err = s.transition(e, req, now)
+		next, wc, err = s.transition(e, req, cur, now)
 		cs = []task.Change{{Op: task.OpUpdate, Task: next, Why: string(req.Verb)}}
 	}
 	if err != nil {
 		return Result{}, err
+	}
+	if wc.put != nil && s.d.Wakes == nil {
+		return Result{}, fmt.Errorf("%w: %s puts a wake, and no wakes are kept", ErrVerb, req.Verb)
 	}
 	if s.beforeApply != nil {
 		s.beforeApply()
@@ -172,7 +189,109 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 	if err := s.d.Store.Apply(ctx, cs, s.verbEvents(e, req, now)...); err != nil {
 		return Result{}, err
 	}
+	if err := s.applyWake(ctx, e.ID, wc); err != nil {
+		return Result{}, err
+	}
 	return Result{Task: cs[len(cs)-1].Task}, nil
+}
+
+// wakeOf is task id's wake, zero when it has none or no wakes are kept.
+func (s *Service) wakeOf(ctx context.Context, id task.ID) (wake.Wake, error) {
+	if s.d.Wakes == nil {
+		return wake.Wake{}, nil
+	}
+	w, _, err := s.d.Wakes.Of(ctx, id)
+	return w, err
+}
+
+// WakeOf is task id's wake; false when it has none.
+func (s *Service) WakeOf(ctx context.Context, id task.ID) (wake.Wake, bool, error) {
+	if s.d.Wakes == nil {
+		return wake.Wake{}, false, nil
+	}
+	return s.d.Wakes.Of(ctx, id)
+}
+
+func (s *Service) applyWake(ctx context.Context, id task.ID, wc wakeChange) error {
+	switch {
+	case wc.put != nil:
+		return s.d.Wakes.Put(ctx, *wc.put)
+	case wc.drop && s.d.Wakes != nil:
+		return s.d.Wakes.Drop(ctx, id)
+	}
+	return nil
+}
+
+// Sleep defers open task id under w: a task not deferred moves to the first deferred state, and w returns it
+// where it was; one deferred already keeps where its wake returned it, else its state. It is how a plugin's
+// wake, such as a mute, holds a task.
+func (s *Service) Sleep(ctx context.Context, id task.ID, w wake.Wake) error {
+	if s.d.Wakes == nil {
+		return fmt.Errorf("%w: no wakes are kept", ErrVerb)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, err := s.d.Store.Task(ctx, id)
+	if err != nil {
+		return err
+	}
+	if !e.Open() {
+		return fmt.Errorf("%w: a wake on a %s task", ErrVerb, e.State)
+	}
+	cur, err := s.wakeOf(ctx, id)
+	if err != nil {
+		return err
+	}
+	w.Task, w.Return = id, string(e.State)
+	if e.Snoozed() && cur.Task == id {
+		w.Return = cur.Return
+	}
+	if s.d.Baseline != nil && w.When != "" {
+		if w.When, err = s.d.Baseline(ctx, e, w.When); err != nil {
+			return err
+		}
+	}
+	if e.Category != task.CategoryDeferred {
+		if err := e.MoveTo(task.CategoryDeferred, s.d.States); err != nil {
+			return err
+		}
+		e.Asleep, e.Updated = true, s.now()
+		if err := s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e, Why: "asleep"}}); err != nil {
+			return err
+		}
+	}
+	return s.d.Wakes.Put(ctx, w)
+}
+
+// Rouse drops task id's wake and returns the task where the wake said, as the wake verb does; a task with no
+// wake is left as it is.
+func (s *Service) Rouse(ctx context.Context, id task.ID) error {
+	if s.d.Wakes == nil {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	w, ok, err := s.d.Wakes.Of(ctx, id)
+	if err != nil || !ok {
+		return err
+	}
+	e, err := s.d.Store.Task(ctx, id)
+	if err != nil {
+		return err
+	}
+	if e.Open() {
+		was := e
+		if err := returnFrom(&e, w, s.d.States); err != nil {
+			return err
+		}
+		if e.Asleep = false; !e.Same(was) {
+			e.Updated = s.now()
+			if err := s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e, Why: "woke"}}); err != nil {
+				return err
+			}
+		}
+	}
+	return s.d.Wakes.Drop(ctx, id)
 }
 
 // project attaches e to the project args["id"] names, or to a new one titled args["title"], after its last action.
@@ -256,7 +375,7 @@ func (s *Service) dismissOff(ctx context.Context, id task.ID, req Request, enabl
 	now := s.now()
 	next, why := e, "detached"
 	if len(off) == 0 || e.Origin == task.OriginDerived || !slices.ContainsFunc(e.Units, func(u unit.Unit) bool { return !isOff(u) }) {
-		if next, err = s.transition(e, req, now); err != nil {
+		if next, _, err = s.transition(e, req, wake.Wake{}, now); err != nil {
 			return Result{}, err
 		}
 		why = string(task.VerbDismiss)
@@ -438,7 +557,7 @@ func (s *Service) Close(ctx context.Context, id task.ID, to task.Category) error
 	if err := e.MoveTo(to, s.d.States); err != nil {
 		return err
 	}
-	e.Snooze, e.Updated = task.Snooze{}, now
+	e.Updated = now
 	return s.d.Store.Apply(ctx, []task.Change{{Op: task.OpResolve, Task: e, Why: "closed"}})
 }
 
@@ -516,38 +635,15 @@ func (p *pending) changes() []task.Change {
 	return out
 }
 
-// Sync reconciles the units named by a TopicItems, TopicSourceEvents or TopicCards note, then Wake for all,
-// in one Apply. A unit whose plugin is disabled keeps its entries as they are. A snooze that ends
-// reconciles its entry's units after waking it, so a still-muted unit snoozes it again before anything sees it
-// in the Inbox.
+// Sync reconciles the units named by a TopicItems, TopicSourceEvents or TopicCards note, in one Apply, then
+// tells Activity the asleep tasks of those units a person's activity reached. A unit whose plugin is disabled
+// keeps its tasks as they are.
 func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := s.now()
-	open, err := s.d.Store.Tasks(ctx, task.Query{View: task.ViewOpen})
-	if err != nil {
-		return err
-	}
 	var p pending
-	enabled := map[unit.Unit]bool{}
-	units = slices.Clone(units)
-	for _, e := range open {
-		woke, ok, err := task.Wake(e, s.d.States, now)
-		if err != nil {
-			return fmt.Errorf("waking %s: %w", e.ID, err)
-		}
-		if !ok {
-			continue
-		}
-		switch err := s.writable(ctx, e, enabled); {
-		case errors.Is(err, ErrPluginDisabled):
-			continue
-		case err != nil:
-			return err
-		}
-		p.put(task.Change{Op: task.OpUpdate, Task: woke, Why: "snooze ended"})
-		units = append(units, e.Units...)
-	}
+	var roused []task.ID
 	seen := map[unit.Unit]bool{}
 	for _, u := range units {
 		if seen[u] {
@@ -558,7 +654,6 @@ func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 		if err != nil {
 			return fmt.Errorf("facts of %s: %w", u, err)
 		}
-		enabled[u] = ok
 		if !ok {
 			continue
 		}
@@ -578,40 +673,28 @@ func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 		for _, c := range cs {
 			p.put(c)
 		}
-		if cs, err = task.Activity(f, p.of(have, u), s.d.States, now); err != nil {
-			return fmt.Errorf("the activity on %s: %w", u, err)
+		for _, e := range p.of(have, u) {
+			if e.Snoozed() && task.ActiveSince(f, e) && !slices.Contains(roused, e.ID) {
+				roused = append(roused, e.ID)
+			}
 		}
-		for _, c := range cs {
+		for _, c := range task.Activity(f, p.of(have, u), now) {
 			p.put(c)
 		}
 	}
-	for _, e := range p.overlay(open) {
-		if !e.Open() {
-			continue
-		}
-		next, why := e, []string{}
-		woke, ok, err := task.Wake(next, s.d.States, now)
-		if err != nil {
-			return fmt.Errorf("waking %s: %w", e.ID, err)
-		}
-		if ok {
-			next, why = woke, append(why, "snooze ended")
-		}
-		if len(why) == 0 {
-			continue
-		}
-		switch err := s.writable(ctx, e, enabled); {
-		case errors.Is(err, ErrPluginDisabled):
-		case err != nil:
+	if len(p.order) > 0 {
+		if err := s.d.Store.Apply(ctx, p.changes()); err != nil {
 			return err
-		default:
-			p.put(task.Change{Op: task.OpUpdate, Task: next, Why: strings.Join(why, ", ")})
 		}
 	}
-	if len(p.order) == 0 {
+	if s.d.Activity == nil {
 		return nil
 	}
-	return s.d.Store.Apply(ctx, p.changes())
+	var errs []error
+	for _, id := range roused {
+		errs = append(errs, s.d.Activity(ctx, id))
+	}
+	return errors.Join(errs...)
 }
 
 // Recategorize gives every stored task the category of its state as the profile declares it now, and returns
@@ -662,7 +745,7 @@ func (s *Service) UnitClosed(ctx context.Context, u unit.Unit) error {
 		if err := e.MoveTo(task.CategoryDone, s.d.States); err != nil {
 			return err
 		}
-		e.Snooze, e.Updated = task.Snooze{}, now
+		e.Updated = now
 		cs = append(cs, task.Change{Op: task.OpResolve, Task: e, Why: "its unit " + u.String() + " closed"})
 	}
 	if len(cs) == 0 {

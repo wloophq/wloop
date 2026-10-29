@@ -39,15 +39,15 @@ const (
 	EffectTaskNudged = "task.nudged"
 )
 
-// The host overrides a proposal reads, as RoundState names them.
+// The host override a proposal reads, as RoundState names it.
 const (
-	overrideMutedUntil           = "muted_until"
-	overrideMuteUntilStateChange = "mute_until_state_change"
-	overrideMutedKind            = "muted_kind"
-	overrideMutedWaitingOn       = "muted_waiting_on"
-	overrideHold                 = "hold"
-	overrideTrue                 = "true"
+	overrideHold = "hold"
+	overrideTrue = "true"
 )
+
+// categoryDeferred is the category of a task asleep under a wake, such as
+// the user's mute of its pull request.
+const categoryDeferred = "deferred"
 
 // The roles plugin.toml declares that drive a pull request's row.
 const (
@@ -176,34 +176,13 @@ func Running(b src.Book) bool {
 	return false
 }
 
-// Muted says whether the host's overrides o mute a pull request whose
-// situation is s at now.
-func Muted(o map[string]string, s Situation, now time.Time) bool {
-	if situation.Kind(s.Kind) == situation.KindDone {
-		return false
-	}
-	if raw := o[overrideMutedUntil]; raw != "" {
-		if until, err := time.Parse(time.RFC3339Nano, raw); err == nil && now.Before(until) {
-			return true
-		}
-	}
-	return o[overrideMuteUntilStateChange] == overrideTrue && s.Kind == o[overrideMutedKind] && sameWaitingOn(s.WaitsOn, o[overrideMutedWaitingOn])
-}
-
-func sameWaitingOn(a, b string) bool {
-	set := func(s string) []string {
-		v := strings.Split(s, ", ")
-		slices.Sort(v)
-		return v
-	}
-	return slices.Equal(set(a), set(b))
-}
-
 // Host is what a proposal reads of the host for one pull request: its
-// overrides and its turns.
+// overrides, its turns, and whether its task sleeps, deferred under a wake
+// such as the user's mute.
 type Host struct {
 	Overrides map[string]string
 	Book      src.Book
+	Asleep    bool
 }
 
 // Stalled says whether r is one the github-nudge rule considers: stalled
@@ -222,7 +201,7 @@ func Stalled(r row.Row) bool {
 // refused now; its text is x's.
 func Propose(r row.Row, h Host, x Texts, ignore []string, now time.Time) (src.Draft, bool, error) {
 	s := Of(r)
-	if !Stalled(r) || h.Overrides[overrideHold] == overrideTrue || Running(h.Book) || Muted(h.Overrides, s, now) {
+	if !Stalled(r) || h.Overrides[overrideHold] == overrideTrue || Running(h.Book) || h.Asleep {
 		return src.Draft{}, false, nil
 	}
 	who, why := Targets(s, r.Payload.Author, r.Payload.Viewer, ignore)
@@ -251,6 +230,7 @@ const originAuto = "auto"
 type Reader interface {
 	Books(ctx context.Context, units []sdk.Unit) ([]src.Book, error)
 	RoundState(ctx context.Context, u sdk.Unit) (src.RoundState, error)
+	Tasks(ctx context.Context, units []sdk.Unit) ([]src.Task, error)
 }
 
 // Proposals are the nudge drafts of rows at now, reading the host's
@@ -275,6 +255,18 @@ func Proposals(ctx context.Context, rows []row.Row, rd Reader, x Texts, ignore [
 	for _, b := range bs {
 		books[b.Unit] = b
 	}
+	asleep := map[sdk.Unit]bool{}
+	ts, err := rd.Tasks(ctx, units)
+	if err != nil && !errors.Is(err, src.ErrUnsupported) {
+		return nil, err
+	}
+	for _, t := range ts {
+		if t.Category == categoryDeferred {
+			for _, u := range t.Units {
+				asleep[u] = true
+			}
+		}
+	}
 	var out []src.Draft
 	for _, r := range candidates {
 		u := r.PR.Ref.Unit()
@@ -282,7 +274,7 @@ func Proposals(ctx context.Context, rows []row.Row, rd Reader, x Texts, ignore [
 		if err != nil {
 			return nil, fmt.Errorf("the round state of %s: %w", r.PR.Ref, err)
 		}
-		d, ok, err := Propose(r, Host{Overrides: st.Overrides, Book: books[u]}, x, ignore, now)
+		d, ok, err := Propose(r, Host{Overrides: st.Overrides, Book: books[u], Asleep: asleep[u]}, x, ignore, now)
 		if err != nil {
 			return nil, err
 		}

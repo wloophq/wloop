@@ -351,6 +351,8 @@ type Deps struct {
 	TasksMe func(ctx context.Context) (grew bool, err error)
 	// TaskUnits are the units a full Sync covers: those with an open item or a live task; nil: none.
 	TaskUnits func(ctx context.Context) ([]unit.Unit, error)
+	// Wakes match the tasks' wakes after each tasks sync; nil matches none.
+	Wakes Wakes
 	// Outbox keeps the drafts; nil answers 503 to the draft routes. SendDrafts runs its sender, which
 	// publishes the approved drafts.
 	Outbox     *outbox.Service
@@ -548,7 +550,7 @@ func (s *Server) sweepJob(sw Sweeper) *job {
 	j = newJob("sweep", time.Duration(s.deps.Cfg.Sweep.Slow), sweepTimeout, s.background(func(ctx context.Context) (string, string, error) {
 		defer func() {
 			if ctx.Err() == nil {
-				s.expireMutesOrLog(ctx)
+				s.keepCurrentOrLog(ctx)
 			}
 		}()
 		from := s.changeGen()
@@ -611,9 +613,9 @@ func (s *Server) changeGen() port.Generation {
 	return s.deps.Changes.Gen()
 }
 
-func (s *Server) expireMutesOrLog(ctx context.Context) {
-	if err := s.expireMutes(ctx); err != nil {
-		s.logf("expiring mutes: %v", err)
+func (s *Server) keepCurrentOrLog(ctx context.Context) {
+	if err := s.keepCurrent(ctx); err != nil {
+		s.logf("keeping the rows: %v", err)
 	}
 }
 

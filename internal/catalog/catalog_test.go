@@ -141,7 +141,6 @@ func TestActionFactsCoverTheActionSlot(t *testing.T) {
 		"row.tracked":                           func(f *Facts) { f.Tracked = true },
 		"pr.adopted":                            func(f *Facts) { f.Override.Adopted = true },
 		"pr.held":                               func(f *Facts) { f.Override.Hold = true },
-		"pr.muted":                              func(f *Facts) { f.Muted = true },
 		"row.question":                          func(f *Facts) { f.Question = true },
 		"row.pending":                           func(f *Facts) { f.Row.Pending = &api.PendingRound{} },
 		"row.capped":                            func(f *Facts) { f.HeldByCap = true },

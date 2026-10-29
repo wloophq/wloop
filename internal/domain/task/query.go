@@ -34,7 +34,7 @@ func inState(e Task, v View) bool {
 	return false
 }
 
-// inSomeday says whether the task is deferred with no snooze to wake it.
+// inSomeday says whether the task is deferred with no wake.
 func inSomeday(e Task) bool { return e.Category == CategoryDeferred && !e.Snoozed() }
 
 // Matches says whether e passes q's area and contexts; the Inbox ignores the area.

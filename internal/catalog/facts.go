@@ -153,8 +153,6 @@ func (f Facts) Get(field string) any {
 		return o.Adopted
 	case "pr.held":
 		return o.Hold
-	case "pr.muted":
-		return f.Muted
 	case "row.question":
 		return f.Question
 	case "row.pending":
@@ -205,7 +203,7 @@ func (f Facts) Get(field string) any {
 // OfferFacts are the facts of e a verb's offer reads.
 func OfferFacts(e task.Task) workflow.Facts {
 	f := workflow.Facts{"task.id": string(e.ID), builtin.OfferKind: e.Prop(task.PropKind).Text, "task.state": string(e.State),
-		"task.muted": e.Snooze.Mute, "task.unit": "", "task.unit_provider": ""}
+		"task.unit": "", "task.unit_provider": ""}
 	if u, ok := e.FirstUnit(); ok {
 		f["task.unit"], f["task.unit_provider"] = u.String(), string(u.Provider)
 	}

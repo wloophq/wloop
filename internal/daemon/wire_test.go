@@ -76,8 +76,10 @@ func TestWireShape(t *testing.T) {
 		AgentStates: []turn.AgentState{turn.AgentWorking}, Comment: "r2 held"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := inventorytest.Of(st).SetOverride(ctx, dinv.Override{PR: r7, Hold: true, Tracked: true, NextGuidance: "look at the tests",
-		MutedUntil: time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC)}); err != nil {
+	if err := inventorytest.Of(st).SetOverride(ctx, dinv.Override{PR: r7, Hold: true, Tracked: true, NextGuidance: "look at the tests"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := muteBy(st, r7, time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC)); err != nil {
 		t.Fatal(err)
 	}
 	s.app.Set(api.AppStatus{State: "running", Notifications: "denied"})

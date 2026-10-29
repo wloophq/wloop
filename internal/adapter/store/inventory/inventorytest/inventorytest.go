@@ -1260,14 +1260,7 @@ func (s *Store) SetOverride(ctx context.Context, o dinv.Override) error {
 
 // hostOverride are o's host columns by name, its next guidance left alone.
 func hostOverride(o dinv.Override) map[string]string {
-	set := map[string]string{port.OverrideMutedUntil: "", port.OverrideMuteUntilStateChange: "", port.OverrideMutedKind: o.MutedKind,
-		port.OverrideMutedWaitingOn: o.MutedWaitingOn, port.OverrideHold: ""}
-	if !o.MutedUntil.IsZero() {
-		set[port.OverrideMutedUntil] = o.MutedUntil.UTC().Format(time.RFC3339Nano)
-	}
-	if o.MuteUntilStateChange {
-		set[port.OverrideMuteUntilStateChange] = port.OverrideTrue
-	}
+	set := map[string]string{port.OverrideHold: ""}
 	if o.Hold {
 		set[port.OverrideHold] = port.OverrideTrue
 	}

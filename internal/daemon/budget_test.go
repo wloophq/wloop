@@ -57,9 +57,10 @@ func TestBudgets(t *testing.T) {
 		cold, warm metertest.Budget
 	}{
 		// The rows read the reported units and their reports apart: one
-		// statement and one row per pull request more than the inventory's.
-		{"rows", api.Rows, false, flowBudget(11, 8294, 1), flowBudget(0, 0, 0)},
-		{"unit detail", detail, true, flowBudget(15, 8297, 2), flowBudget(4, 2, 1)},
+		// statement and one row per pull request more than the inventory's;
+		// and their tasks' wakes, one statement more.
+		{"rows", api.Rows, false, flowBudget(12, 8294, 1), flowBudget(0, 0, 0)},
+		{"unit detail", detail, true, flowBudget(16, 8297, 2), flowBudget(4, 2, 1)},
 		{"actions", api.Actions, false, flowBudget(0, 0, 0), flowBudget(0, 0, 0)},
 		{"health", "/api/health", false, flowBudget(4, 141, 0), flowBudget(2, 1, 0)},
 		{"activity", "/api/activity", false, flowBudget(2, 266, 0), flowBudget(2, 266, 0)},

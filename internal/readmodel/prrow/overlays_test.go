@@ -38,7 +38,7 @@ func TestTheHostOverlaysDecideAsDeriveDid(t *testing.T) {
 	if err := sc.Err(); err != nil {
 		t.Fatal(err)
 	}
-	cases, diverged := 0, 0
+	cases, diverged, woken := 0, 0, 0
 	for _, s := range gridSources() {
 		rep, ok, err := ReportOf(ghreporttest.Snapshot(ghreporttest.Env{Viewer: "me", Teams: []string{"Acme/search"}, Ignore: []string{"sonar"},
 			Stalled: &gridStalled, Now: s.now}, ghreporttest.Input{PR: s.pr, Events: s.evs}))
@@ -58,7 +58,7 @@ func TestTheHostOverlaysDecideAsDeriveDid(t *testing.T) {
 								tf.Facts.AnsweredAt = h(3)
 							}
 						}
-						sit, _ := SituationOf(rep, tf, o, nil, s.now)
+						sit, _ := SituationOf(rep, tf, o.mute, nil, s.now)
 						_, ranOK := tf.situation(src)
 						ran := ranOK
 						if p != nil {
@@ -77,6 +77,9 @@ func TestTheHostOverlaysDecideAsDeriveDid(t *testing.T) {
 							if got != want {
 								diverged++
 							}
+						case o.mute.UntilStateChange && sit.Kind == overlay.KindMuted && !strings.HasPrefix(want, overlay.KindMuted+" "):
+							// The wake of a mute until the state changes decides when it lapses, not the row.
+							woken++
 						case got != want:
 							t.Errorf("%s:\n got %s\nwant %s", key, got, want)
 						}
@@ -85,8 +88,8 @@ func TestTheHostOverlaysDecideAsDeriveDid(t *testing.T) {
 			}
 		}
 	}
-	if cases != len(golden) || diverged == 0 {
-		t.Errorf("%d cases for %d golden rows, %d reordered", cases, len(golden), diverged)
+	if cases != len(golden) || diverged == 0 || woken == 0 {
+		t.Errorf("%d cases for %d golden rows, %d reordered, %d left to the wake", cases, len(golden), diverged, woken)
 	}
 }
 

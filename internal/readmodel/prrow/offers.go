@@ -18,6 +18,7 @@ import (
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/situation"
 )
 
@@ -48,12 +49,12 @@ func (d Deriver) openIntakes(ref github.Ref) []catalog.Intake {
 
 // FactsOf gathers the facts of a row of the inventory; unmuted is the
 // situation without the user's mute, which a nudge reads.
-func (d Deriver) FactsOf(pr dinv.PR, evs []dinv.Event, o dinv.Override, r api.Row, p Payload, unmuted api.Row) catalog.Facts {
+func (d Deriver) FactsOf(pr dinv.PR, evs []dinv.Event, m overlay.Mute, r api.Row, p Payload, unmuted api.Row) catalog.Facts {
 	f := catalog.Facts{
 		PR: pr.Ref.Unit(), Owner: pr.Ref.Owner, Repo: pr.Ref.Repo, Row: r, Author: p.Author, Workspace: p.Workspace, Override: p.Override, Tracked: true, Open: situation.Kind(r.Kind) != situation.KindDone, HeldByCap: situation.Kind(r.Kind) == situation.KindHeldByCap,
 		Mine:        d.Viewer != "" && strings.EqualFold(pr.Author, d.Viewer),
-		Muted:       o.MuteUntilStateChange || o.MutedUntil.After(d.Now),
-		MutedStored: o.MuteUntilStateChange || !o.MutedUntil.IsZero(),
+		Muted:       m.UntilStateChange || m.Until.After(d.Now),
+		MutedStored: m.Set(),
 		Draft:       pr.IsDraft, CrossRepository: pr.IsFork, State: pr.State, Base: pr.BaseBranch,
 		ReviewRequestedMe: slices.ContainsFunc(pr.ReviewRequests, func(who string) bool { return strings.EqualFold(who, d.Viewer) }),
 		GateOn:            d.GateOn, BriefOn: d.BriefOn,

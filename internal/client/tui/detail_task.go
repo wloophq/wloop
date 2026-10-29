@@ -210,11 +210,11 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 	if e.Changed {
 		state = append(state, "changed")
 	}
-	if !e.SnoozeUntil.IsZero() {
-		state = append(state, "until "+e.SnoozeUntil.In(now.Location()).Format("2006-01-02 15:04"))
+	if w := e.Wake; w != nil && !w.Until.IsZero() {
+		state = append(state, "until "+w.Until.In(now.Location()).Format("2006-01-02 15:04"))
 	}
-	if e.SnoozeOnActivity {
-		state = append(state, "until activity")
+	if w := e.Wake; w != nil && w.When != "" {
+		state = append(state, "until "+w.When)
 	}
 	fact("state", strings.Join(state, " · "), plain)
 	for _, name := range slices.Sorted(maps.Keys(e.Props)) {

@@ -1,7 +1,7 @@
 package task
 
 // Verbs are every verb, in the order clients list them.
-var Verbs = []Verb{VerbNext, VerbWaiting, VerbSchedule, VerbSomeday, VerbReference, VerbFocus, VerbProject, VerbApprove,
+var Verbs = []Verb{VerbNext, VerbWaiting, VerbSchedule, VerbWake, VerbSomeday, VerbReference, VerbFocus, VerbProject, VerbApprove,
 	VerbDelegate, VerbDone, VerbDismiss, VerbSeen, VerbContext, VerbArea, VerbAnswer, VerbEdit, VerbRetry, VerbReviewed,
 	VerbSequential, VerbReply}
 

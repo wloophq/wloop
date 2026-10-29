@@ -32,7 +32,6 @@ func Full(id task.ID) task.Task {
 			"contexts": {By: task.WriterPlugin, At: t0}, "area": {By: task.WriterPerson, At: t0}, "due": {By: task.WriterPlugin, At: t0},
 			"owner": {By: task.WriterPerson, At: t0}, "last_nudge": {By: task.WriterWorkflow, At: t0}, "check_on": {By: task.WriterPerson, At: t0}},
 		Parent: "e-proj", Position: 3, Sequential: true,
-		Snooze:  task.Snooze{Until: t0.Add(time.Hour), OnActivity: true, Return: InState("waiting"), Mute: true},
 		Changed: true, SeenAt: t0.Add(-2 * time.Hour), Origin: task.OriginDerived,
 		Created: t0.Add(-3 * time.Hour), Updated: t0,
 	}
@@ -143,9 +142,6 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 					e := task.Task{ID: task.ID("e-" + st.name + "-" + area + "-" + kind), State: task.State(st.name),
 						Category: st.c, Origin: task.OriginUser,
 						Created: t0.Add(time.Duration(n) * time.Second), Updated: t0.Add(time.Duration(n) * time.Second)}
-					if st.name == "scheduled" {
-						e.Snooze = task.Snooze{OnActivity: true}
-					}
 					e.SetProp(task.PropArea, task.Value{Text: area}, task.WriterPerson, t0)
 					e.SetProp(task.PropKind, task.Value{Text: kind}, task.WriterWorkflow, t0)
 					e.SetProp(task.PropContexts, task.Value{List: []string{"@reply"}}, task.WriterPerson, t0)

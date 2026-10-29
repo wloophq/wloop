@@ -51,8 +51,5 @@ func (f CardFacts) UnitFacts(ctx context.Context, u unit.Unit) (task.UnitFacts, 
 	if h := c.LastHuman; h != nil && !h.Who.Is(me) {
 		out.LastHuman = h.At
 	}
-	if c.Mute != nil {
-		out.Mute = &task.Mute{Until: c.Mute.Until, UntilStateChange: c.Mute.UntilStateChange}
-	}
 	return out, true, nil
 }

@@ -148,7 +148,7 @@ func TestPlanReceivesTheRoundState(t *testing.T) {
 	r.save(t)
 	blockedAt := testNow.Add(-2 * time.Hour)
 	r.rec.events = append(r.rec.events, trustBlockEvent(sc.ref, blockedAt))
-	if _, err := sc.te.db.SetOverride(context.Background(), sc.ref.Unit(), map[string]string{port.OverrideMutedKind: "review"}, nil); err != nil {
+	if _, err := sc.te.db.SetOverride(context.Background(), sc.ref.Unit(), map[string]string{port.OverrideNextGuidance: "review"}, nil); err != nil {
 		t.Fatal(err)
 	}
 	r.steps.d.Overrides = sc.te.db
@@ -168,7 +168,7 @@ func TestPlanReceivesTheRoundState(t *testing.T) {
 	if got.Blocked == nil || got.Blocked.Root != "/src/api" || got.Blocked.Folder != "/wt/rev" || !got.Blocked.Since.Equal(blockedAt) {
 		t.Errorf("blocked %+v", got.Blocked)
 	}
-	if got.Overrides[port.OverrideMutedKind] != "review" || got.Paused {
+	if got.Overrides[port.OverrideNextGuidance] != "review" || got.Paused {
 		t.Errorf("overrides %v, paused %v", got.Overrides, got.Paused)
 	}
 

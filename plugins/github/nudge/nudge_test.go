@@ -141,10 +141,7 @@ func TestNoNudgeForCardOnlyStates(t *testing.T) {
 	hold := stalledReview()
 	hold.host.Overrides = map[string]string{"hold": "true"}
 	muted := stalledReview()
-	muted.host.Overrides = map[string]string{"muted_until": now.Add(5 * time.Hour).Format(time.RFC3339Nano)}
-	mutedState := stalledReview()
-	sit := mutedState.row().Situation
-	mutedState.host.Overrides = map[string]string{"mute_until_state_change": "true", "muted_kind": string(sit.Kind), "muted_waiting_on": sit.WaitingOn}
+	muted.host.Asleep = true
 	approved := stalledChanges()
 	approved.pr.Workspace, approved.pr.ReviewRequests = pr.Workspace{ID: "ws-r", DisplayName: "review", Status: "in-review", IsReview: true}, []string{reviewer}
 	approved.events = append(approved.events,
@@ -156,18 +153,16 @@ func TestNoNudgeForCardOnlyStates(t *testing.T) {
 	turn.host.Book = src.Book{Unit: turn.pr.Ref.Unit(), Turns: []src.Turn{{Seq: 1, ID: "t1", Role: "pr.address", State: "started", StartedAt: now.Add(-time.Hour)}}}
 	outOfScope := stalledReview()
 	outOfScope.pr.Reasons = nil
-	for name, s := range map[string]pull{"draft": draftPR, "hold": hold, "muted": muted, "muted until its state changes": mutedState,
+	for name, s := range map[string]pull{"draft": draftPR, "hold": hold, "muted": muted,
 		"approved": approved, "loop working": working, "loop turn": turn, "out of scope": outOfScope} {
 		if d, ok := s.propose(); ok {
 			r := s.row()
 			t.Errorf("%s (%s, views %v): proposed %q", name, r.Kind(), r.Views, d.Text)
 		}
 	}
-	lapsed := stalledReview()
-	lapsed.host.Overrides = map[string]string{"muted_until": now.Add(-time.Hour).Format(time.RFC3339Nano)}
 	ended := stalledReview()
 	ended.host.Book = src.Book{Unit: ended.pr.Ref.Unit(), Turns: []src.Turn{{Seq: 1, ID: "t1", Role: "pr.address", State: "done", StartedAt: now.Add(-time.Hour)}}}
-	for name, s := range map[string]pull{"lapsed mute": lapsed, "ended turn": ended} {
+	for name, s := range map[string]pull{"ended turn": ended} {
 		if _, ok := s.propose(); !ok {
 			t.Errorf("%s: no nudge", name)
 		}
@@ -304,12 +299,15 @@ func TestNudgeSituationCarriesNoCIText(t *testing.T) {
 	}
 }
 
-// fakeReader serves the host's books and overrides of a unit.
+// fakeReader serves the host's books, overrides and tasks of a unit.
 type fakeReader struct {
 	books     []src.Book
 	overrides map[string]map[string]string
+	tasks     []src.Task
 	asked     []string
 }
+
+func (f *fakeReader) Tasks(context.Context, []sdk.Unit) ([]src.Task, error) { return f.tasks, nil }
 
 func (f *fakeReader) Books(context.Context, []sdk.Unit) ([]src.Book, error) { return f.books, nil }
 
@@ -323,15 +321,18 @@ func TestProposalsReadTheHostOfTheStalledPullRequestsOnly(t *testing.T) {
 	fresh.pr.ReviewRequests = []string{reviewer}
 	fresh.events = []pr.Event{ev(4, pr.KindReviewRequest, viewer, now.Add(-time.Hour), reviewer)}
 	held := stalledReview()
-	rd := &fakeReader{overrides: map[string]map[string]string{held.pr.Ref.String(): {"hold": "true"}}}
-	ds, err := nudge.Proposals(context.Background(), []row.Row{stalledChanges().row(), held.row(), fresh.row()}, rd, profileTexts(), nil, now)
+	asleep := stalledReview()
+	asleep.pr.Ref = ref(3)
+	rd := &fakeReader{overrides: map[string]map[string]string{held.pr.Ref.String(): {"hold": "true"}},
+		tasks: []src.Task{{ID: "t-01", State: "scheduled", Category: "deferred", Units: []sdk.Unit{ref(3).Unit()}}}}
+	ds, err := nudge.Proposals(context.Background(), []row.Row{stalledChanges().row(), held.row(), asleep.row(), fresh.row()}, rd, profileTexts(), nil, now)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(ds) != 1 || ds[0].Unit != ref(1).Unit() {
 		t.Fatalf("proposals %+v", ds)
 	}
-	if !slices.Equal(rd.asked, []string{ref(1).String(), ref(2).String()}) {
+	if !slices.Equal(rd.asked, []string{ref(1).String(), ref(2).String(), ref(3).String()}) {
 		t.Fatalf("read the round state of %v", rd.asked)
 	}
 }

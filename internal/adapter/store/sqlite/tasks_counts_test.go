@@ -12,6 +12,7 @@ import (
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/wake"
 )
 
 type outboxSource struct{ drafts []task.Task }
@@ -47,7 +48,7 @@ func randomTasks(r *rand.Rand, n int) []task.Task {
 			Title: fmt.Sprint(i), Origin: task.OriginUser, Created: at, Updated: at}
 		e.Become(e.State, taskstest.BundledStates)
 		if e.State == "scheduled" && r.IntN(2) == 0 {
-			e.Snooze = task.Snooze{OnActivity: true}
+			e.Asleep = true
 		}
 		e.SetProp(task.PropArea, task.Value{Text: countAreas[r.IntN(len(countAreas))]}, task.WriterPerson, at)
 		if r.IntN(4) == 0 {
@@ -89,6 +90,13 @@ func TestCountersEqualTheirLists(t *testing.T) {
 			defer db.Close()
 			store := db.Tasks()
 			applyTasks(t, store, tasks...)
+			for _, e := range tasks {
+				if e.Asleep {
+					if err := db.Wakes().Put(ctx, wake.Wake{Task: e.ID, On: []string{wake.OnActivity}}); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
 			svc := coretasks.New(coretasks.Deps{Store: store, Clock: fixedNow{taskAt}, States: taskstest.BundledStates})
 			svc.RegisterView(task.ViewOutbox, "draft:", outboxSource{drafts: drafts})
 			for _, area := range countAreas {

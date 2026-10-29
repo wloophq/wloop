@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
-
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/adapter/store/storetest"
@@ -19,7 +17,6 @@ import (
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
@@ -59,7 +56,7 @@ func TestGetPathWritesNothing(t *testing.T) {
 	s, f := newLiveServer(t)
 	ctx := context.Background()
 	ref := f.Open[0]
-	if err := inventorytest.Of(f.Inventory).SetOverride(ctx, dinv.Override{PR: ref, MuteUntilStateChange: true, MutedKind: "gone", MutedWaitingOn: "nobody"}); err != nil {
+	if err := muteBy(f.Inventory, ref, time.Time{}); err != nil {
 		t.Fatal(err)
 	}
 	fill := strings.NewReplacer("{provider}", string(unit.GitHub), "{key}", url.PathEscape(ref.String()), "{seq}", "1")
@@ -83,8 +80,8 @@ func TestGetPathWritesNothing(t *testing.T) {
 	if routes < 15 {
 		t.Fatalf("only %d GET routes ran", routes)
 	}
-	if o, _ := f.Inventory.Override(ctx, ref); !o.MuteUntilStateChange {
-		t.Fatalf("a GET cleared the lapsed mute: %+v", o)
+	if ws, _ := f.DB.Wakes().UnitWakes(ctx, []unit.Unit{ref.Unit()}); ws[ref.Unit()].When == "" {
+		t.Fatalf("a GET cleared the mute: %+v", ws)
 	}
 }
 
@@ -95,12 +92,12 @@ func TestNoMuteNoWork(t *testing.T) {
 		t.Fatal(err)
 	}
 	for range 2 {
-		if err := s.expireMutes(context.Background()); err != nil {
+		if err := s.keepCurrent(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}
 	ctx, sc := metertest.Start(t, context.Background())
-	if err := s.expireMutes(ctx); err != nil {
+	if err := s.keepCurrent(ctx); err != nil {
 		t.Fatal(err)
 	}
 	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 0, {Res: meter.Tx}: 0})
@@ -140,7 +137,7 @@ func TestChangedSituationsOneTx(t *testing.T) {
 	before := map[string]int{}
 	for _, ref := range refs {
 		before[ref.String()] = len(situationsOf(t, s, ref))
-		if err := inventorytest.Of(f.Inventory).SetOverride(ctx, dinv.Override{PR: ref, MutedUntil: f.Now.Add(time.Hour)}); err != nil {
+		if err := muteBy(f.Inventory, ref, f.Now.Add(time.Hour)); err != nil {
 			t.Fatal(err)
 		}
 	}

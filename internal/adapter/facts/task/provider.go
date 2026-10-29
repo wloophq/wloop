@@ -22,6 +22,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
@@ -84,6 +85,13 @@ type Deps struct {
 	Me func() task.Me
 	// OwedBy is who owes a task's next step over its other facts, as the profile says; nil: nobody.
 	OwedBy func(ctx context.Context, f workflow.Facts) (string, error)
+	// Wakes are the tasks' wakes, for task.wake_until and task.wake_when; nil: none has one.
+	Wakes Wakes
+}
+
+// Wakes reads a task's wake; false when it has none.
+type Wakes interface {
+	Of(ctx context.Context, id task.ID) (wake.Wake, bool, error)
 }
 
 // Provider is the task subject's facts provider. It names the task's own
@@ -179,6 +187,15 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 	return p.facts(ctx, u, false)
 }
 
+// TaskFacts are the facts of task e, as Facts reads them of its unit.
+func (p *Provider) TaskFacts(ctx context.Context, e task.Task) (workflow.Facts, error) {
+	f, err := p.base(ctx, e)
+	if err != nil {
+		return nil, err
+	}
+	return p.owed(ctx, e, f)
+}
+
 // EventFacts are the facts of a task an event names, also once done or
 // dismissed.
 func (p *Provider) EventFacts(ctx context.Context, u unit.Unit) (workflow.Facts, error) {
@@ -214,7 +231,6 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 	f := workflow.Facts{
 		"task.id":                  string(e.ID),
 		"task.state":               string(e.State),
-		"task.muted":               e.Snooze.Mute,
 		"task.unit":                "",
 		"task.unit_provider":       "",
 		"task.units":               []string{},
@@ -248,6 +264,15 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 	}
 	if p.d.Props != nil {
 		maps.Copy(f, p.d.Props(e))
+	}
+	if p.d.Wakes != nil {
+		w, ok, err := p.d.Wakes.Of(ctx, e.ID)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			f["task.wake_until"], f["task.wake_when"] = w.Until, w.When
+		}
 	}
 	var err error
 	if p.d.Turns != nil {

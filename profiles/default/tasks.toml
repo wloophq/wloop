@@ -171,6 +171,13 @@ from    = ["inbox", "next", "waiting", "scheduled", "someday"]
 to      = "scheduled"
 by      = { person = "true", workflow = "true" }
 
+[verbs.wake]
+handler = "wake"
+label   = "Wake"
+summary = "Bring it back from its snooze, where it was before."
+from    = ["scheduled", "someday"]
+by      = { person = "true", workflow = "true" }
+
 [verbs.someday]
 label   = "Someday"
 summary = "Move it to Someday: not now, kept for a later look."

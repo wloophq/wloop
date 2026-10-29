@@ -16,7 +16,6 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/turns"
-	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -38,7 +37,9 @@ type Deriver struct {
 	Now     time.Time
 	Stalled config.Stalled
 	Pending map[unit.Unit]round.Pending
-	Turns   map[github.Ref]TurnFact
+	// Mutes are the user's mutes of pull requests, their tasks' wakes.
+	Mutes map[unit.Unit]overlay.Mute
+	Turns map[github.Ref]TurnFact
 	// What the actions read besides the row.
 	Loaded          *intentload.Loaded
 	Specs           []api.ActionSpec // nil: catalog.Specs(Loaded)
@@ -125,13 +126,6 @@ func Waiting(facts map[github.Ref]TurnFact, agents []turns.AgentObservation, age
 	}
 }
 
-// MuteLapsed tells whether o's "mute until state change" lapsed: the pull
-// request is open and its situation, kind, is no longer the muted one. The
-// row then shows no mute, and the read model's keeper clears the stored one.
-func MuteLapsed(pr dinv.PR, o dinv.Override, kind situation.Kind) bool {
-	return o.MuteUntilStateChange && kind != situation.KindMuted && pr.State == dgh.StateOpen
-}
-
 // Row derives the row of a pull request the plugin reported.
 func (d Deriver) Row(rep Report, evs []dinv.Event, o dinv.Override) api.Row {
 	return d.Seal(d.Parts(rep, evs, o))
@@ -147,10 +141,8 @@ func (d Deriver) Parts(rep Report, evs []dinv.Event, o dinv.Override) (api.Row, 
 	if hasTurn {
 		turn = &f
 	}
-	res, unmuted := SituationOf(rep, turn, o, evs, d.Now)
-	if MuteLapsed(pr, o, situation.Kind(res.Kind)) {
-		o.MuteUntilStateChange, o.MutedKind, o.MutedWaitingOn = false, "", ""
-	}
+	m := d.Mutes[pr.Ref.Unit()]
+	res, unmuted := SituationOf(rep, turn, m, evs, d.Now)
 	o.Adopted = o.Adopted || rep.Payload.Override.Adopted
 	o.Tracked = o.Tracked || rep.Payload.Override.Tracked
 	r := api.Row{
@@ -174,15 +166,15 @@ func (d Deriver) Parts(rep Report, evs []dinv.Event, o dinv.Override) (api.Row, 
 	if res.Kind == overlay.KindMuted {
 		p.UnmutedKind, p.UnmutedWaitingOn, p.UnmutedReason = unmuted.Kind, unmuted.WaitingOn, unmuted.Reason
 	}
-	if o.MuteUntilStateChange || o.MutedUntil.After(d.Now) {
-		p.Mute = &Mute{Until: o.MutedUntil, UntilStateChange: o.MuteUntilStateChange}
+	if m.UntilStateChange || m.Until.After(d.Now) {
+		p.Mute = &Mute{Until: m.Until, UntilStateChange: m.UntilStateChange}
 	}
 	p.Facts = d.facts(rep.Payload.Facts, r, p)
 	overlaid := string(r.Kind) != rep.Situation.Kind
 	p.Approved = rep.Payload.Approved && !overlaid
 	r.Views = d.views(rep.Views, overlaid, r, p)
 	unmutedRow := api.Row{Kind: api.Kind(unmuted.Kind), Summary: api.Summary{WaitsOn: unmuted.WaitingOn, Reason: unmuted.Reason, Since: unmuted.Since}}
-	r.Actions = catalog.States(d.FactsOf(pr, evs, o, r, p, unmutedRow))
+	r.Actions = catalog.States(d.FactsOf(pr, evs, m, r, p, unmutedRow))
 	r.SpecsVersion = d.SpecsVersion
 	r.Facets = rep.Facets
 	return r, p
@@ -226,7 +218,9 @@ func (d Deriver) facts(reported *api.RowFacts, r api.Row, p Payload) *api.RowFac
 	if r.Pending != nil {
 		f.Next = d.upcoming(f.Next, r.Pending.Deadline, api.UpcomingGate)
 	}
-	f.Next = d.upcoming(f.Next, p.Override.MutedUntil, api.UpcomingUnmute)
+	if p.Mute != nil {
+		f.Next = d.upcoming(f.Next, p.Mute.Until, api.UpcomingUnmute)
+	}
 	return f
 }
 

@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+	"github.com/wloophq/wloop/internal/catalog"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/source/github/present"
@@ -36,10 +37,15 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
@@ -124,10 +130,12 @@ func withStore(d Deps, st *inventory.Store) Deps {
 	d.Events, d.Overrides, d.Meta, d.Records = inventory.ByUnit{Store: st}, st.DB(), st, present.Records{Store: st}
 	d.RowProviders = prRows(st, nil)
 	d.Repo = present.Repo
-	g := &githubTest{deps: present.Deps{Store: st, Reports: ghreporttest.Inventory{Store: st, Now: st.Now}}}
+	g := &githubTest{deps: present.Deps{Store: st, Reports: ghreporttest.Inventory{Store: st, Now: st.Now},
+		Mutes: readmodel.WakeMutes(st.DB().Wakes().UnitWakes)}}
+	wakes := prWakes(st, d.Now)
 	d.Presenters = map[unit.ProviderID]func(PresenterHost) Presenter{unit.GitHub: func(h PresenterHost) Presenter {
 		g.deps.Host = (&psource.Broker{ID: string(unit.GitHub), Units: psource.Units{Codecs: h.Units}, Events: sqlite.New(st.DB()), Marks: st.DB(),
-			Drafts: st.DB(), Overrides: st.DB(), Books: h.Books}).Host()
+			Drafts: st.DB(), Overrides: st.DB(), Wakes: wakes, Books: h.Books}).Host()
 		g.deps.Plugin = pluginPrepare(func() src.Host { return g.deps.Host }, h)
 		return present.New(g.deps, present.Host(h))
 	}}
@@ -148,6 +156,76 @@ func withStore(d Deps, st *inventory.Store) Deps {
 	return d
 }
 
+// prWakes are the tasks of st as a plugin's wakes move them. A pull
+// request no open task holds gets one, in next, as each followed pull
+// request has its task.
+func prWakes(st *inventory.Store, now func() time.Time) psource.TaskWakes {
+	if now == nil {
+		now = time.Now
+	}
+	svc := coretasks.New(coretasks.Deps{Store: st.DB().Tasks(), Clock: clockOf(now), States: taskstest.BundledStates,
+		Authority: taskstest.BundledStates.Authority, Wakes: st.DB().Wakes(), Baseline: catalog.Baseline(bundledActions, ownFacts)})
+	return testWakes{svc: svc, db: st.DB(), now: now}
+}
+
+// ownFacts are the facts a task's own fields hold.
+func ownFacts(_ context.Context, t task.Task) (workflow.Facts, error) {
+	return catalog.TaskFacts(t, bundledActions().Tasks), nil
+}
+
+type clockOf func() time.Time
+
+func (c clockOf) Now() time.Time { return c() }
+
+type testWakes struct {
+	svc *coretasks.Service
+	db  *sqlite.DB
+	now func() time.Time
+}
+
+func (w testWakes) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
+	ts, err := w.db.Tasks().TasksOf(ctx, u)
+	if err != nil || slices.ContainsFunc(ts, task.Task.Open) {
+		return ts, err
+	}
+	e := task.Task{ID: task.DerivedID(u, "pr"), State: "next", Category: task.CategoryReady, Units: []unit.Unit{u}, Origin: task.OriginUser,
+		Created: w.now(), Updated: w.now()}
+	if err := w.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
+		return nil, err
+	}
+	return append(ts, e), nil
+}
+
+func (w testWakes) Sleep(ctx context.Context, id task.ID, k wake.Wake) error {
+	return w.svc.Sleep(ctx, id, k)
+}
+
+func (w testWakes) Rouse(ctx context.Context, id task.ID) error { return w.svc.Rouse(ctx, id) }
+
+// muteBy mutes ref as the mute action does: a wake on every open task that
+// holds it, until a time, or until its state changes when until is zero.
+func muteBy(st *inventory.Store, ref github.Ref, until time.Time) error {
+	ctx := context.Background()
+	w := prWakes(st, st.Now)
+	ts, err := w.TasksOf(ctx, ref.Unit())
+	if err != nil {
+		return err
+	}
+	k := wake.Wake{Until: until}
+	if until.IsZero() {
+		k.When = `size(task.link_owes) != 1 || !("me" in task.link_owes)`
+	}
+	for _, e := range ts {
+		if !e.Open() {
+			continue
+		}
+		if err := w.Sleep(ctx, e.ID, k); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // prRows are the pull request rows over st with the brief queue b, as the
 // github source builds them.
 func prRows(st *inventory.Store, b prrow.Briefs) []func(readmodel.RowDeps) readmodel.Provider {
@@ -156,7 +234,8 @@ func prRows(st *inventory.Store, b prrow.Briefs) []func(readmodel.RowDeps) readm
 		if kept, ok := keptReports.Load(st); ok {
 			reports = kept.(readmodel.Reports)
 		}
-		return prrow.New(prrow.Source{RowDeps: rd, Reports: reports, Store: st, Briefs: b, Catalog: psource.BundledCatalog(string(unit.GitHub))})
+		return prrow.New(prrow.Source{RowDeps: rd, Reports: reports, Store: st, Briefs: b, Catalog: psource.BundledCatalog(string(unit.GitHub)),
+			Mutes: readmodel.WakeMutes(st.DB().Wakes().UnitWakes)})
 	}}
 }
 

@@ -255,7 +255,7 @@ function taskItem(e, open) {
       ...(props.contexts || []).map((c) => h("span", { class: "pill" }, c)),
       props.area ? h("span", { class: "pill area" }, props.area) : null,
       props.due ? h("span", { class: "due" }, "due " + shortDate(props.due)) : null,
-      e.snooze_until ? h("span", { class: "due" }, "until " + shortDate(e.snooze_until)) : null,
+      e.wake && e.wake.until ? h("span", { class: "due" }, "until " + shortDate(e.wake.until)) : null,
       owed ? h("span", { class: "who" }, "on " + owed) : null,
       ...(e.units || []).map((u, i) => h("span", { class: "ref" }, (e.unit_labels || [])[i] || unitLabel(u)))),
     projectFacts(e));

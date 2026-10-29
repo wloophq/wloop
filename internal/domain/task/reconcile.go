@@ -22,15 +22,11 @@ const itemOpen items.State = "open"
 // was clarified never returns to the inbox: an item that opens again on a done task moves it back into the
 // ready category with Changed set, and an open task keeps its state. A task the user dropped stays dropped.
 //
-// Never changes the state, the parent or a property the user set, except to resolve and to reopen as said,
-// and to defer under a mute: with f.Mute set, every open task of the unit is deferred with
-// Snooze{Until: Mute.Until, OnActivity: Mute.UntilStateChange, Return: its state, Mute: true}; when the mute
-// ends (f.Mute nil) a task with Snooze.Mute returns to Snooze.Return.
+// Never changes the state, the parent or a property the user set, except to resolve and to reopen as said.
 //
 // Due: items.Item.Deadline in RFC 3339 is taken as is; "YYYY-MM-DD" is 18:00 in now's location that day;
 // anything else is none.
 func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st States, now time.Time) ([]Change, error) {
-	mute := activeMute(f, now)
 	byID := map[ID]Task{}
 	holder := map[ItemRef]ID{}
 	var order []ID
@@ -58,9 +54,6 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st States, now
 		}
 		if _, known := byID[id]; !known && len(wanted[id]) == 0 {
 			e, err := newTask(id, f, it, initial, st, now)
-			if err == nil {
-				e, err = applyMute(e, mute, st)
-			}
 			if err != nil {
 				return nil, err
 			}
@@ -80,11 +73,7 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st States, now
 			if old.Open() {
 				op, why = OpResolve, "its items resolved"
 				err = e.MoveTo(CategoryDone, st)
-				e.Snooze = Snooze{}
 			}
-		}
-		if err == nil {
-			e, err = applyMute(e, mute, st)
 		}
 		if err != nil {
 			return nil, err
@@ -159,7 +148,6 @@ func update(old Task, f UnitFacts, ws []items.Item, st States, now time.Time) (T
 		if err := e.MoveTo(CategoryReady, st); err != nil {
 			return e, "", err
 		}
-		e.Snooze = Snooze{}
 	}
 	e.Changed = true
 	return e, "an item reopened", nil

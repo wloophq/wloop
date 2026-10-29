@@ -1,0 +1,12 @@
+summary = "Bring a snoozed task back where its wake returns it once the wake matches: its date passed, activity on its units, or its condition holds"
+provider = "task"
+when = 'task.category == "deferred"'
+key = ["task.fingerprint", "trigger.event.id"]
+order = 50
+
+[trigger]
+on = ["task.woke"]
+
+[[step]]
+use = "task.verb"
+verb = "wake"

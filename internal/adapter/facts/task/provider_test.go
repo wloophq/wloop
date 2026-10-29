@@ -26,6 +26,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
@@ -81,6 +82,7 @@ func newEnv(t *testing.T) *env {
 		Props:    func(t task.Task) workflow.Facts { return catalog.PropFacts(t, bundledTasks) },
 		Me:       func() task.Me { return task.Me{Keys: []string{"chat:ME"}} },
 		OwedBy:   catalog.OwedByOf(func() *intentload.Loaded { return &intentload.Loaded{Tasks: bundledTasks} }),
+		Wakes:    db.Wakes(),
 	})
 	return e
 }
@@ -236,7 +238,7 @@ func TestTaskFactsReadTheTaskItsItemsAndItsUnitsCard(t *testing.T) {
 		"task.id": "e-01", "task.state": "waiting",
 		"task.unit": "chat:T1/C1/100.1", "task.unit_provider": "chat",
 		"task.link_started_by_me": true, "task.link_closure_posted": true,
-		"task.items_open": 2, "task.items_resolved": 1, "task.muted": false,
+		"task.items_open": 2, "task.items_resolved": 1,
 		"task.prop.last_nudge": monday.Add(-80 * time.Hour), "task.owed_by": "me",
 		"task.owed_since": time.Date(2026, 2, 25, 9, 0, 0, 0, brt), "task.check_on": time.Time{},
 	}
@@ -247,6 +249,22 @@ func TestTaskFactsReadTheTaskItsItemsAndItsUnitsCard(t *testing.T) {
 	}
 	if got := f["task.link_owes"].([]string); !slices.Equal(got, []string{"chat:U1", "me"}) {
 		t.Errorf("link_owes %v", got)
+	}
+}
+
+func TestTheWakeFactsAreTheTasksWake(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	e.task(waiting("e-01", chatA, monday))
+	if f := e.facts("e-01"); !equal(f["task.wake_until"], time.Time{}) || f["task.wake_when"] != "" {
+		t.Fatalf("no wake: until %v, when %q", f["task.wake_until"], f["task.wake_when"])
+	}
+	until := monday.Add(48 * time.Hour)
+	if err := e.db.Wakes().Put(context.Background(), wake.Wake{Task: "e-01", Until: until, When: `size(task.link_owes) != 0`}); err != nil {
+		t.Fatal(err)
+	}
+	if f := e.facts("e-01"); !equal(f["task.wake_until"], until) || f["task.wake_when"] != `size(task.link_owes) != 0` {
+		t.Fatalf("the wake: until %v, when %q", f["task.wake_until"], f["task.wake_when"])
 	}
 }
 

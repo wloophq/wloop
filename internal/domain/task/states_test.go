@@ -54,8 +54,6 @@ func reconciled(t *testing.T, f task.UnitFacts, its []items.Item, me task.Me, ha
 	return must(t, cs, err)
 }
 
-func activity(t *testing.T, f task.UnitFacts, have []task.Task, st task.States, now time.Time) []task.Change {
-	t.Helper()
-	cs, err := task.Activity(f, have, st, now)
-	return must(t, cs, err)
+func activity(f task.UnitFacts, have []task.Task, now time.Time) []task.Change {
+	return task.Activity(f, have, now)
 }

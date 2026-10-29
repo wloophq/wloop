@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"slices"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
@@ -10,7 +9,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel"
-	rowoverlay "github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 )
 
@@ -42,10 +40,10 @@ func (e *Env) reportedPlugins(cfg config.Config, mods []pluginModule) []reported
 }
 
 // reportedSource is what plugin p's rows and cards read: its reports in
-// the store, under the mutes the overrides hold.
+// the store, under the mutes its tasks' wakes hold.
 func (e *Env) reportedSource(p reportedPlugin, store *inventory.Store, rd readmodel.RowDeps) readmodel.ReportedSource {
 	snaps := e.pluginKind.Snapshots
-	return readmodel.ReportedSource{RowDeps: rd, ID: p.id, Reports: snaps, Mutes: storeMutes{store}, Stale: snaps.Stale,
+	return readmodel.ReportedSource{RowDeps: rd, ID: p.id, Reports: snaps, Mutes: readmodel.WakeMutes(store.DB().Wakes().UnitWakes), Stale: snaps.Stale,
 		Catalog: e.pluginCatalog(p.id)}
 }
 
@@ -67,19 +65,4 @@ func (e *Env) wireReported(w *serveWiring) {
 		w.Engine.Subjects[p.id] = psource.UnitFacts{Snapshots: e.pluginKind.Snapshots}
 	}
 	w.Deps.Units = e.unitCodecs()
-}
-
-// storeMutes are the mutes the overrides hold, as the rows overlay them.
-type storeMutes struct{ store *inventory.Store }
-
-func (m storeMutes) Mutes(ctx context.Context, units []unit.Unit) (map[unit.Unit]rowoverlay.Mute, error) {
-	got, err := m.store.UnitMutes(ctx, units)
-	if err != nil {
-		return nil, err
-	}
-	out := make(map[unit.Unit]rowoverlay.Mute, len(got))
-	for u, x := range got {
-		out[u] = rowoverlay.Mute{Until: x.Until, UntilStateChange: x.UntilStateChange, Kind: x.Kind, WaitingOn: x.WaitingOn}
-	}
-	return out, nil
 }

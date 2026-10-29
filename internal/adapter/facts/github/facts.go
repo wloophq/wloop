@@ -38,10 +38,8 @@ func (v *view) facts(ref pr.Ref, now time.Time) workflow.Facts {
 		o := v.overrides[ref]
 		f["pr.finished_for"] = finishedFor(row, now)
 		f["pr.held"], f["pr.adopted"] = o.Hold, o.Adopted
-		f["pr.muted"] = o.MuteUntilStateChange || o.MutedUntil.After(now)
-		f["pr.mute.refusal"] = o.MuteRefusal(now)
 		if rep != nil {
-			sit, nudge := v.situation(*rep, row, v.eventsOf(ref), o, now)
+			sit, nudge := v.situation(*rep, row, v.eventsOf(ref), v.mutes[ref.Unit()], now)
 			f["pr.nudge.who"], f["pr.nudge.why"] = nonNil(nudge.who), nudge.why
 			f["pr.stalled"] = sit.Stalled
 			f["pr.waits_on_user"] = sit.WaitingOn == "me" || (sit.WaitingOn == "author" && strings.EqualFold(row.Author, v.viewer) && v.viewer != "")
@@ -88,7 +86,8 @@ type nudgeOf struct {
 	why, refusal string
 }
 
-func (v *view) situation(rep prrow.Report, row dinv.PR, evs []dinv.Event, o dinv.Override, now time.Time) (overlay.Situation, nudgeOf) {
+// The nudge is refused while m holds, before what the nudge itself would refuse.
+func (v *view) situation(rep prrow.Report, row dinv.PR, evs []dinv.Event, m overlay.Mute, now time.Time) (overlay.Situation, nudgeOf) {
 	var tf *prrow.TurnFact
 	var unstarted map[string]bool
 	if b, ok := v.books[row.Ref.Unit()]; ok {
@@ -97,9 +96,13 @@ func (v *view) situation(rep prrow.Report, row dinv.PR, evs []dinv.Event, o dinv
 		}
 		unstarted = prrow.Unstarted(b)
 	}
-	res, unmuted := prrow.SituationOf(rep, tf, o, evs, now)
+	res, unmuted := prrow.SituationOf(rep, tf, m, evs, now)
 	who, why := prrow.NudgeTargets(apiRow(unmuted), row.Author, v.viewer, prrow.IgnoreOf(v.cfg))
-	return res, nudgeOf{who: who, why: why, refusal: prrow.NudgeRefusal(row.Ref, who, why, unmuted.Since, evs, unstarted, now)}
+	refusal := m.Refusal(now)
+	if refusal == "" || res.Kind == overlay.KindDone {
+		refusal = prrow.NudgeRefusal(row.Ref, who, why, unmuted.Since, evs, unstarted, now)
+	}
+	return res, nudgeOf{who: who, why: why, refusal: refusal}
 }
 
 // apiRow is the row of situation s, as nudge.targets reads it.

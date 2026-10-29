@@ -160,7 +160,10 @@ func dueTimes(r api.Row, p Payload) []string {
 	if r.Pending != nil {
 		at = append(at, r.Pending.Deadline)
 	}
-	at = append(at, p.Override.MutedUntil, p.briefRetryAt)
+	if p.Mute != nil {
+		at = append(at, p.Mute.Until)
+	}
+	at = append(at, p.briefRetryAt)
 	if p.Facts != nil {
 		for _, n := range p.Facts.Next {
 			at = append(at, n.At)

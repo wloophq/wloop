@@ -11,7 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-func TestTwoConcurrentMutesWriteOnce(t *testing.T) {
+func TestTwoConcurrentGuidancesWriteOnce(t *testing.T) {
 	t.Parallel()
 	db, err := Open(filepath.Join(t.TempDir(), "overrides.db"), nil)
 	if err != nil {
@@ -19,15 +19,14 @@ func TestTwoConcurrentMutesWriteOnce(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	ctx := context.Background()
-	unmuted := map[string]string{port.OverrideMuteUntilStateChange: "", port.OverrideMutedKind: "", port.OverrideMutedWaitingOn: ""}
+	unset := map[string]string{port.OverrideNextGuidance: ""}
 	for n := range 50 {
 		u := unit.Unit{Provider: "acme", Key: fmt.Sprint("t", n)}
 		var wg sync.WaitGroup
 		written := make([]bool, 2)
 		for i, who := range []string{"ana", "bruno"} {
 			wg.Go(func() {
-				mute := map[string]string{port.OverrideMuteUntilStateChange: port.OverrideTrue, port.OverrideMutedKind: "waiting", port.OverrideMutedWaitingOn: who}
-				ok, err := db.SetOverride(ctx, u, mute, unmuted)
+				ok, err := db.SetOverride(ctx, u, map[string]string{port.OverrideNextGuidance: "ask " + who}, unset)
 				if err != nil {
 					t.Error(err)
 				}
@@ -36,10 +35,10 @@ func TestTwoConcurrentMutesWriteOnce(t *testing.T) {
 		}
 		wg.Wait()
 		if written[0] == written[1] {
-			t.Fatalf("%s: written %v, want exactly one mute to win", u.Key, written)
+			t.Fatalf("%s: written %v, want exactly one guidance to win", u.Key, written)
 		}
 		winner := map[bool]string{true: "ana", false: "bruno"}[written[0]]
-		if o, err := db.Override(ctx, u); err != nil || o[port.OverrideMutedWaitingOn] != winner {
+		if o, err := db.Override(ctx, u); err != nil || o[port.OverrideNextGuidance] != "ask "+winner {
 			t.Fatalf("%s: override %v %v, want the winner %s", u.Key, o, err, winner)
 		}
 	}

@@ -39,20 +39,13 @@ func cardFacts(cs cardMap, off ...unit.ProviderID) coretasks.CardFacts {
 }
 
 func TestFactsFromCard(t *testing.T) {
-	until := t0.Add(48 * time.Hour)
 	f := cardFacts(cardMap{unitU: {Unit: unitU, StartedByMe: true, ClosurePosted: true, Cares: true,
-		Mute:      &card.Mute{Until: until, UntilStateChange: true},
 		LastHuman: &card.Human{Who: ana, What: "commented", At: t0.Add(-time.Hour)}}})
 	got, ok, err := f.UnitFacts(context.Background(), unitU)
 	if err != nil || !ok {
 		t.Fatalf("%v %v", ok, err)
 	}
-	want := task.UnitFacts{Unit: unitU, StartedByMe: true, ClosurePosted: true, Cares: true, LastHuman: t0.Add(-time.Hour),
-		Mute: &task.Mute{Until: until, UntilStateChange: true}}
-	if got.Mute == nil || *got.Mute != *want.Mute {
-		t.Fatalf("mute %+v", got.Mute)
-	}
-	got.Mute, want.Mute = nil, nil
+	want := task.UnitFacts{Unit: unitU, StartedByMe: true, ClosurePosted: true, Cares: true, LastHuman: t0.Add(-time.Hour)}
 	if got != want {
 		t.Fatalf("got %+v, want %+v", got, want)
 	}

@@ -161,10 +161,6 @@
       "override": {
         "adopted": false,
         "hold": true,
-        "mute_until_state_change": false,
-        "muted_kind": "",
-        "muted_until": "2026-10-09T00:00:00Z",
-        "muted_waiting_on": "",
         "next_guidance": "",
         "tracked": true
       },
@@ -189,7 +185,7 @@
         "status": "reviewing"
       }
     },
-    "specs_version": "227a48f3fadc",
+    "specs_version": "d989fdf6b655",
     "summary": {
       "closed": false,
       "line": "muted",
@@ -293,7 +289,7 @@
         "status": ""
       }
     },
-    "specs_version": "227a48f3fadc",
+    "specs_version": "d989fdf6b655",
     "summary": {
       "closed": true,
       "line": "merged",

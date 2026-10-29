@@ -86,6 +86,11 @@ func (p *Presenter) storedRead(ctx context.Context, u unit.Unit, asked catalog.A
 		base.Pending = nil
 	}
 	d := p.deriverAt(base, at)
+	if !unmuted && p.d.Mutes != nil {
+		if d.Mutes, err = p.d.Mutes.Mutes(ctx, []unit.Unit{ref.Unit()}); err != nil {
+			return stored{}, false, err
+		}
+	}
 	if p.h.Books != nil {
 		books, err := p.h.Books(ctx, ref.Unit())
 		if err != nil {

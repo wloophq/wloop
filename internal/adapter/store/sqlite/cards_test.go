@@ -46,7 +46,7 @@ func sampleCard(u unit.Unit, title string) card.Card {
 	return card.Card{Unit: u, Title: title, State: "open", Signals: []card.Signal{{Key: "checks", Value: "green", Tone: "good"}},
 		LastHuman: &card.Human{Who: items.Person{Key: "slack:U000BBB", Name: "b"}, What: "replied", At: at, Link: "https://example.test/1"},
 		Why:       "asked", WaitsOn: []items.Person{{Key: "slack:U000AAA"}}, Since: at, Link: "https://example.test",
-		StartedByMe: true, Cares: true, Mute: &card.Mute{Until: at.Add(time.Hour)}}
+		StartedByMe: true, Cares: true}
 }
 
 func TestCardsStoreRoundTrips(t *testing.T) {

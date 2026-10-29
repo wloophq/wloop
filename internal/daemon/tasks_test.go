@@ -17,6 +17,7 @@ import (
 	"time"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/wake"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
@@ -27,6 +28,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
+	"github.com/wloophq/wloop/internal/core/wakes"
 	"github.com/wloophq/wloop/internal/domain/card"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -51,6 +53,7 @@ type tasksRig struct {
 	log    *change.Log
 	g      *coretasks.Service
 	ledger *coreitems.Ledger
+	wakes  *wakes.Service
 }
 
 func newTasksRig(t *testing.T, edit func(*Deps)) *tasksRig {
@@ -70,10 +73,12 @@ func newTasksRig(t *testing.T, edit func(*Deps)) *tasksRig {
 		}
 		enabled := d.PluginEnabled
 		r.ledger.Enabled = enabled
+		r.wakes = wakes.New(wakes.Deps{Store: db.Wakes(), Tasks: db.Tasks(), Clock: fixedClock(tasksNow)})
 		r.g = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority, Store: db.Tasks(), Items: r.ledger,
 			Facts: coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: func() task.Me { return meID }},
-			Me:    meID, Clock: fixedClock(tasksNow), Disabled: disabledOf(enabled)})
-		d.Tasks = r.g
+			Me:    meID, Clock: fixedClock(tasksNow), Disabled: disabledOf(enabled), Wakes: db.Wakes(),
+			Activity: func(ctx context.Context, id task.ID) error { return r.wakes.Event(ctx, id, wake.OnActivity, "") }})
+		d.Tasks, d.Wakes = r.g, r.wakes
 	})
 	stopOnCleanup(t, r.s)
 	return r
@@ -104,6 +109,14 @@ func (r *tasksRig) put(t *testing.T, es ...task.Task) {
 		cs = append(cs, task.Change{Op: task.OpCreate, Task: e})
 	}
 	if err := r.db.Tasks().Apply(context.Background(), cs); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// sleep puts wake w on its task.
+func (r *tasksRig) sleep(t *testing.T, w wake.Wake) {
+	t.Helper()
+	if err := r.db.Wakes().Put(context.Background(), w); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -474,8 +487,9 @@ func TestSourceActivityReturnsASnoozedTaskWhereItWasNotToTheInbox(t *testing.T) 
 	synctest.Test(t, func(t *testing.T) {
 		r := newTasksRig(t, nil)
 		ctx := context.Background()
-		r.put(t, task.Task{ID: "e-s", State: "scheduled", Category: task.CategoryDeferred, Units: []unit.Unit{r7u}, Snooze: task.Snooze{OnActivity: true, Return: task.State("next")},
+		r.put(t, task.Task{ID: "e-s", State: "scheduled", Category: task.CategoryDeferred, Units: []unit.Unit{r7u},
 			SeenAt: tasksNow.Add(-time.Hour), Created: tasksNow.Add(-2 * time.Hour), Updated: tasksNow.Add(-2 * time.Hour)})
+		r.sleep(t, wake.Wake{Task: "e-s", On: []string{wake.OnActivity}, Return: "next"})
 		r.startSync(t)
 		r.log.Note(port.TopicSourceEvents, r7u)
 		time.Sleep(syncMaxDelay)
@@ -488,10 +502,16 @@ func TestSourceActivityReturnsASnoozedTaskWhereItWasNotToTheInbox(t *testing.T) 
 		if _, err := r.db.Cards().Save(ctx, c, tasksNow); err != nil {
 			t.Fatal(err)
 		}
-		waitUntil(t, "the task back in Next", func() bool {
-			p := r.page(t, "view=next")
-			return len(p.Tasks) == 1 && p.Tasks[0].ID == "e-s" && p.Tasks[0].Changed
+		waitUntil(t, "the task's wake matched", func() bool {
+			w, ok, err := r.db.Wakes().Of(ctx, "e-s")
+			return err == nil && ok && len(w.On) == 0 && w.Return == "next"
 		})
+		if _, err := r.g.Do(ctx, "e-s", coretasks.Request{Actor: task.ActorWorkflow, Source: "task-wake", Verb: task.VerbWake}); err != nil {
+			t.Fatal(err)
+		}
+		if p := r.page(t, "view=next"); len(p.Tasks) != 1 || p.Tasks[0].ID != "e-s" || !p.Tasks[0].Changed {
+			t.Fatalf("the woken task is not back in Next: %+v", p.Tasks)
+		}
 		if p := r.page(t, "view=inbox"); len(p.Tasks) != 0 {
 			t.Fatalf("activity brought a clarified task to the Inbox: %+v", p.Tasks)
 		}
@@ -877,4 +897,22 @@ func TestAVerbAWorkflowRunsOnAMessageRecordsItsActor(t *testing.T) {
 func messageIs(v api.TaskView, id int64) bool {
 	m, _, ok := v.MessageOf()
 	return ok && m.ID == id
+}
+
+func TestTaskViewServesTheWake(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.put(t, task.Task{ID: "e-s", State: "scheduled", Category: task.CategoryDeferred, Units: []unit.Unit{r7u}},
+		task.Task{ID: "e-n", State: "next", Category: task.CategoryReady})
+	until := tasksNow.Add(48 * time.Hour)
+	r.sleep(t, wake.Wake{Task: "e-s", Until: until, When: `size(task.link_owes) != 0`, Return: "next"})
+	var v api.TaskView
+	if code := get(t, r.s, api.TaskPath("e-s"), &v); code != 200 || v.Wake == nil || !v.Wake.Until.Equal(until) ||
+		v.Wake.When != `size(task.link_owes) != 0` || v.Wake.Return != "next" {
+		t.Fatalf("%d: wake %+v", code, v.Wake)
+	}
+	var none api.TaskView
+	if code := get(t, r.s, api.TaskPath("e-n"), &none); code != 200 || none.Wake != nil {
+		t.Fatalf("%d: a task with no wake serves %+v", code, none.Wake)
+	}
 }

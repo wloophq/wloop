@@ -149,6 +149,7 @@
             "enum": [
               "focus",
               "schedule",
+              "wake",
               "waiting",
               "approve",
               "delegate",
@@ -175,7 +176,7 @@
           },
           "offer": {
             "default": "true",
-            "description": "When a task offers the verb, over the task's own facts (task.id, task.prop.kind, task.state, task.muted, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run.",
+            "description": "When a task offers the verb, over the task's own facts (task.id, task.prop.kind, task.state, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run.",
             "type": "string"
           },
           "send": {

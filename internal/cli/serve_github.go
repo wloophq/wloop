@@ -180,6 +180,7 @@ func briefHome(cfg config.Config) func(pr.Ref) string {
 // githubPresenter are the GitHub presenter's deps over the env's client.
 func (e *Env) githubPresenter(store *inventory.Store, host src.Host, briefs *interruptFirst) present.Deps {
 	deps := present.Deps{Store: store, Reports: e.sourceReports(store), Host: host,
+		Mutes: readmodel.WakeMutes(store.DB().Wakes().UnitWakes),
 		Plugin: func(ctx context.Context, req src.ActionRequest) (json.RawMessage, error) {
 			return e.forgeCalls().Action(ctx, req)
 		},
@@ -656,7 +657,7 @@ func githubHostModule(cfg config.Config, d moduleDeps) (pluginModule, error) {
 		Codec:  pr.Codec{},
 		Ingest: githubIdleJob(cfg),
 		Rows: func(rd readmodel.RowDeps) readmodel.Provider {
-			return prrow.New(prrow.Source{RowDeps: rd, Reports: d.Reports, Store: d.Inventory, Briefs: briefs, Catalog: cat})
+			return prrow.New(prrow.Source{RowDeps: rd, Reports: d.Reports, Store: d.Inventory, Briefs: briefs, Catalog: cat, Mutes: githubMutes(d)})
 		},
 		Facts:      githubFactsOf(cfg, d),
 		Slow:       func(context.Context) (string, string, error) { return "skipped", "the GitHub plugin does not run", nil },
@@ -680,7 +681,17 @@ func githubFactsOf(cfg config.Config, d moduleDeps) automation.Units {
 	if d.Turns != nil {
 		fd.Books = d.Turns.Store
 	}
+	fd.Mutes = githubMutes(d)
 	return ghsource.FactsOf(fd)
+}
+
+// githubMutes are the mutes the wakes of the store's tasks hold; none
+// without a store.
+func githubMutes(d moduleDeps) readmodel.Mutes {
+	if d.DB == nil {
+		return nil
+	}
+	return readmodel.WakeMutes(d.DB.Wakes().UnitWakes)
 }
 
 // githubIdleJob is the ingestion job of a module whose plugin does not run: it

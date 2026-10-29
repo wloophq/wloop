@@ -27,7 +27,7 @@ type Payload struct {
 	UnmutedWaitingOn string            `json:"unmuted_waiting_on,omitempty"` // the waiting-on the row would have without its mute
 	UnmutedReason    string            `json:"unmuted_reason,omitempty"`     // the reason the row would have without its mute
 	LastHuman        *LastHuman        `json:"last_human,omitempty"`         // newest human event on the PR not by the viewer; nil none
-	Mute             *Mute             `json:"mute,omitempty"`               // the override's mute; nil when not muted
+	Mute             *Mute             `json:"mute,omitempty"`               // the mute its task's wake holds; nil when not muted
 
 	briefRetryAt time.Time
 }

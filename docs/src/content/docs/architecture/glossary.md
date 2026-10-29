@@ -106,7 +106,7 @@ description: The words the code, the configuration, the facts and these pages us
 - **Ambiguity gate**: the rule inside a round's procedure that records `asked` with the full draft before publishing anything unsure, risky or contradicting another reviewer. See [The ambiguity gate](/concepts/approval/#the-ambiguity-gate).
 - **Pause**: `{{command}} pause` stops every workflow but the observe ones, and the board moves, everywhere or on one repository or pull request. A paused pull request has its rounds **held**.
 - **Cap**: a bound on automatic turns: `turns.per_unit_per_day` on a unit whose plugin keeps a per-unit count (a pull request), `turns.per_day` on the others, spent by every automated turn and by no turn by hand, or a workflow's `[limits]`. A round the cap holds back shows as "held (cap)".
-- **Mute**: takes a pull request out of the pending views, for a while or until whom it waits on changes. Its rounds still run at their deadline.
+- **Mute**: a wake on a pull request's task, which takes it out of the pending views for a while or until whom it waits on changes. Its rounds still run at their deadline.
 
 ## Pull requests in scope
 
@@ -130,7 +130,8 @@ description: The words the code, the configuration, the facts and these pages us
 - **Focus**: the star on a task, and the view that lists starred tasks. A stale waiting task and a task past its deadline get it on their own.
 - **Context**: a label on a task such as `@decide`, from `tasks.contexts`.
 - **Area**: a part of your life or work, from `tasks.areas`. Switching area filters every view but the Inbox.
-- **Snooze**: scheduling a task until a date, until activity on one of its units, or both.
+- **Snooze**: scheduling a task until a date, until activity on one of its units, or both: a wake on the task.
+- **Wake**: a task's one wait for a time, an event or a condition over its facts; when it matches, the task gets a `task.woke` event, which the `task-wake` workflow reacts to.
 - **Changed**: the mark on a task that new activity by someone else, or an item that reopened, touched since you saw it; the task stays where it is. Opening or moving the task clears it.
 - **Project**: an outcome that takes more than one action, parallel or sequential, with a review interval and a dossier. See [Projects](/concepts/tasks/#projects).
 - **The review**: the periodic walk through six filtered views, from Inbox to zero to pruning Focus. A review round is a turn of the `review` intent. See [The review](/concepts/tasks/#the-review).

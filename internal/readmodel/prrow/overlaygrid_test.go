@@ -8,6 +8,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/situation"
 )
 
@@ -88,11 +89,19 @@ func gridTurns() []*gridTurn {
 	return out
 }
 
-func gridMutes() []dinv.Override {
-	return []dinv.Override{{}, {MutedUntil: h(200)}, {MutedUntil: h(1)},
-		{MuteUntilStateChange: true, MutedKind: string(situation.KindLoopWaiting), MutedWaitingOn: "me"},
-		{MuteUntilStateChange: true, MutedKind: string(situation.KindReview), MutedWaitingOn: "carla"},
-		{MuteUntilStateChange: true, MutedKind: string(situation.KindNoReviewer), MutedWaitingOn: "author"}}
+// gridMute is a mute of the grid, with the situation the golden's mute
+// until the state changes was set on.
+type gridMute struct {
+	mute            overlay.Mute
+	kind, waitingOn string
+}
+
+func gridMutes() []gridMute {
+	change := overlay.Mute{UntilStateChange: true}
+	return []gridMute{{}, {mute: overlay.Mute{Until: h(200)}}, {mute: overlay.Mute{Until: h(1)}},
+		{change, string(situation.KindLoopWaiting), "me"},
+		{change, string(situation.KindReview), "carla"},
+		{change, string(situation.KindNoReviewer), "author"}}
 }
 
 func gridPendings() []*round.Pending {
@@ -106,17 +115,17 @@ func (t *gridTurn) String() string {
 	return fmt.Sprintf("%s %s %q answered=%t", t.role, t.state, t.summary, t.answered)
 }
 
-func gridCase(s gridSource, t *gridTurn, waiting bool, o dinv.Override, p *round.Pending) string {
+func gridCase(s gridSource, t *gridTurn, waiting bool, o gridMute, p *round.Pending) string {
 	pend := "no round"
 	if p != nil {
 		pend = "round " + p.Intent
 	}
 	until := "never"
-	if !o.MutedUntil.IsZero() {
-		until = o.MutedUntil.UTC().Format(time.RFC3339)
+	if !o.mute.Until.IsZero() {
+		until = o.mute.Until.UTC().Format(time.RFC3339)
 	}
 	return fmt.Sprintf("%s | %s | waiting=%t | mute until=%s change=%t %s/%s | %s", s.name, t, waiting,
-		until, o.MuteUntilStateChange, o.MutedKind, o.MutedWaitingOn, pend)
+		until, o.mute.UntilStateChange, o.kind, o.waitingOn, pend)
 }
 
 func gridResult(kind, waitingOn string, since time.Time, reason string, stalled bool) string {

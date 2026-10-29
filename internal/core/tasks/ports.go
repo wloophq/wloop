@@ -11,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
@@ -68,6 +69,14 @@ type Page struct {
 	Tasks    []task.Task
 	Removed  []task.ID
 	Counters task.Counters
+}
+
+// Wakes keeps the tasks' wakes, one per task: Put replaces a task's, Drop removes it, dropping none is no
+// error, and Of is false for a task with none.
+type Wakes interface {
+	Put(ctx context.Context, w wake.Wake) error
+	Drop(ctx context.Context, id task.ID) error
+	Of(ctx context.Context, id task.ID) (wake.Wake, bool, error)
 }
 
 // Items is the items ledger's reader.

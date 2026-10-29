@@ -130,12 +130,14 @@ func (f *slackFacts) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, er
 	closed, started := f.closed[u], f.started[u]
 	f.mu.Unlock()
 	return workflow.Facts{
-		"slack.channel":                "",
-		"slack.conversation":           "channel",
-		"slack.started_by_me":          started,
-		"slack.closure_posted":         closed,
-		"slack.ended":                  closed,
-		"slack.live_task":              slices.ContainsFunc(es, func(e task.Task) bool { return e.Open() && !e.Snooze.Mute && slices.Contains(e.Units, u) }),
+		"slack.channel":        "",
+		"slack.conversation":   "channel",
+		"slack.started_by_me":  started,
+		"slack.closure_posted": closed,
+		"slack.ended":          closed,
+		"slack.live_task": slices.ContainsFunc(es, func(e task.Task) bool {
+			return e.Open() && e.Category != task.CategoryDeferred && slices.Contains(e.Units, u)
+		}),
 		"slack.items_open":             open,
 		"slack.items_resolved":         resolved,
 		"slack.items_unowned":          orphans,

@@ -15,7 +15,9 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
@@ -36,12 +38,29 @@ func pluginProposals(t *testing.T, f *storetest.Fixture) []src.Draft {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b := &psource.Broker{ID: string(unit.GitHub), Units: psource.Units{Codecs: unit.NewRegistry(pr.Codec{})}, Books: f.Turns.Books, Overrides: f.DB}
+	b := &psource.Broker{ID: string(unit.GitHub), Units: psource.Units{Codecs: unit.NewRegistry(pr.Codec{})}, Books: f.Turns.Books, Overrides: f.DB,
+		Hosted: &psource.Hosted{Tasks: f.DB.Tasks()}}
 	ds, err := nudge.Proposals(ctx, rows, b.Host().Reader, ghreporttest.NudgeTexts(), prrow.IgnoreOf(config.Defaults()), f.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return ds
+}
+
+// muteByWake mutes ref until a time as the mute action does: a wake on an
+// asleep task that holds it.
+func muteByWake(t *testing.T, f *storetest.Fixture, ref pr.Ref, until time.Time) {
+	t.Helper()
+	ctx := context.Background()
+	id := task.DerivedID(ref.Unit(), "mute")
+	e := task.Task{ID: id, State: "scheduled", Category: task.CategoryDeferred, Units: []unit.Unit{ref.Unit()}, Origin: task.OriginUser,
+		Created: f.Now, Updated: f.Now}
+	if err := f.DB.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.DB.Wakes().Put(ctx, wake.Wake{Task: id, Until: until, Return: "next"}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // TestGitHubNudgeDraftsMatchTheNudgeOffer holds the plugin's github-nudge
@@ -65,7 +84,7 @@ func TestGitHubNudgeDraftsMatchTheNudgeOffer(t *testing.T) {
 		case 1:
 			set = map[string]string{port.OverrideHold: port.OverrideTrue}
 		case 2:
-			set = map[string]string{port.OverrideMutedUntil: f.Now.Add(time.Hour).UTC().Format(time.RFC3339Nano)}
+			muteByWake(t, f, ref, f.Now.Add(time.Hour))
 		}
 		if set != nil {
 			if _, err := f.DB.SetOverride(ctx, ref.Unit(), set, nil); err != nil {

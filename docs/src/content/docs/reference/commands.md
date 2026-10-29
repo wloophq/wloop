@@ -484,7 +484,7 @@ Leave or rejoin the pending views.
 {{command}} unmute <url>
 ```
 
-Take a pull request out of the pending views, for good, for a while, or until who it waits on changes; unmute brings it back.
+Snooze a pull request's task, out of the pending views, for a while or until who it waits on changes: a wake on the task; unmute wakes it now.
 
 | Flag | Description |
 | --- | --- |

@@ -13,11 +13,14 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/wakes"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
 // newTasks is the daemon's one entries service, built on first use; its unit facts come from the stored cards.
@@ -28,11 +31,25 @@ func (e *Env) newTasks(db *sqlite.DB, cfg config.Config, its coretasks.Items) *c
 		off := func() []unit.ProviderID { return offProviders(cfg, e.pluginsOff.Load()) }
 		enabled := func(p unit.ProviderID) bool { return !slices.Contains(off(), p) }
 		facts := coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: e.tasksMe.get, Kind: e.pluginTaskKind}
+		e.wakes = wakes.New(wakes.Deps{Store: db.Wakes(), Tasks: db.Tasks(), Holds: catalog.Holds(e.loadedIntents, e.factsOfTask),
+			Clock: clockFunc(e.Now)})
 		e.tasks = coretasks.New(coretasks.Deps{Store: db.Tasks(), Items: its, Facts: facts, Clock: clockFunc(e.Now),
 			Disabled: off, States: profileStates{e},
-			Authority: catalog.Authority(e.loadedIntents), Gates: serviceTaskGates{e, db}})
+			Authority: catalog.Authority(e.loadedIntents), Gates: serviceTaskGates{e, db},
+			Wakes: db.Wakes(), Baseline: catalog.Baseline(e.loadedIntents, e.factsOfTask),
+			Activity: func(ctx context.Context, id task.ID) error {
+				return e.wakes.Event(ctx, id, wake.OnActivity, "")
+			}})
 	}
 	return e.tasks
+}
+
+// factsOfTask are task t's facts a wake's condition reads: the task subject's, else those its own fields hold.
+func (e *Env) factsOfTask(ctx context.Context, t task.Task) (workflow.Facts, error) {
+	if e.wakeFacts != nil {
+		return e.wakeFacts(ctx, t)
+	}
+	return catalog.TaskFacts(t, e.loadedIntents().Tasks), nil
 }
 
 // profileStates are the states and verbs of the profile as it loads now.
@@ -101,6 +118,7 @@ func (e *Env) serveTasks(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods [
 	}
 	me := e.tasksMe
 	d.Tasks = g
+	d.Wakes = e.wakes
 	d.TasksMe = func(ctx context.Context) (bool, error) {
 		got, err := meOf(ctx, mods)
 		grew := me.set(got)
@@ -195,4 +213,28 @@ func syncUnits(ctx context.Context, tasks coretasks.Reader, ledger *coreitems.Le
 		}
 	}
 	return out, nil
+}
+
+// envWakes are the tasks as a plugin's wakes move them, through the tasks service once serve built it.
+type envWakes struct {
+	e  *Env
+	db *sqlite.DB
+}
+
+func (w envWakes) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
+	return w.db.Tasks().TasksOf(ctx, u)
+}
+
+func (w envWakes) Sleep(ctx context.Context, id task.ID, k wake.Wake) error {
+	if w.e.tasks == nil {
+		return errors.New("no tasks service: the daemon keeps the wakes")
+	}
+	return w.e.tasks.Sleep(ctx, id, k)
+}
+
+func (w envWakes) Rouse(ctx context.Context, id task.ID) error {
+	if w.e.tasks == nil {
+		return errors.New("no tasks service: the daemon keeps the wakes")
+	}
+	return w.e.tasks.Rouse(ctx, id)
 }

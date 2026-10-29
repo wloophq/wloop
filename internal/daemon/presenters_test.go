@@ -15,7 +15,6 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/source/github/present"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/config"
-	"github.com/wloophq/wloop/internal/core/port"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel"
@@ -172,29 +171,31 @@ func TestAPluginViewIsServedUnderItsId(t *testing.T) {
 	}
 }
 
-// overrideSpy is the broker's Gates and Reader, recording each SetOverride.
-type overrideSpy struct {
-	src.Gates
-	src.Reader
-	mu   sync.Mutex
-	sets []map[string][2]string
+// wakeSpy is the broker's Wakes, recording each wake set and cleared.
+type wakeSpy struct {
+	src.Wakes
+	mu    sync.Mutex
+	calls []string
 }
 
-func (o *overrideSpy) SetOverride(ctx context.Context, u plugin.Unit, set, ifMatch map[string]string) (bool, error) {
-	o.mu.Lock()
-	rec := map[string][2]string{}
-	for n, v := range set {
-		rec[n] = [2]string{v, ifMatch[n]}
-	}
-	o.sets = append(o.sets, rec)
-	o.mu.Unlock()
-	return o.Gates.SetOverride(ctx, u, set, ifMatch)
+func (w *wakeSpy) SetWake(ctx context.Context, k src.Wake) error {
+	w.mu.Lock()
+	w.calls = append(w.calls, "set "+k.Unit.Key+" until "+k.Until.UTC().Format(time.RFC3339)+" when "+k.When)
+	w.mu.Unlock()
+	return w.Wakes.SetWake(ctx, k)
 }
 
-func (o *overrideSpy) written() []map[string][2]string {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	return slices.Clone(o.sets)
+func (w *wakeSpy) ClearWake(ctx context.Context, u plugin.Unit, task string) error {
+	w.mu.Lock()
+	w.calls = append(w.calls, "clear "+u.Key+" "+task)
+	w.mu.Unlock()
+	return w.Wakes.ClearWake(ctx, u, task)
+}
+
+func (w *wakeSpy) written() []string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return slices.Clone(w.calls)
 }
 
 // actionSpy is a presenter recording the actions the daemon asks of it.
@@ -219,44 +220,41 @@ func (a *actionSpy) asked() []string {
 
 func TestMuteGoesThroughThePlugin(t *testing.T) {
 	t.Parallel()
-	spy := &overrideSpy{}
+	spy := &wakeSpy{}
 	presenter := &actionSpy{}
 	s := newServerWith(t, func(d *Deps) {
 		g := githubOf(d)
 		build := d.Presenters[unit.GitHub]
 		d.Presenters[unit.GitHub] = func(h PresenterHost) Presenter {
 			build(h)
-			spy.Gates, spy.Reader = g.Host.Gates, g.Host.Reader
+			spy.Wakes = g.Host.Wakes
 			gd := *g
-			gd.Host.Gates, gd.Host.Reader = spy, spy
+			gd.Host.Wakes = spy
 			presenter.Presenter = present.New(gd, present.Host(h))
 			return presenter
 		}
 	})
-	ctx := context.Background()
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/mute", `{"until":"2d"}`); rec.Code != http.StatusOK {
 		t.Fatalf("mute: %d %s", rec.Code, rec.Body)
 	}
-	until := s.deps.Now().Add(48 * time.Hour).UTC().Format(time.RFC3339Nano)
-	sets := spy.written()
-	if !slices.Equal(presenter.asked(), []string{present.ActionMute}) || len(sets) != 1 || sets[0][port.OverrideMutedUntil] != [2]string{until, ""} {
-		t.Fatalf("asked %v, set %v", presenter.asked(), sets)
+	until := s.deps.Now().Add(48 * time.Hour).UTC().Format(time.RFC3339)
+	if got := spy.written(); !slices.Equal(presenter.asked(), []string{present.ActionMute}) || !slices.Equal(got, []string{"set acme/api#7 until " + until + " when "}) {
+		t.Fatalf("asked %v, wakes %v", presenter.asked(), got)
 	}
-	if o, _ := s.store().Override(ctx, r7); !o.MutedUntil.Equal(s.deps.Now().Add(48 * time.Hour)) {
-		t.Fatalf("the override %+v", o)
+	if _, w, ok := prTask(t, s, r7); !ok || !w.Until.Equal(s.deps.Now().Add(48*time.Hour)) {
+		t.Fatalf("the wake %+v %v", w, ok)
 	}
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/unmute", `{}`); rec.Code != http.StatusOK {
 		t.Fatalf("unmute: %d %s", rec.Code, rec.Body)
 	}
-	if sets = spy.written(); len(sets) != 2 || sets[1][port.OverrideMutedUntil] != [2]string{"", until} {
-		t.Fatalf("the unmute set %v, want muted_until cleared while it held %s", sets, until)
+	if got := spy.written(); len(got) != 2 || got[1] != "clear acme/api#7 " {
+		t.Fatalf("the unmute %v", got)
 	}
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/mute", `{"until_state":true}`); rec.Code != http.StatusOK {
 		t.Fatalf("mute until state: %d %s", rec.Code, rec.Body)
 	}
-	o, _ := s.store().Override(ctx, r7)
-	if !o.MuteUntilStateChange || o.MutedKind == "" {
-		t.Fatalf("the mute until state change %+v", o)
+	if _, w, ok := prTask(t, s, r7); !ok || w.When == "" {
+		t.Fatalf("the mute until state change %+v", w)
 	}
 	if n := countEvents(t, s, dinv.KindMuted); n != 2 {
 		t.Errorf("%d muted events, want 2", n)

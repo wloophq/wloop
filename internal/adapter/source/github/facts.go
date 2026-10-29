@@ -24,6 +24,8 @@ type FactsDeps struct {
 	Changes port.Changes
 	Rounds  sweep.Rounds
 	Books   sweep.Books
+	// Mutes are the user's mutes of pull requests; nil mutes none.
+	Mutes readmodel.Mutes
 }
 
 // FactsOf are GitHub's workflow facts over d: the plugin's reports under
@@ -42,6 +44,7 @@ func FactsOf(d FactsDeps) *factsgithub.Provider {
 		Changes:  d.Changes,
 		Rounds:   d.Rounds,
 		Books:    d.Books,
+		Mutes:    d.Mutes,
 	}
 	return factsgithub.New(fd)
 }

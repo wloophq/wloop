@@ -39,6 +39,9 @@ type Broker struct {
 	// Overrides are the host's overrides of units; nil serves neither
 	// SetOverride nor RoundState.
 	Overrides OverrideStore
+	// Wakes are the host's tasks as wakes move them; nil serves neither
+	// SetWake nor ClearWake.
+	Wakes TaskWakes
 	// Paused says a unit's rounds are held by a pause wider than its own
 	// hold, such as its repository's; nil holds none.
 	Paused func(ctx context.Context, u unit.Unit) (bool, error)

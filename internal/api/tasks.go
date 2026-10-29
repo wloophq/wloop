@@ -110,19 +110,16 @@ type VerbSpec struct {
 }
 
 type TaskView struct {
-	ID               string      `json:"id"`
-	State            string      `json:"state"`
-	Category         string      `json:"category,omitempty"`
-	Title            string      `json:"title"`
-	Notes            string      `json:"notes,omitempty"`
-	SnoozeUntil      time.Time   `json:"snooze_until,omitzero"`
-	SnoozeOnActivity bool        `json:"snooze_on_activity,omitempty"`
-	Muted            bool        `json:"muted,omitempty"`
-	Changed          bool        `json:"changed,omitempty"`
-	Units            []unit.Unit `json:"units"`
-	UnitLabels       []string    `json:"unit_labels,omitempty"` // Units as a person reads them, in order
-	Cards            []CardView  `json:"cards,omitempty"`       // detail only
-	Verbs            []VerbState `json:"verbs"`
+	ID         string      `json:"id"`
+	State      string      `json:"state"`
+	Category   string      `json:"category,omitempty"`
+	Title      string      `json:"title"`
+	Notes      string      `json:"notes,omitempty"`
+	Changed    bool        `json:"changed,omitempty"`
+	Units      []unit.Unit `json:"units"`
+	UnitLabels []string    `json:"unit_labels,omitempty"` // Units as a person reads them, in order
+	Cards      []CardView  `json:"cards,omitempty"`       // detail only
+	Verbs      []VerbState `json:"verbs"`
 	// Actions are the intents that serve the task's own unit, such as start.
 	Actions   []ActionState `json:"actions,omitempty"`
 	Attention *Attention    `json:"attention,omitempty"`

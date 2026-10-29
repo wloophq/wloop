@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/domain/wake"
 )
 
 var t0 = time.Date(2026, 10, 5, 10, 0, 0, 0, time.UTC) // Monday
@@ -32,22 +33,16 @@ func TestAMuteHoldsUntilItsTime(t *testing.T) {
 	}
 }
 
-func TestAMuteUntilTheStateChangesHoldsWhileTheSituationStays(t *testing.T) {
-	m := Mute{UntilStateChange: true, Kind: "review", WaitingOn: "me"}
-	if !m.Holds(review, h(100)) || m.Lapsed(review) {
-		t.Fatal("the muted situation is not held")
+func TestAMuteUntilTheStateChangesHoldsWhileItsWakeWaits(t *testing.T) {
+	m := MuteOf(wake.Wake{Task: "t-01", When: `task.link_owes != ["me"]`})
+	if !m.Holds(review, h(100)) || !m.Holds(Situation{Kind: "changes", WaitingOn: "author"}, h(100)) {
+		t.Fatal("a mute whose wake waits does not hold")
 	}
-	for name, s := range map[string]Situation{
-		"kind":       {Kind: "changes", WaitingOn: "author"},
-		"waiting on": {Kind: "review", WaitingOn: "carla"},
-	} {
-		if m.Holds(s, h(10)) || !m.Lapsed(s) {
-			t.Errorf("%s changed and the mute still holds", name)
-		}
+	if m.Holds(Situation{Kind: KindDone}, h(10)) {
+		t.Fatal("a mute holds a done unit")
 	}
-	reordered := Mute{UntilStateChange: true, Kind: "review", WaitingOn: "carla, bruno"}
-	if !reordered.Holds(Situation{Kind: "review", WaitingOn: "bruno, carla"}, h(10)) {
-		t.Fatal("reordered reviewers unmuted")
+	if spent := MuteOf(wake.Wake{Task: "t-01", Return: "next"}); spent.Set() || spent.Holds(review, h(10)) {
+		t.Fatal("a spent wake mutes")
 	}
 }
 

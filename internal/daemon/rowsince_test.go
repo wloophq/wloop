@@ -83,7 +83,7 @@ func TestRowsSinceCarriesAChangedRow(t *testing.T) {
 	s := newServer(t)
 	before, _ := rowsPage(t, s, "")
 	r7 := github.Ref{Owner: "acme", Repo: "api", Number: 7}
-	if err := inventorytest.Of(s.store()).SetOverride(context.Background(), dinv.Override{PR: r7, MutedUntil: s.deps.Now().Add(time.Hour)}); err != nil {
+	if err := muteBy(s.store(), r7, s.deps.Now().Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	after, _ := rowsPage(t, s, "?since="+sinceOf(before))
