@@ -250,3 +250,40 @@ func TestAutofocusClearsTheStarsItSetWhoseReasonIsGone(t *testing.T) {
 		}
 	}
 }
+
+func TestAStaleStarStaysWhileItsNudgeIsHeldAndGoesOnceItIsSent(t *testing.T) {
+	t.Parallel()
+	r, p := taskWorkflows(t)
+	ctx := context.Background()
+	r.mine("i1", replayStart.AddDate(0, 0, -7), "", twBruno)
+	r.sync(twThread)
+	id := task.DerivedID(twThread, "i1")
+	focus := func() string { return r.taskOf(id).Prop(task.PropFocus).Text }
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	ds := r.nudges(twBruno)
+	if len(ds) != 1 || focus() != task.FocusOn {
+		t.Fatalf("a stale wait: %d nudges, focus %q; want one held nudge and the star", len(ds), focus())
+	}
+	r.now = r.now.Add(time.Hour)
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if focus() != task.FocusOn {
+		t.Fatalf("the star went while the nudge is held")
+	}
+	if err := approveDraft(ctx, r.svc, ds[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, failed, err := r.svc.Send(ctx); err != nil || failed > 0 {
+		t.Fatalf("send: %d failed, %v", failed, err)
+	}
+	r.now = r.now.Add(time.Hour)
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := focus(); got != "" {
+		t.Fatalf("focus %q after the nudge went, want the star off", got)
+	}
+}
