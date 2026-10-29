@@ -15,7 +15,7 @@ brew install {{org}}/tap/{{command}}
 [`{{command}} init`](/getting-started/init/) checks the requirements, writes your configuration and installs the pieces below, asking before each one. You can also install them one by one:
 
 ```sh
-{{command}} install        # MCP server, hooks, permissions and skills in every Claude Code home
+{{command}} install        # the GitHub and Slack plugins, and the MCP server, hooks, permissions and skills in every Claude Code home
 {{command}} app install    # macOS: {{app}}.app and the LaunchAgents of the daemon and the menu bar
 {{command}} doctor         # what is still missing, with the command that fixes each item
 {{command}} open           # the cockpit in your browser
@@ -23,7 +23,9 @@ brew install {{org}}/tap/{{command}}
 
 ## What `install` writes
 
-`{{command}} install` writes into each Claude Code home it finds:
+A release ships the GitHub and Slack plugins beside the binary, each in `plugins/<id>/` with its manifest, its profile layer, its binary and the binary's SHA-256. `{{command}} install` checks each binary against the checksum shipped with it, refuses one that differs, copies the plugins to `<state>/plugins/bundled/<id>/` and records their checksums in `<state>/plugins/checksums`. The daemon runs a bundled plugin only when its binary has the recorded checksum, so run `install` after every upgrade; `{{command}} doctor` shows each plugin's path, hash, trust, protocol and health.
+
+It also writes into each Claude Code home it finds:
 
 - the registration of {{name}}'s MCP server at user scope, with the URL from `mcp.port`, the `X-Loop-Key` header, and `{{command}} hook mcp-headers` as the `headersHelper` that names the session in `X-Loop-Session`;
 - the `Stop`, `SessionStart` and `UserPromptSubmit` hooks (`{{command}} hook stop || true`, and so on);
@@ -77,4 +79,4 @@ The login shell (`sh -l`) gives the daemon the `PATH` where `gh`, `git`, `orca` 
 {{command}} doctor
 ```
 
-`doctor` changes nothing. It checks `gh`, each workspace manager, the configuration, every agent home, the review profile, the LaunchAgents, the daemon and its jobs, and prints the fix for each problem on its own line. See [Troubleshooting](/guides/troubleshooting/).
+`doctor` changes nothing. It checks `gh`, each workspace manager, the configuration, every agent home, the review profile, the LaunchAgents, the daemon and its jobs, each plugin, and prints the fix for each problem on its own line. See [Troubleshooting](/guides/troubleshooting/).

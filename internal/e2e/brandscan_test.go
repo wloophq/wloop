@@ -12,11 +12,17 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
+	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/brand/brandtest"
 	"github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/plugins/host"
 )
 
 const scanBinaryEnv = "LOOP_BRAND_SCAN_BIN"
+
+// pluginBinary names a plugin binary install copied, whose content is the
+// build's, module paths included, and not text the program wrote.
+var pluginBinary = regexp.MustCompile(`-plugin-[a-z][a-z0-9-]*(\.sha256)?$`)
 
 func TestNothingWrittenNamesTheDefaultBrand(t *testing.T) {
 	bin := os.Getenv(scanBinaryEnv)
@@ -57,13 +63,18 @@ func TestNothingWrittenNamesTheDefaultBrand(t *testing.T) {
 	}
 	filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err == nil && !d.IsDir() && p != filepath.Join(tools, "claude") {
-			raw, _ := os.ReadFile(p)
 			rel, _ := filepath.Rel(root, p)
 			found = append(found, scanLines("path", filepath.ToSlash(rel))...)
-			found = append(found, scanLines(filepath.ToSlash(rel), string(raw))...)
+			if !pluginBinary.MatchString(filepath.Base(p)) {
+				raw, _ := os.ReadFile(p)
+				found = append(found, scanLines(filepath.ToSlash(rel), string(raw))...)
+			}
 		}
 		return nil
 	})
+	if _, err := os.Stat(host.ChecksumsFile(filepath.Join(home, "state", brand.StateDir()))); err != nil {
+		t.Errorf("install placed no plugin to scan: %v", err)
+	}
 	found = append(found, scanLines("store-dump", scriptedStore(t, filepath.Join(root, "store.db")))...)
 	if raw, err := os.ReadFile(filepath.Join(home, ".claude.json")); err != nil || !strings.Contains(string(raw), "mcpServers") {
 		t.Fatalf("install registered no MCP server to scan: %v", err)

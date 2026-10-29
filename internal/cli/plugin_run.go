@@ -30,7 +30,7 @@ func (e *Env) runPluginBinaryTo(ctx context.Context, cfg config.Config, id strin
 	if err != nil {
 		return err
 	}
-	sums, err := host.ReadChecksums(filepath.Join(e.StateDir, "plugins", "checksums"))
+	sums, err := host.ReadChecksums(host.ChecksumsFile(e.StateDir))
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (e *Env) pluginBinary(id string) (host.Plugin, error) {
 		}
 	}
 	var dirs []string
-	for _, r := range host.Roots(filepath.Dir(e.ConfigPath), e.Executable) {
+	for _, r := range host.Roots(filepath.Dir(e.ConfigPath), e.StateDir, e.Executable) {
 		dirs = append(dirs, filepath.Join(r.Dir, id))
 	}
 	return host.Plugin{}, fmt.Errorf("the %s plugin's binary is not installed: looked in %s", id, strings.Join(dirs, " and "))

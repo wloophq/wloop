@@ -157,7 +157,7 @@ func (f testForge) RunCLI(ctx context.Context, req src.CLIRequest, stdout, stder
 func (te *testEnv) serveGitHubPlugin(db *sqlite.DB, ghs ghplugingh.Runner) {
 	t := te.t
 	t.Helper()
-	te.plugins = []host.Plugin{{Manifest: bundledGitHubManifest(t), Dir: t.TempDir(), Binary: brand.PluginBinary(string(unit.GitHub)), Bundled: true}}
+	te.plugins = recordedPlugins(t, te.StateDir, host.Plugin{Manifest: bundledGitHubManifest(t), Dir: t.TempDir(), Binary: brand.PluginBinary(string(unit.GitHub)), Bundled: true})
 	l := plugintest.NewLauncher(t)
 	now := te.Now
 	if ghs == nil {

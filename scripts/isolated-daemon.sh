@@ -3,7 +3,7 @@
 # items or daemon.
 #
 # Usage:
-#   isolated-daemon.sh setup <dir> <binary> <dm-channel-id> [<index>] [--slack] [--agent]
+#   isolated-daemon.sh setup <dir> <binary> <dm-channel-id> [<index>] [--slack] [--agent] [--plugins <id,...>]
 #   isolated-daemon.sh env <dir>
 #   isolated-daemon.sh run <dir> <command> [<arg>...]
 #   isolated-daemon.sh snapshot <dir> <source-store>
@@ -15,12 +15,17 @@
 # setup creates <dir> (it must not exist) with state/, config/, bin/, gh/ and
 # home/ (the user home the binary sees; HOME stays real for the Keychain),
 # copies <binary> into bin/ beside the orca, gh, codex, launchctl and claude
-# stubs, and writes the config: brief, every workflow of
-# profiles/default/workflows/ and plugins/*/profile/workflows/ and the github and slack plugins off, ports 47910+<index> (HTTP) and
+# stubs, and the plugins beside it, as `make build` places them in
+# plugins/<id>/, into bin/plugins/, and writes the config: brief, every
+# workflow of profiles/default/workflows/ and plugins/*/profile/workflows/
+# and the github and slack plugins off, ports 47910+<index> (HTTP) and
 # 47810+<index> (MCP), the e2e Keychain service and <dm-channel-id> as the
-# only channel posts may reach. --slack turns the slack plugin on; every start
-# or pause of that directory then takes <dir>/../slack-socket.lock and refuses
-# while another daemon holds it. --agent leaves claude unstubbed. The state and
+# only channel posts may reach. --plugins turns the plugins it lists on,
+# each trusted by its path since no install recorded its checksum: github
+# runs against the stubbed gh, slack with no socket. --slack turns the slack
+# plugin on with its socket; every start or pause of that directory then
+# takes <dir>/../slack-socket.lock and refuses while another daemon holds
+# it. --agent leaves claude unstubbed. The state and
 # config directory name is ISOLATED_STATE_NAME, else the binary's basename, and
 # setup refuses when the binary does not read the config it wrote. setup also
 # writes the MCP key the daemon requires (state/<name>/mcp.key, 0600); env and
@@ -176,17 +181,36 @@ toml_list() {
 	printf ']'
 }
 
+# plugin_on says plugin $1 is among the --plugins of setup.
+plugin_on() {
+	local p
+	for p in ${plugins[@]+"${plugins[@]}"}; do
+		[[ $p == "$1" ]] && return 0
+	done
+	return 1
+}
+
 cmd_setup() {
-	local pos=() a
-	slack=0 agent=0
-	for a in "$@"; do
+	local pos=() a list=""
+	slack=0 agent=0 plugins=()
+	while [[ $# -gt 0 ]]; do
+		a=$1
+		shift
 		case $a in
 		--slack) slack=1 ;;
 		--agent) agent=1 ;;
+		--plugins)
+			[[ $# -gt 0 ]] || usage
+			list=$1
+			shift
+			;;
+		--plugins=*) list=${a#--plugins=} ;;
 		--*) usage ;;
 		*) pos+=("$a") ;;
 		esac
 	done
+	if [[ -n $list ]]; then IFS=, read -r -a plugins <<<"$list"; fi
+	((slack)) && plugin_on slack && die "--slack runs Slack's socket and --plugins slack runs none; choose one"
 	[[ ${#pos[@]} -ge 3 && ${#pos[@]} -le 4 ]] || usage
 	local target=${pos[0]} binary=${pos[1]} dm=${pos[2]} index=${pos[3]:-0}
 	[[ ! -e $target ]] || die "$target exists; every acceptance starts from a fresh directory"
@@ -208,6 +232,16 @@ cmd_setup() {
 	local bin
 	bin="$dir/bin/$(basename "$binary")"
 	cp "$binary" "$bin"
+	local from p
+	from="$(dirname "$binary")/plugins"
+	if [[ -d $from ]]; then cp -R "$from" "$dir/bin/plugins"; fi
+	for p in ${plugins[@]+"${plugins[@]}"}; do
+		[[ $p =~ ^[a-z][a-z0-9-]*$ ]] || die "plugin id $p is not one"
+		[[ -f $dir/bin/plugins/$p/plugin.toml ]] || {
+			rm -rf "$dir"
+			die "no plugin $p beside $binary: build it with make build, which places it in $from/$p"
+		}
+	done
 	local stubs=(orca gh codex launchctl) stub
 	((agent)) || stubs+=(claude)
 	for stub in "${stubs[@]}"; do
@@ -224,8 +258,22 @@ cmd_setup() {
 	for w in "${workflows[@]}"; do
 		wf+=$'\n'"[workflows.$w]"$'\n'"enabled = false"$'\n'
 	done
-	local slack_on=false
+	local slack_on=false github_on=false
 	((slack)) && slack_on=true
+	plugin_on slack && slack_on=true
+	plugin_on github && github_on=true
+	local github_trust="" slack_trust="" slack_ingest="" others=""
+	plugin_on github && github_trust='trust = "path"'
+	if plugin_on slack; then
+		slack_trust='trust = "path"'
+		slack_ingest=$'\n[plugins.slack.ingest]\nsocket = false\n'
+	fi
+	for p in ${plugins[@]+"${plugins[@]}"}; do
+		case $p in
+		github | slack) ;;
+		*) others+=$'\n'"[plugins.$p]"$'\n'"enabled = true"$'\n'"trust = \"path\""$'\n' ;;
+		esac
+	done
 
 	cat >"$dir/config/$name/config.toml" <<-EOF
 		[http]
@@ -241,14 +289,16 @@ cmd_setup() {
 		enabled = false
 
 		[plugins.github]
-		enabled = false
+		enabled = $github_on
+		$github_trust
 
 		[plugins.slack]
 		enabled = $slack_on
+		$slack_trust
 		keychain_service = "wloop-e2e-slack"
 		post_allowlist = $(toml_list "$dm")
 		request_log = true
-		$wf
+		$slack_ingest$others$wf
 	EOF
 	chmod 600 "$dir/config/$name/config.toml"
 	mkdir -m 700 "$dir/state/$name"

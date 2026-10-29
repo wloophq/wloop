@@ -2,19 +2,50 @@ version: 2
 
 project_name: wloop
 
+# The binary, and each plugin under plugins/<id>/ with its manifest, its profile layer and the SHA-256 of its
+# binary, which `install` checks before it places the plugin and records the checksum the daemon requires.
 builds:
-  - main: ./cmd/wloop
+  - id: wloop
+    main: ./cmd/wloop
     binary: "{{ .ProjectName }}"
     env: [CGO_ENABLED=0]
     goos: [darwin, linux]
     goarch: [amd64, arm64]
     flags: [-trimpath]
     ldflags: ["-s -w -X main.version=v{{ .Version }}"]
+  - &plugin
+    id: plugin-github
+    main: ./plugins/github/cmd/wloop-plugin-github
+    binary: "plugins/github/{{ .ProjectName }}-plugin-github"
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w"]
+    hooks:
+      post:
+        - cmd: sh -c 'cd "$(dirname "$0")" && b=$(basename "$0") && { sha256sum "$b" 2>/dev/null || shasum -a 256 "$b"; } > "$b.sha256"' "{{ .Path }}"
+  - <<: *plugin
+    id: plugin-slack
+    main: ./plugins/slack/cmd/wloop-plugin-slack
+    binary: "plugins/slack/{{ .ProjectName }}-plugin-slack"
 
 archives:
   - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     formats: [tar.gz]
-    files: [LICENSE, README.md]
+    files:
+      - LICENSE
+      - README.md
+      - plugins/github/plugin.toml
+      - plugins/github/profile/**/*
+      - src: "dist/plugin-github_{{ .Os }}_{{ .Arch }}*/plugins/github/*.sha256"
+        dst: plugins/github
+        strip_parent: true
+      - plugins/slack/plugin.toml
+      - plugins/slack/profile/**/*
+      - src: "dist/plugin-slack_{{ .Os }}_{{ .Arch }}*/plugins/slack/*.sha256"
+        dst: plugins/slack
+        strip_parent: true
 
 checksum:
   name_template: checksums.txt
@@ -42,10 +73,10 @@ homebrew_casks:
         # The binary is not signed or notarized; without this, Gatekeeper blocks it and the app bundle built from it.
         install: |
           if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/{{ .ProjectName }}"]
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", staged_path.to_s]
           end
     caveats: |
-      Run `{{ .ProjectName }} install` now and after every upgrade.
+      Run `{{ .ProjectName }} install` now and after every upgrade: it places the GitHub and Slack plugins and records their checksums.
       On macOS, also run `{{ .ProjectName }} app install` now and after every upgrade.
 
 release:

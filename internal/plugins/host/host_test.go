@@ -382,10 +382,10 @@ func TestAnUntrustedBinaryIsRefused(t *testing.T) {
 	if !errors.Is(err, host.ErrUntrusted) || !strings.Contains(err.Error(), `[plugins.acme] trust = "path"`) {
 		t.Errorf("an unrecorded binary outside the bundled directory: %v", err)
 	}
-	if len(runs) != 1 || runs[0].Manifest.ID != "beta" || runs[0].Spec.Checksum != nil || why["beta"] != "dev build, no checksum" {
-		t.Errorf("a bundled plugin with no record: %v, %v", runs, why)
+	if len(runs) != 0 || !strings.Contains(err.Error(), "plugin beta") || !strings.Contains(err.Error(), "install`") {
+		t.Errorf("a bundled plugin no install recorded: %v, %v, %v", runs, why, err)
 	}
-	runs, _, err = host.Runs(ps, settings{trust: map[string]string{"acme": host.TrustPath}}, nil, env, hclog.NewNullLogger())
+	runs, _, err = host.Runs(ps, settings{trust: map[string]string{"acme": host.TrustPath, "beta": host.TrustPath}}, nil, env, hclog.NewNullLogger())
 	if err != nil || len(runs) != 2 {
 		t.Errorf("trust = path: %v, %v", runs, err)
 	}

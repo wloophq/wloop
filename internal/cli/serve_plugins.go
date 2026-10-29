@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
@@ -211,7 +213,7 @@ func InstallPlugins() error {
 	if err != nil {
 		exe = ""
 	}
-	installed, err = installPlugins(config.Dir(), exe)
+	installed, err = installPlugins(config.Dir(), config.StateDir(), exe)
 	return err
 }
 
@@ -221,8 +223,8 @@ func InstallPlugins() error {
 // plugins' vocabulary, their codecs' labels, and their profile layers,
 // which the profile loads while a plugin is enabled. A plugin whose
 // manifest or vocabulary does not fit is left out and named in the error.
-func installPlugins(configDir, exe string) ([]host.Plugin, error) {
-	found, err := host.Discover(host.Roots(configDir, exe)...)
+func installPlugins(configDir, stateDir, exe string) ([]host.Plugin, error) {
+	found, err := host.Discover(host.Roots(configDir, stateDir, exe)...)
 	errs := []error{err}
 	srcs, err := bundled.Sources()
 	if err != nil {
@@ -301,7 +303,7 @@ func (e *Env) servePlugins(ctx context.Context, db *sqlite.DB, cfg config.Config
 		logf("plugins: --no-jobs starts none")
 		return func() {}
 	}
-	sums, err := host.ReadChecksums(filepath.Join(e.StateDir, "plugins", "checksums"))
+	sums, err := host.ReadChecksums(host.ChecksumsFile(e.StateDir))
 	if err != nil {
 		logf("plugins: %v", err)
 	}
@@ -312,6 +314,7 @@ func (e *Env) servePlugins(ctx context.Context, db *sqlite.DB, cfg config.Config
 	for _, r := range runs {
 		logf("plugin %s: runs %s, %s", r.Manifest.ID, r.Spec.Path, why[r.Manifest.ID])
 		e.pluginKind.Expect(r.Manifest.ID)
+		e.pluginRuns = append(e.pluginRuns, r.Manifest.ID)
 	}
 	var launcher plugin.Launcher = host.ExecLauncher{}
 	if e.pluginLauncher != nil {
@@ -391,4 +394,42 @@ type logWriter func(string, ...any)
 func (w logWriter) Write(b []byte) (int, error) {
 	w("%s", strings.TrimRight(string(b), "\n"))
 	return len(b), nil
+}
+
+// pluginHealthWait bounds one plugin's answer to the daemon's health.
+const pluginHealthWait = 2 * time.Second
+
+// pluginHealth is how each plugin serve runs answers its health: down while
+// its process is not running, with why.
+func (e *Env) pluginHealth(ctx context.Context) []api.PluginHealth {
+	loading := e.pluginKind.Loading()
+	out := make([]api.PluginHealth, 0, len(e.pluginRuns))
+	for _, id := range e.pluginRuns {
+		c, err := e.pluginKind.Client(id)
+		if err != nil {
+			out = append(out, api.PluginHealth{ID: id, Status: "down", Reason: cmp.Or(loading[id], err.Error())})
+			continue
+		}
+		hctx, cancel := context.WithTimeout(ctx, pluginHealthWait)
+		h, err := c.Health(hctx)
+		cancel()
+		if err != nil {
+			out = append(out, api.PluginHealth{ID: id, Status: "down", Reason: err.Error()})
+			continue
+		}
+		out = append(out, api.PluginHealth{ID: id, Status: pluginStatus(h.Status), Reason: h.Reason})
+	}
+	return out
+}
+
+func pluginStatus(s plugin.Status) string {
+	switch s {
+	case plugin.StatusLoading:
+		return "loading"
+	case plugin.StatusServing:
+		return "serving"
+	case plugin.StatusDegraded:
+		return "degraded"
+	}
+	return "unknown"
 }

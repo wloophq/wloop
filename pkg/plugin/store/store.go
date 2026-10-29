@@ -52,15 +52,19 @@ func Open(ctx context.Context, dir string, opts Options) (*sql.DB, error) {
 		return nil, err
 	}
 	path := filepath.Join(dir, File)
+	// SQLite gives the log and shared-memory files the store's mode.
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	if err := errors.Join(f.Chmod(0o600), f.Close()); err != nil {
+		return nil, err
+	}
 	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_txlock=immediate")
 	if err != nil {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	if err := os.Chmod(path, 0o600); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		db.Close()
-		return nil, err
-	}
 	if err := migrate(ctx, db, opts.Migrations); err != nil {
 		db.Close()
 		return nil, err

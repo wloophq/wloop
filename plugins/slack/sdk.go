@@ -62,7 +62,7 @@ func (s *Plugin) logf(format string, args ...any) { s.logger().Info(fmt.Sprintf(
 
 // brand is the host's name, which the host passes in the environment.
 func brand() string {
-	if b := os.Getenv(sdk.BrandEnv); b != "" {
+	if b := sdk.Brand(); b != "" {
 		return b
 	}
 	return "loop"

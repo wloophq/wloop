@@ -172,3 +172,24 @@ func TestTwoHandlesOfAStoreWriteWithoutABusyError(t *testing.T) {
 		t.Fatalf("counter %d (%v), want %d: a read-then-write lost an update or failed", n, err, len(dbs)*each)
 	}
 }
+
+func TestANewStoreAndItsLogAreThePluginsAlone(t *testing.T) {
+	dir := t.TempDir()
+	db, err := store.Open(context.Background(), dir, store.Options{Migrations: []store.Migration{{Version: 1, Up: func(ctx context.Context, tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `CREATE TABLE t (v TEXT)`)
+		return err
+	}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`INSERT INTO t (v) VALUES ('x')`); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{store.File, store.File + "-wal", store.File + "-shm"} {
+		fi, err := os.Stat(filepath.Join(dir, f))
+		if err != nil || fi.Mode().Perm() != 0o600 {
+			t.Errorf("%s: %v %v, want 0600", f, fi.Mode().Perm(), err)
+		}
+	}
+}

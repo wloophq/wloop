@@ -4,18 +4,32 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 MODULE := github.com/wloophq/wloop
 GOLANGCI_LINT_VERSION := v2.15.0
 GOLANGCI_LINT := bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
-BRAND_TEST_LDFLAGS := -X $(MODULE)/internal/brand.Name=zzbrand -X "$(MODULE)/internal/brand.Command=gh zzbrand" -X $(MODULE)/internal/brand.App=Zzbrand -X $(MODULE)/internal/brand.Org=zzbrandhq
+BRAND_TEST_NAME := zzbrand
+BRAND_TEST_LDFLAGS := -X $(MODULE)/internal/brand.Name=$(BRAND_TEST_NAME) -X "$(MODULE)/internal/brand.Command=gh zzbrand" -X $(MODULE)/internal/brand.App=Zzbrand -X $(MODULE)/internal/brand.Org=zzbrandhq
 
 .PHONY: build build-targets vet-darwin vet-tags dev-install test lint fmt-check fmt fuzz clean eval-instructions test-brand scan-brand print-brand-ldflags docs-ref docs proto
 
-build: ## Build the binary and the GitHub plugin's into ./bin
+PLUGINS := github slack
+
+build: ## Build the binary into ./bin and each plugin into ./bin/plugins/<id>/ with its manifest and profile layer
 	@mkdir -p bin
 	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY) ./cmd/$(BINARY)
-	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY)-plugin-github ./plugins/github/cmd/$(BINARY)-plugin-github
+	@for id in $(PLUGINS); do \
+		rm -rf bin/plugins/$$id && mkdir -p bin/plugins/$$id && \
+		echo "go build -o bin/plugins/$$id/$(BINARY)-plugin-$$id ./plugins/$$id/cmd/wloop-plugin-$$id" && \
+		go build -ldflags "$(LDFLAGS)" -o bin/plugins/$$id/$(BINARY)-plugin-$$id ./plugins/$$id/cmd/wloop-plugin-$$id && \
+		cp plugins/$$id/plugin.toml bin/plugins/$$id/ && cp -R plugins/$$id/profile bin/plugins/$$id/ || exit 1; \
+	done
 
-build-targets: ## Build every package for each release target
+build-targets: ## Build every package, the binary and each plugin's binary for each release target
+	@d=$$(mktemp -d) && trap 'rm -rf "$$d"' EXIT && \
 	for t in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64; do \
-		CGO_ENABLED=0 GOOS=$${t%/*} GOARCH=$${t#*/} go build ./... || exit 1; \
+		echo "$$t" && \
+		CGO_ENABLED=0 GOOS=$${t%/*} GOARCH=$${t#*/} go build ./... && \
+		CGO_ENABLED=0 GOOS=$${t%/*} GOARCH=$${t#*/} go build -o "$$d/$$t/$(BINARY)" ./cmd/$(BINARY) || exit 1; \
+		for id in $(PLUGINS); do \
+			CGO_ENABLED=0 GOOS=$${t%/*} GOARCH=$${t#*/} go build -o "$$d/$$t/plugins/$$id/$(BINARY)-plugin-$$id" ./plugins/$$id/cmd/wloop-plugin-$$id || exit 1; \
+		done; \
 	done
 
 vet-darwin: ## Vet the darwin build
@@ -25,7 +39,7 @@ vet-tags: ## Vet the contract and live tests, for linux and darwin, without runn
 	GOOS=linux go vet -tags contract,live ./...
 	GOOS=darwin CGO_ENABLED=0 go vet -tags contract,live ./...
 
-dev-install: build ## Run this checkout's build as the installed one: agent homes, app, LaunchAgents and ~/.local/bin
+dev-install: build ## Run this checkout's build as the installed one: agent homes, placed plugins, app, LaunchAgents and ~/.local/bin
 	@mkdir -p $(HOME)/.local/bin
 	ln -sf $(CURDIR)/bin/$(BINARY) $(HOME)/.local/bin/$(BINARY)
 	bin/$(BINARY) install
@@ -39,9 +53,14 @@ test-brand: ## Run the tests built with the test brand; SHARD=<name> runs one sh
 	pkgs=$$(if [ -n "$(SHARD)" ]; then scripts/test-shard.sh "$(SHARD)"; else echo ./...; fi) && \
 	go test -timeout 30m -ldflags '$(BRAND_TEST_LDFLAGS)' $$pkgs
 
-scan-brand: ## Check that a build with the test brand writes nothing that names the default brand
+scan-brand: ## Check that a build with the test brand, and the plugins it installs, write nothing that names the default brand
 	@d=$$(mktemp -d) && trap 'rm -rf "$$d"' EXIT && \
 	go build -ldflags '$(BRAND_TEST_LDFLAGS)' -o "$$d/zz/bin/zz" ./cmd/$(BINARY) && \
+	for id in $(PLUGINS); do \
+		mkdir -p "$$d/zz/bin/plugins/$$id" && \
+		go build -o "$$d/zz/bin/plugins/$$id/$(BRAND_TEST_NAME)-plugin-$$id" ./plugins/$$id/cmd/wloop-plugin-$$id && \
+		cp -R plugins/$$id/plugin.toml plugins/$$id/profile "$$d/zz/bin/plugins/$$id/" || exit 1; \
+	done && \
 	LOOP_BRAND_SCAN_BIN="$$d/zz/bin/zz" go test -count=1 -ldflags '$(BRAND_TEST_LDFLAGS)' -run TestNothingWrittenNamesTheDefaultBrand ./internal/e2e
 
 print-brand-ldflags: ## Print the test brand's ldflags, to update goldens

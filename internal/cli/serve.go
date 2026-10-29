@@ -354,6 +354,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	d.PluginRun = e.pluginRun
 	if e.pluginKind != nil {
 		d.Loading = e.pluginKind.Loading
+		d.PluginHealth = e.pluginHealth
 	}
 	e.serveTurnLedger(db, cfg, logf)
 	links := e.linkDeps(db, cfg, logf, &sd)

@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/wloophq/wloop/internal/brand"
 )
 
 // ErrUntrusted is a plugin binary the host does not run.
@@ -47,12 +50,15 @@ func ReadChecksums(path string) (Checksums, error) {
 	return out, sc.Err()
 }
 
+// ChecksumsFile is where install records the bundled plugins' checksums,
+// under the state directory.
+func ChecksumsFile(stateDir string) string { return filepath.Join(stateDir, "plugins", "checksums") }
+
 // Trusted is how p's binary runs: the checksum it must have, nil to run it
 // by its path, and why. trust is p's [plugins.<id>] trust. A bundled
-// plugin runs only with the checksum its install recorded; one with no
-// record, sitting in the bundled directory, is a development build and runs
-// by its path. Any other binary runs only with trust = "path", which only
-// the user writes.
+// plugin runs only with the checksum its install recorded. Any other
+// binary, and a bundled one no install recorded, runs only with trust =
+// "path", which only the user writes.
 func Trusted(p Plugin, trust string, recorded Checksums) (checksum []byte, why string, err error) {
 	switch {
 	case p.Binary == "":
@@ -62,7 +68,8 @@ func Trusted(p Plugin, trust string, recorded Checksums) (checksum []byte, why s
 	case p.Bundled && recorded[p.ID()] != nil:
 		return recorded[p.ID()], "trusted by its recorded checksum", nil
 	case p.Bundled:
-		return nil, "dev build, no checksum", nil
+		return nil, "", fmt.Errorf("%w: plugin %s runs %s, whose checksum no install recorded; run `%s install`, or set [plugins.%s] trust = %q in the configuration to run it",
+			ErrUntrusted, p.ID(), p.Binary, brand.Command, p.ID(), TrustPath)
 	}
 	return nil, "", fmt.Errorf("%w: plugin %s runs %s, which no install recorded; set [plugins.%s] trust = %q in the configuration to run it",
 		ErrUntrusted, p.ID(), p.Binary, p.ID(), TrustPath)

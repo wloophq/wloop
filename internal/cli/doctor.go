@@ -244,6 +244,9 @@ func runDoctor(ctx context.Context, e *Env, args []string) error {
 	dr := daemonChecks()
 	checks = slices.Concat(sh.timers, sh.bundle, dr.checks)
 	section("Daemon")
+	if cfgErr == nil {
+		section("Plugins", e.pluginChecks(ctx, cfg, dr.health)...)
+	}
 	section("Workflows", dr.workflows...)
 	checks = sh.paths
 	live := ssh()

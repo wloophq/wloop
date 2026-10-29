@@ -137,6 +137,9 @@ type Deps struct {
 	// Loading are the plugins that have not loaded since the daemon
 	// started, with why, by id; nil has none.
 	Loading func() map[string]string
+	// PluginHealth is how each plugin the daemon runs answers; nil runs
+	// none.
+	PluginHealth func(context.Context) []api.PluginHealth
 	// RowProviders build the read model's providers with the daemon's row
 	// deps, one per source.
 	RowProviders []func(readmodel.RowDeps) readmodel.Provider

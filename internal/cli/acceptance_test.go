@@ -482,6 +482,9 @@ var fxCheckouts struct {
 }
 
 func TestMain(m *testing.M) {
+	if servedAsPlugin() {
+		os.Exit(0)
+	}
 	os.Unsetenv("ORCA_USER_DATA_PATH")
 	storeReportWait = 0
 	builtin.Providers = append(builtin.Providers, ingesttest.Provider)
