@@ -3,7 +3,7 @@ title: Plugins
 description: How a source of units plugs into the core, what it contributes, and the boundary that keeps the core free of it.
 ---
 
-The core of {{name}} is a task system over opaque units: tasks, the Inbox, the Outbox, projects, the review, the turns, the workflows and the read model work on `unit.Unit{Provider, Key}` and never on a pull request or a Slack thread. Where units come from is a plugin's business. The bundled plugins, `github` and `slack`, run as their own processes, through the plugin host below; the host keeps, in its composition root, what each still needs in the daemon's process.
+The core of {{name}} is a task system over opaque units: tasks, their views and gates, projects, the review, the turns, the workflows and the read model work on `unit.Unit{Provider, Key}` and never on a pull request or a Slack thread. Where units come from is a plugin's business. The bundled plugins, `github` and `slack`, run as their own processes, through the plugin host below; the host keeps, in its composition root, what each still needs in the daemon's process.
 
 ## A plugin
 

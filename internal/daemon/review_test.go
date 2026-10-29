@@ -23,7 +23,7 @@ func TestTheReviewIsServedOnceRegistered(t *testing.T) {
 	if code := get(t, r.s, api.ReviewPath, &none); code != 404 {
 		t.Errorf("GET review before it is served: %d, want 404", code)
 	}
-	r.put(t, task.Task{ID: "e-in", State: "inbox", Category: task.CategoryInbox, Title: "in"}, task.Task{ID: "e-p", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "next", Category: task.CategoryReady, Title: "P"})
+	r.put(t, task.Task{ID: "t-in", State: "inbox", Category: task.CategoryInbox, Title: "in"}, task.Task{ID: "t-p", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "next", Category: task.CategoryReady, Title: "P"})
 	r.serveProjects()
 	var cat api.ViewsCatalog
 	get(t, r.s, api.ViewsPath, &cat)
@@ -99,18 +99,18 @@ func TestProjectTaskViews(t *testing.T) {
 	r.serveProjects()
 	old := tasksNow.Add(-10 * 24 * time.Hour)
 	r.put(t,
-		task.Task{ID: "e-p", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "next", Category: task.CategoryReady, Title: "P", Sequential: true, ReviewedAt: old, Created: old, Updated: old},
-		task.Task{ID: "e-q", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "next", Category: task.CategoryReady, Title: "Q", ReviewEvery: 14 * 24 * time.Hour, ReviewedAt: old, Created: old, Updated: old},
-		task.Task{ID: "e-a", State: "next", Category: task.CategoryReady, Title: "a", Parent: "e-p", Position: 1},
-		task.Task{ID: "e-b", State: "waiting", Category: task.CategoryWaiting, Title: "b", Parent: "e-p", Position: 2},
+		task.Task{ID: "t-p", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "next", Category: task.CategoryReady, Title: "P", Sequential: true, ReviewedAt: old, Created: old, Updated: old},
+		task.Task{ID: "t-q", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "next", Category: task.CategoryReady, Title: "Q", ReviewEvery: 14 * 24 * time.Hour, ReviewedAt: old, Created: old, Updated: old},
+		task.Task{ID: "t-a", State: "next", Category: task.CategoryReady, Title: "a", Parent: "t-p", Position: 1},
+		task.Task{ID: "t-b", State: "waiting", Category: task.CategoryWaiting, Title: "b", Parent: "t-p", Position: 2},
 	)
 	page := r.page(t, "view=projects")
 	byID := map[string]api.TaskView{}
 	for _, v := range page.Tasks {
 		byID[v.ID] = v
 	}
-	p, q := byID["e-p"], byID["e-q"]
-	if !slices.Equal(p.Children, []string{"e-a", "e-b"}) || !p.Sequential || !p.ReviewDue || p.ReviewEvery != "168h0m0s" || !p.ReviewedAt.Equal(old) {
+	p, q := byID["t-p"], byID["t-q"]
+	if !slices.Equal(p.Children, []string{"t-a", "t-b"}) || !p.Sequential || !p.ReviewDue || p.ReviewEvery != "168h0m0s" || !p.ReviewedAt.Equal(old) {
 		t.Errorf("project p %+v", p)
 	}
 	if len(q.Children) != 0 || q.ReviewDue || q.ReviewEvery != "336h0m0s" {
@@ -127,20 +127,20 @@ func TestProjectTaskViews(t *testing.T) {
 		t.Errorf("project verbs %v", vs)
 	}
 	a := r.page(t, "view=needs-me").Tasks
-	i := slices.IndexFunc(a, func(v api.TaskView) bool { return v.ID == "e-a" })
+	i := slices.IndexFunc(a, func(v api.TaskView) bool { return v.ID == "t-a" })
 	if i < 0 {
-		t.Fatalf("e-a not in Needs me: %v", taskIDs(a))
+		t.Fatalf("t-a not in Needs me: %v", taskIDs(a))
 	}
-	if vs := verbs(a[i]); vs["reviewed"] || vs["sequential"] || !vs["project"] || a[i].Parent != "e-p" {
+	if vs := verbs(a[i]); vs["reviewed"] || vs["sequential"] || !vs["project"] || a[i].Parent != "t-p" {
 		t.Errorf("action verbs %v, parent %q", vs, a[i].Parent)
 	}
 
-	r.put(t, task.Task{ID: "e-done", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "done", Category: task.CategoryDone, Title: "Done"},
-		task.Task{ID: "e-trash", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "trash", Category: task.CategoryDropped, Title: "Trash"})
+	r.put(t, task.Task{ID: "t-done", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "done", Category: task.CategoryDone, Title: "Done"},
+		task.Task{ID: "t-trash", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "trash", Category: task.CategoryDropped, Title: "Trash"})
 	for id, want := range map[string]map[string]bool{
-		"e-done":  {"done": false, "dismiss": true, "reference": true, "reviewed": false, "sequential": false, "project": false},
-		"e-trash": {"done": false, "dismiss": false, "reference": false, "reviewed": false, "sequential": false, "project": false},
-		"e-p":     {"done": true, "dismiss": true, "reference": true, "reviewed": true, "sequential": true, "project": false},
+		"t-done":  {"done": false, "dismiss": true, "reference": true, "reviewed": false, "sequential": false, "project": false},
+		"t-trash": {"done": false, "dismiss": false, "reference": false, "reviewed": false, "sequential": false, "project": false},
+		"t-p":     {"done": true, "dismiss": true, "reference": true, "reviewed": true, "sequential": true, "project": false},
 	} {
 		var v api.TaskView
 		if code := get(t, r.s, api.TaskPath(id), &v); code != 200 {
@@ -159,7 +159,7 @@ func TestProjectTaskViews(t *testing.T) {
 		}
 	}
 
-	rec := post(t, r.s, api.TaskPath("e-p", "reviewed"), `{"args":{"every":"3d"},"source":"test"}`)
+	rec := post(t, r.s, api.TaskPath("t-p", "reviewed"), `{"args":{"every":"3d"},"source":"test"}`)
 	var res api.TaskResult
 	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &res) != nil || res.Task.ReviewDue || res.Task.ReviewEvery != "72h0m0s" {
 		t.Errorf("reviewed: %d %s", rec.Code, rec.Body)

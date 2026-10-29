@@ -27,6 +27,6 @@ func TestActivityMovesOnlyItsUnitsTasks(t *testing.T) {
 		t.Fatal(err)
 	}
 	if e := r.task(t, task.DerivedID(unitU, "a")); e.Category != task.CategoryDeferred || e.Changed {
-		t.Fatalf("activity on V moved U's entry: %+v", e)
+		t.Fatalf("activity on V moved U's task: %+v", e)
 	}
 }

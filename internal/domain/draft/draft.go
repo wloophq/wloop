@@ -115,7 +115,7 @@ type Origin struct {
 	Intent   string // the proposing turn's intent ("" for auto and user)
 	Workflow string // the workflow that started the proposing turn (turn.Turn.Workflow), "" none
 	Rule     string // Kind "auto": the core or plugin rule, e.g. "stalled-nudge", "closure", "ask-owner", "github-nudge"
-	Key      string // Kind "auto": the rule's dedupe key, e.g. "stalled-nudge:<entry>:<person key>"
+	Key      string // Kind "auto": the rule's dedupe key, e.g. "stalled-nudge:<task>:<person key>"
 	// Unit is the unit of the proposing turn when it is not the draft's, such
 	// as a pull request whose turn drafts in a Slack thread; zero when it is.
 	Unit unit.Unit
@@ -131,11 +131,11 @@ type Draft struct {
 	ID       ID
 	Unit     unit.Unit
 	Items    []string // item ids of Unit; may be empty
-	Task     string   // the entry it serves, "" none; the Outbox entry itself is "draft:<ID>"
+	Task     string   // the task it serves, "" none; the Outbox row of the draft itself is "draft:<ID>"
 	Kind     Kind
 	Purpose  string   // what it is for: "nudge", "close", "ask_owner", or any label its proposer names
 	Delivery Delivery // how it is posted
-	Effects  []string // applied when it is sent, such as "entry.nudged"
+	Effects  []string // applied when it is sent, such as "task.nudged"
 	Target   string   // plugin target grammar; "" means the unit itself (its thread, its PR)
 	Text     string   // standard Markdown with mentions as @{<person key>}; the Effects implementation converts both
 	Reaction string   // Kind "react" only: emoji name without colons

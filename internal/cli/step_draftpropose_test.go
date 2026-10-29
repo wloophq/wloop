@@ -32,7 +32,7 @@ import (
 
 var (
 	draftThread = unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1.1"}
-	draftTask   = unit.Unit{Provider: unit.Task, Key: "e1"}
+	draftTask   = unit.Unit{Provider: unit.Task, Key: "t1"}
 	ana         = items.Person{Key: "slack:U000ANA", Name: "Ana"}
 	bob         = items.Person{Key: "slack:U000BOB", Name: "Bob"}
 )
@@ -47,7 +47,7 @@ func (m *memTasks) Task(_ context.Context, id task.ID) (task.Task, error) {
 	defer m.mu.Unlock()
 	e, ok := m.m[id]
 	if !ok {
-		return task.Task{}, fmt.Errorf("entry %s: %w", id, coretasks.ErrNoTask)
+		return task.Task{}, fmt.Errorf("task %s: %w", id, coretasks.ErrNoTask)
 	}
 	return e, nil
 }
@@ -80,7 +80,7 @@ func (okEffects) Verify(context.Context, draft.Draft, time.Time) (draft.Evidence
 }
 
 // draftRig runs draft.propose over a real store's Outbox, a user profile
-// layer in a temporary directory and fake entries and items.
+// layer in a temporary directory and fake tasks and items.
 type draftRig struct {
 	t      *testing.T
 	s      *stepSet
@@ -213,7 +213,7 @@ func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 	wf := draftWF("nudges", "purpose", "nudge", "items", "owed", "per", "person", "repeat_after", "24h")
 	wf.Steps[0].Args["effects"] = []any{"task.nudged"}
 	r := newDraftRig(t, wf, "@{{\"{\"}}{{.Person.Key}}{{\"}\"}}, any news?{{range .Items}}\n- {{.Line}}{{end}}")
-	r.tasks.m["e1"] = task.Task{ID: "e1", State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{draftThread},
+	r.tasks.m["t1"] = task.Task{ID: "t1", State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{draftThread},
 		Items: []task.ItemRef{{Unit: draftThread, Item: "i1"}, {Unit: draftThread, Item: "i2"}}}
 	r.items.set(draftThread, openItem("i1", "The deck", r.now.Add(-96*time.Hour), ana), openItem("i2", "The budget", r.now.Add(-96*time.Hour), bob))
 	r.run(draftTask)
@@ -226,7 +226,7 @@ func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 		byKey[d.Origin.Key] = d
 	}
 	anas := byKey[draftThread.String()+":"+ana.Key]
-	if anas.Text != "@{"+ana.Key+"}, any news?\n- The deck" || anas.Task != "e1" || len(anas.Effects) != 1 {
+	if anas.Text != "@{"+ana.Key+"}, any news?\n- The deck" || anas.Task != "t1" || len(anas.Effects) != 1 {
 		t.Fatalf("ana's draft %+v", anas)
 	}
 	if got := r.check(draftTask); !strings.Contains(got, "held by draft") {

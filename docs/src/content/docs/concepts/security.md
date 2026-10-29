@@ -7,15 +7,15 @@ description: What the loop protects against, what it does not, and the settings 
 
 ## The agent acts as you
 
-A round publishes on GitHub through `gh`, with your login. On Slack it proposes drafts that the Outbox posts with your token, or posts at once through a tool the loop serves to the session, which tells the agent to ask you first when it is unclear whether you want the message posted in your name. {{name}} does not try to keep an agent from an identity that is already yours, on GitHub or on Slack.
+A round publishes on GitHub through `gh`, with your login. On Slack it proposes drafts that go out with your token once their gate approves them, or posts at once through a tool the loop serves to the session, which tells the agent to ask you first when it is unclear whether you want the message posted in your name. {{name}} does not try to keep an agent from an identity that is already yours, on GitHub or on Slack.
 
-The Outbox, the approval policies and the refusals below are workflow controls. They hold against an agent's mistakes, and they keep text from other people from approving a draft: no agent's or thread's text sets a draft's approval (see [What waits for you](/concepts/approval/)). A draft whose policy waits for you is held, whoever steered it. They do not hold against an agent, steered or not, that acts as you by another path: `gh`, a tool that posts, reacts or edits on Slack, the daemon's socket or your Keychain. To keep an agent from your identities, run it where they are not: a virtual machine or another user account that does not mount your home directory or forward your SSH agent or credentials. {{name}} does not set this up for you.
+The gates, the approval policies and the refusals below are workflow controls. They hold against an agent's mistakes, and they keep text from other people from approving a draft: no agent's or thread's text sets a draft's approval (see [What waits for you](/concepts/approval/)). A draft whose policy waits for you is held, whoever steered it. They do not hold against an agent, steered or not, that acts as you by another path: `gh`, a tool that posts, reacts or edits on Slack, the daemon's socket or your Keychain. To keep an agent from your identities, run it where they are not: a virtual machine or another user account that does not mount your home directory or forward your SSH agent or credentials. {{name}} does not set this up for you.
 
 ## The same-user boundary
 
 Every protection in {{name}} assumes that the processes running as your user are on your side. An agent session with a shell is such a process.
 
-- The daemon's Unix socket (`<state>/daemon.sock`, mode 0600 in a 0700 directory) serves the CLI with no further authentication. Any process running as you can start rounds, answer questions and approve Outbox drafts through it, and write a reply that goes out at once as you (the `reply` verb and `POST /api/drafts` with send now).
+- The daemon's Unix socket (`<state>/daemon.sock`, mode 0600 in a 0700 directory) serves the CLI with no further authentication. Any process running as you can start rounds, answer questions and approve drafts through it, and write a reply that goes out at once as you (the `reply` verb and `POST /api/drafts` with send now).
 - The Slack tokens live in your login Keychain, in items created through `/usr/bin/security`. Any process running as you can read them with the same command, without a prompt, and post to Slack as you, just as it can run `gh` as you on GitHub.
 - `{{command}} outbox approve`, `outbox retry` and `outbox new --send` refuse when they detect an agent session's environment, and ask at a terminal unless `--yes`. `slack send` has no such refusal. That is a guard against mistakes, not a security boundary.
 - An agent that follows injected instructions has everything you have: your `gh` token, your SSH keys, your Keychain and your files.
@@ -32,7 +32,7 @@ Both endpoints keep other local users and web pages out. Neither keeps out a pro
 
 Automatic rounds act under your GitHub identity. The agent publishes reviews, inline comments and replies itself, through `gh` in its session, and an address round commits and pushes to your branch.
 
-The [approval window](/concepts/approval/) comes before a round starts, not before what the round publishes. The rules that a first review round never approves, that an unsure round holds its draft and asks, and what a follow-up may approve are instructions to the agent. What the agent can actually run is decided by your Claude Code permissions, plus the allows {{name}} adds for its rounds. No code checks a review before it goes out. Only drafts go through the Outbox: Slack messages and reactions, and the comments that Act and the GitHub plugin's nudge rule propose.
+The [approval window](/concepts/approval/) comes before a round starts, not before what the round publishes. The rules that a first review round never approves, that an unsure round holds its draft and asks, and what a follow-up may approve are instructions to the agent. What the agent can actually run is decided by your Claude Code permissions, plus the allows {{name}} adds for its rounds. No code checks a review before it goes out. Only drafts wait on a gate: Slack messages and reactions, and the comments that Act and the GitHub plugin's nudge rule propose.
 
 ## What reaches an agent from other people
 

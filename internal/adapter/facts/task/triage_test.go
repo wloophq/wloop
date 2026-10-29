@@ -19,14 +19,14 @@ func TestTheTriageFactsReadTheAsksThePromiseAndTheExtraction(t *testing.T) {
 	theirs := e.item(chatA, "i3", items.Open, monday.Add(-9*time.Hour), ana)
 	done := e.item(chatA, "i4", items.Resolved, monday.Add(-20*time.Hour), me)
 	promised := monday.Add(7 * time.Hour)
-	mine := task.Task{ID: "e-01", State: "next", Category: task.CategoryReady, Title: "a", Units: []unit.Unit{chatA},
+	mine := task.Task{ID: "t-01", State: "next", Category: task.CategoryReady, Title: "a", Units: []unit.Unit{chatA},
 		Items: []task.ItemRef{{Unit: chatA, Item: old.ID}, {Unit: chatA, Item: newer.ID}, {Unit: chatA, Item: theirs.ID}, {Unit: chatA, Item: done.ID}}}
 	mine.SetProp("promised", task.Value{Time: promised}, task.WriterPerson, monday)
 	e.task(mine)
 	e.unextracted[chatA] = monday.Add(-12 * time.Minute)
-	e.task(task.Task{ID: "e-02", State: "next", Category: task.CategoryReady, Title: "b", Units: []unit.Unit{chatB}})
+	e.task(task.Task{ID: "t-02", State: "next", Category: task.CategoryReady, Title: "b", Units: []unit.Unit{chatB}})
 
-	f := e.facts("e-01")
+	f := e.facts("t-01")
 	if got := f["task.ask_age"]; got != 3*time.Hour {
 		t.Errorf("task.ask_age %v, want the age of the oldest open ask to me", got)
 	}
@@ -40,7 +40,7 @@ func TestTheTriageFactsReadTheAsksThePromiseAndTheExtraction(t *testing.T) {
 		t.Errorf("task.extraction_lag %v, want 12m", got)
 	}
 
-	f = e.facts("e-02")
+	f = e.facts("t-02")
 	if f["task.ask_age"] != time.Duration(0) || len(f["task.askers"].([]string)) != 0 || !f["task.promised"].(time.Time).IsZero() ||
 		f["task.extraction_lag"] != time.Duration(0) {
 		t.Errorf("a task with no ask, promise or backlog: %v %v %v %v", f["task.ask_age"], f["task.askers"], f["task.promised"], f["task.extraction_lag"])

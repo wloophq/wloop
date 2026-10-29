@@ -132,7 +132,7 @@ func runCapturing(ctx context.Context, e *Env, d dintent.Def, args []string) err
 	fmt.Fprintf(e.Out, "captured %s\n", u)
 	p.guidance, p.briefFile = "", ""
 	if err := askOn(ctx, e, d, u, p); err != nil {
-		return fmt.Errorf("%w; run it again on the entry with %s", err, retryLine(retryArgs(d, u, p)))
+		return fmt.Errorf("%w; run it again on the task with %s", err, retryLine(retryArgs(d, u, p)))
 	}
 	return nil
 }

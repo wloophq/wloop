@@ -1,13 +1,13 @@
 ---
 title: What waits for you
-description: The approval window of automatic rounds, the ambiguity gate inside a round, and the Outbox of drafts.
+description: The gates that wait for you, the approval window of automatic rounds, the ambiguity gate inside a round, and the drafts' gates the Outbox lists.
 ---
 
 Every decision that waits for you is a **gate**: a draft to send, a round to run, an agent's question or post, a proposal, a repository's first run, a workflow's `gate.open`. Three mechanisms keep the loop from acting where you would not:
 
 1. the **approval window** announces every automatic round before it goes out;
 2. the **ambiguity gate** stops a round that is unsure and asks you before publishing;
-3. the **Outbox** holds every draft that an agent or a rule proposes to post, until its gate lets it out.
+3. a **draft gate** holds every draft that an agent or a rule proposes to post until it lets the draft out; the **Outbox** lists them.
 
 ## Gates
 

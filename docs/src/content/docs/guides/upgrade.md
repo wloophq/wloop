@@ -51,12 +51,37 @@ The words for tasks have new names in the profile and the configuration. Each ol
 
 - `gtd.toml` is not read: its `[verbs]` go in `tasks.toml`, its `[views]` and `[review]` in `views.toml`;
 - the `[gtd]` table of `config.toml` is `[tasks]` (`tasks.stale_waiting_days`, `tasks.areas`, `tasks.contexts`);
-- the facts `entry.*` are `task.*`, but `entry.units_ended`, `entry.unit_started_by_me` and `entry.unit_closure_posted`, which are `task.link_ended`, `task.link_started_by_me` and `task.link_closure_posted`; `slack.live_entry` is `slack.live_task` and `config.gtd.*` is `config.tasks.*`;
+- the provider `entry` is `task`: a workflow's or an intent's `provider = "entry"` names `task`;
+- the facts `entry.*` are `task.*`, but these, whose meaning changed with their name: `entry.units_ended`, `entry.unit_started_by_me` and `entry.unit_closure_posted` are `task.link_ended`, `task.link_started_by_me` and `task.link_closure_posted`; `entry.waiting_on` and `entry.items_owed` are `task.owed_by`; `entry.waiting_days` is `task.owed_since`; `entry.resurface_at` is `task.check_on`; `entry.kind` is `task.prop.kind`; `entry.since_nudge` and `entry.nudge_due_at` are `task.prop.last_nudge`; `entry.muted` is `task.wake_until`;
+- `slack.live_entry` is `slack.live_task`, and `config.gtd.*` is `config.tasks.*`;
 - the step `entry.verb` is `task.verb`, and the effect `entry.nudged` is `task.nudged`;
 - the workflow `entry-results-ended` is `task-results-ended`: rename an override directory of the old name in your profile, and a `[workflows.entry-results-ended]` block of `config.toml`;
-- `profile schema --gtd` is `--tasks`, `--views` or `--gates`.
+- `profile schema --gtd` is `--tasks`, `--views` or `--gates`;
+- a view's key and its help are its `key` and `label` in `views.toml`: a user `keys.toml` that words a view's help, such as `"nav:inbox"` under `[help.global]`, is a profile problem naming the line.
+
+A `draft.propose` text template reads the task as `{{.Task}}`, where it read `{{.Entry}}`.
 
 The lists are the views of `views.toml`, each with its own condition (`when`). Next is gone: your next actions are in Needs me, beside the open gates of your tasks, and a sequential project's next action comes first there. A `[views.next]` of your `views.toml` declares a view of your own, which lists nothing until you give it a `when`. The review's projects step walks the view `review-projects`: a `[review.projects]` fails to load, naming it. The badge counts Inbox and Needs me, where it counted Inbox and the Outbox. Needs me, Stalled, In loop, Approved and Done are views of tasks across sources: the GitHub plugin's views of those names are gone, a pull request shows there through its task, and the GitHub views left are My PRs, Plan, Backlog, All, Explore and Recent. The menu bar's In loop section went with them. Done lists the done tasks whose pull request's workspace remains, and it and Approved offer Remove all clean (`POST /api/workspaces/remove-clean`, which takes the view; `remove-done` is gone). `{{command}} status` lists the tasks of the badge's views and your tracked pull requests, and `{{command}} open --view` takes any view's id. The bundled `tasks.toml` gives the properties `area`, `contexts`, `focus` and `due` the roles `area`, `contexts`, `star` and `deadline`, and its `dismiss`, `done` and `reference` verbs the handlers `drop` and `finish`.
+
+A task in Reference is closed now, since its category is `done`: it leaves Focus and Projects, and workflows over tasks no longer see it.
+
+A task is `task:<id>`, its id `t-` and 16 hex digits, where an entry's was `e-`; a migrated task keeps its hex, so `e-3f9a2c4b5d6e7f80` is `t-3f9a2c4b5d6e7f80`. A target `entry:<id>` on the command line, such as `{{command}} start entry:<id>`, is refused naming its `task:<id>` form. A task's dossier is under `dossiers/task/<id>#/`, where an entry's was under `dossiers/entry/`: the daemon moves the directories at its start, retries at every start when a move fails, and `doctor` names a directory left behind.
+
+Links and notifications from before the upgrade:
+
+- a cockpit link whose hash names `entry=<id>` opens no task: the hash is `task=<id>`;
+- the task buttons of a notification take the action ids `task:<verb>`, where they took `gtd:<verb>`: a button of a notification posted before the upgrade runs nothing and answers "Action not sent", so act on that task from the cockpit or the terminal.
+
+A script that calls the daemon's API finds the tasks' routes renamed:
+
+- `/api/entries` is `/api/tasks`, and every route under it is under `/api/tasks/<id>/`;
+- `/api/gtd` is `/api/views`;
+- a task's unit routes are `/api/units/task/<id>/...`, where they were `/api/units/entry/<id>/...`;
+- the JSON fields `entries`, `entry` and `entry_id` are `tasks`, `task` and `task_id`, and `GET /api/drafts` takes `task=<id>` where it took `entry=<id>`.
+
+The agent tools `inbox_post` and `inbox_read` are `task_post` and `task_read`: a post names the gate it waits on, and `task_read` also reads the task, its brief, its open gates and its chat. `{{command}} turn answer` takes `--gate` only; `--message` is gone. The fact `session.unread_answers` is `session.unread_gates`, counting gates, and a user workflow or `tools.toml` that names an old one fails to load naming the new one.
+
+A reply that names no `send` takes its verb's `send` in `tasks.toml`, which the bundled profile sets to `now`: set `send = "draft"` under `[verbs.reply]` in your `tasks.toml` to keep replies held for approval by default.
 
 Each plugin's settings live in its `[plugins.<id>]` table, and each old key fails at load naming its new one:
 
@@ -94,5 +119,3 @@ Run `{{command}} uninstall` first, while the newer binary is still installed: it
 ## Rotating the MCP key
 
 The daemon's MCP endpoint requires a per-install secret, `<state>/mcp.key`, which `install` writes into every home's registration as the `X-Loop-Key` header. To rotate it, delete the file and run `{{command}} install` again. Sessions started before keep the old header until they restart.
-
-The agent tools `inbox_post` and `inbox_read` are `task_post` and `task_read`: a post names the gate it waits on, and `task_read` also reads the task, its brief, its open gates and its chat. `{{command}} turn answer` takes `--gate` only; `--message` is gone. The fact `session.unread_answers` is `session.unread_gates`, counting gates, and a user workflow or `tools.toml` that names an old one fails to load naming the new one. A reply that names no `send` takes its verb's `send` in `tasks.toml`, which the bundled profile sets to `now`: set `send = "draft"` under `[verbs.reply]` in your `tasks.toml` to keep replies held for approval by default.

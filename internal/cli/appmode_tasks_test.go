@@ -83,7 +83,7 @@ func TestTheMenubarFollowsARealDaemonsInbox(t *testing.T) {
 	go func() { _ = app.Run(appCtx); close(appDone) }()
 	defer func() { stopApp(); <-appDone }()
 
-	eventually(t, "the Inbox entry's notification and badge", func() bool {
+	eventually(t, "the Inbox task's notification and badge", func() bool {
 		posted, _ := notes.seen()
 		return len(posted) == 1 && tray.title() == "PR 1" && tray.has("Inbox (1)")
 	})
@@ -103,7 +103,7 @@ func TestTheMenubarFollowsARealDaemonsInbox(t *testing.T) {
 	if _, err := client.New(te.Socket).TaskDo(ctx, task, "next", api.TaskRequest{Source: "cli"}); err != nil {
 		t.Fatal(err)
 	}
-	eventually(t, "the withdrawal once the entry left the Inbox", func() bool {
+	eventually(t, "the withdrawal once the task left the Inbox", func() bool {
 		_, withdrawn := notes.seen()
 		return slices.Equal(withdrawn, []string{n.ID}) && tray.title() == "PR 1" && tray.has("Inbox (0)") && tray.has("Needs me (1)")
 	})

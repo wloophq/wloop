@@ -396,7 +396,7 @@ func TestValidateRefusesWithoutPosting(t *testing.T) {
 		"not member": {d: draft.Draft{Unit: dslack.ThreadUnit(team, pubOutside, pubParent), Kind: draft.Reply, Text: "hi"}, want: []string{"not a member", "#elsewhere"}, is: send.ErrCannotPost},
 		"two users":  {d: draft.Draft{Unit: dslack.ThreadUnit(team, pubConv, pubParent), Kind: draft.Nudge, Text: "hi", Target: "@sam"}, want: []string{"U0000000011", "U0000000012"}, is: send.ErrAmbiguous},
 		"empty":      {d: threadDraft(draft.Reply, "  "), want: []string{"empty"}},
-		"other unit": {d: draft.Draft{Unit: unit.Unit{Provider: unit.ProviderID("task"), Key: "e1"}, Kind: draft.Reply, Text: "hi"}, want: []string{"needs a target"}},
+		"other unit": {d: draft.Draft{Unit: unit.Unit{Provider: unit.ProviderID("task"), Key: "t1"}, Kind: draft.Reply, Text: "hi"}, want: []string{"needs a target"}},
 		"react dm":   {d: draft.Draft{Unit: ps.segmentUnit(t), Kind: draft.React, Delivery: draft.Reaction, Reaction: "eyes"}, want: []string{"needs a target"}},
 		"escapes":    {d: threadDraft(draft.Reply, "a & b <c> <@U0001|x> <https://x.y|z>"), want: nil},
 	} {
@@ -666,7 +666,7 @@ func TestAnEditIsNeverPublishedAsADraft(t *testing.T) {
 func TestADraftOnAnotherProvidersUnitPostsToItsTarget(t *testing.T) {
 	started := time.Unix(1700000300, 0)
 	ps := newPubSlack(t)
-	d := draft.Draft{ID: 9, Unit: unit.Unit{Provider: unit.ProviderID("task"), Key: "e1"}, Kind: draft.Reply, Purpose: "reply", Delivery: draft.Message,
+	d := draft.Draft{ID: 9, Unit: unit.Unit{Provider: unit.ProviderID("task"), Key: "t1"}, Kind: draft.Reply, Purpose: "reply", Delivery: draft.Message,
 		Text: "the new search is live", Target: pubConv}
 	if where, err := ps.publisher().Where(context.Background(), d); err != nil || where != "#general" {
 		t.Fatalf("Where = %q, %v", where, err)
@@ -685,7 +685,7 @@ func TestADraftOnAnotherProvidersUnitPostsToItsTarget(t *testing.T) {
 
 func TestAPostOnAnotherProvidersUnitLandsInTheThreadItStarts(t *testing.T) {
 	ps := newPubSlack(t)
-	d := draft.Draft{ID: 9, Unit: unit.Unit{Provider: unit.ProviderID("task"), Key: "e1"}, Delivery: draft.Message, Target: pubConv,
+	d := draft.Draft{ID: 9, Unit: unit.Unit{Provider: unit.ProviderID("task"), Key: "t1"}, Delivery: draft.Message, Target: pubConv,
 		Evidence: draft.Evidence{Ref: "1700000300.000100", Permalink: "https://acme.slack.com/archives/" + pubConv + "/p1700000300000100"}}
 	u, ok, err := ps.publisher().Landed(context.Background(), d)
 	if err != nil || !ok || u != dslack.ThreadUnit(team, pubConv, "1700000300.000100") {

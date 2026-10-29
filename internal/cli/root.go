@@ -345,7 +345,7 @@ func (e *Env) closedByManager(ctx context.Context, manager, session, lastHandle 
 	return closed, nil
 }
 
-// taskFacts is the entry subject's facts provider, reading the config the
+// taskFacts is the task subject's facts provider, reading the config the
 // daemon holds at each read; ended says whether a unit has ended, repo what
 // repository it is of.
 func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (bool, error), repo func(context.Context, unit.Unit) (string, error)) *facttask.Provider {

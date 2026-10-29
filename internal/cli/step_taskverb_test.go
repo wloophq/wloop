@@ -45,7 +45,7 @@ use = "task.verb"
 verb = "focus"
 `
 
-// taskRig is the entries service over a store, served as the daemon's.
+// taskRig is the tasks service over a store, served as the daemon's.
 type taskRig struct {
 	te *testEnv
 	db *sqlite.DB
@@ -82,7 +82,7 @@ func TestTaskVerbRecordsItsEventAndAnotherWorkflowReactsInChain(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newTaskRig(t, map[string]string{"workflows/my-clarify/workflow.toml": clarifyWorkflow, "workflows/my-star/workflow.toml": starWorkflow})
-	r.put(t, "e-01", task.State("inbox"))
+	r.put(t, "t-01", task.State("inbox"))
 	ed := engineDeps{DB: r.db, SessionFacts: noUnits{}, WorkspaceFacts: noUnits{}}
 	r.te.wireSubjects(&serveWiring{DB: r.db, Cfg: r.te.cfg, Engine: &ed})
 	eng := r.te.newEngine(ed)
@@ -92,7 +92,7 @@ func TestTaskVerbRecordsItsEventAndAnotherWorkflowReactsInChain(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	e, err := r.db.Tasks().Task(ctx, "e-01")
+	e, err := r.db.Tasks().Task(ctx, "t-01")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,18 +122,18 @@ func TestTaskVerbCheckRefusesWhatTheTasksStateRefuses(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newTaskRig(t, nil)
-	r.put(t, "e-01", task.State("done"))
+	r.put(t, "t-01", task.State("done"))
 	s := newStepSet(r.te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: r.te.Rounds})
-	u := task.UnitOf("e-01")
+	u := task.UnitOf("t-01")
 	refusal, err := s.Check(ctx, wfStep("task.verb", "verb", "done"), u, workflow.Why{Workflow: "w"}, automation.CheckOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(refusal, "done on a done entry") {
+	if !strings.Contains(refusal, "done on a done ") {
 		t.Fatalf("refusal %q", refusal)
 	}
 	if refusal, err := s.Check(ctx, wfStep("task.verb", "verb", "dismiss"), u, workflow.Why{Workflow: "w"}, automation.CheckOpts{}); err != nil || refusal != "" {
-		t.Fatalf("dismiss on a done entry: %q %v", refusal, err)
+		t.Fatalf("dismiss on a done task: %q %v", refusal, err)
 	}
 	if refusal, err := s.Check(ctx, wfStep("task.verb", "verb", "reference"), u, workflow.Why{Workflow: "w"}, automation.CheckOpts{}); err != nil || !strings.Contains(refusal, "workflow may not run reference") {
 		t.Fatalf("reference, which no by.workflow lets a workflow run: %q %v", refusal, err)
@@ -145,29 +145,29 @@ func TestTaskVerbLeavesClosingADerivedTaskToItsItems(t *testing.T) {
 	ctx := context.Background()
 	r := newTaskRig(t, nil)
 	at := testNow.Add(-time.Hour)
-	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-02", State: "waiting", Category: task.CategoryWaiting,
+	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-02", State: "waiting", Category: task.CategoryWaiting,
 		Title: "Waiting on the reviewer", Origin: task.OriginDerived, Items: []task.ItemRef{{Unit: verbPR, Item: "gh:review"}}, Units: []unit.Unit{verbPR},
 		Created: at, Updated: at}}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-03", State: "next", Category: task.CategoryReady,
+	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-03", State: "next", Category: task.CategoryReady,
 		Title: "Follow the merged pull request", Origin: task.OriginDerived, Resolved: []task.ItemRef{{Unit: verbPR, Item: "gh:review"}}, Units: []unit.Unit{verbPR},
 		Created: at, Updated: at}}}); err != nil {
 		t.Fatal(err)
 	}
 	s := newStepSet(r.te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: r.te.Rounds})
 	why := workflow.Why{Workflow: "w"}
-	if refusal, err := s.Check(ctx, wfStep("task.verb", "verb", "done"), task.UnitOf("e-03"), why, automation.CheckOpts{}); err != nil || refusal != "" {
+	if refusal, err := s.Check(ctx, wfStep("task.verb", "verb", "done"), task.UnitOf("t-03"), why, automation.CheckOpts{}); err != nil || refusal != "" {
 		t.Errorf("done on a derived task whose items all resolved, such as a merged pull request's: %q %v", refusal, err)
 	}
 	for _, v := range []string{"done", "dismiss"} {
-		refusal, err := s.Check(ctx, wfStep("task.verb", "verb", v), task.UnitOf("e-02"), why, automation.CheckOpts{})
+		refusal, err := s.Check(ctx, wfStep("task.verb", "verb", v), task.UnitOf("t-02"), why, automation.CheckOpts{})
 		if err != nil || !strings.Contains(refusal, "closes when its items resolve") {
-			t.Errorf("%s on a derived entry: %q %v", v, refusal, err)
+			t.Errorf("%s on a derived task: %q %v", v, refusal, err)
 		}
 	}
-	if refusal, err := s.Check(ctx, wfStep("task.verb", "verb", "next"), task.UnitOf("e-02"), why, automation.CheckOpts{}); err != nil || refusal != "" {
-		t.Errorf("next on a derived entry: %q %v", refusal, err)
+	if refusal, err := s.Check(ctx, wfStep("task.verb", "verb", "next"), task.UnitOf("t-02"), why, automation.CheckOpts{}); err != nil || refusal != "" {
+		t.Errorf("next on a derived task: %q %v", refusal, err)
 	}
 }
 

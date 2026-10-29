@@ -82,10 +82,10 @@ func positions(t *testing.T, r *projectRig, ids ...task.ID) map[task.ID]int {
 
 func TestProjectFromTask(t *testing.T) {
 	r := newProjectRig()
-	e := r.put(t, task.Task{ID: "e-cap", State: "inbox", Category: task.CategoryInbox, Title: "Write the RFC", Props: task.Props{"area": {Text: "OSS"}}, Origin: task.OriginUser})
+	e := r.put(t, task.Task{ID: "t-cap", State: "inbox", Category: task.CategoryInbox, Title: "Write the RFC", Props: task.Props{"area": {Text: "OSS"}}, Origin: task.OriginUser})
 	res := r.do(t, e.ID, task.VerbProject, map[string]string{"title": "Ship the v2 API"})
 	if res.Task.ID != e.ID || res.Task.Parent == "" || res.Task.Position != 1 || res.Task.Category != task.CategoryInbox {
-		t.Fatalf("attached entry %+v", res.Task)
+		t.Fatalf("attached task %+v", res.Task)
 	}
 	p := r.task(t, res.Task.Parent)
 	if !p.IsProject() || p.Category != task.CategoryReady || p.Title != "Ship the v2 API" || p.Prop("area").Text != "OSS" {
@@ -95,7 +95,7 @@ func TestProjectFromTask(t *testing.T) {
 		t.Errorf("dossiers opened %v", r.dossiers.opened)
 	}
 
-	other := r.put(t, task.Task{ID: "e-cap2", State: "next", Category: task.CategoryReady, Title: "x", Origin: task.OriginDerived})
+	other := r.put(t, task.Task{ID: "t-cap2", State: "next", Category: task.CategoryReady, Title: "x", Origin: task.OriginDerived})
 	res = r.do(t, other.ID, task.VerbProject, map[string]string{"title": "Ship the v2 API!"})
 	if p2 := r.task(t, res.Task.Parent); p2.ID == p.ID || !slices.Equal(r.dossiers.opened, []task.ID{p.ID, p2.ID}) {
 		t.Errorf("a second project of the same name: %+v", p2)
@@ -109,7 +109,7 @@ func TestProjectFromTask(t *testing.T) {
 	}
 
 	r.dossiers.fail = errors.New("disk full")
-	third := r.put(t, task.Task{ID: "e-cap3", State: "inbox", Category: task.CategoryInbox, Title: "y", Origin: task.OriginUser})
+	third := r.put(t, task.Task{ID: "t-cap3", State: "inbox", Category: task.CategoryInbox, Title: "y", Origin: task.OriginUser})
 	res = r.do(t, third.ID, task.VerbProject, map[string]string{"title": "Broken disk"})
 	if res.Task.Parent == "" || len(res.Lines) == 0 {
 		t.Errorf("a failed dossier still files the project and says so: %+v", res)

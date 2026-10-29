@@ -87,12 +87,12 @@ func TestASentDraftAppliesItsEffectsOnce(t *testing.T) {
 	e := newEnv()
 	l := withApplier(e)
 	p := reply("closing")
-	p.Effects = []string{"entry.nudged", "unit.closed"}
+	p.Effects = []string{"task.nudged", "unit.closed"}
 	d := e.sendNow(t, p)
 	if d.State != draft.Sent || !d.EffectsAppliedAt.Equal(t0) {
 		t.Fatalf("draft %+v", d)
 	}
-	if got := l.names(); !slices.Equal(got, []string{"entry.nudged", "unit.closed"}) {
+	if got := l.names(); !slices.Equal(got, []string{"task.nudged", "unit.closed"}) {
 		t.Fatalf("applied %v", got)
 	}
 	for range 2 {
@@ -135,9 +135,9 @@ func TestADraftDeclaringAnEffectItsProviderDoesNotImplementIsRefused(t *testing.
 func TestEffectsAreAppliedOnceAcrossARestart(t *testing.T) {
 	e := newEnv()
 	l := withApplier(e)
-	l.fail["entry.nudged"] = errBoom
+	l.fail["task.nudged"] = errBoom
 	p := reply("any news?")
-	p.Effects = []string{"entry.nudged"}
+	p.Effects = []string{"task.nudged"}
 	d := e.sendNow(t, p)
 	if d.State != draft.Sent || !d.EffectsAppliedAt.IsZero() {
 		t.Fatalf("a failed effect undid the send or marked it applied: %+v", d)
@@ -148,7 +148,7 @@ func TestEffectsAreAppliedOnceAcrossARestart(t *testing.T) {
 	before.Effects = []string{"unit.closed"}
 	e.store.drafts = append(e.store.drafts, before)
 
-	delete(l.fail, "entry.nudged")
+	delete(l.fail, "task.nudged")
 	restarted := &Service{Store: e.store, Effects: e.svc.Effects, Clock: e.clock,
 		Applier: EffectApplier{Store: memApplied{e.store}, Effects: l.lookup, Clock: e.clock}}
 	for range 2 {
@@ -156,7 +156,7 @@ func TestEffectsAreAppliedOnceAcrossARestart(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := l.names(); !slices.Equal(got, []string{"entry.nudged"}) {
+	if got := l.names(); !slices.Equal(got, []string{"task.nudged"}) {
 		t.Fatalf("applied %v, want the failed effect once and none of the draft applied before", got)
 	}
 	if got := e.get(d.ID); !got.EffectsAppliedAt.Equal(t0) {

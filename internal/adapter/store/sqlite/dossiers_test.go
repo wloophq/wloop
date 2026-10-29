@@ -78,7 +78,7 @@ func TestDossierStoreOpenReadsItemsAndTasks(t *testing.T) {
 		return ok
 	}
 	if open(ghPull) {
-		t.Fatal("a unit without items or entries is open")
+		t.Fatal("a unit without items or tasks is open")
 	}
 	it := sampleItem(ghPull, "i1", at)
 	it.State, it.Resolution = items.Resolved, items.Done
@@ -101,14 +101,14 @@ func TestDossierStoreOpenReadsItemsAndTasks(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !open(slackThread) {
-		t.Fatal("a live entry does not keep the unit open")
+		t.Fatal("a live task does not keep the unit open")
 	}
 	e.State, e.Category = "done", task.CategoryDone
 	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
 	if open(slackThread) {
-		t.Fatal("a done entry keeps the unit open")
+		t.Fatal("a done task keeps the unit open")
 	}
 	of := func(o dossier.Owner) bool {
 		t.Helper()

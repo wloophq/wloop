@@ -156,14 +156,14 @@ func waitUntil(t *testing.T, what string, cond func() bool) {
 
 func mixedTasks() []task.Task {
 	return []task.Task{
-		{ID: "e-1", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "OSS"}, "contexts": {List: []string{"@decide"}}}},
-		{ID: "e-2", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "Hiring"}}},
-		{ID: "e-3", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "OSS"}, "contexts": {List: []string{"@reply"}}}, Created: tasksNow.Add(-time.Hour)},
-		{ID: "e-4", State: "inbox", Category: task.CategoryInbox, Props: task.Props{"area": {Text: "Hiring"}}},
-		{ID: "e-p", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "OSS"}, task.PropKind: {Text: task.KindProject}}, Sequential: true, Title: "Launch"},
-		{ID: "e-5", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "OSS"}}, Parent: "e-p", Position: 1},
-		{ID: "e-6", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "OSS"}}, Parent: "e-p", Position: 2},
-		{ID: "e-7", State: "someday", Category: task.CategoryDeferred, Props: task.Props{"area": {Text: "OSS"}}},
+		{ID: "t-1", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "OSS"}, "contexts": {List: []string{"@decide"}}}},
+		{ID: "t-2", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "Hiring"}}},
+		{ID: "t-3", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "OSS"}, "contexts": {List: []string{"@reply"}}}, Created: tasksNow.Add(-time.Hour)},
+		{ID: "t-4", State: "inbox", Category: task.CategoryInbox, Props: task.Props{"area": {Text: "Hiring"}}},
+		{ID: "t-p", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "OSS"}, task.PropKind: {Text: task.KindProject}}, Sequential: true, Title: "Launch"},
+		{ID: "t-5", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "OSS"}}, Parent: "t-p", Position: 1},
+		{ID: "t-6", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "OSS"}}, Parent: "t-p", Position: 2},
+		{ID: "t-7", State: "someday", Category: task.CategoryDeferred, Props: task.Props{"area": {Text: "OSS"}}},
 	}
 }
 
@@ -196,7 +196,7 @@ func TestTasksPageMatchesTheQuery(t *testing.T) {
 		}
 	}
 	p := r.page(t, "view=needs-me&area=OSS")
-	if i := slices.Index(taskIDs(p.Tasks), "e-5"); i < 0 || p.Tasks[i].Parent != "e-p" || len(p.Tasks[i].Verbs) == 0 {
+	if i := slices.Index(taskIDs(p.Tasks), "t-5"); i < 0 || p.Tasks[i].Parent != "t-p" || len(p.Tasks[i].Verbs) == 0 {
 		t.Fatalf("project action %+v", p.Tasks)
 	}
 	if code := get(t, r.s, api.TasksPath+"?view=bogus", nil); code != 400 {
@@ -210,16 +210,16 @@ func TestTasksSinceIsIncremental(t *testing.T) {
 	r.put(t, mixedTasks()...)
 	inbox := r.page(t, "view=inbox")
 	needs := r.page(t, "view=needs-me")
-	if rec := post(t, r.s, api.TaskPath("e-4", "next"), `{"source":"cockpit"}`); rec.Code != 200 {
+	if rec := post(t, r.s, api.TaskPath("t-4", "next"), `{"source":"cockpit"}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	since := func(p api.TasksPage) string { return api.Since{Epoch: p.Epoch, Rev: p.Rev}.String() }
 	got := r.page(t, "view=inbox&since="+url.QueryEscape(since(inbox)))
-	if got.Full || len(got.Tasks) != 0 || !slices.Equal(got.Removed, []string{"e-4"}) || got.Rev != inbox.Rev+1 {
+	if got.Full || len(got.Tasks) != 0 || !slices.Equal(got.Removed, []string{"t-4"}) || got.Rev != inbox.Rev+1 {
 		t.Fatalf("inbox since: %+v", got)
 	}
 	got = r.page(t, "view=needs-me&since="+url.QueryEscape(since(needs)))
-	if !got.Full || !slices.Contains(taskIDs(got.Tasks), "e-4") || len(got.Tasks) != len(needs.Tasks)+1 {
+	if !got.Full || !slices.Contains(taskIDs(got.Tasks), "t-4") || len(got.Tasks) != len(needs.Tasks)+1 {
 		t.Fatalf("needs me since, a view over who owes a task: full %v tasks %v", got.Full, taskIDs(got.Tasks))
 	}
 	if got := r.page(t, "view=inbox&since=other:1"); !got.Full {
@@ -257,7 +257,7 @@ func waitFeedListening(t *testing.T, log *change.Log, sub *subscriber) {
 			case <-retry:
 				waiting = false
 			case <-deadline:
-				t.Fatal("the entries feed never published")
+				t.Fatal("the tasks feed never published")
 			}
 		}
 	}
@@ -282,11 +282,11 @@ func nextChange(t *testing.T, sub *subscriber) api.Change {
 func TestVerbPostMovesAndStreams(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, nil)
-	r.put(t, task.Task{ID: "e-1", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}})
+	r.put(t, task.Task{ID: "t-1", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}})
 	sub := r.subscribe(t)
-	rec := post(t, r.s, api.TaskPath("e-1", "next"), `{"source":"cockpit"}`)
+	rec := post(t, r.s, api.TaskPath("t-1", "next"), `{"source":"cockpit"}`)
 	var res api.TaskResult
-	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &res) != nil || res.Task.State != "next" || res.Task.ID != "e-1" {
+	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &res) != nil || res.Task.State != "next" || res.Task.ID != "t-1" {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	c := nextChange(t, sub)
@@ -298,7 +298,7 @@ func TestVerbPostMovesAndStreams(t *testing.T) {
 func TestAVerbTheProfileForbidsIsForbidden(t *testing.T) {
 	t.Parallel()
 	rec := httptest.NewRecorder()
-	writeTasksError(rec, fmt.Errorf("%w: agent may not run done on this entry", coretasks.ErrForbidden))
+	writeTasksError(rec, fmt.Errorf("%w: agent may not run done on this task", coretasks.ErrForbidden))
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("%d %s", rec.Code, rec.Body)
 	}
@@ -307,22 +307,22 @@ func TestAVerbTheProfileForbidsIsForbidden(t *testing.T) {
 func TestVerbErrors(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, nil)
-	r.put(t, task.Task{ID: "e-1", State: "inbox", Category: task.CategoryInbox})
-	rec := post(t, r.s, api.TaskPath("e-1", "bogus"), `{}`)
+	r.put(t, task.Task{ID: "t-1", State: "inbox", Category: task.CategoryInbox})
+	rec := post(t, r.s, api.TaskPath("t-1", "bogus"), `{}`)
 	if rec.Code != 400 || !strings.Contains(rec.Body.String(), "next, waiting, schedule") {
 		t.Fatalf("unknown verb: %d %s", rec.Code, rec.Body)
 	}
-	if rec := post(t, r.s, api.TaskPath("e-none", "next"), `{}`); rec.Code != 404 {
+	if rec := post(t, r.s, api.TaskPath("t-none", "next"), `{}`); rec.Code != 404 {
 		t.Fatalf("unknown id: %d %s", rec.Code, rec.Body)
 	}
-	if rec := post(t, r.s, api.TaskPath("e-1", "schedule"), `{}`); rec.Code != 400 {
+	if rec := post(t, r.s, api.TaskPath("t-1", "schedule"), `{}`); rec.Code != 400 {
 		t.Fatalf("a missing argument: %d %s", rec.Code, rec.Body)
 	}
-	if rec := post(t, r.s, api.TaskPath("e-1", "inbox"), `{}`); rec.Code != 400 {
+	if rec := post(t, r.s, api.TaskPath("t-1", "inbox"), `{}`); rec.Code != 400 {
 		t.Fatalf("a state for a verb: %d %s", rec.Code, rec.Body)
 	}
-	post(t, r.s, api.TaskPath("e-1", "done"), `{}`)
-	if rec := post(t, r.s, api.TaskPath("e-1", "next"), `{}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "done") {
+	post(t, r.s, api.TaskPath("t-1", "done"), `{}`)
+	if rec := post(t, r.s, api.TaskPath("t-1", "next"), `{}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "done") {
 		t.Fatalf("a refused state: %d %s", rec.Code, rec.Body)
 	}
 }
@@ -419,7 +419,7 @@ func TestCountersShipWithChanges(t *testing.T) {
 	r := newTasksRig(t, nil)
 	r.put(t, mixedTasks()...)
 	sub := r.subscribe(t)
-	if rec := post(t, r.s, api.TaskPath("e-4", "someday"), `{}`); rec.Code != 200 {
+	if rec := post(t, r.s, api.TaskPath("t-4", "someday"), `{}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	c := nextChange(t, sub)
@@ -480,15 +480,15 @@ func TestSourceActivityReturnsASnoozedTaskWhereItWasNotToTheInbox(t *testing.T) 
 	synctest.Test(t, func(t *testing.T) {
 		r := newTasksRig(t, nil)
 		ctx := context.Background()
-		r.put(t, task.Task{ID: "e-s", State: "scheduled", Category: task.CategoryDeferred, Units: []unit.Unit{r7u},
+		r.put(t, task.Task{ID: "t-s", State: "scheduled", Category: task.CategoryDeferred, Units: []unit.Unit{r7u},
 			SeenAt: tasksNow.Add(-time.Hour), Created: tasksNow.Add(-2 * time.Hour), Updated: tasksNow.Add(-2 * time.Hour)})
-		r.sleep(t, wake.Wake{Task: "e-s", On: []string{wake.OnActivity}, Return: "next"})
+		r.sleep(t, wake.Wake{Task: "t-s", On: []string{wake.OnActivity}, Return: "next"})
 		r.startSync(t)
 		r.log.Note(port.TopicSourceEvents, r7u)
 		time.Sleep(syncMaxDelay)
 		synctest.Wait()
 		if p := r.page(t, "view=inbox"); len(p.Tasks) != 0 {
-			t.Fatalf("the source event moved the entry before its card: %+v", p.Tasks)
+			t.Fatalf("the source event moved the task before its card: %+v", p.Tasks)
 		}
 		ana := items.Person{Key: "github:ana", Name: "ana"}
 		c := card.Card{Unit: r7u, Title: "Batch export", State: "open", LastHuman: &card.Human{Who: ana, What: "commented", At: tasksNow.Add(-time.Minute)}}
@@ -496,13 +496,13 @@ func TestSourceActivityReturnsASnoozedTaskWhereItWasNotToTheInbox(t *testing.T) 
 			t.Fatal(err)
 		}
 		waitUntil(t, "the task's wake matched", func() bool {
-			w, ok, err := r.db.Wakes().Of(ctx, "e-s")
+			w, ok, err := r.db.Wakes().Of(ctx, "t-s")
 			return err == nil && ok && len(w.On) == 0 && w.Return == "next"
 		})
-		if _, err := r.g.Do(ctx, "e-s", coretasks.Request{Actor: task.ActorWorkflow, Source: "task-wake", Verb: task.VerbWake}); err != nil {
+		if _, err := r.g.Do(ctx, "t-s", coretasks.Request{Actor: task.ActorWorkflow, Source: "task-wake", Verb: task.VerbWake}); err != nil {
 			t.Fatal(err)
 		}
-		if p := r.page(t, "view=needs-me"); len(p.Tasks) != 1 || p.Tasks[0].ID != "e-s" || !p.Tasks[0].Changed {
+		if p := r.page(t, "view=needs-me"); len(p.Tasks) != 1 || p.Tasks[0].ID != "t-s" || !p.Tasks[0].Changed {
 			t.Fatalf("the woken task is not back in Next: %+v", p.Tasks)
 		}
 		if p := r.page(t, "view=inbox"); len(p.Tasks) != 0 {
@@ -548,14 +548,14 @@ func TestSyncRunsOffTheSubscriber(t *testing.T) {
 	}
 }
 
-// bridgeRig is the catalog rig serving the tasks of a fake store, with task e-r on acme/api#7.
+// bridgeRig is the catalog rig serving the tasks of a fake store, with task t-r on acme/api#7.
 func bridgeRig(t *testing.T) (catalogRig, *coretasks.Service) {
 	t.Helper()
 	c := newCatalogRig(t)
 	store := taskstest.New()
 	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: store, Facts: coretasks.CardFacts{}, Clock: fixedClock(catalogNow)})
 	c.s.deps.Tasks = g
-	e := task.Task{ID: "e-r", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}, Origin: task.OriginDerived, Created: catalogNow, Updated: catalogNow}
+	e := task.Task{ID: "t-r", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}, Origin: task.OriginDerived, Created: catalogNow, Updated: catalogNow}
 	if err := store.Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
@@ -566,7 +566,7 @@ func TestApproveRunsThePendingRound(t *testing.T) {
 	t.Parallel()
 	c, _ := bridgeRig(t)
 	c.propose(t)
-	rec := post(t, c.s, api.TaskPath("e-r", "approve"), `{"source":"cockpit"}`)
+	rec := post(t, c.s, api.TaskPath("t-r", "approve"), `{"source":"cockpit"}`)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "sent the review-follow-up round") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
@@ -586,7 +586,7 @@ func TestApproveRunsThePendingRound(t *testing.T) {
 func TestDelegateRunsTheIntent(t *testing.T) {
 	t.Parallel()
 	c, _ := bridgeRig(t)
-	rec := post(t, c.s, api.TaskPath("e-r", "delegate"), `{"source":"cockpit"}`)
+	rec := post(t, c.s, api.TaskPath("t-r", "delegate"), `{"source":"cockpit"}`)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "review accepted as intake") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
@@ -601,7 +601,7 @@ func TestBridgeRefusesWhatTheRowDoesNotOffer(t *testing.T) {
 	c, g := bridgeRig(t)
 	fa := &fakeActions{}
 	c.s.deps.Actions = fa
-	rec := post(t, c.s, api.TaskPath("e-r", "approve"), `{"source":"cockpit"}`)
+	rec := post(t, c.s, api.TaskPath("t-r", "approve"), `{"source":"cockpit"}`)
 	row, _ := c.s.currentRow(context.Background(), r7u)
 	want := c.s.offeredFor(row, task.VerbApprove).reason()
 	if rec.Code != 409 || !strings.Contains(rec.Body.String(), want) || want == "" {
@@ -610,10 +610,10 @@ func TestBridgeRefusesWhatTheRowDoesNotOffer(t *testing.T) {
 	if len(fa.calls) != 0 || len(c.plan.acted) != 0 {
 		t.Fatalf("dispatched: %v %v", fa.calls, c.plan.acted)
 	}
-	if e, _ := g.Task(context.Background(), "e-r"); e.State != task.State("inbox") {
-		t.Fatalf("the entry moved: %+v", e)
+	if e, _ := g.Task(context.Background(), "t-r"); e.State != task.State("inbox") {
+		t.Fatalf("the task moved: %+v", e)
 	}
-	if rec := post(t, c.s, api.TaskPath("e-r", "dismiss"), `{}`); rec.Code != 200 || len(fa.calls) != 0 {
+	if rec := post(t, c.s, api.TaskPath("t-r", "dismiss"), `{}`); rec.Code != 200 || len(fa.calls) != 0 {
 		t.Fatalf("dismiss with no question gate to dismiss: %d %s %v", rec.Code, rec.Body, fa.calls)
 	}
 }
@@ -643,16 +643,16 @@ func TestBridgeRefusesADisabledPlugin(t *testing.T) {
 	c.propose(t)
 	c.s.deps.PluginEnabled = func(p unit.ProviderID) bool { return p != unit.GitHub }
 	for _, verb := range []string{"approve", "next"} {
-		rec := post(t, c.s, api.TaskPath("e-r", verb), `{"source":"cockpit"}`)
+		rec := post(t, c.s, api.TaskPath("t-r", verb), `{"source":"cockpit"}`)
 		if rec.Code != 409 || !strings.Contains(rec.Body.String(), `"plugin":"github"`) {
 			t.Fatalf("%s: %d %s", verb, rec.Code, rec.Body)
 		}
 	}
 	var v api.TaskView
-	if code := get(t, c.s, api.TaskPath("e-r"), &v); code != 200 || slices.ContainsFunc(v.Verbs, func(s api.VerbState) bool { return s.Enabled != (s.Verb == "dismiss") }) {
+	if code := get(t, c.s, api.TaskPath("t-r"), &v); code != 200 || slices.ContainsFunc(v.Verbs, func(s api.VerbState) bool { return s.Enabled != (s.Verb == "dismiss") }) {
 		t.Fatalf("%d %+v", code, v.Verbs)
 	}
-	if rec := post(t, c.s, api.TaskPath("e-r", "dismiss"), `{"source":"cockpit"}`); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"state":"trash"`) {
+	if rec := post(t, c.s, api.TaskPath("t-r", "dismiss"), `{"source":"cockpit"}`); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"state":"trash"`) {
 		t.Fatalf("dismiss: %d %s", rec.Code, rec.Body)
 	}
 	if len(c.plan.acted) != 0 {
@@ -669,8 +669,8 @@ func TestRegisteredHandlerWins(t *testing.T) {
 		got = append(got, string(e.ID)+" "+req.Source)
 		return coretasks.Result{Task: e, Lines: []string{"handled"}}, nil
 	})
-	rec := post(t, c.s, api.TaskPath("e-r", "approve"), `{"source":"tui"}`)
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "handled") || !slices.Equal(got, []string{"e-r tui"}) {
+	rec := post(t, c.s, api.TaskPath("t-r", "approve"), `{"source":"tui"}`)
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "handled") || !slices.Equal(got, []string{"t-r tui"}) {
 		t.Fatalf("%d %s %v", rec.Code, rec.Body, got)
 	}
 	if len(c.plan.acted) != 0 || !c.plan.isPending(r7u) {
@@ -765,7 +765,7 @@ func TestTaskAnswerRouteMatchesTheUnitAnswer(t *testing.T) {
 		t.Fatalf("%v %s", err, rec.Body)
 	}
 	if got := r.outcome(rec.Code, res.Lines); !reflect.DeepEqual(got, want) {
-		t.Fatalf("by entry %+v\nby unit %+v", got, want)
+		t.Fatalf("by task %+v\nby unit %+v", got, want)
 	}
 	if evs := r.tasks.Events; len(evs) != 1 || evs[0].Kind != "verb_answer" || evs[0].Actor != "person:cockpit" {
 		t.Fatalf("events %+v", evs)
@@ -810,7 +810,7 @@ func TestBridgeRelaysARefusalAsJSONOnly(t *testing.T) {
 	t.Parallel()
 	c, _ := bridgeRig(t)
 	c.propose(t)
-	rec := post(t, c.s, api.TaskPath("e-r", "approve"), `{"source":"<script>alert(1)</script>"}`)
+	rec := post(t, c.s, api.TaskPath("t-r", "approve"), `{"source":"<script>alert(1)</script>"}`)
 	if rec.Code != 400 || strings.Contains(rec.Body.String(), "<script>") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
@@ -829,15 +829,15 @@ func TestAVerbTheProfileDoesNotOfferIsNeitherListedNorRun(t *testing.T) {
 	r := newTasksRig(t, func(d *Deps) {
 		d.Intents = func() *intentload.Loaded { return &intentload.Loaded{Tasks: tasks, Registry: dintent.NewRegistry(nil)} }
 	})
-	r.put(t, task.Task{ID: "e-c", State: "inbox", Category: task.CategoryInbox, Title: "c", Origin: task.OriginUser, Props: task.Props{task.PropKind: {Text: "capture"}}})
+	r.put(t, task.Task{ID: "t-c", State: "inbox", Category: task.CategoryInbox, Title: "c", Origin: task.OriginUser, Props: task.Props{task.PropKind: {Text: "capture"}}})
 	var v api.TaskView
-	if code := get(t, r.s, api.TaskPath("e-c"), &v); code != 200 || slices.ContainsFunc(v.Verbs, func(s api.VerbState) bool { return s.Verb == "someday" }) {
+	if code := get(t, r.s, api.TaskPath("t-c"), &v); code != 200 || slices.ContainsFunc(v.Verbs, func(s api.VerbState) bool { return s.Verb == "someday" }) {
 		t.Fatalf("%d %+v", code, v.Verbs)
 	}
-	if rec := post(t, r.s, api.TaskPath("e-c", "someday"), `{}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "not offered") {
+	if rec := post(t, r.s, api.TaskPath("t-c", "someday"), `{}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "not offered") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if rec := post(t, r.s, api.TaskPath("e-c", "next"), `{}`); rec.Code != 200 {
+	if rec := post(t, r.s, api.TaskPath("t-c", "next"), `{}`); rec.Code != 200 {
 		t.Fatalf("a verb the profile leaves alone: %d %s", rec.Code, rec.Body)
 	}
 }
@@ -895,17 +895,17 @@ func messageIs(v api.TaskView, id int64) bool {
 func TestTaskViewServesTheWake(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, nil)
-	r.put(t, task.Task{ID: "e-s", State: "scheduled", Category: task.CategoryDeferred, Units: []unit.Unit{r7u}},
-		task.Task{ID: "e-n", State: "next", Category: task.CategoryReady})
+	r.put(t, task.Task{ID: "t-s", State: "scheduled", Category: task.CategoryDeferred, Units: []unit.Unit{r7u}},
+		task.Task{ID: "t-n", State: "next", Category: task.CategoryReady})
 	until := tasksNow.Add(48 * time.Hour)
-	r.sleep(t, wake.Wake{Task: "e-s", Until: until, When: `size(task.link_owes) != 0`, Return: "next"})
+	r.sleep(t, wake.Wake{Task: "t-s", Until: until, When: `size(task.link_owes) != 0`, Return: "next"})
 	var v api.TaskView
-	if code := get(t, r.s, api.TaskPath("e-s"), &v); code != 200 || v.Wake == nil || !v.Wake.Until.Equal(until) ||
+	if code := get(t, r.s, api.TaskPath("t-s"), &v); code != 200 || v.Wake == nil || !v.Wake.Until.Equal(until) ||
 		v.Wake.When != `size(task.link_owes) != 0` || v.Wake.Return != "next" {
 		t.Fatalf("%d: wake %+v", code, v.Wake)
 	}
 	var none api.TaskView
-	if code := get(t, r.s, api.TaskPath("e-n"), &none); code != 200 || none.Wake != nil {
+	if code := get(t, r.s, api.TaskPath("t-n"), &none); code != 200 || none.Wake != nil {
 		t.Fatalf("%d: a task with no wake serves %+v", code, none.Wake)
 	}
 }

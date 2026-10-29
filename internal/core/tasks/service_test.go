@@ -135,7 +135,7 @@ func TestVerbTransitions(t *testing.T) {
 	for verb, want := range table {
 		for _, from := range allStates {
 			r := newRig()
-			e := r.put(t, task.Task{ID: "e-x", State: from, Origin: task.OriginUser})
+			e := r.put(t, task.Task{ID: "t-x", State: from, Origin: task.OriginUser})
 			res, err := r.svc.Do(ctx, e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: verb, Args: args[verb]})
 			to := want[from]
 			if to == no {
@@ -157,37 +157,37 @@ func TestVerbTransitions(t *testing.T) {
 		}
 	}
 	r := newRig()
-	r.put(t, task.Task{ID: "e-x", State: "inbox", Category: task.CategoryInbox})
-	if _, err := r.svc.Do(ctx, "e-x", coretasks.Request{Actor: task.ActorPerson, Verb: "fly"}); !errors.Is(err, coretasks.ErrArgs) {
+	r.put(t, task.Task{ID: "t-x", State: "inbox", Category: task.CategoryInbox})
+	if _, err := r.svc.Do(ctx, "t-x", coretasks.Request{Actor: task.ActorPerson, Verb: "fly"}); !errors.Is(err, coretasks.ErrArgs) {
 		t.Errorf("an unknown verb: %v", err)
 	}
-	if _, err := r.svc.Do(ctx, "e-x", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSchedule}); !errors.Is(err, coretasks.ErrArgs) {
+	if _, err := r.svc.Do(ctx, "t-x", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSchedule}); !errors.Is(err, coretasks.ErrArgs) {
 		t.Errorf("schedule without a date: %v", err)
 	}
-	if _, err := r.svc.Do(ctx, "e-missing", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbNext}); !errors.Is(err, coretasks.ErrNoTask) {
-		t.Errorf("a missing entry: %v", err)
+	if _, err := r.svc.Do(ctx, "t-missing", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbNext}); !errors.Is(err, coretasks.ErrNoTask) {
+		t.Errorf("a missing task: %v", err)
 	}
 }
 
 func TestScheduleKeepsWhereItReturns(t *testing.T) {
 	r := newRig()
-	r.put(t, task.Task{ID: "e-x", State: "next", Category: task.CategoryReady})
-	res, err := r.svc.Do(context.Background(), "e-x", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSchedule, Args: map[string]string{"until": "2026-10-30", "on_activity": "true"}})
+	r.put(t, task.Task{ID: "t-x", State: "next", Category: task.CategoryReady})
+	res, err := r.svc.Do(context.Background(), "t-x", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSchedule, Args: map[string]string{"until": "2026-10-30", "on_activity": "true"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, ok, _ := r.wakes.Of(context.Background(), "e-x")
+	w, ok, _ := r.wakes.Of(context.Background(), "t-x")
 	if !ok || !w.Until.Equal(time.Date(2026, 10, 30, 18, 0, 0, 0, brt)) || !slices.Equal(w.On, []string{wake.OnActivity}) || w.Return != "next" || !res.Task.Snoozed() {
 		t.Fatalf("wake %+v, task %+v", w, res.Task)
 	}
-	res, err = r.svc.Do(context.Background(), "e-x", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSchedule, Args: map[string]string{"until": "2026-11-02"}})
-	if w, _, _ := r.wakes.Of(context.Background(), "e-x"); err != nil || w.Return != "next" || len(w.On) != 0 {
+	res, err = r.svc.Do(context.Background(), "t-x", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSchedule, Args: map[string]string{"until": "2026-11-02"}})
+	if w, _, _ := r.wakes.Of(context.Background(), "t-x"); err != nil || w.Return != "next" || len(w.On) != 0 {
 		t.Fatalf("scheduled again: %+v %v", w, err)
 	}
-	if _, err := r.svc.Do(context.Background(), "e-x", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbNext}); err != nil {
+	if _, err := r.svc.Do(context.Background(), "t-x", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbNext}); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok, _ := r.wakes.Of(context.Background(), "e-x"); ok {
+	if _, ok, _ := r.wakes.Of(context.Background(), "t-x"); ok {
 		t.Fatal("a task moved by hand kept its wake")
 	}
 }
@@ -210,9 +210,9 @@ func TestFocusNeverMovesTheTask(t *testing.T) {
 
 func TestSeenClearsTheMark(t *testing.T) {
 	r := newRig()
-	r.put(t, task.Task{ID: "e-x", State: "inbox", Category: task.CategoryInbox, Changed: true})
+	r.put(t, task.Task{ID: "t-x", State: "inbox", Category: task.CategoryInbox, Changed: true})
 	r.clock.t = t0.Add(time.Hour)
-	res, err := r.svc.Do(context.Background(), "e-x", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSeen})
+	res, err := r.svc.Do(context.Background(), "t-x", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbSeen})
 	if err != nil || res.Task.Changed || !res.Task.SeenAt.Equal(r.clock.t) || res.Task.Category != task.CategoryInbox {
 		t.Fatalf("%+v %v", res.Task, err)
 	}
@@ -231,7 +231,7 @@ func TestSyncTouchesOnlyNotedUnits(t *testing.T) {
 	u, _ := r.store.TasksOf(context.Background(), unitU)
 	v, _ := r.store.TasksOf(context.Background(), unitV)
 	if len(u) != 1 || len(v) != 0 {
-		t.Fatalf("entries of U %v, of V %v", u, v)
+		t.Fatalf("tasks of U %v, of V %v", u, v)
 	}
 	if r.store.Applies != 1 {
 		t.Fatalf("%d applies", r.store.Applies)
@@ -243,8 +243,8 @@ func TestSyncTouchesOnlyNotedUnits(t *testing.T) {
 
 func TestSyncRunsWakeInOneApplyAndLeavesFocusToTheProfile(t *testing.T) {
 	r := newRig()
-	r.put(t, task.Task{ID: "e-due", State: "next", Category: task.CategoryReady, Props: task.Props{"due": {Time: t0.Add(-time.Minute)}}})
-	r.put(t, task.Task{ID: "e-wake", State: "scheduled", Category: task.CategoryDeferred, Asleep: true})
+	r.put(t, task.Task{ID: "t-due", State: "next", Category: task.CategoryReady, Props: task.Props{"due": {Time: t0.Add(-time.Minute)}}})
+	r.put(t, task.Task{ID: "t-wake", State: "scheduled", Category: task.CategoryDeferred, Asleep: true})
 	r.items.byUnit[unitU] = []items.Item{owed(unitU, "a")}
 	r.store.Applies, r.store.Notes = 0, 0
 	if err := r.svc.Sync(context.Background(), []unit.Unit{unitU}); err != nil {
@@ -253,10 +253,10 @@ func TestSyncRunsWakeInOneApplyAndLeavesFocusToTheProfile(t *testing.T) {
 	if r.store.Applies != 1 {
 		t.Fatalf("%d applies", r.store.Applies)
 	}
-	if e := r.task(t, "e-due"); e.Prop("focus").Text == "on" {
+	if e := r.task(t, "t-due"); e.Prop("focus").Text == "on" {
 		t.Fatalf("due %+v", e)
 	}
-	if e := r.task(t, "e-wake"); e.Category != task.CategoryDeferred {
+	if e := r.task(t, "t-wake"); e.Category != task.CategoryDeferred {
 		t.Fatalf("wake %+v", e)
 	}
 }
@@ -279,17 +279,17 @@ func TestDisabledPluginTasksStay(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got := r.task(t, e.ID); !got.Same(e) {
-		t.Fatalf("the entry changed: %+v", got)
+		t.Fatalf("the task changed: %+v", got)
 	}
 	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone}); !errors.Is(err, coretasks.ErrPluginDisabled) {
-		t.Fatalf("a verb on a disabled plugin's entry: %v", err)
+		t.Fatalf("a verb on a disabled plugin's task: %v", err)
 	}
-	inbox := r.put(t, task.Task{ID: "e-msg", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU}, Origin: task.OriginMessage})
+	inbox := r.put(t, task.Task{ID: "t-msg", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU}, Origin: task.OriginMessage})
 	if got, err := r.svc.Task(context.Background(), inbox.ID); err != nil || got.ID != inbox.ID {
-		t.Fatalf("the disabled plugin's inbox entry is not readable: %v %v", got, err)
+		t.Fatalf("the disabled plugin's inbox task is not readable: %v %v", got, err)
 	}
 	if got, err := r.svc.Task(context.Background(), e.ID); err != nil || !got.Same(e) {
-		t.Fatalf("the disabled plugin's entry is not readable: %+v %v", got, err)
+		t.Fatalf("the disabled plugin's task is not readable: %+v %v", got, err)
 	}
 	if got, err := r.svc.Tasks(context.Background(), task.Query{View: "open"}); err == nil || len(got) != 0 {
 		t.Fatalf("a view the profile does not list is served: %v", err)
@@ -319,7 +319,7 @@ func TestOpenAndCloseOwnedTasks(t *testing.T) {
 	}
 	derived := task.DerivedID(unitU, "a")
 	if err := r.svc.Close(ctx, derived, task.CategoryDone); !errors.Is(err, coretasks.ErrVerb) {
-		t.Fatalf("close on a derived entry: %v", err)
+		t.Fatalf("close on a derived task: %v", err)
 	}
 	if c, err := r.svc.Capture(ctx, "call Ana", "", nil); err != nil || c.Origin != task.OriginUser || c.Category != task.CategoryInbox {
 		t.Fatalf("capture %+v %v", c, err)
@@ -344,7 +344,7 @@ func (o outbox) Task(ctx context.Context, id task.ID) (task.Task, bool, error) {
 func TestRegisteredViewSource(t *testing.T) {
 	ctx := context.Background()
 	r := newRig()
-	r.put(t, task.Task{ID: "e-in", State: "inbox", Category: task.CategoryInbox})
+	r.put(t, task.Task{ID: "t-in", State: "inbox", Category: task.CategoryInbox})
 	if es, err := r.svc.Tasks(ctx, task.Query{View: "drafts"}); err != nil || len(es) != 0 {
 		t.Fatalf("outbox without a source: %v %v", es, err)
 	}
@@ -390,10 +390,10 @@ func TestCloseRefusesADisabledPlugin(t *testing.T) {
 	}
 	r.facts.off[unit.GitHub] = true
 	if err := r.svc.Close(ctx, e.ID, task.CategoryDone); !errors.Is(err, coretasks.ErrPluginDisabled) {
-		t.Fatalf("close on a disabled plugin's entry: %v", err)
+		t.Fatalf("close on a disabled plugin's task: %v", err)
 	}
 	if got := r.task(t, e.ID); got.Category != task.CategoryInbox {
-		t.Fatalf("the entry moved to %s", got.State)
+		t.Fatalf("the task moved to %s", got.State)
 	}
 }
 
@@ -410,7 +410,7 @@ func TestRetitleUpdatesAnOpenedTask(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got := r.task(t, e.ID); got.Title != "hold the round?" || !got.Updated.Equal(t0.Add(time.Minute)) || got.Category != task.CategoryInbox {
-		t.Fatalf("entry %+v", got)
+		t.Fatalf("task %+v", got)
 	}
 	page, _ := r.store.TasksSince(ctx, task.Query{}, coretasks.Since{Epoch: before.Epoch, Rev: before.Rev})
 	if page.Full || len(page.Tasks) != 1 {
@@ -424,7 +424,7 @@ func TestRetitleUpdatesAnOpenedTask(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := r.svc.Retitle(ctx, task.DerivedID(unitU, "a"), "x"); !errors.Is(err, coretasks.ErrVerb) {
-		t.Fatalf("retitle of a derived entry: %v", err)
+		t.Fatalf("retitle of a derived task: %v", err)
 	}
 }
 

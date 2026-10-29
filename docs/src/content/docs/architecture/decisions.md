@@ -11,11 +11,14 @@ Each entry is a file under `docs/src/content/docs/architecture/decisions/`, with
 |---|---|
 | [A draft is what its proposer declares](/architecture/decisions/a-draft-is-what-its-proposer-declares/) | A draft carries its purpose, delivery and effects; nothing follows from its kind, and a draft that posts waits for a person. |
 | [A provider is asked what it can do](/architecture/decisions/a-provider-is-asked-what-it-can-do/) | A plugin declares its capabilities, and a provider id appears only in its plugin and the tables. |
+| [A task's history is kept](/architecture/decisions/task-history-is-kept/) | Retention never deletes the events, turns, records, answers or plan items of a task or of a unit a task holds. |
 | [Architecture rules are tests](/architecture/decisions/architecture-rules-are-tests/) | Each architecture rule is a test with a self-test, and its reference page is generated. |
 | [Authority comes from you](/architecture/decisions/authority-comes-from-you/) | Endorsing, approving, taking over and removing come only from your surfaces, never from an agent. |
 | [Behavior lives in the profile](/architecture/decisions/behavior-lives-in-the-profile/) | Behavior is profile files; Go provides a closed vocabulary and never enumerates intents. |
 | [Clients are thin and speak one versioned API](/architecture/decisions/clients-are-thin-and-speak-one-versioned-api/) | The daemon computes what clients show; clients speak internal/api and decide nothing. |
 | [Every spawn is metered](/architecture/decisions/every-spawn-is-metered/) | A package that spawns a process imports the meter, which counts each boundary call. |
+| [Gates hold every decision](/architecture/decisions/gates-hold-every-decision/) | A decision waiting on you is a gate; no rule that releases one reads an untrusted fact, and no agent resolves one. |
+| [Go reads categories, never states](/architecture/decisions/go-reads-categories/) | The profile names a task's states; Go and the store's SQL read only the closed set of categories. |
 | [One adapter reaches each outside tool](/architecture/decisions/one-adapter-reaches-each-outside-tool/) | Each outside tool is reached by one adapter, and its name stays there and in the root. |
 | [One brand package](/architecture/decisions/one-brand-package/) | Every user-visible name derives from internal/brand. |
 | [One daemon writes the store](/architecture/decisions/one-daemon-writes-the-store/) | Only the daemon, and the store commands under its lock, write the store. |

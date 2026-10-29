@@ -44,7 +44,7 @@ func unitsEnded(mods []pluginModule) func(ctx context.Context, u unit.Unit) (boo
 	}
 }
 
-// taskResults attaches to an entry what the turns on it produced: a done
+// taskResults attaches to a task what the turns on it produced: a done
 // record's url (turns.Results) and their posts (outbox.Results).
 type taskResults struct {
 	tasks   *coretasks.Service

@@ -305,7 +305,7 @@ func TestMessagesCostOnARealStore(t *testing.T) {
 		t.Fatalf("open %d %v", len(open), err)
 	}
 	list := time.Since(start)
-	t.Logf("sqlite, %d asked turns: first reconcile %s (messages and entries created), a full reconcile with nothing to do %s, one unit's %s, listing the open messages %s",
+	t.Logf("sqlite, %d asked turns: first reconcile %s (messages and tasks created), a full reconcile with nothing to do %s, one unit's %s, listing the open messages %s",
 		n, first, again, one, list)
 }
 

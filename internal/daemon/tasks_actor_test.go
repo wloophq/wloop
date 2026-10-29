@@ -50,25 +50,25 @@ func TestDoneFromAnAgentSessionNeedsTheProfilesByAgent(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newTasksRig(t, nil)
-	r.put(t, task.Task{ID: "e-1", State: "next", Category: task.CategoryReady})
-	if rec := postFrom(t, r.s, "term_1", api.TaskPath("e-1", "done"), `{"source":"claude"}`); rec.Code != 403 {
+	r.put(t, task.Task{ID: "t-1", State: "next", Category: task.CategoryReady})
+	if rec := postFrom(t, r.s, "term_1", api.TaskPath("t-1", "done"), `{"source":"claude"}`); rec.Code != 403 {
 		t.Fatalf("an agent's done under the bundled profile: %d %s", rec.Code, rec.Body)
 	}
-	if e, _ := r.db.Tasks().Task(ctx, "e-1"); e.Category != task.CategoryReady {
+	if e, _ := r.db.Tasks().Task(ctx, "t-1"); e.Category != task.CategoryReady {
 		t.Fatalf("the refused done moved the task to %s", e.State)
 	}
 
 	r.s.deps.Tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Authority: agentsClose, Store: r.db.Tasks(), Items: r.ledger,
 		Facts: coretasks.CardFacts{Cards: r.db.Cards()}, Me: meID, Clock: fixedClock(tasksNow)})
-	if rec := postFrom(t, r.s, "term_1", api.TaskPath("e-1", "done"), `{"source":"claude"}`); rec.Code != 200 {
+	if rec := postFrom(t, r.s, "term_1", api.TaskPath("t-1", "done"), `{"source":"claude"}`); rec.Code != 200 {
 		t.Fatalf("an agent's done with by.agent: %d %s", rec.Code, rec.Body)
 	}
 	if evs := r.doneEvents(t); len(evs) != 1 || evs[0].Actor != "agent:claude" {
 		t.Fatalf("events %+v", evs)
 	}
 
-	r.put(t, task.Task{ID: "e-2", State: "next", Category: task.CategoryReady})
-	if rec := post(t, r.s, api.TaskPath("e-2", "done"), `{"source":"cockpit"}`); rec.Code != 200 {
+	r.put(t, task.Task{ID: "t-2", State: "next", Category: task.CategoryReady})
+	if rec := post(t, r.s, api.TaskPath("t-2", "done"), `{"source":"cockpit"}`); rec.Code != 200 {
 		t.Fatalf("a person's done: %d %s", rec.Code, rec.Body)
 	}
 	if evs := r.doneEvents(t); len(evs) != 2 || evs[1].Actor != "person:cockpit" {
@@ -103,16 +103,16 @@ func TestAGatedDelegateOnABridgedTaskOpensTheGateAndRunsNothing(t *testing.T) {
 	states := gatingStates{States: taskstest.BundledStates, verb: task.VerbDelegate}
 	c.s.deps.Tasks = coretasks.New(coretasks.Deps{States: states, Authority: states.Authority, Gates: gs, Store: store,
 		Facts: coretasks.CardFacts{}, Clock: fixedClock(catalogNow)})
-	e := task.Task{ID: "e-r", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}, Origin: task.OriginDerived,
+	e := task.Task{ID: "t-r", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}, Origin: task.OriginDerived,
 		Created: catalogNow, Updated: catalogNow}
 	if err := store.Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
-	rec := post(t, c.s, api.TaskPath("e-r", "delegate"), `{"source":"cockpit"}`)
+	rec := post(t, c.s, api.TaskPath("t-r", "delegate"), `{"source":"cockpit"}`)
 	if rec.Code != 200 || strings.Contains(rec.Body.String(), "accepted as intake") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	got, err := gs.OfTask(context.Background(), "e-r")
+	got, err := gs.OfTask(context.Background(), "t-r")
 	if err != nil || len(got) != 1 || got[0].Status != gate.Open {
 		t.Fatalf("gates %+v %v", got, err)
 	}
@@ -124,8 +124,8 @@ func TestAGatedDelegateOnABridgedTaskOpensTheGateAndRunsNothing(t *testing.T) {
 func TestAnAgentSessionWritesNoChat(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, nil)
-	r.put(t, task.Task{ID: "e-1", State: "next", Category: task.CategoryReady})
-	if rec := postFrom(t, r.s, "term_1", api.TaskPath("e-1", "chat"), `{"text":"Ship it."}`); rec.Code != http.StatusForbidden {
+	r.put(t, task.Task{ID: "t-1", State: "next", Category: task.CategoryReady})
+	if rec := postFrom(t, r.s, "term_1", api.TaskPath("t-1", "chat"), `{"text":"Ship it."}`); rec.Code != http.StatusForbidden {
 		t.Fatalf("an agent session's chat: %d %s", rec.Code, rec.Body)
 	}
 }

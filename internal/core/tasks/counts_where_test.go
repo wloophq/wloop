@@ -41,10 +41,10 @@ func TestCountsWhereCountsOnlyTheKeptTasksOfEachView(t *testing.T) {
 	}
 	for _, spec := range r.lens.Views().List {
 		if v := spec.ID; all.Views[v] != plain.Views[v] {
-			t.Errorf("keeping every entry, %s counts %d, Counts %d", v, all.Views[v], plain.Views[v])
+			t.Errorf("keeping every task, %s counts %d, Counts %d", v, all.Views[v], plain.Views[v])
 		}
 	}
 	if all.Contexts["@reply"] != plain.Contexts["@reply"] || all.Areas["OSS"] != plain.Areas["OSS"] {
-		t.Errorf("keeping every entry: %+v, Counts %+v", all, plain)
+		t.Errorf("keeping every task: %+v, Counts %+v", all, plain)
 	}
 }

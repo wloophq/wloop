@@ -25,7 +25,7 @@ type ActionSpec struct {
 	Toggle   string     `json:"toggle,omitempty"` // paired id sharing the key: hold<->release
 	Source   string     `json:"source"`           // "builtin" or the manifest path
 	Scope    string     `json:"scope,omitempty"`  // "unit" (default), "item", "draft" or "run"
-	Verb     string     `json:"verb,omitempty"`   // GTD verb it fulfills: "next", "waiting", "delegate", "done", "dismiss", "approve", "snooze"; scope draft also "edit", "retry"
+	Verb     string     `json:"verb,omitempty"`   // task verb it fulfills: "next", "waiting", "delegate", "done", "dismiss", "approve", "snooze"; scope draft also "edit", "retry"
 	Plugin   string     `json:"plugin,omitempty"` // provider id, from the intent's Def.Provider; "" is core
 }
 

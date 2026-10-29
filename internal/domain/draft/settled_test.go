@@ -11,10 +11,10 @@ func TestSettledAtIsTheNewestSettledDraftOfTheWorkflowOnTheSubject(t *testing.T)
 	t.Parallel()
 	thread := unit.Unit{Provider: "chat", Key: "T1/C1/100.1"}
 	other := unit.Unit{Provider: "chat", Key: "T1/C1/200.2"}
-	task := unit.Unit{Provider: unit.Task, Key: "e-0000000000000001"}
+	task := unit.Unit{Provider: unit.Task, Key: "t-0000000000000001"}
 	at := func(h int) time.Time { return time.Date(2026, 3, 2, h, 0, 0, 0, time.UTC) }
 	mine := func(s State, h int) Draft {
-		return Draft{Unit: thread, Task: "e-0000000000000001", State: s, UpdatedAt: at(h), Origin: Origin{Kind: OriginAuto, Rule: "wf-a", Workflow: "wf-a"}}
+		return Draft{Unit: thread, Task: "t-0000000000000001", State: s, UpdatedAt: at(h), Origin: Origin{Kind: OriginAuto, Rule: "wf-a", Workflow: "wf-a"}}
 	}
 	withdrawn := mine(Dropped, 5)
 	withdrawn.Reason = WithdrawMoot
@@ -30,7 +30,7 @@ func TestSettledAtIsTheNewestSettledDraftOfTheWorkflowOnTheSubject(t *testing.T)
 		want    time.Time
 	}{
 		{"withdrawn included, open and failed ones not", thread, ds, at(5)},
-		{"an entry subject reads the drafts serving it", task, ds, at(5)},
+		{"a task subject reads the drafts serving it", task, ds, at(5)},
 		{"none settled", thread, []Draft{mine(Held, 3)}, time.Time{}},
 		{"another unit's drafts", other, ds[:6], time.Time{}},
 		{"no drafts", thread, nil, time.Time{}},

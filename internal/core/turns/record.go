@@ -46,7 +46,7 @@ type Recorded struct {
 	// already ended or was replaced.
 	Dropped int
 
-	// result is the unit the record produced for the turn's entry; zero
+	// result is the unit the record produced for the turn's task; zero
 	// when it attaches none.
 	result unit.Unit
 }
@@ -89,7 +89,7 @@ func (s *Service) recordEnd(ctx context.Context, r RecordRequest, byHeadless boo
 	return got, nil
 }
 
-// attachResult attaches u to the entry of the turn's unit on; a failure is
+// attachResult attaches u to the task of the turn's unit on; a failure is
 // logged, since the record is stored.
 func (s *Service) attachResult(ctx context.Context, on, u unit.Unit) {
 	id, _ := task.IDOf(on)
@@ -99,7 +99,7 @@ func (s *Service) attachResult(ctx context.Context, on, u unit.Unit) {
 }
 
 // resultOf is the unit rec's outcome url names when rules attach it to the
-// entry the turn on u serves; zero otherwise.
+// task the turn on u serves; zero otherwise.
 func (s *Service) resultOf(u unit.Unit, rules dintent.RecordRules, rec record.Record) unit.Unit {
 	if s.Results == nil || !rules.AttachURL || rec.State != record.Done || rec.Outcome == nil || rec.Outcome.URL == "" {
 		return unit.Unit{}

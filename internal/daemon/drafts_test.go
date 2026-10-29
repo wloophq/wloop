@@ -490,12 +490,12 @@ func TestOutboxViewListsOpenDrafts(t *testing.T) {
 	}
 	p := r.page(t, "view=outbox")
 	if got, want := taskIDs(p.Tasks), []string{fmt.Sprintf("draft:%d", a.ID), fmt.Sprintf("draft:%d", b.ID)}; !slices.Equal(got, want) {
-		t.Fatalf("entries %v, want %v", got, want)
+		t.Fatalf("tasks %v, want %v", got, want)
 	}
 	e := p.Tasks[1]
 	if ed, ok := e.DraftOf(); !ok || ed.ID != int64(b.ID) || e.Title != "reply on acme/api#7: two" || !slices.Equal(e.Units, []unit.Unit{r7u}) ||
 		!slices.Equal(e.UnitLabels, []string{"acme/api#7"}) {
-		t.Fatalf("entry %+v", e)
+		t.Fatalf("task %+v", e)
 	}
 	if p.Counters.Views["outbox"] != 2 || p.Counters.Badge != p.Counters.Views["inbox"]+p.Counters.Views["needs-me"] {
 		t.Fatalf("counters %+v", p.Counters)
@@ -527,7 +527,7 @@ func TestSendingDraftStaysVisibleBeforeRecovery(t *testing.T) {
 	d := r.stored(t, draft.Draft{Unit: r7u, Text: "in flight", State: draft.Sending, SendingAt: tasksNow})
 	p := r.page(t, "view=outbox")
 	if !slices.Equal(taskIDs(p.Tasks), []string{fmt.Sprintf("draft:%d", d.ID)}) || p.Counters.Views["outbox"] != 1 {
-		t.Fatalf("entries %v counters %+v", taskIDs(p.Tasks), p.Counters)
+		t.Fatalf("tasks %v counters %+v", taskIDs(p.Tasks), p.Counters)
 	}
 	for _, v := range p.Tasks[0].Verbs {
 		if v.Enabled {
@@ -609,7 +609,7 @@ func TestObservedDraftIsNotInTheOutbox(t *testing.T) {
 	r.propose(t, r7u, "watch only", draft.DryRun)
 	p := r.page(t, "view=outbox")
 	if len(p.Tasks) != 0 || p.Counters.Views["outbox"] != 0 {
-		t.Fatalf("entries %v counters %+v", taskIDs(p.Tasks), p.Counters)
+		t.Fatalf("tasks %v counters %+v", taskIDs(p.Tasks), p.Counters)
 	}
 }
 
@@ -670,7 +670,7 @@ func TestDraftActionsDisabledWithPlugin(t *testing.T) {
 
 func TestApproveRefusesAStaleRev(t *testing.T) {
 	t.Parallel()
-	for _, path := range []string{"route", "entry verb"} {
+	for _, path := range []string{"route", "task verb"} {
 		t.Run(path, func(t *testing.T) {
 			t.Parallel()
 			r := newOutboxRig(t)
@@ -718,7 +718,7 @@ func TestTheDraftVerbNeedsTheRevAndTheGatePathItsGate(t *testing.T) {
 	r := newOutboxRig(t)
 	d := r.propose(t, r7u, "x", draft.Wait)
 	if code, body := r.verb(t, d.ID, "approve", `{}`); code != 400 || !strings.Contains(body, "takes the rev") {
-		t.Fatalf("entry verb: %d %s", code, body)
+		t.Fatalf("task verb: %d %s", code, body)
 	}
 	if code, body := r.verb(t, d.ID, "approve", `{"text":"typed"}`); code != 400 {
 		t.Fatalf("text without rev: %d %s", code, body)
@@ -742,7 +742,7 @@ func TestRetryRefusesAStaleRev(t *testing.T) {
 		t.Fatalf("route: %d %s", code, body)
 	}
 	if code, body := r.verb(t, d.ID, "retry", fmt.Sprintf(`{"rev":"%d"}`, d.Rev)); code != 409 || !strings.Contains(body, "changed since you saw it") {
-		t.Fatalf("entry verb: %d %s", code, body)
+		t.Fatalf("task verb: %d %s", code, body)
 	}
 	if code, body := r.verb(t, d.ID, "retry", fmt.Sprintf(`{"rev":"%d"}`, d.Rev+1)); code != 200 {
 		t.Fatalf("current rev: %d %s", code, body)
@@ -811,7 +811,7 @@ func TestAHeldPublisherCostsOnePageBudget(t *testing.T) {
 		}
 		for _, e := range p.Tasks {
 			if d, ok := e.DraftOf(); !ok || d.Where != "" {
-				t.Fatalf("entry %+v", e)
+				t.Fatalf("task %+v", e)
 			}
 		}
 	})

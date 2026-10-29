@@ -16,7 +16,7 @@ type Scoper interface {
 }
 
 // EventFacts is a capability of the engine's Keep: the facts of a unit an
-// event names, served after the unit left its list (an entry done or
+// event names, served after the unit left its list (a task done or
 // dismissed), so an event workflow reacts to what took it out.
 type EventFacts interface {
 	EventFacts(ctx context.Context, u unit.Unit) (workflow.Facts, error)

@@ -73,7 +73,7 @@ func TestStartCapturesClonesTrustsAndCreatesFromTheDefaultBase(t *testing.T) {
 	}
 	tk := capturedTask.FindStringSubmatch(te.out.String())
 	if tk == nil {
-		t.Fatalf("no entry captured:\n%s", te.out)
+		t.Fatalf("no task captured:\n%s", te.out)
 	}
 	path := filepath.Join(projects, "api")
 	if len(clones) != 1 || clones[0] != "acme/api "+path {
@@ -96,7 +96,7 @@ func TestStartCapturesClonesTrustsAndCreatesFromTheDefaultBase(t *testing.T) {
 		t.Fatalf("create %+v", c)
 	}
 	if !strings.HasSuffix(c.Name, "-"+short) {
-		t.Fatalf("worktree %q, want it to end in the entry's short id %s", c.Name, short)
+		t.Fatalf("worktree %q, want it to end in the task's short id %s", c.Name, short)
 	}
 	if len(m.Commands) != 1 || !strings.Contains(m.Commands[0], " --name '"+c.Name+"'") {
 		t.Fatalf("commands %q", m.Commands)
@@ -127,7 +127,7 @@ func TestStartCapturesClonesTrustsAndCreatesFromTheDefaultBase(t *testing.T) {
 	}
 	got, err := te.Env.tasks.Task(context.Background(), id)
 	if err != nil || !slices.Contains(got.Units, unit.Unit{Provider: unit.GitHub, Key: "acme/api#9"}) {
-		t.Fatalf("the entry's units %v, %v", got.Units, err)
+		t.Fatalf("the task's units %v, %v", got.Units, err)
 	}
 }
 
@@ -218,14 +218,14 @@ func TestStartRunsOnlyOnATaskTheUserCaptured(t *testing.T) {
 		t.Fatal(err)
 	}
 	if i := slices.IndexFunc(v.Actions, func(a api.ActionState) bool { return a.ID == "start" }); i < 0 || !v.Actions[i].Enabled || v.Actions[i].Label != "Start" {
-		t.Fatalf("the captured entry's actions %+v", v.Actions)
+		t.Fatalf("the captured task's actions %+v", v.Actions)
 	}
 	v, err = client.New(te.Socket).Task(ctx, string(derived.ID))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if i := slices.IndexFunc(v.Actions, func(a api.ActionState) bool { return a.ID == "start" }); i < 0 || v.Actions[i].Enabled {
-		t.Fatalf("the derived entry's actions %+v", v.Actions)
+		t.Fatalf("the derived task's actions %+v", v.Actions)
 	}
 }
 
@@ -238,7 +238,7 @@ func TestAStartAgainOnTheTaskReusesItsRepositoryAndWorktree(t *testing.T) {
 	}
 	task := capturedTask.FindStringSubmatch(te.out.String())
 	if task == nil {
-		t.Fatalf("no entry captured:\n%s", te.out)
+		t.Fatalf("no task captured:\n%s", te.out)
 	}
 	if code := te.run("start", task[1]); code != 0 {
 		t.Fatalf("again: exit %d: %s", code, te.err)
@@ -315,7 +315,7 @@ func TestAFailedTrustLeavesNoCloneAndTheRetryTrustsANewOne(t *testing.T) {
 	}
 	task := capturedTask.FindStringSubmatch(te.out.String())
 	if task == nil {
-		t.Fatalf("no entry captured:\n%s", te.out)
+		t.Fatalf("no task captured:\n%s", te.out)
 	}
 	path := filepath.Join(projects, "api")
 	if _, err := os.Stat(path); !os.IsNotExist(err) {

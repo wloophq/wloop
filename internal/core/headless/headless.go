@@ -163,7 +163,7 @@ func (s *Service) Start(ctx context.Context, r Request) (int64, error) {
 	return st.seq, nil
 }
 
-// Again runs q's intent on q's unit, items and entry (kept in q.Inputs) with said as Guidance, q.Trigger
+// Again runs q's intent on q's unit, items and task (kept in q.Inputs) with said as Guidance, q.Trigger
 // and q.Workflow; ErrNotHeadless when q.Mode is not headless. The route is Resumed.
 func (s *Service) Again(ctx context.Context, q turn.Turn, said string) (turns.AnswerResult, error) {
 	if q.Runner != turn.RunnerHeadless {

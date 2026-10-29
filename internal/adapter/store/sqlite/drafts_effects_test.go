@@ -29,7 +29,7 @@ func TestUnappliedAreTheSentDraftsThatDeclareEffects(t *testing.T) {
 	for _, c := range []struct {
 		state   draft.State
 		effects []string
-	}{{draft.Sent, []string{"entry.nudged"}}, {draft.Sent, nil}, {draft.Held, []string{"unit.closed"}}, {draft.Sent, []string{"unit.closed"}}} {
+	}{{draft.Sent, []string{"task.nudged"}}, {draft.Sent, nil}, {draft.Held, []string{"unit.closed"}}, {draft.Sent, []string{"unit.closed"}}} {
 		d := sampleDraft(slackThread, noteAt)
 		d.State, d.Effects = c.state, c.effects
 		if _, err := db.Drafts().Insert(ctx, d); err != nil {

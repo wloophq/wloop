@@ -1,4 +1,4 @@
-// Package taskstest holds an in-memory entry store and the contract suite every entry store passes.
+// Package taskstest holds an in-memory task store and the contract suite every task store passes.
 package taskstest
 
 import (
@@ -97,7 +97,7 @@ func (s *Store) Apply(ctx context.Context, cs []task.Change, evs ...port.Event) 
 	var changed []task.Task
 	for _, c := range cs {
 		if c.Task.ID == "" {
-			return fmt.Errorf("an entry without an id")
+			return fmt.Errorf("a task without an id")
 		}
 		if old, ok := s.tasks[c.Task.ID]; ok && old.Same(c.Task) {
 			continue

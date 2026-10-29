@@ -85,13 +85,13 @@ func ItemsOf(t turn.Turn) []string {
 	return out
 }
 
-// TaskOf is the GTD entry the turn was asked from, kept in its inputs; "" none.
+// TaskOf is the task the turn was asked from, kept in its inputs; "" none.
 func TaskOf(t turn.Turn) string {
 	s, _ := t.Inputs[taskInput].(string)
 	return s
 }
 
-// bound is inputs with items and entry kept under their reserved names.
+// bound is inputs with items and task kept under their reserved names.
 func bound(inputs map[string]any, items []string, task string) map[string]any {
 	if len(items) == 0 && task == "" {
 		return inputs

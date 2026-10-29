@@ -13,17 +13,17 @@ description: The words the code, the configuration, the facts and these pages us
 ## Units and sources
 
 - **Unit**: a thing work happens on, named by its provider and the provider's key and written `<provider>:<key>`. A pull request is `github:acme/api#7` (shown as `acme/api#7`), a Slack thread is `slack:<team>/<channel>/<ts>`, a DM topic is `slack:<team>/<channel>/seg/<segment>`, an agent session is `session:<session-id>` and a workspace is `workspace:<worktree-path>`. See [Units and items](/concepts/tasks/#units-and-items).
-- **Provider**: the source that owns a kind of unit and validates its keys: `github`, `slack`, `session`, `workspace` or `entry`. A workflow's and an intent's `provider` name one. The vendor of a coding agent is never called a provider.
-- **Plugin**: a compiled-in source of units, `github` or `slack`, which brings an ingestion job, the cards of its units and, as it needs, items, actions, views, filter qualifiers and a publisher for drafts. `<id>.enabled` turns one off (`plugins.github.enabled`, `plugins.slack.enabled`), and `<id>.*` holds all of its settings. `session` and `workspace` are providers the core keeps for its own units and have no plugin. See [Plugins](/architecture/plugins/).
+- **Provider**: the source that owns a kind of unit and validates its keys: `github`, `slack`, `session`, `workspace` or `task`. A workflow's and an intent's `provider` name one. The vendor of a coding agent is never called a provider.
+- **Plugin**: a compiled-in source of units, `github` or `slack`, which brings an ingestion job, the cards of its units and, as it needs, items, actions, views, filter qualifiers and a publisher for drafts. `<id>.enabled` turns one off (`plugins.github.enabled`, `plugins.slack.enabled`), and `<id>.*` holds all of its settings. `session`, `workspace` and `task` are providers the core keeps for its own units and have no plugin. See [Plugins](/architecture/plugins/).
 - **Item**: one thing someone needs from someone inside a unit: a `request`, a `question`, a `decision` or a `todo`. It is `open` or `resolved` and says who asked and who acts next. An item lives in its unit; a task is what you do about it. See [Units and items](/concepts/tasks/#units-and-items).
-- **Confirmed item**: an item you created or corrected. Extraction never overwrites it; a later extraction that disagrees becomes a proposal in the Inbox.
+- **Confirmed item**: an item you created or corrected. Extraction never overwrites it; a later extraction that disagrees becomes a proposal gate on the unit's task.
 - **Extraction**: the `extract:slack` job, which turns a Slack unit's new messages into item changes with one model call per unit. See [Extraction](/concepts/slack/#extraction).
 - **Link**: a connection from one unit to another, found in the facts, by extraction or by you, with the message that names the target as its evidence. A `mention` link is only shown; a `review` link resolves its item when the target pull request gets a review, and a `merge` link when it merges.
 - **Admitted message**: a Slack message the daemon stores because it mentions you, matches `plugins.slack.ingest.terms`, replies to you, sits in a DM or in a thread you follow. Every other message is dropped. See [What comes in](/concepts/slack/#what-comes-in).
 
 ## Agents and sessions
 
-- **Agent**: the coding agent program that runs a turn, such as `claude` (Claude Code) or `codex`. Its vendor is an attribute of the agent. The word *provider* is kept for the sources of units (`github`, `slack`, `session`, `workspace`).
+- **Agent**: the coding agent program that runs a turn, such as `claude` (Claude Code) or `codex`. Its vendor is an attribute of the agent. The word *provider* is kept for the sources of units (`github`, `slack`, `session`, `workspace`, `task`).
 - **Agent home**: the agent's configuration directory, such as `~/.claude` or the one `agent_home` names (`CLAUDE_CONFIG_DIR` for Claude Code). `install` puts the hooks and the skills in each home.
 - **Model tier**: `fast`, `balanced` or `frontier`, the class of model a headless call runs on. `agent_models` pins a tier to a model name per agent.
 - **Session**: an agent's durable conversation in one worktree. {{name}} mints its id and starts the agent under it (`claude --session-id <id>`). A session is in one of three states:
@@ -85,7 +85,7 @@ description: The words the code, the configuration, the facts and these pages us
 ## Automation
 
 - **Workflow**: a manifest, `workflow.toml`, that names a provider, a condition over its units' facts and the steps to run. Everything {{name}} does without being asked is a workflow. See [The sweep and workflows](/concepts/workflows/).
-- **Workflow provider**: the provider whose units a workflow looks at, its `provider`: `github` (pull requests), `session`, `workspace`, `entry` (the tasks neither done nor in the trash) or `slack` (the Slack units a live task is attached to).
+- **Workflow provider**: the provider whose units a workflow looks at, its `provider`: `github` (pull requests), `session`, `workspace`, `task` (the open tasks, those whose category is neither `done` nor `dropped`) or `slack` (the Slack units a live task is attached to).
 - **Fact**: a named, typed value a provider computes for a unit from the store, such as `pr.first.due` or `session.idle_for`. Predicates read facts and never GitHub. See [Facts and steps](/reference/facts/).
 - **Slot**: the set of facts a predicate may read: an intent's action slot (the row) or turn slot (the turn being built), and a workflow's provider slot plus `trigger.*`, `config.*` and `now`.
 - **Predicate**: a CEL expression over the facts of a slot that yields a bool, such as a workflow's `when`. See [Predicates](/reference/intent-manifest/#predicates).
@@ -119,11 +119,17 @@ description: The words the code, the configuration, the facts and these pages us
 
 ## Tasks and views
 
-- **Task**: your record of something to act on, wait for, read later or decide about. It points at the items and units it comes from, and has one state at a time. See [Tasks and views](/concepts/tasks/).
-- **List**: a task's state: `inbox`, `next`, `waiting`, `scheduled`, `someday`, `reference`, `done` or `trash`. Each view shows one or more states. See [Lists are states](/concepts/tasks/#lists-are-states).
-- **Inbox**: the tasks not clarified yet, and the messages that need you to decide.
+- **Task**: your record of something to act on, wait for, read later or decide about, written `task:<id>`. It points at the items and units it comes from, and has one state at a time and its properties. See [Tasks and views](/concepts/tasks/).
+- **State**: where a task is, one of `tasks.toml`'s states, such as `inbox`, `next`, `waiting`, `scheduled`, `someday`, `reference`, `done` or `trash` in the bundled profile. See [Lists are categories](/concepts/tasks/#lists-are-categories).
+- **Category**: what the loop reads of a state, one of `inbox`, `ready`, `active`, `waiting`, `deferred`, `done` and `dropped`. A task is open while its category is neither `done` nor `dropped`.
+- **Property**: a typed value on a task that `tasks.toml` declares, with who may write it, read as `task.prop.<name>`, such as `due`, `size` or `focus`. A property's `role` names the mechanism that acts on it. A property an agent or a plugin writes is untrusted.
+- **Verb**: what you, a workflow, an agent or a plugin do to a task, such as Done, Waiting or Reply, declared in `tasks.toml` with its words, its move and who may run it. Each verb that changes a task records a `verb_<verb>` event.
+- **Gate**: a decision that waits on you, open on a task: a draft to send, a round to run, an agent's question or post, a proposal. `gates.toml` words each gate and the intents it is resolved with; you, a trusted approval rule or a passed window resolve it, never an agent. See [What waits for you](/concepts/approval/#gates).
+- **Run**: a turn on a task, with its workspace and session when it has them. See [Runs](/concepts/tasks/#runs).
+- **Chat**: what you write to a task's agent on the task's page, kept on its timeline and read by the agent with `task_read`. See [Chat](/concepts/tasks/#chat).
+- **Inbox**: the view of the tasks nobody has clarified yet, those in the `inbox` category.
 - **Message**: the subject of a question, post or proposal gate: an agent's question, a post an agent makes with `task_post`, or a proposal to change a confirmed item. See [Messages](/concepts/tasks/#messages).
-- **Outbox**: the drafts that wait for their approval policy before they go out. See [The Outbox](/concepts/approval/#the-outbox).
+- **Outbox**: the view over draft gates: the drafts that wait for their approval policy before they go out, and those approved whose delivery is under way or failed. See [The Outbox](/concepts/approval/#the-outbox).
 - **Draft**: an outbound post an agent or a proposal rule proposes, such as a reply, a nudge or a Slack reaction. Besides its kind it carries a purpose (what it is for, such as `nudge` or `close`), a delivery (`message`, `reaction` or `comment`) and the effects sending it applies once (`task.nudged`, `unit.closed`, `pr.nudged`). Its draft gate holds the decision; the draft keeps its delivery, from `held` to `queued` once its gate approves it, `sending` and `sent`, or ends `dropped` or `failed`.
 - **Draft approval policy**: when a draft may go out: `wait` (when you approve it), `delay` (when its window ends), `send` (at once) or `dry_run` (never; stored as what would have been sent), given by the first `[gates.approval]` rule of a draft gate whose `when` matches the draft, else by its `mode`, else by `gates.toml`'s default. Every bundled intent, workflow and rule uses `wait`. See [The Outbox](/concepts/approval/#the-outbox).
 - **Proposal rule**: a plugin's own rule that adds drafts on its own, hourly and on changes: GitHub's `github-nudge`. The Slack nudges, closures and owner questions come from the default workflows `slack-stalled-nudge`, `slack-closure` and `slack-ask-owner`.
@@ -132,10 +138,11 @@ description: The words the code, the configuration, the facts and these pages us
 - **Area**: a part of your life or work, from `tasks.areas`: the property of the area role. Switching area filters every view.
 - **Snooze**: scheduling a task until a date, until activity on one of its units, or both: a wake on the task.
 - **Wake**: a task's one wait for a time, an event or a condition over its facts; when it matches, the task gets a `task.woke` event, which the `task-wake` workflow reacts to.
+- **Triage**: the verbs that settle an ask at once: Acknowledge (a reply or a reaction telling the asker you are on it), Not mine (to the trash, with a reply pointing elsewhere) and Hand to (waiting on the person you name). Their drafts come from the bundled `task-*` workflows and wait for your approval. See [Tasks and views](/concepts/tasks/).
 - **Changed**: the mark on a task that new activity by someone else, or an item that reopened, touched since you saw it; the task stays where it is. Opening or moving the task clears it.
 - **Project**: an outcome that takes more than one action, parallel or sequential, with a review interval and a dossier. See [Projects](/concepts/tasks/#projects).
-- **The review**: the periodic walk through six filtered views, from Inbox to zero to pruning Focus. A review round is a turn of the `review` intent. See [The review](/concepts/tasks/#the-review).
-- **Logbook**: the view of `reference` and `done` tasks.
+- **The review**: the periodic walk through the views `views.toml`'s `[review]` names, six in the bundled profile, from Inbox to zero to pruning Focus. A review round is a turn of the `review` intent. See [The review](/concepts/tasks/#the-review).
+- **Logbook**: the view of the tasks in the `done` category, the latest moved first.
 
 ## Surfaces
 

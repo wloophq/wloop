@@ -21,18 +21,18 @@ func TestTaskViewServesPropsAndParent(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, nil)
 	due := tasksNow.Add(48 * time.Hour)
-	child := task.Task{ID: "e-c", State: "next", Category: task.CategoryReady, Title: "c", Parent: "e-p", Position: 1}
+	child := task.Task{ID: "t-c", State: "next", Category: task.CategoryReady, Title: "c", Parent: "t-p", Position: 1}
 	child.SetProp("area", task.Value{Text: "OSS"}, task.WriterPerson, tasksNow)
 	child.SetProp("due", task.Value{Time: due}, task.WriterPlugin, tasksNow)
 	child.SetProp("contexts", task.Value{List: []string{"@reply"}}, task.WriterPerson, tasksNow)
 	child.SetProp("size", task.Value{Dur: 30 * time.Minute}, task.WriterPerson, tasksNow)
-	second := task.Task{ID: "e-d", State: "waiting", Category: task.CategoryWaiting, Title: "d", Parent: "e-p", Position: 2}
-	r.put(t, task.Task{ID: "e-p", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "next", Category: task.CategoryReady, Title: "P"}, second, child)
+	second := task.Task{ID: "t-d", State: "waiting", Category: task.CategoryWaiting, Title: "d", Parent: "t-p", Position: 2}
+	r.put(t, task.Task{ID: "t-p", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "next", Category: task.CategoryReady, Title: "P"}, second, child)
 	var got api.TaskView
-	if code := get(t, r.s, api.TaskPath("e-c"), &got); code != 200 {
+	if code := get(t, r.s, api.TaskPath("t-c"), &got); code != 200 {
 		t.Fatalf("GET the task: %d", code)
 	}
-	if got.Category != "ready" || got.Parent != "e-p" {
+	if got.Category != "ready" || got.Parent != "t-p" {
 		t.Errorf("category %q parent %q", got.Category, got.Parent)
 	}
 	want := map[string]string{"area": `"OSS"`, "due": `"` + due.Format(time.RFC3339) + `"`, "contexts": `["@reply"]`, "size": `"30m0s"`}
@@ -45,8 +45,8 @@ func TestTaskViewServesPropsAndParent(t *testing.T) {
 		t.Errorf("props %v", got.Props)
 	}
 	p := r.page(t, "view=needs-me")
-	i := slices.IndexFunc(p.Tasks, func(v api.TaskView) bool { return v.ID == "e-p" })
-	if i < 0 || !slices.Equal(p.Tasks[i].Children, []string{"e-c", "e-d"}) {
+	i := slices.IndexFunc(p.Tasks, func(v api.TaskView) bool { return v.ID == "t-p" })
+	if i < 0 || !slices.Equal(p.Tasks[i].Children, []string{"t-c", "t-d"}) {
 		t.Fatalf("the project's children in %+v", p.Tasks)
 	}
 	var raw map[string]json.RawMessage
@@ -103,9 +103,9 @@ func TestTheSyncWorkerRecategorizesAtStartAndOnAReload(t *testing.T) {
 	r.g = coretasks.New(coretasks.Deps{States: states, Store: r.db.Tasks(), Items: r.ledger, Facts: coretasks.CardFacts{Cards: r.db.Cards()},
 		Clock: fixedClock(tasksNow)})
 	r.s.deps.Tasks = r.g
-	r.put(t, task.Task{ID: "e-b", State: "blocked", Category: task.CategoryWaiting, Title: "b"})
+	r.put(t, task.Task{ID: "t-b", State: "blocked", Category: task.CategoryWaiting, Title: "b"})
 	category := func() task.Category {
-		e, err := r.db.Tasks().Task(context.Background(), "e-b")
+		e, err := r.db.Tasks().Task(context.Background(), "t-b")
 		if err != nil {
 			t.Fatal(err)
 		}

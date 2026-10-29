@@ -37,7 +37,7 @@ func TestRepeatAfterReadsTheConfigFact(t *testing.T) {
 func TestARunLeavingAPersonOnATimedHoldIsNotDone(t *testing.T) {
 	t.Parallel()
 	r := newDraftRig(t, draftWF("nudges", "purpose", "nudge", "items", "owed", "per", "person", "repeat_after", "24h"), "{{.Person.Key}}")
-	r.tasks.m["e1"] = task.Task{ID: "e1", State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{draftThread},
+	r.tasks.m["t1"] = task.Task{ID: "t1", State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{draftThread},
 		Items: []task.ItemRef{{Unit: draftThread, Item: "i1"}, {Unit: draftThread, Item: "i2"}}}
 	r.items.set(draftThread, openItem("i1", "The deck", r.now.Add(-96*time.Hour), ana), openItem("i2", "The budget", r.now.Add(-96*time.Hour), bob))
 	runErr := func() error {
@@ -69,10 +69,10 @@ func TestARunLeavingAPersonOnATimedHoldIsNotDone(t *testing.T) {
 func TestAHeldNudgeUnderTheOldTaskKeyHoldsItsPerson(t *testing.T) {
 	t.Parallel()
 	r := newDraftRig(t, draftWF("nudges", "purpose", "nudge", "items", "owed", "per", "person", "repeat_after", "24h"), "{{.Person.Key}}")
-	r.tasks.m["e1"] = task.Task{ID: "e1", State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{draftThread},
+	r.tasks.m["t1"] = task.Task{ID: "t1", State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{draftThread},
 		Items: []task.ItemRef{{Unit: draftThread, Item: "i1"}, {Unit: draftThread, Item: "i2"}}}
 	r.items.set(draftThread, openItem("i1", "The deck", r.now.Add(-96*time.Hour), ana), openItem("i2", "The budget", r.now.Add(-96*time.Hour), bob))
-	if _, err := r.svc.Propose(context.Background(), outbox.Proposal{Unit: draftThread, Task: "e1", Items: []string{"i1"}, Purpose: "nudge",
+	if _, err := r.svc.Propose(context.Background(), outbox.Proposal{Unit: draftThread, Task: "t1", Items: []string{"i1"}, Purpose: "nudge",
 		Delivery: draft.Message, Text: "@ana?", Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "nudges", Rule: "nudges", Key: "e1:" + ana.Key}}); err != nil {
 		t.Fatal(err)
 	}

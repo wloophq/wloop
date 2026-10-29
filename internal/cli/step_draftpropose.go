@@ -126,7 +126,7 @@ type draftCandidate struct {
 }
 
 // draftSubject is a step's subject as its drafts see it: the unit they post
-// on, and the entry when the subject is one.
+// on, and the task when the subject is one.
 type draftSubject struct {
 	subject, unit unit.Unit
 	task          *task.Task
@@ -286,9 +286,9 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 	return out, nil
 }
 
-// subject reads what a step's subject u holds: for an entry, the unit its
+// subject reads what a step's subject u holds: for a task, the unit its
 // first item is on, else its first unit, with that unit's items and the
-// entry; else u's items.
+// task; else u's items.
 func (d *draftDeps) subject(ctx context.Context, u unit.Unit) (draftSubject, error) {
 	sub := draftSubject{subject: u, unit: u}
 	if id, ok := task.IDOf(u); ok {
@@ -303,7 +303,7 @@ func (d *draftDeps) subject(ctx context.Context, u unit.Unit) (draftSubject, err
 		case len(e.Units) > 0:
 			sub.unit = e.Units[0]
 		default:
-			return sub, fmt.Errorf("entry %s has no unit to post on", e.ID)
+			return sub, fmt.Errorf("task %s has no unit to post on", e.ID)
 		}
 	}
 	its, err := d.Items.Items(ctx, sub.unit)
@@ -556,10 +556,10 @@ func draftFactsOf(sub draftSubject, person string, ids []string) workflow.Facts 
 // template code. Facts are the step's subject's facts by name, none once
 // the subject is gone.
 type draftTextData struct {
-	Workflow, Purpose, Unit, Entry string
-	Person                         draftTextPerson
-	Items                          []draftTextItem
-	Facts                          workflow.Facts
+	Workflow, Purpose, Unit, Task string
+	Person                        draftTextPerson
+	Items                         []draftTextItem
+	Facts                         workflow.Facts
 }
 
 type draftTextPerson struct{ Key, Name string }
@@ -587,14 +587,14 @@ func draftTemplate(cfg config.Config, workflowName, text string, d draft.Deliver
 	return t, nil
 }
 
-// renderDraft renders t over data, filled with sub's unit and entry, person and its items.
+// renderDraft renders t over data, filled with sub's unit and task, person and its items.
 func renderDraft(t *template.Template, data draftTextData, sub draftSubject, person items.Person, its []items.Item) (string, error) {
 	if t == nil {
 		return "", nil
 	}
 	data.Unit, data.Person = sub.unit.String(), draftTextPerson{Key: person.Key, Name: person.Name}
 	if sub.task != nil {
-		data.Entry = string(sub.task.ID)
+		data.Task = string(sub.task.ID)
 	}
 	for _, it := range its {
 		data.Items = append(data.Items, draftTextItem{ID: it.ID, Summary: it.Summary, Line: strings.Join(strings.Fields(it.Summary), " "),

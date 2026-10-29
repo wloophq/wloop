@@ -19,7 +19,7 @@ var (
 	other = unit.Unit{Provider: "thread", Key: "T000/1"}
 )
 
-// Full is an entry with every field set.
+// Full is a task with every field set.
 func Full(id task.ID) task.Task {
 	return task.Task{
 		ID: id, State: InState("scheduled"), Category: task.CategoryDeferred, Title: "Ana owes 2 items", Notes: "notes",
@@ -31,7 +31,7 @@ func Full(id task.ID) task.Task {
 		Written: map[string]task.Written{"focus": {By: task.WriterWorkflow, At: t0.Add(time.Minute)},
 			"contexts": {By: task.WriterPlugin, At: t0}, "area": {By: task.WriterPerson, At: t0}, "due": {By: task.WriterPlugin, At: t0},
 			"owner": {By: task.WriterPerson, At: t0}, "last_nudge": {By: task.WriterWorkflow, At: t0}, "check_on": {By: task.WriterPerson, At: t0}},
-		Parent: "e-proj", Position: 3, Sequential: true,
+		Parent: "t-proj", Position: 3, Sequential: true,
 		Changed: true, SeenAt: t0.Add(-2 * time.Hour), Origin: task.OriginDerived,
 		Created: t0.Add(-3 * time.Hour), Updated: t0,
 	}
@@ -70,7 +70,7 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 	ctx := context.Background()
 	t.Run("RoundTrip", func(t *testing.T) {
 		s := open(t)
-		want := Full("e-0000000000000001")
+		want := Full("t-0000000000000001")
 		apply(t, s, want)
 		got, err := s.Task(ctx, want.ID)
 		if err != nil {
@@ -81,16 +81,16 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 		}
 		for _, u := range []unit.Unit{pr, other} {
 			if es, err := s.TasksOf(ctx, u); err != nil || len(es) != 1 {
-				t.Fatalf("entries of %s: %v %v", u, es, err)
+				t.Fatalf("tasks of %s: %v %v", u, es, err)
 			}
 		}
-		if _, err := s.Task(ctx, "e-missing"); !errors.Is(err, coretasks.ErrNoTask) {
-			t.Fatalf("a missing entry: %v", err)
+		if _, err := s.Task(ctx, "t-missing"); !errors.Is(err, coretasks.ErrNoTask) {
+			t.Fatalf("a missing task: %v", err)
 		}
 	})
 	t.Run("EmptyApplyWritesNothing", func(t *testing.T) {
 		s := open(t)
-		e := Full("e-0000000000000002")
+		e := Full("t-0000000000000002")
 		apply(t, s, e)
 		before := position(t, s)
 		e.Updated = e.Updated.Add(time.Hour)
@@ -104,14 +104,14 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 	})
 	t.Run("TasksSince", func(t *testing.T) {
 		s := open(t)
-		a := task.Task{ID: "e-a", State: InState("inbox"), Category: task.CategoryInbox, Title: "a", Origin: task.OriginUser, Created: t0, Updated: t0}
+		a := task.Task{ID: "t-a", State: InState("inbox"), Category: task.CategoryInbox, Title: "a", Origin: task.OriginUser, Created: t0, Updated: t0}
 		b, c := a, a
-		b.ID, b.Title, b.Created = "e-b", "b", t0.Add(time.Second)
-		c.ID, c.Title, c.State, c.Category = "e-c", "c", InState("done"), task.CategoryDone
+		b.ID, b.Title, b.Created = "t-b", "b", t0.Add(time.Second)
+		c.ID, c.Title, c.State, c.Category = "t-c", "c", InState("done"), task.CategoryDone
 		apply(t, s, a, b, c)
 		q := task.Query{}
 		first, err := s.TasksSince(ctx, q, coretasks.Since{})
-		if err != nil || !first.Full || !slices.Equal(ids(first.Tasks), []task.ID{"e-a", "e-b"}) {
+		if err != nil || !first.Full || !slices.Equal(ids(first.Tasks), []task.ID{"t-a", "t-b"}) {
 			t.Fatalf("first page %+v %v", first, err)
 		}
 		a.Title, b.State, b.Category = "a2", InState("done"), task.CategoryDone
@@ -120,13 +120,13 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if page.Full || !slices.Equal(ids(page.Tasks), []task.ID{"e-a", "e-b"}) || page.Tasks[0].Title != "a2" || len(page.Removed) != 0 || page.Rev <= first.Rev {
+		if page.Full || !slices.Equal(ids(page.Tasks), []task.ID{"t-a", "t-b"}) || page.Tasks[0].Title != "a2" || len(page.Removed) != 0 || page.Rev <= first.Rev {
 			t.Fatalf("page %+v", page)
 		}
 		if again, err := s.TasksSince(ctx, q, coretasks.Since{Epoch: page.Epoch, Rev: page.Rev}); err != nil || again.Full || len(again.Tasks) != 0 {
 			t.Fatalf("a page at the head %+v %v", again, err)
 		}
-		if p, err := s.TasksSince(ctx, task.Query{All: true}, coretasks.Since{Epoch: "other", Rev: page.Rev}); err != nil || !p.Full || !slices.Equal(ids(p.Tasks), []task.ID{"e-a", "e-c", "e-b"}) {
+		if p, err := s.TasksSince(ctx, task.Query{All: true}, coretasks.Since{Epoch: "other", Rev: page.Rev}); err != nil || !p.Full || !slices.Equal(ids(p.Tasks), []task.ID{"t-a", "t-c", "t-b"}) {
 			t.Fatalf("another epoch %+v %v", p, err)
 		}
 	})

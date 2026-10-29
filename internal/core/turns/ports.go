@@ -74,7 +74,7 @@ type Reports interface {
 	WithTurns(ctx context.Context, i turn.Intent) ([]unit.Unit, error)
 }
 
-// Results attaches to an entry the unit a turn on it produced.
+// Results attaches to a task the unit a turn on it produced.
 type Results interface {
 	// UnitOf is the unit a web address names; false for an address of none.
 	UnitOf(url string) (unit.Unit, bool)

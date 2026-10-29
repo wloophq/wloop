@@ -26,7 +26,7 @@ func (r *postResults) AttachesPosts(intent string) bool {
 }
 
 func (r *postResults) Attach(_ context.Context, tk task.ID, u unit.Unit) error {
-	if tk != "e-1" {
+	if tk != "t-1" {
 		panic("attached to " + tk)
 	}
 	r.attached = append(r.attached, u)
@@ -34,7 +34,7 @@ func (r *postResults) Attach(_ context.Context, tk task.ID, u unit.Unit) error {
 }
 
 func fromTask(p Proposal) Proposal {
-	p.Origin = draft.Origin{Kind: draft.OriginSession, TurnSeq: 3, Intent: "begin", Unit: task.UnitOf("e-1")}
+	p.Origin = draft.Origin{Kind: draft.OriginSession, TurnSeq: 3, Intent: "begin", Unit: task.UnitOf("t-1")}
 	return p
 }
 
@@ -77,7 +77,7 @@ func TestOnlyAPostOfAnAttachingTaskTurnAttaches(t *testing.T) {
 	onUnit := fromTask(reply("hi"))
 	onUnit.Origin.Unit = unit.Unit{}
 	auto := reply("hi")
-	auto.Origin = draft.Origin{Kind: draft.OriginAuto, Rule: "nudge", Key: "k", Unit: task.UnitOf("e-1")}
+	auto.Origin = draft.Origin{Kind: draft.OriginAuto, Rule: "nudge", Key: "k", Unit: task.UnitOf("t-1")}
 	for name, p := range map[string]Proposal{"a reaction": react, "an edit": edit, "an intent that does not attach": other,
 		"a turn on the post's own unit": onUnit, "a workflow's draft": auto} {
 		t.Run(name, func(t *testing.T) {
@@ -118,7 +118,7 @@ func TestADraftOnTheTaskAttachesTheUnitItsPostLandedIn(t *testing.T) {
 	r := &postResults{intents: []string{"begin"}}
 	e.svc.Results = r
 	p := onTask("#general")
-	p.Unit = task.UnitOf("e-1")
+	p.Unit = task.UnitOf("t-1")
 	p.Origin = draft.Origin{Kind: draft.OriginSession, TurnSeq: 3, Intent: "begin"}
 	d := e.propose(p)
 	if _, err := e.approve(d.ID, nil); err != nil {

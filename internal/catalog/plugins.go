@@ -27,7 +27,7 @@ var githubBuiltins = map[string]bool{
 var draftVerbs = []string{"approve", "dismiss", "edit", "retry"}
 
 // checkScope refuses a spec of an unknown scope, and a draft action with a
-// key or without a draft verb: the core entry keys reach drafts.
+// key or without a draft verb: the core task keys reach drafts.
 func checkScope(s api.ActionSpec) error {
 	switch s.Scope {
 	case "", ScopeUnit, ScopeItem, ScopeRun:

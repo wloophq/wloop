@@ -23,11 +23,11 @@ func TestDisabledPluginTasksAreHidden(t *testing.T) {
 		Disabled: func() []unit.ProviderID { return off }, Views: r.lens.Views, ViewEval: r.lens.Eval})
 	ctx := context.Background()
 	slack := unit.Unit{Provider: "slack", Key: "C1/1.1"}
-	r.put(t, task.Task{ID: "e-gh", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU}, Origin: task.OriginMessage})
-	r.put(t, task.Task{ID: "e-next", State: "next", Category: task.CategoryReady, Units: []unit.Unit{unitV}, Origin: task.OriginUser})
-	r.put(t, task.Task{ID: "e-wait", State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{unitV}, Origin: task.OriginUser})
-	r.put(t, task.Task{ID: "e-both", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU, slack}, Origin: task.OriginUser})
-	r.put(t, task.Task{ID: "e-mine", State: "inbox", Category: task.CategoryInbox, Origin: task.OriginUser})
+	r.put(t, task.Task{ID: "t-gh", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU}, Origin: task.OriginMessage})
+	r.put(t, task.Task{ID: "t-next", State: "next", Category: task.CategoryReady, Units: []unit.Unit{unitV}, Origin: task.OriginUser})
+	r.put(t, task.Task{ID: "t-wait", State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{unitV}, Origin: task.OriginUser})
+	r.put(t, task.Task{ID: "t-both", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU, slack}, Origin: task.OriginUser})
+	r.put(t, task.Task{ID: "t-mine", State: "inbox", Category: task.CategoryInbox, Origin: task.OriginUser})
 	ids := func(v task.View) []task.ID {
 		t.Helper()
 		es, err := r.svc.Tasks(ctx, task.Query{View: v})
@@ -52,7 +52,7 @@ func TestDisabledPluginTasksAreHidden(t *testing.T) {
 		t.Fatalf("enabled: %+v", c)
 	}
 	off, r.facts.off[unit.GitHub] = []unit.ProviderID{unit.GitHub}, true
-	if got := ids("inbox"); len(got) != 2 || got[0] == "e-gh" || got[1] == "e-gh" {
+	if got := ids("inbox"); len(got) != 2 || got[0] == "t-gh" || got[1] == "t-gh" {
 		t.Fatalf("inbox %v", got)
 	}
 	if got := ids("ready"); len(got) != 0 {
@@ -69,17 +69,17 @@ func TestDisabledPluginTasksAreHidden(t *testing.T) {
 	if err != nil || len(p.Tasks) != 2 || p.Counters.Badge != 2 {
 		t.Fatalf("page %+v %v", p, err)
 	}
-	if _, err := r.svc.Do(ctx, "e-gh", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbNext}); !errors.Is(err, coretasks.ErrPluginDisabled) {
+	if _, err := r.svc.Do(ctx, "t-gh", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbNext}); !errors.Is(err, coretasks.ErrPluginDisabled) {
 		t.Fatalf("next: %v", err)
 	}
-	if res, err := r.svc.Do(ctx, "e-gh", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss}); err != nil || res.Task.Category != task.CategoryDropped {
+	if res, err := r.svc.Do(ctx, "t-gh", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss}); err != nil || res.Task.Category != task.CategoryDropped {
 		t.Fatalf("dismiss: %+v %v", res, err)
 	}
-	if res, err := r.svc.Do(ctx, "e-both", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss}); err != nil || res.Task.Category != task.CategoryInbox ||
+	if res, err := r.svc.Do(ctx, "t-both", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss}); err != nil || res.Task.Category != task.CategoryInbox ||
 		len(res.Task.Units) != 1 || res.Task.Units[0].Provider != "slack" {
-		t.Fatalf("dismiss of an entry with a unit of an enabled plugin detaches the disabled one: %+v %v", res, err)
+		t.Fatalf("dismiss of a task with a unit of an enabled plugin detaches the disabled one: %+v %v", res, err)
 	}
-	if got := r.task(t, "e-next"); got.Category != task.CategoryReady {
+	if got := r.task(t, "t-next"); got.Category != task.CategoryReady {
 		t.Fatalf("data kept: %+v", got)
 	}
 	off, r.facts.off[unit.GitHub] = nil, false
@@ -96,42 +96,42 @@ func TestDismissDetachesADisabledPluginsUnitsFromAMixedTask(t *testing.T) {
 	r.facts.off["slack"] = true
 	ctx := context.Background()
 	slack := unit.Unit{Provider: "slack", Key: "C1/1.1"}
-	r.put(t, task.Task{ID: "e-mixed", State: "next", Category: task.CategoryReady, Units: []unit.Unit{unitU, slack},
+	r.put(t, task.Task{ID: "t-mixed", State: "next", Category: task.CategoryReady, Units: []unit.Unit{unitU, slack},
 		Items: []task.ItemRef{{Unit: unitU, Item: "a"}, {Unit: slack, Item: "b"}}, Origin: task.OriginUser})
-	r.put(t, task.Task{ID: "e-two", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{slack, unitV},
+	r.put(t, task.Task{ID: "t-two", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{slack, unitV},
 		Origin: task.OriginUser})
 
-	_, err := r.svc.Do(ctx, "e-mixed", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone})
+	_, err := r.svc.Do(ctx, "t-mixed", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone})
 	if !errors.Is(err, coretasks.ErrPluginDisabled) || !strings.Contains(err.Error(), "slack") {
 		t.Fatalf("done names the disabled plugin: %v", err)
 	}
-	res, err := r.svc.Do(ctx, "e-mixed", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss})
+	res, err := r.svc.Do(ctx, "t-mixed", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss})
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := r.task(t, "e-mixed")
+	got := r.task(t, "t-mixed")
 	if got.Category != task.CategoryReady || !slices.Equal(got.Units, []unit.Unit{unitU}) ||
 		!slices.Equal(got.Items, []task.ItemRef{{Unit: unitU, Item: "a"}}) || res.Task.ID != got.ID || !slices.Equal(res.Task.Units, got.Units) {
 		t.Fatalf("detached %+v, result %+v", got, res.Task)
 	}
-	if res, err := r.svc.Do(ctx, "e-mixed", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone}); err != nil || res.Task.Category != task.CategoryDone {
+	if res, err := r.svc.Do(ctx, "t-mixed", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone}); err != nil || res.Task.Category != task.CategoryDone {
 		t.Fatalf("done once detached: %+v %v", res, err)
 	}
-	if _, err := r.svc.Do(ctx, "e-two", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss}); err != nil {
+	if _, err := r.svc.Do(ctx, "t-two", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss}); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.task(t, "e-two"); got.Category != task.CategoryInbox || !slices.Equal(got.Units, []unit.Unit{unitV}) {
-		t.Fatalf("e-two %+v", got)
+	if got := r.task(t, "t-two"); got.Category != task.CategoryInbox || !slices.Equal(got.Units, []unit.Unit{unitV}) {
+		t.Fatalf("t-two %+v", got)
 	}
 }
 
 func TestDismissTrashesATaskWithNoUnitOfAnEnabledPluginWhole(t *testing.T) {
 	r := newRig()
 	r.facts.off[unit.GitHub] = true
-	r.put(t, task.Task{ID: "e-gh", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU},
+	r.put(t, task.Task{ID: "t-gh", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU},
 		Items: []task.ItemRef{{Unit: unitU, Item: "a"}}, Origin: task.OriginUser})
-	res, err := r.svc.Do(context.Background(), "e-gh", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss})
-	got := r.task(t, "e-gh")
+	res, err := r.svc.Do(context.Background(), "t-gh", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss})
+	got := r.task(t, "t-gh")
 	if err != nil || res.Task.Category != task.CategoryDropped || got.Category != task.CategoryDropped || len(got.Units) != 1 || len(got.Items) != 1 {
 		t.Fatalf("trashed whole: %+v %+v %v", got, res, err)
 	}
@@ -148,7 +148,7 @@ func TestDismissTrashesADerivedMixedTaskWhole(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got := r.task(t, id); got.Category != task.CategoryDropped || len(got.Units) != 2 || len(got.Items) != 2 {
-		t.Fatalf("a derived entry keeps the unit its id names: %+v", got)
+		t.Fatalf("a derived task keeps the unit its id names: %+v", got)
 	}
 }
 
@@ -156,12 +156,12 @@ func TestDetachDropsItemsOnAnyUnitOfTheDisabledPlugin(t *testing.T) {
 	r := newRig()
 	r.facts.off["slack"] = true
 	a, b := unit.Unit{Provider: "slack", Key: "C1/1.1"}, unit.Unit{Provider: "slack", Key: "C1/2.2"}
-	r.put(t, task.Task{ID: "e-mixed", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU, a},
+	r.put(t, task.Task{ID: "t-mixed", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU, a},
 		Items: []task.ItemRef{{Unit: unitU, Item: "x"}, {Unit: b, Item: "y"}}, Origin: task.OriginUser})
-	if _, err := r.svc.Do(context.Background(), "e-mixed", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss}); err != nil {
+	if _, err := r.svc.Do(context.Background(), "t-mixed", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss}); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.task(t, "e-mixed"); !slices.Equal(got.Items, []task.ItemRef{{Unit: unitU, Item: "x"}}) {
+	if got := r.task(t, "t-mixed"); !slices.Equal(got.Items, []task.ItemRef{{Unit: unitU, Item: "x"}}) {
 		t.Fatalf("items %+v", got.Items)
 	}
 }
@@ -170,12 +170,12 @@ func TestDetachDropsItemsOfADisabledPluginWithNoUnitOnTheTask(t *testing.T) {
 	r := newRig()
 	r.facts.off["slack"], r.facts.off["jira"] = true, true
 	slack, ticket := unit.Unit{Provider: "slack", Key: "C1/1.1"}, unit.Unit{Provider: "jira", Key: "T-1"}
-	r.put(t, task.Task{ID: "e-mixed", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU, slack},
+	r.put(t, task.Task{ID: "t-mixed", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{unitU, slack},
 		Items: []task.ItemRef{{Unit: unitU, Item: "x"}, {Unit: ticket, Item: "y"}}, Origin: task.OriginUser})
-	if _, err := r.svc.Do(context.Background(), "e-mixed", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss}); err != nil {
+	if _, err := r.svc.Do(context.Background(), "t-mixed", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDismiss}); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.task(t, "e-mixed"); !slices.Equal(got.Units, []unit.Unit{unitU}) || !slices.Equal(got.Items, []task.ItemRef{{Unit: unitU, Item: "x"}}) {
+	if got := r.task(t, "t-mixed"); !slices.Equal(got.Units, []unit.Unit{unitU}) || !slices.Equal(got.Items, []task.ItemRef{{Unit: unitU, Item: "x"}}) {
 		t.Fatalf("%+v", got)
 	}
 }

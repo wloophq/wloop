@@ -1147,11 +1147,11 @@ func TestSendKeepsTheItemsAndTaskItWasAskedAbout(t *testing.T) {
 	s, store, _, _, _ := newService(t)
 	ctx := context.Background()
 	if _, err := s.Send(ctx, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: "abc", Trigger: turn.ByHand, Records: true,
-		Inputs: map[string]any{"depth": "deep"}, Items: []string{"i1", "i2"}, Task: "e-1"}); err != nil {
+		Inputs: map[string]any{"depth": "deep"}, Items: []string{"i1", "i2"}, Task: "t-1"}); err != nil {
 		t.Fatal(err)
 	}
 	got := bookOf(t, store, r7).Turns[0]
-	if !slices.Equal(turns.ItemsOf(got), []string{"i1", "i2"}) || turns.TaskOf(got) != "e-1" || got.Inputs["depth"] != "deep" {
+	if !slices.Equal(turns.ItemsOf(got), []string{"i1", "i2"}) || turns.TaskOf(got) != "t-1" || got.Inputs["depth"] != "deep" {
 		t.Fatalf("turn %+v", got)
 	}
 }

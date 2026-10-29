@@ -13,11 +13,11 @@ Handing a review to an agent is one command. Everything after it is manual: noti
 
 - **Review rounds in their own worktree.** `wloop review <url>` opens a worktree at the pull request's head and starts an agent on a review judged by your review profile. When the author pushes, replies or re-requests you, the next round goes to the same worktree on its own.
 - **Your own pull requests, addressed.** When reviews or failing checks arrive on a pull request you develop, an address round triages them: it verifies each comment in the code, applies what holds, replies, and asks for the next look.
-- **Questions come back to you.** Every round ends with a record: done, a question for you, or what broke. The agent is instructed to hold its draft and ask when it is unsure, touches a risky surface or would contradict another reviewer; otherwise it publishes on GitHub itself, as you. You answer from the cockpit, the terminal client or a notification, and the answer reaches the agent's session. Slack drafts wait in the Outbox for your approval by default.
-- **One inbox for what you owe.** Review requests, changes requested on your pull requests and, optionally, Slack threads that ask something of you become items with Inbox, Next, Waiting and Someday lists.
+- **Questions come back to you.** Every round ends with a record: done, a question for you, or what broke. The agent is instructed to hold its draft and ask when it is unsure, touches a risky surface or would contradict another reviewer; otherwise it publishes on GitHub itself, as you. You answer from the cockpit, the terminal client or a notification, and the answer reaches the agent's session. A Slack draft waits on its gate for your approval by default.
+- **One list of what you owe.** Review requests, changes requested on your pull requests and, optionally, Slack threads that ask something of you become tasks, listed in views such as Inbox, Needs me, Waiting and Someday.
 - **Your judgment, written down.** A review profile is a directory of Markdown blocks: what to look for, labels, voice, per organization, repository or author. The bundled profile is a neutral starting point.
 - **Automatic behavior as rules you can read.** What runs on its own (follow-up rounds, nudges, closing a settled thread, asking who owns an item, cleanup of finished sessions and worktrees) is a set of workflows over pull requests, Slack threads and your tasks. `wloop plan` shows what would run now and why.
-- **Drafts wait for you.** A reply, a nudge or a closing message the loop or an agent proposes waits in the Outbox until you approve it, unless a rule of yours lets that kind of draft go on its own or after a delay. A comment on a pull request goes out under your name only when a rule names comments, and an agent never chooses its own approval.
+- **Drafts wait for you.** A reply, a nudge or a closing message the loop or an agent proposes waits on its gate until you approve it, unless a rule of yours lets that kind of draft go on its own or after a delay. A comment on a pull request goes out under your name only when a rule names comments, and an agent never chooses its own approval.
 - **Yours to change, without code.** Intents (what an agent does, where, with which instructions), workflows (when it runs), their texts and the labels and summaries the clients show all live in the profile. A file of yours replaces a bundled one, and an intent you add is a command: `wloop <intent> <url>`. The [language reference](https://wloophq.github.io/wloop/reference/language/) lists every word the profile files and the configuration take.
 
 ## Requirements
@@ -50,7 +50,7 @@ After `brew upgrade`, run `wloop install` and, on macOS, `wloop app install` aga
 | `wloop nudge <url> [guidance]` | Ask whoever a pull request waits on for the next step, in one comment |
 | `wloop <intent> <target> [guidance]` | Run any intent of your profile on a pull request, a Slack thread or another unit it serves |
 | `wloop outbox` | The drafts that wait for your approval |
-| `wloop status` | What waits on you, then what is stalled, yours and in the loop |
+| `wloop status` | The pull requests the loop follows, by view: those that need you, then the stalled ones, yours and those in the loop |
 | `wloop tui` | The same views in the terminal, with one-key actions |
 | `wloop open` | The web cockpit |
 | `wloop plan` | What the workflows would do now, and why |

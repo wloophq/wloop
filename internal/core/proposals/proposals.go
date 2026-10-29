@@ -1,6 +1,6 @@
 // Package proposals is the job that proposes what each enabled plugin
 // proposes on its own units, such as GitHub's nudge. Every draft waits for
-// its rule's approval policy. The drafts on GTD entries and Slack units come
+// its rule's approval policy. The drafts on tasks and Slack units come
 // from the profile's workflows through draft.propose.
 package proposals
 

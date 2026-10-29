@@ -110,7 +110,7 @@ func TestServiceOverSqliteKeepsClarifiedTasksOutOfTheInboxOnActivity(t *testing.
 	}
 	r.facts.off = true
 	if _, err := r.svc.Do(ctx, action, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone}); err == nil {
-		t.Fatal("a disabled plugin's entry moved")
+		t.Fatal("a disabled plugin's task moved")
 	}
 }
 

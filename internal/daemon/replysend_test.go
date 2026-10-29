@@ -59,9 +59,9 @@ func TestANotificationOffersTheReplyItsProfileSendsFirst(t *testing.T) {
 	r, _, _ := newDelegateRig(t)
 	r.s.deps.Outbox = &outbox.Service{Store: r.db.Drafts(), Clock: fixedClock(tasksNow)}
 	r.s.deps.Intents = draftReplies(t)
-	r.put(t, unitTask("e-a", task.OriginDerived, actThread))
+	r.put(t, unitTask("t-a", task.OriginDerived, actThread))
 	var v api.TaskView
-	if code := get(t, r.s, api.TaskPath("e-a"), &v); code != 200 || v.Attention == nil {
+	if code := get(t, r.s, api.TaskPath("t-a"), &v); code != 200 || v.Attention == nil {
 		t.Fatalf("%d %+v", code, v.Attention)
 	}
 	var ids []string
