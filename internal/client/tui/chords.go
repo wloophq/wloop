@@ -336,7 +336,7 @@ func (m *Model) taskVerb(verb string, read uint64) (Command, bool) {
 		return m.editPrompt(c, *draftOn(shown), read)
 	case verb == "delegate":
 		return m.delegatePrompt(e, c, m.bridgedConfirm(e, verb), read)
-	case verb == "reply":
+	case handler == handlerReply:
 		return m.replyPrompt(e, c, read)
 	}
 	if confirm := m.bridgedConfirm(e, verb); confirm != "" {

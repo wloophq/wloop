@@ -1,8 +1,8 @@
 "use strict";
 
-// SKIP_VERB_BUTTONS are the verbs the page offers elsewhere: seen when it opens, reply in the composer, and
-// a draft's in its card.
-const SKIP_VERB_BUTTONS = new Set(["seen", "answer", "reply", "edit", "retry"]);
+// SKIP_VERB_BUTTONS are the verbs the page offers elsewhere: seen when it opens and a draft's in its card;
+// the verb whose handler replies is in the composer.
+const SKIP_VERB_BUTTONS = new Set(["seen", "answer", "edit", "retry"]);
 // CLOSED_CATEGORIES are the categories of a state a task leaves the lists for.
 const CLOSED_CATEGORIES = new Set(["done", "dropped"]);
 // DRAFT_VERBS are the task verbs of a draft's delivery actions; DRAFT_TASK_VERBS every verb its card offers.
@@ -231,13 +231,13 @@ function askedArgs(verb) {
   return ask.args(String(v).trim());
 }
 
-// verbTask is the catalog's word for verb: its label and summary.
 // handlerVerb is the catalog's verb whose handler is handler, "" when none is.
 function handlerVerb(handler) {
   const v = ((typeof tasksState === "object" && tasksState.catalog && tasksState.catalog.verbs) || []).find((x) => x.handler === handler);
   return v ? v.verb : "";
 }
 
+// verbTask is the catalog's word for verb: its label and summary.
 function verbTask(verb) {
   return ((typeof tasksState === "object" && tasksState.catalog && tasksState.catalog.verbs) || []).find((x) => x.verb === verb) || {};
 }
@@ -253,7 +253,8 @@ function verbLabel(verb) {
 }
 
 function verbButtons(e) {
-  const skip = (verb) => SKIP_VERB_BUTTONS.has(verb) || (isDraftTask(e) && DRAFT_TASK_VERBS.includes(verb));
+  const replies = handlerVerb("reply");
+  const skip = (verb) => SKIP_VERB_BUTTONS.has(verb) || verb === replies || (isDraftTask(e) && DRAFT_TASK_VERBS.includes(verb));
   return (e.verbs || []).filter((v) => !skip(v.verb)).map((v) => verbButton(e, v.verb, verbLabel(v.verb), () => {
     const args = askedArgs(v.verb);
     if (args) taskAct(e, v.verb, args);

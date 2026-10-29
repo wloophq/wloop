@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -117,5 +118,14 @@ func TestAGatedDelegateOnABridgedTaskOpensTheGateAndRunsNothing(t *testing.T) {
 	}
 	if len(store.Events) != 0 {
 		t.Errorf("a gated delegate recorded %+v", store.Events)
+	}
+}
+
+func TestAnAgentSessionWritesNoChat(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.put(t, task.Task{ID: "e-1", State: "next", Category: task.CategoryReady})
+	if rec := postFrom(t, r.s, "term_1", api.TaskPath("e-1", "chat"), `{"text":"Ship it."}`); rec.Code != http.StatusForbidden {
+		t.Fatalf("an agent session's chat: %d %s", rec.Code, rec.Body)
 	}
 }

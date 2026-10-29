@@ -24,6 +24,9 @@ const (
 	ownDismiss     = "dismiss"
 )
 
+// handlerReply is the handler of the verb that writes a reply on the task's unit.
+const handlerReply = "reply"
+
 // draftVerbHandlers are the handlers a draft's verbs run.
 var draftVerbHandlers = []string{handlerApprove, ownDismiss, handlerRetry, handlerEdit}
 
@@ -239,7 +242,7 @@ func sessionOff(e api.TaskView) string {
 func (m *Model) replyPrompt(e api.TaskView, c Command, read uint64) (Command, bool) {
 	name := taskLabel(e)
 	labels := map[bool]string{
-		false: m.verbQuestion("reply") + ", on " + name + " (Tab: send now; Ctrl+E: editor)",
+		false: m.verbQuestion(c.verb) + ", on " + name + " (Tab: send now; Ctrl+E: editor)",
 		true:  "reply on " + name + ", sent now (Tab: save to the Outbox; Ctrl+E: editor)",
 	}
 	send := false
