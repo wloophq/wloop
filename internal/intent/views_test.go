@@ -259,7 +259,7 @@ func TestViewsKeepTheirDeclaredOrderAcrossLayers(t *testing.T) {
 	if want := append(bundled.IDs(), "zeta", "alpha"); !slices.Equal(texts.IDs(), want) {
 		t.Errorf("views %v, want %v", texts.IDs(), want)
 	}
-	if want := []string{"inbox", "needs-me", "waiting", "snoozed", "focus", "projects", "someday", "logbook", "outbox", "review-projects", "review"}; !slices.Equal(bundled.IDs(), want) {
+	if want := []string{"inbox", "needs-me", "waiting", "stalled", "in-loop", "approved", "snoozed", "focus", "projects", "someday", "logbook", "done", "outbox", "review-projects", "review"}; !slices.Equal(bundled.IDs(), want) {
 		t.Errorf("bundled views %v, want %v", bundled.IDs(), want)
 	}
 	var steps []string

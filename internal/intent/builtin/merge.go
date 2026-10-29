@@ -54,6 +54,7 @@ type Vocabulary struct {
 	toolProviders      map[string]unit.ProviderID
 	draftKinds         map[unit.ProviderID]DraftKinds
 	marks              []Mark
+	linkSignals        []string
 }
 
 // DraftKinds are a plugin's draft kinds and the delivery of a draft whose
@@ -133,6 +134,7 @@ func Install(v *Vocabulary) {
 	Tools, ToolAnswers, ToolProviders, PluginDraftKinds = v.tools, v.toolAnswers, v.toolProviders, v.draftKinds
 	pluginDeliveries = v.pluginDeliveries
 	Marks = v.marks
+	LinkSignals = v.linkSignals
 }
 
 // fits says why v, provider p's vocabulary among all, cannot merge.
@@ -271,6 +273,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	toolProviders := map[string]unit.ProviderID{}
 	draftKinds := map[unit.ProviderID]DraftKinds{}
 	var marks []Mark
+	var signals []string
 	for _, id := range ids {
 		src := all[id]
 		v := src.SourceVocabulary
@@ -345,6 +348,12 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 				taskKinds = append(taskKinds, k)
 			}
 		}
+		for _, g := range v.Signals {
+			if !slices.Contains(signals, g.Name) {
+				signals = append(signals, g.Name)
+				facts = append(facts, linkSignalFact(g))
+			}
+		}
 	}
 	for _, rows := range [][]Fact{facts, actionFacts} {
 		for i, f := range rows {
@@ -361,7 +370,19 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	return &Vocabulary{facts: facts, actionFacts: actionFacts, effects: effects, roles: roles, steps: stepsWith(steps),
 		slots: slots, briefSubjects: briefSubjects, workflowSlots: slices.Concat(unitSlots, nonUnitSlots),
 		deliveries: deliveries, pluginDeliveries: pluginDelivs, events: events, answering: answering, payloads: payloads, rounds: rounds, taskKinds: taskKinds,
-		tools: tools, toolAnswers: answers, toolProviders: toolProviders, draftKinds: draftKinds, marks: marks}
+		tools: tools, toolAnswers: answers, toolProviders: toolProviders, draftKinds: draftKinds, marks: marks, linkSignals: signals}
+}
+
+// LinkSignals are the link signals the merged plugins declare, each read as
+// the Bool fact task.link_signal.<name>.
+var LinkSignals []string
+
+// linkSignalFact is the task fact of a declared link signal: on when it is
+// on for any of the task's links.
+func linkSignalFact(g manifest.Named) Fact {
+	f := wf("task", strings.TrimPrefix(LinkSignalPrefix, "task.")+g.Name, expr.Bool, g.Doc+" On when it is on for any unit the task links.")
+	f.Untrusted = true
+	return f
 }
 
 // PluginTaskKinds are the values of the task's kind property the merged

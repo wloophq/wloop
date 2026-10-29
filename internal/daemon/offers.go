@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
@@ -133,4 +134,15 @@ func (s *Server) disabledPlugins(l *intentload.Loaded) []unit.ProviderID {
 		}
 	}
 	return off
+}
+
+// LinkState is what the read model holds of unit u for the facts of the tasks that link it: its link signals,
+// and when it last moved, the start of its situation under the host's overlays; ok is false for a unit no
+// provider serves a row of.
+func (s *Server) LinkState(ctx context.Context, u unit.Unit) (signals map[string]bool, moved time.Time, ok bool, err error) {
+	rd, ok, err := s.readModel().Read(ctx, u)
+	if err != nil || !ok {
+		return nil, time.Time{}, false, err
+	}
+	return rd.Signals(), rd.Row.Summary.Since, true, nil
 }

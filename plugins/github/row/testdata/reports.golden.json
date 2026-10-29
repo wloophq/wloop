@@ -3863,8 +3863,7 @@
           "name": "stalled"
         },
         {
-          "name": "in_loop",
-          "on": true
+          "name": "in_loop"
         },
         {
           "name": "ready"
@@ -5697,9 +5696,7 @@
       ],
       "signals": [
         {
-          "name": "stalled",
-          "on": true,
-          "since": "2026-10-02T13:00:00.000000001Z"
+          "name": "stalled"
         },
         {
           "name": "in_loop"

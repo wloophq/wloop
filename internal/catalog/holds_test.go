@@ -51,3 +51,29 @@ func TestABaselineHoldsAListFactToTheTasksValueNow(t *testing.T) {
 		}
 	}
 }
+
+func TestABaselineHoldsEveryFactItNamesToTheTasksValueNow(t *testing.T) {
+	ctx := context.Background()
+	l := bundled(t)
+	loaded := func() *intentload.Loaded { return l }
+	owes, inLoop := []string{"github:ana"}, false
+	facts := func(context.Context, task.Task) (workflow.Facts, error) {
+		return workflow.Facts{"task.link_owes": owes, "task.link_signal.in_loop": inLoop}, nil
+	}
+	got, err := Baseline(loaded, facts)(ctx, task.Task{ID: "t-1"}, "task.link_owes, task.link_signal.in_loop")
+	if err != nil || got != `size(task.link_owes) != 1 || !("github:ana" in task.link_owes) || task.link_signal.in_loop != false` {
+		t.Fatalf("%q %v", got, err)
+	}
+	holds := Holds(loaded, facts)
+	w := wake.Wake{Task: "t-1", When: got}
+	if held, err := holds(ctx, w, task.Task{ID: "t-1"}); err != nil || held {
+		t.Fatalf("the baseline holds at once: %v %v", held, err)
+	}
+	inLoop = true
+	if held, err := holds(ctx, w, task.Task{ID: "t-1"}); err != nil || !held {
+		t.Fatalf("a signal turned on and the wake does not hold: %v %v", held, err)
+	}
+	if got, _ := Baseline(loaded, facts)(ctx, task.Task{ID: "t-1"}, "task.link_owes, task.check_on"); got != "task.link_owes, task.check_on" {
+		t.Errorf("a list naming a time fact became %q", got)
+	}
+}

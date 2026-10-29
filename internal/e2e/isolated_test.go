@@ -498,3 +498,25 @@ func TestIsolatedSetupWritesTheMCPKeyAndExposesIt(t *testing.T) {
 		t.Fatal("the key reached the daemon log")
 	}
 }
+
+func TestIsolatedWorkflowsRunOnASnapshotTakenWithJobs(t *testing.T) {
+	dir := setupIsolated(t, shortDir(t), "w1", 4, "--workflows", "task-check-on,task-wake")
+	c, err := config.LoadFile(filepath.Join(dir, "config", brand.StateDir(), "config.toml"), cli.Defaults())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, w := range c.Workflows {
+		if want := name == "task-check-on" || name == "task-wake"; w.Enabled == nil || *w.Enabled != want {
+			t.Errorf("workflow %s enabled %v, want %v", name, w.Enabled, want)
+		}
+	}
+	mustIsolated(t, "snapshot", "--jobs", dir, walStore(t, map[string]string{"viewer:github": "octo"}, false))
+	mustIsolated(t, "start", dir)
+	mustIsolated(t, "stop", dir)
+
+	none := setupIsolated(t, shortDir(t), "w2", 5)
+	out, err := isolated(t, "snapshot", "--jobs", none, walStore(t, map[string]string{"viewer:github": "octo"}, false))
+	refusedWith(t, out, err, "--workflows")
+	out, err = isolated(t, "setup", filepath.Join(shortDir(t), "w3"), fakeDaemon(t), isolatedDM, "--workflows", "task-nope")
+	refusedWith(t, out, err, "no bundled workflow task-nope")
+}

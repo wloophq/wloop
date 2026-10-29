@@ -72,7 +72,7 @@ func TestEveryWorkflowFactHasASlotAndAType(t *testing.T) {
 		}
 	}
 	for name := range got {
-		if _, ok := want[name]; !ok {
+		if _, ok := want[name]; !ok && !strings.HasPrefix(name, LinkSignalPrefix) {
 			t.Errorf("%s is not in the plan's fact table", name)
 		}
 	}

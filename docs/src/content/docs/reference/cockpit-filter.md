@@ -21,7 +21,7 @@ The counts follow the filter in every view. The rail (the tabs in the terminal) 
 | `type:` | the brief's kind: `feature`, `fix`, `refactor`, `chore`, `infra` |
 | `risk:`, `size:` | the brief's risk and size |
 | `status:` | the workspace's board column |
-| `is:` | `stalled`, `needs-me`, `in-loop`, `approved`, `due` (an automatic round, mute end or brief retry within a day), `paused`, `muted`, `adopted`, `tracked` |
+| `is:` | `stalled`, `needs-me`, `in-loop`, `approved` (the GitHub plugin's own reading of the row, which the lens views of the same names read as link signals), `due` (an automatic round, mute end or brief retry within a day), `paused`, `muted`, `adopted`, `tracked` |
 | `ci:` | `failure`, `pending`, `success`, `none`, or the name of a failing check |
 | `opened:` | age since it opened: `1d`, `3d`, `7d`, `2w`, `4w`, `older` |
 | `scope:` | a scope reason |

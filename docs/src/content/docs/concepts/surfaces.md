@@ -14,17 +14,13 @@ All three are clients of the daemon. They show the same views and offer the same
 {{command}} open <url>                   # focuses the pull request's workspace in its manager
 ```
 
-The page listens on `127.0.0.1` only and asks for the token that `open` hands over. It opens on **Focus**, with the [lists](/concepts/tasks/) beside it, and the GitHub views:
+The page listens on `127.0.0.1` only and asks for the token that `open` hands over. It opens on **Focus**, with the [lists](/concepts/tasks/#views) beside it. Needs me, Stalled, In loop, Approved and Done are lists of tasks across sources: a pull request shows there through its task. The GitHub views list what exists in GitHub:
 
 | View | Shows |
 |---|---|
-| Needs me | what waits on you: an agent asked or stopped, a round is pending or held, a review request, your pull request with changes requested |
-| Stalled | pull requests waiting on someone past the stalled threshold |
 | My PRs | your own pull requests, those you took over included |
 | In loop | pull requests with a review workspace the loop follows |
-| Approved | open pull requests that wait on nothing of yours |
 | Backlog | charts of the open pull requests: who they wait on, age, size against risk, tags, failing checks |
-| Done | workspaces whose pull request merged or closed, ready to remove |
 | All | a dense table of everything in the inventory |
 | Recent | the newest events of every unit the loop follows: pull requests and the units of the other sources with a card |
 | Explore | search other people's pull requests to help on |

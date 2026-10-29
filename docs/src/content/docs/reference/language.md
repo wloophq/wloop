@@ -424,7 +424,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `name` (string): The gate, of gates.toml, the step opens. Required.
 - `task.set`:
   - `prop` (string): The property, of tasks.toml, the step sets. Required.
-  - `value` (string): The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD, a duration, a list comma-separated. Required.
+  - `value` (string): The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD or as a duration after now such as +2d, a duration, a list comma-separated. Required.
 
 ## Defaults (`defaults.toml`)
 

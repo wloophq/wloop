@@ -68,3 +68,18 @@ func (r Read) Book() (b turn.Book, has, kept bool) {
 	b, has = bk.Book(r.In)
 	return b, has, true
 }
+
+// Signaler is optional on a Provider: the link signals of row, derived
+// from in at at, under the host's overlays, by name.
+type Signaler interface {
+	Signals(base Base, row api.Row, in any, at time.Time) map[string]bool
+}
+
+// Signals are the link signals of the read's row, by name; none when its
+// provider reports none.
+func (r Read) Signals() map[string]bool {
+	if s, ok := r.p.(Signaler); ok {
+		return s.Signals(r.Base, r.Row, r.In, r.At)
+	}
+	return nil
+}

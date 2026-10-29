@@ -7,7 +7,6 @@
       "rows": true,
       "order": 0,
       "surfaces": [
-        "web",
         "tui"
       ],
       "unit": "Pull request",
@@ -19,9 +18,7 @@
       "provider": "github",
       "rows": true,
       "order": 1,
-      "surfaces": [
-        "web"
-      ],
+      "surfaces": [],
       "unit": "Pull request",
       "unit_sort": "repo"
     },
@@ -69,9 +66,7 @@
       "provider": "github",
       "rows": true,
       "order": 5,
-      "surfaces": [
-        "web"
-      ],
+      "surfaces": [],
       "unit": "Pull request",
       "unit_sort": "repo"
     },
@@ -91,9 +86,7 @@
       "provider": "github",
       "rows": true,
       "order": 7,
-      "surfaces": [
-        "web"
-      ],
+      "surfaces": [],
       "unit": "Pull request",
       "unit_sort": "repo"
     },
