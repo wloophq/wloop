@@ -32,7 +32,7 @@ const (
 	loopPerson = "system:loop"
 )
 
-// lensViews are the lens views that replaced the GitHub plugin's Needs me, Stalled, In loop, Approved and Done.
+// lensViews are the lens views a pull request's task shows in.
 var lensViews = []string{"needs-me", "stalled", "in-loop", "approved", "done"}
 
 // prCase is one pull request as the GitHub plugin reports it in a snapshot, the host's state over it, what the

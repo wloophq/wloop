@@ -68,7 +68,7 @@ type ViewsCatalog struct {
 
 // TaskViewSpec is a view of views.toml: Over is what it lists (tasks or gates), Group the fact it groups by,
 // Key the key that jumps to it, Badge whether the badge counts it, HideDisabled whether it hides the tasks of a
-// disabled plugin, RemoveClean whether it offers to remove its tasks' clean workspaces (RemoveCleanPath).
+// disabled plugin, RemoveClean whether it offers to remove its tasks' clean workspaces.
 type TaskViewSpec struct {
 	ID           string `json:"id"`
 	Label        string `json:"label"`
