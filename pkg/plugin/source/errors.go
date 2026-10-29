@@ -78,7 +78,8 @@ func fromStatus(err error) error {
 			return fmt.Errorf("%w: %w: %s", ErrNoAnswer, context.Canceled, st.Message())
 		case codes.DeadlineExceeded:
 			return fmt.Errorf("%w: %w: %s", ErrNoAnswer, context.DeadlineExceeded, st.Message())
-		case codes.Unavailable:
+		case codes.Unimplemented:
+		default:
 			return fmt.Errorf("%w: %w: %s", ErrNoAnswer, ErrUnavailable, st.Message())
 		}
 	}

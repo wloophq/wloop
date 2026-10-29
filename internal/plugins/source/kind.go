@@ -224,8 +224,6 @@ func (k *Kind) Client(id string) (*src.Client, error) {
 	return nil, fmt.Errorf("plugin %s: %w", id, src.ErrUnavailable)
 }
 
-// subscribers are the running plugins whose manifest subscribes to a topic
-// of ts, each with those topics, sorted by id.
 // brokers are the brokers of the running plugins, by id.
 func (k *Kind) brokers() map[string]*Broker {
 	k.mu.Lock()
@@ -239,6 +237,8 @@ func (k *Kind) brokers() map[string]*Broker {
 	return out
 }
 
+// subscribers are the running plugins whose manifest subscribes to a topic
+// of ts, each with those topics, sorted by id.
 func (k *Kind) subscribers(ts []plugin.Topic) []subscriber {
 	k.mu.Lock()
 	defer k.mu.Unlock()

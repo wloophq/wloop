@@ -384,3 +384,21 @@ func TestOpensThroughTheWebAPIClient(t *testing.T) {
 	}
 	eventually(t, 3*time.Second, "acked", func() bool { return slices.Equal(srv.Acks(), []string{"env-1"}) })
 }
+
+func TestCloseAwaitsTheKeepAlive(t *testing.T) {
+	srv := sockettest.New(t)
+	u, err := srv.Open(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := dialWebsocket(t.Context(), u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close("done")
+	select {
+	case <-s.(*wsSocket).done:
+	default:
+		t.Fatal("Close returned while the keep-alive still ran")
+	}
+}

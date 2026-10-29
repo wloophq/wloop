@@ -37,12 +37,12 @@ archives:
       - LICENSE
       - README.md
       - plugins/github/plugin.toml
-      - plugins/github/profile/**/*
+      - plugins/github/profile/**
       - src: "dist/plugin-github_{{ .Os }}_{{ .Arch }}*/plugins/github/*.sha256"
         dst: plugins/github
         strip_parent: true
       - plugins/slack/plugin.toml
-      - plugins/slack/profile/**/*
+      - plugins/slack/profile/**
       - src: "dist/plugin-slack_{{ .Os }}_{{ .Arch }}*/plugins/slack/*.sha256"
         dst: plugins/slack
         strip_parent: true

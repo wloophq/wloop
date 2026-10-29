@@ -17,6 +17,7 @@ const (
 type wsSocket struct {
 	c    *websocket.Conn
 	stop context.CancelFunc
+	done chan struct{}
 }
 
 func dialWebsocket(ctx context.Context, u string) (Socket, error) {
@@ -26,8 +27,12 @@ func dialWebsocket(ctx context.Context, u string) (Socket, error) {
 	}
 	c.SetReadLimit(readLimit)
 	pctx, stop := context.WithCancel(context.Background())
-	go keepAlive(pctx, c)
-	return &wsSocket{c: c, stop: stop}, nil
+	s := &wsSocket{c: c, stop: stop, done: make(chan struct{})}
+	go func() {
+		defer close(s.done)
+		keepAlive(pctx, c)
+	}()
+	return s, nil
 }
 
 func keepAlive(ctx context.Context, c *websocket.Conn) {
@@ -62,5 +67,7 @@ func (s *wsSocket) Write(ctx context.Context, frame []byte) error {
 
 func (s *wsSocket) Close(reason string) error {
 	s.stop()
-	return s.c.Close(websocket.StatusNormalClosure, reason)
+	err := s.c.Close(websocket.StatusNormalClosure, reason)
+	<-s.done
+	return err
 }

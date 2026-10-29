@@ -197,8 +197,9 @@ var (
 	// ErrMayHavePosted: a Publish failed after its post may have reached
 	// the source; the host asks a person to confirm before a retry.
 	ErrMayHavePosted = errors.New("may have been posted")
-	// ErrNoAnswer: the call was canceled, timed out or lost its connection
-	// before the other side answered, which may have acted on it.
+	// ErrNoAnswer: the call was canceled, timed out, lost its connection or
+	// failed in transport before the other side answered, which may have
+	// acted on it.
 	ErrNoAnswer = errors.New("no answer")
 )
 
