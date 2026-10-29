@@ -487,7 +487,7 @@ func (e *Env) relayGitHub(cfg config.Config, m pluginModule) (pluginModule, erro
 
 // afterGitHubJob keeps the budget the plugin's job left.
 func (e *Env) afterGitHubJob(ctx context.Context) {
-	if err := e.syncGitHubBudget(ctx); err != nil && !errors.Is(err, src.ErrUnavailable) && !errors.Is(err, src.ErrUnsupported) {
+	if err := e.syncGitHubBudget(ctx); err != nil && ctx.Err() == nil && !errors.Is(err, src.ErrUnavailable) && !errors.Is(err, src.ErrUnsupported) {
 		e.warnf("GitHub budget: %v", err)
 	}
 }

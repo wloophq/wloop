@@ -141,6 +141,9 @@ func (f testForge) Action(ctx context.Context, req src.ActionRequest) (json.RawM
 }
 
 func (f testForge) View(ctx context.Context, req src.ViewRequest) (json.RawMessage, error) {
+	if c, err := f.te.Env.githubPlugin(); err == nil {
+		return c.View(ctx, req)
+	}
 	return f.te.githubPluginOf().View(ctx, req)
 }
 
@@ -163,13 +166,13 @@ func (te *testEnv) serveGitHubPlugin(db *sqlite.DB, ghs ghplugingh.Runner) {
 	l.Add(string(unit.GitHub), map[plugin.Kind]plugin.Impl{src.Kind: src.New(&ghplugin.Plugin{API: apitest.Options(quietGH{te.gh}), GH: ghs,
 		Now: func() time.Time { return now() }})})
 	te.pluginLauncher = l
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(te.serving(context.Background()))
 	stop := te.servePlugins(ctx, db, te.cfg, t.Logf)
 	t.Cleanup(func() {
 		cancel()
 		stop()
 	})
-	eventually(t, "the GitHub plugin runs", func() bool { _, err := te.pluginKind.Client(string(unit.GitHub)); return err == nil })
+	eventually(t, "the GitHub plugin loaded", func() bool { return te.Env.budget.last.Load() != nil })
 }
 
 // bundledGitHubManifest is the GitHub plugin's bundled manifest.

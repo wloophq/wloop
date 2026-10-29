@@ -289,8 +289,10 @@ func (e *Env) servePlugins(ctx context.Context, db *sqlite.DB, cfg config.Config
 		},
 		Loaded: func(id string) {
 			logf("plugin %s: loaded", id)
-			e.pluginLoaded(ctx, db, id)
-			note(port.TopicPRs | port.TopicJobs)
+			e.background.Go(func() {
+				e.pluginLoaded(ctx, db, id)
+				note(port.TopicPRs | port.TopicJobs)
+			})
 		},
 		Logf:   logf,
 		Meters: meters,
