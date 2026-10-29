@@ -57,6 +57,10 @@ func (s *Service) Answer(ctx context.Context, r AnswerRequest) (AnswerResult, er
 		return s.answerPosted(ctx, r)
 	}
 	s.mu.Lock()
+	if prior, ok, err := s.gateAnswered(ctx, r); err != nil || ok {
+		s.mu.Unlock()
+		return prior, err
+	}
 	q, a, said, evs, err := s.storeAnswer(ctx, r)
 	s.mu.Unlock()
 	if err != nil {
@@ -126,6 +130,24 @@ func (s *Service) typeNotice(ctx context.Context, ref unit.Unit, route AnswerRes
 	return route, nil
 }
 
+// gateAnswered is the route of the answer r's gate gave already, which a gate's consequence that runs again
+// after a crash finds: the answer is stored and routed once. The caller holds s.mu.
+func (s *Service) gateAnswered(ctx context.Context, r AnswerRequest) (AnswerResult, bool, error) {
+	if r.Gate == 0 {
+		return AnswerResult{}, false, nil
+	}
+	b, err := s.book(ctx, r.Unit)
+	if err != nil {
+		return AnswerResult{}, false, err
+	}
+	for _, a := range slices.Backward(b.Answers) {
+		if a.Gate == r.Gate {
+			return AnswerResult{Route: a.Route, Handle: a.Session}, true, nil
+		}
+	}
+	return AnswerResult{}, false, nil
+}
+
 // answerPosted stores the answer to a message the agent posted during its turn and routes it to the session
 // that posted it; it never resumes a turn.
 func (s *Service) answerPosted(ctx context.Context, r AnswerRequest) (AnswerResult, error) {
@@ -133,6 +155,10 @@ func (s *Service) answerPosted(ctx context.Context, r AnswerRequest) (AnswerResu
 		return AnswerResult{}, InvalidAnswer{"an answer needs the text, an option, yes or no"}
 	}
 	s.mu.Lock()
+	if prior, ok, err := s.gateAnswered(ctx, r); err != nil || ok {
+		s.mu.Unlock()
+		return prior, err
+	}
 	b, err := s.book(ctx, r.Unit)
 	if err != nil {
 		s.mu.Unlock()

@@ -10,6 +10,7 @@ Each entry is a file under `docs/src/content/docs/architecture/decisions/`, with
 | Decision | What it holds |
 |---|---|
 | [A draft is what its proposer declares](/architecture/decisions/a-draft-is-what-its-proposer-declares/) | A draft carries its purpose, delivery and effects; nothing follows from its kind, and a draft that posts waits for a person. |
+| [A gate's consequence runs once](/architecture/decisions/a-gates-consequence-runs-once/) | A resolved gate records when its consequence ran; the tick reruns one a stopped daemon left, and every consequence is idempotent. |
 | [A provider is asked what it can do](/architecture/decisions/a-provider-is-asked-what-it-can-do/) | A plugin declares its capabilities, and a provider id appears only in its plugin and the tables. |
 | [A task's history is kept](/architecture/decisions/task-history-is-kept/) | Retention never deletes the events, turns, records, answers or plan items of a task or of a unit a task holds. |
 | [Architecture rules are tests](/architecture/decisions/architecture-rules-are-tests/) | Each architecture rule is a test with a self-test, and its reference page is generated. |

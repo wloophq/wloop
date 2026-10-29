@@ -40,7 +40,7 @@ const (
 
 // proposalsSQL are the item proposals, each in the state of its newest gate: the gate of its ledger message,
 // or the one it has before its message exists. A proposal with no gate open or decided is open.
-var proposalsSQL = fmt.Sprintf(`SELECT id, provider, unit_key, item, op, provenance, reason, state, at FROM (
+var proposalsSQL = fmt.Sprintf(`SELECT id, provider, unit_key, item, op, provenance, reason, state, at, decided_at != '' FROM (
 	SELECT p.*, CASE coalesce((SELECT g.status FROM gates g WHERE g.provider = p.provider AND g.unit_key = p.unit_key AND g.kind = '%s'
 		AND g.subject IN ('%s' || p.id, (SELECT CAST(m.id AS TEXT) FROM messages m WHERE m.origin_kind = '%s' AND m.proposal = p.id))
 		ORDER BY g.id DESC LIMIT 1), '')
@@ -138,7 +138,7 @@ func (s itemStore) Proposals(ctx context.Context, state coreitems.ProposalState)
 func scanProposal(r scanner) (coreitems.Proposal, error) {
 	var p coreitems.Proposal
 	var provider, op, prov, state, at string
-	if err := r.Scan(&p.ID, &provider, &p.Unit.Key, &p.Item, &op, &prov, &p.Reason, &state, &at); err != nil {
+	if err := r.Scan(&p.ID, &provider, &p.Unit.Key, &p.Item, &op, &prov, &p.Reason, &state, &at, &p.Decided); err != nil {
 		return p, err
 	}
 	p.Unit.Provider, p.Provenance, p.State = unit.ProviderID(provider), items.Provenance(prov), coreitems.ProposalState(state)
@@ -210,6 +210,11 @@ func (s itemStore) Commit(ctx context.Context, c coreitems.Commit) error {
 		}
 		for _, p := range c.Proposals {
 			if err := saveProposal(ctx, tx, p); err != nil {
+				return err
+			}
+		}
+		for _, id := range c.Decided {
+			if _, err := tx.ExecContext(ctx, `UPDATE item_proposals SET decided_at = ? WHERE id = ?`, formatTime(time.Now()), id); err != nil {
 				return err
 			}
 		}

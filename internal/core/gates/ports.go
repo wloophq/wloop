@@ -24,6 +24,12 @@ type Store interface {
 	Resolve(ctx context.Context, id int64, r Resolution) (gate.Gate, error)
 	// Due are the open gates whose Deadline is set and not after now.
 	Due(ctx context.Context, now time.Time) ([]gate.Gate, error)
+	// Applied marks resolved gate id's consequence as run; an open gate is
+	// refused.
+	Applied(ctx context.Context, id int64) error
+	// Unapplied are the resolved gates whose consequence has not run: a
+	// superseded gate and a recorded send have none.
+	Unapplied(ctx context.Context) ([]gate.Gate, error)
 }
 
 // Reader reads the gates, open and closed. Its lists are ordered by ID,

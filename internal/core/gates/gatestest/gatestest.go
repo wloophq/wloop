@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"sync"
 	"testing"
@@ -19,9 +20,10 @@ import (
 // Store is an in-memory gates.Store, gates.Reader and gates.Sent; Now stamps
 // OpenedAt and ClosedAt.
 type Store struct {
-	mu    sync.Mutex
-	gates []gate.Gate
-	Now   func() time.Time
+	mu      sync.Mutex
+	gates   []gate.Gate
+	applied map[int64]bool
+	Now     func() time.Time
 }
 
 var (
@@ -58,7 +60,37 @@ func (s *Store) Resolve(_ context.Context, id int64, r gates.Resolution) (gate.G
 		return clone(*g), fmt.Errorf("%w: %d is %s", gates.ErrResolved, id, g.Status)
 	}
 	g.Status, g.Intent, g.Answer, g.By, g.Rule, g.ClosedAt = r.Status, r.Intent, r.Answer, r.By, r.Rule, s.Now()
+	if g.Status == gate.Superseded {
+		s.mark(id)
+	}
 	return clone(*g), nil
+}
+
+func (s *Store) mark(id int64) {
+	if s.applied == nil {
+		s.applied = map[int64]bool{}
+	}
+	s.applied[id] = true
+}
+
+func (s *Store) Applied(_ context.Context, id int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if id < 1 || int(id) > len(s.gates) {
+		return fmt.Errorf("%w: %d", gates.ErrNoGate, id)
+	}
+	if s.gates[id-1].Status == gate.Open {
+		return fmt.Errorf("gate %d is open: no consequence ran", id)
+	}
+	s.mark(id)
+	return nil
+}
+
+func (s *Store) Unapplied(context.Context) ([]gate.Gate, error) {
+	s.mu.Lock()
+	applied := maps.Clone(s.applied)
+	s.mu.Unlock()
+	return s.filter(func(g gate.Gate) bool { return g.Status != gate.Open && !applied[g.ID] }), nil
 }
 
 func (s *Store) Get(_ context.Context, id int64) (gate.Gate, error) {
@@ -100,6 +132,7 @@ func (s *Store) RecordSent(_ context.Context, g gate.Gate) (gate.Gate, error) {
 	g.OpenedAt, g.ClosedAt = s.Now(), s.Now()
 	g.Intents = slices.Clone(g.Intents)
 	s.gates = append(s.gates, g)
+	s.mark(g.ID)
 	return clone(g), nil
 }
 
@@ -243,6 +276,34 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 		due, err := s.Due(ctx, Epoch.Add(time.Hour))
 		if err != nil || !slices.Equal(idsOf(due), []int64{a.ID}) {
 			t.Fatalf("due %v %v", idsOf(due), err)
+		}
+	})
+	t.Run("a resolved gate is unapplied until marked", func(t *testing.T) {
+		s, _, sent := open(t)
+		open1, _ := s.Open(ctx, draft("t-01"))
+		resolved, _ := s.Open(ctx, draft("t-01"))
+		superseded, _ := s.Open(ctx, draft("t-01"))
+		if _, err := s.Resolve(ctx, resolved.ID, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.Resolve(ctx, superseded.ID, gates.Resolution{Status: gate.Superseded, By: task.ActorWorkflow}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := sent.RecordSent(ctx, gate.Gate{Task: "t-01", Kind: gate.KindPost, By: task.ActorAgent}); err != nil {
+			t.Fatal(err)
+		}
+		got, err := s.Unapplied(ctx)
+		if err != nil || !slices.Equal(idsOf(got), []int64{resolved.ID}) || got[0].Status != gate.Approved {
+			t.Fatalf("unapplied %v %v, want the resolved gate alone", idsOf(got), err)
+		}
+		if err := s.Applied(ctx, resolved.ID); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Applied(ctx, open1.ID); err == nil {
+			t.Fatal("an open gate marked applied")
+		}
+		if got, err := s.Unapplied(ctx); err != nil || len(got) != 0 {
+			t.Fatalf("unapplied after the mark %v %v", idsOf(got), err)
 		}
 	})
 	t.Run("a recorded send is approved and never open", func(t *testing.T) {

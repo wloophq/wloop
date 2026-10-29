@@ -135,6 +135,16 @@ var writes = []writeCase{
 		topics: port.TopicGates, units: []unit.Unit{u7},
 	},
 	{
+		method: "GateStore.Applied",
+		seed: func(t *testing.T, e *noteEnv) {
+			seedGate(t, e)
+			if _, err := noteGates(e).Resolve(context.Background(), 1, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson}); err != nil {
+				t.Fatal(err)
+			}
+		},
+		call: func(ctx context.Context, e *noteEnv) error { return noteGates(e).Applied(ctx, 1) },
+	},
+	{
 		method: "GateStore.RecordSent",
 		call: func(ctx context.Context, e *noteEnv) error {
 			_, err := noteGates(e).RecordSent(ctx, gate.Gate{Unit: term1, Kind: gate.KindPost, Name: "post", By: task.ActorAgent})
@@ -427,7 +437,7 @@ var reads = []string{
 	"Fetches.Last",
 	"DB.AgentTranscript", "DB.WorkflowActivity",
 	"DB.Tasks", "taskStore.Tasks", "taskStore.TasksSince", "taskStore.Task", "taskStore.TasksOf", "DB.Props",
-	"DB.Gates", "GateStore.Get", "GateStore.OfTask", "GateStore.Where", "GateStore.Due",
+	"DB.Gates", "GateStore.Get", "GateStore.OfTask", "GateStore.Where", "GateStore.Due", "GateStore.Unapplied",
 	"DB.Wakes", "WakeStore.Of", "WakeStore.Due", "WakeStore.Watching", "WakeStore.UnitWakes",
 }
 

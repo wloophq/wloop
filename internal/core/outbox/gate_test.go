@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -152,5 +153,41 @@ func TestGateDeliveryIsTheDraftsDelivery(t *testing.T) {
 	}
 	if got, err := e.svc.DeliveryOf(ctx, gate.Gate{Kind: gate.KindQuestion, Subject: g.Subject}); got != "" || err != nil {
 		t.Fatalf("a question gate's delivery %q %v", got, err)
+	}
+}
+
+func TestADraftApprovedBeforeACrashIsSentOnceAfterIt(t *testing.T) {
+	e := newEnv()
+	cut := e.propose(reply("approved, then the daemon stopped"))
+	ran := e.propose(reply("approved and queued, then the daemon stopped"))
+	resolved := map[draft.ID]gate.Gate{}
+	for _, d := range []draft.Draft{cut, ran} {
+		if _, err := e.svc.Prepare(ctx, d.ID, e.get(d.ID).Rev); err != nil {
+			t.Fatal(err)
+		}
+		g, err := e.gates.Resolve(ctx, e.gate(d.ID).ID, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson})
+		if err != nil {
+			t.Fatal(err)
+		}
+		resolved[d.ID] = g
+	}
+	if err := e.svc.Publish(ctx, resolved[ran.ID]); err != nil {
+		t.Fatal(err)
+	}
+	e.svc.Send(ctx)
+	restarted := gates.New(gates.Deps{Store: e.gates, Reader: e.gates, Profile: draftProfile{}, Clock: e.clock, Publisher: publishTo{e}})
+	for range 2 {
+		if err := restarted.Tick(ctx, e.clock.Now()); err != nil {
+			t.Fatal(err)
+		}
+		e.svc.Send(ctx)
+	}
+	if !slices.Equal(e.fx.published, []draft.ID{ran.ID, cut.ID}) {
+		t.Fatalf("published %v, want each draft once", e.fx.published)
+	}
+	for _, d := range []draft.Draft{cut, ran} {
+		if got := e.get(d.ID).State; got != draft.Sent {
+			t.Errorf("draft %d is %s", d.ID, got)
+		}
 	}
 }

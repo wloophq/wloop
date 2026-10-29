@@ -14,6 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
+	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/event"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/message"
@@ -22,11 +23,19 @@ import (
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
-// TestAnOpenQuestionOnALiveSessionReachesItAfterTheUpgrade upgrades a version 6 store holding a question its
-// live session asked, as the daemon does on start, then answers the question's gate: the answer is typed
-// into that session.
-func TestAnOpenQuestionOnALiveSessionReachesItAfterTheUpgrade(t *testing.T) {
-	t.Parallel()
+// liveQuestion is a version 6 store holding a question its live session s1 asked, upgraded as the daemon does
+// on start, served with its messages: the open question 10 and its gate.
+type liveQuestion struct {
+	te       *testEnv
+	db       *sqlite.DB
+	d        daemon.Deps
+	sessions *turnstest.Sessions
+	open     message.Message
+	gate     gate.Gate
+}
+
+func newLiveQuestion(t *testing.T) liveQuestion {
+	t.Helper()
 	te := newTestEnv(t, &fake.Manager{})
 	te.noDaemon(t)
 	at := testNow.Add(-time.Hour).UTC().Format(event.TimeLayout)
@@ -67,6 +76,16 @@ func TestAnOpenQuestionOnALiveSessionReachesItAfterTheUpgrade(t *testing.T) {
 	if err != nil || len(gs) != 1 || gs[0].Subject != "10" {
 		t.Fatalf("question gates %+v %v", gs, err)
 	}
+	return liveQuestion{te: te, db: db, d: d, sessions: sessions, open: open[0], gate: gs[0]}
+}
+
+// TestAnOpenQuestionOnALiveSessionReachesItAfterTheUpgrade upgrades a version 6 store holding a question its
+// live session asked, as the daemon does on start, then answers the question's gate: the answer is typed
+// into that session.
+func TestAnOpenQuestionOnALiveSessionReachesItAfterTheUpgrade(t *testing.T) {
+	t.Parallel()
+	q := newLiveQuestion(t)
+	ctx, d, sessions, open, gs := context.Background(), q.d, q.sessions, []message.Message{q.open}, []gate.Gate{q.gate}
 	route := &messages.Delivery{Source: turn.Cockpit}
 	if err := d.Gates.Resolve(messages.WithDelivery(ctx, route), gs[0].ID, gates.Resolution{Intent: "answer", Answer: "yes", By: task.ActorPerson}); err != nil {
 		t.Fatal(err)

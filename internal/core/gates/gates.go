@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/port"
@@ -110,9 +111,33 @@ type Deps struct {
 }
 
 // Service opens the gates and is the only code that resolves one.
-type Service struct{ d Deps }
+type Service struct {
+	d Deps
 
-func New(d Deps) *Service { return &Service{d: d} }
+	mu sync.Mutex
+	// running are the gates whose consequence runs now, which the tick does
+	// not replay.
+	running map[int64]bool
+}
+
+func New(d Deps) *Service { return &Service{d: d, running: map[int64]bool{}} }
+
+// claim marks gate id's consequence as running here; false when it runs already.
+func (s *Service) claim(id int64) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.running[id] {
+		return false
+	}
+	s.running[id] = true
+	return true
+}
+
+func (s *Service) release(id int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.running, id)
+}
 
 func (s *Service) logf(format string, args ...any) {
 	if s.d.Log != nil {
@@ -225,7 +250,9 @@ func (s *Service) RecordSent(ctx context.Context, g gate.Gate) (gate.Gate, error
 }
 
 // Tick resolves every open gate whose Deadline is not after now to its
-// Default, with the rule window.
+// Default, with the rule window, then runs the consequence of each resolved
+// gate whose consequence never ran, as when the daemon stopped between the
+// gate's resolution and its consequence.
 func (s *Service) Tick(ctx context.Context, now time.Time) error {
 	due, err := s.d.Store.Due(ctx, now)
 	if err != nil {
@@ -237,7 +264,28 @@ func (s *Service) Tick(ctx context.Context, now time.Time) error {
 			errs = append(errs, fmt.Errorf("gate %d: %w", g.ID, err))
 		}
 	}
-	return errors.Join(errs...)
+	return errors.Join(append(errs, s.replay(ctx))...)
+}
+
+// replay runs the consequence of every resolved gate whose consequence never
+// ran and does not run now. A consequence that fails is logged: what ran of
+// it before the daemon stopped may have settled its subject already.
+func (s *Service) replay(ctx context.Context) error {
+	unapplied, err := s.d.Store.Unapplied(ctx)
+	if err != nil {
+		return err
+	}
+	for _, g := range unapplied {
+		if !s.claim(g.ID) {
+			continue
+		}
+		s.logf("gate %d resolved %s: running its consequence, which had not run", g.ID, g.Status)
+		if err := s.applied(ctx, g); err != nil {
+			s.logf("%v", err)
+		}
+		s.release(g.ID)
+	}
+	return nil
 }
 
 // NextDeadline is the earliest Deadline of an open gate, zero when none
@@ -309,11 +357,29 @@ func (s *Service) released(g gate.Gate, def Def, dec Decision) (Resolution, bool
 }
 
 func (s *Service) close(ctx context.Context, g gate.Gate, r Resolution) (gate.Gate, error) {
+	if !s.claim(g.ID) {
+		return gate.Gate{}, fmt.Errorf("%w: %d resolves now", ErrResolved, g.ID)
+	}
+	defer s.release(g.ID)
 	closed, err := s.d.Store.Resolve(ctx, g.ID, r)
 	if err != nil {
 		return closed, err
 	}
-	return closed, s.apply(ctx, closed)
+	return closed, s.applied(ctx, closed)
+}
+
+// applied runs g's consequence and marks it run, failed or not: a failure is
+// a person's to retry. A consequence its context cut stays unmarked, for the
+// tick to run again.
+func (s *Service) applied(ctx context.Context, g gate.Gate) error {
+	err := s.apply(ctx, g)
+	if ctx.Err() != nil {
+		return err
+	}
+	if merr := s.d.Store.Applied(ctx, g.ID); merr != nil {
+		err = errors.Join(err, fmt.Errorf("marking gate %d's consequence run: %w", g.ID, merr))
+	}
+	return err
 }
 
 // decide is p's decision on g; with no policy, or one that fails, g waits.
