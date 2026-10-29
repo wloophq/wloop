@@ -51,8 +51,8 @@ without one is marked unrecorded.
 
 Every decision waiting on the user is a gate on its task: an agent's question,
 a draft to approve, a pending round. The user resolves it from the cockpit
-(`{{command}} open`), the notification or `{{command}} tui` (`w` answers, `c`
-continues without an answer, `d` dismisses). {{name}} types an answer into the
+(`{{command}} open`), the notification or `{{command}} tui` (`W` answers, `C`
+continues without an answer, `X` dismisses). {{name}} types an answer into the
 agent's session as its next prompt (a long one tells the agent to run
 `{{command}} turn answer <url>`), or starts a new session that resumes the turn
 when the old one is gone; an agent reads the answers to what it posted, and
@@ -61,27 +61,26 @@ terminal.
 
 ## Reading `{{command}} status`
 
-Piped, as you run it, it prints one tab-separated line per pull request and
-view, full values: `view, who it waits on, age, owner/repo#n, title, reason`
-(`tracked` lines too). No line outside `tracked` means no pull request waits.
+Piped, as you run it, it prints one tab-separated line per task and view,
+then one per tracked pull request: `view, who it waits on, age, owner/repo#n,
+title, reason`. The views are those the profile's `[badge]` counts, `inbox` and
+`needs-me` by default; a `tracked` line is a pull request the user follows.
+With no line of those views, nothing waits on the user.
 
-| View | Meaning |
-|---|---|
-| `needs-me` | the user must act: an agent asked or stopped, a round is pending or held, a review or their own PR waits on them |
-| `stalled` | waiting on someone past the configured working days |
-| `mine` | the user's own PRs, those they took over included |
-| `loop` | PRs with a review workspace, which the loop follows |
+Lead with `needs-me`, then `inbox`. Link every PR as a markdown link.
 
-Lead with `needs-me`, then `stalled`. Link every PR as a markdown link.
-
-The tasks have their own lists, the profile's views (`views.toml`), which the
-cockpit and the menu bar show:
+The views are the profile's (`views.toml`), which the cockpit, `{{command}} tui`
+and the menu bar list; among the bundled ones:
 
 | View | Meaning |
 |---|---|
 | `inbox` | tasks nobody has clarified yet; once clarified a task never returns |
 | `needs-me` | the next step is the user's: an open gate (a question, a draft, a round), or their own action |
 | `waiting` | the next step is someone else's, grouped by who owes it |
+| `stalled` | waiting too long: a source says a link stalled, or the check date of a task someone else owes passed with nothing moving |
+| `in-loop` | an agent works on it: a source's loop holds a link, or a run is live |
+| `approved` | the work is approved: a source says a link is ready |
+| `done` | done and still holding a workspace on disk, to remove |
 | `snoozed` | asleep until a date, an event or a condition |
 | `outbox` | drafts waiting on approval, and approved ones whose delivery is under way or failed |
 

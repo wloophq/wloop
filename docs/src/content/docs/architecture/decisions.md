@@ -28,7 +28,7 @@ Each entry is a file under `docs/src/content/docs/architecture/decisions/`, with
 | [Only the gates service resolves a gate](/architecture/decisions/only-the-gates-service-resolves-a-gate/) | Every decision waiting on you is a gate, closed only by you, a trusted policy rule or a passed window. |
 | [Ports and adapters, dependencies inward](/architecture/decisions/ports-and-adapters-dependencies-inward/) | The domain and the core import inward only; adapters implement the core's ports. |
 | [Small ports owned by their consumer](/architecture/decisions/small-ports-owned-by-their-consumer/) | A port belongs to the core package that uses it and has at most five methods. |
-| [Sources are compiled-in plugins](/architecture/decisions/sources-are-compiled-in-plugins/) | A source is a compiled-in plugin; the core imports no plugin and no plugin another. |
+| [Sources are plugins](/architecture/decisions/sources-are-compiled-in-plugins/) | A source is a plugin, a process of its own that imports only the SDK; the host names it in one file, and neither side imports the other. |
 | [Text an agent reads resolves through the profile](/architecture/decisions/text-an-agent-reads-resolves-through-the-profile/) | Every text an agent reads is a profile file a user profile can replace. |
 | [The lists are the profile's views](/architecture/decisions/the-lists-are-the-profiles-views/) | Go names no view and no task property; it reads views.toml's conditions and a property's role. |
 | [The plugins declare their vocabulary](/architecture/decisions/the-plugins-declare-their-vocabulary/) | The builtin tables hold the core's rows only; each plugin's facts, effects, roles and kinds come from its manifest. |
