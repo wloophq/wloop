@@ -124,17 +124,13 @@ func TestCoreSchemaHasNoPluginTables(t *testing.T) {
 	}
 }
 
-// pluginTable says table is one the export moves out of the core.
-func pluginTable(table string) bool {
-	for _, p := range v7Exports {
-		for _, e := range p.tables {
-			if e.table == table && !e.keep {
-				return true
-			}
-		}
-	}
-	return false
-}
+// pluginTables are the version 6 tables that belong to the plugins alone, named here rather than read from
+// v7Exports so a table the export wrongly keeps fails the test.
+var pluginTables = []string{"pull_requests", "pr_seen", "pr_details", "segment_map",
+	"extraction_cursors", "extraction_hints", "extraction_days", "extraction_runs",
+	"slack_conversations", "slack_objects", "slack_messages", "slack_reactions", "slack_users", "slack_changes", "slack_cursors"}
+
+func pluginTable(table string) bool { return slices.Contains(pluginTables, table) }
 
 func exported(t *testing.T, path string) *sql.DB {
 	t.Helper()
