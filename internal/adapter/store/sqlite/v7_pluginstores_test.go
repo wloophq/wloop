@@ -202,3 +202,19 @@ func TestAnExportIsDurableBeforeTheCoreDropsItsTables(t *testing.T) {
 		t.Error("the second migration left the core's pull requests")
 	}
 }
+
+// TestAnIncompleteExportIsWrittenAgain: an import.db that lacks rows of the core, as one left by an earlier
+// build, is replaced by a complete export.
+func TestAnIncompleteExportIsWrittenAgain(t *testing.T) {
+	t.Parallel()
+	path := v6PluginsFixture(t)
+	stale := filepath.Join(filepath.Dir(path), "plugins", "github", "import.db")
+	if err := os.MkdirAll(filepath.Dir(stale), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	rawExec(t, stale, `CREATE TABLE pull_requests (owner TEXT, repo TEXT, number INTEGER)`)
+	migrateV6(t, path)
+	if n := rowCount(t, exported(t, stale), `SELECT count(*) FROM pull_requests`); n != 2 {
+		t.Errorf("the export holds %d pull requests, want the core's 2", n)
+	}
+}
