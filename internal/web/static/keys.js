@@ -16,6 +16,7 @@ const VERB_ASKS = {
   area: { args: (v) => ({ set: v }) },
   delegate: { args: (v) => (v ? { guidance: v } : {}) },
   reply: { args: (v) => (v ? { text: v } : null) },
+  promise: { args: (v) => (v ? { by: v } : {}) },
 };
 
 // servedAsk is how the served verb named verb, among specs, asks for its

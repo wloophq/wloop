@@ -58,6 +58,7 @@ doc     = "When the task is due: the date you set, or the deadline its source de
 
 [props.promised]
 type    = "date"
+role    = "promise"
 writers = ["person"]
 doc     = "The date you promised the task by, such as an answer by Friday."
 
@@ -309,6 +310,35 @@ label   = "Reply"
 summary = "Write a reply on its unit; Send posts it now, Save as draft holds it for your approval."
 input   = "Your reply"
 send    = "now"
+by      = { person = "true" }
+
+# Triage: tell the asker you are on it, say it is not yours, or hand it to
+# someone. Each records its event, verb_<name>, on which the bundled
+# workflows task-acknowledge-*, task-not-mine and task-check-on act.
+
+[verbs.acknowledge]
+handler = "promise"
+label   = "Acknowledge"
+summary = "Tell the asker you are on it: a time proposes a \"looking, by then\" reply and sets promised; none proposes a reaction."
+input   = "By when: HH:MM, a date, or empty to just react"
+from    = ["inbox", "next"]
+to      = "next"
+by      = { person = "true" }
+
+[verbs.not-mine]
+label   = "Not mine"
+summary = "Say it is not yours: it goes to the trash, and a reply pointing the asker elsewhere waits for your approval."
+from    = ["inbox", "next", "waiting", "scheduled", "someday"]
+to      = "trash"
+by      = { person = "true" }
+
+[verbs.hand-to]
+handler = "waiting"
+label   = "Hand to"
+summary = "Hand it to someone: it waits on them, and Chase lists it once its check date passes with nothing moving."
+input   = "Hand to whom"
+from    = ["inbox", "next", "scheduled", "someday"]
+to      = "waiting"
 by      = { person = "true" }
 
 # What you write on a task's chat reaches its live session; with none, it

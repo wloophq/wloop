@@ -1,10 +1,5 @@
 package task
 
-// Verbs are every verb, in the order clients list them.
-var Verbs = []Verb{VerbNext, VerbWaiting, VerbSchedule, VerbWake, VerbSomeday, VerbReference, VerbFocus, VerbProject, VerbApprove,
-	VerbDelegate, VerbDone, VerbDismiss, VerbSeen, VerbContext, VerbArea, VerbAnswer, VerbEdit, VerbRetry, VerbReviewed,
-	VerbSequential, VerbReply}
-
 // VerbEventKind is the kind of the event running v on a task records.
 func VerbEventKind(v Verb) string { return "verb_" + string(v) }
 

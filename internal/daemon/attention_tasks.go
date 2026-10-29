@@ -348,7 +348,7 @@ const (
 // handlerVerb is the verb whose handler is h and its label, as the profile words them; h itself when no verb runs it.
 func (s *Server) handlerVerb(h string) (task.Verb, string) {
 	l := s.loaded().Tasks
-	for _, v := range builtin.TaskVerbs {
+	for _, v := range s.verbOrder() {
 		if l.Handler(v) == h {
 			return task.Verb(v), cmp.Or(l.Verbs[v].Label, bundledWords().tasks.Verbs[v].Label, v)
 		}

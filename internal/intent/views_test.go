@@ -98,13 +98,12 @@ func TestEveryVerbAndViewIsWorded(t *testing.T) {
 		t.Fatal(problems.Error())
 	}
 	texts := lists{views, tasks.Verbs}
-	for _, v := range builtin.TaskVerbs {
-		if w := texts.Verbs[v]; w.Label == "" || w.Summary == "" {
+	for _, v := range tasks.VerbOrder {
+		w := texts.Verbs[v]
+		if w.Label == "" || w.Summary == "" {
 			t.Errorf("verb %s: label %q, summary %q", v, w.Label, w.Summary)
 		}
-	}
-	for _, v := range builtin.TaskVerbInputs {
-		if texts.Verbs[v].Input == "" {
+		if slices.Contains(builtin.InputHandlers, w.Handler) && w.Input == "" {
 			t.Errorf("verb %s asks for a value and says nothing", v)
 		}
 	}
@@ -133,10 +132,10 @@ func TestListTextsComeFromTheProfile(t *testing.T) {
 	}
 }
 
-func TestAUserListsTableNamingNoVerbFails(t *testing.T) {
+func TestAUserVerbAndViewNeedTheirLabels(t *testing.T) {
 	texts, problems := loadListsWith(t, string(defaultLists()), "[verbs.dne]\nsummary = \"x\"\n\n[views.later]\nwhen = \"true\"\n")
 	for _, want := range []string{
-		"verbs.dne: names no verb; did you mean \"done\"?",
+		"verbs.dne.label: is required",
 		"views.later.label: is required",
 	} {
 		if !strings.Contains(problems, want) {
@@ -144,7 +143,7 @@ func TestAUserListsTableNamingNoVerbFails(t *testing.T) {
 		}
 	}
 	if texts.Verbs["done"].Summary == "x" {
-		t.Error("a table naming no verb changed done")
+		t.Error("a new verb changed done")
 	}
 }
 
@@ -160,18 +159,10 @@ func TestAnEmptyListTextKeepsTheBundledOne(t *testing.T) {
 	}
 }
 
-func TestABundledListsFileMissingAVerbFails(t *testing.T) {
-	src := strings.Replace(string(defaultLists()), "[verbs.someday]", "[verbs.somday]", 1)
-	_, problems := loadListsWith(t, src, "")
-	if !strings.Contains(problems, "verbs.someday: is missing: every verb has a table") {
-		t.Errorf("%s", problems)
-	}
-}
-
 func TestAVerbThatAsksNeedsItsQuestion(t *testing.T) {
 	src := strings.Replace(string(defaultLists()), "input   = \"Waiting on whom (optional)\"\n", "", 1)
 	_, problems := loadListsWith(t, src, "")
-	if !strings.Contains(problems, "verbs.waiting.input: is required: the verb asks for a value first") {
+	if !strings.Contains(problems, "verbs.waiting.input: is required: its handler waiting asks for a value first") {
 		t.Errorf("%s", problems)
 	}
 	texts, problems := loadListsWith(t, string(defaultLists()), "[verbs.waiting]\ninput = \"On whom?\"\n")
@@ -259,7 +250,7 @@ func TestViewsKeepTheirDeclaredOrderAcrossLayers(t *testing.T) {
 	if want := append(bundled.IDs(), "zeta", "alpha"); !slices.Equal(texts.IDs(), want) {
 		t.Errorf("views %v, want %v", texts.IDs(), want)
 	}
-	if want := []string{"inbox", "needs-me", "waiting", "stalled", "in-loop", "approved", "snoozed", "focus", "projects", "someday", "logbook", "done", "outbox", "review-projects", "review"}; !slices.Equal(bundled.IDs(), want) {
+	if want := []string{"inbox", "needs-me", "waiting", "chase", "fits-now", "blocked-by-me", "stalled", "in-loop", "approved", "snoozed", "focus", "projects", "someday", "logbook", "done", "outbox", "review-projects", "review"}; !slices.Equal(bundled.IDs(), want) {
 		t.Errorf("bundled views %v, want %v", bundled.IDs(), want)
 	}
 	var steps []string

@@ -48,7 +48,16 @@ var moves = map[task.Verb]struct {
 	task.VerbProject:   {live, ""},
 	task.VerbContext:   {live, ""},
 	task.VerbArea:      {live, ""},
+	"acknowledge":      {[]string{"inbox", "next"}, "next"},
+	"not-mine":         {todo, "trash"},
+	"hand-to":          {without(todo, "waiting"), "waiting"},
 }
+
+// verbs are the bundled verbs, in the bundled file's order.
+var verbs = []task.Verb{task.VerbNext, task.VerbWaiting, task.VerbSchedule, task.VerbWake, task.VerbSomeday, task.VerbReference,
+	task.VerbFocus, task.VerbProject, task.VerbApprove, task.VerbDelegate, task.VerbDone, task.VerbDismiss, task.VerbSeen,
+	task.VerbContext, task.VerbArea, task.VerbAnswer, task.VerbEdit, task.VerbRetry, task.VerbReviewed, task.VerbSequential,
+	task.VerbReply, "acknowledge", "not-mine", "hand-to"}
 
 // InState is the bundled state named s, for fixtures.
 func InState(s string) task.State { return task.State(s) }
@@ -75,7 +84,7 @@ func (bundledStates) Move(verb string) ([]string, string, bool) {
 	if m, ok := moves[task.Verb(verb)]; ok {
 		return m.from, m.to, true
 	}
-	return nil, "", slices.Contains(task.Verbs, task.Verb(verb))
+	return nil, "", slices.Contains(verbs, task.Verb(verb))
 }
 
 // handlers are the bundled verbs that name a handler, each the one named as the verb.
@@ -86,8 +95,10 @@ var handlers = []task.Verb{task.VerbWaiting, task.VerbSchedule, task.VerbWake, t
 // byWorkflow are the bundled verbs a workflow may run; a person may run every verb.
 var byWorkflow = []task.Verb{task.VerbDone, task.VerbDismiss, task.VerbNext, task.VerbWaiting, task.VerbSchedule, task.VerbWake, task.VerbFocus}
 
-// closing are the bundled verbs' handlers that are named otherwise: dismiss drops, done and reference finish.
-var closing = map[task.Verb]string{task.VerbDismiss: "drop", task.VerbDone: "finish", task.VerbReference: "finish"}
+// closing are the bundled verbs' handlers named otherwise than the verb: dismiss drops, done and reference finish,
+// acknowledge promises, hand-to waits.
+var closing = map[task.Verb]string{task.VerbDismiss: "drop", task.VerbDone: "finish", task.VerbReference: "finish",
+	"acknowledge": "promise", "hand-to": "waiting"}
 
 func (bundledStates) Handler(verb string) string {
 	if slices.Contains(handlers, task.Verb(verb)) {
@@ -107,6 +118,8 @@ func (bundledStates) PropOf(r task.Role) (string, []string) {
 		return "focus", []string{"on", "off"}
 	case task.RoleDeadline:
 		return "due", nil
+	case task.RolePromise:
+		return "promised", nil
 	}
 	return "", nil
 }
@@ -118,7 +131,7 @@ func (bundledStates) Gate(string) (gate.Gate, bool) { return gate.Gate{}, false 
 func (bundledStates) Authority(_ context.Context, verb string, a task.Actor, _ task.Task) (bool, bool, error) {
 	switch a {
 	case task.ActorPerson:
-		return slices.Contains(task.Verbs, task.Verb(verb)), false, nil
+		return slices.Contains(verbs, task.Verb(verb)), false, nil
 	case task.ActorWorkflow:
 		return slices.Contains(byWorkflow, task.Verb(verb)), false, nil
 	}

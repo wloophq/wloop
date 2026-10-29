@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"maps"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -52,6 +53,9 @@ type TasksDef struct {
 	Props  []PropDef
 	States []StateDef
 	Verbs  map[string]VerbText
+	// VerbOrder are the names of Verbs in the order clients list them: the bundled file's, then each user
+	// layer's new ones.
+	VerbOrder []string
 	// OwedBy is owed_by.expr as written; Owed is it compiled over OwedByEnv, nil when the profile has none.
 	OwedBy string
 	Owed   *expr.Program
@@ -395,7 +399,7 @@ func loadTasks(layers []profile.Layer, bundled fs.FS, gates *GatesDef) (TasksDef
 	if !read {
 		return l.def, problems
 	}
-	problems = append(problems, missingVerbs(l.def.Verbs)...)
+	problems = append(problems, verbInputs(l.def)...)
 	l.def.withPluginKinds()
 	return l.def, append(problems, l.check(gates)...)
 }
@@ -552,13 +556,16 @@ func (l *tasksLoad) mergeStates(s *sheet, states map[string]mState) {
 }
 
 func (l *tasksLoad) mergeVerbs(s *sheet, verbs map[string]mVerbText) {
-	for _, id := range slices.Sorted(maps.Keys(verbs)) {
-		if !slices.Contains(builtin.TaskVerbs, id) {
-			s.add("verbs."+id, "names no verb%s", expr.DidYouMean(id, builtin.TaskVerbs))
+	for _, id := range declared(s, "verbs", verbs) {
+		path := "verbs." + id
+		if !verbName.MatchString(id) {
+			s.add(path, "is no verb name: lowercase letters, digits and hyphens, starting with a letter")
 			continue
 		}
-		path := "verbs." + id
 		w, t := l.def.Verbs[id], verbs[id]
+		if _, ok := l.def.Verbs[id]; !ok {
+			l.def.VerbOrder = append(l.def.VerbOrder, id)
+		}
 		text(s, path+".label", t.Label, &w.Label)
 		text(s, path+".summary", t.Summary, &w.Summary)
 		text(s, path+".input", t.Input, &w.Input)
@@ -747,18 +754,14 @@ func declared[V any](s *sheet, section string, m map[string]V) []string {
 	return keys
 }
 
-// missingVerbs are the verbs no layer words, or words without the question
-// they ask first.
-func missingVerbs(verbs map[string]VerbText) Problems {
+var verbName = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+
+// verbInputs are the verbs whose handler asks for a value first and that put no question.
+func verbInputs(d TasksDef) Problems {
 	var problems Problems
-	for _, v := range builtin.TaskVerbs {
-		if _, ok := verbs[v]; !ok {
-			problems = append(problems, Problem{File: TasksFile, Field: "verbs." + v, Msg: "is missing: every verb has a table"})
-		}
-	}
-	for _, v := range builtin.TaskVerbInputs {
-		if w, ok := verbs[v]; ok && w.Input == "" {
-			problems = append(problems, Problem{File: TasksFile, Field: "verbs." + v + ".input", Msg: "is required: the verb asks for a value first"})
+	for _, v := range d.VerbOrder {
+		if w := d.Verbs[v]; slices.Contains(builtin.InputHandlers, w.Handler) && w.Input == "" {
+			problems = append(problems, Problem{File: TasksFile, Field: "verbs." + v + ".input", Msg: "is required: its handler " + w.Handler + " asks for a value first"})
 		}
 	}
 	return problems

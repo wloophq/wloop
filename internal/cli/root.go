@@ -365,13 +365,18 @@ func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (b
 			books, err := sqlite.New(db).Books(ctx, u)
 			return len(books[u].Turns), err
 		},
-		Sessions: sqlite.New(db).Sessions,
-		Clock:    clockFunc(func() time.Time { return e.Now() }),
-		Props:    func(t task.Task) workflow.Facts { return catalog.PropFacts(t, e.loadedIntents().Tasks) },
-		Me:       e.me,
-		OwedBy:   catalog.OwedByOf(e.loadedIntents),
-		Wakes:    db.Wakes(),
-		Links:    e.linkState,
+		Sessions:   sqlite.New(db).Sessions,
+		Clock:      clockFunc(func() time.Time { return e.Now() }),
+		Props:      func(t task.Task) workflow.Facts { return catalog.PropFacts(t, e.loadedIntents().Tasks) },
+		Me:         e.me,
+		OwedBy:     catalog.OwedByOf(e.loadedIntents),
+		Wakes:      db.Wakes(),
+		Links:      e.linkState,
+		Extraction: psource.NewSnapshots(db.Snapshots()).Unextracted,
+		RoleProp: func(r task.Role) string {
+			name, _ := e.loadedIntents().Tasks.PropOf(r)
+			return name
+		},
 	})
 }
 

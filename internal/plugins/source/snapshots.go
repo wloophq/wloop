@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/wloophq/wloop/internal/domain/snapshot"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -71,6 +72,31 @@ func (s *Snapshots) Reported(ctx context.Context, units []unit.Unit) (map[unit.U
 		out[u] = snap
 	}
 	return out, nil
+}
+
+// Unextracted is when the oldest message not yet extracted arrived, across the extraction health of units'
+// last snapshots; zero when none waits.
+func (s *Snapshots) Unextracted(ctx context.Context, units []unit.Unit) (time.Time, error) {
+	got, err := s.store.Get(ctx, units)
+	if err != nil {
+		return time.Time{}, err
+	}
+	var oldest time.Time
+	for u, st := range got {
+		var h struct {
+			Extraction *src.ExtractionHealth `json:"extraction"`
+		}
+		if err := json.Unmarshal(st.JSON, &h); err != nil {
+			return time.Time{}, fmt.Errorf("snapshot of %s: %w", u, err)
+		}
+		if h.Extraction == nil || h.Extraction.Oldest.IsZero() {
+			continue
+		}
+		if oldest.IsZero() || h.Extraction.Oldest.Before(oldest) {
+			oldest = h.Extraction.Oldest
+		}
+	}
+	return oldest, nil
 }
 
 // Decode is the snapshot st stores.

@@ -2,29 +2,14 @@ package builtin
 
 import "github.com/wloophq/wloop/internal/domain/task"
 
-// TaskVerbs are the verbs tasks.toml words, in the order clients list them.
-var TaskVerbs = func() []string {
-	out := make([]string, len(task.Verbs))
-	for i, v := range task.Verbs {
-		out[i] = string(v)
-	}
-	return out
-}()
-
-// TaskVerbInputs are the verbs that ask for a value before they run.
-var TaskVerbInputs = []string{
-	string(task.VerbWaiting), string(task.VerbSchedule), string(task.VerbProject), string(task.VerbContext),
-	string(task.VerbArea), string(task.VerbDelegate), string(task.VerbReply),
-}
-
 // tasksGrammar is the keys of tasks.toml.
 var tasksGrammar = []Key{
 	{Path: "verbs", In: SurfaceTasks, Kind: KindTable, Doc: "The verbs a task offers, by verb."},
-	{Path: "verbs.*", In: SurfaceTasks, Kind: KindTable, Doc: "A verb, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones."},
+	{Path: "verbs.*", In: SurfaceTasks, Kind: KindTable, Doc: "A verb, by its name: lowercase letters, digits and hyphens, starting with a letter. A user layer may set only some keys of an entry declared below it, and adds its own verbs, which record the event verb_<name>; a new entry sets the required ones."},
 	{Path: "verbs.*.label", In: SurfaceTasks, Kind: KindText, Required: true, Doc: "The name people read on its button. Required."},
 	{Path: "verbs.*.summary", In: SurfaceTasks, Kind: KindText, Required: true, Doc: "One line, what pressing it does: its tooltip. Required."},
 	{Path: "verbs.*.offer", In: SurfaceTasks, Kind: KindPred, Default: "true", Doc: "When a task offers the verb, over the task's own facts (task.id, task.prop.kind, task.state, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run."},
-	{Path: "verbs.*.input", In: SurfaceTasks, Kind: KindText, Doc: "The question a verb that asks for a value puts first (waiting, schedule, project, context, area, delegate, reply); required for those."},
+	{Path: "verbs.*.input", In: SurfaceTasks, Kind: KindText, Doc: "The question a verb that asks for a value puts first; required for a verb whose handler asks for one (waiting, schedule, project, context, area, delegate, reply, promise)."},
 	{Path: "verbs.*.from", In: SurfaceTasks, Kind: KindList, Elem: KindText, Doc: "The states the verb moves a task from, each a state of states; every state when absent."},
 	{Path: "verbs.*.to", In: SurfaceTasks, Kind: KindText, Doc: "The state the verb moves a task to, a state of states; absent, the verb moves none."},
 	{Path: "verbs.*.by", In: SurfaceTasks, Kind: KindMap, Doc: "Who may run the verb, by actor (person, workflow, agent, plugin); an actor left out may not."},
@@ -66,6 +51,7 @@ var RoleDocs = map[task.Role]string{
 	task.RoleContexts: "A string[]: the contexts filter reads it, the context handler sets it, and a task takes it from the item or the request that opens it.",
 	task.RoleStar:     "An enum: the star handler toggles it between its first value, starred, and its second.",
 	task.RoleDeadline: "A date: a task takes it from its items' deadline, and a draft's task from its gate's window.",
+	task.RolePromise:  "A date: the promise handler sets it to the time you promise the task by, and task.promised reads it.",
 }
 
 func propRoleValues() []Value {
@@ -105,6 +91,7 @@ var VerbHandlers = []VerbHandler{
 	{"context", "Sets the task's contexts: the property of role contexts."},
 	{"area", "Sets the task's area: the property of role area."},
 	{"seen", "Marks the task seen; clients send it when it opens."},
+	{"promise", "Sets the property of role promise to the time its by names: HH:MM, today or tomorrow once that passed; YYYY-MM-DD, 18:00 that day; or an RFC 3339 time. An empty by clears it."},
 	{"reviewed", "Marks a parent task reviewed."},
 	{"sequential", "Switches a parent task's children between sequential and parallel."},
 }
@@ -112,11 +99,16 @@ var VerbHandlers = []VerbHandler{
 // HandlerArgs are the arguments a verb takes by its handler, which a
 // task.verb step may pass; a verb with no handler, or another, takes none.
 var HandlerArgs = map[string][]string{
+	"promise":  {"by"},
 	"schedule": {"until", "on_activity"},
 	"waiting":  {"on", "resurface"},
 	"context":  {"set"},
 	"area":     {"set"},
 }
+
+// InputHandlers are the handlers that ask for a value before they run: a
+// verb that names one puts its question in input.
+var InputHandlers = []string{"waiting", "schedule", "project", "context", "area", "delegate", "reply", "promise"}
 
 func verbHandlerValues() []Value {
 	out := make([]Value, len(VerbHandlers))

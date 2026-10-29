@@ -30,7 +30,7 @@ func TestBundledStatesMatchTheBundledProfile(t *testing.T) {
 			t.Errorf("FirstOf(%s): the fake %q, the profile %q", c, got, want)
 		}
 	}
-	for _, v := range task.Verbs {
+	for _, v := range d.VerbOrder {
 		ff, ft, fok := fake.Move(string(v))
 		pf, pt, pok := d.Move(string(v))
 		if fok != pok || ft != pt || !slices.Equal(ff, pf) {

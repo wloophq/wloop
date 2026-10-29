@@ -174,7 +174,8 @@ func TestTaskVerbLeavesClosingADerivedTaskToItsItems(t *testing.T) {
 func TestTaskVerbRunsOnlyVerbsThatMoveAStoredTask(t *testing.T) {
 	t.Parallel()
 	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority})
-	for _, v := range task.Verbs {
+	for _, name := range bundledVerbs(t) {
+		v := task.Verb(name)
 		moves := false
 		for _, s := range []task.State{"inbox", "next", "waiting", "scheduled", "someday", "reference", "done", "trash"} {
 			moves = moves || g.Accepts(task.Task{State: s}, v, task.ActorWorkflow) == nil
@@ -187,3 +188,10 @@ func TestTaskVerbRunsOnlyVerbsThatMoveAStoredTask(t *testing.T) {
 }
 
 var verbPR = unit.Unit{Provider: unit.GitHub, Key: "acme/api#5"}
+
+// bundledVerbs are the bundled profile's verbs, in its order.
+func bundledVerbs(t *testing.T) []string {
+	t.Helper()
+	te := newTestEnv(t, nil)
+	return te.loadedIntents().Tasks.VerbOrder
+}

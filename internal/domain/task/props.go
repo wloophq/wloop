@@ -66,13 +66,16 @@ const (
 	// RoleDeadline is the property a task takes from its items' deadline, and a draft's task from its gate's
 	// window: a date.
 	RoleDeadline Role = "deadline"
+	// RolePromise is the property the promise handler sets from the time you promise an answer by, which the
+	// fact task.promised reads: a date.
+	RolePromise Role = "promise"
 )
 
 // Roles are every role.
-var Roles = []Role{RoleArea, RoleContexts, RoleStar, RoleDeadline}
+var Roles = []Role{RoleArea, RoleContexts, RoleStar, RoleDeadline, RolePromise}
 
 // RoleTypes are the type of the property each role acts on.
-var RoleTypes = map[Role]PropType{RoleArea: PropString, RoleContexts: PropStrings, RoleStar: PropEnum, RoleDeadline: PropDate}
+var RoleTypes = map[Role]PropType{RoleArea: PropString, RoleContexts: PropStrings, RoleStar: PropEnum, RoleDeadline: PropDate, RolePromise: PropDate}
 
 // Profile is the profile as the rules read it: its states, and the property each role acts on with its
 // values, "" for a role no property takes.

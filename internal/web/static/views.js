@@ -274,8 +274,18 @@ function taskItem(e, open) {
       roleValue(e, "deadline") ? h("span", { class: "due" }, "due " + shortDate(roleValue(e, "deadline"))) : null,
       e.wake && e.wake.until ? h("span", { class: "due" }, "until " + shortDate(e.wake.until)) : null,
       owed ? h("span", { class: "who" }, "on " + owed) : null,
+      e.extraction_lag ? h("span", { class: "due", title: "The oldest message on its links not yet read by the extraction" }, "unread " + shortLag(e.extraction_lag)) : null,
       ...(e.units || []).map((u, i) => h("span", { class: "ref" }, (e.unit_labels || [])[i] || unitLabel(u)))),
     projectFacts(e));
+}
+
+// shortLag reads a Go duration as its largest unit: 2h, 12m, 30s.
+function shortLag(d) {
+  const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?$/.exec(d || "");
+  if (!m) return d || "";
+  if (m[1]) return m[1] + "h";
+  if (m[2]) return m[2] + "m";
+  return Math.round(Number(m[3] || 0)) + "s";
 }
 
 // everyLabel reads a Go duration of whole hours as days or hours.

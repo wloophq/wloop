@@ -78,10 +78,6 @@ func verbKey(v task.Verb) string {
 	return ""
 }
 
-func knownVerb(v string) bool { return slices.Contains(builtin.TaskVerbs, v) }
-
-func verbNames() string { return strings.Join(builtin.TaskVerbs, ", ") }
-
 func (s *Server) tasks(w http.ResponseWriter) (*coretasks.Service, bool) {
 	if s.deps.Tasks == nil {
 		writeError(w, http.StatusServiceUnavailable, errTasksUnavailable.Error())
@@ -130,7 +126,7 @@ func (s *Server) handleViews(w http.ResponseWriter, r *http.Request) {
 		}
 		cat.Props = append(cat.Props, ps)
 	}
-	for _, v := range builtin.TaskVerbs {
+	for _, v := range s.verbOrder() {
 		t, b := l.Tasks.Verbs[v], bundledWords().tasks.Verbs[v]
 		cat.Verbs = append(cat.Verbs, api.VerbSpec{Verb: v, Handler: l.Tasks.Handler(v), Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
 			Input: cmp.Or(t.Input, b.Input), Send: s.replySend(v), Key: verbKey(task.Verb(v)), From: slices.Clone(t.From), To: t.To})
@@ -241,8 +237,8 @@ func (s *Server) runTaskVerb(w http.ResponseWriter, r *http.Request, verb string
 	if !ok {
 		return
 	}
-	if !knownVerb(verb) {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown verb %q; one of %s", verb, verbNames()))
+	if names := s.verbOrder(); !slices.Contains(names, verb) {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown verb %q; one of %s", verb, strings.Join(names, ", ")))
 		return
 	}
 	actor, ok := requestActor(w, r)
@@ -702,7 +698,7 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 	if err := ev.childrenOf(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
-	if err := ev.owedBy(ctx, e, &v); err != nil {
+	if err := ev.row(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
 	if ev.detail {
@@ -815,14 +811,21 @@ func propsView(def intentload.TasksDef, props task.Props) map[string]json.RawMes
 	return out
 }
 
-// owedBy sets who owes e's next step, for a stored task.
-func (ev *taskViewer) owedBy(ctx context.Context, e task.Task, v *api.TaskView) error {
-	if ev.s.deps.OwedBy == nil || e.Origin == task.OriginDraft {
+// row sets what e's row shows of its facts, for a stored task: who owes its next step, who waits on you through
+// it, and its extraction lag.
+func (ev *taskViewer) row(ctx context.Context, e task.Task, v *api.TaskView) error {
+	if ev.s.deps.Row == nil || e.Origin == task.OriginDraft {
 		return nil
 	}
-	who, err := ev.s.deps.OwedBy(ctx, e)
-	v.OwedBy = who
-	return err
+	r, err := ev.s.deps.Row(ctx, e)
+	if err != nil {
+		return err
+	}
+	v.OwedBy, v.Askers = r.OwedBy, r.Askers
+	if r.ExtractionLag > 0 {
+		v.ExtractionLag = r.ExtractionLag.String()
+	}
+	return nil
 }
 
 // asks are the items e holds, as their askers put them, each with the quotes its brief record keeps of it.
@@ -896,7 +899,8 @@ func (ev *taskViewer) cards(ctx context.Context, e task.Task, v *api.TaskView) e
 // verbs are the verbs of the catalog as they stand on e: refused all over on a disabled plugin's unit, taken by
 // a handler, run as the unit's action, or the state change.
 func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
-	out := make([]api.VerbState, 0, len(builtin.TaskVerbs))
+	order := ev.s.verbOrder()
+	out := make([]api.VerbState, 0, len(order))
 	words := ev.s.loaded().Tasks.Verbs
 	off := ""
 	for _, u := range e.Units {
@@ -917,7 +921,7 @@ func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
 		}
 		return ev.s.offeredFor(*row, verb)
 	}
-	for _, name := range builtin.TaskVerbs {
+	for _, name := range order {
 		verb := task.Verb(name)
 		if !offers(words, e, verb) {
 			continue

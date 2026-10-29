@@ -47,10 +47,8 @@ func TestOwedByIsTheProfilesExpression(t *testing.T) {
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
-	byOwner := OwedBy(func() *intentload.Loaded { return mine }, func(context.Context, task.Task) (workflow.Facts, error) {
-		return workflow.Facts{"task.gates_open": 3, "task.prop.owner": "slack:U0CAIO"}, nil
-	})
-	if got, err := byOwner(ctx, task.Task{ID: "t-1"}); err != nil || got != "slack:U0CAIO" {
+	byOwner := OwedByOf(func() *intentload.Loaded { return mine })
+	if got, err := byOwner(ctx, workflow.Facts{"task.gates_open": 3, "task.prop.owner": "slack:U0CAIO"}); err != nil || got != "slack:U0CAIO" {
 		t.Errorf("a profile's own owed_by: %q, %v", got, err)
 	}
 	if _, err := expr.CompileString(`task.owed_by`, intentload.OwedByEnv(l.Tasks)); err == nil {

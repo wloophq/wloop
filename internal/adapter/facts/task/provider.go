@@ -91,6 +91,11 @@ type Deps struct {
 	// Links are what a unit's plugin reports of it, under the host's overlays, for task.link_signal.* and
 	// task.since_movement; nil: every signal off and no unit ever moved.
 	Links func(ctx context.Context, u unit.Unit) (Link, error)
+	// Extraction is when the oldest message of units still waiting to be extracted arrived, as their plugins'
+	// extraction health says, for task.extraction_lag; zero when none waits, and nil none ever does.
+	Extraction func(ctx context.Context, units []unit.Unit) (time.Time, error)
+	// RoleProp is the property role r acts on, "" for none; nil: none.
+	RoleProp func(r task.Role) string
 }
 
 // Link is what the facts read of one unit a task links.
@@ -226,19 +231,6 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 	return p.owed(ctx, e, f)
 }
 
-// BaseFacts are the facts of task e but those its owed_by makes, OwedFacts, over which owed_by.expr is
-// evaluated.
-func (p *Provider) BaseFacts(ctx context.Context, e task.Task) (workflow.Facts, error) {
-	f, err := p.base(ctx, e)
-	if err != nil {
-		return nil, err
-	}
-	for _, name := range []string{"task.owed_by", "task.owed_since", "task.check_on"} {
-		delete(f, name)
-	}
-	return f, nil
-}
-
 func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error) {
 	f := workflow.Facts{
 		"task.id":                  string(e.ID),
@@ -270,13 +262,19 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.review_due":          false,
 		"task.children_ready":      false,
 		"task.ask_age":             time.Duration(0),
-		"task.promised":            e.Prop("promised").Time,
+		"task.askers":              []string{},
+		"task.promised":            time.Time{},
 		"task.extraction_lag":      time.Duration(0),
 		"task.link_owes":           []string{},
 		"task.link_signals":        []string{},
 	}
 	for _, name := range builtin.LinkSignals {
 		f[builtin.LinkSignalPrefix+name] = false
+	}
+	if p.d.RoleProp != nil {
+		if name := p.d.RoleProp(task.RolePromise); name != "" {
+			f["task.promised"] = e.Prop(name).Time
+		}
 	}
 	if p.d.Props != nil {
 		maps.Copy(f, p.d.Props(e))
@@ -364,7 +362,54 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 	}
 	f["task.items_open"], f["task.items_resolved"] = open, resolved
 	f["task.link_owes"] = p.linkOwes(e, us, got)
+	f["task.ask_age"], f["task.askers"] = p.asks(e, us, got)
+	if p.d.Extraction != nil {
+		oldest, err := p.d.Extraction(ctx, us)
+		if err != nil {
+			return nil, err
+		}
+		if !oldest.IsZero() {
+			f["task.extraction_lag"] = max(p.d.Clock.Now().Sub(oldest), 0)
+		}
+	}
 	return f, nil
+}
+
+// asks are the age of the oldest open item e's units hold that waits on me, and the requesters of those items,
+// each once; the items are those task.link_owes reads.
+func (p *Provider) asks(e task.Task, us []unit.Unit, got map[unit.Unit][]items.Item) (time.Duration, []string) {
+	var me task.Me
+	if p.d.Me != nil {
+		me = p.d.Me()
+	}
+	var oldest time.Time
+	askers := []string{}
+	for _, u := range us {
+		for _, it := range owing(e, u, got[u]) {
+			if !slices.ContainsFunc(it.WaitingOn, func(who items.Person) bool { return who.Is(me) }) {
+				continue
+			}
+			if !it.CreatedAt.IsZero() && (oldest.IsZero() || it.CreatedAt.Before(oldest)) {
+				oldest = it.CreatedAt
+			}
+			if k := it.Requester.Key; k != "" && !it.Requester.Is(me) && !slices.Contains(askers, k) {
+				askers = append(askers, k)
+			}
+		}
+	}
+	if oldest.IsZero() {
+		return 0, askers
+	}
+	return max(p.d.Clock.Now().Sub(oldest), 0), askers
+}
+
+// owing are the open items of its, u's, that e's facts read: those e holds, or every open one of a unit e holds
+// no item of.
+func owing(e task.Task, u unit.Unit, its []items.Item) []items.Item {
+	if slices.ContainsFunc(e.Items, func(r task.ItemRef) bool { return r.Unit == u }) {
+		return held(e, its)
+	}
+	return slices.DeleteFunc(slices.Clone(its), func(it items.Item) bool { return it.State != items.Open })
 }
 
 // links sets task.link_signal.<name>, on when the signal is on for any of us, task.link_signals, the declared
@@ -540,11 +585,7 @@ func (p *Provider) linkOwes(e task.Task, us []unit.Unit, got map[unit.Unit][]ite
 	}
 	out := []string{}
 	for _, u := range us {
-		its := held(e, got[u])
-		if !slices.ContainsFunc(e.Items, func(r task.ItemRef) bool { return r.Unit == u }) {
-			its = slices.DeleteFunc(slices.Clone(got[u]), func(it items.Item) bool { return it.State != items.Open })
-		}
-		for _, it := range its {
+		for _, it := range owing(e, u, got[u]) {
 			for _, who := range it.WaitingOn {
 				k := who.Key
 				if who.Is(me) {
