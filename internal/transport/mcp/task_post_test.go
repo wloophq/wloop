@@ -157,13 +157,9 @@ func TestTaskPostCannotMoveTasks(t *testing.T) {
 		t.Fatal(err)
 	}
 	snapshot := func() []task.Task {
-		var all []task.Task
-		for _, v := range task.StoredViews {
-			es, err := r.taskStore.Tasks(ctx, task.Query{View: v})
-			if err != nil {
-				t.Fatal(err)
-			}
-			all = append(all, es...)
+		all, err := r.taskStore.Tasks(ctx, task.Query{All: true})
+		if err != nil {
+			t.Fatal(err)
 		}
 		return all
 	}

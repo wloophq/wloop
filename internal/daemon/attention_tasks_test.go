@@ -14,6 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/storetest"
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/catalog"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/outbox"
@@ -31,7 +32,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // notifyRig is the catalog rig with the tasks, the items ledger and the Inbox messages over its store, so a
@@ -48,9 +48,9 @@ func newNotifyRig(t *testing.T) *notifyRig {
 	r := &notifyRig{catalogRig: c, ledger: &coreitems.Ledger{Store: c.db.Items(), Clock: fixedClock(catalogNow)}}
 	enabled := func(p unit.ProviderID) bool { return c.s.pluginEnabled(p) }
 	r.ledger.Enabled = enabled
-	r.g = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: c.db.Tasks(), Items: r.ledger,
+	r.g = coretasks.New(withLens(coretasks.Deps{States: taskstest.BundledStates, Store: c.db.Tasks(), Items: r.ledger,
 		Facts: coretasks.CardFacts{Cards: c.db.Cards(), Enabled: enabled, Me: func() task.Me { return meID }},
-		Me:    meID, Clock: fixedClock(catalogNow)})
+		Me:    meID, Clock: fixedClock(catalogNow)}, nil, nil))
 	c.s.deps.Tasks, c.s.deps.Items, c.s.deps.Cards = r.g, r.ledger, c.db.Cards()
 	c.s.deps.Messages = &messages.Service{Store: inventory.NewMessages(c.db), Books: c.repo, Turns: c.s.deps.Turns, Tasks: r.g,
 		Intents: turnstest.Intents(), Clock: fixedClock(catalogNow)}
@@ -106,7 +106,7 @@ func (r *notifyRig) notified(t *testing.T) map[string]api.TaskView {
 			if e.Attention == nil {
 				continue
 			}
-			if v != string(task.ViewInbox) && v != string(task.ViewOutbox) && v != string(task.ViewFocus) {
+			if v != "inbox" && v != "outbox" && v != "focus" {
 				t.Errorf("%s entry %s (%s) notifies %+v", v, e.ID, e.State, e.Attention)
 			}
 			out[e.ID] = e
@@ -268,14 +268,9 @@ func (f *fakeOutbox) Task(_ context.Context, id task.ID) (task.Task, bool, error
 	return task.Task{}, false, nil
 }
 
-func (f *fakeOutbox) Count(ctx context.Context, _ string) (int, error) {
-	es, _ := f.Tasks(ctx, task.Query{})
-	return len(es), nil
-}
-
 func withOutbox(r *tasksRig, drafts ...draft.Draft) *fakeOutbox {
 	f := &fakeOutbox{drafts: drafts}
-	r.g.RegisterView(task.ViewOutbox, "draft:", f)
+	r.g.RegisterView(task.OverGates, "draft:", f)
 	r.s.deps.Drafts = f
 	return f
 }
@@ -458,8 +453,8 @@ func TestLiveTasksNotifyAsTheRows(t *testing.T) {
 	ctx := context.Background()
 	ledger := &coreitems.Ledger{Store: f.DB.Items(), Clock: fixedClock(f.Now)}
 	me := task.Me{Keys: []string{"github:user-01"}}
-	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: f.DB.Tasks(), Items: ledger, Facts: coretasks.CardFacts{Cards: f.DB.Cards(), Me: func() task.Me { return me }},
-		Me: me, Clock: fixedClock(f.Now)})
+	g := coretasks.New(withLens(coretasks.Deps{States: taskstest.BundledStates, Store: f.DB.Tasks(), Items: ledger, Facts: coretasks.CardFacts{Cards: f.DB.Cards(), Me: func() task.Me { return me }},
+		Me: me, Clock: fixedClock(f.Now)}, nil, nil))
 	s.deps.Tasks, s.deps.Items = g, ledger
 	s.deps.Messages = &messages.Service{Store: inventory.NewMessages(f.DB), Books: f.Turns, Turns: s.deps.Turns, Tasks: g,
 		Intents: turnstest.Intents(), Clock: fixedClock(f.Now)}
@@ -504,7 +499,7 @@ func TestLiveTasksNotifyAsTheRows(t *testing.T) {
 		}
 		tasks += len(p.Tasks)
 		for _, e := range p.Tasks {
-			if e.Attention == nil || v == string(task.ViewFocus) {
+			if e.Attention == nil || v == "focus" {
 				continue
 			}
 			if len(e.Units) == 0 {
@@ -620,8 +615,15 @@ func TestAnotherDerivedTaskOfANotifyingRowStaysSilent(t *testing.T) {
 }
 
 // storedViews are the views the tasks store serves; review needs its source.
+// storedViews are the bundled views that list something.
 func storedViews() []string {
-	return slices.DeleteFunc(slices.Clone(builtin.Views), func(v string) bool { return v == string(task.ViewReview) })
+	var out []string
+	for _, v := range bundledLoaded().Views.Views {
+		if catalog.Lists(bundledLoaded().Views, v.ID) {
+			out = append(out, v.ID)
+		}
+	}
+	return out
 }
 
 func TestANotificationOffersOnlyTheVerbsTheProfileOffers(t *testing.T) {

@@ -331,7 +331,7 @@ func TestAVerbRunsTheHandlerItsProfileNames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := res.Task.Prop(task.PropContexts).List; !slices.Equal(got, []string{"@calls", "@home"}) {
+	if got := res.Task.Prop("contexts").List; !slices.Equal(got, []string{"@calls", "@home"}) {
 		t.Errorf("area with the context handler set contexts %q", got)
 	}
 	var ran []task.Verb

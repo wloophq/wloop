@@ -79,16 +79,16 @@ func TestV7PropsMovesUserFields(t *testing.T) {
 			t.Errorf("%s written %+v, want %+v", name, got, w)
 		}
 	}
-	if pr.Prop("area").Text != "OSS" || !pr.Starred() || !pr.Due().Equal(v6Deadline) ||
+	if pr.Prop("area").Text != "OSS" || !(pr.Prop("focus").Text == "on") || !pr.Prop("due").Time.Equal(v6Deadline) ||
 		!slices.Equal(pr.Prop("contexts").List, []string{"@reply", "@decide"}) || len(pr.Props) != len(want) {
 		t.Errorf("the pull request's properties %+v", pr.Props)
 	}
 	start := migratedTask(t, db, hexStart)
-	if !start.Starred() || start.Written["focus"].By != task.WriterPerson || start.Written["due"].By != task.WriterPerson {
+	if !(start.Prop("focus").Text == "on") || start.Written["focus"].By != task.WriterPerson || start.Written["due"].By != task.WriterPerson {
 		t.Errorf("a user's star and deadline %+v %+v", start.Props, start.Written)
 	}
 	capture := migratedTask(t, db, hexCapture)
-	if f := capture.Prop("focus"); f.Text != task.FocusOff || capture.Written["focus"] != (task.Written{By: task.WriterPerson, At: v6FocusAt}) {
+	if f := capture.Prop("focus"); f.Text != "off" || capture.Written["focus"] != (task.Written{By: task.WriterPerson, At: v6FocusAt}) {
 		t.Errorf("a star the user cleared: %+v %+v", f, capture.Written["focus"])
 	}
 	if capture.Written["contexts"].By != task.WriterPerson || !slices.Equal(capture.Prop("contexts").List, []string{"@calls"}) {

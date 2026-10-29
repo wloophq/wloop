@@ -16,13 +16,13 @@ func TestCountsWhereCountsOnlyTheKeptTasksOfEachView(t *testing.T) {
 	r.put(t, task.Task{ID: "nx-a", State: "next", Category: task.CategoryReady, Title: "invoice OSS", Props: task.Props{"area": {Text: "OSS"}, "contexts": {List: []string{"@reply"}}}})
 	r.put(t, task.Task{ID: "nx-b", State: "next", Category: task.CategoryReady, Title: "review Hiring", Props: task.Props{"area": {Text: "Hiring"}, "contexts": {List: []string{"@reply"}}}})
 	r.put(t, task.Task{ID: "dn-a", State: "done", Category: task.CategoryDone, Title: "invoice sent"})
-	r.svc.RegisterView(task.ViewOutbox, "draft:", outbox{drafts: []task.Task{{ID: "draft:1", Title: "invoice reply"}, {ID: "draft:2", Title: "hello"}}})
+	r.svc.RegisterView(task.OverGates, "draft:", outbox{drafts: []task.Task{{ID: "draft:1", Title: "invoice reply"}, {ID: "draft:2", Title: "hello"}}})
 	invoice := func(e task.Task) (bool, error) { return strings.Contains(e.Title, "invoice"), nil }
 	c, err := r.svc.CountsWhere(ctx, "", invoice)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[task.View]int{task.ViewInbox: 1, task.ViewNext: 1, task.ViewLogbook: 1, task.ViewOutbox: 1}
+	want := map[task.View]int{"inbox": 1, "ready": 1, "logbook": 1, "drafts": 1}
 	for v, n := range want {
 		if c.Views[v] != n {
 			t.Errorf("%s %d, want %d (%+v)", v, c.Views[v], n, c.Views)
@@ -39,8 +39,8 @@ func TestCountsWhereCountsOnlyTheKeptTasksOfEachView(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, v := range append(task.StoredViews, task.ViewOutbox) {
-		if all.Views[v] != plain.Views[v] {
+	for _, spec := range r.lens.Views().List {
+		if v := spec.ID; all.Views[v] != plain.Views[v] {
 			t.Errorf("keeping every entry, %s counts %d, Counts %d", v, all.Views[v], plain.Views[v])
 		}
 	}

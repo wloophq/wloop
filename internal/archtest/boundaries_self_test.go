@@ -142,12 +142,15 @@ func (*Program) Eval() bool { return true }
 type Programs struct { Records, When, Primary *Program; Refuse []*Program; ActionTexts map[string]string }
 type Loaded struct { Programs map[string]Programs }
 type Other struct { When bool }
+type ViewDef struct { ID string; When *Program }
 `, nil)
 	deps := map[string]*types.Package{module + "internal/intent": loader}
 	f, info, _ := planted(t, fset, module+"internal/daemon", "x.go", `package daemon
 import "github.com/wloophq/wloop/internal/intent"
 type wrap struct { intent.Programs }
-func f(l *intent.Loaded, p *intent.Programs, w wrap, o intent.Other) bool {
+func f(l *intent.Loaded, p *intent.Programs, w wrap, o intent.Other, v intent.ViewDef) bool {
+	_ = v.When.Eval()
+	_ = v.ID
 	_ = p.ActionTexts["note"]
 	_ = l.Programs["review"].Refuse[0].Eval()
 	_ = w.Primary
@@ -157,7 +160,7 @@ func f(l *intent.Loaded, p *intent.Programs, w wrap, o intent.Other) bool {
 	return p.When != nil
 }
 `, deps)
-	flagged(t, "daemon", programReads(fset, "internal/daemon/x.go", info, f), 4, "only the loader and the catalog evaluate an intent's predicates")
+	flagged(t, "daemon", programReads(fset, "internal/daemon/x.go", info, f), 5, "only the loader and the catalog evaluate an intent's predicates")
 	for _, file := range []string{"internal/catalog/intents.go", "internal/intent/validate.go", "internal/daemon/x_test.go"} {
 		flagged(t, file, programReads(fset, file, info, f), 0, "")
 	}

@@ -46,8 +46,9 @@ const (
 // syncInputs are the notes whose units Sync reconciles.
 const syncInputs = port.TopicItems | port.TopicSourceEvents | port.TopicCards
 
-// taskInputs are the notes after which a change carries the counters.
-const taskInputs = port.TopicTasks | port.TopicDrafts
+// taskInputs are the notes after which a change carries the counters: a view reads the tasks, their gates and
+// their wakes.
+const taskInputs = port.TopicTasks | port.TopicGates | port.TopicWakes | port.TopicDrafts
 
 // bridged are the verbs a task with units runs as its unit's action when no handler takes them.
 var bridged = []task.Verb{task.VerbApprove, task.VerbDelegate, task.VerbDismiss}
@@ -110,27 +111,39 @@ func writeTasksError(w http.ResponseWriter, err error) {
 }
 
 func (s *Server) handleViews(w http.ResponseWriter, r *http.Request) {
-	g, ok := s.tasks(w)
-	if !ok {
+	if _, ok := s.tasks(w); !ok {
 		return
 	}
-	cat := api.ViewsCatalog{Areas: nonNil(slices.Clone(s.deps.Cfg.Tasks.Areas)), Contexts: nonNil(slices.Clone(s.deps.Cfg.Tasks.Contexts)), Views: s.servedViews(g)}
+	l := s.loaded()
+	cat := api.ViewsCatalog{Areas: nonNil(slices.Clone(s.deps.Cfg.Tasks.Areas)), Contexts: nonNil(slices.Clone(s.deps.Cfg.Tasks.Contexts)), Views: s.servedViews(),
+		Review: []string{}, States: []api.StateSpec{}, Props: []api.PropSpec{}}
+	for _, st := range l.Views.Review {
+		cat.Review = append(cat.Review, st.View)
+	}
+	for _, st := range l.Tasks.States {
+		cat.States = append(cat.States, api.StateSpec{Name: st.Name, Label: cmp.Or(st.Label, st.Name), Category: string(st.Category)})
+	}
+	for _, p := range l.Tasks.Props {
+		ps := api.PropSpec{Name: p.Name, Type: string(p.Type), Values: slices.Clone(p.Values), Role: string(p.Role)}
+		for _, w := range p.Writers {
+			ps.Writers = append(ps.Writers, string(w))
+		}
+		cat.Props = append(cat.Props, ps)
+	}
 	for _, v := range builtin.TaskVerbs {
-		t, b := s.loaded().Tasks.Verbs[v], bundledWords().tasks.Verbs[v]
-		cat.Verbs = append(cat.Verbs, api.VerbSpec{Verb: v, Handler: s.loaded().Tasks.Handler(v), Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
-			Input: cmp.Or(t.Input, b.Input), Send: s.replySend(v), Key: verbKey(task.Verb(v))})
+		t, b := l.Tasks.Verbs[v], bundledWords().tasks.Verbs[v]
+		cat.Verbs = append(cat.Verbs, api.VerbSpec{Verb: v, Handler: l.Tasks.Handler(v), Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
+			Input: cmp.Or(t.Input, b.Input), Send: s.replySend(v), Key: verbKey(task.Verb(v)), From: slices.Clone(t.From), To: t.To})
 	}
 	writeJSON(w, cat)
 }
 
-// servedViews are the views g serves, worded by the profile.
-func (s *Server) servedViews(g *coretasks.Service) []api.TaskViewSpec {
-	texts, bundled := s.loaded().Lists, bundledWords().lists
-	var out []api.TaskViewSpec
-	for _, v := range builtin.Views {
-		if v != string(task.ViewReview) || g.Serves(task.ViewReview) {
-			out = append(out, api.TaskViewSpec{ID: v, Label: cmp.Or(texts.Views[v], bundled.Views[v], v), Key: texts.Keys[v]})
-		}
+// servedViews are the profile's views, in its order.
+func (s *Server) servedViews() []api.TaskViewSpec {
+	def := s.loaded().Views
+	out := []api.TaskViewSpec{}
+	for _, v := range def.Views {
+		out = append(out, api.TaskViewSpec{ID: v.ID, Label: v.Label, Over: v.Over, Group: v.Group, Key: v.Key, Badge: def.Badged(v.ID), HideDisabled: v.HideDisabled})
 	}
 	return out
 }
@@ -142,10 +155,6 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query()
 	view := task.View(q.Get("view"))
-	if !slices.Contains(builtin.Views, string(view)) {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown view %q", view))
-		return
-	}
 	since, err := api.ParseSince(q.Get("since"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -176,6 +185,25 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, id := range p.Removed {
 		page.Removed = append(page.Removed, string(id))
+	}
+	gs, err := s.gatesIn(ctx, string(view))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	listed := map[task.ID]bool{}
+	for _, e := range p.Tasks {
+		listed[e.ID] = true
+	}
+	for _, g := range gs {
+		e, ok, err := s.gateTask(ctx, g)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if ok && listed[e.ID] {
+			page.Gates = append(page.Gates, s.gateView(ctx, g.gate))
+		}
 	}
 	writeJSON(w, page)
 }
@@ -629,9 +657,7 @@ func (s *Server) counters(ctx context.Context) *api.Counters {
 func wireCounters(c task.Counters) api.Counters {
 	out := api.Counters{Area: c.Area, Views: map[string]int{}, Areas: map[string]int{}, Contexts: map[string]int{}, Badge: c.Badge}
 	for v, n := range c.Views {
-		if v != task.ViewReview && v != task.ViewOpen {
-			out.Views[string(v)] = n
-		}
+		out.Views[string(v)] = n
 	}
 	for a, n := range c.Areas {
 		out.Areas[a] = n

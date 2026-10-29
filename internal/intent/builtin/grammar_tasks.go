@@ -38,6 +38,7 @@ var tasksGrammar = []Key{
 	{Path: "props.*.values", In: SurfaceTasks, Kind: KindList, Elem: KindText, Doc: "An enum's values, in order; required with type enum."},
 	{Path: "props.*.writers", In: SurfaceTasks, Kind: KindList, Elem: KindEnum, Values: writerValues, Doc: "Who may write the property; one an agent or a plugin may write is untrusted, so no approval rule reads it."},
 	{Path: "props.*.doc", In: SurfaceTasks, Kind: KindText, Doc: "What the property holds, for the facts' reference and the agents."},
+	{Path: "props.*.role", In: SurfaceTasks, Kind: KindEnum, Values: propRoleValues, Doc: "The mechanism of the loop that acts on the property; at most one property takes each role. Go names the role, never the property."},
 	{Path: "states", In: SurfaceTasks, Kind: KindMap, Doc: "The states a task takes, by name, in the order the file declares them, a user layer's new ones after the bundled; clients list them in this order, and a task proposed in a category takes the first state of it."},
 	{Path: "states.*", In: SurfaceTasks, Kind: KindTable, Doc: "A state, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones."},
 	{Path: "states.*.category", In: SurfaceTasks, Kind: KindEnum, Values: categoryValues, Required: true, Doc: "The state's category, which is all Go reads of it; required for a new state."},
@@ -59,6 +60,22 @@ func propTypeValues() []Value {
 	return out
 }
 
+// RoleDocs say what each role does with the property that takes it.
+var RoleDocs = map[task.Role]string{
+	task.RoleArea:     "A string: the area filter of the lists and the counters reads it, the area handler sets it, and a new parent takes it from the task it starts with.",
+	task.RoleContexts: "A string[]: the contexts filter reads it, the context handler sets it, and a task takes it from the item or the request that opens it.",
+	task.RoleStar:     "An enum: the star handler toggles it between its first value, starred, and its second.",
+	task.RoleDeadline: "A date: a task takes it from its items' deadline, and a draft's task from its gate's window.",
+}
+
+func propRoleValues() []Value {
+	out := make([]Value, len(task.Roles))
+	for i, r := range task.Roles {
+		out[i] = Value{Name: string(r), Doc: RoleDocs[r]}
+	}
+	return out
+}
+
 func categoryValues() []Value {
 	out := make([]Value, len(task.Categories))
 	for i, c := range task.Categories {
@@ -72,7 +89,9 @@ type VerbHandler struct{ Name, Doc string }
 
 // VerbHandlers are the handlers a verb names with handler.
 var VerbHandlers = []VerbHandler{
-	{"focus", "Stars the task in Focus, or takes the star off."},
+	{"finish", "Moves the task to the verb's to; a project's dossier starts its lifecycle."},
+	{"drop", "Moves the task to the verb's to; a kind another service serves drops its subject: a draft is discarded, a message's gate refused."},
+	{"focus", "Stars the task, or takes the star off: toggles the property of role star."},
 	{"schedule", "Hides the task until a date or until its unit moves, then brings it back where it was."},
 	{"wake", "Brings a deferred task back where its wake returns it, the first ready state when it names none, and drops the wake."},
 	{"waiting", "Records who the task waits on and when it resurfaces."},
@@ -83,8 +102,8 @@ var VerbHandlers = []VerbHandler{
 	{"retry", "Sends again the task's approved draft whose delivery failed."},
 	{"reply", "Posts a reply or a reaction on the task's unit; the composer's verb."},
 	{"project", "Files the task under a parent, creating it from a title."},
-	{"context", "Sets the task's contexts."},
-	{"area", "Sets the task's area."},
+	{"context", "Sets the task's contexts: the property of role contexts."},
+	{"area", "Sets the task's area: the property of role area."},
 	{"seen", "Marks the task seen; clients send it when it opens."},
 	{"reviewed", "Marks a parent task reviewed."},
 	{"sequential", "Switches a parent task's children between sequential and parallel."},

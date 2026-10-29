@@ -40,6 +40,21 @@ func (bundledStates) FirstOf(c task.Category) string {
 	return ""
 }
 
+// PropOf is the bundled property each role acts on.
+func (bundledStates) PropOf(r task.Role) (string, []string) {
+	switch r {
+	case task.RoleArea:
+		return "area", nil
+	case task.RoleContexts:
+		return "contexts", nil
+	case task.RoleStar:
+		return "focus", []string{"on", "off"}
+	case task.RoleDeadline:
+		return "due", nil
+	}
+	return "", nil
+}
+
 func must[T any](t *testing.T, v T, err error) T {
 	t.Helper()
 	if err != nil {
@@ -48,7 +63,7 @@ func must[T any](t *testing.T, v T, err error) T {
 	return v
 }
 
-func reconciled(t *testing.T, f task.UnitFacts, its []items.Item, me task.Me, have []task.Task, st task.States, now time.Time) []task.Change {
+func reconciled(t *testing.T, f task.UnitFacts, its []items.Item, me task.Me, have []task.Task, st task.Profile, now time.Time) []task.Change {
 	t.Helper()
 	cs, err := task.Reconcile(f, its, me, have, st, now)
 	return must(t, cs, err)

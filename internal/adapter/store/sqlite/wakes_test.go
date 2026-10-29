@@ -23,7 +23,7 @@ func TestWakeStoreContract(t *testing.T) {
 	})
 }
 
-func TestATaskWithAWakeIsNotSomedayAndClosingItDropsTheWake(t *testing.T) {
+func TestATaskReadsItsWakeAndClosingItDropsTheWake(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db, _ := openTemp(t)
@@ -36,13 +36,6 @@ func TestATaskWithAWakeIsNotSomedayAndClosingItDropsTheWake(t *testing.T) {
 	}
 	if err := db.Wakes().Put(ctx, wake.Wake{Task: asleep.ID, Until: at.Add(time.Hour), Return: "next"}); err != nil {
 		t.Fatal(err)
-	}
-	got, err := db.Tasks().Tasks(ctx, task.Query{View: task.ViewSomeday})
-	if err != nil || len(got) != 1 || got[0].ID != someday.ID {
-		t.Fatalf("someday %+v %v", got, err)
-	}
-	if c, err := db.Tasks().Counts(ctx, ""); err != nil || c.Views[task.ViewSomeday] != 1 {
-		t.Fatalf("counts %+v %v", c, err)
 	}
 	if e, err := db.Tasks().Task(ctx, asleep.ID); err != nil || !e.Asleep || !e.Snoozed() {
 		t.Fatalf("the asleep task %+v %v", e, err)

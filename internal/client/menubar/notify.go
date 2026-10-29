@@ -98,8 +98,8 @@ func (c *Controller) notify() {
 // notifying are the tasks of the menu's views that carry an attention.
 func (c *Controller) notifying() []api.TaskView {
 	var out []api.TaskView
-	for _, sec := range coreSections {
-		for _, e := range c.viewTasks(sec.view) {
+	for _, v := range c.taskViews {
+		for _, e := range c.viewTasks(v.ID) {
 			if e.Attention != nil {
 				out = append(out, e)
 			}
@@ -158,7 +158,7 @@ func (c *Controller) Respond(ctx context.Context, r Response) {
 	var err error
 	switch {
 	case r.Action == ActionOpen || r.Action == ActionServed && cat == api.CategoryOutbox && r.Identifier == "open":
-		err = c.open(routeOf(cat, task))
+		err = c.open(c.routeOf(cat, task))
 	case r.Action == ActionAnswer:
 		err = c.answer(ctx, r, task)
 	case r.Action == ActionReply:
@@ -172,13 +172,13 @@ func (c *Controller) Respond(ctx context.Context, r Response) {
 }
 
 // routeOf is the cockpit route a notification opens: a note's task part is
-// its route, the digest opens Next, anything else its task.
-func routeOf(cat Category, tk string) string {
+// its route, the digest the menu's first view, anything else its task.
+func (c *Controller) routeOf(cat Category, tk string) string {
 	switch cat {
 	case api.CategoryNote:
 		return tk
 	case api.CategoryDigest:
-		return "view=" + string(task.ViewNext)
+		return c.firstView()
 	}
 	return taskRoute(tk)
 }
@@ -317,7 +317,7 @@ func (c *Controller) notifyNote(id, task, title, body string) {
 
 // postNotice posts what a workflow's notify.self raised; it opens its unit.
 func (c *Controller) postNotice(n api.Notice) {
-	route := "view=" + string(task.ViewInbox)
+	route := c.firstView()
 	if !n.Unit.IsZero() {
 		route = unitRoute(n.Unit)
 	}

@@ -45,15 +45,11 @@ func newSlackFacts(db *sqlite.DB, clock port.Clock) *slackFacts {
 
 // List is every Slack unit a task is attached to, open or done, in unit order.
 func (f *slackFacts) List(ctx context.Context, _ unit.ProviderID) ([]unit.Unit, error) {
-	es, err := f.db.Tasks().Tasks(ctx, task.Query{View: task.ViewOpen})
+	es, err := f.db.Tasks().Tasks(ctx, task.Query{All: true})
 	if err != nil {
 		return nil, err
 	}
-	done, err := f.db.Tasks().Tasks(ctx, task.Query{View: task.ViewLogbook})
-	if err != nil {
-		return nil, err
-	}
-	es = append(es, done...)
+	es = slices.DeleteFunc(es, func(e task.Task) bool { return e.Category == task.CategoryDropped })
 	var out []unit.Unit
 	for _, e := range es {
 		for _, u := range e.Units {

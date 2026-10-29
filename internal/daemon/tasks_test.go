@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -74,10 +75,14 @@ func newTasksRig(t *testing.T, edit func(*Deps)) *tasksRig {
 		enabled := d.PluginEnabled
 		r.ledger.Enabled = enabled
 		r.wakes = wakes.New(wakes.Deps{Store: db.Wakes(), Tasks: db.Tasks(), Clock: fixedClock(tasksNow)})
-		r.g = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority, Store: db.Tasks(), Items: r.ledger,
+		loaded := bundledLoaded
+		if d.Intents != nil {
+			loaded = func() *intentload.Loaded { return cmp.Or(d.Intents(), bundledLoaded()) }
+		}
+		r.g = coretasks.New(withLens(coretasks.Deps{States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority, Store: db.Tasks(), Items: r.ledger,
 			Facts: coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: func() task.Me { return meID }},
 			Me:    meID, Clock: fixedClock(tasksNow), Disabled: disabledOf(enabled), Wakes: db.Wakes(),
-			Activity: func(ctx context.Context, id task.ID) error { return r.wakes.Event(ctx, id, wake.OnActivity, "") }})
+			Activity: func(ctx context.Context, id task.ID) error { return r.wakes.Event(ctx, id, wake.OnActivity, "") }}, loaded, lensFacts(db, loaded, tasksNow)))
 		d.Tasks, d.Wakes = r.g, r.wakes
 	})
 	stopOnCleanup(t, r.s)
@@ -167,11 +172,11 @@ func TestTasksPageMatchesTheQuery(t *testing.T) {
 	r := newTasksRig(t, nil)
 	r.put(t, mixedTasks()...)
 	ctx := context.Background()
-	for _, q := range []task.Query{{View: task.ViewNext, Area: "OSS"}, {View: task.ViewNext}, {View: task.ViewInbox, Area: "OSS"},
-		{View: task.ViewNext, Area: "OSS", Contexts: []string{"@reply"}}, {View: task.ViewProjects}} {
+	for _, q := range []task.Query{{View: "needs-me", Area: "OSS"}, {View: "needs-me"}, {View: "inbox", Area: "Hiring"},
+		{View: "needs-me", Area: "OSS", Contexts: []string{"@reply"}}, {View: "projects"}, {View: "someday", Area: "OSS"}} {
 		v := url.Values{"view": {string(q.View)}, "area": {q.Area}, "context": {strings.Join(q.Contexts, ",")}}
 		p := r.page(t, v.Encode())
-		want, err := r.db.Tasks().Tasks(ctx, q)
+		want, err := r.g.Tasks(ctx, q)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -179,8 +184,8 @@ func TestTasksPageMatchesTheQuery(t *testing.T) {
 		for _, e := range want {
 			wantIDs = append(wantIDs, string(e.ID))
 		}
-		if !p.Full || !slices.Equal(taskIDs(p.Tasks), wantIDs) {
-			t.Errorf("%+v: page %v (full %v), store %v", q, taskIDs(p.Tasks), p.Full, wantIDs)
+		if !p.Full || !slices.Equal(taskIDs(p.Tasks), wantIDs) || len(wantIDs) == 0 {
+			t.Errorf("%+v: page %v (full %v), the service's %v", q, taskIDs(p.Tasks), p.Full, wantIDs)
 		}
 		c, err := r.g.Counts(ctx, q.Area)
 		if err != nil {
@@ -190,7 +195,7 @@ func TestTasksPageMatchesTheQuery(t *testing.T) {
 			t.Errorf("%+v: counters %+v, want %+v", q, got, want)
 		}
 	}
-	p := r.page(t, "view=next&area=OSS")
+	p := r.page(t, "view=needs-me&area=OSS")
 	if i := slices.Index(taskIDs(p.Tasks), "e-5"); i < 0 || p.Tasks[i].Parent != "e-p" || len(p.Tasks[i].Verbs) == 0 {
 		t.Fatalf("project action %+v", p.Tasks)
 	}
@@ -204,7 +209,7 @@ func TestTasksSinceIsIncremental(t *testing.T) {
 	r := newTasksRig(t, nil)
 	r.put(t, mixedTasks()...)
 	inbox := r.page(t, "view=inbox")
-	next := r.page(t, "view=next")
+	needs := r.page(t, "view=needs-me")
 	if rec := post(t, r.s, api.TaskPath("e-4", "next"), `{"source":"cockpit"}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
@@ -213,11 +218,11 @@ func TestTasksSinceIsIncremental(t *testing.T) {
 	if got.Full || len(got.Tasks) != 0 || !slices.Equal(got.Removed, []string{"e-4"}) || got.Rev != inbox.Rev+1 {
 		t.Fatalf("inbox since: %+v", got)
 	}
-	got = r.page(t, "view=next&since="+url.QueryEscape(since(next)))
-	if got.Full || !slices.Equal(taskIDs(got.Tasks), []string{"e-4"}) || len(got.Removed) != 0 {
-		t.Fatalf("next since: full %v entries %v removed %v", got.Full, taskIDs(got.Tasks), got.Removed)
+	got = r.page(t, "view=needs-me&since="+url.QueryEscape(since(needs)))
+	if !got.Full || !slices.Contains(taskIDs(got.Tasks), "e-4") || len(got.Tasks) != len(needs.Tasks)+1 {
+		t.Fatalf("needs me since, a view over who owes a task: full %v tasks %v", got.Full, taskIDs(got.Tasks))
 	}
-	if got := r.page(t, "view=next&since=other:1"); !got.Full {
+	if got := r.page(t, "view=inbox&since=other:1"); !got.Full {
 		t.Fatal("another epoch is not Full")
 	}
 }
@@ -285,7 +290,7 @@ func TestVerbPostMovesAndStreams(t *testing.T) {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	c := nextChange(t, sub)
-	if c.Type != "changed" || c.Counters.Views["next"] != 1 || c.Counters.Views["inbox"] != 0 || !slices.Contains(c.Units, r7u) {
+	if c.Type != "changed" || c.Counters.Views["needs-me"] != 1 || c.Counters.Views["inbox"] != 0 || !slices.Contains(c.Units, r7u) {
 		t.Fatalf("%+v %+v", c, c.Counters)
 	}
 }
@@ -356,7 +361,7 @@ func TestCatalogServesViewsAndVerbs(t *testing.T) {
 	for _, v := range cat.Views {
 		views = append(views, v.ID)
 	}
-	if want := []string{"focus", "inbox", "outbox", "next", "waiting", "projects", "someday", "logbook"}; !slices.Equal(views, want) {
+	if want := bundledLoaded().Views.IDs(); !slices.Equal(views, want) {
 		t.Fatalf("views %v", views)
 	}
 	if !slices.Equal(cat.Areas, []string{"OSS", "Hiring"}) || !slices.Equal(cat.Contexts, []string{"@decide", "@reply"}) {
@@ -372,19 +377,15 @@ func TestCatalogServesViewsAndVerbs(t *testing.T) {
 			t.Errorf("%s: key %q (%v), want %q", verb, k, ok, key)
 		}
 	}
-	r.g.RegisterView(task.ViewReview, "review:", reviewSource{})
-	if get(t, r.s, api.ViewsPath, &cat); cat.Views[len(cat.Views)-1].ID != "review" {
-		t.Fatalf("a registered review: %v", cat.Views)
-	}
 }
 
 func TestTheCatalogIsWordedByTheProfile(t *testing.T) {
 	t.Parallel()
-	texts := intentload.ListTexts{Views: map[string]string{"next": "Now"}}
+	views := intentload.ViewsDef{Views: []intentload.ViewDef{{ID: "needs-me", Label: "Now", Over: task.OverTasks}, {ID: "inbox", Label: "Inbox", Over: task.OverTasks}}}
 	tasks := intentload.TasksDef{Verbs: map[string]intentload.VerbText{"done": {Label: "Finish", Summary: "Close it"}, "waiting": {Label: "Waiting", Summary: "Wait", Input: "On whom?"}}}
 	r := newTasksRig(t, func(d *Deps) {
 		d.Intents = func() *intentload.Loaded {
-			return &intentload.Loaded{Lists: texts, Tasks: tasks, Registry: dintent.NewRegistry(nil)}
+			return &intentload.Loaded{Views: views, Tasks: tasks, Registry: dintent.NewRegistry(nil)}
 		}
 	})
 	var cat api.ViewsCatalog
@@ -408,18 +409,10 @@ func TestTheCatalogIsWordedByTheProfile(t *testing.T) {
 	for _, v := range cat.Views {
 		labels[v.ID] = v.Label
 	}
-	if labels["next"] != "Now" || labels["inbox"] != "Inbox" {
+	if labels["needs-me"] != "Now" || labels["inbox"] != "Inbox" {
 		t.Errorf("views %v", labels)
 	}
 }
-
-type reviewSource struct{}
-
-func (reviewSource) Tasks(context.Context, task.Query) ([]task.Task, error) { return nil, nil }
-func (reviewSource) Task(context.Context, task.ID) (task.Task, bool, error) {
-	return task.Task{}, false, nil
-}
-func (reviewSource) Count(context.Context, string) (int, error) { return 0, nil }
 
 func TestCountersShipWithChanges(t *testing.T) {
 	t.Parallel()
@@ -442,7 +435,7 @@ func TestCountersShipWithChanges(t *testing.T) {
 		t.Fatalf("rows page counters %+v, want %+v", page.Counters, counters)
 	}
 	var oss api.Counters
-	if get(t, r.s, api.CountersPath+"?area=OSS", &oss); oss.Area != "OSS" || oss.Views["next"] != 4 || oss.Areas["Hiring"] != 1 {
+	if get(t, r.s, api.CountersPath+"?area=OSS", &oss); oss.Area != "OSS" || oss.Views["needs-me"] != 5 || oss.Areas["Hiring"] != 2 {
 		t.Fatalf("OSS counters %+v", oss)
 	}
 }
@@ -509,7 +502,7 @@ func TestSourceActivityReturnsASnoozedTaskWhereItWasNotToTheInbox(t *testing.T) 
 		if _, err := r.g.Do(ctx, "e-s", coretasks.Request{Actor: task.ActorWorkflow, Source: "task-wake", Verb: task.VerbWake}); err != nil {
 			t.Fatal(err)
 		}
-		if p := r.page(t, "view=next"); len(p.Tasks) != 1 || p.Tasks[0].ID != "e-s" || !p.Tasks[0].Changed {
+		if p := r.page(t, "view=needs-me"); len(p.Tasks) != 1 || p.Tasks[0].ID != "e-s" || !p.Tasks[0].Changed {
 			t.Fatalf("the woken task is not back in Next: %+v", p.Tasks)
 		}
 		if p := r.page(t, "view=inbox"); len(p.Tasks) != 0 {
@@ -793,7 +786,7 @@ func TestCountersWithTermsCountWhatTheFilteredListsShow(t *testing.T) {
 			if code := get(t, r.s, api.CountersPath+"?"+q.Encode(), &c); code != 200 {
 				t.Fatalf("%v: %d", terms, code)
 			}
-			for _, view := range []string{"focus", "inbox", "next", "waiting", "projects", "someday", "logbook"} {
+			for _, view := range storedViews() {
 				v := url.Values{"view": {view}, "area": {area}}
 				n := 0
 				for _, e := range r.page(t, v.Encode()).Tasks {

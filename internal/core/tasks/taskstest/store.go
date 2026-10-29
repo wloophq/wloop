@@ -2,6 +2,7 @@
 package taskstest
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -36,26 +37,34 @@ func (s *Store) all() []task.Task {
 	for _, e := range s.tasks {
 		out = append(out, e)
 	}
-	slices.SortFunc(out, func(a, b task.Task) int { return a.Created.Compare(b.Created) })
+	slices.SortFunc(out, func(a, b task.Task) int { return cmp.Or(a.Created.Compare(b.Created), cmp.Compare(a.ID, b.ID)) })
 	return out
+}
+
+// selected are the tasks of all q selects: every one, or the open ones.
+func selected(all []task.Task, q task.Query) []task.Task {
+	if q.All {
+		return all
+	}
+	return slices.DeleteFunc(all, func(e task.Task) bool { return !e.Open() })
 }
 
 func (s *Store) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return task.Select(s.all(), q), nil
+	return selected(s.all(), q), nil
 }
 
 func (s *Store) TasksSince(ctx context.Context, q task.Query, since coretasks.Since) (coretasks.Page, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	all := s.all()
-	p := coretasks.Page{Epoch: s.epoch, Rev: s.rev, Counters: task.CountsOf(all, q.Area)}
+	p := coretasks.Page{Epoch: s.epoch, Rev: s.rev}
 	if since.Epoch != s.epoch || since.Rev > s.rev {
-		p.Full, p.Tasks = true, task.Select(all, q)
+		p.Full, p.Tasks = true, selected(all, q)
 		return p, nil
 	}
-	p.Tasks, p.Removed = coretasks.Delta(all, q, func(id task.ID) bool { return s.revs[id] > since.Rev })
+	p.Tasks = slices.DeleteFunc(all, func(e task.Task) bool { return s.revs[e.ID] <= since.Rev })
 	return p, nil
 }
 
@@ -79,12 +88,6 @@ func (s *Store) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
 		}
 	}
 	return out, nil
-}
-
-func (s *Store) Counts(ctx context.Context, area string) (task.Counters, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return task.CountsOf(s.all(), area), nil
 }
 
 func (s *Store) Apply(ctx context.Context, cs []task.Change, evs ...port.Event) error {

@@ -61,7 +61,7 @@ func TestTasksRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !got.Same(want) || !got.Updated.Equal(want.Updated) || !slices.Equal(got.Prop(task.PropContexts).List, want.Prop(task.PropContexts).List) || got.Written["focus"] != want.Written["focus"] || !slices.Equal(got.Units, want.Units) {
+	if !got.Same(want) || !got.Updated.Equal(want.Updated) || !slices.Equal(got.Prop("contexts").List, want.Prop("contexts").List) || got.Written["focus"] != want.Written["focus"] || !slices.Equal(got.Units, want.Units) {
 		t.Fatalf("read back\n%+v\nwant\n%+v", got, want)
 	}
 	if got.Prop("owner").Actors[0].Aliases[0] != want.Prop("owner").Actors[0].Aliases[0] {
@@ -101,7 +101,7 @@ func TestEmptyApplyNotesNothing(t *testing.T) {
 	ctx := context.Background()
 	e := capture("e-1", task.State("inbox"), 0)
 	applyTasks(t, s, e)
-	before, err := s.TasksSince(ctx, task.Query{View: task.ViewInbox}, coretasks.Since{})
+	before, err := s.TasksSince(ctx, task.Query{}, coretasks.Since{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestEmptyApplyNotesNothing(t *testing.T) {
 	e.Updated = e.Updated.Add(time.Hour)
 	applyTasks(t, s, e)
 	applyTasks(t, s)
-	after, err := s.TasksSince(ctx, task.Query{View: task.ViewInbox}, coretasks.Since{})
+	after, err := s.TasksSince(ctx, task.Query{}, coretasks.Since{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,31 +122,23 @@ func TestTasksSinceStore(t *testing.T) {
 	t.Parallel()
 	s, _ := openTasks(t)
 	ctx := context.Background()
-	a, b, c := capture("e-a", task.State("next"), 0), capture("e-b", task.State("next"), 1), capture("e-c", task.State("inbox"), 2)
-	p := capture("e-p", task.State("next"), 3)
-	p.Sequential = true
-	p.SetProp(task.PropKind, task.Value{Text: task.KindProject}, task.WriterWorkflow, p.Created)
-	s1, s2 := capture("e-s1", task.State("next"), 4), capture("e-s2", task.State("next"), 5)
-	s1.Parent, s1.Position, s2.Parent, s2.Position = p.ID, 1, p.ID, 2
-	applyTasks(t, s, a, b, c, p, s1, s2)
-	q := task.Query{View: task.ViewNext}
+	a, b, c := capture("e-a", task.State("next"), 0), capture("e-b", task.State("next"), 1), capture("e-c", task.State("done"), 2)
+	applyTasks(t, s, a, b, c)
+	q := task.Query{}
 	first, err := s.TasksSince(ctx, q, coretasks.Since{})
-	if err != nil || !first.Full || !slices.Equal(taskIDs(first.Tasks), []task.ID{"e-a", "e-b", "e-p", "e-s1"}) {
+	if err != nil || !first.Full || !slices.Equal(taskIDs(first.Tasks), []task.ID{"e-a", "e-b"}) {
 		t.Fatalf("first page %v %v", taskIDs(first.Tasks), err)
 	}
-	a.Title, b.State, s1.State = "a2", task.State("waiting"), task.State("done")
-	applyTasks(t, s, a, b, s1)
+	a.Title, b.State, b.Category = "a2", task.State("done"), task.CategoryDone
+	applyTasks(t, s, a, b)
 	page, err := s.TasksSince(ctx, q, coretasks.Since{Epoch: first.Epoch, Rev: first.Rev})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if page.Full || !slices.Equal(taskIDs(page.Tasks), []task.ID{"e-a", "e-p", "e-s2"}) || !slices.Equal(page.Removed, []task.ID{"e-b", "e-s1"}) {
-		t.Fatalf("page entries %v removed %v full %v", taskIDs(page.Tasks), page.Removed, page.Full)
+	if page.Full || !slices.Equal(taskIDs(page.Tasks), []task.ID{"e-a", "e-b"}) || len(page.Removed) != 0 {
+		t.Fatalf("page tasks %v removed %v full %v", taskIDs(page.Tasks), page.Removed, page.Full)
 	}
-	if page.Counters.Views[task.ViewNext] != 3 || page.Counters.Views[task.ViewWaiting] != 1 {
-		t.Fatalf("counters %+v", page.Counters.Views)
-	}
-	other, err := s.TasksSince(ctx, q, coretasks.Since{Epoch: "another", Rev: page.Rev})
+	other, err := s.TasksSince(ctx, task.Query{All: true}, coretasks.Since{Epoch: "another", Rev: page.Rev})
 	if err != nil || !other.Full || len(other.Tasks) != 3 {
 		t.Fatalf("another epoch %+v %v", other, err)
 	}

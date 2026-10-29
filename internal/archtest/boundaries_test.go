@@ -149,12 +149,12 @@ func actionLiterals(fset *token.FileSet, file string, info *types.Info, f *ast.F
 var programFields = []string{"When", "Refuse", "Primary", "ActionTexts"}
 
 // programField says whether v is one of programFields of internal/intent.Programs,
-// or of its ActionPrograms.
+// of its ActionPrograms, or of a view's ViewDef.
 func programField(v *types.Var) bool {
 	if !v.IsField() || v.Pkg() == nil || v.Pkg().Path() != module+"internal/intent" || !slices.Contains(programFields, v.Name()) {
 		return false
 	}
-	for _, name := range []string{"Programs", "ActionPrograms"} {
+	for _, name := range []string{"Programs", "ActionPrograms", "ViewDef"} {
 		obj := v.Pkg().Scope().Lookup(name)
 		if obj == nil {
 			continue

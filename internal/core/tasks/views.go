@@ -1,31 +1,98 @@
 package tasks
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 )
+
+// ViewSpec is a view of the profile as the service lists it. Over is what it lists: task.OverTasks, the stored
+// tasks ViewEval places in it, or another, which the ViewSource registered for it serves. Paged says its
+// predicate reads only what a write of the task itself moves, and not the time, so a page since a position lists
+// only the tasks written after it; any other view is served Full. HideDisabled leaves out the tasks whose units
+// are all of a disabled plugin.
+type ViewSpec struct {
+	ID           task.View
+	Over         string
+	Paged        bool
+	HideDisabled bool
+}
+
+// Views are the profile's views that list something, in its order, and the views its badge and its review name.
+type Views struct {
+	List   []ViewSpec
+	Badge  []task.View
+	Review []task.View
+}
+
+// ViewSort orders a view's tasks in place as the profile sorts the view; they come in their base order: the
+// oldest first, a parent's children in their sibling order.
+type ViewSort func(ctx context.Context, view string, ts []task.Task) error
+
+// Pass is one evaluation of the views over the tasks: every task it ranges over, so a fact over a task's
+// parent or children reads them here rather than in the store, and what an evaluator read of each task, kept
+// for the pass.
+type Pass struct {
+	Tasks []task.Task
+
+	mu    sync.Mutex
+	facts map[task.ID]workflow.Facts
+}
+
+type passKey struct{}
+
+// WithPass is ctx carrying p, which ViewEval and ViewSort find with PassOf.
+func WithPass(ctx context.Context, p *Pass) context.Context {
+	return context.WithValue(ctx, passKey{}, p)
+}
+
+// PassOf is the pass ctx carries; false outside one.
+func PassOf(ctx context.Context) (*Pass, bool) {
+	p, ok := ctx.Value(passKey{}).(*Pass)
+	return p, ok
+}
+
+// Facts are task id's facts as read reads them, once per pass.
+func (p *Pass) Facts(id task.ID, read func() (workflow.Facts, error)) (workflow.Facts, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if f, ok := p.facts[id]; ok {
+		return f, nil
+	}
+	f, err := read()
+	if err != nil {
+		return nil, err
+	}
+	if p.facts == nil {
+		p.facts = map[task.ID]workflow.Facts{}
+	}
+	p.facts[id] = f
+	return f, nil
+}
 
 type viewSource struct {
 	prefix string
 	src    ViewSource
 }
 
-// RegisterView serves v from src; ids starting with prefix are read from it.
-func (s *Service) RegisterView(v task.View, prefix string, src ViewSource) {
+// RegisterView serves the views over over from src; task ids starting with prefix are read from it.
+func (s *Service) RegisterView(over, prefix string, src ViewSource) {
 	s.reg.Lock()
 	defer s.reg.Unlock()
-	s.views[v] = viewSource{prefix: prefix, src: src}
+	s.views[over] = viewSource{prefix: prefix, src: src}
 }
 
-func (s *Service) view(v task.View) (ViewSource, bool) {
+func (s *Service) source(over string) (ViewSource, bool) {
 	s.reg.RLock()
 	defer s.reg.RUnlock()
-	vs, ok := s.views[v]
+	vs, ok := s.views[over]
 	return vs.src, ok
 }
 
@@ -40,26 +107,134 @@ func (s *Service) sourceOf(id task.ID) (ViewSource, bool) {
 	return nil, false
 }
 
-// Tasks is q's view, from its registered ViewSource or the store; the outbox is empty while none serves it.
-// A disabled plugin's entries are left out, as hidden says.
-func (s *Service) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) {
-	if src, ok := s.view(q.View); ok {
-		return src.Tasks(ctx, q)
+func (s *Service) profileViews() Views {
+	if s.d.Views == nil {
+		return Views{}
 	}
-	switch q.View {
-	case task.ViewOutbox:
-		return nil, nil
-	case task.ViewReview, task.ViewOpen:
-		return nil, fmt.Errorf("%w: view %q is not served", ErrArgs, q.View)
-	}
-	es, err := s.d.Store.Tasks(ctx, q)
-	return s.shown(q.View, es), err
+	return s.d.Views()
 }
 
-// hiddenIn are the views that leave out a disabled plugin's entries; Waiting and the Logbook keep them, read-only.
-var hiddenIn = []task.View{task.ViewFocus, task.ViewInbox, task.ViewNext, task.ViewProjects, task.ViewSomeday}
+// spec is view's spec; ErrArgs when the profile lists nothing by that name.
+func (s *Service) spec(v task.View) (ViewSpec, error) {
+	vs := s.profileViews()
+	i := slices.IndexFunc(vs.List, func(x ViewSpec) bool { return x.ID == v })
+	if i < 0 {
+		return ViewSpec{}, fmt.Errorf("%w: view %q is not served", ErrArgs, v)
+	}
+	return vs.List[i], nil
+}
 
-// hider says whether an entry is hidden: it has units, all of a disabled plugin; nil when no plugin is disabled.
+// Tasks is q's view: its tasks in the view's order, narrowed to q's area and contexts.
+func (s *Service) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) {
+	spec, err := s.spec(q.View)
+	if err != nil {
+		return nil, err
+	}
+	if spec.Over != task.OverTasks {
+		return s.sourced(ctx, spec, q)
+	}
+	all, err := s.d.Store.Tasks(ctx, task.Query{All: true})
+	if err != nil {
+		return nil, err
+	}
+	ctx = WithPass(ctx, &Pass{Tasks: all})
+	return s.list(ctx, spec, q, all)
+}
+
+// sourced are the tasks of the view over another thing than the stored tasks, from its ViewSource, narrowed to
+// q's area and contexts as every view is; none while no source serves it.
+func (s *Service) sourced(ctx context.Context, spec ViewSpec, q task.Query) ([]task.Task, error) {
+	src, ok := s.source(spec.Over)
+	if !ok {
+		return nil, nil
+	}
+	es, err := src.Tasks(ctx, q)
+	return slices.DeleteFunc(es, func(e task.Task) bool { return !s.matches(q, e) }), err
+}
+
+// list is q's view over all in the view's order.
+func (s *Service) list(ctx context.Context, spec ViewSpec, q task.Query, all []task.Task) ([]task.Task, error) {
+	out, err := s.listed(ctx, spec, q, all)
+	if err != nil {
+		return nil, err
+	}
+	baseOrder(out)
+	if s.d.ViewSort != nil {
+		if err := s.d.ViewSort(ctx, string(spec.ID), out); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+// listed are the tasks of all in q's view, in all's order.
+func (s *Service) listed(ctx context.Context, spec ViewSpec, q task.Query, all []task.Task) ([]task.Task, error) {
+	hidden := s.hiderFor(spec)
+	var out []task.Task
+	for _, e := range all {
+		in, err := s.in(ctx, spec, q, e, hidden)
+		if err != nil {
+			return nil, err
+		}
+		if in {
+			out = append(out, e)
+		}
+	}
+	return out, nil
+}
+
+// in says whether e is in q's view: its predicate holds, and e passes q's area and contexts and is not hidden.
+func (s *Service) in(ctx context.Context, spec ViewSpec, q task.Query, e task.Task, hidden func(task.Task) bool) (bool, error) {
+	if !s.matches(q, e) || (hidden != nil && hidden(e)) || s.d.ViewEval == nil {
+		return false, nil
+	}
+	return s.d.ViewEval(ctx, string(spec.ID), e)
+}
+
+// matches says whether e passes q's area and contexts, the properties of the area and contexts roles.
+func (s *Service) matches(q task.Query, e task.Task) bool {
+	if q.Area != "" && e.Role(s.d.States, task.RoleArea).Text != q.Area {
+		return false
+	}
+	for _, c := range q.Contexts {
+		if !slices.Contains(e.Role(s.d.States, task.RoleContexts).List, c) {
+			return false
+		}
+	}
+	return true
+}
+
+// baseOrder orders ts the oldest first, then puts each parent's children, where they stand, in their sibling
+// order.
+func baseOrder(ts []task.Task) {
+	slices.SortStableFunc(ts, func(a, b task.Task) int { return cmp.Or(a.Created.Compare(b.Created), cmp.Compare(a.ID, b.ID)) })
+	slots := map[task.ID][]int{}
+	for i, e := range ts {
+		if e.Parent != "" {
+			slots[e.Parent] = append(slots[e.Parent], i)
+		}
+	}
+	for _, at := range slots {
+		kids := make([]task.Task, len(at))
+		for j, i := range at {
+			kids[j] = ts[i]
+		}
+		slices.SortStableFunc(kids, func(a, b task.Task) int { return cmp.Or(cmp.Compare(a.Position, b.Position), cmp.Compare(a.ID, b.ID)) })
+		for j, i := range at {
+			ts[i] = kids[j]
+		}
+	}
+}
+
+// hiderFor is hider in a view that hides a disabled plugin's tasks; nil in any other.
+func (s *Service) hiderFor(spec ViewSpec) func(task.Task) bool {
+	if !spec.HideDisabled {
+		return nil
+	}
+	return s.hider()
+}
+
+// hider says whether a task is hidden: it has units, all of a disabled plugin; nil when no plugin is disabled.
 func (s *Service) hider() func(task.Task) bool {
 	if s.d.Disabled == nil {
 		return nil
@@ -71,32 +246,6 @@ func (s *Service) hider() func(task.Task) bool {
 	return func(e task.Task) bool {
 		return len(e.Units) > 0 && !slices.ContainsFunc(e.Units, func(u unit.Unit) bool { return !slices.Contains(off, u.Provider) })
 	}
-}
-
-func (s *Service) shown(v task.View, es []task.Task) []task.Task {
-	hidden := s.hider()
-	if hidden == nil || !slices.Contains(hiddenIn, v) {
-		return es
-	}
-	return slices.DeleteFunc(es, hidden)
-}
-
-// hideCounts recounts c's hidden views without a disabled plugin's entries.
-func (s *Service) hideCounts(ctx context.Context, c task.Counters, area string) (task.Counters, error) {
-	hidden := s.hider()
-	if hidden == nil {
-		return c, nil
-	}
-	open, err := s.d.Store.Tasks(ctx, task.Query{View: task.ViewOpen})
-	if err != nil {
-		return task.Counters{}, err
-	}
-	shown := task.CountsOf(slices.DeleteFunc(open, hidden), area)
-	for _, v := range hiddenIn {
-		c.Views[v] = shown.Views[v]
-	}
-	c.Areas, c.Contexts = shown.Areas, shown.Contexts
-	return c, nil
 }
 
 // Task reads id from the ViewSource its prefix names, or the store.
@@ -114,184 +263,141 @@ func (s *Service) Task(ctx context.Context, id task.ID) (task.Task, error) {
 	return s.d.Store.Task(ctx, id)
 }
 
-// Counts is Store.Counts plus each ViewSource.Count but review's; Badge is Inbox plus Outbox.
+// Counts are the counters of the profile's views over area.
 func (s *Service) Counts(ctx context.Context, area string) (task.Counters, error) {
-	c, err := s.d.Store.Counts(ctx, area)
-	if err != nil {
-		return task.Counters{}, err
-	}
-	return s.withSources(ctx, c, area)
+	return s.CountsWhere(ctx, area, nil)
 }
 
-// CountsWhere is Counts over the entries keep holds: each view, area and context counts only the entries of its
-// list that keep takes, so a client's filter narrows the counters as it narrows the lists.
+// CountsWhere is Counts over the tasks keep holds, every task when nil: each view, area and context counts only
+// the tasks of its list that keep takes, so a client's filter narrows the counters as it narrows the lists.
 func (s *Service) CountsWhere(ctx context.Context, area string, keep func(task.Task) (bool, error)) (task.Counters, error) {
-	open, err := s.d.Store.Tasks(ctx, task.Query{View: task.ViewOpen})
+	all, err := s.d.Store.Tasks(ctx, task.Query{All: true})
 	if err != nil {
 		return task.Counters{}, err
 	}
-	logbook, err := s.d.Store.Tasks(ctx, task.Query{View: task.ViewLogbook})
-	if err != nil {
-		return task.Counters{}, err
-	}
-	all := open
-	for _, e := range logbook {
-		if !slices.ContainsFunc(open, func(o task.Task) bool { return o.ID == e.ID }) {
-			all = append(all, e)
-		}
-	}
+	return s.counts(WithPass(ctx, &Pass{Tasks: all}), area, all, keep)
+}
+
+func (s *Service) counts(ctx context.Context, area string, all []task.Task, keep func(task.Task) (bool, error)) (task.Counters, error) {
 	kept := map[task.ID]bool{}
-	count := func(es []task.Task) ([]task.Task, error) {
-		var out []task.Task
-		for _, e := range es {
-			k, seen := kept[e.ID]
-			if !seen {
-				if k, err = keep(e); err != nil {
-					return nil, err
-				}
-				kept[e.ID] = k
-			}
-			if k {
-				out = append(out, e)
-			}
+	keeps := func(e task.Task) (bool, error) {
+		if keep == nil {
+			return true, nil
 		}
-		return out, nil
+		k, seen := kept[e.ID]
+		if !seen {
+			var err error
+			if k, err = keep(e); err != nil {
+				return false, err
+			}
+			kept[e.ID] = k
+		}
+		return k, nil
 	}
-	c := task.Counters{Area: area, Views: map[task.View]int{task.ViewOutbox: 0}, Areas: map[string]int{}, Contexts: map[string]int{}}
-	for _, v := range task.StoredViews {
-		es, err := count(s.shown(v, task.Select(all, task.Query{View: v, Area: area})))
+	vs := s.profileViews()
+	c := task.Counters{Area: area, Views: map[task.View]int{}, Areas: map[string]int{}, Contexts: map[string]int{}}
+	for _, spec := range vs.List {
+		q := task.Query{View: spec.ID, Area: area}
+		var es []task.Task
+		var err error
+		if spec.Over == task.OverTasks {
+			es, err = s.listed(ctx, spec, q, all)
+		} else {
+			es, err = s.sourced(ctx, spec, q)
+		}
 		if err != nil {
 			return task.Counters{}, err
 		}
-		c.Views[v] = len(es)
+		n := 0
+		for _, e := range es {
+			k, err := keeps(e)
+			if err != nil {
+				return task.Counters{}, err
+			}
+			if k {
+				n++
+			}
+		}
+		c.Views[spec.ID] = n
 	}
-	next, err := count(s.shown(task.ViewNext, task.Select(all, task.Query{View: task.ViewNext})))
-	if err != nil {
-		return task.Counters{}, err
-	}
-	for _, e := range next {
-		a := e.Prop(task.PropArea).Text
+	hidden := s.hider()
+	for _, e := range all {
+		if !e.Open() || (hidden != nil && hidden(e)) {
+			continue
+		}
+		k, err := keeps(e)
+		if err != nil {
+			return task.Counters{}, err
+		}
+		if !k {
+			continue
+		}
+		a := e.Role(s.d.States, task.RoleArea).Text
 		if a != "" {
 			c.Areas[a]++
 		}
 		if area == "" || a == area {
-			for _, cx := range e.Prop(task.PropContexts).List {
+			for _, cx := range e.Role(s.d.States, task.RoleContexts).List {
 				c.Contexts[cx]++
 			}
 		}
 	}
-	s.reg.RLock()
-	views := make(map[task.View]ViewSource, len(s.views))
-	for v, vs := range s.views {
-		views[v] = vs.src
+	for _, v := range vs.Badge {
+		c.Badge += c.Views[v]
 	}
-	s.reg.RUnlock()
-	for v, src := range views {
-		if v == task.ViewReview {
-			continue
-		}
-		es, err := src.Tasks(ctx, task.Query{View: v, Area: area})
-		if err != nil {
-			return task.Counters{}, err
-		}
-		if es, err = count(es); err != nil {
-			return task.Counters{}, err
-		}
-		c.Views[v] = len(es)
-	}
-	c.Badge = c.Views[task.ViewInbox] + c.Views[task.ViewOutbox]
 	return c, nil
 }
 
-// withSources is c, the stored views' counters without a disabled plugin's entries, with each ViewSource's count
-// but review's.
-func (s *Service) withSources(ctx context.Context, c task.Counters, area string) (task.Counters, error) {
-	if c.Views == nil {
-		c.Views = map[task.View]int{}
-	}
-	c, err := s.hideCounts(ctx, c, area)
-	if err != nil {
-		return task.Counters{}, err
-	}
-	c.Views[task.ViewOutbox] = 0
-	s.reg.RLock()
-	views := make(map[task.View]ViewSource, len(s.views))
-	for v, vs := range s.views {
-		views[v] = vs.src
-	}
-	s.reg.RUnlock()
-	for v, src := range views {
-		if v == task.ViewReview {
-			continue
-		}
-		n, err := src.Count(ctx, area)
-		if err != nil {
-			return task.Counters{}, err
-		}
-		c.Views[v] = n
-	}
-	c.Badge = c.Views[task.ViewInbox] + c.Views[task.ViewOutbox]
-	return c, nil
-}
-
-// TasksSince is q's page after since with the counters of q's area: a registered ViewSource's view is always
-// Full, at the store's position.
+// TasksSince is q's page after since with the counters of q's area. A paged view's page from the same epoch
+// lists the tasks written after since that are in the view, and removes those written that are not; any other
+// view's page is Full, at the store's position.
 func (s *Service) TasksSince(ctx context.Context, q task.Query, since Since) (Page, error) {
-	src, ok := s.view(q.View)
-	switch {
-	case ok || q.View == task.ViewOutbox:
-		p, err := s.d.Store.TasksSince(ctx, task.Query{View: task.ViewFocus, Area: q.Area}, Since{})
-		if err != nil {
-			return Page{}, err
-		}
-		p.Full, p.Tasks, p.Removed = true, nil, nil
-		if ok {
-			if p.Tasks, err = src.Tasks(ctx, q); err != nil {
-				return Page{}, err
-			}
-		}
-		p.Counters, err = s.withSources(ctx, p.Counters, q.Area)
-		return p, err
-	case !slices.Contains(task.StoredViews, q.View):
-		return Page{}, fmt.Errorf("%w: view %q is not served", ErrArgs, q.View)
-	}
-	p, err := s.d.Store.TasksSince(ctx, q, since)
+	spec, err := s.spec(q.View)
 	if err != nil {
 		return Page{}, err
 	}
-	p.Tasks = s.shown(q.View, p.Tasks)
-	p.Counters, err = s.withSources(ctx, p.Counters, q.Area)
+	p, err := s.d.Store.TasksSince(ctx, task.Query{All: true}, since)
+	if err != nil {
+		return Page{}, err
+	}
+	all := p.Tasks
+	if !p.Full {
+		if all, err = s.d.Store.Tasks(ctx, task.Query{All: true}); err != nil {
+			return Page{}, err
+		}
+	}
+	ctx = WithPass(ctx, &Pass{Tasks: all})
+	switch {
+	case spec.Over != task.OverTasks:
+		p.Full, p.Removed = true, nil
+		p.Tasks, err = s.sourced(ctx, spec, q)
+	case p.Full || !spec.Paged:
+		p.Full, p.Removed = true, nil
+		p.Tasks, err = s.list(ctx, spec, q, all)
+	default:
+		p.Tasks, p.Removed, err = s.delta(ctx, spec, q, p.Tasks)
+	}
+	if err != nil {
+		return Page{}, err
+	}
+	p.Counters, err = s.counts(ctx, q.Area, all, nil)
 	return p, err
 }
 
-// Delta is the incremental page of q over all, the entries a store holds for q and every entry changed after
-// the client's position (changed says which): the changed entries in q's view, and the changed ids out of it.
-// A change to a project, or to one of its actions, counts as a change to all its actions, since the sequential
-// rule may move another one into Next. Removed may name ids the client never held.
-func Delta(all []task.Task, q task.Query, changed func(task.ID) bool) (in []task.Task, removed []task.ID) {
-	touched := map[task.ID]bool{}
-	for _, e := range all {
-		if changed(e.ID) {
-			touched[e.ID] = true
-			if e.Parent != "" {
-				touched[e.Parent] = true
-			}
+// delta splits the tasks written since a position into those in the paged view and the ids of those not.
+func (s *Service) delta(ctx context.Context, spec ViewSpec, q task.Query, changed []task.Task) (in []task.Task, removed []task.ID, err error) {
+	hidden := s.hiderFor(spec)
+	for _, e := range changed {
+		ok, err := s.in(ctx, spec, q, e, hidden)
+		if err != nil {
+			return nil, nil, err
 		}
-	}
-	hit := func(e task.Task) bool { return touched[e.ID] || (e.Parent != "" && touched[e.Parent]) }
-	inView := map[task.ID]bool{}
-	for _, e := range task.Select(all, q) {
-		inView[e.ID] = true
-		if hit(e) {
+		if ok {
 			in = append(in, e)
-		}
-	}
-	seen := map[task.ID]bool{}
-	for _, e := range all {
-		if hit(e) && !inView[e.ID] && !seen[e.ID] {
-			seen[e.ID] = true
+		} else {
 			removed = append(removed, e.ID)
 		}
 	}
-	return in, removed
+	baseOrder(in)
+	return in, removed, nil
 }

@@ -45,7 +45,7 @@ func TestSetPropPagesTheTaskAgain(t *testing.T) {
 	db, log := openProps(t)
 	applyTasks(t, db.Tasks(), task.Task{ID: "t-01", State: "inbox", Category: task.CategoryInbox, Title: "Call Ana",
 		Origin: task.OriginUser, Created: propsNow, Updated: propsNow})
-	q := task.Query{View: task.ViewInbox}
+	q := task.Query{}
 	before, err := db.Tasks().TasksSince(ctx, q, coretasks.Since{})
 	if err != nil {
 		t.Fatal(err)

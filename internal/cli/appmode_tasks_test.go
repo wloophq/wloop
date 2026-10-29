@@ -105,6 +105,6 @@ func TestTheMenubarFollowsARealDaemonsInbox(t *testing.T) {
 	}
 	eventually(t, "the withdrawal once the entry left the Inbox", func() bool {
 		_, withdrawn := notes.seen()
-		return slices.Equal(withdrawn, []string{n.ID}) && tray.title() == "PR 0" && tray.has("Inbox (0)")
+		return slices.Equal(withdrawn, []string{n.ID}) && tray.title() == "PR 1" && tray.has("Inbox (0)") && tray.has("Needs me (1)")
 	})
 }

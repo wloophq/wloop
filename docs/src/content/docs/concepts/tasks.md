@@ -110,13 +110,31 @@ A headless call has no workspace or session, so it offers none of them. `{{comma
 | `reference` | `done` | kept to read, no action |
 | `trash` | `dropped` | dismissed |
 
-A task is open while its category is neither `done` nor `dropped`. Beside its state, a task has properties: the bundled ones include a **focus** star, **contexts** (labels such as `@decide`), an **area** (switching area filters every view but the Inbox) and a **due** date. A task's **parent** is the project it belongs to, and its children keep their order.
+A task is open while its category is neither `done` nor `dropped`. Beside its state, a task has properties: the bundled ones include a **focus** star, **contexts** (labels such as `@decide`), an **area** and a **due** date. A property's `role` in `tasks.toml` names the mechanism of {{name}} that acts on it, so Go reads the role and never the property's name: `area` (the area filter of every view and of the counters reads it, the area verb sets it, a new project takes it from its first task), `contexts` (the contexts filter reads it, the context verb sets it, a derived task takes its item's), `star` (the focus verb toggles it between its first value and its second) and `deadline` (a derived task takes its items' deadline, an Outbox draft its gate's window). One property takes each role; a user layer that gives a role to another property moves it. A task's **parent** is the project it belongs to, and its children keep their order.
 
-The views are Focus (starred open tasks, the landing view), Inbox, Outbox, Next (the `ready` category), Waiting, Projects, Someday (`deferred` with no wake), Logbook (the `done` category, newest first) and Review. The lists are inspired by David Allen's *Getting Things Done*®.
+## Views
+
+A view is a list of the profile's `views.toml`: a `when`, a condition over a task's facts (or a gate's, with `over = "gates"`), and the tasks or gates it holds, with its `label`, the `key` that jumps to it, the fact it groups by (`group`) and those it sorts by (`sort`). A view lists its tasks the oldest first, a parent's children in their sibling order, then by its `sort`; `hide_disabled` leaves out the tasks whose units are all of a disabled plugin. The area and the contexts you pick narrow every view and its count. The bundled views:
+
+| View | Lists |
+|---|---|
+| Inbox | what nobody has clarified (`task.category == 'inbox'`) |
+| Needs me | a clarified task whose next step is yours: an open gate, or your own action (`task.owed_by == 'me'`); a sequential project's next action first (`-task.sequential_next`) |
+| Waiting | a task someone else owes, grouped by `task.owed_by` |
+| Snoozed | a task asleep on a wake |
+| Focus | an open starred task |
+| Projects | the open projects |
+| Someday | the `someday` state |
+| Logbook | the `done` category |
+| Outbox | over gates: the drafts waiting on you, and those approved whose delivery is under way or failed, so you can retry them |
+| Projects to review | an open project past its review, or, unless in Someday, with no ready child (`task.review_due`, `task.children_ready`) |
+| Review | lists nothing: the clients walk the review's steps |
+
+The menu bar's badge adds up the views `[badge] views` names, Inbox and Needs me in the bundled profile: an open gate makes its task yours, even a done one, so it shows in Needs me, and a task still in the Inbox counts there once. A view whose condition reads only the task's own fields (its state, category and properties), and not `now`, pages since a position: a page lists the tasks written after it; any other view, such as Needs me, which reads gates, wakes and items, is served whole each time. Your own `views.toml` changes a bundled view's keys, or adds views after the bundled ones, in the order it writes them.
 
 The states and the task properties are the profile's `tasks.toml`. Each state has a category (`inbox`, `ready`, `active`, `waiting`, `deferred`, `done` or `dropped`), which is all {{name}} reads of it: a task proposed in a category takes the first state of it, in the order the file declares them, and a state of your `tasks.toml` comes after the bundled ones. The store keeps each task's category beside its state, and the lists read the category. When a reload of the profile moves a state to another category, the daemon gives the stored tasks of that state the new one; a state stored tasks hold that no layer declares any more is a profile problem the health shows, naming `states.<name>`, and those tasks keep the category they had until you declare it again or move them. Each property is the fact `task.prop.<name>`, typed from its `type`, and who last wrote it the fact `task.prop_by.<name>` (`person`, `workflow`, `agent` or `plugin`, empty while unset), and says who may write it: a property an agent or a plugin writes, such as `risk`, is untrusted, so no approval rule that sends or runs reads it. An `int` or a `duration` property of 0 is unset.
 
-The words of the verbs come from the profile's `tasks.toml`, and those of the views and the review's steps from its `views.toml`, which also gives each view the `key` that jumps to it: each verb's label is its button, its summary the button's tooltip and its input the question it asks first. A verb's `from` are the states it moves a task from, every state when left out, and its `to` the state it moves it to. A verb's `offer`, a condition over the task's own facts (`task.prop.kind`, `task.state`, `task.unit_provider`), says where a task offers it: `offer = 'task.prop.kind != "capture"'` on `delegate` leaves Delegate off captured tasks, and the daemon refuses it there too. A workflow's `task.verb` step is not bound by it. A verb's `handler` is what the loop runs besides its move (`project`, `reply`, `approve`, ...), bound by that name and never by the verb's. A verb's `by` says who may run it, per actor (`person`, `workflow`, `agent`, `plugin`): a condition over the task's facts, such as `workflow = 'task.prop.kind == "capture"'`, or `"gate"`, which opens the gate the verb's `gate` names in `gates.toml` for you to decide, once per proposal while it is open, and leaves the task as it is; approving it runs the verb as yours. A `by` condition reads the task's own facts (`task.id`, `task.state`, `task.category`, `task.unit`, `task.unit_provider`) and its properties; naming another fact is a load problem. A verb asked from an agent's session, whose requests carry the session's handle, runs as `agent`; any other as `person`. An actor `by` leaves out may not run the verb; the bundled profile lets you run every verb, lets workflows run next, waiting, schedule, wake, focus, done and dismiss, and gives agents none. Every verb run on a task that changes it is a `verb_<verb>` event, by its actor, that a [workflow](/concepts/workflows/#react-to-a-verb) can react to, but one whose handler is `seen` and the verbs on an Outbox draft (approve, edit, retry, dismiss), which are the draft's own. A task's events, and every event, turn, record, answer, plan item and brief of a unit linked to a task, are kept forever: retention never reaches them.
+The words of the verbs come from the profile's `tasks.toml`: each verb's label is its button, its summary the button's tooltip and its input the question it asks first. A verb's `from` are the states it moves a task from, every state when left out, and its `to` the state it moves it to. A verb's `offer`, a condition over the task's own facts (`task.prop.kind`, `task.state`, `task.unit_provider`), says where a task offers it: `offer = 'task.prop.kind != "capture"'` on `delegate` leaves Delegate off captured tasks, and the daemon refuses it there too. A workflow's `task.verb` step is not bound by it. A verb's `handler` is what the loop runs besides its move (`project`, `reply`, `approve`, ...), bound by that name and never by the verb's. A verb's `by` says who may run it, per actor (`person`, `workflow`, `agent`, `plugin`): a condition over the task's facts, such as `workflow = 'task.prop.kind == "capture"'`, or `"gate"`, which opens the gate the verb's `gate` names in `gates.toml` for you to decide, once per proposal while it is open, and leaves the task as it is; approving it runs the verb as yours. A `by` condition reads the task's own facts (`task.id`, `task.state`, `task.category`, `task.unit`, `task.unit_provider`) and its properties; naming another fact is a load problem. A verb asked from an agent's session, whose requests carry the session's handle, runs as `agent`; any other as `person`. An actor `by` leaves out may not run the verb; the bundled profile lets you run every verb, lets workflows run next, waiting, schedule, wake, focus, done and dismiss, and gives agents none. Every verb run on a task that changes it is a `verb_<verb>` event, by its actor, that a [workflow](/concepts/workflows/#react-to-a-verb) can react to, but one whose handler is `seen` and the verbs on an Outbox draft (approve, edit, retry, dismiss), which are the draft's own. A task's events, and every event, turn, record, answer, plan item and brief of a unit linked to a task, are kept forever: retention never reaches them.
 
 - **Changed since you saw it.** New activity on a unit by someone else, after you last opened the task, marks a waiting or scheduled task changed, and matches the wake of one scheduled until activity; it never brings a task back to the Inbox. Opening or moving the task clears the mark.
 - **Snooze.** `s` schedules a task until a date, until activity, or both: it puts a wake on the task, one per task, which remembers the state the task had. A wake matches when its date passes, on activity, or once its condition over the task's facts holds (`task.wake_until` and `task.wake_when` read it); the loop then records `task.woke` on the task, and the bundled `task-wake` workflow runs the `wake` verb, which brings the task back to that state. Moving the task by hand drops its wake. Muting a pull request is a wake on its task: for a while, or until whom it waits on (`task.link_owes`) changes; unmute drops it and brings the task back at once.
@@ -163,18 +181,18 @@ Their texts are templates of the profile; see [Tune the Slack proposals](/guides
 
 ## Projects
 
-A project is an outcome that takes more than one action. `p` on a task makes a project of it or attaches it to one. Its actions are its children: each names the project as its parent and keeps its place among them. A project is parallel or sequential; a sequential one shows only its first open action in Next. Each project has a review interval, 7 days by default, kept on its task, and opens its task's [dossier](/concepts/turns/#dossiers).
+A project is an outcome that takes more than one action. `p` on a task makes a project of it or attaches it to one. Its actions are its children: each names the project as its parent and keeps its place among them. A project is parallel or sequential; a sequential one's first open action, `task.sequential_next`, comes first in Needs me. Each project has a review interval, 7 days by default, kept on its task, and opens its task's [dossier](/concepts/turns/#dossiers).
 
 ## The review
 
-The review (`g r`) walks six steps, each a view you mark done with `Enter` (`]` and `[` move between steps):
+The review (`g r`) walks the steps `views.toml`'s `[review]` declares, in order, each a view you mark done with `Enter` (`]` and `[` move between steps); a step's `label` is what it asks of you, and a step must name a view. The bundled ones:
 
-1. Inbox to zero;
-2. the Outbox;
-3. Waiting: nudge?
-4. projects without a next action or past their review interval;
-5. Someday;
-6. prune Focus.
+1. Inbox to zero (`inbox`);
+2. the Outbox (`outbox`);
+3. Waiting: nudge? (`waiting`);
+4. projects without a next action or past their review interval (`review-projects`);
+5. Someday (`someday`);
+6. prune Focus (`focus`).
 
 ## Configuration
 

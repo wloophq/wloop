@@ -9,6 +9,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/domain/card"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -85,12 +86,30 @@ type StateSpec struct {
 	Category string `json:"category"`
 }
 
-// PropSpec is a task property of tasks.toml: its type, an enum's values and who may write it.
+// PropSpec is a task property of tasks.toml: its type, an enum's values, who may write it, and the role of the
+// loop's that acts on it ("" for none): area, contexts, star or deadline.
 type PropSpec struct {
 	Name    string   `json:"name"`
 	Type    string   `json:"type"`
 	Values  []string `json:"values,omitempty"`
 	Writers []string `json:"writers,omitempty"`
+	Role    string   `json:"role,omitempty"`
+}
+
+// PropOf is the property of c that takes role; false when none does.
+func (c ViewsCatalog) PropOf(role string) (PropSpec, bool) {
+	for _, p := range c.Props {
+		if p.Role == role {
+			return p, true
+		}
+	}
+	return PropSpec{}, false
+}
+
+// Starred says whether e holds the starred value, the first, of the property c's star role acts on.
+func (c ViewsCatalog) Starred(e TaskView) bool {
+	p, ok := c.PropOf(string(task.RoleStar))
+	return ok && len(p.Values) > 0 && e.PropText(p.Name) == p.Values[0]
 }
 
 // VerbSpec is a verb a task offers: Handler is what it runs besides its move, as the profile names it ("" for

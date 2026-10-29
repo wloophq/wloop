@@ -103,20 +103,20 @@ func TestAutofocusStarsStaleAndPastDue(t *testing.T) {
 	r.mine("cleared", friday, pastDue, twMe)
 	r.sync(twThread)
 	off := r.taskOf(task.DerivedID(twThread, "cleared"))
-	off.SetProp(task.PropFocus, task.Value{Text: task.FocusOff}, task.WriterPerson, r.now)
+	off.SetProp("focus", task.Value{Text: "off"}, task.WriterPerson, r.now)
 	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: off}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := p.pass(ctx); err != nil {
 		t.Fatal(err)
 	}
-	for item, want := range map[string]string{"late": task.FocusOn, "stale": task.FocusOn, "fresh": "", "cleared": task.FocusOff} {
+	for item, want := range map[string]string{"late": "on", "stale": "on", "fresh": "", "cleared": "off"} {
 		e := r.taskOf(task.DerivedID(twThread, item))
-		if got := e.Prop(task.PropFocus).Text; got != want {
+		if got := e.Prop("focus").Text; got != want {
 			t.Errorf("%s: focus %q, want %q", item, got, want)
 		}
-		if want == task.FocusOn && e.Written[task.PropFocus].By != task.WriterWorkflow {
-			t.Errorf("%s: starred by %s", item, e.Written[task.PropFocus].By)
+		if want == "on" && e.Written["focus"].By != task.WriterWorkflow {
+			t.Errorf("%s: starred by %s", item, e.Written["focus"].By)
 		}
 	}
 }
@@ -211,30 +211,30 @@ func TestAutofocusClearsTheStarsItSetWhoseReasonIsGone(t *testing.T) {
 		}
 	}
 	change("mine", func(e *task.Task) {
-		e.SetProp(task.PropFocus, task.Value{Text: task.FocusOn}, task.WriterPerson, r.now)
+		e.SetProp("focus", task.Value{Text: "on"}, task.WriterPerson, r.now)
 	})
 	change("theirs", func(e *task.Task) {
-		e.SetProp(task.PropFocus, task.Value{Text: task.FocusOn}, task.WriterWorkflow, r.now)
+		e.SetProp("focus", task.Value{Text: "on"}, task.WriterWorkflow, r.now)
 	})
 	if err := p.pass(ctx); err != nil {
 		t.Fatal(err)
 	}
 	change("restarred", func(e *task.Task) {
-		e.SetProp(task.PropFocus, task.Value{Text: task.FocusOn}, task.WriterPerson, r.now)
-		e.SetProp(task.PropDue, task.Value{Time: replayStart.AddDate(0, 0, 3)}, task.WriterPerson, r.now)
+		e.SetProp("focus", task.Value{Text: "on"}, task.WriterPerson, r.now)
+		e.SetProp("due", task.Value{Time: replayStart.AddDate(0, 0, 3)}, task.WriterPerson, r.now)
 	})
 	change("moved", func(e *task.Task) {
-		e.SetProp(task.PropDue, task.Value{Time: replayStart.AddDate(0, 0, 3)}, task.WriterPerson, r.now)
+		e.SetProp("due", task.Value{Time: replayStart.AddDate(0, 0, 3)}, task.WriterPerson, r.now)
 	})
 	if _, err := r.db.Gates(func() time.Time { return r.now }).Open(ctx, gate.Gate{Task: task.DerivedID(twThread, "moved"), Unit: twThread, Kind: gate.KindQuestion, Name: "question", Subject: "q1"}); err != nil {
 		t.Fatal(err)
 	}
 	starred := func() int {
-		es, err := r.db.Tasks().Tasks(ctx, task.Query{View: task.ViewFocus})
+		es, err := r.db.Tasks().Tasks(ctx, task.Query{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		return len(es)
+		return len(slices.DeleteFunc(es, func(e task.Task) bool { return !(e.Prop("focus").Text == "on") }))
 	}
 	before := starred()
 	r.now = r.now.Add(time.Hour)
@@ -244,8 +244,8 @@ func TestAutofocusClearsTheStarsItSetWhoseReasonIsGone(t *testing.T) {
 	if after := starred(); after >= before {
 		t.Fatalf("%d stars after the run, %d before: the run did not clear the stale one", after, before)
 	}
-	for item, want := range map[string]string{"moved": "", "late": task.FocusOn, "mine": task.FocusOn, "theirs": task.FocusOn, "restarred": task.FocusOn} {
-		if got := r.taskOf(task.DerivedID(twThread, item)).Prop(task.PropFocus).Text; got != want {
+	for item, want := range map[string]string{"moved": "", "late": "on", "mine": "on", "theirs": "on", "restarred": "on"} {
+		if got := r.taskOf(task.DerivedID(twThread, item)).Prop("focus").Text; got != want {
 			t.Errorf("%s: focus %q, want %q", item, got, want)
 		}
 	}
@@ -258,19 +258,19 @@ func TestAStaleStarStaysWhileItsNudgeIsHeldAndGoesOnceItIsSent(t *testing.T) {
 	r.mine("i1", replayStart.AddDate(0, 0, -7), "", twBruno)
 	r.sync(twThread)
 	id := task.DerivedID(twThread, "i1")
-	focus := func() string { return r.taskOf(id).Prop(task.PropFocus).Text }
+	focus := func() string { return r.taskOf(id).Prop("focus").Text }
 	if err := p.pass(ctx); err != nil {
 		t.Fatal(err)
 	}
 	ds := r.nudges(twBruno)
-	if len(ds) != 1 || focus() != task.FocusOn {
+	if len(ds) != 1 || focus() != "on" {
 		t.Fatalf("a stale wait: %d nudges, focus %q; want one held nudge and the star", len(ds), focus())
 	}
 	r.now = r.now.Add(time.Hour)
 	if err := p.pass(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if focus() != task.FocusOn {
+	if focus() != "on" {
 		t.Fatalf("the star went while the nudge is held")
 	}
 	if err := approveDraft(ctx, r.svc, ds[0].ID); err != nil {

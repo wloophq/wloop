@@ -1,7 +1,6 @@
 package daemon
 
 import (
-	"cmp"
 	"encoding/json"
 	"flag"
 	"os"
@@ -10,7 +9,6 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/keys"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 )
@@ -26,10 +24,7 @@ const webKeysFixture = "../web/testdata/keys.web.json"
 func TestTheWebKeysFixtureIsWhatTheDaemonServes(t *testing.T) {
 	s := &Server{}
 	l := s.loaded()
-	var views []api.TaskViewSpec
-	for _, v := range builtin.Views {
-		views = append(views, api.TaskViewSpec{ID: v, Label: cmp.Or(l.Lists.Views[v], v), Key: l.Lists.Keys[v]})
-	}
+	views := s.servedViews()
 	var plugins []api.Plugin
 	for _, p := range []struct {
 		id   unit.ProviderID
@@ -38,7 +33,7 @@ func TestTheWebKeysFixtureIsWhatTheDaemonServes(t *testing.T) {
 		plugins = append(plugins, api.Plugin{ID: p.id, Name: p.name, Enabled: true, UI: psource.BundledCatalog(string(p.id)).PluginUI()})
 	}
 	got, err := json.MarshalIndent(api.KeysResponse{Bindings: keyViews(keys.Web, views, plugins, s.servedSpecs(), catalog.PlanSpecs(l),
-		coreWords{l.Keys, l.Lists, l.Tasks})}, "", "  ")
+		coreWords{l.Keys, l.Tasks})}, "", "  ")
 	if err != nil {
 		t.Fatal(err)
 	}

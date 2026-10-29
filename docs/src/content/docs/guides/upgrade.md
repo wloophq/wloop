@@ -56,6 +56,8 @@ The words for tasks have new names in the profile and the configuration. Each ol
 - the workflow `entry-results-ended` is `task-results-ended`: rename an override directory of the old name in your profile, and a `[workflows.entry-results-ended]` block of `config.toml`;
 - `profile schema --gtd` is `--tasks`, `--views` or `--gates`.
 
+The lists are the views of `views.toml`, each with its own condition (`when`). Next is gone: your next actions are in Needs me, beside the open gates of your tasks, and a sequential project's next action comes first there. A `[views.next]` of your `views.toml` declares a view of your own, which lists nothing until you give it a `when`. The review's projects step walks the view `review-projects`: a `[review.projects]` fails to load, naming it. The badge counts Inbox and Needs me, where it counted Inbox and the Outbox. The bundled `tasks.toml` gives the properties `area`, `contexts`, `focus` and `due` the roles `area`, `contexts`, `star` and `deadline`, and its `dismiss`, `done` and `reference` verbs the handlers `drop` and `finish`.
+
 Each plugin's settings live in its `[plugins.<id>]` table, and each old key fails at load naming its new one:
 
 - `[github]` is `[plugins.github]` and `[slack]` is `[plugins.slack]`, key for key;

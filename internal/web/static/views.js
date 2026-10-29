@@ -4,7 +4,7 @@
 // views; REVIEW_TITLE is its title.
 const REVIEW = "review";
 const REVIEW_TITLE = "Review";
-const tasksState = { catalog: null, catalogError: "", key: "", page: null, tasks: [], gates: [], counters: null, filtered: null, filterSeq: 0, error: "" };
+const tasksState = { catalog: null, catalogError: "", key: "", page: null, tasks: [], gates: [], loading: [], counters: null, filtered: null, filterSeq: 0, error: "" };
 
 function coreViews(cat = tasksState.catalog) {
   return (cat && cat.views) || [];
@@ -143,6 +143,7 @@ function applyTasksPage(key, page) {
     if (page.gates) tasksState.gates = page.gates;
   }
   tasksState.key = key;
+  tasksState.loading = page.loading || [];
   tasksState.page = { epoch: page.epoch || "", rev: page.rev || 0 };
   if (page.counters) tasksState.counters = page.counters;
 }
@@ -230,10 +231,26 @@ function shortDate(t) {
   return isNaN(d) ? "" : d.toISOString().slice(0, 10);
 }
 
+// roleProp is the catalog's property the role acts on (area, contexts, star, deadline); null when none does.
+function roleProp(role, cat = tasksState.catalog) {
+  return ((cat && cat.props) || []).find((p) => p.role === role) || null;
+}
+
+// roleValue is e's value of the property the role acts on; undefined when none does.
+function roleValue(e, role) {
+  const p = roleProp(role);
+  return p ? (e.props || {})[p.name] : undefined;
+}
+
+// starred says whether e holds the first value, starred, of the property the star role acts on.
+function starred(e) {
+  const p = roleProp("star");
+  return !!p && (p.values || []).length > 0 && (e.props || {})[p.name] === p.values[0];
+}
+
 function taskItem(e, open) {
   const go = () => writeHash({ task: e.id, pr: "" });
   const owed = e.owed_by && e.owed_by !== "me" ? e.owed_by : "";
-  const props = e.props || {};
   return h("li", {
     class: "task-row" + (e.id === open ? " sel" : "") + (e.changed ? " changed" : ""),
     tabindex: 0,
@@ -248,13 +265,13 @@ function taskItem(e, open) {
     },
   },
     h("div", { class: "task-line" },
-      props.focus === "on" ? h("span", { class: "star", title: "Starred" }, "★") : null,
+      starred(e) ? h("span", { class: "star", title: "Starred" }, "★") : null,
       h("span", { class: "title" }, e.title || e.id),
       e.changed ? h("span", { class: "flag" }, "changed") : null),
     h("div", { class: "meta" },
-      ...(props.contexts || []).map((c) => h("span", { class: "pill" }, c)),
-      props.area ? h("span", { class: "pill area" }, props.area) : null,
-      props.due ? h("span", { class: "due" }, "due " + shortDate(props.due)) : null,
+      ...(roleValue(e, "contexts") || []).map((c) => h("span", { class: "pill" }, c)),
+      roleValue(e, "area") ? h("span", { class: "pill area" }, roleValue(e, "area")) : null,
+      roleValue(e, "deadline") ? h("span", { class: "due" }, "due " + shortDate(roleValue(e, "deadline"))) : null,
       e.wake && e.wake.until ? h("span", { class: "due" }, "until " + shortDate(e.wake.until)) : null,
       owed ? h("span", { class: "who" }, "on " + owed) : null,
       ...(e.units || []).map((u, i) => h("span", { class: "ref" }, (e.unit_labels || [])[i] || unitLabel(u)))),
@@ -396,6 +413,7 @@ function taskList(route, open) {
   const parts = [h("div", { class: "tools tasks-tools" }, h("h2", { class: "tasks-head" }, label), areaPicker(route), contextChips(route),
     loaded ? h("span", { class: "lens-count" }, `${shown.length} of ${tasksState.tasks.length}`) : null)];
   if (tasksState.error) parts.push(h("p", { class: "plan-error" }, tasksState.error));
+  if (loaded) parts.push(...loadingNotes(tasksState.loading));
   if (!loaded) {
     parts.push(h("p", { class: "empty" }, "Loading."));
     return parts;
@@ -418,6 +436,12 @@ function taskList(route, open) {
     parts.push(h("ol", { class: "task-list" }, ...g.tasks.map((e) => listItem(e, open))));
   }
   return parts;
+}
+
+// loadingNotes say which plugins have not reported all their units yet, and why, so a short list reads as
+// incomplete rather than empty.
+function loadingNotes(loading) {
+  return (loading || []).map((l) => h("p", { class: "loading", "data-plugin": l.plugin }, `Loading ${l.plugin}${l.reason ? ": " + l.reason : ""}`));
 }
 
 // viewLabel is the profile's word for a core view.

@@ -73,14 +73,6 @@ func ProjectsOf(all []Task) map[ID]ProjectStatus {
 	return out
 }
 
-// NeedsReview says whether the Review lists project p: open, and due or, unless in Someday, without a next action.
-func NeedsReview(p Task, st ProjectStatus, now time.Time) bool {
-	if !p.IsProject() || !p.Open() {
-		return false
-	}
-	return p.ReviewDue(now) || (st.Next == "" && !inSomeday(p))
-}
-
 // Place puts e among its project's other actions at position pos (1 first; past the end, last) and numbers
 // them all from 1 in that order.
 func Place(others []Task, e Task, pos int) []Task {

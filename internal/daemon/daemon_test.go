@@ -69,7 +69,8 @@ func waitFor(t *testing.T, cond func() bool) {
 }
 
 // runServer runs s until t ends; stop cancels the run and returns its error,
-// once however often it is called.
+// once however often it is called. The cleanup also waits for the jobs Run
+// left running, before the stores they read close.
 func runServer(t *testing.T, s *Server) (stop func() error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
@@ -78,7 +79,10 @@ func runServer(t *testing.T, s *Server) (stop func() error) {
 		cancel()
 		return <-done
 	})
-	t.Cleanup(func() { stop() })
+	t.Cleanup(func() {
+		stop()
+		s.Wait()
+	})
 	return stop
 }
 
@@ -187,16 +191,19 @@ func TestShutdownDoesNotWaitForeverOnAStuckJob(t *testing.T) {
 	t.Parallel()
 	d := testDeps(t)
 	release := make(chan struct{})
-	t.Cleanup(func() { close(release) })
+	var swept atomic.Bool
 	started := make(chan struct{}, 1)
 	d.Sweep = SweepFunc(func(context.Context) (string, string, error) {
 		started <- struct{}{}
 		<-release
+		swept.Store(true)
 		return "", "", nil
 	})
 	s := New(d)
 	s.grace = 100 * time.Millisecond
 	stop := runServer(t, s)
+	unstick := sync.OnceFunc(func() { close(release) })
+	t.Cleanup(unstick)
 	<-started
 	stopped := make(chan struct{})
 	go func() { stop(); close(stopped) }()
@@ -207,6 +214,11 @@ func TestShutdownDoesNotWaitForeverOnAStuckJob(t *testing.T) {
 	}
 	if _, err := os.Stat(d.Socket); !os.IsNotExist(err) {
 		t.Fatalf("socket left behind: %v", err)
+	}
+	unstick()
+	s.Wait()
+	if !swept.Load() {
+		t.Fatal("Wait returned while a job Run left running still ran")
 	}
 }
 
@@ -749,6 +761,7 @@ func TestUserAPIServesWhenTheReconcileRunsLong(t *testing.T) {
 			close(release)
 		}
 		<-done
+		s.Wait()
 	})
 	waitFor(t, func() bool { _, err := os.Stat(d.InfoPath); return err == nil })
 	req, _ := http.NewRequest(http.MethodGet, "http://daemon/api/rows", nil)
@@ -822,6 +835,7 @@ func TestRowFeedStartsWhenTheUserAPIOpens(t *testing.T) {
 		cancel()
 		close(release)
 		<-done
+		s.Wait()
 	})
 	<-s.reconcile.ready
 	waitFor(t, func() bool { return s.hub.position() != (api.Since{}) })

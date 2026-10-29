@@ -117,31 +117,29 @@ const (
 	VerbReply     Verb = "reply" // a draft the user writes on the entry's unit, served by the daemon
 )
 
+// View is a view's id, as the profile's views.toml names it.
 type View string
 
+// What a view lists: the stored tasks, or the gates.
 const (
-	ViewFocus    View = "focus"
-	ViewInbox    View = "inbox"
-	ViewOutbox   View = "outbox"
-	ViewNext     View = "next"
-	ViewWaiting  View = "waiting"
-	ViewProjects View = "projects"
-	ViewSomeday  View = "someday"
-	ViewLogbook  View = "logbook"
-	ViewReview   View = "review"
+	OverTasks = "tasks"
+	OverGates = "gates"
 )
 
-// Query selects a view's entries; contexts AND; Area ignored for Inbox.
+// Query selects a view's tasks, narrowed to the tasks whose area is Area and that hold every one of Contexts. A
+// store reads All only: every task when true, else the open ones (neither done nor dropped).
 type Query struct {
 	View     View
 	Area     string
 	Contexts []string
+	All      bool
 }
 
+// Counters are the counts of the profile's views over Area ("" every area).
 type Counters struct {
-	Area     string         // "" all areas
-	Views    map[View]int   // every served View except review; Inbox ignores Area; Next counts the sequential rule
-	Areas    map[string]int // Next per area
-	Contexts map[string]int // Next per context, within Area
-	Badge    int            // Inbox + Outbox
+	Area     string
+	Views    map[View]int   // every view that lists something, narrowed to Area
+	Areas    map[string]int // the open tasks per area
+	Contexts map[string]int // the open tasks per context, within Area
+	Badge    int            // the sum of the views the profile's badge names
 }

@@ -141,7 +141,7 @@ func TestTasksCost(t *testing.T) {
 		t.Fatal(err)
 	}
 	full := time.Since(start)
-	open, _ := r.store.Tasks(ctx, task.Query{View: task.ViewOpen})
+	open, _ := r.store.Tasks(ctx, task.Query{})
 	r.clock.t = taskAt.Add(time.Minute)
 	start = time.Now()
 	if err := r.svc.Sync(ctx, all[:1]); err != nil {
@@ -149,27 +149,22 @@ func TestTasksCost(t *testing.T) {
 	}
 	one := time.Since(start)
 	start = time.Now()
-	next, err := r.store.Tasks(ctx, task.Query{View: task.ViewInbox})
+	next, err := r.store.Tasks(ctx, task.Query{All: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	list := time.Since(start)
 	start = time.Now()
-	p, err := r.store.TasksSince(ctx, task.Query{View: task.ViewInbox}, coretasks.Since{})
+	p, err := r.store.TasksSince(ctx, task.Query{}, coretasks.Since{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	page := time.Since(start)
 	start = time.Now()
-	if _, err := r.store.TasksSince(ctx, task.Query{View: task.ViewInbox}, coretasks.Since{Epoch: p.Epoch, Rev: p.Rev}); err != nil {
+	if _, err := r.store.TasksSince(ctx, task.Query{}, coretasks.Since{Epoch: p.Epoch, Rev: p.Rev}); err != nil {
 		t.Fatal(err)
 	}
 	delta := time.Since(start)
-	start = time.Now()
-	if _, err := r.store.Counts(ctx, ""); err != nil {
-		t.Fatal(err)
-	}
-	counts := time.Since(start)
-	t.Logf("%d units, %d open entries: first Sync of all %v, Sync of one unit %v, Inbox list (%d) %v, full page %v, empty delta %v, counts %v",
-		units, len(open), full, one, len(next), list, page, delta, counts)
+	t.Logf("%d units, %d open tasks: first Sync of all %v, Sync of one unit %v, every task (%d) %v, full page %v, empty delta %v",
+		units, len(open), full, one, len(next), list, page, delta)
 }

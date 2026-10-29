@@ -129,7 +129,7 @@ func decideDraft(ctx context.Context, c *client.Client, d api.Draft, st gate.Sta
 const (
 	handlerRetry = "retry"
 	handlerEdit  = "edit"
-	ownDismiss   = "dismiss"
+	ownDismiss   = "drop"
 )
 
 // draftVerb runs on draft id's Outbox task the verb of the profile that runs handler: a draft's delivery actions,

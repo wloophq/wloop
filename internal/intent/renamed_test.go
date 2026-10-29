@@ -105,12 +105,12 @@ func TestAUserGtdTomlNamesItsNewFiles(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "gtd.toml"), []byte("[views.next]\nlabel = \"Now\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	texts, _, problems := loadLists(userLayer(root), bundledDefault(t), nil)
+	texts, _, problems := loadViews(userLayer(root), bundledDefault(t), nil)
 	got := problems.Error()
 	if !strings.Contains(got, filepath.Join(root, "gtd.toml")) || !strings.Contains(got, "tasks.toml") || !strings.Contains(got, "views.toml") {
 		t.Fatal(got)
 	}
-	if texts.Views["next"] == "Now" {
+	if v, _ := texts.View("next"); v.Label == "Now" {
 		t.Error("gtd.toml was read")
 	}
 }

@@ -32,7 +32,7 @@ func (s *Server) registerMessages() {
 	if s.deps.Tasks == nil || s.deps.Messages == nil {
 		return
 	}
-	s.deps.Tasks.Register(task.OriginMessage, string(task.VerbDismiss), func(ctx context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
+	s.deps.Tasks.Register(task.OriginMessage, coretasks.HandlerDrop, func(ctx context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
 		var out strings.Builder
 		ok, err := s.resolveTaskGate(ctx, e, builtin.GateRefuses, req, &out)
 		switch {

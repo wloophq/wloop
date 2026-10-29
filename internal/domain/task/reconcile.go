@@ -16,7 +16,8 @@ const itemOpen items.State = "open"
 // a task already holds stays with that task, so a task the user merged keeps its items; one no task holds gets
 // a new task, DerivedID, in the first state of the category the item proposes (items.Item.Initial), else the
 // inbox for an item waiting on Me and the waiting category for one waiting on others. A new task takes the
-// item's contexts and deadline, and the kind f.Kind names, as the plugin writes them.
+// item's contexts and deadline in the properties of RoleContexts and RoleDeadline, and the kind f.Kind names, as the
+// plugin writes them.
 //
 // A derived task none of whose items calls for it any more is resolved into the done category. A task that
 // was clarified never returns to the inbox: an item that opens again on a done task moves it back into the
@@ -26,7 +27,7 @@ const itemOpen items.State = "open"
 //
 // Due: items.Item.Deadline in RFC 3339 is taken as is; "YYYY-MM-DD" is 18:00 in now's location that day;
 // anything else is none.
-func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st States, now time.Time) ([]Change, error) {
+func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st Profile, now time.Time) ([]Change, error) {
 	byID := map[ID]Task{}
 	holder := map[ItemRef]ID{}
 	var order []ID
@@ -101,14 +102,14 @@ func wants(f UnitFacts, it items.Item, me Me) (Category, bool) {
 	return start, ok
 }
 
-func newTask(id ID, f UnitFacts, it items.Item, initial Category, st States, now time.Time) (Task, error) {
+func newTask(id ID, f UnitFacts, it items.Item, initial Category, st Profile, now time.Time) (Task, error) {
 	e := Task{ID: id, Title: it.Summary, Items: []ItemRef{refOf(f, it)}, Units: unitsOf(f, it),
 		Origin: OriginDerived, Created: now, Updated: now}
 	if err := e.MoveTo(initial, st); err != nil {
 		return e, err
 	}
-	e.SetProp(PropDue, Value{Time: deadline([]items.Item{it}, now.Location())}, WriterPlugin, now)
-	e.SetProp(PropContexts, Value{List: slices.Clone(it.Contexts)}, WriterPlugin, now)
+	e.SetRole(st, RoleDeadline, Value{Time: deadline([]items.Item{it}, now.Location())}, WriterPlugin, now)
+	e.SetRole(st, RoleContexts, Value{List: slices.Clone(it.Contexts)}, WriterPlugin, now)
 	e.SetProp(PropKind, Value{Text: f.Kind}, WriterPlugin, now)
 	return e, nil
 }
@@ -116,7 +117,7 @@ func newTask(id ID, f UnitFacts, it items.Item, initial Category, st States, now
 // update refreshes what the items ws own of old, which holds them or is their derived task, and keeps what
 // the user set: old holds of f.Unit's items exactly ws, and keeps the others it held as Resolved. An item old does
 // not hold opened again: a done task moves back into the ready category, and any task is marked Changed.
-func update(old Task, f UnitFacts, ws []items.Item, st States, now time.Time) (Task, string, error) {
+func update(old Task, f UnitFacts, ws []items.Item, st Profile, now time.Time) (Task, string, error) {
 	e := old
 	e.Items = slices.DeleteFunc(slices.Clone(old.Items), func(r ItemRef) bool { return r.Unit == f.Unit })
 	reopened := false
@@ -138,8 +139,8 @@ func update(old Task, f UnitFacts, ws []items.Item, st States, now time.Time) (T
 	if old.Origin == OriginDerived && len(e.Items) == 1 {
 		e.Title = ws[0].Summary
 	}
-	if e.Written[PropDue].By != WriterPerson {
-		e.SetProp(PropDue, Value{Time: deadline(ws, now.Location())}, WriterPlugin, now)
+	if due, _ := st.PropOf(RoleDeadline); due != "" && e.Written[due].By != WriterPerson {
+		e.SetProp(due, Value{Time: deadline(ws, now.Location())}, WriterPlugin, now)
 	}
 	switch {
 	case !reopened || old.Category == CategoryDropped:

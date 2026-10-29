@@ -37,6 +37,7 @@ func (e *Env) newTasks(db *sqlite.DB, cfg config.Config, its coretasks.Items) *c
 			Disabled: off, States: profileStates{e},
 			Authority: catalog.Authority(e.loadedIntents), Gates: serviceTaskGates{e, db},
 			Wakes: db.Wakes(), Baseline: catalog.Baseline(e.loadedIntents, e.factsOfTask),
+			Views: lensViews(e.loadedIntents), ViewEval: e.lens().Eval, ViewSort: e.lens().Sort,
 			Activity: func(ctx context.Context, id task.ID) error {
 				return e.wakes.Event(ctx, id, wake.OnActivity, "")
 			}})
@@ -66,6 +67,10 @@ func (p profileStates) Move(verb string) ([]string, string, bool) {
 }
 
 func (p profileStates) Handler(verb string) string { return p.e.loadedIntents().Tasks.Handler(verb) }
+
+func (p profileStates) PropOf(r task.Role) (string, []string) {
+	return p.e.loadedIntents().Tasks.PropOf(r)
+}
 
 // Gate is the gate of gates.toml verb's gate names, with its kind and intents.
 func (p profileStates) Gate(verb string) (gate.Gate, bool) {
@@ -200,7 +205,7 @@ func syncUnits(ctx context.Context, tasks coretasks.Reader, ledger *coreitems.Le
 	for _, it := range open {
 		add(it.Unit)
 	}
-	live, err := tasks.Tasks(ctx, task.Query{View: task.ViewOpen})
+	live, err := tasks.Tasks(ctx, task.Query{})
 	if err != nil {
 		return nil, err
 	}

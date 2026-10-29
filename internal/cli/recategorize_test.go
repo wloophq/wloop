@@ -100,10 +100,6 @@ func TestAProfileChangingAStatesCategoryRecategorizesTasks(t *testing.T) {
 	if c := r.log.Since(from, port.TopicTasks); !slices.Equal(c.Units, []unit.Unit{pr, task.UnitOf("t-w")}) {
 		t.Errorf("noted %+v", c)
 	}
-	got, err := g.Tasks(ctx, task.Query{View: task.ViewNext})
-	if err != nil || len(got) != 2 {
-		t.Errorf("next lists %d tasks, %v", len(got), err)
-	}
 }
 
 func TestRemovingAStateTasksHoldIsAProblem(t *testing.T) {

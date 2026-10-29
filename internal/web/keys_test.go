@@ -679,26 +679,30 @@ func TestAPlanItemReadsAsItsServedLabel(t *testing.T) {
 }
 
 func TestLensViewsAndKeysComeFromTheCatalog(t *testing.T) {
-	lists, problems := intentload.BundledLists(os.DirFS("../../profiles/default"))
+	def, problems := intentload.BundledViews(os.DirFS("../../profiles/default"))
 	if len(problems) > 0 {
 		t.Fatal(problems)
 	}
+	labels, viewKeys := map[string]string{}, map[string]string{}
+	for _, v := range def.Views {
+		labels[v.ID], viewKeys[v.ID] = v.Label, v.Key
+	}
 	for _, b := range keys.Core {
-		if id, ok := strings.CutPrefix(b.Action, "nav:"); ok && lists.Views[id] != "" {
+		if id, ok := strings.CutPrefix(b.Action, "nav:"); ok && labels[id] != "" {
 			t.Errorf("the core binds %s to the view %s: a view's key is the catalog's", b.Key, id)
 		}
 	}
 	var fixture []string
 	for _, b := range webBindings(t) {
-		if id, ok := strings.CutPrefix(b.Action, "nav:"); ok && lists.Views[id] != "" {
-			if lists.Keys[id] != b.Key || lists.Views[id] != b.Help {
-				t.Errorf("the fixture binds %s to %s (%q); views.toml gives it %q (%q)", b.Key, id, b.Help, lists.Keys[id], lists.Views[id])
+		if id, ok := strings.CutPrefix(b.Action, "nav:"); ok && labels[id] != "" {
+			if viewKeys[id] != b.Key || labels[id] != b.Help {
+				t.Errorf("the fixture binds %s to %s (%q); views.toml gives it %q (%q)", b.Key, id, b.Help, viewKeys[id], labels[id])
 			}
 			fixture = append(fixture, id)
 		}
 	}
 	var keyed []string
-	for id, k := range lists.Keys {
+	for id, k := range viewKeys {
 		if k != "" {
 			keyed = append(keyed, id)
 		}

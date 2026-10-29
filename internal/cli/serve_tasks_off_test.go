@@ -35,7 +35,7 @@ func TestAPluginRefusedAtBuildCountsAsOff(t *testing.T) {
 	d := daemon.Deps{Plugins: []api.Plugin{{ID: unit.GitHub, Enabled: true}, {ID: "slack"}}}
 	d = te.Env.serveTasks(d, db, te.cfg, nil, t.Logf)
 	c, err := d.Tasks.Counts(ctx, "")
-	if err != nil || c.Views[task.ViewInbox] != 0 || c.Badge != 0 {
+	if err != nil || c.Views["inbox"] != 0 || c.Badge != 0 {
 		t.Fatalf("counts %+v %v", c, err)
 	}
 	if _, err := d.Tasks.Do(ctx, e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbNext}); !errors.Is(err, coretasks.ErrPluginDisabled) {

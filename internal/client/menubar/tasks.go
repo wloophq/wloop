@@ -7,36 +7,46 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
-	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// coreSections are the task views the menu lists first, in order.
-var coreSections = []struct {
-	view  task.View
-	label string
-}{{task.ViewFocus, "Focus"}, {task.ViewInbox, "Inbox"}, {task.ViewOutbox, "Outbox"}}
-
-// pullTasks reads each core view whole: a task's attention also moves
-// with its row's notice and its proposed draft, which no task write marks,
-// so a delta would miss it. The badge comes with the Inbox's page, so the
-// title and the Inbox agree.
+// pullTasks reads the catalog, then each view the profile's badge counts, whole: the menu lists those views
+// first, in the profile's order. A task's attention also moves with its row's notice and its proposed draft,
+// which no task write marks, so a delta would miss it. The badge comes with the first view's page.
 func (c *Controller) pullTasks(ctx context.Context) error {
-	for _, sec := range coreSections {
-		page, err := c.cfg.Daemon.TasksSince(ctx, client.TaskQuery{View: string(sec.view)}, api.Since{})
+	cat, err := c.cfg.Daemon.Views(ctx)
+	if err != nil {
+		return err
+	}
+	var views []api.TaskViewSpec
+	tasks := map[string][]api.TaskView{}
+	for _, v := range cat.Views {
+		if !v.Badge {
+			continue
+		}
+		page, err := c.cfg.Daemon.TasksSince(ctx, client.TaskQuery{View: v.ID}, api.Since{})
 		if err != nil {
 			return err
 		}
-		c.tasks[sec.view] = page.Tasks
-		if sec.view == task.ViewInbox {
+		if len(views) == 0 {
 			counters := page.Counters
 			c.counters = &counters
 		}
+		views, tasks[v.ID] = append(views, v), page.Tasks
 	}
+	c.taskViews, c.tasks = views, tasks
 	return nil
 }
 
-func (c *Controller) viewTasks(v task.View) []api.TaskView { return c.tasks[v] }
+func (c *Controller) viewTasks(v string) []api.TaskView { return c.tasks[v] }
+
+// firstView is the route of the first view the menu lists; the cockpit's own first view when it lists none.
+func (c *Controller) firstView() string {
+	if len(c.taskViews) == 0 {
+		return ""
+	}
+	return viewRoute(c.taskViews[0].ID)
+}
 
 func (c *Controller) title() string {
 	badge := 0
@@ -46,12 +56,12 @@ func (c *Controller) title() string {
 	return fmt.Sprintf("PR %d", badge)
 }
 
-func (c *Controller) taskSection(label string, view task.View) []MenuItem {
+func (c *Controller) taskSection(label string, view string) []MenuItem {
 	tasks := c.viewTasks(view)
 	items := []MenuItem{{Title: fmt.Sprintf("%s (%d)", label, len(tasks))}}
 	for i, e := range tasks {
 		if i == perSection {
-			items = append(items, MenuItem{Title: "more…", Enabled: true, Action: c.later(func(context.Context) error { return c.open("view=" + string(view)) })})
+			items = append(items, MenuItem{Title: "more…", Enabled: true, Action: c.later(func(context.Context) error { return c.open(viewRoute(view)) })})
 			break
 		}
 		items = append(items, MenuItem{Title: taskLabel(e), Enabled: true, Action: c.later(func(context.Context) error { return c.open(taskRoute(e.ID)) })})

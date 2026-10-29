@@ -21,7 +21,7 @@ const (
 	handlerApprove = "approve"
 	handlerEdit    = "edit"
 	handlerRetry   = "retry"
-	ownDismiss     = "dismiss"
+	ownDismiss     = "drop"
 )
 
 // handlerReply is the handler of the verb that writes a reply on the task's unit.

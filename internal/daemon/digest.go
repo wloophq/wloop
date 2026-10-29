@@ -3,14 +3,17 @@ package daemon
 import (
 	"fmt"
 	"net/http"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
-// handleDigest serves the daily digest of the query parameter day: the counters, and the tasks that moved
-// into Next or Waiting since the previous digest, at notifications.digest_at local time (midnight when off).
+// handleDigest serves the daily digest of the query parameter day: the counters, and the tasks of the views the
+// profile's badge counts that moved since the previous digest, at notifications.digest_at local time (midnight
+// when off).
 func (s *Server) handleDigest(w http.ResponseWriter, r *http.Request) {
 	g, ok := s.tasks(w)
 	if !ok {
@@ -28,26 +31,30 @@ func (s *Server) handleDigest(w http.ResponseWriter, r *http.Request) {
 	start := end.AddDate(0, 0, -1)
 	ctx := r.Context()
 	d := api.Digest{Day: day, Title: "Daily digest"}
-	for _, v := range []task.View{task.ViewNext, task.ViewWaiting} {
-		es, err := g.Tasks(ctx, task.Query{View: v})
-		if err != nil {
-			writeTasksError(w, err)
-			return
-		}
-		for _, e := range es {
-			if e.Updated.After(start) && !e.Updated.After(end) && s.unitsEnabled(e.Units) {
-				d.Tasks = append(d.Tasks, string(e.ID))
-			}
-		}
-	}
+	def := s.loaded().Views
+	var labels, counts []string
 	c, err := g.Counts(ctx, "")
 	if err != nil {
 		writeTasksError(w, err)
 		return
 	}
 	d.Counts = wireCounters(c)
-	d.Body = fmt.Sprintf("%d new in Next or Waiting · %d in Inbox · %d in Outbox · %d next · %d waiting", len(d.Tasks),
-		d.Counts.Views[string(task.ViewInbox)], d.Counts.Views[string(task.ViewOutbox)], d.Counts.Views[string(task.ViewNext)], d.Counts.Views[string(task.ViewWaiting)])
+	for _, id := range def.Badge {
+		v, _ := def.View(id)
+		labels = append(labels, v.Label)
+		counts = append(counts, fmt.Sprintf("%d in %s", d.Counts.Views[id], v.Label))
+		es, err := g.Tasks(ctx, task.Query{View: task.View(id)})
+		if err != nil {
+			writeTasksError(w, err)
+			return
+		}
+		for _, e := range es {
+			if e.Updated.After(start) && !e.Updated.After(end) && s.unitsEnabled(e.Units) && !slices.Contains(d.Tasks, string(e.ID)) {
+				d.Tasks = append(d.Tasks, string(e.ID))
+			}
+		}
+	}
+	d.Body = strings.Join(append([]string{fmt.Sprintf("%d new in %s", len(d.Tasks), strings.Join(labels, " or "))}, counts...), " · ")
 	writeJSON(w, d)
 }
 

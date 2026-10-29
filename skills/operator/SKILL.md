@@ -74,6 +74,20 @@ view, full values: `view, who it waits on, age, owner/repo#n, title, reason`
 
 Lead with `needs-me`, then `stalled`. Link every PR as a markdown link.
 
+The tasks have their own lists, the profile's views (`views.toml`), which the
+cockpit and the menu bar show:
+
+| View | Meaning |
+|---|---|
+| `inbox` | tasks nobody has clarified yet; once clarified a task never returns |
+| `needs-me` | the next step is the user's: an open gate (a question, a draft, a round), or their own action |
+| `waiting` | the next step is someone else's, grouped by who owes it |
+| `snoozed` | asleep until a date, an event or a condition |
+| `outbox` | drafts waiting on approval, and approved ones whose delivery is under way or failed |
+
+The menu bar's badge adds up the views the profile's `[badge]` names, Inbox
+and Needs me by default. A user's `views.toml` changes the bundled views or adds its own.
+
 ## Diagnosing
 
 - `{{command}} doctor` lists anything missing with the command that fixes it,

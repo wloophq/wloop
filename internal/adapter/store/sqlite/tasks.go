@@ -53,38 +53,17 @@ const (
 	changedSince = `rev > ?`
 	ofUnit       = `id IN (SELECT task_id FROM task_units WHERE provider = ? AND unit_key = ?
 		UNION SELECT task_id FROM task_items WHERE provider = ? AND unit_key = ?)`
-	isOpen    = `category NOT IN (?, ?)`
-	isSomeday = `category = ? AND NOT ` + hasWake
-	isStarred = `id IN (SELECT task_id FROM task_props WHERE name = ? AND json_extract(value, '$.text') = ?)`
-	// isProject holds a task whose kind property is task.KindProject.
-	isProject = `id IN (SELECT task_id FROM task_props WHERE name = 'kind' AND json_extract(value, '$.text') = 'project')`
+	isOpen = `category NOT IN (?, ?)`
 )
 
 func openArgs() []any { return []any{string(task.CategoryDone), string(task.CategoryDropped)} }
 
-// candidates is the SQL condition on tasks, with its arguments, that holds every task the view predicate of v may
-// select, and what the sequential rule of Next needs.
-func candidates(v task.View) (string, []any) {
-	switch v {
-	case task.ViewFocus:
-		return isStarred + ` AND ` + isOpen, append([]any{task.PropFocus, task.FocusOn}, openArgs()...)
-	case task.ViewInbox:
-		return `category = ?`, []any{string(task.CategoryInbox)}
-	case task.ViewWaiting:
-		return `category = ?`, []any{string(task.CategoryWaiting)}
-	case task.ViewSomeday:
-		return isSomeday, []any{string(task.CategoryDeferred)}
-	case task.ViewNext:
-		return `category = ? OR (parent != '' AND ` + isOpen + `) OR (sequential = 1 AND ` + isProject + `)`,
-			append([]any{string(task.CategoryReady)}, openArgs()...)
-	case task.ViewProjects:
-		return isProject + ` AND ` + isOpen, openArgs()
-	case task.ViewLogbook:
-		return `category = ?`, []any{string(task.CategoryDone)}
-	case task.ViewOpen:
-		return isOpen, openArgs()
+// selected is the SQL condition on tasks, with its arguments, of the tasks q selects: every one, or the open ones.
+func selected(q task.Query) (string, []any) {
+	if q.All {
+		return `1`, nil
 	}
-	return `0`, nil
+	return isOpen, openArgs()
 }
 
 func taskTime(s string) (time.Time, error) {
@@ -200,9 +179,9 @@ func loadTasks(ctx context.Context, q querier, where string, args ...any) ([]tas
 	return out, nil
 }
 
-func loadView(ctx context.Context, q querier, v task.View) ([]task.Task, error) {
-	where, args := candidates(v)
-	return loadTasks(ctx, q, where, args...)
+func loadSelected(ctx context.Context, tx querier, q task.Query) ([]task.Task, error) {
+	where, args := selected(q)
+	return loadTasks(ctx, tx, where, args...)
 }
 
 func eachRow(ctx context.Context, q querier, query string, args []any, fn func(*sql.Rows) error) error {
@@ -234,8 +213,8 @@ func readPosition(ctx context.Context, q querier) (epoch string, rev uint64, err
 func (s taskStore) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) {
 	var out []task.Task
 	err := s.db.Read(ctx, func(tx *sql.Tx) error {
-		all, err := loadView(ctx, tx, q.View)
-		out = task.Select(all, q)
+		var err error
+		out, err = loadSelected(ctx, tx, q)
 		return err
 	})
 	return out, err
@@ -248,36 +227,13 @@ func (s taskStore) TasksSince(ctx context.Context, q task.Query, since coretasks
 		if p.Epoch, p.Rev, err = readPosition(ctx, tx); err != nil {
 			return err
 		}
-		if p.Counters, err = countsTx(ctx, tx, q.Area); err != nil {
-			return err
-		}
 		if since.Epoch != p.Epoch || since.Rev > p.Rev {
 			p.Full = true
-			all, err := loadView(ctx, tx, q.View)
-			p.Tasks = task.Select(all, q)
+			p.Tasks, err = loadSelected(ctx, tx, q)
 			return err
 		}
-		all, err := loadView(ctx, tx, q.View)
-		if err != nil {
-			return err
-		}
-		changed, err := loadTasks(ctx, tx, changedSince, since.Rev)
-		if err != nil {
-			return err
-		}
-		held := map[task.ID]bool{}
-		for _, e := range all {
-			held[e.ID] = true
-		}
-		revs := map[task.ID]bool{}
-		for _, e := range changed {
-			revs[e.ID] = true
-			if !held[e.ID] {
-				all = append(all, e)
-			}
-		}
-		p.Tasks, p.Removed = coretasks.Delta(all, q, func(id task.ID) bool { return revs[id] })
-		return nil
+		p.Tasks, err = loadTasks(ctx, tx, changedSince, since.Rev)
+		return err
 	})
 	return p, err
 }
@@ -307,88 +263,6 @@ func (s taskStore) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error
 		return err
 	})
 	return out, err
-}
-
-func (s taskStore) Counts(ctx context.Context, area string) (task.Counters, error) {
-	var c task.Counters
-	err := s.db.Read(ctx, func(tx *sql.Tx) error {
-		var err error
-		c, err = countsTx(ctx, tx, area)
-		return err
-	})
-	return c, err
-}
-
-// nextIDs selects the tasks Next lists: of the ready category, and of a sequential project only its open action
-// with the lowest Position (then id), as task.Select does over the candidates of ViewNext. Its arguments are
-// nextArgs; area is each task's area property.
-const nextIDs = `WITH seq AS (SELECT id FROM tasks WHERE sequential = 1 AND ` + isProject + `),
-first AS (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY parent ORDER BY position, id) AS n
-	FROM tasks WHERE parent IN seq AND ` + isOpen + `) WHERE n = 1),
-areas AS (SELECT task_id, json_extract(value, '$.text') AS area FROM task_props WHERE name = ?),
-nxt AS (SELECT t.id, COALESCE(a.area, '') AS area FROM tasks t LEFT JOIN areas a ON a.task_id = t.id
-	WHERE t.category = ? AND (t.parent NOT IN seq OR t.id IN first)) `
-
-func nextArgs() []any {
-	return append(openArgs(), task.PropArea, string(task.CategoryReady))
-}
-
-const inArea = `(? = '' OR COALESCE(a.area, '') = ?)`
-
-// countsTx is task.CountsOf over the stored views, one query per map.
-func countsTx(ctx context.Context, tx *sql.Tx, area string) (task.Counters, error) {
-	c := task.Counters{Area: area, Views: map[task.View]int{task.ViewOutbox: 0}, Areas: map[string]int{}, Contexts: map[string]int{}}
-	var focus, inbox, next, waiting, projects, someday, logbook int
-	args := nextArgs()
-	args = append(args, task.PropFocus, task.FocusOn)
-	args = append(args, openArgs()...)
-	args = append(args, area, area, string(task.CategoryInbox), area, area, string(task.CategoryWaiting), area, area)
-	args = append(args, openArgs()...)
-	args = append(args, area, area, string(task.CategoryDeferred), area, area, string(task.CategoryDone), area, area)
-	if err := tx.QueryRowContext(ctx, nextIDs+`SELECT
-		COALESCE(SUM(t.`+isStarred+` AND t.`+isOpen+` AND `+inArea+`), 0),
-		COALESCE(SUM(t.category = ?), 0),
-		(SELECT COUNT(*) FROM nxt a WHERE `+inArea+`),
-		COALESCE(SUM(t.category = ? AND `+inArea+`), 0),
-		COALESCE(SUM(t.`+isProject+` AND t.`+isOpen+` AND `+inArea+`), 0),
-		COALESCE(SUM(t.category = ? AND NOT EXISTS (SELECT 1 FROM wakes w WHERE w.task_id = t.id) AND `+inArea+`), 0),
-		COALESCE(SUM(t.category = ? AND `+inArea+`), 0)
-		FROM tasks t LEFT JOIN areas a ON a.task_id = t.id`, args...).
-		Scan(&focus, &inbox, &next, &waiting, &projects, &someday, &logbook); err != nil {
-		return task.Counters{}, err
-	}
-	for v, n := range map[task.View]int{task.ViewFocus: focus, task.ViewInbox: inbox, task.ViewNext: next, task.ViewWaiting: waiting,
-		task.ViewProjects: projects, task.ViewSomeday: someday, task.ViewLogbook: logbook} {
-		c.Views[v] = n
-	}
-	err := eachRow(ctx, tx, nextIDs+`SELECT area, COUNT(*) FROM nxt WHERE area != '' GROUP BY area`, nextArgs(), func(r *sql.Rows) error {
-		var a string
-		var n int
-		if err := r.Scan(&a, &n); err != nil {
-			return err
-		}
-		c.Areas[a] = n
-		return nil
-	})
-	if err != nil {
-		return task.Counters{}, err
-	}
-	err = eachRow(ctx, tx, nextIDs+`SELECT j.value, COUNT(*) FROM nxt
-		JOIN task_props x ON x.task_id = nxt.id AND x.name = ?, json_each(x.value, '$.list') j
-		WHERE (? = '' OR nxt.area = ?) GROUP BY j.value`, append(nextArgs(), task.PropContexts, area, area), func(r *sql.Rows) error {
-		var cx string
-		var n int
-		if err := r.Scan(&cx, &n); err != nil {
-			return err
-		}
-		c.Contexts[cx] = n
-		return nil
-	})
-	if err != nil {
-		return task.Counters{}, err
-	}
-	c.Badge = c.Views[task.ViewInbox] + c.Views[task.ViewOutbox]
-	return c, nil
 }
 
 func newEpoch() string {

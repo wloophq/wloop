@@ -109,7 +109,7 @@ func TestAWorkflowTriggersOnAResolvedStepGate(t *testing.T) {
 	if err != nil || len(gs) != 1 {
 		t.Fatalf("gates %+v %v", gs, err)
 	}
-	if e, _ := r.db.Tasks().Task(ctx, "t-01"); e.Starred() {
+	if e, _ := r.db.Tasks().Task(ctx, "t-01"); e.Prop("focus").Text == "on" {
 		t.Fatal("starred before the gate was resolved")
 	}
 	if err := svc.Resolve(ctx, gs[0].ID, gates.Resolution{Intent: "approve", By: task.ActorPerson}); err != nil {
@@ -120,7 +120,7 @@ func TestAWorkflowTriggersOnAResolvedStepGate(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if e, _ := r.db.Tasks().Task(ctx, "t-01"); !e.Starred() {
+	if e, _ := r.db.Tasks().Task(ctx, "t-01"); !(e.Prop("focus").Text == "on") {
 		evs, _ := r.db.Events().Since(ctx, 0, []string{gate.EventResolved})
 		t.Fatalf("the workflow on gate_resolved did not run; events %+v", evs)
 	}

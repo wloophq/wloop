@@ -129,7 +129,7 @@ description: The words the code, the configuration, the facts and these pages us
 - **Proposal rule**: a plugin's own rule that adds drafts on its own, hourly and on changes: GitHub's `github-nudge`. The Slack nudges, closures and owner questions come from the default workflows `slack-stalled-nudge`, `slack-closure` and `slack-ask-owner`.
 - **Focus**: the star on a task, and the view that lists starred tasks. A stale waiting task and a task past its deadline get it on their own.
 - **Context**: a label on a task such as `@decide`, from `tasks.contexts`.
-- **Area**: a part of your life or work, from `tasks.areas`. Switching area filters every view but the Inbox.
+- **Area**: a part of your life or work, from `tasks.areas`: the property of the area role. Switching area filters every view.
 - **Snooze**: scheduling a task until a date, until activity on one of its units, or both: a wake on the task.
 - **Wake**: a task's one wait for a time, an event or a condition over its facts; when it matches, the task gets a `task.woke` event, which the `task-wake` workflow reacts to.
 - **Changed**: the mark on a task that new activity by someone else, or an item that reopened, touched since you saw it; the task stays where it is. Opening or moving the task clears it.

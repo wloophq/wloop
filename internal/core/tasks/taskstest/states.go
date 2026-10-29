@@ -86,11 +86,29 @@ var handlers = []task.Verb{task.VerbWaiting, task.VerbSchedule, task.VerbWake, t
 // byWorkflow are the bundled verbs a workflow may run; a person may run every verb.
 var byWorkflow = []task.Verb{task.VerbDone, task.VerbDismiss, task.VerbNext, task.VerbWaiting, task.VerbSchedule, task.VerbWake, task.VerbFocus}
 
+// closing are the bundled verbs' handlers that are named otherwise: dismiss drops, done and reference finish.
+var closing = map[task.Verb]string{task.VerbDismiss: "drop", task.VerbDone: "finish", task.VerbReference: "finish"}
+
 func (bundledStates) Handler(verb string) string {
 	if slices.Contains(handlers, task.Verb(verb)) {
 		return verb
 	}
-	return ""
+	return closing[task.Verb(verb)]
+}
+
+// PropOf is the bundled property each role acts on.
+func (bundledStates) PropOf(r task.Role) (string, []string) {
+	switch r {
+	case task.RoleArea:
+		return "area", nil
+	case task.RoleContexts:
+		return "contexts", nil
+	case task.RoleStar:
+		return "focus", []string{"on", "off"}
+	case task.RoleDeadline:
+		return "due", nil
+	}
+	return "", nil
 }
 
 func (bundledStates) Gate(string) (gate.Gate, bool) { return gate.Gate{}, false }

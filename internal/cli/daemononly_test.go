@@ -74,6 +74,7 @@ func startDaemonOf(t *testing.T, te *testEnv) {
 		if err := <-done; err != nil {
 			t.Errorf("run: %v", err)
 		}
+		srv.Wait()
 	})
 	deadline := time.Now().Add(time.Minute)
 	for {
