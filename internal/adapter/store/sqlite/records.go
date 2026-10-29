@@ -165,7 +165,7 @@ func (db *DB) TasksHolding(ctx context.Context, u unit.Unit) ([]task.ID, error) 
 func (db *DB) ItemsHeld(ctx context.Context, u unit.Unit) (map[task.ID][]string, error) {
 	out := map[task.ID][]string{}
 	err := eachRow(ctx, db.R(), `SELECT task_id, '' FROM task_units WHERE provider = ?1 AND unit_key = ?2
-		UNION ALL SELECT task_id, item FROM task_items WHERE provider = ?1 AND unit_key = ?2 ORDER BY 1, 2`,
+		UNION ALL SELECT task_id, item FROM task_items WHERE provider = ?1 AND unit_key = ?2 AND resolved = 0 ORDER BY 1, 2`,
 		[]any{string(u.Provider), u.Key}, func(rows *sql.Rows) error {
 			var id, item string
 			if err := rows.Scan(&id, &item); err != nil {

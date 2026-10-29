@@ -443,8 +443,9 @@ func (p *Provider) linkOwes(e task.Task, us []unit.Unit, got map[unit.Unit][]ite
 
 // owed sets the facts e's owed_by makes over f, its other facts: task.owed_by, as the profile says;
 // task.owed_since, the oldest of the open items e holds waiting on whoever owes it, else for me its oldest
-// open gate, else e's creation; and task.check_on, its check_on property, else for someone else
-// StaleDays working days after owed_since.
+// open gate, else e's creation; and task.check_on, its check_on property, else, when what e holds waits on
+// someone else and not on me, StaleDays working days after the oldest of those items. The check date reads
+// the items alone, so a gate e's own nudge opens leaves it as it was.
 func (p *Provider) owed(ctx context.Context, e task.Task, f workflow.Facts) (workflow.Facts, error) {
 	if p.d.OwedBy == nil {
 		return f, nil
@@ -462,10 +463,17 @@ func (p *Provider) owed(ctx context.Context, e task.Task, f workflow.Facts) (wor
 		return nil, err
 	}
 	f["task.owed_since"] = since
+	links, _ := f["task.link_owes"].([]string)
 	s, now := p.settings(), p.d.Clock.Now()
-	if e.Prop(task.PropCheckOn).Time.IsZero() && who != "me" && s.StaleDays > 0 {
-		f["task.check_on"] = task.AddWorkdays(since, s.StaleDays, now.Location())
+	if !e.Prop(task.PropCheckOn).Time.IsZero() || s.StaleDays <= 0 || len(links) == 0 || slices.Contains(links, "me") {
+		return f, nil
 	}
+	if links[0] != who {
+		if since, err = p.owedSince(ctx, e, links[0]); err != nil {
+			return nil, err
+		}
+	}
+	f["task.check_on"] = task.AddWorkdays(since, s.StaleDays, now.Location())
 	return f, nil
 }
 

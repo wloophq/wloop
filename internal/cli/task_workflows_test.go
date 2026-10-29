@@ -10,6 +10,7 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -225,6 +226,9 @@ func TestAutofocusClearsTheStarsItSetWhoseReasonIsGone(t *testing.T) {
 	change("moved", func(e *task.Task) {
 		e.SetProp(task.PropDue, task.Value{Time: replayStart.AddDate(0, 0, 3)}, task.WriterPerson, r.now)
 	})
+	if _, err := r.db.Gates(func() time.Time { return r.now }).Open(ctx, gate.Gate{Task: task.DerivedID(twThread, "moved"), Unit: twThread, Kind: gate.KindQuestion, Name: "question", Subject: "q1"}); err != nil {
+		t.Fatal(err)
+	}
 	starred := func() int {
 		es, err := r.db.Tasks().Tasks(ctx, task.Query{View: task.ViewFocus})
 		if err != nil {

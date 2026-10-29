@@ -23,7 +23,7 @@ var (
 func Full(id task.ID) task.Task {
 	return task.Task{
 		ID: id, State: InState("scheduled"), Category: task.CategoryDeferred, Title: "Ana owes 2 items", Notes: "notes",
-		Items: []task.ItemRef{{Unit: pr, Item: "a"}, {Unit: other, Item: "b"}},
+		Items: []task.ItemRef{{Unit: pr, Item: "a"}, {Unit: other, Item: "b"}}, Resolved: []task.ItemRef{{Unit: pr, Item: "c"}},
 		Units: []unit.Unit{pr, other},
 		Props: task.Props{"focus": {Text: "on"}, "contexts": {List: []string{"@reply", "@decide"}}, "area": {Text: "OSS"},
 			"due": {Time: t0.Add(24 * time.Hour)}, "owner": {Actors: []items.Person{{Key: "github:ana", Name: "Ana", Aliases: []string{"email:ana@example.com"}}}},

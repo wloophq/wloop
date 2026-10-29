@@ -39,7 +39,7 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st States, now
 			continue
 		}
 		byID[e.ID], order = e, append(order, e.ID)
-		for _, r := range e.Items {
+		for _, r := range slices.Concat(e.Items, e.Resolved) {
 			if old, ok := holder[r]; !ok || !byID[old].Open() && e.Open() {
 				holder[r] = e.ID
 			}
@@ -76,7 +76,7 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st States, now
 		case ok:
 			e, why, err = update(old, f, ws, st, now)
 		case old.Origin == OriginDerived && slices.Contains(old.Units, f.Unit):
-			e.Items, why = nil, "no item calls for it"
+			e.Items, e.Resolved, why = nil, settle(old.Resolved, old.Items...), "no item calls for it"
 			if old.Open() {
 				op, why = OpResolve, "its items resolved"
 				err = e.MoveTo(CategoryDone, st)
@@ -125,14 +125,16 @@ func newTask(id ID, f UnitFacts, it items.Item, initial Category, st States, now
 }
 
 // update refreshes what the items ws own of old, which holds them or is their derived task, and keeps what
-// the user set: old holds of f.Unit's items exactly ws, so an item that resolves leaves it. An item old does
+// the user set: old holds of f.Unit's items exactly ws, and keeps the others it held as Resolved. An item old does
 // not hold opened again: a done task moves back into the ready category, and any task is marked Changed.
 func update(old Task, f UnitFacts, ws []items.Item, st States, now time.Time) (Task, string, error) {
 	e := old
 	e.Items = slices.DeleteFunc(slices.Clone(old.Items), func(r ItemRef) bool { return r.Unit == f.Unit })
 	reopened := false
+	var calling []ItemRef
 	for _, it := range ws {
 		r := refOf(f, it)
+		calling = append(calling, r)
 		if !slices.Contains(old.Items, r) {
 			reopened = true
 		}
@@ -141,6 +143,8 @@ func update(old Task, f UnitFacts, ws []items.Item, st States, now time.Time) (T
 		}
 		e.Units = mergeUnits(e.Units, unitsOf(f, it))
 	}
+	here := slices.DeleteFunc(slices.Clone(old.Items), func(r ItemRef) bool { return r.Unit != f.Unit })
+	e.Resolved = settle(slices.DeleteFunc(settle(old.Resolved, here...), func(r ItemRef) bool { return slices.Contains(calling, r) }))
 	sortRefs(e.Items)
 	if old.Origin == OriginDerived && len(e.Items) == 1 {
 		e.Title = ws[0].Summary
@@ -193,6 +197,21 @@ func mergeUnits(a, b []unit.Unit) []unit.Unit {
 		if !slices.Contains(out, u) {
 			out = append(out, u)
 		}
+	}
+	return out
+}
+
+// settle is resolved with refs added, each once and sorted.
+func settle(resolved []ItemRef, refs ...ItemRef) []ItemRef {
+	out := slices.Clone(resolved)
+	for _, r := range refs {
+		if !slices.Contains(out, r) {
+			out = append(out, r)
+		}
+	}
+	sortRefs(out)
+	if len(out) == 0 {
+		return nil
 	}
 	return out
 }

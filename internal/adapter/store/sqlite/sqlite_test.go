@@ -57,7 +57,7 @@ var golden = []string{
 	"slack_objects: object, conversation, ts, kind, version, latest_reply, reply_count, watched, reasons, last_activity_at, next_check_at, seen_at, admitted_at",
 	"slack_reactions: conversation, ts, name, user",
 	"slack_users: id, name, display_name, email, is_bot, deleted, fetched_at",
-	"task_items: task_id, provider, unit_key, item",
+	"task_items: task_id, provider, unit_key, item, resolved",
 	"task_position: only, epoch, rev",
 	"task_props: task_id, name, value, writer, at",
 	"task_units: task_id, provider, unit_key, ord",

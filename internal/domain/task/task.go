@@ -117,6 +117,11 @@ func (e Task) canonical() Task {
 	if len(c.Items) == 0 {
 		c.Items = nil
 	}
+	c.Resolved = slices.Clone(e.Resolved)
+	sortRefs(c.Resolved)
+	if len(c.Resolved) == 0 {
+		c.Resolved = nil
+	}
 	c.Units = slices.Clone(e.Units)
 	slices.SortFunc(c.Units, func(a, b unit.Unit) int { return cmp.Compare(a.String(), b.String()) })
 	if len(c.Units) == 0 {

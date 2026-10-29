@@ -267,6 +267,12 @@ func TestTheOwedFactsFollowWhoOwesTheTask(t *testing.T) {
 	if f := e.facts("e-02"); f["task.owed_by"] != "chat:U9" || !equal(f["task.check_on"], monday.Add(5*time.Hour)) || !equal(f["task.owed_since"], monday) {
 		t.Errorf("a task its owner owes: by %v, check on %v, since %v", f["task.owed_by"], f["task.check_on"], f["task.owed_since"])
 	}
+	if _, err := e.db.Gates(func() time.Time { return monday }).Open(context.Background(), gate.Gate{Task: "e-01", Unit: chatA, Kind: gate.KindDraft, Name: "draft", Subject: "1"}); err != nil {
+		t.Fatal(err)
+	}
+	if f := e.facts("e-01"); f["task.owed_by"] != "me" || !equal(f["task.check_on"], time.Date(2026, 3, 3, 9, 0, 0, 0, brt)) {
+		t.Errorf("with a gate open: owed by %v, check on %v; want me, the check date its items keep", f["task.owed_by"], f["task.check_on"])
+	}
 	mine := e.item(chatB, "i2", items.Open, friday, items.Person{Key: "chat:ME"})
 	e.task(task.Task{ID: "e-03", State: "next", Category: task.CategoryReady, Title: "m", Units: []unit.Unit{chatB}, Items: []task.ItemRef{{Unit: chatB, Item: mine.ID}}})
 	if f := e.facts("e-03"); f["task.owed_by"] != "me" || !equal(f["task.check_on"], time.Time{}) {

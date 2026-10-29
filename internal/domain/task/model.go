@@ -41,6 +41,9 @@ type Task struct {
 	Title    string
 	Notes    string
 	Items    []ItemRef
+	// Resolved are the items the task held that no longer call for it, such as one resolved: they keep the
+	// task as their holder, so an item that opens again comes back to it.
+	Resolved []ItemRef
 	Units    []unit.Unit // attached units; their cards render in the detail
 	// Props are the task's properties; Written says who wrote each, and when.
 	Props      Props

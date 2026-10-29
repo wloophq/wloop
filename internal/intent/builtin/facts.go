@@ -194,7 +194,7 @@ var otherFacts = []Fact{
 	untrusted(wf("task", "owed_by", expr.String, "Who owes the task's next step, as tasks.toml's owed_by says: me, a person's key, or empty when nobody does.")),
 	timeVarying(untrusted(wf("task", "owed_since", expr.Time, "Since when task.owed_by has owed the next step; zero when nobody does. Test with `> timestamp(0)`."))),
 	timeVarying(wf("task", "since_movement", expr.Duration, "Time since the task, or a unit linked to it, last moved: a state change, a source event, a run.")),
-	timeVarying(untrusted(wf("task", "check_on", expr.Time, "When to check on the task: its check_on property, else, for a task someone else owes, tasks.stale_waiting_days working days after task.owed_since; zero when neither. Test with `> timestamp(0)`."))),
+	timeVarying(untrusted(wf("task", "check_on", expr.Time, "When to check on the task: its check_on property, else, when the items it holds wait on someone else and not on you, tasks.stale_waiting_days working days after the oldest of them; zero when neither. Test with `> timestamp(0)`."))),
 	wf("task", "gates_open", expr.Int, "The task's open gates."),
 	wf("task", "runs_live", expr.Int, "The task's runs whose session is live."),
 	untrusted(wf("task", "wake_until", expr.Time, "When the task's wake wakes it; zero when it has none, or one that waits on events or a condition only. Test with `> timestamp(0)`.")),

@@ -138,15 +138,20 @@ func loadTasks(ctx context.Context, q querier, where string, args ...any) ([]tas
 		return out, err
 	}
 	sub := `(SELECT id FROM tasks WHERE ` + where + `)`
-	err = eachRow(ctx, q, `SELECT task_id, provider, unit_key, item FROM task_items WHERE task_id IN `+sub+
+	err = eachRow(ctx, q, `SELECT task_id, provider, unit_key, item, resolved FROM task_items WHERE task_id IN `+sub+
 		` ORDER BY task_id, provider, unit_key, item`, args, func(r *sql.Rows) error {
 		var id string
 		var ref task.ItemRef
-		if err := r.Scan(&id, &ref.Unit.Provider, &ref.Unit.Key, &ref.Item); err != nil {
+		var resolved bool
+		if err := r.Scan(&id, &ref.Unit.Provider, &ref.Unit.Key, &ref.Item, &resolved); err != nil {
 			return err
 		}
 		e := &out[at[task.ID(id)]]
-		e.Items = append(e.Items, ref)
+		if resolved {
+			e.Resolved = append(e.Resolved, ref)
+		} else {
+			e.Items = append(e.Items, ref)
+		}
 		return nil
 	})
 	if err != nil {
@@ -495,10 +500,15 @@ func writeTask(ctx context.Context, tx *Tx, e task.Task, rev uint64) error {
 		int64(e.ReviewEvery/time.Second), eventTime(e.ReviewedAt), rev); err != nil {
 		return err
 	}
-	for _, r := range e.Items {
-		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO task_items (task_id, provider, unit_key, item) VALUES (?, ?, ?, ?)`,
-			string(e.ID), string(r.Unit.Provider), r.Unit.Key, r.Item); err != nil {
-			return err
+	for _, rs := range []struct {
+		refs     []task.ItemRef
+		resolved bool
+	}{{e.Items, false}, {e.Resolved, true}} {
+		for _, r := range rs.refs {
+			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO task_items (task_id, provider, unit_key, item, resolved) VALUES (?, ?, ?, ?, ?)`,
+				string(e.ID), string(r.Unit.Provider), r.Unit.Key, r.Item, rs.resolved); err != nil {
+				return err
+			}
 		}
 	}
 	for i, u := range e.Units {

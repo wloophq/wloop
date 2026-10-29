@@ -24,6 +24,7 @@ func v7Rename(ctx context.Context, tx *sql.Tx) error {
 		`ALTER TABLE entries RENAME TO tasks`,
 		`ALTER TABLE entry_items RENAME TO task_items`,
 		`ALTER TABLE task_items RENAME COLUMN entry_id TO task_id`,
+		`ALTER TABLE task_items ADD COLUMN resolved INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE entry_units RENAME TO task_units`,
 		`ALTER TABLE task_units RENAME COLUMN entry_id TO task_id`,
 		`ALTER TABLE entry_contexts RENAME TO task_contexts`,

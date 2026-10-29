@@ -343,8 +343,19 @@ func TestAReopenedItemMarksChangedAndStaysOutOfTheInbox(t *testing.T) {
 	if got.Category != task.CategoryWaiting || !got.Changed || len(got.Items) != 2 {
 		t.Fatalf("an item reopened on a two-item task: %+v", got)
 	}
+	merged := []items.Item{item("a", owedBy(ana)), item("b", owedBy(ana))}
+	holder := only(t, reconcile(t, facts(), merged[:1], nil, now))
+	holder.Items = append(holder.Items, task.ItemRef{Unit: pr, Item: "b"})
+	tombstone := task.Task{ID: task.DerivedID(pr, "b"), State: "trash", Category: task.CategoryDropped, Units: []unit.Unit{pr}, Origin: task.OriginDerived}
+	resolved(&merged[1])
+	afterResolve := reconcile(t, facts(), merged, []task.Task{holder, tombstone}, now)
+	merged[1].State = "open"
+	cs := reconciled(t, facts(), merged, me, afterResolve, bundled, now.Add(time.Hour))
+	if len(cs) != 1 || cs[0].Task.ID != holder.ID || !cs[0].Task.Changed || cs[0].Task.Category != task.CategoryWaiting || len(cs[0].Task.Items) != 2 {
+		t.Fatalf("an item merged into a task, resolved then reopened: %+v", cs)
+	}
 	marked := done
-	marked.Items = []task.ItemRef{{Unit: pr, Item: "a"}}
+	marked.Items, marked.Resolved = []task.ItemRef{{Unit: pr, Item: "a"}}, nil
 	if cs := reconciled(t, facts(), its, me, []task.Task{marked}, bundled, now); len(cs) != 0 {
 		t.Fatalf("a task the user finished while its item is open came back: %+v", cs)
 	}
