@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	facttask "github.com/wloophq/wloop/internal/adapter/facts/task"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -302,13 +303,25 @@ func (c prCase) facts(t *testing.T, l *intentload.Loaded, row api.Row) workflow.
 	f := workflow.Facts{"task.category": string(c.category), "task.state": "", "task.gates_open": c.gates, "task.link_owes": c.owes,
 		"task.wake_until": time.Time{}, "task.wake_when": "", "task.check_on": time.Time{}, "task.since_movement": prNow.Sub(row.Summary.Since),
 		"task.runs_live": c.runs}
+	reported := []string{}
 	for _, name := range builtin.LinkSignals {
-		f[builtin.LinkSignalPrefix+name] = prrow.Signals(row)[name]
+		on, ok := prrow.Signals(row)[name]
+		f[builtin.LinkSignalPrefix+name] = on
+		if ok {
+			reported = append(reported, name)
+		}
 	}
+	f["task.link_signals"] = reported
 	who, err := catalog.OwedByOf(func() *intentload.Loaded { return l })(context.Background(), f)
 	if err != nil {
 		t.Fatal(err)
 	}
 	f["task.owed_by"] = who
+	if facttask.FallsBack(c.owes, reported, prStaleDays) && who != "" {
+		f["task.check_on"] = task.AddWorkdays(row.Summary.Since, prStaleDays, time.UTC)
+	}
 	return f
 }
+
+// prStaleDays is tasks.stale_waiting_days as the bundled configuration sets it.
+const prStaleDays = 2

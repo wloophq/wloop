@@ -273,6 +273,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.promised":            e.Prop("promised").Time,
 		"task.extraction_lag":      time.Duration(0),
 		"task.link_owes":           []string{},
+		"task.link_signals":        []string{},
 	}
 	for _, name := range builtin.LinkSignals {
 		f[builtin.LinkSignalPrefix+name] = false
@@ -366,10 +367,13 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 	return f, nil
 }
 
-// links sets task.link_signal.<name>, on when the signal is on for any of us, and task.since_movement, the time
+// links sets task.link_signal.<name>, on when the signal is on for any of us, task.link_signals, the declared
+// signals any of us reports, and task.since_movement, the time
 // since the newest of e's own last change and its units' last moves.
 func (p *Provider) links(ctx context.Context, e task.Task, us []unit.Unit, f workflow.Facts) error {
 	moved := e.Updated
+	reported := []string{}
+	defer func() { slices.Sort(reported); f["task.link_signals"] = reported }()
 	if p.d.Links != nil {
 		for _, u := range us {
 			l, err := p.d.Links(ctx, u)
@@ -377,8 +381,12 @@ func (p *Provider) links(ctx context.Context, e task.Task, us []unit.Unit, f wor
 				return err
 			}
 			for name, on := range l.Signals {
-				if _, declared := f[builtin.LinkSignalPrefix+name]; declared && on {
-					f[builtin.LinkSignalPrefix+name] = true
+				if _, declared := f[builtin.LinkSignalPrefix+name]; !declared {
+					continue
+				}
+				f[builtin.LinkSignalPrefix+name] = f[builtin.LinkSignalPrefix+name] == true || on
+				if !slices.Contains(reported, name) {
+					reported = append(reported, name)
 				}
 			}
 			if l.Moved.After(moved) {
@@ -574,8 +582,9 @@ func (p *Provider) owed(ctx context.Context, e task.Task, f workflow.Facts) (wor
 	}
 	f["task.owed_since"] = since
 	links, _ := f["task.link_owes"].([]string)
+	signals, _ := f["task.link_signals"].([]string)
 	s, now := p.settings(), p.d.Clock.Now()
-	if !e.Prop(task.PropCheckOn).Time.IsZero() || s.StaleDays <= 0 || len(links) == 0 || slices.Contains(links, "me") {
+	if !e.Prop(task.PropCheckOn).Time.IsZero() || !FallsBack(links, signals, s.StaleDays) {
 		return f, nil
 	}
 	if links[0] != who {
@@ -585,6 +594,13 @@ func (p *Provider) owed(ctx context.Context, e task.Task, f workflow.Facts) (wor
 	}
 	f["task.check_on"] = task.AddWorkdays(since, s.StaleDays, now.Location())
 	return f, nil
+}
+
+// FallsBack says whether a task with no check_on property takes the check date StaleDays working days after
+// what its links owe: they owe someone else and not the user, and no unit it links reports link signals, since a
+// source that does keeps its own staleness.
+func FallsBack(linkOwes, linkSignals []string, staleDays int) bool {
+	return staleDays > 0 && len(linkOwes) > 0 && !slices.Contains(linkOwes, "me") && len(linkSignals) == 0
 }
 
 func (p *Provider) owedSince(ctx context.Context, e task.Task, who string) (time.Time, error) {
