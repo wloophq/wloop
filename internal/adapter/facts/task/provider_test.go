@@ -59,6 +59,8 @@ type env struct {
 	repos    map[unit.Unit]string
 	sessions []turn.Session
 	links    map[unit.Unit]facttask.Link
+	// unextracted are when each unit's oldest message not yet extracted arrived.
+	unextracted map[unit.Unit]time.Time
 }
 
 func newEnv(t *testing.T) *env {
@@ -68,7 +70,8 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	e := &env{t: t, db: db, clock: &clock{now: monday}, s: facttask.Settings{StaleDays: 2, RenudgeAfter: 72 * time.Hour}, ended: map[unit.Unit]bool{}, turns: map[unit.Unit]int{}, repos: map[unit.Unit]string{}, links: map[unit.Unit]facttask.Link{}}
+	e := &env{t: t, db: db, clock: &clock{now: monday}, s: facttask.Settings{StaleDays: 2, RenudgeAfter: 72 * time.Hour}, ended: map[unit.Unit]bool{}, turns: map[unit.Unit]int{}, repos: map[unit.Unit]string{}, links: map[unit.Unit]facttask.Link{},
+		unextracted: map[unit.Unit]time.Time{}}
 	e.p = facttask.New(facttask.Deps{
 		Tasks: db.Tasks(), Items: db.Items(), Drafts: db.Drafts(),
 		Cards:    coretasks.CardFacts{Cards: db.Cards()},
@@ -86,6 +89,19 @@ func newEnv(t *testing.T) *env {
 		Wakes:    db.Wakes(),
 		Links: func(_ context.Context, u unit.Unit) (facttask.Link, error) {
 			return e.links[u], nil
+		},
+		Extraction: func(_ context.Context, us []unit.Unit) (time.Time, error) {
+			var oldest time.Time
+			for _, u := range us {
+				if at := e.unextracted[u]; !at.IsZero() && (oldest.IsZero() || at.Before(oldest)) {
+					oldest = at
+				}
+			}
+			return oldest, nil
+		},
+		RoleProp: func(r task.Role) string {
+			name, _ := bundledTasks.PropOf(r)
+			return name
 		},
 	})
 	return e

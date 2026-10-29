@@ -1,0 +1,14 @@
+summary = "When you say a task is not yours, propose a reply pointing the asker elsewhere, for you to edit and approve"
+provider = "task"
+when = 'trigger.event.kind == "verb_not-mine"'
+key = ["trigger.event.id"]
+order = 54
+
+[trigger]
+on = ["verb_not-mine"]
+actors = ["person"]
+
+[[step]]
+use = "draft.propose"
+purpose = "redirect"
+delivery = "message"

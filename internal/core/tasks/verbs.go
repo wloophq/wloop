@@ -24,6 +24,7 @@ const (
 	handlerWaiting  = "waiting"
 	handlerProject  = "project"
 	handlerWake     = "wake"
+	handlerPromise  = "promise"
 	// HandlerFinish and HandlerDrop are a move and nothing else, unless a kind registers its own handler of
 	// them.
 	HandlerFinish = "finish"
@@ -31,7 +32,7 @@ const (
 )
 
 var ownHandlers = []string{handlerSeen, handlerFocus, handlerContext, handlerArea, handlerSchedule, handlerWaiting, handlerProject, handlerWake,
-	HandlerFinish, HandlerDrop}
+	handlerPromise, HandlerFinish, HandlerDrop}
 
 // Accepts says whether actor a may run verb v on t as its move: ErrArgs for a verb the profile does not
 // declare, ErrVerb naming the verb and the state for one t's state refuses or one whose handler the service
@@ -138,6 +139,15 @@ func (s *Service) transition(e task.Task, req Request, cur wake.Wake, now time.T
 		if err := waitingArgs(&e, req, now); err != nil {
 			return task.Task{}, wakeChange{}, err
 		}
+	case handlerPromise:
+		if name, _ := s.d.States.PropOf(task.RolePromise); name == "" {
+			return task.Task{}, wakeChange{}, fmt.Errorf("%w: %s, and no property of tasks.toml takes the promise role", ErrVerb, req.Verb)
+		}
+		by, err := promiseArg(req.Args["by"], now)
+		if err != nil {
+			return task.Task{}, wakeChange{}, err
+		}
+		e.SetRole(s.d.States, task.RolePromise, task.Value{Time: by}, task.Writer(req.Actor), now)
 	case handlerWake:
 		if err := returnFrom(&e, cur, s.d.States); err != nil {
 			return task.Task{}, wakeChange{}, err
@@ -186,6 +196,24 @@ func parseDate(key, s string, now time.Time) (time.Time, error) {
 	t, ok := task.ParseDeadline(s, now.Location())
 	if !ok {
 		return time.Time{}, fmt.Errorf("%w: %s %q is neither RFC 3339 nor YYYY-MM-DD", ErrArgs, key, s)
+	}
+	return t, nil
+}
+
+// promiseArg is the time by names: HH:MM today, or tomorrow once that time passed; a deadline, as
+// task.ParseDeadline reads one; zero when by is empty.
+func promiseArg(by string, now time.Time) (time.Time, error) {
+	by = strings.TrimSpace(by)
+	if at, err := time.ParseInLocation("15:04", by, now.Location()); err == nil {
+		t := time.Date(now.Year(), now.Month(), now.Day(), at.Hour(), at.Minute(), 0, 0, now.Location())
+		if !t.After(now) {
+			t = t.AddDate(0, 0, 1)
+		}
+		return t, nil
+	}
+	t, err := parseDate("by", by, now)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("%w; or HH:MM", err)
 	}
 	return t, nil
 }

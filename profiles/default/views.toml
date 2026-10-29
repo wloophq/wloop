@@ -28,6 +28,33 @@ key   = "g w"
 when  = "task.category in ['ready', 'active', 'waiting'] && task.owed_by != 'me'"
 group = "task.owed_by"
 
+# Time to chase: someone else owes the next step, its check date passed,
+# and nothing moved on it since, by who owes it.
+[views.chase]
+label         = "Chase"
+key           = "g c"
+when          = "task.category in ['ready', 'active', 'waiting'] && task.owed_by != 'me' && task.owed_by != '' && !('stalled' in task.link_signals) && task.check_on > timestamp(0) && task.check_on < now && now - task.since_movement < task.check_on"
+group         = "task.owed_by"
+hide_disabled = true
+
+# What you can finish now: the next step is yours and its size, the
+# attention it takes, fits in the half hour you have.
+[views.fits-now]
+label         = "Fits now"
+key           = "g n"
+when          = "task.owed_by == 'me' && task.category in ['ready', 'active'] && task.prop.size > duration('0s') && task.prop.size <= duration('30m')"
+sort          = "task.prop.size"
+hide_disabled = true
+
+# Who is blocked by you: the tasks whose asks wait on you, by who asked.
+[views.blocked-by-me]
+label         = "Blocked by me"
+key           = "g b"
+when          = "task.owed_by == 'me' && size(task.askers) > 0 && !(task.category in ['deferred', 'done', 'dropped'])"
+group         = "task.askers"
+sort          = "-task.ask_age"
+hide_disabled = true
+
 # Waiting too long: a source says a link stalled, or, when no link's source
 # keeps its own staleness, the check date of a task someone else owes
 # passed with nothing moving since.

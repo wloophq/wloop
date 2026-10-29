@@ -156,6 +156,11 @@ type TaskView struct {
 	Props map[string]json.RawMessage `json:"props,omitempty"`
 	// OwedBy is who owes the task's next step, as the profile's owed_by says: "me" or a person's key.
 	OwedBy string `json:"owed_by,omitempty"`
+	// Askers are who waits on you through the task, by key: the requesters of its open asks to you.
+	Askers []string `json:"askers,omitempty"`
+	// ExtractionLag is how long the oldest message of its links has waited to be extracted, a Go duration;
+	// empty when none waits.
+	ExtractionLag string `json:"extraction_lag,omitempty"`
 	// Asks are the items the task holds, detail only.
 	Asks  []AskView   `json:"asks,omitempty"`
 	Gates []GateView  `json:"gates,omitempty"` // the open ones

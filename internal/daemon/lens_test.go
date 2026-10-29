@@ -11,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
@@ -53,7 +54,12 @@ func withLens(d coretasks.Deps, loaded func() *intentload.Loaded, facts func(con
 func lensFacts(db *sqlite.DB, loaded func() *intentload.Loaded, now time.Time) func(context.Context, task.Task) (workflow.Facts, error) {
 	p := facttask.New(facttask.Deps{Tasks: db.Tasks(), Items: db.Items(), Gates: db.Gates(func() time.Time { return now }), Wakes: db.Wakes(),
 		Clock: fixedClock(now), Me: func() task.Me { return meID }, OwedBy: catalog.OwedByOf(loaded),
-		Props: func(t task.Task) workflow.Facts { return catalog.PropFacts(t, loaded().Tasks) }})
+		Props:      func(t task.Task) workflow.Facts { return catalog.PropFacts(t, loaded().Tasks) },
+		Extraction: psource.NewSnapshots(db.Snapshots()).Unextracted,
+		RoleProp: func(r task.Role) string {
+			name, _ := loaded().Tasks.PropOf(r)
+			return name
+		}})
 	return func(ctx context.Context, t task.Task) (workflow.Facts, error) {
 		read := func() (workflow.Facts, error) { return p.TaskFacts(ctx, t) }
 		if pass, ok := coretasks.PassOf(ctx); ok {

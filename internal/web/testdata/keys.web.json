@@ -335,6 +335,27 @@
       "help": "Waiting"
     },
     {
+      "key": "g c",
+      "action": "nav:chase",
+      "context": "global",
+      "owner": "core",
+      "help": "Chase"
+    },
+    {
+      "key": "g n",
+      "action": "nav:fits-now",
+      "context": "global",
+      "owner": "core",
+      "help": "Fits now"
+    },
+    {
+      "key": "g b",
+      "action": "nav:blocked-by-me",
+      "context": "global",
+      "owner": "core",
+      "help": "Blocked by me"
+    },
+    {
       "key": "g t",
       "action": "nav:stalled",
       "context": "global",

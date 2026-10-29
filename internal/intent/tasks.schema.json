@@ -54,7 +54,8 @@
               "area",
               "contexts",
               "star",
-              "deadline"
+              "deadline",
+              "promise"
             ],
             "type": "string"
           },
@@ -133,7 +134,7 @@
     "verbs": {
       "additionalProperties": {
         "additionalProperties": false,
-        "description": "A verb, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
+        "description": "A verb, by its name: lowercase letters, digits and hyphens, starting with a letter. A user layer may set only some keys of an entry declared below it, and adds its own verbs, which record the event verb_<name>; a new entry sets the required ones.",
         "properties": {
           "by": {
             "additionalProperties": {
@@ -173,13 +174,14 @@
               "context",
               "area",
               "seen",
+              "promise",
               "reviewed",
               "sequential"
             ],
             "type": "string"
           },
           "input": {
-            "description": "The question a verb that asks for a value puts first (waiting, schedule, project, context, area, delegate, reply); required for those.",
+            "description": "The question a verb that asks for a value puts first; required for a verb whose handler asks for one (waiting, schedule, project, context, area, delegate, reply, promise).",
             "type": "string"
           },
           "label": {

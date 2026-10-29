@@ -59,7 +59,7 @@ const (
 
 // replyVerb is the profile's verb whose handler is reply, "" when none is.
 func (s *Server) replyVerb() string {
-	for _, v := range builtin.TaskVerbs {
+	for _, v := range s.verbOrder() {
 		if s.replies(task.Verb(v)) {
 			return v
 		}

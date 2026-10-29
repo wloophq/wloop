@@ -26,7 +26,7 @@ func (e *Env) wireSubjects(w *serveWiring) {
 		w.Engine.Subjects[task.Codec{}.Provider()] = p
 		e.wakeFacts = p.TaskFacts
 		if w.Deps != nil {
-			w.Deps.OwedBy = catalog.OwedBy(e.loadedIntents, p.BaseFacts)
+			w.Deps.Row = catalog.RowOf(e.lens().Facts)
 		}
 	}
 	for _, p := range e.sourcePlugins() {

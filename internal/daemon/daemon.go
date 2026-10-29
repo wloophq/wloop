@@ -36,6 +36,7 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/brief"
+	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/gates"
@@ -333,8 +334,9 @@ type Deps struct {
 	// Inbox messages, whose tasks' verbs it registers on Tasks.
 	Tasks    *coretasks.Service
 	Messages *messages.Service
-	// OwedBy is who owes a task's next step, as the profile says, for TaskView.OwedBy; nil leaves it empty.
-	OwedBy func(ctx context.Context, t task.Task) (string, error)
+	// Row is what a task's row shows of its facts: TaskView.OwedBy, Askers and ExtractionLag; nil leaves them
+	// empty.
+	Row func(ctx context.Context, t task.Task) (catalog.Row, error)
 	// Timeline reads a task's timeline; nil answers 503 to its route. TaskRecords are the records units
 	// keep, a task's brief among them; nil serves no Brief.
 	Timeline    timeline.Reader

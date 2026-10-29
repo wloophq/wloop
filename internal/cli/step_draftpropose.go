@@ -230,6 +230,15 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 		read.Slot = w.Slot
 		subject = &read
 	}
+	var facts workflow.Facts
+	if tmpl != nil {
+		switch facts, err = s.facts(ctx, c.u); {
+		case errors.Is(err, automation.ErrUnitGone):
+			facts = workflow.Facts{}
+		case err != nil:
+			return nil, err
+		}
+	}
 	var out []draftCandidate
 	for _, person := range sub.people(a.per) {
 		its := selectItems(sub, a.items, person, now, deps.Codecs)
@@ -268,7 +277,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			}
 		}
 		if cd.refusal == "" {
-			if cd.p.Text, err = renderDraft(tmpl, w.Name, sub, a, person, its); err != nil {
+			if cd.p.Text, err = renderDraft(tmpl, draftTextData{Workflow: w.Name, Purpose: a.purpose, Facts: facts}, sub, person, its); err != nil {
 				return nil, err
 			}
 		}
@@ -544,11 +553,13 @@ func draftFactsOf(sub draftSubject, person string, ids []string) workflow.Facts 
 }
 
 // draftTextData is what a draft's template reads: item text is data, never
-// template code.
+// template code. Facts are the step's subject's facts by name, none once
+// the subject is gone.
 type draftTextData struct {
 	Workflow, Purpose, Unit, Entry string
 	Person                         draftTextPerson
 	Items                          []draftTextItem
+	Facts                          workflow.Facts
 }
 
 type draftTextPerson struct{ Key, Name string }
@@ -576,11 +587,12 @@ func draftTemplate(cfg config.Config, workflowName, text string, d draft.Deliver
 	return t, nil
 }
 
-func renderDraft(t *template.Template, workflowName string, sub draftSubject, a draftArgs, person items.Person, its []items.Item) (string, error) {
+// renderDraft renders t over data, filled with sub's unit and entry, person and its items.
+func renderDraft(t *template.Template, data draftTextData, sub draftSubject, person items.Person, its []items.Item) (string, error) {
 	if t == nil {
 		return "", nil
 	}
-	data := draftTextData{Workflow: workflowName, Purpose: a.purpose, Unit: sub.unit.String(), Person: draftTextPerson{Key: person.Key, Name: person.Name}}
+	data.Unit, data.Person = sub.unit.String(), draftTextPerson{Key: person.Key, Name: person.Name}
 	if sub.task != nil {
 		data.Entry = string(sub.task.ID)
 	}

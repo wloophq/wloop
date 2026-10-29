@@ -27,9 +27,13 @@ func TestOwedByIsTheProfilesExpression(t *testing.T) {
 		"an item that waits on me": {workflow.Facts{"task.category": "inbox", "task.link_owes": []string{"slack:U0ANA", "me"}}, "me"},
 		"the items' owers":         {workflow.Facts{"task.category": "waiting", "task.link_owes": []string{"slack:U0ANA", "slack:U0BRUNO"}}, "slack:U0ANA"},
 		"the owner":                {workflow.Facts{"task.category": "waiting", "task.link_owes": []string{}, "task.prop.owner": "slack:U0BRUNO"}, "slack:U0BRUNO"},
-		"nobody named":             {workflow.Facts{"task.category": "ready", "task.link_owes": []string{}}, "me"},
-		"a done task":              {workflow.Facts{"task.category": "done", "task.link_owes": []string{"me"}}, ""},
-		"a done task's open gate":  {workflow.Facts{"task.category": "done", "task.gates_open": 1}, "me"},
+		"the owner a person handed it to, over an item that waits on me": {workflow.Facts{"task.category": "waiting", "task.link_owes": []string{"me"},
+			"task.prop.owner": "slack:U0BRUNO", "task.prop_by.owner": "person"}, "slack:U0BRUNO"},
+		"an owner no person set, under an item that waits on me": {workflow.Facts{"task.category": "waiting", "task.link_owes": []string{"me"},
+			"task.prop.owner": "slack:U0BRUNO", "task.prop_by.owner": "plugin"}, "me"},
+		"nobody named":            {workflow.Facts{"task.category": "ready", "task.link_owes": []string{}}, "me"},
+		"a done task":             {workflow.Facts{"task.category": "done", "task.link_owes": []string{"me"}}, ""},
+		"a done task's open gate": {workflow.Facts{"task.category": "done", "task.gates_open": 1}, "me"},
 	} {
 		if got, err := owed(ctx, c.f); err != nil || got != c.want {
 			t.Errorf("%s: owed by %q, %v; want %q", name, got, err, c.want)
@@ -47,10 +51,8 @@ func TestOwedByIsTheProfilesExpression(t *testing.T) {
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
-	byOwner := OwedBy(func() *intentload.Loaded { return mine }, func(context.Context, task.Task) (workflow.Facts, error) {
-		return workflow.Facts{"task.gates_open": 3, "task.prop.owner": "slack:U0CAIO"}, nil
-	})
-	if got, err := byOwner(ctx, task.Task{ID: "t-1"}); err != nil || got != "slack:U0CAIO" {
+	byOwner := OwedByOf(func() *intentload.Loaded { return mine })
+	if got, err := byOwner(ctx, workflow.Facts{"task.gates_open": 3, "task.prop.owner": "slack:U0CAIO"}); err != nil || got != "slack:U0CAIO" {
 		t.Errorf("a profile's own owed_by: %q, %v", got, err)
 	}
 	if _, err := expr.CompileString(`task.owed_by`, intentload.OwedByEnv(l.Tasks)); err == nil {

@@ -52,6 +52,12 @@ var handlerAsks = map[string]func(string) (map[string]string, bool){
 	},
 	"context": func(v string) (map[string]string, bool) { return map[string]string{"set": v}, true },
 	"area":    func(v string) (map[string]string, bool) { return map[string]string{"set": v}, true },
+	"promise": func(v string) (map[string]string, bool) {
+		if v == "" {
+			return nil, true
+		}
+		return map[string]string{"by": v}, true
+	},
 }
 
 // verbAsk is how verb turns the value it asks for into its arguments; ok is

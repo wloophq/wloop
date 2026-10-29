@@ -38,6 +38,18 @@ var bundledWords = sync.OnceValue(func() coreWords {
 	return coreWords{l.Keys, l.Tasks}
 })
 
+// verbOrder are the verbs of the profile as it loads now, in its order: the bundled ones, which a profile
+// that leaves one out falls back to, then its own.
+func (s *Server) verbOrder() []string {
+	out := slices.Clone(bundledWords().tasks.VerbOrder)
+	for _, v := range s.loaded().Tasks.VerbOrder {
+		if !slices.Contains(out, v) {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
 // isIntent tells an intent the registry offers or a user intent that failed
 // to load.
 func isIntent(l *intentload.Loaded, name string) bool {

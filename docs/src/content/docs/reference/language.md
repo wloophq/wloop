@@ -199,17 +199,17 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ## Tasks: properties, states and verbs (`tasks.toml`)
 
 - `verbs` (table): The verbs a task offers, by verb.
-- `verbs.<name>` (table): A verb, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
+- `verbs.<name>` (table): A verb, by its name: lowercase letters, digits and hyphens, starting with a letter. A user layer may set only some keys of an entry declared below it, and adds its own verbs, which record the event verb_&lt;name&gt;; a new entry sets the required ones.
 - `verbs.<name>.label` (string): The name people read on its button. Required.
 - `verbs.<name>.summary` (string): One line, what pressing it does: its tooltip. Required.
 - `verbs.<name>.offer` (predicate, default `true`): When a task offers the verb, over the task's own facts (task.id, task.prop.kind, task.state, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run.
-- `verbs.<name>.input` (string): The question a verb that asks for a value puts first (waiting, schedule, project, context, area, delegate, reply); required for those.
+- `verbs.<name>.input` (string): The question a verb that asks for a value puts first; required for a verb whose handler asks for one (waiting, schedule, project, context, area, delegate, reply, promise).
 - `verbs.<name>.from` (list of strings): The states the verb moves a task from, each a state of states; every state when absent.
 - `verbs.<name>.to` (string): The state the verb moves a task to, a state of states; absent, the verb moves none.
 - `verbs.<name>.by` (table by name): Who may run the verb, by actor (person, workflow, agent, plugin); an actor left out may not.
 - `verbs.<name>.by.<name>` (string): A predicate over the task's facts that lets the actor run the verb where it holds, or "gate", which opens the gate the verb's gate names, and a person's approval runs the verb as theirs; true lets the actor run it anywhere.
 - `verbs.<name>.gate` (string): The gate, of gates.toml, a by.&lt;actor&gt; of "gate" opens; required when one does.
-- `verbs.<name>.handler` (one of `finish`, `drop`, `focus`, `schedule`, `wake`, `waiting`, `approve`, `delegate`, `answer`, `edit`, `retry`, `reply`, `project`, `context`, `area`, `seen`, `reviewed`, `sequential`): What the verb runs besides its move, a handler of the loop's; none when absent.
+- `verbs.<name>.handler` (one of `finish`, `drop`, `focus`, `schedule`, `wake`, `waiting`, `approve`, `delegate`, `answer`, `edit`, `retry`, `reply`, `project`, `context`, `area`, `seen`, `promise`, `reviewed`, `sequential`): What the verb runs besides its move, a handler of the loop's; none when absent.
   - `finish`: Moves the task to the verb's to; a project's dossier starts its lifecycle.
   - `drop`: Moves the task to the verb's to; a kind another service serves drops its subject: a draft is discarded, a message's gate refused.
   - `focus`: Stars the task, or takes the star off: toggles the property of role star.
@@ -226,6 +226,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `context`: Sets the task's contexts: the property of role contexts.
   - `area`: Sets the task's area: the property of role area.
   - `seen`: Marks the task seen; clients send it when it opens.
+  - `promise`: Sets the property of role promise to the time its by names: HH:MM, today or tomorrow once that passed; YYYY-MM-DD, 18:00 that day; or an RFC 3339 time. An empty by clears it.
   - `reviewed`: Marks a parent task reviewed.
   - `sequential`: Switches a parent task's children between sequential and parallel.
 - `verbs.<name>.send` (one of `now`, `draft`, default `draft`): On a verb whose handler is reply: what a reply that names no send does. now sends it at once, as the person approving it; draft holds it on its gate for approval. The composer's Save as draft always holds it.
@@ -239,11 +240,12 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `agent`: An agent's turn; untrusted.
   - `plugin`: A source plugin; untrusted.
 - `props.<name>.doc` (string): What the property holds, for the facts' reference and the agents.
-- `props.<name>.role` (one of `area`, `contexts`, `star`, `deadline`): The mechanism of the loop that acts on the property; at most one property takes each role. Go names the role, never the property.
+- `props.<name>.role` (one of `area`, `contexts`, `star`, `deadline`, `promise`): The mechanism of the loop that acts on the property; at most one property takes each role. Go names the role, never the property.
   - `area`: A string: the area filter of the lists and the counters reads it, the area handler sets it, and a new parent takes it from the task it starts with.
   - `contexts`: A string[]: the contexts filter reads it, the context handler sets it, and a task takes it from the item or the request that opens it.
   - `star`: An enum: the star handler toggles it between its first value, starred, and its second.
   - `deadline`: A date: a task takes it from its items' deadline, and a draft's task from its gate's window.
+  - `promise`: A date: the promise handler sets it to the time you promise the task by, and task.promised reads it.
 - `states` (table by name): The states a task takes, by name, in the order the file declares them, a user layer's new ones after the bundled; clients list them in this order, and a task proposed in a category takes the first state of it.
 - `states.<name>` (table): A state, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `states.<name>.category` (one of `inbox`, `ready`, `active`, `waiting`, `deferred`, `done`, `dropped`): The state's category, which is all Go reads of it; required for a new state.
@@ -358,10 +360,10 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `answer.refuse`: Refuses a queued answer whose route is gone.
   - `session.mark_dormant`: Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it.
   - `turn.start`: Starts a turn of `intent` on the unit, which the intent must serve; `stage` (`first` or `follow-up`) for a review; `runner` (`session` or `headless`), by default the intent's first runner. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.per_day`.
-  - `draft.propose`: Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`unit` or `person`), `target` (`unit` or `item`), `effects` (the effects sending it applies), `repeat_after` (the least time after a settled draft of the same person, a duration or a duration of the config such as `config.drafts.repeat_after`) and `repeat_after_sent` (the same after a sent one, or `forever`). Holds while a draft of the workflow, unit and person is open or failed; a run that leaves a person under a delay that ends with time stays pending until it ends.
+  - `draft.propose`: Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Items`, `.Person` and `.Facts`, the subject's facts by name, such as `{{index .Facts "task.promised"}}`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`unit` or `person`), `target` (`unit` or `item`), `effects` (the effects sending it applies), `repeat_after` (the least time after a settled draft of the same person, a duration or a duration of the config such as `config.drafts.repeat_after`) and `repeat_after_sent` (the same after a sent one, or `forever`). Holds while a draft of the workflow, unit and person is open or failed; a run that leaves a person under a delay that ends with time stays pending until it ends.
   - `classify`: A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). Event triggers only, cached by fingerprint, under `classify.per_day`.
   - `notify.self`: A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts "pr.slug"}}`, none once the unit is gone).
-  - `task.verb`: Runs a verb on the task: `verb` (`next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done` or `dismiss`), with `until` and `on_activity` for schedule, `on` and `resurface` for waiting, and `set` for context and area. The plan blocks it while the task's state refuses the verb, and `done` and `dismiss` on a task derived from a unit's items, which closes when they resolve. It records no `verb_&lt;verb&gt;` event, which only a person's verb records, so a workflow never triggers another through it.
+  - `task.verb`: Runs a verb of tasks.toml on the task as the workflow: `verb`, one whose `by.workflow` lets a workflow run it, with the arguments its handler takes (`until` and `on_activity` for schedule, `on` and `resurface` for waiting, `set` for context and area, `by` for promise). The plan blocks it while the task's state or the verb's `by` refuses it, and a verb that closes a task derived from a unit's items, which closes when they resolve. It records the `verb_&lt;verb&gt;` event with the workflow as its actor and the chain it runs in, so another workflow may react to it within `trigger.depth`.
   - `gate.open`: Opens the gate `name` of gates.toml on the unit, a decision that waits for you with the intents gates.toml gives it.
   - `task.set`: Sets the task's property `prop` of tasks.toml to `value`, written by the workflow; a property the workflow may not write is refused.
 - `step[].<name>` (string or list): The step's arguments.
@@ -420,6 +422,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `on` (string): With a verb whose handler is waiting, the people the task waits on, comma-separated.
   - `resurface` (string): With a verb whose handler is waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD.
   - `set` (string): With a verb whose handler is context, the contexts, comma-separated; with area, the area.
+  - `by` (string): With a verb whose handler is promise, the time the task is promised by: HH:MM, YYYY-MM-DD or RFC 3339; empty clears it.
 - `gate.open`:
   - `name` (string): The gate, of gates.toml, the step opens. Required.
 - `task.set`:

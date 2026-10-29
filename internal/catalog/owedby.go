@@ -3,6 +3,7 @@ package catalog
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -27,15 +28,24 @@ func OwedByOf(loaded func() *intentload.Loaded) func(ctx context.Context, f work
 	}
 }
 
-// OwedBy is the core's tasks.OwedBy: OwedByOf over the facts facts reads of
-// a task, the task facts provider's.
-func OwedBy(loaded func() *intentload.Loaded, facts func(ctx context.Context, t task.Task) (workflow.Facts, error)) func(ctx context.Context, t task.Task) (string, error) {
-	of := OwedByOf(loaded)
-	return func(ctx context.Context, t task.Task) (string, error) {
+// Row is what a task's row shows of its facts: who owes its next step (task.owed_by), who waits on you through
+// it (task.askers) and how long its links' messages have waited to be extracted (task.extraction_lag).
+type Row struct {
+	OwedBy        string
+	Askers        []string
+	ExtractionLag time.Duration
+}
+
+// RowOf is the Row of a task over the facts facts reads of it, the task facts provider's.
+func RowOf(facts func(ctx context.Context, t task.Task) (workflow.Facts, error)) func(ctx context.Context, t task.Task) (Row, error) {
+	return func(ctx context.Context, t task.Task) (Row, error) {
 		f, err := facts(ctx, t)
 		if err != nil {
-			return "", err
+			return Row{}, err
 		}
-		return of(ctx, f)
+		owed, _ := f["task.owed_by"].(string)
+		askers, _ := f["task.askers"].([]string)
+		lag, _ := f["task.extraction_lag"].(time.Duration)
+		return Row{OwedBy: owed, Askers: askers, ExtractionLag: lag}, nil
 	}
 }

@@ -1,0 +1,9 @@
+summary = "Ask you to review the diff when a start turn on a task you captured opens a pull request"
+provider = "task"
+when = 'task.captured_by_user && task.turns > 0 && "github" in task.unit_providers && !(task.category in ["done", "dropped"])'
+key = ["task.units"]
+order = 56
+
+[[step]]
+use = "gate.open"
+name = "review-diff"
