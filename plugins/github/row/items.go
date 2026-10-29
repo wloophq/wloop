@@ -108,24 +108,24 @@ func (r Row) viewerItem() src.Item {
 
 // followItem waits on the viewer when the pull request needs them, such as
 // an agent waiting with no question the loop holds or a round its gate
-// holds; on whoever else it waits on; and on the loop otherwise, such as
-// while the loop works on it.
+// holds; on the loop while it works on it; otherwise on whoever else the
+// pull request waits on, and on nobody when that is no one, such as the
+// viewer's own draft.
 func (r Row) followItem() src.Item {
 	it := r.item(kindTodo, "", r.repoContext())
 	it.ID, it.Requester, it.Basis = ItemFollow, Person(r.Payload.Viewer), basisNone
-	on := []src.Person{r.loop()}
-	switch who := People(r.Situation.WaitingOn, r.Payload); {
+	viewer := Person(r.Payload.Viewer)
+	on := slices.DeleteFunc(People(r.Situation.WaitingOn, r.Payload), func(p src.Person) bool { return p.Key == viewer.Key })
+	switch {
 	case r.needsMe():
-		on = []src.Person{Person(r.Payload.Viewer)}
-	case r.Kind() != situation.KindLoopWorking && len(who) > 0 && !slices.ContainsFunc(who, r.isViewer):
-		on = who
+		on = []src.Person{viewer}
+	case r.Kind() == situation.KindLoopWorking:
+		on = []src.Person{r.loop()}
 	}
 	it.Assignees, it.WaitingOn = on, on
 	it.Summary = r.summary("Follow")
 	return it
 }
-
-func (r Row) isViewer(p src.Person) bool { return p.Key == Person(r.Payload.Viewer).Key }
 
 // othersItem is what the viewer waits for from someone else: the author's
 // fix after the viewer's review, or the reviewers on the viewer's own pull

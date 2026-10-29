@@ -514,3 +514,24 @@ func mustMarshal(t *testing.T, v any) []byte {
 	}
 	return raw
 }
+
+// TestOnlyARunningLoopOwesAPullRequest holds that an item waits on the loop only while the loop works on the
+// pull request: a quiet one waits on whoever it waits on, or on nobody.
+func TestOnlyARunningLoopOwesAPullRequest(t *testing.T) {
+	quiet := 0
+	for _, c := range ghsourcetest.Cases() {
+		working := kindOf(c.Row) == situation.KindLoopWorking
+		for _, it := range itemsOf(c.Row) {
+			loop := slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return strings.HasPrefix(p.Key, "system:") })
+			if loop != working {
+				t.Errorf("%s (%s): %s waits on %+v", c.Name, c.Row.Kind, it.ID, it.WaitingOn)
+			}
+			if it.ID == itemFollow && !working && !loop {
+				quiet++
+			}
+		}
+	}
+	if quiet == 0 {
+		t.Fatal("no quiet pull request compared")
+	}
+}

@@ -43,6 +43,9 @@ const (
 	PropCheckOn = "check_on"
 	// PropLastNudge is when a nudge last went to whoever owes the task; the task.nudged effect writes it.
 	PropLastNudge = "last_nudge"
+	// PropUnfollowed is when reconcile dropped a unit's own task because nobody followed the unit any more, so
+	// following it again brings the task back; a person's drop never sets it.
+	PropUnfollowed = "unfollowed"
 )
 
 // Role is a mechanism of the loop that reads or writes a task property: the profile's tasks.toml gives it to

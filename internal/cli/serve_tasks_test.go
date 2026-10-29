@@ -486,3 +486,31 @@ func TestUntrackingAPRDropsItsTask(t *testing.T) {
 		t.Fatalf("after untracking: %+v, want %s dropped", es, id)
 	}
 }
+
+func TestRefollowingAPRReopensItsTask(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	l := newPRLife(t)
+	s := ghsourcetest.Situation{PR: ghsourcetest.Open(903, ghsourcetest.Other)}
+	s.PR.Reasons, s.Override.Tracked = nil, true
+	_, es := l.derive(s)
+	id := es[0].ID
+	s.Override.Tracked = false
+	l.derive(s)
+	s.Override.Tracked = true
+	_, es = l.derive(s)
+	if len(es) != 1 || es[0].ID != id || !es[0].Open() || !es[0].Changed {
+		t.Fatalf("followed again: %+v, want %s open and changed", es, id)
+	}
+	e := es[0]
+	e.State, e.Category = "trash", task.CategoryDropped
+	if err := l.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e, Why: "dismissed"}}); err != nil {
+		t.Fatal(err)
+	}
+	s.Override.Tracked = false
+	l.derive(s)
+	s.Override.Tracked = true
+	if _, es = l.derive(s); len(es) != 1 || es[0].Category != task.CategoryDropped {
+		t.Fatalf("a task the person dropped while following: %+v, want it dropped", es)
+	}
+}

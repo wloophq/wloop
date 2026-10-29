@@ -12,13 +12,15 @@ import (
 // v7PullRequest is a pull request version 6 followed.
 type v7PullRequest struct {
 	key, title, state, created string
+	followed                   bool
 }
 
 // v7PRTasks makes every pull request version 6 followed one task, as reconcile keeps it from version 7 on:
 //   - the pull request's items carry its unit as their task key;
 //   - the tasks whose first unit is the pull request, or that hold one of its items, merge into one, an open
 //     one first, then one the loop derived, then the oldest; the others go, aliased to it;
-//   - a pull request no task holds gets one, open while the pull request is, done once it merged or closed;
+//   - an open pull request the loop follows (scope reasons, a review workspace, tracked or adopted) that no
+//     task holds gets one, waiting; a merged or closed one, or one nobody follows, gets none;
 //   - the pull request is the task's first unit, so its brief is the task's;
 //   - an open pull request's task in the inbox moves into the first ready state, as pr-task-clarify would;
 //   - an open plan gate on the pull request with no task, or on a closed task while the pull request's task is
@@ -29,11 +31,13 @@ func v7PRTasks(ctx context.Context, tx *sql.Tx) error {
 		return err
 	}
 	var prs []v7PullRequest
-	err := eachRow(ctx, tx, `SELECT owner || '/' || repo || '#' || number, title, state,
-			coalesce(nullif(created_at, ''), nullif(updated_at, ''), (SELECT min(created) FROM tasks), '1970-01-01T00:00:00.000000000Z')
-		FROM pull_requests ORDER BY owner, repo, number`, nil, func(r *sql.Rows) error {
+	err := eachRow(ctx, tx, `SELECT p.owner || '/' || p.repo || '#' || p.number, p.title, p.state,
+			coalesce(nullif(p.created_at, ''), nullif(p.updated_at, ''), (SELECT min(created) FROM tasks), '1970-01-01T00:00:00.000000000Z'),
+			p.reasons != '' OR p.ws_review != 0 OR EXISTS (SELECT 1 FROM overrides o WHERE o.provider = 'github'
+				AND o.unit_key = p.owner || '/' || p.repo || '#' || p.number AND (o.tracked != 0 OR o.taken_over != 0))
+		FROM pull_requests p ORDER BY p.owner, p.repo, p.number`, nil, func(r *sql.Rows) error {
 		var p v7PullRequest
-		if err := r.Scan(&p.key, &p.title, &p.state, &p.created); err != nil {
+		if err := r.Scan(&p.key, &p.title, &p.state, &p.created, &p.followed); err != nil {
 			return err
 		}
 		prs = append(prs, p)
@@ -68,6 +72,9 @@ func v7PRTask(ctx context.Context, tx *sql.Tx, p v7PullRequest) error {
 		return err
 	}
 	if len(holders) == 0 {
+		if p.state != "OPEN" || !p.followed {
+			return nil
+		}
 		id, err := v7NewPRTask(ctx, tx, p)
 		if err != nil {
 			return err
@@ -110,30 +117,30 @@ func v7PRTask(ctx context.Context, tx *sql.Tx, p v7PullRequest) error {
 }
 
 // v7FirstReady is the first state of the ready category version 6 knew, the one reconcile moves a task into.
-var v7FirstReady = func() string {
+var v7FirstReady = v7FirstOf("ready")
+
+// v7FirstOf is the first state of category c version 6 knew.
+func v7FirstOf(c string) string {
 	for _, s := range v6States {
-		if s.category == "ready" {
+		if s.category == c {
 			return s.state
 		}
 	}
 	return ""
-}()
+}
 
-// v7NewPRTask inserts the task of p, a pull request no task holds, under the id reconcile derives for its
-// unit's task key.
+// v7NewPRTask inserts the task of p, an open pull request the loop follows that no task holds, under the id
+// reconcile derives for its unit's task key. It waits: version 6 made a task of everything that waited on you,
+// so what is left asks nothing of you, and the first sync gives it its asks.
 func v7NewPRTask(ctx context.Context, tx *sql.Tx, p v7PullRequest) (string, error) {
 	sum := sha256.Sum256([]byte("action|github|" + p.key + "|github:" + p.key))
 	id := v7IDPrefix + hex.EncodeToString(sum[:])[:16]
-	state, category := v7FirstReady, "ready"
-	if p.state != "OPEN" {
-		state, category = "done", "done"
-	}
 	title := "Follow " + p.key
 	if p.title != "" {
 		title += ": " + p.title
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO tasks (id, state, category, title, origin, created, updated, rev)
-		VALUES (?1, ?2, ?3, ?4, 'derived', ?5, ?5, (SELECT coalesce(max(rev), 0) + 1 FROM tasks))`, id, state, category, title, p.created); err != nil {
+		VALUES (?1, ?2, 'waiting', ?3, 'derived', ?4, ?4, (SELECT coalesce(max(rev), 0) + 1 FROM tasks))`, id, v7FirstOf("waiting"), title, p.created); err != nil {
 		return "", err
 	}
 	return id, putV7Props(ctx, tx, []v7Prop{{id, "kind", map[string]string{"text": "pull-request"}, "plugin", p.created}})

@@ -1373,19 +1373,7 @@
             "key": "github:me-login",
             "name": "me-login"
           },
-          "assignees": [
-            {
-              "key": "system:the loop",
-              "name": "the loop"
-            }
-          ],
           "basis": "none",
-          "waiting_on": [
-            {
-              "key": "system:the loop",
-              "name": "the loop"
-            }
-          ],
           "state": "open",
           "confidence": "high",
           "provenance": "derived",

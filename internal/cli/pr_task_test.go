@@ -9,6 +9,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/core/automation"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -102,6 +103,9 @@ func (p *prTaskRig) item(t *testing.T, u unit.Unit, id string, initial items.Ini
 	it := items.Item{ID: id, Unit: u, Kind: items.Request, Summary: id + " " + u.Key, State: items.Open, Basis: items.NoBasis,
 		Requester: items.Person{Key: "github:ana"}, WaitingOn: []items.Person{on}, Initial: initial, Confidence: items.High,
 		Provenance: items.Derived, TaskKey: u.String(), Origin: unit.Anchor{Unit: u, Ref: "situation:x"}, CreatedAt: p.r.now}
+	if on.Key == "" {
+		it.WaitingOn, it.Requester = nil, ptMe
+	}
 	p.r.commit(it)
 	p.r.sync(u)
 	ts, err := p.r.db.Tasks().TasksOf(context.Background(), u)
@@ -183,5 +187,33 @@ func TestAMergedPRClosesItsTask(t *testing.T) {
 	}
 	if e := p.r.taskOf(linked.ID); !e.Open() {
 		t.Errorf("a task its open thread still holds closed with its pull request: %s", e.Category)
+	}
+}
+
+func TestAQuietPRIsOwedByNobody(t *testing.T) {
+	t.Parallel()
+	p := newPRTaskRig(t)
+	quiet := p.item(t, ptPR1, "gh:follow", "", items.Person{})
+	p.pass(t)
+	if e := p.r.taskOf(quiet.ID); e.Category != task.CategoryWaiting || p.owedBy(t, quiet.ID) != "" {
+		t.Fatalf("a followed pull request that waits on no one: %s owed by %q, want waiting and owed by nobody", e.Category, p.owedBy(t, quiet.ID))
+	}
+}
+
+// TestAGateOnAPRNoTaskHoldsLandsInNeedsMe opens the task a gate opens on a pull request no task holds, as
+// the gates service does: it takes the pull request's kind, so it is clarified out of the Inbox.
+func TestAGateOnAPRNoTaskHoldsLandsInNeedsMe(t *testing.T) {
+	t.Parallel()
+	p := newPRTaskRig(t)
+	e, err := p.r.te.tasks.Open(context.Background(), coretasks.OpenRequest{Title: "The run stopped", Unit: &ptPR1, Origin: task.OriginGate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e.Prop(task.PropKind).Text != "pull-request" {
+		t.Fatalf("the gate's task kind %+v", e.Prop(task.PropKind))
+	}
+	p.pass(t)
+	if got := p.r.taskOf(e.ID); got.Category != task.CategoryReady {
+		t.Fatalf("the gate's task is %s, want out of the Inbox", got.Category)
 	}
 }

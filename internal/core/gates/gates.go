@@ -73,6 +73,12 @@ type Tasks interface {
 	Open(ctx context.Context, r coretasks.OpenRequest) (task.Task, error)
 }
 
+// OwnTasks is optional on Tasks: the unit's own task, such as a pull request's, which a gate on the unit goes
+// to whatever its state, reopened when it is done, so the unit keeps one task.
+type OwnTasks interface {
+	ReopenOwn(ctx context.Context, u unit.Unit) (task.ID, bool, error)
+}
+
 // Events records the event a resolved step gate is, which workflows
 // trigger on.
 type Events interface {
@@ -416,8 +422,9 @@ func statusIntent(g gate.Gate, def Def, want gate.Status) (Intent, bool) {
 }
 
 // taskOf is the task holding u: u's own when it is a task, else the first
-// open task that holds it, else a new capture task named by the gate's
-// label: a gate on a done or dropped task would wait where no list shows it.
+// open task that holds it, else the unit's own task (OwnTasks), reopened
+// when done, else a new capture task named by the gate's label: a gate on a
+// done task would wait where no list shows it.
 func (s *Service) taskOf(ctx context.Context, u unit.Unit, def Def) (task.ID, error) {
 	if id, ok := task.IDOf(u); ok {
 		return id, nil
@@ -433,6 +440,12 @@ func (s *Service) taskOf(ctx context.Context, u unit.Unit, def Def) (task.ID, er
 		}
 		if i := slices.IndexFunc(ts, func(t task.Task) bool { return t.Category != task.CategoryDone && t.Category != task.CategoryDropped }); i >= 0 {
 			return ts[i].ID, nil
+		}
+		if own, ok := s.d.Tasks.(OwnTasks); ok {
+			id, found, err := own.ReopenOwn(ctx, u)
+			if err != nil || found {
+				return id, err
+			}
 		}
 		r.Unit = &u
 	}

@@ -24,7 +24,8 @@ const itemOpen items.State = "open"
 //
 // A derived task none of whose items calls for it any more is resolved into the done category, except the
 // task of a key that names f.Unit: the unit's one task lives as long as its unit, so it ends through the
-// profile, and is dropped once its card says the user no longer Cares about the unit. A task that was clarified never returns to
+// profile, and is dropped once its card says the user no longer Cares about the unit (PropUnfollowed), to come
+// back when they do again. An item of that key that waits on nobody keeps the task while f Cares. A task that was clarified never returns to
 // the inbox: an item that opens again on a done task moves it back into the ready category with Changed set,
 // and an open task keeps its state. A task the user dropped stays dropped.
 //
@@ -91,6 +92,7 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st Profile, no
 			if old.Open() && old.Origin == OriginDerived && f.Carded && !f.Cares {
 				op, why = OpResolve, "its unit is no longer followed"
 				err = e.MoveTo(CategoryDropped, st)
+				e.SetProp(PropUnfollowed, Value{Time: now}, WriterPlugin, now)
 			}
 		case old.Origin == OriginDerived && slices.Contains(old.Units, f.Unit) && len(old.Items)+len(old.Resolved) > 0:
 			e.Items, e.Resolved, why = nil, settle(old.Resolved, old.Items...), "no item calls for it"
@@ -142,16 +144,25 @@ func keyHolders(f UnitFacts, its []items.Item, holder map[ItemRef]ID, byID map[I
 	return out
 }
 
-// UnitTask is u's own task among ts: of the open tasks whose first unit is u, the one holding an item of u
-// first, then the oldest, then by id.
+// UnitTask is u's own task among ts, whatever its state: of the tasks whose first unit is u, an open one
+// first, the one holding an item of u, then the oldest, then by id; with none open, the one updated last.
 func UnitTask(ts []Task, u unit.Unit) (Task, bool) {
 	holds := func(e Task) bool { return slices.ContainsFunc(e.Items, func(r ItemRef) bool { return r.Unit == u }) }
+	better := func(e, than Task) bool {
+		if e.Open() != than.Open() {
+			return e.Open()
+		}
+		if !e.Open() {
+			return cmp.Or(than.Updated.Compare(e.Updated), strings.Compare(string(e.ID), string(than.ID))) < 0
+		}
+		return cmp.Or(compareBool(holds(than), holds(e)), e.Created.Compare(than.Created), strings.Compare(string(e.ID), string(than.ID))) < 0
+	}
 	var first *Task
 	for i, e := range ts {
-		if !e.Open() || len(e.Units) == 0 || e.Units[0] != u {
+		if len(e.Units) == 0 || e.Units[0] != u {
 			continue
 		}
-		if first == nil || cmp.Or(compareBool(holds(*first), holds(e)), e.Created.Compare(first.Created), strings.Compare(string(e.ID), string(first.ID))) < 0 {
+		if first == nil || better(e, *first) {
 			first = &ts[i]
 		}
 	}
@@ -189,7 +200,8 @@ func wants(f UnitFacts, it items.Item, me Me) (Category, bool) {
 	}
 	start, ok := CategoryInbox, true
 	if !slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return isMe(p, me) }) {
-		start, ok = CategoryWaiting, len(it.WaitingOn) > 0 && (isMe(it.Requester, me) || f.Cares)
+		own := it.TaskKey == f.Unit.String() && len(it.WaitingOn) == 0
+		start, ok = CategoryWaiting, (len(it.WaitingOn) > 0 || own) && (isMe(it.Requester, me) || f.Cares)
 	}
 	if it.Initial != "" {
 		start = Category(it.Initial)
@@ -215,7 +227,9 @@ func newTask(id ID, f UnitFacts, ws []items.Item, initial Category, st Profile, 
 
 // update refreshes what the items ws own of old, which holds them or is their derived task, and keeps what
 // the user set: old holds of f.Unit's items exactly ws, and keeps the others it held as Resolved. A task a gate
-// opened on the unit before its items came becomes the derived task of the unit's key. An item old does
+// opened on the unit before its items came becomes the derived task of the unit's key, and a unit's own task
+// reconcile dropped once nobody followed the unit comes back into the ready category, Changed, when it is
+// followed again. An item old does
 // not hold opened again: a done task moves back into the ready category, and any task is marked Changed.
 func update(old Task, f UnitFacts, ws []items.Item, st Profile, now time.Time) (Task, string, error) {
 	e := old
@@ -244,6 +258,15 @@ func update(old Task, f UnitFacts, ws []items.Item, st Profile, now time.Time) (
 	}
 	if due, _ := st.PropOf(RoleDeadline); due != "" && e.Written[due].By != WriterPerson {
 		e.SetProp(due, Value{Time: deadline(ws, now.Location())}, WriterPlugin, now)
+	}
+	refollowed := old.Category == CategoryDropped && !old.Prop(PropUnfollowed).Time.IsZero() && f.Cares
+	if refollowed {
+		e.SetProp(PropUnfollowed, Value{}, WriterPlugin, now)
+		if err := e.MoveTo(CategoryReady, st); err != nil {
+			return e, "", err
+		}
+		e.Changed = true
+		return e, "its unit is followed again", nil
 	}
 	switch {
 	case !reopened || old.Category == CategoryDropped:

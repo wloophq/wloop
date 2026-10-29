@@ -12,16 +12,20 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-const v6PRs = `INSERT INTO pull_requests (owner, repo, number, title, author, state, created_at) VALUES
-	('acme', 'api', 1, 'Fix the parser', 'ana', 'OPEN', '2026-09-20T09:00:00.000000000Z'),
-	('acme', 'api', 2, 'Drop the cache', 'ana', 'MERGED', '2026-09-21T09:00:00.000000000Z'),
-	('acme', 'api', 3, 'Add the export', 'bruno', 'OPEN', '2026-09-22T09:00:00.000000000Z'),
-	('acme', 'api', 4, 'Bump the linter', 'bruno', 'OPEN', '2026-09-23T09:00:00.000000000Z')`
+const v6PRs = `INSERT INTO pull_requests (owner, repo, number, title, author, state, created_at, reasons, ws_review) VALUES
+	('acme', 'api', 1, 'Fix the parser', 'ana', 'OPEN', '2026-09-20T09:00:00.000000000Z', 'involved', 0),
+	('acme', 'api', 2, 'Drop the cache', 'ana', 'MERGED', '2026-09-21T09:00:00.000000000Z', 'involved', 0),
+	('acme', 'api', 3, 'Add the export', 'bruno', 'OPEN', '2026-09-22T09:00:00.000000000Z', '', 1),
+	('acme', 'api', 4, 'Bump the linter', 'bruno', 'OPEN', '2026-09-23T09:00:00.000000000Z', '', 0),
+	('acme', 'api', 5, 'Read once in Explore', 'bruno', 'OPEN', '2026-09-24T09:00:00.000000000Z', '', 0)`
+
+// v6Tracked tracks acme/api#4 by hand.
+const v6Tracked = `INSERT INTO overrides (provider, unit_key, tracked) VALUES ('github', 'acme/api#4', 1)`
 
 func TestV7PRTasksMergesSeveralTasksOfOnePR(t *testing.T) {
 	t.Parallel()
 	review, merge, address, thread := "e-00000000000000c1", "e-00000000000000c2", "e-00000000000000c3", "e-00000000000000c4"
-	path := v6Store(t, v6PRs,
+	path := v6Store(t, v6PRs, v6Tracked,
 		`INSERT INTO pr_seen (owner, repo, number, at) VALUES ('acme', 'api', 1, '2026-10-20T09:00:00.000000000Z')`,
 		`INSERT INTO entries (id, kind, state, title, changed, origin, created, updated, rev) VALUES
 			('`+review+`', 'action', 'inbox', 'Review acme/api#1', 0, 'derived', '2026-10-01T09:00:00.000000000Z', '2026-10-01T09:00:00.000000000Z', 1),
@@ -69,22 +73,22 @@ func TestV7PRTasksMergesSeveralTasksOfOnePR(t *testing.T) {
 			t.Fatalf("the merged task changed %v, seen at %s, %s: a merged task changed shows changed, and the sighting of a search is no reading", e.Changed, e.SeenAt, e.Category)
 		}
 	})
-	for _, n := range []string{"2", "3", "4"} {
-		if got := strings1(t, raw, `SELECT count(*) FROM task_units WHERE provider = 'github' AND unit_key = 'acme/api#`+n+`' AND ord = 0`); !slices.Equal(got, []string{"1"}) {
-			t.Errorf("acme/api#%s has %q tasks, want 1", n, got)
+	for n, want := range map[string]string{"2": "0", "3": "1", "4": "1", "5": "0"} {
+		if got := strings1(t, raw, `SELECT count(*) FROM task_units WHERE provider = 'github' AND unit_key = 'acme/api#`+n+`' AND ord = 0`); !slices.Equal(got, []string{want}) {
+			t.Errorf("acme/api#%s has %q tasks, want %s: an open pull request the loop follows gets one, a merged one or one nobody follows none", n, got, want)
 		}
 	}
-	if got := strings1(t, raw, `SELECT t.category || ' ' || t.origin || ' ' || json_extract(p.value, '$.text') FROM task_units u JOIN tasks t ON t.id = u.task_id
-		JOIN task_props p ON p.task_id = t.id AND p.name = 'kind' WHERE u.provider = 'github' AND u.unit_key IN ('acme/api#2', 'acme/api#3') ORDER BY u.unit_key`); !slices.Equal(got,
-		[]string{"done derived pull-request", "ready derived pull-request"}) {
-		t.Errorf("the tasks made for the pull requests no task held %q", got)
+	if got := strings1(t, raw, `SELECT t.state || ' ' || t.origin || ' ' || json_extract(p.value, '$.text') FROM task_units u JOIN tasks t ON t.id = u.task_id
+		JOIN task_props p ON p.task_id = t.id AND p.name = 'kind' WHERE u.provider = 'github' AND u.unit_key IN ('acme/api#3', 'acme/api#4') ORDER BY u.unit_key`); !slices.Equal(got,
+		[]string{"waiting derived pull-request", "waiting derived pull-request"}) {
+		t.Errorf("the tasks made for the followed pull requests no task held %q, want waiting: they ask nothing of you yet", got)
 	}
 }
 
 func TestV7PRTasksClarifiesWithoutASweep(t *testing.T) {
 	t.Parallel()
 	inbox, waiting := "e-00000000000000d1", "e-00000000000000d2"
-	path := v6Store(t, v6PRs,
+	path := v6Store(t, v6PRs, v6Tracked,
 		`INSERT INTO entries (id, kind, state, title, origin, created, updated, rev) VALUES
 			('`+inbox+`', 'action', 'inbox', 'Review acme/api#1', 'derived', '2026-10-01T09:00:00.000000000Z', '2026-10-01T09:00:00.000000000Z', 1),
 			('`+waiting+`', 'action', 'waiting', 'Wait for bruno on acme/api#3', 'derived', '2026-10-01T09:00:00.000000000Z', '2026-10-01T09:00:00.000000000Z', 2)`,
@@ -94,7 +98,7 @@ func TestV7PRTasksClarifiesWithoutASweep(t *testing.T) {
 	raw := rawDB(t, path)
 	if got := strings1(t, raw, `SELECT u.unit_key || ' ' || t.state || ' ' || t.category FROM task_units u JOIN tasks t ON t.id = u.task_id
 		WHERE u.provider = 'github' AND u.ord = 0 ORDER BY u.unit_key`); !slices.Equal(got, []string{
-		"acme/api#1 next ready", "acme/api#2 done done", "acme/api#3 waiting waiting", "acme/api#4 next ready"}) {
+		"acme/api#1 next ready", "acme/api#3 waiting waiting", "acme/api#4 waiting waiting"}) {
 		t.Fatalf("the pull requests' tasks %q", got)
 	}
 	me := items.Person{Key: "github:me"}
@@ -110,7 +114,7 @@ func TestV7PRTasksClarifiesWithoutASweep(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ts) != 1 || ts[0].Category != task.CategoryReady || !slices.Contains(ts[0].Items, task.ItemRef{Unit: pr4, Item: "gh:review"}) {
-		t.Fatalf("the first sync after the upgrade %+v: the review request goes to the pull request's ready task", ts)
+	if len(ts) != 1 || ts[0].Category != task.CategoryWaiting || !ts[0].Changed || !slices.Contains(ts[0].Items, task.ItemRef{Unit: pr4, Item: "gh:review"}) {
+		t.Fatalf("the first sync after the upgrade %+v: the review request goes to the pull request's task, changed", ts)
 	}
 }

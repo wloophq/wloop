@@ -334,3 +334,38 @@ func TestAKeyNoTaskHoldsGoesToTheUnitsOwnTask(t *testing.T) {
 		t.Fatalf("a task with no item is never resolved for lack of items: %+v", es)
 	}
 }
+
+func TestAnOpenPRsDoneTaskTakesItsItemsBack(t *testing.T) {
+	done := task.Task{ID: "t-00000000000000a2", State: "done", Category: task.CategoryDone, Title: "Review acme/api#7", Units: []unit.Unit{pr},
+		Origin: task.OriginDerived, Created: now.Add(-48 * time.Hour), Updated: now.Add(-24 * time.Hour)}
+	es := reconcile(t, facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true }), []items.Item{item("gh:follow", keyed, owedBy(ana))}, []task.Task{done}, now)
+	if e := only(t, es); e.ID != done.ID || e.Category != task.CategoryReady || !e.Changed || len(e.Items) != 1 {
+		t.Fatalf("an open pull request whose task is done: %+v", es)
+	}
+}
+
+func TestFollowingAUnitAgainReopensTheTaskReconcileDropped(t *testing.T) {
+	cared := facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true })
+	es := reconcile(t, cared, []items.Item{item("gh:follow", keyed, owedBy(ana))}, nil, now)
+	es = reconcile(t, facts(func(f *task.UnitFacts) { f.Carded = true }), []items.Item{item("gh:follow", keyed, owedBy(ana), resolved)}, es, now)
+	if e := only(t, es); e.Category != task.CategoryDropped {
+		t.Fatalf("untracked: %+v", e)
+	}
+	es = reconcile(t, cared, []items.Item{item("gh:follow", keyed, owedBy(ana))}, es, now)
+	if e := only(t, es); e.Category != task.CategoryReady || !e.Changed || !e.Prop(task.PropUnfollowed).Time.IsZero() {
+		t.Fatalf("followed again: %+v", e)
+	}
+	dropped := only(t, es)
+	dropped.State, dropped.Category = "trash", task.CategoryDropped
+	if e := only(t, reconcile(t, cared, []items.Item{item("gh:follow", keyed, owedBy(ana))}, []task.Task{dropped}, now)); e.Category != task.CategoryDropped {
+		t.Fatalf("a task the person dropped came back: %+v", e)
+	}
+}
+
+func TestAQuietUnitKeepsItsTaskOwedByNobody(t *testing.T) {
+	quiet := item("gh:follow", keyed, func(it *items.Item) { it.WaitingOn, it.Requester = nil, meP })
+	e := only(t, reconcile(t, facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true }), []items.Item{quiet}, nil, now))
+	if e.Category != task.CategoryWaiting || len(e.Items) != 1 {
+		t.Fatalf("a quiet followed unit's task %+v", e)
+	}
+}

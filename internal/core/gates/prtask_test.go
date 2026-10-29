@@ -60,3 +60,25 @@ func TestAPlanGateOnAPullRequestOpensNoCaptureTask(t *testing.T) {
 		t.Fatalf("a round gated before the pull request's items came: gate on %s, tasks %+v %v", early1.Task, ts, err)
 	}
 }
+
+func TestAGateOnAPullRequestWhoseTaskIsDoneReopensIt(t *testing.T) {
+	ctx := context.Background()
+	store := taskstest.New()
+	done := task.Task{ID: "t-00000000000000d1", State: "done", Category: task.CategoryDone, Title: "Review acme/api#7", Units: []unit.Unit{acme},
+		Resolved: []task.ItemRef{{Unit: acme, Item: "gh:review"}}, Origin: task.OriginDerived, Created: fixedNow(), Updated: fixedNow()}
+	if err := store.Apply(ctx, []task.Change{{Op: task.OpCreate, Task: done}}); err != nil {
+		t.Fatal(err)
+	}
+	review := items.Item{ID: "gh:review", Unit: acme, State: items.Resolved, TaskKey: acme.String()}
+	svc := coretasks.New(coretasks.Deps{Store: store, Items: prItems{acme: {review}}, Facts: prCards{}, Clock: clock{fixedNow}, States: taskstest.BundledStates})
+	gs := gatestest.NewStore(fixedNow)
+	g := gates.New(gates.Deps{Store: gs, Reader: gs, Profile: bundled, Tasks: svc, Clock: clock{fixedNow}})
+	q, err := g.Open(ctx, gate.Gate{Kind: gate.KindQuestion, Unit: acme}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts, err := store.TasksOf(ctx, acme)
+	if err != nil || len(ts) != 1 || q.Task != done.ID || ts[0].Category != task.CategoryReady || !ts[0].Changed {
+		t.Fatalf("the question's gate on %s, the pull request's tasks %+v %v", q.Task, ts, err)
+	}
+}

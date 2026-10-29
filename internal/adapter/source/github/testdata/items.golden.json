@@ -2939,19 +2939,7 @@
           "key": "github:octocat",
           "name": "octocat"
         },
-        "assignees": [
-          {
-            "key": "system:\u003cbrand\u003e",
-            "name": "\u003cbrand\u003e"
-          }
-        ],
         "basis": "none",
-        "waiting_on": [
-          {
-            "key": "system:\u003cbrand\u003e",
-            "name": "\u003cbrand\u003e"
-          }
-        ],
         "state": "open",
         "confidence": "high",
         "provenance": "derived",
@@ -2997,19 +2985,7 @@
           "key": "github:octocat",
           "name": "octocat"
         },
-        "assignees": [
-          {
-            "key": "system:\u003cbrand\u003e",
-            "name": "\u003cbrand\u003e"
-          }
-        ],
         "basis": "none",
-        "waiting_on": [
-          {
-            "key": "system:\u003cbrand\u003e",
-            "name": "\u003cbrand\u003e"
-          }
-        ],
         "state": "open",
         "confidence": "high",
         "provenance": "derived",

@@ -103,13 +103,13 @@ func (s *Server) unitsEnabled(units []unit.Unit) bool {
 
 func verbAction(v task.Verb) string { return api.TaskActionPrefix + string(v) }
 
-// unitNotice is what the own task of a unit the read model serves notifies, whatever its state: the unit's
-// row notice, keyed on the task and on the gate the notice stands for (the round's plan gate, the block's
-// trust gate, the question's record), so the task notifies what the row did and only once. ok is false when
-// the task's first unit is not served, or its row notifies nothing.
+// unitNotice is what the own task of a unit the read model serves notifies while it is open and not deferred,
+// which a mute holds: the unit's row notice, keyed on the task and on the gate the notice stands for (the
+// round's plan gate, the block's trust gate, the question's record), so the task notifies what the row did
+// and only once. ok is false when the task's first unit is not served, or its row notifies nothing.
 func (ev *taskViewer) unitNotice(ctx context.Context, e task.Task) (api.Category, string, api.Attention, bool) {
 	n, row, served, ok := ev.rowNotice(ctx, e)
-	if !served || !ok || !ev.unitsOwn(ctx, e) {
+	if !served || !ok || !e.Open() || e.Category == task.CategoryDeferred || !ev.unitsOwn(ctx, e) {
 		return "", "", api.Attention{}, false
 	}
 	if n.Question {

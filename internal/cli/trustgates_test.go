@@ -9,9 +9,12 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/gates/gatestest"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -95,5 +98,41 @@ func TestTrustRunOfAReplacedBlockTrustsNothing(t *testing.T) {
 	}
 	if key, ok, err := a.StartBlockKey(ctx, r.ref.Unit()); err != nil || !ok || key != replaced {
 		t.Fatalf("the current block %q %v %v", key, ok, err)
+	}
+}
+
+func TestAHeldGateOfAnEndedPRIsSuperseded(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newBlockRig(t, trustBlockKey)
+	e := r.sc.env
+	store := taskstest.New()
+	e.tasks = coretasks.New(coretasks.Deps{Store: store, States: taskstest.BundledStates, Clock: clockFunc(e.Now)})
+	merged := task.Task{ID: "t-00000000000000e1", State: "done", Category: task.CategoryDone, Title: "Review acme/api#1", Units: []unit.Unit{r.ref.Unit()},
+		Origin: task.OriginDerived, Created: testNow, Updated: testNow}
+	open := task.Task{ID: "t-00000000000000e2", State: "next", Category: task.CategoryReady, Title: "Review acme/api#2", Units: []unit.Unit{{Provider: unit.GitHub, Key: "acme/api#2"}},
+		Origin: task.OriginDerived, Created: testNow, Updated: testNow}
+	if err := store.Apply(ctx, []task.Change{{Op: task.OpCreate, Task: merged}, {Op: task.OpCreate, Task: open}}); err != nil {
+		t.Fatal(err)
+	}
+	st := gatestest.NewStore(e.Now)
+	e.gates = gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{e.loadedIntents}, Clock: clockFunc(e.Now)})
+	e.gateReader = st
+	ended, err := e.gates.Open(ctx, gate.Gate{Kind: gate.KindPlan, Unit: merged.Units[0], Task: merged.ID, Subject: round.HeldSubject(e.Now())}, waitsForYou{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	live, err := e.gates.Open(ctx, gate.Gate{Kind: gate.KindPlan, Unit: open.Units[0], Task: open.ID, Subject: round.HeldSubject(e.Now())}, waitsForYou{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.supersedeHeldGates(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if g, _ := st.Get(ctx, ended.ID); g.Status != gate.Superseded {
+		t.Errorf("the held gate of a merged pull request's task is %s", g.Status)
+	}
+	if g, _ := st.Get(ctx, live.ID); g.Status != gate.Open {
+		t.Errorf("today's held gate of an open task is %s", g.Status)
 	}
 }
