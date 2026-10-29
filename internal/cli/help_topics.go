@@ -250,7 +250,7 @@ func helpGroups(manager string) []helpGroup {
 			{
 				Names:    []string{"workflows"},
 				Summary:  "The facts and steps a workflow can use",
-				Usage:    []string{"workflows facts [github|session|workspace]", "workflows steps"},
+				Usage:    []string{"workflows facts [<provider>]", "workflows steps"},
 				About:    "Print the facts a workflow's predicates read, by subject, and the steps it may run. The documentation has the manifest reference.",
 				Examples: []string{"workflows facts github", "workflows steps"},
 				Docs:     "reference/facts",

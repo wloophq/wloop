@@ -85,7 +85,7 @@ var pluginDebt = []debt{
 
 const briefQueueDebt = "debt: the brief queue keys its runs by pull request; it reads their input through the GitHub plugin's Briefer"
 
-const daemonTestsDebt = "debt: the daemon's tests serve GitHub in process (explore.Explorer, prrow) while GitHub's rows, facts and cards stay in the host"
+const daemonTestsDebt = "debt: the daemon's tests serve GitHub in process (explore.Explorer, prrow) while GitHub's rows, facts and cards stay in the host (issue 62)"
 
 // ruleR16 flags an import of a plugin package by a core package, or by a
 // package of another plugin, counting test imports; a test import of a
