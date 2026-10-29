@@ -243,16 +243,18 @@ func TestItemProposalsBecomeGates(t *testing.T) {
 	}
 }
 
-func TestAGateOnAUnitWithNoTaskHasANullTask(t *testing.T) {
+func TestADecidedGateOnAUnitWithNoTaskHasANullTask(t *testing.T) {
 	t.Parallel()
-	_, path, all := migratedGates(t)
-	for _, g := range []gate.Gate{gateOf(t, all, gate.KindDraft, "35"), gateOf(t, all, gate.KindProposal, gate.ProposalSubject(42))} {
-		if g.Task != "" || g.Unit != gatesNowhere {
-			t.Errorf("gate %+v", g)
-		}
+	db, path, all := migratedGates(t)
+	if g := gateOf(t, all, gate.KindProposal, gate.ProposalSubject(42)); g.Task != "" || g.Unit != gatesNowhere {
+		t.Errorf("gate %+v", g)
 	}
-	if got := strings1(t, rawDB(t, path), `SELECT count(*) FROM gates WHERE task_id IS NULL`); !slices.Equal(got, []string{"2"}) {
-		t.Errorf("%q gates with a NULL task, want 2", got)
+	open := gateOf(t, all, gate.KindDraft, "35")
+	if e, err := db.Tasks().Task(context.Background(), open.Task); err != nil || !e.Open() || !slices.Equal(e.Units, []unit.Unit{gatesNowhere}) {
+		t.Errorf("the open draft gate %+v sits on %+v (%v), want an open task of its unit", open, e, err)
+	}
+	if got := strings1(t, rawDB(t, path), `SELECT count(*) FROM gates WHERE task_id IS NULL`); !slices.Equal(got, []string{"1"}) {
+		t.Errorf("%q gates with a NULL task, want 1", got)
 	}
 	if got := strings1(t, rawDB(t, path), `SELECT count(*) FROM gates WHERE task_id = ''`); !slices.Equal(got, []string{"0"}) {
 		t.Errorf("%q gates with an empty task", got)

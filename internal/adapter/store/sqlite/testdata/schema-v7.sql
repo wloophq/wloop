@@ -337,12 +337,11 @@ CREATE INDEX links_to ON links (to_provider, to_key);
 -- parent's review.
 CREATE TABLE tasks (
   id TEXT PRIMARY KEY,
-  kind TEXT NOT NULL, state TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
+  state TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
   parent TEXT NOT NULL DEFAULT '', position INTEGER NOT NULL DEFAULT 0,
   sequential INTEGER NOT NULL DEFAULT 0,
   snooze_until TEXT NOT NULL DEFAULT '', snooze_on_activity INTEGER NOT NULL DEFAULT 0,
   snooze_return TEXT NOT NULL DEFAULT '', snooze_mute INTEGER NOT NULL DEFAULT 0,
-  waiting TEXT NOT NULL DEFAULT '',
   changed INTEGER NOT NULL DEFAULT 0, seen_at TEXT NOT NULL DEFAULT '',
   origin TEXT NOT NULL, created TEXT NOT NULL, updated TEXT NOT NULL,
   rev INTEGER NOT NULL,
@@ -352,6 +351,13 @@ CREATE TABLE tasks (
 CREATE INDEX tasks_state ON tasks (state);
 CREATE INDEX tasks_rev ON tasks (rev);
 CREATE INDEX tasks_category ON tasks (category);
+
+-- task_aliases names the task that took over part or all of a task id the store held before: a split
+-- waiting task's items, a dropped close or message task's rows.
+CREATE TABLE task_aliases (
+  old_id TEXT NOT NULL, new_id TEXT NOT NULL,
+  PRIMARY KEY (old_id, new_id)
+) WITHOUT ROWID;
 
 CREATE TABLE task_items (
   task_id TEXT NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,

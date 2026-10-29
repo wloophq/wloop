@@ -17,7 +17,7 @@ func TestATasksTimelineReadsTheStoreByRowID(t *testing.T) {
 	id := task.ID("t-0123456789abcdef")
 	pr := unit.Unit{Provider: "github", Key: "acme/api#7"}
 	at := time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
-	exec(t, db, `INSERT INTO tasks (id, kind, state, origin, created, updated, rev) VALUES (?, 'action', 'next', 'user', '', '', 1)`, string(id))
+	exec(t, db, `INSERT INTO tasks (id, state, origin, created, updated, rev) VALUES (?, 'next', 'user', '', '', 1)`, string(id))
 	exec(t, db, `INSERT INTO task_units (task_id, provider, unit_key, ord) VALUES (?, 'github', 'acme/api#7', 0)`, string(id))
 	for i, e := range []struct{ p, k, kind string }{
 		{"task", string(id), "chat"}, {"github", "acme/api#7", "pushed"}, {"github", "acme/api#8", "pushed"}, {"task", string(id), "chat"},

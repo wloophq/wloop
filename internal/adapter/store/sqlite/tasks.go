@@ -28,8 +28,8 @@ var _ coretasks.Store = taskStore{}
 
 func (db *DB) Tasks() coretasks.Store { return taskStore{db} }
 
-const taskFields = `id, kind, state, category, title, notes, parent, position, sequential,
-	snooze_until, snooze_on_activity, snooze_return, snooze_mute, waiting, changed, seen_at, origin, created, updated,
+const taskFields = `id, state, category, title, notes, parent, position, sequential,
+	snooze_until, snooze_on_activity, snooze_return, snooze_mute, changed, seen_at, origin, created, updated,
 	review_every, reviewed_at`
 
 // upsertTaskSQL updates an existing task in place: a REPLACE would delete
@@ -94,11 +94,11 @@ func taskTime(s string) (time.Time, error) {
 
 func scanTask(row scanner) (task.Task, error) {
 	var e task.Task
-	var snoozeUntil, waiting, seenAt, created, updated, reviewed string
-	var kind, state, category, parent, ret string
+	var snoozeUntil, seenAt, created, updated, reviewed string
+	var state, category, parent, ret string
 	var every int64
-	if err := row.Scan(&e.ID, &kind, &state, &category, &e.Title, &e.Notes, &parent,
-		&e.Position, &e.Sequential, &snoozeUntil, &e.Snooze.OnActivity, &ret, &e.Snooze.Mute, &waiting,
+	if err := row.Scan(&e.ID, &state, &category, &e.Title, &e.Notes, &parent,
+		&e.Position, &e.Sequential, &snoozeUntil, &e.Snooze.OnActivity, &ret, &e.Snooze.Mute,
 		&e.Changed, &seenAt, &e.Origin, &created, &updated, &every, &reviewed); err != nil {
 		return task.Task{}, err
 	}
@@ -280,8 +280,14 @@ func (s taskStore) TasksSince(ctx context.Context, q task.Query, since coretasks
 	return p, err
 }
 
+// Task reads task id, or, when no task has it, the task an alias of id leads to, an open one first: one hop,
+// since every alias leads to a task.
 func (s taskStore) Task(ctx context.Context, id task.ID) (task.Task, error) {
 	es, err := loadTasks(ctx, s.db.R(), `id = ?`, string(id))
+	if err == nil && len(es) == 0 {
+		es, err = loadTasks(ctx, s.db.R(), `id = (SELECT a.new_id FROM task_aliases a JOIN tasks t ON t.id = a.new_id
+			WHERE a.old_id = ? ORDER BY t.`+isOpen+` DESC, t.created, t.id LIMIT 1)`, append([]any{string(id)}, openArgs()...)...)
+	}
 	if err != nil {
 		return task.Task{}, err
 	}
@@ -494,8 +500,8 @@ func writeTask(ctx context.Context, tx *Tx, e task.Task, rev uint64) error {
 		}
 	}
 	if _, err := tx.ExecContext(ctx, upsertTaskSQL,
-		string(e.ID), e.Prop(task.PropKind).Text, string(e.State), string(e.Category), e.Title, e.Notes, string(e.Parent), e.Position,
-		e.Sequential, eventTime(e.Snooze.Until), e.Snooze.OnActivity, string(e.Snooze.Return), e.Snooze.Mute, "",
+		string(e.ID), string(e.State), string(e.Category), e.Title, e.Notes, string(e.Parent), e.Position,
+		e.Sequential, eventTime(e.Snooze.Until), e.Snooze.OnActivity, string(e.Snooze.Return), e.Snooze.Mute,
 		e.Changed, eventTime(e.SeenAt), e.Origin, eventTime(e.Created), eventTime(e.Updated),
 		int64(e.ReviewEvery/time.Second), eventTime(e.ReviewedAt), rev); err != nil {
 		return err
