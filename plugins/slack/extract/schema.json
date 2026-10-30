@@ -83,12 +83,42 @@
       "pattern": "^([0-9]{9,11}\\.[0-9]{6})?$"
      },
      "requester": {
-      "type": "string"
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "id",
+       "name"
+      ],
+      "properties": {
+       "id": {
+        "type": "string",
+        "pattern": "^([UW][A-Z0-9]{8,}|S[A-Z0-9]{8,})?$"
+       },
+       "name": {
+        "type": "string",
+        "maxLength": 80
+       }
+      }
      },
      "assignees": {
       "type": "array",
       "items": {
-       "type": "string"
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "id",
+        "name"
+       ],
+       "properties": {
+        "id": {
+         "type": "string",
+         "pattern": "^([UW][A-Z0-9]{8,}|S[A-Z0-9]{8,})?$"
+        },
+        "name": {
+         "type": "string",
+         "maxLength": 80
+        }
+       }
       }
      },
      "assignment_ts": {
@@ -110,7 +140,22 @@
      "waiting_on": {
       "type": "array",
       "items": {
-       "type": "string"
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "id",
+        "name"
+       ],
+       "properties": {
+        "id": {
+         "type": "string",
+         "pattern": "^([UW][A-Z0-9]{8,}|S[A-Z0-9]{8,})?$"
+        },
+        "name": {
+         "type": "string",
+         "maxLength": 80
+        }
+       }
       }
      },
      "state": {
@@ -201,7 +246,22 @@
         "backed_by": {
          "type": "array",
          "items": {
-          "type": "string"
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+           "id",
+           "name"
+          ],
+          "properties": {
+           "id": {
+            "type": "string",
+            "pattern": "^([UW][A-Z0-9]{8,}|S[A-Z0-9]{8,})?$"
+           },
+           "name": {
+            "type": "string",
+            "maxLength": 80
+           }
+          }
          }
         }
        }

@@ -55,7 +55,6 @@ const (
 type Ledger interface {
 	Apply(ctx context.Context, prov items.Provenance, ops []items.Op) (host.Result, error)
 	Items(ctx context.Context, u unit.Unit) ([]items.Item, error)
-	All(ctx context.Context) (map[unit.Unit][]items.Item, error)
 }
 
 // Clock is the job's clock.
@@ -98,17 +97,15 @@ type Job struct {
 	wants   map[unit.Unit]bool
 	waiting map[unit.Unit]bool
 
-	mu     sync.Mutex
-	loaded bool
-	// repaired says the ledger's people were checked since the process started.
-	repaired bool
-	scanned  int64
-	stored   int64
-	swept    time.Time
-	pending  map[unit.Unit]*pend
-	seqs     map[unit.Unit]int64
-	kinds    map[string]slack.ConversationKind
-	brk      breaker
+	mu      sync.Mutex
+	loaded  bool
+	scanned int64
+	stored  int64
+	swept   time.Time
+	pending map[unit.Unit]*pend
+	seqs    map[unit.Unit]int64
+	kinds   map[string]slack.ConversationKind
+	brk     breaker
 	// lastFailed is the target of the last failed call; an unfit answer feeds the breaker
 	// only from another target, so one bad unit cannot open it.
 	lastFailed unit.Unit
@@ -211,9 +208,6 @@ func (j *Job) Run(ctx context.Context) (summary, skipped string, err error) {
 	j.noteWaiting()
 	defer j.noteWaiting()
 	var errs []error
-	if err := j.repair(ctx); err != nil {
-		errs = append(errs, err)
-	}
 	unwatched, err := j.sweep(ctx, cfg, now)
 	if err != nil {
 		errs = append(errs, err)
@@ -684,78 +678,6 @@ func (j *Job) apply(ctx context.Context, k unit.Unit, p *pend, team string, in I
 		j.logf("slack extraction %s: watch: %v", k, err)
 	}
 	return len(ops), nil
-}
-
-// repair rewrites, once per process, the people of the ledger's items whose keys an answer
-// echoed as the ledger rendered them ("group:group:ana (U0001)"), so each names its id again.
-func (j *Job) repair(ctx context.Context) error {
-	if j.repaired {
-		return nil
-	}
-	all, err := j.Ledger.All(ctx)
-	if err != nil {
-		return fmt.Errorf("slack extraction: repair people: %w", err)
-	}
-	var ops []items.Op
-	for _, u := range slices.SortedFunc(maps.Keys(all), unit.Compare) {
-		for _, it := range all[u] {
-			ops = append(ops, repairOps(u, it)...)
-		}
-	}
-	j.repaired = true
-	if len(ops) == 0 {
-		return nil
-	}
-	res, err := j.Ledger.Apply(ctx, items.Extracted, ops)
-	if err != nil {
-		return fmt.Errorf("slack extraction: repair people: %w", err)
-	}
-	j.logf("slack extraction: %d items' people repaired, %d refused", len(ops)-len(res.Refused), len(res.Refused))
-	return nil
-}
-
-// repairOps are the ops that give it's people their ids back; none when every key is sound.
-func repairOps(u unit.Unit, it items.Item) []items.Op {
-	b := opBuilder{in: Input{Unit: u}}
-	fix := func(ps []items.Person) ([]items.Person, bool) {
-		out, changed := make([]items.Person, len(ps)), false
-		for i, p := range ps {
-			out[i] = p
-			if id, np := personID(p.Key), b.person(p.Key); id != p.Key && np.Key != p.Key {
-				out[i], changed = np, true
-				if np.Name == id && p.Name != "" {
-					out[i].Name = personID(p.Name)
-				}
-			}
-		}
-		return out, changed
-	}
-	anchor := it.Origin
-	anchor.Unit = u
-	var ops []items.Op
-	var f items.Fields
-	changed := false
-	if it.Requester.Key != "" {
-		if ps, ok := fix([]items.Person{it.Requester}); ok {
-			f.Requester, changed = &ps[0], true
-		}
-	}
-	if ps, ok := fix(it.WaitingOn); ok {
-		f.WaitingOn, changed = &ps, true
-	}
-	opts := slices.Clone(it.Options)
-	for i, o := range opts {
-		if ps, ok := fix(o.ArguedBy); ok {
-			opts[i].ArguedBy, f.Options, changed = ps, &opts, true
-		}
-	}
-	if changed {
-		ops = append(ops, items.Op{Op: items.OpUpdate, Unit: u, Item: it.ID, Anchor: anchor, Fields: &f})
-	}
-	if ps, ok := fix(it.Assignees); ok {
-		ops = append(ops, items.Op{Op: items.OpAssign, Unit: u, Item: it.ID, Anchor: anchor, Assignees: ps, Basis: it.Basis})
-	}
-	return ops
 }
 
 // applyOps applies ops; a failed Apply is the host's, which the target retries.

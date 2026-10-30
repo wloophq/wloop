@@ -95,7 +95,7 @@ func TestReviewBetweenMessageAndRunResolves(t *testing.T) {
 	u := thread(ts(1))
 	pr := unit.Unit{Provider: githubProvider, Key: "acme/widget#527"}
 	msgAt := slack.TSTime(ts(1))
-	r.facts.post(jChan, ts(1), "", jOther, "<@U000AAA> please review PR 527", msgAt)
+	r.facts.post(jChan, ts(1), "", jOther, "<@U000000AAA> please review PR 527", msgAt)
 	r.asker.reply = func(int, host.Ask) ([]byte, error) {
 		return answerJSON(t, []obj{jItem("n1", ts(1))}, nil,
 			[]obj{{"item": "n1", "target": "github:" + pr.Key, "kind": "review", "evidence_ts": ts(1)}}, nil), nil
@@ -170,7 +170,7 @@ func TestOldReviewCannotResolveANewAsk(t *testing.T) {
 	u := thread(ts(1))
 	pr := unit.Unit{Provider: githubProvider, Key: "acme/widget#527"}
 	msgAt := slack.TSTime(ts(1))
-	r.facts.post(jChan, ts(1), "", jOther, "<@U000AAA> please re-review PR 527", msgAt)
+	r.facts.post(jChan, ts(1), "", jOther, "<@U000000AAA> please re-review PR 527", msgAt)
 	r.asker.reply = func(int, host.Ask) ([]byte, error) {
 		return answerJSON(t, []obj{jItem("n1", ts(1))}, nil,
 			[]obj{{"item": "n1", "target": "github:" + pr.Key, "kind": "review", "evidence_ts": "1000000000.000000"}}, nil), nil

@@ -72,8 +72,8 @@ func extraction(f Fixture) map[string]any {
 		origin = f.Messages[0].TS
 	}
 	item := map[string]any{"ref": "n1", "kind": "request", "summary": "summary of " + f.ID, "origin_ts": origin,
-		"requester": "U0000000002", "assignees": []any{"U0000000001"}, "assignment_ts": origin, "assignment_basis": "explicit_mention",
-		"waiting_on": []any{"U0000000001"}, "state": "open", "resolution": "none", "evidence_ts": "", "evidence_kind": "none",
+		"requester": map[string]any{"id": "U0000000002", "name": ""}, "assignees": []any{map[string]any{"id": "U0000000001", "name": ""}}, "assignment_ts": origin, "assignment_basis": "explicit_mention",
+		"waiting_on": []any{map[string]any{"id": "U0000000001", "name": ""}}, "state": "open", "resolution": "none", "evidence_ts": "", "evidence_kind": "none",
 		"confidence": "high", "ambiguity": "", "links": []any{}, "context": "", "options": []any{}, "deadline": "",
 		"mode": "none", "place": map[string]any{"context": "", "why": ""}}
 	return map[string]any{"brief": json.RawMessage(`{"unchanged": false, "goal": "brief of ` + f.ID + `", "context": "", "kind": "request", "risk": "low", "risk_why": "", "open_questions": [], "tags": {"domain": [], "audience": [], "concern": []}}`), "viewer_role": "assignee", "started_by_viewer": false, "items": []any{item},

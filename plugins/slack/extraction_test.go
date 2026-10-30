@@ -39,10 +39,13 @@ func resolvePull(address string) (unit.Unit, bool) {
 	return unit.Unit{Provider: "github", Key: m[1] + "/" + m[2] + "#" + m[3]}, true
 }
 
+// answerPerson is a person of an extraction answer, by id.
+func answerPerson(id string) map[string]any { return map[string]any{"id": id, "name": ""} }
+
 func extractionAnswer(t *testing.T, origin string, segments []map[string]string) []byte {
 	t.Helper()
-	it := map[string]any{"ref": "n1", "kind": "request", "summary": "review the PR", "origin_ts": origin, "requester": other,
-		"assignees": []string{me}, "assignment_ts": origin, "assignment_basis": "explicit_mention", "waiting_on": []string{me},
+	it := map[string]any{"ref": "n1", "kind": "request", "summary": "review the PR", "origin_ts": origin, "requester": answerPerson(other),
+		"assignees": []any{answerPerson(me)}, "assignment_ts": origin, "assignment_basis": "explicit_mention", "waiting_on": []any{answerPerson(me)},
 		"state": "open", "resolution": "none", "evidence_ts": "", "evidence_kind": "none", "confidence": "high", "ambiguity": "",
 		"links": []any{}, "context": "", "options": []any{}, "deadline": "", "mode": "headless", "place": map[string]string{"context": "", "why": ""}}
 	segs := []map[string]any{}
@@ -186,8 +189,8 @@ func threadAnswer(t *testing.T, ref, origin, evidence string) []byte {
 	if evidence != "" {
 		state, resolution, kind = "resolved", "done", "message"
 	}
-	it := map[string]any{"ref": ref, "kind": "request", "summary": "review the PR", "origin_ts": origin, "requester": other,
-		"assignees": []string{me}, "assignment_ts": origin, "assignment_basis": "explicit_mention", "waiting_on": []string{},
+	it := map[string]any{"ref": ref, "kind": "request", "summary": "review the PR", "origin_ts": origin, "requester": answerPerson(other),
+		"assignees": []any{answerPerson(me)}, "assignment_ts": origin, "assignment_basis": "explicit_mention", "waiting_on": []any{},
 		"state": state, "resolution": resolution, "evidence_ts": evidence, "evidence_kind": kind, "confidence": "high", "ambiguity": "",
 		"links": []any{}, "context": "", "options": []any{}, "deadline": "", "mode": "none", "place": map[string]string{"context": "", "why": ""}}
 	out, err := json.Marshal(map[string]any{"brief": json.RawMessage(`{"unchanged": false, "goal": "b", "context": "", "kind": "request", "risk": "low", "risk_why": "", "open_questions": [], "tags": {"domain": [], "audience": [], "concern": []}}`), "viewer_role": "assignee", "started_by_viewer": false, "items": []any{it},

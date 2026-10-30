@@ -8,12 +8,12 @@ import (
 )
 
 func TestPlainReadsLikeAPerson(t *testing.T) {
-	users := map[string]store.UserRow{"U000AAA": {ID: "U000AAA", Name: "ana", DisplayName: "Ana"}}
+	users := map[string]store.UserRow{"U000000AAA": {ID: "U000000AAA", Name: "ana", DisplayName: "Ana"}}
 	for in, want := range map[string]string{
-		"<@U000AAA> and <@U000BBB|bob>":                     "@Ana and @bob",
-		"<@U000CCC> left":                                   "@U000CCC left",
+		"<@U000000AAA> and <@U000000BBB|bob>":               "@Ana and @bob",
+		"<@U000000CCC> left":                                "@U000000CCC left",
 		"see <#C000AAA|general> and <#C000BBB>":             "see #general and #C000BBB",
-		"<!here> <!subteam^S000AAA|@ops> <!channel>":        "@here @ops @channel",
+		"<!here> <!subteam^S000000AAA|@ops> <!channel>":     "@here @ops @channel",
 		"<https://example.test/a|the doc> <https://x.test>": "the doc https://x.test",
 		"a &lt;b&gt; &amp; c":                               "a <b> & c",
 	} {

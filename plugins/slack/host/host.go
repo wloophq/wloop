@@ -159,11 +159,6 @@ func (b Broker) Load(ctx context.Context, units []unit.Unit) (map[unit.Unit][]it
 	return b.query(ctx, src.ItemQuery{Units: wireUnits(units)})
 }
 
-// All are the items of every unit of the plugin's, by unit.
-func (b Broker) All(ctx context.Context) (map[unit.Unit][]items.Item, error) {
-	return b.query(ctx, src.ItemQuery{})
-}
-
 // Open are the open items of the plugin's units, by unit; no units reads
 // every unit's.
 func (b Broker) Open(ctx context.Context, units []unit.Unit) (map[unit.Unit][]items.Item, error) {

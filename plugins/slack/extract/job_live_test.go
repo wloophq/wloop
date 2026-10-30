@@ -63,7 +63,7 @@ func TestLinkToDisabledProviderIsStored(t *testing.T) {
 	r := newRig(t)
 	r.ledger.host.Disabled = func(p unit.ProviderID) bool { return p == githubProvider }
 	pr := unit.Unit{Provider: githubProvider, Key: "acme/widget#527"}
-	r.facts.post(jChan, ts(1), "", jOther, "<@U000AAA> please review PR 527", jT0)
+	r.facts.post(jChan, ts(1), "", jOther, "<@U000000AAA> please review PR 527", jT0)
 	r.asker.reply = func(int, host.Ask) ([]byte, error) {
 		return answerJSON(t, []obj{jItem("n1", ts(1))}, nil,
 			[]obj{{"item": "n1", "target": "github:" + pr.Key, "kind": "review", "evidence_ts": ts(1)}}, nil), nil

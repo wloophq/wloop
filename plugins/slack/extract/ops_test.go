@@ -107,8 +107,8 @@ func TestOpsAssignAndResolve(t *testing.T) {
 		Requester: items.Person{Key: "slack:U0000000001", Name: "Ann"}, Assignees: []items.Person{{Key: "slack:U0000000002", Name: "Bob"}},
 		Basis: "explicit_mention", Confidence: "high"})
 	i2 := item("i2")
-	i2.Requester = "U0000000001"
-	i2.Assignees = []string{"U0000000003"}
+	i2.Requester = PersonOut{ID: "U0000000001"}
+	i2.Assignees = []PersonOut{{ID: "U0000000003"}}
 	i2.AssignmentTS = "1700007200.000400"
 	i2.AssignmentBasis = "reassigned"
 	i2.State, i2.Resolution, i2.EvidenceTS, i2.EvidenceKind = "resolved", "done", "1700003600.000300", "reaction"
@@ -144,10 +144,10 @@ func TestOpsUpdateOnlyChangedFields(t *testing.T) {
 	in := loadInput(t)
 	i1 := item("i1")
 	i1.Summary = "Bob reviews the release notes draft by Friday"
-	i1.Requester = "U0000000001"
-	i1.Assignees = []string{"U0000000002"}
+	i1.Requester = PersonOut{ID: "U0000000001"}
+	i1.Assignees = []PersonOut{{ID: "U0000000002"}}
 	i1.AssignmentBasis = "explicit_mention"
-	i1.WaitingOn = []string{"U0000000002"}
+	i1.WaitingOn = []PersonOut{{ID: "U0000000002"}}
 	ops, _, err := Ops(in, Result{Items: []ItemOut{i1}}, "T0001", parseTarget)
 	if err != nil {
 		t.Fatal(err)
@@ -177,8 +177,8 @@ func TestOmittedItemsStay(t *testing.T) {
 func TestLinkOps(t *testing.T) {
 	in := loadInput(t)
 	i1 := item("i1")
-	i1.Summary, i1.Requester, i1.Assignees, i1.AssignmentBasis = in.Ledger[0].Summary, "U0000000001", []string{"U0000000002"}, "explicit_mention"
-	i1.WaitingOn = []string{"U0000000002"}
+	i1.Summary, i1.Requester, i1.Assignees, i1.AssignmentBasis = in.Ledger[0].Summary, PersonOut{ID: "U0000000001"}, []PersonOut{{ID: "U0000000002"}}, "explicit_mention"
+	i1.WaitingOn = []PersonOut{{ID: "U0000000002"}}
 	r := Result{Items: []ItemOut{i1}, Links: []LinkOut{{Item: "i1", Target: "github:acme/widget#527", Kind: link.Review, EvidenceTS: "1700007200.000400"}}}
 	ops, dropped, err := Ops(in, r, "T0001", parseTarget)
 	if err != nil || dropped != 0 {
@@ -239,7 +239,7 @@ func TestConfirmedRewordingIsNoOp(t *testing.T) {
 	in := loadInput(t)
 	in.Ledger[1].Context = "Cy owns the call.\nBob asked twice."
 	i3 := item("i3")
-	i3.Kind, i3.Requester, i3.Assignees, i3.AssignmentBasis = "decision", "U0000000002", []string{"U0000000003"}, "explicit_mention"
+	i3.Kind, i3.Requester, i3.Assignees, i3.AssignmentBasis = "decision", PersonOut{ID: "U0000000002"}, []PersonOut{{ID: "U0000000003"}}, "explicit_mention"
 	i3.Summary = "Should the widget toggle ship on by default?"
 	i3.Context = "Cy owns the call. Bob asked twice."
 	i3.Confidence = "low"
@@ -255,8 +255,8 @@ func TestConfirmedRewordingIsNoOp(t *testing.T) {
 
 	in.Ledger[0].Context = "Line one.\nLine two."
 	i1 := item("i1")
-	i1.Summary, i1.Requester, i1.Assignees, i1.AssignmentBasis = in.Ledger[0].Summary, "U0000000001", []string{"U0000000002"}, "explicit_mention"
-	i1.WaitingOn = []string{"U0000000002"}
+	i1.Summary, i1.Requester, i1.Assignees, i1.AssignmentBasis = in.Ledger[0].Summary, PersonOut{ID: "U0000000001"}, []PersonOut{{ID: "U0000000002"}}, "explicit_mention"
+	i1.WaitingOn = []PersonOut{{ID: "U0000000002"}}
 	i1.Context = "Line one. Line two."
 	ops, _, _ = Ops(in, Result{Items: []ItemOut{i1}}, "T0001", parseTarget)
 	if len(ops) != 0 {
@@ -264,35 +264,44 @@ func TestConfirmedRewordingIsNoOp(t *testing.T) {
 	}
 }
 
-func TestUserGroupsReadByHandle(t *testing.T) {
-	in := Input{Prompts: testPrompts, Messages: []slack.Message{{TS: "1700000000.000100", Text: "<!subteam^S0000000001|@team-a> please"}}}
+func TestAPersonIsAUserAGroupOrATeam(t *testing.T) {
+	in := Input{Prompts: testPrompts, Messages: []slack.Message{{TS: "1700000000.000100", Text: "<!subteam^S0000000001|@team-a> please"}},
+		Users: map[string]slack.User{"U0000000001": {Name: "ana", Email: "ana@example.com"}}}
 	b := opBuilder{in: in}
-	for id, want := range map[string]items.Person{
-		"S0000000001": {Key: "group:S0000000001", Name: "@team-a"},
-		"S0000000002": {Key: "group:S0000000002", Name: slack.UnknownGroup},
+	for name, c := range map[string]struct {
+		in   PersonOut
+		want items.Person
+	}{
+		"a cached user":               {PersonOut{ID: "U0000000001"}, items.Person{Key: "slack:U0000000001", Name: "ana", Aliases: []string{"email:ana@example.com"}}},
+		"a cached user, named too":    {PersonOut{ID: "U0000000001", Name: "Ana Maria"}, items.Person{Key: "slack:U0000000001", Name: "ana", Aliases: []string{"email:ana@example.com"}}},
+		"an unknown user, named":      {PersonOut{ID: "U0000000002", Name: "bia"}, items.Person{Key: "slack:U0000000002", Name: "bia"}},
+		"an unknown user":             {PersonOut{ID: "U0000000002"}, items.Person{Key: "slack:U0000000002", Name: "U0000000002"}},
+		"a mentioned group":           {PersonOut{ID: "S0000000001", Name: "@whatever"}, items.Person{Key: "group:S0000000001", Name: "@team-a"}},
+		"an unmentioned group":        {PersonOut{ID: "S0000000002"}, items.Person{Key: "group:S0000000002", Name: slack.UnknownGroup}},
+		"an unmentioned group, named": {PersonOut{ID: "S0000000002", Name: "@team-b"}, items.Person{Key: "group:S0000000002", Name: "@team-b"}},
+		"a team by name":              {PersonOut{Name: " Plataforma Billing "}, items.Person{Key: "group:Plataforma Billing", Name: "Plataforma Billing"}},
+		"nobody":                      {PersonOut{}, items.Person{}},
 	} {
-		if got := b.person(id); !reflect.DeepEqual(got, want) {
-			t.Errorf("person(%s) = %+v, want %+v", id, got, want)
+		if got := b.person(c.in); !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s: person(%+v) = %+v, want %+v", name, c.in, got, c.want)
 		}
+	}
+	if got := b.people([]PersonOut{{}, {ID: "U0000000002", Name: "bia"}, {}}); len(got) != 1 || got[0].Key != "slack:U0000000002" {
+		t.Errorf("people() = %+v, want bia alone", got)
 	}
 }
 
-func TestAPersonEchoedAsTheLedgerRendersItKeepsItsID(t *testing.T) {
-	in := Input{Prompts: testPrompts, Messages: []slack.Message{{TS: "1700000000.000100", Text: "<!subteam^S0000000001|@team-a> please"}},
-		Users: map[string]slack.User{"U0000000001": {Name: "ana"}}}
-	b := opBuilder{in: in}
-	for ref, want := range map[string]items.Person{
-		"U0000000001":                       {Key: "slack:U0000000001", Name: "ana"},
-		"ana (U0000000001)":                 {Key: "slack:U0000000001", Name: "ana"},
-		"<@U0000000001|ana>":                {Key: "slack:U0000000001", Name: "ana"},
-		"<@U0000000001>":                    {Key: "slack:U0000000001", Name: "ana"},
-		"group:ana (U0000000001)":           {Key: "slack:U0000000001", Name: "ana"},
-		"group:group:group:S0000000001":     {Key: "group:S0000000001", Name: "@team-a"},
-		"group:Plataforma Billing":    {Key: "group:Plataforma Billing", Name: "Plataforma Billing"},
-		"group:group:#temp-churrasco": {Key: "group:#temp-churrasco", Name: "#temp-churrasco"},
+func TestAnAnswerNamingAPersonThePluginMayNotWriteIsRefused(t *testing.T) {
+	in := loadInput(t)
+	for name, person := range map[string]PersonOut{
+		"a rendered user as a team name": {Name: "ana (U0000000001)"},
+		"a key as a team name":           {Name: "group:Plataforma Billing"},
+		"a mention as a team name":       {Name: "<@U0000000001|ana>"},
 	} {
-		if got := b.person(ref); !reflect.DeepEqual(got, want) {
-			t.Errorf("person(%q) = %+v, want %+v", ref, got, want)
+		r := extractScripted(t, in, "answer.json")
+		r.Items[2].WaitingOn = []PersonOut{person}
+		if _, _, err := Ops(in, r, "T0001", parseTarget); err == nil || !strings.Contains(err.Error(), "person key") {
+			t.Errorf("%s: err = %v, want the key refused", name, err)
 		}
 	}
 }

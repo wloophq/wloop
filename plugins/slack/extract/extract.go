@@ -63,15 +63,20 @@ type Result struct {
 }
 
 // ItemOut is the schema's item, v2 fields plus ref, mode and place.
+// PersonOut is a person an answer names: a Slack user or user group by ID, else a team
+// or role by Name; empty when nobody.
+type PersonOut struct{ ID, Name string }
+
 type ItemOut struct {
-	Ref, Kind, Summary, OriginTS, Requester                                    string   // Ref is an Item.ID of Input.Ledger, or "n<N>" for a new item
-	Assignees, WaitingOn                                                       []string // Slack user ids
+	Ref, Kind, Summary, OriginTS                                               string // Ref is an Item.ID of Input.Ledger, or "n<N>" for a new item
+	Requester                                                                  PersonOut
+	Assignees, WaitingOn                                                       []PersonOut
 	AssignmentTS, AssignmentBasis, State, Resolution, EvidenceTS, EvidenceKind string
 	Confidence, Ambiguity, Context, Deadline                                   string
 	Links                                                                      []struct{ URL, Label string }
 	Options                                                                    []struct {
 		Option   string
-		BackedBy []string
+		BackedBy []PersonOut
 	}
 	Mode  string                        // "none", "headless", "session"
 	Place struct{ Context, Why string } // Context is one of Input.Contexts or ""
@@ -142,29 +147,29 @@ type wireResult struct {
 }
 
 type wireItem struct {
-	Ref             string   `json:"ref"`
-	Kind            string   `json:"kind"`
-	Summary         string   `json:"summary"`
-	OriginTS        string   `json:"origin_ts"`
-	Requester       string   `json:"requester"`
-	Assignees       []string `json:"assignees"`
-	AssignmentTS    string   `json:"assignment_ts"`
-	AssignmentBasis string   `json:"assignment_basis"`
-	WaitingOn       []string `json:"waiting_on"`
-	State           string   `json:"state"`
-	Resolution      string   `json:"resolution"`
-	EvidenceTS      string   `json:"evidence_ts"`
-	EvidenceKind    string   `json:"evidence_kind"`
-	Confidence      string   `json:"confidence"`
-	Ambiguity       string   `json:"ambiguity"`
+	Ref             string       `json:"ref"`
+	Kind            string       `json:"kind"`
+	Summary         string       `json:"summary"`
+	OriginTS        string       `json:"origin_ts"`
+	Requester       wirePerson   `json:"requester"`
+	Assignees       []wirePerson `json:"assignees"`
+	AssignmentTS    string       `json:"assignment_ts"`
+	AssignmentBasis string       `json:"assignment_basis"`
+	WaitingOn       []wirePerson `json:"waiting_on"`
+	State           string       `json:"state"`
+	Resolution      string       `json:"resolution"`
+	EvidenceTS      string       `json:"evidence_ts"`
+	EvidenceKind    string       `json:"evidence_kind"`
+	Confidence      string       `json:"confidence"`
+	Ambiguity       string       `json:"ambiguity"`
 	Links           []struct {
 		URL   string `json:"url"`
 		Label string `json:"label"`
 	} `json:"links"`
 	Context string `json:"context"`
 	Options []struct {
-		Option   string   `json:"option"`
-		BackedBy []string `json:"backed_by"`
+		Option   string       `json:"option"`
+		BackedBy []wirePerson `json:"backed_by"`
 	} `json:"options"`
 	Deadline string `json:"deadline"`
 	Mode     string `json:"mode"`
@@ -180,6 +185,19 @@ type wireSeg struct {
 	ToTS   string    `json:"to_ts"`
 	Topic  string    `json:"topic"`
 	Brief  wireBrief `json:"brief"`
+}
+
+type wirePerson struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+func personsOut(ws []wirePerson) []PersonOut {
+	out := make([]PersonOut, len(ws))
+	for i, w := range ws {
+		out[i] = PersonOut(w)
+	}
+	return out
 }
 
 type wireLinkTo struct {
@@ -237,8 +255,8 @@ func decode(raw []byte, in Input) (Result, error) {
 		}
 		refs[wi.Ref] = true
 		it := ItemOut{
-			Ref: wi.Ref, Kind: wi.Kind, Summary: wi.Summary, OriginTS: wi.OriginTS, Requester: wi.Requester,
-			Assignees: wi.Assignees, WaitingOn: wi.WaitingOn, AssignmentTS: wi.AssignmentTS,
+			Ref: wi.Ref, Kind: wi.Kind, Summary: wi.Summary, OriginTS: wi.OriginTS, Requester: PersonOut(wi.Requester),
+			Assignees: personsOut(wi.Assignees), WaitingOn: personsOut(wi.WaitingOn), AssignmentTS: wi.AssignmentTS,
 			AssignmentBasis: wi.AssignmentBasis, State: wi.State, Resolution: wi.Resolution,
 			EvidenceTS: wi.EvidenceTS, EvidenceKind: wi.EvidenceKind, Confidence: wi.Confidence,
 			Ambiguity: wi.Ambiguity, Context: wi.Context, Deadline: wi.Deadline, Mode: wi.Mode,
@@ -249,8 +267,8 @@ func decode(raw []byte, in Input) (Result, error) {
 		for _, o := range wi.Options {
 			it.Options = append(it.Options, struct {
 				Option   string
-				BackedBy []string
-			}{o.Option, o.BackedBy})
+				BackedBy []PersonOut
+			}{o.Option, personsOut(o.BackedBy)})
 		}
 		it.Place.Why = wi.Place.Why
 		if offered[wi.Place.Context] {

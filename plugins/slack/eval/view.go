@@ -12,13 +12,15 @@ import (
 // LedgerView is what the tool shows the viewer about f: the extracted items
 // with names, never the messages.
 func LedgerView(f Fixture, r extract.Result, names map[string]string, now time.Time) string {
-	who := func(ids []string) string {
-		if len(ids) == 0 {
-			return "nobody"
+	who := func(ps []extract.PersonOut) string {
+		var out []string
+		for _, p := range ps {
+			if p.ID != "" || p.Name != "" {
+				out = append(out, cmpOr(names[p.ID], cmpOr(p.Name, p.ID)))
+			}
 		}
-		out := make([]string, len(ids))
-		for i, id := range ids {
-			out[i] = cmpOr(names[id], id)
+		if len(out) == 0 {
+			return "nobody"
 		}
 		return strings.Join(out, ", ")
 	}
@@ -46,7 +48,7 @@ func LedgerView(f Fixture, r extract.Result, names map[string]string, now time.T
 	for _, it := range r.Items {
 		lines = append(lines,
 			fmt.Sprintf("- [%s] %s", it.Kind, it.Summary),
-			fmt.Sprintf("  requested by %s on %s; assignees: %s (assigned %s, %s)", who([]string{it.Requester}), when(it.OriginTS), who(it.Assignees), when(it.AssignmentTS), it.AssignmentBasis))
+			fmt.Sprintf("  requested by %s on %s; assignees: %s (assigned %s, %s)", who([]extract.PersonOut{it.Requester}), when(it.OriginTS), who(it.Assignees), when(it.AssignmentTS), it.AssignmentBasis))
 		state := fmt.Sprintf("  waiting on: %s; state: %s", who(it.WaitingOn), it.State)
 		if it.State == "resolved" {
 			state += fmt.Sprintf(", %s on %s (%s)", it.Resolution, when(it.EvidenceTS), it.EvidenceKind)

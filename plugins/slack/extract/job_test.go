@@ -23,8 +23,8 @@ import (
 
 const (
 	jTeam   = "T000AAA"
-	jViewer = "U000AAA"
-	jOther  = "U000BBB"
+	jViewer = "U000000AAA"
+	jOther  = "U000000BBB"
 	jChan   = "C000AAA"
 	jDM     = "D000AAA"
 )
@@ -240,10 +240,6 @@ func (l *recordingLedger) Items(ctx context.Context, u unit.Unit) ([]items.Item,
 	return l.host.Broker().Items(ctx, u)
 }
 
-func (l *recordingLedger) All(ctx context.Context) (map[unit.Unit][]items.Item, error) {
-	return l.host.Broker().All(ctx)
-}
-
 type jobAsker struct {
 	mu    sync.Mutex
 	asks  []host.Ask
@@ -326,9 +322,12 @@ func thread(anchor string) unit.Unit { return slack.ThreadUnit(jTeam, jChan, anc
 
 type obj = map[string]any
 
+// jPerson is a person of an answer, by id.
+func jPerson(id string) obj { return obj{"id": id, "name": ""} }
+
 func jItem(ref, origin string, mods ...func(obj)) obj {
-	it := obj{"ref": ref, "kind": "request", "summary": "Bob asks Ann for a review", "origin_ts": origin, "requester": jOther,
-		"assignees": []string{jViewer}, "assignment_ts": origin, "assignment_basis": "explicit_mention", "waiting_on": []string{jViewer},
+	it := obj{"ref": ref, "kind": "request", "summary": "Bob asks Ann for a review", "origin_ts": origin, "requester": jPerson(jOther),
+		"assignees": []any{jPerson(jViewer)}, "assignment_ts": origin, "assignment_basis": "explicit_mention", "waiting_on": []any{jPerson(jViewer)},
 		"state": "open", "resolution": "none", "evidence_ts": "", "evidence_kind": "none", "confidence": "high", "ambiguity": "",
 		"links": []any{}, "context": "", "options": []any{}, "deadline": "", "mode": "none", "place": obj{"context": "", "why": ""}}
 	for _, m := range mods {
@@ -812,7 +811,7 @@ func TestExtractedReviewLinkResolvesOnReview(t *testing.T) {
 	r := newRig(t)
 	u := thread(ts(1))
 	pr := unit.Unit{Provider: githubProvider, Key: "acme/widget#527"}
-	r.facts.post(jChan, ts(1), "", jOther, "<@U000AAA> please review PR 527", jT0)
+	r.facts.post(jChan, ts(1), "", jOther, "<@U000000AAA> please review PR 527", jT0)
 	r.asker.reply = func(int, host.Ask) ([]byte, error) {
 		return answerJSON(t, []obj{jItem("n1", ts(1))}, nil,
 			[]obj{{"item": "n1", "target": "github:" + pr.Key, "kind": "review", "evidence_ts": ts(1)}}, nil), nil
@@ -892,45 +891,5 @@ func TestAnswerSegmentsAreOrderedAndClosedBeforeApply(t *testing.T) {
 	want := []slack.Span{{ID: deck, FromTS: ts(1), ToTS: ts(2)}, {FromTS: ts(3)}}
 	if len(r.segs.spans) != 2 || !slices.Equal(r.segs.spans[1], want) {
 		t.Fatalf("second Apply got %+v, want %+v: ascending, the deck closed at its last message", r.segs.spans, want)
-	}
-}
-
-func TestARunRepairsThePersonKeysTheLedgerHolds(t *testing.T) {
-	r := newRig(t)
-	u := thread(ts(1))
-	ctx := context.Background()
-	kind, summary := items.Kind("request"), "review the deck"
-	bad := func(ref string) items.Person { return items.Person{Key: "group:" + ref, Name: ref} }
-	if _, err := r.ledger.host.Broker().Apply(ctx, items.Extracted, []items.Op{
-		{Op: "create", Unit: u, Item: "n1", Anchor: unit.Anchor{Unit: u, Ref: jChan + "/" + ts(1), At: jT0},
-			Fields: &items.Fields{Kind: &kind, Summary: &summary, Requester: ptr(bad("group:ana (U0000000001)")),
-				WaitingOn: &[]items.Person{bad("group:group:macedo (U0000000002)"), bad("Plataforma Billing")},
-				Options:   &[]items.Option{{Label: "ship it", ArguedBy: []items.Person{bad("group:ana (U0000000001)")}}, {Label: "wait"}}}},
-		{Op: "assign", Unit: u, Item: "n1", Anchor: unit.Anchor{Unit: u, Ref: jChan + "/" + ts(1), At: jT0},
-			Assignees: []items.Person{bad("macedo (U0000000002)")}, Basis: "explicit_mention"},
-		{Op: "create", Unit: u, Item: "n2", Anchor: unit.Anchor{Unit: u, Ref: jChan + "/" + ts(1), At: jT0},
-			Fields: &items.Fields{Kind: &kind, Summary: &summary, Requester: &items.Person{Key: "slack:U0000000003", Name: "bia"},
-				WaitingOn: &[]items.Person{{Key: "group:S0000000001", Name: "a user group"}, {Key: "group:Plataforma Billing", Name: "Plataforma Billing"}}}},
-		{Op: "assign", Unit: u, Item: "n2", Anchor: unit.Anchor{Unit: u, Ref: jChan + "/" + ts(1), At: jT0},
-			Assignees: []items.Person{{Key: "group:S0000000001", Name: "a user group"}}, Basis: "group_ask"},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	r.run(jT0.Add(2 * time.Minute))
-	its := r.items(u)
-	if len(its) != 2 {
-		t.Fatalf("items %+v", its)
-	}
-	it := its[0]
-	if it.Requester.Key != "slack:U0000000001" || !slices.Equal(keys(it.WaitingOn), []string{"slack:U0000000002", "group:Plataforma Billing"}) ||
-		!slices.Equal(keys(it.Assignees), []string{"slack:U0000000002"}) || it.Basis != "explicit_mention" {
-		t.Fatalf("after the repair: requester %+v, waiting on %+v, assignees %+v (%s)", it.Requester, it.WaitingOn, it.Assignees, it.Basis)
-	}
-	if len(it.Options) != 2 || it.Options[0].Label != "ship it" || !slices.Equal(keys(it.Options[0].ArguedBy), []string{"slack:U0000000001"}) || it.Options[1].Label != "wait" {
-		t.Fatalf("after the repair: options %+v", it.Options)
-	}
-	r.run(jT0.Add(4 * time.Minute))
-	if len(r.ledger.ops) != 1 || len(r.ledger.ops[0]) != 2 || r.ledger.ops[0][0].Item != "n1" || r.ledger.ops[0][1].Item != "n1" {
-		t.Fatalf("Applies %+v, want one with the repair's update and assign of n1, once per process, and nothing for n2's sound people", r.ledger.ops)
 	}
 }

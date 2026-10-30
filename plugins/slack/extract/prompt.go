@@ -1,6 +1,7 @@
 package extract
 
 import (
+	"cmp"
 	"context"
 	_ "embed"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	slack "github.com/wloophq/wloop/plugins/slack/domain"
 	"github.com/wloophq/wloop/plugins/slack/items"
 	"github.com/wloophq/wloop/plugins/slack/jsonschema"
 )
@@ -151,17 +153,26 @@ func renderLedger(in Input) string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
+// person renders p as the conversation renders them: a user as a mention, a user group as
+// a subteam mention, a team or role by its name.
 func person(p items.Person) string {
 	if p.Key == "" {
 		return "nobody"
 	}
-	if id, ok := strings.CutPrefix(p.Key, "slack:"); ok {
+	if id, ok := strings.CutPrefix(p.Key, slack.UserKey("")); ok {
 		if p.Name == "" || p.Name == id {
-			return id
+			return "<@" + id + ">"
 		}
-		return p.Name + " (" + id + ")"
+		return "<@" + id + "|" + p.Name + ">"
 	}
-	return p.Key
+	name := strings.TrimPrefix(p.Key, slack.GroupKey(""))
+	if !slack.IsGroupID(name) {
+		return cmp.Or(p.Name, name)
+	}
+	if p.Name == "" || p.Name == slack.UnknownGroup {
+		return "<!subteam^" + name + ">"
+	}
+	return "<!subteam^" + name + "|" + p.Name + ">"
 }
 
 func people(ps []items.Person) string {

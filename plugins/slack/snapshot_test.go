@@ -63,8 +63,12 @@ func scriptedItem(ref, origin, requester string, waiting []string, state string)
 	if state == "resolved" {
 		res, ev, kind = "done", ts(3), "message"
 	}
-	return map[string]any{"ref": ref, "kind": "request", "summary": "item " + ref, "origin_ts": origin, "requester": requester,
-		"assignees": waiting, "assignment_ts": origin, "assignment_basis": "explicit_mention", "waiting_on": waiting,
+	people := make([]any, len(waiting))
+	for i, id := range waiting {
+		people[i] = answerPerson(id)
+	}
+	return map[string]any{"ref": ref, "kind": "request", "summary": "item " + ref, "origin_ts": origin, "requester": answerPerson(requester),
+		"assignees": people, "assignment_ts": origin, "assignment_basis": "explicit_mention", "waiting_on": people,
 		"state": state, "resolution": res, "evidence_ts": ev, "evidence_kind": kind, "confidence": "high", "ambiguity": "",
 		"links": []any{}, "context": "", "options": []any{}, "deadline": "", "mode": "none",
 		"place": map[string]string{"context": "", "why": ""}}

@@ -3,7 +3,6 @@ package slackrows
 import (
 	"encoding/json"
 	"net/url"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -344,8 +343,6 @@ func names(ps []items.Person) []string {
 	return out
 }
 
-var groupID = regexp.MustCompile(`^S[A-Z0-9]+$`)
-
 // withGroupNames is in with each user group an item names by its raw id
 // named by its handle in the messages, else as dslack.UnknownGroup.
 func withGroupNames(in *Input) *Input {
@@ -354,7 +351,7 @@ func withGroupNames(in *Input) *Input {
 	for i, it := range in.items {
 		for j, p := range it.WaitingOn {
 			id, ok := strings.CutPrefix(p.Key, "group:")
-			if !ok || !groupID.MatchString(id) || (p.Name != id && p.Name != "") {
+			if !ok || !dslack.IsGroupID(id) || (p.Name != id && p.Name != "") {
 				continue
 			}
 			if handles == nil {

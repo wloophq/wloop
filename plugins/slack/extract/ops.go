@@ -3,7 +3,6 @@ package extract
 import (
 	"cmp"
 	"fmt"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -30,8 +29,9 @@ func itemIDs(in Input, r Result) map[string]string {
 	return out
 }
 
-// Ops diffs r against in.Ledger: create, update, assign, resolve, reopen, link. People are
-// items.Person{Key: "slack:<id>", Name, Aliases: ["email:<addr>"] when the cache has an email}.
+// Ops diffs r against in.Ledger: create, update, assign, resolve, reopen, link. A person is a
+// Slack user ("slack:<id>", with an "email:<addr>" alias when the cache has one), a user group
+// ("group:<id>") or a team named in the conversation ("group:<name>"); any other key is refused.
 // A new item's id is "e<origin ts without its dot>", suffixed ".2", ".3"... while taken, so a
 // retried run creates it once. An item the result omits gets no op.
 func Ops(in Input, r Result, team string, parse ParseTarget) (ops []items.Op, dropped int, err error) {
@@ -67,6 +67,9 @@ func Ops(in Input, r Result, team string, parse ParseTarget) (ops []items.Op, dr
 			continue
 		}
 		ops = append(ops, items.Op{Op: "link", Unit: in.Unit, Item: id, Anchor: b.anchor(l.EvidenceTS), To: &to, LinkKind: l.Kind})
+	}
+	if err := validPeople(ops); err != nil {
+		return nil, 0, err
 	}
 	return ops, dropped, nil
 }
@@ -187,8 +190,7 @@ func (b *opBuilder) fields(out ItemOut) items.Fields {
 		Kind: &kind, Summary: &out.Summary, Context: &out.Context, Deadline: &out.Deadline,
 		Ambiguity: &out.Ambiguity, Options: &opts, URLs: &urls, WaitingOn: &waiting, Confidence: &conf,
 	}
-	if out.Requester != "" {
-		p := b.person(out.Requester)
+	if p := b.person(out.Requester); p.Key != "" {
 		f.Requester = &p
 	}
 	return f
@@ -241,29 +243,6 @@ func keys(ps []items.Person) []string {
 	return out
 }
 
-var (
-	slackUserID  = regexp.MustCompile(`^[UW][A-Z0-9]+$`)
-	slackGroupID = regexp.MustCompile(`^S[A-Z0-9]+$`)
-	// renderedID is an id inside a mention, "<@U0001|ana>", or after a name, "ana (U0001)".
-	renderedID = regexp.MustCompile(`^(?:<@([UWS][A-Z0-9]+)(?:\|[^>]*)?>|.+ \(([UWS][A-Z0-9]+)\))$`)
-)
-
-// personID is the id a reference names, without the "group:" prefixes a rendered key carries.
-func personID(ref string) string {
-	ref = strings.TrimSpace(ref)
-	for {
-		rest, ok := strings.CutPrefix(ref, "group:")
-		if !ok {
-			break
-		}
-		ref = strings.TrimSpace(rest)
-	}
-	if m := renderedID.FindStringSubmatch(ref); m != nil {
-		return cmp.Or(m[1], m[2])
-	}
-	return ref
-}
-
 // groupHandles are the handles of the user groups the input's messages mention.
 func (b *opBuilder) groupHandles() map[string]string {
 	if b.groups == nil {
@@ -275,30 +254,67 @@ func (b *opBuilder) groupHandles() map[string]string {
 	return b.groups
 }
 
-func (b *opBuilder) people(ids []string) []items.Person {
-	out := make([]items.Person, 0, len(ids))
-	for _, id := range ids {
-		out = append(out, b.person(id))
+// people are the ledger's people for ps, without the empty ones.
+func (b *opBuilder) people(ps []PersonOut) []items.Person {
+	out := make([]items.Person, 0, len(ps))
+	for _, p := range ps {
+		if person := b.person(p); person.Key != "" {
+			out = append(out, person)
+		}
 	}
 	return out
 }
 
-// person is a Slack user for a user id, else a group: a user group id or a team's name. The
-// reference may be the id as the ledger renders it ("ana (U0001)", "group:..."), which an
-// answer echoes.
-func (b *opBuilder) person(ref string) items.Person {
-	id := personID(ref)
-	if slackGroupID.MatchString(id) {
-		return items.Person{Key: "group:" + id, Name: slack.GroupName(id, b.groupHandles())}
+// person is the ledger's person for p: a Slack user or user group by its id, named from the
+// user cache or the messages, else the team or role the answer named; nobody when p is empty.
+func (b *opBuilder) person(p PersonOut) items.Person {
+	id, name := strings.TrimSpace(p.ID), strings.TrimSpace(p.Name)
+	switch {
+	case slack.IsUserID(id):
+		out := items.Person{Key: slack.UserKey(id), Name: cmp.Or(userName(b.in, id), id)}
+		if out.Name == id && name != "" {
+			out.Name = name
+		}
+		if u, ok := b.in.Users[id]; ok && u.Email != "" {
+			out.Aliases = []string{"email:" + u.Email}
+		}
+		return out
+	case slack.IsGroupID(id):
+		out := items.Person{Key: slack.GroupKey(id), Name: slack.GroupName(id, b.groupHandles())}
+		if out.Name == slack.UnknownGroup && name != "" {
+			out.Name = name
+		}
+		return out
+	case name != "":
+		return items.Person{Key: slack.TeamKey(name), Name: name}
 	}
-	if !slackUserID.MatchString(id) {
-		return items.Person{Key: "group:" + id, Name: id}
+	return items.Person{}
+}
+
+// validPeople refuses an op naming a person the plugin may not write (slack.ValidPersonKey).
+func validPeople(ops []items.Op) error {
+	for _, op := range ops {
+		ps := slices.Clone(op.Assignees)
+		if f := op.Fields; f != nil {
+			if f.Requester != nil {
+				ps = append(ps, *f.Requester)
+			}
+			if f.WaitingOn != nil {
+				ps = append(ps, *f.WaitingOn...)
+			}
+			if f.Options != nil {
+				for _, o := range *f.Options {
+					ps = append(ps, o.ArguedBy...)
+				}
+			}
+		}
+		for _, p := range ps {
+			if err := slack.ValidPersonKey(p.Key); err != nil {
+				return fmt.Errorf("extract: item %s: %w", op.Item, err)
+			}
+		}
 	}
-	p := items.Person{Key: "slack:" + id, Name: userName(b.in, id)}
-	if u, ok := b.in.Users[id]; ok && u.Email != "" {
-		p.Aliases = []string{"email:" + u.Email}
-	}
-	return p
+	return nil
 }
 
 func firstOf(ss ...string) string {

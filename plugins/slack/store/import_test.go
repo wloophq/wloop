@@ -29,7 +29,7 @@ func plantImport(t *testing.T, dir string) {
 		exportedSchema(),
 		`CREATE TABLE extraction_briefs (provider TEXT NOT NULL, unit_key TEXT NOT NULL, brief TEXT NOT NULL)`,
 		`INSERT INTO slack_conversations (id, team, name, kind) VALUES ('C000AAA', 'T000AAA', 'general', 'channel')`,
-		`INSERT INTO slack_messages (conversation, ts, user, text) VALUES ('C000AAA', '1700000000.000100', 'U000ANA', 'can you look?')`,
+		`INSERT INTO slack_messages (conversation, ts, user, text) VALUES ('C000AAA', '1700000000.000100', 'U000000ANA', 'can you look?')`,
 		`INSERT INTO slack_objects (object, conversation, ts, kind, version) VALUES ('C000AAA/1700000000.000100', 'C000AAA', '1700000000.000100', 'thread', 'v1')`,
 		`INSERT INTO extraction_cursors (provider, unit_key, last_ts, verdict, at) VALUES ('slack', 'T000AAA/C000AAA/1700000000.000100', '1700000000.000100', 'open', '2026-10-20T12:00:00Z')`,
 		`INSERT INTO extraction_briefs (provider, unit_key, brief) VALUES ('slack', 'T000AAA/C000AAA/1700000000.000100', '{"goal":"review"}')`,

@@ -107,8 +107,8 @@ func TestPromptPlaceholders(t *testing.T) {
 			t.Errorf("%s appears %d times in the template", p, n)
 		}
 	}
-	if n := len(strings.Fields(promptTemplate)); n > 5500 {
-		t.Errorf("the template has %d words, over 5500", n)
+	if n := len(strings.Fields(promptTemplate)); n > 5600 {
+		t.Errorf("the template has %d words, over 5600", n)
 	}
 	in := loadInput(t)
 	in.Messages[0].Text += " {{NOW}}"
@@ -126,6 +126,27 @@ func TestPromptPlaceholders(t *testing.T) {
 	}
 }
 
+func TestTheLedgerRendersPeopleAsTheConversationDoes(t *testing.T) {
+	in := loadInput(t)
+	in.Ledger = []items.Item{{ID: "i1", Kind: "decision", State: "open", Summary: "pick a default",
+		Requester: items.Person{Key: "slack:U0000000001", Name: "Ann"},
+		Assignees: []items.Person{{Key: "group:S0000000001", Name: "@team-a"}, {Key: "group:S0000000002", Name: slack.UnknownGroup}},
+		WaitingOn: []items.Person{{Key: "group:Plataforma Billing", Name: "Plataforma Billing"}, {Key: "slack:U0000000002", Name: "U0000000002"}},
+		Options:   []items.Option{{Label: "on", ArguedBy: []items.Person{{Key: "slack:U0000000001", Name: "Ann"}}}}}}
+	got, err := Prompt(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"requester: <@U0000000001|Ann>; assignees: <!subteam^S0000000001|@team-a>, <!subteam^S0000000002>; basis: ; waiting on: Plataforma Billing, <@U0000000002>",
+		"option: on (backed by <@U0000000001|Ann>)",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the prompt lacks %q in:\n%s", want, got)
+		}
+	}
+}
+
 var (
 	slackIDPattern = regexp.MustCompile(`\b[UCWTBSGDAEF][A-Z0-9]*[0-9][A-Z0-9]*\b`)
 	urlPattern     = regexp.MustCompile(`https?://([^/\s"'<>|)` + "`" + `]+)`)
@@ -133,7 +154,7 @@ var (
 
 func TestPromptHoldsNoRealData(t *testing.T) {
 	for _, id := range slackIDPattern.FindAllString(promptTemplate, -1) {
-		if !strings.HasPrefix(id, "U000") && !strings.HasPrefix(id, "C000") {
+		if !strings.HasPrefix(id, "U000") && !strings.HasPrefix(id, "S000") && !strings.HasPrefix(id, "C000") {
 			t.Errorf("the template holds the Slack id %q", id)
 		}
 	}
@@ -283,10 +304,10 @@ func TestSchemaRoundTrip(t *testing.T) {
 		t.Fatalf("result = %+v", r)
 	}
 	n1 := r.Items[2]
-	if n1.Ref != "n1" || n1.Mode != "session" || n1.Place.Context != "widget" || n1.Assignees[0] != "U0000000001" {
+	if n1.Ref != "n1" || n1.Mode != "session" || n1.Place.Context != "widget" || n1.Assignees[0] != (PersonOut{ID: "U0000000001"}) {
 		t.Errorf("n1 = %+v", n1)
 	}
-	if r.Items[1].Options[1].BackedBy[0] != "U0000000003" || r.Links[0].Kind != link.Review {
+	if r.Items[1].Options[1].BackedBy[0] != (PersonOut{ID: "U0000000003"}) || r.Links[0].Kind != link.Review {
 		t.Errorf("result = %+v", r)
 	}
 
@@ -308,7 +329,7 @@ func TestUnfitAnswers(t *testing.T) {
 		"bad state":        strings.Replace(good, `"state": "open"`, `"state": "pending"`, 1),
 		"link to no item":  strings.Replace(good, `{"item": "n1"`, `{"item": "n7"`, 1),
 		"unknown segment":  strings.Replace(good, `"segments": []`, `"segments": [{"ref": "s1", "from_ts": "1700000000.000100", "to_ts": "", "topic": "x", "brief": {"unchanged": true, "goal": "", "context": "", "kind": "request", "risk": "low", "risk_why": "", "open_questions": [], "tags": {"domain": [], "audience": [], "concern": []}}}]`, 1),
-		"origin not a ts":  strings.Replace(good, `"origin_ts": "1700007200.000400", "requester": "U0000000003"`, `"origin_ts": "2023-11-14 22:13", "requester": "U0000000003"`, 1),
+		"origin not a ts":  strings.Replace(good, `"origin_ts": "1700007200.000400", "requester": {"id": "U0000000003", "name": ""}`, `"origin_ts": "2023-11-14 22:13", "requester": {"id": "U0000000003", "name": ""}`, 1),
 		"ts with a space":  strings.Replace(good, `"evidence_ts": "1700003600.000300"`, `"evidence_ts": "1700003600.000300 "`, 1),
 		"summary too long": strings.Replace(good, `"Ship the widget toggle on by default?"`, `"`+strings.Repeat("é", 201)+`"`, 1),
 	} {
