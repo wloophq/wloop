@@ -1770,3 +1770,33 @@ func TestEventsPlanOnAnEndedUnitOncePerEvent(t *testing.T) {
 		t.Errorf("items per workflow %v, want 2 keyed by event and 1 keyed by facts", count)
 	}
 }
+
+type preparedKey struct{}
+
+// preparingUnits prepares the context a sweep reads its facts through and counts the reads made through it.
+type preparingUnits struct {
+	*automationtest.Units
+	seen int
+}
+
+func (p *preparingUnits) Prepare(ctx context.Context) (context.Context, error) {
+	return context.WithValue(ctx, preparedKey{}, true), nil
+}
+
+func (p *preparingUnits) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error) {
+	if ctx.Value(preparedKey{}) == true {
+		p.seen++
+	}
+	return p.Units.Facts(ctx, u)
+}
+
+func TestASweepReadsTheFactsThroughThePreparedContext(t *testing.T) {
+	r := newRig(t, sweepWF("close", idle, "session.close"))
+	pu := &preparingUnits{Units: r.units}
+	r.e.Units, r.e.Keep = pu, pu
+	r.put(s1, "a")
+	r.sweep()
+	if pu.seen == 0 {
+		t.Fatal("no facts were read through the prepared context")
+	}
+}

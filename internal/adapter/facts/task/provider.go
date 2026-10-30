@@ -187,8 +187,34 @@ func (p *Provider) Due() time.Time {
 
 // task is u's task; ErrUnitGone when it is gone, or no longer listed
 // unless anyState is true, or its plugin is disabled.
+// passTask is task id as the pass ctx carries holds it, else as the store does.
+func (p *Provider) passTask(ctx context.Context, id task.ID) (task.Task, error) {
+	if pass, ok := coretasks.PassOf(ctx); ok {
+		byID, err := coretasks.Once(ctx, passTasks, func() (map[task.ID]task.Task, error) {
+			out := make(map[task.ID]task.Task, len(pass.Tasks))
+			for _, e := range pass.Tasks {
+				out[e.ID] = e
+			}
+			return out, nil
+		})
+		if e, held := byID[id]; err == nil && held {
+			return e, nil
+		}
+	}
+	return p.d.Tasks.Task(ctx, id)
+}
+
+// Prepare is ctx carrying a pass over every task, so the facts of each read the store once for all.
+func (p *Provider) Prepare(ctx context.Context) (context.Context, error) {
+	es, err := p.d.Tasks.Tasks(ctx, task.Query{})
+	if err != nil {
+		return nil, err
+	}
+	return coretasks.WithPass(ctx, &coretasks.Pass{Tasks: es}), nil
+}
+
 func (p *Provider) task(ctx context.Context, u unit.Unit, anyState bool) (task.Task, error) {
-	e, err := p.d.Tasks.Task(ctx, task.ID(u.Key))
+	e, err := p.passTask(ctx, task.ID(u.Key))
 	switch {
 	case errors.Is(err, coretasks.ErrNoTask):
 		return task.Task{}, automation.ErrUnitGone
@@ -707,6 +733,7 @@ const (
 	passItems    = "facts.items"
 	passTurns    = "facts.turns"
 	passGates    = "facts.gates"
+	passTasks    = "facts.tasks"
 )
 
 // items are the items of units; those of the pass ctx carries are read once for every unit of it.

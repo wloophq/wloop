@@ -53,7 +53,13 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 			return "", "", fmt.Errorf("refreshing facts: %w", err)
 		}
 	}
-	ev, err := e.evaluate(ctx, "", true)
+	ectx := ctx
+	if p, ok := e.Keep.(Preparer); ok {
+		if ectx, err = p.Prepare(ctx); err != nil {
+			return "", "", fmt.Errorf("preparing facts: %w", err)
+		}
+	}
+	ev, err := e.evaluate(ectx, "", true)
 	if err != nil {
 		return "", "", err
 	}

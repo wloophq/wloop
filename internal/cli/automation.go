@@ -540,6 +540,7 @@ var (
 type unitKeeping struct{ s *unitSet }
 
 var (
+	_ automation.Preparer   = unitKeeping{}
 	_ automation.Refresher  = unitKeeping{}
 	_ automation.Settler    = unitKeeping{}
 	_ automation.Gainer     = unitKeeping{}
@@ -548,6 +549,21 @@ var (
 	_ automation.Scoper     = unitKeeping{}
 	_ automation.EventFacts = unitKeeping{}
 )
+
+// Prepare is ctx as each provider that prepares an evaluation's reads leaves it.
+func (k unitKeeping) Prepare(ctx context.Context) (context.Context, error) {
+	for _, id := range k.s.order {
+		p, ok := k.s.providers[id].(automation.Preparer)
+		if !ok {
+			continue
+		}
+		var err error
+		if ctx, err = p.Prepare(ctx); err != nil {
+			return nil, fmt.Errorf("%s: %w", id, err)
+		}
+	}
+	return ctx, nil
+}
 
 func newUnitSet(providers map[unit.ProviderID]automation.Units) *unitSet {
 	s := &unitSet{providers: map[unit.ProviderID]automation.Units{}}

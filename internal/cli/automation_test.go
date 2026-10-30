@@ -671,3 +671,21 @@ type draftGatesOver struct {
 func (g draftGatesOver) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
 	return g.r.Where(ctx, q)
 }
+
+type preparedKey struct{}
+
+type preparingUnits struct{ *automationtest.Units }
+
+func (preparingUnits) Prepare(ctx context.Context) (context.Context, error) {
+	return context.WithValue(ctx, preparedKey{}, "github"), nil
+}
+
+func TestUnitsPrepareAnEvaluationThroughEachProviderThatDoes(t *testing.T) {
+	t.Parallel()
+	gh, sess := automationtest.NewUnits(), automationtest.NewUnits()
+	set := newUnitSet(map[unit.ProviderID]automation.Units{unit.GitHub: preparingUnits{gh}, unit.Session: sess})
+	ctx, err := (unitKeeping{set}).Prepare(context.Background())
+	if err != nil || ctx.Value(preparedKey{}) != "github" {
+		t.Fatalf("prepared %v %v", ctx.Value(preparedKey{}), err)
+	}
+}
