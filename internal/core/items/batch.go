@@ -313,6 +313,24 @@ func (b *batch) link(ctx context.Context, i int, o items.Op, prov items.Provenan
 	b.links[o.Unit] = append(have, l)
 	b.res.Applied = append(b.res.Applied, Applied{Op: o, Item: it, Changed: true})
 	b.log = append(b.log, LogEntry{Unit: o.Unit, Item: o.Item, Op: o, Provenance: prov, Outcome: OutcomeApplied, Reason: o.Reason, At: b.now})
+	b.settle(ctx, i, l, cur)
+}
+
+// settle applies, as derived, the op that settles cur through l from what l's target already shows.
+func (b *batch) settle(ctx context.Context, i int, l link.Link, cur *items.Item) {
+	if b.l.Settle == nil || cur == nil || cur.State != items.Open {
+		return
+	}
+	op, ok, err := b.l.Settle(ctx, l, *cur)
+	if err != nil {
+		if b.l.Log != nil {
+			b.l.Log("link %s to %s: settling %s: %v", l.From, l.To, l.Item, err)
+		}
+		return
+	}
+	if ok {
+		b.apply(ctx, i, op, items.Derived)
+	}
 }
 
 // ExtractedLinkLookback is how far before its item's creation an extracted link may start: the

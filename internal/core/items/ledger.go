@@ -11,6 +11,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/link"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -34,8 +35,11 @@ type Ledger struct {
 	Store   Store
 	Links   port.LinkStore             // nil refuses link ops
 	Enabled func(unit.ProviderID) bool // nil: every provider enabled
-	Clock   port.Clock
-	Log     func(string, ...any)
+	// Settle is the op that settles an open item through a link, from what the link's target already shows,
+	// such as a pull request merged before the link was made; nil settles nothing at link time.
+	Settle func(ctx context.Context, l link.Link, it items.Item) (items.Op, bool, error)
+	Clock  port.Clock
+	Log    func(string, ...any)
 
 	mu sync.Mutex
 	// confirmedNoops is the last derived value logged as a confirmed noop per item, so an
