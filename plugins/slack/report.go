@@ -61,11 +61,12 @@ func (r *reporter) changed(c store.Change) {
 	r.mark(c.Units...)
 }
 
-// mark asks for a report of units.
+// mark asks for a report of the units of units the host knows: a thread or a DM segment, never the extraction's
+// own cursors, a DM conversation or another provider's unit.
 func (r *reporter) mark(units ...unit.Unit) {
 	r.mu.Lock()
 	for _, u := range units {
-		if u.Provider == dslack.Provider {
+		if u.Provider == dslack.Provider && dslack.ValidKey(u.Key) == nil {
 			r.dirty[u] = true
 		}
 	}
