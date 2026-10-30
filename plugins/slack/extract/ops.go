@@ -80,6 +80,22 @@ type opBuilder struct {
 	ids    map[string]string // new ref -> minted id
 	taken  map[string]bool
 	groups map[string]string
+	names  map[string]string // person key -> the name the ledger holds
+}
+
+// ledgerName is the name the ledger holds for key, "" when none worth keeping.
+func (b *opBuilder) ledgerName(key, id string) string {
+	if b.names == nil {
+		b.names = map[string]string{}
+		for _, it := range b.ledger {
+			for _, p := range peopleOf(it) {
+				if p.Name != "" && p.Name != strings.TrimPrefix(strings.TrimPrefix(p.Key, slack.UserKey("")), slack.GroupKey("")) && p.Name != slack.UnknownGroup {
+					b.names[p.Key] = p.Name
+				}
+			}
+		}
+	}
+	return b.names[key]
 }
 
 func (b *opBuilder) mint(originTS string) string {
@@ -266,14 +282,15 @@ func (b *opBuilder) people(ps []PersonOut) []items.Person {
 }
 
 // person is the ledger's person for p: a Slack user or user group by its id, named from the
-// user cache or the messages, else the team or role the answer named; nobody when p is empty.
+// user cache or the messages, else as the ledger names them, else as the answer does; a team
+// or role by the name the answer gave; nobody when p is empty.
 func (b *opBuilder) person(p PersonOut) items.Person {
 	id, name := strings.TrimSpace(p.ID), strings.TrimSpace(p.Name)
 	switch {
 	case slack.IsUserID(id):
 		out := items.Person{Key: slack.UserKey(id), Name: cmp.Or(userName(b.in, id), id)}
-		if out.Name == id && name != "" {
-			out.Name = name
+		if out.Name == id {
+			out.Name = cmp.Or(b.ledgerName(out.Key, id), name, id)
 		}
 		if u, ok := b.in.Users[id]; ok && u.Email != "" {
 			out.Aliases = []string{"email:" + u.Email}
@@ -281,8 +298,8 @@ func (b *opBuilder) person(p PersonOut) items.Person {
 		return out
 	case slack.IsGroupID(id):
 		out := items.Person{Key: slack.GroupKey(id), Name: slack.GroupName(id, b.groupHandles())}
-		if out.Name == slack.UnknownGroup && name != "" {
-			out.Name = name
+		if out.Name == slack.UnknownGroup {
+			out.Name = cmp.Or(b.ledgerName(out.Key, id), name, slack.UnknownGroup)
 		}
 		return out
 	case name != "":

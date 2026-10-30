@@ -96,7 +96,8 @@
        },
        "name": {
         "type": "string",
-        "maxLength": 80
+        "maxLength": 80,
+        "pattern": "^[^<>\\n]*$"
        }
       }
      },
@@ -116,7 +117,8 @@
         },
         "name": {
          "type": "string",
-         "maxLength": 80
+         "maxLength": 80,
+         "pattern": "^[^<>\\n]*$"
         }
        }
       }
@@ -153,7 +155,8 @@
         },
         "name": {
          "type": "string",
-         "maxLength": 80
+         "maxLength": 80,
+         "pattern": "^[^<>\\n]*$"
         }
        }
       }
@@ -259,7 +262,8 @@
            },
            "name": {
             "type": "string",
-            "maxLength": 80
+            "maxLength": 80,
+            "pattern": "^[^<>\\n]*$"
            }
           }
          }

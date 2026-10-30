@@ -10,7 +10,7 @@ import (
 
 func init() {
 	reads = append(reads, "DB.Extraction", "ExtractionStore.States", "ExtractionStore.Watched", "ExtractionStore.Hints",
-		"ExtractionStore.Day", "SegmentStore.Of", "SegmentStore.Rehoming")
+		"ExtractionStore.Day", "ExtractionStore.Migrated", "SegmentStore.Of", "SegmentStore.Rehoming")
 	u := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1.1"}
 	writes = append(writes,
 		writeCase{method: "ExtractionStore.Save", call: func(ctx context.Context, e *noteEnv) error {
@@ -22,6 +22,9 @@ func init() {
 		}, touches: true, units: []unit.Unit{u}},
 		writeCase{method: "ExtractionStore.SetWatched", call: func(ctx context.Context, e *noteEnv) error {
 			return e.db.Extraction().SetWatched(ctx, u, true, noteAt)
+		}},
+		writeCase{method: "ExtractionStore.MarkMigrated", call: func(ctx context.Context, e *noteEnv) error {
+			return e.db.Extraction().MarkMigrated(ctx, "person-keys", noteAt)
 		}},
 		writeCase{method: "ExtractionStore.Spend", call: func(ctx context.Context, e *noteEnv) error {
 			return e.db.Extraction().Spend(ctx, "2026-10-22", 0.1)

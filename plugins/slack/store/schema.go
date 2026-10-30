@@ -15,10 +15,16 @@ import (
 //go:embed schema.sql
 var schema string
 
-var migrations = []store.Migration{{Version: 1, Up: func(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.ExecContext(ctx, schema)
-	return err
-}}}
+var migrations = []store.Migration{
+	{Version: 1, Up: func(ctx context.Context, tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, schema)
+		return err
+	}},
+	{Version: 2, Up: func(ctx context.Context, tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS ledger_migrations (name TEXT PRIMARY KEY, at TEXT NOT NULL) WITHOUT ROWID`)
+		return err
+	}},
+}
 
 var tableRE = regexp.MustCompile(`CREATE TABLE (\w+) \(`)
 

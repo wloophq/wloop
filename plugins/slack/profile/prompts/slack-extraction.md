@@ -8,8 +8,6 @@ The items already recorded for this conversation, each under its own id, with th
 
 Tag vocabulary: {{VOCABULARY}}
 
-People in the ledger appear as in the conversation: a mention, a user group mention, or a team's name.
-
 Return every item you still track under its id in `ref`, updated by the new messages. Give a new item the ref `n1`, `n2`, ... Never reuse an id for a different ask, and never return an existing ask as a new item. An item marked `confirmed` was corrected by the viewer: keep its fields unless a new message changes them. Leaving an item out never deletes it; resolve it when the conversation settles it.
 
 ## The conversation
@@ -63,7 +61,7 @@ The viewer may appear under other handles (GitHub, Jira, e-mail) that match thei
 ## Owner and next actor
 
 - **Anchor.** `origin_ts` is the message that creates the ask. `assignment_ts` is the message that gives it an owner (the same message when the ask names its owner; later when someone takes it). Always fill both with real ts values; `assignment_ts` is `""` only with basis `none`. Use the thread to resolve what "disso", "isso" or "esses pontos" refer to. Copy the same `assignment_ts` into each item it assigns.
-- **People** (`requester`, `assignees`, `waiting_on`, `backed_by`) are objects `{"id", "name"}`: `id` the Slack user (`U…`, `W…`) or user group (`S…`) id shown in the conversation or the ledger, `name` how they are called, or `""`. A team or role without an id ("o time X") has `id` `""` and its name in `name`. Nothing else goes in `id`; one object is one person; nobody is both `""`.
+- **People** (`requester`, `assignees`, `waiting_on`, `backed_by`) are objects `{"id", "name"}`: `id` the Slack user (`U…`, `W…`) or user group (`S…`) id shown in the conversation or the ledger, `name` how they are called, or `""`. A team, role or person without an id ("o time X", someone only named) has `id` `""` and its name in `name`, written as the conversation writes it, with no commentary or translation. Nothing else goes in `id`; one object is one person; nobody is both `""`.
 - **Assignees** are who is expected to act. Pick the basis as follows:
   - `explicit_mention`: the ask tags them, or calls them by name as a vocative with a second-person question. Typing the name instead of an @mention is still direct address.
   - `dm_addressee`: a 1:1 DM to them.

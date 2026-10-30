@@ -291,6 +291,17 @@ func TestAPersonIsAUserAGroupOrATeam(t *testing.T) {
 	}
 }
 
+func TestALedgerPersonOutsideTheWindowKeepsTheirName(t *testing.T) {
+	in := Input{Prompts: testPrompts, Ledger: []items.Item{{ID: "i1",
+		Assignees: []items.Person{{Key: "slack:U0000000099", Name: "Zed"}, {Key: "group:S0000000009", Name: "@team-z"}, {Key: "slack:U0000000098", Name: "U0000000098"}}}}}
+	b := opBuilder{in: in, ledger: map[string]items.Item{"i1": in.Ledger[0]}}
+	got := b.people([]PersonOut{{ID: "U0000000099"}, {ID: "S0000000009"}, {ID: "U0000000098"}, {ID: "U0000000097", Name: "new"}})
+	want := []items.Person{{Key: "slack:U0000000099", Name: "Zed"}, {Key: "group:S0000000009", Name: "@team-z"}, {Key: "slack:U0000000098", Name: "U0000000098"}, {Key: "slack:U0000000097", Name: "new"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("people = %+v, want %+v", got, want)
+	}
+}
+
 func TestAnAnswerNamingAPersonThePluginMayNotWriteIsRefused(t *testing.T) {
 	in := loadInput(t)
 	for name, person := range map[string]PersonOut{

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -240,6 +241,10 @@ func (l *recordingLedger) Items(ctx context.Context, u unit.Unit) ([]items.Item,
 	return l.host.Broker().Items(ctx, u)
 }
 
+func (l *recordingLedger) All(ctx context.Context) (map[unit.Unit][]items.Item, error) {
+	return l.host.Broker().All(ctx)
+}
+
 type jobAsker struct {
 	mu    sync.Mutex
 	asks  []host.Ask
@@ -287,10 +292,19 @@ func newRig(t testing.TB) *rig {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
+	return newRigOn(t, db, nil)
+}
+
+// newRigOn is a rig over db and the ledger of prev, a new process over the same stores.
+func newRigOn(t testing.TB, db *store.DB, prev *rig) *rig {
+	t.Helper()
 	r := &rig{t: t, db: db, facts: newFakeFacts(), watch: &fakeWatcher{}, clock: &jobClock{now: jT0}, cfg: config.Config{}}
 	r.asker = &jobAsker{reply: func(int, host.Ask) ([]byte, error) { return answerJSON(t, nil, nil, nil, nil), nil }}
 	r.segs = &segments{store: db.Segments(), clock: r.clock, events: &r.events}
 	r.ledger = &recordingLedger{host: &hosttest.Host{Now: r.clock.Now}, events: &r.events}
+	if prev != nil {
+		r.ledger.host = prev.ledger.host
+	}
 	r.job = &Job{
 		Facts: r.facts, Segments: r.segs, Writer: r.segs, DM: r.facts.dm, Ledger: r.ledger, Watcher: r.watch, Asker: r.asker,
 		Parse: func(target string) (unit.Unit, bool) {
@@ -891,5 +905,83 @@ func TestAnswerSegmentsAreOrderedAndClosedBeforeApply(t *testing.T) {
 	want := []slack.Span{{ID: deck, FromTS: ts(1), ToTS: ts(2)}, {FromTS: ts(3)}}
 	if len(r.segs.spans) != 2 || !slices.Equal(r.segs.spans[1], want) {
 		t.Fatalf("second Apply got %+v, want %+v: ascending, the deck closed at its last message", r.segs.spans, want)
+	}
+}
+
+func TestTheFirstPassAfterAnUpgradeGivesTheLedgersPeopleTodaysKeysOnce(t *testing.T) {
+	r := newRig(t)
+	r.facts.users["U0000000001"] = slack.User{ID: "U0000000001", Name: "ana", Email: "ana@example.com"}
+	u := thread(ts(1))
+	ctx := context.Background()
+	kind, summary := items.Kind("request"), "review the deck"
+	at := unit.Anchor{Unit: u, Ref: jChan + "/" + ts(1), At: jT0}
+	assignedAt := unit.Anchor{Unit: u, Ref: jChan + "/" + ts(2), At: jT0.Add(time.Minute)}
+	legacy := func(key string) items.Person { return items.Person{Key: key, Name: strings.TrimPrefix(key, "group:")} }
+	if _, err := r.ledger.host.Broker().Apply(ctx, items.Extracted, []items.Op{
+		{Op: "create", Unit: u, Item: "n1", Anchor: at, Fields: &items.Fields{Kind: &kind, Summary: &summary,
+			Requester: ptr(legacy("group:ana (U0000000001)")),
+			WaitingOn: &[]items.Person{legacy("group:group:macedo (U0000000002)"), legacy("group:group:Plataforma Billing"), {Key: "slack:U0000000003", Name: "U0000000003"}},
+			Options:   &[]items.Option{{Label: "ship it", ArguedBy: []items.Person{legacy("group:<@U0000000001|ana>")}}}}},
+		{Op: "assign", Unit: u, Item: "n1", Anchor: assignedAt, Assignees: []items.Person{legacy("group:group:S0000000001")}, Basis: "group_ask"},
+		{Op: "create", Unit: u, Item: "n2", Anchor: at, Fields: &items.Fields{Kind: &kind, Summary: &summary,
+			Requester: &items.Person{Key: "slack:U0000000001", Name: "ana", Aliases: []string{"email:ana@example.com"}},
+			WaitingOn: &[]items.Person{{Key: "group:Plataforma Billing", Name: "Plataforma Billing"}}}},
+		{Op: "create", Unit: u, Item: "n3", Anchor: at, Fields: &items.Fields{Kind: &kind, Summary: &summary, Requester: ptr(legacy("group:bia (U0000000004)"))}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.ledger.host.Apply(items.User, items.Op{Op: "update", Unit: u, Item: "n3", Anchor: at, Fields: &items.Fields{Summary: ptr("confirmed by the viewer")}}); err != nil {
+		t.Fatal(err)
+	}
+	r.run(jT0.Add(2 * time.Minute))
+	its := map[string]items.Item{}
+	for _, it := range r.items(u) {
+		its[it.ID] = it
+	}
+	n1 := its["n1"]
+	want := items.Item{
+		Requester: items.Person{Key: "slack:U0000000001", Name: "ana", Aliases: []string{"email:ana@example.com"}},
+		WaitingOn: []items.Person{{Key: "slack:U0000000002", Name: "macedo"}, {Key: "group:Plataforma Billing", Name: "Plataforma Billing"}, {Key: "slack:U0000000003", Name: "U0000000003"}},
+		Assignees: []items.Person{{Key: "group:S0000000001", Name: slack.UnknownGroup}},
+		Options:   []items.Option{{Label: "ship it", ArguedBy: []items.Person{{Key: "slack:U0000000001", Name: "ana", Aliases: []string{"email:ana@example.com"}}}}},
+	}
+	if !reflect.DeepEqual(n1.Requester, want.Requester) || !reflect.DeepEqual(n1.WaitingOn, want.WaitingOn) ||
+		!reflect.DeepEqual(n1.Assignees, want.Assignees) || !reflect.DeepEqual(n1.Options, want.Options) {
+		t.Errorf("n1 after the migration:\n%+v\nwant\n%+v", n1, want)
+	}
+	if n1.AssignedAt.Ref != assignedAt.Ref || n1.Basis != "group_ask" {
+		t.Errorf("n1 assigned at %+v (%s), want the assignment kept", n1.AssignedAt, n1.Basis)
+	}
+	if n3 := its["n3"]; n3.Requester.Key != "group:bia (U0000000004)" || !n3.Confirmed {
+		t.Errorf("the confirmed n3 was touched: %+v", n3)
+	}
+	if len(r.ledger.ops) != 1 || len(r.ledger.ops[0]) != 2 {
+		t.Fatalf("Applies %+v, want one with n1's update and assign and nothing for n2", r.ledger.ops)
+	}
+	r.run(jT0.Add(4 * time.Minute))
+	if len(r.ledger.ops) != 1 {
+		t.Fatalf("Applies %+v, want the migration applied once", r.ledger.ops)
+	}
+	r2 := newRigOn(t, r.db, r)
+	r2.run(jT0.Add(6 * time.Minute))
+	if len(r2.ledger.ops) != 0 {
+		t.Fatalf("a new process applied %+v, want the recorded migration skipped", r2.ledger.ops)
+	}
+}
+
+func TestAnAnswerNamingAPersonThePluginMayNotWriteWritesNothing(t *testing.T) {
+	r := newRig(t)
+	u := thread(ts(1))
+	r.facts.post(jChan, ts(1), "", jOther, "please review", jT0)
+	r.asker.reply = func(n int, _ host.Ask) ([]byte, error) {
+		return answerJSON(t, []obj{jItem("n1", ts(1), func(it obj) { it["waiting_on"] = []any{obj{"id": "", "name": "group:Plataforma Billing"}} })}, nil, nil, nil), nil
+	}
+	r.clock.set(jT0.Add(2 * time.Minute))
+	_, _, err := r.job.Run(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "person key") {
+		t.Fatalf("run error %v, want the refused key", err)
+	}
+	if len(r.ledger.ops) != 0 || len(r.items(u)) != 0 {
+		t.Fatalf("ops %+v, items %+v, want nothing written", r.ledger.ops, r.items(u))
 	}
 }

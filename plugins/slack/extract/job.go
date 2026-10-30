@@ -55,6 +55,8 @@ const (
 type Ledger interface {
 	Apply(ctx context.Context, prov items.Provenance, ops []items.Op) (host.Result, error)
 	Items(ctx context.Context, u unit.Unit) ([]items.Item, error)
+	// All are the items of every unit of the plugin's, by unit.
+	All(ctx context.Context) (map[unit.Unit][]items.Item, error)
 }
 
 // Clock is the job's clock.
@@ -97,15 +99,17 @@ type Job struct {
 	wants   map[unit.Unit]bool
 	waiting map[unit.Unit]bool
 
-	mu      sync.Mutex
-	loaded  bool
-	scanned int64
-	stored  int64
-	swept   time.Time
-	pending map[unit.Unit]*pend
-	seqs    map[unit.Unit]int64
-	kinds   map[string]slack.ConversationKind
-	brk     breaker
+	mu     sync.Mutex
+	loaded bool
+	// migrated says the ledger migrations were checked since the process started.
+	migrated bool
+	scanned  int64
+	stored   int64
+	swept    time.Time
+	pending  map[unit.Unit]*pend
+	seqs     map[unit.Unit]int64
+	kinds    map[string]slack.ConversationKind
+	brk      breaker
 	// lastFailed is the target of the last failed call; an unfit answer feeds the breaker
 	// only from another target, so one bad unit cannot open it.
 	lastFailed unit.Unit
@@ -208,6 +212,9 @@ func (j *Job) Run(ctx context.Context) (summary, skipped string, err error) {
 	j.noteWaiting()
 	defer j.noteWaiting()
 	var errs []error
+	if err := j.migrate(ctx, now); err != nil {
+		errs = append(errs, err)
+	}
 	unwatched, err := j.sweep(ctx, cfg, now)
 	if err != nil {
 		errs = append(errs, err)
@@ -471,7 +478,7 @@ func (j *Job) process(ctx context.Context, k unit.Unit, p *pend, team, viewer st
 		j.finish(k, p)
 		return outcome{done: true}
 	}
-	if in.Users, err = j.Facts.Users(ctx, userIDs(append(slices.Clone(in.Context), in.Messages...), conv, viewer)); err != nil {
+	if in.Users, err = j.Facts.Users(ctx, userIDs(append(slices.Clone(in.Context), in.Messages...), conv, viewer, ledgerUserIDs(in.Ledger))); err != nil {
 		return outcome{err: err}
 	}
 	in.Viewer = Viewer{ID: viewer, Name: userName(in, viewer)}
@@ -850,8 +857,9 @@ func newFrom(st store.ExtractionState, p *pend, msgs []slack.Message) string {
 	return nf
 }
 
-func userIDs(msgs []slack.Message, conv slack.Conversation, viewer string) []string {
-	ids := []string{viewer}
+// userIDs are the users the messages, the conversation and the ledger name, deduplicated.
+func userIDs(msgs []slack.Message, conv slack.Conversation, viewer string, more []string) []string {
+	ids := append([]string{viewer}, more...)
 	if conv.DMUser != "" {
 		ids = append(ids, conv.DMUser)
 	}
@@ -866,6 +874,19 @@ func userIDs(msgs []slack.Message, conv slack.Conversation, viewer string) []str
 	ids = slices.Compact(ids)
 	if len(ids) > 0 && ids[0] == "" {
 		ids = ids[1:]
+	}
+	return ids
+}
+
+// ledgerUserIDs are the Slack users the ledger's items name.
+func ledgerUserIDs(ledger []items.Item) []string {
+	var ids []string
+	for _, it := range ledger {
+		for _, p := range peopleOf(it) {
+			if id, ok := strings.CutPrefix(p.Key, slack.UserKey("")); ok {
+				ids = append(ids, id)
+			}
+		}
 	}
 	return ids
 }
