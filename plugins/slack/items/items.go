@@ -70,7 +70,7 @@ const (
 	Low  Confidence = "low"
 )
 
-type Provenance string // "extracted", "derived", "user", "turn", "effects" (the outbox, recording what it sent)
+type Provenance string // "extracted", "derived", "user", "turn", "effects" (the outbox, recording what it sent), "workflow"
 
 const (
 	Extracted Provenance = "extracted"
@@ -78,6 +78,7 @@ const (
 	User      Provenance = "user"
 	Turn      Provenance = "turn"
 	Effects   Provenance = "effects"
+	Workflow  Provenance = "workflow"
 )
 
 type Initial string // "", "inbox", "next": the plugin's proposed first task state; "" is inbox

@@ -73,7 +73,7 @@ const (
 	Low  Confidence = "low"
 )
 
-type Provenance string // "extracted", "derived", "user", "turn", "effects" (the outbox, recording what it sent)
+type Provenance string // "extracted", "derived", "user", "turn", "effects" (the outbox, recording what it sent), "workflow"
 
 const (
 	Extracted Provenance = "extracted"
@@ -81,6 +81,7 @@ const (
 	User      Provenance = "user"
 	Turn      Provenance = "turn"
 	Effects   Provenance = "effects"
+	Workflow  Provenance = "workflow"
 )
 
 // Initial is the category a plugin proposes an item's new task starts in, never a state name: the task
@@ -384,6 +385,9 @@ func (c *checker) people(field string, ps []Person) {
 		}
 	}
 }
+
+// Resolutions are the values a resolve op takes.
+func Resolutions() []Resolution { return slices.Clone(resolutions) }
 
 func (c *checker) evidence(e *Evidence, u unit.Unit) {
 	if !evidenceName.MatchString(string(e.Kind)) {

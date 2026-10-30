@@ -353,7 +353,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ### Steps
 
 - `step[]` (table): A step the run takes, in order. Required: at least one.
-- `step[].use` (one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`, `gate.open`, `task.set`): The step.
+- `step[].use` (one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`, `gate.open`, `items.resolve`, `task.set`): The step.
   - `session.close`: Closes the agent session.
   - `workspace.remove`: Removes the workspace, after its guards. Never with `force`: a manifest that sets it fails to load.
   - `workspace.unregister`: Unregisters a workspace whose path is gone.
@@ -366,6 +366,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `notify.self`: A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts "pr.slug"}}`, none once the unit is gone).
   - `task.verb`: Runs a verb of tasks.toml on the task as the workflow: `verb`, one whose `by.workflow` lets a workflow run it, with the arguments its handler takes (`until` and `on_activity` for schedule, `on` and `resurface` for waiting, `set` for context and area, `by` for promise). The plan blocks it while the task's state or the verb's `by` refuses it, and a verb that closes a task derived from a unit's items, which closes when they resolve. It records the `verb_&lt;verb&gt;` event with the workflow as its actor and the chain it runs in, so another workflow may react to it within `trigger.depth`.
   - `gate.open`: Opens the gate `name` of gates.toml on the unit, a decision that waits for you with the intents gates.toml gives it.
+  - `items.resolve`: Resolves every open item the task holds, as the workflow, with `resolution` and the workflow as its evidence, so a task derived from its units' items closes; an item you confirmed becomes a proposal, a gate on the task. Posts nothing.
   - `task.set`: Sets the task's property `prop` of tasks.toml to `value`, written by the workflow; a property the workflow may not write is refused.
 - `step[].<name>` (string or list): The step's arguments.
 
@@ -426,6 +427,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `by` (string): With a verb whose handler is promise, the time the task is promised by: HH:MM, YYYY-MM-DD or RFC 3339; empty clears it.
 - `gate.open`:
   - `name` (string): The gate, of gates.toml, the step opens. Required.
+- `items.resolve`:
+  - `resolution` (one of `done`, `answered`, `fixed`, `delegated`, `declined`, `dismissed`, `superseded`, `moot`, default `done`): How the items resolved.
 - `task.set`:
   - `prop` (string): The property, of tasks.toml, the step sets. Required.
   - `value` (string): The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD or as a duration after now such as +2d, a duration, a list comma-separated. Required.

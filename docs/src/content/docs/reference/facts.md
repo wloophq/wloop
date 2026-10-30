@@ -222,6 +222,8 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task.link_signal.in_loop` | bool | A review workspace holds the pull request: the loop reviews it. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.link_signal.ready` | bool | The work on the pull request is approved: my review approved its head, or my own can merge. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.link_signal.workspace` | bool | A workspace of the pull request remains on disk, a review or an author one, whatever the pull request's state. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.link_signal.asked_reacted` | bool | Every open item of the unit has a check mark from whoever asked it or whom it waits on, other than you, on a message posted after its ask. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.link_signal.replied_last` | bool | You posted the unit's newest person's message, after every open item's ask, at least 3 days ago. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 
 ### Pull requests (`pr.*`)
 
@@ -380,6 +382,7 @@ The steps a `[[step]]` may name with `use`. `{{command}} workflows steps` prints
 | `notify.self` | any | A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts "pr.slug"}}`, none once the unit is gone). |
 | `task.verb` | task | Runs a verb of tasks.toml on the task as the workflow: `verb`, one whose `by.workflow` lets a workflow run it, with the arguments its handler takes (`until` and `on_activity` for schedule, `on` and `resurface` for waiting, `set` for context and area, `by` for promise). The plan blocks it while the task's state or the verb's `by` refuses it, and a verb that closes a task derived from a unit's items, which closes when they resolve. It records the `verb_<verb>` event with the workflow as its actor and the chain it runs in, so another workflow may react to it within `trigger.depth`. |
 | `gate.open` | any | Opens the gate `name` of gates.toml on the unit, a decision that waits for you with the intents gates.toml gives it. |
+| `items.resolve` | task | Resolves every open item the task holds, as the workflow, with `resolution` and the workflow as its evidence, so a task derived from its units' items closes; an item you confirmed becomes a proposal, a gate on the task. Posts nothing. |
 | `task.set` | task | Sets the task's property `prop` of tasks.toml to `value`, written by the workflow; a property the workflow may not write is refused. |
 
 ## Draft effects

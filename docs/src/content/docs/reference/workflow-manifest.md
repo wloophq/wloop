@@ -65,7 +65,7 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `step[]` | table |  | A step the run takes, in order. Required: at least one. |
-| `step[].use` | one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`, `gate.open`, `task.set` |  | The step. |
+| `step[].use` | one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`, `gate.open`, `items.resolve`, `task.set` |  | The step. |
 | `step[].&lt;name&gt;` | string or list |  | The step's arguments. |
 
 ### Gate approval
@@ -122,6 +122,7 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `task.verb` | `set` | string |  | With a verb whose handler is context, the contexts, comma-separated; with area, the area. |
 | `task.verb` | `by` | string |  | With a verb whose handler is promise, the time the task is promised by: HH:MM, YYYY-MM-DD or RFC 3339; empty clears it. |
 | `gate.open` | `name` | string |  | The gate, of gates.toml, the step opens. Required. |
+| `items.resolve` | `resolution` | one of `done`, `answered`, `fixed`, `delegated`, `declined`, `dismissed`, `superseded`, `moot` | `done` | How the items resolved. |
 | `task.set` | `prop` | string |  | The property, of tasks.toml, the step sets. Required. |
 | `task.set` | `value` | string |  | The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD or as a duration after now such as +2d, a duration, a list comma-separated. Required. |
 

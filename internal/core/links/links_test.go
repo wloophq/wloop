@@ -211,6 +211,28 @@ func TestMergeAndCloseResolveLinks(t *testing.T) {
 	}
 }
 
+func TestAPullRequestThatEndedBeforeTheLinkSettlesIt(t *testing.T) {
+	for _, kind := range []link.Kind{link.Review, link.Merge} {
+		f := newFixture(t, openItem(octocat), reviewLink(kind))
+		f.events.evs = []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}
+		if n := f.run(t); n != 1 {
+			t.Fatalf("%s link: a pull request merged before the link left its item open", kind)
+		}
+	}
+	f := newFixture(t, openItem(octocat), reviewLink(link.Review))
+	f.events.evs = []link.Event{review("octocat", t0.Add(-time.Hour))}
+	if n := f.run(t); n != 0 {
+		t.Fatal("a review before the link resolved its item")
+	}
+	it := openItem(octocat)
+	it.UserAt = t0
+	g := newFixture(t, it, reviewLink(link.Review))
+	g.events.evs = []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}
+	if n := g.run(t); n != 0 {
+		t.Fatal("a merge before you reopened the item resolved it again")
+	}
+}
+
 func TestFirstSettlingEventWins(t *testing.T) {
 	f := newFixture(t, openItem(octocat), reviewLink(link.Review))
 	f.events.evs = []link.Event{state(link.EventClosed, t0.Add(2*time.Hour)), review("octocat", t0.Add(time.Hour))}

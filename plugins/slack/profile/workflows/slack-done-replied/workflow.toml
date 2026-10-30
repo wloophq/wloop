@@ -1,0 +1,13 @@
+summary = "Offer to close a Slack task once you answered its ask and nobody spoke since, for 3 days; it resolves the task's items as answered and posts nothing"
+provider = "task"
+when = 'task.prop.kind == "thread" && task.items_open > 0 && !(task.category in ["done", "dropped", "deferred"]) && task.link_signal.replied_last'
+key = ["task.fingerprint"]
+order = 58
+
+[[step]]
+use = "items.resolve"
+resolution = "answered"
+
+[[gates.approval.rule]]
+when = 'gate.kind == "plan"'
+mode = "wait"

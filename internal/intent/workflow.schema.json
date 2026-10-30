@@ -573,6 +573,41 @@
             "if": {
               "properties": {
                 "use": {
+                  "const": "items.resolve"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "resolution": {
+                  "default": "done",
+                  "description": "How the items resolved.",
+                  "enum": [
+                    "done",
+                    "answered",
+                    "fixed",
+                    "delegated",
+                    "declined",
+                    "dismissed",
+                    "superseded",
+                    "moot"
+                  ],
+                  "type": "string"
+                },
+                "use": {
+                  "const": "items.resolve"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
                   "const": "task.set"
                 }
               },
@@ -618,6 +653,7 @@
               "notify.self",
               "task.verb",
               "gate.open",
+              "items.resolve",
               "task.set"
             ],
             "type": "string"

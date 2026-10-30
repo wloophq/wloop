@@ -1,0 +1,13 @@
+summary = "Offer to close a Slack task once whoever asked, or whom it waits on, checked a later message, such as your answer, with a check mark; it resolves the task's items as done and posts nothing"
+provider = "task"
+when = 'task.prop.kind == "thread" && task.items_open > 0 && !(task.category in ["done", "dropped", "deferred"]) && task.link_signal.asked_reacted'
+key = ["task.fingerprint"]
+order = 57
+
+[[step]]
+use = "items.resolve"
+resolution = "done"
+
+[[gates.approval.rule]]
+when = 'gate.kind == "plan"'
+mode = "wait"
