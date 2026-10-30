@@ -276,3 +276,23 @@ func TestUserGroupsReadByHandle(t *testing.T) {
 		}
 	}
 }
+
+func TestAPersonEchoedAsTheLedgerRendersItKeepsItsID(t *testing.T) {
+	in := Input{Prompts: testPrompts, Messages: []slack.Message{{TS: "1700000000.000100", Text: "<!subteam^S0001|@team-a> please"}},
+		Users: map[string]slack.User{"U0001": {Name: "ana"}}}
+	b := opBuilder{in: in}
+	for ref, want := range map[string]items.Person{
+		"U0001":                       {Key: "slack:U0001", Name: "ana"},
+		"ana (U0001)":                 {Key: "slack:U0001", Name: "ana"},
+		"<@U0001|ana>":                {Key: "slack:U0001", Name: "ana"},
+		"<@U0001>":                    {Key: "slack:U0001", Name: "ana"},
+		"group:ana (U0001)":           {Key: "slack:U0001", Name: "ana"},
+		"group:group:group:S0001":     {Key: "group:S0001", Name: "@team-a"},
+		"group:Plataforma Billing":    {Key: "group:Plataforma Billing", Name: "Plataforma Billing"},
+		"group:group:#temp-churrasco": {Key: "group:#temp-churrasco", Name: "#temp-churrasco"},
+	} {
+		if got := b.person(ref); !reflect.DeepEqual(got, want) {
+			t.Errorf("person(%q) = %+v, want %+v", ref, got, want)
+		}
+	}
+}

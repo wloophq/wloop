@@ -1,6 +1,7 @@
 package extract
 
 import (
+	"cmp"
 	"fmt"
 	"regexp"
 	"slices"
@@ -243,7 +244,25 @@ func keys(ps []items.Person) []string {
 var (
 	slackUserID  = regexp.MustCompile(`^[UW][A-Z0-9]+$`)
 	slackGroupID = regexp.MustCompile(`^S[A-Z0-9]+$`)
+	// renderedID is an id inside a mention, "<@U0001|ana>", or after a name, "ana (U0001)".
+	renderedID = regexp.MustCompile(`^(?:<@([UWS][A-Z0-9]+)(?:\|[^>]*)?>|.+ \(([UWS][A-Z0-9]+)\))$`)
 )
+
+// personID is the id a reference names, without the "group:" prefixes a rendered key carries.
+func personID(ref string) string {
+	ref = strings.TrimSpace(ref)
+	for {
+		rest, ok := strings.CutPrefix(ref, "group:")
+		if !ok {
+			break
+		}
+		ref = strings.TrimSpace(rest)
+	}
+	if m := renderedID.FindStringSubmatch(ref); m != nil {
+		return cmp.Or(m[1], m[2])
+	}
+	return ref
+}
 
 // groupHandles are the handles of the user groups the input's messages mention.
 func (b *opBuilder) groupHandles() map[string]string {
@@ -264,8 +283,11 @@ func (b *opBuilder) people(ids []string) []items.Person {
 	return out
 }
 
-// person is a Slack user for a user id, else a group: a user group id or a team's name.
-func (b *opBuilder) person(id string) items.Person {
+// person is a Slack user for a user id, else a group: a user group id or a team's name. The
+// reference may be the id as the ledger renders it ("ana (U0001)", "group:..."), which an
+// answer echoes.
+func (b *opBuilder) person(ref string) items.Person {
+	id := personID(ref)
 	if slackGroupID.MatchString(id) {
 		return items.Person{Key: "group:" + id, Name: slack.GroupName(id, b.groupHandles())}
 	}

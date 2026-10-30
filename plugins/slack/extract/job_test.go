@@ -890,3 +890,37 @@ func TestAnswerSegmentsAreOrderedAndClosedBeforeApply(t *testing.T) {
 		t.Fatalf("second Apply got %+v, want %+v: ascending, the deck closed at its last message", r.segs.spans, want)
 	}
 }
+
+func TestARunRepairsThePersonKeysTheLedgerHolds(t *testing.T) {
+	r := newRig(t)
+	u := thread(ts(1))
+	ctx := context.Background()
+	kind, summary := items.Kind("request"), "review the deck"
+	bad := func(ref string) items.Person { return items.Person{Key: "group:" + ref, Name: ref} }
+	if _, err := r.ledger.host.Broker().Apply(ctx, items.Extracted, []items.Op{
+		{Op: "create", Unit: u, Item: "n1", Anchor: unit.Anchor{Unit: u, Ref: jChan + "/" + ts(1), At: jT0},
+			Fields: &items.Fields{Kind: &kind, Summary: &summary, Requester: ptr(bad("group:ana (U0001)")),
+				WaitingOn: &[]items.Person{bad("group:group:macedo (U0002)"), bad("Plataforma Billing")}}},
+		{Op: "assign", Unit: u, Item: "n1", Anchor: unit.Anchor{Unit: u, Ref: jChan + "/" + ts(1), At: jT0},
+			Assignees: []items.Person{bad("macedo (U0002)")}, Basis: "explicit_mention"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.job.Store.DB.Save(ctx, store.ExtractionSave{States: map[unit.Unit]store.ExtractionState{u: {LastTS: ts(1), At: jT0}}}); err != nil {
+		t.Fatal(err)
+	}
+	r.run(jT0.Add(2 * time.Minute))
+	its := r.items(u)
+	if len(its) != 1 {
+		t.Fatalf("items %+v", its)
+	}
+	it := its[0]
+	if it.Requester.Key != "slack:U0001" || !slices.Equal(keys(it.WaitingOn), []string{"slack:U0002", "group:Plataforma Billing"}) ||
+		!slices.Equal(keys(it.Assignees), []string{"slack:U0002"}) || it.Basis != "explicit_mention" {
+		t.Fatalf("after the repair: requester %+v, waiting on %+v, assignees %+v (%s)", it.Requester, it.WaitingOn, it.Assignees, it.Basis)
+	}
+	r.run(jT0.Add(4 * time.Minute))
+	if len(r.ledger.ops) != 1 || len(r.ledger.ops[0]) != 2 {
+		t.Fatalf("Applies %+v, want one with the repair's update and assign, once per process", r.ledger.ops)
+	}
+}
