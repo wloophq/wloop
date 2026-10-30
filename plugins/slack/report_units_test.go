@@ -40,7 +40,7 @@ func TestTheReportCarriesOnlyUnitsTheHostKnows(t *testing.T) {
 			t.Fatal(err)
 		}
 		h.Put(items.Item{ID: "i1", Unit: u, Kind: items.Request, Summary: "who takes the release notes?", Origin: unit.Anchor{Unit: u, Ref: "m:i1"},
-			Requester: items.Person{Key: "slack:U0009"}, Basis: items.NoBasis, State: items.Open, Confidence: items.High,
+			Requester: items.Person{Key: "slack:U0000000009"}, Basis: items.NoBasis, State: items.Open, Confidence: items.High,
 			Provenance: items.Extracted, CreatedAt: time.Now(), UpdatedAt: time.Now()})
 		ctx, cancel := context.WithCancel(ctx)
 		var wg sync.WaitGroup

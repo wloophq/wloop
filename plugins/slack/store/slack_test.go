@@ -13,7 +13,7 @@ var slackNoteUnit = unit.Unit{Provider: "slack", Key: "T0001/C0001/1700000000.00
 func slackNoteFacts() FactsRows {
 	return FactsRows{Team: "T0001", Objects: []ObjectFacts{{
 		Object:   ObjectRow{Object: "C0001/1700000000.000100", Conversation: "C0001", TS: "1700000000.000100", Kind: SlackThread, Version: "1700000000.000100"},
-		Messages: []MessageRow{{TS: "1700000000.000100", User: "U0001", Text: "text-1", Units: []unit.Unit{slackNoteUnit}}},
+		Messages: []MessageRow{{TS: "1700000000.000100", User: "U0000000001", Text: "text-1", Units: []unit.Unit{slackNoteUnit}}},
 	}}}
 }
 
@@ -76,7 +76,7 @@ func init() {
 			},
 		},
 		quiet("SlackStore.PutUsers", func(ctx context.Context, e *noteEnv) error {
-			return e.db.Slack().PutUsers(ctx, []UserRow{{ID: "U0001", Name: "name-1"}})
+			return e.db.Slack().PutUsers(ctx, []UserRow{{ID: "U0000000001", Name: "name-1"}})
 		}),
 		quiet("SlackStore.SetCursor", func(ctx context.Context, e *noteEnv) error {
 			return e.db.Slack().SetCursor(ctx, "search", "1700000000.000100")

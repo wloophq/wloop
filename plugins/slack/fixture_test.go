@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	me            = "U0001"
-	other         = "U0002"
+	me            = "U0000000001"
+	other         = "U0000000002"
 	fakeUserToken = "xoxp-1-fakeuser"
 	fakeAppToken  = "xapp-1-fakeapp"
 )

@@ -23,7 +23,7 @@ func TestMessagesBeforeNewestFirstReturnedAscending(t *testing.T) {
 	ctx := context.Background()
 	var msgs []MessageRow
 	for i := 1; i <= 6; i++ {
-		msgs = append(msgs, MessageRow{TS: fmt.Sprintf("170000000%d.000100", i), User: "U0001", Text: "text"})
+		msgs = append(msgs, MessageRow{TS: fmt.Sprintf("170000000%d.000100", i), User: "U0000000001", Text: "text"})
 	}
 	msgs[4].ThreadTS = msgs[1].TS
 	if _, err := db.Slack().Save(ctx, FactsRows{Team: "T0001", Objects: []ObjectFacts{{
@@ -54,9 +54,9 @@ func TestSlackMessageByTS(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 	msgs := []MessageRow{
-		{TS: "1700000001.000100", User: "U0001", Text: "parent"},
-		{TS: "1700000002.000100", ThreadTS: "1700000001.000100", User: "U0001", Text: "reply"},
-		{TS: "1700000003.000100", User: "U0001", Text: "later"},
+		{TS: "1700000001.000100", User: "U0000000001", Text: "parent"},
+		{TS: "1700000002.000100", ThreadTS: "1700000001.000100", User: "U0000000001", Text: "reply"},
+		{TS: "1700000003.000100", User: "U0000000001", Text: "later"},
 	}
 	if _, err := db.Slack().Save(ctx, FactsRows{Team: "T0001", Objects: []ObjectFacts{{
 		Object:   ObjectRow{Object: "D0001", Conversation: "D0001", Kind: SlackDM, Version: "1"},

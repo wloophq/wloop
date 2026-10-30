@@ -164,7 +164,7 @@ func TestCatchUpSearchAdmitsIntoTheInbox(t *testing.T) {
 	f := newFixture(t)
 	f.login(t)
 	f.knownUser(t, other, false)
-	f.searchPages([]any{match(outside, other, ts(7), "", "<@"+me+"> see this"), match(chan1, "U0003", ts(4), "", "no mention here")})
+	f.searchPages([]any{match(outside, other, ts(7), "", "<@"+me+"> see this"), match(chan1, "U0000000003", ts(4), "", "no mention here")})
 	f.threads(nil)
 	ctx := context.Background()
 	n, err := f.p.search(ctx, "reconnect")

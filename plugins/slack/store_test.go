@@ -89,7 +89,7 @@ func thread(conv string, parent int, ms ...dslack.Message) dslack.Facts {
 }
 
 func msg(n int, text string) dslack.Message {
-	return dslack.Message{TS: ts(n), User: "U0001", Text: text}
+	return dslack.Message{TS: ts(n), User: "U0000000001", Text: text}
 }
 
 func reply(n, parent int, text string) dslack.Message {
@@ -180,7 +180,7 @@ func TestReactionsReplaceTheSet(t *testing.T) {
 	r := newRig(t)
 	r.save(t, thread(chan1, 1, msg(1, "text-1")))
 	m := msg(1, "text-1")
-	m.Reactions = []dslack.Reaction{{Name: "eyes", Users: []string{"U0002", "U0003"}}}
+	m.Reactions = []dslack.Reaction{{Name: "eyes", Users: []string{"U0000000002", "U0000000003"}}}
 	if got := r.save(t, thread(chan1, 1, m)); len(got.Units) != 1 {
 		t.Errorf("a reaction noted %+v", got)
 	}
@@ -194,7 +194,7 @@ func TestReactionsReplaceTheSet(t *testing.T) {
 	if ms := r.messages(t, chan1); len(ms) != 1 || len(ms[0].Reactions) != 0 {
 		t.Errorf("an empty set did not remove the last reaction: %+v", ms)
 	}
-	m.Reactions = []dslack.Reaction{{Name: "eyes", Users: []string{"U0002", "U0003"}}}
+	m.Reactions = []dslack.Reaction{{Name: "eyes", Users: []string{"U0000000002", "U0000000003"}}}
 	if got := r.save(t, thread(chan1, 1, m)); len(got.Units) != 1 {
 		t.Errorf("the first set again noted %+v", got)
 	}
@@ -455,7 +455,7 @@ func TestUnwatchKeepsMessages(t *testing.T) {
 func TestMessagesAfterCursor(t *testing.T) {
 	r := newRig(t)
 	last := reply(4, 1, "text-4")
-	last.Reactions = []dslack.Reaction{{Name: "eyes", Users: []string{"U0002", "U0003"}}, {Name: "ok", Users: []string{"U0002"}}}
+	last.Reactions = []dslack.Reaction{{Name: "eyes", Users: []string{"U0000000002", "U0000000003"}}, {Name: "ok", Users: []string{"U0000000002"}}}
 	r.save(t, thread(chan1, 1, msg(1, "text-1"), reply(2, 1, "text-2"), reply(3, 1, "text-3"), last))
 	r.save(t, thread("C0002", 5, msg(5, "text-5")))
 	got, err := r.st.Messages(context.Background(), dslack.ThreadUnit(team, chan1, ts(1)), ts(2), 0)
@@ -465,7 +465,7 @@ func TestMessagesAfterCursor(t *testing.T) {
 	if len(got) != 2 || got[0].TS != ts(3) || got[1].TS != ts(4) {
 		t.Fatalf("messages %+v", got)
 	}
-	want := []dslack.Reaction{{Name: "eyes", Users: []string{"U0002", "U0003"}}, {Name: "ok", Users: []string{"U0002"}}}
+	want := []dslack.Reaction{{Name: "eyes", Users: []string{"U0000000002", "U0000000003"}}, {Name: "ok", Users: []string{"U0000000002"}}}
 	if fmt.Sprint(got[1].Reactions) != fmt.Sprint(want) {
 		t.Errorf("reactions %v, want %v", got[1].Reactions, want)
 	}
@@ -542,20 +542,20 @@ func TestUsersRoundTrip(t *testing.T) {
 	r := newRig(t)
 	ctx := context.Background()
 	r.save(t, dslack.Facts{Users: []dslack.User{
-		{ID: "U0001", Name: "name-1", DisplayName: "display-1", Email: "user-1@example.com", Fetched: t0},
-		{ID: "U0002", Name: "name-2", IsBot: true, Fetched: t0},
+		{ID: "U0000000001", Name: "name-1", DisplayName: "display-1", Email: "user-1@example.com", Fetched: t0},
+		{ID: "U0000000002", Name: "name-2", IsBot: true, Fetched: t0},
 		{ID: "USLACKBOT", Name: "slackbot"},
 	}})
-	got, err := r.st.Users(ctx, []string{"U0001", "U0002", "USLACKBOT", "U0404"})
+	got, err := r.st.Users(ctx, []string{"U0000000001", "U0000000002", "USLACKBOT", "U0000000404"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 3 || got["U0001"].DisplayName != "display-1" || !got["U0001"].Fetched.Equal(t0) || got["U0001"].IsBot ||
-		!got["U0002"].IsBot || !got["USLACKBOT"].IsBot {
+	if len(got) != 3 || got["U0000000001"].DisplayName != "display-1" || !got["U0000000001"].Fetched.Equal(t0) || got["U0000000001"].IsBot ||
+		!got["U0000000002"].IsBot || !got["USLACKBOT"].IsBot {
 		t.Errorf("users %+v", got)
 	}
 	u, ok, err := r.st.UserByEmail(ctx, "USER-1@example.com")
-	if err != nil || !ok || u.ID != "U0001" {
+	if err != nil || !ok || u.ID != "U0000000001" {
 		t.Errorf("by email %+v %v %v", u, ok, err)
 	}
 	if _, ok, _ := r.st.UserByEmail(ctx, "none@example.com"); ok {
@@ -601,12 +601,12 @@ func TestStoreLookups(t *testing.T) {
 	if _, _, err := r.st.Viewer(ctx); err == nil {
 		t.Error("a viewer before login")
 	}
-	for name, v := range map[string]string{CursorViewerTeam: team, CursorViewerUser: "U0001"} {
+	for name, v := range map[string]string{CursorViewerTeam: team, CursorViewerUser: "U0000000001"} {
 		if err := s.SetCursor(ctx, name, v); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if tm, u, err := r.st.Viewer(ctx); err != nil || tm != team || u != "U0001" {
+	if tm, u, err := r.st.Viewer(ctx); err != nil || tm != team || u != "U0000000001" {
 		t.Errorf("viewer %q %q %v", tm, u, err)
 	}
 	if err := r.st.Save(ctx, nil, dslack.Facts{Threads: thread("C0002", 4, msg(4, "text")).Threads}, "", r.now); err != nil {
@@ -641,7 +641,7 @@ func (s *source) Read(context.Context, []string) (ingest.Facts, error) {
 	return dslack.Facts{Team: team, Threads: []dslack.Thread{s.th}}, nil
 }
 
-func (s *source) Viewer(context.Context) (string, error) { return "U0001", nil }
+func (s *source) Viewer(context.Context) (string, error) { return "U0000000001", nil }
 
 func TestIngestPassOverTheStore(t *testing.T) {
 	r := newRig(t)

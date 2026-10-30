@@ -58,9 +58,9 @@ func TestSlackSearchRendersOneLinePerMessage(t *testing.T) {
 		t.Fatalf("query %v", q)
 	}
 	want := "3 of 42 matches for release in:#releases from:@dana after:2023-11-01 before:2023-11-30\n" +
-		findLink + " · n (U0002) · 2023-11-14 19:13 -03 · release 1.2 is out\n" +
+		findLink + " · n (U0000000002) · 2023-11-14 19:13 -03 · release 1.2 is out\n" +
 		"https://example.slack.com/archives/C0000000001/p1700000200000100 · deploybot (bot) · 2023-11-14 19:16 -03 · (no text)\n" +
-		"no permalink (C0000000001/1700000250.000100) · n (U0002) · 2023-11-14 19:17 -03 · no link here\n" +
+		"no permalink (C0000000001/1700000250.000100) · n (U0000000002) · 2023-11-14 19:17 -03 · no link here\n" +
 		"(2 direct messages that are not tracked left out)"
 	if got != want {
 		t.Fatalf("got\n%s\nwant\n%s", got, want)
@@ -74,9 +74,9 @@ func TestSlackSearchResolvesChannelAndAuthorIDs(t *testing.T) {
 		q    SearchQuery
 		want string
 	}{
-		{SearchQuery{Query: "x", Channel: readConv, From: other}, "x in:#releases from:<@U0002>"},
-		{SearchQuery{Query: "x", From: "dana@example.com"}, "x from:<@U0002>"},
-		{SearchQuery{Query: "x", From: "@" + other}, "x from:<@U0002>"},
+		{SearchQuery{Query: "x", Channel: readConv, From: other}, "x in:#releases from:<@U0000000002>"},
+		{SearchQuery{Query: "x", From: "dana@example.com"}, "x from:<@U0000000002>"},
+		{SearchQuery{Query: "x", From: "@" + other}, "x from:<@U0000000002>"},
 	} {
 		if _, err := r.Search(context.Background(), c.q); err != nil {
 			t.Fatal(err)

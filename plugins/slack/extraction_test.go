@@ -82,7 +82,7 @@ func TestExtractionJobOverTheStore(t *testing.T) {
 		Conversations: []dslack.Conversation{{ID: chan1, Name: "general", Kind: dslack.KindChannel, IsMember: true},
 			{ID: dm1, Kind: dslack.KindIM, IsMember: true, DMUser: other}},
 		Threads: []dslack.Thread{{Conversation: chan1, TS: ts(1), LatestReply: ts(2), ReplyCount: 1, Messages: []dslack.Message{
-			{TS: ts(1), User: other, Text: "<@U0001> review please"}, {TS: ts(2), ThreadTS: ts(1), User: me, Text: "on it"}}}},
+			{TS: ts(1), User: other, Text: "<@U0000000001> review please"}, {TS: ts(2), ThreadTS: ts(1), User: me, Text: "on it"}}}},
 		DMs: []dslack.DMWindow{{Conversation: dm1, Latest: ts(5), Messages: []dslack.Message{{TS: ts(5), User: other, Text: "the PR?"}}}},
 	})
 	if j, ok := manifestJob(t, JobExtract); !ok || time.Duration(j.Every) != extract.JobEvery || time.Duration(j.Timeout) != extract.JobTimeout {
@@ -295,7 +295,7 @@ func TestAFirstTurnsBriefWantReadsAWaitingThreadWithTheBriefIntentsFields(t *tes
 	f.now = tsAt(1)
 	f.seed(t, dslack.Facts{
 		Conversations: []dslack.Conversation{{ID: chan1, Name: "general", Kind: dslack.KindChannel, IsMember: true}},
-		Threads:       []dslack.Thread{{Conversation: chan1, TS: ts(1), Messages: []dslack.Message{{TS: ts(1), User: other, Text: "<@U0001> review please"}}}},
+		Threads:       []dslack.Thread{{Conversation: chan1, TS: ts(1), Messages: []dslack.Message{{TS: ts(1), User: other, Text: "<@U0000000001> review please"}}}},
 	})
 	thread := dslack.ThreadUnit(team, chan1, ts(1))
 	running := &Plugin{p: f.p}

@@ -308,12 +308,12 @@ func TestUserGroupsAreNamedNotShownByID(t *testing.T) {
 	f.seed(t, dslack.Facts{
 		Conversations: []dslack.Conversation{{ID: chan1, Name: "general", Kind: dslack.KindChannel, IsMember: true}},
 		Threads: []dslack.Thread{{Conversation: chan1, TS: ts(1), Messages: []dslack.Message{
-			{TS: ts(1), User: other, Text: "<!subteam^S0001|@team-a> can you look?"}}}},
+			{TS: ts(1), User: other, Text: "<!subteam^S0000000001|@team-a> can you look?"}}}},
 	})
 	u := dslack.ThreadUnit(team, chan1, ts(1))
 	f.state(t, u, store.ExtractionState{Verdict: "waits_on_others", At: f.now})
-	applyOps(t, f.ledger(), items.Extracted, createOp(u, "e1", 1, otherPerson, items.Person{Key: "group:S0001", Name: "S0001"},
-		items.Person{Key: "group:S0002", Name: "S0002"}))
+	applyOps(t, f.ledger(), items.Extracted, createOp(u, "e1", 1, otherPerson, items.Person{Key: "group:S0000000001", Name: "S0000000001"},
+		items.Person{Key: "group:S0000000002", Name: "S0000000002"}))
 	r, ok := f.row(t, u)
 	if !ok {
 		t.Fatal("no row")

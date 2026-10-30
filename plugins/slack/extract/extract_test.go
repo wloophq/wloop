@@ -44,7 +44,7 @@ func loadInput(t *testing.T) Input {
 	return Input{
 		Prompts:      testPrompts,
 		Unit:         threadUnit,
-		Viewer:       Viewer{ID: "U0001", Name: "Ann"},
+		Viewer:       Viewer{ID: "U0000000001", Name: "Ann"},
 		Now:          time.Date(2023, 11, 15, 9, 0, 0, 0, time.FixedZone("BRT", -3*3600)),
 		Language:     "English",
 		Conversation: f.Conversation,
@@ -53,11 +53,11 @@ func loadInput(t *testing.T) Input {
 		Users:        users,
 		Ledger: []items.Item{
 			{ID: "i1", Unit: threadUnit, Kind: "request", Summary: "Bob reviews the release notes draft", State: "open",
-				Requester: items.Person{Key: "slack:U0001", Name: "Ann"}, Assignees: []items.Person{{Key: "slack:U0002", Name: "Bob"}},
-				Basis: "explicit_mention", WaitingOn: []items.Person{{Key: "slack:U0002", Name: "Bob"}}, Confidence: "high",
+				Requester: items.Person{Key: "slack:U0000000001", Name: "Ann"}, Assignees: []items.Person{{Key: "slack:U0000000002", Name: "Bob"}},
+				Basis: "explicit_mention", WaitingOn: []items.Person{{Key: "slack:U0000000002", Name: "Bob"}}, Confidence: "high",
 				Origin: unit.Anchor{Unit: threadUnit, Ref: "C0001/1700000000.000100"}},
 			{ID: "i3", Unit: threadUnit, Kind: "decision", Summary: "Ship the widget toggle on by default?", State: "open",
-				Requester: items.Person{Key: "slack:U0002", Name: "Bob"}, Assignees: []items.Person{{Key: "slack:U0003", Name: "Cy"}},
+				Requester: items.Person{Key: "slack:U0000000002", Name: "Bob"}, Assignees: []items.Person{{Key: "slack:U0000000003", Name: "Cy"}},
 				Basis: "explicit_mention", Confidence: "high", Confirmed: true,
 				Origin: unit.Anchor{Unit: threadUnit, Ref: "C0001/1700000300.000200"}},
 		},
@@ -119,7 +119,7 @@ func TestPromptPlaceholders(t *testing.T) {
 	if strings.Count(got, "{{") != 1 {
 		t.Errorf("a placeholder is left in the prompt:\n%s", got)
 	}
-	for _, want := range []string{"Ann (user id U0001", "2023-11-15 09:00 BRT", "every text field in English", "- widget", "- docs"} {
+	for _, want := range []string{"Ann (user id U0000000001", "2023-11-15 09:00 BRT", "every text field in English", "- widget", "- docs"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("the prompt lacks %q", want)
 		}
@@ -193,16 +193,16 @@ func TestWindowKeepsParentsAndNew(t *testing.T) {
 	in := Input{
 		Prompts:      testPrompts,
 		Unit:         unit.Unit{Provider: slack.Provider, Key: "T0001/C0002/seg/1"},
-		Viewer:       Viewer{ID: "U0001", Name: "Ann"},
+		Viewer:       Viewer{ID: "U0000000001", Name: "Ann"},
 		Now:          time.Unix(1700100000, 0).UTC(),
 		Conversation: slack.Conversation{ID: "C0002", Name: "general", Kind: "channel"},
 		Messages: []slack.Message{
-			{TS: "1700000001.000000", User: "U0001", Text: "lone old " + long},
-			{TS: "1700000002.000000", ThreadTS: "1700000002.000000", User: "U0002", Text: "old parent " + long},
-			{TS: "1700000003.000000", ThreadTS: "1700000002.000000", User: "U0001", Text: "old reply " + long},
-			{TS: "1700000004.000000", User: "U0002", Text: "another lone old " + long},
-			{TS: "1700000005.000000", ThreadTS: "1700000002.000000", User: "U0003", Text: "new reply " + long},
-			{TS: "1700000006.000000", User: "U0003", Text: "new lone " + long},
+			{TS: "1700000001.000000", User: "U0000000001", Text: "lone old " + long},
+			{TS: "1700000002.000000", ThreadTS: "1700000002.000000", User: "U0000000002", Text: "old parent " + long},
+			{TS: "1700000003.000000", ThreadTS: "1700000002.000000", User: "U0000000001", Text: "old reply " + long},
+			{TS: "1700000004.000000", User: "U0000000002", Text: "another lone old " + long},
+			{TS: "1700000005.000000", ThreadTS: "1700000002.000000", User: "U0000000003", Text: "new reply " + long},
+			{TS: "1700000006.000000", User: "U0000000003", Text: "new lone " + long},
 		},
 		NewFrom:     "1700000005.000000",
 		WindowChars: 2000,
@@ -248,16 +248,16 @@ func TestRenderMarksNewAndThreads(t *testing.T) {
 		t.Fatalf("no line for %s:\n%s", ts, got)
 		return ""
 	}
-	if l := find("1700000300.000200"); strings.Contains(l, " new ") || !strings.Contains(l, "reply to m1") || !strings.Contains(l, "<@U0003|Cy>") {
+	if l := find("1700000300.000200"); strings.Contains(l, " new ") || !strings.Contains(l, "reply to m1") || !strings.Contains(l, "<@U0000000003|Cy>") {
 		t.Errorf("old reply line = %q", l)
 	}
-	if l := find("1700003600.000300"); !strings.Contains(l, "] new Bob (U0002)") {
+	if l := find("1700003600.000300"); !strings.Contains(l, "] new Bob (U0000000002)") {
 		t.Errorf("new reply line = %q", l)
 	}
-	if !strings.Contains(got, "reactions: eyes by Cy (U0003)") {
+	if !strings.Contains(got, "reactions: eyes by Cy (U0000000003)") {
 		t.Errorf("reactions missing:\n%s", got)
 	}
-	if l := find("1700007200.000400"); !strings.Contains(l, "] new Cy (U0003) reply to m1") {
+	if l := find("1700007200.000400"); !strings.Contains(l, "] new Cy (U0000000003) reply to m1") {
 		t.Errorf("a human posting through an agent app is not its author: %q", l)
 	}
 	if l := find("1700010800.000500"); !strings.Contains(l, "ci-bot (bot B0001)") {
@@ -283,10 +283,10 @@ func TestSchemaRoundTrip(t *testing.T) {
 		t.Fatalf("result = %+v", r)
 	}
 	n1 := r.Items[2]
-	if n1.Ref != "n1" || n1.Mode != "session" || n1.Place.Context != "widget" || n1.Assignees[0] != "U0001" {
+	if n1.Ref != "n1" || n1.Mode != "session" || n1.Place.Context != "widget" || n1.Assignees[0] != "U0000000001" {
 		t.Errorf("n1 = %+v", n1)
 	}
-	if r.Items[1].Options[1].BackedBy[0] != "U0003" || r.Links[0].Kind != link.Review {
+	if r.Items[1].Options[1].BackedBy[0] != "U0000000003" || r.Links[0].Kind != link.Review {
 		t.Errorf("result = %+v", r)
 	}
 
@@ -308,7 +308,7 @@ func TestUnfitAnswers(t *testing.T) {
 		"bad state":        strings.Replace(good, `"state": "open"`, `"state": "pending"`, 1),
 		"link to no item":  strings.Replace(good, `{"item": "n1"`, `{"item": "n7"`, 1),
 		"unknown segment":  strings.Replace(good, `"segments": []`, `"segments": [{"ref": "s1", "from_ts": "1700000000.000100", "to_ts": "", "topic": "x", "brief": {"unchanged": true, "goal": "", "context": "", "kind": "request", "risk": "low", "risk_why": "", "open_questions": [], "tags": {"domain": [], "audience": [], "concern": []}}}]`, 1),
-		"origin not a ts":  strings.Replace(good, `"origin_ts": "1700007200.000400", "requester": "U0003"`, `"origin_ts": "2023-11-14 22:13", "requester": "U0003"`, 1),
+		"origin not a ts":  strings.Replace(good, `"origin_ts": "1700007200.000400", "requester": "U0000000003"`, `"origin_ts": "2023-11-14 22:13", "requester": "U0000000003"`, 1),
 		"ts with a space":  strings.Replace(good, `"evidence_ts": "1700003600.000300"`, `"evidence_ts": "1700003600.000300 "`, 1),
 		"summary too long": strings.Replace(good, `"Ship the widget toggle on by default?"`, `"`+strings.Repeat("é", 201)+`"`, 1),
 	} {
@@ -337,7 +337,7 @@ func BenchmarkExtractAndOps(b *testing.B) {
 	in.Messages = []slack.Message{parent}
 	for i := 1; i < 2000; i++ {
 		in.Messages = append(in.Messages, slack.Message{TS: fmt.Sprintf("1700%06d.000100", i), ThreadTS: parent.TS,
-			User: "U0002", Text: strings.Repeat("a reply about the widget rollout ", 4), Mentions: []string{"U0001"}})
+			User: "U0000000002", Text: strings.Repeat("a reply about the widget rollout ", 4), Mentions: []string{"U0000000001"}})
 	}
 	in.NewFrom = in.Messages[1900].TS
 	in.WindowChars = 40000

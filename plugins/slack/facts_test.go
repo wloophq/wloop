@@ -52,7 +52,7 @@ func (f *fixture) listed(t *testing.T, us ...unit.Unit) {
 
 func (f *fixture) item(u unit.Unit, id string, s items.State, created time.Time, owner ...items.Person) {
 	it := items.Item{ID: id, Unit: u, Kind: items.Request, Summary: "s " + id, Origin: unit.Anchor{Unit: u, Ref: "m:" + id},
-		Requester: items.Person{Key: "slack:U0009"}, Basis: items.NoBasis, State: s, Confidence: items.High,
+		Requester: items.Person{Key: "slack:U0000000009"}, Basis: items.NoBasis, State: s, Confidence: items.High,
 		Provenance: items.Extracted, Assignees: owner, CreatedAt: created, UpdatedAt: created}
 	if s == items.Resolved {
 		it.Resolution = items.Done
@@ -169,7 +169,7 @@ func TestSlackFactsReadTheExtractionTheConversationAndTheItems(t *testing.T) {
 	}
 	f.item(factsThread, "i1", items.Open, monday.Add(-72*time.Hour))
 	f.item(factsThread, "i2", items.Open, monday.Add(-time.Hour))
-	f.item(factsThread, "i3", items.Open, monday.Add(-200*time.Hour), items.Person{Key: "slack:U0001"})
+	f.item(factsThread, "i3", items.Open, monday.Add(-200*time.Hour), items.Person{Key: "slack:U0000000001"})
 	f.item(factsThread, "i4", items.Resolved, monday.Add(-200*time.Hour))
 	f.host.SetTasks(hostTask("t-01", "next", factsThread))
 	got, _ := f.facts(t, factsThread)
@@ -241,7 +241,7 @@ func (f *fixture) messages(t *testing.T, tss ...string) {
 	k, _ := dslack.ParseUnit(factsThread)
 	o := store.ObjectFacts{Object: store.ObjectRow{Object: k.Conversation + "/" + k.TS, Conversation: k.Conversation, TS: k.TS, Kind: store.SlackThread}}
 	for _, ts := range tss {
-		o.Messages = append(o.Messages, store.MessageRow{Conversation: k.Conversation, TS: ts, ThreadTS: k.TS, User: "U0009", Text: "m " + ts})
+		o.Messages = append(o.Messages, store.MessageRow{Conversation: k.Conversation, TS: ts, ThreadTS: k.TS, User: "U0000000009", Text: "m " + ts})
 	}
 	if _, err := f.db.Slack().Save(context.Background(), store.FactsRows{Team: k.Team, Objects: []store.ObjectFacts{o}}, monday); err != nil {
 		t.Fatal(err)

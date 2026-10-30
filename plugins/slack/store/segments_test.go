@@ -84,7 +84,7 @@ func saveDM(t *testing.T, db *DB, conv string, tss ...string) {
 	t.Helper()
 	msgs := make([]MessageRow, len(tss))
 	for i, ts := range tss {
-		msgs[i] = MessageRow{TS: ts, User: "U0001", Text: "text"}
+		msgs[i] = MessageRow{TS: ts, User: "U0000000001", Text: "text"}
 	}
 	if _, err := db.Slack().Save(context.Background(), FactsRows{Team: "T000AAA", Objects: []ObjectFacts{{
 		Object:   ObjectRow{Object: conv, Conversation: conv, Kind: SlackDM, Version: "1"},

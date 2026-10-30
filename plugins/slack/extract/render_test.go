@@ -14,18 +14,18 @@ import (
 func dmInput() Input {
 	return Input{
 		Prompts:      testPrompts,
-		Viewer:       Viewer{ID: "U0001", Name: "Ann"},
+		Viewer:       Viewer{ID: "U0000000001", Name: "Ann"},
 		Now:          time.Unix(1700100000, 0).UTC(),
-		Conversation: slack.Conversation{ID: "D0001", Kind: slack.KindIM, DMUser: "U0002"},
-		Users:        map[string]slack.User{"U0001": {ID: "U0001", Name: "Ann"}, "U0002": {ID: "U0002", Name: "Bob"}},
+		Conversation: slack.Conversation{ID: "D0001", Kind: slack.KindIM, DMUser: "U0000000002"},
+		Users:        map[string]slack.User{"U0000000001": {ID: "U0000000001", Name: "Ann"}, "U0000000002": {ID: "U0000000002", Name: "Bob"}},
 		Context: []slack.Message{
-			{TS: "1700000001.000000", User: "U0002", Text: "the quarterly deck is on the shared drive"},
-			{TS: "1700000002.000000", User: "U0001", Text: "thanks, I will read it"},
+			{TS: "1700000001.000000", User: "U0000000002", Text: "the quarterly deck is on the shared drive"},
+			{TS: "1700000002.000000", User: "U0000000001", Text: "thanks, I will read it"},
 		},
 		Messages: []slack.Message{
-			{TS: "1700000010.000000", User: "U0002", Text: "can you send the numbers for slide four?"},
-			{TS: "1700000011.000000", ThreadTS: "1700000010.000000", User: "U0001", Text: "sure, tomorrow"},
-			{TS: "1700000012.000000", User: "U0002", Text: "great"},
+			{TS: "1700000010.000000", User: "U0000000002", Text: "can you send the numbers for slide four?"},
+			{TS: "1700000011.000000", ThreadTS: "1700000010.000000", User: "U0000000001", Text: "sure, tomorrow"},
+			{TS: "1700000012.000000", User: "U0000000002", Text: "great"},
 		},
 		Segment: slack.Span{FromTS: "1700000010.000000"},
 		Focus:   "1700000010.000000",
@@ -54,7 +54,7 @@ func TestRenderFramesContextAndSegment(t *testing.T) {
 	if l := lineOf(t, got, "1700000001.000000"); !strings.HasPrefix(l, "[c1 ") || strings.Contains(l, " new ") {
 		t.Errorf("a context message is numbered c<N> and never new: %q", l)
 	}
-	if l := lineOf(t, got, "1700000010.000000"); !strings.HasPrefix(l, "[m1 ") || !strings.Contains(l, "] focus new Bob (U0002)") {
+	if l := lineOf(t, got, "1700000010.000000"); !strings.HasPrefix(l, "[m1 ") || !strings.Contains(l, "] focus new Bob (U0000000002)") {
 		t.Errorf("the segment's first message is m1, marked focus: %q", l)
 	}
 	if l := lineOf(t, got, "1700000011.000000"); !strings.HasPrefix(l, "[m2 ") || !strings.Contains(l, "reply to m1") || strings.Contains(l, "focus") {
@@ -72,7 +72,7 @@ func TestRenderWithoutContextOrSegmentIsUnchanged(t *testing.T) {
 			t.Errorf("a plain rendering holds %q:\n%s", marker, got)
 		}
 	}
-	if l := lineOf(t, got, "1700000010.000000"); !strings.HasPrefix(l, "[m1 ts=1700000010.000000 ") || !strings.Contains(l, "] new Bob (U0002): can you") {
+	if l := lineOf(t, got, "1700000010.000000"); !strings.HasPrefix(l, "[m1 ts=1700000010.000000 ") || !strings.Contains(l, "] new Bob (U0000000002): can you") {
 		t.Errorf("plain line = %q", l)
 	}
 }

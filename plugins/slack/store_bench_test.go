@@ -20,7 +20,7 @@ func scaleFacts(threads, perThread int) dslack.Facts {
 		ms = append(ms, msg(parent, "text"))
 		for j := 1; j < perThread; j++ {
 			m := reply(parent+j, parent, "text")
-			m.Reactions = []dslack.Reaction{{Name: "eyes", Users: []string{"U0002"}}}
+			m.Reactions = []dslack.Reaction{{Name: "eyes", Users: []string{"U0000000002"}}}
 			ms = append(ms, m)
 		}
 		f.Threads = append(f.Threads, thread(conv, parent, ms...).Threads...)

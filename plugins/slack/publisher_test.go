@@ -120,7 +120,7 @@ func (ps *pubSlack) publisherWith(token func() (auth.Token, error), allow ...str
 	p.People = func(context.Context, unit.Unit) ([]items.Person, error) {
 		return []items.Person{
 			{Key: "github:octo", Name: "Octo Cat"},
-			{Key: "github:sneaky", Name: "@here <@U0009> & <!channel>"},
+			{Key: "github:sneaky", Name: "@here <@U0000000009> & <!channel>"},
 		}, nil
 	}
 	return p
@@ -237,7 +237,7 @@ func TestPublishConvertsMentions(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := ps.posted(t).Get("text")
-	want := "<@U000AAA> and Octo Cat, *@\u2060here &lt;@\u2060U0009&gt; &amp; &lt;!channel&gt;*, infra"
+	want := "<@U000AAA> and Octo Cat, *@\u2060here &lt;@\u2060U0000000009&gt; &amp; &lt;!channel&gt;*, infra"
 	if got != want {
 		t.Fatalf("posted %q, want %q", got, want)
 	}
@@ -398,7 +398,7 @@ func TestValidateRefusesWithoutPosting(t *testing.T) {
 		"empty":      {d: threadDraft(draft.Reply, "  "), want: []string{"empty"}},
 		"other unit": {d: draft.Draft{Unit: unit.Unit{Provider: unit.ProviderID("task"), Key: "t1"}, Kind: draft.Reply, Text: "hi"}, want: []string{"needs a target"}},
 		"react dm":   {d: draft.Draft{Unit: ps.segmentUnit(t), Kind: draft.React, Delivery: draft.Reaction, Reaction: "eyes"}, want: []string{"needs a target"}},
-		"escapes":    {d: threadDraft(draft.Reply, "a & b <c> <@U0001|x> <https://x.y|z>"), want: nil},
+		"escapes":    {d: threadDraft(draft.Reply, "a & b <c> <@U0000000001|x> <https://x.y|z>"), want: nil},
 	} {
 		t.Run(name, func(t *testing.T) {
 			err := ps.publisher().Validate(context.Background(), tc.d)
@@ -570,7 +570,7 @@ func TestPublishRefreshFailureIsNotPosted(t *testing.T) {
 }
 
 func TestBroadcastMentionsAreRefused(t *testing.T) {
-	for _, text := range []string{"heads up <!channel>", "<!here>", "<!everyone|everyone>", "ping <!subteam^S0001|@infra>", "`<!channel>`"} {
+	for _, text := range []string{"heads up <!channel>", "<!here>", "<!everyone|everyone>", "ping <!subteam^S0000000001|@infra>", "`<!channel>`"} {
 		ps := newPubSlack(t)
 		p := ps.publisher()
 		d := threadDraft(draft.Reply, text)
@@ -626,7 +626,7 @@ func TestVerifyMatchesAMentionPostedAsText(t *testing.T) {
 }
 
 func TestLinkTargetsNeverBecomeTokens(t *testing.T) {
-	for _, text := range []string{"[hi](!here)", "[hi](!channel)", "[x](!subteam^S0001)", "[x](@U0000000042)", "[x](#C0000000001)"} {
+	for _, text := range []string{"[hi](!here)", "[hi](!channel)", "[x](!subteam^S0000000001)", "[x](@U0000000042)", "[x](#C0000000001)"} {
 		ps := newPubSlack(t)
 		if _, err := ps.publisher().Publish(context.Background(), threadDraft(draft.Reply, text)); err != nil {
 			t.Fatalf("Publish(%q) = %v", text, err)
