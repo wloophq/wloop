@@ -354,3 +354,10 @@ func TestTheNudgeTextIsTheProfiles(t *testing.T) {
 		t.Fatal("texts with no waiting or label template parsed")
 	}
 }
+
+func TestADraftPullRequestTakesNoNudge(t *testing.T) {
+	who, why := nudge.Targets(nudge.Situation{Kind: "draft", WaitsOn: "author", Reason: "draft"}, "ana", "me", nil)
+	if len(who) != 0 || why != "is a draft" {
+		t.Fatalf("who %v, why %q", who, why)
+	}
+}

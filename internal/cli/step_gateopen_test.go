@@ -7,9 +7,11 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
+	dturn "github.com/wloophq/wloop/internal/domain/turn"
 )
 
 const diffWorkflow = `summary = "Ask to review the diff of a next action"
@@ -123,5 +125,45 @@ func TestAWorkflowTriggersOnAResolvedStepGate(t *testing.T) {
 	if e, _ := r.db.Tasks().Task(ctx, "t-01"); !(e.Prop("focus").Text == "on") {
 		evs, _ := r.db.Events().Since(ctx, 0, []string{gate.EventResolved})
 		t.Fatalf("the workflow on gate_resolved did not run; events %+v", evs)
+	}
+}
+
+func TestApprovingTheDiffOfAStartedTaskClosesIt(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newTaskRig(t, nil)
+	r.put(t, "t-01", task.State("waiting"))
+	r.put(t, "t-02", task.State("waiting"))
+	start := dturn.Book{Unit: task.UnitOf("t-01"), Turns: []dturn.Turn{{Intent: "start", ID: "s1", Trigger: dturn.ByHand, State: dturn.Done, SentAt: testNow}}}
+	if _, err := sqlite.New(r.db).Save(ctx, start); err != nil {
+		t.Fatal(err)
+	}
+	svc := r.te.newGates(r.db, t.Logf)
+	ed := engineDeps{DB: r.db, SessionFacts: noUnits{}, WorkspaceFacts: noUnits{}}
+	r.te.wireSubjects(&serveWiring{DB: r.db, Cfg: r.te.cfg, Engine: &ed})
+	eng := r.te.newEngine(ed)
+	sweep := func() {
+		t.Helper()
+		if _, _, err := eng.Sweep(ctx, &sync.Mutex{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sweep()
+	for _, id := range []task.ID{"t-01", "t-02"} {
+		g, err := svc.Open(ctx, gate.Gate{Task: id, Unit: task.UnitOf(id), Kind: gate.KindStep, Name: "review-diff"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := svc.Resolve(ctx, g.ID, gates.Resolution{Intent: "approve", By: task.ActorPerson}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sweep()
+	sweep()
+	if e, _ := r.db.Tasks().Task(ctx, "t-01"); e.Category != task.CategoryDone {
+		t.Fatalf("the started task whose diff you approved: %+v", e)
+	}
+	if e, _ := r.db.Tasks().Task(ctx, "t-02"); e.Category == task.CategoryDone {
+		t.Fatalf("a task no start ran on closed: %+v", e)
 	}
 }

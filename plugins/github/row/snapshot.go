@@ -16,6 +16,10 @@ const (
 	SignalInLoop    = "in_loop"
 	SignalReady     = "ready"
 	SignalWorkspace = "workspace"
+	// SignalApprovedByMe is on for someone else's open pull request
+	// whose newest verdict of the viewer approves, with no review asked of
+	// them since.
+	SignalApprovedByMe = "approved_by_me"
 )
 
 // Report is the row's snapshot but its unit, rev, time and data.
@@ -35,7 +39,8 @@ func (r Row) Report() src.Snapshot {
 // Signals are the row's link signals: stalled, an open pull request in
 // scope whose situation lasted past its threshold; in_loop, an open one a
 // review workspace holds; ready, one whose work is approved; workspace, one
-// a workspace of which remains, open or not.
+// a workspace of which remains, open or not; approved_by_me, an open one of
+// someone else's the viewer approved last.
 func (r Row) Signals() []src.Signal {
 	open := r.PR.State == "OPEN"
 	stalled := src.Signal{Name: SignalStalled, On: open && r.Stalled() && len(r.Payload.Reasons) > 0}
@@ -43,7 +48,27 @@ func (r Row) Signals() []src.Signal {
 		stalled.Since = r.stallsAt()
 	}
 	return []src.Signal{stalled, {Name: SignalInLoop, On: open && r.Payload.Workspace.IsReview}, {Name: SignalReady, On: r.Payload.Approved},
-		{Name: SignalWorkspace, On: r.Payload.Workspace.ID != ""}}
+		{Name: SignalWorkspace, On: r.Payload.Workspace.ID != ""}, {Name: SignalApprovedByMe, On: open && r.approvedByMe()}}
+}
+
+// approvedByMe says the viewer's newest verdict on someone else's pull
+// request approves it, and no review was requested of them after it.
+func (r Row) approvedByMe() bool {
+	viewer := r.in.Viewer
+	if viewer == "" || r.Mine() {
+		return false
+	}
+	var verdict pr.Event
+	var asked time.Time
+	for _, e := range r.in.Events {
+		switch {
+		case e.Kind == pr.KindReview && strings.EqualFold(e.Actor, viewer) && !strings.HasPrefix(e.Data, "COMMENTED:") && !e.At.Before(verdict.At):
+			verdict = e
+		case e.Kind == pr.KindReviewRequest && strings.EqualFold(e.Data, viewer) && e.At.After(asked):
+			asked = e.At
+		}
+	}
+	return strings.HasPrefix(verdict.Data, "APPROVED:") && !asked.After(verdict.At)
 }
 
 // stallsAt is the first instant the row's situation is stalled; zero when

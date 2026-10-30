@@ -103,6 +103,9 @@ type GateDef struct {
 	Kind    gate.Kind
 	Label   string
 	Intents []GateIntent
+	// ClosesWith is the intent a person's closing of the gate's task
+	// resolves it with; "" leaves it open.
+	ClosesWith string
 	// Text words the gate's subject when the loop writes it, a template
 	// over the proposal facts; nil writes nothing.
 	Text *template.Template
@@ -174,10 +177,11 @@ type mGatesFile struct {
 }
 
 type mGate struct {
-	Kind    *string                `toml:"kind"`
-	Label   *string                `toml:"label"`
-	Text    *string                `toml:"text"`
-	Intents map[string]mGateIntent `toml:"intents"`
+	Kind       *string                `toml:"kind"`
+	Label      *string                `toml:"label"`
+	Text       *string                `toml:"text"`
+	ClosesWith *string                `toml:"closes_with"`
+	Intents    map[string]mGateIntent `toml:"intents"`
 }
 
 type mGateIntent struct {
@@ -319,6 +323,12 @@ func mergeGate(s *sheet, d *GatesDef, name string, m mGate) {
 	}
 	if len(g.Intents) == 0 && len(s.problems) == n {
 		s.add(path+".intents", "is required: a gate is resolved with one of its intents")
+	}
+	if m.ClosesWith != nil {
+		g.ClosesWith = strings.TrimSpace(*m.ClosesWith)
+	}
+	if g.ClosesWith != "" && !slices.ContainsFunc(g.Intents, func(in GateIntent) bool { return in.Name == g.ClosesWith }) {
+		s.add(path+".closes_with", "names %q, which is not an intent of the gate", g.ClosesWith)
 	}
 	switch {
 	case len(s.problems) > n:

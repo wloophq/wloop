@@ -237,3 +237,32 @@ func TestPluginNudgeWithdrawnWhenTheUnitCloses(t *testing.T) {
 		}
 	}
 }
+
+func TestARuleThatNoLongerProposesWithdrawsItsHeldDraft(t *testing.T) {
+	e := newEnv(t)
+	other := unit.Unit{Provider: unit.GitHub, Key: "o/r#2"}
+	src := &githubSource{out: []outbox.Proposal{ghNudge(pull), ghNudge(other)}}
+	e.job.Sources = []Source{{Provider: unit.GitHub, Proposals: src.Proposals}}
+	e.run()
+	e.facts[pull] = task.UnitFacts{Unit: pull, Carded: true}
+	src.out, src.err = nil, errors.New("rate limited")
+	if _, err := e.job.Run(ctx); err == nil || len(e.list("github-nudge", draft.Held)) != 2 {
+		t.Fatalf("a failed pass withdrew: %v %+v", err, e.list("github-nudge", draft.Held))
+	}
+	src.err = nil
+	if sum := e.run(); sum.Discarded != 1 {
+		t.Fatalf("%s", sum)
+	}
+	for _, d := range e.drafts.all() {
+		switch {
+		case d.Unit == pull && (d.State != draft.Dropped || d.Reason != ReasonMoot):
+			t.Fatalf("the draft its rule no longer proposes on a carded unit: %+v", d)
+		case d.Unit == other && d.State != draft.Held:
+			t.Fatalf("the draft on a unit the plugin has not reported yet: %+v", d)
+		}
+	}
+	src.out = []outbox.Proposal{ghNudge(pull)}
+	if sum := e.run(); sum.Proposed != 1 {
+		t.Fatalf("proposing again after the withdrawal: %s", sum)
+	}
+}

@@ -16,11 +16,13 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/timeline"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -298,6 +300,10 @@ func (s *Server) doTaskVerb(w http.ResponseWriter, r *http.Request, g *coretasks
 			return
 		}
 	}
+	if err := s.settleOnClose(ctx, g, e, creq); err != nil {
+		writeTasksError(w, err)
+		return
+	}
 	reply := s.replies(v) && !g.Handles(e, v)
 	b, bridged := s.bridge(ctx, g, e, v)
 	if reply || bridged {
@@ -323,6 +329,34 @@ func (s *Server) doTaskVerb(w http.ResponseWriter, r *http.Request, g *coretasks
 	}
 	res, err := g.Do(ctx, e.ID, creq)
 	s.writeTaskResult(ctx, w, g, res, err)
+}
+
+// settleOnClose resolves each open gate of e whose gates.toml closes_with names an intent, with that intent, by
+// the person, when creq is a person's verb that ends the task, runs now and no handler of e's kind takes: the
+// decision a closed task holds would otherwise move to the task's unit and bring the task back.
+func (s *Server) settleOnClose(ctx context.Context, g *coretasks.Service, e task.Task, creq coretasks.Request) error {
+	if h := s.handlerOf(creq.Verb); creq.Actor != task.ActorPerson || h != handlerFinish && h != handlerDrop || g.Handles(e, creq.Verb) ||
+		s.deps.GateReader == nil || s.deps.Gates == nil {
+		return nil
+	}
+	if gated, err := g.Allowed(ctx, e, creq); err != nil || gated {
+		return nil
+	}
+	all, err := s.deps.GateReader.OfTask(ctx, e.ID)
+	if err != nil {
+		return err
+	}
+	for _, gt := range all {
+		def, _ := s.loaded().Gates.Gate(gt.Name)
+		if gt.Status != gate.Open || def.ClosesWith == "" || !slices.Contains(gt.Intents, def.ClosesWith) {
+			continue
+		}
+		if err := s.resolveGate(ctx, gt, gates.Resolution{Intent: def.ClosesWith, By: task.ActorPerson}, creq.Source, io.Discard); err != nil &&
+			!errors.Is(err, gates.ErrResolved) {
+			return err
+		}
+	}
+	return nil
 }
 
 // requestActor is who runs the verb a request asks for: an agent when the request comes from a session, the

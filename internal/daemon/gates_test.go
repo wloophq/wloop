@@ -123,3 +123,25 @@ func TestGatesListFiltersByKind(t *testing.T) {
 		t.Fatalf("the plan gates: %d %+v", code, plans)
 	}
 }
+
+func TestClosingATaskSettlesTheGatesGatesTomlClosesWith(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	for _, verb := range []string{"done", "dismiss"} {
+		t.Run(verb, func(t *testing.T) {
+			t.Parallel()
+			r := newTasksRig(t, nil)
+			r.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "ship it"})
+			g := r.withGates(t, "t-0000000000000001")
+			if rec := post(t, r.s, api.TaskPath("t-0000000000000001", verb), `{}`); rec.Code != 200 {
+				t.Fatalf("%s: %d %s", verb, rec.Code, rec.Body)
+			}
+			if got, _ := r.s.deps.GateReader.Get(ctx, g.ID); got.Status != gate.Dismissed || got.Intent != "dismiss" || got.By != task.ActorPerson {
+				t.Fatalf("the question after %s = %+v, want dismissed by the person", verb, got)
+			}
+			if e, err := r.g.Task(ctx, "t-0000000000000001"); err != nil || e.Open() {
+				t.Fatalf("task after %s = %+v, %v; want it closed", verb, e, err)
+			}
+		})
+	}
+}

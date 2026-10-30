@@ -222,6 +222,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task.link_signal.in_loop` | bool | A review workspace holds the pull request: the loop reviews it. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.link_signal.ready` | bool | The work on the pull request is approved: my review approved its head, or my own can merge. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.link_signal.workspace` | bool | A workspace of the pull request remains on disk, a review or an author one, whatever the pull request's state. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.link_signal.approved_by_me` | bool | Someone else's open pull request whose newest verdict of yours approves it, with no review asked of you since. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 
 ### Pull requests (`pr.*`)
 

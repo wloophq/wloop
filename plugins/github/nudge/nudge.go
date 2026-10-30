@@ -75,6 +75,8 @@ func Targets(s Situation, author, viewer string, ignore []string) ([]string, str
 	switch situation.Kind(s.Kind) {
 	case situation.KindDone:
 		return nil, "is " + s.Reason
+	case situation.KindDraft:
+		return nil, "is a draft"
 	case situation.KindLoopWorking, situation.KindLoopWaiting, situation.KindLoopStopped, situation.KindHeldByCap:
 		return nil, "waits on the review loop (" + s.Reason + ")"
 	case situation.KindNoReviewer:

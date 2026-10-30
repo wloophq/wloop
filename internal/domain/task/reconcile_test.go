@@ -238,8 +238,15 @@ func TestAReopenedItemMarksChangedAndStaysOutOfTheInbox(t *testing.T) {
 	done := only(t, reconcile(t, facts(), its, []task.Task{e}, now))
 	its[0].State = "open"
 	got := only(t, reconcile(t, facts(), its, []task.Task{done}, now.Add(time.Hour)))
-	if got.Category != task.CategoryReady || !got.Changed {
-		t.Fatalf("an item reopened on a done task: %+v", got)
+	if got.Category != task.CategoryDone || got.Changed || len(got.Items) != 1 {
+		t.Fatalf("an item that waits on someone else reopened on a done task: %+v", got)
+	}
+	mine := []items.Item{item("a")}
+	resolved(&mine[0])
+	doneMine := only(t, reconcile(t, facts(), mine, []task.Task{e}, now))
+	mine[0].State = "open"
+	if got := only(t, reconcile(t, facts(), mine, []task.Task{doneMine}, now.Add(time.Hour))); got.Category != task.CategoryReady || !got.Changed {
+		t.Fatalf("an item that waits on me reopened on a done task: %+v", got)
 	}
 	dropped := done
 	dropped.State, dropped.Category = "trash", task.CategoryDropped
@@ -339,8 +346,34 @@ func TestAnOpenPRsDoneTaskTakesItsItemsBack(t *testing.T) {
 	done := task.Task{ID: "t-00000000000000a2", State: "done", Category: task.CategoryDone, Title: "Review acme/api#7", Units: []unit.Unit{pr},
 		Origin: task.OriginDerived, Created: now.Add(-48 * time.Hour), Updated: now.Add(-24 * time.Hour)}
 	es := reconcile(t, facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true }), []items.Item{item("gh:follow", keyed, owedBy(ana))}, []task.Task{done}, now)
+	if e := only(t, es); e.ID != done.ID || e.Category != task.CategoryDone || e.Changed || len(e.Items) != 1 {
+		t.Fatalf("an open pull request that waits on someone else, whose task is done: %+v", es)
+	}
+	es = reconcile(t, facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true }), []items.Item{item("gh:review", keyed)}, []task.Task{done}, now)
 	if e := only(t, es); e.ID != done.ID || e.Category != task.CategoryReady || !e.Changed || len(e.Items) != 1 {
-		t.Fatalf("an open pull request whose task is done: %+v", es)
+		t.Fatalf("an open pull request that waits on me, whose task is done: %+v", es)
+	}
+}
+
+func TestADoneTaskComesBackOnlyWhenItsUnitAsksSomethingNewOfMe(t *testing.T) {
+	f := facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true })
+	closedAt := now.Add(-time.Hour)
+	done := task.Task{ID: "t-00000000000000a3", State: "done", Category: task.CategoryDone, Title: "do gh:review",
+		Units: []unit.Unit{pr}, Items: []task.ItemRef{{Unit: pr, Item: "gh:review"}}, Origin: task.OriginDerived,
+		Created: now.Add(-48 * time.Hour), Updated: closedAt}
+	asked := func(at time.Time) items.Item {
+		return item("gh:review", keyed, func(it *items.Item) { it.UpdatedAt = at })
+	}
+	if cs := reconciled(t, f, []items.Item{asked(closedAt.Add(-time.Minute))}, me, []task.Task{done}, bundled, now); len(cs) != 0 {
+		t.Fatalf("the ask you closed the task over, unchanged, brought it back: %+v", cs)
+	}
+	e := only(t, reconcile(t, f, []items.Item{asked(closedAt.Add(time.Minute))}, []task.Task{done}, now))
+	if e.Category != task.CategoryReady || !e.Changed {
+		t.Fatalf("the ask changed after you closed the task, still on you: %+v", e)
+	}
+	waits := item("gh:review", keyed, owedBy(ana), func(it *items.Item) { it.UpdatedAt = closedAt.Add(time.Minute) })
+	if e := only(t, reconcile(t, f, []items.Item{waits}, []task.Task{done}, now)); e.Category != task.CategoryDone || e.Changed {
+		t.Fatalf("the ask moved to someone else after you closed the task: %+v", e)
 	}
 }
 

@@ -33,6 +33,10 @@ doc = "The work on the pull request is approved: my review approved its head, or
 name = "workspace"
 doc = "A workspace of the pull request remains on disk, a review or an author one, whatever the pull request's state."
 
+[[source.signals]]
+name = "approved_by_me"
+doc = "Someone else's open pull request whose newest verdict of yours approves it, with no review asked of you since."
+
 [[source.marks]]
 name = "addressed.reviews"
 doc = "The newest review an address round triaged on a pull request you develop, a time: `handled(\"addressed.reviews\", <time>)`."

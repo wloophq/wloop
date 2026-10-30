@@ -39,7 +39,7 @@ func TestTheSignalsOfEachFixture(t *testing.T) {
 		"held by the cap":              {SignalInLoop, SignalWorkspace},
 		"workspace agent waiting":      {SignalInLoop, SignalWorkspace},
 		"tracked":                      {SignalStalled},
-		"approved review head":         {SignalInLoop, SignalReady, SignalWorkspace},
+		"approved review head":         {SignalInLoop, SignalReady, SignalWorkspace, SignalApprovedByMe},
 		"old stalled review":           {SignalStalled},
 		"closed in a review workspace": {SignalWorkspace},
 	}
@@ -55,6 +55,31 @@ func TestAStalledSignalSaysSinceWhen(t *testing.T) {
 	for _, s := range r.Signals() {
 		if s.Name == SignalStalled && (!s.On || s.Since.IsZero() || s.Since.After(fixtureNow) || fixtureNow.Sub(s.Since) > 60*24*time.Hour) {
 			t.Fatalf("stalled %+v", s)
+		}
+	}
+}
+
+func TestApprovedByMeIsMyNewestVerdictOnSomeoneElsesOpenPullRequest(t *testing.T) {
+	theirs := open(50, "ana", func(p *pr.PR) { p.Reasons = []string{"review-requested"} })
+	approved := ev(50, pr.KindReview, fixtureViewer, ago(3*day), "APPROVED:h0")
+	for _, c := range []struct {
+		name string
+		pr   pr.PR
+		evs  []pr.Event
+		want bool
+	}{
+		{"approved, then pushed", theirs, []pr.Event{approved, ev(50, pr.KindPush, "ana", ago(2*day), "")}, true},
+		{"approved, then commented", theirs, []pr.Event{approved, ev(50, pr.KindReview, fixtureViewer, ago(day), "COMMENTED:h1")}, true},
+		{"approved, then asked changes", theirs, []pr.Event{approved, ev(50, pr.KindReview, fixtureViewer, ago(day), "CHANGES_REQUESTED:h1")}, false},
+		{"approved, then re-requested", open(50, "ana", func(p *pr.PR) { p.Reasons, p.ReviewRequests = []string{"review-requested"}, []string{fixtureViewer} }),
+			[]pr.Event{approved, ev(50, pr.KindReviewRequest, "ana", ago(day), fixtureViewer)}, false},
+		{"approved my own", open(50, fixtureViewer, nil), []pr.Event{approved}, false},
+		{"approved, then merged", open(50, "ana", func(p *pr.PR) { p.State, p.MergedAt = "MERGED", ago(day) }), []pr.Event{approved}, false},
+		{"never reviewed", theirs, nil, false},
+	} {
+		got := slices.Contains(on(Derive(input(fixture{pr: c.pr, events: c.evs}))), SignalApprovedByMe)
+		if got != c.want {
+			t.Errorf("%s: approved_by_me %v, want %v", c.name, got, c.want)
 		}
 	}
 }
