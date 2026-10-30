@@ -64,7 +64,7 @@ func TestALeavingUnitIsATombstoneUntilTheWindowDropsIt(t *testing.T) {
 	defer cancel()
 	published := make(chan api.Change, 4)
 	done := make(chan struct{})
-	full, err := m.Rows(ctx, api.ViewAll, api.Since{})
+	full, err := m.Rows(ctx, api.Since{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestALeavingUnitIsATombstoneUntilTheWindowDropsIt(t *testing.T) {
 
 	p.set(threadUnits(76, 1100))
 	log.Note(port.TopicPRs)
-	one, err := m.Rows(ctx, api.ViewAll, at)
+	one, err := m.Rows(ctx, at)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,14 +97,14 @@ func TestALeavingUnitIsATombstoneUntilTheWindowDropsIt(t *testing.T) {
 
 	p.set(nil)
 	log.Note(port.TopicPRs)
-	behind, err := m.Rows(ctx, api.ViewAll, at)
+	behind, err := m.Rows(ctx, at)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !behind.Full || len(behind.Rows) != 0 {
 		t.Fatalf("a client behind the dropped tombstones got a delta: full %v, %d rows, %d removed", behind.Full, len(behind.Rows), len(behind.Removed))
 	}
-	recent, err := m.Rows(ctx, api.ViewAll, api.Since{Epoch: one.Epoch, Rev: one.Rev})
+	recent, err := m.Rows(ctx, api.Since{Epoch: one.Epoch, Rev: one.Rev})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestAChangeBehindTheTombstonesIsAll(t *testing.T) {
 	m := readmodel.New(log, nil, nil, nil, nil, p)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	if _, err := m.Rows(ctx, api.ViewAll, api.Since{}); err != nil {
+	if _, err := m.Rows(ctx, api.Since{}); err != nil {
 		t.Fatal(err)
 	}
 	published := make(chan api.Change, 4)
@@ -150,12 +150,12 @@ func TestAChangeBehindTheTombstonesIsAll(t *testing.T) {
 	<-running
 	p.set(threadUnits(0, 10))
 	log.Note(port.TopicPRs)
-	if _, err := m.Rows(ctx, api.ViewAll, api.Since{}); err != nil {
+	if _, err := m.Rows(ctx, api.Since{}); err != nil {
 		t.Fatal(err)
 	}
 	p.set(nil)
 	log.Note(port.TopicPRs)
-	if _, err := m.Rows(ctx, api.ViewAll, api.Since{}); err != nil {
+	if _, err := m.Rows(ctx, api.Since{}); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -175,13 +175,13 @@ func TestRunPublishesWhatMovedBeforeItStarted(t *testing.T) {
 	m := readmodel.New(log, nil, nil, nil, nil, p)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	first, err := m.Rows(ctx, api.ViewAll, api.Since{})
+	first, err := m.Rows(ctx, api.Since{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	p.set(threadUnits(0, 10))
 	log.Note(port.TopicPRs)
-	moved, err := m.Rows(ctx, api.ViewAll, api.Since{})
+	moved, err := m.Rows(ctx, api.Since{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +214,7 @@ func TestPresentationsComeFromTheLatestSnapshot(t *testing.T) {
 	if got := m.Presentations(threadUnits(0, 1)); len(got) != 0 {
 		t.Fatalf("presentations before any snapshot %v", got)
 	}
-	if _, err := m.Rows(context.Background(), api.ViewAll, api.Since{}); err != nil {
+	if _, err := m.Rows(context.Background(), api.Since{}); err != nil {
 		t.Fatal(err)
 	}
 	got := m.Presentations(append(threadUnits(0, 2), gone))

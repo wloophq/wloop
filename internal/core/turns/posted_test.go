@@ -25,7 +25,7 @@ func postingTurn(t *testing.T) (*turns.Service, *turnstest.Store, *turnstest.Ses
 }
 
 func posted(text string) turns.AnswerRequest {
-	return turns.AnswerRequest{Unit: r7, Message: 5, Posted: true, Turn: 1, Text: text, Source: turn.Cockpit}
+	return turns.AnswerRequest{Unit: r7, Message: 5, Gate: 5, Posted: true, Turn: 1, Text: text, Source: turn.Cockpit}
 }
 
 func TestAPostedMessageAnswerIsTypedWhenIdle(t *testing.T) {
@@ -34,7 +34,7 @@ func TestAPostedMessageAnswerIsTypedWhenIdle(t *testing.T) {
 	if err != nil || got.Route != turn.Typed || got.Handle != "term_1" {
 		t.Fatalf("%+v %v", got, err)
 	}
-	if typed := sess.Typed(); len(typed) != 1 || typed[0].Line != "answered Message=5 Unit=https://github.com/acme/api/pull/7" {
+	if typed := sess.Typed(); len(typed) != 1 || typed[0].Line != "answered Gate=5 Unit=https://github.com/acme/api/pull/7" {
 		t.Fatalf("typed %+v", typed)
 	}
 	b := bookOf(t, store, r7)
@@ -63,7 +63,7 @@ func TestAPostedMessageAnswerQueuesWhileBusy(t *testing.T) {
 	if err := s.DeliverStopped(ctx, "term_1"); err != nil {
 		t.Fatal(err)
 	}
-	if typed := sess.Typed(); len(typed) != 1 || typed[0].Line != "answered Message=5 Unit=https://github.com/acme/api/pull/7" {
+	if typed := sess.Typed(); len(typed) != 1 || typed[0].Line != "answered Gate=5 Unit=https://github.com/acme/api/pull/7" {
 		t.Fatalf("typed %+v", typed)
 	}
 	if r := routes(t, store); len(r) != 1 || r[0] != turn.Typed {

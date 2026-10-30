@@ -14,10 +14,8 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
-	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 type memoEntry struct {
@@ -108,22 +106,27 @@ func VersionFor(l *intentload.Loaded, disabled []unit.ProviderID) string {
 
 func buildSpecs(l *intentload.Loaded) []api.ActionSpec {
 	var out []api.ActionSpec
-	i := 0
-	for ; i < len(builtinActions) && builtinActions[i].spec.Group == builtin.GroupStart; i++ {
-		out = append(out, withSource(worded(l, builtinActions[i].spec.ID, builtinActions[i].spec)))
+	for _, b := range gateActions(l) {
+		out = append(out, withSource(b.spec))
 	}
 	out = append(out, registryActions{l}.Specs()...)
-	for ; i < len(builtinActions); i++ {
-		out = append(out, withSource(worded(l, builtinActions[i].spec.ID, builtinActions[i].spec)))
+	for _, b := range builtinActions {
+		out = append(out, withSource(worded(l, b.spec.ID, b.spec)))
 	}
 	return out
+}
+
+// rowBuiltins are the built-in actions a row may offer under l: its gates'
+// intents, then the Go table.
+func rowBuiltins(l *intentload.Loaded) []builtinAction {
+	return append(gateActions(l), builtinActions...)
 }
 
 func withSource(s api.ActionSpec) api.ActionSpec {
 	s.Source = SourceBuiltin
 	s.Scope = cmp.Or(s.Scope, ScopeUnit)
 	if githubBuiltins[s.ID] {
-		s.Plugin = string(pr.Codec{}.Provider())
+		s.Plugin = string(unit.GitHub)
 	}
 	return s
 }
@@ -143,14 +146,19 @@ func States(f Facts) []api.ActionState {
 	}
 	out := []api.ActionState{}
 	var facts map[string]any
+	builtins := rowBuiltins(f.Intents)
 	for _, spec := range Specs(f.Intents) {
 		st, ok := intents[spec.ID]
-		if i := slices.IndexFunc(builtinActions, func(b builtinAction) bool { return b.spec.ID == spec.ID }); i >= 0 {
-			if st, ok = builtinActions[i].offer(f); ok {
+		if i := slices.IndexFunc(builtins, func(b builtinAction) bool { return b.spec.ID == spec.ID }); i >= 0 {
+			if st, ok = builtins[i].offer(f); ok {
 				if facts == nil {
 					facts = intentload.ActionFactMap(f.Get)
 				}
-				st = texted(f.Intents, spec.ID, st, facts)
+				if g, ok := RowGateIntent(f.Intents, spec.ID); ok {
+					st = gateTexted(g.Intent, st, facts)
+				} else {
+					st = texted(f.Intents, spec.ID, st, facts)
+				}
 			}
 		}
 		if !ok {
@@ -175,9 +183,21 @@ func UnitStates(f Facts) []api.ActionState {
 	return append(out, registryActions{f.Intents}.States(f)...)
 }
 
-// requestIntent is the intent an intake action asks for.
+// WithOffers are states, then each action of offered they do not hold,
+// enabled: what a plugin offers on its unit.
+func WithOffers(states []api.ActionState, offered []string) []api.ActionState {
+	for _, a := range offered {
+		if !slices.ContainsFunc(states, func(st api.ActionState) bool { return st.ID == a }) {
+			states = append(states, api.ActionState{ID: a, Enabled: true})
+		}
+	}
+	return states
+}
+
+// requestIntent is the intent an intake action asks for: the plan gate's
+// first approving intent asks for the round RunNowIntent names.
 func requestIntent(f Facts, action string) string {
-	if action != "run_now" {
+	if !RunsHeld(f.Intents, action) {
 		return action
 	}
 	name, _ := RunNowIntent(f.Intents.Registry, f.Workspace, f.Override, f.Mine)

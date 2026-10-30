@@ -4,8 +4,6 @@ import (
 	"errors"
 	"io"
 	"io/fs"
-	"os"
-	"path/filepath"
 	"text/template"
 
 	"github.com/pelletier/go-toml/v2"
@@ -75,11 +73,11 @@ func readDefaults(layers []profile.Layer, bundled fs.FS) (manifestDefaults, Prob
 		}
 	}
 	for _, l := range layers {
-		if l.Dir == "" {
+		if l.Bundled() {
 			continue
 		}
-		file := filepath.Join(l.Dir, DefaultsFile)
-		src, err := os.ReadFile(file)
+		r, err := profile.ReadFile(l, DefaultsFile)
+		file, src := r.Path, r.Body
 		switch {
 		case errors.Is(err, fs.ErrNotExist):
 		case err != nil:

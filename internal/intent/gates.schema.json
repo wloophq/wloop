@@ -1,0 +1,135 @@
+{
+  "$id": "https://github.com/wloophq/wloop/gates.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "approval": {
+      "additionalProperties": false,
+      "description": "How a gate is decided when no manifest or configuration says: the default of each kind. A user layer's mode replaces the mode and its window, its rules replace the rules.",
+      "properties": {
+        "mode": {
+          "description": "The mode when no rule holds; the bundled file sets it. send and run release a gate at once, delay when its window ends unless you resolve it first, wait holds it for you, dry_run rejects a draft gate.",
+          "enum": [
+            "wait",
+            "delay",
+            "send",
+            "dry_run",
+            "run"
+          ],
+          "type": "string"
+        },
+        "rule": {
+          "description": "A rule; the first whose when holds gives the mode.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "description": "The rule's mode; dry_run with a when that pins gate.kind to any kind but draft fails to load.",
+                "enum": [
+                  "wait",
+                  "delay",
+                  "send",
+                  "dry_run",
+                  "run"
+                ],
+                "type": "string"
+              },
+              "when": {
+                "description": "When the rule applies, over the gate's facts: gate.kind and gate.name.",
+                "type": "string"
+              },
+              "window": {
+                "description": "With mode delay only: how long you have to resolve the gate.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "window": {
+          "description": "With mode delay only: how long you have to resolve the gate.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "gates": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "A gate, by its name: the one a gate.open step, an intent's record.missing or a verb's gate opens; a gate the loop opens by kind takes the first of its kind. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
+        "properties": {
+          "intents": {
+            "additionalProperties": {
+              "additionalProperties": false,
+              "description": "An intent, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
+              "properties": {
+                "answer": {
+                  "default": false,
+                  "description": "The intent takes text, such as a question's answer.",
+                  "type": "boolean"
+                },
+                "confirm": {
+                  "description": "The dialog that confirms the intent on a row, over the action facts; empty asks nothing.",
+                  "type": "string"
+                },
+                "label": {
+                  "description": "The name people read on its button.",
+                  "type": "string"
+                },
+                "note": {
+                  "description": "What the intent would do on a row that offers it, over the action facts.",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "The status the intent resolves the gate to; required for a new intent.",
+                  "enum": [
+                    "approved",
+                    "rejected",
+                    "answered",
+                    "dismissed",
+                    "superseded"
+                  ],
+                  "type": "string"
+                },
+                "summary": {
+                  "description": "What resolving the gate with the intent does, as help and palettes show it.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "description": "What you may resolve the gate with, by intent, in the order clients offer them.",
+            "type": "object"
+          },
+          "kind": {
+            "description": "What the gate decides, which names the consequence of resolving it; required for a new gate.",
+            "enum": [
+              "draft",
+              "plan",
+              "question",
+              "post",
+              "proposal",
+              "trust",
+              "step"
+            ],
+            "type": "string"
+          },
+          "label": {
+            "description": "What the gate asks of you, as clients list it.",
+            "type": "string"
+          },
+          "text": {
+            "description": "The words of the gate's subject when the loop writes them, over the proposal facts: the first proposal gate words an item proposal of the ledger with it.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "description": "The gates a profile names, by name, in the order the file declares them, a user layer's new ones after the bundled.",
+      "type": "object"
+    }
+  },
+  "title": "Gates (gates.toml)",
+  "type": "object"
+}

@@ -1,0 +1,14 @@
+summary = "Address the reviews, failing checks and conflicts of my pull request"
+provider = "github"
+when = 'pr.address.due'
+order = 30
+key = ["pr.fingerprint"]
+
+[[step]]
+use = "turn.start"
+intent = "address"
+
+[[gates.approval.rule]]
+when = 'gate.kind == "plan"'
+mode = "delay"
+window = "60s"

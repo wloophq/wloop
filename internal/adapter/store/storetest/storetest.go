@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -138,6 +139,7 @@ func open(path string) (*Fixture, error) {
 	}
 	inv := inventory.New(db)
 	inv.UseClock(func() time.Time { return seedNow })
+	inventorytest.Of(inv)
 	return &Fixture{
 		DB:        db,
 		Inventory: inv,

@@ -2,43 +2,33 @@ package daemon
 
 import (
 	"encoding/json"
-	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/domain/task"
 	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
-func (r *entriesRig) serveProjects() {
-	r.g.ServeProjects(coregtd.ProjectDeps{Store: r.db.Projects()})
+func (r *tasksRig) serveProjects() {
+	r.g.ServeProjects(coretasks.ProjectDeps{Store: r.db.Projects()})
 }
 
-func TestReviewViewIsServedOnceRegistered(t *testing.T) {
+func TestTheReviewIsServedOnceRegistered(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, nil)
-	var cat api.GTDCatalog
-	get(t, r.s, api.GTDPath, &cat)
-	if slices.ContainsFunc(cat.Views, func(v api.GTDView) bool { return v.ID == "review" }) {
-		t.Fatalf("review listed before it is served: %v", cat.Views)
-	}
+	r := newTasksRig(t, nil)
 	var none api.Review
 	if code := get(t, r.s, api.ReviewPath, &none); code != 404 {
 		t.Errorf("GET review before it is served: %d, want 404", code)
 	}
-
-	r.put(t, gtd.Entry{ID: "e-in", State: gtd.Inbox, Title: "in"}, gtd.Entry{ID: "e-p", Kind: gtd.KindProject, State: gtd.Next, Title: "P", Slug: "p"})
+	r.put(t, task.Task{ID: "t-in", State: "inbox", Category: task.CategoryInbox, Title: "in"}, task.Task{ID: "t-p", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "next", Category: task.CategoryReady, Title: "P"})
 	r.serveProjects()
-	get(t, r.s, api.GTDPath, &cat)
-	var ids []string
-	for _, v := range cat.Views {
-		ids = append(ids, v.ID)
-	}
-	if want := []string{"focus", "inbox", "outbox", "next", "waiting", "projects", "someday", "logbook", "review"}; !slices.Equal(ids, want) {
-		t.Fatalf("views %v, want %v", ids, want)
+	var cat api.ViewsCatalog
+	get(t, r.s, api.ViewsPath, &cat)
+	if want := []string{"inbox", "outbox", "waiting", "review-projects", "someday", "focus"}; !slices.Equal(cat.Review, want) {
+		t.Fatalf("the catalog's review %v, want %v", cat.Review, want)
 	}
 	var rv api.Review
 	if code := get(t, r.s, api.ReviewPath, &rv); code != 200 {
@@ -47,24 +37,19 @@ func TestReviewViewIsServedOnceRegistered(t *testing.T) {
 	var steps []string
 	for _, st := range rv.Steps {
 		steps = append(steps, st.ID)
-		if st.Query["view"] != st.View || st.View == "" {
+		if st.Query["view"] != st.View || st.View != st.ID {
 			t.Errorf("step %s: view %q query %v", st.ID, st.View, st.Query)
 		}
 	}
-	if want := []string{"inbox", "outbox", "waiting", "projects", "someday", "focus"}; !slices.Equal(steps, want) || rv.ID == "" || rv.Done {
+	if !slices.Equal(steps, cat.Review) || rv.ID == "" || rv.Done {
 		t.Fatalf("review %+v", rv)
 	}
-	if st := rv.Steps[0]; st.Count != 1 || st.Done {
+	if st := rv.Steps[0]; st.Count != 1 || st.Done || st.Label != "Inbox to zero" {
 		t.Errorf("inbox step %+v", st)
 	}
-	if st := rv.Steps[3]; st.View != "review" || st.Count != 1 {
+	if st := rv.Steps[3]; st.Count != 1 {
 		t.Errorf("projects step %+v", st)
 	}
-	page := r.page(t, "view=review")
-	if got := entryIDs(page.Entries); !slices.Equal(got, []string{"e-p"}) {
-		t.Errorf("the review view lists %v", got)
-	}
-
 	rec := post(t, r.s, api.ReviewStepPath("inbox"), `{}`)
 	if rec.Code != 200 {
 		t.Fatalf("POST step done: %d %s", rec.Code, rec.Body)
@@ -77,30 +62,61 @@ func TestReviewViewIsServedOnceRegistered(t *testing.T) {
 	}
 }
 
-func TestProjectEntryViews(t *testing.T) {
+// TestReviewProjectsStepListsProjectsDueOrWithoutANextAction runs the bundled review-projects view over the task
+// facts of a real store: an open project past its review, or with no ready child unless in Someday.
+func TestReviewProjectsStepListsProjectsDueOrWithoutANextAction(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, nil)
+	r := newTasksRig(t, nil)
 	r.serveProjects()
-	old := entriesNow.Add(-10 * 24 * time.Hour)
+	old, recent := tasksNow.Add(-10*24*time.Hour), tasksNow.Add(-time.Hour)
+	project := func(id task.ID, state string, c task.Category, at time.Time) task.Task {
+		return task.Task{ID: id, Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: task.State(state), Category: c, Title: string(id), Created: at, Updated: at}
+	}
 	r.put(t,
-		gtd.Entry{ID: "e-p", Kind: gtd.KindProject, State: gtd.Next, Title: "P", Slug: "p", Sequential: true, ReviewedAt: old, Created: old, Updated: old},
-		gtd.Entry{ID: "e-q", Kind: gtd.KindProject, State: gtd.Next, Title: "Q", Slug: "q", ReviewEvery: 14 * 24 * time.Hour, ReviewedAt: old, Created: old, Updated: old},
-		gtd.Entry{ID: "e-a", State: gtd.Next, Title: "a", Project: "e-p", Position: 1},
-		gtd.Entry{ID: "e-b", State: gtd.Waiting, Title: "b", Project: "e-p", Position: 2},
+		project("p-due", "next", task.CategoryReady, old),
+		task.Task{ID: "a-due", State: "next", Category: task.CategoryReady, Parent: "p-due", Position: 1, Created: old, Updated: old},
+		project("p-empty", "next", task.CategoryReady, recent),
+		task.Task{ID: "a-empty", State: "waiting", Category: task.CategoryWaiting, Parent: "p-empty", Position: 1, Created: recent, Updated: recent},
+		project("p-fine", "next", task.CategoryReady, recent),
+		task.Task{ID: "a-fine", State: "next", Category: task.CategoryReady, Parent: "p-fine", Position: 1, Created: recent, Updated: recent},
+		project("p-someday", "someday", task.CategoryDeferred, recent),
+		project("p-done", "done", task.CategoryDone, old),
+	)
+	page := r.page(t, "view=review-projects")
+	if got := taskIDs(page.Tasks); !slices.Equal(got, []string{"p-due", "p-empty"}) || page.Counters.Views["review-projects"] != 2 {
+		t.Fatalf("review-projects lists %v, counts %d", got, page.Counters.Views["review-projects"])
+	}
+	var rv api.Review
+	get(t, r.s, api.ReviewPath, &rv)
+	if i := slices.IndexFunc(rv.Steps, func(st api.ReviewStep) bool { return st.View == "review-projects" }); i < 0 || rv.Steps[i].Count != 2 {
+		t.Fatalf("the review's projects step %+v", rv.Steps)
+	}
+}
+
+func TestProjectTaskViews(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.serveProjects()
+	old := tasksNow.Add(-10 * 24 * time.Hour)
+	r.put(t,
+		task.Task{ID: "t-p", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "next", Category: task.CategoryReady, Title: "P", Sequential: true, ReviewedAt: old, Created: old, Updated: old},
+		task.Task{ID: "t-q", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "next", Category: task.CategoryReady, Title: "Q", ReviewEvery: 14 * 24 * time.Hour, ReviewedAt: old, Created: old, Updated: old},
+		task.Task{ID: "t-a", State: "next", Category: task.CategoryReady, Title: "a", Parent: "t-p", Position: 1},
+		task.Task{ID: "t-b", State: "waiting", Category: task.CategoryWaiting, Title: "b", Parent: "t-p", Position: 2},
 	)
 	page := r.page(t, "view=projects")
-	byID := map[string]api.EntryView{}
-	for _, v := range page.Entries {
+	byID := map[string]api.TaskView{}
+	for _, v := range page.Tasks {
 		byID[v.ID] = v
 	}
-	p, q := byID["e-p"], byID["e-q"]
-	if p.NextAction != "e-a" || p.NextActionTitle != "a" || p.OpenActions != 2 || !p.Sequential || !p.ReviewDue || p.ReviewEvery != "168h0m0s" || !p.ReviewedAt.Equal(old) {
+	p, q := byID["t-p"], byID["t-q"]
+	if !slices.Equal(p.Children, []string{"t-a", "t-b"}) || !p.Sequential || !p.ReviewDue || p.ReviewEvery != "168h0m0s" || !p.ReviewedAt.Equal(old) {
 		t.Errorf("project p %+v", p)
 	}
-	if q.NextAction != "" || q.OpenActions != 0 || q.ReviewDue || q.ReviewEvery != "336h0m0s" {
+	if len(q.Children) != 0 || q.ReviewDue || q.ReviewEvery != "336h0m0s" {
 		t.Errorf("project q %+v", q)
 	}
-	verbs := func(v api.EntryView) map[string]bool {
+	verbs := func(v api.TaskView) map[string]bool {
 		out := map[string]bool{}
 		for _, st := range v.Verbs {
 			out[st.Verb] = st.Enabled
@@ -110,24 +126,24 @@ func TestProjectEntryViews(t *testing.T) {
 	if vs := verbs(p); !vs["reviewed"] || !vs["sequential"] || vs["project"] {
 		t.Errorf("project verbs %v", vs)
 	}
-	a := r.page(t, "view=next").Entries
-	i := slices.IndexFunc(a, func(v api.EntryView) bool { return v.ID == "e-a" })
+	a := r.page(t, "view=needs-me").Tasks
+	i := slices.IndexFunc(a, func(v api.TaskView) bool { return v.ID == "t-a" })
 	if i < 0 {
-		t.Fatalf("e-a not in Next: %v", entryIDs(a))
+		t.Fatalf("t-a not in Needs me: %v", taskIDs(a))
 	}
-	if vs := verbs(a[i]); vs["reviewed"] || vs["sequential"] || !vs["project"] || a[i].ProjectTitle != "P" {
-		t.Errorf("action verbs %v, project %q", vs, a[i].ProjectTitle)
+	if vs := verbs(a[i]); vs["reviewed"] || vs["sequential"] || !vs["project"] || a[i].Parent != "t-p" {
+		t.Errorf("action verbs %v, parent %q", vs, a[i].Parent)
 	}
 
-	r.put(t, gtd.Entry{ID: "e-done", Kind: gtd.KindProject, State: gtd.Done, Title: "Done", Slug: "done"},
-		gtd.Entry{ID: "e-trash", Kind: gtd.KindProject, State: gtd.Trash, Title: "Trash", Slug: "trash"})
+	r.put(t, task.Task{ID: "t-done", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "done", Category: task.CategoryDone, Title: "Done"},
+		task.Task{ID: "t-trash", Props: task.Props{task.PropKind: {Text: task.KindProject}}, State: "trash", Category: task.CategoryDropped, Title: "Trash"})
 	for id, want := range map[string]map[string]bool{
-		"e-done":  {"done": false, "dismiss": true, "reference": true, "reviewed": false, "sequential": false, "project": false},
-		"e-trash": {"done": false, "dismiss": false, "reference": false, "reviewed": false, "sequential": false, "project": false},
-		"e-p":     {"done": true, "dismiss": true, "reference": true, "reviewed": true, "sequential": true, "project": false},
+		"t-done":  {"done": false, "dismiss": true, "reference": true, "reviewed": false, "sequential": false, "project": false},
+		"t-trash": {"done": false, "dismiss": false, "reference": false, "reviewed": false, "sequential": false, "project": false},
+		"t-p":     {"done": true, "dismiss": true, "reference": true, "reviewed": true, "sequential": true, "project": false},
 	} {
-		var v api.EntryView
-		if code := get(t, r.s, api.EntryPath(id), &v); code != 200 {
+		var v api.TaskView
+		if code := get(t, r.s, api.TaskPath(id), &v); code != 200 {
 			t.Fatalf("GET %s: %d", id, code)
 		}
 		got := verbs(v)
@@ -143,19 +159,19 @@ func TestProjectEntryViews(t *testing.T) {
 		}
 	}
 
-	rec := post(t, r.s, api.EntryPath("e-p", "reviewed"), `{"args":{"every":"3d"},"source":"test"}`)
-	var res api.EntryResult
-	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &res) != nil || res.Entry.ReviewDue || res.Entry.ReviewEvery != "72h0m0s" {
+	rec := post(t, r.s, api.TaskPath("t-p", "reviewed"), `{"args":{"every":"3d"},"source":"test"}`)
+	var res api.TaskResult
+	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &res) != nil || res.Task.ReviewDue || res.Task.ReviewEvery != "72h0m0s" {
 		t.Errorf("reviewed: %d %s", rec.Code, rec.Body)
 	}
 }
 
 func TestTheReviewStepsAreWordedByTheProfile(t *testing.T) {
 	t.Parallel()
-	texts := intentload.GTDTexts{Review: map[string]string{"waiting": "Chase what waits"}}
-	r := newEntriesRig(t, func(d *Deps) {
-		d.Intents = func() *intentload.Loaded { return &intentload.Loaded{GTD: texts, Registry: dintent.NewRegistry(nil)} }
-	})
+	l := *bundledLoaded()
+	l.Views.Review = slices.Clone(l.Views.Review)
+	l.Views.Review[slices.IndexFunc(l.Views.Review, func(st intentload.ReviewStepDef) bool { return st.View == "waiting" })].Label = "Chase what waits"
+	r := newTasksRig(t, func(d *Deps) { d.Intents = func() *intentload.Loaded { return &l } })
 	r.serveProjects()
 	var rv api.Review
 	if code := get(t, r.s, api.ReviewPath, &rv); code != 200 {

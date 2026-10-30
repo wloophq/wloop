@@ -28,15 +28,27 @@ func (s *Server) loaded() *intentload.Loaded {
 	return l
 }
 
-// bundledWords are the bundled profile's words for the verbs, views, Review
-// steps and core keys, which a profile that leaves one out falls back to.
+// bundledWords are the bundled profile's words for the verbs and the core
+// keys, which a profile that leaves one out falls back to.
 var bundledWords = sync.OnceValue(func() coreWords {
 	l, err := turn.Bundled()
 	if err != nil {
 		panic(err)
 	}
-	return coreWords{l.Keys, l.GTD}
+	return coreWords{l.Keys, l.Tasks}
 })
+
+// verbOrder are the verbs of the profile as it loads now, in its order: the bundled ones, which a profile
+// that leaves one out falls back to, then its own.
+func (s *Server) verbOrder() []string {
+	out := slices.Clone(bundledWords().tasks.VerbOrder)
+	for _, v := range s.loaded().Tasks.VerbOrder {
+		if !slices.Contains(out, v) {
+			out = append(out, v)
+		}
+	}
+	return out
+}
 
 // isIntent tells an intent the registry offers or a user intent that failed
 // to load.
@@ -60,9 +72,9 @@ func intentDef(l *intentload.Loaded, name string) (dintent.Def, error) {
 }
 
 // intakeIntent tells an action an intake takes: an intent whose manifest
-// says intake, or run_now.
+// says intake, or the plan gate's intent that runs a held round.
 func intakeIntent(l *intentload.Loaded, name string) bool {
-	if name == "run_now" {
+	if catalog.RunsHeld(l, name) {
 		return true
 	}
 	d, ok := l.Registry.Get(dintent.Name(name))
@@ -136,10 +148,12 @@ func cutGuidance(d dintent.Def, g string) string {
 	return g
 }
 
-// profileWarning is the health warning while a user intent does not load.
-func profileWarning(l *intentload.Loaded) string {
-	if len(l.Problems) == 0 {
+// profileWarning is the health warning while a user intent does not load, or stored tasks hold a state the
+// profile does not declare (held).
+func profileWarning(l *intentload.Loaded, held intentload.Problems) string {
+	problems := append(slices.Clone(l.Problems), held...)
+	if len(problems) == 0 {
 		return ""
 	}
-	return "profile: " + catalog.FirstProblem(l.Problems)
+	return "profile: " + catalog.FirstProblem(problems)
 }

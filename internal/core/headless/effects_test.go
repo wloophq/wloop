@@ -25,7 +25,7 @@ func TestAHeadlessDraftDeclaringAnEffectItsIntentDoesNotListIsRefused(t *testing
 	intents := r.svc.Intents
 	r.svc.Intents = func(n turn.Intent) (dintent.Def, bool) {
 		d, ok := intents(n)
-		d.AllowedEffects = []string{"entry.nudged", "unit.closed"}
+		d.AllowedEffects = []string{"task.nudged", "unit.closed"}
 		return d, ok
 	}
 	got, err := r.svc.Run(context.Background(), headless.Request{Unit: thread})
@@ -68,7 +68,7 @@ func TestAHeadlessDraftTakesItsProposersPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	drafts, _ := r.outbox.List(context.Background(), outbox.Filter{})
-	if len(drafts) != 1 || drafts[0].Approval.Mode != draft.Send || drafts[0].State == draft.Proposed {
+	if len(drafts) != 1 || drafts[0].State != draft.Queued {
 		t.Fatalf("drafts %+v", drafts)
 	}
 }

@@ -24,14 +24,14 @@ func TestEveryNoticeHasABundledText(t *testing.T) {
 }
 
 func TestAUserNoticeReplacesTheBundledOneUnlessItFails(t *testing.T) {
-	bundled := "answered = \"answered {{.Message}}\"\nrecord_owed = \"owed {{.Turn}}\"\n"
+	bundled := "answered = \"answered {{.Gate}}\"\nrecord_owed = \"owed {{.Turn}}\"\n"
 	dir := t.TempDir()
-	user := "answered = \"look at {{.Message}} on {{.Unit}}\"\nrecord_owed = \"{{.Nope}}\"\nanswred = \"x\"\n"
+	user := "answered = \"look at {{.Gate}} on {{.Unit}}\"\nrecord_owed = \"{{.Nope}}\"\nanswred = \"x\"\n"
 	if err := os.WriteFile(filepath.Join(dir, NoticesFile), []byte(user), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	notices, problems := loadNotices([]profile.Layer{{Name: "user", Dir: dir}}, fstest.MapFS{NoticesFile: {Data: []byte(bundled)}})
-	if notices["answered"] != "look at {{.Message}} on {{.Unit}}" || notices["record_owed"] != "owed {{.Turn}}" {
+	if notices["answered"] != "look at {{.Gate}} on {{.Unit}}" || notices["record_owed"] != "owed {{.Turn}}" {
 		t.Fatalf("notices %+v", notices)
 	}
 	got := problems.Error()

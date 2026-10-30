@@ -4,6 +4,8 @@ import (
 	"slices"
 	"testing"
 
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+
 	"github.com/wloophq/wloop/internal/api"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/jsonschema"
@@ -23,9 +25,10 @@ var extraIntents = dintent.NewRegistry([]dintent.Def{
 
 func TestAnExtraEnumIsAFacet(t *testing.T) {
 	loaded := &intentload.Loaded{Registry: extraIntents}
-	p := New(Source{RowDeps: readmodel.RowDeps{Settings: func() readmodel.RowSettings { return readmodel.RowSettings{Loaded: loaded} }}})
+	cat := psource.BundledCatalog(string(unit.GitHub))
+	p := New(Source{RowDeps: readmodel.RowDeps{Settings: func() readmodel.RowSettings { return readmodel.RowSettings{Loaded: loaded} }}, Catalog: cat})
 	specs := p.Facets()
-	if len(specs) != len(FacetSpecs())+2 {
+	if len(specs) != len(cat.Facets())+2 {
 		t.Fatalf("%d facets", len(specs))
 	}
 	approach, areas := specs[len(specs)-2], specs[len(specs)-1]
@@ -35,11 +38,11 @@ func TestAnExtraEnumIsAFacet(t *testing.T) {
 	}
 	d := Deriver{Loaded: loaded}
 	got := d.facetValues(api.Row{}, Payload{Brief: &api.BriefSummary{Extra: map[string]any{
-		"approach": "rewrite", "areas": []any{"ui", "elsewhere"}, "solution": "split the cache"}}})
+		"approach": "rewrite", "areas": []any{"ui", "elsewhere"}, "solution": "split the cache"}}}, nil)
 	if !slices.Equal(got["extra.approach"], []string{"rewrite"}) || !slices.Equal(got["extra.areas"], []string{"ui"}) || got["extra.solution"] != nil {
 		t.Fatalf("%v", got)
 	}
-	if got := d.facetValues(api.Row{}, Payload{}); got["extra.approach"] != nil {
+	if got := d.facetValues(api.Row{}, Payload{}, nil); got["extra.approach"] != nil {
 		t.Fatalf("without a brief: %v", got)
 	}
 }

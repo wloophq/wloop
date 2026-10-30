@@ -31,7 +31,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `label` | string |  | The name people read. Required. |
 | `summary` | string |  | One line on what it does: its action's tooltip, its help line, its profile listing. Required. |
 | `shortcut` | string |  | One uppercase letter for its action, not a built-in action's. |
-| `verb` | one of `approve`, `delegate`, `dismiss` |  | The GTD verb its action fulfils. |
+| `verb` | one of `approve`, `delegate`, `dismiss` |  | The verb its action fulfils. |
 | `user_facing` | bool | `true` | Offered as a command, a skill and an action. |
 | `skill` | bool | `false` | Install writes it a turn skill; needs help.target. |
 | `help` | table |  | How its command presents it. |
@@ -45,8 +45,8 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
-| `role` | one of `pr.review`, `pr.address`, `pr.nudge`, `probe`, `headless` |  | What binds it to a plugin's mechanism. One intent per role and provider. |
-| `provider` | one of `entry`, `github`, `session`, `slack`, `workspace`, `any`, or a list of them |  | The units its turns serve: a provider id, a list of them, or any; defaults.toml provider when absent. |
+| `role` | one of `headless`, `attach`, `pr.review`, `pr.address`, `pr.nudge`, `probe` |  | What binds it to a plugin's mechanism. One intent per role and provider. |
+| `provider` | one of `github`, `session`, `slack`, `task`, `workspace`, `any`, or a list of them |  | The units its turns serve: a provider id, a list of them, or any; defaults.toml provider when absent. |
 | `builds` | one of `brief` |  | A builder, never a turn. |
 | `prompt` | file |  | A builder's prompt file, through the profile layers. |
 | `schema` | file |  | A builder's extra fields' schema file, beside the manifest. |
@@ -67,8 +67,8 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `session.name` | template |  | What the workspace manager and the agent show the session as, over the name facts; defaults.toml session_name when absent, else the title. A name that session.title leads and the start time ends, as dd/mm hh:mm, lets the loop recognize its session when it lost track of it. |
 | `session.close_when_done` | bool | `false` | The session closes when its turn is done. |
 | `target` | table |  | What a run with no unit does. |
-| `target.missing` | one of `capture` |  | capture: a run with no unit captures its guidance as a new entry, the turn's unit; refused when absent. |
-| `target.title` | template |  | The captured entry's title, over .guidance, with firstLine. |
+| `target.missing` | one of `capture` |  | capture: a run with no unit captures its guidance as a new task, the turn's unit; refused when absent. |
+| `target.title` | template |  | The captured task's title, over .guidance, with firstLine or title. |
 
 ### How a turn runs
 
@@ -169,34 +169,42 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
-| `record` | table |  | The turn's record. |
+| `record` | table |  | The turn's record. Left out, a turn of the intent owes no record and its session's stop is never blocked for one. |
 | `record.when` | predicate | `true` | When the turn records its outcome. |
-| `record.states` | list of `done`, `settled`, `asked`, `failed` |  | The states a record may take. Required. |
+| `record.states` | list of `done`, `settled`, `asked`, `failed` |  | The states a record may take. Required when the table sets when, artifacts, outcome, require or attach_url; a table that only sets requires and missing needs none. |
 | `record.artifacts` | list of `review-draft`, `triage` |  | The artifacts a record may carry. |
 | `record.outcome` | list of `verdict`, `url` |  | The outcome fields a record may carry. |
-| `record.attach_url` | bool | `false` | On a turn whose unit is an entry, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the entry; needs url in record.outcome. |
+| `record.attach_url` | bool | `false` | On a turn whose unit is a task, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the task; needs url in record.outcome. |
 | `record.outcome_doc` | string |  | What the outcome holds, for the instructions. |
 | `record.history_artifact` | string |  | The artifact the unit's history shows. |
-| `record.require[]` | table |  | What a record in a state must carry. |
+| `record.require[]` | table |  | What a record in a state must carry; record.requires is the record kind a run owes. |
 | `record.require[].state` | string |  | The state. |
 | `record.require[].artifact` | string |  | The artifact it must carry. |
 | `record.require[].fields` | list of strings |  | The outcome fields it must carry. |
+| `record.requires` | string |  | The record kind, of records.toml, a run of the intent owes; a run that ends without it opens the gate missing names. Left out, a run owes no record. Not record.require, what a record in a state carries. |
+| `record.missing` | string |  | The gate, of gates.toml, a run opens when it fails or ends without its record, which an answer resumes; left out, such a run opens none. Required with requires. |
+
+### Gate approval
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
+| `gates` | table |  | The gates its runs and drafts open. |
+| `gates.approval` | table |  | The approval of its gates: a rule applies to the kinds its when pins gate.kind to, else to draft gates alone when it reads a draft's facts, else to every kind; what no rule or mode here decides, gates.toml's [approval] does. |
+| `gates.approval.mode` | one of `wait`, `delay`, `send`, `dry_run`, `run` |  | The mode of every kind of gate when no rule holds; left out, gates.toml's default of the kind. |
+| `gates.approval.window` | duration |  | With mode delay only: how long a person has to stop the gate's consequence. |
+| `gates.approval.rule[]` | table |  | A rule; the first whose when holds gives the mode. |
+| `gates.approval.rule[].when` | predicate |  | When the rule applies to a gate. |
+| `gates.approval.rule[].mode` | one of `wait`, `delay`, `send`, `dry_run`, `run` |  | The rule's mode. |
+| `gates.approval.rule[].window` | duration |  | With mode delay only: how long a person has to stop the gate's consequence. |
 
 ### Effects and drafts
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
-| `effects` | list of `plan.cleared`, `guidance.handed`, `pr.round_sent`, `pr.reviewed`, `pr.addressed`, `pr.nudged` |  | What sending the turn applies. |
+| `effects` | list of `plan.cleared`, `turn.guidance_handed`, `turn.round_sent`, `pr.reviewed`, `pr.addressed`, `pr.nudged` |  | What sending the turn applies. |
 | `drafts` | table |  | The drafts its turns' agents propose. |
-| `drafts.allowed_effects` | list of `entry.nudged`, `unit.closed`, `pr.nudged` |  | The effects its agents may declare on their drafts. |
-| `drafts.attach_posts` | bool | `false` | On a turn whose unit is an entry, the unit of each post its agent makes, sent at once or once approved, is attached to the entry; reactions and edits are not posts. |
-| `drafts.approval` | table |  | The approval of its drafts; wait when absent. |
-| `drafts.approval.mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The approval when no rule holds. |
-| `drafts.approval.window` | duration |  | With mode delay only: how long a person has to stop the draft. |
-| `drafts.approval.rule[]` | table |  | A rule; the first whose when holds gives the mode. |
-| `drafts.approval.rule[].when` | predicate |  | When the approval rule applies to a draft. |
-| `drafts.approval.rule[].mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The rule's approval. |
-| `drafts.approval.rule[].window` | duration |  | With mode delay only: how long a person has to stop the draft. |
+| `drafts.allowed_effects` | list of `task.nudged`, `unit.closed`, `pr.nudged` |  | The effects its agents may declare on their drafts. |
+| `drafts.attach_posts` | bool | `false` | On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts. |
 
 An intent with `builds` is a builder: it needs `prompt` and holds no role. Any other needs `workspace`, `[session]`, `[headline]` and `[record]`.
 
@@ -212,23 +220,20 @@ Adds another intent's judgment to the turn: `profile` and `when` (a predicate ov
 
 Makes the intent an action on rows. Its description is the intent's `summary`. `when` offers it, `primary = { when = ... }` makes it the row's first, and each `[[action.refuse]]` whose `when` holds offers it disabled with its `why`. `note`, `warning` and `confirm` are templates over the action facts.
 
-### `[drafts.approval]`
+### `[gates.approval]`
 
 ```toml
-[drafts.approval]
-mode = "wait"
-
-[[drafts.approval.rule]]
+[[gates.approval.rule]]
 when = 'draft.delivery == "comment" && pr.repo_name == "docs"'
 mode = "delay"
 window = "10m"
 ```
 
-The policy of the drafts the intent's turns propose: the first rule whose `when` holds gives the mode, else `mode`; `wait` when the table is absent. A rule's `when` reads `draft.delivery`, `draft.proposer` and the [facts](/reference/facts/) of the unit the draft is on, for every provider the intent serves; never `draft.purpose` or `draft.effects`, which the turn's agent names, nor `brief.*` or a fact marked **Untrusted**. A rule over one provider's facts applies only to drafts on that provider's units; a rule over two providers' facts is refused. When the unit's facts cannot be read, a draft whose rules read them waits for you. A rule that sends on its own (`send` or `delay`) applies to a comment draft only when `draft.delivery == "comment"` is a term of its `when`'s top-level `&&`; `mode` alone never releases a comment. `dry_run` stores the draft and never sends it. A workflow's own `[drafts.approval]` wins over the intent's for the turns it starts; the configuration's `workflows.<name>.drafts.approval` is laid over the workflow's, or over the intent's when the workflow has none. See [the Outbox](/concepts/approval/#the-outbox).
+The policy of the drafts the intent's turns propose, its draft gates: the first rule whose `when` holds gives the mode, else `mode`, else `gates.toml`'s default for a draft gate when the table names none. A rule pinned to another `gate.kind` than `draft` fails to load: an intent's turns open draft gates only. A rule's `when` reads `draft.delivery`, `draft.proposer` and the [facts](/reference/facts/) of the unit the draft is on, for every provider the intent serves; never `draft.purpose` or `draft.effects`, which the turn's agent names, nor `brief.*` or a fact marked **Untrusted**. A rule over one provider's facts applies only to drafts on that provider's units; a rule over two providers' facts is refused. When the unit's facts cannot be read, a draft whose rules read them waits for you. A rule that sends on its own (`send`, `run` or `delay`) applies to a draft whose delivery posts, as its plugin's manifest marks it, only when `draft.delivery == "<delivery>"` is a term of its `when`'s top-level `&&`; `mode` alone never releases a comment or a message. `dry_run` stores the draft and never sends it. A workflow's own `[gates.approval]`, when it names a draft gate, wins over the intent's for the turns it starts; the configuration's `workflows.<name>.gates.approval` is laid over the workflow's, or over the intent's when the workflow names none. See [the Outbox](/concepts/approval/#the-outbox).
 
 ## Providers
 
-`provider` names the units the intent works on: a turn is built only on a unit of that provider, and the catalog offers the action only on its rows; `any` serves every provider. When several intents share a `verb`, the entry's key runs the one of highest rank the row enables: an intent of the unit's own provider before one of `any`, and yours before a bundled one within each. So a `provider = "slack"` intent with `verb = "delegate"` replaces the bundled `act` on Slack entries. An intent whose provider is not `github` cannot read the `pr.*` facts, and its templates cannot read `.PR`. Every template reads the unit's wording from the provider: `{{.Wording.Noun}}` ("pull request", "Slack thread"), `{{.Wording.This}}`, `{{.Wording.Short}}`, and the fact `unit.ref` (`acme/api#7`).
+`provider` names the units the intent works on: a turn is built only on a unit of that provider, and the catalog offers the action only on its rows; `any` serves every provider. When several intents share a `verb`, the task's key runs the one of highest rank the row enables: an intent of the unit's own provider before one of `any`, and yours before a bundled one within each. So a `provider = "slack"` intent with `verb = "delegate"` replaces the bundled `act` on Slack tasks. An intent whose provider is not `github` cannot read the `pr.*` facts, and its templates cannot read `.PR`. Every template reads the unit's wording from the provider: `{{.Wording.Noun}}` ("pull request", "Slack thread"), `{{.Wording.This}}`, `{{.Wording.Short}}`, and the fact `unit.ref` (`acme/api#7`).
 
 ## Roles
 

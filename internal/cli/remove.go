@@ -1,11 +1,14 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/wloophq/wloop/internal/domain/pr"
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/workspaces"
@@ -14,11 +17,11 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace"
 )
 
-// Remove deletes the local workspace of a pull request. It checks what the
+// Remove deletes the local workspace of a pull request, the one the call
+// names or else the one the inventory links, and unlinks it when linked. It checks what the
 // workspace manager's own removal does not: an agent at work, commits GitHub
 // does not hold, and ignored files that may matter; the manager refuses
 // uncommitted and untracked files itself. With force it checks nothing but
@@ -31,7 +34,17 @@ func (a envActions) Remove(ctx context.Context, u unit.Unit, c daemon.Call) erro
 	if err != nil {
 		return err
 	}
-	w, err := e.finishedWorkspace(ctx, ref, pr, c.WorkspaceID)
+	linked := ""
+	{
+		stored, ok, err := a.e.reportedPRs().PR(ctx, ref)
+		if err != nil {
+			return err
+		}
+		if ok {
+			linked = stored.Workspace.ID
+		}
+	}
+	w, err := e.finishedWorkspace(ctx, ref, pr, cmp.Or(c.WorkspaceID, linked))
 	if err != nil {
 		return err
 	}
@@ -45,13 +58,16 @@ func (a envActions) Remove(ctx context.Context, u unit.Unit, c daemon.Call) erro
 		return err
 	}
 	fmt.Fprintf(e.Out, "removed %s (%s)\n", w.DisplayName, w.Path)
+	if linked == w.ID && e.changes != nil {
+		e.changes.Note(port.TopicAgents, u)
+	}
 	return nil
 }
 
 // finishedWorkspace is the workspace id names, or without one the only local
 // workspace of the pull request: linked to it, else on its branch when the
 // pull request comes from the same repository.
-func (e *Env) finishedWorkspace(ctx context.Context, ref github.Ref, pr *github.PullRequest, id string) (wsdomain.Workspace, error) {
+func (e *Env) finishedWorkspace(ctx context.Context, ref pr.Ref, pr *pr.PullRequest, id string) (wsdomain.Workspace, error) {
 	repos, err := e.WS.Repos(ctx)
 	if err != nil {
 		return wsdomain.Workspace{}, err
@@ -114,7 +130,7 @@ func (e *Env) finishedWorkspace(ctx context.Context, ref github.Ref, pr *github.
 
 // workspaces is the removal use case of a removal by hand of ref's workspace.
 // It reads no fetch log: Remove fetches itself.
-func (e *Env) workspaces(ctx context.Context, ref github.Ref, force bool) *workspaces.Service {
+func (e *Env) workspaces(ctx context.Context, ref pr.Ref, force bool) *workspaces.Service {
 	remote, tree, files := checkouts(e.Git)
 	if e.Files != nil {
 		files = e.Files
@@ -218,14 +234,14 @@ func (agentGuard) CloseAll(context.Context, string, string) error { return nil }
 type envRounds struct{ e *Env }
 
 func (r envRounds) SkipFirstRound(ctx context.Context, u unit.Unit) error {
-	return r.e.withState(ctx, func(s *sweep) error { s.st.SkipFirstRound(u.Key); return nil })
+	return r.e.withState(ctx, func(s *sweep) error { s.st.SetMark(u.Key, markFirstSkipped, "1"); return nil })
 }
 
 // removalLog records a removal's event on the pull request in the store,
 // when there is one.
 type removalLog struct {
 	e   *Env
-	ref github.Ref
+	ref pr.Ref
 }
 
 func (l removalLog) Publish(evs ...port.Event) {

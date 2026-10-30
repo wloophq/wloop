@@ -1,7 +1,7 @@
 package builtin
 
 import (
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -29,35 +29,14 @@ const (
 	StepAnswerRefuse = "answer.refuse"
 	StepClassify     = "classify"
 	StepNotifySelf   = "notify.self"
-	StepEntryVerb    = "entry.verb"
+	StepTaskVerb     = "task.verb"
+	StepGateOpen     = "gate.open"
+	StepTaskSet      = "task.set"
 )
-
-// EntryStepVerbs are the verbs entry.verb runs: the moves of an entry
-// between lists and its focus, context and area. Approving, delegating and
-// answering never come from automation.
-var EntryStepVerbs = verbNames(gtd.VerbNext, gtd.VerbWaiting, gtd.VerbSchedule, gtd.VerbSomeday, gtd.VerbReference,
-	gtd.VerbFocus, gtd.VerbContext, gtd.VerbArea, gtd.VerbDone, gtd.VerbDismiss)
-
-// EntryVerbArgs are the arguments each verb takes; the loader refuses any
-// other.
-var EntryVerbArgs = map[string][]string{
-	string(gtd.VerbSchedule): {"until", "on_activity"},
-	string(gtd.VerbWaiting):  {"on", "resurface"},
-	string(gtd.VerbContext):  {"set"},
-	string(gtd.VerbArea):     {"set"},
-}
-
-func verbNames(vs ...gtd.Verb) []string {
-	out := make([]string, len(vs))
-	for i, v := range vs {
-		out[i] = string(v)
-	}
-	return out
-}
 
 // The values of draft.propose's arguments.
 var (
-	DraftDeliveries = []string{"message", "reaction", "comment"}
+	DraftDeliveries = []string{string(draft.Message), string(draft.Reaction)}
 	// DraftEmojiDeliveries are the deliveries that post an emoji, which
 	// need the reaction argument, and no text.
 	DraftEmojiDeliveries = []string{"reaction"}
@@ -73,29 +52,39 @@ var (
 var TurnRunners = []string{"session", "headless"}
 
 // Steps is the step vocabulary of workflow manifests.
-var Steps = []StepDef{
+var Steps = stepsWith(nil)
+
+// PluginSteps are the steps that run only on the units of the plugins whose
+// manifest lists them in steps; with none, a workflow cannot name them.
+var PluginSteps = []string{StepAnswerRefuse}
+
+var coreSteps = []StepDef{
 	{"session.close", providers(unit.Session), workflow.ReachLocal, nil,
 		"Closes the agent session."},
 	{"workspace.remove", providers(unit.Workspace), workflow.ReachLocal, nil,
 		"Removes the workspace, after its guards. Never with `force`: a manifest that sets it fails to load."},
 	{"workspace.unregister", providers(unit.Workspace), workflow.ReachLocal, nil,
 		"Unregisters a workspace whose path is gone."},
-	{StepTurnDismiss, providers(unit.Session, unit.GitHub), workflow.ReachLocal, nil,
+	{StepTurnDismiss, providers(unit.Session), workflow.ReachLocal, nil,
 		"Dismisses the open turn, recording the reason."},
-	{StepAnswerRefuse, providers(unit.GitHub), workflow.ReachLocal, nil,
+	{StepAnswerRefuse, nil, workflow.ReachLocal, nil,
 		"Refuses a queued answer whose route is gone."},
 	{"session.mark_dormant", providers(unit.Session), workflow.ReachLocal, nil,
 		"Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it."},
 	{StepTurnStart, nil, "", nil,
 		"Starts a turn of `intent` on the unit, which the intent must serve; `stage` (`first` or `follow-up`) for a review; `runner` (`session` or `headless`), by default the intent's first runner. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.per_day`."},
 	{StepDraftPropose, nil, workflow.ReachLocal, nil,
-		"Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`unit` or `person`), `target` (`unit` or `item`), `effects` (the effects sending it applies), `repeat_after` (the least time after a settled draft of the same person, a duration or a duration of the config such as `config.drafts.repeat_after`) and `repeat_after_sent` (the same after a sent one, or `forever`). Holds while a draft of the workflow, unit and person is open or failed; a run that leaves a person under a delay that ends with time stays pending until it ends."},
+		"Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Items`, `.Person` and `.Facts`, the subject's facts by name, such as `{{index .Facts \"task.promised\"}}`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`unit` or `person`), `target` (`unit` or `item`), `effects` (the effects sending it applies), `repeat_after` (the least time after a settled draft of the same person, a duration or a duration of the config such as `config.drafts.repeat_after`) and `repeat_after_sent` (the same after a sent one, or `forever`). Holds while a draft of the workflow, unit and person is open or failed; a run that leaves a person under a delay that ends with time stays pending until it ends."},
 	{StepClassify, nil, workflow.ReachLocal, []workflow.TriggerKind{workflow.TriggerEvent},
 		"A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). Event triggers only, cached by fingerprint, under `classify.per_day`."},
 	{StepNotifySelf, nil, workflow.ReachPrivate, nil,
 		"A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts \"pr.slug\"}}`, none once the unit is gone)."},
-	{StepEntryVerb, providers(unit.Entry), workflow.ReachLocal, nil,
-		"Runs a GTD verb on the entry: `verb` (`next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done` or `dismiss`), with `until` and `on_activity` for schedule, `on` and `resurface` for waiting, and `set` for context and area. The plan blocks it while the entry's state refuses the verb, and `done` and `dismiss` on an entry derived from a unit's items, which closes when they resolve. It records no `verb_<verb>` event, which only a person's verb records, so a workflow never triggers another through it."},
+	{StepTaskVerb, providers(unit.Task), workflow.ReachLocal, nil,
+		"Runs a verb of tasks.toml on the task as the workflow: `verb`, one whose `by.workflow` lets a workflow run it, with the arguments its handler takes (`until` and `on_activity` for schedule, `on` and `resurface` for waiting, `set` for context and area, `by` for promise). The plan blocks it while the task's state or the verb's `by` refuses it, and a verb that closes a task derived from a unit's items, which closes when they resolve. It records the `verb_<verb>` event with the workflow as its actor and the chain it runs in, so another workflow may react to it within `trigger.depth`."},
+	{StepGateOpen, nil, workflow.ReachLocal, nil,
+		"Opens the gate `name` of gates.toml on the unit, a decision that waits for you with the intents gates.toml gives it."},
+	{StepTaskSet, providers(unit.Task), workflow.ReachLocal, nil,
+		"Sets the task's property `prop` of tasks.toml to `value`, written by the workflow; a property the workflow may not write is refused."},
 }
 
 // StepArg is the grammar row of step use's argument k.

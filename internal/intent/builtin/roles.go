@@ -1,6 +1,10 @@
 package builtin
 
-import "github.com/wloophq/wloop/internal/domain/unit"
+import (
+	"slices"
+
+	"github.com/wloophq/wloop/internal/domain/unit"
+)
 
 // The roles Go resolves an intent by (Registry.ByRole).
 const (
@@ -9,10 +13,14 @@ const (
 	RoleNudge    = "pr.nudge"
 	RoleProbe    = "probe"
 	RoleHeadless = "headless"
+	RoleAttach   = "attach"
 )
 
-// BuildsBrief is what the brief intent builds.
+// BuildsBrief is what the brief intent builds, and the kind of the record, of records.toml, that a brief is.
 const BuildsBrief = "brief"
+
+// BriefText is the field of a brief record that holds a brief a person or an agent wrote, as markdown.
+const BriefText = "text"
 
 // Builds are what a builder intent may build.
 var Builds = []string{BuildsBrief}
@@ -40,8 +48,9 @@ const (
 	ContextSynthetic = "synthetic"
 )
 
-// PrepareNudge is the prepare that fills a nudge's inputs or refuses it.
-const PrepareNudge = "nudge.prepare"
+// PrepareAction prefixes a role's prepare: the plugin action that fills its
+// turn's inputs or refuses the turn, such as "action:nudge.prepare".
+const PrepareAction = "action:"
 
 // ReconcileMyReview reconciles a review turn with the review the viewer
 // published.
@@ -66,21 +75,32 @@ type Role struct {
 	// DrivesRow says its turns drive the row of the workspace they run in;
 	// a user intent taking the role takes it over.
 	DrivesRow bool
+	// PerSession says a turn of its intent replaces only the open turns of
+	// that intent on its own session, so every session holding it is a run
+	// of its own.
+	PerSession bool
 }
 
-// Roles are what Go resolves an intent by, a manifest's role.
-var Roles = []Role{
-	{Name: RoleReview, Doc: "The review round on someone else's pull request, in its review workspace: first or follow-up, reconciled with the review you published; it drives its workspace's row.",
-		Provider: unit.GitHub, RoundKind: RoundKindReview, Reconcile: ReconcileMyReview, Workspace: WorkspaceReview, Context: ContextPR, Policy: PolicyRound, DrivesRow: true},
-	{Name: RoleAddress, Doc: "The address round on a pull request you develop, in its author workspace: its reviews, failing checks and conflicts; its instructions say why it is due; it drives its workspace's row.",
-		Provider: unit.GitHub, RoundKind: RoundKindAddress, Workspace: WorkspaceAuthor, Context: ContextPR, Policy: PolicyRound, DrivesRow: true},
-	{Name: RoleNudge, Doc: "The nudge on a pull request: nudge.prepare fills its inputs from who the pull request waits on, or refuses it.",
-		Provider: unit.GitHub, Prepare: PrepareNudge, Context: ContextPR, Policy: PolicyRound},
-	{Name: RoleProbe, Doc: "The probe of an agent home: a synthetic pull request in the workspace the request names, under the probe's policy.",
-		Provider: unit.GitHub, Launch: LaunchProbe, Context: ContextSynthetic, Policy: PolicyProbe},
+// Roles are what Go resolves an intent by, a manifest's role: the core's,
+// then each plugin's.
+var Roles = slices.Clone(coreRoles)
+
+var coreRoles = []Role{
 	{Name: RoleHeadless, Doc: "The intent a headless turn on a unit runs when its request names none.",
 		Context: ContextPR, Policy: PolicyRound},
+	{Name: RoleAttach, Doc: "The intent a session started outside the loop runs when it attaches to a task: started by hand on that session, which becomes a run of the task.",
+		Provider: unit.Task, Context: ContextPR, Policy: PolicyRound, PerSession: true},
 }
+
+// The host mechanisms a plugin's role may name, by the manifest key that
+// names them.
+var (
+	RoundKinds = []string{RoundKindReview, RoundKindAddress}
+	Reconciles = []string{ReconcileMyReview}
+	Launches   = []string{LaunchProbe}
+	Contexts   = []string{ContextPR, ContextSynthetic}
+	Policies   = []string{PolicyRound, PolicyProbe}
+)
 
 // NoRole is what an intent without a role binds.
 var NoRole = Role{Context: ContextPR, Policy: PolicyRound}

@@ -21,37 +21,25 @@
     "workflow": "slack-closure",
     "rule": "slack-closure"
   },
-  "approval": {
-    "mode": "wait",
-    "window": ""
-  },
-  "deadline": null,
-  "state": "proposed",
+  "state": "held",
   "error": "",
   "reason": "",
   "permalink": "",
-  "would": {
-    "policy": "",
-    "reason": "",
-    "outcome": ""
+  "gate": 1,
+  "deadline": null,
+  "intents": {
+    "approved": "approve",
+    "rejected": "discard"
   },
   "actions": [
-    {
-      "id": "draft.approve",
-      "enabled": true
-    },
     {
       "id": "draft.edit",
       "enabled": true
     },
     {
-      "id": "draft.discard",
-      "enabled": true
-    },
-    {
       "id": "draft.retry",
       "enabled": false,
-      "reason": "the draft is proposed",
+      "reason": "the draft is held",
       "refusal": "draft.retry.why"
     }
   ],

@@ -3,6 +3,7 @@ package expr
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"cel.dev/cel-go/common/types"
@@ -15,6 +16,20 @@ import (
 func (p *Program) Eval(f Facts) bool {
 	ok, _ := p.run(activation{env: p.env, get: f.Get})
 	return ok
+}
+
+// Text evaluates a program CompileString compiled over facts; a fact facts
+// lacks reads as its type's zero value.
+func (p *Program) Text(facts map[string]any) (string, error) {
+	out, _, err := p.prg.Eval(activation{env: p.env, get: func(name string) any { return facts[name] }})
+	if err != nil {
+		return "", err
+	}
+	v, ok := out.Value().(string)
+	if !ok {
+		return "", fmt.Errorf("expression gave %v, not a string", out.Value())
+	}
+	return v, nil
 }
 
 // Reads are the fields the predicate names, sorted.
@@ -102,7 +117,10 @@ func zero(t Type) any {
 
 const nowVar = "now"
 
-type predicate struct{ p *Program }
+type predicate struct {
+	p   *Program
+	now bool
+}
 
 // CompileWorkflow compiles a workflow's `when` over env (one unit slot,
 // trigger.* and config.*) plus now, the evaluation's time.
@@ -122,8 +140,16 @@ func CompileWorkflow(src string, env Env) (workflow.Predicate, error) {
 			reads = append(reads, r)
 		}
 	}
+	now := len(reads) < len(p.reads)
 	p.reads = reads
-	return predicate{p}, nil
+	return predicate{p, now}, nil
+}
+
+// ReadsNow says whether p, a CompileWorkflow predicate, reads now, so its
+// value can change as time passes with no fact changing.
+func ReadsNow(p workflow.Predicate) bool {
+	w, ok := p.(predicate)
+	return ok && w.now
 }
 
 func (w predicate) Reads() []string { return w.p.reads }
@@ -132,6 +158,22 @@ func (w predicate) Reads() []string { return w.p.reads }
 func (w predicate) Source() string { return w.p.src }
 
 func (w predicate) MarkNames() []string { return w.p.marks }
+
+// Pinned are the literals p's top-level conjunction pins field to, as
+// Requires reads them.
+func Pinned(p workflow.Predicate, field string) []string {
+	w, ok := p.(predicate)
+	if !ok {
+		return nil
+	}
+	var out []string
+	for _, pin := range w.p.pins {
+		if v, ok := strings.CutPrefix(pin, field+"="); ok {
+			out = append(out, v)
+		}
+	}
+	return out
+}
 
 // Requires says whether every match of p has field equal to value: a term
 // field == "value" of p's top-level conjunction, which no other term can

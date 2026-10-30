@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
@@ -25,7 +24,6 @@ import (
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -36,12 +34,12 @@ func githubDisabled(cfg *config.Config) {
 
 // countedGitHub is the github plugin counting its builds, with a stream,
 // a job and a health so a test sees whether they are wired.
-func countedGitHub(builds *atomic.Int32) source.Plugin {
-	return source.Plugin{ID: unit.GitHub, Codec: pr.Codec{}, Build: func(cfg config.Config, sd source.Deps) (source.Module, error) {
+func countedGitHub(builds *atomic.Int32) compiledPlugin {
+	return compiledPlugin{ID: unit.GitHub, Codec: pr.Codec{}, Build: func(cfg config.Config, sd moduleDeps) (pluginModule, error) {
 		builds.Add(1)
-		m, err := ghsource.Module(cfg, sd)
+		m, err := githubHostModule(cfg, sd)
 		m.Run = func(ctx context.Context) error { <-ctx.Done(); return ctx.Err() }
-		m.Jobs = []source.Job{{Name: "extract:github", Every: time.Hour, Run: func(context.Context) (string, string, error) { return "", "", nil }}}
+		m.Jobs = []pluginJob{{Name: "extract:github", Every: time.Hour, Run: func(context.Context) (string, string, error) { return "", "", nil }}}
 		m.Health = func(context.Context) (api.SourceHealth, error) { return api.SourceHealth{}, nil }
 		return m, err
 	}}
@@ -57,12 +55,12 @@ func TestDisabledPluginIsNotBuilt(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	var builds atomic.Int32
 	saved := plugins
-	plugins = []source.Plugin{countedGitHub(&builds)}
+	plugins = []compiledPlugin{countedGitHub(&builds)}
 	defer func() { plugins = saved }()
 
 	on := te.serveDeps(context.Background(), db, te.cfg, t.Logf, &lock.Mutex{}, nil)
 	if builds.Load() != 1 || len(on.Ingest) != 1 || len(on.RowProviders) != 1 || on.Collector == nil || len(on.Runtimes) != 1 || on.PluginEnabled != nil ||
-		on.Intakes == nil || on.Explorer == nil || on.Budget == nil || on.Viewer == nil || te.Env.viewFacts().p.Load() == nil {
+		on.Intakes == nil || on.Presenters[unit.GitHub] == nil || on.Budget == nil || on.Identity == nil || te.Env.viewFacts().p.Load() == nil {
 		t.Fatalf("github enabled: builds %d, deps %+v", builds.Load(), on)
 	}
 
@@ -73,9 +71,6 @@ func TestDisabledPluginIsNotBuilt(t *testing.T) {
 	}
 	if len(d.Ingest) != 0 || len(d.RowProviders) != 0 || d.Collector != nil || d.Track != nil || len(d.Runtimes) != 0 {
 		t.Fatalf("a disabled plugin's jobs: ingest %d, rows %d, collector %v, runtimes %d", len(d.Ingest), len(d.RowProviders), d.Collector, len(d.Runtimes))
-	}
-	if d.Brief != nil || d.BriefStatus != nil || d.Intakes != nil || d.IntakeBriefs != nil || d.Explorer != nil || d.Budget != nil || d.Viewer != nil {
-		t.Fatalf("github's handles stayed: %+v", d)
 	}
 	if te.Env.viewFacts().p.Load() != nil {
 		t.Fatal("the views kept a disabled plugin's workflow facts")
@@ -110,12 +105,14 @@ func TestPluginsRoute(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("%d %s", rec.Code, rec.Body)
 		}
-		if strings.Contains(rec.Body.String(), `"ui"`) && strings.Contains(rec.Body.String(), `"enabled":false`) {
-			t.Fatalf("a disabled plugin's ui: %s", rec.Body)
-		}
 		var ps []api.Plugin
 		if err := json.Unmarshal(rec.Body.Bytes(), &ps); err != nil || len(ps) != len(plugins) || ps[0].ID != unit.GitHub {
 			t.Fatalf("%v %s", err, rec.Body)
+		}
+		for _, p := range ps {
+			if !p.Enabled && p.UI != nil {
+				t.Fatalf("a disabled plugin's ui: %s", rec.Body)
+			}
 		}
 		return ps[0]
 	}
@@ -143,15 +140,15 @@ func TestPluginsDefaultEnabled(t *testing.T) {
 			t.Errorf("%s is off with no plugins key", p.ID)
 		}
 	}
-	var built []source.Module
+	var built []pluginModule
 	for _, p := range plugins {
-		built = append(built, source.Module{ID: p.ID})
+		built = append(built, pluginModule{ID: p.ID})
 	}
 	if pluginSwitch(plugins, built, cfg) != nil {
 		t.Error("a config with no plugins key switches a plugin off")
 	}
 	names := map[unit.ProviderID]string{}
-	for _, p := range pluginList(plugins, built, cfg) {
+	for _, p := range pluginList(plugins, built, cfg, bundledUI) {
 		if !p.Enabled {
 			t.Errorf("%s listed disabled", p.ID)
 		}
@@ -165,7 +162,7 @@ func TestPluginsDefaultEnabled(t *testing.T) {
 func TestStatusNamesDisabledPlugins(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	te.Socket = serveJSON(t, map[string]any{"GET /api/health": api.Health{}, "GET /api/rows": api.RowsPage{Full: true, Rows: []api.Row{}},
+	te.Socket = serveJSON(t, map[string]any{"GET /api/health": api.Health{}, "GET /api/rows": api.RowsPage{Full: true, Rows: []api.Row{}}, "GET " + api.ViewsPath: api.ViewsCatalog{},
 		"GET " + api.Plugins: []api.Plugin{{ID: unit.GitHub}, {ID: "thread", Enabled: true}}})
 	if code := te.run("status"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -174,7 +171,7 @@ func TestStatusNamesDisabledPlugins(t *testing.T) {
 		t.Fatalf("stderr:\n%s", got)
 	}
 	te.err.Reset()
-	te.Socket = serveJSON(t, map[string]any{"GET /api/health": api.Health{}, "GET /api/rows": api.RowsPage{Full: true, Rows: []api.Row{}}})
+	te.Socket = serveJSON(t, map[string]any{"GET /api/health": api.Health{}, "GET /api/rows": api.RowsPage{Full: true, Rows: []api.Row{}}, "GET " + api.ViewsPath: api.ViewsCatalog{}})
 	if code := te.run("status"); code != 0 || strings.Contains(te.err.String(), "disabled plugins") {
 		t.Fatalf("a daemon with every plugin on: %d %s", code, te.err)
 	}
@@ -185,7 +182,7 @@ func TestDaemonRunsWithNoPluginEnabled(t *testing.T) {
 	seedR7(t, te)
 	var builds atomic.Int32
 	saved := plugins
-	plugins = []source.Plugin{countedGitHub(&builds)}
+	plugins = []compiledPlugin{countedGitHub(&builds)}
 	defer func() { plugins = saved }()
 	githubDisabled(&te.cfg)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -231,7 +228,7 @@ func TestDaemonRunsWithNoPluginEnabled(t *testing.T) {
 
 func TestRuntimeCarriesJobTimeout(t *testing.T) {
 	t.Parallel()
-	rt := runtimeOf(source.Module{ID: unit.GitHub, Jobs: []source.Job{{Name: "j", Every: time.Minute, Timeout: 25 * time.Minute}}})
+	rt := runtimeOf(pluginModule{ID: unit.GitHub, Jobs: []pluginJob{{Name: "j", Every: time.Minute, Timeout: 25 * time.Minute}}}, nil)
 	if len(rt.Jobs) != 1 || rt.Jobs[0].Timeout != 25*time.Minute {
 		t.Fatalf("jobs %+v", rt.Jobs)
 	}
@@ -239,12 +236,12 @@ func TestRuntimeCarriesJobTimeout(t *testing.T) {
 
 func TestPluginsServeWhetherTheyReact(t *testing.T) {
 	const linear, wiki unit.ProviderID = "linear", "wiki"
-	ps := []source.Plugin{{ID: linear, Name: "Linear"}, {ID: wiki, Name: "Wiki"}, {ID: unit.GitHub, Name: "GitHub"}}
-	mods := []source.Module{{ID: linear, Reacts: true}, {ID: unit.GitHub}}
+	ps := []compiledPlugin{{ID: linear, Name: "Linear"}, {ID: wiki, Name: "Wiki"}, {ID: unit.GitHub, Name: "GitHub"}}
+	mods := []pluginModule{{ID: linear, Reacts: true}, {ID: unit.GitHub}}
 	off := false
-	cfg := config.Config{Plugins: map[string]config.Plugin{string(wiki): {Enabled: &off}}}
+	cfg := config.Config{Plugins: config.Plugins{Other: map[string]config.Plugin{string(wiki): {Enabled: &off}}}}
 	got := map[unit.ProviderID]bool{}
-	for _, p := range pluginList(ps, mods, cfg) {
+	for _, p := range pluginList(ps, mods, cfg, bundledUI) {
 		got[p.ID] = p.Reacts
 	}
 	if want := map[unit.ProviderID]bool{linear: true, wiki: false, unit.GitHub: false}; !reflect.DeepEqual(got, want) {

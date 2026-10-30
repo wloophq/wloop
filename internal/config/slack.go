@@ -12,8 +12,7 @@ const DefaultSlackRedirectPort = 53682
 
 // Slack holds the Slack source's settings; no secret lives here.
 type Slack struct {
-	// Enabled switches the plugin; nil means enabled.
-	Enabled *bool `json:"enabled,omitempty"`
+	Plugin
 	// ClientID is the Slack app's client id; empty leaves Slack unconfigured.
 	ClientID     string `json:"client_id"`
 	RedirectPort int    `json:"redirect_port"`
@@ -28,8 +27,8 @@ type Slack struct {
 	Extraction SlackExtraction `json:"extraction"`
 	Turns      SlackTurns      `json:"turns"`
 	// EndedAfter is how long a unit stays quiet before it has ended; zero is DefaultSlackEndedAfter.
-	EndedAfter Days         `json:"ended_after,omitempty"`
-	Drafts     PluginDrafts `json:"drafts"`
+	EndedAfter Days        `json:"ended_after,omitempty"`
+	Gates      PluginGates `json:"gates"`
 }
 
 // SlackTurns sets what a turn on a Slack unit reads.
@@ -66,7 +65,7 @@ type SlackIngest struct {
 
 func (i SlackIngest) SocketOn() bool { return i.Socket == nil || *i.Socket }
 
-// DefaultSlackEndedAfter is slack.ended_after's default.
+// DefaultSlackEndedAfter is plugins.slack.ended_after's default.
 const DefaultSlackEndedAfter = 7 * 24 * time.Hour
 
 // EndedAfterFor is how long a Slack unit stays quiet before it has ended.

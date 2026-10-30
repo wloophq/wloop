@@ -1,0 +1,40 @@
+ Focus 1    Inbox 2   [Outbox 1]   Next 4    Waiting 4    Projects 0    Someday 0    Logbook 12
+
+>  5h  #releases thread  Ship it tonight. Rollback plan in the doc.  pending
+
+Reply in the release thread
+  state      outbox
+  to         #releases thread
+  draft      reply · from turn
+  text       Ship it tonight. Rollback plan in the doc.
+  keys       a approve  Backspace dismiss
+  not now    x next · w waiting · s schedule · y someday · l reference · f focus · p project · d delegate · e done
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+warning: app: notifications are off
+a approve  Backspace dismiss  ↑↓ move  g view  / filter  ^K actions  ? keys  q quit

@@ -18,7 +18,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -40,16 +39,25 @@ func (f *snapshot) Read(context.Context, wsdomain.Part) (*wsdomain.Snapshot, err
 	return &s, nil
 }
 
-type prStates map[unit.Unit]dinv.PR
+type prStates map[unit.Unit]string
 
-func (p prStates) PRs(_ context.Context, us []unit.Unit) (map[unit.Unit]dinv.PR, error) {
-	out := map[unit.Unit]dinv.PR{}
+func (p prStates) States(_ context.Context, us []unit.Unit) (map[unit.Unit]string, error) {
+	out := map[unit.Unit]string{}
 	for _, u := range us {
 		if got, ok := p[u]; ok {
 			out[u] = got
 		}
 	}
 	return out, nil
+}
+
+// repoOf is the repository of a pull request unit.
+func repoOf(u unit.Unit) string {
+	ref, ok := pr.RefOf(u)
+	if !ok {
+		return ""
+	}
+	return ref.Owner + "/" + ref.Repo
 }
 
 type world struct {
@@ -75,7 +83,7 @@ func newWorld(t *testing.T) *world {
 	w.snap.s.WorkspaceScope.Complete = true
 	w.svc = &turns.Service{Intents: turnstest.Intents(), Store: w.store, Registry: w.reg, Sessions: w.sess, Prompts: w.prompts,
 		Clock: w.clock, Command: brand.Name, FastJob: time.Minute}
-	w.p = factsession.New(factsession.Deps{Turns: w.svc, Snapshot: w.snap, PRs: w.prs, Exists: func(p string) bool { return !w.missing[p] },
+	w.p = factsession.New(factsession.Deps{Turns: w.svc, Snapshot: w.snap, States: w.prs, Repo: repoOf, Exists: func(p string) bool { return !w.missing[p] },
 		Cfg: config.Defaults, Clock: w.clock})
 	return w
 }
@@ -419,7 +427,7 @@ func TestOneEvaluationReadsTheWorldOnce(t *testing.T) {
 	store := &countingStore{Store: w.store}
 	w.svc.Store = store
 	log := change.NewLog(64, nil)
-	w.p = factsession.New(factsession.Deps{Turns: w.svc, Snapshot: w.snap, PRs: w.prs, Changes: log, Exists: func(string) bool { return true },
+	w.p = factsession.New(factsession.Deps{Turns: w.svc, Snapshot: w.snap, States: w.prs, Repo: repoOf, Changes: log, Exists: func(string) bool { return true },
 		Cfg: config.Defaults, Clock: w.clock})
 	for i, h := range []string{"term_1", "term_2", "term_3"} {
 		w.session(h, nil)
@@ -458,7 +466,7 @@ func TestPRStateJoinsTheInventory(t *testing.T) {
 	w.session("term_1", nil)
 	w.session("term_2", nil)
 	w.book(prUnit(7), turn.Turn{Intent: turn.Intent(dintent.Review), ID: "r1", State: turn.Done, Session: "term_1", SentTo: "term_1", SentAt: t0.Add(-4 * time.Hour), StartedAt: t0.Add(-4 * time.Hour), EndedAt: t0.Add(-3 * time.Hour)})
-	w.prs[prUnit(7)] = dinv.PR{State: "MERGED"}
+	w.prs[prUnit(7)] = "MERGED"
 	f := w.facts(t, "term_1")
 	if f["session.pr_state"] != "MERGED" || f["session.repo"] != "acme/api" {
 		t.Errorf("pr_state %v, repo %v", f["session.pr_state"], f["session.repo"])
@@ -611,11 +619,11 @@ func TestUnreadAnswersAreTheDeliveredAnswersTheAgentHasNotRead(t *testing.T) {
 			{ID: 4, TurnSeq: 1, Text: "still queued", Route: turn.Queued, At: t0.Add(-10 * time.Minute)},
 		}})
 	f := w.facts(t, "term_1")
-	if f["session.unread_answers"] != 2 || f["session.unread_for"] != 30*time.Minute || f["session.unread_since"] != t0.Add(-30*time.Minute) {
-		t.Fatalf("unread %v for %v", f["session.unread_answers"], f["session.unread_for"])
+	if f["session.unread_gates"] != 2 || f["session.unread_for"] != 30*time.Minute || f["session.unread_since"] != t0.Add(-30*time.Minute) {
+		t.Fatalf("unread %v for %v", f["session.unread_gates"], f["session.unread_for"])
 	}
 	w.session("term_2", nil)
-	if f := w.facts(t, "term_2"); f["session.unread_answers"] != 0 || f["session.unread_for"] != time.Duration(0) {
-		t.Fatalf("a session with no answers: %v %v", f["session.unread_answers"], f["session.unread_for"])
+	if f := w.facts(t, "term_2"); f["session.unread_gates"] != 0 || f["session.unread_for"] != time.Duration(0) {
+		t.Fatalf("a session with no answers: %v %v", f["session.unread_gates"], f["session.unread_for"])
 	}
 }

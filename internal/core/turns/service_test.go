@@ -55,7 +55,7 @@ type recorder struct {
 	launches  []turns.Launch
 	launchErr error
 	attempts  int
-	reviews   map[unit.Unit][]turns.MyReview
+	reviews   map[unit.Unit][]turns.SourceAnswer
 	published []port.Event
 	changes   []unit.Unit
 }
@@ -71,10 +71,10 @@ func (r *recorder) Launch(_ context.Context, l turns.Launch) error {
 	return nil
 }
 
-func (r *recorder) MyReviews(_ context.Context, u unit.Unit, since time.Time) ([]turns.MyReview, error) {
+func (r *recorder) Answers(_ context.Context, u unit.Unit, since time.Time) ([]turns.SourceAnswer, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	var out []turns.MyReview
+	var out []turns.SourceAnswer
 	for _, rv := range r.reviews[u] {
 		if !rv.At.Before(since) {
 			out = append(out, rv)
@@ -98,8 +98,8 @@ func (r *recorder) changed(_ context.Context, refs ...unit.Unit) {
 func newService(t *testing.T) (*turns.Service, *turnstest.Store, *turnstest.Registry, *turnstest.Sessions, *recorder) {
 	t.Helper()
 	store, reg, sess := turnstest.NewStore(turnstest.Strict(t)), turnstest.NewRegistry(turnstest.Strict(t)), turnstest.NewSessions()
-	rec := &recorder{reviews: map[unit.Unit][]turns.MyReview{}}
-	return &turns.Service{Intents: turnstest.Intents(), Store: store, Registry: reg, Sessions: sess, Launcher: rec, GitHub: rec,
+	rec := &recorder{reviews: map[unit.Unit][]turns.SourceAnswer{}}
+	return &turns.Service{Intents: turnstest.Intents(), Store: store, Registry: reg, Sessions: sess, Launcher: rec, Answers: rec,
 		Changed: rec.changed, Pub: rec, Clock: fixed(t0), Command: "'/bin/" + brand.Name + "'", FastJob: 2 * time.Minute}, store, reg, sess, rec
 }
 
@@ -533,7 +533,7 @@ func TestAnswerRoutes(t *testing.T) {
 		sess.Put("ws", turns.Terminal{Session: "term_1", Key: "tab-1", LastOutput: t0.Add(-5 * time.Minute)})
 		return s, store, reg, sess, rec
 	}
-	notice := "answered Message=9 Unit=https://github.com/acme/api/pull/7"
+	notice := "answered Gate=4 Unit=https://github.com/acme/api/pull/7"
 	for _, c := range []struct {
 		name      string
 		arrange   func(setup)
@@ -588,7 +588,7 @@ func TestAnswerRoutes(t *testing.T) {
 				c.arrange(setup{s, store, reg, sess})
 			}
 			req := c.req
-			req.Unit, req.Message = r7, 9
+			req.Unit, req.Message, req.Gate = r7, 9, 4
 			got, err := s.Answer(ctx, req)
 			if c.refused != refusal(err, "no turn started") || (!c.refused && err != nil) {
 				t.Fatalf("err %v", err)
@@ -768,7 +768,7 @@ func TestReconcileAtStartup(t *testing.T) {
 	store.Put(asked)
 	reg.Put(turn.Session{ID: "term_6", WorkspaceID: "ws6", Pane: "tab-6:leaf-1"})
 	sess.Put("ws6", turns.Terminal{Session: "term_6", LastOutput: long})
-	rec.reviews[r7] = []turns.MyReview{{ID: "98", State: "COMMENTED", At: t0.Add(-2 * time.Hour)}, {ID: "99", State: "APPROVED", At: t0.Add(-30 * time.Minute)}}
+	rec.reviews[r7] = []turns.SourceAnswer{{ID: "98", State: "COMMENTED", Verdict: "COMMENT", At: t0.Add(-2 * time.Hour)}, {ID: "99", State: "APPROVED", Verdict: "APPROVE", URL: "https://github.com/acme/api/pull/7#pullrequestreview-99", At: t0.Add(-30 * time.Minute)}}
 
 	sess.SetAgents(
 		turns.AgentObservation{WorkspaceID: "ws2", Pane: "tab-2:leaf-1", State: turn.AgentDone, LastMessage: "Keep the column?\nOr drop it."},
@@ -1110,7 +1110,7 @@ func TestReconcileFollowsTheManifest(t *testing.T) {
 			Records: []turn.Record{{ID: int64(n * 10), TurnSeq: int64(n), Session: handle, Hash: "q", At: t0.Add(-time.Hour), Acked: true, Record: askedRecord()}}})
 		reg.Put(turn.Session{ID: handle, WorkspaceID: "ws" + handle, Pane: "tab:" + handle})
 		sess.Put("ws"+handle, turns.Terminal{Session: handle, LastOutput: long})
-		rec.reviews[ref(n)] = []turns.MyReview{{ID: "99", State: "APPROVED", At: t0.Add(-30 * time.Minute)}}
+		rec.reviews[ref(n)] = []turns.SourceAnswer{{ID: "99", State: "APPROVED", Verdict: "APPROVE", At: t0.Add(-30 * time.Minute)}}
 	}
 	if _, err := s.Reconcile(ctx, true); err != nil {
 		t.Fatal(err)
@@ -1143,15 +1143,15 @@ func TestALaunchCarriesANonGitHubUnit(t *testing.T) {
 	}
 }
 
-func TestSendKeepsTheItemsAndEntryItWasAskedAbout(t *testing.T) {
+func TestSendKeepsTheItemsAndTaskItWasAskedAbout(t *testing.T) {
 	s, store, _, _, _ := newService(t)
 	ctx := context.Background()
 	if _, err := s.Send(ctx, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: "abc", Trigger: turn.ByHand, Records: true,
-		Inputs: map[string]any{"depth": "deep"}, Items: []string{"i1", "i2"}, Entry: "e-1"}); err != nil {
+		Inputs: map[string]any{"depth": "deep"}, Items: []string{"i1", "i2"}, Task: "t-1"}); err != nil {
 		t.Fatal(err)
 	}
 	got := bookOf(t, store, r7).Turns[0]
-	if !slices.Equal(turns.ItemsOf(got), []string{"i1", "i2"}) || turns.EntryOf(got) != "e-1" || got.Inputs["depth"] != "deep" {
+	if !slices.Equal(turns.ItemsOf(got), []string{"i1", "i2"}) || turns.TaskOf(got) != "t-1" || got.Inputs["depth"] != "deep" {
 		t.Fatalf("turn %+v", got)
 	}
 }

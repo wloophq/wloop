@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,84 +11,118 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
-// repliedKinds are the kinds of entry the user replies on: those about a unit's conversation.
-var repliedKinds = []gtd.Kind{gtd.KindAction, gtd.KindWaiting, gtd.KindClose, gtd.KindCapture}
-
 // replyRefusal is why the user cannot reply on e, "" when they can.
-func (s *Server) replyRefusal(e gtd.Entry) string {
+func (s *Server) replyRefusal(e task.Task) string {
 	switch {
 	case s.deps.Outbox == nil:
 		return errOutboxUnavailable.Error()
 	case len(e.Units) == 0:
-		return "the entry has no conversation to reply in"
-	case !slices.Contains(repliedKinds, e.Kind):
-		return fmt.Sprintf("a %s entry takes no reply", e.Kind)
+		return "the task has no conversation to reply in"
+	case !aboutUnits(e):
+		return "a project task takes no reply"
 	}
 	return ""
 }
 
-// runReply holds the reply the entry's args carry as a user draft on its first unit, for the entry and its
-// items there; send "now" approves it at once.
-func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coregtd.Service, e gtd.Entry, req api.EntryRequest) {
+// handlerReply is the verb handler that writes the composer's reply.
+const handlerReply = "reply"
+
+// replies says whether v is a verb whose handler writes a reply.
+func (s *Server) replies(v task.Verb) bool {
+	return s.loaded().Tasks.Handler(string(v)) == handlerReply
+}
+
+// replySend is what a reply of verb v does when it names no send, as the profile says, "draft" by default;
+// "" for a verb whose handler is not reply.
+func (s *Server) replySend(v string) string {
+	if !s.replies(task.Verb(v)) {
+		return ""
+	}
+	return cmp.Or(s.loaded().Tasks.Verbs[v].Send, sendDraft)
+}
+
+// The reply sends: sendNow sends a reply at once, sendDraft holds it for approval.
+const (
+	sendNow   = "now"
+	sendDraft = "draft"
+)
+
+// replyVerb is the profile's verb whose handler is reply, "" when none is.
+func (s *Server) replyVerb() string {
+	for _, v := range s.verbOrder() {
+		if s.replies(task.Verb(v)) {
+			return v
+		}
+	}
+	return ""
+}
+
+// runReply holds the reply the task's args carry as a user draft on its first unit, for the task and its
+// items there; send "now" approves it at once and "draft" holds it, and with no send the verb's profile
+// send says which.
+func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretasks.Service, e task.Task, v task.Verb, req api.TaskRequest, actor task.Actor) {
 	if why := s.replyRefusal(e); why != "" {
-		writeGTDError(w, fmt.Errorf("%w: %s", coregtd.ErrVerb, why))
+		writeTasksError(w, fmt.Errorf("%w: %s", coretasks.ErrVerb, why))
 		return
 	}
-	send, err := sendArg(req.Args["send"])
+	send, err := sendArg(cmp.Or(req.Args["send"], s.replySend(string(v))))
 	if err != nil {
-		writeGTDError(w, err)
+		writeTasksError(w, err)
 		return
 	}
 	u := e.Units[0]
-	c := api.DraftCreate{Unit: u, Entry: string(e.ID), Kind: req.Args["kind"], Text: req.Args["text"], Reaction: req.Args["reaction"],
+	c := api.DraftCreate{Unit: u, Task: string(e.ID), Kind: req.Args["kind"], Text: req.Args["text"], Reaction: req.Args["reaction"],
 		Send: send, Source: req.Source}
 	for _, ref := range e.Items {
 		if ref.Unit == u {
 			c.Items = append(c.Items, ref.Item)
 		}
 	}
-	d, err := s.writeUserDraft(ctx, c)
+	d, err := s.writeUserDraft(ctx, c, actor)
 	if err != nil {
-		writeGTDError(w, entryDraftError(err))
+		writeTasksError(w, taskDraftError(err))
 		return
 	}
-	s.recordVerb(ctx, g, e, coregtd.Request{Verb: gtd.VerbReply, Source: req.Source})
-	now, err := g.Entry(ctx, e.ID)
+	s.recordVerb(ctx, g, e, coretasks.Request{Verb: v, Source: req.Source, Actor: actor})
+	now, err := g.Task(ctx, e.ID)
 	if err != nil {
 		now = e
 	}
-	view, err := s.entryViews(ctx, g, false).view(ctx, now)
+	view, err := s.taskViews(ctx, g, false).view(ctx, now)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, api.EntryResult{Entry: view, Lines: []string{userDraftLine(d)}})
+	writeJSON(w, api.TaskResult{Task: view, Lines: []string{s.userDraftLine(d)}})
 }
 
 func sendArg(raw string) (bool, error) {
 	switch raw {
-	case "":
+	case "", "draft":
 		return false, nil
 	case "now":
 		return true, nil
 	}
-	return false, fmt.Errorf("%w: send is \"now\" or nothing, not %q", coregtd.ErrArgs, raw)
+	return false, fmt.Errorf("%w: send is \"now\" or \"draft\", not %q", coretasks.ErrArgs, raw)
 }
 
-// userDraftLine says where a user's draft went.
-func userDraftLine(d draft.Draft) string {
-	if d.State == draft.Approved {
-		return fmt.Sprintf("draft %d approved; it goes out in a moment", d.ID)
+// userDraftLine says where a user's draft went, as the profile words it.
+func (s *Server) userDraftLine(d draft.Draft) string {
+	if d.State == draft.Queued {
+		return s.notice(builtin.NoticeDraftSent, map[string]any{"Draft": int64(d.ID)})
 	}
-	return fmt.Sprintf("draft %d saved to the Outbox for your approval", d.ID)
+	return s.notice(builtin.NoticeDraftSaved, map[string]any{"Draft": int64(d.ID)})
 }
 
 func (s *Server) handleDraftCreate(w http.ResponseWriter, r *http.Request) {
@@ -101,31 +136,43 @@ func (s *Server) handleDraftCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := context.WithoutCancel(r.Context())
-	if c.Entry != "" && s.deps.GTD != nil {
-		e, err := s.deps.GTD.Entry(ctx, gtd.ID(c.Entry))
+	if c.Task != "" && s.deps.Tasks != nil {
+		e, err := s.deps.Tasks.Task(ctx, task.ID(c.Task))
 		switch {
-		case errors.Is(err, coregtd.ErrNoEntry):
+		case errors.Is(err, coretasks.ErrNoTask):
 			writeError(w, http.StatusNotFound, err.Error())
 			return
 		case err != nil:
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		case !slices.Contains(e.Units, c.Unit):
-			writeError(w, http.StatusBadRequest, fmt.Sprintf("entry %s is not about %s", c.Entry, c.Unit.Label()))
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("task %s is not about %s", c.Task, c.Unit.Label()))
 			return
 		}
 	}
-	d, err := s.writeUserDraft(ctx, c)
+	actor, ok := requestActor(w, r)
+	if !ok {
+		return
+	}
+	d, err := s.writeUserDraft(ctx, c, actor)
 	if err != nil {
 		writeDraftError(w, err)
 		return
 	}
-	writeJSON(w, s.draftDetail(ctx, d, nil))
+	g, _, err := s.deps.Outbox.GateOf(ctx, d)
+	if err != nil {
+		writeDraftError(w, err)
+		return
+	}
+	writeJSON(w, s.draftDetail(ctx, d, g, nil))
 }
 
-// writeUserDraft proposes the draft the user wrote, under the always policy whatever the unit's, and approves
-// it right away when c.Send: the same approval and publish path a draft takes from the Outbox.
-func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate) (draft.Draft, error) {
+// writeUserDraft proposes the draft the user wrote, under the wait policy whatever the unit's, and approves its
+// gate right away when c.Send: the same approval and publish path a draft takes from the Outbox.
+func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate, actor task.Actor) (draft.Draft, error) {
+	if c.Send && actor != task.ActorPerson {
+		return draft.Draft{}, fmt.Errorf("%w: a draft sent at once is approved by a person, not by %s", gates.ErrRefused, cmp.Or(string(actor), "no one"))
+	}
 	source := turn.Source(c.Source)
 	if source == "" {
 		source = turn.Cockpit
@@ -148,7 +195,7 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate) (draft.D
 	s.draftMu.Lock()
 	defer s.draftMu.Unlock()
 	o := s.deps.Outbox
-	d, err := o.Propose(ctx, outbox.Proposal{Unit: c.Unit, Items: c.Items, Entry: c.Entry, Kind: kind, Text: c.Text, Target: strings.TrimSpace(c.Target),
+	d, err := o.Propose(ctx, outbox.Proposal{Unit: c.Unit, Items: c.Items, Task: c.Task, Kind: kind, Text: c.Text, Target: strings.TrimSpace(c.Target),
 		Reaction: strings.Trim(strings.TrimSpace(c.Reaction), ":"), Origin: draft.Origin{Kind: draft.OriginUser}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
 	if errors.Is(err, outbox.ErrDisabled) {
 		err = noPublisher{c.Unit.Provider, err}
@@ -157,7 +204,7 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate) (draft.D
 		return d, err
 	}
 	s.logf("draft %d sent at once by the user from the %s", d.ID, source)
-	got, err := o.Approve(ctx, d.ID, nil)
+	got, err := s.decideDraft(ctx, d, gate.Approved, nil, actor)
 	if err != nil {
 		return d, fmt.Errorf("draft %d is in the Outbox, not approved: %w", d.ID, err)
 	}

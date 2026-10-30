@@ -44,6 +44,8 @@ type planDaemon struct {
 	mu      sync.Mutex
 	queries []string
 	acts    []api.PlanActRequest
+	// actedAs is the session header of each act.
+	actedAs []string
 	closed  []api.ClosedSession
 	// closedDown fails a request for the closed sessions.
 	closedDown bool
@@ -74,6 +76,7 @@ func servePlan(t *testing.T, te *testEnv, items []api.PlanItem, errs []string) *
 		json.NewDecoder(r.Body).Decode(&req)
 		d.mu.Lock()
 		d.acts = append(d.acts, req)
+		d.actedAs = append(d.actedAs, r.Header.Get(api.SessionHeader))
 		d.mu.Unlock()
 		res := api.PlanResponse{Items: []api.PlanItem{}, Errors: []string{}}
 		for _, id := range req.IDs {
@@ -201,6 +204,30 @@ func TestPlanApplyAndDismiss(t *testing.T) {
 	}
 	if !strings.Contains(te.err.String(), "usage: ") {
 		t.Fatalf("stderr %s", te.err)
+	}
+}
+
+func TestPlanApplyFromAnAgentsShellNamesItsSession(t *testing.T) {
+	t.Parallel()
+	items := planFixture()
+	te := newTestEnv(t, &fake.Manager{})
+	d := servePlan(t, te, items, nil)
+	te.Harness.SessionEnvs["fake"] = fake.SessionEnv{}
+	te.Getenv = func(k string) string {
+		if k == fake.HandleVar {
+			return "term_1"
+		}
+		return ""
+	}
+	if code := te.run("plan", "apply", "1f2e3d4c"); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	te.Getenv = func(string) string { return "" }
+	if code := te.run("plan", "dismiss", "00998877"); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	if !slices.Equal(d.actedAs, []string{"term_1", ""}) {
+		t.Fatalf("the acts carried sessions %q, want the agent's then none", d.actedAs)
 	}
 }
 

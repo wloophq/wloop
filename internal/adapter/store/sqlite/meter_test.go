@@ -207,7 +207,7 @@ func TestMeteredRowsKeepColumnTypes(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer bare.Close()
-	const q = `SELECT number, title, is_draft, created_at FROM pull_requests`
+	const q = `SELECT id, kind, actor, at FROM events`
 	describe := func(h *sql.DB) []string {
 		rows, err := h.Query(q)
 		if err != nil {

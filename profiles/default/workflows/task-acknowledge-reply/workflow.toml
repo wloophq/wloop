@@ -1,0 +1,14 @@
+summary = "When you acknowledge a task with a time, propose a reply saying you are looking into it, by that time"
+provider = "task"
+when = 'trigger.event.kind == "verb_acknowledge" && task.promised > timestamp(0)'
+key = ["trigger.event.id"]
+order = 54
+
+[trigger]
+on = ["verb_acknowledge"]
+actors = ["person"]
+
+[[step]]
+use = "draft.propose"
+purpose = "acknowledge"
+delivery = "message"

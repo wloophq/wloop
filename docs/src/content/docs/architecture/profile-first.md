@@ -5,7 +5,7 @@ description: Behavior and text belong to the profile; Go provides facts, mechani
 
 {{name}} is meant to be customized. A behavior decision (when something happens, on which units, where it runs, what it instructs, which effects it asks for) is an intent or a workflow of the profile, and every text an agent or a person reads belongs there too. Go provides facts, mechanisms and gates: it reads units, launches agents, publishes, and holds the approval, the Outbox, the records, the budgets and the guards. It does not decide what to do and does not write prose.
 
-The embedded `profiles/default/` is the lowest layer of every profile. Your profile, the directory the configuration's `profile` names, sits above it.
+The embedded `profiles/default/` is the lowest layer of every profile. Each enabled plugin's layer sits above it, the Slack plugin's embedded from `plugins/slack/profile/` ([Plugins](/architecture/plugins/)). Your profile, the directory the configuration's `profile` names, sits above them.
 
 ## What lives in the profile
 
@@ -18,16 +18,19 @@ The embedded `profiles/default/` is the lowest layer of every profile. Your prof
 | Partials: the text every intent's instructions share, such as the record protocol, the history and the brief | `profiles/default/partials/<name>.md.tmpl` | replaces a partial for every intent under `partials/<name>.md.tmpl`, and adds partials its intents call |
 | Prompts of {{name}}'s own calls, such as the headless turn's wrapper | `profiles/default/prompts/` | replaces a prompt under `prompts/` |
 | The headings of a block's conditions in a turn's judgment | `profiles/default/labels.toml` | a `labels.toml` whose keys replace the bundled ones |
-| What an agent reads about each MCP tool: its `description`, its parameters' (`params`, by path) and what it answers (`answers`, by name) | `profiles/default/tools.toml` | a `tools.toml` whose keys replace the bundled ones |
-| The GTD verbs' words (`label`, `summary`, the button's tooltip, `input`, the question a verb that asks for a value puts first) and where an entry offers each (`offer`), and the labels of the views and of the Review's steps | `profiles/default/gtd.toml` | a `gtd.toml` whose keys replace the bundled ones |
+| What an agent reads about each MCP tool: its `description`, its parameters' (`params`, by path) and what it answers (`answers`, by name) | `profiles/default/tools.toml`, and a plugin's tools in its layer's `tools.toml` | a `tools.toml` whose keys replace the bundled ones |
+| The task states and their categories, the task properties with their types and writers, the verbs, a profile's own included, and their words (`label`, `summary`, the button's tooltip, `input`, the question a verb that asks for a value puts first), where a task offers each (`offer`), its move (`from`, `to`), its `handler` and who may run it (`by`, `gate`) | `profiles/default/tasks.toml` | a `tasks.toml` whose keys replace the bundled ones and whose new states and properties come after the bundled ones |
+| The gates: each one's kind, words and the intents it is resolved with | `profiles/default/gates.toml` | a `gates.toml` whose keys replace the bundled ones and whose new gates and intents come after the bundled ones |
+| The views: what each lists (its condition over a task's or a gate's facts), its label, key, grouping and sort; the review's steps; the views the badge counts | `profiles/default/views.toml` | a `views.toml` whose keys replace the bundled ones and whose new views and steps come after them |
+| The record kinds: the JSON schema each one's data follows, who may write it and the task properties its fields set | `profiles/default/records.toml`, its schemas under `profiles/default/records/` | a `records.toml` whose keys replace the bundled ones |
 | The help line of each core key, by context, then action | `profiles/default/keys.toml` | a `keys.toml` whose keys replace the bundled ones |
-| What the loop tells a session: the notice that the user answered an Inbox message, and the reason a stop is blocked while the turn owes a record | `profiles/default/notices.toml` | a `notices.toml` whose keys replace the bundled ones |
+| What the loop tells a session, and the person about what they wrote: the notice that the user answered a gate or wrote on the task's chat, the reason a stop is blocked while the turn owes a record, where a reply went, the words of a notification's text inputs | `profiles/default/notices.toml` | a `notices.toml` whose keys replace the bundled ones |
 
 A file of yours replaces the bundled file of the same path; a manifest of yours replaces the bundled manifest whole. An intent becomes a command, a skill and an action on rows; a workflow is everything {{name}} does without being asked. A broken user intent or workflow disables only itself (a broken override leaves the bundled one in force), and evaluating the plan writes nothing. See [Profiles](/concepts/profiles/) and [The sweep and workflows](/concepts/workflows/).
 
 ## What Go provides
 
-Manifests name Go through a closed vocabulary, listed in `internal/intent/builtin` and checked when the profile loads. Every reserved key of a manifest, of `actions.toml`, `gtd.toml`, `keys.toml` and of the configuration is a row of one table, `builtin.Grammar` (`internal/intent/builtin/grammar*.go`), with its kind, values, default and doc; every loader runs `builtin.Check` against it, and the [profile language](/reference/language/) lists it:
+Manifests name Go through a closed vocabulary, listed in `internal/intent/builtin` and checked when the profile loads. Every reserved key of a manifest, of `actions.toml`, `tasks.toml`, `views.toml`, `gates.toml`, `records.toml`, `keys.toml` and of the configuration is a row of one table, `builtin.Grammar` (`internal/intent/builtin/grammar*.go`), with its kind, values, default and doc; every loader runs `builtin.Check` against it, and the [profile language](/reference/language/) lists it:
 
 - **Facts**: named, typed values a provider computes for a unit, in `builtin.Facts` (`internal/intent/builtin/facts.go`). Predicates are CEL over the facts of a slot, compiled at load by `internal/intent/expr`; an evaluation error reads as false. A fact flagged `Dim` is also a condition of a judgment block's path; today's dimension names (`organization`, `reviewer`, `kind`, ...) are aliases of facts in `internal/profile/dims.go`, and an enum field of the brief intent's `extra` is one too.
 - **Steps**: the actions a workflow runs, in `builtin.Steps`, each with its reach and its guards. A profile cannot lower a guard or force a step.
@@ -39,23 +42,25 @@ Manifests name Go through a closed vocabulary, listed in `internal/intent/builti
 
 Some decisions stay in Go as mechanism and are exposed as facts for the profile to act on:
 
-- which GTD entries exist (`gtd.Reconcile`, the close-entry condition in `internal/domain/gtd/rules.go`);
-- when a plugin's unit has ended (`<slot>.ended`, such as `pr.ended` and `slack.ended`), which `entry.units_ended` reads; whether a turn attaches its results to its entry is the intent's (`record.attach_url`, `drafts.attach_posts`), and closing the entry is the `entry-results-ended` workflow's;
+- which tasks exist (`task.Reconcile` in `internal/domain/task/reconcile.go`: one task per item that waits on you or that you are owed);
+- when a plugin's unit has ended (`<slot>.ended`, such as `pr.ended` and `slack.ended`), which `task.link_ended` reads; whether a turn attaches its results to its task is the intent's (`record.attach_url`, `drafts.attach_posts`), and closing the task is the `task-results-ended` workflow's;
 - working-day arithmetic and who owes an item;
 - the GitHub round planners' due logic (`pr.first.due`, `pr.review.action`, `pr.address.due`);
 - injection markers, JSON schemas and limits;
-- the guard on draft approval: a draft's delivery is what its plugin posts it as (every GitHub draft but a reaction or an edit is a comment), a comment waits for your approval unless a rule of yours that names comment delivery releases it, and no agent or thread text sets an approval (no draft rule, nor a run rule that runs, reads an untrusted fact; a workflow's `when` may, and a run it starts releases a draft only through that draft's approval).
+- the gate guard: every decision waiting on you is a gate, which only the gates service resolves, by you, a trusted policy rule or a passed window; a draft's delivery is what its plugin posts it as, a delivery its plugin's manifest marks `posts` waits for your approval unless a rule of yours that names that delivery releases it, and no agent or thread text resolves a gate (no rule of a draft gate, nor a rule that releases a gate, reads an untrusted fact; a workflow's `when` may, and a run it starts releases a draft only through that draft's gate);
+- the gates' consequences, one per kind, and how a mode applies to each kind: `send` and `run` release, `delay` is the window, `wait` holds, `dry_run` is a draft gate's only; the default of each kind is `gates.toml`'s `[approval]`.
 
 ## The rules that keep the line
 
 - Go never enumerates intents and binds none by name. It finds the intents it starts itself by their manifest's `role` (`builtin.Roles`, `Registry.ByRole`), and reads a turn's history by the role stored with it; the files still naming an intent are listed with their reasons (`TestNoIntentEnumerations`).
 - The `role` binds an intent to a plugin's mechanism, and Go derives what the role implies from `builtin.Roles`: the round kind, the reconcile with the review you published, the prepare that fills a nudge's inputs, the context and launch of a probe, the agent policy of its sessions, and whether its turns drive their workspace's row. A manifest does not write those. Which board a turn moves follows from its `workspace` (`review` or `author`, else none), and every automated `turn.start` on a unit spends its daily budget, whatever its intent declares: `turns.per_unit_per_day` on a unit whose plugin keeps a per-unit count, `turns.per_day` on the others. A user intent that takes a bundled role takes all of it over; the loader still refuses two intents that drive one workspace's row.
-- What a turn says about itself is the profile's: its `why`, its `[[refuse]]` conditions with their `why`, and its action's `note`, `warning`, `confirm` and `[[action.refuse]]`, templates over facts that Go computes (`pr.review.reason`, `pr.nudge.refusal`, `pr.mute.refusal`).
+- What a turn says about itself is the profile's: its `why`, its `[[refuse]]` conditions with their `why`, and its action's `note`, `warning`, `confirm` and `[[action.refuse]]`, templates over facts that Go computes (`pr.review.reason`, `pr.nudge.refusal`).
 - A builtin's name is spelled only in its tables: `internal/intent/builtin/builtin.go`, `internal/cli/builtins.go`, `internal/daemon/builtins.go`.
 - Every key a profile or the configuration may write is a row of `builtin.Grammar`; any other key, a removed one included, fails at load, naming a close key when one exists, and no old spelling is read. The JSON schemas and the reference pages of the manifests, the configuration and the language are generated from it (`make docs-ref`).
 - Only `internal/catalog` builds action specs and evaluates an intent's predicates.
 - The automation engine and the rest of the core name no provider.
 - Go never names a draft's kind, compares its purpose with a value, or reads its delivery outside the publishers and the Outbox (`TestNoDraftKindComparisons`).
+- Go reads a task's category and names no state: no Go literal is a `task.State` or a `task.Category` outside the profile's loader, the closed set's declaration and the version 7 migration, and the store's SQL binds categories and compares the state column with no state (`TestGoNamesNoState`). The store keeps the category beside the state, and a profile reload recategorizes the stored tasks.
 - A draft's text comes from a profile template or from whoever wrote it, and only `draft.propose` and the plugin rules its allowlist names propose drafts on their own (`TestDraftTextComesFromTheProfile`, `TestOnlyTheDraftStepProposes`).
 - Prose is embedded only from `profiles/`; what Go still embeds is listed with its reason, and the list of what moves only shrinks (`TestProseIsEmbeddedOnlyFromProfiles`).
 - The engine plans every automatic round; the round gate it replaced stays gone (`TestNothingImportsTheGate`).
@@ -64,11 +69,11 @@ Some decisions stay in Go as mechanism and are exposed as facts for the profile 
 
 These texts and decisions are still in Go, and are moving to the profile:
 
-- the GitHub plugin's `github-nudge` rule and its text (`internal/adapter/source/github/proposals.go`);
-- the workflow providers, pull requests, sessions, workspaces, GTD entries and Slack units (`builtin.Slots`);
-- notification titles, the digest and the menu bar's copy;
-- the cockpit's and the terminal's chrome: the hints a prompt gives on its keys (Tab, Ctrl+E), the titles and empty states of the panes, the modes of the delegate and reply prompts (draft for me, hand to an agent, send now), and the reason shown when an entry does not offer a verb;
-- the renderings of Slack messages that `slack_read` and `slack_search` return (`internal/adapter/source/slack`), the JSON-RPC errors of the MCP endpoint, and the error texts a mechanism returns through a tool's `failed` answer.
+- the GitHub plugin's `github-nudge` rule (`plugins/github/nudge`), whose texts are its profile layer's `prompts/github-nudge.tmpl`;
+- the workflow providers, pull requests, sessions, workspaces, tasks and Slack units (`builtin.Slots`);
+- the menu bar's copy, such as the notes on what became of an answer (a notification's titles and buttons and the digest's words are `notices.toml`'s);
+- the cockpit's and the terminal's chrome: the hints a prompt gives on its keys (Tab, Ctrl+E), the titles and empty states of the panes, the modes of the delegate and reply prompts (draft for me, hand to an agent, send now), and the reason shown when a task does not offer a verb;
+- the renderings of Slack messages that `slack_read` and `slack_search` return (the Slack plugin's `plugins/slack`), the JSON-RPC errors of the MCP endpoint, and the error texts a mechanism returns through a tool's `failed` answer.
 
 ## Direction
 

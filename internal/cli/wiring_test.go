@@ -23,13 +23,12 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
 // seedBriefOf stores a current brief of ref with tags.
-func seedBriefOf(t *testing.T, st *inventory.Store, ref github.Ref, tags ...string) int64 {
+func seedBriefOf(t *testing.T, st *inventory.Store, ref pr.Ref, tags ...string) int64 {
 	t.Helper()
 	ctx := context.Background()
 	version := brief.Version(brief.DefaultTaxonomy)

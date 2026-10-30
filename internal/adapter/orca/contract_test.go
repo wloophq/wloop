@@ -102,8 +102,8 @@ type realBoard struct {
 	ref    pr.Ref
 }
 
-func (b *realBoard) links(context.Context) (map[pr.Ref]orca.Link, error) {
-	return map[pr.Ref]orca.Link{b.ref: {WorkspaceID: b.ws.ID, Review: true}}, nil
+func (b *realBoard) links(context.Context) (map[unit.Unit]orca.Link, error) {
+	return map[unit.Unit]orca.Link{b.ref.Unit(): {WorkspaceID: b.ws.ID, Review: true}}, nil
 }
 
 func (b *realBoard) Place(_ unit.Unit, column string) {
@@ -191,7 +191,7 @@ func TestRealSessionsContract(t *testing.T) {
 			t.Errorf("closing %s: %v", handle, err)
 		}
 	})
-	a := orca.New(m, boardColumns(), func(context.Context) (map[pr.Ref]orca.Link, error) { return nil, nil })
+	a := orca.New(m, boardColumns(), func(context.Context) (map[unit.Unit]orca.Link, error) { return nil, nil })
 
 	t.Run("processes of a workspace", func(t *testing.T) {
 		ts, err := a.Processes(ctx, ws.ID)

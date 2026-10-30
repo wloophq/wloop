@@ -15,8 +15,18 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+	"github.com/wloophq/wloop/internal/catalog"
+
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+	"github.com/wloophq/wloop/internal/adapter/source/github/present"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
@@ -26,13 +36,20 @@ import (
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 	"github.com/wloophq/wloop/internal/web"
 )
 
@@ -45,24 +62,57 @@ func newServer(t *testing.T) *Server {
 }
 
 // store is the inventory store a test server runs on.
-func (s *Server) store() *inventory.Store { return s.deps.PRs.(inventory.ByUnit).Store }
+func (s *Server) store() *inventory.Store { return s.deps.Records.(present.Records).Store }
 
-// briefRoles is a fake brief queue in every role.
+// briefRoles is a fake brief queue in every role, keyed by pull request.
 type briefRoles interface {
-	BriefQueue
+	present.Queue
 	BriefHealth
-	BriefReads
+	prrow.Briefs
+	present.Briefs
 }
 
 // withBriefs sets every brief role of d to b; nil turns briefs off.
 func withBriefs(d *Deps, b briefRoles) {
-	d.Brief, d.BriefStatus, d.BriefViews = b, b, b
-	if d.Rows != nil {
-		d.RowProviders = prRows(d.Rows, b)
+	q := present.BriefQueue{Q: b}
+	d.Brief, d.BriefStatus, d.BriefAttempts = q, b, q
+	if r, ok := d.Records.(present.Records); ok {
+		d.RowProviders = prRows(r.Store, b)
 	}
+	githubOf(d).Briefs = b
 }
 
-// withStore is d with every inventory role on st.
+// githubDeps are the GitHub presenter's deps by the Presenters map
+// withStore set, which every copy of the Deps shares; a test sets them
+// before the server's first request.
+var githubDeps sync.Map
+
+// githubTest is what a test sets of the GitHub plugin: its presenter's
+// deps, and the read of a pull request about to be tracked.
+type githubTest struct {
+	deps present.Deps
+	read atomic.Pointer[func(context.Context, unit.Unit) (port.TrackRead, error)]
+}
+
+func githubTestOf(d *Deps) *githubTest {
+	g, ok := githubDeps.Load(reflect.ValueOf(d.Presenters).Pointer())
+	if !ok {
+		panic("githubOf: no GitHub presenter on these deps; use withStore")
+	}
+	return g.(*githubTest)
+}
+
+// githubOf is the GitHub presenter's deps of d.
+func githubOf(d *Deps) *present.Deps { return &githubTestOf(d).deps }
+
+// trackReads makes read the read of a pull request s tracks; nil tracks
+// unread.
+func (s *Server) trackReads(read func(context.Context, unit.Unit) (port.TrackRead, error)) {
+	githubTestOf(&s.deps).read.Store(&read)
+}
+
+// withStore is d with every store role on st and the GitHub plugin's
+// presenter over it.
 func withStore(d Deps, st *inventory.Store) Deps {
 	if d.Units == nil {
 		d.Units = unit.NewRegistry(pr.Codec{})
@@ -70,18 +120,151 @@ func withStore(d Deps, st *inventory.Store) Deps {
 	if d.Forge == "" {
 		d.Forge = unit.GitHub
 	}
-	u := inventory.ByUnit{Store: st}
-	d.Rows, d.PRs, d.Events, d.Overrides, d.Meta, d.Records = st, u, u, u, st, u
+	if d.Identity != nil {
+		if id, err := d.Identity(context.Background()); err == nil {
+			if err := ghsource.KeepIdentity(context.Background(), st, id); err != nil {
+				panic(err)
+			}
+		}
+	}
+	d.Events, d.Overrides, d.Meta, d.Records = inventory.ByUnit{Store: st}, st.DB(), st, present.Records{Store: st}
 	d.RowProviders = prRows(st, nil)
+	d.Repo = present.Repo
+	g := &githubTest{deps: present.Deps{Store: st, Reports: ghreporttest.Inventory{Store: st, Now: st.Now},
+		Mutes: readmodel.WakeMutes(st.DB().Wakes().UnitWakes)}}
+	wakes := prWakes(st, d.Now)
+	d.Presenters = map[unit.ProviderID]func(PresenterHost) Presenter{unit.GitHub: func(h PresenterHost) Presenter {
+		g.deps.Host = (&psource.Broker{ID: string(unit.GitHub), Units: psource.Units{Codecs: h.Units}, Events: sqlite.New(st.DB()), Marks: st.DB(),
+			Drafts: st.DB(), Overrides: st.DB(), Wakes: wakes, Books: h.Books}).Host()
+		g.deps.Plugin = pluginPrepare(func() src.Host { return g.deps.Host }, h)
+		return present.New(g.deps, present.Host(h))
+	}}
+	githubDeps.Store(reflect.ValueOf(d.Presenters).Pointer(), g)
+	units, now := d.Units, d.Now
+	if now == nil {
+		now = time.Now
+	}
+	d.Track, d.Untrack = testFollows(st, func(ctx context.Context, ref github.Ref) (port.TrackRead, error) {
+		if read := g.read.Load(); read != nil && *read != nil {
+			return (*read)(ctx, ref.Unit())
+		}
+		return port.TrackRead{Unit: ref.Unit()}, nil
+	}, func() *unit.Registry { return units }, func() time.Time { return now() })
+	if d.Follows == nil {
+		d.Follows = func(p unit.ProviderID) bool { return p == unit.GitHub }
+	}
 	return d
+}
+
+// prWakes are the tasks of st as a plugin's wakes move them. A pull
+// request no open task holds gets one, in next, as each followed pull
+// request has its task.
+func prWakes(st *inventory.Store, now func() time.Time) psource.TaskWakes {
+	if now == nil {
+		now = time.Now
+	}
+	svc := coretasks.New(coretasks.Deps{Store: st.DB().Tasks(), Clock: clockOf(now), States: taskstest.BundledStates,
+		Authority: taskstest.BundledStates.Authority, Wakes: st.DB().Wakes(), Baseline: catalog.Baseline(bundledActions, ownFacts)})
+	return testWakes{svc: svc, db: st.DB(), now: now}
+}
+
+// ownFacts are the facts a task's own fields hold.
+func ownFacts(_ context.Context, t task.Task) (workflow.Facts, error) {
+	return catalog.TaskFacts(t, bundledActions().Tasks), nil
+}
+
+type clockOf func() time.Time
+
+func (c clockOf) Now() time.Time { return c() }
+
+type testWakes struct {
+	svc *coretasks.Service
+	db  *sqlite.DB
+	now func() time.Time
+}
+
+func (w testWakes) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
+	ts, err := w.db.Tasks().TasksOf(ctx, u)
+	if err != nil || slices.ContainsFunc(ts, task.Task.Open) {
+		return ts, err
+	}
+	e := task.Task{ID: task.DerivedID(u, "pr"), State: "next", Category: task.CategoryReady, Units: []unit.Unit{u}, Origin: task.OriginUser,
+		Created: w.now(), Updated: w.now()}
+	if err := w.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
+		return nil, err
+	}
+	return append(ts, e), nil
+}
+
+func (w testWakes) Sleep(ctx context.Context, id task.ID, k wake.Wake) error {
+	return w.svc.Sleep(ctx, id, k)
+}
+
+func (w testWakes) Rouse(ctx context.Context, id task.ID) error { return w.svc.Rouse(ctx, id) }
+
+// muteBy mutes ref as the mute action does: a wake on every open task that
+// holds it, until a time, or until its state changes when until is zero.
+func muteBy(st *inventory.Store, ref github.Ref, until time.Time) error {
+	ctx := context.Background()
+	w := prWakes(st, st.Now)
+	ts, err := w.TasksOf(ctx, ref.Unit())
+	if err != nil {
+		return err
+	}
+	k := wake.Wake{Until: until}
+	if until.IsZero() {
+		k.When = `size(task.link_owes) != 1 || !("me" in task.link_owes)`
+	}
+	for _, e := range ts {
+		if !e.Open() {
+			continue
+		}
+		if err := w.Sleep(ctx, e.ID, k); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // prRows are the pull request rows over st with the brief queue b, as the
 // github source builds them.
-func prRows(st prrow.Store, b prrow.Briefs) []func(readmodel.RowDeps) readmodel.Provider {
+func prRows(st *inventory.Store, b prrow.Briefs) []func(readmodel.RowDeps) readmodel.Provider {
 	return []func(readmodel.RowDeps) readmodel.Provider{func(rd readmodel.RowDeps) readmodel.Provider {
-		return prrow.New(prrow.Source{RowDeps: rd, Store: st, Briefs: b})
+		var reports readmodel.Reports = ghreporttest.Inventory{Store: st, Now: st.Now, Config: func() config.Config { return rd.Settings().Cfg }}
+		if kept, ok := keptReports.Load(st); ok {
+			reports = kept.(readmodel.Reports)
+		}
+		return prrow.New(prrow.Source{RowDeps: rd, Reports: reports, Store: st, Briefs: b, Catalog: psource.BundledCatalog(string(unit.GitHub)),
+			Mutes: readmodel.WakeMutes(st.DB().Wakes().UnitWakes)})
 	}}
+}
+
+// cards are the GitHub cards and items over the reports the rows of s
+// read.
+func (s *Server) cards() ghsource.Cards {
+	st := s.store()
+	if kept, ok := keptReports.Load(st); ok {
+		return ghsource.Cards{Reports: kept.(readmodel.Reports)}
+	}
+	return ghsource.Cards{Reports: ghreporttest.Inventory{Store: st, Now: st.Now, Config: func() config.Config { return s.deps.Cfg }}}
+}
+
+// keptReports are the reports a test kept in its store, by the store whose
+// rows read them; a store absent derives them from its inventory at each
+// read.
+var keptReports sync.Map
+
+// keepReports keeps the plugin's reports of st's pull requests in its
+// snapshot store, as the host keeps a running plugin's, and has the rows
+// over st read them there.
+func keepReports(t *testing.T, st *inventory.Store) {
+	t.Helper()
+	snaps := psource.NewSnapshots(st.DB().Snapshots())
+	if err := (ghreporttest.Inventory{Store: st, Now: st.Now}).Keep(context.Background(), snaps); err != nil {
+		t.Fatal(err)
+	}
+	keptReports.Store(st, readmodel.Reports(snaps))
+	t.Cleanup(func() { keptReports.Delete(st) })
 }
 
 // newServerWith is newServer with change applied to the Deps before New.
@@ -114,20 +297,28 @@ func newServerOn(t *testing.T, stDB *sqlite.DB, log *change.Log, change func(*De
 	now := time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC) // Thursday
 	st.UseClock(func() time.Time { return now })
 	r7 := github.Ref{Owner: "acme", Repo: "api", Number: 7}
-	st.UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h2", ChecksState: "SUCCESS", ReviewRequests: []string{"me"}, Reasons: []string{"review-requested"}, URL: "https://github.com/acme/api/pull/7"})
+	inventorytest.Of(st).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h2", ChecksState: "SUCCESS", ReviewRequests: []string{"me"}, Reasons: []string{"review-requested"}, URL: "https://github.com/acme/api/pull/7"})
 	st.AppendEvents(ctx, []dinv.Event{
 		{PR: r7, Kind: dinv.KindPush, Key: "h2", Actor: "ana", At: now.Add(-50 * time.Hour)},
 		{PR: r7, Kind: dinv.KindReviewRequest, Key: "me", Actor: "ana", At: now.Add(-49 * time.Hour)},
 	})
 	r8 := github.Ref{Owner: "acme", Repo: "api", Number: 8}
-	st.UpsertPR(ctx, dinv.PR{Ref: r8, Title: "Done", Author: "me", State: "MERGED", Reasons: []string{"author"}})
+	inventorytest.Of(st).UpsertPR(ctx, dinv.PR{Ref: r8, Title: "Done", Author: "me", State: "MERGED", Reasons: []string{"author"}})
 	d := withStore(Deps{Pauses: sqlite.NewRounds(stDB), Activity: stDB, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return now },
-		Viewer: func(context.Context) (string, []string, error) { return "me", []string{"acme/search"}, nil },
-		Log:    func(string, ...any) {}, Explorer: openOnGitHub{}}, st)
+		Identity: viewerIs("me", "acme/search"),
+		Log:      func(string, ...any) {}}, st)
+	exploreOn(&d, openOnGitHub{})
 	if log != nil {
 		d.Changes = log
 	}
 	change(&d)
+	if d.Identity != nil {
+		if id, err := d.Identity(ctx); err == nil {
+			if err := ghsource.KeepIdentity(ctx, st, id); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
 	s := New(d)
 	s.token = ""
 	stopOnCleanup(t, s)
@@ -236,9 +427,10 @@ func TestCockpitSpeaksTheAPIVersion(t *testing.T) {
 	}
 }
 
-// get serves path and decodes its answer into out. The rows of a view,
-// path api.Rows with the query parameter view, are filtered here, as every
-// client filters the rows it reads.
+// get serves path and decodes its answer into out. The rows of path
+// api.Rows are filtered here: with the query parameter view to the rows of
+// that plugin view (all for every row), with is to the open rows with that
+// flag of their is facet (closed for the closed rows).
 func get(t *testing.T, s *Server, path string, out any) int {
 	t.Helper()
 	rec := httptest.NewRecorder()
@@ -248,7 +440,7 @@ func get(t *testing.T, s *Server, path string, out any) int {
 		var page api.RowsPage
 		if rows, ok := out.(*[]api.Row); ok && strings.HasPrefix(path, api.Rows) {
 			into = &page
-			defer func() { *rows = viewOf(t, path, page.Rows) }()
+			defer func() { *rows = flagged(t, path, page.Rows) }()
 		}
 		if err := json.Unmarshal(rec.Body.Bytes(), into); err != nil {
 			t.Fatalf("%s: %v: %s", path, err, rec.Body)
@@ -257,31 +449,36 @@ func get(t *testing.T, s *Server, path string, out any) int {
 	return rec.Code
 }
 
-func viewOf(t *testing.T, path string, rows []api.Row) []api.Row {
+func flagged(t *testing.T, path string, rows []api.Row) []api.Row {
 	t.Helper()
 	u, err := url.Parse(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	view := u.Query().Get("view")
-	if view == "" {
-		return rows
-	}
-	return slices.DeleteFunc(rows, func(r api.Row) bool { return !r.In(view) })
+	view, flag := u.Query().Get("view"), u.Query().Get("is")
+	return slices.DeleteFunc(rows, func(r api.Row) bool {
+		switch {
+		case view != "" && view != "all" && !r.In(view):
+			return true
+		case flag == "closed":
+			return !r.Summary.Closed
+		}
+		return flag != "" && (r.Summary.Closed || !slices.Contains(r.Facets["is"], flag))
+	})
 }
 
 func TestPRsViewNeedsMe(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	var rows []api.Row
-	if code := get(t, s, "/api/rows?view=needs-me", &rows); code != 200 {
+	if code := get(t, s, "/api/rows?is=needs-me", &rows); code != 200 {
 		t.Fatalf("%d", code)
 	}
 	if len(rows) != 1 || rows[0].Summary.WaitsOn != "me" || rows[0].Kind != "review" || !rows[0].Summary.Stalled {
 		t.Fatalf("%+v", rows)
 	}
-	if !slices.Contains(rows[0].Views, "stalled") {
-		t.Fatalf("views: %v", rows[0].Views)
+	if !slices.Contains(rows[0].Facets["is"], "stalled") {
+		t.Fatalf("flags: %v", rows[0].Facets["is"])
 	}
 }
 
@@ -291,14 +488,14 @@ func TestAReviewToAddressWithoutAWorkspaceShowsInNeedsMeUntilARoundRuns(t *testi
 	ctx := context.Background()
 	now := s.deps.Now()
 	r9 := github.Ref{Owner: "acme", Repo: "api", Number: 9}
-	s.store().UpsertPR(ctx, dinv.PR{Ref: r9, Title: "Mine", Author: "me", State: "OPEN", HeadOid: "h9", ChecksState: "SUCCESS", Reasons: []string{"author"}})
+	inventorytest.Of(s.store()).UpsertPR(ctx, dinv.PR{Ref: r9, Title: "Mine", Author: "me", State: "OPEN", HeadOid: "h9", ChecksState: "SUCCESS", Reasons: []string{"author"}})
 	s.store().AppendEvents(ctx, []dinv.Event{
 		{PR: r9, Kind: dinv.KindReview, Key: "r1", Actor: "bob", At: now.Add(-2 * time.Hour), Data: "CHANGES_REQUESTED:h9"},
 		{PR: r9, Kind: dinv.KindWouldAddress, Key: "2026-10-08T08:00:00Z", At: now.Add(-time.Hour), Data: "reviewed by bob"},
 	})
 	row := func() (api.Row, bool) {
 		var rows []api.Row
-		if code := get(t, s, "/api/rows?view=needs-me", &rows); code != 200 {
+		if code := get(t, s, "/api/rows?is=needs-me", &rows); code != 200 {
 			t.Fatalf("%d", code)
 		}
 		for _, r := range rows {
@@ -462,10 +659,7 @@ func TestHealthWarnsOfNoNotifierOnlyWhenOneIsExpected(t *testing.T) {
 // given.
 func seedRateLimit(t *testing.T, s *Server, remaining, limit int, resetAt time.Time) {
 	t.Helper()
-	c := github.NewClient(github.Options{Host: "github.com", Now: s.deps.Now,
-		Token: func(context.Context) (string, error) { return "", errors.New("no token in tests") }})
-	c.Restore([]dgh.Limit{{Resource: dgh.ResourceGraphQL, Remaining: remaining, Limit: limit, ResetAt: resetAt}})
-	s.deps.Budget = c
+	s.deps.Budget = fakeBudget{rl: api.RateLimit{Remaining: remaining, Limit: limit, ResetAt: resetAt}, now: s.deps.Now}
 }
 
 func TestHealthSlowSyncFollowsTheRateLimit(t *testing.T) {
@@ -517,7 +711,7 @@ func TestHealthJSONIsSnakeCase(t *testing.T) {
 	}
 	rec = httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, apiRequest("GET", "/api/units/github/acme%2Fapi%237", nil))
-	if body := rec.Body.String(); !strings.Contains(body, `"events":[{"pr":{"owner":"acme"`) || !strings.Contains(body, `"kind":"push","key":"h2","actor":"ana","at":`) {
+	if body := rec.Body.String(); !strings.Contains(body, `"events":[{"unit":{"provider":"github","key":"acme/api#7"}`) || !strings.Contains(body, `"kind":"push","key":"h2","actor":"ana","at":`) {
 		t.Fatalf("%s", body)
 	}
 }
@@ -700,99 +894,27 @@ func TestDetailWithoutTheBriefWhenItCannotBeRead(t *testing.T) {
 	}
 }
 
-func TestChecksDetailNamesTheFailedStepsOnce(t *testing.T) {
+func TestChecksDetailIsTheGitHubPluginsView(t *testing.T) {
 	t.Parallel()
-	calls := 0
+	var asked []string
 	s := newServerWith(t, func(d *Deps) {
-		d.FailedSteps = func(_ context.Context, owner, repo string, job int64) ([]string, error) {
-			calls++
-			if owner != "acme" || repo != "api" || job != 114268776435 {
-				t.Errorf("asked for %s/%s job %d", owner, repo, job)
+		githubOf(d).View = func(_ context.Context, req src.ViewRequest) (json.RawMessage, error) {
+			asked = append(asked, req.View+" "+string(req.Query))
+			if strings.Contains(string(req.Query), `"number":99`) {
+				return nil, fmt.Errorf("%w: acme/api#99 is not in the inventory", src.ErrNotFound)
 			}
-			return []string{"Lint PR title"}, nil
+			return json.RawMessage(`[{"name":"Build and test","steps":["Lint PR title"]}]`), nil
 		}
 	})
-	ctx := context.Background()
-	pr, _, _ := s.store().PR(ctx, r7)
-	pr.ChecksState = "FAILURE"
-	pr.FailingChecks = []dinv.FailingCheck{
-		{Name: "Build and test", URL: "https://github.com/acme/api/actions/runs/38071193224/job/114268776435"},
-		{Name: "Preview site", Summary: "Build ou deploy do preview falhou"},
-	}
-	if err := s.store().UpsertPR(ctx, pr); err != nil {
-		t.Fatal(err)
-	}
 	var got []api.CheckDetail
-	for range 2 {
-		if code := get(t, s, "/api/units/github/acme%2Fapi%237/checks", &got); code != 200 {
-			t.Fatalf("%d", code)
-		}
+	if code := get(t, s, "/api/units/github/acme%2Fapi%237/checks", &got); code != 200 || len(got) != 1 || !slices.Equal(got[0].Steps, []string{"Lint PR title"}) {
+		t.Fatalf("%d %+v", code, got)
 	}
-	if calls != 1 || len(got) != 2 || !slices.Equal(got[0].Steps, []string{"Lint PR title"}) || got[1].Summary == "" || got[1].Steps != nil {
-		t.Fatalf("calls %d, got %+v", calls, got)
+	if len(asked) != 1 || asked[0] != `checks {"number":7,"owner":"acme","repo":"api"}` {
+		t.Fatalf("asked %q", asked)
 	}
 	if code := get(t, s, "/api/units/github/acme%2Fapi%2399/checks", nil); code != 404 {
 		t.Fatalf("unknown pull request: %d", code)
-	}
-}
-
-func TestChecksDetailAsksAtMostFiveJobsAndRemembersAFailureForAWhile(t *testing.T) {
-	t.Parallel()
-	var mu sync.Mutex
-	var asked []string
-	clock := time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC)
-	s := newServerWith(t, func(d *Deps) {
-		d.Now = func() time.Time {
-			mu.Lock()
-			defer mu.Unlock()
-			return clock
-		}
-		d.FailedSteps = func(_ context.Context, owner, repo string, job int64) ([]string, error) {
-			mu.Lock()
-			defer mu.Unlock()
-			asked = append(asked, fmt.Sprintf("%s/%s %d", owner, repo, job))
-			if job == 1 {
-				return nil, errors.New("HTTP 403")
-			}
-			return []string{"step"}, nil
-		}
-	})
-	ctx := context.Background()
-	pr, _, _ := s.store().PR(ctx, r7)
-	pr.ChecksState = "FAILURE"
-	pr.FailingChecks = nil
-	for job := 1; job <= 6; job++ {
-		pr.FailingChecks = append(pr.FailingChecks, dinv.FailingCheck{Name: fmt.Sprint("job ", job), URL: fmt.Sprintf("https://github.com/acme/api-fork/actions/runs/9/job/%d", job)})
-	}
-	pr.FailingChecks = append(pr.FailingChecks, dinv.FailingCheck{Name: "huge", URL: "https://github.com/acme/api/actions/runs/9/job/99999999999999999999"})
-	if err := s.store().UpsertPR(ctx, pr); err != nil {
-		t.Fatal(err)
-	}
-	calls := func() []string {
-		mu.Lock()
-		defer mu.Unlock()
-		out := slices.Clone(asked)
-		slices.Sort(out)
-		asked = nil
-		return out
-	}
-	var got []api.CheckDetail
-	if code := get(t, s, "/api/units/github/acme%2Fapi%237/checks", &got); code != 200 || len(got) != 7 {
-		t.Fatalf("%d %+v", code, got)
-	}
-	if c := calls(); len(c) != 5 || c[0] != "acme/api-fork 1" {
-		t.Fatalf("first load asked %v", c)
-	}
-	get(t, s, "/api/units/github/acme%2Fapi%237/checks", &got)
-	if c := calls(); !slices.Equal(c, []string{"acme/api-fork 6"}) {
-		t.Fatalf("second load asked %v: a failure or a success was asked again", c)
-	}
-	mu.Lock()
-	clock = clock.Add(stepRetry + time.Second)
-	mu.Unlock()
-	get(t, s, "/api/units/github/acme%2Fapi%237/checks", &got)
-	if c := calls(); !slices.Equal(c, []string{"acme/api-fork 1"}) {
-		t.Fatalf("after the retry delay asked %v", c)
 	}
 }
 
@@ -803,7 +925,7 @@ func TestDetailNamesTheProfileChain(t *testing.T) {
 	})
 	var d api.Detail
 	get(t, s, "/api/units/github/acme%2Fapi%237", &d)
-	if d.ProfileChain != "bundled + user" {
+	if d.ProfileChain != "bundled + plugin:github + plugin:slack + user" {
 		t.Fatalf("chain %q", d.ProfileChain)
 	}
 }
@@ -837,7 +959,7 @@ func TestBriefRefreshActionTriggersTheJob(t *testing.T) {
 func TestPauseOfARepositoryHoldsOnlyItAndResumingLessThanEverythingIsRefused(t *testing.T) {
 	t.Parallel()
 	plan := newPendingPlan(time.Time{})
-	s := newServerWith(t, func(d *Deps) { d.Plan, d.Pending = plan, plan })
+	s := newServerWith(t, func(d *Deps) { d.Plan, d.Plans = plan, plan })
 	plan.propose(r7.Unit())
 	if rec := post(t, s, "/api/pause", `{"paused":true,"repos":["acme/other"]}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -994,7 +1116,60 @@ func TestCatalogRouteServesTheProviders(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &c); err != nil || rec.Code != http.StatusOK {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if len(c.Views) != 11 || c.Views[0].ID != api.ViewNeedsMe || len(c.Situations) != 18 || c.Version == "" {
+	if len(c.Views) != 6 || c.Views[0].ID != "mine" || len(c.Situations) != 18 || c.Version == "" {
 		t.Fatalf("catalog %+v", c)
+	}
+}
+
+// viewerIs is the forge's Identity of login with teams.
+func viewerIs(login string, teams ...string) func(context.Context) (src.Identity, error) {
+	return func(context.Context) (src.Identity, error) { return identityOf(login, teams...), nil }
+}
+
+func identityOf(login string, teams ...string) src.Identity {
+	return src.Identity{Viewer: src.Person{Key: "github:" + login, Name: login}, Teams: teams}
+}
+
+// refOf is the pull request of a github unit, the zero reference for any other.
+func refOf(u unit.Unit) pr.Ref {
+	ref, _ := pr.RefOf(u)
+	return ref
+}
+
+// pluginPrepare is the GitHub plugin's nudge prepare over the host broker
+// serves the presenter, as h names its viewer and configuration, at the
+// read model's time, which a test moves.
+func pluginPrepare(host func() src.Host, h PresenterHost) func(context.Context, src.ActionRequest) (json.RawMessage, error) {
+	viewer := func(ctx context.Context) (string, error) {
+		if h.Viewer == nil {
+			return "", nil
+		}
+		id, err := h.Viewer(ctx)
+		return readmodel.Login(unit.GitHub, id), err
+	}
+	ignore := func() []string {
+		if h.Settings == nil {
+			return nil
+		}
+		return prrow.IgnoreOf(h.Settings().Cfg)
+	}
+	now := func() time.Time {
+		if h.Model != nil {
+			if _, at, err := h.Model.Base(context.Background()); err == nil {
+				return at
+			}
+		}
+		return h.Now()
+	}
+	return ghreporttest.Prepare(host, viewer, ignore, now)
+}
+
+func TestHealthListsTheUnappliedTurnEffects(t *testing.T) {
+	t.Parallel()
+	s := newServer(t)
+	s.deps.EffectWarnings = func() []string { return []string{"acme/api#7: the plugin applies no pr.reviewed"} }
+	var h api.Health
+	if code := get(t, s, "/api/health", &h); code != 200 || !slices.Contains(h.Warnings, "acme/api#7: the plugin applies no pr.reviewed") {
+		t.Fatalf("%d %+v", code, h.Warnings)
 	}
 }

@@ -1,0 +1,38 @@
+{
+ "type": "object",
+ "properties": {
+  "text": {"type": "string", "description": "The brief as a person or an agent wrote it, in markdown: what to do and how to know it is done."},
+  "goal": {"type": "string"},
+  "context": {"type": "string"},
+  "kind": {"type": "string"},
+  "size": {"type": "string", "enum": ["xs", "s", "m", "l", "xl"]},
+  "risk": {"type": "string", "enum": ["low", "medium", "high"]},
+  "risk_why": {"type": "string"},
+  "open_questions": {"type": "array", "items": {"type": "string"}},
+  "tags": {"type": "array", "items": {"type": "string", "pattern": "^[^:]+:.+$"}},
+  "asks": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "required": ["ask"],
+    "properties": {
+     "item": {"type": "string"},
+     "ask": {"type": "string", "minLength": 1},
+     "asker": {"type": "string"},
+     "permalink": {"type": "string"},
+     "deadline": {"type": "string"},
+     "missing": {"type": "string"},
+     "said": {"type": "string"},
+     "quotes": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "required": ["ref", "text"],
+       "properties": {"ref": {"type": "string"}, "text": {"type": "string"}}
+      }
+     }
+    }
+   }
+  }
+ }
+}

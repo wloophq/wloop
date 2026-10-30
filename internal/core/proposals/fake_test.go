@@ -9,10 +9,12 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/core/outbox/outboxtest"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -59,7 +61,7 @@ func (m *memDrafts) List(ctx context.Context, f outbox.Filter) ([]draft.Draft, e
 	for i := len(m.drafts) - 1; i >= 0; i-- {
 		d := m.drafts[i]
 		if len(f.States) > 0 && !slices.Contains(f.States, d.State) ||
-			f.Unit != nil && *f.Unit != d.Unit || f.Entry != "" && f.Entry != d.Entry ||
+			f.Unit != nil && *f.Unit != d.Unit || f.Task != "" && f.Task != d.Task ||
 			f.Rule != "" && f.Rule != d.Origin.Rule || f.Key != "" && f.Key != d.Origin.Key {
 			continue
 		}
@@ -154,18 +156,20 @@ type env struct {
 	drafts   *memDrafts
 	pub      *publisher
 	svc      *outbox.Service
+	gates    *outboxtest.Gates
 	ledger   *ledger
 	job      *Job
 	disabled map[unit.ProviderID]bool
-	facts    map[unit.Unit]gtd.UnitFacts
+	facts    map[unit.Unit]task.UnitFacts
 	logs     []string
 }
 
 func newEnv(t *testing.T) *env {
 	e := &env{t: t, clock: &clock{now: t0}, drafts: &memDrafts{},
 		ledger: &ledger{items: map[unit.Unit][]items.Item{}}, disabled: map[unit.ProviderID]bool{},
-		facts: map[unit.Unit]gtd.UnitFacts{}}
+		facts: map[unit.Unit]task.UnitFacts{}}
 	e.pub = &publisher{clock: e.clock}
+	e.gates = outboxtest.NewGates(e.clock.Now)
 	e.svc = &outbox.Service{
 		Store: e.drafts,
 		Effects: func(p unit.ProviderID) (port.Effects, error) {
@@ -175,15 +179,26 @@ func newEnv(t *testing.T) *env {
 			return e.pub, nil
 		},
 		Evidence:    outbox.EvidenceTo(e.ledger.apply),
-		Items:       e.ledger,
 		Clock:       e.clock,
+		Posts:       func(draft.Delivery) bool { return false },
 		RepeatAfter: 24 * time.Hour,
 	}
+	e.gates.Bind(e.svc)
 	e.job = &Job{Outbox: e.svc, Clock: e.clock, RepeatAfter: 24 * time.Hour,
 		Enabled: func(p unit.ProviderID) bool { return !e.disabled[p] },
 		Log:     func(format string, args ...any) { e.logs = append(e.logs, fmt.Sprintf(format, args...)) }}
 	e.job.Facts = factsOf(e.facts)
 	return e
+}
+
+// gateOf is d's gate.
+func (e *env) gateOf(d draft.Draft) gate.Gate {
+	e.t.Helper()
+	g, ok, err := e.svc.GateOf(ctx, d)
+	if err != nil || !ok {
+		e.t.Fatalf("draft %d has no gate: %v", d.ID, err)
+	}
+	return g
 }
 
 func (e *env) run() Summary {
@@ -204,8 +219,8 @@ func (e *env) list(rule string, states ...draft.State) []draft.Draft {
 	return got
 }
 
-type factsOf map[unit.Unit]gtd.UnitFacts
+type factsOf map[unit.Unit]task.UnitFacts
 
-func (f factsOf) UnitFacts(ctx context.Context, u unit.Unit) (gtd.UnitFacts, bool, error) {
+func (f factsOf) UnitFacts(ctx context.Context, u unit.Unit) (task.UnitFacts, bool, error) {
 	return f[u], true, nil
 }

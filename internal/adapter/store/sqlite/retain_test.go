@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"slices"
@@ -184,10 +185,14 @@ func TestRetainStops(t *testing.T) {
 	}
 }
 
+// insertPR is ref as the GitHub plugin reports it.
 func insertPR(t *testing.T, db *DB, ref pr.Ref, state string, merged, closed string) {
 	t.Helper()
-	exec(t, db, `INSERT INTO pull_requests (owner, repo, number, state, created_at, merged_at, closed_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		ref.Owner, ref.Repo, ref.Number, state, at(time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)), merged, closed)
+	raw, err := json.Marshal(map[string]any{"data": map[string]any{"pr": map[string]any{"State": state, "MergedAt": merged, "ClosedAt": closed}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exec(t, db, `INSERT INTO unit_snapshots (provider, unit_key, snapshot, rev, at) VALUES ('github', ?, ?, 1, ?)`, ref.String(), string(raw), at(retainNow))
 }
 
 func TestRetainViewRows(t *testing.T) {
@@ -246,12 +251,8 @@ func TestRetainBriefBodies(t *testing.T) {
 
 // prTables counts one pull request's rows in every table it has rows in.
 var prTables = map[string]string{
-	"pull_requests": `SELECT count(*) FROM pull_requests WHERE owner = ? AND repo = ? AND number = ?`,
-	"pr_details":    `SELECT count(*) FROM pr_details WHERE owner = ? AND repo = ? AND number = ?`,
-	"pr_seen":       `SELECT count(*) FROM pr_seen WHERE owner = ? AND repo = ? AND number = ?`,
 	"unit_briefs":   `SELECT count(*) FROM unit_briefs WHERE provider = 'github' AND unit_key = ?`,
 	"brief_runs":    `SELECT count(*) FROM brief_runs WHERE provider = 'github' AND unit_key = ?`,
-	"unit_tags":     `SELECT count(*) FROM unit_tags WHERE provider = 'github' AND unit_key = ?`,
 	"events":        `SELECT count(*) FROM events WHERE provider = 'github' AND unit_key = ?`,
 	"overrides":     `SELECT count(*) FROM overrides WHERE provider = 'github' AND unit_key = ?`,
 	"round_state":   `SELECT count(*) FROM round_state WHERE provider = 'github' AND unit_key = ?`,
@@ -283,12 +284,8 @@ func prRows(t *testing.T, db *DB, ref pr.Ref) map[string]int {
 func seedPRRows(t *testing.T, db *DB, ref pr.Ref, seq int) {
 	t.Helper()
 	u, when := ref.String(), at(time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC))
-	triple := []any{ref.Owner, ref.Repo, ref.Number}
-	exec(t, db, `INSERT INTO pr_details (owner, repo, number, version, read_at, body) VALUES (?, ?, ?, 1, ?, '{}')`, append(triple, when)...)
-	exec(t, db, `INSERT INTO pr_seen (owner, repo, number, at) VALUES (?, ?, ?, ?)`, append(triple, when)...)
 	exec(t, db, `INSERT INTO unit_briefs (provider, unit_key) VALUES ('github', ?)`, u)
 	exec(t, db, `INSERT INTO brief_runs (provider, unit_key, trigger, version, attempt_of, started_at) VALUES ('github', ?, 'wanted', 'v1', 'h', ?)`, u, when)
-	exec(t, db, `INSERT INTO unit_tags (provider, unit_key, key, value, run) VALUES ('github', ?, 'change', 'fix', 1)`, u)
 	exec(t, db, `INSERT INTO events (provider, unit_key, kind, key, at) VALUES ('github', ?, 'review', 'r1', ?)`, u, when)
 	exec(t, db, `INSERT INTO overrides (provider, unit_key, hold) VALUES ('github', ?, 1)`, u)
 	exec(t, db, `INSERT INTO round_state (provider, unit_key, agent_home) VALUES ('github', ?, 'f')`, u)
@@ -324,7 +321,7 @@ func TestRetainEndedPR(t *testing.T) {
 		t.Errorf("%d transactions, want 1\n%s", n, metertest.Report(sc.Tally()))
 	}
 	if n, want := metertest.Count(sc, metertest.Limit{Res: meter.SQL}), int64(1+len(endedTables)+1); n != want {
-		t.Errorf("a pass that removes an ended pull request issued %d statements, want the SELECT, one DELETE per table and optimize: %d\n%s", n, want, metertest.Report(sc.Tally()))
+		t.Errorf("a pass that removes an ended pull request issued %d statements, want the SELECT of the reports, one DELETE per table and optimize: %d\n%s", n, want, metertest.Report(sc.Tally()))
 	}
 	if len(got) != len(prTables) {
 		t.Errorf("retained %v, want one row in each of %d tables", got, len(prTables))
@@ -354,6 +351,7 @@ func seedEveryKind(t *testing.T, db *DB) {
 	exec(t, db, `INSERT INTO sessions (session_id, closed_at) VALUES ('term_1', ?)`, formatTime(past))
 	exec(t, db, `INSERT INTO agent_sessions (agent_session, first_seen_at, last_seen_at) VALUES ('a1', ?, ?)`, at(past), at(past))
 	exec(t, db, `INSERT INTO turn_stops (session, prompt_id, at) VALUES ('term_1', 'p', ?)`, at(past))
+	exec(t, db, `INSERT INTO fetches (workspace_id, at) VALUES ('ws-1', ?)`, at(past))
 	exec(t, db, `INSERT INTO instruction_parts (sha, body) VALUES ('orphan', x'00')`)
 	exec(t, db, `INSERT INTO turn_instructions (sha, kind, repo, created_at, parts) VALUES ('old', 'review', 'acme/api', ?, '["orphan"]')`, at(past))
 	exec(t, db, `INSERT INTO brief_runs (provider, unit_key, trigger, version, attempt_of, started_at, brief) VALUES ('github', 'acme/api#9', 'wanted', 'v', 'h', ?, '{}')`, at(past))
@@ -374,7 +372,7 @@ func TestRetainIdempotent(t *testing.T) {
 	e, log := openNoted(t)
 	seedEveryKind(t, e.db)
 	first := retain(t, e.db, DefaultRetention)
-	for _, table := range []string{SessionEventsKey, ViewEventsKey, "events", "sessions", "agent_sessions", "turn_stops", "turn_instructions", "instruction_parts", "brief_runs", "view_applied", "pull_requests"} {
+	for _, table := range []string{SessionEventsKey, ViewEventsKey, "events", "sessions", "agent_sessions", "turn_stops", "turn_instructions", "instruction_parts", "brief_runs", "view_applied", "fetches"} {
 		if first[table] == 0 {
 			t.Errorf("the first pass left %s: %v", table, first)
 		}
@@ -468,5 +466,61 @@ func TestAnEventKeepsItsActor(t *testing.T) {
 	}
 	if got := rowsOf(t, db, `SELECT kind || '|' || actor FROM events ORDER BY kind`); !slices.Equal(got, []string{"comment|rita", workflow.KindStepRan + "|close"}) {
 		t.Errorf("events %q", got)
+	}
+}
+
+// reportSnapshot keeps the GitHub plugin's report of ref in state, ended at
+// ended, zero for open.
+func reportSnapshot(t *testing.T, db *DB, ref pr.Ref, state string, ended time.Time, gone bool) {
+	t.Helper()
+	raw, err := json.Marshal(map[string]any{"gone": gone, "data": map[string]any{"pr": map[string]any{"State": state, "MergedAt": ended, "ClosedAt": ended}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exec(t, db, `INSERT INTO unit_snapshots (provider, unit_key, snapshot, rev, at) VALUES ('github', ?, ?, 1, ?)`, ref.String(), string(raw), at(retainNow))
+}
+
+// TestRetentionReadsTheGitHubPluginsReports: with no copy of the pull
+// requests in the host, retention reads which ended and which exist from
+// the GitHub plugin's reports.
+func TestRetentionReadsTheGitHubPluginsReports(t *testing.T) {
+	t.Parallel()
+	db, _ := openTemp(t)
+	gone, kept, open, dropped := pr.Ref{Owner: "acme", Repo: "api", Number: 1}, pr.Ref{Owner: "acme", Repo: "api", Number: 2}, pr.Ref{Owner: "acme", Repo: "web", Number: 1}, pr.Ref{Owner: "acme", Repo: "web", Number: 2}
+	reportSnapshot(t, db, gone, "MERGED", retainNow.Add(-401*day), false)
+	reportSnapshot(t, db, kept, "CLOSED", retainNow.Add(-399*day), false)
+	reportSnapshot(t, db, open, "OPEN", time.Time{}, false)
+	reportSnapshot(t, db, dropped, "OPEN", time.Time{}, true)
+	for _, ref := range []pr.Ref{gone, kept, open, dropped} {
+		exec(t, db, `INSERT INTO turns (provider, unit_key, intent, turn_id, state, sent_at, ended_at) VALUES ('github', ?, 'review', 'r', 'done', ?, ?)`, ref.String(), at(past), at(past))
+	}
+	got := retain(t, db, Retention{EndedPRs: 400 * day, UnitlessLoopRows: 30 * day})
+	if got["turns"] != 1 || got[UnitlessLoopRowsKey] != 1 {
+		t.Errorf("retained %v, want the ended pull request's turn and the dropped one's", got)
+	}
+	if keys := rowsOf(t, db, `SELECT unit_key FROM turns ORDER BY unit_key`); !slices.Equal(keys, []string{kept.String(), open.String()}) {
+		t.Errorf("turns of %v left", keys)
+	}
+}
+
+// TestRetentionKeepsAPluginsRowsUntilItReports: a store whose plugins have
+// not reported yet, as right after the migration that moved their rows out,
+// keeps every row a rule would drop for a unit the plugin no longer reports.
+func TestRetentionKeepsAPluginsRowsUntilItReports(t *testing.T) {
+	t.Parallel()
+	db, _ := openTemp(t)
+	exec(t, db, `INSERT INTO turns (provider, unit_key, intent, turn_id, state, sent_at, ended_at) VALUES ('github', 'acme/api#1', 'review', 'r', 'done', ?, ?)`, at(past), at(past))
+	exec(t, db, `INSERT INTO unit_marks (provider, unit_key, mark, value) VALUES ('slack', 'T1/C1/1.1', 'w/settled', 'v')`)
+	exec(t, db, `INSERT INTO brief_runs (id, provider, unit_key, intent, trigger, version, attempt_of, started_at, outcome, brief)
+		VALUES (1, 'slack', 'T1/C1/1.1', 'brief', 'extraction', 'v', '', ?, 'ok', '{"goal":"g"}')`, at(past))
+	exec(t, db, `INSERT INTO unit_briefs (provider, unit_key, run, last_run) VALUES ('slack', 'T1/C1/1.1', 1, 1)`)
+	if got := retain(t, db, DefaultRetention); got["turns"]+got[UnitlessLoopRowsKey]+got["unit_marks"]+got["unit_briefs"] != 0 {
+		t.Errorf("retained %v before any plugin reported", got)
+	}
+	reportSnapshot(t, db, pr.Ref{Owner: "acme", Repo: "web", Number: 1}, "OPEN", time.Time{}, false)
+	reportSlack(t, db, "T1/C1/2.2", false)
+	got := retain(t, db, DefaultRetention)
+	if got[UnitlessLoopRowsKey] != 1 || got["unit_marks"] != 1 || got["unit_briefs"] != 1 {
+		t.Errorf("retained %v once the plugins reported other units, want the unreported units' rows", got)
 	}
 }

@@ -8,6 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/lock"
@@ -17,10 +21,8 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace"
 )
 
@@ -32,11 +34,11 @@ type effects struct {
 	events       []string
 }
 
-func effectsOf(t *testing.T, te *testEnv, ref github.Ref) effects {
+func effectsOf(t *testing.T, te *testEnv, ref pr.Ref) effects {
 	t.Helper()
 	st := te.loadRounds(t)
 	key := ref.String()
-	got := effects{fingerprint: st.Mark(key, round.Reviewed)+st.Mark(key, round.AddressedReviews) != "", checksHead: st.Mark(key, round.AddressedChecks), conflictHead: st.Mark(key, round.AddressedConflict)}
+	got := effects{fingerprint: st.Mark(key, ghsource.MarkReviewed)+st.Mark(key, ghsource.MarkAddressedReviews) != "", checksHead: st.Mark(key, ghsource.MarkAddressedChecks), conflictHead: st.Mark(key, ghsource.MarkAddressedConflict)}
 	evs, err := te.Store.Events(context.Background(), ref)
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +53,7 @@ func effectsOf(t *testing.T, te *testEnv, ref github.Ref) effects {
 
 // storedTurn saves a turn of intent on ref that a resume continues, and
 // returns its seq.
-func storedTurn(t *testing.T, te *testEnv, ref github.Ref, intent dintent.Name, inputs map[string]any) int64 {
+func storedTurn(t *testing.T, te *testEnv, ref pr.Ref, intent dintent.Name, inputs map[string]any) int64 {
 	t.Helper()
 	key := pr.Ref(ref)
 	b := dturn.Book{Unit: key.Unit(), Turns: []dturn.Turn{{Intent: dturn.Intent(intent), ID: "r0", Trigger: dturn.ByHand, Head: "c1", State: dturn.Unrecorded, SentAt: testNow, Inputs: inputs}}}
@@ -67,8 +69,8 @@ var nudgeInputs = map[string]any{"situation": "Waiting on: bob.", "waits_on_main
 func TestEachRouteRunsTodaysEffects(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	byHand := func(intent dintent.Name, ws wsdomain.Workspace, inputs map[string]any) func(t *testing.T) (*testEnv, github.Ref) {
-		return func(t *testing.T) (*testEnv, github.Ref) {
+	byHand := func(intent dintent.Name, ws wsdomain.Workspace, inputs map[string]any) func(t *testing.T) (*testEnv, pr.Ref) {
+		return func(t *testing.T) (*testEnv, pr.Ref) {
 			_, te := handScenario(t, ws)
 			cwd := te.Harness.Cwd()
 			_, err := te.byHand(&lock.Mutex{})(ctx, api.ByHandRequest{Intent: string(intent), URL: r7.URL(), Cwd: cwd, Inputs: inputs}, "term_1")
@@ -78,8 +80,8 @@ func TestEachRouteRunsTodaysEffects(t *testing.T) {
 			return te, r7
 		}
 	}
-	resume := func(intent dintent.Name, m func() workspace.Manager, setup func(*testEnv) github.Ref, inputs map[string]any) func(t *testing.T) (*testEnv, github.Ref) {
-		return func(t *testing.T) (*testEnv, github.Ref) {
+	resume := func(intent dintent.Name, m func() workspace.Manager, setup func(*testEnv) pr.Ref, inputs map[string]any) func(t *testing.T) (*testEnv, pr.Ref) {
+		return func(t *testing.T) (*testEnv, pr.Ref) {
 			te := newTestEnv(t, m())
 			te.Rec = storeRecorder{te.Store}
 			ref := setup(te)
@@ -93,14 +95,14 @@ func TestEachRouteRunsTodaysEffects(t *testing.T) {
 			return te, ref
 		}
 	}
-	review := func(te *testEnv) github.Ref {
+	review := func(te *testEnv) pr.Ref {
 		te.gh.basics = openBasics
 		authorComment := obj{"id": "c", "createdAt": "2026-10-08T13:00:00Z", "author": obj{"login": "alice"}}
 		myReview := obj{"id": "r", "state": "CHANGES_REQUESTED", "submittedAt": myReviewAt, "author": obj{"login": "me"}, "commit": obj{"oid": "c2"}}
 		te.gh.reviewer = mustJSON(t, obj{"data": obj{"viewer": obj{"login": "me"}, "pr0": reviewerPR(7, "OPEN", []obj{myReview}, []obj{authorComment})}})
 		return r7
 	}
-	mine := func(te *testEnv) github.Ref {
+	mine := func(te *testEnv) pr.Ref {
 		te.gh.basics = addressBasics(t, obj{"__typename": "User", "login": "me"})
 		te.git.branch["/worktrees/feat/mine"] = "feat/mine"
 		te.git.ancestor["/worktrees/feat/mine"] = true
@@ -111,7 +113,7 @@ func TestEachRouteRunsTodaysEffects(t *testing.T) {
 	own := func() workspace.Manager { return myPRManager() }
 	for _, c := range []struct {
 		name string
-		run  func(t *testing.T) (*testEnv, github.Ref)
+		run  func(t *testing.T) (*testEnv, pr.Ref)
 		want effects
 	}{
 		{"session route, review", byHand(dintent.Review, reviewWS, nil), effects{events: []string{dinv.KindRoundSent}}},
@@ -120,7 +122,7 @@ func TestEachRouteRunsTodaysEffects(t *testing.T) {
 		{"resume, review", resume(dintent.Review, warm, review, nil), effects{fingerprint: true}},
 		{"resume, address", resume(dintent.Address, own, mine, nil), effects{fingerprint: true, checksHead: "c21", conflictHead: "c21"}},
 		{"resume, nudge", resume(dintent.Nudge, warm, review, nudgeInputs), effects{events: []string{dinv.KindNudged}}},
-		{"held Run now, review", func(t *testing.T) (*testEnv, github.Ref) {
+		{"held Run now, review", func(t *testing.T) (*testEnv, pr.Ref) {
 			sc := followupScenario(t)
 			exhaustCap(t, sc)
 			sc.te.gh.basics = openBasics
@@ -129,7 +131,7 @@ func TestEachRouteRunsTodaysEffects(t *testing.T) {
 			}
 			return sc.te, sc.ref
 		}, effects{fingerprint: true}},
-		{"held Run now, address", func(t *testing.T) (*testEnv, github.Ref) {
+		{"held Run now, address", func(t *testing.T) (*testEnv, pr.Ref) {
 			te := newTestEnv(t, myPRManager())
 			ref := mine(te)
 			if err := (envActions{te.Env, nil}).Run(ctx, ref.Unit(), daemon.Call{Out: io.Discard}); err != nil {
@@ -175,7 +177,7 @@ func TestHeldRunNowOnAnAdoptedPullRequestIsTheAuthors(t *testing.T) {
 	te := newTestEnv(t, myPRManager())
 	te.gh.basics = addressBasics(t, obj{"__typename": "User", "login": "jo"})
 	te.Rec = storeRecorder{te.Store}
-	gh, err := te.GitHub.Basics(ctx, r21)
+	gh, err := te.forgeBasics(ctx, r21)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +192,7 @@ func TestHeldRunNowOnAnAdoptedPullRequestIsTheAuthors(t *testing.T) {
 	if got := role(); got != catalog.RoleReview {
 		t.Fatalf("someone else's pull request: role %s", got)
 	}
-	if err := te.Store.SetOverride(ctx, dinv.Override{PR: r21, Adopted: true}); err != nil {
+	if err := inventorytest.Of(te.Store).SetOverride(ctx, dinv.Override{PR: r21, Adopted: true}); err != nil {
 		t.Fatal(err)
 	}
 	if got := role(); got != catalog.RoleAuthor {

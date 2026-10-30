@@ -2,11 +2,10 @@ package turn
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/wloophq/wloop/internal/core/instructions"
-	dpr "github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
@@ -33,6 +32,12 @@ type Contents interface {
 	Contents() string
 }
 
+// DataPayload is a payload that carries its plugin's data, which the
+// templates read under the payload root the plugin's manifest names.
+type DataPayload interface {
+	Data() json.RawMessage
+}
+
 func contents(p any) string {
 	if c, ok := p.(Contents); ok {
 		return c.Contents()
@@ -40,8 +45,18 @@ func contents(p any) string {
 	return ""
 }
 
+// PayloadReader is a provider's turn payload: a source plugin's
+// Planner.Payload as the turn reads it.
 type PayloadReader interface {
 	Payload(ctx context.Context, r Request) (Payload, error)
+}
+
+// PayloadCompleter is a PayloadReader that completes a payload the caller
+// handed the turn, and names a unit without reading it for an intent whose
+// context is synthetic, such as a probe.
+type PayloadCompleter interface {
+	CompletePayload(r Request, p Payload) (Payload, error)
+	SyntheticPayload(u unit.Unit, probe bool) (Payload, error)
 }
 
 // ItemsReader lists a unit's open items for its instructions; internal/cli/turnitems.go implements it.
@@ -51,7 +66,7 @@ type ItemsReader interface {
 
 var prWording = Wording{Noun: "pull request", This: "this pull request"}
 
-func (p *PR) Unit() unit.Unit { return p.ref().Unit() }
+func (p *PR) Unit() unit.Unit { return unit.Unit{Provider: unit.GitHub, Key: p.Slug()} }
 
 func (p *PR) Arg() string { return p.URL }
 
@@ -109,33 +124,16 @@ func (f payloadFacts) Get(field string) any {
 	return v
 }
 
-func (p *PR) ref() github.Ref { return github.Ref{Owner: p.Owner, Repo: p.Repo, Number: p.Number} }
-
-// GitHub is github's PayloadReader: the pull request as PRs reads it.
-type GitHub struct{ PRs PRReader }
-
-func (g GitHub) Payload(ctx context.Context, r Request) (Payload, error) {
-	ref, err := dpr.ParseKey(r.Unit.Key)
-	if err != nil {
-		return nil, err
-	}
-	pr, err := g.PRs.PR(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-	return &pr, nil
-}
-
-// anchored is pr at ref with its prior review anchored to the head the loop's record covered.
-func anchored(pr PR, ref github.Ref, v *RecordedVerdict) *PR {
-	pr.URL, pr.Owner, pr.Repo, pr.Number = ref.URL(), ref.Owner, ref.Repo, ref.Number
-	if v != nil && pr.Prior != nil && !pr.Prior.At.After(v.At) {
-		prior := *pr.Prior
+// Anchored is p with its prior review anchored to the head the loop's
+// record v covered, when the review is no newer than the record.
+func (p PR) Anchored(v *RecordedVerdict) *PR {
+	if v != nil && p.Prior != nil && !p.Prior.At.After(v.At) {
+		prior := *p.Prior
 		if v.Head != "" {
 			prior.Head = v.Head
 		}
 		prior.Endorsed = v.Endorsed
-		pr.Prior = &prior
+		p.Prior = &prior
 	}
-	return &pr
+	return &p
 }

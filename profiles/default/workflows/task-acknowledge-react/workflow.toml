@@ -1,0 +1,16 @@
+summary = "When you acknowledge a task with no time, propose a reaction on its ask, so the asker sees you are on it"
+provider = "task"
+when = 'trigger.event.kind == "verb_acknowledge" && !(task.promised > timestamp(0))'
+key = ["trigger.event.id"]
+order = 54
+
+[trigger]
+on = ["verb_acknowledge"]
+actors = ["person"]
+
+[[step]]
+use = "draft.propose"
+purpose = "acknowledge"
+delivery = "reaction"
+reaction = "eyes"
+target = "item"

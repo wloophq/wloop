@@ -1,25 +1,22 @@
-<!-- @dsCard group="Navigation" height=420 -->
+<!-- @dsCard group="Navigation" height=400 -->
 <!doctype html><html><body>
 <style>body{padding:16px}</style>
 <nav class="rail-demo" style="padding:10px 0;width:188px;border-right:1px solid var(--rule)">
 <div class="area"><select aria-label="Area"><option>All areas</option><option>work</option><option>oss</option></select></div>
+<div class="area"><button class="act" type="button">Review</button></div>
 <ul class="views">
-<li><a class="on" href="#"><span class="label">Focus</span><span class="count">3</span></a></li>
-<li class="rail-head" role="presentation">Decide</li>
-<li><a href="#"><span class="label">Inbox</span><span class="count" style="color:var(--ink)">12</span></a></li>
-<li><a href="#"><span class="label">Outbox</span><span class="count" style="color:var(--ink)">4</span></a></li>
-<li class="rail-head" role="presentation">Lists</li>
-<li><a href="#"><span class="label">Next</span><span class="count">18</span></a></li>
-<li><a href="#"><span class="label">Waiting</span><span class="count">9</span></a></li>
-<li><a href="#"><span class="label">Scheduled</span><span class="count">5</span></a></li>
-<li><a href="#"><span class="label">Someday</span><span class="count"></span></a></li>
-<li><a href="#"><span class="label">Projects</span><span class="count">2</span></a></li>
+<li><a href="#" class="core"><span class="label">Inbox</span><span class="count" style="color:var(--ink)">3</span></a></li>
+<li><a class="on core" href="#"><span class="label">Needs me</span><span class="count" style="color:var(--ink)">6</span></a></li>
+<li><a href="#" class="core"><span class="label">Waiting</span><span class="count">9</span></a></li>
+<li><a href="#" class="core"><span class="label">Snoozed</span><span class="count">4</span></a></li>
+<li><a href="#" class="core"><span class="label">Someday</span><span class="count"></span></a></li>
+<li><a href="#" class="core"><span class="label">Projects</span><span class="count">2</span></a></li>
+<li><a href="#" class="core"><span class="label">Outbox</span><span class="count" style="color:var(--ink)">2</span></a></li>
 <li class="rail-head rail-sec" role="presentation"><span>GitHub</span><span class="src-mark">GH</span></li>
-<li><a href="#"><span class="label">Needs me</span><span class="count">4</span></a></li>
-<li><a href="#" class="late-count"><span class="label">Stalled</span><span class="count">3</span></a></li>
-<li><a href="#"><span class="label">My PRs</span><span class="count"></span></a></li>
+<li><a href="#" class="plugin late-count"><span class="label">Stalled</span><span class="count">3</span></a></li>
+<li><a href="#" class="plugin"><span class="label">My PRs</span><span class="count"></span></a></li>
 <li class="rail-more">5 more</li>
 <li class="rail-head rail-sec" role="presentation"><span>Slack</span><span class="src-mark">SL</span></li>
-<li><a href="#"><span class="label">Conversations</span><span class="count"></span></a></li>
+<li><a href="#" class="plugin"><span class="label">Conversations</span><span class="count"></span></a></li>
 </ul></nav>
 </body></html>

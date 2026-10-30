@@ -5,9 +5,9 @@ description: The text and qualifiers the filter box takes, and how grouping and 
 
 The filter box at the top of the cockpit (`/` focuses it) narrows every view to the pull requests whose number, repository, title, author, head branch, workspace, board column, reason, card comment, brief goal or brief tag holds every word typed, ignoring case and accents. Pasting a pull request URL opens it.
 
-In the GTD views (Inbox, Next, Waiting, Someday, Projects, Outbox, Logbook) the same words narrow the entries: their title, notes, state, kind, items, the people they wait on or come from, their channel or repository, project, area, contexts, and the text of their message or draft, ignoring case and the accents of Portuguese and Spanish. Qualifiers apply to the pull request views only. The terminal's `/` filter does the same.
+In the task views (Inbox, Needs me, Waiting, Someday, Projects, Outbox, Logbook and the others of your `views.toml`) the same words narrow the tasks: their title, notes, state, kind, items, the people they wait on or come from, their channel or repository, project, area, contexts, and the text of their message or draft, ignoring case and the accents of Portuguese and Spanish. Qualifiers apply to the pull request views only. The terminal's `/` filter does the same.
 
-The counts follow the filter in every view. The rail (the tabs in the terminal) counts what each view shows under the filter, the bar above a list reads "N of M" (what the filter shows of the view), and the group headings, the area picker and the context chips count the matches. With no free words, the GTD counts are those of the whole views.
+The counts follow the filter in every view. The rail (the tabs in the terminal) counts what each view shows under the filter, the bar above a list reads "N of M" (what the filter shows of the view), and the group headings, the area picker and the context chips count the matches. With no free words, the counts of the lists are those of the whole views.
 
 ## Qualifiers
 
@@ -21,7 +21,7 @@ The counts follow the filter in every view. The rail (the tabs in the terminal) 
 | `type:` | the brief's kind: `feature`, `fix`, `refactor`, `chore`, `infra` |
 | `risk:`, `size:` | the brief's risk and size |
 | `status:` | the workspace's board column |
-| `is:` | `stalled`, `needs-me`, `in-loop`, `approved`, `due` (an automatic round, mute end or brief retry within a day), `paused`, `muted`, `adopted`, `tracked` |
+| `is:` | `stalled`, `needs-me`, `in-loop`, `approved` (the GitHub plugin's own reading of the row; the lens views Stalled, In loop and Approved list tasks, reading its link signals), `due` (an automatic round's plan gate deadline, mute end or brief retry within a day), `paused`, `muted`, `adopted`, `tracked` |
 | `ci:` | `failure`, `pending`, `success`, `none`, or the name of a failing check |
 | `opened:` | age since it opened: `1d`, `3d`, `7d`, `2w`, `4w`, `older` |
 | `scope:` | a scope reason |
@@ -39,7 +39,7 @@ Clicking a repository, author, person, situation, type, size, risk, tag or colum
 
 ## Grouping, sorting and boards
 
-The bar above the list groups (`g`), sorts (`s`, or a column header) and switches between list and board in any view. Grouping offers one "Tag `<key>`" per tag key present; a pull request with two values of that key shows in both groups. Filters, grouping and order stay in the URL and follow you across views.
+The bar above the list groups (`g`), sorts (`s`, or a column header) and switches between list and board in any view; a board with no grouping groups by whom a row waits on. Grouping offers one "Tag `<key>`" per tag key present; a pull request with two values of that key shows in both groups. Filters, grouping and order stay in the URL and follow you across views.
 
 ## The Backlog view
 

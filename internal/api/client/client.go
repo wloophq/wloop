@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -42,6 +43,9 @@ type Client struct {
 	// Manager names the workspace manager of the agent session the client
 	// calls for, "" when unknown; it goes with every call that names a handle.
 	Manager string
+	// Handle is the agent session handle every call names when it names
+	// none of its own, "" for a person's.
+	Handle string
 }
 
 // DaemonLabel is the launchd label of the daemon's LaunchAgent.
@@ -106,11 +110,24 @@ func (c *Client) Catalog(ctx context.Context) (api.CatalogResponse, error) {
 	return res, err
 }
 
+// Explore runs query through the plugin that serves the explore view.
 func (c *Client) Explore(ctx context.Context, query string) (api.ExploreResult, error) {
+	cat, err := c.Catalog(ctx)
+	if err != nil {
+		return api.ExploreResult{}, err
+	}
+	i := slices.IndexFunc(cat.Views, func(v api.ViewSpec) bool { return v.ID == exploreView })
+	if i < 0 || cat.Views[i].Provider == "" {
+		return api.ExploreResult{}, errors.New("no plugin serves the explore view")
+	}
 	var res api.ExploreResult
-	err := c.do(ctx, exploreTimeout, http.MethodPost, "/api/explore", api.ExploreRequest{Query: query}, &res)
+	err = c.do(ctx, exploreTimeout, http.MethodPost, api.PluginViewPath(unit.ProviderID(cat.Views[i].Provider), exploreView), api.ExploreRequest{Query: query}, &res)
 	return res, err
 }
+
+// exploreView is the view Explore searches through, and its plugin's view
+// of the same name.
+const exploreView = "explore"
 
 // Rows is every row.
 func (c *Client) Rows(ctx context.Context) ([]api.Row, error) {
@@ -174,7 +191,7 @@ func (c *Client) Trigger(ctx context.Context, job string) error {
 }
 
 func (c *Client) do(ctx context.Context, timeout time.Duration, method, path string, in, out any) error {
-	return c.doAs(ctx, timeout, "", method, path, in, out)
+	return c.doAs(ctx, timeout, c.Handle, method, path, in, out)
 }
 
 // doAs is do on behalf of the agent session handle, "" for none.
@@ -255,14 +272,13 @@ func (c *Client) Prompt(ctx context.Context, handle string, req api.PromptReques
 	return c.doAs(ctx, ReadTimeout, handle, http.MethodPost, api.AgentSessionsPrompt, req, nil)
 }
 
-// TurnAnswer reads the answers to the caller's Inbox messages on the unit arg
-// names (a pull request URL or "<provider>:<key>"): the unread ones, or every
-// answer to message when it is not 0.
-func (c *Client) TurnAnswer(ctx context.Context, handle, arg string, message int64) (api.TurnText, error) {
+// TurnAnswer reads the answers to the caller's gates on the unit arg names (a pull request URL or
+// "<provider>:<key>"): the unread ones, or every answer that resolved gate when it is not 0.
+func (c *Client) TurnAnswer(ctx context.Context, handle, arg string, gate int64) (api.TurnText, error) {
 	var res api.TurnText
 	q := url.Values{"pr": {arg}}
-	if message != 0 {
-		q.Set("message", strconv.FormatInt(message, 10))
+	if gate != 0 {
+		q.Set("gate", strconv.FormatInt(gate, 10))
 	}
 	err := c.doAs(ctx, ReadTimeout, handle, http.MethodGet, api.AgentAnswer+"?"+q.Encode(), nil, &res)
 	return res, err

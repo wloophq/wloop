@@ -14,10 +14,10 @@ import (
 
 func TestAutomatedReasonJoinsThePlannersNamesWithTheRead(t *testing.T) {
 	t.Parallel()
-	f := workflow.Facts{"pr.address.reviewers": []string{"ana", "jussara-ai"}, "pr.address.checks": []any{"ci/test", "gone"}}
+	f := workflow.Facts{"pr.address.reviewers": []string{"ana", "acme-bot"}, "pr.address.checks": []any{"ci/test", "gone"}}
 	checks := []dpr.Check{{Name: "lint"}, {Name: "ci/test", Failed: true, Summary: "3 failed", URL: "https://ci/9"}}
 	want := &turn.RoundReason{
-		Reviewers: []turn.RoundReviewer{{Login: "ana"}, {Login: "jussara-ai"}},
+		Reviewers: []turn.RoundReviewer{{Login: "ana"}, {Login: "acme-bot"}},
 		Checks:    []turn.FailingCheck{{Name: "ci/test", Summary: "3 failed", URL: "https://ci/9"}, {Name: "gone"}},
 	}
 	if got := automatedReason(f, dpr.Facts{Checks: checks}); !reflect.DeepEqual(got, want) {
@@ -62,7 +62,7 @@ func TestHandReasonMarksWhatAnEarlierRoundCovered(t *testing.T) {
 	t.Parallel()
 	base := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
 	at := func(h int) time.Time { return base.Add(time.Duration(h) * time.Hour) }
-	cfg := config.Config{GitHub: config.GitHub{AddressSkipReviewers: []string{"noisy"}, IgnoreChecks: []string{"flaky"}}}
+	cfg := config.Config{Plugins: config.Plugins{GitHub: config.GitHub{AddressSkipReviewers: []string{"noisy"}, IgnoreChecks: []string{"flaky"}}}}
 	got := handReason(handFacts(at), "me", at(2), "h2", "", cfg)
 	want := &turn.RoundReason{
 		Reviewers: []turn.RoundReviewer{{Login: "ana", Handled: true}, {Login: "bob"}},

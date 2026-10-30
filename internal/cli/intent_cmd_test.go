@@ -10,12 +10,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/domain/pr"
+
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
@@ -256,20 +257,20 @@ func TestAReviewSessionLoadsProjectSettingsOnlyWhereTheConfigSays(t *testing.T) 
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.Intents = map[string]config.IntentConfig{"review": {ProjectSettings: &config.ProjectSettings{When: `pr.visibility == "private"`}}}
-	pr := func(visibility string) *github.PullRequest {
-		p := &github.PullRequest{}
+	read := func(visibility string) *pr.PullRequest {
+		p := &pr.PullRequest{}
 		p.Ref, p.Visibility = r7, visibility
 		return p
 	}
 	for _, c := range []struct {
 		intent dintent.Name
-		pr     *github.PullRequest
+		pr     *pr.PullRequest
 		off    bool
 	}{
-		{dintent.Review, pr("private"), false},
-		{dintent.Review, pr("public"), true},
+		{dintent.Review, read("private"), false},
+		{dintent.Review, read("public"), true},
 		{dintent.Review, nil, true},
-		{dintent.Address, pr("public"), false},
+		{dintent.Address, read("public"), false},
 	} {
 		raw, err := te.agentCommand(context.Background(), te.cfg, "/wt", roundOptions{trusted: true, intent: c.intent, pr: c.pr})
 		if err != nil {
@@ -365,7 +366,7 @@ func TestEveryBuiltinNameHasAnImplementation(t *testing.T) {
 	}
 	effects := append(slices.Clone(ours["effects"]), theirs.Effects...)
 	for _, name := range builtin.TurnEffectNames() {
-		if !slices.Contains(effects, name) {
+		if fx, _ := builtin.EffectOf(name); !fx.Plugin && !slices.Contains(effects, name) {
 			t.Errorf("the turn effect %q has no implementation", name)
 		}
 	}
@@ -380,8 +381,8 @@ func TestEveryBuiltinNameHasAnImplementation(t *testing.T) {
 				t.Errorf("the role %s binds the %s %q, which has no implementation", r.Name, what, name)
 			}
 		}
-		if r.Prepare != "" && !slices.Contains(theirs.Prepares, r.Prepare) {
-			t.Errorf("the role %s binds the prepare %q, which has no implementation", r.Name, r.Prepare)
+		if r.Prepare != "" && !strings.HasPrefix(r.Prepare, builtin.PrepareAction) {
+			t.Errorf("the role %s binds the prepare %q, which names no plugin action", r.Name, r.Prepare)
 		}
 	}
 }
@@ -407,7 +408,7 @@ func TestProfileSchemaPrintsTheManifestSchema(t *testing.T) {
 func TestDoctorLoadsTheIntents(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	if got := te.intentChecks(); len(got) != 1 || got[0].mark != markOK || got[0].info != "act address nudge review start" {
+	if got := te.intentChecks(); len(got) != 1 || got[0].mark != markOK || got[0].info != "act address chat nudge review start" {
 		t.Fatalf("checks %+v", got)
 	}
 	userProfile(t, te, map[string]string{

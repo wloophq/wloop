@@ -16,14 +16,14 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/profile"
-	slacksend "github.com/wloophq/wloop/internal/slack/send"
 )
 
 // draftProposeStep adapts draft.propose: Check renders the text and holds per
@@ -35,11 +35,11 @@ var draftProposeStep = stepEntry{check: (*stepSet).draftProposeCheck, run: (*ste
 type draftOutbox interface {
 	Propose(ctx context.Context, p outbox.Proposal) (draft.Draft, error)
 	List(ctx context.Context, f outbox.Filter) ([]draft.Draft, error)
-	Discard(ctx context.Context, id draft.ID, reason string) (draft.Draft, error)
+	Withdraw(ctx context.Context, id draft.ID, reason string) (draft.Draft, error)
 }
 
-type draftEntries interface {
-	Entry(ctx context.Context, id gtd.ID) (gtd.Entry, error)
+type draftTasks interface {
+	Task(ctx context.Context, id task.ID) (task.Task, error)
 }
 
 type draftItems interface {
@@ -49,9 +49,9 @@ type draftItems interface {
 // draftDeps are what draft.propose and the workflows' withdrawals read and
 // act through.
 type draftDeps struct {
-	Outbox  func() draftOutbox // nil until the Outbox is served
-	Entries draftEntries
-	Items   draftItems
+	Outbox func() draftOutbox // nil until the Outbox is served
+	Tasks  draftTasks
+	Items  draftItems
 	// Workflow is the loaded manifest of a workflow, before the config.
 	Workflow func(name string) (workflow.Workflow, bool)
 	Config   func() config.Config
@@ -126,10 +126,10 @@ type draftCandidate struct {
 }
 
 // draftSubject is a step's subject as its drafts see it: the unit they post
-// on, and the entry when the subject is one.
+// on, and the task when the subject is one.
 type draftSubject struct {
 	subject, unit unit.Unit
-	entry         *gtd.Entry
+	task          *task.Task
 	items         []items.Item
 }
 
@@ -219,15 +219,25 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 		return nil, err
 	}
 	now := deps.Now()
-	policy := draftApproval(deps.Config(), w)
+	l := s.e.loadedIntents()
+	policy := draftApproval(deps.Config(), w, briefExtrasOf(l), intentload.DefaultDraftApproval(l.Gates))
 	var subject *draft.Subject
 	if w.Withdraw != nil || len(policy.Rules) > 0 {
-		read, err := subjectFacts(ctx, s.d.Units, c.u, w.Name)
+		read, err := subjectFacts(ctx, s.d.Units, s.d.Keep, c.u, w.Name)
 		if err != nil {
 			return nil, err
 		}
 		read.Slot = w.Slot
 		subject = &read
+	}
+	var facts workflow.Facts
+	if tmpl != nil {
+		switch facts, err = s.facts(ctx, c.u); {
+		case errors.Is(err, automation.ErrUnitGone):
+			facts = workflow.Facts{}
+		case err != nil:
+			return nil, err
+		}
 	}
 	var out []draftCandidate
 	for _, person := range sub.people(a.per) {
@@ -235,19 +245,19 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 		cd := draftCandidate{person: person.Key}
 		key := sub.unit.String()
 		if a.per == "person" {
-			key = sub.subject.Key + ":" + person.Key
+			key += ":" + person.Key
 		}
 		cd.p = outbox.Proposal{Unit: sub.unit, Items: itemIDs(its), Purpose: a.purpose, Delivery: a.delivery, Reaction: a.reaction,
 			Effects: a.effects, RepeatAfter: a.repeatAfter, Policy: &policy, Subject: subject,
 			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: w.Name, Rule: w.Name, Key: key}}
-		if sub.entry != nil {
-			cd.p.Entry = string(sub.entry.ID)
+		if sub.task != nil {
+			cd.p.Task = string(sub.task.ID)
 		}
 		switch {
 		case len(its) == 0:
 			cd.refusal = "no " + a.items + " items"
 		case a.target == "item":
-			if cd.p.Target = its[0].Origin.Permalink; cd.p.Target == "" && slacksend.IsMessage(its[0].Origin.Ref) {
+			if cd.p.Target = its[0].Origin.Permalink; cd.p.Target == "" && s.e.pluginTakes(its[0].Origin.Ref) {
 				cd.p.Target = its[0].Origin.Ref
 			}
 			if cd.p.Target == "" && slices.Contains(builtin.DraftEmojiDeliveries, string(a.delivery)) {
@@ -255,7 +265,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			}
 		}
 		if cd.refusal == "" {
-			cd.refusal, cd.timed, err = holdOf(ctx, ob, cd.p, a, now)
+			cd.refusal, cd.timed, err = holdOf(ctx, ob, cd.p, person.Key, a, now)
 			if err != nil {
 				return nil, err
 			}
@@ -267,7 +277,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			}
 		}
 		if cd.refusal == "" {
-			if cd.p.Text, err = renderDraft(tmpl, w.Name, sub, a, person, its); err != nil {
+			if cd.p.Text, err = renderDraft(tmpl, draftTextData{Workflow: w.Name, Purpose: a.purpose, Facts: facts}, sub, person, its); err != nil {
 				return nil, err
 			}
 		}
@@ -276,24 +286,24 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 	return out, nil
 }
 
-// subject reads what a step's subject u holds: for an entry, the unit its
+// subject reads what a step's subject u holds: for a task, the unit its
 // first item is on, else its first unit, with that unit's items and the
-// entry; else u's items.
+// task; else u's items.
 func (d *draftDeps) subject(ctx context.Context, u unit.Unit) (draftSubject, error) {
 	sub := draftSubject{subject: u, unit: u}
-	if id, ok := gtd.IDOf(u); ok {
-		e, err := d.Entries.Entry(ctx, id)
+	if id, ok := task.IDOf(u); ok {
+		e, err := d.Tasks.Task(ctx, id)
 		if err != nil {
 			return sub, err
 		}
-		sub.entry = &e
+		sub.task = &e
 		switch {
 		case len(e.Items) > 0:
 			sub.unit = e.Items[0].Unit
 		case len(e.Units) > 0:
 			sub.unit = e.Units[0]
 		default:
-			return sub, fmt.Errorf("entry %s has no unit to post on", e.ID)
+			return sub, fmt.Errorf("task %s has no unit to post on", e.ID)
 		}
 	}
 	its, err := d.Items.Items(ctx, sub.unit)
@@ -307,25 +317,19 @@ func (d *draftDeps) subject(ctx context.Context, u unit.Unit) (draftSubject, err
 	return sub, nil
 }
 
-// people are the persons a per-person step proposes to: those the entry
-// waits on, else those the unit's open items wait on; one empty person
+// people are the persons a per-person step proposes to: those the open
+// items of the subject wait on, a task's those it holds; one empty person
 // for a per-subject step.
 func (s draftSubject) people(per string) []items.Person {
 	if per != "person" {
 		return []items.Person{{}}
 	}
 	var out []items.Person
-	if s.entry != nil {
-		if s.entry.Waiting != nil {
-			for _, p := range s.entry.Waiting.On {
-				if strings.Contains(p.Key, ":") {
-					out = append(out, p)
-				}
-			}
-		}
-		return out
+	its := s.items
+	if s.task != nil {
+		its = s.held()
 	}
-	for _, it := range s.items {
+	for _, it := range its {
 		for _, p := range it.WaitingOn {
 			if it.State == items.Open && !slices.ContainsFunc(out, func(q items.Person) bool { return q.Key == p.Key }) {
 				out = append(out, p)
@@ -335,12 +339,29 @@ func (s draftSubject) people(per string) []items.Person {
 	return out
 }
 
-// held are the open items of the subject: those its entry holds, or every
+// owedPool are the open items a draft to person may list as owed: those
+// the subject holds, and of a task's unit those waiting on person that
+// other tasks hold, so one nudge covers what person owes there.
+func (s draftSubject) owedPool(person items.Person) []items.Item {
+	out := s.held()
+	if s.task == nil || person.Key == "" {
+		return out
+	}
+	for _, it := range s.items {
+		if it.State == items.Open && it.Unit == s.unit && !slices.ContainsFunc(out, func(h items.Item) bool { return h.ID == it.ID }) &&
+			slices.ContainsFunc(it.WaitingOn, func(w items.Person) bool { return w.Key == person.Key }) {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
+// held are the open items of the subject: those its task holds, or every
 // open item of its unit.
 func (s draftSubject) held() []items.Item {
 	var out []items.Item
 	for _, it := range s.items {
-		if it.State == items.Open && it.Unit == s.unit && (s.entry == nil || slices.Contains(s.entry.Items, gtd.ItemRef{Unit: it.Unit, Item: it.ID})) {
+		if it.State == items.Open && it.Unit == s.unit && (s.task == nil || slices.Contains(s.task.Items, task.ItemRef{Unit: it.Unit, Item: it.ID})) {
 			out = append(out, it)
 		}
 	}
@@ -351,7 +372,7 @@ func selectItems(s draftSubject, which string, person items.Person, now time.Tim
 	var out []items.Item
 	switch which {
 	case "owed":
-		return owedBy(person, s.held(), codecs)
+		return owedBy(person, s.owedPool(person), codecs)
 	case "resolved":
 		for _, it := range s.items {
 			if it.State == items.Resolved && it.Unit == s.unit {
@@ -363,7 +384,7 @@ func selectItems(s draftSubject, which string, person items.Person, now time.Tim
 			if !unownedItem(it, s.unit) {
 				continue
 			}
-			if which == "unowned_aged" && (it.CreatedAt.IsZero() || gtd.AddWorkdays(it.CreatedAt, 1, now.Location()).After(now)) {
+			if which == "unowned_aged" && (it.CreatedAt.IsZero() || task.AddWorkdays(it.CreatedAt, 1, now.Location()).After(now)) {
 				continue
 			}
 			out = append(out, it)
@@ -407,47 +428,49 @@ func itemIDs(its []items.Item) []string {
 }
 
 // draftApproval is the approval policy of the drafts w's steps propose:
-// workflowApproval's over no intent, else wait.
-func draftApproval(cfg config.Config, w workflow.Workflow) draft.Policy {
-	if p := workflowApproval(cfg, w, nil); p != nil {
+// workflowApproval's over no intent, else def, gates.toml's default for a
+// draft gate.
+func draftApproval(cfg config.Config, w workflow.Workflow, extras func(unit.ProviderID) expr.Env, def draft.Approval) draft.Policy {
+	if p := workflowApproval(cfg, w, nil, extras, def); p != nil {
 		return *p
 	}
-	return draft.Policy{Default: draft.Approval{Mode: draft.Wait}}
+	return draft.Policy{Default: def}
 }
 
 // workflowApproval is the approval policy of w's drafts and of the turns it
 // starts of an intent whose block is intent: the config's
-// workflows.<name>.drafts.approval laid over the manifest's
-// [drafts.approval], else over intent, field by field; nil when none is
-// set.
-func workflowApproval(cfg config.Config, w workflow.Workflow, intent *draft.Policy) *draft.Policy {
+// workflows.<name>.gates.approval laid over the manifest's, else over
+// intent, else over def, field by field; nil when none is set.
+func workflowApproval(cfg config.Config, w workflow.Workflow, intent *draft.Policy, extras func(unit.ProviderID) expr.Env, def draft.Approval) *draft.Policy {
 	base := cmp.Or(w.DraftApproval, intent)
-	if p, _ := configPolicy(w.Name, w.Slot, base, cfg.Workflows[w.Name].DraftApproval()); p != nil {
+	if p, _ := configPolicy(w, base, cfg.Workflows[w.Name].GateApproval(), extras, def); p != nil {
 		return p
 	}
 	return base
 }
 
-// configPolicy is a, the config's drafts approval of workflow name, laid
-// over base, its rules compiled over the unit slot's facts; nil when a is.
+// configPolicy is a, the config's gates approval of w, laid over base (nil:
+// def) for its draft gates, its rules compiled over the unit slot's facts
+// and those extras gives for w's provider (nil gives none); nil when a is.
 // One that does not load is refused, with the error, and holds every draft.
-func configPolicy(name, slot string, base *draft.Policy, a *config.ApprovalConfig) (*draft.Policy, error) {
+func configPolicy(w workflow.Workflow, base *draft.Policy, a *config.ApprovalConfig, extras func(unit.ProviderID) expr.Env, def draft.Approval) (*draft.Policy, error) {
 	if a == nil {
 		return nil, nil
 	}
-	p, err := intentload.OverlayDraftApproval(base, overlay(*a), builtin.ApprovalEnv(true, slot))
+	p, err := intentload.OverlayDraftApproval(base, def, overlay(*a), workflowEnvs(w, extras))
 	if err != nil {
-		return draft.Fixed(draft.Approval{Mode: draft.Wait}), fmt.Errorf("workflows.%s.drafts.approval: %w", name, err)
+		return draft.Fixed(draft.Approval{Mode: draft.Wait}), fmt.Errorf("workflows.%s.gates.approval: %w", w.Name, err)
 	}
 	return &p, nil
 }
 
-// holdOf says why a draft of the same workflow, subject and person holds p:
+// holdOf says why a draft of the same workflow, unit and person holds p, its person read off the draft's key
+// in either shape draftPerson reads, or, with no person, of the same key:
 // one open or failed, one sent within repeat_after_sent (or ever, with
 // forever), one otherwise settled within hold; timed when only the time
 // since a settled draft holds it. A withdrawn draft holds nothing.
-func holdOf(ctx context.Context, ob draftOutbox, p outbox.Proposal, a draftArgs, now time.Time) (string, bool, error) {
-	prior, err := ob.List(ctx, outbox.Filter{Unit: &p.Unit, Rule: p.Origin.Rule, Key: p.Origin.Key})
+func holdOf(ctx context.Context, ob draftOutbox, p outbox.Proposal, person string, a draftArgs, now time.Time) (string, bool, error) {
+	prior, err := ob.List(ctx, outbox.Filter{Unit: &p.Unit, Rule: p.Origin.Rule})
 	if err != nil {
 		return "", false, err
 	}
@@ -456,11 +479,14 @@ func holdOf(ctx context.Context, ob draftOutbox, p outbox.Proposal, a draftArgs,
 		if d.Origin.Kind != draft.OriginAuto || d.Origin.Workflow != p.Origin.Workflow {
 			continue
 		}
+		if person == "" && d.Origin.Key != p.Origin.Key || person != "" && draftPerson(d.Origin.Key, d.Unit, draftSubjectUnit(d)) != person {
+			continue
+		}
 		held := fmt.Sprintf("held by draft %d (%s)", d.ID, d.State)
 		switch {
 		case slices.Contains(draft.Open, d.State), d.State == draft.Failed, d.State == draft.Sent && a.forever:
 			return held, false, nil
-		case d.State == draft.Discarded && (d.Reason == draft.WithdrawAssigned || d.Reason == draft.WithdrawMoot):
+		case d.State == draft.Dropped && (d.Reason == draft.WithdrawAssigned || d.Reason == draft.WithdrawMoot):
 		case d.State == draft.Sent && now.Sub(d.UpdatedAt) < a.repeatAfterSent, d.State != draft.Sent && now.Sub(d.UpdatedAt) < a.repeatAfter:
 			if refusal == "" {
 				refusal, timed = held, true
@@ -496,12 +522,13 @@ func draftFactsOf(sub draftSubject, person string, ids []string) workflow.Facts 
 		}
 	}
 	waited := person == ""
-	if !waited && sub.entry != nil {
-		e := sub.entry
-		waited = e.State == gtd.Waiting && e.Waiting != nil && slices.ContainsFunc(e.Waiting.On, func(p items.Person) bool { return p.Key == person })
+	if !waited && sub.task != nil {
+		waited = slices.ContainsFunc(sub.owedPool(items.Person{Key: person}), func(it items.Item) bool {
+			return slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return p.Key == person })
+		})
 	}
 	held, owned := 0, 0
-	heldNow := sub.held()
+	heldNow := sub.owedPool(items.Person{Key: person})
 	for _, it := range mine {
 		if len(it.Assignees)+len(it.WaitingOn) > 0 || it.State != items.Open {
 			owned++
@@ -512,7 +539,7 @@ func draftFactsOf(sub draftSubject, person string, ids []string) workflow.Facts 
 		case person != "" && slices.ContainsFunc(heldNow, func(h items.Item) bool { return h.ID == it.ID }):
 			held++
 		}
-		if !waited && sub.entry == nil && it.State == items.Open &&
+		if !waited && sub.task == nil && it.State == items.Open &&
 			slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return p.Key == person }) {
 			waited = true
 		}
@@ -521,16 +548,18 @@ func draftFactsOf(sub draftSubject, person string, ids []string) workflow.Facts 
 		"draft.person_waited":  waited,
 		"draft.items_owed":     held,
 		"draft.items_assigned": owned,
-		"draft.unit_open":      sub.entry == nil || sub.entry.Open(),
+		"draft.unit_open":      sub.task == nil || sub.task.Open(),
 	}
 }
 
 // draftTextData is what a draft's template reads: item text is data, never
-// template code.
+// template code. Facts are the step's subject's facts by name, none once
+// the subject is gone.
 type draftTextData struct {
-	Workflow, Purpose, Unit, Entry string
-	Person                         draftTextPerson
-	Items                          []draftTextItem
+	Workflow, Purpose, Unit, Task string
+	Person                        draftTextPerson
+	Items                         []draftTextItem
+	Facts                         workflow.Facts
 }
 
 type draftTextPerson struct{ Key, Name string }
@@ -558,13 +587,14 @@ func draftTemplate(cfg config.Config, workflowName, text string, d draft.Deliver
 	return t, nil
 }
 
-func renderDraft(t *template.Template, workflowName string, sub draftSubject, a draftArgs, person items.Person, its []items.Item) (string, error) {
+// renderDraft renders t over data, filled with sub's unit and task, person and its items.
+func renderDraft(t *template.Template, data draftTextData, sub draftSubject, person items.Person, its []items.Item) (string, error) {
 	if t == nil {
 		return "", nil
 	}
-	data := draftTextData{Workflow: workflowName, Purpose: a.purpose, Unit: sub.unit.String(), Person: draftTextPerson{Key: person.Key, Name: person.Name}}
-	if sub.entry != nil {
-		data.Entry = string(sub.entry.ID)
+	data.Unit, data.Person = sub.unit.String(), draftTextPerson{Key: person.Key, Name: person.Name}
+	if sub.task != nil {
+		data.Task = string(sub.task.ID)
 	}
 	for _, it := range its {
 		data.Items = append(data.Items, draftTextItem{ID: it.ID, Summary: it.Summary, Line: strings.Join(strings.Fields(it.Summary), " "),

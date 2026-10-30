@@ -1,6 +1,7 @@
 package expr
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -35,9 +36,23 @@ func Closest(s string, options []string) string {
 	return best
 }
 
-// DidYouMean is "; did you mean \"x\"?" for Closest's x, "" when none.
+// Renamed is the name that replaced s, a name the language no longer has;
+// "" when s was never renamed. The builtin package sets it from its table.
+var Renamed = func(string) string { return "" }
+
+// Suggest is what s plausibly meant among options, "" when nothing: the
+// name that replaced s when it was renamed and options are empty or hold
+// that name, else Closest's.
+func Suggest(s string, options []string) string {
+	if n := Renamed(s); n != "" && (len(options) == 0 || slices.Contains(options, n)) {
+		return n
+	}
+	return Closest(s, options)
+}
+
+// DidYouMean is "; did you mean \"x\"?" for Suggest's x, "" when none.
 func DidYouMean(s string, options []string) string {
-	if c := Closest(s, options); c != "" {
+	if c := Suggest(s, options); c != "" {
 		return "; did you mean " + strconv.Quote(c) + "?"
 	}
 	return ""

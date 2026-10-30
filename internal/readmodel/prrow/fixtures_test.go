@@ -5,14 +5,14 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
-	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/situation"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 )
 
 // fixtureNow is the instant every fixture row is derived at.
@@ -27,8 +27,9 @@ type rowCase struct {
 	pr       dinv.PR
 	events   []dinv.Event
 	override dinv.Override
+	mute     overlay.Mute
 	turn     *TurnFact
-	pending  *round.Pending
+	pending  *overlay.Pending
 	brief    *api.BriefSummary
 	intake   *api.Intake
 	activity *turn.Activity
@@ -87,12 +88,11 @@ func rowCases() []rowCase {
 			events: []dinv.Event{ev(13, dinv.KindMerged, "ana", ago(day), "")}},
 		{name: "closed without workspace", pr: open(14, "ana", func(p *dinv.PR) { p.State = "CLOSED"; p.ClosedAt = ago(day) })},
 		{name: "muted for a while", pr: open(15, "ana", func(p *dinv.PR) { p.ReviewRequests = []string{fixtureViewer} }),
-			override: dinv.Override{MutedUntil: fixtureNow.Add(5 * time.Hour)},
-			events:   []dinv.Event{ev(15, dinv.KindMuted, fixtureViewer, ago(time.Hour), "")}},
+			mute:   overlay.Mute{Until: fixtureNow.Add(5 * time.Hour)},
+			events: []dinv.Event{ev(15, dinv.KindMuted, fixtureViewer, ago(time.Hour), "")}},
 		{name: "muted until state change", pr: open(16, "ana", func(p *dinv.PR) { p.ReviewRequests = []string{fixtureViewer} }),
-			override: dinv.Override{MuteUntilStateChange: true, MutedKind: string(situation.KindReview), MutedWaitingOn: "me"}},
-		{name: "mute lapsed", pr: open(17, "ana", nil),
-			override: dinv.Override{MuteUntilStateChange: true, MutedKind: string(situation.KindReview), MutedWaitingOn: "me"}},
+			mute: overlay.Mute{UntilStateChange: true}},
+		{name: "mute spent", pr: open(17, "ana", nil)},
 		{name: "held by the cap", pr: open(18, "ana", func(p *dinv.PR) { p.Workspace = reviewWS }),
 			events: []dinv.Event{ev(18, dinv.KindRoundHeld, "", ago(time.Hour), "cap reached")}},
 		{name: "round blocked", pr: open(19, "ana", nil),
@@ -100,13 +100,13 @@ func rowCases() []rowCase {
 		{name: "to address", pr: open(20, fixtureViewer, nil),
 			events: []dinv.Event{ev(20, dinv.KindWouldAddress, "", ago(3*time.Hour), "carol asked")}},
 		{name: "round pending", pr: open(21, "ana", func(p *dinv.PR) { p.ReviewRequests = []string{fixtureViewer}; p.Workspace = reviewWS }),
-			pending: &round.Pending{Intent: "review", Reason: "new push", Since: ago(time.Minute), Deadline: fixtureNow.Add(4 * time.Minute)}},
+			pending: &overlay.Pending{Intent: "review", Reason: "new push", Since: ago(time.Minute), Deadline: fixtureNow.Add(4 * time.Minute)}},
 		{name: "agent asks", pr: open(22, "ana", func(p *dinv.PR) { p.Workspace = reviewWS }),
-			turn: &TurnFact{Facts: situation.TurnFacts{Intent: dintent.Review, Role: "pr.review", State: "asked", Summary: "which branch?", At: ago(30 * time.Minute)}}},
+			turn: &TurnFact{Facts: overlay.Turn{Intent: "review", Role: "pr.review", State: "asked", Summary: "which branch?", At: ago(30 * time.Minute)}}},
 		{name: "agent working", pr: open(23, "ana", func(p *dinv.PR) { p.Workspace = reviewWS; p.Reasons = nil }),
-			turn: &TurnFact{Facts: situation.TurnFacts{Intent: dintent.Review, Role: "pr.review", State: "started", At: ago(10 * time.Minute)}, Session: "s1"}},
+			turn: &TurnFact{Facts: overlay.Turn{Intent: "review", Role: "pr.review", State: "started", At: ago(10 * time.Minute)}, Session: "s1"}},
 		{name: "agent stopped", pr: open(24, fixtureViewer, func(p *dinv.PR) { p.Workspace = authorWS }),
-			turn: &TurnFact{Facts: situation.TurnFacts{Intent: dintent.Address, Role: "pr.address", State: "failed", Summary: "tests broke", At: ago(day)}}},
+			turn: &TurnFact{Facts: overlay.Turn{Intent: "address", Role: "pr.address", State: "failed", Summary: "tests broke", At: ago(day)}}},
 		{name: "workspace agent waiting", pr: open(25, "ana", func(p *dinv.PR) {
 			p.Workspace = reviewWS
 			p.Workspace.AgentStates = []turn.AgentState{turn.AgentWaiting}
@@ -139,14 +139,38 @@ func fixtureDeriver(t *testing.T, at time.Time, cases []rowCase) Deriver {
 	t.Helper()
 	l := bundled(t)
 	d := Deriver{Viewer: fixtureViewer, Teams: []string{"acme/core"}, Now: at, Stalled: config.Defaults().GitHub.Stalled, Loaded: l, Cfg: config.Defaults(),
-		GateOn: true, BriefOn: true, Pending: map[unit.Unit]round.Pending{}, Turns: map[pr.Ref]TurnFact{}}
+		GateOn: true, BriefOn: true, Plans: map[unit.Unit]overlay.Pending{}, Turns: map[pr.Ref]TurnFact{},
+		Mutes: map[unit.Unit]overlay.Mute{}}
 	for _, c := range cases {
+		d.Mutes[c.pr.Ref.Unit()] = c.mute
 		if c.pending != nil {
-			d.Pending[c.pr.Ref.Unit()] = *c.pending
+			d.Plans[c.pr.Ref.Unit()] = *c.pending
 		}
 		if c.turn != nil {
 			d.Turns[c.pr.Ref] = *c.turn
 		}
 	}
 	return d
+}
+
+// report is what the GitHub plugin reports of the case's pull request.
+func (c rowCase) report(t *testing.T) Report {
+	t.Helper()
+	in := ghreporttest.Input{PR: c.pr, Events: c.events, Adopted: c.override.Adopted, Tracked: c.override.Tracked}
+	if c.turn != nil && c.turn.Facts.Role == "pr.address" {
+		in.AddressedAt = c.turn.Facts.At
+	}
+	return reportOf(t, in)
+}
+
+// reportOf is what the GitHub plugin reports of in, derived by the
+// plugin's code with the fixtures' viewer and teams at fixtureNow.
+func reportOf(t *testing.T, in ghreporttest.Input) Report {
+	t.Helper()
+	s := ghreporttest.Snapshot(ghreporttest.Env{Viewer: fixtureViewer, Teams: []string{"acme/core"}, Now: fixtureNow, Loop: brand.Name}, in)
+	rep, ok, err := ReportOf(s)
+	if err != nil || !ok {
+		t.Fatalf("report of %s: %v %v", in.PR.Ref, ok, err)
+	}
+	return rep
 }

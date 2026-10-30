@@ -11,14 +11,13 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/turns"
-	dchange "github.com/wloophq/wloop/internal/domain/change"
+	dchange "github.com/wloophq/wloop/internal/domain/github/change"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace"
@@ -65,14 +64,14 @@ type roundOptions struct {
 	names map[string]any
 	// pr is the round's pull request as read for it, nil for none; the
 	// configuration's project_settings reads its facts.
-	pr *github.PullRequest
+	pr *pr.PullRequest
 }
 
 // trusts says whether pr passes the trust check of automated rounds under
 // its project's configuration: only then may a session the loop starts run
 // unattended, and its preflight fails on a checkout the agent home does not
 // trust.
-func trusts(cfg config.Config, pr *github.PullRequest) bool {
+func trusts(cfg config.Config, pr *pr.PullRequest) bool {
 	return pr != nil && dchange.Untrusted(pr.Facts, []string{pr.Owner}, cfg.For(pr.Owner, pr.Repo).GitHub.TrustedAuthors) == ""
 }
 
@@ -88,7 +87,7 @@ func (o roundOptions) keepBlocked(reason string) bool {
 // prompt to its agent, starting a session when none is alive. The activity
 // check comes first: resetting the tree under a working agent changes the
 // files it is reading, and typing into a waiting one answers its question.
-func (e *Env) startRound(ctx context.Context, cfg config.Config, ws wsdomain.Workspace, ref github.Ref, sent *sentTurn, opts roundOptions) (submitted bool, verb string, err error) {
+func (e *Env) startRound(ctx context.Context, cfg config.Config, ws wsdomain.Workspace, ref pr.Ref, sent *sentTurn, opts roundOptions) (submitted bool, verb string, err error) {
 	activity, err := e.freshActivity(ctx)
 	if err != nil {
 		return false, "", err
@@ -338,6 +337,13 @@ func (e *Env) wake(ctx context.Context, cfg config.Config, m workspace.Manager, 
 	if err != nil || !found || !keep(last) {
 		return proc{}, false, err
 	}
+	return e.wakeSession(ctx, cfg, m, w, ws, u, opts, sess)
+}
+
+// wakeSession gives the dormant session sess of u in ws a live process again
+// through its manager m; woke is false when the wake failed and a new
+// session should start instead.
+func (e *Env) wakeSession(ctx context.Context, cfg config.Config, m workspace.Manager, w workspace.Waker, ws wsdomain.Workspace, u unit.Unit, opts roundOptions, sess dturn.Session) (proc, bool, error) {
 	opts.unit = u
 	s, err := e.agentSession(ctx, cfg, ws, opts)
 	if err != nil {
@@ -677,18 +683,18 @@ func (e *Env) sendPrompt(ctx context.Context, p proc, prompt string, queued bool
 // alignWithPR lets the workspace manager show the pull request on a review
 // workspace even after it drops the link, by the local branch name. A main
 // checkout is left alone: it is the PR's workspace only while on its branch.
-func (e *Env) alignWithPR(ctx context.Context, ws wsdomain.Workspace, pr *github.PullRequest) {
+func (e *Env) alignWithPR(ctx context.Context, ws wsdomain.Workspace, pr *pr.PullRequest) {
 	e.align(ctx, ws, pr, false)
 }
 
 // realign is alignWithPR after a round whose fetch brought trackedHead(ws,
 // pr); it writes the link only when ws, as last listed, lost it.
-func (e *Env) realign(ctx context.Context, ws wsdomain.Workspace, pr *github.PullRequest) {
+func (e *Env) realign(ctx context.Context, ws wsdomain.Workspace, pr *pr.PullRequest) {
 	e.align(ctx, ws, pr, true)
 }
 
 // trackedHead is the head branch align tracks in ws, "" for none.
-func trackedHead(ws wsdomain.Workspace, pr *github.PullRequest) string {
+func trackedHead(ws wsdomain.Workspace, pr *pr.PullRequest) string {
 	if pr == nil || ws.IsMain || pr.IsCrossRepository {
 		return ""
 	}
@@ -702,7 +708,7 @@ func heads(branch string) []string {
 	return []string{branch}
 }
 
-func (e *Env) align(ctx context.Context, ws wsdomain.Workspace, pr *github.PullRequest, afterRound bool) {
+func (e *Env) align(ctx context.Context, ws wsdomain.Workspace, pr *pr.PullRequest, afterRound bool) {
 	if ws.IsMain {
 		return
 	}
@@ -726,7 +732,7 @@ func (e *Env) align(ctx context.Context, ws wsdomain.Workspace, pr *github.PullR
 // setReviewStatus writes the review card through the views; without them it
 // falls back when the board has no `reviewing` column. unread also marks the
 // workspace unread, in the same write when the manager can.
-func (e *Env) setReviewStatus(ctx context.Context, cfg config.Config, ref github.Ref, ws wsdomain.Workspace, unread bool) error {
+func (e *Env) setReviewStatus(ctx context.Context, cfg config.Config, ref pr.Ref, ws wsdomain.Workspace, unread bool) error {
 	if e.Views != nil {
 		e.Views.RoundStarted(ctx, pr.Ref(ref).Unit())
 		return e.setCard(ctx, ws, "", unread)
@@ -778,7 +784,7 @@ func (e *Env) stamp() string { return e.Now().Format(time.DateTime) }
 // handGuidance is the guidance of a round asked for by hand: the user's, else
 // the guidance kept from a round that did not go out. Either way the kept one
 // is used up.
-func (e *Env) handGuidance(ctx context.Context, ref github.Ref, guidance string) string {
+func (e *Env) handGuidance(ctx context.Context, ref pr.Ref, guidance string) string {
 	if e.Rec == nil {
 		return guidance
 	}
@@ -791,7 +797,7 @@ func (e *Env) handGuidance(ctx context.Context, ref github.Ref, guidance string)
 
 // recordGuidance records the guidance a round's prompt carried, so the
 // text survives a prompt that never reached the agent.
-func (e *Env) recordGuidance(ctx context.Context, ref github.Ref, guidance string) {
+func (e *Env) recordGuidance(ctx context.Context, ref pr.Ref, guidance string) {
 	if e.Rec == nil || guidance == "" {
 		return
 	}
@@ -804,7 +810,7 @@ func (e *Env) recordGuidance(ctx context.Context, ref github.Ref, guidance strin
 
 // keepGuidance keeps the guidance of a round that did not go out, or whose
 // prompt was not seen landing, for the next round of the pull request.
-func (e *Env) keepGuidance(ctx context.Context, ref github.Ref, guidance string) {
+func (e *Env) keepGuidance(ctx context.Context, ref pr.Ref, guidance string) {
 	if e.Rec == nil || guidance == "" {
 		return
 	}

@@ -12,11 +12,10 @@ import (
 	"sync"
 
 	"github.com/wloophq/wloop/internal/config"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/workspace"
 )
@@ -24,7 +23,7 @@ import (
 // openReview creates the review workspace for ref, or starts a new round in
 // the existing one. submitted reports whether the agent was seen taking the
 // prompt.
-func (e *Env) openReview(ctx context.Context, cfg config.Config, ref github.Ref, pr *github.PullRequest, sent sentTurn, opts roundOptions) (submitted bool, err error) {
+func (e *Env) openReview(ctx context.Context, cfg config.Config, ref pr.Ref, pr *pr.PullRequest, sent sentTurn, opts roundOptions) (submitted bool, err error) {
 	opts.trusted = trusts(cfg, pr)
 	repos, err := e.WS.Repos(ctx)
 	if err != nil {
@@ -66,14 +65,10 @@ func (e *Env) openReview(ctx context.Context, cfg config.Config, ref github.Ref,
 			return false, cmp.Or(err, errors.New(why))
 		}
 		ws, submitted, err = e.createWithAgent(ctx, cfg, ref, repo, workspace.CreateRequest{
-			Name:    cfg.GitHub.ReviewPrefix + pr.HeadRefName,
-			BaseRef: "origin/pr/" + fmt.Sprint(ref.Number),
-			Unit:    ref.Unit(),
-
-			HeadBranch:      pr.HeadRefName,
-			HeadOid:         pr.HeadRefOid,
-			BaseBranchName:  pr.BaseRefName,
-			CrossRepository: pr.IsCrossRepository,
+			Name:     cfg.GitHub.ReviewPrefix + pr.HeadRefName,
+			BaseRef:  "origin/pr/" + fmt.Sprint(ref.Number),
+			Unit:     ref.Unit(),
+			Checkout: workspace.Checkout{Branch: pr.HeadRefName, Head: pr.HeadRefOid, Base: pr.BaseRefName, Fork: pr.IsCrossRepository},
 		}, sent, opts)
 		if err != nil {
 			return false, err
@@ -96,7 +91,7 @@ func (e *Env) openReview(ctx context.Context, cfg config.Config, ref github.Ref,
 // resetLeftoverBranch moves the PR's local head branch, left behind by a
 // review workspace the user deleted, to the PR head when its tip is a head
 // the loop stored for the pull request: a force push leaves it off the PR.
-func (e *Env) resetLeftoverBranch(ctx context.Context, dir string, ref github.Ref, p *github.PullRequest) error {
+func (e *Env) resetLeftoverBranch(ctx context.Context, dir string, ref pr.Ref, p *pr.PullRequest) error {
 	branch, head := p.HeadRefName, p.HeadRefOid
 	if e.Turns == nil || p.IsCrossRepository || branch == "" || head == "" {
 		return nil
@@ -129,7 +124,7 @@ func storedHead(b dturn.Book, oid string) bool {
 // never got its prompt, or has no loop MCP tool to take it, is removed, so the
 // next round creates it again. A sent turn with no prompt starts the agent
 // alone. submitted reports whether the agent was seen taking the prompt.
-func (e *Env) createWithAgent(ctx context.Context, cfg config.Config, ref github.Ref, repo wsdomain.Repo, req workspace.CreateRequest, sent sentTurn, opts roundOptions) (wsdomain.Workspace, bool, error) {
+func (e *Env) createWithAgent(ctx context.Context, cfg config.Config, ref pr.Ref, repo wsdomain.Repo, req workspace.CreateRequest, sent sentTurn, opts roundOptions) (wsdomain.Workspace, bool, error) {
 	opts.unit = ref.Unit()
 	m, err := e.chooseManager(ctx, cfg, opts)
 	if err != nil {
@@ -148,8 +143,8 @@ func (e *Env) createWithAgent(ctx context.Context, cfg config.Config, ref github
 	if err := e.WS.Keep(ctx, m, ws, repo.Path, true, req.Unit); err != nil {
 		fmt.Fprintf(e.Err, "warning: %s: recording who owns it: %v\n", ws.DisplayName, err)
 	}
-	if !req.CrossRepository && ws.BranchRenamed {
-		return ws, false, e.discard(ctx, ws, fmt.Errorf("%s created %s on branch %s instead of %s, which is taken", e.displayOf([]string{m.Name()}), ws.DisplayName, ws.Branch, req.HeadBranch))
+	if !req.Checkout.Fork && ws.BranchRenamed {
+		return ws, false, e.discard(ctx, ws, fmt.Errorf("%s created %s on branch %s instead of %s, which is taken", e.displayOf([]string{m.Name()}), ws.DisplayName, ws.Branch, req.Checkout.Branch))
 	}
 	s, err := e.agentSession(ctx, cfg, ws, opts)
 	if err != nil {
@@ -208,14 +203,11 @@ func (e *Env) repoIn(ctx context.Context, m workspace.Manager, repo wsdomain.Rep
 	return r, err
 }
 
-// noteWorkspace links a workspace a round created to its pull request in the
-// inventory, so the views find its card before the next collection.
-func (e *Env) noteWorkspace(ctx context.Context, ref github.Ref, ws wsdomain.Workspace, review bool) {
-	if e.Store == nil {
-		return
-	}
-	if err := e.Store.SetWorkspace(ctx, ref, dinv.Workspace{Manager: ws.Manager, ID: ws.ID, DisplayName: ws.DisplayName, IsReview: review, IsMain: ws.IsMain}); err != nil {
-		fmt.Fprintf(e.Err, "warning: %s: linking %s in the inventory: %v\n", ref, ws.DisplayName, err)
+// noteWorkspace tells the GitHub plugin that a round created a workspace
+// for its pull request, so it links them before its next collection.
+func (e *Env) noteWorkspace(_ context.Context, ref pr.Ref, _ wsdomain.Workspace, _ bool) {
+	if e.changes != nil {
+		e.changes.Note(port.TopicAgents, ref.Unit())
 	}
 }
 
@@ -260,7 +252,7 @@ func findReviewWorkspace(cfg config.Config, repos []wsdomain.Repo, all []wsdomai
 	return wsdomain.Workspace{}, false
 }
 
-func (e *Env) resolveCheckout(ctx context.Context, cfg config.Config, repos []wsdomain.Repo, remoteKey string, ref github.Ref, preferRepoID string) (wsdomain.Repo, error) {
+func (e *Env) resolveCheckout(ctx context.Context, cfg config.Config, repos []wsdomain.Repo, remoteKey string, ref pr.Ref, preferRepoID string) (wsdomain.Repo, error) {
 	repo, err := e.checkout(ctx, cfg, repos, remoteKey, ref, preferRepoID, nil)
 	return repo, err
 }
@@ -280,7 +272,7 @@ func lockClone(path string) func() {
 // refused when it holds another repository. A clone made now is handed to
 // cloned, when set, before another caller can take it; when cloned fails,
 // the clone is removed.
-func (e *Env) checkout(ctx context.Context, cfg config.Config, repos []wsdomain.Repo, remoteKey string, ref github.Ref, preferRepoID string, cloned func(path string) error) (wsdomain.Repo, error) {
+func (e *Env) checkout(ctx context.Context, cfg config.Config, repos []wsdomain.Repo, remoteKey string, ref pr.Ref, preferRepoID string, cloned func(path string) error) (wsdomain.Repo, error) {
 	if found := wsdomain.FindRepos(repos, remoteKey, preferRepoID); len(found) > 0 {
 		return found[0], nil
 	}
@@ -294,7 +286,7 @@ func (e *Env) checkout(ctx context.Context, cfg config.Config, repos []wsdomain.
 	switch {
 	case os.IsNotExist(err):
 		fmt.Fprintf(e.Out, "cloning %s/%s into %s\n", ref.Owner, ref.Repo, path)
-		if _, err := e.GH.Run(ctx, "repo", "clone", ref.Owner+"/"+ref.Repo, path); err != nil {
+		if err := e.forgeCommand(ctx, "clone", ref.Owner+"/"+ref.Repo, path); err != nil {
 			return wsdomain.Repo{}, err
 		}
 		if cloned != nil {

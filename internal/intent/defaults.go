@@ -2,12 +2,14 @@ package intent
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
 
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/task"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/frontmatter"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -33,6 +35,15 @@ type sheet struct {
 	extras func(dunit.ProviderID) expr.Env
 	// defaults are the profile's defaults.toml.
 	defaults manifestDefaults
+	// taskFacts are the task.prop.* facts of tasks.toml, which a predicate
+	// over a task's facts reads.
+	taskFacts expr.Env
+	// tasks is the profile's tasks.toml, whose verbs a workflow's trigger
+	// and task.verb steps name.
+	tasks TasksDef
+	// gates is the profile's gates.toml, whose [approval] decides what a
+	// manifest's [gates.approval] leaves out.
+	gates GatesDef
 }
 
 // pos is where path's value starts, else its nearest placed parent, else 1:1.
@@ -159,7 +170,13 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 	if m.Drafts != nil {
 		d.AllowedEffects = orEmpty(m.Drafts.AllowedEffects, nil)
 		d.AttachPosts = m.Drafts.AttachPosts
-		d.DraftApproval = s.draftApprovalAt("drafts.approval", m.Drafts.Approval, builtin.ApprovalEnv(false, servedSlots(d)...))
+	}
+	if m.Gates != nil {
+		env := builtin.ApprovalEnv(false, servedSlots(d)...)
+		if slices.Contains(servedSlots(d), builtin.TaskSlot) {
+			maps.Copy(env, s.taskFacts)
+		}
+		d.DraftApproval = s.gateApproval(m.Gates.Approval, []gate.Kind{gate.KindDraft}, env, nil).draftPolicy(s.gates)
 	}
 	s.workspace(&d, m.Workspace)
 	d.Board = builtin.BoardOf(d.Workspace)
@@ -185,8 +202,8 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 		if t.Missing != "" && t.Missing != dintent.TargetCapture {
 			s.add("target.missing", "%q is not %q", t.Missing, dintent.TargetCapture)
 		}
-		if t.Missing == dintent.TargetCapture && d.Provider != (gtd.Codec{}).Provider() {
-			s.add("target.missing", "capture makes an entry the turn's unit, and the intent serves %s units, not entry ones", d.Provider)
+		if t.Missing == dintent.TargetCapture && d.Provider != (task.Codec{}).Provider() {
+			s.add("target.missing", "capture makes a task the turn's unit, and the intent serves %s units, not %s ones", d.Provider, (task.Codec{}).Provider())
 		}
 		d.Target = dintent.Target{Missing: t.Missing, Title: s.text("target.title", t.Title, "")}
 	}
@@ -225,12 +242,12 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 	if m.Join != nil {
 		d.Join.DiffersOn = m.Join.DiffersOn
 	}
-	switch r := m.Record; {
-	case r == nil && d.Builds == "":
-		s.add("record.states", "is required")
-	case r != nil:
-		if r.States == nil {
+	if r := m.Record; r != nil {
+		if r.States == nil && r.outcomes() {
 			s.add("record.states", "is required")
+		}
+		if r.Requires != nil && r.Missing == nil {
+			s.add("record.missing", "is required with record.requires: the gate a run that ends without its record opens")
 		}
 		d.Records = s.pred("record.when", r.When, "true")
 		d.Record = dintent.RecordRules{
@@ -240,6 +257,8 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 			OutcomeDoc:      r.OutcomeDoc,
 			HistoryArtifact: r.HistoryArtifact,
 			AttachURL:       r.AttachURL,
+			Requires:        str(r.Requires, ""),
+			Missing:         str(r.Missing, ""),
 		}
 		for i, q := range r.Require {
 			d.Record.Require = append(d.Record.Require, dintent.Require{
@@ -248,6 +267,10 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 				Fields:   q.Fields,
 			})
 		}
+	}
+	if m.Record == nil && d.Builds == "" {
+		d.Records = s.pred("record.when", nil, "true")
+		d.Record.None = true
 	}
 	if m.Resume != nil {
 		d.Resume.Changed = str(m.Resume.Changed, DefaultChanged)

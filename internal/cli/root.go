@@ -6,35 +6,41 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/wloophq/wloop/internal/catalog"
+	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/workflow"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
+	"github.com/wloophq/wloop/pkg/plugin"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
 	acd "github.com/wloophq/wloop/internal/adapter/claudedesktop"
 	adossier "github.com/wloophq/wloop/internal/adapter/dossier"
-	factentry "github.com/wloophq/wloop/internal/adapter/facts/entry"
-	factsgithub "github.com/wloophq/wloop/internal/adapter/facts/github"
 	factsession "github.com/wloophq/wloop/internal/adapter/facts/session"
+	facttask "github.com/wloophq/wloop/internal/adapter/facts/task"
 	factworkspace "github.com/wloophq/wloop/internal/adapter/facts/workspace"
 	"github.com/wloophq/wloop/internal/adapter/gitcheck"
 	"github.com/wloophq/wloop/internal/adapter/orca"
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/dossiers"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/port"
 	coresweep "github.com/wloophq/wloop/internal/core/sweep"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
 	coreusage "github.com/wloophq/wloop/internal/core/usage"
 	"github.com/wloophq/wloop/internal/core/views"
 	"github.com/wloophq/wloop/internal/core/workspaces"
 	"github.com/wloophq/wloop/internal/domain/dossier"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/gitx"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace"
 	wscd "github.com/wloophq/wloop/internal/workspace/claudedesktop"
 	wsorca "github.com/wloophq/wloop/internal/workspace/orca"
@@ -65,6 +71,11 @@ func defaultUsage(userHome string) map[string]coreusage.Reader {
 // stored, through lookup.
 func transcriptPrompts(lookup func(ctx context.Context, agentSession string) (path, kind string, err error)) turns.Prompts {
 	return claude.Prompts{UserHome: config.Home(), Transcript: lookup}
+}
+
+// agentTranscripts pages the agents' transcripts the hooks stored, through lookup.
+func agentTranscripts(lookup func(ctx context.Context, agentSession string) (path, kind string, err error)) turns.Transcripts {
+	return claude.Transcripts{Transcript: lookup}
 }
 
 // dossierFiles keeps the dossiers under the state directory; the adapter meters its own git calls.
@@ -111,8 +122,8 @@ func desktopManager(stateDir, userHome string) ManagerEntry {
 }
 
 // desktopPorts points the cached manager's reloads at ctx; Desktop has no board.
-func desktopPorts(string) func(context.Context, workspace.Manager, *inventory.Store, config.Config, *change.Log) (managerSessions, []views.Sink, error) {
-	return func(ctx context.Context, ws workspace.Manager, _ *inventory.Store, _ config.Config, _ *change.Log) (managerSessions, []views.Sink, error) {
+func desktopPorts(string) func(context.Context, workspace.Manager, prrow.ReportedPRs, config.Config, *change.Log) (managerSessions, []views.Sink, error) {
+	return func(ctx context.Context, ws workspace.Manager, _ prrow.ReportedPRs, _ config.Config, _ *change.Log) (managerSessions, []views.Sink, error) {
 		a, err := acd.Ports(ws)
 		if err != nil {
 			return nil, nil, err
@@ -144,7 +155,7 @@ func (e *Env) sessionFacts() automation.Units {
 	if e.Turns == nil || e.Store == nil || snap == nil {
 		return nil
 	}
-	d := factsession.Deps{Turns: e.Turns, Snapshot: snap, PRs: inventory.ByUnit{Store: e.Store}, Transcript: e.transcriptOf, ClosedByManager: e.closedByManager,
+	d := factsession.Deps{Turns: e.Turns, Snapshot: snap, States: unitStates{e.reportedPRs()}, Repo: unitRepo, Transcript: e.transcriptOf, ClosedByManager: e.closedByManager,
 		Cfg: e.currentConfig, Clock: clockFunc(func() time.Time { return e.Now() })}
 	if e.changes != nil {
 		d.Changes = e.changes
@@ -159,7 +170,7 @@ func (e *Env) workspaceFacts() automation.Units {
 	if snap == nil || e.Store == nil {
 		return nil
 	}
-	d := factworkspace.Deps{Snapshot: snap, Sessions: e.planSessions(), PRs: e.planInputs(), Overrides: inventory.ByUnit{Store: e.Store}, Books: e.planBooks(),
+	d := factworkspace.Deps{Snapshot: snap, Sessions: e.planSessions(), Holdings: e.workspaceHoldings(), Books: e.planBooks(),
 		Git: factworkspace.LocalGit{R: e.Git.R}, Disk: factworkspace.OS{}, Cfg: e.currentConfig, Clock: clockFunc(func() time.Time { return e.Now() })}
 	if e.changes != nil {
 		d.Changes = e.changes
@@ -176,22 +187,38 @@ func siblingFacts(f automation.Units) automation.Units {
 	return nil
 }
 
-// candidatesOf is the rounds the github module's facts plan; nil when no
-// module offers them.
-func candidatesOf(mods []source.Module) roundCandidates {
-	for _, m := range mods {
-		if p, ok := m.Facts.(*factsgithub.Provider); ok {
-			return githubCandidates{p}
-		}
+// planners are the round planners of the running source plugins.
+func (e *Env) planners() map[unit.ProviderID]roundPlanner {
+	out := map[unit.ProviderID]roundPlanner{}
+	if e.pluginKind == nil {
+		return out
 	}
-	return nil
+	for _, p := range e.plugins {
+		out[unit.ProviderID(p.ID())] = runningPlanner{kind: e.pluginKind, id: p.ID()}
+	}
+	return out
 }
 
-type githubCandidates struct{ p *factsgithub.Provider }
+// runningPlanner is the planner of plugin id while it runs.
+type runningPlanner struct {
+	kind *psource.Kind
+	id   string
+}
 
-func (g githubCandidates) Candidate(ctx context.Context, u unit.Unit, r string) (roundCandidate, bool, error) {
-	c, ok, err := g.p.Candidate(ctx, u, r)
-	return roundCandidate(c), ok, err
+func (r runningPlanner) Plan(ctx context.Context, u plugin.Unit, st src.RoundState) (src.Plan, error) {
+	c, err := r.kind.Client(r.id)
+	if err != nil {
+		return src.Plan{}, err
+	}
+	return c.Plan(ctx, u, st)
+}
+
+func (r runningPlanner) ApplyEffect(ctx context.Context, req src.EffectRequest) error {
+	c, err := r.kind.Client(r.id)
+	if err != nil {
+		return err
+	}
+	return c.ApplyEffect(ctx, req)
 }
 
 func sessionAndWorkspaceCodecs() []unit.Codec {
@@ -217,16 +244,16 @@ func orcaManager(identities map[string]string) ManagerEntry {
 
 // orcaPorts also points the cached manager's reloads at ctx and notes each moved
 // workspace's units under TopicAgents in changes.
-func orcaPorts(ctx context.Context, ws workspace.Manager, store *inventory.Store, cfg config.Config, changes *change.Log) (managerSessions, []views.Sink, error) {
-	links := func(ctx context.Context) (map[pr.Ref]orca.Link, error) {
-		prs, err := store.ListPRs(ctx, true)
+func orcaPorts(ctx context.Context, ws workspace.Manager, prs prrow.ReportedPRs, cfg config.Config, changes *change.Log) (managerSessions, []views.Sink, error) {
+	links := func(ctx context.Context) (map[unit.Unit]orca.Link, error) {
+		open, err := prs.List(ctx, true)
 		if err != nil {
 			return nil, err
 		}
-		out := map[pr.Ref]orca.Link{}
-		for _, p := range prs {
+		out := map[unit.Unit]orca.Link{}
+		for _, p := range open {
 			if p.Workspace.ID != "" && cmp.Or(p.Workspace.Manager, ws.Name()) == ws.Name() {
-				out[pr.Ref(p.Ref)] = orca.Link{WorkspaceID: p.Workspace.ID, Review: p.Workspace.IsReview}
+				out[p.Ref.Unit()] = orca.Link{WorkspaceID: p.Workspace.ID, Review: p.Workspace.IsReview}
 			}
 		}
 		return out, nil
@@ -277,15 +304,16 @@ func (e *Env) planBooks() coresweep.Books {
 	return e.Turns.Store
 }
 
-// planInputs are the stored pull requests the facts read.
-func (e *Env) planInputs() coresweep.Inputs {
+// planInputs are the pull requests the facts read: those the GitHub
+// plugin reported.
+func (e *Env) planInputs() dinv.PlanInputs {
 	if e.planReads != nil {
 		return e.planReads
 	}
 	if e.Store == nil {
 		return nil
 	}
-	return storeInputs{e.Store}
+	return e.reportedInputs()
 }
 
 // transcriptOf is the transcript file the hooks stored for the agent session;
@@ -317,23 +345,80 @@ func (e *Env) closedByManager(ctx context.Context, manager, session, lastHandle 
 	return closed, nil
 }
 
-// entryFacts is the entry subject's facts provider, reading the config the
-// daemon holds at each read; ended says whether a unit has ended.
-func (e *Env) entryFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (bool, error)) *factentry.Provider {
+// taskFacts is the task subject's facts provider, reading the config the
+// daemon holds at each read; ended says whether a unit has ended, repo what
+// repository it is of.
+func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (bool, error), repo func(context.Context, unit.Unit) (string, error)) *facttask.Provider {
 	enabled := func(p unit.ProviderID) bool { return e.currentConfig().PluginEnabled(string(p)) }
-	return factentry.New(factentry.Deps{
-		Entries: db.Entries(), Items: db.Items(), Drafts: db.Drafts(),
-		Cards:   coregtd.CardFacts{Cards: db.Cards(), Enabled: enabled},
+	return facttask.New(facttask.Deps{
+		Tasks: db.Tasks(), Items: db.Items(), Drafts: db.Drafts(),
+		Cards:   coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled},
 		Enabled: enabled,
-		Settings: func() factentry.Settings {
+		Settings: func() facttask.Settings {
 			cfg := e.currentConfig()
-			return factentry.Settings{StaleDays: cfg.GTD.StaleWaitingDays, RenudgeAfter: time.Duration(cfg.Drafts.RepeatAfter)}
+			return facttask.Settings{StaleDays: cfg.Tasks.StaleWaitingDays, RenudgeAfter: time.Duration(cfg.Drafts.RepeatAfter)}
 		},
-		Ended: ended,
-		Turns: func(ctx context.Context, u unit.Unit) (int, error) {
-			books, err := sqlite.New(db).Books(ctx, u)
-			return len(books[u].Turns), err
+		Ended:      ended,
+		Repo:       repo,
+		Gates:      db.Gates(e.Now),
+		Turns:      sqlite.New(db).TurnCounts,
+		Sessions:   sqlite.New(db).Sessions,
+		Clock:      clockFunc(func() time.Time { return e.Now() }),
+		Props:      func(t task.Task) workflow.Facts { return catalog.PropFacts(t, e.loadedIntents().Tasks) },
+		Me:         e.me,
+		OwedBy:     catalog.OwedByOf(e.loadedIntents),
+		Wakes:      db.Wakes(),
+		Links:      e.linkState,
+		Extraction: psource.NewSnapshots(db.Snapshots()).Unextracted,
+		RoleProp: func(r task.Role) string {
+			name, _ := e.loadedIntents().Tasks.PropOf(r)
+			return name
 		},
-		Clock: clockFunc(func() time.Time { return e.Now() }),
 	})
+}
+
+// linkState is what the daemon's read model holds of u for the task facts; nothing before the daemon is built.
+func (e *Env) linkState(ctx context.Context, u unit.Unit) (facttask.Link, error) {
+	if e.linkStates == nil {
+		return facttask.Link{}, nil
+	}
+	srv := e.linkStates.Load()
+	if srv == nil {
+		return facttask.Link{}, nil
+	}
+	signals, moved, _, err := srv.LinkState(ctx, u)
+	return facttask.Link{Signals: signals, Moved: moved}, err
+}
+
+// me is the user's identity the tasks reconcile with; nobody before the tasks service is built.
+func (e *Env) me() task.Me {
+	if e.tasksMe == nil {
+		return task.Me{}
+	}
+	return e.tasksMe.get()
+}
+
+// unitStates are the states of the pull requests among units, as the
+// GitHub plugin last reported them.
+type unitStates struct{ prs prrow.ReportedPRs }
+
+func (s unitStates) States(ctx context.Context, units []unit.Unit) (map[unit.Unit]string, error) {
+	data, err := s.prs.Data(ctx, units)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[unit.Unit]string, len(data))
+	for u, d := range data {
+		out[u] = d.PR.State
+	}
+	return out, nil
+}
+
+// unitRepo is the repository of a pull request unit, "" for another unit.
+func unitRepo(u unit.Unit) string {
+	ref, ok := pr.RefOf(u)
+	if !ok {
+		return ""
+	}
+	return ref.Owner + "/" + ref.Repo
 }

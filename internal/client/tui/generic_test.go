@@ -35,7 +35,7 @@ func TestTUIViewsFromCatalog(t *testing.T) {
 // threadRow is a row of a provider with no payload.
 func threadRow() api.Row {
 	return api.Row{Unit: unit.Unit{Provider: "thread", Key: "C1/171.1"}, Link: "https://chat.example/C1/171.1", Label: "#general", Title: "Deploy window?",
-		Kind: "waiting", Views: []string{api.ViewNeedsMe}, Facets: map[string][]string{"channel": {"general"}},
+		Kind: "waiting", Views: []string{"needs-me"}, Facets: map[string][]string{"channel": {"general"}},
 		Summary: api.Summary{WaitsOn: "me", Since: now.Add(-5 * time.Hour), Reason: "ana asked you", Line: "2 open asks"}}
 }
 

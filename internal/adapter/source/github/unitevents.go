@@ -13,13 +13,13 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// unitEvents reads a pull request's stored reviews, merge and close as the
+// UnitEvents reads a pull request's stored reviews, merge and close as the
 // resolver's events.
-type unitEvents struct{ store *inventory.Store }
+type UnitEvents struct{ Store *inventory.Store }
 
 // UnitEvents are u's events at or after since, oldest first. A dismissal is
 // no review.
-func (e unitEvents) UnitEvents(ctx context.Context, u unit.Unit, since time.Time) ([]link.Event, error) {
+func (e UnitEvents) UnitEvents(ctx context.Context, u unit.Unit, since time.Time) ([]link.Event, error) {
 	if u.Provider != unit.GitHub {
 		return nil, fmt.Errorf("%s is not a pull request", u)
 	}
@@ -27,7 +27,7 @@ func (e unitEvents) UnitEvents(ctx context.Context, u unit.Unit, since time.Time
 	if err != nil {
 		return nil, err
 	}
-	evs, err := e.store.Events(ctx, ref)
+	evs, err := e.Store.Events(ctx, ref)
 	if err != nil {
 		return nil, err
 	}

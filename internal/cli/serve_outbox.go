@@ -15,14 +15,13 @@ import (
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
-	"github.com/wloophq/wloop/internal/source"
 )
 
 // serveOutbox serves the drafts on d: published by each built module's Publisher, pinned to their turn's unit,
 // approved by the manifests' policies, their evidence written to the items ledger, their effects applied once
 // each is sent. The sender runs only with
 // jobs, so serve --no-jobs publishes nothing.
-func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []source.Module, logf func(string, ...any)) daemon.Deps {
+func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []pluginModule, logf func(string, ...any)) daemon.Deps {
 	ledger := e.itemsLedger(db, cfg, logf)
 	pin := outboxManifests{loaded: e.loadedIntents, books: envBooks{e}}
 	pubs := map[unit.ProviderID]port.Effects{}
@@ -33,19 +32,29 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 			targets = append(targets, m.ID)
 		}
 	}
-	e.outbox = &outbox.Service{Store: db.Drafts(), Effects: publishers(pubs, cfg), Targets: targets, Policies: e.outboxPolicies(), Facts: e.draftFacts,
+	e.outbox = &outbox.Service{Store: db.Drafts(), Gates: draftGates{e, db, logf}, Effects: publishers(pubs, cfg), Targets: targets, Policies: e.outboxPolicies(), Facts: e.draftFacts,
+		Posts:  deliveryPosts,
 		Broken: e.brokenWorkflows,
 		Evidence: outbox.EvidenceTo(func(ctx context.Context, prov items.Provenance, ops []items.Op) error {
 			_, err := ledger.Apply(ctx, prov, ops)
 			return err
 		}),
-		Items: ledger, Clock: clockFunc(e.Now), Log: logf,
+		Clock: clockFunc(e.Now), Log: logf,
 		Applier: outbox.EffectApplier{Store: db.DraftEffects(), Clock: clockFunc(e.Now),
-			Effects: effectLookup(effectDeps{Nudges: e.entries(db, cfg, ledger), Modules: mods})},
-		Results: e.newEntryResults(e.entries(db, cfg, ledger), mods)}
+			Effects: effectLookup(effectDeps{Nudges: e.newTasks(db, cfg, ledger), Ends: e.newTasks(db, cfg, ledger), Modules: mods, Appliers: e.draftAppliers()})},
+		Results: e.newTaskResults(e.newTasks(db, cfg, ledger), mods)}
+	e.hosted.setOutbox(e.outbox)
 	d.Outbox, d.SendDrafts = e.outbox, !e.noJobs
+	if d.Gates == nil {
+		d.Gates = e.newGates(db, logf)
+		d.GateReader = e.gateReader
+	}
 	return d
 }
+
+// deliveryPosts says whether a draft of d reaches people, as the plugins'
+// manifests declare it.
+func deliveryPosts(d draft.Delivery) bool { return builtin.DeliveryPosts(string(d)) }
 
 var errNoEngine = errors.New("no workflow engine reads the unit's facts")
 
@@ -55,17 +64,17 @@ func (e *Env) draftFacts(ctx context.Context, u unit.Unit, workflow string) (dra
 	if e.engine == nil || e.engine.Units == nil {
 		return draft.Subject{}, errNoEngine
 	}
-	return subjectFacts(ctx, e.engine.Units, u, workflow)
+	return subjectFacts(ctx, e.engine.Units, e.engine.Keep, u, workflow)
 }
 
 // subjectFacts are u's facts as the subject of its provider's slot, scoped
-// by workflow when it is set.
-func subjectFacts(ctx context.Context, units automation.Units, u unit.Unit, workflow string) (draft.Subject, error) {
+// by workflow through keep, the host's bookkeeping, when it is set.
+func subjectFacts(ctx context.Context, units automation.Units, keep any, u unit.Unit, workflow string) (draft.Subject, error) {
 	facts, err := units.Facts(ctx, u)
 	if err != nil {
 		return draft.Subject{}, err
 	}
-	if sc, ok := units.(automation.Scoper); ok && workflow != "" {
+	if sc, ok := keep.(automation.Scoper); ok && workflow != "" {
 		if facts, err = sc.Scope(ctx, workflow, u, facts); err != nil {
 			return draft.Subject{}, err
 		}
@@ -97,10 +106,11 @@ type pinnedEffects struct {
 	turns turnReader
 }
 
-func (p pinnedEffects) Delivers(d draft.Delivery) draft.Delivery {
+func (p pinnedEffects) Delivers(k draft.Kind) draft.Delivery {
 	if dl, ok := p.Effects.(port.Deliverer); ok {
-		return dl.Delivers(d)
+		return dl.Delivers(k)
 	}
+	_, d := draft.ShapeOf(k)
 	return d
 }
 

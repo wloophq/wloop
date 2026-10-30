@@ -15,15 +15,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
-	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/daemon"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -32,6 +35,8 @@ type recordingActions struct {
 	mu       sync.Mutex
 	calls    []string
 	profiles []string
+	// store, when set, is marked by an adopt as the real take-over does.
+	store *inventory.Store
 }
 
 func (f *recordingActions) add(s string, c daemon.Call) error {
@@ -47,8 +52,13 @@ func (f *recordingActions) Open(_ context.Context, u unit.Unit, c daemon.Call) e
 	r := prOf(u)
 	return f.add("open "+r.String(), c)
 }
-func (f *recordingActions) Adopt(_ context.Context, u unit.Unit, c daemon.Call) error {
+func (f *recordingActions) Adopt(ctx context.Context, u unit.Unit, c daemon.Call) error {
 	r := prOf(u)
+	if f.store != nil {
+		if err := inventorytest.Of(f.store).SetAdopted(ctx, r); err != nil {
+			return err
+		}
+	}
 	return f.add("adopt "+r.String(), c)
 }
 func (f *recordingActions) Intent(_ context.Context, name string, u unit.Unit, c daemon.Call) error {
@@ -90,6 +100,16 @@ func TestPauseRequiresDaemon(t *testing.T) {
 	}
 }
 
+// wakeOfUnit is the wake of the task that holds ref.
+func wakeOfUnit(t *testing.T, st *inventory.Store, ref pr.Ref) wake.Wake {
+	t.Helper()
+	ws, err := st.DB().Wakes().UnitWakes(context.Background(), []unit.Unit{ref.Unit()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ws[ref.Unit()]
+}
+
 func TestMuteParsesUntil(t *testing.T) {
 	t.Parallel()
 	d := startDaemon(t, nil)
@@ -98,9 +118,8 @@ func TestMuteParsesUntil(t *testing.T) {
 	if code := te.run("mute", r7.URL(), "--until", "36h"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	o, _ := d.store.Override(context.Background(), r7)
-	if !o.MutedUntil.Equal(daemonNow.Add(36 * time.Hour)) {
-		t.Fatalf("muted until %v", o.MutedUntil)
+	if w := wakeOfUnit(t, d.store, r7); !w.Until.Equal(daemonNow.Add(36 * time.Hour)) {
+		t.Fatalf("muted until %v", w.Until)
 	}
 	if code := te.run("unmute", r7.URL()); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -108,9 +127,8 @@ func TestMuteParsesUntil(t *testing.T) {
 	if code := te.run("mute", r7.URL(), "--until-state"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	o, _ = d.store.Override(context.Background(), r7)
-	if !o.MuteUntilStateChange || !o.MutedUntil.IsZero() {
-		t.Fatalf("override %+v", o)
+	if w := wakeOfUnit(t, d.store, r7); w.When == "" || !w.Until.IsZero() {
+		t.Fatalf("wake %+v", w)
 	}
 	if code := te.run("mute", r7.URL()); code == 0 {
 		t.Fatal("mute without a duration succeeded")
@@ -185,7 +203,7 @@ func cockpitEnv(t *testing.T) (*testEnv, *[]string) {
 
 func TestOpenPrintShowsTheCockpitURL(t *testing.T) {
 	t.Parallel()
-	r7 := github.Ref{Owner: "acme", Repo: "api", Number: 7}
+	r7 := pr.Ref{Owner: "acme", Repo: "api", Number: 7}
 	cases := []struct {
 		name string
 		args []string
@@ -225,12 +243,12 @@ func TestCockpitURLTakesARoute(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, httpInfoFile), []byte(`{"port":4321,"token":"tok"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	r7 := github.Ref{Owner: "acme", Repo: "api", Number: 7}
+	r7 := pr.Ref{Owner: "acme", Repo: "api", Number: 7}
 	cases := []struct{ route, want string }{
 		{"", "http://127.0.0.1:4321/?token=tok"},
 		{"view=loop", "http://127.0.0.1:4321/?token=tok#view=loop"},
-		{"entry=e-1", "http://127.0.0.1:4321/?token=tok#entry=e-1"},
-		{"entry=draft:7", "http://127.0.0.1:4321/?token=tok#entry=draft:7"},
+		{"task=e-1", "http://127.0.0.1:4321/?token=tok#task=e-1"},
+		{"task=draft:7", "http://127.0.0.1:4321/?token=tok#task=draft:7"},
 		{unitRoute(r7.Unit()), "http://127.0.0.1:4321/?token=tok#unit=github/acme%2Fapi%237"},
 		{"view=needs-me&" + unitRoute(r7.Unit()), "http://127.0.0.1:4321/?token=tok#view=needs-me&unit=github/acme%2Fapi%237"},
 	}
@@ -253,20 +271,6 @@ func TestOpenViewOpensTheCockpitOnThatView(t *testing.T) {
 	}
 }
 
-func TestOpenRejectsAnUnknownView(t *testing.T) {
-	t.Parallel()
-	te, opened := cockpitEnv(t)
-	if code := te.run("open", "--print", "--view", "later"); code == 0 {
-		t.Fatalf("accepted an unknown view: %s", te.out)
-	}
-	if !strings.Contains(te.err.String(), "later") {
-		t.Fatalf("stderr: %s", te.err)
-	}
-	if te.out.Len() != 0 || len(*opened) != 0 {
-		t.Fatalf("stdout %q, opened %v", te.out, *opened)
-	}
-}
-
 func TestOpenPrintNeedsTheDaemon(t *testing.T) {
 	t.Parallel()
 	te, _ := cockpitEnv(t)
@@ -283,17 +287,6 @@ type unfocusable struct{ *fake.Manager }
 
 func (unfocusable) Focus(context.Context, string) error {
 	return errors.New("no terminal and no README")
-}
-
-func openStore(t *testing.T) *inventory.Store {
-	t.Helper()
-	stDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "inv.db"), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	st := inventory.New(stDB)
-	t.Cleanup(func() { stDB.Close() })
-	return st
 }
 
 func TestOpenFallsBackToTheBrowser(t *testing.T) {
@@ -318,13 +311,13 @@ func TestOpenFallsBackToTheBrowser(t *testing.T) {
 				opened = append(opened, name+" "+strings.Join(args, " "))
 				return nil, nil
 			}
-			st := openStore(t)
+			st := te.Store
 			ctx := context.Background()
-			if err := st.UpsertPR(ctx, dinv.PR{Ref: r7, State: "OPEN", URL: r7.URL()}); err != nil {
+			if err := inventorytest.Of(st).UpsertPR(ctx, dinv.PR{Ref: r7, State: "OPEN", URL: r7.URL()}); err != nil {
 				t.Fatal(err)
 			}
 			if c.ws != "" {
-				if err := st.SetWorkspace(ctx, r7, dinv.Workspace{ID: c.ws}); err != nil {
+				if err := inventorytest.Of(st).SetWorkspace(ctx, r7, dinv.Workspace{ID: c.ws}); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -349,12 +342,12 @@ func TestOpenFocusesAMainCheckout(t *testing.T) {
 		t.Fatalf("opened %s %v", name, args)
 		return nil, nil
 	}
-	st := openStore(t)
+	st := te.Store
 	ctx := context.Background()
-	if err := st.UpsertPR(ctx, dinv.PR{Ref: r7, State: "OPEN", URL: r7.URL()}); err != nil {
+	if err := inventorytest.Of(st).UpsertPR(ctx, dinv.PR{Ref: r7, State: "OPEN", URL: r7.URL()}); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SetWorkspace(ctx, r7, dinv.Workspace{ID: "main-api", DisplayName: "api"}); err != nil {
+	if err := inventorytest.Of(st).SetWorkspace(ctx, r7, dinv.Workspace{ID: "main-api", DisplayName: "api"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := (envActions{te.Env, st}).Open(ctx, r7.Unit(), daemon.Call{Out: io.Discard}); err != nil {
@@ -376,7 +369,7 @@ func TestRoundsAskedByHandDoNotCountAgainstTheCap(t *testing.T) {
 	if why := st.CapReason(sc.ref.String(), testNow, 1); why != "" {
 		t.Fatalf("a triage asked by hand counted against the cap: %s", why)
 	}
-	if st.Mark(sc.ref.String(), round.AddressedReviews) == "" {
+	if st.Mark(sc.ref.String(), ghsource.MarkAddressedReviews) == "" {
 		t.Fatal("the triage was not recorded; the next sweep would send it again")
 	}
 }
@@ -444,7 +437,7 @@ func TestDelegatedAdoptUsesTheCallersProfileElseTheRemembered(t *testing.T) {
 			if err := te.Rounds.Save(context.Background(), st); err != nil {
 				t.Fatal(err)
 			}
-			ref := github.Ref{Owner: "acme", Repo: "api", Number: 20}
+			ref := pr.Ref{Owner: "acme", Repo: "api", Number: 20}
 			var out strings.Builder
 			if err := (envActions{te.Env, nil}).Adopt(context.Background(), ref.Unit(), daemon.Call{AgentHome: c.profile, Out: &out}); err != nil {
 				t.Fatal(err)

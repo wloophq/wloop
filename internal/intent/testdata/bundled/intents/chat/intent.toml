@@ -1,0 +1,14 @@
+label = "Chat"
+summary = "Talk with an agent about a task"
+provider = "task"
+runners = ["session"]
+workspace = "given"
+session = { strategy = "new", title = "chat" }
+
+[headline]
+resumed = "chat on {{.unit.ref}}"
+[[headline.new]]
+line = "Chat on {{.unit.ref}}."
+
+[record]
+states = ["done", "asked", "failed"]

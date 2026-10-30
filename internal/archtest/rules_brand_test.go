@@ -18,8 +18,13 @@ import (
 var brandExempt = []string{".git", ".claude", "bin", "design", "docs", "internal/brand", "README.md", "SECURITY.md", "AGENTS.md", "go.mod", "go.sum", "Makefile", ".goreleaser.yaml", ".gitignore", "LICENSE"}
 
 // fixedNames are the lines that spell the default brand in names fixed
-// outside the program: the live run's Keychain item.
+// outside the program: the live run's Keychain item, and the plugin
+// protocol's package, which plugins built by others compile against.
 var fixedNames = []*regexp.Regexp{
+	regexp.MustCompile(`^proto/` + brandtest.DefaultName + `/`),
+	regexp.MustCompile(`^pkg/plugin/(.+/)?pb/`),
+	regexp.MustCompile(`^plugins/slack/cmd/` + brandtest.DefaultName + `-plugin-slack/`),
+	regexp.MustCompile(`^plugins/github/cmd/` + brandtest.DefaultName + `-plugin-github/`),
 	regexp.MustCompile(`^internal/e2e/isolated_test.go:.*"` + brandtest.DefaultName + `-e2e-slack"`),
 	regexp.MustCompile(`^scripts/isolated-daemon.sh:.*"` + brandtest.DefaultName + `-e2e-slack"`),
 }

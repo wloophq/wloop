@@ -5,7 +5,10 @@ import (
 	"errors"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -20,14 +23,21 @@ type Units interface {
 	Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error)
 }
 
-// Refresher is an optional capability of Units: the provider's own writes
+// Preparer is a capability of the engine's Keep: the context one evaluation
+// reads the units' facts through, such as a pass over every unit whose reads
+// of the store the facts share; run by Sweep only, before Evaluate.
+type Preparer interface {
+	Prepare(ctx context.Context) (context.Context, error)
+}
+
+// Refresher is a capability of the engine's Keep: the provider's own writes
 // (keeping idle periods, registering terminals, census marks), run by Sweep
 // only, before Evaluate.
 type Refresher interface {
 	Refresh(ctx context.Context) error
 }
 
-// Settler is an optional capability of Units: planning bookkeeping, run by
+// Settler is a capability of the engine's Keep: planning bookkeeping, run by
 // an applying Sweep only, after the steps.
 type Settler interface {
 	Settle(ctx context.Context, st State) error
@@ -42,26 +52,29 @@ type StateLoader interface {
 	Load(ctx context.Context) (State, error)
 }
 
-// Gainer is an optional capability of Units: what acting on a unit frees,
+// Gainer is a capability of the engine's Keep: what acting on a unit frees,
 // read for items only.
 type Gainer interface {
 	Gain(ctx context.Context, u unit.Unit) (workflow.Gain, error)
 }
 
-// Owner is an optional capability of Units: the units of work a subject
+// Owner is a capability of the engine's Keep: the units of work a subject
 // belongs to, whose timelines show the steps run on it. None keeps them on
 // the subject.
 type Owner interface {
 	Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error)
 }
 
-// Freshener is an optional capability of Units, asked before the loop lock:
-// the units whose source object moved since their facts were read.
-type Freshener interface {
-	Moved(ctx context.Context, units []unit.Unit) ([]unit.Unit, error)
+// Revisioner is an optional capability of Units: the rev of each unit's
+// last report from its source, which grows with every change the source
+// reports; a unit with none is absent. The engine reads a unit's rev before
+// its facts, and a run planned on them does not run once the unit was
+// reported again.
+type Revisioner interface {
+	Revs(ctx context.Context, units []unit.Unit) (map[unit.Unit]uint64, error)
 }
 
-// Seener is an optional capability of Units: the generation of the
+// Seener is a capability of the engine's Keep: the generation of the
 // workspace snapshot its facts came from.
 type Seener interface {
 	Seen() port.Generation
@@ -141,7 +154,7 @@ type Ledger interface {
 	// Save replaces the items of p's workflows, leaving out, in the same
 	// write, an item whose key is done or dismissed: a writer that planned
 	// before a run or a dismiss never brings the item back. It notes
-	// TopicGate only when the pending set changes.
+	// TopicPending only when the pending set changes.
 	Save(ctx context.Context, p PlanWrite, evs ...port.Event) error
 	Items(ctx context.Context, f Filter) ([]workflow.Item, error)
 	Run(ctx context.Context, k workflow.Key) (workflow.Run, bool, error)
@@ -196,4 +209,12 @@ type Guidance interface {
 type Pause struct {
 	On    bool
 	Repos []string // owner/repo
+}
+
+// Gates are the plan gates the pending items wait on, each naming its
+// item's id as its Subject: the gates service, which alone resolves them.
+type Gates interface {
+	Open(ctx context.Context, g gate.Gate, p gates.Policy) (gate.Gate, error)
+	Supersede(ctx context.Context, id int64, by task.Actor) error
+	Where(ctx context.Context, q gates.Query) ([]gate.Gate, error)
 }

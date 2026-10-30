@@ -6,13 +6,14 @@ import (
 	"strings"
 	"testing"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/automation"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -43,7 +44,7 @@ func discoverScenario(t *testing.T, requested ...obj) (*fake.Manager, *testEnv) 
 func firstRoundCase(t *testing.T) sweepCase {
 	t.Helper()
 	sc := asSweep(discoverScenario(t, requestedPR(20, "feat/new", "acme", false)))
-	sc.ref = github.Ref{Owner: "acme", Repo: "api", Number: 20}
+	sc.ref = pr.Ref{Owner: "acme", Repo: "api", Number: 20}
 	return sc
 }
 
@@ -87,7 +88,7 @@ func TestAFollowUpWhoseSubmissionWasNotObservedStoresNothing(t *testing.T) {
 		t.Fatalf("run: %v", err)
 	}
 	st, _ := sc.te.Rounds.Load(context.Background())
-	if st.Mark(sc.ref.String(), round.Reviewed) != "" {
+	if st.Mark(sc.ref.String(), ghsource.MarkReviewed) != "" {
 		t.Fatal("fingerprint stored without an observed submission")
 	}
 	if st.CapReason(sc.ref.String(), testNow, 1) != "" {
@@ -107,7 +108,7 @@ func TestAnAddressRoundQueuesInABusySession(t *testing.T) {
 		t.Fatalf("writes:\n%s", w)
 	}
 	st, _ := sc.te.Rounds.Load(context.Background())
-	if st.Mark(sc.ref.String(), round.AddressedReviews) == "" {
+	if st.Mark(sc.ref.String(), ghsource.MarkAddressedReviews) == "" {
 		t.Fatal("a queued prompt was not recorded; the next sweep would send it again")
 	}
 }

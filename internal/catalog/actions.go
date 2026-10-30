@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
-	"time"
+	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
-	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // The surfaces an action spec names.
@@ -28,7 +27,7 @@ const (
 // SourceBuiltin is the Source of an action spec Go declares.
 const SourceBuiltin = "builtin"
 
-// The origins of an action spec, in the order a shared gtd verb ranks them.
+// The origins of an action spec, in the order a shared verb ranks them.
 const (
 	OriginBuiltin = iota
 	OriginBundled
@@ -47,7 +46,7 @@ func Origin(s api.ActionSpec) int {
 	return OriginBundled
 }
 
-// Rank orders the specs whose gtd verb an entry runs on a unit of provider, the lowest first: the built-in
+// Rank orders the specs whose verb a task runs on a unit of provider, the lowest first: the built-in
 // actions, then the intents of the unit's own provider, then those of any provider, a user's intent before
 // a bundled one within each.
 func Rank(s api.ActionSpec, provider unit.ProviderID) int {
@@ -79,20 +78,12 @@ func off(id string) (api.ActionState, bool) { return api.ActionState{ID: id}, tr
 
 func absent() (api.ActionState, bool) { return api.ActionState{}, false }
 
-// BasisPending and BasisHeld prefix a run_now basis.
+// BasisPending and BasisHeld prefix the basis of the plan gate's first
+// approving intent.
 const (
 	BasisPending = "pending:"
 	BasisHeld    = "held:"
 )
-
-func questionOffer(id string) func(f Facts) (api.ActionState, bool) {
-	return func(f Facts) (api.ActionState, bool) {
-		if !f.Question {
-			return off(id)
-		}
-		return on(id)
-	}
-}
 
 // blockSurfaces are where the actions on a start block show: the CLI has
 // its own trust command.
@@ -105,47 +96,6 @@ func everywhere(extra ...string) []string {
 // builtinActions is the catalog's Go table; the intents' actions go after
 // the start group.
 var builtinActions = []builtinAction{
-	{api.ActionSpec{ID: "run_now", Group: builtin.GroupStart, Key: "R", Verb: "approve", Surfaces: everywhere(), Intake: true}, func(f Facts) (api.ActionState, bool) {
-		if p := f.Row.Pending; p != nil {
-			return api.ActionState{ID: "run_now", Enabled: true, Primary: true, Basis: BasisPending + p.Since.UTC().Format(time.RFC3339Nano)}, true
-		}
-		if f.HeldByCap {
-			return api.ActionState{ID: "run_now", Enabled: true, Primary: true, Basis: BasisHeld + f.Row.Summary.Reason}, true
-		}
-		return absent()
-	}},
-	{api.ActionSpec{ID: "skip", Group: builtin.GroupStart, Key: "S", Verb: "dismiss", Surfaces: everywhere()}, func(f Facts) (api.ActionState, bool) {
-		if f.Row.Pending == nil {
-			return absent()
-		}
-		return on("skip")
-	}},
-	{api.ActionSpec{ID: "guide", Group: builtin.GroupStart, Key: "G", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification},
-		Input: &api.InputSpec{Kind: "text", Required: true}}, func(f Facts) (api.ActionState, bool) {
-		if !f.Tracked || !f.Open {
-			return absent()
-		}
-		if !f.GateOn {
-			return off("guide")
-		}
-		return on("guide")
-	}},
-	{api.ActionSpec{ID: "trust_run", Group: builtin.GroupStart, Key: "T", Surfaces: blockSurfaces}, func(f Facts) (api.ActionState, bool) {
-		if !f.StartBlocked || f.TrustFolder == "" || len(f.TrustHomes) == 0 || !f.Open {
-			return absent()
-		}
-		return api.ActionState{ID: "trust_run", Enabled: true, Primary: true}, true
-	}},
-	{api.ActionSpec{ID: "unblock", Group: builtin.GroupStart, Key: "D", Surfaces: blockSurfaces}, func(f Facts) (api.ActionState, bool) {
-		if !f.StartBlocked {
-			return absent()
-		}
-		return on("unblock")
-	}},
-	{api.ActionSpec{ID: "answer", Group: "turn", Key: "W", Verb: "answer", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification},
-		Input: &api.InputSpec{Kind: "answer", Required: true}}, questionOffer("answer")},
-	{api.ActionSpec{ID: "continue", Group: "turn", Key: "C", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification}}, questionOffer("continue")},
-	{api.ActionSpec{ID: "dismiss", Group: "turn", Key: "X", Verb: "dismiss", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification}}, questionOffer("dismiss")},
 	{api.ActionSpec{ID: "take_over", Group: "control", Key: "A", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceCLI, SurfaceExplore}}, func(f Facts) (api.ActionState, bool) {
 		if !f.Open || f.Override.Adopted {
 			return absent()
@@ -232,13 +182,48 @@ var builtinActions = []builtinAction{
 		}
 		return on("intake_cancel")
 	}},
-	draftAction("draft.approve", "approve", nil),
 	draftAction("draft.edit", "edit", &api.InputSpec{Kind: "text", Required: true}),
-	draftAction("draft.discard", "dismiss", nil),
 	draftAction("draft.retry", "retry", nil),
+	runAction(RunOpen),
+	runAction(RunEnter),
+	runAction(RunTranscript),
 }
 
-// draftAction is an Outbox action: no row offers it, the draft's entry does (DraftStates).
+// The run actions, as a RunView's actions name them; actions.toml words each under runPrefix and its name.
+const (
+	RunOpen       = "open"
+	RunEnter      = "enter"
+	RunTranscript = "transcript"
+)
+
+const runPrefix = "run."
+
+// runAction is a run's action: no row offers it, a task's run does (RunActions).
+func runAction(name string) builtinAction {
+	spec := api.ActionSpec{ID: runPrefix + name, Group: "run", Scope: ScopeRun, Surfaces: []string{SurfaceDetail, SurfaceCLI}}
+	return builtinAction{spec, func(Facts) (api.ActionState, bool) { return absent() }}
+}
+
+// RunFacts are what a run's actions depend on: its workspace in a manager, a session not closed, and an agent
+// transcript.
+type RunFacts struct {
+	Workspace, Session, Transcript bool
+}
+
+// RunActions are the names of the run actions a run offers, in catalog order.
+func RunActions(f RunFacts) []string {
+	offered := map[string]bool{RunOpen: f.Workspace, RunEnter: f.Workspace && f.Session, RunTranscript: f.Transcript}
+	var out []string
+	for _, b := range builtinActions {
+		if name := strings.TrimPrefix(b.spec.ID, runPrefix); b.spec.Scope == ScopeRun && offered[name] {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// draftAction is an action on a draft's delivery: no row offers it, the draft's task does (DraftStates). Approving
+// and discarding a draft are its gate's intents.
 func draftAction(id, verb string, input *api.InputSpec) builtinAction {
 	spec := api.ActionSpec{ID: id, Group: "draft", Scope: ScopeDraft, Verb: verb, Input: input,
 		Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceCLI}}
@@ -284,12 +269,27 @@ func texted(l *intentload.Loaded, key string, st api.ActionState, facts map[stri
 	return st
 }
 
+// gateTexted is st with the note and confirm of gate intent in over facts,
+// when it is enabled.
+func gateTexted(in intentload.GateIntent, st api.ActionState, facts map[string]any) api.ActionState {
+	if !st.Enabled {
+		return st
+	}
+	render := func(name string) string {
+		out, err := in.Render(name, facts)
+		if err != nil {
+			return fmt.Sprintf("the profile has errors: %s: gates.*.intents.%s.%s: %v", intentload.GatesFile, in.Name, name, err)
+		}
+		return out
+	}
+	st.Note, st.Confirm = render("note"), render("confirm")
+	return st
+}
+
 // draftFrom are the draft states each draft action moves a draft from.
 var draftFrom = map[string][]string{
-	"draft.approve": {"proposed"},
-	"draft.edit":    {"proposed", "failed"},
-	"draft.discard": {"proposed", "approved", "failed"},
-	"draft.retry":   {"failed"},
+	"draft.edit":  {"held", "failed"},
+	"draft.retry": {"failed"},
 }
 
 // DraftFacts are what a draft's actions depend on.
@@ -303,7 +303,7 @@ type DraftFacts struct {
 }
 
 // postingDraftActions are the draft actions that lead to a post.
-var postingDraftActions = []string{"draft.approve", "draft.retry"}
+var postingDraftActions = []string{"draft.retry"}
 
 // DraftStates are the draft actions in catalog order as they stand on a draft, worded by l: all disabled
 // when its plugin is off.
@@ -315,7 +315,7 @@ func DraftStates(l *intentload.Loaded, f DraftFacts) []api.ActionState {
 		}
 		refusal := ""
 		switch {
-		case f.Disabled && b.spec.ID != "draft.discard":
+		case f.Disabled:
 			refusal = "plugin_off"
 		case !slices.Contains(draftFrom[b.spec.ID], f.State):
 			refusal = "state"

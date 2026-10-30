@@ -3,7 +3,7 @@ title: The sweep and workflows
 description: Everything the loop does on its own, written as rules you can read and switch.
 ---
 
-Everything {{name}} does without being asked is a **workflow**: a manifest, `workflow.toml`, that names the provider of the units it looks at (pull requests, agent sessions, workspaces, GTD entries or Slack threads), a condition over their facts, and the steps to run. The daemon evaluates every workflow on each **sweep**, right after each fast job.
+Everything {{name}} does without being asked is a **workflow**: a manifest, `workflow.toml`, that names the provider of the units it looks at (pull requests, agent sessions, workspaces, tasks or Slack threads), a condition over their facts, and the steps to run. The daemon evaluates every workflow on each **sweep**, right after each fast job.
 
 GitHub cannot call your laptop, and the events that matter (a push, a reply, an approval, a merge) happen there. The sweep observes their result on a schedule, costs a few GraphQL requests per run, and does nothing when nothing changed.
 
@@ -14,7 +14,7 @@ GitHub cannot call your laptop, and the events that matter (a push, a reply, an 
 | `review-first-round` | starts a first review round on a pull request that requests your review by name | runs after a 60 s delay |
 | `review-follow-up` | starts a follow-up round when the author pushed, replied or re-requested you | runs after a 60 s delay |
 | `address` | starts an address round on your pull request when reviews arrive, checks fail or it conflicts with its base | runs after a 60 s delay |
-| `nudge-silent-30d` | asks whoever someone else's pull request waits on, after `github.nudge.silent_days` (30) of silence | waits for you |
+| `nudge-silent-30d` | asks whoever someone else's pull request waits on, after `plugins.github.nudge.silent_days` (30) of silence | waits for you |
 | `session-pr-finished`, `session-duplicate`, `session-worktree-gone`, `session-finished-quiet`, `session-asked-quiet`, `session-close-when-done` | close agent sessions that are finished, duplicated or quiet, whose worktree or transcript is gone, or that their manager closed (a session you archived in Claude Desktop) | runs |
 | `session-manual-quiet` | offers to close a session you started that went quiet | waits for you |
 | `answer-unread` | notifies you when an agent session leaves an answer of yours unread for 15 minutes | runs |
@@ -27,35 +27,45 @@ An **observe** workflow (`observe = true`) plans and runs nothing by itself: `{{
 
 ## Automatic rounds
 
-**First round.** A pull request that requests your review by name (team requests are left out), is open, not a draft, not from a fork, whose author is a member, collaborator or owner (or listed in `github.trusted_authors`), whose owner is allowed by `github.owners`, and that has no workspace of yours yet.
+**First round.** A pull request that requests your review by name (team requests are left out), is open, not a draft, not from a fork, whose author is a member, collaborator or owner (or listed in `plugins.github.trusted_authors`), whose owner is allowed by `plugins.github.owners`, and that has no workspace of yours yet.
 
 **Follow-up.** After your last review: new non-merge commits, a comment or review by the author (ignored after an approval), or your review re-requested. There is one follow-up per published review and head, plus one per re-request. A round with nothing new to say publishes nothing and records `settled`; the author's next push starts another. A round that finds the author silent on every point of your last review asks you instead. An automatic first round never approves on its own; an automatic follow-up approves only after a verdict you stood behind, when every blocking finding is resolved and the new commits only answer the reviews.
 
-**Address.** On a pull request you develop: a review by someone else (bots included) with changes requested, comments, or an approval with inline comments; an unresolved thread whose last comment is someone else's; failing checks, once every check on the head finished, one round per head; or a conflict with the base that lasted the conflict window (`sweep.fast`, at least five minutes), one round per head. Turn them off with `github.address_reviews: false`, `github.address_checks: false` and `github.address_conflicts: false`, or skip some with `github.address_skip_reviewers` and `github.ignore_checks`.
+**Address.** On a pull request you develop: a review by someone else (bots included) with changes requested, comments, or an approval with inline comments; an unresolved thread whose last comment is someone else's; failing checks, once every check on the head finished, one round per head; or a conflict with the base that lasted the conflict window (`sweep.fast`, at least five minutes), one round per head. Turn them off with `plugins.github.address_reviews: false`, `plugins.github.address_checks: false` and `plugins.github.address_conflicts: false`, or skip some with `plugins.github.address_skip_reviewers` and `plugins.github.ignore_checks`.
 
 **Postponed.** A round waits while the agent of its workspace works or waits for input, or while you have the workspace focused in its manager. `turns.per_unit_per_day` (5) bounds the automatic rounds per pull request per day; a held round marks the card unread, shows as "held (cap)", and `{{command}} review <url>` or `{{command}} address <url>` runs it by hand, outside the cap.
 
-**Without a workspace.** A review workspace you deleted by hand frees its checkout and the pull request stays followed; the follow-up is only recorded (`would_review`) unless `github.followups_without_workspace` is on. Likewise, your pull request with no workspace gets its address round recorded (`would_address`) and shown in Needs me as "review to address, no workspace", unless `github.address_without_workspace` is on.
+**Without a workspace.** A review workspace you deleted by hand frees its checkout and the pull request stays followed; the follow-up is only recorded (`would_review`) unless `plugins.github.followups_without_workspace` is on. Likewise, your pull request with no workspace gets its address round recorded (`would_address`) and shown in Needs me as "review to address, no workspace", unless `plugins.github.address_without_workspace` is on.
 
 ## React to a verb
 
-A verb you run on an entry, such as Done, Someday or Delegate, records a `verb_<verb>` event on the entry (`verb_done`, `verb_someday`). A workflow with `provider = "entry"` reacts to it with `trigger.on = ["verb_done"]`; its `trigger.event.data` is the state the entry left, and the entry's facts are read even once it is done or dismissed. Its default key is the entry's fingerprint; `key = ["trigger.event.id"]` plans one run per event.
+A verb run on a task, such as Done, Someday or Delegate, records a `verb_<verb>` event on the task (`verb_done`, `verb_someday`), whoever ran it: you, or a workflow. A workflow with `provider = "task"` reacts to it with `trigger.on = ["verb_done"]`, for any verb of the profile's `tasks.toml`; its `trigger.event.data` is the state the task left, and the task's facts are read even once it is done or dismissed. Its default key is the task's fingerprint; `key = ["trigger.event.id"]` plans one run per event.
 
-The core's own moves and a project's verbs record the event with the change, in one write; a verb that changes nothing, such as the area the entry already has, records nothing. A verb another part runs, a question's answer, a unit's action through Approve, Delegate or Dismiss, or Reply, records it once that succeeded. `seen` records nothing, since clients send it when you open an entry, and neither do the verbs on an Outbox draft.
+So workflows can trigger each other: one clarifies a task, another reacts to that move and sets its kind, a third starts a turn. Each event carries its chain, the workflows that led to it, and three guards bound it:
 
-An event workflow reads its entry's facts even once the entry is done or in the trash, so it reacts to the verb that took it there. The same holds while its runs wait and when its drafts are judged for withdrawal: guard on `entry.state` in `when` and `[drafts.withdraw]` when a run should not go on after the entry left its list.
+- `trigger.actors` limits the trigger to the verbs of those actors: `actors = ["person"]` listens to your moves alone;
+- `trigger.depth` (3 when absent, at most 5) is the longest chain the workflow may close: an event that a chain of that many workflows caused plans it no more;
+- a workflow never runs on an event whose chain it is in already, so A then B then A cannot happen.
 
-A workflow moves the entry itself with the `entry.verb` step: `verb = "someday"`, or `verb = "waiting"` with `on` and `resurface`, among the verbs that move an entry or set its focus, context or area. Approve, Delegate, Answer and Reply never come from a workflow. The plan blocks the step while the entry's state refuses the verb. A move a workflow makes records no verb event, so it never triggers another workflow. It is the entry's own move: `dismiss` sends the entry to the trash and never runs its unit's dismiss action, as your Dismiss does on an entry whose unit offers one, and a verb's `offer` in `gtd.toml` does not bind it.
+Marks keep each trigger handled once, and the turn budgets bound what any turn a chain starts costs.
+
+The core's own moves and a project's verbs record the event with the change, in one write; a verb that changes nothing, such as the area the task already has, records nothing. A verb another part runs, a question's answer, a unit's action through Approve, Delegate or Dismiss, or Reply, records it once that succeeded. `seen` records nothing, since clients send it when you open a task, and neither do the verbs on an Outbox draft.
+
+An event workflow reads its task's facts even once the task is done or in the trash, so it reacts to the verb that took it there. The same holds while its runs wait and when its drafts are judged for withdrawal: guard on `task.state` in `when` and `[drafts.withdraw]` when a run should not go on after the task left its list.
+
+A workflow moves the task itself with the `task.verb` step: `verb = "next"`, or `verb = "waiting"` with `on` and `resurface`, among the verbs whose `by.workflow` in `tasks.toml` lets a workflow run them (bundled: next, waiting, schedule, wake, focus, done and dismiss). The arguments a verb takes are its handler's. The plan blocks the step while the task's state refuses the verb or the verb's `by.workflow` does not hold on the task. A move a workflow makes records its verb event, by `workflow:<name>`, and may trigger another workflow within the bounds above. It is the task's own move: `dismiss` sends the task to the trash and never runs its unit's dismiss action, as your Dismiss does on a task whose unit offers one, and a verb's `offer` in `tasks.toml` does not bind it.
 
 ```toml
-summary = "Mark done a waiting entry whose unit has nothing open"
-provider = "entry"
-when = 'entry.state == "waiting" && entry.unit != "" && entry.items_open == 0'
+summary = "Mark done a waiting task whose unit has nothing open"
+provider = "task"
+when = 'task.state == "waiting" && task.unit != "" && task.items_open == 0'
 
 [[step]]
-use = "entry.verb"
+use = "task.verb"
 verb = "done"
 ```
+
+A workflow sets a property of the task with the `task.set` step: `prop`, a property of `tasks.toml` whose writers include `workflow`, and `value`, read as the property's type reads it (a date as `YYYY-MM-DD`, midnight in your location, a duration as `90m` or `2d`). The step is refused for a property a workflow does not write or a value its type does not read. The property records the workflow as its writer.
 
 ## The plan
 

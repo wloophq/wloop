@@ -23,6 +23,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/dossier"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -332,5 +333,38 @@ func TestOnlyALaunchWithTheGrantIsGranted(t *testing.T) {
 	}
 	if _, out, err := te2.renderTurn(ctx, te2.cfg, turn.Request{Intent: turn.Intent(dintent.Act), Unit: headlessThread, Payload: unitPayload{headlessThread}}); err != nil || granted(out.Text) {
 		t.Fatalf("a session registered without a grant is told to write: %v", err)
+	}
+}
+
+func TestASessionOnATasksThreadIsGrantedTheTasksDossier(t *testing.T) {
+	t.Parallel()
+	te, db := servedDossiers(t)
+	ctx := context.Background()
+	tk := task.Task{ID: "t-00000000000000f1", State: "next", Category: task.CategoryReady, Title: "Answer Ana",
+		Units: []unit.Unit{headlessThread}, Origin: task.OriginDerived, Created: testNow, Updated: testNow}
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: tk}}); err != nil {
+		t.Fatal(err)
+	}
+	path := dossierPathOf(t, te, task.UnitOf(tk.ID))
+	line, err := te.agentCommand(ctx, te.cfg, "/wt", roundOptions{trusted: true, unit: headlessThread})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(line, "--add-dir '"+path+"'") {
+		t.Fatalf("the launch line does not grant the task's dossier %s: %s", path, line)
+	}
+	ws := wsdomain.Workspace{ID: "ws1", Path: "/wt"}
+	if err := te.launched(ctx, te.cfg, ws, headlessThread, proc{"term-1", te.WS.First(), "term-1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := te.Turns.SessionStarted(ctx, turns.SessionStart{Session: "term-1", Source: "startup"}); err != nil {
+		t.Fatal(err)
+	}
+	_, out, err := te.renderTurn(ctx, te.cfg, turn.Request{Intent: turn.Intent(dintent.Act), Unit: headlessThread, Payload: unitPayload{headlessThread}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.Text, "`"+path+"`") || !strings.Contains(out.Text, "append to log/") {
+		t.Fatalf("the session's instructions do not grant the task's dossier:\n%s", out.Text)
 	}
 }

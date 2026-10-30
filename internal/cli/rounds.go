@@ -6,13 +6,16 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"time"
+
+	"github.com/wloophq/wloop/internal/domain/pr"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
-	coresweep "github.com/wloophq/wloop/internal/core/sweep"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -20,7 +23,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
 )
@@ -38,20 +40,18 @@ const (
 type step struct {
 	kind   stepKind
 	ws     wsdomain.Workspace
-	pr     github.Ref
+	pr     pr.Ref
 	reason string
 	// observed is a round the facts only log: its workspace is gone and its
 	// project does not let the round recreate it.
 	observed bool
 
-	fingerprint string
-	// checksHead is the head whose failing checks a triage round covers.
-	checksHead string
-	// conflictHead is the head whose conflict with the base a triage round
-	// resolves.
-	conflictHead string
-	lastReviewAt time.Time
-	read         *github.PullRequest // the pull request as the facts read it, for the turn
+	// head is the head the round's plan saw.
+	head string
+	// onSent and onSkipped are the marks the round's plan writes once it
+	// is sent, or skipped.
+	onSent, onSkipped map[string]string
+	read              *pr.PullRequest // the pull request as the facts read it, for the turn
 	// briefMissing is why the round goes without its brief, "" with one.
 	briefMissing string
 	// confirmed is a round the user sent from the plan.
@@ -77,14 +77,27 @@ func (s step) payload() turn.Payload {
 	return p
 }
 
-// mark is the round mark the step's reviews fingerprint sets.
-func (s step) mark() string { return markOf(s.kind) }
+// sent records the step sent in st: a round spent today, and the marks its
+// plan writes.
+func (s step) sent(st *round.Store, now time.Time) {
+	st.RecordSent(s.key(), "", "", now)
+	setMarks(st, s.key(), s.onSent)
+}
 
-func markOf(k stepKind) string {
-	if k == stepAddress {
-		return round.AddressedReviews
+// marksHash names marks by their content.
+func marksHash(marks map[string]string) string {
+	h := sha256.New()
+	for _, name := range slices.Sorted(maps.Keys(marks)) {
+		fmt.Fprintf(h, "%s=%s\n", name, marks[name])
 	}
-	return round.Reviewed
+	return hex.EncodeToString(h.Sum(nil)[:8])
+}
+
+// setMarks sets marks of key in st; a value "" removes one.
+func setMarks(st *round.Store, key string, marks map[string]string) {
+	for _, name := range slices.Sorted(maps.Keys(marks)) {
+		st.SetMark(key, name, marks[name])
+	}
 }
 
 func (s step) roundKind() string {
@@ -155,7 +168,7 @@ const whyPaused = "automatic rounds paused"
 
 // blockRound records a block of the round of kind with key, "" or a
 // StartBlock's. Without an inventory it logs the reason once a day.
-func (s *sweep) blockRound(ctx context.Context, ref github.Ref, kind, why, key string) {
+func (s *sweep) blockRound(ctx context.Context, ref pr.Ref, kind, why, key string) {
 	line := fmt.Sprintf("skip %s: my review was requested, but %s", ref, why)
 	if kind != "first round" {
 		line = fmt.Sprintf("skip the %s of %s: %s", kind, ref, why)
@@ -181,24 +194,6 @@ func (s *sweep) record(ctx context.Context, st step, kind, data string) {
 	ev := dinv.Event{PR: st.pr, Kind: kind, At: s.now, Data: data}
 	if err := s.e.Rec.Record(ctx, ev); err != nil {
 		s.warnf("%s: recording %s: %v", st.pr, kind, err)
-	}
-}
-
-// skip records the round as handled without sending it, so the sweep plans
-// none until something new happens on the pull request. It does not count
-// against the caps.
-func (s *sweep) skip(st step) {
-	key := st.key()
-	switch st.kind {
-	case stepFirstRound:
-		s.st.SkipFirstRound(key)
-	case stepAddress:
-		if st.fingerprint != "" {
-			s.st.SetMark(key, round.AddressedReviews, st.fingerprint)
-		}
-		s.st.SetHeads(key, st.checksHead, st.conflictHead)
-	default:
-		s.st.SetMark(key, round.Reviewed, st.fingerprint)
 	}
 }
 
@@ -254,7 +249,7 @@ func (s *sweep) noteStartProblem(ctx context.Context, st step, err error) {
 		return
 	}
 	if untrusted != nil || st.kind == stepFirstRound || st.ws.ID == "" {
-		block.Round, block.Fingerprint, block.ChecksHead, block.ConflictHead = st.roundKind(), st.fingerprint, st.checksHead, st.conflictHead
+		block.Round, block.Skip = st.roundKind(), st.onSkipped
 		s.blockRound(ctx, st.pr, st.roundKind(), why, block.Key(s.now))
 		return
 	}
@@ -276,16 +271,16 @@ func untrustedWhy(u *turns.UntrustedError) string {
 
 // roundCall is a round a workflow's turn.start sends.
 type roundCall struct {
-	Kind         stepKind
-	Workspace    wsdomain.Workspace
-	Unit         unit.Unit
-	Facts        coresweep.Facts
-	Reason       string
-	Fingerprint  string
-	ChecksHead   string
-	ConflictHead string
-	LastReviewAt time.Time
-	Guidance     string
+	Kind      stepKind
+	Workspace wsdomain.Workspace
+	Unit      unit.Unit
+	Facts     dinv.PlanFacts
+	Reason    string
+	// Head is the head the round's plan saw; OnSent and OnSkipped are the
+	// marks it writes once the round is sent, or skipped.
+	Head              string
+	OnSent, OnSkipped map[string]string
+	Guidance          string
 	// BriefMissing is why the round goes without its brief, "" with one.
 	BriefMissing string
 	// Observed is a round the facts only log: its workspace is gone and its
@@ -309,8 +304,8 @@ func (e *Env) sendRound(ctx context.Context, st *round.Store, c roundCall) (sent
 	}
 	s := &sweep{e: e, cfg: cfg, st: st, now: e.Now()}
 	return s.send(ctx, step{kind: c.Kind, ws: c.Workspace, pr: ref, reason: c.Reason, observed: c.Observed,
-		fingerprint: c.Fingerprint, checksHead: c.ChecksHead, conflictHead: c.ConflictHead, lastReviewAt: c.LastReviewAt,
-		read: &github.PullRequest{Facts: c.Facts.Facts}, briefMissing: c.BriefMissing, confirmed: c.Confirmed,
+		head: c.Head, onSent: c.OnSent, onSkipped: c.OnSkipped,
+		read: &pr.PullRequest{Facts: c.Facts.Facts}, briefMissing: c.BriefMissing, confirmed: c.Confirmed,
 		fresh: true, why: c.Why, address: c.Address}, c.Guidance)
 }
 
@@ -365,7 +360,7 @@ func (s *sweep) followup(ctx context.Context, st step, guidance string) (bool, e
 		s.logf("%s: %s, but its submission was not observed; the next sweep retries", st.describe(), verb)
 		return false, nil
 	}
-	s.st.RecordSent(st.key(), st.mark(), st.fingerprint, s.now)
+	st.sent(s.st, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), sent.ID))
 	s.logf("%s: %s", st.describe(), verb)
 	return true, nil
@@ -415,7 +410,7 @@ func (s *sweep) openRound(ctx context.Context, st step, guidance string, planned
 		s.logf("%s: created, but its submission was not observed; check the session", st.describe())
 		return false, nil
 	}
-	s.st.RecordSent(st.key(), st.mark(), st.fingerprint, s.now)
+	st.sent(s.st, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), sent.ID))
 	s.logf("%s", st.describe())
 	return true, nil
@@ -423,7 +418,7 @@ func (s *sweep) openRound(ctx context.Context, st step, guidance string, planned
 
 // openRead is the open pull request a round that creates its workspace is
 // about: the facts' read when fresh, else read from GitHub.
-func (s *sweep) openRead(ctx context.Context, st step) (*github.PullRequest, error) {
+func (s *sweep) openRead(ctx context.Context, st step) (*pr.PullRequest, error) {
 	if st.fresh && st.read != nil {
 		return st.read, nil
 	}
@@ -431,13 +426,14 @@ func (s *sweep) openRead(ctx context.Context, st step) (*github.PullRequest, err
 }
 
 // observeAddress records a triage round on a pull request without a
-// workspace once per fingerprint of its reviews, and sends nothing.
+// workspace once per head and marks its plan would write, and sends nothing.
 func (s *sweep) observeAddress(ctx context.Context, st step) {
-	if !s.st.FirstNote("would address "+st.key()+" at "+st.fingerprint, s.now) {
+	key := st.head + ":" + marksHash(st.onSent)
+	if !s.st.FirstNote("would address "+st.key()+" at "+key, s.now) {
 		return
 	}
 	if s.e.Rec != nil {
-		ev := dinv.Event{PR: st.pr, Kind: dinv.KindWouldAddress, Key: st.fingerprint, At: s.now, Data: st.reason}
+		ev := dinv.Event{PR: st.pr, Kind: dinv.KindWouldAddress, Key: key, At: s.now, Data: st.reason}
 		if err := s.e.Rec.Record(ctx, ev); err != nil {
 			s.warnf("%s: recording %s: %v", st.pr, dinv.KindWouldAddress, err)
 		}
@@ -474,9 +470,8 @@ func (s *sweep) address(ctx context.Context, st step, guidance string) (bool, er
 		s.logf("%s: %s, but its submission was not observed; the next sweep retries", st.describe(), verb)
 		return false, nil
 	}
-	s.st.RecordSent(st.key(), st.mark(), st.fingerprint, s.now)
+	st.sent(s.st, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), turnID))
-	s.st.SetHeads(st.key(), st.checksHead, st.conflictHead)
 	s.logf("%s: %s", st.describe(), verb)
 	return true, nil
 }

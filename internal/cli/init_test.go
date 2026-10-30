@@ -25,9 +25,9 @@ import (
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/profile"
-	"github.com/wloophq/wloop/internal/slack/slacktest"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
+	"github.com/wloophq/wloop/plugins/slack/slacktest"
 )
 
 // initGH answers gh by the start of its arguments; anything else fails.
@@ -59,6 +59,8 @@ type initTestEnv struct {
 	gh       *initGH
 	ws       *fake.Manager
 	kc       *fakeKeychain
+	// slackSt plays the browser for the Slack plugin's login.
+	slackSt *slackTestEnv
 	// onPath are the binaries the login shell finds.
 	onPath []string
 	// src holds most of the repositories the fake manager knows.
@@ -88,9 +90,9 @@ func newInitTestEnv(t *testing.T) *initTestEnv {
 		onPath: []string{"git", "claude"},
 	}
 	cfgPath := filepath.Join(t.TempDir(), "config", "config.toml")
-	te.Env = &Env{
+	te.Env = (&Env{
 		Out: te.out, Err: te.err, In: strings.NewReader(""),
-		GH: te.gh, WS: workspace.NewSet(te.ws),
+		forge: ghForge{te.gh}, WS: workspace.NewSet(te.ws),
 		Sh: func(_ context.Context, name string, args ...string) ([]byte, error) {
 			if name == shellPath() && len(args) == 2 && args[0] == "-lc" {
 				var out []string
@@ -110,13 +112,12 @@ func newInitTestEnv(t *testing.T) *initTestEnv {
 		Agents:     map[string]turns.Agent{"claude": claude.Agent{}},
 		Homes:      map[string]setup.HomeKind{"claude": fakeKind{}},
 		slack: slackEnv{
-			Keychain:    te.kc,
-			LockPath:    filepath.Join(t.TempDir(), "slack.lock"),
 			Interactive: func() bool { return false },
-			Open:        func(string) error { return errors.New("no browser in tests") },
 			ReadSecret:  func() ([]byte, error) { return nil, errors.New("no secret in tests") },
 		},
-	}
+	}).owning()
+	te.slackSt = &slackTestEnv{kc: te.kc}
+	withSlackPlugin(t, te.Env, te.slackSt.pluginEnv(t, ""))
 	te.Env.intents = newEnvIntents(te.Env)
 	return te
 }
@@ -235,14 +236,14 @@ agent = "claude" # the default
 [sweep]
 fast = "5m" # a shared rate limit
 
-[github.scope]
+[plugins.github.scope]
 # people I follow
 watch = ["boss"]
 repos = [
   "old/repo", # moved
 ]
 
-[slack]
+[plugins.slack]
 post_allowlist = ["C1"]
 `
 	a := initAnswers{ProjectsDir: "/src", Agent: "claude", Repos: []string{"acme/api"}, SlackClientID: "1.2"}
@@ -257,12 +258,12 @@ projects_dir = '/src'
 [sweep]
 fast = "5m" # a shared rate limit
 
-[github.scope]
+[plugins.github.scope]
 # people I follow
 watch = ["boss"]
 repos = ['acme/api']
 
-[slack]
+[plugins.slack]
 post_allowlist = ["C1"]
 client_id = '1.2'
 `
@@ -286,12 +287,12 @@ func TestMergeInitConfigWritesAFreshFile(t *testing.T) {
 profile = '/profiles/mine'
 agent = 'claude'
 
-[github.scope]
+[plugins.github.scope]
 repos = ['acme/api']
 teams = ['acme/core']
 people = ['ana']
 
-[slack]
+[plugins.slack]
 client_id = '1.2'
 `
 	if string(got) != want {
@@ -311,16 +312,16 @@ func TestMergeInitConfigWritesWhereTheFileHasTheTable(t *testing.T) {
 	a := initAnswers{Agent: "claude", Repos: []string{"acme/api"}, SlackClientID: "1.2"}
 	for name, c := range map[string]struct{ raw, want string }{
 		"a parent table": {
-			"[github]\nowners = [\"acme\"]\n\n[[projects]]\nmatch = \"acme/*\"\n",
-			"agent = 'claude'\n\n[github]\nowners = [\"acme\"]\nscope.repos = ['acme/api']\n\n[[projects]]\nmatch = \"acme/*\"\n\n[slack]\nclient_id = '1.2'\n",
+			"[plugins.github]\nowners = [\"acme\"]\n\n[[projects]]\nmatch = \"acme/*\"\n",
+			"agent = 'claude'\n\n[plugins.github]\nowners = [\"acme\"]\nscope.repos = ['acme/api']\n\n[[projects]]\nmatch = \"acme/*\"\n\n[plugins.slack]\nclient_id = '1.2'\n",
 		},
 		"dotted keys at the top": {
-			"agent = \"claude\"\ngithub.scope.watch = [\"boss\"]\nslack.client_id = \"old\"",
-			"agent = \"claude\"\ngithub.scope.watch = [\"boss\"]\nslack.client_id = '1.2'\ngithub.scope.repos = ['acme/api']",
+			"agent = \"claude\"\nplugins.github.scope.watch = [\"boss\"]\nplugins.slack.client_id = \"old\"",
+			"agent = \"claude\"\nplugins.github.scope.watch = [\"boss\"]\nplugins.slack.client_id = '1.2'\nplugins.github.scope.repos = ['acme/api']",
 		},
 		"a header with no keys": {
-			"agent = \"claude\"\n\n[github.scope] # mine\n",
-			"agent = \"claude\"\n\n[github.scope] # mine\nrepos = ['acme/api']\n\n[slack]\nclient_id = '1.2'\n",
+			"agent = \"claude\"\n\n[plugins.github.scope] # mine\n",
+			"agent = \"claude\"\n\n[plugins.github.scope] # mine\nrepos = ['acme/api']\n\n[plugins.slack]\nclient_id = '1.2'\n",
 		},
 	} {
 		got, err := mergeInitConfig([]byte(c.raw), a)
@@ -336,15 +337,15 @@ func TestMergeInitConfigWritesWhereTheFileHasTheTable(t *testing.T) {
 
 func TestMergeInitConfigRefusesToEditAnInlineTable(t *testing.T) {
 	t.Parallel()
-	raw := "github = {owners = [\"acme\"]}\n"
-	if _, err := mergeInitConfig([]byte(raw), initAnswers{Repos: []string{"acme/api"}}); err == nil || !strings.Contains(err.Error(), "github.scope.repos") {
+	raw := "plugins.github = {owners = [\"acme\"]}\n"
+	if _, err := mergeInitConfig([]byte(raw), initAnswers{Repos: []string{"acme/api"}}); err == nil || !strings.Contains(err.Error(), "plugins.github.scope.repos") {
 		t.Fatalf("err %v", err)
 	}
 	if got, err := mergeInitConfig([]byte(raw), initAnswers{}); err != nil || string(got) != raw {
 		t.Fatalf("an empty answer touched the inline table (%v):\n%s", err, got)
 	}
-	followed := "[github]\nscope = { repos = [\"acme/api\"] }\n"
-	if _, err := mergeInitConfig([]byte(followed), initAnswers{}); err == nil || !strings.Contains(err.Error(), "github.scope.repos") {
+	followed := "[plugins.github]\nscope = { repos = [\"acme/api\"] }\n"
+	if _, err := mergeInitConfig([]byte(followed), initAnswers{}); err == nil || !strings.Contains(err.Error(), "plugins.github.scope.repos") {
 		t.Fatalf("clearing a list in an inline table: %v", err)
 	}
 }
@@ -563,11 +564,10 @@ func TestInitAtATerminal(t *testing.T) {
 	srv.Handle("auth.test", func(url.Values) any {
 		return map[string]any{"team_id": "T000", "team": "Acme", "user_id": "U000", "url": "https://acme.example/"}
 	})
-	port := 0
-	te.slack.BaseURL, te.slack.LoginPort = srv.URL, &port
+	te.slackSt.open = func(u string) error { browse(t, u); return nil }
+	withSlackPlugin(t, te.Env, te.slackSt.pluginEnv(t, srv.URL))
 	te.slack.Interactive = func() bool { return true }
 	te.slack.ReadSecret = func() ([]byte, error) { return []byte("xapp-1-fakeapp"), nil }
-	te.slack.Open = func(u string) error { browse(t, u); return nil }
 	te.In = answers(
 		"",             // projects_dir: the suggestion
 		"",             // repositories: the reviewed ones
@@ -589,9 +589,8 @@ func TestInitAtATerminal(t *testing.T) {
 		cfg.Profile != filepath.Join(filepath.Dir(te.ConfigPath), "profiles", "personal") || cfg.Slack.ClientID != "123.456" {
 		t.Fatalf("config %+v", cfg)
 	}
-	st := te.slackState(cfg.Slack)
-	if !st.appToken || st.login == "" {
-		t.Fatalf("slack %+v\n%s", st, te.out)
+	if len(te.kc.items) != 2 {
+		t.Fatalf("slack keychain items %d, want the app token and the login\n%s", len(te.kc.items), te.out)
 	}
 	assertNoSlackToken(t, te.out.String()+te.err.String())
 	for _, want := range []string{"Agent: claude, the only one installed", "you reviewed in the last 30 days: acme/api, acme/web", "socket_mode_enabled: true", "Logged in to Slack as U000"} {
@@ -605,7 +604,7 @@ func TestInitAtATerminal(t *testing.T) {
 	if code := te.run(); code != 0 {
 		t.Fatalf("rerun exit %d: %s", code, te.err)
 	}
-	if !strings.Contains(te.out.String(), "is up to date") || !strings.Contains(te.out.String(), "Slack: logged in as U000") {
+	if !strings.Contains(te.out.String(), "is up to date") || !strings.Contains(te.out.String(), "Slack: logged in") || !strings.Contains(te.out.String(), "user: U000") {
 		t.Errorf("rerun out:\n%s", te.out)
 	}
 }

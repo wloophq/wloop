@@ -12,7 +12,7 @@ import (
 )
 
 func TestEveryToolHasADescription(t *testing.T) {
-	tools, problems := loadTools(nil, os.DirFS("../../profiles/default"))
+	tools, problems := loadTools(profile.BundledChain(), os.DirFS("../../profiles/default"))
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
@@ -84,14 +84,14 @@ func TestAToolTextFailsAtLoad(t *testing.T) {
 }
 
 func TestABundledFileMissingAToolFails(t *testing.T) {
-	_, got := toolsProblems(t, strings.ReplaceAll(everyTool(""), "[slack_edit", "[slack_edit_x"), "")
-	if !strings.Contains(got, "slack_edit: is missing") {
+	_, got := toolsProblems(t, strings.ReplaceAll(everyTool(""), "[task_read", "[task_read_x"), "")
+	if !strings.Contains(got, "task_read: is missing") {
 		t.Fatalf("got:\n%s", got)
 	}
 }
 
 func TestTheSlackSendToolTellsTheAgentToAskWhenUnsure(t *testing.T) {
-	tools, _ := loadTools(nil, os.DirFS("../../profiles/default"))
+	tools, _ := loadTools(profile.BundledChain(), os.DirFS("../../profiles/default"))
 	d := tools["slack_send_message"].Description
 	if !strings.Contains(d, "without their approval") || !strings.Contains(d, "ask them first") {
 		t.Fatalf("description %q", d)
@@ -124,5 +124,25 @@ func TestAnAnswerIsCheckedWithItsFieldsTypesAndBothBranches(t *testing.T) {
 				t.Fatalf("problems %q, want ok %v", got, c.ok)
 			}
 		})
+	}
+}
+
+func TestAPluginsToolsAreWordedByItsLayer(t *testing.T) {
+	core := everyTool("")
+	core = core[:strings.Index(core, "[slack_")]
+	plugin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(plugin, ToolsFile), []byte("[slack_read]\ndescription = \"read it\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	bundled := fstest.MapFS{ToolsFile: {Data: []byte(core)}}
+	if _, problems := loadTools(nil, bundled); len(problems) > 0 {
+		t.Errorf("a plugin left out of the chain needs no tables: %s", problems.Error())
+	}
+	tools, problems := loadTools([]profile.Layer{{Name: profile.PluginLayer("slack"), Dir: plugin}}, bundled)
+	if tools["slack_read"].Description != "read it" {
+		t.Errorf("slack_read %+v", tools["slack_read"])
+	}
+	if got := problems.Error(); !strings.Contains(got, "slack_edit: is missing") || !strings.Contains(got, "slack_read.answers.refused: is missing") {
+		t.Errorf("the plugin's layer leaves its tools unworded:\n%s", got)
 	}
 }

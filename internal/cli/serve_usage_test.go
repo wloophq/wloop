@@ -22,7 +22,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	dusage "github.com/wloophq/wloop/internal/domain/usage"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -112,7 +111,7 @@ func TestServeInterruptsRunningBriefRuns(t *testing.T) {
 	var id int64
 	seedStore(t, te.StateDir, func(ctx context.Context, db *sqlite.DB) {
 		var err error
-		id, err = inventory.New(db).StartBriefRun(ctx, dinv.BriefRun{PR: github.Ref(usageRef), Trigger: "background", StartedAt: testNow.Add(-time.Hour)})
+		id, err = inventory.New(db).StartBriefRun(ctx, dinv.BriefRun{PR: pr.Ref(usageRef), Trigger: "background", StartedAt: testNow.Add(-time.Hour)})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -141,7 +140,7 @@ func TestTheFirstBriefRunInterruptsWhenTheStartUpCouldNot(t *testing.T) {
 	t.Cleanup(cancel)
 	store := inventory.New(db)
 	running := func() int64 {
-		id, err := store.StartBriefRun(ctx, dinv.BriefRun{PR: github.Ref(usageRef), Trigger: "background", StartedAt: testNow.Add(-time.Hour)})
+		id, err := store.StartBriefRun(ctx, dinv.BriefRun{PR: pr.Ref(usageRef), Trigger: "background", StartedAt: testNow.Add(-time.Hour)})
 		if err != nil {
 			t.Fatal(err)
 		}

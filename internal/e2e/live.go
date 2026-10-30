@@ -25,6 +25,7 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/cli"
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -59,6 +60,13 @@ func newLive(t *testing.T) *live {
 	c := client.New(socket)
 	if err := c.Ping(context.Background()); err != nil {
 		t.Fatalf("the installed daemon does not answer on %s: %v", socket, err)
+	}
+	h, err := c.Health(context.Background())
+	if err != nil {
+		t.Fatalf("the installed daemon's health: %v", err)
+	}
+	if !slices.ContainsFunc(h.Plugins, func(p api.PluginHealth) bool { return p.ID == "github" && p.Status != "down" }) {
+		t.Fatalf("the installed daemon runs no GitHub plugin binary (%+v); make dev-install places and records it", h.Plugins)
 	}
 	return &live{t: t, stamp: time.Now().Format("20060102-150405"), socket: socket, daemon: c,
 		orca: &wsorca.Manager{R: wsorca.Exec{}}, terminals: map[string]bool{}}
@@ -375,7 +383,7 @@ func bookOf(t *testing.T, url string) liveBook {
 		t.Fatalf("turn show %s: %v\n%.2000s", url, err, raw)
 	}
 	b := liveBook{shown: shown}
-	b.Unit = shown.PR.Unit()
+	b.Unit = shown.Unit.Unit
 	for _, s := range shown.Turns {
 		b.Turns = append(b.Turns, s.Turn)
 		b.Records = append(b.Records, s.Records...)
@@ -385,51 +393,69 @@ func bookOf(t *testing.T, url string) liveBook {
 	slices.SortStableFunc(b.Answers, func(x, y turn.Answer) int { return cmp.Or(x.At.Compare(y.At), cmp.Compare(x.ID, y.ID)) })
 	ctx, cancel := context.WithTimeout(context.Background(), commandWait)
 	defer cancel()
-	b.Events = storetest.Events(ctx, t, filepath.Join(config.StateDir(), "store.db"), shown.PR)
+	ref, ok := pr.RefOf(shown.Unit.Unit)
+	if !ok {
+		t.Fatalf("turn show %s names %s, no pull request", url, shown.Unit.Label)
+	}
+	b.Events = storetest.Events(ctx, t, filepath.Join(config.StateDir(), "store.db"), ref)
 	return b
 }
 
-// answer answers the open question of the pull request through the UserAPI
-// answer action, as the cockpit, a notification or the TUI do. A 409 (the
-// session is busy, or the question is not recorded yet) is retried for two
+// answer answers the open question of the pull request through its question gate, as the cockpit, a
+// notification or the TUI do. A gate not open yet, or a 409 (the session is busy), is retried for two
 // minutes; any other refusal fails the test.
 func (l *live) answer(t *testing.T, ref pr.Ref, optionID string, source turn.Source) {
 	t.Helper()
 	l.answerWith(t, ref, api.ActionRequest{OptionID: optionID, Source: string(source)})
 }
 
-// answerWith posts req as the answer on ref and returns the daemon's output.
+// answerWith resolves ref's open question gate with req as its answer and returns the daemon's view of the
+// gate it resolved.
 func (l *live) answerWith(t *testing.T, ref pr.Ref, req api.ActionRequest) string {
 	t.Helper()
-	body, err := json.Marshal(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var out string
-	url := "http://" + brand.Name + api.UnitPath(ref.Unit(), "answer")
 	hc := &http.Client{Transport: client.UnixTransport(l.socket), Timeout: 30 * time.Minute}
-	waitFor(t, 2*time.Minute, fmt.Sprintf("the daemon takes the answer %+v on %s", req, ref), func() (bool, string) {
-		req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	do := func(method, path string, body []byte) (int, []byte) {
+		r, err := http.NewRequest(method, "http://"+brand.Name+path, bytes.NewReader(body))
 		if err != nil {
 			t.Fatal(err)
 		}
-		req.Header.Set(api.Header, api.Version)
-		req.Header.Set("Content-Type", "application/json")
-		resp, err := hc.Do(req)
+		r.Header.Set(api.Header, api.Version)
+		r.Header.Set("Content-Type", "application/json")
+		resp, err := hc.Do(r)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer resp.Body.Close()
 		var msg bytes.Buffer
 		_, _ = msg.ReadFrom(resp.Body)
-		switch {
-		case resp.StatusCode/100 == 2:
-			out = msg.String()
-			return true, ""
-		case resp.StatusCode == http.StatusConflict:
-			return false, msg.String()
+		return resp.StatusCode, msg.Bytes()
+	}
+	body, err := json.Marshal(api.TaskRequest{Args: map[string]string{"answer": messages.GateAnswer(messages.Answer{OptionID: req.OptionID, Yes: req.Yes, No: req.No,
+		Text: req.Guidance})}, Source: req.Source})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out string
+	waitFor(t, 2*time.Minute, fmt.Sprintf("the daemon takes the answer %+v on %s", req, ref), func() (bool, string) {
+		code, raw := do(http.MethodGet, api.GatesPath, nil)
+		var open []api.GateView
+		if code != http.StatusOK || json.Unmarshal(raw, &open) != nil {
+			t.Fatalf("the open gates: %d %s", code, raw)
 		}
-		t.Fatalf("answering %s with %+v: %s %s", ref, req, resp.Status, msg.String())
+		i := slices.IndexFunc(open, func(g api.GateView) bool { return g.Kind == "question" && g.Unit == ref.Unit().String() })
+		if i < 0 {
+			return false, "no question gate open on " + ref.String()
+		}
+		path := strings.NewReplacer("{id}", fmt.Sprint(open[i].ID), "{intent}", "answer").Replace(api.GatePath)
+		switch code, raw := do(http.MethodPost, path, body); {
+		case code/100 == 2:
+			out = string(raw)
+			return true, ""
+		case code == http.StatusConflict:
+			return false, string(raw)
+		default:
+			t.Fatalf("answering %s with %+v: %d %s", ref, req, code, raw)
+		}
 		return false, ""
 	})
 	return out

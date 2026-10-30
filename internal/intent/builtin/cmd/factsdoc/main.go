@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	_ "github.com/wloophq/wloop/internal/plugins/bundled"
 )
 
 func main() {
@@ -32,18 +33,19 @@ type group struct {
 var intentGroups = []group{
 	{"The pull request (`pr.*`)", []string{"pr"}},
 	{"The row (`row.*`)", []string{"row"}},
-	{"The entry (`entry.*`)", []string{"entry"}},
+	{"The task (`task.*`)", []string{"task"}},
 	{"The turn (`turn.*`, `unit.*`)", []string{"turn", "unit"}},
 	{"A name (`session.*`, `workspace.*`; slot `name`)", []string{"session", "workspace"}},
 	{"A draft's actions (`draft.*`)", []string{"draft"}},
+	{"An item proposal's gate (`proposal.*`; slot `proposal`)", []string{"proposal"}},
 	{"The configuration (`config.*`)", []string{"config"}},
 }
 
 // workflowGroups title the workflow facts' subsections, one per slot of
 // builtin.WorkflowSlots.
 var workflowGroups = map[string]string{
-	"pr": "Pull requests", "session": "Sessions", "workspace": "Workspaces", "entry": "GTD entries", "slack": "Slack conversations",
-	"brief": "Briefs", "draft": "Drafts", "trigger": "Triggers", "config": "The configuration",
+	"pr": "Pull requests", "session": "Sessions", "workspace": "Workspaces", "task": "Tasks", "slack": "Slack conversations",
+	"brief": "Briefs", "draft": "Drafts", "gate": "Gates", "trigger": "Triggers", "config": "The configuration",
 }
 
 func intentFacts() []builtin.Fact {
@@ -116,13 +118,13 @@ func workflowTable(slot string) string {
 	return b.String()
 }
 
-// untrusted marks a fact no [drafts.approval] rule, nor a run rule that
+// untrusted marks a fact no rule of a draft gate, nor a rule that releases a gate,
 // runs, may read.
 func untrusted(f builtin.Fact) string {
 	if !f.Untrusted {
 		return ""
 	}
-	return " **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it."
+	return " **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it."
 }
 
 func approvalTable() string {
@@ -166,6 +168,15 @@ func effectTable() string {
 	return b.String()
 }
 
+func markTable() string {
+	var b strings.Builder
+	b.WriteString("| Mark | Unit | Covers |\n|---|---|---|\n")
+	for _, m := range builtin.Marks {
+		fmt.Fprintf(&b, "| `%s` | %s | %s |\n", m.Name, m.Provider, cell(m.Doc))
+	}
+	return b.String()
+}
+
 func provider(slot string) string {
 	for p, s := range builtin.Slots {
 		if s == slot {
@@ -199,7 +210,7 @@ func page() (string, error) {
 		out = append(out, "### "+g.title, "", intentTable(parts[i]))
 	}
 	out = append(out, "## Workflow facts", "",
-		"A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `config.*` and `now`; a provider whose units have a brief also reads `brief.*`, and `[drafts.withdraw] when` also reads `draft.*`. `{{command}} workflows facts [entry|github|session|slack|workspace]` prints them. A pull request fact has one name and one spelling in every slot: `pr.repo` is `owner/repo` and `pr.repo_name` the bare name.",
+		"A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `config.*` and `now`; a provider whose units have a brief also reads `brief.*`, and `[drafts.withdraw] when` also reads `draft.*`. `{{command}} workflows facts ["+providerChoice()+"]` prints them. A pull request fact has one name and one spelling in every slot: `pr.repo` is `owner/repo` and `pr.repo_name` the bare name.",
 		"")
 	sections, err := workflowSections(builtin.Facts, workflowGroups)
 	if err != nil {
@@ -208,7 +219,7 @@ func page() (string, error) {
 	out = append(out, sections...)
 	out = append(out,
 		"## Draft approval facts", "",
-		"A `[drafts.approval]` rule's `when` reads these, the facts of the draft, plus the facts of the unit the draft is on (a workflow's: its provider's), never `brief.*`, `trigger.*`, `config.*` or a fact marked **Untrusted**, whose value a third party's text, read by the extraction, or the proposing turn itself sets. A rule over the facts of another provider than the draft's unit's does not apply to it. A rule that releases a draft on its own (`send` or `delay`) applies to a comment draft only when its `when` has `draft.delivery == \"comment\"` as a term of its top-level `&&`.",
+		"A `[gates.approval]` rule of a draft gate reads these in its `when`, the facts of the draft, plus the gate's (`gate.kind`, `gate.name`) and the facts of the unit the draft is on (a workflow's: its provider's), never `brief.*`, `trigger.*`, `config.*` or a fact marked **Untrusted**, whose value a third party's text, read by the extraction, or the proposing turn itself sets. A rule that reads a draft's facts applies to draft gates alone. A rule over the facts of another provider than the draft's unit's does not apply to it. A rule that releases a draft on its own (`send`, `run` or `delay`) applies to a draft whose delivery posts, as its plugin's manifest marks it, only when its `when` has `draft.delivery == \"<delivery>\"` as a term of its top-level `&&`.",
 		"", approvalTable(),
 		"## Workflow steps", "",
 		"The steps a `[[step]]` may name with `use`. `{{command}} workflows steps` prints them with their arguments.",
@@ -216,7 +227,19 @@ func page() (string, error) {
 		"## Draft effects", "",
 		"What a sent draft applies, once: the names a `draft.propose` step lists in `effects` and an intent lists in `[drafts] allowed_effects`. A turn's own `effects` are on the [language](/reference/language/) page.",
 		"", effectTable(),
+		"## Marks", "",
+		"The marks the plugins' rounds write that a workflow's `when` may read with `handled(\"<name>\", <fact>)`, besides those a loaded workflow records. A plugin declares them in its manifest's `[[source.marks]]`.",
+		"", markTable(),
 		"This page is generated from the binary's fact registry by `make docs-ref`.",
 	)
 	return strings.Join(out, "\n") + "\n", nil
+}
+
+// providerChoice is the providers workflows facts takes, as a|b|c.
+func providerChoice() string {
+	names := make([]string, len(builtin.Providers))
+	for i, p := range builtin.Providers {
+		names[i] = string(p)
+	}
+	return strings.Join(names, "|")
 }

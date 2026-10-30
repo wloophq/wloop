@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/brand"
@@ -55,14 +57,14 @@ func startIntakeDaemon(t *testing.T, actions daemon.Actions, briefs intake.Brief
 	}
 	t.Cleanup(func() { db.Close() })
 	st := inventory.New(db)
-	if err := st.UpsertPR(context.Background(), dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h2",
+	if err := inventorytest.Of(st).UpsertPR(context.Background(), dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h2",
 		ReviewRequests: []string{"me"}, Reasons: []string{"review-requested"}, URL: r7.URL()}); err != nil {
 		t.Fatal(err)
 	}
 	srv := daemon.New(withRows(daemon.Deps{Cfg: Defaults(), Version: "test", Actions: actions, Intakes: db.Intakes(), IntakeBriefs: briefs,
-		Now:    func() time.Time { return daemonNow },
-		Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil },
-		Log:    t.Logf}, st))
+		Now:      func() time.Time { return daemonNow },
+		Identity: viewerIs("me"),
+		Log:      t.Logf}, st))
 	return &intakeDaemon{socket: serveSocketOf(t, srv.Handler()), store: st, intakes: db.Intakes()}
 }
 
@@ -151,7 +153,7 @@ func TestReviewNoBriefStartsAtOnce(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	te.Socket = d.socket
 	te.LoadConfig = nil
-	if err := d.store.SetOverride(context.Background(), dinv.Override{PR: r7, Adopted: true}); err != nil {
+	if err := inventorytest.Of(d.store).SetOverride(context.Background(), dinv.Override{PR: r7, Adopted: true}); err != nil {
 		t.Fatal(err)
 	}
 	if code := te.run("address", r7.URL(), "--no-brief", "skip the nit"); code != 0 {
@@ -197,7 +199,7 @@ func TestIntakeCommands(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	te.Socket = d.socket
 	te.LoadConfig = nil
-	if err := d.store.SetOverride(context.Background(), dinv.Override{PR: r7, Adopted: true}); err != nil {
+	if err := inventorytest.Of(d.store).SetOverride(context.Background(), dinv.Override{PR: r7, Adopted: true}); err != nil {
 		t.Fatal(err)
 	}
 	if code := te.run("review", r7.URL(), "--no-wait"); code != 0 {
@@ -242,7 +244,7 @@ func TestInstructionsPrintsTheNotReadyText(t *testing.T) {
 	mu := &lock.Mutex{}
 	srv := daemon.New(withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(mu), LoopMu: mu,
 		Intakes: db.Intakes(), IntakeBriefs: intaketest.NewBriefs(waitBriefing), ByHandRef: te.byHandRef, SessionWait: 50 * time.Millisecond,
-		Cfg: te.cfg, Version: "test", Now: te.Now, Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil }, Log: t.Logf}, te.Store))
+		Cfg: te.cfg, Version: "test", Now: te.Now, Identity: viewerIs("me"), Log: t.Logf}, te.Store))
 	te.Socket = serveSocketOf(t, srv.Handler())
 	if code := te.run("instructions", "review", r7.URL()); code != 1 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -267,7 +269,7 @@ func TestATurnByHandStartsUnderTheHeldLoopMutex(t *testing.T) {
 	mu := &lock.Mutex{}
 	srv := daemon.New(withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(mu), LoopMu: mu,
 		Intakes: db.Intakes(), IntakeBriefs: intaketest.NewBriefs(intake.Readiness{Go: true}), ByHandRef: te.byHandRef,
-		Cfg: te.cfg, Version: "test", Now: te.Now, Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil }, Log: t.Logf}, te.Store))
+		Cfg: te.cfg, Version: "test", Now: te.Now, Identity: viewerIs("me"), Log: t.Logf}, te.Store))
 	te.Socket = serveSocketOf(t, srv.Handler())
 	done := make(chan int)
 	go func() { done <- te.run("instructions", "review", r7.URL()) }()

@@ -383,7 +383,7 @@ func TestCreateFromPRUsesRuntime(t *testing.T) {
 	m := &Manager{R: runner, RPC: &Runtime{UserDataPath: f.dir}}
 	ws, handle, err := m.Create(context.Background(), workspace.CreateRequest{
 		RepoID: "r1", Name: "REVIEW feat/x", Unit: prUnit(7), Agent: "claude", Prompt: "/skill url",
-		HeadBranch: "feat/x", BaseBranchName: "main",
+		Checkout: workspace.Checkout{Branch: "feat/x", Base: "main"},
 	})
 	if err != nil {
 		t.Fatal(err)

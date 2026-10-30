@@ -61,19 +61,19 @@ process.stdout.write(JSON.stringify([at(input.t0), at(input.t0 + 86400000)]));`,
 	}
 }
 
-// domShim is a minimal DOM: elements that keep their children and text,
-// and stubs for what app.js touches while it loads.
+// domShim is a minimal DOM: elements that keep their children, text and
+// listeners (on[type]), and stubs for what app.js touches while it loads.
 const domShim = `
 class Node {}
 class Text extends Node { constructor(t) { super(); this.data = t; } get textContent() { return this.data; } }
 class El extends Node {
   constructor(tag) { super(); this.tag = tag; this.children = []; this.attrs = {}; this.dataset = {}; this.style = { setProperty() {} }; this.hidden = false;
-    this.classList = { add() {}, remove() {}, toggle() {}, contains: () => false }; }
+    this.classList = { add() {}, remove() {}, toggle() {}, contains: () => false }; this.on = {}; }
   append(...c) { this.children.push(...c.map((x) => (x instanceof Node ? x : new Text(String(x))))); }
   replaceChildren(...c) { this.children = []; this.append(...c); }
   setAttribute(k, v) { this.attrs[k] = v; }
   getAttribute(k) { return this.attrs[k]; }
-  addEventListener() {}
+  addEventListener(type, fn) { this.on[type] = fn; }
   querySelector() { return null; }
   querySelectorAll() { return []; }
   closest() { return null; }
@@ -112,7 +112,7 @@ func cockpitScript(t *testing.T) string {
 		t.Fatal("app.js has no hashchange listener")
 	}
 	raw := strings.TrimPrefix(src, app) + "\n" + app[:boot]
-	return domShim + pluginsJS(t) + gtdScripts(t) + strings.Replace(raw, `"use strict";`, "", 1)
+	return domShim + pluginsJS(t) + viewsScripts(t) + strings.Replace(raw, `"use strict";`, "", 1)
 }
 
 func TestThreadRowRendersInTheCockpit(t *testing.T) {
@@ -227,7 +227,7 @@ func jsonEqual(t *testing.T, a, b []byte) bool {
 func TestDeepLinkViewSurvivesBeforeTheCatalog(t *testing.T) {
 	src := appJS(t)
 	prelude := jsConst(t, src, "catalog") + jsConst(t, src, "UNIT_KEY") + jsConst(t, src, "QUERY_MAX") +
-		noPlugins + "const location = { hash: \"#view=stalled&q=x\" };\nconst groupField = () => null;\nconst parseSort = () => ({ field: \"\" });\n" + gtdScripts(t)
+		noPlugins + "const location = { hash: \"#view=stalled&q=x\" };\nconst groupField = () => null;\nconst parseSort = () => ({ field: \"\" });\n" + viewsScripts(t)
 	var got struct{ Before, Unknown, After, Missing string }
 	nodeRun(t, prelude, []string{"readHash"}, `
 const before = readHash().view;

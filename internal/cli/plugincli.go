@@ -7,7 +7,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/source"
 )
 
 // runPluginCLI runs the CLI of plugin id with args; a core command passes it
@@ -17,7 +16,7 @@ func runPluginCLI(ctx context.Context, e *Env, id unit.ProviderID, args []string
 	if err != nil {
 		return err
 	}
-	i := slices.IndexFunc(plugins, func(p source.Plugin) bool { return p.ID == id })
+	i := slices.IndexFunc(plugins, func(p compiledPlugin) bool { return p.ID == id })
 	if i < 0 {
 		return fmt.Errorf("no %s plugin is compiled in", id)
 	}
@@ -59,7 +58,7 @@ func (e *Env) pluginCommand(name string) (unit.ProviderID, bool) {
 
 // cliSourceDeps are the shared handles a command line process has: no
 // store or daemon services.
-func (e *Env) cliSourceDeps(cfg config.Config) source.Deps {
-	return source.Deps{GitHub: e.GitHub, WS: e.WS, Sink: e.boardSink(cfg), Clock: clockFunc(e.Now), Git: e.Git, Agents: e.Agents,
-		Log: func(format string, args ...any) { fmt.Fprintf(e.Err, format+"\n", args...) }}
+func (e *Env) cliSourceDeps(cfg config.Config) moduleDeps {
+	return (moduleDeps{WS: e.WS, Sink: e.boardSink(cfg), Clock: clockFunc(e.Now), Git: e.Git, Agents: e.Agents,
+		Log: func(format string, args ...any) { fmt.Fprintf(e.Err, format+"\n", args...) }})
 }

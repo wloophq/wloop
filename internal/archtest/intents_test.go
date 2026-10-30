@@ -152,7 +152,7 @@ func typeCheck() (*token.FileSet, []typedFile, error) {
 			}
 			files = append(files, f)
 		}
-		info := &types.Info{Types: map[ast.Expr]types.TypeAndValue{}, Uses: map[*ast.Ident]types.Object{}, Selections: map[*ast.SelectorExpr]*types.Selection{}}
+		info := &types.Info{Types: map[ast.Expr]types.TypeAndValue{}, Uses: map[*ast.Ident]types.Object{}, Defs: map[*ast.Ident]types.Object{}, Selections: map[*ast.SelectorExpr]*types.Selection{}}
 		pkg, err := (&types.Config{Importer: imp}).Check(p.ImportPath, fset, files, info)
 		if err != nil {
 			return nil, nil, fmt.Errorf("%s: %w", self, err)

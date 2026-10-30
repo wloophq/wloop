@@ -3,22 +3,26 @@ package messages_test
 import (
 	"context"
 	"slices"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
-	"github.com/wloophq/wloop/internal/core/gtd/gtdtest"
+	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/gates/gatestest"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/messages/messagestest"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -58,7 +62,7 @@ func (l *launcher) Launch(_ context.Context, x turns.Launch) error {
 	return nil
 }
 
-func (l *launcher) MyReviews(context.Context, unit.Unit, time.Time) ([]turns.MyReview, error) {
+func (l *launcher) Answers(context.Context, unit.Unit, time.Time) ([]turns.SourceAnswer, error) {
 	return nil, nil
 }
 
@@ -68,8 +72,8 @@ func (n noItems) Items(_ context.Context, u unit.Unit) ([]items.Item, error) { r
 
 type facts struct{ off map[unit.ProviderID]bool }
 
-func (f facts) UnitFacts(_ context.Context, u unit.Unit) (gtd.UnitFacts, bool, error) {
-	return gtd.UnitFacts{Unit: u}, !f.off[u.Provider], nil
+func (f facts) UnitFacts(_ context.Context, u unit.Unit) (task.UnitFacts, bool, error) {
+	return task.UnitFacts{Unit: u}, !f.off[u.Provider], nil
 }
 
 type fakeLedger struct {
@@ -98,45 +102,148 @@ func (l *fakeLedger) Proposals(_ context.Context, st coreitems.ProposalState) ([
 func (l *fakeLedger) Decide(_ context.Context, id int64, accept bool) (coreitems.Result, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	i := slices.IndexFunc(l.proposals, func(p coreitems.Proposal) bool { return p.ID == id && p.State == coreitems.ProposalOpen })
+	i := slices.IndexFunc(l.proposals, func(p coreitems.Proposal) bool { return p.ID == id })
 	if i < 0 {
 		return coreitems.Result{}, coreitems.ErrNoProposal
-	}
-	l.proposals[i].State = coreitems.ProposalRejected
-	if accept {
-		l.proposals[i].State = coreitems.ProposalAccepted
 	}
 	l.decided = append(l.decided, decision{id, accept})
 	return coreitems.Result{}, nil
 }
 
 type rig struct {
-	svc     *messages.Service
-	turns   *turns.Service
-	books   *turnstest.Store
-	reg     *turnstest.Registry
-	sess    *turnstest.Sessions
-	msgs    *messagestest.Store
-	gtd     *coregtd.Service
-	entries *gtdtest.Store
-	items   noItems
-	facts   facts
-	ledger  *fakeLedger
-	clock   *clock
-	launch  *launcher
+	svc       *messages.Service
+	turns     *turns.Service
+	books     *turnstest.Store
+	reg       *turnstest.Registry
+	sess      *turnstest.Sessions
+	msgs      *messagestest.Store
+	tasks     *coretasks.Service
+	taskStore *taskstest.Store
+	items     noItems
+	facts     facts
+	ledger    *fakeLedger
+	clock     *clock
+	launch    *launcher
+	gateStore *gatestest.Store
+	gates     *gates.Service
+}
+
+// The bundled gates.toml's gates of the messages, and its missing-record gate.
+var profileGates = gateDefs{
+	{Name: "question", Kind: gate.KindQuestion, Label: "The agent asks", Intents: []gates.Intent{
+		{Name: "answer", Status: gate.Answered, Answer: true}, {Name: "continue", Status: gate.Answered}, {Name: "dismiss", Status: gate.Dismissed}}},
+	{Name: "post", Kind: gate.KindPost, Label: "The agent says", Intents: []gates.Intent{
+		{Name: "reply", Status: gate.Answered, Answer: true}, {Name: "dismiss", Status: gate.Dismissed}}},
+	{Name: "proposal", Kind: gate.KindProposal, Label: "Apply this proposal?", Intents: []gates.Intent{
+		{Name: "approve", Status: gate.Approved}, {Name: "reject", Status: gate.Rejected}}},
+	{Name: "missing-record", Kind: gate.KindQuestion, Label: "The run stopped", Intents: []gates.Intent{
+		{Name: "answer", Status: gate.Answered, Answer: true}, {Name: "continue", Status: gate.Answered}, {Name: "dismiss", Status: gate.Dismissed}}},
+}
+
+type gateDefs []gates.Def
+
+func (d gateDefs) Gate(name string) (gates.Def, bool) {
+	i := slices.IndexFunc(d, func(g gates.Def) bool { return g.Name == name })
+	if i < 0 {
+		return gates.Def{}, false
+	}
+	return d[i], true
+}
+
+func (d gateDefs) FirstOf(k gate.Kind) (gates.Def, bool) {
+	i := slices.IndexFunc(d, func(g gates.Def) bool { return g.Kind == k })
+	if i < 0 {
+		return gates.Def{}, false
+	}
+	return d[i], true
+}
+
+// gateTasks give a gate the task of its unit from the store, and open one through the tasks service.
+type gateTasks struct {
+	store *taskstest.Store
+	svc   *coretasks.Service
+}
+
+func (g gateTasks) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
+	return g.store.TasksOf(ctx, u)
+}
+
+func (g gateTasks) Open(ctx context.Context, r coretasks.OpenRequest) (task.Task, error) {
+	return g.svc.Open(ctx, r)
 }
 
 func newRig(t *testing.T) *rig {
 	t.Helper()
 	r := &rig{books: turnstest.NewStore(), reg: turnstest.NewRegistry(), sess: turnstest.NewSessions(), msgs: messagestest.New(),
-		entries: gtdtest.New(), items: noItems{map[unit.Unit][]items.Item{}}, facts: facts{map[unit.ProviderID]bool{}},
+		taskStore: taskstest.New(), items: noItems{map[unit.Unit][]items.Item{}}, facts: facts{map[unit.ProviderID]bool{}},
 		ledger: &fakeLedger{}, clock: &clock{t: t0}, launch: &launcher{}}
-	r.turns = &turns.Service{Intents: turnstest.Intents(), Store: r.books, Registry: r.reg, Sessions: r.sess, Launcher: r.launch, GitHub: r.launch,
+	r.turns = &turns.Service{Intents: turnstest.Intents(), Store: r.books, Registry: r.reg, Sessions: r.sess, Launcher: r.launch, Answers: r.launch,
 		Clock: r.clock, Command: "loop", FastJob: 2 * time.Minute}
-	r.gtd = coregtd.New(coregtd.Deps{Store: r.entries, Items: r.items, Facts: r.facts, Clock: r.clock, StaleWaitingDays: 2})
-	r.svc = &messages.Service{Store: r.msgs, Books: r.books, Turns: r.turns, Ledger: r.ledger, Entries: r.gtd, Intents: turnstest.Intents(),
-		Clock: r.clock, Log: t.Logf}
+	r.tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: r.taskStore, Items: r.items, Facts: r.facts, Clock: r.clock})
+	r.gateStore = gatestest.NewStore(r.clock.Now)
+	r.svc = &messages.Service{Store: r.msgs, Books: r.books, Turns: r.turns, Ledger: r.ledger, Tasks: r.tasks, Intents: turnstest.Intents(),
+		Clock: r.clock, Log: t.Logf, ProposalText: func(p coreitems.Proposal) string {
+			return "Proposed " + string(p.Op.Op) + " of item " + p.Item + ": " + p.Reason
+		}}
+	r.gates = gates.New(gates.Deps{Store: r.gateStore, Reader: r.gateStore, Profile: profileGates, Tasks: gateTasks{r.taskStore, r.tasks}, Clock: r.clock,
+		Deliverer: r.svc, Decider: r.svc, Log: t.Logf})
+	r.svc.Gates = serviceGates{r.gates, r.gateStore}
 	return r
+}
+
+// gateOf is m's gate, open or closed, failing t when m has none.
+func (r *rig) gateOf(t *testing.T, m message.Message) gate.Gate {
+	t.Helper()
+	all, err := r.gateStore.Where(context.Background(), gates.Query{Kind: m.Kind.Gate(), Statuses: []gate.Status{gate.Open, gate.Answered,
+		gate.Approved, gate.Rejected, gate.Dismissed, gate.Superseded}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found []gate.Gate
+	for _, g := range all {
+		if g.Subject == strconv.FormatInt(m.ID, 10) {
+			found = append(found, g)
+		}
+	}
+	if len(found) == 0 {
+		t.Fatalf("message %d has no gate", m.ID)
+	}
+	return found[len(found)-1]
+}
+
+// openGates are the open gates of kind k.
+func (r *rig) openGates(t *testing.T, k gate.Kind) []gate.Gate {
+	t.Helper()
+	open, err := r.gateStore.Where(context.Background(), gates.Query{Kind: k})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return open
+}
+
+// resolve resolves m's open gate with intent and a as a person, from source; it returns the answer's route.
+func (r *rig) resolve(m message.Message, intent string, a messages.Answer) (turns.AnswerResult, error) {
+	d := &messages.Delivery{Source: a.Source}
+	ctx := messages.WithDelivery(context.Background(), d)
+	open, err := r.gateStore.Where(ctx, gates.Query{Kind: m.Kind.Gate(), Unit: m.Unit})
+	if err != nil {
+		return turns.AnswerResult{}, err
+	}
+	i := slices.IndexFunc(open, func(g gate.Gate) bool { return g.Subject == strconv.FormatInt(m.ID, 10) })
+	if i < 0 {
+		return turns.AnswerResult{}, gates.ErrResolved
+	}
+	err = r.gates.Resolve(ctx, open[i].ID, gates.Resolution{Intent: intent, Answer: messages.GateAnswer(a), By: task.ActorPerson})
+	return d.Route, err
+}
+
+// answer answers m through its gate, as a person.
+func (r *rig) answer(m message.Message, a messages.Answer) (turns.AnswerResult, error) {
+	intent := "answer"
+	if m.Kind == message.AgentPost {
+		intent = "reply"
+	}
+	return r.resolve(m, intent, a)
 }
 
 // live puts term_1 as a warm, capable, idle session.
@@ -218,22 +325,22 @@ func (r *rig) message(t *testing.T, id int64) message.Message {
 	return m
 }
 
-func (r *rig) entry(t *testing.T, id string) gtd.Entry {
+func (r *rig) task(t *testing.T, id string) task.Task {
 	t.Helper()
-	e, err := r.entries.Entry(context.Background(), gtd.ID(id))
+	e, err := r.taskStore.Task(context.Background(), task.ID(id))
 	if err != nil {
 		t.Fatal(err)
 	}
 	return e
 }
 
-func (r *rig) inbox(t *testing.T) []gtd.Entry {
+func (r *rig) inbox(t *testing.T) []task.Task {
 	t.Helper()
-	es, err := r.gtd.Entries(context.Background(), gtd.Query{View: gtd.ViewInbox})
+	es, err := r.taskStore.Tasks(context.Background(), task.Query{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return es
+	return slices.DeleteFunc(es, func(e task.Task) bool { return e.Category != task.CategoryInbox })
 }
 
 // only is the one open message, failing t otherwise.
@@ -244,4 +351,22 @@ func (r *rig) only(t *testing.T) message.Message {
 		t.Fatalf("open messages %+v, want one", open)
 	}
 	return open[0]
+}
+
+// subject is the Subject of m's gates.
+func subject(m message.Message) string { return strconv.FormatInt(m.ID, 10) }
+
+// gatesResolution is a person's resolution with intent.
+func gatesResolution(intent string) gates.Resolution {
+	return gates.Resolution{Intent: intent, By: task.ActorPerson}
+}
+
+// serviceGates are the gates service, read through its store.
+type serviceGates struct {
+	*gates.Service
+	read *gatestest.Store
+}
+
+func (g serviceGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
+	return g.read.Where(ctx, q)
 }

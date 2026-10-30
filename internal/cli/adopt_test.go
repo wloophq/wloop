@@ -2,14 +2,15 @@ package cli
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -64,13 +65,14 @@ func TestTakeOverMarksTheInventory(t *testing.T) {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	st := te.Store
-	ref := github.Ref{Owner: "acme", Repo: "api", Number: 20}
+	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 20}
 	ctx := context.Background()
-	if o, err := st.Override(ctx, ref); err != nil || !o.Adopted {
-		t.Fatalf("not adopted: %+v %v", o, err)
+	if !adoptedByPlugin(t, te, ref) {
+		t.Fatal("not adopted")
 	}
 	evs, _ := st.Events(ctx, ref)
-	if len(evs) != 1 || evs[0].Kind != dinv.KindAdopted {
+	if n := slices.IndexFunc(evs, func(e dinv.Event) bool { return e.Kind == dinv.KindAdopted }); n < 0 ||
+		slices.ContainsFunc(evs[n+1:], func(e dinv.Event) bool { return e.Kind == dinv.KindAdopted }) {
 		t.Fatalf("events: %+v", evs)
 	}
 }
@@ -267,7 +269,7 @@ func TestFindAuthorWorkspacePrefersAWorktreeOverTheMainCheckout(t *testing.T) {
 	yes := func() (bool, error) { return true, nil }
 	no := func() (bool, error) { return false, nil }
 	repos := []wsdomain.Repo{{ID: "r1", RemoteKey: "github.com/acme/api"}}
-	pr := &github.PullRequest{Facts: pr.Facts{Ref: github.Ref{Owner: "acme", Repo: "api", Number: 20}, HeadRefName: "feat/theirs"}}
+	pr := &pr.PullRequest{Facts: pr.Facts{Ref: pr.Ref{Owner: "acme", Repo: "api", Number: 20}, HeadRefName: "feat/theirs"}}
 	for name, worktree := range map[string]wsdomain.Workspace{
 		"on the branch": {ID: "wt", RepoID: "r1", HostID: "local", Branch: "feat/theirs"},
 		"linked":        {ID: "wt", RepoID: "r1", HostID: "local", Branch: "other", LinkedPR: 20},
@@ -312,19 +314,19 @@ func TestTakeOverForgetsOnlyTheReviewsAddressed(t *testing.T) {
 	te := newTestEnv(t, m)
 	te.gh.basics = adoptBasics
 	te.git.branch["/worktrees/feat/theirs"] = "feat/theirs"
-	ref := github.Ref{Owner: "acme", Repo: "api", Number: 20}
+	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 20}
 	st := te.loadRounds(t)
-	st.SetMark(ref.String(), round.AddressedReviews, "2026-10-18T10:00:00Z")
-	st.SetMark(ref.String(), round.Reviewed, "2026-10-18T10:00:00Z@c9")
+	st.SetMark(ref.String(), ghsource.MarkAddressedReviews, "2026-10-18T10:00:00Z")
+	st.SetMark(ref.String(), ghsource.MarkReviewed, "2026-10-18T10:00:00Z@c9")
 	te.saveRounds(t, st)
 	if code := te.run("take-over", ref.URL()); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	st = te.loadRounds(t)
-	if got := st.Mark(ref.String(), round.AddressedReviews); got != "" {
+	if got := st.Mark(ref.String(), ghsource.MarkAddressedReviews); got != "" {
 		t.Fatalf("the reviews addressed, %q, survived the take-over", got)
 	}
-	if got := st.Mark(ref.String(), round.Reviewed); got == "" {
+	if got := st.Mark(ref.String(), ghsource.MarkReviewed); got == "" {
 		t.Fatal("the take-over forgot my own review")
 	}
 }

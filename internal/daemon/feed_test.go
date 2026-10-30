@@ -19,7 +19,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
@@ -56,13 +57,13 @@ func feedServer(t *testing.T) (*Server, *change.Log, *turns.Service) {
 	t.Cleanup(func() { db.Close() })
 	st := inventory.New(db)
 	st.UseClock(func() time.Time { return agentNow })
-	if err := st.UpsertPR(context.Background(), feedPR()); err != nil {
+	if err := inventorytest.Of(st).UpsertPR(context.Background(), feedPR()); err != nil {
 		t.Fatal(err)
 	}
 	repo := sqlite.New(db)
 	svc := &turns.Service{Intents: turnstest.Intents(), Store: repo, Registry: repo, Sessions: turnstest.NewSessions(), Clock: agentClock{}, Command: brand.Name, FastJob: 2 * time.Minute}
 	s := New(withStore(Deps{Turns: svc, Activity: db, Changes: log, Snapshot: db, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return agentNow },
-		Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil }}, st))
+		Identity: viewerIs("me")}, st))
 	s.token = ""
 	stopOnCleanup(t, s)
 	return s, log, svc
@@ -236,7 +237,7 @@ func TestIdleCyclePublishesNoRowChange(t *testing.T) {
 		runFeeds(t, s)
 		msgs := listen(t, s, nil)
 		fast := newJob("fast", time.Hour, time.Minute, func(ctx context.Context) (string, string, error) {
-			return ghsource.Outcome(ghsource.Report{Queries: 1}, s.store().UpsertPR(ctx, feedPR()))
+			return sweepOutcome(sweepReport{Queries: 1}, inventorytest.Of(s.store()).UpsertPR(ctx, feedPR()))
 		})
 		fast.onEnd = s.jobEnded
 		fast.once(context.Background(), func(string, ...any) {}, s.jobDone)

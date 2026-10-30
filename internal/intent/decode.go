@@ -38,6 +38,7 @@ type manifest struct {
 	Why         *string           `toml:"why"`
 	Refuse      []mRefuse         `toml:"refuse"`
 	Drafts      *mDrafts          `toml:"drafts"`
+	Gates       *mGates           `toml:"gates"`
 	Guidance    *mGuidance        `toml:"guidance"`
 	Headline    *mHeadline        `toml:"headline"`
 	Inputs      map[string]mInput `toml:"inputs"`
@@ -67,9 +68,8 @@ type mRefuse struct {
 }
 
 type mDrafts struct {
-	AllowedEffects []string   `toml:"allowed_effects"`
-	AttachPosts    bool       `toml:"attach_posts"`
-	Approval       *mApproval `toml:"approval"`
+	AllowedEffects []string `toml:"allowed_effects"`
+	AttachPosts    bool     `toml:"attach_posts"`
 }
 
 type mHelp struct {
@@ -143,6 +143,19 @@ type mRecord struct {
 	HistoryArtifact string     `toml:"history_artifact"`
 	Require         []mRequire `toml:"require"`
 	AttachURL       bool       `toml:"attach_url"`
+	Requires        *string    `toml:"requires"`
+	Missing         *string    `toml:"missing"`
+}
+
+// outcomes says whether the table holds a key of the turn's outcome, which
+// needs record.states.
+func (r *mRecord) outcomes() bool {
+	return r.When != nil || r.Artifacts != nil || r.Outcome != nil || r.Require != nil || r.AttachURL
+}
+
+// mGates is the [gates] table of a manifest: the approval of the gates its runs and drafts open.
+type mGates struct {
+	Approval *mApproval `toml:"approval"`
 }
 
 type mRequire struct {

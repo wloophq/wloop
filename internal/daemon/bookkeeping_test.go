@@ -2,12 +2,14 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/adapter/store/storetest"
 	"github.com/wloophq/wloop/internal/api"
@@ -15,10 +17,10 @@ import (
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // newLiveServer is a server over a store seeded at live size, with the
@@ -26,14 +28,19 @@ import (
 func newLiveServer(t *testing.T) (*Server, *storetest.Fixture) {
 	t.Helper()
 	f := storetest.Seeded(t, storetest.Live)
+	if err := ghsource.KeepIdentity(context.Background(), f.Inventory, identityOf("user-01")); err != nil {
+		t.Fatal(err)
+	}
+	keepReports(t, f.Inventory)
 	now := f.Now
 	sessions := turnstest.NewSessions()
 	d := withStore(Deps{Activity: f.DB, Changes: f.Log, Snapshot: f.DB, Intakes: f.DB.Intakes(), Pauses: f.Rounds, Cfg: config.Defaults(), Version: "test",
 		Now:      func() time.Time { return now },
-		Viewer:   func(context.Context) (string, []string, error) { return "user-01", nil, nil },
+		Identity: viewerIs("user-01"),
 		Log:      func(string, ...any) {},
 		Turns:    &turns.Service{Intents: turnstest.Intents(), Store: f.Turns, Registry: f.Turns, Sessions: sessions, Clock: fixedClock(now)},
 		Sessions: sessions, Agents: snapshotOf(sessions), Items: &coreitems.Ledger{Store: f.DB.Items()}, Cards: f.DB.Cards()}, f.Inventory)
+	githubOf(&d).View = func(context.Context, src.ViewRequest) (json.RawMessage, error) { return json.RawMessage(`[]`), nil }
 	s := New(d)
 	s.token = ""
 	stopOnCleanup(t, s)
@@ -49,7 +56,7 @@ func TestGetPathWritesNothing(t *testing.T) {
 	s, f := newLiveServer(t)
 	ctx := context.Background()
 	ref := f.Open[0]
-	if err := f.Inventory.SetOverride(ctx, dinv.Override{PR: ref, MuteUntilStateChange: true, MutedKind: "gone", MutedWaitingOn: "nobody"}); err != nil {
+	if err := muteBy(f.Inventory, ref, time.Time{}); err != nil {
 		t.Fatal(err)
 	}
 	fill := strings.NewReplacer("{provider}", string(unit.GitHub), "{key}", url.PathEscape(ref.String()), "{seq}", "1")
@@ -73,19 +80,24 @@ func TestGetPathWritesNothing(t *testing.T) {
 	if routes < 15 {
 		t.Fatalf("only %d GET routes ran", routes)
 	}
-	if o, _ := f.Inventory.Override(ctx, ref); !o.MuteUntilStateChange {
-		t.Fatalf("a GET cleared the lapsed mute: %+v", o)
+	if ws, _ := f.DB.Wakes().UnitWakes(ctx, []unit.Unit{ref.Unit()}); ws[ref.Unit()].When == "" {
+		t.Fatalf("a GET cleared the mute: %+v", ws)
 	}
 }
 
 func TestNoMuteNoWork(t *testing.T) {
 	t.Parallel()
 	s, _ := newLiveServer(t)
-	if _, err := s.rows(context.Background(), api.ViewAll); err != nil {
+	if _, err := s.readModel().Rows(context.Background(), api.Since{}); err != nil {
 		t.Fatal(err)
 	}
+	for range 2 {
+		if err := s.keepCurrent(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
 	ctx, sc := metertest.Start(t, context.Background())
-	if err := s.expireMutes(ctx); err != nil {
+	if err := s.keepCurrent(ctx); err != nil {
 		t.Fatal(err)
 	}
 	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 0, {Res: meter.Tx}: 0})
@@ -125,7 +137,7 @@ func TestChangedSituationsOneTx(t *testing.T) {
 	before := map[string]int{}
 	for _, ref := range refs {
 		before[ref.String()] = len(situationsOf(t, s, ref))
-		if err := f.Inventory.SetOverride(ctx, dinv.Override{PR: ref, MutedUntil: f.Now.Add(time.Hour)}); err != nil {
+		if err := muteBy(f.Inventory, ref, f.Now.Add(time.Hour)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -149,7 +161,7 @@ func TestCheckReportsAStaleRowInDoctorAndHealth(t *testing.T) {
 	s, f := newLiveServer(t)
 	log := &lineLog{}
 	s.deps.Log = log.logf
-	if _, err := s.rows(context.Background(), api.ViewAll); err != nil {
+	if _, err := s.readModel().Rows(context.Background(), api.Since{}); err != nil {
 		t.Fatal(err)
 	}
 	var rep api.DoctorReport
@@ -158,7 +170,8 @@ func TestCheckReportsAStaleRowInDoctorAndHealth(t *testing.T) {
 		t.Fatalf("a clean read model: %+v", c)
 	}
 	ref := f.Open[0]
-	sqlitetest.Exec(t, f.DB, `UPDATE pull_requests SET title = 'Written behind the log' WHERE owner = ? AND repo = ? AND number = ?`, ref.Owner, ref.Repo, ref.Number)
+	sqlitetest.Exec(t, f.DB, `UPDATE unit_snapshots SET snapshot = json_set(snapshot, '$.data.pr.Title', 'Written behind the log') WHERE provider = ? AND unit_key = ?`,
+		string(unit.GitHub), ref.String())
 	get(t, s, api.AdminDoctor, &rep)
 	if c := checkNamed(rep, "read model"); c.Mark != api.DoctorMissing || !strings.Contains(c.Info, ref.String()) || !strings.Contains(c.Info, "title") {
 		t.Fatalf("a row written without a note: %+v", c)

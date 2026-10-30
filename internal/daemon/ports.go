@@ -7,8 +7,10 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/ingest"
+	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/port"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -27,6 +29,11 @@ type Sweeper interface {
 	Seen() port.Generation
 }
 
+// Wakes match the tasks' wakes due, and those whose condition holds.
+type Wakes interface {
+	Sweep(ctx context.Context) error
+}
+
 // Plan is the workflows' plan and the user's actions on it.
 type Plan interface {
 	// Evaluate is what the workflows of trigger t would decide now; it
@@ -39,9 +46,9 @@ type Plan interface {
 	Act(ctx context.Context, id string, a workflow.Action, guidance string) (workflow.Item, error)
 	// Drop discards u's pending items without marking them handled.
 	Drop(ctx context.Context, u unit.Unit, why string) error
-	// DueRun runs the pending items whose window ended; the caller holds the
-	// loop lock.
-	DueRun(ctx context.Context) error
+	// Release is the consequence of the resolved plan gate g on the item it
+	// names; the caller holds the loop lock.
+	Release(ctx context.Context, g gate.Gate) error
 }
 
 // SweepFunc is a Sweeper with no deadline that reads no snapshot and runs
@@ -57,33 +64,25 @@ func (f SweepFunc) Sweep(ctx context.Context, loop sync.Locker) (string, string,
 func (SweepFunc) Due() time.Time        { return time.Time{} }
 func (SweepFunc) Seen() port.Generation { return 0 }
 
-// PullRequests reads the stored pull requests and sets the workspace linked
-// to one.
-type PullRequests interface {
-	PR(ctx context.Context, u unit.Unit) (dinv.PR, bool, error)
-	PRs(ctx context.Context, units []unit.Unit) (map[unit.Unit]dinv.PR, error)
-	ListPRs(ctx context.Context, open bool) ([]dinv.PR, error)
-	Tracked(ctx context.Context) ([]unit.Unit, error)
-	SetWorkspace(ctx context.Context, u unit.Unit, ws dinv.Workspace) error
-}
-
-// EventLog reads and records pull request events.
+// EventLog reads and records the loop's events.
 type EventLog interface {
-	Events(ctx context.Context, u unit.Unit) ([]dinv.Event, error)
-	RecentActivity(ctx context.Context, limit int) ([]dinv.ActivityEvent, error)
-	RecordEvent(ctx context.Context, ev dinv.Event) error
-	RecordSituations(ctx context.Context, sits []dinv.Situation) error
+	RecentActivity(ctx context.Context, limit int) ([]port.Activity, error)
+	RecordEvent(ctx context.Context, ev port.Event) error
 }
 
-// Overrides reads and writes the user's overrides.
+// Overrides are the host's overrides of units, by name (port.Overrides).
 type Overrides interface {
-	Override(ctx context.Context, u unit.Unit) (dinv.Override, error)
-	Overrides(ctx context.Context) (map[unit.Unit]dinv.Override, error)
-	// SetOverrideIf writes o only while the stored override is was.
-	SetOverrideIf(ctx context.Context, was, o dinv.Override) (written bool, err error)
-	ClearMute(ctx context.Context, u unit.Unit, kind, waitingOn string) (cleared bool, err error)
-	// SetNextGuidance keeps guidance for u's next automatic round.
-	SetNextGuidance(ctx context.Context, u unit.Unit, guidance string) error
+	Override(ctx context.Context, u unit.Unit) (map[string]string, error)
+	// SetOverride writes set in one transaction only while ifMatch holds;
+	// a value "" clears one.
+	SetOverride(ctx context.Context, u unit.Unit, set, ifMatch map[string]string) (written bool, err error)
+	// Held are the units of provider p the user holds.
+	Held(ctx context.Context, p unit.ProviderID) ([]unit.Unit, error)
+}
+
+// RecordWriter keeps a unit's record of a kind, written by w; a new one replaces the unit's last of that kind.
+type RecordWriter interface {
+	PutRecord(ctx context.Context, u unit.Unit, kind string, w task.Writer, data []byte, at time.Time) error
 }
 
 // Metas keeps the daemon's small values by key.
@@ -95,17 +94,16 @@ type Metas interface {
 
 // Records reads what turns and briefs left behind.
 type Records interface {
-	Turn(ctx context.Context, id string) (dinv.StoredTurn, bool, error)
-	BriefRecord(ctx context.Context, u unit.Unit) (dinv.BriefRecord, bool, error)
-	BriefRun(ctx context.Context, id int64) (dinv.BriefRun, bool, error)
-	Timings(ctx context.Context, since time.Time) (dinv.TimingsData, error)
-	// UnitlessEvents are the events of no pull request, oldest first.
-	UnitlessEvents(ctx context.Context) ([]dinv.Event, error)
+	Turn(ctx context.Context, id string) (port.SentText, bool, error)
+	// Brief is u's stored brief; ok is false for none.
+	Brief(ctx context.Context, u unit.Unit) (b intake.StoredBrief, ok bool, err error)
+	// UnitlessEvents are the events of no source's unit, oldest first.
+	UnitlessEvents(ctx context.Context) ([]port.Event, error)
 }
 
-// Collector rebuilds GitHub's scope and catches what the searches no longer
-// return on the slow job; skipped holds truncation and warnings, which
-// surface in health without failing the job.
+// Collector is the sources' slow job, which rebuilds what their ingestion
+// keeps cheap; skipped holds truncation and warnings, which surface in
+// health without failing the job.
 type Collector interface {
 	SlowJob(ctx context.Context) (summary, skipped string, err error)
 }

@@ -6,6 +6,6 @@ when = 'pr.review.action == "follow-up"'
 use = "turn.start"
 intent = "review"
 
-[[approval.rule]]
+[[gates.approval.rule]]
 when = "session.managed"
 mode = "wait"

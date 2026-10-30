@@ -15,6 +15,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/timeline"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/api"
@@ -31,7 +33,7 @@ import (
 	coreusage "github.com/wloophq/wloop/internal/core/usage"
 	"github.com/wloophq/wloop/internal/core/views"
 	"github.com/wloophq/wloop/internal/daemon"
-	dgh "github.com/wloophq/wloop/internal/domain/github"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -39,15 +41,12 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/view"
 	"github.com/wloophq/wloop/internal/domain/workflow"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/procgroup"
 	"github.com/wloophq/wloop/internal/readmodel"
-	"github.com/wloophq/wloop/internal/source"
-	"github.com/wloophq/wloop/internal/termfmt"
 	"github.com/wloophq/wloop/internal/transport/mcp"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace"
@@ -60,61 +59,6 @@ const (
 	daemonLock   = "daemon.lock"
 	httpInfoFile = "http.json"
 )
-
-type storeRecorder struct{ store *inventory.Store }
-
-// Record writes ev once: an event with a key is stored at most once per
-// pull request, kind and key.
-func (r storeRecorder) Record(ctx context.Context, ev dinv.Event) error {
-	return r.store.RecordEvent(ctx, ev)
-}
-
-func (r storeRecorder) Overrides(ctx context.Context) (map[github.Ref]dinv.Override, error) {
-	return r.store.Overrides(ctx)
-}
-
-func (r storeRecorder) RecordUnit(ctx context.Context, ev port.Event) error {
-	return r.store.RecordUnitEvent(ctx, ev)
-}
-
-func (r storeRecorder) FirstRoundBlocks(ctx context.Context) (map[unit.Unit]port.Event, error) {
-	return r.store.FirstRoundBlocks(ctx)
-}
-
-func (r storeRecorder) KeepNextGuidance(ctx context.Context, ref github.Ref, guidance string) error {
-	return r.store.KeepNextGuidance(ctx, ref, guidance)
-}
-
-func (r storeRecorder) TakeNextGuidance(ctx context.Context, ref github.Ref) (string, error) {
-	return r.store.TakeNextGuidance(ctx, ref)
-}
-
-func (r storeRecorder) OpenQuestions(books map[unit.Unit]dturn.Book) map[github.Ref]map[string]bool {
-	out := map[github.Ref]map[string]bool{}
-	for u, b := range books {
-		ref := prOf(u)
-		for _, i := range roleIntents(b, builtin.RoleReview, builtin.RoleAddress) {
-			if b.OpenQuestion(i) {
-				if out[ref] == nil {
-					out[ref] = map[string]bool{}
-				}
-				out[ref][string(i)] = true
-			}
-		}
-	}
-	return out
-}
-
-// roleIntents are the intents of b's turns whose intent held one of roles.
-func roleIntents(b dturn.Book, roles ...string) []dturn.Intent {
-	var out []dturn.Intent
-	for _, t := range b.Turns {
-		if slices.Contains(roles, t.Role) && !slices.Contains(out, t.Intent) {
-			out = append(out, t.Intent)
-		}
-	}
-	return out
-}
 
 // runServe serves until ctx ends, or until the binary is replaced: then it
 // stops cleanly and execs the new one in place, so an upgrade needs no
@@ -176,8 +120,9 @@ func serve(ctx context.Context, e *Env, args []string) error {
 	store.UseClock(e.Now)
 	e.Rec = storeRecorder{store}
 	e.interrupted = new(atomic.Bool)
+	e.linkStates = new(atomic.Pointer[daemon.Server])
 	e.Rounds = sqlite.NewRounds(db)
-	endpoint := mcpEndpoint{port: *mcpPort, log: logf, slack: e.slack, key: e.mcpKey,
+	endpoint := mcpEndpoint{port: *mcpPort, log: logf, tools: e.pluginTools(db), key: e.mcpKey,
 		intents: func() *dintent.Registry {
 			if l := e.loadedIntents(); l != nil {
 				return l.Registry
@@ -198,8 +143,10 @@ func serve(ctx context.Context, e *Env, args []string) error {
 	e.serveTurns(vctx, db, store, startCfg, logf)
 	defer stopViews()
 	if e.noJobs {
-		logf("serving with --no-jobs: no collector, sweep, gate, brief, usage or retain")
+		logf("serving with --no-jobs: no collector, sweep, gate, brief, usage, retain or plugin")
 	}
+	stopPlugins := e.servePlugins(ctx, db, startCfg, logf)
+	defer stopPlugins()
 
 	// One loop mutex for every server this process runs: an action the
 	// degraded server delegated may still run after it stops.
@@ -209,11 +156,13 @@ func serve(ctx context.Context, e *Env, args []string) error {
 		if cfgErr == nil {
 			e.cfg.Rebase(cfg)
 			gctx, stop := context.WithCancel(ctx)
-			e.restoreBudget(gctx, db, cfg, logf)
+			e.afterGitHubJob(gctx)
 			deps := endpoint.wire(serveDeps(gctx, e, db, cfg, logf, loopMu, appState), cfg)
 			deps.ConfigWarning = e.cfg.Warning
+			deps.EffectWarnings = e.effectProblems.list
 			srv := daemon.New(deps)
-			e.Briefing = srv
+			e.Briefing, e.consequences = srv, srv
+			e.linkStates.Store(srv)
 			err := srv.Run(ctx)
 			stop()
 			return err
@@ -255,9 +204,10 @@ func (e *Env) retainJob(db *sqlite.DB) func(context.Context) (string, error) {
 // mcpEndpoint is the daemon's MCP server over the daemon's turns; port, when
 // not 0, overrides mcp.port.
 type mcpEndpoint struct {
-	port  int
-	log   func(string, ...any)
-	slack slackEnv
+	port int
+	log  func(string, ...any)
+	// tools are the plugins' MCP tools under a configuration; nil is none.
+	tools func(config.Config) []mcp.PluginTool
 	// key is read on each request, so a key install writes later applies
 	// without a restart.
 	key func() string
@@ -282,9 +232,11 @@ func (m mcpEndpoint) wire(d daemon.Deps, cfg config.Config) daemon.Deps {
 	if d.Turns != nil {
 		srv.Turns = d.Turns
 	}
-	m.wireSlack(srv, d, cfg)
+	if m.tools != nil {
+		srv.Plugins = m.tools(cfg)
+	}
 	if d.Messages != nil {
-		srv.Inbox = d.Messages
+		srv.Tasks = d.Messages
 	}
 	d.MCP = srv
 	return d
@@ -293,18 +245,6 @@ func (m mcpEndpoint) wire(d daemon.Deps, cfg config.Config) daemon.Deps {
 type clockFunc func() time.Time
 
 func (f clockFunc) Now() time.Time { return f() }
-
-// restoreBudget sets the client's floors from cfg and seeds its budget with
-// the one the last sweep kept.
-func (e *Env) restoreBudget(ctx context.Context, db *sqlite.DB, cfg config.Config, logf func(string, ...any)) {
-	e.GitHub.SetFloors(github.DefaultFloors(cfg.GitHub.RateLimitFraction))
-	limits, err := storedGitHubBudget(ctx, inventory.New(db))
-	if err != nil {
-		logf("GitHub budget: %v", err)
-		return
-	}
-	e.GitHub.Restore(limits)
-}
 
 // serveDeps wires the daemon's jobs and use cases on db; the views run until
 // ctx ends. Under --no-jobs it plans no round and the views write no card.
@@ -324,8 +264,11 @@ func serveDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config, lo
 }
 
 func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config, logf func(string, ...any), loopMu *lock.Mutex, app *daemon.AppState) daemon.Deps {
+	forge := unit.GitHub
 	store := inventory.New(db)
 	store.UseClock(e.Now)
+	host := e.moduleHost(db)
+	store.UseHost(host(forge))
 	sessions := e.serveTurns(ctx, db, store, cfg, logf)
 	var queue *brief.Queue
 	var briefs *interruptFirst
@@ -337,14 +280,14 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 			briefs, intakeBriefs = &interruptFirst{done: e.interruptedFlag(), Queue: queue}, brief.Intakes{Q: queue}
 		}
 	}
-	sd := source.Deps{DB: db, Inventory: store, GitHub: e.GitHub, WS: e.WS, Sink: e.boardSink(cfg), Turns: e.Turns,
+	sd := (moduleDeps{Catalog: func(id unit.ProviderID) readmodel.Presenter { return e.pluginCatalog(id) }, DB: db, Inventory: store, Host: host, Reports: e.sourceReports(store), WS: e.WS, Sink: e.boardSink(cfg), Turns: e.Turns,
 		Changes: e.changes, Clock: clockFunc(e.Now), Log: logf, Git: e.Git, Agents: e.Agents,
 		Intents: func() *dintent.Registry {
 			if l := e.loadedIntents(); l != nil {
 				return l.Registry
 			}
 			return nil
-		}}
+		}})
 	if briefs != nil {
 		sd.Briefs = briefs.Queue
 	}
@@ -358,58 +301,44 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 		Changes:   e.changes,
 		Snapshot:  db,
 
+		Timeline: timeline.Merged{Log: db, Holdings: db},
+
 		Intakes:           db.Intakes(),
 		IntakeBriefs:      intakeBriefs,
 		BriefsUnavailable: unavailable,
 		ByHandRef:         e.byHandRef,
 		Facts:             e.prFacts(cfg),
 
-		Usage:    e.usageJob(db, logf),
-		Retain:   e.retainJob(db),
-		Explorer: e.GitHub,
-		Budget:   e.GitHub,
-		Turns:    e.Turns,
-		Sessions: sessions,
-		Agents:   lastAgents(sessions),
-		Activity: db,
-		Views:    e.Views,
-		Actions:  envActions{e, store},
-		Intents:  e.loadedIntents,
-		Cfg:      cfg,
-		Viewer: func(ctx context.Context) (string, []string, error) {
-			login, err := store.Viewer(ctx, unit.GitHub)
-			if err != nil {
-				return "", nil, err
-			}
-			if login == "" {
-				if login, err = e.GitHub.Viewer(ctx); err != nil {
-					return "", nil, err
-				}
-				if err := store.SetViewer(ctx, unit.GitHub, login); err != nil {
-					logf("viewer: %v", err)
-				}
-			}
-			teams, err := githubTeams(ctx, store)
-			return login, teams, err
-		},
-		Forge:    unit.GitHub,
-		Now:      e.Now,
-		Version:  Version,
-		Log:      logf,
-		StateDir: e.StateDir,
-		Socket:   e.Socket,
-		LockPath: filepath.Join(e.StateDir, daemonLock),
-		InfoPath: filepath.Join(e.StateDir, httpInfoFile),
-		Restart:  restartHint(),
-		Store:    e.storeStatus,
+		Usage:       e.usageJob(db, logf),
+		Retain:      e.retainJob(db),
+		Budget:      e.budget,
+		Turns:       e.Turns,
+		Sessions:    sessions,
+		Agents:      lastAgents(sessions),
+		Activity:    db,
+		Views:       e.Views,
+		Actions:     envActions{e, store},
+		RunHost:     runHost{e},
+		Transcripts: agentTranscripts(db.AgentTranscript),
+		Intents:     e.loadedIntents,
+		Cfg:         cfg,
+		Identity:    e.githubIdentity(store, logf),
+		Forge:       forge,
+		Now:         e.Now,
+		Version:     Version,
+		Log:         logf,
+		StateDir:    e.StateDir,
+		Socket:      e.Socket,
+		LockPath:    filepath.Join(e.StateDir, daemonLock),
+		InfoPath:    filepath.Join(e.StateDir, httpInfoFile),
+		Restart:     restartHint(),
+		Store:       e.storeStatus,
 
 		WorkspaceManager:  e.healthManager(),
 		WorkspaceManagers: e.managerDisplays(),
 		ManagerNames:      e.WS.Names(),
 
 		NotifierStart: notifierStart(),
-
-		FailedSteps: failedSteps(e.GitHub),
 
 		TurnByHand: e.byHand(loopMu),
 		Startup:    e.startupOnce(cfg, logf),
@@ -418,25 +347,34 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 		Doctor:     e.doctorWith(db),
 	}, store)
 	if briefs != nil {
-		d.Brief, d.BriefStatus, d.BriefViews = briefs, briefs, briefs
+		d.Brief, d.BriefStatus, d.BriefAttempts = githubBriefs(briefs), briefs, githubBriefs(briefs)
 	}
+	d = withGitHub(d, e.githubPresenter(store, host(forge), briefs))
+	d.PluginPresenter = e.pluginPresenter
 	d.Items = e.itemsLedger(db, cfg, logf)
+	d.PluginAction = e.pluginAction
+	d.PluginRun = e.pluginRun
+	if e.pluginKind != nil {
+		d.Loading = e.pluginKind.Loading
+		d.PluginHealth = e.pluginHealth
+	}
 	e.serveTurnLedger(db, cfg, logf)
 	links := e.linkDeps(db, cfg, logf, &sd)
 	d = e.serveMessages(ctx, d, db, cfg, logf)
-	mods, err := buildSources(e.sourcePlugins(), cfg, sd)
+	mods, err := buildSources(e.sourcePlugins(), cfg, sd, e.pluginUI)
 	if err != nil {
 		logf("sources: %v", err)
 	}
-	d = e.withCards(withoutGitHub(withSources(d, plugins, mods)), db, cfg, mods, logf)
+	d = e.withCards(withSources(d, plugins, mods, e.pluginUI), db, cfg, mods, logf)
 	e.resolve = d.Resolve
-	d = e.serveGTD(d, db, cfg, mods, logf)
+	e.hosted.setResolve(d.Resolve)
+	d = e.serveTasks(d, db, cfg, mods, logf)
 	e.serveProposals(ctx, db, cfg, mods, logf)
 	d = e.serveOutbox(d, db, cfg, mods, logf)
 	e.servePlacement(mods)
 	d = links.serve(d, mods)
 	dossierSvc := e.serveDossiers(ctx, db, cfg, logf)
-	serveProjects(d.GTD, db, dossierSvc)
+	serveProjects(d.Tasks, db, dossierSvc)
 	e.serveDossierTurns(ctx, dossierSvc, db, cfg, logf)
 	e.servePayloads(mods)
 	d = e.serveHeadless(ctx, d, db, cfg, mods, logf)
@@ -462,8 +400,8 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 
 // briefsItself says a module's units are briefed by the queue's own calls,
 // which the queue's loop makes; an OnDemand source's job writes its briefs.
-func briefsItself(mods []source.Module) bool {
-	return slices.ContainsFunc(mods, func(m source.Module) bool {
+func briefsItself(mods []pluginModule) bool {
+	return slices.ContainsFunc(mods, func(m pluginModule) bool {
 		_, onDemand := m.Briefs.(brief.OnDemand)
 		return m.Briefs != nil && !onDemand
 	})
@@ -493,11 +431,14 @@ func withEngine(d daemon.Deps, e *Env, ed engineDeps) daemon.Deps {
 		ed.WorkspaceFacts = e.workspaceFacts()
 	}
 	eng := meteredEngine{e.newEngine(ed)}
+	if ed.DB != nil {
+		eng.Gates = draftGates{e: e, db: ed.DB, logf: ed.Log}
+	}
 	d.Sweep = eng
 	pd := ed
 	pd.WorkspaceFacts, pd.Withdrawals = siblingFacts(ed.WorkspaceFacts), nil
 	d.Plan = servedPlan{eng: eng, plan: e.planEngine(pd)}
-	d.Pending = enginePending{e}
+	d.Plans = enginePlans{e}
 	return d
 }
 
@@ -529,11 +470,11 @@ func (p servedPlan) Drop(ctx context.Context, u unit.Unit, why string) error {
 	return p.eng.Drop(ctx, u, why)
 }
 
-func (p servedPlan) DueRun(ctx context.Context) error { return p.eng.DueRun(ctx) }
+func (p servedPlan) Release(ctx context.Context, g gate.Gate) error { return p.eng.Release(ctx, g) }
 
 // authorFacts is the facts provider of the first module that serves the
 // views' author facts; nil without one.
-func authorFacts(mods []source.Module) views.Facts {
+func authorFacts(mods []pluginModule) views.Facts {
 	for _, m := range mods {
 		if f, ok := m.Facts.(views.Facts); ok {
 			return f
@@ -612,13 +553,6 @@ func appendSet(out []string, s string) []string {
 	return append(out, s)
 }
 
-// withStore is d with every inventory role on st.
-func withStore(d daemon.Deps, st *inventory.Store) daemon.Deps {
-	u := inventory.ByUnit{Store: st}
-	d.Rows, d.PRs, d.Events, d.Overrides, d.Meta, d.Records = st, u, u, u, st, u
-	return d
-}
-
 const kindReconcileReport = "reconcile_report"
 
 // startupOnce is the daemon's start-up reconcile, run once per process: a
@@ -667,7 +601,7 @@ func (e *Env) startup(ctx context.Context, cfg config.Config, logf func(string, 
 	if e.Turns != nil {
 		tr, err := e.Turns.Reconcile(ctx, true)
 		errs = append(errs, err)
-		rep.Unrecorded, rep.Closed, rep.GoneSessions = refsOfUnits(tr.Unrecorded), refsOfUnits(tr.Closed), tr.GoneSessions
+		rep.Unrecorded, rep.Closed, rep.GoneSessions = tr.Unrecorded, tr.Closed, tr.GoneSessions
 		for _, w := range tr.Warnings {
 			logf("reconcile: %s", w)
 		}
@@ -914,7 +848,7 @@ func (e *Env) serveTurns(ctx context.Context, db *sqlite.DB, store *inventory.St
 	repo := sqlite.New(db)
 	clock := clockFunc(func() time.Time { return e.Now() })
 	v := &views.Service{Books: trackedBooks{books: repo, cards: e.viewFacts()}, Intents: registryPort{e}, State: repo, Sinks: viewSinks, Clock: clock, Log: logf, Paused: e.boardPaused, Debounce: cmp.Or(e.ViewDebounce, views.FlushDebounce),
-		Facts: e.viewFacts()}
+		Facts: e.viewFacts(), Gates: openGates{e}}
 	if e.changes != nil {
 		v.Changes = e.changes
 	}
@@ -923,10 +857,10 @@ func (e *Env) serveTurns(ctx context.Context, db *sqlite.DB, store *inventory.St
 		fast = time.Duration(Defaults().Sweep.Fast)
 	}
 	e.Store, e.Views, e.served = store, v, served
-	e.Turns = &turns.Service{Store: repo, Registry: repo, Sessions: sessions, Launcher: cliLauncher{e}, GitHub: inventoryFacts{store},
+	e.Turns = &turns.Service{Store: repo, Registry: repo, Sessions: sessions, Launcher: cliLauncher{e}, Answers: hostAnswers{events: sqlite.New(db), viewer: store},
 		Changed: v.Changed, Clock: clock, Command: e.loopCommand(), Notices: profileNotices{e}, FastJob: fast,
 		AgentFor:      e.agentFor(served),
-		AgentSessions: agentSessions{db}, Log: logf, Intents: registryPort{e},
+		AgentSessions: agentSessions{db}, Log: logf, Intents: registryPort{e}, Gates: namedGates{e, db},
 		Prompts: transcriptPrompts(db.AgentTranscript)}
 	e.background.Go(func() {
 		lctx, scope := meter.Start(ctx, meter.Loop("views"))
@@ -1061,7 +995,7 @@ func (e *Env) servedPorts(ctx context.Context, db *sqlite.DB, store *inventory.S
 			managers = append(managers, typeOnly{m})
 			continue
 		}
-		sessions, ms, err := k.Ports(ctx, m, store, cfg, e.changes)
+		sessions, ms, err := k.Ports(ctx, m, e.reportedPRs(), cfg, e.changes)
 		if err != nil {
 			logf("workspace manager %q: %v; "+noSessionsAdapter, m.Name(), err)
 			managers = append(managers, typeOnly{m})
@@ -1124,44 +1058,6 @@ func (e *Env) boardPaused(ctx context.Context, u unit.Unit) bool {
 	return err != nil || p.Holds(ref.Owner, ref.Repo)
 }
 
-func failedSteps(gh *github.Client) func(ctx context.Context, owner, repo string, job int64) ([]string, error) {
-	return func(ctx context.Context, owner, repo string, job int64) ([]string, error) {
-		resp, err := gh.REST(dgh.WithPriority(ctx, dgh.PriorityUser), github.Request{Path: fmt.Sprintf("repos/%s/%s/actions/jobs/%d", owner, repo, job)})
-		if err != nil {
-			return nil, err
-		}
-		var body struct {
-			Steps []struct {
-				Name       string `json:"name"`
-				Conclusion string `json:"conclusion"`
-			} `json:"steps"`
-		}
-		if err := json.Unmarshal(resp.Body, &body); err != nil {
-			return nil, err
-		}
-		var steps []string
-		for _, s := range body.Steps {
-			if s.Conclusion == "failure" {
-				steps = append(steps, termfmt.OneLine(s.Name, 120))
-			}
-		}
-		return steps, nil
-	}
-}
-
-// briefHome runs each brief under the agent home the configuration
-// names for the pull request's repository, when that project runs the
-// brief's agent.
-func briefHome(cfg config.Config) func(github.Ref) string {
-	return func(ref github.Ref) string {
-		c := cfg.For(ref.Owner, ref.Repo)
-		if c.Agent != cfg.Agent {
-			return cfg.AgentHome
-		}
-		return c.AgentHome
-	}
-}
-
 // serveUntilConfigLoads serves health, with the config error as the sweep's
 // warning, and returns once the config loads so the caller starts the jobs.
 // Delegated actions load the config themselves and answer with its error.
@@ -1169,12 +1065,12 @@ func serveUntilConfigLoads(ctx context.Context, e *Env, db *sqlite.DB, logf func
 	cfg := e.defaultConfig()
 	dctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	e.restoreBudget(dctx, db, cfg, logf)
+	e.afterGitHubJob(dctx)
 	deps := endpoint.wire(serveDeps(dctx, e, db, cfg, logf, loopMu, app), cfg)
 	deps.Collector, deps.Ingest = nil, nil
 	deps.Runtimes = withoutPluginJobs(deps.Runtimes)
 	deps.Brief, deps.Intakes, deps.IntakeBriefs = nil, nil, nil
-	deps.Plan, deps.Pending = nil, nil
+	deps.Plan, deps.Plans = nil, nil
 	if !e.noJobs {
 		deps.Sweep = daemon.SweepFunc(func(context.Context) (string, string, error) {
 			if _, err := e.readConfig(); err != nil {
@@ -1215,21 +1111,21 @@ func (e *Env) briefQueue(cfg config.Config, store *inventory.Store, logf func(st
 	if e.changes != nil {
 		changes = e.changes
 	}
-	d := brief.Deps{
+	d := e.withGitHubBriefs(brief.Deps{
 		Enabled:      cfg.Brief.Enabled,
 		Store:        store,
-		Source:       brief.Source{GitHub: e.GitHub},
-		Taxonomy:     func(github.Ref) string { return brief.DefaultTaxonomy },
+		PRs:          e.reportedPRs(),
+		Taxonomy:     func(pr.Ref) string { return brief.DefaultTaxonomy },
 		Home:         briefHome(cfg),
 		Tier:         cfg.Brief.Tier,
 		MaxDiffBytes: cfg.Brief.MaxInputBytes,
 		Retry:        time.Duration(cfg.Sweep.Slow),
-		Allow:        e.GitHub.Allow,
 		Changes:      changes,
 		Now:          e.Now,
 		Log:          logf,
 		Intent:       e.briefIntents(logf),
-	}
+		Records:      e.briefRecords(store.DB()),
+	})
 	asker, err := e.asker(cfg, filepath.Join(e.StateDir, "brief"))
 	if err != nil {
 		logf("brief: %v; only on-demand briefs", err)
@@ -1312,14 +1208,6 @@ func (r *accessRecorder) submit(rec api.GitAccessRecord) {
 }
 
 func (r *accessRecorder) flush() { r.pending.Wait() }
-
-func refsOfUnits(units []unit.Unit) []github.Ref {
-	out := make([]github.Ref, 0, len(units))
-	for _, u := range units {
-		out = append(out, prOf(u))
-	}
-	return out
-}
 
 // fallbacksOf counts the CLI fallbacks of every manager of set that keeps a count.
 func fallbacksOf(set *workspace.Set) func() int64 {

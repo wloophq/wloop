@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -59,18 +61,18 @@ func addRecord(t *testing.T, repo *sqlite.Store, n int, r record.Record) {
 	}
 }
 
-// rowAttention is the notification the deriver makes of a needs-me row, which entry notifications are
+// rowAttention is the notification the deriver makes of a needs-me row, which task notifications are
 // compared with.
 func rowAttention(t *testing.T, s *Server, row api.Row) *api.Attention {
 	t.Helper()
-	if !slices.Contains(row.Views, api.ViewNeedsMe) {
+	if !slices.Contains(row.Facets["is"], "needs-me") {
 		return nil
 	}
 	rd, ok, err := s.readRow(context.Background(), row.Unit)
 	if err != nil || !ok {
 		t.Fatalf("the row of %s: %v %v", row.Unit, ok, err)
 	}
-	return s.deriverAt(rd.Base, rd.At).Attention(rd.Row, rd.In)
+	return prrow.DeriverAt(rd.Base, s.rowSettings(), s.deps.Brief != nil, rd.At).Attention(rd.Row, rd.In)
 }
 
 func TestRowsCarryNoAttention(t *testing.T) {
@@ -79,7 +81,7 @@ func TestRowsCarryNoAttention(t *testing.T) {
 	repo := f.withTurns()
 	f.open(30, "ana", fixtureNow.Add(-time.Hour), requests("fer"))
 	askTurn(t, repo, 30, draftQuestion("the draft approves; publish it?"))
-	if rowAttention(t, f.s, f.rows("?view=" + api.ViewNeedsMe)[0]) == nil {
+	if rowAttention(t, f.s, f.rows("?is=needs-me")[0]) == nil {
 		t.Fatal("the fixture's row would notify nothing")
 	}
 	if raw := getRaw(t, f.s, api.Rows); strings.Contains(raw, `"attention"`) || !strings.Contains(raw, "acme/api#30") {
@@ -105,7 +107,7 @@ func TestAttentionForAQuestion(t *testing.T) {
 	repo := f.withTurns()
 	f.open(30, "ana", fixtureNow.Add(-time.Hour), requests("fer"))
 	askTurn(t, repo, 30, draftQuestion("the draft approves; publish it?"))
-	rows := f.rows("?view=" + api.ViewNeedsMe)
+	rows := f.rows("?is=needs-me")
 	if len(rows) != 1 || rows[0].Question == nil || rowAttention(t, f.s, rows[0]) == nil {
 		t.Fatalf("%+v", rows)
 	}
@@ -124,7 +126,7 @@ func TestAttentionForAQuestion(t *testing.T) {
 	}
 
 	addRecord(t, repo, 30, draftQuestion("the draft approves; publish it?"))
-	again := f.rows("?view=" + api.ViewNeedsMe)[0]
+	again := f.rows("?is=needs-me")[0]
 	b := rowAttention(t, f.s, again)
 	if again.Question.RecordID == q.RecordID || b.ID == a.ID || b.Category != "Q"+strconv.FormatInt(again.Question.RecordID, 10) {
 		t.Fatalf("a new record with the same summary kept the item: %+v then %+v", a, b)
@@ -140,7 +142,7 @@ func TestAttentionForAConfirmAndAStop(t *testing.T) {
 	askTurn(t, repo, 31, record.Record{State: record.Asked, Summary: "push the fix?",
 		Question: &record.Question{Kind: "confirm", Text: "Push?", Recommend: "no"}})
 	f.turn(repo, 32, turn.Intent(dintent.Review), turn.Unrecorded, "term-32")
-	rows := f.rows("?view=" + api.ViewNeedsMe)
+	rows := f.rows("?is=needs-me")
 	byNumber := map[int]api.Row{}
 	for _, r := range rows {
 		byNumber[rowNumber(r)] = r
@@ -168,7 +170,7 @@ func TestAPermissionPromptOffersNoAnswer(t *testing.T) {
 	if err := repo.SaveSession(ctx, turn.Session{ID: "term-22", Pane: "t:1", WorkspaceID: "w3"}, port.Event{Kind: turns.KindSessionLaunched, Key: "term-22", At: fixtureNow}); err != nil {
 		t.Fatal(err)
 	}
-	rows := f.rows("?view=" + api.ViewNeedsMe)
+	rows := f.rows("?is=needs-me")
 	if len(rows) != 1 || rows[0].Question != nil || rowAttention(t, f.s, rows[0]) == nil {
 		t.Fatalf("%+v", rows)
 	}
@@ -182,12 +184,14 @@ func TestOnlyNeedsMeRowsCarryAnAttentionItem(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
 	f.open(40, "ana", fixtureNow.Add(-time.Hour), func(pr *dinv.PR) { pr.Reasons = nil })
-	f.st.SetWorkspace(ctx, ref(40), dinv.Workspace{ID: "w40", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWaiting}})
+	inventorytest.Of(f.st).SetWorkspace(ctx, ref(40), dinv.Workspace{ID: "w40", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWaiting}})
 	f.open(41, "ana", fixtureNow.Add(-time.Hour), func(pr *dinv.PR) { pr.Reasons = []string{"involved"} })
-	f.st.SetOverride(ctx, dinv.Override{PR: ref(41), MutedUntil: fixtureNow.Add(time.Hour)})
-	f.st.SetWorkspace(ctx, ref(41), dinv.Workspace{ID: "w41", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWaiting}})
+	if err := muteBy(f.st, ref(41), fixtureNow.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	inventorytest.Of(f.st).SetWorkspace(ctx, ref(41), dinv.Workspace{ID: "w41", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWaiting}})
 	for _, r := range f.rows("?view=all") {
-		inNeedsMe := slices.Contains(r.Views, api.ViewNeedsMe)
+		inNeedsMe := slices.Contains(r.Facets["is"], "needs-me")
 		if a := rowAttention(t, f.s, r); (a != nil) != inNeedsMe {
 			t.Errorf("#%d views %v attention %+v", rowNumber(r), r.Views, a)
 		}
@@ -205,7 +209,9 @@ func TestNudgeComputedOnce(t *testing.T) {
 	f.open(51, "fer", at, requests("robo"))
 	f.open(52, "ana", at, requests("fer"))
 	f.open(53, "ana", at, func(pr *dinv.PR) { pr.State = "MERGED" })
-	f.st.SetOverride(context.Background(), dinv.Override{PR: ref(54), MutedUntil: fixtureNow.Add(time.Hour)})
+	if err := muteBy(f.st, ref(54), fixtureNow.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
 	f.open(54, "fer", at, requests("bob"))
 	got := map[int]api.ActionState{}
 	for _, r := range f.rows("?view=all") {
@@ -252,7 +258,7 @@ func TestTheRowShowsTheQuestionAnAnswerReaches(t *testing.T) {
 	b = books[ref33.Unit()]
 	want, _ := b.Question([]string{"review", "address", "probe"})
 
-	rows := f.rows("?view=" + api.ViewNeedsMe)
+	rows := f.rows("?is=needs-me")
 	if len(rows) != 1 || rows[0].Question == nil || rows[0].Question.Text != "Which file?" {
 		t.Fatalf("the row shows another question than an answer reaches: %+v", rows)
 	}

@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -19,7 +20,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -103,7 +103,7 @@ func TestGitHubViewsServedAsPluginViews(t *testing.T) {
 			t.Fatalf("saved views %v, catalog views %v", got, want)
 		}
 	}
-	for _, id := range []string{"plan", "dash", "explore", "recent", api.ViewAll, api.ViewLoop} {
+	for _, id := range []string{"plan", "dash", "explore", "recent", "all", "mine"} {
 		if !specs[id] {
 			t.Errorf("view %s is not served", id)
 		}
@@ -112,9 +112,6 @@ func TestGitHubViewsServedAsPluginViews(t *testing.T) {
 		if !specs[sec.View] {
 			t.Errorf("menu bar section %s names %q, which the catalog does not serve", sec.Label, sec.View)
 		}
-	}
-	if len(gh.UI.Menubar) == 0 {
-		t.Errorf("github declares no menu bar section: %+v", gh)
 	}
 }
 
@@ -138,13 +135,15 @@ func TestDisabledPluginHasNoViews(t *testing.T) {
 
 func TestPluginWithCoreKeyIsNotLoaded(t *testing.T) {
 	t.Parallel()
-	keyed := source.Plugin{ID: unit.GitHub, Codec: pr.Codec{}, Build: func(config.Config, source.Deps) (source.Module, error) {
-		return source.Module{ID: unit.GitHub, Codec: pr.Codec{},
+	keyed := compiledPlugin{ID: unit.GitHub, Codec: pr.Codec{}, Build: func(config.Config, moduleDeps) (pluginModule, error) {
+		return pluginModule{ID: unit.GitHub, Codec: pr.Codec{},
 			Ingest: ingest.Job{Every: time.Minute, Prepare: func(context.Context, time.Time) (ingest.Plan, string, error) { return ingest.Plan{}, "", nil }},
-			Rows:   func(readmodel.RowDeps) readmodel.Provider { return nil },
-			UI:     &api.PluginUI{Keys: []api.KeyBinding{{Key: "x", Action: "pick", Surface: "web"}}}}, nil
+			Rows:   func(readmodel.RowDeps) readmodel.Provider { return nil }}, nil
 	}}
-	mods, err := buildSources([]source.Plugin{keyed}, config.Config{}, source.Deps{})
+	ui := func(unit.ProviderID) (*api.PluginUI, fs.FS) {
+		return &api.PluginUI{Keys: []api.KeyBinding{{Key: "x", Action: "pick", Surface: "web"}}}, nil
+	}
+	mods, err := buildSources([]compiledPlugin{keyed}, config.Config{}, moduleDeps{}, ui)
 	if len(mods) != 0 || err == nil {
 		t.Fatalf("a plugin taking the core key x loaded: %d modules, %v", len(mods), err)
 	}
@@ -153,11 +152,11 @@ func TestPluginWithCoreKeyIsNotLoaded(t *testing.T) {
 			t.Errorf("%q does not name %q", err, w)
 		}
 	}
-	on := pluginSwitch([]source.Plugin{keyed}, mods, config.Config{})
+	on := pluginSwitch([]compiledPlugin{keyed}, mods, config.Config{})
 	if on == nil || on(unit.GitHub) {
 		t.Error("a plugin refused at build is switched on")
 	}
-	if ps := pluginList([]source.Plugin{keyed}, mods, config.Config{}); len(ps) != 1 || ps[0].Enabled {
+	if ps := pluginList([]compiledPlugin{keyed}, mods, config.Config{}, ui); len(ps) != 1 || ps[0].Enabled {
 		t.Errorf("a plugin refused at build is listed %+v", ps)
 	}
 }

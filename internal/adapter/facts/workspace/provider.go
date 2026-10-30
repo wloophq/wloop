@@ -15,7 +15,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/sweep"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -38,16 +37,10 @@ var (
 	_ automation.Dueer  = (*Provider)(nil)
 )
 
-// Rows are the stored pull requests, open or not, and the user's login on
-// their provider ("" when not known yet).
-type Rows interface {
-	Rows(ctx context.Context) ([]dinv.PR, error)
-	Viewer(ctx context.Context) (string, error)
-}
-
-// Overrides are the user's overrides, read for a taken-over pull request.
-type Overrides interface {
-	Overrides(ctx context.Context) (map[unit.Unit]dinv.Override, error)
+// Holdings read which unit of work each workspace of a snapshot holds, as
+// the unit's source matches them.
+type Holdings interface {
+	Held(ctx context.Context, snap *workspace.Snapshot, cfg config.Config) (workspace.Held, error)
 }
 
 // Git reads a checkout without reaching the network or taking a lock
@@ -86,27 +79,27 @@ type Sessions interface {
 type Deps struct {
 	Snapshot sweep.Snapshot
 	// Sessions is nil when no turns are kept: every workspace then has none.
-	Sessions  Sessions
-	PRs       Rows
-	Overrides Overrides
-	Books     sweep.Books
-	Git       Git
-	Disk      Disk
-	Changes   Generations
-	Cfg       func() config.Config
-	Clock     port.Clock
+	Sessions Sessions
+	// Holdings say which unit each workspace holds; nil holds none.
+	Holdings Holdings
+	Books    sweep.Books
+	Git      Git
+	Disk     Disk
+	Changes  Generations
+	Cfg      func() config.Config
+	Clock    port.Clock
 }
 
 // Provider is the facts provider of unit provider "workspace".
 type Provider struct {
 	d Deps
 
-	mu   sync.Mutex
-	seen port.Generation
-	due  map[string][]time.Time
-	ix   *index
-	ixAt indexKey
-	c    *reads
+	mu     sync.Mutex
+	seen   port.Generation
+	due    map[string][]time.Time
+	held   workspace.Held
+	heldAt indexKey
+	c      *reads
 }
 
 // reads are the checkout reads siblings share: the local git reads and the
@@ -205,11 +198,11 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 		return nil, err
 	}
 	cfg := p.d.Cfg()
-	ix, err := p.index(ctx, snap, cfg)
+	held, err := p.heldBy(ctx, snap, cfg)
 	if err != nil {
 		return nil, err
 	}
-	f, deadlines, err := p.facts(ctx, snap, ix, w, cfg)
+	f, deadlines, err := p.facts(ctx, snap, held, w, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -219,40 +212,38 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 	return f, nil
 }
 
-// index matches snap's workspaces against the stored pull requests, built
-// once per snapshot and change-log generation.
-func (p *Provider) index(ctx context.Context, snap *workspace.Snapshot, cfg config.Config) (*index, error) {
+// heldBy is what snap's workspaces hold, read once per snapshot and
+// change-log generation.
+func (p *Provider) heldBy(ctx context.Context, snap *workspace.Snapshot, cfg config.Config) (workspace.Held, error) {
+	if p.d.Holdings == nil {
+		return heldNone{}, nil
+	}
 	var key indexKey
 	if p.d.Changes != nil {
 		key = indexKey{snap.Gen, p.d.Changes.Gen()}
 		p.mu.Lock()
-		ix := p.ix
-		hit := ix != nil && p.ixAt == key
+		held := p.held
+		hit := held != nil && p.heldAt == key
 		p.mu.Unlock()
 		if hit {
-			return ix, nil
+			return held, nil
 		}
 	}
-	rows, err := p.d.PRs.Rows(ctx)
+	held, err := p.d.Holdings.Held(ctx, snap, cfg)
 	if err != nil {
 		return nil, err
 	}
-	overrides, err := p.d.Overrides.Overrides(ctx)
-	if err != nil {
-		return nil, err
-	}
-	viewer, err := p.d.PRs.Viewer(ctx)
-	if err != nil {
-		return nil, err
-	}
-	ix := newIndex(snap, rows, overrides, viewer, cfg)
 	if p.d.Changes != nil {
 		p.mu.Lock()
-		p.ix, p.ixAt = ix, key
+		p.held, p.heldAt = held, key
 		p.mu.Unlock()
 	}
-	return ix, nil
+	return held, nil
 }
+
+type heldNone struct{}
+
+func (heldNone) Of(workspace.Workspace) (workspace.Holding, bool) { return workspace.Holding{}, false }
 
 func (p *Provider) workspace(ctx context.Context, u unit.Unit) (*workspace.Snapshot, workspace.Workspace, error) {
 	if u.Provider != unit.Workspace {
@@ -281,12 +272,12 @@ func (p *Provider) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error)
 	if err != nil {
 		return nil, err
 	}
-	ix, err := p.index(ctx, snap, p.d.Cfg())
+	held, err := p.heldBy(ctx, snap, p.d.Cfg())
 	if err != nil {
 		return nil, err
 	}
-	if linked, ok := ix.prOf(w); ok {
-		return []unit.Unit{linked.Ref.Unit()}, nil
+	if linked, ok := held.Of(w); ok {
+		return []unit.Unit{linked.Unit}, nil
 	}
 	return nil, nil
 }

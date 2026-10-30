@@ -3,108 +3,10 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "properties": {
-    "approval": {
-      "additionalProperties": false,
-      "description": "The run approval: how a matched item runs.",
-      "properties": {
-        "mode": {
-          "default": "run",
-          "description": "The mode when no rule matches.",
-          "enum": [
-            "run",
-            "delay",
-            "wait"
-          ],
-          "type": "string"
-        },
-        "rule": {
-          "description": "A rule tried in order; the first whose when holds gives the mode.",
-          "items": {
-            "additionalProperties": false,
-            "properties": {
-              "mode": {
-                "description": "The mode when the rule applies.",
-                "enum": [
-                  "run",
-                  "delay",
-                  "wait"
-                ],
-                "type": "string"
-              },
-              "when": {
-                "description": "When the rule applies.",
-                "type": "string"
-              },
-              "window": {
-                "description": "The rule's window; only with mode delay, which needs it.",
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "window": {
-          "description": "How long a person has before the item runs; only with mode delay, which needs it.",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
     "drafts": {
       "additionalProperties": false,
       "description": "The drafts the workflow's steps and turns propose.",
       "properties": {
-        "approval": {
-          "additionalProperties": false,
-          "description": "The approval of the drafts the workflow's steps and turns propose.",
-          "properties": {
-            "mode": {
-              "default": "wait",
-              "description": "The mode when no rule matches.",
-              "enum": [
-                "send",
-                "delay",
-                "wait",
-                "dry_run"
-              ],
-              "type": "string"
-            },
-            "rule": {
-              "description": "A rule tried in order; the first whose when holds gives the mode.",
-              "items": {
-                "additionalProperties": false,
-                "properties": {
-                  "mode": {
-                    "description": "The mode when the rule applies.",
-                    "enum": [
-                      "send",
-                      "delay",
-                      "wait",
-                      "dry_run"
-                    ],
-                    "type": "string"
-                  },
-                  "when": {
-                    "description": "When the rule applies.",
-                    "type": "string"
-                  },
-                  "window": {
-                    "description": "The rule's window; only with mode delay, which needs it.",
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              },
-              "type": "array"
-            },
-            "window": {
-              "description": "How long a person has before the draft is sent; only with mode delay, which needs it.",
-              "type": "string"
-            }
-          },
-          "type": "object"
-        },
         "withdraw": {
           "additionalProperties": false,
           "description": "When an open draft the workflow proposed is withdrawn.",
@@ -120,6 +22,64 @@
             },
             "when": {
               "description": "When an open draft the workflow proposed is withdrawn, over the unit's facts and the draft's.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "gates": {
+      "additionalProperties": false,
+      "description": "The gates its runs and drafts open.",
+      "properties": {
+        "approval": {
+          "additionalProperties": false,
+          "description": "The approval of its gates: a rule applies to the kinds its when pins gate.kind to, else to draft gates alone when it reads a draft's facts, else to every kind; what no rule or mode here decides, gates.toml's [approval] does.",
+          "properties": {
+            "mode": {
+              "description": "The mode of every kind of gate when no rule holds; left out, gates.toml's default of the kind.",
+              "enum": [
+                "wait",
+                "delay",
+                "send",
+                "dry_run",
+                "run"
+              ],
+              "type": "string"
+            },
+            "rule": {
+              "description": "A rule; the first whose when holds gives the mode.",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "mode": {
+                    "description": "The rule's mode.",
+                    "enum": [
+                      "wait",
+                      "delay",
+                      "send",
+                      "dry_run",
+                      "run"
+                    ],
+                    "type": "string"
+                  },
+                  "when": {
+                    "description": "When the rule applies to a gate.",
+                    "type": "string"
+                  },
+                  "window": {
+                    "description": "With mode delay only: how long a person has to stop the gate's consequence.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "window": {
+              "description": "With mode delay only: how long a person has to stop the gate's consequence.",
               "type": "string"
             }
           },
@@ -182,10 +142,10 @@
     "provider": {
       "description": "The provider of the units it matches. Required.",
       "enum": [
-        "entry",
         "github",
         "session",
         "slack",
+        "task",
         "workspace"
       ],
       "type": "string"
@@ -395,11 +355,12 @@
               "properties": {
                 "delivery": {
                   "default": "message",
-                  "description": "How the draft posts.",
+                  "description": "How the draft posts: the core's message or reaction, or a delivery a plugin declares.",
                   "enum": [
                     "message",
                     "reaction",
-                    "comment"
+                    "comment",
+                    "edit"
                   ],
                   "type": "string"
                 },
@@ -407,7 +368,7 @@
                   "description": "What sending the draft applies.",
                   "items": {
                     "enum": [
-                      "entry.nudged",
+                      "task.nudged",
                       "unit.closed",
                       "pr.nudged"
                     ],
@@ -534,7 +495,7 @@
             "if": {
               "properties": {
                 "use": {
-                  "const": "entry.verb"
+                  "const": "task.verb"
                 }
               },
               "required": [
@@ -544,48 +505,99 @@
             "then": {
               "additionalProperties": false,
               "properties": {
+                "by": {
+                  "description": "With a verb whose handler is promise, the time the task is promised by: HH:MM, YYYY-MM-DD or RFC 3339; empty clears it.",
+                  "type": "string"
+                },
                 "on": {
-                  "description": "With waiting, the people the entry waits on, comma-separated.",
+                  "description": "With a verb whose handler is waiting, the people the task waits on, comma-separated.",
                   "type": "string"
                 },
                 "on_activity": {
-                  "description": "With schedule, `true` returns the entry on new activity on its unit.",
+                  "description": "With a verb whose handler is schedule, `true` returns the task on new activity on its unit.",
                   "type": "string"
                 },
                 "resurface": {
-                  "description": "With waiting, the date the entry resurfaces: RFC 3339 or YYYY-MM-DD.",
+                  "description": "With a verb whose handler is waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD.",
                   "type": "string"
                 },
                 "set": {
-                  "description": "With context, the contexts, comma-separated; with area, the area.",
+                  "description": "With a verb whose handler is context, the contexts, comma-separated; with area, the area.",
                   "type": "string"
                 },
                 "until": {
-                  "description": "With schedule, the date the entry returns: RFC 3339 or YYYY-MM-DD.",
+                  "description": "With a verb whose handler is schedule, the date the task returns: RFC 3339 or YYYY-MM-DD.",
                   "type": "string"
                 },
                 "use": {
-                  "const": "entry.verb"
+                  "const": "task.verb"
                 },
                 "verb": {
-                  "description": "The verb run on the entry. Required.",
-                  "enum": [
-                    "next",
-                    "waiting",
-                    "schedule",
-                    "someday",
-                    "reference",
-                    "focus",
-                    "context",
-                    "area",
-                    "done",
-                    "dismiss"
-                  ],
+                  "description": "The verb of tasks.toml run on the task, one whose by.workflow lets a workflow run it. Required.",
                   "type": "string"
                 }
               },
               "required": [
                 "verb"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
+                  "const": "gate.open"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "description": "The gate, of gates.toml, the step opens. Required.",
+                  "type": "string"
+                },
+                "use": {
+                  "const": "gate.open"
+                }
+              },
+              "required": [
+                "name"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
+                  "const": "task.set"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "prop": {
+                  "description": "The property, of tasks.toml, the step sets. Required.",
+                  "type": "string"
+                },
+                "use": {
+                  "const": "task.set"
+                },
+                "value": {
+                  "description": "The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD or as a duration after now such as +2d, a duration, a list comma-separated. Required.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "prop",
+                "value"
               ]
             }
           }
@@ -604,7 +616,9 @@
               "draft.propose",
               "classify",
               "notify.self",
-              "entry.verb"
+              "task.verb",
+              "gate.open",
+              "task.set"
             ],
             "type": "string"
           }
@@ -624,59 +638,27 @@
       "additionalProperties": false,
       "description": "What plans the workflow: on or schedule; absent, every sweep.",
       "properties": {
-        "on": {
-          "description": "The source event kinds the workflow reacts to; verb_<verb>, a verb a person ran on an entry, with provider entry.",
+        "actors": {
+          "description": "With on, the actors whose verb events plan it (person, workflow, agent, plugin); every actor when absent.",
           "items": {
             "enum": [
-              "opened",
-              "push",
-              "review_requested",
-              "review_request_removed",
-              "review",
-              "comment",
-              "check",
-              "ready",
-              "draft",
-              "merged",
-              "closed",
-              "round_sent",
-              "round_held",
-              "round_pending",
-              "round_skipped",
-              "guidance",
-              "round_blocked",
-              "round_unblocked",
-              "muted",
-              "unmuted",
-              "held",
-              "released",
-              "adopted",
-              "tracked",
-              "untracked",
-              "nudged",
-              "removed",
-              "status",
-              "would_review",
-              "would_address",
-              "review_ended",
-              "verb_next",
-              "verb_waiting",
-              "verb_schedule",
-              "verb_someday",
-              "verb_reference",
-              "verb_focus",
-              "verb_project",
-              "verb_approve",
-              "verb_delegate",
-              "verb_done",
-              "verb_dismiss",
-              "verb_context",
-              "verb_area",
-              "verb_answer",
-              "verb_reviewed",
-              "verb_sequential",
-              "verb_reply"
+              "person",
+              "workflow",
+              "agent",
+              "plugin"
             ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "depth": {
+          "default": 3,
+          "description": "With on, the longest chain of workflows triggering each other the workflow may close: an event a chain of that many workflows caused plans it no more, and a workflow already in an event's chain never runs on it. 1 to 5.",
+          "type": "integer"
+        },
+        "on": {
+          "description": "The event kinds the workflow reacts to: the loop's, the plugins', task.woke (a task's wake matched) and verb_<verb>, a verb of tasks.toml run on a task by anyone, a workflow included; the last two with provider task.",
+          "items": {
             "type": "string"
           },
           "type": "array"

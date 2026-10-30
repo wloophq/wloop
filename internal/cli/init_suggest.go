@@ -50,9 +50,7 @@ func mostFrequent(count map[string]int) []string {
 // reviewedRepos are the repositories of the pull requests you reviewed in
 // the last reviewedWindow, most reviewed first.
 func (e *Env) reviewedRepos(ctx context.Context) ([]string, error) {
-	since := e.Now().Add(-reviewedWindow).UTC().Format("2006-01-02")
-	out, err := e.GH.Run(ctx, "search", "prs", "--reviewed-by=@me", "--updated=>="+since, "--limit", "100",
-		"--json", "repository", "--jq", ".[].repository.nameWithOwner")
+	out, err := e.forgeReviewedRepos(ctx, e.Now().Add(-reviewedWindow))
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +66,7 @@ func (e *Env) reviewedRepos(ctx context.Context) ([]string, error) {
 
 // userTeams are the teams of your organizations you belong to, as org/slug.
 func (e *Env) userTeams(ctx context.Context) ([]string, error) {
-	out, err := e.GH.Run(ctx, "api", "user/teams", "--paginate", "--jq", `.[] | .organization.login + "/" + .slug`)
+	out, err := e.forgeTeams(ctx)
 	if err != nil {
 		return nil, err
 	}

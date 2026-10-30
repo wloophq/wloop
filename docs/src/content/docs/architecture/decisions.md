@@ -9,25 +9,32 @@ Each entry is a file under `docs/src/content/docs/architecture/decisions/`, with
 
 | Decision | What it holds |
 |---|---|
-| [A draft is what its proposer declares](/architecture/decisions/a-draft-is-what-its-proposer-declares/) | A draft carries its purpose, delivery and effects; nothing follows from its kind, and a comment waits for a person. |
+| [A draft is what its proposer declares](/architecture/decisions/a-draft-is-what-its-proposer-declares/) | A draft carries its purpose, delivery and effects; nothing follows from its kind, and a draft that posts waits for a person. |
+| [A gate's consequence runs once](/architecture/decisions/a-gates-consequence-runs-once/) | A resolved gate records when its consequence ran; the tick reruns one a stopped daemon left, and every consequence is idempotent. |
 | [A provider is asked what it can do](/architecture/decisions/a-provider-is-asked-what-it-can-do/) | A plugin declares its capabilities, and a provider id appears only in its plugin and the tables. |
-| [A verb a person runs is an event](/architecture/decisions/a-verb-a-person-runs-is-an-event/) | Every verb a person runs on an entry records one verb event, and a verb a workflow runs records none. |
+| [A task's history is kept](/architecture/decisions/task-history-is-kept/) | Retention never deletes the events, turns, records, answers or plan items of a task or of a unit a task holds. |
 | [Architecture rules are tests](/architecture/decisions/architecture-rules-are-tests/) | Each architecture rule is a test with a self-test, and its reference page is generated. |
 | [Authority comes from you](/architecture/decisions/authority-comes-from-you/) | Endorsing, approving, taking over and removing come only from your surfaces, never from an agent. |
 | [Behavior lives in the profile](/architecture/decisions/behavior-lives-in-the-profile/) | Behavior is profile files; Go provides a closed vocabulary and never enumerates intents. |
 | [Clients are thin and speak one versioned API](/architecture/decisions/clients-are-thin-and-speak-one-versioned-api/) | The daemon computes what clients show; clients speak internal/api and decide nothing. |
 | [Every spawn is metered](/architecture/decisions/every-spawn-is-metered/) | A package that spawns a process imports the meter, which counts each boundary call. |
+| [Gates hold every decision](/architecture/decisions/gates-hold-every-decision/) | A decision waiting on you is a gate; no rule that releases one reads an untrusted fact, and no agent resolves one. |
+| [Go reads categories, never states](/architecture/decisions/go-reads-categories/) | The profile names a task's states; Go and the store's SQL read only the closed set of categories. |
 | [One adapter reaches each outside tool](/architecture/decisions/one-adapter-reaches-each-outside-tool/) | Each outside tool is reached by one adapter, and its name stays there and in the root. |
 | [One brand package](/architecture/decisions/one-brand-package/) | Every user-visible name derives from internal/brand. |
 | [One daemon writes the store](/architecture/decisions/one-daemon-writes-the-store/) | Only the daemon, and the store commands under its lock, write the store. |
 | [One engine plans automatic work, and planning writes nothing](/architecture/decisions/one-engine-plans-automatic-work-and-planning-writes-nothing/) | Workflows are the only planner of automatic work, and evaluating a plan writes nothing. |
 | [One grammar for the profile language](/architecture/decisions/one-grammar-for-the-profile-language/) | Every reserved key of the profile and the configuration is a row of builtin.Grammar. |
+| [Only the gates service resolves a gate](/architecture/decisions/only-the-gates-service-resolves-a-gate/) | Every decision waiting on you is a gate, closed only by you, a trusted policy rule or a passed window. |
 | [Ports and adapters, dependencies inward](/architecture/decisions/ports-and-adapters-dependencies-inward/) | The domain and the core import inward only; adapters implement the core's ports. |
 | [Small ports owned by their consumer](/architecture/decisions/small-ports-owned-by-their-consumer/) | A port belongs to the core package that uses it and has at most five methods. |
-| [Sources are compiled-in plugins](/architecture/decisions/sources-are-compiled-in-plugins/) | A source is a compiled-in plugin; the core imports no plugin and no plugin another. |
+| [Sources are plugins](/architecture/decisions/sources-are-compiled-in-plugins/) | A source is a plugin, a process of its own that imports only the SDK; the host names it in one file, and neither side imports the other. |
 | [Text an agent reads resolves through the profile](/architecture/decisions/text-an-agent-reads-resolves-through-the-profile/) | Every text an agent reads is a profile file a user profile can replace. |
+| [The lists are the profile's views](/architecture/decisions/the-lists-are-the-profiles-views/) | Go names no view and no task property; it reads views.toml's conditions and a property's role. |
+| [The plugins declare their vocabulary](/architecture/decisions/the-plugins-declare-their-vocabulary/) | The builtin tables hold the core's rows only; each plugin's facts, effects, roles and kinds come from its manifest. |
 | [The read model lives in memory](/architecture/decisions/the-read-model-lives-in-memory/) | Every write notes the change log the in-memory read model rebuilds from. |
 | [The store is the truth](/architecture/decisions/the-store-is-the-truth/) | Managers and boards receive a projection of the store and are never read back as state. |
 | [The store migrates forward](/architecture/decisions/the-store-migrates-forward/) | Every schema change is a new version with a migration, and a newer store is refused. |
 | [Units generalize the pull request](/architecture/decisions/units-generalize-the-pull-request/) | Work is keyed by unit.Unit, and only a provider's codec mints and parses a key. |
 | [What the loop proposes to post is a draft](/architecture/decisions/what-the-loop-proposes-to-post-is-a-draft/) | What the loop proposes to post is a draft, published once and only when approved. |
+| [Workflows trigger each other in a bounded chain](/architecture/decisions/workflows-trigger-each-other-in-a-bounded-chain/) | Every verb records its event with its actor and its chain, and an event trigger stops at its depth and never re-enters its chain. |

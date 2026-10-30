@@ -1,0 +1,566 @@
+{
+  "views": [
+    {
+      "id": "mine",
+      "label": "My PRs",
+      "provider": "github",
+      "rows": true,
+      "order": 2,
+      "surfaces": [
+        "web",
+        "tui"
+      ],
+      "unit": "Pull request",
+      "unit_sort": "repo"
+    },
+    {
+      "id": "plan",
+      "label": "Plan",
+      "provider": "github",
+      "rows": false,
+      "order": 4,
+      "surfaces": [
+        "web",
+        "tui"
+      ]
+    },
+    {
+      "id": "dash",
+      "label": "Backlog",
+      "provider": "github",
+      "rows": false,
+      "order": 6,
+      "surfaces": [
+        "web"
+      ]
+    },
+    {
+      "id": "all",
+      "label": "All",
+      "provider": "github",
+      "rows": true,
+      "order": 8,
+      "surfaces": [
+        "web"
+      ]
+    },
+    {
+      "id": "explore",
+      "label": "Explore",
+      "provider": "github",
+      "rows": false,
+      "order": 9,
+      "surfaces": [
+        "web"
+      ],
+      "search": {
+        "default_sort": "updated-asc",
+        "presets": [
+          {
+            "query": "user-review-requested:@me",
+            "label": "Asked of me"
+          },
+          {
+            "query": "review-requested:@me -user-review-requested:@me",
+            "label": "Asked of my teams"
+          }
+        ],
+        "filters": [
+          {
+            "term": "-reviewed-by:@me",
+            "label": "Not reviewed by me"
+          },
+          {
+            "term": "draft:false",
+            "label": "Ready for review"
+          },
+          {
+            "term": "review-requested:@me",
+            "label": "Requested from me or my teams"
+          },
+          {
+            "window": 30,
+            "label": "Active in the last 30 days"
+          }
+        ],
+        "sorts": [
+          {
+            "sort": "updated-asc",
+            "label": "Waiting longest",
+            "shown": "waiting longest"
+          },
+          {
+            "sort": "created-asc",
+            "label": "Oldest opened",
+            "shown": "oldest opened"
+          },
+          {
+            "sort": "updated-desc",
+            "label": "Recently updated",
+            "shown": "most recently updated"
+          }
+        ],
+        "decisions": {
+          "APPROVED": "approved",
+          "CHANGES_REQUESTED": "changes requested",
+          "REVIEW_REQUIRED": "review required"
+        },
+        "no_decision": "no review required"
+      }
+    },
+    {
+      "id": "recent",
+      "label": "Recent",
+      "provider": "github",
+      "rows": false,
+      "order": 10,
+      "surfaces": [
+        "web"
+      ]
+    }
+  ],
+  "facets": [
+    {
+      "id": "repo",
+      "label": "Repo",
+      "provider": "github",
+      "group": true,
+      "sort": "text",
+      "match": "suffix",
+      "menu": true
+    },
+    {
+      "id": "author",
+      "label": "Author",
+      "provider": "github",
+      "group": true,
+      "sort": "rank",
+      "rank": [
+        "me"
+      ],
+      "menu": true
+    },
+    {
+      "id": "wait",
+      "label": "Waits on (role)",
+      "provider": "github",
+      "group": true,
+      "sort": "rank",
+      "rank": [
+        "me",
+        "loop",
+        "reviewer",
+        "author",
+        "nobody"
+      ],
+      "labels": {
+        "author": "Waiting on the author",
+        "loop": "In loop",
+        "me": "Waiting on me",
+        "nobody": "Waiting on nobody",
+        "reviewer": "Waiting on a reviewer"
+      },
+      "menu": true,
+      "strip": true
+    },
+    {
+      "id": "waits-on",
+      "label": "Waits on (person)",
+      "provider": "github",
+      "group": false,
+      "match": "team",
+      "menu": true
+    },
+    {
+      "id": "kind",
+      "label": "Situation",
+      "provider": "github",
+      "group": true,
+      "sort": "rank",
+      "rank": [
+        "round_pending",
+        "loop_waiting",
+        "loop_stopped",
+        "blocked",
+        "to_address",
+        "held",
+        "loop_working",
+        "changes",
+        "checks",
+        "conflicts",
+        "reply",
+        "reviewer_back",
+        "review",
+        "no_reviewer",
+        "merge",
+        "draft",
+        "muted",
+        "done"
+      ],
+      "labels": {
+        "blocked": "round blocked",
+        "changes": "changes asked",
+        "checks": "checks failing",
+        "conflicts": "merge conflicts",
+        "done": "closed",
+        "draft": "draft",
+        "held": "held (cap)",
+        "loop_stopped": "agent stopped",
+        "loop_waiting": "agent asks",
+        "loop_working": "agent working",
+        "merge": "can merge",
+        "muted": "muted",
+        "no_reviewer": "no reviewer",
+        "reply": "reply due",
+        "review": "review",
+        "reviewer_back": "reviewer due",
+        "round_pending": "round soon",
+        "to_address": "to address"
+      },
+      "menu": true
+    },
+    {
+      "id": "type",
+      "label": "Type",
+      "provider": "github",
+      "group": true,
+      "sort": "text",
+      "empty": "no brief",
+      "menu": true
+    },
+    {
+      "id": "risk",
+      "label": "Risk",
+      "provider": "github",
+      "group": true,
+      "sort": "rank",
+      "rank": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "empty": "no brief",
+      "menu": true
+    },
+    {
+      "id": "size",
+      "label": "Size",
+      "provider": "github",
+      "group": true,
+      "sort": "rank",
+      "rank": [
+        "xs",
+        "s",
+        "m",
+        "l",
+        "xl"
+      ],
+      "labels": {
+        "l": "L",
+        "m": "M",
+        "s": "S",
+        "xl": "XL",
+        "xs": "XS"
+      },
+      "empty": "no brief",
+      "menu": true
+    },
+    {
+      "id": "status",
+      "label": "Workspace",
+      "provider": "github",
+      "group": true,
+      "sort": "text",
+      "empty": "no workspace",
+      "menu": true
+    },
+    {
+      "id": "tag",
+      "label": "Tag",
+      "provider": "github",
+      "group": false,
+      "match": "prefix",
+      "menu": true
+    },
+    {
+      "id": "is",
+      "label": "Flags",
+      "provider": "github",
+      "group": false,
+      "menu": true
+    },
+    {
+      "id": "ci",
+      "label": "Checks",
+      "provider": "github",
+      "group": true,
+      "rank": [
+        "failure",
+        "pending",
+        "success"
+      ],
+      "empty": "no checks data",
+      "menu": true
+    },
+    {
+      "id": "opened",
+      "label": "Opened",
+      "provider": "github",
+      "group": true,
+      "sort": "time",
+      "rank": [
+        "1d",
+        "3d",
+        "7d",
+        "2w",
+        "4w",
+        "older"
+      ],
+      "labels": {
+        "1d": "0-1 days",
+        "2w": "1-2 weeks",
+        "3d": "1-3 days",
+        "4w": "2-4 weeks",
+        "7d": "3-7 days",
+        "older": "over 4 weeks"
+      },
+      "empty": "no opening date",
+      "menu": true,
+      "buckets": [
+        {
+          "id": "1d",
+          "label": "0-1 days",
+          "within": "24h"
+        },
+        {
+          "id": "3d",
+          "label": "1-3 days",
+          "within": "72h"
+        },
+        {
+          "id": "7d",
+          "label": "3-7 days",
+          "within": "168h"
+        },
+        {
+          "id": "2w",
+          "label": "1-2 weeks",
+          "within": "336h"
+        },
+        {
+          "id": "4w",
+          "label": "2-4 weeks",
+          "within": "672h"
+        },
+        {
+          "id": "older",
+          "label": "over 4 weeks",
+          "within": ""
+        }
+      ]
+    },
+    {
+      "id": "scope",
+      "label": "In scope as",
+      "provider": "github",
+      "group": false,
+      "menu": true
+    },
+    {
+      "id": "age",
+      "label": "Waiting for",
+      "provider": "github",
+      "group": false,
+      "sort": "time",
+      "menu": true,
+      "buckets": [
+        {
+          "id": "1d",
+          "label": "0-1 days",
+          "within": "24h"
+        },
+        {
+          "id": "3d",
+          "label": "1-3 days",
+          "within": "72h"
+        },
+        {
+          "id": "7d",
+          "label": "3-7 days",
+          "within": "168h"
+        },
+        {
+          "id": "2w",
+          "label": "1-2 weeks",
+          "within": "336h"
+        },
+        {
+          "id": "4w",
+          "label": "2-4 weeks",
+          "within": "672h"
+        },
+        {
+          "id": "older",
+          "label": "over 4 weeks",
+          "within": ""
+        }
+      ]
+    },
+    {
+      "id": "lane",
+      "label": "Board lane",
+      "provider": "github",
+      "group": true,
+      "rank": [
+        "me",
+        "reviewer",
+        "author",
+        "merge",
+        "loop"
+      ],
+      "labels": {
+        "author": "Waiting on author",
+        "loop": "In loop",
+        "me": "Needs me",
+        "merge": "Can merge",
+        "reviewer": "Waiting on reviewer"
+      },
+      "menu": false
+    },
+    {
+      "id": "due",
+      "label": "Due",
+      "provider": "github",
+      "group": false,
+      "sort": "time",
+      "menu": false,
+      "buckets": [
+        {
+          "id": "later",
+          "label": "later",
+          "within": "-24h"
+        },
+        {
+          "id": "due",
+          "label": "due",
+          "within": "1ms"
+        },
+        {
+          "id": "past",
+          "label": "past",
+          "within": ""
+        }
+      ]
+    }
+  ],
+  "situations": [
+    {
+      "provider": "github",
+      "kind": "round_pending",
+      "label": "round soon",
+      "rank": 0
+    },
+    {
+      "provider": "github",
+      "kind": "loop_waiting",
+      "label": "agent asks",
+      "rank": 1
+    },
+    {
+      "provider": "github",
+      "kind": "loop_stopped",
+      "label": "agent stopped",
+      "rank": 2
+    },
+    {
+      "provider": "github",
+      "kind": "blocked",
+      "label": "round blocked",
+      "rank": 3
+    },
+    {
+      "provider": "github",
+      "kind": "to_address",
+      "label": "to address",
+      "rank": 4
+    },
+    {
+      "provider": "github",
+      "kind": "held",
+      "label": "held (cap)",
+      "rank": 5
+    },
+    {
+      "provider": "github",
+      "kind": "loop_working",
+      "label": "agent working",
+      "rank": 6
+    },
+    {
+      "provider": "github",
+      "kind": "changes",
+      "label": "changes asked",
+      "rank": 7
+    },
+    {
+      "provider": "github",
+      "kind": "checks",
+      "label": "checks failing",
+      "rank": 8
+    },
+    {
+      "provider": "github",
+      "kind": "conflicts",
+      "label": "merge conflicts",
+      "rank": 9
+    },
+    {
+      "provider": "github",
+      "kind": "reply",
+      "label": "reply due",
+      "rank": 10
+    },
+    {
+      "provider": "github",
+      "kind": "reviewer_back",
+      "label": "reviewer due",
+      "rank": 11
+    },
+    {
+      "provider": "github",
+      "kind": "review",
+      "label": "review",
+      "rank": 12
+    },
+    {
+      "provider": "github",
+      "kind": "no_reviewer",
+      "label": "no reviewer",
+      "rank": 13
+    },
+    {
+      "provider": "github",
+      "kind": "merge",
+      "label": "can merge",
+      "rank": 14
+    },
+    {
+      "provider": "github",
+      "kind": "draft",
+      "label": "draft",
+      "rank": 15
+    },
+    {
+      "provider": "github",
+      "kind": "muted",
+      "label": "muted",
+      "rank": 16
+    },
+    {
+      "provider": "github",
+      "kind": "done",
+      "label": "closed",
+      "rank": 17
+    }
+  ]
+}

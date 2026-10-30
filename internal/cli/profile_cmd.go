@@ -26,7 +26,7 @@ var profileUsage = `usage:
   profile where <intent> [conditions]
   profile add <intent>[,<intent>...] [conditions] [--section <heading>] [--title <text>] [--override] [--paths <glob>]... [--apply] [-- <text>]
   profile check [<dir>] [--color auto|always|never]
-  profile schema [--workflow|--actions|--gtd|--keys|--config]
+  profile schema [--workflow|--actions|--tasks|--views|--gates|--records|--keys|--config]
   profile try <pr-url>
 conditions: ` + conditionNames() + `, --tag <key>=<value> (repeatable)`
 
@@ -60,8 +60,12 @@ func runProfile(ctx context.Context, e *Env, args []string) error {
 	case "check":
 		return runProfileCheck(e, args[1:])
 	case "schema":
-		schemas := map[string][]byte{"--workflow": intentload.WorkflowSchema, "--actions": intentload.ActionsSchema, "--gtd": intentload.GTDSchema, "--keys": intentload.KeysSchema, "--config": intentload.ConfigSchema}
+		schemas := map[string][]byte{"--workflow": intentload.WorkflowSchema, "--actions": intentload.ActionsSchema, "--tasks": intentload.TasksSchema,
+			"--views": intentload.ViewsSchema, "--gates": intentload.GatesSchema, "--records": intentload.RecordsSchema, "--keys": intentload.KeysSchema,
+			"--config": intentload.ConfigSchema}
 		switch {
+		case len(args) == 2 && args[1] == "--gtd":
+			return usageError{usage: profileUsage, why: "--gtd is no longer a schema: gtd.toml split into tasks.toml, views.toml and gates.toml; use --tasks, --views or --gates"}
 		case len(args) == 1:
 			_, err := e.Out.Write(intentload.Schema)
 			return err
@@ -215,7 +219,7 @@ func runProfileWhere(e *Env, args []string) error {
 	_, statErr := os.Stat(file)
 	exists := statErr == nil
 	if !exists {
-		tree.Blocks = append(tree.Blocks, profile.Block{Layer: profile.Chain(cfg)[1], File: file, Path: p})
+		tree.Blocks = append(tree.Blocks, profile.Block{Layer: profile.Layer{Name: "user", Source: cfg.Profile, Dir: cfg.Profile}, File: file, Path: p})
 	}
 	g := tree.Compose(kinds[0], conds.facts())
 	state := "exists"
@@ -428,7 +432,9 @@ func runProfileCheck(e *Env, args []string) error {
 		dir = d
 	}
 	out, errOut := e.term(color), e.termOf(e.Err, color)
-	layer := []profile.Layer{{Name: "user", Source: dir, Dir: dir}}
+	cfg, _ := e.loadConfig()
+	cfg.Profile = dir
+	layer := profile.Chain(cfg)
 	b, err := turn.Base()
 	if err != nil {
 		return err
@@ -457,7 +463,7 @@ func runProfileCheck(e *Env, args []string) error {
 		}
 		return fmt.Errorf("%s: %d problem(s)", dir, len(problems))
 	}
-	tree, err := profile.Load(layer, loaded.Registry, loaded.BrokenNames())
+	tree, err := profile.Load([]profile.Layer{{Name: "user", Source: dir, Dir: dir}}, loaded.Registry, loaded.BrokenNames())
 	if err != nil {
 		return err
 	}

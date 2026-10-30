@@ -1,6 +1,10 @@
 package keys
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+	"strings"
+)
 
 var (
 	everySurface  = []Surface{Web, TUI, Menubar}
@@ -10,8 +14,41 @@ var (
 	chordPrefixes = []string{"g"}
 )
 
-// Core are the core bindings of spec 9.2.
+// Core are the core bindings of spec 9.2. The keys that jump to a view are the catalog's (Views); a digit in a
+// gate runs the gate's intent of that order (answer:<n>).
 var Core = core()
+
+// View is a view the catalog serves: its id and the key that jumps to it, "" for none.
+type View struct{ ID, Key string }
+
+// Views are the bindings that jump to the views of vs that have a key, in their order, on the screens.
+func Views(vs []View) []Binding {
+	var out []Binding
+	for _, v := range vs {
+		if v.Key != "" {
+			out = append(out, Binding{v.Key, "nav:" + v.ID, Global, screens})
+		}
+	}
+	return out
+}
+
+// CheckView refuses a view's key: not a chord of a chord prefix, or a core key on a screen.
+func CheckView(key string) error {
+	k, err := Canonical(key)
+	if err != nil {
+		return err
+	}
+	prefix, _, chord := strings.Cut(k, " ")
+	if !chord || !slices.Contains(chordPrefixes, prefix) {
+		return fmt.Errorf("%s is not a chord: a view's key is %s, a space and a key", k, strings.Join(chordPrefixes, " or "))
+	}
+	for _, b := range Core {
+		if b.Key == k {
+			return reservedError{fmt.Sprintf("%s is the core key of %s", k, b.Action)}
+		}
+	}
+	return nil
+}
 
 func core() []Binding {
 	b := []Binding{
@@ -34,14 +71,6 @@ func core() []Binding {
 		{"i", "edit", List, terminalOnly},
 		{"o", "open-source", List, everySurface},
 		{"n", "capture", Global, screens},
-		{"g f", "nav:focus", Global, screens},
-		{"g i", "nav:inbox", Global, screens},
-		{"g o", "nav:outbox", Global, screens},
-		{"g n", "nav:next", Global, screens},
-		{"g w", "nav:waiting", Global, screens},
-		{"g p", "nav:projects", Global, screens},
-		{"g r", "nav:review", Global, screens},
-		{"g g", "nav:github", Global, screens},
 		{"/", "filter", Global, screens},
 		{"Cmd+K", "palette", Global, webOnly},
 		{"Ctrl+K", "palette", Global, terminalOnly},

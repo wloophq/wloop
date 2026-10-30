@@ -1,0 +1,222 @@
+{
+  "$id": "https://github.com/wloophq/wloop/tasks.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "areas": {
+      "description": "The areas a task may be in, the values of the area property.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "chat": {
+      "additionalProperties": false,
+      "description": "The chat on a task.",
+      "properties": {
+        "intent": {
+          "description": "The intent of the turn a message starts on a task with no live session.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "contexts": {
+      "description": "The contexts the menu offers; a task may hold others.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "owed_by": {
+      "additionalProperties": false,
+      "description": "Who owes a task's next step.",
+      "properties": {
+        "expr": {
+          "description": "An expression over the task's facts whose value, me or a person's key, is task.owed_by.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "props": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "A property, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
+        "properties": {
+          "doc": {
+            "description": "What the property holds, for the facts' reference and the agents.",
+            "type": "string"
+          },
+          "role": {
+            "description": "The mechanism of the loop that acts on the property; at most one property takes each role. Go names the role, never the property.",
+            "enum": [
+              "area",
+              "contexts",
+              "star",
+              "deadline",
+              "promise"
+            ],
+            "type": "string"
+          },
+          "type": {
+            "description": "The property's type; required for a new property. An int or a duration of 0 means unset: a value of 0 is refused.",
+            "enum": [
+              "string",
+              "string[]",
+              "int",
+              "enum",
+              "date",
+              "duration",
+              "actor",
+              "actor[]"
+            ],
+            "type": "string"
+          },
+          "values": {
+            "description": "An enum's values, in order; required with type enum.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "writers": {
+            "description": "Who may write the property; one an agent or a plugin may write is untrusted, so no approval rule reads it.",
+            "items": {
+              "enum": [
+                "person",
+                "workflow",
+                "agent",
+                "plugin"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "description": "The task properties, by name, in the order the file declares them, a user layer's new ones after the bundled; each is the fact task.prop.<name>, typed from its type.",
+      "type": "object"
+    },
+    "stale_waiting_days": {
+      "description": "Working days a task waits before it is stale.",
+      "type": "integer"
+    },
+    "states": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "A state, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
+        "properties": {
+          "category": {
+            "description": "The state's category, which is all Go reads of it; required for a new state.",
+            "enum": [
+              "inbox",
+              "ready",
+              "active",
+              "waiting",
+              "deferred",
+              "done",
+              "dropped"
+            ],
+            "type": "string"
+          },
+          "label": {
+            "description": "The name people read.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "description": "The states a task takes, by name, in the order the file declares them, a user layer's new ones after the bundled; clients list them in this order, and a task proposed in a category takes the first state of it.",
+      "type": "object"
+    },
+    "verbs": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "A verb, by its name: lowercase letters, digits and hyphens, starting with a letter. A user layer may set only some keys of an entry declared below it, and adds its own verbs, which record the event verb_<name>; a new entry sets the required ones.",
+        "properties": {
+          "by": {
+            "additionalProperties": {
+              "description": "A predicate over the task's facts that lets the actor run the verb where it holds, or \"gate\", which opens the gate the verb's gate names, and a person's approval runs the verb as theirs; true lets the actor run it anywhere.",
+              "type": "string"
+            },
+            "description": "Who may run the verb, by actor (person, workflow, agent, plugin); an actor left out may not.",
+            "type": "object"
+          },
+          "from": {
+            "description": "The states the verb moves a task from, each a state of states; every state when absent.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "gate": {
+            "description": "The gate, of gates.toml, a by.<actor> of \"gate\" opens; required when one does.",
+            "type": "string"
+          },
+          "handler": {
+            "description": "What the verb runs besides its move, a handler of the loop's; none when absent.",
+            "enum": [
+              "finish",
+              "drop",
+              "focus",
+              "schedule",
+              "wake",
+              "waiting",
+              "approve",
+              "delegate",
+              "answer",
+              "edit",
+              "retry",
+              "reply",
+              "project",
+              "context",
+              "area",
+              "seen",
+              "promise",
+              "reviewed",
+              "sequential"
+            ],
+            "type": "string"
+          },
+          "input": {
+            "description": "The question a verb that asks for a value puts first; required for a verb whose handler asks for one (waiting, schedule, project, context, area, delegate, reply, promise).",
+            "type": "string"
+          },
+          "label": {
+            "description": "The name people read on its button. Required.",
+            "type": "string"
+          },
+          "offer": {
+            "default": "true",
+            "description": "When a task offers the verb, over the task's own facts (task.id, task.prop.kind, task.state, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run.",
+            "type": "string"
+          },
+          "send": {
+            "default": "draft",
+            "description": "On a verb whose handler is reply: what a reply that names no send does. now sends it at once, as the person approving it; draft holds it on its gate for approval. The composer's Save as draft always holds it.",
+            "enum": [
+              "now",
+              "draft"
+            ],
+            "type": "string"
+          },
+          "summary": {
+            "description": "One line, what pressing it does: its tooltip. Required.",
+            "type": "string"
+          },
+          "to": {
+            "description": "The state the verb moves a task to, a state of states; absent, the verb moves none.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "description": "The verbs a task offers, by verb.",
+      "type": "object"
+    }
+  },
+  "title": "Tasks: properties, states and verbs (tasks.toml)",
+  "type": "object"
+}

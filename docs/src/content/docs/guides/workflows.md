@@ -9,20 +9,32 @@ The `workflows` table of `config.toml` tunes a bundled workflow, or one of yours
 [workflows.<name>]
 enabled = false
 observe = true
-approval = { mode = "delay", window = "5m" }
 only_when = 'pr.visibility == "private"'
+
+[[workflows.<name>.gates.approval.rule]]
+when = 'gate.kind == "plan"'
+mode = "delay"
+window = "5m"
 ```
 
 | Key | Values |
 |---|---|
 | `enabled` | `false` drops the workflow |
 | `observe` | `true` plans and runs nothing by itself; `false` runs the steps |
-| `approval.mode` | `run` runs an item at once; `delay` runs a pending item when its window ends; `wait` keeps it until you apply or dismiss it |
-| `approval.window` | how long a `delay` item waits, such as `"60s"` or `"5m"` |
-| `approval.rule` | rules tried before `mode`, the first whose `when` holds gives the item's mode; set, they replace the manifest's, and `[]` clears them |
+| `gates.approval.mode` | the mode of every gate the workflow opens: its runs' plan gates, its drafts and its turns' drafts, its `gate.open` gates. `run` and `send` release a gate at once, `delay` when its window ends, `wait` keeps it until you resolve it, `dry_run` stores a draft without sending it |
+| `gates.approval.window` | how long a `delay` gate waits, such as `"60s"` or `"5m"` |
+| `gates.approval.rule` | rules tried before `mode`, the first whose `when` holds gives the gate's mode; a rule applies to the kinds of gate its `when` pins `gate.kind` to, to draft gates alone when it reads a draft's facts, else to every kind; set, they replace the manifest's, and `[]` clears them |
 | `only_when` | a predicate over the workflow's [facts](/reference/facts/#workflow-facts) that must hold besides the manifest's `when`; where it does not, the workflow plans nothing |
 
-The review, address and nudge workflows wait `60s`, the `window` of their manifests. `workflows.review-follow-up.approval.mode = "run"` sends that workflow's rounds at once; set it per workflow. Each key of `approval` overlays the manifest's own field by field: `mode` and `window` replace those fields and keep the manifest's rules, so `window = "5m"` alone lengthens a `delay` workflow's window. The config refuses at load what no manifest could fix, such as a `window` beside `mode = "wait"` or a rule that runs on an untrusted fact; what only fails once merged, such as a `window` over a manifest that waits, stops that workflow, and `{{command}} doctor` and the daemon's log name it.
+The review and address workflows wait `60s` before a round starts, by a rule of their manifests pinned to `gate.kind == "plan"`. A rule whose `when` reads `gate.kind` alone decides every gate of that kind, as a mode of its own. To start that workflow's rounds at once, pin a rule to its plan gates, so its drafts keep their own approval:
+
+```toml
+[[workflows.review-follow-up.gates.approval.rule]]
+when = 'gate.kind == "plan"'
+mode = "run"
+```
+
+Each key of `gates.approval` overlays the manifest's own field by field: `mode` and `window` replace those fields for every kind of gate and keep the manifest's rules, so `window = "5m"` alone lengthens a `delay` workflow's window. What neither the config nor the manifest decides, `gates.toml`'s `[approval]` does: a run starts at once, every other decision waits for you. The config refuses at load what no manifest could fix, such as a `window` beside `mode = "wait"`, a rule that releases a gate on an untrusted fact, or `dry_run` pinned to a kind but `draft`; what only fails once merged, such as a `window` over a manifest that waits, stops that workflow, and `{{command}} doctor` and the daemon's log name it.
 
 ## Read the plan first
 
@@ -63,22 +75,26 @@ The thresholds:
 
 ## Let nudges go out
 
-`nudge-silent-30d` posts in your name, so each nudge waits for you. Once they read the way you want, let them go out when the window ends:
+`nudge-silent-30d` posts in your name, so each nudge waits for you. Once they read the way you want, let them start when the window ends:
 
 ```toml
-[workflows.nudge-silent-30d.approval]
+[[workflows.nudge-silent-30d.gates.approval.rule]]
+when = 'gate.kind == "plan"'
 mode = "delay"
 window = "5m"
 ```
 
-`github.nudge.silent_days` (30) sets the silence before a nudge.
+The comment each nudge drafts still waits for you, unless a rule that names its delivery, `draft.delivery == "comment"`, releases it.
+
+`plugins.github.nudge.silent_days` (30) sets the silence before a nudge.
 
 ## Tune the Slack proposals
 
-`slack-stalled-nudge`, `slack-closure` and `slack-ask-owner` propose drafts in the Outbox, where they wait for you. `drafts.approval` sets when their drafts go out, as the [draft policies](/concepts/approval/#the-outbox) say, its `rule` list tried before its `mode`:
+`slack-stalled-nudge`, `slack-closure` and `slack-ask-owner` propose drafts in the Outbox, where they wait for you. `gates.approval` sets when their drafts go out, as the [draft policies](/concepts/approval/#the-outbox) say, its `rule` list tried before its `mode`. A Slack message posts, as the Slack plugin's manifest marks it, so only a rule that names its delivery releases one; a rule over a draft's facts applies to draft gates alone, and leaves the workflow's runs as they are:
 
 ```toml
-[workflows.slack-closure.drafts.approval]
+[[workflows.slack-closure.gates.approval.rule]]
+when = 'draft.delivery == "message"'
 mode = "delay"
 window = "10m"
 ```
@@ -86,20 +102,21 @@ window = "10m"
 A rule picks the mode by the draft's and the unit's facts; this one sends a closing reaction at once and keeps the window for a closing message:
 
 ```toml
-[workflows.slack-closure.drafts.approval]
-mode = "delay"
-window = "10m"
-
-[[workflows.slack-closure.drafts.approval.rule]]
+[[workflows.slack-closure.gates.approval.rule]]
 when = 'draft.delivery == "reaction"'
 mode = "send"
+
+[[workflows.slack-closure.gates.approval.rule]]
+when = 'draft.delivery == "message"'
+mode = "delay"
+window = "10m"
 ```
 
-A rule never reads a fact the [facts](/reference/facts/) page marks **Untrusted**, such as `entry.unit_started_by_me`, which the extraction reads from the thread's text. The config's block overlays the workflow's `[drafts.approval]` the same way, a `rule` list alone keeping its mode; on a workflow that has none, it overlays the block of the intent whose turns the workflow starts, and `wait` for the drafts the workflow proposes itself. One that does not merge, such as a `window` over a mode other than `delay`, holds every draft of the workflow for you, and `{{command}} doctor` names it.
+A rule never reads a fact the [facts](/reference/facts/) page marks **Untrusted**, such as `task.link_started_by_me`, which the extraction reads from the thread's text. The config's block overlays the workflow's `[gates.approval]` the same way, a `rule` list alone keeping its mode; for the drafts of a workflow whose manifest names none for a draft gate, it overlays the approval of the intent whose turns the workflow starts, else `gates.toml`'s default for a draft gate. One that does not merge, such as a `window` over a mode other than `delay`, holds every draft of the workflow for you, and `{{command}} doctor` names it.
 
-A workflow's `observe` and a draft's `dry_run` mode differ: `observe = true` plans the workflow and proposes nothing, while `drafts.approval.mode = "dry_run"` proposes each draft and stores it as what would have been sent, without sending it.
+A workflow's `observe` and a draft's `dry_run` mode differ: `observe = true` plans the workflow and proposes nothing, while a `dry_run` rule over a draft's facts proposes each draft and stores it as what would have been sent, without sending it.
 
-Their texts are `text.md.tmpl` in each workflow's directory, a [template](/reference/workflow-manifest/) over the draft's items, where `.Line` is an item's summary on one line. `<profile>/workflows/slack-closure/text.md.tmpl` closes in your words:
+Their texts are `text.md.tmpl` in each workflow's directory, which the Slack plugin's profile layer ships in `plugins/slack/profile/workflows/`, a [template](/reference/workflow-manifest/) over the draft's items, where `.Line` is an item's summary on one line. `<profile>/workflows/slack-closure/text.md.tmpl` closes in your words:
 
 ```
 Encerrando:
@@ -107,7 +124,7 @@ Encerrando:
 - {{.Line}}: {{or .Resolution "resolvido"}}{{end}}
 ```
 
-Your own `<profile>/workflows/slack-closure/workflow.toml` with `delivery = "reaction"`, `reaction = "white_check_mark"` and `target = "item"` in its step closes with a ✅ on the resolved message instead; its `effects = ["unit.closed"]` still ends the close entry. A reaction carries no text: the workflow's `text.md.tmpl` is not read, and a step that wants a text with its reaction names another file in `text`.
+Your own `<profile>/workflows/slack-closure/workflow.toml` with `delivery = "reaction"`, `reaction = "white_check_mark"` and `target = "item"` in its step closes with a ✅ on the resolved message instead; its `effects = ["unit.closed"]` still records the closure and ends the thread's tasks. A reaction carries no text: the workflow's `text.md.tmpl` is not read, and a step that wants a text with its reaction names another file in `text`.
 
 ## Narrow one to some pull requests
 
@@ -165,23 +182,23 @@ use = "notify.self"
 
 With no `[trigger]`, a workflow is evaluated on every sweep.
 
-A workflow can also look at your GTD entries, `provider = "entry"`, every entry neither done nor in the trash of an enabled plugin, or at the Slack units a live entry is attached to, `provider = "slack"`. This one tells you about a waiting entry once its stalled nudge is due:
+A workflow can also look at your tasks, `provider = "task"`, every open task (its category neither `done` nor `dropped`) of an enabled plugin, or at the Slack units a live task is attached to, `provider = "slack"`. This one tells you about a task someone else owes once its check date passed:
 
 ```toml
-summary = "Tell me when a waiting entry is due a nudge"
-provider = "entry"
-when = 'entry.nudge_due_at != timestamp("0001-01-01T00:00:00Z") && entry.items_owed > 0'
-key = ["entry.nudge_due_at"]
+summary = "Tell me when a task I am owed is due a check"
+provider = "task"
+when = 'task.owed_by != "me" && task.owed_by != "" && task.check_on > timestamp(0) && task.check_on <= now'
+key = ["task.owed_by"]
 
 [[step]]
 use = "notify.self"
 ```
 
-A workflow can react to a verb you run on an entry. This one tells you whenever you mark an entry done that came from the Inbox:
+A workflow can react to a verb you run on a task. This one tells you whenever you mark a task done that came from the Inbox:
 
 ```toml
 summary = "Tell me when I finish something straight from the Inbox"
-provider = "entry"
+provider = "task"
 when = 'trigger.event.kind == "verb_done" && trigger.event.data == "inbox"'
 key = ["trigger.event.id"]
 
@@ -192,7 +209,7 @@ on = ["verb_done"]
 use = "notify.self"
 ```
 
-`<slot>.settled_at` is the newest draft the workflow itself proposed on the unit that was sent or discarded, so a key of `["entry.settled_at"]` opens a new run after each settlement.
+`<slot>.settled_at` is the newest draft the workflow itself proposed on the unit that was sent or discarded, so a key of `["task.settled_at"]` opens a new run after each settlement.
 
 The [workflow manifest](/reference/workflow-manifest/) lists every field and the [facts](/reference/facts/) every condition can read. `{{command}} profile check` loads it; a broken workflow disables only itself.
 

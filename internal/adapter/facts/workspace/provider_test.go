@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
 	factworkspace "github.com/wloophq/wloop/internal/adapter/facts/workspace"
 	"github.com/wloophq/wloop/internal/adapter/facts/workspace/factworkspacetest"
 	"github.com/wloophq/wloop/internal/config"
@@ -99,15 +101,14 @@ func (w *world) provider() *factworkspace.Provider { return factworkspace.New(w.
 
 func (w *world) deps() factworkspace.Deps {
 	return factworkspace.Deps{
-		Snapshot:  snapshot{&w.snap},
-		PRs:       viewerRows{rows(w.rows), w.viewer},
-		Overrides: overrides(w.overrides),
-		Books:     books(w.books),
-		Git:       w.git,
-		Disk:      w.disk,
-		Changes:   gen{w},
-		Cfg:       func() config.Config { return w.cfg },
-		Clock:     clock{w},
+		Snapshot: snapshot{&w.snap},
+		Holdings: ghsource.Holdings{PRs: viewerRows{rows(w.rows), w.viewer}, Overrides: overrides(w.overrides)},
+		Books:    books(w.books),
+		Git:      w.git,
+		Disk:     w.disk,
+		Changes:  gen{w},
+		Cfg:      func() config.Config { return w.cfg },
+		Clock:    clock{w},
 	}
 }
 
@@ -751,7 +752,7 @@ func TestTheIndexIsBuiltOncePerGeneration(t *testing.T) {
 	w.add(workspace.Workspace{ID: "b", Path: "/w/b", Branch: "b"})
 	n := 0
 	deps := w.deps()
-	deps.PRs = countingRows{rows(w.rows), &n}
+	deps.Holdings = ghsource.Holdings{PRs: countingRows{rows(w.rows), &n}, Overrides: overrides(w.overrides)}
 	p := factworkspace.New(deps)
 	for _, id := range []string{"a", "b", "main"} {
 		if _, err := p.Facts(context.Background(), w.unit(id)); err != nil {

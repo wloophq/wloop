@@ -16,6 +16,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
+
 	factsgithub "github.com/wloophq/wloop/internal/adapter/facts/github"
 	factsession "github.com/wloophq/wloop/internal/adapter/facts/session"
 	factworkspace "github.com/wloophq/wloop/internal/adapter/facts/workspace"
@@ -35,14 +40,12 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
-	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/intent/builtin"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -479,6 +482,9 @@ var fxCheckouts struct {
 }
 
 func TestMain(m *testing.M) {
+	if servedAsPlugin() {
+		os.Exit(0)
+	}
 	os.Unsetenv("ORCA_USER_DATA_PATH")
 	storeReportWait = 0
 	builtin.Providers = append(builtin.Providers, ingesttest.Provider)
@@ -643,7 +649,7 @@ func loadFixture(t *testing.T, dir string, now time.Time) *fixtureEnv {
 	prompts := turnstest.NewPrompts()
 	te.Turns.Store, te.Turns.Registry, te.Turns.Prompts = te.repo, te.repo, prompts
 	te.Turns.Sessions = turns.NewRouter(te.repo, handleSessions{f.mgr.Name(), f.sessions})
-	te.Turns.GitHub = inventoryFacts{te.Store}
+	te.Turns.Answers = hostAnswers{events: te.repo, viewer: te.Store}
 	te.Views.Books, te.Views.State = te.repo, te.repo
 
 	if err := te.Store.SetViewer(ctx, unit.GitHub, prf.Viewer); err != nil {
@@ -656,7 +662,7 @@ func loadFixture(t *testing.T, dir string, now time.Time) *fixtureEnv {
 		}
 		row := dinv.PR{Ref: ref, State: p.State, Author: p.Author, HeadBranch: p.HeadBranch, HeadOid: heads[p.Ref], MergedAt: fxTime(t, p.MergedAt), ClosedAt: fxTime(t, p.ClosedAt),
 			Reasons: []string{"review-requested"}, LastSeenAt: now}
-		if err := te.Store.UpsertPR(ctx, row); err != nil {
+		if err := inventorytest.Of(te.Store).UpsertPR(ctx, row); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -759,15 +765,18 @@ func (f *fixtureEnv) engine(t *testing.T) *automation.Engine {
 	t.Helper()
 	te := f.te
 	clock := clockFunc(func() time.Time { return f.now })
-	sf := factsession.New(factsession.Deps{Turns: te.Turns, Snapshot: f.snap, PRs: inventory.ByUnit{Store: te.Store},
+	sf := factsession.New(factsession.Deps{Turns: te.Turns, Snapshot: f.snap, States: unitStates{te.reportedPRs()}, Repo: unitRepo,
 		Exists: func(p string) bool { return f.exists[p] }, Changes: te.changes, Cfg: te.currentConfig, Clock: clock})
-	wf := factworkspace.New(factworkspace.Deps{Snapshot: f.snap, PRs: factsgithub.InventoryInputs(te.Store), Overrides: inventory.ByUnit{Store: te.Store},
+	wf := factworkspace.New(factworkspace.Deps{Snapshot: f.snap, Holdings: ghsource.Holdings{PRs: te.reportedInputs(), Overrides: inventory.ByUnit{Store: te.Store}},
 		Books: te.repo, Git: factworkspace.LocalGit{R: te.Env.Git.R}, Disk: f.disk, Changes: te.changes, Cfg: te.currentConfig, Clock: clock})
-	gh := factsgithub.New(factsgithub.Deps{Inputs: factsgithub.InventoryInputs(te.Store), Store: te.Store, Snapshot: f.snap, Books: te.repo,
-		Rounds: sqlite.NewRounds(f.db), Git: factsgithub.LocalGit(te.Env.Git), Branches: te.Env.Git, Cfg: te.currentConfig, Clock: clock, Changes: te.changes,
-		Teams: func(context.Context) ([]string, error) { return nil, nil }, Intents: func() *dintent.Registry { return te.loadedIntents().Registry }})
-	return te.newEngine(engineDeps{DB: f.db, Modules: []source.Module{{ID: unit.GitHub, Codec: pr.Codec{}, Facts: gh}}, SessionFacts: sf, WorkspaceFacts: wf, Snapshot: f.snap,
-		Subjects: map[unit.ProviderID]automation.Units{unit.Entry: noUnits{}, dslack.Provider: noUnits{}}})
+	gh := factsgithub.New(factsgithub.Deps{Inputs: te.reportedInputs(), Store: te.Store, Snapshot: f.snap, Books: te.repo,
+		Rounds: sqlite.NewRounds(f.db), Git: factsgithub.LocalGit(te.Env.Git), Cfg: te.currentConfig, Clock: clock, Changes: te.changes,
+		Intents: func() *dintent.Registry { return te.loadedIntents().Registry },
+		Reports: ghreporttest.Inventory{Store: te.Store, Now: func() time.Time { return f.now }, Config: te.currentConfig,
+			Plan: &ghreporttest.InventoryPlan{Facts: storeInputs{te.Store}, Rounds: sqlite.NewRounds(f.db), Books: te.repo, Snapshot: f.snap,
+				Git: ghreporttest.GitOf(factsgithub.LocalGit(te.Env.Git), te.Env.Git)}}})
+	return te.newEngine(engineDeps{DB: f.db, Modules: []pluginModule{{ID: unit.GitHub, Codec: pr.Codec{}, Facts: gh}}, SessionFacts: sf, WorkspaceFacts: wf, Snapshot: f.snap,
+		Subjects: map[unit.ProviderID]automation.Units{unit.Task: noUnits{}, slackPlugin: noUnits{}}})
 }
 
 func (f *fixtureEnv) setApply(name string) {
@@ -1272,7 +1281,7 @@ func TestATurnOpenWhenThePRClosedIsDismissed(t *testing.T) {
 	refs := map[string]string{"acme/widgets#9001": "sent", "acme/widgets#9002": "started"}
 	for key, state := range refs {
 		ref, _ := pr.ParseKey(key)
-		if err := f.te.Store.UpsertPR(ctx, dinv.PR{Ref: ref, State: "CLOSED", ClosedAt: clockA.Add(-time.Hour), HeadBranch: "x", Reasons: []string{"review-requested"}}); err != nil {
+		if err := inventorytest.Of(f.te.Store).UpsertPR(ctx, dinv.PR{Ref: ref, State: "CLOSED", ClosedAt: clockA.Add(-time.Hour), HeadBranch: "x", Reasons: []string{"review-requested"}}); err != nil {
 			t.Fatal(err)
 		}
 		at := clockA.Add(-2 * time.Hour).Format(time.RFC3339)

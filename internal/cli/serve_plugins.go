@@ -1,27 +1,48 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"slices"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/hashicorp/go-hclog"
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
+	"github.com/wloophq/wloop/internal/brief"
+	"github.com/wloophq/wloop/internal/plugins/codec"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/daemon"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/source"
+	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/plugins/bundled"
+	"github.com/wloophq/wloop/internal/plugins/host"
+	"github.com/wloophq/wloop/internal/profile"
+	"github.com/wloophq/wloop/pkg/plugin"
+	"github.com/wloophq/wloop/pkg/plugin/manifest"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // buildSources builds the module of every enabled plugin; one that fails
 // to build is left out and named in the error.
-func buildSources(ps []source.Plugin, cfg config.Config, sd source.Deps) ([]source.Module, error) {
-	var mods []source.Module
+func buildSources(ps []compiledPlugin, cfg config.Config, sd moduleDeps, ui uiOf) ([]pluginModule, error) {
+	var mods []pluginModule
 	var errs []error
 	for _, p := range ps {
 		if !cfg.PluginEnabled(string(p.ID)) {
@@ -32,7 +53,8 @@ func buildSources(ps []source.Plugin, cfg config.Config, sd source.Deps) ([]sour
 			err = m.Valid()
 		}
 		if err == nil {
-			err = catalog.CheckPluginKeys(m.ID, m.UI)
+			pu, _ := ui(m.ID)
+			err = catalog.CheckPluginKeys(m.ID, pu)
 		}
 		if err == nil && m.ID != p.ID {
 			err = fmt.Errorf("source %s: the plugin built a module of %s", p.ID, m.ID)
@@ -51,8 +73,8 @@ func buildSources(ps []source.Plugin, cfg config.Config, sd source.Deps) ([]sour
 // one's included; the built modules' ingestion jobs, slow jobs, rows,
 // streams, jobs and health run in the daemon; Track reads a unit through
 // its source.
-func withSources(d daemon.Deps, ps []source.Plugin, mods []source.Module) daemon.Deps {
-	codecs := []unit.Codec{dturn.SessionCodec{}, wsdomain.Codec{}, gtd.Codec{}}
+func withSources(d daemon.Deps, ps []compiledPlugin, mods []pluginModule, ui uiOf) daemon.Deps {
+	codecs := []unit.Codec{dturn.SessionCodec{}, wsdomain.Codec{}, task.Codec{}}
 	for _, p := range ps {
 		codecs = append(codecs, p.Codec)
 	}
@@ -75,7 +97,8 @@ func withSources(d daemon.Deps, ps []source.Plugin, mods []source.Module) daemon
 		if m.Slow != nil {
 			slow = append(slow, m.Slow)
 		}
-		d.Runtimes = append(d.Runtimes, runtimeOf(m))
+		_, web := ui(m.ID)
+		d.Runtimes = append(d.Runtimes, runtimeOf(m, web))
 	}
 	d.Units = unit.NewRegistry(codecs...)
 	if len(tracks) > 0 {
@@ -110,13 +133,13 @@ func withSources(d daemon.Deps, ps []source.Plugin, mods []source.Module) daemon
 			return unit.Unit{}, false, nil
 		}
 	}
-	d.Plugins = pluginList(ps, mods, d.Cfg)
+	d.Plugins = pluginList(ps, mods, d.Cfg, ui)
 	d.PluginEnabled = pluginSwitch(ps, mods, d.Cfg)
 	return d
 }
 
-func runtimeOf(m source.Module) daemon.PluginRuntime {
-	rt := daemon.PluginRuntime{ID: m.ID, Run: m.Run, Health: m.Health, WebAssets: m.WebAssets}
+func runtimeOf(m pluginModule, web fs.FS) daemon.PluginRuntime {
+	rt := daemon.PluginRuntime{ID: m.ID, Run: m.Run, Health: m.Health, WebAssets: web}
 	for _, j := range m.Jobs {
 		rt.Jobs = append(rt.Jobs, daemon.PluginJob{Name: j.Name, Every: j.Every, Timeout: j.Timeout, Run: j.Run})
 	}
@@ -136,10 +159,10 @@ func withoutPluginJobs(rts []daemon.PluginRuntime) []daemon.PluginRuntime {
 // pluginSwitch is the daemon's PluginEnabled: nil while every compiled-in
 // plugin is enabled. A plugin is on when its config enables it and its
 // module was built.
-func pluginSwitch(ps []source.Plugin, mods []source.Module, cfg config.Config) func(unit.ProviderID) bool {
+func pluginSwitch(ps []compiledPlugin, mods []pluginModule, cfg config.Config) func(unit.ProviderID) bool {
 	off := map[unit.ProviderID]bool{}
 	for _, p := range ps {
-		if !cfg.PluginEnabled(string(p.ID)) || !slices.ContainsFunc(mods, func(m source.Module) bool { return m.ID == p.ID }) {
+		if !cfg.PluginEnabled(string(p.ID)) || !slices.ContainsFunc(mods, func(m pluginModule) bool { return m.ID == p.ID }) {
 			off[p.ID] = true
 		}
 	}
@@ -151,8 +174,8 @@ func pluginSwitch(ps []source.Plugin, mods []source.Module, cfg config.Config) f
 
 // pluginList is every compiled-in plugin as GET /api/plugins serves it: a
 // disabled one, or one refused at build, with no UI.
-func pluginList(ps []source.Plugin, mods []source.Module, cfg config.Config) []api.Plugin {
-	built := map[unit.ProviderID]source.Module{}
+func pluginList(ps []compiledPlugin, mods []pluginModule, cfg config.Config, ui uiOf) []api.Plugin {
+	built := map[unit.ProviderID]pluginModule{}
 	for _, m := range mods {
 		built[m.ID] = m
 	}
@@ -160,7 +183,8 @@ func pluginList(ps []source.Plugin, mods []source.Module, cfg config.Config) []a
 	for _, p := range ps {
 		ap := api.Plugin{ID: p.ID, Name: p.Name}
 		if m, ok := built[p.ID]; ok && cfg.PluginEnabled(string(p.ID)) {
-			ap.Enabled, ap.UI, ap.Reacts, ap.Capabilities = true, m.UI, m.Reacts, m.Capabilities()
+			pu, _ := ui(p.ID)
+			ap.Enabled, ap.UI, ap.Reacts, ap.Capabilities = true, pu, m.Reacts, m.Capabilities()
 		}
 		out = append(out, ap)
 	}
@@ -178,13 +202,234 @@ func disabledPlugins(ps []api.Plugin) []string {
 	return out
 }
 
-// withoutGitHub is d with nothing of GitHub's when its plugin is disabled:
-// no brief queue, intakes, explorer, budget or viewer read.
-func withoutGitHub(d daemon.Deps) daemon.Deps {
-	if d.Cfg.PluginEnabled(string(unit.GitHub)) {
-		return d
+// installed are the plugins InstallPlugins found, which NewEnv's Env runs.
+var installed []host.Plugin
+
+// InstallPlugins finds and installs the plugins, as installPlugins does,
+// for the process's Envs. The command's main calls it once, before NewEnv
+// and before anything reads the configuration or the profile.
+func InstallPlugins() error {
+	exe, err := os.Executable()
+	if err != nil {
+		exe = ""
 	}
-	d.Brief, d.BriefStatus, d.BriefViews, d.BriefsUnavailable = nil, nil, nil, ""
-	d.Intakes, d.IntakeBriefs, d.Explorer, d.Budget, d.Viewer = nil, nil, nil, nil, nil
-	return d
+	installed, err = installPlugins(config.Dir(), config.StateDir(), exe)
+	return err
+}
+
+// installPlugins finds the plugins in configDir's plugins directory and in
+// the bundled one beside exe, and installs what the configuration and the
+// profile read of every plugin, enabled or not: the bundled and found
+// plugins' vocabulary, their codecs' labels, and their profile layers,
+// which the profile loads while a plugin is enabled. A plugin whose
+// manifest or vocabulary does not fit is left out and named in the error.
+func installPlugins(configDir, stateDir, exe string) ([]host.Plugin, error) {
+	found, err := host.Discover(host.Roots(configDir, stateDir, exe)...)
+	errs := []error{err}
+	srcs, err := bundled.Sources()
+	if err != nil {
+		return nil, err
+	}
+	var dirs []profile.PluginDir
+	var kept []host.Plugin
+	for _, p := range found {
+		s, err := p.Manifest.Source()
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		srcs = slices.DeleteFunc(srcs, func(b *manifest.Source) bool { return b.Provider == s.Provider })
+		srcs = append(srcs, s)
+		kept = append(kept, p)
+		dirs = append(dirs, profile.PluginDir{ID: p.ID(), Dir: p.Dir})
+	}
+	v, err := builtin.Merge(srcs...)
+	errs = append(errs, err)
+	builtin.Install(v)
+	codecs := []unit.Codec{dturn.SessionCodec{}, wsdomain.Codec{}, task.Codec{}}
+	for _, s := range srcs {
+		c, err := codec.Of(s.Provider, s.Codec)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		codecs = append(codecs, c)
+	}
+	unit.UseLabels(unit.NewRegistry(codecs...))
+	profile.UsePlugins(dirs)
+	return kept, errors.Join(errs...)
+}
+
+// servePlugins runs the plugins of e that cfg enables until ctx ends or
+// the returned stop runs, which waits for them to stop; under --no-jobs it
+// runs none.
+func (e *Env) servePlugins(ctx context.Context, db *sqlite.DB, cfg config.Config, logf func(string, ...any)) (stop func()) {
+	snaps := psource.NewSnapshots(db.Snapshots())
+	meters := &psource.Meters{Registry: e.meter}
+	e.briefsHeard = &atomic.Pointer[brief.Queue]{}
+	briefIntents := e.briefIntents(logf)
+	hosted := e.hostedFor(db, cfg, logf)
+	codecs := e.unitCodecs()
+	note := func(t port.Topic, units ...unit.Unit) {
+		if e.changes != nil {
+			e.changes.Note(t, units...)
+		}
+	}
+	snaps.OnStale(func(unit.ProviderID) {
+		if e.changes != nil {
+			e.changes.NoteAll(port.TopicPRs)
+		}
+	})
+	e.pluginKind = &psource.Kind{
+		Snapshots: snaps,
+		StateDir:  func(id string) string { return filepath.Join(e.StateDir, "plugins", id) },
+		Broker: func(id string, s *manifest.Source) *psource.Broker {
+			return e.withGitHubBroker(&psource.Broker{ID: id, Manifest: s, Snapshots: snaps, Units: psource.Units{Codecs: codecs}, Config: e.currentConfig,
+				Note: note, Briefs: db, BriefRecords: e.briefRecords(db), Briefed: e.heardBrief, Now: e.Now, BriefIntent: briefIntents,
+				Events: sqlite.New(db), Marks: db, Drafts: db, Overrides: db, Wakes: envWakes{e, db}, Paused: e.roundsPaused, Rounds: e.storedRoundState,
+				Links: db.Links(), Hosted: hosted(id), Meters: meters, Workspaces: e.workspaceListing, Books: sqlite.New(db).Books}, id, db)
+		},
+		Loaded: func(id string) {
+			logf("plugin %s: loaded", id)
+			e.background.Go(func() {
+				e.pluginLoaded(ctx, db, id)
+				note(port.TopicPRs | port.TopicJobs)
+			})
+		},
+		Logf:   logf,
+		Meters: meters,
+	}
+	if e.noJobs {
+		logf("plugins: --no-jobs starts none")
+		return func() {}
+	}
+	sums, err := host.ReadChecksums(host.ChecksumsFile(e.StateDir))
+	if err != nil {
+		logf("plugins: %v", err)
+	}
+	runs, why, err := host.Runs(e.plugins, cfg, sums, []string{plugin.BrandEnv + "=" + brand.Name}, pluginLogger(logf))
+	if err != nil {
+		logf("%v", err)
+	}
+	for _, r := range runs {
+		logf("plugin %s: runs %s, %s", r.Manifest.ID, r.Spec.Path, why[r.Manifest.ID])
+		e.pluginKind.Expect(r.Manifest.ID)
+		e.pluginRuns = append(e.pluginRuns, r.Manifest.ID)
+	}
+	var launcher plugin.Launcher = host.ExecLauncher{}
+	if e.pluginLauncher != nil {
+		launcher = e.pluginLauncher
+	}
+	h := &host.Host{Launcher: launcher, Kinds: []host.Kind{e.pluginKind}, Logf: logf}
+	pctx, cancel := context.WithCancel(ctx)
+	var notifying sync.WaitGroup
+	if e.changes != nil {
+		from := e.changes.Gen()
+		notifying.Go(func() { e.pluginKind.Notify(pctx, e.changes, from) })
+	}
+	h.Start(pctx, runs)
+	return func() {
+		cancel()
+		notifying.Wait()
+		h.Wait()
+	}
+}
+
+// heardBrief wakes the turns waiting on u's brief, which a plugin wrote.
+func (e *Env) heardBrief(u unit.Unit) {
+	if q := e.briefsHeard.Load(); q != nil {
+		q.Noted(u)
+	}
+}
+
+// moduleHost is the broker the host serves a built-in source module of
+// provider id: its events, marks, drafts and overrides are the host's, in
+// db.
+func (e *Env) moduleHost(db *sqlite.DB) func(id unit.ProviderID) src.Host {
+	codecs := e.unitCodecs()
+	return func(id unit.ProviderID) src.Host {
+		b := &psource.Broker{ID: string(id), Units: psource.Units{Codecs: codecs}, Config: e.currentConfig,
+			Events: sqlite.New(db), Marks: db, Drafts: db, Overrides: db, Wakes: envWakes{e, db}, Paused: e.roundsPaused, Rounds: e.storedRoundState}
+		return b.Host()
+	}
+}
+
+// pluginPresenter is the presenter of a running plugin of the source kind.
+func (e *Env) pluginPresenter(p unit.ProviderID) (daemon.Presenter, bool) {
+	if e.pluginKind == nil {
+		return nil, false
+	}
+	c, err := e.pluginKind.Client(string(p))
+	if err != nil {
+		return nil, false
+	}
+	return c, true
+}
+
+// unitCodecs are the codecs of every provider: the core's and every
+// plugin's, enabled or not.
+func (e *Env) unitCodecs() *unit.Registry {
+	codecs := []unit.Codec{dturn.SessionCodec{}, wsdomain.Codec{}, task.Codec{}}
+	for _, p := range e.sourcePlugins() {
+		codecs = append(codecs, p.Codec)
+	}
+	for _, p := range e.plugins {
+		if s, err := p.Manifest.Source(); err == nil {
+			if c, err := codec.Of(s.Provider, s.Codec); err == nil {
+				codecs = append(codecs, c)
+			}
+		}
+	}
+	return unit.NewRegistry(codecs...)
+}
+
+// pluginLogger relays a plugin's log lines to the daemon's log.
+func pluginLogger(logf func(string, ...any)) hclog.Logger {
+	return hclog.New(&hclog.LoggerOptions{Output: logWriter(logf), Level: hclog.Info, JSONFormat: false})
+}
+
+// logWriter writes each line to logf.
+type logWriter func(string, ...any)
+
+func (w logWriter) Write(b []byte) (int, error) {
+	w("%s", strings.TrimRight(string(b), "\n"))
+	return len(b), nil
+}
+
+// pluginHealthWait bounds one plugin's answer to the daemon's health.
+const pluginHealthWait = 2 * time.Second
+
+// pluginHealth is how each plugin serve runs answers its health: down while
+// its process is not running, with why.
+func (e *Env) pluginHealth(ctx context.Context) []api.PluginHealth {
+	loading := e.pluginKind.Loading()
+	out := make([]api.PluginHealth, 0, len(e.pluginRuns))
+	for _, id := range e.pluginRuns {
+		c, err := e.pluginKind.Client(id)
+		if err != nil {
+			out = append(out, api.PluginHealth{ID: id, Status: "down", Reason: cmp.Or(loading[id], err.Error())})
+			continue
+		}
+		hctx, cancel := context.WithTimeout(ctx, pluginHealthWait)
+		h, err := c.Health(hctx)
+		cancel()
+		if err != nil {
+			out = append(out, api.PluginHealth{ID: id, Status: "down", Reason: err.Error()})
+			continue
+		}
+		out = append(out, api.PluginHealth{ID: id, Status: pluginStatus(h.Status), Reason: h.Reason})
+	}
+	return out
+}
+
+func pluginStatus(s plugin.Status) string {
+	switch s {
+	case plugin.StatusLoading:
+		return "loading"
+	case plugin.StatusServing:
+		return "serving"
+	case plugin.StatusDegraded:
+		return "degraded"
+	}
+	return "unknown"
 }

@@ -18,13 +18,15 @@ import (
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/items"
-	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 	"github.com/wloophq/wloop/internal/situation"
 	"github.com/wloophq/wloop/internal/turn"
 )
@@ -47,22 +49,13 @@ func pinLocal(t *testing.T, loc *time.Location) {
 	t.Cleanup(func() { time.Local = old })
 }
 
-func brt(t *testing.T) *time.Location {
-	t.Helper()
-	loc, err := time.LoadLocation("America/Sao_Paulo")
-	if err != nil {
-		t.Skip(err)
-	}
-	return loc
-}
-
 func TestItemsPerSituation(t *testing.T) {
 	pinLocal(t, time.UTC)
 	var got []goldenRow
 	for _, c := range ghsourcetest.Cases() {
 		p, _ := prrow.PayloadOf(c.Row)
 		got = append(got, goldenRow{Name: c.Name, Kind: c.Row.Kind, UnmutedKind: p.UnmutedKind, WaitsOn: c.Row.Summary.WaitsOn,
-			NeedsMe: prrow.NeedsMe(c.Row), InScope: prrow.InScope(c.Row), Items: brandless(Items(c.Row))})
+			NeedsMe: prrow.NeedsMe(c.Row), InScope: prrow.InScope(c.Row), Items: brandless(itemsOf(c.Row))})
 	}
 	raw, err := json.MarshalIndent(got, "", "  ")
 	if err != nil {
@@ -87,9 +80,21 @@ func TestItemsPerSituation(t *testing.T) {
 // brandless names the loop's requester by placeholder, so the golden holds under any brand.
 func brandless(v []items.Item) []items.Item {
 	out := []items.Item{}
+	loop := func(p items.Person) items.Person {
+		if p.Key == "system:"+brand.Name {
+			return items.Person{Key: "system:<brand>", Name: "<brand>"}
+		}
+		return p
+	}
 	for _, it := range v {
-		if it.Requester.Key == "system:"+brand.Name {
-			it.Requester = items.Person{Key: "system:<brand>", Name: "<brand>"}
+		it.Requester = loop(it.Requester)
+		it.WaitingOn = slices.Clone(it.WaitingOn)
+		it.Assignees = slices.Clone(it.Assignees)
+		for i := range it.WaitingOn {
+			it.WaitingOn[i] = loop(it.WaitingOn[i])
+		}
+		for i := range it.Assignees {
+			it.Assignees[i] = loop(it.Assignees[i])
 		}
 		out = append(out, it)
 	}
@@ -98,8 +103,8 @@ func brandless(v []items.Item) []items.Item {
 
 func TestItemsDeterministic(t *testing.T) {
 	for _, r := range ghsourcetest.Rows() {
-		a, _ := json.Marshal(Items(r))
-		b, _ := json.Marshal(Items(r))
+		a, _ := json.Marshal(itemsOf(r))
+		b, _ := json.Marshal(itemsOf(r))
 		if !bytes.Equal(a, b) {
 			t.Fatalf("%s: %s then %s", r.Label, a, b)
 		}
@@ -110,19 +115,19 @@ func reviewOfViewer(n int, muted bool) api.Row {
 	s := ghsourcetest.Situation{PR: ghsourcetest.Open(n, ghsourcetest.Other)}
 	s.PR.ReviewRequests = []string{ghsourcetest.Viewer}
 	if muted {
-		s.Override.MuteUntilStateChange, s.Override.MutedKind, s.Override.MutedWaitingOn = true, string(situation.KindReview), "me"
+		s.Mute = overlay.Mute{UntilStateChange: true}
 	}
 	return ghsourcetest.Derive(s)
 }
 
-func TestMutedRowKeepsItemsAndCarriesMute(t *testing.T) {
+func TestMutedRowKeepsItems(t *testing.T) {
 	t.Run("pending round", func(t *testing.T) {
 		round := func(muted bool) api.Row {
 			s := ghsourcetest.Situation{PR: ghsourcetest.Open(3, ghsourcetest.Other)}
 			s.PR.ReviewRequests, s.PR.Workspace = []string{ghsourcetest.Viewer}, ghsourcetest.ReviewWorkspace
-			s.Pending = &round.Pending{Intent: "review", Reason: "new push", Since: ghsourcetest.Now.Add(-time.Minute), Deadline: ghsourcetest.Now.Add(4 * time.Minute)}
+			s.Pending = &overlay.Pending{Intent: "review", Reason: "new push", Since: ghsourcetest.Now.Add(-time.Minute), Deadline: ghsourcetest.Now.Add(4 * time.Minute)}
 			if muted {
-				s.Override.MutedUntil = ghsourcetest.Now.Add(time.Hour)
+				s.Mute = overlay.Mute{Until: ghsourcetest.Now.Add(time.Hour)}
 			}
 			return ghsourcetest.Derive(s)
 		}
@@ -130,9 +135,9 @@ func TestMutedRowKeepsItemsAndCarriesMute(t *testing.T) {
 		if situation.Kind(muted.Kind) != situation.KindMuted {
 			t.Fatalf("kind %s", muted.Kind)
 		}
-		a, _ := json.Marshal(Items(plain))
-		b, _ := json.Marshal(Items(muted))
-		if !bytes.Equal(a, b) || len(Items(plain)) != 1 || Items(plain)[0].ID != "gh:round" {
+		a, _ := json.Marshal(itemsOf(plain))
+		b, _ := json.Marshal(itemsOf(muted))
+		if !bytes.Equal(a, b) || len(itemsOf(plain)) != 1 || itemsOf(plain)[0].ID != "gh:review" {
 			t.Fatalf("plain %s\nmuted %s", a, b)
 		}
 	})
@@ -140,54 +145,10 @@ func TestMutedRowKeepsItemsAndCarriesMute(t *testing.T) {
 	if situation.Kind(muted.Kind) != situation.KindMuted {
 		t.Fatalf("kind %s", muted.Kind)
 	}
-	a, _ := json.Marshal(Items(plain))
-	b, _ := json.Marshal(Items(muted))
-	if !bytes.Equal(a, b) || len(Items(plain)) != 1 || Items(plain)[0].ID != "gh:review" {
+	a, _ := json.Marshal(itemsOf(plain))
+	b, _ := json.Marshal(itemsOf(muted))
+	if !bytes.Equal(a, b) || len(itemsOf(plain)) != 1 || itemsOf(plain)[0].ID != "gh:review" {
 		t.Fatalf("plain %s\nmuted %s", a, b)
-	}
-	c, err := Card(context.Background(), muted)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if c.Mute == nil || !c.Mute.UntilStateChange {
-		t.Errorf("mute %+v", c.Mute)
-	}
-	s := ghsourcetest.Situation{PR: ghsourcetest.Open(2, ghsourcetest.Other)}
-	s.PR.ReviewRequests = []string{ghsourcetest.Viewer}
-	s.Override.MutedUntil = ghsourcetest.Now.Add(3 * time.Hour)
-	c, err = Card(context.Background(), ghsourcetest.Derive(s))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if c.Mute == nil || !c.Mute.Until.Equal(ghsourcetest.Now.Add(3*time.Hour)) {
-		t.Errorf("mute %+v", c.Mute)
-	}
-	if c, _ := Card(context.Background(), plain); c.Mute != nil {
-		t.Errorf("unmuted card carries %+v", c.Mute)
-	}
-}
-
-func TestHeldIDIsTheLocalDay(t *testing.T) {
-	loc := brt(t)
-	pinLocal(t, loc)
-	hold := time.Date(2026, 10, 21, 20, 0, 0, 0, loc)
-	held := func(n int, at time.Time, mutedAt time.Time) api.Row {
-		s := ghsourcetest.Situation{PR: ghsourcetest.Open(n, ghsourcetest.Other), At: at}
-		s.PR.Workspace = ghsourcetest.ReviewWorkspace
-		s.Events = []dinv.Event{ghsourcetest.Event(n, dinv.KindRoundHeld, "", hold, "cap reached")}
-		if !mutedAt.IsZero() {
-			s.Override.MutedUntil = at.Add(5 * time.Hour)
-			s.Events = append(s.Events, ghsourcetest.Event(n, dinv.KindMuted, ghsourcetest.Viewer, mutedAt, ""))
-		}
-		return ghsourcetest.Derive(s)
-	}
-	now := time.Date(2026, 10, 21, 22, 0, 0, 0, loc)
-	rows := []api.Row{held(1, now, time.Time{}), held(1, now, time.Date(2026, 10, 21, 21, 30, 0, 0, loc))}
-	for _, r := range rows {
-		got := Items(r)
-		if len(got) != 1 || got[0].ID != "gh:held:2026-10-21" {
-			t.Errorf("%s (%s): %+v", r.Label, r.Kind, got)
-		}
 	}
 }
 
@@ -195,21 +156,24 @@ func TestAskedTurnDerivesNoItem(t *testing.T) {
 	for _, c := range ghsourcetest.Cases() {
 		switch kindOf(c.Row) {
 		case situation.KindLoopWaiting, situation.KindLoopStopped:
-			if !loopItemsAsExpected(c.Row) {
-				t.Errorf("%s: %+v", c.Name, Items(c.Row))
+			if !loopItemsAsExpected(c.Row, itemsOf) {
+				t.Errorf("%s: %+v", c.Name, itemsOf(c.Row))
 			}
 		}
 	}
 }
 
-// loopItemsAsExpected: a loop row derives no item, but for an agent that waits on the viewer with no
-// question, which derives gh:wait.
-func loopItemsAsExpected(r api.Row) bool {
-	got := Items(r)
-	if situation.Kind(r.Kind) == situation.KindLoopWaiting && r.Question == nil && prrow.NeedsMe(r) {
-		return len(got) == 1 && got[0].ID == "gh:wait"
+// loopItemsAsExpected: a loop row asks what the plugin reported under the turn, else follows the pull request:
+// on the user when its agent waits with no question, on the loop while it works.
+func loopItemsAsExpected(r api.Row, itemsOf func(api.Row) []items.Item) bool {
+	got := itemsOf(r)
+	if len(got) == 0 || slices.ContainsFunc(got, func(it items.Item) bool { return it.TaskKey != r.Unit.String() }) {
+		return false
 	}
-	return len(got) == 0
+	if situation.Kind(r.Kind) == situation.KindLoopWaiting && r.Question == nil && prrow.NeedsMe(r) {
+		return hasViewerItem(r, itemsOf)
+	}
+	return true
 }
 
 func kindOf(r api.Row) situation.Kind {
@@ -228,11 +192,11 @@ func TestTransitionsResolveItems(t *testing.T) {
 	derive := func(r api.Row) {
 		t.Helper()
 		rev++
-		c, err := Card(ctx, r)
+		c, err := cardOf(ctx, r)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := l.Reconcile(ctx, r.Unit, Items(r), unit.Anchor{Unit: r.Unit, Ref: "row:" + strings.Repeat("1", rev)}, c.Outcome); err != nil {
+		if _, err := l.Reconcile(ctx, r.Unit, itemsOf(r), unit.Anchor{Unit: r.Unit, Ref: "row:" + strings.Repeat("1", rev)}, c.Outcome); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -260,7 +224,7 @@ func TestTransitionsResolveItems(t *testing.T) {
 		{"closed", func(s *ghsourcetest.Situation) { s.PR.State, s.PR.ClosedAt = "CLOSED", ghsourcetest.Now }, items.Moot},
 		{"loop working", func(s *ghsourcetest.Situation) {
 			s.PR.Workspace = ghsourcetest.ReviewWorkspace
-			s.Turn = &prrow.TurnFact{Facts: situation.TurnFacts{Intent: "review", Role: "pr.review", State: "started", At: ghsourcetest.Now}, Session: "s1"}
+			s.Turn = &prrow.TurnFact{Facts: overlay.Turn{Intent: "review", Role: "pr.review", State: "started", At: ghsourcetest.Now}, Session: "s1"}
 		}, items.Superseded},
 	}
 	for i, tc := range cases {
@@ -286,21 +250,31 @@ type fixedClock time.Time
 
 func (c fixedClock) Now() time.Time { return time.Time(c) }
 
-func hasViewerItem(r api.Row) bool {
+func hasViewerItem(r api.Row, itemsOf func(api.Row) []items.Item) bool {
 	p, _ := prrow.PayloadOf(r)
 	me := items.Identity{Keys: []string{"github:" + p.Viewer}}
-	return slices.ContainsFunc(Items(r), func(it items.Item) bool {
+	return slices.ContainsFunc(itemsOf(r), func(it items.Item) bool {
 		return it.State == items.Open && slices.ContainsFunc(it.WaitingOn, func(w items.Person) bool { return w.Is(me) })
 	})
 }
 
-func compareNeedsMe(t *testing.T, rows []api.Row) (compared int) {
+// ownNext tells whether r is the viewer's own in-scope pull request that
+// waits on its author rather than on the viewer: merge, no reviewer, a
+// reviewer's comment to answer.
+func ownNext(r api.Row) bool {
+	p, ok := prrow.PayloadOf(r)
+	k := situation.Kind(r.Kind)
+	return ok && p.Viewer != "" && strings.EqualFold(p.Author, p.Viewer) && prrow.InScope(r) &&
+		(k == situation.KindMerge || k == situation.KindNoReviewer || k == situation.KindReply)
+}
+
+func compareNeedsMe(t *testing.T, rows []api.Row, itemsOf func(api.Row) []items.Item) (compared int) {
 	t.Helper()
 	for _, r := range rows {
 		switch kindOf(r) {
 		case situation.KindLoopWaiting, situation.KindLoopStopped:
-			if !loopItemsAsExpected(r) {
-				t.Errorf("%s asked: %+v", r.Label, Items(r))
+			if !loopItemsAsExpected(r, itemsOf) {
+				t.Errorf("%s asked: %+v", r.Label, itemsOf(r))
 			}
 			continue
 		}
@@ -308,8 +282,8 @@ func compareNeedsMe(t *testing.T, rows []api.Row) (compared int) {
 			continue
 		}
 		compared++
-		want := slices.Contains(r.Views, api.ViewNeedsMe) || ownNext(r)
-		if got := hasViewerItem(r); want != got {
+		want := slices.Contains(r.Facets["is"], "needs-me") || ownNext(r)
+		if got := hasViewerItem(r, itemsOf); want != got {
 			t.Errorf("%s (%s, waits on %s): needs-me or own next %v, viewer item %v", r.Label, r.Kind, r.Summary.WaitsOn, want, got)
 		}
 	}
@@ -317,7 +291,7 @@ func compareNeedsMe(t *testing.T, rows []api.Row) (compared int) {
 }
 
 func TestNeedsMeDifferential(t *testing.T) {
-	if n := compareNeedsMe(t, ghsourcetest.Rows()); n == 0 {
+	if n := compareNeedsMe(t, ghsourcetest.Rows(), itemsOf); n == 0 {
 		t.Fatal("no table row compared")
 	}
 	f := storetest.Seeded(t, storetest.Live)
@@ -325,17 +299,24 @@ func TestNeedsMeDifferential(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := seededModel(t, f)
-	page, err := m.Rows(context.Background(), api.ViewAll, api.Since{})
+	page, err := m.Rows(context.Background(), api.Since{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	needs := 0
 	for _, r := range page.Rows {
-		if slices.Contains(r.Views, api.ViewNeedsMe) {
+		if slices.Contains(r.Facets["is"], "needs-me") {
 			needs++
 		}
 	}
-	n := compareNeedsMe(t, page.Rows)
+	cards := Cards{Reports: ghreporttest.Inventory{Store: f.Inventory, Now: f.Inventory.Now}}
+	n := compareNeedsMe(t, page.Rows, func(r api.Row) []items.Item {
+		its, err := cards.Items(context.Background(), r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return its
+	})
 	if n < storetest.Live.PRs/2 || needs == 0 {
 		t.Fatalf("compared %d of %d seeded rows, %d in needs-me", n, len(page.Rows), needs)
 	}
@@ -350,19 +331,16 @@ func seededModel(t *testing.T, f *storetest.Fixture) *readmodel.Model {
 	if err != nil {
 		t.Fatal(err)
 	}
-	src := prrow.Source{Store: f.Inventory, RowDeps: readmodel.RowDeps{Books: f.Turns, Sessions: f.Turns, Intakes: f.DB.Intakes().Open,
-		Settings: func() readmodel.RowSettings {
-			return readmodel.RowSettings{Cfg: config.Defaults(), Loaded: l, GateOn: true}
-		}}}
-	m := readmodel.New(f.Log, f.DB, noPending{}, nil, baseSettings{Base: readmodel.Base{Viewers: map[unit.ProviderID]string{unit.GitHub: seededViewer},
+	src := prrow.Source{Store: f.Inventory, Reports: ghreporttest.Inventory{Store: f.Inventory, Now: f.Inventory.Now},
+		Mutes: readmodel.WakeMutes(f.DB.Wakes().UnitWakes), RowDeps: readmodel.RowDeps{Books: f.Turns, Sessions: f.Turns, Intakes: f.DB.Intakes().Open,
+			Settings: func() readmodel.RowSettings {
+				return readmodel.RowSettings{Cfg: config.Defaults(), Loaded: l, GateOn: true}
+			}}}
+	m := readmodel.New(f.Log, f.DB, nil, nil, baseSettings{Base: readmodel.Base{Viewers: map[unit.ProviderID]string{unit.GitHub: seededViewer},
 		Specs: catalog.Specs(l)}}, prrow.New(src))
 	m.UseClock(func() time.Time { return f.Now })
 	return m
 }
-
-type noPending struct{}
-
-func (noPending) Pending(context.Context) (map[unit.Unit]round.Pending, error) { return nil, nil }
 
 type baseSettings struct{ Base readmodel.Base }
 
@@ -383,8 +361,8 @@ func TestStalledRowHasWaitingItem(t *testing.T) {
 		if !c.Row.Summary.Stalled || !prrow.InScope(c.Row) {
 			t.Fatalf("%s: stalled %v, in scope %v", c.Name, c.Row.Summary.Stalled, prrow.InScope(c.Row))
 		}
-		if !slices.ContainsFunc(Items(c.Row), func(it items.Item) bool { return it.ID == id && it.State == items.Open && len(it.WaitingOn) > 0 }) {
-			t.Errorf("%s (%s, waits on %s): no waiting %s in %+v", c.Name, c.Row.Kind, c.Row.Summary.WaitsOn, id, Items(c.Row))
+		if !slices.ContainsFunc(itemsOf(c.Row), func(it items.Item) bool { return it.ID == id && it.State == items.Open && len(it.WaitingOn) > 0 }) {
+			t.Errorf("%s (%s, waits on %s): no waiting %s in %+v", c.Name, c.Row.Kind, c.Row.Summary.WaitsOn, id, itemsOf(c.Row))
 		}
 	}
 	if len(want) > 0 {
@@ -397,8 +375,8 @@ func BenchmarkItemsAndCard(b *testing.B) {
 	ctx := context.Background()
 	for b.Loop() {
 		for _, r := range rows {
-			_ = Items(r)
-			if _, err := Card(ctx, r); err != nil {
+			_ = itemsOf(r)
+			if _, err := cardOf(ctx, r); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -418,7 +396,7 @@ func TestMutedRowKeepsItsFix(t *testing.T) {
 			continue
 		}
 		hasFix := func(r api.Row) bool {
-			return slices.ContainsFunc(Items(r), func(it items.Item) bool { return it.ID == "gh:fix" })
+			return slices.ContainsFunc(itemsOf(r), func(it items.Item) bool { return it.ID == "gh:fix" })
 		}
 		plain := byName[plainName]
 		if hasFix(plain) {
@@ -443,22 +421,20 @@ func waitingAgent(q *api.QuestionView) api.Row {
 	return r
 }
 
-func TestAWaitingAgentWithNoQuestionIsAnItem(t *testing.T) {
-	waiting := waitingAgent
-	r := waiting(nil)
+func TestAWaitingAgentWithNoQuestionWaitsOnTheViewer(t *testing.T) {
+	r := waitingAgent(nil)
 	if situation.Kind(r.Kind) != situation.KindLoopWaiting || !prrow.NeedsMe(r) {
 		t.Fatalf("kind %s, needs me %v", r.Kind, prrow.NeedsMe(r))
 	}
-	got := Items(r)
-	if len(got) != 1 || got[0].ID != "gh:wait" || got[0].Initial != items.InitialInbox || len(got[0].WaitingOn) != 1 {
+	got := itemsOf(r)
+	if len(got) != 1 || got[0].ID != itemFollow || got[0].TaskKey != r.Unit.String() || !hasViewerItem(r, itemsOf) {
 		t.Fatalf("%+v", got)
-	}
-	if got := Items(waiting(&api.QuestionView{State: "asked", RecordID: 3})); len(got) != 0 {
-		t.Fatalf("a question derives %+v", got)
 	}
 }
 
-func TestEveryNoticeHasItsItem(t *testing.T) {
+// TestEveryNoticeStandsForAGateOrAnAsk holds what a needs-me row notifies against what its task holds: a
+// round, held or blocked, through its gate, and every other notice an ask of the viewer on the task.
+func TestEveryNoticeStandsForAGateOrAnAsk(t *testing.T) {
 	l, err := turn.Bundled()
 	if err != nil {
 		t.Fatal(err)
@@ -466,7 +442,7 @@ func TestEveryNoticeHasItsItem(t *testing.T) {
 	d := prrow.Deriver{Now: ghsourcetest.Now, Loaded: l}
 	seen := map[prrow.NoticeCase]bool{}
 	for _, c := range append(ghsourcetest.Cases(), ghsourcetest.Case{Name: "waiting agent", Row: waitingAgent(nil)}) {
-		if !slices.Contains(c.Row.Views, api.ViewNeedsMe) {
+		if !slices.Contains(c.Row.Facets["is"], "needs-me") {
 			continue
 		}
 		n, ok := d.Notice(c.Row, nil)
@@ -474,20 +450,83 @@ func TestEveryNoticeHasItsItem(t *testing.T) {
 			continue
 		}
 		seen[n.Case] = true
-		got := Items(c.Row)
-		if n.Case == prrow.NoticeQuestion {
-			if len(got) != 0 {
-				t.Errorf("%s: a question derives %+v", c.Name, got)
-			}
-			continue
+		got := itemsOf(c.Row)
+		if slices.ContainsFunc(got, func(it items.Item) bool {
+			return strings.HasPrefix(it.ID, "gh:held") || it.ID == "gh:blocked" || it.ID == "gh:round" || it.ID == "gh:wait"
+		}) {
+			t.Errorf("%s: an approval is an item: %+v", c.Name, got)
 		}
-		if len(got) != 1 || !strings.HasPrefix(got[0].ID, n.Case.Item()) || got[0].Initial != items.InitialInbox {
-			t.Errorf("%s: notice %s, items %+v", c.Name, n.Case, got)
+		switch n.Case {
+		case prrow.NoticeRound, prrow.NoticeHeld:
+			if n.Case.Gate() != gate.KindPlan {
+				t.Errorf("%s: notice %s stands for %q", c.Name, n.Case, n.Case.Gate())
+			}
+		case prrow.NoticeBlocked:
+			if n.Case.Gate() != gate.KindTrust {
+				t.Errorf("%s: notice %s stands for %q", c.Name, n.Case, n.Case.Gate())
+			}
+		case prrow.NoticeWait:
+			if !hasViewerItem(c.Row, itemsOf) {
+				t.Errorf("%s: notice %s, items %+v", c.Name, n.Case, got)
+			}
 		}
 	}
 	for _, c := range []prrow.NoticeCase{prrow.NoticeHeld, prrow.NoticeBlocked, prrow.NoticeWait, prrow.NoticeQuestion} {
 		if !seen[c] {
 			t.Errorf("no case notifies %s", c)
 		}
+	}
+}
+
+// TestAPermissionPromptIsTheSameWaitItemAsTheWorkspacesAgent holds the item
+// the host derives when a turn's waiting session sets the row's
+// situation to the one the plugin reports when the review workspace's agent
+// waits: the same pull request asks the same answer of the viewer.
+func TestAPermissionPromptIsTheSameWaitItemAsTheWorkspacesAgent(t *testing.T) {
+	prompt := ghsourcetest.Situation{PR: ghsourcetest.Open(5, ghsourcetest.Other)}
+	prompt.PR.Workspace = ghsourcetest.ReviewWorkspace
+	prompt.Turn = &prrow.TurnFact{Facts: overlay.Turn{Intent: "review", Role: "pr.review", State: "started", At: ghsourcetest.Now}, Session: "s1", Waiting: true}
+	host, rep := ghsourcetest.DeriveReport(prompt)
+	if situation.Kind(host.Kind) != situation.KindLoopWaiting || rep.Situation.Kind == string(situation.KindLoopWaiting) {
+		t.Fatalf("the prompt's row %s over the report's %s", host.Kind, rep.Situation.Kind)
+	}
+	got := ItemsOf(host, rep)
+	want := itemsOf(waitingAgent(nil))
+	if len(got) != 1 || len(want) != 1 {
+		t.Fatalf("prompt %+v, agent %+v", got, want)
+	}
+	got[0].Origin.Ref, want[0].Origin.Ref = "", ""
+	if a, b := mustMarshal(t, got[0]), mustMarshal(t, want[0]); !bytes.Equal(a, b) {
+		t.Fatalf("prompt %s\nagent  %s", a, b)
+	}
+}
+
+func mustMarshal(t *testing.T, v any) []byte {
+	t.Helper()
+	raw, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
+// TestOnlyARunningLoopOwesAPullRequest holds that an item waits on the loop only while the loop works on the
+// pull request: a quiet one waits on whoever it waits on, or on nobody.
+func TestOnlyARunningLoopOwesAPullRequest(t *testing.T) {
+	quiet := 0
+	for _, c := range ghsourcetest.Cases() {
+		working := kindOf(c.Row) == situation.KindLoopWorking
+		for _, it := range itemsOf(c.Row) {
+			loop := slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return strings.HasPrefix(p.Key, "system:") })
+			if loop != working {
+				t.Errorf("%s (%s): %s waits on %+v", c.Name, c.Row.Kind, it.ID, it.WaitingOn)
+			}
+			if it.ID == itemFollow && !working && !loop {
+				quiet++
+			}
+		}
+	}
+	if quiet == 0 {
+		t.Fatal("no quiet pull request compared")
 	}
 }

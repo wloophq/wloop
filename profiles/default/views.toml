@@ -1,0 +1,160 @@
+# The lists of tasks and gates, in the order clients list them: each
+# view's when says what it lists, over the facts of a task (or of a gate,
+# with over = "gates"), and its key jumps to it. The review walks the
+# views its steps name, in order; the badge adds up the counts of the
+# views it names. A user profile's views.toml replaces the keys it sets
+# and adds its own views and steps after these.
+
+# What nobody has clarified yet: once clarified, a task never comes back.
+[views.inbox]
+label         = "Inbox"
+key           = "g i"
+when          = "task.category == 'inbox'"
+hide_disabled = true
+
+# The next step is yours: an open gate, or your own action, on a task
+# clarified already. A sequential project's next action comes first.
+[views.needs-me]
+label         = "Needs me"
+key           = "g m"
+when          = "task.owed_by == 'me' && task.category != 'inbox' && (task.gates_open > 0 || task.category in ['ready', 'active', 'waiting'])"
+sort          = "-task.sequential_next"
+hide_disabled = true
+
+# The next step is someone else's, by who owes it.
+[views.waiting]
+label = "Waiting"
+key   = "g w"
+when  = "task.category in ['ready', 'active', 'waiting'] && task.owed_by != 'me'"
+group = "task.owed_by"
+
+# Time to chase: someone else owes the next step, its check date passed,
+# and nothing moved on it since, by who owes it.
+[views.chase]
+label         = "Chase"
+key           = "g c"
+when          = "task.category in ['ready', 'active', 'waiting'] && task.owed_by != 'me' && task.owed_by != '' && !('stalled' in task.link_signals) && task.check_on > timestamp(0) && task.check_on < now && now - task.since_movement < task.check_on"
+group         = "task.owed_by"
+hide_disabled = true
+
+# What you can finish now: the next step is yours and its size, the
+# attention it takes, fits in the half hour you have.
+[views.fits-now]
+label         = "Fits now"
+key           = "g n"
+when          = "task.owed_by == 'me' && task.category in ['ready', 'active'] && task.prop.size > duration('0s') && task.prop.size <= duration('30m')"
+sort          = "task.prop.size"
+hide_disabled = true
+
+# Who is blocked by you: the tasks whose asks wait on you, by who asked.
+[views.blocked-by-me]
+label         = "Blocked by me"
+key           = "g b"
+when          = "task.owed_by == 'me' && size(task.askers) > 0 && !(task.category in ['deferred', 'done', 'dropped'])"
+group         = "task.askers"
+sort          = "-task.ask_age"
+hide_disabled = true
+
+# Waiting too long: a source says a link stalled, or, when no link's source
+# keeps its own staleness, the check date of a task someone else owes
+# passed with nothing moving since.
+[views.stalled]
+label         = "Stalled"
+key           = "g t"
+when          = "task.link_signal.stalled || (!('stalled' in task.link_signals) && task.owed_by != 'me' && task.check_on > timestamp(0) && task.check_on < now && now - task.since_movement < task.check_on)"
+hide_disabled = true
+
+# An agent works on it: a source's loop holds a link, or a run is live.
+[views.in-loop]
+label         = "In loop"
+key           = "g u"
+when          = "task.link_signal.in_loop || task.runs_live > 0"
+hide_disabled = true
+
+# The work is approved: a source says a link is ready.
+[views.approved]
+label         = "Approved"
+key           = "g a"
+when          = "task.link_signal.ready"
+hide_disabled = true
+remove_clean  = true
+
+# Asleep until a date, an event or a condition.
+[views.snoozed]
+label         = "Snoozed"
+key           = "g z"
+when          = "task.wake_until > timestamp(0) || task.wake_when != '' || task.state == 'scheduled'"
+hide_disabled = true
+
+[views.focus]
+label         = "Focus"
+key           = "g f"
+when          = "task.prop.focus == 'on' && !(task.category in ['done', 'dropped'])"
+hide_disabled = true
+
+[views.projects]
+label         = "Projects"
+key           = "g p"
+when          = "task.prop.kind == 'project' && !(task.category in ['done', 'dropped'])"
+hide_disabled = true
+
+[views.someday]
+label         = "Someday"
+when          = "task.state == 'someday'"
+hide_disabled = true
+
+# Done, the latest first.
+[views.logbook]
+label = "Logbook"
+when  = "task.category == 'done'"
+sort  = "task.since_movement"
+
+# Done and still holding a workspace on disk, to remove.
+[views.done]
+label         = "Done"
+key           = "g d"
+when          = "task.category == 'done' && task.link_signal.workspace"
+hide_disabled = true
+remove_clean  = true
+
+# The drafts waiting on your approval, and those approved whose delivery
+# is under way or failed, so you can send them again.
+[views.outbox]
+label         = "Outbox"
+key           = "g o"
+over          = "gates"
+when          = "gate.kind == 'draft' && (gate.status == 'open' || gate.delivery in ['sending', 'failed'])"
+hide_disabled = true
+
+# The projects past their review, or, unless in Someday, without a
+# next action.
+[views.review-projects]
+label         = "Projects to review"
+when          = "task.prop.kind == 'project' && !(task.category in ['done', 'dropped']) && (task.review_due || (!task.children_ready && task.state != 'someday'))"
+hide_disabled = true
+
+# The review: it lists nothing itself; the clients walk its steps.
+[views.review]
+label = "Review"
+key   = "g r"
+
+[review.inbox]
+label = "Inbox to zero"
+
+[review.outbox]
+label = "Outbox"
+
+[review.waiting]
+label = "Waiting: nudge?"
+
+[review.review-projects]
+label = "Projects without a next action or past their review"
+
+[review.someday]
+label = "Someday"
+
+[review.focus]
+label = "Prune Focus"
+
+[badge]
+views = ["inbox", "needs-me"]

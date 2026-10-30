@@ -17,7 +17,11 @@ func TestDirNestsKeySegments(t *testing.T) {
 		{Owner{Unit: unit.Unit{Provider: "github", Key: "owner/repo#12"}}, "dossiers/github/owner/repo%2312#"},
 		{Owner{Unit: unit.Unit{Provider: "slack", Key: "T000/C000/1700.1"}}, "dossiers/slack/T000/C000/1700.1#"},
 		{Owner{Unit: unit.Unit{Provider: "slack", Key: "T000/C 0?/x"}}, "dossiers/slack/T000/C%200%3F/x#"},
-		{Owner{Project: "launch-v2"}, "dossiers/project/launch-v2#"},
+		{Owner{Unit: unit.Unit{Provider: "task", Key: "t-00000000000000a1"}}, "dossiers/task/t-00000000000000a1#"},
+		{Owner{Unit: unit.Unit{Provider: "project", Key: "launch-v2"}}, "dossiers/project/launch-v2#"},
+		{Owner{Unit: unit.Unit{Provider: "task", Key: "t-b"}, Merged: "t-a"}, "dossiers/task/t-b#/merged/t-a"},
+		{Owner{Unit: unit.Unit{Provider: "task", Key: "t-b"}, Merged: "github/acme/api#7"}, "dossiers/task/t-b#/merged/github%2Facme%2Fapi%237"},
+		{Owner{Unit: unit.Unit{Provider: "task", Key: "t-b"}, Merged: ".x"}, "dossiers/task/t-b#/merged/%2Ex"},
 		{Owner{Unit: unit.Unit{Provider: "github", Key: "owner/.github#3"}}, "dossiers/github/owner/%2Egithub%233#"},
 		{Owner{Unit: unit.Unit{Provider: "fake", Key: "a/.git/x#"}}, "dossiers/fake/a/%2Egit/x%23#"},
 	}
@@ -56,21 +60,20 @@ func TestDirRefusesEscapes(t *testing.T) {
 		{Unit: unit.Unit{Provider: "github", Key: "/abs"}},
 		{Unit: unit.Unit{Provider: "..", Key: "x"}},
 		{Unit: unit.Unit{Provider: ".archive", Key: "x"}},
-		{Unit: unit.Unit{Provider: "project", Key: "x"}},
+		{Unit: unit.Unit{Provider: "merged", Key: "x"}},
 		{Unit: unit.Unit{Provider: "a/b", Key: "x"}},
-		{Project: ".."},
-		{Project: "a/b"},
-		{Project: "p", Unit: unit.Unit{Provider: "github", Key: "x"}},
+		{Merged: "t-a"},
+		{Unit: unit.Unit{Provider: "task", Key: "t-b"}, Merged: ".."},
 	}
 	for _, o := range bad {
 		if got, err := Dir(state, o); err == nil {
 			t.Errorf("Dir(%+v) = %s, want a refusal", o, got)
 		}
 	}
-	if _, err := Dir("relative", Owner{Project: "p"}); err == nil {
+	if _, err := Dir("relative", Owner{Unit: unit.Unit{Provider: "task", Key: "t-a"}}); err == nil {
 		t.Error("a relative state dir was accepted")
 	}
-	for _, rel := range []string{"github#", "project/a/b#", "github/a%2Fb#", "github/../x#", "github/a", "github/a#/b#", "github/.git#"} {
+	for _, rel := range []string{"github#", "task/t-b#/merged/a/b", "task/t-b/merged/t-a", "task/t-b#/other/t-a", "merged/t-a#", "github/a%2Fb#", "github/../x#", "github/a", "github/a#/b#", "github/.git#"} {
 		if o, err := OwnerOf(rel); err == nil {
 			t.Errorf("OwnerOf(%s) = %v, want a refusal", rel, o)
 		}

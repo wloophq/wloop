@@ -1,7 +1,0 @@
-summary = "Move a stale next action to Someday"
-provider = "entry"
-when = 'entry.state == "next"'
-
-[[step]]
-use = "entry.verb"
-verb = "someday"

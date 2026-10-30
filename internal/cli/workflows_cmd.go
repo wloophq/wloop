@@ -13,7 +13,7 @@ import (
 )
 
 const workflowsUsage = `usage:
-  workflows facts [github|session|workspace]
+  workflows facts [<provider>]
   workflows steps
 manifest reference: the workflow manifest page of the documentation
 editor schema: profile schema --workflow`

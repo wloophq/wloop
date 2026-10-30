@@ -1,0 +1,14 @@
+summary = "Take off a star task-autofocus set, as its autostar property says, once the task is neither past due nor a stale wait; a star you set stays"
+provider = "task"
+when = 'task.prop.focus == "on" && task.prop_by.focus == "workflow" && task.prop.autostar == "on" && !(task.prop.due > timestamp(0) && task.prop.due <= now) && !(size(task.link_owes) > 0 && !("me" in task.link_owes) && !("stalled" in task.link_signals) && task.check_on > timestamp(0) && task.check_on <= now && task.prop.last_nudge < task.check_on)'
+order = 54
+
+[[step]]
+use = "task.set"
+prop = "focus"
+value = ""
+
+[[step]]
+use = "task.set"
+prop = "autostar"
+value = ""

@@ -1,4 +1,5 @@
-// Package backup keeps a copy of a file the loop is about to change.
+// Package backup keeps a copy of a file the loop is about to change, and
+// of the plugin stores beside a copy of the store.
 package backup
 
 import (

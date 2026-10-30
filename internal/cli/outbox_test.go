@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -17,7 +18,8 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/source"
+	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -30,24 +32,26 @@ func outboxDaemon(t *testing.T, te *testEnv, interactive bool) *sqlite.DB {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	mods, err := buildSources([]source.Plugin{publishing(&recordingPublisher{})}, te.cfg, source.Deps{DB: db, Clock: clockFunc(te.Now)})
+	mods, err := buildSources([]compiledPlugin{publishing(&recordingPublisher{})}, te.cfg, moduleDeps{DB: db, Clock: clockFunc(te.Now)}, bundledUI)
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := te.serveOutbox(daemon.Deps{Cfg: te.cfg, Version: "test", Now: te.Now, Log: t.Logf}, db, te.cfg, mods, t.Logf)
+	d := te.serveTasks(daemon.Deps{Cfg: te.cfg, Version: "test", Now: te.Now, Log: t.Logf, Intents: te.loadedIntents}, db, te.cfg, mods, t.Logf)
+	d = te.serveOutbox(d, db, te.cfg, mods, t.Logf)
 	h := daemon.New(d).Handler()
 	te.Socket = serveSocket(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			body, _ := io.ReadAll(r.Body)
 			draftPosts.Lock()
 			draftPosts.bodies = append(draftPosts.bodies, string(body))
+			draftPosts.paths = append(draftPosts.paths, r.URL.Path)
 			draftPosts.Unlock()
 			r.Body = io.NopCloser(bytes.NewReader(body))
 		}
 		h.ServeHTTP(w, r)
 	}))
 	draftPosts.Lock()
-	draftPosts.bodies = nil
+	draftPosts.bodies, draftPosts.paths = nil, nil
 	draftPosts.Unlock()
 	saved := outboxInteractive
 	outboxInteractive = func(*Env) bool { return interactive }
@@ -55,10 +59,16 @@ func outboxDaemon(t *testing.T, te *testEnv, interactive bool) *sqlite.DB {
 	return db
 }
 
-// draftPosts are the bodies the CLI posted to the outbox daemon.
+// draftPosts are the bodies the CLI posted to the outbox daemon, and their paths.
 var draftPosts struct {
 	sync.Mutex
-	bodies []string
+	bodies, paths []string
+}
+
+func postedPaths() []string {
+	draftPosts.Lock()
+	defer draftPosts.Unlock()
+	return slices.Clone(draftPosts.paths)
 }
 
 func posted() []string {
@@ -70,18 +80,17 @@ func posted() []string {
 func TestOutboxListGolden(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	db := outboxDaemon(t, te, false)
-	insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "Thanks, merging now.\nSecond line stays out.", State: draft.Proposed,
+	insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "Thanks, merging now.\nSecond line stays out.", State: draft.Held,
 		Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "review"}})
 	insertDraft(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Nudge, Target: "#general", Text: "Any news on this?", State: draft.Failed,
 		Error: "may have been posted: timeout", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge"},
 		CreatedAt: testNow.Add(time.Minute), UpdatedAt: testNow.Add(time.Minute)})
-	insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "Closing this.", State: draft.Proposed,
-		Approval: draft.Approval{Mode: draft.Delay, Window: 10 * time.Minute}, Deadline: testNow.Add(10 * time.Minute),
-		CreatedAt: testNow.Add(2 * time.Minute), UpdatedAt: testNow.Add(2 * time.Minute)})
+	insertDraftGate(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Reply, Text: "Closing this.", Original: "Closing this.", State: draft.Held,
+		CreatedAt: testNow.Add(2 * time.Minute), UpdatedAt: testNow.Add(2 * time.Minute)}, testNow.Add(12*time.Minute))
 	insertDraft(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Close, Text: "Left sending by a crash.", State: draft.Sending, SendingAt: testNow,
 		CreatedAt: testNow.Add(3 * time.Minute), UpdatedAt: testNow.Add(3 * time.Minute)})
 	insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "already out", State: draft.Sent})
-	insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "only watched", State: draft.Discarded, Reason: "observe"})
+	insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "only watched", State: draft.Dropped, Reason: "observe"})
 	if code := te.run("outbox"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
@@ -114,7 +123,7 @@ func TestOutboxApproveConfirms(t *testing.T) {
 	seed := func(t *testing.T, interactive bool) (*testEnv, *sqlite.DB, draft.Draft) {
 		te := newTestEnv(t, &fake.Manager{})
 		db := outboxDaemon(t, te, interactive)
-		d := insertDraft(t, db, draft.Draft{Unit: threadUnit, Target: "#general", Text: text, State: draft.Proposed})
+		d := insertDraft(t, db, draft.Draft{Unit: threadUnit, Target: "#general", Text: text, State: draft.Held})
 		return te, db, d
 	}
 	t.Run("not a terminal", func(t *testing.T) {
@@ -123,7 +132,7 @@ func TestOutboxApproveConfirms(t *testing.T) {
 			if code := te.run(args...); code == 0 || !strings.Contains(te.err.String(), "cockpit") {
 				t.Fatalf("%v: exit %d: %s", args, code, te.err)
 			}
-			if got := te.draftState(t, db, d.ID); got.State != draft.Proposed {
+			if got := te.draftState(t, db, d.ID); got.State != draft.Held {
 				t.Fatalf("%v approved it", args)
 			}
 		}
@@ -139,7 +148,7 @@ func TestOutboxApproveConfirms(t *testing.T) {
 		if code := te.run("outbox", "approve", "1", "--yes"); code == 0 || !strings.Contains(te.err.String(), "agent session") {
 			t.Fatalf("exit %d: %s", code, te.err)
 		}
-		if got := te.draftState(t, db, d.ID); got.State != draft.Proposed {
+		if got := te.draftState(t, db, d.ID); got.State != draft.Held {
 			t.Fatal("an agent approved it")
 		}
 	})
@@ -149,7 +158,7 @@ func TestOutboxApproveConfirms(t *testing.T) {
 		if code := te.run("outbox", "approve", "1"); code != 1 || !strings.Contains(te.out.String(), "Not approved") {
 			t.Fatalf("exit %d: %s %s", code, te.out, te.err)
 		}
-		if got := te.draftState(t, db, d.ID); got.State != draft.Proposed {
+		if got := te.draftState(t, db, d.ID); got.State != draft.Held {
 			t.Fatal("approved on no")
 		}
 	})
@@ -160,15 +169,15 @@ func TestOutboxApproveConfirms(t *testing.T) {
 			t.Fatalf("exit %d: %s", code, te.err)
 		}
 		out := te.out.String()
-		for _, want := range []string{"target:   #general", "to:       #general (C0GEN)", "  First line.", "  Second line names @{github:ana} and @bob.", "  Third line.", "mentions: @{github:ana}, @bob", "draft 1 approved"} {
+		for _, want := range []string{"target:   #general", "to:       #general (C0GEN)", "  First line.", "  Second line names @{github:ana} and @bob.", "  Third line.", "mentions: @{github:ana}, @bob", "draft 1 queued"} {
 			if !strings.Contains(out, want) {
 				t.Errorf("printed no %q:\n%s", want, out)
 			}
 		}
-		if got := te.draftState(t, db, d.ID); got.State != draft.Approved || got.Text != text || got.Edited {
+		if got := te.draftState(t, db, d.ID); got.State != draft.Queued || got.Text != text || got.Edited {
 			t.Fatalf("approved %+v", got)
 		}
-		if bodies := posted(); len(bodies) != 1 || !strings.Contains(bodies[0], `"rev":0`) {
+		if bodies := posted(); len(bodies) != 1 || !strings.Contains(bodies[0], `"rev":"0"`) {
 			t.Fatalf("posted %v, want the rev shown", bodies)
 		}
 	})
@@ -180,7 +189,7 @@ func TestOutboxApproveConfirms(t *testing.T) {
 		if !strings.Contains(te.out.String(), "  Only this.") || strings.Contains(te.out.String(), "Third line") {
 			t.Fatalf("printed\n%s", te.out)
 		}
-		if got := te.draftState(t, db, d.ID); got.State != draft.Approved || got.Text != "Only this." || !got.Edited {
+		if got := te.draftState(t, db, d.ID); got.State != draft.Queued || got.Text != "Only this." || !got.Edited {
 			t.Fatalf("approved %+v", got)
 		}
 	})
@@ -196,10 +205,10 @@ func TestOutboxRetryNeedsConfirmAndATerminal(t *testing.T) {
 	if code := te.run("outbox", "retry", "1", "--yes", "--confirm"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	if got := te.draftState(t, db, d.ID); got.State != draft.Approved {
+	if got := te.draftState(t, db, d.ID); got.State != draft.Queued {
 		t.Fatalf("retried %+v", got)
 	}
-	if bodies := posted(); len(bodies) != 2 || !strings.Contains(bodies[1], `"rev":0`) {
+	if bodies := posted(); len(bodies) != 2 || !strings.Contains(bodies[1], `"rev":"0"`) {
 		t.Fatalf("posted %v, want the rev shown", bodies)
 	}
 }
@@ -207,20 +216,20 @@ func TestOutboxRetryNeedsConfirmAndATerminal(t *testing.T) {
 func TestOutboxEditAndDiscard(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	db := outboxDaemon(t, te, false)
-	d := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "draft", State: draft.Proposed})
+	d := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "draft", State: draft.Held})
 	if code := te.run("outbox", "edit", "1", "better text"); code != 0 {
 		t.Fatalf("edit: exit %d: %s", code, te.err)
 	}
-	if got := te.draftState(t, db, d.ID); got.Text != "better text" || got.State != draft.Proposed {
+	if got := te.draftState(t, db, d.ID); got.Text != "better text" || got.State != draft.Held {
 		t.Fatalf("edited %+v", got)
 	}
 	if code := te.run("outbox", "discard", "1", "--reason", "stale"); code != 0 {
 		t.Fatalf("discard: exit %d: %s", code, te.err)
 	}
-	if got := te.draftState(t, db, d.ID); got.State != draft.Discarded || got.Reason != "stale" {
+	if got := te.draftState(t, db, d.ID); got.State != draft.Dropped || got.Reason != "user" {
 		t.Fatalf("discarded %+v", got)
 	}
-	if code := te.run("outbox", "show", "1"); code != 0 || !strings.Contains(te.out.String(), "#1  reply  discarded") || !strings.Contains(te.out.String(), "Discarded   stale") {
+	if code := te.run("outbox", "show", "1"); code != 0 || !strings.Contains(te.out.String(), "#1  reply  dropped") || !strings.Contains(te.out.String(), "Dropped     user") {
 		t.Fatalf("show: exit %d: %s", code, te.out)
 	}
 	if code := te.run("outbox", "frob"); code != 2 {
@@ -246,17 +255,17 @@ func (r *editingReader) Read(p []byte) (int, error) {
 func TestOutboxApproveRefusesAnEditMadeWhileAsking(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	db := outboxDaemon(t, te, true)
-	d := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "as shown", State: draft.Proposed})
+	d := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "as shown", State: draft.Held})
 	te.In = &editingReader{edit: func() {
 		d.Text = "swapped while asking"
-		if _, err := db.Drafts().Update(context.Background(), d, draft.Proposed); err != nil {
+		if _, err := db.Drafts().Update(context.Background(), d, draft.Held); err != nil {
 			t.Error(err)
 		}
 	}}
 	if code := te.run("outbox", "approve", "1"); code == 0 || !strings.Contains(te.err.String(), "changed since you saw it") {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	if got := te.draftState(t, db, d.ID); got.State != draft.Proposed {
+	if got := te.draftState(t, db, d.ID); got.State != draft.Held {
 		t.Fatalf("approved %+v", got)
 	}
 }
@@ -264,7 +273,7 @@ func TestOutboxApproveRefusesAnEditMadeWhileAsking(t *testing.T) {
 func TestOutboxShowSaysWhenTheDestinationIsUnknown(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	db := outboxDaemon(t, te, false)
-	insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "hi", State: draft.Proposed})
+	insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "hi", State: draft.Held})
 	if code := te.run("outbox", "show", "1"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
@@ -293,7 +302,7 @@ func TestOutboxNewSavesOrSends(t *testing.T) {
 		if code := te.run("outbox", "new", target, "Friday works"); code != 0 || !strings.Contains(te.out.String(), "draft 1 saved to the Outbox for your approval") {
 			t.Fatalf("exit %d: %s %s", code, te.out, te.err)
 		}
-		if got := te.draftState(t, db, 1); got.State != draft.Proposed || got.Kind != draft.Reply || got.Text != "Friday works" || got.Origin.Kind != draft.OriginUser || got.Unit != threadUnit {
+		if got := te.draftState(t, db, 1); got.State != draft.Held || got.Kind != draft.Reply || got.Text != "Friday works" || got.Origin.Kind != draft.OriginUser || got.Unit != threadUnit {
 			t.Fatalf("draft %+v", got)
 		}
 		if code := te.run("outbox", "new", target, "--react", ":eyes:"); code != 0 {
@@ -307,10 +316,10 @@ func TestOutboxNewSavesOrSends(t *testing.T) {
 		te := newTestEnv(t, &fake.Manager{})
 		db := outboxDaemon(t, te, false)
 		knowThreads(t)
-		if code := te.run("outbox", "new", target, "Shipped", "--send", "--yes"); code != 0 || !strings.Contains(te.out.String(), "draft 1 approved") {
+		if code := te.run("outbox", "new", target, "Shipped", "--send", "--yes"); code != 0 || !strings.Contains(te.out.String(), "draft 1 queued") {
 			t.Fatalf("exit %d: %s %s", code, te.out, te.err)
 		}
-		if got := te.draftState(t, db, 1); got.State != draft.Approved {
+		if got := te.draftState(t, db, 1); got.State != draft.Queued {
 			t.Fatalf("draft %+v", got)
 		}
 	})
@@ -328,14 +337,14 @@ func TestOutboxNewSavesOrSends(t *testing.T) {
 		if code := te.run("outbox", "new", target, "Shipped", "--send"); code != 1 || !strings.Contains(te.out.String(), "Not sent; draft 1 stays in the Outbox") {
 			t.Fatalf("exit %d: %s %s", code, te.out, te.err)
 		}
-		if got := te.draftState(t, db, 1); got.State != draft.Proposed {
+		if got := te.draftState(t, db, 1); got.State != draft.Held {
 			t.Fatalf("draft %+v", got)
 		}
 		te.In = strings.NewReader("y\n")
 		if code := te.run("outbox", "new", target, "Shipped", "--send"); code != 0 {
 			t.Fatalf("exit %d: %s", code, te.err)
 		}
-		if got := te.draftState(t, db, 2); got.State != draft.Approved {
+		if got := te.draftState(t, db, 2); got.State != draft.Queued {
 			t.Fatalf("draft %+v", got)
 		}
 	})
@@ -359,11 +368,118 @@ func TestOutboxNewSavesOrSends(t *testing.T) {
 func TestOutboxListLaysOutForATerminal(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	db := outboxDaemon(t, te, false)
-	insertDraft(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Nudge, Text: "@{github:ana}, any news?", State: draft.Proposed})
+	insertDraft(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Nudge, Text: "@{github:ana}, any news?", State: draft.Held})
 	if code := te.run("outbox", "--color", "always"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	if out := te.out.String(); !strings.Contains(out, "NUDGE") || !strings.Contains(out, "\x1b[36m#1") || !strings.Contains(out, "@ana, any news?") {
 		t.Fatalf("printed\n%s", out)
+	}
+}
+
+func TestOutboxCLIUsesGates(t *testing.T) {
+	te := newTestEnv(t, &fake.Manager{})
+	db := outboxDaemon(t, te, true)
+	ctx := context.Background()
+	approve := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "approve me", State: draft.Held})
+	drop := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "drop me", State: draft.Held})
+	failed := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "failed once", State: draft.Failed, Error: "refused"})
+	gateOf := func(id draft.ID) gate.Gate {
+		t.Helper()
+		d := te.draftState(t, db, id)
+		g, ok, err := te.outbox.GateOf(ctx, d)
+		if err != nil || !ok {
+			t.Fatalf("draft %d has no gate: %v", id, err)
+		}
+		return g
+	}
+	ga, gd := gateOf(approve.ID), gateOf(drop.ID)
+
+	if code := te.run("outbox", "approve", "1", "--yes"); code != 0 {
+		t.Fatalf("approve: exit %d: %s", code, te.err)
+	}
+	if code := te.run("outbox", "discard", "2"); code != 0 {
+		t.Fatalf("discard: exit %d: %s", code, te.err)
+	}
+	want := []string{fmt.Sprintf("/api/gates/%d/approve", ga.ID), fmt.Sprintf("/api/gates/%d/discard", gd.ID)}
+	if got := postedPaths(); !slices.Equal(got, want) {
+		t.Fatalf("the CLI posted to %v, want the drafts' gates %v", got, want)
+	}
+	if g := gateOf(approve.ID); g.Status != gate.Approved || g.By != task.ActorPerson || te.draftState(t, db, approve.ID).State != draft.Queued {
+		t.Fatalf("approved gate %+v", g)
+	}
+	if g := gateOf(drop.ID); g.Status != gate.Rejected || g.By != task.ActorPerson || te.draftState(t, db, drop.ID).State != draft.Dropped {
+		t.Fatalf("discarded gate %+v", g)
+	}
+
+	te.out.Reset()
+	if code := te.run("outbox"); code != 0 {
+		t.Fatalf("list: exit %d: %s", code, te.err)
+	}
+	if lines := strings.Split(strings.TrimSpace(te.out.String()), "\n"); len(lines) != 1 || !strings.HasPrefix(lines[0], fmt.Sprintf("%d\t", failed.ID)) {
+		t.Fatalf("the Outbox lists %q, want the failed draft its gate approved alone", te.out)
+	}
+	te.out.Reset()
+	if code := te.run("outbox", "show", "3"); code != 0 || !strings.Contains(te.out.String(), "outbox retry 3") ||
+		strings.Contains(te.out.String(), "outbox approve 3") {
+		t.Fatalf("show: exit %d: %s", code, te.out)
+	}
+	if code := te.run("outbox", "approve", "3", "--yes"); code == 0 || !strings.Contains(te.err.String(), "waits on no decision") {
+		t.Fatalf("approving a decided draft: exit %d: %s", code, te.err)
+	}
+}
+
+func TestAnAgentSessionsShellResolvesNoGate(t *testing.T) {
+	te := newTestEnv(t, &fake.Manager{})
+	db := outboxDaemon(t, te, true)
+	held := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "drop me", State: draft.Held})
+	te.Harness.SessionEnvs["fake"] = fake.SessionEnv{}
+	te.Getenv = func(k string) string {
+		if k == fake.HandleVar {
+			return "term_1"
+		}
+		return ""
+	}
+	if code := te.run("outbox", "discard", "1"); code == 0 {
+		t.Fatalf("an agent's shell discarded a held draft: %s", te.out)
+	}
+	d := te.draftState(t, db, held.ID)
+	if g, ok, err := te.outbox.GateOf(context.Background(), d); err != nil || !ok || g.Status != gate.Open || d.State != draft.Held {
+		t.Fatalf("after an agent's discard: draft %+v, gate %+v %v", d, g, err)
+	}
+	te.Getenv = func(string) string { return "" }
+	if code := te.run("outbox", "discard", "1"); code != 0 || te.draftState(t, db, held.ID).State != draft.Dropped {
+		t.Fatalf("a person's discard: exit %d: %s", code, te.err)
+	}
+}
+
+func TestOutboxCLIFindsDraftVerbsByHandler(t *testing.T) {
+	te := newTestEnv(t, &fake.Manager{})
+	userProfile(t, te, map[string]string{"tasks.toml": `[verbs.edit]
+handler = "retry"
+
+[verbs.retry]
+handler = "edit"
+`})
+	db := outboxDaemon(t, te, true)
+	failed := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "failed once", State: draft.Failed, Error: "refused"})
+	if code := te.run("outbox", "retry", "1", "--yes"); code != 0 {
+		t.Fatalf("retry: exit %d: %s %v", code, te.err, postedPaths())
+	}
+	if got := postedPaths(); !slices.Equal(got, []string{"/api/tasks/draft:1/edit"}) {
+		t.Fatalf("retry posted %v, want the verb whose handler is retry", got)
+	}
+	if got := te.draftState(t, db, failed.ID); got.State != draft.Queued {
+		t.Fatalf("retried %+v", got)
+	}
+	held := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "draft", State: draft.Held})
+	if code := te.run("outbox", "edit", "2", "better"); code != 0 {
+		t.Fatalf("edit: exit %d: %s", code, te.err)
+	}
+	if got := postedPaths(); len(got) != 2 || got[1] != "/api/tasks/draft:2/retry" {
+		t.Fatalf("edit posted %v, want the verb whose handler is edit", got)
+	}
+	if got := te.draftState(t, db, held.ID); got.Text != "better" {
+		t.Fatalf("edited %+v", got)
 	}
 }

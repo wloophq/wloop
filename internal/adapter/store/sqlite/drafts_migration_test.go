@@ -49,14 +49,15 @@ func TestVersion2ShapesDraftsFromTheirKind(t *testing.T) {
 	}
 	rows.Close()
 	want := []string{
-		`C1/1 nudge message ["entry.nudged"]`, `C1/2 nudge message []`, `C1/3 close message ["unit.closed"]`, `C1/4 close message []`,
+		`C1/1 nudge message ["task.nudged"]`, `C1/2 nudge message []`, `C1/3 close message ["unit.closed"]`, `C1/4 close message []`,
 		`C1/5 react reaction []`, `C1/6 comment comment []`, `C1/7 reply message []`, `C1/8 ask_owner message []`,
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("got\n%s", strings.Join(got, "\n"))
 	}
 	var closed string
-	if err := db.r.QueryRow(`SELECT group_concat(unit_key) FROM extraction_cursors WHERE closure_posted = 1`).Scan(&closed); err != nil || closed != "C1/4" {
+	slack := exported(t, filepath.Join(filepath.Dir(path), "plugins", "slack", "import.db"))
+	if err := slack.QueryRow(`SELECT group_concat(unit_key) FROM extraction_cursors WHERE closure_posted = 1`).Scan(&closed); err != nil || closed != "C1/4" {
 		t.Errorf("closure_posted on %q %v", closed, err)
 	}
 }

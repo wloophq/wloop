@@ -109,7 +109,7 @@ func TestBuildNamesAProviderWithoutReader(t *testing.T) {
 
 func TestIntentOfAnotherProviderIsRefused(t *testing.T) {
 	reads := &threadReads{}
-	b := Builder{Intents: threadIntents(t), Payloads: map[unit.ProviderID]PayloadReader{"thread": reads, unit.GitHub: GitHub{PRs: &fakePRs{}}}, Guides: guides{}}
+	b := Builder{Intents: threadIntents(t), Payloads: map[unit.ProviderID]PayloadReader{"thread": reads, unit.GitHub: fakeGitHub{&fakePRs{}}}, Guides: guides{}}
 	for _, r := range []Request{{Intent: Intent(dintent.Review), Unit: thread1}, {Intent: "discuss", Unit: ref7.Unit()}} {
 		_, err := b.Build(context.Background(), r)
 		if err == nil || !strings.Contains(err.Error(), "github") || !strings.Contains(err.Error(), "thread") {
@@ -173,7 +173,7 @@ func TestTurnFactsOfASample(t *testing.T) {
 		"turn.automated": false, "turn.owned": false, "turn.needs_take_over": false, "turn.resume": false,
 		"turn.try": false, "turn.planned": "", "turn.stage": "first", "unit.ref": "acme/api#7",
 		"pr.last_review.exists": true, "pr.last_review.verdict": "", "pr.last_review.decision": "APPROVED",
-		"config.github.address_reviews": false, "config.github.address_checks": false, "config.github.followups_without_workspace": false, "config.github.address_without_workspace": false,
+		"config.plugins.github.address_reviews": false, "config.plugins.github.address_checks": false, "config.plugins.github.followups_without_workspace": false, "config.plugins.github.address_without_workspace": false,
 	}
 	var seen []string
 	for _, f := range builtin.Facts {
@@ -240,7 +240,7 @@ func TestAnAnyIntentBuildsOnEveryProvider(t *testing.T) {
 		t.Fatal(problems)
 	}
 	b := Builder{Intents: func() *intentload.Loaded { return l }, Guides: guides{},
-		Payloads: map[unit.ProviderID]PayloadReader{"thread": &threadReads{}, unit.GitHub: GitHub{PRs: &fakePRs{}}}}
+		Payloads: map[unit.ProviderID]PayloadReader{"thread": &threadReads{}, unit.GitHub: fakeGitHub{&fakePRs{}}}}
 	for _, u := range []unit.Unit{thread1, ref7.Unit()} {
 		c, err := b.Build(context.Background(), Request{Intent: "anywhere", Unit: u})
 		if err != nil || c.Unit != u {

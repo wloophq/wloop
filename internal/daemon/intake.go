@@ -20,12 +20,13 @@ import (
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/meter"
-	"github.com/wloophq/wloop/internal/readmodel/prrow"
 )
 
 const (
@@ -33,7 +34,7 @@ const (
 	sourceCockpit = "cockpit"
 	sourceMenubar = "menubar"
 	sourceTUI     = "tui"
-	sourceSession = prrow.SourceSession
+	sourceSession = intake.SourceSession
 )
 
 const (
@@ -101,7 +102,7 @@ func (s *Server) newIntakes(d Deps) *intake.Service {
 	if d.Intakes == nil {
 		return nil
 	}
-	return &intake.Service{Store: d.Intakes, Briefs: intakeBriefs(d), Firsts: intakeFirsts{s}, Starter: intakeStarter{s}, Payloads: guidancePayloads{},
+	return &intake.Service{Store: d.Intakes, Briefs: taskBriefs{Briefs: intakeBriefs(d), s: s}, Firsts: intakeFirsts{s}, Starter: intakeStarter{s}, Payloads: guidancePayloads{},
 		Clock: clockFunc(d.Now), Pub: intakePub{s}, Lock: d.LoopMu, Log: s.logf, Needs: briefNeeds(d)}
 }
 
@@ -130,6 +131,71 @@ func intakeBriefs(d Deps) intake.Briefs {
 	return offBriefs{}
 }
 
+// taskBriefs waits on a task's brief: its own brief record, else the brief of the unit it holds first, as
+// a pull request task's brief is its pull request's. Every other unit waits on its own.
+type taskBriefs struct {
+	intake.Briefs
+	s *Server
+}
+
+func (b taskBriefs) Ready(ctx context.Context, u unit.Unit, first bool, need []string) (intake.Readiness, error) {
+	id, ok := task.IDOf(u)
+	if !ok {
+		return b.Briefs.Ready(ctx, u, first, need)
+	}
+	if recs := b.s.deps.TaskRecords; recs != nil {
+		own, err := recs.Records(ctx, builtin.BuildsBrief, u)
+		if err != nil {
+			return intake.Readiness{}, err
+		}
+		if _, ok := own[u]; ok {
+			return intake.Readiness{Go: true}, nil
+		}
+	}
+	held, err := b.held(ctx, id)
+	if err != nil {
+		return intake.Readiness{}, err
+	}
+	return b.Briefs.Ready(ctx, held, first, need)
+}
+
+func (b taskBriefs) Changed(ctx context.Context, u unit.Unit) (<-chan struct{}, func()) {
+	if id, ok := task.IDOf(u); ok {
+		if held, err := b.held(ctx, id); err == nil {
+			u = held
+		}
+	}
+	return b.Briefs.Changed(ctx, u)
+}
+
+func (b taskBriefs) Unwant(ctx context.Context, u unit.Unit) error {
+	if id, ok := task.IDOf(u); ok {
+		held, err := b.held(ctx, id)
+		if err != nil {
+			return err
+		}
+		u = held
+	}
+	return b.Briefs.Unwant(ctx, u)
+}
+
+// held is the unit task id holds first, the task's own when it holds none.
+func (b taskBriefs) held(ctx context.Context, id task.ID) (unit.Unit, error) {
+	if b.s.deps.Tasks == nil {
+		return task.UnitOf(id), nil
+	}
+	t, err := b.s.deps.Tasks.Task(ctx, id)
+	switch {
+	case errors.Is(err, coretasks.ErrNoTask):
+		return task.UnitOf(id), nil
+	case err != nil:
+		return unit.Unit{}, err
+	case len(t.Units) == 0:
+		return task.UnitOf(id), nil
+	}
+	return t.Units[0], nil
+}
+
 // unavailableBriefs starts every intake at once without a brief the
 // daemon cannot make, saying why.
 type unavailableBriefs struct {
@@ -148,7 +214,7 @@ func (offBriefs) Ready(context.Context, unit.Unit, bool, []string) (intake.Readi
 	return intake.Readiness{Go: true, Without: true, Cause: intake.CauseOff}, nil
 }
 
-func (offBriefs) Changed(unit.Unit) (<-chan struct{}, func()) { return nil, func() {} }
+func (offBriefs) Changed(context.Context, unit.Unit) (<-chan struct{}, func()) { return nil, func() {} }
 
 func (offBriefs) Unwant(context.Context, unit.Unit) error { return nil }
 
@@ -405,6 +471,9 @@ func (s *Server) startAction(ctx context.Context, i intake.Intake, out io.Writer
 	if err := json.Unmarshal(i.Request, &p); err != nil {
 		return fmt.Errorf("the request of intake %d: %w", i.Seq, err)
 	}
+	if _, ok := catalog.RowGateIntent(s.loaded(), p.Action); ok && i.Source == sourceSession {
+		return Refusal{Reason: p.Action + " resolves a gate as a person; an agent's session does not"}
+	}
 	line := startHeldRound
 	if d, ok := s.loaded().Registry.Get(dintent.Name(p.Action)); ok {
 		line = d.StartLine
@@ -469,14 +538,14 @@ func (s *Server) briefLine(ctx context.Context, i intake.Intake, out io.Writer) 
 	if i.Brief != intake.BriefReady || s.deps.Records == nil {
 		return
 	}
-	rec, ok, err := s.deps.Records.BriefRecord(ctx, i.Unit)
+	rec, ok, err := s.deps.Records.Brief(ctx, i.Unit)
 	var b brief.Brief
-	if err != nil || !ok || json.Unmarshal([]byte(rec.Brief), &b) != nil {
+	if err != nil || !ok || json.Unmarshal([]byte(rec.JSON), &b) != nil {
 		return
 	}
 	took := ""
-	if run, ok, err := s.deps.Records.BriefRun(ctx, rec.Run); err == nil && ok && !run.EndedAt.IsZero() {
-		took = fmt.Sprintf(" in %.1f s", run.EndedAt.Sub(run.StartedAt).Seconds())
+	if rec.Took > 0 {
+		took = fmt.Sprintf(" in %.1f s", rec.Took.Seconds())
 	}
 	line := fmt.Sprintf("brief ready%s: %s, size %s, risk %s", took, b.Kind, b.Size, b.Risk)
 	if len(b.Tags) > 0 {
@@ -574,23 +643,16 @@ func (s *Server) expireSessionIntakesLocked(ctx context.Context) error {
 	return nil
 }
 
-// intentOf is the intent an intake action asks for: run_now's is the one
-// run.resolve picks for the row.
-func (s *Server) intentOf(ctx context.Context, action string, row api.Row) (turn.Intent, error) {
-	if action != "run_now" {
+// intentOf is the intent an intake action asks for: the held round's is
+// the one the row's action state names.
+func (s *Server) intentOf(action string, row api.Row) (turn.Intent, error) {
+	if !catalog.RunsHeld(s.loaded(), action) {
 		return turn.Intent(action), nil
 	}
-	login, _, err := s.viewerInfo(ctx)
-	if err != nil {
-		return "", err
+	if st, ok := offerOf(row, action); ok && st.Intent != "" {
+		return turn.Intent(st.Intent), nil
 	}
-	p, _ := prrow.PayloadOf(row)
-	mine := login != "" && strings.EqualFold(p.Author, login)
-	name, err := catalog.RunNowIntent(s.loaded().Registry, p.Workspace, p.Override, mine)
-	if err != nil {
-		return "", conflict{msg: err.Error()}
-	}
-	return turn.Intent(name), nil
+	return "", conflict{msg: "no single intent runs the held round of " + row.Unit.Label()}
 }
 
 // conflict is a request the row's state refuses; refusal is the code of
@@ -660,7 +722,7 @@ func (s *Server) acceptAction(w http.ResponseWriter, r *http.Request, name strin
 		writeActionError(w, err)
 		return
 	}
-	intent, err := s.intentOf(ctx, name, row)
+	intent, err := s.intentOf(name, row)
 	if err != nil {
 		writeActionError(w, err)
 		return
@@ -690,6 +752,14 @@ func (s *Server) acceptAction(w http.ResponseWriter, r *http.Request, name strin
 	writeJSON(w, api.ActionResult{OK: true, Intake: &wi})
 }
 
+// afterFunc arms f after d through Deps.AfterFunc, else time.AfterFunc.
+func (s *Server) afterFunc(d time.Duration, f func()) func() bool {
+	if s.deps.AfterFunc != nil {
+		return s.deps.AfterFunc(d, f)
+	}
+	return time.AfterFunc(d, f).Stop
+}
+
 // turnByHandIntake runs a turn by hand through an intake, waiting up to
 // sessionWait for it to start, and for its start to end once it began; one
 // not started by then stays open for the same session's next call to join,
@@ -707,10 +777,10 @@ func (s *Server) turnByHandIntake(w http.ResponseWriter, ctx context.Context, d 
 	}
 	wctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	timer := time.AfterFunc(s.sessionWait, cancel)
-	defer timer.Stop()
+	stop := s.afterFunc(s.sessionWait, cancel)
+	defer stop()
 	i, err := s.acceptSession(ctx, intake.Request{Unit: u, Intent: turn.Intent(req.Intent), Source: sourceSession, Payload: payload, Guidance: req.Guidance,
-		CanJoin: joinsSession(handle, d, req.Inputs)}, func() { timer.Stop() })
+		CanJoin: joinsSession(handle, d, req.Inputs)}, func() { stop() })
 	if err != nil {
 		writeAgentError(w, err)
 		return
@@ -774,14 +844,13 @@ func notReady(u unit.Unit, w api.Intake) string {
 // a waiting intake's attempt comes from the brief queue, its last error and
 // next attempt from its pull request's brief record.
 func (s *Server) wireIntake(ctx context.Context, i intake.Intake, after int, withLog bool) api.Intake {
-	var rec dinv.BriefRecord
-	found := false
+	var state intake.BriefState
 	if briefing(i) && s.deps.Records != nil {
-		var err error
-		rec, found, err = s.deps.Records.BriefRecord(ctx, i.Unit)
-		found = found && err == nil
+		if rec, found, err := s.deps.Records.Brief(ctx, i.Unit); err == nil && found {
+			state = rec.State
+		}
 	}
-	w := s.intakeView(i, rec, found, s.deps.Now(), func() (int, error) { return s.deps.BriefViews.Attempt(ctx, refOf(i.Unit)) })
+	w := s.intakeView(i, state, s.deps.Now(), func() (int, error) { return s.deps.BriefAttempts.Attempt(ctx, i.Unit) })
 	if withLog {
 		w.Log = slices.Clone(i.Log[min(max(after, 0), len(i.Log)):])
 	}
@@ -791,26 +860,24 @@ func (s *Server) wireIntake(ctx context.Context, i intake.Intake, after int, wit
 // briefing tells an intake whose brief attempt and retry show.
 func briefing(i intake.Intake) bool { return i.State.Open() && i.State != intake.Starting }
 
-// intakeView is the wire intake without its log, from the pull request's
-// brief record as of now; attempt asks the brief queue.
-func (s *Server) intakeView(i intake.Intake, rec dinv.BriefRecord, found bool, now time.Time, attempt func() (int, error)) api.Intake {
-	w := api.Intake{Seq: i.Seq, PR: refOf(i.Unit).URL(), Intent: string(i.Intent), Source: i.Source, State: string(i.State), Brief: i.Brief, Note: i.Note, Error: i.Error, LogLen: len(i.Log)}
+// intakeView is the wire intake without its log, from its unit's brief as
+// of now; attempt asks the brief queue.
+func (s *Server) intakeView(i intake.Intake, b intake.BriefState, now time.Time, attempt func() (int, error)) api.Intake {
+	w := api.Intake{Seq: i.Seq, PR: i.Unit.Address(), Intent: string(i.Intent), Source: i.Source, State: string(i.State), Brief: i.Brief, Note: i.Note, Error: i.Error, LogLen: len(i.Log)}
 	if !briefing(i) || s.deps.Records == nil {
 		return w
 	}
 	w.Attempt = 1
-	if found && rec.GaveUpAt.IsZero() {
-		w.Attempt = rec.Failures + 1
-		if s.deps.BriefViews != nil {
+	if b.Found && !b.GaveUp {
+		w.Attempt = b.Failures + 1
+		if s.deps.BriefAttempts != nil {
 			if n, err := attempt(); err == nil {
 				w.Attempt = n
 			}
 		}
-		if rec.LastRun != 0 && rec.LastRun != rec.Run {
-			w.LastError = rec.Error
-		}
-		if rec.RetryAt.After(now) {
-			w.Next = rec.RetryAt
+		w.LastError = b.LastError
+		if b.RetryAt.After(now) {
+			w.Next = b.RetryAt
 		}
 	}
 	return w

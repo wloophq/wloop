@@ -11,10 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/source/fakethread"
+	"github.com/wloophq/wloop/internal/domain/unit"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand/brandtest"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/plugins/source/fakesource"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/situation"
 )
@@ -28,7 +30,7 @@ func deriveCases(t *testing.T, at time.Time) []api.Row {
 	d := fixtureDeriver(t, at, cases)
 	out := make([]api.Row, len(cases))
 	for i, c := range cases {
-		r, p := d.Parts(c.pr, c.events, c.override)
+		r, p := d.Parts(c.report(t), c.events, c.override)
 		p.Brief, p.Intake = c.brief, c.intake
 		if c.activity != nil {
 			d.AddActivity(&p, *c.activity)
@@ -74,7 +76,7 @@ func TestGitHubRowKeepsPRFieldsInThePayload(t *testing.T) {
 
 func TestPayloadOfRefusesAnotherProvider(t *testing.T) {
 	gh := deriveCases(t, fixtureNow)[0]
-	thread := fakethread.Row(fakethread.Thread{Key: "C1/1.1", Channel: "general", Kind: fakethread.KindWaiting, WaitsOn: "me"})
+	thread := fakesource.Row(fakesource.Thread{Key: "C1/1.1", Channel: "general", Kind: fakesource.KindWaiting, WaitsOn: "me"})
 	thread.Payload = gh.Payload
 	if _, ok := PayloadOf(thread); ok {
 		t.Error("a thread row read as GitHub's")
@@ -139,7 +141,7 @@ var (
 )
 
 func TestSituationsServeTheirLabels(t *testing.T) {
-	c := readmodel.BuildCatalog(New(Source{}))
+	c := readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))}))
 	if len(c.Situations) != len(kindOrder) {
 		t.Fatalf("%d situations, want %d", len(c.Situations), len(kindOrder))
 	}
@@ -151,15 +153,17 @@ func TestSituationsServeTheirLabels(t *testing.T) {
 }
 
 func TestCatalogServesTheGitHubViews(t *testing.T) {
-	want := []struct{ id, label string }{{"needs-me", "Needs me"}, {"stalled", "Stalled"}, {"mine", "My PRs"}, {"loop", "In loop"}, {"plan", "Plan"},
-		{"approved", "Approved"}, {"dash", "Backlog"}, {"done", "Done"}, {"all", "All"}, {"explore", "Explore"}, {"recent", "Recent"}}
-	c := readmodel.BuildCatalog(New(Source{}))
+	want := []struct {
+		id, label string
+		order     int
+	}{{"mine", "My PRs", 2}, {"plan", "Plan", 4}, {"dash", "Backlog", 6}, {"all", "All", 8}, {"explore", "Explore", 9}, {"recent", "Recent", 10}}
+	c := readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))}))
 	if len(c.Views) != len(want) {
 		t.Fatalf("%d views: %+v", len(c.Views), c.Views)
 	}
 	custom := []string{"plan", "dash", "explore", "recent"}
 	for i, v := range c.Views {
-		if v.ID != want[i].id || v.Label != want[i].label || v.Provider != "github" || v.Order != i || v.Rows == slices.Contains(custom, v.ID) ||
+		if v.ID != want[i].id || v.Label != want[i].label || v.Provider != "github" || v.Order != want[i].order || v.Rows == slices.Contains(custom, v.ID) ||
 			!slices.Contains(v.Surfaces, "web") {
 			t.Errorf("view %d: %+v", i, v)
 		}
@@ -168,10 +172,10 @@ func TestCatalogServesTheGitHubViews(t *testing.T) {
 	for _, v := range c.ViewsOn("tui") {
 		tui = append(tui, v.ID)
 	}
-	if !slices.Equal(tui, []string{"needs-me", "mine", "loop", "plan"}) {
+	if !slices.Equal(tui, []string{"mine", "plan"}) {
 		t.Errorf("terminal views %v", tui)
 	}
-	if c.Version == "" || c.Version != readmodel.BuildCatalog(New(Source{})).Version {
+	if c.Version == "" || c.Version != readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))})).Version {
 		t.Errorf("version %q is not stable", c.Version)
 	}
 }
@@ -195,7 +199,7 @@ func TestFacetValuesMatchTheCockpit(t *testing.T) {
 		t.Fatal(err)
 	}
 	specs := map[string]api.FacetSpec{}
-	for _, f := range FacetSpecs() {
+	for _, f := range psource.BundledCatalog(string(unit.GitHub)).Facets() {
 		specs[f.ID] = f
 	}
 	rows := deriveCases(t, fixtureNow)
@@ -246,7 +250,7 @@ func TestFacetValuesMatchTheCockpit(t *testing.T) {
 	}
 	if *update {
 		writeJSON(t, "testdata/rows.json", rows)
-		writeJSON(t, "testdata/catalog.json", readmodel.BuildCatalog(New(Source{})))
+		writeJSON(t, "testdata/catalog.json", readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))})))
 	}
 }
 
@@ -263,7 +267,7 @@ func writeJSON(t *testing.T, path string, v any) {
 }
 
 func TestRowsGoldenIsCurrent(t *testing.T) {
-	for path, v := range map[string]any{"testdata/rows.json": deriveCases(t, fixtureNow), "testdata/catalog.json": readmodel.BuildCatalog(New(Source{}))} {
+	for path, v := range map[string]any{"testdata/rows.json": deriveCases(t, fixtureNow), "testdata/catalog.json": readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))}))} {
 		want, err := json.MarshalIndent(v, "", "  ")
 		if err != nil {
 			t.Fatal(err)
@@ -304,13 +308,13 @@ func TestFacetsDoNotDependOnTheClock(t *testing.T) {
 }
 
 func TestProviderFacetsStayWithTheirRows(t *testing.T) {
-	c := readmodel.BuildCatalog(New(Source{}), fakethread.New())
-	i := slices.IndexFunc(c.Facets, func(f api.FacetSpec) bool { return f.ID == fakethread.FacetChannel })
+	c := readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))}), fakesource.New().Rows())
+	i := slices.IndexFunc(c.Facets, func(f api.FacetSpec) bool { return f.ID == fakesource.FacetChannel })
 	if i < 0 || c.Facets[i].Provider != "thread" {
 		t.Fatalf("channel facet: %+v", c.Facets)
 	}
 	for _, r := range deriveCases(t, fixtureNow) {
-		if _, ok := r.Facets[fakethread.FacetChannel]; ok {
+		if _, ok := r.Facets[fakesource.FacetChannel]; ok {
 			t.Errorf("%s carries the thread facet", r.Label)
 		}
 		for id := range r.Facets {
@@ -319,8 +323,8 @@ func TestProviderFacetsStayWithTheirRows(t *testing.T) {
 			}
 		}
 	}
-	thread := fakethread.Row(fakethread.Thread{Key: "C1/1.1", Channel: "general", Kind: fakethread.KindWaiting, WaitsOn: "me"})
-	if !slices.Equal(slices.Collect(maps.Keys(thread.Facets)), []string{fakethread.FacetChannel}) {
+	thread := fakesource.Row(fakesource.Thread{Key: "C1/1.1", Channel: "general", Kind: fakesource.KindWaiting, WaitsOn: "me"})
+	if !slices.Equal(slices.Collect(maps.Keys(thread.Facets)), []string{fakesource.FacetChannel}) {
 		t.Errorf("thread facets %v", thread.Facets)
 	}
 }
@@ -331,15 +335,15 @@ func TestMutedRowKeepsItsUnmutedSituation(t *testing.T) {
 			continue
 		}
 		d := fixtureDeriver(t, fixtureNow, []rowCase{c})
-		r := d.Row(c.pr, c.events, c.override)
+		r := d.Row(c.report(t), c.events, c.override)
 		p := payloadOf(t, r)
 		if situation.Kind(r.Kind) != situation.KindMuted || p.Mute == nil || p.UnmutedKind != string(situation.KindReview) || p.UnmutedWaitingOn != "me" {
 			t.Errorf("%s: kind %s, payload %+v", c.name, r.Kind, p)
 		}
-		if !NeedsMe(r) || slices.Contains(r.Views, api.ViewNeedsMe) {
-			t.Errorf("%s: NeedsMe %v, views %v", c.name, NeedsMe(r), r.Views)
+		if !NeedsMe(r) || slices.Contains(r.Facets["is"], "needs-me") {
+			t.Errorf("%s: NeedsMe %v, flags %v", c.name, NeedsMe(r), r.Facets["is"])
 		}
-		if p.Mute.UntilStateChange != c.override.MuteUntilStateChange || !p.Mute.Until.Equal(c.override.MutedUntil) {
+		if p.Mute.UntilStateChange != c.mute.UntilStateChange || !p.Mute.Until.Equal(c.mute.Until) {
 			t.Errorf("%s: mute %+v", c.name, p.Mute)
 		}
 	}
@@ -352,32 +356,12 @@ func TestMutedRowKeepsItsUnmutedSituation(t *testing.T) {
 func TestNeedsMeAndInScopeMatchTheDeriver(t *testing.T) {
 	for _, r := range deriveCases(t, fixtureNow) {
 		p := payloadOf(t, r)
-		if in := slices.Contains(r.Views, api.ViewNeedsMe); in != (NeedsMe(r) && p.Mute == nil) {
+		if in := slices.Contains(r.Facets["is"], "needs-me"); in != (NeedsMe(r) && p.Mute == nil) {
 			t.Errorf("%s: needs-me %v, NeedsMe %v, muted %v", r.Label, in, NeedsMe(r), p.Mute != nil)
 		}
 		if want := len(p.Reasons) > 0 || p.Workspace.IsReview || p.Override.Adopted || p.Override.Tracked; InScope(r) != want {
 			t.Errorf("%s: InScope %v, want %v", r.Label, InScope(r), want)
 		}
-	}
-}
-
-func TestLastHumanSkipsViewerAndBots(t *testing.T) {
-	c := rowCases()[0]
-	d := fixtureDeriver(t, fixtureNow, nil)
-	d.Ignore = []string{"copilot"}
-	ev := func(kind, actor string, at time.Time) dinv.Event {
-		return dinv.Event{PR: c.pr.Ref, Kind: kind, Key: actor + at.String(), Actor: actor, At: at}
-	}
-	only := []dinv.Event{ev(dinv.KindComment, fixtureViewer, ago(time.Hour)), ev(dinv.KindReview, "renovate[bot]", ago(time.Minute)),
-		ev(dinv.KindComment, "Copilot", ago(time.Second)), ev(dinv.KindMuted, "ana", ago(time.Second))}
-	if p := payloadOf(t, d.Row(c.pr, only, c.override)); p.LastHuman != nil {
-		t.Errorf("viewer and bots only: %+v", p.LastHuman)
-	}
-	evs := append(only, ev(dinv.KindComment, "bia", ago(2*time.Hour)), ev(dinv.KindReview, "carol", ago(30*time.Minute)))
-	r := d.Row(c.pr, evs, c.override)
-	p := payloadOf(t, r)
-	if h := p.LastHuman; h == nil || h.Who != "carol" || h.What != dinv.KindReview || !h.At.Equal(ago(30*time.Minute)) || h.Link != r.Link || h.Link == "" {
-		t.Errorf("last human %+v", h)
 	}
 }
 

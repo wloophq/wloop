@@ -80,21 +80,25 @@ func KindOf(purpose string, d Delivery) Kind {
 	return Reply
 }
 
-type State string // "proposed", "approved", "sending", "sent", "failed", "discarded"
+// State is where a draft's delivery stands; whether it may be posted at all
+// is its gate's decision. A draft is held while its gate is open, queued
+// once its gate approved it, and dropped when its gate refused it or its
+// proposer withdrew it.
+type State string
 
 const (
-	Proposed  State = "proposed"
-	Approved  State = "approved"
-	Sending   State = "sending"
-	Sent      State = "sent"
-	Failed    State = "failed"
-	Discarded State = "discarded"
+	Held    State = "held"
+	Queued  State = "queued"
+	Sending State = "sending"
+	Sent    State = "sent"
+	Failed  State = "failed"
+	Dropped State = "dropped"
 )
 
-var States = []State{Proposed, Approved, Sending, Sent, Failed, Discarded}
+var States = []State{Held, Queued, Sending, Sent, Failed, Dropped}
 
 // Open are the states in which a draft may still be posted.
-var Open = []State{Proposed, Approved, Sending}
+var Open = []State{Held, Queued, Sending}
 
 type OriginKind string // "turn", "session", "auto", "user"
 
@@ -111,7 +115,7 @@ type Origin struct {
 	Intent   string // the proposing turn's intent ("" for auto and user)
 	Workflow string // the workflow that started the proposing turn (turn.Turn.Workflow), "" none
 	Rule     string // Kind "auto": the core or plugin rule, e.g. "stalled-nudge", "closure", "ask-owner", "github-nudge"
-	Key      string // Kind "auto": the rule's dedupe key, e.g. "stalled-nudge:<entry>:<person key>"
+	Key      string // Kind "auto": the rule's dedupe key, e.g. "stalled-nudge:<task>:<person key>"
 	// Unit is the unit of the proposing turn when it is not the draft's, such
 	// as a pull request whose turn drafts in a Slack thread; zero when it is.
 	Unit unit.Unit
@@ -123,38 +127,15 @@ type Evidence struct {
 	At        time.Time
 }
 
-type WouldPolicy string // "release", "wait"
-
-const (
-	WouldRelease WouldPolicy = "release"
-	WouldWait    WouldPolicy = "wait"
-)
-
-type Outcome string // "", "as_is", "edited", "discarded", "released" (approved by its policy), "dry_run" (stored, never sent)
-
-const (
-	OutcomeAsIs      Outcome = "as_is"
-	OutcomeEdited    Outcome = "edited"
-	OutcomeDiscarded Outcome = "discarded"
-	OutcomeReleased  Outcome = "released"
-	OutcomeDryRun    Outcome = "dry_run"
-)
-
-type Would struct {
-	Policy  WouldPolicy // what auto-send would have done, fixed at proposal
-	Reason  string      // why, one line
-	Outcome Outcome     // what the user (or the policy) did, set at approve or discard
-}
-
 type Draft struct {
 	ID       ID
 	Unit     unit.Unit
 	Items    []string // item ids of Unit; may be empty
-	Entry    string   // the entry it serves, "" none; the Outbox entry itself is "draft:<ID>"
+	Task     string   // the task it serves, "" none; the Outbox row of the draft itself is "draft:<ID>"
 	Kind     Kind
 	Purpose  string   // what it is for: "nudge", "close", "ask_owner", or any label its proposer names
 	Delivery Delivery // how it is posted
-	Effects  []string // applied when it is sent, such as "entry.nudged"
+	Effects  []string // applied when it is sent, such as "task.nudged"
 	Target   string   // plugin target grammar; "" means the unit itself (its thread, its PR)
 	Text     string   // standard Markdown with mentions as @{<person key>}; the Effects implementation converts both
 	Reaction string   // Kind "react" only: emoji name without colons
@@ -162,14 +143,11 @@ type Draft struct {
 	Original string   // Text as proposed
 	Edited   bool     // Text != Original
 	Origin   Origin
-	Approval Approval  // fixed at proposal
-	Deadline time.Time // Approval.Mode "delay": when Tick approves it; zero otherwise
 	State    State
 	Evidence Evidence // State "sent" only
 	Error    string   // State "failed" only, never a token
-	Reason   string   // State "discarded": "user", "assigned", "dry_run", ...
-	Would    Would
-	Rev      int64 // the stored row's version; every Update bumps it
+	Reason   string   // State "dropped": "user", "assigned", "moot", "dry_run", ...
+	Rev      int64    // the stored row's version; every Update bumps it
 	// EffectsAppliedAt is when the Effects of a sent draft were applied;
 	// zero while they are not.
 	EffectsAppliedAt time.Time
@@ -181,8 +159,8 @@ type Draft struct {
 var ErrTransition = errors.New("draft: transition not allowed")
 
 // Can says why d cannot move to s, nil when it can:
-// proposed->approved|discarded; approved->sending|failed|discarded;
-// sending->sent|failed; failed->approved (by hand only)|discarded.
+// held->queued|failed|dropped; queued->sending|failed|dropped;
+// sending->sent|failed; failed->queued (by hand only)|dropped.
 func (d Draft) Can(s State) error {
 	if !slices.Contains(transitions[d.State], s) {
 		return fmt.Errorf("%w: %s -> %s", ErrTransition, d.State, s)
@@ -191,10 +169,10 @@ func (d Draft) Can(s State) error {
 }
 
 var transitions = map[State][]State{
-	Proposed: {Approved, Discarded},
-	Approved: {Sending, Failed, Discarded},
-	Sending:  {Sent, Failed},
-	Failed:   {Approved, Discarded},
+	Held:    {Queued, Failed, Dropped},
+	Queued:  {Sending, Failed, Dropped},
+	Sending: {Sent, Failed},
+	Failed:  {Queued, Dropped},
 }
 
 // The reasons a workflow withdraws a draft it proposed, as Reason of the

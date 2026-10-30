@@ -68,29 +68,7 @@ func CompareUnits(a, b unit.Unit) int {
 	return 0
 }
 
-// In tells whether the row belongs in view; a done row is listed only in
-// all and done.
+// In tells whether the row is in plugin view view; a closed row is in none.
 func (r Row) In(view string) bool {
-	switch view {
-	case ViewAll:
-		return true
-	case ViewDone:
-		return slices.Contains(r.Views, view)
-	}
 	return !r.Summary.Closed && slices.Contains(r.Views, view)
-}
-
-// CompareRows orders rows as every client lists them: stalled first, then
-// the oldest since, then by unit.
-func CompareRows(a, b Row) int {
-	if a.Summary.Stalled != b.Summary.Stalled {
-		if a.Summary.Stalled {
-			return -1
-		}
-		return 1
-	}
-	if c := a.Summary.Since.Compare(b.Summary.Since); c != 0 {
-		return c
-	}
-	return CompareUnits(a.Unit, b.Unit)
 }

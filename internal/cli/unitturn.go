@@ -12,6 +12,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/domain/pr"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
@@ -26,7 +28,6 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace"
@@ -45,7 +46,7 @@ type unitRun struct {
 
 // unitRound sends a round of d the user asked for on u, a unit of a
 // provider other than GitHub, in the workspace its placement names; the
-// turn keeps the call's items and entry for its drafts.
+// turn keeps the call's items and task for its drafts.
 func (e *Env) unitRound(ctx context.Context, d dintent.Def, u unit.Unit, c daemon.Call) error {
 	cfg, err := e.loadConfig()
 	if err != nil {
@@ -54,7 +55,7 @@ func (e *Env) unitRound(ctx context.Context, d dintent.Def, u unit.Unit, c daemo
 	if cfg.AgentHome == "" {
 		cfg.AgentHome = c.AgentHome
 	}
-	r := turn.Request{Intent: turn.Intent(d.Name), Trigger: turn.ByHand, Unit: u, Guidance: c.Guidance, Inputs: c.Inputs, Items: c.Items, Entry: c.Entry}
+	r := turn.Request{Intent: turn.Intent(d.Name), Trigger: turn.ByHand, Unit: u, Guidance: c.Guidance, Inputs: c.Inputs, Items: c.Items, Task: c.Task}
 	if r.Inputs, err = e.keptRepo(ctx, d, u, r.Inputs); err != nil {
 		return err
 	}
@@ -85,7 +86,7 @@ func (e *Env) launchUnit(ctx context.Context, d dintent.Def, l turns.Launch) err
 		if r.Inputs == nil {
 			r.Inputs = prev.Inputs
 		}
-		r.Items, r.Entry = turns.ItemsOf(prev), turns.EntryOf(prev)
+		r.Items, r.Task = turns.ItemsOf(prev), turns.TaskOf(prev)
 		r.Resume = instructions.ResumeOf(b, l.ResumeOf, l.Answer, "", "")
 		if r.History, err = e.turnHistory(ctx, l.Unit, b); err != nil {
 			return err
@@ -189,32 +190,46 @@ func scoped(run unitRun) config.Config {
 }
 
 // keptRepo is inputs with the repository input d's newest turn on u kept,
-// when inputs leave it out: a later run on the unit works where the first did.
+// when inputs leave it out, else the repository u's placement names: a
+// later run on the unit works where the first did, and a first one where
+// the task was created to run.
 func (e *Env) keptRepo(ctx context.Context, d dintent.Def, u unit.Unit, inputs map[string]any) (map[string]any, error) {
 	w := d.WorkspaceRepo
-	if w == nil || w.RepoInput == "" || inputSet(inputs[w.RepoInput]) || e.Turns == nil {
+	if w == nil || w.RepoInput == "" || inputSet(inputs[w.RepoInput]) {
 		return inputs, nil
 	}
-	books, err := e.Turns.Store.Books(ctx, u)
-	if err != nil {
+	with := func(repo string) map[string]any {
+		out := maps.Clone(inputs)
+		if out == nil {
+			out = map[string]any{}
+		}
+		out[w.RepoInput] = repo
+		return out
+	}
+	if e.Turns != nil {
+		books, err := e.Turns.Store.Books(ctx, u)
+		if err != nil {
+			return inputs, err
+		}
+		ts := books[u].Turns
+		for i := len(ts) - 1; i >= 0; i-- {
+			if string(ts[i].Intent) != string(d.Name) {
+				continue
+			}
+			if repo, ok := ts[i].Inputs[w.RepoInput].(string); ok && repo != "" {
+				return with(repo), nil
+			}
+			break
+		}
+	}
+	if e.Store == nil {
+		return inputs, nil
+	}
+	p, ok, err := inventory.Placements{Store: e.Store}.Override(ctx, u)
+	if err != nil || !ok || p.Repo == "" {
 		return inputs, err
 	}
-	ts := books[u].Turns
-	for i := len(ts) - 1; i >= 0; i-- {
-		if string(ts[i].Intent) != string(d.Name) {
-			continue
-		}
-		if repo, ok := ts[i].Inputs[w.RepoInput].(string); ok && repo != "" {
-			out := maps.Clone(inputs)
-			if out == nil {
-				out = map[string]any{}
-			}
-			out[w.RepoInput] = repo
-			return out, nil
-		}
-		break
-	}
-	return inputs, nil
+	return with(p.Repo), nil
 }
 
 // runRepo is the repository, owner/name, run's turn runs in: its
@@ -293,7 +308,7 @@ func (e *Env) repoCheckout(ctx context.Context, cfg config.Config, name string) 
 		return wsdomain.Repo{}, err
 	}
 	owner, repo, _ := strings.Cut(name, "/")
-	ref := github.Ref{Owner: owner, Repo: repo}
+	ref := pr.Ref{Owner: owner, Repo: repo}
 	var trust func(string) error
 	if cfg.TrustsClones(owner, repo) {
 		trust = func(path string) error {

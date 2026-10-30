@@ -12,7 +12,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/config"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	dpr "github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -44,7 +43,7 @@ func TestBundledManifestsLoad(t *testing.T) {
 			}
 		}
 	}
-	if strings.Join(names, ",") != "act,address,brief,nudge,probe,review,start" || len(l.Problems) != 0 {
+	if strings.Join(names, ",") != "act,address,attach,brief,chat,nudge,probe,review,start" || len(l.Problems) != 0 {
 		t.Fatalf("%v %v", names, l.Problems)
 	}
 	if p, _ := l.Registry.Get(dintent.Probe); p.UserFacing {
@@ -160,7 +159,7 @@ func userIntent(t *testing.T, name, manifest, tmpl string) (*intentload.Loaded, 
 	if err != nil {
 		t.Fatal(err)
 	}
-	return intentload.Load([]profile.Layer{{Name: "user", Source: dir, Dir: dir}}, BundledFS(), b, CheckTemplate)
+	return intentload.Load(append(profile.BundledChain(), profile.Layer{Name: "user", Source: dir, Dir: dir}), BundledFS(), b, CheckTemplate)
 }
 
 const askAuthor = `label = "Ask author"
@@ -279,10 +278,10 @@ func TestTurnFactsCoverTheTurnSlot(t *testing.T) {
 		"pr.mine":                 func(_ *Builder, r *Request) { r.Payload.(*PR).Author = "Me" },
 		"pr.author":               func(_ *Builder, r *Request) { r.Payload.(*PR).Author = "bob" },
 		"pr.state":                func(_ *Builder, r *Request) { r.Payload.(*PR).State = "OPEN" },
-		"pr.slug":                 func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "acme", Repo: "api", Number: 8}.Unit() },
-		"pr.owner":                func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "other", Repo: "api", Number: 7}.Unit() },
-		"pr.repo":                 func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "acme", Repo: "web", Number: 7}.Unit() },
-		"pr.repo_name":            func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "acme", Repo: "web", Number: 7}.Unit() },
+		"pr.slug":                 func(_ *Builder, r *Request) { r.Unit = testRef{Owner: "acme", Repo: "api", Number: 8}.Unit() },
+		"pr.owner":                func(_ *Builder, r *Request) { r.Unit = testRef{Owner: "other", Repo: "api", Number: 7}.Unit() },
+		"pr.repo":                 func(_ *Builder, r *Request) { r.Unit = testRef{Owner: "acme", Repo: "web", Number: 7}.Unit() },
+		"pr.repo_name":            func(_ *Builder, r *Request) { r.Unit = testRef{Owner: "acme", Repo: "web", Number: 7}.Unit() },
 		"pr.base":                 func(_ *Builder, r *Request) { r.Payload.(*PR).Base = "main" },
 		"pr.association":          func(_ *Builder, r *Request) { r.Payload.(*PR).Association = "MEMBER" },
 		"pr.cross_repository":     func(_ *Builder, r *Request) { r.Payload.(*PR).CrossRepository = true },
@@ -291,7 +290,7 @@ func TestTurnFactsCoverTheTurnSlot(t *testing.T) {
 		"pr.requested_teams":      func(b *Builder, _ *Request) { b.Facts = &facts{st: Stored{Teams: []string{"acme-platform"}}} },
 		"turn.trigger":            func(_ *Builder, r *Request) { r.Trigger = Automated },
 		"turn.automated":          func(_ *Builder, r *Request) { r.Trigger = Automated },
-		"unit.ref":                func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "acme", Repo: "api", Number: 8}.Unit() },
+		"unit.ref":                func(_ *Builder, r *Request) { r.Unit = testRef{Owner: "acme", Repo: "api", Number: 8}.Unit() },
 		"turn.owned":              func(_ *Builder, r *Request) { r.Owned = true },
 		"turn.needs_take_over":    func(_ *Builder, r *Request) { r.Owned = true },
 		"turn.resume":             func(_ *Builder, r *Request) { r.Resume = scenario(t, "address/resume/continue").Context.Resume },
@@ -310,13 +309,17 @@ func TestTurnFactsCoverTheTurnSlot(t *testing.T) {
 		"pr.address.conflict": func(_ *Builder, r *Request) {
 			r.Payload.(*PR).Address = &RoundReason{Conflict: &RoundConflict{Base: "main"}}
 		},
-		"config.github.address_reviews": func(b *Builder, _ *Request) { b.Config = config.Config{GitHub: config.GitHub{AddressReviews: true}} },
-		"config.github.address_checks":  func(b *Builder, _ *Request) { b.Config = config.Config{GitHub: config.GitHub{AddressChecks: true}} },
-		"config.github.followups_without_workspace": func(b *Builder, _ *Request) {
-			b.Config = config.Config{GitHub: config.GitHub{FollowupsWithoutWorkspace: true}}
+		"config.plugins.github.address_reviews": func(b *Builder, _ *Request) {
+			b.Config = config.Config{Plugins: config.Plugins{GitHub: config.GitHub{AddressReviews: true}}}
 		},
-		"config.github.address_without_workspace": func(b *Builder, _ *Request) {
-			b.Config = config.Config{GitHub: config.GitHub{AddressWithoutWorkspace: true}}
+		"config.plugins.github.address_checks": func(b *Builder, _ *Request) {
+			b.Config = config.Config{Plugins: config.Plugins{GitHub: config.GitHub{AddressChecks: true}}}
+		},
+		"config.plugins.github.followups_without_workspace": func(b *Builder, _ *Request) {
+			b.Config = config.Config{Plugins: config.Plugins{GitHub: config.GitHub{FollowupsWithoutWorkspace: true}}}
+		},
+		"config.plugins.github.address_without_workspace": func(b *Builder, _ *Request) {
+			b.Config = config.Config{Plugins: config.Plugins{GitHub: config.GitHub{AddressWithoutWorkspace: true}}}
 		},
 	}
 	get := func(b Builder, r Request, field string) any {

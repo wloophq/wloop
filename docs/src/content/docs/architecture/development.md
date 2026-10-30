@@ -13,13 +13,24 @@ make vet-tags     # compile the contract and live tests without running them
 make fuzz         # fuzz the predicate compilers for 60 s each
 make test-brand   # the tests, built with a test product name (SHARD=<name> for one CI shard)
 make scan-brand   # check that nothing the program writes names the default product name
+make proto        # lint proto/ and regenerate the plugin protocol's Go code
 ```
+
+`make proto` runs `buf`, `protoc-gen-go` and `protoc-gen-go-grpc` through `go tool`, at the versions the `tool` directives of `go.mod` pin, so it needs no `protoc`. The generated code is committed, and CI fails when it drifts from `proto/`.
 
 ## Running your checkout
 
 `make dev-install` builds the checkout and makes that build the installed one: it links `~/.local/bin/{{command}}` to `bin/{{command}}`, then runs `install` and `app install` with it, so the agent homes, the app and the LaunchAgents run your build. After pulling or changing the code, run it again; it restarts the daemon on the new binary, then runs `store migrate`, which asks before migrating the store to a schema your build adds. A release does not read a store migrated past it, so switch back with `{{command}} store restore`.
 
 Uninstall the Homebrew cask first (`brew uninstall --cask {{command}}`), or put `~/.local/bin` ahead of the Homebrew directory in your `PATH`, so the shell runs the same binary as the daemon. To go back to a release, install the cask and run `{{command}} install` and `{{command}} app install` with it.
+
+### Profiling the daemon
+
+The daemon serves the Go runtime's profiles on its socket alone, never on the token-guarded port: `curl --unix-socket ~/.local/state/wloop/daemon.sock 'http://wloop/debug/pprof/profile?seconds=15' > cpu.out`, then `go tool pprof -top cpu.out` (the profile carries its symbols). `/debug/pprof/goroutine?debug=2` dumps every goroutine when a request hangs. The daemon's log names each API request that took longer than two seconds, with its path and duration, and `doctor` reports the load of the last ten minutes by route and job.
+
+### An isolated daemon
+
+`scripts/isolated-daemon.sh` runs a build in a directory of its own, with its own state, config, Orca stub and Keychain service, so it never reaches your daemon, your store, your Orca workspaces or your agents. `setup` stubs `gh`, `orca`, `claude`, `codex` and `launchctl`. `--plugins <id,...>` turns plugins on, and `--slack` turns on Slack with its socket; either way, each plugin it turns on is trusted by its path. `--real-gh <owner/repo,...>` turns the GitHub plugin on against your own `gh`: it leaves `gh`, `GH_TOKEN` and `GH_CONFIG_DIR` as they are and sets `[plugins.github] owners` to those repositories' owners and `scope.repos` to the repositories. The plugin still reads your own pull requests and the reviews requested of you in any repository, since its searches always include them. Automated rounds stay within the owners, and every post waits on its gate (`TestIsolatedSetupRealGhScopesGitHubAndLeavesGhUnstubbed`). The script's header lists every command.
 
 ## Changing the store's schema
 
@@ -58,11 +69,11 @@ To try a local build, replace the installed binary with a new file (copy it next
 
 1. `{{command}} app install`. Expect `~/Applications/{{app}}.app`, the LaunchAgents reloaded, and the menu bar item `PR <n>` within a few seconds.
 2. On the first install macOS asks to allow notifications. Allow. `{{command}} doctor` shows notifications as authorized.
-3. Set `workflows.review-follow-up.approval.window = "5m"` (and the same for `review-first-round`), restart the daemon (`launchctl kickstart -k gui/$(id -u)/io.github.{{org}}.{{name}}`) and make a review round due. Expect a notification "Round in ... · owner/repo #n".
+3. Add a rule `[[workflows.review-follow-up.gates.approval.rule]]` with `when = 'gate.kind == "plan"'`, `mode = "delay"` and `window = "5m"` (and the same for `review-first-round`), restart the daemon (`launchctl kickstart -k gui/$(id -u)/io.github.{{org}}.{{name}}`) and make a review round due. Expect a notification "Round in ... · owner/repo #n".
 4. Choose Skip on it. Expect the row to leave "round soon" in the cockpit, a `round_skipped` event in its timeline, and no new notification for that round.
 5. On the next pending round, choose Guide, type a sentence and send. Expect the round to start at once, carrying the sentence.
 6. On the next one, choose Pause. Expect the row paused and no round sent.
 7. Click the body of a notification. Expect the cockpit on that row.
-8. Open the menu: up to five entries under Focus, Inbox and Outbox, the In loop section with its actions, Open cockpit, Sweep now, Pause automatic rounds (then Resume), the sync line, Quit.
+8. Open the menu: up to five tasks under each view the badge counts (the bundled Inbox and Needs me), Open cockpit, Sweep now, Pause automatic rounds (then Resume), the sync line, Quit.
 9. Quit. Expect the item gone and the daemon still running; the menu bar starts again at the next login or with `launchctl kickstart`.
 10. Turn notifications off in System Settings. Expect `doctor` to report it within a minute and the cockpit to show the warning.

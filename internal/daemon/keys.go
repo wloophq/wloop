@@ -18,17 +18,23 @@ func (s *Server) handleKeys(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	l := s.loaded()
-	writeJSON(w, api.KeysResponse{Bindings: keyViews(surface, s.servedSpecs(), catalog.PlanSpecs(l), coreWords{l.Keys, l.GTD})})
+	var views []api.TaskViewSpec
+	if s.deps.Tasks != nil {
+		views = s.servedViews()
+	}
+	writeJSON(w, api.KeysResponse{Bindings: keyViews(surface, views, s.deps.Plugins, s.servedSpecs(), catalog.PlanSpecs(l), coreWords{l.Keys, l.Tasks})})
 }
 
 // coreWords are the profile's words for the core keys: their help, and a
 // verb's summary.
 type coreWords struct {
-	keys intentload.KeyTexts
-	gtd  intentload.GTDTexts
+	keys  intentload.KeyTexts
+	tasks intentload.TasksDef
 }
 
-func keyViews(surface keys.Surface, specs, plan []api.ActionSpec, words coreWords) []api.KeyView {
+// keyViews are the core keys, the keys of views and of the plugins' views, then the keys of specs and of plan.
+// A plugin's key that a view holds is left out.
+func keyViews(surface keys.Surface, views []api.TaskViewSpec, plugins []api.Plugin, specs, plan []api.ActionSpec, words coreWords) []api.KeyView {
 	bundled := bundledWords()
 	out := []api.KeyView{}
 	for _, b := range keys.Core {
@@ -36,9 +42,30 @@ func keyViews(surface keys.Surface, specs, plan []api.ActionSpec, words coreWord
 			help := cmp.Or(words.keys.Help(string(b.Context), b.Action), bundled.keys.Help(string(b.Context), b.Action), b.Action)
 			var summary string
 			if b.Context == keys.List {
-				summary = cmp.Or(words.gtd.Verbs[b.Action].Summary, bundled.gtd.Verbs[b.Action].Summary)
+				summary = cmp.Or(words.tasks.Verbs[b.Action].Summary, bundled.tasks.Verbs[b.Action].Summary)
 			}
 			out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: help, Summary: summary})
+		}
+	}
+	jumps := make([]keys.View, len(views))
+	label := map[string]string{}
+	for i, v := range views {
+		jumps[i] = keys.View{ID: v.ID, Key: v.Key}
+		label["nav:"+v.ID] = v.Label
+	}
+	for _, b := range keys.Views(jumps) {
+		if slices.Contains(b.Surfaces, surface) {
+			out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: label[b.Action]})
+		}
+	}
+	for _, p := range plugins {
+		if !p.Enabled || p.UI == nil || p.UI.Key == "" || slices.ContainsFunc(jumps, func(v keys.View) bool { return v.Key == p.UI.Key }) {
+			continue
+		}
+		for _, b := range keys.Views([]keys.View{{ID: string(p.ID), Key: p.UI.Key}}) {
+			if slices.Contains(b.Surfaces, surface) {
+				out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: string(p.ID), Help: p.Name})
+			}
 		}
 	}
 	add := func(specs []api.ActionSpec, ctx keys.Context) {

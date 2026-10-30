@@ -18,12 +18,15 @@ description: Where the configuration, the state, the logs and the installed piec
 
 | Path | Holds |
 |---|---|
-| `store.db` | the SQLite store, which only the daemon opens: the inventory and the history of every pull request, your holds and mutes, the round state and the pause, the turns with their instructions, records and answers, the agent sessions, the GTD entries, the Inbox messages, the Outbox drafts, the items and the admitted Slack messages. Open it read-only while the daemon runs |
+| `store.db` | the SQLite store, which only the daemon opens: the history of every unit, what each plugin last reported of it, your holds, the round state and the pause, the turns with their instructions, records and answers, the agent sessions, the tasks with their properties, wakes and gates, the messages, the drafts and the items. Open it read-only while the daemon runs |
+| `plugins/bundled/<id>/` | the bundled plugins `install` placed: each one's manifest, profile layer and binary |
+| `plugins/checksums` | the SHA-256 of each bundled plugin's binary, as `install` recorded it (`<hex>  <id>` lines); the daemon runs a bundled plugin only with it |
+| `plugins/<id>/plugin.db` | a plugin's own store: GitHub's pull requests, Slack's admitted messages and extraction state. The plugin opens it; `import.db` is what the store's migration to version 7 exported for the plugin, renamed `import.db.done` once imported |
 | `mcp.key` | the secret of the MCP endpoint (mode 0600) |
 | `daemon.sock` | the socket the CLI talks to |
 | `daemon.lock` | keeps a second daemon from starting |
 | `store.lock` | held by whoever writes the store: the daemon, or `store migrate` and `store restore` while they run |
-| `backups/` | copies of the store taken before each migration (`store-v<version>-<time>.db`, the three newest kept) and before each restore (`*.pre-restore.db`, kept 30 days) |
+| `backups/` | copies of the store taken before each migration (`store-v<version>-<time>.db`, the three newest kept) and before each restore (`*.pre-restore.db`, kept 30 days), each with the plugins' stores of that moment in `<backup>.plugins/<id>/` |
 | `http.json` | the cockpit's port and token (mode 0600), kept across restarts so an open page reconnects |
 | `notified.json` | the held rounds the menu bar already announced today |
 | `dossiers/` | the dossiers and their archives (mode 0700) |
@@ -36,25 +39,26 @@ description: Where the configuration, the state, the logs and the installed piec
 ## Dossiers
 
 ```text
-<state>/dossiers/<provider>/<unit-key>/
-<state>/dossiers/project/<slug>/
+<state>/dossiers/task/<id>#/
+<state>/dossiers/<provider>/<unit-key>#/
   notes.md      curated notes
   sources/      material gathered
   drafts/       drafts being written
   log/          one append-only file per turn
+  merged/       the dossiers of the tasks merged into this one
 <state>/dossiers/.archive/
 ```
 
-Each dossier is a local git repository the daemon commits after every turn, never inside a repository checkout. After each turn the daemon checks the rules (only a compaction or the closing call rewrites `notes.md`, `log/` is append-only, no deletes, links or nested repositories) and restores what broke them.
+A task owns its dossier: a turn on a pull request or a thread reads the dossier of the task that holds it, an open one first, then the oldest, and a unit no task holds keeps its own. Each dossier is a local git repository the daemon commits after every turn, never inside a repository checkout. After each turn the daemon checks the rules (only a compaction or the closing call rewrites `notes.md`, `log/` is append-only, no deletes, links or nested repositories) and restores what broke them.
 
 | Status | When |
 |---|---|
-| active | the unit or project has open work; never archived or purged |
-| resolved | no open item or entry is left |
+| active | the task is open, or the unit has open work; never archived or purged |
+| resolved | the task ended, or no open item or task is left on the unit |
 | archived | `dossiers.archive_after` (30 days) after it resolved, as a tarball under `.archive/` |
 | purged | `dossiers.purge_after` (400 days) after the archive |
 
-Open work on the unit again revives the dossier, from its archive if needed.
+Open work again revives the dossier, from its archive if needed. When tasks merge, the dossier of the one that goes moves inside the other's under `merged/<id>/`, which the turns' checks leave as it is; an archived one keeps its own row and is purged on its own schedule.
 
 ## In each workspace
 

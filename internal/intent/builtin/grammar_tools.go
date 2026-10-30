@@ -9,21 +9,15 @@ import (
 // one table each.
 var Tools = []Value{
 	{Name: "turn_end", Doc: "Records how the session's turn ended."},
-	{Name: "inbox_post", Doc: "Posts a question or a note to the user's Inbox during a turn."},
-	{Name: "inbox_read", Doc: "Reads the user's answers to the session's Inbox messages, and marks them read."},
-	{Name: "slack_send_message", Doc: "Posts to Slack as the user, now."},
-	{Name: "slack_read", Doc: "Reads a Slack thread or conversation."},
-	{Name: "slack_search", Doc: "Searches the Slack messages the user can read."},
-	{Name: "slack_draft", Doc: "Proposes a Slack message or reaction for the user's approval."},
-	{Name: "slack_react", Doc: "Adds or removes a reaction on a Slack message as the user, now."},
-	{Name: "slack_edit", Doc: "Replaces the text of one of the user's Slack messages, now."},
+	{Name: "task_post", Doc: "Posts a question or a note on the session's task during a turn, waiting on a gate."},
+	{Name: "task_read", Doc: "Reads the session's task: the task, its brief, its open gates, the chat since the last read and the user's answers, and marks them read."},
 }
 
 // ToolData is what every tools.toml text reads.
 type ToolData struct {
 	// Name is the product's name, Command its command.
 	Name, Command string
-	// PostsPerTurn is how many inbox_post messages of a turn wait at once.
+	// PostsPerTurn is how many task_post messages of a turn wait at once.
 	PostsPerTurn int
 }
 
@@ -62,17 +56,6 @@ func answersOf(names []string) []ToolAnswer {
 	return out
 }
 
-func slackAnswers(names ...string) []ToolAnswer {
-	var out []ToolAnswer
-	for _, n := range names {
-		out = append(out,
-			ToolAnswer{Tool: n, Name: "not_logged_in", Doc: "Slack is logged out."},
-			ToolAnswer{Tool: n, Name: "failed", Doc: "Slack or the daemon failed the call.", Fields: []AnswerField{str("Error")}},
-		)
-	}
-	return out
-}
-
 func answer(tool, name, doc string, fields ...AnswerField) ToolAnswer {
 	return ToolAnswer{Tool: tool, Name: name, Doc: doc, Fields: fields}
 }
@@ -80,9 +63,7 @@ func answer(tool, name, doc string, fields ...AnswerField) ToolAnswer {
 // ToolAnswers are the texts each tool answers with, which tools.toml words
 // under [<tool>.answers].
 var ToolAnswers = func() []ToolAnswer {
-	slackTools := []string{"slack_send_message", "slack_read", "slack_search", "slack_draft", "slack_react", "slack_edit"}
-	out := answersOf(append([]string{"turn_end", "inbox_post", "inbox_read"}, slackTools...))
-	out = append(out, slackAnswers(slackTools...)...)
+	out := answersOf([]string{"turn_end", "task_post", "task_read"})
 	return append(out,
 		answer("turn_end", "problem_extra_arguments", "A problem: arguments besides turn and record.", str("Keys")),
 		answer("turn_end", "problem_turn_type", "A problem: turn is not a string."),
@@ -99,58 +80,29 @@ var ToolAnswers = func() []ToolAnswer {
 		answer("turn_end", "ledger_refused", "A part of the ledger's outcome: ops refused, and why.", num("Count"), str("Why")),
 		answer("turn_end", "ledger_refusal", "Why one op was refused.", num("Index"), str("Reason")),
 
-		answer("inbox_post", "text_required", "The text is missing."),
-		answer("inbox_post", "capped", "The turn has too many messages waiting.", str("Error")),
-		answer("inbox_post", "not_in_turn", "The session has no started turn.", str("Error")),
-		answer("inbox_post", "post_failed", "The message could not be posted.", str("Error")),
-		answer("inbox_post", "posted", "The message is in the Inbox.", num("ID")),
+		answer("task_post", "text_required", "The text is missing."),
+		answer("task_post", "capped", "The turn has too many posts waiting.", str("Error")),
+		answer("task_post", "not_in_turn", "The session has no started turn.", str("Error")),
+		answer("task_post", "post_failed", "The message could not be posted.", str("Error")),
+		answer("task_post", "posted", "The message is on the task, waiting on gate Gate.", num("Gate")),
 
-		answer("inbox_read", "no_turn", "The session has no turn.", str("Error")),
-		answer("inbox_read", "no_message", "The message is not one of the session's.", num("ID")),
-		answer("inbox_read", "read_failed", "The Inbox could not be read.", str("Error")),
-		answer("inbox_read", "nothing", "No answer to read: of message ID, or of any message when ID is 0.", num("ID")),
-		answer("inbox_read", "read", "The answers read: the conversations, one after another.", str("Conversations")),
-		answer("inbox_read", "conversation", "A part of read: a message, its kind (question or agent_post), its text and options, and its answers.",
-			num("ID"), str("Kind"), str("Text"), str("Options"), str("Answers")),
-		answer("inbox_read", "turn_answers", "A part of read: answers to the session's turns stored before each answer named its message.", str("Answers")),
-		answer("inbox_read", "option", "A part of conversation: one option of the message.", str("ID"), str("Label")),
-		answer("inbox_read", "answer", "A part of conversation: one answer, with its option and the option's label, yes or no, its text and when it was given.",
+		answer("task_read", "no_turn", "The session has no turn.", str("Error")),
+		answer("task_read", "no_gate", "No answer of the session's resolved gate ID.", num("ID")),
+		answer("task_read", "not_the_tasks", "The session's turns are on no unit of the task it would read.", str("Error")),
+		answer("task_read", "read_failed", "The task could not be read.", str("Error")),
+		answer("task_read", "nothing", "Nothing to read: the session's turns are on no task, and no answer of gate ID, or of any gate when ID is 0, waits.", num("ID")),
+		answer("task_read", "read", "What was read: the task, its brief record's data, its open gates, the chat since the last read and the conversations, each \"\" when empty.",
+			str("Task"), str("Brief"), str("Gates"), str("Chat"), str("Conversations")),
+		answer("task_read", "task", "A part of read: the task's id, title and state.", str("ID"), str("Title"), str("State")),
+		answer("task_read", "gate", "A part of read: one open gate of the task, its kind, its name in gates.toml and the intents that resolve it.",
+			num("ID"), str("Kind"), str("Name"), str("Intents")),
+		answer("task_read", "chat_message", "A part of read: one message the user wrote on the task's chat, and when.", str("Text"), str("At")),
+		answer("task_read", "conversation", "A part of read: a message, the gate its answers resolved (0 for one stored before answers named their gate), its kind (question or agent_post), its text and options, and its answers.",
+			num("Gate"), str("Kind"), str("Text"), str("Options"), str("Answers")),
+		answer("task_read", "turn_answers", "A part of read: answers to the session's turns stored before each answer named its message.", str("Answers")),
+		answer("task_read", "option", "A part of conversation: one option of the message.", str("ID"), str("Label")),
+		answer("task_read", "answer", "A part of conversation: one answer, with its option and the option's label, yes or no, its text and when it was given.",
 			str("Option"), str("Label"), str("Choice"), str("Text"), str("At")),
-
-		answer("slack_send_message", "problem_target_required", "A problem: target is missing."),
-		answer("slack_send_message", "problem_text_required", "A problem: text is missing or empty."),
-		answer("slack_send_message", "broadcast", "The text notifies a whole channel or group."),
-		answer("slack_send_message", "posted", "The message is posted: where, its permalink, \"\" when Slack gave none, and its text as posted.",
-			str("Conversation"), str("Parent"), str("Permalink"), str("Channel"), str("TS"), str("Text")),
-
-		answer("slack_read", "problem_target_required", "A problem: target is missing."),
-		answer("slack_read", "problem_limit", "A problem: limit is out of range.", num("Max")),
-
-		answer("slack_search", "problem_query_required", "A problem: query is missing or empty."),
-		answer("slack_search", "problem_after", "A problem: after is not a date."),
-		answer("slack_search", "problem_before", "A problem: before is not a date."),
-		answer("slack_search", "problem_before_after", "A problem: before is not after after."),
-		answer("slack_search", "problem_limit", "A problem: limit is out of range.", num("Max")),
-
-		answer("slack_draft", "problem_kind", "A problem: kind is none of the kinds.", str("Kinds")),
-		answer("slack_draft", "problem_reaction_required", "A problem: a react draft has no reaction."),
-		answer("slack_draft", "problem_text_required", "A problem: text is missing or empty."),
-		answer("slack_draft", "proposed", "The draft waits for the user.", num("ID"), str("Unit"), str("Where")),
-		answer("slack_draft", "approved", "The draft's policy approved it.", num("ID"), str("Unit"), str("Where")),
-		answer("slack_draft", "dry_run", "The draft's policy only stores it.", num("ID"), str("Unit"), str("Where")),
-
-		answer("slack_react", "problem_message", "A problem: message is not a message ref or permalink."),
-		answer("slack_react", "problem_emoji_required", "A problem: emoji is missing or empty."),
-		answer("slack_react", "reacted", "The reaction is added; Permalink is \"\" when Slack gave none.", str("Emoji"), str("Conversation"), str("Message"), str("Permalink")),
-		answer("slack_react", "removed", "The reaction is removed; Permalink is \"\" when Slack gave none.", str("Emoji"), str("Conversation"), str("Message"), str("Permalink")),
-		answer("slack_react", "already", "The message already had the user's reaction; Permalink is \"\" when Slack gave none.", str("Emoji"), str("Conversation"), str("Message"), str("Permalink")),
-		answer("slack_react", "absent", "The message had no such reaction of the user; Permalink is \"\" when Slack gave none.", str("Emoji"), str("Conversation"), str("Message"), str("Permalink")),
-
-		answer("slack_edit", "problem_message", "A problem: message is not a message ref or permalink."),
-		answer("slack_edit", "problem_text_required", "A problem: text is missing or empty."),
-		answer("slack_edit", "broadcast", "The text notifies a whole channel or group."),
-		answer("slack_edit", "edited", "The message is edited: where, its ref and its permalink, \"\" when Slack gave none, its new text as posted and the text it replaced.",
-			str("Conversation"), str("Message"), str("Permalink"), str("Text"), str("Replaced")),
 	)
 }()
 

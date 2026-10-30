@@ -33,13 +33,17 @@ type CreateRequest struct {
 	Unit   unit.Unit
 	Agent  string
 	Prompt string
-	// HeadBranch, HeadOid, BaseBranchName and CrossRepository describe the
-	// linked PR; with them the workspace's branch is named after the PR's head
-	// branch.
-	HeadBranch      string
-	HeadOid         string
-	BaseBranchName  string
-	CrossRepository bool
+	// Checkout is what the unit's work checks out, as its source says; with
+	// a branch, the workspace's branch is named after it.
+	Checkout Checkout
+}
+
+// Checkout is what a unit's work checks out: its head branch and commit,
+// the branch it merges into, and whether the head lives in another
+// repository.
+type Checkout struct {
+	Branch, Head, Base string
+	Fork               bool
 }
 
 // LinkedPR is the pull request number of a github unit, 0 for any other.

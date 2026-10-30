@@ -1,1 +1,1 @@
-testdata/workflows/bad/approval-window-off-delay/workflows/case-workflow/workflow.toml:10:10: approval.window: is read only with mode delay, not with wait
+testdata/workflows/bad/approval-window-off-delay/workflows/case-workflow/workflow.toml:10:10: gates.approval.window: is read only with mode delay, not with wait

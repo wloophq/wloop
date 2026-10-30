@@ -10,13 +10,15 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/dossiers"
 	"github.com/wloophq/wloop/internal/domain/dossier"
+	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 type dossierStore struct{ db *DB }
 
 var _ dossiers.Store = dossierStore{}
 
-// Dossiers is the dossiers table, and whether a dossier's unit still has open work.
+// Dossiers is the dossiers table, whose dossier a unit's is, and whether a dossier's owner still has open work.
 func (db *DB) Dossiers() dossiers.Store { return dossierStore{db} }
 
 const (
@@ -26,11 +28,14 @@ const (
 		files = excluded.files, last_write_at = excluded.last_write_at, resolved_at = excluded.resolved_at,
 		archived_at = excluded.archived_at, purge_after = excluded.purge_after`
 	unitOpenSQL = `SELECT EXISTS (SELECT 1 FROM items WHERE provider = ?1 AND unit_key = ?2 AND state = 'open')
-		OR EXISTS (SELECT 1 FROM entries e WHERE e.state NOT IN ('done', 'trash', 'reference') AND (
-			e.id IN (SELECT entry_id FROM entry_items WHERE provider = ?1 AND unit_key = ?2) OR
-			e.id IN (SELECT entry_id FROM entry_units WHERE provider = ?1 AND unit_key = ?2)))`
-	projectOpenSQL = `SELECT EXISTS (SELECT 1 FROM projects p JOIN entries e ON e.id = p.entry_id
-		WHERE p.slug = ?1 AND p.slug != '' AND e.state NOT IN ('done', 'trash', 'reference'))`
+		OR EXISTS (SELECT 1 FROM tasks e WHERE e.category NOT IN (?3, ?4) AND (
+			e.id IN (SELECT task_id FROM task_items WHERE provider = ?1 AND unit_key = ?2) OR
+			e.id IN (SELECT task_id FROM task_units WHERE provider = ?1 AND unit_key = ?2)))`
+	taskOpenSQL = `SELECT EXISTS (SELECT 1 FROM tasks WHERE id = ?1 AND category NOT IN (?2, ?3))`
+	// holderSQL is the task that holds a unit: an open one first, then the oldest.
+	holderSQL = `SELECT e.id FROM tasks e WHERE e.id IN (SELECT task_id FROM task_units WHERE provider = ?1 AND unit_key = ?2
+		UNION SELECT task_id FROM task_items WHERE provider = ?1 AND unit_key = ?2)
+		ORDER BY e.category IN (?3, ?4), e.created, e.id LIMIT 1`
 )
 
 func (s dossierStore) Put(ctx context.Context, d dossier.Dossier) error {
@@ -72,12 +77,30 @@ func (s dossierStore) List(ctx context.Context) ([]dossier.Dossier, error) {
 
 func (s dossierStore) Open(ctx context.Context, o dossier.Owner) (bool, error) {
 	var open bool
-	if o.Project != "" {
-		err := s.db.R().QueryRowContext(ctx, projectOpenSQL, o.Project).Scan(&open)
+	if o.Merged != "" {
+		return false, nil
+	}
+	if id, ok := task.IDOf(o.Unit); ok {
+		err := s.db.R().QueryRowContext(ctx, taskOpenSQL, append([]any{string(id)}, openArgs()...)...).Scan(&open)
 		return open, err
 	}
-	err := s.db.R().QueryRowContext(ctx, unitOpenSQL, string(o.Unit.Provider), o.Unit.Key).Scan(&open)
+	err := s.db.R().QueryRowContext(ctx, unitOpenSQL, append([]any{string(o.Unit.Provider), o.Unit.Key}, openArgs()...)...).Scan(&open)
 	return open, err
+}
+
+func (s dossierStore) Owner(ctx context.Context, u unit.Unit) (dossier.Owner, error) {
+	if _, ok := task.IDOf(u); ok {
+		return dossier.Owner{Unit: u}, nil
+	}
+	var id string
+	err := s.db.R().QueryRowContext(ctx, holderSQL, append([]any{string(u.Provider), u.Key}, openArgs()...)...).Scan(&id)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return dossier.Owner{Unit: u}, nil
+	case err != nil:
+		return dossier.Owner{}, err
+	}
+	return dossier.Owner{Unit: task.UnitOf(task.ID(id))}, nil
 }
 
 func scanDossier(row scanner) (dossier.Dossier, error) {

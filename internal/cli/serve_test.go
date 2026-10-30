@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
@@ -38,6 +40,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/views"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/event"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -47,15 +50,15 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/view"
 	"github.com/wloophq/wloop/internal/domain/workflow"
-	"github.com/wloophq/wloop/internal/github"
-	"github.com/wloophq/wloop/internal/github/githubtest"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
-	"github.com/wloophq/wloop/internal/source"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/transport/mcp"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 	wsorca "github.com/wloophq/wloop/internal/workspace/orca"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+	"github.com/wloophq/wloop/pkg/plugin/source/sourcetest"
 )
 
 type syncBuffer struct {
@@ -127,7 +130,7 @@ func TestServeDegradedUntilTheConfigLoads(t *testing.T) {
 	broken.Store(false)
 	eventually(t, "the restart with collection", func() bool {
 		h, err := c.Health(ctx)
-		return err == nil && slices.Equal(jobNames(h), []string{"due", "extract:slack", "fast", "ingest:github", "ingest:slack", "retain", "slow", "sweep", "usage"})
+		return err == nil && slices.Equal(jobNames(h), []string{"extract:slack", "fast", "ingest:github", "ingest:slack", "retain", "slow", "sweep", "usage"})
 	})
 	cancel()
 	select {
@@ -199,7 +202,7 @@ func TestServeNoJobsRegistersNone(t *testing.T) {
 	if d.Collector != nil || d.Sweep != nil || d.Brief != nil || d.Usage != nil || d.Retain != nil {
 		t.Fatalf("--no-jobs left a job: collector %v sweep %v brief %v usage %v retain %v", d.Collector != nil, d.Sweep != nil, d.Brief != nil, d.Usage != nil, d.Retain != nil)
 	}
-	if d.Actions == nil || d.PRs == nil {
+	if d.Actions == nil || d.Overrides == nil {
 		t.Fatal("--no-jobs dropped the APIs")
 	}
 }
@@ -370,7 +373,7 @@ func TestServeDepsShareTheLoopMutex(t *testing.T) {
 	}
 }
 
-func TestServeViewerTeamsAreTheOnesIBelongTo(t *testing.T) {
+func TestServeViewerTeamsAreTheOnesTheGitHubPluginNamed(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.GitHub.Scope.Teams = []string{"acme/platform", "acme/search"}
@@ -380,12 +383,14 @@ func TestServeViewerTeamsAreTheOnesIBelongTo(t *testing.T) {
 	}
 	store := inventory.New(storeDB)
 	t.Cleanup(func() { storeDB.Close() })
-	store.SetMeta(context.Background(), "scope_resolved", `{"Teams":["acme/platform","acme/search"],"MyTeams":["acme/search"]}`)
+	if err := ghsource.KeepIdentity(context.Background(), store, src.Identity{Viewer: src.Person{Key: "github:me", Name: "me"}, Teams: []string{"acme/search"}}); err != nil {
+		t.Fatal(err)
+	}
 	te.cfg = withoutWindows(te.cfg)
 	d := te.serveDeps(context.Background(), storeDB, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
-	login, teams, err := d.Viewer(context.Background())
-	if err != nil || login != "me" || !slices.Equal(teams, []string{"acme/search"}) {
-		t.Fatalf("%q %v %v", login, teams, err)
+	id, err := d.Identity(context.Background())
+	if err != nil || id.Viewer.Key != "github:me" || !slices.Equal(id.Teams, []string{"acme/search"}) {
+		t.Fatalf("%+v %v", id, err)
 	}
 }
 
@@ -405,8 +410,8 @@ func TestViewerReadsNoGitHub(t *testing.T) {
 	te.cfg = withoutWindows(te.cfg)
 	d := te.serveDeps(context.Background(), storeDB, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
 	for range 100 {
-		if login, _, err := d.Viewer(context.Background()); err != nil || login != "stored" {
-			t.Fatalf("%q %v", login, err)
+		if id, err := d.Identity(context.Background()); err != nil || id.Viewer.Key != "github:stored" {
+			t.Fatalf("%+v %v", id, err)
 		}
 	}
 	te.Env.Store = store
@@ -432,7 +437,7 @@ func seedPR(t *testing.T, te *testEnv, p dinv.PR) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	if err := inventory.New(db).UpsertPR(context.Background(), p); err != nil {
+	if err := inventorytest.Of(inventory.New(db)).UpsertPR(context.Background(), p); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -448,6 +453,7 @@ func newServeEnv(t *testing.T) *testEnv {
 	te.Out, te.Err = &syncBuffer{}, &syncBuffer{}
 	te.cfg = withoutWindows(te.cfg)
 	te.Exit = func(code int) { t.Errorf("unexpected exit %d", code) }
+	te.githubPluginOf()
 	return te
 }
 
@@ -497,10 +503,10 @@ func TestBriefHomeFollowsTheProjectsProfile(t *testing.T) {
 	cfg := Defaults()
 	cfg.Projects = []config.Project{{Match: "me/*", AgentHome: "/home/me/.claude-personal"}}
 	home := briefHome(cfg)
-	if got := home(github.Ref{Owner: "me", Repo: "lib", Number: 1}); got != "/home/me/.claude-personal" {
+	if got := home(pr.Ref{Owner: "me", Repo: "lib", Number: 1}); got != "/home/me/.claude-personal" {
 		t.Fatalf("project: %q", got)
 	}
-	if got := home(github.Ref{Owner: "acme", Repo: "api", Number: 1}); got != "" {
+	if got := home(pr.Ref{Owner: "acme", Repo: "api", Number: 1}); got != "" {
 		t.Fatalf("no profile: %q", got)
 	}
 }
@@ -764,106 +770,34 @@ func TestAgentForFollowsTheReloadedConfig(t *testing.T) {
 	}
 }
 
-// spentBudget is a GitHub that finds nothing and reports one GraphQL bucket.
-type spentBudget struct {
-	ghsource.GitHub
-	limit dgh.Limit
+// budgetStub is a GitHub plugin whose API budget is one GraphQL bucket.
+type budgetStub struct {
+	*forgeStub
+	low   bool
+	limit api.RateLimit
 }
 
-func (b spentBudget) Allow(dgh.Priority) bool { return true }
-func (b spentBudget) Budget() map[dgh.Resource]dgh.Limit {
-	return map[dgh.Resource]dgh.Limit{dgh.ResourceGraphQL: b.limit}
-}
-func (spentBudget) Viewer(context.Context) (string, error) { return "me", nil }
-func (spentBudget) SearchStubsFirst(_ context.Context, qs []string, _ int) ([]github.StubPage, []error, error) {
-	return make([]github.StubPage, len(qs)), make([]error, len(qs)), nil
+func (b budgetStub) View(_ context.Context, req src.ViewRequest) (json.RawMessage, error) {
+	if req.View != ghsource.ViewBudget {
+		return nil, src.ErrUnsupported
+	}
+	return json.Marshal(map[string]any{"low": b.low, "remaining": b.limit.Remaining, "limit": b.limit.Limit, "reset_at": b.limit.ResetAt})
 }
 
-func TestServeRestoresTheBudgetAFastRunKept(t *testing.T) {
+func TestServeKeepsTheBudgetTheGitHubPluginNames(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	at := te.Now()
-	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
-	if err != nil {
-		t.Fatal(err)
+	spent := api.RateLimit{Limit: 5000, Remaining: 3000, ResetAt: te.Now().Add(time.Hour).UTC()}
+	te.Env.forge = sourcetest.Launch(t, "github", budgetStub{forgeStub: &forgeStub{Stub: sourcetest.NewStub(), login: "ana"}, low: true, limit: spent}, src.Host{})
+	if te.Env.budget.Low() || te.Env.budget.RateLimit() != (api.RateLimit{}) {
+		t.Fatal("a budget before the plugin named one")
 	}
-	t.Cleanup(func() { db.Close() })
-	ctx := context.Background()
-	spent := dgh.Limit{Resource: dgh.ResourceGraphQL, Limit: 5000, Remaining: 3000, ResetAt: at.Add(time.Hour).UTC()}
-	cfg := te.cfg
-	cfg.GitHub.Scope = config.Scope{People: []string{"ana"}}
-	col := &ghsource.Collector{Store: inventory.New(db), GH: spentBudget{limit: spent}, Cfg: cfg, Now: func() time.Time { return at }, Log: t.Logf}
-	if rep, err := col.Fast(ctx); err != nil || rep.Skipped != "" {
-		t.Fatalf("fast: %+v %v", rep, err)
+	te.Env.afterGitHubJob(context.Background())
+	if got := te.Env.budget.RateLimit(); got.Remaining != 3000 || got.Limit != 5000 || !got.ResetAt.Equal(spent.ResetAt) {
+		t.Fatalf("kept %+v", got)
 	}
-
-	te.Env.GitHub = github.NewClient(github.Options{Host: "github.com", Now: func() time.Time { return at },
-		Token: func(context.Context) (string, error) { return "t", nil }})
-	cfg.GitHub.RateLimitFraction = 0.7
-	te.Env.restoreBudget(ctx, db, cfg, t.Logf)
-	if got := te.Env.GitHub.Budget()[dgh.ResourceGraphQL]; got.Remaining != 3000 || got.Limit != 5000 || !got.ResetAt.Equal(spent.ResetAt) {
-		t.Fatalf("restored %+v", got)
-	}
-	if te.Env.GitHub.Allow(dgh.PriorityBackground) || !te.Env.GitHub.Allow(dgh.PriorityUser) {
-		t.Fatal("60 % left under a 0.7 floor: background must wait, the user may read")
-	}
-}
-
-type ghFunc func(args ...string) ([]byte, error)
-
-func (f ghFunc) Run(_ context.Context, args ...string) ([]byte, error) { return f(args...) }
-
-func TestFailedStepsReadsTheJobOnce(t *testing.T) {
-	t.Parallel()
-	var asked [][]string
-	steps := failedSteps(githubtest.Runner(ghFunc(func(args ...string) ([]byte, error) {
-		asked = append(asked, args)
-		return []byte(`{"steps":[{"name":"Lint PR title","conclusion":"failure"},{"name":"Build","conclusion":"success"},{"name":"Run\ttests\u001b[2J","conclusion":"failure"}]}`), nil
-	})))
-	got, err := steps(context.Background(), "acme", "api", 114268776435)
-	if err != nil || !slices.Equal(got, []string{"Lint PR title", "Run tests [2J"}) {
-		t.Fatalf("%q %v", got, err)
-	}
-	if len(asked) != 1 || !slices.Equal(asked[0], []string{"api", "repos/acme/api/actions/jobs/114268776435"}) {
-		t.Fatalf("gh %q", asked)
-	}
-	steps = failedSteps(githubtest.Runner(ghFunc(func(...string) ([]byte, error) { return nil, errors.New("HTTP 404") })))
-	if _, err := steps(context.Background(), "acme", "api", 1); err == nil {
-		t.Fatal("no error from a failed call")
-	}
-}
-
-type roundTripFunc func(*http.Request) (*http.Response, error)
-
-func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
-
-func TestFailedStepsOneRequestPerJob(t *testing.T) {
-	t.Parallel()
-	var paths []string
-	gh := githubtest.Client(roundTripFunc(func(r *http.Request) (*http.Response, error) {
-		paths = append(paths, r.URL.Path)
-		return &http.Response{
-			StatusCode: 200,
-			Header:     http.Header{"Content-Type": {"application/json"}},
-			Body:       io.NopCloser(strings.NewReader(`{"steps":[{"name":"Build","conclusion":"failure"}]}`)),
-			Request:    r,
-		}, nil
-	}))
-	gh.SetFloors(github.DefaultFloors(0.5))
-	gh.Restore([]dgh.Limit{{Resource: dgh.ResourceCore, Limit: 5000, Remaining: 1000, ResetAt: time.Now().Add(time.Hour)}})
-	background := dgh.WithPriority(context.Background(), dgh.PriorityBackground)
-	if _, err := gh.REST(background, github.Request{Path: "repos/acme/api"}); !errors.Is(err, dgh.ErrBudget) {
-		t.Fatalf("a background read at 20 %% was admitted: %v", err)
-	}
-	steps := failedSteps(gh)
-	for _, job := range []int64{11, 12} {
-		got, err := steps(background, "acme", "api", job)
-		if err != nil || !slices.Equal(got, []string{"Build"}) {
-			t.Fatalf("job %d: %q %v", job, got, err)
-		}
-	}
-	if len(paths) != 2 || !strings.HasSuffix(paths[0], "/repos/acme/api/actions/jobs/11") || !strings.HasSuffix(paths[1], "/repos/acme/api/actions/jobs/12") {
-		t.Fatalf("requests %q", paths)
+	if !te.Env.budget.Low() || te.Env.budget.allow(dgh.PriorityBackground) || !te.Env.budget.allow(dgh.PriorityUser) {
+		t.Fatal("a low budget: background must wait, the user may read")
 	}
 }
 
@@ -877,7 +811,7 @@ func TestBriefSkipsTheHomeOfAProjectOfAnotherAgent(t *testing.T) {
 		{Match: "acme/*", Agent: "claude", AgentHome: "/home/me/.claude-acme"},
 	}
 	home := briefHome(cfg)
-	for ref, want := range map[github.Ref]string{
+	for ref, want := range map[pr.Ref]string{
 		{Owner: "me", Repo: "lib", Number: 1}:   "/home/me/.claude-personal",
 		{Owner: "oss", Repo: "lib", Number: 1}:  "/home/me/.claude-work",
 		{Owner: "acme", Repo: "api", Number: 1}: "/home/me/.claude-acme",
@@ -944,7 +878,7 @@ func TestOrcaSinkGetsTheSectionsColumns(t *testing.T) {
 	cfg := (&Env{}).defaultConfig()
 	cfg.Views["orca"].Columns["needs-me"] = "waiting-me"
 	cfg.Views["orca"].Columns["working"] = "doing"
-	_, sinks, err := orcaPorts(context.Background(), &wsorca.Manager{}, nil, cfg, nil)
+	_, sinks, err := orcaPorts(context.Background(), &wsorca.Manager{}, prrow.ReportedPRs{}, cfg, nil)
 	if err != nil || len(sinks) != 1 {
 		t.Fatalf("sinks %v, %v", sinks, err)
 	}
@@ -1158,8 +1092,8 @@ func TestServeWiresAuthorFactsIntoViews(t *testing.T) {
 	board := testsink.New("board").WithAuthorColumns()
 	te.ports = sinksOf(board)
 	saved := plugins
-	plugins = []source.Plugin{{ID: unit.GitHub, Codec: pr.Codec{}, Build: func(cfg config.Config, sd source.Deps) (source.Module, error) {
-		m, err := ghsource.Module(cfg, sd)
+	plugins = []compiledPlugin{{ID: unit.GitHub, Codec: pr.Codec{}, Build: func(cfg config.Config, sd moduleDeps) (pluginModule, error) {
+		m, err := githubHostModule(cfg, sd)
 		m.Facts = readyFacts{automationtest.NewUnits()}
 		return m, err
 	}}}
@@ -1193,7 +1127,7 @@ func TestPendingRoundsReachTheReadModel(t *testing.T) {
 	}
 	t.Cleanup(func() { storeDB.Close() })
 	ctx := context.Background()
-	if err := inventory.New(storeDB).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", URL: r7.URL(), Reasons: []string{"review-requested"}}); err != nil {
+	if err := inventorytest.Of(inventory.New(storeDB)).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", URL: r7.URL(), Reasons: []string{"review-requested"}}); err != nil {
 		t.Fatal(err)
 	}
 	deadline := testNow.Add(4 * time.Minute)
@@ -1206,6 +1140,12 @@ func TestPendingRoundsReachTheReadModel(t *testing.T) {
 	}
 	d := te.serveDeps(ctx, storeDB, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
 	d.Startup = nil
+	g, err := te.newGates(storeDB, nil).Open(ctx, gate.Gate{Kind: gate.KindPlan, Unit: r7.Unit(), Subject: it.ID},
+		workflowPolicy{w: workflow.Workflow{Approval: workflow.Approval{Mode: workflow.ApprovalDelay, Window: 4 * time.Minute}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline = g.Deadline
 	req := httptest.NewRequest("GET", api.Rows, nil)
 	req.Header.Set(api.Header, api.Version)
 	rec := httptest.NewRecorder()
@@ -1215,8 +1155,21 @@ func TestPendingRoundsReachTheReadModel(t *testing.T) {
 		t.Fatalf("%v: %s", err, rec.Body)
 	}
 	i := slices.IndexFunc(page.Rows, func(r api.Row) bool { return r.Unit == r7.Unit() })
-	if i < 0 || page.Rows[i].Pending == nil || !page.Rows[i].Pending.Deadline.Equal(deadline) || page.Rows[i].Pending.Intent != "follow-up" {
+	if i < 0 || page.Rows[i].Kind != "round_pending" || !strings.HasPrefix(page.Rows[i].Summary.Reason, "follow-up ") {
 		t.Fatalf("rows %s", rec.Body)
+	}
+	req = httptest.NewRequest("GET", api.GatesPath, nil)
+	req.Header.Set(api.Header, api.Version)
+	rec = httptest.NewRecorder()
+	daemon.New(d).Handler().ServeHTTP(rec, req)
+	var gs []api.GateView
+	if err := json.Unmarshal(rec.Body.Bytes(), &gs); err != nil {
+		t.Fatalf("%v: %s", err, rec.Body)
+	}
+	if !slices.ContainsFunc(gs, func(v api.GateView) bool {
+		return v.Kind == string(gate.KindPlan) && v.Unit == r7.Unit().String() && v.Deadline.Equal(deadline)
+	}) {
+		t.Fatalf("gates %s", rec.Body)
 	}
 }
 
@@ -1233,8 +1186,8 @@ func TestThePlanAPIIsServedFromAnEngineOfItsOwn(t *testing.T) {
 	if !ok || p.plan == nil || p.plan == te.engine || p.eng.Engine != te.engine || d.Sweep != daemon.Sweeper(p.eng) {
 		t.Fatalf("plan %T, sweep %T", d.Plan, d.Sweep)
 	}
-	if _, ok := d.Pending.(enginePending); !ok {
-		t.Fatalf("pending %T", d.Pending)
+	if _, ok := d.Plans.(enginePlans); !ok {
+		t.Fatalf("plans %T", d.Plans)
 	}
 	if f := te.viewFacts().p.Load(); f == nil {
 		t.Fatal("the views read no github facts")
@@ -1287,7 +1240,7 @@ func TestTheServedPlanEvaluatesOverTheRealStepsWithoutWriting(t *testing.T) {
 	t.Cleanup(func() { storeDB.Close() })
 	ctx := context.Background()
 	st := inventory.New(storeDB)
-	if err := st.UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "c2", ChecksState: "SUCCESS",
+	if err := inventorytest.Of(st).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "c2", ChecksState: "SUCCESS",
 		ReviewRequests: []string{"me"}, Reasons: []string{"review-requested"}, URL: r7.URL()}); err != nil {
 		t.Fatal(err)
 	}
@@ -1323,12 +1276,12 @@ func TestTheServedPlanEvaluatesOverTheRealStepsWithoutWriting(t *testing.T) {
 func TestDaemonReadsSpawnNoGh(t *testing.T) {
 	t.Parallel()
 	_, te := scenario(t)
-	te.GH = noGH{t}
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
+	te.serveGitHubPlugin(db, noGH{t})
 	dctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	d := te.serveDeps(dctx, db, te.cfg, t.Logf, &lock.Mutex{}, nil)
@@ -1358,10 +1311,6 @@ func TestDaemonReadsSpawnNoGh(t *testing.T) {
 		if p.reads && metertest.Count(sc, metertest.Limit{Res: meter.GitHub, Op: "graphql"}) == 0 {
 			t.Errorf("%s sent no GraphQL request through the client\n%s", p.name, metertest.Report(sc.End()))
 		}
-	}
-	d.FailedSteps(ctx, "acme", "api", 1)
-	if n := metertest.Count(all, metertest.Limit{Res: meter.GitHub, Op: "rest"}); n == 0 {
-		t.Error("failed steps sent no REST request through the client")
 	}
 	if n := all.Tally().Total(meter.GitHub).Spawns; n != 0 {
 		t.Fatalf("%d GitHub spawns\n%s", n, metertest.Report(all.Tally()))

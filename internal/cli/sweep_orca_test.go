@@ -9,8 +9,8 @@ import (
 
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
 	"github.com/wloophq/wloop/internal/turn"
@@ -51,7 +51,7 @@ func TestStartAddressRereadsAWaitingAgent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
+	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 7}
 	_, _, _, err = te.startAddress(context.Background(), cfg, ws, turn.Request{Intent: turn.Intent(dintent.Address), Unit: ref.Unit()}, roundOptions{})
 	if !errors.Is(err, errWaiting) {
 		t.Fatalf("err = %v, want errWaiting", err)

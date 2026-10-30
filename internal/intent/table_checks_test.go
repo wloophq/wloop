@@ -35,9 +35,9 @@ func TestTheDecodersCheckValuesInTheTablesWords(t *testing.T) {
 	for edit, want := range map[[2]string]string{
 		{`workspace = "review"`, "workspace = \"review\"\nrunners = [\"sesion\"]"}:                                                        `runners[0]: "sesion" is not one of "session" or "headless"; did you mean "session"?`,
 		{`workspace = "review"`, `workspace = "linked_else_mian"`}:                                                                        `workspace: "linked_else_mian" is not one of "review", "author", "linked_else_main" or "given"; did you mean "linked_else_main"?`,
-		{`workspace = "review"`, "workspace = \"review\"\nprovider = \"slak\""}:                                                           `provider: "slak" is not one of "entry", "github", "session", "slack", "workspace" or "any"; did you mean "slack"?`,
+		{`workspace = "review"`, "workspace = \"review\"\nprovider = \"slak\""}:                                                           `provider: "slak" is not one of "github", "session", "slack", "task", "workspace" or "any"; did you mean "slack"?`,
 		{`workspace = "review"`, "workspace = \"review\"\nprovider = [\"github\", \"slak\"]"}:                                             `provider[1]: "slak" is not one of`,
-		{"[record]", "[drafts.approval]\nmode = \"dry-run\"\n\n[record]"}:                                                                 `drafts.approval.mode: "dry-run" is not one of "send", "delay", "wait" or "dry_run"; did you mean "dry_run"?`,
+		{"[record]", "[gates.approval]\nmode = \"dry-run\"\n\n[record]"}:                                                                  `gates.approval.mode: "dry-run" is not one of "wait", "delay", "send", "dry_run" or "run"; did you mean "dry_run"?`,
 		{"[record]", "[[also_profile]]\nprofile = \"review\"\ndefine = \"x\"\nwhen = \"true\"\ndims = { stag = \"first\" }\n\n[record]"}:  `also_profile[0].dims.stag: unknown key; did you mean "stage"?`,
 		{"[record]", "[[also_profile]]\nprofile = \"review\"\ndefine = \"x\"\nwhen = \"true\"\ndims = { stage = \"frist\" }\n\n[record]"}: `also_profile[0].dims.stage: "frist" is not one of "first" or "follow-up"; did you mean "first"?`,
 	} {
@@ -50,14 +50,14 @@ func TestTheDecodersCheckValuesInTheTablesWords(t *testing.T) {
 func TestNoGuessReleasesADraftOrARun(t *testing.T) {
 	t.Parallel()
 	for _, mode := range []string{"record", "sned", "dalay"} {
-		got := intentProblems(t, strings.Replace(minimal, "[record]", "[drafts.approval]\nmode = \""+mode+"\"\n\n[record]", 1))
-		wantProblem(t, got, `drafts.approval.mode: "`+mode+`" is not one of "send", "delay", "wait" or "dry_run"`)
+		got := intentProblems(t, strings.Replace(minimal, "[record]", "[gates.approval]\nmode = \""+mode+"\"\n\n[record]", 1))
+		wantProblem(t, got, `gates.approval.mode: "`+mode+`" is not one of "wait", "delay", "send", "dry_run" or "run"`)
 		if strings.Contains(got, "did you mean") {
 			t.Errorf("%s: %s", mode, got)
 		}
 	}
-	got := workflowProblems(t, quietSession+"\n[approval]\nmode = \"rnu\"\n")
-	wantProblem(t, got, `approval.mode: "rnu" is not one of "run", "delay" or "wait"`)
+	got := workflowProblems(t, quietSession+"\n[gates.approval]\nmode = \"rnu\"\n")
+	wantProblem(t, got, `gates.approval.mode: "rnu" is not one of "wait", "delay", "send", "dry_run" or "run"`)
 	if strings.Contains(got, "did you mean") {
 		t.Error(got)
 	}
@@ -66,10 +66,10 @@ func TestNoGuessReleasesADraftOrARun(t *testing.T) {
 func TestWorkflowValuesAreTheTables(t *testing.T) {
 	t.Parallel()
 	for edit, want := range map[[2]string]string{
-		{`provider = "session"`, `provider = "sesion"`}:                           `provider: "sesion" is not one of "entry", "github", "session", "slack" or "workspace"; did you mean "session"?`,
+		{`provider = "session"`, `provider = "sesion"`}:                           `provider: "sesion" is not one of "github", "session", "slack", "task" or "workspace"; did you mean "session"?`,
 		{`use = "session.close"`, `use = "session.clsoe"`}:                        `step[0].use: "session.clsoe" is not one of`,
 		{`use = "session.close"`, "use = \"session.close\"\nreasn = \"x\""}:       `step[0].reasn: unknown key`,
-		{`when = 'session`, "[trigger]\non = [\"zzz\"]\n\nwhen = 'session"}:       `trigger.on[0]: "zzz" is not one of`,
+		{`when = 'session`, "[trigger]\non = [\"zzz\"]\n\nwhen = 'session"}:       `trigger.on[0]: names no event kind`,
 		{`session.managed &&`, `session.managed && session.manager == "orca" &&`}: "",
 	} {
 		got := workflowProblems(t, strings.Replace(quietSession, edit[0], edit[1], 1))
@@ -123,14 +123,14 @@ when = 'pr.repo == "acme/api" && pr.repo_name == "api" && pr.state == "OPEN"'
 
 func TestAWorkflowNamesOnlyItsProvidersEffects(t *testing.T) {
 	t.Parallel()
-	entry := `summary = "Nudge a waiting entry"
-provider = "entry"
-when = 'entry.waiting_days > 2'
+	task := `summary = "Nudge a waiting task"
+provider = "task"
+when = 'task.waiting_days > 2'
 
 [[step]]
 use = "draft.propose"
 purpose = "nudge"
 effects = ["pr.nudged"]
 `
-	wantProblem(t, workflowProblems(t, entry), "step[0].effects[0]: pr.nudged applies to github units only; a entry workflow cannot name it")
+	wantProblem(t, workflowProblems(t, task), "step[0].effects[0]: pr.nudged applies to github units only; a task workflow cannot name it")
 }

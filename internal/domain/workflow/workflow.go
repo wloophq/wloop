@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -40,6 +41,9 @@ const (
 	DecisionPending Decision = "pending"
 	DecisionBlocked Decision = "blocked"
 	DecisionSkipped Decision = "skipped"
+	// DecisionDeferred is an item whose step started asynchronously: it runs
+	// again at its Deadline until a run is done. No person decides it.
+	DecisionDeferred Decision = "deferred"
 )
 
 type TriggerKind string
@@ -54,6 +58,25 @@ type Trigger struct {
 	Kind     TriggerKind
 	On       []string // event kinds, Kind == TriggerEvent
 	Schedule *Cron    // Kind == TriggerSchedule
+	// Actors are the kinds of actor whose events plan the workflow, every
+	// one when empty; Depth the longest chain an event it reacts to may
+	// close, DefaultChainDepth when 0. Both read with Kind == TriggerEvent.
+	Actors []string
+	Depth  int
+}
+
+// Fires says whether an event of the trigger's kinds plans workflow w: its
+// actor is one the trigger listens to, its chain is shorter than the
+// trigger's depth, and w is not in that chain already.
+func (t Trigger) Fires(w string, ev Event) bool {
+	if len(t.Actors) > 0 && !slices.Contains(t.Actors, ActorKind(ev.Actor)) {
+		return false
+	}
+	depth := t.Depth
+	if depth == 0 {
+		depth = DefaultChainDepth
+	}
+	return ev.Chain.Depth < depth && !ev.Chain.Has(w)
 }
 
 // Predicate is a compiled `when`; Reads are the facts it names, for the why.
@@ -133,7 +156,8 @@ type Vars struct {
 }
 
 // Facts are a unit's facts by dotted name; values are bool, int, string,
-// []string, time.Duration or time.Time. "<slot>.repo" is "owner/repo" or ""
+// []string, time.Duration or time.Time, or a Temporal a provider reports,
+// which the engine resolves to one of those before a predicate reads it. "<slot>.repo" is "owner/repo" or ""
 // and is what the pause's Repos reads.
 type Facts map[string]any
 
@@ -234,13 +258,19 @@ type Workflow struct {
 	Key     []string // fact names; empty means the slot's fingerprint fact
 	// Marks are the facts whose values a done or dismissed item records as
 	// the unit's marks, by the mark's name under the workflow (mark.Of).
-	Marks    map[string]string
+	Marks map[string]string
+	// Approval is the approval of its runs' plan gates.
 	Approval Approval
-	Source   string // manifest path
-	Bundled  bool
+	// Gates are the approval of the gates its gate.open steps open, by
+	// kind, every kind but draft and plan.
+	Gates   map[gate.Kind]Approval
+	Source  string // manifest path
+	Bundled bool
 	// Overrides are the files of a bundled workflow a user directory replaces.
 	Overrides []string
-	// DraftApproval is the manifest's [drafts.approval] block; nil when absent.
+	// DraftApproval is the approval of the drafts its steps and turns
+	// propose, from its [gates.approval]; nil when that names none for a
+	// draft gate.
 	DraftApproval *draft.Policy
 	// Withdraw is the manifest's [drafts.withdraw] when, over the subject's facts
 	// and each draft's (the draft slot): an open draft the workflow proposed
@@ -314,7 +344,11 @@ type Event struct {
 	ID              int64 // events.id
 	Unit            unit.Unit
 	Kind, Key, Data string
-	At              time.Time
+	// Actor is who recorded it, "<actor>:<source>" for a verb; Chain the
+	// chain of workflows it closes.
+	Actor string
+	Chain Chain
+	At    time.Time
 }
 
 type Why struct {
@@ -389,3 +423,15 @@ const (
 
 // EngineKinds are the engine's own event kinds; a workflow's `on` may not name them.
 var EngineKinds = []string{KindPlanned, KindStepRan, KindStepRefused, KindStepFailed, KindItemDismissed, KindItemDropped}
+
+// ModeOf is a gate's approval mode as a run's: send and run run it; dry_run,
+// a draft gate's only, waits.
+func ModeOf(m gate.Mode) ApprovalMode {
+	switch m {
+	case gate.ModeSend, gate.ModeRun:
+		return ApprovalRun
+	case gate.ModeDelay:
+		return ApprovalDelay
+	}
+	return ApprovalWait
+}

@@ -16,7 +16,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -52,7 +51,7 @@ func TestPriorReviewIsYourLatestHeadAndVerdict(t *testing.T) {
 
 func TestTurnPRKeepsTheFactsATurnReads(t *testing.T) {
 	t.Parallel()
-	p := turnPR(&github.PullRequest{Facts: pr.Facts{Title: "Add x", Author: "ana", AuthorAssociation: "MEMBER", HeadRefOid: "c2", BaseRefName: "main", ViewerRequested: true}})
+	p := turnPR(&pr.PullRequest{Facts: pr.Facts{Title: "Add x", Author: "ana", AuthorAssociation: "MEMBER", HeadRefOid: "c2", BaseRefName: "main", ViewerRequested: true}})
 	if p.Title != "Add x" || p.Author != "ana" || p.Association != "MEMBER" || p.Head != "c2" || p.Base != "main" || p.Prior != nil || !p.ReviewRequested {
 		t.Fatalf("%+v", p)
 	}

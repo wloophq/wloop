@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -28,29 +29,6 @@ const (
 
 var actionReply = api.AttentionAction{ID: "answer:text", Title: "Reply", TextInput: true}
 
-// questionOf is the question view of a turn that waits on the user, from
-// its last record; ok is false for any other turn.
-func questionOf(t *turn.Turn, last *turn.Record) (*api.QuestionView, bool) {
-	if t.State != turn.Asked && !t.State.Stopped() {
-		return nil, false
-	}
-	q := &api.QuestionView{State: string(t.State)}
-	if last == nil {
-		return q, true
-	}
-	q.RecordID = last.ID
-	if rq := last.Record.Question; rq != nil {
-		q.Kind, q.Text, q.Options, q.Recommend, q.Publishes = rq.Kind, rq.Text, slices.Clone(rq.Options), rq.Recommend, rq.Publishes
-	}
-	if o := last.Record.Outcome; o != nil {
-		q.Verdict, q.Blocking, q.NonBlocking = o.Verdict, o.Blocking, o.NonBlocking
-	}
-	if last.Record.State == record.UnrecordedState {
-		q.LastMessage = last.Record.Resume
-	}
-	return q, true
-}
-
 // NoticeCase is what a needs-me row notifies of.
 type NoticeCase string
 
@@ -62,18 +40,14 @@ const (
 	NoticeWait     NoticeCase = "wait"
 )
 
-// Item is the id prefix of the derived item whose entry carries the case's
-// notification; "" for a question, which the turn's Inbox message carries.
-func (c NoticeCase) Item() string {
+// Gate is the kind of the gate the case stands for: a plan gate holds a
+// pending or held round, a trust gate a blocked one; "" for the others.
+func (c NoticeCase) Gate() gate.Kind {
 	switch c {
-	case NoticeRound:
-		return "gh:round"
-	case NoticeHeld:
-		return "gh:held"
+	case NoticeRound, NoticeHeld:
+		return gate.KindPlan
 	case NoticeBlocked:
-		return "gh:blocked"
-	case NoticeWait:
-		return "gh:wait"
+		return gate.KindTrust
 	}
 	return ""
 }
@@ -138,11 +112,12 @@ func (d Deriver) Attention(r api.Row, in any) *api.Attention {
 
 func (d Deriver) notice(r api.Row, started bool) (Notice, bool) {
 	ref := refOf(r)
+	pend, pending := d.pending(r)
 	switch {
-	case r.Pending != nil:
-		return Notice{Case: NoticeRound, Token: r.Pending.Since.UTC().Format(stampToken), Attention: api.Attention{
+	case pending:
+		return Notice{Case: NoticeRound, Token: pend.Since.UTC().Format(stampToken), Attention: api.Attention{
 			Title: "Round pending", Subtitle: prLabel(ref),
-			Body:  r.Pending.Intent + ": " + r.Pending.Reason + " · waiting " + span(d.Now.Sub(r.Summary.Since)) + " · " + r.Title,
+			Body:  pend.Intent + ": " + pend.Reason + " · waiting " + span(d.Now.Sub(r.Summary.Since)) + " · " + r.Title,
 			Image: "round", Actions: d.notificationActions(r),
 		}}, true
 	case situation.Kind(r.Kind) == situation.KindHeldByCap:

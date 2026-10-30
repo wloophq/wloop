@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -83,7 +85,7 @@ func TestSituationsAreRecordedOnChange(t *testing.T) {
 	if got := situationsOf(t, s, situationR8); got != nil {
 		t.Fatalf("a merged pull request got situations %v", got)
 	}
-	if err := s.store().SetOverride(context.Background(), dinv.Override{PR: situationR7, MutedUntil: s.deps.Now().Add(time.Hour)}); err != nil {
+	if err := muteBy(s.store(), situationR7, s.deps.Now().Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	if err := keepOnce(t, s); err != nil {
@@ -99,13 +101,13 @@ func TestAFailedViewerRecordsNoSituation(t *testing.T) {
 	var down sync.Mutex
 	failing := true
 	s := newServerWith(t, func(d *Deps) {
-		d.Viewer = func(context.Context) (string, []string, error) {
+		d.Identity = func(context.Context) (src.Identity, error) {
 			down.Lock()
 			defer down.Unlock()
 			if failing {
-				return "", nil, errors.New("github is down")
+				return src.Identity{}, errors.New("github is down")
 			}
-			return "me", nil, nil
+			return identityOf("me"), nil
 		}
 	})
 	for range 2 {

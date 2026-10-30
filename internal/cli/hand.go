@@ -7,8 +7,13 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"strings"
-	"time"
+
+	"github.com/wloophq/wloop/internal/domain/pr"
+
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
@@ -20,7 +25,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
@@ -150,7 +154,7 @@ func (e *Env) turnByHand(ctx context.Context, h handTurn, text io.Writer) error 
 			return false, err
 		}
 		sr.pr, sr.cfg, sr.inputs, sr.id = pr, cfg, h.inputs, sent.ID
-		runPhase(routeSession, d, sr, sentPhase)
+		e.applySentEffects(ctx, routeSession, d, sr)
 		e.recordGuidance(ctx, ref, sr.guidance)
 		return true, nil
 	})
@@ -197,17 +201,22 @@ func (e *Env) handUnit(ctx context.Context, target, cwd string, ws wsdomain.Work
 	}
 	if inWS && ws.LinkedPR != 0 {
 		if owner, name, ok := repo.OwnerName(); ok {
-			return github.Ref{Owner: owner, Repo: name, Number: ws.LinkedPR}.Unit(), nil
+			return pr.Ref{Owner: owner, Repo: name, Number: ws.LinkedPR}.Unit(), nil
 		}
 	}
-	for p, l := range e.locators() {
-		key, ok, err := l.UnitAt(ctx, cwd)
+	var errs []error
+	for _, l := range e.locators() {
+		u, ok, err := l.Locate(ctx, cwd)
 		if err != nil {
-			return unit.Unit{}, fmt.Errorf("no unit here; pass its target: %w", err)
+			errs = append(errs, err)
+			continue
 		}
 		if ok {
-			return unit.Unit{Provider: p, Key: key}, nil
+			return u, nil
 		}
+	}
+	if err := errors.Join(errs...); err != nil {
+		return unit.Unit{}, fmt.Errorf("no unit here; pass its target: %w", err)
 	}
 	return unit.Unit{}, errors.New("no unit here; pass its target")
 }
@@ -275,7 +284,7 @@ func realPath(p string) string {
 // the rule rounds use: an author workspace, the viewer's own pull request, or
 // one taken over. An author workspace elsewhere is an error: the round runs
 // there.
-func (e *Env) ownedByHand(ctx context.Context, cfg config.Config, repos []wsdomain.Repo, all []wsdomain.Workspace, ref github.Ref, pr *github.PullRequest, cwd string) (bool, error) {
+func (e *Env) ownedByHand(ctx context.Context, cfg config.Config, repos []wsdomain.Repo, all []wsdomain.Workspace, ref pr.Ref, pr *pr.PullRequest, cwd string) (bool, error) {
 	mine := e.prOf(ctx, pr)
 	ws, found, err := findAuthorWorkspace(cfg, repos, all, ref, pr, mine)
 	if err != nil {
@@ -300,7 +309,7 @@ func (e *Env) ownedByHand(ctx context.Context, cfg config.Config, repos []wsdoma
 // prepareWorktree links the worktree the turn runs in to the pull request
 // when its role allows; it never moves the checkout, never relinks a worktree
 // and never links a main checkout.
-func (e *Env) prepareWorktree(ctx context.Context, cfg config.Config, ws wsdomain.Workspace, repo wsdomain.Repo, ref github.Ref, role string) error {
+func (e *Env) prepareWorktree(ctx context.Context, cfg config.Config, ws wsdomain.Workspace, repo wsdomain.Repo, ref pr.Ref, role string) error {
 	if !strings.EqualFold(repo.RemoteKey, ref.RemoteKey()) {
 		return fmt.Errorf("this worktree is a checkout of %s, not of %s/%s", repo.RemoteKey, ref.Owner, ref.Repo)
 	}
@@ -329,7 +338,7 @@ func (e *Env) prepareWorktree(ctx context.Context, cfg config.Config, ws wsdomai
 
 // takeOverHere takes the pull request over and refuses to go on when the
 // author workspace the loop settled on is not the current directory.
-func (e *Env) takeOverHere(ctx context.Context, cfg config.Config, ref github.Ref, cwd string) error {
+func (e *Env) takeOverHere(ctx context.Context, cfg config.Config, ref pr.Ref, cwd string) error {
 	ws, err := adoptPR(ctx, e, cfg, ref, e.callerAgentHome(cfg))
 	if err != nil {
 		return err
@@ -343,12 +352,12 @@ func (e *Env) takeOverHere(ctx context.Context, cfg config.Config, ref github.Re
 	return nil
 }
 
-func (e *Env) recordEvent(ctx context.Context, ref github.Ref, kind, data string) {
+func (e *Env) recordEvent(ctx context.Context, ref pr.Ref, kind, data string) {
 	e.recordTurnEvent(ctx, ref, kind, "", data)
 }
 
 // recordTurnEvent records an event of turn, keyed by its id.
-func (e *Env) recordTurnEvent(ctx context.Context, ref github.Ref, kind, turn, data string) {
+func (e *Env) recordTurnEvent(ctx context.Context, ref pr.Ref, kind, turn, data string) {
 	if e.Rec == nil {
 		return
 	}
@@ -359,12 +368,14 @@ func (e *Env) recordTurnEvent(ctx context.Context, ref github.Ref, kind, turn, d
 }
 
 // handRound runs a round asked for by hand on route rt, with the phases of
-// the effects d names around it: guide first, unsent when the round
-// does not go out, state on the round state once it went out. send gets the
-// round state when the route writes it or keepsHome, which remembers the
-// caller's agent home in it, and the round with its guidance,
+// the host effects d names around it: guide first, unsent when the round
+// does not go out. send gets the round state when keepsHome, which
+// remembers the caller's agent home in it, and the round with its guidance,
 // fills in what the round sent, and reports whether the round went out.
-func (e *Env) handRound(ctx context.Context, rt route, ref github.Ref, guidance string, d dintent.Def, keepsHome bool, send func(st *round.Store, r *sentRound) (bool, error)) error {
+func (e *Env) handRound(ctx context.Context, rt route, ref pr.Ref, guidance string, d dintent.Def, keepsHome bool, send func(st *round.Store, r *sentRound) (bool, error)) error {
+	if err := e.checkEffects(d, ref.Unit()); err != nil {
+		return err
+	}
 	r := &sentRound{env: e, ctx: ctx, ref: ref, guidance: guidance}
 	runPhase(rt, d, r, guidePhase)
 	sent := false
@@ -373,7 +384,7 @@ func (e *Env) handRound(ctx context.Context, rt route, ref github.Ref, guidance 
 			runPhase(rt, d, r, unsentPhase)
 		}
 	}()
-	if !keepsHome && !writesRounds(rt, d, r) {
+	if !keepsHome {
 		var err error
 		sent, err = send(nil, r)
 		return err
@@ -389,13 +400,21 @@ func (e *Env) handRound(ctx context.Context, rt route, ref github.Ref, guidance 
 	if sent, err = send(st, r); err != nil {
 		return err
 	}
-	runPhase(rt, d, r, statePhase(st))
 	return rounds.Save(ctx, st)
 }
 
-// recordAddressed marks the reviews so far and the checks and the conflict
-// of head as covered by a round asked for by hand.
-func (e *Env) recordAddressed(st *round.Store, ref github.Ref, head string) {
-	st.SetMark(ref.String(), round.AddressedReviews, e.Now().UTC().Format(time.RFC3339))
-	st.SetHeads(ref.String(), head, head)
+// locators know the unit a checkout holds: each source plugin's this
+// process runs.
+func (e *Env) locators() []unit.Locator {
+	var out []unit.Locator
+	if e.pluginKind == nil {
+		return out
+	}
+	units := psource.Units{Codecs: e.unitCodecs()}
+	for _, p := range e.plugins {
+		if slices.Contains(p.Manifest.Kinds, src.Kind) {
+			out = append(out, psource.Checkouts{ID: p.ID(), Units: units, Kind: e.pluginKind})
+		}
+	}
+	return out
 }

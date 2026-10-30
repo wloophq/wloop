@@ -234,7 +234,7 @@ func (q *Queue) scan(ctx context.Context) (next time.Time, ok bool, err error) {
 // at the current version, not given up and not waiting for a retry.
 func (q *Queue) wantedNow(p dinv.PR, rec dinv.BriefRecord, has bool, version string, now time.Time) bool {
 	return has && !rec.WantedAt.IsZero() && (rec.Run == 0 || rec.Version != version) &&
-		(rec.AttemptOf != q.attemptKey(p, version) || rec.GaveUpAt.IsZero() && !now.Before(rec.RetryAt))
+		(rec.AttemptOf != attemptOf(p, version) || rec.GaveUpAt.IsZero() && !now.Before(rec.RetryAt))
 }
 
 // wanted lists the wanted pull requests not in flight, the oldest want

@@ -6,21 +6,8 @@ import (
 
 	"github.com/wloophq/wloop/internal/domain/card"
 	"github.com/wloophq/wloop/internal/domain/items"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/unit"
-)
-
-const (
-	ViewNeedsMe = "needs-me"
-	ViewStalled = "stalled"
-	ViewMine    = "mine"
-	ViewLoop    = "loop"
-	ViewAll     = "all"
-	ViewDone    = "done"
-	// ViewApproved holds open pull requests that wait on nothing of mine,
-	// whose workspace may go before the merge.
-	ViewApproved = "approved"
 )
 
 // Kind is a row's provider-scoped situation; its labels come from
@@ -47,9 +34,11 @@ type Row struct {
 	// Question is the open question or stop of the turn the situation
 	// comes from.
 	Question *QuestionView   `json:"question,omitempty"`
-	Pending  *PendingRound   `json:"pending,omitempty"`
 	Items    []RowItem       `json:"items,omitempty"`
 	Payload  json.RawMessage `json:"payload,omitempty"`
+	// Stale says the row is its plugin's last report, which the plugin no
+	// longer stands behind: it is down.
+	Stale bool `json:"stale,omitempty"`
 }
 
 // Since is a client's position in the rows: the epoch and revision it last
@@ -70,7 +59,7 @@ type Change struct {
 	All     bool        `json:"all,omitempty"`
 	Health  bool        `json:"health,omitempty"`
 	Notices []Notice    `json:"notices,omitempty"`
-	// Counters are the Area "" counters, on every "changed" change after a TopicEntries or TopicDrafts note.
+	// Counters are the Area "" counters, on every "changed" change after a TopicTasks or TopicDrafts note.
 	Counters *Counters `json:"counters,omitempty"`
 }
 
@@ -93,6 +82,15 @@ type RowsPage struct {
 	Rows     []Row       `json:"rows"`
 	Removed  []unit.Unit `json:"removed"`
 	Counters *Counters   `json:"counters,omitempty"`
+	// Loading are the plugins whose rows are not all here yet.
+	Loading []Loading `json:"loading,omitempty"`
+}
+
+// Loading is a plugin that has not yet imported its data and reported every
+// unit since the daemon started, and why, in the plugin's words.
+type Loading struct {
+	Plugin string `json:"plugin"`
+	Reason string `json:"reason"`
 }
 
 // RowFacts are a row's numbers for the backlog panels.
@@ -149,15 +147,16 @@ type QuestionView struct {
 	LastMessage string          `json:"last_message,omitempty"`
 }
 
-// AttentionAction ids are catalog ids, gtd:<verb> (gtd:<verb>:<mode> with
-// the delegate's mode) for an entry's verb, answer:option:<id>, answer:yes,
+// AttentionAction ids are catalog ids, task:<verb> (task:<verb>:<mode> with
+// the delegate's mode) for a task's verb, answer:option:<id>, answer:yes,
 // answer:no and answer:text for the answer's choices, and reply:save and
 // reply:send for a reply typed in the notification.
-// The actions of an Inbox entry's notification: Draft for me delegates it
+// The actions of an Inbox task's notification: Draft for me delegates it
 // headless, Reply saves the typed text to the Outbox as a reply on its unit
 // and Send reply sends it at once.
 const (
-	AttentionDraftForMe = "gtd:delegate:headless"
+	TaskActionPrefix    = "task:"
+	AttentionDraftForMe = TaskActionPrefix + "delegate:headless"
 	AttentionReply      = "reply:save"
 	AttentionSendReply  = "reply:send"
 )
@@ -166,6 +165,9 @@ type AttentionAction struct {
 	ID        string `json:"id"`
 	Title     string `json:"title"`
 	TextInput bool   `json:"text_input,omitempty"`
+	// Placeholder and Button word a text input: the hint in its field and the button that sends it.
+	Placeholder string `json:"placeholder,omitempty"`
+	Button      string `json:"button,omitempty"`
 	// Basis is the row state's basis the action was offered on.
 	Basis string `json:"basis,omitempty"`
 }
@@ -241,8 +243,10 @@ type TurnAnswer struct {
 	Route    string    `json:"route"`
 	Session  string    `json:"session,omitempty"`
 	At       time.Time `json:"at"`
-	// Message is the Inbox message answered, 0 for none; Posted says the agent posted it.
+	// Message is the Inbox message answered, 0 for none; Posted says the agent posted it. Gate is the gate the
+	// answer resolved, 0 for one given with no gate open.
 	Message int64 `json:"message_id,omitempty"`
+	Gate    int64 `json:"gate_id,omitempty"`
 	Posted  bool  `json:"posted,omitempty"`
 	// NoticedAt is when the session was told of the answer, ReadAt when the agent read it; each absent until then.
 	NoticedAt *time.Time `json:"noticed_at,omitempty"`
@@ -278,18 +282,13 @@ type Workspace struct {
 // Override is what the user set on a unit; the zero Override leaves the
 // wire.
 type Override struct {
-	MutedUntil           time.Time `json:"muted_until"`
-	MuteUntilStateChange bool      `json:"mute_until_state_change"`
-	MutedKind            string    `json:"muted_kind"`
-	MutedWaitingOn       string    `json:"muted_waiting_on"`
-	Hold                 bool      `json:"hold"`
-	Adopted              bool      `json:"adopted"`
-	Tracked              bool      `json:"tracked"`
-	NextGuidance         string    `json:"next_guidance"`
+	Hold         bool   `json:"hold"`
+	Adopted      bool   `json:"adopted"`
+	Tracked      bool   `json:"tracked"`
+	NextGuidance string `json:"next_guidance"`
 }
 
 type Event struct {
-	PR    pr.Ref    `json:"pr"`
 	Unit  unit.Unit `json:"unit"`
 	Kind  string    `json:"kind"`
 	Key   string    `json:"key"`
@@ -300,16 +299,7 @@ type Event struct {
 
 // IsZero reports an override that sets nothing.
 func (o Override) IsZero() bool {
-	return o.MutedUntil.IsZero() && o == Override{MutedUntil: o.MutedUntil}
-}
-
-// PendingRound is an automatic round waiting for the user's answer; a
-// client counts down to Deadline itself.
-type PendingRound struct {
-	Intent   string    `json:"intent"`
-	Reason   string    `json:"reason"`
-	Since    time.Time `json:"since"`
-	Deadline time.Time `json:"deadline"`
+	return o == Override{}
 }
 
 type BriefSummary struct {
@@ -393,6 +383,16 @@ type Health struct {
 	// Store is the store's schema version and state; nil from a daemon that
 	// predates it.
 	Store *StoreStatus `json:"store,omitempty"`
+	// Plugins are the plugins the daemon runs, by id, and how each answers.
+	Plugins []PluginHealth `json:"plugins,omitempty"`
+}
+
+// PluginHealth is a plugin the daemon runs: its status, one of loading,
+// serving, degraded or down, and why in the plugin's words.
+type PluginHealth struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+	Reason string `json:"reason,omitempty"`
 }
 
 // StoreStatus is the store as the daemon found it. A daemon whose store is
@@ -509,10 +509,10 @@ type ActionRequest struct {
 	// NoBrief starts a review, address or run without waiting for the
 	// brief.
 	NoBrief bool `json:"no_brief,omitempty"`
-	// Items and Entry tie what the action's turn drafts to the item ids of the unit and the entry it
+	// Items and Task tie what the action's turn drafts to the item ids of the unit and the task it
 	// was asked from.
 	Items []string `json:"items,omitempty"`
-	Entry string   `json:"entry,omitempty"`
+	Task  string   `json:"task,omitempty"`
 	// Manager is the workspace manager that creates the turn's worktree, ""
 	// for the configured ones; Parent is the caller's worktree, the new
 	// one's parent where its manager keeps parents.
@@ -549,8 +549,8 @@ type ExploreRequest struct {
 // Candidate is a pull request Explore found, with what deciding whether to
 // help on it needs.
 type Candidate struct {
-	Ref            pr.Ref    `json:"ref"`
 	Unit           unit.Unit `json:"unit"`
+	Label          string    `json:"label"`
 	URL            string    `json:"url"`
 	Title          string    `json:"title"`
 	Author         string    `json:"author"`
@@ -586,13 +586,24 @@ type ExploreResult struct {
 	Recent     []string    `json:"recent"`
 }
 
-type RemoveDoneResult struct {
-	Removed []pr.Ref `json:"removed"`
-	Kept    []Kept   `json:"kept"`
+// RemoveCleanRequest names the view whose tasks' clean workspaces to remove.
+type RemoveCleanRequest struct {
+	View string `json:"view"`
+}
+
+type RemoveCleanResult struct {
+	Removed []Named `json:"removed"`
+	Kept    []Kept  `json:"kept"`
+}
+
+// Named is a unit with its label.
+type Named struct {
+	Unit  unit.Unit `json:"unit"`
+	Label string    `json:"label"`
 }
 
 type Kept struct {
-	Ref       pr.Ref `json:"ref"`
+	Named
 	Reason    string `json:"reason"`
 	Detail    string `json:"detail,omitempty"`
 	Source    string `json:"source,omitempty"`
@@ -600,7 +611,9 @@ type Kept struct {
 }
 
 type ActivityItem struct {
-	Event  Event  `json:"event"`
+	Event Event `json:"event"`
+	// Label is the event's unit as people read it; "" for none.
+	Label  string `json:"label,omitempty"`
 	Title  string `json:"title"`
 	URL    string `json:"url"`
 	Author string `json:"author"`

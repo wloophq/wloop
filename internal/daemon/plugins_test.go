@@ -160,7 +160,7 @@ func TestAPluginHealthWarningReachesTheWarnings(t *testing.T) {
 
 func TestPluginsServed(t *testing.T) {
 	t.Parallel()
-	plugins := []api.Plugin{{ID: unit.GitHub, Enabled: false}, {ID: "thread", Enabled: true, UI: &api.PluginUI{TUIViews: []string{"t"}}}}
+	plugins := []api.Plugin{{ID: unit.GitHub, Enabled: false}, {ID: "thread", Enabled: true, UI: &api.PluginUI{Key: "g t"}}}
 	s := newServerWith(t, func(d *Deps) { d.Plugins = plugins })
 	var got []api.Plugin
 	if code := get(t, s, api.Plugins, &got); code != http.StatusOK || !reflect.DeepEqual(got, plugins) {

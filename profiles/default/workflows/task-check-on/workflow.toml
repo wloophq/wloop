@@ -1,0 +1,9 @@
+summary = "Give a task someone else owes a check date when no source it links to says whom it waits on, or a person handed it to them, and no source keeps its own staleness, so Stalled lists it once that date passes with nothing moving"
+provider = "task"
+when = 'task.owed_by != "me" && task.owed_by != "" && !(task.category in ["done", "dropped", "deferred"]) && !(task.check_on > timestamp(0)) && (size(task.link_owes) == 0 || task.owed_by == task.prop.owner) && !("stalled" in task.link_signals)'
+order = 53
+
+[[step]]
+use = "task.set"
+prop = "check_on"
+value = "+2d"

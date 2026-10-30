@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/wloophq/wloop/internal/profile"
 )
 
 // files are the files of one intents/<name>/ or workflows/<name>/ directory:
@@ -17,7 +19,20 @@ import (
 type files struct {
 	bundled fs.FS
 	dir     string // slash path in bundled, else a user directory
+	// shown is where dir is as problems name it, when bundled is a
+	// plugin's layer.
+	shown   string
 	overlay []string
+}
+
+// layerFiles are the files of dir, a slash path in l, a layer other than
+// the bundled one, and where they are as problems name them.
+func layerFiles(l profile.Layer, dir string) (files, string) {
+	shown := l.FileName(dir)
+	if l.FS == nil {
+		return files{dir: shown}, shown
+	}
+	return files{bundled: l.FS, dir: dir, shown: shown}, shown
 }
 
 // read falls through to the next layer only when name is absent; an
@@ -41,7 +56,15 @@ func (f files) path(name string) string {
 			return filepath.Join(d, name)
 		}
 	}
-	if f.bundled != nil {
+	return f.base(name)
+}
+
+// base is where name is read from without the overlay.
+func (f files) base(name string) string {
+	switch {
+	case f.shown != "":
+		return path.Join(f.shown, name)
+	case f.bundled != nil:
 		return path.Join(f.dir, name)
 	}
 	return filepath.Join(f.dir, name)
@@ -66,7 +89,7 @@ func (f files) own(problems Problems, manifest string) Problems {
 		return problems
 	}
 	user := f.overlay[len(f.overlay)-1]
-	if p := f.path(manifest); p != path.Join(f.dir, manifest) {
+	if p := f.path(manifest); p != f.base(manifest) {
 		user = p
 	}
 	inOverlay := func(file string) bool {

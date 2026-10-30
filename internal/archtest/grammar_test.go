@@ -18,6 +18,11 @@ import (
 // the grammar, and the front matter reader they share.
 var profileDecoders = []string{"internal/intent", "internal/profile", "internal/frontmatter", "internal/config"}
 
+// pluginContract is the plugin SDK, which decodes plugin.toml: a file of the
+// plugin contract, checked by pkg/plugin/manifest and the kinds' SDK
+// packages, which import nothing under internal/ and so not the grammar.
+var pluginContract = []string{"pkg/plugin"}
+
 // decodeCalls are the calls that decode a profile file's TOML.
 var decodeCalls = map[string][]string{"toml": {"Unmarshal", "NewDecoder"}, "frontmatter": {"Decode"}}
 
@@ -35,6 +40,9 @@ func grammarWords() map[string]bool {
 // ruleGrammarKeys flags, in the file rel, a toml key no grammar row names,
 // and a toml key or a decode of a profile or config file outside their loaders.
 func ruleGrammarKeys(fset *token.FileSet, rel string, f *ast.File, words map[string]bool) []string {
+	if under(filepath.ToSlash(filepath.Dir(rel)), pluginContract...) {
+		return nil
+	}
 	loader := under(filepath.ToSlash(filepath.Dir(rel)), profileDecoders...)
 	var out []string
 	ast.Inspect(f, func(n ast.Node) bool {
@@ -82,7 +90,8 @@ func ruleGrammarKeys(fset *token.FileSet, rel string, f *ast.File, words map[str
 // the table the loaders check, the
 // schemas and the reference pages derive from. The configuration's keys
 // are checked against the table by internal/config's
-// TestEveryConfigKeyIsInTheGrammar.
+// TestEveryConfigKeyIsInTheGrammar. The plugin SDK under `pkg/plugin`, which
+// reads a plugin's `plugin.toml`, is outside the rule.
 func TestManifestKeysAreInTheGrammar(t *testing.T) {
 	t.Parallel()
 	words := grammarWords()

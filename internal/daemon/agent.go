@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/messages"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/turns"
@@ -251,12 +252,8 @@ func (s *Server) byHandRef(ctx context.Context, req api.ByHandRequest, handle st
 // prepareByHand runs the intent's prepare for a turn by hand, whose
 // request then carries what it filled.
 func (s *Server) prepareByHand(ctx context.Context, d dintent.Def, u unit.Unit, req api.ByHandRequest) (api.ByHandRequest, error) {
-	prepare, ok := prepares[d.Prepare]
-	if !ok {
-		return req, fmt.Errorf("%s: the daemon has no prepare %s", d.Name, d.Prepare)
-	}
 	c := Call{Guidance: req.Guidance, Inputs: maps.Clone(req.Inputs)}
-	if err := prepare(s, ctx, u, &c); err != nil {
+	if err := s.prepare(ctx, d, u, &c); err != nil {
 		return req, err
 	}
 	req.Guidance, req.Inputs = c.Guidance, c.Inputs
@@ -458,26 +455,33 @@ func (s *Server) handleTurnAnswer(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "pr: "+err.Error())
 		return
 	}
-	var id int64
-	if raw := r.URL.Query().Get("message"); raw != "" {
-		if id, err = strconv.ParseInt(raw, 10, 64); err != nil || id <= 0 {
-			writeError(w, http.StatusBadRequest, "message: not a message id: "+raw)
+	var id, gateID int64
+	if s.deps.Messages == nil {
+		writeError(w, http.StatusServiceUnavailable, "the tasks are not wired")
+		return
+	}
+	if raw := r.URL.Query().Get("gate"); raw != "" {
+		var ok bool
+		if gateID, err = strconv.ParseInt(raw, 10, 64); err != nil || gateID <= 0 {
+			writeError(w, http.StatusBadRequest, "gate: not a gate id: "+raw)
+			return
+		}
+		if id, ok = s.gateMessage(r.Context(), raw); !ok || id == 0 {
+			writeError(w, http.StatusNotFound, "gate: no question or post gate "+raw)
 			return
 		}
 	}
-	if s.deps.Messages == nil {
-		writeError(w, http.StatusServiceUnavailable, "the Inbox is not wired")
-		return
-	}
-	convs, err := s.deps.Messages.Read(r.Context(), messages.ReadRequest{Session: handle, Unit: u, Message: id})
+	got, err := s.deps.Messages.ReadTask(r.Context(), messages.ReadRequest{Session: handle, Unit: u, Message: id})
 	switch {
+	case errors.Is(err, messages.ErrNotTheTasks):
+		writeError(w, http.StatusForbidden, s.notice(builtin.NoticeChatNotYours, map[string]any{"Unit": u.Address()}))
 	case errors.Is(err, messages.ErrNoMessage), errors.Is(err, messages.ErrNoTurn):
 		writeError(w, http.StatusNotFound, err.Error())
 	case err != nil:
 		writeAgentError(w, err)
 	case s.deps.ReadText != nil:
-		writeJSON(w, api.TurnText{Text: s.deps.ReadText(r.Context(), convs, id)})
+		writeJSON(w, api.TurnText{Text: s.deps.ReadText(r.Context(), got, gateID)})
 	default:
-		writeJSON(w, api.TurnText{Text: fmt.Sprint(convs)})
+		writeJSON(w, api.TurnText{Text: fmt.Sprint(got.Answers, got.Chat)})
 	}
 }

@@ -37,7 +37,7 @@ const (
 type Model struct {
 	changes   port.Changes
 	snap      Snapshotter
-	pending   Pending
+	plans     Plans
 	agents    Agents
 	settings  Settings
 	providers []Provider
@@ -91,11 +91,11 @@ type entry struct {
 }
 
 // New builds a model over the providers. A nil changes rebuilds on every
-// read; nil pending, agents or settings leave their Base fields zero.
-func New(changes port.Changes, snap Snapshotter, pending Pending, agents Agents, settings Settings, providers ...Provider) *Model {
+// read; nil plans, agents or settings leave their Base fields zero.
+func New(changes port.Changes, snap Snapshotter, plans Plans, agents Agents, settings Settings, providers ...Provider) *Model {
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)
-	return &Model{changes: changes, snap: snap, pending: pending, agents: agents, settings: settings, providers: providers,
+	return &Model{changes: changes, snap: snap, plans: plans, agents: agents, settings: settings, providers: providers,
 		epoch: hex.EncodeToString(b), now: time.Now, logf: func(string, ...any) {}}
 }
 
@@ -141,12 +141,12 @@ func (m *Model) base(ctx context.Context) (Base, error) {
 			return Base{}, err
 		}
 	}
-	if m.pending != nil {
-		p, err := m.pending.Pending(ctx)
+	if m.plans != nil {
+		p, err := m.plans.Plans(ctx)
 		if err != nil {
 			return Base{}, err
 		}
-		b.Pending = p
+		b.Plans = p
 	}
 	if m.agents != nil {
 		b.Agents, b.AgentsOK = m.agents.Agents()
@@ -197,7 +197,7 @@ func derive(base Base, loaded []listing, at time.Time) ([]*entry, error) {
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", u, err)
 			}
-			row = withIntents(base, l.p, u, row)
+			row = withIntents(base, u, row)
 			raw, err := json.Marshal(row)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", u, err)
@@ -208,17 +208,11 @@ func derive(base Base, loaded []listing, at time.Time) ([]*entry, error) {
 	return out, nil
 }
 
-// Offerer is an optional capability of a Provider whose deriver offers the
-// catalog's actions on its rows itself.
-type Offerer interface {
-	OffersActions() bool
-}
-
-// withIntents sets the row's unit and, on a row of a provider that offers no actions itself, the intents'
-// actions it offers.
-func withIntents(base Base, p Provider, u unit.Unit, row api.Row) api.Row {
+// withIntents sets the row's unit and, on a row whose deriver set no
+// actions, the intents' actions it offers.
+func withIntents(base Base, u unit.Unit, row api.Row) api.Row {
 	row.Unit = u
-	if o, ok := p.(Offerer); ok && o.OffersActions() || base.Intents == nil {
+	if row.Actions != nil || base.Intents == nil {
 		return row
 	}
 	row.Actions = catalog.UnitStates(catalog.Facts{Row: row, Tracked: true, Open: !row.Summary.Closed, Asked: base.Asked, Intents: base.Intents})
@@ -313,11 +307,11 @@ func (s *snapshot) trim() {
 	}
 }
 
-// Rows is the view's rows: all of them when since is zero, of another
+// Rows are the rows: all of them when since is zero, of another
 // epoch, ahead of Rev or behind the tombstones, else those that changed
 // after since and the units that left. The rows are copies the caller may
 // change.
-func (m *Model) Rows(ctx context.Context, view string, since api.Since) (api.RowsPage, error) {
+func (m *Model) Rows(ctx context.Context, since api.Since) (api.RowsPage, error) {
 	s, err := m.sync(ctx)
 	if err != nil {
 		return api.RowsPage{}, err
@@ -328,11 +322,7 @@ func (m *Model) Rows(ctx context.Context, view string, since api.Since) (api.Row
 		if !page.Full && e.Rev <= since.Rev {
 			continue
 		}
-		if e.Row.In(view) {
-			page.Rows = append(page.Rows, cloneRow(e.Row))
-		} else if !page.Full {
-			page.Removed = append(page.Removed, e.Unit)
-		}
+		page.Rows = append(page.Rows, cloneRow(e.Row))
 	}
 	if !page.Full {
 		for u, rev := range s.gone {
@@ -342,7 +332,7 @@ func (m *Model) Rows(ctx context.Context, view string, since api.Since) (api.Row
 		}
 		slices.SortFunc(page.Removed, api.CompareUnits)
 	}
-	slices.SortStableFunc(page.Rows, api.CompareRows)
+	slices.SortStableFunc(page.Rows, func(a, b api.Row) int { return api.CompareUnits(a.Unit, b.Unit) })
 	return page, nil
 }
 
@@ -363,7 +353,7 @@ func (m *Model) Row(ctx context.Context, u unit.Unit, asked catalog.Asked) (api.
 	b := s.base
 	b.Asked = asked
 	r, err := e.provider.Derive(b, e.in, s.at)
-	r = withIntents(b, e.provider, u, r)
+	r = withIntents(b, u, r)
 	return cloneRow(r), err == nil, err
 }
 
@@ -395,8 +385,13 @@ type Read struct {
 	p    Provider
 }
 
-// Derive is the unit's row from base and in, at the minute of the snapshot.
-func (r Read) Derive(base Base, in any) (api.Row, error) { return r.p.Derive(base, in, r.At) }
+// Derive is the unit's row from base and in, at the minute of the snapshot,
+// on the read's unit.
+func (r Read) Derive(base Base, in any) (api.Row, error) {
+	row, err := r.p.Derive(base, in, r.At)
+	row.Unit = r.Row.Unit
+	return row, err
+}
 
 // Read is u's entry; ok is false for a unit no provider lists. The row is a
 // copy the caller may change; In is shared and must not be.
@@ -682,10 +677,6 @@ func cloneRow(r api.Row) api.Row {
 			f[k] = slices.Clone(v)
 		}
 		r.Facets = f
-	}
-	if r.Pending != nil {
-		p := *r.Pending
-		r.Pending = &p
 	}
 	if r.Question != nil {
 		q := *r.Question

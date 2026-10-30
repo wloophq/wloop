@@ -3,13 +3,14 @@ package views_test
 import (
 	"context"
 	"errors"
-	"github.com/wloophq/wloop/internal/domain/unit"
 	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/wloophq/wloop/internal/domain/unit"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/view/testsink"

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -19,7 +20,7 @@ var ErrRuleMarks = errors.New("a rule reads no marks: handled() is for a workflo
 type UntrustedError struct{ Fact string }
 
 func (e *UntrustedError) Error() string {
-	return fmt.Sprintf("reads %s, which no draft approval rule may: a third party's text or the proposing turn sets its value", e.Fact)
+	return fmt.Sprintf("reads %s, which a rule that releases a gate may not, nor any rule of a draft gate: a third party's text or an agent sets its value", e.Fact)
 }
 
 // SubjectsError refuses a rule's when that reads the facts of two subjects,
@@ -30,12 +31,17 @@ func (e *SubjectsError) Error() string {
 	return fmt.Sprintf("reads facts of %v, but a draft has one subject, so it never applies", e.Subjects)
 }
 
-// ApprovalRule is the [drafts.approval] rule of a whose when is compiled
-// over env. It names comment delivery when its top-level conjunction holds
-// draft.delivery == "comment", the only way a rule releases a comment.
+// ApprovalRule is the [gates.approval] rule of a draft gate, a, whose when
+// is compiled over env. A task.prop.* fact it reads must be typed in env,
+// which only the profile does; one env marks untrusted refuses the rule
+// like an untrusted fact of the table. It names a delivery when its
+// top-level conjunction holds draft.delivery == "<delivery>", the only way
+// a rule releases a draft whose delivery posts.
 func ApprovalRule(when string, a draft.Approval, env expr.Env) (draft.Rule, error) {
-	if names := DynamicFacts(when); len(names) > 0 {
-		return draft.Rule{}, &UntrustedError{Fact: names[0]}
+	for _, name := range DynamicFacts(when) {
+		if _, typed := env[name]; !typed || !strings.HasPrefix(name, PropPrefix) {
+			return draft.Rule{}, &UntrustedError{Fact: name}
+		}
 	}
 	p, err := expr.CompileWorkflow(when, env)
 	if err != nil {
@@ -46,12 +52,12 @@ func ApprovalRule(when string, a draft.Approval, env expr.Env) (draft.Rule, erro
 	}
 	var subjects []string
 	for _, name := range p.Reads() {
-		if IsUntrusted(name) {
+		if IsUntrusted(name) || env.Untrusted(name) {
 			return draft.Rule{}, &UntrustedError{Fact: name}
 		}
 		f, ok := workflowFact(name)
 		switch {
-		case !ok || f.Slot == "" || f.Slot == DraftSlot:
+		case !ok || f.Slot == "" || f.Slot == DraftSlot || f.Slot == GateSlot:
 		case !slices.Contains(subjects, f.Slot):
 			subjects = append(subjects, f.Slot)
 		}
@@ -60,24 +66,23 @@ func ApprovalRule(when string, a draft.Approval, env expr.Env) (draft.Rule, erro
 		slices.Sort(subjects)
 		return draft.Rule{}, &SubjectsError{Subjects: subjects}
 	}
-	return draft.Rule{When: condition{p}, Approval: a, Subjects: subjects,
-		NamesComment: expr.Requires(p, DraftDelivery, string(draft.CommentDelivery))}, nil
-}
-
-// NeverReleasesComment says that r releases, reads draft.delivery and pins
-// it to no delivery, yet does not name comment delivery: a form such as
-// draft.delivery in ["comment"] reads as one that may release a comment,
-// and never does.
-func NeverReleasesComment(r draft.Rule) bool {
-	c, ok := r.When.(condition)
-	if !ok || !r.Approval.Releases() || r.NamesComment || !slices.Contains(c.p.Reads(), DraftDelivery) {
-		return false
+	rule := draft.Rule{When: condition{p}, Approval: a, Subjects: subjects}
+	if named := expr.Pinned(p, DraftDelivery); len(named) == 1 {
+		rule.Names = draft.Delivery(named[0])
 	}
-	return !expr.Requires(c.p, DraftDelivery, string(draft.Message)) && !expr.Requires(c.p, DraftDelivery, string(draft.Reaction))
+	return rule, nil
 }
 
-// CommentForm is how a rule names comment delivery.
-const CommentForm = `draft.delivery == "comment" as a term of the top-level &&`
+// NeverNamesADelivery says that r releases and reads draft.delivery, yet
+// pins it to no delivery: a form such as draft.delivery in ["comment"]
+// reads as one that may release a draft that posts, and never does.
+func NeverNamesADelivery(r draft.Rule) bool {
+	c, ok := r.When.(condition)
+	return ok && r.Approval.Releases() && r.Names == "" && slices.Contains(c.p.Reads(), DraftDelivery)
+}
+
+// DeliveryForm is how a rule names a delivery.
+const DeliveryForm = `draft.delivery == "<delivery>" as a term of the top-level &&`
 
 func workflowFact(name string) (Fact, bool) {
 	for _, f := range Facts {
@@ -104,12 +109,15 @@ func (c condition) Source() string {
 
 var (
 	quotedText  = regexp.MustCompile(`"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'`)
-	dynamicName = regexp.MustCompile(`(?:^|[^\w.])((?:` + regexp.QuoteMeta(ExtraPrefix) + `|` + regexp.QuoteMeta(ClassifyPrefix) + `)[A-Za-z_]\w*)`)
+	dynamicName = regexp.MustCompile(`(?:^|[^\w.])((?:` + regexp.QuoteMeta(ExtraPrefix) + `|` + regexp.QuoteMeta(ClassifyPrefix) + `|` + regexp.QuoteMeta(PropPrefix) + `)[A-Za-z_]\w*)`)
 )
 
-// DynamicFacts are the brief.extra.* and classify.* facts src names outside
-// its string literals: facts the profile declares, untrusted whatever their
-// name, which a check without the profile cannot type.
+// DynamicFacts are the brief.extra.*, classify.* and task.prop.* facts src
+// names outside its string literals: facts the profile declares, which a
+// check without the profile cannot type, so it refuses them in a rule that
+// releases. A brief's extra field and a classification's output are
+// untrusted whatever their name; a property is untrusted when an agent or a
+// plugin writes it, which only the profile says.
 func DynamicFacts(src string) []string {
 	var out []string
 	for _, m := range dynamicName.FindAllStringSubmatch(quotedText.ReplaceAllString(src, `""`), -1) {

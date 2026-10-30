@@ -3,37 +3,61 @@
 # items or daemon.
 #
 # Usage:
-#   isolated-daemon.sh setup <dir> <binary> <dm-channel-id> [<index>] [--slack] [--agent]
+#   isolated-daemon.sh setup <dir> <binary> <dm-channel-id> [<index>] [--slack] [--agent] [--plugins <id,...>] [--real-gh <owner/repo,...>] [--workflows <name,...>]
 #   isolated-daemon.sh env <dir>
 #   isolated-daemon.sh run <dir> <command> [<arg>...]
-#   isolated-daemon.sh snapshot <dir> <source-store>
+#   isolated-daemon.sh snapshot [--jobs] <dir> <source-store>
 #   isolated-daemon.sh pause <dir>
-#   isolated-daemon.sh start <dir> [<serve arg>...]
+#   isolated-daemon.sh start <dir> [--jobs] [<serve arg>...]
 #   isolated-daemon.sh stop <dir>
 #   isolated-daemon.sh clean <dir>
 #
 # setup creates <dir> (it must not exist) with state/, config/, bin/, gh/ and
 # home/ (the user home the binary sees; HOME stays real for the Keychain),
 # copies <binary> into bin/ beside the orca, gh, codex, launchctl and claude
-# stubs, and writes the config: brief, every workflow of
-# profiles/default/workflows/ and the github and slack plugins off, ports 47910+<index> (HTTP) and
+# stubs and orca-stub, an Orca runtime with no worktree that it builds from
+# this checkout, and the plugins beside it, as `make build` places them in
+# plugins/<id>/, into bin/plugins/, and writes the config: brief, every
+# workflow of profiles/default/workflows/ and plugins/*/profile/workflows/
+# and the github and slack plugins off, ports 47910+<index> (HTTP) and
 # 47810+<index> (MCP), the e2e Keychain service and <dm-channel-id> as the
-# only channel posts may reach. --slack turns the slack plugin on; every start
-# or pause of that directory then takes <dir>/../slack-socket.lock and refuses
-# while another daemon holds it. --agent leaves claude unstubbed. The state and
+# only channel posts may reach. --plugins turns the plugins it lists on,
+# each trusted by its path since no install recorded its checksum: github
+# runs against the stubbed gh, slack with no socket. --slack turns the slack
+# plugin on with its socket; every start or pause of that directory then
+# takes <dir>/../slack-socket.lock and refuses while another daemon holds
+# it. Each of --slack and --plugins trusts the plugin it turns on by its
+# path. --real-gh turns the github plugin on against the user's own gh:
+# gh is not stubbed and GH_TOKEN and GH_CONFIG_DIR keep the user's values,
+# and the config sets the plugin's owners to the owners of the repositories
+# it lists and its scope repos to them. The plugin still reads the user's
+# own pull requests and the reviews requested of them wherever they are;
+# automated rounds stay within the owners, and every post waits on its gate.
+# --agent leaves claude unstubbed. --workflows turns on the bundled
+# workflows it names, each of which must exist. The state and
 # config directory name is ISOLATED_STATE_NAME, else the binary's basename, and
 # setup refuses when the binary does not read the config it wrote. setup also
 # writes the MCP key the daemon requires (state/<name>/mcp.key, 0600); env and
 # run expose it as ISOLATED_MCP_KEY for a recipe's X-Loop-Key header.
 #
 # snapshot copies a store into <dir>'s state, never writing the source, at
-# 0600, and marks <dir> as holding a copy: start and serve then require
-# --no-jobs. The copy must carry a stored GitHub viewer.
+# 0600, with the plugins/<id>/import.db beside it, and marks <dir> as
+# holding a copy: start and serve then require --no-jobs. The copy must
+# carry a stored GitHub viewer. snapshot --jobs marks the copy as one whose
+# jobs may run, so start and serve run the plugins and workflows setup turned
+# on against it without --no-jobs; setup must have turned some on. start
+# --jobs serves a copy with its jobs on
+# when setup turned plugins on, so they start, import and report against
+# the stubs; a version 6 copy first takes `run <dir> <binary> store migrate
+# --yes`, which writes each import.db.
 #
 # pause serves --no-jobs once, stores the pause through the CLI and stops.
-# start serves in the background, logging to <dir>/daemon.log. stop signals
-# only the pid start recorded, and only while that pid is still the process
-# start launched. clean stops and deletes state/. run refuses any argument
+# start serves in the background, logging to <dir>/daemon.log, beside
+# orca-stub serving <dir>/orca, so the daemon has a reachable workspace
+# manager and its sweep runs the workflows setup turned on; the stub lists
+# nothing and refuses every write a session would need. stop signals only the
+# pids start recorded, and only while each is still the process start
+# launched. clean stops and deletes state/. run refuses any argument
 # naming the user's real state or config directory, and the binary's
 # install, uninstall and app subcommands.
 set -euo pipefail
@@ -54,7 +78,7 @@ load() {
 	[[ -d $1 ]] || die "$1 is not a directory this script set up"
 	dir=$(cd "$1" && pwd)
 	[[ -f $dir/isolated.env ]] || die "$1 is not a directory this script set up"
-	slack=0 agent=0
+	slack=0 agent=0 plugins="" workflows="" realgh=""
 	# shellcheck source=/dev/null
 	source "$dir/isolated.env"
 }
@@ -102,10 +126,10 @@ isolation() {
 		esac
 	done
 	vars=(XDG_STATE_HOME="$dir/state" XDG_CONFIG_HOME="$dir/config"
-		ORCA_USER_DATA_PATH="$dir/no-orca" PATH="$dir/bin:$PATH"
-		GH_TOKEN=isolated-invalid GH_CONFIG_DIR="$dir/gh"
+		ORCA_USER_DATA_PATH="$dir/orca" PATH="$dir/bin:$PATH"
 		GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0 LOOP_USER_HOME="$dir/home"
 		ISOLATED_MCP_KEY="$(cat "$dir/state/$name/mcp.key" 2>/dev/null || true)")
+	[[ -n ${realgh:-} ]] || vars+=(GH_TOKEN=isolated-invalid GH_CONFIG_DIR="$dir/gh")
 }
 
 with_env() {
@@ -155,14 +179,21 @@ release_lock() {
 	fi
 }
 
-# needs_no_jobs refuses a serve without --no-jobs over a copied store.
+# needs_no_jobs refuses a serve without --no-jobs over a copied store,
+# unless jobs is 1 and setup turned plugins on.
 needs_no_jobs() {
+	local jobs=$1 a
+	shift
 	[[ -f $dir/copied ]] || return 0
-	local a
+	[[ $(cat "$dir/copied") == jobs ]] && return 0
 	for a in "$@"; do
 		[[ $a == --no-jobs ]] && return 0
 	done
-	die "$dir holds a copy of a store; serve it only with --no-jobs"
+	if ((jobs)); then
+		[[ -n $plugins ]] || die "--jobs serves a copied store for its plugins; set $dir up with --plugins"
+		return 0
+	fi
+	die "$dir holds a copy of a store; serve it only with --no-jobs, or with --jobs for the plugins setup turned on"
 }
 
 toml_list() {
@@ -176,17 +207,61 @@ toml_list() {
 	printf ']'
 }
 
+# plugin_on says plugin $1 is among the --plugins of setup.
+plugin_on() {
+	local p
+	for p in ${plugins[@]+"${plugins[@]}"}; do
+		[[ $p == "$1" ]] && return 0
+	done
+	return 1
+}
+
 cmd_setup() {
-	local pos=() a
-	slack=0 agent=0
-	for a in "$@"; do
+	local pos=() a list="" wlist="" on=() repos=() r owners=()
+	slack=0 agent=0 plugins=() realgh=""
+	while [[ $# -gt 0 ]]; do
+		a=$1
+		shift
 		case $a in
 		--slack) slack=1 ;;
 		--agent) agent=1 ;;
+		--plugins)
+			[[ $# -gt 0 ]] || usage
+			list=$1
+			shift
+			;;
+		--plugins=*) list=${a#--plugins=} ;;
+		--workflows)
+			[[ $# -gt 0 ]] || usage
+			wlist=$1
+			shift
+			;;
+		--workflows=*) wlist=${a#--workflows=} ;;
+		--real-gh)
+			[[ $# -gt 0 ]] || usage
+			realgh=$1
+			shift
+			;;
+		--real-gh=*) realgh=${a#--real-gh=} ;;
 		--*) usage ;;
 		*) pos+=("$a") ;;
 		esac
 	done
+	if [[ -n $list ]]; then IFS=, read -r -a plugins <<<"$list"; fi
+	if [[ -n $wlist ]]; then IFS=, read -r -a on <<<"$wlist"; fi
+	if [[ -n $realgh ]]; then
+		IFS=, read -r -a repos <<<"$realgh"
+		for r in "${repos[@]}"; do
+			[[ $r =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || die "--real-gh: $r is not owner/repo"
+			[[ " ${owners[*]-} " == *" ${r%%/*} "* ]] || owners+=("${r%%/*}")
+		done
+		plugin_on github || plugins+=(github)
+		list=$(
+			IFS=,
+			echo "${plugins[*]}"
+		)
+	fi
+	((slack)) && plugin_on slack && die "--slack runs Slack's socket and --plugins slack runs none; choose one"
 	[[ ${#pos[@]} -ge 3 && ${#pos[@]} -le 4 ]] || usage
 	local target=${pos[0]} binary=${pos[1]} dm=${pos[2]} index=${pos[3]:-0}
 	[[ ! -e $target ]] || die "$target exists; every acceptance starts from a fresh directory"
@@ -208,7 +283,26 @@ cmd_setup() {
 	local bin
 	bin="$dir/bin/$(basename "$binary")"
 	cp "$binary" "$bin"
-	local stubs=(orca gh codex launchctl) stub
+	local from p
+	from="$(dirname "$binary")/plugins"
+	if [[ -d $from ]]; then cp -R "$from" "$dir/bin/plugins"; fi
+	for p in ${plugins[@]+"${plugins[@]}"}; do
+		[[ $p =~ ^[a-z][a-z0-9-]*$ ]] || die "plugin id $p is not one"
+		[[ -f $dir/bin/plugins/$p/plugin.toml ]] || {
+			rm -rf "$dir"
+			die "no plugin $p beside $binary: build it with make build, which places it in $from/$p"
+		}
+	done
+	command -v go >/dev/null || {
+		rm -rf "$dir"
+		die "setup builds orca-stub from $repo and needs go"
+	}
+	(cd "$repo" && go build -o "$dir/bin/orca-stub" ./internal/workspace/orca/orcatest/cmd/orca-stub) || {
+		rm -rf "$dir"
+		die "could not build orca-stub from $repo"
+	}
+	local stubs=(orca codex launchctl) stub
+	[[ -n $realgh ]] || stubs+=(gh)
 	((agent)) || stubs+=(claude)
 	for stub in "${stubs[@]}"; do
 		printf '#!/bin/sh\necho refused >&2\nexit 1\n' >"$dir/bin/$stub"
@@ -216,16 +310,43 @@ cmd_setup() {
 	done
 
 	local workflows=() manifest
-	for manifest in "$repo"/profiles/default/workflows/*/workflow.toml; do
+	for manifest in "$repo"/profiles/default/workflows/*/workflow.toml "$repo"/plugins/*/profile/workflows/*/workflow.toml; do
 		[[ -f $manifest ]] && workflows+=("$(basename "$(dirname "$manifest")")")
 	done
 	[[ ${#workflows[@]} -gt 0 ]] || die "no workflow under $repo/profiles/default/workflows"
-	local wf="" w
-	for w in "${workflows[@]}"; do
-		wf+=$'\n'"[workflows.$w]"$'\n'"enabled = false"$'\n'
+	local wf="" w enabled
+	for w in ${on[@]+"${on[@]}"}; do
+		[[ " ${workflows[*]} " == *" $w "* ]] || {
+			rm -rf "$dir"
+			die "no bundled workflow $w"
+		}
 	done
-	local slack_on=false
+	for w in "${workflows[@]}"; do
+		enabled=false
+		[[ " ${on[*]-} " == *" $w "* ]] && enabled=true
+		wf+=$'\n'"[workflows.$w]"$'\n'"enabled = $enabled"$'\n'
+	done
+	local slack_on=false github_on=false
 	((slack)) && slack_on=true
+	plugin_on slack && slack_on=true
+	plugin_on github && github_on=true
+	local github_trust="" github_scope="" slack_trust="" slack_ingest="" others=""
+	plugin_on github && github_trust='trust = "path"'
+	if [[ -n $realgh ]]; then
+		github_trust+=$'\n'"owners = $(toml_list "${owners[@]}")"
+		github_scope=$'\n[plugins.github.scope]\n'"repos = $(toml_list "${repos[@]}")"$'\n'
+	fi
+	((slack)) && slack_trust='trust = "path"'
+	if plugin_on slack; then
+		slack_trust='trust = "path"'
+		slack_ingest=$'\n[plugins.slack.ingest]\nsocket = false\n'
+	fi
+	for p in ${plugins[@]+"${plugins[@]}"}; do
+		case $p in
+		github | slack) ;;
+		*) others+=$'\n'"[plugins.$p]"$'\n'"enabled = true"$'\n'"trust = \"path\""$'\n' ;;
+		esac
+	done
 
 	cat >"$dir/config/$name/config.toml" <<-EOF
 		[http]
@@ -240,20 +361,23 @@ cmd_setup() {
 		[brief]
 		enabled = false
 
-		[github]
-		enabled = false
+		[plugins.github]
+		enabled = $github_on
+		$github_trust
+		$github_scope
 
-		[slack]
+		[plugins.slack]
 		enabled = $slack_on
+		$slack_trust
 		keychain_service = "wloop-e2e-slack"
 		post_allowlist = $(toml_list "$dm")
 		request_log = true
-		$wf
+		$slack_ingest$others$wf
 	EOF
 	chmod 600 "$dir/config/$name/config.toml"
 	mkdir -m 700 "$dir/state/$name"
 	(umask 077 && od -An -tx1 -N24 /dev/urandom | tr -d ' \n' >"$dir/state/$name/mcp.key")
-	printf 'binary=%q\nname=%q\nslack=%d\nagent=%d\n' "$bin" "$name" "$slack" "$agent" >"$dir/isolated.env"
+	printf 'binary=%q\nname=%q\nslack=%d\nagent=%d\nplugins=%q\nworkflows=%q\nrealgh=%q\n' "$bin" "$name" "$slack" "$agent" "$list" "$wlist" "$realgh" >"$dir/isolated.env"
 
 	local got
 	got=$(with_env "$bin" config get http.port 2>/dev/null || true)
@@ -290,7 +414,7 @@ cmd_run() {
 	local a
 	for a in "$@"; do
 		if [[ $a == serve ]]; then
-			needs_no_jobs "$@"
+			needs_no_jobs 0 "$@"
 			break
 		fi
 	done
@@ -298,9 +422,16 @@ cmd_run() {
 }
 
 cmd_snapshot() {
+	local jobs=0
+	if [[ ${1:-} == --jobs ]]; then
+		jobs=1
+		shift
+	fi
 	[[ $# -eq 2 ]] || usage
 	load "$1"
 	local src=$2
+	((jobs == 0)) || [[ -n $plugins || -n $workflows ]] ||
+		die "--jobs runs the plugins and workflows setup turned on; set $dir up with --plugins or --workflows"
 	[[ -f $src ]] || die "no store at $src"
 	command -v sqlite3 >/dev/null || die "snapshot needs sqlite3"
 	! running || die "stop the daemon of $dir first"
@@ -324,7 +455,16 @@ cmd_snapshot() {
 		drop_copy "the snapshot has no meta table"
 	[[ $(sqlite3 "$dest" "SELECT count(*) FROM meta WHERE key = 'viewer:github' AND value != ''") != 0 ]] ||
 		drop_copy "the copy has no stored GitHub viewer; its rows cannot render"
-	touch "$dir/copied"
+	local export id
+	for export in "$(dirname "$src")"/plugins/*/import.db; do
+		[[ -f $export ]] || continue
+		id=$(basename "$(dirname "$export")")
+		mkdir -m 700 -p "$(dirname "$dest")/plugins/$id"
+		cp "$export" "$(dirname "$dest")/plugins/$id/import.db"
+		chmod 600 "$(dirname "$dest")/plugins/$id/import.db"
+		echo "copied the $id plugin's import.db"
+	done
+	if ((jobs)); then echo jobs >"$dir/copied"; else touch "$dir/copied"; fi
 	echo "copied $(sqlite3 "$dest" "SELECT count(*) FROM sqlite_master WHERE type = 'table'") tables"
 }
 
@@ -336,6 +476,7 @@ drop_copy() {
 launch() {
 	local vars unsets
 	isolation
+	launch_stub
 	(exec env "${unsets[@]}" "${vars[@]}" nohup "$binary" serve "$@" </dev/null >>"$dir/daemon.log" 2>&1) &
 	local pid=$!
 	disown "$pid"
@@ -349,6 +490,39 @@ launch() {
 	printf '%s\n%s\n' "$pid" "$at" >"$dir/daemon.pid"
 }
 
+# launch_stub starts orca-stub on <dir>/orca, after stopping one an earlier
+# start left, and waits for the runtime file it writes, recording its pid in
+# <dir>/orca.pid.
+launch_stub() {
+	stop_stub
+	rm -rf "$dir/orca"
+	mkdir -m 700 "$dir/orca"
+	("$dir/bin/orca-stub" "$dir/orca" </dev/null >>"$dir/orca-stub.log" 2>&1) &
+	local pid=$! at=""
+	disown "$pid"
+	for _ in $(seq 300); do
+		[[ -f $dir/orca/orca-runtime.json ]] && at=$(started_at "$pid") && break
+		sleep 0.1
+	done
+	[[ -n $at ]] || die "orca-stub did not start; see $dir/orca-stub.log"
+	printf '%s\n%s\n' "$pid" "$at" >"$dir/orca.pid"
+}
+
+# stop_stub stops the orca-stub start recorded, while it is still that process.
+stop_stub() {
+	[[ -f $dir/orca.pid ]] || return 0
+	local pid at
+	{ read -r pid; read -r at; } <"$dir/orca.pid"
+	if [[ -n $pid && -n $at && $(started_at "$pid") == "$at" ]]; then
+		kill -TERM "$pid" 2>/dev/null || true
+		for _ in $(seq 50); do
+			[[ $(started_at "$pid") == "$at" ]] || break
+			sleep 0.1
+		done
+	fi
+	rm -f "$dir/orca.pid"
+}
+
 # launch_locked launches with the Slack socket lock when the directory has
 # the slack plugin on.
 launch_locked() {
@@ -357,6 +531,7 @@ launch_locked() {
 	fi
 	if ((slack)); then take_lock; fi
 	if ! (launch "$@"); then
+		stop_stub
 		if ((slack)); then release_lock; fi
 		exit 1
 	fi
@@ -365,6 +540,7 @@ launch_locked() {
 stop_ours() {
 	if ! running; then
 		rm -f "$dir/daemon.pid"
+		stop_stub
 		release_lock
 		echo "no daemon of $dir is running"
 		return 0
@@ -380,6 +556,7 @@ stop_ours() {
 		kill -KILL "$pid"
 	fi
 	rm -f "$dir/daemon.pid"
+	stop_stub
 	release_lock
 	echo "stopped $pid"
 }
@@ -406,7 +583,12 @@ cmd_start() {
 	[[ $# -ge 1 ]] || usage
 	load "$1"
 	shift
-	needs_no_jobs "$@"
+	local jobs=0
+	if [[ ${1:-} == --jobs ]]; then
+		jobs=1
+		shift
+	fi
+	needs_no_jobs "$jobs" "$@"
 	launch_locked "$@"
 	echo "started $(head -n 1 "$dir/daemon.pid")"
 }

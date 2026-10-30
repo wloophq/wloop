@@ -1,5 +1,6 @@
-// Package messages keeps the Inbox messages: questions of turns, agent posts
-// and proposals that ask a decision.
+// Package messages keeps the subjects of the question, post and proposal gates: a turn's question, an agent's
+// post and a proposal. Each open message waits on its gate; resolving the gate delivers its answer to the
+// session or applies its decision, and closes the message.
 package messages
 
 import (
@@ -7,18 +8,22 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
 
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
+	"github.com/wloophq/wloop/internal/core/gates"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/gate"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -29,9 +34,11 @@ type Books interface {
 	BookOf(ctx context.Context, k turns.Key) (turn.Book, bool, error)
 }
 
-// Turns answers and dismisses a unit's question and notes the answers an agent read, as turns.Service does.
+// Turns answers, continues and dismisses a unit's question and notes the answers an agent read, as
+// turns.Service does.
 type Turns interface {
 	Answer(ctx context.Context, r turns.AnswerRequest) (turns.AnswerResult, error)
+	Continue(ctx context.Context, u unit.Unit) error
 	Dismiss(ctx context.Context, u unit.Unit) error
 	MarkRead(ctx context.Context, u unit.Unit, ids []int64) error
 }
@@ -42,31 +49,35 @@ type Ledger interface {
 	Decide(ctx context.Context, id int64, accept bool) (coreitems.Result, error)
 }
 
-// Entries opens and closes the Inbox entry of each message, as gtd.Service does.
-type Entries interface {
-	Open(ctx context.Context, r coregtd.OpenRequest) (gtd.Entry, error)
-	Close(ctx context.Context, id gtd.ID, to gtd.State) error
-	Entry(ctx context.Context, id gtd.ID) (gtd.Entry, error)
-	Retitle(ctx context.Context, id gtd.ID, title string) error
+// Tasks names the capture task a message on no unit gets after its text, and closes the message task a
+// message of an earlier version holds, as tasks.Service does.
+type Tasks interface {
+	Close(ctx context.Context, id task.ID, to task.Category) error
+	Task(ctx context.Context, id task.ID) (task.Task, error)
+	Retitle(ctx context.Context, id task.ID, title string) error
 }
 
-// Intents names the intents whose questions an answer addresses.
-type Intents interface{ Answerable() []string }
+// Gates are the gates the messages are the subjects of, as gates.Service opens and supersedes them.
+type Gates interface {
+	Open(ctx context.Context, g gate.Gate, p gates.Policy) (gate.Gate, error)
+	Supersede(ctx context.Context, id int64, by task.Actor) error
+	Where(ctx context.Context, q gates.Query) ([]gate.Gate, error)
+}
+
+// Intents names the intents whose questions an answer addresses, and the missing gate of each.
+type Intents interface {
+	Answerable() []string
+	Rules(intent string) (dintent.RecordRules, error)
+}
 
 // PostsPerTurn is how many agent posts of one turn may be open at once.
 const PostsPerTurn = 3
 
-// The options of a ledger proposal's message.
-const (
-	OptionAccept = "accept"
-	OptionReject = "reject"
-)
-
 var (
 	ErrNoMessage = errors.New("no such message")
-	// ErrClosed is an answer or a dismiss of a message that is no longer open.
+	// ErrClosed is an answer to a message that is no longer open.
 	ErrClosed = errors.New("the message is closed")
-	// ErrNoStartedTurn refuses inbox_post from a session with no started turn.
+	// ErrNoStartedTurn refuses task_post from a session with no started turn.
 	ErrNoStartedTurn = errors.New("this session has no started turn")
 )
 
@@ -74,7 +85,7 @@ var (
 type Capped struct{ Max int }
 
 func (c Capped) Error() string {
-	return fmt.Sprintf("this turn already has %d open Inbox messages, the most it may have; wait for the user's answers", c.Max)
+	return fmt.Sprintf("this turn already has %d open posts, the most it may have; wait for the user's answers", c.Max)
 }
 
 type Service struct {
@@ -82,14 +93,22 @@ type Service struct {
 	Books   Books
 	Turns   Turns
 	Ledger  Ledger // nil: no proposal messages
-	Entries Entries
+	Tasks   Tasks
+	Gates   Gates
 	Intents Intents
 	Clock   port.Clock
 	Log     func(format string, args ...any)
-	// OnAnswer runs when a core or workflow proposal is answered, before it closes; nil only closes it.
+	// OnAnswer runs when a core or workflow proposal's gate is resolved, before it closes; nil only closes it.
 	OnAnswer func(ctx context.Context, m message.Message, a Answer) error
+	// ProposalText words a ledger proposal's message, as the profile's proposal gate does; nil leaves it
+	// without text.
+	ProposalText func(p coreitems.Proposal) string
+	// ChatDeps serve the chat on the tasks; zero serves none.
+	ChatDeps ChatDeps
 
 	mu sync.Mutex
+	// gating serializes opening the messages' gates, so a message gets one.
+	gating sync.Mutex
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now() }
@@ -105,62 +124,119 @@ type turnKey struct {
 	seq  int64
 }
 
-// Reconcile makes the open question messages match the books: one per turn whose newest record is asked
-// or that stopped waiting on the user; others closed. With no units it reconciles every book.
+// Reconcile makes the open question messages match the books: one per turn whose newest record is asked,
+// each with its open gate; others closed, their gates superseded. A missing gate whose turn no longer
+// waits on the user is superseded too. With no units it reconciles every book.
 func (s *Service) Reconcile(ctx context.Context, units ...unit.Unit) error {
+	gated, missing, err := s.reconcile(ctx, units)
+	errs := []error{err, s.gate(ctx, gated)}
+	for _, g := range missing {
+		if _, err := s.OpenMissing(ctx, g); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// OpenMissing opens g, the missing gate of a turn that failed or ended without its record, unless one with
+// its subject is open on its unit already; it returns the open one. A gate on a task that closed moves off it,
+// as a message's does, and a run whose own task closed asks nothing more: it returns no gate.
+func (s *Service) OpenMissing(ctx context.Context, g gate.Gate) (gate.Gate, error) {
+	s.gating.Lock()
+	defer s.gating.Unlock()
+	open, err := s.Gates.Where(ctx, gates.Query{Kind: gate.KindQuestion, Unit: g.Unit})
+	if err != nil {
+		return gate.Gate{}, err
+	}
+	if i := slices.IndexFunc(open, func(o gate.Gate) bool { return o.Unit == g.Unit && o.Subject == g.Subject }); i >= 0 {
+		if !s.closedTask(ctx, open[i].Task) {
+			return open[i], nil
+		}
+		if err := s.Gates.Supersede(ctx, open[i].ID, task.ActorWorkflow); err != nil {
+			return gate.Gate{}, fmt.Errorf("moving missing gate %d off its closed task: %w", open[i].ID, err)
+		}
+	}
+	if own, ok := task.IDOf(g.Unit); ok && s.closedTask(ctx, own) {
+		return gate.Gate{}, nil
+	}
+	if s.closedTask(ctx, g.Task) {
+		g.Task = ""
+	}
+	return s.Gates.Open(ctx, g, nil)
+}
+
+// missingOf is the missing gate b's question turn calls for: one that stopped, still waits on the user, and
+// whose intent names a missing gate.
+func (s *Service) missingOf(u unit.Unit, b *turn.Book, answerable []string) (gate.Gate, bool) {
+	q, ok := b.Question(answerable)
+	if !ok || !q.State.Stopped() || !waits(b, q.ID) {
+		return gate.Gate{}, false
+	}
+	rules, err := s.Intents.Rules(string(q.Intent))
+	if err != nil || rules.Missing == "" {
+		return gate.Gate{}, false
+	}
+	g := gate.Gate{Unit: u, Name: rules.Missing, Subject: turns.MissingSubject(q.ID)}
+	if id, ok := task.IDOf(u); ok {
+		g.Task = id
+	}
+	return g, true
+}
+
+func (s *Service) reconcile(ctx context.Context, units []unit.Unit) ([]message.Message, []gate.Gate, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	books, err := s.Books.Books(ctx, units...)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	open, err := s.Store.Open(ctx)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	answerable := s.Intents.Answerable()
 	want := map[turnKey]message.Message{}
+	var missing []gate.Gate
 	for u, b := range books {
 		if m, ok := questionOf(u, b, answerable, s.now()); ok {
 			want[turnKey{u, m.Origin.TurnSeq}] = m
 		}
+		if g, ok := s.missingOf(u, &b, answerable); ok {
+			missing = append(missing, g)
+		}
 	}
+	slices.SortFunc(missing, func(a, b gate.Gate) int { return strings.Compare(a.Unit.String(), b.Unit.String()) })
 	inScope := func(u unit.Unit) bool { return len(units) == 0 || slices.Contains(units, u) }
 	var errs []error
+	var gated []message.Message
 	for _, m := range open {
-		if m.Kind == message.AgentPost && inScope(m.Unit) {
-			if b, ok := books[m.Unit]; !postable(&b, m) && ok {
-				errs = append(errs, s.close(ctx, m, message.Superseded, ""))
+		if !inScope(m.Unit) {
+			continue
+		}
+		switch m.Kind {
+		case message.AgentPost:
+			if b, ok := books[m.Unit]; ok && !postable(&b, m) {
+				errs = append(errs, s.close(ctx, m, ""))
+				continue
 			}
-			continue
-		}
-		if m.Kind != message.Question || !inScope(m.Unit) {
-			continue
-		}
-		k := turnKey{m.Unit, m.Origin.TurnSeq}
-		w, ok := want[k]
-		if !ok {
-			b := books[m.Unit]
-			st, said := closing(&b, m.Origin.TurnSeq)
-			errs = append(errs, s.close(ctx, m, st, said))
-			continue
-		}
-		delete(want, k)
-		w.ID, w.EntryID, w.CreatedAt = m.ID, m.EntryID, m.CreatedAt
-		if !sameContent(w, m) {
-			if w.EntryID != "" {
-				if err := s.Entries.Retitle(ctx, gtd.ID(w.EntryID), title(w.Text)); err != nil && !errors.Is(err, coregtd.ErrNoEntry) {
+			gated = append(gated, m)
+		case message.Question:
+			k := turnKey{m.Unit, m.Origin.TurnSeq}
+			w, ok := want[k]
+			if !ok {
+				b := books[m.Unit]
+				errs = append(errs, s.close(ctx, m, closing(&b, m.Origin.TurnSeq)))
+				continue
+			}
+			delete(want, k)
+			w.ID, w.TaskID, w.CreatedAt = m.ID, m.TaskID, m.CreatedAt
+			if !sameContent(w, m) {
+				if m, err = s.Store.Upsert(ctx, w); err != nil {
 					errs = append(errs, err)
 					continue
 				}
 			}
-			if m, err = s.Store.Upsert(ctx, w); err != nil {
-				errs = append(errs, err)
-				continue
-			}
-		}
-		if _, err := s.ensureEntry(ctx, m); err != nil {
-			errs = append(errs, err)
+			gated = append(gated, m)
 		}
 	}
 	keys := make([]turnKey, 0, len(want))
@@ -177,11 +253,54 @@ func (s *Service) Reconcile(ctx context.Context, units ...unit.Unit) error {
 		return int(a.seq - b.seq)
 	})
 	for _, k := range keys {
-		if _, err := s.create(ctx, want[k]); err != nil {
+		m, err := s.Store.Upsert(ctx, want[k])
+		if err != nil {
 			errs = append(errs, err)
+			continue
 		}
+		gated = append(gated, m)
+	}
+	errs = append(errs, s.missing(ctx, books, inScope))
+	return gated, missing, errors.Join(errs...)
+}
+
+// missing supersedes each open missing gate on books whose turn no longer waits on the user: it ran again,
+// was answered or dismissed, or a newer turn of its intent took its place.
+func (s *Service) missing(ctx context.Context, books map[unit.Unit]turn.Book, inScope func(unit.Unit) bool) error {
+	open, err := s.Gates.Where(ctx, gates.Query{Kind: gate.KindQuestion})
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, g := range open {
+		id, ok := turns.MissingTurn(g.Subject)
+		if !ok || !inScope(g.Unit) {
+			continue
+		}
+		b, ok := books[g.Unit]
+		if !ok || waits(&b, id) {
+			continue
+		}
+		errs = append(errs, s.Gates.Supersede(ctx, g.ID, task.ActorWorkflow))
 	}
 	return errors.Join(errs...)
+}
+
+// waits says whether turn id of b still waits on the user: it stopped, no answer came since its last record,
+// and it is its intent's newest turn.
+func waits(b *turn.Book, id string) bool {
+	t, ok := b.ByID(id)
+	if !ok || !t.State.Stopped() {
+		return false
+	}
+	if newest, ok := b.Newest(t.Intent); ok && newest.Seq != t.Seq {
+		return false
+	}
+	var since time.Time
+	if last, ok := b.LastRecord(t.Seq); ok {
+		since = last.At
+	}
+	return !answeredSince(b, t.Seq, since)
 }
 
 // postable says whether an agent post can still take an answer: its turn is still started, so the answer is
@@ -201,33 +320,25 @@ func sameContent(a, b message.Message) bool {
 }
 
 // questionOf is the open question message the book calls for on u, as the unit's row shows it: the turn an
-// answer addresses, when it is asked or stopped and has no answer since its last record.
+// answer addresses, when it is asked and has no answer since its last record. A turn that failed or ended
+// without its record asks through its intent's missing gate instead.
 func questionOf(u unit.Unit, b turn.Book, answerable []string, now time.Time) (message.Message, bool) {
 	q, ok := b.Question(answerable)
-	if !ok || (q.State != turn.Asked && !q.State.Stopped()) {
+	if !ok || q.State != turn.Asked {
 		return message.Message{}, false
 	}
 	last, recorded := b.LastRecord(q.Seq)
 	if recorded && answeredSince(&b, q.Seq, last.At) {
 		return message.Message{}, false
 	}
-	m := message.Message{Unit: u, Kind: message.Question, State: message.Open, CreatedAt: now,
+	m := message.Message{Unit: u, Kind: message.Question, CreatedAt: now,
 		Origin: message.Origin{Kind: message.OriginTurn, TurnSeq: q.Seq, Session: q.Session}}
 	switch {
 	case recorded && last.Record.Question != nil:
 		rq := last.Record.Question
 		m.Text, m.Options, m.Recommend, m.Confirm = rq.Text, slices.Clone(rq.Options), rq.Recommend, rq.Kind == "confirm"
-	case q.State == turn.Failed:
-		m.Text = "The agent's turn failed"
-	case q.State == turn.Unrecorded:
-		m.Text = "The agent ended its turn without a record"
-	default:
-		m.Text = "The agent waits on you"
-	}
-	if recorded && last.Record.Question == nil {
-		if detail := strings.TrimSpace(firstOf(last.Record.Summary, last.Record.Resume)); detail != "" {
-			m.Text += ": " + detail
-		}
+	case recorded:
+		m.Text = strings.TrimSpace(firstOf(last.Record.Summary, last.Record.Resume))
 	}
 	if recorded && last.Record.Suspicious {
 		m.Text = record.SuspectedInjection + m.Text
@@ -259,97 +370,179 @@ func lastAnswer(b *turn.Book, seq int64, since time.Time) (turn.Answer, bool) {
 	return turn.Answer{}, false
 }
 
-// closing is how a question message of turn seq closes: answered with what the agent reads, dismissed, or
-// superseded by a newer turn, record or outcome.
-func closing(b *turn.Book, seq int64) (message.State, string) {
+// closing is the answer a question message of turn seq closes with: the one the agent reads when the user
+// answered it without its gate, "" when the turn was dismissed or a newer turn, record or outcome took it.
+func closing(b *turn.Book, seq int64) string {
 	var since time.Time
 	if last, ok := b.LastRecord(seq); ok {
 		since = last.At
 	}
 	if a, ok := lastAnswer(b, seq, since); ok {
-		return message.Answered, oneLine(b.Said(a))
+		return oneLine(b.Said(a))
 	}
-	for _, t := range b.Turns {
-		if t.Seq == seq && t.State == turn.Dismissed {
-			return message.Dismissed, ""
+	return ""
+}
+
+// close supersedes m's open gate and closes m with answer.
+func (s *Service) close(ctx context.Context, m message.Message, answer string) error {
+	if g, ok, err := s.openGate(ctx, m); err != nil {
+		return err
+	} else if ok {
+		if err := s.Gates.Supersede(ctx, g.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {
+			return fmt.Errorf("superseding the gate of message %d: %w", m.ID, err)
 		}
 	}
-	return message.Superseded, ""
+	return s.closeMessage(ctx, m, answer)
 }
 
-// create stores a new open message and opens its Inbox entry.
-func (s *Service) create(ctx context.Context, m message.Message) (message.Message, error) {
-	m.State = message.Open
-	if m.CreatedAt.IsZero() {
-		m.CreatedAt = s.now()
-	}
-	got, err := s.Store.Upsert(ctx, m)
-	if err != nil {
-		return message.Message{}, err
-	}
-	return s.ensureEntry(ctx, got)
-}
-
-// ensureEntry opens the Inbox entry of an open message that has none yet.
-func (s *Service) ensureEntry(ctx context.Context, m message.Message) (message.Message, error) {
-	if m.EntryID != "" || m.State != message.Open {
-		return m, nil
-	}
-	var u *unit.Unit
-	if !m.Unit.IsZero() {
-		u = &m.Unit
-	}
-	e, err := s.Entries.Open(ctx, coregtd.OpenRequest{Kind: gtd.KindMessage, Title: title(m.Text), Unit: u, Origin: gtd.OriginMessage})
-	if err != nil {
-		return m, fmt.Errorf("opening the entry of message %d: %w", m.ID, err)
-	}
-	m.EntryID = string(e.ID)
-	return s.Store.Upsert(ctx, m)
-}
-
-// close closes m and the entry it opened: Done when answered, Trash otherwise. An entry that refuses to move
-// keeps the message open, so the next reconcile tries again.
-func (s *Service) close(ctx context.Context, m message.Message, st message.State, answer string) error {
-	if m.EntryID != "" {
-		to := gtd.Trash
-		if st == message.Answered {
-			to = gtd.Done
+// closeMessage closes m with answer, and the message task an earlier version opened for it: done when
+// answered, dropped otherwise. A task that refuses to move keeps the message open, so the next reconcile
+// tries again.
+func (s *Service) closeMessage(ctx context.Context, m message.Message, answer string) error {
+	if m.TaskID != "" {
+		to := task.CategoryDropped
+		if answer != "" {
+			to = task.CategoryDone
 		}
-		e, err := s.Entries.Entry(ctx, gtd.ID(m.EntryID))
+		e, err := s.Tasks.Task(ctx, task.ID(m.TaskID))
 		switch {
-		case errors.Is(err, coregtd.ErrNoEntry):
+		case errors.Is(err, coretasks.ErrNoTask):
 		case err != nil:
 			return err
-		case e.Kind == gtd.KindMessage:
-			if err := s.Entries.Close(ctx, e.ID, to); err != nil {
-				return fmt.Errorf("closing the entry of message %d: %w", m.ID, err)
+		case e.Origin == task.OriginMessage:
+			if err := s.Tasks.Close(ctx, e.ID, to); err != nil {
+				return fmt.Errorf("closing the task of message %d: %w", m.ID, err)
 			}
 		}
 	}
-	return s.Store.Close(ctx, m.ID, st, answer, s.now())
+	return s.Store.Close(ctx, m.ID, answer, s.now())
 }
 
-// ReconcileProposals makes one open proposal message per open items.Proposal; closed when it is decided.
+// subjectOf is the Subject of m's gates.
+func subjectOf(m message.Message) string { return strconv.FormatInt(m.ID, 10) }
+
+// openGate is m's open gate; ok is false when none is open.
+func (s *Service) openGate(ctx context.Context, m message.Message) (gate.Gate, bool, error) {
+	open, err := s.Gates.Where(ctx, gates.Query{Kind: m.Kind.Gate(), Unit: m.Unit})
+	if err != nil {
+		return gate.Gate{}, false, err
+	}
+	i := slices.IndexFunc(open, func(g gate.Gate) bool { return g.Unit == m.Unit && g.Subject == subjectOf(m) })
+	if i < 0 {
+		return gate.Gate{}, false, nil
+	}
+	return open[i], true, nil
+}
+
+// gate gives each of ms that is still open its gate when it has none open.
+func (s *Service) gate(ctx context.Context, ms []message.Message) error {
+	var errs []error
+	for _, m := range ms {
+		if _, err := s.gated(ctx, m); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// gated is m with its gate open: the one it has while its task is open, else a new one on m's task, or on
+// its unit's open task, or on a capture task named after m's text when m is on no unit. A ledger proposal's
+// message supersedes the gate its proposal waited on before the message existed.
+func (s *Service) gated(ctx context.Context, m message.Message) (message.Message, error) {
+	s.gating.Lock()
+	defer s.gating.Unlock()
+	if g, ok, err := s.openGate(ctx, m); err != nil {
+		return m, err
+	} else if ok {
+		if !s.closedTask(ctx, g.Task) {
+			return m, nil
+		}
+		if err := s.Gates.Supersede(ctx, g.ID, task.ActorWorkflow); err != nil {
+			return m, fmt.Errorf("moving the gate of message %d off its closed task: %w", m.ID, err)
+		}
+		m.TaskID = ""
+	}
+	if cur, ok, err := s.Store.Message(ctx, m.ID); err != nil {
+		return m, err
+	} else if !ok || !cur.Open() {
+		return m, nil
+	}
+	if m.Origin.Kind == message.OriginLedger {
+		if err := s.supersedeProposal(ctx, m.Unit, m.Origin.Proposal); err != nil {
+			return m, err
+		}
+	}
+	g, err := s.Gates.Open(ctx, gate.Gate{Kind: m.Kind.Gate(), Unit: m.Unit, Task: task.ID(m.TaskID), Subject: subjectOf(m)}, nil)
+	if err != nil {
+		return m, fmt.Errorf("opening the gate of message %d: %w", m.ID, err)
+	}
+	if m.Unit.IsZero() && m.TaskID == "" && g.Task != "" {
+		if err := s.Tasks.Retitle(ctx, g.Task, title(m.Text)); err != nil {
+			s.logf("messages: naming the task of message %d: %v", m.ID, err)
+		}
+	}
+	if g.Task == "" || string(g.Task) == m.TaskID {
+		return m, nil
+	}
+	m.TaskID = string(g.Task)
+	return s.Store.Upsert(ctx, m)
+}
+
+// closedTask says whether task id is done or dropped, where no list shows the gate it holds.
+func (s *Service) closedTask(ctx context.Context, id task.ID) bool {
+	if id == "" || s.Tasks == nil {
+		return false
+	}
+	e, err := s.Tasks.Task(ctx, id)
+	if err != nil {
+		return false
+	}
+	return e.Category == task.CategoryDone || e.Category == task.CategoryDropped
+}
+
+// supersedeProposal supersedes the open gate item proposal id waited on before its message existed.
+func (s *Service) supersedeProposal(ctx context.Context, u unit.Unit, id int64) error {
+	open, err := s.Gates.Where(ctx, gates.Query{Kind: gate.KindProposal, Unit: u})
+	if err != nil {
+		return err
+	}
+	for _, g := range open {
+		if g.Subject == gate.ProposalSubject(id) {
+			if err := s.Gates.Supersede(ctx, g.ID, task.ActorWorkflow); err != nil {
+				return fmt.Errorf("superseding the gate of item proposal %d: %w", id, err)
+			}
+		}
+	}
+	return nil
+}
+
+// ReconcileProposals makes one open proposal message, with its gate, per open items.Proposal; one whose
+// proposal is no longer open closes.
 func (s *Service) ReconcileProposals(ctx context.Context) error {
 	if s.Ledger == nil {
 		return nil
 	}
+	gated, err := s.reconcileProposals(ctx)
+	return errors.Join(err, s.gate(ctx, gated))
+}
+
+func (s *Service) reconcileProposals(ctx context.Context) ([]message.Message, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	ps, err := s.Ledger.Proposals(ctx, coreitems.ProposalOpen)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	open, err := s.Store.Open(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	pending := map[int64]bool{}
 	for _, p := range ps {
 		pending[p.ID] = true
 	}
 	var errs []error
-	var stale []message.Message
+	var gated []message.Message
 	have := map[int64]bool{}
 	for _, m := range open {
 		if m.Origin.Kind != message.OriginLedger {
@@ -357,71 +550,54 @@ func (s *Service) ReconcileProposals(ctx context.Context) error {
 		}
 		have[m.Origin.Proposal] = true
 		if !pending[m.Origin.Proposal] {
-			stale = append(stale, m)
-		} else if _, err := s.ensureEntry(ctx, m); err != nil {
+			answer, err := s.decidedIntent(ctx, m)
+			if err == nil {
+				err = s.close(ctx, m, answer)
+			}
 			errs = append(errs, err)
+			continue
 		}
+		gated = append(gated, m)
 	}
 	for _, p := range ps {
 		if have[p.ID] {
 			continue
 		}
-		m, err := s.Store.Upsert(ctx, proposalMessage(p, s.now()))
+		m, err := s.Store.Upsert(ctx, s.proposalMessage(p))
 		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
-		if _, err := s.ensureEntry(ctx, m); err != nil {
-			errs = append(errs, err)
-		}
+		gated = append(gated, m)
 	}
-	if len(stale) > 0 {
-		decided, err := s.decided(ctx)
-		if err != nil {
-			return errors.Join(append(errs, err)...)
-		}
-		for _, m := range stale {
-			answer, ok := decided[m.Origin.Proposal]
-			if !ok {
-				errs = append(errs, s.close(ctx, m, message.Superseded, ""))
-				continue
-			}
-			errs = append(errs, s.close(ctx, m, message.Answered, answer))
-		}
-	}
-	return errors.Join(errs...)
+	return gated, errors.Join(errs...)
 }
 
-// decided maps each decided proposal to its message's answer.
-func (s *Service) decided(ctx context.Context) (map[int64]string, error) {
-	out := map[int64]string{}
-	for st, answer := range map[coreitems.ProposalState]string{coreitems.ProposalAccepted: OptionAccept, coreitems.ProposalRejected: OptionReject} {
-		ps, err := s.Ledger.Proposals(ctx, st)
-		if err != nil {
-			return nil, err
-		}
-		for _, p := range ps {
-			out[p.ID] = answer
+// decidedIntent is the intent m's newest gate closed with, "" when none closed it.
+func (s *Service) decidedIntent(ctx context.Context, m message.Message) (string, error) {
+	all, err := s.Gates.Where(ctx, gates.Query{Kind: m.Kind.Gate(), Unit: m.Unit, Statuses: []gate.Status{gate.Approved, gate.Rejected, gate.Answered, gate.Dismissed}})
+	if err != nil {
+		return "", err
+	}
+	answer := ""
+	for _, g := range all {
+		if g.Subject == subjectOf(m) {
+			answer = g.Intent
 		}
 	}
-	return out, nil
+	return answer, nil
 }
 
-func proposalMessage(p coreitems.Proposal, now time.Time) message.Message {
-	text := fmt.Sprintf("Proposed %s of item %s on %s", p.Op.Op, p.Item, p.Unit.Label())
-	if r := strings.TrimSpace(p.Reason); r != "" {
-		text += ": " + r
+// proposalMessage is the message of ledger proposal p, worded by ProposalText.
+func (s *Service) proposalMessage(p coreitems.Proposal) message.Message {
+	m := message.Message{Unit: p.Unit, Kind: message.Proposal, CreatedAt: s.now(), Origin: message.Origin{Kind: message.OriginLedger, Proposal: p.ID}}
+	if s.ProposalText != nil {
+		m.Text = clean(s.ProposalText(p))
 	}
-	text += fmt.Sprintf(" (from %s; you confirmed the item)", p.Provenance)
-	return message.Message{Unit: p.Unit, Kind: message.Proposal, Text: clean(text), State: message.Open, CreatedAt: now,
-		Options: []record.Option{
-			{ID: OptionAccept, Label: "Accept", Consequence: "applies the change to the item"},
-			{ID: OptionReject, Label: "Reject", Consequence: "keeps the item as you confirmed it"},
-		},
-		Origin: message.Origin{Kind: message.OriginLedger, Proposal: p.ID}}
+	return m
 }
 
-// Post is inbox_post: an open agent_post message on the unit of the session's started turn.
+// Post is task_post: an open agent_post message, with its gate, on the unit of the session's started turn.
 func (s *Service) Post(ctx context.Context, p PostRequest) (message.Message, error) {
 	if err := checkPost(p); err != nil {
 		return message.Message{}, err
@@ -437,6 +613,14 @@ func (s *Service) Post(ctx context.Context, p PostRequest) (message.Message, err
 	if !ok || t.State != turn.Started || t.Session != p.Session {
 		return message.Message{}, ErrNoStartedTurn
 	}
+	m, err := s.post(ctx, b.Unit, t.Seq, p)
+	if err != nil {
+		return message.Message{}, err
+	}
+	return s.gated(ctx, m)
+}
+
+func (s *Service) post(ctx context.Context, u unit.Unit, seq int64, p PostRequest) (message.Message, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	open, err := s.Store.Open(ctx)
@@ -445,16 +629,16 @@ func (s *Service) Post(ctx context.Context, p PostRequest) (message.Message, err
 	}
 	n := 0
 	for _, m := range open {
-		if m.Kind == message.AgentPost && m.Unit == b.Unit && m.Origin.TurnSeq == t.Seq {
+		if m.Kind == message.AgentPost && m.Unit == u && m.Origin.TurnSeq == seq {
 			n++
 		}
 	}
 	if n >= PostsPerTurn {
 		return message.Message{}, Capped{PostsPerTurn}
 	}
-	return s.create(ctx, message.Message{Unit: b.Unit, Kind: message.AgentPost, Text: strings.TrimSpace(p.Text),
-		Options: slices.Clone(p.Options), Recommend: p.Recommend, Confirm: p.Confirm,
-		Origin: message.Origin{Kind: message.OriginAgent, TurnSeq: t.Seq, Session: p.Session}})
+	return s.Store.Upsert(ctx, message.Message{Unit: u, Kind: message.AgentPost, Text: strings.TrimSpace(p.Text),
+		Options: slices.Clone(p.Options), Recommend: p.Recommend, Confirm: p.Confirm, CreatedAt: s.now(),
+		Origin: message.Origin{Kind: message.OriginAgent, TurnSeq: seq, Session: p.Session}})
 }
 
 // checkPost applies a turn record's question rules to a post: kind choice with options, confirm, else free.
@@ -483,8 +667,8 @@ func checkPost(p PostRequest) error {
 	return out
 }
 
-// Propose opens a proposal message of a workflow or core rule, one per unit and rule while it is open; with
-// EntryID it attaches to that entry instead of opening one.
+// Propose opens a proposal message of a workflow or core rule, with its gate, one per unit and rule while it
+// is open; with TaskID its gate is on that task.
 func (s *Service) Propose(ctx context.Context, p ProposeRequest) (message.Message, error) {
 	if p.Origin.Kind != message.OriginCore && p.Origin.Kind != message.OriginWorkflow {
 		return message.Message{}, fmt.Errorf("a proposal comes from a core rule or a workflow, not %q", p.Origin.Kind)
@@ -496,136 +680,363 @@ func (s *Service) Propose(ctx context.Context, p ProposeRequest) (message.Messag
 		return message.Message{}, errors.New("a proposal needs its text")
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	m, err := s.Store.Upsert(ctx, message.Message{Unit: p.Unit, EntryID: p.EntryID, Kind: message.Proposal, Text: clean(p.Text),
-		Options: slices.Clone(p.Options), Origin: p.Origin, State: message.Open, CreatedAt: s.now()})
+	m, err := s.Store.Upsert(ctx, message.Message{Unit: p.Unit, TaskID: p.TaskID, Kind: message.Proposal, Text: clean(p.Text),
+		Options: slices.Clone(p.Options), Origin: p.Origin, CreatedAt: s.now()})
+	s.mu.Unlock()
 	if err != nil {
 		return message.Message{}, err
 	}
-	return s.ensureEntry(ctx, m)
+	return s.gated(ctx, m)
 }
 
-// Answer answers an open message: a question through turns.Service.Answer unchanged, an agent post into the
-// session that posted it, a proposal by deciding it.
-func (s *Service) Answer(ctx context.Context, id int64, a Answer) (turns.AnswerResult, error) {
-	m, err := s.answerable(ctx, id)
+// Delivery is what the caller of a gate's resolution learns of the answer it delivered: the Source it gives
+// the answer, and the Route the answer took.
+type Delivery struct {
+	Source turn.Source
+	Route  turns.AnswerResult
+}
+
+type deliveryKey struct{}
+
+// WithDelivery is ctx carrying d, which Deliver reads the answer's source from and fills with its route.
+func WithDelivery(ctx context.Context, d *Delivery) context.Context {
+	return context.WithValue(ctx, deliveryKey{}, d)
+}
+
+// delivery is ctx's Delivery, a fresh one when it carries none.
+func delivery(ctx context.Context) *Delivery {
+	if d, ok := DeliveryOf(ctx); ok {
+		return d
+	}
+	return &Delivery{}
+}
+
+// DeliveryOf is the Delivery ctx carries; false when it carries none.
+func DeliveryOf(ctx context.Context) (*Delivery, bool) {
+	d, ok := ctx.Value(deliveryKey{}).(*Delivery)
+	return d, ok && d != nil
+}
+
+// Deliver is a resolved question or post gate's consequence: the answer goes to the session that asked, a
+// dismissal dismisses the question, and the message closes. A missing gate's answer resumes its turn with it,
+// an answer with no text resumes it as it was, and a dismissal dismisses it.
+func (s *Service) Deliver(ctx context.Context, g gate.Gate) error {
+	if id, ok := turns.MissingTurn(g.Subject); ok {
+		return s.deliverMissing(ctx, g, id)
+	}
+	m, err := s.subject(ctx, g)
+	if err != nil {
+		return err
+	}
+	d := delivery(ctx)
+	switch {
+	case m.Kind == message.AgentPost:
+		return s.deliverPost(ctx, g, m, d)
+	case g.Status == gate.Dismissed || g.Status == gate.Rejected:
+		if err := s.Turns.Dismiss(ctx, m.Unit); err != nil && !errors.Is(err, turn.ErrNoQuestion) {
+			return err
+		}
+		return s.closeAfter(ctx, m, "")
+	case strings.TrimSpace(g.Answer) == "":
+		if err := s.Turns.Continue(ctx, m.Unit); err != nil {
+			return err
+		}
+		return s.closeAfter(ctx, m, "")
+	}
+	a := AnswerOf(m, g.Answer)
+	said, err := saidTo(m, a)
+	if err != nil {
+		return err
+	}
+	d.Route, err = s.Turns.Answer(ctx, turns.AnswerRequest{Unit: m.Unit, Message: m.ID, Gate: g.ID, Text: a.Text, OptionID: a.OptionID,
+		Yes: a.Yes, No: a.No, Source: d.Source})
+	var refused turns.Refusal
+	if err != nil && !errors.As(err, &refused) {
+		return err
+	}
+	return errors.Join(err, s.closeAfter(ctx, m, oneLine(said)))
+}
+
+// deliverPost answers m, an agent's post, into the session that posted it, or closes it unanswered.
+func (s *Service) deliverPost(ctx context.Context, g gate.Gate, m message.Message, d *Delivery) error {
+	if g.Status != gate.Answered {
+		return s.closeAfter(ctx, m, "")
+	}
+	a := AnswerOf(m, g.Answer)
+	said, err := saidTo(m, a)
+	if err != nil {
+		return err
+	}
+	req := turns.AnswerRequest{Unit: m.Unit, Message: m.ID, Gate: g.ID, Posted: true, Turn: m.Origin.TurnSeq, Text: a.Text, OptionID: a.OptionID,
+		Yes: a.Yes, No: a.No, Source: d.Source}
+	d.Route, err = s.Turns.Answer(ctx, req)
+	var refused turns.Refusal
+	switch {
+	case errors.Is(err, turn.ErrClosed):
+		return errors.Join(fmt.Errorf("%w: %w", ErrClosed, err), s.closeAfter(ctx, m, ""))
+	case err != nil && !errors.As(err, &refused):
+		return err
+	}
+	return errors.Join(err, s.closeAfter(ctx, m, oneLine(said)))
+}
+
+// closeAfter closes m with answer once its gate resolved, then reconciles its unit.
+func (s *Service) closeAfter(ctx context.Context, m message.Message, answer string) error {
+	s.mu.Lock()
+	err := s.close(ctx, m, answer)
+	s.mu.Unlock()
+	if m.Unit.IsZero() {
+		return err
+	}
+	if rerr := s.Reconcile(ctx, m.Unit); rerr != nil {
+		s.logf("messages: reconciling %s after its gate: %v", m.Unit, rerr)
+	}
+	return err
+}
+
+// deliverMissing resumes or dismisses turn id, which failed or ended without its record.
+func (s *Service) deliverMissing(ctx context.Context, g gate.Gate, id string) error {
+	books, err := s.Books.Books(ctx, g.Unit)
+	if err != nil {
+		return err
+	}
+	b := books[g.Unit]
+	if q, ok := b.Question(s.Intents.Answerable()); !ok || q.ID != id || !waits(&b, id) {
+		return fmt.Errorf("%w: turn %s on %s no longer waits on you", turn.ErrNoQuestion, id, g.Unit.Label())
+	}
+	d := delivery(ctx)
+	switch {
+	case g.Status == gate.Dismissed || g.Status == gate.Rejected:
+		return s.Turns.Dismiss(ctx, g.Unit)
+	case strings.TrimSpace(g.Answer) == "":
+		return s.Turns.Continue(ctx, g.Unit)
+	}
+	d.Route, err = s.Turns.Answer(ctx, turns.AnswerRequest{Unit: g.Unit, Gate: g.ID, Text: strings.TrimSpace(g.Answer), Source: d.Source})
+	return err
+}
+
+// Reanswer answers question message id again, given its gate closed answered while its turn still asks:
+// the newer answer replaces a queued one or adds to it, and rewords the message.
+func (s *Service) Reanswer(ctx context.Context, id int64, a Answer) (turns.AnswerResult, error) {
+	m, ok, err := s.Store.Message(ctx, id)
+	switch {
+	case err != nil:
+		return turns.AnswerResult{}, err
+	case !ok:
+		return turns.AnswerResult{}, fmt.Errorf("%w: %d", ErrNoMessage, id)
+	case m.Kind != message.Question || m.Open() || m.Answer == "":
+		return turns.AnswerResult{}, fmt.Errorf("%w: message %d takes no newer answer", ErrClosed, id)
+	}
+	books, err := s.Books.Books(ctx, m.Unit)
 	if err != nil {
 		return turns.AnswerResult{}, err
 	}
-	switch m.Kind {
-	case message.Question:
-		if m.State == message.Open {
-			if err := s.current(ctx, m); err != nil {
-				return turns.AnswerResult{}, err
-			}
-		}
-		res, err := s.Turns.Answer(ctx, turns.AnswerRequest{Unit: m.Unit, Message: m.ID, Text: a.Text, OptionID: a.OptionID, Yes: a.Yes, No: a.No, Source: a.Source})
-		if err == nil && m.State == message.Answered {
-			s.reanswered(ctx, m)
-		}
-		if rerr := s.Reconcile(ctx, m.Unit); rerr != nil {
-			s.logf("messages: reconciling %s after an answer: %v", m.Unit, rerr)
-		}
-		return res, err
-	case message.AgentPost:
-		said, err := saidTo(m, a)
-		if err != nil {
-			return turns.AnswerResult{}, err
-		}
-		books, err := s.Books.Books(ctx, m.Unit)
-		if err != nil {
-			return turns.AnswerResult{}, err
-		}
-		if b := books[m.Unit]; !postable(&b, m) {
-			if rerr := s.Reconcile(ctx, m.Unit); rerr != nil {
-				s.logf("messages: reconciling %s: %v", m.Unit, rerr)
-			}
-			return turns.AnswerResult{}, fmt.Errorf("%w: message %d: the turn that posted it has ended", ErrClosed, m.ID)
-		}
-		req := turns.AnswerRequest{Unit: m.Unit, Message: m.ID, Posted: true, Turn: m.Origin.TurnSeq,
-			Text: strings.TrimSpace(a.Text), OptionID: a.OptionID, Yes: a.Yes, No: a.No || (m.Confirm && !a.Yes && a.OptionID == "" && strings.TrimSpace(a.Text) == ""), Source: a.Source}
-		res, err := s.Turns.Answer(ctx, req)
-		if errors.Is(err, turn.ErrClosed) {
-			if rerr := s.Reconcile(ctx, m.Unit); rerr != nil {
-				s.logf("messages: reconciling %s: %v", m.Unit, rerr)
-			}
-			return res, fmt.Errorf("%w: %w", ErrClosed, err)
-		}
-		if err != nil {
-			return res, err
-		}
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		return res, s.close(ctx, m, message.Answered, oneLine(said))
-	case message.Proposal:
-		return turns.AnswerResult{}, s.decide(ctx, m, a)
-	}
-	return turns.AnswerResult{}, fmt.Errorf("message %d is of kind %q", m.ID, m.Kind)
-}
-
-// answerable is message id while it takes an answer: open, or a question already answered whose turn still
-// asks, which a newer answer replaces or adds to.
-func (s *Service) answerable(ctx context.Context, id int64) (message.Message, error) {
-	m, ok, err := s.Store.Message(ctx, id)
-	if err != nil || !ok || m.Kind != message.Question || m.State != message.Answered {
-		return s.open(ctx, id)
-	}
-	books, err := s.Books.Books(ctx, m.Unit)
-	if err != nil {
-		return message.Message{}, err
-	}
 	b := books[m.Unit]
-	if q, asks := asking(&b, s.Intents.Answerable()); asks && q.Seq == m.Origin.TurnSeq {
-		if id, ok := answeredQuestion(&b, q.Seq); ok && id == m.ID {
-			return m, nil
+	q, asks := asking(&b, s.Intents.Answerable())
+	if prev, ok := answeredQuestion(&b, m.Origin.TurnSeq); !asks || q.Seq != m.Origin.TurnSeq || !ok || prev != m.ID {
+		return turns.AnswerResult{}, fmt.Errorf("%w: message %d", ErrClosed, id)
+	}
+	res, err := s.Turns.Answer(ctx, turns.AnswerRequest{Unit: m.Unit, Message: m.ID, Text: a.Text, OptionID: a.OptionID, Yes: a.Yes, No: a.No, Source: a.Source})
+	if err != nil {
+		return res, err
+	}
+	if books, err = s.Books.Books(ctx, m.Unit); err == nil {
+		b = books[m.Unit]
+		if said := closing(&b, m.Origin.TurnSeq); said != "" {
+			err = s.Store.Close(ctx, m.ID, said, s.now())
 		}
 	}
-	return message.Message{}, fmt.Errorf("%w: message %d is %s", ErrClosed, id, m.State)
+	return res, err
 }
 
-// reanswered words a question message already answered with its newest answer.
-func (s *Service) reanswered(ctx context.Context, m message.Message) {
+// Decide is a resolved proposal gate's consequence: an item proposal is accepted when the gate is approved
+// and rejected otherwise, a workflow's or core rule's goes to OnAnswer, and its message closes. A ledger
+// proposal is decided under the lock ReconcileProposals holds, even when the reconcile already closed its
+// message as its gate decided; one whose operations the ledger refuses stays open on a new gate, and Decide
+// returns ErrNotApplied.
+func (s *Service) Decide(ctx context.Context, g gate.Gate) error {
+	approved := g.Status == gate.Approved
+	if id, ok := proposalOf(g.Subject); ok {
+		if s.Ledger == nil {
+			return errors.New("no ledger decides item proposals")
+		}
+		res, err := s.Ledger.Decide(ctx, id, approved)
+		if err != nil || len(res.Refused) == 0 {
+			return err
+		}
+		return s.notApplied(ctx, gate.Gate{Kind: gate.KindProposal, Unit: g.Unit, Task: g.Task, Subject: g.Subject}, res)
+	}
+	m, err := s.subject(ctx, g)
+	if errors.Is(err, ErrClosed) {
+		if lm, ok := s.ledgerMessage(ctx, g); ok {
+			m, err = lm, nil
+		}
+	}
+	if err != nil {
+		return err
+	}
+	if m.Kind != message.Proposal {
+		return fmt.Errorf("gate %d: message %d is a %s, not a proposal", g.ID, m.ID, m.Kind)
+	}
+	if m.Origin.Kind != message.OriginLedger {
+		if s.OnAnswer != nil {
+			if err := s.OnAnswer(ctx, m, Answer{Yes: approved, No: !approved}); err != nil {
+				return err
+			}
+		}
+		return s.closeAfter(ctx, m, g.Intent)
+	}
+	res, err := s.decideLedger(ctx, m, approved, g.Intent)
+	if err != nil || len(res.Refused) == 0 {
+		return err
+	}
+	reopen := gate.Gate{Kind: gate.KindProposal, Unit: m.Unit, Task: g.Task, Subject: subjectOf(m)}
+	if cur, ok, err := s.Store.Message(ctx, m.ID); err != nil || !ok || !cur.Open() {
+		reopen.Subject = gate.ProposalSubject(m.Origin.Proposal)
+	}
+	return s.notApplied(ctx, reopen, res)
+}
+
+// decideLedger decides m's item proposal and, when the ledger applies it, closes m with intent.
+func (s *Service) decideLedger(ctx context.Context, m message.Message, approved bool, intent string) (coreitems.Result, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	books, err := s.Books.Books(ctx, m.Unit)
-	if err != nil {
-		s.logf("messages: rewording message %d: %v", m.ID, err)
-		return
-	}
-	b := books[m.Unit]
-	if st, said := closing(&b, m.Origin.TurnSeq); st == message.Answered {
-		if err := s.Store.Close(ctx, m.ID, st, said, s.now()); err != nil {
-			s.logf("messages: rewording message %d: %v", m.ID, err)
+	var res coreitems.Result
+	if s.Ledger != nil {
+		var err error
+		if res, err = s.Ledger.Decide(ctx, m.Origin.Proposal, approved); err != nil && !errors.Is(err, coreitems.ErrNoProposal) {
+			return res, err
 		}
 	}
+	if len(res.Refused) > 0 {
+		return res, nil
+	}
+	if cur, ok, err := s.Store.Message(ctx, m.ID); err != nil || !ok || !cur.Open() {
+		return res, err
+	}
+	return res, s.close(ctx, m, intent)
 }
 
-func (s *Service) open(ctx context.Context, id int64) (message.Message, error) {
+// ledgerMessage is the ledger proposal's message g is the gate of when ReconcileProposals closed it: g's
+// status is written before its consequence runs, and the proposal reads decided from it, so the reconcile can
+// close the message first; deciding the ledger is still the consequence's.
+func (s *Service) ledgerMessage(ctx context.Context, g gate.Gate) (message.Message, bool) {
+	id, err := strconv.ParseInt(g.Subject, 10, 64)
+	if err != nil {
+		return message.Message{}, false
+	}
+	m, ok, err := s.Store.Message(ctx, id)
+	if err != nil || !ok || m.Kind != message.Proposal || m.Origin.Kind != message.OriginLedger {
+		return message.Message{}, false
+	}
+	return m, true
+}
+
+// ErrNotApplied is an approved proposal whose operations the ledger refused: it stays open, on a new gate.
+var ErrNotApplied = errors.New("the approved proposal was not applied")
+
+// notApplied opens g again, held for a person, so the proposal res refused reads open, and says why.
+func (s *Service) notApplied(ctx context.Context, g gate.Gate, res coreitems.Result) error {
+	why := make([]string, len(res.Refused))
+	for i, r := range res.Refused {
+		why[i] = r.Reason
+	}
+	err := fmt.Errorf("%w: %s", ErrNotApplied, strings.Join(why, "; "))
+	s.gating.Lock()
+	defer s.gating.Unlock()
+	open, oerr := s.Gates.Where(ctx, gates.Query{Kind: gate.KindProposal, Unit: g.Unit})
+	if oerr != nil {
+		return errors.Join(err, oerr)
+	}
+	if slices.ContainsFunc(open, func(o gate.Gate) bool { return o.Unit == g.Unit && o.Subject == g.Subject }) {
+		return err
+	}
+	if _, oerr := s.Gates.Open(ctx, g, holdForPerson{}); oerr != nil {
+		return errors.Join(err, fmt.Errorf("opening its gate again: %w", oerr))
+	}
+	return err
+}
+
+// holdForPerson holds a gate for a person: a proposal the ledger refused waits for one, whatever releases
+// proposals.
+type holdForPerson struct{}
+
+func (holdForPerson) Decide(context.Context, gate.Gate) (gates.Decision, error) {
+	return gates.Decision{Mode: gate.ModeWait}, nil
+}
+
+// proposalPrefix is what gate.ProposalSubject puts before an item proposal's id.
+var proposalPrefix = strings.TrimSuffix(gate.ProposalSubject(0), "0")
+
+// proposalOf is the item proposal a gate on no message decides; false for any other subject.
+func proposalOf(subject string) (int64, bool) {
+	rest, ok := strings.CutPrefix(subject, proposalPrefix)
+	if !ok {
+		return 0, false
+	}
+	id, err := strconv.ParseInt(rest, 10, 64)
+	return id, err == nil
+}
+
+// subject is the open message g is the gate of.
+func (s *Service) subject(ctx context.Context, g gate.Gate) (message.Message, error) {
+	id, err := strconv.ParseInt(g.Subject, 10, 64)
+	if err != nil {
+		return message.Message{}, fmt.Errorf("%w: gate %d names %q", ErrNoMessage, g.ID, g.Subject)
+	}
 	m, ok, err := s.Store.Message(ctx, id)
 	switch {
 	case err != nil:
 		return message.Message{}, err
 	case !ok:
 		return message.Message{}, fmt.Errorf("%w: %d", ErrNoMessage, id)
-	case m.State != message.Open:
-		return message.Message{}, fmt.Errorf("%w: message %d is %s", ErrClosed, id, m.State)
+	case !m.Open():
+		return message.Message{}, fmt.Errorf("%w: message %d", ErrClosed, id)
 	}
 	return m, nil
 }
 
-// current refuses a question message whose turn no longer waits on the user, and closes it.
-func (s *Service) current(ctx context.Context, m message.Message) error {
-	books, err := s.Books.Books(ctx, m.Unit)
-	if err != nil {
-		return err
+// AnswerOf reads a gate's answer to m: a first line naming one of m's options, or yes or no on a confirm,
+// chooses it, and the lines after it are the note; any other text is the answer itself.
+func AnswerOf(m message.Message, text string) Answer {
+	text = strings.TrimSpace(text)
+	first, rest, _ := strings.Cut(text, "\n")
+	first, rest = strings.TrimSpace(first), strings.TrimSpace(rest)
+	switch {
+	case slices.ContainsFunc(m.Options, func(o record.Option) bool { return o.ID == first }):
+		return Answer{OptionID: first, Text: rest}
+	case m.Confirm && first == yes:
+		return Answer{Yes: true, Text: rest}
+	case m.Confirm && first == no:
+		return Answer{No: true, Text: rest}
 	}
-	if q, ok := questionOf(m.Unit, books[m.Unit], s.Intents.Answerable(), s.now()); ok && q.Origin.TurnSeq == m.Origin.TurnSeq {
-		return nil
+	return Answer{Text: text}
+}
+
+// The words of a confirm's answer.
+const (
+	yes = "yes"
+	no  = "no"
+)
+
+// GateAnswer is a's text as a question or post gate takes it, which AnswerOf reads back: the option, or yes
+// or no, on its first line, then the note.
+func GateAnswer(a Answer) string {
+	choice := a.OptionID
+	switch {
+	case choice == "" && a.Yes:
+		choice = yes
+	case choice == "" && a.No:
+		choice = no
 	}
-	if err := s.Reconcile(ctx, m.Unit); err != nil {
-		s.logf("messages: reconciling %s: %v", m.Unit, err)
+	note := strings.TrimSpace(a.Text)
+	switch {
+	case choice == "":
+		return note
+	case note == "" || note == choice:
+		return choice
 	}
-	return fmt.Errorf("%w on %s", turn.ErrNoQuestion, m.Unit.Label())
+	return choice + "\n" + note
 }
 
 // saidTo is the answer to a message as the agent reads it, refusing what the message does not take as turns
@@ -645,13 +1056,13 @@ func saidTo(m message.Message, a Answer) (string, error) {
 	case (a.Yes || a.No) && !m.Confirm:
 		return "", turns.InvalidAnswer{Reason: "yes and no answer only a confirm"}
 	case a.Yes:
-		choice = "yes"
+		choice = yes
 	case a.No:
-		choice = "no"
+		choice = no
 	}
 	switch {
 	case choice == "" && note == "" && m.Confirm:
-		return "no", nil
+		return no, nil
 	case choice == "" && note == "":
 		return "", turns.InvalidAnswer{Reason: "an answer needs the text, an option or yes"}
 	case choice == "":
@@ -660,71 +1071,6 @@ func saidTo(m message.Message, a Answer) (string, error) {
 		return choice, nil
 	}
 	return choice + ". " + note, nil
-}
-
-// decide answers a proposal: a ledger one by deciding it (accept or yes accepts, reject or no rejects), a
-// core or workflow one through OnAnswer.
-func (s *Service) decide(ctx context.Context, m message.Message, a Answer) error {
-	if m.Origin.Kind == message.OriginLedger {
-		var accept bool
-		switch {
-		case a.OptionID == OptionAccept || (a.OptionID == "" && a.Yes && !a.No):
-			accept = true
-		case a.OptionID == OptionReject || (a.OptionID == "" && a.No && !a.Yes):
-		default:
-			return turns.InvalidAnswer{Reason: fmt.Sprintf("a proposal takes %s or %s", OptionAccept, OptionReject)}
-		}
-		if _, err := s.Ledger.Decide(ctx, m.Origin.Proposal, accept); errors.Is(err, coreitems.ErrNoProposal) {
-			return errors.Join(fmt.Errorf("%w: %w", ErrClosed, err), s.ReconcileProposals(ctx))
-		} else if err != nil {
-			return err
-		}
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		answer := OptionReject
-		if accept {
-			answer = OptionAccept
-		}
-		return s.close(ctx, m, message.Answered, answer)
-	}
-	said, err := saidTo(m, a)
-	if err != nil {
-		return err
-	}
-	if s.OnAnswer != nil {
-		if err := s.OnAnswer(ctx, m, a); err != nil {
-			return err
-		}
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.close(ctx, m, message.Answered, oneLine(said))
-}
-
-// Dismiss closes a message without an answer: a question's turn is dismissed as turns.Service.Dismiss does,
-// a ledger proposal is rejected.
-func (s *Service) Dismiss(ctx context.Context, id int64) error {
-	m, err := s.open(ctx, id)
-	if err != nil {
-		return err
-	}
-	switch {
-	case m.Kind == message.Question:
-		if err := s.current(ctx, m); err != nil {
-			return err
-		}
-		if err := s.Turns.Dismiss(ctx, m.Unit); err != nil {
-			return err
-		}
-		return s.Reconcile(ctx, m.Unit)
-	case m.Origin.Kind == message.OriginLedger:
-		if _, err := s.Ledger.Decide(ctx, m.Origin.Proposal, false); err != nil && !errors.Is(err, coreitems.ErrNoProposal) {
-			return err
-		}
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.close(ctx, m, message.Dismissed, "")
 }
 
 const titleMax = 120
@@ -767,10 +1113,10 @@ type PostRequest struct {
 
 type ProposeRequest struct {
 	Unit    unit.Unit
-	EntryID string // attach to an existing entry; "" opens a new Inbox entry
+	TaskID  string // the task its gate is on; "" is its unit's task, or a capture task with no unit
 	Text    string
-	Options []record.Option // answering an option calls OnAnswer
-	Origin  message.Origin  // Kind core or workflow; Workflow names the rule (dedupe key with Unit)
+	Options []record.Option
+	Origin  message.Origin // Kind core or workflow; Workflow names the rule (dedupe key with Unit)
 }
 
 type Answer struct {

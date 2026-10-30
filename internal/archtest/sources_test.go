@@ -9,17 +9,15 @@ import (
 const (
 	sourcesFile    = sourceRoot
 	sourceAdapters = "internal/adapter/source"
-	sourceModules  = "internal/source"
 )
 
 // sourceImports flags a non-test file that names a source outside the one
 // registration point: an import of a source adapter anywhere but
-// internal/cli/sources.go, internal/cli/slack*.go for Slack and the sources
-// themselves, an import of the registration package outside the composition
-// root and the sources.
+// internal/cli/sources.go, the files that wire one source and the sources
+// themselves.
 func sourceImports(file string, imports []string) []string {
 	dir := filepath.Dir(file)
-	if under(dir, sourceAdapters, sourceModules) {
+	if under(dir, sourceAdapters) {
 		return nil
 	}
 	var out []string
@@ -29,15 +27,15 @@ func sourceImports(file string, imports []string) []string {
 		case !internal:
 		case under(dep, sourceAdapters) && !mayNameSource(file, dep):
 			out = append(out, file+" imports "+dep+"; only "+sourcesFile+" names a source")
-		case dep == sourceModules && dir != "internal/cli":
-			out = append(out, file+" imports "+dep+"; sources register only through internal/cli")
 		}
 	}
 	return out
 }
 
 // TestOnlySourcesGoNamesASource checks that only `cli/sources.go`, and
-// `cli/slack*.go` for Slack, imports a source.
+// for one source the files that wire it (`cli/slack*.go` and
+// `cli/serve_slack.go` for Slack, `cli/serve_github.go` for GitHub), imports
+// a source.
 func TestOnlySourcesGoNamesASource(t *testing.T) {
 	t.Parallel()
 	seen := false
@@ -67,18 +65,16 @@ func TestOnlySourcesGoNamesASource(t *testing.T) {
 
 func TestOnlySourcesGoNamesASourceFlagsAPlantedImport(t *testing.T) {
 	t.Parallel()
-	gh, reg := module+"internal/adapter/source/github", module+"internal/source"
-	imports := []string{"context", gh, reg}
+	gh := module + "internal/adapter/source/github"
+	imports := []string{"context", gh}
 	flagged(t, "sources.go", sourceImports(sourcesFile, imports), 0, "")
 	flagged(t, "another cli file", sourceImports("internal/cli/serve.go", imports), 1, "only "+sourcesFile)
-	flagged(t, "the daemon", sourceImports("internal/daemon/daemon.go", imports), 2, "")
-	flagged(t, "core", sourceImports("internal/core/ingest/ingest.go", []string{reg}), 1, "only through internal/cli")
+	flagged(t, "the file that wires the source", sourceImports("internal/cli/serve_github.go", imports), 0, "")
+	flagged(t, "the daemon", sourceImports("internal/daemon/daemon.go", imports), 1, "")
 	flagged(t, "the read model", sourceImports("internal/readmodel/prrow/provider.go", []string{gh}), 1, "names a source")
-	flagged(t, "a source", sourceImports("internal/adapter/source/github/module.go", imports), 0, "")
+	flagged(t, "a source", sourceImports("internal/adapter/source/github/cards.go", imports), 0, "")
 	flagged(t, "a future source", sourceImports("internal/adapter/source/slack/module.go", imports), 0, "")
-	flagged(t, "the registration package", sourceImports("internal/source/source.go", imports), 0, "")
 	flagged(t, "a sibling of sources", sourceImports("internal/adapter/sourcex/x.go", []string{gh}), 1, "names a source")
-	flagged(t, "a cli subpackage", sourceImports("internal/cli/sub/x.go", []string{reg}), 1, "only through internal/cli")
 }
 
 func TestSlackWiringFilesMayNameSlack(t *testing.T) {

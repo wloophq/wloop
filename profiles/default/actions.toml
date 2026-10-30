@@ -3,54 +3,6 @@
 # facts. An empty note, warning or confirm shows nothing; why may not be
 # empty.
 
-[run_now]
-label   = "Run now"
-summary = "Start the round waiting on this pull request now, without waiting for its delay or the daily budget. Skip drops it instead."
-confirm = "{{if and .row.capped (not .row.pending)}}Run the held round on {{.pr.slug}} now? It does not count against the cap.{{end}}"
-
-[skip]
-label   = "Skip"
-summary = "Drop the round waiting on this pull request without running it. Run now starts it instead."
-
-[guide]
-label   = "Guide"
-summary = "Tell the agent what its round should look at; your text goes with the round waiting now, or with the next one when none waits."
-note    = "{{if not .row.pending}}Kept for the next automatic round{{end}}"
-why     = "the daemon plans no automatic round; see doctor"
-
-[guide.input]
-label = "Guidance"
-help  = "what the next round should look at"
-
-[trust_run]
-label   = "Trust folder and run"
-summary = "Trust the folder the agent was blocked on in your agent homes, then run the round. Dismiss block lifts the block without trusting it."
-note    = "Trust {{.row.trust_folder}} in {{join .row.trust_homes \", \"}}, then run the round"
-
-[unblock]
-label   = "Dismiss block"
-summary = "Lift the block without trusting the folder; the round waits for its next trigger. Trust folder and run trusts it and runs now."
-note    = "Lift the block without trusting; the round waits for a new trigger"
-
-[answer]
-label   = "Answer"
-summary = "Reply to the agent's open question with your text; the agent resumes from your answer."
-why     = "no open question on {{.pr.slug}}"
-
-[answer.input]
-label = "Answer"
-
-[continue]
-label   = "Continue"
-summary = "Let the agent resume without an answer, deciding the open question itself. Answer gives it your reply instead."
-why     = "no open question on {{.pr.slug}}"
-
-[dismiss]
-label   = "Dismiss"
-summary = "Close the agent's open question without resuming it; the pull request goes back to whoever it waits on."
-note    = "Close the question; the pull request goes back to whoever it waits on"
-why     = "no open question on {{.pr.slug}}"
-
 [take_over]
 label   = "Take over"
 summary = "Make someone else's pull request yours to develop: from then on it counts as one of yours, and Address works on it."
@@ -67,7 +19,7 @@ summary = "Let automatic rounds run on this pull request again."
 
 [mute]
 label   = "Mute"
-summary = "Take this pull request out of the lists that wait on you, for a while or until who it waits on changes; review and address rounds still run, unannounced, and no nudge goes out automatically. Pause stops the rounds instead."
+summary = "Snooze this pull request's task, out of the lists that wait on you, for a while or until who it waits on changes; review and address rounds still run, unannounced, and no nudge goes out automatically. Pause stops the rounds instead."
 
 [mute.input]
 label = "Mute for"
@@ -75,7 +27,7 @@ help  = "2d, 36h"
 
 [unmute]
 label   = "Unmute"
-summary = "Bring this pull request back into the lists that wait on you."
+summary = "Wake this pull request's task now, back into the lists that wait on you."
 
 [track]
 label   = "Track"
@@ -121,11 +73,6 @@ why     = "intake {{.row.intake_seq}} is a turn by hand, which only its session 
 label   = "Cancel"
 summary = "Drop this intake: the turn it waits on never starts."
 
-["draft.approve"]
-label   = "Approve"
-summary = "Send this draft as it stands."
-why     = "{{if eq .draft.refusal \"plugin_off\"}}{{.draft.provider}} is disabled{{else if eq .draft.refusal \"state\"}}the draft is {{.draft.state}}{{else}}{{.draft.provider}} posts nothing{{end}}"
-
 ["draft.edit"]
 label   = "Edit"
 summary = "Change the draft's text; it waits for your approval again."
@@ -133,11 +80,6 @@ why     = "{{if eq .draft.refusal \"plugin_off\"}}{{.draft.provider}} is disable
 
 ["draft.edit".input]
 label = "Text"
-
-["draft.discard"]
-label   = "Discard"
-summary = "Drop this draft for good; nothing is sent."
-why     = "{{if eq .draft.refusal \"plugin_off\"}}{{.draft.provider}} is disabled{{else if eq .draft.refusal \"state\"}}the draft is {{.draft.state}}{{else}}{{.draft.provider}} posts nothing{{end}}"
 
 ["draft.retry"]
 label   = "Retry"
@@ -161,3 +103,17 @@ note    = "Runs the round now with your guidance"
 [plan_guide.input]
 label = "Guidance"
 help  = "what the round should look at"
+
+# The actions of a task's run, on the task's page.
+
+["run.open"]
+label   = "Open workspace"
+summary = "Bring the run's workspace on screen in the workspace manager it ran in."
+
+["run.enter"]
+label   = "Enter session"
+summary = "Bring the run's agent session on screen to type in it; a session with no live process is woken first."
+
+["run.transcript"]
+label   = "Transcript"
+summary = "Read what the person typed and what the agent answered in the run's session."

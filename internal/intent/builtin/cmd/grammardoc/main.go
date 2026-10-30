@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	_ "github.com/wloophq/wloop/internal/plugins/bundled"
 )
 
 const referenceDir = "docs/src/content/docs/reference"
@@ -254,7 +255,10 @@ var sections = []struct {
 }{
 	{builtin.SurfaceIntent, "Intent manifest (`intents/<name>/intent.toml`)"},
 	{builtin.SurfaceActions, "Built-in actions (`actions.toml`)"},
-	{builtin.SurfaceGTD, "GTD verbs and views (`gtd.toml`)"},
+	{builtin.SurfaceTasks, "Tasks: properties, states and verbs (`tasks.toml`)"},
+	{builtin.SurfaceViews, "Views and the review (`views.toml`)"},
+	{builtin.SurfaceGates, "Gates (`gates.toml`)"},
+	{builtin.SurfaceRecords, "Record kinds (`records.toml`)"},
 	{builtin.SurfaceKeys, "Key help (`keys.toml`)"},
 	{builtin.SurfaceWorkflow, "Workflow manifest (`workflows/<name>/workflow.toml`)"},
 	{builtin.SurfaceStep, "Steps and their arguments"},
@@ -262,6 +266,7 @@ var sections = []struct {
 	{builtin.SurfaceLabels, "Block headings (`labels.toml`)"},
 	{builtin.SurfaceTools, "MCP tool descriptions (`tools.toml`)"},
 	{builtin.SurfaceNotices, "What the loop tells a session (`notices.toml`)"},
+	{builtin.SurfaceUI, "A plugin's views, facets and situations (`ui.toml`)"},
 	{builtin.SurfaceBlock, "Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)"},
 	{builtin.SurfaceConfig, "Configuration (`config.toml`)"},
 }
@@ -309,11 +314,8 @@ func approvalModes(k builtin.Key, all []builtin.Key) (string, bool) {
 			mode = all[i]
 		}
 	}
-	switch names := values(mode); {
-	case slices.Equal(names, builtin.ValueNames(builtin.RunModes())):
-		return "run", true
-	case slices.Equal(names, builtin.ValueNames(builtin.DraftModes())):
-		return "draft", true
+	if slices.Equal(values(mode), builtin.ValueNames(builtin.GateModes())) {
+		return "gate", true
 	}
 	return "", false
 }
@@ -345,28 +347,22 @@ func lines(keys []builtin.Key) []string {
 	return out
 }
 
-// approvalSection states the approval table's shape once, with its two
-// mode sets.
+// approvalSection states the approval table's shape once, with its modes.
 func approvalSection() []string {
 	out := []string{"", "## Approval tables", "",
-		"An approval table that links here has these keys; a run approval takes the run modes, a draft approval the draft modes.", ""}
+		"An approval table that links here has these keys, and takes the gate modes.", ""}
 	for _, r := range rows(builtin.SurfaceWorkflow) {
-		if sub, ok := strings.CutPrefix(r.Path, "approval."); ok && slices.Contains(approvalKeys, sub) {
+		if sub, ok := strings.CutPrefix(r.Path, "gates.approval."); ok && slices.Contains(approvalKeys, sub) {
 			k := r
 			k.Path, k.Values, k.Default = sub, nil, ""
-			k.Doc = strings.Replace(k.Doc, "the item runs", "the item runs or the draft is sent", 1)
 			if sub == "mode" || sub == "rule[].mode" {
 				k.Kind = builtin.KindText
 			}
 			out = append(out, line(k))
 		}
 	}
-	out = append(out, "", "The run modes:", "")
-	for _, v := range builtin.RunModes() {
-		out = append(out, fmt.Sprintf("- `%s`: %s", v.Name, cell(v.Doc)))
-	}
-	out = append(out, "", "The draft modes:", "")
-	for _, v := range builtin.DraftModes() {
+	out = append(out, "", "The gate modes:", "")
+	for _, v := range builtin.GateModes() {
 		out = append(out, fmt.Sprintf("- `%s`: %s", v.Name, cell(v.Doc)))
 	}
 	return out
@@ -436,8 +432,12 @@ var schemas = []struct {
 	{"intent.schema.json", "Intent manifest (intent.toml)", builtin.SurfaceIntent},
 	{"workflow.schema.json", "Workflow manifest (workflow.toml)", builtin.SurfaceWorkflow},
 	{"actions.schema.json", "Built-in actions (actions.toml)", builtin.SurfaceActions},
-	{"gtd.schema.json", "GTD verbs and views (gtd.toml)", builtin.SurfaceGTD},
+	{"tasks.schema.json", "Tasks: properties, states and verbs (tasks.toml)", builtin.SurfaceTasks},
+	{"views.schema.json", "Views and the review (views.toml)", builtin.SurfaceViews},
+	{"gates.schema.json", "Gates (gates.toml)", builtin.SurfaceGates},
+	{"records.schema.json", "Record kinds (records.toml)", builtin.SurfaceRecords},
 	{"keys.schema.json", "Key help (keys.toml)", builtin.SurfaceKeys},
+	{"ui.schema.json", "A plugin's views, facets and situations (ui.toml)", builtin.SurfaceUI},
 	{"config.schema.json", "Configuration (config.toml)", builtin.SurfaceConfig},
 }
 
@@ -497,6 +497,11 @@ func schemaOf(s struct {
 	return b.Bytes(), nil
 }
 
+// layered are the surfaces whose files a user layer lays over the bundled
+// one key by key: only the merged layers tell a new entry of a map from an
+// override, so an entry's schema requires none of its keys.
+var layered = []builtin.Surface{builtin.SurfaceTasks, builtin.SurfaceViews, builtin.SurfaceGates}
+
 // object is the schema of a table's keys; a name the author chooses
 // takes any key.
 func object(n *node) map[string]any {
@@ -505,7 +510,11 @@ func object(n *node) map[string]any {
 	var required []string
 	for name, c := range n.keys {
 		if name == "*" {
-			out["additionalProperties"] = schemaOfNode(c)
+			entry := schemaOfNode(c)
+			if c.row != nil && slices.Contains(layered, c.row.In) {
+				delete(entry, "required")
+			}
+			out["additionalProperties"] = entry
 			continue
 		}
 		props[name] = schemaOfNode(c)

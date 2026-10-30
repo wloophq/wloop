@@ -7,7 +7,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -18,7 +17,6 @@ type fakeOnDemand struct {
 	mu     sync.Mutex
 	coming bool
 	wants  []unit.Unit
-	noted  func(unit.Unit)
 }
 
 func (f *fakeOnDemand) Want(_ context.Context, u unit.Unit) (bool, error) {
@@ -27,8 +25,6 @@ func (f *fakeOnDemand) Want(_ context.Context, u unit.Unit) (bool, error) {
 	f.wants = append(f.wants, u)
 	return f.coming, nil
 }
-
-func (f *fakeOnDemand) Watch(noted func(unit.Unit)) { f.noted = noted }
 
 func TestASlackUnitIsBriefedOnDemand(t *testing.T) {
 	r := newRig(t, 0)
@@ -40,7 +36,7 @@ func TestASlackUnitIsBriefedOnDemand(t *testing.T) {
 	if rd, err := a.Ready(ctx, thread, false, nil); err != nil || !rd.Go || !rd.Without {
 		t.Fatalf("a later turn without a brief: %+v %v", rd, err)
 	}
-	changed, release := a.Changed(thread)
+	changed, release := a.Changed(ctx, thread)
 	defer release()
 	rd, err := a.Ready(ctx, thread, true, nil)
 	if err != nil || rd.Go || rd.Wait != WaitBriefing || !rd.Next.Equal(t0.Add(DemandTimeout)) || len(src.wants) != 1 {
@@ -49,11 +45,10 @@ func TestASlackUnitIsBriefedOnDemand(t *testing.T) {
 	if rd, _ := a.Peek(ctx, thread, true, nil); rd.Go {
 		t.Fatalf("peek after the want: %+v", rd)
 	}
-	if err := r.db.Extraction().Save(ctx, sqlite.ExtractionSave{States: map[unit.Unit]sqlite.ExtractionState{
-		thread: {Brief: `{"goal":"Ship the export","kind":"request","risk":"low","tags":["domain:billing"]}`, At: t0}}}); err != nil {
+	if err := r.db.PutUnitBrief(ctx, thread, "extraction", `{"goal":"Ship the export","kind":"request","risk":"low","tags":["domain:billing"]}`, t0); err != nil {
 		t.Fatal(err)
 	}
-	src.noted(thread)
+	r.q.Noted(thread)
 	closes(t, changed)
 	got, err := r.q.Ready(ctx, thread, true, nil)
 	if err != nil || got.State != Ready || got.Brief == nil || got.Brief.Goal != "Ship the export" || got.Brief.Kind != "request" || got.Run == 0 {

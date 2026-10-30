@@ -7,10 +7,9 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/config"
-	dchange "github.com/wloophq/wloop/internal/domain/change"
+	dchange "github.com/wloophq/wloop/internal/domain/github/change"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dpr "github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/turn"
 )
@@ -96,8 +95,8 @@ func (e *Env) withAddressReason(ctx context.Context, cfg config.Config, d dinten
 	var checksHead, conflictHead string
 	if e.Rounds != nil {
 		if st, err := e.Rounds.Load(ctx); err == nil {
-			handled, _ = time.Parse(time.RFC3339Nano, st.Mark(ref.String(), round.AddressedReviews))
-			checksHead, conflictHead = st.Mark(ref.String(), round.AddressedChecks), st.Mark(ref.String(), round.AddressedConflict)
+			handled, _ = time.Parse(time.RFC3339Nano, st.Mark(ref.String(), markAddressedReviews))
+			checksHead, conflictHead = st.Mark(ref.String(), markAddressedChecks), st.Mark(ref.String(), markAddressedConflict)
 		}
 	}
 	p.Address = handReason(full.Facts, viewer, handled, checksHead, conflictHead, cfg.For(ref.Owner, ref.Repo))

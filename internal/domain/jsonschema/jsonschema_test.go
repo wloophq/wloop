@@ -105,12 +105,13 @@ func TestEveryBundledSchemaCompiles(t *testing.T) {
 	paths := []string{
 		"internal/brief/schema.json",
 		"internal/core/headless/schema.json",
-		"internal/adapter/source/slack/extract/schema.json",
-		"internal/adapter/source/slack/eval/brief.schema.json",
-		"internal/adapter/source/slack/eval/judge.schema.json",
+		"plugins/slack/extract/schema.json",
+		"plugins/slack/eval/brief.schema.json",
+		"plugins/slack/eval/judge.schema.json",
 	}
 	matches, _ := filepath.Glob(filepath.Join(root, "profiles/default/prompts/*schema*.json"))
-	for _, m := range matches {
+	plugins, _ := filepath.Glob(filepath.Join(root, "plugins/*/profile/prompts/*schema*.json"))
+	for _, m := range append(matches, plugins...) {
 		rel, _ := filepath.Rel(root, m)
 		paths = append(paths, rel)
 	}

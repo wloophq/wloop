@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/core/gtd/gtdtest"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 )
@@ -29,9 +29,10 @@ func execWrite(db *DB, query string, args ...any) error {
 	return err
 }
 
-func projectEntry(id gtd.ID) gtd.Entry {
-	e := gtdtest.Full(id)
-	e.Kind, e.Project, e.Slug, e.ReviewEvery = gtd.KindProject, "", "p", 36*time.Hour
+func projectTask(id task.ID) task.Task {
+	e := taskstest.Full(id)
+	e.Parent, e.ReviewEvery = "", 36*time.Hour
+	e.SetProp(task.PropKind, task.Value{Text: task.KindProject}, task.WriterWorkflow, e.Updated)
 	return e
 }
 
@@ -43,15 +44,14 @@ func TestDeletingAParentCascades(t *testing.T) {
 	if err := db.Worktrees().Keep(ctx, wsdomain.Custody{Path: "/wt/a", Manager: "orca", Units: []unit.Unit{pr}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpCreate, Entry: projectEntry("e-p")}}); err != nil {
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: projectTask("t-p")}}); err != nil {
 		t.Fatal(err)
 	}
 	children := []struct{ table, column, parent string }{
 		{"worktree_units", "path", "/wt/a"},
-		{"entry_items", "entry_id", "e-p"},
-		{"entry_units", "entry_id", "e-p"},
-		{"entry_contexts", "entry_id", "e-p"},
-		{"projects", "entry_id", "e-p"},
+		{"task_items", "task_id", "t-p"},
+		{"task_units", "task_id", "t-p"},
+		{"task_props", "task_id", "t-p"},
 	}
 	for _, c := range children {
 		if n := countRows(t, db, c.table, c.column+` = ?`, c.parent); n == 0 {
@@ -61,7 +61,7 @@ func TestDeletingAParentCascades(t *testing.T) {
 	if err := execWrite(db, `DELETE FROM worktrees WHERE path = ?`, "/wt/a"); err != nil {
 		t.Fatal(err)
 	}
-	if err := execWrite(db, `DELETE FROM entries WHERE id = ?`, "e-p"); err != nil {
+	if err := execWrite(db, `DELETE FROM tasks WHERE id = ?`, "t-p"); err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range children {
@@ -71,24 +71,29 @@ func TestDeletingAParentCascades(t *testing.T) {
 	}
 }
 
-func TestRewritingAnEntryKeepsItsProjectRow(t *testing.T) {
+func TestRewritingATaskKeepsItsRows(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db, _ := openTemp(t)
-	p := projectEntry("e-p")
-	if err := db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpCreate, Entry: p}}); err != nil {
+	p := projectTask("t-p")
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: p}}); err != nil {
 		t.Fatal(err)
 	}
-	p.Kind, p.Title = gtd.KindCapture, "no longer a project"
-	if err := db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpUpdate, Entry: p}}); err != nil {
+	props := countRows(t, db, "task_props", `task_id = 't-p'`)
+	if props == 0 {
+		t.Fatal("the task has no property rows")
+	}
+	p.Title = "no longer a project"
+	p.SetProp(task.PropKind, task.Value{Text: "capture"}, task.WriterWorkflow, p.Updated)
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: p}}); err != nil {
 		t.Fatal(err)
 	}
-	if n := countRows(t, db, "projects", `entry_id = 'e-p' AND slug = 'p' AND review_every = ?`, int64(36*time.Hour/time.Second)); n != 1 {
-		t.Errorf("the project row of a rewritten entry: %d rows, want 1", n)
+	if n := countRows(t, db, "task_props", `task_id = 't-p'`); n != props {
+		t.Errorf("the property rows of a rewritten task: %d rows, want %d", n, props)
 	}
-	got, err := db.Entries().Entry(ctx, "e-p")
-	if err != nil || got.Title != p.Title || got.Kind != gtd.KindCapture || len(got.Items) != len(p.Items) {
-		t.Errorf("rewritten entry %+v, %v", got, err)
+	got, err := db.Tasks().Task(ctx, "t-p")
+	if err != nil || got.Title != p.Title || got.Prop(task.PropKind).Text != "capture" || len(got.Items) != len(p.Items) || got.ReviewEvery != 36*time.Hour {
+		t.Errorf("rewritten task %+v, %v", got, err)
 	}
 }
 
@@ -97,10 +102,9 @@ func TestAChildWithoutItsParentIsRefused(t *testing.T) {
 	db, _ := openTemp(t)
 	for _, insert := range []string{
 		`INSERT INTO worktree_units (path, provider, unit_key, at) VALUES ('/wt/none', 'github', 'acme/api#7', '')`,
-		`INSERT INTO entry_items (entry_id, provider, unit_key, item) VALUES ('e-none', 'github', 'acme/api#7', 'a')`,
-		`INSERT INTO entry_units (entry_id, provider, unit_key, ord) VALUES ('e-none', 'github', 'acme/api#7', 0)`,
-		`INSERT INTO entry_contexts (entry_id, context, ord) VALUES ('e-none', '@reply', 0)`,
-		`INSERT INTO projects (entry_id) VALUES ('e-none')`,
+		`INSERT INTO task_items (task_id, provider, unit_key, item) VALUES ('t-none', 'github', 'acme/api#7', 'a')`,
+		`INSERT INTO task_units (task_id, provider, unit_key, ord) VALUES ('t-none', 'github', 'acme/api#7', 0)`,
+		`INSERT INTO task_props (task_id, name, value, writer, at) VALUES ('t-none', 'area', '{"text":"OSS"}', 'person', 't')`,
 	} {
 		if err := execWrite(db, insert); err == nil || !strings.Contains(err.Error(), "FOREIGN KEY") {
 			t.Errorf("%s: %v, want a foreign key error", insert, err)

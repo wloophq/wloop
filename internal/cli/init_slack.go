@@ -50,44 +50,25 @@ settings:
 
 func renderSlackManifest() string { return strings.ReplaceAll(slackManifest, "{{name}}", brand.Name) }
 
-// slackState is what the Keychain holds for the config's Slack app.
-type slackState struct {
-	appToken bool
-	// login is the logged-in user and team, "" when logged out.
-	login string
-}
-
-func (e *Env) slackState(cfg config.Slack) slackState {
-	kit := e.slack.kit(cfg, nil)
-	var s slackState
-	if _, err := kit.Store.AppToken(); err == nil {
-		s.appToken = true
-	}
-	if tok, err := kit.Store.Load(); err == nil {
-		s.login = tok.User + " in " + teamLabel(tok)
-	}
-	return s
-}
-
 // askSlack walks the user through creating the Slack app and returns its
-// client id, "" when they skip Slack.
-func (w *initWizard) askSlack(cur config.Slack) string {
+// client id, "" when they skip Slack, and whether to log in again.
+func (w *initWizard) askSlack(ctx context.Context, cfg config.Config) (string, bool) {
 	e := w.e
+	cur := cfg.Slack
 	if cur.Configured() {
-		st := e.slackState(cur)
-		if st.login != "" && st.appToken {
-			fmt.Fprintf(e.Out, "Slack: logged in as %s.\n", st.login)
-			if !w.p.yes("Set Slack up again?", false) {
-				return cur.ClientID
-			}
-		} else if !w.p.yes("Slack has a client id but no login yet. Finish the Slack setup now?", true) {
-			return cur.ClientID
+		if status, err := e.slackStatusText(ctx, cfg); err != nil {
+			fmt.Fprintf(e.Out, "Slack: %v\n", err)
+		} else {
+			fmt.Fprintln(e.Out, status)
+		}
+		if !w.p.yes("Set Slack up again?", false) {
+			return cur.ClientID, false
 		}
 	} else {
 		fmt.Fprintln(e.Out, "Slack (optional) brings the threads and DMs that ask something of you into the Inbox.")
 		if !w.p.yes("Set Slack up now?", false) {
 			fmt.Fprintf(e.Out, "Skipped; '%s init' offers it again.\n", brand.Command)
-			return ""
+			return "", false
 		}
 	}
 	if !cur.Configured() || w.p.yes("Show the steps that create the Slack app?", false) {
@@ -97,10 +78,10 @@ func (w *initWizard) askSlack(cur config.Slack) string {
 		id := strings.TrimSpace(w.p.line("Client ID (Basic Information > App Credentials)", cur.ClientID))
 		if id == "" {
 			fmt.Fprintf(e.Out, "Skipped Slack; '%s init' offers it again.\n", brand.Command)
-			return ""
+			return "", false
 		}
 		if !strings.ContainsAny(id, " \t") {
-			return id
+			return id, true
 		}
 		fmt.Fprintln(e.Out, "A client id has no spaces, such as 000000000000.000000000000.")
 	}
@@ -123,18 +104,10 @@ func (w *initWizard) printSlackSteps() {
 // finishSlack saves the app token and logs in, as slack login --app-token
 // and slack login do, for the config just written.
 func (w *initWizard) finishSlack(ctx context.Context, cfg config.Config) error {
-	e := w.e
-	kit := e.slack.kit(cfg.Slack, func(format string, a ...any) { fmt.Fprintf(e.Err, format+"\n", a...) })
-	st := e.slackState(cfg.Slack)
-	if !st.appToken || w.p.yes("Replace the stored Slack app token?", false) {
-		if err := e.saveAppToken(kit); err != nil {
-			return err
-		}
+	if err := w.e.slackLogin(ctx, cfg, []string{"--app-token"}); err != nil {
+		return err
 	}
-	if st.login != "" && !w.p.yes("Logged in to Slack as "+st.login+". Log in again?", false) {
-		return nil
-	}
-	return e.slackLogin(ctx, cfg, kit, nil)
+	return w.e.slackLogin(ctx, cfg, nil)
 }
 
 // slackNextSteps are the commands that finish Slack off a terminal.

@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand/brandtest"
 	"github.com/wloophq/wloop/internal/brief"
@@ -27,7 +29,6 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/github"
 )
@@ -70,12 +71,14 @@ func TestWireShape(t *testing.T) {
 	ctx := context.Background()
 	st := s.store()
 	r7 := github.Ref{Owner: "acme", Repo: "api", Number: 7}
-	if err := st.SetWorkspace(ctx, r7, dinv.Workspace{ID: "w1", DisplayName: "REVIEW batch", Status: "reviewing", IsReview: true,
+	if err := inventorytest.Of(st).SetWorkspace(ctx, r7, dinv.Workspace{ID: "w1", DisplayName: "REVIEW batch", Status: "reviewing", IsReview: true,
 		AgentStates: []turn.AgentState{turn.AgentWorking}, Comment: "r2 held"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SetOverride(ctx, dinv.Override{PR: r7, Hold: true, Tracked: true, NextGuidance: "look at the tests",
-		MutedUntil: time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC)}); err != nil {
+	if err := inventorytest.Of(st).SetOverride(ctx, dinv.Override{PR: r7, Hold: true, Tracked: true, NextGuidance: "look at the tests"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := muteBy(st, r7, time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC)); err != nil {
 		t.Fatal(err)
 	}
 	s.app.Set(api.AppStatus{State: "running", Notifications: "denied"})
@@ -123,13 +126,11 @@ func TestWireShape(t *testing.T) {
 func TestWireTypesCoverTheirSources(t *testing.T) {
 	t.Parallel()
 	unwired := map[reflect.Type]int{reflect.TypeFor[turn.Turn](): 1, reflect.TypeFor[dinv.Override](): 1}
-	// derived are wire fields the daemon computes from the source's: an event's and a candidate's unit.
-	derived := map[reflect.Type]int{reflect.TypeFor[api.Event](): 1}
+	derived := map[reflect.Type]int{}
 	for _, c := range []struct{ from, to any }{
 		{dinv.Workspace{}, api.Workspace{}},
 		{dinv.Override{}, api.Override{}},
 		{dinv.Event{}, api.Event{}},
-		{round.Pending{}, api.PendingRound{}},
 		{brief.Summary{}, api.BriefSummary{}},
 		{brief.View{}, api.BriefView{}},
 		{brief.Brief{}, api.Brief{}},
@@ -146,7 +147,7 @@ func TestWireTypesCoverTheirSources(t *testing.T) {
 	}
 	cand := reflect.TypeOf(dgh.Candidate{})
 	if got := reflect.TypeOf(api.Candidate{}).NumField(); got != cand.NumField()+3 {
-		t.Errorf("api.Candidate has %d fields, github.Candidate %d plus the unit, the brief and the actions", got, cand.NumField())
+		t.Errorf("api.Candidate has %d fields, github.Candidate %d with the unit and the label for the reference, plus the brief and the actions", got, cand.NumField())
 	}
 }
 
@@ -199,10 +200,10 @@ func TestDraftWireShape(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
 	d := r.stored(t, draft.Draft{Unit: r7u, Kind: draft.Close, Purpose: "close", Delivery: draft.Message, Effects: []string{"unit.closed"},
-		Text: "Closing this out", State: draft.Proposed, Approval: draft.Approval{Mode: draft.Wait},
+		Text: "Closing this out", State: draft.Held,
 		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "slack-closure", Rule: "slack-closure", Key: "acme/api#7"}})
 	var got api.Draft
-	if code := get(t, r.s, api.DraftPath(int64(d.ID)), &got); code != 200 {
+	if code := r.getDraft(t, d.ID, &got); code != 200 {
 		t.Fatalf("GET: %d", code)
 	}
 	b, _ := json.MarshalIndent(got, "", "  ")

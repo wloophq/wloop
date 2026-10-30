@@ -1,0 +1,148 @@
+# The words of the gates, the decisions that wait on you. A user profile's
+# gates.toml replaces the keys it sets.
+
+# One gate per kind: the loop opens the first gate of a kind when it opens
+# one by kind.
+
+[gates.draft]
+kind = "draft"
+label = "Send this draft?"
+
+[gates.draft.intents.approve]
+label = "Approve"
+status = "approved"
+
+[gates.draft.intents.discard]
+label = "Discard"
+status = "rejected"
+
+# A round, or any workflow item, that waits for you or for its window.
+[gates.plan]
+kind = "plan"
+label = "Run this?"
+
+[gates.plan.intents.run_now]
+label = "Run now"
+summary = "Start the round waiting on this pull request now, without waiting for its delay or the daily budget. Skip drops it instead."
+confirm = "{{if and .row.capped (not .row.pending)}}Run the held round on {{.pr.slug}} now? It does not count against the cap.{{end}}"
+status = "approved"
+
+[gates.plan.intents.skip]
+label = "Skip"
+summary = "Drop the round waiting on this pull request without running it. Run now starts it instead."
+status = "rejected"
+
+[gates.plan.intents.guide]
+label = "Guide"
+summary = "Tell the agent what its round should look at; your text goes with the round waiting now, or with the next one when none waits."
+note = "{{if not .row.pending}}Kept for the next automatic round{{end}}"
+status = "approved"
+answer = true
+
+[gates.question]
+kind = "question"
+label = "The agent asks"
+
+[gates.question.intents.answer]
+label = "Answer"
+summary = "Reply to the agent's open question with your text; the agent resumes from your answer."
+status = "answered"
+answer = true
+
+[gates.question.intents.continue]
+label = "Continue"
+summary = "Let the agent resume without an answer, deciding the open question itself. Answer gives it your reply instead."
+status = "answered"
+
+[gates.question.intents.dismiss]
+label = "Dismiss"
+summary = "Close the agent's open question without resuming it; the pull request goes back to whoever it waits on."
+note = "Close the question; the pull request goes back to whoever it waits on"
+status = "dismissed"
+
+[gates.post]
+kind = "post"
+label = "The agent says"
+
+[gates.post.intents.reply]
+label = "Reply"
+status = "answered"
+answer = true
+
+[gates.post.intents.dismiss]
+label = "Dismiss"
+status = "dismissed"
+
+[gates.proposal]
+kind = "proposal"
+label = "Apply this proposal?"
+text = "Proposed {{.proposal.op}} of item {{.proposal.item}} on {{.proposal.unit}}{{with .proposal.reason}}: {{.}}{{end}} (from {{.proposal.provenance}}; you confirmed the item)"
+
+[gates.proposal.intents.approve]
+label = "Approve"
+status = "approved"
+
+[gates.proposal.intents.reject]
+label = "Reject"
+status = "rejected"
+
+# A round whose start the agent blocked on its question, such as trusting
+# its folder.
+[gates.trust]
+kind = "trust"
+label = "The agent blocked the round's start"
+
+[gates.trust.intents.trust_run]
+label = "Trust folder and run"
+summary = "Trust the folder the agent was blocked on in your agent homes, then run the round. Dismiss block lifts the block without trusting it."
+note = "Trust {{.row.trust_folder}} in {{join .row.trust_homes \", \"}}, then run the round"
+status = "approved"
+
+[gates.trust.intents.unblock]
+label = "Dismiss block"
+summary = "Lift the block without trusting the folder; the round waits for its next trigger. Trust folder and run trusts it and runs now."
+note = "Lift the block without trusting; the round waits for a new trigger"
+status = "dismissed"
+
+[gates.review-diff]
+kind = "step"
+label = "Review the diff"
+
+[gates.review-diff.intents.approve]
+label = "Looks good"
+status = "approved"
+
+[gates.review-diff.intents.dismiss]
+label = "Dismiss"
+status = "dismissed"
+
+# A run that failed or ended without its record, of an intent whose
+# record.missing names it.
+[gates.missing-record]
+kind = "question"
+label = "The run stopped: it failed or ended without its record"
+
+[gates.missing-record.intents.answer]
+label = "Answer"
+summary = "Resume the run with your text."
+status = "answered"
+answer = true
+
+[gates.missing-record.intents.continue]
+label = "Continue"
+summary = "Resume the run as it was, without your text."
+status = "answered"
+
+[gates.missing-record.intents.dismiss]
+label = "Dismiss"
+summary = "Close the stopped run without resuming it."
+status = "dismissed"
+
+# How a gate is decided when no workflow, intent or configuration says: a
+# run starts at once, every other decision waits for you.
+[approval]
+mode = "wait"
+
+[[approval.rule]]
+when = 'gate.kind == "plan"'
+mode = "run"

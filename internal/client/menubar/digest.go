@@ -55,7 +55,7 @@ func (c *Controller) postDigest(ctx context.Context, day string) error {
 	if err != nil {
 		return err
 	}
-	if len(d.Entries) > 0 {
+	if len(d.Tasks) > 0 {
 		if err := c.cfg.Notifier.Post(Notification{ID: id, Title: d.Title, Body: d.Body, Category: api.CategoryDigest}); err != nil {
 			return err
 		}

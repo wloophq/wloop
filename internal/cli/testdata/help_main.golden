@@ -11,6 +11,7 @@ GET STARTED
 PULL REQUESTS
   act                    Resolve a unit's open items, replies as drafts
   address                Triage the reviews and failing checks of yours
+  chat                   Talk with an agent about a task
   nudge                  Ask whoever it waits on for the next step
   review                 Review someone else's pull request in its own worktree
   start                  Start new work from a brief
@@ -18,10 +19,11 @@ PULL REQUESTS
   remove                 Delete the workspace of a merged or closed one
 
 WHAT WAITS ON YOU
-  status                 Pull requests by view, those needing you first
+  status                 What needs you, by view, and the tracked pull requests
   tui                    The same views in the terminal, one-key actions
   open                   The cockpit, a workspace or a pull request
   outbox                 Drafts waiting for your approval, and yours
+  task                   Create a task, or make this agent session a run of one
   explore                Open pull requests of others to help on
 
 AUTOMATION

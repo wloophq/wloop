@@ -87,7 +87,7 @@ Examples:
 {{command}} act https://acme.slack.com/archives/C0123/p1700000000000100 say we ship Friday
 ```
 
-See [Inbox, entries and work units](/concepts/gtd/).
+See [Tasks and views](/concepts/tasks/).
 
 ### address
 
@@ -114,6 +114,30 @@ Examples:
 ```
 
 See [Address reviews on your pull request](/guides/address/).
+
+### chat
+
+Talk with an agent about a task.
+
+```sh
+{{command}} chat <task:key> [--repo <repo>] [--manager <name>] [--parent <worktree>] [guidance...]
+```
+
+Talk with an agent about a task: in the task's last session when it can resume, else in a new one, in a worktree of the task's repository or with no checkout. The target is task:&lt;id&gt;; words after it are guidance for the turn.
+
+| Flag | Description |
+| --- | --- |
+| `--repo <repo>` | Owner/name of the repository to work in; without it the session has no checkout |
+| `--manager <name>` | The workspace manager that creates the worktree, instead of the configured ones |
+| `--parent <worktree>` | The worktree the new one goes under, where its manager keeps parents; the one the command runs in by default |
+
+Examples:
+
+```sh
+{{command}} chat task:t-3f9a2c4b5d6e7f80 what is left before we can ship this?
+```
+
+See [Tasks and views](/concepts/tasks/).
 
 ### nudge
 
@@ -163,14 +187,15 @@ See [Review someone else's pull request](/guides/review/).
 Start new work from a brief.
 
 ```sh
-{{command}} start [entry:<id>] [--repo <repo>] [--manager <name>] [--parent <worktree>] [guidance...]
+{{command}} start [task:<id>] [--repo <repo>] [--manager <name>] [--parent <worktree>] [guidance...]
 ```
 
-Start new work from a brief: in a fresh worktree of a repository, or with no checkout. The target is entry:&lt;id&gt;, or none to capture the brief as a new entry; words after it are guidance for the turn.
+Start new work from a brief: in a fresh worktree of a repository, or with no checkout. The target is task:&lt;id&gt;, or none to capture the brief as a new task; words after it are guidance for the turn.
 
 | Flag | Description |
 | --- | --- |
 | `--repo <repo>` | Owner/name of the repository to work in; without it the session has no checkout |
+| `--brief-file <path>` | Read the new task's brief from a file, instead of the words after the flags |
 | `--manager <name>` | The workspace manager that creates the worktree, instead of the configured ones |
 | `--parent <worktree>` | The worktree the new one goes under, where its manager keeps parents; the one the command runs in by default |
 
@@ -178,10 +203,11 @@ Examples:
 
 ```sh
 {{command}} start --repo acme/api add retries to the webhook sender; done when a failed delivery is retried three times
-{{command}} start entry:e-3f9a2c4b5d6e7f80 --repo acme/api
+{{command}} start task:t-3f9a2c4b5d6e7f80 --repo acme/api
+{{command}} start --repo acme/api --brief-file brief.md
 ```
 
-See [Inbox, entries and work units](/concepts/gtd/).
+See [Tasks and views](/concepts/tasks/).
 
 ### take-over
 
@@ -227,13 +253,13 @@ See [Workspaces and board columns](/concepts/board/).
 
 ### status
 
-Pull requests by view, those needing you first.
+What needs you, by view, and the tracked pull requests.
 
 ```sh
 {{command}} status [--color auto|always|never]
 ```
 
-List the daemon's pull requests by view, those needing you first. Piped, it prints one tab-separated line per pull request and view.
+List the tasks of the views the badge counts, such as Inbox and Needs me, then the pull requests you track. Piped, it prints one tab-separated line per task or pull request and view.
 
 | Flag | Description |
 | --- | --- |
@@ -256,7 +282,7 @@ The same views in the terminal, one-key actions.
 {{command}} tui
 ```
 
-The Needs me, In loop and My PRs views in the terminal, with one-key actions on the selected pull request.
+The views in the terminal, the profile's and the plugins', with one-key actions on the selected task or pull request.
 
 Examples:
 
@@ -280,7 +306,7 @@ Open the workspace of a pull request in Claude Desktop or Orca, or the pull requ
 | Flag | Description |
 | --- | --- |
 | `--print` | Print the cockpit URL with its token instead of opening it |
-| `--view <view>` | The cockpit view: needs-me, stalled, mine, loop, dash, done, all, recent, explore |
+| `--view <view>` | The cockpit view, by its id, such as needs-me or mine |
 
 Examples:
 
@@ -329,6 +355,33 @@ Examples:
 ```
 
 See [What waits for you](/concepts/approval/).
+
+### task
+
+Create a task, or make this agent session a run of one.
+
+```sh
+{{command}} task new --title <title> [--brief-file <path>] [--prop <name>=<value>]... [--repo <owner/name>]
+{{command}} task attach task:<id>
+```
+
+new creates a task in the Inbox and prints it as task:&lt;id&gt;: a title alone captures it. Each property is one tasks.toml declares, parsed by its type, and a value its type refuses creates nothing. attach makes the agent session it runs in, one a workspace manager started, a run of the task: the task's page lists it with its workspace, session and transcript, and what it posts or drafts lands on the task. Its turn owes no record, so the session stops as it would without {{name}}.
+
+| Flag | Description |
+| --- | --- |
+| `--title <title>` | new: the task's title, one short line |
+| `--brief-file <path>` | new: a file whose markdown is the task's brief |
+| `--prop <name>=<value>` | new: a property of the task; repeatable |
+| `--repo <owner/name>` | new: the repository the task's work runs in |
+
+Examples:
+
+```sh
+{{command}} task new --title "Add retries to the webhook sender" --brief-file brief.md --prop priority=high --repo acme/api
+{{command}} task attach task:t-3f9a2c4b5d6e7f80
+```
+
+See [Tasks and views](/concepts/tasks/).
 
 ### explore
 
@@ -431,7 +484,7 @@ Leave or rejoin the pending views.
 {{command}} unmute <url>
 ```
 
-Take a pull request out of the pending views, for good, for a while, or until who it waits on changes; unmute brings it back.
+Snooze a pull request's task, out of the pending views, for a while or until who it waits on changes: a wake on the task; unmute wakes it now.
 
 | Flag | Description |
 | --- | --- |
@@ -452,7 +505,7 @@ See [What waits for you](/concepts/approval/).
 The facts and steps a workflow can use.
 
 ```sh
-{{command}} workflows facts [github|session|workspace]
+{{command}} workflows facts [<provider>]
 {{command}} workflows steps
 ```
 
@@ -592,16 +645,19 @@ See [Write your review profile](/guides/review-profile/).
 The JSON Schemas of the profile files, for editors.
 
 ```sh
-{{command}} profile schema [--workflow|--actions|--gtd|--keys|--config]
+{{command}} profile schema [--workflow|--actions|--tasks|--views|--gates|--records|--keys|--config]
 ```
 
-Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml, gtd.toml, keys.toml or config.toml, for an editor. Every schema comes from the grammar the loaders check.
+Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml, tasks.toml, views.toml, gates.toml, records.toml, keys.toml or config.toml, for an editor. Every schema comes from the grammar the loaders check.
 
 | Flag | Description |
 | --- | --- |
 | `--workflow` | The schema of workflow.toml |
 | `--actions` | The schema of actions.toml |
-| `--gtd` | The schema of gtd.toml |
+| `--tasks` | The schema of tasks.toml |
+| `--views` | The schema of views.toml |
+| `--gates` | The schema of gates.toml |
+| `--records` | The schema of records.toml |
 | `--keys` | The schema of keys.toml |
 | `--config` | The schema of config.toml |
 
@@ -626,7 +682,7 @@ Connect to Slack, or disconnect.
 {{command}} slack logout
 ```
 
-Log in to Slack in the browser; it needs slack.client_id in the config. `--app-token` saves the app-level token read from standard input. logout revokes and deletes the tokens.
+Log in to Slack in the browser; it needs plugins.slack.client_id in the config. `--app-token` saves the app-level token read from standard input. logout revokes and deletes the tokens.
 
 | Flag | Description |
 | --- | --- |
@@ -1032,10 +1088,10 @@ Record how a turn ended; read your answer.
 
 ```sh
 {{command}} turn end <url> --turn <id> --file <path>
-{{command}} turn answer <url> [--message <id>]
+{{command}} turn answer <url> [--gate <id>]
 ```
 
-end records how this session's turn ended, from a JSON file, when the session has no {{name}} MCP tool; the file is deleted once stored. answer prints the user's answers to this session's Inbox messages that it has not read, or, with `--message`, every answer to that message, and marks them read.
+end records how this session's turn ended, from a JSON file, when the session has no {{name}} MCP tool; the file is deleted once stored. answer prints the user's answers to this session's gates that it has not read, or, with `--gate`, every answer that resolved that gate, and marks them read.
 
 | Flag | Description |
 | --- | --- |

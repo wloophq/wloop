@@ -11,7 +11,8 @@ import (
 // batch is what one workflow's trigger brings to an evaluation.
 type batch struct {
 	w workflow.Workflow
-	// events are the unhandled events of the workflow's provider (TriggerEvent).
+	// events are the unhandled events of the workflow's provider its trigger fires on (TriggerEvent): of its
+	// actors, in a chain shorter than its depth that it is not in yet.
 	events []workflow.Event
 	// fired is the schedule firing the batch handles; zero when none (TriggerSchedule).
 	fired time.Time
@@ -96,7 +97,7 @@ func (e *Engine) batch(ctx context.Context, w workflow.Workflow, now time.Time, 
 		if ev.ID > b.cursor {
 			b.advance, b.cursor = true, ev.ID
 		}
-		if ev.Unit.Provider == w.Provider {
+		if ev.Unit.Provider == w.Provider && w.Trigger.Fires(w.Name, ev) {
 			b.events = append(b.events, ev)
 		}
 	}

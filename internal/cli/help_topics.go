@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"strings"
-
 	"github.com/wloophq/wloop/internal/brand"
 )
 
@@ -110,10 +108,10 @@ func helpGroups(manager string) []helpGroup {
 		{"WHAT WAITS ON YOU", []helpTopic{
 			{
 				Names:   []string{"status"},
-				Summary: "Pull requests by view, those needing you first",
+				Summary: "What needs you, by view, and the tracked pull requests",
 				Usage:   []string{"status [--color auto|always|never]"},
-				About: "List the daemon's pull requests by view, those needing you first. " +
-					"Piped, it prints one tab-separated line per pull request and view.",
+				About: "List the tasks of the views the badge counts, such as Inbox and Needs me, then the pull requests you track. " +
+					"Piped, it prints one tab-separated line per task or pull request and view.",
 				Flags:    []helpFlag{colorFlag},
 				Examples: []string{"status", "status | grep needs-me"},
 				Docs:     "concepts/surfaces",
@@ -122,7 +120,7 @@ func helpGroups(manager string) []helpGroup {
 				Names:    []string{"tui"},
 				Summary:  "The same views in the terminal, one-key actions",
 				Usage:    []string{"tui"},
-				About:    "The Needs me, In loop and My PRs views in the terminal, with one-key actions on the selected pull request.",
+				About:    "The views in the terminal, the profile's and the plugins', with one-key actions on the selected task or pull request.",
 				Examples: []string{"tui"},
 				Docs:     "concepts/surfaces",
 			},
@@ -134,7 +132,7 @@ func helpGroups(manager string) []helpGroup {
 					"With no URL, open the cockpit. With --print, print the cockpit URL with its token instead of opening it.",
 				Flags: []helpFlag{
 					{"--print", "Print the cockpit URL with its token instead of opening it"},
-					{"--view <view>", "The cockpit view: " + strings.Join(cockpitViews, ", ")},
+					{"--view <view>", "The cockpit view, by its id, such as needs-me or mine"},
 				},
 				Examples: []string{"open", "open " + pr, "open --print --view needs-me"},
 				Docs:     "concepts/surfaces",
@@ -166,6 +164,25 @@ func helpGroups(manager string) []helpGroup {
 				Examples: []string{"outbox", "outbox new https://acme.slack.com/archives/C0123/p1700000000000100 \"Friday works\"", "outbox approve 12",
 					"outbox discard 12 --reason \"answered in person\""},
 				Docs: "concepts/approval",
+			},
+			{
+				Names:   []string{"task"},
+				Summary: "Create a task, or make this agent session a run of one",
+				Usage:   []string{"task new --title <title> [--brief-file <path>] [--prop <name>=<value>]... [--repo <owner/name>]", "task attach task:<id>"},
+				About: "new creates a task in the Inbox and prints it as task:<id>: a title alone captures it. " +
+					"Each property is one tasks.toml declares, parsed by its type, and a value its type refuses creates nothing. " +
+					"attach makes the agent session it runs in, one a workspace manager started, a run of the task: " +
+					"the task's page lists it with its workspace, session and transcript, and what it posts or drafts lands on the task. " +
+					"Its turn owes no record, so the session stops as it would without " + name + ".",
+				Flags: []helpFlag{
+					{"--title <title>", "new: the task's title, one short line"},
+					{"--brief-file <path>", "new: a file whose markdown is the task's brief"},
+					{"--prop <name>=<value>", "new: a property of the task; repeatable"},
+					{"--repo <owner/name>", "new: the repository the task's work runs in"},
+				},
+				Examples: []string{"task new --title \"Add retries to the webhook sender\" --brief-file brief.md --prop priority=high --repo acme/api",
+					"task attach task:t-3f9a2c4b5d6e7f80"},
+				Docs: "concepts/tasks",
 			},
 			{
 				Names:   []string{"explore"},
@@ -220,7 +237,7 @@ func helpGroups(manager string) []helpGroup {
 				Names:   []string{"mute", "unmute"},
 				Summary: "Leave or rejoin the pending views",
 				Usage:   []string{"mute <url> [--until <duration> | --until-state]", "unmute <url>"},
-				About:   "Take a pull request out of the pending views, for good, for a while, or until who it waits on changes; unmute brings it back.",
+				About:   "Snooze a pull request's task, out of the pending views, for a while or until who it waits on changes: a wake on the task; unmute wakes it now.",
 				Flags: []helpFlag{
 					{"--until <duration>", "Mute for a duration such as 2d or 36h"},
 					{"--until-state", "Mute until who the pull request waits on changes"},
@@ -231,7 +248,7 @@ func helpGroups(manager string) []helpGroup {
 			{
 				Names:    []string{"workflows"},
 				Summary:  "The facts and steps a workflow can use",
-				Usage:    []string{"workflows facts [github|session|workspace]", "workflows steps"},
+				Usage:    []string{"workflows facts [<provider>]", "workflows steps"},
 				About:    "Print the facts a workflow's predicates read, by subject, and the steps it may run. The documentation has the manifest reference.",
 				Examples: []string{"workflows facts github", "workflows steps"},
 				Docs:     "reference/facts",
@@ -296,11 +313,12 @@ func helpGroups(manager string) []helpGroup {
 				Docs:     "guides/review-profile",
 			},
 			{
-				Names:    []string{"profile schema"},
-				Summary:  "The JSON Schemas of the profile files, for editors",
-				Usage:    []string{"profile schema [--workflow|--actions|--gtd|--keys|--config]"},
-				About:    "Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml, gtd.toml, keys.toml or config.toml, for an editor. Every schema comes from the grammar the loaders check.",
-				Flags:    []helpFlag{{"--workflow", "The schema of workflow.toml"}, {"--actions", "The schema of actions.toml"}, {"--gtd", "The schema of gtd.toml"}, {"--keys", "The schema of keys.toml"}, {"--config", "The schema of config.toml"}},
+				Names:   []string{"profile schema"},
+				Summary: "The JSON Schemas of the profile files, for editors",
+				Usage:   []string{"profile schema [--workflow|--actions|--tasks|--views|--gates|--records|--keys|--config]"},
+				About:   "Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml, tasks.toml, views.toml, gates.toml, records.toml, keys.toml or config.toml, for an editor. Every schema comes from the grammar the loaders check.",
+				Flags: []helpFlag{{"--workflow", "The schema of workflow.toml"}, {"--actions", "The schema of actions.toml"}, {"--tasks", "The schema of tasks.toml"},
+					{"--views", "The schema of views.toml"}, {"--gates", "The schema of gates.toml"}, {"--records", "The schema of records.toml"}, {"--keys", "The schema of keys.toml"}, {"--config", "The schema of config.toml"}},
 				Examples: []string{"profile schema > intent.schema.json", "profile schema --config > config.schema.json"},
 				Docs:     "reference/language",
 			},
@@ -310,7 +328,7 @@ func helpGroups(manager string) []helpGroup {
 				Names:   []string{"slack login", "slack logout"},
 				Summary: "Connect to Slack, or disconnect",
 				Usage:   []string{"slack login [--no-browser]", "slack login --app-token", "slack logout"},
-				About: "Log in to Slack in the browser; it needs slack.client_id in the config. " +
+				About: "Log in to Slack in the browser; it needs plugins.slack.client_id in the config. " +
 					"--app-token saves the app-level token read from standard input. logout revokes and deletes the tokens.",
 				Flags: []helpFlag{
 					{"--no-browser", "Print the login URL instead of opening the browser"},
@@ -522,9 +540,9 @@ func helpGroups(manager string) []helpGroup {
 			{
 				Names:   []string{"turn end", "turn answer"},
 				Summary: "Record how a turn ended; read your answer",
-				Usage:   []string{"turn end <url> --turn <id> --file <path>", "turn answer <url> [--message <id>]"},
+				Usage:   []string{"turn end <url> --turn <id> --file <path>", "turn answer <url> [--gate <id>]"},
 				About: "end records how this session's turn ended, from a JSON file, when the session has no " + name + " MCP tool; the file is deleted once stored. " +
-					"answer prints the user's answers to this session's Inbox messages that it has not read, or, with --message, every answer to that message, and marks them read.",
+					"answer prints the user's answers to this session's gates that it has not read, or, with --gate, every answer that resolved that gate, and marks them read.",
 				Flags: []helpFlag{
 					{"--turn <id>", "The id on the first line of the turn's instructions"},
 					{"--file <path>", "The JSON file that holds the record"},

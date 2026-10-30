@@ -11,15 +11,15 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	"github.com/wloophq/wloop/internal/domain/items"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 type turnClock struct{}
 
 func (turnClock) Now() time.Time { return time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC) }
 
-var r7 = pr.Ref{Owner: "acme", Repo: "api", Number: 7}.Unit()
+var r7 = unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 
 // ledgerServer serves turn_end over a real turns service whose turn abc on
 // r7 is started on the session term_1, whose process is term_1, with l as

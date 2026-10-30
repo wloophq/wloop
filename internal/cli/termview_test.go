@@ -61,8 +61,8 @@ func doctorFixture() []checkSection {
 		{"GitHub and Orca", []check{{markOK, "gh authenticated", "", ""}, {markOK, "orca reachable", "", ""}}},
 		{"Config", []check{
 			{markOK, "config", "/home/u/.config/" + brand.StateDir() + "/config.toml", ""},
-			{markInfo, "effective config", `agent=claude github.review_prefix="REVIEW " views.orca.columns.working=reviewing views.orca.columns.ready=ready-to-merge github.automated_reviewers=[lintbot-ai] brief=true`, ""},
-			{markInfo, "turn budgets", "turns.per_unit_per_day=5 (github) turns.per_day=20 (entry, session, slack, workspace)", ""},
+			{markInfo, "effective config", `agent=claude plugins.github.review_prefix="REVIEW " views.orca.columns.working=reviewing views.orca.columns.ready=ready-to-merge plugins.github.automated_reviewers=[lintbot-ai] brief=true`, ""},
+			{markInfo, "turn budgets", "turns.per_unit_per_day=5 (github) turns.per_day=20 (session, slack, task, workspace)", ""},
 		}},
 		{homesSection, []check{
 			{markOK, "agent home /home/u/.claude: MCP server " + brand.Name, "", ""},
@@ -100,8 +100,8 @@ func TestDoctorPipedKeepsItsLines(t *testing.T) {
 	want := `  [ok     ] gh authenticated
   [ok     ] orca reachable
   [ok     ] config: /home/u/.config/` + brand.StateDir() + `/config.toml
-  [info   ] effective config: agent=claude github.review_prefix="REVIEW " views.orca.columns.working=reviewing views.orca.columns.ready=ready-to-merge github.automated_reviewers=[lintbot-ai] brief=true
-  [info   ] turn budgets: turns.per_unit_per_day=5 (github) turns.per_day=20 (entry, session, slack, workspace)
+  [info   ] effective config: agent=claude plugins.github.review_prefix="REVIEW " views.orca.columns.working=reviewing views.orca.columns.ready=ready-to-merge plugins.github.automated_reviewers=[lintbot-ai] brief=true
+  [info   ] turn budgets: turns.per_unit_per_day=5 (github) turns.per_day=20 (session, slack, task, workspace)
   [ok     ] agent home /home/u/.claude: MCP server ` + brand.Name + `
   [ok     ] agent home /home/u/.claude: hook Stop
   [missing] agent home /home/u/.claude: hook SessionStart: absent

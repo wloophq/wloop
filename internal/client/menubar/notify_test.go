@@ -20,57 +20,58 @@ import (
 
 const stamp = "20060102T150405.000000000"
 
-func entryID(n int) string { return fmt.Sprintf("e-%d", n) }
+func taskID(n int) string { return fmt.Sprintf("e-%d", n) }
 
-func pendingEntry(n int) api.EntryView {
-	e := plainEntry(n)
+func pendingTask(n int) api.TaskView {
+	e := plainTask(n)
 	e.Title = "Round soon"
 	e.Attention = &api.Attention{ID: api.NotificationID(api.CategoryInbox, e.ID, now.UTC().Format(stamp)), Category: "INBOX", Title: "Round in 60 s",
 		Subtitle: uref(n).Key, Body: "follow-up: ana replied · waiting 20 min", Image: "round",
-		Actions: []api.AttentionAction{{ID: "gtd:approve", Title: "Run now"}, {ID: "gtd:dismiss", Title: "Skip"}, {ID: "guide", Title: "Guide", TextInput: true, Basis: "b-guide"},
+		Actions: []api.AttentionAction{{ID: "task:approve", Title: "Run now"}, {ID: "task:dismiss", Title: "Skip"}, {ID: "guide", Title: "Guide", TextInput: true, Basis: "b-guide"},
 			{ID: "hold", Title: "Hold", Basis: "b-hold"}, {ID: "open", Title: "Open"}}}
 	return e
 }
 
-func heldEntry(n int, day time.Time) api.EntryView {
-	e := plainEntry(n)
+func heldTask(n int, day time.Time) api.TaskView {
+	e := plainTask(n)
 	e.Attention = &api.Attention{ID: api.NotificationID(api.CategoryHeld, e.ID, day.Local().Format(time.DateOnly)), Category: "HELD", Title: "Round held",
 		Subtitle: uref(n).Key, Body: "automatic round held: daily cap", Image: "held",
-		Actions: []api.AttentionAction{{ID: "gtd:approve", Title: "Run now"}, {ID: "hold", Title: "Hold"}, {ID: "open", Title: "Open"}}}
+		Actions: []api.AttentionAction{{ID: "task:approve", Title: "Run now"}, {ID: "hold", Title: "Hold"}, {ID: "open", Title: "Open"}}}
 	return e
 }
 
-func waitEntry(n int, token string) api.EntryView {
-	e := plainEntry(n)
+func waitTask(n int, token string) api.TaskView {
+	e := plainTask(n)
 	e.Attention = &api.Attention{ID: api.NotificationID(api.CategoryInbox, e.ID, token), Category: "INBOX", Title: "Waiting for a permission",
 		Subtitle: uref(n).Key, Body: "the agent may be waiting for you", Image: "ask",
 		Actions: []api.AttentionAction{{ID: "hold", Title: "Hold"}, {ID: "open", Title: "Open"}}}
 	return e
 }
 
-func questionEntry(n int) api.EntryView {
-	e := plainEntry(n)
-	e.Kind, e.Title = "message", "Publish the review?"
-	e.Message = &api.Message{ID: int64(n), EntryID: e.ID, Unit: uref(n), Kind: "question", Text: "Publish the review?", Recommend: "publish", State: "open",
+func questionTask(n int) api.TaskView {
+	e := plainTask(n)
+	e.Title = "Publish the review?"
+	subject, _ := json.Marshal(api.Message{ID: int64(n), Unit: uref(n), Kind: "question", Text: "Publish the review?", Recommend: "publish",
 		Options: []record.Option{
 			{ID: "comment", Label: "Comment only", Consequence: "posts a comment"},
 			{ID: "publish", Label: "Publish APPROVE", Consequence: "approves", Publishes: true},
 			{ID: "hold", Label: "Hold the draft", Consequence: "nothing is posted"},
-		}}
+		}})
+	e.Gates = []api.GateView{{ID: int64(n), Kind: "question", Status: "open", Intents: []api.IntentView{}, Subject: subject}}
 	e.Attention = &api.Attention{ID: api.NotificationID("Q5", e.ID, "5"), Category: "Q5", Title: "Agent asks", Subtitle: uref(n).Key, Image: "ask",
 		Body: "the draft approves; publish it?",
 		Actions: []api.AttentionAction{
 			{ID: "answer:option:publish", Title: "Publish APPROVE (recommended)"}, {ID: "answer:option:comment", Title: "Comment only"},
-			{ID: "answer:option:hold", Title: "Hold the draft"}, {ID: "answer:text", Title: "Reply", TextInput: true}, {ID: "gtd:dismiss", Title: "Dismiss"},
+			{ID: "answer:option:hold", Title: "Hold the draft"}, {ID: "answer:text", Title: "Reply", TextInput: true}, {ID: "task:dismiss", Title: "Dismiss"},
 		}}
 	return e
 }
 
-func draftEntry(n int) api.EntryView {
+func draftTask(n int) api.TaskView {
 	id := fmt.Sprintf("draft:%d", n)
-	return api.EntryView{ID: id, Kind: "draft", State: "inbox", Title: "reply: on it", Units: []unit.Unit{uref(n)},
+	return api.TaskView{ID: id, State: "inbox", Title: "reply: on it", Units: []unit.Unit{uref(n)},
 		Attention: &api.Attention{ID: api.NotificationID(api.CategoryOutbox, id, now.UTC().Format(stamp)), Category: "OUTBOX", Title: "Draft to approve",
-			Subtitle: uref(n).Key, Body: "reply: on it", Actions: []api.AttentionAction{{ID: "open", Title: "Open"}, {ID: "gtd:dismiss", Title: "Discard"}}}}
+			Subtitle: uref(n).Key, Body: "reply: on it", Actions: []api.AttentionAction{{ID: "open", Title: "Open"}, {ID: "task:dismiss", Title: "Discard"}}}}
 }
 
 func buttons(n Notification) []string {
@@ -111,8 +112,8 @@ func (f *fakeNotifier) withdrawnIDs() []string {
 
 func TestTheNotificationIsTheAttentionAsGiven(t *testing.T) {
 	r := newRig(t)
-	e := pendingEntry(1)
-	r.d.entries["inbox"] = []api.EntryView{e, plainEntry(2)}
+	e := pendingTask(1)
+	r.d.tasks["inbox"] = []api.TaskView{e, plainTask(2)}
 	r.c.Refresh(context.Background())
 	r.c.Refresh(context.Background())
 	if len(r.notes.posted) != 1 {
@@ -126,10 +127,10 @@ func TestTheNotificationIsTheAttentionAsGiven(t *testing.T) {
 }
 
 func TestNotificationButtonsAreTheServedActions(t *testing.T) {
-	for name, e := range map[string]api.EntryView{"pending": pendingEntry(1), "held": heldEntry(2, now), "wait": waitEntry(3, "a"), "question": questionEntry(4), "draft": draftEntry(5)} {
+	for name, e := range map[string]api.TaskView{"pending": pendingTask(1), "held": heldTask(2, now), "wait": waitTask(3, "a"), "question": questionTask(4), "draft": draftTask(5)} {
 		t.Run(name, func(t *testing.T) {
 			r := newRig(t)
-			r.d.entries["inbox"] = []api.EntryView{e}
+			r.d.tasks["inbox"] = []api.TaskView{e}
 			r.c.Refresh(context.Background())
 			if len(r.notes.posted) != 1 {
 				t.Fatalf("posted %+v", r.notes.posted)
@@ -145,11 +146,11 @@ func TestNotificationButtonsAreTheServedActions(t *testing.T) {
 	}
 }
 
-func TestOneNotificationPerEntryInSeveralViews(t *testing.T) {
+func TestOneNotificationPerTaskInSeveralViews(t *testing.T) {
 	r := newRig(t)
-	e := pendingEntry(1)
-	r.d.entries["focus"] = []api.EntryView{e}
-	r.d.entries["inbox"] = []api.EntryView{e}
+	e := pendingTask(1)
+	r.d.tasks["focus"] = []api.TaskView{e}
+	r.d.tasks["inbox"] = []api.TaskView{e}
 	r.c.Refresh(context.Background())
 	if len(r.notes.posted) != 1 {
 		t.Fatalf("posted %+v", r.notes.posted)
@@ -159,17 +160,17 @@ func TestOneNotificationPerEntryInSeveralViews(t *testing.T) {
 func TestLeavingInboxWithdraws(t *testing.T) {
 	r := newRig(t)
 	ctx := context.Background()
-	inbox := []api.EntryView{pendingEntry(1), waitEntry(5, "a"), heldEntry(4, now), questionEntry(6)}
-	r.d.entries["inbox"] = inbox
-	r.d.entries["outbox"] = []api.EntryView{draftEntry(7)}
+	inbox := []api.TaskView{pendingTask(1), waitTask(5, "a"), heldTask(4, now), questionTask(6)}
+	r.d.tasks["inbox"] = inbox
+	r.d.tasks["outbox"] = []api.TaskView{draftTask(7)}
 	r.c.Refresh(ctx)
 	if len(r.notes.posted) != 5 || !slices.Contains(r.notes.categories(), "Q5") {
 		t.Fatalf("posted %+v categories %q", r.notes.posted, r.notes.categories())
 	}
-	r.d.entries["inbox"], r.d.entries["outbox"] = nil, nil
+	r.d.tasks["inbox"], r.d.tasks["outbox"] = nil, nil
 	r.c.Refresh(ctx)
 	var want []string
-	for _, e := range append(slices.Clone(inbox), draftEntry(7)) {
+	for _, e := range append(slices.Clone(inbox), draftTask(7)) {
 		want = append(want, e.Attention.ID)
 	}
 	slices.Sort(want)
@@ -183,27 +184,27 @@ func TestLeavingInboxWithdraws(t *testing.T) {
 	if len(r.notes.withdrawn) != len(want) {
 		t.Fatalf("withdrew again: %q", r.notes.withdrawn)
 	}
-	r.d.entries["inbox"] = []api.EntryView{waitEntry(5, "a"), heldEntry(4, now)}
+	r.d.tasks["inbox"] = []api.TaskView{waitTask(5, "a"), heldTask(4, now)}
 	r.c.Refresh(ctx)
-	if len(r.notes.posted) != 6 || r.notes.posted[5].ID != waitEntry(5, "a").Attention.ID {
-		t.Fatalf("an entry back in the Inbox was not posted, or a held one twice a day: %+v", r.notes.posted[5:])
+	if len(r.notes.posted) != 6 || r.notes.posted[5].ID != waitTask(5, "a").Attention.ID {
+		t.Fatalf("a task back in the Inbox was not posted, or a held one twice a day: %+v", r.notes.posted[5:])
 	}
 }
 
 func TestANewAttentionIDReplacesTheNotification(t *testing.T) {
 	r := newRig(t)
-	r.d.entries["inbox"] = []api.EntryView{waitEntry(5, "a")}
+	r.d.tasks["inbox"] = []api.TaskView{waitTask(5, "a")}
 	r.c.Refresh(context.Background())
-	r.d.entries["inbox"] = []api.EntryView{waitEntry(5, "b")}
+	r.d.tasks["inbox"] = []api.TaskView{waitTask(5, "b")}
 	r.c.Refresh(context.Background())
 	if len(r.notes.posted) != 2 || r.notes.posted[1].ID == r.notes.posted[0].ID || !slices.Equal(r.notes.withdrawn, []string{r.notes.posted[0].ID}) {
 		t.Fatalf("posted %+v withdrawn %v", r.notes.posted, r.notes.withdrawn)
 	}
 }
 
-func TestAnEntryWithoutAttentionIsNotNotified(t *testing.T) {
+func TestATaskWithoutAttentionIsNotNotified(t *testing.T) {
 	r := newRig(t)
-	r.d.entries["inbox"] = []api.EntryView{plainEntry(1)}
+	r.d.tasks["inbox"] = []api.TaskView{plainTask(1)}
 	r.d.rows["needs-me"] = []api.Row{reviewRow(1)}
 	r.c.Refresh(context.Background())
 	if len(r.notes.posted) != 0 {
@@ -211,14 +212,14 @@ func TestAnEntryWithoutAttentionIsNotNotified(t *testing.T) {
 	}
 }
 
-func TestResponsesBecomeEntryVerbs(t *testing.T) {
+func TestResponsesBecomeTaskVerbs(t *testing.T) {
 	r := newRig(t)
 	ctx := context.Background()
-	r.d.entries["inbox"] = []api.EntryView{pendingEntry(1), questionEntry(6)}
+	r.d.tasks["inbox"] = []api.TaskView{pendingTask(1), questionTask(6)}
 	r.c.Refresh(ctx)
-	id, q := pendingEntry(1).Attention.ID, questionEntry(6).Attention.ID
+	id, q := pendingTask(1).Attention.ID, questionTask(6).Attention.ID
 	for _, c := range []struct{ id, action, text string }{
-		{id, "gtd:approve", ""}, {id, "gtd:dismiss", ""}, {id, "guide", "look at the retry"}, {id, "hold", ""}, {id, "open", ""},
+		{id, "task:approve", ""}, {id, "task:dismiss", ""}, {id, "guide", "look at the retry"}, {id, "hold", ""}, {id, "open", ""},
 		{q, "answer:option:publish", ""},
 	} {
 		resp, ok := ResponseFor(c.id, c.action)
@@ -246,37 +247,37 @@ func TestResponsesBecomeEntryVerbs(t *testing.T) {
 	}
 }
 
-func TestACatalogButtonAfterARestartFindsTheEntrysUnit(t *testing.T) {
+func TestACatalogButtonAfterARestartFindsTheTasksUnit(t *testing.T) {
 	r := newRig(t)
-	r.d.entries["next"] = nil
-	r.d.entries["inbox"] = nil
-	r.d.entries["someday"] = []api.EntryView{pendingEntry(3)}
-	resp, _ := ResponseFor(pendingEntry(3).Attention.ID, "hold")
+	r.d.tasks["next"] = nil
+	r.d.tasks["inbox"] = nil
+	r.d.tasks["someday"] = []api.TaskView{pendingTask(3)}
+	resp, _ := ResponseFor(pendingTask(3).Attention.ID, "hold")
 	r.c.Respond(context.Background(), resp)
 	if got := r.d.snapshotActions(); !slices.Equal(got, []string{"hold acme/api#3"}) {
 		t.Fatalf("actions %q", got)
 	}
 }
 
-func TestOpenGoesToTheEntry(t *testing.T) {
+func TestOpenGoesToTheTask(t *testing.T) {
 	r := newRig(t)
 	ctx := context.Background()
-	r.c.Respond(ctx, Response{ID: pendingEntry(1).Attention.ID, Action: ActionOpen})
-	r.c.Respond(ctx, Response{ID: questionEntry(6).Attention.ID, Action: ActionOpen})
-	want := []string{"cockpit#entry=e-1", "cockpit#entry=e-6"}
+	r.c.Respond(ctx, Response{ID: pendingTask(1).Attention.ID, Action: ActionOpen})
+	r.c.Respond(ctx, Response{ID: questionTask(6).Attention.ID, Action: ActionOpen})
+	want := []string{"cockpit#task=e-1", "cockpit#task=e-6"}
 	waitFor(t, func() bool { return slices.Equal(r.openedURLs(), want) })
 	if len(r.d.snapshotActions())+len(r.d.snapshotVerbs()) != 0 {
 		t.Fatalf("opening posted %q %+v", r.d.snapshotActions(), r.d.snapshotVerbs())
 	}
 }
 
-func TestOutboxOpenGoesToTheDraftEntry(t *testing.T) {
+func TestOutboxOpenGoesToTheDraftTask(t *testing.T) {
 	r := newRig(t)
-	r.d.entries["outbox"] = []api.EntryView{draftEntry(7)}
+	r.d.tasks["outbox"] = []api.TaskView{draftTask(7)}
 	r.c.Refresh(context.Background())
 	resp, _ := ResponseFor(r.notes.posted[0].ID, "open")
 	r.c.Respond(context.Background(), resp)
-	if o := r.openedURLs(); !slices.Equal(o, []string{"cockpit#entry=draft:7"}) {
+	if o := r.openedURLs(); !slices.Equal(o, []string{"cockpit#task=draft:7"}) {
 		t.Fatalf("opened %v", o)
 	}
 	if len(r.d.snapshotActions()) != 0 {
@@ -286,15 +287,15 @@ func TestOutboxOpenGoesToTheDraftEntry(t *testing.T) {
 
 func TestADraftNotificationNeverApproves(t *testing.T) {
 	r := newRig(t)
-	d := draftEntry(7)
-	d.Attention.Actions = append([]api.AttentionAction{{ID: "gtd:approve", Title: "Approve"}}, d.Attention.Actions...)
-	r.d.entries["outbox"] = []api.EntryView{d}
+	d := draftTask(7)
+	d.Attention.Actions = append([]api.AttentionAction{{ID: "task:approve", Title: "Approve"}}, d.Attention.Actions...)
+	r.d.tasks["outbox"] = []api.TaskView{d}
 	r.c.Refresh(context.Background())
 	n := r.notes.posted[0]
-	if got := buttons(n); !slices.Equal(got, []string{"open Open", "gtd:dismiss Discard"}) {
+	if got := buttons(n); !slices.Equal(got, []string{"open Open", "task:dismiss Discard"}) {
 		t.Fatalf("a draft offers %q", got)
 	}
-	for _, action := range []string{"gtd:approve", "gtd:dismiss"} {
+	for _, action := range []string{"task:approve", "task:dismiss"} {
 		resp, _ := ResponseFor(n.ID, action)
 		r.c.Respond(context.Background(), resp)
 	}
@@ -303,10 +304,10 @@ func TestADraftNotificationNeverApproves(t *testing.T) {
 	}
 }
 
-func TestQuickAnswersPostTheEntrysAnswer(t *testing.T) {
+func TestQuickAnswersPostTheTasksAnswer(t *testing.T) {
 	r := newRig(t)
 	ctx := context.Background()
-	id := questionEntry(7).Attention.ID
+	id := questionTask(7).Attention.ID
 	for _, c := range []struct{ action, text string }{{"answer:yes", ""}, {"answer:no", ""}, {"answer:text", "keep the retry"}} {
 		resp, ok := ResponseFor(id, c.action)
 		if !ok {
@@ -333,7 +334,7 @@ func TestQuickAnswersPostTheEntrysAnswer(t *testing.T) {
 func TestAnAnswerThatDidNotLandSaysSo(t *testing.T) {
 	r := newRig(t)
 	r.d.failing = errors.New("no agent session in the workspace of acme/api#5 to answer; use Review or Address")
-	resp, _ := ResponseFor(questionEntry(5).Attention.ID, "answer:text")
+	resp, _ := ResponseFor(questionTask(5).Attention.ID, "answer:text")
 	resp.Text = "sim"
 	r.c.Respond(context.Background(), resp)
 	if len(r.notes.posted) != 1 {
@@ -341,22 +342,22 @@ func TestAnAnswerThatDidNotLandSaysSo(t *testing.T) {
 	}
 	n := r.notes.posted[0]
 	cat, route, ok := api.ParseNotificationID(n.ID)
-	if !ok || cat != api.CategoryNote || route != "entry=e-5" || n.Title != "Answer not sent" || !strings.Contains(n.Body, "no agent session") {
+	if !ok || cat != api.CategoryNote || route != "task=e-5" || n.Title != "Answer not sent" || !strings.Contains(n.Body, "no agent session") {
 		t.Fatalf("%+v", n)
 	}
 	r.c.Respond(context.Background(), Response{ID: n.ID, Action: ActionOpen})
-	if o := r.openedURLs(); !slices.Equal(o, []string{"cockpit#entry=e-5"}) {
+	if o := r.openedURLs(); !slices.Equal(o, []string{"cockpit#task=e-5"}) {
 		t.Fatalf("the note opened %v", o)
 	}
 }
 
 func TestAnActionThatDidNotLandSaysSo(t *testing.T) {
 	r := newRig(t)
-	r.d.entries["inbox"] = []api.EntryView{pendingEntry(7)}
+	r.d.tasks["inbox"] = []api.TaskView{pendingTask(7)}
 	r.c.Refresh(context.Background())
 	r.d.failing = errors.New("the row changed: the pending round already went out")
-	for _, action := range []string{"hold", "gtd:approve"} {
-		resp, _ := ResponseFor(pendingEntry(7).Attention.ID, action)
+	for _, action := range []string{"hold", "task:approve"} {
+		resp, _ := ResponseFor(pendingTask(7).Attention.ID, action)
 		r.c.Respond(context.Background(), resp)
 	}
 	notes := r.notes.snapshot()[1:]
@@ -368,13 +369,13 @@ func TestAnActionThatDidNotLandSaysSo(t *testing.T) {
 
 func TestAQueuedAnswerSaysItWaitsForTheAgent(t *testing.T) {
 	r := newRig(t)
-	r.d.result = api.EntryResult{Lines: []string{api.AnswerQueued}}
-	resp, _ := ResponseFor(questionEntry(7).Attention.ID, "answer:yes")
+	r.d.result = api.TaskResult{Lines: []string{api.AnswerQueued}}
+	resp, _ := ResponseFor(questionTask(7).Attention.ID, "answer:yes")
 	r.c.Respond(context.Background(), resp)
 	if len(r.notes.posted) != 1 || r.notes.posted[0].Title != "Answer queued" || r.notes.posted[0].Body != api.AnswerQueued {
 		t.Fatalf("posted %+v", r.notes.posted)
 	}
-	r.d.result = api.EntryResult{Lines: []string{"answer sent to the agent session"}}
+	r.d.result = api.TaskResult{Lines: []string{"answer sent to the agent session"}}
 	r.c.Respond(context.Background(), resp)
 	if len(r.notes.posted) != 1 {
 		t.Fatalf("a typed answer posted %+v", r.notes.posted[1:])
@@ -397,7 +398,7 @@ func TestEachNotificationResponseIsLoggedWithoutItsText(t *testing.T) {
 	r := newRig(t)
 	var logs []string
 	r.c.cfg.Log = func(format string, args ...any) { logs = append(logs, fmt.Sprintf(format, args...)) }
-	id := questionEntry(7).Attention.ID
+	id := questionTask(7).Attention.ID
 	resp, _ := ResponseFor(id, "answer:text")
 	resp.Text = "look at the retry"
 	r.c.Respond(context.Background(), resp)
@@ -409,7 +410,7 @@ func TestEachNotificationResponseIsLoggedWithoutItsText(t *testing.T) {
 
 func TestNotificationButtonsSendTheBasisTheyWereServedFor(t *testing.T) {
 	r := newRig(t)
-	r.d.entries["inbox"] = []api.EntryView{pendingEntry(1)}
+	r.d.tasks["inbox"] = []api.TaskView{pendingTask(1)}
 	r.c.Refresh(context.Background())
 	resp, _ := ResponseFor(r.notes.posted[0].ID, "hold")
 	r.c.Respond(context.Background(), resp)
@@ -423,8 +424,8 @@ func TestEveryPostCarriesItsSource(t *testing.T) {
 	ctx := context.Background()
 	rows := goldenRows(t)
 	r.d.rows["loop"] = []api.Row{rows["pending"], rows["asked_choice"], rows["intake_waiting_cli"]}
-	r.d.entries["inbox"] = []api.EntryView{pendingEntry(1), questionEntry(2)}
-	r.d.entries["outbox"] = []api.EntryView{draftEntry(3)}
+	r.d.tasks["inbox"] = []api.TaskView{pendingTask(1), questionTask(2)}
+	r.d.tasks["outbox"] = []api.TaskView{draftTask(3)}
 	r.c.Refresh(ctx)
 	var clicks int
 	for _, it := range r.tray.menu {
@@ -474,7 +475,7 @@ func TestEveryPostCarriesItsSource(t *testing.T) {
 func TestAFailedPostIsRetried(t *testing.T) {
 	r := newRig(t)
 	r.notes.postErr = errors.New("not authorized")
-	r.d.entries["inbox"] = []api.EntryView{pendingEntry(1)}
+	r.d.tasks["inbox"] = []api.TaskView{pendingTask(1)}
 	r.c.Refresh(context.Background())
 	r.notes.postErr = nil
 	r.c.Refresh(context.Background())
@@ -485,7 +486,7 @@ func TestAFailedPostIsRetried(t *testing.T) {
 
 func TestDeliveredNotificationsAreClearedAtStart(t *testing.T) {
 	r := newRig(t)
-	r.d.entries["inbox"] = []api.EntryView{pendingEntry(1)}
+	r.d.tasks["inbox"] = []api.TaskView{pendingTask(1)}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { _ = r.c.Run(ctx); close(done) }()
@@ -506,7 +507,7 @@ func TestUnreadableIdsAreWithdrawnAtStart(t *testing.T) {
 	writeSent(t, path, sentFile{Day: today, IDs: []string{unreadable}})
 	notes := &fakeNotifier{perm: PermissionAuthorized}
 	d := newDaemon()
-	d.entries["inbox"] = []api.EntryView{heldEntry(4, now)}
+	d.tasks["inbox"] = []api.TaskView{heldTask(4, now)}
 	c := newController(d, notes, path, func() time.Time { return now })
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
@@ -520,7 +521,7 @@ func TestUnreadableIdsAreWithdrawnAtStart(t *testing.T) {
 	if cleared != 1 {
 		t.Fatalf("the delivered notifications were cleared %d times at start", cleared)
 	}
-	if f := readSent(t, path); slices.Contains(f.IDs, unreadable) || !slices.Equal(f.IDs, []string{heldEntry(4, now).Attention.ID}) {
+	if f := readSent(t, path); slices.Contains(f.IDs, unreadable) || !slices.Equal(f.IDs, []string{heldTask(4, now).Attention.ID}) {
 		t.Fatalf("the sent file holds %q", f.IDs)
 	}
 }
@@ -554,105 +555,105 @@ func newController(d *fakeDaemon, notes *fakeNotifier, path string, clock func()
 	})
 }
 
-func startAt(t *testing.T, path string, perm Permission, at time.Time, entries ...api.EntryView) *fakeNotifier {
+func startAt(t *testing.T, path string, perm Permission, at time.Time, tasks ...api.TaskView) *fakeNotifier {
 	t.Helper()
 	notes := &fakeNotifier{perm: perm}
 	d := newDaemon()
-	d.entries["inbox"] = entries
+	d.tasks["inbox"] = tasks
 	newController(d, notes, path, func() time.Time { return at }).Refresh(context.Background())
 	return notes
 }
 
-func TestHeldEntryOncePerDayAcrossRestart(t *testing.T) {
+func TestHeldTaskOncePerDayAcrossRestart(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "notified.json")
-	if n := startAt(t, path, PermissionAuthorized, now, heldEntry(4, now)); len(n.posted) != 1 {
+	if n := startAt(t, path, PermissionAuthorized, now, heldTask(4, now)); len(n.posted) != 1 {
 		t.Fatalf("first start posted %d", len(n.posted))
 	}
-	if n := startAt(t, path, PermissionAuthorized, now.Add(time.Minute), heldEntry(4, now)); len(n.posted) != 0 {
+	if n := startAt(t, path, PermissionAuthorized, now.Add(time.Minute), heldTask(4, now)); len(n.posted) != 0 {
 		t.Fatalf("restart posted again: %+v", n.posted)
 	}
 	next := now.Add(24 * time.Hour)
-	if n := startAt(t, path, PermissionAuthorized, next, heldEntry(4, next)); len(n.posted) != 1 {
+	if n := startAt(t, path, PermissionAuthorized, next, heldTask(4, next)); len(n.posted) != 1 {
 		t.Fatalf("next day posted %d", len(n.posted))
 	}
 	if err := os.WriteFile(path, []byte("{broken"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	later := now.Add(48 * time.Hour)
-	if n := startAt(t, path, PermissionAuthorized, later, heldEntry(4, later)); len(n.posted) != 1 {
+	if n := startAt(t, path, PermissionAuthorized, later, heldTask(4, later)); len(n.posted) != 1 {
 		t.Fatalf("a broken file stopped the notification: %d", len(n.posted))
 	}
 }
 
-func TestTheSentFileKeepsOnlyTodaysHeldEntries(t *testing.T) {
+func TestTheSentFileKeepsOnlyTodaysHeldTasks(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "notified.json")
-	entries := []api.EntryView{heldEntry(4, now), waitEntry(5, "a"), pendingEntry(6)}
-	if n := startAt(t, path, PermissionAuthorized, now, entries...); len(n.posted) != 3 {
+	tasks := []api.TaskView{heldTask(4, now), waitTask(5, "a"), pendingTask(6)}
+	if n := startAt(t, path, PermissionAuthorized, now, tasks...); len(n.posted) != 3 {
 		t.Fatalf("posted %+v", n.posted)
 	}
 	fi, err := os.Stat(path)
 	if err != nil || fi.Mode().Perm() != 0o600 {
 		t.Fatalf("mode %v %v", fi, err)
 	}
-	if f := readSent(t, path); f.Day != now.Local().Format(time.DateOnly) || !slices.Equal(f.IDs, []string{entries[0].Attention.ID}) {
+	if f := readSent(t, path); f.Day != now.Local().Format(time.DateOnly) || !slices.Equal(f.IDs, []string{tasks[0].Attention.ID}) {
 		t.Fatalf("%+v", f)
 	}
-	if n := startAt(t, path, PermissionAuthorized, now, entries...); len(n.posted) != 2 || slices.ContainsFunc(n.posted, func(p Notification) bool { cat, _, _ := api.ParseNotificationID(p.ID); return cat == api.CategoryHeld }) {
+	if n := startAt(t, path, PermissionAuthorized, now, tasks...); len(n.posted) != 2 || slices.ContainsFunc(n.posted, func(p Notification) bool { cat, _, _ := api.ParseNotificationID(p.ID); return cat == api.CategoryHeld }) {
 		t.Fatalf("after a restart: %+v", n.posted)
 	}
 }
 
-func TestTheSentFileIsReadOnlyForItsDayAndForHeldEntries(t *testing.T) {
+func TestTheSentFileIsReadOnlyForItsDayAndForHeldTasks(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "notified.json")
 	today := now.Local().Format(time.DateOnly)
-	writeSent(t, path, sentFile{Day: now.Add(-24 * time.Hour).Local().Format(time.DateOnly), IDs: []string{heldEntry(4, now).Attention.ID}})
-	if n := startAt(t, path, PermissionAuthorized, now, heldEntry(4, now)); len(n.posted) != 1 {
+	writeSent(t, path, sentFile{Day: now.Add(-24 * time.Hour).Local().Format(time.DateOnly), IDs: []string{heldTask(4, now).Attention.ID}})
+	if n := startAt(t, path, PermissionAuthorized, now, heldTask(4, now)); len(n.posted) != 1 {
 		t.Fatalf("yesterday's file suppressed today's notice: %+v", n.posted)
 	}
-	wait := waitEntry(5, "a")
+	wait := waitTask(5, "a")
 	writeSent(t, path, sentFile{Day: today, IDs: []string{wait.Attention.ID}})
 	if n := startAt(t, path, PermissionAuthorized, now, wait); len(n.posted) != 1 {
 		t.Fatalf("the file suppressed a wait: %+v", n.posted)
 	}
 }
 
-func TestAHeldEntryWaitsForNotificationsToBeAllowed(t *testing.T) {
+func TestAHeldTaskWaitsForNotificationsToBeAllowed(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "notified.json")
-	if n := startAt(t, path, PermissionDenied, now, heldEntry(4, now)); len(n.posted) != 0 {
+	if n := startAt(t, path, PermissionDenied, now, heldTask(4, now)); len(n.posted) != 0 {
 		t.Fatalf("posted while denied: %+v", n.posted)
 	}
 	if _, err := os.Stat(path); err == nil {
 		t.Fatal("saved a notice nobody saw")
 	}
-	if n := startAt(t, path, PermissionAuthorized, now, heldEntry(4, now)); len(n.posted) != 1 {
+	if n := startAt(t, path, PermissionAuthorized, now, heldTask(4, now)); len(n.posted) != 1 {
 		t.Fatalf("allowed later the same day: %+v", n.posted)
 	}
 }
 
-func TestAHeldEntryAlreadyPostedDoesNotAskForPermission(t *testing.T) {
+func TestAHeldTaskAlreadyPostedDoesNotAskForPermission(t *testing.T) {
 	r := newRig(t)
-	r.d.entries["inbox"] = []api.EntryView{heldEntry(4, now)}
+	r.d.tasks["inbox"] = []api.TaskView{heldTask(4, now)}
 	r.c.Refresh(context.Background())
 	before := r.notes.permissionCalls()
 	r.c.Refresh(context.Background())
 	withHeld := r.notes.permissionCalls() - before
-	r.d.entries["inbox"] = nil
+	r.d.tasks["inbox"] = nil
 	r.c.Refresh(context.Background())
 	before = r.notes.permissionCalls()
 	r.c.Refresh(context.Background())
 	if without := r.notes.permissionCalls() - before; withHeld != without {
-		t.Fatalf("a held entry posted already asked for permission: %d calls, %d without it", withHeld, without)
+		t.Fatalf("a held task posted already asked for permission: %d calls, %d without it", withHeld, without)
 	}
 }
 
-func TestARestartThroughRunPostsTodaysHeldEntryAgain(t *testing.T) {
+func TestARestartThroughRunPostsTodaysHeldTaskAgain(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "notified.json")
-	if n := startAt(t, path, PermissionAuthorized, now, heldEntry(4, now)); len(n.posted) != 1 {
+	if n := startAt(t, path, PermissionAuthorized, now, heldTask(4, now)); len(n.posted) != 1 {
 		t.Fatalf("first start posted %d", len(n.posted))
 	}
 	notes := &fakeNotifier{perm: PermissionAuthorized}
 	d := newDaemon()
-	d.entries["inbox"] = []api.EntryView{heldEntry(4, now)}
+	d.tasks["inbox"] = []api.TaskView{heldTask(4, now)}
 	c := newController(d, notes, path, func() time.Time { return now })
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
@@ -669,7 +670,7 @@ func TestARestartThroughRunPostsTodaysHeldEntryAgain(t *testing.T) {
 
 func TestACategoryIsRegisteredFromTheServedButtons(t *testing.T) {
 	c := NewCategories()
-	a := pendingEntry(1).Attention
+	a := pendingTask(1).Attention
 	n := Notification{ID: a.ID, Category: Category(a.Category)}
 	for _, x := range a.Actions {
 		n.Actions = append(n.Actions, NotificationAction{ID: x.ID, Title: x.Title, TextInput: x.TextInput})
@@ -681,7 +682,7 @@ func TestACategoryIsRegisteredFromTheServedButtons(t *testing.T) {
 
 func TestAQuestionCategoryStaysWhileAnotherNotificationUsesIt(t *testing.T) {
 	c := NewCategories()
-	actions := []NotificationAction{{ID: "gtd:dismiss", Title: "Dismiss"}}
+	actions := []NotificationAction{{ID: "task:dismiss", Title: "Dismiss"}}
 	a := Notification{ID: api.NotificationID("Q0", "e-1", "0"), Category: "Q0", Actions: actions}
 	b := Notification{ID: api.NotificationID("Q0", "e-2", "0"), Category: "Q0", Actions: actions}
 	if !c.Post(a) || c.Post(b) {
@@ -697,33 +698,33 @@ func TestAQuestionCategoryStaysWhileAnotherNotificationUsesIt(t *testing.T) {
 		t.Fatal("kept Q0 after its last notification")
 	}
 	if c.Withdraw([]string{api.NotificationID(api.CategoryInbox, "e-3", "x")}) {
-		t.Fatal("an Inbox entry's withdrawal changed the categories")
+		t.Fatal("an Inbox task's withdrawal changed the categories")
 	}
 }
 
 func TestMenubarNotifiesFromTheSet(t *testing.T) {
 	r := newRig(t)
-	r.d.entries["inbox"] = []api.EntryView{pendingEntry(1)}
+	r.d.tasks["inbox"] = []api.TaskView{pendingTask(1)}
 	r.c.Refresh(context.Background())
 	r.c.Refresh(context.Background())
 	if n := len(r.notes.snapshot()); n != 1 {
-		t.Fatalf("posted %d notifications for one entry over two refreshes", n)
+		t.Fatalf("posted %d notifications for one task over two refreshes", n)
 	}
 }
 
 func TestMenubarNotificationsFollowTheInbox(t *testing.T) {
 	r := newRig(t)
 	r.c.Refresh(context.Background())
-	added := pendingEntry(1)
-	inbox := func(entries ...api.EntryView) {
+	added := pendingTask(1)
+	inbox := func(tasks ...api.TaskView) {
 		r.d.mu.Lock()
-		r.d.entries["inbox"] = entries
+		r.d.tasks["inbox"] = tasks
 		r.d.mu.Unlock()
 		r.c.Refresh(context.Background())
 	}
 	inbox(added)
 	if len(r.notes.postedIDs()) != 1 {
-		t.Fatalf("an entry added posted %v", r.notes.postedIDs())
+		t.Fatalf("a task added posted %v", r.notes.postedIDs())
 	}
 	inbox(added)
 	if len(r.notes.postedIDs()) != 1 {
@@ -731,14 +732,14 @@ func TestMenubarNotificationsFollowTheInbox(t *testing.T) {
 	}
 	inbox()
 	if w := r.notes.withdrawnIDs(); len(w) != 1 || w[0] != added.Attention.ID {
-		t.Fatalf("the entry leaving withdrew %v", w)
+		t.Fatalf("the task leaving withdrew %v", w)
 	}
 }
 
 func TestMenubarReconnectPostsNothing(t *testing.T) {
 	r, k := clockedRig(t)
 	r.d.events = make(chan api.Change)
-	r.d.entries["inbox"] = []api.EntryView{pendingEntry(1)}
+	r.d.tasks["inbox"] = []api.TaskView{pendingTask(1)}
 	stop := run(t, r)
 	defer stop()
 	waitFor(t, func() bool { return len(r.notes.postedIDs()) == 1 })
@@ -779,9 +780,9 @@ func TestMenubarPostsANoticeWithoutPullingTheRows(t *testing.T) {
 
 func TestEachActionSetGetsItsOwnCategory(t *testing.T) {
 	r := newRig(t)
-	plain := plainEntry(3)
+	plain := plainTask(3)
 	plain.Attention = &api.Attention{ID: api.NotificationID(api.CategoryInbox, plain.ID, "x"), Category: "INBOX", Title: "In your Inbox", Body: plain.Title, Actions: []api.AttentionAction{}}
-	r.d.entries["inbox"] = []api.EntryView{pendingEntry(1), waitEntry(2, "a"), plain, questionEntry(4)}
+	r.d.tasks["inbox"] = []api.TaskView{pendingTask(1), waitTask(2, "a"), plain, questionTask(4)}
 	r.c.Refresh(context.Background())
 	posted := r.notes.snapshot()
 	if len(posted) != 4 {
@@ -797,21 +798,21 @@ func TestEachActionSetGetsItsOwnCategory(t *testing.T) {
 	if len(cats) != 4 || !cats["Q5"] {
 		t.Fatalf("categories %v", cats)
 	}
-	r.d.entries["inbox"] = nil
+	r.d.tasks["inbox"] = nil
 	r.c.Refresh(context.Background())
 	if got := r.notes.categories(); len(got) != 0 {
 		t.Fatalf("categories outlive their notifications: %q", got)
 	}
 }
 
-func TestAttentionChangedWithoutAnEntryWritePostsTheNewID(t *testing.T) {
+func TestAttentionChangedWithoutATaskWritePostsTheNewID(t *testing.T) {
 	r := newRig(t)
-	e := waitEntry(5, "a")
-	r.d.entries["inbox"] = []api.EntryView{e}
+	e := waitTask(5, "a")
+	r.d.tasks["inbox"] = []api.TaskView{e}
 	r.c.Refresh(context.Background())
-	proposed := waitEntry(5, "with-draft-1")
+	proposed := waitTask(5, "with-draft-1")
 	r.d.mu.Lock()
-	r.d.entries["inbox"] = []api.EntryView{proposed}
+	r.d.tasks["inbox"] = []api.TaskView{proposed}
 	r.d.mu.Unlock()
 	r.c.Refresh(context.Background())
 	if got := r.notes.postedIDs(); !slices.Equal(got, []string{e.Attention.ID, proposed.Attention.ID}) {
@@ -842,7 +843,7 @@ func TestConcurrentSavesKeepEveryID(t *testing.T) {
 	var wg sync.WaitGroup
 	want := []string{}
 	for i := range 64 {
-		id := api.NotificationID(api.CategoryHeld, entryID(i), day)
+		id := api.NotificationID(api.CategoryHeld, taskID(i), day)
 		want = append(want, id)
 		wg.Go(func() {
 			c.mu.Lock()
@@ -855,5 +856,42 @@ func TestConcurrentSavesKeepEveryID(t *testing.T) {
 	slices.Sort(want)
 	if f := readSent(t, path); !slices.Equal(f.IDs, want) {
 		t.Fatalf("the sent file holds %d of %d ids", len(f.IDs), len(want))
+	}
+}
+
+func TestNotificationActionsUseTaskIds(t *testing.T) {
+	r := newRig(t)
+	ctx := context.Background()
+	e := pendingTask(1)
+	e.Attention.Actions = []api.AttentionAction{{ID: "task:approve", Title: "Run now"}, {ID: "task:delegate:headless", Title: "Draft for me"}, {ID: "gtd:dismiss", Title: "Skip"}}
+	r.d.tasks["inbox"] = []api.TaskView{e}
+	r.d.tasks["outbox"] = []api.TaskView{draftTask(7)}
+	r.c.Refresh(ctx)
+	for _, action := range []string{"task:approve", "task:delegate:headless", "gtd:dismiss"} {
+		resp, _ := ResponseFor(e.Attention.ID, action)
+		r.c.Respond(ctx, resp)
+	}
+	var verbs []string
+	for _, v := range r.d.snapshotVerbs() {
+		verbs = append(verbs, fmt.Sprintf("%s %s %v", v.id, v.verb, v.req.Args))
+	}
+	if want := []string{"e-1 approve map[]", "e-1 delegate map[mode:headless]"}; !slices.Equal(verbs, want) {
+		t.Fatalf("verbs %q, want %q: an old gtd: id must not run a verb", verbs, want)
+	}
+	var draft Notification
+	for _, n := range r.notes.posted {
+		if cat, _, _ := api.ParseNotificationID(n.ID); cat == api.CategoryOutbox {
+			draft = n
+		}
+	}
+	if got := buttons(draft); !slices.Equal(got, []string{"open Open", "task:dismiss Discard"}) {
+		t.Fatalf("a draft offers %q", got)
+	}
+	r.d.failing = errors.New("refused")
+	resp, _ := ResponseFor(e.Attention.ID, "task:approve")
+	r.c.Respond(ctx, resp)
+	note := r.notes.snapshot()[len(r.notes.snapshot())-1]
+	if _, route, ok := api.ParseNotificationID(note.ID); !ok || route != "task=e-1" {
+		t.Fatalf("the note's id %q does not carry the task route", note.ID)
 	}
 }

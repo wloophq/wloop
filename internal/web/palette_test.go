@@ -13,7 +13,7 @@ type paletteItem struct {
 func TestPaletteShowsEveryKey(t *testing.T) {
 	row := map[string]any{
 		"unit": map[string]string{"provider": "github", "key": "acme/api#8"}, "label": "acme/api#8",
-		"actions": []map[string]any{{"id": "hold", "enabled": true, "label": "Hold"}, {"id": "release", "enabled": false}, {"id": "dismiss", "enabled": true, "label": "Dismiss the turn"}, {"id": "act", "enabled": true, "label": "Act"}},
+		"actions": []map[string]any{{"id": "pause", "enabled": true, "label": "Pause"}, {"id": "resume", "enabled": false}, {"id": "dismiss", "enabled": true, "label": "Dismiss the turn"}, {"id": "act", "enabled": true, "label": "Act"}},
 	}
 	var got struct {
 		Title string        `json:"title"`
@@ -32,7 +32,7 @@ func TestPaletteShowsEveryKey(t *testing.T) {
 		Narrowed []paletteItem `json:"narrowed"`
 	}
 	keysRun(t, "", `
-const k = harness({ selected: input.entry, rows: [input.row], areas: ["OSS", "Hiring"] });
+const k = harness({ selected: input.task, rows: [input.row], areas: ["OSS", "Hiring"] });
 await k.press("k", { meta: true });
 const pal = k.log.palette;
 await k.press("?");
@@ -43,7 +43,7 @@ await pal.items.find((i) => i.label === "Area...").run();
 const areas = k.log.palette;
 areas.items[2].run();
 return { title: pal.title, items: strip(pal.items), help: k.log.help, bindings: BINDINGS.length, areas: strip(areas.items), picked: k.log.area, unit: k.log.unit,
-  narrowed: strip(paletteMatch(pal.items, "TO next")) };`, map[string]any{"entry": entryFixture(), "row": row}, &got)
+  narrowed: strip(paletteMatch(pal.items, "TO next")) };`, map[string]any{"task": taskFixture(), "row": row}, &got)
 
 	has := func(label, key string) bool {
 		for _, it := range got.Items {
@@ -57,14 +57,14 @@ return { title: pal.title, items: strip(pal.items), help: k.log.help, bindings: 
 		{"to Next", "x"}, {"to Waiting", "w"}, {"schedule or snooze", "s"}, {"to Someday", "y"}, {"to Reference", "l"},
 		{"toggle Focus", "f"}, {"make a project or attach to one", "p"}, {"approve the draft or proposal", "a"},
 		{"delegate to an agent", "d"}, {"done", "e"}, {"dismiss", "Backspace"},
-		{"Hold", "H"}, {"Dismiss the turn", "X"}, {"Act", ""}, {"open the source", "o"},
-		{"capture", "n"}, {"Inbox", "g i"}, {"the GitHub views", "g g"}, {"filter", "/"}, {"help", "?"}, {"Area...", ""},
+		{"Pause", "H"}, {"Dismiss the turn", "X"}, {"Act", ""}, {"open the source", "o"},
+		{"capture", "n"}, {"Inbox", "g i"}, {"GitHub", "g g"}, {"filter", "/"}, {"help", "?"}, {"Area...", ""},
 	} {
 		if !has(want.Label, want.Key) {
 			t.Errorf("the palette lacks %q on %q: %+v", want.Label, want.Key, got.Items)
 		}
 	}
-	if has("Release", "H") || has("seen", "") {
+	if has("Resume", "H") || has("seen", "") {
 		t.Errorf("the palette offers what the selection does not: %+v", got.Items)
 	}
 	if len(got.Unit) != 2 {

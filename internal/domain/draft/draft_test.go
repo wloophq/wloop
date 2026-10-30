@@ -8,10 +8,10 @@ import (
 
 func TestDraftTransitionsTable(t *testing.T) {
 	allowed := map[State][]State{
-		Proposed: {Approved, Discarded},
-		Approved: {Sending, Failed, Discarded},
-		Sending:  {Sent, Failed},
-		Failed:   {Approved, Discarded},
+		Held:    {Queued, Failed, Dropped},
+		Queued:  {Sending, Failed, Dropped},
+		Sending: {Sent, Failed},
+		Failed:  {Queued, Dropped},
 	}
 	for _, from := range States {
 		for _, to := range States {
@@ -28,7 +28,7 @@ func TestDraftTransitionsTable(t *testing.T) {
 			}
 		}
 	}
-	if err := (Draft{State: "bogus"}).Can(Approved); !errors.Is(err, ErrTransition) {
+	if err := (Draft{State: "bogus"}).Can(Queued); !errors.Is(err, ErrTransition) {
 		t.Errorf("unknown state: %v", err)
 	}
 }
@@ -93,8 +93,7 @@ func TestShapeAndKindRoundTrip(t *testing.T) {
 
 func TestStoredSpellingsAreTheLanguages(t *testing.T) {
 	for _, c := range [][2]string{
-		{string(DryRun), "dry_run"}, {string(WouldWait), "wait"}, {string(WouldRelease), "release"},
-		{string(OutcomeReleased), "released"}, {string(OutcomeDryRun), "dry_run"},
+		{string(DryRun), "dry_run"}, {string(Held), "held"}, {string(Queued), "queued"}, {string(Dropped), "dropped"},
 	} {
 		if c[0] != c[1] {
 			t.Errorf("stored %q, want %q", c[0], c[1])

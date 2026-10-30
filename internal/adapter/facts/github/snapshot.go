@@ -2,13 +2,10 @@ package factsgithub
 
 import (
 	"context"
-	"fmt"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/sweep"
@@ -19,14 +16,17 @@ import (
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
+	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/workspace"
 )
 
 // view is one read of everything the facts derive from but the clock: the
-// stored pull requests, the books, the round state, the holds and blocks,
-// and the workspace snapshot. Facts and events load lazily, by unit.
+// stored pull requests, the books, the round counts, the holds and the
+// agents' activity. Facts, events and the plugin's reports load lazily, by
+// unit.
 type view struct {
 	p       *Provider
 	gen     port.Generation
@@ -34,31 +34,26 @@ type view struct {
 	cfg     config.Config
 
 	viewer    string
-	teams     []string
 	rows      []dinv.PR
 	byRef     map[pr.Ref]dinv.PR
 	books     map[unit.Unit]turn.Book
 	rounds    *round.Store
-	pause     round.Pause
 	overrides map[pr.Ref]dinv.Override
-	blocks    map[pr.Ref]dinv.Event
+	mutes     map[unit.Unit]overlay.Mute
 	registry  *dintent.Registry
-
-	repos      []wsdomain.Repo
-	workspaces []wsdomain.Workspace
-	activity   map[string]wsdomain.Activity
-	// partial is a listing that may miss a workspace: no round is due on it.
-	partial bool
+	activity  map[string]wsdomain.Activity
 
 	mu      sync.Mutex
-	prFacts map[pr.Ref]sweep.Facts
+	prFacts map[pr.Ref]dinv.PlanFacts
 	events  map[pr.Ref][]dinv.Event
-	ended   map[unit.Unit]bool
-	targets *targets
+	// reports are the plugin's reports read, nil for a pull request it
+	// has not reported.
+	reports map[pr.Ref]*prrow.Report
 }
 
 func (p *Provider) build(ctx context.Context, now time.Time) (*view, error) {
-	v := &view{p: p, builtAt: now, cfg: p.cfg(), prFacts: map[pr.Ref]sweep.Facts{}, events: map[pr.Ref][]dinv.Event{}}
+	v := &view{p: p, builtAt: now, cfg: p.cfg(), prFacts: map[pr.Ref]dinv.PlanFacts{}, events: map[pr.Ref][]dinv.Event{},
+		reports: map[pr.Ref]*prrow.Report{}}
 	if p.d.Changes != nil {
 		v.gen = p.d.Changes.Gen()
 	}
@@ -73,11 +68,6 @@ func (p *Provider) build(ctx context.Context, now time.Time) (*view, error) {
 	for _, r := range v.rows {
 		v.byRef[r.Ref] = r
 	}
-	if p.d.Teams != nil {
-		if v.teams, err = p.d.Teams(ctx); err != nil {
-			return nil, err
-		}
-	}
 	v.books = map[unit.Unit]turn.Book{}
 	if p.d.Books != nil {
 		if v.books, err = p.d.Books.Books(ctx); err != nil {
@@ -89,15 +79,18 @@ func (p *Provider) build(ctx context.Context, now time.Time) (*view, error) {
 		if v.rounds, err = p.d.Rounds.Load(ctx); err != nil {
 			return nil, err
 		}
-		if v.pause, err = p.d.Rounds.Pause(ctx); err != nil {
-			return nil, err
-		}
 	}
 	if v.overrides, err = p.d.Store.Overrides(ctx); err != nil {
 		return nil, err
 	}
-	if v.blocks, err = prBlocks(ctx, p.d.Store); err != nil {
-		return nil, err
+	if p.d.Mutes != nil {
+		units := make([]unit.Unit, 0, len(v.rows))
+		for _, r := range v.rows {
+			units = append(units, r.Ref.Unit())
+		}
+		if v.mutes, err = p.d.Mutes.Mutes(ctx, units); err != nil {
+			return nil, err
+		}
 	}
 	v.registry = &dintent.Registry{}
 	if p.d.Intents != nil {
@@ -105,52 +98,20 @@ func (p *Provider) build(ctx context.Context, now time.Time) (*view, error) {
 			v.registry = r
 		}
 	}
-	if err := v.readSnapshot(ctx); err != nil {
-		return nil, err
+	if p.d.Snapshot != nil {
+		snap, err := p.d.Snapshot.Read(ctx, wsdomain.PartAll)
+		if err != nil {
+			return nil, err
+		}
+		v.activity = snap.Activity()
 	}
 	return v, nil
 }
 
-// readSnapshot reads the workspace listing: a listing
-// that may miss some is partial, and one without a snapshot lists none.
-func (v *view) readSnapshot(ctx context.Context) error {
-	if v.p.d.Snapshot == nil {
-		v.partial = true
-		return nil
-	}
-	snap, err := v.p.d.Snapshot.Read(ctx, wsdomain.PartAll)
-	if err != nil {
-		return err
-	}
-	v.partial = partialSnapshot(snap)
-	v.repos = slices.Clone(snap.Repos)
-	v.workspaces = slices.Clone(snap.Workspaces)
-	v.activity = snap.Activity()
-	return nil
-}
-
-// partialSnapshot says whether the listing may miss a workspace. In a snapshot
-// merged from several managers, each manager answers for its own: one whose
-// app is down while its worktrees still list, terminals unread, leaves the
-// listing whole.
-func partialSnapshot(snap *wsdomain.Snapshot) bool {
-	split := func(ws, ts wsdomain.Scope) bool {
-		return !ws.Complete || !ts.Complete || ws.RuntimeID == "" || ws.RuntimeID != ts.RuntimeID
-	}
-	if len(snap.Scopes) == 0 {
-		return split(snap.WorkspaceScope, snap.TerminalScope)
-	}
-	for _, sc := range snap.Scopes {
-		if !sc.Workspaces.Complete || sc.Terminals.Complete && split(sc.Workspaces, sc.Terminals) {
-			return true
-		}
-	}
-	return false
-}
-
-// listed are the open pull requests nothing lapsed, those the plan phases
-// reach, and those with an open turn or an answer waiting.
-func (v *view) listed(ctx context.Context, now time.Time) []unit.Unit {
+// listed are the open pull requests nothing lapsed, those a workspace
+// targets, and those with an open turn, an answer waiting or a recent
+// review turn.
+func (v *view) listed(ctx context.Context, now time.Time) ([]unit.Unit, error) {
 	seen := map[unit.Unit]bool{}
 	var out []unit.Unit
 	add := func(u unit.Unit) {
@@ -159,14 +120,20 @@ func (v *view) listed(ctx context.Context, now time.Time) []unit.Unit {
 			out = append(out, u)
 		}
 	}
+	all := make([]unit.Unit, 0, len(v.rows))
+	for _, r := range v.rows {
+		all = append(all, r.Ref.Unit())
+	}
+	if err := v.loadReports(ctx, all); err != nil {
+		return nil, err
+	}
 	for _, r := range v.rows {
 		if r.State == "OPEN" && (!r.Lapsed() || v.overrides[r.Ref].Adopted) {
 			add(r.Ref.Unit())
 		}
-	}
-	t := v.targetsOf(ctx)
-	for _, ref := range t.order {
-		add(ref.Unit())
+		if rep := v.reportOf(r.Ref); rep != nil && rep.Plan.Board.Carded {
+			add(r.Ref.Unit())
+		}
 	}
 	for u, b := range v.books {
 		if _, ok := openTurn(b); ok {
@@ -175,7 +142,7 @@ func (v *view) listed(ctx context.Context, now time.Time) []unit.Unit {
 		if _, ok := waitingAnswer(b); ok {
 			add(u)
 		}
-		if at, ok := newestReview(b); ok && now.Sub(at) < sweep.ReviewTurnsFollowed {
+		if at, ok := newestReview(b); ok && now.Sub(at) < dinv.ReviewTurnsFollowed {
 			add(u)
 		}
 	}
@@ -188,7 +155,22 @@ func (v *view) listed(ctx context.Context, now time.Time) []unit.Unit {
 		}
 		return 0
 	})
-	return out
+	return out, nil
+}
+
+// newestReview is when b's newest review turn was sent.
+func newestReview(b turn.Book) (time.Time, bool) {
+	var at time.Time
+	found := false
+	for _, t := range b.Turns {
+		if t.Role == builtin.RoleReview && t.State != turn.Withdrawn {
+			found = true
+			if t.SentAt.After(at) {
+				at = t.SentAt
+			}
+		}
+	}
+	return at, found
 }
 
 // loadFacts reads the facts of the stored units not read yet, in one query.
@@ -255,7 +237,53 @@ func (v *view) loadEvents(ctx context.Context, units []unit.Unit) error {
 	return nil
 }
 
-func (v *view) factsOf(ref pr.Ref) (sweep.Facts, bool) {
+// loadReports reads the plugin's reports of the units not read yet, in one
+// query.
+func (v *view) loadReports(ctx context.Context, units []unit.Unit) error {
+	if v.p.d.Reports == nil {
+		return nil
+	}
+	v.mu.Lock()
+	var missing []unit.Unit
+	for _, u := range units {
+		if ref, err := refOf(u); err == nil {
+			if _, ok := v.reports[ref]; !ok {
+				missing = append(missing, ref.Unit())
+			}
+		}
+	}
+	v.mu.Unlock()
+	if len(missing) == 0 {
+		return nil
+	}
+	snaps, err := v.p.d.Reports.Reported(ctx, missing)
+	if err != nil {
+		return err
+	}
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	for _, u := range missing {
+		ref, _ := refOf(u)
+		v.reports[ref] = nil
+		rep, ok, err := prrow.ReportOf(snaps[u])
+		if err != nil {
+			return err
+		}
+		if ok {
+			v.reports[ref] = &rep
+		}
+	}
+	return nil
+}
+
+// reportOf is the plugin's report of ref; nil for none.
+func (v *view) reportOf(ref pr.Ref) *prrow.Report {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.reports[ref]
+}
+
+func (v *view) factsOf(ref pr.Ref) (dinv.PlanFacts, bool) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	f, ok := v.prFacts[ref]
@@ -286,60 +314,6 @@ func waitingAnswer(b turn.Book) (turn.Answer, bool) {
 		}
 	}
 	return turn.Answer{}, false
-}
-
-// InventoryInputs are the planning inputs as the inventory stores them.
-func InventoryInputs(st *inventory.Store) sweep.Inputs { return inventoryInputs{st} }
-
-type inventoryInputs struct{ store *inventory.Store }
-
-func (i inventoryInputs) Viewer(ctx context.Context) (string, error) {
-	return i.store.Viewer(ctx, unit.GitHub)
-}
-
-func (i inventoryInputs) Rows(ctx context.Context) ([]dinv.PR, error) {
-	return i.store.ListPRs(ctx, false)
-}
-
-// Facts reads the details of rows in one query; a detail of another version
-// gives its facts with a zero ReadAt, as the collector has yet to re-read it.
-func (i inventoryInputs) Facts(ctx context.Context, rows []dinv.PR, viewer string) (map[unit.Unit]sweep.Facts, error) {
-	refs := make([]pr.Ref, len(rows))
-	for n, row := range rows {
-		refs[n] = row.Ref
-	}
-	details, err := i.store.Details(ctx, refs)
-	if err != nil {
-		return nil, err
-	}
-	out := make(map[unit.Unit]sweep.Facts, len(rows))
-	for _, row := range rows {
-		d, ok := details[row.Ref]
-		f := sweep.Facts{Facts: inventory.FactsOf(row, d, viewer)}
-		if ok && d.Version == inventory.DetailVersion {
-			f.ReadAt = d.ReadAt
-		}
-		out[row.Ref.Unit()] = f
-	}
-	return out, nil
-}
-
-func (i inventoryInputs) Ended(ctx context.Context, kind string, units []unit.Unit) (map[unit.Unit]bool, error) {
-	refs := make([]pr.Ref, 0, len(units))
-	for _, u := range units {
-		if ref, err := refOf(u); err == nil {
-			refs = append(refs, ref)
-		}
-	}
-	ended, err := i.store.Ended(ctx, kind, refs)
-	if err != nil {
-		return nil, err
-	}
-	out := make(map[unit.Unit]bool, len(ended))
-	for ref, ok := range ended {
-		out[ref.Unit()] = ok
-	}
-	return out, nil
 }
 
 // LocalGit reads the checkouts through git.
@@ -375,186 +349,4 @@ func SnapshotOf(set *workspace.Set) sweep.Snapshot {
 		return set
 	}
 	return nil
-}
-
-// targets are the pull requests the workspaces stand for: review workspaces by link or by branch, and author
-// workspaces by link or among my pull requests by branch.
-type targets struct {
-	review map[pr.Ref]wsdomain.Workspace
-	author map[pr.Ref]wsdomain.Workspace
-	// authorOrder are the author targets in the workspaces' order.
-	authorOrder []pr.Ref
-	// reviewLinked are the pull requests a review workspace links, lower-cased.
-	reviewLinked map[string]bool
-	order        []pr.Ref
-}
-
-func (v *view) targetsOf(ctx context.Context) *targets {
-	v.mu.Lock()
-	t := v.targets
-	v.mu.Unlock()
-	if t != nil {
-		return t
-	}
-	t = v.buildTargets(ctx)
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	if v.targets == nil {
-		v.targets = t
-	}
-	return v.targets
-}
-
-func (v *view) buildTargets(ctx context.Context) *targets {
-	t := &targets{review: map[pr.Ref]wsdomain.Workspace{}, author: map[pr.Ref]wsdomain.Workspace{}, reviewLinked: map[string]bool{}}
-	repoByID := map[string]wsdomain.Repo{}
-	for _, r := range v.repos {
-		repoByID[r.ID] = r
-	}
-	var reviewWS, authorWS []wsdomain.Workspace
-	for _, w := range v.workspaces {
-		if w.IsMain {
-			w.LinkedPR = 0
-		}
-		switch {
-		case wsdomain.MainOnDefault(w, repoByID[w.RepoID]):
-		case w.HostID != wsdomain.LocalHost:
-		case w.IsMain:
-			authorWS = append(authorWS, w)
-		case strings.HasPrefix(w.DisplayName, v.cfg.GitHub.ReviewPrefix):
-			reviewWS = append(reviewWS, w)
-		default:
-			authorWS = append(authorWS, w)
-		}
-	}
-	add := func(m map[pr.Ref]wsdomain.Workspace, ref pr.Ref, w wsdomain.Workspace) {
-		if _, ok := m[ref]; ok {
-			return
-		}
-		m[ref] = w
-		if !slices.Contains(t.order, ref) {
-			t.order = append(t.order, ref)
-		}
-	}
-	for _, w := range reviewWS {
-		owner, name, ok := repoByID[w.RepoID].OwnerName()
-		if !ok {
-			continue
-		}
-		n := w.LinkedPR
-		if n == 0 {
-			n, _ = v.byBranch(owner, name, strings.TrimPrefix(w.DisplayName, v.cfg.GitHub.ReviewPrefix))
-		}
-		if n == 0 {
-			continue
-		}
-		ref := pr.Ref{Owner: owner, Repo: name, Number: n}
-		t.reviewLinked[strings.ToLower(ref.String())] = true
-		add(t.review, ref, w)
-	}
-	for _, w := range v.workspaces {
-		if owner, name, ok := repoByID[w.RepoID].OwnerName(); ok && !w.IsMain && strings.HasPrefix(w.DisplayName, v.cfg.GitHub.ReviewPrefix) && w.LinkedPR != 0 {
-			t.reviewLinked[strings.ToLower(pr.Ref{Owner: owner, Repo: name, Number: w.LinkedPR}.String())] = true
-		}
-	}
-	mine := v.authored(v.builtAt.Add(-authorLookback))
-	for _, w := range authorWS {
-		owner, name, ok := repoByID[w.RepoID].OwnerName()
-		if !ok {
-			continue
-		}
-		ref, why := matchAuthored(mine, w, owner, name)
-		if ref.Number == 0 && why == "" && w.PushBranch == "" && !w.IsMain && w.HostID == wsdomain.LocalHost && v.p.d.Git != nil {
-			upstream, err := v.p.d.Git.Upstream(ctx, w.Path)
-			if err != nil {
-				continue
-			}
-			if upstream != "" && upstream != w.Branch {
-				w.PushBranch = upstream
-				ref, _ = matchAuthored(mine, w, owner, name)
-			}
-		}
-		if _, seen := t.author[ref]; ref.Number != 0 && !seen {
-			t.authorOrder = append(t.authorOrder, ref)
-			add(t.author, ref, w)
-		}
-	}
-	return t
-}
-
-// byBranch picks, as a branch search would, the pull request of owner/name
-// whose head is branch: a single one, or a single open one among several.
-func (v *view) byBranch(owner, name, branch string) (int, string) {
-	var matches []github.BranchMatch
-	for _, p := range v.rows {
-		if p.HeadBranch == branch && strings.EqualFold(p.Ref.Owner, owner) && strings.EqualFold(p.Ref.Repo, name) {
-			matches = append(matches, github.BranchMatch{Number: p.Ref.Number, State: p.State})
-		}
-	}
-	return github.PickByBranch(matches)
-}
-
-// authored are the viewer's open pull requests and those closed or merged
-// since the day of since began, open first.
-func (v *view) authored(since time.Time) []dinv.PR {
-	y, m, d := since.UTC().Date()
-	day := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
-	var open, recent []dinv.PR
-	for _, p := range v.rows {
-		switch {
-		case !strings.EqualFold(p.Author, v.viewer):
-		case p.State == "OPEN":
-			open = append(open, p)
-		case !p.UpdatedAt.Before(day):
-			recent = append(recent, p)
-		}
-	}
-	return append(open, recent...)
-}
-
-// matchAuthored takes the workspace's linked pull request, whoever opened
-// it. By branch it needs a unique match among my pull requests, preferring
-// the open one, from the same repository and not from a fork.
-func matchAuthored(mine []dinv.PR, w wsdomain.Workspace, owner, name string) (pr.Ref, string) {
-	if w.LinkedPR != 0 {
-		return pr.Ref{Owner: owner, Repo: name, Number: w.LinkedPR}, ""
-	}
-	branch := w.PRBranch()
-	var found []dinv.PR
-	for _, p := range mine {
-		if strings.EqualFold(p.Ref.Owner, owner) && strings.EqualFold(p.Ref.Repo, name) && p.HeadBranch == branch && !p.IsFork {
-			found = append(found, p)
-		}
-	}
-	switch len(found) {
-	case 0:
-		return pr.Ref{}, ""
-	case 1:
-		return found[0].Ref, ""
-	}
-	var open []dinv.PR
-	for _, p := range found {
-		if p.State == "OPEN" {
-			open = append(open, p)
-		}
-	}
-	if len(open) == 1 {
-		return open[0].Ref, ""
-	}
-	return pr.Ref{}, fmt.Sprintf("%d of my pull requests match branch %s", len(found), branch)
-}
-
-// prBlocks are the stored start blocks of pull requests.
-func prBlocks(ctx context.Context, st Store) (map[pr.Ref]dinv.Event, error) {
-	all, err := st.FirstRoundBlocks(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := make(map[pr.Ref]dinv.Event, len(all))
-	for _, ev := range all {
-		if ref, ok := port.PROf(ev); ok {
-			out[ref] = dinv.Event{PR: ref, Kind: ev.Kind, Key: ev.Key, At: ev.At, Data: ev.Data}
-		}
-	}
-	return out, nil
 }

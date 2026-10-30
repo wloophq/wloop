@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -107,5 +108,61 @@ func TestKeysEndpoint(t *testing.T) {
 	}
 	if code := get(t, s, api.Keys+"?surface=watch", nil); code != 400 {
 		t.Errorf("an unknown surface: %d", code)
+	}
+}
+
+func TestAViewsKeyIsTheOneItsCatalogServes(t *testing.T) {
+	t.Parallel()
+	s := newTasksRig(t, nil).s
+	var cat api.ViewsCatalog
+	if code := get(t, s, api.ViewsPath, &cat); code != 200 {
+		t.Fatalf("%d", code)
+	}
+	var bound api.KeysResponse
+	get(t, s, api.Keys+"?surface=tui", &bound)
+	nav := map[string]api.KeyView{}
+	for _, b := range bound.Bindings {
+		if strings.HasPrefix(b.Action, "nav:") {
+			nav[strings.TrimPrefix(b.Action, "nav:")] = b
+		}
+	}
+	keyed := 0
+	for _, v := range cat.Views {
+		b, ok := nav[v.ID]
+		if v.Key == "" {
+			if ok {
+				t.Errorf("view %s has no key but %s jumps to it", v.ID, b.Key)
+			}
+			continue
+		}
+		keyed++
+		if b.Key != v.Key || b.Help != v.Label || b.Context != "global" {
+			t.Errorf("view %s (%s, %q): bound %+v", v.ID, v.Key, v.Label, b)
+		}
+	}
+	if keyed == 0 {
+		t.Fatalf("no served view has a key: %+v", cat.Views)
+	}
+}
+
+func TestAPluginsViewsKeyIsTheOneItsUIDeclares(t *testing.T) {
+	t.Parallel()
+	plugins := []api.Plugin{{ID: "acme", Name: "Acme", Enabled: true, UI: &api.PluginUI{Key: "g a"}},
+		{ID: "beta", Name: "Beta", UI: &api.PluginUI{Key: "g b"}}, {ID: "gamma", Name: "Gamma", Enabled: true, UI: &api.PluginUI{Key: "g i"}}}
+	views := []api.TaskViewSpec{{ID: "inbox", Label: "Inbox", Key: "g i"}}
+	nav := map[string]api.KeyView{}
+	for _, b := range keyViews(keys.TUI, views, plugins, nil, nil, coreWords{}) {
+		if strings.HasPrefix(b.Action, "nav:") {
+			nav[b.Action] = b
+		}
+	}
+	if b := nav["nav:acme"]; b.Key != "g a" || b.Owner != "acme" || b.Help != "Acme" || b.Context != string(keys.Global) {
+		t.Errorf("an enabled plugin's key: %+v", b)
+	}
+	if _, ok := nav["nav:beta"]; ok {
+		t.Error("a disabled plugin's key is served")
+	}
+	if _, ok := nav["nav:gamma"]; ok || nav["nav:inbox"].Key != "g i" {
+		t.Errorf("a plugin took a view's key: %+v", nav)
 	}
 }

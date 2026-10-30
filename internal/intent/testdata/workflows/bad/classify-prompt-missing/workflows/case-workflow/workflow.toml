@@ -3,7 +3,7 @@ provider = "session"
 when = 'session.managed'
 
 [trigger]
-on = ["merged"]
+on = ["muted"]
 
 [[step]]
 use = "classify"

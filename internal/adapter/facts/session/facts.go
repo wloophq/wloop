@@ -34,7 +34,10 @@ type world struct {
 	agents    []turns.AgentObservation
 	units     map[string]unit.Unit
 	books     map[unit.Unit]turn.Book
-	prs       map[unit.Unit]string
+	// states are the units' states as their sources reported them, and
+	// repo the repository of a unit.
+	states map[unit.Unit]string
+	repo   func(unit.Unit) string
 	// transcripts are each session's known transcript file.
 	transcripts map[string]string
 	// closedByManager are the dormant sessions their manager's record closed.
@@ -129,20 +132,10 @@ func (p *Provider) build(ctx context.Context, snap *wsdomain.Snapshot) (*world, 
 			return nil, err
 		}
 	}
-	w.prs = map[unit.Unit]string{}
-	var prUnits []unit.Unit
-	for _, u := range wanted {
-		if u.Provider == unit.GitHub {
-			prUnits = append(prUnits, u)
-		}
-	}
-	if len(prUnits) > 0 && p.d.PRs != nil {
-		got, err := p.d.PRs.PRs(ctx, prUnits)
-		if err != nil {
+	w.states, w.repo = map[unit.Unit]string{}, p.d.Repo
+	if len(wanted) > 0 && p.d.States != nil {
+		if w.states, err = p.d.States.States(ctx, wanted); err != nil {
 			return nil, err
-		}
-		for u, pr := range got {
-			w.prs[u] = pr.State
 		}
 	}
 	return w, nil
@@ -171,7 +164,7 @@ type state struct {
 	open      *turn.Turn
 	newest    *turn.Turn
 	idleSince time.Time
-	// unread counts the answers noticed to the session that its agent has not read; unreadSince is when the oldest
+	// unread counts the gates whose answers were noticed to the session and its agent has not read; unreadSince is when the oldest
 	// notice reached it.
 	unread      int
 	unreadSince time.Time
@@ -204,9 +197,10 @@ func (w *world) state(h string) *state {
 	return s
 }
 
-// unreadOf counts the answers to the handle's turns whose notice reached it and that its agent has not read,
-// and when the oldest notice reached it.
+// unreadOf counts the gates whose answers to the handle's turns reached it by a notice and its agent has not
+// read, an answer stored before answers named their gate counting alone, and when the oldest notice reached it.
 func unreadOf(b *turn.Book, handle string) (int, time.Time) {
+	gates := map[int64]bool{}
 	var n int
 	var since time.Time
 	for _, a := range b.Answers {
@@ -214,9 +208,14 @@ func unreadOf(b *turn.Book, handle string) (int, time.Time) {
 		if i < 0 || b.Turns[i].Session != handle || !a.ReadAt.IsZero() || !a.Route.Noticed() {
 			continue
 		}
-		if n++; since.IsZero() || a.NoticedAt.Before(since) {
+		if since.IsZero() || a.NoticedAt.Before(since) {
 			since = a.NoticedAt
 		}
+		if a.Gate != 0 && gates[a.Gate] {
+			continue
+		}
+		gates[a.Gate] = true
+		n++
 	}
 	return n, since
 }
@@ -253,17 +252,17 @@ func (s *state) facts(now time.Time, pf turns.PromptFacts, processGone bool) wor
 		"session.newest_intent":         "",
 		"session.closes_when_done":      false,
 		"session.idle_for":              time.Duration(0),
-		"session.unread_answers":        s.unread,
+		"session.unread_gates":          s.unread,
 		"session.unread_since":          time.Time{},
 		"session.unread_for":            time.Duration(0),
-		"session.pr_state":              w.prs[s.unit],
+		"session.pr_state":              w.states[s.unit],
 		"session.duplicate":             s.duplicate(),
 		"session.worktree_gone":         s.worktreeGone(),
 		"session.transcript_gone":       s.transcriptGone,
 		"session.closed_by_manager":     w.closedByManager[s.sess.ID],
 		"session.process_gone":          processGone,
 		"session.fingerprint":           s.fingerprint(),
-		"session.repo":                  repoOf(s.unit),
+		"session.repo":                  w.repoOf(s.unit),
 	}
 	if s.hasAgent {
 		f["session.agent_state"] = s.agent.State.String()
@@ -353,10 +352,9 @@ func (s *state) fingerprint() string {
 	return s.sess.ID + ":" + string(s.sess.State()) + ":" + since + ":" + strconv.FormatInt(seq, 10)
 }
 
-func repoOf(u unit.Unit) string {
-	ref, ok := port.PROf(port.Event{Unit: u})
-	if !ok {
+func (w *world) repoOf(u unit.Unit) string {
+	if w.repo == nil {
 		return ""
 	}
-	return ref.Owner + "/" + ref.Repo
+	return w.repo(u)
 }

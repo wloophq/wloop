@@ -52,7 +52,8 @@ func (e *Env) serveDossierTurns(ctx context.Context, svc *dossiers.Service, db *
 	pages := e.dossierPages(svc.Policy)
 	events := sqlite.New(db)
 	record := func(ctx context.Context, ev port.Event) error { return events.RecordEvents(ctx, ev) }
-	t := &dossiers.Turns{Dossiers: svc, Pages: pages, Log: logf, Events: record, Serial: e.dossierMu}
+	t := &dossiers.Turns{Dossiers: svc, Pages: pages, Log: logf, Events: record, Serial: e.dossierMu,
+		Moves: func(ctx context.Context) error { return e.applyDossierMoves(ctx, db) }}
 	calls := &dossiers.Calls{Turns: t, Asker: lazyAsker{e: e, cfg: cfg, dir: filepath.Join(e.StateDir, "dossier-calls")},
 		Caps:  dossiers.Caps{PerCallUSD: cfg.Headless.PerCallUSD, PerDayUSD: cfg.Headless.PerDayUSD, Tier: cfg.Headless.Tier},
 		Spent: storedSpend(db),
@@ -133,7 +134,7 @@ func (e *Env) checkTurnEnds(ctx context.Context, t *dossiers.Turns, q <-chan por
 	}
 }
 
-// dossierGrant opens u's dossier for a session about to launch and grants it: read everywhere, write
+// dossierGrant opens the dossier u's turns read, its task's when a task holds u, for a session about to launch and grants it: read everywhere, write
 // under the dossiers' write directories. None without the dossiers or a unit, or when it cannot open.
 func (e *Env) dossierGrant(ctx context.Context, u unit.Unit) []turns.Dir {
 	if e.dossierTurns == nil || u.IsZero() {
@@ -199,13 +200,13 @@ func (s sessionDossiers) Dossier(ctx context.Context, u unit.Unit) (turn.Dossier
 	return out, true, nil
 }
 
-// grantLaunched records that the session handle, launched for u, was granted u's dossier: the launch
-// line opened it just before.
+// grantLaunched records that the session handle, launched for u, was granted the dossier u's turns read:
+// the launch line opened it just before.
 func (e *Env) grantLaunched(ctx context.Context, u unit.Unit, handle string) {
 	if e.dossierTurns == nil || e.recordGrant == nil || u.IsZero() {
 		return
 	}
-	d, ok, err := e.dossierTurns.Dossiers.Get(ctx, dossier.Owner{Unit: u})
+	d, ok, err := e.dossierTurns.Dossiers.Of(ctx, u)
 	if err != nil || !ok || d.Status != dossier.Active {
 		return
 	}

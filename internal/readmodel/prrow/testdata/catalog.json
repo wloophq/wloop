@@ -1,31 +1,6 @@
 {
-  "version": "74130d9c100c",
+  "version": "14972f3ff107",
   "views": [
-    {
-      "id": "needs-me",
-      "label": "Needs me",
-      "provider": "github",
-      "rows": true,
-      "order": 0,
-      "surfaces": [
-        "web",
-        "tui"
-      ],
-      "unit": "Pull request",
-      "unit_sort": "repo"
-    },
-    {
-      "id": "stalled",
-      "label": "Stalled",
-      "provider": "github",
-      "rows": true,
-      "order": 1,
-      "surfaces": [
-        "web"
-      ],
-      "unit": "Pull request",
-      "unit_sort": "repo"
-    },
     {
       "id": "mine",
       "label": "My PRs",
@@ -35,20 +10,6 @@
       "surfaces": [
         "web",
         "tui"
-      ],
-      "unit": "Pull request",
-      "unit_sort": "repo"
-    },
-    {
-      "id": "loop",
-      "label": "In loop",
-      "provider": "github",
-      "rows": true,
-      "order": 3,
-      "surfaces": [
-        "web",
-        "tui",
-        "menubar"
       ],
       "unit": "Pull request",
       "unit_sort": "repo"
@@ -65,18 +26,6 @@
       ]
     },
     {
-      "id": "approved",
-      "label": "Approved",
-      "provider": "github",
-      "rows": true,
-      "order": 5,
-      "surfaces": [
-        "web"
-      ],
-      "unit": "Pull request",
-      "unit_sort": "repo"
-    },
-    {
       "id": "dash",
       "label": "Backlog",
       "provider": "github",
@@ -85,18 +34,6 @@
       "surfaces": [
         "web"
       ]
-    },
-    {
-      "id": "done",
-      "label": "Done",
-      "provider": "github",
-      "rows": true,
-      "order": 7,
-      "surfaces": [
-        "web"
-      ],
-      "unit": "Pull request",
-      "unit_sort": "repo"
     },
     {
       "id": "all",
@@ -116,7 +53,61 @@
       "order": 9,
       "surfaces": [
         "web"
-      ]
+      ],
+      "search": {
+        "default_sort": "updated-asc",
+        "presets": [
+          {
+            "query": "user-review-requested:@me",
+            "label": "Asked of me"
+          },
+          {
+            "query": "review-requested:@me -user-review-requested:@me",
+            "label": "Asked of my teams"
+          }
+        ],
+        "filters": [
+          {
+            "term": "-reviewed-by:@me",
+            "label": "Not reviewed by me"
+          },
+          {
+            "term": "draft:false",
+            "label": "Ready for review"
+          },
+          {
+            "term": "review-requested:@me",
+            "label": "Requested from me or my teams"
+          },
+          {
+            "window": 30,
+            "label": "Active in the last 30 days"
+          }
+        ],
+        "sorts": [
+          {
+            "sort": "updated-asc",
+            "label": "Waiting longest",
+            "shown": "waiting longest"
+          },
+          {
+            "sort": "created-asc",
+            "label": "Oldest opened",
+            "shown": "oldest opened"
+          },
+          {
+            "sort": "updated-desc",
+            "label": "Recently updated",
+            "shown": "most recently updated"
+          }
+        ],
+        "decisions": {
+          "APPROVED": "approved",
+          "CHANGES_REQUESTED": "changes requested",
+          "REVIEW_REQUIRED": "review required"
+        },
+        "no_decision": "no review required"
+      }
     },
     {
       "id": "recent",
@@ -170,7 +161,8 @@
         "nobody": "Waiting on nobody",
         "reviewer": "Waiting on a reviewer"
       },
-      "menu": true
+      "menu": true,
+      "strip": true
     },
     {
       "id": "waits-on",
@@ -570,6 +562,123 @@
       "kind": "done",
       "label": "closed",
       "rank": 17
+    }
+  ],
+  "events": [
+    {
+      "provider": "github",
+      "kind": "opened",
+      "label": "opened"
+    },
+    {
+      "provider": "github",
+      "kind": "push",
+      "label": "pushed"
+    },
+    {
+      "provider": "github",
+      "kind": "review_requested",
+      "label": "review requested",
+      "data": "requested"
+    },
+    {
+      "provider": "github",
+      "kind": "review_request_removed",
+      "label": "review request removed",
+      "data": "requested"
+    },
+    {
+      "provider": "github",
+      "kind": "review",
+      "label": "reviewed",
+      "data": "first_field"
+    },
+    {
+      "provider": "github",
+      "kind": "comment",
+      "label": "commented"
+    },
+    {
+      "provider": "github",
+      "kind": "check",
+      "label": "checks"
+    },
+    {
+      "provider": "github",
+      "kind": "ready",
+      "label": "ready for review"
+    },
+    {
+      "provider": "github",
+      "kind": "draft",
+      "label": "back to draft"
+    },
+    {
+      "provider": "github",
+      "kind": "merged",
+      "label": "merged",
+      "data": "short_sha"
+    },
+    {
+      "provider": "github",
+      "kind": "closed",
+      "label": "closed"
+    },
+    {
+      "provider": "github",
+      "kind": "round_sent",
+      "label": "round sent",
+      "loop": true
+    },
+    {
+      "provider": "github",
+      "kind": "round_held",
+      "label": "round held",
+      "loop": true
+    },
+    {
+      "provider": "github",
+      "kind": "round_pending",
+      "label": "round pending",
+      "loop": true
+    },
+    {
+      "provider": "github",
+      "kind": "round_skipped",
+      "label": "round skipped",
+      "loop": true
+    },
+    {
+      "provider": "github",
+      "kind": "guidance",
+      "label": "guidance",
+      "loop": true
+    },
+    {
+      "provider": "github",
+      "kind": "round_blocked",
+      "label": "round blocked",
+      "loop": true
+    },
+    {
+      "provider": "github",
+      "kind": "round_unblocked",
+      "label": "round unblocked",
+      "loop": true
+    }
+  ],
+  "details": [
+    {
+      "provider": "github",
+      "field": "next_guidance",
+      "label": "Next round guidance",
+      "title": "Guidance waiting for the next round: given with no round pending, or kept from a round that did not go out or whose prompt was not seen landing. The next round, Review or Address included, takes it unless you give other guidance"
+    },
+    {
+      "provider": "github",
+      "field": "profile_chain",
+      "label": "Review profile",
+      "title": "The review profile layers a round here reads, lowest first; the profile show command lists the files"
     }
   ]
 }

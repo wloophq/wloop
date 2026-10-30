@@ -21,6 +21,10 @@ const (
 	outcomeDeferred
 	outcomeTransient
 	outcomeFailed
+	// outcomeNone is an item left as it was, and outcomeDropped one taken
+	// out of the plan unmarked.
+	outcomeNone
+	outcomeDropped
 )
 
 // result is how running an item ended; err is the step's error, nil when done.
@@ -67,7 +71,7 @@ func (e *Engine) stopped(ctx context.Context, it workflow.Item, err error, evs [
 		r := workflow.Run{Key: it.Key, Status: workflow.RunRefused, Attempts: it.Attempts, Error: refused.Reason, At: now}
 		return result{it, outcomeRefused, err}, e.record(ctx, r, it, evs)
 	case errors.As(err, &deferred):
-		it.Decision, it.Reason = workflow.DecisionPending, deferred.Reason
+		it.Decision, it.Reason = workflow.DecisionDeferred, deferred.Reason
 		it.Default, it.Deadline = workflow.OutcomeRun, now.Add(e.retryBase())
 		return result{it, outcomeDeferred, nil}, e.replace(ctx, it, evs)
 	case errors.As(err, &transient) || ctx.Err() != nil:
@@ -91,6 +95,7 @@ func (e *Engine) record(ctx context.Context, r workflow.Run, it workflow.Item, e
 		return fmt.Errorf("recording %s: %w", it.ID, err)
 	}
 	e.publish(evs)
+	e.syncGatesOrLog(ctx)
 	return nil
 }
 
@@ -110,6 +115,7 @@ func (e *Engine) save(ctx context.Context, p PlanWrite, evs []port.Event) error 
 		return fmt.Errorf("saving the plan: %w", err)
 	}
 	e.publish(evs)
+	e.syncGatesOrLog(ctx)
 	return nil
 }
 
@@ -120,7 +126,7 @@ func event(it workflow.Item, kind, key, data string, at time.Time) port.Event {
 // owners are the units of work u belongs to; none for a unit gone or a
 // provider that knows no owners.
 func (e *Engine) owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error) {
-	o, ok := e.Units.(Owner)
+	o, ok := e.Keep.(Owner)
 	if !ok {
 		return nil, nil
 	}
@@ -184,7 +190,7 @@ func (e *Engine) Act(ctx context.Context, id string, a workflow.Action, guidance
 // byHand checks every step's guards and that the item's source did not move
 // before running any step, then runs the item.
 func (e *Engine) byHand(ctx context.Context, it workflow.Item, o RunOpts) (workflow.Item, error) {
-	moved, err := e.sourceMoved(ctx, it.Unit)
+	moved, err := e.sourceMoved(ctx, it)
 	if err != nil {
 		return it, err
 	}
@@ -229,10 +235,10 @@ func (e *Engine) dismiss(ctx context.Context, it workflow.Item) (workflow.Item, 
 	return it, e.record(ctx, r, it, []port.Event{event(it, workflow.KindItemDismissed, it.ID, "", now)})
 }
 
-// Drop discards u's pending items without marking their keys: the next
-// evaluation plans them again if they still match.
+// Drop discards u's pending and deferred items without marking their keys:
+// the next evaluation plans them again if they still match.
 func (e *Engine) Drop(ctx context.Context, u unit.Unit, why string) error {
-	pending, err := e.Ledger.Items(ctx, Filter{Unit: &u, Decisions: []workflow.Decision{workflow.DecisionPending}})
+	pending, err := e.Ledger.Items(ctx, Filter{Unit: &u, Decisions: []workflow.Decision{workflow.DecisionPending, workflow.DecisionDeferred}})
 	if err != nil {
 		return err
 	}

@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"encoding/json"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"maps"
 	"path/filepath"
 	"slices"
@@ -345,7 +344,7 @@ func TestPlanWritesNoteGateOnlyWhenPendingChanges(t *testing.T) {
 		}
 		return got
 	}
-	if c := save(p); c.Topics != port.TopicGate || !slices.Equal(c.Units, []unit.Unit{wfUnit}) {
+	if c := save(p); c.Topics != port.TopicPending || !slices.Equal(c.Units, []unit.Unit{wfUnit}) {
 		t.Errorf("a new pending item noted %+v", c)
 	}
 	if c := save(p, blocked); !c.Empty() {
@@ -353,10 +352,10 @@ func TestPlanWritesNoteGateOnlyWhenPendingChanges(t *testing.T) {
 	}
 	other := p
 	other.Default = workflow.OutcomeWait
-	if c := save(other, blocked); c.Topics != port.TopicGate {
+	if c := save(other, blocked); c.Topics != port.TopicPending {
 		t.Errorf("a pending item whose default changed noted %+v", c)
 	}
-	if c := save(blocked); c.Topics != port.TopicGate || !slices.Equal(c.Units, []unit.Unit{wfUnit}) {
+	if c := save(blocked); c.Topics != port.TopicPending || !slices.Equal(c.Units, []unit.Unit{wfUnit}) {
 		t.Errorf("a dropped pending item noted %+v", c)
 	}
 }
@@ -402,7 +401,7 @@ func TestEngineEventsShareTheSaveTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n != 1 || got.Topics != port.TopicGate|port.TopicLoopEvents {
+	if n != 1 || got.Topics != port.TopicPending|port.TopicLoopEvents {
 		t.Errorf("a save with its event noted %d times %+v, want once with gate and loop events", n, got)
 	}
 
@@ -632,18 +631,5 @@ func TestRetentionPrunesClassificationsAndFetches(t *testing.T) {
 	}
 	if last, _ := f.Last(ctx, "ws-"+recent.Format(time.DateOnly)); !last.Equal(recent) {
 		t.Errorf("the recent fetch reads %v", last)
-	}
-}
-
-func TestRetentionPrunesVerbEvents(t *testing.T) {
-	t.Parallel()
-	db, _ := openTemp(t)
-	event_(t, db, "entry", "e-1", gtd.VerbEventKind(gtd.VerbDone), "", past)
-	event_(t, db, "entry", "e-2", gtd.VerbEventKind(gtd.VerbNext), "", recent)
-	event_(t, db, "entry", "e-3", "intake_guidance", "", past)
-
-	got := retain(t, db, DefaultRetention)
-	if want := (Retained{VerbEventsKey: 1}); !maps.Equal(got, want) {
-		t.Errorf("retained %v, want %v", got, want)
 	}
 }

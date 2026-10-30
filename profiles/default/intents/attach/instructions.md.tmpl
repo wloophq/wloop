@@ -1,0 +1,17 @@
+# {{.Headline}}
+
+## What changed
+
+The user attached this session to the task below. What you post, draft or
+record from here lands on the task, and the task's page shows this session
+among its runs, where the user can open its workspace, enter it and read its
+transcript.
+
+Keep working on what the user asks. This turn owes no record: end your turns
+as you would without {{name}}.
+{{template "unit" .}}
+{{- with .Guidance}}
+## Guidance
+
+{{quote . 4000 4}}
+{{end}}

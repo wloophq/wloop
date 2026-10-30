@@ -3,9 +3,9 @@ title: Keys
 description: The keys of the cockpit and the terminal client.
 ---
 
-The same keys work in the web cockpit and the terminal client, on the selected entry or row. Lowercase keys and digits belong to the core; actions of the loop, of plugins and of intents use uppercase letters.
+The same keys work in the web cockpit and the terminal client, on the selected task or row. Lowercase keys and digits belong to the core; actions of the loop, of plugins and of intents use uppercase letters.
 
-## Entries
+## Tasks
 
 | Key | Action |
 |---|---|
@@ -20,20 +20,20 @@ The same keys work in the web cockpit and the terminal client, on the selected e
 | `p` | make a project or attach to one |
 | `a` | approve the draft or proposal |
 | `d` | delegate to an agent (asks for optional guidance; in the terminal, Tab hands it to a session) |
-| `r` | reply in the entry's conversation, saved to the Outbox (in the terminal, Tab sends it now) |
+| `r` | reply in the task's conversation: sent now or held for your approval, as the reply verb's `send` in `tasks.toml` says (`now` in the bundled profile); in the terminal, Tab does the other |
 | `i` | edit a draft's text (terminal) |
 | `e` | done |
 | `Backspace` | dismiss |
 | `o` | open the source |
 | `n` | capture |
-| `1`-`9` | answer that option, while a question card is focused; in the terminal, pick a draft the open detail lists when it asks no question |
+| `1`-`9` | the gate's intent of that number, in the order the gate lists them, while a gate is focused; in the terminal, pick a draft the open detail lists when it asks no question |
 
 ## Navigation
 
 | Key | Action |
 |---|---|
-| `g f`, `g i`, `g o`, `g n`, `g w`, `g p`, `g r` | Focus, Inbox, Outbox, Next, Waiting, Projects, Review |
-| `g g` | the GitHub views |
+| `g i`, `g m`, `g w`, `g c`, `g n`, `g b`, `g t`, `g u`, `g a`, `g z`, `g f`, `g p`, `g d`, `g o`, `g r` | Inbox, Needs me, Waiting, Chase, Fits now, Blocked by me, Stalled, In loop, Approved, Snoozed, Focus, Projects, Done, Outbox, Review: each view's `key` in `views.toml`, and a view of yours adds its own (`g`, a space and a key no core key uses) |
+| `g g` | the GitHub views: a plugin's own chord, which its UI declares (`key`), served while the plugin is enabled; a view's key in `views.toml` takes it first |
 | `Shift+1`..`9` | switch area |
 | `/` | filter |
 | `Cmd+K` (web), `Ctrl+K` (terminal) | the palette, with every action and its key |

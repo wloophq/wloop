@@ -11,11 +11,11 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	rowoverlay "github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -169,8 +169,8 @@ func TestNudgeSilentRespectsCapsPauseHoldAndMute(t *testing.T) {
 		{"held by you", func() { r.units.Set(r.u, "pr.held", true) }, func() { r.units.Set(r.u, "pr.held", false) }},
 		{whyPaused, func() { sc.te.setPause(t, round.Pause{On: true, At: testNow}) }, func() { sc.te.setPause(t, round.Pause{At: testNow}) }},
 		{"muted until", func() {
-			r.units.Set(r.u, "pr.mute.refusal", dinv.Override{PR: sc.ref, MutedUntil: testNow.Add(time.Hour)}.MuteRefusal(testNow))
-		}, func() { r.units.Set(r.u, "pr.mute.refusal", "") }},
+			r.units.Set(r.u, "pr.nudge.refusal", rowoverlay.Mute{Until: testNow.Add(time.Hour)}.Refusal(testNow))
+		}, func() { r.units.Set(r.u, "pr.nudge.refusal", "") }},
 		{"turns.per_unit_per_day reached (1)", func() {
 			sc.te.cfg.Turns.PerUnitPerDay = 1
 			st.Count(sc.ref.String(), testNow)

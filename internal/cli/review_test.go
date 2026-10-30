@@ -11,8 +11,8 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -345,7 +345,7 @@ func TestReviewKeepsTheGuidanceOfARoundWhosePromptDidNotLand(t *testing.T) {
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics
 	agentDaemon(t, te)
-	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
+	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 7}
 	url := "https://github.com/acme/api/pull/7"
 
 	if code := te.run("review", url, "look at the migration first"); code != 0 {
@@ -378,7 +378,7 @@ func TestReviewGuidanceReplacesTheKeptOne(t *testing.T) {
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics
 	agentDaemon(t, te)
-	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
+	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 7}
 	if err := te.Store.KeepNextGuidance(context.Background(), ref, "an old ask"); err != nil {
 		t.Fatal(err)
 	}

@@ -1,0 +1,165 @@
+package source
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"slices"
+
+	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/unit"
+
+	"github.com/wloophq/wloop/pkg/plugin"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+)
+
+type reader struct{ b *Broker }
+
+// Tasks are the host's tasks linked to the plugin's units.
+func (r reader) Tasks(ctx context.Context, units []plugin.Unit) ([]src.Task, error) {
+	h := r.b.Hosted
+	if h == nil || h.Tasks == nil {
+		return nil, src.ErrUnsupported
+	}
+	var out []src.Task
+	seen := map[string]bool{}
+	var errs []error
+	for _, w := range units {
+		u, err := r.b.Units.Own(r.b.ID, w)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		ts, err := h.Tasks.TasksOf(ctx, u)
+		if err != nil {
+			return nil, err
+		}
+		for _, t := range ts {
+			if seen[string(t.ID)] {
+				continue
+			}
+			seen[string(t.ID)] = true
+			props, err := json.Marshal(t.Props)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, src.Task{ID: string(t.ID), Title: t.Title, State: string(t.State), Category: string(t.Category),
+				Parent: string(t.Parent), Props: props, Units: Wires(t.Units)})
+		}
+	}
+	return out, errors.Join(errs...)
+}
+
+// Books are the turns and records of the plugin's own units, each turn at
+// the time it reached its state: its last record's, else its start's, else
+// its send's.
+func (r reader) Books(ctx context.Context, units []plugin.Unit) ([]src.Book, error) {
+	if r.b.Books == nil {
+		return nil, src.ErrUnsupported
+	}
+	own := make([]unit.Unit, 0, len(units))
+	var errs []error
+	for _, w := range units {
+		u, err := r.b.Units.Own(r.b.ID, w)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		own = append(own, u)
+	}
+	if err := errors.Join(errs...); err != nil {
+		return nil, err
+	}
+	books, err := r.b.Books(ctx, own...)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]src.Book, 0, len(books))
+	for _, u := range own {
+		b, ok := books[u]
+		if !ok {
+			continue
+		}
+		wb := src.Book{Unit: Wire(u)}
+		for _, t := range b.Turns {
+			wt := src.Turn{Seq: t.Seq, ID: t.ID, Intent: string(t.Intent), Role: t.Role, Workflow: t.Workflow, State: string(t.State),
+				Head: t.Head, Session: t.Session, SentAt: t.SentAt, StartedAt: t.StartedAt, EndedAt: t.EndedAt, At: t.SentAt}
+			if !t.StartedAt.IsZero() {
+				wt.At = t.StartedAt
+			}
+			if rec, ok := b.LastRecord(t.Seq); ok {
+				wt.Summary, wt.At = rec.Record.Headline(), rec.At
+			}
+			wt.AnsweredAt, _ = b.AnsweredAt(t.Seq)
+			wb.Turns = append(wb.Turns, wt)
+		}
+		for _, rec := range b.Records {
+			raw, err := json.Marshal(rec.Record)
+			if err != nil {
+				return nil, err
+			}
+			wb.Records = append(wb.Records, src.TurnRecord{ID: rec.ID, TurnSeq: rec.TurnSeq, Head: rec.Head, At: rec.At, Record: raw})
+		}
+		out = append(out, wb)
+	}
+	return out, nil
+}
+
+// RoundState is the host's round bookkeeping of one of the plugin's own
+// units, its overrides, and whether its rounds are paused: by its hold or a
+// wider pause.
+func (r reader) RoundState(ctx context.Context, w plugin.Unit) (src.RoundState, error) {
+	if r.b.Overrides == nil {
+		return src.RoundState{}, src.ErrUnsupported
+	}
+	u, err := r.b.Units.Own(r.b.ID, w)
+	if err != nil {
+		return src.RoundState{}, err
+	}
+	var st src.RoundState
+	if r.b.Rounds != nil {
+		if st, err = r.b.Rounds(ctx, u); err != nil {
+			return src.RoundState{}, err
+		}
+	}
+	o, err := r.b.Overrides.Override(ctx, u)
+	if err != nil {
+		return src.RoundState{}, err
+	}
+	st.Overrides, st.Paused = o, o[port.OverrideHold] == port.OverrideTrue
+	if !st.Paused && r.b.Paused != nil {
+		if st.Paused, err = r.b.Paused(ctx, u); err != nil {
+			return src.RoundState{}, err
+		}
+	}
+	return st, nil
+}
+
+// Workspaces lists the host's workspaces of repo, every one when "".
+func (r reader) Workspaces(ctx context.Context, repo string) (src.Listing, error) {
+	if r.b.Workspaces == nil {
+		return src.Listing{}, src.ErrUnsupported
+	}
+	return r.b.Workspaces(ctx, repo)
+}
+
+// Session is the session with id handle as a plugin's tool reads it: the
+// unit of its newest turn, that turn and the effects its intent lets a
+// draft carry. A session with no turn has no unit.
+func (r reader) Session(ctx context.Context, handle string) (src.Session, error) {
+	h := r.b.Hosted
+	if h == nil || h.Sessions == nil {
+		return src.Session{}, src.ErrUnsupported
+	}
+	b, ok, err := h.Sessions.BookOf(ctx, handle)
+	if err != nil || !ok {
+		return src.Session{}, err
+	}
+	t, ok := b.OfSession(handle)
+	if !ok {
+		return src.Session{}, nil
+	}
+	out := src.Session{Unit: Wire(b.Unit), Turn: t.ID, TurnSeq: t.Seq, Intent: string(t.Intent), Role: t.Role}
+	out.AllowedEffects = slices.Clone(h.allowedEffects(string(t.Intent)))
+	return out, nil
+}

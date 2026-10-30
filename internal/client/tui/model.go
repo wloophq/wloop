@@ -1,5 +1,5 @@
-// Package tui is the terminal view of the daemon: the GTD views of its
-// entries, the plugins' views of their units and the workflows' plan, with
+// Package tui is the terminal view of the daemon: the task views of its
+// tasks, the plugins' views of their units and the workflows' plan, with
 // the keys of #keys.
 package tui
 
@@ -13,8 +13,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
-	"github.com/wloophq/wloop/internal/client/rowset"
-	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/termfmt"
@@ -37,20 +36,24 @@ type Command struct {
 	Req    api.ActionRequest
 	PlanID string
 
-	// entry is the entry the command is about: verb runs on it with args,
-	// fetch reads its detail, after a seen when seen is set.
-	entry string
-	verb  string
-	args  map[string]string
-	fetch bool
-	seen  bool
-	// capture is the title of an entry to capture.
+	// task is the task the command is about: verb runs on it with args,
+	// fetch reads its detail, after the verb seenVerb when seen is set.
+	task     string
+	verb     string
+	args     map[string]string
+	fetch    bool
+	seen     bool
+	seenVerb string
+	// capture is the title of a task to capture.
 	capture string
-	// open is a link to open; openFind looks it up from the entry's cards.
+	// open is a link to open; openFind looks it up from the task's cards.
 	open     string
 	openFind bool
 	// reviewStep is a Review step to mark done.
 	reviewStep string
+	// gate is a gate of task to resolve with intent, args carrying its answer.
+	gate   int64
+	intent string
 }
 
 // prompt is the bottom line asking for text, or, with confirm set, for a
@@ -94,9 +97,12 @@ type Model struct {
 	views   []View
 	catalog api.CatalogResponse
 	rows    []api.Row
-	health  api.Health
-	loaded  bool
-	sel     unit.Unit
+	// plans are the open plan gates with a deadline, by unit: the automatic
+	// rounds that wait on them.
+	plans  map[string]api.GateView
+	health api.Health
+	loaded bool
+	sel    unit.Unit
 	// at is the selection's index, kept when the selected pull request
 	// leaves the view.
 	at     int
@@ -128,36 +134,36 @@ type Model struct {
 	// closed are the sessions closed in the last day, newest first.
 	closed []api.ClosedSession
 
-	// plugins are the enabled plugins' views, after the plan; set is the
-	// rows as they read them, nil until one asks.
-	plugins []PluginView
-	set     *rowset.Set
 	// served are the plugins the daemon serves, enabled or not.
 	served []api.Plugin
 
-	// gtd are the core views of GET /api/gtd, after the plan; entries are
-	// each view's entries as last pulled, counters the tabs' counts.
-	gtd           []View
-	gtdCat        api.GTDCatalog
-	entries       map[string][]api.EntryView
-	entriesLoaded bool
-	counters      api.Counters
-	// filtered are the counts of the entries the filter's words keep, as
+	// taskViews are the core views of GET /api/views, after the plan; tasks are
+	// each view's tasks as last pulled, counters the tabs' counts.
+	taskViews   []View
+	viewsCat    api.ViewsCatalog
+	tasks       map[string][]api.TaskView
+	tasksLoaded bool
+	// tasksLoading and rowsLoading are the plugins the last page of tasks
+	// and of rows said are still loading, and why.
+	tasksLoading []api.Loading
+	rowsLoading  []api.Loading
+	counters     api.Counters
+	// filtered are the counts of the tasks the filter's words keep, as
 	// last read.
 	filtered *api.Counters
 	area     string
-	entrySel string
-	entryAt  int
-	// detailID is the entry whose detail is open; opened is what the
+	taskSel  string
+	taskAt   int
+	// detailID is the task whose detail is open; opened is what the
 	// daemon answered for it, stale once a page changed it.
 	detailID    string
-	opened      *api.EntryView
+	opened      *api.TaskView
 	detailStale bool
 	// detailRead is the read that opened the detail: a digit typed ahead
 	// in it does not answer.
 	detailRead uint64
 	seen       map[string]bool
-	// navigated is set once a key chose a view, so the GTD views arriving
+	// navigated is set once a key chose a view, so the task views arriving
 	// late do not move the screen to Focus.
 	navigated bool
 
@@ -167,8 +173,8 @@ type Model struct {
 
 	// edit is a prompt's text waiting for the editor.
 	edit *EditRequest
-	// drafts are the drafts made for the open detail's entry, draftsFor
-	// that entry, picked the one the draft keys act on, 0 none.
+	// drafts are the drafts made for the open detail's task, draftsFor
+	// that task, picked the one the draft keys act on, 0 none.
 	drafts    []api.Draft
 	draftsFor string
 	picked    int64
@@ -189,8 +195,25 @@ func (m *Model) Stay(why string) { m.quit, m.status = false, why }
 // SetData replaces the rows and keeps the selected pull request while it is
 // still in the view, else the same place in the list.
 func (m *Model) SetData(rows []api.Row, h api.Health) {
-	m.rows, m.health, m.loaded, m.err, m.set = rows, h, true, "", nil
+	m.rows, m.health, m.loaded, m.err = rows, h, true, ""
 	m.keepSelection()
+}
+
+// SetGates takes the open gates: a plan gate with a deadline is an
+// automatic round its unit's row counts down to.
+func (m *Model) SetGates(gs []api.GateView) {
+	m.plans = map[string]api.GateView{}
+	for _, g := range gs {
+		if g.Kind == string(gate.KindPlan) && g.Unit != "" && !g.Deadline.IsZero() {
+			m.plans[g.Unit] = g
+		}
+	}
+}
+
+// roundGate is the open plan gate r's automatic round waits on.
+func (m *Model) roundGate(r api.Row) (api.GateView, bool) {
+	g, ok := m.plans[r.Unit.String()]
+	return g, ok
 }
 
 // SetCatalog takes the terminal's row views and the kinds' labels from the
@@ -269,9 +292,9 @@ func (m *Model) move(delta int) {
 		m.planMove(delta)
 		return
 	}
-	if _, ok := m.gtdView(); ok {
+	if _, ok := m.viewOnScreen(); ok {
 		if !m.reviewMove(delta) {
-			m.entryMove(delta)
+			m.taskMove(delta)
 		}
 		return
 	}
@@ -284,14 +307,14 @@ func (m *Model) move(delta int) {
 }
 
 func (m *Model) setView(i int) {
-	m.view, m.at, m.entryAt, m.entrySel, m.navigated = i, 0, 0, "", true
+	m.view, m.at, m.taskAt, m.taskSel, m.navigated = i, 0, 0, "", true
 	m.rv.step, m.rv.head = "", true
 	if m.rv.review != nil {
 		m.rv.step = firstOpenStep(m.rv.review.Steps, -1)
 	}
 	m.closeDetail()
 	m.keepSelection()
-	m.keepEntrySelection()
+	m.keepTaskSelection()
 }
 
 // Key applies one key press; ok means the command goes to the daemon.
@@ -323,13 +346,6 @@ func (m *Model) Key(k Key) (c Command, ok bool) {
 		m.quit = true
 	case k.Name == KeyTab:
 		m.cycle()
-	case m.view >= m.pluginBase():
-		if v, ok := m.plugin(); ok {
-			if name := bindingName(k); name == "?" || name == "Ctrl+K" || m.prefix(name) {
-				return m.dispatch(k)
-			}
-			return m.pluginKey(v, k)
-		}
 	case k.Name == KeyUp:
 		m.move(-1)
 	case k.Name == KeyDown:
@@ -649,21 +665,21 @@ func (m *Model) restoreSelection() {
 		m.sel = m.unfiltered
 	}
 	m.keepSelection()
-	m.keepEntrySelection()
+	m.keepTaskSelection()
 }
 
-// jump turns a pasted pull request URL into the selection of its row, in
-// the first view that holds it.
+// jump turns a pasted web address into the selection of the row it links
+// to, or a page under it, in the first view that holds it.
 func (m *Model) jump() {
-	ref, err := pr.ParseURL(strings.TrimSpace(string(m.filter)))
-	if err != nil {
+	addr := strings.TrimSpace(string(m.filter))
+	if !strings.HasPrefix(addr, "https://") && !strings.HasPrefix(addr, "http://") {
 		m.restoreSelection()
 		return
 	}
 	m.filter = nil
 	for i, v := range m.views {
 		for _, r := range m.in(v.ID) {
-			if strings.EqualFold(r.Label, ref.String()) {
+			if links(r.Link, addr) {
 				m.view, m.sel = i, r.Unit
 				m.keepSelection()
 				return
@@ -675,7 +691,15 @@ func (m *Model) jump() {
 	for i, v := range m.views {
 		labels[i] = v.Label
 	}
-	m.status = ref.String() + " is not in " + orList(labels) + "; " + brand.Command + " open " + ref.URL() + " shows it"
+	m.status = addr + " is not in " + orList(labels) + "; " + brand.Command + " open " + addr + " shows it"
+}
+
+// links says whether addr is link or a page under it.
+func links(link, addr string) bool {
+	if link == "" || len(addr) < len(link) || !strings.EqualFold(addr[:len(link)], link) {
+		return false
+	}
+	return len(addr) == len(link) || strings.ContainsRune("/?#", rune(addr[len(link)]))
 }
 
 func (m *Model) send(c Command) (Command, bool) {

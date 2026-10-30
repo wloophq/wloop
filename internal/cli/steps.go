@@ -17,6 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/port"
 	coresweep "github.com/wloophq/wloop/internal/core/sweep"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/workspaces"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -47,8 +48,14 @@ const stepClassify = "classify"
 // stepDeps are what the builtin steps read and act through; newStepSet
 // fills the removal ports the Env has.
 type stepDeps struct {
-	Units      automation.Units
-	Candidates roundCandidates
+	Units automation.Units
+	// Keep is the host's bookkeeping of Units, which scopes a workflow's
+	// facts; nil scopes none.
+	Keep any
+	// Planners plan the rounds of their plugin's units, by provider.
+	Planners map[unit.ProviderID]roundPlanner
+	// Overrides are the host's overrides a plan reads; nil reads none.
+	Overrides overrideReader
 	// Briefs is nil when briefs are off: every round goes without one.
 	Briefs   briefPort
 	Rounds   Rounds
@@ -57,8 +64,12 @@ type stepDeps struct {
 	Classify classifyDeps
 	// Drafts are what draft.propose reads; nil refuses it.
 	Drafts *draftDeps
-	Pub    port.Publisher
-	Log    func(format string, args ...any)
+	// Props are what task.set writes; nil refuses it.
+	Props coretasks.PropStore
+	// Gates are what gate.open opens and reads; nil refuses it.
+	Gates stepGates
+	Pub   port.Publisher
+	Log   func(format string, args ...any)
 	// Headless starts turn.start's headless turns; Turns counts the
 	// automated turns turns.per_day caps.
 	Headless headlessStarter
@@ -199,7 +210,9 @@ func stepRegistry() map[string]stepEntry {
 		builtin.StepDraftPropose: draftProposeStep,
 		stepClassify:             {check: (*stepSet).classifyCheck, run: (*stepSet).classifyRun},
 		"notify.self":            {check: (*stepSet).notifyCheck, run: (*stepSet).notifyRun},
-		builtin.StepEntryVerb:    {check: (*stepSet).entryVerbCheck, run: (*stepSet).entryVerbRun},
+		builtin.StepTaskVerb:     {check: (*stepSet).taskVerbCheck, run: (*stepSet).taskVerbRun},
+		builtin.StepTaskSet:      {check: (*stepSet).taskSetCheck, run: (*stepSet).taskSetRun},
+		builtin.StepGateOpen:     {check: (*stepSet).gateOpenCheck, run: (*stepSet).gateOpenRun},
 	}
 }
 
@@ -521,7 +534,7 @@ func (s *stepSet) target(ctx context.Context, c stepCall) (wsdomain.Workspace, w
 	}
 	info := workspaces.PRInfo{Unit: ref.Unit(), Number: ref.Number, Open: strings.EqualFold(factString(f, "workspace.pr_state"), "open")}
 	if s.e.Store != nil {
-		row, found, err := s.e.Store.PR(ctx, ref)
+		row, found, err := s.e.reportedInputs().PR(ctx, ref)
 		if err != nil {
 			return w, info, err
 		}
@@ -753,7 +766,7 @@ func (b boundRounds) SkipFirstRound(_ context.Context, u unit.Unit) error {
 	if st == nil {
 		return errNoRoundState
 	}
-	st.SkipFirstRound(u.Key)
+	st.SetMark(u.Key, markFirstSkipped, "1")
 	return nil
 }
 

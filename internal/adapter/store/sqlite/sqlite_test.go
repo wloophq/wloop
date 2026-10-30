@@ -17,51 +17,38 @@ var golden = []string{
 	"brief_runs: id, trigger, intake, version, attempt_of, started_at, ended_at, input_ms, call_ms, agent_ms, outcome, error, model, cost_usd, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, input_bytes, input_cut, brief, tags, dropped_tags, input_sha, reused_from, provider, unit_key, revision, input, intent",
 	"classifications: provider, unit_key, fingerprint, workflow, output, at",
 	"classify_days: day, total",
+	"dossier_moves: seq, from_path, to_path",
 	"dossiers: owner, rel_path, status, bytes, files, last_write_at, resolved_at, archived_at, purge_after",
-	"drafts: id, provider, unit_key, items, entry, kind, target, text, reaction, original, edited, origin_kind, turn_seq, intent, workflow, rule, rule_key, approval_mode, approval_window, deadline, state, evidence_ref, evidence_permalink, evidence_at, error, reason, would_policy, would_reason, would_outcome, created_at, updated_at, sending_at, rev, purpose, delivery, effects, effects_applied_at, origin_provider, origin_unit_key, replaced",
-	"entries: id, kind, state, title, notes, focus_on, focus_auto, focus_at, area, project, position, sequential, snooze_until, snooze_on_activity, snooze_return, snooze_mute, waiting, deadline, changed, seen_at, origin, created, updated, rev",
-	"entry_contexts: entry_id, context, ord",
-	"entry_items: entry_id, provider, unit_key, item",
-	"entry_position: only, epoch, rev",
-	"entry_units: entry_id, provider, unit_key, ord",
-	"events: id, provider, unit_key, kind, key, actor, at, data",
-	"extraction_cursors: provider, unit_key, last_ts, last_seq, verdict, verdict_why, viewer_role, topic, started_by_viewer, closure_posted, watched, at, closure_marked",
-	"extraction_days: day, calls, cost_usd",
-	"extraction_hints: provider, unit_key, item_id, mode, context, why",
-	"extraction_runs: id, provider, unit_key, at, model, cost_usd, outcome, error",
+	"drafts: id, provider, unit_key, items, task, kind, target, text, reaction, original, edited, origin_kind, turn_seq, intent, workflow, rule, rule_key, state, evidence_ref, evidence_permalink, evidence_at, error, reason, created_at, updated_at, sending_at, rev, purpose, delivery, effects, effects_applied_at, origin_provider, origin_unit_key, replaced",
+	"events: id, provider, unit_key, kind, key, actor, at, data, anchor",
 	"fetches: workspace_id, at",
+	"gates: id, task_id, provider, unit_key, kind, name, subject, status, intents, intent, answer, by_actor, rule, deadline, default_intent, opened_at, closed_at, applied_at, begun_at",
 	"instruction_parts: sha, body",
 	"intakes: seq, provider, unit_key, intent, source, request, state, brief, note, accepted_at, briefing_at, starting_at, ended_at, turn_seq, turn_id, error, log",
 	"item_ops: seq, provider, unit_key, item, op, provenance, outcome, reason, at",
-	"item_proposals: id, provider, unit_key, item, op, provenance, reason, dedupe, state, at",
+	"item_proposals: id, provider, unit_key, item, op, provenance, reason, dedupe, at, decided_at",
 	"items: provider, unit_key, id, body, state, confirmed, provenance, created_at, updated_at",
 	"links: provider, unit_key, to_provider, to_key, kind, item, evidence, origin, at",
-	"messages: id, entry_id, provider, unit_key, kind, text, options, recommend, confirm, origin_kind, turn_seq, session, workflow, proposal, state, answer, created_at, closed_at",
+	"messages: id, task_id, provider, unit_key, kind, text, options, recommend, confirm, origin_kind, turn_seq, session, workflow, proposal, answer, created_at, closed_at",
 	"meta: key, value",
-	"overrides: provider, unit_key, muted_until, mute_until_state, hold, taken_over, muted_kind, muted_waiting_on, next_guidance, tracked",
+	"overrides: provider, unit_key, hold, taken_over, next_guidance, tracked",
 	"pause: id, paused, repos, at, why",
 	"placements: provider, unit_key, repo, checkout, role, shared, set_at",
 	"plan_items: id, workflow, provider, unit_key, key_value, decision, reason, steps, why, default_outcome, deadline, guidance, attempts, error, at, gain_memory, gain_disk, saved_at, observe",
-	"pr_details: owner, repo, number, version, read_at, body",
-	"pr_seen: owner, repo, number, at",
-	"projects: entry_id, slug, review_every, reviewed_at",
-	"pull_requests: owner, repo, number, title, author, state, is_draft, head_oid, head_branch, base_branch, is_fork, checks_state, review_decision, review_requests, url, created_at, updated_at, merged_at, closed_at, body_edited_at, changed_files, reasons, ws_id, ws_name, ws_status, ws_review, ws_agent, ws_comment, ws_main, ws_manager, failing_checks, mergeable, mergeable_at",
 	"review_runs: id, started_at, finished_at, done",
 	"round_day_notes: day, kind, note",
 	"round_day_prs: day, provider, unit_key, rounds",
 	"round_days: day, total",
-	"round_state: provider, unit_key, sent_at, agent_home, first_round_skipped",
-	"segment_map: provider, conversation, segment_id, team, from_ts, to_ts, created_at, updated_at, closed",
+	"round_state: provider, unit_key, sent_at, agent_home",
 	"session_handles: session_id, manager, handle, runtime, from_at, to_at",
 	"sessions: session_id, manager, agent, pane, agent_session, workspace_id, worktree, home, managed, started_at, mcp_at, idle_since, closed_at, typed_at, typed_line, user_prompt_at, prompt_seen_at, provider, unit_key",
-	"slack_changes: seq, conversation, ts, thread_ts, kind, edited_ts, at",
-	"slack_conversations: id, team, name, kind, is_member, archived, dm_user, hwm, admitted, updated_at",
-	"slack_cursors: name, value, at",
-	"slack_messages: conversation, ts, thread_ts, parent_user, user, bot_id, app_id, username, subtype, text, edited_ts, deleted, files, links, mentions, permalink, via, received_at",
-	"slack_objects: object, conversation, ts, kind, version, latest_reply, reply_count, watched, reasons, last_activity_at, next_check_at, seen_at, admitted_at",
-	"slack_reactions: conversation, ts, name, user",
-	"slack_users: id, name, display_name, email, is_bot, deleted, fetched_at",
-	"turn_answers: id, turn_seq, provider, unit_key, at, text, source, option_id, yes, no, route, session, message_id, read_at, noticed_at",
+	"task_aliases: old_id, new_id",
+	"task_items: task_id, provider, unit_key, item, resolved",
+	"task_position: only, epoch, rev",
+	"task_props: task_id, name, value, writer, at",
+	"task_units: task_id, provider, unit_key, ord",
+	"tasks: id, state, title, notes, parent, position, sequential, changed, seen_at, origin, created, updated, rev, category, review_every, reviewed_at",
+	"turn_answers: id, turn_seq, provider, unit_key, at, text, source, option_id, yes, no, route, session, message_id, read_at, noticed_at, gate_id",
 	"turn_instructions: sha, kind, repo, created_at, bundled_sha, sources, parts",
 	"turn_records: id, turn_seq, provider, unit_key, session, agent_session, head, hash, at, acked, record",
 	"turn_stops: session, prompt_id, agent_session, at, message, blocked, record_id",
@@ -70,8 +57,9 @@ var golden = []string{
 	"unit_briefs: provider, unit_key, failures, attempt_of, run, last_run, wanted_at, retry_at, gave_up_at, gave_up_reason",
 	"unit_cards: provider, unit_key, card, at",
 	"unit_marks: provider, unit_key, mark, value",
-	"unit_tags: provider, unit_key, key, value, run",
+	"unit_snapshots: provider, unit_key, snapshot, rev, at",
 	"view_applied: sink, provider, unit_key, role, status, unread, summary, col, override, at",
+	"wakes: task_id, until, on_kinds, actors, cond, expires, return_state",
 	"workflow_cursors: workflow, cursor, last_fire",
 	"workflow_runs: workflow, provider, unit_key, key_value, status, attempts, error, at",
 	"worktree_units: path, provider, unit_key, at",
@@ -180,8 +168,9 @@ func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a.SetHeads(key, "abc", "def")
-	b.RecordSent(key, round.Reviewed, "fp", now)
+	a.SetMark(key, "addressed.checks", "abc")
+	a.SetMark(key, "addressed.conflict", "def")
+	b.RecordSent(key, "reviewed", "fp", now)
 	b.SetAgentHome(key, "/home/me/.claude")
 	if err := r.Save(ctx, a); err != nil {
 		t.Fatal(err)
@@ -194,7 +183,7 @@ func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := c.PRs[key]
-	if p.Marks[round.AddressedChecks] != "abc" || p.Marks[round.AddressedConflict] != "def" || p.Marks[round.Reviewed] != "fp" || p.AgentHome != "/home/me/.claude" || !p.SentAt.Equal(now) {
+	if p.Marks["addressed.checks"] != "abc" || p.Marks["addressed.conflict"] != "def" || p.Marks["reviewed"] != "fp" || p.AgentHome != "/home/me/.claude" || !p.SentAt.Equal(now) {
 		t.Fatalf("%+v", p)
 	}
 	if d := c.Days[round.DayKey(now)]; d.Total != 1 || d.PerPR[key] != 1 {
@@ -202,7 +191,7 @@ func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
 	}
 
 	c.Count(key, now)
-	c.SetMark(key, round.AddressedConflict, "")
+	c.SetMark(key, "addressed.conflict", "")
 	c.FirstCapHit("acme/api#8", now)
 	other, _ := r.Load(ctx)
 	other.Count("acme/web#1", now)
@@ -216,7 +205,7 @@ func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
 	}
 	d, _ := r.Load(ctx)
 	day := d.Days[round.DayKey(now)]
-	if day.Total != 3 || day.PerPR[key] != 2 || day.PerPR["acme/web#1"] != 1 || !slices.Equal(day.CapLogged, []string{"acme/api#8"}) || d.PRs[key].Marks[round.Reviewed] != "fp" || d.PRs[key].Marks[round.AddressedConflict] != "" {
+	if day.Total != 3 || day.PerPR[key] != 2 || day.PerPR["acme/web#1"] != 1 || !slices.Equal(day.CapLogged, []string{"acme/api#8"}) || d.PRs[key].Marks["reviewed"] != "fp" || d.PRs[key].Marks["addressed.conflict"] != "" {
 		t.Fatalf("day %+v, pr %+v", day, d.PRs[key])
 	}
 
@@ -236,7 +225,7 @@ func TestRoundsSaveRefusesAKeyThatDoesNotParse(t *testing.T) {
 	db, _ := openTemp(t)
 	r := NewRounds(db)
 	st := round.New()
-	st.SetMark("not a key", round.Reviewed, "x")
+	st.SetMark("not a key", "reviewed", "x")
 	if err := r.Save(context.Background(), st); err == nil {
 		t.Fatal("saved a key that does not parse")
 	}

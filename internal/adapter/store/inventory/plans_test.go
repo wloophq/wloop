@@ -46,25 +46,21 @@ type hotPlan struct {
 }
 
 var hotPlans = []hotPlan{
-	{name: "open messages", query: messagesOpenSQL, want: []string{"messages_open (state=?)"}},
-	{name: "message by entry", query: messageByEntrySQL, args: 1, want: []string{"messages_entry (entry_id=?)"}},
-	{name: "open question", query: openQuestionSQL, args: 5, want: []string{"messages_open (state=?)"}},
-	{name: "open workflow proposal", query: openWorkflowSQL, args: 4, want: []string{"messages_open (state=?)"}},
+	{name: "open messages", query: messagesOpenSQL, want: []string{"messages_open (closed_at=?)"}},
+	{name: "open question", query: openQuestionSQL, args: 5, want: []string{"messages_open (closed_at=?)"}},
+	{name: "open workflow proposal", query: openWorkflowSQL, args: 4, want: []string{"messages_open (closed_at=?)"}},
 	{name: "ledger message", query: ledgerMessageSQL, args: 1, want: []string{"messages_proposal (proposal=?)"}},
 	{name: "recent activity", query: recentActivitySQL(marks(2)), args: 5, want: []string{"SCAN e USING INDEX events_recent"}},
 	{name: "active refs", query: activeRefsSQL, args: 1, want: []string{"events_recent (at>?)"}, tempSorts: []string{"USE TEMP B-TREE FOR DISTINCT"}},
-	{name: "reviewed", query: reviewedSQL, args: 2, want: []string{"turns_sent_at (sent_at>?)"}},
 	{name: "timed turns", query: timedTurnsSQL, args: 1, want: []string{"turns_sent_at (sent_at>?)"}, tempSorts: []string{"USE TEMP B-TREE FOR ORDER BY"}},
 	{name: "turn tokens", query: turnTokensSQL, args: 1, want: []string{"SEARCH t USING INTEGER PRIMARY KEY"}},
 	{name: "last situation", query: lastSituationSQL, args: 3, want: []string{"events_unit_kind (provider=? AND unit_key=? AND kind=?)"}, tempSorts: []string{"USE TEMP B-TREE FOR ORDER BY"}},
 	{name: "last event", query: lastEventSQL, args: 3, want: []string{"events_unit_kind (provider=? AND unit_key=? AND kind=?)"}},
-	{name: "stored facts events", query: storedFactsEventsSQL(marks(2)), args: 4, want: []string{"events_unit_kind"}},
 	{name: "ended", query: endedSQL(marks(2)), args: 3, want: []string{"events_keyed"}},
 	{name: "events of units", query: eventsByUnitsSQL, args: 1, want: []string{"events_unit (provider=? AND unit_key=?)"}, tempSorts: []string{"USE TEMP B-TREE FOR ORDER BY"}},
 	{name: "outages", query: outagesSQL, args: 1, want: []string{"events_kind (kind=? AND at>?)"}},
 	{name: "latest bundle", query: latestBundleSQL, args: 2, want: []string{"turn_instructions_kind (kind=? AND repo=?)"}},
-	{name: "open pull requests", query: listPRsSQL(true), want: []string{"pr_state (state=?)"}, tempSorts: []string{"USE TEMP B-TREE FOR LAST 3 TERMS OF ORDER BY"}},
-	{name: "tag vocabulary", query: tagVocabularySQL(2), args: 4, want: []string{"unit_tags_kv (key=?)"}, tempSorts: []string{"USE TEMP B-TREE FOR ORDER BY"}},
+	{name: "tag vocabulary", query: tagVocabularySQL(2), args: 4, want: []string{"events_kind (kind=?)"}, tempSorts: []string{"USE TEMP B-TREE FOR GROUP BY", "USE TEMP B-TREE FOR ORDER BY"}},
 }
 
 var (
@@ -121,7 +117,7 @@ func TestHotPlans(t *testing.T) {
 	}
 }
 
-// indexesPlannedElsewhere are the indexes of the turn, stop, session handle, plan, entry, project and draft tables, whose
+// indexesPlannedElsewhere are the indexes of the turn, stop, session handle, plan, task, project, draft and gate tables, whose
 // statements the sqlite package's plans cover, and the unique index that
 // only constrains INSERT OR IGNORE.
 var indexesPlannedElsewhere = []string{
@@ -130,10 +126,14 @@ var indexesPlannedElsewhere = []string{
 	"turn_records_once", "turn_records_unit", "turn_answers_unit", "turn_stops_session", "turn_stops_at", "intakes_open",
 	"session_handles_handle", "session_handles_open",
 	"plan_items_workflow",
-	"entries_state", "entries_rev", "entry_items_unit", "entry_units_unit",
+	"tasks_state", "tasks_rev", "tasks_category", "task_items_unit", "task_units_unit",
 	"projects_slug", "review_runs_open",
 	"links_to",
-	"drafts_state", "drafts_unit", "drafts_entry", "drafts_rule", "drafts_workflow",
+	// pr_state is of the version 6 pull_requests, which the host no longer
+	// reads.
+	"pr_state",
+	"drafts_state", "drafts_unit", "drafts_task", "drafts_rule", "drafts_workflow",
+	"gates_due", "gates_task", "gates_unit",
 }
 
 func TestNoUnusedIndex(t *testing.T) {

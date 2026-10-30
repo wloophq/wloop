@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/wloophq/wloop/internal/domain/gtd"
-	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"strings"
 	"time"
+
+	"github.com/wloophq/wloop/internal/domain/gate"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/task"
 
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -43,7 +46,7 @@ type Recorded struct {
 	// already ended or was replaced.
 	Dropped int
 
-	// result is the unit the record produced for the turn's entry; zero
+	// result is the unit the record produced for the turn's task; zero
 	// when it attaches none.
 	result unit.Unit
 }
@@ -72,6 +75,7 @@ func (s *Service) recordEnd(ctx context.Context, r RecordRequest, byHeadless boo
 	if err != nil {
 		return got, err
 	}
+	defer s.openMissing(ctx)
 	if len(ops) > 0 {
 		got.Ledger = s.applyLedger(context.WithoutCancel(ctx), ops)
 	}
@@ -85,22 +89,22 @@ func (s *Service) recordEnd(ctx context.Context, r RecordRequest, byHeadless boo
 	return got, nil
 }
 
-// attachResult attaches u to the entry of the turn's unit on; a failure is
+// attachResult attaches u to the task of the turn's unit on; a failure is
 // logged, since the record is stored.
 func (s *Service) attachResult(ctx context.Context, on, u unit.Unit) {
-	id, _ := gtd.IDOf(on)
+	id, _ := task.IDOf(on)
 	if err := s.Results.Attach(ctx, id, u); err != nil {
 		s.logf("turn result %s on %s: %v", u, on, err)
 	}
 }
 
 // resultOf is the unit rec's outcome url names when rules attach it to the
-// entry the turn on u serves; zero otherwise.
+// task the turn on u serves; zero otherwise.
 func (s *Service) resultOf(u unit.Unit, rules dintent.RecordRules, rec record.Record) unit.Unit {
 	if s.Results == nil || !rules.AttachURL || rec.State != record.Done || rec.Outcome == nil || rec.Outcome.URL == "" {
 		return unit.Unit{}
 	}
-	if _, ok := gtd.IDOf(u); !ok {
+	if _, ok := task.IDOf(u); !ok {
 		return unit.Unit{}
 	}
 	got, _ := s.Results.UnitOf(rec.Outcome.URL)
@@ -223,6 +227,7 @@ func (s *Service) recordTurnEnd(ctx context.Context, r RecordRequest, byHeadless
 	if _, err := s.Store.Save(ctx, b, ev); err != nil {
 		return Recorded{}, nil, nil, err
 	}
+	s.ended(b.Unit, *t, r.Record)
 	return out, []port.Event{ev}, ops, nil
 }
 
@@ -364,4 +369,59 @@ func (s *Service) applySession(ctx context.Context, handle string, apply func(cu
 	kind, key := apply(&cur, now)
 	ev := s.event(unit.Unit{}, kind, key, "")
 	return ev, s.Registry.SaveSession(ctx, cur, ev)
+}
+
+// endedTurn is turn t on u, which ended.
+type endedTurn struct {
+	u unit.Unit
+	t turn.Turn
+}
+
+// ended notes, under s.mu, that turn t on u ended with rec, so that
+// openMissing opens its intent's missing gate when rec is no record or a
+// failed one.
+func (s *Service) ended(u unit.Unit, t turn.Turn, rec record.Record) {
+	if rec.State == record.UnrecordedState || rec.State == record.Failed {
+		s.unrecorded = append(s.unrecorded, endedTurn{u, t})
+	}
+}
+
+// missingPrefix keeps a missing gate's Subject from reading as a message id.
+const missingPrefix = "turn/"
+
+// MissingSubject is the Subject of the gate turn id opens when it ends
+// without its record or failed.
+func MissingSubject(id string) string { return missingPrefix + id }
+
+// MissingTurn is the turn id a missing gate's Subject names; false for any
+// other subject.
+func MissingTurn(subject string) (string, bool) {
+	id, ok := strings.CutPrefix(subject, missingPrefix)
+	return id, ok && id != ""
+}
+
+// openMissing opens, outside s.mu, the gate record.missing names for each
+// turn that ended without a record or failed; a turn of an intent that
+// names no missing gate opens nothing.
+func (s *Service) openMissing(ctx context.Context) {
+	s.mu.Lock()
+	ended := s.unrecorded
+	s.unrecorded = nil
+	s.mu.Unlock()
+	if s.Gates == nil || s.Intents == nil {
+		return
+	}
+	for _, e := range ended {
+		rules, err := s.Intents.Rules(string(e.t.Intent))
+		if err != nil || rules.Missing == "" {
+			continue
+		}
+		g := gate.Gate{Unit: e.u, Name: rules.Missing, Subject: MissingSubject(e.t.ID)}
+		if id, ok := task.IDOf(e.u); ok {
+			g.Task = id
+		}
+		if _, err := s.Gates.OpenNamed(context.WithoutCancel(ctx), rules.Missing, g); err != nil {
+			s.logf("turn %s on %s ended without its record: %v", e.t.ID, e.u, err)
+		}
+	}
 }

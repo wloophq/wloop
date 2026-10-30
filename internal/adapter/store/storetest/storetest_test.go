@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 )
@@ -59,7 +61,7 @@ func TestSeededMatchesSizes(t *testing.T) {
 			t.Errorf("WithTurns names %s, which has no book", u)
 		}
 	}
-	open, err := f.Inventory.ListPRs(context.Background(), true)
+	open, err := inventorytest.Of(f.Inventory).ListPRs(context.Background(), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,13 +230,13 @@ func TestSeededCopyIsIsolated(t *testing.T) {
 	ctx := context.Background()
 	a, b := Seeded(t, Live), Seeded(t, Live)
 	ref := pr.Ref{Owner: "org-9", Repo: "repo-9", Number: 1}
-	if err := a.Inventory.UpsertPR(ctx, dinv.PR{Ref: ref, State: "OPEN", LastSeenAt: a.Now}); err != nil {
+	if err := inventorytest.Of(a.Inventory).UpsertPR(ctx, dinv.PR{Ref: ref, State: "OPEN", LastSeenAt: a.Now}); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok, err := a.Inventory.PR(ctx, ref); err != nil || !ok {
+	if _, ok, err := inventorytest.Of(a.Inventory).PR(ctx, ref); err != nil || !ok {
 		t.Fatalf("written copy: found %v, %v", ok, err)
 	}
-	if _, ok, err := b.Inventory.PR(ctx, ref); err != nil || ok {
+	if _, ok, err := inventorytest.Of(b.Inventory).PR(ctx, ref); err != nil || ok {
 		t.Fatalf("other copy: found %v, %v", ok, err)
 	}
 	if got := count(t, Seeded(t, Live), `SELECT count(*) FROM pull_requests`); got != Live.PRs {

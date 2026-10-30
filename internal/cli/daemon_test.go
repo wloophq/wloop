@@ -11,23 +11,29 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+	"github.com/wloophq/wloop/internal/catalog"
+	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/turn"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/menubar"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/daemon"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/domain/pr"
 )
 
 var _ menubar.Daemon = (*client.Client)(nil)
 
 var daemonNow = time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC)
 
-var r7 = github.Ref{Owner: "acme", Repo: "api", Number: 7}
+var r7 = pr.Ref{Owner: "acme", Repo: "api", Number: 7}
 
 type testDaemon struct {
 	socket string
@@ -53,6 +59,20 @@ func (d *testDaemon) holdByCap(t *testing.T) {
 
 // startDaemon serves a daemon over a socket in a short temporary directory,
 // with one open pull request in its store.
+// bundledLens is d listing the bundled profile's views, each task's facts those its own fields hold.
+func bundledLens(d coretasks.Deps) coretasks.Deps {
+	loaded := func() *intentload.Loaded {
+		l, err := turn.Bundled()
+		if err != nil {
+			panic(err)
+		}
+		return l
+	}
+	lens := catalog.Lens{Loaded: loaded, Now: func() time.Time { return daemonNow }}
+	d.Views, d.ViewEval, d.ViewSort = lensViews(loaded), lens.Eval, lens.Sort
+	return d
+}
+
 func startDaemon(t *testing.T, actions daemon.Actions) *testDaemon {
 	t.Helper()
 	dir, err := os.MkdirTemp("/tmp", brand.Name)
@@ -67,18 +87,21 @@ func startDaemon(t *testing.T, actions daemon.Actions) *testDaemon {
 	st := inventory.New(stDB)
 	t.Cleanup(func() { stDB.Close() })
 	ctx := context.Background()
-	if err := st.UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h2",
+	if err := inventorytest.Of(st).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h2",
 		ReviewRequests: []string{"me"}, Reasons: []string{"review-requested"}, URL: r7.URL()}); err != nil {
 		t.Fatal(err)
 	}
 	d := &testDaemon{socket: filepath.Join(dir, "daemon.sock"), store: st}
+	if fa, ok := actions.(*recordingActions); ok {
+		fa.store = st
+	}
 	srv := daemon.New(withRows(daemon.Deps{
 		Cfg: Defaults(), Version: "test", Actions: actions,
-		Now:    func() time.Time { return daemonNow },
-		Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil },
-		Sweep:  daemon.SweepFunc(func(context.Context) (string, string, error) { return "", "", nil }),
-		Log:    t.Logf,
-		GTD:    coregtd.New(coregtd.Deps{Store: stDB.Entries(), Clock: clockFunc(func() time.Time { return daemonNow })}),
+		Now:      func() time.Time { return daemonNow },
+		Identity: viewerIs("me"),
+		Sweep:    daemon.SweepFunc(func(context.Context) (string, string, error) { return "", "", nil }),
+		Log:      t.Logf,
+		Tasks:    coretasks.New(bundledLens(coretasks.Deps{States: taskstest.BundledStates, Store: stDB.Tasks(), Clock: clockFunc(func() time.Time { return daemonNow })})),
 	}, st))
 	h := srv.Handler()
 	l, err := net.Listen("unix", d.socket)

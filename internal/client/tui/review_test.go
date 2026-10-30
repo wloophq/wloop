@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
@@ -63,17 +64,17 @@ func reviewFixture() api.Review {
 	}}
 }
 
-func reviewCatalog() api.GTDCatalog {
-	c := gtdCatalog()
-	c.Views = append(c.Views, api.GTDView{ID: "review", Label: "Review"})
+func reviewCatalog() api.ViewsCatalog {
+	c := viewsCatalog()
+	c.Views = append(c.Views, api.TaskViewSpec{ID: "review", Label: "Review"})
 	return c
 }
 
-func reviewEntries() map[string][]api.EntryView {
-	es := gtdEntries()
-	p := entry("e-p", "Ship the v2 API", "next")
-	p.Kind, p.ReviewDue, p.ReviewEvery = "project", true, "168h0m0s"
-	es["review"] = []api.EntryView{p}
+func reviewTasks() map[string][]api.TaskView {
+	es := viewTasks()
+	p := task("e-p", "Ship the v2 API", "next")
+	p.Props, p.ReviewDue, p.ReviewEvery = map[string]json.RawMessage{"kind": json.RawMessage(`"project"`)}, true, "168h0m0s"
+	es["review"] = []api.TaskView{p}
 	return es
 }
 
@@ -82,9 +83,9 @@ func reviewModel(t testing.TB, color bool) *Model {
 	t.Helper()
 	m := newModel(t)
 	m.SetColor(color)
-	m.SetGTD(reviewCatalog())
-	for v, es := range reviewEntries() {
-		m.SetEntries(v, es, gtdCounters())
+	m.SetViews(reviewCatalog())
+	for v, es := range reviewTasks() {
+		m.SetTasks(v, es, viewCounters())
 	}
 	m.SetReview(reviewFixture())
 	m.navigate("review")
@@ -93,20 +94,20 @@ func reviewModel(t testing.TB, color bool) *Model {
 
 func TestReviewKeysTUI(t *testing.T) {
 	m := newModel(t)
-	m.SetGTD(reviewCatalog())
-	for v, es := range reviewEntries() {
-		m.SetEntries(v, es, gtdCounters())
+	m.SetViews(reviewCatalog())
+	for v, es := range reviewTasks() {
+		m.SetTasks(v, es, viewCounters())
 	}
 	chord(m, "gr")
 	if !m.inReview() {
 		t.Fatalf("g r: view %d", m.view)
 	}
 	m.SetReview(reviewFixture())
-	if view, area, ok := m.EntryQuery(); view != "inbox" || area != "" || !ok || m.rv.step != "inbox" || !m.rv.head {
+	if view, area, ok := m.TaskQuery(); view != "inbox" || area != "" || !ok || m.rv.step != "inbox" || !m.rv.head {
 		t.Fatalf("the review opened on %q (query %q %q %v, head %v), want the first open step", m.rv.step, view, area, ok, m.rv.head)
 	}
-	if _, ok := m.selectedEntry(); ok {
-		t.Fatal("an entry is selected while the cursor is on the step's header")
+	if _, ok := m.selectedTask(); ok {
+		t.Fatal("a task is selected while the cursor is on the step's header")
 	}
 
 	c, ok := press(m, Key{Name: KeyEnter})
@@ -129,27 +130,27 @@ func TestReviewKeysTUI(t *testing.T) {
 	press(m, Key{Rune: ']'})
 
 	press(m, Key{Rune: 'j'})
-	e, ok := m.selectedEntry()
+	e, ok := m.selectedTask()
 	if !ok || e.ID != "e9" || m.rv.head {
 		t.Fatalf("j from the header selected %+v %v", e, ok)
 	}
 	c, ok = press(m, Key{Rune: 'x'})
-	if !ok || c.verb != "next" || c.entry != "e9" {
-		t.Fatalf("x on the step's entry: %+v %v", c, ok)
+	if !ok || c.verb != "next" || c.task != "e9" {
+		t.Fatalf("x on the step's task: %+v %v", c, ok)
 	}
 	m.Done(c, nil, nil)
 	c, ok = press(m, Key{Name: KeyEnter})
-	if !ok || !c.fetch || c.entry != "e9" || c.reviewStep != "" {
-		t.Fatalf("Enter on an entry opens it, got %+v %v", c, ok)
+	if !ok || !c.fetch || c.task != "e9" || c.reviewStep != "" {
+		t.Fatalf("Enter on a task opens it, got %+v %v", c, ok)
 	}
 	press(m, Key{Rune: 'k'})
 	if !m.rv.head {
-		t.Fatal("k from the first entry did not return to the header")
+		t.Fatal("k from the first task did not return to the header")
 	}
 	if c, ok := press(m, Key{Rune: ']'}); ok || m.rv.step != "projects" {
 		t.Fatalf("] sent %+v or showed %q", c, m.rv.step)
 	}
-	if view, _, _ := m.EntryQuery(); view != "review" {
+	if view, _, _ := m.TaskQuery(); view != "review" {
 		t.Errorf("the projects step queries %q", view)
 	}
 
@@ -166,7 +167,7 @@ func TestReviewKeysTUI(t *testing.T) {
 func TestReviewThroughTheDaemon(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		rv := reviewFixture()
-		d := &fakeDaemon{rows: oneRow(), gtd: ptr(reviewCatalog()), entries: reviewEntries(), counters: gtdCounters(), review: &rv}
+		d := &fakeDaemon{rows: oneRow(), viewsCat: ptr(reviewCatalog()), tasks: reviewTasks(), counters: viewCounters(), review: &rv}
 		term, done := start(t, d)
 		eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "[Focus 1]") })
 		term.press(Key{Rune: 'g'}, Key{Rune: 'r'})
@@ -203,32 +204,32 @@ func TestProjectsShowTheirReview(t *testing.T) {
 
 func TestPaletteRunsTheProjectVerbs(t *testing.T) {
 	m := newModel(t)
-	m.SetGTD(reviewCatalog())
-	p := entry("e-p", "Ship the v2 API", "next")
-	p.Kind = "project"
+	m.SetViews(reviewCatalog())
+	p := task("e-p", "Ship the v2 API", "next")
+	p.Props = map[string]json.RawMessage{"kind": json.RawMessage(`"project"`)}
 	p.Verbs = append(verbs("done"), api.VerbState{Verb: "reviewed", Enabled: true}, api.VerbState{Verb: "sequential", Enabled: true})
-	m.SetEntries("projects", []api.EntryView{p}, gtdCounters())
+	m.SetTasks("projects", []api.TaskView{p}, viewCounters())
 	m.navigate("projects")
 	var labels []string
 	var run func(uint64) (Command, bool)
 	for _, it := range m.paletteItems() {
 		labels = append(labels, it.label)
-		if it.label == "reviewed" {
+		if it.label == "Reviewed" {
 			run = it.run
 		}
 	}
-	if !slices.Contains(labels, "sequential") || run == nil {
+	if !slices.Contains(labels, "Sequential") || run == nil {
 		t.Fatalf("palette %v", labels)
 	}
-	if c, ok := run(0); !ok || c.verb != "reviewed" || c.entry != "e-p" {
+	if c, ok := run(0); !ok || c.verb != "reviewed" || c.task != "e-p" {
 		t.Errorf("reviewed from the palette: %+v %v", c, ok)
 	}
 }
 
-func TestProjectFactsNameTheNextAction(t *testing.T) {
-	p := entry("e-p", "Ship", "next")
-	p.Kind, p.NextAction, p.NextActionTitle, p.OpenActions = "project", "e-a", "Draft the plan", 2
-	if got := strings.Join(projectFacts(p), " "); got != "next: Draft the plan 2 open" {
+func TestProjectFactsCountTheOpenChildren(t *testing.T) {
+	p := task("e-p", "Ship", "next")
+	p.Props, p.Children = map[string]json.RawMessage{"kind": json.RawMessage(`"project"`)}, []string{"e-a", "e-b"}
+	if got := strings.Join(projectFacts(p), " "); got != "2 open" {
 		t.Errorf("facts %q", got)
 	}
 }

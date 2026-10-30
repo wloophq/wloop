@@ -5,7 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,12 +22,13 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/readmodel"
-	"github.com/wloophq/wloop/internal/situation"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 )
 
-// Store is what the rows read of the inventory.
+// Store is what the rows read of the host's own state of pull requests:
+// their overrides, events and brief records.
 type Store interface {
-	PRsWithOverrides(ctx context.Context) ([]dinv.PR, map[github.Ref]dinv.Override, error)
+	Overrides(ctx context.Context) (map[github.Ref]dinv.Override, error)
 	EventsByPR(ctx context.Context, refs []github.Ref) (map[github.Ref][]dinv.Event, error)
 	BriefRecords(ctx context.Context, refs ...github.Ref) (map[github.Ref]dinv.BriefRecord, error)
 }
@@ -38,15 +41,22 @@ type Briefs interface {
 }
 
 // Source is where the provider reads rows from: the daemon's RowDeps, the
-// inventory and the brief queue. Briefs may be nil: the brief off.
+// GitHub plugin's reports, the host's state of pull requests and the brief
+// queue. Briefs may be nil: the brief off.
 type Source struct {
 	readmodel.RowDeps
-	Store  Store
-	Briefs Briefs
+	Reports readmodel.Reports
+	Store   Store
+	Briefs  Briefs
+	// Catalog is the plugin's views, facets and situations; nil serves
+	// none.
+	Catalog readmodel.Presenter
+	// Mutes are the user's mutes of pull requests; nil mutes none.
+	Mutes readmodel.Mutes
 }
 
 // Provider is the github provider of the read model: one row per pull
-// request of the inventory, but lapsed ones nobody adopted.
+// request the GitHub plugin reported, but lapsed ones nobody adopted.
 type Provider struct {
 	src Source
 
@@ -55,7 +65,7 @@ type Provider struct {
 }
 
 type listing struct {
-	prs       map[unit.Unit]dinv.PR
+	reports   map[unit.Unit]Report
 	overrides map[github.Ref]dinv.Override
 }
 
@@ -71,37 +81,63 @@ var _ readmodel.Provider = (*Provider)(nil)
 
 func (p *Provider) Provider() unit.ProviderID { return unit.GitHub }
 
-// OffersActions says the deriver offers the whole catalog on its rows.
-func (p *Provider) OffersActions() bool { return true }
-
-// Listed lists every pull request of the inventory but the lapsed ones
+// Listed lists every pull request the plugin reported but the lapsed ones
 // nobody adopted, the most recently updated first.
 func (p *Provider) Listed(ctx context.Context) ([]unit.Unit, error) {
-	prs, overrides, err := p.src.Store.PRsWithOverrides(ctx)
+	if p.src.Reports == nil {
+		return nil, nil
+	}
+	units, err := p.src.Reports.Units(ctx, unit.GitHub)
 	if err != nil {
 		return nil, err
 	}
-	l := &listing{prs: make(map[unit.Unit]dinv.PR, len(prs)), overrides: overrides}
-	units := make([]unit.Unit, 0, len(prs))
-	for _, pr := range prs {
-		if pr.Lapsed() && !overrides[pr.Ref].Adopted {
+	snaps, err := p.src.Reports.Reported(ctx, units)
+	if err != nil {
+		return nil, err
+	}
+	overrides, err := p.src.Store.Overrides(ctx)
+	if err != nil {
+		return nil, err
+	}
+	l := &listing{reports: make(map[unit.Unit]Report, len(snaps)), overrides: overrides}
+	var reps []Report
+	for _, s := range snaps {
+		rep, ok, err := ReportOf(s)
+		if err != nil {
+			p.src.Logf("rows: %v", err)
 			continue
 		}
-		u := pr.Ref.Unit()
-		l.prs[u] = pr
-		units = append(units, u)
+		if !ok || rep.PR.Lapsed() && !overrides[rep.PR.Ref].Adopted && !rep.Payload.Override.Adopted {
+			continue
+		}
+		reps = append(reps, rep)
+	}
+	slices.SortFunc(reps, func(a, b Report) int {
+		if c := b.PR.UpdatedAt.Compare(a.PR.UpdatedAt); c != 0 {
+			return c
+		}
+		return cmp.Or(strings.Compare(a.PR.Ref.Owner, b.PR.Ref.Owner), strings.Compare(a.PR.Ref.Repo, b.PR.Ref.Repo),
+			cmp.Compare(b.PR.Ref.Number, a.PR.Ref.Number))
+	})
+	out := make([]unit.Unit, 0, len(reps))
+	for _, rep := range reps {
+		u := rep.PR.Ref.Unit()
+		l.reports[u] = rep
+		out = append(out, u)
 	}
 	p.mu.Lock()
 	p.listed = l
 	p.mu.Unlock()
-	return units, nil
+	return out, nil
 }
 
 // input is what one pull request's row derives from.
 type input struct {
+	rep      Report
 	pr       dinv.PR
 	events   []dinv.Event
 	override dinv.Override
+	mute     overlay.Mute
 	turn     *TurnFact
 	// session is the started turn's session; sessionErr says it could
 	// not be read.
@@ -135,21 +171,40 @@ func (p *Provider) Load(ctx context.Context, units []unit.Unit) (map[unit.Unit]a
 		l, p.listed = p.listed, nil
 		p.mu.Unlock()
 	}
+	if l == nil {
+		return nil, nil
+	}
 	set := &shared{RowSettings: p.src.Settings(), briefOn: p.src.Briefs != nil}
 
 	ins := make(map[unit.Unit]*input, len(units))
 	refs := make([]github.Ref, 0, len(units))
 	for _, u := range units {
-		pr, ok := l.prs[u]
+		rep, ok := l.reports[u]
 		if !ok {
 			continue
 		}
+		pr := rep.PR
 		o, ok := l.overrides[pr.Ref]
 		if !ok {
 			o.PR = pr.Ref
 		}
-		ins[u] = &input{pr: pr, override: o, set: set}
+		ins[u] = &input{rep: rep, pr: pr, override: o, set: set}
 		refs = append(refs, pr.Ref)
+	}
+	if p.src.Mutes != nil {
+		us := make([]unit.Unit, 0, len(ins))
+		for u := range ins {
+			us = append(us, u)
+		}
+		mutes, err := p.src.Mutes.Mutes(ctx, us)
+		if err != nil {
+			return nil, err
+		}
+		for u, m := range mutes {
+			if in, ok := ins[u]; ok {
+				in.mute = m
+			}
+		}
 	}
 	events, err := p.src.Store.EventsByPR(ctx, refs)
 	if err != nil {
@@ -268,11 +323,24 @@ func (p *Provider) loadIntakes(ctx context.Context, ins map[unit.Unit]*input, re
 		in.intakes = byUnit[in.pr.Ref.Unit()]
 		if len(in.intakes) > 0 && p.src.Intake != nil {
 			rec, found := recs[in.pr.Ref]
-			w := p.src.Intake(in.intakes[0], rec, found, p.attemptOf(in.pr, rec))
+			w := p.src.Intake(in.intakes[0], BriefState(rec, found), p.attemptOf(in.pr, rec))
 			in.intake = &w
 		}
 	}
 	return nil
+}
+
+// BriefState is what an intake shows of the brief record rec, found false
+// for none.
+func BriefState(rec dinv.BriefRecord, found bool) intake.BriefState {
+	if !found {
+		return intake.BriefState{}
+	}
+	b := intake.BriefState{Found: true, Failures: rec.Failures, GaveUp: !rec.GaveUpAt.IsZero(), RetryAt: rec.RetryAt}
+	if rec.LastRun != 0 && rec.LastRun != rec.Run {
+		b.LastError = rec.Error
+	}
+	return b
 }
 
 // attemptOf is the brief attempt an intake of pr waits on.
@@ -302,7 +370,8 @@ func (p *Provider) Derive(base readmodel.Base, in any, at time.Time) (api.Row, e
 	if len(x.intakes) > 0 {
 		d.Intakes = map[github.Ref][]intake.Intake{ref: x.intakes}
 	}
-	r, pl := d.Parts(x.pr, x.events, x.override)
+	d.Mutes = map[unit.Unit]overlay.Mute{x.pr.Ref.Unit(): x.mute}
+	r, pl := d.Parts(x.rep, x.events, x.override)
 	pl.Brief = x.brief
 	pl.Intake = x.intake
 	if x.activity != nil {
@@ -314,8 +383,8 @@ func (p *Provider) Derive(base readmodel.Base, in any, at time.Time) (api.Row, e
 // DeriverAt is the deriver of a request: base and the settings, at the
 // minute at, with no turn and no intake of any pull request.
 func DeriverAt(base readmodel.Base, set readmodel.RowSettings, briefOn bool, at time.Time) Deriver {
-	return Deriver{Viewer: base.Viewers[unit.GitHub], Teams: base.Teams, Ignore: IgnoreOf(set.Cfg), Now: at, Stalled: set.Cfg.GitHub.Stalled,
-		Pending: base.Pending, Loaded: set.Loaded, Specs: base.Specs, Cfg: set.Cfg, GateOn: set.GateOn, BriefOn: briefOn,
+	return Deriver{Viewer: base.Viewers[unit.GitHub], Teams: base.Teams[unit.GitHub], Ignore: IgnoreOf(set.Cfg), Now: at, Stalled: set.Cfg.GitHub.Stalled,
+		Plans: base.Plans, Loaded: set.Loaded, Specs: base.Specs, Cfg: set.Cfg, GateOn: set.GateOn, BriefOn: briefOn,
 		Forceable: set.Forceable, SpecsVersion: cmp.Or(base.SpecsVersion, catalog.VersionOf(set.Loaded)), Asked: base.Asked}
 }
 
@@ -326,6 +395,15 @@ func PROf(in any) (dinv.PR, bool) {
 		return dinv.PR{}, false
 	}
 	return x.pr, true
+}
+
+// ReportIn is the plugin's report a row's input derives from.
+func ReportIn(in any) (Report, bool) {
+	x, ok := in.(*input)
+	if !ok {
+		return Report{}, false
+	}
+	return x.rep, true
 }
 
 // EventsOf are the events a row's input holds, oldest first; the caller
@@ -352,7 +430,7 @@ func Unmuted(in any) any {
 		return in
 	}
 	c := *x
-	c.override = dinv.Override{PR: x.pr.Ref}
+	c.override, c.mute = dinv.Override{PR: x.pr.Ref}, overlay.Mute{}
 	return &c
 }
 
@@ -368,7 +446,7 @@ func (x *input) turnFact(base readmodel.Base) (f TurnFact, ok bool) {
 	case !base.AgentsOK || x.sessionErr:
 		f.Unread = true
 	case x.session != nil:
-		f.Waiting = sessionWaiting(*x.session, base.Agents)
+		f.Waiting = overlay.SessionWaiting(*x.session, base.Agents)
 	}
 	return f, true
 }
@@ -411,19 +489,6 @@ func lastSituation(evs []dinv.Event) string {
 	return last
 }
 
-// LapsedMutes are the stored overrides whose "mute until state change"
-// lapsed: the rows of k show them unmuted.
-func LapsedMutes(k readmodel.Kept) []dinv.Override {
-	var out []dinv.Override
-	for _, b := range k.Rows {
-		x, ok := b.In.(*input)
-		if ok && MuteLapsed(x.pr, x.override, situation.Kind(b.Row.Kind)) {
-			out = append(out, x.override)
-		}
-	}
-	return out
-}
-
 // activities are the pull requests' activity; none without an activity
 // reader.
 func (p *Provider) activities(ctx context.Context) (map[unit.Unit]turn.Activity, error) {
@@ -432,3 +497,21 @@ func (p *Provider) activities(ctx context.Context) (map[unit.Unit]turn.Activity,
 	}
 	return p.src.Activity.Activities(ctx, unit.GitHub)
 }
+
+// Unmuted is in as it stands with no override at all.
+func (p *Provider) Unmuted(in any) any { return Unmuted(in) }
+
+// Notice is what row, a row of this provider derived from in, notifies at
+// the minute at.
+func (p *Provider) Notice(base readmodel.Base, row api.Row, in any, at time.Time) (readmodel.Notice, bool) {
+	x, ok := in.(*input)
+	if !ok {
+		return readmodel.Notice{}, false
+	}
+	n, ok := DeriverAt(base, x.set.RowSettings, x.set.briefOn, at).Notice(row, in)
+	return readmodel.Notice{Gate: n.Case.Gate(), Held: n.Case == NoticeHeld, Question: n.Case == NoticeQuestion, Record: n.Record,
+		Token: n.Token, Attention: n.Attention}, ok
+}
+
+// Book is the turn book of the input's pull request, when it has one.
+func (p *Provider) Book(in any) (turn.Book, bool) { return BookOf(in) }

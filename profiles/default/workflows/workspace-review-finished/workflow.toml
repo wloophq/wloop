@@ -11,6 +11,6 @@ use = "workspace.remove"
 per_run = 5
 per_day = 30
 
-[[approval.rule]]
-when = 'workspace.dirty > 0 || workspace.untracked > 0 || workspace.unpushed > 0 || "checkout unreadable" in workspace.pendency'
+[[gates.approval.rule]]
+when = 'gate.kind == "plan" && (workspace.dirty > 0 || workspace.untracked > 0 || workspace.unpushed > 0 || "checkout unreadable" in workspace.pendency)'
 mode = "wait"

@@ -3,6 +3,7 @@
 package turn
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/profile"
 )
 
@@ -168,9 +170,9 @@ type Request struct {
 	BriefMissing string
 	// Why is the workflow that started the turn; nil for a turn started by hand.
 	Why *workflow.Why
-	// Items and Entry are the unit's item ids and the GTD entry the turn was asked about.
+	// Items and Task are the unit's item ids and the task the turn was asked about.
 	Items []string
-	Entry string
+	Task  string
 }
 
 // TurnFacts are the facts of a turn Build reads besides the request.
@@ -295,11 +297,27 @@ func WhySection(text string) string {
 
 const whyHeading = "## Why this turn started"
 
-// PR is the github payload, nil on any other unit.
+// PR is the github payload, nil on any other unit: the payload itself,
+// or the data of a plugin whose manifest names its payload root PR.
 func (c Context) PR() *PR {
-	p, _ := c.Payload.(*PR)
-	return p
+	switch p := c.Payload.(type) {
+	case *PR:
+		return p
+	case DataPayload:
+		if builtin.PayloadProviders[prRoot] != c.Payload.Unit().Provider || len(p.Data()) == 0 {
+			return nil
+		}
+		var out PR
+		if err := json.Unmarshal(p.Data(), &out); err != nil {
+			return nil
+		}
+		return &out
+	}
+	return nil
 }
+
+// prRoot is the payload root the GitHub plugin's manifest names.
+const prRoot = "PR"
 
 // prior is the github payload's prior review, nil without one.
 func (c Context) prior() *PriorReview {

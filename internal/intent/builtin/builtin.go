@@ -7,11 +7,12 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/record"
-	dslack "github.com/wloophq/wloop/internal/domain/slack"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
@@ -74,7 +75,7 @@ func BoardOf(workspace string) string {
 var ReservedNames = []string{
 	"app", "brief", "config", "doctor", "eval-instructions", "explore", "help", "hook", "init", "install",
 	"instructions", "intake", "mute", "open", "outbox", "pause", "plan", "profile", "remove", "resume",
-	"serve", "slack", "status", "store", "take-over", "timings", "track", "trust", "tui", "turn", "uninstall", "unmute", "untrack",
+	"serve", "slack", "status", "store", "take-over", "task", "timings", "track", "trust", "tui", "turn", "uninstall", "unmute", "untrack",
 	"version", "workflows",
 
 	"answer", "brief_refresh", "continue", "dismiss", "guide", "intake_cancel", "intake_without", "remove_force", "skip",
@@ -90,23 +91,59 @@ var ReservedNames = []string{
 var ActionKeys = map[string]string{
 	"open":      "O",
 	"take_over": "A",
-	"skip":      "S",
 	"pause":     "H",
 	"resume":    "H",
-	"run_now":   "R",
 	"mute":      "M",
 	"unmute":    "M",
-	"answer":    "W",
-	"continue":  "C",
-	"dismiss":   "X",
-	"guide":     "G",
-	"trust_run": "T",
-	"unblock":   "D",
 }
 
-// IntentVerbs are the gtd verbs a manifest's verb may name: those an entry
+// GateRole is what an intent of a gate does, which its status and answer
+// say: approves the gate, takes text, or refuses it.
+type GateRole string
+
+const (
+	GateApproves  GateRole = "approves"
+	GateTakesText GateRole = "takes text"
+	GateRefuses   GateRole = "refuses"
+)
+
+// GateRoleOf is the role of an intent resolving to status, taking text when
+// answer; "" for any other.
+func GateRoleOf(status gate.Status, answer bool) GateRole {
+	switch {
+	case answer:
+		return GateTakesText
+	case status == gate.Approved || status == gate.Answered:
+		return GateApproves
+	case status == gate.Rejected || status == gate.Dismissed:
+		return GateRefuses
+	}
+	return ""
+}
+
+// GateKey is the key of the row action an intent of a row's open gate of
+// Kind takes when it has Role: the first intent of each role takes it.
+type GateKey struct {
+	Kind gate.Kind
+	Role GateRole
+	Key  string
+}
+
+// GateKeys are the keys of the row actions of the gates a row offers: a
+// pending round's plan gate and a start block's trust gate.
+var GateKeys = []GateKey{
+	{gate.KindPlan, GateApproves, "R"}, {gate.KindPlan, GateTakesText, "G"}, {gate.KindPlan, GateRefuses, "S"},
+	{gate.KindTrust, GateApproves, "T"}, {gate.KindTrust, GateRefuses, "D"},
+	{gate.KindQuestion, GateTakesText, "W"}, {gate.KindQuestion, GateApproves, "C"}, {gate.KindQuestion, GateRefuses, "X"},
+}
+
+// RowGateKinds are the kinds of the gates whose intents a row offers as its
+// actions.
+var RowGateKinds = []gate.Kind{gate.KindQuestion, gate.KindPlan, gate.KindTrust}
+
+// IntentVerbs are the verbs a manifest's verb may name: those a task
 // bridges to its unit's served action.
-var IntentVerbs = []string{string(gtd.VerbApprove), string(gtd.VerbDelegate), string(gtd.VerbDismiss)}
+var IntentVerbs = []string{string(task.VerbApprove), string(task.VerbDelegate), string(task.VerbDismiss)}
 
 type FactSlot string
 
@@ -114,7 +151,7 @@ const (
 	ActionSlot   FactSlot = "action"
 	TurnSlot     FactSlot = "turn"
 	WorkflowSlot FactSlot = "workflow"
-	// ApprovalSlot holds the draft's own facts a [drafts.approval] rule
+	// ApprovalSlot holds the draft's own facts a draft gate's rule
 	// reads besides its unit's.
 	ApprovalSlot FactSlot = "approval"
 	// NameSlot holds the facts a manifest's session.name reads.
@@ -140,7 +177,7 @@ type Fact struct {
 	Enum map[unit.ProviderID][]string
 	// Untrusted says that a third party's text, read by the extraction, the
 	// proposing turn itself or an agent's brief sets the fact's value, so
-	// no [drafts.approval] rule may read it.
+	// no rule of a draft gate, nor one that releases a gate, may read it.
 	Untrusted bool
 	// TimeVarying says that the fact changes as time passes with nothing
 	// else changing, so no workflow key may hold it.
@@ -181,28 +218,68 @@ var Stages = []string{"first", "follow-up"}
 var ReservedFlags = []string{"--no-wait", "--no-brief", "--turn", "--help", "--manager", "--parent"}
 
 // RoundProviders are the providers whose plugin keeps a per-unit count of
-// turns: every automated turn.start on their units spends
-// turns.per_unit_per_day; a workflow starting turns on any other must set
-// limits.per_day.
-var RoundProviders = []unit.ProviderID{unit.GitHub}
+// turns, their manifest's rounds: every automated turn.start on their units
+// spends turns.per_unit_per_day; a workflow starting turns on any other must
+// set limits.per_day.
+var RoundProviders []unit.ProviderID
 
 // PayloadProviders are the template roots a provider's payload alone holds,
-// which only an intent of that provider may read.
-var PayloadProviders = map[string]unit.ProviderID{"PR": unit.GitHub}
+// which only an intent of that provider may read: each plugin's payload.
+var PayloadProviders = map[string]unit.ProviderID{}
 
 // EventProviders are the event kinds only one provider's units record, by
-// kind: a workflow reacting to one needs that provider.
-var EventProviders = func() map[string]unit.ProviderID {
-	out := map[string]unit.ProviderID{}
-	for _, k := range gtd.VerbEventKinds {
-		out[k] = unit.Entry
-	}
-	return out
-}()
+// kind: a workflow reacting to one needs that provider. The kinds of the
+// profile's verbs are the task provider's; the loader reads them from
+// tasks.toml.
+var EventProviders = coreEventProviders()
 
-// Slots name each provider's fact slot.
-var Slots = map[unit.ProviderID]string{unit.GitHub: "pr", unit.Session: "session", unit.Workspace: "workspace",
-	unit.Entry: "entry", dslack.Provider: "slack"}
+// AnsweringEvents are the event kinds of each provider that answer the turn
+// that asked for them, each with the record verdict of its states: what
+// reconcile = "my_review" reads.
+var AnsweringEvents = map[unit.ProviderID]map[string]map[string]string{}
+
+func coreEventProviders() map[string]unit.ProviderID { return map[string]unit.ProviderID{} }
+
+// LoopEventKinds are the event kinds the loop records on a unit of any
+// provider, which a workflow's trigger.on names.
+var LoopEventKinds = []string{EventMuted, EventUnmuted, EventHeld, EventReleased, EventAdopted, EventTracked, EventUntracked, "nudged",
+	EventRemoved, "status", gate.EventResolved}
+
+// The loop's event kinds the host records itself.
+const (
+	EventMuted     = "muted"
+	EventUnmuted   = "unmuted"
+	EventHeld      = "held"
+	EventReleased  = "released"
+	EventAdopted   = "adopted"
+	EventTracked   = "tracked"
+	EventUntracked = "untracked"
+	EventRemoved   = "removed"
+	// EventRoundSent and EventRoundUnblocked are a round's, which the
+	// host records when a person sends or unblocks it.
+	EventRoundSent      = "round_sent"
+	EventRoundUnblocked = "round_unblocked"
+)
+
+// TriggerEventKinds are the event kinds a workflow's trigger.on names: the
+// loop's, the plugins' and the task's.
+func TriggerEventKinds() []string {
+	out := slices.Clone(LoopEventKinds)
+	for _, k := range slices.Sorted(maps.Keys(EventProviders)) {
+		if !slices.Contains(out, k) {
+			out = append(out, k)
+		}
+	}
+	return append(out, wake.EventWoke)
+}
+
+// Slots name each provider's fact slot: the core providers', and each
+// plugin's.
+var Slots = coreSlots()
+
+func coreSlots() map[unit.ProviderID]string {
+	return map[unit.ProviderID]string{unit.Session: "session", unit.Workspace: "workspace", unit.Task: "task"}
+}
 
 // Providers are the providers an intent may serve: those of Slots, and a
 // plugin whose units have no workflow facts adds its own.

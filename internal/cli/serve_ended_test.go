@@ -5,11 +5,17 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
+
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+	"github.com/wloophq/wloop/internal/readmodel"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/core/change"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -35,7 +41,7 @@ func TestAQuestionOfAPullRequestThatEndsLeavesTheInbox(t *testing.T) {
 		if state == "MERGED" {
 			p.MergedAt = testNow
 		}
-		if err := store.UpsertPR(ctx, p); err != nil {
+		if err := inventorytest.Of(store).UpsertPR(ctx, p); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -43,9 +49,12 @@ func TestAQuestionOfAPullRequestThatEndsLeavesTheInbox(t *testing.T) {
 	save(2, "OPEN")
 	save(4, "CLOSED")
 	te := newTestEnv(t, &fake.Manager{})
+	te.Env.reports = func(*inventory.Store) readmodel.Reports {
+		return ghreporttest.Inventory{Store: store, Now: func() time.Time { return testNow }}
+	}
 	d := servedMessages(t, te, db, log)
 	open := waitOpen(t, d, func(ms []message.Message) bool {
-		return len(ms) == 3 && !slices.ContainsFunc(ms, func(m message.Message) bool { return m.EntryID == "" })
+		return len(ms) == 3 && !slices.ContainsFunc(ms, func(m message.Message) bool { return m.TaskID == "" })
 	})
 	if open[2].Unit != ghUnit(3) {
 		t.Fatalf("a closed pull request's question opened: %+v", open)
@@ -55,11 +64,11 @@ func TestAQuestionOfAPullRequestThatEndsLeavesTheInbox(t *testing.T) {
 	if open[0].Unit != ghUnit(2) || open[1].Unit != ghUnit(3) {
 		t.Fatalf("open %+v", open)
 	}
-	if m, _, _ := d.Messages.Store.Message(ctx, 1); m.Unit != ghUnit(1) || m.State != message.Superseded {
+	if m, _, _ := d.Messages.Store.Message(ctx, 1); m.Unit != ghUnit(1) || m.Open() {
 		t.Fatalf("the merged one's message %+v", m)
 	}
-	inbox, err := db.Entries().Entries(ctx, gtd.Query{View: gtd.ViewInbox})
-	if err != nil || len(inbox) != 2 {
-		t.Fatalf("inbox %+v %v", inbox, err)
+	open1, err := d.GateReader.Where(ctx, gates.Query{Kind: gate.KindQuestion})
+	if err != nil || len(open1) != 2 || slices.ContainsFunc(open1, func(g gate.Gate) bool { return g.Subject == "1" }) {
+		t.Fatalf("open question gates %+v %v", open1, err)
 	}
 }

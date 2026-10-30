@@ -21,11 +21,13 @@ func TestRolesImplyTheRemovedKeys(t *testing.T) {
 	}
 	want := map[string]implied{
 		"act":     {context: "pr", policy: "round", board: "none"},
+		"attach":  {context: "pr", policy: "round", board: "none"},
 		"address": {roundKind: "address", context: "pr", policy: "round", board: "author", drivesRow: true},
 		"brief":   {context: "pr", policy: "round", board: "none"},
-		"nudge":   {prepare: "nudge.prepare", context: "pr", policy: "round", board: "none"},
+		"nudge":   {prepare: "action:nudge.prepare", context: "pr", policy: "round", board: "none"},
 		"probe":   {context: "synthetic", launch: "probe", policy: "probe", board: "none"},
 		"review":  {roundKind: "review", reconcile: "my_review", context: "pr", policy: "round", board: "review", drivesRow: true},
+		"chat":    {context: "pr", policy: "round", board: "none"},
 		"start":   {context: "pr", policy: "round", board: "none"},
 	}
 	for _, d := range l.Registry.All() {
@@ -58,15 +60,14 @@ func TestTheBundledNudgeRefusesWithItsFirstHoldingRefuse(t *testing.T) {
 		facts map[string]any
 		want  string
 	}{
-		{map[string]any{"pr.nudge.refusal": "it waits on you", "pr.mute.refusal": "muted"}, "it waits on you"},
-		{map[string]any{"pr.nudge.refusal": "", "pr.mute.refusal": "muted"}, "muted"},
+		{map[string]any{"pr.nudge.refusal": "muted until its state changes"}, "muted until its state changes"},
 		{map[string]any{}, ""},
 	} {
 		if got, err := l.Refusal("nudge", c.facts); err != nil || got != c.want {
 			t.Errorf("%v: %q %v, want %q", c.facts, got, err, c.want)
 		}
 	}
-	if got, _ := l.Refusal("review", map[string]any{"pr.mute.refusal": "muted"}); got != "" {
+	if got, _ := l.Refusal("review", map[string]any{"pr.nudge.refusal": "muted"}); got != "" {
 		t.Errorf("the review, with no [[refuse]], refused: %q", got)
 	}
 }

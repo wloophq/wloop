@@ -26,14 +26,14 @@ type Headless interface {
 type modeRequest struct {
 	Mode     string   `json:"mode"` // "headless" (default) or "session"
 	Items    []string `json:"items"`
-	Entry    string   `json:"entry"`
+	Task     string   `json:"task"`
 	Guidance string   `json:"guidance"`
 }
 
 const actBodyMax = 64 << 10
 
 // runModes is the one place an intent that runs headless picks its mode, whoever posts it (the generic
-// action route, the GTD bridge): headless unless the body says "session", which runs the
+// action route, the task bridge): headless unless the body says "session", which runs the
 // ordinary action path.
 func (s *Server) runModes(w http.ResponseWriter, r *http.Request, d dintent.Def) {
 	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, actBodyMax))
@@ -68,18 +68,18 @@ func (s *Server) runHeadless(w http.ResponseWriter, r *http.Request, d dintent.D
 		return
 	}
 	name := string(d.Name)
-	if err := unitAction(s.loaded(), name, u, s.deps.Follows); err != nil {
+	if err := unitAction(s.loaded(), name, u, s.forge(u), s.deps.Follows); err != nil {
 		writeActionError(w, err)
 		return
 	}
-	if why, err := s.entryRefusal(r.Context(), s.loaded(), name, u); err != nil || why != "" {
+	if why, err := s.taskRefusal(r.Context(), s.loaded(), name, u); err != nil || why != "" {
 		if err == nil {
 			err = Refusal{Reason: why}
 		}
 		writeActionError(w, err)
 		return
 	}
-	if isPullRequest(u) {
+	if s.forge(u) {
 		row, _, err := s.offered(context.WithoutCancel(r.Context()), u, catalog.Asked{Name: name}, api.ActionRequest{Guidance: req.Guidance})
 		if err != nil {
 			writeActionError(w, err)
@@ -91,7 +91,7 @@ func (s *Server) runHeadless(w http.ResponseWriter, r *http.Request, d dintent.D
 		writeError(w, http.StatusServiceUnavailable, "headless turns are not wired")
 		return
 	}
-	seq, err := s.deps.Headless.Start(r.Context(), headless.Request{Unit: u, Items: req.Items, Entry: req.Entry, Intent: turn.Intent(name),
+	seq, err := s.deps.Headless.Start(r.Context(), headless.Request{Unit: u, Items: req.Items, Task: req.Task, Intent: turn.Intent(name),
 		Guidance: req.Guidance, Trigger: turn.ByHand})
 	switch {
 	case errors.Is(err, headless.ErrBusy):

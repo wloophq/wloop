@@ -29,10 +29,10 @@ func mergeInitConfig(raw []byte, a initAnswers) ([]byte, error) {
 		v    any
 	}{
 		{[]string{"agent"}, a.Agent},
-		{[]string{config.KeyOf("GitHub"), "scope", "repos"}, a.Repos},
-		{[]string{config.KeyOf("GitHub"), "scope", "teams"}, a.Teams},
-		{[]string{config.KeyOf("GitHub"), "scope", "people"}, a.People},
-		{[]string{"slack", "client_id"}, a.SlackClientID},
+		{append(config.PluginPath("GitHub"), "scope", "repos"), a.Repos},
+		{append(config.PluginPath("GitHub"), "scope", "teams"), a.Teams},
+		{append(config.PluginPath("GitHub"), "scope", "people"), a.People},
+		{append(config.PluginPath("Slack"), "client_id"), a.SlackClientID},
 	}
 	for _, s := range sets {
 		if err := d.Set(s.path, s.v); err != nil {

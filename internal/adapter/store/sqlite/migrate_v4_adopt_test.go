@@ -51,13 +51,13 @@ func TestV4RewritesTheJobsDraftsToTheirWorkflows(t *testing.T) {
 		got = append(got, r+" "+w+" "+k+" "+s+" "+e)
 	}
 	want := []string{
-		`slack-stalled-nudge slack-stalled-nudge e-1:slack:U1 proposed ["entry.nudged"]`,
+		`slack-stalled-nudge slack-stalled-nudge e-1:slack:U1 held ["task.nudged"]`,
 		`slack-stalled-nudge slack-stalled-nudge e-1:slack:U2 sent []`,
 		`slack-closure slack-closure slack:T1/C1/1.1 sent []`,
-		`slack-closure slack-closure slack:T1/C1/1.2 discarded ["unit.closed"]`,
+		`slack-closure slack-closure slack:T1/C1/1.2 dropped ["unit.closed"]`,
 		`slack-ask-owner slack-ask-owner slack:T1/C1/1.3 failed []`,
-		`github-nudge  github:o/r#1 proposed ["entry.nudged"]`,
-		`   proposed []`,
+		`github-nudge  github:o/r#1 held ["task.nudged"]`,
+		`   held []`,
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("drafts after v4:\n%q\nwant\n%q", got, want)

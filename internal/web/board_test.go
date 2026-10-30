@@ -162,7 +162,7 @@ func TestFilterMatchesEveryTermAndAPastedLinkFindsItsRow(t *testing.T) {
 		Matches []bool   `json:"matches"`
 		Keys    []string `json:"keys"`
 	}
-	pull := wireRow("me", time.Now(), map[string]any{"title": "Batch export", "ref": map[string]any{"owner": "acme", "repo": "api", "number": 7}, "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "repo": "acme/api", "author": "ana", "head": "ana/batch-x", "waiting_on": "bob"})
+	pull := wireRow("me", time.Now(), map[string]any{"title": "Batch export", "label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "repo": "acme/api", "author": "ana", "head": "ana/batch-x", "waiting_on": "bob"})
 	pull["link"] = "https://github.com/acme/api/pull/7"
 	issue := map[string]any{"unit": map[string]any{"provider": "linear", "key": "PAY-88"}, "label": "PAY-88", "title": "Retry budget", "link": "https://linear.app/acme/issue/PAY-88"}
 	in := map[string]any{
@@ -199,18 +199,18 @@ const state = { loaded: true, rows: [], activityLoaded: true, activity: [{ event
   activityEmptyNote("https://github.com/acme/web/pull/3"),
   (activityLoopOnly = true, activityEmptyNote("")),
   (activityLoopOnly = false, state.activity = [], activityEmptyNote("zzz")),
-  emptyNote("stalled", "zzz"),
-  emptyNote("stalled", "waits-on:bob zzz"),
-  emptyNote("stalled", ""),
+  emptyNote("mine", "zzz"),
+  emptyNote("mine", "waits-on:bob zzz"),
+  emptyNote("mine", ""),
 ]));`, nil, &got)
 	want := [][]any{
 		{`Nothing in Recent matches "zzz".`},
 		{"acme/web#3 is not in the inventory. ", map[string]any{"button": "Explore it"}, " ", map[string]any{"a": "Open it on GitHub"}},
 		{"No loop events in the recent activity."},
 		{"Nothing happened in the inventory yet."},
-		{`Nothing in Stalled matches "zzz".`},
-		{`Nothing in Stalled matches "waits-on:bob zzz".`, " ", map[string]any{"button": "Clear filters"}},
-		{"Nothing in Stalled right now."},
+		{`Nothing in My PRs matches "zzz".`},
+		{`Nothing in My PRs matches "waits-on:bob zzz".`, " ", map[string]any{"button": "Clear filters"}},
+		{"Nothing in My PRs right now."},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got  %#v\nwant %#v", got, want)
@@ -234,7 +234,7 @@ func TestExploreChipsFollowTheText(t *testing.T) {
 
 func TestExploreSortChipsFollowTheText(t *testing.T) {
 	var got []any
-	nodeRun(t, jsConst(t, appJS(t), "DEFAULT_SORT"), []string{"querySort", "withSort"}, `process.stdout.write(JSON.stringify([
+	nodeRun(t, catalogPrelude(t), []string{"querySort", "withSort"}, `process.stdout.write(JSON.stringify([
   withSort("org:acme", "created-asc"),
   withSort("org:acme  sort:created-asc label:x", "updated-desc"),
   withSort("sort:updated-desc @zoe sort:created-asc", "updated-asc"),
@@ -297,7 +297,7 @@ process.stdout.write(JSON.stringify([
 
 func TestTheFilterFindsKindsByTheirLabel(t *testing.T) {
 	var got []bool
-	nodeRun(t, filterPrelude(t), filterFuncs, `process.stdout.write(JSON.stringify(input.map((q) => matches({ title: "t", ref: { owner: "a", repo: "b", number: 1 }, unit: { provider: "github", key: "a/b#1" }, kind: "conflicts" }, terms(q)))));`,
+	nodeRun(t, filterPrelude(t), filterFuncs, `process.stdout.write(JSON.stringify(input.map((q) => matches({ title: "t", label: "a/b#1", unit: { provider: "github", key: "a/b#1" }, kind: "conflicts" }, terms(q)))));`,
 		[]string{"merge conflicts", "conflicts", "can merge"}, &got)
 	if !slices.Equal(got, []bool{true, true, false}) {
 		t.Errorf("got %v", got)
@@ -344,7 +344,7 @@ func TestRowsShowTheBriefSizeRiskAndQuestions(t *testing.T) {
 
 func TestTheFilterFindsTheBriefGoal(t *testing.T) {
 	var got []bool
-	row := wireRow("me", time.Now(), map[string]any{"title": "Batch export", "ref": map[string]any{"owner": "acme", "repo": "api", "number": 7}, "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "brief": map[string]any{"goal": "Retry the webhook delivery"}})
+	row := wireRow("me", time.Now(), map[string]any{"title": "Batch export", "label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "brief": map[string]any{"goal": "Retry the webhook delivery"}})
 	nodeRun(t, filterPrelude(t), filterFuncs,
 		`process.stdout.write(JSON.stringify(["webhook", "batch delivery", "zebra"].map((q) => matches(input, terms(q)))));`, row, &got)
 	if !slices.Equal(got, []bool{true, true, false}) {
@@ -354,9 +354,9 @@ func TestTheFilterFindsTheBriefGoal(t *testing.T) {
 
 func TestAReviewRequestIsReadyForSlack(t *testing.T) {
 	in := []map[string]any{
-		{"row": map[string]any{"ref": map[string]any{"owner": "acme", "repo": "widgets", "number": 4877}, "unit": map[string]any{"provider": "github", "key": "acme/widgets#4877"}, "link": "https://github.com/acme/widgets/pull/4877", "title": "perf(queue): refill <each> free slot"},
+		{"row": map[string]any{"label": "acme/widgets#4877", "unit": map[string]any{"provider": "github", "key": "acme/widgets#4877"}, "link": "https://github.com/acme/widgets/pull/4877", "title": "perf(queue): refill <each> free slot"},
 			"brief": map[string]any{"brief": map[string]any{"goal": "Give each free slot the next message.", "context": "The loop asked for the whole batch.", "risk_why": "Affects every pod & the dispatch job."}}},
-		{"row": map[string]any{"ref": map[string]any{"owner": "acme", "repo": "api", "number": 7}, "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "link": "javascript:alert(1)", "title": "fix: x"}},
+		{"row": map[string]any{"label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "link": "javascript:alert(1)", "title": "fix: x"}},
 	}
 	var got []map[string]string
 	nodeRun(t, keyJS(t), []string{"safeURL", "escapeHTML", "reviewRequest"},
@@ -375,13 +375,17 @@ func TestAReviewRequestIsReadyForSlack(t *testing.T) {
 }
 
 func TestExplorePresetsAskForMyTeamsInOneClick(t *testing.T) {
+	var got []map[string]string
+	nodeRun(t, catalogPrelude(t), nil, `process.stdout.write(JSON.stringify(exploreSearch().presets));`, nil, &got)
+	want := []map[string]string{
+		{"query": "user-review-requested:@me", "label": "Asked of me"},
+		{"query": "review-requested:@me -user-review-requested:@me", "label": "Asked of my teams"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("presets %v, want %v", got, want)
+	}
 	src := appJS(t)
-	for _, want := range []string{
-		`{ query: "user-review-requested:@me", label: "Asked of me" }`,
-		`{ query: "review-requested:@me -user-review-requested:@me", label: "Asked of my teams" }`,
-		"EXPLORE_PRESETS.map((p) =>",
-		"onclick: () => explore(p.query)",
-	} {
+	for _, want := range []string{"(exploreSearch().presets || []).map((p) =>", "onclick: () => explore(p.query)"} {
 		if !strings.Contains(src, want) {
 			t.Errorf("app.js lacks %s", want)
 		}
@@ -394,12 +398,12 @@ const state = { rows: [], actionError: "", explore: { status: {} } };
 const calls = [];
 const rowByKey = (k) => state.rows.find((r) => keyOf(r) === k);
 const render = () => {};
-async function load() { if (calls.includes("track")) state.rows = [{ ref: { owner: "acme", repo: "api", number: 7 }, unit: { provider: "github", key: "acme/api#7" }, reasons: ["tracked"] }]; }
+async function load() { if (calls.includes("track")) state.rows = [{ label: "acme/api#7", unit: { provider: "github", key: "acme/api#7" }, reasons: ["tracked"] }]; }
 async function act(row, name) { calls.push(name); if (name === "review" && input.failReview) { state.actionError = "review acme/api#7 failed: boom"; return false; } return true; }
 `
 	var got []map[string]any
 	nodeRun(t, prelude, []string{"actOnCandidate"},
-		`(async () => { const c = { ref: { owner: "acme", repo: "api", number: 7 }, unit: { provider: "github", key: "acme/api#7" } }; const ok = await actOnCandidate(c, "review", {}); process.stdout.write(JSON.stringify([{ ok, calls, status: state.explore.status["github:acme/api#7"] }])); })();`,
+		`(async () => { const c = { label: "acme/api#7", unit: { provider: "github", key: "acme/api#7" } }; const ok = await actOnCandidate(c, "review", {}); process.stdout.write(JSON.stringify([{ ok, calls, status: state.explore.status["github:acme/api#7"] }])); })();`,
 		map[string]any{"failReview": false}, &got)
 	if got[0]["ok"] != true || fmt.Sprint(got[0]["calls"]) != "[track review]" {
 		t.Fatalf("%v", got[0])
@@ -414,7 +418,7 @@ func TestACopiedListIsYAMLAnAgentCanRead(t *testing.T) {
 	in := map[string]any{
 		"meta": map[string]any{"view": "needs-me", "filter": `widgets "x"`, "at": "2026-10-15T13:00:00Z"},
 		"rows": wireRows("carol", time.Now(), map[string]any{
-			"ref": map[string]any{"owner": "acme", "repo": "widgets", "number": 4870}, "unit": map[string]any{"provider": "github", "key": "acme/widgets#4870"}, "link": "https://github.com/acme/widgets/pull/4870",
+			"label": "acme/widgets#4870", "unit": map[string]any{"provider": "github", "key": "acme/widgets#4870"}, "link": "https://github.com/acme/widgets/pull/4870",
 			"title": "perf: one \"conn\"\nper batch", "author": "carol", "kind": "conflicts", "waiting_on": "author", "since": "2026-10-13T13:00:00Z",
 			"stalled": true, "reason": "merge conflicts with develop", "head": "fix/x", "reasons": []string{"author"},
 			"workspace": map[string]any{"display_name": "fix-x", "status": "in-progress"},
@@ -444,14 +448,14 @@ func TestCopiedExploreCandidatesSayWhatTheCardsSay(t *testing.T) {
 	in := map[string]any{
 		"meta": map[string]any{"query": "widgets", "read": `read "widgets" as repo:acme/widgets`, "at": "2026-10-15T13:00:00Z"},
 		"cands": []map[string]any{{
-			"ref": map[string]any{"owner": "acme", "repo": "widgets", "number": 5068}, "unit": map[string]any{"provider": "github", "key": "acme/widgets#5068"}, "url": "https://github.com/acme/widgets/pull/5068", "title": "fix(cron): flags", "author": "ana",
+			"label": "acme/widgets#5068", "unit": map[string]any{"provider": "github", "key": "acme/widgets#5068"}, "url": "https://github.com/acme/widgets/pull/5068", "title": "fix(cron): flags", "author": "ana",
 			"additions": 6, "deletions": 0, "changed_files": 2, "review_decision": "APPROVED", "checks": "FAILURE",
 			"review_requests": []string{"bia", "team:acme/web"}, "draft": false, "updated_at": "2026-10-14T13:00:00Z", "created_at": "2026-10-10T13:00:00Z",
 			"brief": map[string]any{"brief": map[string]any{"size": "s", "risk": "low", "goal": "Add flags.", "open_questions": []string{"why?"}}},
 		}},
 	}
 	var got string
-	nodeRun(t, keyJS(t)+`const REVIEW_LABEL = { APPROVED: "approved" }; const state = { rows: [] };
+	nodeRun(t, keyJS(t)+catalogPrelude(t)+`const state = { rows: [] };
 const rowByKey = () => undefined;`,
 		[]string{"safeURL", "candidateURL", "yamlString", "candidatesYAML"},
 		`process.stdout.write(JSON.stringify(candidatesYAML(input.meta, input.cands)));`, in, &got)
@@ -531,7 +535,8 @@ var lensFuncs = append(slices.Clone(queryFuncs), "haystack", "matches", "inView"
 
 func lensPrelude(t *testing.T) string {
 	src := appJS(t)
-	return filterPrelude(t) + jsConst(t, src, "SIZES") + jsConst(t, src, "RISKS") + jsConst(t, src, "rowValuesCache") + `const state = { health: { viewer: "me" } };` + "\n"
+	return filterPrelude(t) + jsConst(t, src, "SIZES") + jsConst(t, src, "RISKS") + jsConst(t, src, "rowValuesCache") + `const state = { health: { viewer: "me" } };
+const roundGate = (r) => r.round_gate;` + "\n"
 }
 
 func TestWaitCatIsTheStripAndAgreesWithTheLabel(t *testing.T) {
@@ -540,7 +545,7 @@ func TestWaitCatIsTheStripAndAgreesWithTheLabel(t *testing.T) {
 	for _, kind := range kinds {
 		for _, waiting := range []string{"me", "author", "alice", "team:o/t", "author, alice", "nobody", ""} {
 			for _, author := range []string{"me", "ana"} {
-				cases = append(cases, wireRow("me", time.Now(), map[string]any{"ref": map[string]any{"owner": "o", "repo": "r", "number": 1}, "unit": map[string]any{"provider": "github", "key": "o/r#1"}, "kind": kind, "waiting_on": waiting, "author": author}))
+				cases = append(cases, wireRow("me", time.Now(), map[string]any{"label": "o/r#1", "unit": map[string]any{"provider": "github", "key": "o/r#1"}, "kind": kind, "waiting_on": waiting, "author": author}))
 			}
 		}
 	}
@@ -617,7 +622,6 @@ func TestPipelineFiltersSortsAndGroups(t *testing.T) {
 		{"view": "needs-me", "q": "", "sort": "age-desc"},
 		{"view": "needs-me", "q": "", "group": "wait"},
 		{"view": "needs-me", "q": "", "group": "repo", "sort": "age"},
-		{"view": "stalled", "q": "", "layout": "board"},
 		{"view": "needs-me", "q": "", "layout": "board"},
 		{"view": "needs-me", "q": "", "group": "size"},
 	}
@@ -665,16 +669,15 @@ process.stdout.write(JSON.stringify(input.map((l) => {
 	for i, want := range map[int][]string{
 		11: {"me=[2 4]", "loop=[5]", "reviewer=[1]", "author=[3]"},
 		12: {"acme/api=[1 5]", "acme/web=[2]", "acme/widgets=[3 4]"},
-		13: {"me=[2 4]", "reviewer=[]", "author=[]", "merge=[]", "loop=[]"},
-		14: {"me=[2 4]", "loop=[5]", "reviewer=[1]", "author=[3]"},
-		15: {"xs=[5]", "s=[1]", "m=[4]", "l=[2]", "none=[3]"},
+		13: {"me=[2 4]", "loop=[5]", "reviewer=[1]", "author=[3]"},
+		14: {"xs=[5]", "s=[1]", "m=[4]", "l=[2]", "none=[3]"},
 	} {
 		if g := keys(got[i]); !slices.Equal(g, want) {
 			t.Errorf("lens %v: groups %v, want %v", lenses[i], g, want)
 		}
 	}
-	if got[15].Groups[4].Label != "no brief" || got[11].Groups[0].Label != "Waiting on me" {
-		t.Errorf("labels %+v %+v", got[15].Groups[4], got[11].Groups[0])
+	if got[14].Groups[4].Label != "no brief" || got[11].Groups[0].Label != "Waiting on me" {
+		t.Errorf("labels %+v %+v", got[14].Groups[4], got[11].Groups[0])
 	}
 }
 
@@ -739,6 +742,7 @@ process.stdout.write(JSON.stringify(log));`
 func TestQuestionBlockRenders(t *testing.T) {
 	src := appJS(t)
 	prelude := `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
+const roundGate = () => undefined;
 const state = { busy: new Set(), guidance: { "github:acme/api#7": " check the CI first " }, health: { viewer: "me" }, specs: { byId: { answer: { id: "answer", input: { kind: "answer" } } } } };
 const posts = [];
 async function fetch(url, init) { posts.push({ url, body: JSON.parse(init.body) }); return { ok: true, status: 200, json: async () => ({ ok: true }) }; }
@@ -847,6 +851,7 @@ const document = { getElementById: () => null };
 func TestQuestionCardSendsTheChoiceWithTheNoteOrTheTextAlone(t *testing.T) {
 	src := appJS(t)
 	prelude := `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
+const roundGate = () => undefined;
 const state = { busy: new Set(), guidance: {}, health: { viewer: "me" }, specs: { byId: { answer: { id: "answer", input: { kind: "answer" } } } } };
 const posts = [];
 async function fetch(url, init) { posts.push(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => ({ ok: true }) }; }
@@ -856,7 +861,7 @@ function scheduleLoad() {}
 const document = { getElementById: () => null };
 ` + keyJS(t) + jsConst(t, src, "ARTIFACT_LINES") + jsConst(t, src, "API_VERSION")
 	in := map[string]any{
-		"row":  map[string]any{"ref": map[string]any{"owner": "acme", "repo": "api", "number": 7}, "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "kind": "loop_waiting", "actions": []map[string]any{{"id": "answer", "enabled": true}, {"id": "continue", "enabled": true}, {"id": "dismiss", "enabled": true}}, "question": map[string]any{"state": "asked", "kind": "confirm", "text": "Publish?", "recommend": "yes"}},
+		"row":  map[string]any{"label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "kind": "loop_waiting", "actions": []map[string]any{{"id": "answer", "enabled": true}, {"id": "continue", "enabled": true}, {"id": "dismiss", "enabled": true}}, "question": map[string]any{"state": "asked", "kind": "confirm", "text": "Publish?", "recommend": "yes"}},
 		"turn": map[string]any{"turn": map[string]any{"seq": 1}, "records": []any{}, "answers": []any{}},
 	}
 	var got struct {
@@ -1108,7 +1113,7 @@ func buttonPrelude(t *testing.T) string {
 const state = { busy: new Set(), guidance: {}, actionError: "", actionDetail: "", specs: { version: "", byId: {} } };
 const render = () => {}, setNotice = () => {}, scheduleLoad = () => {};
 const document = { getElementById: () => null };
-` + keyJS(t) + jsConst(t, appJS(t), "API_VERSION") + jsConst(t, appJS(t), "focusSlot") + "\n" + jsConst(t, appJS(t), "CARD_GROUPS") + `
+` + keyJS(t) + jsConst(t, appJS(t), "API_VERSION") + jsConst(t, appJS(t), "FOCUS_PAIRS") + jsFunction(t, appJS(t), "focusSlot") + "\n" + jsConst(t, appJS(t), "CARD_GROUPS") + `
 let confirmed = [], prompts = [], fetched = [], promptAnswer = null, confirmAnswer = false;
 const confirm = (text) => { confirmed.push(text); return confirmAnswer; };
 const prompt = (text, def) => { prompts.push([text, def]); return promptAnswer; };
@@ -1200,7 +1205,7 @@ func cmpOr(a, b string) string {
 
 func TestADisabledActionLooksNotAllowed(t *testing.T) {
 	specs, _, byID, _ := wireFixtures(t)
-	row := map[string]any{"ref": map[string]any{"owner": "acme", "repo": "api", "number": 7}, "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "actions": []wireState{
+	row := map[string]any{"label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "actions": []wireState{
 		{ID: "address", Enabled: false, Primary: true, Reason: "Not yours: take it over first"},
 		{ID: "open", Enabled: true, Note: "Open the workspace"},
 	}}
@@ -1247,7 +1252,7 @@ func TestPostCarriesBasisAndSource(t *testing.T) {
 		{call{Fixture: "held", ID: "run_now", Confirm: true}, result{URL: "/api/units/github/acme%2Fapi%237/run_now", Body: map[string]any{"source": "cockpit", "basis": "held:automatic round held: daily cap"}, Fetched: 1}},
 		{call{Fixture: "pending", ID: "mute", Prompt: "36h"}, result{URL: "/api/units/github/acme%2Fapi%237/mute", Body: map[string]any{"source": "cockpit", "until": "36h"}, Fetched: 1}},
 		{call{Fixture: "pending", ID: "mute", Prompt: "state"}, result{URL: "/api/units/github/acme%2Fapi%237/mute", Body: map[string]any{"source": "cockpit", "until_state": true}, Fetched: 1}},
-		{call{Fixture: "pending", ID: "guide"}, result{Error: "guide acme/api#7: Guidance is required"}},
+		{call{Fixture: "pending", ID: "guide"}, result{Error: "guide acme/api#7: Guide is required"}},
 		{call{Fixture: "mine_no_reviewer", ID: "nudge", Guidance: long, Confirm: true}, result{Error: "nudge acme/api#10: guidance is 501 characters, the limit is 500"}},
 		{call{Fixture: "mine_no_reviewer", ID: "nudge", Guidance: "ask about CI", Confirm: true}, result{URL: "/api/units/github/acme%2Fapi%2310/nudge", Body: map[string]any{"source": "cockpit", "guidance": "ask about CI"}, Fetched: 1}},
 		{call{Fixture: "forceable_refusal", ID: "remove_force", Confirm: true}, result{URL: "/api/units/github/acme%2Fapi%237/remove_force", Body: map[string]any{"source": "cockpit"}, Fetched: 1}},
@@ -1352,12 +1357,12 @@ const state = { rows: [], actionError: "", explore: { status: {} } };
 const calls = [];
 const rowByKey = (k) => state.rows.find((r) => keyOf(r) === k);
 const render = () => {};
-async function load() { if (calls.includes("track") && !calls.includes("untrack")) state.rows = [{ ref: { owner: "acme", repo: "api", number: 7 }, unit: { provider: "github", key: "acme/api#7" }, actions: [{ id: "nudge", enabled: false, reason: "it waits on the review loop" }] }]; else state.rows = []; }
+async function load() { if (calls.includes("track") && !calls.includes("untrack")) state.rows = [{ label: "acme/api#7", unit: { provider: "github", key: "acme/api#7" }, actions: [{ id: "nudge", enabled: false, reason: "it waits on the review loop" }] }]; else state.rows = []; }
 async function act(row, name) { calls.push(name); return true; }
 `
 	var got []map[string]any
 	nodeRun(t, prelude, []string{"actOnCandidate"},
-		`(async () => { const c = { ref: { owner: "acme", repo: "api", number: 7 }, unit: { provider: "github", key: "acme/api#7" } }; const ok = await actOnCandidate(c, "nudge", {}); process.stdout.write(JSON.stringify([{ ok, calls, status: state.explore.status["github:acme/api#7"] }])); })();`,
+		`(async () => { const c = { label: "acme/api#7", unit: { provider: "github", key: "acme/api#7" } }; const ok = await actOnCandidate(c, "nudge", {}); process.stdout.write(JSON.stringify([{ ok, calls, status: state.explore.status["github:acme/api#7"] }])); })();`,
 		nil, &got)
 	if got[0]["ok"] != false || fmt.Sprint(got[0]["calls"]) != "[track untrack]" {
 		t.Fatalf("%v", got[0])
@@ -1388,7 +1393,7 @@ func TestTheQuestionCardFollowsTheServedStates(t *testing.T) {
 	in := map[string]any{"specs": specs, "rows": map[string]any{
 		"asked_choice": rows["asked_choice"],
 		"blocked":      rows["blocked"],
-		"hidden":       map[string]any{"ref": map[string]any{"owner": "acme", "repo": "api", "number": 7}, "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "actions": []wireState{{ID: "open", Enabled: true}}},
+		"hidden":       map[string]any{"label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "actions": []wireState{{ID: "open", Enabled: true}}},
 	}}
 	var got map[string]map[string]*wireButton
 	nodeRun(t, buttonPrelude(t), append(buttonFuncs, "answerNote", "turnButton"), `useSpecs(input.specs);
@@ -1423,8 +1428,8 @@ process.stdout.write(JSON.stringify(out));`, in, &got)
 			t.Errorf("%s is drawn though the row does not offer it: %+v", id, b)
 		}
 	}
-	if got["blocked"]["continue"] == nil || !got["blocked"]["continue"].Disabled {
-		t.Error("a disabled continue is not disabled")
+	if got["blocked"]["continue"] != nil {
+		t.Errorf("continue is drawn on a row with no question gate: %+v", got["blocked"]["continue"])
 	}
 }
 
@@ -1523,18 +1528,18 @@ func TestLoadRefreshesTheSpecsAndKeepsThemWhenTheFetchFails(t *testing.T) {
 		Error    string   `json:"error"`
 	}
 	nodeRun(t, `const state = { specs: { version: "", byId: {} }, rows: [], detail: null, error: "", busy: new Set() };
-`+keyJS(t)+noPlugins+noGTD+noUpdate+`const CARD_GROUPS = new Set(["turn", "intake", "brief"]);
+`+keyJS(t)+noPlugins+noViews+noUpdate+`const CARD_GROUPS = new Set(["turn", "intake", "brief"]);
 const focusSlot = (n) => n;
 function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, text: c.flat().join("") }; }
 const fetches = []; let listed = "v1"; let actionsFail = false; let detailVersion = "v1";
-const row = (v) => ({ ref: { owner: "a", repo: "b", number: 1 }, unit: { provider: "github", key: "a/b#1" }, specs_version: v, actions: [{ id: "open", enabled: true }] });
+const row = (v) => ({ label: "a/b#1", unit: { provider: "github", key: "a/b#1" }, specs_version: v, actions: [{ id: "open", enabled: true }] });
 const getJSON = async (url) => {
   if (url === "/api/rows") return { rows: [row(listed)] };
   if (url === "/api/health") return {};
   if (url === "/api/actions") { fetches.push(url); if (actionsFail) throw new Error("boom"); return { version: listed, specs: [{ id: "open", label: "Open", surfaces: ["row"] }] }; }
   throw new Error(url);
 };
-const loadActivity = async () => {}, loadExploreRecent = async () => {}, loadPlan = async () => {}, render = () => {};
+const loadActivity = async () => {}, loadExploreRecent = async () => {}, loadPlan = async () => {}, loadRoundGates = async () => {}, render = () => {};
 const loadDetail = async () => { state.detail = { row: row(detailVersion) }; };
 `, []string{"specsStale", "loadSpecs", "refreshSpecs", "actionStates", "actionTitle", "actionButton", "actionButtons", "load"}, `(async () => {
   const versions = [];
@@ -1560,7 +1565,7 @@ func TestOnlyATextInputOrAnIntakeTakesTheGuidance(t *testing.T) {
   { id: "review", intake: true },
   { id: "hold" },
 ] });
-const row = { ref: { owner: "a", repo: "b", number: 1 }, unit: { provider: "github", key: "a/b#1" }, actions: [] };
+const row = { label: "a/b#1", unit: { provider: "github", key: "a/b#1" }, actions: [] };
 promptAnswer = "2d";
 (async () => {
   const out = [];
@@ -1589,7 +1594,7 @@ func TestSpecsLoadWithAnEmptyInventory(t *testing.T) {
 		Fetches []string `json:"fetches"`
 		Version string   `json:"version"`
 	}
-	nodeRun(t, noPlugins+noGTD+noUpdate+`const state = { specs: { version: "", byId: {} }, rows: [], detail: null, error: "" };
+	nodeRun(t, noPlugins+noViews+noUpdate+`const state = { specs: { version: "", byId: {} }, rows: [], detail: null, error: "" };
 const fetches = [];
 const getJSON = async (url) => {
   if (url === "/api/rows") return { rows: [] };
@@ -1597,7 +1602,7 @@ const getJSON = async (url) => {
   if (url === "/api/actions") { fetches.push(url); return { version: "v1", specs: [{ id: "track", label: "Track", surfaces: ["explore"] }] }; }
   throw new Error(url);
 };
-const loadActivity = async () => {}, loadExploreRecent = async () => {}, loadPlan = async () => {}, loadDetail = async () => {}, render = () => {};
+const loadActivity = async () => {}, loadExploreRecent = async () => {}, loadPlan = async () => {}, loadRoundGates = async () => {}, loadDetail = async () => {}, render = () => {};
 `, []string{"specsStale", "loadSpecs", "refreshSpecs", "load"}, `(async () => {
   await load();
   await load();
@@ -1613,7 +1618,7 @@ func TestTheDetailShowsTheServedBriefRefreshWithoutABrief(t *testing.T) {
 	treeH := `function h(tag, attrs, ...c) { const kids = c.flat().filter((x) => x !== null && x !== undefined && x !== false); return { tag, attrs: attrs || {}, kids, text: kids.map((x) => (typeof x === "object" ? x.text : String(x))).join("") }; }`
 	prelude := treeH + "\n" + strings.SplitN(buttonPrelude(t), "\n", 2)[1]
 	nodeRun(t, prelude, append(buttonFuncs, "refreshBriefButton", "briefBlock"), `useSpecs({ version: "v1", specs: [{ id: "brief_refresh", label: "Refresh brief", group: "brief", surfaces: ["detail"] }] });
-const row = (st) => ({ ref: { owner: "a", repo: "b", number: 1 }, unit: { provider: "github", key: "a/b#1" }, actions: st ? [st] : [] });
+const row = (st) => ({ label: "a/b#1", unit: { provider: "github", key: "a/b#1" }, actions: st ? [st] : [] });
 const text = (el) => (el ? JSON.stringify(el) : "");
 process.stdout.write(JSON.stringify([
   text(briefBlock(null, row({ id: "brief_refresh", reason: "the brief is off; set brief.enabled in the config" }))),
@@ -1748,18 +1753,20 @@ function age() { return "2h 0m"; }
 	}
 }
 
-func TestActivityNamesAPullRequestEventByItsRefAndAnotherByNoRef(t *testing.T) {
+func TestActivityNamesAnEventByItsUnitsLabel(t *testing.T) {
 	type in struct {
+		Label string         `json:"label,omitempty"`
 		Event map[string]any `json:"event"`
 	}
 	cases := []in{
-		{map[string]any{"pr": map[string]any{"owner": "acme", "repo": "api", "number": 7}, "unit": map[string]any{"provider": "github", "key": "acme/api#7"}}},
-		{map[string]any{"pr": map[string]any{"owner": "", "repo": "", "number": 0}, "unit": map[string]any{"provider": "chat", "key": "C1/1.1"}}},
+		{"acme/api#7", map[string]any{"unit": map[string]any{"provider": "github", "key": "acme/api#7"}}},
+		{"#general", map[string]any{"unit": map[string]any{"provider": "chat", "key": "C1/1.1"}}},
+		{"", map[string]any{}},
 	}
 	var got [][2]any
 	nodeRun(t, keyJS(t)+jsConst(t, appJS(t), "eventRef"), nil,
-		`process.stdout.write(JSON.stringify(input.map((it) => [eventRef(it.event), activityRepos(it)])));`+jsFunction(t, appJS(t), "activityRepos"), cases, &got)
-	want := `[["acme/api#7",["acme/api"]],["",[]]]`
+		`process.stdout.write(JSON.stringify(input.map((it) => [eventRef(it), activityRepos(it)])));`+jsFunction(t, appJS(t), "activityRepos"), cases, &got)
+	want := `[["acme/api#7",["acme/api"]],["#general",[]],["",[]]]`
 	if b, _ := json.Marshal(got); string(b) != want {
 		t.Fatalf("got %s, want %s", b, want)
 	}

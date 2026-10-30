@@ -1,0 +1,8 @@
+summary = "Case"
+provider = "task"
+when = 'task.state == "next"'
+
+[[step]]
+use = "task.verb"
+verb = "next"
+until = "2026-12-01"

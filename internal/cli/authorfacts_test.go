@@ -8,7 +8,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/views"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/view"
-	"github.com/wloophq/wloop/internal/source"
 )
 
 type forgeAuthorFacts struct{ automation.Units }
@@ -19,7 +18,7 @@ func (forgeAuthorFacts) Author(context.Context, unit.Unit, bool) (*view.AuthorFa
 
 func TestTheViewsReadTheAuthorFactsOfTheModuleThatServesThem(t *testing.T) {
 	served := forgeAuthorFacts{}
-	mods := []source.Module{{ID: "chat"}, {ID: "forge", Facts: served}}
+	mods := []pluginModule{{ID: "chat"}, {ID: "forge", Facts: served}}
 	if got := authorFacts(mods); got != views.Facts(served) {
 		t.Fatalf("author facts %v, want the forge module's", got)
 	}

@@ -28,7 +28,7 @@ type Noter interface {
 func Notes(n Noter) Option { return func(o *options) { o.notes = n } }
 
 // Ledger is an in-memory plan and run store that notes like the store does:
-// TopicLoopEvents when a write stores events, TopicGate when the pending set changes.
+// TopicLoopEvents when a write stores events, TopicPending when the pending set changes.
 type Ledger struct {
 	o options
 
@@ -120,7 +120,7 @@ func (l *Ledger) write(ctx context.Context, evs []port.Event, change func()) err
 		l.o.notes.Note(port.TopicLoopEvents, units...)
 	}
 	if len(moved) > 0 {
-		l.o.notes.Note(port.TopicGate, moved...)
+		l.o.notes.Note(port.TopicPending, moved...)
 	}
 	return nil
 }

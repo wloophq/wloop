@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/domain/pr"
 )
 
 // adminTimeout covers an evaluation of the plan and a turn's rendering,
@@ -40,10 +39,11 @@ func (c *Client) Doctor(ctx context.Context, q api.DoctorQuery) (api.DoctorRepor
 	return res, err
 }
 
-// TurnBook is the pull request's turns with their instructions and events.
-func (c *Client) TurnBook(ctx context.Context, ref pr.Ref) (api.TurnBook, error) {
+// TurnBook is the turns of the unit at address with their instructions and
+// events.
+func (c *Client) TurnBook(ctx context.Context, address string) (api.TurnBook, error) {
 	var res api.TurnBook
-	err := c.do(ctx, adminTimeout, http.MethodGet, api.AdminTurn+"?pr="+url.QueryEscape(ref.URL()), nil, &res)
+	err := c.do(ctx, adminTimeout, http.MethodGet, api.AdminTurn+"?pr="+url.QueryEscape(address), nil, &res)
 	return res, err
 }
 
@@ -54,10 +54,10 @@ func (c *Client) Timings(ctx context.Context, days int) (api.TimingsReport, erro
 	return res, err
 }
 
-// Facts are what the pull request's guide is matched against.
-func (c *Client) Facts(ctx context.Context, ref pr.Ref) (api.Facts, error) {
+// Facts are what the guide of the unit at address is matched against.
+func (c *Client) Facts(ctx context.Context, address string) (api.Facts, error) {
 	var res api.Facts
-	err := c.do(ctx, adminTimeout, http.MethodGet, api.AdminFacts+"?pr="+url.QueryEscape(ref.URL()), nil, &res)
+	err := c.do(ctx, adminTimeout, http.MethodGet, api.AdminFacts+"?pr="+url.QueryEscape(address), nil, &res)
 	return res, err
 }
 

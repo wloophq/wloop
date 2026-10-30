@@ -24,6 +24,10 @@ func configPaths(t reflect.Type, at string, out map[string]builtin.Kind) {
 		if !f.IsExported() || name == "-" {
 			continue
 		}
+		if f.Anonymous && name == "" {
+			configPaths(f.Type, at, out)
+			continue
+		}
 		path := join(at, name)
 		ft := f.Type
 		for ft.Kind() == reflect.Pointer {
@@ -98,6 +102,8 @@ func TestEveryConfigKeyIsInTheGrammar(t *testing.T) {
 	t.Parallel()
 	want := map[string]builtin.Kind{}
 	configPaths(reflect.TypeFor[Config](), "", want)
+	maps.Copy(want, map[string]builtin.Kind{"plugins.*": builtin.KindTable, "plugins.*.enabled": builtin.KindBool,
+		"plugins.*.trust": builtin.KindText, "plugins.*.*": builtin.KindAny})
 	rows := configRows()
 	for _, p := range slices.Sorted(maps.Keys(want)) {
 		r, ok := rows[p]

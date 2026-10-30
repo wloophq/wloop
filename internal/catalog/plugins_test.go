@@ -176,9 +176,18 @@ func TestDraftActionHasNoKey(t *testing.T) {
 	noVerb := draft
 	noVerb.Verb = "next"
 	if err := checkScope(noVerb); err == nil {
-		t.Error("a draft action without a gtd draft verb passes")
+		t.Error("a draft action without a draft verb passes")
 	}
 	if err := checkScope(api.ActionSpec{ID: "x", Scope: "thread"}); err == nil {
 		t.Error("an unknown scope passes")
+	}
+}
+
+func TestAPluginsViewsKeyIsAFreeChord(t *testing.T) {
+	if err := CheckPluginKeys("acme", &api.PluginUI{Key: "g a"}); err != nil {
+		t.Errorf("a free chord: %v", err)
+	}
+	if err := CheckPluginKeys("acme", &api.PluginUI{Key: "a"}); err == nil || !strings.Contains(err.Error(), "acme: the key of its views") {
+		t.Errorf("a key that is no chord: %v", err)
 	}
 }

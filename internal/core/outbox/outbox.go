@@ -1,5 +1,6 @@
-// Package outbox keeps the drafts the loop proposes and publishes the ones
-// the user, or their approval policy, approved.
+// Package outbox keeps the drafts the loop proposes and delivers them. Each
+// draft waits on a draft gate, which holds the decision: the outbox posts a
+// draft only once its gate approved it.
 package outbox
 
 import (
@@ -11,17 +12,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 type Proposal struct {
 	Unit                   unit.Unit
 	Items                  []string
-	Entry                  string
+	Task                   string
 	Kind                   draft.Kind
 	Target, Text, Reaction string
 	// Replaced is the text a recorded edit replaced.
@@ -43,12 +46,14 @@ type Proposal struct {
 	// RepeatAfter is how long a settled draft of the same origin holds this
 	// proposal from being proposed again; zero keeps Service.RepeatAfter.
 	RepeatAfter time.Duration
+	// Tool is the tool that made a post RecordSent records.
+	Tool string
 }
 
 type Filter struct {
 	States    []draft.State
 	Unit      *unit.Unit
-	Entry     string
+	Task      string
 	Rule, Key string
 	// Workflow keeps the drafts whose Origin.Workflow is it; "" any.
 	Workflow string
@@ -91,31 +96,32 @@ type Policies interface {
 // workflow when it is set.
 type Facts func(ctx context.Context, u unit.Unit, workflow string) (draft.Subject, error)
 
-// ItemReader reads a unit's items, for the confidence Would.Policy weighs.
-type ItemReader interface {
-	Items(ctx context.Context, u unit.Unit) ([]items.Item, error)
-}
-
-// Results attaches to an entry the unit of each post a turn on it makes.
+// Results attaches to a task the unit of each post a turn on it makes.
 type Results interface {
 	// AttachesPosts says whether the turns of intent attach their posts.
 	AttachesPosts(intent string) bool
-	Attach(ctx context.Context, entry gtd.ID, u unit.Unit) error
+	Attach(ctx context.Context, tk task.ID, u unit.Unit) error
 }
 
 type Service struct {
-	Store   Store
+	Store Store
+	// Gates holds the gate each draft waits on.
+	Gates   Gates
 	Effects Effects
 	// Targets are the providers whose publishers PublisherOf asks to take a
 	// draft's target.
 	Targets  []unit.ProviderID
 	Policies Policies // nil resolves every proposal to wait
-	Facts    Facts    // nil: a policy whose rules read the unit's facts resolves to wait
-	// Broken names the workflows that failed to load; a delay draft of one
-	// waits for a person until it loads again.
+	// Posts says whether a draft of a delivery reaches people, as the
+	// plugins' manifests declare it, so a policy releases one only by a rule
+	// that names that delivery; nil: every delivery does.
+	Posts func(d draft.Delivery) bool
+	Facts Facts // nil: a policy whose rules read the unit's facts resolves to wait
+	// Broken names the workflows that failed to load; a draft of one whose
+	// gate a rule or a window released fails, for a person to retry, until
+	// it loads again.
 	Broken   func() []string
-	Evidence Evidence   // nil none
-	Items    ItemReader // nil: no item counts as low confidence
+	Evidence Evidence // nil none
 	Changes  port.Changes
 	Clock    port.Clock
 	Log      func(format string, args ...any) // ids, states and kinds only; never text or tokens
@@ -126,7 +132,7 @@ type Service struct {
 	RepeatAfter time.Duration
 	// Applier applies a sent draft's Effects; nil applies none.
 	Applier Applier
-	// Results attaches a sent post to its turn's entry; nil attaches none.
+	// Results attaches a sent post to its turn's task; nil attaches none.
 	Results Results
 }
 
@@ -137,6 +143,7 @@ var (
 	ErrDuplicate    = errors.New("an open draft of the same rule and key exists")
 	ErrNeedsConfirm = errors.New("the draft may have been posted; retry needs confirm")
 	ErrInvalid      = errors.New("invalid draft")
+	ErrNoGates      = errors.New("the outbox has no gates to hold its drafts")
 )
 
 // NotConfirmed is the Error of a draft Recover found in sending and Verify could not confirm.
@@ -144,14 +151,20 @@ const NotConfirmed = "not confirmed after a restart"
 
 const mayHaveBeenPosted = "may have been posted"
 
+// Propose stores the draft p proposes as held and opens its gate under
+// p's approval: a policy that releases it queues it at once, a dry_run drops
+// it, a delay gives the gate its window.
 func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) {
 	if err := checkKind(p.Kind); err != nil {
 		return draft.Draft{}, err
 	}
+	if s.Gates == nil {
+		return draft.Draft{}, ErrNoGates
+	}
 	now := s.Clock.Now()
 	d := s.delivered(shaped(draft.Draft{
-		Unit: p.Unit, Items: p.Items, Entry: p.Entry, Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction,
-		Original: p.Text, Origin: p.Origin, State: draft.Proposed, CreatedAt: now, UpdatedAt: now,
+		Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction,
+		Original: p.Text, Origin: p.Origin, State: draft.Held, CreatedAt: now, UpdatedAt: now,
 		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects,
 	}))
 	if err := checkContent(d); err != nil {
@@ -161,13 +174,10 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	approval := dec.Approval
-	outside := targetsOutside(d)
-	if outside && approval.Mode != draft.DryRun {
-		approval = waiting
+	if targetsOutside(d) && dec.Approval.Mode != draft.DryRun {
+		dec = draft.Decision{Approval: waiting, Rule: -1}
 	}
-	d.Approval = approval
-	if dup, ok, err := s.duplicate(ctx, d, p.RepeatAfter, now); err != nil || ok {
+	if dup, ok, err := s.duplicate(ctx, d, dec.Approval, p.RepeatAfter, now); err != nil || ok {
 		return dup, err
 	}
 	if err := s.publishable(ctx, &d); err != nil {
@@ -176,26 +186,22 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	if err := s.implemented(d); err != nil {
 		return draft.Draft{}, err
 	}
-	d.Would = s.would(ctx, d, dec, outside)
-	switch approval.Mode {
-	case draft.Delay:
-		d.Deadline = now.Add(approval.Window)
-	case draft.DryRun:
-		d.State, d.Reason, d.Would.Outcome = draft.Discarded, string(draft.DryRun), draft.OutcomeDryRun
-	}
 	d, err = s.Store.Insert(ctx, d)
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	s.logf("draft %d proposed: %s on %s by %s, approval %s, would %s", d.ID, d.Purpose, d.Unit, d.Origin.Kind, d.Approval.Mode, d.Would.Policy)
-	if approval.Mode == draft.Send {
-		approved, err := s.markAuto(ctx, d)
-		if err != nil {
-			return d, err
-		}
-		return approved, nil
+	s.logf("draft %d proposed: %s on %s by %s, approval %s", d.ID, d.Purpose, d.Unit, d.Origin.Kind, dec.Approval.Mode)
+	if _, err := s.Gates.Open(ctx, gateOf(d), decided(dec)); err != nil {
+		return d, errors.Join(fmt.Errorf("opening the gate of draft %d: %w", d.ID, err), s.ungated(ctx, d))
 	}
-	return d, nil
+	return s.Store.Get(ctx, d.ID)
+}
+
+// ungated drops d, whose gate did not open, so nothing ever posts it.
+func (s *Service) ungated(ctx context.Context, d draft.Draft) error {
+	d.State, d.Reason = draft.Dropped, reasonUngated
+	_, err := s.save(ctx, d, draft.Held)
+	return err
 }
 
 // shaped is d with its purpose and delivery derived from its kind when it
@@ -218,7 +224,7 @@ func (s *Service) delivered(d draft.Draft) draft.Draft {
 		return d
 	}
 	if dl, ok := fx.(port.Deliverer); ok && d.Delivery != "" {
-		if got := dl.Delivers(d.Delivery); got != d.Delivery {
+		if got := dl.Delivers(cmp.Or(d.Kind, draft.KindOf(d.Purpose, d.Delivery))); got != d.Delivery {
 			d.Delivery, d.Kind = got, draft.KindOf(d.Purpose, got)
 		}
 	}
@@ -228,13 +234,13 @@ func (s *Service) delivered(d draft.Draft) draft.Draft {
 // duplicate is the open draft an auto proposal d repeats, with ErrDuplicate:
 // one of the same rule, key, purpose and delivery; under dry_run, a
 // dry_run one younger than repeatAfter (zero: Service.RepeatAfter) counts too.
-func (s *Service) duplicate(ctx context.Context, d draft.Draft, repeatAfter time.Duration, now time.Time) (draft.Draft, bool, error) {
+func (s *Service) duplicate(ctx context.Context, d draft.Draft, a draft.Approval, repeatAfter time.Duration, now time.Time) (draft.Draft, bool, error) {
 	if d.Origin.Kind != draft.OriginAuto {
 		return draft.Draft{}, false, nil
 	}
 	states := draft.Open
-	if d.Approval.Mode == draft.DryRun {
-		states = append(slices.Clone(states), draft.Discarded)
+	if a.Mode == draft.DryRun {
+		states = append(slices.Clone(states), draft.Dropped)
 	}
 	found, err := s.Store.List(ctx, Filter{States: states, Unit: &d.Unit, Rule: d.Origin.Rule, Key: d.Origin.Key})
 	if err != nil {
@@ -247,7 +253,7 @@ func (s *Service) duplicate(ctx context.Context, d draft.Draft, repeatAfter time
 		if o = s.delivered(o); o.Purpose != d.Purpose || o.Delivery != d.Delivery || o.Origin.Rule != d.Origin.Rule || o.Origin.Key != d.Origin.Key {
 			continue
 		}
-		if o.State != draft.Discarded || o.Reason == string(draft.DryRun) && (repeatAfter <= 0 || now.Sub(o.UpdatedAt) < repeatAfter) {
+		if o.State != draft.Dropped || o.Reason == reasonDryRun && (repeatAfter <= 0 || now.Sub(o.UpdatedAt) < repeatAfter) {
 			return o, true, ErrDuplicate
 		}
 	}
@@ -319,7 +325,7 @@ func (s *Service) decide(ctx context.Context, p Proposal, d draft.Draft, now tim
 			return held, nil
 		}
 	}
-	dec, err := pol.Decide(d, sub, now)
+	dec, err := pol.Decide(d, sub, s.posts(d), now)
 	if err != nil {
 		s.logf("draft approval of a %s proposal on %s resolved to wait: %v", d.Purpose, d.Unit, err)
 		return held, nil
@@ -356,30 +362,9 @@ func targetsOutside(d draft.Draft) bool {
 	return (d.Origin.Kind == draft.OriginTurn || d.Origin.Kind == draft.OriginSession) && t != "" && !strings.EqualFold(t, d.Unit.Key)
 }
 
-// would is what auto-send would do with d: a comment only once a rule that
-// names comment delivery released it. outside is targetsOutside of d as proposed, before its placement.
-func (s *Service) would(ctx context.Context, d draft.Draft, dec draft.Decision, outside bool) draft.Would {
-	hold := func(reason string) draft.Would { return draft.Would{Policy: draft.WouldWait, Reason: reason} }
-	switch {
-	case outside:
-		return hold("targets outside its unit")
-	case d.Origin.Kind != draft.OriginTurn && d.Origin.Kind != draft.OriginAuto:
-		return hold(fmt.Sprintf("proposed by %s", d.Origin.Kind))
-	case d.Delivery == draft.CommentDelivery && !dec.CommentReleased:
-		return hold("a comment is sent on its own only by a rule that names comment delivery")
-	}
-	if len(d.Items) > 0 && s.Items != nil {
-		its, err := s.Items.Items(ctx, d.Unit)
-		if err != nil {
-			return hold("the items could not be read")
-		}
-		for _, it := range its {
-			if it.Confidence == items.Low && slices.Contains(d.Items, it.ID) {
-				return hold(fmt.Sprintf("item %s is low confidence", it.ID))
-			}
-		}
-	}
-	return draft.Would{Policy: draft.WouldRelease, Reason: fmt.Sprintf("a %s %s from a %s over confident items", d.Purpose, d.Delivery, d.Origin.Kind)}
+// posts says whether d's delivery reaches people.
+func (s *Service) posts(d draft.Draft) bool {
+	return s.Posts == nil || s.Posts(d.Delivery)
 }
 
 // publishable refuses d when its provider has no enabled publisher, its Placer cannot place d
@@ -497,57 +482,104 @@ func setText(d *draft.Draft, text string) error {
 	return nil
 }
 
+// Edit sets the text of held or failed draft id. A held draft waits for a
+// person again: its gate is superseded first, so no window and no approval
+// given to the old text releases the new one, and a gate that waits opens.
 func (s *Service) Edit(ctx context.Context, id draft.ID, text string) (draft.Draft, error) {
-	d, err := s.load(ctx, id, "", draft.Proposed, draft.Failed)
+	d, err := s.load(ctx, id, "", draft.Held, draft.Failed)
 	if err != nil {
 		return draft.Draft{}, err
 	}
 	if err := setText(&d, text); err != nil {
 		return draft.Draft{}, err
 	}
-	if d.Approval.Mode == draft.Delay {
-		d.Approval, d.Deadline = waiting, time.Time{}
-	}
-	return s.save(ctx, d, d.State)
-}
-
-func (s *Service) Approve(ctx context.Context, id draft.ID, text *string) (draft.Draft, error) {
-	d, err := s.load(ctx, id, draft.Approved, draft.Proposed)
-	if err != nil {
-		return draft.Draft{}, err
-	}
-	if text != nil {
-		if err := setText(&d, *text); err != nil {
+	reopen := false
+	if d.State == draft.Held {
+		g, ok, err := s.GateOf(ctx, d)
+		if err != nil {
 			return draft.Draft{}, err
 		}
+		if ok && g.Status != gate.Open {
+			return draft.Draft{}, fmt.Errorf("draft %d: %w: its gate decided it meanwhile", id, ErrConflict)
+		}
+		if ok {
+			if err := s.Gates.Supersede(ctx, g.ID, task.ActorPerson); errors.Is(err, gates.ErrResolved) {
+				return draft.Draft{}, fmt.Errorf("draft %d: %w: its gate decided it meanwhile", id, ErrConflict)
+			} else if err != nil {
+				return draft.Draft{}, err
+			}
+			reopen = true
+		}
 	}
-	if err := s.publishable(ctx, &d); err != nil {
-		return draft.Draft{}, err
+	saved, err := s.save(ctx, d, d.State)
+	if reopen {
+		if _, gerr := s.Gates.Open(ctx, gateOf(d), decided(draft.Decision{Approval: waiting, Rule: -1})); gerr != nil {
+			return saved, errors.Join(err, fmt.Errorf("reopening the gate of draft %d: %w", id, gerr), s.ungated(ctx, d))
+		}
 	}
-	d.State, d.Would.Outcome = draft.Approved, draft.OutcomeAsIs
-	if d.Edited {
-		d.Would.Outcome = draft.OutcomeEdited
-	}
-	return s.save(ctx, d, draft.Proposed)
+	return saved, err
 }
 
-func (s *Service) Discard(ctx context.Context, id draft.ID, reason string) (draft.Draft, error) {
-	d, err := s.load(ctx, id, draft.Discarded, draft.Proposed, draft.Approved, draft.Failed)
+// Prepare readies held draft id for a person to approve its gate: the
+// draft at rev, which its publisher must take. It writes nothing. The caller
+// reads the gate it resolves before it prepares: an edit after the person saw
+// the draft supersedes that gate, and a person who changes the text approves
+// through Edit's new gate.
+func (s *Service) Prepare(ctx context.Context, id draft.ID, rev int64) (draft.Draft, error) {
+	d, err := s.load(ctx, id, draft.Queued, draft.Held)
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	from := d.State
-	if reason == "" {
-		reason = "user"
+	if d.Rev != rev {
+		return draft.Draft{}, fmt.Errorf("%w: draft %d changed since you saw it (rev %d, now %d)", ErrConflict, id, rev, d.Rev)
 	}
-	d.State, d.Reason, d.Would.Outcome = draft.Discarded, reason, draft.OutcomeDiscarded
+	return d, s.publishable(ctx, &d)
+}
+
+// Discard drops queued or failed draft id, whose gate a person approved:
+// a held draft's discard is its gate's.
+func (s *Service) Discard(ctx context.Context, id draft.ID, reason string) (draft.Draft, error) {
+	d, err := s.load(ctx, id, draft.Dropped, draft.Queued, draft.Failed)
+	if err != nil {
+		return draft.Draft{}, err
+	}
+	return s.drop(ctx, d, cmp.Or(reason, reasonUser))
+}
+
+// Withdraw drops draft id, which its proposer no longer stands by, for
+// reason: a held draft's gate is superseded.
+func (s *Service) Withdraw(ctx context.Context, id draft.ID, reason string) (draft.Draft, error) {
+	d, err := s.load(ctx, id, draft.Dropped, draft.Held, draft.Queued, draft.Failed)
+	if err != nil {
+		return draft.Draft{}, err
+	}
+	if d.State == draft.Held {
+		g, ok, err := s.GateOf(ctx, d)
+		if err != nil {
+			return draft.Draft{}, err
+		}
+		if ok && g.Status == gate.Open {
+			if err := s.Gates.Supersede(ctx, g.ID, task.ActorWorkflow); err != nil {
+				return draft.Draft{}, err
+			}
+		}
+		if d, err = s.Store.Get(ctx, id); err != nil || d.State != draft.Held {
+			return d, err
+		}
+	}
+	return s.drop(ctx, d, reason)
+}
+
+func (s *Service) drop(ctx context.Context, d draft.Draft, reason string) (draft.Draft, error) {
+	from := d.State
+	d.State, d.Reason = draft.Dropped, reason
 	return s.save(ctx, d, from)
 }
 
-// Retry: failed -> approved. A draft that failed as "not confirmed after a restart" or with an Error
+// Retry: failed -> queued. A draft that failed as "not confirmed after a restart" or with an Error
 // starting "may have been posted" needs confirm true, else ErrNeedsConfirm.
 func (s *Service) Retry(ctx context.Context, id draft.ID, confirm bool) (draft.Draft, error) {
-	d, err := s.load(ctx, id, draft.Approved, draft.Failed)
+	d, err := s.load(ctx, id, draft.Queued, draft.Failed)
 	if err != nil {
 		return draft.Draft{}, err
 	}
@@ -557,7 +589,7 @@ func (s *Service) Retry(ctx context.Context, id draft.ID, confirm bool) (draft.D
 	if err := s.publishable(ctx, &d); err != nil {
 		return draft.Draft{}, err
 	}
-	d.State, d.Error = draft.Approved, ""
+	d.State, d.Error = draft.Queued, ""
 	return s.save(ctx, d, draft.Failed)
 }
 
@@ -571,10 +603,15 @@ func (s *Service) List(ctx context.Context, f Filter) ([]draft.Draft, error) {
 	return ds, err
 }
 
-// RecordSent stores a post already made outside the outbox (origin session) as sent.
+// RecordSent stores a post already made outside the outbox (origin
+// session), by p.Tool, as sent, with a gate already approved by the agent
+// that made it. It resolves no gate: no agent resolves an open one.
 func (s *Service) RecordSent(ctx context.Context, p Proposal, ev draft.Evidence) (draft.Draft, error) {
 	if err := checkKind(p.Kind); err != nil {
 		return draft.Draft{}, err
+	}
+	if s.Gates == nil {
+		return draft.Draft{}, ErrNoGates
 	}
 	now := s.Clock.Now()
 	if p.Origin.Kind == "" {
@@ -584,7 +621,7 @@ func (s *Service) RecordSent(ctx context.Context, p Proposal, ev draft.Evidence)
 		ev.At = now
 	}
 	d := s.delivered(shaped(draft.Draft{
-		Unit: p.Unit, Items: p.Items, Entry: p.Entry, Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction, Replaced: p.Replaced,
+		Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction, Replaced: p.Replaced,
 		Original: p.Text, Origin: p.Origin, State: draft.Sent, Evidence: ev, CreatedAt: now, UpdatedAt: now, SendingAt: now,
 		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects,
 	}))
@@ -596,7 +633,14 @@ func (s *Service) RecordSent(ctx context.Context, p Proposal, ev draft.Evidence)
 		return draft.Draft{}, err
 	}
 	s.logf("draft %d recorded sent: %s on %s by %s", d.ID, d.Purpose, d.Unit, d.Origin.Kind)
-	return d, s.afterSent(ctx, d)
+	g := gateOf(d)
+	g.By, g.Rule = task.ActorAgent, p.Tool
+	var errs []error
+	if _, err := s.Gates.RecordSent(ctx, g); err != nil {
+		s.logf("draft %d: its gate was not recorded", d.ID)
+		errs = append(errs, fmt.Errorf("the gate of sent draft %d: %w", d.ID, err))
+	}
+	return d, errors.Join(append(errs, s.afterSent(ctx, d))...)
 }
 
 func (s *Service) afterSent(ctx context.Context, d draft.Draft) error {
@@ -614,7 +658,7 @@ func (s *Service) afterSent(ctx context.Context, d draft.Draft) error {
 		}
 	}
 	if err := s.attachPost(ctx, d); err != nil {
-		s.logf("draft %d: its unit was not attached to its entry", d.ID)
+		s.logf("draft %d: its unit was not attached to its task", d.ID)
 		errs = append(errs, fmt.Errorf("attaching draft %d: %w", d.ID, err))
 	}
 	for _, hook := range s.OnSent {
@@ -626,20 +670,20 @@ func (s *Service) afterSent(ctx context.Context, d draft.Draft) error {
 	return errors.Join(errs...)
 }
 
-// attachPost attaches the unit of d, a post, to the entry its turn is on
+// attachPost attaches the unit of d, a post, to the task its turn is on
 // when the turn's intent attaches its posts.
 func (s *Service) attachPost(ctx context.Context, d draft.Draft) error {
 	if s.Results == nil || !slices.Contains(posts, d.Delivery) || d.Origin.Intent == "" {
 		return nil
 	}
-	id, ok := gtd.IDOf(d.Origin.Unit)
+	id, ok := task.IDOf(d.Origin.Unit)
 	posted := d.Unit
-	if onEntry, isEntry := gtd.IDOf(d.Unit); isEntry {
+	if onTask, isTask := task.IDOf(d.Unit); isTask {
 		landed, found, err := s.landed(ctx, d)
 		if err != nil || !found {
 			return err
 		}
-		id, ok, posted = onEntry, true, landed
+		id, ok, posted = onTask, true, landed
 	}
 	if !ok || !s.Results.AttachesPosts(d.Origin.Intent) {
 		return nil
@@ -647,7 +691,7 @@ func (s *Service) attachPost(ctx context.Context, d draft.Draft) error {
 	return s.Results.Attach(ctx, id, posted)
 }
 
-// landed is the unit the post of d, a draft on an entry sent to a target of
+// landed is the unit the post of d, a draft on a task sent to a target of
 // another provider, landed in; false when its publisher cannot say.
 func (s *Service) landed(ctx context.Context, d draft.Draft) (unit.Unit, bool, error) {
 	fx, err := s.effects(s.PublisherOf(d))
@@ -667,7 +711,7 @@ var posts = []draft.Delivery{draft.Message, draft.CommentDelivery}
 // Send is the sender pass: the effects of the sent drafts not applied yet,
 // then every approved draft -> sending -> sent | failed, one Publish each, no retry.
 func (s *Service) Send(ctx context.Context) (sent, failed int, err error) {
-	approved, err := s.Store.List(ctx, Filter{States: []draft.State{draft.Approved}})
+	approved, err := s.Store.List(ctx, Filter{States: []draft.State{draft.Queued}})
 	if err != nil {
 		return 0, 0, err
 	}
@@ -700,18 +744,21 @@ var errClaimLost = errors.New("another pass or decision took the draft")
 func (s *Service) sendOne(ctx context.Context, d draft.Draft) (bool, error) {
 	fx, err := s.publisher(d)
 	if err == nil {
+		err = s.approved(ctx, d)
+	}
+	if err == nil {
 		err = place(ctx, fx, &d)
 	}
 	if err != nil {
 		d.State, d.Error = draft.Failed, err.Error()
-		_, err := s.save(ctx, d, draft.Approved)
+		_, err := s.save(ctx, d, draft.Queued)
 		if errors.Is(err, ErrConflict) {
 			return false, errClaimLost
 		}
 		return false, err
 	}
 	d.State, d.SendingAt = draft.Sending, s.Clock.Now()
-	d, err = s.save(ctx, d, draft.Approved)
+	d, err = s.save(ctx, d, draft.Queued)
 	if errors.Is(err, ErrConflict) {
 		return false, errClaimLost
 	}
@@ -724,6 +771,20 @@ func (s *Service) sendOne(ctx context.Context, d draft.Draft) (bool, error) {
 	}
 	return s.settleSent(ctx, d, ev)
 }
+
+// approved refuses d, queued, unless its gate approved it.
+func (s *Service) approved(ctx context.Context, d draft.Draft) error {
+	g, ok, err := s.GateOf(ctx, d)
+	switch {
+	case err != nil:
+		return err
+	case !ok || g.Status != gate.Approved:
+		return errNotApproved
+	}
+	return nil
+}
+
+var errNotApproved = errors.New("its gate did not approve it")
 
 func (s *Service) fail(ctx context.Context, d draft.Draft, reason string) error {
 	d.State, d.Error = draft.Failed, reason

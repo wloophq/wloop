@@ -20,6 +20,7 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	dpr "github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/tag"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 )
@@ -72,7 +73,6 @@ const (
 
 type Store interface {
 	BriefStates(ctx context.Context) ([]inventory.BriefState, error)
-	PR(ctx context.Context, ref github.Ref) (dinv.PR, bool, error)
 	BriefRecords(ctx context.Context, refs ...github.Ref) (map[github.Ref]dinv.BriefRecord, error)
 	BriefRecord(ctx context.Context, ref github.Ref) (dinv.BriefRecord, bool, error)
 	TagVocabulary(ctx context.Context, owner string, keys []string, limit int) (map[string][]tag.Count, error)
@@ -94,7 +94,10 @@ type RunStore interface {
 const VocabularySize = 30
 
 type Deps struct {
-	Store  Store
+	Store Store
+	// PRs are the pull requests the GitHub plugin last reported; nil knows
+	// none.
+	PRs    PRReader
 	Source interface {
 		Facts(ctx context.Context, ref github.Ref) (Input, error)
 		Diff(ctx context.Context, ref github.Ref, max int) (diff string, cut bool, err error)
@@ -138,6 +141,9 @@ type Deps struct {
 	// Intent is the brief intent of a provider's units as the profile
 	// resolves it now; nil is the bundled one.
 	Intent func(p unit.ProviderID) Intent
+	// Records projects a pull request's brief record onto the tasks holding
+	// it; nil projects none.
+	Records *Records
 	// Sources are the providers' BriefSources by provider. Pull requests
 	// default to GitHubSource over Store and Source; a GitHub source set
 	// here keeps Retry. A source that is also an OnDemand briefs its units
@@ -293,12 +299,6 @@ func (q *Queue) isDue(pr dinv.PR, rec dinv.BriefRecord, ok bool, version string,
 	return q.source(pr.Ref.Unit().Provider).Stale(w, AtOf(pr), version, now)
 }
 
-// attemptKey is what an attempt at version on pr is made from, as its
-// BriefSource names it.
-func (q *Queue) attemptKey(pr dinv.PR, version string) string {
-	return q.source(pr.Ref.Unit().Provider).AttemptKey(version, AtOf(pr))
-}
-
 // source is the BriefSource of p's units; a pull request without one in
 // Deps.Sources has the GitHub rules with the queue's retry.
 func (q *Queue) source(p unit.ProviderID) BriefSource {
@@ -309,7 +309,7 @@ func (q *Queue) source(p unit.ProviderID) BriefSource {
 		return s
 	}
 	if p == (dpr.Codec{}).Provider() {
-		return GitHubSource{Store: q.d.Store, Source: q.d.Source, MaxDiffBytes: q.d.MaxDiffBytes, Retry: q.d.Retry}
+		return GitHubSource{Store: q.prs(), Source: q.d.Source, MaxDiffBytes: q.d.MaxDiffBytes, Retry: q.d.Retry}
 	}
 	return nil
 }
@@ -328,9 +328,7 @@ func tried(rec dinv.BriefRecord, ok bool) bool {
 
 // attemptOf names what a brief is made from: a change in any of it is a
 // new pull request to try.
-func attemptOf(pr dinv.PR, version string) string {
-	return fmt.Sprintf("%s %s %s %d", version, pr.HeadOid, pr.BodyEditedAt.UTC().Format(time.RFC3339), pr.ChangedFiles)
-}
+func attemptOf(pr dinv.PR, version string) string { return AttemptKey(version, AtOf(pr)) }
 
 // moved is a description edited BodyQuiet ago or more, or a head that added
 // more than RefreshFiles files since the brief. A record without a file
@@ -365,7 +363,7 @@ func backoff(retry time.Duration, failures int) time.Duration {
 
 // ghUnavailable is a GitHub error no pull request gets past.
 func ghUnavailable(err error) bool {
-	return errors.Is(err, github.ErrUnauthorized) || errors.Is(err, dgh.ErrBudget)
+	return errors.Is(err, dgh.ErrBudget)
 }
 
 // priority is what a run's GitHub reads spend: only a run a turn waits on
@@ -487,7 +485,7 @@ func (q *Queue) timeout(wanted bool) time.Duration {
 func (q *Queue) brief(ctx context.Context, pr dinv.PR, trigger string, timeout time.Duration) error {
 	defer q.release(pr.Ref)
 	taxonomy, version := q.version(pr.Ref)
-	run := dinv.BriefRun{PR: pr.Ref, Trigger: trigger, Version: version, AttemptOf: q.attemptKey(pr, version),
+	run := dinv.BriefRun{PR: pr.Ref, Trigger: trigger, Version: version, AttemptOf: attemptOf(pr, version),
 		HeadOid: pr.HeadOid, BodyEditedAt: pr.BodyEditedAt, ChangedFiles: pr.ChangedFiles}
 	vocabulary, err := q.d.Store.TagVocabulary(ctx, pr.Ref.Owner, tag.OpenKeys(), VocabularySize)
 	if err != nil {
@@ -558,6 +556,11 @@ func (q *Queue) brief(ctx context.Context, pr dinv.PR, trigger string, timeout t
 	st, change := q.settle(prev, run, err)
 	if serr := q.d.Store.EndBriefRun(ctx, run, st); serr != nil {
 		return q.storeFault(ctx, errors.Join(err, serr))
+	}
+	if run.Outcome == OutcomeOK {
+		if perr := q.d.Records.ProjectHeld(ctx, pr.Ref.Unit(), []byte(run.Brief), task.WriterAgent); perr != nil {
+			q.d.Log("brief %s: the brief's properties: %v", pr.Ref, perr)
+		}
 	}
 	q.recordBreaker(ctx, change, run)
 	return err
@@ -902,7 +905,7 @@ func summaryOf(rec dinv.BriefRecord) (Summary, bool) {
 // read.
 func (q *Queue) AttemptOf(pr dinv.PR, rec dinv.BriefRecord) int {
 	_, version := q.version(pr.Ref)
-	return q.attempt(pr.Ref, rec, q.attemptKey(pr, version))
+	return q.attempt(pr.Ref, rec, attemptOf(pr, version))
 }
 
 // Views are what the detail panel shows for each of prs, by pull request.
@@ -960,4 +963,17 @@ func (q *Queue) RefreshIfStale(ctx context.Context, pr dinv.PR) error {
 		q.spawn(ctx, pr, TriggerRefresh, q.timeout(true), false)
 	}
 	return nil
+}
+
+// noPRs knows no pull request.
+type noPRs struct{}
+
+func (noPRs) PR(context.Context, github.Ref) (dinv.PR, bool, error) { return dinv.PR{}, false, nil }
+
+// prs are the pull requests the queue reads.
+func (q *Queue) prs() PRReader {
+	if q.d.PRs == nil {
+		return noPRs{}
+	}
+	return q.d.PRs
 }

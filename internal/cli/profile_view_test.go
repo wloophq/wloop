@@ -64,7 +64,9 @@ func TestProfileCheckPipedKeepsItsLines(t *testing.T) {
   act              bundled   Act on the open items of a unit without touching its code: settle what you can and propose the replies it needs as drafts for you to approve; Address works on the code of a pull request you develop
   address          bundled   Triage the reviews and failing checks of a pull request you develop, in its workspace, changing its code where they call for it; Act only settles open items and drafts replies
   ask-author       ` + filepath.Join(dir, "intents", "ask-author", "intent.toml") + `   Ask the author one question
+  attach           bundled   Make a session started outside the loop a run of a task, keeping its context
   brief            bundled   One brief per unit: goal, context, kind, size, risk, open questions and tags
+  chat             bundled   Talk with an agent about a task: in the task's last session when it can resume, else in a new one, in a worktree of the task's repository or with no checkout
   nudge            bundled   Ask whoever the pull request waits on for the next step, in a comment; guidance is the topic
   probe            bundled   Check that an agent home can read its turn, record it, take an answer and be resumed
   review           bundled   Start or continue a review round on someone else's pull request, in a dedicated workspace
@@ -158,11 +160,11 @@ func TestProfileCheckFitsANarrowTerminal(t *testing.T) {
 func TestProfileCheckNamesTheBundledFilesAProfileOverrides(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	nudge, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "intents", "nudge", "instructions.md.tmpl"))
+	nudge, err := readBundled("intents/nudge/instructions.md.tmpl")
 	if err != nil {
 		t.Fatal(err)
 	}
-	wf, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "workflows", "review-first-round", "workflow.toml"))
+	wf, err := readBundled("workflows/review-first-round/workflow.toml")
 	if err != nil {
 		t.Fatal(err)
 	}

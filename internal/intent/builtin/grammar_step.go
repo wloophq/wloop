@@ -7,7 +7,7 @@ var stepGrammar = []Key{
 	stepEnum(StepTurnStart, "runner", TurnRunners, "", "How the turn runs, one of the intent's runners; by default its first."),
 
 	required(stepKey(StepDraftPropose, "purpose", KindText, "", "What the draft is for, such as nudge or close. Required.")),
-	stepEnum(StepDraftPropose, "delivery", DraftDeliveries, DraftDeliveries[0], "How the draft posts."),
+	{Path: "delivery", In: SurfaceStep, Step: StepDraftPropose, Kind: KindEnum, Values: func() []Value { return names(DraftDeliveries) }, Default: DraftDeliveries[0], Doc: "How the draft posts: the core's message or reaction, or a delivery a plugin declares."},
 	stepKey(StepDraftPropose, "text", KindFile, "text.md.tmpl", "The template of the draft's text, beside the manifest."),
 	stepKey(StepDraftPropose, "reaction", KindText, "", "The emoji name, with delivery reaction."),
 	stepEnum(StepDraftPropose, "items", DraftItems, "all", "Which of the unit's items the draft lists."),
@@ -25,12 +25,18 @@ var stepGrammar = []Key{
 
 	stepKey(StepNotifySelf, "text", KindFile, "text.md.tmpl", "The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`."),
 
-	required(stepEnum(StepEntryVerb, "verb", EntryStepVerbs, "", "The verb run on the entry. Required.")),
-	stepKey(StepEntryVerb, "until", KindText, "", "With schedule, the date the entry returns: RFC 3339 or YYYY-MM-DD."),
-	stepKey(StepEntryVerb, "on_activity", KindText, "", "With schedule, `true` returns the entry on new activity on its unit."),
-	stepKey(StepEntryVerb, "on", KindText, "", "With waiting, the people the entry waits on, comma-separated."),
-	stepKey(StepEntryVerb, "resurface", KindText, "", "With waiting, the date the entry resurfaces: RFC 3339 or YYYY-MM-DD."),
-	stepKey(StepEntryVerb, "set", KindText, "", "With context, the contexts, comma-separated; with area, the area."),
+	required(stepKey(StepTaskVerb, "verb", KindText, "", "The verb of tasks.toml run on the task, one whose by.workflow lets a workflow run it. Required.")),
+	stepKey(StepTaskVerb, "until", KindText, "", "With a verb whose handler is schedule, the date the task returns: RFC 3339 or YYYY-MM-DD."),
+	stepKey(StepTaskVerb, "on_activity", KindText, "", "With a verb whose handler is schedule, `true` returns the task on new activity on its unit."),
+	stepKey(StepTaskVerb, "on", KindText, "", "With a verb whose handler is waiting, the people the task waits on, comma-separated."),
+	stepKey(StepTaskVerb, "resurface", KindText, "", "With a verb whose handler is waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD."),
+	stepKey(StepTaskVerb, "set", KindText, "", "With a verb whose handler is context, the contexts, comma-separated; with area, the area."),
+	stepKey(StepTaskVerb, "by", KindText, "", "With a verb whose handler is promise, the time the task is promised by: HH:MM, YYYY-MM-DD or RFC 3339; empty clears it."),
+
+	required(stepKey(StepGateOpen, "name", KindText, "", "The gate, of gates.toml, the step opens. Required.")),
+
+	required(stepKey(StepTaskSet, "prop", KindText, "", "The property, of tasks.toml, the step sets. Required.")),
+	required(stepKey(StepTaskSet, "value", KindText, "", "The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD or as a duration after now such as +2d, a duration, a list comma-separated. Required.")),
 }
 
 func required(k Key) Key {

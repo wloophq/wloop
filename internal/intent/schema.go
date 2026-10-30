@@ -22,10 +22,25 @@ var ActionsSchema []byte
 //go:embed config.schema.json
 var ConfigSchema []byte
 
-// GTDSchema is the JSON Schema of gtd.toml, for editors.
+// TasksSchema is the JSON Schema of tasks.toml, for editors.
 //
-//go:embed gtd.schema.json
-var GTDSchema []byte
+//go:embed tasks.schema.json
+var TasksSchema []byte
+
+// ViewsSchema is the JSON Schema of views.toml, for editors.
+//
+//go:embed views.schema.json
+var ViewsSchema []byte
+
+// GatesSchema is the JSON Schema of gates.toml, for editors.
+//
+//go:embed gates.schema.json
+var GatesSchema []byte
+
+// RecordsSchema is the JSON Schema of records.toml, for editors.
+//
+//go:embed records.schema.json
+var RecordsSchema []byte
 
 // KeysSchema is the JSON Schema of keys.toml, for editors.
 //

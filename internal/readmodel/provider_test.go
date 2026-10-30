@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/source/fakethread"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/plugins/source/fakesource"
 	"github.com/wloophq/wloop/internal/readmodel"
 )
 
@@ -60,7 +60,7 @@ func (p *summaries) Derive(_ readmodel.Base, in any, _ time.Time) (api.Row, erro
 	s.Reason = fmt.Sprintf("%d open items", s.OpenItems)
 	r := api.Row{Link: "https://chat.example/" + s.WaitsOn, Label: "#general", Summary: s, Views: []string{}}
 	if s.WaitsOn == "me" {
-		r.Views = append(r.Views, api.ViewNeedsMe)
+		r.Views = append(r.Views, "asks")
 	}
 	return r, nil
 }
@@ -76,23 +76,32 @@ func TestReadModelServesAFakeProvider(t *testing.T) {
 	m := readmodel.New(log, nil, nil, nil, nil, p)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	rows := func(view string, since api.Since) api.RowsPage {
+	rows := func(since api.Since) api.RowsPage {
 		t.Helper()
-		page, err := m.Rows(ctx, view, since)
+		page, err := m.Rows(ctx, since)
 		if err != nil {
 			t.Fatal(err)
 		}
 		return page
 	}
-	full := rows(api.ViewAll, api.Since{})
-	if !full.Full || len(full.Rows) != 2 || full.Rows[0].Unit != b || full.Rows[1].Unit != a {
+	asks := func(page api.RowsPage) []unit.Unit {
+		var out []unit.Unit
+		for _, r := range page.Rows {
+			if r.In("asks") {
+				out = append(out, r.Unit)
+			}
+		}
+		return out
+	}
+	full := rows(api.Since{})
+	if !full.Full || len(full.Rows) != 2 || full.Rows[0].Unit != a || full.Rows[1].Unit != b {
 		t.Fatalf("full page: %+v", full)
 	}
-	if r := full.Rows[0]; !r.Summary.Stalled || r.Summary.WaitsOn != "ana" || r.Summary.Reason != "0 open items" || r.Label != "#general" || r.Link != "https://chat.example/ana" {
+	if r := full.Rows[1]; !r.Summary.Stalled || r.Summary.WaitsOn != "ana" || r.Summary.Reason != "0 open items" || r.Label != "#general" || r.Link != "https://chat.example/ana" {
 		t.Fatalf("the row of %s does not say its summary: %+v", b, r)
 	}
-	if needs := rows(api.ViewNeedsMe, api.Since{}); len(needs.Rows) != 1 || needs.Rows[0].Unit != a {
-		t.Fatalf("needs-me: %+v", needs.Rows)
+	if got := asks(full); !slices.Equal(got, []unit.Unit{a}) {
+		t.Fatalf("asks: %v", got)
 	}
 
 	published := make(chan api.Change, 4)
@@ -121,12 +130,12 @@ func TestReadModelServesAFakeProvider(t *testing.T) {
 	if c := next("a summary change"); c.All || !slices.Equal(c.Units, []unit.Unit{b}) {
 		t.Fatalf("change %+v", c)
 	}
-	delta := rows(api.ViewAll, needsAt)
+	delta := rows(needsAt)
 	if delta.Full || len(delta.Rows) != 1 || delta.Rows[0].Unit != b || delta.Rows[0].Summary.Reason != "1 open items" || len(delta.Removed) != 0 {
 		t.Fatalf("delta after one summary changed: %+v", delta)
 	}
-	if needs := rows(api.ViewNeedsMe, needsAt); needs.Full || len(needs.Rows) != 1 || needs.Rows[0].Unit != b {
-		t.Fatalf("needs-me delta: %+v", needs)
+	if got := asks(delta); !slices.Equal(got, []unit.Unit{b}) {
+		t.Fatalf("asks in the delta: %v", got)
 	}
 
 	at2 := api.Since{Epoch: delta.Epoch, Rev: delta.Rev}
@@ -135,24 +144,24 @@ func TestReadModelServesAFakeProvider(t *testing.T) {
 	if c := next("a unit that left"); c.All || !slices.Equal(c.Units, []unit.Unit{a}) {
 		t.Fatalf("change %+v", c)
 	}
-	if gone := rows(api.ViewAll, at2); gone.Full || len(gone.Rows) != 0 || !slices.Equal(gone.Removed, []unit.Unit{a}) {
+	if gone := rows(at2); gone.Full || len(gone.Rows) != 0 || !slices.Equal(gone.Removed, []unit.Unit{a}) {
 		t.Fatalf("delta after a unit left: %+v", gone)
 	}
 }
 
 func TestThreadRowNeedsNoPRField(t *testing.T) {
 	at := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
-	th := fakethread.Thread{Key: "C1/171.1", Channel: "general", Title: "deploy?", Kind: fakethread.KindWaiting, WaitsOn: "me", Reason: "ana asked you", Since: at}
-	m := readmodel.New(change.NewLog(change.DefaultWindow, nil), nil, nil, nil, nil, fakethread.New(th))
-	page, err := m.Rows(context.Background(), api.ViewNeedsMe, api.Since{})
+	th := fakesource.Thread{Key: "C1/171.1", Channel: "general", Title: "deploy?", Kind: fakesource.KindWaiting, WaitsOn: "me", Reason: "ana asked you", Since: at}
+	m := readmodel.New(change.NewLog(change.DefaultWindow, nil), nil, nil, nil, nil, fakesource.New(th).Rows())
+	page, err := m.Rows(context.Background(), api.Since{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(page.Rows) != 1 {
-		t.Fatalf("needs-me %+v", page.Rows)
+		t.Fatalf("rows %+v", page.Rows)
 	}
 	r := page.Rows[0]
-	if r.Unit != th.Unit() || r.Payload != nil || r.Summary.Line != "ana asked you" || !slices.Equal(r.Facets[fakethread.FacetChannel], []string{"general"}) {
+	if r.Unit != th.Unit() || r.Payload != nil || r.Summary.Line != "ana asked you" || !slices.Equal(r.Facets[fakesource.FacetChannel], []string{"general"}) {
 		t.Fatalf("thread row %+v", r)
 	}
 	raw, err := json.Marshal(r)

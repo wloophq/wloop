@@ -17,9 +17,7 @@
       "reason": "publish?",
       "line": "agent asks"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-08T09:30:00Z"
@@ -66,6 +64,19 @@
     },
     "actions": [
       {
+        "id": "answer",
+        "enabled": true
+      },
+      {
+        "id": "continue",
+        "enabled": true
+      },
+      {
+        "id": "dismiss",
+        "enabled": true,
+        "note": "Close the question; the pull request goes back to whoever it waits on"
+      },
+      {
         "id": "guide",
         "enabled": true,
         "note": "Kept for the next automatic round"
@@ -94,19 +105,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": true
-      },
-      {
-        "id": "continue",
-        "enabled": true
-      },
-      {
-        "id": "dismiss",
-        "enabled": true,
-        "note": "Close the question; the pull request goes back to whoever it waits on"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -133,7 +131,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "question": {
       "record_id": 1,
       "state": "asked",
@@ -219,9 +217,7 @@
       "reason": "push?",
       "line": "agent asks"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-08T09:30:00Z"
@@ -268,6 +264,19 @@
     },
     "actions": [
       {
+        "id": "answer",
+        "enabled": true
+      },
+      {
+        "id": "continue",
+        "enabled": true
+      },
+      {
+        "id": "dismiss",
+        "enabled": true,
+        "note": "Close the question; the pull request goes back to whoever it waits on"
+      },
+      {
         "id": "guide",
         "enabled": true,
         "note": "Kept for the next automatic round"
@@ -296,19 +305,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": true
-      },
-      {
-        "id": "continue",
-        "enabled": true
-      },
-      {
-        "id": "dismiss",
-        "enabled": true,
-        "note": "Close the question; the pull request goes back to whoever it waits on"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -335,7 +331,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "question": {
       "record_id": 1,
       "state": "asked",
@@ -402,9 +398,7 @@
       "reason": "round blocked: no workspace",
       "line": "round blocked"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-08T10:00:00Z"
@@ -479,24 +473,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -523,7 +499,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -580,9 +556,7 @@
       "reason": "round blocked: could not start: /src/api is not trusted in /home/.claude-work",
       "line": "round blocked"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-08T10:00:00Z"
@@ -668,24 +642,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -712,7 +668,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -769,10 +725,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -848,24 +801,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -892,7 +827,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -949,9 +884,7 @@
       "reason": "round blocked: could not start: /src/api/wt is not trusted in the agent home of its terminal",
       "line": "round blocked"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-08T10:00:00Z"
@@ -1037,24 +970,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -1081,7 +996,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1138,10 +1053,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -1217,24 +1129,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -1262,7 +1156,7 @@
         "refusal": "brief_refresh.why"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1367,24 +1261,6 @@
     },
     "actions": [
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#8",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#8",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#8",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "unmute",
         "enabled": true
       },
@@ -1398,7 +1274,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "me",
       "repo": "acme/api",
@@ -1415,16 +1291,6 @@
         "agent_states": [],
         "comment": "",
         "is_main": false
-      },
-      "override": {
-        "muted_until": "2026-10-08T11:00:00Z",
-        "mute_until_state_change": false,
-        "muted_kind": "",
-        "muted_waiting_on": "",
-        "hold": false,
-        "adopted": false,
-        "tracked": false,
-        "next_guidance": ""
       },
       "facts": {
         "changed_files": 0,
@@ -1468,9 +1334,7 @@
       "reason": "merged",
       "line": "merged"
     },
-    "views": [
-      "done"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "0001-01-01T00:00:00Z"
@@ -1512,24 +1376,6 @@
     },
     "actions": [
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#8",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#8",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#8",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "open",
         "enabled": true
       },
@@ -1544,7 +1390,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "me",
       "repo": "acme/api",
@@ -1642,31 +1488,13 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
         "enabled": false,
         "reason": "acme/web#4 is not tracked; track it before a nudge",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/web#4",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/web#4",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/web#4",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -1683,7 +1511,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "me",
       "repo": "acme/web",
@@ -1720,11 +1548,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me",
-      "stalled",
-      "loop"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -1801,24 +1625,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -1856,7 +1662,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1913,10 +1719,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -1964,12 +1767,6 @@
     },
     "actions": [
       {
-        "id": "guide",
-        "enabled": false,
-        "reason": "the daemon plans no automatic round; see doctor",
-        "refusal": "guide.why"
-      },
-      {
         "id": "review",
         "enabled": true,
         "primary": true
@@ -1991,24 +1788,6 @@
         "enabled": false,
         "reason": "acme/api#7 waits on you (review requested, no review on the head); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -2037,7 +1816,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2094,9 +1873,7 @@
       "reason": "automatic round held: daily cap",
       "line": "held (cap)"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-08T10:00:00Z"
@@ -2147,7 +1924,8 @@
         "enabled": true,
         "primary": true,
         "confirm": "Run the held round on acme/api#7 now? It does not count against the cap.",
-        "basis": "held:automatic round held: daily cap"
+        "basis": "held:automatic round held: daily cap",
+        "intent": "review"
       },
       {
         "id": "guide",
@@ -2178,24 +1956,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -2222,7 +1982,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2279,10 +2039,7 @@
       "reason": "review requested, no review on the head",
       "line": "briefing… (attempt 1)"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -2358,24 +2115,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -2410,7 +2149,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2476,10 +2215,7 @@
       "reason": "review requested, no review on the head",
       "line": "briefing… (attempt 1)"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -2555,24 +2291,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -2609,7 +2327,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2676,7 +2394,6 @@
       "line": "no reviewer requested"
     },
     "views": [
-      "stalled",
       "mine"
     ],
     "facets": {
@@ -2742,31 +2459,13 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
         "enabled": true,
         "note": "Nudge the maintainers (no reviewer requested)",
         "confirm": "Nudge the maintainers (no reviewer requested) on acme/api#10? An agent posts one comment under your name."
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#10",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#10",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#10",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -2796,7 +2495,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "me",
       "repo": "acme/api",
@@ -2847,9 +2546,7 @@
       "reason": "no reviewer requested",
       "line": "no reviewer requested"
     },
-    "views": [
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-05T10:00:00Z"
@@ -2924,24 +2621,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#9",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#9",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#9",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#9? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -2968,7 +2647,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3026,8 +2705,6 @@
       "line": "review requested, no review on the head"
     },
     "views": [
-      "needs-me",
-      "stalled",
       "mine"
     ],
     "facets": {
@@ -3094,31 +2771,13 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
         "enabled": false,
         "reason": "acme/api#7 waits on you (review requested, no review on the head); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
       },
       {
         "id": "pause",
@@ -3142,7 +2801,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3161,10 +2820,6 @@
         "is_main": false
       },
       "override": {
-        "muted_until": "0001-01-01T00:00:00Z",
-        "mute_until_state_change": false,
-        "muted_kind": "",
-        "muted_waiting_on": "",
         "hold": false,
         "adopted": true,
         "tracked": false,
@@ -3209,10 +2864,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -3288,24 +2940,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -3332,7 +2966,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3389,9 +3023,7 @@
       "reason": "follow-up waiting for your answer: ana replied",
       "line": "round soon"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -3478,24 +3110,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -3522,13 +3136,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
-    "pending": {
-      "intent": "follow-up",
-      "reason": "ana replied",
-      "since": "2026-10-08T10:00:00Z",
-      "deadline": "2026-10-08T10:01:00Z"
-    },
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3676,24 +3284,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -3720,13 +3310,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
-    "pending": {
-      "intent": "follow-up",
-      "reason": "ana replied",
-      "since": "2026-10-08T10:00:00Z",
-      "deadline": "2026-10-08T10:01:00Z"
-    },
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3743,16 +3327,6 @@
         "agent_states": [],
         "comment": "",
         "is_main": false
-      },
-      "override": {
-        "muted_until": "2026-10-08T11:00:00Z",
-        "mute_until_state_change": false,
-        "muted_kind": "",
-        "muted_waiting_on": "",
-        "hold": false,
-        "adopted": false,
-        "tracked": false,
-        "next_guidance": ""
       },
       "facts": {
         "changed_files": 0,
@@ -3809,9 +3383,7 @@
       "reason": "automatic round held: daily cap",
       "line": "briefing… (attempt 1)"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-08T10:00:00Z"
@@ -3891,24 +3463,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -3943,7 +3497,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -4009,9 +3563,7 @@
       "reason": "the agent ended its turn without a record: stopped",
       "line": "agent stopped"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-08T09:30:00Z"
@@ -4058,6 +3610,19 @@
     },
     "actions": [
       {
+        "id": "answer",
+        "enabled": true
+      },
+      {
+        "id": "continue",
+        "enabled": true
+      },
+      {
+        "id": "dismiss",
+        "enabled": true,
+        "note": "Close the question; the pull request goes back to whoever it waits on"
+      },
+      {
         "id": "guide",
         "enabled": true,
         "note": "Kept for the next automatic round"
@@ -4086,19 +3651,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": true
-      },
-      {
-        "id": "continue",
-        "enabled": true
-      },
-      {
-        "id": "dismiss",
-        "enabled": true,
-        "note": "Close the question; the pull request goes back to whoever it waits on"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -4125,7 +3677,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "question": {
       "record_id": 1,
       "state": "unrecorded",
@@ -4191,10 +3743,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -4272,24 +3821,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -4316,7 +3847,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -4336,10 +3867,6 @@
         "is_main": false
       },
       "override": {
-        "muted_until": "0001-01-01T00:00:00Z",
-        "mute_until_state_change": false,
-        "muted_kind": "",
-        "muted_waiting_on": "",
         "hold": false,
         "adopted": false,
         "tracked": true,
@@ -4442,24 +3969,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/web#3",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/web#3",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/web#3",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/web#3? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -4473,7 +3982,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "zoe",
       "repo": "acme/web",
@@ -4510,10 +4019,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-06T08:00:00Z"
@@ -4590,24 +4096,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -4634,7 +4122,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -4653,10 +4141,6 @@
         "is_main": false
       },
       "override": {
-        "muted_until": "0001-01-01T00:00:00Z",
-        "mute_until_state_change": false,
-        "muted_kind": "",
-        "muted_waiting_on": "",
         "hold": true,
         "adopted": false,
         "tracked": false,

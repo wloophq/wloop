@@ -1,0 +1,34 @@
+label     = "Chat"
+summary   = "Talk with an agent about a task: in the task's last session when it can resume, else in a new one, in a worktree of the task's repository or with no checkout"
+provider  = "task"
+workspace = { repo_input = "repo", repo_optional = true, name = '{{slug .task.title}}-{{.task.short_id}}' }
+runners   = ["session"]
+session   = { strategy = "new", title = "chat", name = '{{or .workspace.name .task.title}}' }
+brief     = { render = false, wait = false }
+
+[help]
+target   = "task:<id>"
+summary  = "Talk with an agent about a task"
+group    = "pull requests"
+examples = ["task:t-3f9a2c4b5d6e7f80 what is left before we can ship this?"]
+docs     = "concepts/tasks"
+
+[guidance]
+help = "what you write to the agent"
+
+[inputs.repo]
+type    = "text"
+flag    = "--repo"
+help    = "owner/name of the repository to work in; without it the session has no checkout"
+persist = true
+
+[headline]
+resumed = "chat on {{.unit.ref}}"
+[[headline.new]]
+line = 'Talk with the user about the task {{.unit.ref}}, {{template "started_by" .}}.'
+
+[record]
+states      = ["done", "asked", "failed"]
+missing     = "missing-record"
+outcome_doc = "`outcome` (done): `url`, when the turn produced a link the user should open."
+outcome     = ["url"]

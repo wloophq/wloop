@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"io"
 	"strings"
 	"sync"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/workspace/fake"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // barrier lets n callers through only once all n have arrived, and reports
@@ -40,16 +42,16 @@ func (b *barrier) wait(who string) {
 	}
 }
 
-type slowGH struct {
-	*fakeGH
+type slowForge struct {
+	testForge
 	b *barrier
 }
 
-func (g slowGH) Run(ctx context.Context, args ...string) ([]byte, error) {
-	if strings.Join(args, " ") == "auth status" {
-		g.b.wait("gh auth status")
+func (f slowForge) RunCLI(ctx context.Context, req src.CLIRequest, stdout, stderr io.Writer) (int, error) {
+	if strings.Join(req.Args, " ") == "auth" {
+		f.b.wait("gh auth status")
 	}
-	return g.fakeGH.Run(ctx, args...)
+	return f.testForge.RunCLI(ctx, req, stdout, stderr)
 }
 
 type slowGit struct {
@@ -79,7 +81,7 @@ func TestDoctorWaitsOnItsSlowChecksAtOnce(t *testing.T) {
 	b := newBarrier(4)
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/widget", RemoteKey: "github.com/acme/widget"}}}
 	te := newTestEnv(t, slowManager{m, b})
-	te.GH = slowGH{te.gh, b}
+	te.Env.forge = slowForge{testForge{te}, b}
 	te.Git = gitx.Git{R: slowGit{te.git, b}}
 	te.Sh = func(_ context.Context, _ string, args ...string) ([]byte, error) {
 		if len(args) > 0 && args[0] == "-lc" {

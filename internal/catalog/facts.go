@@ -4,25 +4,34 @@
 package catalog
 
 import (
-	"github.com/wloophq/wloop/internal/domain/gtd"
-	"github.com/wloophq/wloop/internal/domain/workflow"
 	"slices"
+	"time"
+
+	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // Facts are what decides the actions a row offers; the action slot of
 // manifest predicates reads the same values through Get.
 type Facts struct {
-	Ref pr.Ref
-	Row api.Row
+	// PR is the unit of the row's pull request, and Owner and Repo its
+	// repository; zero on a row of any other unit.
+	PR          unit.Unit
+	Owner, Repo string
+	Row         api.Row
 	// Author, Workspace and Override are the pull request's, from its row's
 	// payload.
 	Author    string
 	Workspace api.Workspace
 	Override  api.Override
+	// PendingSince is when the open plan gate an automatic round of the row
+	// waits on opened; zero for none.
+	PendingSince time.Time
 	// HeldByCap is a row whose automatic round the daily cap held.
 	HeldByCap bool
 	Tracked   bool
@@ -55,8 +64,8 @@ type Facts struct {
 	// joins on; zero for a row served to a client.
 	Asked   Asked
 	Intents *intentload.Loaded
-	// CapturedByUser is a row of an entry the user captured; false for any
-	// other row, a derived entry's included.
+	// CapturedByUser is a row of a task the user captured; false for any
+	// other row, a derived task's included.
 	CapturedByUser bool
 	// Recommended is the execution mode recommended for the row's items ("session", "headless"), "" none;
 	// the row offers every mode's action whatever it says.
@@ -103,13 +112,13 @@ func (f Facts) authorWorkspace() bool {
 // yours says the row's unit is the user's to act on: any unit but a pull request, or a pull request that
 // is the user's, taken over or held by an author workspace.
 func (f Facts) yours() bool {
-	if !f.Row.Unit.IsZero() && f.Row.Unit != f.Ref.Unit() {
+	if !f.Row.Unit.IsZero() && f.Row.Unit != f.PR {
 		return true
 	}
 	return f.Mine || f.Override.Adopted || f.authorWorkspace()
 }
 
-func (f Facts) slug() string { return f.Ref.String() }
+func (f Facts) slug() string { return f.PR.Key }
 
 // Get resolves a fact of the action slot by its dotted name; nil for one
 // the slot does not have.
@@ -125,11 +134,11 @@ func (f Facts) Get(field string) any {
 	case "pr.slug":
 		return f.slug()
 	case "pr.owner":
-		return f.Ref.Owner
+		return f.Owner
 	case "pr.repo":
-		return f.Ref.Owner + "/" + f.Ref.Repo
+		return f.Owner + "/" + f.Repo
 	case "pr.repo_name":
-		return f.Ref.Repo
+		return f.Repo
 	case "pr.base":
 		return f.Base
 	case "pr.cross_repository":
@@ -148,12 +157,10 @@ func (f Facts) Get(field string) any {
 		return o.Adopted
 	case "pr.held":
 		return o.Hold
-	case "pr.muted":
-		return f.Muted
 	case "row.question":
 		return f.Question
 	case "row.pending":
-		return f.Row.Pending != nil
+		return !f.PendingSince.IsZero()
 	case "row.capped":
 		return f.HeldByCap
 	case "row.intake":
@@ -177,7 +184,7 @@ func (f Facts) Get(field string) any {
 		return f.yours()
 	case "row.review_workspace":
 		return f.Workspace.ID != "" && f.Workspace.IsReview
-	case "entry.captured_by_user":
+	case "task.captured_by_user":
 		return f.CapturedByUser
 	case "pr.nudge.who":
 		return slices.Clone(f.NudgeWho)
@@ -185,24 +192,24 @@ func (f Facts) Get(field string) any {
 		return f.NudgeWhy
 	case "pr.nudge.refusal":
 		return f.NudgeRefusal
-	case "config.github.address_reviews":
+	case "config.plugins.github.address_reviews":
 		return f.Config.AddressReviews
-	case "config.github.address_checks":
+	case "config.plugins.github.address_checks":
 		return f.Config.AddressChecks
-	case "config.github.followups_without_workspace":
+	case "config.plugins.github.followups_without_workspace":
 		return f.Config.FollowupsWithoutWorkspace
-	case "config.github.address_without_workspace":
+	case "config.plugins.github.address_without_workspace":
 		return f.Config.AddressWithoutWorkspace
 	}
 	return nil
 }
 
 // OfferFacts are the facts of e a verb's offer reads.
-func OfferFacts(e gtd.Entry) workflow.Facts {
-	f := workflow.Facts{"entry.id": string(e.ID), "entry.kind": string(e.Kind), "entry.state": string(e.State),
-		"entry.muted": e.Snooze.Mute, "entry.unit": "", "entry.unit_provider": ""}
+func OfferFacts(e task.Task) workflow.Facts {
+	f := workflow.Facts{"task.id": string(e.ID), builtin.OfferKind: e.Prop(task.PropKind).Text, "task.state": string(e.State),
+		"task.unit": "", "task.unit_provider": ""}
 	if u, ok := e.FirstUnit(); ok {
-		f["entry.unit"], f["entry.unit_provider"] = u.String(), string(u.Provider)
+		f["task.unit"], f["task.unit_provider"] = u.String(), string(u.Provider)
 	}
 	return f
 }

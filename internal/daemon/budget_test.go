@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/storetest"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brief"
@@ -54,11 +56,14 @@ func TestBudgets(t *testing.T) {
 		settle     bool
 		cold, warm metertest.Budget
 	}{
-		{"rows", api.Rows, false, flowBudget(9, 8082, 1), flowBudget(0, 0, 0)},
-		{"unit detail", detail, true, flowBudget(13, 8085, 2), flowBudget(4, 2, 1)},
+		// The rows read the reported units and their reports apart: one
+		// statement and one row per pull request more than the inventory's;
+		// and their tasks' wakes, one statement more.
+		{"rows", api.Rows, false, flowBudget(12, 8294, 1), flowBudget(0, 0, 0)},
+		{"unit detail", detail, true, flowBudget(16, 8297, 2), flowBudget(4, 2, 1)},
 		{"actions", api.Actions, false, flowBudget(0, 0, 0), flowBudget(0, 0, 0)},
-		{"health", "/api/health", false, flowBudget(3, 71, 0), flowBudget(2, 1, 0)},
-		{"activity", "/api/activity", false, flowBudget(1, 200, 0), flowBudget(1, 200, 0)},
+		{"health", "/api/health", false, flowBudget(4, 141, 0), flowBudget(2, 1, 0)},
+		{"activity", "/api/activity", false, flowBudget(2, 266, 0), flowBudget(2, 266, 0)},
 	}
 	for _, fl := range flows {
 		t.Run(fl.name, func(t *testing.T) {
@@ -91,11 +96,11 @@ func (failingSource) Diff(context.Context, github.Ref, int) (string, bool, error
 // start run to its failure first, so serving the detail starts none.
 func settledBrief(t *testing.T, s *Server, f *storetest.Fixture, ref pr.Ref) {
 	t.Helper()
-	q := brief.New(brief.Deps{Store: f.Inventory, Source: failingSource{}, Taxonomy: func(github.Ref) string { return brief.DefaultTaxonomy },
+	q := brief.New(brief.Deps{Store: f.Inventory, PRs: inventorytest.Of(f.Inventory), Source: failingSource{}, Taxonomy: func(github.Ref) string { return brief.DefaultTaxonomy },
 		Retry: time.Hour, Changes: f.Log, Now: func() time.Time { return f.Now }, Log: func(string, ...any) {}})
 	withBriefs(&s.deps, q)
 	ctx := context.Background()
-	p, ok, err := f.Inventory.PR(ctx, github.Ref(ref))
+	p, ok, err := inventorytest.Of(f.Inventory).PR(ctx, github.Ref(ref))
 	if err != nil || !ok {
 		t.Fatalf("pull request %v: %v %v", ref, ok, err)
 	}

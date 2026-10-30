@@ -230,12 +230,8 @@ func TestDecideProposal(t *testing.T) {
 	if got := itemOf(t, l, thread, "i1").Summary; got != "a" {
 		t.Errorf("rejected changed it: %q", got)
 	}
-	all, _ := l.Proposals(ctx, "")
-	if len(all) != 2 || all[0].State != ProposalAccepted || all[1].State != ProposalRejected {
-		t.Errorf("%+v", all)
-	}
-	if _, err := l.Decide(ctx, p1.ID, true); !errors.Is(err, ErrNoProposal) {
-		t.Errorf("deciding twice: %v", err)
+	if _, err := l.Decide(ctx, 99, true); !errors.Is(err, ErrNoProposal) {
+		t.Errorf("deciding no proposal: %v", err)
 	}
 }
 
@@ -464,5 +460,33 @@ func TestLinkTimeHonorsAnchorOnlyWhenExtracted(t *testing.T) {
 				t.Errorf("At = %v, want %v", got, c.want)
 			}
 		})
+	}
+}
+
+func TestADecisionAppliesOnce(t *testing.T) {
+	ctx := context.Background()
+	s := newMem()
+	l, _ := newLedger(s)
+	apply(t, l, items.User, create(thread, "i1", "x"))
+	accepted := apply(t, l, items.Extracted, update(thread, "i1", "a", "m:1")).Proposed[0]
+	rejected := apply(t, l, items.Turn, update(thread, "i1", "b", "turn:1")).Proposed[0]
+	if res, err := l.Decide(ctx, accepted.ID, true); err != nil || len(res.Applied) != 1 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	apply(t, l, items.User, update(thread, "i1", "c", "user:2"))
+	logged := len(s.log)
+	for range 2 {
+		if res, err := l.Decide(ctx, accepted.ID, true); err != nil || len(res.Applied) != 0 {
+			t.Fatalf("a replayed decision applied %+v %v", res, err)
+		}
+	}
+	if _, err := l.Decide(ctx, rejected.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	if res, err := l.Decide(ctx, rejected.ID, true); err != nil || len(res.Applied) != 0 {
+		t.Fatalf("a decided proposal applied again %+v %v", res, err)
+	}
+	if got := itemOf(t, l, thread, "i1").Summary; got != "c" || len(s.log) != logged {
+		t.Errorf("summary %q, %d log rows after %d: a decision applied twice", got, len(s.log), logged)
 	}
 }

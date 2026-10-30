@@ -51,7 +51,7 @@ var leaves = map[string]struct {
 	deps  []string
 }{
 	"internal/intent/expr":    {roots: []string{"internal/domain"}, deps: []string{"cel.dev/cel-go"}},
-	"internal/intent/builtin": {roots: []string{"internal/domain", "internal/intent/expr"}},
+	"internal/intent/builtin": {roots: []string{"internal/domain", "internal/intent/expr", "pkg/plugin"}},
 	"internal/frontmatter":    {toml: true},
 	"internal/keys":           {},
 }
@@ -115,6 +115,12 @@ var actionTypes = []string{
 
 func testFile(file string) bool { return strings.HasSuffix(file, "_test.go") }
 
+// historicalMigration reports a store migration file, which keeps the words
+// the version it migrates from stored.
+func historicalMigration(file string) bool {
+	return strings.HasPrefix(file, "internal/adapter/store/sqlite/migrate_v")
+}
+
 // actionLiterals (R4) flags a non-empty composite literal of an action spec,
 // state or input spec in a non-test file outside internal/catalog. A zero
 // value is allowed. Mutating a state received from the catalog is not checked.
@@ -143,12 +149,12 @@ func actionLiterals(fset *token.FileSet, file string, info *types.Info, f *ast.F
 var programFields = []string{"When", "Refuse", "Primary", "ActionTexts"}
 
 // programField says whether v is one of programFields of internal/intent.Programs,
-// or of its ActionPrograms.
+// of its ActionPrograms, or of a view's ViewDef.
 func programField(v *types.Var) bool {
 	if !v.IsField() || v.Pkg() == nil || v.Pkg().Path() != module+"internal/intent" || !slices.Contains(programFields, v.Name()) {
 		return false
 	}
-	for _, name := range []string{"Programs", "ActionPrograms"} {
+	for _, name := range []string{"Programs", "ActionPrograms", "ViewDef"} {
 		obj := v.Pkg().Scope().Lookup(name)
 		if obj == nil {
 			continue
@@ -193,7 +199,10 @@ func programReads(fset *token.FileSet, file string, info *types.Info, f *ast.Fil
 // builtinTables are the files that may spell a builtin's dotted or snake name.
 var builtinTables = []string{"internal/intent/builtin/builtin.go", "internal/intent/builtin/steps.go", "internal/intent/builtin/effects.go",
 	"internal/intent/builtin/roles.go", "internal/cli/builtins.go", "internal/cli/builtins_effects.go",
-	"internal/daemon/builtins.go", "internal/cli/steps.go", "internal/cli/root.go"}
+	"internal/daemon/builtins.go", "internal/cli/steps.go", "internal/cli/root.go", "internal/intent/builtin/renamed.go",
+	// debt: the GitHub plugin's nudge effect name, which the in-process
+	// publisher and proposals read until they run in the plugin.
+	"internal/adapter/source/github/effects.go"}
 
 // builtinNames are the effect, prepare, workspace and workflow step names
 // holding a . or _.
@@ -221,7 +230,7 @@ func builtinNames() map[string]bool {
 // builtinLiterals (R6) flags a string literal equal to a name of builtinNames
 // in a non-test file outside builtinTables.
 func builtinLiterals(fset *token.FileSet, file string, f *ast.File) []string {
-	if testFile(file) || slices.Contains(builtinTables, file) {
+	if testFile(file) || slices.Contains(builtinTables, file) || historicalMigration(file) {
 		return nil
 	}
 	names := builtinNames()
@@ -280,7 +289,8 @@ func TestOnlyTheCatalogEvaluatesIntentPredicates(t *testing.T) {
 }
 
 // TestBuiltinNamesLiveInTheirTables checks that builtin names appear only in
-// their table files.
+// their table files. A released migration keeps the words that version stored,
+// so migrate_v*.go files are history and exempt.
 func TestBuiltinNamesLiveInTheirTables(t *testing.T) {
 	t.Parallel()
 	for _, p := range packages(t) {

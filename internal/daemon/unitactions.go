@@ -11,28 +11,29 @@ import (
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/port"
 
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
-// unitAction refuses an action on u that only a pull request takes. Any
-// other unit takes a turn action, track and untrack when its source follows
-// it, and an intent unitIntent admits. The row of such a unit offers the
+// unitAction refuses an action on u, no unit of the forge when forge is
+// false, that only the forge's units take. Any other unit takes a
+// question gate's intent, track and untrack when its source follows it, and an intent
+// unitIntent admits. The row of such a unit offers the
 // intents serving its provider, but this route does not check their
-// visible and enabled predicates; the entries' bridge does.
-func unitAction(l *intentload.Loaded, name string, u unit.Unit, follows func(unit.ProviderID) bool) error {
-	if isPullRequest(u) {
+// visible and enabled predicates; the tasks' bridge does.
+func unitAction(l *intentload.Loaded, name string, u unit.Unit, forge bool, follows func(unit.ProviderID) bool) error {
+	if forge {
 		return nil
 	}
-	if _, ok := turnActions[name]; ok {
+	if _, ok := questionIntent(l, name); ok {
 		return nil
 	}
 	if sourceFollowed(name, u, follows) {
 		return nil
 	}
-	if isBuiltin(name) {
+	if isBuiltin(l, name) {
 		return notFound{fmt.Sprintf("no pull request %s: %s acts on pull requests only", u.Label(), name)}
 	}
 	d, err := intentDef(l, name)
@@ -42,14 +43,14 @@ func unitAction(l *intentload.Loaded, name string, u unit.Unit, follows func(uni
 	return unitIntent(d, u)
 }
 
-// entryIntentActions are the actions of the intents that name the entry provider
+// taskIntentActions are the actions of the intents that name the task provider
 // among theirs, over e's facts.
-func entryIntentActions(l *intentload.Loaded, e gtd.Entry) []api.ActionState {
+func taskIntentActions(l *intentload.Loaded, e task.Task) []api.ActionState {
 	if l == nil {
 		return nil
 	}
-	u := gtd.UnitOf(e.ID)
-	f := catalog.Facts{Row: api.Row{Unit: u}, Intents: l, Open: e.Live(), CapturedByUser: e.CapturedByUser()}
+	u := task.UnitOf(e.ID)
+	f := catalog.Facts{Row: api.Row{Unit: u}, Intents: l, Open: e.Open(), CapturedByUser: e.CapturedByUser()}
 	var out []api.ActionState
 	for _, st := range catalog.UnitStates(f) {
 		d, ok := l.Registry.Get(dintent.Name(st.ID))
@@ -61,17 +62,17 @@ func entryIntentActions(l *intentload.Loaded, e gtd.Entry) []api.ActionState {
 	return out
 }
 
-// entryRefusal is why the entry u names refuses the intent name, "" when
-// it takes it or names no entry.
-func (s *Server) entryRefusal(ctx context.Context, l *intentload.Loaded, name string, u unit.Unit) (string, error) {
-	id, ok := gtd.IDOf(u)
-	if !ok || isBuiltin(name) {
+// taskRefusal is why the task u names refuses the intent name, "" when
+// it takes it or names no task.
+func (s *Server) taskRefusal(ctx context.Context, l *intentload.Loaded, name string, u unit.Unit) (string, error) {
+	id, ok := task.IDOf(u)
+	if !ok || isBuiltin(l, name) {
 		return "", nil
 	}
-	if s.deps.GTD == nil {
-		return "", errGTDUnavailable
+	if s.deps.Tasks == nil {
+		return "", errTasksUnavailable
 	}
-	e, err := s.deps.GTD.Entry(ctx, id)
+	e, err := s.deps.Tasks.Task(ctx, id)
 	if err != nil {
 		return "", notFound{err.Error()}
 	}
@@ -79,7 +80,7 @@ func (s *Server) entryRefusal(ctx context.Context, l *intentload.Loaded, name st
 	if !ok || !(d.ProviderOrDefault() == u.Provider || slices.Contains(d.Providers, u.Provider)) {
 		return "", nil
 	}
-	for _, st := range entryIntentActions(l, e) {
+	for _, st := range taskIntentActions(l, e) {
 		if st.ID == name {
 			return st.Reason, nil
 		}
@@ -142,9 +143,9 @@ func (s *Server) unitArg(u unit.Unit) string {
 }
 
 // sourceFollowed says whether the track or untrack of u goes to its source,
-// which keeps its own follows, instead of the pull request overrides.
+// which keeps its own follows.
 func sourceFollowed(name string, u unit.Unit, follows func(unit.ProviderID) bool) bool {
-	return (name == "track" || name == "untrack") && !isPullRequest(u) && follows != nil && follows(u.Provider)
+	return (name == "track" || name == "untrack") && follows != nil && follows(u.Provider)
 }
 
 // sourceFollow runs track or untrack on a unit its source follows.
@@ -153,17 +154,21 @@ func (s *Server) sourceFollow(ctx context.Context, name string, u unit.Unit) err
 		if s.deps.Untrack == nil {
 			return notFound{"untrack " + u.Label() + ": no source untracks it"}
 		}
-		return s.deps.Untrack(ctx, u)
+		return pluginErr(s.deps.Untrack(ctx, u), "untrack "+u.Label()+": no source untracks it")
 	}
 	if s.track == nil {
 		return notFound{"track " + u.Label() + ": no source tracks it"}
 	}
 	read, err := s.track(ctx, u)
-	if errors.Is(err, port.ErrNotFound) {
+	switch {
+	case errors.Is(err, port.ErrNotFound):
 		return notFound{"track " + u.Label() + ": " + err.Error()}
+	case errors.Is(err, port.ErrGitHub):
+		return badGateway{"track " + u.Label() + ": " + err.Error()}
+	case err != nil:
+		return pluginErr(err, "track "+u.Label()+": no source tracks it")
+	case read.Save == nil:
+		return nil
 	}
-	if err != nil || read.Save == nil {
-		return err
-	}
-	return read.Save(ctx)
+	return pluginErr(read.Save(ctx), "track "+u.Label()+": no source tracks it")
 }

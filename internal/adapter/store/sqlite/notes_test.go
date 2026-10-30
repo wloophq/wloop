@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -16,20 +15,25 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/port"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/domain/snapshot"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	dusage "github.com/wloophq/wloop/internal/domain/usage"
 	"github.com/wloophq/wloop/internal/domain/view"
+	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 )
 
-const everyTopic = port.Topic(math.MaxUint32)
+const everyTopic = ^port.Topic(0)
 
 var (
 	noteRef = pr.Ref{Owner: "acme", Repo: "api", Number: 7}
@@ -52,6 +56,9 @@ type writeCase struct {
 	call   func(ctx context.Context, e *noteEnv) error
 	topics port.Topic
 	units  []unit.Unit
+	// notes is how many notes the call makes when it writes the core's rows
+	// and a plugin's in transactions of their own; 0 is one.
+	notes int
 }
 
 var (
@@ -63,8 +70,121 @@ func loopEvent(kind string) port.Event {
 	return port.Event{Unit: u7, Kind: kind, Key: "k", At: noteAt}
 }
 
+func noteGates(e *noteEnv) GateStore { return e.db.Gates(func() time.Time { return noteAt }) }
+
+func seedGate(t *testing.T, e *noteEnv) {
+	if _, err := noteGates(e).Open(context.Background(), gate.Gate{Unit: u7, Kind: gate.KindDraft, Name: "draft", Subject: "1"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// seedWake is the task t-01 with a wake.
+func seedWake(t *testing.T, e *noteEnv) {
+	applyTask(t, e.db, "t-01")
+	if err := e.db.Wakes().Put(context.Background(), wake.Wake{Task: "t-01", Return: "next"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // writes is every exported write method of the sqlite store types.
 var writes = []writeCase{
+	{
+		method: "WakeStore.Put",
+		seed:   func(t *testing.T, e *noteEnv) { applyTask(t, e.db, "t-01") },
+		call: func(ctx context.Context, e *noteEnv) error {
+			return e.db.Wakes().Put(ctx, wake.Wake{Task: "t-01", Until: time.Date(2026, 10, 28, 9, 0, 0, 0, time.UTC)})
+		},
+		topics: port.TopicWakes, units: []unit.Unit{task.UnitOf("t-01")},
+	},
+	{
+		method: "WakeStore.Drop",
+		seed:   seedWake,
+		call:   func(ctx context.Context, e *noteEnv) error { return e.db.Wakes().Drop(ctx, "t-01") },
+		topics: port.TopicWakes, units: []unit.Unit{task.UnitOf("t-01")},
+	},
+	{
+		method: "DB.SetOverride",
+		call: func(ctx context.Context, e *noteEnv) error {
+			_, err := e.db.SetOverride(ctx, u7, map[string]string{port.OverrideHold: port.OverrideTrue}, nil)
+			return err
+		},
+		topics: port.TopicOverrides, units: []unit.Unit{u7},
+	},
+	{
+		method: "snapshotStore.Put",
+		call: func(ctx context.Context, e *noteEnv) error {
+			return e.db.Snapshots().Put(ctx, []snapshot.Stored{{Unit: u7, Rev: 1, JSON: []byte(`{}`)}}, []unit.Unit{term1})
+		},
+		topics: port.TopicPRs, units: []unit.Unit{u7, term1},
+	},
+	{
+		method: "GateStore.Open",
+		call: func(ctx context.Context, e *noteEnv) error {
+			_, err := noteGates(e).Open(ctx, gate.Gate{Unit: u7, Kind: gate.KindDraft, Name: "draft", Subject: "1"})
+			return err
+		},
+		topics: port.TopicGates, units: []unit.Unit{u7},
+	},
+	{
+		method: "GateStore.Resolve",
+		seed:   seedGate,
+		call: func(ctx context.Context, e *noteEnv) error {
+			_, err := noteGates(e).Resolve(ctx, 1, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson})
+			return err
+		},
+		topics: port.TopicGates, units: []unit.Unit{u7},
+	},
+	{
+		method: "GateStore.Applied",
+		seed: func(t *testing.T, e *noteEnv) {
+			seedGate(t, e)
+			if _, err := noteGates(e).Resolve(context.Background(), 1, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson}); err != nil {
+				t.Fatal(err)
+			}
+		},
+		call: func(ctx context.Context, e *noteEnv) error { return noteGates(e).Applied(ctx, 1) },
+	},
+	{
+		method: "GateStore.Begin",
+		seed: func(t *testing.T, e *noteEnv) {
+			seedGate(t, e)
+			if _, err := noteGates(e).Resolve(context.Background(), 1, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson}); err != nil {
+				t.Fatal(err)
+			}
+		},
+		call: func(ctx context.Context, e *noteEnv) error { return noteGates(e).Begin(ctx, 1) },
+	},
+	{
+		method: "GateStore.End",
+		seed:   seedGate,
+		call:   func(ctx context.Context, e *noteEnv) error { return noteGates(e).End(ctx, 1) },
+	},
+	{
+		method: "GateStore.RecordSent",
+		call: func(ctx context.Context, e *noteEnv) error {
+			_, err := noteGates(e).RecordSent(ctx, gate.Gate{Unit: term1, Kind: gate.KindPost, Name: "post", By: task.ActorAgent})
+			return err
+		},
+		topics: port.TopicGates, units: []unit.Unit{term1},
+	},
+	{
+		method: "DB.PutRecord",
+		call: func(ctx context.Context, e *noteEnv) error {
+			return e.db.PutRecord(ctx, u7, "brief", task.WriterAgent, []byte(`{"goal":"g"}`), noteAt)
+		},
+		topics: port.TopicLoopEvents, units: []unit.Unit{u7},
+	},
+	{
+		method: "DB.PutUnitBrief",
+		call: func(ctx context.Context, e *noteEnv) error {
+			return e.db.PutUnitBrief(ctx, u7, "x1", `{"goal":"g"}`, noteAt)
+		},
+		topics: port.TopicBriefs | port.TopicLoopEvents, units: []unit.Unit{u7},
+	},
+	{
+		method: "DB.DossierMoved",
+		call:   func(ctx context.Context, e *noteEnv) error { return e.db.DossierMoved(ctx, 1) },
+	},
 	{
 		method: "DB.SaveAgentSession",
 		call: func(ctx context.Context, e *noteEnv) error {
@@ -160,7 +280,7 @@ var writes = []writeCase{
 	{
 		method: "Rounds.Save", name: "/fields and a count",
 		call: func(ctx context.Context, e *noteEnv) error {
-			return saveRounds(ctx, e.db, func(st *round.Store) { st.RecordSent(noteRef.String(), round.Reviewed, "fp", noteAt) })
+			return saveRounds(ctx, e.db, func(st *round.Store) { st.RecordSent(noteRef.String(), "reviewed", "fp", noteAt) })
 		},
 		topics: port.TopicRounds, units: []unit.Unit{u7},
 	},
@@ -223,7 +343,7 @@ var writes = []writeCase{
 			it := noteItem(workflow.DecisionPending)
 			return e.db.Ledger().Save(ctx, automation.PlanWrite{Workflows: []string{it.Workflow}, Items: []workflow.Item{it}}, loopEvent(workflow.KindPlanned))
 		},
-		topics: port.TopicGate | port.TopicLoopEvents, units: []unit.Unit{u7, term1},
+		topics: port.TopicPending | port.TopicLoopEvents, units: []unit.Unit{u7, term1},
 	},
 	{
 		method: "ledger.Record",
@@ -270,12 +390,33 @@ var writes = []writeCase{
 		},
 	},
 	{
-		method: "entryStore.Apply",
+		method: "taskStore.Apply",
 		call: func(ctx context.Context, e *noteEnv) error {
-			return e.db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpCreate, Entry: gtd.Entry{ID: "e-1", Kind: gtd.KindCapture,
-				State: gtd.Inbox, Units: []unit.Unit{u7}, Origin: gtd.OriginUser, Created: noteAt, Updated: noteAt}}})
+			return e.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-1", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{u7}, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}})
 		},
-		topics: port.TopicEntries, units: []unit.Unit{u7},
+		topics: port.TopicTasks, units: []unit.Unit{u7, task.UnitOf("t-1")},
+	},
+	{
+		method: "taskStore.Apply",
+		name:   "a task picking up a unit back-fills the unit's gates",
+		seed:   seedGate,
+		call: func(ctx context.Context, e *noteEnv) error {
+			return e.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-1", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{u7}, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}})
+		},
+		topics: port.TopicTasks | port.TopicGates, units: []unit.Unit{u7, task.UnitOf("t-1")},
+	},
+	{
+		method: "taskStore.Recategorize",
+		seed: func(t *testing.T, e *noteEnv) {
+			if err := e.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-1", State: "inbox", Category: task.CategoryWaiting, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}}); err != nil {
+				t.Fatal(err)
+			}
+		},
+		call: func(ctx context.Context, e *noteEnv) error {
+			_, err := e.db.Tasks().(coretasks.Recategorizer).Recategorize(ctx, func(string) (task.Category, bool) { return task.CategoryInbox, true })
+			return err
+		},
+		topics: port.TopicTasks, units: []unit.Unit{task.UnitOf("t-1")},
 	},
 	{
 		method: "Fetches.Mark",
@@ -295,20 +436,24 @@ func noteItem(d workflow.Decision) workflow.Item {
 // reads are the exported methods of the sqlite store types that note
 // nothing: reads, and the handle's own plumbing.
 var reads = []string{
-	"DB.Close", "DB.R", "reader.QueryContext", "reader.QueryRowContext", "DB.Read", "DB.Snapshot", "DB.Write", "DB.Intakes", "DB.Usage", "DB.HeadlessSpent", "DB.AutomatedTurns", "DB.DossierSpent", "DB.UnitEventKeys",
-	"Store.Books", "Store.BookOf", "Store.UnitsOf", "Store.Open", "Store.WithTurns", "Store.Applied", "Store.Session", "Store.Sessions",
+	"DB.Snapshots", "snapshotStore.Get", "snapshotStore.Revs", "snapshotStore.Units",
+	"DB.Close", "DB.R", "reader.QueryContext", "reader.QueryRowContext", "DB.Read", "DB.Snapshot", "DB.Write", "DB.Intakes", "DB.Usage", "DB.HeadlessSpent", "DB.AutomatedTurns", "DB.DossierSpent", "DB.UnitEventKeys", "DB.DossierMoves",
+	"DB.EventsOf", "DB.Records", "DB.UnitsOf", "DB.TasksHolding", "DB.ItemsHeld",
+	"Store.Books", "Store.TurnCounts", "Store.BookOf", "Store.UnitsOf", "Store.UnitOfTurn", "Store.Open", "Store.WithTurns", "Store.Applied", "Store.Session", "Store.Sessions",
 	"Store.LastStops", "Store.SessionOf", "Store.SessionOfHandle",
 	"DB.Worktrees", "Worktrees.Worktree", "Worktrees.Worktrees",
 	"Rounds.AgentHome", "Rounds.Load", "Rounds.Pause",
 	"intakeStore.Intake", "intakeStore.Open",
 	"usageStore.Pending",
-	"DB.Ledger", "DB.Marks", "DB.Events", "DB.Classifications", "DB.Fetches",
+	"DB.Ledger", "DB.Marks", "DB.Events", "DB.Classifications", "DB.Fetches", "DB.Override", "DB.Held",
 	"ledger.Items", "ledger.Run", "ledger.Count",
 	"events.Since", "events.Head", "events.Cursor",
 	"Classifications.Output", "Classifications.Spent",
 	"Fetches.Last",
 	"DB.AgentTranscript", "DB.WorkflowActivity",
-	"DB.Entries", "entryStore.Entries", "entryStore.EntriesSince", "entryStore.Entry", "entryStore.EntriesOf", "entryStore.Counts",
+	"DB.Tasks", "taskStore.Tasks", "taskStore.TasksSince", "taskStore.Task", "taskStore.TasksOf", "DB.Props",
+	"DB.Gates", "GateStore.Get", "GateStore.OfTask", "GateStore.Where", "GateStore.Due", "GateStore.Unapplied", "GateStore.Begun",
+	"DB.Wakes", "WakeStore.Of", "WakeStore.Due", "WakeStore.Watching", "WakeStore.UnitWakes",
 }
 
 // notesAll are the write methods that note Change.All.
@@ -383,7 +528,11 @@ func TestEveryWriteNotes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if want := min(int(c.topics), 1); n != want {
+			want := min(int(c.topics), 1)
+			if c.notes > 0 {
+				want = c.notes
+			}
+			if n != want {
 				t.Fatalf("%d notes, want %d: %+v", n, want, got)
 			}
 			if got.Topics != c.topics || got.All {
@@ -399,7 +548,7 @@ func TestEveryWriteNotes(t *testing.T) {
 func TestEveryExportedMethodIsReadOrNoted(t *testing.T) {
 	t.Parallel()
 	db, _ := openTemp(t)
-	types := []reflect.Type{reflect.TypeOf(db), reflect.TypeOf(New(db)), reflect.TypeOf(NewRounds(db))}
+	types := []reflect.Type{reflect.TypeOf(db), reflect.TypeOf(New(db)), reflect.TypeOf(NewRounds(db)), reflect.TypeOf(db.Gates(nil))}
 	types = append(types, accessorTypes(db)...)
 	known := map[string]bool{}
 	for _, m := range reads {

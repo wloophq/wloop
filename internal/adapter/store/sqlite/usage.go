@@ -44,7 +44,7 @@ func (u usageStore) Pending(ctx context.Context, endedSince time.Time, limit int
 			&t.Transcript, &t.Home, &t.Worktree, &sent, &started, &ended, &t.Attempts); err != nil {
 			return nil, err
 		}
-		t.PR, t.From, t.To = prOf(u), parseTime(cmp.Or(started, sent)), parseTime(ended)
+		t.Unit, t.From, t.To = u, parseTime(cmp.Or(started, sent)), parseTime(ended)
 		out = append(out, t)
 	}
 	return out, rows.Err()

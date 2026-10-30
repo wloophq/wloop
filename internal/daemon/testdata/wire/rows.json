@@ -2,10 +2,17 @@
   {
     "actions": [
       {
-        "enabled": false,
-        "id": "guide",
-        "reason": "the daemon plans no automatic round; see doctor",
-        "refusal": "guide.why"
+        "enabled": true,
+        "id": "answer"
+      },
+      {
+        "enabled": true,
+        "id": "continue"
+      },
+      {
+        "enabled": true,
+        "id": "dismiss",
+        "note": "Close the question; the pull request goes back to whoever it waits on"
       },
       {
         "enabled": true,
@@ -29,19 +36,6 @@
         "id": "nudge",
         "reason": "acme/api#7 waits on the review loop (publish?); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "enabled": true,
-        "id": "answer"
-      },
-      {
-        "enabled": true,
-        "id": "continue"
-      },
-      {
-        "enabled": true,
-        "id": "dismiss",
-        "note": "Close the question; the pull request goes back to whoever it waits on"
       },
       {
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace.",
@@ -167,10 +161,6 @@
       "override": {
         "adopted": false,
         "hold": true,
-        "mute_until_state_change": false,
-        "muted_kind": "",
-        "muted_until": "2026-10-09T00:00:00Z",
-        "muted_waiting_on": "",
         "next_guidance": "",
         "tracked": true
       },
@@ -195,7 +185,7 @@
         "status": "reviewing"
       }
     },
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "summary": {
       "closed": false,
       "line": "muted",
@@ -210,30 +200,10 @@
       "key": "acme/api#7",
       "provider": "github"
     },
-    "views": [
-      "loop"
-    ]
+    "views": []
   },
   {
     "actions": [
-      {
-        "enabled": false,
-        "id": "answer",
-        "reason": "no open question on acme/api#8",
-        "refusal": "answer.why"
-      },
-      {
-        "enabled": false,
-        "id": "continue",
-        "reason": "no open question on acme/api#8",
-        "refusal": "continue.why"
-      },
-      {
-        "enabled": false,
-        "id": "dismiss",
-        "reason": "no open question on acme/api#8",
-        "refusal": "dismiss.why"
-      },
       {
         "enabled": true,
         "id": "open"
@@ -317,7 +287,7 @@
         "status": ""
       }
     },
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "d989fdf6b655",
     "summary": {
       "closed": true,
       "line": "merged",

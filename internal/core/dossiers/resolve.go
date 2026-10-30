@@ -15,12 +15,14 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/dossier"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// Resolution follows the units' open work into their dossiers: a unit with an active dossier, items,
-// and no open item or entry gets its closing call and is resolved; a resolved or archived one with open work
-// again is reopened. A call the daily cap refuses waits for a later Retry.
+// Resolution follows the open work into the dossiers: an active dossier whose task ended, or whose unit has
+// items and no open item or task, gets its closing call and is resolved; a resolved or archived one with open
+// work again is reopened. A unit's dossier is its task's when a task holds it. A call the daily cap refuses
+// waits for a later Retry.
 type Resolution struct {
 	Calls *Calls
 	// Items are the unit's items the closing call reads; nil reads none.
@@ -46,7 +48,7 @@ func (r *Resolution) Units(ctx context.Context, us ...unit.Unit) error {
 	return errors.Join(errs...)
 }
 
-// All follows every unit dossier.
+// All follows every dossier but the merged ones, which keep their own lifecycle.
 func (r *Resolution) All(ctx context.Context) error {
 	all, err := r.svc().Store.List(ctx)
 	if err != nil {
@@ -54,7 +56,7 @@ func (r *Resolution) All(ctx context.Context) error {
 	}
 	var us []unit.Unit
 	for _, d := range all {
-		if !d.Owner.Unit.IsZero() {
+		if d.Owner.Merged == "" {
 			us = append(us, d.Owner.Unit)
 		}
 	}
@@ -109,11 +111,15 @@ func (r *Resolution) svc() *Service { return r.Calls.Turns.Dossiers }
 
 func (r *Resolution) follow(ctx context.Context, u unit.Unit) error {
 	s := r.svc()
-	o := dossier.Owner{Unit: u}
+	o, err := s.Store.Owner(ctx, u)
+	if err != nil {
+		return err
+	}
 	d, ok, err := s.Get(ctx, o)
 	if err != nil || !ok {
 		return err
 	}
+	_, ofTask := task.IDOf(o.Unit)
 	open, err := s.Store.Open(ctx, o)
 	if err != nil {
 		return err
@@ -121,7 +127,7 @@ func (r *Resolution) follow(ctx context.Context, u unit.Unit) error {
 	switch {
 	case d.Status == dossier.Active && !open:
 		its, err := r.items(ctx, u)
-		if err != nil || (r.Items != nil && len(its) == 0) {
+		if err != nil || (r.Items != nil && len(its) == 0 && !ofTask) {
 			return err
 		}
 		err = r.close(ctx, u, its)
@@ -208,7 +214,7 @@ func (a closed) check() error {
 
 func closePrompt(s snapshot, u unit.Unit, its []items.Item) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "The work on %s is over: %s tracks no open item or entry on it any more. You write the closing notes of its dossier, the working memory %s kept for it.\n", u.Label(), brand.Name, brand.Name)
+	fmt.Fprintf(&b, "The work on %s is over: %s tracks no open item or task on it any more. You write the closing notes of its dossier, the working memory %s kept for it.\n", u.Label(), brand.Name, brand.Name)
 	b.WriteString("Say what the work ended with (outcome), the URL of the final product in its natural home if the items or the files name one (deliverable_url, empty otherwise: never invent one), and rewrite notes.md so a reader who reopens the work later finds the decisions, the links and what was left open.\n")
 	var lines []string
 	for _, it := range its {
@@ -233,7 +239,7 @@ func (r *Resolution) logf(format string, args ...any) {
 	}
 }
 
-// Watch follows the units of each TopicItems or TopicEntries note, everything once at start, and runs
+// Watch follows the units of each TopicItems or TopicTasks note, everything once at start, and runs
 // Retry every retry, until ctx ends; the subscriber only queues.
 func (r *Resolution) Watch(ctx context.Context, changes port.Changes, retry time.Duration) {
 	var mu sync.Mutex
@@ -241,7 +247,7 @@ func (r *Resolution) Watch(ctx context.Context, changes port.Changes, retry time
 	all := true
 	kick := make(chan struct{}, 1)
 	cancel := changes.Subscribe(func(c port.Change) {
-		if !c.Has(port.TopicItems | port.TopicEntries) {
+		if !c.Has(port.TopicItems | port.TopicTasks) {
 			return
 		}
 		mu.Lock()

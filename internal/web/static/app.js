@@ -11,34 +11,14 @@ function apiError(out, fallback, status) {
   return out.fix ? `${msg}; run: ${out.fix}` : msg;
 }
 
-const EXPLORE_FILTERS = [
-  { term: "-reviewed-by:@me", label: "Not reviewed by me" },
-  { term: "draft:false", label: "Ready for review" },
-  { term: "review-requested:@me", label: "Requested from me or my teams" },
-  { window: 30, label: "Active in the last 30 days" },
-];
-const EXPLORE_PRESETS = [
-  { query: "user-review-requested:@me", label: "Asked of me" },
-  { query: "review-requested:@me -user-review-requested:@me", label: "Asked of my teams" },
-];
-const DEFAULT_SORT = "updated-asc";
-const EXPLORE_SORTS = [
-  { sort: DEFAULT_SORT, label: "Waiting longest", shown: "waiting longest" },
-  { sort: "created-asc", label: "Oldest opened", shown: "oldest opened" },
-  { sort: "updated-desc", label: "Recently updated", shown: "most recently updated" },
-];
-const REVIEW_LABEL = { APPROVED: "approved", CHANGES_REQUESTED: "changes requested", REVIEW_REQUIRED: "review required" };
-
 const SIZES = ["xs", "s", "m", "l", "xl"];
 const RISKS = ["low", "medium", "high"];
-const STRIP_LEGEND = [["me", "you"], ["author", "author"], ["reviewer", "reviewer"], ["loop", "loop"], ["nobody", "nobody"]];
-const STRIP_TITLE = { me: "Waits on you", author: "Waits on the author", reviewer: "Waits on a reviewer", loop: "Waits on the loop", nobody: "Waits on nobody" };
 const TAG_CHIPS = 3;
 
 // catalog is the daemon's served presentation (GET /api/catalog): its views
 // for the web, the lens's fields built from its facets, and the situations'
 // labels in rank order.
-const catalog = { version: "", views: [], fields: [], kinds: new Map(), kindOrder: [] };
+const catalog = { version: "", views: [], fields: [], strip: "", kinds: new Map(), kindOrder: [], events: new Map(), eventData: new Map(), loopEvents: new Set(), details: [], search: null };
 
 // MATCH is how a facet's match compares a row's value v with a query q.
 const MATCH = {
@@ -54,6 +34,33 @@ function applyCatalog(c) {
   catalog.kinds = new Map(sits.map((x) => [`${x.provider}:${x.kind}`, x.label]));
   catalog.kindOrder = [...new Set(sits.map((x) => x.kind))];
   catalog.fields = (c.facets || []).map(fieldOf);
+  catalog.events = new Map((c.events || []).map((e) => [e.kind, e.label]));
+  catalog.eventData = new Map((c.events || []).filter((e) => e.data).map((e) => [e.kind, e.data]));
+  catalog.loopEvents = new Set((c.events || []).filter((e) => e.loop).map((e) => e.kind));
+  catalog.strip = ((c.facets || []).find((f) => f.strip) || {}).id || "";
+  catalog.details = c.details || [];
+  catalog.search = ((c.views || []).find((v) => v.search) || {}).search || null;
+}
+
+// exploreSearch is the served Explore search: its presets, filters, sorts
+// and the review decisions' words.
+function exploreSearch() {
+  return catalog.search || { presets: [], filters: [], sorts: [], decisions: {}, no_decision: "", default_sort: "" };
+}
+
+function reviewDecision(decision) {
+  const s = exploreSearch();
+  return (s.decisions || {})[decision] || s.no_decision || "";
+}
+
+// eventLabel is an event kind in a few words: its plugin's, else the core's.
+function eventLabel(kind) {
+  return catalog.events.get(kind) || EVENT_LABEL[kind] || kind.replaceAll("_", " ");
+}
+
+// loopEvent says whether an event kind is the loop's doing.
+function loopEvent(kind) {
+  return LOOP_EVENTS.has(kind) || catalog.loopEvents.has(kind);
 }
 
 function kindLabel(kind, provider) {
@@ -134,20 +141,15 @@ function sm(r) {
 }
 
 const EVENT_LABEL = {
-  opened: "opened", push: "pushed", review_requested: "review requested", review_request_removed: "review request removed",
-  review: "reviewed", comment: "commented", check: "checks", ready: "ready for review", draft: "back to draft",
-  merged: "merged", closed: "closed",
-  round_pending: "round pending", round_sent: "round sent", round_skipped: "round skipped", round_held: "round held",
-  round_blocked: "round blocked", round_unblocked: "round unblocked",
   held: "paused", released: "resumed", muted: "muted", unmuted: "unmuted", adopted: "adopted", status: "board",
-  removed: "workspace removed", nudged: "nudged", tracked: "tracked", untracked: "untracked", answered: "answered", guidance: "guidance",
+  removed: "workspace removed", nudged: "nudged", tracked: "tracked", untracked: "untracked", answered: "answered",
   turn_sent: "turn sent", turn_started: "turn started", turn_ended: "turn ended", turn_resumed: "turn resumed",
   turn_withdrawn: "turn withdrawn", question_dismissed: "question dismissed",
   turn_delivered: "turn delivered", answer_routed: "answer routed", late_record: "late record",
   stop_blocked: "stop blocked", turn_stopped: "turn stopped", guide_trimmed: "guide trimmed", dossier_restored: "dossier file restored", dossier_granted: "dossier granted to the session", dossier_call: "dossier compaction, US$", brief_waiting: "waiting for the brief", intake_accepted: "request accepted", intake_briefing: "request waits for the brief", intake_starting: "request starting", intake_started: "request started", intake_failed: "request failed", intake_canceled: "request canceled", intake_guidance: "request guidance replaced",
   workflow_step_ran: "step ran",
 };
-const LOOP_EVENTS = new Set(["round_pending", "round_sent", "round_skipped", "round_held", "round_blocked", "round_unblocked", "held", "released", "muted", "unmuted", "adopted", "status", "removed", "nudged", "tracked", "untracked", "answered", "guidance", "turn_sent", "turn_started", "turn_ended", "turn_resumed", "turn_withdrawn", "question_dismissed", "turn_delivered", "answer_routed", "late_record", "stop_blocked", "turn_stopped", "guide_trimmed", "dossier_restored", "dossier_granted", "dossier_call", "brief_waiting", "intake_accepted", "intake_briefing", "intake_starting", "intake_started", "intake_failed", "intake_canceled", "intake_guidance", "workflow_step_ran"]);
+const LOOP_EVENTS = new Set(["held", "released", "muted", "unmuted", "adopted", "status", "removed", "nudged", "tracked", "untracked", "answered", "turn_sent", "turn_started", "turn_ended", "turn_resumed", "turn_withdrawn", "question_dismissed", "turn_delivered", "answer_routed", "late_record", "stop_blocked", "turn_stopped", "guide_trimmed", "dossier_restored", "dossier_granted", "dossier_call", "brief_waiting", "intake_accepted", "intake_briefing", "intake_starting", "intake_started", "intake_failed", "intake_canceled", "intake_guidance", "workflow_step_ran"]);
 const LOOP_ONLY_KEY = "loop.activity.loopOnly";
 const DETAIL_WIDTH_KEY = "loop.detailWidth";
 const DETAIL_WIDTH_MIN = 300;
@@ -161,7 +163,7 @@ const ARTIFACT_LINES = 40;
 const PR_URL = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([\w.-]+)\/pull\/(\d+)(?:[/?#]\S*)?$/;
 const folded = new WeakMap();
 
-const state = { specs: { version: "", byId: {} }, planSpecs: {}, plan: { items: [], closed: [], error: "", loaded: false }, collapsed: new Set(), collapsedFor: "", rows: [], epoch: "", rev: 0, activity: [], health: null, detail: null, checks: {}, checksLoading: new Set(), busy: new Set(), guidance: {}, conn: "connecting", authLost: false,
+const state = { roundGates: new Map(), specs: { version: "", byId: {} }, planSpecs: {}, plan: { items: [], closed: [], error: "", loaded: false }, collapsed: new Set(), collapsedFor: "", rows: [], epoch: "", rev: 0, activity: [], health: null, detail: null, checks: {}, checksLoading: new Set(), busy: new Set(), guidance: {}, conn: "connecting", authLost: false,
   explore: { result: null, busy: false, error: "", recent: [], sel: "", status: {} } };
 let lastFocus = null;
 
@@ -187,12 +189,12 @@ function safeURL(u) {
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   const route = readRoute(location.hash);
-  const view = gtdResolveView(route.view, gtdState.catalog, catalog.views, (id) => pluginViews.has(id));
+  const view = resolveView(route.view, tasksState.catalog, catalog.views, (id) => pluginViews.has(id));
   const g = p.get("g") || "";
   return {
     view,
     pr: UNIT_KEY.test(route.unit) ? route.unit : "",
-    entry: route.entry,
+    task: route.task,
     area: route.area,
     ctx: route.ctx,
     layout: p.get("layout") === "board" ? "board" : "",
@@ -207,7 +209,7 @@ function readHash() {
 
 function hashString(next) {
   const p = new URLSearchParams();
-  if (next.entry) p.set("entry", next.entry);
+  if (next.task) p.set("task", next.task);
   if (next.area) p.set("area", next.area);
   if (next.ctx && next.ctx.length) p.set("ctx", [].concat(next.ctx).join(","));
   if (next.layout) p.set("layout", next.layout);
@@ -235,10 +237,10 @@ const keyUnit = (k) => ({ provider: k.slice(0, k.indexOf(":")), key: k.slice(k.i
 const unitPath = (u, ...rest) => "/api/units/" + [u.provider, u.key, ...rest].map(encodeURIComponent).join("/");
 const unitOf = (x) => x.unit;
 const keyOf = (x) => unitKey(unitOf(x));
-const labelOf = (x) => x.label || refLabel(x.ref);
+const labelOf = (x) => x.label || "";
 const labelTail = (r) => (pl(r).repo && labelOf(r).startsWith(pl(r).repo) ? labelOf(r).slice(pl(r).repo.length) : labelOf(r));
 const refLabel = (ref) => `${ref.owner}/${ref.repo}#${ref.number}`;
-const eventRef = (e) => (e.pr && e.pr.number ? refLabel(e.pr) : "");
+const eventRef = (it) => it.label || "";
 
 function fold(s) {
   return String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
@@ -347,7 +349,7 @@ function matches(r, ts) {
 
 function matchesActivity(it, ts) {
   const e = it.event;
-  const fields = [it.title, eventRef(e), it.author, e.actor, EVENT_LABEL[e.kind] || e.kind, e.data].map(fold);
+  const fields = [it.title, eventRef(it), it.author, e.actor, eventLabel(e.kind), e.data].map(fold);
   return ts.every((t) => fields.some((f) => f.includes(t)));
 }
 
@@ -361,8 +363,8 @@ function activityPasses(it, lens) {
 }
 
 function activityRepos(it) {
-  const p = it.event.pr;
-  return p && p.number ? [`${p.owner}/${p.repo}`] : [];
+  const m = /^(\S+\/\S+)#\d+$/.exec(it.label || "");
+  return m ? [m[1]] : [];
 }
 
 // foldMap folds s and maps each folded position back to s, so a match in
@@ -447,8 +449,14 @@ function left(deadline, now = Date.now()) {
   return `in ${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
 }
 
+// roundGate is the open plan gate an automatic round of the row waits on, until its deadline.
+function roundGate(row) {
+  return state.roundGates.get(keyOf(row));
+}
+
 function countdown(row) {
-  return h("span", { class: "age countdown", "data-deadline": row.pending.deadline, title: `sends at ${stamp(row.pending.deadline)}` }, left(row.pending.deadline));
+  const deadline = roundGate(row).deadline;
+  return h("span", { class: "age countdown", "data-deadline": deadline, title: `sends at ${stamp(deadline)}` }, left(deadline));
 }
 
 function tickCountdowns() {
@@ -477,10 +485,15 @@ function waitingLabel(row) {
   return (sm(row).waits_on || "").split(", ").map((w) => resolveWho(row, w)).join(", ");
 }
 
+// waitField is the served facet whose value colors a row's strip.
+function waitField() {
+  return catalog.fields.find((f) => f.id === catalog.strip);
+}
+
 // waitCat is the class of whom a row waits on its strip shows: me, the
 // loop, a reviewer, the author, or nobody.
 function waitCat(row) {
-  return facetValues(row, "wait")[0] || "nobody";
+  return facetValues(row, catalog.strip)[0] || "nobody";
 }
 
 function waitClass(row) {
@@ -496,11 +509,13 @@ function isMine(author) {
 function stripTitle(row) {
   const cat = waitCat(row);
   const who = cat === "author" || cat === "reviewer" ? ` (${waitingLabel(row)})` : "";
-  return [`${STRIP_TITLE[cat] || cat}${who}: ${rowKindLabel(row)}`, sm(row).reason].filter(Boolean).join(". ");
+  const f = waitField();
+  return [`${f && f.show ? f.show(cat) : cat}${who}: ${rowKindLabel(row)}`, sm(row).reason].filter(Boolean).join(". ");
 }
 
-function isMuted(o) {
-  return o.mute_until_state_change || (isSet(o.muted_until) && Date.parse(o.muted_until) > Date.now());
+function isMuted(p) {
+  const m = p.mute;
+  return !!m && (m.until_state_change || (isSet(m.until) && Date.parse(m.until) > Date.now()));
 }
 
 // The backlog is every pull request still open; done joins it on request.
@@ -510,9 +525,9 @@ function inView(row, view, withDone) {
   return view === "all" || (row.views || []).includes(view);
 }
 
-// isStalled is the daemon's stalled view: past its threshold and in scope.
+// isStalled is the row's stalled flag: past its threshold and in scope.
 function isStalled(r) {
-  return (r.views || []).includes("stalled");
+  return rowFlags(r).includes("stalled");
 }
 
 function rowFlags(r) {
@@ -525,10 +540,11 @@ function sinceTime(r) {
 }
 
 // upcoming are a row's next instants: the daemon's list, or else the
-// deadline of its pending round.
+// deadline of the plan gate its automatic round waits on.
 function upcoming(r) {
   const next = ((pl(r).facts || {}).next || []).filter((e) => isSet(e.at));
-  if (r.pending && isSet(r.pending.deadline) && !next.some((e) => e.what === "gate")) next.push({ at: r.pending.deadline, what: "gate" });
+  const g = roundGate(r);
+  if (g && !next.some((e) => e.what === "gate")) next.push({ at: g.deadline, what: "gate" });
   return next;
 }
 
@@ -599,12 +615,11 @@ function readLens() {
   return { view, q, ts: terms(q), quals, filters: filtersOf(quals), group: g, sort: s, layout, tk, done };
 }
 
-// A board needs groups: the Stalled board keeps its lanes, the others group
-// by whom a row waits on.
+// A board needs groups: by whom a row waits on.
 function effectiveGroup(lens) {
   if (lens.group) return lens.group;
   if (lens.layout !== "board") return "";
-  return lens.view === "stalled" ? "lane" : "wait";
+  return catalog.strip;
 }
 
 function cmp(a, b) {
@@ -758,7 +773,7 @@ function listYAML(meta, rows) {
   for (const r of rows) {
     const p = pl(r);
     const o = p.override || {};
-    const flags = [o.hold && "paused", isMuted(o) && "muted", o.adopted && "adopted", o.tracked && "tracked"].filter(Boolean);
+    const flags = [o.hold && "paused", isMuted(p) && "muted", o.adopted && "adopted", o.tracked && "tracked"].filter(Boolean);
     const b = p.brief;
     const ws = p.workspace;
     const fields = [
@@ -792,13 +807,13 @@ function candidatesYAML(meta, cands) {
     const b = c.brief && c.brief.brief;
     const asks = (c.review_requests || []).map((w) => w.replace(/^team:/, ""));
     const fields = [
-      ["ref", yamlString(refLabel(c.ref))],
+      ["ref", yamlString(labelOf(c))],
       ["url", yamlString(candidateURL(c))],
       ["title", yamlString(c.title)],
       ["author", yamlString(c.author)],
       ["draft", c.draft ? "true" : ""],
       ["size", yamlString(`+${c.additions} -${c.deletions}, ${c.changed_files} file${c.changed_files === 1 ? "" : "s"}`)],
-      ["review", yamlString(REVIEW_LABEL[c.review_decision] || "no review required")],
+      ["review", yamlString(reviewDecision(c.review_decision))],
       ["checks", yamlString(c.checks ? c.checks.toLowerCase() : "none")],
       ["asks", asks.length ? `[${asks.map(yamlString).join(", ")}]` : ""],
       ["my_review", c.my_review ? yamlString(c.my_review.toLowerCase()) : ""],
@@ -882,9 +897,11 @@ function lensChips(lens, applied) {
 }
 
 function stripLegend() {
-  return h("span", { class: "legend", title: "The strip on the left of each pull request is the color of whom it waits on" },
-    h("span", { class: "lens-label" }, "Waits on:"),
-    STRIP_LEGEND.map(([cat, label]) => h("span", { class: "lg w-" + cat }, h("span", { class: "sw", "aria-hidden": "true" }), label)));
+  const f = waitField();
+  if (!f || !f.rank) return null;
+  return h("span", { class: "legend", title: "The strip on the left of each row is the color of whom it waits on" },
+    h("span", { class: "lens-label" }, `${f.label}:`),
+    f.rank.map((cat) => h("span", { class: "lg w-" + cat }, h("span", { class: "sw", "aria-hidden": "true" }), f.show ? f.show(cat) : cat)));
 }
 
 function lensSelect(id, label, value, options, onchange) {
@@ -904,12 +921,10 @@ function renderLens(lens, res) {
     tools.dataset.sig = "";
     return;
   }
-  const removable = lens.view === "done" || lens.view === "approved";
-  const n = removable ? state.rows.filter((r) => inView(r, lens.view)).length : 0;
   const keys = tagKeys(state.rows);
   const current = tagKeyField(lens.group);
   if (current && !keys.includes(current.tagKey)) keys.push(current.tagKey);
-  const sig = JSON.stringify([lens.view, lens.q, lens.group, lens.sort, lens.layout, res && res.shown, res && res.total, n, !!state.removingDone, state.health && state.health.viewer, keys]);
+  const sig = JSON.stringify([lens.view, lens.q, lens.group, lens.sort, lens.layout, res && res.shown, res && res.total, state.health && state.health.viewer, keys]);
   if (tools.dataset.sig === sig) return;
   tools.dataset.sig = sig;
   const filtered = !!lens.q.trim();
@@ -925,7 +940,7 @@ function renderLens(lens, res) {
     onclick: () => writeHash({ layout }),
   }, label);
   const items = [
-    lensSelect("group", "Group", lens.group, [["", board ? (lens.view === "stalled" ? "Board lanes" : "Waiting on (board)") : "None"],
+    lensSelect("group", "Group", lens.group, [["", board ? "Waiting on (board)" : "None"],
       ...catalog.fields.filter((f) => f.group && f.menu).map((f) => [f.id, f.label]),
       ...keys.map((k) => [`tag:${k}`, `Tag ${k}`])], setGroup),
     lensSelect("sort", "Sort", field, [["", "Waiting longest"], ...catalog.fields.filter((f) => f.sort).map((f) => [f.id, f.label])],
@@ -948,49 +963,8 @@ function renderLens(lens, res) {
       type: "button", class: "act", "data-focus": "lens:copy-list", title: "Copy the pull requests shown here, in this order, as YAML, to paste for an agent",
       onclick: () => copyList(lens.view),
     }, "Copy list"),
-    removable ? h("button", {
-      type: "button", class: "act", "data-focus": "lens:remove-done", disabled: n === 0 || state.removingDone || filtered,
-      title: filtered ? "Clear the filters first: this acts on the whole view" : undefined,
-      onclick: () => removeAllClean(n, lens.view),
-    }, "Remove all clean") : null,
   ];
   tools.replaceChildren(...items.filter(Boolean));
-}
-
-async function removeAllClean(n, view) {
-  const what = view === "approved" ? "approved pull request" : "finished pull request";
-  if (!confirm(`Remove the workspaces of ${n} ${what}${n === 1 ? "" : "s"}? Their checkouts are deleted and their terminals are closed. A workspace whose agent works or waits, or that holds uncommitted files, unpushed commits or ignored files outside build and dependency folders, is kept.`)) return;
-  state.removingDone = true;
-  state.actionError = "";
-  state.actionDetail = "";
-  render();
-  try {
-    const res = await fetch("/api/workspaces/remove-done", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json", "X-Loop-API": API_VERSION },
-      body: JSON.stringify({ view }),
-    });
-    const out = await res.json().catch(() => ({}));
-    if (!res.ok || out.error) throw new Error(apiError(out, `HTTP ${res.status}`, res.status));
-    const removed = (out.removed || []).map(refLabel);
-    const kept = (out.kept || []).map((k) => `${refLabel(k.ref)} (${k.reason})`);
-    const details = (out.kept || []).filter((k) => k.detail).map((k) => `${refLabel(k.ref)}: ${k.detail}`);
-    const text = [
-      `Removed ${removed.length}${removed.length ? ": " + removed.join(", ") : ""}.`,
-      kept.length ? `Kept ${kept.length}: ${kept.join("; ")}.` : "",
-    ].filter(Boolean).join(" ");
-    setNotice(text);
-    document.getElementById("notice").title = text;
-    if (details.length) {
-      state.actionError = `Kept ${details.length} with details`;
-      state.actionSource = "";
-      state.actionDetail = details.join("\n");
-    }
-  } catch (err) {
-    state.actionError = `remove all clean failed: ${err.message}`;
-  }
-  state.removingDone = false;
-  scheduleLoad();
 }
 
 async function setPaused(paused) {
@@ -1028,13 +1002,13 @@ function lensHash(change) {
 
 function renderRail() {
   const lens = readLens();
-  const nav = gtdNav(gtdState.catalog, catalog.views, [...pluginViews.keys()], gtdCounters(readHash()));
+  const nav = viewNav(tasksState.catalog, catalog.views, [...pluginViews.keys()], viewCounters(readHash()));
   const views = railSections(nav, providerName).flatMap((sec) => [
     sec.title ? h("li", { class: "rail-head", role: "presentation" }, sec.title) : null,
     ...sec.views.map((v) => {
       const rows = !v.core && catalog.views.some((c) => c.id === v.id) && !(v.id === "recent" || v.id === "explore" || v.id === "plan");
       const count = v.core ? v.count : v.id === "plan" ? planCount() : rows ? state.rows.filter((r) => passes(r, v.id, lens)).length : "";
-      return railItem(v.label, count, v.id === lens.view, lensHash({ view: v.id, entry: "", pr: "" }), (v.id === "stalled" ? "late-count " : "") + (v.core ? "core" : "plugin"));
+      return railItem(v.label, count, v.id === lens.view, lensHash({ view: v.id, task: "", pr: "" }), (v.id === "stalled" ? "late-count " : "") + (v.core ? "core" : "plugin"));
     })]).filter(Boolean);
   document.getElementById("views").replaceChildren(...views);
 
@@ -1050,7 +1024,16 @@ function renderRail() {
   }));
 }
 
-const focusSlot = (name) => ({ resume: "pause", unmute: "mute", skip: "open", run_now: "review", untrack: "track" })[name] || name;
+// focusSlot is the slot an action keeps focus in when a render swaps it for
+// its counterpart: a toggle's pair, or a round's start, which an approving
+// gate intent and an intent that starts a round on request share.
+const FOCUS_PAIRS = { resume: "pause", unmute: "mute", untrack: "track" };
+function focusSlot(name) {
+  const sp = state.specs.byId[name];
+  if (sp && sp.group === "start" && sp.intake) return "start";
+  if (sp && sp.group === "start" && sp.verb === "dismiss") return "open";
+  return FOCUS_PAIRS[name] || name;
+}
 
 const CARD_GROUPS = new Set(["turn", "intake", "brief"]);
 
@@ -1164,7 +1147,7 @@ function multiCopy(field) {
 
 function openRow(scope, key) {
   state.openSlot = scope;
-  writeHash({ pr: key, entry: "" });
+  writeHash({ pr: key, task: "" });
 }
 
 // openSlot is the copy of the open pull request last opened, when it is
@@ -1205,13 +1188,14 @@ function rowTr(r, pr, lens, copy) {
         briefTags(p.brief, lens, slot),
         p.head && ts.some((t) => fold(p.head).includes(t)) ? h("span", { class: "head" }, marked(p.head, ts)) : null,
         o.hold ? facet(lens, "is", "paused", h("span", { class: "flag" }, "paused"), slot + "is:paused") : null,
-        isMuted(o) ? facet(lens, "is", "muted", h("span", { class: "flag" }, "muted"), slot + "is:muted") : null,
+        isMuted(p) ? facet(lens, "is", "muted", h("span", { class: "flag" }, "muted"), slot + "is:muted") : null,
+        r.stale ? h("span", { class: "flag stale", title: "Its plugin is not reporting; this is its last report" }, "stale") : null,
         intakeChip(r))),
     h("td", { class: "c-wait" },
       h("div", { class: "who" },
-        facet(lens, "wait", waitCat(r), h("span", { class: "dot", "aria-hidden": "true" }, "●"), slot + "wait"), " ", whoFacets(r, lens, slot)),
+        facet(lens, catalog.strip, waitCat(r), h("span", { class: "dot", "aria-hidden": "true" }, "●"), slot + catalog.strip), " ", whoFacets(r, lens, slot)),
       facet(lens, "kind", r.kind, h("span", { class: "pill" }, rowKindLabel(r)), slot + "kind")),
-    h("td", { class: "c-for" }, r.pending ? countdown(r) : h("span", { class: "age", title: stamp(sm(r).since) }, age(sm(r).since))),
+    h("td", { class: "c-for" }, roundGate(r) ? countdown(r) : h("span", { class: "age", title: stamp(sm(r).since) }, age(sm(r).since))),
     h("td", { class: "c-why" }, sm(r).reason),
     h("td", { class: "c-where" }, where(r, scope, lens)),
     h("td", { class: "c-act" }, actionButtons(r, "row", { scope })));
@@ -1259,7 +1243,7 @@ function renderTable(res, pr, lens) {
     if (!grouped) return h("tbody", {}, rows);
     const id = `g-${i}`;
     return h("tbody", { id },
-      h("tr", { class: "g-head" + (g.field === "wait" ? " w-" + g.key : "") },
+      h("tr", { class: "g-head" + (g.field === catalog.strip ? " w-" + g.key : "") },
         h("th", { scope: "rowgroup", colspan: 6 },
           h("button", { type: "button", class: "g-toggle", "aria-expanded": String(!collapsed), "aria-controls": id, "data-focus": `group:${key}`, onclick: () => toggleCollapsed(key) },
             `${collapsed ? "▸" : "▾"} ${g.label}`),
@@ -1269,7 +1253,7 @@ function renderTable(res, pr, lens) {
   }));
 }
 
-const SORT_COLUMNS = { "c-pr": "repo", "c-wait": "wait", "c-for": "age", "c-why": "kind", "c-where": "status" };
+const SORT_COLUMNS = { "c-pr": "repo", "c-for": "age", "c-why": "kind", "c-where": "status" };
 
 // unitColumn is how the list names its unit column in view: by the view's
 // provider, "Item" when its rows mix providers.
@@ -1295,7 +1279,7 @@ function renderSortHeaders(lens) {
   const { field, desc } = parseSort(lens.sort);
   const unitSort = unitColumn(lens.view).sort;
   for (const th of document.querySelectorAll("#table thead th")) {
-    const id = th.className === "c-pr" ? unitSort : SORT_COLUMNS[th.className];
+    const id = th.className === "c-pr" ? unitSort : th.className === "c-wait" ? catalog.strip : SORT_COLUMNS[th.className];
     if (id) th.setAttribute("aria-sort", id === field ? (desc ? "descending" : "ascending") : "none");
   }
 }
@@ -1304,14 +1288,14 @@ function renderRows() {
   const lens = readLens();
   const { pr } = readHash();
   const { view } = lens;
-  const listless = view === "recent" || view === "explore" || view === "plan" || pluginViews.has(view) || isGTDView(view);
+  const listless = view === "recent" || view === "explore" || view === "plan" || pluginViews.has(view) || isCoreView(view);
   renderActivity(lens);
   const table = document.getElementById("table");
   const boardBox = document.getElementById("board");
   const empty = document.getElementById("empty");
   const listBox = document.getElementById("list-box");
   listBox.classList.toggle("in-dash", view === "dash");
-  listBox.hidden = view === "plan" || pluginViews.has(view) || isGTDView(view);
+  listBox.hidden = view === "plan" || pluginViews.has(view) || isCoreView(view);
   if (view !== "dash") listBox.open = true;
   if (listless) {
     renderLens(lens, null);
@@ -1370,7 +1354,7 @@ function emptyNote(view, q) {
 
 function renderBoard(groups, pr, lens) {
   document.getElementById("board").replaceChildren(...groups.map((g) => h("section", { class: "lane", "aria-label": g.label },
-    h("h2", { class: "lane-head" + (g.field === "wait" ? " w-" + g.key : "") }, h("span", {}, g.label),
+    h("h2", { class: "lane-head" + (g.field === catalog.strip ? " w-" + g.key : "") }, h("span", {}, g.label),
       h("span", { class: "lane-tools" }, onlyThis(g, lens), h("span", { class: "count" }, g.rows.length))),
     h("ol", { class: "cards" }, g.rows.map((r) => card(r, pr, multiCopy(g.field) ? g.key : ""))))));
 }
@@ -1434,19 +1418,24 @@ function actorLabel(actor) {
   return viewer && actor.toLowerCase() === viewer.toLowerCase() ? "me" : actor;
 }
 
-const REQUEST_EVENTS = new Set(["review_requested", "review_request_removed"]);
-
 function requestedFrom(reviewer) {
   return reviewer.startsWith("team:") ? reviewer.slice("team:".length) : actorLabel(reviewer);
 }
 
+// EVENT_DATA shows an event's data the way its plugin's catalog says:
+// whole by default, a field or a short sha, or nothing when it names whom
+// a review was requested from, which the row shows on its own.
+const EVENT_DATA = {
+  none: () => "",
+  first_field: (d) => d.split(":")[0],
+  short_sha: (d) => d.slice(0, 7),
+  requested: () => "",
+};
+
 function eventData(e) {
-  if (!e.data || REQUEST_EVENTS.has(e.kind)) return "";
-  switch (e.kind) {
-    case "review": return e.data.split(":")[0];
-    case "merged": return e.data.slice(0, 7);
-  }
-  return e.data;
+  if (!e.data) return "";
+  const show = EVENT_DATA[catalog.eventData.get(e.kind)];
+  return show ? show(e.data) : e.data;
 }
 
 function renderActivity(lens) {
@@ -1457,7 +1446,7 @@ function renderActivity(lens) {
     list.replaceChildren();
     return;
   }
-  const items = state.activity.filter((it) => (!activityLoopOnly || LOOP_EVENTS.has(it.event.kind)) && activityPasses(it, lens));
+  const items = state.activity.filter((it) => (!activityLoopOnly || loopEvent(it.event.kind)) && activityPasses(it, lens));
   const out = [h("li", { class: "a-tools" },
     h("label", {},
       h("input", { type: "checkbox", checked: activityLoopOnly, "data-focus": "activity:loop-only", onchange: (e) => setLoopOnly(e.target.checked) }),
@@ -1477,9 +1466,9 @@ function renderActivity(lens) {
       writeHash({ pr: key });
     };
     const data = eventData(e);
-    const requested = REQUEST_EVENTS.has(e.kind) && e.data;
+    const requested = catalog.eventData.get(e.kind) === "requested" && e.data;
     out.push(h("li", {
-      class: `a-ev ev-${e.kind}` + (LOOP_EVENTS.has(e.kind) ? " loop" : "") + (key === pr && id === activitySelected ? " sel" : ""),
+      class: `a-ev ev-${e.kind}` + (loopEvent(e.kind) ? " loop" : "") + (key === pr && id === activitySelected ? " sel" : ""),
       tabindex: 0,
       "data-focus": id,
       onclick: open,
@@ -1492,10 +1481,10 @@ function renderActivity(lens) {
     },
       h("time", { datetime: e.at, title: stamp(e.at) }, clock(e.at)),
       h("div", {},
-        h("span", { class: "kind" }, EVENT_LABEL[e.kind] || e.kind.replaceAll("_", " ")),
+        h("span", { class: "kind" }, eventLabel(e.kind)),
         requested ? h("span", { class: "who" }, " from " + requestedFrom(e.data)) : null,
         e.actor ? h("span", { class: "who" }, (requested ? " by " : " ") + actorLabel(e.actor)) : null,
-        " ", h("span", { class: "ref" }, eventRef(e)),
+        " ", h("span", { class: "ref" }, eventRef(it)),
         " ", h("span", { class: "title" }, it.title)),
       data ? h("span", { class: "data" }, data) : null));
   }
@@ -1513,7 +1502,9 @@ function activityEmptyNote(q) {
 
 function guidanceLabel(r) {
   if (r.question) return r.question.state === "asked" && questionChoices(r, r.question).length ?"Or answer in your own words" : "Answer in your own words";
-  return r.pending ? "Guidance for the pending round; Run now sends it at once" : "Guidance for the next round (optional)";
+  const start = Object.values(state.specs.byId).find((sp) => sp.group === "start" && sp.verb === "approve");
+  if (!roundGate(r)) return "Guidance for the next round (optional)";
+  return start ? `Guidance for the pending round; ${start.label} sends it at once` : "Guidance for the pending round";
 }
 
 function guidanceBox(key, placeholder) {
@@ -1907,9 +1898,19 @@ function setupDetailResize() {
   window.addEventListener("resize", layout);
 }
 
+// detailFacts are the row's plugin's own detail fields, as its catalog
+// words them, read from the detail or the row's override.
+function detailFacts(r, d, o) {
+  const provider = unitOf(r).provider;
+  return catalog.details.filter((x) => x.provider === provider).map((x) => {
+    const v = d[x.field] ?? o[x.field];
+    return v ? [h("dt", x.title ? { title: x.title } : {}, x.label), h("dd", {}, v)] : null;
+  });
+}
+
 function renderDetail() {
   const box = document.getElementById("detail");
-  if (renderEntryDetail(box, readHash())) return;
+  if (renderTaskDetail(box, readHash())) return;
   const { pr } = readHash();
   const d = state.detail;
   if (!pr || !d || keyOf(d.row) !== pr) {
@@ -1927,8 +1928,8 @@ function renderDetail() {
   const old = document.getElementById("guidance");
   const caret = old && document.activeElement === old ? [old.selectionStart, old.selectionEnd] : null;
   const guidance = inCard ? null : guidanceBox(key, guidanceLabel(r));
-  const muteState = o.mute_until_state_change ? "muted until the situation changes"
-    : isMuted(o) ? `muted until ${stamp(o.muted_until)}` : "";
+  const muteState = (p.mute || {}).until_state_change ? "muted until who it waits on changes"
+    : isMuted(p) ? `muted until ${stamp(p.mute.until)}` : "";
   const events = timelineEvents(d);
 
   const top = h("div", { class: "d-top" },
@@ -1940,7 +1941,7 @@ function renderDetail() {
         " ", h("a", { href: safeURL(r.link), target: "_blank", rel: "noopener noreferrer", class: "ext", "data-focus": "detail:link" }, providerName(unitOf(r).provider)),
         p.author ? [" by ", h("span", { class: "who" }, p.author)] : null)),
     h("div", { class: "d-sit " + waitClass(r) + (sm(r).stalled ? " late" : "") },
-      h("div", { class: "d-clock" }, r.pending ? countdown(r) : h("span", { class: "age" }, age(sm(r).since)), h("span", { class: "pill" }, rowKindLabel(r))),
+      h("div", { class: "d-clock" }, roundGate(r) ? countdown(r) : h("span", { class: "age" }, age(sm(r).since)), h("span", { class: "pill" }, rowKindLabel(r))),
       h("div", {}, "Waiting on ", h("strong", {}, waitingLabel(r)), isSet(sm(r).since) ? ` since ${stamp(sm(r).since)}` : ""),
       h("div", { class: "why" }, sm(r).reason),
       sm(r).line && sm(r).line !== sm(r).reason ? h("div", { class: "line" }, sm(r).line) : null,
@@ -1950,8 +1951,7 @@ function renderDetail() {
       h("dt", {}, "In scope as"), h("dd", {}, (p.reasons || []).join(", ") || "out of scope"),
       h("dt", {}, "Workspace"), h("dd", {}, p.workspace && p.workspace.display_name ? where(r, "detail") : "none"),
       h("dt", {}, "Controls"), h("dd", {}, [o.hold ? "paused" : "", muteState, o.adopted ? "adopted" : ""].filter(Boolean).join(", ") || "none"),
-      d.profile_chain ? [h("dt", { title: "The review profile layers a round here reads, lowest first; {{command}} profile show shows the files" }, "Review profile"), h("dd", {}, d.profile_chain)] : null,
-      o.next_guidance ? [h("dt", { title: "Guidance waiting for the next round: given with no round pending, or kept from a round that did not go out or whose prompt was not seen landing. The next round, Review or Address included, takes it unless you give other guidance" }, "Next round guidance"), h("dd", {}, o.next_guidance)] : null),
+      detailFacts(r, d, o)),
     questionBlock(d),
     unitExtras(d),
     trimmedNote(d),
@@ -1965,7 +1965,7 @@ function renderDetail() {
     h("h2", { class: "d-sub" }, "Timeline"),
     h("ol", { class: "timeline" }, events.map((e) => h("li", { class: "ev-" + e.kind },
       h("time", { datetime: e.at }, stamp(e.at)),
-      h("div", {}, h("span", { class: "kind" }, EVENT_LABEL[e.kind] || e.kind.replaceAll("_", " ")), e.actor ? h("span", { class: "who" }, " " + e.actor) : null),
+      h("div", {}, h("span", { class: "kind" }, eventLabel(e.kind)), e.actor ? h("span", { class: "who" }, " " + e.actor) : null),
       e.data ? h("span", { class: "data" }, e.data) : null))));
 
   if (box.querySelector(".d-acts") && (!guidance || guidance.parentNode === box)) {
@@ -2021,7 +2021,7 @@ function toggledQuery(text, term) {
 
 function querySort(text) {
   const sorts = text.split(/\s+/).filter((w) => w.startsWith("sort:"));
-  return sorts.length ? sorts[sorts.length - 1].slice("sort:".length) : DEFAULT_SORT;
+  return sorts.length ? sorts[sorts.length - 1].slice("sort:".length) : exploreSearch().default_sort;
 }
 
 function withSort(text, sort) {
@@ -2079,6 +2079,12 @@ function toggleTerm(term) {
   writeHash({ x: input.value }, true);
 }
 
+// viewOfExplore is the route of the view name of the plugin that serves the Explore view.
+function viewOfExplore(name) {
+  const provider = (catalog.views.find((v) => v.id === "explore") || {}).provider || "";
+  return `/api/plugins/${encodeURIComponent(provider)}/views/${encodeURIComponent(name)}`;
+}
+
 async function explore(query) {
   const input = document.getElementById("explore-q");
   query = String(query || "").trim();
@@ -2088,7 +2094,7 @@ async function explore(query) {
   state.explore.error = "";
   writeHash({ x: query }, true);
   try {
-    const res = await fetch("/api/explore", {
+    const res = await fetch(viewOfExplore("explore"), {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json", "X-Loop-API": API_VERSION },
       body: JSON.stringify({ query }),
@@ -2112,7 +2118,7 @@ function exploreStatus() {
   const r = ex.result;
   if (!r) return "A search runs only when you press Enter or Search; each one spends about 1 point of GitHub's hourly budget.";
   const shown = r.candidates.length;
-  const order = EXPLORE_SORTS.find((s) => s.sort === querySort(r.query || ""));
+  const order = (exploreSearch().sorts || []).find((s) => s.sort === querySort(r.query || ""));
   const more = r.total > shown ? `, the ${order ? `${shown} ${order.shown}` : `first ${shown}`} of ${r.total}; narrow the search for the rest` : "";
   const cost = r.rate_limit && r.rate_limit.limit ? ` · cost ${r.cost}, ${r.rate_limit.remaining} of ${r.rate_limit.limit} left` : "";
   const read = r.read ? `${r.read} · ` : "";
@@ -2125,7 +2131,7 @@ function candidateItem(c, sel) {
   const row = rowByKey(key);
   const facts = [
     `+${c.additions} -${c.deletions} · ${c.changed_files} file${c.changed_files === 1 ? "" : "s"}`,
-    REVIEW_LABEL[c.review_decision] || "no review required",
+    reviewDecision(c.review_decision),
     c.checks ? `checks ${c.checks.toLowerCase()}` : "no checks",
     `${c.comments} comment${c.comments === 1 ? "" : "s"}`,
   ];
@@ -2135,8 +2141,8 @@ function candidateItem(c, sel) {
   const wait = candidateWait(c, row, state.health && state.health.stalled_review_hours);
   return h("li", { class: ["cand", row ? waitClass(row) : "", key === sel ? "sel" : ""].join(" ") },
     h("button", { type: "button", class: "cand-pick", "aria-pressed": String(key === sel), "data-focus": `cand:${key}`, onclick: () => selectCandidate(key) },
-      h("span", { class: "title" }, c.title || refLabel(c.ref)),
-      h("span", { class: "meta" }, `${refLabel(c.ref)} by ${c.author} · opened ${ago(c.created_at)} · updated ${ago(c.updated_at)}`,
+      h("span", { class: "title" }, c.title || labelOf(c)),
+      h("span", { class: "meta" }, `${labelOf(c)} by ${c.author} · opened ${ago(c.created_at)} · updated ${ago(c.updated_at)}`,
         wait ? h("span", { class: wait.late ? "wait late" : "wait", title: row ? `waiting on ${waitingLabel(row)}` : "since the last activity" }, wait.text) : null,
         c.draft ? h("span", { class: "flag" }, "draft") : null,
         c.state && c.state !== "OPEN" ? h("span", { class: "flag" }, c.state.toLowerCase()) : null)),
@@ -2175,10 +2181,10 @@ async function actOnCandidate(c, name, extra = {}) {
   await load();
   if (ok === undefined && implicit) {
     const undone = (await act(row, "untrack")) ? "untracked it again" : `untracking it failed too: ${state.actionError}`;
-    status(`${name} ${refLabel(c.ref)}: ${refused || "cancelled"}; ${undone}`, { error: true });
+    status(`${name} ${labelOf(c)}: ${refused || "cancelled"}; ${undone}`, { error: true });
     return false;
   }
-  if (refused) return status(`${name} ${refLabel(c.ref)}: ${refused}`, { error: true }), false;
+  if (refused) return status(`${name} ${labelOf(c)}: ${refused}`, { error: true }), false;
   status(ok ? (implicit ? `${name} started; it is in {{name}} now` : `${name} sent`) : (state.actionError || `${name} failed`), { error: !ok, done: ok });
   return ok;
 }
@@ -2202,7 +2208,7 @@ function renderExploreActions() {
     guidance.value = state.guidance[key] || "";
   }
   document.getElementById("explore-act-head").replaceChildren(
-    h("a", { href: candidateURL(c), target: "_blank", rel: "noopener noreferrer", "data-focus": "explore:gh" }, refLabel(c.ref)), " ", c.title);
+    h("a", { href: candidateURL(c), target: "_blank", rel: "noopener noreferrer", "data-focus": "explore:gh" }, labelOf(c)), " ", c.title);
   document.getElementById("explore-act-buttons").replaceChildren(
     ...actionButtons(c, "explore", { scope: "explore", run: (id) => actOnCandidate(c, id, { guidance: guidance.value.trim() }) }),
     row ? h("button", { type: "button", class: "act", disabled: state.busy.has(key), "data-focus": "explore:detail", onclick: () => writeHash({ pr: key }) }, "Detail") : null);
@@ -2219,17 +2225,17 @@ function renderExplore(view) {
   document.getElementById("explore-go").disabled = ex.busy;
   document.getElementById("explore-chips").replaceChildren(
     h("span", { class: "chip-head" }, "Run"),
-    ...EXPLORE_PRESETS.map((p) => chip({
+    ...(exploreSearch().presets || []).map((p) => chip({
       title: p.query, disabled: ex.busy, "data-focus": `explore:preset:${p.query}`, onclick: () => explore(p.query),
     }, p.label)),
     h("span", { class: "chip-head" }, "Filters"),
-    ...EXPLORE_FILTERS.map((f) => f.window ? chip({
+    ...(exploreSearch().filters || []).map((f) => f.window ? chip({
       title: "updated:>=", "aria-pressed": String(hasWindow(input.value)), "data-focus": "explore:filter:window", onclick: () => toggleWindow(f.window),
     }, f.label) : chip({
       "aria-pressed": String(hasTerm(input.value, f.term)), "data-focus": `explore:filter:${f.term}`, onclick: () => toggleTerm(f.term),
     }, f.label)),
     h("span", { class: "chip-head" }, "Order"),
-    ...EXPLORE_SORTS.map((o) => chip({
+    ...(exploreSearch().sorts || []).map((o) => chip({
       title: `sort:${o.sort}`, "aria-pressed": String(querySort(input.value) === o.sort), "data-focus": `explore:sort:${o.sort}`, onclick: () => pickSort(o.sort),
     }, o.label)),
     ex.recent.length ? h("span", { class: "chip-head" }, "Recent") : null,
@@ -2380,7 +2386,7 @@ function renderPlan(view) {
 async function loadExploreRecent() {
   if (readHash().view !== "explore") return;
   try {
-    state.explore.recent = await getJSON("/api/explore/recent");
+    state.explore.recent = await getJSON(viewOfExplore("explore.recent"));
   } catch {
     // Without the chips the search box still works.
   }
@@ -2423,7 +2429,7 @@ function render() {
   renderExplore(readHash().view);
   renderPlan(readHash().view);
   renderPluginView(readHash().view);
-  renderGTD(readHash());
+  renderTasks(readHash());
   renderDash(readLens());
   renderRows();
   renderDetail();
@@ -2455,9 +2461,9 @@ async function loadActivity() {
 }
 
 async function loadDetail() {
-  const { pr, entry } = readHash();
-  await detailPane.load({ entry, unit: pr });
-  if (!pr || entry) {
+  const { pr, task } = readHash();
+  await detailPane.load({ task, unit: pr });
+  if (!pr || task) {
     state.detail = null;
     state.detailError = "";
     return;
@@ -2518,7 +2524,7 @@ async function load() {
     state.error = "";
     state.authLost = false;
   }
-  await Promise.all([loadActivity(), loadDetail(), loadExploreRecent(), loadPlan(), loadGTD()]);
+  await Promise.all([loadActivity(), loadDetail(), loadExploreRecent(), loadPlan(), loadRoundGates(), loadTasks()]);
   await refreshSpecs([...state.rows, ...(state.detail ? [state.detail.row] : [])]);
   render();
 }
@@ -2629,9 +2635,10 @@ async function applyChange(c) {
   const { view, pr } = route;
   await Promise.all([
     c.units.length && view === "recent" ? loadActivity() : null,
-    (pr && c.units.some((u) => u.toLowerCase() === pr.toLowerCase())) || (c.entries && (route.entry || pr)) ? loadDetail() : null,
+    (pr && c.units.some((u) => u.toLowerCase() === pr.toLowerCase())) || (c.tasks && (route.task || pr)) ? loadDetail() : null,
     loadPlan(),
-    c.entries ? loadGTD(route) : null,
+    loadRoundGates(),
+    c.tasks ? loadTasks(route) : null,
   ]);
   await refreshSpecs([...state.rows, ...(state.detail ? [state.detail.row] : [])]);
   render();
@@ -2641,12 +2648,12 @@ let pending;
 let queued = null;
 let chain = Promise.resolve();
 function scheduleLoad(c = { all: true }) {
-  queued = queued || { units: [], all: false, rows: false, health: false, entries: false };
+  queued = queued || { units: [], all: false, rows: false, health: false, tasks: false };
   queued.units = [...new Set([...queued.units, ...(c.units || [])])];
   queued.all = queued.all || !!c.all;
   queued.rows = queued.rows || !!c.rows;
   queued.health = queued.health || !!c.health;
-  queued.entries = queued.entries || !!c.entries;
+  queued.tasks = queued.tasks || !!c.tasks;
   clearTimeout(pending);
   pending = setTimeout(() => {
     const c = queued;
@@ -2662,7 +2669,7 @@ function onChange(e) {
   } catch {
     return scheduleLoad();
   }
-  scheduleLoad({ units: (c.units || []).map(unitKey), all: !!c.all, health: !!c.health, entries: !!c.counters });
+  scheduleLoad({ units: (c.units || []).map(unitKey), all: !!c.all, health: !!c.health, tasks: !!c.counters });
 }
 
 let retries = 0;
@@ -2699,7 +2706,7 @@ window.addEventListener("hashchange", async () => {
   searchBox.value = readHash().q;
   document.getElementById("explore-q").value = readHash().x;
   render();
-  await Promise.all([viewChanged || !state.activityLoaded ? loadActivity() : null, viewChanged ? loadExploreRecent() : null, loadDetail(), viewChanged ? loadPlan() : null, loadGTD(readHash())]);
+  await Promise.all([viewChanged || !state.activityLoaded ? loadActivity() : null, viewChanged ? loadExploreRecent() : null, loadDetail(), viewChanged ? loadPlan() : null, loadTasks(readHash())]);
   render();
 });
 

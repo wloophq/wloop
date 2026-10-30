@@ -15,8 +15,12 @@ type Engine struct {
 	Workflows func() []workflow.Workflow
 	// Broken names the workflows that failed to load; their proposed drafts
 	// stay until they load again or are gone. Nil: none failed.
-	Broken   func() []string
-	Units    Units
+	Broken func() []string
+	Units  Units
+	// Keep is the host's own bookkeeping of the units, which no unit
+	// reports: a value implementing any of Preparer, Refresher, Settler,
+	// Gainer, Owner, Seener, Scoper and EventFacts; nil keeps none.
+	Keep     any
 	Events   Events
 	Steps    Steps
 	Ledger   Ledger
@@ -28,6 +32,9 @@ type Engine struct {
 	Config   func() workflow.Facts
 	State    StateLoader
 	Marks    Marks // nil reads every unit as having no marks
+	// Gates are the plan gates a pending item waits on; nil opens none, and
+	// a window's end runs its item.
+	Gates Gates
 	// Withdrawals are the drafts the workflows proposed; nil withdraws none.
 	Withdrawals Withdrawals
 	// PluginEnabled says whether a provider's plugin is on; nil: every one
@@ -39,9 +46,12 @@ type Engine struct {
 	Log           func(format string, args ...any)
 
 	mu     sync.Mutex
+	gateMu sync.Mutex
 	due    time.Time
 	seen   port.Generation
 	events heldEvents
+	// revs are the revs the last sweep's items were planned at, by item id.
+	revs map[string]uint64
 }
 
 type Plan struct {
@@ -59,7 +69,8 @@ const DefaultRetryBase = time.Minute
 
 // Due is the earliest instant after the last sweep at which a decision
 // changes with no input changing: a pending deadline, a retry time, the
-// next schedule firing, or a facts provider's own deadline. Zero when none.
+// next schedule firing, the deadline of a temporal fact the sweep read, or
+// a facts provider's own deadline. Zero when none.
 func (e *Engine) Due() time.Time {
 	e.mu.Lock()
 	due := e.due

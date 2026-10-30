@@ -14,7 +14,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/instructions"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/github"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/profile"
 )
@@ -24,7 +23,7 @@ type fakePRs struct {
 	calls int
 }
 
-func (f *fakePRs) PR(context.Context, github.Ref) (PR, error) {
+func (f *fakePRs) PR(context.Context, testRef) (PR, error) {
 	f.calls++
 	return f.pr, nil
 }
@@ -52,7 +51,7 @@ func (f *facts) Facts(context.Context, unit.Unit) (Stored, error) {
 	return f.st, f.err
 }
 
-var ref7 = github.Ref{Owner: "acme", Repo: "api", Number: 7}
+var ref7 = testRef{Owner: "acme", Repo: "api", Number: 7}
 
 func TestBuildUsesTheCallersReadBeforeGitHub(t *testing.T) {
 	f := &fakePRs{}
@@ -179,7 +178,7 @@ func TestOnlyAnAddressNeitherOwnedNorTakenOverNeedsTakeOver(t *testing.T) {
 
 func TestBuildOfAProbeReadsNeitherGitHubNorAGuide(t *testing.T) {
 	f := &fakePRs{}
-	probe := github.Ref{Owner: "loop-e2e", Repo: "probe", Number: 1760000000}
+	probe := testRef{Owner: "loop-e2e", Repo: "probe", Number: 1760000000}
 	c, err := Builder{Intents: bundledIntents, Payloads: githubReads(f), Guides: guides{err: errors.New("no guide for a probe")}, Command: brand.Name}.Build(context.Background(), Request{Intent: Intent(dintent.Probe), Unit: probe.Unit()})
 	if err != nil || f.calls != 0 || c.PR().Title != ProbeTitle || c.PR().URL != probe.URL() || c.PR().Slug() != "loop-e2e/probe#1760000000" || len(c.Guide.Parts) != 0 {
 		t.Fatalf("%+v %v calls=%d", c, err, f.calls)
@@ -279,8 +278,8 @@ func TestTheRecordedVerdictAnchorsOnlyAReviewNoNewerThanIt(t *testing.T) {
 	}
 }
 
-func githubReads(prs PRReader) map[unit.ProviderID]PayloadReader {
-	return map[unit.ProviderID]PayloadReader{unit.GitHub: GitHub{PRs: prs}}
+func githubReads(prs *fakePRs) map[unit.ProviderID]PayloadReader {
+	return map[unit.ProviderID]PayloadReader{unit.GitHub: fakeGitHub{prs}}
 }
 
 func TestAnAddressRoundComposesWithItsReviewers(t *testing.T) {

@@ -6,6 +6,8 @@ import (
 	"io"
 	"time"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
 	"slices"
 	"strings"
 	"testing"
@@ -13,7 +15,6 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/domain/record"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent"
 
@@ -24,7 +25,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -90,7 +90,7 @@ func TestATakeOverAsksGitHubNothingUnderTheLoop(t *testing.T) {
 
 // actAhead runs act with what ReadAhead read of ref before, and fails t on
 // any GitHub request act makes: the daemon runs act under the loop mutex.
-func actAhead(t *testing.T, te *testEnv, ref github.Ref, full bool, act func(ctx context.Context) error) {
+func actAhead(t *testing.T, te *testEnv, ref pr.Ref, full bool, act func(ctx context.Context) error) {
 	t.Helper()
 	ctx := te.ReadAhead(context.Background(), ref, full)
 	mctx, sc := metertest.Start(t, ctx)
@@ -156,7 +156,7 @@ func TestALaunchedTurnOfAStoredPullRequestAsksGitHubNothing(t *testing.T) {
 		t.Fatalf("%v\n%s", err, te.err)
 	}
 	metertest.Within(t, sc, metertest.Budget{{Res: meter.GitHub}: 0})
-	if st := te.loadRounds(t); st.Mark(r7.String(), round.Reviewed) == "" {
+	if st := te.loadRounds(t); st.Mark(r7.String(), ghsource.MarkReviewed) == "" {
 		t.Fatal("the launched round marked no reviews covered")
 	}
 }
@@ -237,7 +237,7 @@ func TestARunNowWithoutAReviewWorkspaceReadsOnlyTheBasicsAhead(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx, sc := metertest.Start(t, context.Background())
-	te.ReadAhead(ctx, github.Ref{Owner: "acme", Repo: "api", Number: 11}, true)
+	te.ReadAhead(ctx, pr.Ref{Owner: "acme", Repo: "api", Number: 11}, true)
 	metertest.Within(t, sc, metertest.Budget{{Res: meter.GitHub}: 1})
 }
 

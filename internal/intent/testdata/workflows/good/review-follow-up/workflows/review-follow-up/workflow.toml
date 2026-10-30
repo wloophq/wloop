@@ -9,5 +9,5 @@ use = "turn.start"
 intent = "review"
 stage = "follow-up"
 
-[approval]
+[gates.approval]
 mode = "run"

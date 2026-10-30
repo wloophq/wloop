@@ -74,7 +74,7 @@ func newRig(t *testing.T, wfs ...workflow.Workflow) *rig {
 func (r *rig) restart() {
 	r.e = &automation.Engine{
 		Workflows: func() []workflow.Workflow { return r.wfs },
-		Units:     r.units, Events: r.events, Steps: r.steps, Ledger: r.ledger, Guidance: r.guidance,
+		Units:     r.units, Keep: r.units, Events: r.events, Steps: r.steps, Ledger: r.ledger, Guidance: r.guidance,
 		Changes: r.log, Clock: r.clock, State: r.state, RetryBase: time.Minute,
 		Pause:     func(context.Context) (automation.Pause, error) { return r.pause, nil },
 		Config:    func() workflow.Facts { return workflow.Facts{"config.cleanup.idle": 2 * time.Hour} },
@@ -288,7 +288,7 @@ func TestEvaluateWritesNothing(t *testing.T) {
 		t.Errorf("Plan.Gen = %d, want %d", p.Gen, gen)
 	}
 	for _, c := range r.trace {
-		if c == "units.refresh" || c == "units.settle" || c == "units.moved" {
+		if c == "units.refresh" || c == "units.settle" {
 			t.Errorf("Evaluate called %s", c)
 		}
 	}
@@ -468,7 +468,7 @@ func TestApplyByHandIsConfirmed(t *testing.T) {
 	}
 }
 
-func TestADeferredStepStaysPendingUntilItsResultIsStored(t *testing.T) {
+func TestADeferredStepStaysDeferredUntilItsResultIsStored(t *testing.T) {
 	w := eventWF("triage", unit.GitHub, "pr", always, "review")
 	w.Steps = []workflow.Step{{Use: "classify", Reach: workflow.ReachLocal}}
 	r := newRig(t, w)
@@ -478,7 +478,7 @@ func TestADeferredStepStaysPendingUntilItsResultIsStored(t *testing.T) {
 	r.steps.Defer("classify", p1, "classifying")
 	r.sweep()
 	it := r.mustItem("triage", p1)
-	if it.Decision != workflow.DecisionPending || it.Reason != "classifying" {
+	if it.Decision != workflow.DecisionDeferred || it.Reason != "classifying" {
 		t.Fatalf("a deferred item is %+v", it)
 	}
 	gen := r.log.Gen()
@@ -488,7 +488,7 @@ func TestADeferredStepStaysPendingUntilItsResultIsStored(t *testing.T) {
 	}
 	r.clock.Advance(time.Minute)
 	r.sweep()
-	if it := r.mustItem("triage", p1); it.Decision != workflow.DecisionPending {
+	if it := r.mustItem("triage", p1); it.Decision != workflow.DecisionDeferred {
 		t.Fatalf("still classifying, the item is %+v", it)
 	}
 	r.steps.Defer("classify", p1, "")
@@ -748,19 +748,24 @@ func TestPeekedGuidanceRunsAndIsTakenOnlyInRun(t *testing.T) {
 	}
 }
 
-func TestPendingServesTheReadModel(t *testing.T) {
+func TestWaitingServesTheReadModel(t *testing.T) {
 	w := windowed(sweepWF("review", always, "turn.start"), 5*time.Minute)
 	w.Provider, w.Slot = unit.GitHub, "pr"
 	r := newRig(t, w, sweepWF("close", idle, "session.close"))
+	gated(r)
 	r.put(p1, "h1")
 	r.put(s1, "a")
 	r.sweep()
-	got, err := r.e.Pending(context.Background())
+	got, err := r.e.Waiting(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 1 || got[0].Unit != p1 || got[0].Steps[0].Use != "turn.start" || !got[0].Deadline.Equal(t0.Add(5*time.Minute)) || !got[0].At.Equal(t0) {
-		t.Errorf("Pending = %+v", got)
+	if len(got) != 1 || got[0].Item.Unit != p1 || got[0].Item.Steps[0].Use != "turn.start" || got[0].Gate.Subject != got[0].Item.ID ||
+		!got[0].Gate.Deadline.Equal(t0.Add(5*time.Minute)) || !got[0].Gate.OpenedAt.Equal(t0) {
+		t.Errorf("Waiting = %+v", got)
+	}
+	if mine, err := r.e.Waiting(context.Background(), &s1); err != nil || len(mine) != 0 {
+		t.Errorf("Waiting on %s = %+v %v", s1, mine, err)
 	}
 }
 
@@ -890,7 +895,7 @@ func TestSweepPlansWithoutTheLockAndActsUnderIt(t *testing.T) {
 	r := newRig(t, sweepWF("close", idle, "session.close"))
 	r.put(s1, "a")
 	r.sweep()
-	for _, c := range []string{"units.list", "units.facts", "steps.check", "ledger.save", "units.moved", "units.refresh"} {
+	for _, c := range []string{"units.list", "units.facts", "steps.check", "ledger.save", "units.revs", "units.refresh"} {
 		if !slices.Contains(r.trace, c) || slices.Contains(r.trace, "locked:"+c) {
 			t.Errorf("%s ran under the lock: %v", c, r.trace)
 		}
@@ -902,17 +907,31 @@ func TestSweepPlansWithoutTheLockAndActsUnderIt(t *testing.T) {
 	}
 }
 
-// noteOnMoved runs fn when the sweep asks Moved, after the plan is saved and
-// before it takes the loop lock.
+// noteOnMoved runs fn when the sweep checks the run items' revs, after the
+// plan is saved and before it takes the loop lock.
 func noteOnMoved(t *testing.T, r *rig, fn func()) {
 	t.Helper()
 	r.units = automationtest.NewUnits(automationtest.Trace(func(c string) {
 		r.trace = append(r.trace, r.loop.tag()+c)
-		if c == "units.moved" {
+		if c == "units.revs" && freshCheck(r.trace) == len(r.trace)-1 {
 			fn()
 		}
 	}))
 	r.restart()
+}
+
+// freshCheck is the index in trace of the sweep's check of the run items'
+// revs, the first after it saved the plan; -1 for none.
+func freshCheck(trace []string) int {
+	saved := slices.Index(trace, "ledger.save")
+	if saved < 0 {
+		return -1
+	}
+	at := slices.Index(trace[saved:], "units.revs")
+	if at < 0 {
+		return -1
+	}
+	return saved + at
 }
 
 func TestAUnitNotedAfterThePlanIsRevalidated(t *testing.T) {
@@ -949,7 +968,7 @@ func TestOwnWritesDoNotWakeTheSweep(t *testing.T) {
 	r.put(s1, "a")
 	g0 := r.log.Gen()
 	r.sweep()
-	if c := r.log.Since(g0, port.SweepInputs); c.Topics != port.TopicGate {
+	if c := r.log.Since(g0, port.SweepInputs); c.Topics != port.TopicPending {
 		t.Errorf("the first pass woke the sweep with %+v; want the pending set once", c)
 	}
 	if c := r.log.Since(g0, ^port.Topic(0)); !c.Has(port.TopicLoopEvents) {
@@ -1451,6 +1470,28 @@ func TestADueRunDropsAnItemWhoseSourceMoved(t *testing.T) {
 	}
 }
 
+func TestRevsCountedAgainAfterARestartNeitherDropNorRepeatARun(t *testing.T) {
+	r := newRig(t, windowed(sweepWF("close", idle, "session.close"), 5*time.Minute))
+	r.put(s1, "a")
+	for range 3 {
+		r.units.Report(t, s1)
+	}
+	r.sweep()
+	r.units.RestartRevs()
+	r.restart()
+	r.clock.Advance(6 * time.Minute)
+	if err := r.e.DueRun(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.ran("session.close"); !slices.Equal(got, []unit.Unit{s1}) {
+		t.Fatalf("ran %v; the item planned before the restart was due", got)
+	}
+	r.sweep()
+	if got := r.ran("session.close"); len(got) != 1 {
+		t.Fatalf("ran %v; the run repeated after the restart", got)
+	}
+}
+
 func TestAnApplyOfAMovedSourceIsRefused(t *testing.T) {
 	r := newRig(t, windowed(sweepWF("close", idle, "session.close"), 5*time.Minute))
 	r.put(s1, "a")
@@ -1703,12 +1744,12 @@ func TestOnlyAWorkflowThatReadsMarksLoadsThem(t *testing.T) {
 
 func TestEventsPlanOnAnEndedUnitOncePerEvent(t *testing.T) {
 	ctx := context.Background()
-	w := eventWF("on-done", unit.Entry, "entry", always, "verb_done")
+	w := eventWF("on-done", unit.Task, "task", always, "verb_done")
 	w.Key = []string{workflow.EventIDFact}
-	byFacts := eventWF("by-facts", unit.Entry, "entry", always, "verb_done")
+	byFacts := eventWF("by-facts", unit.Task, "task", always, "verb_done")
 	r := newRig(t, w, byFacts)
-	e1 := unit.Unit{Provider: unit.Entry, Key: "e-1"}
-	r.units.PutEnded(e1, workflow.Facts{"entry.fingerprint": "done"})
+	e1 := unit.Unit{Provider: unit.Task, Key: "t-1"}
+	r.units.PutEnded(e1, workflow.Facts{"task.fingerprint": "done"})
 	for _, name := range []string{"on-done", "by-facts"} {
 		if err := r.events.Advance(ctx, name, 0, time.Time{}); err != nil {
 			t.Fatal(err)
@@ -1727,5 +1768,35 @@ func TestEventsPlanOnAnEndedUnitOncePerEvent(t *testing.T) {
 	}
 	if count["on-done"] != 2 || count["by-facts"] != 1 {
 		t.Errorf("items per workflow %v, want 2 keyed by event and 1 keyed by facts", count)
+	}
+}
+
+type preparedKey struct{}
+
+// preparingUnits prepares the context a sweep reads its facts through and counts the reads made through it.
+type preparingUnits struct {
+	*automationtest.Units
+	seen int
+}
+
+func (p *preparingUnits) Prepare(ctx context.Context) (context.Context, error) {
+	return context.WithValue(ctx, preparedKey{}, true), nil
+}
+
+func (p *preparingUnits) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error) {
+	if ctx.Value(preparedKey{}) == true {
+		p.seen++
+	}
+	return p.Units.Facts(ctx, u)
+}
+
+func TestASweepReadsTheFactsThroughThePreparedContext(t *testing.T) {
+	r := newRig(t, sweepWF("close", idle, "session.close"))
+	pu := &preparingUnits{Units: r.units}
+	r.e.Units, r.e.Keep = pu, pu
+	r.put(s1, "a")
+	r.sweep()
+	if pu.seen == 0 {
+		t.Fatal("no facts were read through the prepared context")
 	}
 }

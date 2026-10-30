@@ -1,4 +1,4 @@
-[bold]Intents[/] [dim]8[/]
+[bold]Intents[/] [dim]10[/]
   act         [dim]bundled[/]                         Act on the open items of a unit without touching its
                                               code: settle what you can and propose the replies it
                                               needs as drafts for you to approve; Address works on
@@ -8,8 +8,13 @@
                                               code where they call for it; Act only settles open
                                               items and drafts replies
   ask-author  [dim]intents/ask-author/intent.toml[/]  Ask the author one question
+  attach      [dim]bundled[/]                         Make a session started outside the loop a run of a
+                                              task, keeping its context
   brief       [dim]bundled[/]                         One brief per unit: goal, context, kind, size, risk,
                                               open questions and tags
+  chat        [dim]bundled[/]                         Talk with an agent about a task: in the task's last
+                                              session when it can resume, else in a new one, in a
+                                              worktree of the task's repository or with no checkout
   nudge       [dim]bundled[/]                         Ask whoever the pull request waits on for the next
                                               step, in a comment; guidance is the topic
   probe       [dim]bundled[/]                         Check that an agent home can read its turn, record it,

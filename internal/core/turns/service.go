@@ -21,7 +21,9 @@ type Service struct {
 	AgentSessions AgentSessions
 	Sessions      Sessions
 	Launcher      Launcher
-	GitHub        GitHub
+	// Answers are the user's answers asked turns reconcile with; nil reads
+	// none.
+	Answers Answers
 	// Changed tells the views the pull requests whose turns changed; nil
 	// does nothing.
 	Changed func(ctx context.Context, refs ...unit.Unit)
@@ -29,6 +31,8 @@ type Service struct {
 	Clock   port.Clock
 	// Command is how messages name the binary.
 	Command string
+	// Chats are the chat messages a session's stop tells of; nil tells of none.
+	Chats Chats
 	// Notices words what the loop tells a session; nil names each notice and its data.
 	Notices Notices
 	// FastJob is the configured interval of the fast job Reconcile runs on.
@@ -46,7 +50,10 @@ type Service struct {
 	Prompts Prompts
 	// Items is nil when records' ledger ops are not applied.
 	Items Ledger
-	// Results attaches a done record's outcome url to the turn's entry when
+	// Gates opens the gate an intent's record.missing names when a turn of it
+	// ends without the record it requires; nil opens none.
+	Gates Gates
+	// Results attaches a done record's outcome url to the turn's task when
 	// its intent's record.attach_url says so; nil attaches nothing.
 	Results Results
 	// Usage is where EndHeadless writes a headless turn's usage; nil writes none.
@@ -73,6 +80,9 @@ type Service struct {
 	begun map[int64]unit.Unit
 	// unboundMCP holds the MCP initializes of handles no session took yet.
 	unboundMCP map[string]time.Time
+	// unrecorded are the turns that ended without a record since the last
+	// openMissing.
+	unrecorded []endedTurn
 }
 
 // Refusal is a request the turn's state or the caller's identity refuses.
@@ -169,11 +179,5 @@ func short(hash string) string {
 	return hash
 }
 
-// unitArg names a unit as the loop's commands read it: a pull request by its URL, any other unit as
-// <provider>:<key>.
-func unitArg(u unit.Unit) string {
-	if ref, ok := port.PROf(port.Event{Unit: u}); ok {
-		return ref.URL()
-	}
-	return u.String()
-}
+// unitArg names a unit as the loop's commands read it.
+func unitArg(u unit.Unit) string { return u.Address() }

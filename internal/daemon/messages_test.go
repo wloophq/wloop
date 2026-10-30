@@ -3,34 +3,38 @@ package daemon
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"slices"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
 	dmessage "github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 type enabledUnits struct{ off map[unit.ProviderID]bool }
 
-func (e enabledUnits) UnitFacts(_ context.Context, u unit.Unit) (gtd.UnitFacts, bool, error) {
-	return gtd.UnitFacts{Unit: u}, !e.off[u.Provider], nil
+func (e enabledUnits) UnitFacts(_ context.Context, u unit.Unit) (task.UnitFacts, bool, error) {
+	return task.UnitFacts{Unit: u}, !e.off[u.Provider], nil
 }
 
 type itemsNone struct{}
@@ -41,7 +45,7 @@ type messageRig struct{ *turnRig }
 
 var r8u = pr.Ref{Owner: "acme", Repo: "api", Number: 8}
 
-// newMessageRig serves the messages over a turn rig, with the entries' verbs registered.
+// newMessageRig serves the messages over a turn rig, with the tasks' verbs registered.
 func newMessageRig(t *testing.T) *messageRig {
 	t.Helper()
 	r := &messageRig{turnRig: newTurnRig(t)}
@@ -98,13 +102,32 @@ func actionLines(t *testing.T, body []byte) []string {
 	return res.Output
 }
 
-func entryLines(t *testing.T, body []byte) []string {
+func taskLines(t *testing.T, body []byte) []string {
 	t.Helper()
-	var res api.EntryResult
+	var res api.TaskResult
 	if err := json.Unmarshal(body, &res); err != nil {
 		t.Fatalf("%v: %s", err, body)
 	}
 	return res.Lines
+}
+
+// gatePath is the route that resolves gate id with intent.
+func gatePath(id int64, intent string) string {
+	return strings.NewReplacer("{id}", strconv.FormatInt(id, 10), "{intent}", intent).Replace(api.GatePath)
+}
+
+// gateOf is m's open gate.
+func (r *messageRig) gateOf(t *testing.T, m dmessage.Message) gate.Gate {
+	t.Helper()
+	open, err := r.s.deps.GateReader.Where(context.Background(), gates.Query{Kind: m.Kind.Gate(), Unit: m.Unit})
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := slices.IndexFunc(open, func(g gate.Gate) bool { return g.Subject == strconv.FormatInt(m.ID, 10) })
+	if i < 0 {
+		t.Fatalf("message %d has no open gate in %+v", m.ID, open)
+	}
+	return open[i]
 }
 
 func TestMessageAnswerDifferential(t *testing.T) {
@@ -123,35 +146,30 @@ func TestMessageAnswerDifferential(t *testing.T) {
 					rec := post(t, r.s, "/api/units/github/acme%2Fapi%238/answer", body)
 					return r.outcome(rec.Code, actionLines(t, rec.Body.Bytes()))
 				}
-				byRoute := func(t *testing.T) outcome {
+				byTask := func(t *testing.T) outcome {
 					r := newMessageRig(t)
 					m := r.question(t)
 					arrange(r)
-					rec := post(t, r.s, api.EntryPath(m.EntryID, "answer"), `{"args":{"option_id":"publish","guidance":"say thanks"},"source":"`+source+`"}`)
-					return r.outcome(rec.Code, entryLines(t, rec.Body.Bytes()))
-				}
-				byEntry := func(t *testing.T) outcome {
-					r := newMessageRig(t)
-					m := r.question(t)
-					arrange(r)
-					res, err := r.s.deps.GTD.Do(context.Background(), gtd.ID(m.EntryID), coregtd.Request{Verb: gtd.VerbAnswer,
-						Args: map[string]string{"option_id": "publish", "guidance": "say thanks"}, Source: source})
-					if err != nil {
-						t.Fatal(err)
-					}
-					if res.Entry.State != gtd.Done {
-						t.Fatalf("the entry is %s after its answer", res.Entry.State)
-					}
-					return r.outcome(200, res.Lines)
+					rec := post(t, r.s, api.TaskPath(m.TaskID, "answer"), `{"args":{"option_id":"publish","guidance":"say thanks"},"source":"`+source+`"}`)
+					return r.outcome(rec.Code, taskLines(t, rec.Body.Bytes()))
 				}
 				want := byUnit(t)
-				if want.Code != 200 || len(want.Answers) != 1 || want.Answers[0].Source != turn.Source(source) || want.Answers[0].Route != routes[name] {
+				if want.Code != 200 || len(want.Answers) != 1 || want.Answers[0].Source != turn.Source(source) || want.Answers[0].Route != routes[name] ||
+					want.Answers[0].Gate == 0 {
 					t.Fatalf("unit path %+v", want)
 				}
-				for path, got := range map[string]outcome{"entry route": byRoute(t), "entry": byEntry(t)} {
-					if !reflect.DeepEqual(got, want) {
-						t.Errorf("%s path\n got %+v\nwant %+v", path, got, want)
-					}
+				if got := byTask(t); !reflect.DeepEqual(got, want) {
+					t.Errorf("task path\n got %+v\nwant %+v", got, want)
+				}
+				if source != "cockpit" {
+					return
+				}
+				r := newMessageRig(t)
+				m := r.question(t)
+				arrange(r)
+				rec := post(t, r.s, gatePath(r.gateOf(t, m).ID, "answer"), `{"args":{"answer":"publish\nsay thanks"}}`)
+				if got := r.outcome(rec.Code, want.Lines); !reflect.DeepEqual(got, want) {
+					t.Errorf("gate path %s\n got %+v\nwant %+v", rec.Body, got, want)
 				}
 			})
 		}
@@ -165,40 +183,176 @@ func TestMessageAnswerRefusesAnUnknownOption(t *testing.T) {
 	want := post(t, ref.s, "/api/units/github/acme%2Fapi%238/answer", `{"option_id":"nope"}`)
 	r := newMessageRig(t)
 	m := r.question(t)
-	got := post(t, r.s, api.EntryPath(m.EntryID, "answer"), `{"args":{"option_id":"nope"}}`)
+	got := post(t, r.s, api.TaskPath(m.TaskID, "answer"), `{"args":{"option_id":"nope"}}`)
 	if got.Code != 400 || want.Code != 400 || got.Body.String() != want.Body.String() {
-		t.Fatalf("entry %d %s; unit %d %s", got.Code, got.Body, want.Code, want.Body)
+		t.Fatalf("task %d %s; unit %d %s", got.Code, got.Body, want.Code, want.Body)
 	}
-	if open, _ := r.msgs.Open(context.Background()); len(open) != 1 {
+	if open, _ := r.msgs.Open(context.Background()); len(open) != 1 || r.gateOf(t, open[0]).Status != gate.Open {
 		t.Fatalf("open %+v", open)
 	}
 }
 
-func TestDismissingAQuestionMessageThroughTheDaemon(t *testing.T) {
+func TestDismissingAQuestionGateThroughTheDaemon(t *testing.T) {
 	t.Parallel()
-	for _, via := range []string{"route", "entry"} {
+	for _, via := range []string{"unit", "gate"} {
 		t.Run(via, func(t *testing.T) {
 			t.Parallel()
 			r := newMessageRig(t)
 			m := r.question(t)
-			if via == "route" {
-				if rec := post(t, r.s, api.EntryPath(m.EntryID, "dismiss"), ``); rec.Code != 200 {
-					t.Fatalf("%d %s", rec.Code, rec.Body)
-				}
-			} else if _, err := r.s.deps.GTD.Do(context.Background(), gtd.ID(m.EntryID), coregtd.Request{Verb: gtd.VerbDismiss, Source: "tui"}); err != nil {
-				t.Fatal(err)
+			path := "/api/units/github/acme%2Fapi%238/dismiss"
+			if via == "gate" {
+				path = gatePath(r.gateOf(t, m).ID, "dismiss")
+			}
+			if rec := post(t, r.s, path, ``); rec.Code != 200 {
+				t.Fatalf("%d %s", rec.Code, rec.Body)
 			}
 			books, _ := r.store.Books(context.Background(), r8u.Unit())
 			if st := books[r8u.Unit()].Turns[0].State; st != turn.Dismissed {
 				t.Fatalf("turn %s", st)
 			}
-			if got, _, _ := r.msgs.Message(context.Background(), m.ID); got.State != dmessage.Dismissed {
+			if got, _, _ := r.msgs.Message(context.Background(), m.ID); got.Open() {
 				t.Fatalf("message %+v", got)
 			}
-			if e, _ := r.entries.Entry(context.Background(), gtd.ID(m.EntryID)); e.State != gtd.Trash {
-				t.Fatalf("entry %s", e.State)
+		})
+	}
+}
+
+func TestATaskServesItsQuestionGateWithItsMessage(t *testing.T) {
+	t.Parallel()
+	r := newMessageRig(t)
+	m := r.question(t)
+	var v api.TaskView
+	if code := get(t, r.s, api.TaskPath(m.TaskID), &v); code != 200 {
+		t.Fatalf("%d", code)
+	}
+	got, g, ok := v.MessageOf()
+	if !ok || got.ID != m.ID || got.Text != "Publish?" || len(got.Options) != 2 || g.Kind != "question" || g.Text != "The agent asks" {
+		t.Fatalf("%+v %+v %v", got, g, ok)
+	}
+}
+
+func TestMessageAnswerKeepsItsSource(t *testing.T) {
+	t.Parallel()
+	for _, source := range []string{"tui", "notification"} {
+		t.Run(source, func(t *testing.T) {
+			t.Parallel()
+			r := newMessageRig(t)
+			m := r.question(t)
+			if rec := post(t, r.s, api.TaskPath(m.TaskID, "answer"), `{"args":{"option_id":"hold"},"source":"`+source+`"}`); rec.Code != 200 {
+				t.Fatalf("%d %s", rec.Code, rec.Body)
+			}
+			books, _ := r.store.Books(context.Background(), r8u.Unit())
+			if a := books[r8u.Unit()].Answers; len(a) != 1 || a[0].Source != turn.Source(source) {
+				t.Fatalf("answers %+v", a)
 			}
 		})
+	}
+	r := newMessageRig(t)
+	m := r.question(t)
+	if rec := post(t, r.s, api.TaskPath(m.TaskID, "answer"), `{"args":{"option_id":"hold"},"source":"bogus"}`); rec.Code != 400 {
+		t.Fatalf("a bogus source: %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestMessageOfADisabledPluginAnswers409(t *testing.T) {
+	t.Parallel()
+	r := newMessageRig(t)
+	m := r.question(t)
+	r.s.deps.PluginEnabled = func(p unit.ProviderID) bool { return p != unit.GitHub }
+	if rec := post(t, r.s, api.TaskPath(m.TaskID, "answer"), `{"args":{"option_id":"hold"}}`); rec.Code != 409 || rec.Body.String() != `{"error":"github is disabled","plugin":"github"}`+"\n" {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	if books, _ := r.store.Books(context.Background(), r8u.Unit()); len(books[r8u.Unit()].Answers) != 0 {
+		t.Fatal("an answer was stored")
+	}
+	if r.gateOf(t, m).Status != gate.Open {
+		t.Fatal("the gate closed")
+	}
+}
+
+func TestApproveAnswersAConfirmWithYesAndApprovesAProposal(t *testing.T) {
+	t.Parallel()
+	r := newMessageRig(t)
+	ctx := context.Background()
+	r.asked(r8u, turn.Intent(dintent.Review), turn.Asked, &record.Question{Kind: "confirm", Text: "Publish?"})
+	if err := r.s.deps.Messages.Reconcile(ctx, r8u.Unit()); err != nil {
+		t.Fatal(err)
+	}
+	open, _ := r.msgs.Open(ctx)
+	if rec := post(t, r.s, api.TaskPath(open[0].TaskID, "approve"), `{"source":"tui"}`); rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	books, _ := r.store.Books(ctx, r8u.Unit())
+	if a := books[r8u.Unit()].Answers; len(a) != 1 || !a[0].Yes || a[0].Source != turn.TUI {
+		t.Fatalf("answers %+v", a)
+	}
+	m, err := r.s.deps.Messages.Propose(ctx, messages.ProposeRequest{Unit: r8u.Unit(), Text: "Close it?", Origin: dmessage.Origin{Kind: dmessage.OriginCore, Workflow: "close"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := r.gateOf(t, m)
+	if rec := post(t, r.s, api.TaskPath(m.TaskID, "approve"), ``); rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	if got, _ := r.s.deps.GateReader.Get(ctx, g.ID); got.Status != gate.Approved || got.By != task.ActorPerson {
+		t.Fatalf("gate %+v", got)
+	}
+	if got, _, _ := r.msgs.Message(ctx, m.ID); got.Open() {
+		t.Fatalf("message %+v", got)
+	}
+}
+
+func TestDismissingAMessageTaskOfAnEarlierVersionDismissesItsQuestion(t *testing.T) {
+	t.Parallel()
+	r := newMessageRig(t)
+	ctx := context.Background()
+	r.asked(r8u, turn.Intent(dintent.Review), turn.Asked, publishQuestion)
+	e, err := r.s.deps.Tasks.Open(ctx, coretasks.OpenRequest{Title: "Publish?", Unit: ptr(r8u.Unit()), Origin: task.OriginMessage})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := r.msgs.Upsert(ctx, dmessage.Message{TaskID: string(e.ID), Unit: r8u.Unit(), Kind: dmessage.Question, Text: "Publish?", Options: publishQuestion.Options,
+		Recommend: "publish", Origin: dmessage.Origin{Kind: dmessage.OriginTurn, TurnSeq: 1, Session: "term-1"}, CreatedAt: r.s.deps.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.s.deps.Messages.Reconcile(ctx, r8u.Unit()); err != nil {
+		t.Fatal(err)
+	}
+	if g := r.gateOf(t, m); g.Task != e.ID {
+		t.Fatalf("gate %+v", g)
+	}
+	if rec := post(t, r.s, api.TaskPath(string(e.ID), "dismiss"), ``); rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	books, _ := r.store.Books(ctx, r8u.Unit())
+	if st := books[r8u.Unit()].Turns[0].State; st != turn.Dismissed {
+		t.Fatalf("turn %s", st)
+	}
+	if got, _ := r.s.deps.Tasks.Task(ctx, e.ID); got.Category != task.CategoryDropped {
+		t.Fatalf("task %+v", got)
+	}
+}
+
+func ptr[T any](v T) *T { return &v }
+
+func TestAClosedTurnAnswers409(t *testing.T) {
+	t.Parallel()
+	rec := httptest.NewRecorder()
+	writeTasksError(rec, fmt.Errorf("%w: turn 1", turn.ErrClosed))
+	if rec.Code != 409 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestAProposalTheLedgerRefusedAnswers409(t *testing.T) {
+	t.Parallel()
+	refused := fmt.Errorf("gate 3 resolved approved, its consequence failed: %w: item: unknown \"i9\"", messages.ErrNotApplied)
+	for name, write := range map[string]func(http.ResponseWriter, error){"gate": writeGateError, "task": writeTasksError} {
+		rec := httptest.NewRecorder()
+		if write(rec, refused); rec.Code != 409 {
+			t.Errorf("%s route: %d %s", name, rec.Code, rec.Body)
+		}
 	}
 }
 
@@ -209,104 +363,4 @@ func getRaw(t *testing.T, s *Server, path string) string {
 		t.Fatalf("%s: %d", path, code)
 	}
 	return string(raw) + "\n"
-}
-
-func TestEntryCarriesItsMessage(t *testing.T) {
-	t.Parallel()
-	r := newMessageRig(t)
-	m := r.question(t)
-	got, err := r.s.entryMessage(context.Background(), m.EntryID)
-	if err != nil || got == nil || !reflect.DeepEqual(*got, messageView(m)) || got.EntryID != m.EntryID {
-		t.Fatalf("%+v %v", got, err)
-	}
-	capture, err := r.s.deps.GTD.Capture(context.Background(), "call Ana", "", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, err := r.s.entryMessage(context.Background(), string(capture.ID)); got != nil || err != nil {
-		t.Fatalf("a capture carries %+v %v", got, err)
-	}
-}
-
-func TestMessageAnswerKeepsItsSource(t *testing.T) {
-	t.Parallel()
-	for _, c := range []struct {
-		via, source string
-	}{{"entry", "tui"}, {"route", "notification"}} {
-		t.Run(c.via, func(t *testing.T) {
-			t.Parallel()
-			r := newMessageRig(t)
-			m := r.question(t)
-			if c.via == "route" {
-				if rec := post(t, r.s, api.EntryPath(m.EntryID, "answer"), `{"args":{"option_id":"hold"},"source":"`+c.source+`"}`); rec.Code != 200 {
-					t.Fatalf("%d %s", rec.Code, rec.Body)
-				}
-			} else if _, err := r.s.deps.GTD.Do(context.Background(), gtd.ID(m.EntryID), coregtd.Request{Verb: gtd.VerbAnswer,
-				Args: map[string]string{"option_id": "hold"}, Source: c.source}); err != nil {
-				t.Fatal(err)
-			}
-			books, _ := r.store.Books(context.Background(), r8u.Unit())
-			if a := books[r8u.Unit()].Answers; len(a) != 1 || a[0].Source != turn.Source(c.source) {
-				t.Fatalf("answers %+v", a)
-			}
-		})
-	}
-	r := newMessageRig(t)
-	m := r.question(t)
-	if rec := post(t, r.s, api.EntryPath(m.EntryID, "answer"), `{"args":{"option_id":"hold"},"source":"bogus"}`); rec.Code != 400 {
-		t.Fatalf("a bogus source: %d %s", rec.Code, rec.Body)
-	}
-}
-
-func TestMessageOfADisabledPluginAnswers409(t *testing.T) {
-	t.Parallel()
-	r := newMessageRig(t)
-	m := r.question(t)
-	r.s.deps.PluginEnabled = func(p unit.ProviderID) bool { return p != unit.GitHub }
-	for _, verb := range []string{"answer", "dismiss"} {
-		if rec := post(t, r.s, api.EntryPath(m.EntryID, verb), `{"args":{"option_id":"hold"}}`); rec.Code != 409 || !slices.Contains([]string{`{"error":"github is disabled","plugin":"github"}` + "\n"}, rec.Body.String()) {
-			t.Fatalf("%s: %d %s", verb, rec.Code, rec.Body)
-		}
-	}
-	r.facts.off[unit.GitHub] = true
-	if _, err := r.s.deps.GTD.Do(context.Background(), gtd.ID(m.EntryID), coregtd.Request{Verb: gtd.VerbAnswer, Args: map[string]string{"option_id": "hold"}}); err == nil {
-		t.Fatal("the entry verb answered a disabled plugin's message")
-	}
-	if books, _ := r.store.Books(context.Background(), r8u.Unit()); len(books[r8u.Unit()].Answers) != 0 {
-		t.Fatal("an answer was stored")
-	}
-}
-
-func TestApproveAnswersAConfirmWithYes(t *testing.T) {
-	t.Parallel()
-	r := newMessageRig(t)
-	ctx := context.Background()
-	r.asked(r8u, turn.Intent(dintent.Review), turn.Asked, &record.Question{Kind: "confirm", Text: "Publish?"})
-	if err := r.s.deps.Messages.Reconcile(ctx, r8u.Unit()); err != nil {
-		t.Fatal(err)
-	}
-	open, _ := r.msgs.Open(ctx)
-	if _, err := r.s.deps.GTD.Do(ctx, gtd.ID(open[0].EntryID), coregtd.Request{Verb: gtd.VerbApprove, Source: "tui"}); err != nil {
-		t.Fatal(err)
-	}
-	books, _ := r.store.Books(ctx, r8u.Unit())
-	if a := books[r8u.Unit()].Answers; len(a) != 1 || !a[0].Yes || a[0].Source != turn.TUI {
-		t.Fatalf("answers %+v", a)
-	}
-	m, err := r.s.deps.Messages.Propose(ctx, messages.ProposeRequest{Unit: r8u.Unit(), Text: "Close it?", Origin: dmessage.Origin{Kind: dmessage.OriginCore, Workflow: "close"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := r.s.deps.GTD.Do(ctx, gtd.ID(m.EntryID), coregtd.Request{Verb: gtd.VerbApprove}); !errors.Is(err, coregtd.ErrVerb) {
-		t.Fatalf("approve on a proposal with no accept option: %v", err)
-	}
-}
-
-func TestAClosedTurnAnswers409(t *testing.T) {
-	t.Parallel()
-	rec := httptest.NewRecorder()
-	writeGTDError(rec, fmt.Errorf("%w: turn 1", turn.ErrClosed))
-	if rec.Code != 409 {
-		t.Fatalf("%d %s", rec.Code, rec.Body)
-	}
 }

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -9,7 +10,9 @@ import (
 	"testing"
 	"time"
 
-	factsgithub "github.com/wloophq/wloop/internal/adapter/facts/github"
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+	rmoverlay "github.com/wloophq/wloop/internal/readmodel/overlay"
+
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
@@ -17,22 +20,25 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/gates/gatestest"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/workspaces"
 	wt "github.com/wloophq/wloop/internal/core/workspaces/workspacestest"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/jsonschema"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/meter"
-	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -51,8 +57,8 @@ func TestApplyConfigOverridesModeApprovalAndDisables(t *testing.T) {
 	cfg.Workflows = map[string]config.WorkflowConfig{
 		"gone":    {Enabled: &off},
 		"watched": {Observe: &on},
-		"waits":   {Approval: &config.ApprovalConfig{Mode: "delay", Window: &window}},
-		"refused": {Approval: &config.ApprovalConfig{Mode: "run", Window: &window}},
+		"waits":   {Gates: &config.WorkflowGates{Approval: &config.ApprovalConfig{Mode: "delay", Window: &window}}},
+		"refused": {Gates: &config.WorkflowGates{Approval: &config.ApprovalConfig{Mode: "run", Window: &window}}},
 	}
 	clean := workflow.Workflow{Name: "watched", Observe: false, Approval: workflow.Approval{Mode: workflow.ApprovalRun}}
 	in := []workflow.Workflow{{Name: "gone", Observe: false}, clean, turnStartWorkflow("waits"), turnStartWorkflow("refused"), {Name: "kept", Observe: false}}
@@ -70,7 +76,7 @@ func TestApplyConfigOverridesModeApprovalAndDisables(t *testing.T) {
 	if a := out[1].Approval; a.Mode != workflow.ApprovalDelay || a.Window != 10*time.Minute {
 		t.Errorf("approval %+v", a)
 	}
-	if ok, err := out[2].When.Match(workflow.Vars{}); ok || err == nil || !strings.Contains(err.Error(), "workflows.refused.approval") {
+	if ok, err := out[2].When.Match(workflow.Vars{}); ok || err == nil || !strings.Contains(err.Error(), "workflows.refused.gates.approval") {
 		t.Errorf("a window left on run matched: %v, %v", ok, err)
 	}
 	if in[1].Observe {
@@ -160,7 +166,7 @@ func TestOneStateLoadPerSweep(t *testing.T) {
 	if !slices.Equal(r.mgr.Removed(), []string{"ws1"}) {
 		t.Fatalf("removed %v", r.mgr.Removed())
 	}
-	if !r.te.loadRounds(t).FirstRoundSkipped("acme/api#7") {
+	if r.te.loadRounds(t).Mark("acme/api#7", ghsource.MarkFirstSkipped) == "" {
 		t.Fatal("the removal's SkipFirstRound did not land in the saved state")
 	}
 }
@@ -189,7 +195,11 @@ func TestPendingRunsKeepTheGateMeterScope(t *testing.T) {
 	}
 	job.End()
 	clock.Advance(2 * time.Minute)
-	if err := eng.DueRun(ctx); err != nil {
+	due, err := ledger.Items(ctx, automation.Filter{Decisions: []workflow.Decision{workflow.DecisionPending}})
+	if err != nil || len(due) != 1 {
+		t.Fatalf("pending %v %v", due, err)
+	}
+	if err := eng.Release(ctx, gate.Gate{ID: 1, Kind: gate.KindPlan, Subject: due[0].ID, Status: gate.Approved, By: task.ActorWorkflow, Rule: gates.RuleWindow}); err != nil {
 		t.Fatal(err)
 	}
 	if len(steps.Ran()) != 1 {
@@ -231,12 +241,24 @@ func TestPendingRoundsServeTheReadModel(t *testing.T) {
 	if err := ledger.Save(context.Background(), automation.PlanWrite{Workflows: []string{"review-follow-up", "session-manual"}, Items: items}); err != nil {
 		t.Fatal(err)
 	}
-	te.engine = &automation.Engine{Ledger: ledger}
-	got, err := te.pendingRounds(context.Background())
+	st := gatestest.NewStore(func() time.Time { return testNow.Add(time.Second) })
+	svc := gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{te.loadedIntents}, Clock: clockFunc(func() time.Time { return testNow.Add(time.Second) })})
+	te.engine = &automation.Engine{Ledger: ledger, Gates: draftGatesOver{svc, st}}
+	var opened gate.Gate
+	for _, it := range items {
+		g, err := svc.Open(context.Background(), gate.Gate{Kind: gate.KindPlan, Unit: it.Unit, Subject: it.ID}, waitsForYou{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if it.Unit == pr {
+			opened = g
+		}
+	}
+	got, err := enginePlans{te.Env}.Plans(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[unit.Unit]round.Pending{pr: {Intent: "follow-up", Reason: "runs when its window ends", Since: testNow, Deadline: deadline}}
+	want := map[unit.Unit]rmoverlay.Pending{pr: {Intent: "follow-up", Reason: "runs when its window ends", Since: opened.OpenedAt, Deadline: opened.Deadline}}
 	if len(got) != 1 || got[pr] != want[pr] {
 		t.Fatalf("pending %+v", got)
 	}
@@ -265,13 +287,13 @@ func TestUnitsRouteByProvider(t *testing.T) {
 	if got := set.Due(); !got.Equal(testNow.Add(time.Minute)) {
 		t.Fatalf("due %v", got)
 	}
-	if moved, err := set.Moved(context.Background(), []unit.Unit{pr, s}); err != nil || !slices.Equal(moved, []unit.Unit{s}) {
-		t.Fatalf("moved %v %v", moved, err)
+	if revs, err := set.Revs(context.Background(), []unit.Unit{pr, s}); err != nil || len(revs) != 2 || revs[s] != 1 || revs[pr] != 0 {
+		t.Fatalf("revs %v %v", revs, err)
 	}
 	var refreshed []string
 	gh.OnRefresh(func(context.Context) error { refreshed = append(refreshed, "github"); return nil })
 	sess.OnRefresh(func(context.Context) error { refreshed = append(refreshed, "session"); return nil })
-	if err := set.Refresh(context.Background()); err != nil || !slices.Equal(refreshed, []string{"github", "session"}) {
+	if err := (unitKeeping{set}).Refresh(context.Background()); err != nil || !slices.Equal(refreshed, []string{"github", "session"}) {
 		t.Fatalf("refreshed %v %v", refreshed, err)
 	}
 	st := round.New()
@@ -280,11 +302,11 @@ func TestUnitsRouteByProvider(t *testing.T) {
 		settled = s.(interface{ Rounds() *round.Store }).Rounds()
 		return nil
 	})
-	if err := set.Settle(context.Background(), &roundState{st: st}); err != nil || settled != st {
+	if err := (unitKeeping{set}).Settle(context.Background(), &roundState{st: st}); err != nil || settled != st {
 		t.Fatalf("settled %p, want %p: %v", settled, st, err)
 	}
 	sess.SetSeen(7)
-	if got := set.Seen(); got != 7 {
+	if got := (unitKeeping{set}).Seen(); got != 7 {
 		t.Fatalf("seen %d", got)
 	}
 }
@@ -306,14 +328,10 @@ func TestNewEngineAssemblesOverTheStore(t *testing.T) {
 	}
 }
 
-func TestTheGithubModuleOffersTheRounds(t *testing.T) {
+func TestOnlyRunningPluginsPlanRounds(t *testing.T) {
 	t.Parallel()
-	p := factsgithub.New(factsgithub.Deps{})
-	if _, ok := candidatesOf([]source.Module{{ID: unit.GitHub, Facts: p}}).(githubCandidates); !ok {
-		t.Fatal("the github facts provider does not offer its rounds")
-	}
-	if candidatesOf(nil) != nil {
-		t.Fatal("no module offers rounds")
+	if got := (&Env{}).planners(); len(got) != 0 {
+		t.Fatalf("planners without a running plugin: %v", got)
 	}
 }
 
@@ -334,7 +352,7 @@ func threeProviders(t *testing.T) (sweepCase, engineDeps) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	return sc, engineDeps{DB: db, Modules: []source.Module{{ID: unit.GitHub, Facts: gh}}}
+	return sc, engineDeps{DB: db, Modules: []pluginModule{{ID: unit.GitHub, Facts: gh}}}
 }
 
 func everyUnit(p unit.ProviderID, slot string) workflow.Workflow {
@@ -385,7 +403,7 @@ func TestThePlanEngineKeepsItsOwnSeen(t *testing.T) {
 	if _, err := plan.Evaluate(context.Background(), ""); err != nil {
 		t.Fatal(err)
 	}
-	if got := eng.Units.(*unitSet).Seen(); got != seen {
+	if got := eng.Keep.(unitKeeping).Seen(); got != seen {
 		t.Fatalf("a plan moved the sweep's Seen from %d to %d", seen, got)
 	}
 }
@@ -395,8 +413,8 @@ func TestTurnStartWindowsComeFromTheManifest(t *testing.T) {
 	if w := applyConfig([]workflow.Workflow{turnStartWorkflow("review-follow-up")}, Defaults())[0]; w.Approval.Window != time.Minute {
 		t.Fatalf("window %v", w.Approval.Window)
 	}
-	if w := applyConfig([]workflow.Workflow{turnStartWorkflow("review-follow-up")}, withoutWindows(Defaults()))[0]; w.Approval.Window != 0 {
-		t.Fatalf("window with approval.mode run %v", w.Approval.Window)
+	if w := applyConfig([]workflow.Workflow{turnStartWorkflow("review-follow-up")}, withoutWindows(Defaults()))[0]; len(w.Approval.Rules) == 0 || w.Approval.Rules[0].Mode != workflow.ApprovalRun {
+		t.Fatalf("a plan gate with a run rule first: %+v", w.Approval)
 	}
 }
 
@@ -405,7 +423,7 @@ func TestGuidanceAGuidedRunDidNotUseIsKeptUnlessNewerIsStored(t *testing.T) {
 	ctx := context.Background()
 	rec := &memRecorder{}
 	g := recGuidance{&Env{Rec: rec}}
-	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
+	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 7}
 	if err := rec.KeepNextGuidance(ctx, ref, "check the migration"); err != nil {
 		t.Fatal(err)
 	}
@@ -547,13 +565,13 @@ func TestThePlanEnginesWorkspaceFactsAreASibling(t *testing.T) {
 func TestTheConfigsDraftApprovalIsLaidOnce(t *testing.T) {
 	t.Parallel()
 	cfg := Defaults()
-	cfg.Workflows = map[string]config.WorkflowConfig{"drafts": {Drafts: &config.WorkflowDrafts{Approval: &config.ApprovalConfig{Mode: "delay", Window: new(config.Days(5 * time.Minute))}}}}
+	cfg.Workflows = map[string]config.WorkflowConfig{"drafts": {Gates: &config.WorkflowGates{Approval: &config.ApprovalConfig{Mode: "delay", Window: new(config.Days(5 * time.Minute))}}}}
 	manifest := draft.Fixed(draft.Approval{Mode: draft.Wait})
 	out := applyConfig([]workflow.Workflow{{Name: "drafts", Slot: "slack", Observe: false, DraftApproval: manifest}}, cfg)
 	if out[0].DraftApproval != manifest {
 		t.Fatalf("applyConfig laid the drafts approval its resolver lays: %+v", out[0].DraftApproval)
 	}
-	if a := draftApproval(cfg, out[0]); a.Default.Mode != draft.Delay || a.Default.Window != 5*time.Minute {
+	if a := draftApproval(cfg, out[0], nil, draft.Approval{Mode: draft.Wait}); a.Default.Mode != draft.Delay || a.Default.Window != 5*time.Minute {
 		t.Fatalf("draft approval %+v", a)
 	}
 	if manifest.Default.Mode != draft.Wait {
@@ -564,7 +582,7 @@ func TestTheConfigsDraftApprovalIsLaidOnce(t *testing.T) {
 func TestConfigFactsCarryTheProposalSettings(t *testing.T) {
 	t.Parallel()
 	f := configFacts(Defaults())
-	if f["config.gtd.stale_waiting_days"] != 2 || f["config.drafts.repeat_after"] != 24*time.Hour || f["config.turns.per_day"] != 20 {
+	if f["config.tasks.stale_waiting_days"] != 2 || f["config.drafts.repeat_after"] != 24*time.Hour || f["config.turns.per_day"] != 20 {
 		t.Fatalf("%v", f)
 	}
 }
@@ -584,5 +602,90 @@ func TestApplyConfigOnlyWhenReadsTheBriefExtras(t *testing.T) {
 		if got, err := w.When.Match(workflow.Vars{Facts: workflow.Facts{"brief.extra.approach": approach}}); err != nil || got != want {
 			t.Errorf("approach %q: %v, %v; want %v", approach, got, err, want)
 		}
+	}
+}
+
+func TestApplyConfigOnlyWhenReadsTheTaskProperties(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	w := turnStartWorkflow("focus")
+	w.Provider, w.Slot = unit.Task, "task"
+	cfg := Defaults()
+	cfg.Workflows = map[string]config.WorkflowConfig{"focus": {OnlyWhen: `task.prop.priority == "high"`}}
+	w = applyConfigWith([]workflow.Workflow{w}, cfg, briefExtrasOf(te.loadedIntents()))[0]
+	for priority, want := range map[string]bool{"high": true, "low": false} {
+		if got, err := w.When.Match(workflow.Vars{Facts: workflow.Facts{"task.prop.priority": priority}}); err != nil || got != want {
+			t.Errorf("priority %q: %v, %v; want %v", priority, got, err, want)
+		}
+	}
+}
+
+// nudgeDraftRule is the config with one drafts approval rule on the bundled
+// slack-stalled-nudge workflow, whose units are tasks.
+func nudgeDraftRule(when, mode string) config.Config {
+	cfg := Defaults()
+	cfg.Workflows = map[string]config.WorkflowConfig{"slack-stalled-nudge": {Gates: &config.WorkflowGates{Approval: &config.ApprovalConfig{
+		Mode: string(draft.Wait), Rule: []config.ApprovalRuleConfig{{When: when, Mode: mode}}}}}}
+	return cfg
+}
+
+func TestAConfigDraftWaitRuleReadsATrustedProperty(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	cfg := nudgeDraftRule(`task.prop.owner == "slack:U0AAA"`, string(draft.Wait))
+	if errs := configWorkflowProblems(cfg, te.loadedIntents()); len(errs) > 0 {
+		t.Fatalf("%v", errs)
+	}
+	file := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(file, []byte("[[workflows.slack-stalled-nudge.gates.approval.rule]]\nwhen = 'task.prop.owner == \"slack:U0AAA\"'\nmode = \"wait\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := config.LoadFile(file, Defaults()); err != nil {
+		t.Fatalf("config.toml refuses a wait rule over a property: %v", err)
+	}
+}
+
+func TestAConfigDraftRuleReadingAnAgentWrittenPropertyIsRefused(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	cfg := nudgeDraftRule(`task.prop.risk == "low"`, string(draft.Send))
+	errs := configWorkflowProblems(cfg, te.loadedIntents())
+	if len(errs) == 0 || slices.ContainsFunc(errs, func(err error) bool { return !strings.Contains(err.Error(), "task.prop.risk") }) {
+		t.Fatalf("%v", errs)
+	}
+	file := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(file, []byte("[[workflows.slack-stalled-nudge.gates.approval.rule]]\nwhen = 'task.prop.risk == \"low\"'\nmode = \"send\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := config.LoadFile(file, Defaults()); err == nil || !strings.Contains(err.Error(), "config.toml cannot see who writes it") {
+		t.Fatalf("config.toml loads a send rule over a property: %v", err)
+	}
+}
+
+// draftGatesOver are a gates service and its reader as the engine's gates.
+type draftGatesOver struct {
+	*gates.Service
+	r gates.Reader
+}
+
+func (g draftGatesOver) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
+	return g.r.Where(ctx, q)
+}
+
+type preparedKey struct{}
+
+type preparingUnits struct{ *automationtest.Units }
+
+func (preparingUnits) Prepare(ctx context.Context) (context.Context, error) {
+	return context.WithValue(ctx, preparedKey{}, "github"), nil
+}
+
+func TestUnitsPrepareAnEvaluationThroughEachProviderThatDoes(t *testing.T) {
+	t.Parallel()
+	gh, sess := automationtest.NewUnits(), automationtest.NewUnits()
+	set := newUnitSet(map[unit.ProviderID]automation.Units{unit.GitHub: preparingUnits{gh}, unit.Session: sess})
+	ctx, err := (unitKeeping{set}).Prepare(context.Background())
+	if err != nil || ctx.Value(preparedKey{}) != "github" {
+		t.Fatalf("prepared %v %v", ctx.Value(preparedKey{}), err)
 	}
 }

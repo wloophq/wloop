@@ -10,6 +10,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -135,9 +137,9 @@ func TestLaterTurnTakesAStaleBrief(t *testing.T) {
 	r.q.Run(ctx)
 	r.settled()
 	calls := r.run.calls
-	p, _, _ := r.st.PR(ctx, refN(1))
+	p, _, _ := inventorytest.Of(r.st).PR(ctx, refN(1))
 	p.BodyEditedAt = t0.Add(time.Minute)
-	r.st.UpsertPR(ctx, p)
+	inventorytest.Of(r.st).UpsertPR(ctx, p)
 	r.now = t0.Add(time.Minute + BodyQuiet)
 	rd := r.ready(t, refN(1), false)
 	if rd.State != Ready || rd.Brief == nil || rd.Run == 0 {
@@ -277,9 +279,9 @@ func TestANewHeadClearsTheGiveUp(t *testing.T) {
 	r.ready(t, refN(1), true)
 	r.settled()
 	delete(r.run.fail, "acme/api#1")
-	p, _, _ := r.st.PR(ctx, refN(1))
+	p, _, _ := inventorytest.Of(r.st).PR(ctx, refN(1))
 	p.HeadOid = "h2"
-	r.st.UpsertPR(ctx, p)
+	inventorytest.Of(r.st).UpsertPR(ctx, p)
 	if rd := r.ready(t, refN(1), true); rd.State != Wait || rd.Attempt != 1 || rd.LastError != "" {
 		t.Fatalf("%+v", rd)
 	}
@@ -311,7 +313,7 @@ func TestIntakesAnswerTheIntakesPort(t *testing.T) {
 	r.run.fail["acme/api#1"] = fmt.Errorf("%w: kind %q", ErrInvalid, "epic")
 	a := Intakes{Q: r.q}
 	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 1}
-	changed, release := a.Changed(ref.Unit())
+	changed, release := a.Changed(context.Background(), ref.Unit())
 	defer release()
 	if rd, err := a.Ready(context.Background(), ref.Unit(), true, nil); err != nil || rd != (intake.Readiness{Wait: WaitBriefing, Attempt: 1}) {
 		t.Fatalf("%+v %v", rd, err)

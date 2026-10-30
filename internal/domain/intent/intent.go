@@ -37,7 +37,7 @@ type Def struct {
 	Label      string
 	Summary    string
 	Key        string
-	Verb       string // the gtd verb its action fulfills; "" for none
+	Verb       string // the task verb its action fulfills; "" for none
 	UserFacing bool
 	Workspace  string // review | author | linked_else_main | given
 	Session    Session
@@ -73,7 +73,8 @@ type Def struct {
 	Bundled      bool
 	// Provider is the manifest's provider; default "github".
 	Provider unit.ProviderID
-	// DraftApproval is the manifest's [drafts.approval] block; nil when absent.
+	// DraftApproval is the approval of its turns' drafts, from the manifest's
+	// [gates.approval]; nil when that names none for a draft gate.
 	DraftApproval *draft.Policy
 	// Runners are turn.Runner values; default ["session"].
 	Runners []string
@@ -99,8 +100,8 @@ type Def struct {
 	// AllowedEffects are the effects the intent's agents may declare on the
 	// drafts they propose, names of builtin.Effects.
 	AllowedEffects []string
-	// AttachPosts says the unit of each post its turns make on an entry is
-	// attached to that entry.
+	// AttachPosts says the unit of each post its turns make on a task is
+	// attached to that task.
 	AttachPosts bool
 	// RoundKind is the sweep round the intent's turns are, from its role:
 	// "review" (first or follow-up, by the step's stage) or "address"; ""
@@ -146,11 +147,11 @@ type WorkspaceRepo struct {
 }
 
 // TargetCapture is the target.missing that captures the run's guidance as
-// a new entry, the turn's unit.
+// a new task, the turn's unit.
 const TargetCapture = "capture"
 
 // Target is what a run of the intent with no unit does: Missing is "" to
-// refuse it, or TargetCapture; Title names the captured entry over the
+// refuse it, or TargetCapture; Title names the captured task over the
 // guidance.
 type Target struct {
 	Missing string
@@ -253,8 +254,14 @@ type RecordRules struct {
 	HistoryArtifact string
 	Require         []Require
 	// AttachURL says a done record's outcome url, when it names a unit, is
-	// attached to the turn's entry.
+	// attached to the turn's task.
 	AttachURL bool
+	// Requires is the record kind a run owes, "" for none; Missing the gate
+	// a run that ends without it opens.
+	Requires, Missing string
+	// None is an intent whose manifest has no [record]: its turns owe no
+	// record, so its sessions' stops are never blocked for one.
+	None bool
 }
 
 type Require struct {

@@ -3,16 +3,20 @@ package daemon
 import (
 	"fmt"
 	"net/http"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
-// handleDigest serves the daily digest of the query parameter day: the counters, and the entries that moved
-// into Next or Waiting since the previous digest, at notifications.digest_at local time (midnight when off).
+// handleDigest serves the daily digest of the query parameter day: the counters, and the tasks of the views the
+// profile's badge counts that moved since the previous digest, at notifications.digest_at local time (midnight
+// when off).
 func (s *Server) handleDigest(w http.ResponseWriter, r *http.Request) {
-	g, ok := s.gtd(w)
+	g, ok := s.tasks(w)
 	if !ok {
 		return
 	}
@@ -27,27 +31,30 @@ func (s *Server) handleDigest(w http.ResponseWriter, r *http.Request) {
 	}
 	start := end.AddDate(0, 0, -1)
 	ctx := r.Context()
-	d := api.Digest{Day: day, Title: "Daily digest"}
-	for _, v := range []gtd.View{gtd.ViewNext, gtd.ViewWaiting} {
-		es, err := g.Entries(ctx, gtd.Query{View: v})
-		if err != nil {
-			writeGTDError(w, err)
-			return
-		}
-		for _, e := range es {
-			if e.Updated.After(start) && !e.Updated.After(end) && s.unitsEnabled(e.Units) {
-				d.Entries = append(d.Entries, string(e.ID))
-			}
-		}
-	}
+	d := api.Digest{Day: day, Title: s.notice(builtin.NoticeDigestTitle, nil)}
+	def := s.loaded().Views
+	var counts []string
 	c, err := g.Counts(ctx, "")
 	if err != nil {
-		writeGTDError(w, err)
+		writeTasksError(w, err)
 		return
 	}
 	d.Counts = wireCounters(c)
-	d.Body = fmt.Sprintf("%d new in Next or Waiting · %d in Inbox · %d in Outbox · %d next · %d waiting", len(d.Entries),
-		d.Counts.Views[string(gtd.ViewInbox)], d.Counts.Views[string(gtd.ViewOutbox)], d.Counts.Views[string(gtd.ViewNext)], d.Counts.Views[string(gtd.ViewWaiting)])
+	for _, id := range def.Badge {
+		v, _ := def.View(id)
+		counts = append(counts, s.notice(builtin.NoticeDigestView, map[string]any{"View": v.Label, "Count": d.Counts.Views[id]}))
+		es, err := g.Tasks(ctx, task.Query{View: task.View(id)})
+		if err != nil {
+			writeTasksError(w, err)
+			return
+		}
+		for _, e := range es {
+			if e.Updated.After(start) && !e.Updated.After(end) && s.unitsEnabled(e.Units) && !slices.Contains(d.Tasks, string(e.ID)) {
+				d.Tasks = append(d.Tasks, string(e.ID))
+			}
+		}
+	}
+	d.Body = strings.Join(append([]string{s.notice(builtin.NoticeDigestNew, map[string]any{"Count": len(d.Tasks)})}, counts...), " · ")
 	writeJSON(w, d)
 }
 

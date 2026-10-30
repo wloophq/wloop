@@ -9,6 +9,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -198,7 +200,7 @@ func TestStartSleepsUntilTheEarliestDeadline(t *testing.T) {
 				t.Fatalf("%d scans in an hour, want 7", n)
 			}
 			metertest.Within(t, sc, metertest.Budget{
-				{Res: meter.SQL, Op: "query"}: 7,
+				{Res: meter.SQL, Op: "query"}: 14,
 				{Res: meter.SQL, Op: "exec"}:  0,
 				{Res: meter.Tx, Op: "write"}:  0,
 			})
@@ -210,7 +212,7 @@ func TestStartSleepsUntilTheEarliestDeadline(t *testing.T) {
 			ctx := context.Background()
 			run := dinv.BriefRun{PR: refN(1), Trigger: TriggerBackground, StartedAt: t0.Add(-time.Minute), EndedAt: t0, Outcome: OutcomeFailed, Error: "boom"}
 			_, v := s.q.version(refN(1))
-			p, _, _ := s.st.PR(ctx, refN(1))
+			p, _, _ := inventorytest.Of(s.st).PR(ctx, refN(1))
 			run.AttemptOf, run.Version = attemptOf(p, v), v
 			id, err := s.st.StartBriefRun(ctx, run)
 			if err != nil {
@@ -352,7 +354,7 @@ func TestScanTellsTheJobAboutADuePullRequest(t *testing.T) {
 	})
 }
 
-func TestRunWithNothingDueReadsOnceAndWritesNothing(t *testing.T) {
+func TestRunWithNothingDueReadsTheBriefStatesOnceAndWritesNothing(t *testing.T) {
 	r := newRig(t, 3)
 	if _, err := r.q.Run(context.Background()); err != nil {
 		t.Fatal(err)
@@ -363,7 +365,7 @@ func TestRunWithNothingDueReadsOnceAndWritesNothing(t *testing.T) {
 		t.Fatalf("%q %v", summary, err)
 	}
 	metertest.Within(t, sc, metertest.Budget{
-		{Res: meter.SQL}:             1,
+		{Res: meter.SQL}:             2,
 		{Res: meter.SQL, Op: "exec"}: 0,
 		{Res: meter.Tx, Op: "write"}: 0,
 	})

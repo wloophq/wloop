@@ -3,11 +3,11 @@
 package intent
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io/fs"
 	"maps"
-	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -99,12 +99,21 @@ type Loaded struct {
 	Actions map[string]BuiltinAction
 	// Tools are the MCP tools' texts from tools.toml, by tool name.
 	Tools map[string]ToolText
-	// GTD are the GTD verbs' and views' texts from gtd.toml.
-	GTD GTDTexts
+	// Views are the views, the review and the badge of views.toml.
+	Views ViewsDef
+	// Tasks are the task properties, states and verbs of tasks.toml.
+	Tasks TasksDef
+	// Gates are the gates of gates.toml.
+	Gates GatesDef
+	// Records are the record kinds of records.toml.
+	Records RecordsDef
 	// Keys are the core keys' help from keys.toml.
 	Keys KeyTexts
 	// Notices are what the loop tells a session, from notices.toml, by notice name.
 	Notices map[string]string
+	// UI are each plugin's words of its manifest's views, facets and
+	// situations, from its layers' ui.toml, by plugin id.
+	UI map[string]UITexts
 	// EmptyRefusal is what a [[refuse]] case whose why renders empty says,
 	// from defaults.toml.
 	EmptyRefusal string
@@ -176,20 +185,24 @@ func (u *unit) broken() bool { return len(u.sheet.problems) > 0 }
 func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check TemplateCheck) (*Loaded, Problems) {
 	reverted := brokenOverlays{}
 	partials := revertedPartials{}
+	gates, gateProblems := loadGates(layers, bundled)
+	views, tasks, listProblems := loadViews(layers, bundled, &gates)
+	records, recordProblems := loadRecords(layers, bundled, &tasks)
+	listProblems = append(listProblems, recordProblems...)
 	for {
 		set, problems := withPartials(base, layers, partials)
-		l, broken := load(layers, bundled, set, check, reverted)
+		l, broken := load(layers, bundled, set, check, reverted, declarations{tasks, gates, records})
 		if partials.breaking(layers, append(problems, l.Problems...)) {
 			continue
 		}
 		if len(broken) == 0 {
 			actions, actionProblems := loadActions(layers, bundled)
 			tools, toolProblems := loadTools(layers, bundled)
-			gtdTexts, gtdProblems := loadGTD(layers, bundled)
 			keyTexts, keyProblems := loadKeys(layers, bundled)
 			notices, noticeProblems := loadNotices(layers, bundled)
-			l.Actions, l.Tools, l.GTD, l.Keys, l.Notices = actions, tools, gtdTexts, keyTexts, notices
-			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, gtdProblems, keyProblems, noticeProblems)
+			ui, uiProblems := loadUI(layers)
+			l.Actions, l.Tools, l.Views, l.Keys, l.Notices, l.Gates, l.UI = actions, tools, views, keyTexts, notices, gates, ui
+			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, listProblems, gateProblems, keyProblems, noticeProblems, uiProblems)
 			l.Reverted = map[dintent.Name]Problems{}
 			for n, r := range reverted {
 				l.Reverted[n] = r.problems
@@ -296,7 +309,15 @@ func profilesOf(also []dintent.AlsoProfile) []string {
 
 // load is one pass of Load; the intents in plain are read without their
 // overlay. It returns the overlaid intents that broke.
-func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check TemplateCheck, plain brokenOverlays) (*Loaded, brokenOverlays) {
+// declarations are the profile files an intent's manifest names into.
+type declarations struct {
+	tasks   TasksDef
+	gates   GatesDef
+	records RecordsDef
+}
+
+func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check TemplateCheck, plain brokenOverlays, decl declarations) (*Loaded, brokenOverlays) {
+	tasks := decl.tasks
 	var units []*unit
 	var dirProblems Problems
 	bundledUnits := map[dintent.Name]*unit{}
@@ -317,17 +338,21 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	}
 	seen := map[dintent.Name]string{}
 	for _, l := range layers {
-		if l.Dir == "" {
+		if l.Bundled() {
 			continue
 		}
-		entries, _ := os.ReadDir(filepath.Join(l.Dir, "intents"))
+		entries, _ := profile.ReadDir(l, "intents")
 		for _, e := range entries {
 			if !e.IsDir() {
 				continue
 			}
 			name := dintent.Name(e.Name())
-			dir := filepath.Join(l.Dir, "intents", e.Name())
+			fl, dir := layerFiles(l, path.Join("intents", e.Name()))
 			if b := bundledUnits[name]; b != nil {
+				if l.Embedded() {
+					dirProblems = append(dirProblems, Problem{File: dir, Msg: fmt.Sprintf("%s is defined already in %s", name, b.files.base("intent.toml"))})
+					continue
+				}
 				if _, skip := plain[name]; !skip && len(overrides([]string{dir})) > 0 {
 					b.files.overlay = append(b.files.overlay, dir)
 					b.source = dintent.Source{Layer: l.Name, Dir: dir, Overrides: overrides(b.files.overlay)}
@@ -342,18 +367,23 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 				dirProblems = append(dirProblems, Problem{File: dir, Msg: fmt.Sprintf("%s is defined already in %s", name, seen[name])})
 				continue
 			}
-			seen[name] = dir
-			units = append(units, &unit{
-				name: name, dir: dir,
-				source: dintent.Source{Layer: l.Name, Dir: dir},
-				files:  files{dir: dir},
-			})
+			u := &unit{name: name, dir: dir, source: dintent.Source{Layer: l.Name, Dir: dir}, files: fl}
+			if l.Plugin() {
+				u.bundled = true
+				bundledUnits[name] = u
+			} else {
+				seen[name] = dir
+			}
+			units = append(units, u)
 		}
 	}
 	defaults, defaultProblems := readDefaults(layers, bundled)
 	dirProblems = append(dirProblems, defaultProblems...)
 	for _, u := range units {
-		u.load(base, defaults)
+		u.load(base, defaults, tasks.Facts(), decl.gates)
+		if u.defined {
+			u.sheet.declaredRecord(u.def.Record, decl)
+		}
 		if u.defined && !u.broken() && check != nil && u.tmpl != nil {
 			u.sheet.problems = append(u.sheet.problems, check(u.def, u.tmpl)...)
 		}
@@ -365,6 +395,9 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 		Broken:       map[dintent.Name]Problems{},
 		Problems:     dirProblems,
 		EmptyRefusal: defaults.Refusal,
+		Tasks:        tasks,
+		Records:      decl.records,
+		Gates:        decl.gates,
 		layers:       layers,
 	}
 	var defs []dintent.Def
@@ -385,17 +418,29 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 		l.Programs[u.name] = u.programs
 	}
 	l.Registry = dintent.NewRegistry(defs)
+	if name := l.Tasks.ChatIntent; name != "" {
+		if _, msg := l.turnProblem(name, "session"); msg != "" {
+			at := l.Tasks.ChatAt
+			l.Problems = append(l.Problems, Problem{File: cmp.Or(at.File, TasksFile), Line: at.Line, Col: at.Col, Field: "chat.intent", Msg: msg})
+		}
+	}
 	var wfProblems, wfWarnings Problems
-	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems, wfWarnings = loadWorkflows(layers, bundled, l.turnProblem, l.briefExtras)
+	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems, wfWarnings = loadWorkflows(layers, bundled, l.turnProblem, l.profileFacts, l.Tasks, l.Gates)
 	l.Problems = append(l.Problems, wfProblems...)
 	l.Warnings = append(l.Warnings, wfWarnings...)
 	return l, broken
 }
 
-// briefExtras are the brief.extra.* facts of p's brief intent.
-func (l *Loaded) briefExtras(p dunit.ProviderID) expr.Env {
+// profileFacts are the facts the profile declares for p's units: the
+// brief.extra.* facts of p's brief intent and, of a task, the task.prop.*
+// facts of tasks.toml.
+func (l *Loaded) profileFacts(p dunit.ProviderID) expr.Env {
 	d, _ := l.Registry.Builder(builtin.BuildsBrief, p)
-	return builtin.ExtraFacts(d.Extra)
+	env := builtin.ExtraFacts(d.Extra)
+	if builtin.Slots[p] == builtin.TaskSlot {
+		maps.Copy(env, l.Tasks.Facts())
+	}
+	return env
 }
 
 func (l *Loaded) turnProblem(name, runner string) (arg, msg string) {
@@ -435,9 +480,9 @@ func (l *Loaded) Rules(intent string) (dintent.RecordRules, error) {
 	return l.Registry.Rules(intent)
 }
 
-func (u *unit) load(base *template.Template, defaults manifestDefaults) {
+func (u *unit) load(base *template.Template, defaults manifestDefaults, taskFacts expr.Env, gates GatesDef) {
 	file := u.files.path("intent.toml")
-	s := &sheet{file: file, defaults: defaults}
+	s := &sheet{file: file, defaults: defaults, taskFacts: taskFacts, gates: gates}
 	u.sheet = s
 	if !nameRe.MatchString(string(u.name)) {
 		s.problems = append(s.problems, Problem{File: u.dir, Msg: "an intent name is 2 to 24 lowercase letters, digits and -, starting with a letter"})
@@ -646,6 +691,9 @@ func newClaims() *claims {
 	for k, id := range ids {
 		keys[k] = "the built-in action " + id
 	}
+	for _, g := range builtin.GateKeys {
+		keys[g.Key] = fmt.Sprintf("the %s gate's intent that %s", g.Kind, g.Role)
+	}
 	return &claims{keys: keys, flags: map[string]meaning{}, drivers: map[string]dintent.Name{}, roles: map[roleClaim]dintent.Name{}}
 }
 
@@ -802,7 +850,7 @@ func (c *Cache) get() (loaded *Loaded, reloaded bool) {
 func stampOf(layers []profile.Layer) string {
 	var b strings.Builder
 	for _, l := range layers {
-		if l.Dir == "" {
+		if l.Embedded() {
 			continue
 		}
 		var n int

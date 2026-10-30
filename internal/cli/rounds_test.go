@@ -6,27 +6,24 @@ import (
 	"strings"
 	"testing"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // observed makes the rig's round one the github facts observe: its
 // workspace is gone and the config sends none without it.
 func (r *startRig) observed(round string) {
-	cands := r.steps.d.Candidates.(fakeCandidates)
-	key := r.sc.ref.String() + " " + round
-	c := cands[key]
-	c.Observed, c.Workspace = true, wsdomain.Workspace{}
-	cands[key] = c
+	r.planner().edit(r.sc.ref.String(), round, func(r *src.Round) { r.Observed, r.Workspace = true, src.WorkspaceRef{} })
 }
 
 func (r *startRig) count(kind string) int {
@@ -103,8 +100,9 @@ func TestAnUntrustedFolderBlocksTheRoundUntilTheUserUnblocksIt(t *testing.T) {
 	if want := sc.ref.String() + ": the blocked round waits for a new trigger\n"; out.String() != want {
 		t.Fatalf("out %q, want %q", out.String(), want)
 	}
-	fp := r.steps.d.Candidates.(fakeCandidates)[sc.ref.String()+" "+roundAddress].Fingerprint
-	if got := sc.te.loadRounds(t).Mark(sc.ref.String(), round.AddressedReviews); fp == "" || got != fp {
+	planned, _ := r.planner().round(sc.ref.String(), roundAddress)
+	fp := planned.OnSent[ghsource.MarkAddressedReviews]
+	if got := sc.te.loadRounds(t).Mark(sc.ref.String(), ghsource.MarkAddressedReviews); fp == "" || got != fp {
 		t.Fatalf("fingerprint %q, want the blocked round's %q", got, fp)
 	}
 }
@@ -112,11 +110,11 @@ func TestAnUntrustedFolderBlocksTheRoundUntilTheUserUnblocksIt(t *testing.T) {
 func TestARoundWaitsWhileItsTurnAsksTheUser(t *testing.T) {
 	t.Parallel()
 	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
-	r.rec.questions = map[github.Ref]map[string]bool{r.sc.ref: {string(dintent.Review): true}}
+	r.rec.questions = map[pr.Ref]map[string]bool{r.sc.ref: {string(dintent.Review): true}}
 	if got := r.check(t, automation.CheckOpts{}); got != "its review turn asks you something" {
 		t.Fatalf("refusal %q", got)
 	}
-	r.rec.questions = map[github.Ref]map[string]bool{r.sc.ref: {string(dintent.Address): true}}
+	r.rec.questions = map[pr.Ref]map[string]bool{r.sc.ref: {string(dintent.Address): true}}
 	if got := r.check(t, automation.CheckOpts{}); got != "" {
 		t.Fatalf("an address question refused the review: %q", got)
 	}
@@ -137,7 +135,7 @@ func TestOpenQuestionsAreTheIntentsWhoseNewestTurnAsks(t *testing.T) {
 		}},
 	}
 	got := storeRecorder{}.OpenQuestions(books)
-	want := map[github.Ref]map[string]bool{prOf(asked): {string(dintent.Address): true}}
+	want := map[pr.Ref]map[string]bool{prOf(asked): {string(dintent.Address): true}}
 	if len(got) != 1 || len(got[prOf(asked)]) != 1 || !got[prOf(asked)][string(dintent.Address)] {
 		t.Fatalf("open questions %v, want %v", got, want)
 	}

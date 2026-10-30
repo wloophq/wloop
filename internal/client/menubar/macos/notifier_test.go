@@ -5,7 +5,6 @@ package macos
 import (
 	"testing"
 
-	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/client/menubar"
 )
 
@@ -33,20 +32,5 @@ func TestResponses(t *testing.T) {
 	}
 	if _, ok := response(id, "com.apple.UNNotificationDismissActionIdentifier"); ok {
 		t.Error("a dismissal became an action")
-	}
-}
-
-func TestTextInputPlaceholders(t *testing.T) {
-	if got := placeholder("guide"); got != "Guidance for this round" {
-		t.Errorf("guide: %q", got)
-	}
-	if got := placeholder("answer:text"); got != "Your answer to the agent" {
-		t.Errorf("answer:text: %q", got)
-	}
-	if got, button := placeholder(api.AttentionReply), inputButton(api.AttentionReply); got != "Your reply, saved to the Outbox" || button != "Save" {
-		t.Errorf("reply: %q %q", got, button)
-	}
-	if got, button := placeholder(api.AttentionSendReply), inputButton(api.AttentionSendReply); got != "Your reply, sent now" || button != "Send" {
-		t.Errorf("send reply: %q %q", got, button)
 	}
 }

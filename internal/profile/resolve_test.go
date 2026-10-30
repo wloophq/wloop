@@ -11,19 +11,19 @@ import (
 func TestAUserFileReplacesTheBundledOneOfItsPath(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, "intents", "review"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "intents", "start"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "intents", "review", "instructions.md.tmpl"), []byte("mine"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "intents", "start", "instructions.md.tmpl"), []byte("mine"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	layers := []Layer{{Name: "bundled", Source: "embedded"}, {Name: "user", Source: dir, Dir: dir}}
-	r, err := Resolve(layers, "intents/review/instructions.md.tmpl")
+	r, err := Resolve(layers, "intents/start/instructions.md.tmpl")
 	if err != nil || string(r.Body) != "mine" || r.Layer.Name != "user" {
 		t.Fatalf("%+v %v", r, err)
 	}
-	r, err = Resolve(layers, "intents/review/intent.toml")
-	if err != nil || r.Layer.Name != "bundled" || r.Path != "default/intents/review/intent.toml" || len(r.Body) == 0 {
+	r, err = Resolve(layers, "intents/start/intent.toml")
+	if err != nil || r.Layer.Name != "bundled" || r.Path != "default/intents/start/intent.toml" || len(r.Body) == 0 {
 		t.Fatalf("%+v %v", r, err)
 	}
 	if _, err := Resolve(layers, "prompts/absent.md"); !errors.Is(err, fs.ErrNotExist) {

@@ -1,6 +1,6 @@
 summary = "Tell the user when an agent session has left an answer of theirs unread for 15 minutes"
 provider = "session"
-when = 'session.unread_answers > 0 && session.unread_for > duration("15m")'
+when = 'session.unread_gates > 0 && session.unread_for > duration("15m")'
 order = 16
 key = ["session.unread_since"]
 

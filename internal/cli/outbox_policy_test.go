@@ -23,7 +23,8 @@ use = "turn.start"
 intent = "review"
 stage = "follow-up"
 
-[approval]
+[[gates.approval.rule]]
+when = 'gate.kind == "plan"'
 mode = "run"
 `
 
@@ -40,7 +41,7 @@ line = "Ask {{.pr.slug}} one quick question."
 [record]
 states = ["done"]
 
-[drafts.approval]
+[gates.approval]
 mode = "send"
 `
 
@@ -96,7 +97,7 @@ func TestWorkflowRunApprovalIsNotDraftApproval(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	userProfile(t, te, map[string]string{
 		"workflows/follow-up-run/workflow.toml":   followUp,
-		"workflows/follow-up-timed/workflow.toml": followUp + "\n[drafts.approval]\nmode = \"delay\"\nwindow = \"5m\"\n",
+		"workflows/follow-up-timed/workflow.toml": followUp + "\n[gates.approval]\nmode = \"delay\"\nwindow = \"5m\"\n",
 		"intents/ask-quick/intent.toml":           askQuick,
 		"intents/ask-quick/instructions.md.tmpl":  "Ask.\n",
 	})

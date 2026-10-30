@@ -21,7 +21,7 @@ func TestEveryCoreKeyHasItsHelp(t *testing.T) {
 			t.Errorf("%s (%s) has no help", b.Key, b.Action)
 		}
 	}
-	if got := texts.Help("question", "answer:3"); got != "answer option 3" {
+	if got := texts.Help("question", "answer:3"); got != "the gate's intent 3" {
 		t.Errorf("answer:3: %q", got)
 	}
 }
@@ -32,18 +32,18 @@ func TestKeyHelpComesFromTheProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 	dir := t.TempDir()
-	user := "[help.global]\n\"nav:inbox\" = \"go to the Inbox\"\n\"nav:inbx\" = \"x\"\n\n[help.list]\n\"move:up\" = \"\"\n"
+	user := "[help.global]\n\"capture\" = \"capture a task\"\n\"captur\" = \"x\"\n\"nav:inbox\" = \"x\"\n\n[help.list]\n\"move:up\" = \"\"\n"
 	if err := os.WriteFile(filepath.Join(dir, KeysFile), []byte(user), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	texts, problems := loadKeys([]profile.Layer{{Name: "user", Dir: dir}}, fstest.MapFS{KeysFile: {Data: bundled}})
-	if texts.Help("global", "nav:inbox") != "go to the Inbox" || texts.Help("list", "move:up") != "move up" {
-		t.Errorf("help %q, %q", texts.Help("global", "nav:inbox"), texts.Help("list", "move:up"))
+	if texts.Help("global", "capture") != "capture a task" || texts.Help("list", "move:up") != "move up" {
+		t.Errorf("help %q, %q", texts.Help("global", "capture"), texts.Help("list", "move:up"))
 	}
 	if texts.Help("list", "approve") == texts.Help("plan", "approve") {
 		t.Errorf("approve reads alike in the list and the plan: %q", texts.Help("plan", "approve"))
 	}
-	for _, want := range []string{`help.global.nav:inbx: names no core key action of global; did you mean "nav:inbox"?`, "help.list.move:up: is required"} {
+	for _, want := range []string{`help.global.captur: names no core key action of global; did you mean "capture"?`, "help.global.nav:inbox: names no core key action of global", "help.list.move:up: is required"} {
 		if !strings.Contains(problems.Error(), want) {
 			t.Errorf("no %q in:\n%s", want, problems.Error())
 		}

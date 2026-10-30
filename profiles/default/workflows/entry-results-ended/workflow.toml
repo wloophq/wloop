@@ -1,8 +1,0 @@
-summary = "Close an entry you captured and started work on once every unit attached to it has ended, such as its pull request merged"
-provider = "entry"
-when = 'entry.captured_by_user && entry.turns > 0 && entry.units_ended'
-order = 53
-
-[[step]]
-use = "entry.verb"
-verb = "done"

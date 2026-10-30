@@ -13,12 +13,14 @@ var removedKeys = map[Surface][]string{
 	SurfaceIntent: {"key", "modes", "round_kind", "cap", "reason", "reconcile", "prepare", "context", "launch", "policy",
 		"drives_row", "board", "on_sent", "draft_effects", "draft_approval", "reason_fact", "refuse_when", "records", "also_profiles",
 		"headline.new.text", "action.visible", "action.enabled", "action.reason_off", "action.hint", "action.note_when_question",
-		"resume.head_moved"},
+		"resume.head_moved", "drafts.approval", "drafts.approval.mode", "drafts.approval.rule"},
 	SurfaceWorkflow: {"description", "subject", "mode", "trigger.every", "approval.default", "approval.wait_when", "allow_visible",
-		"draft_approval", "withdraw"},
-	SurfaceConfig: {"workflows.*.mode", "workflows.*.approval.default", "workflows.*.draft_approval", "project_settings", "proposals",
+		"draft_approval", "withdraw", "approval", "approval.mode", "approval.rule", "drafts.approval", "drafts.approval.mode"},
+	SurfaceConfig: {"workflows.*.mode", "workflows.*.approval.default", "workflows.*.draft_approval", "workflows.*.approval",
+		"workflows.*.drafts.approval", "workflows.*.drafts", "project_settings", "proposals",
 		"rounds", "turns.automated_per_day", "classify.daily_cap", "brief.max_diff_bytes", "slack.extraction.max_call_usd",
-		"slack.extraction.max_day_usd", "slack.extraction.max_day_calls", "plugins", "automated_reviewers", "owners",
+		"slack.extraction.max_day_usd", "slack.extraction.max_day_calls", "plugins.slack.extraction.max_call_usd",
+		"plugins.slack.extraction.max_day_usd", "plugins.slack.extraction.max_day_calls", "automated_reviewers", "owners",
 		"trusted_authors", "review_prefix", "followups_without_workspace", "address_without_workspace", "projects.trusted_authors",
 		"projects.followups_without_workspace", "projects.address_without_workspace"},
 }
@@ -52,7 +54,7 @@ func TestNoRemovedKeyReturns(t *testing.T) {
 			t.Errorf("the fact %s was removed and is a fact again", f.Name)
 		}
 	}
-	for _, v := range DraftModes() {
+	for _, v := range GateModes() {
 		if strings.EqualFold(v.Name, "record") {
 			t.Error("the draft mode record was removed and is a mode again")
 		}

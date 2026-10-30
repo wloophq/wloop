@@ -186,7 +186,7 @@
           "description": "The effects its agents may declare on their drafts.",
           "items": {
             "enum": [
-              "entry.nudged",
+              "task.nudged",
               "unit.closed",
               "pr.nudged"
             ],
@@ -194,58 +194,9 @@
           },
           "type": "array"
         },
-        "approval": {
-          "additionalProperties": false,
-          "description": "The approval of its drafts; wait when absent.",
-          "properties": {
-            "mode": {
-              "description": "The approval when no rule holds.",
-              "enum": [
-                "send",
-                "delay",
-                "wait",
-                "dry_run"
-              ],
-              "type": "string"
-            },
-            "rule": {
-              "description": "A rule; the first whose when holds gives the mode.",
-              "items": {
-                "additionalProperties": false,
-                "properties": {
-                  "mode": {
-                    "description": "The rule's approval.",
-                    "enum": [
-                      "send",
-                      "delay",
-                      "wait",
-                      "dry_run"
-                    ],
-                    "type": "string"
-                  },
-                  "when": {
-                    "description": "When the approval rule applies to a draft.",
-                    "type": "string"
-                  },
-                  "window": {
-                    "description": "With mode delay only: how long a person has to stop the draft.",
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              },
-              "type": "array"
-            },
-            "window": {
-              "description": "With mode delay only: how long a person has to stop the draft.",
-              "type": "string"
-            }
-          },
-          "type": "object"
-        },
         "attach_posts": {
           "default": false,
-          "description": "On a turn whose unit is an entry, the unit of each post its agent makes, sent at once or once approved, is attached to the entry; reactions and edits are not posts.",
+          "description": "On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts.",
           "type": "boolean"
         }
       },
@@ -256,8 +207,8 @@
       "items": {
         "enum": [
           "plan.cleared",
-          "guidance.handed",
-          "pr.round_sent",
+          "turn.guidance_handed",
+          "turn.round_sent",
           "pr.reviewed",
           "pr.addressed",
           "pr.nudged"
@@ -265,6 +216,64 @@
         "type": "string"
       },
       "type": "array"
+    },
+    "gates": {
+      "additionalProperties": false,
+      "description": "The gates its runs and drafts open.",
+      "properties": {
+        "approval": {
+          "additionalProperties": false,
+          "description": "The approval of its gates: a rule applies to the kinds its when pins gate.kind to, else to draft gates alone when it reads a draft's facts, else to every kind; what no rule or mode here decides, gates.toml's [approval] does.",
+          "properties": {
+            "mode": {
+              "description": "The mode of every kind of gate when no rule holds; left out, gates.toml's default of the kind.",
+              "enum": [
+                "wait",
+                "delay",
+                "send",
+                "dry_run",
+                "run"
+              ],
+              "type": "string"
+            },
+            "rule": {
+              "description": "A rule; the first whose when holds gives the mode.",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "mode": {
+                    "description": "The rule's mode.",
+                    "enum": [
+                      "wait",
+                      "delay",
+                      "send",
+                      "dry_run",
+                      "run"
+                    ],
+                    "type": "string"
+                  },
+                  "when": {
+                    "description": "When the rule applies to a gate.",
+                    "type": "string"
+                  },
+                  "window": {
+                    "description": "With mode delay only: how long a person has to stop the gate's consequence.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "window": {
+              "description": "With mode delay only: how long a person has to stop the gate's consequence.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
     },
     "guidance": {
       "additionalProperties": false,
@@ -474,7 +483,7 @@
     },
     "record": {
       "additionalProperties": false,
-      "description": "The turn's record.",
+      "description": "The turn's record. Left out, a turn of the intent owes no record and its session's stop is never blocked for one.",
       "properties": {
         "artifacts": {
           "description": "The artifacts a record may carry.",
@@ -489,11 +498,15 @@
         },
         "attach_url": {
           "default": false,
-          "description": "On a turn whose unit is an entry, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the entry; needs url in record.outcome.",
+          "description": "On a turn whose unit is a task, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the task; needs url in record.outcome.",
           "type": "boolean"
         },
         "history_artifact": {
           "description": "The artifact the unit's history shows.",
+          "type": "string"
+        },
+        "missing": {
+          "description": "The gate, of gates.toml, a run opens when it fails or ends without its record, which an answer resumes; left out, such a run opens none. Required with requires.",
           "type": "string"
         },
         "outcome": {
@@ -512,7 +525,7 @@
           "type": "string"
         },
         "require": {
-          "description": "What a record in a state must carry.",
+          "description": "What a record in a state must carry; record.requires is the record kind a run owes.",
           "items": {
             "additionalProperties": false,
             "properties": {
@@ -536,8 +549,12 @@
           },
           "type": "array"
         },
+        "requires": {
+          "description": "The record kind, of records.toml, a run of the intent owes; a run that ends without it opens the gate missing names. Left out, a run owes no record. Not record.require, what a record in a state carries.",
+          "type": "string"
+        },
         "states": {
-          "description": "The states a record may take. Required.",
+          "description": "The states a record may take. Required when the table sets when, artifacts, outcome, require or attach_url; a table that only sets requires and missing needs none.",
           "items": {
             "enum": [
               "done",
@@ -555,9 +572,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "states"
-      ],
       "type": "object"
     },
     "refuse": {
@@ -597,11 +611,12 @@
     "role": {
       "description": "What binds it to a plugin's mechanism. One intent per role and provider.",
       "enum": [
+        "headless",
+        "attach",
         "pr.review",
         "pr.address",
         "pr.nudge",
-        "probe",
-        "headless"
+        "probe"
       ],
       "type": "string"
     },
@@ -670,14 +685,14 @@
       "description": "What a run with no unit does.",
       "properties": {
         "missing": {
-          "description": "capture: a run with no unit captures its guidance as a new entry, the turn's unit; refused when absent.",
+          "description": "capture: a run with no unit captures its guidance as a new task, the turn's unit; refused when absent.",
           "enum": [
             "capture"
           ],
           "type": "string"
         },
         "title": {
-          "description": "The captured entry's title, over .guidance, with firstLine.",
+          "description": "The captured task's title, over .guidance, with firstLine or title.",
           "type": "string"
         }
       },
@@ -689,7 +704,7 @@
       "type": "boolean"
     },
     "verb": {
-      "description": "The GTD verb its action fulfils.",
+      "description": "The verb its action fulfils.",
       "enum": [
         "approve",
         "delegate",

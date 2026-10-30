@@ -274,10 +274,10 @@ func TestPlanAsksTheQueryAndActsWithTheRequest(t *testing.T) {
 
 func TestDigestAsksTheDay(t *testing.T) {
 	socket := serve(t, func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(api.Digest{Day: r.URL.Path + "?" + r.URL.RawQuery, Entries: []string{"e-1"}})
+		json.NewEncoder(w).Encode(api.Digest{Day: r.URL.Path + "?" + r.URL.RawQuery, Tasks: []string{"t-1"}})
 	})
 	d, err := New(socket).Digest(context.Background(), "2026-10-08")
-	if err != nil || d.Day != api.DigestPath+"?day=2026-10-08" || len(d.Entries) != 1 {
+	if err != nil || d.Day != api.DigestPath+"?day=2026-10-08" || len(d.Tasks) != 1 {
 		t.Fatalf("%+v %v", d, err)
 	}
 }
@@ -292,5 +292,34 @@ func TestClientReadsTheRefusalCode(t *testing.T) {
 	var refused interface{ Refusal() string }
 	if !errors.As(err, &refused) || refused.Refusal() != api.BuiltinWhy("take_over") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestViewsRouteServesTheCatalog(t *testing.T) {
+	socket := serve(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/views":
+			fmt.Fprint(w, `{"views":[{"id":"inbox","label":"Inbox"}],"areas":["OSS"],"contexts":[],"verbs":[]}`)
+		case "/api/tasks":
+			fmt.Fprint(w, `{"epoch":"e","rev":2,"full":true,"tasks":[{"id":"t-1","title":"Call the bank","units":[],"items":[],"verbs":[],"contexts":[]}],"removed":[]}`)
+		case "/api/tasks/t-1/done":
+			fmt.Fprint(w, `{"task":{"id":"t-1","state":"done"}}`)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	c := New(socket)
+	ctx := context.Background()
+	cat, err := c.Views(ctx)
+	if err != nil || len(cat.Views) != 1 || cat.Views[0].Label != "Inbox" || cat.Areas[0] != "OSS" {
+		t.Fatalf("views %+v %v", cat, err)
+	}
+	page, err := c.TasksSince(ctx, TaskQuery{View: "inbox"}, api.Since{})
+	if err != nil || len(page.Tasks) != 1 || page.Tasks[0].Title != "Call the bank" {
+		t.Fatalf("page %+v %v", page, err)
+	}
+	res, err := c.TaskDo(ctx, "t-1", "done", api.TaskRequest{Source: "cli"})
+	if err != nil || res.Task.State != "done" {
+		t.Fatalf("result %+v %v", res, err)
 	}
 }

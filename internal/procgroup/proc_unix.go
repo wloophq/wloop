@@ -67,6 +67,30 @@ func Run(cmd *exec.Cmd) error {
 	return err
 }
 
+// Prepare sets cmd to start as the leader of its own process group, for a
+// caller that starts it itself; once started, Adopt lists its group.
+func Prepare(cmd *exec.Cmd) {
+	if cmd.SysProcAttr == nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	cmd.SysProcAttr.Setpgid = true
+	cmd.WaitDelay = grace
+}
+
+// Adopt lists the group pgid a Prepare'd command leads, so KillAll and the
+// next process's Track stop it; release, once the command exited, kills
+// what is left of the group and unlists it.
+func Adopt(pgid int) (release func()) {
+	add(pgid, time.Now())
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			_ = signal(pgid, syscall.SIGKILL)
+			remove(pgid)
+		})
+	}
+}
+
 func signal(pgid int, sig syscall.Signal) error {
 	err := syscall.Kill(-pgid, sig)
 	if errors.Is(err, syscall.ESRCH) {

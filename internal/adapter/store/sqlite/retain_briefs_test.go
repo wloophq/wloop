@@ -6,13 +6,29 @@ import (
 	"testing"
 )
 
+// reportSlack is the Slack plugin's report of key, gone or not.
+func reportSlack(t *testing.T, db *DB, key string, gone bool) {
+	t.Helper()
+	snapshot := `{}`
+	if gone {
+		snapshot = `{"gone":true}`
+	}
+	exec(t, db, `INSERT INTO unit_snapshots (provider, unit_key, snapshot, rev, at) VALUES ('slack', ?, ?, 1, ?)`, key, snapshot, at(retainNow))
+}
+
 // retainBriefs runs the brief retention retain.go's BriefBodies rule runs.
 func retainBriefs(t *testing.T, db *DB, before string) Retained {
 	t.Helper()
 	out := Retained{}
+	var in retainInputs
+	var err error
+	if in.slackUnits, in.slackReported, err = (reportedUnits{db}).live(context.Background(), reportedSlackSQL); err != nil {
+		t.Fatal(err)
+	}
+	cursors := in.slackPairs()
 	if _, err := db.Write(context.Background(), func(tx *Tx) error {
 		r := &retainer{ctx: context.Background(), tx: tx, out: out}
-		r.briefs(before)
+		r.briefs(before, cursors, in.slackReported)
 		return r.err
 	}); err != nil {
 		t.Fatal(err)
@@ -28,7 +44,7 @@ func TestASlackBriefGoesWithItsCursor(t *testing.T) {
 			VALUES (?, 'slack', ?, 'brief', 'extraction', 'extraction', '', ?, ?, 'ok', '{"goal":"g"}')`, id, unitKey, started, started)
 	}
 	old, fresh := at(retainNow.Add(-8*day)), at(retainNow.Add(-day))
-	exec(t, db, `INSERT INTO extraction_cursors (provider, unit_key, at) VALUES ('slack', 'C1/1', ?)`, fresh)
+	reportSlack(t, db, "C1/1", false)
 	run(1, "C1/1", old)
 	run(2, "C1/1", old)
 	run(3, "C1/1", old)
@@ -38,12 +54,14 @@ func TestASlackBriefGoesWithItsCursor(t *testing.T) {
 	run(5, "C2/2", old)
 	run(6, "C2/2", fresh)
 	exec(t, db, `INSERT INTO unit_briefs (provider, unit_key, run, last_run) VALUES ('slack', 'C2/2', 6, 6)`)
-	exec(t, db, `INSERT INTO unit_tags (provider, unit_key, key, value, run) VALUES ('slack', 'C2/2', 'domain', 'billing', 6)`)
 	exec(t, db, `INSERT INTO brief_runs (id, provider, unit_key, intent, trigger, version, attempt_of, started_at, outcome)
 		VALUES (7, 'github', 'acme/api#1', 'brief', 'wanted', 'v', '', ?, 'ok')`, old)
+	for _, key := range []string{"C1/1", "C2/2"} {
+		exec(t, db, `INSERT INTO events (provider, unit_key, kind, key, actor, at, data) VALUES ('slack', ?, 'record', 'brief', 'plugin', ?, '{"goal":"g","tags":["domain:billing"]}')`, key, fresh)
+	}
 
 	got := retainBriefs(t, db, at(retainNow.Add(-7*day)))
-	if got["unit_briefs"] != 1 || got["unit_tags"] != 1 {
+	if got["unit_briefs"] != 1 || got[briefRecordsKey] != 1 {
 		t.Errorf("retained %v", got)
 	}
 	if left := column(t, db, `SELECT id FROM brief_runs ORDER BY id`); !slices.Equal(left, []string{"2", "4", "7"}) {
@@ -52,22 +70,25 @@ func TestASlackBriefGoesWithItsCursor(t *testing.T) {
 	if left := column(t, db, `SELECT unit_key FROM unit_briefs`); !slices.Equal(left, []string{"C1/1"}) {
 		t.Errorf("briefs left %q", left)
 	}
+	if left := column(t, db, `SELECT unit_key FROM events WHERE kind = 'record'`); !slices.Equal(left, []string{"C1/1"}) {
+		t.Errorf("brief records left %q", left)
+	}
 	if again := retainBriefs(t, db, at(retainNow.Add(-7*day))); len(again) != 0 {
 		t.Errorf("a second pass retained %v", again)
 	}
 }
 
-func TestACursorOfAPullRequestLeavesItsBriefs(t *testing.T) {
+func TestSlacksReportsLeaveAPullRequestsBriefs(t *testing.T) {
 	t.Parallel()
 	db, _ := openTemp(t)
-	old, fresh := at(retainNow.Add(-8*day)), at(retainNow.Add(-day))
-	exec(t, db, `INSERT INTO extraction_cursors (provider, unit_key, at) VALUES ('github', 'acme/api#9', ?)`, fresh)
+	old := at(retainNow.Add(-8 * day))
+	reportSlack(t, db, "C9/9", false)
 	for id, trigger := range map[int]string{1: "wanted", 2: "fields"} {
 		exec(t, db, `INSERT INTO brief_runs (id, provider, unit_key, intent, trigger, version, attempt_of, started_at, outcome, brief)
 			VALUES (?, 'github', 'acme/api#1', 'brief', ?, 'v', '', ?, 'ok', '{"goal":"g"}')`, id, trigger, old)
 	}
 	exec(t, db, `INSERT INTO unit_briefs (provider, unit_key, run, last_run) VALUES ('github', 'acme/api#1', 1, 2)`)
-	exec(t, db, `INSERT INTO unit_tags (provider, unit_key, key, value, run) VALUES ('github', 'acme/api#1', 'domain', 'billing', 1)`)
+	exec(t, db, `INSERT INTO events (provider, unit_key, kind, key, actor, at, data) VALUES ('github', 'acme/api#1', 'record', 'brief', 'agent', ?, '{"goal":"g"}')`, old)
 
 	if got := retainBriefs(t, db, at(retainNow.Add(-7*day))); len(got) != 0 {
 		t.Errorf("retained %v", got)
@@ -78,7 +99,7 @@ func TestACursorOfAPullRequestLeavesItsBriefs(t *testing.T) {
 	if left := column(t, db, `SELECT count(*) FROM unit_briefs`); !slices.Equal(left, []string{"1"}) {
 		t.Errorf("briefs left %q", left)
 	}
-	if left := column(t, db, `SELECT count(*) FROM unit_tags`); !slices.Equal(left, []string{"1"}) {
-		t.Errorf("tags left %q", left)
+	if left := column(t, db, `SELECT count(*) FROM events WHERE kind = 'record'`); !slices.Equal(left, []string{"1"}) {
+		t.Errorf("brief records left %q", left)
 	}
 }

@@ -12,21 +12,22 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
-	"github.com/wloophq/wloop/internal/core/gtd/gtdtest"
 	"github.com/wloophq/wloop/internal/core/headless"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/messages/messagestest"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/core/outbox/outboxtest"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	dusage "github.com/wloophq/wloop/internal/domain/usage"
@@ -127,7 +128,10 @@ func newRig(t *testing.T, script ...scripted) *rig {
 	r := &rig{db: db, store: sqlite.New(db), ledger: &turnstest.Ledger{Open: map[unit.Unit][]items.Item{thread: {{ID: "i1", Unit: thread}, {ID: "i2", Unit: thread}}}},
 		asker: &asker{script: script}, clock: &clock{t: t0}, sess: turnstest.NewSessions()}
 	r.turns = r.newTurns()
-	r.outbox = &outbox.Service{Store: db.Drafts(), Effects: func(unit.ProviderID) (port.Effects, error) { return effects{}, nil }, Clock: r.clock}
+	gs := db.Gates(r.clock.Now)
+	r.outbox = outboxtest.GatesOn(gs, gs, r.clock.Now).Bind(&outbox.Service{Store: db.Drafts(),
+		Effects: func(unit.ProviderID) (port.Effects, error) { return effects{}, nil }, Clock: r.clock,
+		Posts: func(draft.Delivery) bool { return false }})
 	reg := turnstest.Intents()
 	r.svc = &headless.Service{Turns: r.turns, Build: builder{}, Place: placer{dir: "/work/checkout"}, Asker: r.asker, Ledger: r.ledger, Outbox: r.outbox,
 		Intents: func(n turn.Intent) (dintent.Def, bool) { return reg.Get(dintent.Name(n)) },
@@ -387,7 +391,7 @@ func TestHeadlessResultAppliesOpsAndDrafts(t *testing.T) {
 	}
 	d := drafts[0]
 	want := draft.Origin{Kind: draft.OriginTurn, TurnSeq: got.Seq, Intent: string(dintent.Act), Workflow: "triage"}
-	if d.Unit != thread || d.Origin != want || d.State != draft.Proposed || d.Approval.Mode != draft.Wait || !slices.Equal(d.Items, []string{"i1"}) {
+	if d.Unit != thread || d.Origin != want || d.State != draft.Held || !slices.Equal(d.Items, []string{"i1"}) {
 		t.Fatalf("draft %+v", d)
 	}
 	if b := r.book(t, thread); b.Turns[0].Workflow != "triage" {
@@ -462,13 +466,29 @@ func TestHeadlessDailyCap(t *testing.T) {
 
 type facts struct{}
 
-func (facts) UnitFacts(_ context.Context, u unit.Unit) (gtd.UnitFacts, bool, error) {
-	return gtd.UnitFacts{Unit: u}, true, nil
+func (facts) UnitFacts(_ context.Context, u unit.Unit) (task.UnitFacts, bool, error) {
+	return task.UnitFacts{Unit: u}, true, nil
 }
 
 func (r *rig) inbox() *messages.Service {
-	g := coregtd.New(coregtd.Deps{Store: gtdtest.New(), Items: r.ledger, Facts: facts{}, Clock: r.clock, StaleWaitingDays: 2})
-	return &messages.Service{Store: messagestest.New(), Books: r.store, Turns: r.turns, Entries: g, Intents: turnstest.Intents(), Clock: r.clock}
+	st := taskstest.New()
+	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: st, Items: r.ledger, Facts: facts{}, Clock: r.clock})
+	gs := messagestest.NewGates(r.clock.Now, gateTasks{st, g})
+	return gs.Bind(&messages.Service{Store: messagestest.New(), Books: r.store, Turns: r.turns, Tasks: g, Intents: turnstest.Intents(), Clock: r.clock})
+}
+
+// gateTasks give a gate the task of its unit from the store, and open one through the tasks service.
+type gateTasks struct {
+	store *taskstest.Store
+	svc   *coretasks.Service
+}
+
+func (g gateTasks) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
+	return g.store.TasksOf(ctx, u)
+}
+
+func (g gateTasks) Open(ctx context.Context, r coretasks.OpenRequest) (task.Task, error) {
+	return g.svc.Open(ctx, r)
 }
 
 func asked() record.Record {
@@ -520,7 +540,7 @@ func TestHeadlessAnswerRunsAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 	q := questions(t, m)[0]
-	route, err := m.Answer(ctx, q.ID, messages.Answer{OptionID: "mon", Source: turn.Cockpit})
+	route, err := m.Gates.(*messagestest.Gates).Answer(ctx, q, messages.Answer{OptionID: "mon", Source: turn.Cockpit})
 	if err != nil || route.Route != turn.Resumed {
 		t.Fatalf("route %+v %v", route, err)
 	}

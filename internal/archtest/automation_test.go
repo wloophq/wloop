@@ -20,11 +20,18 @@ import (
 var engineBans = []string{"internal/domain/pr", "internal/domain/turn", "internal/domain/view",
 	"internal/domain/workspace", "internal/domain/round", "internal/adapter"}
 
-var providerIDs = map[string]bool{string(unit.GitHub): true, string(unit.Session): true, string(unit.Workspace): true,
-	string(unit.Entry): true, "slack": true}
+// providerIDs are the core's providers and the bundled plugins', as their
+// manifests name them.
+var providerIDs = func() map[string]bool {
+	ids := map[string]bool{string(unit.Session): true, string(unit.Workspace): true, string(unit.Task): true}
+	for _, id := range pluginIDs() {
+		ids[id] = true
+	}
+	return ids
+}()
 
 // providerConsts are the unit provider constants the core may not spell.
-var providerConsts = map[string]bool{"GitHub": true, "Session": true, "Workspace": true, "Entry": true}
+var providerConsts = map[string]bool{"GitHub": true, "Session": true, "Workspace": true, "Task": true}
 
 // engineImports flags an import of engineBans by internal/core/automation;
 // its fakes, automationtest, are excluded.
@@ -53,40 +60,33 @@ type providerSite struct {
 
 // coreProviderAllowlist are the places that may still name a provider.
 var coreProviderAllowlist = []providerSite{
-	{"internal/core/turns/headless.go", "entryInput", `"entry"`, 1, "the headless turn's entry input, which shares the entry provider's spelling"},
-	{"internal/adapter/facts/session/facts.go", "Provider.build", "unit.GitHub", 1, "debt: a session's facts read its linked pull request's state"},
-	{"internal/adapter/orca/orca.go", "Adapter.Apply", "unit.GitHub", 1, "Orca links a worktree to a GitHub pull request only"},
+	{"internal/core/turns/headless.go", "taskInput", `"task"`, 1, "the headless turn's task input, which shares the task provider's spelling"},
+	{"internal/core/intake/intake.go", "SourceSession", `"session"`, 1, "the intake source a managed session asks from, which shares the session provider's spelling"},
+	{"internal/client/tui/views.go", "taskProvider", "unit.Task", 1, "debt: the TUI keys its busy map by unit, so a task stands as a unit of the task provider; a TaskView serves no unit, and a busy set keyed by task id removes it"},
+	{"internal/catalog/catalog.go", "withSource", "unit.GitHub", 1, "debt: the catalog's built-in actions name the GitHub plugin"},
+	{"internal/turn/payload.go", "PR.Unit", "unit.GitHub", 1, "debt: the pull request payload a host round hands its turn, while the host sends GitHub's rounds"},
 	{"internal/workspace/orca/orca.go", "Manager.LinkUnit", "unit.GitHub", 1, "Orca's linkedPR holds a GitHub pull request only"},
 	{"internal/adapter/store/inventory/briefruns.go", "githubBriefs", `"github"`, 1, "debt: the inventory keeps GitHub's pull request tables"},
 	{"internal/adapter/store/inventory/activity.go", "Store.RecentActivity", "unit.GitHub", 1, "debt: the inventory keeps GitHub's pull request tables"},
-	{"internal/adapter/store/inventory/store.go", "Store.StoredFacts", "unit.GitHub", 1, "debt: the inventory keeps GitHub's pull request tables"},
 	{"internal/adapter/store/inventory/store.go", "refOf", "unit.GitHub", 1, "debt: the inventory keeps GitHub's pull request tables"},
-	{"internal/adapter/store/inventory/store.go", "Store.Reviewed", "unit.GitHub", 1, "debt: the inventory keeps GitHub's pull request tables"},
 	{"internal/adapter/store/inventory/store.go", "Store.Ended", "unit.GitHub", 1, "debt: the inventory keeps GitHub's pull request tables"},
 	{"internal/adapter/store/inventory/store.go", "Store.FirstRoundBlocks", "unit.GitHub", 1, "debt: the inventory keeps GitHub's pull request tables"},
-	{"internal/adapter/store/inventory/store.go", "Store.Tracked", "unit.GitHub", 1, "debt: the inventory keeps GitHub's pull request tables"},
 	{"internal/adapter/store/inventory/store.go", "Store.UnitlessEvents", "unit.Session", 1, "the store keeps the sessions the core keeps"},
 	{"internal/adapter/store/inventory/timings.go", "Store.activeRefs", "unit.GitHub", 1, "debt: the inventory keeps GitHub's pull request tables"},
 	{"internal/adapter/store/sqlite/marks.go", "marksTopic", "unit.GitHub", 1, "debt: a round mark notes GitHub's rounds topic"},
 	{"internal/adapter/store/sqlite/registry.go", "sessionUnit", "unit.Session", 1, "the store keeps the sessions the core keeps"},
 	{"internal/adapter/store/sqlite/retain.go", "retainWorkflowEventsSQL", "unit.Session", 1, "the store keeps the sessions the core keeps"},
 	{"internal/adapter/store/sqlite/retain.go", "retainWorkflowEventsSQL", "unit.Workspace", 1, "the store keeps the workspaces the core keeps"},
-	{"internal/adapter/store/sqlite/slack.go", "slackProvider", `"slack"`, 1, "the store keeps the Slack plugin's tables"},
-	{"internal/adapter/store/sqlite/turns.go", "prOf", "unit.GitHub", 1, "debt: a pull request's turns are keyed by owner, repository and number"},
 	{"internal/adapter/store/sqlite/turns.go", "compareUnits", "unit.GitHub", 2, "debt: pull requests sort by owner, repository and number"},
 	{"internal/cli/actions.go", "Env.fetchPR", "unit.GitHub", 1, "debt: the GitHub viewer read outside the plugin"},
-	{"internal/cli/facts.go", "inventoryFacts.MyReviews", "unit.GitHub", 1, "debt: the GitHub viewer read outside the plugin"},
-	{"internal/cli/sweepinputs.go", "storeInputs.Viewer", "unit.GitHub", 1, "debt: the GitHub viewer read outside the plugin"},
 	{"internal/cli/turn.go", "Env.storedViewer", "unit.GitHub", 1, "debt: the GitHub viewer read outside the plugin"},
 	{"internal/cli/cli.go", "commands", `"slack"`, 1, "the slack command, the Slack plugin's own commands"},
 	{"internal/cli/help.go", "devCommand", `"slack"`, 1, "the slack command, the Slack plugin's own commands"},
-	{"internal/cli/init_config.go", "mergeInitConfig", `"slack"`, 1, "the slack section of the config init writes"},
 	{"internal/cli/placement.go", "Env.placements", "unit.GitHub", 1, "debt: GitHub's default placement, wired outside the plugin's PlacementDefaults"},
 	{"internal/cli/placement.go", "githubPlacement.Default", "unit.GitHub", 2, "debt: GitHub's default placement reads the pull request and the viewer outside the plugin"},
-	{"internal/cli/serve.go", "serveAllDeps", "unit.GitHub", 3, "debt: the daemon's wiring of the GitHub viewer and the forge"},
+	{"internal/cli/serve.go", "serveAllDeps", "unit.GitHub", 1, "debt: the daemon's wiring of the GitHub viewer and the forge"},
 	{"internal/cli/serve.go", "trackedBooks.Books", "unit.GitHub", 1, "debt: a carded pull request without a turn still gets an empty book, so its card stays"},
 	{"internal/cli/serve_payloads.go", "Env.payloadReaders", "unit.GitHub", 1, "debt: GitHub's payload reader, wired outside the plugin's Payload"},
-	{"internal/cli/serve_plugins.go", "withoutGitHub", "unit.GitHub", 1, "debt: the GitHub facilities the daemon holds go with the GitHub plugin"},
 	{"internal/cli/storedfacts.go", "storedFacts.Facts", "unit.GitHub", 1, "debt: the stored facts of a pull request's turn"},
 	{"internal/meter/meter.go", "GitHub", `"github"`, 1, "the meter's resource of a GitHub API request, not a unit provider"},
 }
@@ -99,17 +99,16 @@ var coreProviderAllowlist = []providerSite{
 var providerHomes = []string{
 	"internal/domain/unit",
 	"internal/domain/pr", "internal/readmodel/prrow", "internal/situation", "internal/github",
-	"internal/slack", "internal/domain/slack",
 	"internal/intent/builtin",
 	"internal/e2e",
 	// The codecs of the providers the core keeps.
-	"internal/domain/gtd/codec.go", "internal/domain/turn/session.go", "internal/domain/workspace",
+	"internal/domain/task/codec.go", "internal/domain/turn/session.go", "internal/domain/workspace",
 }
 
 // providerHome says whether file may spell any provider id.
 func providerHome(file string) bool {
 	dir := filepath.Dir(file)
-	if under(file, providerHomes...) || under(dir, providerHomes...) || compositionRoot(file) || file == sourceRoot {
+	if under(file, providerHomes...) || under(dir, providerHomes...) || compositionRoot(file) || file == sourceRoot || slices.Contains(serveWiring, file) {
 		return true
 	}
 	wiring, _ := filepath.Match(slackWiring, file)
@@ -127,7 +126,7 @@ func ownProvider(dir string) string {
 }
 
 // constIDs are the ids the unit provider constants hold.
-var constIDs = map[string]unit.ProviderID{"GitHub": unit.GitHub, "Session": unit.Session, "Workspace": unit.Workspace, "Entry": unit.Entry}
+var constIDs = map[string]unit.ProviderID{"GitHub": unit.GitHub, "Session": unit.Session, "Workspace": unit.Workspace, "Task": unit.Task}
 
 // decls are f's top-level declarations by name: a function, a method as
 // Type.Method, and each var, const and type by its first name.
@@ -371,12 +370,12 @@ var b = unit.Session
 var c = "sessions"
 var d = workflow.Session
 var e = unit.Unit{}
-var f = unit.Entry
-var g = "entry"
+var f = unit.Task
+var g = "task"
 `)
 	none := map[int]int{}
 	flagged(t, "literals", coreLiterals(fset, "internal/core/automation/x.go", f, nil, none, nil), 4, "the core names no provider")
-	flagged(t, "another core package", coreLiterals(fset, "internal/core/gtd/x.go", f, nil, none, nil), 4, "the core names no provider")
+	flagged(t, "another core package", coreLiterals(fset, "internal/core/tasks/x.go", f, nil, none, nil), 4, "the core names no provider")
 	flagged(t, "a test file", coreLiterals(fset, "internal/core/automation/x_test.go", f, nil, none, nil), 0, "")
 	flagged(t, "the fakes", coreLiterals(fset, "internal/core/automation/automationtest/x.go", f, nil, none, nil), 0, "")
 	outside := map[string]int{"internal/daemon/x.go": 3, "internal/client/tui/x.go": 3, "internal/cli/root.go": 0, "internal/cli/sources.go": 0,
@@ -393,9 +392,9 @@ var g = "https://github.com/a/b"
 `)
 		flagged(t, file, coreLiterals(fset, file, f, nil, none, nil), n, "a provider id lives in its plugin")
 	}
-	allow := []providerSite{{"internal/core/gtd/x.go", "b", "unit.Session", 1, "planted"}, {"internal/core/gtd/x.go", "a", `"slack"`, 1, "stale"}}
+	allow := []providerSite{{"internal/core/tasks/x.go", "b", "unit.Session", 1, "planted"}, {"internal/core/tasks/x.go", "a", `"slack"`, 1, "stale"}}
 	used := map[int]int{}
-	flagged(t, "allowlisted", coreLiterals(fset, "internal/core/gtd/x.go", f, allow, used, nil), 3, "the core names no provider")
+	flagged(t, "allowlisted", coreLiterals(fset, "internal/core/tasks/x.go", f, allow, used, nil), 3, "the core names no provider")
 	flagged(t, "stale", staleSites(allow, used), 1, "matches 0")
 	fset, f = parse(t, `package x
 func (s *server) open() {
@@ -426,7 +425,7 @@ var a = dunit.GitHub
 `)
 	flagged(t, "an aliased import", coreLiterals(fset, "internal/intent/x.go", f, nil, none, nil), 1, "a provider id lives in its plugin")
 	fset, f = parse(t, `package x
-import dslack "github.com/wloophq/wloop/internal/domain/slack"
+import dslack "github.com/wloophq/wloop/plugins/slack/domain"
 func open(u unit.Unit) bool { return u.Provider == dslack.Provider || u.Provider == chatPlugin }
 `)
 	_, decl := parse(t, "package x\nconst chatPlugin unit.ProviderID = \"slack\"\nvar other = \"slackish\"\n")

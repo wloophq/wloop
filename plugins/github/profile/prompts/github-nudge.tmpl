@@ -1,0 +1,40 @@
+{{- /* The texts of GitHub's github-nudge rule and of the nudge intent's
+prepare. "draft" is a proposed nudge's comment, from .Mentions (each person
+as @{github:<login>}, each team as @org/team), .Since (yyyy-mm-dd, or ""),
+.Kind and .Maintainers (it asks the maintainers, the pull request having no
+reviewer). "waiting" is the situation line the nudge intent reads, from .Who
+and .Since (RFC 3339, or ""). "label" names a situation kind. */ -}}
+{{define "draft" -}}
+{{if .Maintainers -}}
+Friendly nudge: this pull request has had no reviewer{{if .Since}} since {{.Since}}{{end}}. Could a maintainer take a look or suggest a reviewer?
+{{- else -}}
+{{.Mentions}} friendly nudge: this pull request has been waiting on you{{if .Since}} since {{.Since}}{{end}} ({{template "label" .Kind}}). Could you take a look when you have a moment?
+{{- end}}
+{{- end}}
+
+{{define "waiting" -}}
+Waiting on: {{.Who}}{{if .Since}} since {{.Since}}{{end}}, {{template "label" .Kind}}.
+{{- end}}
+
+{{define "label" -}}
+{{- if eq . "done"}}closed
+{{- else if eq . "muted"}}muted
+{{- else if eq . "held"}}held (cap)
+{{- else if eq . "blocked"}}round blocked
+{{- else if eq . "to_address"}}to address
+{{- else if eq . "round_pending"}}round soon
+{{- else if eq . "loop_working"}}agent working
+{{- else if eq . "loop_waiting"}}agent asks
+{{- else if eq . "loop_stopped"}}agent stopped
+{{- else if eq . "draft"}}draft
+{{- else if eq . "checks"}}checks failing
+{{- else if eq . "changes"}}changes asked
+{{- else if eq . "merge"}}can merge
+{{- else if eq . "conflicts"}}merge conflicts
+{{- else if eq . "reply"}}reply due
+{{- else if eq . "reviewer_back"}}reviewer due
+{{- else if eq . "review"}}review
+{{- else if eq . "no_reviewer"}}no reviewer
+{{- else}}{{.}}
+{{- end}}
+{{- end}}

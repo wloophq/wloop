@@ -42,7 +42,7 @@ func TestBundledWorkflowsLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	loaded, broken, _, problems, warnings := loadWorkflows(nil, sub, nil, nil)
+	loaded, broken, _, problems, warnings := loadWorkflows(profile.BundledChain(), sub, nil, nil, bundledTasks(t), bundledGates(t))
 	if len(problems) > 0 || len(broken) > 0 || len(warnings) > 0 {
 		t.Fatalf("%v\n%v", problems.Error(), warnings.Error())
 	}
@@ -96,7 +96,7 @@ func TestAWorkflowManifestBecomesTheDomainWorkflow(t *testing.T) {
 	if len(w.Steps) != 1 || w.Steps[0].Use != "session.close" || w.Steps[0].Reach != workflow.ReachLocal || w.Steps[0].Args != nil {
 		t.Errorf("%+v", w.Steps)
 	}
-	if w.Approval.Mode != workflow.ApprovalRun || w.Summary != "Close an agent session that finished and stayed quiet" || w.When == nil || !strings.HasSuffix(w.Source, "close-quiet/workflow.toml") {
+	if w.Approval.Mode != workflow.ApprovalWait || w.Summary != "Close an agent session that finished and stayed quiet" || w.When == nil || !strings.HasSuffix(w.Source, "close-quiet/workflow.toml") {
 		t.Errorf("%+v", w)
 	}
 	if want := []string{"config.cleanup.idle", "session.agent_state", "session.idle_for", "session.managed", "session.open_turn", "session.user_active"}; !slices.Equal(w.When.Reads(), want) {

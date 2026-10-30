@@ -12,7 +12,6 @@ import (
 
 	"github.com/ebitengine/purego/objc"
 
-	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/client/menubar"
 )
 
@@ -58,7 +57,7 @@ func (n *notifier) register(specs []menubar.CategorySpec) {
 		for j, a := range spec.Actions {
 			if a.TextInput {
 				actions[j] = class("UNTextInputNotificationAction").Send(sel("actionWithIdentifier:title:options:textInputButtonTitle:textInputPlaceholder:"),
-					nsString(a.ID), nsString(a.Title), uint(0), nsString(inputButton(a.ID)), nsString(placeholder(a.ID)))
+					nsString(a.ID), nsString(a.Title), uint(0), nsString(a.Button), nsString(a.Placeholder))
 				continue
 			}
 			actions[j] = class("UNNotificationAction").Send(sel("actionWithIdentifier:title:options:"), nsString(a.ID), nsString(a.Title), uint(0))
@@ -82,26 +81,6 @@ func (n *notifier) awaitCategories() {
 	case <-time.After(postTimeout):
 		// the center may still call b, so it is never released
 	}
-}
-
-func placeholder(action string) string {
-	switch action {
-	case "guide":
-		return "Guidance for this round"
-	case api.AttentionReply:
-		return "Your reply, saved to the Outbox"
-	case api.AttentionSendReply:
-		return "Your reply, sent now"
-	}
-	return "Your answer to the agent"
-}
-
-// inputButton is the button that sends a text input's text.
-func inputButton(action string) string {
-	if action == api.AttentionReply {
-		return "Save"
-	}
-	return "Send"
 }
 
 var delegateOnce = sync.OnceValue(newDelegate)

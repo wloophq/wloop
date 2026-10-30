@@ -31,4 +31,4 @@ The bundled `intent=nudge.md` sets the tone (neutral and friendly), the length (
 
 ## Automatic nudges
 
-The `nudge-silent-30d` workflow plans a nudge on someone else's open pull request after `github.nudge.silent_days` (30) calendar days of silence. It never nudges a pull request you develop. Each one waits for you as a pending item: apply it with `{{command}} plan apply <id>` or the cockpit. To let them go out when their window ends, see [Tune workflows](/guides/workflows/#let-nudges-go-out).
+The `nudge-silent-30d` workflow plans a nudge on someone else's open pull request after `plugins.github.nudge.silent_days` (30) calendar days of silence. It never nudges a pull request you develop. Each one waits for you as a pending item: apply it with `{{command}} plan apply <id>` or the cockpit. To let them go out when their window ends, see [Tune workflows](/guides/workflows/#let-nudges-go-out).

@@ -87,10 +87,8 @@ func TestCheckReadsKinds(t *testing.T) {
 	wants(t, check(testRows, SurfaceWorkflow, map[string]any{"drafts": map[string]any{"approval": map[string]any{"window": "1d", "mode": "delay"}}}))
 }
 
-func TestASurfaceWithNoRowsIsNotChecked(t *testing.T) {
-	if ps := check(testRows, SurfaceLabels, map[string]any{"anything": 1}); ps != nil {
-		t.Fatalf("%v", ps)
-	}
+func TestASurfaceWithNoRowsRefusesEveryKey(t *testing.T) {
+	wants(t, check(testRows, SurfaceLabels, map[string]any{"anything": 1}), "anything: unknown key")
 }
 
 func TestEveryPredKeyHasTheQuotingHint(t *testing.T) {
@@ -171,4 +169,20 @@ func TestCheckStepReadsOnlyItsStepsArguments(t *testing.T) {
 	wants(t, CheckStep(StepNotifySelf, map[string]any{"reason": "x"}), "reason: unknown key")
 	wants(t, CheckStep(StepTurnStart, map[string]any{"intent": "review", "stage": "frist"}), `stage: "frist" is not one of`)
 	wants(t, CheckStep("session.close", map[string]any{"reason": "x"}), "reason: unknown key")
+}
+
+func TestRequireAndRequiresNameEachOther(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		doc  map[string]any
+		want string
+	}{
+		{map[string]any{"record": map[string]any{"require": "report"}}, "did you mean record.requires?"},
+		{map[string]any{"record": map[string]any{"requires": []any{map[string]any{"state": "done"}}}}, "did you mean record.require?"},
+	} {
+		ps := Check(SurfaceIntent, c.doc)
+		if len(ps) != 1 || !strings.Contains(ps[0].Msg, c.want) {
+			t.Errorf("%v: %+v", c.doc, ps)
+		}
+	}
 }

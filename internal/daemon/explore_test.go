@@ -4,21 +4,28 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"reflect"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
+	ghapi "github.com/wloophq/wloop/plugins/github/api"
+
+	"github.com/wloophq/wloop/internal/adapter/source/github/present"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
+	"github.com/wloophq/wloop/plugins/github/explore"
+
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/core/change"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
@@ -84,7 +91,7 @@ func (f *fakeExplorer) CandidateByRef(_ context.Context, ref github.Ref, viewer 
 func explorePost(t *testing.T, s *Server, query string) (int, api.ExploreResult, string) {
 	t.Helper()
 	body, _ := json.Marshal(api.ExploreRequest{Query: query})
-	rec := post(t, s, "/api/explore", string(body))
+	rec := post(t, s, api.PluginViewPath(unit.GitHub, present.ViewExplore), string(body))
 	var res api.ExploreResult
 	if rec.Code == 200 {
 		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
@@ -101,7 +108,7 @@ func TestExploreSearchesGitHubAndAddsWhatTheInventoryKnows(t *testing.T) {
 			{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN"},
 			{Ref: github.Ref{Owner: "acme", Repo: "web", Number: 3}, Title: "Other", Author: "zoe", State: "OPEN"},
 		}}}
-	s := newServerWith(t, func(d *Deps) { d.Explorer = fe; withBriefs(d, stubBriefs{}) })
+	s := newServerWith(t, func(d *Deps) { exploreOn(d, fe); withBriefs(d, stubBriefs{}) })
 	code, res, body := explorePost(t, s, "acme/api")
 	if code != 200 {
 		t.Fatalf("%d %s", code, body)
@@ -126,7 +133,7 @@ func TestExploreSanitizesWhatGitHubSends(t *testing.T) {
 	fe := &fakeExplorer{page: dgh.CandidatePage{Candidates: []dgh.Candidate{
 		{Ref: r7, Title: "Batch\x1b[2J export\u202e", HeadBranch: "ana/\x07bell"},
 	}}}
-	s := newServerWith(t, func(d *Deps) { d.Explorer = fe })
+	s := newServerWith(t, func(d *Deps) { exploreOn(d, fe) })
 	_, res, body := explorePost(t, s, "acme/api")
 	c := res.Candidates[0]
 	if strings.ContainsAny(c.Title+c.HeadBranch, "\x1b\x07\u202e") {
@@ -137,36 +144,40 @@ func TestExploreSanitizesWhatGitHubSends(t *testing.T) {
 func TestExploreRefusesWhatItCannotRun(t *testing.T) {
 	t.Parallel()
 	fe := &fakeExplorer{err: fmt.Errorf("graphql: boom")}
-	s := newServerWith(t, func(d *Deps) { d.Explorer = fe })
+	s := newServerWith(t, func(d *Deps) { exploreOn(d, fe) })
 	for query, want := range map[string]int{"": 400, strings.Repeat("x", 300): 400, "acme/api": 502} {
 		if code, _, body := explorePost(t, s, query); code != want {
 			t.Errorf("%.20q: %d %s, want %d", query, code, body, want)
 		}
 	}
-	if code, _, _ := explorePost(t, newServerWith(t, func(d *Deps) { d.Explorer = nil }), "acme/api"); code != 503 {
-		t.Errorf("no explorer: %d", code)
+	if code, _, _ := explorePost(t, newServerWith(t, func(d *Deps) { githubOf(d).View = nil }), "acme/api"); code != 503 {
+		t.Errorf("no GitHub plugin: %d", code)
 	}
 }
 
 func TestExploreWaitsWhenTheBudgetIsLow(t *testing.T) {
 	t.Parallel()
 	fe := &fakeExplorer{}
-	s := newServerWith(t, func(d *Deps) { d.Explorer = fe })
-	seedRateLimit(t, s, 100, 5000, s.deps.Now().Add(time.Hour))
-	if code, _, body := explorePost(t, s, "acme/api"); code != 429 || !strings.Contains(body, "budget") || len(fe.queries) != 0 {
+	var x *explore.Explorer
+	s := newServerWith(t, func(d *Deps) { x = exploreOn(d, fe) })
+	x.Budget = func() (bool, ghapi.Limit) {
+		return false, ghapi.Limit{Remaining: 100, Limit: 5000, ResetAt: s.deps.Now().Add(time.Hour)}
+	}
+	if code, _, body := explorePost(t, s, "acme/api"); code != 503 || !strings.Contains(body, "budget") || len(fe.queries) != 0 {
 		t.Fatalf("%d %s, %d searches", code, body, len(fe.queries))
 	}
 }
 
 func TestExploreRemembersTheLastSearches(t *testing.T) {
 	t.Parallel()
-	s := newServerWith(t, func(d *Deps) { d.Explorer = &fakeExplorer{} })
+	s := newServerWith(t, func(d *Deps) { exploreOn(d, &fakeExplorer{}) })
+	const recentMax = 8
 	for i := range recentMax + 1 {
 		explorePost(t, s, fmt.Sprintf("org:acme label:l%d", i))
 	}
 	_, res, _ := explorePost(t, s, "org:acme   label:l3")
 	var recent []string
-	get(t, s, "/api/explore/recent", &recent)
+	get(t, s, api.PluginViewPath(unit.GitHub, present.ViewExploreRecent), &recent)
 	if len(recent) != recentMax || recent[0] != "org:acme label:l3" || recent[1] != fmt.Sprintf("org:acme label:l%d", recentMax) || !slices.Equal(recent, res.Recent) {
 		t.Fatalf("recent %v", recent)
 	}
@@ -181,7 +192,7 @@ func (goalBriefs) Views(_ context.Context, prs ...dinv.PR) (map[github.Ref]*brie
 func TestExploreSanitizesTheBrief(t *testing.T) {
 	t.Parallel()
 	fe := &fakeExplorer{page: dgh.CandidatePage{Candidates: []dgh.Candidate{{Ref: r7, Title: "Batch export"}}}}
-	s := newServerWith(t, func(d *Deps) { d.Explorer = fe; withBriefs(d, goalBriefs{}) })
+	s := newServerWith(t, func(d *Deps) { exploreOn(d, fe); withBriefs(d, goalBriefs{}) })
 	_, res, body := explorePost(t, s, "acme/api")
 	b := res.Candidates[0].Brief.Brief
 	if b.Goal != "Export [2J in batches" || b.Kind != "feature" {
@@ -203,11 +214,11 @@ func (b *blockingExplorer) SearchCandidates(ctx context.Context, q, viewer strin
 func TestExploreRunsOneSearchAtATime(t *testing.T) {
 	t.Parallel()
 	be := &blockingExplorer{started: make(chan struct{}), release: make(chan struct{})}
-	s := newServerWith(t, func(d *Deps) { d.Explorer = be })
+	s := newServerWith(t, func(d *Deps) { exploreOn(d, be) })
 	first := make(chan int)
 	go func() { code, _, _ := explorePost(t, s, "acme/api"); first <- code }()
 	<-be.started
-	if code, _, body := explorePost(t, s, "acme/web"); code != 409 {
+	if code, _, body := explorePost(t, s, "acme/web"); code != 503 || !strings.Contains(body, "already running") {
 		t.Fatalf("a second search while one runs: %d %s", code, body)
 	}
 	close(be.release)
@@ -216,36 +227,9 @@ func TestExploreRunsOneSearchAtATime(t *testing.T) {
 	}
 }
 
-type roundTripFunc func(*http.Request) (*http.Response, error)
-
-func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
-
-func TestExploreKeepsTheBudgetItSpent(t *testing.T) {
-	t.Parallel()
-	var sent int
-	reset := time.Date(2026, 10, 8, 11, 0, 0, 0, time.UTC)
-	body := fmt.Sprintf(`{"data":{"search":{"issueCount":0,"nodes":[]},"rateLimit":{"cost":1,"remaining":100,"limit":5000,"resetAt":%q}}}`, reset.Format(time.RFC3339))
-	gh := github.NewClient(github.Options{Host: "github.com", Now: func() time.Time { return time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC) },
-		Token: func(context.Context) (string, error) { return "t", nil },
-		Base: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			sent++
-			return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body)), Request: r}, nil
-		})})
-	s := newServerWith(t, func(d *Deps) { d.Explorer, d.Budget = gh, gh })
-	if code, _, body := explorePost(t, s, "acme/api"); code != 200 {
-		t.Fatalf("%d %s", code, body)
-	}
-	if code, _, body := explorePost(t, s, "acme/api"); code != 429 || sent != 1 {
-		t.Fatalf("the search's own budget did not hold the next: %d %s, %d requests", code, body, sent)
-	}
-	if _, err := s.readUntracked(context.Background(), github.Ref{Owner: "acme", Repo: "api", Number: 9}.Unit(), "me"); err == nil || !strings.Contains(err.Error(), "budget") || sent != 1 {
-		t.Fatalf("a candidate read below the background floor: %v, %d requests", err, sent)
-	}
-}
-
 func TestExploreRemembersAPullRequestByItsURL(t *testing.T) {
 	t.Parallel()
-	s := newServerWith(t, func(d *Deps) { d.Explorer = &fakeExplorer{} })
+	s := newServerWith(t, func(d *Deps) { exploreOn(d, &fakeExplorer{}) })
 	_, res, _ := explorePost(t, s, "  https://github.com/acme/api/pull/7/files?diff=split  ")
 	if len(res.Recent) != 1 || res.Recent[0] != "https://github.com/acme/api/pull/7" {
 		t.Fatalf("recent %q", res.Recent)
@@ -255,7 +239,7 @@ func TestExploreRemembersAPullRequestByItsURL(t *testing.T) {
 func TestExploreReadsWhatTheUserMeant(t *testing.T) {
 	t.Parallel()
 	fe := &fakeExplorer{users: map[string]bool{"zoe": true}, page: dgh.CandidatePage{Total: 1, Candidates: []dgh.Candidate{{Ref: r7}}}}
-	s := newServerWith(t, func(d *Deps) { d.Explorer = fe })
+	s := newServerWith(t, func(d *Deps) { exploreOn(d, fe) })
 	const base = "is:pr is:open archived:false -author:@me "
 	for _, c := range []struct{ in, query, read string }{
 		{"API", base + "repo:acme/api sort:updated-asc", `read "API" as repo:acme/api`},
@@ -283,7 +267,7 @@ func TestExploreReadsWhatTheUserMeant(t *testing.T) {
 func TestExploreSaysWhoHasNothingOpen(t *testing.T) {
 	t.Parallel()
 	fe := &fakeExplorer{users: map[string]bool{"zoe": true}}
-	s := newServerWith(t, func(d *Deps) { d.Explorer = fe })
+	s := newServerWith(t, func(d *Deps) { exploreOn(d, fe) })
 	if _, res, body := explorePost(t, s, "zoe"); res.Empty != "zoe has no open pull requests you did not open in the 1 repository "+brand.Name+" knows" {
 		t.Fatalf("%q: %s", res.Empty, body)
 	}
@@ -301,13 +285,14 @@ func TestExploreSaysWhoHasNothingOpen(t *testing.T) {
 
 func TestExploreRetriesAGatewayErrorOnce(t *testing.T) {
 	t.Parallel()
-	fe := &fakeExplorer{errs: []error{&github.StatusError{Status: 502}}, page: dgh.CandidatePage{Total: 3}}
-	s := newServerWith(t, func(d *Deps) { d.Explorer = fe })
-	s.exploreRetryPause = time.Millisecond
+	fe := &fakeExplorer{errs: []error{&ghapi.StatusError{Status: 502}}, page: dgh.CandidatePage{Total: 3}}
+	var x *explore.Explorer
+	s := newServerWith(t, func(d *Deps) { x = exploreOn(d, fe) })
+	x.Pause = time.Millisecond
 	if code, res, body := explorePost(t, s, "acme/api"); code != 200 || res.Total != 3 || len(fe.queries) != 2 {
 		t.Fatalf("%d %s after %d searches", code, body, len(fe.queries))
 	}
-	fe.queries, fe.errs = nil, []error{&github.StatusError{Status: 502}, &github.StatusError{Status: 504}}
+	fe.queries, fe.errs = nil, []error{&ghapi.StatusError{Status: 502}, &ghapi.StatusError{Status: 504}}
 	if code, _, body := explorePost(t, s, "acme/api"); code != 502 || len(fe.queries) != 2 || !strings.Contains(body, "narrow the search") {
 		t.Fatalf("%d %s after %d searches", code, body, len(fe.queries))
 	}
@@ -335,8 +320,9 @@ func (e *slowExplorer) SearchCandidates(ctx context.Context, q, viewer string, f
 func TestExploreRetriesATimeoutOnce(t *testing.T) {
 	t.Parallel()
 	se := &slowExplorer{slow: 1}
-	s := newServerWith(t, func(d *Deps) { d.Explorer = se })
-	s.exploreRetryPause, s.exploreAttempt = time.Millisecond, 20*time.Millisecond
+	var x *explore.Explorer
+	s := newServerWith(t, func(d *Deps) { x = exploreOn(d, se) })
+	x.Pause, x.Attempt = time.Millisecond, 20*time.Millisecond
 	if code, _, body := explorePost(t, s, "acme/api"); code != 200 || len(se.queries) != 2 {
 		t.Fatalf("%d %s after %d searches", code, body, len(se.queries))
 	}
@@ -349,7 +335,7 @@ func TestExploreRetriesATimeoutOnce(t *testing.T) {
 func TestExploreSendsTheViewerToTheirOwnView(t *testing.T) {
 	t.Parallel()
 	fe := &fakeExplorer{users: map[string]bool{"me": true, "Me": true}}
-	s := newServerWith(t, func(d *Deps) { d.Explorer = fe })
+	s := newServerWith(t, func(d *Deps) { exploreOn(d, fe) })
 	for _, in := range []string{"me", "@Me"} {
 		if code, _, body := explorePost(t, s, in); code != 400 || !strings.Contains(body, "My PRs") || len(fe.queries) != 0 {
 			t.Fatalf("%q: %d %s, %d searches", in, code, body, len(fe.queries))
@@ -373,10 +359,10 @@ func TestExploreFindsAnAuthorSearchHidesInTheKnownRepositories(t *testing.T) {
 		page.Total = len(page.Candidates)
 		return page
 	}}
-	s := newServerWith(t, func(d *Deps) { d.Explorer = fe })
+	s := newServerWith(t, func(d *Deps) { exploreOn(d, fe) })
 	ctx := context.Background()
 	for n := range 20 {
-		s.store().UpsertPR(ctx, dinv.PR{Ref: github.Ref{Owner: "acme-labs", Repo: fmt.Sprintf("repository-%02d", n), Number: 100}, State: "OPEN"})
+		inventorytest.Of(s.store()).UpsertPR(ctx, dinv.PR{Ref: github.Ref{Owner: "acme-labs", Repo: fmt.Sprintf("repository-%02d", n), Number: 100}, State: "OPEN"})
 	}
 	code, res, body := explorePost(t, s, "@ivanova")
 	if code != 200 {
@@ -391,12 +377,12 @@ func TestExploreFindsAnAuthorSearchHidesInTheKnownRepositories(t *testing.T) {
 		}
 	}
 	searches := len(fe.queries) - 1
-	requests := (searches + github.SearchesPerRequest - 1) / github.SearchesPerRequest
-	if searches <= github.SearchesPerRequest || fe.batches != requests {
+	requests := (searches + ghapi.SearchesPerRequest - 1) / ghapi.SearchesPerRequest
+	if searches <= ghapi.SearchesPerRequest || fe.batches != requests {
 		t.Fatalf("the %d fallback searches ran in %d requests, want %d", searches, fe.batches, requests)
 	}
-	if len(res.Candidates) != 30 || res.Total != 60 || res.Cost != 1+requests || res.Candidates[0].Ref.Repo != "repository-00" {
-		t.Fatalf("%d candidates of %d, cost %d, first %v", len(res.Candidates), res.Total, res.Cost, res.Candidates[0].Ref)
+	if len(res.Candidates) != 30 || res.Total != 60 || res.Cost != 1+requests || !strings.HasPrefix(res.Candidates[0].Label, "acme-labs/repository-00#") {
+		t.Fatalf("%d candidates of %d, cost %d, first %v", len(res.Candidates), res.Total, res.Cost, res.Candidates[0].Label)
 	}
 	want := fmt.Sprintf(`read "@ivanova" as author:ivanova; GitHub search cannot see ivanova without a repository; searched the 21 repositories `+brand.Name+` knows in %d searches`, searches)
 	if res.Read != want || res.Empty != "" {
@@ -404,8 +390,8 @@ func TestExploreFindsAnAuthorSearchHidesInTheKnownRepositories(t *testing.T) {
 	}
 
 	fe.queries = nil
-	if _, res, _ := explorePost(t, s, "@ivanova sort:updated-desc"); res.Candidates[0].Ref.Repo != "repository-19" || !strings.HasSuffix(fe.queries[1], " sort:updated-desc|30") {
-		t.Fatalf("the merge does not follow the sort asked: first %v, searches %v", res.Candidates[0].Ref, fe.queries)
+	if _, res, _ := explorePost(t, s, "@ivanova sort:updated-desc"); !strings.HasPrefix(res.Candidates[0].Label, "acme-labs/repository-19#") || !strings.HasSuffix(fe.queries[1], " sort:updated-desc|30") {
+		t.Fatalf("the merge does not follow the sort asked: first %v, searches %v", res.Candidates[0].Label, fe.queries)
 	}
 
 	fe.queries, fe.pages = nil, func(string) dgh.CandidatePage { return dgh.CandidatePage{} }
@@ -435,10 +421,10 @@ func TestExploreKeepsTheSearchesThatDidNotFailAlone(t *testing.T) {
 		page.Total = len(page.Candidates)
 		return page
 	}}
-	s := newServerWith(t, func(d *Deps) { d.Explorer = fe })
+	s := newServerWith(t, func(d *Deps) { exploreOn(d, fe) })
 	ctx := context.Background()
 	for n := range 20 {
-		if err := s.store().UpsertPR(ctx, dinv.PR{Ref: github.Ref{Owner: "acme-labs", Repo: fmt.Sprintf("repository-%02d", n), Number: 100}, State: "OPEN"}); err != nil {
+		if err := inventorytest.Of(s.store()).UpsertPR(ctx, dinv.PR{Ref: github.Ref{Owner: "acme-labs", Repo: fmt.Sprintf("repository-%02d", n), Number: 100}, State: "OPEN"}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -449,7 +435,7 @@ func TestExploreKeepsTheSearchesThatDidNotFailAlone(t *testing.T) {
 		return nil
 	}
 	code, res, body := explorePost(t, s, "@ivanova")
-	if code != 200 || len(res.Candidates) == 0 || slices.ContainsFunc(res.Candidates, func(c api.Candidate) bool { return c.Ref.Repo == "repository-00" }) {
+	if code != 200 || len(res.Candidates) == 0 || slices.ContainsFunc(res.Candidates, func(c api.Candidate) bool { return strings.HasPrefix(c.Label, "acme-labs/repository-00#") }) {
 		t.Fatalf("%d %s", code, body)
 	}
 	if !strings.Contains(res.Read, "; 1 of the ") || !strings.HasSuffix(res.Read, " failed: the listed repositories cannot be searched") {
@@ -481,7 +467,7 @@ func TestExploreStartsNoBriefRefresh(t *testing.T) {
 	t.Parallel()
 	fe := &fakeExplorer{page: dgh.CandidatePage{Candidates: []dgh.Candidate{{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN"}}}}
 	b := &refreshCounting{}
-	s := newServerWith(t, func(d *Deps) { d.Explorer = fe; withBriefs(d, b) })
+	s := newServerWith(t, func(d *Deps) { exploreOn(d, fe); withBriefs(d, b) })
 	if code, _, body := explorePost(t, s, "acme/api"); code != 200 || b.refreshes != 0 {
 		t.Fatalf("%d %s, %d refreshes", code, body, b.refreshes)
 	}
@@ -491,7 +477,7 @@ func TestExploreStoreBudget(t *testing.T) {
 	t.Parallel()
 	var cands []dgh.Candidate
 	s := newServerLogged(t, change.NewLog(change.DefaultWindow, nil), func(d *Deps) {
-		withBriefs(d, brief.New(brief.Deps{Store: d.PRs.(inventory.ByUnit).Store, Now: d.Now, Taxonomy: func(github.Ref) string { return brief.DefaultTaxonomy }}))
+		withBriefs(d, brief.New(brief.Deps{Store: d.Records.(present.Records).Store, PRs: inventorytest.Of(d.Records.(present.Records).Store), Now: d.Now, Taxonomy: func(github.Ref) string { return brief.DefaultTaxonomy }}))
 	})
 	ctx := context.Background()
 	st := s.store()
@@ -502,13 +488,13 @@ func TestExploreStoreBudget(t *testing.T) {
 		if n%2 == 1 {
 			continue
 		}
-		if err := st.UpsertPR(ctx, dinv.PR{Ref: ref, Title: "T", Author: "ana", State: dgh.StateOpen, Reasons: []string{"review-requested"}}); err != nil {
+		if err := inventorytest.Of(st).UpsertPR(ctx, dinv.PR{Ref: ref, Title: "T", Author: "ana", State: dgh.StateOpen, Reasons: []string{"review-requested"}}); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := st.AppendEvents(ctx, []dinv.Event{{PR: ref, Kind: dinv.KindPush, Key: "h", Actor: "ana", At: at}}); err != nil {
 			t.Fatal(err)
 		}
-		if err := st.SetOverride(ctx, dinv.Override{PR: ref, Tracked: true, Hold: n == 4}); err != nil {
+		if err := inventorytest.Of(st).SetOverride(ctx, dinv.Override{PR: ref, Tracked: true, Hold: n == 4}); err != nil {
 			t.Fatal(err)
 		}
 		if err := st.WantBrief(ctx, ref, at); err != nil {
@@ -529,13 +515,15 @@ func TestExploreStoreBudget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := s.deriverAt(base, at)
+	d := prrow.DeriverAt(base, s.rowSettings(), s.deps.Brief != nil, at)
+	exploreOn(&s.deps, &fakeExplorer{page: dgh.CandidatePage{Total: len(cands), Candidates: cands}})
 	mctx, sc := metertest.Start(t, ctx)
-	got, err := s.wireCandidates(mctx, cands)
-	if err != nil {
+	var res api.ExploreResult
+	if _, err := s.pluginViewOf(mctx, unit.GitHub, present.ViewExplore, api.ExploreRequest{Query: "is:open"}, &res); err != nil {
 		t.Fatal(err)
 	}
-	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 6})
+	got := res.Candidates
+	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 9})
 	if len(got) != 30 {
 		t.Fatalf("%d candidates", len(got))
 	}
@@ -546,13 +534,15 @@ func TestExploreStoreBudget(t *testing.T) {
 		if (got[i].Brief != nil) != (c.Ref == briefed) {
 			t.Fatalf("%s: brief %+v", c.Ref, got[i].Brief)
 		}
-		pr, tracked, _ := st.PR(ctx, c.Ref)
+		pr, tracked, _ := inventorytest.Of(st).PR(ctx, c.Ref)
 		o, _ := st.Override(ctx, c.Ref)
 		o.PR = c.Ref
 		want := d.UntrackedRow(c, o).Actions
 		if tracked {
 			evs, _ := st.Events(ctx, c.Ref)
-			want = d.Row(pr, evs, o).Actions
+			rep, _, _ := prrow.ReportOf(ghreporttest.Snapshot(ghreporttest.Env{Viewer: base.Viewers[unit.GitHub], Teams: base.Teams[unit.GitHub], Now: at},
+				ghreporttest.Input{PR: pr, Events: evs, Adopted: o.Adopted, Tracked: o.Tracked}))
+			want = d.Row(rep, evs, o).Actions
 		}
 		if !reflect.DeepEqual(got[i].Actions, want) {
 			t.Fatalf("%s: actions\n got %+v\nwant %+v", c.Ref, got[i].Actions, want)
@@ -561,4 +551,11 @@ func TestExploreStoreBudget(t *testing.T) {
 	if got[3].Brief.Brief.Goal != "Export in batches" {
 		t.Fatalf("brief %+v", got[3].Brief)
 	}
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return "1 " + one
+	}
+	return fmt.Sprintf("%d %s", n, many)
 }

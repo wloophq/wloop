@@ -23,7 +23,6 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -152,13 +151,13 @@ func TestFailingCommandStampsItsError(t *testing.T) {
 type memRecorder struct {
 	mu        sync.Mutex
 	events    []dinv.Event
-	overrides map[github.Ref]dinv.Override
+	overrides map[pr.Ref]dinv.Override
 	// failures fails that many Record calls first.
 	failures  int
-	questions map[github.Ref]map[string]bool
+	questions map[pr.Ref]map[string]bool
 }
 
-func (m *memRecorder) OpenQuestions(map[unit.Unit]dturn.Book) map[github.Ref]map[string]bool {
+func (m *memRecorder) OpenQuestions(map[unit.Unit]dturn.Book) map[pr.Ref]map[string]bool {
 	return m.questions
 }
 
@@ -177,7 +176,7 @@ func (m *memRecorder) Record(_ context.Context, ev dinv.Event) error {
 }
 
 func (m *memRecorder) RecordUnit(ctx context.Context, ev port.Event) error {
-	ref, ok := port.PROf(ev)
+	ref, ok := pr.RefOf(ev.Unit)
 	if !ok {
 		return fmt.Errorf("the memory recorder keeps pull requests only, not %s", ev.Unit)
 	}
@@ -187,7 +186,7 @@ func (m *memRecorder) RecordUnit(ctx context.Context, ev port.Event) error {
 func (m *memRecorder) FirstRoundBlocks(context.Context) (map[unit.Unit]port.Event, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	byPR := map[github.Ref][]dinv.Event{}
+	byPR := map[pr.Ref][]dinv.Event{}
 	for _, e := range m.events {
 		byPR[e.PR] = append(byPR[e.PR], e)
 	}
@@ -200,15 +199,15 @@ func (m *memRecorder) FirstRoundBlocks(context.Context) (map[unit.Unit]port.Even
 	return out, nil
 }
 
-func (m *memRecorder) Overrides(context.Context) (map[github.Ref]dinv.Override, error) {
+func (m *memRecorder) Overrides(context.Context) (map[pr.Ref]dinv.Override, error) {
 	return m.overrides, nil
 }
 
-func (m *memRecorder) KeepNextGuidance(_ context.Context, ref github.Ref, guidance string) error {
+func (m *memRecorder) KeepNextGuidance(_ context.Context, ref pr.Ref, guidance string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.overrides == nil {
-		m.overrides = map[github.Ref]dinv.Override{}
+		m.overrides = map[pr.Ref]dinv.Override{}
 	}
 	o := m.overrides[ref]
 	if o.NextGuidance == "" {
@@ -218,7 +217,7 @@ func (m *memRecorder) KeepNextGuidance(_ context.Context, ref github.Ref, guidan
 	return nil
 }
 
-func (m *memRecorder) TakeNextGuidance(_ context.Context, ref github.Ref) (string, error) {
+func (m *memRecorder) TakeNextGuidance(_ context.Context, ref pr.Ref) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	o, ok := m.overrides[ref]
@@ -245,7 +244,7 @@ type sweepCase struct {
 	env *Env
 	te  *testEnv
 	ws  *fake.Manager
-	ref github.Ref
+	ref pr.Ref
 }
 
 func asSweep(m *fake.Manager, te *testEnv) sweepCase {
@@ -258,14 +257,14 @@ func followupScenario(t *testing.T) sweepCase {
 	t.Helper()
 	sc := asSweep(scenario(t))
 	sc.ws.WorkspaceList = slices.DeleteFunc(sc.ws.WorkspaceList, func(w wsdomain.Workspace) bool { return w.ID != "ws-rev" })
-	sc.ref = github.Ref{Owner: "acme", Repo: "api", Number: 7}
+	sc.ref = pr.Ref{Owner: "acme", Repo: "api", Number: 7}
 	return sc
 }
 
 func addressScenario(t *testing.T) sweepCase {
 	t.Helper()
 	sc := asSweep(reviewedAuthorScenario(t))
-	sc.ref = github.Ref{Owner: "acme", Repo: "api", Number: 9}
+	sc.ref = pr.Ref{Owner: "acme", Repo: "api", Number: 9}
 	return sc
 }
 
@@ -279,7 +278,7 @@ func TestSweepRecordsDistinctTimesPerPRAndKind(t *testing.T) {
 	t.Parallel()
 	store := openInventory(t, t.TempDir())
 	s := &sweep{e: &Env{Rec: storeRecorder{store: store}}, now: testNow}
-	st := step{pr: github.Ref{Owner: "acme", Repo: "api", Number: 7}}
+	st := step{pr: pr.Ref{Owner: "acme", Repo: "api", Number: 7}}
 	s.record(context.Background(), st, dinv.KindStatus, "reviewed")
 	s.record(context.Background(), st, dinv.KindStatus, "completed")
 	s.record(context.Background(), st, dinv.KindRoundSent, "")
@@ -315,12 +314,12 @@ func openInventory(t *testing.T, dir string) *inventory.Store {
 
 // saveReview stores a done review turn at head c1 whose record published a
 // verdict.
-func saveReview(t *testing.T, te *testEnv, ref github.Ref, trigger dturn.Trigger) {
+func saveReview(t *testing.T, te *testEnv, ref pr.Ref, trigger dturn.Trigger) {
 	t.Helper()
 	saveReviewAt(t, te, ref, trigger, testNow.Add(-2*time.Hour))
 }
 
-func saveReviewAt(t *testing.T, te *testEnv, ref github.Ref, trigger dturn.Trigger, at time.Time) {
+func saveReviewAt(t *testing.T, te *testEnv, ref pr.Ref, trigger dturn.Trigger, at time.Time) {
 	t.Helper()
 	round := strings.ReplaceAll(ref.String(), "/", "-")
 	b := dturn.Book{Unit: pr.Ref(ref).Unit(), Turns: []dturn.Turn{{Intent: dturn.Intent(dintent.Review), ID: round, Trigger: trigger, Head: "c1", Session: "term-old",
@@ -336,7 +335,7 @@ func saveReviewAt(t *testing.T, te *testEnv, ref github.Ref, trigger dturn.Trigg
 // setReviewer answers the reviewer read with one pull request per ref, in
 // order, each with my review on c1 and the author's comment after it, edited
 // by edit.
-func setReviewer(t *testing.T, te *testEnv, refs []github.Ref, edit func(obj)) {
+func setReviewer(t *testing.T, te *testEnv, refs []pr.Ref, edit func(obj)) {
 	t.Helper()
 	data := obj{"viewer": obj{"login": "me"}}
 	for i, ref := range refs {
@@ -360,7 +359,7 @@ func lostWorkspaceScenario(t *testing.T) sweepCase {
 	sc.ws.WorkspaceList, sc.ws.Sessions = nil, nil
 	sc.te.gh.basics = openBasics
 	saveReview(t, sc.te, sc.ref, dturn.Automated)
-	setReviewer(t, sc.te, []github.Ref{sc.ref}, nil)
+	setReviewer(t, sc.te, []pr.Ref{sc.ref}, nil)
 	return sc
 }
 

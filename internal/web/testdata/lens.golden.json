@@ -7000,55 +7000,6 @@
   }
  },
  {
-  "view": "stalled",
-  "layout": "board",
-  "result": {
-   "group": "lane",
-   "total": 10,
-   "shown": 10,
-   "groups": [
-    {
-     "key": "me",
-     "label": "Needs me",
-     "rows": [
-      "acme/api#31",
-      "acme/api#29",
-      "acme/api#7",
-      "acme/api#6",
-      "acme/api#4"
-     ]
-    },
-    {
-     "key": "reviewer",
-     "label": "Waiting on reviewer",
-     "rows": [
-      "acme/api#12"
-     ]
-    },
-    {
-     "key": "author",
-     "label": "Waiting on author",
-     "rows": [
-      "acme/api#27",
-      "acme/api#17",
-      "acme/api#11",
-      "acme/api#10"
-     ]
-    },
-    {
-     "key": "merge",
-     "label": "Can merge",
-     "rows": []
-    },
-    {
-     "key": "loop",
-     "label": "In loop",
-     "rows": []
-    }
-   ]
-  }
- },
- {
   "q": "repo:api is:needs-me",
   "group": "kind",
   "sort": "age-desc",

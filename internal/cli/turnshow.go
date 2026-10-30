@@ -54,7 +54,7 @@ func runTurnShow(ctx context.Context, e *Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	book, err := c.TurnBook(ctx, ref)
+	book, err := c.TurnBook(ctx, ref.URL())
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func writeBook(w io.Writer, t termfmt.Term, b api.TurnBook, loc *time.Location) 
 	if len(b.Turns) == 1 {
 		turns = "turn"
 	}
-	fmt.Fprintln(w, t.Link(b.PR.URL(), t.Bold(b.PR.String()))+"  "+t.Dim(fmt.Sprintf("%d %s", len(b.Turns), turns)))
+	fmt.Fprintln(w, t.Link(b.Unit.Unit.Address(), t.Bold(b.Unit.Label))+"  "+t.Dim(fmt.Sprintf("%d %s", len(b.Turns), turns)))
 	for _, s := range b.Turns {
 		fmt.Fprintln(w)
 		v.turn(s)

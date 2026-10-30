@@ -6,5 +6,5 @@ when = 'pr.review.action == "follow-up"'
 use = "turn.start"
 intent = "review"
 
-[approval]
+[gates.approval]
 mode = "later"

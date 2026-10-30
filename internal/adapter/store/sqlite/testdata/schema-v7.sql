@@ -1,0 +1,494 @@
+-- An event of no unit (a pause) has an empty provider and unit_key. A record is an event of kind
+-- 'record' keyed by its record kind, its data the record's JSON: a unit keeps one of each kind.
+CREATE TABLE events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  kind TEXT NOT NULL, key TEXT NOT NULL DEFAULT '', actor TEXT NOT NULL DEFAULT '',
+  at TEXT NOT NULL, data TEXT NOT NULL DEFAULT '', anchor TEXT NOT NULL DEFAULT ''
+);
+CREATE UNIQUE INDEX events_keyed ON events(provider, unit_key, kind, key) WHERE key != '';
+CREATE UNIQUE INDEX events_unkeyed ON events(provider, unit_key, kind, at) WHERE key = '';
+CREATE INDEX events_unit ON events(provider, unit_key, at);
+CREATE INDEX events_unit_kind ON events(provider, unit_key, kind, at);
+CREATE INDEX events_recent ON events(at DESC, kind, key);
+CREATE INDEX events_kind ON events(kind, at);
+
+CREATE TABLE overrides (
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  hold INTEGER NOT NULL DEFAULT 0, taken_over INTEGER NOT NULL DEFAULT 0,
+  next_guidance TEXT NOT NULL DEFAULT '',
+  tracked INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (provider, unit_key)
+);
+
+CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+CREATE TABLE turn_instructions (
+  sha TEXT PRIMARY KEY, kind TEXT NOT NULL, repo TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  bundled_sha TEXT NOT NULL DEFAULT '',
+  sources TEXT NOT NULL DEFAULT '',
+  parts TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX turn_instructions_kind ON turn_instructions(kind, repo, created_at);
+
+CREATE TABLE instruction_parts (
+  sha TEXT PRIMARY KEY, body BLOB NOT NULL
+) WITHOUT ROWID;
+
+CREATE TABLE round_state (
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  sent_at TEXT NOT NULL DEFAULT '',
+  agent_home TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (provider, unit_key)
+);
+CREATE TABLE unit_marks (
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  mark TEXT NOT NULL CHECK (mark != ''),
+  value TEXT NOT NULL CHECK (value != ''),
+  PRIMARY KEY (provider, unit_key, mark)
+) WITHOUT ROWID;
+CREATE TABLE round_days (
+  day TEXT PRIMARY KEY,
+  total INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE round_day_prs (
+  day TEXT NOT NULL, provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  rounds INTEGER NOT NULL,
+  PRIMARY KEY (day, provider, unit_key)
+);
+CREATE TABLE round_day_notes (
+  day TEXT NOT NULL, kind TEXT NOT NULL, note TEXT NOT NULL,
+  PRIMARY KEY (day, kind, note)
+);
+
+-- paused holds everything; repos is a JSON list of the owner/repo held
+-- while it is off.
+CREATE TABLE pause (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  paused INTEGER NOT NULL DEFAULT 0,
+  repos TEXT NOT NULL DEFAULT '[]',
+  at TEXT NOT NULL DEFAULT '',
+  why TEXT NOT NULL DEFAULT ''
+);
+INSERT INTO pause (id) VALUES (1);
+
+CREATE TABLE turns (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  intent TEXT NOT NULL, turn_id TEXT NOT NULL, trigger TEXT NOT NULL DEFAULT '',
+  guidance TEXT NOT NULL DEFAULT '', head TEXT NOT NULL DEFAULT '',
+  sent_to TEXT NOT NULL DEFAULT '', session TEXT NOT NULL DEFAULT '',
+  state TEXT NOT NULL,
+  sent_at TEXT NOT NULL, started_at TEXT NOT NULL DEFAULT '', ended_at TEXT NOT NULL DEFAULT '',
+  resume_of INTEGER NOT NULL DEFAULT 0,
+  replaced_by INTEGER NOT NULL DEFAULT 0, prior_state TEXT NOT NULL DEFAULT '',
+  agent TEXT NOT NULL DEFAULT '', brief_run INTEGER NOT NULL DEFAULT 0, agent_session TEXT NOT NULL DEFAULT '',
+  -- written only by the usage store: '', transcript or unavailable
+  usage_source TEXT NOT NULL DEFAULT '', usage_read_at TEXT NOT NULL DEFAULT '', usage_attempts INTEGER NOT NULL DEFAULT 0,
+  -- the intent's inputs as one JSON object with sorted keys
+  inputs TEXT NOT NULL DEFAULT '{}',
+  runner TEXT NOT NULL DEFAULT '', workflow TEXT NOT NULL DEFAULT '',
+  -- the role of the turn's intent (pr.review, pr.address, pr.nudge, probe, headless); '' none
+  role TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX turns_unit ON turns(provider, unit_key, seq);
+CREATE INDEX turns_sent_at ON turns(sent_at);
+CREATE INDEX turns_turn_id ON turns(turn_id, seq);
+CREATE INDEX turns_session ON turns(session, seq);
+CREATE INDEX turns_sent_to ON turns(sent_to, seq);
+CREATE INDEX turns_open ON turns(state) WHERE state IN ('sent', 'started', 'asked');
+
+CREATE TABLE turn_records (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  turn_seq INTEGER NOT NULL DEFAULT 0,
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  session TEXT NOT NULL DEFAULT '', agent_session TEXT NOT NULL DEFAULT '',
+  head TEXT NOT NULL DEFAULT '', hash TEXT NOT NULL,
+  at TEXT NOT NULL, acked INTEGER NOT NULL DEFAULT 0, record TEXT NOT NULL
+);
+CREATE UNIQUE INDEX turn_records_once ON turn_records(provider, unit_key, turn_seq, hash);
+CREATE INDEX turn_records_unit ON turn_records(provider, unit_key);
+
+CREATE TABLE turn_answers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  turn_seq INTEGER NOT NULL,
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  at TEXT NOT NULL, text TEXT NOT NULL, source TEXT NOT NULL,
+  option_id TEXT NOT NULL DEFAULT '', yes INTEGER NOT NULL DEFAULT 0, no INTEGER NOT NULL DEFAULT 0,
+  route TEXT NOT NULL, session TEXT NOT NULL DEFAULT '',
+  message_id INTEGER NOT NULL DEFAULT 0, read_at TEXT NOT NULL DEFAULT '', noticed_at TEXT NOT NULL DEFAULT '',
+  gate_id INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX turn_answers_unit ON turn_answers(provider, unit_key);
+
+-- A session is keyed by the id the loop minted for it; session_handles keeps
+-- the handles its manager gave each process of it, the open one with to_at ''.
+CREATE TABLE sessions (
+  session_id TEXT PRIMARY KEY,
+  manager TEXT NOT NULL DEFAULT '', agent TEXT NOT NULL DEFAULT '',
+  pane TEXT NOT NULL DEFAULT '', agent_session TEXT NOT NULL DEFAULT '',
+  workspace_id TEXT NOT NULL DEFAULT '', worktree TEXT NOT NULL DEFAULT '', home TEXT NOT NULL DEFAULT '',
+  managed INTEGER NOT NULL DEFAULT 0,
+  started_at TEXT NOT NULL DEFAULT '', mcp_at TEXT NOT NULL DEFAULT '',
+  idle_since TEXT NOT NULL DEFAULT '', closed_at TEXT NOT NULL DEFAULT '',
+  typed_at TEXT NOT NULL DEFAULT '', typed_line TEXT NOT NULL DEFAULT '',
+  user_prompt_at TEXT NOT NULL DEFAULT '', prompt_seen_at TEXT NOT NULL DEFAULT '',
+  provider TEXT NOT NULL DEFAULT '', unit_key TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE session_handles (
+  session_id TEXT NOT NULL, manager TEXT NOT NULL, handle TEXT NOT NULL,
+  runtime TEXT NOT NULL DEFAULT '',
+  from_at TEXT NOT NULL, to_at TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (session_id, from_at)
+) WITHOUT ROWID;
+CREATE INDEX session_handles_handle ON session_handles(manager, handle, from_at);
+CREATE UNIQUE INDEX session_handles_open ON session_handles(session_id) WHERE to_at = '';
+
+-- A worktree in the custody of one manager, its owner; workspace_id is the
+-- owner's id of it. worktree_units are the units it stands for.
+CREATE TABLE worktrees (
+  path TEXT PRIMARY KEY,
+  repo TEXT NOT NULL DEFAULT '', manager TEXT NOT NULL, workspace_id TEXT NOT NULL DEFAULT '',
+  created_by TEXT NOT NULL DEFAULT '', at TEXT NOT NULL
+) WITHOUT ROWID;
+CREATE TABLE worktree_units (
+  path TEXT NOT NULL REFERENCES worktrees (path) ON DELETE CASCADE,
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL, at TEXT NOT NULL,
+  PRIMARY KEY (path, provider, unit_key)
+) WITHOUT ROWID;
+
+-- at is in event.TimeLayout, which sorts as text: the newest stop and the
+-- stops to drop are found by it.
+CREATE TABLE turn_stops (
+  session TEXT NOT NULL, prompt_id TEXT NOT NULL, agent_session TEXT NOT NULL DEFAULT '',
+  at TEXT NOT NULL, message TEXT NOT NULL DEFAULT '',
+  blocked INTEGER NOT NULL DEFAULT 0, record_id INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX turn_stops_session ON turn_stops(session, at);
+CREATE INDEX turn_stops_at ON turn_stops(at);
+
+CREATE TABLE view_applied (
+  sink TEXT NOT NULL, provider TEXT NOT NULL, unit_key TEXT NOT NULL, role TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT '', unread INTEGER NOT NULL DEFAULT 0, summary TEXT NOT NULL DEFAULT '',
+  col TEXT NOT NULL DEFAULT '', override TEXT NOT NULL DEFAULT '', at TEXT NOT NULL,
+  PRIMARY KEY (sink, provider, unit_key, role)
+);
+
+CREATE TABLE brief_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  trigger TEXT NOT NULL, -- wanted, background, refresh, trial, extraction, fields, legacy
+  intake INTEGER NOT NULL DEFAULT 0,
+  version TEXT NOT NULL, attempt_of TEXT NOT NULL,
+  started_at TEXT NOT NULL, ended_at TEXT NOT NULL DEFAULT '',
+  input_ms INTEGER, call_ms INTEGER, agent_ms INTEGER,
+  outcome TEXT NOT NULL DEFAULT 'running', -- running, ok, reused, failed, unfit, over-budget, too-long, timeout, unavailable, interrupted
+  error TEXT NOT NULL DEFAULT '',
+  model TEXT NOT NULL DEFAULT '', cost_usd REAL,
+  input_tokens INTEGER, output_tokens INTEGER, cache_read_tokens INTEGER, cache_write_tokens INTEGER,
+  input_bytes INTEGER, input_cut INTEGER NOT NULL DEFAULT 0,
+  brief TEXT NOT NULL DEFAULT '', -- the brief JSON, ok runs only
+  tags TEXT NOT NULL DEFAULT '', -- JSON lists: normalized key:value, what normalization refused
+  dropped_tags TEXT NOT NULL DEFAULT '',
+  input_sha TEXT NOT NULL DEFAULT '',
+  reused_from INTEGER NOT NULL DEFAULT 0,
+  provider TEXT NOT NULL DEFAULT '', unit_key TEXT NOT NULL DEFAULT '',
+  -- what the unit was at when the run read it, in its provider's format
+  revision TEXT NOT NULL DEFAULT '',
+  -- the provider's own parts of what the run read, a JSON object
+  input TEXT NOT NULL DEFAULT '{}',
+  intent TEXT NOT NULL DEFAULT ''
+);
+
+-- run is the ok brief run in use and last_run the latest attempt; the
+-- brief, its model, cost and times are that run's.
+CREATE TABLE unit_briefs (
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  failures INTEGER NOT NULL DEFAULT 0, attempt_of TEXT NOT NULL DEFAULT '',
+  run INTEGER NOT NULL DEFAULT 0, last_run INTEGER NOT NULL DEFAULT 0,
+  wanted_at TEXT NOT NULL DEFAULT '', retry_at TEXT NOT NULL DEFAULT '',
+  gave_up_at TEXT NOT NULL DEFAULT '', gave_up_reason TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (provider, unit_key)
+);
+
+CREATE TABLE intakes (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  intent TEXT NOT NULL, source TEXT NOT NULL, -- cli, cockpit, menubar, tui, session
+  request TEXT NOT NULL,
+  state TEXT NOT NULL, -- accepted, briefing, starting, started, failed, canceled
+  brief TEXT NOT NULL DEFAULT '', -- ready, without, off
+  note TEXT NOT NULL DEFAULT '',
+  accepted_at TEXT NOT NULL, briefing_at TEXT NOT NULL DEFAULT '', starting_at TEXT NOT NULL DEFAULT '', ended_at TEXT NOT NULL DEFAULT '',
+  turn_seq INTEGER NOT NULL DEFAULT 0, turn_id TEXT NOT NULL DEFAULT '',
+  error TEXT NOT NULL DEFAULT '',
+  log TEXT NOT NULL DEFAULT '[]'
+);
+CREATE UNIQUE INDEX intakes_open ON intakes(provider, unit_key, intent) WHERE state IN ('accepted', 'briefing', 'starting');
+
+CREATE TABLE turn_usage (
+  turn_seq INTEGER NOT NULL, model TEXT NOT NULL,
+  messages INTEGER NOT NULL,
+  input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL,
+  cache_read_tokens INTEGER NOT NULL, cache_write_tokens INTEGER NOT NULL,
+  cost_usd REAL,
+  first_at TEXT NOT NULL, last_at TEXT NOT NULL,
+  PRIMARY KEY (turn_seq, model)
+);
+
+CREATE TABLE agent_sessions (
+  agent_session TEXT PRIMARY KEY,
+  kind TEXT NOT NULL DEFAULT '',
+  session TEXT NOT NULL DEFAULT '', home TEXT NOT NULL DEFAULT '', worktree TEXT NOT NULL DEFAULT '',
+  transcript TEXT NOT NULL DEFAULT '',
+  first_seen_at TEXT NOT NULL, last_seen_at TEXT NOT NULL
+);
+
+CREATE TABLE plan_items (
+  id TEXT PRIMARY KEY,
+  workflow TEXT NOT NULL, provider TEXT NOT NULL, unit_key TEXT NOT NULL, key_value TEXT NOT NULL,
+  decision TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '',
+  steps TEXT NOT NULL DEFAULT '[]', why TEXT NOT NULL DEFAULT '{}',
+  default_outcome TEXT NOT NULL DEFAULT '', deadline TEXT NOT NULL DEFAULT '',
+  guidance TEXT NOT NULL DEFAULT '', attempts INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT '',
+  at TEXT NOT NULL,
+  gain_memory INTEGER NOT NULL DEFAULT 0, gain_disk INTEGER NOT NULL DEFAULT 0,
+  saved_at TEXT NOT NULL DEFAULT '', observe INTEGER NOT NULL DEFAULT 0
+) WITHOUT ROWID;
+CREATE INDEX plan_items_workflow ON plan_items(workflow);
+
+CREATE TABLE workflow_runs (
+  workflow TEXT NOT NULL, provider TEXT NOT NULL, unit_key TEXT NOT NULL, key_value TEXT NOT NULL,
+  status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT '', at TEXT NOT NULL,
+  PRIMARY KEY (workflow, provider, unit_key, key_value)
+) WITHOUT ROWID;
+
+CREATE TABLE workflow_cursors (
+  workflow TEXT PRIMARY KEY,
+  cursor INTEGER NOT NULL DEFAULT 0, last_fire TEXT NOT NULL DEFAULT ''
+) WITHOUT ROWID;
+
+CREATE TABLE classifications (
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL, fingerprint TEXT NOT NULL, workflow TEXT NOT NULL,
+  output TEXT NOT NULL DEFAULT '{}', at TEXT NOT NULL,
+  PRIMARY KEY (provider, unit_key, fingerprint, workflow)
+) WITHOUT ROWID;
+
+CREATE TABLE classify_days (
+  day TEXT PRIMARY KEY,
+  total INTEGER NOT NULL DEFAULT 0
+) WITHOUT ROWID;
+
+CREATE TABLE fetches (
+  workspace_id TEXT PRIMARY KEY,
+  at TEXT NOT NULL
+) WITHOUT ROWID;
+
+CREATE TABLE links (
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  to_provider TEXT NOT NULL, to_key TEXT NOT NULL,
+  kind TEXT NOT NULL, item TEXT NOT NULL DEFAULT '',
+  evidence TEXT NOT NULL, origin TEXT NOT NULL, at TEXT NOT NULL,
+  PRIMARY KEY (provider, unit_key, to_provider, to_key, kind, item)
+) WITHOUT ROWID;
+
+CREATE INDEX links_to ON links (to_provider, to_key);
+
+-- category is the category of state, as the profile declares it; review_every (seconds) and reviewed_at are a
+-- parent's review.
+CREATE TABLE tasks (
+  id TEXT PRIMARY KEY,
+  state TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
+  parent TEXT NOT NULL DEFAULT '', position INTEGER NOT NULL DEFAULT 0,
+  sequential INTEGER NOT NULL DEFAULT 0,
+  changed INTEGER NOT NULL DEFAULT 0, seen_at TEXT NOT NULL DEFAULT '',
+  origin TEXT NOT NULL, created TEXT NOT NULL, updated TEXT NOT NULL,
+  rev INTEGER NOT NULL,
+  category TEXT NOT NULL DEFAULT '',
+  review_every INTEGER NOT NULL DEFAULT 0, reviewed_at TEXT NOT NULL DEFAULT ''
+) WITHOUT ROWID;
+CREATE INDEX tasks_state ON tasks (state);
+CREATE INDEX tasks_rev ON tasks (rev);
+CREATE INDEX tasks_category ON tasks (category);
+
+-- task_aliases names the task that took over part or all of a task id the store held before: a split
+-- waiting task's items, a dropped close or message task's rows.
+CREATE TABLE task_aliases (
+  old_id TEXT NOT NULL, new_id TEXT NOT NULL,
+  PRIMARY KEY (old_id, new_id)
+) WITHOUT ROWID;
+
+-- wakes are a task's one wake: on and actors are JSON lists of strings, until and expires times ('' for
+-- none), cond a predicate over the task's facts, return_state the state the wake returns the task to.
+CREATE TABLE wakes (
+  task_id TEXT PRIMARY KEY REFERENCES tasks (id) ON DELETE CASCADE,
+  until TEXT NOT NULL DEFAULT '', on_kinds TEXT NOT NULL DEFAULT '[]', actors TEXT NOT NULL DEFAULT '[]',
+  cond TEXT NOT NULL DEFAULT '', expires TEXT NOT NULL DEFAULT '', return_state TEXT NOT NULL DEFAULT ''
+) WITHOUT ROWID;
+
+CREATE TABLE task_items (
+  task_id TEXT NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL, item TEXT NOT NULL,
+  resolved INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (task_id, provider, unit_key, item)
+) WITHOUT ROWID;
+CREATE INDEX task_items_unit ON task_items (provider, unit_key);
+
+CREATE TABLE task_units (
+  task_id TEXT NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL, ord INTEGER NOT NULL,
+  PRIMARY KEY (task_id, provider, unit_key)
+) WITHOUT ROWID;
+CREATE INDEX task_units_unit ON task_units (provider, unit_key);
+
+-- task_props.value is the property's task.Value as JSON; writer is who wrote it.
+CREATE TABLE task_props (
+  task_id TEXT NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,
+  name TEXT NOT NULL, value TEXT NOT NULL, writer TEXT NOT NULL, at TEXT NOT NULL,
+  PRIMARY KEY (task_id, name)
+) WITHOUT ROWID;
+
+-- A gate's task_id is NULL while no task holds its unit. intents is a JSON list.
+-- applied_at is when its consequence ran; a resolved gate without it runs it again at the gates' next tick.
+-- begun_at is when an at-most-once consequence began, '' once it ended; one a stopped daemon cut keeps it.
+CREATE TABLE gates (
+  id INTEGER PRIMARY KEY,
+  task_id TEXT REFERENCES tasks (id),
+  provider TEXT NOT NULL DEFAULT '', unit_key TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', subject TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL, intents TEXT NOT NULL, intent TEXT NOT NULL DEFAULT '', answer TEXT NOT NULL DEFAULT '',
+  by_actor TEXT NOT NULL DEFAULT '', rule TEXT NOT NULL DEFAULT '',
+  deadline TEXT NOT NULL DEFAULT '', default_intent TEXT NOT NULL DEFAULT '',
+  opened_at TEXT NOT NULL, closed_at TEXT NOT NULL DEFAULT '',
+  applied_at TEXT NOT NULL DEFAULT '',
+  begun_at TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX gates_due ON gates (status, deadline);
+CREATE INDEX gates_task ON gates (task_id);
+CREATE INDEX gates_unit ON gates (provider, unit_key);
+
+CREATE TABLE task_position (
+  only INTEGER PRIMARY KEY CHECK (only = 1),
+  epoch TEXT NOT NULL, rev INTEGER NOT NULL
+);
+
+CREATE TABLE placements (
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  repo TEXT NOT NULL DEFAULT '', checkout TEXT NOT NULL DEFAULT '', role TEXT NOT NULL DEFAULT '',
+  shared INTEGER NOT NULL DEFAULT 0,
+  set_at TEXT NOT NULL,
+  PRIMARY KEY (provider, unit_key)
+);
+
+-- A message is the subject of a question, post or proposal gate, whose status is its state; closed_at is
+-- when that gate closed. messages.answer is the answer as stored; a turn's question and an agent post keep
+-- theirs in turn_answers (message_id, gate_id) too, and a proposal only here.
+CREATE TABLE messages (
+  id INTEGER PRIMARY KEY,
+  task_id TEXT NOT NULL DEFAULT '',
+  provider TEXT NOT NULL DEFAULT '', unit_key TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL, text TEXT NOT NULL,
+  options TEXT NOT NULL DEFAULT '[]', recommend TEXT NOT NULL DEFAULT '', confirm INTEGER NOT NULL DEFAULT 0,
+  origin_kind TEXT NOT NULL, turn_seq INTEGER NOT NULL DEFAULT 0, session TEXT NOT NULL DEFAULT '',
+  workflow TEXT NOT NULL DEFAULT '', proposal INTEGER NOT NULL DEFAULT 0,
+  answer TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL, closed_at TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX messages_open ON messages (closed_at, id);
+CREATE UNIQUE INDEX messages_proposal ON messages (proposal) WHERE origin_kind = 'ledger';
+
+CREATE TABLE unit_cards (
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  card TEXT NOT NULL, at TEXT NOT NULL,
+  PRIMARY KEY (provider, unit_key)
+) WITHOUT ROWID;
+
+-- The last snapshot each source plugin reported of each of its units, as JSON; rev grows with every change
+-- the plugin reports.
+CREATE TABLE unit_snapshots (
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  snapshot TEXT NOT NULL, rev INTEGER NOT NULL, at TEXT NOT NULL,
+  PRIMARY KEY (provider, unit_key)
+) WITHOUT ROWID;
+
+CREATE TABLE drafts (
+  id INTEGER PRIMARY KEY,
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  items TEXT NOT NULL DEFAULT '[]', task TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL, target TEXT NOT NULL DEFAULT '', text TEXT NOT NULL DEFAULT '',
+  reaction TEXT NOT NULL DEFAULT '', original TEXT NOT NULL DEFAULT '', edited INTEGER NOT NULL DEFAULT 0,
+  origin_kind TEXT NOT NULL, turn_seq INTEGER NOT NULL DEFAULT 0, intent TEXT NOT NULL DEFAULT '',
+  workflow TEXT NOT NULL DEFAULT '', rule TEXT NOT NULL DEFAULT '', rule_key TEXT NOT NULL DEFAULT '',
+  -- held, queued, sending, sent, failed or dropped: its delivery; its gate holds whether it may be posted
+  state TEXT NOT NULL,
+  evidence_ref TEXT NOT NULL DEFAULT '', evidence_permalink TEXT NOT NULL DEFAULT '', evidence_at TEXT NOT NULL DEFAULT '',
+  error TEXT NOT NULL DEFAULT '', reason TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, sending_at TEXT NOT NULL DEFAULT '',
+  rev INTEGER NOT NULL DEFAULT 0,
+  purpose TEXT NOT NULL DEFAULT '', delivery TEXT NOT NULL DEFAULT '', effects TEXT NOT NULL DEFAULT '[]',
+  -- when the effects of a sent draft were applied; '' while they are not
+  effects_applied_at TEXT NOT NULL DEFAULT '',
+  -- the unit of the proposing turn when it is not the draft's; '' when it is
+  origin_provider TEXT NOT NULL DEFAULT '', origin_unit_key TEXT NOT NULL DEFAULT '',
+  -- an edit's: the text it replaced
+  replaced TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX drafts_state ON drafts (state, id);
+CREATE INDEX drafts_unit ON drafts (provider, unit_key, id);
+CREATE INDEX drafts_task ON drafts (task, id);
+CREATE INDEX drafts_rule ON drafts (rule, rule_key, id);
+CREATE INDEX drafts_workflow ON drafts (workflow, provider, unit_key, id);
+
+CREATE TABLE review_runs (
+  id TEXT PRIMARY KEY,
+  started_at TEXT NOT NULL,
+  finished_at TEXT NOT NULL DEFAULT '',
+  done TEXT NOT NULL DEFAULT ''
+) WITHOUT ROWID;
+CREATE INDEX review_runs_open ON review_runs (finished_at, started_at);
+
+CREATE TABLE dossiers (
+  owner TEXT PRIMARY KEY,
+  rel_path TEXT NOT NULL, status TEXT NOT NULL,
+  bytes INTEGER NOT NULL DEFAULT 0, files INTEGER NOT NULL DEFAULT 0,
+  last_write_at TEXT NOT NULL DEFAULT '', resolved_at TEXT NOT NULL DEFAULT '',
+  archived_at TEXT NOT NULL DEFAULT '', purge_after TEXT NOT NULL DEFAULT ''
+) WITHOUT ROWID;
+
+-- A dossier directory a merge of tasks, or the migration onto tasks, moved in the store and not yet on disk:
+-- paths under the dossiers root, an archive at the same path under .archive with .tar.gz. Moves apply in seq
+-- order, a later one moving what an earlier one put in place.
+CREATE TABLE dossier_moves (
+  seq INTEGER PRIMARY KEY,
+  from_path TEXT NOT NULL,
+  to_path TEXT NOT NULL
+);
+
+CREATE TABLE items (
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL, id TEXT NOT NULL,
+  body TEXT NOT NULL, state TEXT NOT NULL,
+  confirmed INTEGER NOT NULL DEFAULT 0, provenance TEXT NOT NULL,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  PRIMARY KEY (provider, unit_key, id)
+) WITHOUT ROWID;
+
+CREATE INDEX items_state ON items (state, provider);
+
+CREATE TABLE item_ops (
+  seq INTEGER PRIMARY KEY,
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL, item TEXT NOT NULL,
+  op TEXT NOT NULL, provenance TEXT NOT NULL, outcome TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '',
+  at TEXT NOT NULL
+);
+
+CREATE INDEX item_ops_unit ON item_ops (provider, unit_key, at);
+
+-- decided_at is when a gate's decision of the proposal was applied, so a replayed decision applies nothing.
+CREATE TABLE item_proposals (
+  id INTEGER PRIMARY KEY,
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL, item TEXT NOT NULL,
+  op TEXT NOT NULL, provenance TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '',
+  dedupe TEXT NOT NULL, at TEXT NOT NULL,
+  decided_at TEXT NOT NULL DEFAULT ''
+);

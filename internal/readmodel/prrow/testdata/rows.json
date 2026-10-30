@@ -17,9 +17,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-14T02:00:00Z"
@@ -99,24 +97,6 @@
         "enabled": false,
         "reason": "acme/api#1 waits on you (review requested, no review on the head); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#1",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#1",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#1",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -208,9 +188,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-13T13:00:00Z"
@@ -286,24 +264,6 @@
         "enabled": false,
         "reason": "acme/api#2 waits on you (review requested, no review on the head); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#2",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#2",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#2",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -466,24 +426,6 @@
         "confirm": "Nudge @carol on acme/api#3? An agent posts one comment under your name."
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#3",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#3",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#3",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#3? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -563,7 +505,6 @@
       "line": "no reviewer requested"
     },
     "views": [
-      "stalled",
       "mine"
     ],
     "facets": {
@@ -632,31 +573,13 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
         "enabled": true,
         "note": "Nudge the maintainers (no reviewer requested)",
         "confirm": "Nudge the maintainers (no reviewer requested) on acme/api#4? An agent posts one comment under your name."
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#4",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#4",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#4",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -804,31 +727,13 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
         "enabled": false,
         "reason": "acme/api#5 waits on you (draft); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#5",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#5",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#5",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -916,8 +821,6 @@
       "line": "checks failing: lint, unit"
     },
     "views": [
-      "needs-me",
-      "stalled",
       "mine"
     ],
     "facets": {
@@ -989,31 +892,13 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
         "enabled": false,
         "reason": "acme/api#6 waits on you (checks failing: lint, unit); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#6",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#6",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#6",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -1100,8 +985,6 @@
       "line": "changes requested by carol"
     },
     "views": [
-      "needs-me",
-      "stalled",
       "mine"
     ],
     "facets": {
@@ -1171,31 +1054,13 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
         "enabled": false,
         "reason": "acme/api#7 waits on you (changes requested by carol); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#7",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -1284,8 +1149,7 @@
       "line": "approved and green"
     },
     "views": [
-      "mine",
-      "approved"
+      "mine"
     ],
     "facets": {
       "age": [
@@ -1353,31 +1217,13 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
         "enabled": false,
         "reason": "acme/api#8 waits on you (approved and green); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#8",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#8",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#8",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -1471,7 +1317,6 @@
       "line": "merge conflicts with main"
     },
     "views": [
-      "needs-me",
       "mine"
     ],
     "facets": {
@@ -1540,31 +1385,13 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
         "enabled": false,
         "reason": "acme/api#9 waits on you (merge conflicts with main); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#9",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#9",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#9",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -1646,9 +1473,7 @@
       "reason": "me-login commented, no reply",
       "line": "me-login commented, no reply"
     },
-    "views": [
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-09T15:00:00Z"
@@ -1724,24 +1549,6 @@
         "enabled": true,
         "note": "Nudge @ana",
         "confirm": "Nudge @ana on acme/api#10? An agent posts one comment under your name."
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#10",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#10",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#10",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -1822,9 +1629,7 @@
       "reason": "no reviewer requested",
       "line": "no reviewer requested"
     },
-    "views": [
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-08T16:00:00Z"
@@ -1900,24 +1705,6 @@
         "enabled": true,
         "note": "Nudge @ana",
         "confirm": "Nudge @ana on acme/api#11? An agent posts one comment under your name."
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#11",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#11",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#11",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -2005,7 +1792,6 @@
       "line": "me-login replied, dave has not returned"
     },
     "views": [
-      "stalled",
       "mine"
     ],
     "facets": {
@@ -2074,31 +1860,13 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
         "enabled": true,
         "note": "Nudge @dave",
         "confirm": "Nudge @dave on acme/api#12? An agent posts one comment under your name."
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#12",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#12",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#12",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -2186,10 +1954,7 @@
       "reason": "merged",
       "line": "merged"
     },
-    "views": [
-      "loop",
-      "done"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-13T15:00:00Z"
@@ -2235,24 +2000,6 @@
       ]
     },
     "actions": [
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#13",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#13",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#13",
-        "refusal": "dismiss.why"
-      },
       {
         "id": "open",
         "enabled": true
@@ -2363,24 +2110,6 @@
       ]
     },
     "actions": [
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#14",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#14",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#14",
-        "refusal": "dismiss.why"
-      },
       {
         "id": "open",
         "enabled": true
@@ -2521,24 +2250,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#15",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#15",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#15",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#15? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -2582,16 +2293,6 @@
         "agent_states": [],
         "comment": "",
         "is_main": false
-      },
-      "override": {
-        "muted_until": "2026-10-14T20:00:00Z",
-        "mute_until_state_change": false,
-        "muted_kind": "",
-        "muted_waiting_on": "",
-        "hold": false,
-        "adopted": false,
-        "tracked": false,
-        "next_guidance": ""
       },
       "facts": {
         "created_at": "2026-10-06T12:00:00Z",
@@ -2714,24 +2415,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#16",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#16",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#16",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#16? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -2776,16 +2459,6 @@
         "comment": "",
         "is_main": false
       },
-      "override": {
-        "muted_until": "0001-01-01T00:00:00Z",
-        "mute_until_state_change": true,
-        "muted_kind": "review",
-        "muted_waiting_on": "me",
-        "hold": false,
-        "adopted": false,
-        "tracked": false,
-        "next_guidance": ""
-      },
       "facts": {
         "created_at": "2026-10-05T23:00:00Z",
         "changed_files": 16,
@@ -2826,9 +2499,7 @@
       "reason": "no reviewer requested",
       "line": "no reviewer requested"
     },
-    "views": [
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-05T10:00:00Z"
@@ -2904,24 +2575,6 @@
         "enabled": true,
         "note": "Nudge @ana",
         "confirm": "Nudge @ana on acme/api#17? An agent posts one comment under your name."
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#17",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#17",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#17",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -3002,10 +2655,7 @@
       "reason": "automatic round held: cap reached",
       "line": "held (cap)"
     },
-    "views": [
-      "needs-me",
-      "loop"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-14T14:00:00Z"
@@ -3060,7 +2710,8 @@
         "enabled": true,
         "primary": true,
         "confirm": "Run the held round on acme/api#18 now? It does not count against the cap.",
-        "basis": "held:automatic round held: cap reached"
+        "basis": "held:automatic round held: cap reached",
+        "intent": "review"
       },
       {
         "id": "guide",
@@ -3089,24 +2740,6 @@
         "enabled": false,
         "reason": "acme/api#18 waits on the review loop (automatic round held: cap reached); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#18",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#18",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#18",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -3192,9 +2825,7 @@
       "reason": "round blocked: no access",
       "line": "round blocked"
     },
-    "views": [
-      "needs-me"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-14T13:00:00Z"
@@ -3270,24 +2901,6 @@
         "enabled": false,
         "reason": "acme/api#19 waits on you (round blocked: no access); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#19",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#19",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#19",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -3369,7 +2982,6 @@
       "line": "review to address, no workspace: carol asked"
     },
     "views": [
-      "needs-me",
       "mine"
     ],
     "facets": {
@@ -3438,31 +3050,13 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
         "enabled": false,
         "reason": "acme/api#20 waits on you (review to address, no workspace: carol asked); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#20",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#20",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#20",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -3544,10 +3138,7 @@
       "reason": "review waiting for your answer: new push",
       "line": "round soon"
     },
-    "views": [
-      "needs-me",
-      "loop"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-03T06:00:00Z"
@@ -3638,24 +3229,6 @@
         "refusal": "action.refuse[0]"
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#21",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#21",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#21",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#21? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -3688,12 +3261,6 @@
       }
     ],
     "specs_version": "",
-    "pending": {
-      "intent": "review",
-      "reason": "new push",
-      "since": "2026-10-14T14:59:00Z",
-      "deadline": "2026-10-14T15:04:00Z"
-    },
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3751,10 +3318,7 @@
       "reason": "which branch?",
       "line": "agent asks"
     },
-    "views": [
-      "needs-me",
-      "loop"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-14T14:30:00Z"
@@ -3831,24 +3395,6 @@
         "enabled": false,
         "reason": "acme/api#22 waits on the review loop (which branch?); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#22",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#22",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#22",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -3934,9 +3480,7 @@
       "reason": "review round in progress",
       "line": "agent working"
     },
-    "views": [
-      "loop"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-14T14:50:00Z"
@@ -4009,24 +3553,6 @@
         "enabled": false,
         "reason": "acme/api#23 waits on the review loop (review round in progress); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#23",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#23",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#23",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -4111,7 +3637,6 @@
       "line": "agent stopped"
     },
     "views": [
-      "needs-me",
       "mine"
     ],
     "facets": {
@@ -4180,31 +3705,13 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
         "enabled": false,
         "reason": "acme/api#24 waits on the review loop (tests broke); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#24",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#24",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#24",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -4291,10 +3798,7 @@
       "reason": "the agent asked you something",
       "line": "agent asks"
     },
-    "views": [
-      "needs-me",
-      "loop"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "0001-01-01T00:00:00Z"
@@ -4371,24 +3875,6 @@
         "enabled": false,
         "reason": "acme/api#25 waits on the review loop (the agent asked you something); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#25",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#25",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#25",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -4542,31 +4028,13 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
         "enabled": true,
         "note": "Nudge @carol",
         "confirm": "Nudge @carol on acme/api#26? An agent posts one comment under your name."
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#26",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#26",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#26",
-        "refusal": "dismiss.why"
       },
       {
         "id": "resume",
@@ -4607,10 +4075,6 @@
         "is_main": false
       },
       "override": {
-        "muted_until": "0001-01-01T00:00:00Z",
-        "mute_until_state_change": false,
-        "muted_kind": "",
-        "muted_waiting_on": "",
         "hold": true,
         "adopted": true,
         "tracked": false,
@@ -4650,9 +4114,7 @@
       "reason": "no reviewer requested",
       "line": "no reviewer requested"
     },
-    "views": [
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-09-30T00:00:00Z"
@@ -4731,24 +4193,6 @@
         "confirm": "Nudge @bob on acme/api#27? An agent posts one comment under your name."
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#27",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#27",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#27",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/api#27? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -4794,10 +4238,6 @@
         "is_main": false
       },
       "override": {
-        "muted_until": "0001-01-01T00:00:00Z",
-        "mute_until_state_change": false,
-        "muted_kind": "",
-        "muted_waiting_on": "",
         "hold": false,
         "adopted": false,
         "tracked": true,
@@ -4837,10 +4277,7 @@
       "reason": "approved and green",
       "line": "approved and green"
     },
-    "views": [
-      "loop",
-      "approved"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-10-13T15:00:00Z"
@@ -4917,24 +4354,6 @@
         "enabled": true,
         "note": "Nudge @ana",
         "confirm": "Nudge @ana on acme/api#28? An agent posts one comment under your name."
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#28",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#28",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#28",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -5020,10 +4439,7 @@
       "reason": "review requested, no review on the head",
       "line": "briefing… (attempt 2; timeout)"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-09-28T22:00:00Z"
@@ -5100,24 +4516,6 @@
         "enabled": false,
         "reason": "acme/api#29 waits on you (review requested, no review on the head); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#29",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#29",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#29",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -5283,24 +4681,6 @@
         "confirm": "Nudge @acme/web on acme/web#30? An agent posts one comment under your name."
       },
       {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/web#30",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/web#30",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/web#30",
-        "refusal": "dismiss.why"
-      },
-      {
         "id": "take_over",
         "enabled": true,
         "confirm": "Take over acme/web#30? It becomes yours to develop: {{name}} creates or renames its author workspace."
@@ -5385,10 +4765,7 @@
       "reason": "review requested, no review on the head",
       "line": "review requested, no review on the head"
     },
-    "views": [
-      "needs-me",
-      "stalled"
-    ],
+    "views": [],
     "facets": {
       "age": [
         "2026-08-15T15:00:00Z"
@@ -5468,24 +4845,6 @@
         "enabled": false,
         "reason": "acme/api#31 waits on you (review requested, no review on the head); a nudge asks someone else for the next step",
         "refusal": "action.refuse[0]"
-      },
-      {
-        "id": "answer",
-        "enabled": false,
-        "reason": "no open question on acme/api#31",
-        "refusal": "answer.why"
-      },
-      {
-        "id": "continue",
-        "enabled": false,
-        "reason": "no open question on acme/api#31",
-        "refusal": "continue.why"
-      },
-      {
-        "id": "dismiss",
-        "enabled": false,
-        "reason": "no open question on acme/api#31",
-        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",

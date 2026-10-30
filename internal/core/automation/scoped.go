@@ -7,7 +7,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
-// Scoper is an optional capability of Units: the facts of u that depend on
+// Scoper is a capability of the engine's Keep: the facts of u that depend on
 // the workflow reading them, such as the settlement of the drafts it
 // proposed, laid over the unit's facts f. It returns a new map and never
 // writes f, which the other workflows read.
@@ -15,8 +15,8 @@ type Scoper interface {
 	Scope(ctx context.Context, workflow string, u unit.Unit, f workflow.Facts) (workflow.Facts, error)
 }
 
-// EventFacts is an optional capability of Units: the facts of a unit an
-// event names, served after the unit left its list (an entry done or
+// EventFacts is a capability of the engine's Keep: the facts of a unit an
+// event names, served after the unit left its list (a task done or
 // dismissed), so an event workflow reacts to what took it out.
 type EventFacts interface {
 	EventFacts(ctx context.Context, u unit.Unit) (workflow.Facts, error)
@@ -31,16 +31,28 @@ func (e *Engine) factsFor(ctx context.Context, w workflow.Workflow, u unit.Unit)
 	return e.scoped(ctx, w.Name, u, f)
 }
 
-// unitFacts are u's facts, through EventFacts for an event workflow.
+// unitFacts are u's facts, through EventFacts for an event workflow, with
+// their temporal values resolved now.
 func (e *Engine) unitFacts(ctx context.Context, w workflow.Workflow, u unit.Unit) (workflow.Facts, error) {
-	if ef, ok := e.Units.(EventFacts); ok && w.Trigger.Kind == workflow.TriggerEvent {
+	f, err := e.reportedFacts(ctx, w, u)
+	if err != nil {
+		return nil, err
+	}
+	f, _ = workflow.Resolve(f, e.now())
+	return f, nil
+}
+
+// reportedFacts are u's facts as its provider reports them, temporal values
+// unresolved.
+func (e *Engine) reportedFacts(ctx context.Context, w workflow.Workflow, u unit.Unit) (workflow.Facts, error) {
+	if ef, ok := e.Keep.(EventFacts); ok && w.Trigger.Kind == workflow.TriggerEvent {
 		return ef.EventFacts(ctx, u)
 	}
 	return e.Units.Facts(ctx, u)
 }
 
 func (e *Engine) scoped(ctx context.Context, w string, u unit.Unit, f workflow.Facts) (workflow.Facts, error) {
-	s, ok := e.Units.(Scoper)
+	s, ok := e.Keep.(Scoper)
 	if !ok {
 		return f, nil
 	}

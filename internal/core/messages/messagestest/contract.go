@@ -27,13 +27,13 @@ func questionsKeyByTurn(t *testing.T, s message.Store) {
 	ctx := context.Background()
 	q := message.Message{Unit: u, Kind: message.Question, Text: "Publish?", Confirm: true, Origin: message.Origin{Kind: message.OriginTurn, TurnSeq: 3, Session: "term_1"}, CreatedAt: at}
 	first, err := s.Upsert(ctx, q)
-	if err != nil || first.ID == 0 || first.State != message.Open || !first.CreatedAt.Equal(at) {
+	if err != nil || first.ID == 0 || !first.Open() || !first.CreatedAt.Equal(at) {
 		t.Fatalf("insert %+v %v", first, err)
 	}
-	q.Text, q.EntryID = "Publish now?", "e-1"
+	q.Text, q.TaskID = "Publish now?", "t-1"
 	q.Options = []record.Option{{ID: "a", Label: "A", Consequence: "does a"}}
 	again, err := s.Upsert(ctx, q)
-	if err != nil || again.ID != first.ID || again.Text != "Publish now?" || again.EntryID != "e-1" || len(again.Options) != 1 || !again.CreatedAt.Equal(at) {
+	if err != nil || again.ID != first.ID || again.Text != "Publish now?" || again.TaskID != "t-1" || len(again.Options) != 1 || !again.CreatedAt.Equal(at) {
 		t.Fatalf("re-ask: %+v %v", again, err)
 	}
 	other := q
@@ -41,36 +41,27 @@ func questionsKeyByTurn(t *testing.T, s message.Store) {
 	if m, _ := s.Upsert(ctx, other); m.ID == first.ID {
 		t.Fatal("another turn's question took the first one's row")
 	}
-	if err := s.Close(ctx, first.ID, message.Answered, "yes", at.Add(time.Minute)); err != nil {
+	if err := s.Close(ctx, first.ID, "yes", at.Add(time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Close(ctx, first.ID, message.Dismissed, "", at.Add(2*time.Minute)); err != nil {
+	if err := s.Close(ctx, first.ID, "", at.Add(2*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	got, ok, err := s.Message(ctx, first.ID)
-	if err != nil || !ok || got.State != message.Answered || got.Answer != "yes" || !got.ClosedAt.Equal(at.Add(time.Minute)) {
+	if err != nil || !ok || got.Open() || got.Answer != "yes" || !got.ClosedAt.Equal(at.Add(time.Minute)) {
 		t.Fatalf("closed %+v %v %v", got, ok, err)
 	}
-	if err := s.Close(ctx, first.ID, message.Answered, "no, wait", at.Add(3*time.Minute)); err != nil {
+	if err := s.Close(ctx, first.ID, "no, wait", at.Add(3*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	if got, _, _ := s.Message(ctx, first.ID); got.State != message.Answered || got.Answer != "no, wait" || !got.ClosedAt.Equal(at.Add(time.Minute)) {
+	if got, _, _ := s.Message(ctx, first.ID); got.Answer != "no, wait" || !got.ClosedAt.Equal(at.Add(time.Minute)) {
 		t.Fatalf("a newer answer did not reword the answered message: %+v", got)
 	}
-	if again, _ := s.Upsert(ctx, q); again.ID == first.ID || again.State != message.Open {
+	if again, _ := s.Upsert(ctx, q); again.ID == first.ID || !again.Open() {
 		t.Fatalf("a question asked after its answer reused the closed message: %+v", again)
-	}
-	if by, ok, _ := s.ByEntry(ctx, "e-1"); !ok || by.EntryID != "e-1" {
-		t.Fatalf("by entry %+v %v", by, ok)
-	}
-	if _, ok, _ := s.ByEntry(ctx, "e-none"); ok {
-		t.Fatal("found a message for no entry")
 	}
 	if _, ok, _ := s.Message(ctx, 999); ok {
 		t.Fatal("found message 999")
-	}
-	if err := s.Close(ctx, first.ID, message.Open, "", at); err == nil {
-		t.Fatal("closed a message as open")
 	}
 	open, err := s.Open(ctx)
 	if err != nil || len(open) != 2 {
@@ -85,10 +76,10 @@ func ledgerKeysByProposal(t *testing.T, s message.Store) {
 	ctx := context.Background()
 	led := message.Message{Unit: u, Kind: message.Proposal, Text: "accept?", Origin: message.Origin{Kind: message.OriginLedger, Proposal: 9}, CreatedAt: at}
 	l1, _ := s.Upsert(ctx, led)
-	if err := s.Close(ctx, l1.ID, message.Answered, "accept", at); err != nil {
+	if err := s.Close(ctx, l1.ID, "accept", at); err != nil {
 		t.Fatal(err)
 	}
-	if l2, _ := s.Upsert(ctx, led); l2.ID != l1.ID || l2.State != message.Answered {
+	if l2, _ := s.Upsert(ctx, led); l2.ID != l1.ID || l2.Open() {
 		t.Fatalf("a decided ledger proposal came back: %+v", l2)
 	}
 }
@@ -100,7 +91,7 @@ func workflowKeysWhileOpen(t *testing.T, s message.Store) {
 	if b, _ := s.Upsert(ctx, p); a.ID != b.ID {
 		t.Fatal("an open workflow proposal was duplicated")
 	}
-	if err := s.Close(ctx, a.ID, message.Dismissed, "", at); err != nil {
+	if err := s.Close(ctx, a.ID, "", at); err != nil {
 		t.Fatal(err)
 	}
 	if c, _ := s.Upsert(ctx, p); c.ID == a.ID {
@@ -117,9 +108,9 @@ func idUpdates(t *testing.T, s message.Store) {
 	ctx := context.Background()
 	post := message.Message{Unit: u, Kind: message.AgentPost, Text: "fyi", Origin: message.Origin{Kind: message.OriginAgent, TurnSeq: 1}, CreatedAt: at}
 	x, _ := s.Upsert(ctx, post)
-	x.EntryID = "e-9"
+	x.TaskID = "t-9"
 	y, err := s.Upsert(ctx, x)
-	if err != nil || y.ID != x.ID || y.EntryID != "e-9" {
+	if err != nil || y.ID != x.ID || y.TaskID != "t-9" {
 		t.Fatalf("update by id %+v %v", y, err)
 	}
 	if open, _ := s.Open(ctx); len(open) != 1 {

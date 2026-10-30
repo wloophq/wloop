@@ -23,14 +23,14 @@ var _ outbox.Store = draftStore{}
 func (db *DB) Drafts() outbox.Store { return draftStore{db} }
 
 const (
-	draftFields = `provider, unit_key, items, entry, kind, target, text, reaction, original, edited,
-	origin_kind, turn_seq, intent, workflow, rule, rule_key, approval_mode, approval_window, deadline, state,
-	evidence_ref, evidence_permalink, evidence_at, error, reason, would_policy, would_reason, would_outcome,
+	draftFields = `provider, unit_key, items, task, kind, target, text, reaction, original, edited,
+	origin_kind, turn_seq, intent, workflow, rule, rule_key, state,
+	evidence_ref, evidence_permalink, evidence_at, error, reason,
 	created_at, updated_at, sending_at, purpose, delivery, effects, effects_applied_at, origin_provider, origin_unit_key, replaced`
 	draftSelect = `SELECT id, rev, ` + draftFields + ` FROM drafts`
 	draftOrder  = ` ORDER BY id DESC`
-	insertDraft = `INSERT INTO drafts (` + draftFields + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updateDraft = `UPDATE drafts SET (` + draftFields + `, rev) = (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, rev + 1)
+	insertDraft = `INSERT INTO drafts (` + draftFields + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	updateDraft = `UPDATE drafts SET (` + draftFields + `, rev) = (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, rev + 1)
 	WHERE id = ? AND state = ? AND rev = ?`
 )
 
@@ -56,10 +56,10 @@ func draftArgs(d draft.Draft) []any {
 	}
 	list, _ := json.Marshal(its)
 	effects, _ := json.Marshal(d.Effects)
-	o, a, w, ev := d.Origin, d.Approval, d.Would, d.Evidence
-	return []any{string(d.Unit.Provider), d.Unit.Key, string(list), d.Entry, string(d.Kind), d.Target, d.Text, d.Reaction, d.Original, d.Edited,
-		string(o.Kind), o.TurnSeq, o.Intent, o.Workflow, o.Rule, o.Key, string(a.Mode), int64(a.Window), draftTime(d.Deadline), string(d.State),
-		ev.Ref, ev.Permalink, draftTime(ev.At), d.Error, d.Reason, string(w.Policy), w.Reason, string(w.Outcome),
+	o, ev := d.Origin, d.Evidence
+	return []any{string(d.Unit.Provider), d.Unit.Key, string(list), d.Task, string(d.Kind), d.Target, d.Text, d.Reaction, d.Original, d.Edited,
+		string(o.Kind), o.TurnSeq, o.Intent, o.Workflow, o.Rule, o.Key, string(d.State),
+		ev.Ref, ev.Permalink, draftTime(ev.At), d.Error, d.Reason,
 		draftTime(d.CreatedAt), draftTime(d.UpdatedAt), draftTime(d.SendingAt), d.Purpose, string(d.Delivery), string(effects),
 		draftTime(d.EffectsAppliedAt), string(o.Unit.Provider), o.Unit.Key, d.Replaced}
 }
@@ -80,18 +80,15 @@ func shaped(d draft.Draft) draft.Draft {
 
 func scanDraft(row scanner) (draft.Draft, error) {
 	var d draft.Draft
-	var provider, list, kind, originKind, mode, state, policy, outcome, delivery, effects, originProvider string
-	var window int64
-	var deadline, evAt, created, updated, sending, applied string
-	if err := row.Scan(&d.ID, &d.Rev, &provider, &d.Unit.Key, &list, &d.Entry, &kind, &d.Target, &d.Text, &d.Reaction, &d.Original, &d.Edited,
-		&originKind, &d.Origin.TurnSeq, &d.Origin.Intent, &d.Origin.Workflow, &d.Origin.Rule, &d.Origin.Key, &mode, &window, &deadline, &state,
-		&d.Evidence.Ref, &d.Evidence.Permalink, &evAt, &d.Error, &d.Reason, &policy, &d.Would.Reason, &outcome,
+	var provider, list, kind, originKind, state, delivery, effects, originProvider string
+	var evAt, created, updated, sending, applied string
+	if err := row.Scan(&d.ID, &d.Rev, &provider, &d.Unit.Key, &list, &d.Task, &kind, &d.Target, &d.Text, &d.Reaction, &d.Original, &d.Edited,
+		&originKind, &d.Origin.TurnSeq, &d.Origin.Intent, &d.Origin.Workflow, &d.Origin.Rule, &d.Origin.Key, &state,
+		&d.Evidence.Ref, &d.Evidence.Permalink, &evAt, &d.Error, &d.Reason,
 		&created, &updated, &sending, &d.Purpose, &delivery, &effects, &applied, &originProvider, &d.Origin.Unit.Key, &d.Replaced); err != nil {
 		return draft.Draft{}, err
 	}
 	d.Unit.Provider, d.Kind, d.Origin.Kind, d.State = unit.ProviderID(provider), draft.Kind(kind), draft.OriginKind(originKind), draft.State(state)
-	d.Approval = draft.Approval{Mode: draft.ApprovalMode(mode), Window: time.Duration(window)}
-	d.Would.Policy, d.Would.Outcome = draft.WouldPolicy(policy), draft.Outcome(outcome)
 	d.Delivery, d.Origin.Unit.Provider = draft.Delivery(delivery), unit.ProviderID(originProvider)
 	if err := json.Unmarshal([]byte(list), &d.Items); err != nil {
 		return draft.Draft{}, fmt.Errorf("the items of draft %d: %w", d.ID, err)
@@ -102,7 +99,7 @@ func scanDraft(row scanner) (draft.Draft, error) {
 	for _, f := range []struct {
 		dst *time.Time
 		raw string
-	}{{&d.Deadline, deadline}, {&d.Evidence.At, evAt}, {&d.CreatedAt, created}, {&d.UpdatedAt, updated}, {&d.SendingAt, sending}, {&d.EffectsAppliedAt, applied}} {
+	}{{&d.Evidence.At, evAt}, {&d.CreatedAt, created}, {&d.UpdatedAt, updated}, {&d.SendingAt, sending}, {&d.EffectsAppliedAt, applied}} {
 		t, err := parseDraftTime(f.raw)
 		if err != nil {
 			return draft.Draft{}, fmt.Errorf("a time of draft %d: %w", d.ID, err)
@@ -115,7 +112,7 @@ func scanDraft(row scanner) (draft.Draft, error) {
 // normal is d as a scan returns it: shaped, times in UTC, Items never nil.
 func normal(d draft.Draft) draft.Draft {
 	d = shaped(d)
-	for _, t := range []*time.Time{&d.Deadline, &d.Evidence.At, &d.CreatedAt, &d.UpdatedAt, &d.SendingAt, &d.EffectsAppliedAt} {
+	for _, t := range []*time.Time{&d.Evidence.At, &d.CreatedAt, &d.UpdatedAt, &d.SendingAt, &d.EffectsAppliedAt} {
 		if !t.IsZero() {
 			*t = t.UTC()
 		}
@@ -164,7 +161,7 @@ func (s draftStore) List(ctx context.Context, f outbox.Filter) ([]draft.Draft, e
 	if f.Unit != nil {
 		where, args = append(where, `provider = ? AND unit_key = ?`), append(args, string(f.Unit.Provider), f.Unit.Key)
 	}
-	for _, c := range []struct{ col, v string }{{"entry", f.Entry}, {"rule", f.Rule}, {"rule_key", f.Key}, {"workflow", f.Workflow}} {
+	for _, c := range []struct{ col, v string }{{"task", f.Task}, {"rule", f.Rule}, {"rule_key", f.Key}, {"workflow", f.Workflow}} {
 		if c.v != "" {
 			where, args = append(where, c.col+` = ?`), append(args, c.v)
 		}

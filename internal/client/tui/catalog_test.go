@@ -3,11 +3,13 @@ package tui
 import (
 	"cmp"
 	"encoding/json"
-	intentload "github.com/wloophq/wloop/internal/intent"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
+
+	intentload "github.com/wloophq/wloop/internal/intent"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand/brandtest"
@@ -34,8 +36,14 @@ func servedSpecs(t testing.TB) api.ActionsResponse {
 	return readWire[api.ActionsResponse](t, "specs.json")
 }
 
+// fixtures are the rows the daemon derives of its catalog fixtures, each in the needs-me tab.
 func fixtures(t testing.TB) map[string]api.Row {
-	return readWire[map[string]api.Row](t, "actions.json")
+	rows := readWire[map[string]api.Row](t, "actions.json")
+	for name, r := range rows {
+		r.Views = []string{"needs-me"}
+		rows[name] = r
+	}
+	return rows
 }
 
 // modelOn is a model that follows the served specs and shows the fixture row.
@@ -82,7 +90,8 @@ func newModel(t testing.TB) *Model {
 	return m
 }
 
-// servedCatalog is the catalog the daemon serves with the GitHub provider.
+// servedCatalog is the catalog the daemon serves with the GitHub provider, with two more terminal views of rows,
+// needs-me and loop, so the tests' rows fill three tabs.
 func servedCatalog(t testing.TB) api.CatalogResponse {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join("..", "..", "readmodel", "prrow", "testdata", "catalog.json"))
@@ -93,6 +102,10 @@ func servedCatalog(t testing.TB) api.CatalogResponse {
 	if err := json.Unmarshal([]byte(brandtest.Expand(string(b))), &c); err != nil {
 		t.Fatal(err)
 	}
+	tui := []string{"tui"}
+	c.Views = append([]api.ViewSpec{{ID: "needs-me", Label: "Needs me", Provider: "github", Rows: true, Surfaces: tui, Unit: "Pull request", UnitSort: "repo"},
+		{ID: "loop", Label: "In loop", Provider: "github", Rows: true, Order: 3, Surfaces: tui, Unit: "Pull request", UnitSort: "repo"}}, c.Views...)
+	slices.SortStableFunc(c.Views, func(a, b api.ViewSpec) int { return a.Order - b.Order })
 	return c
 }
 
@@ -108,7 +121,7 @@ func setPR(r *api.Row, change func(p *prView)) {
 }
 
 // servedKeys are the bindings GET /api/keys serves the terminal for specs:
-// the core keys, then the actions' keys.
+// the core keys, the views' keys, the GitHub plugin's, then the actions' keys.
 func servedKeys(specs api.ActionsResponse) []api.KeyView {
 	help, _ := intentload.BundledKeys(os.DirFS("../../../profiles/default"))
 	var out []api.KeyView
@@ -116,6 +129,18 @@ func servedKeys(specs api.ActionsResponse) []api.KeyView {
 		if slices.Contains(b.Surfaces, keys.TUI) {
 			out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: help.Help(string(b.Context), b.Action)})
 		}
+	}
+	def, _ := intentload.BundledViews(os.DirFS("../../../profiles/default"))
+	var views []keys.View
+	for _, v := range def.Views {
+		views = append(views, keys.View{ID: v.ID, Key: v.Key})
+	}
+	for _, b := range keys.Views(views) {
+		v, _ := def.View(strings.TrimPrefix(b.Action, "nav:"))
+		out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: v.Label})
+	}
+	for _, b := range keys.Views([]keys.View{{ID: "github", Key: "g g"}}) {
+		out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "github", Help: "GitHub"})
 	}
 	add := func(specs []api.ActionSpec, ctx keys.Context) {
 		for _, s := range specs {

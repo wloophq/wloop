@@ -19,6 +19,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/wloophq/wloop/internal/brief"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/readmodel"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
+	"github.com/wloophq/wloop/pkg/plugin"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
@@ -29,7 +35,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/dossiers"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/intake"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/messages"
@@ -37,22 +43,25 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/setup"
 	coresweep "github.com/wloophq/wloop/internal/core/sweep"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
 	coreusage "github.com/wloophq/wloop/internal/core/usage"
 	"github.com/wloophq/wloop/internal/core/views"
+	"github.com/wloophq/wloop/internal/core/wakes"
 	"github.com/wloophq/wloop/internal/core/workspaces"
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/ghcli"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/meter"
+	"github.com/wloophq/wloop/internal/plugins/host"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace"
 )
@@ -64,15 +73,15 @@ type Recorder interface {
 	Record(ctx context.Context, ev dinv.Event) error
 	// RecordUnit is Record for an event on any unit.
 	RecordUnit(ctx context.Context, ev port.Event) error
-	Overrides(ctx context.Context) (map[github.Ref]dinv.Override, error)
+	Overrides(ctx context.Context) (map[pr.Ref]dinv.Override, error)
 	// FirstRoundBlocks maps each unit whose round is blocked to its
 	// round_blocked event.
 	FirstRoundBlocks(ctx context.Context) (map[unit.Unit]port.Event, error)
-	KeepNextGuidance(ctx context.Context, ref github.Ref, guidance string) error
-	TakeNextGuidance(ctx context.Context, ref github.Ref) (string, error)
+	KeepNextGuidance(ctx context.Context, ref pr.Ref, guidance string) error
+	TakeNextGuidance(ctx context.Context, ref pr.Ref) (string, error)
 	// OpenQuestions maps each pull request to the intents whose newest turn
 	// is asked.
-	OpenQuestions(books map[unit.Unit]dturn.Book) map[github.Ref]map[string]bool
+	OpenQuestions(books map[unit.Unit]dturn.Book) map[pr.Ref]map[string]bool
 }
 
 // Rounds is the round state's repository and the pause, in the daemon's
@@ -99,8 +108,8 @@ type Env struct {
 	// In is the standard input profile add reads its text from.
 	In io.Reader
 
-	GH     ghcli.Runner
-	GitHub *github.Client
+	// budget is the GitHub plugin's budget as it last named it.
+	budget *githubBudget
 	Git    gitx.Git
 	// Files is what removals read of the file system; nil reads it directly.
 	Files workspaces.Files
@@ -130,7 +139,7 @@ type Env struct {
 	// none, and its rounds keep no turn.
 	Store *inventory.Store
 	// planReads are the pull requests a sweep plans from; nil reads Store.
-	planReads coresweep.Inputs
+	planReads dinv.PlanInputs
 	Turns     *turns.Service
 	Views     *views.Service
 	// Briefing is the daemon's; nil sends every automatic round without
@@ -171,6 +180,29 @@ type Env struct {
 	// whatever the config selects.
 	Managers map[string]ManagerEntry
 
+	// plugins are the plugins found on disk, which serve runs; nil when
+	// none is.
+	plugins []host.Plugin
+	// pluginKind is serve's source kind: the clients and the snapshots of
+	// the source plugins it runs.
+	pluginKind *psource.Kind
+	// pluginRuns are the ids of the plugins serve runs.
+	pluginRuns []string
+	// pluginLauncher starts serve's plugins; nil starts their binaries.
+	pluginLauncher plugin.Launcher
+	// reports are what the source plugins last reported, as a test derives
+	// them over a store; nil reads the running plugins' reports.
+	reports func(store *inventory.Store) readmodel.Reports
+	// briefsHeard holds the brief queue that hears of each brief a plugin
+	// writes through its broker; nil outside serve.
+	briefsHeard *atomic.Pointer[brief.Queue]
+	// pluginEffects applies a provider's plugin effects in place of its
+	// running plugin; nil asks the plugin.
+	pluginEffects func(p unit.ProviderID) (effectApplier, bool)
+	// forge is the forge's plugin the round commands call; nil calls the
+	// running plugin, else the one in process.
+	forge forgeCalls
+
 	// noJobs is serve --no-jobs: the daemon plans no round and writes no
 	// Orca card; it still writes unit cards and derived items to its store.
 	noJobs bool
@@ -197,15 +229,29 @@ type Env struct {
 	background *sync.WaitGroup
 	// items is the daemon's one items ledger; every writer of items shares it.
 	items *coreitems.Ledger
-	// gtd and messages are the daemon's entries and Inbox messages, built once per daemon; gtdMe is the
-	// user's identity the entries reconcile with.
-	gtd   *coregtd.Service
-	gtdMe *identity
-	// pluginsOff holds the plugins the daemon serves disabled, by config or build; empty until serveGTD.
+	// tasks and messages are the daemon's tasks and Inbox messages, built once per daemon; tasksMe is the
+	// user's identity the tasks reconcile with.
+	tasks   *coretasks.Service
+	tasksMe *identity
+	// wakes match the tasks' wakes, built with tasks; wakeFacts are a task's facts their conditions read, once
+	// serve wired the task subject.
+	wakes     *wakes.Service
+	wakeFacts func(ctx context.Context, t task.Task) (workflow.Facts, error)
+	// pluginsOff holds the plugins the daemon serves disabled, by config or build; empty until serveTasks.
 	pluginsOff *atomic.Pointer[[]unit.ProviderID]
 	messages   *messages.Service
 	// outbox is the daemon's drafts, built once per daemon by serveOutbox.
 	outbox *outbox.Service
+	// gates are the daemon's decisions waiting on the user, built once per daemon by newGates; gateReader
+	// reads them.
+	gates      *gates.Service
+	gateReader gates.Reader
+	// consequences apply the resolved plan and trust gates: the daemon
+	// serve built, nil before it.
+	consequences gateConsequences
+	// linkStates holds the daemon serve built, whose read model gives the task facts their links' states; nil
+	// outside serve, and empty until serve built the daemon.
+	linkStates *atomic.Pointer[daemon.Server]
 	// headlessSwept is set once the headless turns a stop cut short were ended, so a later serve of
 	// this process never ends a run it started.
 	headlessSwept bool
@@ -230,12 +276,37 @@ type Env struct {
 	placementSources *placementSources
 	// slack is how the Slack commands and the daemon reach the Keychain, Slack and the browser.
 	slack slackEnv
+	// hosted are the services serve builds after the plugins start, which
+	// their brokers read; nil until serve starts the plugins.
+	hosted *hostedLate
 	// payloads are the enabled plugins' turn payload readers; nil outside serve.
 	payloads map[unit.ProviderID]turn.PayloadReader
+	// payloadPlanner builds GitHub's turn payloads in place of the running
+	// plugin; nil is the running plugin.
+	payloadPlanner func() (psource.PayloadPlanner, error)
+	// effectProblems are the turn effects that went unapplied, which the
+	// daemon's health lists.
+	effectProblems *effectProblems
+	// briefReader reads GitHub's brief inputs in place of the running
+	// plugin; nil is the running plugin.
+	briefReader func() (briefReader, error)
+	// identityReader reads the viewer GitHub names in place of the running
+	// plugin; nil is the running plugin.
+	identityReader func() (identityReader, error)
+}
+
+// owning is e with the state an Env owns, which its copies share: the
+// work it starts in the background and waits for, its unapplied turn
+// effects and the GitHub plugin's budget. Every Env that serves is built
+// through it.
+func (e *Env) owning() *Env {
+	e.background = &sync.WaitGroup{}
+	e.effectProblems = &effectProblems{}
+	e.budget = &githubBudget{}
+	return e
 }
 
 func NewEnv() *Env {
-	gh := ghcli.Metered(ghcli.New())
 	exe, err := os.Executable()
 	if err != nil {
 		exe = brand.StateDir()
@@ -244,13 +315,11 @@ func NewEnv() *Env {
 	managers := defaultManagers()
 	agents, homes, protocols := agentRegistries(defaultAgents())
 	home := config.Home()
-	e := &Env{
-		background:    &sync.WaitGroup{},
+	e := (&Env{
+		plugins:       installed,
 		Out:           os.Stdout,
 		Err:           os.Stderr,
 		In:            os.Stdin,
-		GH:            gh,
-		GitHub:        github.NewClient(github.Options{}),
 		Git:           gitx.New(),
 		WS:            newSet(managers, Defaults().WorkspaceManagers),
 		Sh:            execSh,
@@ -277,7 +346,7 @@ func NewEnv() *Env {
 		Homes:      homes,
 		Usage:      defaultUsage(home),
 		Managers:   managers,
-	}
+	}).owning()
 	e.intents = newEnvIntents(e)
 	return e
 }
@@ -341,7 +410,7 @@ type ManagerEntry struct {
 	New     func() workspace.Manager
 	// Ports are the processes and sinks on ws; reloads ws starts on its own run under
 	// ctx, and its changes are noted in changes, which may be nil.
-	Ports func(ctx context.Context, ws workspace.Manager, store *inventory.Store, cfg config.Config, changes *change.Log) (managerSessions, []views.Sink, error)
+	Ports func(ctx context.Context, ws workspace.Manager, prs prrow.ReportedPRs, cfg config.Config, changes *change.Log) (managerSessions, []views.Sink, error)
 	// Homes lists agent homes the manager keeps for kind under userHome.
 	Homes func(userHome, kind string) []string
 	// Available is nil when the manager is installed and this release can
@@ -685,6 +754,7 @@ func commands() map[string]command {
 		"explore":           runExplore,
 		"slack":             runSlack,
 		"outbox":            runOutbox,
+		"task":              runTask,
 		"version":           version,
 		"--version":         version,
 		"-v":                version,

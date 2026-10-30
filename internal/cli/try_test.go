@@ -166,7 +166,7 @@ func TestRoundSessionsReadOnlyStoredTurns(t *testing.T) {
 	for name, policy := range map[string]turns.Policy{"round": roundPolicy("'/bin/"+brand.Name+"'", bundledStored()), "try": tryPolicy("'/bin/"+brand.Name+"'", bundledStored())} {
 		raw := claude.Agent{}.Settings(policy)
 		var want []string
-		for _, intent := range []string{"act", "address", "nudge", "review", "start"} {
+		for _, intent := range []string{"act", "address", "attach", "chat", "nudge", "review", "start"} {
 			want = append(want, "Bash('/bin/"+brand.Name+"' instructions "+intent+" --turn *)")
 		}
 		var got []string

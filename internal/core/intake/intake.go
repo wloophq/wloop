@@ -59,6 +59,29 @@ const (
 	NoteCanceled = "canceled by the user"
 )
 
+// BriefState is what an intake shows of its unit's brief: whether one is
+// recorded, the attempts that failed since its last success, whether the
+// queue gave up on it, the error of a last run that failed, and when it
+// tries again.
+// SourceSession is the source of an intake a managed session asked for.
+const SourceSession = "session"
+
+type BriefState struct {
+	Found     bool
+	Failures  int
+	GaveUp    bool
+	LastError string
+	RetryAt   time.Time
+}
+
+// StoredBrief is a unit's stored brief as an intake reads it: its state,
+// the brief's JSON and how long its last run took, zero when unknown.
+type StoredBrief struct {
+	State BriefState
+	JSON  string
+	Took  time.Duration
+}
+
 type Intake struct {
 	Seq                                         int64
 	Unit                                        unit.Unit
@@ -138,7 +161,7 @@ type Briefs interface {
 	// Changed is closed by the next end of a brief run of the unit after the
 	// call, so a run that ends while the caller asks Ready still wakes it;
 	// the func releases it.
-	Changed(u unit.Unit) (<-chan struct{}, func())
+	Changed(ctx context.Context, u unit.Unit) (<-chan struct{}, func())
 	// Unwant drops the want of a brief once no intake waits on it.
 	Unwant(ctx context.Context, u unit.Unit) error
 }

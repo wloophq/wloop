@@ -285,7 +285,7 @@ func (s *Server) handleDryRunTurn(w http.ResponseWriter, r *http.Request) {
 	if !decodeAdmin(w, r, &req) {
 		return
 	}
-	if _, err := parsePRURL(req.PR); err != nil {
+	if _, err := s.parseForgeURL(req.PR); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -300,7 +300,7 @@ func (s *Server) handleDryRunTurn(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDoctor(w http.ResponseWriter, r *http.Request) {
 	q := api.DoctorQuery{Repo: r.URL.Query().Get("repo"), PR: r.URL.Query().Get("pr")}
 	if q.PR != "" {
-		if _, err := parsePRURL(q.PR); err != nil {
+		if _, err := s.parseForgeURL(q.PR); err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
@@ -323,7 +323,7 @@ func (s *Server) handleDoctor(w http.ResponseWriter, r *http.Request) {
 		rep.Checks = append(rep.Checks, reconcileChecks(*rec, err)...)
 	}
 	rep.Checks = append(append([]api.DoctorCheck{}, rep.Checks...), loadChecks(s.deps.Meter, s.deps.Now())...)
-	if s.deps.Rows != nil {
+	if len(s.deps.RowProviders) > 0 {
 		rep.Checks = append(rep.Checks, s.readModelCheck(r.Context()))
 	}
 	writeJSON(w, rep)
@@ -344,7 +344,7 @@ func reconcileChecks(rep api.ReconcileReport, err error) []api.DoctorCheck {
 }
 
 func (s *Server) handleTurnShow(w http.ResponseWriter, r *http.Request) {
-	u, err := parsePRURL(r.URL.Query().Get("pr"))
+	u, err := s.parseForgeURL(r.URL.Query().Get("pr"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -363,7 +363,7 @@ func (s *Server) handleTurnShow(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "no turn of "+u.Label())
 		return
 	}
-	out := api.TurnBook{PR: refOf(u), Turns: make([]api.TurnShown, 0, len(b.Turns))}
+	out := api.TurnBook{Unit: named(u), Turns: make([]api.TurnShown, 0, len(b.Turns))}
 	for _, t := range b.Turns {
 		shown := api.TurnShown{Turn: t, Records: []turn.Record{}, Answers: []turn.Answer{}}
 		if s.deps.Records != nil {

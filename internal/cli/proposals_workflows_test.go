@@ -2,16 +2,16 @@ package cli
 
 import (
 	"context"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
-	slacksource "github.com/wloophq/wloop/internal/adapter/source/slack"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/outbox"
-	"github.com/wloophq/wloop/internal/source"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // workflowProposer is the sweep engine as serve wires it, running the
@@ -26,14 +26,10 @@ func newWorkflowProposer(r *replay) *workflowProposer {
 	r.t.Helper()
 	te := r.te
 	clock := clockFunc(func() time.Time { return r.now })
-	m, err := slacksource.Module(te.cfg, source.Deps{DB: r.db, Clock: clock}, slacksource.Slack{})
-	if err != nil {
-		r.t.Fatal(err)
-	}
-	mods := []source.Module{m}
+	mods := []pluginModule{{ID: slackPlugin, Facts: r.slack, OnPosted: map[string]outbox.Effect{builtin.EffectUnitClosed: r.slack.markClosed}}}
 	ledger := te.itemsLedger(r.db, te.cfg, r.t.Logf)
 	r.svc.Applier = outbox.EffectApplier{Store: r.db.DraftEffects(), Clock: clock,
-		Effects: effectLookup(effectDeps{Nudges: te.entries(r.db, te.cfg, ledger), Modules: mods})}
+		Effects: effectLookup(effectDeps{Nudges: te.newTasks(r.db, te.cfg, ledger), Modules: mods, Appliers: te.draftAppliers()})}
 	te.Env.outbox = r.svc
 	ed := engineDeps{DB: r.db, Modules: mods, SessionFacts: noUnits{}, WorkspaceFacts: noUnits{}, Log: r.t.Logf}
 	w := &serveWiring{DB: r.db, Cfg: te.cfg, Modules: mods, Log: r.t.Logf, Engine: &ed}
@@ -52,7 +48,13 @@ func (p *workflowProposer) pass(ctx context.Context) error {
 func TestTheDefaultWorkflowsReproduceTheJobsDrafts(t *testing.T) {
 	t.Parallel()
 	r := newReplay(t)
-	if d := firstDiff(r.run(newWorkflowProposer(r)), readGolden(t)); d != "" {
+	got := r.run(newWorkflowProposer(r))
+	if *update {
+		if err := os.WriteFile(replayGolden, []byte(got), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if d := firstDiff(got, readGolden(t)); d != "" {
 		t.Fatalf("the default workflows' drafts differ from the job's at %s", d)
 	}
 }

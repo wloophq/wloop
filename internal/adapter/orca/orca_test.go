@@ -144,16 +144,12 @@ func (b *board) Run(_ context.Context, args ...string) ([]byte, error) {
 	return nil, fmt.Errorf("unexpected orca %v", args)
 }
 
-func (b *board) links(context.Context) (map[pr.Ref]orca.Link, error) {
+func (b *board) links(context.Context) (map[unit.Unit]orca.Link, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	out := map[pr.Ref]orca.Link{}
+	out := map[unit.Unit]orca.Link{}
 	for u, id := range b.refs {
-		ref, err := pr.ParseKey(u.Key)
-		if err != nil {
-			return nil, err
-		}
-		out[ref] = orca.Link{WorkspaceID: id, Review: true}
+		out[u] = orca.Link{WorkspaceID: id, Review: true}
 	}
 	return out, nil
 }
@@ -354,7 +350,7 @@ func TestApplyWritesTheAuthorColumns(t *testing.T) {
 	for status, want := range map[view.Status]string{view.Ready: "ready-to-merge", view.InProgress: "in-progress", view.Completed: "completed", view.InReview: "in-review"} {
 		b := newBoard(allColumns...)
 		b.Place(r7, "in-review")
-		authorLinks := func(ctx context.Context) (map[pr.Ref]orca.Link, error) {
+		authorLinks := func(ctx context.Context) (map[unit.Unit]orca.Link, error) {
 			out, err := b.links(ctx)
 			for ref, l := range out {
 				l.Review = false

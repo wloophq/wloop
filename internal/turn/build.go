@@ -10,21 +10,14 @@ import (
 	"text/template"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	dpr "github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
-	"github.com/wloophq/wloop/internal/github"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/profile"
 )
-
-// PRReader reads a pull request and your reviews of it, in one read.
-type PRReader interface {
-	PR(ctx context.Context, ref github.Ref) (PR, error)
-}
 
 // Brief is the stored preview of a pull request a turn reads.
 type Brief struct {
@@ -77,7 +70,7 @@ type Builder struct {
 	Command string
 	// ManagerBinary is the workspace manager's executable, which a probe never runs; "" for none.
 	ManagerBinary string
-	// Payloads read each provider's payload; github's is GitHub over a PRReader.
+	// Payloads read each provider's payload.
 	Payloads map[unit.ProviderID]PayloadReader
 	// Items nil renders no items.
 	Items ItemsReader
@@ -103,16 +96,14 @@ func (b Builder) Build(ctx context.Context, r Request) (Context, error) {
 		Intent: r.Intent, Trigger: r.Trigger, Planned: r.Planned, Plain: r.Plain, Owned: r.Owned, Inputs: r.Inputs,
 		Agent: r.Agent, Command: b.Command, ManagerBinary: b.ManagerBinary, History: r.History, Resume: r.Resume, Why: whyOf(r.Why),
 	}
-	if d.Context == "synthetic" {
-		ref, err := dpr.ParseKey(r.Unit.Key)
-		if err != nil {
+	if d.Context == builtin.ContextSynthetic {
+		read, ok := b.Payloads[r.Unit.Provider].(PayloadCompleter)
+		if !ok {
+			return Context{}, fmt.Errorf("the %s provider names no unit for a synthetic turn", r.Unit.Provider)
+		}
+		if c.Payload, err = read.SyntheticPayload(r.Unit, d.Launch == builtin.LaunchProbe); err != nil {
 			return Context{}, err
 		}
-		pr := &PR{URL: ref.URL(), Owner: ref.Owner, Repo: ref.Repo, Number: ref.Number}
-		if d.Launch == builtin.LaunchProbe {
-			pr.Title = ProbeTitle
-		}
-		c.Payload = pr
 		return Complete(c, l)
 	}
 	if c.Payload, err = b.payload(ctx, r); err != nil {
@@ -168,29 +159,20 @@ func (b Builder) Build(ctx context.Context, r Request) (Context, error) {
 	return b.compose(c, l)
 }
 
-// payload is the request's payload, else what the unit provider's reader
-// reads; a pull request's prior review is anchored to the loop's last
-// verdict.
+// payload is the request's payload as the unit provider's reader completes
+// it, else what that reader reads.
 func (b Builder) payload(ctx context.Context, r Request) (Payload, error) {
-	p := r.Payload
-	if p == nil {
-		read, ok := b.Payloads[r.Unit.Provider]
-		if !ok {
-			return nil, fmt.Errorf("no turn payload reader for the %s provider", r.Unit.Provider)
+	read, ok := b.Payloads[r.Unit.Provider]
+	if r.Payload != nil {
+		if c, ok := read.(PayloadCompleter); ok {
+			return c.CompletePayload(r, r.Payload)
 		}
-		var err error
-		if p, err = read.Payload(ctx, r); err != nil {
-			return nil, err
-		}
+		return r.Payload, nil
 	}
-	if pr, ok := p.(*PR); ok {
-		ref, err := dpr.ParseKey(r.Unit.Key)
-		if err != nil {
-			return nil, err
-		}
-		p = anchored(*pr, ref, r.LastVerdict)
+	if !ok {
+		return nil, fmt.Errorf("no turn payload reader for the %s provider", r.Unit.Provider)
 	}
-	return p, nil
+	return read.Payload(ctx, r)
 }
 
 // compose reads the turn's guides: the intent's profile at the turn's

@@ -65,7 +65,7 @@ func dashRows(now time.Time) []map[string]any {
 		row(7, "acme/api", "ana", "done", "nobody", 30*day, false, []string{"done"}, nil),
 	}
 	rows[3]["approved"] = true
-	rows[0]["pending"] = map[string]any{"deadline": iso(now.Add(2 * time.Hour))}
+	rows[0]["round_gate"] = map[string]any{"deadline": iso(now.Add(2 * time.Hour))}
 	rows[1]["facts"] = map[string]any{"created_at": iso(now.Add(-10 * day)), "changed_files": 12,
 		"checks": map[string]any{"state": "FAILURE", "failing": []string{"lint", "unit"}},
 		"turns":  map[string]any{"count": 3, "open": 1, "tokens": 9000, "cost_usd": 1.25},
@@ -332,7 +332,7 @@ func TestPanelsOnFactsStayQuietWithoutThem(t *testing.T) {
 	rows := dashRows(now)
 	for _, r := range rows {
 		delete(r, "facts")
-		delete(r, "pending")
+		delete(r, "round_gate")
 	}
 	var got map[string]any
 	dashRun(t, "", rows, now, `

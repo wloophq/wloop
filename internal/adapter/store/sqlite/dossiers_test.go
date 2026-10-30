@@ -8,13 +8,13 @@ import (
 
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/domain/dossier"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 func init() {
-	reads = append(reads, "DB.Dossiers", "dossierStore.Get", "dossierStore.List", "dossierStore.Open", "DB.AgentWorktrees")
+	reads = append(reads, "DB.Dossiers", "dossierStore.Get", "dossierStore.List", "dossierStore.Open", "dossierStore.Owner", "DB.AgentWorktrees")
 	writes = append(writes, writeCase{
 		method: "dossierStore.Put",
 		call: func(ctx context.Context, e *noteEnv) error {
@@ -30,7 +30,7 @@ func TestDossierStoreRoundTrips(t *testing.T) {
 	at := time.Date(2026, 10, 22, 12, 0, 0, 500, time.UTC)
 	d := dossier.Dossier{Owner: dossier.Owner{Unit: unit.Unit{Provider: "slack", Key: "T000/C000/1.2"}}, RelPath: "slack/T000/C000/1.2",
 		Status: dossier.Archived, Bytes: 10, Files: 2, LastWriteAt: at, ResolvedAt: at.Add(time.Hour), ArchivedAt: at.Add(2 * time.Hour), PurgeAfter: at.Add(3 * time.Hour)}
-	p := dossier.Dossier{Owner: dossier.Owner{Project: "launch"}, RelPath: "project/launch", Status: dossier.Active}
+	p := dossier.Dossier{Owner: dossier.Owner{Unit: task.UnitOf("t-launch"), Merged: "t-old"}, RelPath: "task/t-launch#/merged/t-old", Status: dossier.Archived}
 	for _, x := range []dossier.Dossier{d, p} {
 		if err := db.Dossiers().Put(ctx, x); err != nil {
 			t.Fatal(err)
@@ -40,7 +40,7 @@ func TestDossierStoreRoundTrips(t *testing.T) {
 	if err != nil || !ok || !reflect.DeepEqual(got, d) {
 		t.Errorf("Get = %+v %v %v, want %+v", got, ok, err, d)
 	}
-	if _, ok, err := db.Dossiers().Get(ctx, dossier.Owner{Project: "none"}); ok || err != nil {
+	if _, ok, err := db.Dossiers().Get(ctx, dossier.Owner{Unit: task.UnitOf("t-none")}); ok || err != nil {
 		t.Errorf("Get of an absent owner: %v %v", ok, err)
 	}
 	all, err := db.Dossiers().List(ctx)
@@ -64,7 +64,7 @@ func TestDossierStoreRoundTrips(t *testing.T) {
 	}
 }
 
-func TestDossierStoreOpenReadsItemsAndEntries(t *testing.T) {
+func TestDossierStoreOpenReadsItemsAndTasks(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db, _ := openTemp(t)
@@ -78,7 +78,7 @@ func TestDossierStoreOpenReadsItemsAndEntries(t *testing.T) {
 		return ok
 	}
 	if open(ghPull) {
-		t.Fatal("a unit without items or entries is open")
+		t.Fatal("a unit without items or tasks is open")
 	}
 	it := sampleItem(ghPull, "i1", at)
 	it.State, it.Resolution = items.Resolved, items.Done
@@ -96,44 +96,82 @@ func TestDossierStoreOpenReadsItemsAndEntries(t *testing.T) {
 		t.Fatal("an open item does not keep the unit open")
 	}
 
-	e := gtd.Entry{ID: gtd.NewID(), Kind: gtd.KindCapture, State: gtd.Next, Title: "t", Units: []unit.Unit{slackThread}, Origin: gtd.OriginUser, Created: at, Updated: at}
-	if err := db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpCreate, Entry: e}}); err != nil {
+	e := task.Task{ID: task.NewID(), State: "next", Category: task.CategoryReady, Title: "t", Units: []unit.Unit{slackThread}, Origin: task.OriginUser, Created: at, Updated: at}
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
 	if !open(slackThread) {
-		t.Fatal("a live entry does not keep the unit open")
+		t.Fatal("a live task does not keep the unit open")
 	}
-	e.State = gtd.Done
-	if err := db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpUpdate, Entry: e}}); err != nil {
+	e.State, e.Category = "done", task.CategoryDone
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
 	if open(slackThread) {
-		t.Fatal("a done entry keeps the unit open")
+		t.Fatal("a done task keeps the unit open")
 	}
-	project := func() bool {
+	of := func(o dossier.Owner) bool {
 		t.Helper()
-		ok, err := db.Dossiers().Open(ctx, dossier.Owner{Project: "ship-it"})
+		ok, err := db.Dossiers().Open(ctx, o)
 		if err != nil {
 			t.Fatal(err)
 		}
 		return ok
 	}
-	if project() {
-		t.Fatal("a project without an entry is open")
+	own := dossier.Owner{Unit: task.UnitOf(e.ID)}
+	if of(own) {
+		t.Fatal("a done task's own dossier is open")
 	}
-	p := gtd.Entry{ID: gtd.NewID(), Kind: gtd.KindProject, State: gtd.Next, Title: "Ship it", Slug: "ship-it", Origin: gtd.OriginUser, Created: at, Updated: at}
-	if err := db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpCreate, Entry: p}}); err != nil {
+	e.State, e.Category = "next", task.CategoryReady
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
-	if !project() {
-		t.Fatal("a live project is not open")
+	if !of(own) {
+		t.Fatal("an open task's own dossier is not open")
 	}
-	p.State = gtd.Done
-	if err := db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpUpdate, Entry: p}}); err != nil {
+	if of(dossier.Owner{Unit: task.UnitOf(e.ID), Merged: "t-old"}) {
+		t.Fatal("a merged dossier is open")
+	}
+}
+
+func TestADossierOwnerIsTheTaskHoldingTheUnit(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
+	owner := func(u unit.Unit) dossier.Owner {
+		t.Helper()
+		o, err := db.Dossiers().Owner(ctx, u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return o
+	}
+	if got := owner(ghPull); got != (dossier.Owner{Unit: ghPull}) {
+		t.Fatalf("a unit no task holds: %v", got)
+	}
+	tk := func(id task.ID, cat task.Category, created time.Time, u ...unit.Unit) task.Task {
+		return task.Task{ID: id, State: task.State(cat), Category: cat, Title: string(id), Units: u, Origin: task.OriginDerived, Created: created, Updated: created}
+	}
+	closed := tk("t-closed", task.CategoryDone, at.Add(-2*time.Hour), ghPull)
+	young := tk("t-young", task.CategoryReady, at, ghPull)
+	old := tk("t-old", task.CategoryReady, at.Add(-time.Hour))
+	old.Items = []task.ItemRef{{Unit: ghPull, Item: "i1"}}
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: closed}, {Op: task.OpCreate, Task: young}, {Op: task.OpCreate, Task: old}}); err != nil {
 		t.Fatal(err)
 	}
-	if project() {
-		t.Fatal("a done project is open")
+	if got, want := owner(ghPull), (dossier.Owner{Unit: task.UnitOf(old.ID)}); got != want {
+		t.Fatalf("owner %v, want the oldest open task %v", got, want)
+	}
+	young.State, young.Category, old.State, old.Category = "done", task.CategoryDone, "done", task.CategoryDone
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: young}, {Op: task.OpUpdate, Task: old}}); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := owner(ghPull), (dossier.Owner{Unit: task.UnitOf(closed.ID)}); got != want {
+		t.Fatalf("owner %v, want the oldest task once none is open %v", got, want)
+	}
+	if got := owner(task.UnitOf("t-x")); got != (dossier.Owner{Unit: task.UnitOf("t-x")}) {
+		t.Fatalf("a task's own unit: %v", got)
 	}
 }
 

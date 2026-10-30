@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	slacksource "github.com/wloophq/wloop/internal/adapter/source/slack"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/plugins/slack"
+	dslack "github.com/wloophq/wloop/plugins/slack/domain"
 )
 
 func TestAProviderKeyTargetNamesEveryCompiledInProvider(t *testing.T) {
@@ -47,25 +47,30 @@ func TestASlackMessageRefTargetNamesItsThread(t *testing.T) {
 		return map[string]any{"messages": []any{map[string]any{"type": "message", "ts": v.Get("ts"), "thread_ts": "1700000000.000100", "user": "U001"}}}
 	})
 	u, err := te.unitTarget(context.Background(), "C000/1700000050.000200")
-	if want := dslack.ThreadUnit("T000", "C000", "1700000000.000100"); err != nil || u != want {
+	if want := slackThreadUnit("T000", "C000", "1700000000.000100"); err != nil || u != want {
 		t.Fatalf("unitTarget = %+v, %v; want %+v", u, err, want)
 	}
 }
 
 func TestASlackDirectMessageRefTargetNamesItsSegment(t *testing.T) {
 	te := newSlackTestEnv(t)
-	db := startSlackDaemon(t, te)
 	te.saveToken(t, fakeToken())
 	ctx := context.Background()
+	pdb := pluginStore(t, te.StateDir)
 	facts := dslack.Facts{Team: "T000", Conversations: []dslack.Conversation{{ID: "D000", Kind: dslack.KindIM, DMUser: "U001"}}}
-	if err := (&slacksource.Store{DB: db.Slack()}).Save(ctx, nil, facts, "", testNow); err != nil {
+	if err := (&slack.Store{DB: pdb.Slack()}).Save(ctx, nil, facts, "", testNow); err != nil {
 		t.Fatal(err)
 	}
-	segs, err := (slacksource.Segments{Store: db.Segments(), Clock: clockFunc(func() time.Time { return testNow })}).Apply(ctx, "T000", "D000",
+	ps, err := (slack.Segments{Store: pdb.Segments(), Clock: clockFunc(func() time.Time { return testNow })}).Apply(ctx, "T000", "D000",
 		[]dslack.Span{{FromTS: "1700000000.000000"}})
-	if err != nil || len(segs) != 1 {
-		t.Fatalf("segments %v %v", segs, err)
+	if err != nil || len(ps) != 1 {
+		t.Fatalf("segments %v %v", ps, err)
 	}
+	segs := []unit.Unit{{Provider: unit.ProviderID(ps[0].Provider), Key: ps[0].Key}}
+	if err := pdb.Close(); err != nil {
+		t.Fatal(err)
+	}
+	startSlackDaemon(t, te)
 	u, err := te.unitTarget(ctx, "D000/1700000050.000200")
 	if err != nil || u != segs[0] {
 		t.Fatalf("unitTarget = %+v, %v; want the segment %+v", u, err, segs[0])
@@ -78,14 +83,14 @@ func TestASlackDirectMessageRefTargetNamesItsSegment(t *testing.T) {
 func TestTheDaemonResolvesASlackRefWithoutAskingItself(t *testing.T) {
 	te := newSlackTestEnv(t)
 	te.saveToken(t, fakeToken())
-	seg := dslack.ThreadUnit("T000", "C000", "1700000000.000100")
+	seg := slackThreadUnit("T000", "C000", "1700000000.000100")
 	te.resolve = func(_ context.Context, address string) (unit.Unit, bool, error) {
 		return seg, address == "C000/1700000050.000200", nil
 	}
 	if u, err := te.unitTarget(context.Background(), "C000/1700000050.000200"); err != nil || u != seg {
 		t.Fatalf("unitTarget = %+v, %v", u, err)
 	}
-	if _, err := te.unitTarget(context.Background(), "C000/1700000060.000200"); err == nil || !strings.Contains(err.Error(), "resolves no Slack unit") {
+	if _, err := te.unitTarget(context.Background(), "C000/1700000060.000200"); err == nil || !strings.Contains(err.Error(), "resolves no slack unit") {
 		t.Fatalf("an address the daemon does not resolve: %v", err)
 	}
 }

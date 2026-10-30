@@ -1,6 +1,6 @@
 // Package proposals is the job that proposes what each enabled plugin
 // proposes on its own units, such as GitHub's nudge. Every draft waits for
-// its rule's approval policy. The drafts on GTD entries and Slack units come
+// its rule's approval policy. The drafts on tasks and Slack units come
 // from the profile's workflows through draft.propose.
 package proposals
 
@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -27,7 +27,7 @@ const ReasonMoot = draft.WithdrawMoot
 type Outbox interface {
 	Propose(ctx context.Context, p outbox.Proposal) (draft.Draft, error)
 	List(ctx context.Context, f outbox.Filter) ([]draft.Draft, error)
-	Discard(ctx context.Context, id draft.ID, reason string) (draft.Draft, error)
+	Withdraw(ctx context.Context, id draft.ID, reason string) (draft.Draft, error)
 }
 
 // Source is an enabled plugin's Proposals.
@@ -39,7 +39,7 @@ type Source struct {
 type Job struct {
 	Outbox Outbox
 	// Facts reads a unit's card facts; a plugin rule's draft on a unit whose closure is posted is withdrawn. nil: none.
-	Facts   coregtd.Facts
+	Facts   coretasks.Facts
 	Sources []Source
 	// Enabled says whether a provider's plugin is enabled; nil: every one is.
 	Enabled func(unit.ProviderID) bool
@@ -127,7 +127,7 @@ func (j *Job) propose(ctx context.Context, p outbox.Proposal, now time.Time) err
 		switch {
 		case slices.Contains(draft.Open, d.State), d.State == draft.Failed:
 			return errHeld
-		case d.State == draft.Discarded && d.Reason == ReasonMoot:
+		case d.State == draft.Dropped && d.Reason == ReasonMoot:
 		case now.Sub(d.UpdatedAt) < j.RepeatAfter:
 			return errHeld
 		}
@@ -162,7 +162,7 @@ func (j *Job) plugged(p unit.ProviderID) bool {
 // withdraw discards each proposed auto draft of a plugin rule whose unit's
 // card reports its closure posted (moot).
 func (j *Job) withdraw(ctx context.Context) (int, error) {
-	proposed, err := j.Outbox.List(ctx, outbox.Filter{States: []draft.State{draft.Proposed}})
+	proposed, err := j.Outbox.List(ctx, outbox.Filter{States: []draft.State{draft.Held}})
 	if err != nil {
 		return 0, err
 	}
@@ -174,7 +174,7 @@ func (j *Job) withdraw(ctx context.Context) (int, error) {
 		}
 		reason, err := j.closed(ctx, d)
 		if err == nil && reason != "" {
-			_, err = j.Outbox.Discard(ctx, d.ID, reason)
+			_, err = j.Outbox.Withdraw(ctx, d.ID, reason)
 		}
 		if err != nil {
 			errs = append(errs, err)

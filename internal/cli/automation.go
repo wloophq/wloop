@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	rmoverlay "github.com/wloophq/wloop/internal/readmodel/overlay"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/brief"
@@ -19,34 +21,35 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/workspaces"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/meter"
-	"github.com/wloophq/wloop/internal/source"
 )
 
 var _ workspaces.FetchLog = (*sqlite.Fetches)(nil)
 
 // engineDeps are what the engine runs over besides the Env. SessionFacts,
-// WorkspaceFacts and Candidates override the Env's session and workspace
-// providers and the github module's rounds.
+// WorkspaceFacts and Planners override the Env's session and workspace
+// providers and the plugins' round planners.
 type engineDeps struct {
 	DB             *sqlite.DB
-	Modules        []source.Module
+	Modules        []pluginModule
 	SessionFacts   automation.Units
 	WorkspaceFacts automation.Units
 	// Snapshot overrides the Env's workspace snapshot for the removal's
 	// session guard.
-	Snapshot   coresweep.Snapshot
-	Candidates roundCandidates
-	Briefs     *brief.Queue
+	Snapshot coresweep.Snapshot
+	// Planners override the plugins' round planners, by provider.
+	Planners map[unit.ProviderID]roundPlanner
+	Briefs   *brief.Queue
 	// Asker answers classify's headless calls; nil refuses every classify.
 	Asker turns.Asker
 	// Pub hears the engine's events once stored and the steps' once
@@ -54,7 +57,7 @@ type engineDeps struct {
 	Pub port.Publisher
 	Log func(format string, args ...any)
 	// Subjects are facts providers of the core-kept subjects beyond the
-	// session and workspace ones, such as entry, by provider.
+	// session and workspace ones, such as task, by provider.
 	Subjects map[unit.ProviderID]automation.Units
 	// Withdrawals are the drafts the workflows proposed; nil withdraws none.
 	Withdrawals automation.Withdrawals
@@ -88,7 +91,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	for id, u := range d.Subjects {
 		providers[id] = u
 	}
-	codecs := []unit.Codec{pr.Codec{}, gtd.Codec{}}
+	codecs := []unit.Codec{pr.Codec{}, task.Codec{}}
 	for _, m := range d.Modules {
 		if m.Facts != nil {
 			providers[m.ID] = m.Facts
@@ -99,10 +102,11 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	}
 	codecs = append(codecs, sessionAndWorkspaceCodecs()...)
 	units := newUnitSet(providers)
-	if d.Candidates == nil {
-		d.Candidates = candidatesOf(d.Modules)
+	units.blocks = &startBlocks{e: e}
+	if d.Planners == nil {
+		d.Planners = e.planners()
 	}
-	sd := stepDeps{Units: units, Candidates: d.Candidates, Rounds: e.Rounds, Drafts: d.Drafts, Pub: d.Pub, Log: d.Log,
+	sd := stepDeps{Units: units, Keep: unitKeeping{units}, Planners: d.Planners, Rounds: e.Rounds, Drafts: d.Drafts, Pub: d.Pub, Log: d.Log,
 		Headless: d.TurnStart.Headless, Turns: d.TurnStart.Turns}
 	if d.DB != nil {
 		sd.Pub = stepEvents{rec: sqlite.New(d.DB), next: d.Pub, log: d.Log}
@@ -116,6 +120,9 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 		sd.Removal.Snapshot = e.planSnapshot()
 	}
 	if d.DB != nil {
+		sd.Overrides = d.DB
+		sd.Props = serviceProps{e}
+		sd.Gates = serviceGates{e}
 		sd.Classify.Store = d.DB.Classifications()
 		sd.Removal.Fetched = d.DB.Fetches()
 	}
@@ -127,7 +134,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	workflows := func() []workflow.Workflow {
 		cfg, _ := e.loadConfig()
 		l := e.loadedIntents()
-		return applyConfigWith(l.Workflows, cfg, briefExtrasOf(l.Registry))
+		return applyConfigWith(l.Workflows, cfg, briefExtrasOf(l))
 	}
 	units.classified = &classifiedUnits{c: steps.classify, workflows: workflows}
 	if d.DB != nil {
@@ -137,6 +144,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 		Workflows: workflows,
 		Broken:    e.brokenWorkflows,
 		Units:     units,
+		Keep:      unitKeeping{units},
 		Steps:     steps,
 		Guidance:  recGuidance{e},
 		Clock:     clockFunc(func() time.Time { return e.Now() }),
@@ -206,12 +214,10 @@ func applyConfigWith(ws []workflow.Workflow, cfg config.Config, extras func(unit
 		if wc.Observe != nil {
 			w.Observe = *wc.Observe
 		}
-		if o, ok := runOverlay(wc.Approval); ok {
-			a, err := intentload.OverlayRunApproval(w.Approval, o, workflowEnv(w, extras))
-			if err != nil {
-				w.When = workflow.Refused{Err: fmt.Errorf("workflows.%s.approval: %w", w.Name, err)}
+		if o, ok := runOverlay(wc.GateApproval()); ok {
+			if err := overlayGates(&w, o, extras); err != nil {
+				w.When = workflow.Refused{Err: fmt.Errorf("workflows.%s.gates.approval: %w", w.Name, err)}
 			}
-			w.Approval = a
 		}
 		if wc.OnlyWhen != "" {
 			w.When = workflow.All(w.When, onlyWhen(w, wc.OnlyWhen, extras))
@@ -222,11 +228,11 @@ func applyConfigWith(ws []workflow.Workflow, cfg config.Config, extras func(unit
 }
 
 // configWorkflowProblems are the config's workflows.<name> blocks that do
-// not load over the workflow they change: its only_when and its approval,
-// which stop the workflow, and its drafts.approval over each block it may
-// overlay, which holds every draft of it.
+// not load over the workflow they change: its only_when and its gates
+// approval over its runs' and gate.open's gates, which stop the workflow,
+// and over each drafts block it may overlay, which holds every draft of it.
 func configWorkflowProblems(cfg config.Config, l *intentload.Loaded) []error {
-	extras := briefExtrasOf(l.Registry)
+	extras := briefExtrasOf(l)
 	var out []error
 	for _, w := range l.Workflows {
 		wc, ok := cfg.Workflows[w.Name]
@@ -238,13 +244,14 @@ func configWorkflowProblems(cfg config.Config, l *intentload.Loaded) []error {
 				out = append(out, fmt.Errorf("workflows.%s.only_when: %w; the workflow runs nowhere", w.Name, err))
 			}
 		}
-		if o, ok := runOverlay(wc.Approval); ok {
-			if _, err := intentload.OverlayRunApproval(w.Approval, o, workflowEnv(w, extras)); err != nil {
-				out = append(out, fmt.Errorf("workflows.%s.approval: %w; the workflow runs nowhere", w.Name, err))
+		if o, ok := runOverlay(wc.GateApproval()); ok {
+			if err := overlayGates(&w, o, extras); err != nil {
+				out = append(out, fmt.Errorf("workflows.%s.gates.approval: %w; the workflow runs nowhere", w.Name, err))
 			}
 		}
+		def := intentload.DefaultDraftApproval(l.Gates)
 		for _, base := range draftBases(w, l.Registry) {
-			if _, err := configPolicy(w.Name, w.Slot, base, wc.DraftApproval()); err != nil {
+			if _, err := configPolicy(w, base, wc.GateApproval(), extras, def); err != nil {
 				out = append(out, fmt.Errorf("%w; every draft of %s waits for you", err, w.Name))
 				break
 			}
@@ -253,9 +260,9 @@ func configWorkflowProblems(cfg config.Config, l *intentload.Loaded) []error {
 	return out
 }
 
-// draftBases are the blocks the config's drafts.approval of w may be laid
-// over: its manifest's; without one, wait for the drafts its steps propose
-// and the block of each intent its turn.start steps name.
+// draftBases are the drafts blocks the config's gates.approval of w may be
+// laid over: its manifest's; without one, the default for the drafts its
+// steps propose and the block of each intent its turn.start steps name.
 func draftBases(w workflow.Workflow, reg *dintent.Registry) []*draft.Policy {
 	if w.DraftApproval != nil {
 		return []*draft.Policy{w.DraftApproval}
@@ -286,6 +293,36 @@ func onlyWhen(w workflow.Workflow, src string, extras func(unit.ProviderID) expr
 		return workflow.Refused{Err: fmt.Errorf("workflows.%s.only_when: %w", w.Name, err)}
 	}
 	return p
+}
+
+// overlayGates lays o, the config's gates approval of w, over the approval
+// of w's plan gates and of the gates its gate.open steps open.
+func overlayGates(w *workflow.Workflow, o intentload.ApprovalOverlay, extras func(unit.ProviderID) expr.Env) error {
+	envs := workflowEnvs(*w, extras)
+	a, err := intentload.OverlayRunApproval(w.Approval, gate.KindPlan, o, envs)
+	if err != nil {
+		return err
+	}
+	w.Approval = a
+	gates := make(map[gate.Kind]workflow.Approval, len(w.Gates))
+	for k, ga := range w.Gates {
+		if gates[k], err = intentload.OverlayRunApproval(ga, k, o, envs); err != nil {
+			return err
+		}
+	}
+	w.Gates = gates
+	return nil
+}
+
+// workflowEnvs are what a config rule of w's gates approval reads: a
+// draft's facts and its unit's for its draft gates, its unit's for the
+// others, each with the facts extras gives for its provider.
+func workflowEnvs(w workflow.Workflow, extras func(unit.ProviderID) expr.Env) intentload.ApprovalEnvs {
+	draftEnv := builtin.ApprovalEnv(true, w.Slot)
+	if extras != nil {
+		maps.Copy(draftEnv, extras(w.Provider))
+	}
+	return intentload.ApprovalEnvs{Draft: draftEnv, Unit: workflowEnv(w, extras)}
 }
 
 // workflowEnv is w's facts, with the brief.extra.* facts extras gives for
@@ -323,12 +360,17 @@ func overlay(a config.ApprovalConfig) intentload.ApprovalOverlay {
 	return o
 }
 
-// briefExtrasOf are the brief.extra.* facts of each provider's brief intent
-// in reg.
-func briefExtrasOf(reg *dintent.Registry) func(unit.ProviderID) expr.Env {
+// briefExtrasOf are the facts l's profile declares for each provider's
+// units: the brief.extra.* facts of its brief intent and, of a task, the
+// task.prop.* facts of tasks.toml.
+func briefExtrasOf(l *intentload.Loaded) func(unit.ProviderID) expr.Env {
 	return func(p unit.ProviderID) expr.Env {
-		d, _ := reg.Builder(builtin.BuildsBrief, p)
-		return builtin.ExtraFacts(d.Extra)
+		d, _ := l.Registry.Builder(builtin.BuildsBrief, p)
+		env := builtin.ExtraFacts(d.Extra)
+		if builtin.Slots[p] == builtin.TaskSlot {
+			maps.Copy(env, l.Tasks.Facts())
+		}
+		return env
 	}
 }
 
@@ -336,15 +378,15 @@ func briefExtrasOf(reg *dintent.Registry) func(unit.ProviderID) expr.Env {
 func configFacts(cfg config.Config) workflow.Facts {
 	c := cfg.Cleanup
 	return workflow.Facts{
-		"config.cleanup.idle":             time.Duration(c.Idle),
-		"config.cleanup.asked_idle":       time.Duration(c.AskedIdle),
-		"config.cleanup.workspace_grace":  time.Duration(c.WorkspaceGrace),
-		"config.cleanup.manual_idle":      time.Duration(c.ManualIdle),
-		"config.cleanup.stale_workspace":  time.Duration(c.StaleWorkspace),
-		"config.github.nudge.silent_days": cfg.GitHub.Nudge.SilentDays,
-		"config.gtd.stale_waiting_days":   cfg.GTD.StaleWaitingDays,
-		"config.drafts.repeat_after":      time.Duration(cfg.Drafts.RepeatAfter),
-		"config.turns.per_day":            cfg.Turns.PerDay,
+		"config.cleanup.idle":                     time.Duration(c.Idle),
+		"config.cleanup.asked_idle":               time.Duration(c.AskedIdle),
+		"config.cleanup.workspace_grace":          time.Duration(c.WorkspaceGrace),
+		"config.cleanup.manual_idle":              time.Duration(c.ManualIdle),
+		"config.cleanup.stale_workspace":          time.Duration(c.StaleWorkspace),
+		"config.plugins.github.nudge.silent_days": cfg.GitHub.Nudge.SilentDays,
+		"config.tasks.stale_waiting_days":         cfg.Tasks.StaleWaitingDays,
+		"config.drafts.repeat_after":              time.Duration(cfg.Drafts.RepeatAfter),
+		"config.turns.per_day":                    cfg.Turns.PerDay,
 	}
 }
 
@@ -412,32 +454,30 @@ func (l roundStates) Load(ctx context.Context) (automation.State, error) {
 	return &roundState{st: st, rounds: l.steps.d.Rounds, steps: l.steps}, nil
 }
 
-// pendingRounds are the engine's pending turn.start items as the read model
-// lists pending automatic rounds.
-func (e *Env) pendingRounds(ctx context.Context) (map[unit.Unit]round.Pending, error) {
+// enginePlans are the automatic rounds the engine's open plan gates hold, by
+// unit, as the read model lays them over the rows: a turn.start item that
+// waits on its plan gate, since the gate opened, until its window ends.
+type enginePlans struct{ e *Env }
+
+func (p enginePlans) Plans(ctx context.Context) (map[unit.Unit]rmoverlay.Pending, error) {
+	e := p.e
 	if e.engine == nil {
 		return nil, nil
 	}
-	items, err := e.engine.Pending(ctx)
+	ws, err := e.engine.Waiting(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	out := map[unit.Unit]round.Pending{}
-	for _, it := range items {
-		i := slices.IndexFunc(it.Steps, isTurnStart)
-		if i < 0 {
+	out := map[unit.Unit]rmoverlay.Pending{}
+	for _, w := range ws {
+		i := slices.IndexFunc(w.Item.Steps, isTurnStart)
+		if _, seen := out[w.Item.Unit]; i < 0 || seen {
 			continue
 		}
-		out[it.Unit] = round.Pending{Intent: e.startOf(it.Steps[i], it.Unit.Provider).kindName(), Reason: it.Reason, Since: it.At, Deadline: it.Deadline}
+		out[w.Item.Unit] = rmoverlay.Pending{Intent: e.startOf(w.Item.Steps[i], w.Item.Unit.Provider).kindName(),
+			Reason: w.Item.Reason, Since: w.Gate.OpenedAt, Deadline: w.Gate.Deadline}
 	}
 	return out, nil
-}
-
-// enginePending is pendingRounds as the read model's port.
-type enginePending struct{ e *Env }
-
-func (p enginePending) Pending(ctx context.Context) (map[unit.Unit]round.Pending, error) {
-	return p.e.pendingRounds(ctx)
 }
 
 // meteredEngine runs the user's and the deadline's runs under the gate
@@ -448,10 +488,10 @@ func (m meteredEngine) Sweep(ctx context.Context, loop sync.Locker) (string, str
 	return m.Engine.Sweep(ctx, meteredLock{ctx: ctx, l: loop})
 }
 
-func (m meteredEngine) DueRun(ctx context.Context) error {
+func (m meteredEngine) Release(ctx context.Context, g gate.Gate) error {
 	ctx, scope := meter.Start(ctx, meter.Loop("gate"))
 	defer scope.End()
-	return m.Engine.DueRun(ctx)
+	return m.Engine.Release(ctx, g)
 }
 
 func (m meteredEngine) Act(ctx context.Context, id string, a workflow.Action, guidance string) (workflow.Item, error) {
@@ -482,18 +522,48 @@ type unitSet struct {
 	classified *classifiedUnits
 	// briefed adds the brief.* facts; nil adds none.
 	briefed *briefedFacts
+	// blocks lifts the answered start blocks first; nil lifts none.
+	blocks *startBlocks
 }
 
 var (
-	_ automation.Refresher  = (*unitSet)(nil)
-	_ automation.Settler    = (*unitSet)(nil)
-	_ automation.Gainer     = (*unitSet)(nil)
-	_ automation.Owner      = (*unitSet)(nil)
-	_ automation.Freshener  = (*unitSet)(nil)
-	_ automation.Seener     = (*unitSet)(nil)
+	_ automation.Revisioner = (*unitSet)(nil)
 	_ automation.Dueer      = (*unitSet)(nil)
-	_ automation.EventFacts = (*unitSet)(nil)
 )
+
+// unitKeeping is the host's bookkeeping of the set's units, which the
+// engine keeps apart from their facts: the start blocks and the host
+// providers' own writes, the planning settlement, what acting on a unit
+// frees, the units of work a subject belongs to, the workspace snapshot
+// its facts came from, the facts a workflow scopes and those an event
+// names.
+type unitKeeping struct{ s *unitSet }
+
+var (
+	_ automation.Preparer   = unitKeeping{}
+	_ automation.Refresher  = unitKeeping{}
+	_ automation.Settler    = unitKeeping{}
+	_ automation.Gainer     = unitKeeping{}
+	_ automation.Owner      = unitKeeping{}
+	_ automation.Seener     = unitKeeping{}
+	_ automation.Scoper     = unitKeeping{}
+	_ automation.EventFacts = unitKeeping{}
+)
+
+// Prepare is ctx as each provider that prepares an evaluation's reads leaves it.
+func (k unitKeeping) Prepare(ctx context.Context) (context.Context, error) {
+	for _, id := range k.s.order {
+		p, ok := k.s.providers[id].(automation.Preparer)
+		if !ok {
+			continue
+		}
+		var err error
+		if ctx, err = p.Prepare(ctx); err != nil {
+			return nil, fmt.Errorf("%s: %w", id, err)
+		}
+	}
+	return ctx, nil
+}
 
 func newUnitSet(providers map[unit.ProviderID]automation.Units) *unitSet {
 	s := &unitSet{providers: map[unit.ProviderID]automation.Units{}}
@@ -528,7 +598,8 @@ func (s *unitSet) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error
 
 // EventFacts reads u through its provider's EventFacts, or its Facts when
 // it has none.
-func (s *unitSet) EventFacts(ctx context.Context, u unit.Unit) (workflow.Facts, error) {
+func (k unitKeeping) EventFacts(ctx context.Context, u unit.Unit) (workflow.Facts, error) {
+	s := k.s
 	return s.facts(ctx, u, true)
 }
 
@@ -552,8 +623,14 @@ func (s *unitSet) facts(ctx context.Context, u unit.Unit, event bool) (workflow.
 	return s.classified.add(ctx, u, f)
 }
 
-func (s *unitSet) Refresh(ctx context.Context) error {
+func (k unitKeeping) Refresh(ctx context.Context) error {
+	s := k.s
 	var errs []error
+	if s.blocks != nil {
+		if err := s.blocks.Refresh(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("start blocks: %w", err))
+		}
+	}
 	for _, id := range s.order {
 		if r, ok := s.providers[id].(automation.Refresher); ok {
 			if err := r.Refresh(ctx); err != nil {
@@ -564,7 +641,8 @@ func (s *unitSet) Refresh(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-func (s *unitSet) Settle(ctx context.Context, st automation.State) error {
+func (k unitKeeping) Settle(ctx context.Context, st automation.State) error {
+	s := k.s
 	var errs []error
 	for _, id := range s.order {
 		if r, ok := s.providers[id].(automation.Settler); ok {
@@ -573,45 +651,59 @@ func (s *unitSet) Settle(ctx context.Context, st automation.State) error {
 			}
 		}
 	}
+	if s.blocks != nil {
+		if err := s.blocks.e.syncTrustGates(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("trust gates: %w", err))
+		}
+	}
+	if s.blocks != nil {
+		if err := s.blocks.e.supersedeHeldGates(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("held rounds' gates: %w", err))
+		}
+	}
 	return errors.Join(errs...)
 }
 
-func (s *unitSet) Gain(ctx context.Context, u unit.Unit) (workflow.Gain, error) {
+func (k unitKeeping) Gain(ctx context.Context, u unit.Unit) (workflow.Gain, error) {
+	s := k.s
 	if g, ok := s.providers[u.Provider].(automation.Gainer); ok {
 		return g.Gain(ctx, u)
 	}
 	return workflow.Gain{}, nil
 }
 
-func (s *unitSet) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error) {
+func (k unitKeeping) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error) {
+	s := k.s
 	if o, ok := s.providers[u.Provider].(automation.Owner); ok {
 		return o.Owners(ctx, u)
 	}
 	return nil, nil
 }
 
-func (s *unitSet) Moved(ctx context.Context, units []unit.Unit) ([]unit.Unit, error) {
+// Revs are the revs of units whose provider reports them.
+func (s *unitSet) Revs(ctx context.Context, units []unit.Unit) (map[unit.Unit]uint64, error) {
 	byProvider := map[unit.ProviderID][]unit.Unit{}
 	for _, u := range units {
 		byProvider[u.Provider] = append(byProvider[u.Provider], u)
 	}
-	var out []unit.Unit
+	out := map[unit.Unit]uint64{}
 	for _, id := range s.order {
-		f, ok := s.providers[id].(automation.Freshener)
+		r, ok := s.providers[id].(automation.Revisioner)
 		if !ok || len(byProvider[id]) == 0 {
 			continue
 		}
-		moved, err := f.Moved(ctx, byProvider[id])
+		revs, err := r.Revs(ctx, byProvider[id])
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", id, err)
 		}
-		out = append(out, moved...)
+		maps.Copy(out, revs)
 	}
 	return out, nil
 }
 
 // Seen is the workspace snapshot generation the provider that reads it saw.
-func (s *unitSet) Seen() port.Generation {
+func (k unitKeeping) Seen() port.Generation {
+	s := k.s
 	var g port.Generation
 	for _, id := range s.order {
 		if r, ok := s.providers[id].(automation.Seener); ok {
@@ -623,6 +715,9 @@ func (s *unitSet) Seen() port.Generation {
 
 func (s *unitSet) Due() time.Time {
 	var due time.Time
+	if s.blocks != nil {
+		due = s.blocks.Due()
+	}
 	for _, id := range s.order {
 		if d, ok := s.providers[id].(automation.Dueer); ok {
 			if t := d.Due(); !t.IsZero() && (due.IsZero() || t.Before(due)) {

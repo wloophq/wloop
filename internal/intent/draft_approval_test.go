@@ -24,8 +24,8 @@ func loadWorkflowWith(t *testing.T, extra string) (*Loaded, Problems) {
 
 // The draft approval table of each manifest.
 const (
-	intentDrafts   = "drafts.approval"
-	workflowDrafts = "drafts.approval"
+	intentDrafts   = "gates.approval"
+	workflowDrafts = "gates.approval"
 )
 
 // drafts is block written at the draft approval table at, its rules
@@ -126,10 +126,10 @@ window = "10m"`)
 	if p == nil || p.Default.Mode != draft.Wait || len(p.Rules) != 2 {
 		t.Fatalf("%+v", p)
 	}
-	if r := p.Rules[0]; !r.NamesComment || r.Approval.Mode != draft.Send {
+	if r := p.Rules[0]; r.Names != draft.CommentDelivery || r.Approval.Mode != draft.Send {
 		t.Errorf("rule 0: %+v", r)
 	}
-	if r := p.Rules[1]; r.NamesComment || r.Approval != (draft.Approval{Mode: draft.Delay, Window: 10 * time.Minute}) {
+	if r := p.Rules[1]; r.Names != "" || r.Approval != (draft.Approval{Mode: draft.Delay, Window: 10 * time.Minute}) {
 		t.Errorf("rule 1: %+v", r)
 	}
 	comment := draft.Draft{Delivery: draft.CommentDelivery, Origin: draft.Origin{Kind: draft.OriginTurn, Intent: "ask-author"}}
@@ -143,7 +143,7 @@ window = "10m"`)
 		"a message on the docs":           {draft.Draft{Delivery: draft.Message}, map[string]any{"pr.repo": "acme/docs"}, draft.Delay},
 		"a comment on another repository": {comment, map[string]any{"pr.repo": "acme/widgets"}, draft.Wait},
 	} {
-		got, err := p.Decide(c.d, draft.Subject{Slot: "pr", Facts: c.facts}, time.Time{})
+		got, err := p.Decide(c.d, draft.Subject{Slot: "pr", Facts: c.facts}, c.d.Delivery == draft.CommentDelivery, time.Time{})
 		if err != nil || got.Approval.Mode != c.want {
 			t.Errorf("%s: %+v %v, want %s", name, got, err, c.want)
 		}
@@ -192,7 +192,7 @@ func TestARuleReadingAnUntrustedFactIsRefused(t *testing.T) {
 	} {
 		_, problems := c.load(t, drafts(c.at, "mode = \"wait\"\n[[rule]]\nwhen = '"+c.when+"'\nmode = \"send\""))
 		if len(problems) != 1 || problems[0].Field != c.at+".rule[0].when" || !strings.Contains(problems[0].Msg, c.fact) ||
-			!strings.Contains(problems[0].Msg, "no draft approval rule may") || !strings.HasSuffix(problems[0].File, ".toml") {
+			!strings.Contains(problems[0].Msg, "which a rule that releases a gate may not") || !strings.HasSuffix(problems[0].File, ".toml") {
 			t.Errorf("%s: %s", loader, problems.Error())
 		}
 	}
@@ -206,7 +206,7 @@ func TestAnIntentsRuleMayNotReadTheEffectsItsAgentNames(t *testing.T) {
 	}
 }
 
-func TestAReleasingRuleThatNeverNamesCommentLoadsWithAWarning(t *testing.T) {
+func TestAReleasingRuleThatNamesNoDeliveryLoadsWithAWarning(t *testing.T) {
 	for when, warns := range map[string]bool{
 		`draft.delivery in ["comment"] && pr.author == "dependabot[bot]"`: true,
 		`draft.delivery == "comment" && pr.author == "dependabot[bot]"`:   false,
@@ -217,7 +217,7 @@ func TestAReleasingRuleThatNeverNamesCommentLoadsWithAWarning(t *testing.T) {
 		if len(problems) > 0 {
 			t.Fatalf("%s: %s", when, problems.Error())
 		}
-		got := len(l.Warnings) == 1 && l.Warnings[0].Field == intentDrafts+".rule[0].when" && strings.Contains(l.Warnings[0].Msg, `draft.delivery == "comment"`)
+		got := len(l.Warnings) == 1 && l.Warnings[0].Field == intentDrafts+".rule[0].when" && strings.Contains(l.Warnings[0].Msg, `draft.delivery == "<delivery>"`)
 		if got != warns || !warns && len(l.Warnings) != 0 {
 			t.Errorf("%s: warnings %+v", when, l.Warnings)
 		}

@@ -3,7 +3,6 @@ package prrow
 import (
 	"github.com/wloophq/wloop/internal/api"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
 )
 
@@ -26,11 +25,5 @@ func agentStates(states []turn.AgentState) []string {
 
 // Override is the wire form of a stored override.
 func Override(o dinv.Override) api.Override {
-	return api.Override{MutedUntil: o.MutedUntil, MuteUntilStateChange: o.MuteUntilStateChange,
-		MutedKind: o.MutedKind, MutedWaitingOn: o.MutedWaitingOn, Hold: o.Hold, Adopted: o.Adopted, Tracked: o.Tracked,
-		NextGuidance: o.NextGuidance}
-}
-
-func pendingOf(p round.Pending) *api.PendingRound {
-	return &api.PendingRound{Intent: p.Intent, Reason: p.Reason, Since: p.Since, Deadline: p.Deadline}
+	return api.Override{Hold: o.Hold, Adopted: o.Adopted, Tracked: o.Tracked, NextGuidance: o.NextGuidance}
 }

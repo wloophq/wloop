@@ -1,0 +1,15 @@
+summary = "Follow up a review when its pull request moved since"
+provider = "github"
+when = 'pr.review.action == "follow-up"'
+order = 10
+key = ["pr.fingerprint"]
+
+[[step]]
+use = "turn.start"
+intent = "review"
+stage = "follow-up"
+
+[[gates.approval.rule]]
+when = 'gate.kind == "plan"'
+mode = "delay"
+window = "60s"

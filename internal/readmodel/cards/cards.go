@@ -23,14 +23,14 @@ import (
 // Rows is the read model as the job reads it.
 type Rows interface {
 	Row(ctx context.Context, u unit.Unit, asked catalog.Asked) (api.Row, bool, error)
-	Rows(ctx context.Context, view string, since api.Since) (api.RowsPage, error)
+	Rows(ctx context.Context, since api.Since) (api.RowsPage, error)
 }
 
 // Provider is what one enabled plugin derives from its rows; a nil field is
 // a capability the plugin lacks.
 type Provider struct {
 	Card  func(ctx context.Context, row api.Row) (card.Card, error)
-	Items func(row api.Row) []items.Item
+	Items func(ctx context.Context, row api.Row) ([]items.Item, error)
 }
 
 // OpenItems finds the open items of units that may have no row.
@@ -133,7 +133,7 @@ type revRow struct {
 func (j *Job) sweep(ctx context.Context, rows Rows, all bool, pending map[unit.Unit]uint64) {
 	batch := map[unit.Unit]revRow{}
 	if all {
-		page, err := rows.Rows(ctx, api.ViewAll, api.Since{})
+		page, err := rows.Rows(ctx, api.Since{})
 		if err != nil {
 			j.logf("cards: rows: %v", err)
 		}
@@ -208,7 +208,11 @@ func (j *Job) apply(ctx context.Context, batch map[unit.Unit]revRow) {
 		at := unit.Anchor{Unit: u, Ref: "row:" + strconv.FormatUint(rr.rev, 10)}
 		var desired []items.Item
 		if !rr.gone {
-			desired = p.Items(rr.row)
+			var err error
+			if desired, err = p.Items(ctx, rr.row); err != nil {
+				j.logf("cards: items of %s: %v", u.Label(), err)
+				continue
+			}
 		}
 		if _, err := j.Ledger.Reconcile(ctx, u, desired, at, absent); err != nil {
 			j.logf("cards: items of %s: %v", u.Label(), err)

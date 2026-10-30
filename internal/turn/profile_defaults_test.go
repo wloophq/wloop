@@ -48,7 +48,7 @@ func TestALayersDefaultProviderFillsOnlyTheManifestsThatNameNone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	l, problems := intentload.Load([]profile.Layer{{Name: "user", Source: dir, Dir: dir}}, BundledFS(), b, CheckTemplate)
+	l, problems := intentload.Load(append(profile.BundledChain(), profile.Layer{Name: "user", Source: dir, Dir: dir}), BundledFS(), b, CheckTemplate)
 	if len(problems) > 0 {
 		t.Fatalf("%s", problems.Error())
 	}

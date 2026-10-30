@@ -14,6 +14,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
+	"github.com/wloophq/wloop/internal/adapter/source/github/present"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
@@ -21,11 +24,12 @@ import (
 	"github.com/wloophq/wloop/internal/brand/brandtest"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/intake/intaketest"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
@@ -93,33 +97,35 @@ func newCatalogRig(t *testing.T) catalogRig {
 	st := inventory.New(db)
 	st.UseClock(func() time.Time { return catalogNow })
 	ctx := context.Background()
-	st.UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h2", ReviewRequests: []string{"me"},
+	inventorytest.Of(st).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h2", ReviewRequests: []string{"me"},
 		Reasons: []string{"review-requested"}, URL: r7.URL()})
 	st.AppendEvents(ctx, []dinv.Event{
 		{PR: r7, Kind: dinv.KindPush, Key: "h2", Actor: "ana", At: catalogNow.Add(-50 * time.Hour)},
 		{PR: r7, Kind: dinv.KindReviewRequest, Key: "me", Actor: "ana", At: catalogNow.Add(-49 * time.Hour)},
 	})
-	st.UpsertPR(ctx, dinv.PR{Ref: github.Ref{Owner: "acme", Repo: "api", Number: 8}, Title: "Done", Author: "me", State: "MERGED", Reasons: []string{"author"}})
+	inventorytest.Of(st).UpsertPR(ctx, dinv.PR{Ref: github.Ref{Owner: "acme", Repo: "api", Number: 8}, Title: "Done", Author: "me", State: "MERGED", Reasons: []string{"author"}})
 	repo := sqlite.New(db)
 	sessions := turnstest.NewSessions()
 	plan := newPendingPlan(catalogNow)
 	ts := &turns.Service{Store: repo, Registry: repo, Sessions: sessions, Intents: turnstest.Intents(), Launcher: noLaunch{}, Clock: clockFunc(func() time.Time { return catalogNow })}
-	inbox := coregtd.New(coregtd.Deps{Store: db.Entries(), Items: itemsNone{}, Facts: enabledUnits{map[unit.ProviderID]bool{}}, Clock: fixedClock(catalogNow)})
+	inbox := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: db.Tasks(), Items: itemsNone{}, Facts: enabledUnits{map[unit.ProviderID]bool{}}, Clock: fixedClock(catalogNow)})
 	d := withStore(Deps{Pauses: sqlite.NewRounds(db), Activity: db, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return catalogNow },
-		Viewer:  func(context.Context) (string, []string, error) { return "me", nil, nil },
-		Log:     func(string, ...any) {},
-		Actions: &fakeActions{}, Intakes: db.Intakes(), IntakeBriefs: intaketest.NewBriefs(waitBriefing),
+		Identity: viewerIs("me"),
+		Log:      func(string, ...any) {},
+		Actions:  &fakeActions{}, Intakes: db.Intakes(), IntakeBriefs: intaketest.NewBriefs(waitBriefing),
 		Turns:    ts,
-		Messages: &messages.Service{Store: inventory.NewMessages(db), Books: repo, Turns: ts, Entries: inbox, Intents: turnstest.Intents(), Clock: fixedClock(catalogNow)},
+		Messages: &messages.Service{Store: inventory.NewMessages(db), Books: repo, Turns: ts, Tasks: inbox, Intents: turnstest.Intents(), Clock: fixedClock(catalogNow)},
 		Sessions: sessions,
-		Explorer: knownOnGitHub{mineRef: {Ref: mineRef, URL: mineRef.URL(), Title: "Mine", Author: "me", State: dgh.StateOpen}},
 		StateDir: t.TempDir(),
 	}, st)
+	exploreOn(&d, knownOnGitHub{mineRef: {Ref: mineRef, URL: mineRef.URL(), Title: "Mine", Author: "me", State: dgh.StateOpen}})
 	withBriefs(&d, stubBriefs{})
-	d.Plan, d.Pending = plan, plan
+	d.Plan, d.Plans = plan, plan
 	s := New(d)
+	serveMessageGates(s, db.Tasks(), inbox)
 	s.token = ""
 	stopOnCleanup(t, s)
+	plan.gated(s)
 	return catalogRig{s: s, db: db, st: st, repo: repo, plan: plan}
 }
 
@@ -137,7 +143,7 @@ func (c catalogRig) events(t *testing.T, evs ...dinv.Event) {
 
 func (c catalogRig) override(t *testing.T, o dinv.Override) {
 	t.Helper()
-	if err := c.st.SetOverride(context.Background(), o); err != nil {
+	if err := inventorytest.Of(c.st).SetOverride(context.Background(), o); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -173,8 +179,10 @@ type catalogFixture struct {
 var catalogFixtures = []catalogFixture{
 	{"pending", r7, func(t *testing.T, c catalogRig) { c.propose(t) }},
 	{"pending_muted", r7, func(t *testing.T, c catalogRig) {
-		c.override(t, dinv.Override{PR: r7, MutedUntil: catalogNow.Add(time.Hour)})
 		c.propose(t)
+		if err := muteBy(c.st, r7, catalogNow.Add(time.Hour)); err != nil {
+			t.Fatal(err)
+		}
 	}},
 	{"held", r7, func(t *testing.T, c catalogRig) {
 		c.events(t, dinv.Event{PR: r7, Kind: dinv.KindRoundHeld, Key: "cap", At: catalogNow, Data: "daily cap"})
@@ -183,7 +191,7 @@ var catalogFixtures = []catalogFixture{
 		c.events(t, dinv.Event{PR: r7, Kind: dinv.KindRoundBlocked, Key: "b", At: catalogNow, Data: "no workspace"})
 	}},
 	{"blocked_untrusted", r7, func(t *testing.T, c catalogRig) {
-		b := inventory.StartBlock{Question: turns.QuestionTrust, Root: "/src/api", Folder: "/src/api", Home: "/home/.claude-work", Homes: []string{"/home/.claude-work"}, Round: "triage", Fingerprint: "f1"}
+		b := inventory.StartBlock{Question: turns.QuestionTrust, Root: "/src/api", Folder: "/src/api", Home: "/home/.claude-work", Homes: []string{"/home/.claude-work"}, Round: "triage", Skip: map[string]string{"addressed.reviews": "f1"}}
 		c.events(t, dinv.Event{PR: r7, Kind: dinv.KindRoundBlocked, Key: b.Key(catalogNow), At: catalogNow, Data: "could not start: /src/api is not trusted in /home/.claude-work"})
 	}},
 	{"blocked_untrusted_terminal_home", r7, func(t *testing.T, c catalogRig) {
@@ -203,13 +211,15 @@ var catalogFixtures = []catalogFixture{
 		c.asks(t, turn.Unrecorded, record.Record{State: record.UnrecordedState, Summary: "stopped"})
 	}},
 	{"done_muted", github.Ref{Owner: "acme", Repo: "api", Number: 8}, func(t *testing.T, c catalogRig) {
-		c.override(t, dinv.Override{PR: github.Ref{Owner: "acme", Repo: "api", Number: 8}, MutedUntil: catalogNow.Add(time.Hour)})
+		if err := muteBy(c.st, github.Ref{Owner: "acme", Repo: "api", Number: 8}, catalogNow.Add(time.Hour)); err != nil {
+			t.Fatal(err)
+		}
 	}},
 	{"done_with_workspace", github.Ref{Owner: "acme", Repo: "api", Number: 8}, func(t *testing.T, c catalogRig) {
-		c.st.SetWorkspace(context.Background(), github.Ref{Owner: "acme", Repo: "api", Number: 8}, dinv.Workspace{ID: "w8", DisplayName: "feat-done"})
+		inventorytest.Of(c.st).SetWorkspace(context.Background(), github.Ref{Owner: "acme", Repo: "api", Number: 8}, dinv.Workspace{ID: "w8", DisplayName: "feat-done"})
 	}},
 	{"mine_no_reviewer", r10, func(t *testing.T, c catalogRig) {
-		c.st.UpsertPR(context.Background(), dinv.PR{Ref: r10, Title: "Mine", Author: "me", State: "OPEN", HeadOid: "h1", Reasons: []string{"author"}, URL: r10.URL()})
+		inventorytest.Of(c.st).UpsertPR(context.Background(), dinv.PR{Ref: r10, Title: "Mine", Author: "me", State: "OPEN", HeadOid: "h1", Reasons: []string{"author"}, URL: r10.URL()})
 		c.events(t, dinv.Event{PR: r10, Kind: dinv.KindPush, Key: "h1", Actor: "me", At: catalogNow.Add(-72 * time.Hour)})
 	}},
 	{"others_adopted", r7, func(t *testing.T, c catalogRig) { c.override(t, dinv.Override{PR: r7, Adopted: true}) }},
@@ -222,11 +232,11 @@ var catalogFixtures = []catalogFixture{
 	{"intake_waiting_cli", r7, func(t *testing.T, c catalogRig) { c.intake(t, sourceCLI) }},
 	{"intake_waiting_session", r7, func(t *testing.T, c catalogRig) { c.intake(t, sourceSession) }},
 	{"forceable_refusal", r7, func(t *testing.T, c catalogRig) {
-		c.st.SetWorkspace(context.Background(), r7, dinv.Workspace{ID: "w7", DisplayName: "REVIEW batch", IsReview: true})
+		inventorytest.Of(c.st).SetWorkspace(context.Background(), r7, dinv.Workspace{ID: "w7", DisplayName: "REVIEW batch", IsReview: true})
 		c.s.forceable.Store(forceableKey(r7.Unit()), "the workspace holds uncommitted files")
 	}},
 	{"user_hold", r7, func(t *testing.T, c catalogRig) { c.override(t, dinv.Override{PR: r7, Hold: true}) }},
-	{"gate_off", r7, func(_ *testing.T, c catalogRig) { c.s.deps.Plan, c.s.deps.Pending = nil, nil }},
+	{"gate_off", r7, func(_ *testing.T, c catalogRig) { c.s.deps.Plan, c.s.deps.Plans = nil, nil }},
 	{"brief_off", r7, func(_ *testing.T, c catalogRig) { withBriefs(&c.s.deps, nil) }},
 	{"run_now_join_refused", r7, func(t *testing.T, c catalogRig) {
 		c.events(t, dinv.Event{PR: r7, Kind: dinv.KindRoundHeld, Key: "cap", At: catalogNow, Data: "daily cap"})
@@ -356,11 +366,11 @@ func TestEveryOfferAgreesWithTheHandler(t *testing.T) {
 				rec := post(t, c.s, path, requestFor(spec.ID, st))
 				var body struct{ Error string }
 				json.Unmarshal(rec.Body.Bytes(), &body)
-				_, isTurn := turnActions[spec.ID]
+				_, isQuestion := questionIntent(c.s.loaded(), spec.ID)
 				switch {
-				case isTurn && (!offered || !st.Enabled):
-					if rec.Code != 409 || body.Error != st.Reason {
-						t.Errorf("offered %+v (%v), the turn service answered %d %q", st, offered, rec.Code, body.Error)
+				case isQuestion && !offered:
+					if rec.Code != 409 {
+						t.Errorf("absent, the question's gate answered %d %q", rec.Code, body.Error)
 					}
 				case !offered:
 					if want := fmt.Sprintf("no %s on %s", spec.ID, f.ref); rec.Code != 409 || body.Error != want {
@@ -392,7 +402,7 @@ func TestAReviewOfAnUntrackedPullRequestIsAccepted(t *testing.T) {
 
 func TestAnUntrackedPullRequestWithoutAnExplorerIs503(t *testing.T) {
 	t.Parallel()
-	s := newServerWith(t, func(d *Deps) { d.Actions, d.Explorer = &fakeActions{}, nil })
+	s := newServerWith(t, func(d *Deps) { d.Actions, githubOf(d).View = &fakeActions{}, nil })
 	rec := post(t, s, "/api/units/github/acme%2Fweb%233/review", `{"source":"cli"}`)
 	if rec.Code != 503 || !strings.Contains(rec.Body.String(), "cannot read acme/web#3 from GitHub") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -405,17 +415,28 @@ func TestEverySpecHasADispatchAndBack(t *testing.T) {
 	for _, spec := range catalogOf(bundledActions()) {
 		ids[spec.ID] = true
 		if spec.Scope == catalog.ScopeDraft {
-			if !slices.Contains(api.DraftActions, strings.TrimPrefix(spec.ID, "draft.")) {
-				t.Errorf("%s has no draft route", spec.ID)
+			if _, ok := draftHandlers[spec.Verb]; !ok {
+				t.Errorf("%s runs no draft verb", spec.ID)
 			}
 			continue
 		}
-		if !isBuiltin(spec.ID) && !isIntent((&Server{}).loaded(), spec.ID) {
+		if spec.Scope == catalog.ScopeRun {
+			routes := map[string]string{catalog.RunOpen: api.RunOpen, catalog.RunEnter: api.RunEnter, catalog.RunTranscript: api.RunTranscript}
+			if routes[strings.TrimPrefix(spec.ID, "run.")] == "" {
+				t.Errorf("%s has no run route", spec.ID)
+			}
+			continue
+		}
+		plugin := slices.Contains([]string{present.ActionMute, present.ActionUnmute}, spec.ID)
+		if l := (&Server{}).loaded(); !isBuiltin(l, spec.ID) && !isIntent(l, spec.ID) && !plugin {
 			t.Errorf("%s has no dispatch", spec.ID)
 		}
 	}
-	dispatched := slices.Concat(slices.Collect(maps.Keys(delegatedActions)), slices.Collect(maps.Keys(overrideActions)),
-		slices.Collect(maps.Keys(roundActions)), slices.Collect(maps.Keys(turnActions)), slices.Collect(maps.Keys(intakeRouteActions)), []string{"brief_refresh"})
+	dispatched := slices.Concat(slices.Collect(maps.Keys(delegatedActions)), slices.Collect(maps.Keys(holdActions)), slices.Collect(maps.Keys(followActions)),
+		slices.Collect(maps.Keys(intakeRouteActions)), []string{"brief_refresh"})
+	for _, g := range catalog.RowGateIntents((&Server{}).loaded()) {
+		dispatched = append(dispatched, g.Intent.Name)
+	}
 	for _, id := range dispatched {
 		if !ids[id] {
 			t.Errorf("%s is dispatched with no spec", id)

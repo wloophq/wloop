@@ -22,6 +22,16 @@ func TestFakeUnits(t *testing.T) {
 	})
 }
 
+func TestFakeRevisioner(t *testing.T) {
+	automationtest.RunRevisioner(t, unit.Session, func(*testing.T) automationtest.RevisionerBackend {
+		us := automationtest.NewUnits()
+		for _, k := range []string{"t2", "t1"} {
+			us.Put(unit.Unit{Provider: unit.Session, Key: k}, workflow.Facts{"session.fingerprint": k, "session.repo": "o/r"})
+		}
+		return us
+	})
+}
+
 func TestFakeEvents(t *testing.T) {
 	automationtest.RunEvents(t, func(*testing.T) automationtest.EventsBackend { return automationtest.NewEvents() })
 }

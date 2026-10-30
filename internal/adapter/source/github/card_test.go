@@ -1,7 +1,11 @@
 package ghsource
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -18,7 +22,7 @@ func TestCardFromRow(t *testing.T) {
 	s := ghsourcetest.Situation{PR: ghsourcetest.Open(1, ghsourcetest.Viewer)}
 	s.PR.ChecksState, s.PR.FailingChecks = "FAILURE", []dinv.FailingCheck{{Name: "lint"}}
 	r := ghsourcetest.Derive(s)
-	c, err := Card(context.Background(), r)
+	c, err := cardOf(context.Background(), r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +41,7 @@ func TestCardFromRow(t *testing.T) {
 	if !c.Since.Equal(r.Summary.Since) || c.Since.IsZero() || c.Link != r.Link || c.Link == "" {
 		t.Errorf("since %v link %q", c.Since, c.Link)
 	}
-	if c.TurnsLink != "#unit=github/"+r.Unit.Key || !c.StartedByMe || !c.Cares || c.ClosurePosted || c.Mute != nil {
+	if c.TurnsLink != "#unit=github/"+r.Unit.Key || !c.StartedByMe || !c.Cares || c.ClosurePosted {
 		t.Errorf("card %+v", c)
 	}
 }
@@ -48,7 +52,7 @@ func TestCardLastHuman(t *testing.T) {
 	at := ghsourcetest.Now.Add(-time.Hour)
 	s := ghsourcetest.Situation{PR: ghsourcetest.Open(1, ghsourcetest.Viewer)}
 	s.Events = []dinv.Event{ghsourcetest.Event(1, dinv.KindComment, ghsourcetest.Reviewer, at, "")}
-	c, err := Card(context.Background(), ghsourcetest.Derive(s))
+	c, err := cardOf(context.Background(), ghsourcetest.Derive(s))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +61,7 @@ func TestCardLastHuman(t *testing.T) {
 		t.Fatalf("last human %+v", h)
 	}
 	s.Events = []dinv.Event{ghsourcetest.Event(1, dinv.KindComment, ghsourcetest.Viewer, at, "")}
-	if c, _ := Card(context.Background(), ghsourcetest.Derive(s)); c.LastHuman != nil {
+	if c, _ := cardOf(context.Background(), ghsourcetest.Derive(s)); c.LastHuman != nil {
 		t.Errorf("last human %+v", c.LastHuman)
 	}
 }
@@ -70,7 +74,7 @@ func TestCardDone(t *testing.T) {
 		s := ghsourcetest.Situation{PR: ghsourcetest.Open(1, ghsourcetest.Other)}
 		s.PR.State, s.PR.ChecksState = tc.state, "FAILURE"
 		r := ghsourcetest.Derive(s)
-		c, err := Card(context.Background(), r)
+		c, err := cardOf(context.Background(), r)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -80,7 +84,7 @@ func TestCardDone(t *testing.T) {
 		if slices.ContainsFunc(c.Signals, func(s card.Signal) bool { return s.Tone == "bad" }) {
 			t.Errorf("%s: signals %+v", tc.state, c.Signals)
 		}
-		if got := Items(r); len(got) != 0 {
+		if got := itemsOf(r); len(got) != 0 {
 			t.Errorf("%s: items %+v", tc.state, got)
 		}
 	}
@@ -89,10 +93,10 @@ func TestCardDone(t *testing.T) {
 func TestCardRefusesAnotherProvider(t *testing.T) {
 	r := ghsourcetest.Derive(ghsourcetest.Situation{PR: ghsourcetest.Open(1, ghsourcetest.Other)})
 	r.Unit = unit.Unit{Provider: "slack", Key: "T000/C000/1.2"}
-	if _, err := Card(context.Background(), r); err == nil {
+	if _, err := cardOf(context.Background(), r); err == nil {
 		t.Fatal("no error")
 	}
-	if got := Items(r); got != nil {
+	if got := itemsOf(r); got != nil {
 		t.Errorf("items %+v", got)
 	}
 }
@@ -100,7 +104,7 @@ func TestCardRefusesAnotherProvider(t *testing.T) {
 func TestIdentity(t *testing.T) {
 	ctx := context.Background()
 	f := storetest.Empty(t)
-	id := identity(f.Inventory)
+	id := IdentityOf(f.Inventory)
 	if _, err := id(ctx); err == nil {
 		t.Fatal("no error without a viewer")
 	}
@@ -113,5 +117,38 @@ func TestIdentity(t *testing.T) {
 	}
 	if p.Key != "github:octocat" || p.Name != "octocat" {
 		t.Errorf("%+v", p)
+	}
+}
+
+// TestTheCardsAreTheRowsCardsOfBefore holds the cards of every situation,
+// author, scope and mute, each the plugin's card under the host's overlays,
+// to the cards testdata/cards.golden.json holds: those the host derived
+// from the whole row before the plugin reported its cards.
+func TestTheCardsAreTheRowsCardsOfBefore(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("testdata", "cards.golden.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want []struct {
+		Name string    `json:"name"`
+		Card card.Card `json:"card"`
+	}
+	if err := json.Unmarshal(raw, &want); err != nil {
+		t.Fatal(err)
+	}
+	cases := ghsourcetest.Cases()
+	if len(cases) != len(want) {
+		t.Fatalf("%d cases, the golden holds %d", len(cases), len(want))
+	}
+	for i, c := range cases {
+		got, err := CardOf(c.Row, c.Report)
+		if err != nil {
+			t.Fatal(err)
+		}
+		a, _ := json.Marshal(got)
+		b, _ := json.Marshal(want[i].Card)
+		if want[i].Name != c.Name || !bytes.Equal(a, b) {
+			t.Errorf("%s:\n got %s\nwant %s", c.Name, a, b)
+		}
 	}
 }

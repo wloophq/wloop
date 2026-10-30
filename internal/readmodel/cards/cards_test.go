@@ -56,14 +56,12 @@ func (f *fakeRows) Row(_ context.Context, u unit.Unit, _ catalog.Asked) (api.Row
 	return r, ok, nil
 }
 
-func (f *fakeRows) Rows(_ context.Context, view string, _ api.Since) (api.RowsPage, error) {
+func (f *fakeRows) Rows(_ context.Context, _ api.Since) (api.RowsPage, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	page := api.RowsPage{Rev: f.rev, Full: true}
 	for _, r := range f.rows {
-		if r.In(view) {
-			page.Rows = append(page.Rows, r)
-		}
+		page.Rows = append(page.Rows, r)
 	}
 	slices.SortFunc(page.Rows, func(a, b api.Row) int { return api.CompareUnits(a.Unit, b.Unit) })
 	return page, nil
@@ -158,8 +156,8 @@ func cardOf(_ context.Context, r api.Row) (card.Card, error) {
 	return c, nil
 }
 
-func itemsOf(r api.Row) []items.Item {
-	return []items.Item{{ID: "x:1", Unit: r.Unit, Kind: items.Request, Summary: r.Title}}
+func itemsOf(_ context.Context, r api.Row) ([]items.Item, error) {
+	return []items.Item{{ID: "x:1", Unit: r.Unit, Kind: items.Request, Summary: r.Title}}, nil
 }
 
 type logs struct {
@@ -311,7 +309,7 @@ func TestCardsJobPassesOutcome(t *testing.T) {
 	for state, want := range map[string]items.Resolution{"merged": items.Done, "closed": items.Moot, "open": items.Superseded} {
 		t.Run(state, func(t *testing.T) {
 			rows := newRows(api.Row{Unit: t1, Title: "x", Payload: json.RawMessage(`{"state":"` + state + `"}`)})
-			e := start(t, Provider{Card: cardOf, Items: func(api.Row) []items.Item { return nil }}, rows, nil)
+			e := start(t, Provider{Card: cardOf, Items: func(context.Context, api.Row) ([]items.Item, error) { return nil, nil }}, rows, nil)
 			e.idle(t)
 			calls := e.ledger.got()
 			if len(calls) != 1 || calls[0].absent != want {
@@ -323,7 +321,7 @@ func TestCardsJobPassesOutcome(t *testing.T) {
 
 func TestCardsJobUsesStoredOutcomeWhenTheCardFails(t *testing.T) {
 	rows := newRows(api.Row{Unit: t1, Title: "x", Payload: json.RawMessage(`{"state":"merged"}`)})
-	e := start(t, Provider{Card: cardOf, Items: func(api.Row) []items.Item { return nil }}, rows, nil)
+	e := start(t, Provider{Card: cardOf, Items: func(context.Context, api.Row) ([]items.Item, error) { return nil, nil }}, rows, nil)
 	e.idle(t)
 	e.change(rows.set(api.Row{Unit: t1, Title: "x", Payload: json.RawMessage(`{"state":"broken"}`)}), t1)
 	e.idle(t)

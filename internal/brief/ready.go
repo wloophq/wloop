@@ -77,7 +77,7 @@ func (q *Queue) readyPR(ctx context.Context, ref github.Ref, first bool) (Readin
 		rd.Cause = intake.CauseOff
 		return rd, nil
 	}
-	p, inInventory, err := q.d.Store.PR(ctx, ref)
+	p, inInventory, err := q.prs().PR(ctx, ref)
 	if err != nil {
 		return Readiness{}, err
 	}
@@ -102,7 +102,7 @@ func (q *Queue) readyPR(ctx context.Context, ref github.Ref, first bool) (Readin
 		}
 		return Readiness{State: Ready, Brief: b, Run: rec.Run}, nil
 	}
-	cur := q.attemptKey(p, version)
+	cur := attemptOf(p, version)
 	rd := Readiness{State: Wait, Wait: WaitBriefing, Attempt: q.attempt(ref, rec, cur)}
 	if rd.Attempt > 1 {
 		rd.LastError = rec.Error
@@ -157,7 +157,7 @@ func (q *Queue) peekPR(ctx context.Context, ref github.Ref, first bool) (Readine
 		rd.Cause = intake.CauseOff
 		return rd, nil
 	}
-	p, inInventory, err := q.d.Store.PR(ctx, ref)
+	p, inInventory, err := q.prs().PR(ctx, ref)
 	if err != nil {
 		return Readiness{}, err
 	}
@@ -178,7 +178,7 @@ func (q *Queue) peekPR(ctx context.Context, ref github.Ref, first bool) (Readine
 		}
 		return Readiness{State: Ready, Brief: b, Run: rec.Run}, nil
 	}
-	cur := q.attemptKey(p, version)
+	cur := attemptOf(p, version)
 	rd := Readiness{State: Wait, Wait: WaitBriefing, Attempt: q.attempt(ref, rec, cur)}
 	if rd.Attempt > 1 {
 		rd.LastError = rec.Error
@@ -216,7 +216,7 @@ func (q *Queue) attempt(ref github.Ref, rec dinv.BriefRecord, cur string) int {
 
 // Attempt is the attempt a first turn of ref waits on, as Ready counts it.
 func (q *Queue) Attempt(ctx context.Context, ref github.Ref) (int, error) {
-	p, ok, err := q.d.Store.PR(ctx, ref)
+	p, ok, err := q.prs().PR(ctx, ref)
 	if err != nil {
 		return 0, err
 	}
@@ -230,7 +230,7 @@ func (q *Queue) Attempt(ctx context.Context, ref github.Ref) (int, error) {
 		return 0, err
 	}
 	_, version := q.version(ref)
-	return q.attempt(ref, rec, q.attemptKey(p, version)), nil
+	return q.attempt(ref, rec, attemptOf(p, version)), nil
 }
 
 func (q *Queue) want(ctx context.Context, ref github.Ref, rec dinv.BriefRecord, now time.Time) error {
@@ -366,7 +366,9 @@ func (a Intakes) Ready(ctx context.Context, u unit.Unit, first bool, need []stri
 	return readinessOf(rd), err
 }
 
-func (a Intakes) Changed(u unit.Unit) (<-chan struct{}, func()) { return a.Q.Changed(u) }
+func (a Intakes) Changed(_ context.Context, u unit.Unit) (<-chan struct{}, func()) {
+	return a.Q.Changed(u)
+}
 
 func (a Intakes) Unwant(ctx context.Context, u unit.Unit) error { return a.Q.Unwant(ctx, u) }
 

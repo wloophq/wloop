@@ -7,13 +7,13 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 )
 
-// Watch runs a pass at once, then a pass debounce after a TopicEntries or
+// Watch runs a pass at once, then a pass debounce after a TopicTasks or
 // TopicItems note, and a pass every period for staleness, until ctx ends.
 func (j *Job) Watch(ctx context.Context, changes port.Changes, debounce, every time.Duration) {
 	kick := make(chan struct{}, 1)
 	if changes != nil {
 		cancel := changes.Subscribe(func(c port.Change) {
-			if !c.Has(port.TopicEntries | port.TopicItems) {
+			if !c.Has(port.TopicTasks | port.TopicItems) {
 				return
 			}
 			select {

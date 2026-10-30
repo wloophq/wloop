@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/brand"
-	"github.com/wloophq/wloop/internal/slack/slacktest"
 	"github.com/wloophq/wloop/internal/workspace/fake"
+	"github.com/wloophq/wloop/plugins/slack/slacktest"
 )
 
 type uninstallWorld struct {
@@ -50,7 +50,8 @@ func newUninstallWorld(t *testing.T) *uninstallWorld {
 	w.profile = filepath.Join(root, "my-profile")
 	mkdir(t, w.profile)
 	te.cfg.Profile = w.profile
-	te.slack = slackEnv{Keychain: w.kc, BaseURL: w.srv.URL, LockPath: filepath.Join(t.TempDir(), "slack.lock")}
+	te.cfg.Slack.KeychainService = "loop-test-slack"
+	withSlackPlugin(t, te.Env, (&slackTestEnv{kc: w.kc}).pluginEnv(t, w.srv.URL))
 	w.srv.Handle("auth.revoke", func(url.Values) any { return map[string]any{"revoked": true} })
 	w.saveSlackToken(t)
 	w.sh = fakeLaunchctl(t, te, fakeShell{})
@@ -182,7 +183,7 @@ func TestUninstallDryRunChangesNothing(t *testing.T) {
 	out := w.out.String()
 	for _, want := range []string{"Would remove:", "LaunchAgent " + launchAgentLabel + " (" + w.plists[0] + ")", "app bundle " + bundlePath(w.Home),
 		"remove MCP server " + brand.MCPServer(), "skill " + brand.Name + " (" + filepath.Join(skillsRoot(w.claude), brand.Name) + ")",
-		"the Slack tokens in Keychain service", "Would delete (--purge):", w.StateDir + ": the store", filepath.Dir(w.ConfigPath) + ": config.toml",
+		"the Slack tokens, revoked first", "Would delete (--purge):", w.StateDir + ": the store", filepath.Dir(w.ConfigPath) + ": config.toml",
 		"Would leave:", "review profile " + w.profile, "brew uninstall --cask " + brand.Name} {
 		if !strings.Contains(out, want) {
 			t.Errorf("plan lacks %q:\n%s", want, out)

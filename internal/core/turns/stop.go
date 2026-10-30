@@ -30,6 +30,7 @@ func (s *Service) Stop(ctx context.Context, r StopRequest) (StopAnswer, error) {
 	ans, ref, saved, err := s.stop(ctx, r)
 	s.mu.Unlock()
 	s.publish(saved...)
+	s.openMissing(ctx)
 	if ref != nil {
 		s.changed(ctx, *ref)
 	}
@@ -81,7 +82,7 @@ func (s *Service) stop(ctx context.Context, r StopRequest) (StopAnswer, *unit.Un
 		for _, rec := range b.Records {
 			facts.Unacked = facts.Unacked || (rec.TurnSeq == t.Seq && !rec.Acked)
 		}
-		facts.Owes = b.OwesRecord(t.Seq)
+		facts.Owes = b.OwesRecord(t.Seq) && s.owesRecords(t.Intent)
 		last, ok, err := LastStop(ctx, s.Registry, r.Session)
 		if err != nil {
 			return StopAnswer{}, nil, evs, err
@@ -96,6 +97,9 @@ func (s *Service) stop(ctx context.Context, r StopRequest) (StopAnswer, *unit.Un
 	var changed *unit.Unit
 	switch turn.DecideStop(facts) {
 	case turn.Allow:
+		if a, ok := s.chatBlock(ctx, u, r.Session); ok {
+			return a, nil, evs, nil
+		}
 		return StopAnswer{}, nil, evs, nil
 	case turn.AckAndAllow:
 		ackRecords(&b, t.Seq, &stop)
@@ -135,11 +139,17 @@ func (s *Service) stop(ctx context.Context, r StopRequest) (StopAnswer, *unit.Un
 		if err != nil {
 			return StopAnswer{}, nil, evs, err
 		}
+		s.ended(b.Unit, *t, rec)
 		if last, ok := saved.LastRecord(t.Seq); ok {
 			stop.RecordID = last.ID
 		}
 		evs = append(evs, ended)
 		changed = &b.Unit
+	}
+	if !ans.Block {
+		if a, ok := s.chatBlock(ctx, u, r.Session); ok {
+			ans, stop.Blocked = a, true
+		}
 	}
 	if err := s.Registry.LogStop(ctx, stop, stopped); err != nil {
 		return StopAnswer{}, changed, evs, err
@@ -148,6 +158,16 @@ func (s *Service) stop(ctx context.Context, r StopRequest) (StopAnswer, *unit.Un
 		evs = append(evs, stopped)
 	}
 	return ans, changed, evs, nil
+}
+
+// owesRecords is false for an intent whose manifest declares no record; an
+// intent whose rules cannot be read still owes one.
+func (s *Service) owesRecords(i turn.Intent) bool {
+	if s.Intents == nil {
+		return true
+	}
+	r, err := s.Intents.Rules(string(i))
+	return err != nil || !r.None
 }
 
 // queuedFor are the indexes of the answers queued for the turns of handle's session, oldest first, but those a

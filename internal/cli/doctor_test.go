@@ -448,7 +448,7 @@ func TestDoctorPrintsOrcasColumns(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{ManagerName: "orca"})
 	te.run("doctor")
 	for _, want := range []string{
-		"views.orca.columns.working=reviewing views.orca.columns.working-fallback=in-review views.orca.columns.ready=ready-to-merge github.automated_reviewers=",
+		"views.orca.columns.working=reviewing views.orca.columns.working-fallback=in-review views.orca.columns.ready=ready-to-merge plugins.github.automated_reviewers=",
 		"  [info   ] board columns reviewing, needs-me, reviewed, in-review, ready-to-merge, in-progress, completed: not verifiable without writing",
 	} {
 		if !strings.Contains(te.out.String(), want) {
@@ -575,7 +575,7 @@ func TestDoctorPrintsBudgetScopes(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.run("doctor")
-	if want := "turns.per_unit_per_day=5 (github) turns.per_day=20 (entry, session, slack, workspace)"; !strings.Contains(te.out.String(), want) {
+	if want := "turns.per_unit_per_day=5 (github) turns.per_day=20 (session, slack, task, workspace)"; !strings.Contains(te.out.String(), want) {
 		t.Errorf("doctor lacks %q:\n%s", want, te.out)
 	}
 }

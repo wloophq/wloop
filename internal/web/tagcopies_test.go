@@ -44,7 +44,7 @@ process.stdout.write(JSON.stringify({
 
 func TestEachCopyOfARowHasItsOwnFocusSlots(t *testing.T) {
 	src := appJS(t)
-	prelude := lensPrelude(t) + jsConst(t, src, "focusSlot") + jsConst(t, src, "CARD_GROUPS") + jsConst(t, src, "STRIP_TITLE") + jsConst(t, src, "TAG_CHIPS") +
+	prelude := lensPrelude(t) + jsConst(t, src, "FOCUS_PAIRS") + jsFunction(t, src, "focusSlot") + jsFunction(t, src, "waitField") + jsConst(t, src, "CARD_GROUPS") + jsConst(t, src, "TAG_CHIPS") +
 		`function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat().filter((x) => x !== null && x !== undefined && x !== false) }; }
 const providerName = (id) => id;
 state.busy = new Set(); state.openSlot = "";

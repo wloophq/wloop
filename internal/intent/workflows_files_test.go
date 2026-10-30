@@ -65,23 +65,23 @@ func TestClassifyAndNotifyReadFiles(t *testing.T) {
 }
 
 func TestEffectsIsAList(t *testing.T) {
-	const closeEntry = `summary = "Close"
-provider = "entry"
-when = 'entry.items_resolved > 0'
+	const closeTask = `summary = "Close"
+provider = "task"
+when = 'task.items_resolved > 0'
 
 [[step]]
 use = "draft.propose"
 purpose = "close"
 `
 	for effects, problem := range map[string]string{
-		`["unit.closed"]`:                 "",
-		`["unit.closed", "entry.nudged"]`: "",
-		`"unit.closed"`:                   "step[0].effects: must be a list of strings",
-		`"unit.closed,entry.nudged"`:      "step[0].effects: must be a list of strings",
-		`["unit.close"]`:                  `step[0].effects[0]: "unit.close" is not one of`,
+		`["unit.closed"]`:                "",
+		`["unit.closed", "task.nudged"]`: "",
+		`"unit.closed"`:                  "step[0].effects: must be a list of strings",
+		`"unit.closed,task.nudged"`:      "step[0].effects: must be a list of strings",
+		`["unit.close"]`:                 `step[0].effects[0]: "unit.close" is not one of`,
 	} {
 		root := t.TempDir()
-		writeWorkflow(t, root, "close", closeEntry+"effects = "+effects+"\n")
+		writeWorkflow(t, root, "close", closeTask+"effects = "+effects+"\n")
 		l, problems := Load(userLayer(root), nil, testBase(), nil)
 		if problem == "" {
 			if len(problems) > 0 {

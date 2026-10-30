@@ -12,18 +12,18 @@ description: The words the code, the configuration, the facts and these pages us
 
 ## Units and sources
 
-- **Unit**: a thing work happens on, named by its provider and the provider's key and written `<provider>:<key>`. A pull request is `github:acme/api#7` (shown as `acme/api#7`), a Slack thread is `slack:<team>/<channel>/<ts>`, a DM topic is `slack:<team>/<channel>/seg/<segment>`, an agent session is `session:<session-id>` and a workspace is `workspace:<worktree-path>`. See [Units and items](/concepts/gtd/#units-and-items).
-- **Provider**: the source that owns a kind of unit and validates its keys: `github`, `slack`, `session`, `workspace` or `entry`. A workflow's and an intent's `provider` name one. The vendor of a coding agent is never called a provider.
-- **Plugin**: a compiled-in source of units, `github` or `slack`, which brings an ingestion job, the cards of its units and, as it needs, items, actions, views, filter qualifiers and a publisher for drafts. `<id>.enabled` turns one off (`github.enabled`, `slack.enabled`), and `<id>.*` holds all of its settings. `session` and `workspace` are providers the core keeps for its own units and have no plugin. See [Plugins](/architecture/plugins/).
-- **Item**: one thing someone needs from someone inside a unit: a `request`, a `question`, a `decision` or a `todo`. It is `open` or `resolved` and says who asked and who acts next. An item lives in its unit; an entry is what you do about it. See [Units and items](/concepts/gtd/#units-and-items).
-- **Confirmed item**: an item you created or corrected. Extraction never overwrites it; a later extraction that disagrees becomes a proposal in the Inbox.
+- **Unit**: a thing work happens on, named by its provider and the provider's key and written `<provider>:<key>`. A pull request is `github:acme/api#7` (shown as `acme/api#7`), a Slack thread is `slack:<team>/<channel>/<ts>`, a DM topic is `slack:<team>/<channel>/seg/<segment>`, an agent session is `session:<session-id>` and a workspace is `workspace:<worktree-path>`. See [Units and items](/concepts/tasks/#units-and-items).
+- **Provider**: the source that owns a kind of unit and validates its keys: `github`, `slack`, `session`, `workspace` or `task`. A workflow's and an intent's `provider` name one. The vendor of a coding agent is never called a provider.
+- **Plugin**: a source of units, `github` or `slack`, a process of its own the host starts, which brings an ingestion job, the cards of its units and, as it needs, items, actions, views, filter qualifiers and a publisher for drafts. `<id>.enabled` turns one off (`plugins.github.enabled`, `plugins.slack.enabled`), and `<id>.*` holds all of its settings. `session`, `workspace` and `task` are providers the core keeps for its own units and have no plugin. See [Plugins](/architecture/plugins/).
+- **Item**: one thing someone needs from someone inside a unit: a `request`, a `question`, a `decision` or a `todo`. It is `open` or `resolved` and says who asked and who acts next. An item lives in its unit; a task is what you do about it. See [Units and items](/concepts/tasks/#units-and-items).
+- **Confirmed item**: an item you created or corrected. Extraction never overwrites it; a later extraction that disagrees becomes a proposal gate on the unit's task.
 - **Extraction**: the `extract:slack` job, which turns a Slack unit's new messages into item changes with one model call per unit. See [Extraction](/concepts/slack/#extraction).
 - **Link**: a connection from one unit to another, found in the facts, by extraction or by you, with the message that names the target as its evidence. A `mention` link is only shown; a `review` link resolves its item when the target pull request gets a review, and a `merge` link when it merges.
-- **Admitted message**: a Slack message the daemon stores because it mentions you, matches `slack.ingest.terms`, replies to you, sits in a DM or in a thread you follow. Every other message is dropped. See [What comes in](/concepts/slack/#what-comes-in).
+- **Admitted message**: a Slack message the daemon stores because it mentions you, matches `plugins.slack.ingest.terms`, replies to you, sits in a DM or in a thread you follow. Every other message is dropped. See [What comes in](/concepts/slack/#what-comes-in).
 
 ## Agents and sessions
 
-- **Agent**: the coding agent program that runs a turn, such as `claude` (Claude Code) or `codex`. Its vendor is an attribute of the agent. The word *provider* is kept for the sources of units (`github`, `slack`, `session`, `workspace`).
+- **Agent**: the coding agent program that runs a turn, such as `claude` (Claude Code) or `codex`. Its vendor is an attribute of the agent. The word *provider* is kept for the sources of units (`github`, `slack`, `session`, `workspace`, `task`).
 - **Agent home**: the agent's configuration directory, such as `~/.claude` or the one `agent_home` names (`CLAUDE_CONFIG_DIR` for Claude Code). `install` puts the hooks and the skills in each home.
 - **Model tier**: `fast`, `balanced` or `frontier`, the class of model a headless call runs on. `agent_models` pins a tier to a model name per agent.
 - **Session**: an agent's durable conversation in one worktree. {{name}} mints its id and starts the agent under it (`claude --session-id <id>`). A session is in one of three states:
@@ -41,7 +41,7 @@ description: The words the code, the configuration, the facts and these pages us
   - **Orca** hosts any agent, in terminals, and has a board.
   - **Claude Desktop** hosts `claude` alone and has no board.
 - **Workspace**: a worktree in the custody of one manager, its **owner**. {{name}}'s store records the custody of each worktree and the units a worktree stands for, such as the pull request it reviews. When two managers list the same worktree, it belongs to the one that created it, else to the one custody names, else to the one with a live agent there, else to the first of `workspace_managers`.
-- **Review workspace** and **author workspace**: the two roles of a pull request's workspace. A review workspace is named with `github.review_prefix` (`REVIEW <branch>`) and reviews someone else's pull request; any other name is an author workspace, for a pull request you develop. See [Workspaces and board columns](/concepts/board/).
+- **Review workspace** and **author workspace**: the two roles of a pull request's workspace. A review workspace is named with `plugins.github.review_prefix` (`REVIEW <branch>`) and reviews someone else's pull request; any other name is an author workspace, for a pull request you develop. See [Workspaces and board columns](/concepts/board/).
 - **Capability**: a feature only some managers offer: a board with columns, a card comment, the unread mark, reading a process's screen, closing a terminal, waking a dormant session, and the parts of a session's launch policy it can honor. {{name}} does without a capability where the owner lacks it.
 - **Launch policy**: what a session asks of the manager that starts it: whether it loads the checkout's project settings, which agent home it uses, the allows and denies {{name}} adds, and whether it runs strict or without MCP servers. A new worktree goes to the first manager in `workspace_managers` that honors it. See [`workspace_managers`](/reference/configuration/).
 - **Census**: the list of live processes a manager reports each time the daemon reads it. An active session whose process two complete censuses miss turns dormant; a census never closes a session.
@@ -53,7 +53,7 @@ description: The words the code, the configuration, the facts and these pages us
 - **Round**: a turn on a pull request.
 - **Role**: what binds an intent to a plugin's mechanism, and what {{name}} finds it by when it starts one on its own: `pr.review`, `pr.address`, `pr.nudge`, `probe` or `headless`, from the manifest's `role`. Go derives what a role implies (its round, the builtins its turns run, the policy of its sessions, whether it drives its workspace's row) from `builtin.Roles`. A turn keeps the role its intent held. See [The intent manifest](/reference/intent-manifest/).
 - **Runner**: how a turn runs, `session` (in a session of a workspace) or `headless` (one read-only call). An intent's `runners` lists the ones it allows, the first being its default; `turn.start`'s `runner` picks one. Which manager hosts a session is configuration, never the runner.
-- **Effect**: what sending a turn or a draft applies, once, by name: an intent's `effects` when its turn is sent (`pr.reviewed`, `pr.round_sent`, `plan.cleared`, ...), a draft's when it is sent (`entry.nudged`, `unit.closed`, `pr.nudged`). An effect a plugin owns carries its slot's prefix. An agent's draft may declare only the effects its intent lists in `[drafts] allowed_effects`.
+- **Effect**: what sending a turn or a draft applies, once, by name: an intent's `effects` when its turn is sent (`pr.reviewed`, `turn.round_sent`, `plan.cleared`, ...), a draft's when it is sent (`task.nudged`, `unit.closed`, `pr.nudged`). An effect a plugin owns carries its slot's prefix. An agent's draft may declare only the effects its intent lists in `[drafts] allowed_effects`.
 - **Turn state**: `sent`, `started`, `asked`, `done`, `settled`, `failed`, `unrecorded`, `dismissed` or `replaced`. A turn is open while it is `sent` or `started`. See [States](/concepts/turns/#states).
 - **First round** and **follow-up round**: the two review rounds. The first reviews a pull request you have not reviewed; a follow-up comes after the author pushed, replied or re-requested you.
 - **Stage**: which pass over a unit a turn is, `first` or `follow-up`: `turn.start`'s `stage`, the turn fact `turn.stage`, and the dimension of a block path such as `stage=first/intent=review.md`.
@@ -61,12 +61,12 @@ description: The words the code, the configuration, the facts and these pages us
 - **Book**: one unit's turns in order, each with its sequence number. A book has at most one open turn, and a turn's "Earlier turns" come from it.
 - **Instructions**: the stored text a turn's agent reads with `{{command}} instructions <intent> --turn <id>`: the procedure, the judgment, the brief, the guidance and the earlier turns. They are rendered once, when the turn is created. See [Instructions](/concepts/turns/#instructions).
 - **Guidance**: your free text for one round, carried verbatim in its instructions. Guidance for a round that does not go out is kept for the next one.
-- **Question** and **answer**: a turn that records `asked` stops on a question, an Inbox message; your answer names that message, and the session gets a notice it reads the answer from with `inbox_read`, or a resume turn carries it. See [Answers](/concepts/turns/#answers).
+- **Question** and **answer**: a turn that records `asked` stops on a question, a message with its gate; your answer names that message and gate, and the session gets a notice naming the gate, and reads the answer with `task_read`, or a resume turn carries it. See [Answers](/concepts/turns/#answers).
 - **Resume turn**: a new turn of the same intent, in a new session, that carries the stopped turn's question, draft, notes and your answer. **Continue** sends one without an answer.
 - **Endorsement**: whether you stood behind the verdict a turn published, by publishing it by hand or approving it. An automatic follow-up approves only after an endorsed verdict.
 - **Headless turn**: a turn run as one read-only call of the agent, with no session and no workspace, that proposes up to 3 drafts. See [Headless turns](/concepts/turns/#headless-turns).
 - **Intake**: the numbered wait of a first turn for its brief. `{{command}} intake <n>` follows it, and `{{command}} intake without <n>` starts it without the brief.
-- **Dossier**: the working memory of a unit or a project, a local git repository under `<state>/dossiers/` that the daemon commits after every turn. See [Dossiers](/concepts/turns/#dossiers).
+- **Dossier**: the working memory of a task, or of a unit no task holds, a local git repository under `<state>/dossiers/` that the daemon commits after every turn. See [Dossiers](/concepts/turns/#dossiers).
 
 ## Profiles and intents
 
@@ -85,7 +85,7 @@ description: The words the code, the configuration, the facts and these pages us
 ## Automation
 
 - **Workflow**: a manifest, `workflow.toml`, that names a provider, a condition over its units' facts and the steps to run. Everything {{name}} does without being asked is a workflow. See [The sweep and workflows](/concepts/workflows/).
-- **Workflow provider**: the provider whose units a workflow looks at, its `provider`: `github` (pull requests), `session`, `workspace`, `entry` (the GTD entries neither done nor in the trash) or `slack` (the Slack units a live entry is attached to).
+- **Workflow provider**: the provider whose units a workflow looks at, its `provider`: `github` (pull requests), `session`, `workspace`, `task` (the open tasks, those whose category is neither `done` nor `dropped`) or `slack` (the Slack units a live task is attached to).
 - **Fact**: a named, typed value a provider computes for a unit from the store, such as `pr.first.due` or `session.idle_for`. Predicates read facts and never GitHub. See [Facts and steps](/reference/facts/).
 - **Slot**: the set of facts a predicate may read: an intent's action slot (the row) or turn slot (the turn being built), and a workflow's provider slot plus `trigger.*`, `config.*` and `now`.
 - **Predicate**: a CEL expression over the facts of a slot that yields a bool, such as a workflow's `when`. See [Predicates](/reference/intent-manifest/#predicates).
@@ -101,12 +101,12 @@ description: The words the code, the configuration, the facts and these pages us
 - **Plan item**: one workflow matched on one unit, with a decision: `pending`, `blocked`, `run` or `skipped`.
 - **Key**: the facts that identify one run of a workflow, by default the unit's `fingerprint`. A key that ran is not run again, and skipping or dismissing an item is final for its key.
 - **Mark**: what a unit's trigger already handled, such as the head whose conflict an address round covered, kept per unit and name until the unit ends. A string mark is a version and a time or an int a watermark; a workflow records its own with `[marks]` and reads any with `handled()`. See [the workflow manifest](/reference/workflow-manifest/).
-- **Approval**: a workflow's `[approval]` table, which decides whether a plan item runs or is `pending`: `mode = "run"` runs it, `"delay"` runs it when its `window` ends, `"wait"` keeps it until you apply or dismiss it; `[[approval.rule]]` entries tried first pick another mode where their `when` holds. See [the workflow manifest](/reference/workflow-manifest/).
+- **Approval**: a `[gates.approval]` table, which decides how the gates a manifest opens are resolved: `mode = "run"` or `"send"` releases a gate at once, `"delay"` when its `window` ends, `"wait"` keeps it until you resolve it, `"dry_run"` stores a draft unsent; `[[gates.approval.rule]]` entries tried first pick another mode where their `when` holds, each for the kinds of gate it pins `gate.kind` to. What no table decides, `gates.toml`'s `[approval]` does. See [What waits for you](/concepts/approval/#gates).
 - **Approval window**: the countdown during which a pending automatic round can be skipped, paused, steered or run now. See [The approval window](/concepts/approval/#the-approval-window).
 - **Ambiguity gate**: the rule inside a round's procedure that records `asked` with the full draft before publishing anything unsure, risky or contradicting another reviewer. See [The ambiguity gate](/concepts/approval/#the-ambiguity-gate).
 - **Pause**: `{{command}} pause` stops every workflow but the observe ones, and the board moves, everywhere or on one repository or pull request. A paused pull request has its rounds **held**.
 - **Cap**: a bound on automatic turns: `turns.per_unit_per_day` on a unit whose plugin keeps a per-unit count (a pull request), `turns.per_day` on the others, spent by every automated turn and by no turn by hand, or a workflow's `[limits]`. A round the cap holds back shows as "held (cap)".
-- **Mute**: takes a pull request out of the pending views, for a while or until whom it waits on changes. Its rounds still run at their deadline.
+- **Mute**: a wake on a pull request's task, which takes it out of the pending views for a while or until whom it waits on changes. Its rounds still run at their deadline.
 
 ## Pull requests in scope
 
@@ -117,24 +117,32 @@ description: The words the code, the configuration, the facts and these pages us
 - **Waits on**: whom a pull request waits on: the author, the requested reviewers, you, the loop or nobody, and since when. Past the `stalled` thresholds it reads as **stalled**. See [Who a pull request waits on](/concepts/daemon/#who-a-pull-request-waits-on).
 - **Take over**: making someone else's pull request yours to develop, with an author workspace.
 
-## GTD
+## Tasks and views
 
-- **Entry**: your GTD record of something to act on, wait for, read later or decide about. It points at the items and units it comes from, and has one state at a time. See [Inbox, entries and work units](/concepts/gtd/).
-- **List**: an entry's state: `inbox`, `next`, `waiting`, `scheduled`, `someday`, `reference`, `done` or `trash`. Each view of the GTD lists shows one or more states. See [Lists are states](/concepts/gtd/#lists-are-states).
-- **Inbox**: the entries not clarified yet, and the messages that need you to decide.
-- **Message**: an Inbox entry that needs a decision: an agent's question, a post an agent makes with `inbox_post`, or a proposal to change a confirmed item. See [Messages](/concepts/gtd/#messages).
-- **Outbox**: the drafts that wait for their approval policy before they go out. See [The Outbox](/concepts/approval/#the-outbox).
-- **Draft**: an outbound post an agent or a proposal rule proposes, such as a reply, a nudge or a Slack reaction. Besides its kind it carries a purpose (what it is for, such as `nudge` or `close`), a delivery (`message`, `reaction` or `comment`) and the effects sending it applies once (`entry.nudged`, `unit.closed`, `pr.nudged`). It moves from `proposed` to `approved`, `sending` and `sent`, or ends `discarded` or `failed`.
-- **Draft approval policy**: when a draft may go out: `wait` (when you approve it), `delay` (when its window ends), `send` (at once) or `dry_run` (never; stored as what would have been sent), given by the first `[drafts.approval]` rule whose `when` matches the draft, else by its `mode`. Every bundled intent, workflow and rule uses `wait`. See [The Outbox](/concepts/approval/#the-outbox).
+- **Task**: your record of something to act on, wait for, read later or decide about, written `task:<id>`. It points at the items and units it comes from, and has one state at a time and its properties. See [Tasks and views](/concepts/tasks/).
+- **State**: where a task is, one of `tasks.toml`'s states, such as `inbox`, `next`, `waiting`, `scheduled`, `someday`, `reference`, `done` or `trash` in the bundled profile. See [Lists are categories](/concepts/tasks/#lists-are-categories).
+- **Category**: what the loop reads of a state, one of `inbox`, `ready`, `active`, `waiting`, `deferred`, `done` and `dropped`. A task is open while its category is neither `done` nor `dropped`.
+- **Property**: a typed value on a task that `tasks.toml` declares, with who may write it, read as `task.prop.<name>`, such as `due`, `size` or `focus`. A property's `role` names the mechanism that acts on it. A property an agent or a plugin writes is untrusted.
+- **Verb**: what you, a workflow, an agent or a plugin do to a task, such as Done, Waiting or Reply, declared in `tasks.toml` with its words, its move and who may run it. Each verb that changes a task records a `verb_<verb>` event.
+- **Gate**: a decision that waits on you, open on a task: a draft to send, a round to run, an agent's question or post, a proposal. `gates.toml` words each gate and the intents it is resolved with; you, a trusted approval rule or a passed window resolve it, never an agent. See [What waits for you](/concepts/approval/#gates).
+- **Run**: a turn on a task, with its workspace and session when it has them. See [Runs](/concepts/tasks/#runs).
+- **Chat**: what you write to a task's agent on the task's page, kept on its timeline and read by the agent with `task_read`. See [Chat](/concepts/tasks/#chat).
+- **Inbox**: the view of the tasks nobody has clarified yet, those in the `inbox` category.
+- **Message**: the subject of a question, post or proposal gate: an agent's question, a post an agent makes with `task_post`, or a proposal to change a confirmed item. See [Messages](/concepts/tasks/#messages).
+- **Outbox**: the view over draft gates: the drafts that wait for their approval policy before they go out, and those approved whose delivery is under way or failed. See [The Outbox](/concepts/approval/#the-outbox).
+- **Draft**: an outbound post an agent or a proposal rule proposes, such as a reply, a nudge or a Slack reaction. Besides its kind it carries a purpose (what it is for, such as `nudge` or `close`), a delivery (`message`, `reaction` or `comment`) and the effects sending it applies once (`task.nudged`, `unit.closed`, `pr.nudged`). Its draft gate holds the decision; the draft keeps its delivery, from `held` to `queued` once its gate approves it, `sending` and `sent`, or ends `dropped` or `failed`.
+- **Draft approval policy**: when a draft may go out: `wait` (when you approve it), `delay` (when its window ends), `send` (at once) or `dry_run` (never; stored as what would have been sent), given by the first `[gates.approval]` rule of a draft gate whose `when` matches the draft, else by its `mode`, else by `gates.toml`'s default. Every bundled intent, workflow and rule uses `wait`. See [The Outbox](/concepts/approval/#the-outbox).
 - **Proposal rule**: a plugin's own rule that adds drafts on its own, hourly and on changes: GitHub's `github-nudge`. The Slack nudges, closures and owner questions come from the default workflows `slack-stalled-nudge`, `slack-closure` and `slack-ask-owner`.
-- **Focus**: the star on an entry, and the view that lists starred entries. A stale waiting entry and an entry past its deadline get it on their own.
-- **Context**: a label on an entry such as `@decide`, from `gtd.contexts`.
-- **Area**: a part of your life or work, from `gtd.areas`. Switching area filters every view but the Inbox.
-- **Snooze**: scheduling an entry until a date, until activity on one of its units, or both.
-- **Changed**: the mark on an entry that new activity by someone else brought back to the Inbox. Opening or moving the entry clears it.
-- **Project**: an outcome that takes more than one action, parallel or sequential, with a review interval and a dossier. See [Projects](/concepts/gtd/#projects).
-- **The Review**: the weekly walk through six filtered views, from Inbox to zero to pruning Focus. A review round is a turn of the `review` intent. See [The weekly Review](/concepts/gtd/#the-weekly-review).
-- **Logbook**: the view of `reference` and `done` entries.
+- **Focus**: the star on a task, and the view that lists starred tasks. A stale waiting task and a task past its deadline get it on their own.
+- **Context**: a label on a task such as `@decide`, from `tasks.contexts`.
+- **Area**: a part of your life or work, from `tasks.areas`: the property of the area role. Switching area filters every view.
+- **Snooze**: scheduling a task until a date, until activity on one of its units, or both: a wake on the task.
+- **Wake**: a task's one wait for a time, an event or a condition over its facts; when it matches, the task gets a `task.woke` event, which the `task-wake` workflow reacts to.
+- **Triage**: the verbs that settle an ask at once: Acknowledge (a reply or a reaction telling the asker you are on it), Not mine (to the trash, with a reply pointing elsewhere) and Hand to (waiting on the person you name). Their drafts come from the bundled `task-*` workflows and wait for your approval. See [Tasks and views](/concepts/tasks/).
+- **Changed**: the mark on a task that new activity by someone else, or an item that reopened, touched since you saw it; the task stays where it is. Opening or moving the task clears it.
+- **Project**: an outcome that takes more than one action, parallel or sequential, with a review interval and a dossier. See [Projects](/concepts/tasks/#projects).
+- **The review**: the periodic walk through the views `views.toml`'s `[review]` names, six in the bundled profile, from Inbox to zero to pruning Focus. A review round is a turn of the `review` intent. See [The review](/concepts/tasks/#the-review).
+- **Logbook**: the view of the tasks in the `done` category, the latest moved first.
 
 ## Surfaces
 
@@ -143,12 +151,12 @@ description: The words the code, the configuration, the facts and these pages us
 - **MCP server**: the daemon's endpoint on `127.0.0.1:47800` (`mcp.port`) that agent sessions call to record turns and read or draft Slack.
 - **Cockpit**: the web page the daemon serves on `127.0.0.1` behind a token, opened with `{{command}} open`. See [The cockpit](/concepts/surfaces/#the-cockpit).
 - **Terminal client**: `{{command}} tui`, the same views and actions in a terminal. See [The terminal client](/concepts/surfaces/#the-terminal-client).
-- **Menu bar**: `{{command}} app` on macOS, which counts what waits on you and offers the actions of the "In loop" rows. See [The menu bar](/concepts/surfaces/#the-menu-bar-macos).
+- **Menu bar**: `{{command}} app` on macOS, which counts what waits on you and lists the tasks of the views the badge counts. See [The menu bar](/concepts/surfaces/#the-menu-bar-macos).
 - **View**: a filtered list a surface shows, such as Needs me, Stalled, Inbox or Waiting. Every client shows the views the daemon computes.
 - **Row**: one unit in a view, with the actions the daemon computes for it. A client renders them and decides nothing.
 - **Action catalog**: the actions the daemon offers on a row: the built-in ones, such as Run now, Skip and Take over, and each intent's `[action]`. Each says what it does in its `summary`; the built-in ones' words are the profile's `actions.toml`. See [the intent manifest](/reference/intent-manifest/).
-- **Card**: what a plugin shows of one unit, in a row or an entry's detail. In Orca it is also the unit's workspace on the board.
+- **Card**: what a plugin shows of one unit, in a row or a task's detail. In Orca it is also the unit's workspace on the board.
 - **Board column**: the column of an Orca card, which {{name}} writes from the turn's state and never reads back. `views.orca.columns` maps each state to a column of your board. See [Workspaces and board columns](/concepts/board/).
 - **Sink**: a destination that receives the projection of every unit's view, such as Orca's board. A sink fails alone and is reconciled on start.
 - **Placement**: the rule that says where a unit's work runs: the repository, the checkout, the role and whether the workspace is shared. `placement` in the configuration lists the rules. A card's placement is the column you see it in. See [the configuration](/reference/configuration/).
-- **Notification**: a macOS alert for a pending round, a held round, a question or a blocked first round, with its actions. The rest goes in the daily digest at `notifications.digest_at`.
+- **Notification**: a macOS alert for a pending round, a held round, a question, post or proposal gate open on a task, or a blocked first round, with its actions. The rest goes in the daily digest at `notifications.digest_at`.

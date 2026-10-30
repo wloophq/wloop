@@ -4,17 +4,20 @@
 package ghsourcetest
 
 import (
+	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
-	"github.com/wloophq/wloop/internal/situation"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
@@ -36,6 +39,8 @@ func ago(d time.Duration) time.Time { return Now.Add(-d) }
 type Case struct {
 	Name string
 	Row  api.Row
+	// Report is what the GitHub plugin reported of the case.
+	Report prrow.Report
 }
 
 // Situation is what one row derives from.
@@ -43,8 +48,9 @@ type Situation struct {
 	PR       dinv.PR
 	Events   []dinv.Event
 	Override dinv.Override
+	Mute     overlay.Mute
 	Turn     *prrow.TurnFact
-	Pending  *round.Pending
+	Pending  *overlay.Pending
 	// At is when the row is derived; zero is Now.
 	At time.Time
 }
@@ -76,10 +82,11 @@ func Cases() []Case {
 						s.PR.Reasons = nil
 					}
 					if muted {
-						s.Override.MutedUntil = Now.Add(5 * time.Hour)
+						s.Mute = overlay.Mute{Until: Now.Add(5 * time.Hour)}
 						s.add(dinv.KindMuted, Viewer, ago(time.Hour), "")
 					}
-					out = append(out, Case{Name: caseName(b.name, author, inScope, muted), Row: Derive(s)})
+					row, rep := DeriveReport(s)
+					out = append(out, Case{Name: caseName(b.name, author, inScope, muted), Row: row, Report: rep})
 				}
 			}
 		}
@@ -124,6 +131,12 @@ var ReviewWorkspace = dinv.Workspace{ID: "ws-r", DisplayName: "review", Status: 
 
 // Derive is s's row as prrow's deriver serves it at s.At (default Now) to Viewer.
 func Derive(s Situation) api.Row {
+	row, _ := DeriveReport(s)
+	return row
+}
+
+// DeriveReport is s's row and the plugin's report it derives from.
+func DeriveReport(s Situation) (api.Row, prrow.Report) {
 	l, err := turn.Bundled()
 	if err != nil {
 		panic(fmt.Sprintf("ghsourcetest: bundled intents: %v", err))
@@ -133,15 +146,45 @@ func Derive(s Situation) api.Row {
 		at = Now
 	}
 	d := prrow.Deriver{Viewer: Viewer, Teams: []string{Team}, Now: at, Stalled: config.Defaults().GitHub.Stalled, Loaded: l, Cfg: config.Defaults(),
-		GateOn: true, BriefOn: true, Pending: map[unit.Unit]round.Pending{}, Turns: map[pr.Ref]prrow.TurnFact{}}
+		GateOn: true, BriefOn: true, Plans: map[unit.Unit]overlay.Pending{}, Turns: map[pr.Ref]prrow.TurnFact{},
+		Mutes: map[unit.Unit]overlay.Mute{s.PR.Ref.Unit(): s.Mute}}
 	if s.Pending != nil {
-		d.Pending[s.PR.Ref.Unit()] = *s.Pending
+		d.Plans[s.PR.Ref.Unit()] = *s.Pending
 	}
 	if s.Turn != nil {
 		d.Turns[s.PR.Ref] = *s.Turn
 	}
 	s.Override.PR = s.PR.Ref
-	return d.Row(s.PR, s.Events, s.Override)
+	in := ghreporttest.Input{PR: s.PR, Events: s.Events, Adopted: s.Override.Adopted, Tracked: s.Override.Tracked}
+	if s.Turn != nil && s.Turn.Facts.Role == "pr.address" {
+		in.AddressedAt = s.Turn.Facts.At
+	}
+	rep, ok, err := prrow.ReportOf(ghreporttest.Snapshot(ghreporttest.Env{Viewer: Viewer, Teams: []string{Team}, Now: at, Loop: brand.Name}, in))
+	if err != nil || !ok {
+		panic(fmt.Sprintf("ghsourcetest: the report of %s: %v %v", s.PR.Ref, ok, err))
+	}
+	row := d.Row(rep, s.Events, s.Override)
+	if key, err := json.Marshal(row); err == nil {
+		derived.Store(string(key), rep)
+	}
+	return row, rep
+}
+
+// derived are the reports rows derived from, by the row's JSON.
+var derived sync.Map
+
+// ReportOf is the report row, a row Derive derived, derives from; false
+// for any other row.
+func ReportOf(row api.Row) (prrow.Report, bool) {
+	key, err := json.Marshal(row)
+	if err != nil {
+		return prrow.Report{}, false
+	}
+	rep, ok := derived.Load(string(key))
+	if !ok {
+		return prrow.Report{}, false
+	}
+	return rep.(prrow.Report), true
 }
 
 type base struct {
@@ -163,7 +206,7 @@ func (s *Situation) add(kind, actor string, at time.Time, data string) {
 // reviewTurn is a review turn in state; an asked or stopped one holds its question, as an answerable turn's
 // facts do.
 func reviewTurn(state string) *prrow.TurnFact {
-	f := &prrow.TurnFact{Facts: situation.TurnFacts{Intent: "review", Role: "pr.review", State: state, Summary: "which branch?", At: ago(30 * time.Minute)}, Session: "s1"}
+	f := &prrow.TurnFact{Facts: overlay.Turn{Intent: "review", Role: "pr.review", State: state, Summary: "which branch?", At: ago(30 * time.Minute)}, Session: "s1"}
 	if state != "started" {
 		f.Question = &api.QuestionView{State: state, RecordID: 1, Kind: "choice", Text: "which branch?"}
 	}
@@ -188,7 +231,7 @@ func bases() []base {
 		{name: "to_address", edit: func(s *Situation) { s.add(dinv.KindWouldAddress, "", ago(3*time.Hour), "bob asked") }},
 		{name: "round_pending", edit: func(s *Situation) {
 			s.PR.ReviewRequests, s.PR.Workspace = []string{Viewer}, ReviewWorkspace
-			s.Pending = &round.Pending{Intent: "review", Reason: "new push", Since: ago(time.Minute), Deadline: Now.Add(4 * time.Minute)}
+			s.Pending = &overlay.Pending{Intent: "review", Reason: "new push", Since: ago(time.Minute), Deadline: Now.Add(4 * time.Minute)}
 		}},
 		{name: "loop_working", edit: func(s *Situation) { s.PR.Workspace, s.Turn = ReviewWorkspace, reviewTurn("started") }},
 		{name: "loop_waiting", edit: func(s *Situation) { s.PR.Workspace, s.Turn = ReviewWorkspace, reviewTurn("asked") }},

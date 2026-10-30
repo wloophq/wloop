@@ -30,10 +30,10 @@ type Locator interface {
 }
 
 // Deliverer is optional: an Effects value that implements it says how it
-// posts a draft whose proposer asked for delivery d, which the draft then
-// carries, so its approval reads what the provider will show.
+// posts a draft of kind k, whatever delivery its proposer asked for, which
+// the draft then carries, so its approval reads what the provider will show.
 type Deliverer interface {
-	Delivers(d draft.Delivery) draft.Delivery
+	Delivers(k draft.Kind) draft.Delivery
 }
 
 // Placer is optional: an Effects value that implements it names, when a draft
@@ -45,14 +45,14 @@ type Placer interface {
 
 // Lander is optional: an Effects value that implements it names the unit the
 // post of a sent draft landed in, for a draft whose own unit publishes
-// nothing, such as a GTD entry's posted to a channel; false when it cannot.
+// nothing, such as a task's posted to a channel; false when it cannot.
 type Lander interface {
 	Landed(ctx context.Context, d draft.Draft) (unit.Unit, bool, error)
 }
 
 // Targeter is optional: an Effects value that implements it says whether it
 // posts to target, so a draft on a unit whose provider publishes nothing, such
-// as a GTD entry, is posted by the provider its target names.
+// as a task, is posted by the provider its target names.
 type Targeter interface {
 	Takes(target string) bool
 }

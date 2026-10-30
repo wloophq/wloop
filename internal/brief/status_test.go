@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
@@ -20,7 +22,7 @@ func statusOf(t *testing.T, ctx context.Context, q *Queue) Status {
 	return st
 }
 
-func TestStatusReadsOnce(t *testing.T) {
+func TestStatusReadsTheBriefStatesOnce(t *testing.T) {
 	r := newRig(t, 3)
 	r.q.Run(context.Background())
 	for range 2 {
@@ -28,7 +30,7 @@ func TestStatusReadsOnce(t *testing.T) {
 		if st := statusOf(t, ctx, r.q); st.Ready != 3 {
 			t.Fatalf("%+v", st)
 		}
-		metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 1})
+		metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 2})
 	}
 }
 
@@ -54,12 +56,12 @@ func TestStatusRecomputesOnlyOnBriefOrPRNotes(t *testing.T) {
 		t.Fatalf("after the briefs were stored: %+v", st)
 	}
 
-	pr, _, err := r.st.PR(ctx, refN(2))
+	pr, _, err := inventorytest.Of(r.st).PR(ctx, refN(2))
 	if err != nil {
 		t.Fatal(err)
 	}
 	pr.ChangedFiles += RefreshFiles + 1
-	if err := r.st.UpsertPR(ctx, pr); err != nil {
+	if err := inventorytest.Of(r.st).UpsertPR(ctx, pr); err != nil {
 		t.Fatal(err)
 	}
 	mctx, sc = metertest.Start(t, ctx)
@@ -67,7 +69,7 @@ func TestStatusRecomputesOnlyOnBriefOrPRNotes(t *testing.T) {
 		t.Fatalf("after a pull request moved: %+v", st)
 	}
 	statusOf(t, mctx, r.q)
-	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 1})
+	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 2})
 }
 
 func TestStatusRecomputesOnTheMinute(t *testing.T) {
@@ -78,12 +80,12 @@ func TestStatusRecomputesOnTheMinute(t *testing.T) {
 	if _, err := r.q.Run(ctx); err != nil {
 		t.Fatal(err)
 	}
-	pr, _, err := r.st.PR(ctx, refN(2))
+	pr, _, err := inventorytest.Of(r.st).PR(ctx, refN(2))
 	if err != nil {
 		t.Fatal(err)
 	}
 	pr.BodyEditedAt = r.now
-	if err := r.st.UpsertPR(ctx, pr); err != nil {
+	if err := inventorytest.Of(r.st).UpsertPR(ctx, pr); err != nil {
 		t.Fatal(err)
 	}
 	if st := statusOf(t, ctx, r.q); st.Failed != 1 || st.Ready != 1 {
@@ -95,7 +97,7 @@ func TestStatusRecomputesOnTheMinute(t *testing.T) {
 	if st := statusOf(t, mctx, r.q); st.Ready != 1 {
 		t.Fatalf("minutes later, still quiet: %+v", st)
 	}
-	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 1})
+	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 2})
 
 	r.now = t0.Add(BodyQuiet - 10*time.Second)
 	mctx, sc = metertest.Start(t, ctx)

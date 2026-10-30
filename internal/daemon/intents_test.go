@@ -12,8 +12,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"testing/synctest"
 	"time"
+
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
@@ -42,7 +43,7 @@ var askAuthorFixture = filepath.Join("..", "intent", "testdata", "good", "ask-au
 // cacheOver is the registry cache over the bundled intents and dir's.
 func cacheOver(t *testing.T, dir string) *intentload.Cache {
 	t.Helper()
-	c, err := turnpkg.NewCache(func() []profile.Layer { return []profile.Layer{{Name: "user", Dir: dir}} }, intentload.CacheOptions{})
+	c, err := turnpkg.NewCache(func() []profile.Layer { return append(profile.BundledChain(), profile.Layer{Name: "user", Dir: dir}) }, intentload.CacheOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +60,7 @@ func copyIntents(t *testing.T, src, dst string) {
 
 func adopt(t *testing.T, s *Server, ref github.Ref) {
 	t.Helper()
-	if err := s.store().SetOverride(context.Background(), dinv.Override{PR: ref, Adopted: true}); err != nil {
+	if err := inventorytest.Of(s.store()).SetOverride(context.Background(), dinv.Override{PR: ref, Adopted: true}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -107,7 +108,7 @@ func TestIntentActionsComeFromManifests(t *testing.T) {
 		t.Fatalf("on someone else's pull request: %+v %v", st, ok)
 	}
 	ctx := context.Background()
-	if err := s.store().UpsertPR(ctx, dinv.PR{Ref: r10, Title: "Mine", Author: "me", State: "OPEN", HeadOid: "h1", Reasons: []string{"author"}, URL: r10.URL()}); err != nil {
+	if err := inventorytest.Of(s.store()).UpsertPR(ctx, dinv.PR{Ref: r10, Title: "Mine", Author: "me", State: "OPEN", HeadOid: "h1", Reasons: []string{"author"}, URL: r10.URL()}); err != nil {
 		t.Fatal(err)
 	}
 	if st, ok := offerOf(rowOf(t, s, r10), "ask-author"); ok {
@@ -271,7 +272,8 @@ func TestAPendingRunNowIgnoresAnOpenIntake(t *testing.T) {
 	t.Parallel()
 	s, _ := newIntakeServer(t, intaketest.NewBriefs(waitBriefing), nil)
 	plan := newPendingPlan(s.deps.Now())
-	s.deps.Plan, s.deps.Pending = plan, plan
+	s.deps.Plan, s.deps.Plans = plan, plan
+	plan.gated(s)
 	in := ask(t, s, "review", `{"source":"cockpit"}`)
 	waitFor(t, func() bool { return intakeOf(t, s, in.Seq).State == intake.Briefing })
 	plan.propose(r7.Unit())
@@ -288,31 +290,29 @@ func TestAPendingRunNowIgnoresAnOpenIntake(t *testing.T) {
 
 func TestASessionAskWithADifferentInputDoesNotJoin(t *testing.T) {
 	t.Parallel()
-	synctest.Test(t, func(t *testing.T) {
-		s, _, hand := newByHandServer(t, intaketest.NewBriefs(waitBriefing), 50*time.Millisecond)
-		byHand := func(body string) *httptest.ResponseRecorder {
-			rec := httptest.NewRecorder()
-			req := apiRequest("POST", api.AgentTurnsByHand, strings.NewReader(body))
-			req.Header.Set(api.SessionHeader, "term-1")
-			s.Handler().ServeHTTP(rec, req)
-			return rec
-		}
-		if rec := byHand(`{"intent":"address","cwd":"/w"}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "not ready yet") {
-			t.Fatalf("%d %s", rec.Code, rec.Body)
-		}
-		open, _ := s.deps.Intakes.Open(context.Background())
-		if len(open) != 1 {
-			t.Fatalf("open %+v", open)
-		}
-		rec := byHand(`{"intent":"address","cwd":"/w","inputs":{"self_review":true}}`)
-		want := fmt.Sprintf("intake %d already asks for this pull request's address without --self-review", open[0].Seq)
-		if rec.Code != 409 || !strings.Contains(rec.Body.String(), want) {
-			t.Fatalf("%d %s", rec.Code, rec.Body)
-		}
-		if again, _ := s.deps.Intakes.Open(context.Background()); len(again) != 1 || len(hand.list()) != 0 {
-			t.Fatalf("open %+v, calls %v", again, hand.list())
-		}
-	})
+	s, _, hand := newByHandServer(t, intaketest.NewBriefs(waitBriefing), 50*time.Millisecond)
+	byHand := func(body string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		req := apiRequest("POST", api.AgentTurnsByHand, strings.NewReader(body))
+		req.Header.Set(api.SessionHeader, "term-1")
+		s.Handler().ServeHTTP(rec, req)
+		return rec
+	}
+	if rec := byHand(`{"intent":"address","cwd":"/w"}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "not ready yet") {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	open, _ := s.deps.Intakes.Open(context.Background())
+	if len(open) != 1 {
+		t.Fatalf("open %+v", open)
+	}
+	rec := byHand(`{"intent":"address","cwd":"/w","inputs":{"self_review":true}}`)
+	want := fmt.Sprintf("intake %d already asks for this pull request's address without --self-review", open[0].Seq)
+	if rec.Code != 409 || !strings.Contains(rec.Body.String(), want) {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	if again, _ := s.deps.Intakes.Open(context.Background()); len(again) != 1 || len(hand.list()) != 0 {
+		t.Fatalf("open %+v, calls %v", again, hand.list())
+	}
 }
 
 func TestASweepTurnWithoutTheInputFailsTheIntake(t *testing.T) {
@@ -433,7 +433,7 @@ func TestHeldRunNowPicksTheIntentByTheWorkspaceRule(t *testing.T) {
 	}
 	s, _ := newIntakeServer(t, nil, nil)
 	holdByCap(t, s)
-	if err := s.store().SetWorkspace(context.Background(), r7, dinv.Workspace{ID: "w7", DisplayName: "feat-batch"}); err != nil {
+	if err := inventorytest.Of(s.store()).SetWorkspace(context.Background(), r7, dinv.Workspace{ID: "w7", DisplayName: "feat-batch"}); err != nil {
 		t.Fatal(err)
 	}
 	if in := ask(t, s, "run_now", `{"source":"cockpit"}`); in.Intent != "address" {
@@ -480,20 +480,6 @@ func TestAnInvalidUserIntentDisablesOnlyItself(t *testing.T) {
 	s.Handler().ServeHTTP(rec, req)
 	if rec.Code != 409 || !strings.Contains(rec.Body.String(), "the intent ask-author has problems") {
 		t.Fatalf("session: %d %s", rec.Code, rec.Body)
-	}
-}
-
-func TestProbeIsExcludedFromReportsByItsManifest(t *testing.T) {
-	t.Parallel()
-	at := time.Date(2026, 10, 8, 9, 0, 0, 0, time.UTC)
-	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
-	d := dinv.TimingsData{Turns: []dinv.TimedTurn{
-		{Seq: 1, PR: ref, Intent: "review", Trigger: "automated", State: "done", SentAt: at, StartedAt: at, EndedAt: at.Add(time.Minute)},
-		{Seq: 2, PR: ref, Intent: "probe", Trigger: "automated", State: "done", SentAt: at, StartedAt: at, EndedAt: at.Add(time.Minute)},
-	}}
-	rep := timings(d, at.Add(-time.Hour), at.Add(time.Hour), me{login: "me"}, reportsOf((&Server{}).loaded().Registry))
-	if len(rep.TurnList) != 1 || rep.TurnList[0].Intent != "review" {
-		t.Fatalf("turns %+v", rep.TurnList)
 	}
 }
 
@@ -568,7 +554,7 @@ func TestTheRowsNewestTurnIsADrivesRowIntents(t *testing.T) {
 		{Intent: turn.Intent(dintent.Nudge), ID: "b", Trigger: turn.ByHand, State: turn.Sent, SentAt: at.Add(time.Minute)},
 	}})
 	bundled := r.s.loaded().Registry
-	facts, err := r.s.turnFacts(context.Background(), bundled)
+	facts, err := turnFacts(r.s, context.Background(), bundled)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -580,7 +566,7 @@ func TestTheRowsNewestTurnIsADrivesRowIntents(t *testing.T) {
 		d.DrivesRow = d.Name == dintent.Nudge
 		defs = append(defs, d)
 	}
-	if facts, _ = r.s.turnFacts(context.Background(), dintent.NewRegistry(defs)); facts[r7].Facts.Intent != "nudge" {
+	if facts, _ = turnFacts(r.s, context.Background(), dintent.NewRegistry(defs)); facts[r7].Facts.Intent != "nudge" {
 		t.Fatalf("with nudge driving the row, it follows the %s turn", facts[r7].Facts.Intent)
 	}
 }

@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
@@ -37,7 +37,7 @@ func (v *repoView) layers(chain []profile.Layer) {
 	}
 }
 
-func (v *repoView) facts(ref github.Ref, f *api.Facts, err error) {
+func (v *repoView) facts(ref pr.Ref, f *api.Facts, err error) {
 	if err != nil {
 		fmt.Fprintln(v.w, v.t.Yellow("brief facts unavailable: ")+termfmt.Clean(err.Error()))
 		v.sections++

@@ -1,4 +1,4 @@
-#11  close  proposed
+#11  close  held
 DM with Ana Lima: rollout
 
   Closing this out:
@@ -11,5 +11,5 @@ Origin      rule closure, 3h ago
 Approval    wait
 
 {{command}} outbox approve 11
-{{command}} outbox edit 11 <markdown>
 {{command}} outbox discard 11
+{{command}} outbox edit 11 <markdown>

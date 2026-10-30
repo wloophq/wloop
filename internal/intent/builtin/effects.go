@@ -29,28 +29,25 @@ type Effect struct {
 	Plugin bool
 }
 
-// The effects code applies by name.
+// The effects the host applies by name.
 const (
 	EffectPlanCleared    = "plan.cleared"
-	EffectGuidanceHanded = "guidance.handed"
-	EffectPRRoundSent    = "pr.round_sent"
-	EffectPRReviewed     = "pr.reviewed"
-	EffectPRAddressed    = "pr.addressed"
-	EffectEntryNudged    = "entry.nudged"
+	EffectGuidanceHanded = "turn.guidance_handed"
+	EffectRoundSent      = "turn.round_sent"
+	EffectTaskNudged     = "task.nudged"
 	EffectUnitClosed     = "unit.closed"
-	EffectPRNudged       = "pr.nudged"
 )
 
-// Effects is the effect vocabulary of turns and drafts.
-var Effects = []Effect{
+// Effects is the effect vocabulary of turns and drafts: the core's, then
+// each plugin's.
+var Effects = slices.Clone(coreEffects)
+
+var coreEffects = []Effect{
 	{EffectPlanCleared, "", AppliesTurn, "Drops the unit's pending plan items.", false},
-	{EffectGuidanceHanded, unit.GitHub, AppliesTurn, "Hands the guidance queued on the pull request to the turn, and queues it back when the turn is not sent.", false},
-	{EffectPRRoundSent, unit.GitHub, AppliesTurn, "Records the round-sent event on the pull request.", false},
-	{EffectPRReviewed, unit.GitHub, AppliesTurn, "Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted.", false},
-	{EffectPRAddressed, unit.GitHub, AppliesTurn, "Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered.", false},
-	{EffectEntryNudged, "", AppliesDraft, "Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none.", false},
-	{EffectUnitClosed, "", AppliesDraft, "Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin.", true},
-	{EffectPRNudged, unit.GitHub, AppliesTurn | AppliesDraft, "Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.", false},
+	{EffectGuidanceHanded, "", AppliesTurn, "Hands the guidance queued on the unit to the turn, and queues it back when the turn is not sent.", false},
+	{EffectRoundSent, "", AppliesTurn, "Records the round-sent event on the unit when a person sends the turn.", false},
+	{EffectTaskNudged, "", AppliesDraft, "Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists.", false},
+	{EffectUnitClosed, "", AppliesDraft, "Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit.", true},
 }
 
 // EffectNames are the names of the draft effects: what a draft's effects, a

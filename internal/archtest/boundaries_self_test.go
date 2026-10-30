@@ -87,7 +87,7 @@ func planted(t *testing.T, fset *token.FileSet, path, file, src string, deps map
 	if err != nil {
 		t.Fatal(err)
 	}
-	info := &types.Info{Types: map[ast.Expr]types.TypeAndValue{}, Uses: map[*ast.Ident]types.Object{}, Selections: map[*ast.SelectorExpr]*types.Selection{}}
+	info := &types.Info{Types: map[ast.Expr]types.TypeAndValue{}, Uses: map[*ast.Ident]types.Object{}, Defs: map[*ast.Ident]types.Object{}, Selections: map[*ast.SelectorExpr]*types.Selection{}}
 	imp := importerFunc(func(p string) (*types.Package, error) {
 		if pkg, ok := deps[p]; ok {
 			return pkg, nil
@@ -142,12 +142,15 @@ func (*Program) Eval() bool { return true }
 type Programs struct { Records, When, Primary *Program; Refuse []*Program; ActionTexts map[string]string }
 type Loaded struct { Programs map[string]Programs }
 type Other struct { When bool }
+type ViewDef struct { ID string; When *Program }
 `, nil)
 	deps := map[string]*types.Package{module + "internal/intent": loader}
 	f, info, _ := planted(t, fset, module+"internal/daemon", "x.go", `package daemon
 import "github.com/wloophq/wloop/internal/intent"
 type wrap struct { intent.Programs }
-func f(l *intent.Loaded, p *intent.Programs, w wrap, o intent.Other) bool {
+func f(l *intent.Loaded, p *intent.Programs, w wrap, o intent.Other, v intent.ViewDef) bool {
+	_ = v.When.Eval()
+	_ = v.ID
 	_ = p.ActionTexts["note"]
 	_ = l.Programs["review"].Refuse[0].Eval()
 	_ = w.Primary
@@ -157,7 +160,7 @@ func f(l *intent.Loaded, p *intent.Programs, w wrap, o intent.Other) bool {
 	return p.When != nil
 }
 `, deps)
-	flagged(t, "daemon", programReads(fset, "internal/daemon/x.go", info, f), 4, "only the loader and the catalog evaluate an intent's predicates")
+	flagged(t, "daemon", programReads(fset, "internal/daemon/x.go", info, f), 5, "only the loader and the catalog evaluate an intent's predicates")
 	for _, file := range []string{"internal/catalog/intents.go", "internal/intent/validate.go", "internal/daemon/x_test.go"} {
 		flagged(t, file, programReads(fset, file, info, f), 0, "")
 	}
@@ -167,15 +170,16 @@ func TestBuiltinLiteralsFlagsANameOutsideTheTables(t *testing.T) {
 	t.Parallel()
 	fset, f := parse(t, `package daemon
 import "github.com/wloophq/wloop/internal/intent/builtin"
-const a = "pr.round_sent"
-const b = "nudge.prepare"
+const a = "turn.round_sent"
+const b = "pr.addressed"
 const c = "linked_else_main"
 const d = "plan.cleared"
 const e = "review"
-const g = "pr.round_sent is fine inside a sentence"
+const g = "turn.round_sent is fine inside a sentence"
 var _ = builtin.Names
 `)
 	flagged(t, "daemon", builtinLiterals(fset, "internal/daemon/x.go", f), 4, "a builtin's name lives in its table")
+	flagged(t, "a migration", builtinLiterals(fset, "internal/adapter/store/sqlite/migrate_v7_gates.go", f), 0, "")
 	for _, file := range []string{"internal/intent/builtin/builtin.go", "internal/cli/builtins.go", "internal/daemon/builtins.go", "internal/daemon/x_test.go"} {
 		flagged(t, file, builtinLiterals(fset, file, f), 0, "")
 	}
@@ -198,7 +202,7 @@ const d = "classify"
 func TestBuiltinLiteralsFlagsAnEffectNameOutsideTheTables(t *testing.T) {
 	t.Parallel()
 	fset, f := parse(t, `package cli
-const a = "entry.nudged"
+const a = "task.nudged"
 const b = "unit.closed"
 const c = "draft.propose"
 `)
@@ -210,7 +214,7 @@ func TestBuiltinNamesAreTheDottedAndSnakeNames(t *testing.T) {
 	t.Parallel()
 	names := builtinNames()
 	var missing, extra []string
-	for _, want := range []string{"pr.round_sent", "nudge.prepare", "linked_else_main", "pr.addressed"} {
+	for _, want := range []string{"turn.round_sent", "plan.cleared", "linked_else_main", "pr.addressed"} {
 		if !names[want] {
 			missing = append(missing, want)
 		}

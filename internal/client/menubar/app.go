@@ -17,7 +17,6 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/rowset"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -37,9 +36,9 @@ const (
 
 type Daemon interface {
 	RowsSince(ctx context.Context, since api.Since) (api.RowsPage, error)
-	EntriesSince(ctx context.Context, q client.EntryQuery, since api.Since) (api.EntriesPage, error)
-	Entry(ctx context.Context, id string) (api.EntryView, error)
-	EntryDo(ctx context.Context, id, verb string, req api.EntryRequest) (api.EntryResult, error)
+	TasksSince(ctx context.Context, q client.TaskQuery, since api.Since) (api.TasksPage, error)
+	Task(ctx context.Context, id string) (api.TaskView, error)
+	TaskDo(ctx context.Context, id, verb string, req api.TaskRequest) (api.TaskResult, error)
 	Digest(ctx context.Context, day string) (api.Digest, error)
 	Health(ctx context.Context) (api.Health, error)
 	Action(ctx context.Context, u unit.Unit, action string, req api.ActionRequest) ([]string, error)
@@ -49,6 +48,7 @@ type Daemon interface {
 	Events(ctx context.Context, client string, since api.Since) (<-chan api.Change, error)
 	Actions(ctx context.Context) (api.ActionsResponse, error)
 	Plugins(ctx context.Context) ([]api.Plugin, error)
+	Views(ctx context.Context) (api.ViewsCatalog, error)
 }
 
 type Config struct {
@@ -57,7 +57,7 @@ type Config struct {
 	Notifier Notifier
 	OpenURL  func(url string) error
 	// CockpitURL is the cockpit's address at a hash route such as
-	// "entry=<id>" or "view=inbox".
+	// "task=<id>" or "view=inbox".
 	CockpitURL func(route string) (string, error)
 	Quit       func()
 	// Copy puts text on the clipboard; nil offers no copy.
@@ -78,7 +78,7 @@ type Controller struct {
 	ctx  context.Context
 	mu   sync.Mutex
 	sent map[string]bool
-	// daily are today's held entries and digest already posted.
+	// daily are today's held tasks and digest already posted.
 	daily    map[string]bool
 	posted   map[string]posted
 	saveMu   sync.Mutex
@@ -92,9 +92,16 @@ type Controller struct {
 	hasHealth bool
 	sections  []api.MenubarSection
 	// plugins are the served plugins, read with the sections.
-	plugins  []api.Plugin
-	entries  map[gtd.View][]api.EntryView
-	counters *api.Counters
+	plugins []api.Plugin
+	tasks   map[string][]api.TaskView
+	// taskViews are the views the menu lists first: those the profile's badge counts.
+	taskViews []api.TaskViewSpec
+	counters  *api.Counters
+	// tasksLoading and rowsLoading are the plugins the last pages of tasks and of rows said are still
+	// loading.
+	tasksLoading, rowsLoading []api.Loading
+	// cat is the served catalog of views and verbs, under mu.
+	cat api.ViewsCatalog
 }
 
 func New(cfg Config) *Controller {
@@ -107,7 +114,7 @@ func New(cfg Config) *Controller {
 	if cfg.Log == nil {
 		cfg.Log = func(string, ...any) {}
 	}
-	c := &Controller{cfg: cfg, ctx: context.Background(), sent: map[string]bool{}, daily: map[string]bool{}, entries: map[gtd.View][]api.EntryView{}}
+	c := &Controller{cfg: cfg, ctx: context.Background(), sent: map[string]bool{}, daily: map[string]bool{}, tasks: map[string][]api.TaskView{}}
 	cfg.Notifier.OnResponse(func(r Response) { c.Respond(c.runCtx(), r) })
 	c.loadSent()
 	return c
@@ -216,7 +223,7 @@ func (c *Controller) follow(ctx context.Context, events <-chan api.Change) bool 
 	}
 }
 
-// apply pulls the rows and the entries past the held revision, unless the
+// apply pulls the rows and the tasks past the held revision, unless the
 // change only names the health and is not ahead of it, and the health only
 // when the change names it.
 func (c *Controller) apply(ctx context.Context, ch api.Change) {
@@ -243,7 +250,7 @@ func (c *Controller) report(ctx context.Context, st api.AppStatus) {
 	}
 }
 
-// Refresh reads the rows and entries that moved and the health, then
+// Refresh reads the rows and tasks that moved and the health, then
 // redraws the title, the menu and the notifications.
 func (c *Controller) Refresh(ctx context.Context) { c.refresh(ctx, true, true) }
 
@@ -253,7 +260,7 @@ func (c *Controller) refresh(ctx context.Context, health, rows bool) {
 	var err error
 	if rows {
 		if err = c.pullRows(ctx); err == nil {
-			err = c.pullEntries(ctx)
+			err = c.pullTasks(ctx)
 		}
 	}
 	if err == nil && (health || !c.hasHealth) {
@@ -336,12 +343,14 @@ func (c *Controller) pullRows(ctx context.Context) error {
 		return err
 	}
 	if c.set.Apply(page) {
+		c.rowsLoading = page.Loading
 		return nil
 	}
 	if page, err = c.cfg.Daemon.RowsSince(ctx, api.Since{}); err != nil {
 		return err
 	}
 	c.set.Apply(page)
+	c.rowsLoading = page.Loading
 	return nil
 }
 
@@ -386,8 +395,9 @@ func (c *Controller) menu(h api.Health) []MenuItem {
 	if len(h.WorkspaceManagers) == 1 {
 		open = "Open in " + h.WorkspaceManagers[0]
 	}
-	for _, sec := range coreSections {
-		items = append(items, c.entrySection(sec.label, sec.view)...)
+	items = append(items, c.loadingItems()...)
+	for _, v := range c.taskViews {
+		items = append(items, c.taskSection(v.Label, v.ID)...)
 		items = append(items, MenuItem{Separator: true})
 	}
 	for _, sec := range c.sections {
@@ -395,7 +405,7 @@ func (c *Controller) menu(h api.Health) []MenuItem {
 		items = append(items, MenuItem{Separator: true})
 	}
 	items = append(items,
-		MenuItem{Title: "Open cockpit", Enabled: true, Action: c.later(func(ctx context.Context) error { return c.open("view=" + string(gtd.ViewInbox)) })},
+		MenuItem{Title: "Open cockpit", Enabled: true, Action: c.later(func(ctx context.Context) error { return c.open(c.firstView()) })},
 		MenuItem{Title: "Sweep now", Enabled: true, Action: c.later(func(ctx context.Context) error { return c.cfg.Daemon.Trigger(ctx, "sweep") })},
 	)
 	pause := MenuItem{Title: "Pause automatic rounds", Enabled: true, Action: c.later(func(ctx context.Context) error { return c.cfg.Daemon.SetPause(ctx, api.PauseRequest{Paused: true}) })}
@@ -424,8 +434,12 @@ func (c *Controller) rowItem(view string, r api.Row, open string) MenuItem {
 	if !api.PluginCan(c.plugins, r.Unit.Provider, api.CapabilityDetail) && strings.HasPrefix(r.Link, "https://") {
 		action = func(context.Context) error { return c.cfg.OpenURL(r.Link) }
 	}
+	title := r.Label + " · " + label(r)
+	if r.Stale {
+		title += " " + staleMark
+	}
 	return MenuItem{
-		Title:    r.Label + " · " + label(r),
+		Title:    title,
 		Enabled:  true,
 		Action:   c.later(action),
 		Children: c.rowActions(r, open),
@@ -476,6 +490,9 @@ func actionTooltip(spec api.ActionSpec, st api.ActionState) string {
 }
 
 func label(r api.Row) string { return r.Summary.Line }
+
+// staleMark marks a row its plugin last reported before it went down.
+const staleMark = "(stale)"
 
 func (c *Controller) syncLine(h api.Health) string {
 	line := "Not synced yet"

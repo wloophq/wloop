@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
@@ -44,19 +45,20 @@ func TestAnApprovalEnvReadsItsSlotsAndNeverABrief(t *testing.T) {
 	}
 }
 
-func TestAnApprovalRuleNamesCommentDeliveryByItsConjunction(t *testing.T) {
+func TestAnApprovalRuleNamesADeliveryByItsConjunction(t *testing.T) {
 	env := ApprovalEnv(false, "pr")
 	none := draft.Approval{Mode: draft.Send}
-	for when, want := range map[string]bool{
-		`draft.delivery == "comment" && pr.author == "dependabot[bot]"`: true,
-		`pr.repo == "acme/docs"`:                                false,
-		`draft.delivery == "comment" || pr.repo == "acme/docs"`: false,
+	for when, want := range map[string]draft.Delivery{
+		`draft.delivery == "comment" && pr.author == "dependabot[bot]"`: draft.CommentDelivery,
+		`draft.delivery == "message"`:                                   draft.Message,
+		`pr.repo == "acme/docs"`:                                        "",
+		`draft.delivery == "comment" || pr.repo == "acme/docs"`:         "",
 	} {
 		r, err := ApprovalRule(when, none, env)
 		if err != nil {
 			t.Fatalf("%s: %v", when, err)
 		}
-		if r.NamesComment != want || r.Approval != none {
+		if r.Names != want || r.Approval != none {
 			t.Errorf("%s: %+v", when, r)
 		}
 	}
@@ -108,8 +110,8 @@ func TestARuleReadingAnUntrustedFactIsRefused(t *testing.T) {
 			t.Errorf("%s: %v", f.Name, err)
 		}
 	}
-	for _, name := range []string{"slack.started_by_me", "slack.closure_posted", "entry.unit_started_by_me", "entry.unit_closure_posted",
-		"slack.items_open", "slack.items_unowned", "slack.items_unowned_age_days", "entry.items_open", "entry.items_resolved", "entry.items_owed"} {
+	for _, name := range []string{"slack.started_by_me", "slack.closure_posted", "task.link_started_by_me", "task.link_closure_posted",
+		"slack.items_open", "slack.items_unowned", "slack.items_unowned_age_days", "task.items_open", "task.items_resolved", "task.link_owes"} {
 		if i := slices.IndexFunc(Facts, func(f Fact) bool { return f.Name == name }); i < 0 || !Facts[i].Untrusted {
 			t.Errorf("%s is trusted", name)
 		}
@@ -138,7 +140,7 @@ func zeroLiteral(f Fact) string {
 	return `""`
 }
 
-func TestNeverReleasesCommentFlagsAReleasingRuleThatReadsDeliveryAndPinsNone(t *testing.T) {
+func TestNeverNamesADeliveryFlagsAReleasingRuleThatReadsDeliveryAndPinsNone(t *testing.T) {
 	env := ApprovalEnv(false, "pr")
 	for when, want := range map[string]bool{
 		`draft.delivery in ["comment"]`:                         true,
@@ -152,11 +154,11 @@ func TestNeverReleasesCommentFlagsAReleasingRuleThatReadsDeliveryAndPinsNone(t *
 		if err != nil {
 			t.Fatalf("%s: %v", when, err)
 		}
-		if got := NeverReleasesComment(r); got != want {
+		if got := NeverNamesADelivery(r); got != want {
 			t.Errorf("%s: %v", when, got)
 		}
 		r.Approval = draft.Approval{Mode: draft.Wait}
-		if NeverReleasesComment(r) {
+		if NeverNamesADelivery(r) {
 			t.Errorf("%s holding: flagged", when)
 		}
 	}
@@ -185,5 +187,26 @@ func TestARuleReadingAProfilesUntrustedFactIsRefused(t *testing.T) {
 func TestTriggerEventDataIsUntrusted(t *testing.T) {
 	if !IsUntrusted("trigger.event.data") {
 		t.Fatal("the event's data carries a person's or an agent's text, yet reads as trusted")
+	}
+}
+
+func TestAPropRuleNeedsTheProfileAndATrustedWriter(t *testing.T) {
+	const when = `task.prop.promised > timestamp(0)`
+	send := draft.Approval{Mode: draft.Send}
+	var untrusted *UntrustedError
+	if _, err := ApprovalRule(when, send, ApprovalEnv(true, "task")); !errors.As(err, &untrusted) || untrusted.Fact != PropPrefix+"promised" {
+		t.Errorf("without the profile: %v", err)
+	}
+	env := ApprovalEnv(true, "task")
+	env[PropPrefix+"promised"] = PropFactType(task.PropDate)
+	if _, err := ApprovalRule(when, send, env); err != nil {
+		t.Errorf("a property a person writes: %v", err)
+	}
+	env.SetUntrusted(PropPrefix + "promised")
+	if _, err := ApprovalRule(when, send, env); !errors.As(err, &untrusted) {
+		t.Errorf("a property an agent writes: %v", err)
+	}
+	if got := DynamicFacts(`task.prop.risk == "task.prop.x" && task.state == "next"`); len(got) != 1 || got[0] != PropPrefix+"risk" {
+		t.Errorf("DynamicFacts = %v", got)
 	}
 }

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/pkg/plugin/manifest"
 )
 
 func TestCleanupDefaults(t *testing.T) {
@@ -32,8 +34,8 @@ func TestCleanupDefaults(t *testing.T) {
 	}
 
 	refused := map[string]string{
-		`workflows = {x = {approval = {mode = "never"}}}`: `workflows.x.approval.mode: "never" is not one of "run", "delay" or "wait"`,
-		`workflows = {x = {approval = {window = "0s"}}}`:  `workflows.x.approval.window: a duration must be longer than zero`,
+		`workflows = {x = {gates = {approval = {mode = "never"}}}}`: `workflows.x.gates.approval.mode: "never" is not one of "wait", "delay", "send", "dry_run" or "run"`,
+		`workflows = {x = {gates = {approval = {window = "0s"}}}}`:  `workflows.x.gates.approval.window: a duration must be longer than zero`,
 	}
 	for body, want := range refused {
 		path := filepath.Join(t.TempDir(), "config.toml")
@@ -102,7 +104,7 @@ func TestLoadWorkflowConfig(t *testing.T) {
 idle = "3h"
 disposable = ["tmp"]
 
-[github.nudge]
+[plugins.github.nudge]
 silent_days = 10
 
 [classify]
@@ -112,7 +114,7 @@ per_day = 5
 observe = true
 enabled = false
 
-[workflows.x.approval]
+[workflows.x.gates.approval]
 mode = "delay"
 window = "10m"
 `
@@ -128,8 +130,58 @@ window = "10m"
 		!slices.Equal(c.Cleanup.Disposable, []string{"tmp"}) || c.GitHub.Nudge.SilentDays != 10 || c.Classify.PerDay != 5 {
 		t.Errorf("config = %+v %+v %+v", c.Cleanup, c.GitHub.Nudge, c.Classify)
 	}
-	if x.Observe == nil || !*x.Observe || x.Enabled == nil || *x.Enabled || x.Approval == nil || x.Approval.Mode != "delay" ||
-		x.Approval.Window == nil || time.Duration(*x.Approval.Window) != 10*time.Minute {
+	if x.Observe == nil || !*x.Observe || x.Enabled == nil || *x.Enabled || x.GateApproval() == nil || x.GateApproval().Mode != "delay" ||
+		x.GateApproval().Window == nil || time.Duration(*x.GateApproval().Window) != 10*time.Minute {
 		t.Errorf("workflows.x = %+v", x)
+	}
+}
+
+func TestProjectSettingsReadAnyPluginsTurnFacts(t *testing.T) {
+	m, err := manifest.Parse([]byte(`id = "acme"
+kinds = ["source"]
+protocol = 1
+
+[source]
+name = "Acme"
+slot = "acme"
+
+[source.codec]
+keys = ["{id}"]
+target = "<id>"
+targets = '^\s*[0-9]+\s*$'
+
+[source.codec.fields]
+id = "[0-9]+"
+
+[[source.facts]]
+name = "acme.private"
+type = "bool"
+doc = "The note is private."
+slots = ["turn"]
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := m.Source()
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := builtin.Merge(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	was := builtin.Installed()
+	builtin.Install(v)
+	t.Cleanup(func() { builtin.Install(was) })
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(`intents = {review = {project_settings = {when = "!acme.private"}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := LoadFile(path, tools())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.ProjectSettingsFor("review", prFacts{"acme.private": true}) || !c.ProjectSettingsFor("review", prFacts{"acme.private": false}) {
+		t.Error("the predicate does not follow the plugin's turn fact")
 	}
 }

@@ -8,13 +8,15 @@ import (
 	"testing"
 	"time"
 
-	slacksource "github.com/wloophq/wloop/internal/adapter/source/slack"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
+	dslack "github.com/wloophq/wloop/plugins/slack/domain"
 )
+
+// reactedPurpose is the purpose of a reaction slack_react records.
+const reactedPurpose = "react"
 
 const (
 	refSecond = "1700000000.000200"
@@ -30,9 +32,7 @@ func storeRefThread(t *testing.T, w *sessionWiring) {
 			{TS: refSecond, ThreadTS: sessParent, User: sessUser, Text: "I can take it"},
 			{TS: refThird, ThreadTS: sessParent, User: "U000", Text: "thanks, ship it friday"},
 		}}}}
-	if err := (&slacksource.Store{DB: w.db.Slack()}).Save(context.Background(), nil, facts, "", testNow); err != nil {
-		t.Fatal(err)
-	}
+	w.seedSlack(t, facts)
 }
 
 var printedRef = regexp.MustCompile(`(?m)^\[m3 (\S+)\]`)
@@ -42,7 +42,7 @@ func TestAnAgentReactsToTheThirdMessageOfAThreadByTheRefSlackReadPrints(t *testi
 	w := newSessionWiring(t)
 	storeRefThread(t, w)
 	w.st.srv.Handle("reactions.add", func(url.Values) any { return map[string]any{} })
-	thread := dslack.ThreadUnit("T000", sessThreaded, sessParent)
+	thread := slackThreadUnit("T000", sessThreaded, sessParent)
 
 	read, isErr := w.callTool(t, "", draftHandle, "slack_read", `{"target":"slack:`+thread.Key+`"}`)
 	m := printedRef.FindStringSubmatch(read)
@@ -79,7 +79,7 @@ func TestASessionReplyToARefInAStoredThreadLandsInThatThread(t *testing.T) {
 	if posts := w.st.srv.Calls("chat.postMessage"); len(posts) != 1 || posts[0].Get("channel") != sessThreaded || posts[0].Get("thread_ts") != sessParent {
 		t.Fatalf("posts %v", posts)
 	}
-	if ds := w.drafts(t); len(ds) != 1 || ds[0].Unit != dslack.ThreadUnit("T000", sessThreaded, sessParent) || ds[0].State != draft.Sent {
+	if ds := w.drafts(t); len(ds) != 1 || ds[0].Unit != slackThreadUnit("T000", sessThreaded, sessParent) || ds[0].State != draft.Sent {
 		t.Fatalf("records %+v", ds)
 	}
 }
@@ -94,7 +94,7 @@ func TestASessionReplyToARefNotStoredFindsItsThreadOnSlack(t *testing.T) {
 	if posts := w.st.srv.Calls("chat.postMessage"); len(posts) != 1 || posts[0].Get("channel") != sessThreaded || posts[0].Get("thread_ts") != sessParent {
 		t.Fatalf("posts %v", posts)
 	}
-	if ds := w.drafts(t); len(ds) != 1 || ds[0].Unit != dslack.ThreadUnit("T000", sessThreaded, sessParent) {
+	if ds := w.drafts(t); len(ds) != 1 || ds[0].Unit != slackThreadUnit("T000", sessThreaded, sessParent) {
 		t.Fatalf("records %+v", ds)
 	}
 }
@@ -114,10 +114,10 @@ func TestSlackDraftOnARefPostsInItsThreadOnceApproved(t *testing.T) {
 		t.Fatalf("slack_draft = %q", got)
 	}
 	ds := w.drafts(t)
-	if len(ds) != 1 || ds[0].Unit != dslack.ThreadUnit("T000", sessThreaded, sessParent) || ds[0].Target != ref {
+	if len(ds) != 1 || ds[0].Unit != slackThreadUnit("T000", sessThreaded, sessParent) || ds[0].Target != ref {
 		t.Fatalf("drafts %+v", ds)
 	}
-	if _, err := w.deps.Outbox.Approve(ctx, ds[0].ID, nil); err != nil {
+	if err := approveDraft(ctx, w.deps.Outbox, ds[0].ID); err != nil {
 		t.Fatal(err)
 	}
 	if sent, _, err := w.deps.Outbox.Send(ctx); sent != 1 || err != nil {
@@ -151,7 +151,7 @@ func TestOutboxNewReactsToTheMessageItNames(t *testing.T) {
 		t.Fatalf("exit %d: %s %s", code, w.te.out, w.te.err)
 	}
 	ds := w.drafts(t)
-	if len(ds) != 1 || ds[0].Unit != dslack.ThreadUnit("T000", sessThreaded, sessParent) || ds[0].Kind != draft.React || ds[0].Target != ref {
+	if len(ds) != 1 || ds[0].Unit != slackThreadUnit("T000", sessThreaded, sessParent) || ds[0].Kind != draft.React || ds[0].Target != ref {
 		t.Fatalf("drafts %+v", ds)
 	}
 	if sent, _, err := w.deps.Outbox.Send(ctx); sent != 1 || err != nil {

@@ -1,6 +1,6 @@
 ---
 name: {{name}}
-description: Use when the user wants a GitHub pull request reviewed, followed or monitored by the review loop, wants to take over someone else's PR to finish it, or asks which reviews or PRs need them, what the loop is doing, or why a review did not continue. Drives the {{name}} CLI, which runs each review in its own workspace with its own agent. Do NOT review the PR yourself in the current session.
+description: Use when the user wants a GitHub pull request reviewed, followed or monitored by the review loop, wants to take over someone else's PR to finish it, or asks which reviews or PRs need them, what the loop is doing, or why a review did not continue, or wants new work started from a description or a diagnosis. Drives the {{name}} CLI, which runs each review in its own workspace with its own agent. Do NOT review the PR yourself in the current session.
 ---
 
 # Operating the review loop
@@ -26,7 +26,8 @@ rounds. This session only drives the CLI: never review the PR here.
 | know why nothing happens to a PR, a session or a workspace | `{{command}} plan --unit <url>` (its items, then every workflow that gives it none, with the facts its `when` read and the reasons beside them, such as `pr.first.reason`) |
 | run a sweep now | tell them to choose Sweep now in the menu bar; `{{command}} plan` prints what it would do |
 | stop or restart the automatic workflows, everywhere or on some PRs or repositories | `{{command}} pause [<url>\|<owner/repo>]...`, `{{command}} resume [<url>\|<owner/repo>]...` (none means everywhere; only when the user asks) |
-| start new work from a description: code to change, or a message to post | resolve the repository with `gh` (ask which when more than one matches), then `{{command}} start --repo <owner/name> <brief>`; leave out `--repo` when no code is involved. The brief says what to do and how to know it is done |
+| start new work from a description or a diagnosis: code to change, or a message to post | map it into a task: a title (one short line naming the work), a brief in a markdown file (what you found, what to do, how to know it is done) and the properties the user gave, such as a priority or a due date; resolve the repository with `gh` (ask which when more than one matches); run `{{command}} task new --title <title> --brief-file <path> [--prop <name>=<value>]... [--repo <owner/name>]`, which prints `task:<id>`, then `{{command}} start task:<id>`, which works in the repository `--repo` named. Leave out `--repo` when no code is involved |
+| make this session a run of a task, so the task lists it and what it posts lands on the task | `{{command}} task attach task:<id>` (in a session a workspace manager started) |
 | ask whoever a PR waits on for the next step (a reviewer, the author) | `{{command}} nudge <url> [guidance]` (an agent posts one comment under the user's name; only when the user asks, and it refuses when the PR waits on the user or the loop) |
 | run a kind of turn their profile defines | `{{command}} <intent> <url> [flags] [guidance]`; `{{command}} --help` lists the intents and their flags |
 | watch what needs them in the terminal, with one-key actions | tell them to run `{{command}} tui` in their own terminal (it needs one; do not run it here) |
@@ -48,27 +49,43 @@ every turn with a record, through the `turn_end` tool of the {{name}} MCP server
 to publish), asked (a question for the user) or failed. A session that stops
 without one is marked unrecorded.
 
-When the agent asks, the user answers from the cockpit (`{{command}} open`),
-the notification or `{{command}} tui` (`w` answers, `c` continues without an
-answer, `d` dismisses). {{name}} types the answer into the agent's session as
-its next prompt (a long one tells the agent to run
-`{{command}} turn answer <url>`), or starts a new session that resumes the turn when the old one is
-gone. Do not answer for the user and do not type into that agent's terminal.
+Every decision waiting on the user is a gate on its task: an agent's question,
+a draft to approve, a pending round. The user resolves it from the cockpit
+(`{{command}} open`), the notification or `{{command}} tui` (`W` answers, `C`
+continues without an answer, `X` dismisses). {{name}} types an answer into the
+agent's session as its next prompt (a long one tells the agent to run
+`{{command}} turn answer <url>`), or starts a new session that resumes the turn
+when the old one is gone; an agent reads the answers to what it posted, and
+what you wrote on its task's chat, with `task_read`. Do not answer for the user and do not type into that agent's
+terminal.
 
 ## Reading `{{command}} status`
 
-Piped, as you run it, it prints one tab-separated line per pull request and
-view, full values: `view, who it waits on, age, owner/repo#n, title, reason`
-(`tracked` lines too). No line outside `tracked` means no pull request waits.
+Piped, as you run it, it prints one tab-separated line per task and view,
+then one per tracked pull request: `view, who it waits on, age, owner/repo#n,
+title, reason`. The views are those the profile's `[badge]` counts, `inbox` and
+`needs-me` by default; a `tracked` line is a pull request the user follows.
+With no line of those views, nothing waits on the user.
+
+Lead with `needs-me`, then `inbox`. Link every PR as a markdown link.
+
+The views are the profile's (`views.toml`), which the cockpit, `{{command}} tui`
+and the menu bar list; among the bundled ones:
 
 | View | Meaning |
 |---|---|
-| `needs-me` | the user must act: an agent asked or stopped, a round is pending or held, a review or their own PR waits on them |
-| `stalled` | waiting on someone past the configured working days |
-| `mine` | the user's own PRs, those they took over included |
-| `loop` | PRs with a review workspace, which the loop follows |
+| `inbox` | tasks nobody has clarified yet; once clarified a task never returns |
+| `needs-me` | the next step is the user's: an open gate (a question, a draft, a round), or their own action |
+| `waiting` | the next step is someone else's, grouped by who owes it |
+| `stalled` | waiting too long: a source says a link stalled, or the check date of a task someone else owes passed with nothing moving |
+| `in-loop` | an agent works on it: a source's loop holds a link, or a run is live |
+| `approved` | the work is approved: a source says a link is ready |
+| `done` | done and still holding a workspace on disk, to remove |
+| `snoozed` | asleep until a date, an event or a condition |
+| `outbox` | drafts waiting on approval, and approved ones whose delivery is under way or failed |
 
-Lead with `needs-me`, then `stalled`. Link every PR as a markdown link.
+The menu bar's badge adds up the views the profile's `[badge]` names, Inbox
+and Needs me by default. A user's `views.toml` changes the bundled views or adds its own.
 
 ## Diagnosing
 

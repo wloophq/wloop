@@ -12,16 +12,15 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/situation"
 )
-
-// SourceSession is the intake source of a request a managed session asked.
-const SourceSession = "session"
 
 // RenudgeAfter is how long a wait that a nudge did not move stays nudged.
 const RenudgeAfter = 24 * time.Hour
@@ -43,19 +42,19 @@ func (d Deriver) openIntakes(ref github.Ref) []catalog.Intake {
 		var p intakeAction
 		_ = json.Unmarshal(i.Request, &p)
 		out = append(out, catalog.Intake{Intake: api.Intake{Seq: i.Seq, Intent: string(i.Intent), Source: i.Source, State: string(i.State)},
-			Action: p.Action, Inputs: p.Inputs, FromSession: i.Source == SourceSession})
+			Action: p.Action, Inputs: p.Inputs, FromSession: i.Source == intake.SourceSession})
 	}
 	return out
 }
 
 // FactsOf gathers the facts of a row of the inventory; unmuted is the
 // situation without the user's mute, which a nudge reads.
-func (d Deriver) FactsOf(pr dinv.PR, evs []dinv.Event, o dinv.Override, r api.Row, p Payload, unmuted api.Row) catalog.Facts {
+func (d Deriver) FactsOf(pr dinv.PR, evs []dinv.Event, m overlay.Mute, r api.Row, p Payload, unmuted api.Row) catalog.Facts {
 	f := catalog.Facts{
-		Ref: pr.Ref, Row: r, Author: p.Author, Workspace: p.Workspace, Override: p.Override, Tracked: true, Open: situation.Kind(r.Kind) != situation.KindDone, HeldByCap: situation.Kind(r.Kind) == situation.KindHeldByCap,
+		PR: pr.Ref.Unit(), Owner: pr.Ref.Owner, Repo: pr.Ref.Repo, Row: r, Author: p.Author, Workspace: p.Workspace, Override: p.Override, Tracked: true, Open: situation.Kind(r.Kind) != situation.KindDone, HeldByCap: situation.Kind(r.Kind) == situation.KindHeldByCap,
 		Mine:        d.Viewer != "" && strings.EqualFold(pr.Author, d.Viewer),
-		Muted:       o.MuteUntilStateChange || o.MutedUntil.After(d.Now),
-		MutedStored: o.MuteUntilStateChange || !o.MutedUntil.IsZero(),
+		Muted:       m.UntilStateChange || m.Until.After(d.Now),
+		MutedStored: m.Set(),
 		Draft:       pr.IsDraft, CrossRepository: pr.IsFork, State: pr.State, Base: pr.BaseBranch,
 		ReviewRequestedMe: slices.ContainsFunc(pr.ReviewRequests, func(who string) bool { return strings.EqualFold(who, d.Viewer) }),
 		GateOn:            d.GateOn, BriefOn: d.BriefOn,
@@ -64,6 +63,9 @@ func (d Deriver) FactsOf(pr dinv.PR, evs []dinv.Event, o dinv.Override, r api.Ro
 	}
 	if t, ok := d.Turns[pr.Ref]; ok {
 		f.Question = t.Question != nil
+	}
+	if pend, ok := d.pending(r); ok {
+		f.PendingSince = pend.Since
 	}
 	if d.Forceable != nil {
 		f.Forceable = d.Forceable(pr.Ref.Unit())
@@ -96,7 +98,7 @@ func (d Deriver) UntrackedRow(c dgh.Candidate, o dinv.Override) api.Row {
 	if !open {
 		r.Kind, r.Summary.WaitsOn, r.Summary.Reason = api.Kind(situation.KindDone), "nobody", strings.ToLower(c.State)
 	}
-	f := catalog.Facts{Ref: c.Ref, Row: r, Author: p.Author, Workspace: p.Workspace, Override: p.Override, Open: open, Mine: d.Viewer != "" && strings.EqualFold(c.Author, d.Viewer),
+	f := catalog.Facts{PR: c.Ref.Unit(), Owner: c.Ref.Owner, Repo: c.Ref.Repo, Row: r, Author: p.Author, Workspace: p.Workspace, Override: p.Override, Open: open, Mine: d.Viewer != "" && strings.EqualFold(c.Author, d.Viewer),
 		Draft: c.IsDraft, State: c.State, Base: c.BaseBranch, GateOn: d.GateOn, BriefOn: d.BriefOn,
 		ReviewRequestedMe: slices.ContainsFunc(c.ReviewRequests, func(who string) bool { return strings.EqualFold(who, d.Viewer) }),
 		Config:            catalogConfig(d.Cfg.For(c.Ref.Owner, c.Ref.Repo)),
@@ -109,6 +111,11 @@ func (d Deriver) UntrackedRow(c dgh.Candidate, o dinv.Override) api.Row {
 	f.NudgeRefusal = fmt.Sprintf("%s is not tracked; track it before a nudge", c.Ref)
 	r.Actions = catalog.States(f)
 	r.SpecsVersion = d.SpecsVersion
+	author := []string{c.Author}
+	if f.Mine {
+		author = []string{"me", c.Author}
+	}
+	r.Facets = map[string][]string{FacetRepo: {p.Repo}, FacetAuthor: author, FacetStatus: {"none"}, FacetCI: {"none"}}
 	return d.Seal(r, p)
 }
 

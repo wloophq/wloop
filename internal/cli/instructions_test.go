@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -22,7 +24,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -217,7 +218,7 @@ func TestAddressByHandOnSomeoneElsesPullRequestAsksAndChangesNothing(t *testing.
 		t.Fatal(out)
 	}
 	st := te.Store
-	if evs, _ := st.Events(context.Background(), github.Ref{Owner: "acme", Repo: "api", Number: 21}); len(evs) != 0 || len(m.Writes) != 0 {
+	if evs, _ := st.Events(context.Background(), pr.Ref{Owner: "acme", Repo: "api", Number: 21}); len(evs) != 0 || len(m.Writes) != 0 {
 		t.Fatalf("events %v writes %v", evs, m.Writes)
 	}
 }
@@ -247,12 +248,12 @@ func TestTakeOverByHandWritesTheDaemonsStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	te.StateDir = filepath.Join(blocked, "state")
-	ref := github.Ref{Owner: "acme", Repo: "api", Number: 20}
+	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 20}
 	if code := te.run("instructions", "address", ref.URL(), "--take-over"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	if o, err := te.Store.Override(context.Background(), ref); err != nil || !o.Adopted {
-		t.Fatalf("override %+v %v", o, err)
+	if !adoptedByPlugin(t, te, ref) {
+		t.Fatal("not taken over")
 	}
 }
 
@@ -346,7 +347,7 @@ func TestNudgeByHandStartsItsTurn(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	te.gh.basics = openBasics
 	ctx := context.Background()
-	if err := te.Store.UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h1", Reasons: []string{"repo"}, URL: r7.URL()}); err != nil {
+	if err := inventorytest.Of(te.Store).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "h1", Reasons: []string{"repo"}, URL: r7.URL()}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := te.Store.AppendEvents(ctx, []dinv.Event{{PR: r7, Kind: dinv.KindPush, Key: "h1", Actor: "ana", At: testNow.Add(-72 * time.Hour)}}); err != nil {
@@ -369,7 +370,7 @@ func TestNudgeByHandStartsItsTurn(t *testing.T) {
 	}
 }
 
-func bookOf(t *testing.T, te *testEnv, ref github.Ref) dturn.Book {
+func bookOf(t *testing.T, te *testEnv, ref pr.Ref) dturn.Book {
 	t.Helper()
 	books, err := te.Turns.Store.Books(context.Background(), pr.Ref(ref).Unit())
 	if err != nil {

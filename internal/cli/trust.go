@@ -17,7 +17,6 @@ import (
 	"github.com/wloophq/wloop/internal/daemon"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/github"
 )
 
 type truster interface {
@@ -114,7 +113,7 @@ func (a envActions) TrustAndRun(ctx context.Context, u unit.Unit, c daemon.Call)
 	if err != nil {
 		return err
 	}
-	b, err := e.startBlockOf(ctx, u)
+	b, err := e.namedBlockOf(ctx, u, c.Block)
 	if err != nil {
 		return err
 	}
@@ -141,14 +140,12 @@ func (a envActions) TrustAndRun(ctx context.Context, u unit.Unit, c daemon.Call)
 func (a envActions) Unblock(ctx context.Context, u unit.Unit, c daemon.Call) error {
 	ref := prOf(u)
 	e := a.call(c)
-	b, err := e.startBlockOf(ctx, u)
+	b, err := e.namedBlockOf(ctx, u, c.Block)
 	if err != nil {
 		return err
 	}
 	err = e.withState(ctx, func(s *sweep) error {
-		if st, ok := blockedStep(ref, b); ok {
-			s.skip(st)
-		}
+		setMarks(s.st, u.Key, b.Skip)
 		return nil
 	})
 	if err != nil {
@@ -156,6 +153,43 @@ func (a envActions) Unblock(ctx context.Context, u unit.Unit, c daemon.Call) err
 	}
 	fmt.Fprintf(e.Out, "%s: the blocked round waits for a new trigger\n", ref)
 	return nil
+}
+
+// StartBlockKey names the start block holding u's round, the subject of
+// its trust gate.
+func (a envActions) StartBlockKey(ctx context.Context, u unit.Unit) (string, bool, error) {
+	if a.e.Rec == nil {
+		return "", false, errNoStore
+	}
+	blocks, err := a.e.Rec.FirstRoundBlocks(ctx)
+	if err != nil {
+		return "", false, err
+	}
+	ev, ok := blocks[u]
+	if _, isBlock := inventory.StartBlockOf(ev); !ok || !isBlock {
+		return "", false, nil
+	}
+	return ev.Key, true, nil
+}
+
+// namedBlockOf is u's start block when it is the block named key, or any
+// when key is "": a trust gate decides only the block it was opened on.
+func (e *Env) namedBlockOf(ctx context.Context, u unit.Unit, key string) (inventory.StartBlock, error) {
+	if key == "" {
+		return e.startBlockOf(ctx, u)
+	}
+	if e.Rec == nil {
+		return inventory.StartBlock{}, errNoStore
+	}
+	blocks, err := e.Rec.FirstRoundBlocks(ctx)
+	if err != nil {
+		return inventory.StartBlock{}, err
+	}
+	ev, ok := blocks[u]
+	if !ok || ev.Key != key {
+		return inventory.StartBlock{}, daemon.Refusal{Reason: "the start block this decision was asked on was replaced; decide the round's current block"}
+	}
+	return e.startBlockOf(ctx, u)
 }
 
 func (e *Env) startBlockOf(ctx context.Context, u unit.Unit) (inventory.StartBlock, error) {
@@ -171,16 +205,6 @@ func (e *Env) startBlockOf(ctx context.Context, u unit.Unit) (inventory.StartBlo
 		return inventory.StartBlock{}, fmt.Errorf("no round of %s is blocked on the agent's question", u.Label())
 	}
 	return b, nil
-}
-
-// blockedStep is the round b holds, as the sweep marks it handled.
-func blockedStep(ref github.Ref, b inventory.StartBlock) (step, bool) {
-	for _, k := range []stepKind{stepFirstRound, stepAddress, stepFollowup} {
-		if st := (step{kind: k, pr: ref, fingerprint: b.Fingerprint, checksHead: b.ChecksHead, conflictHead: b.ConflictHead}); st.roundKind() == b.Round {
-			return st, true
-		}
-	}
-	return step{}, false
 }
 
 // trustHomes are the agent homes trusting a folder writes in for a session

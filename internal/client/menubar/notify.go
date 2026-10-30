@@ -16,36 +16,38 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// posted is what the buttons of a notification answer: its entry, the
-// entry's units, the basis each button was served for and the options of
+// posted is what the buttons of a notification answer: its task, the
+// task's units, the basis each button was served for and the options of
 // its question.
 type posted struct {
-	entry    string
+	task     string
 	subtitle string
 	units    []unit.Unit
 	basis    map[string]string
 	options  []record.Option
 }
 
-// draftButtons are the only buttons a draft's notification offers: a draft
-// is approved where its whole text shows.
-var draftButtons = []string{"open", "gtd:" + string(gtd.VerbDismiss)}
+// draftButtons are the only buttons a draft's notification offers, open and
+// the verb that discards it: a draft is approved where its whole text shows.
+func (c *Controller) draftButtons() []string {
+	return []string{"open", api.TaskActionPrefix + c.verbOf(handlerDrop)}
+}
 
-// notify posts the attention of the entries that are new, and withdraws the
-// notifications of entries that left the Inbox and of drafts that left the
-// Outbox. A held entry's id holds its day, so it is posted once a day.
+// notify posts the attention of the tasks that are new, and withdraws the
+// notifications of tasks that left the Inbox and of drafts that left the
+// Outbox. A held task's id holds its day, so it is posted once a day.
 func (c *Controller) notify() {
 	today := c.cfg.Now().Local().Format(time.DateOnly)
 	postedDaily := false
 	live := map[string]bool{}
 	notes := map[string]posted{}
+	buttons := c.draftButtons()
 	for _, e := range c.notifying() {
-		n, p := notification(e)
+		n, p := notification(e, buttons)
 		if _, dup := notes[n.ID]; dup {
 			continue
 		}
@@ -95,11 +97,11 @@ func (c *Controller) notify() {
 	}
 }
 
-// notifying are the entries of the menu's views that carry an attention.
-func (c *Controller) notifying() []api.EntryView {
-	var out []api.EntryView
-	for _, sec := range coreSections {
-		for _, e := range c.viewEntries(sec.view) {
+// notifying are the tasks of the menu's views that carry an attention.
+func (c *Controller) notifying() []api.TaskView {
+	var out []api.TaskView
+	for _, v := range c.taskViews {
+		for _, e := range c.viewTasks(v.ID) {
 			if e.Attention != nil {
 				out = append(out, e)
 			}
@@ -108,14 +110,14 @@ func (c *Controller) notifying() []api.EntryView {
 	return out
 }
 
-// notification is the entry's attention as the daemon gave it, with what
+// notification is the task's attention as the daemon gave it, with what
 // its buttons answer.
-func notification(e api.EntryView) (Notification, posted) {
+func notification(e api.TaskView, draftButtons []string) (Notification, posted) {
 	a := *e.Attention
 	n := Notification{ID: a.ID, Title: a.Title, Subtitle: a.Subtitle, Body: a.Body, Image: Image(a.Image)}
-	p := posted{entry: e.ID, subtitle: a.Subtitle, units: e.Units, basis: map[string]string{}}
-	if e.Message != nil {
-		p.options = e.Message.Options
+	p := posted{task: e.ID, subtitle: a.Subtitle, units: e.Units, basis: map[string]string{}}
+	if m, _, ok := e.MessageOf(); ok {
+		p.options = m.Options
 	}
 	for _, x := range a.Actions {
 		if Category(a.Category) == api.CategoryOutbox && !slices.Contains(draftButtons, x.ID) {
@@ -124,7 +126,7 @@ func notification(e api.EntryView) (Notification, posted) {
 		if x.Basis != "" {
 			p.basis[x.ID] = x.Basis
 		}
-		n.Actions = append(n.Actions, NotificationAction{ID: x.ID, Title: x.Title, TextInput: x.TextInput})
+		n.Actions = append(n.Actions, NotificationAction{ID: x.ID, Title: x.Title, TextInput: x.TextInput, Placeholder: x.Placeholder, Button: x.Button})
 	}
 	n.Category = displayCategory(Category(a.Category), n.Actions)
 	return n, p
@@ -139,18 +141,18 @@ func displayCategory(cat Category, actions []NotificationAction) Category {
 	}
 	h := fnv.New64a()
 	for _, a := range actions {
-		fmt.Fprintf(h, "%s\x00%s\x00%t\x00", a.ID, a.Title, a.TextInput)
+		fmt.Fprintf(h, "%s\x00%s\x00%t\x00%s\x00%s\x00", a.ID, a.Title, a.TextInput, a.Placeholder, a.Button)
 	}
 	return cat + "." + Category(strconv.FormatUint(h.Sum64(), 36))
 }
 
-// Respond turns a notification answer into the entry's verb, its answer, or
+// Respond turns a notification answer into the task's verb, its answer, or
 // the catalog action on its first unit; opening the cockpit, and a draft's
 // open, are the app's own.
 func (c *Controller) Respond(ctx context.Context, r Response) {
 	c.cfg.Log("notification response %s: action %q as %s, option %q, yes %v, text of %d bytes",
 		r.ID, r.Identifier, r.Action, r.OptionID, r.Yes, len(r.Text))
-	cat, entry, ok := api.ParseNotificationID(r.ID)
+	cat, task, ok := api.ParseNotificationID(r.ID)
 	if !ok {
 		c.cfg.Log("notification answer for an unknown id %q", r.ID)
 		return
@@ -158,32 +160,32 @@ func (c *Controller) Respond(ctx context.Context, r Response) {
 	var err error
 	switch {
 	case r.Action == ActionOpen || r.Action == ActionServed && cat == api.CategoryOutbox && r.Identifier == "open":
-		err = c.open(routeOf(cat, entry))
+		err = c.open(c.routeOf(cat, task))
 	case r.Action == ActionAnswer:
-		err = c.answer(ctx, r, entry)
+		err = c.answer(ctx, r, task)
 	case r.Action == ActionReply:
-		err = c.reply(ctx, r, entry)
+		err = c.reply(ctx, r, task)
 	case r.Action == ActionServed:
-		err = c.served(ctx, r, cat, entry)
+		err = c.served(ctx, r, cat, task)
 	}
 	if err != nil {
-		c.cfg.Log("%s %s: %v", r.Action, entry, err)
+		c.cfg.Log("%s %s: %v", r.Action, task, err)
 	}
 }
 
-// routeOf is the cockpit route a notification opens: a note's entry part is
-// its route, the digest opens Next, anything else its entry.
-func routeOf(cat Category, entry string) string {
+// routeOf is the cockpit route a notification opens: a note's task part is
+// its route, the digest the menu's first view, anything else its task.
+func (c *Controller) routeOf(cat Category, tk string) string {
 	switch cat {
 	case api.CategoryNote:
-		return entry
+		return tk
 	case api.CategoryDigest:
-		return "view=" + string(gtd.ViewNext)
+		return c.firstView()
 	}
-	return entryRoute(entry)
+	return taskRoute(tk)
 }
 
-func (c *Controller) answer(ctx context.Context, r Response, entry string) error {
+func (c *Controller) answer(ctx context.Context, r Response, tk string) error {
 	args := map[string]string{}
 	if r.Text != "" {
 		args["guidance"] = r.Text
@@ -202,80 +204,80 @@ func (c *Controller) answer(ctx context.Context, r Response, entry string) error
 	if r.No {
 		args["no"] = "true"
 	}
-	res, err := c.cfg.Daemon.EntryDo(ctx, entry, string(gtd.VerbAnswer), api.EntryRequest{Args: args, Source: AnswerSource})
+	res, err := c.cfg.Daemon.TaskDo(ctx, tk, c.verbOf(handlerAnswer), api.TaskRequest{Args: args, Source: AnswerSource})
 	if err != nil {
-		c.notifyNote(r.ID, entry, "Answer not sent", err.Error())
+		c.notifyNote(r.ID, tk, "Answer not sent", err.Error())
 		return err
 	}
 	if slices.Contains(res.Lines, api.AnswerQueued) {
-		c.notifyNote(r.ID, entry, "Answer queued", api.AnswerQueued)
+		c.notifyNote(r.ID, tk, "Answer queued", api.AnswerQueued)
 	}
 	return nil
 }
 
-// reply writes the notification's text as a reply on its entry's unit, and says where it went.
-func (c *Controller) reply(ctx context.Context, r Response, entry string) error {
+// reply writes the notification's text as a reply on its task's unit, and says where it went.
+func (c *Controller) reply(ctx context.Context, r Response, task string) error {
 	if strings.TrimSpace(r.Text) == "" {
-		c.notifyNote(r.ID, entry, "Reply not saved", "Nothing was typed.")
+		c.notifyNote(r.ID, task, "Reply not saved", "Nothing was typed.")
 		return nil
 	}
-	args := map[string]string{"text": r.Text}
+	args := map[string]string{"text": r.Text, "send": "draft"}
 	title := "Reply saved to the Outbox"
 	if r.Send {
 		args["send"], title = "now", "Reply sent"
 	}
-	res, err := c.cfg.Daemon.EntryDo(ctx, entry, "reply", api.EntryRequest{Args: args, Source: AnswerSource})
+	res, err := c.cfg.Daemon.TaskDo(ctx, task, c.verbOf(handlerReply), api.TaskRequest{Args: args, Source: AnswerSource})
 	if err != nil {
-		c.notifyNote(r.ID, entry, "Reply not saved", err.Error())
+		c.notifyNote(r.ID, task, "Reply not saved", err.Error())
 		return err
 	}
 	body := ""
 	if len(res.Lines) > 0 {
 		body = res.Lines[len(res.Lines)-1]
 	}
-	c.notifyNote(r.ID, entry, title, body)
+	c.notifyNote(r.ID, task, title, body)
 	return nil
 }
 
-func (c *Controller) served(ctx context.Context, r Response, cat Category, entry string) error {
+func (c *Controller) served(ctx context.Context, r Response, cat Category, task string) error {
 	var err error
-	if verb, ok := strings.CutPrefix(r.Identifier, "gtd:"); ok {
-		if cat == api.CategoryOutbox && !slices.Contains(draftButtons, r.Identifier) {
+	if verb, ok := strings.CutPrefix(r.Identifier, api.TaskActionPrefix); ok {
+		if cat == api.CategoryOutbox && !slices.Contains(c.draftButtons(), r.Identifier) {
 			return errors.New("a draft's notification offers no " + r.Identifier)
 		}
 		var args map[string]string
 		if v, mode, ok := strings.Cut(verb, ":"); ok {
 			verb, args = v, map[string]string{"mode": mode}
 		}
-		_, err = c.cfg.Daemon.EntryDo(ctx, entry, verb, api.EntryRequest{Args: args, Source: source})
+		_, err = c.cfg.Daemon.TaskDo(ctx, task, verb, api.TaskRequest{Args: args, Source: source})
 	} else {
 		var u unit.Unit
-		if u, err = c.unitOf(ctx, r.ID, entry); err == nil {
+		if u, err = c.unitOf(ctx, r.ID, task); err == nil {
 			_, err = c.cfg.Daemon.Action(ctx, u, r.Identifier, api.ActionRequest{Guidance: r.Text, Source: source, Basis: c.basisOf(r.ID, r.Identifier)})
 		}
 	}
 	if err != nil {
-		c.notifyNote(r.ID, entry, "Action not sent", err.Error())
+		c.notifyNote(r.ID, task, "Action not sent", err.Error())
 	}
 	return err
 }
 
-// unitOf is the first unit of the notification's entry, read again from the
+// unitOf is the first unit of the notification's task, read again from the
 // daemon when the app restarted since it was posted.
-func (c *Controller) unitOf(ctx context.Context, id, entry string) (unit.Unit, error) {
+func (c *Controller) unitOf(ctx context.Context, id, task string) (unit.Unit, error) {
 	c.mu.Lock()
 	p, ok := c.posted[id]
 	c.mu.Unlock()
 	units := p.units
 	if !ok {
-		e, err := c.cfg.Daemon.Entry(ctx, entry)
+		e, err := c.cfg.Daemon.Task(ctx, task)
 		if err != nil {
 			return unit.Unit{}, err
 		}
 		units = e.Units
 	}
 	if len(units) == 0 {
-		return unit.Unit{}, errors.New("entry " + entry + " has no unit to act on")
+		return unit.Unit{}, errors.New("task " + task + " has no unit to act on")
 	}
 	return units[0], nil
 }
@@ -301,13 +303,13 @@ func (c *Controller) optionAnswer(id, option string) string {
 }
 
 // notifyNote tells the user what became of an answer to notification id,
-// since the log is out of sight; the note opens the entry.
-func (c *Controller) notifyNote(id, entry, title, body string) {
+// since the log is out of sight; the note opens the task.
+func (c *Controller) notifyNote(id, task, title, body string) {
 	c.mu.Lock()
 	subtitle := c.posted[id].subtitle
 	c.mu.Unlock()
 	c.postNote(Notification{
-		ID:       api.NotificationID(api.CategoryNote, entryRoute(entry), c.cfg.Now().UTC().Format("20060102T150405.000000000")),
+		ID:       api.NotificationID(api.CategoryNote, taskRoute(task), c.cfg.Now().UTC().Format("20060102T150405.000000000")),
 		Title:    title,
 		Subtitle: subtitle,
 		Body:     body,
@@ -317,7 +319,7 @@ func (c *Controller) notifyNote(id, entry, title, body string) {
 
 // postNotice posts what a workflow's notify.self raised; it opens its unit.
 func (c *Controller) postNotice(n api.Notice) {
-	route := "view=" + string(gtd.ViewInbox)
+	route := c.firstView()
 	if !n.Unit.IsZero() {
 		route = unitRoute(n.Unit)
 	}
@@ -330,7 +332,7 @@ func (c *Controller) postNote(n Notification) {
 	}
 }
 
-// forgetSent drops the held entries marked as posted, which the start has
+// forgetSent drops the held tasks marked as posted, which the start has
 // just cleared from the notification center, so today's is posted again;
 // today's digest stays posted.
 func (c *Controller) forgetSent() {
@@ -408,13 +410,13 @@ func (c *Controller) saveSent(today string) {
 	}
 }
 
-// dailyOn says whether id is a held entry's or the digest's of day.
+// dailyOn says whether id is a held task's or the digest's of day.
 func dailyOn(id, day string) bool {
 	cat, _, ok := api.ParseNotificationID(id)
 	return ok && (cat == api.CategoryHeld || cat == api.CategoryDigest) && strings.HasSuffix(id, "|"+day)
 }
 
-// mayPost reports whether a notification would be shown, so a held entry or
+// mayPost reports whether a notification would be shown, so a held task or
 // the digest, announced once a day, is not spent while notifications are
 // off.
 func (c *Controller) mayPost() bool {

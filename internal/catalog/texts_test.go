@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
@@ -34,7 +35,7 @@ func stateOf(t *testing.T, f Facts, id string) api.ActionState {
 func TestBuiltinTextsComeFromTheProfile(t *testing.T) {
 	l := bundled(t)
 	base := func() Facts {
-		return Facts{Intents: l, Ref: r7, Row: api.Row{Unit: r7.Unit()}, Open: true, Tracked: true, GateOn: true, BriefOn: true, NudgeWho: []string{}}
+		return Facts{Intents: l, PR: r7, Owner: "acme", Repo: "api", Row: api.Row{Unit: r7}, Open: true, Tracked: true, GateOn: true, BriefOn: true, NudgeWho: []string{}}
 	}
 	slug := "acme/api#7"
 	cases := []struct {
@@ -45,17 +46,13 @@ func TestBuiltinTextsComeFromTheProfile(t *testing.T) {
 	}{
 		{"held run_now", "run_now", func(f *Facts) { f.HeldByCap = true },
 			api.ActionState{Confirm: "Run the held round on " + slug + " now? It does not count against the cap."}},
-		{"pending run_now", "run_now", func(f *Facts) { f.HeldByCap, f.Row.Pending = true, &api.PendingRound{} }, api.ActionState{}},
+		{"pending run_now", "run_now", func(f *Facts) { f.HeldByCap, f.PendingSince = true, time.Unix(1, 0) }, api.ActionState{}},
 		{"guide without a pending round", "guide", func(*Facts) {}, api.ActionState{Note: "Kept for the next automatic round"}},
-		{"guide on a pending round", "guide", func(f *Facts) { f.Row.Pending = &api.PendingRound{} }, api.ActionState{}},
-		{"guide with the gate off", "guide", func(f *Facts) { f.GateOn = false }, api.ActionState{Reason: "the daemon plans no automatic round; see doctor"}},
+		{"guide on a pending round", "guide", func(f *Facts) { f.PendingSince = time.Unix(1, 0) }, api.ActionState{}},
 		{"trust_run", "trust_run", func(f *Facts) {
 			f.StartBlocked, f.TrustFolder, f.TrustHomes = true, "/src/api", []string{"~/.claude", "~/.codex"}
 		}, api.ActionState{Note: "Trust /src/api in ~/.claude, ~/.codex, then run the round"}},
 		{"unblock", "unblock", func(f *Facts) { f.StartBlocked = true }, api.ActionState{Note: "Lift the block without trusting; the round waits for a new trigger"}},
-		{"answer without a question", "answer", func(*Facts) {}, api.ActionState{Reason: "no open question on " + slug}},
-		{"continue without a question", "continue", func(*Facts) {}, api.ActionState{Reason: "no open question on " + slug}},
-		{"dismiss without a question", "dismiss", func(*Facts) {}, api.ActionState{Reason: "no open question on " + slug}},
 		{"dismiss on a question", "dismiss", func(f *Facts) { f.Question = true },
 			api.ActionState{Note: "Close the question; the pull request goes back to whoever it waits on"}},
 		{"take_over of mine", "take_over", func(f *Facts) { f.Mine = true }, api.ActionState{Reason: "It is yours already"}},
@@ -85,11 +82,66 @@ func TestBuiltinTextsComeFromTheProfile(t *testing.T) {
 	}
 }
 
+// TestTheRowGatesIntentsAreOfferedWhereTheirActionsWere pins where the
+// intents of the plan and trust gates show on a row, worded by gates.toml.
+func TestTheRowGatesIntentsAreOfferedWhereTheirActionsWere(t *testing.T) {
+	l := bundled(t)
+	base := func() Facts {
+		return Facts{Intents: l, PR: r7, Owner: "acme", Repo: "api", Row: api.Row{Unit: r7}, Open: true, Tracked: true, GateOn: true, NudgeWho: []string{}}
+	}
+	offered := func(f Facts) map[string]api.ActionState {
+		out := map[string]api.ActionState{}
+		for _, st := range States(f) {
+			out[st.ID] = st
+		}
+		return out
+	}
+	for _, c := range []struct {
+		name string
+		set  func(f *Facts)
+		want []string
+		none []string
+	}{
+		{"nothing pending", func(*Facts) {}, []string{"guide"}, []string{"run_now", "skip", "trust_run", "unblock"}},
+		{"held", func(f *Facts) { f.HeldByCap = true }, []string{"run_now", "guide"}, []string{"skip"}},
+		{"pending", func(f *Facts) { f.PendingSince = time.Unix(1, 0) }, []string{"run_now", "guide", "skip"}, []string{"trust_run"}},
+		{"the gate off", func(f *Facts) { f.GateOn = false }, nil, []string{"guide"}},
+		{"blocked", func(f *Facts) { f.StartBlocked = true }, []string{"unblock"}, []string{"trust_run"}},
+		{"blocked on a folder", func(f *Facts) {
+			f.StartBlocked, f.TrustFolder, f.TrustHomes = true, "/src/api", []string{"~/.claude"}
+		}, []string{"trust_run", "unblock"}, nil},
+	} {
+		f := base()
+		c.set(&f)
+		got := offered(f)
+		for _, id := range c.want {
+			if st, ok := got[id]; !ok || !st.Enabled {
+				t.Errorf("%s: %s = %+v %v, want it offered", c.name, id, st, ok)
+			}
+		}
+		for _, id := range c.none {
+			if st, ok := got[id]; ok {
+				t.Errorf("%s: %s offered: %+v", c.name, id, st)
+			}
+		}
+	}
+	held := base()
+	held.HeldByCap = true
+	if st := offered(held)["run_now"]; st.Intent != "review" || !st.Primary {
+		t.Errorf("the held round's run_now = %+v, want the review it runs", st)
+	}
+	for id, want := range map[string]string{"run_now": "Run now", "skip": "Skip", "guide": "Guide", "trust_run": "Trust folder and run", "unblock": "Dismiss block"} {
+		if s, ok := specByID(Specs(l), id); !ok || s.Label != want || s.Summary == "" {
+			t.Errorf("%s spec %+v %v, want label %q and a summary from gates.toml", id, s, ok, want)
+		}
+	}
+}
+
 func TestBuiltinSpecsAreWordedByTheProfile(t *testing.T) {
 	l := bundled(t)
 	specs := Specs(l)
 	for id, want := range map[string]api.InputSpec{
-		"guide": {Label: "Guidance", Placeholder: "what the next round should look at"},
+		"guide": {Label: "Guide"},
 		"mute":  {Label: "Mute for", Placeholder: "2d, 36h"},
 	} {
 		s, _ := specByID(specs, id)
@@ -126,7 +178,7 @@ func TestActionRefuseIsTheOldEnabled(t *testing.T) {
 		func(f *Facts) { f.Row.Unit = unit.Unit{Provider: "thread", Key: "1"} },
 	}
 	for i, set := range rows {
-		f := Facts{Intents: l, Ref: r7, Row: api.Row{Unit: r7.Unit()}, Open: true, Tracked: true, NudgeWho: []string{"@ana"}}
+		f := Facts{Intents: l, PR: r7, Owner: "acme", Repo: "api", Row: api.Row{Unit: r7}, Open: true, Tracked: true, NudgeWho: []string{"@ana"}}
 		set(&f)
 		for _, st := range States(f) {
 			was, ok := old[dintent.Name(st.ID)]
@@ -145,7 +197,7 @@ func TestWarningShowsOnlyOnAQuestion(t *testing.T) {
 	l := bundled(t)
 	const warning = "Starts a new round; the agent's open question is replaced"
 	for _, question := range []bool{false, true} {
-		f := Facts{Intents: l, Ref: r7, Row: api.Row{Unit: r7.Unit()}, Open: true, Tracked: true, Question: question, NudgeWho: []string{}}
+		f := Facts{Intents: l, PR: r7, Owner: "acme", Repo: "api", Row: api.Row{Unit: r7}, Open: true, Tracked: true, Question: question, NudgeWho: []string{}}
 		st := stateOf(t, f, string(dintent.Review))
 		if want := map[bool]string{true: warning}[question]; st.Warning != want {
 			t.Errorf("question %v: review warning %q, want %q", question, st.Warning, want)
@@ -155,7 +207,7 @@ func TestWarningShowsOnlyOnAQuestion(t *testing.T) {
 
 func TestARefusalNamesTheProfileTextItShows(t *testing.T) {
 	l := bundled(t)
-	f := Facts{Intents: l, Ref: r7, Row: api.Row{Unit: r7.Unit()}, Open: true, Tracked: true, Mine: false, NudgeWho: []string{}}
+	f := Facts{Intents: l, PR: r7, Owner: "acme", Repo: "api", Row: api.Row{Unit: r7}, Open: true, Tracked: true, Mine: false, NudgeWho: []string{}}
 	if st := stateOf(t, f, string(dintent.Address)); st.Enabled || st.Refusal != api.RefuseCase(0) {
 		t.Errorf("address on another's pull request: %+v", st)
 	}

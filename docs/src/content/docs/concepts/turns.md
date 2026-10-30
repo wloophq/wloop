@@ -35,16 +35,18 @@ The first line names the turn id. The agent reads them with `{{command}} instruc
 
 ## The record
 
-Every turn ends with a record: its state, a one-line summary, the outcome (verdict, URL, counts) and, for a question, its text, its options (marking those that publish), a recommendation, the draft to read and the notes a new session needs to finish.
+A turn of an intent with a `[record]` table ends with a record: its state, a one-line summary, the outcome (verdict, URL, counts) and, for a question, its text, its options (marking those that publish), a recommendation, the draft to read and the notes a new session needs to finish.
 
 The agent sends it with the `turn_end` tool of {{name}}'s MCP server, which the daemon serves at `http://127.0.0.1:<mcp.port>/mcp`. The daemon stores a record only for the turn it sent to, or that was started by, the calling session. A malformed record comes back with every problem listed, and the agent fixes it and calls again. A session without the tool writes the record to a file and runs `{{command}} turn end <url> --turn <id> --file <path>`.
+
+A run can owe more than its record: `record.requires` in an intent's manifest names a record kind of `records.toml` its run owes, and `record.missing` the gate of `gates.toml` a run opens when it fails or ends without its record, as when its session stops or goes away. That gate opens on its task, once, in place of a question; you answer it to resume the run with your text, continue it as it was, or dismiss it. It closes on its own when the run goes on another way, or a newer run of the intent takes its place. The bundled `start` requires a `report`, and every bundled intent that asks you a question names `missing-record`. An intent with no `[record]` table records no outcome and owes nothing, as `attach` does; one that sets no `record.requires` owes nothing more than its record, and its `[record]` table needs `states` only when it sets one of `when`, `artifacts`, `outcome`, `require` or `attach_url`.
 
 ## The hooks
 
 `{{command}} install` adds three hooks to each Claude Code home:
 
 - **SessionStart** registers the session: its manager and process handle (an Orca terminal, or a Claude Desktop session), worktree, agent session id and home.
-- **Stop** asks the daemon whether the session's turn owes a record. When it does, the hook blocks the stop once, telling the agent how to record. A second stop without one marks the turn `unrecorded` with the agent's last message.
+- **Stop** asks the daemon whether the session's turn owes a record; a turn of an intent without `[record]`, such as `attach`, owes none. When it does, the hook blocks the stop once, telling the agent how to record. A second stop without one marks the turn `unrecorded` with the agent's last message.
 - **UserPromptSubmit** records when you type in a session, so cleanup never closes a session under your hands. It prints nothing to the agent.
 
 All three exit at once outside a session of an enabled workspace manager, give the daemon 2 seconds, and allow the stop on any error, so a broken {{name}} never traps an agent.
@@ -53,13 +55,13 @@ All three exit at once outside a session of an enabled workspace manager, give t
 
 An `asked` turn shows its question in the cockpit's detail, in a notification (macOS) and in the terminal client (`W`). You can pick an option, answer Yes or No to a confirmation, or write your own answer; text given with an option reaches the agent as a note after the choice.
 
-The question is an Inbox message, as is every note an agent posts mid-turn with `inbox_post`, and every answer names the message it answers. The agent never receives the answer as text typed into its session. {{name}} tells the session that message N was answered, and the agent reads the answer with the `inbox_read` tool, or `{{command}} turn answer <unit> --message N` without the tool:
+The question is a message, as is every note an agent posts mid-turn with `task_post`, and each waits on its gate (see [Messages](/concepts/tasks/#messages)); every answer names the message and the gate it answers. The agent never receives the answer as text typed into its session. {{name}} tells the session that gate G was answered, and the agent reads the answer with the `task_read` tool, or `{{command}} turn answer <unit> --gate G` without the tool:
 
 ```
-agent ──turn_end asked / inbox_post──▶ message N (Inbox) ◀── you answer N
+agent ──turn_end asked / task_post──▶ message N, gate G ◀── you resolve G
   ▲                                         │
-  │ notice: "message N answered"            │ answer stored with message N
-  └──── inbox_read ──▶ the answers of N, marked read
+  │ notice: "gate G answered"               │ answer stored with message N and gate G
+  └──── task_read ──▶ the answers of G, marked read
 ```
 
 The notice goes:
@@ -68,9 +70,9 @@ The notice goes:
 - **through the Stop hook** while that session is working or waiting on a permission: the answer waits, and the agent's next stop is blocked with the notice as its reason. A newer answer to the question replaces one still waiting;
 - otherwise, for a question, as a **resume turn**: a new turn of the same intent, in a new session, for the pull request as it is now, with the question, the draft, the notes, the head it worked at and your answer. When the head moved since, it reviews the new commits before publishing an approval. An answer to a post whose session is gone stays stored.
 
-`inbox_read` with a message returns that message, its options and every answer to it; without one, every answer the agent has not read, oldest first. Reading marks an answer read: the message's card in the cockpit says whether the agent read each answer, a resume turn's answer counts as read, and the `answer-unread` workflow notifies you when a session leaves an answer unread for 15 minutes. The texts of the notices live in the profile's `notices.toml`.
+`task_read` with a gate returns the message of that gate, its options and every answer that resolved it; without one, every answer the agent has not read, oldest first. It also returns the task the session works on, its brief, its open gates and what you wrote on the task's chat since its agents last read it (see [Chat](/concepts/tasks/#chat)). Reading marks an answer and the chat read: the message's card in the cockpit says whether the agent read each answer, a resume turn's answer counts as read, and the `answer-unread` workflow notifies you when a session leaves a gate's answer unread for 15 minutes (`session.unread_gates`). The texts of the notices live in the profile's `notices.toml`.
 
-**Continue** sends a resume turn with no answer to an `asked`, `failed` or `unrecorded` turn. **Dismiss** closes it as `dismissed`. An answer typed directly in the agent's session still works.
+**Continue** sends a resume turn with no answer to an `asked`, `failed` or `unrecorded` turn. **Dismiss** closes it as `dismissed`. Answer, Continue and Dismiss are the intents of the question gate open on the unit, the question's or the missing gate of a stopped turn; with none open, Answer answers again a question already answered while its turn still asks. An answer typed directly in the agent's session still works, and closes the question's gate as superseded.
 
 ## Sessions
 
@@ -82,11 +84,11 @@ In Claude Desktop, {{name}} creates the session headlessly, imports it into the 
 
 ## Headless turns
 
-A turn of an intent whose manifest's `runners` include `headless` runs as one read-only call of the agent, with no session and no workspace. It may read only the unit's checkout and its dossier, and proposes up to 3 drafts, which wait in the [Outbox](/concepts/gtd/#the-outbox). The bundled `act` intent runs this way. `headless.tier`, `headless.per_call_usd` (0.5) and `headless.per_day_usd` (5) cap these calls.
+A turn of an intent whose manifest's `runners` include `headless` runs as one read-only call of the agent, with no session and no workspace. It may read only the unit's checkout and its dossier, and proposes up to 3 drafts, which wait in the [Outbox](/concepts/tasks/#the-outbox). The bundled `act` intent runs this way. `headless.tier`, `headless.per_call_usd` (0.5) and `headless.per_day_usd` (5) cap these calls.
 
 ## Dossiers
 
-A dossier is the working memory of a unit or a project, a local git repository under `<state>/dossiers/` that the daemon commits after every turn. A turn's instructions name its path; a session may read it and write under `log/`, `sources/` and `drafts/`. A resolved dossier is archived after `dossiers.archive_after` (30 days) and purged `dossiers.purge_after` (400 days) later. See [Files on disk](/reference/files/).
+A dossier is the working memory of a task, shared by the turns on every pull request or thread it holds (a unit no task holds keeps its own), a local git repository under `<state>/dossiers/` that the daemon commits after every turn. A turn's instructions name its path; a session may read it and write under `log/`, `sources/` and `drafts/`. A resolved dossier is archived after `dossiers.archive_after` (30 days) and purged `dossiers.purge_after` (400 days) later. See [Files on disk](/reference/files/).
 
 ## Inspecting turns
 

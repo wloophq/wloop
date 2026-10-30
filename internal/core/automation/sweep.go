@@ -30,6 +30,8 @@ func (t *tally) add(r result) {
 		t.transient++
 	case outcomeFailed:
 		t.failed++
+	case outcomeDropped:
+		t.dropped++
 	}
 }
 
@@ -46,20 +48,27 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 			return "", "the workspace manager is unreachable: " + err.Error(), nil
 		}
 	}
-	if r, ok := e.Units.(Refresher); ok {
+	if r, ok := e.Keep.(Refresher); ok {
 		if err := r.Refresh(ctx); err != nil {
 			return "", "", fmt.Errorf("refreshing facts: %w", err)
 		}
 	}
-	ev, err := e.evaluate(ctx, "", true)
+	ectx := ctx
+	if p, ok := e.Keep.(Preparer); ok {
+		if ectx, err = p.Prepare(ctx); err != nil {
+			return "", "", fmt.Errorf("preparing facts: %w", err)
+		}
+	}
+	ev, err := e.evaluate(ectx, "", true)
 	if err != nil {
 		return "", "", err
 	}
-	if s, ok := e.Units.(Seener); ok {
+	if s, ok := e.Keep.(Seener); ok {
 		e.mu.Lock()
 		e.seen = s.Seen()
 		e.mu.Unlock()
 	}
+	e.keepRevs(ev)
 	for _, msg := range ev.plan.Errors {
 		e.logf("%s", msg)
 	}
@@ -154,7 +163,7 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 	if err := e.withdraw(ctx); err != nil {
 		e.logf("withdrawing drafts: %v", err)
 	}
-	if s, ok := e.Units.(Settler); ok {
+	if s, ok := e.Keep.(Settler); ok {
 		if err := s.Settle(ctx, st); err != nil {
 			return "", "", fmt.Errorf("settling: %w", err)
 		}
@@ -205,34 +214,47 @@ func (e *Engine) live() map[string]workflow.Workflow {
 	return live
 }
 
-// fresh are the plan's run items whose source did not move since their facts were read.
+// fresh are the plan's run items whose unit was not reported again since
+// their facts were read: its rev is the one they were planned at.
 func (e *Engine) fresh(ctx context.Context, items []*planned, t *tally) ([]*planned, error) {
 	var runs []*planned
+	var units []unit.Unit
 	for _, pl := range items {
 		if pl.item.Decision == workflow.DecisionRun && !pl.item.Observe && !pl.carried {
 			runs = append(runs, pl)
+			if pl.hasRev && !slices.Contains(units, pl.item.Unit) {
+				units = append(units, pl.item.Unit)
+			}
 		}
 	}
-	f, ok := e.Units.(Freshener)
-	if !ok || len(runs) == 0 {
+	r, ok := e.Units.(Revisioner)
+	if !ok || len(units) == 0 {
 		return runs, nil
 	}
-	units := make([]unit.Unit, 0, len(runs))
-	for _, pl := range runs {
-		if !slices.Contains(units, pl.item.Unit) {
-			units = append(units, pl.item.Unit)
-		}
-	}
-	moved, err := f.Moved(ctx, units)
+	revs, err := r.Revs(ctx, units)
 	if err != nil {
 		return nil, fmt.Errorf("checking sources: %w", err)
 	}
 	return e.drop(runs, t, func(pl *planned) string {
-		if slices.Contains(moved, pl.item.Unit) {
-			return "its source moved; planned again on the next sweep"
+		if rev, ok := revs[pl.item.Unit]; pl.hasRev && (!ok || rev != pl.rev) {
+			return whyMoved
 		}
 		return ""
 	}), nil
+}
+
+// keepRevs keeps the revs ev's items were planned at, which a due run or
+// an apply between sweeps compares.
+func (e *Engine) keepRevs(ev *evaluation) {
+	revs := map[string]uint64{}
+	for _, pl := range ev.items {
+		if pl.hasRev {
+			revs[pl.item.ID] = pl.rev
+		}
+	}
+	e.mu.Lock()
+	e.revs = revs
+	e.mu.Unlock()
 }
 
 // revalidate drops the run items whose unit was noted on Revalidate after
@@ -316,12 +338,15 @@ func (e *Engine) drop(runs []*planned, t *tally, why func(*planned) string) []*p
 func (e *Engine) schedule(ctx context.Context, ev *evaluation) error {
 	now := e.now()
 	var due time.Time
+	if ev.due.After(now) {
+		due = ev.due
+	}
 	for _, pl := range ev.items {
 		if pl.retryAt.After(now) {
 			due = earliest(due, pl.retryAt)
 		}
 	}
-	pending, err := e.Ledger.Items(ctx, Filter{Decisions: []workflow.Decision{workflow.DecisionPending}})
+	pending, err := e.Ledger.Items(ctx, Filter{Decisions: e.dueDecisions()})
 	if err != nil {
 		return err
 	}
@@ -359,7 +384,7 @@ func summarize(ev *evaluation, t tally) string {
 		n[it.Decision]++
 	}
 	s := fmt.Sprintf("%d item(s): %d ran, %d failed, %d refused, %d pending, %d blocked, %d skipped",
-		len(ev.plan.Items), t.ran, t.failed, t.refused, n[workflow.DecisionPending]+t.deferred,
+		len(ev.plan.Items), t.ran, t.failed, t.refused, n[workflow.DecisionPending]+n[workflow.DecisionDeferred]+t.deferred,
 		n[workflow.DecisionBlocked], n[workflow.DecisionSkipped])
 	if t.dropped > 0 {
 		s += fmt.Sprintf(", %d dropped", t.dropped)

@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"maps"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -19,7 +18,6 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/turns"
-	"github.com/wloophq/wloop/internal/ghcli"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
@@ -273,9 +271,9 @@ func runInit(ctx context.Context, e *Env, args []string) error {
 func (w *initWizard) prerequisites(ctx context.Context) ([]string, error) {
 	e := w.e
 	var checks []check
-	if err := ghcli.Authenticated(ctx, e.GH); err != nil {
+	if missing, err := e.forgeAuthenticated(ctx); err != nil {
 		fix := "gh auth login"
-		if errors.Is(err, exec.ErrNotFound) {
+		if missing {
 			fix = "brew install gh && gh auth login"
 		}
 		checks = append(checks, check{markMissing, "gh authenticated", err.Error(), fix})
@@ -394,15 +392,11 @@ func (w *initWizard) ask(ctx context.Context, f initFacts, a initAnswers) (initA
 	case fl.slackClientID != "":
 		w.slackLogin = true
 	default:
-		a.SlackClientID = w.askSlack(f.cur.Slack)
-		w.slackLogin = a.SlackClientID != "" && (a.SlackClientID != f.cur.Slack.ClientID || !w.slackDone(f.cur.Slack))
+		var again bool
+		a.SlackClientID, again = w.askSlack(ctx, f.cur)
+		w.slackLogin = a.SlackClientID != "" && (a.SlackClientID != f.cur.Slack.ClientID || again)
 	}
 	return a, nil
-}
-
-func (w *initWizard) slackDone(s config.Slack) bool {
-	st := w.e.slackState(s)
-	return st.appToken && st.login != ""
 }
 
 func (w *initWizard) askScope(ctx context.Context, f initFacts, a initAnswers) initAnswers {
@@ -552,7 +546,7 @@ func (w *initWizard) slack(ctx context.Context, cfg config.Config) {
 		}
 		return
 	}
-	if w.slackDone(cfg.Slack) {
+	if !w.slackLogin {
 		return
 	}
 	fmt.Fprintln(e.Out, "To finish Slack, run at a terminal:")

@@ -1,0 +1,29 @@
+{
+  "conversation": {"ID": "C0001", "Name": "widget-release", "Kind": "channel", "IsMember": true},
+  "users": [
+    {"ID": "U0000000001", "Name": "ann", "DisplayName": "Ann", "Email": "ann@example.com"},
+    {"ID": "U0000000002", "Name": "bob", "DisplayName": "Bob"},
+    {"ID": "U0000000003", "Name": "cy", "DisplayName": "Cy", "Email": "cy@example.com"}
+  ],
+  "messages": [
+    {"TS": "1700000000.000100", "ThreadTS": "1700000000.000100", "User": "U0000000001",
+     "Text": "<@U0000000002> can you review the release notes draft before Friday? https://example.com/docs/notes",
+     "Links": ["https://example.com/docs/notes"], "Mentions": ["U0000000002"], "ReplyCount": 4,
+     "Permalink": "https://example.com/archives/C0001/p1700000000000100"},
+    {"TS": "1700000300.000200", "ThreadTS": "1700000000.000100", "ParentUser": "U0000000001", "User": "U0000000002",
+     "Text": "On it. Also <@U0000000003>, should we ship the widget toggle on by default?", "Mentions": ["U0000000003"],
+     "Reactions": [{"Name": "eyes", "Users": ["U0000000003"]}],
+     "Permalink": "https://example.com/archives/C0001/p1700000300000200?thread_ts=1700000000.000100"},
+    {"TS": "1700003600.000300", "ThreadTS": "1700000000.000100", "ParentUser": "U0000000001", "User": "U0000000002",
+     "Text": "Notes reviewed, two typos fixed.",
+     "Reactions": [{"Name": "white_check_mark", "Users": ["U0000000001"]}],
+     "Permalink": "https://example.com/archives/C0001/p1700003600000300?thread_ts=1700000000.000100"},
+    {"TS": "1700007200.000400", "ThreadTS": "1700000000.000100", "ParentUser": "U0000000001", "User": "U0000000003",
+     "Text": "Off by default. <@U0000000001> please take over the rollout once pull request 527 of acme/widget is reviewed.",
+     "Mentions": ["U0000000001"],
+     "Permalink": "https://example.com/archives/C0001/p1700007200000400?thread_ts=1700000000.000100"},
+    {"TS": "1700010800.000500", "ThreadTS": "1700000000.000100", "ParentUser": "U0000000001", "BotID": "B0001",
+     "Username": "ci-bot", "Text": "Build 41 passed.",
+     "Permalink": "https://example.com/archives/C0001/p1700010800000500?thread_ts=1700000000.000100"}
+  ]
+}

@@ -8,17 +8,17 @@ Two things in wloop are open-ended: sources and behavior. Plugins bring new kind
   plugin  ──  rich model: its own views, facets, situations, custom pages
      │
      ▼   projection (the seam)
-  unit + card + items         the generic shape every surface reads
+  unit + card + asks          the generic shape every surface reads
      │
      ▼
-  GTD  ──  entries, lists, projects, Outbox, Review
+  tasks  ──  views, gates, runs, children, review
      ▲
-  profile  ──  intents and workflows: actions with a GTD verb, plan items
+  profile  ──  intents and workflows: actions with a verb, plan items
 ```
 
 - **Above the seam a plugin is free.** Its perspectives can show pull request situations, Slack participants, anything its own data model knows, with its own facets and columns.
-- **At the seam it speaks one shape**: the unit, its card and its items. The GTD layer, the source chip, the unit card, the menu bar and notifications read only that shape, so a new plugin appears in them with no client change.
-- **Below the seam everything is GTD**: entries in lists, whatever produced them.
+- **At the seam it speaks one shape**: the unit, its card and its asks. The task layer, the source chip, the unit card, the menu bar and notifications read only that shape, so a new plugin appears in them with no client change.
+- **Below the seam everything is a task** in the profile's views, whatever produced it.
 
 ## What the interface reads at the seam
 
@@ -35,7 +35,7 @@ Two things in wloop are open-ended: sources and behavior. Plugins bring new kind
 | `card.last_human` | the plugin | "lee replied 2h ago" with a link |
 | `card.link` | the plugin | the chip's link out |
 | `stale` | the store, when the plugin is off | dashed chip and card, "stale" flag |
-| items: kind, state, waiting on | the plugin's derivation or extraction | the item list in the inspector |
+| asks: asker, summary, permalink, quotes | the plugin's derivation or extraction | the AskList on the task's page |
 
 **Tones map to tokens**, once, for every plugin: `good` → `loop-text`, `warn` → `late`, `bad` → `err`, `info` → `me-text`, `neutral` → `muted`. A plugin chooses a tone; it never chooses a color.
 
@@ -57,18 +57,18 @@ A plugin's views go under its own section of the rail, titled with the plugin's 
 
 ## Actions from the profile
 
-Every action (built-in, a bundled intent, an intent the profile overrides or adds) arrives from the daemon with an id, a label, a group, the surfaces it appears on, a scope (`unit`, `item`, `draft`), an input, and optionally the **GTD verb** it fulfills and the plugin it belongs to. The client places actions by those fields, never by id.
+Every action (built-in, a bundled intent, an intent the profile overrides or adds) arrives from the daemon with an id, a label, a group, the surfaces it appears on, a scope (`unit`, `item`, `draft`), an input, and optionally the **verb** it fulfills and the plugin it belongs to. The client places actions by those fields, never by id.
 
 | Slot | Takes | Where |
 |---|---|---|
-| **State control** | verbs `next`, `waiting`, `snooze`, `done`, `dismiss` | the inspector's segmented control and the row's state glyph; an action with that verb runs instead of the bare state change |
-| **Primary** | the daemon's recommended action, any verb | the one `primary` button of a row, an inspector or a question |
-| **Delegate** | verb `delegate` | the inspector's Delegate block, with the action's input (guidance) |
-| **Approve** | verb `approve` | the question or draft block |
-| **Draft** | scope `draft`, verbs `edit`, `retry` | the draft row and its inspector |
+| **Verbs** | the verbs the catalog serves | the buttons of the task page's header and the row's state glyph; an action with that verb runs instead of the bare state change |
+| **Primary** | the daemon's recommended action, any verb | the one `primary` button of a row or a unit's detail |
+| **Gate** | a gate's intents, in the order of `gates.toml` | the GateCard, the first one `primary`, digits `1` to `9` picking them |
+| **Run** | a run's actions: open, enter, transcript | the RunCard |
+| **Draft** | scope `draft`, verbs `edit`, `retry` | the Outbox and the draft's gate |
 | **By group** | everything else: `round`, `turn`, `control`, `workspace`, `brief`, `intake` | the actions bar, one cluster per group, in catalog order |
 
-Labels are the manifest's own words. A profile that renames `review` changes the button text; one that adds an intent adds a button to its group's cluster on the surfaces it names. An input of kind `text`, `duration` or `answer` gets the matching control (textarea, snooze picker, option buttons). An action the daemon offers but marks unavailable stays visible as the `off` button with its reason in the tooltip.
+Labels are the manifest's own words. A profile that renames `review` changes the button text; one that adds an intent adds a button to its group's cluster on the surfaces it names. An input of kind `text`, `duration` or `answer` gets the matching control (textarea, snooze picker, the gate's answer box). An action the daemon offers but marks unavailable stays visible as the `off` button with its reason in the tooltip.
 
 ## Workflows from the profile
 

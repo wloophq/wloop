@@ -26,7 +26,7 @@ var _ automation.Ledger = ledger{}
 
 // Ledger is the workflows' plan and runs. A write stores its rows and its
 // events in one transaction, noting TopicLoopEvents for the events and
-// TopicGate only when the pending set changes.
+// TopicPending only when the pending set changes.
 func (db *DB) Ledger() automation.Ledger { return ledger{db, time.Now} }
 
 const itemColumns = `id, workflow, provider, unit_key, key_value, decision, reason, steps, why,
@@ -98,7 +98,7 @@ func (l ledger) Record(ctx context.Context, r workflow.Run, it workflow.Item, ev
 	})
 }
 
-// write runs fn and writes evs in one transaction, touching TopicGate with
+// write runs fn and writes evs in one transaction, touching TopicPending with
 // the units of the pending items fn added, dropped or re-timed.
 func (l ledger) write(ctx context.Context, evs []port.Event, fn func(tx *Tx) error) error {
 	for _, ev := range evs {
@@ -130,7 +130,7 @@ func (l ledger) write(ctx context.Context, evs []port.Event, fn func(tx *Tx) err
 			}
 		}
 		if len(moved) > 0 {
-			tx.Touch(port.TopicGate, moved...)
+			tx.Touch(port.TopicPending, moved...)
 		}
 		return writeEvents(ctx, tx, evs)
 	})

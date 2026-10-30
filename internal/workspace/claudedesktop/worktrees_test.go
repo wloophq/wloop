@@ -42,7 +42,7 @@ func TestCreateListsOnlyWorktreesUnderRoot(t *testing.T) {
 		t.Fatalf("before any workspace: %+v, %v", ws, err)
 	}
 	review := f.worktree(t, "review/feat x")
-	pr, _, err := f.m.Create(ctx, workspace.CreateRequest{RepoID: f.repo, Name: "pr-7", HeadBranch: "feat/x", BaseRef: "main"})
+	pr, _, err := f.m.Create(ctx, workspace.CreateRequest{RepoID: f.repo, Name: "pr-7", BaseRef: "main", Checkout: workspace.Checkout{Branch: "feat/x"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestCreateListsOnlyWorktreesUnderRoot(t *testing.T) {
 	if err != nil || !scope.Complete || len(list) != 2 {
 		t.Fatalf("Workspaces = %+v, %+v, %v", list, scope, err)
 	}
-	if _, _, err := f.m.Create(ctx, workspace.CreateRequest{RepoID: f.repo, Name: "again", HeadBranch: "feat/x"}); err == nil {
+	if _, _, err := f.m.Create(ctx, workspace.CreateRequest{RepoID: f.repo, Name: "again", Checkout: workspace.Checkout{Branch: "feat/x"}}); err == nil {
 		t.Fatal("checked out a branch another worktree holds")
 	}
 }
@@ -70,7 +70,7 @@ func TestCreateChecksOutAnExistingBranch(t *testing.T) {
 	if _, err := f.m.git(ctx, f.repo, "branch", "leftover"); err != nil {
 		t.Fatal(err)
 	}
-	ws, _, err := f.m.Create(ctx, workspace.CreateRequest{RepoID: f.repo, Name: "w", HeadBranch: "leftover", BaseRef: "origin/pr/1"})
+	ws, _, err := f.m.Create(ctx, workspace.CreateRequest{RepoID: f.repo, Name: "w", BaseRef: "origin/pr/1", Checkout: workspace.Checkout{Branch: "leftover"}})
 	if err != nil || ws.Branch != "leftover" {
 		t.Fatalf("Create = %+v, %v", ws, err)
 	}
@@ -136,7 +136,7 @@ func TestCreateKeepsTheDisplayNameAndRenamesATakenHead(t *testing.T) {
 	if err != nil || !slicesContainName(list, "REVIEW feat/x") {
 		t.Fatalf("listing loses the name: %+v, %v", list, err)
 	}
-	fork, _, err := f.m.Create(ctx, workspace.CreateRequest{RepoID: f.repo, Name: "REVIEW main-copy", HeadBranch: "main-copy", CrossRepository: true})
+	fork, _, err := f.m.Create(ctx, workspace.CreateRequest{RepoID: f.repo, Name: "REVIEW main-copy", Checkout: workspace.Checkout{Branch: "main-copy", Fork: true}})
 	if err != nil || fork.Branch != "main-copy-2" || !fork.BranchRenamed {
 		t.Fatalf("a fork head colliding with a local branch: %+v, %v", fork, err)
 	}

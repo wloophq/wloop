@@ -41,7 +41,7 @@ Dependencies point down and inward. An adapter imports the port it implements an
 | Clients | `internal/client/...` | `internal/api`, `internal/api/client`, the domain and `internal/termfmt` |
 | Read model | `internal/readmodel`, `internal/readmodel/cards` | ports; no adapter, GitHub, brief queue, situation deriver or Orca client |
 | Daemon | `internal/daemon` | anything but the adapters, `internal/github` and the Orca client, which it reaches through ports `serve.go` wires |
-| Adapters | `internal/adapter/...`, `internal/workspace/...`, `internal/github`, `internal/ghcli`, `internal/slack`, `internal/gitx` | the ports they implement and the domain |
+| Adapters | `internal/adapter/...`, `internal/workspace/...`, `internal/gitx` | the ports they implement and the domain |
 | Composition root | `internal/cli`, `cmd/{{command}}` | everything |
 
 Some packages sit beside the layers with rules of their own:
@@ -72,7 +72,7 @@ The commands call the daemon through `internal/api/client`. Those that work with
 | A fact a predicate reads | `builtin.Facts` in `internal/intent/builtin/facts.go`, computed by the provider's facts adapter (`internal/adapter/facts/<provider>`) | `make docs-ref` |
 | A trigger that fires once per signal | a workflow with `[marks]` and `handled()` in its `when`; the signal as a fact of its provider if it is not one yet | see [Marks](/reference/workflow-manifest/) |
 | A workflow step or an intent builtin | its name in `internal/intent/builtin/builtin.go`, its implementation in `internal/cli/steps.go` or `internal/cli/builtins.go` (`internal/daemon/builtins.go` for the daemon's routes) | `make docs-ref` |
-| A key of a manifest, `actions.toml`, `gtd.toml`, `keys.toml` or the configuration | a row of `builtin.Grammar` in `internal/intent/builtin/grammar*.go`, with its kind, values, default and doc, and the field that decodes it | `make docs-ref` |
+| A key of a manifest, `actions.toml`, `tasks.toml`, `views.toml`, `gates.toml`, `records.toml`, `keys.toml` or the configuration | a row of `builtin.Grammar` in `internal/intent/builtin/grammar*.go`, with its kind, values, default and doc, and the field that decodes it | `make docs-ref` |
 | A role or an effect | `builtin.Roles` in `internal/intent/builtin/roles.go`, `builtin.Effects` in `internal/intent/builtin/effects.go` | `make docs-ref` |
 | A use case | a package under `internal/core`, with the ports it needs declared there and a fake in `<name>test` | |
 | A value or a pure rule | `internal/domain/<name>` | |

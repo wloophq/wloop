@@ -112,13 +112,14 @@ func NewCache(layers func() []profile.Layer, opts intentload.CacheOptions) (*int
 	return intentload.NewCache(layers, BundledFS(), b, CheckTemplate, opts), nil
 }
 
-// Bundled is the bundled intents alone, loaded once; callers never change it.
+// Bundled is the profile the release ships, the bundled layer and the
+// bundled plugins' layers, loaded once; callers never change it.
 var Bundled = sync.OnceValues(func() (*intentload.Loaded, error) {
 	b, err := Base()
 	if err != nil {
 		return nil, err
 	}
-	l, problems := intentload.Load(nil, BundledFS(), b, CheckTemplate)
+	l, problems := intentload.Load(profile.BundledChain(), BundledFS(), b, CheckTemplate)
 	if len(problems) > 0 {
 		return nil, problems
 	}
@@ -183,7 +184,9 @@ func instructionsOf(d dintent.Def, l *intentload.Loaded, devDir string) (*templa
 	switch {
 	case d.Bundled && !slices.Contains(d.Source.Overrides, "instructions.md.tmpl"):
 		if raw, err = os.ReadFile(filepath.Join(devDir, filepath.FromSlash(rel))); errors.Is(err, fs.ErrNotExist) {
-			raw, err = fs.ReadFile(BundledFS(), rel)
+			var r profile.Resolved
+			r, err = profile.Resolve(profile.BundledChain(), rel)
+			raw = r.Body
 		}
 	default:
 		raw, err = os.ReadFile(filepath.Join(d.Source.Dir, "instructions.md.tmpl"))

@@ -3,8 +3,6 @@ package round
 import (
 	"testing"
 	"time"
-
-	"github.com/wloophq/wloop/internal/domain/mark"
 )
 
 func TestCapAndFingerprint(t *testing.T) {
@@ -13,7 +11,7 @@ func TestCapAndFingerprint(t *testing.T) {
 	if s.CapReason("a#1", now, 1) != "" {
 		t.Fatal("capped on a fresh state")
 	}
-	s.RecordSent("a#1", Reviewed, "fp1", now)
+	s.RecordSent("a#1", "reviewed", "fp1", now)
 	if s.CapReason("a#1", now, 1) == "" {
 		t.Fatal("per-PR cap not applied")
 	}
@@ -23,8 +21,8 @@ func TestCapAndFingerprint(t *testing.T) {
 	if !s.FirstCapHit("a#3", now) || s.FirstCapHit("a#3", now) {
 		t.Fatal("cap hit should be reported once per day")
 	}
-	if s.Mark("a#1", Reviewed) != "fp1" || s.Mark("a#1", AddressedReviews) != "" {
-		t.Fatalf("marks: reviewed %q, addressed %q", s.Mark("a#1", Reviewed), s.Mark("a#1", AddressedReviews))
+	if s.Mark("a#1", "reviewed") != "fp1" || s.Mark("a#1", "addressed.reviews") != "" {
+		t.Fatalf("marks: reviewed %q, addressed %q", s.Mark("a#1", "reviewed"), s.Mark("a#1", "addressed.reviews"))
 	}
 	if s.CapReason("a#1", now.Add(24*time.Hour), 1) != "" {
 		t.Fatal("cap did not reset the next day")
@@ -34,17 +32,16 @@ func TestCapAndFingerprint(t *testing.T) {
 func TestSettersRecordWhatTheyChanged(t *testing.T) {
 	now := time.Date(2026, 10, 9, 10, 0, 0, 0, time.Local)
 	s := New()
-	s.SetHeads("a/b#1", "abc", "")
-	s.RecordSent("a/b#1", AddressedReviews, "", now)
-	s.ClearFirstRoundSkipped("a/b#2")
+	s.SetMark("a/b#1", "addressed.checks", "abc")
+	s.RecordSent("a/b#1", "addressed.reviews", "", now)
 	s.FirstNote("hello", now)
 	s.FirstNote("hello", now)
 	ch := s.Changes()
 	if got, want := ch.PRs["a/b#1"], FieldSentAt; got != want {
 		t.Fatalf("fields %b, want %b", got, want)
 	}
-	if got := ch.Marks["a/b#1"]; len(got) != 1 || !got[AddressedChecks] {
-		t.Fatalf("marks %v, want only %s", got, AddressedChecks)
+	if got := ch.Marks["a/b#1"]; len(got) != 1 || !got["addressed.checks"] {
+		t.Fatalf("marks %v, want only addressed.checks", got)
 	}
 	if _, ok := ch.PRs["a/b#2"]; ok {
 		t.Fatal("a clear that changed nothing was recorded")
@@ -76,20 +73,12 @@ func TestPauseHoldsEverythingOrItsRepositories(t *testing.T) {
 
 func TestAnEmptyMarkIsNoMark(t *testing.T) {
 	s := New()
-	s.SetMark("a/b#1", AddressedReviews, "2026-10-09T10:00:00Z")
-	s.SetMark("a/b#1", AddressedReviews, "")
-	if _, ok := s.PRs["a/b#1"].Marks[AddressedReviews]; ok {
+	s.SetMark("a/b#1", "addressed.reviews", "2026-10-09T10:00:00Z")
+	s.SetMark("a/b#1", "addressed.reviews", "")
+	if _, ok := s.PRs["a/b#1"].Marks["addressed.reviews"]; ok {
 		t.Fatal("an emptied mark is kept")
 	}
-	if !s.Changes().Marks["a/b#1"][AddressedReviews] {
+	if !s.Changes().Marks["a/b#1"]["addressed.reviews"] {
 		t.Fatal("removing a mark is a change to save")
-	}
-}
-
-func TestTheRoundsMarksArePluginMarkNames(t *testing.T) {
-	for _, name := range []string{Reviewed, AddressedReviews, AddressedChecks, AddressedConflict} {
-		if err := mark.ValidName(name); err != nil {
-			t.Error(err)
-		}
 	}
 }

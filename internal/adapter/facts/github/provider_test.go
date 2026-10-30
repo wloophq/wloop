@@ -2,7 +2,6 @@ package factsgithub_test
 
 import (
 	"context"
-	"errors"
 	"maps"
 	"slices"
 	"strings"
@@ -14,9 +13,8 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/sweep"
-	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
-	dchange "github.com/wloophq/wloop/internal/domain/change"
+	dchange "github.com/wloophq/wloop/internal/domain/github/change"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -25,9 +23,11 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+	"github.com/wloophq/wloop/plugins/github/plan"
 )
 
 // t0 is a Wednesday afternoon.
@@ -48,7 +48,7 @@ type world struct {
 	cfg       config.Config
 	viewer    string
 	rows      map[pr.Ref]dinv.PR
-	details   map[pr.Ref]sweep.Facts
+	details   map[pr.Ref]dinv.PlanFacts
 	ended     map[unit.Unit]bool
 	overrides map[pr.Ref]dinv.Override
 	blocks    map[pr.Ref]dinv.Event
@@ -60,16 +60,15 @@ type world struct {
 	snap      *wsdomain.Snapshot
 	git       *fakeGit
 	branches  *fakeBranches
-	stubs     *fakeStubs
 	// factReads counts the Facts queries.
 	factReads int
 }
 
 func newWorld() *world {
-	w := &world{now: t0, cfg: config.Defaults(), viewer: me, rows: map[pr.Ref]dinv.PR{}, details: map[pr.Ref]sweep.Facts{},
+	w := &world{now: t0, cfg: config.Defaults(), viewer: me, rows: map[pr.Ref]dinv.PR{}, details: map[pr.Ref]dinv.PlanFacts{},
 		ended: map[unit.Unit]bool{}, overrides: map[pr.Ref]dinv.Override{}, blocks: map[pr.Ref]dinv.Event{},
 		events: map[pr.Ref][]dinv.Event{}, books: map[unit.Unit]turn.Book{}, rounds: round.New(),
-		git: &fakeGit{heads: map[string]string{}, dirty: map[string]bool{}}, branches: &fakeBranches{}, stubs: &fakeStubs{}}
+		git: &fakeGit{heads: map[string]string{}, dirty: map[string]bool{}}, branches: &fakeBranches{}}
 	w.cfg.Views = map[string]config.SinkConfig{"board": {Columns: map[string]string{config.ColumnCompleted: "Done"}}}
 	w.snap = &wsdomain.Snapshot{Gen: 1, Repos: []wsdomain.Repo{repo}, WorkspaceScope: complete, TerminalScope: complete,
 		Workspaces: []wsdomain.Workspace{{ID: "main", RepoID: "r1", Path: "/w/app", DisplayName: "app", Branch: "main", HostID: "local", IsMain: true}}}
@@ -81,9 +80,9 @@ func (w *world) provider() *factsgithub.Provider { return w.providerWith(nil) }
 // providerWith is provider over a change log, which keeps its view between
 // calls; nil builds one per call.
 func (w *world) providerWith(changes port.Changes) *factsgithub.Provider {
-	d := factsgithub.Deps{Inputs: w, Store: w, Snapshot: w, Books: w, Rounds: w, Git: w.git, Branches: w.branches,
-		Stubs: w.stubs, Cfg: func() config.Config { return w.cfg }, Sink: "board", Clock: clock{w},
-		Intents: func() *dintent.Registry { return turnstest.Intents() }}
+	d := factsgithub.Deps{Inputs: w, Store: w, Snapshot: w, Books: w, Rounds: w, Git: w.git,
+		Cfg: func() config.Config { return w.cfg }, Clock: clock{w},
+		Intents: func() *dintent.Registry { return turnstest.Intents() }, Reports: w}
 	if changes != nil {
 		d.Changes = changes
 	}
@@ -108,7 +107,7 @@ func (w *world) add(n int, author string, edit func(*dinv.PR, *pr.Facts)) pr.Ref
 	f.Author, f.ReviewRequests, f.IsCrossRepository, f.ChecksState = row.Author, row.ReviewRequests, row.IsFork, row.ChecksState
 	f.Mergeable, f.ReviewDecision = row.Mergeable, row.ReviewDecision
 	w.rows[r] = row
-	w.details[r] = sweep.Facts{Facts: f, ReadAt: w.now.Add(-time.Minute)}
+	w.details[r] = dinv.PlanFacts{Facts: f, ReadAt: w.now.Add(-time.Minute)}
 	return r
 }
 
@@ -130,9 +129,9 @@ func (w *world) Rows(context.Context) ([]dinv.PR, error) {
 	return rows, nil
 }
 
-func (w *world) Facts(_ context.Context, rows []dinv.PR, _ string) (map[unit.Unit]sweep.Facts, error) {
+func (w *world) Facts(_ context.Context, rows []dinv.PR, _ string) (map[unit.Unit]dinv.PlanFacts, error) {
 	w.factReads++
-	out := map[unit.Unit]sweep.Facts{}
+	out := map[unit.Unit]dinv.PlanFacts{}
 	for _, r := range rows {
 		out[r.Ref.Unit()] = w.details[r.Ref]
 	}
@@ -251,20 +250,9 @@ func (b *fakeBranches) IsAncestor(context.Context, string, string, string) (bool
 	return true, nil
 }
 
-type fakeStubs struct {
-	calls int
-	stubs map[pr.Ref]github.Stub
-	errs  map[pr.Ref]error
-	err   error
-}
-
-func (s *fakeStubs) StubsByRef(_ context.Context, refs []github.Ref) (map[github.Ref]github.Stub, map[github.Ref]error, error) {
-	s.calls++
-	return s.stubs, s.errs, s.err
-}
-
-// facts lists, then reads u's facts, as an evaluation does.
-func facts(t *testing.T, p *factsgithub.Provider, u unit.Unit) workflow.Facts {
+// facts lists, then reads u's facts, as an evaluation does, resolved at
+// the world's now.
+func (w *world) facts(t *testing.T, p *factsgithub.Provider, u unit.Unit) workflow.Facts {
 	t.Helper()
 	ctx := context.Background()
 	if _, err := p.List(ctx, unit.GitHub); err != nil {
@@ -273,6 +261,9 @@ func facts(t *testing.T, p *factsgithub.Provider, u unit.Unit) workflow.Facts {
 	f, err := p.Facts(ctx, u)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if resolved, _ := workflow.Resolve(f, w.now); resolved != nil {
+		return resolved
 	}
 	return f
 }
@@ -302,10 +293,10 @@ func TestFollowupFactsMatchChangeReviewer(t *testing.T) {
 		{name: "no review by me", edit: func(_ *dinv.PR, f *pr.Facts) { f.Reviews = nil }},
 		{name: "new commits", action: "follow-up"},
 		{name: "this head got its follow-up", setup: func(w *world) {
-			w.rounds.SetMark(ref(7).String(), round.Reviewed, t0.Add(-2*time.Hour).UTC().Format(time.RFC3339)+"@c2")
+			w.rounds.SetMark(ref(7).String(), plan.MarkReviewed, t0.Add(-2*time.Hour).UTC().Format(time.RFC3339)+"@c2")
 		}},
 		{name: "this review got its follow-up", setup: func(w *world) {
-			w.rounds.SetMark(ref(7).String(), round.Reviewed, t0.Add(-2*time.Hour).UTC().Format(time.RFC3339))
+			w.rounds.SetMark(ref(7).String(), plan.MarkReviewed, t0.Add(-2*time.Hour).UTC().Format(time.RFC3339))
 		}},
 		{name: "draft", edit: func(row *dinv.PR, _ *pr.Facts) { row.IsDraft = true }},
 		{name: "fork", edit: func(row *dinv.PR, _ *pr.Facts) { row.IsFork = true }},
@@ -321,8 +312,8 @@ func TestFollowupFactsMatchChangeReviewer(t *testing.T) {
 				c.setup(w)
 			}
 			want := dchange.Reviewer(dchange.ReviewerInput{PR: w.details[r].Facts, Viewer: me, WorkspaceStatus: w.snap.Workspaces[1].Status,
-				CompletedStatus: "Done", TrustedOwners: []string{"acme"}, LastFingerprint: w.rounds.Mark(r.String(), round.Reviewed)})
-			f := facts(t, w.provider(), r.Unit())
+				CompletedStatus: "Done", TrustedOwners: []string{"acme"}, LastFingerprint: w.rounds.Mark(r.String(), plan.MarkReviewed)})
+			f := w.facts(t, w.provider(), r.Unit())
 			if f["pr.review.action"] != c.action || f["pr.review.reason"] != want.Reason {
 				t.Fatalf("review = %q, %q; want %q, %q", f["pr.review.action"], f["pr.review.reason"], c.action, want.Reason)
 			}
@@ -341,12 +332,12 @@ func TestAFollowupWithoutItsWorkspaceIsObserved(t *testing.T) {
 		f.Reviews = []pr.Review{{ID: "r1", State: pr.ReviewCommented, Author: me, SubmittedAt: t0.Add(-2 * time.Hour), CommitOid: "c1"}}
 	})
 	w.books[r.Unit()] = turn.Book{Unit: r.Unit(), Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), Role: "pr.review", State: turn.Done, SentAt: t0.Add(-3 * time.Hour)}}}
-	f := facts(t, w.provider(), r.Unit())
+	f := w.facts(t, w.provider(), r.Unit())
 	if f["pr.review.action"] != "follow-up" || f["pr.review.observed"] != true {
 		t.Fatalf("facts = %v", f)
 	}
 	w.cfg.GitHub.FollowupsWithoutWorkspace = true
-	if f := facts(t, w.provider(), r.Unit()); f["pr.review.observed"] != false {
+	if f := w.facts(t, w.provider(), r.Unit()); f["pr.review.observed"] != false {
 		t.Fatalf("followups_without_workspace still observes: %v", f)
 	}
 }
@@ -370,7 +361,7 @@ func TestFirstRoundFactsCarryTheSkipReason(t *testing.T) {
 		reason string
 	}{
 		{name: "due", due: true, reason: "my review was requested"},
-		{name: "skipped", setup: func(w *world) { w.rounds.SkipFirstRound(ref(3).String()) }, reason: "you skipped its first round"},
+		{name: "skipped", setup: func(w *world) { w.rounds.SetMark(ref(3).String(), plan.MarkFirstSkipped, "1") }, reason: "you skipped its first round"},
 		{name: "review workspace", setup: func(w *world) {
 			w.workspace(wsdomain.Workspace{ID: "rev", DisplayName: "REVIEW feature", Branch: "feature-x"})
 		}, reason: "its review workspace exists"},
@@ -387,7 +378,7 @@ func TestFirstRoundFactsCarryTheSkipReason(t *testing.T) {
 			if c.setup != nil {
 				c.setup(w)
 			}
-			f := facts(t, w.provider(), r.Unit())
+			f := w.facts(t, w.provider(), r.Unit())
 			if f["pr.first.due"] != c.due || f["pr.first.reason"] != c.reason {
 				t.Fatalf("first = %v, %q; want %v, %q", f["pr.first.due"], f["pr.first.reason"], c.due, c.reason)
 			}
@@ -414,7 +405,7 @@ func TestAddressFactsMatchReviewsToAddressAndFailingChecks(t *testing.T) {
 	w := newWorld()
 	r := w.mine(5, nil)
 	p := w.provider()
-	f := facts(t, p, r.Unit())
+	f := w.facts(t, p, r.Unit())
 	who, fp := dchange.ReviewsToAddress(dchange.AddressInput{PR: w.details[r].Facts, Viewer: me})
 	failed := dchange.FailingChecks(w.details[r].Facts, "", nil)
 	if f["pr.address.due"] != true || !slices.Equal(f["pr.address.reviewers"].([]string), who) || !slices.Equal(f["pr.address.checks"].([]string), failed) {
@@ -423,18 +414,19 @@ func TestAddressFactsMatchReviewsToAddressAndFailingChecks(t *testing.T) {
 	if f["pr.address.reason"] != "reviewed by bob; failing checks: lint" || f["pr.address.observed"] != false {
 		t.Fatalf("reason = %q, observed %v", f["pr.address.reason"], f["pr.address.observed"])
 	}
-	c, ok, err := p.Candidate(context.Background(), r.Unit(), factsgithub.RoundAddress)
-	if err != nil || !ok || c.Fingerprint != fp || c.ChecksHead != "head" || c.Workspace.ID != "dev" || c.Facts.HeadRefOid != "head" {
-		t.Fatalf("candidate = %+v, %v, %v", c, ok, err)
+	c, ok := w.planned(t, p, r.Unit(), plan.RoundAddress)
+	want := map[string]string{plan.MarkAddressedReviews: fp, plan.MarkAddressedChecks: "head"}
+	if !ok || !maps.Equal(c.OnSent, want) || !maps.Equal(c.OnSkipped, want) || c.Workspace.ID != "dev" || c.Head != "head" {
+		t.Fatalf("round = %+v, %v", c, ok)
 	}
 
-	w.rounds.SetMark(r.String(), round.AddressedReviews, fp)
-	w.rounds.SetHeads(r.String(), "head", "")
-	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "nothing to address" {
+	w.rounds.SetMark(r.String(), plan.MarkAddressedReviews, fp)
+	w.rounds.SetMark(r.String(), plan.MarkAddressedChecks, "head")
+	if f := w.facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "nothing to address" {
 		t.Fatalf("a handled pull request is due: %v", f)
 	}
-	if _, ok, _ := w.provider().Candidate(context.Background(), r.Unit(), factsgithub.RoundAddress); ok {
-		t.Fatal("a handled pull request has a candidate")
+	if _, ok := w.planned(t, w.provider(), r.Unit(), plan.RoundAddress); ok {
+		t.Fatal("a handled pull request plans its round")
 	}
 }
 
@@ -445,33 +437,33 @@ func TestAConflictPastItsWindowStartsOneAddressRoundPerHead(t *testing.T) {
 		f.Reviews, f.Checks = nil, nil
 	})
 	p := w.provider()
-	f := facts(t, p, r.Unit())
+	f := w.facts(t, p, r.Unit())
 	if f["pr.address.due"] != true || f["pr.address.reason"] != "conflicts with main" || f["pr.address.conflict"] != true {
 		t.Fatalf("a lasting conflict: %v", f)
 	}
 	if f["pr.head"] != "head" || f["pr.conflicting_for"] != time.Hour {
 		t.Fatalf("signals: head %v, conflicting for %v", f["pr.head"], f["pr.conflicting_for"])
 	}
-	c, ok, err := p.Candidate(context.Background(), r.Unit(), factsgithub.RoundAddress)
-	if err != nil || !ok || c.ConflictHead != "head" || c.ChecksHead != "" || c.Fingerprint != "" {
-		t.Fatalf("candidate = %+v, %v, %v", c, ok, err)
+	c, ok := w.planned(t, p, r.Unit(), plan.RoundAddress)
+	if want := map[string]string{plan.MarkAddressedConflict: "head"}; !ok || !maps.Equal(c.OnSent, want) || !maps.Equal(c.OnSkipped, want) {
+		t.Fatalf("round = %+v, %v", c, ok)
 	}
 	first := f["pr.fingerprint"]
 
-	w.rounds.SetHeads(r.String(), "", "head")
-	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "nothing to address" || f["pr.address.conflict"] != false {
+	for name, v := range c.OnSkipped {
+		w.rounds.SetMark(r.String(), name, v)
+	}
+	if _, ok := w.planned(t, w.provider(), r.Unit(), plan.RoundAddress); ok || w.rounds.Mark(r.String(), plan.MarkAddressedConflict) != "head" {
+		t.Fatalf("an address round skipped with its conflict head is planned again")
+	}
+	if f := w.facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "nothing to address" || f["pr.address.conflict"] != false {
 		t.Fatalf("a handled conflict is due: %v", f)
 	}
 
 	row, d := w.rows[r], w.details[r]
-	row.HeadOid, d.HeadRefOid, d.Mergeable = "head2", "head2", "UNKNOWN"
+	row.HeadOid, d.HeadRefOid = "head2", "head2"
 	w.rows[r], w.details[r] = row, d
-	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false {
-		t.Fatalf("a new head GitHub has not judged yet, under the stored conflict: %v", f)
-	}
-	d.Mergeable = "CONFLICTING"
-	w.details[r] = d
-	f = facts(t, w.provider(), r.Unit())
+	f = w.facts(t, w.provider(), r.Unit())
 	if f["pr.address.due"] != true || f["pr.fingerprint"] == first {
 		t.Fatalf("a conflict on a new head: %v", f)
 	}
@@ -484,7 +476,7 @@ func TestAddressConflictsOffStartsNoRoundForAConflict(t *testing.T) {
 		row.Mergeable, row.MergeableAt, row.ChecksState = "CONFLICTING", t0.Add(-time.Hour), ""
 		f.Reviews, f.Checks = nil, nil
 	})
-	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.conflict"] != false {
+	if f := w.facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.conflict"] != false {
 		t.Fatalf("address_conflicts off: %v", f)
 	}
 }
@@ -495,7 +487,7 @@ func TestAConflictWithinItsWindowIsNoReason(t *testing.T) {
 		row.Mergeable, row.MergeableAt, row.ChecksState = "CONFLICTING", t0.Add(-time.Minute), ""
 		f.Reviews, f.Checks = nil, nil
 	})
-	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.conflict"] != false {
+	if f := w.facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.conflict"] != false {
 		t.Fatalf("a fresh conflict: %v", f)
 	}
 }
@@ -505,7 +497,7 @@ func TestAConflictJoinsTheReviewsItCameWith(t *testing.T) {
 	r := w.mine(5, func(row *dinv.PR, _ *pr.Facts) {
 		row.Mergeable, row.MergeableAt = "CONFLICTING", t0.Add(-time.Hour)
 	})
-	if f := facts(t, w.provider(), r.Unit()); f["pr.address.reason"] != "reviewed by bob; failing checks: lint; conflicts with main" {
+	if f := w.facts(t, w.provider(), r.Unit()); f["pr.address.reason"] != "reviewed by bob; failing checks: lint; conflicts with main" {
 		t.Fatalf("reason = %q", f["pr.address.reason"])
 	}
 }
@@ -516,18 +508,18 @@ func TestAddressWithoutAWorkspaceNeedsReviews(t *testing.T) {
 		row.ChecksState = "FAILURE"
 		f.Checks = []pr.Check{{Name: "lint", Failed: true}}
 	})
-	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "failing checks or a conflict alone start no round without a workspace" {
+	if f := w.facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "failing checks or a conflict alone start no round without a workspace" {
 		t.Fatalf("checks alone without a workspace: %v", f)
 	}
 	r = w.add(7, me, func(row *dinv.PR, _ *pr.Facts) {
 		row.Mergeable, row.MergeableAt = "CONFLICTING", t0.Add(-time.Hour)
 	})
-	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "failing checks or a conflict alone start no round without a workspace" {
+	if f := w.facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "failing checks or a conflict alone start no round without a workspace" {
 		t.Fatalf("a conflict alone without a workspace: %v", f)
 	}
 	r = w.mine(6, nil)
 	w.snap.Workspaces = w.snap.Workspaces[:1]
-	f := facts(t, w.provider(), r.Unit())
+	f := w.facts(t, w.provider(), r.Unit())
 	if f["pr.address.due"] != true || f["pr.address.observed"] != true || f["pr.has_workspace"] != false {
 		t.Fatalf("reviews without a workspace: %v", f)
 	}
@@ -536,18 +528,18 @@ func TestAddressWithoutAWorkspaceNeedsReviews(t *testing.T) {
 func TestTheFingerprintIsStableAcrossSweeps(t *testing.T) {
 	w := newWorld()
 	r := w.review(7, nil)
-	first := facts(t, w.provider(), r.Unit())["pr.fingerprint"]
+	first := w.facts(t, w.provider(), r.Unit())["pr.fingerprint"]
 	if first == "" {
 		t.Fatal("a due follow-up has no fingerprint")
 	}
 	w.now = w.now.Add(5 * time.Minute)
-	if again := facts(t, w.provider(), r.Unit())["pr.fingerprint"]; again != first {
+	if again := w.facts(t, w.provider(), r.Unit())["pr.fingerprint"]; again != first {
 		t.Fatalf("fingerprint moved from %q to %q", first, again)
 	}
 	d := w.details[r]
 	d.Reviews = append(d.Reviews, pr.Review{ID: "r2", State: pr.ReviewCommented, Author: me, SubmittedAt: w.now.Add(-time.Minute), CommitOid: "c1"})
 	w.details[r] = d
-	if next := facts(t, w.provider(), r.Unit())["pr.fingerprint"]; next == first {
+	if next := w.facts(t, w.provider(), r.Unit())["pr.fingerprint"]; next == first {
 		t.Fatal("a new review keeps the fingerprint")
 	}
 }
@@ -574,14 +566,14 @@ func TestListReachesMergedPRsWithOpenTurnsOrQueuedAnswers(t *testing.T) {
 	if slices.Contains(got, neither.Unit()) {
 		t.Fatal("a merged pull request without a turn is listed")
 	}
-	f := facts(t, p, withTurn.Unit())
+	f := w.facts(t, p, withTurn.Unit())
 	if f["pr.open_turn"] != "sent" || f["pr.open_turn_seq"] != 2 || f["pr.state"] != "MERGED" || f["pr.ended"] != true {
 		t.Fatalf("open turn facts = %v", f)
 	}
-	if f := facts(t, p, open.Unit()); f["pr.ended"] != false {
+	if f := w.facts(t, p, open.Unit()); f["pr.ended"] != false {
 		t.Fatalf("an open pull request has ended: %v", f)
 	}
-	if f := facts(t, p, withAnswer.Unit()); f["pr.orphan_answer_id"] != 41 || f["pr.open_turn"] != "" {
+	if f := w.facts(t, p, withAnswer.Unit()); f["pr.orphan_answer_id"] != 41 || f["pr.open_turn"] != "" {
 		t.Fatalf("orphan answer facts = %v", f)
 	}
 	if other, _ := p.List(context.Background(), unit.Session); len(other) != 0 {
@@ -596,38 +588,28 @@ func TestFactsAreReadOnlyAndSendNoGitHubRequest(t *testing.T) {
 	p := w.provider()
 	ctx := context.Background()
 	for _, u := range units {
-		facts(t, p, u)
-		for _, round := range []string{factsgithub.RoundFollowup, factsgithub.RoundFirst, factsgithub.RoundAddress} {
-			if _, _, err := p.Candidate(ctx, u, round); err != nil {
-				t.Fatal(err)
-			}
-		}
+		w.facts(t, p, u)
+		w.plan(u, w.roundState(u))
 		if _, err := p.Author(ctx, u, true); err != nil {
 			t.Fatal(err)
 		}
 	}
 	p.Due()
-	if w.stubs.calls != 0 || len(w.recorded) != 0 {
-		t.Fatalf("reading facts sent %d GitHub reads and recorded %v", w.stubs.calls, w.recorded)
+	if len(w.recorded) != 0 {
+		t.Fatalf("reading facts recorded %v", w.recorded)
 	}
 	if c := w.rounds.Changes(); len(c.PRs) != 0 || len(c.Counts) != 0 || len(c.Notes) != 0 {
 		t.Fatalf("reading facts edited the round state: %+v", c)
 	}
 }
 
-// state is the sweep's round state as the composition root gives Settle.
-type state struct{ st *round.Store }
-
-func (s state) Save(context.Context) error { return nil }
-func (s state) Rounds() *round.Store       { return s.st }
-
 func TestSettleWritesTheBasesBookkeeping(t *testing.T) {
 	w := newWorld()
 	reviewed := w.review(7, nil)
 	reviewedAt := t0.Add(-2 * time.Hour).UTC().Format(time.RFC3339)
-	w.rounds.SetMark(reviewed.String(), round.Reviewed, reviewedAt)
+	w.rounds.SetMark(reviewed.String(), plan.MarkReviewed, reviewedAt)
 	skipped := w.requested(3, func(row *dinv.PR, _ *pr.Facts) { row.HeadBranch = "skipped" })
-	w.rounds.SkipFirstRound(skipped.String())
+	w.rounds.SetMark(skipped.String(), plan.MarkFirstSkipped, "1")
 	w.workspace(wsdomain.Workspace{ID: "rev3", DisplayName: "REVIEW skipped", Branch: "skipped"})
 	w.blocks[skipped] = dinv.Event{PR: skipped, Kind: dinv.KindRoundBlocked, Data: "old"}
 	busy := w.requested(4, func(row *dinv.PR, _ *pr.Facts) { row.HeadBranch = "busy" })
@@ -638,15 +620,11 @@ func TestSettleWritesTheBasesBookkeeping(t *testing.T) {
 	w.blocks[gone] = dinv.Event{PR: gone, Kind: dinv.KindRoundBlocked, Data: "old"}
 	held := w.requested(12, func(row *dinv.PR, _ *pr.Facts) { row.HeadBranch = "busy" })
 	w.overrides[held] = dinv.Override{PR: held, Hold: true}
-	w.rounds.Saved()
-
-	if err := w.provider().Settle(context.Background(), state{w.rounds}); err != nil {
-		t.Fatal(err)
-	}
-	if fp := w.rounds.Mark(reviewed.String(), round.Reviewed); fp != reviewedAt+"@c2" {
+	w.settle()
+	if fp := w.rounds.Mark(reviewed.String(), plan.MarkReviewed); fp != reviewedAt+"@c2" {
 		t.Fatalf("fingerprint = %q, want the head added", fp)
 	}
-	if w.rounds.FirstRoundSkipped(skipped.String()) {
+	if w.rounds.Mark(skipped.String(), plan.MarkFirstSkipped) != "" {
 		t.Fatal("a review workspace left the first round skipped")
 	}
 	got := map[pr.Ref]string{}
@@ -661,42 +639,19 @@ func TestSettleWritesTheBasesBookkeeping(t *testing.T) {
 	if !maps.Equal(got, want) {
 		t.Fatalf("recorded %v, want %v", got, want)
 	}
-	if err := w.provider().Settle(context.Background(), struct{ state2 }{}); err == nil {
-		t.Fatal("settling without the round store succeeded")
-	}
 }
 
-type state2 struct{}
-
-func (state2) Save(context.Context) error { return nil }
-
-func TestRefreshUnblocksAnAnsweredStartBlock(t *testing.T) {
-	w := newWorld()
-	r := w.requested(3, nil)
-	key := "2026-10-21T14:00:00Z\ntrust\n/w/app\n/w/app/sub\n\n\nfirst\n\n"
-	w.blocks[r] = dinv.Event{PR: r, Kind: dinv.KindRoundBlocked, Key: key, At: t0.Add(-time.Hour), Data: "folder not trusted"}
-	p := w.provider()
-	if err := p.Refresh(context.Background()); err != nil {
-		t.Fatal(err)
+// settle has the plugin's planner settle the world: its marks onto the
+// round state, its events recorded.
+func (w *world) settle() {
+	env, pe, ins := w.inputs()
+	marks, evs := ghreporttest.Settled(env, pe, ins)
+	for ref, m := range marks {
+		for name, v := range m {
+			w.rounds.SetMark(ref.String(), name, v)
+		}
 	}
-	if len(w.recorded) != 0 {
-		t.Fatalf("Refresh without the agents recorded %v", w.recorded)
-	}
-	p = factsgithub.New(factsgithub.Deps{Inputs: w, Store: w, Snapshot: w, Books: w, Rounds: w, Git: w.git, Cfg: func() config.Config { return w.cfg },
-		Clock: clock{w}, Agents: map[string]turns.Agent{}})
-	if err := p.Refresh(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if !p.Due().Equal(t0.Add(23 * time.Hour)) {
-		t.Fatalf("due = %v, want the blind block's day", p.Due())
-	}
-	w.now = t0.Add(24 * time.Hour)
-	if err := p.Refresh(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if len(w.recorded) != 1 || w.recorded[0].Kind != dinv.KindRoundUnblocked {
-		t.Fatalf("a day later recorded %v", w.recorded)
-	}
+	w.recorded = append(w.recorded, evs...)
 }
 
 func TestStaleDetailSetsStale(t *testing.T) {
@@ -710,7 +665,7 @@ func TestStaleDetailSetsStale(t *testing.T) {
 	}
 	p := w.provider()
 	for r, want := range map[pr.Ref]bool{fresh: false, stale: true, closed: false} {
-		if got := facts(t, p, r.Unit())["pr.stale"]; got != want {
+		if got := w.facts(t, p, r.Unit())["pr.stale"]; got != want {
 			t.Errorf("%s: stale = %v, want %v", r, got, want)
 		}
 	}
@@ -724,11 +679,11 @@ func TestVisibilityComesFromTheDetail(t *testing.T) {
 	delete(w.details, unread)
 	p := w.provider()
 	for r, want := range map[pr.Ref]string{private: "private", public: "public", unread: ""} {
-		if got := facts(t, p, r.Unit())["pr.visibility"]; got != want {
+		if got := w.facts(t, p, r.Unit())["pr.visibility"]; got != want {
 			t.Errorf("%s: visibility = %v, want %q", r, got, want)
 		}
 	}
-	if f := facts(t, p, private.Unit()); f["pr.owner"] != private.Owner || f["pr.author"] != "alice" {
+	if f := w.facts(t, p, private.Unit()); f["pr.owner"] != private.Owner || f["pr.author"] != "alice" {
 		t.Errorf("owner %v, author %v", f["pr.owner"], f["pr.author"])
 	}
 }
@@ -744,12 +699,12 @@ func TestLastInteractionCountsAnyonesCommentReviewPushOrRequest(t *testing.T) {
 		{PR: r, Kind: dinv.KindCheck, At: t0.Add(-day)},
 		{PR: r, Kind: dinv.KindSituation, At: t0.Add(-day)},
 	}
-	f := facts(t, w.provider(), r.Unit())
+	f := w.facts(t, w.provider(), r.Unit())
 	if at := f["pr.last_interaction_at"]; at != t0.Add(-32*day) || f["pr.silent_days"] != 32 {
 		t.Fatalf("last interaction = %v, %v days", at, f["pr.silent_days"])
 	}
 	quiet := w.add(6, me, func(row *dinv.PR, _ *pr.Facts) { row.CreatedAt = t0.Add(-3 * day) })
-	if f := facts(t, w.provider(), quiet.Unit()); f["pr.last_interaction_at"] != t0.Add(-3*day) {
+	if f := w.facts(t, w.provider(), quiet.Unit()); f["pr.last_interaction_at"] != t0.Add(-3*day) {
 		t.Fatalf("without an interaction = %v, want its opening", f["pr.last_interaction_at"])
 	}
 }
@@ -761,79 +716,30 @@ func TestWaitsOnUserFollowsTheRow(t *testing.T) {
 	myDraft := w.add(6, me, func(row *dinv.PR, _ *pr.Facts) { row.IsDraft = true })
 	p := w.provider()
 	for r, want := range map[pr.Ref]bool{asksMe: true, waitsOnBob: false, myDraft: true} {
-		if got := facts(t, p, r.Unit())["pr.waits_on_user"]; got != want {
+		if got := w.facts(t, p, r.Unit())["pr.waits_on_user"]; got != want {
 			t.Errorf("%s: waits_on_user = %v, want %v", r, got, want)
 		}
 	}
-	if f := facts(t, p, waitsOnBob.Unit()); f["pr.nudge.refusal"] != "" {
+	if f := w.facts(t, p, waitsOnBob.Unit()); f["pr.nudge.refusal"] != "" {
 		t.Errorf("a nudge to bob is refused: %q", f["pr.nudge.refusal"])
 	}
-	if f := facts(t, p, asksMe.Unit()); f["pr.nudge.refusal"] == "" {
+	if f := w.facts(t, p, asksMe.Unit()); f["pr.nudge.refusal"] == "" {
 		t.Error("a nudge on a pull request waiting on me goes")
 	}
 }
 
-func TestMovedComparesStubs(t *testing.T) {
-	w := newWorld()
-	same, head, closed, missing := w.requested(1, nil), w.requested(2, nil), w.requested(3, nil), w.requested(4, nil)
-	stub := func(r pr.Ref) github.Stub {
-		row := w.rows[r]
-		return github.Stub{Ref: r, HeadOid: row.HeadOid, State: row.State, UpdatedAt: row.UpdatedAt}
-	}
-	w.stubs.stubs = map[pr.Ref]github.Stub{same: stub(same), head: stub(head), closed: stub(closed)}
-	s := w.stubs.stubs[head]
-	s.HeadOid = "moved"
-	w.stubs.stubs[head] = s
-	s = w.stubs.stubs[closed]
-	s.State = "CLOSED"
-	w.stubs.stubs[closed] = s
-	p := w.provider()
-	units := []unit.Unit{same.Unit(), head.Unit(), closed.Unit(), missing.Unit()}
-	moved, err := p.Moved(context.Background(), units)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := units[1:]; !slices.Equal(moved, want) {
-		t.Fatalf("moved = %v, want %v", moved, want)
-	}
-	if !p.Due().Equal(t0.Add(2 * time.Minute)) {
-		t.Fatalf("due = %v, want the next fast run", p.Due())
-	}
-	w.stubs.err = errors.New("budget")
-	if moved, _ := p.Moved(context.Background(), units); !slices.Equal(moved, units) {
-		t.Fatalf("a failed read moved %v", moved)
-	}
-}
-
-func TestDueMatchesTheBasesNextDue(t *testing.T) {
-	day := 24 * time.Hour
+func TestDueIsTheCapsRollover(t *testing.T) {
 	for _, c := range []struct {
 		name  string
 		setup func(w *world)
 		want  time.Time
 	}{
-		{"review cutoff", func(w *world) {
-			r := w.add(7, "alice", nil)
-			w.books[r.Unit()] = turn.Book{Unit: r.Unit(), Turns: []turn.Turn{{Seq: 1, Intent: "review", Role: "pr.review", State: turn.Done, SentAt: t0.Add(-10 * day)}}}
-		}, t0.Add(20 * day)},
 		{"cap rollover", func(w *world) {
 			r := w.review(7, nil)
 			for range w.cfg.Turns.PerUnitPerDay {
 				w.rounds.Count(r.String(), t0)
 			}
 		}, nextDay(t0)},
-		{"conflict window", func(w *world) {
-			w.mine(5, func(row *dinv.PR, f *pr.Facts) {
-				row.Mergeable, row.MergeableAt, row.ChecksState = "CONFLICTING", t0.Add(-time.Minute), ""
-				f.Reviews, f.Checks = nil, nil
-			})
-		}, t0.Add(4 * time.Minute)},
-		{"stale detail", func(w *world) {
-			r := w.review(7, nil)
-			d := w.details[r]
-			d.ReadAt = time.Time{}
-			w.details[r] = d
-		}, t0.Add(2 * time.Minute)},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			w := newWorld()
@@ -895,7 +801,7 @@ func TestEveryFactIsDeclaredWithItsType(t *testing.T) {
 	r := w.mine(5, func(row *dinv.PR, _ *pr.Facts) {
 		row.State, row.MergedAt, row.ClosedAt = "MERGED", t0.Add(-time.Hour), t0.Add(-time.Hour)
 	})
-	f := facts(t, w.provider(), r.Unit())
+	f := w.facts(t, w.provider(), r.Unit())
 	types := map[expr.Type]func(any) bool{
 		expr.Bool:     func(v any) bool { _, ok := v.(bool); return ok },
 		expr.Int:      func(v any) bool { _, ok := v.(int); return ok },
@@ -930,47 +836,8 @@ func TestListReachesAFollowupWithoutItsWorkspace(t *testing.T) {
 	if err != nil || !slices.Contains(got, r.Unit()) {
 		t.Fatalf("list = %v, %v; want the lapsed follow-up", got, err)
 	}
-	if f := facts(t, p, r.Unit()); f["pr.review.action"] != "follow-up" || f["pr.review.observed"] != true {
+	if f := w.facts(t, p, r.Unit()); f["pr.review.action"] != "follow-up" || f["pr.review.observed"] != true {
 		t.Fatalf("facts = %v", f)
-	}
-}
-
-func TestALaterDeadlineIsNotHiddenByAPastOne(t *testing.T) {
-	w := newWorld()
-	r := w.review(7, nil)
-	w.stubs.stubs = map[pr.Ref]github.Stub{}
-	p := w.provider()
-	if _, err := p.Moved(context.Background(), []unit.Unit{r.Unit()}); err != nil {
-		t.Fatal(err)
-	}
-	w.now = t0.Add(time.Hour)
-	if _, err := p.List(context.Background(), unit.GitHub); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := p.Moved(context.Background(), []unit.Unit{r.Unit()}); err != nil {
-		t.Fatal(err)
-	}
-	if want := w.now.Add(2 * time.Minute); !p.Due().Equal(want) {
-		t.Fatalf("due = %v, want %v", p.Due(), want)
-	}
-}
-
-func TestMovedNeverReadsAnObservedRound(t *testing.T) {
-	w := newWorld()
-	r := w.add(7, "alice", func(row *dinv.PR, f *pr.Facts) {
-		row.HeadOid = "c2"
-		f.Commits = []pr.Commit{{Oid: "c1", Parents: 1}, {Oid: "c2", Parents: 1}}
-		f.Reviews = []pr.Review{{ID: "r1", State: pr.ReviewCommented, Author: me, SubmittedAt: t0.Add(-2 * time.Hour), CommitOid: "c1"}}
-	})
-	w.books[r.Unit()] = turn.Book{Unit: r.Unit(), Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), Role: "pr.review", State: turn.Done, SentAt: t0.Add(-3 * time.Hour)}}}
-	w.stubs.err = errors.New("budget")
-	p := w.provider()
-	if f := facts(t, p, r.Unit()); f["pr.review.observed"] != true {
-		t.Fatalf("not observed: %v", f)
-	}
-	moved, err := p.Moved(context.Background(), []unit.Unit{r.Unit()})
-	if err != nil || len(moved) != 0 || w.stubs.calls != 0 {
-		t.Fatalf("moved %v, %v after %d reads", moved, err, w.stubs.calls)
 	}
 }
 
@@ -1016,7 +883,7 @@ func TestListOrdersEachRoundAsTheBasePlannedIt(t *testing.T) {
 	}
 	for path, u := range map[string]unit.Unit{"pr.review.action": older.Unit(), "pr.first.due": oldest.Unit(), "pr.address.due": firstWS.Unit()} {
 		for _, v := range got {
-			f := facts(t, p, v)
+			f := w.facts(t, p, v)
 			if f[path] == true || f[path] == "follow-up" {
 				if v != u {
 					t.Errorf("%s: the one slot goes to %v, the base sent %v", path, v, u)
@@ -1027,27 +894,97 @@ func TestListOrdersEachRoundAsTheBasePlannedIt(t *testing.T) {
 	}
 }
 
-// answeredQuestions is an agent whose home or checkout answered every
-// question.
-type answeredQuestions struct{ turns.Agent }
+// roundState is w's round state of u, as the host gives it to a plan.
+func (w *world) roundState(u unit.Unit) src.RoundState {
+	p := w.rounds.PRs[u.Key]
+	day := w.rounds.Days[round.DayKey(w.now)]
+	return src.RoundState{Marks: maps.Clone(p.Marks), SentAt: p.SentAt, AgentHome: p.AgentHome, Today: day.PerPR[u.Key], DayTotal: day.Total}
+}
 
-func (answeredQuestions) BlockedOn(string) string { return "" }
+// planned is the round name the plugin's planner plans on u over w's round
+// state.
+func (w *world) planned(t *testing.T, _ *factsgithub.Provider, u unit.Unit, name string) (src.Round, bool) {
+	t.Helper()
+	plan := w.plan(u, w.roundState(u))
+	i := slices.IndexFunc(plan.Rounds, func(r src.Round) bool { return r.Name == name })
+	if i < 0 {
+		return src.Round{}, false
+	}
+	return plan.Rounds[i], true
+}
 
-func (answeredQuestions) Explain(context.Context, turns.AgentSession, string) error { return nil }
+func (w *world) plan(u unit.Unit, st src.RoundState) src.Plan {
+	env, pe, ins := w.inputs()
+	r, _ := pr.RefOf(u)
+	return ghreporttest.PlanOf(env, pe, ins, r, st)
+}
 
-func (answeredQuestions) Unanswered(context.Context, turns.AgentSession, string) bool { return false }
-
-func TestRefreshUnblocksAQuestionTheCheckoutAnswersWithoutAnAgentHome(t *testing.T) {
+func TestTheFirstRoundPlanReadsTheHostsRoundState(t *testing.T) {
 	w := newWorld()
 	r := w.requested(3, nil)
-	key := "2026-10-21T14:00:00Z\nagent-project-mcp\n/w/app\n\n\n\nfirst\n\n"
-	w.blocks[r] = dinv.Event{PR: r, Kind: dinv.KindRoundBlocked, Key: key, At: t0.Add(-time.Hour), Data: "the agent waits on the MCP question"}
-	p := factsgithub.New(factsgithub.Deps{Inputs: w, Store: w, Snapshot: w, Books: w, Rounds: w, Git: w.git, Cfg: func() config.Config { return w.cfg },
-		Clock: clock{w}, Agents: map[string]turns.Agent{w.cfg.Agent: answeredQuestions{}}})
-	if err := p.Refresh(context.Background()); err != nil {
-		t.Fatal(err)
+	p := w.provider()
+	first, ok := w.planned(t, p, r.Unit(), plan.RoundFirst)
+	if !ok || !maps.Equal(first.OnSkipped, map[string]string{plan.MarkFirstSkipped: "1"}) || len(first.OnSent) != 0 {
+		t.Fatalf("first round %+v, %v", first, ok)
 	}
-	if len(w.recorded) != 1 || w.recorded[0].Kind != dinv.KindRoundUnblocked || w.recorded[0].Data != "the agent's question is answered" {
-		t.Fatalf("recorded %v", w.recorded)
+	st := w.roundState(r.Unit())
+	st.Marks = map[string]string{plan.MarkFirstSkipped: "1"}
+	if plan := w.plan(r.Unit(), st); len(plan.Rounds) != 0 {
+		t.Fatalf("a round state whose first round was skipped plans %+v", plan.Rounds)
 	}
+}
+
+// Units are the pull requests the world holds, as the plugin reports them.
+func (w *world) Units(_ context.Context, p unit.ProviderID) ([]unit.Unit, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	var out []unit.Unit
+	for r := range w.rows {
+		out = append(out, r.Unit())
+	}
+	return out, nil
+}
+
+// Reported are the plugin's reports of units, its planner's included,
+// derived from the world now.
+func (w *world) Reported(_ context.Context, units []unit.Unit) (map[unit.Unit]src.Snapshot, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	all := w.planned1()
+	out := map[unit.Unit]src.Snapshot{}
+	for _, u := range units {
+		if s, ok := all[u]; ok {
+			out[u] = s
+		}
+	}
+	return out, nil
+}
+
+// inputs are the world's pull requests as the plugin's planner reads them.
+func (w *world) inputs() (ghreporttest.Env, ghreporttest.PlanEnv, []ghreporttest.Input) {
+	cfg := w.cfg
+	env := ghreporttest.Env{Viewer: w.viewer, Now: w.now, Stalled: &cfg.GitHub.Stalled, Teams: []string{}}
+	pe := ghreporttest.PlanEnv{Rounds: w.rounds, Pause: w.pause, Books: w.books, Snapshot: w.snap, Git: ghreporttest.GitOf(w.git, w.branches), Config: cfg}
+	var ins []ghreporttest.Input
+	for _, r := range slices.SortedFunc(maps.Keys(w.rows), func(a, b pr.Ref) int { return a.Number - b.Number }) {
+		row := w.rows[r]
+		evs := slices.Clone(w.events[r])
+		if b, ok := w.blocks[r]; ok {
+			evs = append(evs, b)
+		}
+		if w.ended[r.Unit()] {
+			evs = append(evs, dinv.Event{PR: r, Kind: dinv.KindReviewEnded, At: w.now})
+		}
+		in := ghreporttest.Input{PR: row, Events: evs, Adopted: w.overrides[r].Adopted, Tracked: w.overrides[r].Tracked, Held: w.overrides[r].Hold}
+		if f, ok := w.details[r]; ok {
+			in.Facts = &f
+		}
+		ins = append(ins, in)
+	}
+	return env, pe, ins
+}
+
+func (w *world) planned1() map[unit.Unit]src.Snapshot {
+	env, pe, ins := w.inputs()
+	return ghreporttest.Planned(env, pe, ins)
 }

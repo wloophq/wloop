@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
@@ -29,11 +28,10 @@ func goldenModel(t *testing.T, color bool) *Model {
 	setPR(&asked, func(p *prView) { p.Workspace = api.Workspace{DisplayName: "REVIEW batch-export", Status: "reviewing"} })
 
 	pending := row(3, "Retry webhooks with backoff", "round_pending", "needs-me")
-	pending.Pending = &api.PendingRound{Deadline: now.Add(42 * time.Second)}
 	pending.Summary.Reason = "new commits since the last review"
 
 	stalled := row(1365, "Remove hardcoded credentials from the common constants fallbacks", "changes", "needs-me", "mine")
-	stalled.Unit = pr.Ref{Owner: "acme", Repo: "billing-service", Number: 1365}.Unit()
+	stalled.Unit = unit.Unit{Provider: unit.GitHub, Key: "acme/billing-service#1365"}
 	stalled.Label = "acme/billing-service#1365"
 	stalled.Link = "https://github.com/acme/billing-service/pull/1365"
 	stalled.Summary.Stalled, stalled.Summary.Since = true, now.Add(-9*24*time.Hour)
@@ -52,6 +50,7 @@ func goldenModel(t *testing.T, color bool) *Model {
 	busy.Summary.Since = now.Add(-12 * time.Minute)
 
 	m := modelWith(t, asked, pending, stalled, failing, busy)
+	m.SetGates([]api.GateView{planGate(pending, now.Add(42*time.Second))})
 	m.SetColor(color)
 	m.busy[busy.Unit] = "review"
 	m.health.Paused = true
@@ -59,34 +58,34 @@ func goldenModel(t *testing.T, color bool) *Model {
 	return m
 }
 
-// gtdGolden is the golden model on GTD view, the Inbox with its first
-// entry's detail open, the Outbox with its draft's.
-func gtdGolden(t *testing.T, color bool, view string) *Model {
+// viewsGolden is the golden model on task view, the Inbox with its first
+// task's detail open, the Outbox with its draft's.
+func viewsGolden(t *testing.T, color bool, view string) *Model {
 	m := goldenModel(t, color)
-	m.SetGTD(gtdCatalog())
-	for v, es := range gtdEntries() {
-		m.SetEntries(v, es, gtdCounters())
+	m.SetViews(viewsCatalog())
+	for v, es := range viewTasks() {
+		m.SetTasks(v, es, viewCounters())
 	}
 	m.navigate(view)
-	m.busy[entryUnit("e5")] = "done"
+	m.busy[taskUnit("e5")] = "done"
 	if view == "inbox" || view == "outbox" {
-		e, _ := m.selectedEntry()
-		m.openEntry(e, 0)
+		e, _ := m.selectedTask()
+		m.openTask(e, 0)
 		m.SetDetail(e.ID, e, nil)
 	}
 	return m
 }
 
-// draftsGolden is Focus with its entry's detail open, listing the drafts
+// draftsGolden is Focus with its task's detail open, listing the drafts
 // made for it, the first one picked.
 func draftsGolden(t *testing.T, color bool) *Model {
-	m := gtdGolden(t, color, "focus")
-	e, _ := m.selectedEntry()
-	m.openEntry(e, 0)
+	m := viewsGolden(t, color, "focus")
+	e, _ := m.selectedTask()
+	m.openTask(e, 0)
 	m.SetDetail(e.ID, e, nil)
 	m.SetDrafts(e.ID, []api.Draft{
-		{ID: 4, Entry: e.ID, Kind: "reply", Purpose: "reply", Text: "Thanks, the export now runs in batches.\nI will watch tonight's job.", State: "proposed", Origin: api.DraftOrigin{Kind: "turn"}},
-		{ID: 3, Entry: e.ID, Kind: "react", Purpose: "react", Reaction: "eyes", State: "sent", Origin: api.DraftOrigin{Kind: "user"}},
+		{ID: 4, Task: e.ID, Kind: "reply", Purpose: "reply", Text: "Thanks, the export now runs in batches.\nI will watch tonight's job.", State: "proposed", Origin: api.DraftOrigin{Kind: "turn"}},
+		{ID: 3, Task: e.ID, Kind: "react", Purpose: "react", Reaction: "eyes", State: "sent", Origin: api.DraftOrigin{Kind: "user"}},
 	})
 	m.picked = 4
 	return m
@@ -110,10 +109,10 @@ func planGolden(t *testing.T, color bool) *Model {
 func TestRenderGolden(t *testing.T) {
 	models := map[string]func(*testing.T, bool) *Model{"render": goldenModel}
 	for _, v := range []string{"focus", "inbox", "outbox", "next", "waiting"} {
-		models["gtd-"+v] = func(t *testing.T, color bool) *Model { return gtdGolden(t, color, v) }
+		models["views-"+v] = func(t *testing.T, color bool) *Model { return viewsGolden(t, color, v) }
 	}
-	models["gtd-review"] = func(t *testing.T, color bool) *Model { return reviewModel(t, color) }
-	models["gtd-drafts"] = draftsGolden
+	models["views-review"] = func(t *testing.T, color bool) *Model { return reviewModel(t, color) }
+	models["views-drafts"] = draftsGolden
 	models["plan"] = planGolden
 	for prefix, model := range models {
 		for _, color := range []bool{false, true} {

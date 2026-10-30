@@ -1,0 +1,21 @@
+package task
+
+import (
+	"testing"
+
+	"github.com/wloophq/wloop/internal/domain/unit"
+)
+
+func TestTheTaskCodecTakesATaskID(t *testing.T) {
+	t.Parallel()
+	r := unit.NewRegistry(Codec{})
+	u, err := r.Parse("task", "t-0a1b2c3d4e5f6a7b")
+	if err != nil || u != UnitOf("t-0a1b2c3d4e5f6a7b") {
+		t.Fatalf("%v %v", u, err)
+	}
+	for _, bad := range []string{"", " ", "e 1", "e\n1"} {
+		if _, err := r.Parse("task", bad); err == nil {
+			t.Errorf("%q parsed", bad)
+		}
+	}
+}

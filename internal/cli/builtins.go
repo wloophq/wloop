@@ -2,9 +2,17 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"maps"
 	"slices"
 	"strings"
+	"sync"
+
+	"github.com/wloophq/wloop/internal/domain/pr"
+
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/turns"
@@ -12,14 +20,10 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/turn"
 )
-
-// nudgedWho is the input nudge.prepare fills with whom the round asks,
-// which pr.nudged records.
-const nudgedWho = "who"
 
 // The workspace builtins whose role links a worktree to the pull request.
 const (
@@ -46,70 +50,57 @@ const (
 	routeLaunch
 )
 
+// wire is rt as an effect request names it.
+func (rt route) wire() string {
+	switch rt {
+	case routeAsked:
+		return src.RouteAsked
+	case routeLaunch:
+		return src.RouteLaunch
+	}
+	return src.RouteSession
+}
+
 // sentRound is what a turn effect reads of a round on its way out; the
 // route fills it as the round goes.
 type sentRound struct {
 	env       *Env
 	ctx       context.Context
-	ref       github.Ref
-	pr        *github.PullRequest
+	ref       pr.Ref
+	pr        *pr.PullRequest
 	cfg       config.Config
 	inputs    map[string]any
 	id        string
 	submitted bool
 	guidance  string
-	// fingerprint is the reviews the round covers, "" when unread.
-	fingerprint string
 }
 
-// effectRun is what an effect does on a route, by phase: guide before the
-// round, sent once it went out, state on the round state the route loaded,
-// unsent when it did not go out.
+// effectRun is what a host effect does on a route, by phase: guide before
+// the round, sent once it went out, unsent when it did not.
 type effectRun struct {
 	guide, sent, unsent func(r *sentRound)
-	state               func(r *sentRound, st *round.Store)
-	// writesIf, when set, says whether the state phase writes for r.
-	writesIf func(r *sentRound) bool
 }
 
-// onSentEffect is a turn effect and what it does on each route.
+// onSentEffect is a turn effect the host applies and what it does on each
+// route; every other turn effect is its plugin's, applied through
+// ApplyEffect once the round went out.
 type onSentEffect struct {
 	name string
 	on   map[route]effectRun
 }
 
-var (
-	keepsGuidance = effectRun{
-		guide:  func(r *sentRound) { r.guidance = r.env.handGuidance(r.ctx, r.ref, r.guidance) },
-		unsent: func(r *sentRound) { r.env.keepGuidance(r.ctx, r.ref, r.guidance) },
-	}
-	// recordsNudge keys the nudged event by its turn, so a turn that posted
-	// nothing does not hold the next nudge.
-	recordsNudge = effectRun{sent: func(r *sentRound) {
-		r.env.recordTurnEvent(r.ctx, r.ref, dinv.KindNudged, r.id, strings.Join(inputList(r.inputs[nudgedWho]), ", "))
-	}}
-	markAddressed = effectRun{state: func(r *sentRound, st *round.Store) { r.env.recordAddressed(st, r.ref, r.pr.HeadRefOid) }}
-)
+var keepsGuidance = effectRun{
+	guide:  func(r *sentRound) { r.guidance = r.env.handGuidance(r.ctx, r.ref, r.guidance) },
+	unsent: func(r *sentRound) { r.env.keepGuidance(r.ctx, r.ref, r.guidance) },
+}
 
-// onSent is the turn effects the command line runs, in the order each
-// phase runs them. The daemon records the round-sent event of a round asked
-// through its action.
+// onSent is the turn effects the command line applies, in the order each
+// phase runs them.
 var onSent = []onSentEffect{
 	{name: builtin.EffectGuidanceHanded, on: map[route]effectRun{routeSession: keepsGuidance, routeAsked: keepsGuidance}},
-	{name: builtin.EffectPRRoundSent, on: map[route]effectRun{routeSession: {sent: func(r *sentRound) {
+	{name: builtin.EffectRoundSent, on: map[route]effectRun{routeSession: {sent: func(r *sentRound) {
 		r.env.recordEvent(r.ctx, r.ref, dinv.KindRoundSent, withInstructions(handInSession, r.id))
 	}}}},
-	{name: builtin.EffectPRNudged, on: map[route]effectRun{routeSession: recordsNudge, routeAsked: recordsNudge, routeLaunch: recordsNudge}},
-	{name: builtin.EffectPRReviewed, on: map[route]effectRun{routeLaunch: {
-		sent: func(r *sentRound) {
-			if r.submitted {
-				r.fingerprint = r.env.reviewFingerprint(r.ctx, r.cfg, r.ref)
-			}
-		},
-		state:    func(r *sentRound, st *round.Store) { st.SetMark(r.ref.String(), round.Reviewed, r.fingerprint) },
-		writesIf: func(r *sentRound) bool { return r.fingerprint != "" },
-	}}},
-	{name: builtin.EffectPRAddressed, on: map[route]effectRun{routeSession: markAddressed, routeAsked: markAddressed, routeLaunch: markAddressed}},
 }
 
 type phase func(c effectRun, r *sentRound)
@@ -120,25 +111,13 @@ func sentPhase(c effectRun, r *sentRound) { runCell(c.sent, r) }
 
 func unsentPhase(c effectRun, r *sentRound) { runCell(c.unsent, r) }
 
-func statePhase(st *round.Store) phase {
-	return func(c effectRun, r *sentRound) {
-		if c.writes(r) {
-			c.state(r, st)
-		}
-	}
-}
-
-func (c effectRun) writes(r *sentRound) bool {
-	return c.state != nil && (c.writesIf == nil || c.writesIf(r))
-}
-
 func runCell(f func(r *sentRound), r *sentRound) {
 	if f != nil {
 		f(r)
 	}
 }
 
-// runPhase runs p of the turn effects d names, on route rt.
+// runPhase runs p of the host's turn effects d names, on route rt.
 func runPhase(rt route, d dintent.Def, r *sentRound, p phase) {
 	for _, e := range onSent {
 		if slices.Contains(d.Effects, e.name) {
@@ -147,15 +126,109 @@ func runPhase(rt route, d dintent.Def, r *sentRound, p phase) {
 	}
 }
 
-// writesRounds is whether the state phase of d's effects on rt writes the
-// round state for r.
-func writesRounds(rt route, d dintent.Def, r *sentRound) bool {
-	for _, e := range onSent {
-		if slices.Contains(d.Effects, e.name) && e.on[rt].writes(r) {
-			return true
+// pluginEffects are the turn effects of d the plugin of u applies.
+func pluginEffects(d dintent.Def, u unit.Unit) []string {
+	var names []string
+	for _, name := range d.Effects {
+		hosts := slices.ContainsFunc(onSent, func(h onSentEffect) bool { return h.name == name })
+		if fx, ok := builtin.EffectOf(name); ok && !hosts && fx.Plugin && fx.Provider == u.Provider && fx.Applies&builtin.AppliesTurn != 0 {
+			names = append(names, name)
 		}
 	}
-	return false
+	return names
+}
+
+// checkEffects refuses, before a turn of d on u goes out, one whose plugin
+// effects no running plugin applies.
+func (e *Env) checkEffects(d dintent.Def, u unit.Unit) error {
+	names := pluginEffects(d, u)
+	if len(names) == 0 {
+		return nil
+	}
+	if _, ok := e.turnEffects(u.Provider); !ok {
+		return fmt.Errorf("%s: no running plugin applies %s; the turn was not sent", u.Label(), strings.Join(names, ", "))
+	}
+	return nil
+}
+
+// applySentEffects applies the turn effects of d once r went out on route
+// rt: the host's sent phase, then, through ApplyEffect, those of the plugin
+// of r's unit. The turn is out whatever they answer: an effect that fails,
+// or that its plugin does not apply, is a health problem the daemon shows
+// until the next turn of the unit applies it.
+func (e *Env) applySentEffects(ctx context.Context, rt route, d dintent.Def, r *sentRound) {
+	runPhase(rt, d, r, sentPhase)
+	u := r.ref.Unit()
+	names := pluginEffects(d, u)
+	if len(names) == 0 {
+		return
+	}
+	a, ok := e.turnEffects(u.Provider)
+	if !ok {
+		for _, name := range names {
+			e.effectProblems.set(u, name, fmt.Sprintf("%s: no running plugin applied %s to the turn that went out", u.Label(), name))
+		}
+		return
+	}
+	head := ""
+	if r.pr != nil {
+		head = r.pr.HeadRefOid
+	}
+	var inputs json.RawMessage
+	if len(r.inputs) > 0 {
+		var err error
+		if inputs, err = json.Marshal(r.inputs); err != nil {
+			fmt.Fprintf(e.Err, "warning: %s: the turn's inputs: %v\n", r.ref, err)
+		}
+	}
+	for _, name := range names {
+		req := src.EffectRequest{Effect: name, Unit: psource.Wire(u), Turn: &src.TurnRef{ID: r.id, Head: head}, Route: rt.wire(), Taken: r.submitted,
+			Inputs: inputs}
+		err := a.ApplyEffect(context.WithoutCancel(ctx), req)
+		switch {
+		case errors.Is(err, src.ErrUnsupported):
+			e.effectProblems.set(u, name, fmt.Sprintf("%s: the plugin applies no %s, which the turn that went out names: %v", u.Label(), name, err))
+		case err != nil:
+			e.effectProblems.set(u, name, fmt.Sprintf("%s: applying %s to the turn that went out: %v", u.Label(), name, err))
+			fmt.Fprintf(e.Err, "warning: %s: applying %s: %v\n", r.ref, name, err)
+		default:
+			e.effectProblems.set(u, name, "")
+		}
+	}
+}
+
+// effectProblems are the turn effects that went unapplied, by unit and
+// effect, which the daemon's health lists.
+type effectProblems struct {
+	mu sync.Mutex
+	m  map[string]string
+}
+
+func (p *effectProblems) set(u unit.Unit, effect, text string) {
+	if p == nil {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	key := u.String() + " " + effect
+	if text == "" {
+		delete(p.m, key)
+		return
+	}
+	if p.m == nil {
+		p.m = map[string]string{}
+	}
+	p.m[key] = text
+}
+
+// list is every problem, sorted.
+func (p *effectProblems) list() []string {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return slices.Sorted(maps.Values(p.m))
 }
 
 // roundRun is a round of an intent about to go out in the workspace its
@@ -164,7 +237,7 @@ type roundRun struct {
 	def dintent.Def
 	cfg config.Config
 	r   turn.Request
-	pr  *github.PullRequest
+	pr  *pr.PullRequest
 	// resumeOf is the turn a resume continues, 0 for a new round.
 	resumeOf int64
 	// st is the round state of a round asked for by hand; nil on a resume.

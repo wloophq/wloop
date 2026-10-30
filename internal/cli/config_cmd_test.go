@@ -15,16 +15,16 @@ func TestConfigGet(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.Views["orca"].Columns["needs-me"] = "waiting-me"
 	for key, want := range map[string]string{
-		"views.orca.columns.needs-me": "waiting-me\n",
-		"views.orca.columns.reviewed": "reviewed\n",
-		"github.rate_limit_fraction":  "0.5\n",
-		"turns.per_unit_per_day":      "5\n",
-		"brief.enabled":               "false\n",
-		"github.automated_reviewers":  "[]\n",
-		"sweep.fast":                  "2m\n",
-		"sweep.slow":                  "1h\n",
-		"github.stalled.review":       "2d\n",
-		"cleanup.idle":                "2h\n",
+		"views.orca.columns.needs-me":        "waiting-me\n",
+		"views.orca.columns.reviewed":        "reviewed\n",
+		"plugins.github.rate_limit_fraction": "0.5\n",
+		"turns.per_unit_per_day":             "5\n",
+		"brief.enabled":                      "false\n",
+		"plugins.github.automated_reviewers": "[]\n",
+		"sweep.fast":                         "2m\n",
+		"sweep.slow":                         "1h\n",
+		"plugins.github.stalled.review":      "2d\n",
+		"cleanup.idle":                       "2h\n",
 	} {
 		te.out.Reset()
 		if code := te.run("config", "get", key); code != 0 || te.out.String() != want {

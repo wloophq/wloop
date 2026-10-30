@@ -5,20 +5,21 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/wloophq/wloop/internal/domain/pr"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/config"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
-	"github.com/wloophq/wloop/internal/github"
 )
 
 // aheadReads are the GitHub reads of one pull request an action makes,
 // made before it takes the loop lock so that it asks GitHub nothing under it.
 type aheadReads struct {
 	at        time.Time
-	basics    *github.PullRequest
+	basics    *pr.PullRequest
 	basicsErr error
 	// full is the read in full readPR returns, when read ahead.
-	full    *github.PullRequest
+	full    *pr.PullRequest
 	fullErr error
 	hasFull bool
 	viewer  string
@@ -30,12 +31,12 @@ type aheadKey struct{}
 // with those read ahead before, for the action that takes the loop lock
 // next. With full, an open pull request with a review workspace, the one a
 // held round reads in full, is also read in full into the inventory.
-func (e *Env) ReadAhead(ctx context.Context, ref github.Ref, full bool) context.Context {
+func (e *Env) ReadAhead(ctx context.Context, ref pr.Ref, full bool) context.Context {
 	r := &aheadReads{at: e.Now()}
-	r.basics, r.basicsErr = e.GitHub.Basics(ctx, ref)
+	r.basics, r.basicsErr = e.forgeBasics(ctx, ref)
 	if v, err := e.storedViewer(ctx); err == nil && v != "" {
 		r.viewer = v
-	} else if v, err := e.GitHub.Viewer(ctx); err == nil {
+	} else if v, err := e.forgeViewer(ctx); err == nil {
 		r.viewer = v
 	}
 	if full && r.basicsErr == nil && r.basics.State == dgh.StateOpen {
@@ -46,8 +47,8 @@ func (e *Env) ReadAhead(ctx context.Context, ref github.Ref, full bool) context.
 			r.hasFull = true
 		}
 	}
-	set := map[github.Ref]*aheadReads{ref: r}
-	if prev, _ := ctx.Value(aheadKey{}).(map[github.Ref]*aheadReads); prev != nil {
+	set := map[pr.Ref]*aheadReads{ref: r}
+	if prev, _ := ctx.Value(aheadKey{}).(map[pr.Ref]*aheadReads); prev != nil {
 		for k, v := range prev {
 			if k != ref {
 				set[k] = v
@@ -57,7 +58,7 @@ func (e *Env) ReadAhead(ctx context.Context, ref github.Ref, full bool) context.
 	return context.WithValue(ctx, aheadKey{}, set)
 }
 
-func (e *Env) hasReviewWorkspace(ctx context.Context, cfg config.Config, ref github.Ref, pr *github.PullRequest) bool {
+func (e *Env) hasReviewWorkspace(ctx context.Context, cfg config.Config, ref pr.Ref, pr *pr.PullRequest) bool {
 	repos, err := e.WS.Repos(ctx)
 	if err != nil {
 		return false
@@ -70,13 +71,13 @@ func (e *Env) hasReviewWorkspace(ctx context.Context, cfg config.Config, ref git
 	return found
 }
 
-func aheadOf(ctx context.Context, ref github.Ref) *aheadReads {
-	set, _ := ctx.Value(aheadKey{}).(map[github.Ref]*aheadReads)
+func aheadOf(ctx context.Context, ref pr.Ref) *aheadReads {
+	set, _ := ctx.Value(aheadKey{}).(map[pr.Ref]*aheadReads)
 	return set[ref]
 }
 
 func aheadViewer(ctx context.Context) string {
-	set, _ := ctx.Value(aheadKey{}).(map[github.Ref]*aheadReads)
+	set, _ := ctx.Value(aheadKey{}).(map[pr.Ref]*aheadReads)
 	for _, r := range set {
 		if r.viewer != "" {
 			return r.viewer
@@ -87,15 +88,15 @@ func aheadViewer(ctx context.Context) string {
 
 // basics is GitHub's basics of ref, as read ahead when they were, refused
 // when the inventory saw ref close or move to another head since.
-func (e *Env) basics(ctx context.Context, ref github.Ref) (*github.PullRequest, error) {
+func (e *Env) basics(ctx context.Context, ref pr.Ref) (*pr.PullRequest, error) {
 	r := aheadOf(ctx, ref)
 	if r == nil {
-		return e.GitHub.Basics(ctx, ref)
+		return e.forgeBasics(ctx, ref)
 	}
 	if r.basicsErr != nil || e.Store == nil {
 		return r.basics, r.basicsErr
 	}
-	row, ok, err := e.Store.PR(ctx, ref)
+	row, ok, err := e.reportedPRs().PR(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -108,18 +109,18 @@ func (e *Env) basics(ctx context.Context, ref github.Ref) (*github.PullRequest, 
 // storedOpenPR is ref as the inventory holds it, refused unless open: what
 // a turn the loop launches under its lock reads instead of GitHub. ok is
 // false when the inventory has no row of ref.
-func (e *Env) storedOpenPR(ctx context.Context, ref github.Ref) (pr *github.PullRequest, ok bool, err error) {
+func (e *Env) storedOpenPR(ctx context.Context, ref pr.Ref) (pull *pr.PullRequest, ok bool, err error) {
 	if e.Store == nil {
 		return nil, false, nil
 	}
-	row, ok, err := e.Store.PR(ctx, ref)
+	row, ok, err := e.reportedPRs().PR(ctx, ref)
 	if err != nil || !ok {
 		return nil, false, err
 	}
 	if row.State != dgh.StateOpen {
 		return nil, true, fmt.Errorf("%s is %s", ref.URL(), row.State)
 	}
-	details, err := e.Store.Details(ctx, []github.Ref{ref})
+	details, err := e.reportedPRs().Details(ctx, []pr.Ref{ref})
 	if err != nil {
 		return nil, true, err
 	}
@@ -133,7 +134,7 @@ func (e *Env) storedOpenPR(ctx context.Context, ref github.Ref) (pr *github.Pull
 // launchPR is the open pull request a turn the loop launches is about: as
 // read ahead, else as stored, else read from GitHub for one the inventory
 // never held.
-func (e *Env) launchPR(ctx context.Context, ref github.Ref) (*github.PullRequest, error) {
+func (e *Env) launchPR(ctx context.Context, ref pr.Ref) (*pr.PullRequest, error) {
 	if aheadOf(ctx, ref) != nil {
 		return e.openPR(ctx, ref)
 	}
@@ -146,7 +147,7 @@ func (e *Env) launchPR(ctx context.Context, ref github.Ref) (*github.PullRequest
 
 // readPR reads ref in full from GitHub into the inventory and returns it as
 // the sweep reads it, with the viewer; as read ahead when it was.
-func (e *Env) readPR(ctx context.Context, cfg config.Config, ref github.Ref) (*github.PullRequest, string, error) {
+func (e *Env) readPR(ctx context.Context, cfg config.Config, ref pr.Ref) (*pr.PullRequest, string, error) {
 	if r := aheadOf(ctx, ref); r != nil && r.hasFull {
 		return r.full, r.viewer, r.fullErr
 	}
@@ -156,18 +157,18 @@ func (e *Env) readPR(ctx context.Context, cfg config.Config, ref github.Ref) (*g
 // coveredPR is ref in full for the reviews a launched round covers: as read
 // ahead, else as stored with its detail. It never asks GitHub: a launch
 // holds the loop lock.
-func (e *Env) coveredPR(ctx context.Context, ref github.Ref) (*github.PullRequest, string, error) {
+func (e *Env) coveredPR(ctx context.Context, ref pr.Ref) (*pr.PullRequest, string, error) {
 	if r := aheadOf(ctx, ref); r != nil && r.hasFull {
 		return r.full, r.viewer, r.fullErr
 	}
 	if e.Store == nil {
 		return nil, "", errNoStore
 	}
-	row, ok, err := e.Store.PR(ctx, ref)
+	row, ok, err := e.reportedPRs().PR(ctx, ref)
 	if err != nil {
 		return nil, "", err
 	}
-	details, err := e.Store.Details(ctx, []github.Ref{ref})
+	details, err := e.reportedPRs().Details(ctx, []pr.Ref{ref})
 	if err != nil {
 		return nil, "", err
 	}

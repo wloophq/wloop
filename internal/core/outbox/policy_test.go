@@ -3,7 +3,6 @@ package outbox
 import (
 	"context"
 	"errors"
-	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -11,6 +10,8 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -22,6 +23,8 @@ type fakeManifests struct {
 	// on, when set, is the unit whose book holds the turns.
 	on unit.Unit
 }
+
+func (fakeManifests) DefaultApproval() draft.Approval { return draft.Approval{Mode: draft.Wait} }
 
 func (f fakeManifests) IntentApproval(name string) (*draft.Policy, bool) {
 	a, ok := f.intents[name]
@@ -90,8 +93,8 @@ func TestPolicyResolutionOrder(t *testing.T) {
 			p := reply("x")
 			p.Origin, p.Policy = c.origin, c.explicit
 			d := e.propose(p)
-			if d.Approval != c.want {
-				t.Fatalf("approval %+v, want %+v", d.Approval, c.want)
+			if e.approval(d.ID) != c.want {
+				t.Fatalf("approval %+v, want %+v", e.approval(d.ID), c.want)
 			}
 		})
 	}
@@ -120,7 +123,7 @@ func TestPolicyLookupFailureIsAlways(t *testing.T) {
 			p := reply("x")
 			p.Origin = c.origin
 			d := e.propose(p)
-			if d.Approval != waiting || d.State != draft.Proposed {
+			if e.approval(d.ID) != waiting || d.State != draft.Held {
 				t.Fatalf("%+v", d)
 			}
 			if !slices.ContainsFunc(e.logs, func(l string) bool { return strings.Contains(l, "resolved to wait") && strings.Contains(l, c.logged) }) {
@@ -149,7 +152,7 @@ func TestOriginCannotPickThePolicy(t *testing.T) {
 			p := reply("x")
 			p.Origin = c.origin
 			d := e.propose(p)
-			if d.Approval != waiting || d.State != draft.Proposed {
+			if e.approval(d.ID) != waiting || d.State != draft.Held {
 				t.Fatalf("%+v", d)
 			}
 			e.svc.Send(ctx)
@@ -163,17 +166,17 @@ func TestOriginCannotPickThePolicy(t *testing.T) {
 	}
 }
 
-func TestNoneDraftWhoseApprovalFailsIsReturned(t *testing.T) {
+func TestAReleasedDraftWithdrawnAsItIsQueuedStaysDropped(t *testing.T) {
 	e := newEnv()
 	withPolicy(e, none)
 	e.store.beforeUpdate = func(u draft.Draft) {
 		e.store.beforeUpdate = nil
-		if _, err := e.svc.Discard(ctx, u.ID, ""); err != nil {
-			t.Errorf("discard: %v", err)
+		if _, err := e.svc.Withdraw(ctx, u.ID, draft.WithdrawMoot); err != nil {
+			t.Errorf("withdraw: %v", err)
 		}
 	}
 	d, err := e.svc.Propose(ctx, reply("x"))
-	if !errors.Is(err, ErrConflict) || d.ID == 0 || d.State != draft.Proposed {
+	if err != nil || d.ID == 0 || d.State != draft.Dropped || d.Reason != draft.WithdrawMoot {
 		t.Fatalf("%+v %v", d, err)
 	}
 }
@@ -186,18 +189,15 @@ func TestDraftPolicyDefaultsToAlways(t *testing.T) {
 	e := newEnv()
 	e.svc.Policies = Resolver{Manifests: manifests()}
 	d := e.propose(reply("x"))
-	if d.Approval != waiting || d.State != draft.Proposed || !d.Deadline.IsZero() || d.Would.Outcome != "" {
+	if e.approval(d.ID) != waiting || d.State != draft.Held || !e.gate(d.ID).Deadline.IsZero() {
 		t.Fatalf("%+v", d)
 	}
 	e.clock.now = t0.Add(48 * time.Hour)
-	if n, err := e.svc.Tick(ctx); n != 0 || err != nil {
-		t.Fatalf("tick %d %v", n, err)
+	if err := e.tick(); err != nil {
+		t.Fatal(err)
 	}
-	if sent, _, _ := e.svc.Send(ctx); sent != 0 || e.get(d.ID).State != draft.Proposed {
+	if sent, _, _ := e.svc.Send(ctx); sent != 0 || e.get(d.ID).State != draft.Held {
 		t.Fatalf("sent %d, %s", sent, e.get(d.ID).State)
-	}
-	if _, ok, err := e.svc.NextDeadline(ctx); ok || err != nil {
-		t.Fatalf("a wait draft has a deadline: %v", err)
 	}
 }
 
@@ -205,11 +205,8 @@ func TestDraftPolicyNoneAutoApproves(t *testing.T) {
 	e := newEnv()
 	withPolicy(e, none)
 	d := e.propose(reply("x"))
-	if d.State != draft.Approved || d.Would.Outcome != draft.OutcomeReleased || !d.Deadline.IsZero() {
-		t.Fatalf("%+v", d)
-	}
-	if got := e.get(d.ID); got.State != draft.Approved || got.Would.Outcome != draft.OutcomeReleased {
-		t.Fatalf("stored %+v", got)
+	if g := e.gate(d.ID); d.State != draft.Queued || g.Status != gate.Approved || g.By != task.ActorWorkflow || g.Rule != "send" {
+		t.Fatalf("%+v %+v", d, g)
 	}
 	for range 3 {
 		e.svc.Send(ctx)
@@ -223,14 +220,14 @@ func TestDraftPolicyObserveRecordsOnly(t *testing.T) {
 	e := newEnv()
 	withPolicy(e, observe)
 	d := e.propose(reply("x"))
-	if d.State != draft.Discarded || d.Reason != string(draft.DryRun) || d.Would.Outcome != draft.OutcomeDryRun || d.Would.Policy != draft.WouldRelease {
-		t.Fatalf("%+v", d)
+	if g := e.gate(d.ID); d.State != draft.Dropped || d.Reason != string(draft.DryRun) || g.Status != gate.Rejected || g.Rule != "dry_run" {
+		t.Fatalf("%+v %+v", d, g)
 	}
-	if got, _ := e.svc.List(ctx, Filter{States: []draft.State{draft.Proposed, draft.Failed}}); len(got) != 0 {
+	if got, _ := e.svc.List(ctx, Filter{States: []draft.State{draft.Held, draft.Failed}}); len(got) != 0 {
 		t.Fatalf("listed %+v", got)
 	}
 	e.clock.now = t0.Add(time.Hour)
-	e.svc.Tick(ctx)
+	e.tick()
 	e.svc.Send(ctx)
 	if len(e.fx.published) != 0 {
 		t.Fatalf("published %v", e.fx.published)
@@ -243,28 +240,23 @@ func TestDraftPolicyObserveRecordsOnly(t *testing.T) {
 	}
 }
 
-func TestAutoApprovalHonorsTheGate(t *testing.T) {
+func TestAWindowReleaseTheDraftsPublisherRefusesFails(t *testing.T) {
 	t.Run("disabled plugin at the window's end", func(t *testing.T) {
 		e := newEnv()
 		withPolicy(e, window(time.Minute))
 		d := e.propose(reply("x"))
 		e.disabled["slack"] = true
 		e.clock.now = t0.Add(2 * time.Minute)
-		if n, err := e.svc.Tick(ctx); n != 0 || err != nil {
-			t.Fatalf("tick %d %v", n, err)
+		if err := e.tick(); err != nil {
+			t.Fatal(err)
 		}
 		e.svc.Send(ctx)
-		if got := e.get(d.ID); got.State != draft.Proposed || len(e.fx.published) != 0 {
-			t.Fatalf("%s, published %v", got.State, e.fx.published)
-		}
-		if !slices.ContainsFunc(e.logs, func(l string) bool {
-			return strings.Contains(l, fmt.Sprintf("draft %d", d.ID)) && strings.Contains(l, "disabled")
-		}) {
-			t.Fatalf("logs %q", e.logs)
+		if got := e.get(d.ID); got.State != draft.Failed || !strings.Contains(got.Error, "disabled") || len(e.fx.published) != 0 {
+			t.Fatalf("%+v, published %v", got, e.fx.published)
 		}
 		e.disabled["slack"] = false
-		if n, _ := e.svc.Tick(ctx); n != 1 {
-			t.Fatalf("tick after re-enabling %d", n)
+		if got, err := e.svc.Retry(ctx, d.ID, false); err != nil || got.State != draft.Queued {
+			t.Fatalf("retry after re-enabling %+v %v", got, err)
 		}
 	})
 	t.Run("validator refuses at the window's end", func(t *testing.T) {
@@ -275,11 +267,11 @@ func TestAutoApprovalHonorsTheGate(t *testing.T) {
 		d := e.propose(reply("x"))
 		e.fx.refuse = errors.New("channel archived")
 		e.clock.now = t0.Add(2 * time.Minute)
-		if n, _ := e.svc.Tick(ctx); n != 0 || e.get(d.ID).State != draft.Proposed {
-			t.Fatalf("tick %d, %s", n, e.get(d.ID).State)
+		if err := e.tick(); err != nil {
+			t.Fatal(err)
 		}
-		if !slices.ContainsFunc(e.logs, func(l string) bool { return strings.Contains(l, "channel archived") }) {
-			t.Fatalf("logs %q", e.logs)
+		if got := e.get(d.ID); got.State != draft.Failed || !strings.Contains(got.Error, "channel archived") {
+			t.Fatalf("%+v", got)
 		}
 	})
 	t.Run("none on a disabled plugin stores nothing", func(t *testing.T) {
@@ -321,14 +313,13 @@ func TestDraftsTargetingOutsideTheirUnitAlwaysWait(t *testing.T) {
 				p := reply("x")
 				p.Origin.Kind, p.Target = kind, "#general"
 				d := e.propose(p)
-				if d.Approval != waiting || d.State != draft.Proposed || !d.Deadline.IsZero() ||
-					d.Would.Policy != draft.WouldWait || d.Would.Reason != "targets outside its unit" {
+				if e.approval(d.ID) != waiting || d.State != draft.Held {
 					t.Fatalf("%+v", d)
 				}
 				e.clock.now = t0.Add(time.Hour)
-				e.svc.Tick(ctx)
+				e.tick()
 				e.svc.Send(ctx)
-				if len(e.fx.published) != 0 || e.get(d.ID).State != draft.Proposed {
+				if len(e.fx.published) != 0 || e.get(d.ID).State != draft.Held {
 					t.Fatalf("published %v, %s", e.fx.published, e.get(d.ID).State)
 				}
 			})
@@ -338,7 +329,7 @@ func TestDraftsTargetingOutsideTheirUnitAlwaysWait(t *testing.T) {
 		e := newEnv()
 		p := reply("x")
 		p.Target, p.Policy = "U0OTHER", none
-		if d := e.propose(p); d.Approval != waiting || d.State != draft.Proposed {
+		if d := e.propose(p); e.approval(d.ID) != waiting || d.State != draft.Held {
 			t.Fatalf("%+v", d)
 		}
 	})
@@ -347,7 +338,7 @@ func TestDraftsTargetingOutsideTheirUnitAlwaysWait(t *testing.T) {
 		withPolicy(e, observe)
 		p := reply("x")
 		p.Target = "#general"
-		if d := e.propose(p); d.State != draft.Discarded || d.Would.Policy != draft.WouldWait {
+		if d := e.propose(p); d.State != draft.Dropped {
 			t.Fatalf("%+v", d)
 		}
 	})
@@ -356,7 +347,7 @@ func TestDraftsTargetingOutsideTheirUnitAlwaysWait(t *testing.T) {
 		withPolicy(e, none)
 		p := reply("x")
 		p.Unit, p.Target = pull, "O/R#1"
-		if d := e.propose(p); d.State != draft.Approved {
+		if d := e.propose(p); d.State != draft.Queued {
 			t.Fatalf("%+v", d)
 		}
 	})
@@ -364,7 +355,7 @@ func TestDraftsTargetingOutsideTheirUnitAlwaysWait(t *testing.T) {
 		e := newEnv()
 		p := Proposal{Unit: thread, Kind: draft.Nudge, Text: "ping", Target: "U0OTHER", Policy: none,
 			Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge", Key: "k1"}}
-		if d := e.propose(p); d.State != draft.Approved {
+		if d := e.propose(p); d.State != draft.Queued {
 			t.Fatalf("%+v", d)
 		}
 	})

@@ -22,12 +22,12 @@ func (n *notices) Notice(name string, data map[string]any) (string, error) {
 func TestAnAnswerWhileTheSessionWorksBlocksItsStopWithTheNotice(t *testing.T) {
 	s, store, _, sess, _ := busyAsked(t)
 	ctx := context.Background()
-	got, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, Message: 12, Text: "go ahead", Source: turn.Cockpit})
+	got, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, Message: 12, Gate: 12, Text: "go ahead", Source: turn.Cockpit})
 	if err != nil || got.Route != turn.Queued {
 		t.Fatalf("%+v %v", got, err)
 	}
 	stop, err := s.Stop(ctx, turns.StopRequest{Session: "term_1", AgentSession: "s1", PromptID: "p1"})
-	if err != nil || !stop.Block || stop.Reason != "answered Message=12 Unit=https://github.com/acme/api/pull/7" {
+	if err != nil || !stop.Block || stop.Reason != "answered Gate=12 Unit=https://github.com/acme/api/pull/7" {
 		t.Fatalf("stop %+v %v", stop, err)
 	}
 	b := bookOf(t, store, r7)
@@ -46,7 +46,7 @@ func TestAnAnswerWhileTheSessionWorksBlocksItsStopWithTheNotice(t *testing.T) {
 func TestAStopLeavesAnAnswerADeliverIsRouting(t *testing.T) {
 	s, store, _, _, _ := busyAsked(t)
 	ctx := context.Background()
-	if _, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, Message: 12, Text: "go ahead", Source: turn.Cockpit}); err != nil {
+	if _, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, Message: 12, Gate: 12, Text: "go ahead", Source: turn.Cockpit}); err != nil {
 		t.Fatal(err)
 	}
 	s.Routing(bookOf(t, store, r7).Answers[0].ID)
@@ -61,7 +61,7 @@ func TestAStopLeavesAnAnswerADeliverIsRouting(t *testing.T) {
 func TestAStopBlocksOnlyForTheAnswersOfItsSession(t *testing.T) {
 	s, store, _, _, _ := busyAsked(t)
 	ctx := context.Background()
-	if _, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, Message: 12, Text: "go ahead", Source: turn.Cockpit}); err != nil {
+	if _, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, Message: 12, Gate: 12, Text: "go ahead", Source: turn.Cockpit}); err != nil {
 		t.Fatal(err)
 	}
 	b := bookOf(t, store, r7)
@@ -82,14 +82,14 @@ func TestANoticeNamesAUnitThatIsNotAPullRequestAsItsCommandsReadIt(t *testing.T)
 	reg.Put(turn.Session{ID: "term_1", Pane: "tab-1:leaf-1", WorkspaceID: "ws", AgentSession: "s1", StartedAt: t0.Add(-2 * time.Hour), MCPAt: t0.Add(-2 * time.Hour)})
 	sess.Put("ws", turns.Terminal{Session: "term_1", Key: "tab-1", LastOutput: t0.Add(-time.Minute)})
 	ctx := context.Background()
-	if _, err := s.Answer(ctx, turns.AnswerRequest{Unit: thread, Message: 3, Posted: true, Turn: 1, Text: "yes", Source: turn.Cockpit}); err != nil {
+	if _, err := s.Answer(ctx, turns.AnswerRequest{Unit: thread, Message: 3, Gate: 3, Posted: true, Turn: 1, Text: "yes", Source: turn.Cockpit}); err != nil {
 		t.Fatal(err)
 	}
 	if stop, err := s.Stop(ctx, turns.StopRequest{Session: "term_1", AgentSession: "s1", PromptID: "p1"}); err != nil || !stop.Block {
 		t.Fatalf("stop %+v %v", stop, err)
 	}
 	want := "chat:C1/1700000000.000100"
-	if len(n.got) != 2 || n.got[0]["Unit"] != want || n.got[0]["Message"] != int64(3) || n.got[1]["Unit"] != want || n.got[1]["Turn"] != "abc" ||
+	if len(n.got) != 2 || n.got[0]["Unit"] != want || n.got[0]["Gate"] != int64(3) || n.got[1]["Unit"] != want || n.got[1]["Turn"] != "abc" ||
 		n.got[1]["Command"] != s.Command {
 		t.Fatalf("notices read %+v", n.got)
 	}
@@ -114,7 +114,7 @@ func TestMarkReadKeepsTheFirstRead(t *testing.T) {
 func TestAfterTheNoticeTheTurnOwesARecordAgain(t *testing.T) {
 	s, _, _, _, _ := busyAsked(t)
 	ctx := context.Background()
-	if _, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, Message: 12, Text: "go ahead", Source: turn.Cockpit}); err != nil {
+	if _, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, Message: 12, Gate: 12, Text: "go ahead", Source: turn.Cockpit}); err != nil {
 		t.Fatal(err)
 	}
 	stop := func(prompt string) turns.StopAnswer {
@@ -154,7 +154,7 @@ func TestTheRecordBlockOfAPromptSurvivesANoticeInBetween(t *testing.T) {
 		t.Fatalf("first stop %+v", got)
 	}
 	sess.SetAgents(working)
-	if _, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, Message: 12, Text: "and this", Source: turn.Cockpit}); err != nil {
+	if _, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, Message: 12, Gate: 12, Text: "and this", Source: turn.Cockpit}); err != nil {
 		t.Fatal(err)
 	}
 	if got := stop(); !got.Block || !strings.HasPrefix(got.Reason, "answered") {
@@ -171,7 +171,7 @@ func TestANoticeBeforeTheRecordIsAckedStillOwesARecord(t *testing.T) {
 	b := bookOf(t, store, r7)
 	b.Records[0].Acked = false
 	store.Put(b)
-	if _, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, Message: 12, Text: "go ahead", Source: turn.Cockpit}); err != nil {
+	if _, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, Message: 12, Gate: 12, Text: "go ahead", Source: turn.Cockpit}); err != nil {
 		t.Fatal(err)
 	}
 	stop := func(prompt string) turns.StopAnswer {

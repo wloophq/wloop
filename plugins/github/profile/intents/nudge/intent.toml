@@ -1,0 +1,64 @@
+label   = "Nudge"
+summary = "Ask whoever the pull request waits on for the next step, in a comment; guidance is the topic"
+shortcut = "N"
+role    = "pr.nudge"
+provider = "github"
+skill = true
+workspace = "linked_else_main"
+session   = { strategy = "new", title = "nudge", close_when_done = true }
+answerable = false
+profile   = "nudge"
+brief     = { render = false, wait = false }
+effects   = ["pr.nudged"]
+
+[[refuse]]
+when = 'pr.nudge.refusal != ""'
+why  = "{{.pr.nudge.refusal}}"
+
+[help]
+target   = "a pull request URL"
+summary  = "Ask whoever it waits on for the next step"
+group    = "pull requests"
+examples = ["https://github.com/acme/api/pull/7", "https://github.com/acme/api/pull/7 the release is on Friday"]
+docs     = "guides/nudge"
+
+[guidance]
+help  = "what to ask about"
+max   = 500
+
+[headline]
+resumed = "nudge on {{.pr.slug}}"
+[[headline.new]]
+line = 'Nudge on {{.pr.slug}}, {{template "started_by" .}}.'
+
+[inputs.situation]
+type    = "text"
+from    = "prepare"
+persist = true
+hidden  = true
+
+[inputs.waits_on_maintainers]
+type    = "bool"
+from    = "prepare"
+persist = true
+hidden  = true
+
+[inputs.who]
+type    = "list"
+from    = "prepare"
+persist = true
+hidden  = true
+
+[action]
+note    = "Nudge {{join .pr.nudge.who \", \"}}"
+confirm = "Nudge {{join .pr.nudge.who \", \"}} on {{.pr.slug}}? An agent posts one comment under your name."
+
+[[action.refuse]]
+when = '!(pr.nudge.refusal == "")'
+why  = "{{.pr.nudge.refusal}}"
+
+[record]
+states  = ["done", "failed"]
+outcome = ["url"]
+outcome_doc = "`outcome` (done): `url`, the comment's URL."
+require = [{ state = "done", fields = ["url"] }]

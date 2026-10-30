@@ -5,10 +5,9 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 // v3Store is a store built from the frozen v3 schema with seed run on it,
@@ -88,9 +87,8 @@ func TestV4KeepsEveryPRBriefTagAndRun(t *testing.T) {
 		"github|acme/api#12|0||7|7||||",
 		"github|acme/web#3|3|b1-x h2 0001-01-01T00:00:00Z 0|0|9|w|r|g|too many",
 	})
-	sameRows(t, "unit_tags", tableRows(t, db, `SELECT * FROM unit_tags ORDER BY unit_key, key`), []string{
-		"github|acme/api#12|concern|perf|7",
-		"github|acme/api#12|domain|billing|7",
+	sameRows(t, "the brief records", tableRows(t, db, `SELECT provider, unit_key, key, data FROM events WHERE kind = 'record' ORDER BY unit_key`), []string{
+		`github|acme/api#12|brief|{"goal":"g","tags":["concern:perf","domain:billing"]}`,
 	})
 	sameRows(t, "brief_runs", tableRows(t, db, `SELECT id, provider, unit_key, intent, trigger, version, attempt_of, revision, input,
 		input_bytes, input_cut, outcome, error, brief, tags, input_sha FROM brief_runs ORDER BY id`), []string{
@@ -116,16 +114,6 @@ func TestV4CopiesTheSlackBriefBeforeDroppingItsColumn(t *testing.T) {
 		`slack|D1/1700000000.000200|brief|legacy|legacy|ok|2026-10-05T09:00:00.000000000Z|2026-10-05T09:00:00.000000000Z|{"goal":"Pick the venue"}|1|1`,
 		`slack|D1/1700000000.000300|brief|legacy|legacy|ok|2026-10-05T09:00:00.000000000Z|2026-10-05T09:00:00.000000000Z|{"goal":"Book the train"}|1|1`,
 	})
-	units := []unit.Unit{{Provider: "slack", Key: "C1/1700000000.000100"}, {Provider: "slack", Key: "D1/1700000000.000300"}, {Provider: "slack", Key: "C2/1700000000.000400"}}
-	got, err := db.Extraction().States(context.Background(), units)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for u, want := range map[unit.Unit]string{units[0]: `{"goal":"Ship the export"}`, units[1]: `{"goal":"Book the train"}`, units[2]: ""} {
-		if got[u].Brief != want {
-			t.Errorf("%s reads brief %q, want %q", u.Key, got[u].Brief, want)
-		}
-	}
 }
 
 func TestAV3ReleaseRefusesTheV4Store(t *testing.T) {
@@ -138,7 +126,7 @@ func TestAV3ReleaseRefusesTheV4Store(t *testing.T) {
 	var compatible string
 	err = db.QueryRow(`SELECT value FROM meta WHERE key = ?`, compatibleKey).Scan(&compatible)
 	db.Close()
-	if err != nil || compatible != "4" {
+	if err != nil || compatible != strconv.FormatUint(uint64(current.compatibleAt(SchemaVersion)), 10) {
 		t.Fatalf("compatible version %q, %v", compatible, err)
 	}
 	frozen, err := os.ReadFile(filepath.Join("testdata", "schema-v3.sql"))

@@ -58,7 +58,7 @@ func printCandidates(w io.Writer, res api.ExploreResult, rows []api.Row, now tim
 		if c.ChecksState != "" {
 			checks = "checks " + strings.ToLower(c.ChecksState)
 		}
-		facts := []string{c.Ref.String(), fmt.Sprintf("+%d -%d", c.Additions, c.Deletions), plural(c.ChangedFiles, "file", "files"),
+		facts := []string{c.Label, fmt.Sprintf("+%d -%d", c.Additions, c.Deletions), plural(c.ChangedFiles, "file", "files"),
 			review, checks, "by " + c.Author}
 		if since := waitingSince(c, inventory); !since.IsZero() {
 			facts = append(facts, "waiting "+shortAge(now.Sub(since), false))
@@ -71,7 +71,7 @@ func printCandidates(w io.Writer, res api.ExploreResult, rows []api.Row, now tim
 		}
 		fmt.Fprintln(w, strings.Join(facts, "  "))
 		fmt.Fprintf(w, "  %s\n", c.Title)
-		if r, ok := inventory[c.Ref.Unit()]; ok {
+		if r, ok := inventory[c.Unit]; ok {
 			fmt.Fprintf(w, "  in the inventory: %s, waiting on %s\n", r.Kind, r.Summary.WaitsOn)
 		}
 		if c.Brief != nil && c.Brief.Brief != nil {
@@ -83,7 +83,7 @@ func printCandidates(w io.Writer, res api.ExploreResult, rows []api.Row, now tim
 
 // waitingSince prefers the inventory's own clock to the last update.
 func waitingSince(c api.Candidate, inventory map[unit.Unit]api.Row) time.Time {
-	if r, ok := inventory[c.Ref.Unit()]; ok && !r.Summary.Since.IsZero() {
+	if r, ok := inventory[c.Unit]; ok && !r.Summary.Since.IsZero() {
 		return r.Summary.Since
 	}
 	return c.UpdatedAt

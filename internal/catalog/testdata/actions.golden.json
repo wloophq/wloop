@@ -1,5 +1,49 @@
 [
   {
+    "id": "answer",
+    "label": "Answer",
+    "summary": "Reply to the agent's open question with your text; the agent resumes from your answer.",
+    "group": "turn",
+    "key": "W",
+    "surfaces": [
+      "detail",
+      "tui",
+      "notification"
+    ],
+    "input": {
+      "kind": "answer",
+      "required": true,
+      "label": "Answer"
+    },
+    "source": "builtin"
+  },
+  {
+    "id": "continue",
+    "label": "Continue",
+    "summary": "Let the agent resume without an answer, deciding the open question itself. Answer gives it your reply instead.",
+    "group": "turn",
+    "key": "C",
+    "surfaces": [
+      "detail",
+      "tui",
+      "notification"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "dismiss",
+    "label": "Dismiss",
+    "summary": "Close the agent's open question without resuming it; the pull request goes back to whoever it waits on.",
+    "group": "turn",
+    "key": "X",
+    "surfaces": [
+      "detail",
+      "tui",
+      "notification"
+    ],
+    "source": "builtin"
+  },
+  {
     "id": "run_now",
     "label": "Run now",
     "summary": "Start the round waiting on this pull request now, without waiting for its delay or the daily budget. Skip drops it instead.",
@@ -46,8 +90,7 @@
     "input": {
       "kind": "text",
       "required": true,
-      "label": "Guidance",
-      "placeholder": "what the next round should look at"
+      "label": "Guide"
     },
     "source": "builtin"
   },
@@ -183,50 +226,6 @@
     "source": "intents/nudge/intent.toml"
   },
   {
-    "id": "answer",
-    "label": "Answer",
-    "summary": "Reply to the agent's open question with your text; the agent resumes from your answer.",
-    "group": "turn",
-    "key": "W",
-    "surfaces": [
-      "detail",
-      "tui",
-      "notification"
-    ],
-    "input": {
-      "kind": "answer",
-      "required": true,
-      "label": "Answer"
-    },
-    "source": "builtin"
-  },
-  {
-    "id": "continue",
-    "label": "Continue",
-    "summary": "Let the agent resume without an answer, deciding the open question itself. Answer gives it your reply instead.",
-    "group": "turn",
-    "key": "C",
-    "surfaces": [
-      "detail",
-      "tui",
-      "notification"
-    ],
-    "source": "builtin"
-  },
-  {
-    "id": "dismiss",
-    "label": "Dismiss",
-    "summary": "Close the agent's open question without resuming it; the pull request goes back to whoever it waits on.",
-    "group": "turn",
-    "key": "X",
-    "surfaces": [
-      "detail",
-      "tui",
-      "notification"
-    ],
-    "source": "builtin"
-  },
-  {
     "id": "take_over",
     "label": "Take over",
     "summary": "Make someone else's pull request yours to develop: from then on it counts as one of yours, and Address works on it.",
@@ -276,7 +275,7 @@
   {
     "id": "mute",
     "label": "Mute",
-    "summary": "Take this pull request out of the lists that wait on you, for a while or until who it waits on changes; review and address rounds still run, unannounced, and no nudge goes out automatically. Pause stops the rounds instead.",
+    "summary": "Snooze this pull request's task, out of the lists that wait on you, for a while or until who it waits on changes; review and address rounds still run, unannounced, and no nudge goes out automatically. Pause stops the rounds instead.",
     "group": "control",
     "key": "M",
     "surfaces": [
@@ -299,7 +298,7 @@
   {
     "id": "unmute",
     "label": "Unmute",
-    "summary": "Bring this pull request back into the lists that wait on you.",
+    "summary": "Wake this pull request's task now, back into the lists that wait on you.",
     "group": "control",
     "key": "M",
     "surfaces": [
@@ -417,19 +416,6 @@
     "source": "builtin"
   },
   {
-    "id": "draft.approve",
-    "label": "Approve",
-    "summary": "Send this draft as it stands.",
-    "group": "draft",
-    "surfaces": [
-      "row",
-      "detail",
-      "tui",
-      "cli"
-    ],
-    "source": "builtin"
-  },
-  {
     "id": "draft.edit",
     "label": "Edit",
     "summary": "Change the draft's text; it waits for your approval again.",
@@ -448,9 +434,9 @@
     "source": "builtin"
   },
   {
-    "id": "draft.discard",
-    "label": "Discard",
-    "summary": "Drop this draft for good; nothing is sent.",
+    "id": "draft.retry",
+    "label": "Retry",
+    "summary": "Send this draft again after its post failed.",
     "group": "draft",
     "surfaces": [
       "row",
@@ -461,14 +447,34 @@
     "source": "builtin"
   },
   {
-    "id": "draft.retry",
-    "label": "Retry",
-    "summary": "Send this draft again after its post failed.",
-    "group": "draft",
+    "id": "run.open",
+    "label": "Open workspace",
+    "summary": "Bring the run's workspace on screen in the workspace manager it ran in.",
+    "group": "run",
     "surfaces": [
-      "row",
       "detail",
-      "tui",
+      "cli"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "run.enter",
+    "label": "Enter session",
+    "summary": "Bring the run's agent session on screen to type in it; a session with no live process is woken first.",
+    "group": "run",
+    "surfaces": [
+      "detail",
+      "cli"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "run.transcript",
+    "label": "Transcript",
+    "summary": "Read what the person typed and what the agent answered in the run's session.",
+    "group": "run",
+    "surfaces": [
+      "detail",
       "cli"
     ],
     "source": "builtin"

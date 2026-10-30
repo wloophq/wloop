@@ -4,13 +4,11 @@ import (
 	"cmp"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
@@ -19,6 +17,9 @@ var navHelp = []helpItem{{"↑↓", "move"}, {"g", "view"}, {"/", "filter"}, {"^
 var quitHelp = helpItem{"q", "quit"}
 
 var keysHelp = helpItem{"?", "keys"}
+
+// staleMark marks a row its plugin last reported before it went down.
+const staleMark = "(stale)"
 
 // factLabel is the width of the detail pane's labels.
 const factLabel = 9
@@ -29,9 +30,6 @@ const factLabel = 9
 func (m *Model) Render(width, height int, now time.Time) []string {
 	if width < 20 || height < 5 {
 		return pad([]string{termfmt.Fit(brand.Name+": terminal too small", width)}, height)
-	}
-	if v, ok := m.plugin(); ok {
-		return m.renderPlugin(v, width, height)
 	}
 	lines := []string{m.tabs(width)}
 	if height >= 7 {
@@ -46,13 +44,16 @@ func (m *Model) Render(width, height int, now time.Time) []string {
 		lines = pad(m.renderReview(lines, width, body, now), height-2)
 		return append(lines, m.statusLine(width), m.bottom(width))
 	}
-	if v, ok := m.gtdView(); ok {
-		lines = pad(m.renderEntries(lines, v, width, body, now), height-2)
+	if v, ok := m.viewOnScreen(); ok {
+		lines = pad(m.renderTasks(lines, v, width, body, now), height-2)
 		return append(lines, m.statusLine(width), m.bottom(width))
 	}
 	if m.view == m.planView() {
 		lines = pad(m.renderPlan(lines, width, body, now), height-2)
 		return append(lines, m.statusLine(width), m.bottom(width))
+	}
+	if l, ok := m.loadingLine(m.rowsLoading, width); ok {
+		lines, body = append(lines, l), body-1
 	}
 	rows := m.visible()
 	cur := m.cursor(rows)
@@ -91,20 +92,16 @@ func pad(lines []string, n int) []string {
 	return lines[:n]
 }
 
-// pluginViewsGroup groups the plugins' own views; no provider id has its
-// shape.
-const pluginViewsGroup = " plugins"
-
 // tabs names the views with their counts, the current one bold, and the
 // daemon's flags at the right edge when they fit: the group on screen
-// whole, then each other group that fits whole, GTD views first.
+// whole, then each other group that fits whole, task views first.
 func (m *Model) tabs(width int) string {
 	t := m.t
-	gtd := make([]tab, len(m.gtd))
-	for i, label := range m.gtdTabs() {
-		gtd[i] = tab{label, m.gtdBase() + i}
+	views := make([]tab, len(m.taskViews))
+	for i, label := range m.viewTabs() {
+		views[i] = tab{label, m.viewsBase() + i}
 	}
-	groups := [][]tab{gtd}
+	groups := [][]tab{views}
 	at := map[string]int{}
 	add := func(provider string, x tab) {
 		i, ok := at[provider]
@@ -124,9 +121,6 @@ func (m *Model) tabs(width int) string {
 		add(cmp.Or(v.Provider, first), tab{fmt.Sprintf("%s %d", v.Label, len(m.in(v.ID))), i})
 	}
 	add(first, tab{fmt.Sprintf("%s %d", planLabel, len(m.plan)), m.planView()})
-	for i, v := range m.plugins {
-		add(pluginViewsGroup, tab{v.Label(), m.pluginBase() + i})
-	}
 	mine := 0
 	for i, g := range groups {
 		if slices.ContainsFunc(g, func(x tab) bool { return x.view == m.view }) {
@@ -260,6 +254,9 @@ func (m *Model) list(rows []api.Row, cur, width, height int, now time.Time) []st
 			{Text: shortRef(r.Label, refMax), Style: func(s string) string { return t.Link(url, s) }},
 			{Text: r.Title},
 		}
+		if r.Stale {
+			c[2] = termfmt.Cell{Text: staleMark + " " + r.Title}
+		}
 		if brief {
 			c = append(c, termfmt.Cell{Text: sizeRisk(r), Style: t.Dim})
 		}
@@ -286,20 +283,21 @@ func (m *Model) list(rows []api.Row, cur, width, height int, now time.Time) []st
 }
 
 // shortRef is a unit's label within w cells: a label of the form
-// owner/repo#n loses the owner when it does not fit, then has the
-// repository cut, never the number; any other label is cut at its end.
+// <scope>/<name>#<n> loses its scope when it does not fit, then has the
+// name cut, never the #<n>; any other label is cut at its end.
 func shortRef(label string, w int) string {
 	label = termfmt.Clean(label)
 	if termfmt.Cells(label) <= w {
 		return label
 	}
-	ref, err := pr.ParseKey(label)
-	if err != nil {
+	hash := strings.LastIndex(label, "#")
+	slash := strings.LastIndex(label[:max(hash, 0)], "/")
+	if hash < 0 || slash <= 0 || slash+1 == hash || !digits(label[hash+1:]) || strings.ContainsAny(label, " \t") {
 		return termfmt.Cut(label, w)
 	}
-	num := "#" + strconv.Itoa(ref.Number)
+	num := label[hash:]
 	if room := w - termfmt.Cells(num); room >= 2 {
-		return termfmt.Cut(ref.Repo, room) + num
+		return termfmt.Cut(label[slash+1:hash], room) + num
 	}
 	return termfmt.Cut(num, w)
 }
@@ -319,9 +317,10 @@ func (m *Model) waitCell(r api.Row, w int) string {
 // days.
 func (m *Model) age(r api.Row, now time.Time) (string, func(string) string) {
 	t := m.t
+	g, pending := m.roundGate(r)
 	switch {
-	case r.Pending != nil:
-		return fmt.Sprintf("%ds", max(0, int(r.Pending.Deadline.Sub(now).Seconds()+0.999))), t.Cyan
+	case pending:
+		return fmt.Sprintf("%ds", max(0, int(g.Deadline.Sub(now).Seconds()+0.999))), t.Cyan
 	case r.Summary.Since.IsZero():
 		return "-", t.Dim
 	case r.Summary.Stalled:
@@ -356,8 +355,9 @@ func (m *Model) detail(r api.Row, width int, now time.Time) []string {
 	age, _ := m.age(r, now)
 	kind := m.kindLabel(r)
 	waiting := m.waiting(r) + " · " + kind
+	_, pending := m.roundGate(r)
 	switch {
-	case r.Pending != nil:
+	case pending:
 		waiting += " · round in " + age
 	case r.Summary.Stalled:
 		waiting += " · " + strings.TrimPrefix(age, "!") + ", stalled"
@@ -613,11 +613,11 @@ func (m *Model) bottom(width int) string {
 // the moves.
 func (m *Model) helpItems() []helpItem {
 	var items []helpItem
-	if _, ok := m.gtdView(); ok {
+	if _, ok := m.viewOnScreen(); ok {
 		if m.inReview() {
 			items = m.reviewHelp()
 		}
-		if e, ok := m.selectedEntry(); ok {
+		if e, ok := m.selectedTask(); ok {
 			verbs, _ := m.verbHelp(e)
 			items = append(items, verbs...)
 		}
@@ -646,4 +646,8 @@ func (m *Model) help() string {
 		parts = append(parts, h.String())
 	}
 	return strings.Join(parts, "  ")
+}
+
+func digits(s string) bool {
+	return s != "" && strings.Trim(s, "0123456789") == ""
 }

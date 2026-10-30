@@ -279,7 +279,7 @@ func TestTheBundledIntentsLeadTheGroupTheirManifestsName(t *testing.T) {
 			}
 		}
 	}
-	if want := []string{"act", "address", "nudge", "review", "start", "take-over", "remove"}; !slices.Equal(prs, want) {
+	if want := []string{"act", "address", "chat", "nudge", "review", "start", "take-over", "remove"}; !slices.Equal(prs, want) {
 		t.Errorf("PULL REQUESTS lists %q, want %q", prs, want)
 	}
 }

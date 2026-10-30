@@ -7,10 +7,13 @@ import (
 	"maps"
 	"math"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/adapter/store/storetest"
@@ -23,15 +26,19 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/domain/workday"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 	"github.com/wloophq/wloop/internal/situation"
 	"github.com/wloophq/wloop/internal/turn"
 )
@@ -49,12 +56,15 @@ type rig struct {
 
 	mu      sync.Mutex
 	now     time.Time
-	pending map[unit.Unit]round.Pending
+	pending map[unit.Unit]overlay.Pending
 	// agents are what the workspace snapshot last read.
 	agents   []turns.AgentObservation
 	agentsOK bool
 
 	listed atomic.Int64
+	// reports are what the rows read the plugin's reports from; nil
+	// derives them from the inventory at each read.
+	reports readmodel.Reports
 }
 
 func newRig(t testing.TB, f *storetest.Fixture) *rig {
@@ -63,15 +73,32 @@ func newRig(t testing.TB, f *storetest.Fixture) *rig {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := &rig{t: t, f: f, loaded: l, cfg: config.Defaults(), now: f.Now, pending: map[unit.Unit]round.Pending{}, agentsOK: true}
+	r := &rig{t: t, f: f, loaded: l, cfg: config.Defaults(), now: f.Now, pending: map[unit.Unit]overlay.Pending{}, agentsOK: true}
 	r.agents = r.every(dturn.AgentWaiting)
 	r.m = r.model()
 	return r
 }
 
+// keepReports keeps the plugin's reports of the inventory in the store, as
+// the host keeps a running plugin's, and has the rows read them there.
+func (r *rig) keepReports() {
+	r.t.Helper()
+	snaps := psource.NewSnapshots(r.f.DB.Snapshots())
+	if err := (ghreporttest.Inventory{Store: r.f.Inventory, Now: r.clock}).Keep(context.Background(), snaps); err != nil {
+		r.t.Fatal(err)
+	}
+	r.reports = snaps
+	r.m = r.model()
+}
+
 // model is a new read model over the rig's sources, as a restart builds.
 func (r *rig) model() *readmodel.Model {
-	src := prrow.Source{Store: r.f.Inventory, Briefs: brief.New(brief.Deps{Store: r.f.Inventory}),
+	var reports readmodel.Reports = ghreporttest.Inventory{Store: r.f.Inventory, Now: r.clock}
+	if r.reports != nil {
+		reports = r.reports
+	}
+	src := prrow.Source{Store: r.f.Inventory, Reports: reports, Briefs: brief.New(brief.Deps{Store: r.f.Inventory, PRs: inventorytest.Of(r.f.Inventory)}),
+		Mutes: readmodel.WakeMutes(r.f.DB.Wakes().UnitWakes),
 		RowDeps: readmodel.RowDeps{Books: r.f.Turns, Sessions: r.f.Turns, Activity: r.f.DB, Intakes: r.f.DB.Intakes().Open, Intake: intakeView,
 			Settings: func() readmodel.RowSettings { return readmodel.RowSettings{Cfg: r.cfg, Loaded: r.loaded, GateOn: true} }}}
 	m := readmodel.New(r.f.Log, r.f.DB, r, readmodel.AgentsFunc(r.lastAgents), r, counting{prrow.New(src), &r.listed})
@@ -105,11 +132,11 @@ func (r *rig) snapshot(ok bool, agents []turns.AgentObservation) {
 	r.agents, r.agentsOK = agents, ok
 }
 
-func intakeView(i intake.Intake, rec dinv.BriefRecord, found bool, _ func() (int, error)) api.Intake {
+func intakeView(i intake.Intake, b intake.BriefState, _ func() (int, error)) api.Intake {
 	ref, _ := pr.ParseKey(i.Unit.Key)
 	w := api.Intake{Seq: i.Seq, PR: ref.URL(), Intent: string(i.Intent), Source: i.Source, State: string(i.State), Attempt: 1}
-	if found {
-		w.Attempt, w.LastError = rec.Failures+1, rec.Error
+	if b.Found {
+		w.Attempt, w.LastError = b.Failures+1, b.LastError
 	}
 	return w
 }
@@ -136,17 +163,17 @@ func (r *rig) advance(d time.Duration) {
 	r.now = r.now.Add(d)
 }
 
-func (r *rig) Pending(context.Context) (map[unit.Unit]round.Pending, error) {
+func (r *rig) Plans(context.Context) (map[unit.Unit]overlay.Pending, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return maps.Clone(r.pending), nil
 }
 
-func (r *rig) propose(u unit.Unit, p round.Pending) {
+func (r *rig) propose(u unit.Unit, p overlay.Pending) {
 	r.mu.Lock()
 	r.pending[u] = p
 	r.mu.Unlock()
-	r.f.Log.Note(port.TopicGate, u)
+	r.f.Log.Note(port.TopicPending, u)
 }
 
 func (r *rig) Settings(context.Context) (readmodel.Base, error) {
@@ -176,12 +203,7 @@ func (c counting) Derive(base readmodel.Base, in any, at time.Time) (api.Row, er
 
 func (r *rig) rows(m *readmodel.Model, since api.Since) api.RowsPage {
 	r.t.Helper()
-	return r.view(m, api.ViewAll, since)
-}
-
-func (r *rig) view(m *readmodel.Model, view string, since api.Since) api.RowsPage {
-	r.t.Helper()
-	p, err := m.Rows(context.Background(), view, since)
+	p, err := m.Rows(context.Background(), since)
 	if err != nil {
 		r.t.Fatal(err)
 	}
@@ -206,14 +228,9 @@ func encoded(t testing.TB, rows []api.Row) map[unit.Unit]string {
 // from the store now.
 func (r *rig) matchesFresh(got map[unit.Unit]string) {
 	r.t.Helper()
-	r.matchesFreshView(api.ViewAll, got)
-}
-
-func (r *rig) matchesFreshView(view string, got map[unit.Unit]string) {
-	r.t.Helper()
-	want := encoded(r.t, r.view(r.model(), view, api.Since{}).Rows)
+	want := encoded(r.t, r.rows(r.model(), api.Since{}).Rows)
 	if len(got) != len(want) {
-		r.t.Fatalf("%s: %d rows, a fresh derive has %d", view, len(got), len(want))
+		r.t.Fatalf("%d rows, a fresh derive has %d", len(got), len(want))
 	}
 	for u, w := range want {
 		if got[u] != w {
@@ -224,13 +241,12 @@ func (r *rig) matchesFreshView(view string, got map[unit.Unit]string) {
 
 // client merges pages of one view as a client does.
 type client struct {
-	view    string
 	since   api.Since
 	rows    map[unit.Unit]api.Row
 	removed int // units a delta removed
 }
 
-func (c *client) pull(r *rig) { c.apply(r.t, r.view(r.m, c.view, c.since)) }
+func (c *client) pull(r *rig) { c.apply(r.t, r.rows(r.m, c.since)) }
 
 func (c *client) apply(t testing.TB, p api.RowsPage) {
 	t.Helper()
@@ -262,7 +278,7 @@ func TestRowsWithNoChangeIssueNoQuery(t *testing.T) {
 	best := time.Duration(math.MaxInt64)
 	for range 10 {
 		start := time.Now()
-		again, err := r.m.Rows(ctx, api.ViewAll, api.Since{})
+		again, err := r.m.Rows(ctx, api.Since{})
 		best = min(best, time.Since(start))
 		if err != nil {
 			t.Fatal(err)
@@ -277,12 +293,15 @@ func TestRowsWithNoChangeIssueNoQuery(t *testing.T) {
 	}
 }
 
-// rebuildSQL is one rebuild at live size: one statement per input.
-const rebuildSQL = 9
+// rebuildSQL is one rebuild at live size: one statement per input, the
+// reported units, their reports, their overrides and their tasks' wakes
+// apart.
+const rebuildSQL = 12
 
 func TestRebuildAtLiveSize(t *testing.T) {
 	f := storetest.Seeded(t, storetest.Live)
 	r := newRig(t, f)
+	r.keepReports()
 	r.openIntakes(f.Open[1], f.Open[2])
 	before := r.rows(r.m, api.Since{})
 	withIntake := 0
@@ -300,7 +319,7 @@ func TestRebuildAtLiveSize(t *testing.T) {
 	}
 	f.Log.Note(port.TopicPRs, units...)
 	ctx, sc := metertest.Start(t, context.Background())
-	after, err := r.m.Rows(ctx, api.ViewAll, api.Since{})
+	after, err := r.m.Rows(ctx, api.Since{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -319,7 +338,7 @@ func TestRebuildAtLiveSize(t *testing.T) {
 	for range 10 {
 		f.Log.Note(port.TopicPRs, units...)
 		start := time.Now()
-		if _, err := r.m.Rows(context.Background(), api.ViewAll, api.Since{}); err != nil {
+		if _, err := r.m.Rows(context.Background(), api.Since{}); err != nil {
 			t.Fatal(err)
 		}
 		best = min(best, time.Since(start))
@@ -340,7 +359,7 @@ func BenchmarkRebuildAtLiveSize(b *testing.B) {
 	ctx := context.Background()
 	for b.Loop() {
 		f.Log.Note(port.TopicPRs, units...)
-		if _, err := m.Rows(ctx, api.ViewAll, api.Since{}); err != nil {
+		if _, err := m.Rows(ctx, api.Since{}); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -358,7 +377,7 @@ func TestSnapshotNoteFlipsWaiting(t *testing.T) {
 	}
 	f.Log.Note(port.TopicAgents, f.WithTurns...)
 	ctx, sc := metertest.Start(t, context.Background())
-	page, err := r.m.Rows(ctx, api.ViewAll, api.Since{})
+	page, err := r.m.Rows(ctx, api.Since{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,7 +449,7 @@ func TestRebuildPublishesOnlyChangedRows(t *testing.T) {
 	eventually(t, "the note's rebuild", func() bool { return r.listed.Load() > rebuilds })
 
 	ref := f.Open[3]
-	if err := f.Inventory.SetOverride(context.Background(), dinv.Override{PR: ref, Hold: true}); err != nil {
+	if err := inventorytest.Of(f.Inventory).SetOverride(context.Background(), dinv.Override{PR: ref, Hold: true}); err != nil {
 		t.Fatal(err)
 	}
 	var c api.Change
@@ -454,11 +473,11 @@ func TestReadYourWrites(t *testing.T) {
 	r.rows(r.m, api.Since{})
 	ref := f.Open[5]
 	until := f.Now.Add(48 * time.Hour)
-	if err := f.Inventory.SetOverride(context.Background(), dinv.Override{PR: ref, MutedUntil: until}); err != nil {
+	if err := mute(context.Background(), f, ref, until); err != nil {
 		t.Fatal(err)
 	}
 	row, ok, err := r.m.Row(context.Background(), ref.Unit(), catalog.Asked{})
-	if err != nil || !ok || row.Kind != api.Kind(situation.KindMuted) || !overrideOf(row).MutedUntil.Equal(until) {
+	if p, _ := prrow.PayloadOf(row); err != nil || !ok || row.Kind != api.Kind(situation.KindMuted) || p.Mute == nil || !p.Mute.Until.Equal(until) {
 		t.Fatalf("row %+v, ok %v, err %v", row, ok, err)
 	}
 }
@@ -467,7 +486,7 @@ func TestConcurrentReadersShareOneRebuild(t *testing.T) {
 	f := storetest.Seeded(t, storetest.Live)
 	r := newRig(t, f)
 	r.rows(r.m, api.Since{})
-	if err := f.Inventory.SetOverride(context.Background(), dinv.Override{PR: f.Open[0], Hold: true}); err != nil {
+	if err := inventorytest.Of(f.Inventory).SetOverride(context.Background(), dinv.Override{PR: f.Open[0], Hold: true}); err != nil {
 		t.Fatal(err)
 	}
 	before := r.listed.Load()
@@ -475,7 +494,7 @@ func TestConcurrentReadersShareOneRebuild(t *testing.T) {
 	revs := make([]uint64, 9)
 	for i := range revs {
 		wg.Go(func() {
-			p, err := r.m.Rows(context.Background(), api.ViewNeedsMe, api.Since{})
+			p, err := r.m.Rows(context.Background(), api.Since{})
 			if err != nil {
 				t.Error(err)
 			}
@@ -492,6 +511,17 @@ func TestConcurrentReadersShareOneRebuild(t *testing.T) {
 	}
 }
 
+// mute mutes ref until a time: a wake on a task that holds it.
+func mute(ctx context.Context, f *storetest.Fixture, ref pr.Ref, until time.Time) error {
+	id := task.ID("t-" + strings.ReplaceAll(ref.String(), "/", "-"))
+	e := task.Task{ID: id, State: "scheduled", Category: task.CategoryDeferred, Units: []unit.Unit{ref.Unit()}, Origin: task.OriginUser,
+		Created: f.Now, Updated: f.Now}
+	if err := f.DB.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
+		return err
+	}
+	return f.DB.Wakes().Put(ctx, wake.Wake{Task: id, Until: until, Return: "next"})
+}
+
 // writer makes the n-th scripted write of a script over the seeded open
 // pull requests; the unlinked ones from index 58 lapse and come back.
 func writer(r *rig, n int) error {
@@ -501,7 +531,7 @@ func writer(r *rig, n int) error {
 	at := f.Now.Add(time.Duration(n) * time.Second)
 	switch n % 9 {
 	case 0:
-		return f.Inventory.SetOverride(ctx, dinv.Override{PR: ref, MutedUntil: f.Now.Add(time.Duration(1+n%3) * time.Hour)})
+		return mute(ctx, f, ref, f.Now.Add(time.Duration(1+n%3)*time.Hour))
 	case 1:
 		_, err := f.Inventory.AppendEvents(ctx, []dinv.Event{{PR: ref, Kind: dinv.KindComment, Key: fmt.Sprintf("script-%d", n), Actor: viewer, At: at}})
 		return err
@@ -511,12 +541,12 @@ func writer(r *rig, n int) error {
 	case 3:
 		return f.Inventory.RecordEvent(ctx, dinv.Event{PR: ref, Kind: dinv.KindNudged, Key: fmt.Sprintf("script-%d", n), At: at, Data: "@user-03"})
 	case 4:
-		return f.Inventory.SetOverride(ctx, dinv.Override{PR: ref, Hold: n%2 == 0, Adopted: true})
+		return inventorytest.Of(f.Inventory).SetOverride(ctx, dinv.Override{PR: ref, Hold: n%2 == 0, Adopted: true})
 	case 5:
-		r.propose(ref.Unit(), round.Pending{Intent: "follow-up", Reason: fmt.Sprintf("script %d", n), Since: at, Deadline: at.Add(time.Minute)})
+		r.propose(ref.Unit(), overlay.Pending{Intent: "follow-up", Reason: fmt.Sprintf("script %d", n), Since: at, Deadline: at.Add(time.Minute)})
 		return nil
 	case 6:
-		p, ok, err := f.Inventory.PR(ctx, ref)
+		p, ok, err := inventorytest.Of(f.Inventory).PR(ctx, ref)
 		if err != nil || !ok {
 			return fmt.Errorf("%s: %v %v", ref, ok, err)
 		}
@@ -524,11 +554,11 @@ func writer(r *rig, n int) error {
 		if n%3 == 0 {
 			p.State, p.MergedAt, p.ClosedAt = "MERGED", at, at
 		}
-		return f.Inventory.UpsertPR(ctx, p)
+		return inventorytest.Of(f.Inventory).UpsertPR(ctx, p)
 	case 7:
-		return f.Inventory.SetReasons(ctx, f.Open[58+(n/9)%4], nil)
+		return inventorytest.Of(f.Inventory).SetReasons(ctx, f.Open[58+(n/9)%4], nil)
 	default:
-		return f.Inventory.SetReasons(ctx, f.Open[58+(n/9+2)%4], []string{"review-requested"})
+		return inventorytest.Of(f.Inventory).SetReasons(ctx, f.Open[58+(n/9+2)%4], []string{"review-requested"})
 	}
 }
 
@@ -536,29 +566,25 @@ func TestProjectionMatchesAFreshDerive(t *testing.T) {
 	f := storetest.Seeded(t, storetest.Live)
 	r := newRig(t, f)
 	r.openIntakes(f.Open[1], f.Open[2])
-	all, mine := &client{view: api.ViewAll}, &client{view: api.ViewNeedsMe}
+	all := &client{}
 	all.pull(r)
-	mine.pull(r)
 	for n := range 50 {
 		if err := writer(r, n); err != nil {
 			t.Fatalf("write %d: %v", n, err)
 		}
 		if n%5 == 4 {
 			all.pull(r)
-			mine.pull(r)
 		}
 		if n%10 == 9 {
 			r.advance(time.Minute)
 		}
 	}
 	all.pull(r)
-	mine.pull(r)
-	if all.removed == 0 || mine.removed == 0 {
-		t.Fatalf("no delta removed a row: all %d, needs-me %d", all.removed, mine.removed)
+	if all.removed == 0 {
+		t.Fatal("no delta removed a row")
 	}
 	r.matchesFresh(encoded(t, r.rows(r.m, api.Since{}).Rows))
 	r.matchesFresh(encoded(t, all.all()))
-	r.matchesFreshView(api.ViewNeedsMe, encoded(t, mine.all()))
 }
 
 func TestProjectionConvergesUnderConcurrentWrites(t *testing.T) {
@@ -572,9 +598,8 @@ func TestProjectionConvergesUnderConcurrentWrites(t *testing.T) {
 		r.m.Run(ctx, func(c api.Change) { published <- c })
 		close(runDone)
 	}()
-	all, mine := &client{view: api.ViewAll}, &client{view: api.ViewNeedsMe}
+	all := &client{}
 	all.pull(r)
-	mine.pull(r)
 	var writers, readers sync.WaitGroup
 	for w := range 4 {
 		writers.Go(func() {
@@ -595,7 +620,7 @@ func TestProjectionConvergesUnderConcurrentWrites(t *testing.T) {
 					return
 				default:
 				}
-				if _, err := r.m.Rows(context.Background(), api.ViewNeedsMe, api.Since{}); err != nil {
+				if _, err := r.m.Rows(context.Background(), api.Since{}); err != nil {
 					t.Error(err)
 					return
 				}
@@ -611,7 +636,6 @@ func TestProjectionConvergesUnderConcurrentWrites(t *testing.T) {
 			return
 		}
 		all.pull(r)
-		mine.pull(r)
 		pulls++
 	}
 	writersDone := make(chan struct{})
@@ -638,13 +662,11 @@ func TestProjectionConvergesUnderConcurrentWrites(t *testing.T) {
 	cancel()
 	<-runDone
 	all.pull(r)
-	mine.pull(r)
 	if t.Failed() {
 		return
 	}
 	r.matchesFresh(encoded(t, r.rows(r.m, api.Since{}).Rows))
 	r.matchesFresh(encoded(t, all.all()))
-	r.matchesFreshView(api.ViewNeedsMe, encoded(t, mine.all()))
 	if pulls == 0 {
 		t.Error("no change was published")
 	}
@@ -655,7 +677,7 @@ func TestMinuteTickChangesNothingAtLiveData(t *testing.T) {
 	before := r.rows(r.m, api.Since{})
 	r.advance(time.Minute)
 	ctx, sc := metertest.Start(t, context.Background())
-	after, err := r.m.Rows(ctx, api.ViewAll, api.Since{Epoch: before.Epoch, Rev: before.Rev})
+	after, err := r.m.Rows(ctx, api.Since{Epoch: before.Epoch, Rev: before.Rev})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -677,7 +699,7 @@ func TestClockFlipsStalledAndRenudge(t *testing.T) {
 		{Ref: waits, Title: "Waits", Author: "ana", State: "OPEN", HeadOid: "h1", ReviewRequests: []string{viewer}, Reasons: []string{"review-requested"}},
 		{Ref: nudged, Title: "Nudged", Author: viewer, State: "OPEN", HeadOid: "h2", ReviewRequests: []string{"bia"}, Reasons: []string{"author"}},
 	} {
-		if err := f.Inventory.UpsertPR(ctx, p); err != nil {
+		if err := inventorytest.Of(f.Inventory).UpsertPR(ctx, p); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -760,4 +782,30 @@ func TestCheckFindsAStaleRow(t *testing.T) {
 func overrideOf(r api.Row) api.Override {
 	p, _ := prrow.PayloadOf(r)
 	return p.Override
+}
+
+func TestUpcomingUnmuteReadsWakes(t *testing.T) {
+	f := storetest.Seeded(t, storetest.Live)
+	r := newRig(t, f)
+	ctx := context.Background()
+	ref := f.Open[3]
+	until := f.Now.Add(5 * time.Hour)
+	if err := mute(ctx, f, ref, until); err != nil {
+		t.Fatal(err)
+	}
+	row, ok, err := r.m.Row(ctx, ref.Unit(), catalog.Asked{})
+	if err != nil || !ok {
+		t.Fatalf("row %v %v", ok, err)
+	}
+	p, _ := prrow.PayloadOf(row)
+	if p.Facts == nil || !slices.ContainsFunc(p.Facts.Next, func(u api.Upcoming) bool { return u.What == api.UpcomingUnmute && u.At.Equal(until) }) {
+		t.Fatalf("next %+v, want the wake's until", p.Facts)
+	}
+	if err := f.DB.Wakes().Drop(ctx, task.ID("t-"+strings.ReplaceAll(ref.String(), "/", "-"))); err != nil {
+		t.Fatal(err)
+	}
+	row, _, _ = r.m.Row(ctx, ref.Unit(), catalog.Asked{})
+	if p, _ := prrow.PayloadOf(row); p.Facts != nil && slices.ContainsFunc(p.Facts.Next, func(u api.Upcoming) bool { return u.What == api.UpcomingUnmute }) {
+		t.Fatalf("a dropped wake is still next: %+v", p.Facts.Next)
+	}
 }

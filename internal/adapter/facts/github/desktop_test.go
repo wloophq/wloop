@@ -42,7 +42,7 @@ func TestTheDesktopListingIsWholeWhetherTheAppRunsOrNot(t *testing.T) {
 				"orca":             {Workspaces: complete, Terminals: complete},
 				claudedesktop.Name: desktop.Scopes[claudedesktop.Name],
 			}
-			if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != true {
+			if f := w.facts(t, w.provider(), r.Unit()); f["pr.address.due"] != true {
 				t.Fatalf("address = %v, %v with Desktop scopes %+v", f["pr.address.due"], f["pr.address.reason"], desktop.Scopes[claudedesktop.Name])
 			}
 		})

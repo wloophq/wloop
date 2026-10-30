@@ -1,0 +1,63 @@
+package tasks
+
+import (
+	"context"
+
+	"github.com/wloophq/wloop/internal/domain/card"
+	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
+)
+
+// CardFacts reads a unit's facts from its stored card (#unit-card).
+type CardFacts struct {
+	Cards card.Store
+	// Enabled says whether a provider's plugin is enabled; nil: every one is.
+	Enabled func(unit.ProviderID) bool
+	// Me is the user's identity now; nil: nobody.
+	Me func() task.Me
+	// Kind is the value of the kind property a provider's plugin gives the tasks of its units; nil: none.
+	Kind func(unit.ProviderID) string
+}
+
+var _ Facts = CardFacts{}
+
+// UnitFacts is u's facts from its card; ok is false for a disabled plugin's unit. A unit with no card stored
+// has no facts beyond its identity.
+func (f CardFacts) UnitFacts(ctx context.Context, u unit.Unit) (task.UnitFacts, bool, error) {
+	if f.Enabled != nil && !f.Enabled(u.Provider) {
+		return task.UnitFacts{}, false, nil
+	}
+	out := task.UnitFacts{Unit: u}
+	if f.Kind != nil {
+		out.Kind = f.Kind(u.Provider)
+	}
+	if f.Cards == nil {
+		return out, true, nil
+	}
+	got, err := f.cards(ctx, u)
+	if err != nil {
+		return task.UnitFacts{}, false, err
+	}
+	snap, ok := got[u]
+	if !ok {
+		return out, true, nil
+	}
+	c := snap.Card
+	out.StartedByMe, out.ClosurePosted, out.Cares, out.Carded = c.StartedByMe, c.ClosurePosted, c.Cares, true
+	var me task.Me
+	if f.Me != nil {
+		me = f.Me()
+	}
+	if h := c.LastHuman; h != nil && !h.Who.Is(me) {
+		out.LastHuman = h.At
+	}
+	return out, true, nil
+}
+
+// cards is u's card; with every card of the pass ctx carries, read once, when u is a unit of it.
+func (f CardFacts) cards(ctx context.Context, u unit.Unit) (map[unit.Unit]card.Snapshot, error) {
+	if pass, ok := PassOf(ctx); ok && pass.Holds(u) {
+		return Once(ctx, "cards", func() (map[unit.Unit]card.Snapshot, error) { return f.Cards.Get(ctx, pass.Units()) })
+	}
+	return f.Cards.Get(ctx, []unit.Unit{u})
+}

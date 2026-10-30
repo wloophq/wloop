@@ -89,3 +89,19 @@ func TestATargetIsHowACommandLineNamesAProvidersUnit(t *testing.T) {
 		}
 	}
 }
+
+type linked struct{ unit.OpaqueCodec }
+
+func (linked) URL(key string) string       { return "https://acme.example/" + key }
+func (linked) KeyOf(string) (string, bool) { return "", false }
+
+func TestAUnitIsAddressedByItsURLWhenItsCodecHasOne(t *testing.T) {
+	unit.UseLabels(unit.NewRegistry(linked{unit.OpaqueCodec{ID: "acme"}}, unit.OpaqueCodec{ID: "thread"}))
+	t.Cleanup(func() { unit.UseLabels(nil) })
+	if got := (unit.Unit{Provider: "acme", Key: "42"}).Address(); got != "https://acme.example/42" {
+		t.Errorf("a linked unit's address = %q", got)
+	}
+	if got := (unit.Unit{Provider: "thread", Key: "t1"}).Address(); got != "thread:t1" {
+		t.Errorf("an unlinked unit's address = %q", got)
+	}
+}

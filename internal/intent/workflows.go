@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"maps"
-	"os"
 	"path"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -14,9 +12,11 @@ import (
 
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/duration"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/jsonschema"
 	"github.com/wloophq/wloop/internal/domain/mark"
+	"github.com/wloophq/wloop/internal/domain/task"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -40,14 +40,13 @@ type wManifest struct {
 	Order    *int              `toml:"order"`
 	Key      []string          `toml:"key"`
 	Marks    map[string]string `toml:"marks"`
-	Approval *mApproval        `toml:"approval"`
 	Drafts   *wDrafts          `toml:"drafts"`
+	Gates    *mGates           `toml:"gates"`
 }
 
-// wDrafts is the [drafts] table: the approval of the drafts the
-// workflow's steps and turns propose, and when its open ones are withdrawn.
+// wDrafts is the [drafts] table: when the open drafts the workflow's steps
+// and turns propose are withdrawn.
 type wDrafts struct {
-	Approval *mApproval `toml:"approval"`
 	Withdraw *wWithdraw `toml:"withdraw"`
 }
 
@@ -59,6 +58,8 @@ type wWithdraw struct {
 type wTrigger struct {
 	On       []string `toml:"on"`
 	Schedule *string  `toml:"schedule"`
+	Actors   []string `toml:"actors"`
+	Depth    *int     `toml:"depth"`
 }
 
 type wLimits struct {
@@ -81,12 +82,14 @@ type wUnit struct {
 	whenAt dintent.Pos
 }
 
-// loadWorkflows reads workflows/ of the bundled FS and of each directory layer.
-// A user workflow that fails is listed in broken and left out of loaded; a
-// bundled one whose override fails is listed in reverted and loads without
-// it. turnProblem, when set, is why a turn.start may not name an intent
-// or run it under a runner, with the argument at fault; "" when it may.
-func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems, warnings Problems) {
+// loadWorkflows reads workflows/ of the bundled FS and of each other layer.
+// A plugin's workflow is a bundled one that a higher layer's directory of
+// its name overrides. A user workflow that fails is listed in broken and
+// left out of loaded; a bundled one whose override fails is listed in
+// reverted and loads without it. turnProblem, when set, is why a
+// turn.start may not name an intent or run it under a runner, with the
+// argument at fault; "" when it may.
+func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env, tasks TasksDef, gates GatesDef) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems, warnings Problems) {
 	var units []*wUnit
 	bundledUnits := map[string]*wUnit{}
 	if bundled != nil {
@@ -103,17 +106,24 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(inten
 	}
 	seen := map[string]string{}
 	for _, l := range layers {
-		if l.Dir == "" {
+		if l.Bundled() {
 			continue
 		}
-		entries, _ := os.ReadDir(filepath.Join(l.Dir, "workflows"))
+		entries, _ := profile.ReadDir(l, "workflows")
 		for _, e := range entries {
 			if !e.IsDir() {
 				continue
 			}
-			dir := filepath.Join(l.Dir, "workflows", e.Name())
+			fl, dir := layerFiles(l, path.Join("workflows", e.Name()))
+			if n := builtin.RenamedTo(e.Name()); n != "" && bundledUnits[n] != nil {
+				problems = append(problems, Problem{File: dir, Msg: e.Name() + " was renamed" + expr.DidYouMean(e.Name(), []string{n})})
+				continue
+			}
 			if b := bundledUnits[e.Name()]; b != nil {
-				if len(overrides([]string{dir})) > 0 {
+				switch {
+				case l.Embedded():
+					problems = append(problems, Problem{File: dir, Msg: fmt.Sprintf("%s is defined already in %s", e.Name(), b.files.base("workflow.toml"))})
+				case len(overrides([]string{dir})) > 0:
 					b.files.overlay = append(b.files.overlay, dir)
 				}
 				continue
@@ -122,18 +132,24 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(inten
 				problems = append(problems, Problem{File: dir, Msg: fmt.Sprintf("%s is defined already in %s", e.Name(), seen[e.Name()])})
 				continue
 			}
-			seen[e.Name()] = dir
-			units = append(units, &wUnit{name: e.Name(), dir: dir, files: files{dir: dir}})
+			u := &wUnit{name: e.Name(), dir: dir, files: fl}
+			if l.Plugin() {
+				u.bundled = true
+				bundledUnits[u.name] = u
+			} else {
+				seen[e.Name()] = dir
+			}
+			units = append(units, u)
 		}
 	}
 	broken, reverted = map[string]Problems{}, map[string]Problems{}
 	for _, u := range units {
-		u.load(turnProblem, extras)
+		u.load(turnProblem, extras, tasks, gates)
 		if len(u.problems) > 0 && len(u.files.overlay) > 0 {
 			reverted[u.name] = u.files.own(u.problems, "workflow.toml")
 			problems = append(problems, reverted[u.name]...)
 			u.files.overlay = nil
-			u.load(turnProblem, extras)
+			u.load(turnProblem, extras, tasks, gates)
 		}
 		if len(u.problems) > 0 {
 			problems = append(problems, u.problems...)
@@ -199,9 +215,9 @@ func (u *wUnit) unknownMarks(readable map[string]bool) Problems {
 	return out
 }
 
-func (u *wUnit) load(turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env) {
+func (u *wUnit) load(turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env, tasks TasksDef, gates GatesDef) {
 	file := u.files.path("workflow.toml")
-	s := &sheet{file: file, extras: extras}
+	s := &sheet{file: file, extras: extras, tasks: tasks, gates: gates}
 	defer func() { u.problems, u.warnings = s.problems, s.warnings }()
 	if !workflowNameRe.MatchString(u.name) {
 		s.problems = append(s.problems, Problem{File: u.dir, Msg: "a workflow name is 2 to 40 lowercase letters, digits and -, starting with a letter"})
@@ -311,9 +327,8 @@ func (s *sheet) defineWorkflow(name string, m wManifest, turnProblem func(intent
 	}
 	s.defineKey(&w, m.Key, slot)
 	s.defineMarks(&w, m.Marks, slot)
-	s.defineApproval(&w, m.Approval, slot)
+	s.defineApproval(&w, m.Gates, slot)
 	if d := m.Drafts; d != nil {
-		w.DraftApproval = s.draftApprovalAt("drafts.approval", d.Approval, builtin.ApprovalEnv(true, slot))
 		s.defineWithdraw(&w, d.Withdraw, slot)
 	}
 	s.turnBudget(w, m.Limits)
@@ -376,14 +391,23 @@ func (s *sheet) defineTrigger(w *workflow.Workflow, t *wTrigger) {
 		if len(t.On) == 0 {
 			s.add("trigger.on", "must name at least one event kind")
 		}
+		kinds, verbs := builtin.TriggerEventKinds(), s.tasks.VerbKinds()
 		for i, k := range t.On {
+			at := fmt.Sprintf("trigger.on[%d]", i)
 			switch {
 			case slices.Contains(workflow.EngineKinds, k):
-				s.add(fmt.Sprintf("trigger.on[%d]", i), "%s is an engine event; a workflow reacts to source events", k)
+				s.add(at, "%s is an engine event; a workflow reacts to source events", k)
+			case slices.Contains(verbs, k) && w.Provider != task.UnitOf("").Provider:
+				s.add(at, "%s is an event of %s units; it needs provider = %q", k, task.UnitOf("").Provider, task.UnitOf("").Provider)
+			case slices.Contains(verbs, k):
+			case !slices.Contains(kinds, k):
+				all := slices.Concat(kinds, verbs)
+				s.add(at, "names no event kind%s", expr.DidYouMean(k, all))
 			case builtin.EventProviders[k] != "" && w.Provider != builtin.EventProviders[k]:
-				s.add(fmt.Sprintf("trigger.on[%d]", i), "%s is an event of %s units; it needs provider = %q", k, builtin.EventProviders[k], builtin.EventProviders[k])
+				s.add(at, "%s is an event of %s units; it needs provider = %q", k, builtin.EventProviders[k], builtin.EventProviders[k])
 			}
 		}
+		s.defineChain(w, t)
 	default:
 		w.Trigger.Kind = workflow.TriggerSchedule
 		c, err := workflow.ParseCron(*t.Schedule)
@@ -392,6 +416,29 @@ func (s *sheet) defineTrigger(w *workflow.Workflow, t *wTrigger) {
 		}
 		w.Trigger.Schedule = c
 	}
+}
+
+// defineChain reads trigger.actors and trigger.depth, which bound the
+// chains of workflows an event trigger closes.
+func (s *sheet) defineChain(w *workflow.Workflow, t *wTrigger) {
+	for i, a := range t.Actors {
+		if !slices.ContainsFunc(task.Actors, func(x task.Actor) bool { return string(x) == a }) {
+			continue
+		}
+		if slices.Contains(w.Trigger.Actors, a) {
+			s.add(fmt.Sprintf("trigger.actors[%d]", i), "names %s twice", a)
+			continue
+		}
+		w.Trigger.Actors = append(w.Trigger.Actors, a)
+	}
+	if t.Depth == nil {
+		return
+	}
+	if d := *t.Depth; d < 1 || d > workflow.MaxChainDepth {
+		s.add("trigger.depth", "must be 1 to %d: the longest chain of workflows triggering each other, %d when absent", workflow.MaxChainDepth, workflow.DefaultChainDepth)
+		return
+	}
+	w.Trigger.Depth = *t.Depth
 }
 
 func stepDef(use string) (builtin.StepDef, bool) {
@@ -475,8 +522,11 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, turnPr
 		if use == builtin.StepDraftPropose {
 			s.draftPropose(p, st.Args, w.Provider)
 		}
-		if use == builtin.StepEntryVerb {
-			s.entryVerb(p, st.Args)
+		if use == builtin.StepTaskVerb {
+			s.taskVerb(p, st.Args)
+		}
+		if use == builtin.StepGateOpen {
+			s.gateOpen(p, st.Args)
 		}
 		args := maps.Clone(raw)
 		delete(args, "use")
@@ -544,25 +594,39 @@ func (s *sheet) stepFiles(steps []workflow.Step, read func(string) ([]byte, erro
 	}
 }
 
-// entryVerb checks entry.verb's arguments: a verb, only the arguments it
-// takes, and a date or on_activity for schedule.
-func (s *sheet) entryVerb(p string, args map[string]any) {
+// gateOpen checks that gate.open names a gate of gates.toml.
+func (s *sheet) gateOpen(p string, args map[string]any) {
+	name, _ := args["name"].(string)
+	if _, ok := s.gates.Gate(name); name != "" && !ok {
+		s.add(p+".name", "names no gate of %s%s", GatesFile, expr.DidYouMean(name, s.gates.names()))
+	}
+}
+
+// taskVerb checks task.verb's arguments: a verb of tasks.toml a workflow
+// may run, only the arguments its handler takes, and a date or
+// on_activity for the schedule handler.
+func (s *sheet) taskVerb(p string, args map[string]any) {
 	verb, _ := args["verb"].(string)
 	if verb == "" {
-		s.add(p+".verb", "is required: the verb run on the entry")
+		s.add(p+".verb", "is required: the verb run on the task")
 		return
 	}
-	if !slices.Contains(builtin.EntryStepVerbs, verb) {
+	v, ok := s.tasks.Verbs[verb]
+	if !ok {
+		s.add(p+".verb", "names no verb of %s%s", TasksFile, expr.DidYouMean(verb, slices.Sorted(maps.Keys(s.tasks.Verbs))))
 		return
 	}
-	takes := builtin.EntryVerbArgs[verb]
+	if v.By[string(task.ActorWorkflow)] == "" {
+		s.add(p+".verb", "%s has no by.workflow in %s: no workflow may run it", verb, TasksFile)
+	}
+	takes := builtin.HandlerArgs[v.Handler]
 	for _, k := range slices.Sorted(maps.Keys(args)) {
 		if k != "verb" && !slices.Contains(takes, k) {
 			s.add(p+"."+k, "is not an argument of %s", verb)
 		}
 	}
-	if verb == "schedule" && args["until"] == nil && args["on_activity"] != "true" {
-		s.add(p+".verb", "schedule needs until or on_activity = \"true\"")
+	if slices.Contains(takes, "on_activity") && args["until"] == nil && args["on_activity"] != "true" {
+		s.add(p+".verb", "%s needs until or on_activity = \"true\"", verb)
 	}
 }
 
@@ -648,21 +712,39 @@ func (s *sheet) defineMarks(w *workflow.Workflow, marks map[string]string, slot 
 	w.Marks = marks
 }
 
-func (s *sheet) defineApproval(w *workflow.Workflow, a *mApproval, slot string) {
-	var env expr.Env
-	if slot != "" {
-		env = s.withExtras(builtin.WorkflowEnv(slot), w.Provider, slot)
+// defineApproval loads the workflow's [gates.approval]: the approval of its
+// runs' plan gates, of the drafts its steps and turns propose, and of the
+// gates its gate.open steps open, each laid over gates.toml's default.
+func (s *sheet) defineApproval(w *workflow.Workflow, g *mGates, slot string) {
+	var m *mApproval
+	if g != nil {
+		m = g.Approval
 	}
-	w.Approval = s.runApproval(a, env)
+	draftEnv := s.withExtras(builtin.ApprovalEnv(true, slot), w.Provider, slot)
+	var unitEnv expr.Env
+	if slot != "" {
+		unitEnv = s.withExtras(builtin.WorkflowEnv(slot), w.Provider, slot)
+	}
+	a := s.gateApproval(m, gate.Kinds, draftEnv, unitEnv)
+	w.Approval = a.kindApproval(gate.KindPlan, s.gates)
+	w.DraftApproval = a.draftPolicy(s.gates)
+	w.Gates = map[gate.Kind]workflow.Approval{}
+	for _, k := range GateKinds {
+		w.Gates[k] = a.kindApproval(k, s.gates)
+	}
 }
 
 // schemaArg is the step argument holding the schema the step's agent
 // answers to, which Go validates the answer against.
 const schemaArg = "schema"
 
-// withExtras is env with the brief.extra.* facts of p's brief intent when
-// slot's units have a brief.
+// withExtras is env with the task.prop.* facts of tasks.toml in the task
+// slot, and the brief.extra.* facts of p's brief intent when slot's units
+// have a brief.
 func (s *sheet) withExtras(env expr.Env, p dunit.ProviderID, slot string) expr.Env {
+	if slot == builtin.TaskSlot {
+		maps.Copy(env, s.tasks.Facts())
+	}
 	if s.extras == nil || !slices.Contains(builtin.BriefSubjects, slot) {
 		return env
 	}

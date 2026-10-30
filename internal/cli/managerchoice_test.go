@@ -7,8 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/domain/pr"
+
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -25,7 +26,7 @@ func TestAnUntrustedPullRequestFallsThroughToTheNextManager(t *testing.T) {
 	te.WS = workspace.NewSet(desk, orca)
 	te.cfg.WorkspaceManagers = []string{"desk", "orca"}
 	ctx := context.Background()
-	pr := &github.PullRequest{}
+	pr := &pr.PullRequest{}
 
 	m, err := te.chooseManager(ctx, te.cfg, roundOptions{pr: pr, trusted: true})
 	if err != nil || m.Name() != "desk" {
@@ -126,7 +127,7 @@ func TestTheFallThroughRowKeepsThePullRequestLink(t *testing.T) {
 	desk.Refuses = errors.New("runs only the default home")
 	ws := desk.WorkspaceList[0]
 	ws.Manager, ws.LinkedPR = "desk", 9
-	host, err := te.hostOf(context.Background(), te.cfg, ws, roundOptions{trusted: false, pr: &github.PullRequest{}})
+	host, err := te.hostOf(context.Background(), te.cfg, ws, roundOptions{trusted: false, pr: &pr.PullRequest{}})
 	if err != nil || host.Manager != "orca" || host.LinkedPR != 9 {
 		t.Fatalf("hostOf = %+v, %v", host, err)
 	}

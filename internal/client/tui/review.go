@@ -1,27 +1,26 @@
 package tui
 
 import (
-	"cmp"
 	"fmt"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	dtask "github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
-const (
-	viewReview = "review"
-	ctxReview  = "review"
-)
+// ctxReview is the key context of the review, a mode of the terminal that walks the catalog's review steps; the
+// served view of that name is where it sits among the views.
+const ctxReview = "review"
 
-// projectVerbs are a project's verbs, which no key takes: the palette runs them.
-var projectVerbs = []string{"reviewed", "sequential"}
+// projectHandlers are the handlers of a project's verbs, which no key takes: the palette runs them.
+var projectHandlers = []string{"reviewed", "sequential"}
 
-// reviewView is the weekly Review on screen: the daemon's Review, the step
+// reviewView is the Review on screen: the daemon's Review, the step
 // shown, and whether the cursor is on that step's header rather than on one
-// of its entries.
+// of its tasks.
 type reviewView struct {
 	review *api.Review
 	step   string
@@ -29,8 +28,8 @@ type reviewView struct {
 }
 
 func (m *Model) inReview() bool {
-	v, ok := m.gtdView()
-	return ok && v.ID == viewReview
+	v, ok := m.viewOnScreen()
+	return ok && v.ID == ctxReview
 }
 
 // SetReview takes the Review the daemon serves; with no step shown, or one
@@ -40,7 +39,7 @@ func (m *Model) SetReview(r api.Review) {
 	if _, ok := m.reviewStep(); !ok {
 		m.rv.step, m.rv.head = firstOpenStep(r.Steps, -1), true
 	}
-	m.keepEntrySelection()
+	m.keepTaskSelection()
 }
 
 // reviewStep is the step on screen.
@@ -69,10 +68,10 @@ func firstOpenStep(steps []api.ReviewStep, from int) string {
 	return steps[len(steps)-1].ID
 }
 
-// listView is the view whose entries a GTD view lists: the step's on the
+// listView is the view whose tasks a task view lists: the step's on the
 // Review.
 func (m *Model) listView(v View) string {
-	if v.ID != viewReview {
+	if v.ID != ctxReview {
 		return v.ID
 	}
 	st, _ := m.reviewStep()
@@ -80,7 +79,7 @@ func (m *Model) listView(v View) string {
 }
 
 // reviewAction runs a key of the Review context; took is false where it
-// does not apply, so Enter on an entry opens it.
+// does not apply, so Enter on a task opens it.
 func (m *Model) reviewAction(action string) (c Command, ok, took bool) {
 	st, shown := m.reviewStep()
 	if !m.inReview() || !shown {
@@ -109,31 +108,31 @@ func (m *Model) reviewAction(action string) (c Command, ok, took bool) {
 		if !m.rv.review.Done {
 			m.showStep(firstOpenStep(steps, at))
 		}
-		c, ok = m.send(Command{Unit: entryUnit(viewReview), Label: st.Label, Action: "review", reviewStep: st.ID})
+		c, ok = m.send(Command{Unit: taskUnit(ctxReview), Label: st.Label, Action: "review", reviewStep: st.ID})
 		return c, ok, true
 	}
 	return Command{}, false, false
 }
 
 func (m *Model) showStep(id string) {
-	m.rv.step, m.rv.head, m.entryAt, m.entrySel = id, true, 0, ""
+	m.rv.step, m.rv.head, m.taskAt, m.taskSel = id, true, 0, ""
 	m.closeDetail()
 }
 
-// reviewMove moves between the step's header and its entries; false leaves
-// the move to the entry list.
+// reviewMove moves between the step's header and its tasks; false leaves
+// the move to the task list.
 func (m *Model) reviewMove(delta int) bool {
 	if !m.inReview() {
 		return false
 	}
-	entries := m.visibleEntries()
+	tasks := m.visibleTasks()
 	switch {
-	case m.rv.head && delta > 0 && len(entries) > 0:
-		m.rv.head, m.entryAt, m.entrySel = false, 0, entries[0].ID
+	case m.rv.head && delta > 0 && len(tasks) > 0:
+		m.rv.head, m.taskAt, m.taskSel = false, 0, tasks[0].ID
 		return true
 	case m.rv.head:
 		return true
-	case delta < 0 && m.entryCursor(entries) == 0:
+	case delta < 0 && m.taskCursor(tasks) == 0:
 		m.rv.head = true
 		m.closeDetail()
 		return true
@@ -142,7 +141,7 @@ func (m *Model) reviewMove(delta int) bool {
 }
 
 // renderReview draws the Review's steps, the step on screen's header and
-// its entries.
+// its tasks.
 func (m *Model) renderReview(lines []string, width, body int, now time.Time) []string {
 	t := m.t
 	if m.rv.review == nil {
@@ -174,7 +173,7 @@ func (m *Model) renderReview(lines []string, width, body int, now time.Time) []s
 		line = t.Reverse(line + strings.Repeat(" ", max(width-termfmt.Cells(termfmt.Plain(line)), 0)))
 	}
 	lines = append(lines, "", line)
-	return m.renderEntries(lines, View{ID: st.View, Label: st.Label}, width, body-(len(lines)-start), now)
+	return m.renderTasks(lines, View{ID: st.View, Label: st.Label}, width, body-(len(lines)-start), now)
 }
 
 // reviewLine is the steps on one line, by id: a short screen's.
@@ -230,22 +229,20 @@ func (m *Model) reviewHelp() []helpItem {
 	return append(items, helpItem{"]", "next step"}, helpItem{"[", "previous step"})
 }
 
-// projectFacts are a project's review mark, next action, open actions and
-// interval; none for another kind.
-func projectFacts(e api.EntryView) []string {
-	if e.Kind != "project" {
+// projectFacts are a project's review mark, open children, with no next
+// action when it has none, and interval; none for another kind.
+func projectFacts(e api.TaskView) []string {
+	if e.PropText(dtask.PropKind) != dtask.KindProject {
 		return nil
 	}
 	var out []string
 	if e.ReviewDue {
 		out = append(out, "review due")
 	}
-	if e.NextAction == "" {
+	if len(e.Children) == 0 {
 		out = append(out, "no next action")
-	} else {
-		out = append(out, "next: "+cmp.Or(e.NextActionTitle, e.NextAction))
 	}
-	out = append(out, fmt.Sprintf("%d open", e.OpenActions))
+	out = append(out, fmt.Sprintf("%d open", len(e.Children)))
 	if d, err := time.ParseDuration(e.ReviewEvery); err == nil && d > 0 {
 		out = append(out, "every "+everyLabel(d))
 	}

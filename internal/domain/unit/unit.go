@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync/atomic"
 )
 
 type ProviderID string
@@ -21,9 +22,9 @@ const (
 	GitHub    ProviderID = "github"
 	Session   ProviderID = "session"
 	Workspace ProviderID = "workspace"
-	// Entry is the provider the core keeps for GTD entries: the key is the
-	// entry's id.
-	Entry ProviderID = "entry"
+	// Task is the provider the core keeps for tasks: the key is the
+	// task's id.
+	Task ProviderID = "task"
 )
 
 type Unit struct {
@@ -35,12 +36,43 @@ func (u Unit) String() string { return string(u.Provider) + ":" + u.Key }
 
 func (u Unit) IsZero() bool { return u == Unit{} }
 
-// Label names u as users read it: a pull request by its reference alone.
+// Label names u as users read it: as the codec of its provider in the
+// registry UseLabels set labels its key, else as provider:key.
 func (u Unit) Label() string {
-	if u.Provider == GitHub {
-		return u.Key
+	if l, ok := labels.Load().codecOf(u.Provider).(Labeler); ok {
+		return l.Label(u.Key)
 	}
 	return u.String()
+}
+
+// Address names u as a person or an agent types it: as its web address
+// when the codec of its provider in the registry UseLabels set has one,
+// else as provider:key.
+func (u Unit) Address() string {
+	if l, ok := labels.Load().codecOf(u.Provider).(Linker); ok {
+		return l.URL(u.Key)
+	}
+	return u.String()
+}
+
+// ParseAddress is the unit a web address names, as the codecs of the
+// registry UseLabels set read it; false for an address none of them has.
+func ParseAddress(raw string) (Unit, bool) { return labels.Load().ParseURL(raw) }
+
+// Labeler is an optional capability of a Codec: how a person reads a key.
+type Labeler interface {
+	Label(key string) string
+}
+
+var labels atomic.Pointer[Registry]
+
+// UseLabels makes r's codecs the ones Unit.Label asks. The composition root
+// sets it once, before anything labels a unit.
+func UseLabels(r *Registry) { labels.Store(r) }
+
+func (r *Registry) codecOf(p ProviderID) Codec {
+	c, _ := r.Codec(p)
+	return c
 }
 
 // Less orders by provider, then key; the sort order of every unit list.
@@ -229,8 +261,8 @@ type Resolver interface {
 	Resolve(ctx context.Context, address string) (key string, ok bool, err error)
 }
 
-// Locator is a codec that knows the unit a working directory holds, such as
-// the pull request of a checkout's branch; ok is false when it holds none.
+// Locator knows the unit a local checkout's directory holds, such as the
+// pull request of its branch; ok is false when it holds none.
 type Locator interface {
-	UnitAt(ctx context.Context, dir string) (key string, ok bool, err error)
+	Locate(ctx context.Context, dir string) (u Unit, ok bool, err error)
 }

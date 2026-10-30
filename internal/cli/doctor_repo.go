@@ -23,7 +23,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/termfmt"
 	"github.com/wloophq/wloop/internal/turn"
@@ -195,7 +194,7 @@ func runProfileShow(ctx context.Context, e *Env, args []string) error {
 
 // placeholderTurn is a turn asked for by hand on a pull request of ref's
 // repository, with nothing read from GitHub.
-func placeholderTurn(d dintent.Def, ref github.Ref) turn.Request {
+func placeholderTurn(d dintent.Def, ref pr.Ref) turn.Request {
 	inputs := map[string]any{}
 	for _, in := range d.Inputs {
 		if in.Type == "text" {
@@ -220,7 +219,7 @@ func doctorIntents(r *dintent.Registry, show bool, p unit.ProviderID) []dintent.
 
 // placeholderTurnOf is placeholderTurn with the facts the daemon read of
 // the pull request, when it did.
-func placeholderTurnOf(d dintent.Def, ref github.Ref, f *api.Facts) turn.Request {
+func placeholderTurnOf(d dintent.Def, ref pr.Ref, f *api.Facts) turn.Request {
 	r := placeholderTurn(d, ref)
 	if f != nil {
 		r.Payload = &turn.PR{Author: f.Author, Association: f.Association, Base: f.Base, Labels: f.Labels}
@@ -230,11 +229,11 @@ func placeholderTurnOf(d dintent.Def, ref github.Ref, f *api.Facts) turn.Request
 
 // briefFacts asks the daemon what the pull request's guide is matched
 // against.
-func (e *Env) briefFacts(ctx context.Context, c *client.Client, ref github.Ref) (*api.Facts, error) {
+func (e *Env) briefFacts(ctx context.Context, c *client.Client, ref pr.Ref) (*api.Facts, error) {
 	if c == nil {
 		return nil, errors.New("the daemon is not running")
 	}
-	f, err := c.Facts(ctx, pr.Ref(ref))
+	f, err := c.Facts(ctx, ref.URL())
 	if err != nil {
 		return nil, err
 	}
@@ -270,15 +269,15 @@ func describeFacts(f api.Facts) string {
 
 var profileShowUsage = "usage: " + brand.Command + " profile show <owner/repo|pr-url> [--intent <intent>] [--show] [--color auto|always|never]"
 
-func parseRepoArg(v string) (github.Ref, error) {
+func parseRepoArg(v string) (pr.Ref, error) {
 	if strings.HasPrefix(v, "https://") {
-		return github.ParseURL(v)
+		return pr.ParseURL(v)
 	}
 	owner, repo, ok := strings.Cut(v, "/")
 	if !ok || owner == "" || repo == "" || strings.Contains(repo, "/") {
-		return github.Ref{}, errors.New(profileShowUsage)
+		return pr.Ref{}, errors.New(profileShowUsage)
 	}
-	return github.Ref{Owner: owner, Repo: repo}, nil
+	return pr.Ref{Owner: owner, Repo: repo}, nil
 }
 
 // printBlocks lists the blocks of kind with their conditions and what each
@@ -407,7 +406,7 @@ func (e *Env) workflowChecks(ctx context.Context, db workflowReads) ([]api.Docto
 			out = append(out, api.DoctorCheck{Mark: api.DoctorInfo, Name: name, Info: "disabled by workflows." + w.Name + ".enabled in " + e.ConfigPath})
 			continue
 		}
-		w = applyConfigWith([]workflow.Workflow{w}, cfg, briefExtrasOf(l.Registry))[0]
+		w = applyConfigWith([]workflow.Workflow{w}, cfg, briefExtrasOf(l))[0]
 		c, err := e.workflowLine(ctx, db, w, activity[w.Name], now)
 		if err != nil {
 			return out, err
@@ -460,7 +459,7 @@ func (e *Env) workflowLine(ctx context.Context, db workflowReads, w workflow.Wor
 		}
 		mark = api.DoctorInfo
 		info = fmt.Sprintf("observe, %s, %d item(s) planned and none run; see %s plan --workflow %s; set %s in %s to run them",
-			w.Trigger.Kind, len(items), brand.Command, w.Name, workflowEntry(w.Name, "observe", "false"), e.ConfigPath)
+			w.Trigger.Kind, len(items), brand.Command, w.Name, workflowTask(w.Name, "observe", "false"), e.ConfigPath)
 	} else {
 		last := "never ran"
 		if !a.LastRun.IsZero() {
@@ -469,14 +468,14 @@ func (e *Env) workflowLine(ctx context.Context, db workflowReads, w workflow.Wor
 		info = fmt.Sprintf("%s, %s, %d refusal(s) in the last day", w.Trigger.Kind, last, a.Refusals)
 	}
 	if w.Approval.Mode == workflow.ApprovalWait {
-		info += fmt.Sprintf("; each item waits for you to apply it; set %s in %s to run them without you",
-			workflowEntry(w.Name, "approval.mode", `"run"`), e.ConfigPath)
+		info += fmt.Sprintf("; each item waits for you to apply it; add [[%s.gates.approval.rule]] with when = 'gate.kind == \"plan\"' and mode = \"run\" in %s to run them without you",
+			config.Key("workflows", w.Name), e.ConfigPath)
 	}
 	return api.DoctorCheck{Mark: mark, Info: info}, nil
 }
 
-// workflowEntry is the config.toml line that sets field of workflow name to value.
-func workflowEntry(name, field, value string) string {
+// workflowTask is the config.toml line that sets field of workflow name to value.
+func workflowTask(name, field, value string) string {
 	return config.Key("workflows", name) + "." + field + " = " + value
 }
 

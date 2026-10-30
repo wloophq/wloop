@@ -10,10 +10,10 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/dossier"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -41,7 +41,7 @@ func TestProjectDossierOnDisk(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	cfg := config.Config{}
-	g := e.entries(db, cfg, noItems{})
+	g := e.newTasks(db, cfg, noItems{})
 	ds := e.serveDossiers(ctx, db, cfg, t.Logf)
 	serveProjects(g, db, ds)
 
@@ -49,11 +49,12 @@ func TestProjectDossierOnDisk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := g.Do(ctx, capture.ID, coregtd.Request{Verb: gtd.VerbProject, Args: map[string]string{"title": "Ship the v2 API"}})
+	res, err := g.Do(ctx, capture.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbProject, Args: map[string]string{"title": "Ship the v2 API"}})
 	if err != nil || len(res.Lines) > 0 {
 		t.Fatalf("project: %+v %v", res, err)
 	}
-	dir, err := dossier.Dir(state, dossier.Owner{Project: "ship-the-v2-api"})
+	project := dossier.Owner{Unit: task.UnitOf(res.Task.Parent)}
+	dir, err := dossier.Dir(state, project)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,10 +73,10 @@ func TestProjectDossierOnDisk(t *testing.T) {
 	if archived, _, err := ds.Sweep(ctx); err != nil || archived != 0 {
 		t.Fatalf("an open project's dossier swept: %d %v", archived, err)
 	}
-	if _, err := g.Do(ctx, res.Entry.Project, coregtd.Request{Verb: gtd.VerbDone}); err != nil {
+	if _, err := g.Do(ctx, res.Task.Parent, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone}); err != nil {
 		t.Fatal(err)
 	}
-	d, ok, err := ds.Get(ctx, dossier.Owner{Project: "ship-the-v2-api"})
+	d, ok, err := ds.Get(ctx, project)
 	if err != nil || !ok || d.Status != dossier.Resolved || !d.ResolvedAt.Equal(now) {
 		t.Fatalf("after done: %+v %v %v", d, ok, err)
 	}

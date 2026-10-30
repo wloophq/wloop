@@ -5,15 +5,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/pr"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/automation"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/intake"
-	coresweep "github.com/wloophq/wloop/internal/core/sweep"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -23,38 +27,28 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/plugins/source/value"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
-// The rounds a roundCandidate names, as the github facts provider does.
+// The rounds of a pull request's plan, as the github planner names them.
 const (
 	roundFollowup = "follow-up"
 	roundFirst    = "first"
 	roundAddress  = "address"
 )
 
-// roundCandidate is the round of a pull request the github facts plan, with
-// what its turn is sent with.
-type roundCandidate struct {
-	Round        string
-	Workspace    wsdomain.Workspace
-	Facts        coresweep.Facts
-	Fingerprint  string
-	ChecksHead   string
-	ConflictHead string
-	LastReviewAt time.Time
-	Observed     bool
-	// Reason is why the planner plans the round.
-	Reason string
-}
-
-// roundCandidates is the github facts provider's Candidate: false when the
-// round is not due.
-type roundCandidates interface {
-	Candidate(ctx context.Context, u unit.Unit, round string) (roundCandidate, bool, error)
+// plannedRound is a round of the unit's plugin plan, with what the host
+// resolves of it: its workspace, and the pull request as the host keeps
+// what the plugin reported, for its turn.
+type plannedRound struct {
+	src.Round
+	ws   wsdomain.Workspace
+	read dinv.PlanFacts
 }
 
 // refusalBriefNotReady starts the refusal of a round whose brief is not
@@ -124,7 +118,7 @@ func (a startArgs) kindName() string {
 // other round the intent's why over the unit's facts.
 func (s *stepSet) reason(p startPlan) string {
 	if p.args.candidate() == roundFirst {
-		return cmp.Or(p.cand.Reason, p.args.kindName())
+		return cmp.Or(p.planned.Reason, p.args.kindName())
 	}
 	var why string
 	if l := s.e.loadedIntents(); l != nil {
@@ -149,11 +143,11 @@ func (a startArgs) runnerName() string {
 
 // startPlan is what the guards of a turn.start read, for its run.
 type startPlan struct {
-	ref   github.Ref
-	args  startArgs
-	facts workflow.Facts
-	cand  roundCandidate
-	// round is a round of the sweep's, sent through sendRound.
+	ref     pr.Ref
+	args    startArgs
+	facts   workflow.Facts
+	planned plannedRound
+	// round is a round of the unit's plan, sent through sendRound.
 	round bool
 	first bool
 	// briefMissing is why the round goes without its brief; brief is the
@@ -162,21 +156,76 @@ type startPlan struct {
 	brief        intake.Readiness
 }
 
-func (p startPlan) observed() bool { return p.round && p.cand.Observed }
+func (p startPlan) observed() bool { return p.round && p.planned.Observed }
 
 // address is why the plan's address round runs now; nil for other rounds.
-func (p startPlan) address() *turn.RoundReason {
+func (p startPlan) address(now time.Time) *turn.RoundReason {
 	if p.args.def.RoundKind != builtin.RoundKindAddress {
 		return nil
 	}
-	return automatedReason(p.facts, p.cand.Facts.Facts)
+	return automatedReason(withTurnFacts(p.facts, p.planned.TurnFacts, now), p.planned.read.Facts)
 }
 
-func (s *stepSet) candidate(ctx context.Context, u unit.Unit, r string) (roundCandidate, bool, error) {
-	if s.d.Candidates == nil {
-		return roundCandidate{}, false, errors.New("no github facts provider plans the rounds")
+// withTurnFacts are f with the turn slot facts of a planned round over them.
+func withTurnFacts(f workflow.Facts, turn []src.Fact, now time.Time) workflow.Facts {
+	if len(turn) == 0 {
+		return f
 	}
-	return s.d.Candidates.Candidate(ctx, u, r)
+	out := maps.Clone(f)
+	if out == nil {
+		out = workflow.Facts{}
+	}
+	for _, t := range turn {
+		out[t.Name] = value.Resolve(t.Value, now)
+	}
+	return out
+}
+
+// plan is the round named name of u's plugin plan, over u's round state:
+// the bound one while a sweep runs, else the stored one; false when the plan
+// has no such round. A round the plan holds as not due is only skipped.
+func (s *stepSet) plan(ctx context.Context, u unit.Unit, name string) (plannedRound, bool, error) {
+	pl := s.d.Planners[u.Provider]
+	if pl == nil {
+		return plannedRound{}, false, fmt.Errorf("no plugin plans the rounds of %s", u.Provider)
+	}
+	st := s.bound()
+	if st == nil {
+		var err error
+		if st, err = s.rounds(ctx, false); err != nil {
+			return plannedRound{}, false, err
+		}
+	}
+	rs, err := s.e.roundStateOf(ctx, u, st, s.d.Overrides)
+	if err != nil {
+		return plannedRound{}, false, err
+	}
+	plan, err := pl.Plan(ctx, psource.Wire(u), rs)
+	if err != nil {
+		return plannedRound{}, false, err
+	}
+	i := slices.IndexFunc(plan.Rounds, func(r src.Round) bool { return r.Name == name })
+	if i < 0 {
+		return plannedRound{}, false, nil
+	}
+	out := plannedRound{Round: plan.Rounds[i], ws: s.workspaceOf(ctx, plan.Rounds[i].Workspace)}
+	if out.read, err = s.e.keptPR(ctx, u); err != nil {
+		return plannedRound{}, false, err
+	}
+	return out, true, nil
+}
+
+// workspaceOf is the workspace ref names, as its manager lists it; a
+// workspace no manager lists now keeps its name.
+func (s *stepSet) workspaceOf(ctx context.Context, ref src.WorkspaceRef) wsdomain.Workspace {
+	out := wsdomain.Workspace{Manager: ref.Manager, ID: ref.ID}
+	if ref.ID == "" || s.e.WS == nil {
+		return out
+	}
+	if ws, ok, err := s.e.WS.Find(ctx, ref.ID); err == nil && ok {
+		return ws
+	}
+	return out
 }
 
 func (s *stepSet) startCheck(ctx context.Context, c stepCall, o automation.CheckOpts) (string, error) {
@@ -216,14 +265,14 @@ func (s *stepSet) startGuards(ctx context.Context, c stepCall, byHand, live bool
 		return "its stored detail is stale", p, nil
 	}
 	if r := p.args.candidate(); r != "" {
-		cand, ok, err := s.candidate(ctx, c.u, r)
+		planned, ok, err := s.plan(ctx, c.u, r)
 		if err != nil {
 			return "", p, err
 		}
-		if !ok {
+		if !ok || planned.NotDue != "" {
 			return "its " + p.args.kindName() + " is not due", p, nil
 		}
-		p.cand, p.round = cand, true
+		p.planned, p.round = planned, true
 		if why := s.activity(ctx, p, byHand); why != "" {
 			return why, p, nil
 		}
@@ -272,14 +321,14 @@ func (s *stepSet) startGuards(ctx context.Context, c stepCall, byHand, live bool
 // agent waiting on a question; for a review an agent working, or the user
 // in the workspace unless the user applies it.
 func (s *stepSet) activity(ctx context.Context, p startPlan, byHand bool) string {
-	if p.cand.Observed || p.cand.Workspace.ID == "" || s.e.WS == nil {
+	if p.planned.Observed || p.planned.ws.ID == "" || s.e.WS == nil {
 		return ""
 	}
 	activity, err := s.e.WS.AgentActivity(ctx)
 	if err != nil {
 		return ""
 	}
-	a := activity[p.cand.Workspace.ID]
+	a := activity[p.planned.ws.ID]
 	switch {
 	case p.args.kind() == stepAddress:
 		if a.Waiting {
@@ -326,7 +375,7 @@ func (s *stepSet) intakeAsks(ctx context.Context, u unit.Unit, intent string) (s
 
 // startBlocked refuses a round its start block holds: folder trust is the
 // user's alone, so no step clears it.
-func (s *stepSet) startBlocked(ctx context.Context, ref github.Ref) (string, error) {
+func (s *stepSet) startBlocked(ctx context.Context, ref pr.Ref) (string, error) {
 	if s.e.Rec == nil {
 		return "", nil
 	}
@@ -409,7 +458,7 @@ func (s *stepSet) startNote(ctx context.Context, c stepCall, refusal string) err
 const kindBriefWaiting = "brief_waiting"
 
 func (s *stepSet) recordBriefWaiting(ctx context.Context, p startPlan) error {
-	head := p.cand.Facts.HeadRefOid
+	head := p.planned.Head
 	if s.e.Rec == nil || head == "" {
 		return nil
 	}
@@ -427,8 +476,8 @@ func (s *stepSet) holdByCap(ctx context.Context, c stepCall, why string) error {
 		return err
 	}
 	args := s.e.startOf(c.st, c.u.Provider)
-	cand, _, err := s.candidate(ctx, c.u, args.candidate())
-	if err != nil || cand.Observed {
+	planned, ok, err := s.plan(ctx, c.u, args.candidate())
+	if err != nil || !ok || planned.NotDue != "" || planned.Observed {
 		return err
 	}
 	if !st.FirstCapHit(ref.String(), s.e.Now()) {
@@ -440,10 +489,26 @@ func (s *stepSet) holdByCap(ctx context.Context, c stepCall, why string) error {
 	}
 	fmt.Fprintf(s.e.Err, "%s held: %s %s, %s; raise the cap in %s or run '"+brand.Command+" %s %s'\n",
 		s.e.stamp(), args.kindName(), ref, why, s.e.ConfigPath, args.intent, ref.URL())
-	if cand.Workspace.ID != "" {
-		errs = append(errs, s.e.setCard(ctx, cand.Workspace, "", true))
+	if planned.ws.ID != "" {
+		errs = append(errs, s.e.setCard(ctx, planned.ws, "", true))
 	}
+	errs = append(errs, s.openHeldGate(ctx, c.u))
 	return errors.Join(errs...)
+}
+
+// openHeldGate opens the plan gate of u's round the daily cap held today, once: approving it runs the round by
+// hand, and no rule releases it, since the cap held it.
+func (s *stepSet) openHeldGate(ctx context.Context, u unit.Unit) error {
+	if s.d.Gates == nil {
+		return nil
+	}
+	subject := round.HeldSubject(s.e.Now())
+	open, err := s.d.Gates.Where(ctx, gates.Query{Kind: gate.KindPlan, Unit: u})
+	if err != nil || slices.ContainsFunc(open, func(g gate.Gate) bool { return g.Subject == subject }) {
+		return err
+	}
+	_, err = s.d.Gates.Open(ctx, gate.Gate{Kind: gate.KindPlan, Unit: u, Subject: subject}, waitsForYou{})
+	return err
 }
 
 // startRun checks again on current facts, then sends the round through
@@ -486,20 +551,20 @@ func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts
 			}
 			return "", startError(err)
 		}
-		st.RecordSent(p.ref.String(), markOf(p.args.kind()), "", s.e.Now())
+		st.RecordSent(p.ref.String(), "", "", s.e.Now())
 		return started, nil
 	}
 	reason := s.reason(p)
-	sent, err := s.e.sendRound(ctx, st, roundCall{Kind: p.args.kind(), Workspace: p.cand.Workspace, Unit: c.u, Facts: p.cand.Facts,
-		Reason: reason, Fingerprint: p.cand.Fingerprint, ChecksHead: p.cand.ChecksHead, ConflictHead: p.cand.ConflictHead, LastReviewAt: p.cand.LastReviewAt,
-		Guidance: guidance, BriefMissing: p.briefMissing, Observed: p.cand.Observed, Confirmed: o.Confirmed, Why: &why, Address: p.address()})
+	sent, err := s.e.sendRound(ctx, st, roundCall{Kind: p.args.kind(), Workspace: p.planned.ws, Unit: c.u, Facts: p.planned.read,
+		Reason: reason, Head: p.planned.Head, OnSent: p.planned.OnSent, OnSkipped: p.planned.OnSkipped, Guidance: guidance, BriefMissing: p.briefMissing, Observed: p.planned.Observed,
+		Confirmed: o.Confirmed, Why: &why, Address: p.address(s.e.Now())})
 	if !sent && guidance != "" {
 		s.e.keepGuidance(ctx, p.ref, guidance)
 	}
 	switch {
 	case err != nil:
 		return "", startError(err)
-	case p.cand.Observed:
+	case p.planned.Observed:
 		return "observed the " + p.args.kindName() + ": " + reason, nil
 	case !sent:
 		return "", automation.Transient{Err: errors.New("its submission was not observed")}
@@ -518,7 +583,7 @@ func startError(err error) error {
 		return automation.Refused{Reason: err.Error()}
 	case errors.As(err, &untrusted), errors.As(err, &asked):
 		return automation.Refused{Reason: "round blocked: " + err.Error()}
-	case errors.Is(err, workspace.ErrUnreachable), errors.Is(err, github.ErrRateLimited), errors.Is(err, github.ErrUnavailable), errors.Is(err, dgh.ErrBudget):
+	case errors.Is(err, workspace.ErrUnreachable), errors.Is(err, src.ErrUnavailable), errors.Is(err, dgh.ErrBudget):
 		return automation.Transient{Err: err}
 	}
 	return err
@@ -540,31 +605,16 @@ func (s *stepSet) startDismiss(ctx context.Context, c stepCall) error {
 	}
 	args := s.e.startOf(c.st, c.u.Provider)
 	if r := args.candidate(); r != "" {
-		cand, ok, err := s.candidate(ctx, c.u, r)
+		planned, ok, err := s.plan(ctx, c.u, r)
 		if err != nil {
 			return err
 		}
-		skip(st, ref.String(), args.kind(), cand, ok)
+		if ok {
+			setMarks(st, ref.String(), planned.OnSkipped)
+		}
 	}
 	if s.e.Rec == nil {
 		return nil
 	}
 	return s.e.Rec.Record(ctx, dinv.Event{PR: ref, Kind: dinv.KindRoundSkipped, At: s.e.Now(), Data: args.kindName() + ": skipped by you"})
-}
-
-// skip is sweep.skip on a candidate: a round the user skipped is not
-// planned again until something new happens.
-func skip(st *round.Store, key string, kind stepKind, cand roundCandidate, ok bool) {
-	switch {
-	case kind == stepFirstRound:
-		st.SkipFirstRound(key)
-	case !ok:
-	case kind == stepAddress:
-		if cand.Fingerprint != "" {
-			st.SetMark(key, round.AddressedReviews, cand.Fingerprint)
-		}
-		st.SetHeads(key, cand.ChecksHead, cand.ConflictHead)
-	default:
-		st.SetMark(key, round.Reviewed, cand.Fingerprint)
-	}
 }

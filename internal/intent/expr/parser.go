@@ -20,7 +20,17 @@ import (
 // Compile type-checks src against env; it returns an *Error on failure, and an empty or blank src is an error.
 func Compile(src string, env Env) (*Program, error) { return compileWith(src, env, false) }
 
+// CompileString type-checks src, an expression whose value is a string, against env, as Compile does a
+// predicate; Text evaluates it.
+func CompileString(src string, env Env) (*Program, error) {
+	return compileOf(src, env, false, cel.StringType)
+}
+
 func compileWith(src string, env Env, marks bool) (*Program, error) {
+	return compileOf(src, env, marks, cel.BoolType)
+}
+
+func compileOf(src string, env Env, marks bool, want *cel.Type) (*Program, error) {
 	if strings.TrimSpace(src) == "" {
 		return nil, &Error{Col: 1, Msg: "empty predicate"}
 	}
@@ -42,9 +52,12 @@ func compileWith(src string, env Env, marks bool) (*Program, error) {
 		loc := ast.NativeRep().SourceInfo().GetStartLocation(id)
 		return nil, fail(offset(cs, loc.Line(), loc.Column()), msg)
 	}
-	if out := ast.OutputType(); !out.IsExactType(cel.BoolType) {
+	if out := ast.OutputType(); !out.IsExactType(want) {
 		start := len(src) - len(strings.TrimLeftFunc(src, unicode.IsSpace))
-		return nil, newError(src, start, "predicate must be bool, got %s", typeName(out.String()))
+		if want == cel.BoolType {
+			return nil, newError(src, start, "predicate must be bool, got %s", typeName(out.String()))
+		}
+		return nil, newError(src, start, "expression must be %s, got %s", typeName(want.String()), typeName(out.String()))
 	}
 	prg, err := ce.Program(ast, cel.EvalOptions(cel.OptOptimize))
 	if err != nil {

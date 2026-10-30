@@ -18,13 +18,23 @@ var (
 )
 
 func (b *Book) Send(t Turn) *Turn {
+	return b.send(t, func(*Turn) bool { return true })
+}
+
+// SendOn is Send for a turn that will start on session: it replaces only
+// the open turns of its intent sent to or started on that session.
+func (b *Book) SendOn(t Turn, session string) *Turn {
+	return b.send(t, func(o *Turn) bool { return o.Session == session || o.SentTo == session })
+}
+
+func (b *Book) send(t Turn, replaces func(*Turn) bool) *Turn {
 	if t.ResumeOf != 0 {
 		if r, ok := b.bySeq(t.ResumeOf); ok {
 			t.Trigger = r.Trigger
 		}
 	}
 	for i := range b.Turns {
-		if o := &b.Turns[i]; o.Intent == t.Intent && o.State.Open() {
+		if o := &b.Turns[i]; o.Intent == t.Intent && o.State.Open() && replaces(o) {
 			o.Before, o.ReplacedBy = o.State, 0
 			o.State, o.EndedAt = Replaced, t.SentAt
 		}

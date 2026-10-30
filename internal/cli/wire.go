@@ -4,7 +4,6 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/daemon"
-	"github.com/wloophq/wloop/internal/source"
 )
 
 // serveWiring is what one part of the daemon's composition reads and adds
@@ -12,7 +11,7 @@ import (
 type serveWiring struct {
 	DB      *sqlite.DB
 	Cfg     config.Config
-	Modules []source.Module
+	Modules []pluginModule
 	Log     func(format string, args ...any)
 	Deps    *daemon.Deps
 	Engine  *engineDeps
@@ -23,6 +22,7 @@ type serveWiring struct {
 func (e *Env) wireParts() []func(w *serveWiring) {
 	return []func(w *serveWiring){
 		e.wireSubjects,
+		e.wireReported,
 		e.wireDrafts,
 		e.wireTurnStart,
 		e.wireProse,

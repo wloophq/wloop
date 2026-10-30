@@ -11,13 +11,9 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/intake"
-	dgh "github.com/wloophq/wloop/internal/domain/github"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/readmodel"
-	"github.com/wloophq/wloop/internal/readmodel/prrow"
 )
 
 // NotOffered is the conflict of an action the row does not offer.
@@ -38,8 +34,8 @@ type unavailable struct{ msg string }
 
 func (e unavailable) Error() string { return e.msg }
 
-// currentRow is the row of the unit as served now, or, for a pull request
-// the inventory lacks, the row a GitHub read derives.
+// currentRow is the row of the unit as served now, or, for a unit the read
+// model does not list, the row its plugin derives.
 func (s *Server) currentRow(ctx context.Context, u unit.Unit) (api.Row, error) {
 	return s.rowAsked(ctx, u, catalog.Asked{})
 }
@@ -47,147 +43,50 @@ func (s *Server) currentRow(ctx context.Context, u unit.Unit) (api.Row, error) {
 // rowAsked is currentRow for a request that asks for an action with its
 // inputs.
 func (s *Server) rowAsked(ctx context.Context, u unit.Unit, asked catalog.Asked) (api.Row, error) {
-	rd, ok, err := s.readRow(ctx, u)
+	m := s.readModel()
+	rd, ok, err := m.Read(ctx, u)
 	if err != nil {
 		return api.Row{}, err
 	}
-	if ok {
-		if asked.Name == "" && asked.Inputs == nil {
-			return rd.Row, nil
-		}
-		b := rd.Base
-		b.Asked = asked
-		return rd.Derive(b, rd.In)
-	}
-	if st, found, err := s.storedRead(ctx, u, asked, false); err != nil {
-		return api.Row{}, err
-	} else if found {
-		return st.row, nil
-	}
-	base, at, err := s.readModel().Base(ctx)
-	if err != nil {
-		return api.Row{}, err
-	}
-	base.Asked = asked
-	d := s.deriverAt(base, at)
-	c, err := s.readUntracked(ctx, u, d.Viewer)
-	if err != nil {
-		return api.Row{}, err
-	}
-	o, err := s.deps.Overrides.Override(ctx, c.Ref.Unit())
-	if err != nil {
-		return api.Row{}, err
-	}
-	return d.UntrackedRow(c, o), nil
-}
-
-// stored is what a pull request the inventory holds and the read model does
-// not list, a lapsed one nobody adopted, derives from.
-type stored struct {
-	row  api.Row
-	pr   dinv.PR
-	evs  []dinv.Event
-	book *turn.Book
-	d    prrow.Deriver
-}
-
-// storedRead derives the row of such a pull request from the inventory, its
-// own turn book and its open intakes; unmuted drops the override and the
-// pending round.
-func (s *Server) storedRead(ctx context.Context, u unit.Unit, asked catalog.Asked, unmuted bool) (stored, bool, error) {
-	p, found, err := s.inventoryPR(ctx, u)
-	if err != nil || !found {
-		return stored{}, false, err
-	}
-	evs, err := s.deps.Events.Events(ctx, p.Ref.Unit())
-	if err != nil {
-		return stored{}, false, err
-	}
-	o := dinv.Override{PR: p.Ref}
-	if !unmuted {
-		if o, err = s.deps.Overrides.Override(ctx, p.Ref.Unit()); err != nil {
-			return stored{}, false, err
-		}
-		o.PR = p.Ref
-	}
-	base, at, err := s.readModel().Base(ctx)
-	if err != nil {
-		return stored{}, false, err
-	}
-	base.Asked = asked
-	if unmuted {
-		base.Pending = nil
-	}
-	d := s.deriverAt(base, at)
-	st := stored{pr: p, evs: evs, d: d}
-	if s.deps.Turns != nil {
-		books, err := s.deps.Turns.Store.Books(ctx, p.Ref.Unit())
+	if !ok {
+		row, found, err := s.pluginRow(ctx, api.UnitRowQuery{Unit: u, Action: asked.Name, Inputs: asked.Inputs})
 		if err != nil {
-			return stored{}, false, err
+			return api.Row{}, err
 		}
-		if b, ok := books[p.Ref.Unit()]; ok {
-			st.book = &b
+		if !found {
+			return api.Row{}, notFound{u.Label() + " is not in the inventory"}
 		}
-		st.d.Turns = prrow.TurnFacts(books, s.loaded().Registry)
+		if row.Unit == u || row.Unit.IsZero() {
+			return row, nil
+		}
+		if rd, ok, err = m.Read(ctx, row.Unit); err != nil || !ok {
+			return row, err
+		}
 	}
-	if intakes, err := s.waitingIntakes(ctx); err != nil {
-		return stored{}, false, err
-	} else if len(intakes[p.Ref.Unit()]) > 0 {
-		st.d.Intakes = refIntakes(p.Ref, intakes[p.Ref.Unit()])
+	if asked.Name == "" && asked.Inputs == nil {
+		return rd.Row, nil
 	}
-	st.row = st.d.Row(p, evs, o)
-	return st, true, nil
+	b := rd.Base
+	b.Asked = asked
+	return rd.Derive(b, rd.In)
 }
 
-// readRow is the read model's entry of the unit under any case, which costs the
-// inventory's lookup only when the exact key is unknown.
+// readRow is the read model's entry of the unit under any case: a unit it
+// does not list under u's key is read under the key its plugin names it by.
 func (s *Server) readRow(ctx context.Context, u unit.Unit) (readmodel.Read, bool, error) {
 	m := s.readModel()
 	rd, ok, err := m.Read(ctx, u)
 	if ok || err != nil {
 		return rd, ok, err
 	}
-	pr, found, err := s.inventoryPR(ctx, u)
-	if err != nil || !found || pr.Ref.Unit() == u {
+	if _, has := s.presenter(u.Provider); !has {
+		return readmodel.Read{}, false, nil
+	}
+	row, found, err := s.pluginRow(ctx, api.UnitRowQuery{Unit: u, Kept: true})
+	if err != nil || !found || row.Unit == u || row.Unit.IsZero() {
 		return readmodel.Read{}, false, err
 	}
-	return m.Read(ctx, pr.Ref.Unit())
-}
-
-// deriverAt derives the rows of a request from base, with no turn and no
-// intake of any pull request.
-func (s *Server) deriverAt(base readmodel.Base, at time.Time) prrow.Deriver {
-	return prrow.DeriverAt(base, s.rowSettings(), s.deps.Brief != nil, at)
-}
-
-// inventoryPR is the inventory's pull request of the unit under any case.
-func (s *Server) inventoryPR(ctx context.Context, u unit.Unit) (dinv.PR, bool, error) {
-	pr, ok, err := s.deps.PRs.PR(ctx, u)
-	if err != nil || ok {
-		return pr, ok, err
-	}
-	all, err := s.deps.PRs.ListPRs(ctx, false)
-	if err != nil {
-		return dinv.PR{}, false, err
-	}
-	if i := slices.IndexFunc(all, func(p dinv.PR) bool { return s.sameUnit(p.Ref.Unit(), u) }); i >= 0 {
-		return all[i], true, nil
-	}
-	return dinv.PR{}, false, nil
-}
-
-func (s *Server) readUntracked(ctx context.Context, u unit.Unit, viewer string) (dgh.Candidate, error) {
-	if s.deps.Explorer == nil {
-		return dgh.Candidate{}, unavailable{"cannot read " + u.Label() + " from GitHub"}
-	}
-	page, err := s.deps.Explorer.CandidateByRef(dgh.WithPriority(ctx, dgh.PriorityBackground), refOf(u), viewer)
-	if err != nil {
-		return dgh.Candidate{}, badGateway{"cannot read " + u.Label() + " from GitHub: " + err.Error()}
-	}
-	if len(page.Candidates) == 0 {
-		return dgh.Candidate{}, notFound{u.Label() + ": GitHub knows no such pull request"}
-	}
-	return page.Candidates[0], nil
+	return m.Read(ctx, row.Unit)
 }
 
 func forceableKey(u unit.Unit) string { return strings.ToLower(u.Label()) }
@@ -235,4 +134,15 @@ func (s *Server) disabledPlugins(l *intentload.Loaded) []unit.ProviderID {
 		}
 	}
 	return off
+}
+
+// LinkState is what the read model holds of unit u for the facts of the tasks that link it: its link signals,
+// and when it last moved, the start of its situation under the host's overlays; ok is false for a unit no
+// provider serves a row of.
+func (s *Server) LinkState(ctx context.Context, u unit.Unit) (signals map[string]bool, moved time.Time, ok bool, err error) {
+	rd, ok, err := s.readModel().Read(ctx, u)
+	if err != nil || !ok {
+		return nil, time.Time{}, false, err
+	}
+	return rd.Signals(), rd.Row.Summary.Since, true, nil
 }

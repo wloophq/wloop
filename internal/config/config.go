@@ -30,8 +30,6 @@ type Config struct {
 	// session's launch policy owns it.
 	WorkspaceManagers []string `json:"workspace_managers"`
 	Agent             string   `json:"agent"`
-	// GitHub is the GitHub plugin's settings.
-	GitHub GitHub `json:"github"`
 	// AgentHome is the agent's own configuration directory (CLAUDE_CONFIG_DIR
 	// for Claude Code), "" for the agent's default.
 	AgentHome string `json:"agent_home"`
@@ -55,17 +53,14 @@ type Config struct {
 	Workflows map[string]WorkflowConfig `json:"workflows"`
 	// Intents set each intent's settings by intent name.
 	Intents map[string]IntentConfig `json:"intents"`
-	// Plugins switch, by provider id, a plugin registered without a settings
-	// namespace, which has no <id>.enabled for the file to set: the
-	// composition root that registers it switches it here, as a test's
-	// plugin is. Every plugin the file knows switches with <id>.enabled.
-	Plugins map[string]Plugin `json:"-"`
+	// Plugins are the [plugins.<id>] tables: each plugin's switch and trust,
+	// and the bundled plugins' settings, which the embedding promotes.
+	Plugins `json:"plugins"`
 	// Placement is the rules that place units; the first match wins.
 	Placement []PlacementRule `json:"placement,omitempty"`
-	GTD       GTD             `json:"gtd"`
+	Tasks     Tasks           `json:"tasks"`
 	// Notifications sets the menu bar's daily digest.
 	Notifications Notifications `json:"notifications"`
-	Slack         Slack         `json:"slack"`
 	Dossiers      Dossiers      `json:"dossiers"`
 	Drafts        Drafts        `json:"drafts"`
 	Items         Items         `json:"items"`
@@ -84,8 +79,7 @@ type Turns struct {
 
 // GitHub is the GitHub plugin's settings.
 type GitHub struct {
-	// Enabled switches the plugin; nil means enabled.
-	Enabled            *bool    `json:"enabled,omitempty"`
+	Plugin
 	ReviewPrefix       string   `json:"review_prefix"`
 	AutomatedReviewers []string `json:"automated_reviewers"`
 	// Owners restricts automated follow-ups to these GitHub owners. Empty
@@ -114,11 +108,11 @@ type GitHub struct {
 	IgnoreChecks  []string `json:"ignore_checks"`
 	// AddressConflicts starts a triage round when a pull request I develop
 	// conflicts with its base past the conflict window.
-	AddressConflicts bool         `json:"address_conflicts"`
-	Scope            Scope        `json:"scope"`
-	Stalled          Stalled      `json:"stalled"`
-	Drafts           PluginDrafts `json:"drafts"`
-	Nudge            Nudge        `json:"nudge"`
+	AddressConflicts bool        `json:"address_conflicts"`
+	Scope            Scope       `json:"scope"`
+	Stalled          Stalled     `json:"stalled"`
+	Gates            PluginGates `json:"gates"`
+	Nudge            Nudge       `json:"nudge"`
 	// RateLimitFraction is the share of the GitHub rate limit the sweeps
 	// may spend.
 	RateLimitFraction float64 `json:"rate_limit_fraction"`
@@ -153,7 +147,7 @@ type Headless struct {
 
 // Dossiers sets the dossiers' lifecycle and quotas; a value of zero or less keeps its default.
 type Dossiers struct {
-	ArchiveAfter Days  `json:"archive_after"` // after the unit or project resolved
+	ArchiveAfter Days  `json:"archive_after"` // after its task or unit resolved
 	PurgeAfter   Days  `json:"purge_after"`   // after the archive
 	SoftCapMB    int64 `json:"soft_cap_mb"`   // per dossier, reported by doctor
 	TotalCapMB   int64 `json:"total_cap_mb"`  // dossiers and archives, reported by doctor
@@ -161,8 +155,8 @@ type Dossiers struct {
 	CompactAtKB  int64 `json:"compact_at_kb"` // log/ size that triggers compaction
 }
 
-// GTD holds the entries' settings: when a waiting entry goes stale, and the areas and contexts offered.
-type GTD struct {
+// Tasks holds the tasks' settings: when a waiting task goes stale, and the areas and contexts offered.
+type Tasks struct {
 	StaleWaitingDays int      `json:"stale_waiting_days"` // working days
 	Areas            []string `json:"areas"`
 	Contexts         []string `json:"contexts"`
@@ -286,16 +280,15 @@ type Cleanup struct {
 type WorkflowConfig struct {
 	Enabled *bool `json:"enabled,omitempty"`
 	// Observe plans the workflow's items pending, for a person to run.
-	Observe  *bool           `json:"observe,omitempty"`
-	Approval *ApprovalConfig `json:"approval,omitempty"`
+	Observe *bool `json:"observe,omitempty"`
 	// OnlyWhen is a predicate over the workflow's facts that must hold
 	// besides its manifest's when; "" adds none.
-	OnlyWhen string          `json:"only_when,omitempty"`
-	Drafts   *WorkflowDrafts `json:"drafts,omitempty"`
+	OnlyWhen string         `json:"only_when,omitempty"`
+	Gates    *WorkflowGates `json:"gates,omitempty"`
 }
 
-// WorkflowDrafts holds the approval of the drafts a workflow proposes.
-type WorkflowDrafts struct {
+// WorkflowGates holds the approval of the gates a workflow opens.
+type WorkflowGates struct {
 	Approval *ApprovalConfig `json:"approval,omitempty"`
 }
 
@@ -421,7 +414,7 @@ const DefaultPRDailyCap = 5
 // manager: the composition root picks those.
 func Defaults() Config {
 	return Config{
-		GitHub: GitHub{
+		Plugins: Plugins{GitHub: GitHub{
 			AddressReviews:     true,
 			AddressChecks:      true,
 			AddressConflicts:   true,
@@ -430,7 +423,7 @@ func Defaults() Config {
 			Stalled:            Stalled{Review: Days(48 * time.Hour), Reply: Days(24 * time.Hour), Merge: Days(24 * time.Hour)},
 			Nudge:              Nudge{SilentDays: 30},
 			RateLimitFraction:  0.5,
-		},
+		}, Slack: Slack{EndedAfter: Days(DefaultSlackEndedAfter)}},
 		Sweep: Sweep{Fast: Days(2 * time.Minute), Slow: Days(time.Hour)},
 		Brief: Brief{Tier: turns.TierFast, MaxInputBytes: 60000},
 		MCP:   MCP{Port: DefaultMCPPort},
@@ -448,14 +441,13 @@ func Defaults() Config {
 			},
 		},
 		Classify:      Classify{PerDay: 50},
-		GTD:           GTD{StaleWaitingDays: 2},
+		Tasks:         Tasks{StaleWaitingDays: 2},
 		Notifications: Notifications{DigestAt: "09:00"},
 		Dossiers: Dossiers{ArchiveAfter: Days(30 * 24 * time.Hour), PurgeAfter: Days(400 * 24 * time.Hour),
 			SoftCapMB: 50, TotalCapMB: 2048, MaxFileMB: 5, CompactAtKB: 256},
 		Drafts:   Drafts{RepeatAfter: Days(24 * time.Hour)},
 		Headless: Headless{Tier: turns.TierBalanced, PerCallUSD: 0.5, PerDayUSD: 5},
 		Turns:    Turns{PerDay: 20, PerUnitPerDay: DefaultPRDailyCap},
-		Slack:    Slack{EndedAfter: Days(DefaultSlackEndedAfter)},
 	}
 }
 
@@ -571,7 +563,7 @@ func LoadFile(file string, base Config) (Config, error) {
 }
 
 func (c Config) validateTrustedAuthors() error {
-	lists := map[string][]string{"github.trusted_authors": c.GitHub.TrustedAuthors}
+	lists := map[string][]string{"plugins.github.trusted_authors": c.GitHub.TrustedAuthors}
 	for i, p := range c.Projects {
 		lists[fmt.Sprintf("projects[%d].github.trusted_authors", i)] = p.GitHub.TrustedAuthors
 	}
@@ -588,9 +580,9 @@ func (c Config) validateCockpit() error {
 		key string
 		v   Days
 	}{
-		{"github.stalled.review", c.GitHub.Stalled.Review},
-		{"github.stalled.reply", c.GitHub.Stalled.Reply},
-		{"github.stalled.merge", c.GitHub.Stalled.Merge},
+		{"plugins.github.stalled.review", c.GitHub.Stalled.Review},
+		{"plugins.github.stalled.reply", c.GitHub.Stalled.Reply},
+		{"plugins.github.stalled.merge", c.GitHub.Stalled.Merge},
 		{"sweep.fast", c.Sweep.Fast},
 		{"sweep.slow", c.Sweep.Slow},
 	}
@@ -605,7 +597,7 @@ func (c Config) validateCockpit() error {
 		}
 	}
 	if f := c.GitHub.RateLimitFraction; f < 0 || f > 1 {
-		return fmt.Errorf("github.rate_limit_fraction must be between 0 and 1, got %v", f)
+		return fmt.Errorf("plugins.github.rate_limit_fraction must be between 0 and 1, got %v", f)
 	}
 	if c.HTTP.Port < 0 || c.HTTP.Port > 65535 {
 		return fmt.Errorf("http.port must be between 0 and 65535, got %d", c.HTTP.Port)
@@ -655,7 +647,7 @@ func (c Config) validateWorkflows() error {
 		}
 	}
 	if c.GitHub.Nudge.SilentDays < 1 {
-		return fmt.Errorf("github.nudge.silent_days must be positive, got %d", c.GitHub.Nudge.SilentDays)
+		return fmt.Errorf("plugins.github.nudge.silent_days must be positive, got %d", c.GitHub.Nudge.SilentDays)
 	}
 	if c.Classify.PerDay < 0 {
 		return fmt.Errorf("classify.per_day must not be negative, got %d", c.Classify.PerDay)
@@ -671,24 +663,22 @@ func (c Config) validateWorkflows() error {
 		if ps == nil {
 			continue
 		}
-		if _, err := expr.Compile(ps.When, builtin.PREnv()); err != nil {
+		if _, err := expr.Compile(ps.When, builtin.TurnEnv()); err != nil {
 			return fmt.Errorf("intents.%s.project_settings.when: %w", intent, err)
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(c.Workflows)) {
+		if n := builtin.RenamedTo(name); n != "" && strings.Contains(name, "-") {
+			return fmt.Errorf("workflows.%s: the workflow was renamed%s", name, expr.DidYouMean(name, []string{n}))
+		}
 		w := c.Workflows[name]
 		if w.OnlyWhen != "" {
-			if err := workflowRule("workflows."+name+".only_when", w.OnlyWhen, false); err != nil {
+			if err := workflowRule("workflows."+name+".only_when", w.OnlyWhen); err != nil {
 				return err
 			}
 		}
-		if a := w.DraftApproval(); a != nil {
-			if err := a.validateDrafts("workflows." + name + ".drafts.approval"); err != nil {
-				return err
-			}
-		}
-		if w.Approval != nil {
-			if err := w.Approval.validateRun("workflows." + name + ".approval"); err != nil {
+		if a := w.GateApproval(); a != nil {
+			if err := a.validateGates("workflows." + name + ".gates.approval"); err != nil {
 				return err
 			}
 		}
@@ -696,19 +686,19 @@ func (c Config) validateWorkflows() error {
 	return nil
 }
 
-// ProjectSettingsFor says whether a session of intent on the pull request
-// whose facts pr resolves loads the checkout's own agent settings. Without
+// ProjectSettingsFor says whether a session of intent on the unit whose
+// turn facts facts resolves loads the checkout's own agent settings. Without
 // the facts, an intent that has a predicate does not.
-func (c Config) ProjectSettingsFor(intent string, pr expr.Facts) bool {
+func (c Config) ProjectSettingsFor(intent string, facts expr.Facts) bool {
 	ps := c.Intents[intent].ProjectSettings
 	if ps == nil {
 		return true
 	}
-	if pr == nil {
+	if facts == nil {
 		return false
 	}
-	p, err := expr.Compile(ps.When, builtin.PREnv())
-	return err == nil && p.Eval(pr)
+	p, err := expr.Compile(ps.When, builtin.TurnEnv())
+	return err == nil && p.Eval(facts)
 }
 
 // oneOf refuses a set value outside allowed; "" keeps the manifest's.

@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/core/turns"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -21,8 +21,8 @@ type results struct {
 }
 
 type attached struct {
-	entry gtd.ID
-	u     unit.Unit
+	task task.ID
+	u    unit.Unit
 }
 
 func (r *results) UnitOf(url string) (unit.Unit, bool) {
@@ -30,8 +30,8 @@ func (r *results) UnitOf(url string) (unit.Unit, bool) {
 	return u, ok
 }
 
-func (r *results) Attach(_ context.Context, entry gtd.ID, u unit.Unit) error {
-	r.attached = append(r.attached, attached{entry, u})
+func (r *results) Attach(_ context.Context, tk task.ID, u unit.Unit) error {
+	r.attached = append(r.attached, attached{tk, u})
 	return r.err
 }
 
@@ -41,7 +41,7 @@ const (
 )
 
 var (
-	brief = gtd.UnitOf("e-1")
+	brief = task.UnitOf("t-1")
 	pr9   = unit.Unit{Provider: unit.GitHub, Key: "acme/api#9"}
 )
 
@@ -74,12 +74,12 @@ func recordBegin(t *testing.T, s *turns.Service, rec record.Record) {
 	}
 }
 
-func TestADoneRecordAttachesItsURLToTheTurnsEntry(t *testing.T) {
+func TestADoneRecordAttachesItsURLToTheTurnsTask(t *testing.T) {
 	s, r := beginService(t, true)
 	beginOn(t, s, brief)
 	recordBegin(t, s, record.Record{State: record.Done, Summary: "opened the pull request", Outcome: &record.Outcome{URL: prURL}})
-	if len(r.attached) != 1 || r.attached[0] != (attached{"e-1", pr9}) {
-		t.Fatalf("attached = %+v, want the pull request on e-1", r.attached)
+	if len(r.attached) != 1 || r.attached[0] != (attached{"t-1", pr9}) {
+		t.Fatalf("attached = %+v, want the pull request on t-1", r.attached)
 	}
 }
 
@@ -94,7 +94,7 @@ func TestARecordAttachesNothingOutsideItsCase(t *testing.T) {
 		{"a failed record", true, brief, record.Record{State: record.Failed, Summary: "s", Resume: "retry", Outcome: &record.Outcome{URL: prURL}}},
 		{"an address of no unit", true, brief, record.Record{State: record.Done, Summary: "s", Outcome: &record.Outcome{URL: docURL}}},
 		{"no outcome", true, brief, record.Record{State: record.Done, Summary: "s"}},
-		{"a turn on no entry", true, r7, record.Record{State: record.Done, Summary: "s", Outcome: &record.Outcome{URL: prURL}}},
+		{"a turn on no task", true, r7, record.Record{State: record.Done, Summary: "s", Outcome: &record.Outcome{URL: prURL}}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			s, r := beginService(t, c.attach)

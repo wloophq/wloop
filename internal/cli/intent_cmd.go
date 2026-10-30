@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 
@@ -12,12 +13,11 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/daemon"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/shell"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/github"
-	"github.com/wloophq/wloop/internal/slack/send"
 )
 
 // The input surfaces of the command line: an intent's own command and a
@@ -33,6 +33,8 @@ const (
 	flagNoBrief = "--no-brief"
 	flagManager = "--manager"
 	flagParent  = "--parent"
+	// flagBriefFile reads the brief of a task a capturing intent creates.
+	flagBriefFile = "--brief-file"
 )
 
 // intentArgs is what an intent's command line asked for.
@@ -40,6 +42,7 @@ type intentArgs struct {
 	inputs          map[string]any
 	noWait, noBrief bool
 	guidance        string
+	briefFile       string
 	// manager and parent are the workspace manager and the parent worktree
 	// of the worktree the turn creates, "" for the configured and none.
 	manager, parent string
@@ -56,11 +59,11 @@ func runIntent(ctx context.Context, e *Env, d dintent.Def, args []string) error 
 	if len(args) == 0 {
 		return errors.New(usage)
 	}
-	ref, err := github.ParseURL(args[0])
+	ref, err := pr.ParseURL(args[0])
 	if err != nil {
 		u, uerr := e.unitTarget(ctx, args[0])
 		switch {
-		case uerr != nil && strings.Contains(args[0], "://") && !send.IsPermalink(args[0]):
+		case uerr != nil && strings.Contains(args[0], "://") && !e.pluginTakes(args[0]):
 			return err
 		case uerr != nil:
 			return uerr
@@ -90,11 +93,15 @@ func runIntent(ctx context.Context, e *Env, d dintent.Def, args []string) error 
 }
 
 // runCapturing runs d, whose manifest captures a missing target, on the
-// entry args name as entry:<id>, else on a new entry that captures the
+// task args name as task:<id>, else on a new task that captures the
 // run's guidance as its notes; a failed run says how to retry on it.
 func runCapturing(ctx context.Context, e *Env, d dintent.Def, args []string) error {
 	if len(args) > 0 {
-		if u, ok := explicitEntry(args[0]); ok {
+		u, ok, err := explicitTask(args[0])
+		if err != nil {
+			return err
+		}
+		if ok {
 			return runIntentOn(ctx, e, d, u, args[1:])
 		}
 	}
@@ -102,10 +109,14 @@ func runCapturing(ctx context.Context, e *Env, d dintent.Def, args []string) err
 	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(p.guidance) == "" {
+	brief, err := capturedBrief(p)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(brief) == "" {
 		return errors.New(intentUsage(d))
 	}
-	title, err := e.loadedIntents().TargetTitle(d.Name, p.guidance)
+	title, err := e.loadedIntents().TargetTitle(d.Name, brief)
 	if err != nil {
 		return err
 	}
@@ -113,17 +124,42 @@ func runCapturing(ctx context.Context, e *Env, d dintent.Def, args []string) err
 	if err != nil {
 		return err
 	}
-	entry, err := c.Capture(ctx, api.CaptureRequest{Title: cmp.Or(title, p.guidance), Notes: p.guidance})
+	tk, err := c.CreateTask(ctx, api.TaskCreate{Title: cmp.Or(title, firstWords(brief)), Brief: brief})
 	if err != nil {
 		return err
 	}
-	u := gtd.UnitOf(gtd.ID(entry.ID))
+	u := task.UnitOf(task.ID(tk.ID))
 	fmt.Fprintf(e.Out, "captured %s\n", u)
-	p.guidance = ""
+	p.guidance, p.briefFile = "", ""
 	if err := askOn(ctx, e, d, u, p); err != nil {
-		return fmt.Errorf("%w; run it again on the entry with %s", err, retryLine(retryArgs(d, u, p)))
+		return fmt.Errorf("%w; run it again on the task with %s", err, retryLine(retryArgs(d, u, p)))
 	}
 	return nil
+}
+
+// capturedBrief is the brief p captures: the file its --brief-file names, else its words.
+func capturedBrief(p intentArgs) (string, error) {
+	if p.briefFile == "" {
+		return p.guidance, nil
+	}
+	if strings.TrimSpace(p.guidance) != "" {
+		return "", fmt.Errorf("%s and a brief in words: give the brief one way", flagBriefFile)
+	}
+	raw, err := os.ReadFile(p.briefFile)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", flagBriefFile, err)
+	}
+	return string(raw), nil
+}
+
+// firstWords is the first non-blank line of brief, the title of a task whose intent declares none.
+func firstWords(brief string) string {
+	for l := range strings.Lines(brief) {
+		if t := strings.TrimSpace(l); t != "" {
+			return t
+		}
+	}
+	return ""
 }
 
 // retryLine is args as a shell line.
@@ -171,6 +207,9 @@ func runIntentOn(ctx context.Context, e *Env, d dintent.Def, u unit.Unit, args [
 func askOn(ctx context.Context, e *Env, d dintent.Def, u unit.Unit, p intentArgs) error {
 	if p.noWait || p.noBrief || beforeSet(d, p.inputs, beforeTakeOver) {
 		return fmt.Errorf("%s, %s and taking over apply to pull requests only", flagNoWait, flagNoBrief)
+	}
+	if p.briefFile != "" {
+		return fmt.Errorf("%s gives a new task its brief, and %s exists", flagBriefFile, u)
 	}
 	c, err := e.daemonClient(ctx)
 	if err != nil {
@@ -240,6 +279,19 @@ func parseIntentArgs(reg *dintent.Registry, d dintent.Def, surface, usage string
 				return p, fmt.Errorf("%s takes no value", name)
 			}
 			p.noWait, p.noBrief = p.noWait || name == flagNoWait, p.noBrief || name == flagNoBrief
+			continue
+		case flagBriefFile:
+			if d.Target.Missing != dintent.TargetCapture {
+				return p, flagError(reg, d, name)
+			}
+			if !hasValue {
+				if i+1 >= len(args) {
+					return p, fmt.Errorf("%s needs a value\n%s", name, usage)
+				}
+				i++
+				value = args[i]
+			}
+			p.briefFile = value
 			continue
 		case flagManager, flagParent:
 			if d.WorkspaceRepo == nil {
@@ -323,7 +375,7 @@ func flagError(reg *dintent.Registry, d dintent.Def, flag string) error {
 // takeOverHint words the refusal of a pull request that is not the user's
 // with the command that takes it over first and asks again with the same
 // persisted flags.
-func takeOverHint(err error, d dintent.Def, ref github.Ref, inputs map[string]any) error {
+func takeOverHint(err error, d dintent.Def, ref pr.Ref, inputs map[string]any) error {
 	why := actionRefusal(err, d)
 	if why == "" {
 		return err
@@ -375,7 +427,7 @@ func intentUsage(d dintent.Def) string {
 // units d serves, as their providers' codecs name them.
 func intentTarget(d dintent.Def) string {
 	if d.Target.Missing == dintent.TargetCapture {
-		return "[entry:<id>]"
+		return "[task:<id>]"
 	}
 	ps := d.Providers
 	if ps == nil {

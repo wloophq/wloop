@@ -142,7 +142,6 @@ func TestMyPullRequestsStandOutAndTheStripExplainsItself(t *testing.T) {
 		t.Error("the mine tint must come before the selection, so the open row still shows as open")
 	}
 	prelude := `function h(tag, attrs, ...c) { return { tag, attrs, children: c.flat().filter((x) => x !== null && x !== undefined && x !== false) }; }` + "\n" +
-		jsConst(t, src, "STRIP_LEGEND") + jsConst(t, src, "STRIP_TITLE") +
 		jsConst(t, src, "SIZES") + jsConst(t, src, "RISKS") + jsConst(t, src, "TAG_CHIPS") + keyJS(t) + catalogPrelude(t) +
 		`const state = { health: { viewer: "Me" } }; function writeHash() {}` + "\n"
 	var got struct {
@@ -160,7 +159,7 @@ func TestMyPullRequestsStandOutAndTheStripExplainsItself(t *testing.T) {
 		row(4, "ana", "loop_working", "me", "a review round runs"),
 		row(5, "ana", "draft", "nobody", ""),
 	}
-	nodeRun(t, prelude, []string{"isSet", "age", "stamp", "resolveWho", "waitingLabel", "waitCat", "waitClass", "isMine", "stripTitle",
+	nodeRun(t, prelude, []string{"isSet", "age", "stamp", "resolveWho", "waitingLabel", "waitField", "waitCat", "waitClass", "isMine", "stripTitle",
 		"intakeWaiting", "intakeChip", "tagChips", "briefTags", "mineMark", "copySlot", "card", "stripLegend"}, `process.stdout.write(JSON.stringify({
   cards: input.map((r) => card(r, "").children[0].attrs),
   titles: input.map(stripTitle),
@@ -171,11 +170,11 @@ func TestMyPullRequestsStandOutAndTheStripExplainsItself(t *testing.T) {
 		t.Errorf("mine class: %v / %v", classes(0), classes(1))
 	}
 	wantTitles := []string{
-		"Waits on you: changes asked. changes requested by bia",
-		"Waits on the author (ana): changes asked. changes requested by bia",
-		"Waits on a reviewer (bia, team:acme/core): review",
-		"Waits on the loop: agent working. a review round runs",
-		"Waits on nobody: draft",
+		"Waiting on me: changes asked. changes requested by bia",
+		"Waiting on the author (ana): changes asked. changes requested by bia",
+		"Waiting on a reviewer (bia, team:acme/core): review",
+		"In loop: agent working. a review round runs",
+		"Waiting on nobody: draft",
 	}
 	if !slices.Equal(got.Titles, wantTitles) {
 		t.Errorf("titles\n%q\nwant\n%q", got.Titles, wantTitles)
@@ -184,7 +183,7 @@ func TestMyPullRequestsStandOutAndTheStripExplainsItself(t *testing.T) {
 		t.Errorf("card title %v", got.Cards[1]["title"])
 	}
 	legend := mustJS(t, got.Legend)
-	for _, want := range []string{`"Waits on:"`, `"lg w-me"`, `"you"`, `"lg w-author"`, `"lg w-reviewer"`, `"lg w-loop"`, `"lg w-nobody"`, `"nobody"`} {
+	for _, want := range []string{`"Waits on (role):"`, `"lg w-me"`, `"Waiting on me"`, `"lg w-author"`, `"lg w-reviewer"`, `"lg w-loop"`, `"lg w-nobody"`, `"Waiting on nobody"`} {
 		if !strings.Contains(legend, want) {
 			t.Errorf("legend lacks %s: %s", want, legend)
 		}

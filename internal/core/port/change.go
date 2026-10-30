@@ -7,10 +7,10 @@ import "github.com/wloophq/wloop/internal/domain/unit"
 type Generation uint64
 
 // Topic is a set of input kinds; a note carries one or more.
-type Topic uint32
+type Topic uint64
 
 const (
-	TopicPRs          Topic = 1 << iota // pull_requests, pr_details
+	TopicPRs          Topic = 1 << iota // a source's unit data: pull_requests, pr_details, unit_snapshots
 	TopicFollow                         // pull_requests.reasons and ws_*: follow state (noted with TopicPRs)
 	TopicSourceEvents                   // events a source writes (GitHub timeline, Slack changes)
 	TopicLoopEvents                     // events the loop writes: rounds, turns, sessions, situations, views, briefs, would_*
@@ -18,13 +18,13 @@ const (
 	TopicTurns                          // turns, turn_records, turn_answers
 	TopicSessions                       // sessions, agent_sessions, turn_stops
 	TopicIntakes                        // intakes
-	TopicBriefs                         // unit_briefs, brief_runs, unit_tags
+	TopicBriefs                         // unit_briefs, brief_runs, and the brief records
 	TopicUsage                          // turn_usage
 	TopicRounds                         // round_state, round_days, round_day_prs, round_day_notes, turn_instructions, instruction_parts
 	TopicPause                          // pause
 	TopicViews                          // view_applied
 	TopicMeta                           // meta
-	TopicGate                           // the pending-round set (in memory)
+	TopicPending                        // the pending-round set (in memory)
 	TopicAgents                         // the workspace snapshot's projection
 	TopicConfig                         // a new loaded intent set or a reloaded profile
 	TopicViewer                         // viewer login or teams
@@ -34,9 +34,13 @@ const (
 	TopicLinks                          // links
 	TopicItems                          // items, item_proposals
 	TopicCards                          // unit_cards
-	TopicEntries                        // entries and their tables
+	TopicTasks                          // tasks and their tables
 	TopicDrafts                         // drafts
 	TopicMarks                          // unit_marks of units other than pull requests, whose are TopicRounds
+	TopicGates                          // gates
+	TopicWakes                          // wakes
+	TopicTimeline                       // events on a task or a unit linked to one
+	TopicRuns                           // a task's runs: its turns' sessions and workspaces
 )
 
 // pr_seen notes nothing. A write that inserts events notes SourceEvents or
@@ -46,17 +50,18 @@ const (
 	// RowInputs are the topics a row is derived from.
 	RowInputs = TopicPRs | TopicFollow | TopicSourceEvents | TopicLoopEvents | TopicOverrides |
 		TopicTurns | TopicSessions | TopicIntakes | TopicBriefs | TopicUsage | TopicPause |
-		TopicGate | TopicAgents | TopicConfig | TopicViewer | TopicRefusals | TopicItems
+		TopicPending | TopicAgents | TopicConfig | TopicViewer | TopicRefusals | TopicItems | TopicGates | TopicWakes
 	// HealthInputs are the topics the health endpoint shows.
 	HealthInputs = TopicMeta | TopicPause | TopicBriefs | TopicApp | TopicJobs | TopicConfig
 	// SweepInputs leaves out LoopEvents and Rounds, the sweep's own writes
-	// that never change its plan. Entries, items and drafts wake the
-	// workflows over GTD entries and Slack units; the drafts draft.propose
+	// that never change its plan. Tasks, items and drafts wake the
+	// workflows over tasks and Slack units, and a matched wake the one that
+	// reacts to task.woke; the drafts draft.propose
 	// writes wake one more pass, which their hold makes idle. The
 	// extraction notes SourceEvents.
 	SweepInputs = TopicPRs | TopicFollow | TopicSourceEvents | TopicOverrides | TopicTurns |
-		TopicIntakes | TopicBriefs | TopicPause | TopicGate | TopicAgents | TopicConfig | TopicViewer |
-		TopicEntries | TopicItems | TopicDrafts
+		TopicIntakes | TopicBriefs | TopicPause | TopicPending | TopicAgents | TopicConfig | TopicViewer |
+		TopicTasks | TopicItems | TopicDrafts | TopicWakes
 	// BriefInputs leaves out the queue's own Briefs writes.
 	BriefInputs = TopicPRs | TopicFollow | TopicConfig
 )

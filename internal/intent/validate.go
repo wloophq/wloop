@@ -224,7 +224,7 @@ func (s *sheet) compile(d dintent.Def) Programs {
 	var ps Programs
 	ps.Records = one("record.when", d.Records, turn)
 	for i, r := range d.Refuse {
-		ps.Refuse = append(ps.Refuse, one(fmt.Sprintf("refuse[%d].when", i), r.When, unitEnv(d)))
+		ps.Refuse = append(ps.Refuse, one(fmt.Sprintf("refuse[%d].when", i), r.When, unitEnv(d, s.taskFacts)))
 	}
 	for i, c := range d.Headline.New {
 		if i == len(d.Headline.New)-1 {
@@ -250,13 +250,16 @@ func (s *sheet) compile(d dintent.Def) Programs {
 
 // unitEnv is the env of a predicate over the workflow facts of the units
 // d's turns run on: each served slot's, with the brief's, trigger.* and
-// config.*.
-func unitEnv(d dintent.Def) expr.Env {
+// config.*, and taskFacts, the profile's task.prop.*, when d serves tasks.
+func unitEnv(d dintent.Def, taskFacts expr.Env) expr.Env {
 	env := expr.Env{}
 	for _, slot := range servedSlots(d) {
 		maps.Copy(env, builtin.WorkflowEnv(slot))
 	}
 	builtin.Narrow(env, servedProviders(d))
+	if slices.Contains(servedSlots(d), builtin.TaskSlot) {
+		maps.Copy(env, taskFacts)
+	}
 	return env
 }
 

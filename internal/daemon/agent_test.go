@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -18,14 +19,16 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	dmessage "github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -48,19 +51,20 @@ func agentServer(t *testing.T) (*Server, *turns.Service) {
 	t.Cleanup(func() { db.Close() })
 	repo := sqlite.New(db)
 	svc := &turns.Service{Intents: turnstest.Intents(), Store: repo, Registry: repo, Sessions: turnstest.NewSessions(), Clock: agentClock{}, Command: brand.Name, FastJob: 2 * time.Minute}
-	inbox := coregtd.New(coregtd.Deps{Store: db.Entries(), Items: itemsNone{}, Facts: enabledUnits{map[unit.ProviderID]bool{}}, Clock: agentClock{}})
+	inbox := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: db.Tasks(), Items: itemsNone{}, Facts: enabledUnits{map[unit.ProviderID]bool{}}, Clock: agentClock{}})
 	s := New(withStore(Deps{Turns: svc, Activity: db, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return agentNow },
-		Viewer:   func(context.Context) (string, []string, error) { return "me", nil, nil },
-		Messages: &messages.Service{Store: inventory.NewMessages(db), Books: repo, Turns: svc, Entries: inbox, Intents: turnstest.Intents(), Clock: agentClock{}},
-		ReadText: func(_ context.Context, convs []dmessage.Conversation, id int64) string {
+		Identity: viewerIs("me"),
+		Messages: &messages.Service{Store: inventory.NewMessages(db), Books: repo, Turns: svc, Tasks: inbox, Intents: turnstest.Intents(), Clock: agentClock{}},
+		ReadText: func(_ context.Context, got messages.TaskRead, id int64) string {
 			var texts []string
-			for _, c := range convs {
+			for _, c := range got.Answers {
 				for _, a := range c.Answers {
 					texts = append(texts, fmt.Sprintf("%d:%s", c.Message.ID, a.Text))
 				}
 			}
 			return fmt.Sprintf("message %d: %s", id, strings.Join(texts, ","))
 		}}, inventory.New(db)))
+	serveMessageGates(s, db.Tasks(), inbox)
 	stopOnCleanup(t, s)
 	return s, svc
 }
@@ -337,11 +341,11 @@ func TestTurnAnswerReadsTheUnreadAnswersOfTheCallersTurns(t *testing.T) {
 	if code, text := read("term_1", path); code != 200 || text != "message 0: " {
 		t.Fatalf("read twice: %d %q", code, text)
 	}
-	if code, _ := read("term_1", path+"&message=42"); code != http.StatusNotFound {
-		t.Fatalf("a message of no turn of the session: %d", code)
+	if code, _ := read("term_1", path+"&gate=42"); code != http.StatusNotFound {
+		t.Fatalf("a gate of no turn of the session: %d", code)
 	}
-	if code, _ := read("term_1", path+"&message=x"); code != http.StatusBadRequest {
-		t.Fatalf("a bad message id: %d", code)
+	if code, _ := read("term_1", path+"&gate=x"); code != http.StatusBadRequest {
+		t.Fatalf("a bad gate id: %d", code)
 	}
 }
 
@@ -435,5 +439,36 @@ func TestThePromptHookReachesTheSession(t *testing.T) {
 	}
 	if rec := agentCall(t, h, "POST", api.AgentSessionsPrompt, "", `{"prompt":"hi"}`); rec.Code != http.StatusBadRequest {
 		t.Fatalf("a prompt without a handle: %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestTurnAnswerReadsTheAnswersOfAGate(t *testing.T) {
+	t.Parallel()
+	s, svc := agentServer(t)
+	sendTurn(t, s, svc, agentRef, turn.Intent(dintent.Review), "abc123abc123")
+	h := s.Handler()
+	if rec := agentCall(t, h, "POST", api.AgentTurnsStart, "term_1", `{"turn":"abc123abc123","intent":"review"}`); rec.Code != 200 {
+		t.Fatalf("start: %d %s", rec.Code, rec.Body)
+	}
+	ctx := context.Background()
+	m, err := s.deps.Messages.Post(ctx, messages.PostRequest{Session: bookOf(t, svc, agentRef).Turns[0].Session, Text: "Which column?"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gs, err := s.deps.GateReader.Where(ctx, gates.Query{Kind: gate.KindPost})
+	if err != nil || len(gs) != 1 {
+		t.Fatalf("gates %+v %v", gs, err)
+	}
+	if rec := post(t, s, gatePath(gs[0].ID, "reply"), `{"args":{"answer":"the old one"}}`); rec.Code != 200 {
+		t.Fatalf("reply: %d %s", rec.Code, rec.Body)
+	}
+	path := api.AgentAnswer + "?pr=" + agentRef.URL()
+	var text api.TurnText
+	rec := agentCall(t, h, "GET", path+"&gate="+strconv.FormatInt(gs[0].ID, 10), "term_1", "")
+	if _ = json.Unmarshal(rec.Body.Bytes(), &text); rec.Code != 200 || text.Text != fmt.Sprintf("message %d: %d:the old one", m.ID, m.ID) {
+		t.Fatalf("%d %q", rec.Code, text.Text)
+	}
+	if rec := agentCall(t, h, "GET", path+"&gate=999", "term_1", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("no such gate: %d %s", rec.Code, rec.Body)
 	}
 }

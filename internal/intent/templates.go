@@ -12,6 +12,7 @@ import (
 	"text/template"
 	"text/template/parse"
 	"time"
+	"unicode"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -77,7 +78,7 @@ func (s *sheet) parseMain(d dintent.Def, base *template.Template, file string, b
 		ok = s.parseText(set, "workspace.name", WorkspaceNameName, w.Name, names) && ok
 	}
 	ok = s.parseText(set, "target.title", TargetTitleName, d.Target.Title, targetEnv) && ok
-	unit := unitEnv(d)
+	unit := unitEnv(d, s.taskFacts)
 	text("why", WhyName, d.Why, unit)
 	for i, r := range d.Refuse {
 		text(fmt.Sprintf("refuse[%d].why", i), RefuseWhyName(i), r.Why, unit)
@@ -224,9 +225,10 @@ const (
 var targetEnv = expr.Env{"guidance": expr.String}
 
 // NameFuncs are the functions a manifest's names may call: slug, a text
-// as lowercase words joined by dashes, and firstLine, its first non-blank
-// line, trimmed.
-var NameFuncs = template.FuncMap{"slug": slug, "firstLine": firstLine}
+// as lowercase words joined by dashes; firstLine, its first non-blank
+// line, trimmed; and title n, that line without its markdown heading
+// marks, cut at its last whole word within n runes.
+var NameFuncs = template.FuncMap{"slug": slug, "firstLine": firstLine, "title": title}
 
 var notSlug = regexp.MustCompile(`[^a-z0-9]+`)
 
@@ -252,6 +254,19 @@ func firstLine(s string) string {
 		}
 	}
 	return ""
+}
+
+func title(n int, s string) string {
+	line := strings.TrimSpace(strings.TrimLeft(firstLine(s), "#"))
+	runes := []rune(line)
+	if n <= 0 || len(runes) <= n {
+		return line
+	}
+	cut := string(runes[:n])
+	if i := strings.LastIndexFunc(cut, unicode.IsSpace); i > 0 && !unicode.IsSpace(runes[n]) {
+		cut = cut[:i]
+	}
+	return strings.TrimRightFunc(cut, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsPunct(r) }) + "…"
 }
 
 // RefuseWhyName is the name refuse[i].why is parsed under.
@@ -352,7 +367,24 @@ func (s *sheet) parseText(set *template.Template, path, name string, txt dintent
 		s.add(path, "%s", msg)
 		return false
 	}
-	return true
+	return s.renamedFields(path, t.Tree, env)
+}
+
+// renamedFields adds a problem for each field of tree that a release
+// renamed, naming its new name, and says whether there was none.
+func (s *sheet) renamedFields(path string, tree *parse.Tree, env expr.Env) bool {
+	ok := true
+	walk(tree.Root, func(_ parse.Node, chain []string) {
+		name := strings.Join(chain, ".")
+		if _, known := env[name]; known || builtin.RenamedTo(name) == "" {
+			return
+		}
+		if hint := expr.DidYouMean(name, env.Names()); hint != "" {
+			s.add(path, "unknown field .%s%s", name, hint)
+			ok = false
+		}
+	})
+	return ok
 }
 
 // Why renders the why of the intent name over facts, the unit's workflow
@@ -362,7 +394,7 @@ func (l *Loaded) Why(name dintent.Name, facts map[string]any) (string, error) {
 	if !ok || d.Why.Src == "" {
 		return "", nil
 	}
-	return l.render(name, WhyName, unitEnv(d), facts)
+	return l.render(name, WhyName, unitEnv(d, l.Tasks.Facts()), facts)
 }
 
 // SessionName renders the session.name of the intent name over facts, its
@@ -423,7 +455,7 @@ func (l *Loaded) Refusal(name dintent.Name, facts map[string]any) (string, error
 		if i >= len(p.Refuse) || p.Refuse[i] == nil || !p.Refuse[i].Eval(mapFacts(facts)) {
 			continue
 		}
-		why, err := l.render(name, RefuseWhyName(i), unitEnv(d), facts)
+		why, err := l.render(name, RefuseWhyName(i), unitEnv(d, l.Tasks.Facts()), facts)
 		if strings.TrimSpace(why) == "" {
 			why = cmp.Or(l.EmptyRefusal, RefuseWhyName(i))
 		}

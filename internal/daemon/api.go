@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
+	"net/http/pprof"
 	"slices"
 	"strconv"
 	"strings"
@@ -15,7 +17,8 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/port"
-	dgh "github.com/wloophq/wloop/internal/domain/github"
+	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/web"
@@ -31,7 +34,35 @@ func (s *Server) Handler() http.Handler {
 		writeError(w, http.StatusNotFound, "no such endpoint "+r.URL.Path)
 	})
 	mux.Handle("GET /", web.Handler(s.deps.Version))
-	return s.versioned(s.afterReconcile(mux))
+	return s.versioned(s.afterReconcile(s.slowLogged(mux)))
+}
+
+// SocketHandler is Handler with the runtime's profiles under /debug/pprof/, for the socket alone: the person
+// who owns the socket reads them, never the token-guarded port.
+func (s *Server) SocketHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	mux.Handle("/", s.Handler())
+	return mux
+}
+
+// slowRequest is the duration past which a request is logged with its path.
+const slowRequest = 2 * time.Second
+
+// slowLogged logs each request of the API that took longer than slowRequest, so a slow cockpit or client
+// has a server-side record of what was slow and for how long.
+func (s *Server) slowLogged(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := s.deps.Now()
+		h.ServeHTTP(w, r)
+		if took := s.deps.Now().Sub(start); took > slowRequest && strings.HasPrefix(r.URL.Path, "/api/") {
+			s.logf("slow request: %s %s took %s", r.Method, r.URL.RequestURI(), took.Round(time.Millisecond))
+		}
+	})
 }
 
 func scopedHandler(name string, h http.Handler) http.Handler {
@@ -62,11 +93,9 @@ func (s *Server) routes() []route {
 		{"GET " + api.Keys, s.handleKeys},
 		{"GET /api/events", s.handleEvents},
 		{"GET /api/activity", s.handleActivity},
-		{"POST /api/explore", s.handleExplore},
-		{"GET /api/explore/recent", s.handleExploreRecent},
 		{"POST /api/pause", s.handlePause},
 		{"POST /api/app", s.handleApp},
-		{"POST /api/workspaces/remove-done", s.handleRemoveDone},
+		{"POST /api/workspaces/remove-clean", s.handleRemoveClean},
 		{"GET " + api.Intakes, s.handleIntake},
 		{"POST " + api.IntakeWithout, s.handleIntakeWithout},
 		{"POST " + api.IntakeCancel, s.handleIntakeCancel},
@@ -74,16 +103,27 @@ func (s *Server) routes() []route {
 		{"POST " + api.Plan, s.handlePlanAct},
 		{"GET " + api.Plugins, s.handlePlugins},
 		{"GET " + api.PluginAssets, s.handlePluginAsset},
-		{"GET " + api.GTDPath, s.handleGTD},
-		{"GET " + api.EntriesPath, s.handleEntries},
-		{"POST " + api.EntriesPath, s.handleCapture},
-		{"GET " + api.EntryDetail, s.handleEntry},
-		{"POST " + api.EntryVerb, s.handleEntryVerb},
+		{"GET " + api.PluginView, s.handlePluginView},
+		{"POST " + api.PluginView, s.handlePluginView},
+		{"POST " + api.PluginAction, s.handlePluginAction},
+		{"POST " + api.PluginRun, s.handlePluginRun},
+		{"GET " + api.ViewsPath, s.handleViews},
+		{"GET " + api.TasksPath, s.handleTasks},
+		{"POST " + api.TasksPath, s.handleTaskCreate},
+		{"GET " + api.TaskDetail, s.handleTask},
+		{"POST " + api.TaskVerb, s.handleTaskVerb},
+		{"GET " + api.TimelinePath, s.handleTimeline},
+		{"GET " + api.RunsPath, s.handleRuns},
+		{"POST " + api.ChatPath, s.handleChat},
+		{"POST " + api.AttachPath, s.handleAttach},
+		{"GET " + api.GatesPath, s.handleGates},
+		{"POST " + api.GatePath, s.handleGate},
+		{"POST " + api.RunOpen, s.handleRunOpen},
+		{"POST " + api.RunEnter, s.handleRunEnter},
+		{"GET " + api.RunTranscript, s.handleRunTranscript},
 		{"GET " + api.CountersPath, s.handleCounters},
 		{"GET " + api.Drafts, s.handleDrafts},
 		{"POST " + api.Drafts, s.handleDraftCreate},
-		{"GET " + api.DraftDetail, s.handleDraft},
-		{"POST " + api.DraftActionPath, s.handleDraftAction},
 		{"GET " + api.DigestPath, s.handleDigest},
 		{"GET " + api.ReviewPath, s.handleReview},
 		{"POST " + api.ReviewStepDone, s.handleReviewStepDone},
@@ -179,13 +219,16 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		Build:              web.Build(s.deps.Version),
 		Jobs:               s.jobStatuses(),
 		Warnings:           s.warnings.list(),
-		Viewer:             s.viewer.cachedLogin(),
+		Viewer:             s.cachedLogin(),
 		StalledReviewHours: time.Duration(s.deps.Cfg.GitHub.Stalled.Review).Hours(),
 		WorkspaceManagers:  s.deps.WorkspaceManagers,
 		Store:              s.deps.Store,
 	}
-	if s.deps.PRs != nil {
-		h.RateLimit = wireLimit(s.graphQLBudget())
+	if s.deps.PluginHealth != nil {
+		h.Plugins = s.deps.PluginHealth(r.Context())
+	}
+	if s.deps.Budget != nil {
+		h.RateLimit = s.graphQLBudget()
 		h.SlowSync = s.rateLimitLow()
 	}
 	if s.deps.GitAccess != nil {
@@ -206,6 +249,12 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		if w := appWarning(*app); w != "" {
 			h.Warnings = append(h.Warnings, w)
 		}
+	}
+	if s.deps.Gates != nil {
+		h.Warnings = append(h.Warnings, cutWarnings(s.deps.Gates.Cut())...)
+	}
+	if s.deps.EffectWarnings != nil {
+		h.Warnings = append(h.Warnings, s.deps.EffectWarnings()...)
 	}
 	if h.Notifier = s.hub.has(notifierClient); !h.Notifier && s.deps.NotifierStart != "" {
 		h.Warnings = append(h.Warnings, "menu bar not running: notifications are off; "+s.deps.NotifierStart)
@@ -232,7 +281,8 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	h.Warnings = append(h.Warnings, s.reconcileWarnings()...)
 	h.Warnings = append(h.Warnings, s.homeWarnings()...)
-	if w := profileWarning(s.loaded()); w != "" {
+	l := s.loaded()
+	if w := profileWarning(l, s.heldProblems(l)); w != "" {
 		h.Warnings = append(h.Warnings, w)
 	}
 	for _, src := range s.sourceHealth(r.Context()) {
@@ -259,54 +309,70 @@ func (s *Server) handleActivity(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, items)
 }
 
-// handleRemoveDone removes the workspace of every row of the Done view, or
-// the Approved one, whose checkout holds nothing that is not on GitHub.
-func (s *Server) handleRemoveDone(w http.ResponseWriter, r *http.Request) {
+// handleRemoveClean removes the workspaces of the tasks of a view that
+// offers it (remove_clean): each link of a task whose remove action is on,
+// when its checkout holds nothing that is not published; the rest are kept,
+// with why.
+func (s *Server) handleRemoveClean(w http.ResponseWriter, r *http.Request) {
 	if s.deps.Actions == nil {
 		writeError(w, http.StatusServiceUnavailable, errActionsUnavailable.Error())
 		return
 	}
-	var req struct {
-		View string `json:"view"`
+	g, ok := s.tasks(w)
+	if !ok {
+		return
 	}
-	if r.ContentLength != 0 {
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid body: "+err.Error())
-			return
-		}
+	var req api.RemoveCleanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid body: "+err.Error())
+		return
 	}
-	view := cmp.Or(req.View, api.ViewDone)
-	if view != api.ViewDone && view != api.ViewApproved {
-		writeError(w, http.StatusBadRequest, "view is done or approved")
+	if v, ok := s.loaded().Views.View(req.View); !ok || !v.RemoveClean {
+		writeError(w, http.StatusBadRequest, "view "+strconv.Quote(req.View)+" does not offer to remove clean workspaces")
 		return
 	}
 	ctx := context.WithoutCancel(r.Context())
-	rows, err := s.rows(ctx, view)
+	ts, err := g.Tasks(ctx, task.Query{View: task.View(req.View)})
+	if err != nil {
+		writeTasksError(w, err)
+		return
+	}
+	page, err := s.readModel().Rows(ctx, api.Since{})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	res := removeDoneResult()
-	for _, row := range rows {
-		u := row.Unit
-		if !isPullRequest(u) || !s.pluginEnabled(u.Provider) {
-			continue
-		}
-		var out bytes.Buffer
-		if err := s.act(ctx, "remove", u, api.ActionRequest{}, &out); err != nil {
-			kept := api.Kept{Ref: refOf(u), Reason: err.Error()}
-			var refused Refusal
-			if errors.As(err, &refused) {
-				kept.Detail, kept.Source, kept.Forceable = refused.Detail, refused.Source, refused.Forceable
-				s.logDetail("remove", u, refused)
+	removable := map[unit.Unit]bool{}
+	for _, row := range page.Rows {
+		removable[row.Unit] = slices.ContainsFunc(row.Actions, func(a api.ActionState) bool { return a.ID == actionRemove && a.Enabled })
+	}
+	res := removeCleanResult()
+	done := map[unit.Unit]bool{}
+	for _, t := range ts {
+		for _, u := range t.Units {
+			if done[u] || !removable[u] || !s.forge(u) || !s.pluginEnabled(u.Provider) {
+				continue
 			}
-			res.Kept = append(res.Kept, kept)
-			continue
+			done[u] = true
+			var out bytes.Buffer
+			if err := s.act(ctx, actionRemove, u, api.ActionRequest{}, &out); err != nil {
+				kept := api.Kept{Named: named(u), Reason: err.Error()}
+				var refused Refusal
+				if errors.As(err, &refused) {
+					kept.Detail, kept.Source, kept.Forceable = refused.Detail, refused.Source, refused.Forceable
+					s.logDetail(actionRemove, u, refused)
+				}
+				res.Kept = append(res.Kept, kept)
+				continue
+			}
+			res.Removed = append(res.Removed, named(u))
 		}
-		res.Removed = append(res.Removed, refOf(u))
 	}
 	writeJSON(w, res)
 }
+
+// actionRemove is the built-in action that removes a unit's workspace.
+const actionRemove = "remove"
 
 func (s *Server) handlePause(w http.ResponseWriter, r *http.Request) {
 	if s.deps.Pauses == nil {
@@ -334,7 +400,7 @@ func (s *Server) setPause(ctx context.Context, req api.PauseRequest) error {
 	prs := make([]unit.Unit, 0, len(req.PRs))
 	for _, key := range req.PRs {
 		u, err := s.deps.Units.Parse(string(s.deps.Forge), key)
-		if err != nil || refOf(u).Number <= 0 {
+		if err != nil {
 			return badRequest{key + " is not an owner/repo#n"}
 		}
 		prs = append(prs, u)
@@ -356,8 +422,12 @@ func (s *Server) setPause(ctx context.Context, req api.PauseRequest) error {
 			return conflict{msg: "everything is paused; resume with no argument resumes everything"}
 		}
 		for _, u := range prs {
-			if ref := refOf(u); p.HoldsRepo(ref.Owner + "/" + ref.Repo) {
-				return conflict{msg: ref.Owner + "/" + ref.Repo + " is paused as a whole; resume it to resume " + u.Label()}
+			repo, err := s.repoOf(ctx, u)
+			if err != nil {
+				return err
+			}
+			if repo != "" && p.HoldsRepo(repo) {
+				return conflict{msg: repo + " is paused as a whole; resume it to resume " + u.Label()}
 			}
 		}
 	}
@@ -391,7 +461,7 @@ func (s *Server) setPause(ctx context.Context, req api.PauseRequest) error {
 	}
 	action := map[bool]string{true: "pause", false: "resume"}[req.Paused]
 	for _, u := range prs {
-		if _, err := s.applyOverride(ctx, action, u, api.ActionRequest{}); err != nil {
+		if err := s.applyHold(ctx, action, u); err != nil {
 			return err
 		}
 	}
@@ -403,23 +473,20 @@ func (s *Server) setPause(ctx context.Context, req api.PauseRequest) error {
 	return nil
 }
 
-// pausedPRs are the pull requests paused one by one.
+// pausedPRs are the forge's units paused one by one.
 func (s *Server) pausedPRs(ctx context.Context) ([]unit.Unit, error) {
-	if s.deps.Overrides == nil {
+	if s.deps.Overrides == nil || s.deps.Forge == "" {
 		return nil, nil
 	}
-	all, err := s.deps.Overrides.Overrides(ctx)
-	if err != nil {
-		return nil, err
+	return s.deps.Overrides.Held(ctx, s.deps.Forge)
+}
+
+// repoOf is the repository of u, owner/name; "" for none.
+func (s *Server) repoOf(ctx context.Context, u unit.Unit) (string, error) {
+	if s.deps.Repo == nil {
+		return "", nil
 	}
-	var out []unit.Unit
-	for u, o := range all {
-		if o.Hold {
-			out = append(out, u)
-		}
-	}
-	slices.SortFunc(out, func(a, b unit.Unit) int { return strings.Compare(a.String(), b.String()) })
-	return out, nil
+	return s.deps.Repo(ctx, u)
 }
 
 func (s *Server) handleApp(w http.ResponseWriter, r *http.Request) {
@@ -441,14 +508,14 @@ func (s *Server) handleApp(w http.ResponseWriter, r *http.Request) {
 // rateLimitLow says the client refuses background reads: the fast sweep
 // skips its turns while it holds.
 func (s *Server) rateLimitLow() bool {
-	return s.deps.Budget != nil && !s.deps.Budget.Allow(dgh.PriorityBackground)
+	return s.deps.Budget != nil && s.deps.Budget.Low()
 }
 
-func (s *Server) graphQLBudget() dgh.Limit {
+func (s *Server) graphQLBudget() api.RateLimit {
 	if s.deps.Budget == nil {
-		return dgh.Limit{}
+		return api.RateLimit{}
 	}
-	return s.deps.Budget.Budget()[dgh.ResourceGraphQL]
+	return s.deps.Budget.RateLimit()
 }
 
 func (s *Server) handleRows(w http.ResponseWriter, r *http.Request) {
@@ -457,13 +524,27 @@ func (s *Server) handleRows(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	page, err := s.readModel().Rows(r.Context(), api.ViewAll, since)
+	page, err := s.readModel().Rows(r.Context(), since)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	page.Counters = s.counters(r.Context())
+	page.Loading = s.loading()
 	writeJSON(w, page)
+}
+
+// loading are the plugins still loading, by id.
+func (s *Server) loading() []api.Loading {
+	if s.deps.Loading == nil {
+		return nil
+	}
+	got := s.deps.Loading()
+	var out []api.Loading
+	for _, id := range slices.Sorted(maps.Keys(got)) {
+		out = append(out, api.Loading{Plugin: id, Reason: got[id]})
+	}
+	return out
 }
 
 // parseUnit is the unit a unit route names, of any provider the daemon
@@ -477,13 +558,6 @@ func (s *Server) parseUnit(r *http.Request) (unit.Unit, bool) {
 		return unit.Unit{}, false
 	}
 	return u, true
-}
-
-// parsePR is the pull request a unit route names; the routes that act on a
-// pull request take no other unit.
-func (s *Server) parsePR(r *http.Request) (unit.Unit, bool) {
-	u, ok := s.parseUnit(r)
-	return u, ok && isPullRequest(u)
 }
 
 // writeNoUnit answers a unit route whose unit the daemon does not serve.
@@ -520,4 +594,18 @@ func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
+}
+
+// cutWarnings name each gate whose consequence, which runs at most once, a
+// stopped daemon cut: the person decides whether it ran.
+func cutWarnings(cut []gate.Gate) []string {
+	out := make([]string, 0, len(cut))
+	for _, g := range cut {
+		on := g.Unit.Label()
+		if g.Task != "" {
+			on = string(g.Task)
+		}
+		out = append(out, fmt.Sprintf("the %s gate %d on %s was %s, and the daemon stopped while its consequence ran: it may not have run; check it, and act again if it did not", g.Kind, g.ID, on, g.Status))
+	}
+	return out
 }

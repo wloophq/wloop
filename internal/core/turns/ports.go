@@ -3,11 +3,13 @@ package turns
 import (
 	"context"
 	"errors"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"time"
+
+	"github.com/wloophq/wloop/internal/domain/task"
 
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -72,11 +74,11 @@ type Reports interface {
 	WithTurns(ctx context.Context, i turn.Intent) ([]unit.Unit, error)
 }
 
-// Results attaches to an entry the unit a turn on it produced.
+// Results attaches to a task the unit a turn on it produced.
 type Results interface {
 	// UnitOf is the unit a web address names; false for an address of none.
 	UnitOf(url string) (unit.Unit, bool)
-	Attach(ctx context.Context, entry gtd.ID, u unit.Unit) error
+	Attach(ctx context.Context, tk task.ID, u unit.Unit) error
 }
 
 // Intents is what the turns ask of the loaded intents: the record rules, the
@@ -89,6 +91,13 @@ type Intents interface {
 	ClosesWhenDone(intent string) bool
 	Reconcile(intent string) string
 	SessionTitles() []string
+}
+
+// Gates opens the gates of gates.toml by name.
+type Gates interface {
+	// OpenNamed opens the gate name declares, of its kind and intents, on g's
+	// task and unit.
+	OpenNamed(ctx context.Context, name string, g gate.Gate) (gate.Gate, error)
 }
 
 // StopsKept is how long the store keeps a stop.
@@ -132,15 +141,18 @@ type AgentSessionInfo struct {
 	At                                            time.Time
 }
 
-type MyReview struct {
-	// State is APPROVED, CHANGES_REQUESTED or COMMENTED.
-	ID, State, URL string
-	At             time.Time
+// SourceAnswer is the user's answer, in a unit's source, to a turn that
+// asked them, such as their review of a pull request.
+type SourceAnswer struct {
+	// State is the answer's state in its source; Verdict is the record's
+	// verdict it gives, "" for a state that answers nothing.
+	ID, State, Verdict, URL string
+	At                      time.Time
 }
 
-// GitHub reads facts the collector already stored.
-type GitHub interface {
-	MyReviews(ctx context.Context, u unit.Unit, since time.Time) ([]MyReview, error)
+// Answers reads the user's answers on a unit since a time.
+type Answers interface {
+	Answers(ctx context.Context, u unit.Unit, since time.Time) ([]SourceAnswer, error)
 }
 
 // Ledger is the items ledger a record's ops go to, and the unit's items and

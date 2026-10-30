@@ -12,8 +12,6 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/agent/echo"
-	slacksource "github.com/wloophq/wloop/internal/adapter/source/slack"
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/adapter/view/testsink"
@@ -30,13 +28,17 @@ import (
 	"github.com/wloophq/wloop/internal/core/views"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/record"
-	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/source"
+	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+	"github.com/wloophq/wloop/plugins/slack"
+	dslack "github.com/wloophq/wloop/plugins/slack/domain"
+	"github.com/wloophq/wloop/plugins/slack/slacktest"
+	slackstore "github.com/wloophq/wloop/plugins/slack/store"
 )
 
 const (
@@ -48,8 +50,8 @@ const (
 )
 
 var (
-	slackThread1 = dslack.ThreadUnit(slackTeam, slackChannel, slackParent1)
-	slackThread2 = dslack.ThreadUnit(slackTeam, slackChannel, slackParent2)
+	slackThread1 = slackThreadUnit(slackTeam, slackChannel, slackParent1)
+	slackThread2 = slackThreadUnit(slackTeam, slackChannel, slackParent2)
 )
 
 const slackDiscussIntent = `label = "Discuss"
@@ -85,14 +87,16 @@ func slackDiscussRound(t *testing.T, prompt string, u unit.Unit) string {
 	return m[1]
 }
 
-// seedSlack stores two threads of #general, each with a parent and a reply.
-func seedSlack(t *testing.T, db *sqlite.DB) {
+// seedSlack stores two threads of #general, each with a parent and a reply,
+// in the store of the Slack plugin under stateDir.
+func seedSlack(t *testing.T, stateDir string) {
 	t.Helper()
 	ctx := context.Background()
-	if err := db.Slack().PutUsers(ctx, []sqlite.UserRow{{ID: slackAsker, Name: "asker", FetchedAt: testNow}}); err != nil {
+	db := pluginStore(t, stateDir)
+	if err := db.Slack().PutUsers(ctx, []slackstore.UserRow{{ID: slackAsker, Name: "asker", FetchedAt: testNow}}); err != nil {
 		t.Fatal(err)
 	}
-	st := &slacksource.Store{DB: db.Slack(), Now: func() time.Time { return testNow }}
+	st := &slack.Store{DB: db.Slack(), Now: func() time.Time { return testNow }}
 	thread := func(parent, reply, text string) dslack.Thread {
 		return dslack.Thread{Conversation: slackChannel, TS: parent, LatestReply: reply, ReplyCount: 1, Messages: []dslack.Message{
 			{TS: parent, ThreadTS: parent, User: slackAsker, Text: text, Permalink: "https://example.slack.com/archives/" + slackChannel + "/p" + strings.ReplaceAll(parent, ".", "")},
@@ -107,17 +111,51 @@ func seedSlack(t *testing.T, db *sqlite.DB) {
 	}
 }
 
-// withSlackTurns gives te the Slack module's turn payload and placement over
-// te's own store, seeded with two threads.
+// runSlackPlugin runs the real Slack plugin for te over db, logged in, its
+// store seeded with two threads, until it reported both.
+func runSlackPlugin(t *testing.T, te *testEnv, db *sqlite.DB) {
+	t.Helper()
+	st := &slackTestEnv{kc: newFakeKeychain(), srv: slacktest.New(t), cfg: te.cfg}
+	te.cfg.Slack.ClientID = testClientID
+	te.cfg.Slack.KeychainService = "loop-test-slack"
+	off := false
+	te.cfg.Slack.Ingest.Socket = &off
+	st.cfg = te.cfg
+	st.saveToken(t, fakeToken())
+	withSlackPlugin(t, te.Env, st.pluginEnv(t, st.srv.URL))
+	seedSlack(t, te.StateDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	stop := te.servePlugins(ctx, db, te.cfg, t.Logf)
+	t.Cleanup(func() {
+		cancel()
+		stop()
+	})
+	var c *src.Client
+	eventually(t, "the slack plugin running", func() bool {
+		var err error
+		c, err = te.pluginKind.Client(string(slackPlugin))
+		return err == nil
+	})
+	if err := c.Notify(ctx, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the slack plugin's threads reported", func() bool {
+		got, err := te.pluginKind.Snapshots.Reported(ctx, []unit.Unit{slackThread1, slackThread2})
+		return err == nil && len(got) == 2
+	})
+}
+
+// withSlackTurns gives te the Slack module's turn payload and placement,
+// relayed to the running plugin.
 func withSlackTurns(t *testing.T, te *testEnv) {
 	t.Helper()
-	seedSlack(t, te.db)
-	m, err := slacksource.Module(te.cfg, source.Deps{DB: te.db, Clock: clockFunc(te.Now)}, slacksource.Slack{})
+	runSlackPlugin(t, te, te.db)
+	m, err := te.slackRelay(te.cfg, moduleDeps{DB: te.db, Inventory: te.Store, Clock: clockFunc(te.Now)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	te.servePayloads([]source.Module{m})
-	te.servePlacement([]source.Module{m})
+	te.servePayloads([]pluginModule{m})
+	te.servePlacement([]pluginModule{m})
 }
 
 func TestSharedWorkspaceKeepsSlackSessionsApart(t *testing.T) {
@@ -196,7 +234,7 @@ func TestSlackTurnEndToEnd(t *testing.T) {
 	te.Managers = map[string]ManagerEntry{"fake": {
 		Display: "Fake", Binary: "true", SessionVar: fake.HandleVar, Sink: "fake",
 		New: func() workspace.Manager { return ws },
-		Ports: func(context.Context, workspace.Manager, *inventory.Store, config.Config, *change.Log) (managerSessions, []views.Sink, error) {
+		Ports: func(context.Context, workspace.Manager, prrow.ReportedPRs, config.Config, *change.Log) (managerSessions, []views.Sink, error) {
 			return handleSessions{"fake", sessions}, []views.Sink{{ViewSink: sink, Placements: sink}}, nil
 		},
 	}}
@@ -211,7 +249,7 @@ func TestSlackTurnEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	seedSlack(t, db)
+	runSlackPlugin(t, te, db)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	te.Rounds = sqlite.NewRounds(db)
@@ -330,7 +368,7 @@ func TestHeadlessPromptCarriesFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	seedSlack(t, db)
+	runSlackPlugin(t, te, db)
 	ctx := context.Background()
 	d := te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, &daemon.AppState{})
 	if d.Startup != nil {
@@ -391,10 +429,10 @@ func TestAnActTurnReadsItsSlackThreadsBrief(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	seedSlack(t, db)
+	runSlackPlugin(t, te, db)
 	te.cfg.Brief.Enabled = true
-	if err := db.Extraction().Save(context.Background(), sqlite.ExtractionSave{States: map[unit.Unit]sqlite.ExtractionState{slackThread2: {
-		Brief: `{"goal":"Answer the second question","kind":"question","risk":"low","tags":["domain:billing"]}`, At: testNow}}}); err != nil {
+	if err := db.PutUnitBrief(context.Background(), slackThread2, "extraction",
+		`{"goal":"Answer the second question","kind":"question","risk":"low","tags":["domain:billing"]}`, testNow); err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()

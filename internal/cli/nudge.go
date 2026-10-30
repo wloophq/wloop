@@ -4,17 +4,18 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/wloophq/wloop/internal/domain/pr"
+
 	"github.com/wloophq/wloop/internal/config"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
 // nudge sends r in a new agent session, so it never types into a
 // conversation the user or an earlier round is having, and returns the id
 // of the turn sent; resumeOf is the turn it resumes, 0 for none.
-func (e *Env) nudge(ctx context.Context, cfg config.Config, r turn.Request, pr *github.PullRequest, resumeOf int64) (string, error) {
+func (e *Env) nudge(ctx context.Context, cfg config.Config, r turn.Request, pr *pr.PullRequest, resumeOf int64) (string, error) {
 	ref := prOf(r.Unit)
 	sent, err := e.sendTurn(ctx, cfg, r)
 	if err != nil {
@@ -65,7 +66,7 @@ func (e *Env) nudge(ctx context.Context, cfg config.Config, r turn.Request, pr *
 // has its context and review rounds already run, and falls back to the
 // repository's main checkout on its default branch, since a nudge needs only
 // gh.
-func nudgeWorkspace(cfg config.Config, manager string, repos []wsdomain.Repo, all []wsdomain.Workspace, ref github.Ref, pr *github.PullRequest, mine func() (bool, error)) (wsdomain.Workspace, string, error) {
+func nudgeWorkspace(cfg config.Config, manager string, repos []wsdomain.Repo, all []wsdomain.Workspace, ref pr.Ref, pr *pr.PullRequest, mine func() (bool, error)) (wsdomain.Workspace, string, error) {
 	remoteKey := ref.RemoteKey()
 	if w, ok := findReviewWorkspace(cfg, repos, all, remoteKey, ref.Number, pr.HeadRefName); ok {
 		return w, "review workspace", nil

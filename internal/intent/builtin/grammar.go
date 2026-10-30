@@ -16,9 +16,13 @@ const (
 	SurfaceDefaults Surface = "defaults" // defaults.toml
 	SurfaceLabels   Surface = "labels"   // labels.toml
 	SurfaceTools    Surface = "tools"    // tools.toml
-	SurfaceGTD      Surface = "gtd"      // gtd.toml
+	SurfaceTasks    Surface = "tasks"    // tasks.toml
+	SurfaceViews    Surface = "views"    // views.toml
+	SurfaceGates    Surface = "gates"    // gates.toml
+	SurfaceRecords  Surface = "records"  // records.toml
 	SurfaceKeys     Surface = "keys"     // keys.toml
 	SurfaceNotices  Surface = "notices"  // notices.toml
+	SurfaceUI       Surface = "ui"       // a plugin layer's ui.toml
 	SurfaceBlock    Surface = "block"    // a judgment block's front matter
 	SurfaceConfig   Surface = "config"   // config.toml
 )
@@ -72,7 +76,8 @@ type Value struct {
 }
 
 // Grammar is every reserved key of the language.
-var Grammar = slices.Concat(intentGrammar, workflowGrammar, stepGrammar, actionsGrammar, configGrammar, profileGrammar, toolsGrammar, gtdGrammar, keysGrammar, noticesGrammar)
+var Grammar = slices.Concat(intentGrammar, workflowGrammar, stepGrammar, actionsGrammar, configGrammar, profileGrammar, toolsGrammar, tasksGrammar, viewsGrammar, gatesGrammar, recordsGrammar, keysGrammar, noticesGrammar, uiGrammar,
+	gateApprovalRows(SurfaceIntent), gateApprovalRows(SurfaceWorkflow))
 
 // Problem is a key Check refuses, at its dotted path in the document.
 type Problem struct {
@@ -87,7 +92,7 @@ type Problem struct {
 // Check walks doc, a document of surface decoded without a schema (a TOML
 // table or a JSON object as map[string]any), against the grammar: unknown
 // keys and values, with did-you-mean, kinds and enums. A
-// surface the grammar has no row of is not checked.
+// surface the grammar has no row of refuses every key.
 func Check(surface Surface, doc map[string]any) []Problem {
 	return check(Grammar, surface, doc)
 }

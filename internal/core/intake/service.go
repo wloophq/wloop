@@ -139,7 +139,7 @@ func (s *Service) Drive(ctx context.Context, seq int64) (Intake, error) {
 		if err != nil || !i.State.waiting() {
 			return i, err
 		}
-		changed, release := s.Briefs.Changed(i.Unit)
+		changed, release := s.Briefs.Changed(ctx, i.Unit)
 		rd := Readiness{Go: true, Without: true}
 		if i.Brief != BriefWithout {
 			if rd, err = s.ready(ctx, i); err != nil {

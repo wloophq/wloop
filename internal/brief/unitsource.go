@@ -22,12 +22,18 @@ type UnitInput struct {
 }
 
 // At is what a unit is at: its revision in the provider's own format, as
-// brief_runs.revision stores it, and the parts of its input a staleness
-// rule reads, as brief_runs.input stores them.
+// brief_runs.revision stores it, the parts of its input a staleness rule
+// reads, as brief_runs.input stores them, and what an attempt at it is made
+// from, in the provider's own format.
 type At struct {
 	Revision string
 	Parts    json.RawMessage
+	Attempt  string
 }
+
+// AttemptKey names an attempt at version on a unit at at, as attempt_of
+// stores it, so a failure counts against that attempt only.
+func AttemptKey(version string, at At) string { return version + " " + at.Attempt }
 
 // Written is what a stored brief was made from and how its last attempt
 // went, as brief_runs and unit_briefs keep it.
@@ -43,8 +49,9 @@ type Written struct {
 	AttemptOf string
 }
 
-// BriefSource is what the brief queue asks a provider about its units. A
-// provider without one answers "without" to the intakes of its units.
+// BriefSource is what the brief queue asks a provider about its units, the
+// calls of a source plugin's Briefer. A provider without one answers
+// "without" to the intakes of its units.
 type BriefSource interface {
 	// Input reads what a brief of u reads now.
 	Input(ctx context.Context, u unit.Unit) (UnitInput, error)
@@ -55,7 +62,4 @@ type BriefSource interface {
 	// Stale says whether the brief w holds of a unit now at cur is due
 	// again at now, version being the brief's current version.
 	Stale(w Written, cur At, version string, now time.Time) bool
-	// AttemptKey names what an attempt at version on a unit at cur is made
-	// from, so a failure counts against that attempt only.
-	AttemptKey(version string, cur At) string
 }

@@ -164,6 +164,11 @@ func TestIsolatedConfigDisablesAutomation(t *testing.T) {
 	if err != nil || len(manifests) == 0 {
 		t.Fatalf("no workflow manifests: %v", err)
 	}
+	plugins, err := filepath.Glob(filepath.Join("..", "..", "plugins", "*", "profile", "workflows", "*", "workflow.toml"))
+	if err != nil || len(plugins) == 0 {
+		t.Fatalf("no plugin workflow manifests: %v", err)
+	}
+	manifests = append(manifests, plugins...)
 	for _, m := range manifests {
 		name := filepath.Base(filepath.Dir(m))
 		w, ok := c.Workflows[name]
@@ -179,17 +184,19 @@ func TestIsolatedConfigDisablesAutomation(t *testing.T) {
 		t.Fatal(err)
 	}
 	var doc struct {
-		Slack struct {
-			KeychainService string   `toml:"keychain_service"`
-			PostAllowlist   []string `toml:"post_allowlist"`
-			RequestLog      bool     `toml:"request_log"`
-		} `toml:"slack"`
+		Plugins struct {
+			Slack struct {
+				KeychainService string   `toml:"keychain_service"`
+				PostAllowlist   []string `toml:"post_allowlist"`
+				RequestLog      bool     `toml:"request_log"`
+			} `toml:"slack"`
+		} `toml:"plugins"`
 	}
 	if err := toml.Unmarshal(raw, &doc); err != nil {
 		t.Fatal(err)
 	}
-	if doc.Slack.KeychainService != "wloop-e2e-slack" || !slices.Equal(doc.Slack.PostAllowlist, []string{isolatedDM}) || !doc.Slack.RequestLog {
-		t.Errorf("slack %+v", doc.Slack)
+	if s := doc.Plugins.Slack; s.KeychainService != "wloop-e2e-slack" || !slices.Equal(s.PostAllowlist, []string{isolatedDM}) || !s.RequestLog {
+		t.Errorf("slack %+v", s)
 	}
 	for _, sub := range []string{"state", "config", "gh", "bin", "home"} {
 		if fi, err := os.Stat(filepath.Join(dir, sub)); err != nil || fi.Mode().Perm() != 0o700 {
@@ -489,5 +496,63 @@ func TestIsolatedSetupWritesTheMCPKeyAndExposesIt(t *testing.T) {
 	mustIsolated(t, "start", dir)
 	if log, _ := os.ReadFile(filepath.Join(dir, "daemon.log")); strings.Contains(string(log), key) {
 		t.Fatal("the key reached the daemon log")
+	}
+}
+
+func TestIsolatedWorkflowsRunOnASnapshotTakenWithJobs(t *testing.T) {
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("snapshot needs sqlite3")
+	}
+	none := setupIsolated(t, shortDir(t), "w2", 5)
+	out, err := isolated(t, "snapshot", "--jobs", none, walStore(t, map[string]string{"viewer:github": "octo"}, false))
+	refusedWith(t, out, err, "--workflows")
+	out, err = isolated(t, "setup", filepath.Join(shortDir(t), "w3"), fakeDaemon(t), isolatedDM, "--workflows", "task-nope")
+	refusedWith(t, out, err, "no bundled workflow task-nope")
+
+	bin := buildRelease(t)
+	dir := filepath.Join(shortDir(t), "w1")
+	mustIsolated(t, "setup", dir, bin, isolatedDM, "4", "--workflows", "task-kind,task-wake")
+	t.Cleanup(func() { isolated(t, "stop", dir) })
+	file := filepath.Join(dir, "config", brand.StateDir(), "config.toml")
+	c, err := config.LoadFile(file, cli.Defaults())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, w := range c.Workflows {
+		if want := name == "task-kind" || name == "task-wake"; w.Enabled == nil || *w.Enabled != want {
+			t.Errorf("workflow %s enabled %v, want %v", name, w.Enabled, want)
+		}
+	}
+	raw, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file, withFreePorts(t, raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	mustIsolated(t, "snapshot", "--jobs", dir, v6StoreWith(t))
+	mustIsolated(t, "run", dir, filepath.Join(dir, "bin", brand.Name), "store", "migrate", "--yes")
+	mustIsolated(t, "start", dir)
+	var id string
+	for deadline := time.Now().Add(90 * time.Second); id == "" && time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
+		if out, err := isolated(t, "run", dir, filepath.Join(dir, "bin", brand.Name), "task", "new", "--title", "Write the runbook"); err == nil {
+			id = strings.TrimPrefix(strings.TrimSpace(out[strings.LastIndex(out, "task:"):]), "task:")
+		}
+	}
+	if id == "" {
+		t.Fatal("task new never reached the daemon")
+	}
+	store := "file:" + filepath.Join(dir, "state", brand.StateDir(), "store.db") + "?mode=ro"
+	query := fmt.Sprintf("SELECT value || ' ' || writer FROM task_props WHERE task_id = '%s' AND name = 'kind'", id)
+	var got string
+	for deadline := time.Now().Add(90 * time.Second); time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
+		raw, _ := exec.Command("sqlite3", store, query).CombinedOutput()
+		if got = strings.TrimSpace(string(raw)); got != "" {
+			break
+		}
+	}
+	if got != `{"text":"capture"} workflow` {
+		log, _ := os.ReadFile(filepath.Join(dir, "daemon.log"))
+		t.Fatalf("task-kind wrote %q on %s, want the kind capture by the workflow:\n%s", got, id, log)
 	}
 }

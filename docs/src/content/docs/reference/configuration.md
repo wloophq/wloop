@@ -9,7 +9,7 @@ The daemon reads the file when it starts. It follows a change of `profile` live;
 
 ## Settings
 
-A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` switches it, read at start. `workflows.<name>` overlays a workflow's manifest field by field, as [Tune workflows](/guides/workflows/) shows; its `approval` and `drafts.approval` take `mode`, `window` and `rule`, a list of tables with `when`, `mode` and `window` (`[[workflows.<name>.approval.rule]]`): a `rule` list replaces the manifest's rules and `[]` clears them, a key left out keeps the manifest's, and a block that does not merge with the manifest's is named by `doctor`. `intents.<name>.project_settings.when` is a predicate over the pull request's [facts](/reference/facts/#intent-facts) where the intent's sessions load the checkout's own agent settings (`.claude/`, `.mcp.json`, `CLAUDE.md`); elsewhere they start with your settings alone, and an intent it does not name loads them; see [Review](/guides/review/#the-checkouts-own-agent-settings). Unless the table says otherwise, `workspace_managers` is `["claude-desktop", "orca"]` and `agent` is `"claude"`.
+A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` switches it, read at start. `workflows.<name>` overlays a workflow's manifest field by field, as [Tune workflows](/guides/workflows/) shows; its `gates.approval` takes `mode`, `window` and `rule`, a list of tables with `when`, `mode` and `window` (`[[workflows.<name>.gates.approval.rule]]`), for every gate the workflow opens, a rule for the kinds its `when` pins `gate.kind` to: a `rule` list replaces the manifest's rules and `[]` clears them, a key left out keeps the manifest's, and a block that does not merge with the manifest's is named by `doctor`. `intents.<name>.project_settings.when` is a predicate over the turn [facts](/reference/facts/#intent-facts) of the session's unit, such as a pull request's, where the intent's sessions load the checkout's own agent settings (`.claude/`, `.mcp.json`, `CLAUDE.md`); elsewhere they start with your settings alone, and an intent it does not name loads them; see [Review](/guides/review/#the-checkouts-own-agent-settings). Unless the table says otherwise, `workspace_managers` is `["claude-desktop", "orca"]` and `agent` is `"claude"`.
 
 ### Agent and workspaces
 
@@ -40,9 +40,9 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `projects[].workspace_managers` | list of strings |  | The managers a new worktree of the project picks from, in order. |
 | `projects[].trust_clones` | bool |  | Trusts a repository of the project in the agent home at the moment the loop clones it, so its settings and hooks run as you; the match must name its owner, such as acme/*. |
 | `projects[].github` | table |  | The GitHub settings the project overrides. |
-| `projects[].github.trusted_authors` | list of strings |  | The project's github.trusted_authors. |
-| `projects[].github.followups_without_workspace` | bool |  | The project's github.followups_without_workspace. |
-| `projects[].github.address_without_workspace` | bool |  | The project's github.address_without_workspace. |
+| `projects[].github.trusted_authors` | list of strings |  | The project's plugins.github.trusted_authors. |
+| `projects[].github.followups_without_workspace` | bool |  | The project's plugins.github.followups_without_workspace. |
+| `projects[].github.address_without_workspace` | bool |  | The project's plugins.github.address_without_workspace. |
 
 ### Placement
 
@@ -55,98 +55,110 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `placement[].role` | one of `review`, `author`, `work` |  | The role of their workspace. |
 | `placement[].shared` | bool |  | The units share one workspace. |
 
+### Plugins
+
+| Setting | Kind | Default | Meaning |
+|---|---|---|---|
+| `plugins` | table |  | Each plugin's table, by id: its switch, its trust and its settings. |
+| `plugins.&lt;name&gt;` | table |  | A plugin's table; the keys besides enabled and trust are the plugin's own, which only it reads. |
+| `plugins.&lt;name&gt;.enabled` | bool |  | Switches the plugin; left out, it is on. |
+| `plugins.&lt;name&gt;.trust` | one of `path` |  | path runs the plugin's binary whatever its checksum; left out, a bundled plugin runs only with the checksum its install recorded, and any other plugin does not run. Only you write it. |
+| `plugins.&lt;name&gt;.&lt;name&gt;` | string or list |  | A key of the plugin's own. |
+
 ### GitHub
 
 | Setting | Kind | Default | Meaning |
 |---|---|---|---|
-| `github` | table |  | The GitHub plugin's settings. |
-| `github.enabled` | bool |  | Switches the GitHub plugin; left out, it is on. |
-| `github.review_prefix` | string | `REVIEW ` | The prefix of a review workspace's name. |
-| `github.automated_reviewers` | list of strings |  | Logins of review bots whose reviews count as automated. |
-| `github.owners` | list of strings |  | The GitHub owners automated follow-ups run on; empty is every owner the workspace manager knows. |
-| `github.trusted_authors` | list of strings |  | Logins whose pull requests pass the author association check of automated rounds. |
-| `github.followups_without_workspace` | bool | `false` | A follow-up review recreates the review workspace the user deleted; off, the sweep only logs it. |
-| `github.address_without_workspace` | bool | `false` | An address round creates its author workspace when it has none; off, the sweep only records it. |
-| `github.rate_limit_fraction` | number | `0.5` | The share of the GitHub rate limit the sweeps may spend, a number between 0 and 1. |
-| `github.drafts` | table |  | The drafts the plugin's own rules propose. |
-| `github.drafts.approval` | table |  | Their approval; left out, each waits for you. |
-| `github.drafts.approval.mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The approval mode. |
-| `github.drafts.approval.window` | duration |  | How long a delay waits before the draft goes; only with mode delay. |
+| `plugins.github` | table |  | The GitHub plugin's settings. |
+| `plugins.github.enabled` | bool |  | Switches the GitHub plugin; left out, it is on. |
+| `plugins.github.trust` | one of `path` |  | path runs the GitHub plugin's binary whatever its checksum; left out, it runs only with the checksum its install recorded. |
+| `plugins.github.review_prefix` | string | `REVIEW ` | The prefix of a review workspace's name. |
+| `plugins.github.automated_reviewers` | list of strings |  | Logins of review bots whose reviews count as automated. |
+| `plugins.github.owners` | list of strings |  | The GitHub owners automated follow-ups run on; empty is every owner the workspace manager knows. |
+| `plugins.github.trusted_authors` | list of strings |  | Logins whose pull requests pass the author association check of automated rounds. |
+| `plugins.github.followups_without_workspace` | bool | `false` | A follow-up review recreates the review workspace the user deleted; off, the sweep only logs it. |
+| `plugins.github.address_without_workspace` | bool | `false` | An address round creates its author workspace when it has none; off, the sweep only records it. |
+| `plugins.github.rate_limit_fraction` | number | `0.5` | The share of the GitHub rate limit the sweeps may spend, a number between 0 and 1. |
+| `plugins.github.gates` | table |  | The gates the plugin's own rules open. |
+| `plugins.github.gates.approval` | table |  | Their approval; left out, the default gates.toml gives a draft gate. |
+| `plugins.github.gates.approval.mode` | one of `wait`, `delay`, `send`, `dry_run`, `run` |  | The approval mode. |
+| `plugins.github.gates.approval.window` | duration |  | How long a delay waits before the gate's consequence; only with mode delay. |
 
 ### GitHub address rounds
 
 | Setting | Kind | Default | Meaning |
 |---|---|---|---|
-| `github.address_reviews` | bool | `true` | Someone's review of a pull request you develop starts an address round. |
-| `github.address_skip_reviewers` | list of strings |  | Logins whose reviews never start an address round. |
-| `github.address_checks` | bool | `true` | Failing checks on the head of a pull request you develop start an address round. |
-| `github.ignore_checks` | list of strings |  | Checks whose failure never starts an address round. |
-| `github.address_conflicts` | bool | `true` | A pull request you develop that conflicts with its base past the conflict window starts an address round. |
+| `plugins.github.address_reviews` | bool | `true` | Someone's review of a pull request you develop starts an address round. |
+| `plugins.github.address_skip_reviewers` | list of strings |  | Logins whose reviews never start an address round. |
+| `plugins.github.address_checks` | bool | `true` | Failing checks on the head of a pull request you develop start an address round. |
+| `plugins.github.ignore_checks` | list of strings |  | Checks whose failure never starts an address round. |
+| `plugins.github.address_conflicts` | bool | `true` | A pull request you develop that conflicts with its base past the conflict window starts an address round. |
 
 ### GitHub scope, stalls and nudges
 
 | Setting | Kind | Default | Meaning |
 |---|---|---|---|
-| `github.scope` | table |  | Whose pull requests the GitHub plugin follows. |
-| `github.scope.people` | list of strings |  | Logins whose pull requests it follows. |
-| `github.scope.teams` | list of strings |  | Teams whose pull requests it follows. |
-| `github.scope.repos` | list of strings |  | Repositories whose pull requests it follows. |
-| `github.scope.watch` | list of strings |  | Repositories it watches. |
-| `github.stalled` | table |  | When a pull request counts as stalled. |
-| `github.stalled.review` | duration | `2d` | Waiting on a review for this long. |
-| `github.stalled.reply` | duration | `1d` | Waiting on a reply for this long. |
-| `github.stalled.merge` | duration | `1d` | Approved and unmerged for this long. |
-| `github.nudge` | table |  | The nudges on pull requests. |
-| `github.nudge.silent_days` | integer | `30` | Calendar days of silence on a pull request before a nudge is due; workflows read it as config.github.nudge.silent_days. |
+| `plugins.github.scope` | table |  | Whose pull requests the GitHub plugin follows. |
+| `plugins.github.scope.people` | list of strings |  | Logins whose pull requests it follows. |
+| `plugins.github.scope.teams` | list of strings |  | Teams whose pull requests it follows. |
+| `plugins.github.scope.repos` | list of strings |  | Repositories whose pull requests it follows. |
+| `plugins.github.scope.watch` | list of strings |  | Repositories it watches. |
+| `plugins.github.stalled` | table |  | When a pull request counts as stalled. |
+| `plugins.github.stalled.review` | duration | `2d` | Waiting on a review for this long. |
+| `plugins.github.stalled.reply` | duration | `1d` | Waiting on a reply for this long. |
+| `plugins.github.stalled.merge` | duration | `1d` | Approved and unmerged for this long. |
+| `plugins.github.nudge` | table |  | The nudges on pull requests. |
+| `plugins.github.nudge.silent_days` | integer | `30` | Calendar days of silence on a pull request before a nudge is due; workflows read it as config.plugins.github.nudge.silent_days. |
 
 ### Slack
 
 | Setting | Kind | Default | Meaning |
 |---|---|---|---|
-| `slack` | table |  | The Slack plugin's settings; no secret lives here. |
-| `slack.enabled` | bool |  | Switches the Slack plugin; left out, it is on. |
-| `slack.client_id` | string |  | The Slack app's client id; empty leaves Slack unconfigured. |
-| `slack.redirect_port` | integer |  | The login callback port registered in the Slack app; 0 is 53682. |
-| `slack.keychain_service` | string |  | The name of the Keychain items; empty is the brand's. |
-| `slack.post_allowlist` | list of strings |  | When not empty, the only channel ids, or user ids naming the DM with that user, a post may go to. |
-| `slack.request_log` | bool | `false` | Logs one line per Slack call: method and HTTP status. |
-| `slack.ended_after` | duration | `7d` | How long a Slack unit stays quiet, its newest stored message that old, before the plugin says it has ended (slack.ended). |
-| `slack.turns` | table |  | What a turn on a Slack unit reads. |
-| `slack.turns.max_chars` | integer |  | The characters of the unit's messages rendered into the instructions; 0 is 30000. |
-| `slack.drafts` | table |  | The drafts the plugin's own rules propose. |
-| `slack.drafts.approval` | table |  | Their approval; left out, each waits for you. |
-| `slack.drafts.approval.mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The approval mode. |
-| `slack.drafts.approval.window` | duration |  | How long a delay waits before the draft goes; only with mode delay. |
+| `plugins.slack` | table |  | The Slack plugin's settings; no secret lives here. |
+| `plugins.slack.enabled` | bool |  | Switches the Slack plugin; left out, it is on. |
+| `plugins.slack.trust` | one of `path` |  | path runs the Slack plugin's binary whatever its checksum; left out, it runs only with the checksum its install recorded. |
+| `plugins.slack.client_id` | string |  | The Slack app's client id; empty leaves Slack unconfigured. |
+| `plugins.slack.redirect_port` | integer |  | The login callback port registered in the Slack app; 0 is 53682. |
+| `plugins.slack.keychain_service` | string |  | The name of the Keychain items; empty is the brand's. |
+| `plugins.slack.post_allowlist` | list of strings |  | When not empty, the only channel ids, or user ids naming the DM with that user, a post may go to. |
+| `plugins.slack.request_log` | bool | `false` | Logs one line per Slack call: method and HTTP status. |
+| `plugins.slack.ended_after` | duration | `7d` | How long a Slack unit stays quiet, its newest stored message that old, before the plugin says it has ended (slack.ended). |
+| `plugins.slack.turns` | table |  | What a turn on a Slack unit reads. |
+| `plugins.slack.turns.max_chars` | integer |  | The characters of the unit's messages rendered into the instructions; 0 is 30000. |
+| `plugins.slack.gates` | table |  | The gates the plugin's own rules open. |
+| `plugins.slack.gates.approval` | table |  | Their approval; left out, the default gates.toml gives a draft gate. |
+| `plugins.slack.gates.approval.mode` | one of `wait`, `delay`, `send`, `dry_run`, `run` |  | The approval mode. |
+| `plugins.slack.gates.approval.window` | duration |  | How long a delay waits before the gate's consequence; only with mode delay. |
 
 ### Slack ingest
 
 | Setting | Kind | Default | Meaning |
 |---|---|---|---|
-| `slack.ingest` | table |  | What the Slack plugin admits and how it listens. |
-| `slack.ingest.terms` | list of strings |  | A message that holds one of them as a word, in any case, is admitted. |
-| `slack.ingest.allow_apps` | list of strings |  | Bot ids (B...) or app ids (A...) whose messages are admitted. |
-| `slack.ingest.deny_apps` | list of strings |  | Bot ids (B...) or app ids (A...) whose messages are not. |
-| `slack.ingest.socket` | bool |  | Listens on a socket; left out, it does. |
-| `slack.ingest.since` | string |  | The first start's backfill date, YYYY-MM-DD; empty is 7 days back. |
+| `plugins.slack.ingest` | table |  | What the Slack plugin admits and how it listens. |
+| `plugins.slack.ingest.terms` | list of strings |  | A message that holds one of them as a word, in any case, is admitted. |
+| `plugins.slack.ingest.allow_apps` | list of strings |  | Bot ids (B...) or app ids (A...) whose messages are admitted. |
+| `plugins.slack.ingest.deny_apps` | list of strings |  | Bot ids (B...) or app ids (A...) whose messages are not. |
+| `plugins.slack.ingest.socket` | bool |  | Listens on a socket; left out, it does. |
+| `plugins.slack.ingest.since` | string |  | The first start's backfill date, YYYY-MM-DD; empty is 7 days back. |
 
 ### Slack extraction
 
 | Setting | Kind | Default | Meaning |
 |---|---|---|---|
-| `slack.extraction` | table |  | The extraction job; a zero value keeps its default. |
-| `slack.extraction.enabled` | bool |  | Switches the extraction job; left out, it is on. |
-| `slack.extraction.tier` | one of `fast`, `balanced`, `frontier` |  | Its model tier; left out, fast. |
-| `slack.extraction.language` | string |  | The language the extraction writes in; empty is English. |
-| `slack.extraction.per_call_usd` | number |  | What one extraction call may cost, in USD; 0 is 0.10. |
-| `slack.extraction.per_day_usd` | number |  | What extraction may cost in a day, in USD; 0 is 3. |
-| `slack.extraction.per_day` | integer |  | Extraction calls per day; 0 is 500. |
-| `slack.extraction.quiet` | duration |  | How long a unit stays unchanged before it runs; empty is 90s. |
-| `slack.extraction.max_wait` | duration |  | The longest delay of a unit's oldest change; empty is 10m. |
-| `slack.extraction.window_chars` | integer |  | The characters of conversation one call reads; 0 is 40000. |
-| `slack.extraction.max_failures` | integer |  | Failed calls in a row after which the job gives up on a unit until its next change; 0 is 3. |
-| `slack.extraction.context_messages` | integer |  | The read-only messages shown before a DM's window; 0 is 10, -1 turns them off. |
-| `slack.extraction.context_chars` | integer |  | The characters of those messages; 0 is 4000, -1 turns them off. |
-| `slack.extraction.escalate_over_chars` | integer |  | A unit whose rendered conversation is longer goes to the frontier tier; 0 or -1 is off. |
+| `plugins.slack.extraction` | table |  | The extraction job; a zero value keeps its default. |
+| `plugins.slack.extraction.enabled` | bool |  | Switches the extraction job; left out, it is on. |
+| `plugins.slack.extraction.tier` | one of `fast`, `balanced`, `frontier` |  | Its model tier; left out, fast. |
+| `plugins.slack.extraction.language` | string |  | The language the extraction writes in; empty is English. |
+| `plugins.slack.extraction.per_call_usd` | number |  | What one extraction call may cost, in USD; 0 is 0.10. |
+| `plugins.slack.extraction.per_day_usd` | number |  | What extraction may cost in a day, in USD; 0 is 3. |
+| `plugins.slack.extraction.per_day` | integer |  | Extraction calls per day; 0 is 500. |
+| `plugins.slack.extraction.quiet` | duration |  | How long a unit stays unchanged before it runs; empty is 90s. |
+| `plugins.slack.extraction.max_wait` | duration |  | The longest delay of a unit's oldest change; empty is 10m. |
+| `plugins.slack.extraction.window_chars` | integer |  | The characters of conversation one call reads; 0 is 40000. |
+| `plugins.slack.extraction.max_failures` | integer |  | Failed calls in a row after which the job gives up on a unit until its next change; 0 is 3. |
+| `plugins.slack.extraction.context_messages` | integer |  | The read-only messages shown before a DM's window; 0 is 10, -1 turns them off. |
+| `plugins.slack.extraction.context_chars` | integer |  | The characters of those messages; 0 is 4000, -1 turns them off. |
+| `plugins.slack.extraction.escalate_over_chars` | integer |  | A unit whose rendered conversation is longer goes to the frontier tier; 0 or -1 is off. |
 
 ### Workflow overrides
 
@@ -157,26 +169,19 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `workflows.&lt;name&gt;.enabled` | bool |  | Switches the workflow; left out, it is on. |
 | `workflows.&lt;name&gt;.observe` | bool |  | Plans the workflow's items pending, for you to run; left out, the manifest's. |
 | `workflows.&lt;name&gt;.only_when` | predicate |  | A condition ANDed with the workflow's when. |
-| `workflows.&lt;name&gt;.approval` | table |  | The approval of the workflow's runs, over the manifest's field by field. |
-| `workflows.&lt;name&gt;.approval.mode` | one of `run`, `delay`, `wait` |  | The mode when no rule matches; left out, the manifest's. |
-| `workflows.&lt;name&gt;.approval.window` | duration |  | How long a delay waits before it goes; only with mode delay. |
-| `workflows.&lt;name&gt;.approval.rule[]` | table |  | Rules tried in order before the mode, the first match wins; set, they replace the manifest's, and [] clears them. |
-| `workflows.&lt;name&gt;.approval.rule[].when` | predicate |  | When the rule applies. |
-| `workflows.&lt;name&gt;.approval.rule[].mode` | one of `run`, `delay`, `wait` |  | The rule's mode. |
-| `workflows.&lt;name&gt;.approval.rule[].window` | duration |  | The rule's delay; only with mode delay. |
 
-### Workflow draft approval
+### Workflow gate approval
 
 | Setting | Kind | Default | Meaning |
 |---|---|---|---|
-| `workflows.&lt;name&gt;.drafts` | table |  | The drafts the workflow proposes. |
-| `workflows.&lt;name&gt;.drafts.approval` | table |  | The approval of the workflow's drafts, over the manifest's field by field. |
-| `workflows.&lt;name&gt;.drafts.approval.mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The mode when no rule matches; left out, the manifest's. |
-| `workflows.&lt;name&gt;.drafts.approval.window` | duration |  | How long a delay waits before it goes; only with mode delay. |
-| `workflows.&lt;name&gt;.drafts.approval.rule[]` | table |  | Rules tried in order before the mode, the first match wins; set, they replace the manifest's, and [] clears them. |
-| `workflows.&lt;name&gt;.drafts.approval.rule[].when` | predicate |  | When the rule applies. |
-| `workflows.&lt;name&gt;.drafts.approval.rule[].mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The rule's mode. |
-| `workflows.&lt;name&gt;.drafts.approval.rule[].window` | duration |  | The rule's delay; only with mode delay. |
+| `workflows.&lt;name&gt;.gates` | table |  | The gates the workflow opens: its runs' plan gates, its drafts', its turns' drafts' and its gate.open steps'. |
+| `workflows.&lt;name&gt;.gates.approval` | table |  | The approval of the workflow's gates, a rule for the kinds its when pins gate.kind to, over the manifest's field by field. |
+| `workflows.&lt;name&gt;.gates.approval.mode` | one of `wait`, `delay`, `send`, `dry_run`, `run` |  | The mode when no rule matches; left out, the manifest's. |
+| `workflows.&lt;name&gt;.gates.approval.window` | duration |  | How long a delay waits before it goes; only with mode delay. |
+| `workflows.&lt;name&gt;.gates.approval.rule[]` | table |  | Rules tried in order before the mode, the first match wins; set, they replace the manifest's, and [] clears them. |
+| `workflows.&lt;name&gt;.gates.approval.rule[].when` | predicate |  | When the rule applies. |
+| `workflows.&lt;name&gt;.gates.approval.rule[].mode` | one of `wait`, `delay`, `send`, `dry_run`, `run` |  | The rule's mode. |
+| `workflows.&lt;name&gt;.gates.approval.rule[].window` | duration |  | The rule's delay; only with mode delay. |
 
 ### Turns and headless calls
 
@@ -205,17 +210,17 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `notifications` | table |  | The notifications. |
 | `notifications.digest_at` | string | `09:00` | The local HH:MM of the daily digest; empty for none. |
 
-### Units and GTD
+### Units and tasks
 
 | Setting | Kind | Default | Meaning |
 |---|---|---|---|
 | `items` | table |  | The items. |
 | `items.heat` | table |  | How long a unit stays warm. |
 | `items.heat.warm_for` | duration |  | How long a unit stays warm after its last item resolved; left out, the heat reader's default. |
-| `gtd` | table |  | The GTD entries' settings. |
-| `gtd.stale_waiting_days` | integer | `2` | Working days after which a waiting entry goes stale. |
-| `gtd.areas` | list of strings |  | The areas an entry is offered. |
-| `gtd.contexts` | list of strings |  | The contexts an entry is offered. |
+| `tasks` | table |  | The tasks' settings. |
+| `tasks.stale_waiting_days` | integer | `2` | Working days after which a waiting task goes stale. |
+| `tasks.areas` | list of strings |  | The areas a task is offered. |
+| `tasks.contexts` | list of strings |  | The contexts a task is offered. |
 
 ### Cleanup
 
@@ -234,7 +239,7 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | Setting | Kind | Default | Meaning |
 |---|---|---|---|
 | `dossiers` | table |  | The dossiers' lifecycle and quotas; a value of zero or less keeps its default. |
-| `dossiers.archive_after` | duration | `30d` | How long after its unit or project resolved a dossier is archived. |
+| `dossiers.archive_after` | duration | `30d` | How long after its task or unit resolved a dossier is archived. |
 | `dossiers.purge_after` | duration | `400d` | How long after the archive it is purged. |
 | `dossiers.soft_cap_mb` | integer | `50` | The size per dossier doctor reports. |
 | `dossiers.total_cap_mb` | integer | `2048` | The size of dossiers and archives doctor reports. |
@@ -317,10 +322,10 @@ The first rule whose `match`, a glob over `<provider>:<key>`, matches gives the 
 projects_dir = "~/projects"
 profile = "mine"
 
-[github]
+[plugins.github]
 trusted_authors = ["github-actions[bot]"]
 
-[github.scope]
+[plugins.github.scope]
 teams = ["acme/backend"]
 repos = ["acme/api"]
 

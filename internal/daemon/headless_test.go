@@ -11,13 +11,13 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
-	"github.com/wloophq/wloop/internal/core/gtd/gtdtest"
 	"github.com/wloophq/wloop/internal/core/headless"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/core/turns"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -85,10 +85,10 @@ func TestGitHubDelegateRunsReviewWithActLoaded(t *testing.T) {
 	if !slices.ContainsFunc(row.Actions, func(st api.ActionState) bool { return st.ID == string(dintent.Act) }) {
 		t.Fatalf("the row does not offer act: %+v", row.Actions)
 	}
-	if st, ok := c.s.offeredFor(row, gtd.VerbDelegate).runs(); !ok || st.ID != string(dintent.Review) {
+	if st, ok := c.s.offeredFor(row, task.VerbDelegate).runs(); !ok || st.ID != string(dintent.Review) {
 		t.Fatalf("delegate runs %q (%v), want review", st.ID, ok)
 	}
-	rec := post(t, c.s, api.EntryPath("e-r", "delegate"), `{"source":"cockpit"}`)
+	rec := post(t, c.s, api.TaskPath("t-r", "delegate"), `{"source":"cockpit"}`)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "review accepted as intake") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
@@ -139,7 +139,7 @@ func TestActRunsOneModeDecisionWhateverTheCaller(t *testing.T) {
 	rec := httptest.NewRecorder()
 	s.handleAction(rec, bridged)
 	if rec.Code != 202 || len(h.got) != 2 || len(fa.calls) != 0 {
-		t.Fatalf("the generic action path, as the GTD bridge calls it: %d %s, started %d, session calls %v", rec.Code, rec.Body, len(h.got), fa.calls)
+		t.Fatalf("the generic action path, as the task verbs' bridge calls it: %d %s, started %d, session calls %v", rec.Code, rec.Body, len(h.got), fa.calls)
 	}
 	if rec := post(t, s, threadAct, `{"mode":"session","guidance":"look"}`); rec.Code != 200 || len(fa.calls) != 1 || !strings.HasPrefix(fa.calls[0], "act ") || len(h.got) != 2 {
 		t.Fatalf("session mode: %d %s, calls %v, started %d", rec.Code, rec.Body, fa.calls, len(h.got))
@@ -149,25 +149,25 @@ func TestActRunsOneModeDecisionWhateverTheCaller(t *testing.T) {
 	}
 }
 
-func TestTheBridgeDelegatesActHeadlessWithTheEntrysItems(t *testing.T) {
+func TestTheBridgeDelegatesActHeadlessWithTheTasksItems(t *testing.T) {
 	t.Parallel()
 	s, h := newThreadActServer(t)
-	store := gtdtest.New()
-	g := coregtd.New(coregtd.Deps{Store: store, Facts: coregtd.CardFacts{}, Clock: fixedClock(catalogNow)})
-	e := gtd.Entry{ID: "e-t", Kind: gtd.KindAction, State: gtd.Inbox, Units: []unit.Unit{actThread}, Items: []gtd.ItemRef{{Unit: actThread, Item: "i1"}},
-		Origin: gtd.OriginDerived, Created: catalogNow, Updated: catalogNow}
-	if err := store.Apply(context.Background(), []gtd.Change{{Op: gtd.OpCreate, Entry: e}}); err != nil {
+	store := taskstest.New()
+	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: store, Facts: coretasks.CardFacts{}, Clock: fixedClock(catalogNow)})
+	e := task.Task{ID: "t-t", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{actThread}, Items: []task.ItemRef{{Unit: actThread, Item: "i1"}},
+		Origin: task.OriginDerived, Created: catalogNow, Updated: catalogNow}
+	if err := store.Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
 	rec := httptest.NewRecorder()
-	s.runBridge(rec, apiRequest("POST", api.EntryPath("e-t", "delegate"), nil), g, e, gtd.VerbDelegate, actThread, api.ActionState{ID: string(dintent.Act), Enabled: true}, api.EntryRequest{Source: "cockpit"})
+	s.runBridge(rec, apiRequest("POST", api.TaskPath("t-t", "delegate"), nil), g, e, task.VerbDelegate, actThread, api.ActionState{ID: string(dintent.Act), Enabled: true}, api.TaskRequest{Source: "cockpit"}, task.ActorPerson)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "act started headless as turn 42") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if len(h.got) != 1 || !slices.Equal(h.got[0].Items, []string{"i1"}) || h.got[0].Entry != "e-t" {
+	if len(h.got) != 1 || !slices.Equal(h.got[0].Items, []string{"i1"}) || h.got[0].Task != "t-t" {
 		t.Fatalf("started %+v", h.got)
 	}
-	if len(store.Events) != 1 || store.Events[0].Kind != "verb_delegate" || store.Events[0].Actor != "cockpit" {
+	if len(store.Events) != 1 || store.Events[0].Kind != "verb_delegate" || store.Events[0].Actor != "person:cockpit" {
 		t.Fatalf("events %+v", store.Events)
 	}
 }

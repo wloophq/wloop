@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	"github.com/wloophq/wloop/profiles"
 )
 
 const (
@@ -71,8 +70,8 @@ func (e SizeError) Error() string {
 // layerFS confines every read to the layer's directory: a symlink that
 // leads out of it fails to open.
 func layerFS(l Layer) (fs.FS, func(), error) {
-	if l.Dir == "" {
-		fsys, err := fs.Sub(profiles.Default, "default")
+	if l.Embedded() {
+		fsys, err := l.FSys()
 		return fsys, func() {}, err
 	}
 	if fi, err := os.Stat(l.Dir); err != nil || !fi.IsDir() {
@@ -86,10 +85,13 @@ func layerFS(l Layer) (fs.FS, func(), error) {
 }
 
 func fileName(l Layer, rel string) string {
-	if l.Dir == "" {
+	switch {
+	case l.Bundled():
 		return "embedded " + rel
+	case l.Embedded():
+		return "embedded " + l.FileName(rel)
 	}
-	return filepath.Join(l.Dir, filepath.FromSlash(rel))
+	return l.FileName(rel)
 }
 
 // Load reads and checks every block of the chain's layers, lowest layer

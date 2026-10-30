@@ -8,21 +8,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
 var (
-	r8       = github.Ref{Owner: "acme", Repo: "api", Number: 8}
+	r8       = pr.Ref{Owner: "acme", Repo: "api", Number: 8}
 	sharedWS = wsdomain.Workspace{ID: "ws-shared", RepoID: "r1", Path: "/wt/shared", DisplayName: "shared", HostID: "local"}
 )
 
@@ -191,12 +193,12 @@ func TestGitHubDefaultPlacement(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, p := range []dinv.PR{{Ref: r7, Author: "someone", State: dgh.StateOpen, LastSeenAt: testNow}, {Ref: r8, Author: "me", State: dgh.StateOpen, LastSeenAt: testNow}} {
-		if err := te.Store.UpsertPR(ctx, p); err != nil {
+		if err := inventorytest.Of(te.Store).UpsertPR(ctx, p); err != nil {
 			t.Fatal(err)
 		}
 	}
 	s := te.placements(te.cfg)
-	for ref, role := range map[github.Ref]string{r7: "review", r8: "author", {Owner: "acme", Repo: "web", Number: 1}: "review"} {
+	for ref, role := range map[pr.Ref]string{r7: "review", r8: "author", {Owner: "acme", Repo: "web", Number: 1}: "review"} {
 		got, err := s.Place(ctx, ref.Unit(), "")
 		if err != nil || got.Repo != ref.Owner+"/"+ref.Repo || got.Role != role || got.Shared || got.Source != "provider" {
 			t.Errorf("%s: %+v %v, want role %s", ref, got, err, role)

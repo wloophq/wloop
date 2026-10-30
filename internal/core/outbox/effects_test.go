@@ -74,7 +74,7 @@ func withApplier(e *env) *effectLog {
 func (e *env) sendNow(t *testing.T, p Proposal) draft.Draft {
 	t.Helper()
 	d := e.propose(p)
-	if _, err := e.svc.Approve(ctx, d.ID, nil); err != nil {
+	if _, err := e.approve(d.ID, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := e.svc.Send(ctx); err != nil && !errors.Is(err, errBoom) && !errors.Is(err, ErrUnknownEffect) {
@@ -87,12 +87,12 @@ func TestASentDraftAppliesItsEffectsOnce(t *testing.T) {
 	e := newEnv()
 	l := withApplier(e)
 	p := reply("closing")
-	p.Effects = []string{"entry.nudged", "unit.closed"}
+	p.Effects = []string{"task.nudged", "unit.closed"}
 	d := e.sendNow(t, p)
 	if d.State != draft.Sent || !d.EffectsAppliedAt.Equal(t0) {
 		t.Fatalf("draft %+v", d)
 	}
-	if got := l.names(); !slices.Equal(got, []string{"entry.nudged", "unit.closed"}) {
+	if got := l.names(); !slices.Equal(got, []string{"task.nudged", "unit.closed"}) {
 		t.Fatalf("applied %v", got)
 	}
 	for range 2 {
@@ -106,8 +106,8 @@ func TestASentDraftAppliesItsEffectsOnce(t *testing.T) {
 	if got := l.names(); len(got) != 2 {
 		t.Fatalf("applied again: %v", got)
 	}
-	stored, err := e.store.Insert(ctx, draft.Draft{Unit: thread, Purpose: "reply", Delivery: draft.Message, Text: "an effect nobody implements now",
-		State: draft.Approved, Effects: []string{"unknown.effect"}, CreatedAt: t0, UpdatedAt: t0})
+	stored, err := e.insertApproved(draft.Draft{Unit: thread, Purpose: "reply", Delivery: draft.Message, Text: "an effect nobody implements now",
+		State: draft.Queued, Effects: []string{"unknown.effect"}, CreatedAt: t0, UpdatedAt: t0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,9 +135,9 @@ func TestADraftDeclaringAnEffectItsProviderDoesNotImplementIsRefused(t *testing.
 func TestEffectsAreAppliedOnceAcrossARestart(t *testing.T) {
 	e := newEnv()
 	l := withApplier(e)
-	l.fail["entry.nudged"] = errBoom
+	l.fail["task.nudged"] = errBoom
 	p := reply("any news?")
-	p.Effects = []string{"entry.nudged"}
+	p.Effects = []string{"task.nudged"}
 	d := e.sendNow(t, p)
 	if d.State != draft.Sent || !d.EffectsAppliedAt.IsZero() {
 		t.Fatalf("a failed effect undid the send or marked it applied: %+v", d)
@@ -148,7 +148,7 @@ func TestEffectsAreAppliedOnceAcrossARestart(t *testing.T) {
 	before.Effects = []string{"unit.closed"}
 	e.store.drafts = append(e.store.drafts, before)
 
-	delete(l.fail, "entry.nudged")
+	delete(l.fail, "task.nudged")
 	restarted := &Service{Store: e.store, Effects: e.svc.Effects, Clock: e.clock,
 		Applier: EffectApplier{Store: memApplied{e.store}, Effects: l.lookup, Clock: e.clock}}
 	for range 2 {
@@ -156,7 +156,7 @@ func TestEffectsAreAppliedOnceAcrossARestart(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := l.names(); !slices.Equal(got, []string{"entry.nudged"}) {
+	if got := l.names(); !slices.Equal(got, []string{"task.nudged"}) {
 		t.Fatalf("applied %v, want the failed effect once and none of the draft applied before", got)
 	}
 	if got := e.get(d.ID); !got.EffectsAppliedAt.Equal(t0) {
@@ -215,12 +215,15 @@ func TestACommentDraftWaitsForAPersonWhateverItsMode(t *testing.T) {
 		p := Proposal{Unit: thread, Purpose: "nudge", Delivery: draft.CommentDelivery, Text: "any news?", Policy: draft.Fixed(mode),
 			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "my-followups", Rule: "my-followups", Key: string(mode.Mode)}}
 		d := e.propose(p)
-		if d.State != draft.Proposed || d.Approval.Mode != draft.Wait || !d.Deadline.IsZero() || d.Would.Policy != draft.WouldWait {
+		if d.State != draft.Held || e.approval(d.ID).Mode != draft.Wait {
 			t.Fatalf("%s: %+v", mode.Mode, d)
 		}
 	}
 	e.clock.now = t0.Add(time.Hour)
-	if n, err := e.svc.Tick(ctx); n != 0 || err != nil {
-		t.Fatalf("tick approved %d %v", n, err)
+	if err := e.tick(); err != nil {
+		t.Fatal(err)
+	}
+	if ds, _ := e.svc.List(ctx, Filter{States: []draft.State{draft.Held}}); len(ds) != 2 {
+		t.Fatalf("held %+v", ds)
 	}
 }

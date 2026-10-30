@@ -13,7 +13,7 @@ let pending, queued = null, chain = Promise.resolve(), retries = 0, opened = fal
 const setTimeout = (f) => timers.push(f);
 const clearTimeout = () => {};
 const readHash = () => hash;
-const render = () => {}, refreshSpecs = async () => {}, loadExploreRecent = async () => {}, loadPlan = async () => {};
+const render = () => {}, refreshSpecs = async () => {}, loadExploreRecent = async () => {}, loadPlan = async () => {}, loadRoundGates = async () => {};
 const applyCatalog = () => {};
 const loadActivity = async () => { requests.push("activity"); };
 const loadDetail = async () => { requests.push("detail"); };
@@ -22,7 +22,7 @@ EventSource.CLOSED = 2;
 const unit = (k) => ({ provider: "github", key: k });
 const row = (k, title) => ({ unit: unit(k), label: k, title });
 let pages = {};
-` + noPlugins + noGTD + noUpdate + `const getJSON = async (url) => {
+` + noPlugins + noViews + noUpdate + `const getJSON = async (url) => {
   requests.push(url);
   if (url === "/api/health") return { viewer: "me" };
   if (url === "/api/catalog") return { version: "c1", views: [], facets: [], situations: [] };

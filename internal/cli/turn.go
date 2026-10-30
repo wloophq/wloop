@@ -18,22 +18,22 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/github"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
 // turnPR is a pull request as a turn reads it.
-func turnPR(pr *github.PullRequest) *turn.PR {
+func turnPR(pr *pr.PullRequest) *turn.PR {
 	return &turn.PR{Title: pr.Title, Author: pr.Author, State: pr.State, Association: pr.AuthorAssociation, Head: pr.HeadRefOid, Base: pr.BaseRefName, Labels: pr.Labels,
 		CrossRepository: pr.IsCrossRepository, Visibility: pr.Visibility, Prior: priorReview(pr.Reviews), ReviewRequested: pr.ViewerRequested, LastReviewVerdict: lastReviewVerdict(pr.Reviews)}
 }
 
 // prFacts resolves pr's facts for a predicate over the pull request; nil
 // without one.
-func prFacts(pr *github.PullRequest) expr.Facts {
+func prFacts(pr *pr.PullRequest) expr.Facts {
 	if pr == nil {
 		return nil
 	}
@@ -42,60 +42,15 @@ func prFacts(pr *github.PullRequest) expr.Facts {
 	return turn.PayloadFacts(p)
 }
 
-// lastReviewVerdict is the state of your newest submitted review, comments included.
-func lastReviewVerdict(reviews []pr.Review) string {
-	var state string
-	var at time.Time
-	for _, r := range reviews {
-		if r.ByViewer && !r.SubmittedAt.IsZero() && r.SubmittedAt.After(at) {
-			state, at = r.State, r.SubmittedAt
-		}
-	}
-	return state
-}
+func lastReviewVerdict(reviews []pr.Review) string { return pr.LastReviewVerdict(reviews) }
 
-// priorReview is your latest submitted review: the head it covered, and the
-// latest verdict that was not a comment. GitHub can return a review without
-// its commit; such a review gives no head.
+// priorReview is your latest submitted review, nil when there is none.
 func priorReview(reviews []pr.Review) *turn.PriorReview {
-	var p turn.PriorReview
-	reviewed := false
-	var headAt, verdictAt time.Time
-	for _, r := range reviews {
-		if !r.ByViewer || r.SubmittedAt.IsZero() {
-			continue
-		}
-		switch r.State {
-		case pr.ReviewApproved, pr.ReviewChangesRequested, pr.ReviewCommented, pr.ReviewDismissed:
-		default:
-			continue
-		}
-		reviewed = true
-		if r.CommitOid != "" && r.SubmittedAt.After(headAt) {
-			p.Head, headAt = r.CommitOid, r.SubmittedAt
-		}
-		if r.SubmittedAt.After(p.At) {
-			p.At = r.SubmittedAt
-		}
-		if r.State != pr.ReviewCommented && r.SubmittedAt.After(verdictAt) {
-			p.Verdict, verdictAt = r.State, r.SubmittedAt
-		}
-	}
-	if !reviewed {
+	p, ok := pr.PriorReview(reviews)
+	if !ok {
 		return nil
 	}
-	return &p
-}
-
-// basicsReader reads a turn's pull request with the read rounds already make.
-type basicsReader struct{ e *Env }
-
-func (b basicsReader) PR(ctx context.Context, ref github.Ref) (turn.PR, error) {
-	pr, err := b.e.basics(ctx, ref)
-	if err != nil {
-		return turn.PR{}, err
-	}
-	return *turnPR(pr), nil
+	return &turn.PriorReview{Verdict: p.Verdict, Head: p.Head, At: p.At}
 }
 
 type sentTurn struct {
@@ -233,7 +188,7 @@ func (e *Env) viewerLogin(ctx context.Context) (string, error) {
 		login, err = e.storedViewer(ctx)
 	}
 	if err != nil || login == "" {
-		if login, err = e.GitHub.Viewer(ctx); err != nil {
+		if login, err = e.forgeViewer(ctx); err != nil {
 			return "", err
 		}
 	}
@@ -256,7 +211,7 @@ func (e *Env) turnBuilder(cfg config.Config) turn.Builder {
 		Viewer: e.viewerLogin, Config: cfg, Command: e.loopCommand(), ManagerBinary: e.controlBinary(cfg), Items: e.itemsReader(), Dossiers: e.dossierReader()}
 	switch {
 	case e.Store != nil:
-		b.Facts = storedFacts{store: e.Store, briefs: cfg.Brief.Enabled}
+		b.Facts = storedFacts{store: e.Store, prs: e.reportedPRs(), briefs: cfg.Brief.Enabled}
 	case e.facts != nil:
 		b.Facts = e.facts
 	}
@@ -310,7 +265,10 @@ func (e *Env) storeTurn(ctx context.Context, cfg config.Config, r turn.Request) 
 	if out.Records && e.Turns != nil {
 		sent.send = &turns.SendRequest{Unit: r.Unit, Intent: dturn.Intent(r.Intent), Turn: out.ID, Trigger: turnTrigger(r.Trigger),
 			Guidance: r.Guidance, Agent: cfg.For(ref.Owner, ref.Repo).Agent, Records: true, Inputs: persisted(c),
-			Items: r.Items, Entry: r.Entry, Role: c.Def.Role}
+			Items: r.Items, Task: r.Task, Role: c.Def.Role}
+		if role, ok := builtin.RoleOf(c.Def.Role); ok {
+			sent.send.PerSession = role.PerSession
+		}
 		if r.Why != nil {
 			sent.send.Workflow = r.Why.Workflow
 		}
@@ -392,7 +350,7 @@ func (e *Env) lastVerdict(b dturn.Book, intent turn.Intent) (dturn.Published, bo
 
 // openPR reads the pull request a round is about and refuses one that is
 // not open.
-func (e *Env) openPR(ctx context.Context, ref github.Ref) (*github.PullRequest, error) {
+func (e *Env) openPR(ctx context.Context, ref pr.Ref) (*pr.PullRequest, error) {
 	pr, err := e.basics(ctx, ref)
 	if err != nil {
 		return nil, err

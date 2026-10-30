@@ -1,0 +1,40 @@
+{
+  "brief": {"unchanged": false, "goal": "Ann asked Bob to review the release notes; Bob did, and Cy decided the widget toggle stays off. Ann now owns the rollout once pull request 527 is reviewed.", "context": "", "kind": "request", "risk": "low", "risk_why": "", "open_questions": [], "tags": {"domain": ["release"], "audience": [], "concern": []}},
+  "viewer_role": "both",
+  "started_by_viewer": true,
+  "items": [
+    {
+      "ref": "i1", "kind": "request", "summary": "Bob reviews the release notes draft",
+      "origin_ts": "1700000000.000100", "requester": {"id": "U0000000001", "name": ""}, "assignees": [{"id": "U0000000002", "name": ""}],
+      "assignment_ts": "1700000000.000100", "assignment_basis": "explicit_mention", "waiting_on": [],
+      "state": "resolved", "resolution": "done", "evidence_ts": "1700003600.000300", "evidence_kind": "message",
+      "confidence": "high", "ambiguity": "", "links": [{"url": "https://example.com/docs/notes", "label": "notes"}],
+      "context": "Bob fixed two typos; Ann approved with a check mark.", "options": [], "deadline": "",
+      "mode": "none", "place": {"context": "", "why": "Settled."}
+    },
+    {
+      "ref": "i3", "kind": "decision", "summary": "Ship the widget toggle on by default?",
+      "origin_ts": "1700000300.000200", "requester": {"id": "U0000000002", "name": ""}, "assignees": [{"id": "U0000000003", "name": ""}],
+      "assignment_ts": "1700000300.000200", "assignment_basis": "explicit_mention", "waiting_on": [],
+      "state": "resolved", "resolution": "answered", "evidence_ts": "1700007200.000400", "evidence_kind": "message",
+      "confidence": "high", "ambiguity": "", "links": [], "context": "Cy decided: off by default.",
+      "options": [{"option": "On by default", "backed_by": []}, {"option": "Off by default", "backed_by": [{"id": "U0000000003", "name": ""}]}],
+      "deadline": "", "mode": "none", "place": {"context": "", "why": "Settled."}
+    },
+    {
+      "ref": "n1", "kind": "request", "summary": "Ann takes over the widget rollout after pull request 527 is reviewed",
+      "origin_ts": "1700007200.000400", "requester": {"id": "U0000000003", "name": ""}, "assignees": [{"id": "U0000000001", "name": ""}],
+      "assignment_ts": "1700007200.000400", "assignment_basis": "explicit_mention", "waiting_on": [{"id": "U0000000001", "name": ""}],
+      "state": "open", "resolution": "none", "evidence_ts": "", "evidence_kind": "none",
+      "confidence": "high", "ambiguity": "", "links": [], "context": "Waits on the review of pull request 527.",
+      "options": [], "deadline": "", "mode": "session", "place": {"context": "widget", "why": "The rollout lives in the widget repository."}
+    }
+  ],
+  "verdict": "waits_on_viewer",
+  "verdict_why": "Ann owns the rollout Cy handed over.",
+  "closure_posted": false,
+  "segments": [],
+  "links": [
+    {"item": "n1", "target": "github:acme/widget#527", "kind": "review", "evidence_ts": "1700007200.000400"}
+  ]
+}

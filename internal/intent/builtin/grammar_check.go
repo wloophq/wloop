@@ -28,11 +28,13 @@ func segments(path string) []string { return strings.Split(path, ".") }
 func bare(s string) string { return strings.ReplaceAll(s, "[]", "") }
 
 func check(all []Key, surface Surface, doc map[string]any) []Problem {
-	rows := rowsOf(all, surface)
-	if len(rows) == 0 {
-		return nil
+	w := walker{rows: rowsOf(all, surface)}
+	switch surface {
+	case SurfaceConfig:
+		w.renamed = KeyRenamedTo
+	case SurfaceIntent, SurfaceWorkflow:
+		w.renamed = ManifestKeyRenamedTo
 	}
-	w := walker{rows: rows}
 	w.table(nil, "", doc)
 	return w.problems
 }
@@ -40,6 +42,8 @@ func check(all []Key, surface Surface, doc map[string]any) []Problem {
 type walker struct {
 	rows     []Key
 	problems []Problem
+	// renamed is the key that replaced a document path, "" for none.
+	renamed func(path string) string
 }
 
 func (w *walker) add(path, format string, args ...any) {
@@ -55,7 +59,9 @@ func (w *walker) table(pat []string, at string, m map[string]any) {
 		}
 		seg, ok := w.match(pat, k)
 		if !ok {
-			w.unknown(pat, k, path)
+			if !w.moved(path, m[k]) {
+				w.unknown(pat, k, path)
+			}
 			continue
 		}
 		w.value(append(slices.Clone(pat), seg), path, m[k])
@@ -81,6 +87,14 @@ func (w *walker) match(pat []string, k string) (string, bool) {
 	return wild, wild != ""
 }
 
+// parent says whether a row lies under pat.
+func (w *walker) parent(pat []string) bool {
+	return slices.ContainsFunc(w.rows, func(r Key) bool {
+		s := segments(r.Path)
+		return len(s) > len(pat) && slices.Equal(s[:len(pat)], pat)
+	})
+}
+
 func (w *walker) row(pat []string) (Key, bool) {
 	for _, r := range w.rows {
 		if slices.Equal(segments(r.Path), pat) {
@@ -90,13 +104,33 @@ func (w *walker) row(pat []string) (Key, bool) {
 	return Key{}, false
 }
 
+// confused are the rows whose keys a slip swaps, each with the other's path:
+// a value of the wrong shape at one names the other.
+var confused = map[string]string{
+	"record.require[]": "record.requires",
+	"record.requires":  "record.require",
+}
+
 func (w *walker) value(pat []string, path string, v any) {
+	if other, ok := confused[strings.Join(pat, ".")]; ok {
+		n := len(w.problems)
+		defer func() {
+			for i := n; i < len(w.problems); i++ {
+				if strings.HasPrefix(w.problems[i].Msg, "must be") {
+					w.problems[i].Msg += fmt.Sprintf("; did you mean %s?", other)
+				}
+			}
+		}()
+	}
 	r, isRow := w.row(pat)
 	array := strings.HasSuffix(pat[len(pat)-1], "[]")
 	switch x := v.(type) {
 	case map[string]any:
 		if isRow && !slices.Contains([]Kind{KindTable, KindMap, KindAny}, r.Kind) {
 			w.add(path, "must be %s, not a table", kindName(r.Kind))
+			return
+		}
+		if isRow && r.Kind == KindAny && r.Values == nil && !w.parent(pat) {
 			return
 		}
 		w.table(pat, path, x)
@@ -223,7 +257,7 @@ func EnumProblem(v string, values []Value) (msg, near string) {
 		names[i] = x.Name
 	}
 	msg = fmt.Sprintf("%q is not one of %s", v, OrList(names))
-	if c := expr.Closest(v, names); c != "" && !values[slices.Index(names, c)].Releases {
+	if c := expr.Suggest(v, names); c != "" && !values[slices.Index(names, c)].Releases {
 		near = c
 		msg += fmt.Sprintf("; did you mean %q?", c)
 	}
@@ -242,6 +276,43 @@ func OrList(names []string) string {
 	return strings.Join(q[:len(q)-1], ", ") + " or " + q[len(q)-1]
 }
 
+// moved reports a key that was renamed, at path with value v, naming the
+// key that replaced it; under a renamed table it reports instead each key
+// whose own rename differs from its table's, such as a moved and renamed
+// approval. False when path was never renamed.
+func (w *walker) moved(path string, v any) bool {
+	if w.renamed == nil {
+		return false
+	}
+	var deeper []string
+	var walk func(at string, v any)
+	walk = func(at string, v any) {
+		m, ok := v.(map[string]any)
+		if !ok {
+			return
+		}
+		for _, k := range slices.Sorted(maps.Keys(m)) {
+			sub := at + "." + k
+			if r := w.renamed(sub); r != "" && r != w.renamed(at)+"."+k {
+				deeper = append(deeper, sub)
+				continue
+			}
+			walk(sub, m[k])
+		}
+	}
+	walk(path, v)
+	if len(deeper) == 0 && w.renamed(path) == "" {
+		return false
+	}
+	if len(deeper) == 0 {
+		deeper = []string{path}
+	}
+	for _, p := range deeper {
+		w.problems = append(w.problems, Problem{Path: p, Msg: fmt.Sprintf("renamed; did you mean %q?", w.renamed(p)), Near: w.renamed(p), Unknown: true})
+	}
+	return true
+}
+
 func (w *walker) unknown(pat []string, k, path string) {
 	var siblings []string
 	for _, r := range w.rows {
@@ -250,7 +321,7 @@ func (w *walker) unknown(pat []string, k, path string) {
 			siblings = append(siblings, bare(s[len(pat)]))
 		}
 	}
-	near := expr.Closest(k, siblings)
+	near := expr.Suggest(k, siblings)
 	w.problems = append(w.problems, Problem{Path: path, Msg: "unknown key" + expr.DidYouMean(k, siblings), Near: near, Unknown: true})
 }
 

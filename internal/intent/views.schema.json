@@ -1,0 +1,88 @@
+{
+  "$id": "https://github.com/wloophq/wloop/views.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "badge": {
+      "additionalProperties": false,
+      "description": "The menu bar's badge.",
+      "properties": {
+        "views": {
+          "description": "The views whose counts the badge adds up, each a view of views.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "review": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "A step of the review, by the view it walks, which views declares. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones, and comes after the steps below it.",
+        "properties": {
+          "label": {
+            "description": "What the step asks of you, as the review lists it. Required.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "description": "The review's steps, in the order the review walks them.",
+      "type": "object"
+    },
+    "views": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "A view, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
+        "properties": {
+          "group": {
+            "description": "The fact the view groups by, such as task.owed_by.",
+            "type": "string"
+          },
+          "hide_disabled": {
+            "default": false,
+            "description": "The view hides the tasks whose units are all of a disabled plugin, and the gates on a disabled plugin's units.",
+            "type": "boolean"
+          },
+          "key": {
+            "description": "The key that jumps to the view: `g`, a space and a key that no core key uses, such as `g i`. Its help is the view's label.",
+            "type": "string"
+          },
+          "label": {
+            "description": "The name people read in the list of views. Required.",
+            "type": "string"
+          },
+          "over": {
+            "default": "tasks",
+            "description": "What the view lists: tasks, or gates.",
+            "enum": [
+              "tasks",
+              "gates"
+            ],
+            "type": "string"
+          },
+          "remove_clean": {
+            "default": false,
+            "description": "The view offers to remove at once the workspaces its tasks' links hold whose checkouts hold nothing that is not published, as each link's remove action does; the rest are kept, with why.",
+            "type": "boolean"
+          },
+          "sort": {
+            "description": "The facts the view sorts by, comma-separated; a leading - sorts one descending. A view's tasks start oldest first, a parent's children in their sibling order.",
+            "type": "string"
+          },
+          "when": {
+            "description": "Which tasks or gates the view lists, over their facts: a task's, its properties' (task.prop.*), or a gate's. A view with none lists nothing: a place in the clients' list of views that a client draws itself, such as the review.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "description": "The lists of tasks, by view.",
+      "type": "object"
+    }
+  },
+  "title": "Views and the review (views.toml)",
+  "type": "object"
+}

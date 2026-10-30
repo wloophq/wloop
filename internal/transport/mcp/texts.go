@@ -105,16 +105,6 @@ func (s *Server) badArguments(ctx context.Context, tool string, err error) map[s
 	return s.answer(ctx, tool, "bad_arguments", fields{"Error": msg}, true)
 }
 
-// notLoggedIn is tool's answer while Slack is logged out.
-func (s *Server) notLoggedIn(ctx context.Context, tool string) map[string]any {
-	return s.answer(ctx, tool, "not_logged_in", nil, true)
-}
-
-// failed is tool's answer to a call Slack or the daemon failed.
-func (s *Server) failed(ctx context.Context, tool string, err error) map[string]any {
-	return s.answer(ctx, tool, "failed", fields{"Error": redactTokens(err.Error())}, true)
-}
-
 // describe sets t's description and its parameters' from text; it logs,
 // once each, a text that names no parameter or does not render.
 func (s *Server) describe(t *tool, text ToolText) {
@@ -145,7 +135,7 @@ func (s *Server) render(name, src string, data map[string]any) (string, bool) {
 		s.logOnce("mcp: tools.toml %s: %v", name, err)
 		return "", false
 	}
-	return b.String(), true
+	return strings.Trim(b.String(), "\n"), true
 }
 
 // walkParams calls f on every parameter under sc, by its path: a property

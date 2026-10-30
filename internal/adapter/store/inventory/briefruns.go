@@ -13,12 +13,15 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/core/timeline"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/tag"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/usage"
 	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 func nullable[T any](p *T) any {
@@ -93,7 +96,7 @@ func (s *Store) StartBriefRun(ctx context.Context, r dinv.BriefRun) (int64, erro
 	return id, nil
 }
 
-// EndBriefRun updates r, sets unit_briefs.last_run (and run, failures cleared, on ok or reused; a reused run carries the brief, tags and model of ReusedFrom) and the state fields of st, and for an ok run replaces unit_tags with r.Tags, in one transaction with KindBriefEnded and, when st newly gives up, KindBriefGaveUp.
+// EndBriefRun updates r, sets unit_briefs.last_run (and run, failures cleared, on ok or reused; a reused run carries the brief, tags and model of ReusedFrom) and the state fields of st, and for an ok run keeps r.Brief, its tags r.Tags, as the pull request's brief record, in one transaction with KindBriefEnded and, when st newly gives up, KindBriefGaveUp.
 func (s *Store) EndBriefRun(ctx context.Context, r dinv.BriefRun, st dinv.BriefRecord) error {
 	if r.ID == 0 || r.EndedAt.IsZero() {
 		return fmt.Errorf("ending a brief run of %s: no id or end time", r.PR)
@@ -146,7 +149,7 @@ func (s *Store) EndBriefRun(ctx context.Context, r dinv.BriefRun, st dinv.BriefR
 			return err
 		}
 		if ok {
-			if err := replaceTags(ctx, tx, r.PR, r.ID, r.Tags); err != nil {
+			if err := keepBriefRecord(ctx, tx, r); err != nil {
 				return err
 			}
 		}
@@ -176,23 +179,6 @@ func carryBrief(ctx context.Context, tx *sqlite.Tx, r *dinv.BriefRun) error {
 	}
 	r.Tags, err = splitList(tags)
 	return err
-}
-
-func replaceTags(ctx context.Context, tx *sqlite.Tx, ref github.Ref, run int64, tags []string) error {
-	if _, err := tx.ExecContext(ctx, `DELETE FROM unit_tags WHERE provider = ? AND unit_key = ?`, githubBriefs, ref.String()); err != nil {
-		return err
-	}
-	for _, t := range tags {
-		key, value, ok := strings.Cut(t, ":")
-		if !ok || key == "" || value == "" {
-			return fmt.Errorf("the tag %q of %s is not key:value", t, ref)
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO unit_tags (provider, unit_key, key, value, run) VALUES (?, ?, ?, ?, ?)`,
-			githubBriefs, ref.String(), key, value, run); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // insertEvents stores events the loop writes, each at most once.
@@ -274,8 +260,8 @@ func (s *Store) ClearWanted(ctx context.Context, ref github.Ref) error {
 	return s.exec(ctx, port.TopicBriefs, ref, `UPDATE unit_briefs SET wanted_at = '' WHERE provider = ? AND unit_key = ? AND wanted_at IS NOT ''`, githubBriefs, ref.String())
 }
 
-// RefreshBrief puts the pull request back to having no brief, no tags and
-// no give-up; every run stays.
+// RefreshBrief puts the pull request back to having no brief, so no brief
+// record nor tags, and no give-up; every run stays.
 func (s *Store) RefreshBrief(ctx context.Context, ref github.Ref) error {
 	_, err := s.db.Write(ctx, func(tx *sqlite.Tx) error {
 		res, err := tx.ExecContext(ctx, `UPDATE unit_briefs SET run = 0, failures = 0, gave_up_at = '', gave_up_reason = '' WHERE provider = ? AND unit_key = ?
@@ -283,15 +269,18 @@ func (s *Store) RefreshBrief(ctx context.Context, ref github.Ref) error {
 		if err := touchChanged(tx, res, err, port.TopicBriefs, ref); err != nil {
 			return err
 		}
-		res, err = tx.ExecContext(ctx, `DELETE FROM unit_tags WHERE provider = ? AND unit_key = ?`, githubBriefs, ref.String())
-		return touchChanged(tx, res, err, port.TopicBriefs, ref)
+		dropped, err := tx.DropRecord(ctx, ref.Unit(), builtin.BuildsBrief)
+		if dropped {
+			tx.Touch(port.TopicBriefs, ref.Unit())
+		}
+		return err
 	})
 	return err
 }
 
 // Tags lists the pull request's key:value tags, sorted.
 func (s *Store) Tags(ctx context.Context, ref github.Ref) ([]string, error) {
-	rows, err := s.db.R().QueryContext(ctx, `SELECT key || ':' || value FROM unit_tags WHERE provider = ? AND unit_key = ? ORDER BY key, value`,
+	rows, err := s.db.R().QueryContext(ctx, `SELECT key || ':' || value FROM `+briefTagsSQL+` WHERE provider = ? AND unit_key = ? ORDER BY key, value`,
 		githubBriefs, ref.String())
 	if err != nil {
 		return nil, err
@@ -308,15 +297,41 @@ func (s *Store) Tags(ctx context.Context, ref github.Ref) ([]string, error) {
 	return out, rows.Err()
 }
 
+// keepBriefRecord keeps r's brief as the pull request's brief record, with r's tags when it has some; a
+// brief that is no JSON object keeps none.
+func keepBriefRecord(ctx context.Context, tx *sqlite.Tx, r dinv.BriefRun) error {
+	tags := "null"
+	if r.Tags != nil {
+		raw, err := json.Marshal(r.Tags)
+		if err != nil {
+			return err
+		}
+		tags = string(raw)
+	}
+	var data string
+	err := tx.QueryRowContext(ctx, `SELECT iif(json_valid(?1) AND json_type(?1) = 'object', iif(?2 = 'null', json(?1), json_set(?1, '$.tags', json(?2))), '')`,
+		r.Brief, tags).Scan(&data)
+	if err != nil || data == "" {
+		return err
+	}
+	return tx.PutRecord(ctx, r.PR.Unit(), builtin.BuildsBrief, string(task.WriterAgent), data, r.EndedAt)
+}
+
+// briefTagsSQL is the tags of the brief records, each a row of provider, unit_key, key and value.
+const briefTagsSQL = `(SELECT e.provider, e.unit_key, substr(j.value, 1, instr(j.value, ':') - 1) AS key,
+	substr(j.value, instr(j.value, ':') + 1) AS value
+	FROM events e, json_each(iif(json_valid(e.data), e.data, '{}'), '$.tags') j
+	WHERE e.kind = '` + timeline.KindRecord + `' AND e.key = '` + builtin.BuildsBrief + `' AND j.type = 'text' AND instr(j.value, ':') > 1)`
+
 func tagVocabularySQL(keys int) string {
 	return `SELECT key, value, total FROM (
 		SELECT key, value, total, ROW_NUMBER() OVER (PARTITION BY key ORDER BY own DESC, total DESC, value) AS n FROM (
-			SELECT key, value, COUNT(*) AS total, SUM(substr(unit_key, 1, instr(unit_key, '/') - 1) = ?) AS own FROM unit_tags
+			SELECT key, value, COUNT(*) AS total, SUM(substr(unit_key, 1, instr(unit_key, '/') - 1) = ?) AS own FROM ` + briefTagsSQL + `
 			WHERE key IN (?` + strings.Repeat(", ?", keys-1) + `) AND +provider = '` + githubBriefs + `' GROUP BY key, value))
 		WHERE n <= ? ORDER BY key, n`
 }
 
-// TagVocabulary lists, for each of keys, up to limit values of the github unit_tags with
+// TagVocabulary lists, for each of keys, up to limit values of the github brief records' tags with
 // the number of pull requests that carry them: the ones owner's pull
 // requests use first, then the most used, then by name.
 func (s *Store) TagVocabulary(ctx context.Context, owner string, keys []string, limit int) (map[string][]tag.Count, error) {
@@ -429,12 +444,17 @@ func scanBriefRun(row scanner) (dinv.BriefRun, error) {
 	return r, nil
 }
 
-// briefRecordQuery reads the brief in use from the run and the error and
+// briefRecordQuery reads the brief in use from the pull request's brief
+// record, else from its run, the rest of it from the run, and the error and
 // attempt time from the last run; a last run that did not end ok is a
 // failure even without an error text.
-var briefRecordQuery = `SELECT p.unit_key, ` + fmt.Sprintf(briefFields, "COALESCE(r.brief, '')") + `
+var briefRecordQuery = `SELECT p.unit_key, ` + fmt.Sprintf(briefFields, "COALESCE(iif(p.run != 0, "+briefRecordData+"), r.brief, '')") + `
 	FROM unit_briefs p LEFT JOIN brief_runs r ON p.run != 0 AND r.id = p.run LEFT JOIN brief_runs l ON p.last_run != 0 AND l.id = p.last_run
 	WHERE p.provider = '` + githubBriefs + `'`
+
+// briefRecordData is the data of p's brief record.
+const briefRecordData = `(SELECT e.data FROM events e WHERE e.provider = p.provider AND e.unit_key = p.unit_key
+	AND e.kind = '` + timeline.KindRecord + `' AND e.key = '` + builtin.BuildsBrief + `')`
 
 // briefFields are the columns of a BriefRecord after its pull request, read
 // from unit_briefs p, the run in use r and the last run l; the brief JSON
@@ -505,7 +525,7 @@ func (s *Store) BriefRecords(ctx context.Context, refs ...github.Ref) (map[githu
 	if len(refs) == 0 {
 		return out, s.readBriefRecords(ctx, out, briefRecordQuery)
 	}
-	for chunk := range slices.Chunk(refs, prReadChunk) {
+	for chunk := range slices.Chunk(refs, briefReadChunk) {
 		marks := strings.TrimSuffix(strings.Repeat("?,", len(chunk)), ",")
 		args := make([]any, 0, len(chunk))
 		for _, r := range chunk {
@@ -542,42 +562,41 @@ type BriefState struct {
 	Has bool
 }
 
-type joined struct {
-	scanner
-	more []any
-}
+// briefStateQuery reads the brief state of the pull requests whose unit
+// keys it is bound to, Brief left empty.
+var briefStateQuery = `SELECT p.unit_key, ` + fmt.Sprintf(briefFields, "''") + `
+	FROM unit_briefs p LEFT JOIN brief_runs r ON p.run != 0 AND r.id = p.run LEFT JOIN brief_runs l ON p.last_run != 0 AND l.id = p.last_run
+	WHERE p.provider = '` + githubBriefs + `' AND p.unit_key IN (SELECT value FROM json_each(?))`
 
-func (j joined) Scan(dest ...any) error { return j.scanner.Scan(append(dest, j.more...)...) }
-
-// BriefStates lists the open pull requests with their brief state, in one
-// query that never reads a brief's JSON, newest update first.
+// BriefStates lists the open pull requests with their brief state, newest
+// update first: the pull requests, then the brief states, a read each that
+// never reads a brief's JSON.
 func (s *Store) BriefStates(ctx context.Context) ([]BriefState, error) {
-	rows, err := s.db.R().QueryContext(ctx, `SELECT `+prColumns+`, p.unit_key IS NOT NULL, `+fmt.Sprintf(briefFields, "''")+`
-		FROM pull_requests pr LEFT JOIN unit_briefs p ON p.provider = '`+githubBriefs+`' AND p.unit_key = pr.owner || '/' || pr.repo || '#' || pr.number
-		LEFT JOIN brief_runs r ON p.run != 0 AND r.id = p.run LEFT JOIN brief_runs l ON p.last_run != 0 AND l.id = p.last_run
-		WHERE pr.state = 'OPEN' ORDER BY pr.updated_at DESC, pr.owner, pr.repo, pr.number DESC`)
+	prs, err := s.openPRs(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []BriefState
-	for rows.Next() {
-		var st BriefState
-		var x briefTimes
-		pr, err := scanPR(joined{rows, append([]any{&st.Has}, x.dests(&st.Rec)...)})
-		if err != nil {
-			return nil, err
-		}
-		if err := x.parse(&st.Rec); err != nil {
-			return nil, err
-		}
-		st.PR, st.Rec.PR = pr, pr.Ref
-		if !st.Has {
-			st.Rec = dinv.BriefRecord{PR: pr.Ref}
-		}
-		out = append(out, st)
+	keys := make([]string, len(prs))
+	for i, p := range prs {
+		keys[i] = p.Ref.String()
 	}
-	return out, rows.Err()
+	list, err := json.Marshal(keys)
+	if err != nil {
+		return nil, err
+	}
+	recs := map[github.Ref]dinv.BriefRecord{}
+	if err := s.readBriefRecords(ctx, recs, briefStateQuery, string(list)); err != nil {
+		return nil, err
+	}
+	out := make([]BriefState, len(prs))
+	for i, p := range prs {
+		rec, has := recs[p.Ref]
+		if !has {
+			rec = dinv.BriefRecord{PR: p.Ref}
+		}
+		out[i] = BriefState{PR: p, Rec: rec, Has: has}
+	}
+	return out, nil
 }
 
 // UnitBrief is the brief in use of a unit of any provider: its run, its
@@ -600,3 +619,5 @@ func (s *Store) UnitBrief(ctx context.Context, u unit.Unit) (UnitBrief, bool, er
 	}
 	return b, err == nil, err
 }
+
+const briefReadChunk = 400

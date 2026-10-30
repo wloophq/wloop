@@ -13,7 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/github"
 )
 
-// PRReader reads a pull request the inventory holds.
+// PRReader reads a pull request the GitHub plugin reported.
 type PRReader interface {
 	PR(ctx context.Context, ref github.Ref) (dinv.PR, bool, error)
 }
@@ -47,10 +47,13 @@ func (g GitHubSource) ref(u unit.Unit) (github.Ref, error) {
 	return ref, nil
 }
 
-// AtOf is what p is at, in the format brief_runs stores.
+// AtOf is what p is at, in the format brief_runs stores. Its attempt is the
+// head, the description's edit time to the second and the changed files,
+// as attempt_of has stored them since version 4.
 func AtOf(p dinv.PR) At {
 	parts, _ := json.Marshal(prParts{ChangedFiles: p.ChangedFiles})
-	return At{Revision: p.HeadOid + " " + timeText(p.BodyEditedAt), Parts: parts}
+	return At{Revision: p.HeadOid + " " + timeText(p.BodyEditedAt), Parts: parts,
+		Attempt: fmt.Sprintf("%s %s %d", p.HeadOid, p.BodyEditedAt.UTC().Format(time.RFC3339), p.ChangedFiles)}
 }
 
 func timeText(t time.Time) string {
@@ -99,6 +102,9 @@ func (g GitHubSource) Input(ctx context.Context, u unit.Unit) (UnitInput, error)
 	if err != nil {
 		return UnitInput{}, err
 	}
+	if g.Source == nil {
+		return UnitInput{}, fmt.Errorf("brief: %s: no source reads a pull request's input", ref)
+	}
 	in, err := g.Source.Facts(ctx, ref)
 	if err != nil {
 		return UnitInput{}, err
@@ -134,15 +140,7 @@ func (g GitHubSource) Stale(w Written, cur At, version string, now time.Time) bo
 	}
 	rec.Version, rec.Error, rec.Failures, rec.AttemptedAt, rec.AttemptOf = w.Version, w.Error, w.Failures, w.AttemptedAt, w.AttemptOf
 	if rec.Error != "" {
-		return rec.AttemptOf != attemptOf(p, version) || now.Sub(rec.AttemptedAt) >= backoff(g.Retry, rec.Failures)
+		return rec.AttemptOf != AttemptKey(version, cur) || now.Sub(rec.AttemptedAt) >= backoff(g.Retry, rec.Failures)
 	}
 	return moved(p, rec, now)
-}
-
-func (g GitHubSource) AttemptKey(version string, cur At) string {
-	p, _, err := prAt(cur)
-	if err != nil {
-		return version + " " + cur.Revision
-	}
-	return attemptOf(p, version)
 }

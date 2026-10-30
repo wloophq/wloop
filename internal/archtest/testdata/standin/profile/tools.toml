@@ -1,0 +1,14 @@
+[standin_note]
+description = "Keep a short note on the stand-in's shelf."
+
+[standin_note.params]
+"text" = "the note"
+
+[standin_note.answers]
+refused = "standin_note refused: {{.Error}}."
+bad_arguments = "Nothing was kept: the arguments are not an object with text{{with .Error}} ({{.}}){{end}}."
+fix_these = """Nothing was kept; fix these and call standin_note again:
+{{.Problems}}"""
+failed = "standin_note failed: {{.Error}}"
+problem_text_required = "text: required, not empty"
+noted = "Kept {{printf \"%q\" .Text}}; the shelf holds {{.Count}} notes."

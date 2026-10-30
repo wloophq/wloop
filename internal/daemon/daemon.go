@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -24,33 +25,38 @@ import (
 	"syscall"
 	"time"
 
-	dmessage "github.com/wloophq/wloop/internal/domain/message"
+	"github.com/wloophq/wloop/internal/core/timeline"
+
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+
+	"github.com/wloophq/wloop/internal/domain/placement"
+	"github.com/wloophq/wloop/internal/domain/task"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/brief"
+	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/change"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/ingest"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
 	coreusage "github.com/wloophq/wloop/internal/core/usage"
 	coreviews "github.com/wloophq/wloop/internal/core/views"
 	"github.com/wloophq/wloop/internal/domain/card"
-	dgh "github.com/wloophq/wloop/internal/domain/github"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/procgroup"
 	"github.com/wloophq/wloop/internal/readmodel"
-	"github.com/wloophq/wloop/internal/readmodel/prrow"
 )
 
 // ShutdownGrace is how long the daemon waits for open requests to finish when
@@ -129,13 +135,17 @@ type Deps struct {
 	Units *unit.Registry
 	// Ingest are the sources' ingestion jobs.
 	Ingest []IngestJob
+	// Loading are the plugins that have not loaded since the daemon
+	// started, with why, by id; nil has none.
+	Loading func() map[string]string
+	// PluginHealth is how each plugin the daemon runs answers; nil runs
+	// none.
+	PluginHealth func(context.Context) []api.PluginHealth
 	// RowProviders build the read model's providers with the daemon's row
 	// deps, one per source.
 	RowProviders []func(readmodel.RowDeps) readmodel.Provider
-	// The inventory, one field per role; a nil role answers as a daemon
-	// with no store does.
-	Rows      prrow.Store
-	PRs       PullRequests
+	// The store, one field per role; a nil role answers as a daemon with
+	// no store does.
 	Events    EventLog
 	Overrides Overrides
 	Meta      Metas
@@ -150,42 +160,47 @@ type Deps struct {
 	Pauses    Pauses // nil reads as not paused and refuses a pause
 	// Collector runs the slow job; nil registers no fast and slow jobs.
 	Collector Collector
-	// Track reads a pull request about to be tracked, wrapping a failed read
-	// in port.ErrNotFound or port.ErrGitHub when it can tell which; nil
-	// tracks without reading.
+	// Track reads a unit about to be tracked through its source, wrapping a
+	// failed read in port.ErrNotFound or port.ErrGitHub when it can tell
+	// which; the read's Save admits and follows it. Nil tracks nothing.
 	Track func(ctx context.Context, u unit.Unit) (port.TrackRead, error)
 	// Follows says whether a provider's source keeps its own follows: track
-	// and untrack of its units go to Track and Untrack, never to the pull
-	// request overrides. Nil follows none.
+	// and untrack of its units go to Track and Untrack. Nil follows none.
 	Follows func(unit.ProviderID) bool
 	Untrack func(ctx context.Context, u unit.Unit) error
 	// Resolve is the unit an address a person gives lands in, such as a
 	// Slack message ref; ok is false when no plugin reads it. Nil reads none.
 	Resolve func(ctx context.Context, address string) (u unit.Unit, ok bool, err error)
-	Sweep   Sweeper // nil registers no sweep job
-	Actions Actions // nil answers 503 to delegated actions
+	// PluginAction runs an action of plugin id that names no unit; nil
+	// runs none.
+	PluginAction func(ctx context.Context, id string, req api.PluginActionRequest) (json.RawMessage, error)
+	// PluginRun runs a command line of running plugin id, writing as it
+	// goes; nil runs none.
+	PluginRun func(ctx context.Context, id string, args []string, stdout, stderr io.Writer) (exit int, err error)
+	Sweep     Sweeper // nil registers no sweep job
+	Actions   Actions // nil answers 503 to delegated actions
 	// Intents is the registry as the profile defines it now, read on every
 	// rows rebuild and action; nil serves the bundled intents.
 	Intents func() *intentload.Loaded
 	// Plan is the workflows' plan; nil answers 503 to the plan routes.
 	Plan Plan
-	// Pending are the pending automatic rounds the rows show; nil shows none.
-	Pending readmodel.Pending
+	// Plans are the automatic rounds the open plan gates hold, which the rows
+	// show; nil shows none.
+	Plans   readmodel.Plans
 	Changes *change.Log // nil notes nothing
 	// Snapshot pins the read model's loads to one read transaction; nil
 	// loads without one.
 	Snapshot readmodel.Snapshotter
-	// Brief, BriefStatus and BriefViews are the brief queue's roles; nil
+	// Brief, BriefStatus and BriefAttempts are the brief queue's roles; nil
 	// when brief.enabled is false.
-	Brief       BriefQueue
-	BriefStatus BriefHealth
-	BriefViews  BriefReads
-	Usage       *coreusage.Service // nil registers no usage job
-	Explorer    Explorer           // nil answers 503 to explore
+	Brief         BriefQueue
+	BriefStatus   BriefHealth
+	BriefAttempts BriefAttempts
+	Usage         *coreusage.Service // nil registers no usage job
 	// Retain drops the store's rows past their retention and says what it
 	// dropped; nil registers no retain job.
 	Retain func(ctx context.Context) (summary string, err error)
-	// Budget is the GitHub client's budget; nil reads as unknown.
+	// Budget is the forge's budget; nil reads as unknown.
 	Budget Budget
 	// Turns, Sessions and Views are the turn and view use cases and the
 	// sessions turns are typed into; nil answers 503 from the routes that
@@ -193,6 +208,10 @@ type Deps struct {
 	Turns    *turns.Service
 	Sessions turns.Sessions
 	Views    *coreviews.Service
+	// RunHost opens a run's workspace and enters its session; Transcripts
+	// pages its agent transcript. nil offers neither.
+	RunHost     RunHost
+	Transcripts turns.Transcripts
 	// Agents are the agents' states as the workspace snapshot last read
 	// them, never a call to the manager; nil reads as unknown, so a started
 	// turn's session is never told waiting.
@@ -222,24 +241,41 @@ type Deps struct {
 	// SessionWait is how long a turn by hand waits for its brief; 0 is
 	// brief.SessionWait.
 	SessionWait time.Duration
+	// AfterFunc arms the timer that ends a turn by hand's session wait and
+	// returns its stop; nil is time.AfterFunc.
+	AfterFunc func(d time.Duration, f func()) (stop func() bool)
 	// LoopMu serializes every loop write: sweep, review, take over, address, run.
 	// Shared across restarts of the server in one process; nil makes one.
 	LoopMu *lock.Mutex
 	// App is the menu bar's status, shared across restarts of the server
 	// like LoopMu; nil makes one.
-	App    *AppState
-	Cfg    config.Config
-	Viewer func(ctx context.Context) (login string, teams []string, err error)
-	// Forge is the plugin of the pull requests the daemon's viewer,
-	// explorer, intakes and budget serve.
-	Forge    unit.ProviderID
-	Now      func() time.Time
-	Version  string
-	Log      func(format string, args ...any)
-	StateDir string
-	Socket   string
-	LockPath string
-	InfoPath string
+	App *AppState
+	Cfg config.Config
+	// Identity is who the viewer is in the forge, as its plugin's
+	// Presenter.Identity says; nil knows nobody.
+	Identity func(ctx context.Context) (src.Identity, error)
+	// Forge is the plugin of the units the daemon's viewer, intakes, brief
+	// queue, timings and budget serve; they serve nothing while it is
+	// disabled.
+	Forge unit.ProviderID
+	// Repo is the repository of a unit, owner/name; "" none, and nil
+	// knows none.
+	Repo func(ctx context.Context, u unit.Unit) (string, error)
+	// Background tags a job's context as background work, below the user's
+	// reserve of the forge's budget; nil tags nothing.
+	Background func(ctx context.Context) context.Context
+	// Presenters build each compiled-in plugin's presenter, by provider,
+	// with what the daemon serves it.
+	Presenters map[unit.ProviderID]func(PresenterHost) Presenter
+	// PluginPresenter is a running plugin's presenter; nil runs none.
+	PluginPresenter func(unit.ProviderID) (Presenter, bool)
+	Now             func() time.Time
+	Version         string
+	Log             func(format string, args ...any)
+	StateDir        string
+	Socket          string
+	LockPath        string
+	InfoPath        string
 	// Restart is the command that restarts the daemon, which a refused
 	// client of another API major is told to run.
 	Restart string
@@ -248,6 +284,9 @@ type Deps struct {
 	// ConfigWarning is the health warning about config.toml drifting from the
 	// running config, "" for none; nil never warns.
 	ConfigWarning func() string
+	// EffectWarnings are the turn effects that went unapplied after their
+	// turn went out; nil lists none.
+	EffectWarnings func() []string
 	// WorkspaceManager names the workspace managers in messages, such as
 	// "Claude Desktop or Orca".
 	WorkspaceManager string
@@ -263,16 +302,12 @@ type Deps struct {
 	// event subscribers as they come; nil raises none.
 	Notices Notices
 
-	// FailedSteps names the failed steps of a GitHub Actions job; nil names
-	// none.
-	FailedSteps func(ctx context.Context, owner, repo string, jobID int64) ([]string, error)
-
 	// MCP serves agents' MCP sessions on 127.0.0.1:MCPPort; nil listens on
 	// no MCP port.
 	MCP http.Handler
-	// ReadText words the answers an agent's turn answer command reads, as inbox_read does, read of message
-	// id or of every unread answer when 0; nil prints them bare.
-	ReadText func(ctx context.Context, convs []dmessage.Conversation, id int64) string
+	// ReadText words what an agent's turn answer command reads, as task_read does, read of gate id or of every
+	// unread answer when 0; nil prints the answers and the chat bare.
+	ReadText func(ctx context.Context, got messages.TaskRead, id int64) string
 	MCPPort  int
 
 	// Startup reconciles the store and the views; Run holds
@@ -299,17 +334,34 @@ type Deps struct {
 	Cards card.Store
 	// CardsJob is told each published row change; nil runs none.
 	CardsJob CardsJob
-	// GTD is the entries service; nil answers 503 to the entries routes and runs no Sync. Messages are the
-	// Inbox messages, whose entries' verbs it registers on GTD.
-	GTD      *coregtd.Service
+	// Tasks is the tasks service; nil answers 503 to the tasks routes and runs no Sync. Messages are the
+	// Inbox messages, whose tasks' verbs it registers on Tasks.
+	Tasks    *coretasks.Service
 	Messages *messages.Service
+	// Row is what a task's row shows of its facts: TaskView.OwedBy, Askers and ExtractionLag; nil leaves them
+	// empty.
+	Row func(ctx context.Context, t task.Task) (catalog.Row, error)
+	// Timeline reads a task's timeline; nil answers 503 to its route. TaskRecords are the records units
+	// keep, a task's brief among them; nil serves no Brief.
+	Timeline    timeline.Reader
+	TaskRecords timeline.Records
+	// Gates resolves the decisions waiting on the user and GateReader lists them; nil answers 503 to the gate
+	// routes and serves no TaskView.Gates.
+	Gates      *gates.Service
+	GateReader gates.Reader
+	// RecordWriter keeps the brief a created task carries; nil refuses a create with a brief. Placements
+	// keep where a created task's work runs; nil refuses a create with a placement.
+	RecordWriter RecordWriter
+	Placements   placement.Overrides
 	// Drafts are the outbox's drafts the notifications read; nil: no draft notifies.
 	Drafts Drafts
-	// GTDMe resolves the user's identity over the enabled plugins and sets it on GTD, saying whether it grew;
-	// the Sync worker calls it before each batch until it succeeds. nil: GTD's identity stands.
-	GTDMe func(ctx context.Context) (grew bool, err error)
-	// GTDUnits are the units a full Sync covers: those with an open item or a live entry; nil: none.
-	GTDUnits func(ctx context.Context) ([]unit.Unit, error)
+	// TasksMe resolves the user's identity over the enabled plugins and sets it on Tasks, saying whether it grew;
+	// the Sync worker calls it before each batch until it succeeds. nil: Tasks' identity stands.
+	TasksMe func(ctx context.Context) (grew bool, err error)
+	// TaskUnits are the units a full Sync covers: those with an open item or a live task; nil: none.
+	TaskUnits func(ctx context.Context) ([]unit.Unit, error)
+	// Wakes match the tasks' wakes after each tasks sync; nil matches none.
+	Wakes Wakes
 	// Outbox keeps the drafts; nil answers 503 to the draft routes. SendDrafts runs its sender, which
 	// publishes the approved drafts.
 	Outbox     *outbox.Service
@@ -326,50 +378,52 @@ type Placer interface {
 	SessionPlace(ctx context.Context, u unit.Unit) (string, error)
 }
 
-// Budget is the GitHub budget as the client keeps it.
+// Budget is the forge's rate-limited budget.
 type Budget interface {
-	Allow(p dgh.Priority) bool
-	Budget() map[dgh.Resource]dgh.Limit
+	// Low says the budget refuses background reads.
+	Low() bool
+	// RateLimit is the budget as a client shows it.
+	RateLimit() api.RateLimit
 }
 
-// background tags a job's GitHub reads below the user's reserve.
-func background(run runFunc) runFunc {
+// background tags a job's context as background work.
+func (s *Server) background(run runFunc) runFunc {
 	return func(ctx context.Context) (string, string, error) {
-		return run(dgh.WithPriority(ctx, dgh.PriorityBackground))
+		if s.deps.Background != nil {
+			ctx = s.deps.Background(ctx)
+		}
+		return run(ctx)
 	}
 }
 
 type Server struct {
-	deps      Deps
-	jobs      map[string]*job
-	token     string
-	warnings  *warnings
-	grace     time.Duration
-	hub       *hub
-	model     *readmodel.Model
-	modelOnce sync.Once
-	viewer    viewerCache
-	app       *AppState
-	steps     stepCache
-	exploring sync.Mutex
-	users     sync.Map // lowercase login -> whether GitHub knows it as a user
+	deps Deps
+	// heldStates are the states stored tasks hold that the profile does not declare, as of the last
+	// recategorize pass.
+	heldStates atomic.Pointer[[]string]
+	jobs       map[string]*job
+	token      string
+	warnings   *warnings
+	grace      time.Duration
+	hub        *hub
+	model      *readmodel.Model
+	modelOnce  sync.Once
+	viewer     viewerCache
+	app        *AppState
+	// presenters are the compiled-in plugins' presenters, built once.
+	presenters     map[unit.ProviderID]Presenter
+	presentersOnce sync.Once
 	// draftWheres keeps, by draft id, the destination its publisher resolved or when it last failed to.
 	draftWheres sync.Map
 	// whereLookup and wherePage override draftWhereTimeout and draftWhereBudget; zero keeps them.
 	whereLookup, wherePage time.Duration
-	// exploreAttempt bounds one GitHub search; exploreRetryPause separates
-	// the two tries.
-	exploreAttempt, exploreRetryPause time.Duration
-	// overrideMu serializes every read-modify-write of an override.
-	overrideMu sync.Mutex
 	// pauseMu serializes every read-modify-write of the pause.
 	pauseMu sync.Mutex
 	// track reads a pull request before it is tracked; nil tracks unread.
-	track             func(ctx context.Context, u unit.Unit) (port.TrackRead, error)
-	reconcile         reconcileState
-	homes             homeCache
-	situationsFailing atomic.Bool
-	mutesFailing      atomic.Bool
+	track        func(ctx context.Context, u unit.Unit) (port.TrackRead, error)
+	reconcile    reconcileState
+	homes        homeCache
+	mutesFailing atomic.Bool
 	// intakesExpiredAt is the minute the read model's keeper last expired
 	// the session intakes; only the keeper touches it.
 	intakesExpiredAt time.Time
@@ -386,6 +440,8 @@ type Server struct {
 	life     context.Context
 	stopLife context.CancelFunc
 	driving  sync.WaitGroup
+	// ran holds every goroutine Run starts that may outlive it, a job past the shutdown grace.
+	ran sync.WaitGroup
 	// streamClock times the plugins' stream restarts.
 	streamClock jobClock
 	// draftClock times the draft sender's waits.
@@ -417,11 +473,15 @@ func New(d Deps) *Server {
 	if d.App == nil {
 		d.App = &AppState{}
 	}
+	if d.Forge != "" && d.PluginEnabled != nil && !d.PluginEnabled(d.Forge) {
+		d.Brief, d.BriefStatus, d.BriefAttempts, d.BriefsUnavailable = nil, nil, nil, ""
+		d.Intakes, d.IntakeBriefs, d.Budget, d.Identity = nil, nil, nil, nil
+	}
 	if d.GitAccess == nil && d.Meta != nil {
 		d.GitAccess = &GitAccessLog{Store: d.Meta}
 	}
 	s := &Server{deps: d, jobs: map[string]*job{}, token: rand.Text(), warnings: &warnings{}, grace: ShutdownGrace, hub: newHub(), app: d.App,
-		track: d.Track, exploreAttempt: exploreAttempt, exploreRetryPause: exploreRetryPause,
+		track:     d.Track,
 		reconcile: reconcileState{ready: make(chan struct{}), done: make(chan struct{}), wait: ReconcileWait}, sessionWait: cmp.Or(d.SessionWait, brief.SessionWait),
 		streamClock: wallClock{}, draftClock: wallClock{}}
 	s.life, s.stopLife = context.WithCancel(meter.WithRegistry(context.Background(), d.Meter))
@@ -435,7 +495,7 @@ func New(d Deps) *Server {
 	ingested := make(chan struct{}, 1)
 	for _, in := range d.Ingest {
 		name := ingestJobName(in.ID)
-		s.jobs[name] = newJob(name, in.Job.Every, fastTimeout, background(func(ctx context.Context) (string, string, error) {
+		s.jobs[name] = newJob(name, in.Job.Every, fastTimeout, s.background(func(ctx context.Context) (string, string, error) {
 			defer func() {
 				select {
 				case ingested <- struct{}{}:
@@ -451,28 +511,23 @@ func New(d Deps) *Server {
 			// The end of each ingestion run wakes it; its own period is a watchdog.
 			every = time.Duration(d.Cfg.Sweep.Slow)
 		}
-		s.jobs["fast"] = newJob("fast", every, fastTimeout, background(func(ctx context.Context) (string, string, error) {
+		s.jobs["fast"] = newJob("fast", every, fastTimeout, s.background(func(ctx context.Context) (string, string, error) {
 			s.noteConfigStale()
 			phase(ctx, "turns", s.reconcileTurns)
-			phase(ctx, "untrack", s.untrackFinished)
 			return "", "", nil
 		}))
 		s.jobs["fast"].wakeOn(ingested)
-		s.jobs["slow"] = newJob("slow", time.Duration(d.Cfg.Sweep.Slow), slowTimeout, background(func(ctx context.Context) (string, string, error) {
+		s.jobs["slow"] = newJob("slow", time.Duration(d.Cfg.Sweep.Slow), slowTimeout, s.background(func(ctx context.Context) (string, string, error) {
 			summary, skipped, err := c.SlowJob(ctx)
 			s.refreshHomes(ctx)
-			s.untrackFinished(ctx)
 			return summary, skipped, err
 		}))
 	}
 	if sw := d.Sweep; sw != nil {
 		s.jobs["sweep"] = s.sweepJob(sw)
-		if d.Plan != nil {
-			s.jobs["due"] = s.dueJob(d.Plan)
-		}
 	}
 	if b := d.Brief; b != nil {
-		s.jobs["brief"] = newJob("brief", time.Duration(d.Cfg.Sweep.Slow), briefTimeout, background(func(ctx context.Context) (string, string, error) {
+		s.jobs["brief"] = newJob("brief", time.Duration(d.Cfg.Sweep.Slow), briefTimeout, s.background(func(ctx context.Context) (string, string, error) {
 			summary, err := b.Run(ctx)
 			return summary, "", err
 		}))
@@ -503,10 +558,10 @@ func (s *Server) sweepJob(sw Sweeper) *job {
 	var planned, seen atomic.Uint64
 	skips := 0
 	var j *job
-	j = newJob("sweep", time.Duration(s.deps.Cfg.Sweep.Slow), sweepTimeout, background(func(ctx context.Context) (string, string, error) {
+	j = newJob("sweep", time.Duration(s.deps.Cfg.Sweep.Slow), sweepTimeout, s.background(func(ctx context.Context) (string, string, error) {
 		defer func() {
 			if ctx.Err() == nil {
-				s.expireMutesOrLog(ctx)
+				s.keepCurrentOrLog(ctx)
 			}
 		}()
 		from := s.changeGen()
@@ -569,9 +624,9 @@ func (s *Server) changeGen() port.Generation {
 	return s.deps.Changes.Gen()
 }
 
-func (s *Server) expireMutesOrLog(ctx context.Context) {
-	if err := s.expireMutes(ctx); err != nil {
-		s.logf("expiring mutes: %v", err)
+func (s *Server) keepCurrentOrLog(ctx context.Context) {
+	if err := s.keepCurrent(ctx); err != nil {
+		s.logf("keeping the rows: %v", err)
 	}
 }
 
@@ -774,7 +829,7 @@ func (s *Server) Run(ctx context.Context) error {
 	ctx = meter.WithRegistry(ctx, d.Meter)
 	base := func(net.Listener) context.Context { return meter.WithRegistry(context.Background(), d.Meter) }
 	servers := []*http.Server{
-		{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second, BaseContext: base},
+		{Handler: s.SocketHandler(), ReadHeaderTimeout: 10 * time.Second, BaseContext: base},
 		{Handler: s.AuthHandler(), ReadHeaderTimeout: 10 * time.Second, BaseContext: base},
 	}
 	listeners := []net.Listener{unixLn, tcpLn}
@@ -787,11 +842,11 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	errc := make(chan error, len(servers))
 	for i, ln := range listeners {
-		go func() {
+		s.ran.Go(func() {
 			if err := servers[i].Serve(ln); !errors.Is(err, http.ErrServerClosed) {
 				errc <- err
 			}
-		}()
+		})
 	}
 
 	jctx, stopJobs := context.WithCancel(ctx)
@@ -827,12 +882,21 @@ func (s *Server) Run(ctx context.Context) error {
 		case <-jctx.Done():
 		}
 	})
-	if d.GTD != nil {
-		wg.Go(func() { s.feedEntries(jctx) })
+	if d.Tasks != nil {
+		wg.Go(func() { s.feedTasks(jctx) })
 		wg.Go(func() {
 			select {
 			case <-s.reconcile.ready:
-				s.syncEntries(jctx)
+				s.syncTasks(jctx)
+			case <-jctx.Done():
+			}
+		})
+	}
+	if d.Gates != nil {
+		wg.Go(func() {
+			select {
+			case <-s.reconcile.done:
+				s.tickGates(jctx)
 			case <-jctx.Done():
 			}
 		})
@@ -883,7 +947,7 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 	}
 	jobsDone := make(chan struct{})
-	go func() { wg.Wait(); s.driving.Wait(); close(jobsDone) }()
+	s.ran.Go(func() { wg.Wait(); s.driving.Wait(); close(jobsDone) })
 	select {
 	case <-jobsDone:
 	case <-sctx.Done():
@@ -897,6 +961,10 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	return serveErr
 }
+
+// Wait blocks until every goroutine Run started has returned, those it left running past the shutdown
+// grace included; the owner of the stores they read waits here before closing them.
+func (s *Server) Wait() { s.ran.Wait() }
 
 // listenMCP listens on the MCP port. A port it cannot take fails the start:
 // every agent session sends its key to that port, so whoever holds it would

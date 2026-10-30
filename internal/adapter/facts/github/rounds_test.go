@@ -54,7 +54,7 @@ func TestAFollowupWithoutItsWorkspaceNamesWhyItIsNotFollowed(t *testing.T) {
 			if c.setup != nil {
 				c.setup(w, r)
 			}
-			f := facts(t, w.provider(), r.Unit())
+			f := w.facts(t, w.provider(), r.Unit())
 			if f["pr.review.action"] != "" || f["pr.review.reason"] != c.reason {
 				t.Fatalf("review = %q, %q; want no action, %q", f["pr.review.action"], f["pr.review.reason"], c.reason)
 			}
@@ -65,14 +65,14 @@ func TestAFollowupWithoutItsWorkspaceNamesWhyItIsNotFollowed(t *testing.T) {
 func TestAVerdictTheLoopRecordedOnTheHeadCountsAsMyReviewOfIt(t *testing.T) {
 	w := newWorld()
 	r := w.review(7, nil)
-	if f := facts(t, w.provider(), r.Unit()); f["pr.review.action"] != "follow-up" {
+	if f := w.facts(t, w.provider(), r.Unit()); f["pr.review.action"] != "follow-up" {
 		t.Fatalf("without a recorded verdict: %v", f["pr.review.action"])
 	}
 	approve := record.Record{State: record.Done, Summary: "approved", Outcome: &record.Outcome{Verdict: "APPROVE"}}
 	w.books[r.Unit()] = turn.Book{Unit: r.Unit(),
 		Turns:   []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), Role: "pr.review", Trigger: turn.ByHand, State: turn.Done, Head: "c2", SentAt: t0.Add(-90 * time.Minute)}},
 		Records: []turn.Record{{TurnSeq: 1, Head: "c2", At: t0.Add(-time.Hour), Record: approve}}}
-	if f := facts(t, w.provider(), r.Unit()); f["pr.review.action"] != "" {
+	if f := w.facts(t, w.provider(), r.Unit()); f["pr.review.action"] != "" {
 		t.Fatalf("with a verdict recorded on the head: %v (%v)", f["pr.review.action"], f["pr.review.reason"])
 	}
 }
@@ -81,7 +81,7 @@ func TestAFirstRoundWaitsWhenIDevelopThePRInAWorktree(t *testing.T) {
 	w := newWorld()
 	r := w.requested(3, nil)
 	w.workspace(wsdomain.Workspace{ID: "dev", Path: "/w/dev", DisplayName: "feature-work", Branch: "feature"})
-	if f := facts(t, w.provider(), r.Unit()); f["pr.first.due"] != false || f["pr.first.reason"] != "you develop it in feature-work" {
+	if f := w.facts(t, w.provider(), r.Unit()); f["pr.first.due"] != false || f["pr.first.reason"] != "you develop it in feature-work" {
 		t.Fatalf("first = %v, %q", f["pr.first.due"], f["pr.first.reason"])
 	}
 }
@@ -154,10 +154,7 @@ func TestSettleKeepsTheAgentsQuestionOnAnOpenPRNoLongerRequestingMe(t *testing.T
 	for _, r := range []pr.Ref{open, closed} {
 		w.blocks[r] = dinv.Event{PR: r, Kind: dinv.KindRoundBlocked, Key: b.Key(t0.Add(-time.Hour)), At: t0.Add(-time.Hour), Data: "could not start"}
 	}
-	w.rounds.Saved()
-	if err := w.provider().Settle(context.Background(), state{w.rounds}); err != nil {
-		t.Fatal(err)
-	}
+	w.settle()
 	if len(w.recorded) != 1 || w.recorded[0].PR != closed || w.recorded[0].Kind != dinv.KindRoundUnblocked || w.recorded[0].Data != "it is closed" {
 		t.Fatalf("recorded %+v", w.recorded)
 	}
@@ -173,13 +170,13 @@ func TestAStoreOfReviewTurnsAndAProfileMyReviewProposesNoNewRound(t *testing.T) 
 			{Seq: 2, Intent: "my-review", Role: "pr.review", Trigger: turn.ByHand, State: turn.Done, Head: "c2", SentAt: t0.Add(-90 * time.Minute)},
 		},
 		Records: []turn.Record{{TurnSeq: 2, Head: "c2", At: t0.Add(-time.Hour), Record: approve}}}
-	if f := facts(t, w.provider(), r.Unit()); f["pr.review.action"] != "" {
+	if f := w.facts(t, w.provider(), r.Unit()); f["pr.review.action"] != "" {
 		t.Fatalf("my-review's verdict on the head: %v (%v)", f["pr.review.action"], f["pr.review.reason"])
 	}
 	b := w.books[r.Unit()]
 	b.Turns[1].Role = ""
 	w.books[r.Unit()] = b
-	if f := facts(t, w.provider(), r.Unit()); f["pr.review.action"] != "follow-up" {
+	if f := w.facts(t, w.provider(), r.Unit()); f["pr.review.action"] != "follow-up" {
 		t.Fatalf("a verdict of an intent holding no review role counted: %v", f["pr.review.action"])
 	}
 }

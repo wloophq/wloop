@@ -15,17 +15,15 @@ import (
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/intake"
-	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
-	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/situation"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
@@ -37,8 +35,11 @@ type Deriver struct {
 	Ignore  []string
 	Now     time.Time
 	Stalled config.Stalled
-	Pending map[unit.Unit]round.Pending
-	Turns   map[github.Ref]TurnFact
+	// Plans are the automatic rounds the open plan gates hold, by unit.
+	Plans map[unit.Unit]overlay.Pending
+	// Mutes are the user's mutes of pull requests, their tasks' wakes.
+	Mutes map[unit.Unit]overlay.Mute
+	Turns map[github.Ref]TurnFact
 	// What the actions read besides the row.
 	Loaded          *intentload.Loaded
 	Specs           []api.ActionSpec // nil: catalog.Specs(Loaded)
@@ -54,7 +55,7 @@ type Deriver struct {
 
 // TurnFact is what a row reads of its pull request's turn book.
 type TurnFact struct {
-	Facts situation.TurnFacts
+	Facts overlay.Turn
 	// Session is the handle of a started turn's session, "" otherwise.
 	Session  string
 	Waiting  bool
@@ -67,18 +68,7 @@ type TurnFact struct {
 
 // Unstarted are the ids of b's turns that ended before their agent started
 // them, which posted nothing.
-func Unstarted(b turn.Book) map[string]bool {
-	var out map[string]bool
-	for _, t := range b.Turns {
-		if !t.State.Open() && t.StartedAt.IsZero() {
-			if out == nil {
-				out = map[string]bool{}
-			}
-			out[t.ID] = true
-		}
-	}
-	return out
-}
+func Unstarted(b turn.Book) map[string]bool { return overlay.Unstarted(b) }
 
 // IgnoreOf is who a row never waits on and a nudge never mentions.
 func IgnoreOf(cfg config.Config) []string {
@@ -89,32 +79,13 @@ func IgnoreOf(cfg config.Config) []string {
 // one; whether that session waits is resolved by Waiting.
 func TurnFacts(books map[unit.Unit]turn.Book, reg *dintent.Registry) map[github.Ref]TurnFact {
 	out := make(map[github.Ref]TurnFact, len(books))
-	drives := drivingIntents(reg)
 	for u, b := range books {
-		t, ok := b.Newest(drives...)
+		run, ok := overlay.RunOf(b, reg)
 		if !ok {
-			if t, ok = b.Newest(); !ok {
-				continue
-			}
+			continue
 		}
-		f := situation.TurnFacts{Intent: dintent.Name(t.Intent), Role: t.Role, State: string(t.State), At: t.SentAt}
-		if !t.StartedAt.IsZero() {
-			f.At = t.StartedAt
-		}
-		if r, ok := b.LastRecord(t.Seq); ok {
-			f.Summary, f.At = r.Record.Headline(), r.At
-		}
-		f.AnsweredAt, _ = b.AnsweredAt(t.Seq)
-		fact := TurnFact{Facts: f, Unstarted: Unstarted(b)}
-		if q, ok := b.Question(reg.Answerable()); ok {
-			qLast, _ := b.LastRecord(q.Seq)
-			fact.Question, _ = questionOf(q, qLast)
-		}
-		if t.State == turn.Started && t.Session != "" {
-			fact.Session = t.Session
-		}
-		ref, _ := port.PROf(port.Event{Unit: u})
-		out[ref] = fact
+		ref, _ := pr.RefOf(u)
+		out[ref] = TurnFact{Facts: run.Turn, Session: run.Session, Question: run.Question, Unstarted: run.Unstarted}
 	}
 	return out
 }
@@ -148,105 +119,63 @@ func Waiting(facts map[github.Ref]TurnFact, agents []turns.AgentObservation, age
 			facts[ref] = f
 			continue
 		}
-		if ok && sessionWaiting(sess, agents) {
+		if ok && overlay.SessionWaiting(sess, agents) {
 			f.Waiting = true
 			facts[ref] = f
 		}
 	}
 }
 
-// drivingIntents are the intents whose newest turn drives the row; with
-// none, any turn does.
-func drivingIntents(reg *dintent.Registry) []turn.Intent {
-	var out []turn.Intent
-	for _, d := range reg.All() {
-		if d.DrivesRow {
-			out = append(out, turn.Intent(d.Name))
-		}
-	}
-	return out
-}
-
-// sessionWaiting says whether Orca shows the session's agent waiting; with
-// no known pane, any agent of its workspace counts.
-func sessionWaiting(sess turn.Session, agents []turns.AgentObservation) bool {
-	return slices.ContainsFunc(agents, func(a turns.AgentObservation) bool {
-		if a.State != turn.AgentWaiting {
-			return false
-		}
-		if sess.Pane != "" {
-			return a.Pane == sess.Pane
-		}
-		return sess.WorkspaceID != "" && a.WorkspaceID == sess.WorkspaceID
-	})
-}
-
-// MuteLapsed tells whether o's "mute until state change" lapsed: the pull
-// request is open and its situation, kind, is no longer the muted one. The
-// row then shows no mute, and the read model's keeper clears the stored one.
-func MuteLapsed(pr dinv.PR, o dinv.Override, kind situation.Kind) bool {
-	return o.MuteUntilStateChange && kind != situation.KindMuted && pr.State == dgh.StateOpen
-}
-
-// Row derives the row of a pull request of the inventory.
-func (d Deriver) Row(pr dinv.PR, evs []dinv.Event, o dinv.Override) api.Row {
-	return d.Seal(d.Parts(pr, evs, o))
+// Row derives the row of a pull request the plugin reported.
+func (d Deriver) Row(rep Report, evs []dinv.Event, o dinv.Override) api.Row {
+	return d.Seal(d.Parts(rep, evs, o))
 }
 
 // Parts derives a pull request's row and payload before Seal: a caller adds
-// the brief, the intake and the activity in between.
-func (d Deriver) Parts(pr dinv.PR, evs []dinv.Event, o dinv.Override) (api.Row, Payload) {
-	in := situation.Input{PR: pr, Events: evs, Override: o, Viewer: d.Viewer, MyTeams: d.Teams, Ignore: d.Ignore, Now: d.Now, Stalled: d.Stalled}
+// the brief, the intake and the activity in between. evs are the host's
+// events of the pull request and o its overrides there.
+func (d Deriver) Parts(rep Report, evs []dinv.Event, o dinv.Override) (api.Row, Payload) {
+	pr := rep.PR
+	var turn *TurnFact
 	f, hasTurn := d.Turns[pr.Ref]
 	if hasTurn {
-		in.Turn, in.SessionWaiting = &f.Facts, f.Waiting
-		if f.Unread && o.MuteUntilStateChange {
-			// An unread session cannot show that the muted state changed.
-			in.SessionWaiting = o.MutedKind == string(situation.KindLoopWaiting)
-		}
+		turn = &f
 	}
-	res := situation.Derive(in)
-	if MuteLapsed(pr, o, res.Kind) {
-		o.MuteUntilStateChange, o.MutedKind, o.MutedWaitingOn = false, "", ""
-	}
-	unmuted := res
-	if res.Kind == situation.KindMuted {
-		in.Override = dinv.Override{PR: pr.Ref}
-		unmuted = situation.Derive(in)
-	}
-	ws := Workspace(pr.Workspace)
-	ws.AgentStates = nonNil(ws.AgentStates)
+	m := d.Mutes[pr.Ref.Unit()]
+	res, unmuted := SituationOf(rep, turn, m, evs, d.Now)
+	o.Adopted = o.Adopted || rep.Payload.Override.Adopted
+	o.Tracked = o.Tracked || rep.Payload.Override.Tracked
 	r := api.Row{
 		Unit: pr.Ref.Unit(), Link: cmp.Or(pr.URL, pr.Ref.URL()), Label: pr.Ref.String(), Title: pr.Title, Kind: api.Kind(res.Kind),
 		Summary: api.Summary{WaitsOn: res.WaitingOn, Since: res.Since, Reason: res.Reason, Stalled: res.Stalled},
 	}
-	p := Payload{Author: pr.Author, Repo: pr.Ref.Owner + "/" + pr.Ref.Repo, Head: termfmt.OneLine(pr.HeadBranch, 255),
-		Reasons: nonNil(pr.Reasons), Workspace: ws, Override: Override(o), Viewer: d.Viewer}
-	switch res.Kind {
-	case situation.KindLoopWaiting, situation.KindLoopWorking, situation.KindLoopStopped:
+	p := rep.Payload
+	p.Reasons, p.Workspace.AgentStates = nonNil(p.Reasons), nonNil(p.Workspace.AgentStates)
+	p.Override, p.Viewer = Override(o), d.Viewer
+	switch situation.Kind(res.Kind) {
+	case situation.KindLoopWaiting, situation.KindLoopStopped, situation.KindLoopWorking:
 		r.Question = f.Question
 	}
-	if pend, ok := d.Pending[pr.Ref.Unit()]; ok && res.Kind != situation.KindDone {
-		r.Pending = pendingOf(pend)
-		if res.Kind != situation.KindMuted {
-			r.Kind = api.Kind(situation.KindRoundPending)
-			r.Summary.WaitsOn, r.Summary.Stalled = "me", false
-			r.Summary.Reason = pend.Intent + " waiting for your answer: " + pend.Reason
-		}
+	if pend, ok := d.Plans[pr.Ref.Unit()]; ok && res.Kind != overlay.KindDone {
+		over := pend.Over(overlay.Situation{Kind: string(r.Kind),
+			WaitingOn: r.Summary.WaitsOn, Since: r.Summary.Since, Reason: r.Summary.Reason, Stalled: r.Summary.Stalled})
+		r.Kind = api.Kind(over.Kind)
+		r.Summary.WaitsOn, r.Summary.Since, r.Summary.Reason, r.Summary.Stalled = over.WaitingOn, over.Since, over.Reason, over.Stalled
 	}
-	if res.Kind == situation.KindMuted {
-		p.UnmutedKind, p.UnmutedWaitingOn, p.UnmutedReason = string(unmuted.Kind), unmuted.WaitingOn, unmuted.Reason
+	if res.Kind == overlay.KindMuted {
+		p.UnmutedKind, p.UnmutedWaitingOn, p.UnmutedReason = unmuted.Kind, unmuted.WaitingOn, unmuted.Reason
 	}
-	if o.MuteUntilStateChange || o.MutedUntil.After(d.Now) {
-		p.Mute = &Mute{Until: o.MutedUntil, UntilStateChange: o.MuteUntilStateChange}
+	if m.UntilStateChange || m.Until.After(d.Now) {
+		p.Mute = &Mute{Until: m.Until, UntilStateChange: m.UntilStateChange}
 	}
-	p.LastHuman = d.lastHuman(pr, evs, r.Link)
-	p.Facts = d.facts(pr, r, p)
-	p.Approved = d.approved(pr, evs, r, p)
-	r.Views = d.views(r, p)
+	p.Facts = d.facts(rep.Payload.Facts, r, p)
+	overlaid := string(r.Kind) != rep.Situation.Kind
+	p.Approved = rep.Payload.Approved && !overlaid
+	r.Views = d.views(rep.Views, r, p)
 	unmutedRow := api.Row{Kind: api.Kind(unmuted.Kind), Summary: api.Summary{WaitsOn: unmuted.WaitingOn, Reason: unmuted.Reason, Since: unmuted.Since}}
-	r.Actions = catalog.States(d.FactsOf(pr, evs, o, r, p, unmutedRow))
+	r.Actions = catalog.States(d.FactsOf(pr, evs, m, r, p, unmutedRow))
 	r.SpecsVersion = d.SpecsVersion
+	r.Facets = rep.Facets
 	return r, p
 }
 
@@ -255,7 +184,7 @@ func (d Deriver) Parts(pr dinv.PR, evs []dinv.Event, o dinv.Override) (api.Row, 
 func (d Deriver) Seal(r api.Row, p Payload) api.Row {
 	r.Summary.Closed = situation.Kind(r.Kind) == situation.KindDone
 	r.Summary.Line = summaryLine(r, p)
-	r.Facets = d.facetValues(r, p)
+	r.Facets = d.facetValues(r, p, r.Facets)
 	raw, err := json.Marshal(p)
 	if err != nil {
 		panic(fmt.Sprintf("prrow: encoding a payload: %v", err))
@@ -267,7 +196,7 @@ func (d Deriver) Seal(r api.Row, p Payload) api.Row {
 // summaryLine is the short status the menu bar and the terminal list show.
 func summaryLine(r api.Row, p Payload) string {
 	if i := p.Intake; i != nil && i.Waiting() {
-		return briefingLabel(*i)
+		return overlay.Briefing(*i)
 	}
 	switch k := situation.Kind(r.Kind); k {
 	case situation.KindRoundPending, situation.KindHeldByCap, situation.KindBlocked,
@@ -277,49 +206,20 @@ func summaryLine(r api.Row, p Payload) string {
 	return r.Summary.Reason
 }
 
-// briefingLabel is a row waiting for its brief: the attempt and the last
-// error.
-func briefingLabel(i api.Intake) string {
-	switch {
-	case i.Attempt > 1 && i.LastError != "":
-		return fmt.Sprintf("briefing… (attempt %d; %s)", i.Attempt, i.LastError)
-	case i.Attempt > 0:
-		return fmt.Sprintf("briefing… (attempt %d)", i.Attempt)
+// facts are the reported facts of the row with the instants ahead it waits
+// for.
+func (d Deriver) facts(reported *api.RowFacts, r api.Row, p Payload) *api.RowFacts {
+	f := &api.RowFacts{}
+	if reported != nil {
+		*f = *reported
+		f.Checks.Failing = slices.Clone(reported.Checks.Failing)
 	}
-	return "briefing…"
-}
-
-// humanEvents are the event kinds a person's own action on GitHub leaves.
-var humanEvents = []string{dinv.KindOpened, dinv.KindPush, dinv.KindReview, dinv.KindComment}
-
-// lastHuman is the newest action of a person other than the viewer, bots
-// and the ignored reviewers; nil for none.
-func (d Deriver) lastHuman(pr dinv.PR, evs []dinv.Event, link string) *LastHuman {
-	var last *dinv.Event
-	for i, e := range evs {
-		if !slices.Contains(humanEvents, e.Kind) || e.Actor == "" || strings.HasSuffix(e.Actor, "[bot]") ||
-			strings.EqualFold(e.Actor, d.Viewer) || slices.ContainsFunc(d.Ignore, func(s string) bool { return strings.EqualFold(s, e.Actor) }) {
-			continue
-		}
-		if last == nil || !e.At.Before(last.At) {
-			last = &evs[i]
-		}
+	if pend, ok := d.pending(r); ok {
+		f.Next = d.upcoming(f.Next, pend.Deadline, api.UpcomingGate)
 	}
-	if last == nil {
-		return nil
+	if p.Mute != nil {
+		f.Next = d.upcoming(f.Next, p.Mute.Until, api.UpcomingUnmute)
 	}
-	return &LastHuman{Who: last.Actor, What: last.Kind, At: last.At, Link: link}
-}
-
-func (d Deriver) facts(pr dinv.PR, r api.Row, p Payload) *api.RowFacts {
-	f := &api.RowFacts{CreatedAt: pr.CreatedAt, ChangedFiles: pr.ChangedFiles, Checks: api.CheckFacts{State: pr.ChecksState}}
-	for _, c := range pr.FailingChecks {
-		f.Checks.Failing = append(f.Checks.Failing, c.Name)
-	}
-	if r.Pending != nil {
-		f.Next = d.upcoming(f.Next, r.Pending.Deadline, api.UpcomingGate)
-	}
-	f.Next = d.upcoming(f.Next, p.Override.MutedUntil, api.UpcomingUnmute)
 	return f
 }
 
@@ -350,31 +250,6 @@ func BriefSummary(b brief.Summary) *api.BriefSummary {
 	return &api.BriefSummary{Kind: b.Kind, Size: b.Size, Risk: b.Risk, Goal: termfmt.OneLine(b.Goal, 300), OpenQuestions: b.OpenQuestions, Tags: b.Tags, Extra: b.Extra}
 }
 
-func (d Deriver) approved(pr dinv.PR, evs []dinv.Event, r api.Row, p Payload) bool {
-	if pr.State != "OPEN" || p.Workspace.ID == "" || p.Workspace.IsMain {
-		return false
-	}
-	switch situation.Kind(r.Kind) {
-	case situation.KindRoundPending, situation.KindLoopWorking, situation.KindLoopWaiting, situation.KindLoopStopped, situation.KindHeldByCap, situation.KindBlocked, situation.KindMuted:
-		return false
-	}
-	if p.Workspace.IsReview {
-		return d.approvedHead(pr, evs)
-	}
-	return d.Viewer != "" && strings.EqualFold(pr.Author, d.Viewer) && situation.Kind(r.Kind) == situation.KindMerge
-}
-
-// approvedHead tells whether my newest review approved the current head.
-func (d Deriver) approvedHead(pr dinv.PR, evs []dinv.Event) bool {
-	var last dinv.Event
-	for _, e := range evs {
-		if e.Kind == dinv.KindReview && strings.EqualFold(e.Actor, d.Viewer) && !e.At.Before(last.At) {
-			last = e
-		}
-	}
-	return d.Viewer != "" && pr.HeadOid != "" && last.Data == "APPROVED:"+pr.HeadOid
-}
-
 func nonNil(v []string) []string {
 	if v == nil {
 		return []string{}
@@ -382,31 +257,35 @@ func nonNil(v []string) []string {
 	return v
 }
 
-// views puts a pull request outside the scope (no reasons) only where the
-// loop or an adoption put it: loop, mine, and needs-me for a review
-// workspace's question or an author workspace whose agent waits for me.
-func (d Deriver) views(r api.Row, p Payload) []string {
-	out := []string{}
-	kind := situation.Kind(r.Kind)
-	if needsMe(kind, r.Summary.WaitsOn, p) && kind != situation.KindMuted {
-		out = append(out, api.ViewNeedsMe)
+// pending is the automatic round the open plan gate of r's pull request
+// holds; false for none, or once the pull request is done.
+func (d Deriver) pending(r api.Row) (overlay.Pending, bool) {
+	p, ok := d.Plans[r.Unit]
+	return p, ok && situation.Kind(r.Kind) != situation.KindDone
+}
+
+// viewMine is the GitHub plugin's view of the viewer's own or adopted open
+// pull requests.
+const viewMine = "mine"
+
+// views are the plugin views the plugin put the row in, and mine for a
+// pull request the user took over.
+func (d Deriver) views(reported []string, r api.Row, p Payload) []string {
+	out := slices.Clone(reported)
+	if out == nil {
+		out = []string{}
 	}
-	if r.Summary.Stalled && len(p.Reasons) > 0 {
-		out = append(out, api.ViewStalled)
-	}
-	if (mineAuthor(p) || p.Override.Adopted) && kind != situation.KindDone {
-		out = append(out, api.ViewMine)
-	}
-	if p.Workspace.IsReview {
-		out = append(out, api.ViewLoop)
-	}
-	if p.Approved {
-		out = append(out, api.ViewApproved)
-	}
-	if kind == situation.KindDone && p.Workspace.ID != "" {
-		out = append(out, api.ViewDone)
+	if p.Override.Adopted && situation.Kind(r.Kind) != situation.KindDone && !slices.Contains(out, viewMine) {
+		out = append(out, viewMine)
 	}
 	return out
+}
+
+// rowNeedsMe says the row, after the host's overlays, waits on the user:
+// the needs-me predicate of its situation, never while muted.
+func rowNeedsMe(r api.Row, p Payload) bool {
+	kind := situation.Kind(r.Kind)
+	return kind != situation.KindMuted && needsMe(kind, r.Summary.WaitsOn, p)
 }
 
 func mineAuthor(p Payload) bool { return p.Viewer != "" && strings.EqualFold(p.Author, p.Viewer) }

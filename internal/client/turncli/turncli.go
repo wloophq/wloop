@@ -15,20 +15,19 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/harness"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 const (
 	endUsage    = "usage: turn end <pr-url>|<provider>:<key> --turn <id> --file <path>"
-	answerUsage = "usage: turn answer <pr-url>|<provider>:<key> [--message <id>]"
+	answerUsage = "usage: turn answer <pr-url>|<provider>:<key> [--gate <id>]"
 )
 
 // Agent is the part of AgentAPI the agent's commands call.
 type Agent interface {
 	EndTurn(ctx context.Context, handle string, r api.TurnEndRequest) (api.TurnEnded, error)
-	TurnAnswer(ctx context.Context, handle, arg string, message int64) (api.TurnText, error)
+	TurnAnswer(ctx context.Context, handle, arg string, gate int64) (api.TurnText, error)
 }
 
 // End stores the record in the file for the turn it names, and deletes the
@@ -97,12 +96,12 @@ func End(ctx context.Context, env func(string) string, args []string, out, errw 
 	return 0
 }
 
-// Answer prints the user's answers to the caller's Inbox messages, as inbox_read words them.
+// Answer prints the user's answers to the caller's gates, as task_read words them.
 func Answer(ctx context.Context, env func(string) string, args []string, out, errw io.Writer, c Agent, h harness.Set) int {
 	raw, args := positional(args)
 	fs := flag.NewFlagSet("turn answer", flag.ContinueOnError)
 	fs.SetOutput(errw)
-	message := fs.Int64("message", 0, "the id of the Inbox message to read; every unread answer without it")
+	gate := fs.Int64("gate", 0, "the id of the gate whose answers to read; every unread answer without it")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -111,7 +110,7 @@ func Answer(ctx context.Context, env func(string) string, args []string, out, er
 	} else if fs.NArg() > 0 {
 		raw = ""
 	}
-	if raw == "" || *message < 0 {
+	if raw == "" || *gate < 0 {
 		fmt.Fprintln(errw, answerUsage)
 		return 2
 	}
@@ -120,7 +119,7 @@ func Answer(ctx context.Context, env func(string) string, args []string, out, er
 		fmt.Fprintln(errw, brand.Command+" turn answer:", err)
 		return 1
 	}
-	got, err := c.TurnAnswer(ctx, handle(env, h), arg, *message)
+	got, err := c.TurnAnswer(ctx, handle(env, h), arg, *gate)
 	if errors.Is(err, client.ErrDown) {
 		fmt.Fprintf(errw, brand.Name+"'s daemon is not running; start it with `%s`, then run this command again\n", client.Kickstart())
 		return 1
@@ -133,18 +132,17 @@ func Answer(ctx context.Context, env func(string) string, args []string, out, er
 	return 0
 }
 
-// unitArg reads the unit a turn command names: a pull request URL, sent as
-// its canonical URL, or "<provider>:<key>", sent as given; label is how the
-// command's output names it.
+// unitArg reads the unit a turn command names: a unit's web address, sent
+// as its canonical address, or "<provider>:<key>", sent as given; label is
+// how the command's output names it.
 func unitArg(raw string) (arg, label string, err error) {
-	ref, err := pr.ParseURL(raw)
-	if err == nil {
-		return ref.URL(), ref.String(), nil
+	if u, ok := unit.ParseAddress(strings.TrimSpace(raw)); ok {
+		return u.Address(), u.Label(), nil
 	}
 	if p, key, ok := strings.Cut(raw, ":"); ok && unit.ValidProvider(p) && key != "" && strings.IndexByte(" \t\n\f\r", key[0]) < 0 && !strings.HasPrefix(raw, "http") {
 		return raw, raw, nil
 	}
-	return "", "", err
+	return "", "", fmt.Errorf("not a unit's address or <provider>:<key>: %s", raw)
 }
 
 func handle(env func(string) string, h harness.Set) string {

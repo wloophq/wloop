@@ -23,7 +23,7 @@ func servedCatalog(t *testing.T) string {
 // catalogFuncs are the functions that build the lens's fields from the
 // catalog and read a row's facets.
 var catalogFuncs = []string{"applyCatalog", "kindLabel", "rowKindLabel", "fieldOf", "facetValues", "bucketsOf", "facetTime", "goDuration", "bucketOf", "dueNow",
-	"pl", "sm", "fieldRank", "fieldShow"}
+	"pl", "sm", "fieldRank", "fieldShow", "exploreSearch", "reviewDecision"}
 
 // catalogPrelude declares the catalog and the functions it needs, and
 // applies the served catalog.
@@ -60,9 +60,13 @@ func wireRow(viewer string, now time.Time, old map[string]any) map[string]any {
 		switch {
 		case k == "ref":
 			r["ref"] = v
+			ref := v.(map[string]any)
+			label := str(ref["owner"]) + "/" + str(ref["repo"]) + "#" + fmt.Sprint(ref["number"])
+			if old["label"] == nil {
+				r["label"] = label
+			}
 			if old["unit"] == nil {
-				ref := v.(map[string]any)
-				r["unit"] = map[string]any{"provider": "github", "key": str(ref["owner"]) + "/" + str(ref["repo"]) + "#" + fmt.Sprint(ref["number"])}
+				r["unit"] = map[string]any{"provider": "github", "key": label}
 			}
 		case slices.Contains(payloadKeys, k):
 			payload[k] = v
@@ -173,9 +177,10 @@ func facetsOf(viewer string, now time.Time, r map[string]any) map[string][]strin
 	f["size"] = []string{oneOf(str(brief["size"]), "xs", "s", "m", "l", "xl")}
 	f["status"] = []string{cmpOr(str(ws["status"]), "none")}
 	f["tag"] = strs(brief["tags"])
-	mutedUntil, _ := time.Parse(time.RFC3339, str(o["muted_until"]))
+	mute := obj(r["mute"])
+	mutedUntil, _ := time.Parse(time.RFC3339, str(mute["until"]))
 	flags := map[string]bool{"stalled": slices.Contains(views, "stalled"), "needs-me": slices.Contains(views, "needs-me"), "in-loop": slices.Contains(views, "loop"),
-		"approved": r["approved"] == true, "hold": o["hold"] == true, "muted": o["mute_until_state_change"] == true || mutedUntil.After(now),
+		"approved": r["approved"] == true, "hold": o["hold"] == true, "muted": mute["until_state_change"] == true || mutedUntil.After(now),
 		"adopted": o["adopted"] == true, "tracked": o["tracked"] == true}
 	f["is"] = []string{}
 	for _, k := range []string{"stalled", "needs-me", "in-loop", "approved", "hold", "muted", "adopted", "tracked"} {
@@ -198,7 +203,7 @@ func facetsOf(viewer string, now time.Time, r map[string]any) map[string][]strin
 			due = append(due, at)
 		}
 	}
-	if p := obj(r["pending"]); isSetTime(str(p["deadline"])) {
+	if p := obj(r["round_gate"]); isSetTime(str(p["deadline"])) {
 		due = append(due, str(p["deadline"]))
 	}
 	if len(due) > 0 {

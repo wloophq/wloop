@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/port"
-	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/usage"
 )
 
@@ -26,7 +26,7 @@ const (
 // paths and the window its messages fall in.
 type Turn struct {
 	Seq                                      int64
-	PR                                       pr.Ref
+	Unit                                     unit.Unit
 	Kind                                     string
 	AgentSession, Transcript, Home, Worktree string
 	From, To                                 time.Time

@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"io/fs"
 	"regexp"
 	"slices"
 	"strings"
@@ -10,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/source/fakethread"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
@@ -21,16 +19,16 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/plugins/source/fakesource"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace/fake"
-	"github.com/wloophq/wloop/profiles"
 )
 
 var thread2 = unit.Unit{Provider: ingesttest.Provider, Key: "1700000000.2"}
@@ -80,7 +78,7 @@ func newUnitStartRig(t *testing.T, intentToml string) *unitStartRig {
 	saved := plugins
 	plugins = append(slices.Clone(plugins), threadModule(thread1))
 	t.Cleanup(func() { plugins = saved })
-	te.payloads = map[unit.ProviderID]turn.PayloadReader{ingesttest.Provider: fakethread.Payloads{}}
+	te.payloads = map[unit.ProviderID]turn.PayloadReader{ingesttest.Provider: fakesource.Payloads{}}
 	userProfile(t, te, map[string]string{"intents/implement/intent.toml": intentToml, "intents/implement/instructions.md.tmpl": implementBody})
 	te.Env.serveTurnLedger(te.db, te.cfg, t.Logf)
 	kind, sum := items.Request, "Add a retry to the export job"
@@ -264,7 +262,7 @@ func TestRoundsReadTheManifestKeys(t *testing.T) {
 		}
 	}
 	addr := startPlan{args: startArgs{def: dintent.Def{RoundKind: builtin.RoundKindAddress}}, facts: workflow.Facts{"pr.address.reviewers": []string{"bob"}}}
-	if addr.address() == nil || (startPlan{args: startArgs{def: dintent.Def{RoundKind: builtin.RoundKindReview}}}).address() != nil {
+	if addr.address(testNow) == nil || (startPlan{args: startArgs{def: dintent.Def{RoundKind: builtin.RoundKindReview}}}).address(testNow) != nil {
 		t.Error("the address reason follows the role's round")
 	}
 }
@@ -272,7 +270,7 @@ func TestRoundsReadTheManifestKeys(t *testing.T) {
 // nudgeWithoutRefuse is the bundled nudge's manifest with no [[refuse]].
 func nudgeWithoutRefuse(t *testing.T) string {
 	t.Helper()
-	b, err := fs.ReadFile(profiles.Default, "default/intents/nudge/intent.toml")
+	b, err := readBundled("intents/nudge/intent.toml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,24 +299,22 @@ func TestANudgeWithoutRefuseIgnoresTheNudgeRefusal(t *testing.T) {
 func TestRefuseIsFirstMatch(t *testing.T) {
 	t.Parallel()
 	r := nudgeStartRig(t)
+	userProfile(t, r.sc.te, map[string]string{"intents/nudge/intent.toml": nudgeWithoutRefuse(t) + `
+[[refuse]]
+when = 'pr.nudge.refusal != ""'
+why  = "{{.pr.nudge.refusal}}"
+[[refuse]]
+when = 'pr.draft'
+why  = "a draft"
+`})
 	r.units.Set(r.u, "pr.nudge.refusal", "it waits on you")
-	r.units.Set(r.u, "pr.mute.refusal", "muted until its state changes")
+	r.units.Set(r.u, "pr.draft", true)
 	if got := r.check(t, automation.CheckOpts{Observe: false}); got != "it waits on you" {
 		t.Fatalf("both hold: %q, want the first refusal's", got)
 	}
 	r.units.Set(r.u, "pr.nudge.refusal", "")
-	if got := r.check(t, automation.CheckOpts{Observe: false}); got != "muted until its state changes" {
-		t.Fatalf("the mute alone: %q", got)
-	}
-}
-
-func TestMuteRefusesOnlyWithAnExplicitRefuse(t *testing.T) {
-	t.Parallel()
-	r := nudgeStartRig(t)
-	r.units.Set(r.u, "pr.mute.refusal", "muted until its state changes")
-	userProfile(t, r.sc.te, map[string]string{"intents/nudge/intent.toml": nudgeWithoutRefuse(t)})
-	if got := r.check(t, automation.CheckOpts{Observe: false}); got == "muted until its state changes" {
-		t.Fatal("an intent with no [[refuse]] read the mute")
+	if got := r.check(t, automation.CheckOpts{Observe: false}); got != "a draft" {
+		t.Fatalf("the second alone: %q", got)
 	}
 }
 
@@ -351,7 +347,7 @@ func bundledIntentAs(t *testing.T, from, as string) map[string]string {
 	t.Helper()
 	files := map[string]string{}
 	for _, name := range []string{"intent.toml", "instructions.md.tmpl"} {
-		b, err := fs.ReadFile(profiles.Default, "default/intents/"+from+"/"+name)
+		b, err := readBundled("intents/" + from + "/" + name)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -391,7 +387,7 @@ func TestTheRoleHolderAnswersTurnStartsGuards(t *testing.T) {
 		t.Fatalf("the holder's [[refuse]]: %q", got)
 	}
 	r.units.Set(r.u, "pr.repo", "acme/web")
-	r.rec.questions = map[github.Ref]map[string]bool{sc.ref: {"my-review": true}}
+	r.rec.questions = map[pr.Ref]map[string]bool{sc.ref: {"my-review": true}}
 	if got := r.check(t, automation.CheckOpts{}); got != "its my-review turn asks you something" {
 		t.Fatalf("the holder's open question: %q", got)
 	}

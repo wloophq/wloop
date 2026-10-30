@@ -57,6 +57,9 @@ func listPackages() ([]pkg, error) {
 		if err := dec.Decode(&p); err != nil {
 			return nil, err
 		}
+		if self, _ := local(p.ImportPath); externalPlugin(self) {
+			continue
+		}
 		p.Imports = slices.DeleteFunc(p.Imports, func(imp string) bool { return imp == module+"internal/brand" })
 		all = append(all, p)
 	}
@@ -87,11 +90,18 @@ func parseOnce(path string) (*ast.File, error) {
 
 func local(path string) (string, bool) { return strings.CutPrefix(path, module) }
 
+// externalPlugin says the package is an external plugin's, which runs as
+// its own process and imports only the SDK; the host's rules skip it.
+func externalPlugin(path string) bool { return strings.HasPrefix(path, "plugins/") }
+
 func std(path string) bool { return !strings.Contains(strings.Split(path, "/")[0], ".") }
 
 func under(path string, roots ...string) bool {
 	return slices.ContainsFunc(roots, func(r string) bool { return path == r || strings.HasPrefix(path, r+"/") })
 }
+
+// pluginStore is a plugin's own database, which the host never reads.
+const pluginStore = "pkg/plugin/store"
 
 // TestArchitecture checks that only the store imports the SQLite driver;
 // clients import only the API, the domain and `termfmt`; the domain imports
@@ -109,7 +119,7 @@ func TestArchitecture(t *testing.T) {
 		for _, imp := range p.Imports {
 			dep, internal := local(imp)
 			switch {
-			case (imp == "modernc.org/sqlite" || imp == "database/sql") && !under(self, "internal/adapter/store"):
+			case (imp == "modernc.org/sqlite" || imp == "database/sql") && !under(self, "internal/adapter/store", pluginStore):
 				broken = append(broken, fmt.Sprintf("%s imports %s; only the store may (C1)", self, imp))
 			case under(self, "internal/domain") && !std(imp) && !(internal && under(dep, "internal/domain")):
 				broken = append(broken, fmt.Sprintf("%s imports %s; the domain imports only the standard library and the domain (C3)", self, imp))
@@ -212,8 +222,10 @@ func checkCoreFiles(t *testing.T, self string, p pkg) {
 	}
 }
 
-// ruleNoGate flags an import of the round gate, which the workflows replaced:
-// two automation mechanisms never live side by side.
+// ruleNoGate flags an import of internal/gate, the round gate the workflows
+// replaced, so two automation mechanisms never live side by side; the
+// gates of internal/core/gates, the decisions waiting on the user, are
+// another thing.
 func ruleNoGate(self string, imports []string) []string {
 	var out []string
 	for _, imp := range imports {
@@ -224,8 +236,9 @@ func ruleNoGate(self string, imports []string) []string {
 	return out
 }
 
-// TestNothingImportsTheGate checks that nothing imports `internal/gate`: the
-// workflow engine is the only planner of automatic rounds.
+// TestNothingImportsTheGate checks that nothing imports `internal/gate`, the
+// old round gate: the workflow engine is the only planner of automatic
+// rounds.
 func TestNothingImportsTheGate(t *testing.T) {
 	t.Parallel()
 	for _, p := range packages(t) {

@@ -8,9 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/config"
-
-	factslack "github.com/wloophq/wloop/internal/adapter/facts/slack"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/core/automation"
@@ -18,36 +15,36 @@ import (
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
-	dslack "github.com/wloophq/wloop/internal/domain/slack"
+	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/source"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
-var subjectThread = dslack.ThreadUnit("T0001", "C0001", "1700000000.000100")
+var subjectThread = slackThreadUnit("T0001", "C0001", "1700000000.000100")
 
 const (
-	waitingWorkflow = `summary = "Watch waiting entries"
-provider = "entry"
-when = 'entry.state == "waiting" && entry.items_owed > 0 && entry.settled_at < now'
-key = ["entry.settled_at", "entry.waiting_on"]
+	waitingWorkflow = `summary = "Watch waiting tasks"
+provider = "task"
+when = 'task.state == "waiting" && task.owed_by != "me" && task.owed_by != "" && task.settled_at < now'
+key = ["task.settled_at", "task.owed_by"]
 
 [[step]]
 use = "notify.self"
 `
-	closeWorkflow = `summary = "Watch close entries with a resolved item"
-provider = "entry"
-when = 'entry.kind == "close" && entry.items_resolved > 0'
+	closeWorkflow = `summary = "Watch close tasks with a resolved item"
+provider = "task"
+when = 'task.state == "inbox" && task.items_resolved > 0'
 
 [[step]]
 use = "notify.self"
 `
 	slackWorkflow = `summary = "Watch Slack units with unowned items"
 provider = "slack"
-when = 'slack.live_entry && slack.items_unowned > 0'
+when = 'slack.live_task && slack.items_unowned > 0'
 
 [[step]]
 use = "notify.self"
@@ -62,14 +59,25 @@ use = "notify.self"
 )
 
 type subjectsRig struct {
-	te  *testEnv
-	db  *sqlite.DB
-	log *change.Log
-	eng *automation.Engine
+	te    *testEnv
+	db    *sqlite.DB
+	log   *change.Log
+	eng   *automation.Engine
+	snaps *psource.Snapshots
+	rev   uint64
+}
+
+// report keeps facts as the Slack plugin's last snapshot of u.
+func (r *subjectsRig) report(t *testing.T, u unit.Unit, facts ...src.Fact) {
+	t.Helper()
+	r.rev++
+	if err := r.snaps.Put(context.Background(), map[unit.Unit]src.Snapshot{u: {Unit: psource.Wire(u), Rev: r.rev, At: testNow, Facts: facts}}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // newSubjectsRig is a plan engine wired as the daemon wires it, over a store
-// and the Slack plugin's facts, with the user's workflows on the entry,
+// and the facts the Slack plugin reports, with the user's workflows on the task,
 // slack and github subjects; github's plugin is not built. planned lists
 // the user's workflows only.
 func newSubjectsRig(t *testing.T) *subjectsRig {
@@ -94,10 +102,15 @@ func newSubjectsRig(t *testing.T) *subjectsRig {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	mods := []source.Module{{ID: dslack.Provider, Facts: factslack.New(db, clockFunc(func() time.Time { return te.Now() }), config.DefaultSlackEndedAfter)}}
+	snaps := psource.NewSnapshots(db.Snapshots())
+	s, err := te.pluginSource(slackPlugin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mods := []pluginModule{{ID: slackPlugin, Facts: psource.SettledFacts{UnitFacts: psource.UnitFacts{Snapshots: snaps}, Source: s, Drafts: db.Drafts()}}}
 	ed := engineDeps{DB: db, Modules: mods, SessionFacts: noUnits{}, WorkspaceFacts: noUnits{}}
 	te.wireSubjects(&serveWiring{DB: db, Cfg: te.cfg, Modules: mods, Engine: &ed})
-	return &subjectsRig{te: te, db: db, log: log, eng: te.planEngine(ed)}
+	return &subjectsRig{te: te, db: db, log: log, eng: te.planEngine(ed), snaps: snaps}
 }
 
 func (r *subjectsRig) item(t *testing.T, u unit.Unit, id string, s items.State, waitingOn ...items.Person) items.Item {
@@ -115,10 +128,10 @@ func (r *subjectsRig) item(t *testing.T, u unit.Unit, id string, s items.State, 
 	return it
 }
 
-func (r *subjectsRig) entry(t *testing.T, e gtd.Entry, op gtd.ChangeOp) {
+func (r *subjectsRig) task(t *testing.T, e task.Task, op task.ChangeOp) {
 	t.Helper()
-	e.Origin, e.Created, e.Updated = gtd.OriginUser, testNow.Add(-72*time.Hour), testNow.Add(-72*time.Hour)
-	if err := r.db.Entries().Apply(context.Background(), []gtd.Change{{Op: op, Entry: e}}); err != nil {
+	e.Origin, e.Created, e.Updated = task.OriginUser, testNow.Add(-72*time.Hour), testNow.Add(-72*time.Hour)
+	if err := r.db.Tasks().Apply(context.Background(), []task.Change{{Op: op, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -142,21 +155,21 @@ func (r *subjectsRig) planned(t *testing.T) []string {
 	return out
 }
 
-func TestPlanEvaluatesUserWorkflowsOnEntryAndSlackSubjects(t *testing.T) {
+func TestPlanEvaluatesUserWorkflowsOnTaskAndSlackSubjects(t *testing.T) {
 	t.Parallel()
 	r := newSubjectsRig(t)
 	owed := r.item(t, subjectThread, "i1", items.Open, items.Person{Key: "slack:U0001"})
 	r.item(t, subjectThread, "i2", items.Open)
-	r.entry(t, gtd.Entry{ID: "e-01", Kind: gtd.KindWaiting, State: gtd.Waiting, Title: "w", Units: []unit.Unit{subjectThread},
-		Items:   []gtd.ItemRef{{Unit: owed.Unit, Item: owed.ID}},
-		Waiting: &gtd.WaitingOn{On: []items.Person{{Key: "slack:U0001"}}, Since: testNow.Add(-72 * time.Hour)}}, gtd.OpCreate)
-	want := []string{"my-slack " + subjectThread.String(), "my-waiting entry:e-01"}
+	r.report(t, subjectThread, src.Fact{Name: "slack.live_task", Value: src.Bool(true)}, src.Fact{Name: "slack.items_unowned", Value: src.Int(1)})
+	r.task(t, task.Task{ID: "t-01", State: "waiting", Category: task.CategoryWaiting, Title: "w", Units: []unit.Unit{subjectThread},
+		Items: []task.ItemRef{{Unit: owed.Unit, Item: owed.ID}}}, task.OpCreate)
+	want := []string{"my-slack " + subjectThread.String(), "my-waiting task:t-01"}
 	if got := r.planned(t); !slices.Equal(got, want) {
 		t.Fatalf("planned %v, want %v", got, want)
 	}
-	if _, err := r.db.Drafts().Insert(context.Background(), draft.Draft{Unit: subjectThread, Entry: "e-01", Kind: draft.Nudge, Purpose: "nudge",
+	if _, err := r.db.Drafts().Insert(context.Background(), draft.Draft{Unit: subjectThread, Task: "t-01", Kind: draft.Nudge, Purpose: "nudge",
 		Delivery: draft.Message, Text: "x", Original: "x", Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "my-waiting", Rule: "my-waiting"},
-		Approval: draft.Approval{Mode: draft.Wait}, State: draft.Sent, CreatedAt: testNow.Add(time.Hour), UpdatedAt: testNow.Add(time.Hour)}); err != nil {
+		State: draft.Sent, CreatedAt: testNow.Add(time.Hour), UpdatedAt: testNow.Add(time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
 	if got := r.planned(t); !slices.Equal(got, want[:1]) {
@@ -164,7 +177,7 @@ func TestPlanEvaluatesUserWorkflowsOnEntryAndSlackSubjects(t *testing.T) {
 	}
 }
 
-func TestTheSweepWakesOnEntryItemAndDraftChanges(t *testing.T) {
+func TestTheSweepWakesOnTaskItemAndDraftChanges(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newSubjectsRig(t)
@@ -178,18 +191,18 @@ func TestTheSweepWakesOnEntryItemAndDraftChanges(t *testing.T) {
 	}
 	var it items.Item
 	woke("a new item", func() { it = r.item(t, subjectThread, "i1", items.Open) })
-	close := gtd.Entry{ID: "e-01", Kind: gtd.KindClose, State: gtd.Inbox, Title: "c", Units: []unit.Unit{subjectThread}}
-	woke("a new entry", func() { r.entry(t, close, gtd.OpCreate) })
-	if got := r.planned(t); slices.Contains(got, "my-close entry:e-01") {
+	close := task.Task{ID: "t-01", State: "inbox", Category: task.CategoryInbox, Title: "c", Units: []unit.Unit{subjectThread}}
+	woke("a new task", func() { r.task(t, close, task.OpCreate) })
+	if got := r.planned(t); slices.Contains(got, "my-close task:t-01") {
 		t.Fatalf("nothing resolved yet: %v", got)
 	}
 	woke("a resolved item", func() { r.item(t, it.Unit, it.ID, items.Resolved) })
-	if got := r.planned(t); !slices.Contains(got, "my-close entry:e-01") {
-		t.Fatalf("the next pass after the item resolved plans the close entry: %v", got)
+	if got := r.planned(t); !slices.Contains(got, "my-close task:t-01") {
+		t.Fatalf("the next pass after the item resolved plans the close task: %v", got)
 	}
 	woke("a draft", func() {
 		if _, err := r.db.Drafts().Insert(ctx, draft.Draft{Unit: subjectThread, Kind: draft.Close, Purpose: "close", Delivery: draft.Message, Text: "x", Original: "x",
-			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "my-close"}, Approval: draft.Approval{Mode: draft.Wait}, State: draft.Proposed,
+			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "my-close"}, State: draft.Held,
 			CreatedAt: testNow, UpdatedAt: testNow}); err != nil {
 			t.Fatal(err)
 		}
@@ -212,19 +225,19 @@ func TestADisabledSlackPluginListsNoUnits(t *testing.T) {
 			t.Errorf("%s, not built: listed %v, %v", p.ID, us, err)
 		}
 	}
-	if us, err := te.planEngine(ed).Units.List(context.Background(), gtd.Codec{}.Provider()); err != nil || len(us) > 0 {
-		t.Errorf("entries of an empty store: %v, %v", us, err)
+	if us, err := te.planEngine(ed).Units.List(context.Background(), task.Codec{}.Provider()); err != nil || len(us) > 0 {
+		t.Errorf("tasks of an empty store: %v, %v", us, err)
 	}
 }
 
-func TestACapturedEntryWhoseUnitsEndedPlansItsClose(t *testing.T) {
+func TestACapturedTaskWhoseUnitsEndedPlansItsClose(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newSubjectsRig(t)
-	r.entry(t, gtd.Entry{ID: "e-01", Kind: gtd.KindCapture, State: gtd.Next, Title: "ship it", Units: []unit.Unit{subjectThread}}, gtd.OpCreate)
-	derived := gtd.Entry{ID: "e-02", Kind: gtd.KindClose, State: gtd.Inbox, Title: "close", Units: []unit.Unit{subjectThread},
-		Origin: gtd.OriginDerived, Created: testNow, Updated: testNow}
-	if err := r.db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpCreate, Entry: derived}}); err != nil {
+	r.task(t, task.Task{ID: "t-01", State: "next", Category: task.CategoryReady, Title: "ship it", Units: []unit.Unit{subjectThread}}, task.OpCreate)
+	derived := task.Task{ID: "t-02", State: "inbox", Category: task.CategoryInbox, Title: "close", Units: []unit.Unit{subjectThread},
+		Origin: task.OriginDerived, Created: testNow, Updated: testNow}
+	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: derived}}); err != nil {
 		t.Fatal(err)
 	}
 	closes := func() []string {
@@ -235,7 +248,7 @@ func TestACapturedEntryWhoseUnitsEndedPlansItsClose(t *testing.T) {
 		}
 		var out []string
 		for _, it := range p.Items {
-			if it.Workflow == "entry-results-ended" {
+			if it.Workflow == "task-results-ended" {
 				out = append(out, it.Unit.String())
 			}
 		}
@@ -244,18 +257,15 @@ func TestACapturedEntryWhoseUnitsEndedPlansItsClose(t *testing.T) {
 	if got := closes(); len(got) != 0 {
 		t.Fatalf("closes %v before the thread ended", got)
 	}
-	if err := r.db.Extraction().Save(ctx, sqlite.ExtractionSave{States: map[unit.Unit]sqlite.ExtractionState{
-		subjectThread: {ClosurePosted: true, At: testNow}}}); err != nil {
-		t.Fatal(err)
-	}
+	r.report(t, subjectThread, src.Fact{Name: "slack.ended", Value: src.Bool(true)})
 	if got := closes(); len(got) != 0 {
-		t.Fatalf("closes %v, an entry no turn ran on", got)
+		t.Fatalf("closes %v, a task no turn ran on", got)
 	}
-	start := dturn.Book{Unit: gtd.UnitOf("e-01"), Turns: []dturn.Turn{{Intent: "start", ID: "s1", Trigger: dturn.ByHand, State: dturn.Done, SentAt: testNow}}}
+	start := dturn.Book{Unit: task.UnitOf("t-01"), Turns: []dturn.Turn{{Intent: "start", ID: "s1", Trigger: dturn.ByHand, State: dturn.Done, SentAt: testNow}}}
 	if _, err := sqlite.New(r.db).Save(ctx, start); err != nil {
 		t.Fatal(err)
 	}
-	if got := closes(); !slices.Equal(got, []string{"entry:e-01"}) {
-		t.Fatalf("closes %v, want the captured entry only", got)
+	if got := closes(); !slices.Equal(got, []string{"task:t-01"}) {
+		t.Fatalf("closes %v, want the captured task only", got)
 	}
 }
