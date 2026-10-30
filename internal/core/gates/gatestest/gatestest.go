@@ -54,7 +54,7 @@ func (s *Store) Resolve(_ context.Context, id int64, r gates.Resolution) (gate.G
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if id < 1 || int(id) > len(s.gates) {
+	if id < 1 || id > int64(len(s.gates)) {
 		return gate.Gate{}, fmt.Errorf("%w: %d", gates.ErrNoGate, id)
 	}
 	g := &s.gates[id-1]
@@ -78,7 +78,7 @@ func (s *Store) mark(id int64) {
 func (s *Store) Applied(_ context.Context, id int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if id < 1 || int(id) > len(s.gates) {
+	if id < 1 || id > int64(len(s.gates)) {
 		return fmt.Errorf("%w: %d", gates.ErrNoGate, id)
 	}
 	if s.gates[id-1].Status == gate.Open {
@@ -125,7 +125,7 @@ func (s *Store) Unapplied(context.Context) ([]gate.Gate, error) {
 func (s *Store) Get(_ context.Context, id int64) (gate.Gate, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if id < 1 || int(id) > len(s.gates) {
+	if id < 1 || id > int64(len(s.gates)) {
 		return gate.Gate{}, fmt.Errorf("%w: %d", gates.ErrNoGate, id)
 	}
 	return clone(s.gates[id-1]), nil

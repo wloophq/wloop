@@ -56,6 +56,9 @@ func TestTaskViewServesItsBriefAndItsTimeline(t *testing.T) {
 	if code := get(t, r.s, api.TaskPath("t-0123456789abcdef", "timeline")+"?limit=x", nil); code != 400 {
 		t.Fatalf("a bad limit: %d", code)
 	}
+	if code := get(t, r.s, api.TaskPath("t-0123456789abcdef", "timeline")+"?limit=4294967296", nil); code != 400 {
+		t.Fatalf("a limit beyond 32 bits: %d", code)
+	}
 }
 
 // unitBriefs answers Ready by unit, recording what it was asked for.

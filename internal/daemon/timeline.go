@@ -58,11 +58,11 @@ func timelineFilter(r *http.Request) (timeline.Filter, error) {
 	if k := q.Get("kinds"); k != "" {
 		f.Kinds = strings.Split(k, ",")
 	}
-	before, err := queryCount(q.Get("before"))
+	before, err := queryCount(q.Get("before"), 64)
 	if err != nil {
 		return f, fmt.Errorf("before: %w", err)
 	}
-	limit, err := queryCount(q.Get("limit"))
+	limit, err := queryCount(q.Get("limit"), 32)
 	if err != nil {
 		return f, fmt.Errorf("limit: %w", err)
 	}
@@ -70,12 +70,12 @@ func timelineFilter(r *http.Request) (timeline.Filter, error) {
 	return f, nil
 }
 
-// queryCount is a query parameter's count, 0 when absent.
-func queryCount(v string) (int64, error) {
+// queryCount is a query parameter's count, 0 when absent; bits is the size it must fit.
+func queryCount(v string, bits int) (int64, error) {
 	if v == "" {
 		return 0, nil
 	}
-	n, err := strconv.ParseInt(v, 10, 64)
+	n, err := strconv.ParseInt(v, 10, bits)
 	if err != nil || n < 0 {
 		return 0, fmt.Errorf("%q is not a count", v)
 	}
