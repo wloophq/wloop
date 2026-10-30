@@ -230,6 +230,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `reviewed`: Marks a parent task reviewed.
   - `sequential`: Switches a parent task's children between sequential and parallel.
 - `verbs.<name>.send` (one of `now`, `draft`, default `draft`): On a verb whose handler is reply: what a reply that names no send does. now sends it at once, as the person approving it; draft holds it on its gate for approval. The composer's Save as draft always holds it.
+- `verbs.<name>.keep_drafts` (list of strings): The purposes of the held drafts a task keeps when the verb moves it from an open state to a done or dropped one; every other held draft of the task is withdrawn with the reason ended, and holds its workflow from proposing again on the unit while the task stays ended. Every held draft is withdrawn when absent.
 - `props` (table by name): The task properties, by name, in the order the file declares them, a user layer's new ones after the bundled; each is the fact task.prop.&lt;name&gt;, typed from its type.
 - `props.<name>` (table): A property, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `props.<name>.type` (one of `string`, `string[]`, `int`, `enum`, `date`, `duration`, `actor`, `actor[]`): The property's type; required for a new property. An int or a duration of 0 means unset: a value of 0 is refused.

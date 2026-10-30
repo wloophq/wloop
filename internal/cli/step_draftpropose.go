@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -265,7 +266,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			}
 		}
 		if cd.refusal == "" {
-			cd.refusal, cd.timed, err = holdOf(ctx, ob, cd.p, person.Key, a, now)
+			cd.refusal, cd.timed, err = holdOf(ctx, ob, deps.Tasks, cd.p, person.Key, a, now)
 			if err != nil {
 				return nil, err
 			}
@@ -468,8 +469,9 @@ func configPolicy(w workflow.Workflow, base *draft.Policy, a *config.ApprovalCon
 // in either shape draftPerson reads, or, with no person, of the same key:
 // one open or failed, one sent within repeat_after_sent (or ever, with
 // forever), one otherwise settled within hold; timed when only the time
-// since a settled draft holds it. A withdrawn draft holds nothing.
-func holdOf(ctx context.Context, ob draftOutbox, p outbox.Proposal, person string, a draftArgs, now time.Time) (string, bool, error) {
+// since a settled draft holds it. A withdrawn draft holds nothing, but one withdrawn as its task ended, which holds
+// while that task stays ended: the person settled the unit by ending it.
+func holdOf(ctx context.Context, ob draftOutbox, tasks draftTasks, p outbox.Proposal, person string, a draftArgs, now time.Time) (string, bool, error) {
 	prior, err := ob.List(ctx, outbox.Filter{Unit: &p.Unit, Rule: p.Origin.Rule})
 	if err != nil {
 		return "", false, err
@@ -486,6 +488,10 @@ func holdOf(ctx context.Context, ob draftOutbox, p outbox.Proposal, person strin
 		switch {
 		case slices.Contains(draft.Open, d.State), d.State == draft.Failed, d.State == draft.Sent && a.forever:
 			return held, false, nil
+		case d.State == draft.Dropped && d.Reason == draft.WithdrawEnded:
+			if ended, err := taskEnded(ctx, tasks, task.ID(d.Task)); err != nil || ended {
+				return held, false, err
+			}
 		case d.State == draft.Dropped && (d.Reason == draft.WithdrawAssigned || d.Reason == draft.WithdrawMoot):
 		case d.State == draft.Sent && now.Sub(d.UpdatedAt) < a.repeatAfterSent, d.State != draft.Sent && now.Sub(d.UpdatedAt) < a.repeatAfter:
 			if refusal == "" {
@@ -494,6 +500,18 @@ func holdOf(ctx context.Context, ob draftOutbox, p outbox.Proposal, person strin
 		}
 	}
 	return refusal, timed, nil
+}
+
+// taskEnded says whether task id is done or dropped; a task no longer stored has ended too.
+func taskEnded(ctx context.Context, tasks draftTasks, id task.ID) (bool, error) {
+	if id == "" || tasks == nil {
+		return false, nil
+	}
+	e, err := tasks.Task(ctx, id)
+	if errors.Is(err, coretasks.ErrNoTask) {
+		return true, nil
+	}
+	return err == nil && !e.Open(), err
 }
 
 // withdrawnAtOnce refuses a draft the workflow's [withdraw] when would

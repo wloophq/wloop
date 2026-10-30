@@ -429,3 +429,31 @@ func TestUnitClosedEndsTheUnitsTasksOnce(t *testing.T) {
 		t.Fatalf("applied again after a restart: %+v, closed %v", pending, closed)
 	}
 }
+
+func TestADraftItsTasksEndWithdrewHoldsWhileTheTaskStaysEnded(t *testing.T) {
+	t.Parallel()
+	r := newDraftRig(t, draftWF("nudges", "purpose", "nudge", "items", "owed", "per", "person", "repeat_after", "24h"), "any news?")
+	waiting := task.Task{ID: "t1", State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{draftThread},
+		Items: []task.ItemRef{{Unit: draftThread, Item: "i1"}}}
+	r.tasks.m["t1"] = waiting
+	r.items.set(draftThread, openItem("i1", "The deck", r.now.Add(-96*time.Hour), ana))
+	r.run(draftTask)
+	ds := r.drafts()
+	if len(ds) != 1 {
+		t.Fatalf("%d drafts, want ana's nudge", len(ds))
+	}
+	ended := waiting
+	ended.State, ended.Category = "done", task.CategoryDone
+	r.tasks.m["t1"] = ended
+	if _, err := r.svc.Withdraw(context.Background(), ds[0].ID, draft.WithdrawEnded); err != nil {
+		t.Fatal(err)
+	}
+	r.now = r.now.Add(72 * time.Hour)
+	if got := r.check(draftTask); !strings.Contains(got, "held by draft") {
+		t.Fatalf("a draft withdrawn as its task ended does not hold while the task stays done: %q", got)
+	}
+	r.tasks.m["t1"] = waiting
+	if got := r.check(draftTask); got != "" {
+		t.Fatalf("the task is open again, and the ended draft still holds: %q", got)
+	}
+}

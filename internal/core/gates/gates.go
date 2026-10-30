@@ -81,6 +81,12 @@ type OwnTasks interface {
 	ReopenOwn(ctx context.Context, u unit.Unit) (task.ID, bool, error)
 }
 
+// HeldTasks is optional on Tasks: ends task id, one Tasks opened only to hold gates, into category c once its last
+// gate closed; a task opened otherwise, or ended already, is left as it is.
+type HeldTasks interface {
+	EndHeld(ctx context.Context, id task.ID, c task.Category) error
+}
+
 // Events records the event a resolved step gate is, which workflows
 // trigger on.
 type Events interface {
@@ -211,7 +217,8 @@ func (s *Service) Resolve(ctx context.Context, id int64, r Resolution) error {
 
 // Supersede closes open gate id as superseded by by, its subject gone or
 // replaced, with no consequence: the subject's owner settles the subject.
-// It refuses an agent: no agent closes an open gate.
+// It refuses an agent: no agent closes an open gate. A gate a person
+// supersedes is replaced by another, so the task it held stays.
 func (s *Service) Supersede(ctx context.Context, id int64, by task.Actor) error {
 	if by == task.ActorAgent || by == "" {
 		return fmt.Errorf("%w: gate %d is superseded by its subject's owner, not by %s", ErrRefused, id, cmp.Or(string(by), "no one"))
@@ -223,8 +230,11 @@ func (s *Service) Supersede(ctx context.Context, id int64, by task.Actor) error 
 	if g.Status != gate.Open {
 		return fmt.Errorf("%w: %d is %s", ErrResolved, id, g.Status)
 	}
-	_, err = s.d.Store.Resolve(ctx, id, Resolution{Status: gate.Superseded, By: by})
-	return err
+	closed, err := s.d.Store.Resolve(ctx, id, Resolution{Status: gate.Superseded, By: by})
+	if err != nil || by == task.ActorPerson {
+		return err
+	}
+	return s.endHeld(ctx, closed)
 }
 
 // RecordSent records g, a post a tool made at once, as a gate already
@@ -380,7 +390,25 @@ func (s *Service) close(ctx context.Context, g gate.Gate, r Resolution) (gate.Ga
 	if err != nil {
 		return closed, err
 	}
-	return closed, s.applied(ctx, closed)
+	return closed, errors.Join(s.applied(ctx, closed), s.endHeld(ctx, closed))
+}
+
+// endHeld ends the task closed g was on when Tasks opened it only to hold gates and none of them is open now: done
+// when g was approved or answered, dropped otherwise.
+func (s *Service) endHeld(ctx context.Context, g gate.Gate) error {
+	held, ok := s.d.Tasks.(HeldTasks)
+	if !ok || g.Task == "" {
+		return nil
+	}
+	gs, err := s.d.Reader.OfTask(ctx, g.Task)
+	if err != nil || slices.ContainsFunc(gs, func(o gate.Gate) bool { return o.Status == gate.Open }) {
+		return err
+	}
+	c := task.CategoryDropped
+	if g.Status == gate.Approved || g.Status == gate.Answered {
+		c = task.CategoryDone
+	}
+	return held.EndHeld(ctx, g.Task, c)
 }
 
 // applied runs g's consequence and marks it run, failed or not: a failure is

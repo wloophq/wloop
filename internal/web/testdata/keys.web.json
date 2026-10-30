@@ -106,7 +106,7 @@
       "context": "list",
       "owner": "core",
       "help": "done",
-      "summary": "Mark it done: it leaves your lists for the Logbook."
+      "summary": "Mark it done: it leaves your lists for the Logbook, and a draft it carries is discarded."
     },
     {
       "key": "Backspace",

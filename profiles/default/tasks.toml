@@ -160,7 +160,11 @@ task.items_open > 0 ? "" : "me"'''
 # handler what the loop runs besides the move. by says who may run it:
 # a condition over the task's facts per actor (person, workflow, agent,
 # plugin), or "gate", which opens the gate the verb's gate names for a
-# person to approve; an actor left out may not run it.
+# person to approve; an actor left out may not run it. A verb that ends a
+# task, moving it from an open state to a done or dropped one, withdraws
+# the held drafts the task carries, but those of the purposes its
+# keep_drafts lists: the bundled verbs keep none, so closing a task never
+# leaves a nudge or a closure waiting on it.
 
 [verbs.next]
 label   = "Next"
@@ -240,7 +244,7 @@ by      = { person = "true" }
 [verbs.done]
 handler = "finish"
 label   = "Done"
-summary = "Mark it done: it leaves your lists for the Logbook."
+summary = "Mark it done: it leaves your lists for the Logbook, and a draft it carries is discarded."
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "reference"]
 to      = "done"
 by      = { person = "true", workflow = "true" }

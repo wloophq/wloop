@@ -117,6 +117,11 @@ type Request struct {
 	Approved int64
 }
 
+// Drafts settles the drafts of a task a verb ended: e as the verb left it, done or dropped.
+type Drafts interface {
+	Ended(ctx context.Context, e task.Task, v task.Verb) error
+}
+
 // Gates are the gates a gated verb opens and reads back: one open gate per proposal.
 type Gates interface {
 	Open(ctx context.Context, g gate.Gate) (gate.Gate, error)

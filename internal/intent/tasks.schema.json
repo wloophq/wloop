@@ -184,6 +184,13 @@
             "description": "The question a verb that asks for a value puts first; required for a verb whose handler asks for one (waiting, schedule, project, context, area, delegate, reply, promise).",
             "type": "string"
           },
+          "keep_drafts": {
+            "description": "The purposes of the held drafts a task keeps when the verb moves it from an open state to a done or dropped one; every other held draft of the task is withdrawn with the reason ended, and holds its workflow from proposing again on the unit while the task stays ended. Every held draft is withdrawn when absent.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "label": {
             "description": "The name people read on its button. Required.",
             "type": "string"

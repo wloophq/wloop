@@ -37,6 +37,8 @@ type Deps struct {
 	Authority Authority
 	// Gates opens the gate a gated verb opens; nil: a gated verb fails.
 	Gates Gates
+	// Drafts settles the drafts of a task a verb ends; nil settles none.
+	Drafts Drafts
 	// Wakes are the tasks' wakes, which schedule puts and wake reads; nil: schedule fails and no task has one.
 	Wakes Wakes
 	// Baseline fills a wake Sleep puts on task t: a When that asks to wake once a fact of t changes becomes the
@@ -207,7 +209,13 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 	if err := s.applyWake(ctx, e.ID, wc); err != nil {
 		return Result{}, err
 	}
-	return Result{Task: cs[len(cs)-1].Task}, nil
+	next := cs[len(cs)-1].Task
+	if s.d.Drafts != nil && e.Open() && !next.Open() {
+		if err := s.d.Drafts.Ended(ctx, next, req.Verb); err != nil {
+			return Result{Task: next}, err
+		}
+	}
+	return Result{Task: next}, nil
 }
 
 // wakeOf is task id's wake, zero when it has none or no wakes are kept.
@@ -783,6 +791,25 @@ func (s *Service) ReopenOwn(ctx context.Context, u unit.Unit) (task.ID, bool, er
 	}
 	e.Changed, e.Updated = true, s.now()
 	return e.ID, true, s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e, Why: "a gate opened on " + u.String()}})
+}
+
+// EndHeld moves task id, opened only to hold gates, into category c; a task of another origin, or one closed
+// already, is left as it is.
+func (s *Service) EndHeld(ctx context.Context, id task.ID, c task.Category) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, err := s.d.Store.Task(ctx, id)
+	if errors.Is(err, ErrNoTask) || err == nil && (e.Origin != task.OriginGate || !e.Open()) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if err := e.MoveTo(c, s.d.States); err != nil {
+		return err
+	}
+	e.Updated = s.now()
+	return s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e, Why: "its gates closed"}})
 }
 
 // UnitClosed ends the open tasks that hold u, its closure posted: each moves into the done category.
