@@ -343,7 +343,7 @@ func (r *running) rowsWith(ctx context.Context, refs []pr.Ref, at time.Time) ([]
 		}
 		d := Data{PR: p, Tracked: slices.Contains(tracked, ref), Adopted: o.Adopted}
 		ri := in.of(ref)
-		ri.PR, ri.Override, ri.Now = p, o, at
+		ri.PR, ri.Override, ri.Now, ri.Location = p, o, at, time.Local
 		if det, ok := details[ref]; ok {
 			d.Detail, d.DetailVersion, d.DetailReadAt = &det, det.Version, det.ReadAt
 			ri.Detail = &det

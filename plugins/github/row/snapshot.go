@@ -133,7 +133,7 @@ func (r Row) Facts() []src.Fact {
 	at := lastInteraction(p, in.Events)
 	if !at.IsZero() {
 		add("pr.last_interaction_at", src.Time(at))
-		add("pr.silent_days", src.Int(int64(calendarDays(at, in.Now))))
+		add("pr.silent_days", src.Int(int64(calendarDays(at, in.Now, in.Location))))
 	}
 	return out
 }
@@ -206,10 +206,13 @@ func lastInteraction(p pr.PR, evs []pr.Event) time.Time {
 	return at
 }
 
-// calendarDays counts the local midnights between from and to.
-func calendarDays(from, to time.Time) int {
-	y1, m1, d1 := from.Local().Date()
-	y2, m2, d2 := to.Local().Date()
+// calendarDays counts the midnights of loc between from and to; nil counts UTC's.
+func calendarDays(from, to time.Time, loc *time.Location) int {
+	if loc == nil {
+		loc = time.UTC
+	}
+	y1, m1, d1 := from.In(loc).Date()
+	y2, m2, d2 := to.In(loc).Date()
 	a := time.Date(y1, m1, d1, 12, 0, 0, 0, time.UTC)
 	b := time.Date(y2, m2, d2, 12, 0, 0, 0, time.UTC)
 	return int(b.Sub(a).Hours() / 24)

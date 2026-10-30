@@ -36,6 +36,8 @@ type Input struct {
 	// Loop is the loop's name, as items it asks of the user name it.
 	Loop string
 	Now  time.Time
+	// Location is the calendar pr.silent_days counts midnights in; nil counts UTC's.
+	Location *time.Location
 }
 
 // Row is a pull request's source row: its situation and the source part of

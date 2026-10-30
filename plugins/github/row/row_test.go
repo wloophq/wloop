@@ -22,6 +22,9 @@ var update = flag.Bool("update", false, "rewrite testdata/reports.golden.json")
 // fixtureNow is the instant every fixture is reported at.
 var fixtureNow = time.Date(2026, 10, 14, 15, 0, 0, 0, time.UTC)
 
+// fixtureZone is the calendar the golden counts silent days in; the fixtures never change it.
+var fixtureZone = time.FixedZone("UTC-3", -3*60*60)
+
 const (
 	fixtureViewer = "me-login"
 	day           = 24 * time.Hour
@@ -104,7 +107,7 @@ func fixtures() []fixture {
 func input(f fixture) Input {
 	f.override.Ref = f.pr.Ref
 	return Input{PR: f.pr, Events: f.events, Override: f.override, Viewer: fixtureViewer, Teams: []string{"acme/core"},
-		Stalled: situation.Thresholds{Review: 2 * day, Reply: day, Merge: day}, MaxDetailAge: time.Hour, Loop: "the loop", Now: fixtureNow}
+		Stalled: situation.Thresholds{Review: 2 * day, Reply: day, Merge: day}, MaxDetailAge: time.Hour, Loop: "the loop", Now: fixtureNow, Location: fixtureZone}
 }
 
 // TestTheReportsGoldenIsCurrent holds what the plugin reports of every
