@@ -369,7 +369,10 @@ func (h *hostClient) Ask(ctx context.Context, req AskRequest) (AskResult, error)
 	r, err := viaHost(h, func(c pb.HostServiceClient) (*pb.AskResponse, error) {
 		return c.Ask(ctx, &pb.AskRequest{Prompt: req.Prompt, SchemaJson: req.Schema, Tier: req.Tier, MaxCostUsd: req.MaxCostUSD, MeterScope: req.MeterScope})
 	})
-	return AskResult{Text: r.GetText(), Model: r.GetModel(), CostUSD: r.CostUsd, Duration: r.GetDuration().AsDuration(), Tokens: r.GetTokens()}, err
+	if err != nil {
+		return AskResult{}, err
+	}
+	return AskResult{Text: r.GetText(), Model: r.GetModel(), CostUSD: r.CostUsd, Duration: r.GetDuration().AsDuration(), Tokens: r.GetTokens()}, nil
 }
 
 func (h *hostClient) Meter(ctx context.Context, s Sample) error {

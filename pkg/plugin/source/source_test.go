@@ -34,6 +34,7 @@ type recorder struct {
 	asks      []source.AskRequest
 	ops       []source.ItemOp
 	gates     []string
+	askErr    error
 }
 
 func (r *recorder) note(format string, args ...any) {
@@ -90,6 +91,9 @@ func (r *recorder) Ask(_ context.Context, req source.AskRequest) (source.AskResu
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.asks = append(r.asks, req)
+	if r.askErr != nil {
+		return source.AskResult{}, r.askErr
+	}
 	return source.AskResult{Text: "yes", Model: "small-1", CostUSD: ptr(0.02), Duration: 2 * time.Second, Tokens: 120}, nil
 }
 
@@ -248,6 +252,22 @@ func (s tooler) RunCLI(_ context.Context, req source.CLIRequest, stdout, stderr 
 }
 
 func ptr[T any](v T) *T { return &v }
+
+func TestAFailedAskComesBackAsAnErrorAndThePluginLives(t *testing.T) {
+	rec := &recorder{askErr: errors.New("the agent is down")}
+	c := sourcetest.Launch(t, "pulls", tooler{sourcetest.NewStub()}, rec.host())
+	ctx := source.WithCall(t.Context(), source.Call{Priority: source.PriorityBackground, MeterScope: "mcp/pull_read"})
+	call := source.ToolCall{Tool: "pull_read", Args: json.RawMessage(`{}`), Session: "s-1", Turn: "t-1"}
+	if _, err := c.CallTool(ctx, call); err == nil || !strings.Contains(err.Error(), "the agent is down") {
+		t.Fatalf("err %v, want the host's", err)
+	}
+	rec.mu.Lock()
+	rec.askErr = nil
+	rec.mu.Unlock()
+	if res, err := c.CallTool(ctx, call); err != nil || res.Answer != "read" {
+		t.Fatalf("after the failed ask: %+v, %v; the plugin must still answer", res, err)
+	}
+}
 
 func TestBrokerCallbackReachesTheHost(t *testing.T) {
 	rec := &recorder{}
