@@ -139,16 +139,15 @@ func (p *Publisher) canReact() error {
 }
 
 var (
-	userIDRE      = regexp.MustCompile(`^[UW][A-Z0-9]{2,}$`)
-	personKeyRE   = regexp.MustCompile(`^@\{` + string(dslack.Provider) + `:([UW][A-Z0-9]{2,})\}$`)
-	unitPersonRE  = regexp.MustCompile(`^` + string(dslack.Provider) + `:([UW][A-Z0-9]{2,})$`)
+	personKeyRE   = regexp.MustCompile(`^@\{` + string(dslack.Provider) + `:(` + dslack.UserIDPattern + `)\}$`)
+	unitPersonRE  = regexp.MustCompile(`^` + string(dslack.Provider) + `:(` + dslack.UserIDPattern + `)$`)
 	conversationR = regexp.MustCompile(`^[CGD][A-Z0-9]{2,}$`)
 )
 
 // userOf is the user id a person target names, "" when it names none.
 func userOf(target string) string {
 	t := strings.TrimPrefix(target, "@")
-	if userIDRE.MatchString(t) {
+	if dslack.IsUserID(t) {
 		return t
 	}
 	for _, re := range []*regexp.Regexp{personKeyRE, unitPersonRE} {
@@ -341,7 +340,7 @@ func (p *Publisher) body(ctx context.Context, d draft.Draft) (string, error) {
 			errs = append(errs, fmt.Errorf("mention %s is not @{<provider>:<id>}", m))
 			return m
 		case provider == string(dslack.Provider):
-			if !userIDRE.MatchString(id) {
+			if !dslack.IsUserID(id) {
 				errs = append(errs, fmt.Errorf("mention %s names no Slack user id", m))
 				return m
 			}

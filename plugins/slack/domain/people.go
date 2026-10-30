@@ -7,10 +7,15 @@ import (
 )
 
 // Slack ids: a user's starts with U or W, a user group's with S, each followed by at least
-// eight letters or digits.
+// eight letters or digits. The patterns are for regular expressions that embed an id.
+const (
+	UserIDPattern  = `[UW][A-Z0-9]{8,}`
+	GroupIDPattern = `S[A-Z0-9]{8,}`
+)
+
 var (
-	userIDRE  = regexp.MustCompile(`^[UW][A-Z0-9]{8,}$`)
-	groupIDRE = regexp.MustCompile(`^S[A-Z0-9]{8,}$`)
+	userIDRE  = regexp.MustCompile(`^` + UserIDPattern + `$`)
+	groupIDRE = regexp.MustCompile(`^` + GroupIDPattern + `$`)
 )
 
 // IsUserID says whether s is a Slack user id.

@@ -42,8 +42,8 @@ func newWorkspace() *fakeWorkspace {
 			"C200": {"id": "C200", "name": "outsiders", "is_channel": true, "is_member": false},
 			"C300": {"id": "C300", "name": "old", "is_channel": true, "is_member": true, "is_archived": true},
 			"G400": {"id": "G400", "name": "secret", "is_group": true, "is_private": true, "is_member": true},
-			"D500": {"id": "D500", "is_im": true, "user": "U001"},
-			"D505": {"id": "D505", "is_im": true, "user": "U005"},
+			"D500": {"id": "D500", "is_im": true, "user": "U000000001"},
+			"D505": {"id": "D505", "is_im": true, "user": "U000000005"},
 			"G600": {"id": "G600", "name": "mpdm-a--b-1", "is_mpim": true, "is_member": true},
 		},
 		mine: []map[string]any{
@@ -53,18 +53,18 @@ func newWorkspace() *fakeWorkspace {
 			{"id": "C701", "name": "dev-ops", "is_channel": true, "is_member": true},
 		},
 		users: []map[string]any{
-			{"id": "U001", "name": "alice", "profile": map[string]any{"display_name": "alice", "email": "alice@example.com"}},
-			{"id": "U002", "name": "bob", "profile": map[string]any{"display_name": "bobby", "email": "bob@example.com"}},
-			{"id": "U003", "name": "sam.one", "profile": map[string]any{"display_name": "sam"}},
-			{"id": "U004", "name": "sam.two", "profile": map[string]any{"display_name": "sam"}},
-			{"id": "U005", "name": "gone", "deleted": true, "profile": map[string]any{"display_name": "gone"}},
+			{"id": "U000000001", "name": "alice", "profile": map[string]any{"display_name": "alice", "email": "alice@example.com"}},
+			{"id": "U000000002", "name": "bob", "profile": map[string]any{"display_name": "bobby", "email": "bob@example.com"}},
+			{"id": "U000000003", "name": "sam.one", "profile": map[string]any{"display_name": "sam"}},
+			{"id": "U000000004", "name": "sam.two", "profile": map[string]any{"display_name": "sam"}},
+			{"id": "U000000005", "name": "gone", "deleted": true, "profile": map[string]any{"display_name": "gone"}},
 		},
 		messages: map[string]message{
 			"C100/1700000000.123456": {ts: "1700000000.123456", text: "Parent question\nsecond line"},
 			"C100/1699999999.000100": {ts: "1699999999.000100", threadTS: "1699999999.000100", text: "The real parent"},
 			"C100/1700000100.000200": {ts: "1700000100.000200", threadTS: "1699999999.000100", text: "a reply"},
 		},
-		dms: map[string]string{"U001": "D500", "U002": "D501", "U003": "D503"},
+		dms: map[string]string{"U000000001": "D500", "U000000002": "D501", "U000000003": "D503"},
 	}
 }
 
@@ -283,12 +283,12 @@ func TestUnknownChannelFails(t *testing.T) {
 func TestDMByHandleEmailOrID(t *testing.T) {
 	t.Parallel()
 	cases := []struct{ target, channel, conversation, user string }{
-		{"@alice", "D500", "@alice", "U001"},
-		{"@bobby", "D501", "@bob", "U002"},
-		{"bob@example.com", "D501", "@bob", "U002"},
-		{"U001", "D500", "@alice", "U001"},
-		{"@U002", "D501", "@bob", "U002"},
-		{"https://acme.slack.com/archives/D500/p1700000000000001", "D500", "@alice", "U001"},
+		{"@alice", "D500", "@alice", "U000000001"},
+		{"@bobby", "D501", "@bob", "U000000002"},
+		{"bob@example.com", "D501", "@bob", "U000000002"},
+		{"U000000001", "D500", "@alice", "U000000001"},
+		{"@U000000002", "D501", "@bob", "U000000002"},
+		{"https://acme.slack.com/archives/D500/p1700000000000001", "D500", "@alice", "U000000001"},
 	}
 	for _, c := range cases {
 		f := newFixture(t, newWorkspace())
@@ -390,7 +390,7 @@ func TestEmptyTextFails(t *testing.T) {
 func TestPostAllowlistRefusesOtherConversations(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, newWorkspace())
-	f.svc.PostAllowlist = []string{"U001", "G400"}
+	f.svc.PostAllowlist = []string{"U000000001", "G400"}
 	for _, target := range []string{"#general", "@bob", "https://acme.slack.com/archives/C100/p1700000000123456"} {
 		_, err := f.svc.Send(context.Background(), send.Request{Target: target, Text: "hi"})
 		if !errors.Is(err, send.ErrNotAllowed) {
@@ -525,8 +525,8 @@ func TestNameLookupsReuseTheListingUntilAMiss(t *testing.T) {
 	if u, c := len(f.slack.Calls("users.list")), len(f.slack.Calls("users.conversations")); u != 1 || c != 1 {
 		t.Fatalf("users.list = %d, users.conversations = %d, want 1 each", u, c)
 	}
-	ws.users = append(ws.users, map[string]any{"id": "U009", "name": "newcomer"})
-	ws.dms["U009"] = "D509"
+	ws.users = append(ws.users, map[string]any{"id": "U000000009", "name": "newcomer"})
+	ws.dms["U000000009"] = "D509"
 	ws.mine = append(ws.mine, map[string]any{"id": "C800", "name": "fresh", "is_channel": true, "is_member": true})
 	ws.conversations["C800"] = map[string]any{"id": "C800", "name": "fresh", "is_channel": true, "is_member": true}
 	if res, err := f.svc.Resolve(ctx, send.Request{Target: "@newcomer"}); err != nil || res.Channel != "D509" {
@@ -551,9 +551,9 @@ func TestNameListingsPage(t *testing.T) {
 	})
 	f.slack.Handle("users.list", func(v url.Values) any {
 		if v.Get("cursor") == "" {
-			return map[string]any{"members": []any{map[string]any{"id": "U002", "name": "bob"}}, "response_metadata": map[string]any{"next_cursor": "next"}}
+			return map[string]any{"members": []any{map[string]any{"id": "U000000002", "name": "bob"}}, "response_metadata": map[string]any{"next_cursor": "next"}}
 		}
-		return map[string]any{"members": []any{map[string]any{"id": "U001", "name": "alice"}}}
+		return map[string]any{"members": []any{map[string]any{"id": "U000000001", "name": "alice"}}}
 	})
 	if res, err := f.svc.Resolve(context.Background(), send.Request{Target: "#secret"}); err != nil || res.Channel != "G400" {
 		t.Fatalf("#secret: %+v, %v", res, err)
@@ -572,10 +572,10 @@ func TestRenamedHandleIsNotReusedFromTheCache(t *testing.T) {
 	ws := newWorkspace()
 	f := newFixture(t, ws)
 	ctx := context.Background()
-	if res, err := f.svc.Resolve(ctx, send.Request{Target: "@alice"}); err != nil || res.DMUser != "U001" {
+	if res, err := f.svc.Resolve(ctx, send.Request{Target: "@alice"}); err != nil || res.DMUser != "U000000001" {
 		t.Fatalf("first @alice: %+v, %v", res, err)
 	}
-	ws.users[0] = map[string]any{"id": "U001", "name": "alice.old", "profile": map[string]any{"display_name": "alice.old"}}
+	ws.users[0] = map[string]any{"id": "U000000001", "name": "alice.old", "profile": map[string]any{"display_name": "alice.old"}}
 	ws.users = append(ws.users, map[string]any{"id": "U010", "name": "alice", "profile": map[string]any{"display_name": "alice"}})
 	ws.dms["U010"] = "D510"
 	sent := mustSend(t, f, send.Request{Target: "@alice", Text: "hi"})
@@ -587,11 +587,11 @@ func TestRenamedHandleIsNotReusedFromTheCache(t *testing.T) {
 	}
 
 	ws.users = ws.users[:len(ws.users)-1]
-	ws.users[0] = map[string]any{"id": "U001", "name": "alice", "profile": map[string]any{"display_name": "alice"}}
+	ws.users[0] = map[string]any{"id": "U000000001", "name": "alice", "profile": map[string]any{"display_name": "alice"}}
 	if _, err := f.svc.Resolve(ctx, send.Request{Target: "@alice"}); err != nil {
 		t.Fatal(err)
 	}
-	ws.users[0] = map[string]any{"id": "U001", "name": "alice.old", "profile": map[string]any{"display_name": "alice.old"}}
+	ws.users[0] = map[string]any{"id": "U000000001", "name": "alice.old", "profile": map[string]any{"display_name": "alice.old"}}
 	if _, err := f.svc.Send(ctx, send.Request{Target: "@alice", Text: "hi"}); !errors.Is(err, send.ErrAmbiguous) {
 		t.Fatalf("handle given up: err = %v, want ErrAmbiguous", err)
 	}
@@ -644,7 +644,7 @@ func TestAKnownConversationIsPlacedWithoutAskingSlack(t *testing.T) {
 		case "C300":
 			return send.KnownConversation{ID: "C300", Name: "old", Kind: "channel", IsMember: true, Archived: true}, true
 		case "D500":
-			return send.KnownConversation{ID: "D500", Kind: "im", DMUser: "U001", DMUserName: "alice"}, true
+			return send.KnownConversation{ID: "D500", Kind: "im", DMUser: "U000000001", DMUserName: "alice"}, true
 		}
 		return send.KnownConversation{}, false
 	}
@@ -653,7 +653,7 @@ func TestAKnownConversationIsPlacedWithoutAskingSlack(t *testing.T) {
 	if err != nil || res.Channel != "C100" || res.Conversation != "#general" {
 		t.Fatalf("a known channel: %+v, %v", res, err)
 	}
-	if res, err := f.svc.Resolve(ctx, send.Request{Target: "D500"}); err != nil || res.DMUser != "U001" || res.Conversation != "@alice" {
+	if res, err := f.svc.Resolve(ctx, send.Request{Target: "D500"}); err != nil || res.DMUser != "U000000001" || res.Conversation != "@alice" {
 		t.Fatalf("a known DM: %+v, %v", res, err)
 	}
 	if _, err := f.svc.Resolve(ctx, send.Request{Target: "C300"}); !errors.Is(err, send.ErrCannotPost) {

@@ -16,7 +16,7 @@ func editFixture(t *testing.T, author string) fixture {
 	f := newFixture(t, newWorkspace())
 	f.slack.Handle("conversations.replies", func(v url.Values) any {
 		return map[string]any{"messages": []map[string]any{
-			{"ts": "1699999999.000100", "thread_ts": "1699999999.000100", "user": "U002", "text": "The real parent"},
+			{"ts": "1699999999.000100", "thread_ts": "1699999999.000100", "user": "U000000002", "text": "The real parent"},
 			{"ts": "1700000100.000200", "thread_ts": "1699999999.000100", "user": author, "text": "release 1.2 :hourglass:"},
 		}}
 	})
@@ -25,13 +25,13 @@ func editFixture(t *testing.T, author string) fixture {
 }
 
 func TestEditReplacesTheUsersMessageAndKeepsWhatItReplaced(t *testing.T) {
-	f := editFixture(t, "U001")
-	got, err := f.svc.Edit(context.Background(), send.Edit{Message: editLink, Text: "release 1.2 **done**, thanks @bobby", User: "U001"})
+	f := editFixture(t, "U000000001")
+	got, err := f.svc.Edit(context.Background(), send.Edit{Message: editLink, Text: "release 1.2 **done**, thanks @bobby", User: "U000000001"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got.Channel != "C100" || got.TS != "1700000100.000200" || got.Conversation != "#general" || got.Replaced != "release 1.2 :hourglass:" ||
-		got.Text != "release 1.2 *done*, thanks <@U002>" {
+		got.Text != "release 1.2 *done*, thanks <@U000000002>" {
 		t.Fatalf("Edit = %+v", got)
 	}
 	ups := f.slack.Calls("chat.update")
@@ -42,17 +42,17 @@ func TestEditReplacesTheUsersMessageAndKeepsWhatItReplaced(t *testing.T) {
 }
 
 func TestEditRefusesAnotherUsersMessageAndWhatSendRefuses(t *testing.T) {
-	f := editFixture(t, "U002")
-	if _, err := f.svc.Edit(context.Background(), send.Edit{Message: editLink, Text: "x", User: "U001"}); !errors.Is(err, send.ErrCannotPost) {
+	f := editFixture(t, "U000000002")
+	if _, err := f.svc.Edit(context.Background(), send.Edit{Message: editLink, Text: "x", User: "U000000001"}); !errors.Is(err, send.ErrCannotPost) {
 		t.Fatalf("another's message: %v", err)
 	}
-	f = editFixture(t, "U001")
+	f = editFixture(t, "U000000001")
 	f.svc.PostAllowlist = []string{"C999"}
-	if _, err := f.svc.Edit(context.Background(), send.Edit{Message: editLink, Text: "x", User: "U001"}); !errors.Is(err, send.ErrNotAllowed) {
+	if _, err := f.svc.Edit(context.Background(), send.Edit{Message: editLink, Text: "x", User: "U000000001"}); !errors.Is(err, send.ErrNotAllowed) {
 		t.Fatalf("outside the allowlist: %v", err)
 	}
 	f.svc.PostAllowlist = nil
-	for _, e := range []send.Edit{{Message: "#general", Text: "x", User: "U001"}, {Message: editLink, Text: " ", User: "U001"},
+	for _, e := range []send.Edit{{Message: "#general", Text: "x", User: "U000000001"}, {Message: editLink, Text: " ", User: "U000000001"},
 		{Message: editLink, Text: "x"}} {
 		if _, err := f.svc.Edit(context.Background(), e); err == nil {
 			t.Errorf("%+v edited", e)
@@ -64,9 +64,9 @@ func TestEditRefusesAnotherUsersMessageAndWhatSendRefuses(t *testing.T) {
 }
 
 func TestEditOnARefReadsTheMessageInTheThreadTheStoreHolds(t *testing.T) {
-	f := editFixture(t, "U001")
+	f := editFixture(t, "U000000001")
 	f.svc.Stored, _ = storedMessages(send.StoredMessage{TS: "1700000100.000200", ThreadTS: "1699999999.000100"})
-	got, err := f.svc.Edit(context.Background(), send.Edit{Message: "C100/1700000100.000200", Text: "done", User: "U001"})
+	got, err := f.svc.Edit(context.Background(), send.Edit{Message: "C100/1700000100.000200", Text: "done", User: "U000000001"})
 	if err != nil || got.TS != "1700000100.000200" || got.Replaced != "release 1.2 :hourglass:" || got.Permalink == "" {
 		t.Fatalf("Edit = %+v %v", got, err)
 	}
@@ -77,9 +77,9 @@ func TestEditOnARefReadsTheMessageInTheThreadTheStoreHolds(t *testing.T) {
 }
 
 func TestEditOnARefNotStoredFindsTheMessageOnSlack(t *testing.T) {
-	f := editFixture(t, "U001")
+	f := editFixture(t, "U000000001")
 	f.slack.Handle("conversations.history", func(url.Values) any { return map[string]any{"messages": []any{}} })
-	got, err := f.svc.Edit(context.Background(), send.Edit{Message: "C100/1700000100.000200", Text: "done", User: "U001"})
+	got, err := f.svc.Edit(context.Background(), send.Edit{Message: "C100/1700000100.000200", Text: "done", User: "U000000001"})
 	if err != nil || got.TS != "1700000100.000200" || got.Replaced != "release 1.2 :hourglass:" {
 		t.Fatalf("Edit = %+v %v", got, err)
 	}

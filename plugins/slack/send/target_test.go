@@ -33,7 +33,7 @@ func TestParseMessageReadsARefOrAPermalink(t *testing.T) {
 func TestParseMessageRefusesWhatNamesNoMessage(t *testing.T) {
 	t.Parallel()
 	for _, in := range []string{
-		"", "C100", "#general", "@alice", "U001", "U001/1700000100.000200", "c100/1700000100.000200",
+		"", "C100", "#general", "@alice", "U000000001", "U000000001/1700000100.000200", "c100/1700000100.000200",
 		"C100/1700000100", "C100/1700000100.0002", "C100/1700000100.000200/1700000100.000300", "C100/ 1700000100.000200",
 		"/1700000100.000200", "slack:T000/C100/1700000100.000200",
 		"https://example.com/archives/C100/p1700000100000200", "https://acme.slack.com/archives/C100",

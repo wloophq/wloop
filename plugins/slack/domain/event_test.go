@@ -164,32 +164,32 @@ func TestFromEventCases(t *testing.T) {
 	}{
 		{
 			name:    "reply from an agent app",
-			payload: `{"event_id":"Ev1","event":{"type":"message","channel":"C1","channel_type":"channel","user":"U1","bot_id":"B1","bot_profile":{"app_id":"A1","name":"agent"},"text":"hi <@U2> see <https://x.test/a|a>","ts":"2.0","thread_ts":"1.0","parent_user_id":"U3"}}`,
+			payload: `{"event_id":"Ev1","event":{"type":"message","channel":"C1","channel_type":"channel","user":"U000000001","bot_id":"B1","bot_profile":{"app_id":"A1","name":"agent"},"text":"hi <@U000000002> see <https://x.test/a|a>","ts":"2.0","thread_ts":"1.0","parent_user_id":"U000000003"}}`,
 			ok:      true,
 			want: Delta{Conversation: "C1", ChannelType: "channel", TS: "2.0", ThreadTS: "1.0", EventID: "Ev1", Kind: KindMessage,
-				Message: &Message{TS: "2.0", ThreadTS: "1.0", ParentUser: "U3", User: "U1", BotID: "B1", AppID: "A1", Username: "agent",
-					Text: "hi <@U2> see <https://x.test/a|a>", Links: []string{"https://x.test/a"}, Mentions: []string{"U2"}}},
+				Message: &Message{TS: "2.0", ThreadTS: "1.0", ParentUser: "U000000003", User: "U000000001", BotID: "B1", AppID: "A1", Username: "agent",
+					Text: "hi <@U000000002> see <https://x.test/a|a>", Links: []string{"https://x.test/a"}, Mentions: []string{"U000000002"}}},
 		},
 		{
 			name:    "reaction removed",
-			payload: `{"event_id":"Ev2","event":{"type":"reaction_removed","user":"U1","reaction":"eyes","item":{"type":"message","channel":"D1","channel_type":"im","ts":"1.0"},"item_user":"U2"}}`,
+			payload: `{"event_id":"Ev2","event":{"type":"reaction_removed","user":"U000000001","reaction":"eyes","item":{"type":"message","channel":"D1","channel_type":"im","ts":"1.0"},"item_user":"U000000002"}}`,
 			ok:      true,
 			want: Delta{Conversation: "D1", ChannelType: "im", TS: "1.0", EventID: "Ev2", Kind: KindReactionRemoved,
-				Reaction: &struct{ Name, User string }{"eyes", "U1"}},
+				Reaction: &struct{ Name, User string }{"eyes", "U000000001"}},
 		},
 		{
 			name:    "deleted reply",
-			payload: `{"event_id":"Ev3","event":{"type":"message","subtype":"message_deleted","channel":"C1","channel_type":"channel","deleted_ts":"2.0","previous_message":{"type":"message","user":"U1","text":"x","ts":"2.0","thread_ts":"1.0"}}}`,
+			payload: `{"event_id":"Ev3","event":{"type":"message","subtype":"message_deleted","channel":"C1","channel_type":"channel","deleted_ts":"2.0","previous_message":{"type":"message","user":"U000000001","text":"x","ts":"2.0","thread_ts":"1.0"}}}`,
 			ok:      true,
 			want: Delta{Conversation: "C1", ChannelType: "channel", TS: "2.0", ThreadTS: "1.0", EventID: "Ev3", Kind: KindDelete,
-				Message: &Message{TS: "2.0", ThreadTS: "1.0", User: "U1", Text: "x", Deleted: true}},
+				Message: &Message{TS: "2.0", ThreadTS: "1.0", User: "U000000001", Text: "x", Deleted: true}},
 		},
 		{
 			name:    "edit",
-			payload: `{"event_id":"Ev4","event":{"type":"message","subtype":"message_changed","channel":"G1","channel_type":"group","message":{"type":"message","user":"U1","text":"y","ts":"2.0","edited":{"ts":"3.0"}},"previous_message":{"user":"U1","text":"x","ts":"2.0"}}}`,
+			payload: `{"event_id":"Ev4","event":{"type":"message","subtype":"message_changed","channel":"G1","channel_type":"group","message":{"type":"message","user":"U000000001","text":"y","ts":"2.0","edited":{"ts":"3.0"}},"previous_message":{"user":"U000000001","text":"x","ts":"2.0"}}}`,
 			ok:      true,
 			want: Delta{Conversation: "G1", ChannelType: "group", TS: "2.0", EventID: "Ev4", Kind: KindEdit,
-				Message: &Message{TS: "2.0", User: "U1", Text: "y", EditedTS: "3.0"}},
+				Message: &Message{TS: "2.0", User: "U000000001", Text: "y", EditedTS: "3.0"}},
 		},
 		{
 			name:    "deleted parent left as a tombstone",
@@ -198,10 +198,10 @@ func TestFromEventCases(t *testing.T) {
 			want: Delta{Conversation: "C1", TS: "1.0", ThreadTS: "1.0", EventID: "Ev5", Kind: KindDelete,
 				Message: &Message{TS: "1.0", ThreadTS: "1.0", User: "USLACKBOT", Subtype: "tombstone", Text: "deleted", Deleted: true, ReplyCount: 2, LatestReply: "5.0"}},
 		},
-		{name: "hidden subtype", payload: `{"event":{"type":"message","subtype":"channel_join","channel":"C1","user":"U1","ts":"1.0"}}`},
+		{name: "hidden subtype", payload: `{"event":{"type":"message","subtype":"channel_join","channel":"C1","user":"U000000001","ts":"1.0"}}`},
 		{name: "message_replied", payload: `{"event":{"type":"message","subtype":"message_replied","channel":"C1","message":{"ts":"1.0"}}}`},
-		{name: "non-message event", payload: `{"event":{"type":"app_mention","channel":"C1","user":"U1","ts":"1.0"}}`},
-		{name: "reaction on a file", payload: `{"event":{"type":"reaction_added","user":"U1","reaction":"eyes","item":{"type":"file","file":"F1"}}}`},
+		{name: "non-message event", payload: `{"event":{"type":"app_mention","channel":"C1","user":"U000000001","ts":"1.0"}}`},
+		{name: "reaction on a file", payload: `{"event":{"type":"reaction_added","user":"U000000001","reaction":"eyes","item":{"type":"file","file":"F1"}}}`},
 		{name: "no event", payload: `{"type":"event_callback"}`},
 	}
 	for _, c := range cases {
@@ -268,20 +268,20 @@ func TestMessageFromMatchesFromEvent(t *testing.T) {
 	if !reflect.DeepEqual(m, *d.Message) {
 		t.Fatalf("history %+v\nsocket  %+v", m, *d.Message)
 	}
-	want := Message{TS: "5.0", ThreadTS: "4.0", ParentUser: "U9", User: "U1", Subtype: "file_share",
-		Text: "ping <@U2|bob> and <@U3>, <https://a.test/x> <mailto:a@b.test|mail> <@U2>", EditedTS: "6.0",
+	want := Message{TS: "5.0", ThreadTS: "4.0", ParentUser: "U000000009", User: "U000000001", Subtype: "file_share",
+		Text: "ping <@U000000002|bob> and <@U000000003>, <https://a.test/x> <mailto:a@b.test|mail> <@U000000002>", EditedTS: "6.0",
 		Files:    []File{{ID: "F1", Title: "plan", Mimetype: "text/plain"}},
 		Links:    []string{"https://a.test/x", "https://b.test/y", "https://c.test/z"},
-		Mentions: []string{"U2", "U3"}, ReplyCount: 0}
+		Mentions: []string{"U000000002", "U000000003"}, ReplyCount: 0}
 	if !reflect.DeepEqual(m, want) {
 		t.Fatalf("got  %+v\nwant %+v", m, want)
 	}
 
-	search, err := MessageFrom(json.RawMessage(`{"type":"message","user":"U1","username":"al","ts":"7.0","text":"x","channel":{"id":"C1","name":"general"},"permalink":"https://t.slack.test/archives/C1/p7","reactions":[{"name":"eyes","users":["U2"],"count":1}],"reply_count":3,"latest_reply":"8.0"}`))
+	search, err := MessageFrom(json.RawMessage(`{"type":"message","user":"U000000001","username":"al","ts":"7.0","text":"x","channel":{"id":"C1","name":"general"},"permalink":"https://t.slack.test/archives/C1/p7","reactions":[{"name":"eyes","users":["U000000002"],"count":1}],"reply_count":3,"latest_reply":"8.0"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if search.Permalink == "" || search.Username != "al" || len(search.Reactions) != 1 || search.Reactions[0].Users[0] != "U2" || search.ReplyCount != 3 || search.LatestReply != "8.0" {
+	if search.Permalink == "" || search.Username != "al" || len(search.Reactions) != 1 || search.Reactions[0].Users[0] != "U000000002" || search.ReplyCount != 3 || search.LatestReply != "8.0" {
 		t.Fatalf("search match %+v", search)
 	}
 	if _, err := MessageFrom(json.RawMessage(`[`)); err == nil {
@@ -289,7 +289,7 @@ func TestMessageFromMatchesFromEvent(t *testing.T) {
 	}
 }
 
-const historyFields = `"user":"U1","ts":"5.0","thread_ts":"4.0","parent_user_id":"U9","edited":{"ts":"6.0"},
-"text":"ping <@U2|bob> and <@U3>, <https://a.test/x> <mailto:a@b.test|mail> <@U2>",
+const historyFields = `"user":"U000000001","ts":"5.0","thread_ts":"4.0","parent_user_id":"U000000009","edited":{"ts":"6.0"},
+"text":"ping <@U000000002|bob> and <@U000000003>, <https://a.test/x> <mailto:a@b.test|mail> <@U000000002>",
 "files":[{"id":"F1","title":"plan","mimetype":"text/plain"}],
 "attachments":[{"title_link":"https://b.test/y","from_url":"https://c.test/z","original_url":"https://c.test/z"}]`

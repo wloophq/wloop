@@ -46,7 +46,7 @@ type wireMessage struct {
 
 var (
 	linkRE    = regexp.MustCompile(`<(https?://[^|>\s]+)(?:\|[^>]*)?>`)
-	mentionRE = regexp.MustCompile(`<@([UW][A-Z0-9]+)(?:\|[^>]*)?>`)
+	mentionRE = regexp.MustCompile(`<@(` + UserIDPattern + `)(?:\|[^>]*)?>`)
 )
 
 func (w wireMessage) message() Message {

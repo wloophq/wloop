@@ -252,7 +252,7 @@ func mentioned(msgs []dslack.Message) []string {
 	return out
 }
 
-var readMention = regexp.MustCompile(`<@([UW][A-Z0-9]+)>`)
+var readMention = regexp.MustCompile(`<@(` + dslack.UserIDPattern + `)>`)
 
 // renderRead is one message of conv as "[m<N> <ref>] <author>[ reply to
 // m<K>]", its text, its files and its reactions; a reply is marked only when

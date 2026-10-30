@@ -89,7 +89,7 @@ func header(in Input) string {
 }
 
 var (
-	mentionPattern = regexp.MustCompile(`<@([UW][A-Z0-9]+)>`)
+	mentionPattern = regexp.MustCompile(`<@(` + slack.UserIDPattern + `)>`)
 	// markerLike is the dash run that opens a marker, in text that is not one.
 	markerLike = regexp.MustCompile(`(?i)-{2,}(\s*(?:end of )?(?:context|segment)\b)`)
 )

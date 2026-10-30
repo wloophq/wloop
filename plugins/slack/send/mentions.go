@@ -6,7 +6,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/wloophq/wloop/plugins/slack/slackapi"
+	dslack "github.com/wloophq/wloop/plugins/slack/domain"
+	slack "github.com/wloophq/wloop/plugins/slack/slackapi"
 )
 
 var (
@@ -19,7 +20,7 @@ var (
 	mentionSkipRE = regexp.MustCompile("`[^`]*`|<[^<>]*>|\\[[^\\]\\n]*\\]\\([^()\\s]*\\)|(?i:https?://|mailto:)\\S+")
 	broadcasts    = []string{"channel", "here", "everyone"}
 
-	typedUserRE = regexp.MustCompile(`<@([UW][A-Z0-9]{2,})(?:\|[^<>]*)?>`)
+	typedUserRE = regexp.MustCompile(`<@(` + dslack.UserIDPattern + `)(?:\|[^<>]*)?>`)
 	// typedSkipRE are the parts of a line no typed mention is read in: code
 	// spans and Markdown links.
 	typedSkipRE = regexp.MustCompile("`[^`]*`|\\[[^\\]\\n]*\\]\\([^()\\s]*\\)")
