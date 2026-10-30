@@ -34,7 +34,7 @@ func (f CardFacts) UnitFacts(ctx context.Context, u unit.Unit) (task.UnitFacts, 
 	if f.Cards == nil {
 		return out, true, nil
 	}
-	got, err := f.Cards.Get(ctx, []unit.Unit{u})
+	got, err := f.cards(ctx, u)
 	if err != nil {
 		return task.UnitFacts{}, false, err
 	}
@@ -52,4 +52,12 @@ func (f CardFacts) UnitFacts(ctx context.Context, u unit.Unit) (task.UnitFacts, 
 		out.LastHuman = h.At
 	}
 	return out, true, nil
+}
+
+// cards is u's card; with every card of the pass ctx carries, read once, when u is a unit of it.
+func (f CardFacts) cards(ctx context.Context, u unit.Unit) (map[unit.Unit]card.Snapshot, error) {
+	if pass, ok := PassOf(ctx); ok && pass.Holds(u) {
+		return Once(ctx, "cards", func() (map[unit.Unit]card.Snapshot, error) { return f.Cards.Get(ctx, pass.Units()) })
+	}
+	return f.Cards.Get(ctx, []unit.Unit{u})
 }

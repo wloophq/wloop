@@ -44,6 +44,15 @@ type Pass struct {
 
 	mu    sync.Mutex
 	facts map[task.ID]workflow.Facts
+	once  map[string]*loaded
+	units []unit.Unit
+	held  map[unit.Unit]bool
+}
+
+type loaded struct {
+	once sync.Once
+	v    any
+	err  error
 }
 
 type passKey struct{}
@@ -62,19 +71,92 @@ func PassOf(ctx context.Context) (*Pass, bool) {
 // Facts are task id's facts as read reads them, once per pass.
 func (p *Pass) Facts(id task.ID, read func() (workflow.Facts, error)) (workflow.Facts, error) {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-	if f, ok := p.facts[id]; ok {
+	f, ok := p.facts[id]
+	p.mu.Unlock()
+	if ok {
 		return f, nil
 	}
 	f, err := read()
 	if err != nil {
 		return nil, err
 	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.facts == nil {
 		p.facts = map[task.ID]workflow.Facts{}
 	}
 	p.facts[id] = f
 	return f, nil
+}
+
+// Once is what load returns under key, loaded once per pass and shared by every task of it: what a fact reads
+// of the store as a whole, such as the open sessions, rather than once per task.
+func (p *Pass) Once(key string, load func() (any, error)) (any, error) {
+	p.mu.Lock()
+	if p.once == nil {
+		p.once = map[string]*loaded{}
+	}
+	l := p.once[key]
+	if l == nil {
+		l = &loaded{}
+		p.once[key] = l
+	}
+	p.mu.Unlock()
+	l.once.Do(func() { l.v, l.err = load() })
+	return l.v, l.err
+}
+
+// Units are the units of every task of the pass, its own and its items', each once, in pass order.
+func (p *Pass) Units() []unit.Unit {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.units == nil {
+		seen := map[unit.Unit]bool{}
+		p.units = []unit.Unit{}
+		for _, e := range p.Tasks {
+			for _, u := range e.Units {
+				if !seen[u] {
+					seen[u] = true
+					p.units = append(p.units, u)
+				}
+			}
+			for _, r := range e.Items {
+				if !seen[r.Unit] {
+					seen[r.Unit] = true
+					p.units = append(p.units, r.Unit)
+				}
+			}
+		}
+	}
+	return p.units
+}
+
+// Holds says whether u is a unit of a task of the pass.
+func (p *Pass) Holds(u unit.Unit) bool {
+	units := p.Units()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.held == nil {
+		p.held = make(map[unit.Unit]bool, len(units))
+		for _, u := range units {
+			p.held[u] = true
+		}
+	}
+	return p.held[u]
+}
+
+// Once is what load returns under key, once per the pass ctx carries; load's result each time outside a pass.
+func Once[T any](ctx context.Context, key string, load func() (T, error)) (T, error) {
+	p, ok := PassOf(ctx)
+	if !ok {
+		return load()
+	}
+	v, err := p.Once(key, func() (any, error) { return load() })
+	if err != nil {
+		var zero T
+		return zero, err
+	}
+	return v.(T), nil
 }
 
 type viewSource struct {

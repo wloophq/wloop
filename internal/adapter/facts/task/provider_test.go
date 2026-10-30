@@ -61,6 +61,43 @@ type env struct {
 	links    map[unit.Unit]facttask.Link
 	// unextracted are when each unit's oldest message not yet extracted arrived.
 	unextracted map[unit.Unit]time.Time
+	// reads counts the store reads by what they read.
+	reads map[string]int
+}
+
+type countingItems struct {
+	coreitems.Store
+	e *env
+}
+
+func (c countingItems) Load(ctx context.Context, us []unit.Unit) (map[unit.Unit][]items.Item, error) {
+	c.e.reads["items"]++
+	return c.Store.Load(ctx, us)
+}
+
+type countingCards struct {
+	card.Store
+	e *env
+}
+
+func (c countingCards) Get(ctx context.Context, us []unit.Unit) (map[unit.Unit]card.Snapshot, error) {
+	c.e.reads["cards"]++
+	return c.Store.Get(ctx, us)
+}
+
+type countingGates struct {
+	sqlite.GateStore
+	e *env
+}
+
+func (c countingGates) OfTask(ctx context.Context, id task.ID) ([]gate.Gate, error) {
+	c.e.reads["gates"]++
+	return c.GateStore.OfTask(ctx, id)
+}
+
+func (c countingGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
+	c.e.reads["gates"]++
+	return c.GateStore.Where(ctx, q)
 }
 
 func newEnv(t *testing.T) *env {
@@ -71,17 +108,26 @@ func newEnv(t *testing.T) *env {
 	}
 	t.Cleanup(func() { db.Close() })
 	e := &env{t: t, db: db, clock: &clock{now: monday}, s: facttask.Settings{StaleDays: 2, RenudgeAfter: 72 * time.Hour}, ended: map[unit.Unit]bool{}, turns: map[unit.Unit]int{}, repos: map[unit.Unit]string{}, links: map[unit.Unit]facttask.Link{},
-		unextracted: map[unit.Unit]time.Time{}}
+		unextracted: map[unit.Unit]time.Time{}, reads: map[string]int{}}
 	e.p = facttask.New(facttask.Deps{
-		Tasks: db.Tasks(), Items: db.Items(), Drafts: db.Drafts(),
-		Cards:    coretasks.CardFacts{Cards: db.Cards()},
+		Tasks: db.Tasks(), Items: countingItems{db.Items(), e}, Drafts: db.Drafts(),
+		Cards:    coretasks.CardFacts{Cards: countingCards{db.Cards(), e}},
 		Enabled:  func(p unit.ProviderID) bool { return p != mailX.Provider },
 		Settings: func() facttask.Settings { return e.s },
 		Ended:    func(_ context.Context, u unit.Unit) (bool, error) { return e.ended[u], nil },
-		Turns:    func(_ context.Context, u unit.Unit) (int, error) { return e.turns[u], nil },
+		Turns: func(_ context.Context, us []unit.Unit) (map[unit.Unit]int, error) {
+			e.reads["turns"]++
+			out := map[unit.Unit]int{}
+			for _, u := range us {
+				if n := e.turns[u]; n > 0 {
+					out[u] = n
+				}
+			}
+			return out, nil
+		},
 		Repo:     func(_ context.Context, u unit.Unit) (string, error) { return e.repos[u], nil },
-		Gates:    db.Gates(func() time.Time { return e.clock.now }),
-		Sessions: func(context.Context) ([]turn.Session, error) { return e.sessions, nil },
+		Gates:    countingGates{db.Gates(func() time.Time { return e.clock.now }), e},
+		Sessions: func(context.Context) ([]turn.Session, error) { e.reads["sessions"]++; return e.sessions, nil },
 		Clock:    e.clock,
 		Props:    func(t task.Task) workflow.Facts { return catalog.PropFacts(t, bundledTasks) },
 		Me:       func() task.Me { return task.Me{Keys: []string{"chat:ME"}} },

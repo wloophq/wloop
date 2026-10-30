@@ -139,6 +139,34 @@ func (s *Store) Books(ctx context.Context, units ...unit.Unit) (map[unit.Unit]tu
 	return out, nil
 }
 
+// TurnCounts counts the turns on each of units; a unit with none is absent.
+func (s *Store) TurnCounts(ctx context.Context, units []unit.Unit) (map[unit.Unit]int, error) {
+	want := make(map[unit.Unit]bool, len(units))
+	for _, u := range units {
+		want[u] = true
+	}
+	out := map[unit.Unit]int{}
+	err := s.db.Read(ctx, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, `SELECT provider, unit_key, COUNT(*) FROM turns GROUP BY provider, unit_key`)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var p, k string
+			var n int
+			if err := rows.Scan(&p, &k, &n); err != nil {
+				return err
+			}
+			if u := (unit.Unit{Provider: unit.ProviderID(p), Key: k}); want[u] {
+				out[u] = n
+			}
+		}
+		return rows.Err()
+	})
+	return out, err
+}
+
 const booksChunk = 500
 
 // loadBooks returns the book of each unit, empty for a unit with no turn;

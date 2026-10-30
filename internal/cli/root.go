@@ -358,13 +358,10 @@ func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (b
 			cfg := e.currentConfig()
 			return facttask.Settings{StaleDays: cfg.Tasks.StaleWaitingDays, RenudgeAfter: time.Duration(cfg.Drafts.RepeatAfter)}
 		},
-		Ended: ended,
-		Repo:  repo,
-		Gates: db.Gates(e.Now),
-		Turns: func(ctx context.Context, u unit.Unit) (int, error) {
-			books, err := sqlite.New(db).Books(ctx, u)
-			return len(books[u].Turns), err
-		},
+		Ended:      ended,
+		Repo:       repo,
+		Gates:      db.Gates(e.Now),
+		Turns:      sqlite.New(db).TurnCounts,
 		Sessions:   sqlite.New(db).Sessions,
 		Clock:      clockFunc(func() time.Time { return e.Now() }),
 		Props:      func(t task.Task) workflow.Facts { return catalog.PropFacts(t, e.loadedIntents().Tasks) },

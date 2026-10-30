@@ -72,3 +72,37 @@ func TestDisabledPluginFactsNotOK(t *testing.T) {
 		t.Fatalf("%+v %v %v", got, ok, err)
 	}
 }
+
+type countingCards struct {
+	cardMap
+	reads *int
+}
+
+func (c countingCards) Get(ctx context.Context, us []unit.Unit) (map[unit.Unit]card.Snapshot, error) {
+	*c.reads++
+	return c.cardMap.Get(ctx, us)
+}
+
+func TestAPassReadsTheCardsOnce(t *testing.T) {
+	reads := 0
+	cards := countingCards{cardMap{unitU: {Unit: unitU, StartedByMe: true}, unitV: {Unit: unitV, Cares: true}}, &reads}
+	f := coretasks.CardFacts{Cards: cards}
+	other := unit.Unit{Provider: "mail", Key: "m-9"}
+	pass := &coretasks.Pass{Tasks: []task.Task{{ID: "t-1", Units: []unit.Unit{unitU}}, {ID: "t-2", Units: []unit.Unit{unitV}}}}
+	ctx := coretasks.WithPass(context.Background(), pass)
+	for _, u := range []unit.Unit{unitU, unitV, unitU} {
+		got, ok, err := f.UnitFacts(ctx, u)
+		if err != nil || !ok || !got.Carded || got.Unit != u {
+			t.Fatalf("%s: %+v %v %v", u, got, ok, err)
+		}
+	}
+	if reads != 1 {
+		t.Fatalf("the cards were read %d times", reads)
+	}
+	if got, ok, err := f.UnitFacts(ctx, other); err != nil || !ok || got.Carded {
+		t.Fatalf("a unit outside the pass: %+v %v %v", got, ok, err)
+	}
+	if reads != 2 {
+		t.Fatalf("a unit outside the pass read the cards %d times in all", reads)
+	}
+}

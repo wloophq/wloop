@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/automation"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
@@ -46,6 +47,7 @@ type Drafts interface {
 // Gates reads a task's gates (gates.Reader).
 type Gates interface {
 	OfTask(ctx context.Context, id task.ID) ([]gate.Gate, error)
+	Where(ctx context.Context, q gates.Query) ([]gate.Gate, error)
 }
 
 // Settings are the config values the facts read.
@@ -74,8 +76,8 @@ type Deps struct {
 	Repo func(ctx context.Context, u unit.Unit) (string, error)
 	// Gates are read for task.gates_open; nil: always zero.
 	Gates Gates
-	// Turns counts the turns run on a unit; nil: none.
-	Turns func(ctx context.Context, u unit.Unit) (int, error)
+	// Turns counts the turns on each of units; a unit with none is absent.
+	Turns func(ctx context.Context, units []unit.Unit) (map[unit.Unit]int, error)
 	// Sessions are the sessions not closed, for task.runs_live; nil: none.
 	Sessions func(ctx context.Context) ([]turn.Session, error)
 	// Clock's location is where working days are counted.
@@ -293,7 +295,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 	}
 	var err error
 	if p.d.Turns != nil {
-		n, err := p.d.Turns(ctx, task.UnitOf(e.ID))
+		n, err := p.turns(ctx, e)
 		if err != nil {
 			return nil, err
 		}
@@ -345,7 +347,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 			f["task.link_started_by_me"], f["task.link_closure_posted"] = uf.StartedByMe, uf.ClosurePosted
 		}
 	}
-	got, err := p.d.Items.Load(ctx, us)
+	got, err := p.items(ctx, us)
 	if err != nil {
 		return nil, err
 	}
@@ -647,7 +649,7 @@ func (p *Provider) owedSince(ctx context.Context, e task.Task, who string) (time
 	if p.d.Me != nil {
 		me = p.d.Me()
 	}
-	got, err := p.d.Items.Load(ctx, unitsOf(e))
+	got, err := p.items(ctx, unitsOf(e))
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -684,13 +686,80 @@ func (p *Provider) gates(ctx context.Context, id task.ID) ([]gate.Gate, error) {
 	if p.d.Gates == nil {
 		return nil, nil
 	}
+	if _, ok := coretasks.PassOf(ctx); ok {
+		open, err := coretasks.Once(ctx, passGates, func() (map[task.ID][]gate.Gate, error) {
+			gs, err := p.d.Gates.Where(ctx, gates.Query{Statuses: []gate.Status{gate.Open}})
+			out := map[task.ID][]gate.Gate{}
+			for _, g := range gs {
+				out[g.Task] = append(out[g.Task], g)
+			}
+			return out, err
+		})
+		return open[id], err
+	}
 	gs, err := p.d.Gates.OfTask(ctx, id)
 	return slices.DeleteFunc(gs, func(g gate.Gate) bool { return g.Status != gate.Open }), err
 }
 
-// runsLive counts the sessions of u with a live process.
+// What every task's facts read of the store as a whole, once per pass.
+const (
+	passSessions = "facts.sessions"
+	passItems    = "facts.items"
+	passTurns    = "facts.turns"
+	passGates    = "facts.gates"
+)
+
+// items are the items of units; those of the pass ctx carries are read once for every unit of it.
+func (p *Provider) items(ctx context.Context, units []unit.Unit) (map[unit.Unit][]items.Item, error) {
+	pass, ok := coretasks.PassOf(ctx)
+	if !ok {
+		return p.d.Items.Load(ctx, units)
+	}
+	all, err := coretasks.Once(ctx, passItems, func() (map[unit.Unit][]items.Item, error) { return p.d.Items.Load(ctx, pass.Units()) })
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[unit.Unit][]items.Item, len(units))
+	var rest []unit.Unit
+	for _, u := range units {
+		switch its, held := all[u]; {
+		case !pass.Holds(u):
+			rest = append(rest, u)
+		case held:
+			out[u] = its
+		}
+	}
+	if len(rest) > 0 {
+		more, err := p.d.Items.Load(ctx, rest)
+		if err != nil {
+			return nil, err
+		}
+		maps.Copy(out, more)
+	}
+	return out, nil
+}
+
+// turns counts the turns on e; the counts of every task of the pass ctx carries are read once.
+func (p *Provider) turns(ctx context.Context, e task.Task) (int, error) {
+	own := task.UnitOf(e.ID)
+	pass, ok := coretasks.PassOf(ctx)
+	if ok && slices.ContainsFunc(pass.Tasks, func(t task.Task) bool { return t.ID == e.ID }) {
+		all, err := coretasks.Once(ctx, passTurns, func() (map[unit.Unit]int, error) {
+			units := make([]unit.Unit, len(pass.Tasks))
+			for i, t := range pass.Tasks {
+				units[i] = task.UnitOf(t.ID)
+			}
+			return p.d.Turns(ctx, units)
+		})
+		return all[own], err
+	}
+	n, err := p.d.Turns(ctx, []unit.Unit{own})
+	return n[own], err
+}
+
+// runsLive counts the sessions of u with a live process; the sessions are read once per pass.
 func (p *Provider) runsLive(ctx context.Context, u unit.Unit) (int, error) {
-	all, err := p.d.Sessions(ctx)
+	all, err := coretasks.Once(ctx, passSessions, func() ([]turn.Session, error) { return p.d.Sessions(ctx) })
 	if err != nil {
 		return 0, err
 	}

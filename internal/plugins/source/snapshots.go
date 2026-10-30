@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"sync"
 	"time"
 
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/snapshot"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -52,14 +54,52 @@ func (s *Snapshots) Put(ctx context.Context, ss map[unit.Unit]src.Snapshot) erro
 
 // Last is u's last snapshot.
 func (s *Snapshots) Last(ctx context.Context, u unit.Unit) (src.Snapshot, bool, error) {
-	got, err := s.Reported(ctx, []unit.Unit{u})
-	snap, ok := got[u]
-	return snap, ok, err
+	l, err := coretasks.Once(ctx, "snapshot."+u.String(), func() (last, error) {
+		got, err := s.Reported(ctx, []unit.Unit{u})
+		snap, ok := got[u]
+		return last{snap, ok}, err
+	})
+	return l.snap, l.ok, err
+}
+
+type last struct {
+	snap src.Snapshot
+	ok   bool
+}
+
+// stored are units' stored snapshots; those of the pass ctx carries are read once for every unit of it.
+func (s *Snapshots) stored(ctx context.Context, units []unit.Unit) (map[unit.Unit]snapshot.Stored, error) {
+	pass, ok := coretasks.PassOf(ctx)
+	if !ok {
+		return s.store.Get(ctx, units)
+	}
+	all, err := coretasks.Once(ctx, "snapshots", func() (map[unit.Unit]snapshot.Stored, error) { return s.store.Get(ctx, pass.Units()) })
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[unit.Unit]snapshot.Stored, len(units))
+	var rest []unit.Unit
+	for _, u := range units {
+		switch st, held := all[u]; {
+		case !pass.Holds(u):
+			rest = append(rest, u)
+		case held:
+			out[u] = st
+		}
+	}
+	if len(rest) > 0 {
+		more, err := s.store.Get(ctx, rest)
+		if err != nil {
+			return nil, err
+		}
+		maps.Copy(out, more)
+	}
+	return out, nil
 }
 
 // Reported are units' last snapshots; a unit with none is absent.
 func (s *Snapshots) Reported(ctx context.Context, units []unit.Unit) (map[unit.Unit]src.Snapshot, error) {
-	got, err := s.store.Get(ctx, units)
+	got, err := s.stored(ctx, units)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +117,7 @@ func (s *Snapshots) Reported(ctx context.Context, units []unit.Unit) (map[unit.U
 // Unextracted is when the oldest message not yet extracted arrived, across the extraction health of units'
 // last snapshots; zero when none waits.
 func (s *Snapshots) Unextracted(ctx context.Context, units []unit.Unit) (time.Time, error) {
-	got, err := s.store.Get(ctx, units)
+	got, err := s.stored(ctx, units)
 	if err != nil {
 		return time.Time{}, err
 	}
