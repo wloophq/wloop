@@ -717,11 +717,40 @@ func (j *Job) segment(ctx context.Context, team string, in Input, r Result) ([]u
 		}
 		spans, segs = []slack.Span{{FromTS: in.Messages[0].TS}}, []SegmentOut{{Brief: r.Brief}}
 	}
+	spans, segs = consecutive(spans, segs, in.Messages)
 	applied, err := j.Writer.Apply(ctx, team, in.Conversation.ID, spans)
 	if err != nil {
 		return nil, nil, fmt.Errorf("segments: %w", err)
 	}
 	return applied, segs, nil
+}
+
+// consecutive orders spans by their start and ends every span but the last at the window's
+// last message before the next one starts: what an answer that leaves a continued topic open
+// beside a new one means. segs follows the spans.
+func consecutive(spans []slack.Span, segs []SegmentOut, msgs []slack.Message) ([]slack.Span, []SegmentOut) {
+	order := make([]int, len(spans))
+	for i := range order {
+		order[i] = i
+	}
+	slices.SortStableFunc(order, func(a, b int) int { return strings.Compare(spans[a].FromTS, spans[b].FromTS) })
+	outSpans, outSegs := make([]slack.Span, len(spans)), make([]SegmentOut, len(segs))
+	for i, at := range order {
+		outSpans[i], outSegs[i] = spans[at], segs[at]
+	}
+	for i := range outSpans[:max(len(outSpans)-1, 0)] {
+		sp, next := &outSpans[i], outSpans[i+1].FromTS
+		if sp.ToTS != "" && sp.ToTS < next {
+			continue
+		}
+		sp.ToTS = sp.FromTS
+		for _, m := range msgs {
+			if m.TS > sp.ToTS && m.TS < next {
+				sp.ToTS = m.TS
+			}
+		}
+	}
+	return outSpans, outSegs
 }
 
 // place moves every op onto the segment unit of its item: a new item's segment covers its

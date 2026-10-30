@@ -866,3 +866,27 @@ func TestDailyCapSaysWhenItFrees(t *testing.T) {
 		t.Fatalf("skipped %q; want when the cap frees (%s) and the queue", skipped, midnight)
 	}
 }
+
+func TestAnswerSegmentsAreOrderedAndClosedBeforeApply(t *testing.T) {
+	r := newRig(t)
+	r.facts.post(jDM, ts(1), "", jOther, "can you review the deck", jT0)
+	r.facts.post(jDM, ts(2), "", jViewer, "sure", jT0)
+	r.asker.reply = func(_ int, _ host.Ask) ([]byte, error) {
+		return answerJSON(t, nil, []obj{{"ref": "new", "from_ts": ts(1), "to_ts": "", "topic": "the deck"}}, nil, nil), nil
+	}
+	r.run(jT0.Add(2 * time.Minute))
+	r.facts.post(jDM, ts(3), "", jOther, "also the PR please", jT0.Add(5*time.Minute))
+	r.facts.post(jDM, ts(4), "", jViewer, "on it", jT0.Add(5*time.Minute))
+	// The answer lists the new topic first and leaves the deck's segment open.
+	r.asker.reply = func(_ int, _ host.Ask) ([]byte, error) {
+		return answerJSON(t, nil,
+			[]obj{{"ref": "new", "from_ts": ts(3), "to_ts": "", "topic": "the PR"}, {"ref": "s1", "from_ts": ts(1), "to_ts": "", "topic": "the deck"}},
+			nil, nil), nil
+	}
+	r.run(jT0.Add(8 * time.Minute))
+	deck := strings.ReplaceAll(ts(1), ".", "")
+	want := []slack.Span{{ID: deck, FromTS: ts(1), ToTS: ts(2)}, {FromTS: ts(3)}}
+	if len(r.segs.spans) != 2 || !slices.Equal(r.segs.spans[1], want) {
+		t.Fatalf("second Apply got %+v, want %+v: ascending, the deck closed at its last message", r.segs.spans, want)
+	}
+}
