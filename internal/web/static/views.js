@@ -468,7 +468,7 @@ function viewLabel(view) {
 // loadRoundGates keeps the open plan gates with a deadline by unit: the automatic rounds a row counts down to.
 async function loadRoundGates() {
   try {
-    const gs = await getJSON("/api/gates");
+    const gs = await getJSON("/api/gates?status=open&kind=plan");
     state.roundGates = new Map((gs || []).filter((g) => g.kind === "plan" && g.unit && isSet(g.deadline)).map((g) => [g.unit, g]));
   } catch {
     // The rows still show their situation; only the countdown waits for the next load.

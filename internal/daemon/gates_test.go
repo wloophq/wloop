@@ -103,3 +103,23 @@ func TestATaskServesItsOpenGates(t *testing.T) {
 		t.Fatalf("answered gates: %+v", answered)
 	}
 }
+
+func TestGatesListFiltersByKind(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newTasksRig(t, nil)
+	id := task.ID("t-0000000000000002")
+	r.put(t, task.Task{ID: id, State: "next", Category: task.CategoryReady, Title: "ship it"})
+	question := r.withGates(t, id)
+	plan, err := r.s.deps.Gates.Open(ctx, gate.Gate{Unit: task.UnitOf(id), Kind: gate.KindPlan, Subject: "round"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var all, plans []api.GateView
+	if code := get(t, r.s, api.GatesPath, &all); code != 200 || len(all) != 2 {
+		t.Fatalf("every open gate: %d %+v", code, all)
+	}
+	if code := get(t, r.s, api.GatesPath+"?status=open&kind=plan", &plans); code != 200 || len(plans) != 1 || plans[0].ID != plan.ID || plans[0].ID == question.ID {
+		t.Fatalf("the plan gates: %d %+v", code, plans)
+	}
+}

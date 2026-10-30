@@ -72,7 +72,7 @@ func (s *Server) handleGates(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var q gates.Query
+	q := gates.Query{Kind: gate.Kind(r.URL.Query().Get("kind"))}
 	if v := r.URL.Query().Get("status"); v != "" {
 		for _, st := range strings.Split(v, ",") {
 			q.Statuses = append(q.Statuses, gate.Status(strings.TrimSpace(st)))
