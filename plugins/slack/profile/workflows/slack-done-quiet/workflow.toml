@@ -1,0 +1,13 @@
+summary = "Offer to close a Slack task whose threads all went quiet for plugins.slack.ended_after; it resolves the task's items as moot and posts nothing"
+provider = "task"
+when = 'task.prop.kind == "thread" && task.items_open > 0 && !(task.category in ["done", "dropped", "deferred"]) && task.link_ended'
+key = ["task.fingerprint"]
+order = 59
+
+[[step]]
+use = "items.resolve"
+resolution = "moot"
+
+[[gates.approval.rule]]
+when = 'gate.kind == "plan"'
+mode = "wait"

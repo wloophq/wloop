@@ -261,3 +261,9 @@ func (in *Input) State() (store.ExtractionState, bool) { return in.state, in.has
 
 // Items are the unit's items in the host's ledger.
 func (in *Input) Items() []items.Item { return in.items }
+
+// Viewer is the viewer's Slack user id; "" when unknown.
+func (in *Input) Viewer() string { return in.viewer }
+
+// Human says whether m is a person's message, not a bot's, a deleted one or a hidden subtype.
+func (in *Input) Human(m store.MessageRow) bool { return human(m, in.users) }

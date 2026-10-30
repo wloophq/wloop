@@ -312,7 +312,11 @@ func (p *plugin) tasks(ctx context.Context, units []unit.Unit) (map[sdk.Unit][]s
 func (p *plugin) snapshot(u unit.Unit, in *slackrows.Input, tasks []src.Task, now time.Time) (src.Snapshot, time.Time) {
 	row := slackrows.Derive(in)
 	facts, next := unitFacts(u, in, tasks, p.cfg.EndedAfterFor(), now)
-	s := src.Snapshot{Unit: u.Wire(), At: now, Data: row.Payload, Facts: facts, Views: row.Views, Links: unitLinks(u, in)}
+	signals, flips := unitSignals(in, repliedAfter, now)
+	if !flips.IsZero() && (next.IsZero() || flips.Before(next)) {
+		next = flips
+	}
+	s := src.Snapshot{Unit: u.Wire(), At: now, Data: row.Payload, Facts: facts, Signals: signals, Views: row.Views, Links: unitLinks(u, in)}
 	sit := &src.Situation{Kind: string(row.Kind), WaitingOn: row.Summary.WaitsOn, Since: row.Summary.Since, Reason: row.Summary.Reason}
 	if row.Summary.Closed {
 		sit.Kind = kindDone
