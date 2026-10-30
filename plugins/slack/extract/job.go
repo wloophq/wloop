@@ -743,6 +743,12 @@ func repairOps(u unit.Unit, it items.Item) []items.Op {
 	if ps, ok := fix(it.WaitingOn); ok {
 		f.WaitingOn, changed = &ps, true
 	}
+	opts := slices.Clone(it.Options)
+	for i, o := range opts {
+		if ps, ok := fix(o.ArguedBy); ok {
+			opts[i].ArguedBy, f.Options, changed = ps, &opts, true
+		}
+	}
 	if changed {
 		ops = append(ops, items.Op{Op: items.OpUpdate, Unit: u, Item: it.ID, Anchor: anchor, Fields: &f})
 	}

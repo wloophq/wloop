@@ -904,7 +904,8 @@ func TestARunRepairsThePersonKeysTheLedgerHolds(t *testing.T) {
 	if _, err := r.ledger.host.Broker().Apply(ctx, items.Extracted, []items.Op{
 		{Op: "create", Unit: u, Item: "n1", Anchor: unit.Anchor{Unit: u, Ref: jChan + "/" + ts(1), At: jT0},
 			Fields: &items.Fields{Kind: &kind, Summary: &summary, Requester: ptr(bad("group:ana (U0001)")),
-				WaitingOn: &[]items.Person{bad("group:group:macedo (U0002)"), bad("Plataforma Billing")}}},
+				WaitingOn: &[]items.Person{bad("group:group:macedo (U0002)"), bad("Plataforma Billing")},
+				Options:   &[]items.Option{{Label: "ship it", ArguedBy: []items.Person{bad("group:ana (U0001)")}}, {Label: "wait"}}}},
 		{Op: "assign", Unit: u, Item: "n1", Anchor: unit.Anchor{Unit: u, Ref: jChan + "/" + ts(1), At: jT0},
 			Assignees: []items.Person{bad("macedo (U0002)")}, Basis: "explicit_mention"},
 	}); err != nil {
@@ -919,6 +920,9 @@ func TestARunRepairsThePersonKeysTheLedgerHolds(t *testing.T) {
 	if it.Requester.Key != "slack:U0001" || !slices.Equal(keys(it.WaitingOn), []string{"slack:U0002", "group:Plataforma Billing"}) ||
 		!slices.Equal(keys(it.Assignees), []string{"slack:U0002"}) || it.Basis != "explicit_mention" {
 		t.Fatalf("after the repair: requester %+v, waiting on %+v, assignees %+v (%s)", it.Requester, it.WaitingOn, it.Assignees, it.Basis)
+	}
+	if len(it.Options) != 2 || it.Options[0].Label != "ship it" || !slices.Equal(keys(it.Options[0].ArguedBy), []string{"slack:U0001"}) || it.Options[1].Label != "wait" {
+		t.Fatalf("after the repair: options %+v", it.Options)
 	}
 	r.run(jT0.Add(4 * time.Minute))
 	if len(r.ledger.ops) != 1 || len(r.ledger.ops[0]) != 2 {
