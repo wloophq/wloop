@@ -789,18 +789,26 @@ func TestAHeldPublisherCostsOnePageBudget(t *testing.T) {
 		const budget = 200 * time.Millisecond
 		r.s.whereLookup, r.s.wherePage = time.Second, budget
 		r.fx.whereHangs = true
+		// The pull request's task holds the gates of the drafts proposed on it, as the daemon's gates service opens them.
+		holder := task.ID("t-0000000000000007")
+		r.put(t, task.Task{ID: holder, State: "next", Category: task.CategoryReady, Title: "the pull request", Units: []unit.Unit{r7u}})
 		for i := range 5 {
-			r.propose(t, r7u, fmt.Sprint("draft ", i), draft.Wait)
+			d := r.propose(t, r7u, fmt.Sprint("draft ", i), draft.Wait)
+			if _, err := r.s.deps.Gates.Open(context.Background(), gate.Gate{Task: holder, Unit: r7u, Kind: gate.KindDraft, Subject: fmt.Sprint(d.ID)}, nil); err != nil {
+				t.Fatal(err)
+			}
 		}
-		for _, read := range []func(){
-			func() { r.page(t, "view=outbox") },
-			func() { get(t, r.s, api.Drafts, nil) },
+		for name, read := range map[string]func(){
+			"the outbox":            func() { r.page(t, "view=outbox") },
+			"the task of the gates": func() { get(t, r.s, api.TaskPath("t-0000000000000007"), nil) },
+			"the drafts":            func() { get(t, r.s, api.Drafts, nil) },
+			"the gates":             func() { get(t, r.s, api.GatesPath, nil) },
 		} {
 			r.s.draftWheres.Clear()
 			start := time.Now()
 			read()
 			if took := time.Since(start); took != budget {
-				t.Fatalf("a page took %v under a held publisher, want one page budget, %v", took, budget)
+				t.Fatalf("%s took %v under a held publisher, want one page budget, %v", name, took, budget)
 			}
 		}
 		before := r.fx.whereCalls()

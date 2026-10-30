@@ -78,14 +78,15 @@ func (s *Server) handleGates(w http.ResponseWriter, r *http.Request) {
 			q.Statuses = append(q.Statuses, gate.Status(strings.TrimSpace(st)))
 		}
 	}
-	gs, err := rd.Where(r.Context(), q)
+	ctx := whereBy(r.Context(), time.Now().Add(s.whereBudget()))
+	gs, err := rd.Where(ctx, q)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	out := make([]api.GateView, len(gs))
 	for i, g := range gs {
-		out[i] = s.gateView(r.Context(), g)
+		out[i] = s.gateView(ctx, g)
 	}
 	writeJSON(w, out)
 }

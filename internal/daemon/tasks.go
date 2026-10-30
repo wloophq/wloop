@@ -203,7 +203,7 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if ok && listed[e.ID] {
-			page.Gates = append(page.Gates, s.gateView(ctx, g.gate))
+			page.Gates = append(page.Gates, s.gateView(whereBy(ctx, vs.whereBy), g.gate))
 		}
 	}
 	writeJSON(w, page)
@@ -688,6 +688,7 @@ func (s *Server) taskViews(_ context.Context, g *coretasks.Service, detail bool)
 }
 
 func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, error) {
+	ctx = whereBy(ctx, ev.whereBy)
 	v := api.TaskView{ID: string(e.ID), State: string(e.State), Category: string(e.Category), Title: e.Title,
 		Notes: e.Notes, Parent: string(e.Parent), Props: propsView(ev.s.loaded().Tasks, e.Props), Changed: e.Changed,
 		Units: slices.Clone(e.Units), Created: e.Created, Updated: e.Updated}
@@ -731,7 +732,7 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 	if err := ev.openGates(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
-	if err := ev.s.withDraft(whereBy(ctx, ev.whereBy), e, &v); err != nil {
+	if err := ev.s.withDraft(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
 	return v, nil
