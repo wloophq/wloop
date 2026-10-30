@@ -67,6 +67,41 @@ func StoredOver(db *store.DB, log func(string, ...any)) send.Stored {
 	}
 }
 
+// KnownOver finds a conversation as db holds it: a channel with its name and membership, a DM with the other
+// party's handle; one db does not hold, or a channel it holds without a name, is left to Slack.
+func KnownOver(db *store.DB, log func(string, ...any)) send.Known {
+	st := db.Slack()
+	return func(ctx context.Context, id string) (send.KnownConversation, bool) {
+		rows, err := st.Conversations(ctx, []string{id})
+		if err != nil {
+			if log != nil {
+				log("slack_known conversation=%s error=%v", id, err)
+			}
+			return send.KnownConversation{}, false
+		}
+		if len(rows) == 0 {
+			return send.KnownConversation{}, false
+		}
+		r := rows[0]
+		c := send.KnownConversation{ID: r.ID, Name: r.Name, Kind: r.Kind, DMUser: r.DMUser, IsMember: r.IsMember, Archived: r.Archived}
+		switch dslack.ConversationKind(r.Kind) {
+		case dslack.KindIM:
+			if r.DMUser == "" {
+				return send.KnownConversation{}, false
+			}
+			if us, err := st.Users(ctx, []string{r.DMUser}); err == nil && len(us) == 1 {
+				c.DMUserName = us[0].Name
+			}
+		case dslack.KindMPIM:
+		default:
+			if r.Name == "" {
+				return send.KnownConversation{}, false
+			}
+		}
+		return c, true
+	}
+}
+
 // parseMessage reads s as a message ref or permalink.
 func parseMessage(s string) (conv, ts, threadTS string, err error) {
 	m, ok := send.ParseMessage(s)

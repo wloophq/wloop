@@ -3,9 +3,12 @@ package send
 import (
 	"cmp"
 	"context"
+	"fmt"
 	"net/url"
 	"regexp"
 	"strings"
+
+	slack "github.com/wloophq/wloop/plugins/slack/slackapi"
 )
 
 // Message names one Slack message: by its ref, "<conversation>/<ts>", or by
@@ -72,6 +75,44 @@ type Stored func(ctx context.Context, conversation, ts string) (m StoredMessage,
 // StoredMessage is what placing a message needs of its stored copy. ThreadTS
 // is "" or TS for a message that starts no thread or is its parent.
 type StoredMessage struct{ TS, ThreadTS, Text, Permalink string }
+
+// Known finds conversation id as the store holds it; ok is false when the
+// store holds none, or not enough to place a post in it.
+type Known func(ctx context.Context, id string) (c KnownConversation, ok bool)
+
+// KnownConversation is what placing a post needs of a conversation's stored
+// copy. Kind is "channel", "private", "im" or "mpim"; DMUserName is the other
+// party's handle of an im, "" when the store holds none.
+type KnownConversation struct {
+	ID, Name, Kind, DMUser, DMUserName string
+	IsMember, Archived                 bool
+}
+
+// resolved is c as a post is placed in it, refused as Slack's answer would be.
+func (c KnownConversation) resolved() (Resolved, error) {
+	if c.Archived {
+		return Resolved{}, fmt.Errorf("%w: %s is archived", ErrCannotPost, c.ID)
+	}
+	res := Resolved{Channel: c.ID}
+	switch c.Kind {
+	case "im":
+		res.DMUser = c.DMUser
+		res.Conversation = "@" + cmp.Or(c.DMUserName, c.DMUser)
+	case "mpim":
+		res.Conversation = "group DM"
+	default:
+		if !c.IsMember {
+			return Resolved{}, fmt.Errorf("%w: not a member of #%s (%s)", ErrCannotPost, c.Name, c.ID)
+		}
+		res.Conversation = "#" + c.Name
+	}
+	return res, nil
+}
+
+func (c KnownConversation) info() slack.ConversationInfo {
+	return slack.ConversationInfo{ID: c.ID, Name: c.Name, IsIM: c.Kind == "im", IsMPIM: c.Kind == "mpim", IsPrivate: c.Kind == "private",
+		IsArchived: c.Archived, IsMember: c.IsMember, User: c.DMUser}
+}
 
 // InThread is m with the thread the store holds it in, its own TS when it is
 // in none; m as named when its name says the thread or the store does not.

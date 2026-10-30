@@ -717,6 +717,6 @@ func (p *plugin) publisher() (*Publisher, error) {
 	if p.src == nil || p.slack.Client == nil || p.slack.Tokens == nil {
 		return nil, send.ErrNotLoggedIn
 	}
-	s := &send.Service{Client: p.slack.Client, Log: p.log, PostAllowlist: p.cfg.PostAllowlist, Stored: StoredOver(p.db, p.log)}
+	s := &send.Service{Client: p.slack.Client, Log: p.log, PostAllowlist: p.cfg.PostAllowlist, Stored: StoredOver(p.db, p.log), Known: KnownOver(p.db, p.log)}
 	return PublisherOver(p.db, s, p.slack.Tokens.Load, p.host.Items, p.now, p.log), nil
 }

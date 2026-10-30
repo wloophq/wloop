@@ -45,6 +45,8 @@ type Service struct {
 	PostAllowlist []string
 	// Stored finds the thread of a message without asking Slack; nil asks Slack.
 	Stored Stored
+	// Known finds a conversation without asking Slack; nil asks Slack.
+	Known Known
 
 	dir directory
 }
@@ -191,6 +193,12 @@ func (s *Service) conversation(ctx context.Context, id string) (Resolved, error)
 }
 
 func (s *Service) conversationInfo(ctx context.Context, id string) (Resolved, slack.ConversationInfo, error) {
+	if s.Known != nil {
+		if c, ok := s.Known(ctx, id); ok {
+			res, err := c.resolved()
+			return res, c.info(), err
+		}
+	}
 	info, err := s.Client.ConversationInfo(ctx, id)
 	if err != nil {
 		if code(err) == "channel_not_found" {

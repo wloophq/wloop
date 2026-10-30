@@ -633,3 +633,36 @@ func TestRenamedChannelIsNotReusedFromTheCache(t *testing.T) {
 		t.Fatalf("posts = %d, want only the first", n)
 	}
 }
+
+func TestAKnownConversationIsPlacedWithoutAskingSlack(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t, newWorkspace())
+	f.svc.Known = func(_ context.Context, id string) (send.KnownConversation, bool) {
+		switch id {
+		case "C100":
+			return send.KnownConversation{ID: "C100", Name: "general", Kind: "channel", IsMember: true}, true
+		case "C300":
+			return send.KnownConversation{ID: "C300", Name: "old", Kind: "channel", IsMember: true, Archived: true}, true
+		case "D500":
+			return send.KnownConversation{ID: "D500", Kind: "im", DMUser: "U001", DMUserName: "alice"}, true
+		}
+		return send.KnownConversation{}, false
+	}
+	ctx := context.Background()
+	res, err := f.svc.Resolve(ctx, send.Request{Target: "C100"})
+	if err != nil || res.Channel != "C100" || res.Conversation != "#general" {
+		t.Fatalf("a known channel: %+v, %v", res, err)
+	}
+	if res, err := f.svc.Resolve(ctx, send.Request{Target: "D500"}); err != nil || res.DMUser != "U001" || res.Conversation != "@alice" {
+		t.Fatalf("a known DM: %+v, %v", res, err)
+	}
+	if _, err := f.svc.Resolve(ctx, send.Request{Target: "C300"}); !errors.Is(err, send.ErrCannotPost) {
+		t.Fatalf("a known archived channel: %v, want ErrCannotPost", err)
+	}
+	if n := len(f.slack.Calls("conversations.info")) + len(f.slack.Calls("users.info")); n != 0 {
+		t.Fatalf("Slack was asked %d times about conversations the store knows", n)
+	}
+	if res, err := f.svc.Resolve(ctx, send.Request{Target: "G400"}); err != nil || res.Conversation != "#secret" || len(f.slack.Calls("conversations.info")) != 1 {
+		t.Fatalf("a conversation the store does not know: %+v, %v, %d calls", res, err, len(f.slack.Calls("conversations.info")))
+	}
+}
