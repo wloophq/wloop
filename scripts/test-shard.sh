@@ -14,7 +14,7 @@ patterns() {
 	daemon) echo ./internal/daemon ;;
 	store) echo ./internal/adapter/store/... ;;
 	cli) echo ./internal/cli ;;
-	sources) echo ./internal/adapter/source/slack ./internal/adapter/source/github ./internal/readmodel ./internal/brief ;;
+	sources) echo ./plugins/... ./internal/adapter/source/... ./internal/readmodel ./internal/brief ;;
 	*) echo "unknown shard $1" >&2; return 1 ;;
 	esac
 }
