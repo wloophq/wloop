@@ -908,12 +908,17 @@ func TestARunRepairsThePersonKeysTheLedgerHolds(t *testing.T) {
 				Options:   &[]items.Option{{Label: "ship it", ArguedBy: []items.Person{bad("group:ana (U0001)")}}, {Label: "wait"}}}},
 		{Op: "assign", Unit: u, Item: "n1", Anchor: unit.Anchor{Unit: u, Ref: jChan + "/" + ts(1), At: jT0},
 			Assignees: []items.Person{bad("macedo (U0002)")}, Basis: "explicit_mention"},
+		{Op: "create", Unit: u, Item: "n2", Anchor: unit.Anchor{Unit: u, Ref: jChan + "/" + ts(1), At: jT0},
+			Fields: &items.Fields{Kind: &kind, Summary: &summary, Requester: &items.Person{Key: "slack:U0003", Name: "bia"},
+				WaitingOn: &[]items.Person{{Key: "group:S0001", Name: "a user group"}, {Key: "group:Plataforma Billing", Name: "Plataforma Billing"}}}},
+		{Op: "assign", Unit: u, Item: "n2", Anchor: unit.Anchor{Unit: u, Ref: jChan + "/" + ts(1), At: jT0},
+			Assignees: []items.Person{{Key: "group:S0001", Name: "a user group"}}, Basis: "group_ask"},
 	}); err != nil {
 		t.Fatal(err)
 	}
 	r.run(jT0.Add(2 * time.Minute))
 	its := r.items(u)
-	if len(its) != 1 {
+	if len(its) != 2 {
 		t.Fatalf("items %+v", its)
 	}
 	it := its[0]
@@ -925,7 +930,7 @@ func TestARunRepairsThePersonKeysTheLedgerHolds(t *testing.T) {
 		t.Fatalf("after the repair: options %+v", it.Options)
 	}
 	r.run(jT0.Add(4 * time.Minute))
-	if len(r.ledger.ops) != 1 || len(r.ledger.ops[0]) != 2 {
-		t.Fatalf("Applies %+v, want one with the repair's update and assign, once per process", r.ledger.ops)
+	if len(r.ledger.ops) != 1 || len(r.ledger.ops[0]) != 2 || r.ledger.ops[0][0].Item != "n1" || r.ledger.ops[0][1].Item != "n1" {
+		t.Fatalf("Applies %+v, want one with the repair's update and assign of n1, once per process, and nothing for n2's sound people", r.ledger.ops)
 	}
 }

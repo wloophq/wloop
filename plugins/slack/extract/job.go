@@ -721,9 +721,9 @@ func repairOps(u unit.Unit, it items.Item) []items.Op {
 		out, changed := make([]items.Person, len(ps)), false
 		for i, p := range ps {
 			out[i] = p
-			if id := personID(p.Key); id != p.Key && (slackUserID.MatchString(id) || slackGroupID.MatchString(id) || strings.HasPrefix(p.Key, "group:group:")) {
-				out[i], changed = b.person(p.Key), true
-				if out[i].Name == id && p.Name != "" {
+			if id, np := personID(p.Key), b.person(p.Key); id != p.Key && np.Key != p.Key {
+				out[i], changed = np, true
+				if np.Name == id && p.Name != "" {
 					out[i].Name = personID(p.Name)
 				}
 			}
