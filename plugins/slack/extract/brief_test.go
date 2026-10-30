@@ -3,6 +3,7 @@ package extract
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -33,8 +34,21 @@ func TestTheExtractionWritesTheStructuredBriefPerDMSegment(t *testing.T) {
 		return answerJSON(t, nil, []obj{{"ref": "s1", "from_ts": ts(1), "to_ts": ts(2), "topic": "the deck", "brief": kept},
 			{"ref": "s2", "from_ts": ts(3), "to_ts": "", "topic": "the export", "brief": kept}}, nil, obj{"brief": kept}), nil
 	}
+	var put, briefed []unit.Unit
+	r.job.PutBrief = func(_ context.Context, u unit.Unit, _ string, _ time.Time) error {
+		if err := slack.ValidKey(u.Key); err != nil {
+			return err
+		}
+		put = append(put, u)
+		return nil
+	}
+	r.job.Briefed = func(u unit.Unit) { briefed = append(briefed, u) }
 	r.run(jT0.Add(2 * time.Minute))
 	deck, export := segUnit(jTeam, jDM, strings.ReplaceAll(ts(1), ".", "")), segUnit(jTeam, jDM, strings.ReplaceAll(ts(3), ".", ""))
+	slices.SortFunc(briefed, unit.Compare)
+	if segments := []unit.Unit{deck, export}; !slices.Equal(put, segments) || !slices.Equal(briefed, segments) {
+		t.Fatalf("the host got the briefs of %v and heard of %v, want the segments %v", put, briefed, segments)
+	}
 	want := map[unit.Unit]storedBrief{
 		deck: {Goal: "Review the deck", Kind: "request", Risk: "low", OpenQuestions: []string{}, Tags: []string{"domain:sales-deck", "audience:internal"}},
 		export: {Goal: "The invoice export is down", Kind: "incident", Risk: "high", RiskWhy: "customers cannot export",

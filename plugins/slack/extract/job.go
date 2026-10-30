@@ -651,9 +651,11 @@ func (j *Job) apply(ctx context.Context, k unit.Unit, p *pend, team string, in I
 		return 0, err
 	}
 	hints := hintsOf(r, ops, itemUnit, k)
+	// A DM conversation is no unit of the host, which knows its segments: its brief stays in the plugin's store.
+	hosted := func(u unit.Unit) bool { return !(p.dm && u == k) }
 	if j.PutBrief != nil {
 		for _, u := range slices.SortedFunc(maps.Keys(states), unit.Compare) {
-			if b := states[u].Brief; b != "" {
+			if b := states[u].Brief; b != "" && hosted(u) {
 				if err := j.PutBrief(ctx, u, b, now); err != nil {
 					return 0, err
 				}
@@ -666,7 +668,7 @@ func (j *Job) apply(ctx context.Context, k unit.Unit, p *pend, team string, in I
 	j.finish(k, p)
 	if j.Briefed != nil {
 		for u, s := range states {
-			if s.Brief != "" {
+			if s.Brief != "" && hosted(u) {
 				j.Briefed(u)
 			}
 		}
