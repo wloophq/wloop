@@ -15,7 +15,7 @@ const itemOpen items.State = "open"
 // Reconcile is what the items of one unit call for, given the tasks that hold them or the unit.
 //
 // One task per task key (items.Item.TaskKey, else the item id) of the open items that wait on Me, or that Me
-// requested or f.Cares about and wait on others. An item a task already holds stays with that task, so a task
+// requested, is assigned or f.Cares about and wait on others. An item a task already holds stays with that task, so a task
 // the user merged keeps its items, and every item of a key goes to the task holding one of them. A key no task
 // holds that names f.Unit goes to the unit's own task (UnitTask) while it is open, else to the oldest open task
 // holding f.Unit as a link, such as a task you started whose pull request was attached, else to its own closed
@@ -226,7 +226,8 @@ func wants(f UnitFacts, it items.Item, me Me) (Category, bool) {
 	start, ok := CategoryInbox, true
 	if !slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return isMe(p, me) }) {
 		own := it.TaskKey == f.Unit.String() && len(it.WaitingOn) == 0
-		start, ok = CategoryWaiting, (len(it.WaitingOn) > 0 || own) && (isMe(it.Requester, me) || f.Cares)
+		mine := isMe(it.Requester, me) || slices.ContainsFunc(it.Assignees, func(p items.Person) bool { return isMe(p, me) })
+		start, ok = CategoryWaiting, (len(it.WaitingOn) > 0 || own) && (mine || f.Cares)
 	}
 	if it.Initial != "" {
 		start = Category(it.Initial)

@@ -41,7 +41,8 @@ func (e *Env) linkDeps(db *sqlite.DB, cfg config.Config, logf func(string, ...an
 
 // serve is d with the resolver as a runtime: woken by the source events and
 // links noted on units, it resolves the open items linked to them. It runs
-// only when an enabled plugin reads unit events.
+// only when an enabled plugin reads unit events, and then also settles an item
+// as the ledger stores its link.
 func (w *linkWiring) serve(d daemon.Deps, mods []pluginModule) daemon.Deps {
 	w.units.Store(d.Units)
 	events := map[unit.ProviderID]links.EventReader{}
@@ -50,10 +51,15 @@ func (w *linkWiring) serve(d daemon.Deps, mods []pluginModule) daemon.Deps {
 			events[m.ID] = m.UnitEvents
 		}
 	}
-	if len(events) == 0 || w.e.changes == nil {
+	if len(events) == 0 {
 		return d
 	}
-	r := &links.Resolver{Links: w.store, Events: events, Ledger: w.e.itemsLedger(w.db, w.cfg, w.logf), Clock: clockFunc(w.e.Now), Log: w.logf, Codecs: d.Units}
+	ledger := w.e.itemsLedger(w.db, w.cfg, w.logf)
+	r := &links.Resolver{Links: w.store, Events: events, Ledger: ledger, Clock: clockFunc(w.e.Now), Log: w.logf, Codecs: d.Units}
+	ledger.Settle = r.Settles
+	if w.e.changes == nil {
+		return d
+	}
 	changes := w.e.changes
 	d.Runtimes = append(d.Runtimes, daemon.PluginRuntime{ID: linksRuntime, Run: func(ctx context.Context) error {
 		return resolveNoted(ctx, r.Run, w.db.LinkTargets, changes, w.logf)

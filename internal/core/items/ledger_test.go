@@ -350,6 +350,32 @@ func TestLinkOpWritesLink(t *testing.T) {
 	}
 }
 
+func TestALinkToAnEndedUnitSettlesItsItemInTheSameBatch(t *testing.T) {
+	s := newMem()
+	l, _ := newLedger(s)
+	l.Links = &fakeLinks{}
+	merged := unit.Anchor{Unit: pull, Ref: "merged", At: t0}
+	l.Settle = func(_ context.Context, lk link.Link, it items.Item) (items.Op, bool, error) {
+		if lk.To != pull || it.ID != "i1" || it.State != items.Open {
+			return items.Op{}, false, nil
+		}
+		ev := items.Evidence{Kind: items.EvidenceUnitEvent, Anchor: merged}
+		return items.Op{Op: items.OpResolve, Unit: thread, Item: "i1", Anchor: merged, Resolution: items.Moot, Evidence: &ev}, true, nil
+	}
+	res := apply(t, l, items.Extracted, create(thread, "i1", "review o/r#1"),
+		items.Op{Op: items.OpLink, Unit: thread, Item: "i1", Anchor: anchor("C000AAA/1.3"), To: &pull, LinkKind: link.Review})
+	if len(res.Refused) != 0 {
+		t.Fatalf("%+v", res.Refused)
+	}
+	i := slices.IndexFunc(s.items[thread], func(it items.Item) bool { return it.ID == "i1" })
+	if i < 0 {
+		t.Fatal("no item i1")
+	}
+	if got := s.items[thread][i]; got.State != items.Resolved || got.Resolution != items.Moot || got.Evidence.Anchor != merged {
+		t.Fatalf("item %+v", got)
+	}
+}
+
 func TestLinkOpRefusals(t *testing.T) {
 	l, _ := newLedger(newMem())
 	apply(t, l, items.Turn, create(thread, "i1", "x"))

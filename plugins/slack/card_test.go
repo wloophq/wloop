@@ -158,8 +158,8 @@ func TestCardTaskFields(t *testing.T) {
 		t.Fatalf("resolved, no item, not followed: %+v", c)
 	}
 	applyOps(t, f.ledger(), items.Extracted, createOp(u, "e1", 1, mePerson, otherPerson))
-	if c := f.card(t, u); !c.Cares {
-		t.Fatalf("an open item: %+v", c)
+	if c := f.card(t, u); c.Cares {
+		t.Fatalf("an open item does not make a thread followed: %+v", c)
 	}
 
 	g := newFixture(t)

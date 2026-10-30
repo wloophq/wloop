@@ -32,7 +32,7 @@ func Card(r slackrows.Row) (src.Card, error) {
 		TurnsLink:     "#unit=" + string(r.Unit.Provider) + "/" + r.Unit.Key,
 		StartedByMe:   p.StartedByViewer,
 		ClosurePosted: p.ClosurePosted,
-		Cares:         r.Summary.OpenItems > 0 || p.Followed,
+		Cares:         p.Followed,
 	}
 	if r.Summary.OpenItems > 0 {
 		c.Since = r.Summary.Since

@@ -222,6 +222,7 @@ var otherFacts = []Fact{
 	wf("draft", "items_owed", expr.Int, "Items of the draft still open and held by its person, or unowned for a draft of no person."),
 	wf("draft", "items_assigned", expr.Int, "Items of the draft that have an owner, someone waited on, or are no longer open."),
 	wf("draft", "unit_open", expr.Bool, "The draft's unit still exists: its task is neither done nor in the trash, or its unit is stored."),
+	wf("draft", "person_asks_you", expr.Bool, "The draft's person asked you something still open on the draft's unit: an open item there that they requested waits on you. False for a draft of no person."),
 	enum(approvalFact("delivery", expr.String, "How the unit's plugin posts the draft: message, reaction or comment. A plugin that posts every text as a comment makes each draft that is not a reaction a comment, whatever its proposer asked for."), enumOf(DraftDeliveries...)),
 	approvalFact("proposer", expr.String, "What proposed the draft: workflow:<name> for a workflow's draft.propose, intent:<name> for a turn's or a session's, rule:<name> for a plugin rule's."),
 	approvalFact("effects", expr.List, "The effects the draft applies once sent when the loop named them, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names them. A workflow's rules and the configuration's read it; an intent's do not."),

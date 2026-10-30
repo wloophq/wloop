@@ -211,6 +211,31 @@ func TestMergeAndCloseResolveLinks(t *testing.T) {
 	}
 }
 
+func TestMergeBeforeTheLinkResolvesIt(t *testing.T) {
+	for _, kind := range []link.Kind{link.Review, link.Merge} {
+		f := newFixture(t, openItem(octocat), reviewLink(kind))
+		f.events.evs = []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}
+		if n := f.run(t); n != 1 {
+			t.Fatalf("%s link to a pull request merged before it: resolved = %d", kind, n)
+		}
+	}
+	reopened := openItem(octocat)
+	reopened.UserAt = t0
+	f := newFixture(t, reopened, reviewLink(link.Review))
+	f.events.evs = []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}
+	if n := f.run(t); n != 0 {
+		t.Fatalf("a merge before the user reopened the item resolved it: %d", n)
+	}
+}
+
+func TestCloseBeforeTheLinkLeavesItOpen(t *testing.T) {
+	f := newFixture(t, openItem(octocat), reviewLink(link.Review))
+	f.events.evs = []link.Event{state(link.EventClosed, t0.Add(-time.Hour)), review("octocat", t0.Add(-time.Hour))}
+	if n := f.run(t); n != 0 {
+		t.Fatalf("a close or a review before the link resolved it: %d", n)
+	}
+}
+
 func TestFirstSettlingEventWins(t *testing.T) {
 	f := newFixture(t, openItem(octocat), reviewLink(link.Review))
 	f.events.evs = []link.Event{state(link.EventClosed, t0.Add(2*time.Hour)), review("octocat", t0.Add(time.Hour))}
@@ -300,3 +325,23 @@ type foldCodec struct{ id unit.ProviderID }
 func (c foldCodec) Provider() unit.ProviderID { return c.id }
 func (foldCodec) Valid(string) error          { return nil }
 func (foldCodec) Equal(a, b string) bool      { return strings.EqualFold(a, b) }
+
+func TestSettlesWhatTheTargetAlreadyShows(t *testing.T) {
+	f := newFixture(t, openItem(octocat))
+	f.events.evs = []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}
+	op, ok, err := f.r.Settles(context.Background(), reviewLink(link.Merge), openItem(octocat))
+	if err != nil || !ok || op.Op != items.OpResolve || op.Unit != thread || op.Item != "i1" || op.Resolution != items.Done ||
+		op.Evidence == nil || op.Evidence.Anchor.Ref != "merged" {
+		t.Fatalf("op %+v ok %v err %v", op, ok, err)
+	}
+	if _, ok, _ := f.r.Settles(context.Background(), reviewLink(link.Mention), openItem(octocat)); ok {
+		t.Fatal("a mention settled its item")
+	}
+	f.events.evs = []link.Event{review("octocat", t0.Add(-time.Hour))}
+	if _, ok, _ := f.r.Settles(context.Background(), reviewLink(link.Review), openItem(octocat)); ok {
+		t.Fatal("a review before the link settled it")
+	}
+	if len(f.ledger.applied) != 0 {
+		t.Fatalf("Settles applied %+v", f.ledger.applied)
+	}
+}
