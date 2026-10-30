@@ -240,6 +240,10 @@ func (l *recordingLedger) Items(ctx context.Context, u unit.Unit) ([]items.Item,
 	return l.host.Broker().Items(ctx, u)
 }
 
+func (l *recordingLedger) All(ctx context.Context) (map[unit.Unit][]items.Item, error) {
+	return l.host.Broker().All(ctx)
+}
+
 type jobAsker struct {
 	mu    sync.Mutex
 	asks  []host.Ask
@@ -904,9 +908,6 @@ func TestARunRepairsThePersonKeysTheLedgerHolds(t *testing.T) {
 		{Op: "assign", Unit: u, Item: "n1", Anchor: unit.Anchor{Unit: u, Ref: jChan + "/" + ts(1), At: jT0},
 			Assignees: []items.Person{bad("macedo (U0002)")}, Basis: "explicit_mention"},
 	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := r.job.Store.DB.Save(ctx, store.ExtractionSave{States: map[unit.Unit]store.ExtractionState{u: {LastTS: ts(1), At: jT0}}}); err != nil {
 		t.Fatal(err)
 	}
 	r.run(jT0.Add(2 * time.Minute))

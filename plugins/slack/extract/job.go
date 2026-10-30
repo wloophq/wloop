@@ -55,6 +55,7 @@ const (
 type Ledger interface {
 	Apply(ctx context.Context, prov items.Provenance, ops []items.Op) (host.Result, error)
 	Items(ctx context.Context, u unit.Unit) ([]items.Item, error)
+	All(ctx context.Context) (map[unit.Unit][]items.Item, error)
 }
 
 // Clock is the job's clock.
@@ -691,17 +692,13 @@ func (j *Job) repair(ctx context.Context) error {
 	if j.repaired {
 		return nil
 	}
-	states, err := j.Store.DB.All(ctx, slack.Provider)
+	all, err := j.Ledger.All(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("slack extraction: repair people: %w", err)
 	}
 	var ops []items.Op
-	for _, u := range slices.SortedFunc(maps.Keys(states), unit.Compare) {
-		its, err := j.Ledger.Items(ctx, u)
-		if err != nil {
-			return err
-		}
-		for _, it := range its {
+	for _, u := range slices.SortedFunc(maps.Keys(all), unit.Compare) {
+		for _, it := range all[u] {
 			ops = append(ops, repairOps(u, it)...)
 		}
 	}

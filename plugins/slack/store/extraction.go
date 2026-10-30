@@ -54,7 +54,6 @@ const (
 	extractionStatesSQL = `SELECT ` + extractionStateColumns + ` FROM extraction_cursors
 		WHERE (provider, unit_key) IN (SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?))`
 	extractionWatchedSQL  = `SELECT ` + extractionStateColumns + ` FROM extraction_cursors WHERE provider = ? AND watched = 1`
-	extractionAllSQL      = `SELECT ` + extractionStateColumns + ` FROM extraction_cursors WHERE provider = ? AND unit_key != ''`
 	putExtractionStateSQL = `INSERT INTO extraction_cursors (provider, unit_key, last_ts, last_seq, verdict, verdict_why,
 		viewer_role, topic, started_by_viewer, closure_posted, at, brief) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (provider, unit_key) DO UPDATE SET last_ts = excluded.last_ts, last_seq = excluded.last_seq,
@@ -114,11 +113,6 @@ func (s *ExtractionStore) States(ctx context.Context, units []unit.Unit) (map[un
 		return nil, err
 	}
 	return scanExtractionStates(s.db.R().QueryContext(ctx, extractionStatesSQL, list))
-}
-
-// All are the rows of every unit of provider.
-func (s *ExtractionStore) All(ctx context.Context, provider unit.ProviderID) (map[unit.Unit]ExtractionState, error) {
-	return scanExtractionStates(s.db.R().QueryContext(ctx, extractionAllSQL, string(provider)))
 }
 
 // Watched are the rows of provider that SetWatched marked.

@@ -9,7 +9,7 @@ import (
 )
 
 func init() {
-	reads = append(reads, "DB.Extraction", "ExtractionStore.States", "ExtractionStore.Watched", "ExtractionStore.All", "ExtractionStore.Hints",
+	reads = append(reads, "DB.Extraction", "ExtractionStore.States", "ExtractionStore.Watched", "ExtractionStore.Hints",
 		"ExtractionStore.Day", "SegmentStore.Of", "SegmentStore.Rehoming")
 	u := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1.1"}
 	writes = append(writes,
