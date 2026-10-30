@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"net/http/pprof"
 	"slices"
 	"strconv"
 	"strings"
@@ -33,7 +34,35 @@ func (s *Server) Handler() http.Handler {
 		writeError(w, http.StatusNotFound, "no such endpoint "+r.URL.Path)
 	})
 	mux.Handle("GET /", web.Handler(s.deps.Version))
-	return s.versioned(s.afterReconcile(mux))
+	return s.versioned(s.afterReconcile(s.slowLogged(mux)))
+}
+
+// SocketHandler is Handler with the runtime's profiles under /debug/pprof/, for the socket alone: the person
+// who owns the socket reads them, never the token-guarded port.
+func (s *Server) SocketHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	mux.Handle("/", s.Handler())
+	return mux
+}
+
+// slowRequest is the duration past which a request is logged with its path.
+const slowRequest = 2 * time.Second
+
+// slowLogged logs each request of the API that took longer than slowRequest, so a slow cockpit or client
+// has a server-side record of what was slow and for how long.
+func (s *Server) slowLogged(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := s.deps.Now()
+		h.ServeHTTP(w, r)
+		if took := s.deps.Now().Sub(start); took > slowRequest && strings.HasPrefix(r.URL.Path, "/api/") {
+			s.logf("slow request: %s %s took %s", r.Method, r.URL.RequestURI(), took.Round(time.Millisecond))
+		}
+	})
 }
 
 func scopedHandler(name string, h http.Handler) http.Handler {

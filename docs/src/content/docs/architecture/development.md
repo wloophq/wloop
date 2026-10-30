@@ -24,6 +24,10 @@ make proto        # lint proto/ and regenerate the plugin protocol's Go code
 
 Uninstall the Homebrew cask first (`brew uninstall --cask {{command}}`), or put `~/.local/bin` ahead of the Homebrew directory in your `PATH`, so the shell runs the same binary as the daemon. To go back to a release, install the cask and run `{{command}} install` and `{{command}} app install` with it.
 
+### Profiling the daemon
+
+The daemon serves the Go runtime's profiles on its socket alone, never on the token-guarded port: `curl --unix-socket ~/.local/state/wloop/daemon.sock 'http://wloop/debug/pprof/profile?seconds=15' > cpu.out`, then `go tool pprof -top cpu.out` (the profile carries its symbols). `/debug/pprof/goroutine?debug=2` dumps every goroutine when a request hangs. The daemon's log names each API request that took longer than two seconds, with its path and duration, and `doctor` reports the load of the last ten minutes by route and job.
+
 ### An isolated daemon
 
 `scripts/isolated-daemon.sh` runs a build in a directory of its own, with its own state, config, Orca stub and Keychain service, so it never reaches your daemon, your store, your Orca workspaces or your agents. `setup` stubs `gh`, `orca`, `claude`, `codex` and `launchctl`. `--plugins <id,...>` turns plugins on, and `--slack` turns on Slack with its socket; either way, each plugin it turns on is trusted by its path. `--real-gh <owner/repo,...>` turns the GitHub plugin on against your own `gh`: it leaves `gh`, `GH_TOKEN` and `GH_CONFIG_DIR` as they are and sets `[plugins.github] owners` to those repositories' owners and `scope.repos` to the repositories. The plugin still reads your own pull requests and the reviews requested of you in any repository, since its searches always include them. Automated rounds stay within the owners, and every post waits on its gate (`TestIsolatedSetupRealGhScopesGitHubAndLeavesGhUnstubbed`). The script's header lists every command.

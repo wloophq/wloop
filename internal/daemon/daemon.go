@@ -829,7 +829,7 @@ func (s *Server) Run(ctx context.Context) error {
 	ctx = meter.WithRegistry(ctx, d.Meter)
 	base := func(net.Listener) context.Context { return meter.WithRegistry(context.Background(), d.Meter) }
 	servers := []*http.Server{
-		{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second, BaseContext: base},
+		{Handler: s.SocketHandler(), ReadHeaderTimeout: 10 * time.Second, BaseContext: base},
 		{Handler: s.AuthHandler(), ReadHeaderTimeout: 10 * time.Second, BaseContext: base},
 	}
 	listeners := []net.Listener{unixLn, tcpLn}
