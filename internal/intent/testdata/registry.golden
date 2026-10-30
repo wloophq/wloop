@@ -899,7 +899,7 @@ workflow/slack-stalled-nudge.Gates[step].Mode = "wait"
 workflow/slack-stalled-nudge.Gates[trust].Mode = "wait"
 workflow/slack-stalled-nudge.Source = "plugins/slack/profile/workflows/slack-stalled-nudge/workflow.toml"
 workflow/slack-stalled-nudge.Bundled = true
-workflow/slack-stalled-nudge.Withdraw = "!draft.person_waited || draft.items_owed == 0"
+workflow/slack-stalled-nudge.Withdraw = "!draft.person_waited || draft.items_owed == 0 || draft.person_asks_you"
 workflow/slack-stalled-nudge.WithdrawReason = "moot"
 workflow/task-wake.Name = "task-wake"
 workflow/task-wake.Summary = "Bring a snoozed task back where its wake returns it once the wake matches: its date passed, activity on its units, or its condition holds"

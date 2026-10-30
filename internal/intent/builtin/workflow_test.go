@@ -31,7 +31,7 @@ var workflowTable = map[string]string{
 	"slack": "channel:S conversation:S started_by_me:B closure_posted:B live_task:B items_open:I items_resolved:I items_unowned:I items_unowned_age_days:I " +
 		"ended:B settled_at:T fingerprint:S",
 	"brief":   "goal:S risk:S kind:S size:S tags:L missing:L",
-	"draft":   "person_waited:B items_owed:I items_assigned:I unit_open:B",
+	"draft":   "person_waited:B items_owed:I items_assigned:I unit_open:B person_asks_you:B",
 	"trigger": "kind:S event.kind:S event.key:S event.id:I event.data:S fired_at:T",
 	"config": "cleanup.idle:D cleanup.asked_idle:D cleanup.workspace_grace:D cleanup.manual_idle:D cleanup.stale_workspace:D plugins.github.nudge.silent_days:I " +
 		"tasks.stale_waiting_days:I drafts.repeat_after:D turns.per_day:I",

@@ -112,6 +112,15 @@ func TestOthersItemsIgnoredWithoutCare(t *testing.T) {
 	}
 }
 
+func TestMyItemWaitingOnOthersIsWaitedOn(t *testing.T) {
+	mine := func(it *items.Item) {
+		it.Requester, it.Assignees, it.WaitingOn = bob, []items.Person{meP}, []items.Person{ana}
+	}
+	if e := only(t, reconcile(t, facts(), []items.Item{item("a", mine)}, nil, now)); e.Category != task.CategoryWaiting {
+		t.Fatalf("task %+v", e)
+	}
+}
+
 func TestOnlyItemsCreateTasks(t *testing.T) {
 	f := facts(func(f *task.UnitFacts) { f.StartedByMe, f.Cares, f.LastHuman = true, true, now })
 	if es := reconcile(t, f, nil, nil, now); len(es) != 0 {

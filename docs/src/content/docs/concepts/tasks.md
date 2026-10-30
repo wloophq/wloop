@@ -27,7 +27,7 @@ Once you create or correct an item it is **confirmed**: extraction never overwri
 
 ## From items to tasks
 
-- Each open item that waits on you becomes a task in the Inbox; one you requested, or of a unit you care about, that waits on someone else becomes a task in Waiting. An item a task already holds stays with it, so a task you merged keeps its items.
+- Each open item that waits on you becomes a task in the Inbox; one you requested or are assigned, or of a unit you care about, that waits on someone else becomes a task in Waiting. You care about a pull request in scope, adopted or tracked, and about a Slack thread you follow; an open item alone does not make you care about its thread, so an ask between other people never becomes your task. An item a task already holds stays with it, so a task you merged keeps its items.
 - A plugin decides how its items group into tasks: each item carries a task key, its own id unless the plugin sets one. Every item of a key is an ask of one task. The GitHub plugin keys every item of a pull request on the pull request, so each pull request you follow is one task, the pull request its first unit, and a situation change (a review, then changes to address, then the merge) changes the task's asks, never the task. A key no task holds that names the unit goes to the unit's own task, the task whose first unit it is, open or not: a done one comes back into Next, marked changed, so an open pull request never gets a second task. A gate on a pull request whose task is done reopens that task too.
 - A pull request's task lives as long as the pull request: it does not close when it asks nothing for a while, such as while the loop works on it. It ends through the bundled `task-results-ended` workflow once the pull request merged or closed, and is dropped when you stop following it (its `unfollowed` property says when); following it again brings it back to Next, marked changed. A pull request task you dropped yourself stays dropped. The bundled `pr-task-clarify` workflow moves a pull request's task that lands in the Inbox to Next, so what it asks of you is in Needs me.
 - A plugin proposes the category a new task starts in (`inbox` or `ready`), never a state name: the task takes the first state of that category in `tasks.toml`. It also gives the task the `kind` its manifest names for its units, such as `thread`; the bundled `task-kind` workflow gives a task you made with no unit the kind `capture`.
@@ -188,7 +188,7 @@ Every post an agent or a rule proposes is a draft first, held by its draft gate 
 
 | Workflow or rule | Proposes |
 |---|---|
-| `slack-stalled-nudge` | a nudge to each person who owes a task with a Slack unit, once its check date passed and it was not nudged within `drafts.repeat_after` (1d) |
+| `slack-stalled-nudge` | a nudge to each person who owes a task with a Slack unit, once its check date passed and it was not nudged within `drafts.repeat_after` (1d); never to someone with an open ask to you in that thread (`draft.person_asks_you`) |
 | `slack-closure` | a closing message for a Slack unit you started whose items resolved |
 | `slack-ask-owner` | a question for a Slack unit's open items with no owner after a working day; it always waits for you |
 | `github-nudge` | the GitHub plugin's nudge |

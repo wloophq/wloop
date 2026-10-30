@@ -60,6 +60,18 @@ type draftDeps struct {
 	Enabled func(unit.ProviderID) bool
 	// Codecs compare a person's keys; nil compares them byte for byte.
 	Codecs unit.KeyComparer
+	// Me is the user's identity; nil: nobody.
+	Me func() task.Me
+}
+
+// me is the user's identity, compared through the deps' codecs.
+func (d *draftDeps) me() task.Me {
+	if d.Me == nil {
+		return task.Me{}
+	}
+	me := d.Me()
+	me.Codecs = d.Codecs
+	return me
 }
 
 var errNoDraftDeps = errors.New("draft.propose needs the daemon's Outbox")
@@ -271,7 +283,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			}
 		}
 		if cd.refusal == "" && w.Withdraw != nil {
-			cd.refusal, err = withdrawnAtOnce(w, subject.Facts, draftFactsOf(sub, person.Key, cd.p.Items), deps.Config, now)
+			cd.refusal, err = withdrawnAtOnce(w, subject.Facts, draftFactsOf(sub, person.Key, cd.p.Items, deps.me()), deps.Config, now)
 			if err != nil {
 				return nil, err
 			}
@@ -354,6 +366,18 @@ func (s draftSubject) owedPool(person items.Person) []items.Item {
 		}
 	}
 	return out
+}
+
+// asks says whether person requested an open item of the subject's unit that waits on me.
+func (s draftSubject) asks(person string, me task.Me) bool {
+	if person == "" {
+		return false
+	}
+	them := items.Identity{Keys: []string{person}, Codecs: me.Codecs}
+	return slices.ContainsFunc(s.items, func(it items.Item) bool {
+		return it.State == items.Open && it.Unit == s.unit && it.Requester.Is(them) &&
+			slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return p.Is(me) })
+	})
 }
 
 // held are the open items of the subject: those its task holds, or every
@@ -514,7 +538,7 @@ func withdrawnAtOnce(w workflow.Workflow, subject, drafted workflow.Facts, cfg f
 
 // draftFactsOf are the draft slot's facts of a draft on sub for person
 // over the items ids.
-func draftFactsOf(sub draftSubject, person string, ids []string) workflow.Facts {
+func draftFactsOf(sub draftSubject, person string, ids []string, me task.Me) workflow.Facts {
 	var mine []items.Item
 	for _, it := range sub.items {
 		if slices.Contains(ids, it.ID) {
@@ -545,10 +569,11 @@ func draftFactsOf(sub draftSubject, person string, ids []string) workflow.Facts 
 		}
 	}
 	return workflow.Facts{
-		"draft.person_waited":  waited,
-		"draft.items_owed":     held,
-		"draft.items_assigned": owned,
-		"draft.unit_open":      sub.task == nil || sub.task.Open(),
+		"draft.person_waited":   waited,
+		"draft.items_owed":      held,
+		"draft.items_assigned":  owned,
+		"draft.unit_open":       sub.task == nil || sub.task.Open(),
+		"draft.person_asks_you": sub.asks(person, me),
 	}
 }
 
