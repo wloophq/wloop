@@ -52,6 +52,10 @@ func TestASlackTaskIsOfferedToCloseByTheSignalItsSourceReports(t *testing.T) {
 			[]string{"slack-done-replied"}},
 		{"the thread went quiet", facttask.Link{}, true, "waiting", task.CategoryWaiting, []string{"slack-done-quiet"}},
 		{"a snoozed task", facttask.Link{Signals: map[string]bool{"asked_reacted": true}}, true, "scheduled", task.CategoryDeferred, nil},
+		{"every signal at once offers the first", facttask.Link{Signals: map[string]bool{"asked_reacted": true, "replied_last": true}}, true,
+			"waiting", task.CategoryWaiting, []string{"slack-done-reacted"}},
+		{"you replied last on a quiet thread", facttask.Link{Signals: map[string]bool{"replied_last": true}}, true, "waiting", task.CategoryWaiting,
+			[]string{"slack-done-replied"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -83,5 +87,44 @@ func TestOnlyASlackThreadsTaskIsOfferedToClose(t *testing.T) {
 	e.links[chatA], e.ended[chatA] = facttask.Link{Signals: map[string]bool{"asked_reacted": true, "replied_last": true}}, true
 	if got := closingWorkflows(t, e.facts("t-pr")); len(got) > 0 {
 		t.Fatalf("a pull request's task is offered by %v", got)
+	}
+}
+
+func TestASignalOnOneThreadOffersNoTaskOfTwo(t *testing.T) {
+	t.Parallel()
+	ana := items.Person{Key: "chat:ANA"}
+	for _, ended := range []bool{false, true} {
+		e := newEnv(t)
+		at := monday.Add(-10 * 24 * time.Hour)
+		th := task.Task{ID: "t-th", State: "waiting", Category: task.CategoryWaiting, Title: "check the rollout", Origin: task.OriginDerived,
+			Units: []unit.Unit{chatA, chatB}, Items: []task.ItemRef{{Unit: chatA, Item: "i1"}, {Unit: chatB, Item: "i2"}}, Created: at, Updated: at}
+		th.SetProp(task.PropKind, task.Value{Text: "thread"}, task.WriterPlugin, at)
+		e.task(th)
+		e.item(chatA, "i1", items.Open, at, ana)
+		e.item(chatB, "i2", items.Open, at, ana)
+		e.links[chatA] = facttask.Link{Signals: map[string]bool{"asked_reacted": true, "replied_last": true}}
+		e.ended[chatA], e.ended[chatB] = ended, ended
+		var want []string
+		if ended {
+			want = []string{"slack-done-quiet"}
+		}
+		if got := closingWorkflows(t, e.facts("t-th")); !slices.Equal(got, want) {
+			t.Fatalf("ended %v: offered by %v, want %v", ended, got, want)
+		}
+	}
+}
+
+func TestATaskWithNoOpenItemIsNotOfferedToClose(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	at := monday.Add(-10 * 24 * time.Hour)
+	th := task.Task{ID: "t-th", State: "waiting", Category: task.CategoryWaiting, Title: "check the rollout", Origin: task.OriginDerived,
+		Units: []unit.Unit{chatA}, Items: []task.ItemRef{{Unit: chatA, Item: "i1"}}, Created: at, Updated: at}
+	th.SetProp(task.PropKind, task.Value{Text: "thread"}, task.WriterPlugin, at)
+	e.task(th)
+	e.item(chatA, "i1", items.Resolved, at, items.Person{Key: "chat:ANA"})
+	e.links[chatA], e.ended[chatA] = facttask.Link{Signals: map[string]bool{"asked_reacted": true, "replied_last": true}}, true
+	if got := closingWorkflows(t, e.facts("t-th")); len(got) > 0 {
+		t.Fatalf("a task with nothing open is offered by %v", got)
 	}
 }

@@ -1,6 +1,6 @@
-summary = "Offer to close a Slack task once you answered its ask and nobody spoke since, for 3 days; it resolves the task's items as answered and posts nothing"
+summary = "Offer to close a Slack task of one thread once you answered the asks waiting on you and nobody spoke since, for 3 days; it resolves the task's items as answered and posts nothing"
 provider = "task"
-when = 'task.prop.kind == "thread" && task.items_open > 0 && !(task.category in ["done", "dropped", "deferred"]) && task.link_signal.replied_last'
+when = 'task.prop.kind == "thread" && task.items_open > 0 && !(task.category in ["done", "dropped", "deferred"]) && size(task.units) == 1 && task.link_signal.replied_last && !task.link_signal.asked_reacted'
 key = ["task.fingerprint"]
 order = 58
 
