@@ -255,9 +255,9 @@ func newTask(id ID, f UnitFacts, ws []items.Item, initial Category, st Profile, 
 // the user set: old holds of f.Unit's items exactly ws, and keeps the others it held as Resolved. A task a gate
 // opened on the unit before its items came becomes the derived task of the unit's key, and a unit's own task
 // reconcile dropped once nobody followed the unit comes back into the ready category, Changed, when it is
-// followed again. An item old does
-// not hold opened again marks an open task Changed; a done task moves back into the ready category, Changed,
-// only for an item waiting on me that it did not hold or that changed after old was last updated.
+// followed again. An item old does not hold opened again marks an open task Changed; a done task moves back
+// into the ready category, Changed, only for an item waiting on me that it did not hold or that changed after
+// old was last updated.
 func update(old Task, f UnitFacts, ws []items.Item, me Me, st Profile, now time.Time) (Task, string, error) {
 	e := old
 	e.Items = slices.DeleteFunc(slices.Clone(old.Items), func(r ItemRef) bool { return r.Unit == f.Unit })

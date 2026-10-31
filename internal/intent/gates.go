@@ -103,8 +103,8 @@ type GateDef struct {
 	Kind    gate.Kind
 	Label   string
 	Intents []GateIntent
-	// ClosesWith is the intent a person's closing of the gate's task
-	// resolves it with; "" leaves it open.
+	// ClosesWith is the intent, one that refuses the gate, a person's
+	// closing of the gate's task resolves it with; "" leaves it open.
 	ClosesWith string
 	// Text words the gate's subject when the loop writes it, a template
 	// over the proposal facts; nil writes nothing.
@@ -327,8 +327,13 @@ func mergeGate(s *sheet, d *GatesDef, name string, m mGate) {
 	if m.ClosesWith != nil {
 		g.ClosesWith = strings.TrimSpace(*m.ClosesWith)
 	}
-	if g.ClosesWith != "" && !slices.ContainsFunc(g.Intents, func(in GateIntent) bool { return in.Name == g.ClosesWith }) {
-		s.add(path+".closes_with", "names %q, which is not an intent of the gate", g.ClosesWith)
+	if g.ClosesWith != "" {
+		switch j := slices.IndexFunc(g.Intents, func(in GateIntent) bool { return in.Name == g.ClosesWith }); {
+		case j < 0:
+			s.add(path+".closes_with", "names %q, which is not an intent of the gate", g.ClosesWith)
+		case builtin.GateRoleOf(g.Intents[j].Status, g.Intents[j].Answer) != builtin.GateRefuses:
+			s.add(path+".closes_with", "names %q, which does not refuse the gate: closing a task never approves or answers for the person", g.ClosesWith)
+		}
 	}
 	switch {
 	case len(s.problems) > n:

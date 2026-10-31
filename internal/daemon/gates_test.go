@@ -9,6 +9,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
@@ -143,5 +144,71 @@ func TestClosingATaskSettlesTheGatesGatesTomlClosesWith(t *testing.T) {
 				t.Fatalf("task after %s = %+v, %v; want it closed", verb, e, err)
 			}
 		})
+	}
+}
+
+func TestOnlyAPersonClosingATaskSettlesItsGates(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	for name, c := range map[string]struct {
+		session, verb string
+	}{
+		"an agent's done":           {"term_1", "done"},
+		"a verb that keeps it open": {"", "someday"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			r := newTasksRig(t, nil)
+			r.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "ship it"})
+			g := r.withGates(t, "t-0000000000000001")
+			path := api.TaskPath("t-0000000000000001", c.verb)
+			if c.session != "" {
+				postFrom(t, r.s, c.session, path, `{}`)
+			} else if rec := post(t, r.s, path, `{}`); rec.Code != 200 {
+				t.Fatalf("%s: %d %s", c.verb, rec.Code, rec.Body)
+			}
+			if got, _ := r.s.deps.GateReader.Get(ctx, g.ID); got.Status != gate.Open {
+				t.Fatalf("the question after %s = %+v, want open", name, got)
+			}
+		})
+	}
+}
+
+func TestClosingATaskLeavesAGateWithoutClosesWithOpen(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newTasksRig(t, nil)
+	r.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "ship it"})
+	r.withGates(t, "t-0000000000000001")
+	plan, err := r.s.deps.Gates.Open(ctx, gate.Gate{Unit: task.UnitOf("t-0000000000000001"), Kind: gate.KindPlan, Subject: "round"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec := post(t, r.s, api.TaskPath("t-0000000000000001", "done"), `{}`); rec.Code != 200 {
+		t.Fatalf("done: %d %s", rec.Code, rec.Body)
+	}
+	if got, _ := r.s.deps.GateReader.Get(ctx, plan.ID); got.Status != gate.Open {
+		t.Fatalf("the plan gate after done = %+v, want open", got)
+	}
+}
+
+func TestDismissingATaskOfADisabledPluginLeavesItsGate(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newTasksRig(t, func(d *Deps) { d.PluginEnabled = func(p unit.ProviderID) bool { return p != unit.GitHub } })
+	r.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "ship it", Units: []unit.Unit{r7u}})
+	r.withGates(t, "t-0000000000000001")
+	g, err := r.s.deps.Gates.Open(ctx, gate.Gate{Task: "t-0000000000000001", Unit: r7u, Kind: gate.KindQuestion, Subject: "8"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec := post(t, r.s, api.TaskPath("t-0000000000000001", "dismiss"), `{}`); rec.Code != 200 {
+		t.Fatalf("dismiss: %d %s", rec.Code, rec.Body)
+	}
+	if got, _ := r.s.deps.GateReader.Get(ctx, g.ID); got.Status != gate.Open {
+		t.Fatalf("the disabled plugin's question = %+v, want open", got)
+	}
+	if e, err := r.g.Task(ctx, "t-0000000000000001"); err != nil || e.Open() {
+		t.Fatalf("task after dismiss = %+v, %v; want it dropped", e, err)
 	}
 }

@@ -304,3 +304,23 @@ func TestGateFactsComeFromTheGate(t *testing.T) {
 		t.Fatalf("gates.toml decides a plan gate by its facts: %s %s %v", m, at, err)
 	}
 }
+
+func TestClosesWithNamesAnIntentThatRefusesTheGate(t *testing.T) {
+	t.Parallel()
+	for user, want := range map[string]string{
+		"[gates.question]\ncloses_with = \"nope\"\n":   `gates.question.closes_with: names "nope", which is not an intent of the gate`,
+		"[gates.draft]\ncloses_with = \"approve\"\n":   `gates.draft.closes_with: names "approve", which does not refuse the gate`,
+		"[gates.question]\ncloses_with = \"answer\"\n": `gates.question.closes_with: names "answer", which does not refuse the gate`,
+	} {
+		if _, problems := loadGatesWith(t, user); !strings.Contains(problems, want) {
+			t.Errorf("%q: %s, want %q", user, problems, want)
+		}
+	}
+	d, problems := loadGatesWith(t, "[gates.question]\ncloses_with = \"\"\n")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	if g, _ := d.Gate("question"); g.ClosesWith != "" {
+		t.Fatalf("an empty closes_with left %q", g.ClosesWith)
+	}
+}
