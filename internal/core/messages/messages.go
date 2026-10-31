@@ -488,16 +488,13 @@ func (s *Service) gated(ctx context.Context, m message.Message) (message.Message
 	return s.Store.Upsert(ctx, m)
 }
 
-// closedTask says whether task id is done or dropped, where no list shows the gate it holds.
+// closedTask says whether task id is done, dropped or gone, where no list shows the gate it holds.
 func (s *Service) closedTask(ctx context.Context, id task.ID) bool {
 	if id == "" || s.Tasks == nil {
 		return false
 	}
-	e, err := s.Tasks.Task(ctx, id)
-	if err != nil {
-		return false
-	}
-	return e.Category == task.CategoryDone || e.Category == task.CategoryDropped
+	ended, _ := coretasks.Ended(s.Tasks.Task(ctx, id))
+	return ended
 }
 
 // supersedeProposal supersedes the open gate item proposal id waited on before its message existed.
