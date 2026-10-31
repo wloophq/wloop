@@ -7,18 +7,16 @@ import (
 
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/github/pr"
+	"github.com/wloophq/wloop/plugins/github/situation"
 	"github.com/wloophq/wloop/plugins/github/workday"
 )
 
 // The link signals plugin.toml declares.
 const (
-	SignalStalled   = "stalled"
-	SignalInLoop    = "in_loop"
-	SignalReady     = "ready"
-	SignalWorkspace = "workspace"
-	// SignalApprovedByMe is on for someone else's open pull request
-	// whose newest verdict of the viewer approves, with no review asked of
-	// them since.
+	SignalStalled      = "stalled"
+	SignalInLoop       = "in_loop"
+	SignalReady        = "ready"
+	SignalWorkspace    = "workspace"
 	SignalApprovedByMe = "approved_by_me"
 )
 
@@ -52,23 +50,19 @@ func (r Row) Signals() []src.Signal {
 }
 
 // approvedByMe says the viewer's newest verdict on someone else's pull
-// request approves it, and no review was requested of them after it.
+// request approves it, and their review is not pending again.
 func (r Row) approvedByMe() bool {
 	viewer := r.in.Viewer
-	if viewer == "" || r.Mine() {
+	if viewer == "" || r.Mine() || situation.Pending(r.PR, r.in.Events, viewer) {
 		return false
 	}
 	var verdict pr.Event
-	var asked time.Time
 	for _, e := range r.in.Events {
-		switch {
-		case e.Kind == pr.KindReview && strings.EqualFold(e.Actor, viewer) && !strings.HasPrefix(e.Data, "COMMENTED:") && !e.At.Before(verdict.At):
+		if e.Kind == pr.KindReview && strings.EqualFold(e.Actor, viewer) && !strings.HasPrefix(e.Data, "COMMENTED:") && !e.At.Before(verdict.At) {
 			verdict = e
-		case e.Kind == pr.KindReviewRequest && strings.EqualFold(e.Data, viewer) && e.At.After(asked):
-			asked = e.At
 		}
 	}
-	return strings.HasPrefix(verdict.Data, "APPROVED:") && !asked.After(verdict.At)
+	return strings.HasPrefix(verdict.Data, "APPROVED:")
 }
 
 // stallsAt is the first instant the row's situation is stalled; zero when

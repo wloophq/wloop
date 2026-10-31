@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/plugins/github/pr"
+	"github.com/wloophq/wloop/plugins/github/situation"
+	"github.com/wloophq/wloop/plugins/github/store"
 )
 
 // on are the names of the row's signals that are on.
@@ -73,6 +75,9 @@ func TestApprovedByMeIsMyNewestVerdictOnSomeoneElsesOpenPullRequest(t *testing.T
 		{"approved, then asked changes", theirs, []pr.Event{approved, ev(50, pr.KindReview, fixtureViewer, ago(day), "CHANGES_REQUESTED:h1")}, false},
 		{"approved, then re-requested", open(50, "ana", func(p *pr.PR) { p.Reasons, p.ReviewRequests = []string{"review-requested"}, []string{fixtureViewer} }),
 			[]pr.Event{approved, ev(50, pr.KindReviewRequest, "ana", ago(day), fixtureViewer)}, false},
+		{"approved, re-requested, then the request withdrawn", theirs, []pr.Event{approved, ev(50, pr.KindReviewRequest, "ana", ago(day), fixtureViewer)}, true},
+		{"approved, then listed as requested with no event", open(50, "ana", func(p *pr.PR) { p.Reasons, p.ReviewRequests = []string{"review-requested"}, []string{fixtureViewer} }),
+			[]pr.Event{approved}, true},
 		{"approved my own", open(50, fixtureViewer, nil), []pr.Event{approved}, false},
 		{"approved, then merged", open(50, "ana", func(p *pr.PR) { p.State, p.MergedAt = "MERGED", ago(day) }), []pr.Event{approved}, false},
 		{"never reviewed", theirs, nil, false},
@@ -80,6 +85,27 @@ func TestApprovedByMeIsMyNewestVerdictOnSomeoneElsesOpenPullRequest(t *testing.T
 		got := slices.Contains(on(Derive(input(fixture{pr: c.pr, events: c.evs}))), SignalApprovedByMe)
 		if got != c.want {
 			t.Errorf("%s: approved_by_me %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestResolvedThreadsSettleAReviewersCommentOnlyWhenThePullRequestHasThreads(t *testing.T) {
+	p := open(51, "ana", func(p *pr.PR) { p.ReviewRequests, p.ReviewDecision = []string{"dave"}, "REVIEW_REQUIRED" })
+	in := input(fixture{pr: p, events: []pr.Event{ev(51, pr.KindPush, "ana", ago(5*day), ""),
+		ev(51, pr.KindReview, "carla", ago(4*day), "COMMENTED:h1"), ev(51, pr.KindReview, "bia", ago(3*day), "APPROVED:h1")}})
+	for name, c := range map[string]struct {
+		detail *store.Detail
+		want   situation.Kind
+	}{
+		"no detail":                {nil, situation.KindReply},
+		"no thread, a top comment": {&store.Detail{ThreadsRead: true}, situation.KindReply},
+		"a thread open":            {&store.Detail{ThreadsRead: true, ThreadsTotal: 2, OpenThreads: []pr.Thread{{}}}, situation.KindReply},
+		"threads not read":         {&store.Detail{ThreadsTotal: 2}, situation.KindReply},
+		"every thread resolved":    {&store.Detail{ThreadsRead: true, ThreadsTotal: 2, ReadAt: ago(30 * day)}, situation.KindReview},
+	} {
+		in.Detail = c.detail
+		if got := Derive(in).Kind(); got != c.want {
+			t.Errorf("%s: %s, want %s", name, got, c.want)
 		}
 	}
 }

@@ -58,7 +58,7 @@ const ViewMine = "mine"
 // Derive is in's source row at in.Now.
 func Derive(in Input) Row {
 	p := in.PR
-	settled := in.Detail != nil && in.Detail.Fresh(in.Now, in.MaxDetailAge) && in.Detail.ThreadsRead && len(in.Detail.OpenThreads) == 0
+	settled := in.Detail != nil && in.Detail.ThreadsRead && in.Detail.ThreadsTotal > 0 && len(in.Detail.OpenThreads) == 0
 	res := situation.Derive(situation.Input{PR: p, Events: in.Events, Viewer: in.Viewer, MyTeams: in.Teams, Ignore: in.Ignore,
 		Now: in.Now, Stalled: in.Stalled, AddressedAt: in.AddressedAt, ThreadsSettled: settled})
 	ws := WorkspaceOf(p.Workspace)

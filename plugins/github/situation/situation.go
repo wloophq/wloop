@@ -64,8 +64,8 @@ type Input struct {
 	// AddressedAt is when the pull request's driving turn, an address turn,
 	// reached its state; zero without one.
 	AddressedAt time.Time
-	// ThreadsSettled says every review thread of the pull request is
-	// resolved, as its full read found them.
+	// ThreadsSettled says the pull request has review threads and every one
+	// is resolved, as its last full read found them.
 	ThreadsSettled bool
 }
 
@@ -262,24 +262,39 @@ func Derive(in Input) Result {
 }
 
 // requestedOfMe is when the viewer's review was last requested by name,
-// when the pull request lists the request and no review of the viewer's
-// came since, zero when no event dates the request; again when the viewer
-// reviewed before it.
+// zero when no event dates the request, when Pending holds for them; again
+// when the viewer reviewed before it.
 func requestedOfMe(in Input, evs []pr.Event) (at time.Time, again, ok bool) {
-	viewer := in.Viewer
-	if viewer == "" || !slices.ContainsFunc(in.PR.ReviewRequests, func(r string) bool { return strings.EqualFold(r, viewer) }) {
+	if in.Viewer == "" || !Pending(in.PR, evs, in.Viewer) {
 		return time.Time{}, false, false
+	}
+	for _, e := range evs {
+		switch {
+		case e.Kind == pr.KindReviewRequest && strings.EqualFold(e.Data, in.Viewer):
+			at = e.At
+		case e.Kind == pr.KindReview && strings.EqualFold(e.Actor, in.Viewer):
+			again = true
+		}
+	}
+	return at, again, true
+}
+
+// Pending says p asks login's review: it lists the request by name, and
+// login reviewed never or before the newest event that asked it.
+func Pending(p pr.PR, evs []pr.Event, login string) bool {
+	if !slices.ContainsFunc(p.ReviewRequests, func(r string) bool { return strings.EqualFold(r, login) }) {
+		return false
 	}
 	var asked, reviewed time.Time
 	for _, e := range evs {
 		switch {
-		case e.Kind == pr.KindReviewRequest && strings.EqualFold(e.Data, viewer):
+		case e.Kind == pr.KindReviewRequest && strings.EqualFold(e.Data, login):
 			asked = e.At
-		case e.Kind == pr.KindReview && strings.EqualFold(e.Actor, viewer):
+		case e.Kind == pr.KindReview && strings.EqualFold(e.Actor, login):
 			reviewed = e.At
 		}
 	}
-	return asked, !reviewed.IsZero(), reviewed.IsZero() || asked.After(reviewed)
+	return reviewed.IsZero() || asked.After(reviewed)
 }
 
 // approvedAfter says whether someone other than the author, an automated

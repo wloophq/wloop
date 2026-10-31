@@ -81,9 +81,8 @@ func (j *Job) logf(format string, args ...any) {
 }
 
 // Run is one pass: it withdraws the plugin rules' drafts on units whose
-// closure is posted and those their rule no longer proposes, then proposes
-// what every plugin calls for now and no draft of the same rule and key
-// holds back.
+// closure is posted, then proposes what every plugin calls for now and no
+// draft of the same rule and key holds back.
 func (j *Job) Run(ctx context.Context) (Summary, error) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
@@ -94,12 +93,7 @@ func (j *Job) Run(ctx context.Context) (Summary, error) {
 	if err != nil {
 		return sum, err
 	}
-	props, answered, err := j.fromSources(ctx)
-	stopped, werr := j.withdrawStopped(ctx, props, answered)
-	sum.Discarded += stopped
-	if werr != nil {
-		return sum, errors.Join(err, werr)
-	}
+	props, err := j.fromSources(ctx)
 	for _, p := range props {
 		p.Policy = draft.Fixed(j.approval(p.Unit.Provider))
 		switch perr := j.propose(ctx, p, now); {
@@ -210,10 +204,9 @@ func (j *Job) closed(ctx context.Context, d draft.Draft) (string, error) {
 // fromSources is what each enabled plugin proposes on its own units, keeping
 // of its Origin only the rule id: the job sets the key and, in Run, the
 // plugin's configured approval.
-func (j *Job) fromSources(ctx context.Context) ([]outbox.Proposal, map[unit.ProviderID]bool, error) {
+func (j *Job) fromSources(ctx context.Context) ([]outbox.Proposal, error) {
 	now := j.Clock.Now()
 	var out []outbox.Proposal
-	answered := map[unit.ProviderID]bool{}
 	var errs []error
 	for _, src := range j.Sources {
 		if src.Proposals == nil || !j.enabled(src.Provider) {
@@ -224,7 +217,6 @@ func (j *Job) fromSources(ctx context.Context) ([]outbox.Proposal, map[unit.Prov
 			errs = append(errs, fmt.Errorf("%s proposals: %w", src.Provider, err))
 			continue
 		}
-		answered[src.Provider] = true
 		for _, p := range ps {
 			rule := p.Origin.Rule
 			switch {
@@ -242,43 +234,5 @@ func (j *Job) fromSources(ctx context.Context) ([]outbox.Proposal, map[unit.Prov
 			})
 		}
 	}
-	return out, answered, errors.Join(errs...)
-}
-
-// withdrawStopped discards, as moot, each held auto draft of a plugin rule
-// whose plugin answered this pass without proposing it again, on a unit the
-// plugin carded: its rule no longer calls for it, such as a nudge on a pull
-// request that became a draft. A unit with no card yet keeps its draft, since
-// a plugin proposes nothing before its read model is built.
-func (j *Job) withdrawStopped(ctx context.Context, props []outbox.Proposal, answered map[unit.ProviderID]bool) (int, error) {
-	if j.Facts == nil || len(answered) == 0 {
-		return 0, nil
-	}
-	held, err := j.Outbox.List(ctx, outbox.Filter{States: []draft.State{draft.Held}})
-	if err != nil {
-		return 0, err
-	}
-	n := 0
-	var errs []error
-	for _, d := range held {
-		if d.Origin.Kind != draft.OriginAuto || d.Origin.Workflow != "" || !answered[d.Unit.Provider] ||
-			slices.ContainsFunc(props, func(p outbox.Proposal) bool { return p.Unit == d.Unit && p.Origin == d.Origin }) {
-			continue
-		}
-		f, ok, err := j.Facts.UnitFacts(ctx, d.Unit)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-		if !ok || !f.Carded {
-			continue
-		}
-		if _, err := j.Outbox.Withdraw(ctx, d.ID, ReasonMoot); err != nil {
-			errs = append(errs, err)
-			continue
-		}
-		n++
-		j.logf("proposals: draft %d (%s on %s) discarded: its rule no longer proposes it", d.ID, d.Origin.Rule, d.Unit)
-	}
-	return n, errors.Join(errs...)
+	return out, errors.Join(errs...)
 }
