@@ -40,8 +40,13 @@ type planner struct {
 func (p *planner) Plan(context.Context, plugin.Unit, src.RoundState) (src.Plan, error) {
 	return src.Plan{}, nil
 }
-func (p *planner) ApplyEffect(context.Context, src.EffectRequest) error      { return nil }
-func (p *planner) Proposals(context.Context, time.Time) ([]src.Draft, error) { return nil, nil }
+func (p *planner) ApplyEffect(context.Context, src.EffectRequest) error { return nil }
+func (p *planner) Proposals(context.Context, time.Time) (src.Proposed, error) {
+	return src.Proposed{}, nil
+}
+
+var _ src.Planner = (*planner)(nil)
+
 func (p *planner) Placement(context.Context, plugin.Unit, string) (src.Placements, error) {
 	return src.Placements{}, nil
 }

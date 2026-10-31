@@ -64,6 +64,9 @@ type Input struct {
 	// AddressedAt is when the pull request's driving turn, an address turn,
 	// reached its state; zero without one.
 	AddressedAt time.Time
+	// ThreadsSettled says the pull request has review threads and every one
+	// is resolved, as its last full read found them.
+	ThreadsSettled bool
 }
 
 type Result struct {
@@ -196,11 +199,28 @@ func Derive(in Input) Result {
 		}
 		return stalled(Result{Kind: KindMerge, WaitingOn: "author", Since: since, Reason: reason}, in.Stalled.Merge)
 	}
+	if at, again, ok := requestedOfMe(in, evs); ok {
+		reason := "review requested, no review on the head"
+		if again {
+			reason = "review requested again after your review"
+		}
+		return stalled(Result{Kind: KindReview, WaitingOn: "me", Since: latest(at, pushedAt), Reason: reason}, in.Stalled.Review)
+	}
 	nudgeComment := nudgeComments(evs, in.Viewer, ignored)
+	approvedAt := map[string]time.Time{}
+	for _, e := range evs {
+		if e.Kind == pr.KindReview && strings.HasPrefix(e.Data, "APPROVED:") {
+			approvedAt[strings.ToLower(e.Actor)] = e.At
+		}
+	}
 	var lastReviewer, lastAuthor pr.Event
 	for i := len(evs) - 1; i >= 0; i-- {
 		e := evs[i]
-		if (e.Kind != pr.KindReview && e.Kind != pr.KindComment) || ignored(e.Actor) || (e.Kind == pr.KindReview && strings.HasPrefix(e.Data, "APPROVED:")) || nudgeComment[e] {
+		if (e.Kind != pr.KindReview && e.Kind != pr.KindComment) || ignored(e.Actor) || nudgeComment[e] ||
+			(e.Kind == pr.KindReview && (strings.HasPrefix(e.Data, "APPROVED:") || strings.HasPrefix(e.Data, "DISMISSED:"))) {
+			continue
+		}
+		if at, ok := approvedAt[strings.ToLower(e.Actor)]; ok && e.Actor != p.Author && !e.At.After(at) {
 			continue
 		}
 		switch {
@@ -216,7 +236,7 @@ func Derive(in Input) Result {
 		}
 		return login
 	}
-	if !lastReviewer.At.IsZero() && lastReviewer.At.After(pushedAt) {
+	if !lastReviewer.At.IsZero() && lastReviewer.At.After(pushedAt) && !(in.ThreadsSettled && approvedAfter(evs, p, lastReviewer.At)) {
 		if lastAuthor.At.After(lastReviewer.At) {
 			return stalled(Result{Kind: KindReviewerBack, WaitingOn: me(lastReviewer.Actor), Since: lastAuthor.At,
 				Reason: p.Author + " replied, " + lastReviewer.Actor + " has not returned"}, in.Stalled.Reply)
@@ -239,6 +259,57 @@ func Derive(in Input) Result {
 		return stalled(Result{Kind: KindReview, WaitingOn: waitingOn(in, pending), Since: since, Reason: "review requested, no review on the head"}, in.Stalled.Review)
 	}
 	return stalled(Result{Kind: KindNoReviewer, WaitingOn: "author", Since: pushedAt, Reason: "no reviewer requested"}, in.Stalled.Review)
+}
+
+// requestedOfMe is when the viewer's review was last requested by name,
+// zero when no event dates the request, when Pending holds for them; again
+// when the viewer reviewed before it.
+func requestedOfMe(in Input, evs []pr.Event) (at time.Time, again, ok bool) {
+	if in.Viewer == "" || !Pending(in.PR, evs, in.Viewer) {
+		return time.Time{}, false, false
+	}
+	for _, e := range evs {
+		switch {
+		case e.Kind == pr.KindReviewRequest && strings.EqualFold(e.Data, in.Viewer):
+			at = e.At
+		case e.Kind == pr.KindReview && strings.EqualFold(e.Actor, in.Viewer):
+			again = true
+		}
+	}
+	return at, again, true
+}
+
+// Pending says p asks login's review: it lists the request by name, and
+// login reviewed never or before the newest event that asked it.
+func Pending(p pr.PR, evs []pr.Event, login string) bool {
+	if !slices.ContainsFunc(p.ReviewRequests, func(r string) bool { return strings.EqualFold(r, login) }) {
+		return false
+	}
+	var asked, reviewed time.Time
+	for _, e := range evs {
+		switch {
+		case e.Kind == pr.KindReviewRequest && strings.EqualFold(e.Data, login):
+			asked = e.At
+		case e.Kind == pr.KindReview && strings.EqualFold(e.Actor, login):
+			reviewed = e.At
+		}
+	}
+	return reviewed.IsZero() || asked.After(reviewed)
+}
+
+// approvedAfter says whether someone other than the author, an automated
+// reviewer included, approved the head after at.
+func approvedAfter(evs []pr.Event, p pr.PR, at time.Time) bool {
+	return slices.ContainsFunc(evs, func(e pr.Event) bool {
+		return e.Kind == pr.KindReview && e.Data == "APPROVED:"+p.HeadOid && e.At.After(at) && !strings.EqualFold(e.Actor, p.Author)
+	})
+}
+
+func latest(a, b time.Time) time.Time {
+	if a.After(b) {
+		return a
+	}
+	return b
 }
 
 // The agent states of a workspace the situation reads.

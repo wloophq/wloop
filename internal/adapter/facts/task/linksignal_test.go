@@ -1,6 +1,7 @@
 package facttask_test
 
 import (
+	"maps"
 	"slices"
 	"testing"
 	"time"
@@ -126,5 +127,43 @@ func TestASourceThatReportsSignalsKeepsItsOwnStaleness(t *testing.T) {
 	pr["task.link_signal.stalled"] = true
 	if !stalls(t, pr) {
 		t.Error("a pull request whose source says it stalled is not in Stalled")
+	}
+}
+
+func TestPrTaskApprovedClosesATaskWhoseLinkYouApprovedAndAsksNothingOfYou(t *testing.T) {
+	t.Parallel()
+	l, err := turn.Bundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := slices.IndexFunc(l.Workflows, func(w workflow.Workflow) bool { return w.Name == "pr-task-approved" })
+	if i < 0 {
+		t.Fatal("no pr-task-approved")
+	}
+	e := newEnv(t)
+	e.task(task.Task{ID: "t-a", State: "next", Category: task.CategoryReady, Title: "a", Units: []unit.Unit{chatA}})
+	e.links[chatA] = facttask.Link{Signals: map[string]bool{"approved_by_me": true}}
+	approved := e.facts("t-a")
+	approved["task.prop.kind"] = "pull-request"
+	for name, c := range map[string]struct {
+		edit func(workflow.Facts)
+		want bool
+	}{
+		"approved, nothing owed": {func(workflow.Facts) {}, true},
+		"not approved":           {func(f workflow.Facts) { f[builtin.LinkSignalPrefix+"approved_by_me"] = false }, false},
+		"a review asked of me":   {func(f workflow.Facts) { f["task.link_owes"] = []string{"me"} }, false},
+		"a question open":        {func(f workflow.Facts) { f["task.gates_open"] = 1 }, false},
+		"not a pull request":     {func(f workflow.Facts) { f["task.prop.kind"] = "" }, false},
+		"already done":           {func(f workflow.Facts) { f["task.category"] = string(task.CategoryDone) }, false},
+	} {
+		f := maps.Clone(approved)
+		c.edit(f)
+		got, err := l.Workflows[i].When.Match(workflow.Vars{Facts: f, Now: monday})
+		if err != nil || got != c.want {
+			t.Errorf("%s: %v, %v; want %v", name, got, err, c.want)
+		}
+	}
+	if !slices.Equal(l.Workflows[i].Key, []string{"task.units"}) {
+		t.Errorf("key = %v: a task you open again after it closed must stay open", l.Workflows[i].Key)
 	}
 }

@@ -28,8 +28,9 @@ const itemOpen items.State = "open"
 // task of a key that names f.Unit: the unit's one task lives as long as its unit, so it ends through the
 // profile, and is dropped once its card says the user no longer Cares about the unit (PropUnfollowed), to come
 // back when they do again. An item of that key that waits on nobody keeps the task while f Cares. A task that was clarified never returns to
-// the inbox: an item that opens again on a done task moves it back into the ready category with Changed set,
-// and an open task keeps its state. A task the user dropped stays dropped.
+// the inbox: a done task moves back into the ready category with Changed set only when its unit asks something
+// new of Me, an item waiting on Me that the task did not hold or that changed since the task was last updated;
+// an item that opens again on an open task sets Changed and keeps its state. A task the user dropped stays dropped.
 //
 // Never changes the state, the parent or a property the user set, except to resolve and to reopen as said.
 //
@@ -87,7 +88,7 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st Profile, no
 		var err error
 		switch ws, ok := wanted[id]; {
 		case ok:
-			e, why, err = update(old, f, ws, st, now)
+			e, why, err = update(old, f, ws, me, st, now)
 		case hasOwn && id == own:
 			e.Items, e.Resolved = unheld(old, f.Unit)
 			why = "no item calls for it"
@@ -224,7 +225,7 @@ func wants(f UnitFacts, it items.Item, me Me) (Category, bool) {
 		return "", false
 	}
 	start, ok := CategoryInbox, true
-	if !slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return isMe(p, me) }) {
+	if !waitsOnMe(it, me) {
 		own := it.TaskKey == f.Unit.String() && len(it.WaitingOn) == 0
 		start, ok = CategoryWaiting, (len(it.WaitingOn) > 0 || own) && (isMe(it.Requester, me) || f.Cares)
 	}
@@ -254,19 +255,20 @@ func newTask(id ID, f UnitFacts, ws []items.Item, initial Category, st Profile, 
 // the user set: old holds of f.Unit's items exactly ws, and keeps the others it held as Resolved. A task a gate
 // opened on the unit before its items came becomes the derived task of the unit's key, and a unit's own task
 // reconcile dropped once nobody followed the unit comes back into the ready category, Changed, when it is
-// followed again. An item old does
-// not hold opened again: a done task moves back into the ready category, and any task is marked Changed.
-func update(old Task, f UnitFacts, ws []items.Item, st Profile, now time.Time) (Task, string, error) {
+// followed again. An item old does not hold opened again marks an open task Changed; a done task moves back
+// into the ready category, Changed, only for an item waiting on me that it did not hold or that changed after
+// old was last updated.
+func update(old Task, f UnitFacts, ws []items.Item, me Me, st Profile, now time.Time) (Task, string, error) {
 	e := old
 	e.Items = slices.DeleteFunc(slices.Clone(old.Items), func(r ItemRef) bool { return r.Unit == f.Unit })
-	reopened := false
+	reopened, asksMe := false, false
 	var calling []ItemRef
 	for _, it := range ws {
 		r := refOf(f, it)
 		calling = append(calling, r)
-		if !slices.Contains(old.Items, r) {
-			reopened = true
-		}
+		fresh := !slices.Contains(old.Items, r)
+		reopened = reopened || fresh
+		asksMe = asksMe || waitsOnMe(it, me) && (fresh || it.UpdatedAt.After(old.Updated))
 		if !slices.Contains(e.Items, r) {
 			e.Items = append(e.Items, r)
 		}
@@ -294,15 +296,19 @@ func update(old Task, f UnitFacts, ws []items.Item, st Profile, now time.Time) (
 		return e, "its unit is followed again", nil
 	}
 	switch {
-	case !reopened || old.Category == CategoryDropped:
-		return e, "items changed", nil
-	case old.Category == CategoryDone:
+	case old.Category == CategoryDone && asksMe:
 		if err := e.MoveTo(CategoryReady, st); err != nil {
 			return e, "", err
 		}
+	case !reopened || old.Category == CategoryDropped || old.Category == CategoryDone:
+		return e, "items changed", nil
 	}
 	e.Changed = true
 	return e, "an item reopened", nil
+}
+
+func waitsOnMe(it items.Item, me Me) bool {
+	return slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return isMe(p, me) })
 }
 
 func refOf(f UnitFacts, it items.Item) ItemRef {

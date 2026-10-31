@@ -19,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/links"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/core/proposals"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/card"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -71,7 +72,7 @@ type pluginModule struct {
 	// Reacts says Publisher posts drafts of kind react.
 	Reacts bool
 	// Proposals is called by the proposals job; a provider with Proposals gets no generic stalled nudge.
-	Proposals         func(ctx context.Context, now time.Time) ([]outbox.Proposal, error)
+	Proposals         func(ctx context.Context, now time.Time) (proposals.Pass, error)
 	Payload           turn.PayloadReader
 	PlacementDefaults placement.Defaults
 	PlacementHints    placement.Hints

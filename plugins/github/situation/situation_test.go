@@ -483,3 +483,47 @@ func TestTheNudgeCommentIsTheFirstOfMineAfterTheNudge(t *testing.T) {
 		t.Fatalf("a comment of mine hours after the nudge was taken for it: %+v", r)
 	}
 }
+
+func TestAReviewerWhoseNewestReviewApprovesAwaitsNoReply(t *testing.T) {
+	p := open("ana", "dave")
+	p.ReviewDecision = "REVIEW_REQUIRED"
+	r := derive(p, h(10), ev(pr.KindPush, "h2", "ana", h(1), ""), requested("dave", "ana", h(2)),
+		ev(pr.KindReview, "r1", "carla", h(3), "COMMENTED:h2"), ev(pr.KindReview, "r2", "carla", h(4), "APPROVED:h2"))
+	if r.Kind != KindReview || r.WaitingOn != "dave" {
+		t.Fatalf("%+v", r)
+	}
+}
+
+func TestADismissedReviewAwaitsNoReply(t *testing.T) {
+	r := derive(open("ana"), h(10), ev(pr.KindPush, "h2", "ana", h(1), ""), ev(pr.KindReview, "r1", "carla", h(3), "DISMISSED:h2"))
+	if r.Kind != KindNoReviewer {
+		t.Fatalf("%+v", r)
+	}
+}
+
+func TestResolvedThreadsAndALaterApprovalAnswerAComment(t *testing.T) {
+	p := open("ana", "dave")
+	p.ReviewDecision = "REVIEW_REQUIRED"
+	evs := []pr.Event{ev(pr.KindPush, "h2", "ana", h(1), ""), requested("dave", "ana", h(1)),
+		ev(pr.KindReview, "r1", "carla", h(3), "COMMENTED:h2"), ev(pr.KindReview, "r2", "sonar", h(4), "APPROVED:h2")}
+	in := Input{PR: p, Events: evs, Viewer: "me", Ignore: []string{"sonar"}, Now: h(10), Stalled: th}
+	if r := Derive(in); r.Kind != KindReply {
+		t.Fatalf("threads not known to be resolved: %+v", r)
+	}
+	in.ThreadsSettled = true
+	if r := Derive(in); r.Kind != KindReview || r.WaitingOn != "dave" {
+		t.Fatalf("threads resolved and approved after the comment: %+v", r)
+	}
+	in.Events = append(slices.Clone(evs[:2]), evs[3], ev(pr.KindReview, "r1", "carla", h(5), "COMMENTED:h2"))
+	if r := Derive(in); r.Kind != KindReply {
+		t.Fatalf("a comment after the approval: %+v", r)
+	}
+}
+
+func TestAReRequestAfterMyReviewWaitsOnMe(t *testing.T) {
+	r := derive(open("ana", "me"), h(10), ev(pr.KindPush, "h1", "ana", h(0), ""), ev(pr.KindReview, "r1", "me", h(1), "CHANGES_REQUESTED:h1"),
+		ev(pr.KindPush, "h2", "ana", h(2), ""), ev(pr.KindReview, "r2", "carla", h(3), "COMMENTED:h2"), requested("me", "ana", h(4)))
+	if r.Kind != KindReview || r.WaitingOn != "me" || !r.Since.Equal(h(4)) || r.Reason != "review requested again after your review" {
+		t.Fatalf("%+v", r)
+	}
+}

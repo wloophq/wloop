@@ -186,7 +186,8 @@ func TestGitHubNudgeDraftsThroughTheOutbox(t *testing.T) {
 
 	now := time.Date(2026, 10, 22, 15, 0, 0, 0, time.UTC)
 	proposals := psource.Proposals{ID: m.ID, Units: units, Kind: kind}
-	props, err := proposals.Proposals(ctx, now)
+	pass, err := proposals.Proposals(ctx, now)
+	props := pass.Proposals
 	if err != nil || len(props) != 1 || props[0].Unit != ref.Unit() || !strings.Contains(props[0].Text, "@{github:bob}") {
 		t.Fatalf("proposals %+v %v, want the nudge of bob on #7", props, err)
 	}
@@ -226,7 +227,7 @@ func TestGitHubNudgeDraftsThroughTheOutbox(t *testing.T) {
 	if evs, err := sqlite.New(db).UnitEvents(ctx, []unit.Unit{ref.Unit()}, []string{"nudged"}, time.Time{}); err != nil || len(evs) != 1 || evs[0].Data != "@bob" {
 		t.Fatalf("the nudged events %+v %v, want the one the post may have made", evs, err)
 	}
-	if again, err := proposals.Proposals(ctx, now.Add(time.Hour)); err != nil || len(again) != 0 {
+	if again, err := proposals.Proposals(ctx, now.Add(time.Hour)); err != nil || len(again.Proposals) != 0 {
 		t.Fatalf("proposed %+v %v within the nudge's window", again, err)
 	}
 	if posts := gh.posted(); len(posts) != 1 {

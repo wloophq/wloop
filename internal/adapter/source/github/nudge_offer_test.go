@@ -40,11 +40,11 @@ func pluginProposals(t *testing.T, f *storetest.Fixture) []src.Draft {
 	}
 	b := &psource.Broker{ID: string(unit.GitHub), Units: psource.Units{Codecs: unit.NewRegistry(pr.Codec{})}, Books: f.Turns.Books, Overrides: f.DB,
 		Hosted: &psource.Hosted{Tasks: f.DB.Tasks()}}
-	ds, err := nudge.Proposals(ctx, rows, b.Host().Reader, ghreporttest.NudgeTexts(), prrow.IgnoreOf(config.Defaults()), f.Now)
+	got, err := nudge.Proposals(ctx, rows, b.Host().Reader, ghreporttest.NudgeTexts(), prrow.IgnoreOf(config.Defaults()), f.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return ds
+	return got.Drafts
 }
 
 // muteByWake mutes ref until a time as the mute action does: a wake on an

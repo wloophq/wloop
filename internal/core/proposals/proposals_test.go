@@ -17,17 +17,18 @@ import (
 
 // githubSource proposes one nudge per call on pull, claiming more than a rule id.
 type githubSource struct {
-	mu    sync.Mutex
-	calls int
-	out   []outbox.Proposal
-	err   error
+	mu       sync.Mutex
+	calls    int
+	out      []outbox.Proposal
+	withdraw []Withdrawal
+	err      error
 }
 
-func (g *githubSource) Proposals(ctx context.Context, now time.Time) ([]outbox.Proposal, error) {
+func (g *githubSource) Proposals(ctx context.Context, now time.Time) (Pass, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.calls++
-	return slices.Clone(g.out), g.err
+	return Pass{Proposals: slices.Clone(g.out), Withdrawals: slices.Clone(g.withdraw)}, g.err
 }
 
 func ghNudge(u unit.Unit) outbox.Proposal {
@@ -235,5 +236,33 @@ func TestPluginNudgeWithdrawnWhenTheUnitCloses(t *testing.T) {
 		case d.Unit == other && d.State != draft.Held:
 			t.Fatalf("open PR's nudge %s", d.State)
 		}
+	}
+}
+
+func TestAWithdrawalItsPluginNamesDiscardsTheRulesHeldDraft(t *testing.T) {
+	e := newEnv(t)
+	other := unit.Unit{Provider: unit.GitHub, Key: "o/r#2"}
+	src := &githubSource{out: []outbox.Proposal{ghNudge(pull), ghNudge(other)}}
+	e.job.Sources = []Source{{Provider: unit.GitHub, Proposals: src.Proposals}}
+	e.run()
+	src.out = nil
+	if sum := e.run(); sum.Discarded != 0 || len(e.list("github-nudge", draft.Held)) != 2 {
+		t.Fatalf("a pass that only left the drafts out withdrew: %s", sum)
+	}
+	src.withdraw = []Withdrawal{{Unit: pull, Rule: "github-nudge"}, {Unit: other, Rule: "another-rule"}, {Unit: thread, Rule: "github-nudge"}}
+	if sum := e.run(); sum.Discarded != 1 {
+		t.Fatalf("%s", sum)
+	}
+	for _, d := range e.drafts.all() {
+		switch {
+		case d.Unit == pull && (d.State != draft.Dropped || d.Reason != ReasonMoot):
+			t.Fatalf("the draft its plugin withdrew: %+v", d)
+		case d.Unit == other && d.State != draft.Held:
+			t.Fatalf("a withdrawal of another rule discarded %+v", d)
+		}
+	}
+	src.out, src.withdraw = []outbox.Proposal{ghNudge(pull)}, nil
+	if sum := e.run(); sum.Proposed != 1 {
+		t.Fatalf("the rule calls for it again: %s", sum)
 	}
 }

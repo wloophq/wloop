@@ -1,0 +1,12 @@
+summary = "Close a start task once you approve the diff of the pull request it opened: the work it asked for is delivered and no other question of it is open, and what the pull request asks of you later brings the task back"
+provider = "task"
+when = 'trigger.event.data == "approve" && trigger.event.key.startsWith("review-diff/") && task.captured_by_user && task.turns > 0 && task.gates_open == 0 && !(task.category in ["done", "dropped"])'
+key = ["trigger.event.id"]
+order = 57
+
+[trigger]
+on = ["gate_resolved"]
+
+[[step]]
+use = "task.verb"
+verb = "done"

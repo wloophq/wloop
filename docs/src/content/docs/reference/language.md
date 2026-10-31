@@ -291,6 +291,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `step`: A workflow's gate.open: resolving it records the event gate_resolved on its task, which workflows react to.
 - `gates.<name>.label` (string): What the gate asks of you, as clients list it.
 - `gates.<name>.text` (template): The words of the gate's subject when the loop writes them, over the proposal facts: the first proposal gate words an item proposal of the ledger with it.
+- `gates.<name>.closes_with` (string): The intent, one that refuses the gate, the gate is resolved with, by the person, once they end the task it is on with a verb whose handler is finish or drop; empty or left out, the gate stays open and moves off the closed task.
 - `gates.<name>.intents` (table by name): What you may resolve the gate with, by intent, in the order clients offer them.
 - `gates.<name>.intents.<name>` (table): An intent, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `gates.<name>.intents.<name>.label` (string): The name people read on its button.

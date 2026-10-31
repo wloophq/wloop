@@ -172,7 +172,7 @@ func TestTheGitHubBinaryIngestsAndReportsAFollowedPullRequest(t *testing.T) {
 	}
 	rep, ok, err := prrow.ReportOf(snap)
 	if err != nil || !ok || snap.Situation.Kind == "" || snap.Card == nil || snap.Card.Title != "Batch export" || rep.PR.Ref != ref ||
-		rep.Payload.Repo != "acme/api" || !slices.Contains(rep.Payload.Reasons, "tracked") || len(snap.Signals) != 4 || len(snap.Facts) == 0 {
+		rep.Payload.Repo != "acme/api" || !slices.Contains(rep.Payload.Reasons, "tracked") || len(snap.Signals) != 5 || len(snap.Facts) == 0 {
 		t.Fatalf("the reported row %+v %v %v of %+v", rep, ok, err, snap)
 	}
 	row, ok, err := prrow.ReportedPRs{Reports: snaps}.PR(ctx, ref)

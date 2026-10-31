@@ -104,6 +104,9 @@ type GateDef struct {
 	Kind    gate.Kind
 	Label   string
 	Intents []GateIntent
+	// ClosesWith is the intent, one that refuses the gate, a person's
+	// closing of the gate's task resolves it with; "" leaves it open.
+	ClosesWith string
 	// EndsTask is the category, done or dropped, a task opened only to hold gates ends in once the gate closes
 	// with a status and none of its gates is open; a status it leaves out leaves the task open.
 	EndsTask map[gate.Status]task.Category
@@ -178,11 +181,12 @@ type mGatesFile struct {
 }
 
 type mGate struct {
-	Kind     *string                `toml:"kind"`
-	Label    *string                `toml:"label"`
-	Text     *string                `toml:"text"`
-	Intents  map[string]mGateIntent `toml:"intents"`
-	EndsTask map[string]string      `toml:"ends_task"`
+	Kind       *string                `toml:"kind"`
+	Label      *string                `toml:"label"`
+	Text       *string                `toml:"text"`
+	ClosesWith *string                `toml:"closes_with"`
+	Intents    map[string]mGateIntent `toml:"intents"`
+	EndsTask   map[string]string      `toml:"ends_task"`
 }
 
 type mGateIntent struct {
@@ -335,6 +339,17 @@ func mergeGate(s *sheet, d *GatesDef, name string, m mGate) {
 	}
 	if len(g.Intents) == 0 && len(s.problems) == n {
 		s.add(path+".intents", "is required: a gate is resolved with one of its intents")
+	}
+	if m.ClosesWith != nil {
+		g.ClosesWith = strings.TrimSpace(*m.ClosesWith)
+	}
+	if g.ClosesWith != "" {
+		switch j := slices.IndexFunc(g.Intents, func(in GateIntent) bool { return in.Name == g.ClosesWith }); {
+		case j < 0:
+			s.add(path+".closes_with", "names %q, which is not an intent of the gate", g.ClosesWith)
+		case builtin.GateRoleOf(g.Intents[j].Status, g.Intents[j].Answer) != builtin.GateRefuses:
+			s.add(path+".closes_with", "names %q, which does not refuse the gate: closing a task never approves or answers for the person", g.ClosesWith)
+		}
 	}
 	switch {
 	case len(s.problems) > n:

@@ -59,6 +59,10 @@
         "additionalProperties": false,
         "description": "A gate, by its name: the one a gate.open step, an intent's record.missing or a verb's gate opens; a gate the loop opens by kind takes the first of its kind. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
         "properties": {
+          "closes_with": {
+            "description": "The intent, one that refuses the gate, the gate is resolved with, by the person, once they end the task it is on with a verb whose handler is finish or drop; empty or left out, the gate stays open and moves off the closed task.",
+            "type": "string"
+          },
           "ends_task": {
             "additionalProperties": {
               "description": "The category the task ends in.",
