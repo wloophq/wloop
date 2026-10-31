@@ -468,3 +468,30 @@ func TestADraftItsTasksEndWithdrewHoldsWhileTheTaskStaysEnded(t *testing.T) {
 		t.Fatalf("the task is open again past repeat_after, and the ended draft still holds: %q", got)
 	}
 }
+
+func TestAWorkflowThatRepeatsAfterAnEndedDraftHoldsOnlyForRepeatAfter(t *testing.T) {
+	t.Parallel()
+	r := newDraftRig(t, draftWF("nudges", "purpose", "nudge", "items", "owed", "per", "person", "repeat_after", "24h", "ended", "repeat"), "any news?")
+	waiting := task.Task{ID: "t1", State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{draftThread},
+		Items: []task.ItemRef{{Unit: draftThread, Item: "i1"}}}
+	r.tasks.m["t1"] = waiting
+	r.items.set(draftThread, openItem("i1", "The deck", r.now.Add(-96*time.Hour), ana))
+	r.run(draftTask)
+	ds := r.drafts()
+	if len(ds) != 1 {
+		t.Fatalf("%d drafts, want ana's nudge", len(ds))
+	}
+	ended := waiting
+	ended.State, ended.Category = "done", task.CategoryDone
+	r.tasks.m["t1"] = ended
+	if _, err := r.svc.Withdraw(context.Background(), ds[0].ID, draft.WithdrawEnded); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.check(draftTask); !strings.Contains(got, "held by draft") {
+		t.Fatalf("within repeat_after the ended draft does not hold: %q", got)
+	}
+	r.now = r.now.Add(72 * time.Hour)
+	if got := r.check(draftTask); got != "" {
+		t.Fatalf("with ended = repeat, past repeat_after the ended draft still holds: %q", got)
+	}
+}

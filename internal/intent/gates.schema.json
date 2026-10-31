@@ -59,6 +59,18 @@
         "additionalProperties": false,
         "description": "A gate, by its name: the one a gate.open step, an intent's record.missing or a verb's gate opens; a gate the loop opens by kind takes the first of its kind. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
         "properties": {
+          "ends_task": {
+            "additionalProperties": {
+              "description": "The category the task ends in.",
+              "enum": [
+                "done",
+                "dropped"
+              ],
+              "type": "string"
+            },
+            "description": "What closing the gate does to a task the loop opened only to hold gates, by the status it closes with (superseded when its subject is withdrawn), once none of the task's gates is open; a status left out leaves the task open, and a user layer sets only the statuses it names.",
+            "type": "object"
+          },
           "intents": {
             "additionalProperties": {
               "additionalProperties": false,

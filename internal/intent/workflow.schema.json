@@ -376,6 +376,15 @@
                   },
                   "type": "array"
                 },
+                "ended": {
+                  "default": "hold",
+                  "description": "What a draft withdrawn as its task ended does while that task stays ended: hold the workflow's proposals of no task or of that task, or hold them for repeat_after like any settled draft.",
+                  "enum": [
+                    "hold",
+                    "repeat"
+                  ],
+                  "type": "string"
+                },
                 "items": {
                   "default": "all",
                   "description": "Which of the unit's items the draft lists.",

@@ -626,7 +626,8 @@ func (s *Server) sendDrafts(ctx context.Context) {
 	}
 }
 
-// adoptDrafts gives each held draft of no task the task its gate waits on, settling one whose task ended.
+// adoptDrafts gives each held draft of no task the task its gate waits on, settling one whose task ended, and
+// ends each task opened to hold gates whose draft gates all closed.
 func (s *Server) adoptDrafts(ctx context.Context) {
 	if s.deps.Tasks == nil {
 		return
@@ -639,6 +640,16 @@ func (s *Server) adoptDrafts(ctx context.Context) {
 	}
 	if adopted+ended > 0 {
 		s.logf("drafts: %d of no task adopted by their gate's task, %d of an ended task withdrawn", adopted, ended)
+	}
+	if s.deps.Gates == nil {
+		return
+	}
+	held, err := s.deps.Tasks.HeldOpen(ctx)
+	for _, id := range held {
+		err = errors.Join(err, s.deps.Gates.SettleHeld(ctx, id))
+	}
+	if err != nil && ctx.Err() == nil {
+		s.logf("drafts: settling the tasks opened to hold gates: %v", err)
 	}
 }
 

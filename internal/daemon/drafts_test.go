@@ -24,6 +24,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/keys"
@@ -976,5 +977,42 @@ func TestApprovingWithOtherTextApprovesTheGateItsEditOpened(t *testing.T) {
 	old, _ := r.s.deps.GateReader.Get(ctx, g.ID)
 	if got.State != draft.Queued || got.Text != "second" || ng.ID == g.ID || ng.Status != gate.Approved || ng.By != task.ActorPerson || old.Status != gate.Superseded {
 		t.Fatalf("draft %+v, its gate %+v, the gate the person saw %+v", got, ng, old)
+	}
+}
+
+func TestTheSenderSettlesDraftsAndHeldTasksAtStart(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	ctx := context.Background()
+	st := r.db.Gates(r.clock.Now)
+	svc := gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{r.s.loaded().Gates}, Clock: r.clock, Tasks: r.s.deps.Tasks,
+		Publisher: publishTo(func(ctx context.Context, g gate.Gate) error { return r.o.Publish(ctx, g) })})
+	r.s.deps.Gates, r.o.Gates = svc, rigGates{svc, st}
+
+	thread := unit.Unit{Provider: unit.GitHub, Key: "acme/api#8"}
+	stranded, err := r.s.deps.Tasks.Open(ctx, coretasks.OpenRequest{Title: "Send this draft?", Unit: &thread, Origin: task.OriginGate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, err := st.Open(ctx, gate.Gate{Kind: gate.KindDraft, Name: "draft", Unit: thread, Task: stranded.ID, Subject: "999"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.Resolve(ctx, old.ID, gates.Resolution{Status: gate.Rejected, By: task.ActorPerson}); err != nil {
+		t.Fatal(err)
+	}
+	taskless := r.stored(t, draft.Draft{Unit: r7u, Text: "any news?", State: draft.Held})
+
+	clock := r.startSender(t)
+	clock.next(t)
+	if e, err := r.s.deps.Tasks.Task(ctx, stranded.ID); err != nil || e.Category != task.CategoryDropped {
+		t.Errorf("the task left holding a discarded draft's gate is %s (%v), want dropped", e.Category, err)
+	}
+	g, ok, err := r.o.GateOf(ctx, taskless)
+	if err != nil || !ok || g.Task == "" {
+		t.Fatalf("the held draft's gate %+v %v %v", g, ok, err)
+	}
+	if d, _ := r.o.Store.Get(ctx, taskless.ID); d.Task != string(g.Task) {
+		t.Errorf("the held draft of no task names %q, want its gate's task %s", d.Task, g.Task)
 	}
 }

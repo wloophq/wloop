@@ -39,6 +39,9 @@ type Def struct {
 	Kind    gate.Kind
 	Label   string
 	Intents []Intent
+	// EndsTask is the category, done or dropped, a task opened only to hold gates ends in once the gate closes
+	// with a status and none of its gates is open; a status it leaves out leaves the task open.
+	EndsTask map[gate.Status]task.Category
 }
 
 // Intent is what a gate is resolved with: the status gates.toml gives it,
@@ -393,22 +396,51 @@ func (s *Service) close(ctx context.Context, g gate.Gate, r Resolution) (gate.Ga
 	return closed, errors.Join(s.applied(ctx, closed), s.endHeld(ctx, closed))
 }
 
-// endHeld ends the task closed draft gate g was on when Tasks opened it only to hold gates and none of them is open
-// now: done when g was approved, dropped otherwise.
+// SettleHeld ends task id when Tasks opened it only to hold gates and none of them is open, in the category the
+// last gate to close that names one ends it in; it settles a task whose gates closed before endHeld ran.
+func (s *Service) SettleHeld(ctx context.Context, id task.ID) error {
+	gs, err := s.d.Reader.OfTask(ctx, id)
+	if err != nil {
+		return err
+	}
+	var last gate.Gate
+	for _, g := range gs {
+		if _, ends := s.endsTask(g); ends && g.Status != gate.Open && !g.ClosedAt.Before(last.ClosedAt) {
+			last = g
+		}
+	}
+	if last.ID == 0 {
+		return nil
+	}
+	return s.endHeld(ctx, last)
+}
+
+// endHeld ends the task closed gate g was on when Tasks opened it only to hold gates and none of them is open now,
+// in the category g's EndsTask names for its status.
 func (s *Service) endHeld(ctx context.Context, g gate.Gate) error {
 	held, ok := s.d.Tasks.(HeldTasks)
-	if !ok || g.Task == "" || g.Kind != gate.KindDraft {
+	if !ok || g.Task == "" {
+		return nil
+	}
+	c, ends := s.endsTask(g)
+	if !ends {
 		return nil
 	}
 	gs, err := s.d.Reader.OfTask(ctx, g.Task)
 	if err != nil || slices.ContainsFunc(gs, func(o gate.Gate) bool { return o.Status == gate.Open }) {
 		return err
 	}
-	c := task.CategoryDropped
-	if g.Status == gate.Approved {
-		c = task.CategoryDone
-	}
 	return held.EndHeld(ctx, g.Task, c)
+}
+
+// endsTask is the category closed gate g ends a task held only for gates in, as its gate's EndsTask names it.
+func (s *Service) endsTask(g gate.Gate) (task.Category, bool) {
+	def, err := s.def(g)
+	if err != nil {
+		return "", false
+	}
+	c, ok := def.EndsTask[g.Status]
+	return c, ok
 }
 
 // applied runs g's consequence and marks it run, failed or not: a failure is

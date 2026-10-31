@@ -82,7 +82,7 @@ type draftArgs struct {
 	delivery                                    draft.Delivery
 	effects                                     []string
 	repeatAfter, repeatAfterSent                time.Duration
-	forever                                     bool
+	forever, holdEnded                          bool
 }
 
 const defaultDraftText = "text.md.tmpl"
@@ -98,6 +98,7 @@ func parseDraftArgs(c stepCall, cfg config.Config) (draftArgs, error) {
 		return a, fmt.Errorf("draft.propose's text %q is not a file of the workflow's directory", a.text)
 	}
 	a.effects = c.list("effects")
+	a.holdEnded = cmp.Or(c.arg("ended"), builtin.DraftEnded[0]) == builtin.DraftEnded[0]
 	var err error
 	if v := c.arg("repeat_after"); v != "" {
 		if a.repeatAfter, err = repeatDuration(v, cfg); err != nil {
@@ -469,8 +470,8 @@ func configPolicy(w workflow.Workflow, base *draft.Policy, a *config.ApprovalCon
 // in either shape draftPerson reads, or, with no person, of the same key:
 // one open or failed, one sent within repeat_after_sent (or ever, with
 // forever), one otherwise settled within hold; timed when only the time
-// since a settled draft holds it. A withdrawn draft holds nothing, but one withdrawn as its task ended: while that
-// task stays ended it holds a proposal of no task or of that task, and once reopened it holds as a settled one.
+// since a settled draft holds it. A withdrawn draft holds nothing, but one withdrawn as its task ended: with ended
+// hold, while that task stays ended it holds a proposal of no task or of that task; otherwise as a settled one.
 func holdOf(ctx context.Context, ob draftOutbox, tasks draftTasks, p outbox.Proposal, person string, a draftArgs, now time.Time) (string, bool, error) {
 	prior, err := ob.List(ctx, outbox.Filter{Unit: &p.Unit, Rule: p.Origin.Rule})
 	if err != nil {
@@ -485,7 +486,7 @@ func holdOf(ctx context.Context, ob draftOutbox, tasks draftTasks, p outbox.Prop
 			continue
 		}
 		held := fmt.Sprintf("held by draft %d (%s)", d.ID, d.State)
-		if d.State == draft.Dropped && d.Reason == draft.WithdrawEnded && (p.Task == "" || p.Task == d.Task) {
+		if a.holdEnded && d.State == draft.Dropped && d.Reason == draft.WithdrawEnded && (p.Task == "" || p.Task == d.Task) {
 			if ended, err := taskEnded(ctx, tasks, task.ID(d.Task)); err != nil || ended {
 				return held, false, err
 			}

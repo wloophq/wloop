@@ -93,3 +93,43 @@ func TestATaskOpenedToHoldGatesEndsWithItsLastGate(t *testing.T) {
 		t.Fatalf("a task the user captured ended with its gate: %s", c)
 	}
 }
+
+func TestATaskLeftHoldingOnlyClosedDraftGatesEndsWhenSettled(t *testing.T) {
+	ctx := context.Background()
+	store := taskstest.New()
+	svc := coretasks.New(coretasks.Deps{Store: store, Items: prItems{}, Clock: clock{fixedNow}, States: taskstest.BundledStates})
+	gs := gatestest.NewStore(fixedNow)
+	g := gates.New(gates.Deps{Store: gs, Reader: gs, Profile: bundled, Tasks: svc, Clock: clock{fixedNow}})
+	strand := func(key string, status gate.Status) task.ID {
+		t.Helper()
+		thread := unit.Unit{Provider: "slack", Key: key}
+		e, err := svc.Open(ctx, coretasks.OpenRequest{Title: "Send this draft?", Unit: &thread, Origin: task.OriginGate})
+		if err != nil {
+			t.Fatal(err)
+		}
+		d, err := gs.Open(ctx, gate.Gate{Kind: gate.KindDraft, Name: "draft", Unit: thread, Task: e.ID, Subject: key})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := gs.Resolve(ctx, d.ID, gates.Resolution{Status: status, By: task.ActorPerson}); err != nil {
+			t.Fatal(err)
+		}
+		return e.ID
+	}
+	discarded, sent := strand("T1/C1/8.1", gate.Rejected), strand("T1/C1/8.2", gate.Approved)
+	waiting := unit.Unit{Provider: "slack", Key: "T1/C1/8.3"}
+	pending, err := g.Open(ctx, gate.Gate{Kind: gate.KindDraft, Unit: waiting, Subject: "9"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []task.ID{discarded, sent, pending.Task} {
+		if err := g.SettleHeld(ctx, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for id, want := range map[task.ID]task.Category{discarded: task.CategoryDropped, sent: task.CategoryDone, pending.Task: task.CategoryInbox} {
+		if e, err := store.Task(ctx, id); err != nil || e.Category != want {
+			t.Errorf("task %s is %s (%v), want %s", id, e.Category, err, want)
+		}
+	}
+}

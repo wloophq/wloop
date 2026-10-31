@@ -66,7 +66,7 @@ func (d taskDrafts) Ended(ctx context.Context, t task.Task, v task.Verb) {
 		return
 	}
 	if _, err := ob.Ended(ctx, t.ID, d.e.loadedIntents().Tasks.Verbs[string(v)].KeepDrafts); err != nil && ob.Log != nil {
-		ob.Log("drafts of %s, which %s ended: %v", t.ID, v, err)
+		ob.Log("drafts of ended task %s: %v", t.ID, err)
 	}
 }
 

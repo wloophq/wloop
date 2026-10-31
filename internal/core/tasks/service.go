@@ -142,10 +142,21 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 			return r, nil
 		}
 	}
-	if !next.Open() {
-		s.d.Drafts.Ended(ctx, next, req.Verb)
-	}
+	s.settle(ctx, []task.Task{next}, req.Verb)
 	return r, nil
+}
+
+// settle hands Drafts each of es that ended, by verb v, or by no verb when v is empty; it runs with the lock
+// released, since settling a draft can reach back into the service.
+func (s *Service) settle(ctx context.Context, es []task.Task, v task.Verb) {
+	if s.d.Drafts == nil {
+		return
+	}
+	for _, e := range es {
+		if !e.Open() {
+			s.d.Drafts.Ended(ctx, e, v)
+		}
+	}
 }
 
 // do runs req.Verb on task id as Do says, returning the task as it was before the verb.
@@ -710,9 +721,17 @@ func (p *pending) changes() []task.Change {
 // tells Activity the asleep tasks of those units a person's activity reached. A unit whose plugin is disabled
 // keeps its tasks as they are.
 func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
+	ended, err := s.sync(ctx, units)
+	s.settle(ctx, ended, "")
+	return err
+}
+
+// sync is Sync under the lock, returning the open tasks it ended.
+func (s *Service) sync(ctx context.Context, units []unit.Unit) ([]task.Task, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := s.now()
+	wasOpen := map[task.ID]bool{}
 	var p pending
 	var roused []task.ID
 	seen := map[unit.Unit]bool{}
@@ -723,7 +742,7 @@ func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 		seen[u] = true
 		f, ok, err := s.d.Facts.UnitFacts(ctx, u)
 		if err != nil {
-			return fmt.Errorf("facts of %s: %w", u, err)
+			return nil, fmt.Errorf("facts of %s: %w", u, err)
 		}
 		if !ok {
 			continue
@@ -731,15 +750,18 @@ func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 		f.Unit = u
 		its, err := s.d.Items.Items(ctx, u)
 		if err != nil {
-			return fmt.Errorf("items of %s: %w", u, err)
+			return nil, fmt.Errorf("items of %s: %w", u, err)
 		}
 		have, err := s.d.Store.TasksOf(ctx, u)
 		if err != nil {
-			return err
+			return nil, err
+		}
+		for _, e := range have {
+			wasOpen[e.ID] = wasOpen[e.ID] || e.Open()
 		}
 		cs, err := task.Reconcile(f, its, s.d.Me, p.of(have, u), s.d.States, now)
 		if err != nil {
-			return fmt.Errorf("the tasks of %s: %w", u, err)
+			return nil, fmt.Errorf("the tasks of %s: %w", u, err)
 		}
 		for _, c := range cs {
 			p.put(c)
@@ -753,19 +775,26 @@ func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 			p.put(c)
 		}
 	}
+	var ended []task.Task
 	if len(p.order) > 0 {
-		if err := s.d.Store.Apply(ctx, p.changes()); err != nil {
-			return err
+		cs := p.changes()
+		if err := s.d.Store.Apply(ctx, cs); err != nil {
+			return nil, err
+		}
+		for _, c := range cs {
+			if wasOpen[c.Task.ID] && !c.Task.Open() {
+				ended = append(ended, c.Task)
+			}
 		}
 	}
 	if s.d.Activity == nil {
-		return nil
+		return ended, nil
 	}
 	var errs []error
 	for _, id := range roused {
 		errs = append(errs, s.d.Activity(ctx, id))
 	}
-	return errors.Join(errs...)
+	return ended, errors.Join(errs...)
 }
 
 // Recategorize gives every stored task the category of its state as the profile declares it now, and returns
@@ -838,6 +867,21 @@ func Ended(e task.Task, err error) (bool, error) {
 	return err == nil && !e.Open(), err
 }
 
+// HeldOpen are the open tasks opened only to hold gates.
+func (s *Service) HeldOpen(ctx context.Context) ([]task.ID, error) {
+	es, err := s.d.Store.Tasks(ctx, task.Query{})
+	if err != nil {
+		return nil, err
+	}
+	var out []task.ID
+	for _, e := range es {
+		if e.Origin == task.OriginGate && e.Open() {
+			out = append(out, e.ID)
+		}
+	}
+	return out, nil
+}
+
 // EndHeld closes task id, opened only to hold gates, into category c; a task of another origin, or one closed
 // already, is left as it is.
 func (s *Service) EndHeld(ctx context.Context, id task.ID, c task.Category) error {
@@ -846,11 +890,21 @@ func (s *Service) EndHeld(ctx context.Context, id task.ID, c task.Category) erro
 
 // UnitClosed ends the open tasks that hold u, its closure posted: each moves into the done category.
 func (s *Service) UnitClosed(ctx context.Context, u unit.Unit) error {
+	ended, err := s.unitClosed(ctx, u)
+	if err != nil {
+		return err
+	}
+	s.settle(ctx, ended, "")
+	return nil
+}
+
+// unitClosed is UnitClosed under the lock, returning the tasks it ended.
+func (s *Service) unitClosed(ctx context.Context, u unit.Unit) ([]task.Task, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	es, err := s.d.Store.TasksOf(ctx, u)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	now := s.now()
 	var cs []task.Change
@@ -859,13 +913,17 @@ func (s *Service) UnitClosed(ctx context.Context, u unit.Unit) error {
 			continue
 		}
 		if err := e.MoveTo(task.CategoryDone, s.d.States); err != nil {
-			return err
+			return nil, err
 		}
 		e.Updated = now
 		cs = append(cs, task.Change{Op: task.OpResolve, Task: e, Why: "its unit " + u.String() + " closed"})
 	}
 	if len(cs) == 0 {
-		return nil
+		return nil, nil
 	}
-	return s.d.Store.Apply(ctx, cs)
+	ended := make([]task.Task, len(cs))
+	for i, c := range cs {
+		ended[i] = c.Task
+	}
+	return ended, s.d.Store.Apply(ctx, cs)
 }
