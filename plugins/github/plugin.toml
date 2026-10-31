@@ -154,6 +154,7 @@ workspace = "review"
 context = "pr"
 policy = "round"
 drives_row = true
+replaces_stale_question = true
 
 [[source.roles]]
 name = "pr.address"

@@ -127,6 +127,24 @@ func refusal(err error, want string) bool {
 	return errors.As(err, &r) && strings.Contains(r.Reason, want)
 }
 
+func TestASendThatKeepsAnsweredWaitsForTheAnswerOnItsWay(t *testing.T) {
+	s, store, _, _, _ := newService(t)
+	ctx := context.Background()
+	asked := store.Put(turn.Book{Unit: r7, Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), ID: "q", Trigger: turn.Automated, State: turn.Asked, Head: "c1", SentAt: t0.Add(-time.Hour)}},
+		Answers: []turn.Answer{{TurnSeq: 1, Text: "publish it", Route: turn.Typed, At: t0.Add(-time.Minute)}}})
+	req := turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: "abc", Trigger: turn.Automated, Head: "c2", Records: true, KeepsAnswered: true}
+	if _, err := s.Send(ctx, req); !refusal(err, "has an answer on its way") {
+		t.Fatalf("send = %v", err)
+	}
+	if b := bookOf(t, store, r7); len(b.Turns) != 1 || b.Turns[0].State != turn.Asked {
+		t.Fatalf("turns %+v", b.Turns)
+	}
+	req.ResumeOf = asked.Turns[0].Seq
+	if _, err := s.Send(ctx, req); err != nil {
+		t.Fatalf("the resume of the answered question: %v", err)
+	}
+}
+
 func TestWithdrawUndoesTheSend(t *testing.T) {
 	s, store, _, _, rec := newService(t)
 	ctx := context.Background()

@@ -242,6 +242,30 @@ func (b *Book) OpenQuestion(i Intent) bool {
 	return ok && t.State == Asked
 }
 
+// QuestionMovedPast says whether the open question of intent i is about a
+// head other than head, both known, with no answer on its way to it.
+func (b *Book) QuestionMovedPast(i Intent, head string) bool {
+	t, ok := b.Newest(i)
+	if !ok || t.State != Asked || t.Head == "" || head == "" || t.Head == head {
+		return false
+	}
+	return !b.QuestionAnswered(i)
+}
+
+// QuestionAnswered says whether the open question of intent i has an answer
+// stored since its last record, refused ones aside.
+func (b *Book) QuestionAnswered(i Intent) bool {
+	t, ok := b.Newest(i)
+	if !ok || t.State != Asked {
+		return false
+	}
+	var since time.Time
+	if last, ok := b.LastRecord(t.Seq); ok {
+		since = last.At
+	}
+	return b.answeredSince(t.Seq, since)
+}
+
 // AnsweredAt is when the newest answer noticed or resumed after the turn's last
 // record arrived.
 func (b *Book) AnsweredAt(seq int64) (time.Time, bool) {

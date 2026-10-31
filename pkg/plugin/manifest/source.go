@@ -120,16 +120,17 @@ type Named struct {
 
 // Role binds an intent to host mechanisms, each by its host name.
 type Role struct {
-	Name      string `toml:"name" doc:"The role's name. Required."`
-	Doc       string `toml:"doc" doc:"What the role's turns do. Required."`
-	RoundKind string `toml:"round_kind" doc:"The sweep round its turns are, such as \"review\"."`
-	Reconcile string `toml:"reconcile" doc:"The host reconcile its turns run, such as \"my_review\"."`
-	Prepare   string `toml:"prepare" doc:"The host prepare its turns run, such as \"action:nudge.prepare\"."`
-	Launch    string `toml:"launch" doc:"The host launch its turns run, such as \"probe\"."`
-	Workspace string `toml:"workspace" doc:"The workspace builtin its turns run in; empty is any."`
-	Context   string `toml:"context" doc:"What its turns are about."`
-	Policy    string `toml:"policy" doc:"The agent policy of its sessions."`
-	DrivesRow bool   `toml:"drives_row" doc:"Its turns drive the row of the workspace they run in."`
+	Name                  string `toml:"name" doc:"The role's name. Required."`
+	Doc                   string `toml:"doc" doc:"What the role's turns do. Required."`
+	RoundKind             string `toml:"round_kind" doc:"The sweep round its turns are, such as \"review\"."`
+	Reconcile             string `toml:"reconcile" doc:"The host reconcile its turns run, such as \"my_review\"."`
+	Prepare               string `toml:"prepare" doc:"The host prepare its turns run, such as \"action:nudge.prepare\"."`
+	Launch                string `toml:"launch" doc:"The host launch its turns run, such as \"probe\"."`
+	Workspace             string `toml:"workspace" doc:"The workspace builtin its turns run in; empty is any."`
+	Context               string `toml:"context" doc:"What its turns are about."`
+	Policy                string `toml:"policy" doc:"The agent policy of its sessions."`
+	DrivesRow             bool   `toml:"drives_row" doc:"Its turns drive the row of the workspace they run in."`
+	ReplacesStaleQuestion bool   `toml:"replaces_stale_question" doc:"A round of its turns on a head other than the one its open, unanswered question was asked on replaces that question instead of waiting for the answer. Leave it off for a role whose own agent pushes: its turn's head predates those pushes."`
 }
 
 // Delivery is how a source plugin posts a draft.

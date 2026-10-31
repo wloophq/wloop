@@ -267,7 +267,7 @@ func (e *Env) storeTurn(ctx context.Context, cfg config.Config, r turn.Request) 
 			Guidance: r.Guidance, Agent: cfg.For(ref.Owner, ref.Repo).Agent, Records: true, Inputs: persisted(c),
 			Items: r.Items, Task: r.Task, Role: c.Def.Role}
 		if role, ok := builtin.RoleOf(c.Def.Role); ok {
-			sent.send.PerSession = role.PerSession
+			sent.send.PerSession, sent.send.KeepsAnswered = role.PerSession, role.ReplacesStaleQuestion
 		}
 		if r.Why != nil {
 			sent.send.Workflow = r.Why.Workflow
