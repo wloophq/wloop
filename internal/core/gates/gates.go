@@ -217,8 +217,8 @@ func (s *Service) Resolve(ctx context.Context, id int64, r Resolution) error {
 
 // Supersede closes open gate id as superseded by by, its subject gone or
 // replaced, with no consequence: the subject's owner settles the subject.
-// It refuses an agent: no agent closes an open gate. A gate a person
-// supersedes is replaced by another, so the task it held stays.
+// It refuses an agent: no agent closes an open gate. A person supersedes
+// a draft's gate only to replace it with its edit's.
 func (s *Service) Supersede(ctx context.Context, id int64, by task.Actor) error {
 	if by == task.ActorAgent || by == "" {
 		return fmt.Errorf("%w: gate %d is superseded by its subject's owner, not by %s", ErrRefused, id, cmp.Or(string(by), "no one"))
@@ -393,11 +393,11 @@ func (s *Service) close(ctx context.Context, g gate.Gate, r Resolution) (gate.Ga
 	return closed, errors.Join(s.applied(ctx, closed), s.endHeld(ctx, closed))
 }
 
-// endHeld ends the task closed g was on when Tasks opened it only to hold gates and none of them is open now: done
-// when g was approved or answered, dropped otherwise.
+// endHeld ends the task closed draft gate g was on when Tasks opened it only to hold gates and none of them is open
+// now: done when g was approved, dropped otherwise.
 func (s *Service) endHeld(ctx context.Context, g gate.Gate) error {
 	held, ok := s.d.Tasks.(HeldTasks)
-	if !ok || g.Task == "" {
+	if !ok || g.Task == "" || g.Kind != gate.KindDraft {
 		return nil
 	}
 	gs, err := s.d.Reader.OfTask(ctx, g.Task)
@@ -405,7 +405,7 @@ func (s *Service) endHeld(ctx context.Context, g gate.Gate) error {
 		return err
 	}
 	c := task.CategoryDropped
-	if g.Status == gate.Approved || g.Status == gate.Answered {
+	if g.Status == gate.Approved {
 		c = task.CategoryDone
 	}
 	return held.EndHeld(ctx, g.Task, c)

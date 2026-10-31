@@ -69,6 +69,17 @@ func TestATaskOpenedToHoldGatesEndsWithItsLastGate(t *testing.T) {
 		t.Fatalf("its gate approved, the task is %s, want done", c)
 	}
 
+	plan, err := g.Open(ctx, gate.Gate{Kind: gate.KindPlan, Unit: unit.Unit{Provider: "slack", Key: "T1/C1/9.3"}, Subject: "review/first"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := g.Resolve(ctx, plan.ID, gates.Resolution{Intent: "run", By: task.ActorPerson}); err != nil {
+		t.Fatal(err)
+	}
+	if c := category(plan.Task); c != task.CategoryInbox {
+		t.Fatalf("its plan gate run, the task it held is %s: only a draft's gate ends it", c)
+	}
+
 	user := task.Task{ID: "t-00000000000000c1", State: "inbox", Category: task.CategoryInbox, Origin: task.OriginUser, Units: []unit.Unit{acme},
 		Created: fixedNow(), Updated: fixedNow()}
 	if err := store.Apply(ctx, []task.Change{{Op: task.OpCreate, Task: user}}); err != nil {
