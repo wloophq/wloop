@@ -33,7 +33,20 @@ type Outbox interface {
 // Source is an enabled plugin's Proposals.
 type Source struct {
 	Provider  unit.ProviderID
-	Proposals func(ctx context.Context, now time.Time) ([]outbox.Proposal, error)
+	Proposals func(ctx context.Context, now time.Time) (Pass, error)
+}
+
+// Pass is what a plugin's rules call for now: the drafts to propose, and the
+// rules that no longer call for a draft on a unit.
+type Pass struct {
+	Proposals   []outbox.Proposal
+	Withdrawals []Withdrawal
+}
+
+// Withdrawal says the plugin's rule Rule no longer calls for a draft on Unit.
+type Withdrawal struct {
+	Unit unit.Unit
+	Rule string
 }
 
 type Job struct {
@@ -81,8 +94,9 @@ func (j *Job) logf(format string, args ...any) {
 }
 
 // Run is one pass: it withdraws the plugin rules' drafts on units whose
-// closure is posted, then proposes what every plugin calls for now and no
-// draft of the same rule and key holds back.
+// closure is posted or whose rule its plugin says no longer calls for them,
+// then proposes what every plugin calls for now and no draft of the same rule
+// and key holds back.
 func (j *Job) Run(ctx context.Context) (Summary, error) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
@@ -93,7 +107,10 @@ func (j *Job) Run(ctx context.Context) (Summary, error) {
 	if err != nil {
 		return sum, err
 	}
-	props, err := j.fromSources(ctx)
+	props, withdrawals, err := j.fromSources(ctx)
+	withdrawn, werr := j.withdrawNamed(ctx, withdrawals)
+	sum.Discarded += withdrawn
+	err = errors.Join(err, werr)
 	for _, p := range props {
 		p.Policy = draft.Fixed(j.approval(p.Unit.Provider))
 		switch perr := j.propose(ctx, p, now); {
@@ -204,20 +221,28 @@ func (j *Job) closed(ctx context.Context, d draft.Draft) (string, error) {
 // fromSources is what each enabled plugin proposes on its own units, keeping
 // of its Origin only the rule id: the job sets the key and, in Run, the
 // plugin's configured approval.
-func (j *Job) fromSources(ctx context.Context) ([]outbox.Proposal, error) {
+func (j *Job) fromSources(ctx context.Context) ([]outbox.Proposal, []Withdrawal, error) {
 	now := j.Clock.Now()
 	var out []outbox.Proposal
+	var withdrawals []Withdrawal
 	var errs []error
 	for _, src := range j.Sources {
 		if src.Proposals == nil || !j.enabled(src.Provider) {
 			continue
 		}
-		ps, err := src.Proposals(ctx, now)
+		pass, err := src.Proposals(ctx, now)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("%s proposals: %w", src.Provider, err))
 			continue
 		}
-		for _, p := range ps {
+		for _, w := range pass.Withdrawals {
+			if w.Unit.Provider != src.Provider || w.Rule == "" {
+				j.logf("proposals: %s withdrew %q on %s, outside its lane; ignored", src.Provider, w.Rule, w.Unit)
+				continue
+			}
+			withdrawals = append(withdrawals, w)
+		}
+		for _, p := range pass.Proposals {
 			rule := p.Origin.Rule
 			switch {
 			case p.Unit.Provider != src.Provider:
@@ -234,5 +259,31 @@ func (j *Job) fromSources(ctx context.Context) ([]outbox.Proposal, error) {
 			})
 		}
 	}
-	return out, errors.Join(errs...)
+	return out, withdrawals, errors.Join(errs...)
+}
+
+// withdrawNamed discards, as moot, each held auto draft of a plugin rule on
+// a unit where the rule's plugin said it no longer calls for one.
+func (j *Job) withdrawNamed(ctx context.Context, ws []Withdrawal) (int, error) {
+	n := 0
+	var errs []error
+	for _, w := range ws {
+		held, err := j.Outbox.List(ctx, outbox.Filter{Unit: &w.Unit, Rule: w.Rule, States: []draft.State{draft.Held}})
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		for _, d := range held {
+			if d.Origin.Kind != draft.OriginAuto || d.Origin.Workflow != "" {
+				continue
+			}
+			if _, err := j.Outbox.Withdraw(ctx, d.ID, ReasonMoot); err != nil {
+				errs = append(errs, err)
+				continue
+			}
+			n++
+			j.logf("proposals: draft %d (%s on %s) discarded: its rule no longer calls for it", d.ID, d.Origin.Rule, d.Unit)
+		}
+	}
+	return n, errors.Join(errs...)
 }

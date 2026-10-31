@@ -124,7 +124,7 @@ type Planner interface {
 	Plan(ctx context.Context, u plugin.Unit, st RoundState) (Plan, error)
 	Payload(ctx context.Context, req PayloadRequest) (PayloadResult, error)
 	ApplyEffect(ctx context.Context, req EffectRequest) error
-	Proposals(ctx context.Context, now time.Time) ([]Draft, error)
+	Proposals(ctx context.Context, now time.Time) (Proposed, error)
 	Placement(ctx context.Context, u plugin.Unit, item string) (Placements, error)
 }
 

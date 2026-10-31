@@ -350,8 +350,11 @@ func (planner) Payload(context.Context, source.PayloadRequest) (source.PayloadRe
 	return source.PayloadResult{}, nil
 }
 func (planner) ApplyEffect(context.Context, source.EffectRequest) error { return nil }
-func (planner) Proposals(context.Context, time.Time) ([]source.Draft, error) {
-	return nil, nil
+func (planner) Proposals(context.Context, time.Time) (source.Proposed, error) {
+	return source.Proposed{
+		Drafts:      []source.Draft{{Unit: plugin.Unit{Provider: "pulls", Key: "o/r#1"}, Text: "ping", Origin: source.DraftOrigin{Kind: "auto", Rule: "pulls-nudge"}}},
+		Withdrawals: []source.Withdrawal{{Unit: plugin.Unit{Provider: "pulls", Key: "o/r#2"}, Rule: "pulls-nudge"}},
+	}, nil
 }
 func (planner) Placement(context.Context, plugin.Unit, string) (source.Placements, error) {
 	return source.Placements{}, nil
@@ -400,6 +403,18 @@ func TestTemporalFactsRoundTrip(t *testing.T) {
 		if zero != f.Value.Time.IsZero() && (f.Value.Temporal() || f.Value.Kind == source.KindTime) {
 			t.Errorf("%s: a zero time did not stay zero: %v", f.Name, f.Value.Time)
 		}
+	}
+}
+
+func TestProposalsCarryTheirWithdrawals(t *testing.T) {
+	c := sourcetest.Launch(t, "pulls", planner{Stub: sourcetest.NewStub()}, (&recorder{}).host())
+	got, err := c.Proposals(t.Context(), t0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, _ := planner{}.Proposals(t.Context(), t0)
+	if len(got.Drafts) != 1 || got.Drafts[0].Text != "ping" || !reflect.DeepEqual(got.Withdrawals, want.Withdrawals) {
+		t.Fatalf("proposed %+v, want %+v", got, want)
 	}
 }
 

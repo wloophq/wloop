@@ -325,15 +325,39 @@ func TestProposalsReadTheHostOfTheStalledPullRequestsOnly(t *testing.T) {
 	asleep.pr.Ref = ref(3)
 	rd := &fakeReader{overrides: map[string]map[string]string{held.pr.Ref.String(): {"hold": "true"}},
 		tasks: []src.Task{{ID: "t-01", State: "scheduled", Category: "deferred", Units: []sdk.Unit{ref(3).Unit()}}}}
-	ds, err := nudge.Proposals(context.Background(), []row.Row{stalledChanges().row(), held.row(), asleep.row(), fresh.row()}, rd, profileTexts(), nil, now)
+	got, err := nudge.Proposals(context.Background(), []row.Row{stalledChanges().row(), held.row(), asleep.row(), fresh.row()}, rd, profileTexts(), nil, now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ds) != 1 || ds[0].Unit != ref(1).Unit() {
+	if ds := got.Drafts; len(ds) != 1 || ds[0].Unit != ref(1).Unit() {
 		t.Fatalf("proposals %+v", ds)
 	}
 	if !slices.Equal(rd.asked, []string{ref(1).String(), ref(2).String(), ref(3).String()}) {
 		t.Fatalf("read the round state of %v", rd.asked)
+	}
+}
+
+func TestAPullRequestNoLongerStalledWithdrawsItsNudge(t *testing.T) {
+	draftPR := stalledReview()
+	draftPR.pr.Ref, draftPR.pr.IsDraft = ref(5), true
+	fresh := pull{pr: open(4, viewer)}
+	fresh.pr.ReviewRequests = []string{reviewer}
+	fresh.events = []pr.Event{ev(4, pr.KindReviewRequest, viewer, now.Add(-time.Hour), reviewer)}
+	held := stalledReview()
+	turn := stalledReviewerBack()
+	unknown := stalledReview()
+	unknown.pr.Ref = ref(6)
+	unknownRow := unknown.row()
+	unknownRow.Payload.Viewer = ""
+	rd := &fakeReader{overrides: map[string]map[string]string{held.pr.Ref.String(): {"hold": "true"}},
+		books: []src.Book{{Unit: turn.pr.Ref.Unit(), Turns: []src.Turn{{Seq: 1, ID: "t1", Role: "pr.address", State: "started", StartedAt: now.Add(-time.Hour)}}}}}
+	got, err := nudge.Proposals(context.Background(), []row.Row{draftPR.row(), fresh.row(), held.row(), turn.row(), unknownRow}, rd, profileTexts(), nil, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []src.Withdrawal{{Unit: ref(5).Unit(), Rule: nudge.Rule}, {Unit: ref(4).Unit(), Rule: nudge.Rule}}
+	if len(got.Drafts) != 0 || !slices.Equal(got.Withdrawals, want) {
+		t.Fatalf("proposed %+v, want withdrawals %+v: a hold, a running turn or an unknown viewer withdraws nothing", got, want)
 	}
 }
 

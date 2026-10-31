@@ -232,11 +232,11 @@ func (c *Client) ApplyEffect(ctx context.Context, req EffectRequest) error {
 	return err
 }
 
-func (c *Client) Proposals(ctx context.Context, now time.Time) ([]Draft, error) {
+func (c *Client) Proposals(ctx context.Context, now time.Time) (Proposed, error) {
 	r, err := via(ctx, func(call *pb.Call) (*pb.ProposalsResponse, error) {
 		return c.c.Proposals(ctx, &pb.ProposalsRequest{Call: call, Now: ts(now)})
 	})
-	return mapSlice(r.GetDrafts(), draftGo), err
+	return Proposed{Drafts: mapSlice(r.GetDrafts(), draftGo), Withdrawals: mapSlice(r.GetWithdrawals(), withdrawalGo)}, err
 }
 
 func (c *Client) Placement(ctx context.Context, u plugin.Unit, item string) (Placements, error) {
