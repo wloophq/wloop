@@ -41,15 +41,16 @@ type silentKey struct {
 
 const silentEvery = 24 * time.Hour
 
-// pending is an open item a link may resolve, with the time after which a
-// review on its target counts, and the time after which its target merging
-// or closing does: a pull request that ended before the link was noted
-// still settles it, unless you touched the item since.
+// pending is an open item a link may resolve, with the time after which an
+// event on its target counts, and the time after which its target merging
+// does: a pull request merged before the link was noted still settles it,
+// unless you touched the item since. A close before the link does not, since
+// the stored events keep a close the pull request was reopened from.
 type pending struct {
-	link  link.Link
-	item  ditems.Item
-	after time.Time
-	ended time.Time
+	link    link.Link
+	item    ditems.Item
+	after   time.Time
+	touched time.Time
 }
 
 // Run resolves the open linked items whose link targets are in targets.
@@ -110,7 +111,7 @@ func (r *Resolver) open(ctx context.Context, ls []link.Link, itemsOf map[unit.Un
 		if its[i].UserAt.After(after) {
 			after = its[i].UserAt
 		}
-		out = append(out, pending{link: l, item: its[i], after: after, ended: its[i].UserAt})
+		out = append(out, pending{link: l, item: its[i], after: after, touched: its[i].UserAt})
 	}
 	return out, errors.Join(errs...)
 }
@@ -121,10 +122,10 @@ func (r *Resolver) resolve(ctx context.Context, target unit.Unit, open []pending
 		r.quiet(target, "has no events")
 		return 0, nil
 	}
-	since := open[0].ended
+	since := open[0].touched
 	for _, p := range open[1:] {
-		if p.ended.Before(since) {
-			since = p.ended
+		if p.touched.Before(since) {
+			since = p.touched
 		}
 	}
 	evs, err := reader.UnitEvents(ctx, target, since)
@@ -164,8 +165,7 @@ func (r *Resolver) resolve(ctx context.Context, target unit.Unit, open []pending
 // the resolution it gives.
 func settle(p pending, evs []link.Event, codecs unit.KeyComparer) (link.Event, ditems.Resolution, bool) {
 	for _, ev := range evs {
-		terminal := ev.Kind == link.EventClosed || ev.Kind == link.EventMerged
-		if !ev.At.After(p.after) && !(terminal && ev.At.After(p.ended)) {
+		if !ev.At.After(p.after) && !(ev.Kind == link.EventMerged && ev.At.After(p.touched)) {
 			continue
 		}
 		switch {

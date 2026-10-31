@@ -211,7 +211,7 @@ func TestMergeAndCloseResolveLinks(t *testing.T) {
 	}
 }
 
-func TestAPullRequestThatEndedBeforeTheLinkSettlesIt(t *testing.T) {
+func TestAPullRequestMergedBeforeTheLinkSettlesIt(t *testing.T) {
 	for _, kind := range []link.Kind{link.Review, link.Merge} {
 		f := newFixture(t, openItem(octocat), reviewLink(kind))
 		f.events.evs = []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}
@@ -223,6 +223,11 @@ func TestAPullRequestThatEndedBeforeTheLinkSettlesIt(t *testing.T) {
 	f.events.evs = []link.Event{review("octocat", t0.Add(-time.Hour))}
 	if n := f.run(t); n != 0 {
 		t.Fatal("a review before the link resolved its item")
+	}
+	c := newFixture(t, openItem(octocat), reviewLink(link.Review))
+	c.events.evs = []link.Event{state(link.EventClosed, t0.Add(-time.Hour))}
+	if n := c.run(t); n != 0 {
+		t.Fatal("a close before the link, which a reopen leaves stored, resolved its item")
 	}
 	it := openItem(octocat)
 	it.UserAt = t0
