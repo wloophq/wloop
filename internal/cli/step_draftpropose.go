@@ -469,8 +469,8 @@ func configPolicy(w workflow.Workflow, base *draft.Policy, a *config.ApprovalCon
 // in either shape draftPerson reads, or, with no person, of the same key:
 // one open or failed, one sent within repeat_after_sent (or ever, with
 // forever), one otherwise settled within hold; timed when only the time
-// since a settled draft holds it. A withdrawn draft holds nothing, but one withdrawn as its task ended, which holds
-// while that task stays ended: the person settled the unit by ending it.
+// since a settled draft holds it. A withdrawn draft holds nothing, but one withdrawn as its task ended: while that
+// task stays ended it holds a proposal of no task or of that task, and once reopened it holds as a settled one.
 func holdOf(ctx context.Context, ob draftOutbox, tasks draftTasks, p outbox.Proposal, person string, a draftArgs, now time.Time) (string, bool, error) {
 	prior, err := ob.List(ctx, outbox.Filter{Unit: &p.Unit, Rule: p.Origin.Rule})
 	if err != nil {
@@ -485,13 +485,14 @@ func holdOf(ctx context.Context, ob draftOutbox, tasks draftTasks, p outbox.Prop
 			continue
 		}
 		held := fmt.Sprintf("held by draft %d (%s)", d.ID, d.State)
-		switch {
-		case slices.Contains(draft.Open, d.State), d.State == draft.Failed, d.State == draft.Sent && a.forever:
-			return held, false, nil
-		case d.State == draft.Dropped && d.Reason == draft.WithdrawEnded:
+		if d.State == draft.Dropped && d.Reason == draft.WithdrawEnded && (p.Task == "" || p.Task == d.Task) {
 			if ended, err := taskEnded(ctx, tasks, task.ID(d.Task)); err != nil || ended {
 				return held, false, err
 			}
+		}
+		switch {
+		case slices.Contains(draft.Open, d.State), d.State == draft.Failed, d.State == draft.Sent && a.forever:
+			return held, false, nil
 		case d.State == draft.Dropped && (d.Reason == draft.WithdrawAssigned || d.Reason == draft.WithdrawMoot):
 		case d.State == draft.Sent && now.Sub(d.UpdatedAt) < a.repeatAfterSent, d.State != draft.Sent && now.Sub(d.UpdatedAt) < a.repeatAfter:
 			if refusal == "" {
@@ -507,11 +508,7 @@ func taskEnded(ctx context.Context, tasks draftTasks, id task.ID) (bool, error) 
 	if id == "" || tasks == nil {
 		return false, nil
 	}
-	e, err := tasks.Task(ctx, id)
-	if errors.Is(err, coretasks.ErrNoTask) {
-		return true, nil
-	}
-	return err == nil && !e.Open(), err
+	return coretasks.Ended(tasks.Task(ctx, id))
 }
 
 // withdrawnAtOnce refuses a draft the workflow's [withdraw] when would

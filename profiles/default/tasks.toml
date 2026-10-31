@@ -208,7 +208,7 @@ by      = { person = "true" }
 [verbs.reference]
 handler = "finish"
 label   = "Reference"
-summary = "Keep it as reference: nothing to do, worth finding again."
+summary = "Keep it as reference: nothing to do, worth finding again, and a draft it carries is discarded."
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "done"]
 to      = "reference"
 by      = { person = "true" }
@@ -332,7 +332,7 @@ by      = { person = "true" }
 
 [verbs.not-mine]
 label   = "Not mine"
-summary = "Say it is not yours: it goes to the trash, and a reply pointing the asker elsewhere waits for your approval."
+summary = "Say it is not yours: it goes to the trash with the drafts it carries, and a reply pointing the asker elsewhere waits for your approval."
 from    = ["inbox", "next", "waiting", "scheduled", "someday"]
 to      = "trash"
 by      = { person = "true" }

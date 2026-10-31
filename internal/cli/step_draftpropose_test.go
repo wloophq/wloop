@@ -448,12 +448,23 @@ func TestADraftItsTasksEndWithdrewHoldsWhileTheTaskStaysEnded(t *testing.T) {
 	if _, err := r.svc.Withdraw(context.Background(), ds[0].ID, draft.WithdrawEnded); err != nil {
 		t.Fatal(err)
 	}
+	r.tasks.m["t1"] = waiting
+	if got := r.check(draftTask); !strings.Contains(got, "held by draft") {
+		t.Fatalf("the task reopened at once, and the ended draft does not hold for repeat_after: %q", got)
+	}
+	r.tasks.m["t1"] = ended
 	r.now = r.now.Add(72 * time.Hour)
 	if got := r.check(draftTask); !strings.Contains(got, "held by draft") {
 		t.Fatalf("a draft withdrawn as its task ended does not hold while the task stays done: %q", got)
 	}
+	captured := waiting
+	captured.ID = "t2"
+	r.tasks.m["t2"] = captured
+	if got := r.check(unit.Unit{Provider: unit.Task, Key: "t2"}); got != "" {
+		t.Fatalf("another task captured on the unit is held by the ended task's draft: %q", got)
+	}
 	r.tasks.m["t1"] = waiting
 	if got := r.check(draftTask); got != "" {
-		t.Fatalf("the task is open again, and the ended draft still holds: %q", got)
+		t.Fatalf("the task is open again past repeat_after, and the ended draft still holds: %q", got)
 	}
 }

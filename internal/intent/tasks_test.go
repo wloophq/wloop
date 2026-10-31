@@ -449,3 +449,17 @@ func TestAnUnknownChatIntentFailsToLoad(t *testing.T) {
 		t.Fatalf("the bundled chat intent: %s", problems.Error())
 	}
 }
+
+func TestAUserLayerNamesTheDraftsAVerbKeeps(t *testing.T) {
+	t.Parallel()
+	d, problems := loadTasksWith(t, defaultTasks(t), "[verbs.done]\nkeep_drafts = [\"close\"]\n")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	if got := d.Verbs["done"].KeepDrafts; !slices.Equal(got, []string{"close"}) {
+		t.Errorf("done keeps %q, want the close drafts", got)
+	}
+	if got := d.Verbs["dismiss"].KeepDrafts; got != nil {
+		t.Errorf("dismiss keeps %q, want none", got)
+	}
+}

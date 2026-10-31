@@ -196,7 +196,7 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 		return d, errors.Join(fmt.Errorf("opening the gate of draft %d: %w", d.ID, err), s.ungated(ctx, d))
 	}
 	if _, err := s.adoptGate(ctx, d, g); err != nil {
-		return d, err
+		s.logf("draft %d: taking the task of its gate: %v", d.ID, err)
 	}
 	return s.Store.Get(ctx, d.ID)
 }

@@ -338,18 +338,17 @@ type mTasks struct {
 }
 
 type mVerbText struct {
-	Label   *string           `toml:"label"`
-	Summary *string           `toml:"summary"`
-	Input   *string           `toml:"input"`
-	Offer   *string           `toml:"offer"`
-	From    []string          `toml:"from"`
-	To      *string           `toml:"to"`
-	By      map[string]string `toml:"by"`
-	Gate    *string           `toml:"gate"`
-	Handler *string           `toml:"handler"`
-	Send    *string           `toml:"send"`
-	// KeepDrafts is keep_drafts.
-	KeepDrafts []string `toml:"keep_drafts"`
+	Label      *string           `toml:"label"`
+	Summary    *string           `toml:"summary"`
+	Input      *string           `toml:"input"`
+	Offer      *string           `toml:"offer"`
+	From       []string          `toml:"from"`
+	To         *string           `toml:"to"`
+	By         map[string]string `toml:"by"`
+	Gate       *string           `toml:"gate"`
+	Handler    *string           `toml:"handler"`
+	Send       *string           `toml:"send"`
+	KeepDrafts []string          `toml:"keep_drafts"`
 }
 
 type mProp struct {

@@ -75,7 +75,7 @@ func TestAdoptGivesATasklessHeldDraftItsGatesTask(t *testing.T) {
 	closed := e.tasklessHeld("close", "t-closed")
 	gateless := e.tasklessHeld("ask", "")
 
-	adopted, ended, err := e.svc.Adopt(ctx, func(_ context.Context, id task.ID) (bool, error) { return id == "t-open", nil })
+	adopted, ended, err := e.svc.Adopt(ctx, func(_ context.Context, id task.ID) (bool, error) { return id != "t-open", nil })
 	if err != nil {
 		t.Fatal(err)
 	}

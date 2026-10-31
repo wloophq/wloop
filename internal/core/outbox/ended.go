@@ -39,8 +39,8 @@ func (s *Service) Ended(ctx context.Context, id task.ID, keep []string) ([]draft
 }
 
 // Adopt gives each held draft of no task the task its open gate waits on, and withdraws, as draft.WithdrawEnded,
-// one whose task open says ended; a draft whose gate is on no task stays as it is.
-func (s *Service) Adopt(ctx context.Context, open func(ctx context.Context, id task.ID) (bool, error)) (adopted, ended int, err error) {
+// one whose task ended says has ended; a draft whose gate is on no task stays as it is.
+func (s *Service) Adopt(ctx context.Context, ended func(ctx context.Context, id task.ID) (bool, error)) (adopted, withdrawn int, err error) {
 	held, err := s.Store.List(ctx, Filter{States: []draft.State{draft.Held}})
 	if err != nil {
 		return 0, 0, err
@@ -58,17 +58,16 @@ func (s *Service) Adopt(ctx context.Context, open func(ctx context.Context, id t
 		if !ok || g.Status != gate.Open || g.Task == "" {
 			continue
 		}
-		live, err := open(ctx, g.Task)
+		gone, err := ended(ctx, g.Task)
 		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
-		d.Task = string(g.Task)
-		if d, err = s.save(ctx, d, draft.Held); err != nil {
+		if d, err = s.adoptGate(ctx, d, g); err != nil {
 			errs = append(errs, err)
 			continue
 		}
-		if live {
+		if !gone {
 			adopted++
 			continue
 		}
@@ -76,9 +75,9 @@ func (s *Service) Adopt(ctx context.Context, open func(ctx context.Context, id t
 			errs = append(errs, err)
 			continue
 		}
-		ended++
+		withdrawn++
 	}
-	return adopted, ended, errors.Join(errs...)
+	return adopted, withdrawn, errors.Join(errs...)
 }
 
 // adoptGate gives held draft d the task its gate g was placed on when d names none, so the task carries it.

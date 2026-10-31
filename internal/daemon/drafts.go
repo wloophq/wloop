@@ -632,11 +632,7 @@ func (s *Server) adoptDrafts(ctx context.Context) {
 		return
 	}
 	adopted, ended, err := s.deps.Outbox.Adopt(ctx, func(ctx context.Context, id task.ID) (bool, error) {
-		e, err := s.deps.Tasks.Task(ctx, id)
-		if errors.Is(err, coretasks.ErrNoTask) {
-			return false, nil
-		}
-		return e.Open(), err
+		return coretasks.Ended(s.deps.Tasks.Task(ctx, id))
 	})
 	if err != nil && ctx.Err() == nil {
 		s.logf("drafts: adopt: %v", err)
