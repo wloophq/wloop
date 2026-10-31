@@ -223,7 +223,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task.link_signal.ready` | bool | The work on the pull request is approved: my review approved its head, or my own can merge. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.link_signal.workspace` | bool | A workspace of the pull request remains on disk, a review or an author one, whatever the pull request's state. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.link_signal.asked_reacted` | bool | Every open item of the unit has a check mark from whoever asked it or whom it waits on, other than you, on a message posted after its ask. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
-| `task.link_signal.replied_last` | bool | You posted the unit's newest person's message, after every open item's ask, at least 3 days ago. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.link_signal.replied_last` | bool | Every open item waits on you, and you posted the unit's newest person's message, after every open item's ask, at least 3 days ago. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 
 ### Pull requests (`pr.*`)
 
