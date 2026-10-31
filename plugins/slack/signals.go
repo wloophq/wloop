@@ -26,9 +26,9 @@ var checkMarks = []string{"white_check_mark", "heavy_check_mark", "ballot_box_wi
 
 // unitSignals are in's link signals at now, and when the next of them changes with time alone: asked_reacted,
 // every open item has a check mark from whoever asked it or whom it waits on, other than the viewer, on a
-// message posted after its ask; replied_last, the viewer posted the newest person's message, after every open
-// item's ask, at least repliedAfter ago.
-func unitSignals(in *slackrows.Input, repliedAfter time.Duration, now time.Time) ([]src.Signal, time.Time) {
+// message posted after its ask; replied_last, every open item waits on the viewer, who posted the newest
+// person's message, after every open item's ask, at least quietFor ago.
+func unitSignals(in *slackrows.Input, quietFor time.Duration, now time.Time) ([]src.Signal, time.Time) {
 	open := slices.DeleteFunc(slices.Clone(in.Items()), func(it items.Item) bool { return it.State != items.Open })
 	asked := src.Signal{Name: signalAskedReacted}
 	replied := src.Signal{Name: signalRepliedLast}
@@ -37,8 +37,10 @@ func unitSignals(in *slackrows.Input, repliedAfter time.Duration, now time.Time)
 	}
 	var newestAsk time.Time
 	asked.On = true
+	owed := in.Viewer() != ""
 	for _, it := range open {
 		newestAsk = later(newestAsk, it.Origin.At)
+		owed = owed && slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return p.Key == "slack:"+in.Viewer() })
 		at, ok := checkedAfter(in, it)
 		if !ok {
 			asked.On = false
@@ -50,10 +52,10 @@ func unitSignals(in *slackrows.Input, repliedAfter time.Duration, now time.Time)
 		asked.Since = time.Time{}
 	}
 	var next time.Time
-	if m, ok := newestHuman(in); ok && in.Viewer() != "" && m.User == in.Viewer() {
+	if m, ok := newestHuman(in); ok && owed && m.User == in.Viewer() {
 		at := dslack.TSTime(m.TS)
 		if at.After(newestAsk) {
-			quiet := at.Add(repliedAfter)
+			quiet := at.Add(quietFor)
 			if now.Before(quiet) {
 				next = quiet
 			} else {

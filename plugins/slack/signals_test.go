@@ -134,3 +134,16 @@ func TestRepliedLastIsOffWhenSomeoneElseSpokeLastOrNothingIsOpen(t *testing.T) {
 		t.Fatal("a unit with no open item reports a closing signal")
 	}
 }
+
+func TestRepliedLastIsOffOnAnAskTheViewerWaitsOn(t *testing.T) {
+	t.Parallel()
+	f := signalsFixture(t)
+	f.now = tsAt(2).Add(2 * signalsRepliedAfter)
+	u := f.signalThread(t, nil, dslack.Message{TS: ts(2), User: me, Text: "any update?"})
+	it := f.host.Items(u)[0]
+	it.Requester, it.WaitingOn = mePerson, []items.Person{otherPerson}
+	f.host.Put(it)
+	if got, _ := f.signals(t, u); got[signalRepliedLast].On {
+		t.Fatal("the viewer's follow-up on their own ask reads as an answer")
+	}
+}
