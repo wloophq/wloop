@@ -63,6 +63,18 @@
             "description": "The intent, one that refuses the gate, the gate is resolved with, by the person, once they end the task it is on with a verb whose handler is finish or drop; empty or left out, the gate stays open and moves off the closed task.",
             "type": "string"
           },
+          "ends_task": {
+            "additionalProperties": {
+              "description": "The category the task ends in.",
+              "enum": [
+                "done",
+                "dropped"
+              ],
+              "type": "string"
+            },
+            "description": "What closing the gate does to a task the loop opened only to hold gates, by the status it closes with (superseded when its subject is withdrawn), once none of the task's gates is open; a status left out leaves the task open, and a user layer sets only the statuses it names.",
+            "type": "object"
+          },
           "intents": {
             "additionalProperties": {
               "additionalProperties": false,

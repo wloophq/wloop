@@ -1,6 +1,9 @@
 package builtin
 
-import "github.com/wloophq/wloop/internal/domain/gate"
+import (
+	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/task"
+)
 
 // gatesGrammar is the keys of gates.toml.
 var gatesGrammar = []Key{
@@ -18,6 +21,8 @@ var gatesGrammar = []Key{
 	{Path: "gates.*.intents.*.confirm", In: SurfaceGates, Kind: KindTemplate, Doc: "The dialog that confirms the intent on a row, over the action facts; empty asks nothing."},
 	{Path: "gates.*.intents.*.status", In: SurfaceGates, Kind: KindEnum, Values: gateStatusValues, Required: true, Doc: "The status the intent resolves the gate to; required for a new intent."},
 	{Path: "gates.*.intents.*.answer", In: SurfaceGates, Kind: KindBool, Default: "false", Doc: "The intent takes text, such as a question's answer."},
+	{Path: "gates.*.ends_task", In: SurfaceGates, Kind: KindMap, Doc: "What closing the gate does to a task the loop opened only to hold gates, by the status it closes with (superseded when its subject is withdrawn), once none of the task's gates is open; a status left out leaves the task open, and a user layer sets only the statuses it names."},
+	{Path: "gates.*.ends_task.*", In: SurfaceGates, Kind: KindEnum, Values: endsTaskValues, Doc: "The category the task ends in."},
 	{Path: "approval", In: SurfaceGates, Kind: KindTable, Doc: "How a gate is decided when no manifest or configuration says: the default of each kind. A user layer's mode replaces the mode and its window, its rules replace the rules."},
 	{Path: "approval.mode", In: SurfaceGates, Kind: KindEnum, Values: GateModes, Doc: "The mode when no rule holds; the bundled file sets it. send and run release a gate at once, delay when its window ends unless you resolve it first, wait holds it for you, dry_run rejects a draft gate."},
 	{Path: "approval.window", In: SurfaceGates, Kind: KindDur, Doc: "With mode delay only: how long you have to resolve the gate."},
@@ -25,6 +30,11 @@ var gatesGrammar = []Key{
 	{Path: "approval.rule[].when", In: SurfaceGates, Kind: KindPred, Doc: "When the rule applies, over the gate's facts: gate.kind and gate.name."},
 	{Path: "approval.rule[].mode", In: SurfaceGates, Kind: KindEnum, Values: GateModes, Doc: "The rule's mode; dry_run with a when that pins gate.kind to any kind but draft fails to load."},
 	{Path: "approval.rule[].window", In: SurfaceGates, Kind: KindDur, Doc: "With mode delay only: how long you have to resolve the gate."},
+}
+
+func endsTaskValues() []Value {
+	return []Value{{Name: string(task.CategoryDone), Doc: "Done: the task leaves the lists for the Logbook."},
+		{Name: string(task.CategoryDropped), Doc: "Dropped: the task goes to the trash."}}
 }
 
 func gateKindValues() []Value {

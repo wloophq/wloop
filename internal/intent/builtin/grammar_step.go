@@ -16,6 +16,7 @@ var stepGrammar = []Key{
 	{Path: "effects", In: SurfaceStep, Step: StepDraftPropose, Kind: KindList, Elem: KindEnum, Values: effectValues(AppliesDraft), Doc: "What sending the draft applies."},
 	stepKey(StepDraftPropose, "repeat_after", KindText, "", "The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after."),
 	stepKey(StepDraftPropose, "repeat_after_sent", KindText, "", "The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever."),
+	stepEnum(StepDraftPropose, "ended", DraftEnded, DraftEnded[0], "What a draft withdrawn as its task ended does while that task stays ended: hold the workflow's proposals of no task or of that task, or hold them for repeat_after like any settled draft."),
 
 	stepKey(StepTurnDismiss, "reason", KindText, "", "The reason the dismissed turn records."),
 	stepKey(StepAnswerRefuse, "reason", KindText, "", "The reason the refused answer records."),

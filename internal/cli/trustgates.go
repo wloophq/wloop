@@ -9,6 +9,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/core/gates"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -102,6 +103,6 @@ func (e *Env) taskOpen(ctx context.Context, id task.ID) bool {
 	if id == "" || e.tasks == nil {
 		return true
 	}
-	t, err := e.tasks.Task(ctx, id)
-	return err != nil || t.Open()
+	ended, _ := coretasks.Ended(e.tasks.Task(ctx, id))
+	return !ended
 }

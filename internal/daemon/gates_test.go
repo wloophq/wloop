@@ -27,7 +27,7 @@ func (p profileGates) FirstOf(k gate.Kind) (gates.Def, bool) {
 }
 
 func defOf(g intentload.GateDef) gates.Def {
-	d := gates.Def{Name: g.Name, Kind: g.Kind, Label: g.Label}
+	d := gates.Def{Name: g.Name, Kind: g.Kind, Label: g.Label, EndsTask: g.EndsTask}
 	for _, in := range g.Intents {
 		d.Intents = append(d.Intents, gates.Intent{Name: in.Name, Status: in.Status, Answer: in.Answer})
 	}
