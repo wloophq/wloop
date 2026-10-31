@@ -118,7 +118,7 @@ doc = "Every open item of the unit has a check mark from whoever asked it or who
 
 [[source.signals]]
 name = "replied_last"
-doc = "Every open item waits on you, and you posted the unit's newest person's message, after every open item's ask, at least 3 days ago."
+doc = "You posted the unit's newest person's message, after every open item's ask, at least 3 days ago, and every open item waits on you or got a message from someone else after its ask."
 
 [[source.jobs]]
 name = "ingest"

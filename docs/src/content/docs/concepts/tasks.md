@@ -85,7 +85,7 @@ The Slack plugin's layer bundles three workflows over the `items.resolve` step, 
 | Workflow | Signal | Resolution |
 |---|---|---|
 | `slack-done-reacted` | `task.link_signal.asked_reacted`: whoever asked checked a later message, such as your answer | `done` |
-| `slack-done-replied` | `task.link_signal.replied_last`: every open item waits on you, you posted after its ask and nobody spoke since, for 3 days | `answered` |
+| `slack-done-replied` | `task.link_signal.replied_last`: you posted last, after an answer to each ask you made, and nobody spoke since, for 3 days | `answered` |
 | `slack-done-quiet` | `task.link_ended`: every thread of the task ended, a closure posted or marked, or quiet for `plugins.slack.ended_after` | `moot` |
 
 Skipping one is final until the task changes (`key = ["task.fingerprint"]`). To let one close on its own, set its plan gate's mode in the configuration:

@@ -135,15 +135,29 @@ func TestRepliedLastIsOffWhenSomeoneElseSpokeLastOrNothingIsOpen(t *testing.T) {
 	}
 }
 
-func TestRepliedLastIsOffOnAnAskTheViewerWaitsOn(t *testing.T) {
+func TestRepliedLastOnAnAskTheViewerWaitsOnNeedsAnAnswer(t *testing.T) {
 	t.Parallel()
-	f := signalsFixture(t)
-	f.now = tsAt(2).Add(2 * signalsRepliedAfter)
-	u := f.signalThread(t, nil, dslack.Message{TS: ts(2), User: me, Text: "any update?"})
-	it := f.host.Items(u)[0]
-	it.Requester, it.WaitingOn = mePerson, []items.Person{otherPerson}
-	f.host.Put(it)
-	if got, _ := f.signals(t, u); got[signalRepliedLast].On {
-		t.Fatal("the viewer's follow-up on their own ask reads as an answer")
+	cases := []struct {
+		name    string
+		replies []dslack.Message
+		want    bool
+	}{
+		{"the viewer only followed up", []dslack.Message{{TS: ts(2), User: me, Text: "any update?"}}, false},
+		{"someone answered and the viewer thanked them", []dslack.Message{{TS: ts(2), User: other, Text: "shipped"},
+			{TS: ts(3), User: me, Text: "thanks"}}, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			f := signalsFixture(t)
+			f.now = tsAt(3).Add(2 * signalsRepliedAfter)
+			u := f.signalThread(t, nil, c.replies...)
+			it := f.host.Items(u)[0]
+			it.Requester, it.WaitingOn = mePerson, []items.Person{otherPerson}
+			f.host.Put(it)
+			if got, _ := f.signals(t, u); got[signalRepliedLast].On != c.want {
+				t.Fatalf("replied_last %v, want %v", got[signalRepliedLast].On, c.want)
+			}
+		})
 	}
 }
