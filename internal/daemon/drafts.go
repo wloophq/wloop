@@ -605,6 +605,7 @@ func (s *Server) sendDrafts(ctx context.Context) {
 	if err := o.Recover(rctx); err != nil && ctx.Err() == nil {
 		s.logf("drafts: recover: %v", err)
 	}
+	s.adoptDrafts(rctx)
 	scope.End()
 	for {
 		pctx, scope := meter.Start(ctx, meter.Loop("drafts"))
@@ -622,6 +623,33 @@ func (s *Server) sendDrafts(ctx context.Context) {
 		case <-poke:
 		case <-s.draftClock.After(draftWatchdog):
 		}
+	}
+}
+
+// adoptDrafts gives each held draft of no task the task its gate waits on, settling one whose task ended, and
+// ends each task opened to hold gates whose draft gates all closed.
+func (s *Server) adoptDrafts(ctx context.Context) {
+	if s.deps.Tasks == nil {
+		return
+	}
+	adopted, ended, err := s.deps.Outbox.Adopt(ctx, func(ctx context.Context, id task.ID) (bool, error) {
+		return coretasks.Ended(s.deps.Tasks.Task(ctx, id))
+	})
+	if err != nil && ctx.Err() == nil {
+		s.logf("drafts: adopt: %v", err)
+	}
+	if adopted+ended > 0 {
+		s.logf("drafts: %d of no task adopted by their gate's task, %d of an ended task withdrawn", adopted, ended)
+	}
+	if s.deps.Gates == nil {
+		return
+	}
+	held, err := s.deps.Tasks.HeldOpen(ctx)
+	for _, id := range held {
+		err = errors.Join(err, s.deps.Gates.SettleHeld(ctx, id))
+	}
+	if err != nil && ctx.Err() == nil {
+		s.logf("drafts: settling the tasks opened to hold gates: %v", err)
 	}
 }
 

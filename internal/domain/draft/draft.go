@@ -175,11 +175,13 @@ var transitions = map[State][]State{
 	Failed:  {Queued, Dropped},
 }
 
-// The reasons a workflow withdraws a draft it proposed, as Reason of the
-// discarded draft: its person was assigned the items, or it is moot.
+// The reasons a draft is withdrawn, as Reason of the discarded draft: a
+// workflow's, its person was assigned the items or it is moot; or a verb
+// ended the task the draft served.
 const (
 	WithdrawAssigned = "assigned"
 	WithdrawMoot     = "moot"
+	WithdrawEnded    = "ended"
 )
 
 type ApprovalMode string // "wait" (default), "delay", "send", "dry_run"

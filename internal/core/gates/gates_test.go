@@ -38,7 +38,8 @@ func (p profile) FirstOf(k gate.Kind) (gates.Def, bool) {
 }
 
 var bundled = profile{
-	{Name: "draft", Kind: gate.KindDraft, Label: "Send this draft?", Intents: []gates.Intent{{Name: "approve", Status: gate.Approved}, {Name: "discard", Status: gate.Rejected}}},
+	{Name: "draft", Kind: gate.KindDraft, Label: "Send this draft?", Intents: []gates.Intent{{Name: "approve", Status: gate.Approved}, {Name: "discard", Status: gate.Rejected}},
+		EndsTask: map[gate.Status]task.Category{gate.Approved: task.CategoryDone, gate.Rejected: task.CategoryDropped, gate.Superseded: task.CategoryDropped}},
 	{Name: "plan", Kind: gate.KindPlan, Label: "Run this?", Intents: []gates.Intent{{Name: "run", Status: gate.Approved}, {Name: "skip", Status: gate.Rejected}}},
 	{Name: "question", Kind: gate.KindQuestion, Label: "The agent asks", Intents: []gates.Intent{{Name: "answer", Status: gate.Answered, Answer: true}, {Name: "dismiss", Status: gate.Dismissed}}},
 	{Name: "review-diff", Kind: gate.KindStep, Label: "Review the diff", Intents: []gates.Intent{{Name: "approve", Status: gate.Approved}}},

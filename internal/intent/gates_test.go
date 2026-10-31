@@ -14,6 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/profile"
@@ -302,5 +303,33 @@ func TestGateFactsComeFromTheGate(t *testing.T) {
 	}
 	if m, _, at, err := d.Approval.Decide(GateFacts(gate.Gate{Kind: gate.KindPlan, Name: "plan"}, "")); err != nil || m != gate.ModeRun || at != "gates.toml approval.rule[0]" {
 		t.Fatalf("gates.toml decides a plan gate by its facts: %s %s %v", m, at, err)
+	}
+}
+
+func TestAGateNamesWhatItsClosingDoesToATaskHeldForGates(t *testing.T) {
+	t.Parallel()
+	d, problems := loadGatesWith(t, "")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	dg, _ := d.Gate("draft")
+	want := map[gate.Status]task.Category{gate.Approved: task.CategoryDone, gate.Rejected: task.CategoryDropped, gate.Superseded: task.CategoryDropped}
+	if !maps.Equal(dg.EndsTask, want) {
+		t.Fatalf("the bundled draft gate ends a held task as %v, want %v", dg.EndsTask, want)
+	}
+	if plan, _ := d.Gate("plan"); plan.EndsTask != nil {
+		t.Errorf("the plan gate ends a held task as %v, want it left open", plan.EndsTask)
+	}
+	d, problems = loadGatesWith(t, "[gates.draft]\nends_task = { rejected = \"done\" }\n")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	dg, _ = d.Gate("draft")
+	want = map[gate.Status]task.Category{gate.Approved: task.CategoryDone, gate.Rejected: task.CategoryDone, gate.Superseded: task.CategoryDropped}
+	if !maps.Equal(dg.EndsTask, want) {
+		t.Errorf("a user layer's ends_task gives %v, want %v", dg.EndsTask, want)
+	}
+	if _, problems := loadGatesWith(t, "[gates.draft]\nends_task = { opened = \"done\", approved = \"later\" }\n"); !strings.Contains(problems, "ends_task.opened") || !strings.Contains(problems, "ends_task.approved") {
+		t.Errorf("an unknown status or category loads: %q", problems)
 	}
 }

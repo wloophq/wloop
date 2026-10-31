@@ -41,6 +41,9 @@ type VerbText struct {
 	By                    map[string]string
 	Allow                 map[string]workflow.Predicate
 	Gate, Handler, Send   string
+	// KeepDrafts are the purposes of the held drafts a task keeps when the verb ends it; the others are
+	// withdrawn.
+	KeepDrafts []string
 }
 
 // TasksDef is the profile's tasks.toml over every layer. Props and States
@@ -335,16 +338,17 @@ type mTasks struct {
 }
 
 type mVerbText struct {
-	Label   *string           `toml:"label"`
-	Summary *string           `toml:"summary"`
-	Input   *string           `toml:"input"`
-	Offer   *string           `toml:"offer"`
-	From    []string          `toml:"from"`
-	To      *string           `toml:"to"`
-	By      map[string]string `toml:"by"`
-	Gate    *string           `toml:"gate"`
-	Handler *string           `toml:"handler"`
-	Send    *string           `toml:"send"`
+	Label      *string           `toml:"label"`
+	Summary    *string           `toml:"summary"`
+	Input      *string           `toml:"input"`
+	Offer      *string           `toml:"offer"`
+	From       []string          `toml:"from"`
+	To         *string           `toml:"to"`
+	By         map[string]string `toml:"by"`
+	Gate       *string           `toml:"gate"`
+	Handler    *string           `toml:"handler"`
+	Send       *string           `toml:"send"`
+	KeepDrafts []string          `toml:"keep_drafts"`
 }
 
 type mProp struct {
@@ -603,6 +607,9 @@ func (l *tasksLoad) mergeVerbs(s *sheet, verbs map[string]mVerbText) {
 		}
 		text(s, path+".handler", t.Handler, &w.Handler)
 		text(s, path+".send", t.Send, &w.Send)
+		if t.KeepDrafts != nil {
+			w.KeepDrafts = slices.Clone(t.KeepDrafts)
+		}
 		if w.Gate == "" && slices.Contains(slices.Collect(maps.Values(w.By)), "gate") {
 			s.add(path+".gate", "is required: a by.<actor> of \"gate\" opens the gate it names")
 		}

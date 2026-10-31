@@ -35,7 +35,7 @@ func (e *Env) newTasks(db *sqlite.DB, cfg config.Config, its coretasks.Items) *c
 			Clock: clockFunc(e.Now)})
 		e.tasks = coretasks.New(coretasks.Deps{Store: db.Tasks(), Items: its, Facts: facts, Clock: clockFunc(e.Now),
 			Disabled: off, States: profileStates{e},
-			Authority: catalog.Authority(e.loadedIntents), Gates: serviceTaskGates{e, db},
+			Authority: catalog.Authority(e.loadedIntents), Gates: serviceTaskGates{e, db}, Drafts: taskDrafts{e},
 			Wakes: db.Wakes(), Baseline: catalog.Baseline(e.loadedIntents, e.factsOfTask),
 			Views: lensViews(e.loadedIntents), ViewEval: e.lens().Eval, ViewSort: e.lens().Sort,
 			Activity: func(ctx context.Context, id task.ID) error {
@@ -51,6 +51,23 @@ func (e *Env) factsOfTask(ctx context.Context, t task.Task) (workflow.Facts, err
 		return e.wakeFacts(ctx, t)
 	}
 	return catalog.TaskFacts(t, e.loadedIntents().Tasks), nil
+}
+
+// taskDrafts settles the held drafts of a task a verb ended, but those of the purposes the verb's keep_drafts names,
+// while the task stays ended.
+type taskDrafts struct{ e *Env }
+
+func (d taskDrafts) Ended(ctx context.Context, t task.Task, v task.Verb) {
+	ob := d.e.outbox
+	if ob == nil {
+		return
+	}
+	if cur, err := d.e.tasks.Task(ctx, t.ID); err == nil && cur.Open() {
+		return
+	}
+	if _, err := ob.Ended(ctx, t.ID, d.e.loadedIntents().Tasks.Verbs[string(v)].KeepDrafts); err != nil && ob.Log != nil {
+		ob.Log("drafts of ended task %s: %v", t.ID, err)
+	}
 }
 
 // profileStates are the states and verbs of the profile as it loads now.

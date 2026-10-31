@@ -13,6 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/intent/expr"
 
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/profile"
 )
@@ -103,6 +104,9 @@ type GateDef struct {
 	Kind    gate.Kind
 	Label   string
 	Intents []GateIntent
+	// EndsTask is the category, done or dropped, a task opened only to hold gates ends in once the gate closes
+	// with a status and none of its gates is open; a status it leaves out leaves the task open.
+	EndsTask map[gate.Status]task.Category
 	// Text words the gate's subject when the loop writes it, a template
 	// over the proposal facts; nil writes nothing.
 	Text *template.Template
@@ -174,10 +178,11 @@ type mGatesFile struct {
 }
 
 type mGate struct {
-	Kind    *string                `toml:"kind"`
-	Label   *string                `toml:"label"`
-	Text    *string                `toml:"text"`
-	Intents map[string]mGateIntent `toml:"intents"`
+	Kind     *string                `toml:"kind"`
+	Label    *string                `toml:"label"`
+	Text     *string                `toml:"text"`
+	Intents  map[string]mGateIntent `toml:"intents"`
+	EndsTask map[string]string      `toml:"ends_task"`
 }
 
 type mGateIntent struct {
@@ -316,6 +321,17 @@ func mergeGate(s *sheet, d *GatesDef, name string, m mGate) {
 	}
 	for _, in := range declared(s, path+".intents", m.Intents) {
 		mergeIntent(s, &g, path+".intents."+in, in, m.Intents[in])
+	}
+	if m.EndsTask != nil {
+		g.EndsTask = maps.Clone(g.EndsTask)
+		if g.EndsTask == nil {
+			g.EndsTask = map[gate.Status]task.Category{}
+		}
+		for _, st := range declared(s, path+".ends_task", m.EndsTask) {
+			s.oneOf(path+".ends_task."+st, st, builtin.ValuesOf(builtin.SurfaceGates, "gates.*.intents.*.status"))
+			s.oneOf(path+".ends_task."+st, m.EndsTask[st], builtin.ValuesOf(builtin.SurfaceGates, "gates.*.ends_task.*"))
+			g.EndsTask[gate.Status(st)] = task.Category(m.EndsTask[st])
+		}
 	}
 	if len(g.Intents) == 0 && len(s.problems) == n {
 		s.add(path+".intents", "is required: a gate is resolved with one of its intents")

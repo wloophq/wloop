@@ -66,7 +66,7 @@
       "context": "list",
       "owner": "core",
       "help": "to Reference",
-      "summary": "Keep it as reference: nothing to do, worth finding again."
+      "summary": "Keep it as reference: nothing to do, worth finding again, and a draft it carries is discarded."
     },
     {
       "key": "f",
@@ -106,7 +106,7 @@
       "context": "list",
       "owner": "core",
       "help": "done",
-      "summary": "Mark it done: it leaves your lists for the Logbook."
+      "summary": "Mark it done: it leaves your lists for the Logbook, and a draft it carries is discarded."
     },
     {
       "key": "Backspace",

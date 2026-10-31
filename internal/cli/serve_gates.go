@@ -158,7 +158,7 @@ func (p profileGates) FirstOf(k gate.Kind) (gates.Def, bool) {
 }
 
 func gateDef(g intentload.GateDef) gates.Def {
-	d := gates.Def{Name: g.Name, Kind: g.Kind, Label: g.Label}
+	d := gates.Def{Name: g.Name, Kind: g.Kind, Label: g.Label, EndsTask: g.EndsTask}
 	for _, in := range g.Intents {
 		d.Intents = append(d.Intents, gates.Intent{Name: in.Name, Status: in.Status, Answer: in.Answer})
 	}
@@ -242,6 +242,13 @@ func (g gateTasks) ReopenOwn(ctx context.Context, u unit.Unit) (task.ID, bool, e
 		return "", false, errNoTasksService
 	}
 	return g.e.tasks.ReopenOwn(ctx, u)
+}
+
+func (g gateTasks) EndHeld(ctx context.Context, id task.ID, c task.Category) error {
+	if g.e.tasks == nil {
+		return errNoTasksService
+	}
+	return g.e.tasks.EndHeld(ctx, id, c)
 }
 
 // openGates are the daemon's gates as the views read them, none before

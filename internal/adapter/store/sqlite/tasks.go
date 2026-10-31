@@ -17,7 +17,9 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/dossier"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/event"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -343,7 +345,8 @@ func (s taskStore) Apply(ctx context.Context, cs []task.Change, evs ...port.Even
 }
 
 // adoptUnits gives open task e what waited on its units for a task to hold them: the gates opened on a unit
-// before any task held it, and the unit's own dossier, whose directory move dossier_moves records.
+// before any task held it, with the held drafts those gates wait on, and the unit's own dossier, whose directory
+// move dossier_moves records.
 func adoptUnits(ctx context.Context, tx *Tx, e task.Task) error {
 	if !e.Open() {
 		return nil
@@ -352,7 +355,18 @@ func adoptUnits(ctx context.Context, tx *Tx, e task.Task) error {
 		if u.Provider == task.UnitOf(e.ID).Provider {
 			continue
 		}
-		res, err := tx.ExecContext(ctx, `UPDATE gates SET task_id = ? WHERE task_id IS NULL AND provider = ? AND unit_key = ?`,
+		res, err := tx.ExecContext(ctx, `UPDATE drafts SET task = ?1, rev = rev + 1 WHERE task = '' AND state = ?2 AND id IN (
+			SELECT CAST(subject AS INTEGER) FROM gates WHERE task_id IS NULL AND kind = ?3 AND status = ?4 AND provider = ?5 AND unit_key = ?6)`,
+			string(e.ID), string(draft.Held), string(gate.KindDraft), string(gate.Open), string(u.Provider), u.Key)
+		if err != nil {
+			return err
+		}
+		if n, err := res.RowsAffected(); err != nil {
+			return err
+		} else if n > 0 {
+			tx.Touch(port.TopicDrafts, u)
+		}
+		res, err = tx.ExecContext(ctx, `UPDATE gates SET task_id = ? WHERE task_id IS NULL AND provider = ? AND unit_key = ?`,
 			string(e.ID), string(u.Provider), u.Key)
 		if err != nil {
 			return err

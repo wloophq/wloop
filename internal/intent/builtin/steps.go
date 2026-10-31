@@ -43,6 +43,9 @@ var (
 	DraftItems           = []string{"owed", "resolved", "unowned", "unowned_aged", "all"}
 	DraftPer             = []string{"unit", "person"}
 	DraftTargets         = []string{"unit", "item"}
+	// DraftEnded is what a draft withdrawn as its task ended does to draft.propose while that task stays ended:
+	// hold the workflow's proposals of no task or of that task, or hold them only for repeat_after.
+	DraftEnded = []string{"hold", "repeat"}
 	// RepeatForever is repeat_after_sent's value that never proposes again
 	// after a draft was sent.
 	RepeatForever = "forever"
@@ -74,7 +77,7 @@ var coreSteps = []StepDef{
 	{StepTurnStart, nil, "", nil,
 		"Starts a turn of `intent` on the unit, which the intent must serve; `stage` (`first` or `follow-up`) for a review; `runner` (`session` or `headless`), by default the intent's first runner. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.per_day`."},
 	{StepDraftPropose, nil, workflow.ReachLocal, nil,
-		"Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Items`, `.Person` and `.Facts`, the subject's facts by name, such as `{{index .Facts \"task.promised\"}}`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`unit` or `person`), `target` (`unit` or `item`), `effects` (the effects sending it applies), `repeat_after` (the least time after a settled draft of the same person, a duration or a duration of the config such as `config.drafts.repeat_after`) and `repeat_after_sent` (the same after a sent one, or `forever`). Holds while a draft of the workflow, unit and person is open or failed; a run that leaves a person under a delay that ends with time stays pending until it ends."},
+		"Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Items`, `.Person` and `.Facts`, the subject's facts by name, such as `{{index .Facts \"task.promised\"}}`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`unit` or `person`), `target` (`unit` or `item`), `effects` (the effects sending it applies), `repeat_after` (the least time after a settled draft of the same person, a duration or a duration of the config such as `config.drafts.repeat_after`) `repeat_after_sent` (the same after a sent one, or `forever`) and `ended` (`hold`, the default, holds proposals of no task or of the same task while a draft's task a verb ended stays ended; `repeat` holds them for `repeat_after`). Holds while a draft of the workflow, unit and person is open or failed; a run that leaves a person under a delay that ends with time stays pending until it ends."},
 	{StepClassify, nil, workflow.ReachLocal, []workflow.TriggerKind{workflow.TriggerEvent},
 		"A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). Event triggers only, cached by fingerprint, under `classify.per_day`."},
 	{StepNotifySelf, nil, workflow.ReachPrivate, nil,

@@ -39,6 +39,9 @@ type Def struct {
 	Kind    gate.Kind
 	Label   string
 	Intents []Intent
+	// EndsTask is the category, done or dropped, a task opened only to hold gates ends in once the gate closes
+	// with a status and none of its gates is open; a status it leaves out leaves the task open.
+	EndsTask map[gate.Status]task.Category
 }
 
 // Intent is what a gate is resolved with: the status gates.toml gives it,
@@ -79,6 +82,12 @@ type Tasks interface {
 // to whatever its state, reopened when it is done, so the unit keeps one task.
 type OwnTasks interface {
 	ReopenOwn(ctx context.Context, u unit.Unit) (task.ID, bool, error)
+}
+
+// HeldTasks is optional on Tasks: ends task id, one Tasks opened only to hold gates, into category c once its last
+// gate closed; a task opened otherwise, or ended already, is left as it is.
+type HeldTasks interface {
+	EndHeld(ctx context.Context, id task.ID, c task.Category) error
 }
 
 // Events records the event a resolved step gate is, which workflows
@@ -211,7 +220,8 @@ func (s *Service) Resolve(ctx context.Context, id int64, r Resolution) error {
 
 // Supersede closes open gate id as superseded by by, its subject gone or
 // replaced, with no consequence: the subject's owner settles the subject.
-// It refuses an agent: no agent closes an open gate.
+// It refuses an agent: no agent closes an open gate. A person supersedes
+// a draft's gate only to replace it with its edit's.
 func (s *Service) Supersede(ctx context.Context, id int64, by task.Actor) error {
 	if by == task.ActorAgent || by == "" {
 		return fmt.Errorf("%w: gate %d is superseded by its subject's owner, not by %s", ErrRefused, id, cmp.Or(string(by), "no one"))
@@ -223,8 +233,11 @@ func (s *Service) Supersede(ctx context.Context, id int64, by task.Actor) error 
 	if g.Status != gate.Open {
 		return fmt.Errorf("%w: %d is %s", ErrResolved, id, g.Status)
 	}
-	_, err = s.d.Store.Resolve(ctx, id, Resolution{Status: gate.Superseded, By: by})
-	return err
+	closed, err := s.d.Store.Resolve(ctx, id, Resolution{Status: gate.Superseded, By: by})
+	if err != nil || by == task.ActorPerson {
+		return err
+	}
+	return s.endHeld(ctx, closed)
 }
 
 // RecordSent records g, a post a tool made at once, as a gate already
@@ -380,7 +393,54 @@ func (s *Service) close(ctx context.Context, g gate.Gate, r Resolution) (gate.Ga
 	if err != nil {
 		return closed, err
 	}
-	return closed, s.applied(ctx, closed)
+	return closed, errors.Join(s.applied(ctx, closed), s.endHeld(ctx, closed))
+}
+
+// SettleHeld ends task id when Tasks opened it only to hold gates and none of them is open, in the category the
+// last gate to close that names one ends it in; it settles a task whose gates closed before endHeld ran.
+func (s *Service) SettleHeld(ctx context.Context, id task.ID) error {
+	gs, err := s.d.Reader.OfTask(ctx, id)
+	if err != nil {
+		return err
+	}
+	var last gate.Gate
+	for _, g := range gs {
+		if _, ends := s.endsTask(g); ends && g.Status != gate.Open && !g.ClosedAt.Before(last.ClosedAt) {
+			last = g
+		}
+	}
+	if last.ID == 0 {
+		return nil
+	}
+	return s.endHeld(ctx, last)
+}
+
+// endHeld ends the task closed gate g was on when Tasks opened it only to hold gates and none of them is open now,
+// in the category g's EndsTask names for its status.
+func (s *Service) endHeld(ctx context.Context, g gate.Gate) error {
+	held, ok := s.d.Tasks.(HeldTasks)
+	if !ok || g.Task == "" {
+		return nil
+	}
+	c, ends := s.endsTask(g)
+	if !ends {
+		return nil
+	}
+	gs, err := s.d.Reader.OfTask(ctx, g.Task)
+	if err != nil || slices.ContainsFunc(gs, func(o gate.Gate) bool { return o.Status == gate.Open }) {
+		return err
+	}
+	return held.EndHeld(ctx, g.Task, c)
+}
+
+// endsTask is the category closed gate g ends a task held only for gates in, as its gate's EndsTask names it.
+func (s *Service) endsTask(g gate.Gate) (task.Category, bool) {
+	def, err := s.def(g)
+	if err != nil {
+		return "", false
+	}
+	c, ok := def.EndsTask[g.Status]
+	return c, ok
 }
 
 // applied runs g's consequence and marks it run, failed or not: a failure is

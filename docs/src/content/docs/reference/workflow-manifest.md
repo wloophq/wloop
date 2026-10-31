@@ -111,6 +111,7 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `draft.propose` | `effects` | list of `task.nudged`, `unit.closed`, `pr.nudged` |  | What sending the draft applies. |
 | `draft.propose` | `repeat_after` | string |  | The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after. |
 | `draft.propose` | `repeat_after_sent` | string |  | The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever. |
+| `draft.propose` | `ended` | one of `hold`, `repeat` | `hold` | What a draft withdrawn as its task ended does while that task stays ended: hold the workflow's proposals of no task or of that task, or hold them for repeat_after like any settled draft. |
 | `classify` | `prompt` | file | `prompt.md` | The classification's prompt, beside the manifest. |
 | `classify` | `schema` | file | `schema.json` | The JSON schema of its answer, beside the manifest. |
 | `notify.self` | `text` | file | `text.md.tmpl` | The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`. |

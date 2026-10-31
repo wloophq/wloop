@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -81,7 +82,7 @@ type draftArgs struct {
 	delivery                                    draft.Delivery
 	effects                                     []string
 	repeatAfter, repeatAfterSent                time.Duration
-	forever                                     bool
+	forever, holdEnded                          bool
 }
 
 const defaultDraftText = "text.md.tmpl"
@@ -97,6 +98,7 @@ func parseDraftArgs(c stepCall, cfg config.Config) (draftArgs, error) {
 		return a, fmt.Errorf("draft.propose's text %q is not a file of the workflow's directory", a.text)
 	}
 	a.effects = c.list("effects")
+	a.holdEnded = cmp.Or(c.arg("ended"), builtin.DraftEnded[0]) == builtin.DraftEnded[0]
 	var err error
 	if v := c.arg("repeat_after"); v != "" {
 		if a.repeatAfter, err = repeatDuration(v, cfg); err != nil {
@@ -265,7 +267,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			}
 		}
 		if cd.refusal == "" {
-			cd.refusal, cd.timed, err = holdOf(ctx, ob, cd.p, person.Key, a, now)
+			cd.refusal, cd.timed, err = holdOf(ctx, ob, deps.Tasks, cd.p, person.Key, a, now)
 			if err != nil {
 				return nil, err
 			}
@@ -468,8 +470,9 @@ func configPolicy(w workflow.Workflow, base *draft.Policy, a *config.ApprovalCon
 // in either shape draftPerson reads, or, with no person, of the same key:
 // one open or failed, one sent within repeat_after_sent (or ever, with
 // forever), one otherwise settled within hold; timed when only the time
-// since a settled draft holds it. A withdrawn draft holds nothing.
-func holdOf(ctx context.Context, ob draftOutbox, p outbox.Proposal, person string, a draftArgs, now time.Time) (string, bool, error) {
+// since a settled draft holds it. A withdrawn draft holds nothing, but one withdrawn as its task ended: with ended
+// hold, while that task stays ended it holds a proposal of no task or of that task; otherwise as a settled one.
+func holdOf(ctx context.Context, ob draftOutbox, tasks draftTasks, p outbox.Proposal, person string, a draftArgs, now time.Time) (string, bool, error) {
 	prior, err := ob.List(ctx, outbox.Filter{Unit: &p.Unit, Rule: p.Origin.Rule})
 	if err != nil {
 		return "", false, err
@@ -483,6 +486,11 @@ func holdOf(ctx context.Context, ob draftOutbox, p outbox.Proposal, person strin
 			continue
 		}
 		held := fmt.Sprintf("held by draft %d (%s)", d.ID, d.State)
+		if a.holdEnded && d.State == draft.Dropped && d.Reason == draft.WithdrawEnded && (p.Task == "" || p.Task == d.Task) {
+			if ended, err := taskEnded(ctx, tasks, task.ID(d.Task)); err != nil || ended {
+				return held, false, err
+			}
+		}
 		switch {
 		case slices.Contains(draft.Open, d.State), d.State == draft.Failed, d.State == draft.Sent && a.forever:
 			return held, false, nil
@@ -494,6 +502,14 @@ func holdOf(ctx context.Context, ob draftOutbox, p outbox.Proposal, person strin
 		}
 	}
 	return refusal, timed, nil
+}
+
+// taskEnded says whether task id is done or dropped; a task no longer stored has ended too.
+func taskEnded(ctx context.Context, tasks draftTasks, id task.ID) (bool, error) {
+	if id == "" || tasks == nil {
+		return false, nil
+	}
+	return coretasks.Ended(tasks.Task(ctx, id))
 }
 
 // withdrawnAtOnce refuses a draft the workflow's [withdraw] when would
