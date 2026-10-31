@@ -42,16 +42,30 @@ func (s *stepSet) itemsResolveRun(ctx context.Context, c stepCall, _ automation.
 	for i, it := range open {
 		at := unit.Anchor{Unit: it.Unit, Ref: "workflow:" + c.why.Workflow, At: now}
 		ops[i] = items.Op{Op: items.OpResolve, Unit: it.Unit, Item: it.ID, Anchor: at, Resolution: res,
-			Evidence: &items.Evidence{Kind: items.EvidenceUnitEvent, Anchor: at}, Reason: "workflow " + c.why.Workflow}
+			Evidence: &items.Evidence{Kind: items.EvidenceWorkflow, Anchor: at}, Reason: "workflow " + c.why.Workflow}
 	}
-	if _, err := s.d.Items.Apply(ctx, items.Workflow, ops); err != nil {
+	got, err := s.d.Items.Apply(ctx, items.Workflow, ops)
+	if err != nil {
 		return "", err
 	}
+	if len(got.Refused) > 0 {
+		return "", automation.Refused{Reason: fmt.Sprintf("the ledger refused %d of %d items: %s", len(got.Refused), len(ops), got.Refused[0].Reason)}
+	}
+	resolved := 0
+	for _, a := range got.Applied {
+		if a.Changed && a.Item.State == items.Resolved {
+			resolved++
+		}
+	}
 	id, _ := task.IDOf(c.u)
-	return fmt.Sprintf("resolved %d items of %s as %s", len(ops), id, res), nil
+	out := fmt.Sprintf("resolved %d items of %s as %s", resolved, id, res)
+	if len(got.Proposed) > 0 {
+		out += fmt.Sprintf(", proposed %d you confirmed", len(got.Proposed))
+	}
+	return out, nil
 }
 
-// openItemsOf are the open items the task c runs on holds, or why it holds none the step can resolve.
+// openItemsOf are the open items the derived task c runs on holds, or why it holds none the step can resolve.
 func (s *stepSet) openItemsOf(ctx context.Context, c stepCall) ([]items.Item, string, error) {
 	if s.d.Items == nil {
 		return nil, "", errors.New("no items ledger: the daemon runs the steps")
@@ -70,6 +84,9 @@ func (s *stepSet) openItemsOf(ctx context.Context, c stepCall) ([]items.Item, st
 			return nil, r, nil
 		}
 		return nil, "", err
+	}
+	if e.Origin != task.OriginDerived {
+		return nil, "the task is not derived from items: its items do not close it", nil
 	}
 	held := map[unit.Unit]map[string]bool{}
 	for _, r := range e.Items {

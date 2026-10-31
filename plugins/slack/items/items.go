@@ -61,6 +61,7 @@ const (
 	EvidenceExternalClaim EvidenceKind = "external_claim"
 	EvidenceUnitEvent     EvidenceKind = "unit_event"
 	EvidenceSentDraft     EvidenceKind = "sent_draft"
+	EvidenceWorkflow      EvidenceKind = "workflow"
 )
 
 type Confidence string // "high", "low"
