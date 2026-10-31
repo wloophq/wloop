@@ -132,53 +132,84 @@ func (s *Service) handler(e task.Task, verb task.Verb) VerbHandler {
 // derived task, or one whose units are all of disabled plugins, to the Trash whole, and detaches a disabled
 // plugin's units from any other.
 func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, error) {
+	prev, r, err := s.do(ctx, id, req)
+	if err != nil || s.d.Drafts == nil || !prev.Open() {
+		return r, err
+	}
+	next := r.Task
+	if next.ID == "" {
+		if next, err = s.d.Store.Task(ctx, id); err != nil {
+			return r, nil
+		}
+	}
+	if !next.Open() {
+		s.d.Drafts.Ended(ctx, next, req.Verb)
+	}
+	return r, nil
+}
+
+// do runs req.Verb on task id as Do says, returning the task as it was before the verb.
+func (s *Service) do(ctx context.Context, id task.ID, req Request) (task.Task, Result, error) {
 	if _, _, ok := s.d.States.Move(string(req.Verb)); !ok {
-		return Result{}, fmt.Errorf("%w: unknown verb %q", ErrArgs, req.Verb)
+		return task.Task{}, Result{}, fmt.Errorf("%w: unknown verb %q", ErrArgs, req.Verb)
 	}
 	if src, ok := s.sourceOf(id); ok {
 		e, found, err := src.Task(ctx, id)
 		if err != nil {
-			return Result{}, err
+			return e, Result{}, err
 		}
 		if !found {
-			return Result{}, fmt.Errorf("%w: %s", ErrNoTask, id)
+			return e, Result{}, fmt.Errorf("%w: %s", ErrNoTask, id)
 		}
 		h := s.handler(e, req.Verb)
 		if h == nil {
-			return Result{}, fmt.Errorf("%w: %s on a %s task", ErrVerb, req.Verb, classOf(e))
+			return e, Result{}, fmt.Errorf("%w: %s on a %s task", ErrVerb, req.Verb, classOf(e))
 		}
 		if gated, err := s.Allowed(ctx, e, req); err != nil || gated {
-			return s.gated(ctx, e, req, err)
+			r, err := s.gated(ctx, e, req, err)
+			return e, r, err
 		}
-		return h(ctx, e, req)
+		r, err := h(ctx, e, req)
+		return e, r, err
 	}
 	e, err := s.d.Store.Task(ctx, id)
 	if err != nil {
-		return Result{}, err
+		return e, Result{}, err
 	}
 	enabled := map[unit.Unit]bool{}
 	if err := s.writable(ctx, e, enabled); err != nil {
 		if s.d.States.Handler(string(req.Verb)) != HandlerDrop || !errors.Is(err, ErrPluginDisabled) {
-			return Result{}, err
+			return e, Result{}, err
 		}
 		if gated, err := s.Allowed(ctx, e, req); err != nil || gated {
-			return s.gated(ctx, e, req, err)
+			r, err := s.gated(ctx, e, req, err)
+			return e, r, err
 		}
-		return s.dismissOff(ctx, id, req, enabled)
+		r, err := s.dismissOff(ctx, id, req, enabled)
+		return e, r, err
 	}
 	if err := s.declared(e, req.Verb); err != nil {
-		return Result{}, err
+		return e, Result{}, err
 	}
 	if gated, err := s.Allowed(ctx, e, req); err != nil || gated {
-		return s.gated(ctx, e, req, err)
+		r, err := s.gated(ctx, e, req, err)
+		return e, r, err
 	}
 	if h := s.handler(e, req.Verb); h != nil {
-		return h(ctx, e, req)
+		r, err := h(ctx, e, req)
+		return e, r, err
 	}
+	prev, next, err := s.change(ctx, id, req)
+	return prev, Result{Task: next}, err
+}
+
+// change applies req.Verb's state change to task id under the lock, returning the task before and after it.
+func (s *Service) change(ctx context.Context, id task.ID, req Request) (task.Task, task.Task, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if e, err = s.d.Store.Task(ctx, id); err != nil {
-		return Result{}, err
+	e, err := s.d.Store.Task(ctx, id)
+	if err != nil {
+		return task.Task{}, task.Task{}, err
 	}
 	now := s.now()
 	var cs []task.Change
@@ -188,34 +219,28 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 	} else {
 		var cur wake.Wake
 		if cur, err = s.wakeOf(ctx, e.ID); err != nil {
-			return Result{}, err
+			return task.Task{}, task.Task{}, err
 		}
 		var next task.Task
 		next, wc, err = s.transition(e, req, cur, now)
 		cs = []task.Change{{Op: task.OpUpdate, Task: next, Why: string(req.Verb)}}
 	}
 	if err != nil {
-		return Result{}, err
+		return task.Task{}, task.Task{}, err
 	}
 	if wc.put != nil && s.d.Wakes == nil {
-		return Result{}, fmt.Errorf("%w: %s puts a wake, and no wakes are kept", ErrVerb, req.Verb)
+		return task.Task{}, task.Task{}, fmt.Errorf("%w: %s puts a wake, and no wakes are kept", ErrVerb, req.Verb)
 	}
 	if s.beforeApply != nil {
 		s.beforeApply()
 	}
 	if err := s.d.Store.Apply(ctx, cs, s.verbEvents(e, req, now)...); err != nil {
-		return Result{}, err
+		return task.Task{}, task.Task{}, err
 	}
 	if err := s.applyWake(ctx, e.ID, wc); err != nil {
-		return Result{}, err
+		return task.Task{}, task.Task{}, err
 	}
-	next := cs[len(cs)-1].Task
-	if s.d.Drafts != nil && e.Open() && !next.Open() {
-		if err := s.d.Drafts.Ended(ctx, next, req.Verb); err != nil {
-			return Result{Task: next}, err
-		}
-	}
-	return Result{Task: next}, nil
+	return e, cs[len(cs)-1].Task, nil
 }
 
 // wakeOf is task id's wake, zero when it has none or no wakes are kept.
@@ -570,20 +595,31 @@ func (s *Service) create(ctx context.Context, title, notes string, u *unit.Unit,
 // Close moves a task opened by Open or Capture into the done or the dropped category; a derived task, or one
 // whose unit's plugin is disabled, refuses it.
 func (s *Service) Close(ctx context.Context, id task.ID, to task.Category) error {
+	return s.close(ctx, id, to, nil)
+}
+
+// close moves task id into category to, done or dropped. With only, a task only refuses, or no longer stored, is
+// left alone, and one of a disabled plugin closes too.
+func (s *Service) close(ctx context.Context, id task.ID, to task.Category, only func(task.Task) bool) error {
 	if to != task.CategoryDone && to != task.CategoryDropped {
 		return fmt.Errorf("%w: close to %s", ErrArgs, to)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	e, err := s.d.Store.Task(ctx, id)
+	if only != nil && (errors.Is(err, ErrNoTask) || err == nil && !only(e)) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
-	if e.Origin == task.OriginDerived {
-		return fmt.Errorf("%w: close on a derived task", ErrVerb)
-	}
-	if err := s.writable(ctx, e, nil); err != nil {
-		return err
+	if only == nil {
+		if e.Origin == task.OriginDerived {
+			return fmt.Errorf("%w: close on a derived task", ErrVerb)
+		}
+		if err := s.writable(ctx, e, nil); err != nil {
+			return err
+		}
 	}
 	if e.Category == to {
 		return nil
@@ -793,23 +829,19 @@ func (s *Service) ReopenOwn(ctx context.Context, u unit.Unit) (task.ID, bool, er
 	return e.ID, true, s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e, Why: "a gate opened on " + u.String()}})
 }
 
-// EndHeld moves task id, opened only to hold gates, into category c; a task of another origin, or one closed
+// Ended says whether e, as a read of it returned it with err, is done or dropped; a task no longer stored has
+// ended too.
+func Ended(e task.Task, err error) (bool, error) {
+	if errors.Is(err, ErrNoTask) {
+		return true, nil
+	}
+	return err == nil && !e.Open(), err
+}
+
+// EndHeld closes task id, opened only to hold gates, into category c; a task of another origin, or one closed
 // already, is left as it is.
 func (s *Service) EndHeld(ctx context.Context, id task.ID, c task.Category) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	e, err := s.d.Store.Task(ctx, id)
-	if errors.Is(err, ErrNoTask) || err == nil && (e.Origin != task.OriginGate || !e.Open()) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	if err := e.MoveTo(c, s.d.States); err != nil {
-		return err
-	}
-	e.Updated = s.now()
-	return s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e, Why: "its gates closed"}})
+	return s.close(ctx, id, c, func(e task.Task) bool { return e.Origin == task.OriginGate && e.Open() })
 }
 
 // UnitClosed ends the open tasks that hold u, its closure posted: each moves into the done category.
