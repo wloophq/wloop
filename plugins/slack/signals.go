@@ -26,8 +26,9 @@ var checkMarks = []string{"white_check_mark", "heavy_check_mark", "ballot_box_wi
 
 // unitSignals are in's link signals at now, and when the next of them changes with time alone: asked_reacted,
 // every open item has a check mark from whoever asked it or whom it waits on, other than the viewer, on a
-// message posted after its ask; replied_last, every open item waits on the viewer, who posted the newest
-// person's message, after every open item's ask, at least quietFor ago.
+// message posted after its ask; replied_last, the viewer posted the newest person's message, after every open
+// item's ask, at least quietFor ago, and every open item waits on the viewer or got a message from someone else
+// after its ask.
 func unitSignals(in *slackrows.Input, quietFor time.Duration, now time.Time) ([]src.Signal, time.Time) {
 	open := slices.DeleteFunc(slices.Clone(in.Items()), func(it items.Item) bool { return it.State != items.Open })
 	asked := src.Signal{Name: signalAskedReacted}
@@ -37,10 +38,10 @@ func unitSignals(in *slackrows.Input, quietFor time.Duration, now time.Time) ([]
 	}
 	var newestAsk time.Time
 	asked.On = true
-	owed := in.Viewer() != ""
+	answered := in.Viewer() != ""
 	for _, it := range open {
 		newestAsk = later(newestAsk, it.Origin.At)
-		owed = owed && slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return p.Key == "slack:"+in.Viewer() })
+		answered = answered && (waitsOnViewer(in, it) || othersSpokeAfter(in, it.Origin.At))
 		at, ok := checkedAfter(in, it)
 		if !ok {
 			asked.On = false
@@ -52,7 +53,7 @@ func unitSignals(in *slackrows.Input, quietFor time.Duration, now time.Time) ([]
 		asked.Since = time.Time{}
 	}
 	var next time.Time
-	if m, ok := newestHuman(in); ok && owed && m.User == in.Viewer() {
+	if m, ok := newestHuman(in); ok && answered && m.User == in.Viewer() {
 		at := dslack.TSTime(m.TS)
 		if at.After(newestAsk) {
 			quiet := at.Add(quietFor)
@@ -100,4 +101,15 @@ func newestHuman(in *slackrows.Input) (store.MessageRow, bool) {
 		}
 	}
 	return store.MessageRow{}, false
+}
+
+func waitsOnViewer(in *slackrows.Input, it items.Item) bool {
+	return slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return p.Key == "slack:"+in.Viewer() })
+}
+
+// othersSpokeAfter says whether a person other than the viewer posted in in after at.
+func othersSpokeAfter(in *slackrows.Input, at time.Time) bool {
+	return slices.ContainsFunc(in.Messages(), func(m store.MessageRow) bool {
+		return in.Human(m) && m.User != in.Viewer() && dslack.TSTime(m.TS).After(at)
+	})
 }
