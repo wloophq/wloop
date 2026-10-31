@@ -421,6 +421,10 @@
                 "description": "The host reconcile its turns run, such as \"my_review\".",
                 "type": "string"
               },
+              "replaces_stale_question": {
+                "description": "A round of its turns on a head other than the one its open, unanswered question was asked on replaces that question instead of waiting for the answer. Leave it off for a role whose own agent pushes: its turn's head predates those pushes.",
+                "type": "boolean"
+              },
               "round_kind": {
                 "description": "The sweep round its turns are, such as \"review\".",
                 "type": "string"

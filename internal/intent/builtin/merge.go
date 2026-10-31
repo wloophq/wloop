@@ -424,7 +424,8 @@ func effectRow(p unit.ProviderID, e manifest.Effect) Effect {
 
 func roleRow(p unit.ProviderID, r manifest.Role) Role {
 	out := Role{Name: r.Name, Doc: r.Doc, Provider: p, RoundKind: r.RoundKind, Reconcile: r.Reconcile, Prepare: r.Prepare,
-		Launch: r.Launch, Workspace: r.Workspace, Context: r.Context, Policy: r.Policy, DrivesRow: r.DrivesRow}
+		Launch: r.Launch, Workspace: r.Workspace, Context: r.Context, Policy: r.Policy, DrivesRow: r.DrivesRow,
+		ReplacesStaleQuestion: r.ReplacesStaleQuestion}
 	if out.Context == "" {
 		out.Context = NoRole.Context
 	}

@@ -5,15 +5,19 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/intake"
+	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/record"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/workspace"
@@ -117,6 +121,78 @@ func TestARoundWaitsWhileItsTurnAsksTheUser(t *testing.T) {
 	r.rec.questions = map[pr.Ref]map[string]bool{r.sc.ref: {string(dintent.Address): true}}
 	if got := r.check(t, automation.CheckOpts{}); got != "" {
 		t.Fatalf("an address question refused the review: %q", got)
+	}
+}
+
+// askOn stores an asked turn of intent on the rig's unit, sent on head, and
+// returns its seq.
+func (r *startRig) askOn(t *testing.T, intent, role, head string) int64 {
+	t.Helper()
+	b := r.sc.te.bookOf(t, r.sc.ref)
+	b.Unit = r.u
+	b.Turns = append(b.Turns, dturn.Turn{Intent: dturn.Intent(intent), Role: role, ID: "q-" + head, Trigger: dturn.Automated, Head: head, Session: "term-" + head, State: dturn.Asked, SentAt: testNow})
+	b.Records = append(b.Records, dturn.Record{Session: "term-" + head, Hash: "h-" + head, Head: head, At: testNow, Record: record.Record{State: record.Asked, Summary: "publish the approval?"}})
+	saved, err := r.sc.te.repo.Save(context.Background(), b, port.Event{Unit: r.u, Kind: turns.KindTurnSent, Key: "q-" + head, At: testNow})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.rec.questions = map[pr.Ref]map[string]bool{r.sc.ref: {intent: true}}
+	q, _ := saved.ByID("q-" + head)
+	return q.Seq
+}
+
+func TestAReviewQuestionOnThePlannedHeadHoldsTheRound(t *testing.T) {
+	t.Parallel()
+	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
+	planned, ok := r.planner().round(r.sc.ref.String(), roundFollowup)
+	if !ok || planned.Head == "" {
+		t.Fatalf("planned %+v %v", planned, ok)
+	}
+	r.askOn(t, string(dintent.Review), "pr.review", planned.Head)
+	if got := r.check(t, automation.CheckOpts{}); got != "its review turn asks you something" {
+		t.Fatalf("refusal %q", got)
+	}
+}
+
+func TestAReviewRoundOnANewerHeadReplacesTheQuestionAskedOnAnOlderOne(t *testing.T) {
+	t.Parallel()
+	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
+	planned, _ := r.planner().round(r.sc.ref.String(), roundFollowup)
+	seq := r.askOn(t, string(dintent.Review), "pr.review", "c-gone")
+	if got := r.check(t, automation.CheckOpts{}); got != "" {
+		t.Fatalf("a question on a head the pull request moved past: %q", got)
+	}
+	if _, err := r.run(t, automation.RunOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	b := r.sc.te.bookOf(t, r.sc.ref)
+	q, _ := b.ByID("q-c-gone")
+	next, ok := b.Newest(dturn.Intent(dintent.Review))
+	if q.Seq != seq || q.State != dturn.Replaced || !ok || next.Seq == seq || next.Head != planned.Head || b.OpenQuestion(dturn.Intent(dintent.Review)) {
+		t.Fatalf("turns %+v", b.Turns)
+	}
+}
+
+func TestAReviewQuestionWithAnAnswerOnItsWayHoldsTheRoundOnANewerHead(t *testing.T) {
+	t.Parallel()
+	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
+	seq := r.askOn(t, string(dintent.Review), "pr.review", "c-gone")
+	b := r.sc.te.bookOf(t, r.sc.ref)
+	b.Answers = append(b.Answers, dturn.Answer{TurnSeq: seq, Text: "publish it", Route: dturn.Typed, At: testNow.Add(time.Minute)})
+	if _, err := r.sc.te.repo.Save(context.Background(), b); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.check(t, automation.CheckOpts{}); got != "its review turn asks you something" {
+		t.Fatalf("refusal %q", got)
+	}
+}
+
+func TestAnAddressRoundWaitsOnItsQuestionWhateverTheHead(t *testing.T) {
+	t.Parallel()
+	r := newStartRig(t, addressScenario(t), string(dintent.Address), roundAddress)
+	r.askOn(t, string(dintent.Address), "pr.address", "c-the-agent-pushed")
+	if got := r.check(t, automation.CheckOpts{}); got != "its address turn asks you something" {
+		t.Fatalf("refusal %q", got)
 	}
 }
 

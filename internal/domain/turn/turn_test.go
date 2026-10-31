@@ -160,6 +160,37 @@ func TestOpenQuestion(t *testing.T) {
 	}
 }
 
+func TestAQuestionIsMovedPastOnlyOnAnotherHeadWithNoAnswerSinceItsRecord(t *testing.T) {
+	asked := func() Book {
+		return Book{Unit: r7, Turns: []Turn{{Seq: 1, Intent: "review", State: Asked, Head: "c1"}},
+			Records: []Record{{TurnSeq: 1, At: at(2), Record: record.Record{State: record.Asked}}}}
+	}
+	b := asked()
+	if !b.QuestionMovedPast("review", "c2") {
+		t.Fatal("a question on c1 holds a round on c2")
+	}
+	for name, change := range map[string]func(*Book){
+		"same head":         func(b *Book) { b.Turns[0].Head = "c2" },
+		"turn with no head": func(b *Book) { b.Turns[0].Head = "" },
+		"answer in flight":  func(b *Book) { b.Answers = []Answer{{TurnSeq: 1, At: at(3)}} },
+		"not asked":         func(b *Book) { b.Turns[0].State = Done },
+		"other intent":      func(b *Book) { b.Turns[0].Intent = "address" },
+	} {
+		b := asked()
+		change(&b)
+		if b.QuestionMovedPast("review", "c2") {
+			t.Errorf("%s: the question is moved past", name)
+		}
+	}
+	if b := asked(); b.QuestionMovedPast("review", "") {
+		t.Error("an unknown head moved past the question")
+	}
+	b.Answers = []Answer{{TurnSeq: 1, At: at(1)}, {TurnSeq: 1, Route: Refused, At: at(4)}}
+	if !b.QuestionMovedPast("review", "c2") {
+		t.Fatal("an answer before the record, or a refused one, holds the round")
+	}
+}
+
 func TestEndorsedBelongsToTheVerdict(t *testing.T) {
 	silent := record.Record{State: record.Asked, Summary: "s", Resume: "r", Question: &record.Question{Kind: "choice", Text: "q", Options: []record.Option{{ID: "nudge", Label: "N", Consequence: "c"}, {ID: "drop", Label: "D", Consequence: "c"}}}}
 	for _, c := range []struct {

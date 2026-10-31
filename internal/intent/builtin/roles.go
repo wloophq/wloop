@@ -79,6 +79,9 @@ type Role struct {
 	// that intent on its own session, so every session holding it is a run
 	// of its own.
 	PerSession bool
+	// ReplacesStaleQuestion says a round of its turns on a head other than
+	// the one its open, unanswered question was asked on replaces it.
+	ReplacesStaleQuestion bool
 }
 
 // Roles are what Go resolves an intent by, a manifest's role: the core's,

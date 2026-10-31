@@ -127,6 +127,7 @@ every = "5m"
 | `context` | string | What its turns are about. |
 | `policy` | string | The agent policy of its sessions. |
 | `drives_row` | bool | Its turns drive the row of the workspace they run in. |
+| `replaces_stale_question` | bool | A round of its turns on a head other than the one its open, unanswered question was asked on replaces that question instead of waiting for the answer. Leave it off for a role whose own agent pushes: its turn's head predates those pushes. |
 
 ## `[[source.deliveries]]`
 

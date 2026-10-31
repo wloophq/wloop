@@ -343,7 +343,8 @@ func (s *stepSet) activity(ctx context.Context, p startPlan, byHand bool) string
 }
 
 // asks refuses a round whose intent's newest turn asks the user something:
-// the round would replace the turn the agent finishes with the answer.
+// the round would replace the turn the agent finishes with the answer,
+// unless its role replaces a question its head moved past.
 func (s *stepSet) asks(ctx context.Context, u unit.Unit, p *startPlan) (string, error) {
 	if s.e.Turns == nil {
 		return "", nil
@@ -352,11 +353,15 @@ func (s *stepSet) asks(ctx context.Context, u unit.Unit, p *startPlan) (string, 
 	if err != nil {
 		return "", err
 	}
-	p.first = !slices.ContainsFunc(books[u].Turns, func(t dturn.Turn) bool { return t.State != dturn.Withdrawn })
-	if s.e.Rec != nil && s.e.Rec.OpenQuestions(books)[p.ref][p.args.intent] {
-		return "its " + p.args.intent + " turn asks you something", nil
+	b := books[u]
+	p.first = !slices.ContainsFunc(b.Turns, func(t dturn.Turn) bool { return t.State != dturn.Withdrawn })
+	if s.e.Rec == nil || !s.e.Rec.OpenQuestions(books)[p.ref][p.args.intent] {
+		return "", nil
 	}
-	return "", nil
+	if role, _ := builtin.RoleOf(p.args.def.Role); p.round && role.ReplacesStaleQuestion && b.QuestionMovedPast(dturn.Intent(p.args.intent), p.planned.Head) {
+		return "", nil
+	}
+	return "its " + p.args.intent + " turn asks you something", nil
 }
 
 func (s *stepSet) intakeAsks(ctx context.Context, u unit.Unit, intent string) (string, error) {

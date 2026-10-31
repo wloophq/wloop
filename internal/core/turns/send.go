@@ -33,6 +33,9 @@ type SendRequest struct {
 	// PerSession replaces, on a start by hand, only the open turns of the
 	// intent on the starting session, as the role says.
 	PerSession bool
+	// KeepsAnswered refuses an automated send while the intent's open
+	// question has an answer on its way, which the send would replace.
+	KeepsAnswered bool
 	// Items and Task are the unit's item ids and the task the turn was asked about, kept with
 	// the turn so its drafts are tied to them.
 	Items []string
@@ -73,6 +76,10 @@ func (s *Service) send(ctx context.Context, r SendRequest, start bool, handle st
 	if err := refuseOverRunning(&b, r.Intent); err != nil {
 		s.mu.Unlock()
 		return turn.Turn{}, err
+	}
+	if r.KeepsAnswered && !start && r.ResumeOf == 0 && b.QuestionAnswered(r.Intent) {
+		s.mu.Unlock()
+		return turn.Turn{}, Refusal{fmt.Sprintf("%s: its %s question has an answer on its way", r.Unit.Label(), r.Intent)}
 	}
 	now := s.now()
 	next := turn.Turn{
