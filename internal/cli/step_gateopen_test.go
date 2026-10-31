@@ -134,11 +134,18 @@ func TestApprovingTheDiffOfAStartedTaskClosesIt(t *testing.T) {
 	r := newTaskRig(t, nil)
 	r.put(t, "t-01", task.State("waiting"))
 	r.put(t, "t-02", task.State("waiting"))
-	start := dturn.Book{Unit: task.UnitOf("t-01"), Turns: []dturn.Turn{{Intent: "start", ID: "s1", Trigger: dturn.ByHand, State: dturn.Done, SentAt: testNow}}}
-	if _, err := sqlite.New(r.db).Save(ctx, start); err != nil {
-		t.Fatal(err)
+	r.put(t, "t-03", task.State("waiting"))
+	r.put(t, "t-04", task.State("waiting"))
+	for _, id := range []task.ID{"t-01", "t-03", "t-04"} {
+		start := dturn.Book{Unit: task.UnitOf(id), Turns: []dturn.Turn{{Intent: "start", ID: "s1", Trigger: dturn.ByHand, State: dturn.Done, SentAt: testNow}}}
+		if _, err := sqlite.New(r.db).Save(ctx, start); err != nil {
+			t.Fatal(err)
+		}
 	}
 	svc := r.te.newGates(r.db, t.Logf)
+	if _, err := svc.Open(ctx, gate.Gate{Task: "t-04", Unit: task.UnitOf("t-04"), Kind: gate.KindQuestion, Subject: "9"}, nil); err != nil {
+		t.Fatal(err)
+	}
 	ed := engineDeps{DB: r.db, SessionFacts: noUnits{}, WorkspaceFacts: noUnits{}}
 	r.te.wireSubjects(&serveWiring{DB: r.db, Cfg: r.te.cfg, Engine: &ed})
 	eng := r.te.newEngine(ed)
@@ -149,12 +156,12 @@ func TestApprovingTheDiffOfAStartedTaskClosesIt(t *testing.T) {
 		}
 	}
 	sweep()
-	for _, id := range []task.ID{"t-01", "t-02"} {
+	for id, intent := range map[task.ID]string{"t-01": "approve", "t-02": "approve", "t-03": "dismiss", "t-04": "approve"} {
 		g, err := svc.Open(ctx, gate.Gate{Task: id, Unit: task.UnitOf(id), Kind: gate.KindStep, Name: "review-diff"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := svc.Resolve(ctx, g.ID, gates.Resolution{Intent: "approve", By: task.ActorPerson}); err != nil {
+		if err := svc.Resolve(ctx, g.ID, gates.Resolution{Intent: intent, By: task.ActorPerson}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -163,7 +170,9 @@ func TestApprovingTheDiffOfAStartedTaskClosesIt(t *testing.T) {
 	if e, _ := r.db.Tasks().Task(ctx, "t-01"); e.Category != task.CategoryDone {
 		t.Fatalf("the started task whose diff you approved: %+v", e)
 	}
-	if e, _ := r.db.Tasks().Task(ctx, "t-02"); e.Category == task.CategoryDone {
-		t.Fatalf("a task no start ran on closed: %+v", e)
+	for id, why := range map[task.ID]string{"t-02": "a task no start ran on", "t-03": "a started task whose diff you dismissed", "t-04": "a started task with a question open"} {
+		if e, _ := r.db.Tasks().Task(ctx, id); e.Category == task.CategoryDone {
+			t.Errorf("%s closed: %+v", why, e)
+		}
 	}
 }

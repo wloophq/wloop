@@ -1,6 +1,7 @@
-summary = "Close the task of someone else's pull request once you approved it and nothing there waits on you: merging it is its author's; a new review asked of you brings the task back"
+summary = "Close the task of someone else's pull request once you approved it and nothing there waits on you: merging it is its author's; a new review asked of you brings the task back, and a task you open again stays open"
 provider = "task"
 when = 'task.prop.kind == "pull-request" && task.link_signal.approved_by_me && !("me" in task.link_owes) && task.gates_open == 0 && !(task.category in ["done", "dropped"])'
+key = ["task.units"]
 order = 53
 
 [[step]]
