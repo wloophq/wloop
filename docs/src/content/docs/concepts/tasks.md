@@ -77,16 +77,16 @@ Each plugin says when one of its units has ended: a pull request merged or close
 
 A task derived from a unit's items closes when its items resolve. Besides the extraction, two things resolve them from what the source shows:
 
-- An item's `review` or `merge` link settles when the pull request it names merges or closes, as the [glossary](/architecture/glossary/) says, even when the pull request ended before the link was noted; an item you reopened or edited after it ended stays open. A review counts only after the link.
-- The `items.resolve` step resolves every open item a task holds, as the workflow (provenance `workflow`, evidence `workflow:<name>`), with its `resolution`; an item you confirmed becomes a proposal on the task instead. It posts nothing.
+- An item's `review` or `merge` link settles when the pull request it names merges or closes, as the [glossary](/architecture/glossary/) says, and a merge settles it even when it happened before the link was noted; an item you reopened or edited after the merge stays open. A review or a close counts only after the link, since a pull request closed and reopened still has its close stored.
+- The `items.resolve` step resolves every open item a derived task holds, as the workflow (provenance `workflow`, evidence of kind `workflow` anchored at `workflow:<name>`), with its `resolution`; an item you confirmed becomes a proposal on the task instead. It refuses a task that is not derived or holds no open item, and posts nothing.
 
-The Slack plugin's layer bundles three workflows over the `items.resolve` step, one per signal, each on an open `thread` task with open items, and each a plan gate that waits for you (Run this?):
+The Slack plugin's layer bundles three workflows over the `items.resolve` step, one per signal, each on an open `thread` task with open items, and each a plan gate that waits for you (Run this?). The two that read a link signal offer only on a task of one unit, since a signal on one thread says nothing of another's items. They exclude each other in the table's order, so a task gets one offer at a time:
 
 | Workflow | Signal | Resolution |
 |---|---|---|
 | `slack-done-reacted` | `task.link_signal.asked_reacted`: whoever asked checked a later message, such as your answer | `done` |
-| `slack-done-replied` | `task.link_signal.replied_last`: you answered and nobody spoke since, for 3 days | `answered` |
-| `slack-done-quiet` | `task.link_ended`: every thread of the task quiet for `plugins.slack.ended_after` | `moot` |
+| `slack-done-replied` | `task.link_signal.replied_last`: every open item waits on you, you posted after its ask and nobody spoke since, for 3 days | `answered` |
+| `slack-done-quiet` | `task.link_ended`: every thread of the task ended, a closure posted or marked, or quiet for `plugins.slack.ended_after` | `moot` |
 
 Skipping one is final until the task changes (`key = ["task.fingerprint"]`). To let one close on its own, set its plan gate's mode in the configuration:
 
@@ -95,6 +95,8 @@ Skipping one is final until the task changes (`key = ["task.fingerprint"]`). To 
 when = 'gate.kind == "plan"'
 mode = "run"
 ```
+
+The signals come from the thread, which anyone in it writes: with `run`, a check mark from whoever asked resolves your items with no look from you.
 
 Resolving the items of a thread you started can make `slack-closure` propose its closure, a draft that waits for you like any other.
 
