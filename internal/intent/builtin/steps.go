@@ -32,6 +32,7 @@ const (
 	StepTaskVerb     = "task.verb"
 	StepGateOpen     = "gate.open"
 	StepTaskSet      = "task.set"
+	StepItemsResolve = "items.resolve"
 )
 
 // The values of draft.propose's arguments.
@@ -83,6 +84,8 @@ var coreSteps = []StepDef{
 		"Runs a verb of tasks.toml on the task as the workflow: `verb`, one whose `by.workflow` lets a workflow run it, with the arguments its handler takes (`until` and `on_activity` for schedule, `on` and `resurface` for waiting, `set` for context and area, `by` for promise). The plan blocks it while the task's state or the verb's `by` refuses it, and a verb that closes a task derived from a unit's items, which closes when they resolve. It records the `verb_<verb>` event with the workflow as its actor and the chain it runs in, so another workflow may react to it within `trigger.depth`."},
 	{StepGateOpen, nil, workflow.ReachLocal, nil,
 		"Opens the gate `name` of gates.toml on the unit, a decision that waits for you with the intents gates.toml gives it."},
+	{StepItemsResolve, providers(unit.Task), workflow.ReachLocal, nil,
+		"Resolves every open item the task holds, as the workflow, with `resolution` and the workflow as its evidence, so a task derived from its units' items closes; an item you confirmed becomes a proposal, a gate on the task. Posts nothing."},
 	{StepTaskSet, providers(unit.Task), workflow.ReachLocal, nil,
 		"Sets the task's property `prop` of tasks.toml to `value`, written by the workflow; a property the workflow may not write is refused."},
 }

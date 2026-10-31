@@ -14,7 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-var provenances = []items.Provenance{items.Extracted, items.Derived, items.User, items.Turn, items.Effects}
+var provenances = []items.Provenance{items.Extracted, items.Derived, items.User, items.Turn, items.Effects, items.Workflow}
 
 func emptyResult() Result {
 	return Result{Applied: []Applied{}, Proposed: []Proposal{}, Refused: []Refused{}}

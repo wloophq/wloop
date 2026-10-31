@@ -71,7 +71,34 @@ What a turn on a task produces is attached to it, when the turn's intent asks fo
 - With `record.attach_url = true`, a turn that records `done` with an outcome `url` naming a unit, such as a pull request, attaches that unit. The address is resolved by the plugins' units; a branch name never attaches anything.
 - With `drafts.attach_posts = true`, the unit of each post the turn's agent makes, sent at once or once approved, is attached; a draft on the task posted to a channel or a person attaches the thread its post starts. Reactions and edits are not posts.
 
-Each plugin says when one of its units has ended: a pull request merged or closed (`pr.ended`); a Slack unit with a closure posted or marked, or quiet for `plugins.slack.ended_after` (7 days) (`slack.ended`). The bundled workflow `task-results-ended` marks done a pull request's task, and a task you captured once a turn ran on it, such as a start, when it has a unit and every one of them has ended and no gate waits on you there (`task.link_ended && task.gates_open == 0 && (task.prop.kind == "pull-request" || task.captured_by_user && task.turns > 0)`): a pull request's task that also holds a thread still open stays open. A task a gate opens on a unit no task holds takes the kind the unit's plugin gives its tasks, so a gate on a pull request with no task, such as a merged one, makes it the pull request's task, out of the Inbox. A task you captured on a pull request to keep track of it, with no turn on the task itself, stays open. No workflow closes a derived task while it holds an item that calls for it.
+Each plugin says when one of its units has ended: a pull request merged or closed (`pr.ended`); a Slack unit with a closure posted or marked, or quiet for `plugins.slack.ended_after` (7 days) (`slack.ended`). The bundled workflow `task-results-ended` marks done a pull request's task, and a task you captured once a turn ran on it, such as a start, when it has a unit and every one of them has ended and no gate waits on you there (`task.link_ended && task.gates_open == 0 && (task.prop.kind == "pull-request" || task.captured_by_user && task.turns > 0)`): a pull request's task that also holds a thread still open stays open. A task a gate opens on a unit no task holds takes the kind the unit's plugin gives its tasks, so a gate on a pull request with no task, such as a merged one, makes it the pull request's task, out of the Inbox. A task you captured on a pull request to keep track of it, with no turn on the task itself, stays open. `task.verb` never closes a derived task while it holds an item that calls for it: a workflow closes one by resolving its items with the `items.resolve` step, as the next section says.
+
+### Closing a task its source shows done
+
+A task derived from a unit's items closes when its items resolve. Besides the extraction, two things resolve them from what the source shows:
+
+- An item's `review` or `merge` link settles when the pull request it names merges or closes, as the [glossary](/architecture/glossary/) says, and a merge settles it even when it happened before the link was noted; an item you reopened or edited after the merge stays open. A review or a close counts only after the link, since a pull request closed and reopened still has its close stored.
+- The `items.resolve` step resolves every open item a derived task holds, as the workflow (provenance `workflow`, evidence of kind `workflow` anchored at `workflow:<name>`), with its `resolution`; an item you confirmed becomes a proposal on the task instead. It refuses a task that is not derived or holds no open item, and posts nothing.
+
+The Slack plugin's layer bundles three workflows over the `items.resolve` step, one per signal, each on an open `thread` task with open items, and each a plan gate that waits for you (Run this?). The two that read a link signal offer only on a task of one unit, since a signal on one thread says nothing of another's items. They exclude each other in the table's order, so a task gets one offer at a time:
+
+| Workflow | Signal | Resolution |
+|---|---|---|
+| `slack-done-reacted` | `task.link_signal.asked_reacted`: whoever asked checked a later message, such as your answer | `done` |
+| `slack-done-replied` | `task.link_signal.replied_last`: you posted last, after an answer to each ask you made, and nobody spoke since, for 3 days | `answered` |
+| `slack-done-quiet` | `task.link_ended`: every thread of the task ended, a closure posted or marked, or quiet for `plugins.slack.ended_after` | `moot` |
+
+Skipping one is final until the task changes (`key = ["task.fingerprint"]`). To let one close on its own, set its plan gate's mode in the configuration:
+
+```toml
+[[workflows.slack-done-reacted.gates.approval.rule]]
+when = 'gate.kind == "plan"'
+mode = "run"
+```
+
+The signals come from the thread, which anyone in it writes: with `run`, a check mark from whoever asked resolves your items with no look from you.
+
+Resolving the items of a thread you started can make `slack-closure` propose its closure, a draft that waits for you like any other.
 
 ## The timeline and the records
 
