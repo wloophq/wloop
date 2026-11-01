@@ -50,9 +50,9 @@ type running struct {
 	cfgMu sync.Mutex
 	cfg   settings
 
+	// reportMu orders the reports, and guards reported: the rev and content
+	// of each pull request's last report.
 	reportMu sync.Mutex
-	revMu    sync.Mutex
-	// reported are the rev and content of each pull request's last report.
 	reported map[pr.Ref]reported
 	dirtyMu  sync.Mutex
 	dirty    map[pr.Ref]bool
@@ -468,10 +468,7 @@ func (r *running) revOf(ctx context.Context, ref pr.Ref, s src.Snapshot, batch *
 		return 0, err
 	}
 	sum := sha256.Sum256(raw)
-	r.revMu.Lock()
-	last, ok := r.reported[ref]
-	r.revMu.Unlock()
-	if ok && last.sum == sum {
+	if last, ok := r.reported[ref]; ok && last.sum == sum {
 		return last.rev, nil
 	}
 	if *batch == 0 {
@@ -479,9 +476,7 @@ func (r *running) revOf(ctx context.Context, ref pr.Ref, s src.Snapshot, batch *
 			return 0, err
 		}
 	}
-	r.revMu.Lock()
 	r.reported[ref] = reported{rev: *batch, sum: sum}
-	r.revMu.Unlock()
 	return *batch, nil
 }
 
@@ -580,6 +575,8 @@ const (
 // retain drops what the host's retention ends from the store and reports
 // each dropped pull request gone.
 func (r *running) retain(ctx context.Context) error {
+	r.reportMu.Lock()
+	defer r.reportMu.Unlock()
 	now := r.now()
 	dropped, err := r.db.Retain(ctx, now.Add(-endedRetention), now.Add(-fetchesRetention))
 	if err != nil || len(dropped) == 0 {
@@ -590,11 +587,9 @@ func (r *running) retain(ctx context.Context) error {
 		delete(r.dirty, ref)
 	}
 	r.dirtyMu.Unlock()
-	r.revMu.Lock()
 	for _, ref := range dropped {
 		delete(r.reported, ref)
 	}
-	r.revMu.Unlock()
 	if r.host.Reporter == nil {
 		return nil
 	}

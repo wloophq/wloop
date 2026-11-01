@@ -195,8 +195,7 @@ func (e *Engine) byHand(ctx context.Context, it workflow.Item, o RunOpts) (workf
 		return it, err
 	}
 	if why != "" {
-		e.logf("%s: %s", it.ID, why)
-		return outcomeOf(e.stopped(ctx, it, Refused{Reason: whyMoved}, nil, e.now()))
+		return outcomeOf(e.stopped(ctx, it, Refused{Reason: why}, nil, e.now()))
 	}
 	for _, st := range it.Steps {
 		refusal, err := e.Steps.Check(ctx, st, it.Unit, it.Why, CheckOpts{Observe: it.Observe, ByHand: true})
@@ -225,7 +224,7 @@ func (e *Engine) handInvalid(ctx context.Context, it workflow.Item) (string, err
 	if err != nil {
 		return "", err
 	}
-	return e.invalid(ctx, w, it, facts)
+	return e.invalid(ctx, w, it, facts, true)
 }
 
 // outcomeOf is a by-hand run's item and error: the ledger's, else the step's.

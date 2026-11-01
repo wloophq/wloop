@@ -38,8 +38,9 @@ func (t *tally) add(r result) {
 // Sweep implements daemon.Sweeper. Without the loop lock it checks the
 // manager is reachable, refreshes the facts providers, evaluates every
 // trigger, saves the plan, advances the event cursors and drops the run
-// items whose source moved. Under the lock it drops the run items whose unit
-// was noted after the plan's generation and no longer match, notes the
+// items whose source moved and that no longer hold. Under the lock it drops
+// the run items whose unit was noted after the plan's generation and no
+// longer hold, notes the
 // refusals, runs the run items and the due pending ones, withdraws the
 // drafts the workflows no longer call for, and settles.
 func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped string, err error) {
@@ -238,7 +239,7 @@ func (e *Engine) fresh(ctx context.Context, items []*planned, t *tally) ([]*plan
 	}
 	return e.drop(runs, t, func(pl *planned) string {
 		if rev, ok := revs[pl.item.Unit]; pl.hasRev && (!ok || rev != pl.rev) {
-			return e.stale(ctx, pl.w, pl.item)
+			return e.staleNow(ctx, pl.w, pl.item)
 		}
 		return ""
 	}), nil
@@ -272,35 +273,52 @@ func (e *Engine) revalidate(ctx context.Context, ev *evaluation, runs []*planned
 		if !ch.All && !slices.Contains(ch.Units, pl.item.Unit) {
 			return ""
 		}
-		return e.stale(ctx, pl.w, pl.item)
+		return e.staleNow(ctx, pl.w, pl.item)
 	})
 }
 
-// stale says why it, of w, no longer holds on its unit's current facts: its
-// facts or marks cannot be read, its when no longer matches or its key
-// changed; "" when it still holds and may run.
-func (e *Engine) stale(ctx context.Context, w workflow.Workflow, it workflow.Item) string {
+// staleNow is why the automatic run of it, of w, no longer holds on its
+// unit's current facts, or why they cannot be read; "" when it may run.
+func (e *Engine) staleNow(ctx context.Context, w workflow.Workflow, it workflow.Item) string {
 	facts, err := e.factsFor(ctx, w, it.Unit)
 	if err != nil {
 		return "its facts cannot be read: " + err.Error()
 	}
+	why, err := e.stale(ctx, w, it, facts, false)
+	if err != nil {
+		return "its marks cannot be read: " + err.Error()
+	}
+	return why
+}
+
+// stale says why it, of w, no longer holds on facts: its when no longer
+// matches, its key changed or, unless a person runs it by hand, an approval
+// rule now waits for one; "" when it still holds.
+func (e *Engine) stale(ctx context.Context, w workflow.Workflow, it workflow.Item, facts workflow.Facts, byHand bool) (string, error) {
 	var config workflow.Facts
 	if e.Config != nil {
 		config = e.Config()
 	}
 	vars := workflow.Vars{Facts: facts, Trigger: triggerFacts(it.Why), Config: config, Now: e.now()}
 	if readsMarks(w) {
+		var err error
 		if vars.Marks, err = e.unitMarks(ctx, it.Unit); err != nil {
-			return "its marks cannot be read: " + err.Error()
+			return "", err
 		}
 	}
 	if ok, err := match(w.When, vars); err != nil || !ok {
-		return "it no longer matches since it was planned"
+		return "it no longer matches since it was planned", nil
 	}
 	if keyMoved(w, it, facts) {
-		return "its unit changed since it was planned"
+		return "its unit changed since it was planned", nil
 	}
-	return ""
+	if byHand {
+		return "", nil
+	}
+	if rule, err := matchedRule(w.Approval, vars); err != nil || rule != nil && rule.Mode == workflow.ApprovalWait {
+		return "it waits for you since it was planned", nil
+	}
+	return "", nil
 }
 
 // settled says why a planned run must not run: after the plan was saved,

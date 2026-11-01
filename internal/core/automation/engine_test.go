@@ -1841,3 +1841,40 @@ func TestASweepReadsTheFactsThroughThePreparedContext(t *testing.T) {
 		t.Fatal("no facts were read through the prepared context")
 	}
 }
+
+func TestADueRunDropsAnItemWhoseApprovalRuleWaitsSinceItWasPlanned(t *testing.T) {
+	w := windowed(sweepWF("close", idle, "session.close"), 5*time.Minute)
+	w.Approval.Rules = waitRule(automationtest.MatchFunc(func(v workflow.Vars) bool { return v.Facts["session.held"] == true }, "session.held"))
+	r := newRig(t, w)
+	r.put(s1, "a")
+	r.sweep()
+	r.units.Report(t, s1)
+	r.units.Set(s1, "session.held", true)
+	r.clock.Advance(6 * time.Minute)
+	if err := r.e.DueRun(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.ran("session.close"); len(got) != 0 {
+		t.Fatalf("ran %v; its approval rule waits for you since it was planned", got)
+	}
+	r.sweep()
+	if it := r.mustItem("close", s1); it.Decision != workflow.DecisionPending || it.Default != workflow.OutcomeWait {
+		t.Fatalf("not planned again to wait: %+v", it)
+	}
+}
+
+func TestAnApplyRunsAnItemWhoseApprovalRuleWaitsSinceItWasPlanned(t *testing.T) {
+	w := windowed(sweepWF("close", idle, "session.close"), 5*time.Minute)
+	w.Approval.Rules = waitRule(automationtest.MatchFunc(func(v workflow.Vars) bool { return v.Facts["session.held"] == true }, "session.held"))
+	r := newRig(t, w)
+	r.put(s1, "a")
+	r.sweep()
+	r.units.Report(t, s1)
+	r.units.Set(s1, "session.held", true)
+	if _, err := r.e.Act(context.Background(), r.mustItem("close", s1).ID, workflow.ActionApply, ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.ran("session.close"); !slices.Equal(got, []unit.Unit{s1}) {
+		t.Fatalf("ran %v; applying by hand is the approval the rule waits for", got)
+	}
+}
