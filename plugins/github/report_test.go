@@ -167,3 +167,25 @@ func TestAReportRecordsNothingThatNotifiesThePluginAgain(t *testing.T) {
 			len(h.reports)-reports, len(h.events)-events, len(h.topics)-topics)
 	}
 }
+
+func TestTheRevGrowsOnlyWhenTheReportChanges(t *testing.T) {
+	ctx := context.Background()
+	h := &fakeHost{}
+	p := started(t, &githubGraphQL{}, h)
+	ref := mine(t, p)
+	notify := func() uint64 {
+		t.Helper()
+		if err := p.Notify(ctx, []sdk.Unit{ref.Unit()}, []sdk.Topic{sdk.TopicEvents}); err != nil {
+			t.Fatal(err)
+		}
+		return h.lastReport(t, ref).Rev
+	}
+	first := notify()
+	if again := notify(); again != first {
+		t.Fatalf("an unchanged report moved the rev from %d to %d", first, again)
+	}
+	h.record(src.Event{Unit: ref.Unit(), Kind: pr.KindReview, Key: "r1", Actor: "bruno", At: testAt.Add(-time.Hour), Data: []byte("CHANGES_REQUESTED:h7")})
+	if changed := notify(); changed <= first {
+		t.Fatalf("a changed report kept rev %d, was %d", changed, first)
+	}
+}

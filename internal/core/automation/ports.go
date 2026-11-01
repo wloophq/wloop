@@ -68,8 +68,8 @@ type Owner interface {
 // Revisioner is an optional capability of Units: the rev of each unit's
 // last report from its source, which grows with every change the source
 // reports; a unit with none is absent. The engine reads a unit's rev before
-// its facts, and a run planned on them does not run once the unit was
-// reported again.
+// its facts, and an item planned on them whose unit was reported again runs
+// only when it still holds on the current facts.
 type Revisioner interface {
 	Revs(ctx context.Context, units []unit.Unit) (map[unit.Unit]uint64, error)
 }

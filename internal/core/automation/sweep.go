@@ -38,8 +38,9 @@ func (t *tally) add(r result) {
 // Sweep implements daemon.Sweeper. Without the loop lock it checks the
 // manager is reachable, refreshes the facts providers, evaluates every
 // trigger, saves the plan, advances the event cursors and drops the run
-// items whose source moved. Under the lock it drops the run items whose unit
-// was noted after the plan's generation and no longer match, notes the
+// items whose source moved and that no longer hold. Under the lock it drops
+// the run items whose unit was noted after the plan's generation and no
+// longer hold, notes the
 // refusals, runs the run items and the due pending ones, withdraws the
 // drafts the workflows no longer call for, and settles.
 func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped string, err error) {
@@ -214,8 +215,9 @@ func (e *Engine) live() map[string]workflow.Workflow {
 	return live
 }
 
-// fresh are the plan's run items whose unit was not reported again since
-// their facts were read: its rev is the one they were planned at.
+// fresh are the plan's run items that still hold: those whose unit was
+// reported again since their facts were read are checked on its current
+// facts.
 func (e *Engine) fresh(ctx context.Context, items []*planned, t *tally) ([]*planned, error) {
 	var runs []*planned
 	var units []unit.Unit
@@ -237,7 +239,7 @@ func (e *Engine) fresh(ctx context.Context, items []*planned, t *tally) ([]*plan
 	}
 	return e.drop(runs, t, func(pl *planned) string {
 		if rev, ok := revs[pl.item.Unit]; pl.hasRev && (!ok || rev != pl.rev) {
-			return whyMoved
+			return e.staleNow(ctx, pl.w, pl.item)
 		}
 		return ""
 	}), nil
@@ -258,7 +260,7 @@ func (e *Engine) keepRevs(ev *evaluation) {
 }
 
 // revalidate drops the run items whose unit was noted on Revalidate after
-// the plan's generation and no longer matches on fresh facts under the same key.
+// the plan's generation and are stale.
 func (e *Engine) revalidate(ctx context.Context, ev *evaluation, runs []*planned, t *tally) []*planned {
 	if e.Changes == nil || len(runs) == 0 {
 		return runs
@@ -267,33 +269,56 @@ func (e *Engine) revalidate(ctx context.Context, ev *evaluation, runs []*planned
 	if ch.Empty() {
 		return runs
 	}
-	now := e.now()
-	var config workflow.Facts
-	if e.Config != nil {
-		config = e.Config()
-	}
 	return e.drop(runs, t, func(pl *planned) string {
 		if !ch.All && !slices.Contains(ch.Units, pl.item.Unit) {
 			return ""
 		}
-		facts, err := e.factsFor(ctx, pl.w, pl.item.Unit)
-		if err != nil {
-			return "its facts cannot be read: " + err.Error()
-		}
-		vars := workflow.Vars{Facts: facts, Trigger: triggerFacts(pl.item.Why), Config: config, Now: now}
-		if readsMarks(pl.w) {
-			if vars.Marks, err = e.unitMarks(ctx, pl.item.Unit); err != nil {
-				return "its marks cannot be read: " + err.Error()
-			}
-		}
-		if ok, err := match(pl.w.When, vars); err != nil || !ok {
-			return "it no longer matches since it was planned"
-		}
-		if workflow.NewKey(pl.w, pl.item.Unit, facts, pl.item.Why) != pl.item.Key {
-			return "its unit changed since it was planned"
-		}
-		return ""
+		return e.staleNow(ctx, pl.w, pl.item)
 	})
+}
+
+// staleNow is why the automatic run of it, of w, no longer holds on its
+// unit's current facts, or why they cannot be read; "" when it may run.
+func (e *Engine) staleNow(ctx context.Context, w workflow.Workflow, it workflow.Item) string {
+	facts, err := e.factsFor(ctx, w, it.Unit)
+	if err != nil {
+		return "its facts cannot be read: " + err.Error()
+	}
+	why, err := e.stale(ctx, w, it, facts, false)
+	if err != nil {
+		return "its marks cannot be read: " + err.Error()
+	}
+	return why
+}
+
+// stale says why it, of w, no longer holds on facts: its when no longer
+// matches, its key changed or, unless a person runs it by hand, an approval
+// rule now waits for one; "" when it still holds.
+func (e *Engine) stale(ctx context.Context, w workflow.Workflow, it workflow.Item, facts workflow.Facts, byHand bool) (string, error) {
+	var config workflow.Facts
+	if e.Config != nil {
+		config = e.Config()
+	}
+	vars := workflow.Vars{Facts: facts, Trigger: triggerFacts(it.Why), Config: config, Now: e.now()}
+	if readsMarks(w) {
+		var err error
+		if vars.Marks, err = e.unitMarks(ctx, it.Unit); err != nil {
+			return "", err
+		}
+	}
+	if ok, err := match(w.When, vars); err != nil || !ok {
+		return "it no longer matches since it was planned", nil
+	}
+	if keyMoved(w, it, facts) {
+		return "its unit changed since it was planned", nil
+	}
+	if byHand {
+		return "", nil
+	}
+	if rule, err := matchedRule(w.Approval, vars); err != nil || rule != nil && rule.Mode == workflow.ApprovalWait {
+		return "it waits for you since it was planned", nil
+	}
+	return "", nil
 }
 
 // settled says why a planned run must not run: after the plan was saved,

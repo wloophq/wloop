@@ -19,7 +19,8 @@ type Stored struct {
 
 // Store keeps the last snapshot of every unit a source plugin reports.
 type Store interface {
-	// Put replaces the snapshot of each of puts' units and drops gone's, in one write.
+	// Put replaces the snapshot of each of puts' units and drops gone's, in one
+	// write; a unit put at the rev it is stored at is not noted as changed.
 	Put(ctx context.Context, puts []Stored, gone []unit.Unit) error
 	// Get is the snapshots of units; a unit with none is absent.
 	Get(ctx context.Context, units []unit.Unit) (map[unit.Unit]Stored, error)
