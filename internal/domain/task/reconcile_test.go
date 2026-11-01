@@ -2,6 +2,7 @@ package task_test
 
 import (
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -109,6 +110,52 @@ func TestOthersItemsIgnoredWithoutCare(t *testing.T) {
 	cares := func(f *task.UnitFacts) { f.Cares = true }
 	if e := only(t, reconcile(t, facts(cares), its, nil, now)); e.Category != task.CategoryWaiting {
 		t.Fatalf("with care: %+v", e)
+	}
+}
+
+func TestMyItemWaitingOnOthersIsWaitedOn(t *testing.T) {
+	mine := func(it *items.Item) {
+		it.Requester, it.Assignees, it.WaitingOn = bob, []items.Person{meP}, []items.Person{ana}
+	}
+	if e := only(t, reconcile(t, facts(), []items.Item{item("a", mine)}, nil, now)); e.Category != task.CategoryWaiting {
+		t.Fatalf("task %+v", e)
+	}
+}
+
+func TestMyPartDoneWhileCoAssigneesOweTheirsIsNoTask(t *testing.T) {
+	peersOwe := func(it *items.Item) {
+		it.Requester, it.Assignees, it.WaitingOn = ana, []items.Person{meP, bob}, []items.Person{bob}
+	}
+	if es := reconcile(t, facts(), []items.Item{item("a", peersOwe)}, nil, now); len(es) != 0 {
+		t.Fatalf("tasks %+v", es)
+	}
+}
+
+type foldKeys struct{}
+
+func (foldKeys) KeysEqual(_ unit.ProviderID, a, b string) bool { return strings.EqualFold(a, b) }
+
+func TestACoAssigneeIsMatchedThroughTheCodec(t *testing.T) {
+	folded := task.Me{Keys: me.Keys, Codecs: foldKeys{}}
+	bobSpelled := items.Person{Key: "github:Bob"}
+	peerOwes := func(it *items.Item) {
+		it.Requester, it.Assignees, it.WaitingOn = ana, []items.Person{meP, bobSpelled}, []items.Person{bob}
+	}
+	if cs := reconciled(t, facts(), []items.Item{item("a", peerOwes)}, folded, nil, bundled, now); len(cs) != 0 {
+		t.Fatalf("tasks %+v", cs)
+	}
+}
+
+func TestATaskKeepsAnItemThatStillWaitsOnSomeone(t *testing.T) {
+	e := only(t, reconcile(t, facts(), []items.Item{item("a")}, nil, now))
+	handedOff := item("a", func(it *items.Item) { it.Requester, it.WaitingOn = bob, []items.Person{ana} })
+	got := only(t, reconcile(t, facts(), []items.Item{handedOff}, []task.Task{e}, now.Add(time.Hour)))
+	if !got.Open() || !slices.Equal(got.Items, e.Items) {
+		t.Fatalf("task %+v", got)
+	}
+	idle := item("a", func(it *items.Item) { it.WaitingOn = nil })
+	if got := only(t, reconcile(t, facts(), []items.Item{idle}, []task.Task{e}, now.Add(time.Hour))); got.Category != task.CategoryDone {
+		t.Fatalf("item waiting on nobody: %+v", got)
 	}
 }
 
@@ -320,6 +367,31 @@ func TestItemsOfOneTaskKeyAreOneTask(t *testing.T) {
 	es = reconcile(t, facts(func(f *task.UnitFacts) { f.Carded = true }), []items.Item{item("gh:merge", keyed, resolved)}, es, now)
 	if e := only(t, es); e.Category != task.CategoryDropped {
 		t.Fatalf("a unit no longer followed drops its task: %+v", e)
+	}
+}
+
+func TestUnfollowingAUnitDropsItsTaskWhileItsAsksAreOpen(t *testing.T) {
+	cases := map[string]func(*items.Item){
+		"waits on another": func(it *items.Item) { it.Requester, it.WaitingOn = ana, []items.Person{ana} },
+		"waits on nobody":  func(it *items.Item) { it.Requester, it.WaitingOn = ana, nil },
+	}
+	for name, mod := range cases {
+		its := []items.Item{item("gh:follow", keyed, mod)}
+		es := reconcile(t, facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true }), its, nil, now)
+		es = reconcile(t, facts(func(f *task.UnitFacts) { f.Carded = true }), its, es, now)
+		if e := only(t, es); e.Category != task.CategoryDropped {
+			t.Fatalf("%s: unfollowed %+v", name, e)
+		}
+	}
+}
+
+func TestATaskTakesNoAskItNeverHeld(t *testing.T) {
+	thread := unit.Unit{Provider: "slack", Key: "T1/C1/1.1"}
+	start := task.Task{ID: "t-00000000000000a4", State: "next", Category: task.CategoryReady, Title: "Ship the export",
+		Units: []unit.Unit{thread, pr}, Origin: task.OriginUser, Created: now.Add(-time.Hour)}
+	others := item("gh:follow", keyed, func(it *items.Item) { it.Requester, it.WaitingOn = ana, []items.Person{bob} })
+	if cs := reconciled(t, facts(), []items.Item{others}, me, []task.Task{start}, bundled, now); len(cs) != 0 {
+		t.Fatalf("an ask between others joined the task linking its unit: %+v", cs)
 	}
 }
 

@@ -18,6 +18,7 @@ import (
 
 var (
 	twBruno  = items.Person{Key: "slack:U000BRUNO", Name: "Bruno"}
+	twCarla  = items.Person{Key: "slack:U000CARLA", Name: "Carla"}
 	twMe     = items.Person{Key: "slack:U000ME", Name: "Me"}
 	twThread = slackThreadUnit("T000TEAM", "C000CHAN", "1700000100.000100")
 )
@@ -118,6 +119,35 @@ func TestAutofocusStarsStaleAndPastDue(t *testing.T) {
 		if want == "on" && e.Written["focus"].By != task.WriterWorkflow {
 			t.Errorf("%s: starred by %s", item, e.Written["focus"].By)
 		}
+	}
+}
+
+func TestStalledNudgeSparesWhoeverWaitsOnMeInTheThread(t *testing.T) {
+	t.Parallel()
+	r, p := taskWorkflows(t)
+	ctx := context.Background()
+	long := replayStart.AddDate(0, 0, -7)
+	r.mine("i1", long, "", twBruno)
+	asked := r.item(twThread, "a1", items.Open, r.now, twMe)
+	asked.Requester = twBruno
+	r.commit(asked)
+	elsewhere := slackThreadUnit("T000TEAM", "C000CHAN", "1700000200.000100")
+	owed := r.item(elsewhere, "e1", items.Open, long, twCarla)
+	owed.Requester = twMe
+	r.commit(owed)
+	other := slackThreadUnit("T000TEAM", "C000CHAN", "1700000300.000100")
+	asks := r.item(other, "o1", items.Open, r.now, twMe)
+	asks.Requester = twCarla
+	r.commit(asks)
+	r.sync(twThread, elsewhere, other)
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if ds := r.nudges(twBruno); len(ds) != 0 {
+		t.Fatalf("nudged Bruno, who waits on my answer in the thread: %+v", ds)
+	}
+	if ds := r.nudges(twCarla); len(ds) != 1 {
+		t.Fatalf("nudges to Carla, who waits on me only in another thread: %+v, want one", ds)
 	}
 }
 

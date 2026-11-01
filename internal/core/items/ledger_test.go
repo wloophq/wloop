@@ -3,6 +3,7 @@ package items
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -89,9 +90,10 @@ func TestReopenClearsResolution(t *testing.T) {
 	l, _ := newLedger(newMem())
 	apply(t, l, items.Extracted, create(thread, "i1", "x"),
 		items.Op{Op: items.OpResolve, Unit: thread, Item: "i1", Anchor: anchor("m:2"), Resolution: items.Answered})
-	apply(t, l, items.Extracted, items.Op{Op: items.OpReopen, Unit: thread, Item: "i1", Anchor: anchor("m:3")})
+	reopen := unit.Anchor{Ref: "m:3", At: t0.Add(time.Hour)}
+	apply(t, l, items.Extracted, items.Op{Op: items.OpReopen, Unit: thread, Item: "i1", Anchor: reopen})
 	it := itemOf(t, l, thread, "i1")
-	if it.State != items.Open || it.Resolution != "" || it.Evidence != (items.Evidence{}) {
+	if it.State != items.Open || it.Resolution != "" || it.Evidence != (items.Evidence{}) || !it.ReopenedAt.Equal(reopen.At) {
 		t.Errorf("%+v", it)
 	}
 }
@@ -295,6 +297,28 @@ func TestReconcileIdempotent(t *testing.T) {
 	}
 }
 
+func TestReconcileKeepsWhenADerivedItemReopened(t *testing.T) {
+	ctx := context.Background()
+	s := newMem()
+	l, c := newLedger(s)
+	done := items.Item{ID: "gh:review", Kind: items.Request, Summary: "r", State: items.Resolved, Resolution: items.Done}
+	if _, err := l.Reconcile(ctx, pull, []items.Item{done}, anchor("row:1"), ""); err != nil {
+		t.Fatal(err)
+	}
+	c.t = c.t.Add(time.Hour)
+	if _, err := l.Reconcile(ctx, pull, []items.Item{derived("gh:review", "r")}, unit.Anchor{Ref: "row:2"}, ""); err != nil {
+		t.Fatal(err)
+	}
+	if it := itemOf(t, l, pull, "gh:review"); it.State != items.Open || !it.ReopenedAt.Equal(c.t) {
+		t.Fatalf("reopened by the source: %+v", it)
+	}
+	commits := s.commits
+	c.t = c.t.Add(time.Hour)
+	if res, err := l.Reconcile(ctx, pull, []items.Item{derived("gh:review", "r")}, anchor("row:3"), ""); err != nil || len(res.Applied) != 0 || s.commits != commits {
+		t.Fatalf("the same desired item again: %+v %v", res, err)
+	}
+}
+
 func TestReconcileOnConfirmedNeverProposes(t *testing.T) {
 	ctx := context.Background()
 	s := newMem()
@@ -347,6 +371,32 @@ func TestLinkOpWritesLink(t *testing.T) {
 	apply(t, l, items.User, items.Op{Op: items.OpLink, Unit: thread, Anchor: anchor("user:1"), To: &pull, LinkKind: link.Mention})
 	if len(links.put) != 2 || links.put[1].Origin != link.User || links.put[1].Item != "" {
 		t.Errorf("%+v", links.put)
+	}
+}
+
+func TestALinkToAnEndedUnitSettlesItsItemInTheSameBatch(t *testing.T) {
+	s := newMem()
+	l, _ := newLedger(s)
+	l.Links = &fakeLinks{}
+	merged := unit.Anchor{Unit: pull, Ref: "merged", At: t0}
+	l.SetSettle(func(_ context.Context, lk link.Link, it items.Item) (items.Op, bool, error) {
+		if lk.To != pull || it.ID != "i1" || it.State != items.Open {
+			return items.Op{}, false, nil
+		}
+		ev := items.Evidence{Kind: items.EvidenceUnitEvent, Anchor: merged}
+		return items.Op{Op: items.OpResolve, Unit: thread, Item: "i1", Anchor: merged, Resolution: items.Moot, Evidence: &ev}, true, nil
+	})
+	res := apply(t, l, items.Extracted, create(thread, "i1", "review o/r#1"),
+		items.Op{Op: items.OpLink, Unit: thread, Item: "i1", Anchor: anchor("C000AAA/1.3"), To: &pull, LinkKind: link.Review})
+	if len(res.Refused) != 0 {
+		t.Fatalf("%+v", res.Refused)
+	}
+	i := slices.IndexFunc(s.items[thread], func(it items.Item) bool { return it.ID == "i1" })
+	if i < 0 {
+		t.Fatal("no item i1")
+	}
+	if got := s.items[thread][i]; got.State != items.Resolved || got.Resolution != items.Moot || got.Evidence.Anchor != merged {
+		t.Fatalf("item %+v", got)
 	}
 }
 
@@ -488,5 +538,28 @@ func TestADecisionAppliesOnce(t *testing.T) {
 	}
 	if got := itemOf(t, l, thread, "i1").Summary; got != "c" || len(s.log) != logged {
 		t.Errorf("summary %q, %d log rows after %d: a decision applied twice", got, len(s.log), logged)
+	}
+}
+
+func TestARefusedSettleLeavesTheLinkApplied(t *testing.T) {
+	s := newMem()
+	l, _ := newLedger(s)
+	links := &fakeLinks{}
+	l.Links = links
+	var logged []string
+	l.Log = func(f string, a ...any) { logged = append(logged, fmt.Sprintf(f, a...)) }
+	l.SetSettle(func(context.Context, link.Link, items.Item) (items.Op, bool, error) {
+		return items.Op{Op: items.OpResolve, Unit: thread, Item: "i1", Anchor: anchor("x"), Resolution: "bogus"}, true, nil
+	})
+	res := apply(t, l, items.Extracted, create(thread, "i1", "review o/r#1"),
+		items.Op{Op: items.OpLink, Unit: thread, Item: "i1", Anchor: anchor("C000AAA/1.3"), To: &pull, LinkKind: link.Review})
+	if len(res.Refused) != 0 || len(logged) != 1 || !strings.Contains(logged[0], "refused") {
+		t.Fatalf("refused %+v, logged %q", res.Refused, logged)
+	}
+	if !slices.ContainsFunc(res.Applied, func(a Applied) bool { return a.Op.Op == items.OpLink }) || len(links.put) != 1 {
+		t.Fatalf("applied %+v, links %+v", res.Applied, links.put)
+	}
+	if it := itemOf(t, l, thread, "i1"); it.State != items.Open {
+		t.Fatalf("item %+v", it)
 	}
 }

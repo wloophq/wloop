@@ -15,7 +15,7 @@ const itemOpen items.State = "open"
 // Reconcile is what the items of one unit call for, given the tasks that hold them or the unit.
 //
 // One task per task key (items.Item.TaskKey, else the item id) of the open items that wait on Me, or that Me
-// requested or f.Cares about and wait on others. An item a task already holds stays with that task, so a task
+// requested, is assigned while no other assignee owes it, or f.Cares about, and wait on others. An item a task already holds stays with that task, so a task
 // the user merged keeps its items, and every item of a key goes to the task holding one of them. A key no task
 // holds that names f.Unit goes to the unit's own task (UnitTask) while it is open, else to the oldest open task
 // holding f.Unit as a link, such as a task you started whose pull request was attached, else to its own closed
@@ -24,6 +24,8 @@ const itemOpen items.State = "open"
 // waiting on others. A new task takes the item's contexts and deadline in the properties of RoleContexts and
 // RoleDeadline, and the kind f.Kind names, as the plugin writes them.
 //
+// An open task keeps an item it holds while the item waits on someone, even once no rule above calls for it,
+// except an item of the key that names f.Unit.
 // A derived task none of whose items calls for it any more is resolved into the done category, except the
 // task of a key that names f.Unit: the unit's one task lives as long as its unit, so it ends through the
 // profile, and is dropped once its card says the user no longer Cares about the unit (PropUnfollowed), to come
@@ -57,12 +59,13 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st Profile, no
 	var out []Change
 	for _, it := range its {
 		initial, ok := wants(f, it, me)
-		if !ok {
-			continue
-		}
 		id, held := holder[refOf(f, it)]
+		kept := held && byID[id].Open() && waited(f, it)
 		if it.TaskKey != "" {
 			id, held = keyed[it.TaskKey]
+		}
+		if !ok && !kept {
+			continue
 		}
 		if !held {
 			id = DerivedID(f.Unit, keyOf(it))
@@ -226,12 +229,30 @@ func wants(f UnitFacts, it items.Item, me Me) (Category, bool) {
 	start, ok := CategoryInbox, true
 	if !slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return isMe(p, me) }) {
 		own := it.TaskKey == f.Unit.String() && len(it.WaitingOn) == 0
-		start, ok = CategoryWaiting, (len(it.WaitingOn) > 0 || own) && (isMe(it.Requester, me) || f.Cares)
+		start, ok = CategoryWaiting, (len(it.WaitingOn) > 0 || own) && (mine(it, me) || f.Cares)
 	}
 	if it.Initial != "" {
 		start = Category(it.Initial)
 	}
 	return start, ok
+}
+
+// waited says whether open item it waits on someone and belongs to no unit's own task, which lives by Cares.
+func waited(f UnitFacts, it items.Item) bool {
+	return it.State == itemOpen && len(it.WaitingOn) > 0 && it.TaskKey != f.Unit.String()
+}
+
+// mine says whether Me requested it, or is assigned it while no other assignee is what it waits on.
+func mine(it items.Item, me Me) bool {
+	if isMe(it.Requester, me) {
+		return true
+	}
+	assigned := func(p items.Person) bool {
+		them := items.Identity{Keys: []string{p.Key}, Codecs: me.Codecs}
+		return slices.ContainsFunc(it.Assignees, func(a items.Person) bool { return a.Is(them) })
+	}
+	return slices.ContainsFunc(it.Assignees, func(p items.Person) bool { return isMe(p, me) }) &&
+		!slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return !isMe(p, me) && assigned(p) })
 }
 
 func newTask(id ID, f UnitFacts, ws []items.Item, initial Category, st Profile, now time.Time) (Task, error) {

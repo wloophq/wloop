@@ -163,3 +163,36 @@ func TestResolverRetriesFailedUnits(t *testing.T) {
 		t.Fatalf("runs = %v", calls)
 	}
 }
+
+func TestServeSettlesALinkToAPullRequestMergedAfterTheAsk(t *testing.T) {
+	te := newTestEnv(t, &fake.Manager{})
+	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	saved := plugins
+	plugins = []compiledPlugin{{ID: unit.GitHub, Codec: pr.Codec{}, Build: githubHostModule}}
+	defer func() { plugins = saved }()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, nil)
+
+	if _, err := inventory.New(db).AppendEvents(ctx, []dinv.Event{{PR: r7, Kind: dinv.KindMerged, Actor: "ana", At: testNow.Add(-time.Hour)}}); err != nil {
+		t.Fatal(err)
+	}
+	thread := unit.Unit{Provider: "thread", Key: "C1 0001"}
+	asked := unit.Anchor{Unit: thread, Ref: "C1/0001", At: testNow.Add(-2 * time.Hour)}
+	kind, summary, target := items.Request, "merge acme/api#7", r7.Unit()
+	ledger := te.Env.itemsLedger(db, te.cfg, t.Logf)
+	if res, err := ledger.Apply(ctx, items.Extracted, []items.Op{
+		{Op: items.OpCreate, Unit: thread, Item: "i1", Anchor: asked, Fields: &items.Fields{Kind: &kind, Summary: &summary}},
+		{Op: items.OpLink, Unit: thread, Item: "i1", Anchor: asked, To: &target, LinkKind: link.Merge},
+	}); err != nil || len(res.Refused) > 0 {
+		t.Fatalf("items: %+v %v", res.Refused, err)
+	}
+	got, err := ledger.Items(ctx, thread)
+	if err != nil || len(got) != 1 || got[0].State != items.Resolved || got[0].Resolution != items.Done {
+		t.Fatalf("items %+v %v", got, err)
+	}
+}

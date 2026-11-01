@@ -25,6 +25,7 @@ func (e *Env) wireDrafts(w *serveWiring) {
 		}
 	}
 	d.Codecs = unit.NewRegistry(codecs...)
+	d.Me = e.me
 	w.Engine.Drafts = d
 	w.Engine.Withdrawals = draftWithdrawals{d: d}
 }
@@ -77,12 +78,13 @@ func (w draftWithdrawals) Proposed(ctx context.Context, name string) ([]automati
 		sub, err := w.d.subject(ctx, subject)
 		switch {
 		case err != nil && d.Task != "" && errors.Is(err, coretasks.ErrNoTask):
-			pd.Facts = workflow.Facts{"draft.person_waited": false, "draft.items_owed": 0, "draft.items_assigned": 0, "draft.unit_open": false}
+			pd.Facts = workflow.Facts{"draft.person_waited": false, "draft.items_owed": 0, "draft.items_assigned": 0, "draft.unit_open": false,
+				"draft.person_asks_you": false}
 		case err != nil:
 			return nil, err
 		default:
 			person := draftPerson(d.Origin.Key, d.Unit, subject)
-			pd.Facts = draftFactsOf(sub, person, d.Items)
+			pd.Facts = draftFactsOf(sub, person, d.Items, w.d.me())
 		}
 		out = append(out, pd)
 	}
