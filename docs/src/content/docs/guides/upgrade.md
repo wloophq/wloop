@@ -47,6 +47,8 @@ A key or a value the new release does not know, in `config.toml` or in a manifes
 
 `slack_react` and `slack_edit` take the message as `message`, a ref (`<conversation>/<ts>`) or a permalink, where they took `permalink`: an agent's call with `permalink` is refused as a bad argument. Their answer for a missing or unreadable message is `problem_message`, where it was `problem_permalink`, so a profile whose `tools.toml` words `problem_permalink` fails at load until it is renamed.
 
+A view of your own `views.toml` needs its `summary`, one line on what it lists: a view without one fails at load naming `views.<id>.summary`, and one that changes a bundled view keeps the bundled summary.
+
 The words for tasks have new names in the profile and the configuration. Each old name fails at load with a problem naming the new one:
 
 - `gtd.toml` is not read: its `[verbs]` go in `tasks.toml`, its `[views]` and `[review]` in `views.toml`;

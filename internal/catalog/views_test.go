@@ -175,7 +175,7 @@ func TestOnlyAViewOverATasksOwnFieldsIsPaged(t *testing.T) {
 		t.Errorf("paged views %v, want %v", paged, want)
 	}
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, intentload.ViewsFile), []byte("[views.overdue]\nlabel = \"Overdue\"\nwhen = \"task.prop.due > timestamp(0) && task.prop.due < now\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, intentload.ViewsFile), []byte("[views.overdue]\nlabel = \"Overdue\"\nsummary = \"s\"\nwhen = \"task.prop.due > timestamp(0) && task.prop.due < now\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	base, err := turn.Base()

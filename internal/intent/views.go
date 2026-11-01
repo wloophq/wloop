@@ -3,10 +3,12 @@ package intent
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"maps"
 	"slices"
 	"strings"
+	"text/template"
 
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -28,19 +30,25 @@ type ViewsDef struct {
 	Review []ReviewStepDef
 	// Badge are the views whose counts the badge adds up.
 	Badge []string
+	// Empty is what a view without its own empty shows when it lists nothing.
+	Empty *template.Template
 }
 
-// ViewDef is a view: what it lists (Over, task.OverTasks or task.OverGates),
-// When, which of them, compiled over their facts, nil for a view that lists
-// nothing and is a place a client draws itself, such as the review; Group the
-// fact it groups by, Sort the facts it sorts by, Key the key that jumps to it,
-// HideDisabled whether it leaves out what a disabled plugin holds, and
-// RemoveClean whether it offers to remove its tasks' clean workspaces.
+// ViewDef is a view: Summary, one line on what it lists; what it lists (Over,
+// task.OverTasks or task.OverGates); When, which of them, compiled over their
+// facts, nil for a view that lists nothing and is a place a client draws
+// itself, such as the review; Group the fact it groups by, Sort the facts it
+// sorts by, Key the key that jumps to it, HideDisabled whether it leaves out
+// what a disabled plugin holds, RemoveClean whether it offers to remove its
+// tasks' clean workspaces, and Empty what it shows when it lists nothing.
+// WhenText and SortText are its when and sort as the profile writes them.
 type ViewDef struct {
-	ID, Label, Over, Group, Key string
-	Sort                        []SortKey
-	HideDisabled, RemoveClean   bool
-	When                        workflow.Predicate
+	ID, Label, Summary, Over, Group, Key, Empty string
+	WhenText, SortText                          string
+	Sort                                        []SortKey
+	HideDisabled, RemoveClean                   bool
+	When                                        workflow.Predicate
+	ownEmpty                                    string
 }
 
 // SortKey is a fact a view sorts by, descending when Desc.
@@ -76,6 +84,7 @@ func (d ViewsDef) IDs() []string {
 func (d ViewsDef) Badged(id string) bool { return slices.Contains(d.Badge, id) }
 
 type mViews struct {
+	Empty  *string                `toml:"empty"`
 	Views  map[string]mView       `toml:"views"`
 	Review map[string]mReviewStep `toml:"review"`
 	Badge  *mBadge                `toml:"badge"`
@@ -83,6 +92,8 @@ type mViews struct {
 
 type mView struct {
 	Label        *string `toml:"label"`
+	Summary      *string `toml:"summary"`
+	Empty        *string `toml:"empty"`
 	Over         *string `toml:"over"`
 	When         *string `toml:"when"`
 	Group        *string `toml:"group"`
@@ -191,6 +202,15 @@ func (l *viewsLoad) merge(file string, src []byte) Problems {
 		return problems
 	}
 	s := &sheet{file: file, at: positions(src), problems: problems}
+	if m.Empty != nil {
+		if t, err := template.New("empty").Option("missingkey=error").Parse(*m.Empty); err != nil {
+			s.add("empty", "%s", err)
+		} else if err := t.Execute(io.Discard, map[string]any{"label": ""}); err != nil {
+			s.add("empty", "%s", err)
+		} else {
+			l.def.Empty = t
+		}
+	}
 	l.mergeViews(s, m.Views)
 	l.mergeReview(s, m.Review)
 	if m.Badge != nil && m.Badge.Views != nil {
@@ -220,13 +240,23 @@ func (l *viewsLoad) mergeViews(s *sheet, views map[string]mView) {
 		case i < 0:
 			s.add(path+".label", "is required")
 		}
+		switch {
+		case m.Summary != nil:
+			text(s, path+".summary", m.Summary, &v.Summary)
+		case i < 0:
+			s.add(path+".summary", "is required")
+		}
+		if m.Empty != nil {
+			v.ownEmpty = strings.TrimSpace(*m.Empty)
+		}
 		if m.Over != nil {
 			s.oneOf(path+".over", *m.Over, builtin.ValuesOf(builtin.SurfaceViews, "views.*.over"))
 			v.Over = *m.Over
 		}
 		if m.When != nil {
 			delete(l.refs, path+".when")
-			if strings.TrimSpace(*m.When) != "" {
+			v.WhenText = strings.TrimSpace(*m.When)
+			if v.WhenText != "" {
 				l.refs[path+".when"] = ref{s, path + ".when", *m.When}
 			}
 		}
@@ -234,7 +264,7 @@ func (l *viewsLoad) mergeViews(s *sheet, views map[string]mView) {
 			v.Group = strings.TrimSpace(*m.Group)
 		}
 		if m.Sort != nil {
-			v.Sort = sortKeys(*m.Sort)
+			v.Sort, v.SortText = sortKeys(*m.Sort), strings.TrimSpace(*m.Sort)
 		}
 		if m.Key != nil {
 			v.Key = ""
@@ -352,6 +382,13 @@ func (l *viewsLoad) check(tasks TasksDef) Problems {
 			keep = append(keep, k)
 		}
 		v.Sort = keep
+		v.Empty = v.ownEmpty
+		if v.Empty == "" && l.def.Empty != nil {
+			var b strings.Builder
+			if err := l.def.Empty.Execute(&b, map[string]any{"label": v.Label}); err == nil {
+				v.Empty = b.String()
+			}
+		}
 	}
 	for _, at := range slices.Sorted(maps.Keys(l.refs)) {
 		r := l.refs[at]

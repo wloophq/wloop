@@ -66,12 +66,17 @@ type ViewsCatalog struct {
 	Props  []PropSpec  `json:"props,omitempty"`
 }
 
-// TaskViewSpec is a view of views.toml: Over is what it lists (tasks or gates), Group the fact it groups by,
-// Key the key that jumps to it, Badge whether the badge counts it, HideDisabled whether it hides the tasks of a
-// disabled plugin, RemoveClean whether it offers to remove its tasks' clean workspaces.
+// TaskViewSpec is a view of views.toml: Summary is one line on what it lists, Empty what it shows when it lists
+// nothing, Over what it lists (tasks or gates), When and Sort its rule as the profile writes it, Group the fact it
+// groups by, Key the key that jumps to it, Badge whether the badge counts it, HideDisabled whether it hides the
+// tasks of a disabled plugin, RemoveClean whether it offers to remove its tasks' clean workspaces.
 type TaskViewSpec struct {
 	ID           string `json:"id"`
 	Label        string `json:"label"`
+	Summary      string `json:"summary,omitempty"`
+	Empty        string `json:"empty,omitempty"`
+	When         string `json:"when,omitempty"`
+	Sort         string `json:"sort,omitempty"`
 	Over         string `json:"over,omitempty"`
 	Group        string `json:"group,omitempty"`
 	Key          string `json:"key,omitempty"`
