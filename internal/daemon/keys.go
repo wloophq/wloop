@@ -48,14 +48,14 @@ func keyViews(surface keys.Surface, views []api.TaskViewSpec, plugins []api.Plug
 		}
 	}
 	jumps := make([]keys.View, len(views))
-	label := map[string]string{}
+	byAction := map[string]api.TaskViewSpec{}
 	for i, v := range views {
 		jumps[i] = keys.View{ID: v.ID, Key: v.Key}
-		label["nav:"+v.ID] = v.Label
+		byAction["nav:"+v.ID] = v
 	}
 	for _, b := range keys.Views(jumps) {
 		if slices.Contains(b.Surfaces, surface) {
-			out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: label[b.Action]})
+			out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: byAction[b.Action].Label, Summary: byAction[b.Action].Summary})
 		}
 	}
 	for _, p := range plugins {

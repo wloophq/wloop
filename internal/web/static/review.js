@@ -127,7 +127,7 @@ function reviewStepItem(s) {
 // reviewPanel is the review: its steps with their counts, then the step
 // shown with its tasks.
 function reviewPanel(open) {
-  const parts = [h("div", { class: "tools tasks-tools" }, h("h2", { class: "tasks-head" }, REVIEW_TITLE))];
+  const parts = [h("div", { class: "tools tasks-tools" }, h("h2", { class: "tasks-head" }, REVIEW_TITLE)), viewIntro(viewSpec(REVIEW))];
   if (reviewState.error) parts.push(h("p", { class: "plan-error" }, reviewState.error));
   const steps = reviewSteps();
   if (!reviewState.review) {
@@ -148,7 +148,7 @@ function reviewPanel(open) {
     return parts;
   }
   if (!tasksState.tasks.length) {
-    parts.push(h("p", { class: "empty" }, "Nothing here."));
+    parts.push(h("p", { class: "empty" }, (viewSpec(step.view) || {}).empty));
     return parts;
   }
   parts.push(h("ol", { class: "task-list" }, ...tasksState.tasks.map((e) => listItem(e, open))));

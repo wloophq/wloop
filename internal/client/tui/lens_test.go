@@ -175,3 +175,24 @@ func TestTUIDetailShowsAsksGatesAndRuns(t *testing.T) {
 		t.Fatalf("a question gate with no choices does not offer its intents:\n%s", screen)
 	}
 }
+
+func TestAViewSaysWhatItListsInTheHelpAndWhatItShowsEmpty(t *testing.T) {
+	m := newModel(t)
+	cat := lensCatalog()
+	cat.Views[0].Summary, cat.Views[0].Empty = "Tasks waiting too long.", "Nothing is stalled."
+	m.SetViews(cat)
+	m.SetKeys(append(slices.Clone(m.keys), api.KeyView{Key: "g t", Action: "nav:stalled", Context: ctxGlobal, Owner: "core", Help: "Stalled", Summary: "Tasks waiting too long."}))
+	m.SetTasks("stalled", nil, api.Counters{})
+	if screen := screenOf(m, 120, 30); !strings.Contains(screen, "Nothing is stalled.") {
+		t.Fatalf("the empty view lacks its empty:\n%s", screen)
+	}
+	m.filter = []rune("zzz")
+	if screen := screenOf(m, 120, 30); !strings.Contains(screen, `Nothing in Stalled matches "zzz".`) {
+		t.Fatalf("a filter keeps its own words:\n%s", screen)
+	}
+	m.filter = nil
+	press(m, Key{Rune: '?'})
+	if screen := squash(screenOf(m, 400, 120)); !strings.Contains(screen, "Tasks waiting too long.") {
+		t.Errorf("the help lacks the view's summary:\n%s", screen)
+	}
+}

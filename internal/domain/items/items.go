@@ -177,10 +177,12 @@ type Item struct {
 	Confirmed  bool        `json:"confirmed"`
 	// TaskKey groups a unit's items into one task: the item id when empty. A plugin sets the unit's own key to
 	// make every item of the unit an ask of the unit's one task.
-	TaskKey   string    `json:"task_key,omitempty"`
-	UserAt    time.Time `json:"user_at,omitzero"` // time of the last applied user op
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	TaskKey string    `json:"task_key,omitempty"`
+	UserAt  time.Time `json:"user_at,omitzero"` // time of the last applied user op
+	// ReopenedAt is when the item last reopened: its anchor's time, else when the ledger applied it.
+	ReopenedAt time.Time `json:"reopened_at,omitzero"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 type OpKind string // "create", "update", "assign", "resolve", "reopen", "link", "evidence"

@@ -11,6 +11,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/link"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -37,10 +38,22 @@ type Ledger struct {
 	Clock   port.Clock
 	Log     func(string, ...any)
 
-	mu sync.Mutex
+	mu     sync.Mutex
+	settle Settler
 	// confirmedNoops is the last derived value logged as a confirmed noop per item, so an
 	// unchanged disagreement is logged once.
 	confirmedNoops map[itemKey]string
+}
+
+// Settler is the op that settles open item it through link l from what l's target already shows, such as
+// a pull request merged after the ask; ok is false when nothing settles it yet.
+type Settler func(ctx context.Context, l link.Link, it items.Item) (op items.Op, ok bool, err error)
+
+// SetSettle makes the ledger settle an item as it stores the item's link; nil settles nothing then.
+func (l *Ledger) SetSettle(f Settler) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.settle = f
 }
 
 type itemKey struct {

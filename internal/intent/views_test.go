@@ -33,6 +33,10 @@ func splitLists(src string) map[string]string {
 	out := map[string]string{}
 	file := ViewsFile
 	for _, line := range strings.SplitAfter(src, "\n") {
+		if strings.HasPrefix(line, "empty =") {
+			out[ViewsFile] += line
+			continue
+		}
 		if strings.HasPrefix(line, "[") {
 			file = ViewsFile
 			if strings.HasPrefix(line, "[verbs") || strings.HasPrefix(line, "[states") || strings.HasPrefix(line, "[props") || strings.HasPrefix(line, "[owed_by") || strings.HasPrefix(line, "[chat]") {
@@ -108,8 +112,8 @@ func TestEveryVerbAndViewIsWorded(t *testing.T) {
 		}
 	}
 	for _, v := range texts.Views {
-		if v.Label == "" {
-			t.Errorf("view %s: no label", v.ID)
+		if v.Label == "" || v.Summary == "" || v.Empty == "" {
+			t.Errorf("view %s: label %q, summary %q, empty %q", v.ID, v.Label, v.Summary, v.Empty)
 		}
 	}
 	for _, st := range texts.Review {
@@ -144,6 +148,46 @@ func TestAUserVerbAndViewNeedTheirLabels(t *testing.T) {
 	}
 	if texts.Verbs["done"].Summary == "x" {
 		t.Error("a new verb changed done")
+	}
+}
+
+func TestAViewSaysWhatItListsAndWhatItShowsEmpty(t *testing.T) {
+	bundled := "[views.inbox]\nlabel = \"Inbox\"\nsummary = \"What nobody clarified yet.\"\nwhen = \"task.category == 'inbox'\"\nempty = \"Inbox zero.\"\n\n" +
+		"[views.waiting]\nlabel = \"Waiting\"\nsummary = \"What others owe.\"\nwhen = \" task.owed_by != 'me' \"\ngroup = \"task.owed_by\"\nsort = \"-task.since_movement\"\n"
+	tasks, err := os.ReadFile("../../profiles/default/" + TasksFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(tasks) + "\nempty = \"Nothing in {{.label}} right now.\"\n\n" + bundled
+	texts, problems := loadListsWith(t, src, "[views.waiting]\nlabel = \"Owed\"\n\n[views.later]\nlabel = \"Later\"\nsummary = \"Low priority.\"\nwhen = \"true\"\n")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	inbox, _ := texts.View("inbox")
+	waiting, _ := texts.View("waiting")
+	later, _ := texts.View("later")
+	if inbox.Summary != "What nobody clarified yet." || inbox.Empty != "Inbox zero." {
+		t.Errorf("inbox %+v", inbox)
+	}
+	if waiting.Summary != "What others owe." || waiting.Empty != "Nothing in Owed right now." || waiting.WhenText != "task.owed_by != 'me'" || waiting.SortText != "-task.since_movement" {
+		t.Errorf("waiting %+v", waiting)
+	}
+	if later.Summary != "Low priority." || later.Empty != "Nothing in Later right now." {
+		t.Errorf("later %+v", later)
+	}
+	texts, problems = loadListsWith(t, src, "empty = \"No {{.label}}.\"\n\n[views.later]\nlabel = \"Later\"\nwhen = \"true\"\n")
+	if !strings.Contains(problems, "views.later.summary: is required") {
+		t.Errorf("no summary problem in:\n%s", problems)
+	}
+	if _, ok := texts.View("later"); ok {
+		t.Error("a view without its summary loaded")
+	}
+	if w, _ := texts.View("waiting"); w.Empty != "No Waiting." {
+		t.Errorf("the user's empty: %q", w.Empty)
+	}
+	_, problems = loadListsWith(t, src, "empty = \"No {{.labl}}.\"\n")
+	if !strings.Contains(problems, "empty:") {
+		t.Errorf("no empty problem in:\n%s", problems)
 	}
 }
 
@@ -207,8 +251,8 @@ func TestAReviewStepNamesAView(t *testing.T) {
 }
 
 func TestAUserViewLoads(t *testing.T) {
-	user := "[views.later]\nlabel = \"Later\"\nkey = \"g y\"\nwhen = \"task.prop.priority == 'low' && task.gates_open == 0\"\ngroup = \"task.prop.area\"\nsort = \"-task.prop.due, task.id\"\n\n" +
-		"[views.asks]\nlabel = \"Asks\"\nover = \"gates\"\nwhen = \"gate.kind == 'question'\"\n\n" +
+	user := "[views.later]\nlabel = \"Later\"\nsummary = \"s\"\nkey = \"g y\"\nwhen = \"task.prop.priority == 'low' && task.gates_open == 0\"\ngroup = \"task.prop.area\"\nsort = \"-task.prop.due, task.id\"\n\n" +
+		"[views.asks]\nlabel = \"Asks\"\nsummary = \"s\"\nover = \"gates\"\nwhen = \"gate.kind == 'question'\"\n\n" +
 		"[review.later]\nlabel = \"Anything to pull in?\"\n\n[badge]\nviews = [\"inbox\", \"later\"]\n"
 	texts, problems := loadListsWith(t, string(defaultLists()), user)
 	if problems != "" {
@@ -231,7 +275,7 @@ func TestAUserViewLoads(t *testing.T) {
 	if texts.step("later") == "" || !texts.Badged("later") || texts.Badged("needs-me") {
 		t.Errorf("review %v, badge %v", texts.Review, texts.Badge)
 	}
-	_, problems = loadListsWith(t, string(defaultLists()), "[views.later]\nlabel = \"Later\"\nwhen = \"gate.kind == 'draft'\"\ngroup = \"task.nope\"\n")
+	_, problems = loadListsWith(t, string(defaultLists()), "[views.later]\nlabel = \"Later\"\nsummary = \"s\"\nwhen = \"gate.kind == 'draft'\"\ngroup = \"task.nope\"\n")
 	for _, want := range []string{"views.later.when:", "views.later.group: task.nope names no fact of a view over tasks"} {
 		if !strings.Contains(problems, want) {
 			t.Errorf("no %q in:\n%s", want, problems)
@@ -240,7 +284,7 @@ func TestAUserViewLoads(t *testing.T) {
 }
 
 func TestViewsKeepTheirDeclaredOrderAcrossLayers(t *testing.T) {
-	user := "[views.zeta]\nlabel = \"Zeta\"\nwhen = \"true\"\n\n[views.inbox]\nlabel = \"In\"\n\n[views.alpha]\nlabel = \"Alpha\"\nwhen = \"true\"\n\n" +
+	user := "[views.zeta]\nlabel = \"Zeta\"\nsummary = \"s\"\nwhen = \"true\"\n\n[views.inbox]\nlabel = \"In\"\n\n[views.alpha]\nlabel = \"Alpha\"\nsummary = \"s\"\nwhen = \"true\"\n\n" +
 		"[review.zeta]\nlabel = \"z\"\n\n[review.alpha]\nlabel = \"a\"\n"
 	texts, problems := loadListsWith(t, string(defaultLists()), user)
 	if problems != "" {

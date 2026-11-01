@@ -261,14 +261,17 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 ## Views and the review (`views.toml`)
 
+- `empty` (template): What a view without its own empty shows when it lists nothing, over the view's label as `{{.label}}`. Required in the bundled profile; a user layer may replace it.
 - `views` (table): The lists of tasks, by view.
 - `views.<name>` (table): A view, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `views.<name>.label` (string): The name people read in the list of views. Required.
+- `views.<name>.summary` (string): One line on what the view lists: its tooltip in the list of views, its subtitle, and its key's help line. Required.
+- `views.<name>.empty` (string): What the view shows when it lists nothing; the top-level empty when absent. A filter that matches nothing says so in its own words.
 - `views.<name>.over` (one of `tasks`, `gates`, default `tasks`): What the view lists: tasks, or gates.
 - `views.<name>.when` (predicate): Which tasks or gates the view lists, over their facts: a task's, its properties' (task.prop.*), or a gate's. A view with none lists nothing: a place in the clients' list of views that a client draws itself, such as the review.
 - `views.<name>.group` (string): The fact the view groups by, such as task.owed_by.
 - `views.<name>.sort` (string): The facts the view sorts by, comma-separated; a leading - sorts one descending. A view's tasks start oldest first, a parent's children in their sibling order.
-- `views.<name>.key` (string): The key that jumps to the view: `g`, a space and a key that no core key uses, such as `g i`. Its help is the view's label.
+- `views.<name>.key` (string): The key that jumps to the view: `g`, a space and a key that no core key uses, such as `g i`. Its help is the view's label, and its help line the view's summary.
 - `views.<name>.hide_disabled` (bool, default `false`): The view hides the tasks whose units are all of a disabled plugin, and the gates on a disabled plugin's units.
 - `views.<name>.remove_clean` (bool, default `false`): The view offers to remove at once the workspaces its tasks' links hold whose checkouts hold nothing that is not published, as each link's remove action does; the rest are kept, with why.
 - `badge` (table): The menu bar's badge.

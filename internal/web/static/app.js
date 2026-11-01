@@ -988,11 +988,13 @@ async function setPaused(paused) {
   scheduleLoad({ health: true });
 }
 
-function railItem(label, count, active, hash, cls) {
+function railItem(label, count, active, hash, cls, tip) {
+  const tipID = tip ? "rail-tip-" + hash.replace(/[^A-Za-z0-9_-]/g, "-") : undefined;
   return h("li", {},
-    h("a", { href: "#" + hash, class: (active ? "on " : "") + (cls || ""), "aria-current": active ? "page" : undefined, "data-focus": "rail:" + hash },
-      h("span", { class: "label", title: label }, label),
-      h("span", { class: "count" }, count)));
+    h("a", { href: "#" + hash, class: (active ? "on " : "") + (cls || ""), "aria-current": active ? "page" : undefined, "aria-describedby": tipID, "data-focus": "rail:" + hash },
+      h("span", { class: "label", title: tip ? undefined : label }, label),
+      h("span", { class: "count" }, count),
+      tip ? h("span", { class: "rail-tip", role: "tooltip", id: tipID }, tip) : null));
 }
 
 function lensHash(change) {
@@ -1008,7 +1010,7 @@ function renderRail() {
     ...sec.views.map((v) => {
       const rows = !v.core && catalog.views.some((c) => c.id === v.id) && !(v.id === "recent" || v.id === "explore" || v.id === "plan");
       const count = v.core ? v.count : v.id === "plan" ? planCount() : rows ? state.rows.filter((r) => passes(r, v.id, lens)).length : "";
-      return railItem(v.label, count, v.id === lens.view, lensHash({ view: v.id, task: "", pr: "" }), (v.id === "stalled" ? "late-count " : "") + (v.core ? "core" : "plugin"));
+      return railItem(v.label, count, v.id === lens.view, lensHash({ view: v.id, task: "", pr: "" }), (v.id === "stalled" ? "late-count " : "") + (v.core ? "core" : "plugin"), v.summary);
     })]).filter(Boolean);
   document.getElementById("views").replaceChildren(...views);
 

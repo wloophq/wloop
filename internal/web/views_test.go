@@ -373,3 +373,53 @@ process.stdout.write(JSON.stringify(text(taskItem(input.task, ""))));`,
 		t.Errorf("row %q", got)
 	}
 }
+
+// TestAViewExplainsItself checks that a view's summary is its rail item's tooltip and its heading's subtitle, that
+// its rule shows as the profile writes it, and that an empty view says what its profile says.
+func TestAViewExplainsItself(t *testing.T) {
+	var got struct {
+		Tip, TipRole, Described, TipID, Sub, Rule, Toggle, Empty, GatesEmpty, Filtered string
+		Rules                                                                          int
+	}
+	cat := api.ViewsCatalog{Views: []api.TaskViewSpec{
+		{ID: "waiting", Label: "Waiting", Summary: "What others owe you.", Empty: "Nobody owes you anything.", When: "task.owed_by != 'me'", Group: "task.owed_by", Sort: "-task.since_movement"},
+		{ID: "outbox", Label: "Outbox", Over: "gates", Summary: "Drafts to approve.", Empty: "No drafts wait on you."},
+		{ID: "review", Label: "Review", Summary: "The weekly review."},
+	}}
+	nodeRun(t, viewsPrelude(t), []string{"railItem"}, `
+function writeHash() {}
+tasksState.catalog = input.cat;
+const nav = viewNav(input.cat, [], [], null);
+const item = railItem(nav[0].label, 1, false, "view=waiting", "core", nav[0].summary);
+const link = item.children[0];
+const tip = byClass(item, "rail-tip")[0];
+const list = (view, q) => { tasksState.key = viewQueryKey(view, "", []); tasksState.tasks = []; tasksState.gates = []; return h("div", {}, ...taskList({ view, area: "", ctx: [], q: q || "" }, "")); };
+const waiting = list("waiting");
+tasksState.key = viewQueryKey("waiting", "", []);
+tasksState.tasks = [{ id: "t-1", title: "Call the bank", state: "waiting", units: [], verbs: [] }];
+const filtered = h("div", {}, ...taskList({ view: "waiting", area: "", ctx: [], q: "zzz" }, ""));
+process.stdout.write(JSON.stringify({
+  Tip: text(tip), TipRole: tip.attrs.role, TipID: tip.attrs.id, Described: link.attrs["aria-describedby"],
+  Sub: text(byClass(waiting, "view-summary")), Toggle: text(all(waiting, (x) => x.tag === "summary")),
+  Rule: text(byClass(waiting, "view-rule")), Empty: text(byClass(waiting, "empty")),
+  GatesEmpty: text(byClass(list("outbox"), "empty")), Filtered: text(byClass(filtered, "empty")),
+  Rules: byClass(list("review"), "view-rule").length,
+}));`, map[string]any{"cat": cat}, &got)
+	if got.Tip != "What others owe you." || got.TipRole != "tooltip" || got.TipID == "" || got.Described != got.TipID {
+		t.Errorf("rail tooltip %+v", got)
+	}
+	if got.Sub != "What others owe you." || got.Toggle != "Why these tasks?" {
+		t.Errorf("heading %q, toggle %q", got.Sub, got.Toggle)
+	}
+	for _, want := range []string{"task.owed_by != 'me'", "-task.since_movement", "task.owed_by"} {
+		if !strings.Contains(got.Rule, want) {
+			t.Errorf("the rule lacks %q: %q", want, got.Rule)
+		}
+	}
+	if got.Empty != "Nobody owes you anything." || got.GatesEmpty != "No drafts wait on you." || got.Filtered != `Nothing here matches "zzz".` {
+		t.Errorf("empty %q, gates %q, filtered %q", got.Empty, got.GatesEmpty, got.Filtered)
+	}
+	if got.Rules != 0 {
+		t.Errorf("a view without a rule shows %d", got.Rules)
+	}
+}

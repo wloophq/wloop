@@ -42,11 +42,12 @@ type silentKey struct {
 const silentEvery = 24 * time.Hour
 
 // pending is an open item a link may resolve, with the time after which an
-// event on its target counts.
+// event of its target counts: the ask, or the user's last edit or the item's
+// reopening when later. An event between the ask and the link still settles it.
 type pending struct {
-	link  link.Link
-	item  ditems.Item
-	after time.Time
+	link link.Link
+	item ditems.Item
+	from time.Time
 }
 
 // Run resolves the open linked items whose link targets are in targets.
@@ -103,13 +104,49 @@ func (r *Resolver) open(ctx context.Context, ls []link.Link, itemsOf map[unit.Un
 		if i < 0 || its[i].State != ditems.Open {
 			continue
 		}
-		after := l.At
-		if its[i].UserAt.After(after) {
-			after = its[i].UserAt
-		}
-		out = append(out, pending{link: l, item: its[i], after: after})
+		out = append(out, pendingOf(l, its[i]))
 	}
 	return out, errors.Join(errs...)
+}
+
+func pendingOf(l link.Link, it ditems.Item) pending {
+	from := it.Origin.At
+	if from.IsZero() {
+		from = it.CreatedAt
+	}
+	for _, t := range []time.Time{it.UserAt, it.ReopenedAt} {
+		if t.After(from) {
+			from = t
+		}
+	}
+	return pending{link: l, item: it, from: from}
+}
+
+// Settles is the op that settles it, open, through l from the events l's target already has, as Run would
+// apply it; ok is false when none does yet. The items ledger calls it as it stores l, so an item linked to a
+// pull request that merged, closed or was reviewed after the ask resolves in the same batch, before any task holds it.
+func (r *Resolver) Settles(ctx context.Context, l link.Link, it ditems.Item) (ditems.Op, bool, error) {
+	reader := r.Events[l.To.Provider]
+	if reader == nil || l.Item == "" || l.Item != it.ID || it.State != ditems.Open || (l.Kind != link.Review && l.Kind != link.Merge) {
+		return ditems.Op{}, false, nil
+	}
+	p := pendingOf(l, it)
+	evs, err := reader.UnitEvents(ctx, l.To, p.from)
+	if err != nil {
+		return ditems.Op{}, false, fmt.Errorf("events of %s: %w", l.To, err)
+	}
+	slices.SortStableFunc(evs, func(a, b link.Event) int { return a.At.Compare(b.At) })
+	ev, res, ok := settle(p, evs, r.Codecs)
+	if !ok {
+		return ditems.Op{}, false, nil
+	}
+	return resolveOp(p, ev, res), true, nil
+}
+
+func resolveOp(p pending, ev link.Event, res ditems.Resolution) ditems.Op {
+	e := ditems.Evidence{Kind: ditems.EvidenceUnitEvent, Anchor: ev.Anchor}
+	return ditems.Op{Op: ditems.OpResolve, Unit: p.link.From, Item: p.link.Item, Anchor: ev.Anchor, Resolution: res, Evidence: &e,
+		Reason: fmt.Sprintf("%s link: %s on %s", p.link.Kind, ev.Kind, p.link.To)}
 }
 
 func (r *Resolver) resolve(ctx context.Context, target unit.Unit, open []pending) (int, error) {
@@ -118,10 +155,10 @@ func (r *Resolver) resolve(ctx context.Context, target unit.Unit, open []pending
 		r.quiet(target, "has no events")
 		return 0, nil
 	}
-	since := open[0].after
+	since := open[0].from
 	for _, p := range open[1:] {
-		if p.after.Before(since) {
-			since = p.after
+		if p.from.Before(since) {
+			since = p.from
 		}
 	}
 	evs, err := reader.UnitEvents(ctx, target, since)
@@ -136,10 +173,7 @@ func (r *Resolver) resolve(ctx context.Context, target unit.Unit, open []pending
 		if !ok {
 			continue
 		}
-		e := ditems.Evidence{Kind: ditems.EvidenceUnitEvent, Anchor: ev.Anchor}
-		op := ditems.Op{Op: ditems.OpResolve, Unit: p.link.From, Item: p.link.Item, Anchor: ev.Anchor, Resolution: res, Evidence: &e,
-			Reason: fmt.Sprintf("%s link: %s on %s", p.link.Kind, ev.Kind, target)}
-		got, err := r.Ledger.Apply(ctx, ditems.Derived, []ditems.Op{op})
+		got, err := r.Ledger.Apply(ctx, ditems.Derived, []ditems.Op{resolveOp(p, ev, res)})
 		var disabled *items.DisabledError
 		switch {
 		case errors.As(err, &disabled):
@@ -161,21 +195,25 @@ func (r *Resolver) resolve(ctx context.Context, target unit.Unit, open []pending
 // the resolution it gives.
 func settle(p pending, evs []link.Event, codecs unit.KeyComparer) (link.Event, ditems.Resolution, bool) {
 	for _, ev := range evs {
-		if !ev.At.After(p.after) {
-			continue
-		}
 		switch {
-		case ev.Kind == link.EventClosed:
-			return ev, ditems.Moot, true
-		case ev.Kind == link.EventMerged && p.link.Kind == link.Merge:
-			return ev, ditems.Done, true
+		case !ev.At.After(p.from):
 		case ev.Kind == link.EventMerged:
+			return ev, mergeResolution(p.link.Kind), true
+		case ev.Kind == link.EventClosed:
 			return ev, ditems.Moot, true
 		case ev.Kind == link.EventReview && p.link.Kind == link.Review && byAssignee(p.item, ev.Actor, codecs):
 			return ev, ditems.Done, true
 		}
 	}
 	return link.Event{}, "", false
+}
+
+// mergeResolution is how a merge of its target settles a link of kind k.
+func mergeResolution(k link.Kind) ditems.Resolution {
+	if k == link.Merge {
+		return ditems.Done
+	}
+	return ditems.Moot
 }
 
 // byAssignee says whether actor is an assignee of it; anyone is when it has none.
