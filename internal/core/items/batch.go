@@ -420,7 +420,7 @@ func (b *batch) reconcile(u unit.Unit, d items.Item, at unit.Anchor) {
 		return
 	}
 	next := d
-	next.Trail, next.Confirmed, next.UserAt, next.CreatedAt = cur.Trail, cur.Confirmed, cur.UserAt, cur.CreatedAt
+	next.Trail, next.Confirmed, next.UserAt, next.CreatedAt, next.ReopenedAt = cur.Trail, cur.Confirmed, cur.UserAt, cur.CreatedAt, cur.ReopenedAt
 	if content(next) == content(*cur) {
 		return
 	}
@@ -430,6 +430,7 @@ func (b *batch) reconcile(u unit.Unit, d items.Item, at unit.Anchor) {
 		op = items.Op{Op: items.OpResolve, Unit: u, Item: d.ID, Anchor: at, Resolution: d.Resolution, Evidence: &d.Evidence}
 	case cur.State == items.Resolved && d.State == items.Open:
 		op = items.Op{Op: items.OpReopen, Unit: u, Item: d.ID, Anchor: at}
+		next.ReopenedAt = cmp.Or(at.At, b.now)
 	}
 	if !cur.Confirmed {
 		b.put(op, items.Derived, next, false)

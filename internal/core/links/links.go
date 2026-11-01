@@ -42,9 +42,10 @@ type silentKey struct {
 const silentEvery = 24 * time.Hour
 
 // pending is an open item a link may resolve, with the time after which a
-// review of its target counts, and the time after which its target's merge or
-// close does: the ask, or the user's last edit or the item's reopening when
-// later. A target that ended between the ask and the link still settles it.
+// review or a close of its target counts, and the time after which its merge
+// does: the ask, or the user's last edit or the item's reopening when later. A
+// merge between the ask and the link still settles it; a close does not, since
+// a pull request reopened keeps its close stored.
 type pending struct {
 	link       link.Link
 	item       ditems.Item
@@ -212,7 +213,7 @@ func settle(p pending, evs []link.Event, codecs unit.KeyComparer) (link.Event, d
 		switch {
 		case ev.Kind == link.EventMerged && ev.At.After(p.endedAfter):
 			return ev, mergeResolution(p.link.Kind), true
-		case ev.Kind == link.EventClosed && ev.At.After(p.endedAfter):
+		case ev.Kind == link.EventClosed && ev.At.After(p.after):
 			return ev, ditems.Moot, true
 		case ev.Kind == link.EventReview && ev.At.After(p.after) && p.link.Kind == link.Review && byAssignee(p.item, ev.Actor, codecs):
 			return ev, ditems.Done, true

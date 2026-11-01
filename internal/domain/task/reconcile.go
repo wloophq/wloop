@@ -24,7 +24,8 @@ const itemOpen items.State = "open"
 // waiting on others. A new task takes the item's contexts and deadline in the properties of RoleContexts and
 // RoleDeadline, and the kind f.Kind names, as the plugin writes them.
 //
-// An open task keeps an item it holds while the item waits on someone, even once no rule above calls for it.
+// An open task keeps an item it holds while the item waits on someone, even once no rule above calls for it,
+// except an item of the key that names f.Unit.
 // A derived task none of whose items calls for it any more is resolved into the done category, except the
 // task of a key that names f.Unit: the unit's one task lives as long as its unit, so it ends through the
 // profile, and is dropped once its card says the user no longer Cares about the unit (PropUnfollowed), to come
@@ -59,10 +60,11 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st Profile, no
 	for _, it := range its {
 		initial, ok := wants(f, it, me)
 		id, held := holder[refOf(f, it)]
+		kept := held && byID[id].Open() && waited(f, it)
 		if it.TaskKey != "" {
 			id, held = keyed[it.TaskKey]
 		}
-		if !ok && !(held && byID[id].Open() && waited(f, it)) {
+		if !ok && !kept {
 			continue
 		}
 		if !held {
@@ -235,9 +237,9 @@ func wants(f UnitFacts, it items.Item, me Me) (Category, bool) {
 	return start, ok
 }
 
-// waited says whether open item it waits on someone, or is an ask of the unit's own task.
+// waited says whether open item it waits on someone and belongs to no unit's own task, which lives by Cares.
 func waited(f UnitFacts, it items.Item) bool {
-	return it.State == itemOpen && (len(it.WaitingOn) > 0 || it.TaskKey == f.Unit.String())
+	return it.State == itemOpen && len(it.WaitingOn) > 0 && it.TaskKey != f.Unit.String()
 }
 
 // mine says whether Me requested it, or is assigned it while no other assignee is what it waits on.

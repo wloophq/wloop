@@ -354,6 +354,31 @@ func TestItemsOfOneTaskKeyAreOneTask(t *testing.T) {
 	}
 }
 
+func TestUnfollowingAUnitDropsItsTaskWhileItsAsksAreOpen(t *testing.T) {
+	cases := map[string]func(*items.Item){
+		"waits on another": func(it *items.Item) { it.Requester, it.WaitingOn = ana, []items.Person{ana} },
+		"waits on nobody":  func(it *items.Item) { it.Requester, it.WaitingOn = ana, nil },
+	}
+	for name, mod := range cases {
+		its := []items.Item{item("gh:follow", keyed, mod)}
+		es := reconcile(t, facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true }), its, nil, now)
+		es = reconcile(t, facts(func(f *task.UnitFacts) { f.Carded = true }), its, es, now)
+		if e := only(t, es); e.Category != task.CategoryDropped {
+			t.Fatalf("%s: unfollowed %+v", name, e)
+		}
+	}
+}
+
+func TestATaskTakesNoAskItNeverHeld(t *testing.T) {
+	thread := unit.Unit{Provider: "slack", Key: "T1/C1/1.1"}
+	start := task.Task{ID: "t-00000000000000a4", State: "next", Category: task.CategoryReady, Title: "Ship the export",
+		Units: []unit.Unit{thread, pr}, Origin: task.OriginUser, Created: now.Add(-time.Hour)}
+	others := item("gh:follow", keyed, func(it *items.Item) { it.Requester, it.WaitingOn = ana, []items.Person{bob} })
+	if cs := reconciled(t, facts(), []items.Item{others}, me, []task.Task{start}, bundled, now); len(cs) != 0 {
+		t.Fatalf("an ask between others joined the task linking its unit: %+v", cs)
+	}
+}
+
 func TestAKeyNoTaskHoldsGoesToTheUnitsOwnTask(t *testing.T) {
 	own := task.Task{ID: "t-00000000000000a1", State: "next", Category: task.CategoryReady, Title: "Follow acme/api#7", Units: []unit.Unit{pr},
 		Origin: task.OriginDerived, Created: now.Add(-time.Hour)}

@@ -217,23 +217,21 @@ func askedAt(at time.Time) items.Item {
 	return it
 }
 
-func TestAnEndBetweenTheAskAndTheLinkSettlesIt(t *testing.T) {
-	cases := []struct {
-		end  link.EventKind
-		kind link.Kind
-		want items.Resolution
-	}{
-		{link.EventMerged, link.Review, items.Moot},
-		{link.EventMerged, link.Merge, items.Done},
-		{link.EventClosed, link.Review, items.Moot},
-		{link.EventClosed, link.Merge, items.Moot},
-	}
-	for _, c := range cases {
-		f := newFixture(t, askedAt(t0.Add(-2*time.Hour)), reviewLink(c.kind))
-		f.events.evs = []link.Event{state(c.end, t0.Add(-time.Hour))}
-		if n := f.run(t); n != 1 || f.ledger.applied[0].Resolution != c.want {
-			t.Fatalf("%s link, %s before it: resolved = %d, ops %+v", c.kind, c.end, n, f.ledger.applied)
+func TestAMergeBetweenTheAskAndTheLinkSettlesIt(t *testing.T) {
+	for kind, want := range map[link.Kind]items.Resolution{link.Review: items.Moot, link.Merge: items.Done} {
+		f := newFixture(t, askedAt(t0.Add(-2*time.Hour)), reviewLink(kind))
+		f.events.evs = []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}
+		if n := f.run(t); n != 1 || f.ledger.applied[0].Resolution != want {
+			t.Fatalf("%s link, merged before it: resolved = %d, ops %+v", kind, n, f.ledger.applied)
 		}
+	}
+}
+
+func TestACloseBeforeTheLinkLeavesItOpen(t *testing.T) {
+	f := newFixture(t, askedAt(t0.Add(-2*time.Hour)), reviewLink(link.Merge))
+	f.events.evs = []link.Event{state(link.EventClosed, t0.Add(-time.Hour)), state(link.EventMerged, t0.Add(time.Hour))}
+	if n := f.run(t); n != 1 || f.ledger.applied[0].Resolution != items.Done {
+		t.Fatalf("closed, reopened and merged after the link: resolved = %d, ops %+v", n, f.ledger.applied)
 	}
 }
 

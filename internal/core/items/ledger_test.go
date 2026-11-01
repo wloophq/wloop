@@ -297,6 +297,28 @@ func TestReconcileIdempotent(t *testing.T) {
 	}
 }
 
+func TestReconcileKeepsWhenADerivedItemReopened(t *testing.T) {
+	ctx := context.Background()
+	s := newMem()
+	l, c := newLedger(s)
+	done := items.Item{ID: "gh:review", Kind: items.Request, Summary: "r", State: items.Resolved, Resolution: items.Done}
+	if _, err := l.Reconcile(ctx, pull, []items.Item{done}, anchor("row:1"), ""); err != nil {
+		t.Fatal(err)
+	}
+	c.t = c.t.Add(time.Hour)
+	if _, err := l.Reconcile(ctx, pull, []items.Item{derived("gh:review", "r")}, unit.Anchor{Ref: "row:2"}, ""); err != nil {
+		t.Fatal(err)
+	}
+	if it := itemOf(t, l, pull, "gh:review"); it.State != items.Open || !it.ReopenedAt.Equal(c.t) {
+		t.Fatalf("reopened by the source: %+v", it)
+	}
+	commits := s.commits
+	c.t = c.t.Add(time.Hour)
+	if res, err := l.Reconcile(ctx, pull, []items.Item{derived("gh:review", "r")}, anchor("row:3"), ""); err != nil || len(res.Applied) != 0 || s.commits != commits {
+		t.Fatalf("the same desired item again: %+v %v", res, err)
+	}
+}
+
 func TestReconcileOnConfirmedNeverProposes(t *testing.T) {
 	ctx := context.Background()
 	s := newMem()
@@ -522,7 +544,8 @@ func TestADecisionAppliesOnce(t *testing.T) {
 func TestARefusedSettleLeavesTheLinkApplied(t *testing.T) {
 	s := newMem()
 	l, _ := newLedger(s)
-	l.Links = &fakeLinks{}
+	links := &fakeLinks{}
+	l.Links = links
 	var logged []string
 	l.Log = func(f string, a ...any) { logged = append(logged, fmt.Sprintf(f, a...)) }
 	l.SetSettle(func(context.Context, link.Link, items.Item) (items.Op, bool, error) {
@@ -532,6 +555,9 @@ func TestARefusedSettleLeavesTheLinkApplied(t *testing.T) {
 		items.Op{Op: items.OpLink, Unit: thread, Item: "i1", Anchor: anchor("C000AAA/1.3"), To: &pull, LinkKind: link.Review})
 	if len(res.Refused) != 0 || len(logged) != 1 || !strings.Contains(logged[0], "refused") {
 		t.Fatalf("refused %+v, logged %q", res.Refused, logged)
+	}
+	if !slices.ContainsFunc(res.Applied, func(a Applied) bool { return a.Op.Op == items.OpLink }) || len(links.put) != 1 {
+		t.Fatalf("applied %+v, links %+v", res.Applied, links.put)
 	}
 	if it := itemOf(t, l, thread, "i1"); it.State != items.Open {
 		t.Fatalf("item %+v", it)
