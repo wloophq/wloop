@@ -152,6 +152,7 @@ Some people post through an agent app and appear as bots. When a bot message is 
 - `review`: the item asks someone to review the target; it settles when an assignee reviews it.
 - `merge`: the item is done when the target merges ("ship it once #12 is in").
 - `mention`: the target is cited as context only; it never settles anything.
+
 Asking to review, approve or merge a pull request is `review` or `merge`, never `mention`; new work about it (a fix, a follow-up) is `mention`.
 Example: a message `ts=1700000000.000100` asking `<@U0001|ann>` to review pull request 7 of `acme/widget` gives `{"item": "n1", "target": "github:acme/widget#7", "kind": "review", "evidence_ts": "1700000000.000100"}`.
 

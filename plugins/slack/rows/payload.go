@@ -15,7 +15,7 @@ type Payload struct {
 	// Channel is the channel's name without "#"; "" for a DM.
 	Channel string `json:"channel,omitempty"`
 	DM      bool   `json:"dm,omitempty"`
-	// Direct is a 1:1 DM between the viewer and one other person.
+	// Direct is a 1:1 DM between the viewer and one other person, not an app.
 	Direct bool `json:"direct,omitempty"`
 	// With are the other people of a DM, by name.
 	With  []string `json:"with,omitempty"`

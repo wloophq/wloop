@@ -2,6 +2,7 @@ package task_test
 
 import (
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -127,6 +128,21 @@ func TestMyPartDoneWhileCoAssigneesOweTheirsIsNoTask(t *testing.T) {
 	}
 	if es := reconcile(t, facts(), []items.Item{item("a", peersOwe)}, nil, now); len(es) != 0 {
 		t.Fatalf("tasks %+v", es)
+	}
+}
+
+type foldKeys struct{}
+
+func (foldKeys) KeysEqual(_ unit.ProviderID, a, b string) bool { return strings.EqualFold(a, b) }
+
+func TestACoAssigneeIsMatchedThroughTheCodec(t *testing.T) {
+	folded := task.Me{Keys: me.Keys, Codecs: foldKeys{}}
+	bobSpelled := items.Person{Key: "github:Bob"}
+	peerOwes := func(it *items.Item) {
+		it.Requester, it.Assignees, it.WaitingOn = ana, []items.Person{meP, bobSpelled}, []items.Person{bob}
+	}
+	if cs := reconciled(t, facts(), []items.Item{item("a", peerOwes)}, folded, nil, bundled, now); len(cs) != 0 {
+		t.Fatalf("tasks %+v", cs)
 	}
 }
 

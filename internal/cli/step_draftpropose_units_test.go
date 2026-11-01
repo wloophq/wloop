@@ -30,7 +30,7 @@ func TestATasksDraftPostsOnTheUnitItsItemsAreOn(t *testing.T) {
 	}
 }
 
-func TestAPersonAsksYouWhenTheyWaitOnYouOrAssignedYouAlone(t *testing.T) {
+func TestAPersonAsksYouWhenTheirAskWaitsOnYouOrAssignsYouAndWaitsOnNobodyElse(t *testing.T) {
 	t.Parallel()
 	thread := unit.Unit{Provider: "slack", Key: "T1/C1/1.1"}
 	me := task.Me{Keys: []string{"slack:UME"}}
@@ -45,6 +45,7 @@ func TestAPersonAsksYouWhenTheyWaitOnYouOrAssignedYouAlone(t *testing.T) {
 	}{
 		{"waits on me", ask(nil, []items.Person{meP}), true},
 		{"assigned to me, waiting on nobody", ask([]items.Person{meP}, nil), true},
+		{"assigned to me and Carla, waiting on nobody", ask([]items.Person{meP, carla}, nil), true},
 		{"assigned to me, waiting on Carla", ask([]items.Person{meP}, []items.Person{carla}), false},
 		{"waits on Carla", ask(nil, []items.Person{carla}), false},
 	}

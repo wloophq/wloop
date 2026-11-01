@@ -248,7 +248,8 @@ func mine(it items.Item, me Me) bool {
 		return true
 	}
 	assigned := func(p items.Person) bool {
-		return slices.ContainsFunc(it.Assignees, func(a items.Person) bool { return a.Key == p.Key })
+		them := items.Identity{Keys: []string{p.Key}, Codecs: me.Codecs}
+		return slices.ContainsFunc(it.Assignees, func(a items.Person) bool { return a.Is(them) })
 	}
 	return slices.ContainsFunc(it.Assignees, func(p items.Person) bool { return isMe(p, me) }) &&
 		!slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return !isMe(p, me) && assigned(p) })

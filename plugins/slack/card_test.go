@@ -234,6 +234,26 @@ func TestDMSegmentCard(t *testing.T) {
 	}
 }
 
+func TestADMWithAnAppIsNotCaredAbout(t *testing.T) {
+	f := newFixture(t)
+	f.login(t)
+	const app = "U0000000009"
+	if err := f.db.Slack().PutUsers(context.Background(), []store.UserRow{{ID: app, Name: "reminders", IsBot: true, FetchedAt: f.now}}); err != nil {
+		t.Fatal(err)
+	}
+	f.seed(t, dslack.Facts{
+		Conversations: []dslack.Conversation{{ID: dm1, Kind: dslack.KindIM, IsMember: true, DMUser: app}},
+		DMs:           []dslack.DMWindow{{Conversation: dm1, Latest: ts(5), Messages: []dslack.Message{{TS: ts(5), User: app, Text: "3 pull requests wait on review"}}}},
+	})
+	segs, err := f.p.src.segments.(dslack.SegmentWriter).Apply(context.Background(), team, dm1, []dslack.Span{{FromTS: ts(5)}})
+	if err != nil || len(segs) != 1 {
+		t.Fatalf("segments %v %v", segs, err)
+	}
+	if c := f.card(t, segs[0]); c.Cares {
+		t.Errorf("a DM with an app: %+v", c)
+	}
+}
+
 func TestCardBeforeExtraction(t *testing.T) {
 	f := newFixture(t)
 	f.login(t)

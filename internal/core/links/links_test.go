@@ -217,21 +217,24 @@ func askedAt(at time.Time) items.Item {
 	return it
 }
 
-func TestAMergeBetweenTheAskAndTheLinkSettlesIt(t *testing.T) {
-	for kind, want := range map[link.Kind]items.Resolution{link.Review: items.Moot, link.Merge: items.Done} {
-		f := newFixture(t, askedAt(t0.Add(-2*time.Hour)), reviewLink(kind))
-		f.events.evs = []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}
-		if n := f.run(t); n != 1 || f.ledger.applied[0].Resolution != want {
-			t.Fatalf("%s link, merged before it: resolved = %d, ops %+v", kind, n, f.ledger.applied)
-		}
+func TestAnEventBetweenTheAskAndTheLinkSettlesIt(t *testing.T) {
+	cases := []struct {
+		name string
+		kind link.Kind
+		evs  []link.Event
+		want items.Resolution
+	}{
+		{"merged", link.Review, []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}, items.Moot},
+		{"merged", link.Merge, []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}, items.Done},
+		{"closed", link.Merge, []link.Event{state(link.EventClosed, t0.Add(-time.Hour))}, items.Moot},
+		{"reviewed, then merged", link.Review, []link.Event{review("octocat", t0.Add(-90*time.Minute)), state(link.EventMerged, t0.Add(-time.Hour))}, items.Done},
 	}
-}
-
-func TestACloseBeforeTheLinkLeavesItOpen(t *testing.T) {
-	f := newFixture(t, askedAt(t0.Add(-2*time.Hour)), reviewLink(link.Merge))
-	f.events.evs = []link.Event{state(link.EventClosed, t0.Add(-time.Hour)), state(link.EventMerged, t0.Add(time.Hour))}
-	if n := f.run(t); n != 1 || f.ledger.applied[0].Resolution != items.Done {
-		t.Fatalf("closed, reopened and merged after the link: resolved = %d, ops %+v", n, f.ledger.applied)
+	for _, c := range cases {
+		f := newFixture(t, askedAt(t0.Add(-2*time.Hour)), reviewLink(c.kind))
+		f.events.evs = c.evs
+		if n := f.run(t); n != 1 || f.ledger.applied[0].Resolution != c.want {
+			t.Fatalf("%s link, %s before it: resolved = %d, ops %+v", c.kind, c.name, n, f.ledger.applied)
+		}
 	}
 }
 
@@ -354,9 +357,9 @@ func TestSettlesWhatTheTargetAlreadyShows(t *testing.T) {
 	if _, ok, _ := f.r.Settles(context.Background(), reviewLink(link.Mention), asked); ok {
 		t.Fatal("a mention settled its item")
 	}
-	f.events.evs = []link.Event{review("octocat", t0.Add(-time.Hour))}
+	f.events.evs = []link.Event{review("octocat", t0.Add(-3*time.Hour))}
 	if _, ok, _ := f.r.Settles(context.Background(), reviewLink(link.Review), asked); ok {
-		t.Fatal("a review before the link settled it")
+		t.Fatal("a review before the ask settled it")
 	}
 	if len(f.ledger.applied) != 0 {
 		t.Fatalf("Settles applied %+v", f.ledger.applied)
