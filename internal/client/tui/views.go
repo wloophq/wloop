@@ -361,7 +361,7 @@ func (m *Model) renderTasks(lines []string, v View, width, body int, now time.Ti
 	}
 	tasks := m.visibleTasks()
 	if len(tasks) == 0 {
-		text := "Nothing in " + v.Label + " right now."
+		text := m.viewSpec(v.ID).Empty
 		switch {
 		case !m.tasksLoaded:
 			text = "loading…"

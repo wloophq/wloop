@@ -128,6 +128,9 @@ func TestAViewsKeyIsTheOneItsCatalogServes(t *testing.T) {
 	}
 	keyed := 0
 	for _, v := range cat.Views {
+		if v.Summary == "" || v.Empty == "" {
+			t.Errorf("view %s serves summary %q, empty %q", v.ID, v.Summary, v.Empty)
+		}
 		b, ok := nav[v.ID]
 		if v.Key == "" {
 			if ok {
@@ -136,12 +139,15 @@ func TestAViewsKeyIsTheOneItsCatalogServes(t *testing.T) {
 			continue
 		}
 		keyed++
-		if b.Key != v.Key || b.Help != v.Label || b.Context != "global" {
+		if b.Key != v.Key || b.Help != v.Label || b.Summary != v.Summary || b.Context != "global" {
 			t.Errorf("view %s (%s, %q): bound %+v", v.ID, v.Key, v.Label, b)
 		}
 	}
 	if keyed == 0 {
 		t.Fatalf("no served view has a key: %+v", cat.Views)
+	}
+	if i := slices.IndexFunc(cat.Views, func(v api.TaskViewSpec) bool { return v.ID == "needs-me" }); i < 0 || cat.Views[i].When == "" || cat.Views[i].Sort != "-task.sequential_next" {
+		t.Errorf("needs-me's rule as the profile writes it: %+v", cat.Views)
 	}
 }
 

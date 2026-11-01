@@ -318,105 +318,120 @@
       "action": "nav:inbox",
       "context": "global",
       "owner": "core",
-      "help": "Inbox"
+      "help": "Inbox",
+      "summary": "What nobody has clarified yet; once clarified, a task leaves for good."
     },
     {
       "key": "g m",
       "action": "nav:needs-me",
       "context": "global",
       "owner": "core",
-      "help": "Needs me"
+      "help": "Needs me",
+      "summary": "Tasks whose next step is yours: a gate to answer or your own next action."
     },
     {
       "key": "g w",
       "action": "nav:waiting",
       "context": "global",
       "owner": "core",
-      "help": "Waiting"
+      "help": "Waiting",
+      "summary": "Tasks whose next step is someone else's, grouped by who owes it."
     },
     {
       "key": "g c",
       "action": "nav:chase",
       "context": "global",
       "owner": "core",
-      "help": "Chase"
+      "help": "Chase",
+      "summary": "Tasks someone else owes whose check date passed with nothing moving: time to nudge."
     },
     {
       "key": "g n",
       "action": "nav:fits-now",
       "context": "global",
       "owner": "core",
-      "help": "Fits now"
+      "help": "Fits now",
+      "summary": "Your next steps that take half an hour or less."
     },
     {
       "key": "g b",
       "action": "nav:blocked-by-me",
       "context": "global",
       "owner": "core",
-      "help": "Blocked by me"
+      "help": "Blocked by me",
+      "summary": "Asks that wait on you, grouped by who asked, the oldest first."
     },
     {
       "key": "g t",
       "action": "nav:stalled",
       "context": "global",
       "owner": "core",
-      "help": "Stalled"
+      "help": "Stalled",
+      "summary": "Tasks waiting too long: a source says they stalled, or their check date passed with nothing moving."
     },
     {
       "key": "g u",
       "action": "nav:in-loop",
       "context": "global",
       "owner": "core",
-      "help": "In loop"
+      "help": "In loop",
+      "summary": "Tasks an agent is working on right now."
     },
     {
       "key": "g a",
       "action": "nav:approved",
       "context": "global",
       "owner": "core",
-      "help": "Approved"
+      "help": "Approved",
+      "summary": "Work a source says is approved and ready to land."
     },
     {
       "key": "g z",
       "action": "nav:snoozed",
       "context": "global",
       "owner": "core",
-      "help": "Snoozed"
+      "help": "Snoozed",
+      "summary": "Tasks asleep until a date, an event or a condition."
     },
     {
       "key": "g f",
       "action": "nav:focus",
       "context": "global",
       "owner": "core",
-      "help": "Focus"
+      "help": "Focus",
+      "summary": "The tasks you marked to focus on."
     },
     {
       "key": "g p",
       "action": "nav:projects",
       "context": "global",
       "owner": "core",
-      "help": "Projects"
+      "help": "Projects",
+      "summary": "Your open projects."
     },
     {
       "key": "g d",
       "action": "nav:done",
       "context": "global",
       "owner": "core",
-      "help": "Done"
+      "help": "Done",
+      "summary": "Finished tasks that still hold a workspace on disk, to remove."
     },
     {
       "key": "g o",
       "action": "nav:outbox",
       "context": "global",
       "owner": "core",
-      "help": "Outbox"
+      "help": "Outbox",
+      "summary": "Drafts waiting for your approval, and approved ones still sending or that failed to send."
     },
     {
       "key": "g r",
       "action": "nav:review",
       "context": "global",
       "owner": "core",
-      "help": "Review"
+      "help": "Review",
+      "summary": "The weekly review: walk each step until the lists are clean."
     },
     {
       "key": "g g",

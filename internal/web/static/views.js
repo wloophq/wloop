@@ -31,7 +31,7 @@ function resolveView(view, cat, served, plugin) {
 // view (count left to the caller).
 function viewNav(cat, served, plugin, counters) {
   const views = (counters && counters.views) || {};
-  const out = coreViews(cat).map((v) => ({ id: v.id, label: v.label, count: views[v.id] === undefined ? "" : views[v.id], core: true }));
+  const out = coreViews(cat).map((v) => ({ id: v.id, label: v.label, summary: v.summary || "", count: views[v.id] === undefined ? "" : views[v.id], core: true }));
   const taken = new Set(out.map((v) => v.id));
   for (const v of served) {
     if (taken.has(v.id)) continue;
@@ -428,7 +428,7 @@ function taskList(route, open) {
       type: "button", class: "act", "data-focus": "tasks:remove-clean", disabled: n === 0 || removeState.busy,
       title: "Remove the workspaces of this view's tasks whose checkouts hold nothing unpublished",
       onclick: () => removeAllClean(n, route.view),
-    }, "Remove all clean") : null)];
+    }, "Remove all clean") : null), viewIntro(spec)];
   if (tasksState.error) parts.push(h("p", { class: "plan-error" }, tasksState.error));
   if (loaded) parts.push(...loadingNotes(tasksState.loading));
   if (!loaded) {
@@ -436,11 +436,11 @@ function taskList(route, open) {
     return parts;
   }
   if (spec && spec.over === "gates") {
-    parts.push(tasksState.gates.length ? h("div", { class: "gate-list" }, ...tasksState.gates.map((g) => gateCard(taskById(g.task), g))) : h("p", { class: "empty" }, `Nothing in ${label}.`));
+    parts.push(tasksState.gates.length ? h("div", { class: "gate-list" }, ...tasksState.gates.map((g) => gateCard(taskById(g.task), g))) : h("p", { class: "empty" }, spec.empty));
     return parts;
   }
   if (!tasksState.tasks.length) {
-    parts.push(h("p", { class: "empty" }, `Nothing in ${label}.`));
+    parts.push(h("p", { class: "empty" }, spec && spec.empty));
     return parts;
   }
   if (!shown.length) {
@@ -452,6 +452,17 @@ function taskList(route, open) {
     parts.push(h("ol", { class: "task-list" }, ...g.tasks.map((e) => listItem(e, open))));
   }
   return parts;
+}
+
+// viewIntro is a view's summary under its heading, and the rule its profile lists it by behind a toggle.
+function viewIntro(spec) {
+  if (!spec || !spec.summary) return null;
+  const rule = [["Lists", spec.when], ["Sorted by", spec.sort], ["Grouped by", spec.group]].filter(([, v]) => v);
+  return h("div", { class: "view-intro" },
+    h("p", { class: "view-summary" }, spec.summary),
+    rule.length ? h("details", { class: "view-rule" },
+      h("summary", {}, "Why these tasks?"),
+      h("dl", {}, ...rule.flatMap(([k, v]) => [h("dt", {}, k), h("dd", {}, h("code", {}, v))]))) : null);
 }
 
 // loadingNotes say which plugins have not reported all their units yet, and why, so a short list reads as
