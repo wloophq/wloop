@@ -68,7 +68,8 @@ func (e *Engine) dueRun(ctx context.Context, pause Pause) (tally, error) {
 }
 
 // dueOne runs it, of w, unless the pause holds its unit or its facts cannot
-// be read; an item whose source or key facts moved is dropped instead.
+// be read; an item whose key facts moved, or whose source moved and that is
+// stale, is dropped instead.
 func (e *Engine) dueOne(ctx context.Context, w workflow.Workflow, it workflow.Item, pause Pause) (result, error) {
 	facts, err := e.factsFor(ctx, w, it.Unit)
 	if err != nil {
@@ -78,13 +79,28 @@ func (e *Engine) dueOne(ctx context.Context, w workflow.Workflow, it workflow.It
 	if holds(pause, w.Slot, facts) {
 		return result{outcome: outcomeNone}, nil
 	}
-	if moved, err := e.sourceMoved(ctx, it); err != nil || moved || keyMoved(w, it, facts) {
+	why, err := e.invalid(ctx, w, it, facts)
+	if err != nil || why != "" {
 		if err == nil {
+			e.logf("%s: %s", it.ID, why)
 			err = e.dropMoved(ctx, it)
 		}
 		return result{outcome: outcomeDropped}, err
 	}
 	return e.runItem(ctx, it, RunOpts{})
+}
+
+// invalid says why it, of w, planned on facts other than the current ones,
+// must not run: its key facts moved, or its source moved and it is stale.
+func (e *Engine) invalid(ctx context.Context, w workflow.Workflow, it workflow.Item, facts workflow.Facts) (string, error) {
+	if keyMoved(w, it, facts) {
+		return "its unit changed since it was planned", nil
+	}
+	moved, err := e.sourceMoved(ctx, it)
+	if err != nil || !moved {
+		return "", err
+	}
+	return e.stale(ctx, w, it), nil
 }
 
 // whyMoved drops or refuses an item whose source moved since it was planned.

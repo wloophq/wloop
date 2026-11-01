@@ -948,18 +948,31 @@ func TestAUnitNotedAfterThePlanIsRevalidated(t *testing.T) {
 	}
 }
 
-func TestAMovedSourceDropsTheRound(t *testing.T) {
+func TestAMovedSourceThatNoLongerMatchesDropsTheRound(t *testing.T) {
+	r := newRig(t, sweepWF("close", idle, "session.close"))
+	noteOnMoved(t, r, func() {
+		r.units.Report(t, s1)
+		r.units.Set(s1, "session.idle", false)
+	})
+	r.put(s1, "a")
+	sum := r.sweep()
+	if len(r.steps.Ran()) != 0 || !strings.Contains(sum, "1 dropped") {
+		t.Fatalf("a moved source that no longer matches ran: %s", sum)
+	}
+	r.units.Set(s1, "session.idle", true)
+	r.sweep()
+	if got := r.ran("session.close"); len(got) != 1 {
+		t.Errorf("ran %v on the next sweep", got)
+	}
+}
+
+func TestAMovedSourceThatStillMatchesRuns(t *testing.T) {
 	r := newRig(t, sweepWF("close", idle, "session.close"))
 	r.put(s1, "a")
 	r.units.SetMoved(s1)
 	sum := r.sweep()
-	if len(r.steps.Ran()) != 0 || !strings.Contains(sum, "1 dropped") {
-		t.Fatalf("a moved source ran: %s", sum)
-	}
-	r.units.SetMoved()
-	r.sweep()
-	if got := r.ran("session.close"); len(got) != 1 {
-		t.Errorf("ran %v on the next sweep", got)
+	if got := r.ran("session.close"); !slices.Equal(got, []unit.Unit{s1}) || strings.Contains(sum, "dropped") {
+		t.Fatalf("ran %v (%s); a report that changed no fact the round reads dropped it", got, sum)
 	}
 }
 
@@ -1445,11 +1458,12 @@ func TestAnUndecidableEventHoldsForAnHourWithoutReplayingLaterOnes(t *testing.T)
 	}
 }
 
-func TestADueRunDropsAnItemWhoseSourceMoved(t *testing.T) {
+func TestADueRunDropsAnItemWhoseSourceMovedAndNoLongerMatches(t *testing.T) {
 	r := newRig(t, windowed(sweepWF("close", idle, "session.close"), 5*time.Minute))
 	r.put(s1, "a")
 	r.sweep()
 	r.units.SetMoved(s1)
+	r.units.Set(s1, "session.idle", false)
 	r.clock.Advance(6 * time.Minute)
 	if err := r.e.DueRun(context.Background()); err != nil {
 		t.Fatal(err)
@@ -1464,9 +1478,24 @@ func TestADueRunDropsAnItemWhoseSourceMoved(t *testing.T) {
 		t.Fatalf("the drop marked the key: %+v", run)
 	}
 	r.units.SetMoved()
+	r.units.Set(s1, "session.idle", true)
 	r.sweep()
 	if it := r.mustItem("close", s1); it.Decision != workflow.DecisionPending {
 		t.Fatalf("not planned again: %+v", it)
+	}
+}
+
+func TestADueRunRunsAnItemWhoseSourceMovedButStillMatches(t *testing.T) {
+	r := newRig(t, windowed(sweepWF("close", idle, "session.close"), 5*time.Minute))
+	r.put(s1, "a")
+	r.sweep()
+	r.units.Report(t, s1)
+	r.clock.Advance(6 * time.Minute)
+	if err := r.e.DueRun(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.ran("session.close"); !slices.Equal(got, []unit.Unit{s1}) {
+		t.Fatalf("ran %v; a report that changed no fact the item reads dropped it", got)
 	}
 }
 
@@ -1492,11 +1521,23 @@ func TestRevsCountedAgainAfterARestartNeitherDropNorRepeatARun(t *testing.T) {
 	}
 }
 
-func TestAnApplyOfAMovedSourceIsRefused(t *testing.T) {
+func TestAnApplyOfAMovedSourceThatStillMatchesRuns(t *testing.T) {
+	r := newRig(t, windowed(sweepWF("close", idle, "session.close"), 5*time.Minute))
+	r.put(s1, "a")
+	r.sweep()
+	r.units.Report(t, s1)
+	got, err := r.e.Act(context.Background(), r.mustItem("close", s1).ID, workflow.ActionApply, "")
+	if err != nil || got.Decision != workflow.DecisionRun || !slices.Equal(r.ran("session.close"), []unit.Unit{s1}) {
+		t.Fatalf("apply: %+v %v, ran %v", got, err, r.steps.Ran())
+	}
+}
+
+func TestAnApplyOfAMovedSourceThatNoLongerMatchesIsRefused(t *testing.T) {
 	r := newRig(t, windowed(sweepWF("close", idle, "session.close"), 5*time.Minute))
 	r.put(s1, "a")
 	r.sweep()
 	r.units.SetMoved(s1)
+	r.units.Set(s1, "session.idle", false)
 	got, err := r.e.Act(context.Background(), r.mustItem("close", s1).ID, workflow.ActionApply, "")
 	var refused automation.Refused
 	if !errors.As(err, &refused) || got.Decision != workflow.DecisionBlocked || len(r.steps.Ran()) != 0 {

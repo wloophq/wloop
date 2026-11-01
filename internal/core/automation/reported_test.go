@@ -145,12 +145,12 @@ func TestASweepReadsFactsWithoutCallingThePlugin(t *testing.T) {
 	broker := &psource.Broker{ID: "acme", Manifest: m, Snapshots: snaps, Units: psource.Units{Codecs: unit.NewRegistry(c)},
 		Config: func() config.Config { return config.Config{} }}
 	one := unit.Unit{Provider: "acme", Key: "one"}
-	report := func(rev uint64, waiting time.Time) src.Snapshot {
+	report := func(rev uint64, ready bool, waiting time.Time) src.Snapshot {
 		return src.Snapshot{Unit: plugin.Unit{Provider: "acme", Key: "one"}, Rev: rev, At: t0,
-			Facts: []src.Fact{{Name: "acme.ready", Value: src.Bool(true)}, {Name: "acme.waiting", Value: src.Since(waiting)},
+			Facts: []src.Fact{{Name: "acme.ready", Value: src.Bool(ready)}, {Name: "acme.waiting", Value: src.Since(waiting)},
 				{Name: "acme.late", Value: src.After(waiting, time.Hour, src.Calendar)}}}
 	}
-	stub := &countingSource{Stub: sourcetest.NewStub(report(1, t0.Add(-2*time.Hour)))}
+	stub := &countingSource{Stub: sourcetest.NewStub(report(1, true, t0.Add(-2*time.Hour)))}
 	client := sourcetest.Launch(t, "acme", stub, broker.Host())
 	ingest := func() {
 		t.Helper()
@@ -170,15 +170,17 @@ func TestASweepReadsFactsWithoutCallingThePlugin(t *testing.T) {
 	before := stub.calls.Load()
 
 	units.after = func() {
-		stub.Script(report(2, t0.Add(-2*time.Hour)))
+		stub.Script(report(2, false, t0.Add(-2*time.Hour)))
 		ingest()
 	}
 	if sum := r.sweep(); len(r.steps.Ran()) != 0 || !strings.Contains(sum, "1 dropped") {
-		t.Fatalf("a run planned on rev 1 ran after rev 2 was reported: %s, ran %v", sum, r.steps.Ran())
+		t.Fatalf("a run planned on rev 1 ran after rev 2 stopped it matching: %s, ran %v", sum, r.steps.Ran())
 	}
 	if read.Facts["acme.waiting"] != 2*time.Hour || read.Facts["acme.late"] != true {
 		t.Errorf("the reported temporal facts read %v", read.Facts)
 	}
+	stub.Script(report(3, true, t0.Add(-2*time.Hour)))
+	ingest()
 	r.sweep()
 	if got := r.ran("session.close"); len(got) != 1 || got[0] != one {
 		t.Fatalf("ran %v on the next sweep", got)
