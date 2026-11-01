@@ -116,7 +116,7 @@ func payload(in *Input) Payload {
 			in.viewer != "" && in.msgs[0].User == in.viewer
 	}
 	if dslack.ConversationKind(in.conv.Kind).DM() || in.key.Segment != "" {
-		pl.DM, pl.With = true, with(in)
+		pl.DM, pl.With, pl.Direct = true, with(in), in.conv.DMUser != ""
 	} else {
 		pl.Channel = in.conv.Name
 	}

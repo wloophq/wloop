@@ -229,6 +229,9 @@ func TestDMSegmentCard(t *testing.T) {
 	if r, _ := f.row(t, u); r.Label != "DM with Ana" || !slices.Equal(r.Facets[slackrows.FacetConversation], []string{"DM with Ana"}) {
 		t.Errorf("row %+v", r)
 	}
+	if !c.Cares {
+		t.Errorf("a 1:1 DM is the viewer's: %+v", c)
+	}
 }
 
 func TestCardBeforeExtraction(t *testing.T) {

@@ -370,15 +370,20 @@ func (s draftSubject) owedPool(person items.Person) []items.Item {
 	return out
 }
 
-// asks says whether person requested an open item of the subject's unit that waits on me.
+// asks says whether person requested an open item of the subject's unit that waits on me, or that I am
+// assigned and waits on nobody else.
 func (s draftSubject) asks(person string, me task.Me) bool {
 	if person == "" {
 		return false
 	}
 	them := items.Identity{Keys: []string{person}, Codecs: me.Codecs}
+	isMe := func(p items.Person) bool { return p.Is(me) }
 	return slices.ContainsFunc(s.items, func(it items.Item) bool {
-		return it.State == items.Open && it.Unit == s.unit && it.Requester.Is(them) &&
-			slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return p.Is(me) })
+		if it.State != items.Open || it.Unit != s.unit || !it.Requester.Is(them) {
+			return false
+		}
+		return slices.ContainsFunc(it.WaitingOn, isMe) ||
+			slices.ContainsFunc(it.Assignees, isMe) && !slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return !isMe(p) })
 	})
 }
 

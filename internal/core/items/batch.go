@@ -1,6 +1,7 @@
 package items
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -172,7 +173,7 @@ func (b *batch) apply(ctx context.Context, i int, o items.Op, prov items.Provena
 		b.evidence(o, prov, *cur)
 		return
 	}
-	next := mutate(*cur, o)
+	next := mutate(*cur, o, b.now)
 	changed := content(next) != content(*cur)
 	switch {
 	case prov == items.User && (changed || !cur.Confirmed):
@@ -194,7 +195,7 @@ func (b *batch) newItem(o items.Op, prov items.Provenance) items.Item {
 	return it
 }
 
-func mutate(it items.Item, o items.Op) items.Item {
+func mutate(it items.Item, o items.Op, now time.Time) items.Item {
 	switch o.Op {
 	case items.OpCreate, items.OpUpdate:
 		applyFields(&it, o.Fields)
@@ -217,7 +218,10 @@ func mutate(it items.Item, o items.Op) items.Item {
 		}
 		it.State, it.Resolution, it.Evidence = items.Resolved, o.Resolution, ev
 	case items.OpReopen:
-		it.State, it.Resolution, it.Evidence = items.Open, "", items.Evidence{}
+		if it.State == items.Open {
+			return it
+		}
+		it.State, it.Resolution, it.Evidence, it.ReopenedAt = items.Open, "", items.Evidence{}, cmp.Or(o.Anchor.At, now)
 	}
 	return it
 }
@@ -318,19 +322,27 @@ func (b *batch) link(ctx context.Context, i int, o items.Op, prov items.Provenan
 
 // settle applies, as derived, the op that settles cur through l from what l's target already shows.
 func (b *batch) settle(ctx context.Context, i int, l link.Link, cur *items.Item) {
-	if b.l.Settle == nil || cur == nil || cur.State != items.Open {
+	if b.l.settle == nil || cur == nil || cur.State != items.Open {
 		return
 	}
-	op, ok, err := b.l.Settle(ctx, l, *cur)
+	op, ok, err := b.l.settle(ctx, l, *cur)
 	if err != nil {
 		if b.l.Log != nil {
 			b.l.Log("link %s to %s: settling %s: %v", l.From, l.To, l.Item, err)
 		}
 		return
 	}
-	if ok {
-		b.apply(ctx, i, op, items.Derived)
+	if !ok {
+		return
 	}
+	refused := len(b.res.Refused)
+	b.apply(ctx, i, op, items.Derived)
+	for _, r := range b.res.Refused[refused:] {
+		if b.l.Log != nil {
+			b.l.Log("link %s to %s: settling %s: refused: %s", l.From, l.To, l.Item, r.Reason)
+		}
+	}
+	b.res.Refused = b.res.Refused[:refused]
 }
 
 // ExtractedLinkLookback is how far before its item's creation an extracted link may start: the

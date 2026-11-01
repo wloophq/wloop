@@ -41,15 +41,15 @@ type silentKey struct {
 
 const silentEvery = 24 * time.Hour
 
-// pending is an open item a link may resolve, with the time after which an
-// event on its target counts, and the time after which its merge does: a pull
-// request merged before the link was made still settles it, unless the user
-// reopened the item since.
+// pending is an open item a link may resolve, with the time after which a
+// review of its target counts, and the time after which its target's merge or
+// close does: the ask, or the user's last edit or the item's reopening when
+// later. A target that ended between the ask and the link still settles it.
 type pending struct {
-	link        link.Link
-	item        ditems.Item
-	after       time.Time
-	mergedAfter time.Time
+	link       link.Link
+	item       ditems.Item
+	after      time.Time
+	endedAfter time.Time
 }
 
 // Run resolves the open linked items whose link targets are in targets.
@@ -116,19 +116,36 @@ func pendingOf(l link.Link, it ditems.Item) pending {
 	if it.UserAt.After(after) {
 		after = it.UserAt
 	}
-	return pending{link: l, item: it, after: after, mergedAfter: it.UserAt}
+	ended := it.Origin.At
+	if ended.IsZero() {
+		ended = it.CreatedAt
+	}
+	for _, t := range []time.Time{it.UserAt, it.ReopenedAt} {
+		if t.After(ended) {
+			ended = t
+		}
+	}
+	return pending{link: l, item: it, after: after, endedAfter: ended}
+}
+
+// since is the earliest time an event of the target can settle p.
+func (p pending) since() time.Time {
+	if p.endedAfter.Before(p.after) {
+		return p.endedAfter
+	}
+	return p.after
 }
 
 // Settles is the op that settles it, open, through l from the events l's target already has, as Run would
 // apply it; ok is false when none does yet. The items ledger calls it as it stores l, so an item linked to a
-// pull request merged before the link resolves in the same batch, before any task holds it.
+// pull request that merged or closed after the ask resolves in the same batch, before any task holds it.
 func (r *Resolver) Settles(ctx context.Context, l link.Link, it ditems.Item) (ditems.Op, bool, error) {
 	reader := r.Events[l.To.Provider]
 	if reader == nil || l.Item == "" || l.Item != it.ID || it.State != ditems.Open || (l.Kind != link.Review && l.Kind != link.Merge) {
 		return ditems.Op{}, false, nil
 	}
 	p := pendingOf(l, it)
-	evs, err := reader.UnitEvents(ctx, l.To, p.mergedAfter)
+	evs, err := reader.UnitEvents(ctx, l.To, p.since())
 	if err != nil {
 		return ditems.Op{}, false, fmt.Errorf("events of %s: %w", l.To, err)
 	}
@@ -152,10 +169,10 @@ func (r *Resolver) resolve(ctx context.Context, target unit.Unit, open []pending
 		r.quiet(target, "has no events")
 		return 0, nil
 	}
-	since := open[0].mergedAfter
+	since := open[0].since()
 	for _, p := range open[1:] {
-		if p.mergedAfter.Before(since) {
-			since = p.mergedAfter
+		if s := p.since(); s.Before(since) {
+			since = s
 		}
 	}
 	evs, err := reader.UnitEvents(ctx, target, since)
@@ -192,16 +209,12 @@ func (r *Resolver) resolve(ctx context.Context, target unit.Unit, open []pending
 // the resolution it gives.
 func settle(p pending, evs []link.Event, codecs unit.KeyComparer) (link.Event, ditems.Resolution, bool) {
 	for _, ev := range evs {
-		if ev.Kind == link.EventMerged && ev.At.After(p.mergedAfter) {
-			return ev, mergeResolution(p.link.Kind), true
-		}
-		if !ev.At.After(p.after) {
-			continue
-		}
 		switch {
-		case ev.Kind == link.EventClosed:
+		case ev.Kind == link.EventMerged && ev.At.After(p.endedAfter):
+			return ev, mergeResolution(p.link.Kind), true
+		case ev.Kind == link.EventClosed && ev.At.After(p.endedAfter):
 			return ev, ditems.Moot, true
-		case ev.Kind == link.EventReview && p.link.Kind == link.Review && byAssignee(p.item, ev.Actor, codecs):
+		case ev.Kind == link.EventReview && ev.At.After(p.after) && p.link.Kind == link.Review && byAssignee(p.item, ev.Actor, codecs):
 			return ev, ditems.Done, true
 		}
 	}

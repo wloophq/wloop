@@ -211,28 +211,46 @@ func TestMergeAndCloseResolveLinks(t *testing.T) {
 	}
 }
 
-func TestMergeBeforeTheLinkResolvesIt(t *testing.T) {
-	for _, kind := range []link.Kind{link.Review, link.Merge} {
-		f := newFixture(t, openItem(octocat), reviewLink(kind))
-		f.events.evs = []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}
-		if n := f.run(t); n != 1 {
-			t.Fatalf("%s link to a pull request merged before it: resolved = %d", kind, n)
-		}
+func askedAt(at time.Time) items.Item {
+	it := openItem(octocat)
+	it.Origin = unit.Anchor{Unit: thread, Ref: "C1/0001", At: at}
+	return it
+}
+
+func TestAnEndBetweenTheAskAndTheLinkSettlesIt(t *testing.T) {
+	cases := []struct {
+		end  link.EventKind
+		kind link.Kind
+		want items.Resolution
+	}{
+		{link.EventMerged, link.Review, items.Moot},
+		{link.EventMerged, link.Merge, items.Done},
+		{link.EventClosed, link.Review, items.Moot},
+		{link.EventClosed, link.Merge, items.Moot},
 	}
-	reopened := openItem(octocat)
-	reopened.UserAt = t0
-	f := newFixture(t, reopened, reviewLink(link.Review))
-	f.events.evs = []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}
-	if n := f.run(t); n != 0 {
-		t.Fatalf("a merge before the user reopened the item resolved it: %d", n)
+	for _, c := range cases {
+		f := newFixture(t, askedAt(t0.Add(-2*time.Hour)), reviewLink(c.kind))
+		f.events.evs = []link.Event{state(c.end, t0.Add(-time.Hour))}
+		if n := f.run(t); n != 1 || f.ledger.applied[0].Resolution != c.want {
+			t.Fatalf("%s link, %s before it: resolved = %d, ops %+v", c.kind, c.end, n, f.ledger.applied)
+		}
 	}
 }
 
-func TestCloseBeforeTheLinkLeavesItOpen(t *testing.T) {
-	f := newFixture(t, openItem(octocat), reviewLink(link.Review))
-	f.events.evs = []link.Event{state(link.EventClosed, t0.Add(-time.Hour)), review("octocat", t0.Add(-time.Hour))}
-	if n := f.run(t); n != 0 {
-		t.Fatalf("a close or a review before the link resolved it: %d", n)
+func TestAnEndBeforeTheAskLeavesItOpen(t *testing.T) {
+	cases := map[string]func(*items.Item){
+		"asked after the merge": func(it *items.Item) { it.Origin.At = t0.Add(-30 * time.Minute) },
+		"reopened by the user":  func(it *items.Item) { it.UserAt = t0 },
+		"reopened since":        func(it *items.Item) { it.ReopenedAt = t0 },
+	}
+	for name, mod := range cases {
+		it := askedAt(t0.Add(-2 * time.Hour))
+		mod(&it)
+		f := newFixture(t, it, reviewLink(link.Review))
+		f.events.evs = []link.Event{state(link.EventMerged, t0.Add(-time.Hour)), review("octocat", t0.Add(-time.Hour))}
+		if n := f.run(t); n != 0 {
+			t.Fatalf("%s: resolved = %d", name, n)
+		}
 	}
 }
 
@@ -327,18 +345,19 @@ func (foldCodec) Valid(string) error          { return nil }
 func (foldCodec) Equal(a, b string) bool      { return strings.EqualFold(a, b) }
 
 func TestSettlesWhatTheTargetAlreadyShows(t *testing.T) {
-	f := newFixture(t, openItem(octocat))
+	asked := askedAt(t0.Add(-2 * time.Hour))
+	f := newFixture(t, asked)
 	f.events.evs = []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}
-	op, ok, err := f.r.Settles(context.Background(), reviewLink(link.Merge), openItem(octocat))
+	op, ok, err := f.r.Settles(context.Background(), reviewLink(link.Merge), asked)
 	if err != nil || !ok || op.Op != items.OpResolve || op.Unit != thread || op.Item != "i1" || op.Resolution != items.Done ||
 		op.Evidence == nil || op.Evidence.Anchor.Ref != "merged" {
 		t.Fatalf("op %+v ok %v err %v", op, ok, err)
 	}
-	if _, ok, _ := f.r.Settles(context.Background(), reviewLink(link.Mention), openItem(octocat)); ok {
+	if _, ok, _ := f.r.Settles(context.Background(), reviewLink(link.Mention), asked); ok {
 		t.Fatal("a mention settled its item")
 	}
 	f.events.evs = []link.Event{review("octocat", t0.Add(-time.Hour))}
-	if _, ok, _ := f.r.Settles(context.Background(), reviewLink(link.Review), openItem(octocat)); ok {
+	if _, ok, _ := f.r.Settles(context.Background(), reviewLink(link.Review), asked); ok {
 		t.Fatal("a review before the link settled it")
 	}
 	if len(f.ledger.applied) != 0 {

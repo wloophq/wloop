@@ -121,6 +121,28 @@ func TestMyItemWaitingOnOthersIsWaitedOn(t *testing.T) {
 	}
 }
 
+func TestMyPartDoneWhileCoAssigneesOweTheirsIsNoTask(t *testing.T) {
+	peersOwe := func(it *items.Item) {
+		it.Requester, it.Assignees, it.WaitingOn = ana, []items.Person{meP, bob}, []items.Person{bob}
+	}
+	if es := reconcile(t, facts(), []items.Item{item("a", peersOwe)}, nil, now); len(es) != 0 {
+		t.Fatalf("tasks %+v", es)
+	}
+}
+
+func TestATaskKeepsAnItemThatStillWaitsOnSomeone(t *testing.T) {
+	e := only(t, reconcile(t, facts(), []items.Item{item("a")}, nil, now))
+	handedOff := item("a", func(it *items.Item) { it.Requester, it.WaitingOn = bob, []items.Person{ana} })
+	got := only(t, reconcile(t, facts(), []items.Item{handedOff}, []task.Task{e}, now.Add(time.Hour)))
+	if !got.Open() || !slices.Equal(got.Items, e.Items) {
+		t.Fatalf("task %+v", got)
+	}
+	idle := item("a", func(it *items.Item) { it.WaitingOn = nil })
+	if got := only(t, reconcile(t, facts(), []items.Item{idle}, []task.Task{e}, now.Add(time.Hour))); got.Category != task.CategoryDone {
+		t.Fatalf("item waiting on nobody: %+v", got)
+	}
+}
+
 func TestOnlyItemsCreateTasks(t *testing.T) {
 	f := facts(func(f *task.UnitFacts) { f.StartedByMe, f.Cares, f.LastHuman = true, true, now })
 	if es := reconcile(t, f, nil, nil, now); len(es) != 0 {

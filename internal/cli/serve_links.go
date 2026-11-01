@@ -56,7 +56,7 @@ func (w *linkWiring) serve(d daemon.Deps, mods []pluginModule) daemon.Deps {
 	}
 	ledger := w.e.itemsLedger(w.db, w.cfg, w.logf)
 	r := &links.Resolver{Links: w.store, Events: events, Ledger: ledger, Clock: clockFunc(w.e.Now), Log: w.logf, Codecs: d.Units}
-	ledger.Settle = r.Settles
+	ledger.SetSettle(r.Settles)
 	if w.e.changes == nil {
 		return d
 	}
