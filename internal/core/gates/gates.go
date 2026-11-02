@@ -42,6 +42,9 @@ type Def struct {
 	// EndsTask is the category, done or dropped, a task opened only to hold gates ends in once the gate closes
 	// with a status and none of its gates is open; a status it leaves out leaves the task open.
 	EndsTask map[gate.Status]task.Category
+	// ClosesWith is the intent, one that refuses the gate, the gate closes with once its task ends; "" leaves it
+	// open.
+	ClosesWith string
 }
 
 // Intent is what a gate is resolved with: the status gates.toml gives it,
@@ -238,6 +241,59 @@ func (s *Service) Supersede(ctx context.Context, id int64, by task.Actor) error 
 		return err
 	}
 	return s.endHeld(ctx, closed)
+}
+
+// HoldsTask says whether an open gate of task id holds it open: one whose ClosesWith names one of its intents,
+// a question to the person only the person, or the end of the task's unit, settles.
+func (s *Service) HoldsTask(ctx context.Context, id task.ID) (bool, error) {
+	gs, err := s.d.Reader.OfTask(ctx, id)
+	if err != nil {
+		return false, err
+	}
+	return slices.ContainsFunc(gs, s.closesWithTask), nil
+}
+
+func (s *Service) closesWithTask(g gate.Gate) bool {
+	def, err := s.def(g)
+	return g.Status == gate.Open && err == nil && def.ClosesWith != "" && slices.Contains(g.Intents, def.ClosesWith)
+}
+
+// TaskEnded settles each gate of task id that HoldsTask counts and that opened by at, when by ended the task:
+// a person's end closes it with its ClosesWith intent, which refuses the gate, in their name; a plugin's or a
+// workflow's end, which only the end of the task's unit makes, supersedes it as moot. It never approves or
+// answers, refuses an agent, as Supersede does, and logs what it returns.
+func (s *Service) TaskEnded(ctx context.Context, id task.ID, by task.Actor, at time.Time) (err error) {
+	defer func() {
+		if err != nil {
+			s.logf("gates of ended task %s: %v", id, err)
+		}
+	}()
+	if by == task.ActorAgent || by == "" {
+		return fmt.Errorf("%w: the gates of task %s close with it, not by %s", ErrRefused, id, cmp.Or(string(by), "no one"))
+	}
+	gs, err := s.d.Reader.OfTask(ctx, id)
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, g := range gs {
+		if !s.closesWithTask(g) || g.OpenedAt.After(at) {
+			continue
+		}
+		if by == task.ActorPerson {
+			def, _ := s.def(g)
+			var r Resolution
+			if r, err = withStatus(g, def, Resolution{Intent: def.ClosesWith, By: by}); err == nil {
+				_, err = s.close(ctx, g, r)
+			}
+		} else {
+			err = s.Supersede(ctx, g.ID, by)
+		}
+		if err != nil && !errors.Is(err, ErrResolved) {
+			errs = append(errs, fmt.Errorf("gate %d: %w", g.ID, err))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // RecordSent records g, a post a tool made at once, as a gate already

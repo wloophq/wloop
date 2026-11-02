@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/change"
@@ -62,7 +63,7 @@ func TestStoreFiltersByCategory(t *testing.T) {
 		}
 		c, ok := userStates[state]
 		return c, ok
-	})
+	}, taskAt)
 	if err != nil || !slices.Equal(unknown, []string{"doing"}) {
 		t.Fatalf("unknown %v, %v", unknown, err)
 	}
@@ -74,5 +75,37 @@ func TestStoreFiltersByCategory(t *testing.T) {
 	}
 	if ch := log.Since(from, port.TopicTasks); !slices.Equal(ch.Units, []unit.Unit{task.UnitOf("t-blocked")}) {
 		t.Errorf("the recategorize noted %+v", ch)
+	}
+}
+
+func TestRecategorizingATaskOpenOrClosedStampsWhen(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, err := sqlite.Open(filepath.Join(t.TempDir(), "tasks.db"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	s := db.Tasks()
+	all := []task.Task{inUserState("t-next", "next"), inUserState("t-blocked", "blocked"), inUserState("t-archived", "archived")}
+	var cs []task.Change
+	for _, e := range all {
+		cs = append(cs, task.Change{Op: task.OpCreate, Task: e})
+	}
+	if err := s.Apply(ctx, cs); err != nil {
+		t.Fatal(err)
+	}
+	at := taskAt.Add(time.Hour)
+	moved := map[string]task.Category{"next": task.CategoryDone, "blocked": task.CategoryReady, "archived": task.CategoryReady}
+	if _, err := s.(coretasks.Recategorizer).Recategorize(ctx, func(state string) (task.Category, bool) {
+		c, ok := moved[state]
+		return c, ok
+	}, at); err != nil {
+		t.Fatal(err)
+	}
+	for id, want := range map[task.ID]time.Time{"t-next": at, "t-blocked": taskAt, "t-archived": at} {
+		if e, err := s.Task(ctx, id); err != nil || !e.OpenChanged.Equal(want) {
+			t.Errorf("%s opened or closed at %v, %v; want %v", id, e.OpenChanged, err, want)
+		}
 	}
 }

@@ -22,7 +22,7 @@ func TestFreshStoreIsAtSchemaVersion(t *testing.T) {
 
 func TestOtherVersionsAreRefused(t *testing.T) {
 	t.Parallel()
-	for _, v := range []int{0, SchemaVersion + 1, 8} {
+	for _, v := range []int{0, SchemaVersion + 1, 9} {
 		db, path := openTemp(t)
 		if _, err := execW(db, fmt.Sprintf(`PRAGMA user_version = %d`, v)); err != nil {
 			t.Fatal(err)

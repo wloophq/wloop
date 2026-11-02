@@ -81,7 +81,7 @@ var hotPlans = []hotPlan{
 	{name: "replace a workflow's plan items", query: `DELETE FROM plan_items WHERE workflow = ?`, args: 1, want: []string{"SEARCH plan_items USING INDEX plan_items_workflow (workflow=?)"}},
 	{name: "tasks in a category", query: `SELECT ` + taskFields + ` FROM tasks WHERE category = ?` + taskOrder, args: 1,
 		want: []string{"tasks_category (category=?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
-	{name: "recategorize a state's tasks", query: recategorizeSQL, args: 4, want: []string{"tasks_state (state=?)"}},
+	{name: "recategorize a state's tasks", query: recategorizeSQL, args: 10, want: []string{"tasks_state (state=?)"}},
 	{name: "tasks changed since", query: `SELECT ` + taskFields + ` FROM tasks WHERE ` + changedSince + taskOrder, args: 1, want: []string{"tasks_rev (rev>?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
 	{name: "tasks of a unit", query: `SELECT ` + taskFields + ` FROM tasks WHERE ` + ofUnit + taskOrder, args: 4,
 		want: []string{"task_units_unit (provider=? AND unit_key=?)", "task_items_unit (provider=? AND unit_key=?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},

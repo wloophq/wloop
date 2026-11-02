@@ -144,6 +144,10 @@ func (g serviceTaskGates) OfTask(ctx context.Context, id task.ID) ([]gate.Gate, 
 	return g.e.gateReader.OfTask(ctx, id)
 }
 
+func (g serviceTaskGates) HoldsTask(ctx context.Context, id task.ID) (bool, error) {
+	return g.e.newGates(g.db, nil).HoldsTask(ctx, id)
+}
+
 // profileGates are the gates of gates.toml as the profile loads now.
 type profileGates struct{ loaded func() *intentload.Loaded }
 
@@ -158,7 +162,7 @@ func (p profileGates) FirstOf(k gate.Kind) (gates.Def, bool) {
 }
 
 func gateDef(g intentload.GateDef) gates.Def {
-	d := gates.Def{Name: g.Name, Kind: g.Kind, Label: g.Label, EndsTask: g.EndsTask}
+	d := gates.Def{Name: g.Name, Kind: g.Kind, Label: g.Label, EndsTask: g.EndsTask, ClosesWith: g.ClosesWith}
 	for _, in := range g.Intents {
 		d.Intents = append(d.Intents, gates.Intent{Name: in.Name, Status: in.Status, Answer: in.Answer})
 	}

@@ -91,7 +91,8 @@
             "key": "acme/api#9"
           },
           "ref": "situation:held",
-          "permalink": "https://github.com/acme/api/pull/9"
+          "permalink": "https://github.com/acme/api/pull/9",
+          "at": "2026-10-22T14:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -149,7 +150,8 @@
             "key": "acme/api#10"
           },
           "ref": "situation:held",
-          "permalink": "https://github.com/acme/api/pull/10"
+          "permalink": "https://github.com/acme/api/pull/10",
+          "at": "2026-10-22T14:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -206,7 +208,8 @@
             "key": "acme/api#11"
           },
           "ref": "situation:held",
-          "permalink": "https://github.com/acme/api/pull/11"
+          "permalink": "https://github.com/acme/api/pull/11",
+          "at": "2026-10-22T14:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -264,7 +267,8 @@
             "key": "acme/api#12"
           },
           "ref": "situation:held",
-          "permalink": "https://github.com/acme/api/pull/12"
+          "permalink": "https://github.com/acme/api/pull/12",
+          "at": "2026-10-22T14:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -321,7 +325,8 @@
             "key": "acme/api#13"
           },
           "ref": "situation:held",
-          "permalink": "https://github.com/acme/api/pull/13"
+          "permalink": "https://github.com/acme/api/pull/13",
+          "at": "2026-10-22T14:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -379,7 +384,8 @@
             "key": "acme/api#14"
           },
           "ref": "situation:held",
-          "permalink": "https://github.com/acme/api/pull/14"
+          "permalink": "https://github.com/acme/api/pull/14",
+          "at": "2026-10-22T14:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -436,7 +442,8 @@
             "key": "acme/api#15"
           },
           "ref": "situation:held",
-          "permalink": "https://github.com/acme/api/pull/15"
+          "permalink": "https://github.com/acme/api/pull/15",
+          "at": "2026-10-22T14:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -494,7 +501,8 @@
             "key": "acme/api#16"
           },
           "ref": "situation:held",
-          "permalink": "https://github.com/acme/api/pull/16"
+          "permalink": "https://github.com/acme/api/pull/16",
+          "at": "2026-10-22T14:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -551,7 +559,8 @@
             "key": "acme/api#17"
           },
           "ref": "situation:blocked",
-          "permalink": "https://github.com/acme/api/pull/17"
+          "permalink": "https://github.com/acme/api/pull/17",
+          "at": "2026-10-22T13:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -609,7 +618,8 @@
             "key": "acme/api#18"
           },
           "ref": "situation:blocked",
-          "permalink": "https://github.com/acme/api/pull/18"
+          "permalink": "https://github.com/acme/api/pull/18",
+          "at": "2026-10-22T13:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -683,7 +693,8 @@
             "key": "acme/api#21"
           },
           "ref": "situation:blocked",
-          "permalink": "https://github.com/acme/api/pull/21"
+          "permalink": "https://github.com/acme/api/pull/21",
+          "at": "2026-10-22T13:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -741,7 +752,8 @@
             "key": "acme/api#22"
           },
           "ref": "situation:blocked",
-          "permalink": "https://github.com/acme/api/pull/22"
+          "permalink": "https://github.com/acme/api/pull/22",
+          "at": "2026-10-22T13:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -816,7 +828,8 @@
             "key": "acme/api#25"
           },
           "ref": "situation:to_address",
-          "permalink": "https://github.com/acme/api/pull/25"
+          "permalink": "https://github.com/acme/api/pull/25",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -875,7 +888,8 @@
             "key": "acme/api#26"
           },
           "ref": "situation:to_address",
-          "permalink": "https://github.com/acme/api/pull/26"
+          "permalink": "https://github.com/acme/api/pull/26",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -950,7 +964,8 @@
             "key": "acme/api#29"
           },
           "ref": "situation:to_address",
-          "permalink": "https://github.com/acme/api/pull/29"
+          "permalink": "https://github.com/acme/api/pull/29",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:alice",
@@ -1009,7 +1024,8 @@
             "key": "acme/api#30"
           },
           "ref": "situation:to_address",
-          "permalink": "https://github.com/acme/api/pull/30"
+          "permalink": "https://github.com/acme/api/pull/30",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:alice",
@@ -1084,7 +1100,8 @@
             "key": "acme/api#33"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/33"
+          "permalink": "https://github.com/acme/api/pull/33",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -1143,7 +1160,8 @@
             "key": "acme/api#34"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/34"
+          "permalink": "https://github.com/acme/api/pull/34",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -1201,7 +1219,8 @@
             "key": "acme/api#35"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/35"
+          "permalink": "https://github.com/acme/api/pull/35",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -1260,7 +1279,8 @@
             "key": "acme/api#36"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/36"
+          "permalink": "https://github.com/acme/api/pull/36",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -1318,7 +1338,8 @@
             "key": "acme/api#37"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/37"
+          "permalink": "https://github.com/acme/api/pull/37",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:alice",
@@ -1377,7 +1398,8 @@
             "key": "acme/api#38"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/38"
+          "permalink": "https://github.com/acme/api/pull/38",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:alice",
@@ -1435,7 +1457,8 @@
             "key": "acme/api#39"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/39"
+          "permalink": "https://github.com/acme/api/pull/39",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:alice",
@@ -1494,7 +1517,8 @@
             "key": "acme/api#40"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/40"
+          "permalink": "https://github.com/acme/api/pull/40",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:alice",
@@ -2012,7 +2036,8 @@
             "key": "acme/api#49"
           },
           "ref": "situation:no_reviewer",
-          "permalink": "https://github.com/acme/api/pull/49"
+          "permalink": "https://github.com/acme/api/pull/49",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -2128,7 +2153,8 @@
             "key": "acme/api#51"
           },
           "ref": "situation:no_reviewer",
-          "permalink": "https://github.com/acme/api/pull/51"
+          "permalink": "https://github.com/acme/api/pull/51",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -2243,7 +2269,8 @@
             "key": "acme/api#53"
           },
           "ref": "situation:no_reviewer",
-          "permalink": "https://github.com/acme/api/pull/53"
+          "permalink": "https://github.com/acme/api/pull/53",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -2358,7 +2385,8 @@
             "key": "acme/api#55"
           },
           "ref": "situation:no_reviewer",
-          "permalink": "https://github.com/acme/api/pull/55"
+          "permalink": "https://github.com/acme/api/pull/55",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -2933,7 +2961,8 @@
             "key": "acme/api#65"
           },
           "ref": "situation:draft",
-          "permalink": "https://github.com/acme/api/pull/65"
+          "permalink": "https://github.com/acme/api/pull/65",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -2979,7 +3008,8 @@
             "key": "acme/api#66"
           },
           "ref": "situation:draft",
-          "permalink": "https://github.com/acme/api/pull/66"
+          "permalink": "https://github.com/acme/api/pull/66",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -3041,7 +3071,8 @@
             "key": "acme/api#69"
           },
           "ref": "situation:draft",
-          "permalink": "https://github.com/acme/api/pull/69"
+          "permalink": "https://github.com/acme/api/pull/69",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -3099,7 +3130,8 @@
             "key": "acme/api#70"
           },
           "ref": "situation:draft",
-          "permalink": "https://github.com/acme/api/pull/70"
+          "permalink": "https://github.com/acme/api/pull/70",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -3174,7 +3206,8 @@
             "key": "acme/api#73"
           },
           "ref": "situation:checks",
-          "permalink": "https://github.com/acme/api/pull/73"
+          "permalink": "https://github.com/acme/api/pull/73",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -3233,7 +3266,8 @@
             "key": "acme/api#74"
           },
           "ref": "situation:checks",
-          "permalink": "https://github.com/acme/api/pull/74"
+          "permalink": "https://github.com/acme/api/pull/74",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -3307,7 +3341,8 @@
             "key": "acme/api#77"
           },
           "ref": "situation:checks",
-          "permalink": "https://github.com/acme/api/pull/77"
+          "permalink": "https://github.com/acme/api/pull/77",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -3365,7 +3400,8 @@
             "key": "acme/api#78"
           },
           "ref": "situation:checks",
-          "permalink": "https://github.com/acme/api/pull/78"
+          "permalink": "https://github.com/acme/api/pull/78",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -3440,7 +3476,8 @@
             "key": "acme/api#81"
           },
           "ref": "situation:changes",
-          "permalink": "https://github.com/acme/api/pull/81"
+          "permalink": "https://github.com/acme/api/pull/81",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -3499,7 +3536,8 @@
             "key": "acme/api#82"
           },
           "ref": "situation:changes",
-          "permalink": "https://github.com/acme/api/pull/82"
+          "permalink": "https://github.com/acme/api/pull/82",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -3574,7 +3612,8 @@
             "key": "acme/api#85"
           },
           "ref": "situation:changes",
-          "permalink": "https://github.com/acme/api/pull/85"
+          "permalink": "https://github.com/acme/api/pull/85",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -3633,7 +3672,8 @@
             "key": "acme/api#86"
           },
           "ref": "situation:changes",
-          "permalink": "https://github.com/acme/api/pull/86"
+          "permalink": "https://github.com/acme/api/pull/86",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -3708,7 +3748,8 @@
             "key": "acme/api#89"
           },
           "ref": "situation:changes",
-          "permalink": "https://github.com/acme/api/pull/89"
+          "permalink": "https://github.com/acme/api/pull/89",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -3767,7 +3808,8 @@
             "key": "acme/api#90"
           },
           "ref": "situation:changes",
-          "permalink": "https://github.com/acme/api/pull/90"
+          "permalink": "https://github.com/acme/api/pull/90",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -3841,7 +3883,8 @@
             "key": "acme/api#93"
           },
           "ref": "situation:changes",
-          "permalink": "https://github.com/acme/api/pull/93"
+          "permalink": "https://github.com/acme/api/pull/93",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -3899,7 +3942,8 @@
             "key": "acme/api#94"
           },
           "ref": "situation:changes",
-          "permalink": "https://github.com/acme/api/pull/94"
+          "permalink": "https://github.com/acme/api/pull/94",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -3974,7 +4018,8 @@
             "key": "acme/api#97"
           },
           "ref": "situation:merge",
-          "permalink": "https://github.com/acme/api/pull/97"
+          "permalink": "https://github.com/acme/api/pull/97",
+          "at": "2026-10-22T13:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -4033,7 +4078,8 @@
             "key": "acme/api#98"
           },
           "ref": "situation:merge",
-          "permalink": "https://github.com/acme/api/pull/98"
+          "permalink": "https://github.com/acme/api/pull/98",
+          "at": "2026-10-22T13:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -4107,7 +4153,8 @@
             "key": "acme/api#101"
           },
           "ref": "situation:merge",
-          "permalink": "https://github.com/acme/api/pull/101"
+          "permalink": "https://github.com/acme/api/pull/101",
+          "at": "2026-10-22T13:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -4165,7 +4212,8 @@
             "key": "acme/api#102"
           },
           "ref": "situation:merge",
-          "permalink": "https://github.com/acme/api/pull/102"
+          "permalink": "https://github.com/acme/api/pull/102",
+          "at": "2026-10-22T13:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -4240,7 +4288,8 @@
             "key": "acme/api#105"
           },
           "ref": "situation:conflicts",
-          "permalink": "https://github.com/acme/api/pull/105"
+          "permalink": "https://github.com/acme/api/pull/105",
+          "at": "2026-10-22T14:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -4299,7 +4348,8 @@
             "key": "acme/api#106"
           },
           "ref": "situation:conflicts",
-          "permalink": "https://github.com/acme/api/pull/106"
+          "permalink": "https://github.com/acme/api/pull/106",
+          "at": "2026-10-22T14:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -4373,7 +4423,8 @@
             "key": "acme/api#109"
           },
           "ref": "situation:conflicts",
-          "permalink": "https://github.com/acme/api/pull/109"
+          "permalink": "https://github.com/acme/api/pull/109",
+          "at": "2026-10-22T14:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -4431,7 +4482,8 @@
             "key": "acme/api#110"
           },
           "ref": "situation:conflicts",
-          "permalink": "https://github.com/acme/api/pull/110"
+          "permalink": "https://github.com/acme/api/pull/110",
+          "at": "2026-10-22T14:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -4506,7 +4558,8 @@
             "key": "acme/api#113"
           },
           "ref": "situation:no_reviewer",
-          "permalink": "https://github.com/acme/api/pull/113"
+          "permalink": "https://github.com/acme/api/pull/113",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -4565,7 +4618,8 @@
             "key": "acme/api#114"
           },
           "ref": "situation:no_reviewer",
-          "permalink": "https://github.com/acme/api/pull/114"
+          "permalink": "https://github.com/acme/api/pull/114",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -4640,7 +4694,8 @@
             "key": "acme/api#117"
           },
           "ref": "situation:reply",
-          "permalink": "https://github.com/acme/api/pull/117"
+          "permalink": "https://github.com/acme/api/pull/117",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -4699,7 +4754,8 @@
             "key": "acme/api#118"
           },
           "ref": "situation:reply",
-          "permalink": "https://github.com/acme/api/pull/118"
+          "permalink": "https://github.com/acme/api/pull/118",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -4774,7 +4830,8 @@
             "key": "acme/api#121"
           },
           "ref": "situation:reply",
-          "permalink": "https://github.com/acme/api/pull/121"
+          "permalink": "https://github.com/acme/api/pull/121",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -4833,7 +4890,8 @@
             "key": "acme/api#122"
           },
           "ref": "situation:reply",
-          "permalink": "https://github.com/acme/api/pull/122"
+          "permalink": "https://github.com/acme/api/pull/122",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -4907,7 +4965,8 @@
             "key": "acme/api#125"
           },
           "ref": "situation:reply",
-          "permalink": "https://github.com/acme/api/pull/125"
+          "permalink": "https://github.com/acme/api/pull/125",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -4965,7 +5024,8 @@
             "key": "acme/api#126"
           },
           "ref": "situation:reply",
-          "permalink": "https://github.com/acme/api/pull/126"
+          "permalink": "https://github.com/acme/api/pull/126",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -5040,7 +5100,8 @@
             "key": "acme/api#129"
           },
           "ref": "situation:no_reviewer",
-          "permalink": "https://github.com/acme/api/pull/129"
+          "permalink": "https://github.com/acme/api/pull/129",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -5099,7 +5160,8 @@
             "key": "acme/api#130"
           },
           "ref": "situation:no_reviewer",
-          "permalink": "https://github.com/acme/api/pull/130"
+          "permalink": "https://github.com/acme/api/pull/130",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -5174,7 +5236,8 @@
             "key": "acme/api#133"
           },
           "ref": "situation:reviewer_back",
-          "permalink": "https://github.com/acme/api/pull/133"
+          "permalink": "https://github.com/acme/api/pull/133",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:alice",
@@ -5233,7 +5296,8 @@
             "key": "acme/api#134"
           },
           "ref": "situation:reviewer_back",
-          "permalink": "https://github.com/acme/api/pull/134"
+          "permalink": "https://github.com/acme/api/pull/134",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:alice",
@@ -5308,7 +5372,8 @@
             "key": "acme/api#137"
           },
           "ref": "situation:reviewer_back",
-          "permalink": "https://github.com/acme/api/pull/137"
+          "permalink": "https://github.com/acme/api/pull/137",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -5367,7 +5432,8 @@
             "key": "acme/api#138"
           },
           "ref": "situation:reviewer_back",
-          "permalink": "https://github.com/acme/api/pull/138"
+          "permalink": "https://github.com/acme/api/pull/138",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -5441,7 +5507,8 @@
             "key": "acme/api#141"
           },
           "ref": "situation:reviewer_back",
-          "permalink": "https://github.com/acme/api/pull/141"
+          "permalink": "https://github.com/acme/api/pull/141",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -5499,7 +5566,8 @@
             "key": "acme/api#142"
           },
           "ref": "situation:reviewer_back",
-          "permalink": "https://github.com/acme/api/pull/142"
+          "permalink": "https://github.com/acme/api/pull/142",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -5574,7 +5642,8 @@
             "key": "acme/api#145"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/145"
+          "permalink": "https://github.com/acme/api/pull/145",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -5633,7 +5702,8 @@
             "key": "acme/api#146"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/146"
+          "permalink": "https://github.com/acme/api/pull/146",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -5708,7 +5778,8 @@
             "key": "acme/api#149"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/149"
+          "permalink": "https://github.com/acme/api/pull/149",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:alice",
@@ -5767,7 +5838,8 @@
             "key": "acme/api#150"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/150"
+          "permalink": "https://github.com/acme/api/pull/150",
+          "at": "2026-10-22T12:00:00Z"
         },
         "requester": {
           "key": "github:alice",
@@ -5842,7 +5914,8 @@
             "key": "acme/api#153"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/153"
+          "permalink": "https://github.com/acme/api/pull/153",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -5901,7 +5974,8 @@
             "key": "acme/api#154"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/154"
+          "permalink": "https://github.com/acme/api/pull/154",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -5976,7 +6050,8 @@
             "key": "acme/api#157"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/157"
+          "permalink": "https://github.com/acme/api/pull/157",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:alice",
@@ -6035,7 +6110,8 @@
             "key": "acme/api#158"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/158"
+          "permalink": "https://github.com/acme/api/pull/158",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:alice",
@@ -6110,7 +6186,8 @@
             "key": "acme/api#161"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/161"
+          "permalink": "https://github.com/acme/api/pull/161",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -6169,7 +6246,8 @@
             "key": "acme/api#162"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/162"
+          "permalink": "https://github.com/acme/api/pull/162",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -6243,7 +6321,8 @@
             "key": "acme/api#165"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/165"
+          "permalink": "https://github.com/acme/api/pull/165",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -6301,7 +6380,8 @@
             "key": "acme/api#166"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/166"
+          "permalink": "https://github.com/acme/api/pull/166",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -6376,7 +6456,8 @@
             "key": "acme/api#169"
           },
           "ref": "situation:no_reviewer",
-          "permalink": "https://github.com/acme/api/pull/169"
+          "permalink": "https://github.com/acme/api/pull/169",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -6435,7 +6516,8 @@
             "key": "acme/api#170"
           },
           "ref": "situation:no_reviewer",
-          "permalink": "https://github.com/acme/api/pull/170"
+          "permalink": "https://github.com/acme/api/pull/170",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -6509,7 +6591,8 @@
             "key": "acme/api#173"
           },
           "ref": "situation:no_reviewer",
-          "permalink": "https://github.com/acme/api/pull/173"
+          "permalink": "https://github.com/acme/api/pull/173",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -6567,7 +6650,8 @@
             "key": "acme/api#174"
           },
           "ref": "situation:no_reviewer",
-          "permalink": "https://github.com/acme/api/pull/174"
+          "permalink": "https://github.com/acme/api/pull/174",
+          "at": "2026-10-20T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -6642,7 +6726,8 @@
             "key": "acme/api#177"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/177"
+          "permalink": "https://github.com/acme/api/pull/177",
+          "at": "2026-10-12T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -6701,7 +6786,8 @@
             "key": "acme/api#178"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/178"
+          "permalink": "https://github.com/acme/api/pull/178",
+          "at": "2026-10-12T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -6775,7 +6861,8 @@
             "key": "acme/api#181"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/181"
+          "permalink": "https://github.com/acme/api/pull/181",
+          "at": "2026-10-12T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -6833,7 +6920,8 @@
             "key": "acme/api#182"
           },
           "ref": "situation:review",
-          "permalink": "https://github.com/acme/api/pull/182"
+          "permalink": "https://github.com/acme/api/pull/182",
+          "at": "2026-10-12T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -6908,7 +6996,8 @@
             "key": "acme/api#185"
           },
           "ref": "situation:changes",
-          "permalink": "https://github.com/acme/api/pull/185"
+          "permalink": "https://github.com/acme/api/pull/185",
+          "at": "2026-10-14T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -6967,7 +7056,8 @@
             "key": "acme/api#186"
           },
           "ref": "situation:changes",
-          "permalink": "https://github.com/acme/api/pull/186"
+          "permalink": "https://github.com/acme/api/pull/186",
+          "at": "2026-10-14T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -7042,7 +7132,8 @@
             "key": "acme/api#189"
           },
           "ref": "situation:changes",
-          "permalink": "https://github.com/acme/api/pull/189"
+          "permalink": "https://github.com/acme/api/pull/189",
+          "at": "2026-10-14T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -7101,7 +7192,8 @@
             "key": "acme/api#190"
           },
           "ref": "situation:changes",
-          "permalink": "https://github.com/acme/api/pull/190"
+          "permalink": "https://github.com/acme/api/pull/190",
+          "at": "2026-10-14T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -7176,7 +7268,8 @@
             "key": "acme/api#193"
           },
           "ref": "situation:merge",
-          "permalink": "https://github.com/acme/api/pull/193"
+          "permalink": "https://github.com/acme/api/pull/193",
+          "at": "2026-10-21T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -7235,7 +7328,8 @@
             "key": "acme/api#194"
           },
           "ref": "situation:merge",
-          "permalink": "https://github.com/acme/api/pull/194"
+          "permalink": "https://github.com/acme/api/pull/194",
+          "at": "2026-10-21T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -7293,7 +7387,8 @@
             "key": "acme/api#195"
           },
           "ref": "situation:merge",
-          "permalink": "https://github.com/acme/api/pull/195"
+          "permalink": "https://github.com/acme/api/pull/195",
+          "at": "2026-10-21T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -7352,7 +7447,8 @@
             "key": "acme/api#196"
           },
           "ref": "situation:merge",
-          "permalink": "https://github.com/acme/api/pull/196"
+          "permalink": "https://github.com/acme/api/pull/196",
+          "at": "2026-10-21T15:00:00Z"
         },
         "requester": {
           "key": "github:octocat",
@@ -7387,56 +7483,7 @@
     "waits_on": "author",
     "needs_me": false,
     "in_scope": true,
-    "items": [
-      {
-        "id": "gh:follow",
-        "unit": {
-          "provider": "github",
-          "key": "acme/api#197"
-        },
-        "kind": "todo",
-        "summary": "Follow acme/api#197: Change 197",
-        "context": "",
-        "urls": [
-          "https://github.com/acme/api/pull/197"
-        ],
-        "contexts": [
-          "@repo-api"
-        ],
-        "origin": {
-          "unit": {
-            "provider": "github",
-            "key": "acme/api#197"
-          },
-          "ref": "situation:merge",
-          "permalink": "https://github.com/acme/api/pull/197"
-        },
-        "requester": {
-          "key": "github:octocat",
-          "name": "octocat"
-        },
-        "assignees": [
-          {
-            "key": "github:alice",
-            "name": "alice"
-          }
-        ],
-        "basis": "none",
-        "waiting_on": [
-          {
-            "key": "github:alice",
-            "name": "alice"
-          }
-        ],
-        "state": "open",
-        "confidence": "high",
-        "provenance": "derived",
-        "confirmed": false,
-        "task_key": "github:acme/api#197",
-        "created_at": "0001-01-01T00:00:00Z",
-        "updated_at": "0001-01-01T00:00:00Z"
-      }
-    ]
+    "items": []
   },
   {
     "name": "approved_by_viewer/theirs/in/muted",
@@ -7445,56 +7492,7 @@
     "waits_on": "nobody",
     "needs_me": false,
     "in_scope": true,
-    "items": [
-      {
-        "id": "gh:follow",
-        "unit": {
-          "provider": "github",
-          "key": "acme/api#198"
-        },
-        "kind": "todo",
-        "summary": "Follow acme/api#198: Change 198",
-        "context": "",
-        "urls": [
-          "https://github.com/acme/api/pull/198"
-        ],
-        "contexts": [
-          "@repo-api"
-        ],
-        "origin": {
-          "unit": {
-            "provider": "github",
-            "key": "acme/api#198"
-          },
-          "ref": "situation:merge",
-          "permalink": "https://github.com/acme/api/pull/198"
-        },
-        "requester": {
-          "key": "github:octocat",
-          "name": "octocat"
-        },
-        "assignees": [
-          {
-            "key": "github:alice",
-            "name": "alice"
-          }
-        ],
-        "basis": "none",
-        "waiting_on": [
-          {
-            "key": "github:alice",
-            "name": "alice"
-          }
-        ],
-        "state": "open",
-        "confidence": "high",
-        "provenance": "derived",
-        "confirmed": false,
-        "task_key": "github:acme/api#198",
-        "created_at": "0001-01-01T00:00:00Z",
-        "updated_at": "0001-01-01T00:00:00Z"
-      }
-    ]
+    "items": []
   },
   {
     "name": "approved_by_viewer/theirs/out",
@@ -7502,56 +7500,7 @@
     "waits_on": "author",
     "needs_me": false,
     "in_scope": true,
-    "items": [
-      {
-        "id": "gh:follow",
-        "unit": {
-          "provider": "github",
-          "key": "acme/api#199"
-        },
-        "kind": "todo",
-        "summary": "Follow acme/api#199: Change 199",
-        "context": "",
-        "urls": [
-          "https://github.com/acme/api/pull/199"
-        ],
-        "contexts": [
-          "@repo-api"
-        ],
-        "origin": {
-          "unit": {
-            "provider": "github",
-            "key": "acme/api#199"
-          },
-          "ref": "situation:merge",
-          "permalink": "https://github.com/acme/api/pull/199"
-        },
-        "requester": {
-          "key": "github:octocat",
-          "name": "octocat"
-        },
-        "assignees": [
-          {
-            "key": "github:alice",
-            "name": "alice"
-          }
-        ],
-        "basis": "none",
-        "waiting_on": [
-          {
-            "key": "github:alice",
-            "name": "alice"
-          }
-        ],
-        "state": "open",
-        "confidence": "high",
-        "provenance": "derived",
-        "confirmed": false,
-        "task_key": "github:acme/api#199",
-        "created_at": "0001-01-01T00:00:00Z",
-        "updated_at": "0001-01-01T00:00:00Z"
-      }
-    ]
+    "items": []
   },
   {
     "name": "approved_by_viewer/theirs/out/muted",
@@ -7560,55 +7509,6 @@
     "waits_on": "nobody",
     "needs_me": false,
     "in_scope": true,
-    "items": [
-      {
-        "id": "gh:follow",
-        "unit": {
-          "provider": "github",
-          "key": "acme/api#200"
-        },
-        "kind": "todo",
-        "summary": "Follow acme/api#200: Change 200",
-        "context": "",
-        "urls": [
-          "https://github.com/acme/api/pull/200"
-        ],
-        "contexts": [
-          "@repo-api"
-        ],
-        "origin": {
-          "unit": {
-            "provider": "github",
-            "key": "acme/api#200"
-          },
-          "ref": "situation:merge",
-          "permalink": "https://github.com/acme/api/pull/200"
-        },
-        "requester": {
-          "key": "github:octocat",
-          "name": "octocat"
-        },
-        "assignees": [
-          {
-            "key": "github:alice",
-            "name": "alice"
-          }
-        ],
-        "basis": "none",
-        "waiting_on": [
-          {
-            "key": "github:alice",
-            "name": "alice"
-          }
-        ],
-        "state": "open",
-        "confidence": "high",
-        "provenance": "derived",
-        "confirmed": false,
-        "task_key": "github:acme/api#200",
-        "created_at": "0001-01-01T00:00:00Z",
-        "updated_at": "0001-01-01T00:00:00Z"
-      }
-    ]
+    "items": []
   }
 ]

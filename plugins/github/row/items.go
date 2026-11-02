@@ -28,10 +28,12 @@ const (
 // on the pull request so they are the asks of its one task: what waits on
 // the viewer when the row needs them or is the viewer's own to merge, staff
 // or answer, what waits on others in scope, and otherwise, while the pull
-// request is open and followed, ItemFollow. A held or blocked round asks
+// request is open and followed, ItemFollow. Someone else's pull request the
+// viewer approved last, that does not need them and that they neither track
+// nor adopted, asks nothing: merging it is its author's. A held or blocked round asks
 // through its gate, never an item.
 func (r Row) Items() []src.Item {
-	if r.Payload.Viewer == "" || r.Kind() == situation.KindDone {
+	if r.Payload.Viewer == "" || r.Kind() == situation.KindDone || r.approvedByMe() && !r.needsMe() && !r.Payload.Override.Tracked && !r.Payload.Override.Adopted {
 		return nil
 	}
 	out := r.asks()
@@ -179,7 +181,7 @@ func (r Row) item(kind, category string, contexts []string) src.Item {
 		URLs:       []string{link},
 		Contexts:   contexts,
 		Category:   category,
-		Origin:     src.Anchor{Unit: r.PR.Ref.Unit(), Ref: "situation:" + string(r.Kind()), Permalink: link},
+		Origin:     src.Anchor{Unit: r.PR.Ref.Unit(), Ref: "situation:" + string(r.Kind()), Permalink: link, At: r.Situation.Since},
 		State:      stateOpen,
 		Confidence: confidenceHigh,
 		Provenance: provenanceDerived,
@@ -202,4 +204,20 @@ func (r Row) summary(verb string) string {
 		s += ": " + r.PR.Title
 	}
 	return pr.OneLine(s, summaryMax)
+}
+
+// approvedByMe says the viewer's newest verdict on someone else's pull
+// request approves it, and their review is not pending again.
+func (r Row) approvedByMe() bool {
+	viewer := r.in.Viewer
+	if viewer == "" || r.Mine() || situation.Pending(r.PR, r.in.Events, viewer) {
+		return false
+	}
+	var verdict pr.Event
+	for _, e := range situation.Standing(r.in.Events) {
+		if e.Kind == pr.KindReview && strings.EqualFold(e.Actor, viewer) && !strings.HasPrefix(e.Data, "COMMENTED:") && !e.At.Before(verdict.At) {
+			verdict = e
+		}
+	}
+	return strings.HasPrefix(verdict.Data, "APPROVED:")
 }

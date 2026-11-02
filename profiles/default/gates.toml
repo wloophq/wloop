@@ -45,6 +45,7 @@ answer = true
 [gates.question]
 kind = "question"
 label = "The agent asks"
+closes_with = "dismiss"
 
 [gates.question.intents.answer]
 label = "Answer"
@@ -66,6 +67,7 @@ status = "dismissed"
 [gates.post]
 kind = "post"
 label = "The agent says"
+closes_with = "dismiss"
 
 [gates.post.intents.reply]
 label = "Reply"
@@ -110,6 +112,7 @@ status = "dismissed"
 [gates.review-diff]
 kind = "step"
 label = "Review the diff"
+closes_with = "dismiss"
 
 [gates.review-diff.intents.approve]
 label = "Looks good"
@@ -124,6 +127,7 @@ status = "dismissed"
 [gates.missing-record]
 kind = "question"
 label = "The run stopped: it failed or ended without its record"
+closes_with = "dismiss"
 
 [gates.missing-record.intents.answer]
 label = "Answer"

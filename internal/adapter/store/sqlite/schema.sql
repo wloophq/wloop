@@ -296,7 +296,7 @@ CREATE TABLE links (
 CREATE INDEX links_to ON links (to_provider, to_key);
 
 -- category is the category of state, as the profile declares it; review_every (seconds) and reviewed_at are a
--- parent's review.
+-- parent's review; open_changed_at is when the task last opened or closed.
 CREATE TABLE tasks (
   id TEXT PRIMARY KEY,
   state TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
@@ -306,7 +306,8 @@ CREATE TABLE tasks (
   origin TEXT NOT NULL, created TEXT NOT NULL, updated TEXT NOT NULL,
   rev INTEGER NOT NULL,
   category TEXT NOT NULL DEFAULT '',
-  review_every INTEGER NOT NULL DEFAULT 0, reviewed_at TEXT NOT NULL DEFAULT ''
+  review_every INTEGER NOT NULL DEFAULT 0, reviewed_at TEXT NOT NULL DEFAULT '',
+  open_changed_at TEXT NOT NULL DEFAULT ''
 ) WITHOUT ROWID;
 CREATE INDEX tasks_state ON tasks (state);
 CREATE INDEX tasks_rev ON tasks (rev);

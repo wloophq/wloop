@@ -44,7 +44,7 @@ const (
 )
 
 // syncInputs are the notes whose units Sync reconciles.
-const syncInputs = port.TopicItems | port.TopicSourceEvents | port.TopicCards
+const syncInputs = port.TopicItems | port.TopicSourceEvents | port.TopicCards | port.TopicGates
 
 // taskInputs are the notes after which a change carries the counters: a view reads the tasks, their gates and
 // their wakes.
@@ -995,7 +995,7 @@ func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
 	return out
 }
 
-// syncTasks runs Sync once per burst of item, source-event and card notes, on its own goroutine, until ctx
+// syncTasks runs Sync once per burst of item, source-event, card and gate notes, on its own goroutine, until ctx
 // ends: everything at start, after an All note and when the user's identity grows, and each minute for the
 // snoozes and stars that come due. At start and after each profile reload it first recategorizes the stored
 // tasks.

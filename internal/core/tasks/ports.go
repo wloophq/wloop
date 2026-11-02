@@ -5,6 +5,7 @@ package tasks
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/gate"
@@ -117,10 +118,11 @@ type Request struct {
 	Approved int64
 }
 
-// Drafts settles the drafts of a task a verb ended: e as the verb left it, done or dropped. The verb stands
-// whatever happens to them, so Ended reports its own failures.
-type Drafts interface {
-	Ended(ctx context.Context, e task.Task, v task.Verb)
+// Ending settles what a task that ended still holds, its drafts and gates: e as it was left, done or dropped, by
+// verb v of by, or by no verb when the source ended it. The end stands whatever happens to them, so Ended
+// reports its own failures.
+type Ending interface {
+	Ended(ctx context.Context, e task.Task, v task.Verb, by task.Actor)
 }
 
 // Gates are the gates a gated verb opens and reads back: one open gate per proposal.
@@ -128,6 +130,8 @@ type Gates interface {
 	Open(ctx context.Context, g gate.Gate) (gate.Gate, error)
 	Get(ctx context.Context, id int64) (gate.Gate, error)
 	OfTask(ctx context.Context, id task.ID) ([]gate.Gate, error)
+	// HoldsTask says whether an open gate of task id holds it open until a person settles it or its unit ends.
+	HoldsTask(ctx context.Context, id task.ID) (bool, error)
 }
 
 type Result struct {
@@ -166,8 +170,8 @@ type States interface {
 	Gate(verb string) (gate.Gate, bool)
 }
 
-// Recategorizer rewrites the stored tasks' categories from their states, as of reads them, noting the tasks
-// it moved. Unknown are the states tasks hold that of does not know; their tasks keep their category.
+// Recategorizer rewrites the stored tasks' categories from their states, as of reads them, at at, noting the
+// tasks it moved. Unknown are the states tasks hold that of does not know; their tasks keep their category.
 type Recategorizer interface {
-	Recategorize(ctx context.Context, of func(state string) (task.Category, bool)) (unknown []string, err error)
+	Recategorize(ctx context.Context, of func(state string) (task.Category, bool), at time.Time) (unknown []string, err error)
 }

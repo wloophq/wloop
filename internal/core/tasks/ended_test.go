@@ -12,17 +12,17 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-type endedDrafts struct{ ended []string }
+type endedTasks struct{ ended []string }
 
-func (d *endedDrafts) Ended(_ context.Context, e task.Task, v task.Verb) {
-	d.ended = append(d.ended, string(e.ID)+" "+string(v)+" "+string(e.Category))
+func (d *endedTasks) Ended(_ context.Context, e task.Task, v task.Verb, by task.Actor) {
+	d.ended = append(d.ended, string(e.ID)+" "+string(v)+" "+string(e.Category)+" "+string(by))
 }
 
 func TestAVerbThatEndsATaskSettlesItsDrafts(t *testing.T) {
 	r := newRig()
-	drafts := &endedDrafts{}
+	drafts := &endedTasks{}
 	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates,
-		Authority: taskstest.BundledStates.Authority, Wakes: r.wakes, Drafts: drafts})
+		Authority: taskstest.BundledStates.Authority, Wakes: r.wakes, Ending: drafts})
 	for _, c := range []struct {
 		id   task.ID
 		from string
@@ -34,7 +34,7 @@ func TestAVerbThatEndsATaskSettlesItsDrafts(t *testing.T) {
 			t.Fatalf("%s on %s: %v", c.verb, c.id, err)
 		}
 	}
-	want := []string{"t-done done done", "t-dismissed dismiss dropped", "t-filed reference done"}
+	want := []string{"t-done done done person", "t-dismissed dismiss dropped person", "t-filed reference done person"}
 	if !slices.Equal(drafts.ended, want) {
 		t.Errorf("settled %q, want %q: only a verb that takes an open task to done or dropped settles its drafts", drafts.ended, want)
 	}
@@ -47,7 +47,7 @@ type reentrantDrafts struct {
 	err error
 }
 
-func (d *reentrantDrafts) Ended(ctx context.Context, e task.Task, _ task.Verb) {
+func (d *reentrantDrafts) Ended(ctx context.Context, e task.Task, _ task.Verb, _ task.Actor) {
 	d.err = d.svc.EndHeld(ctx, e.ID, task.CategoryDropped)
 }
 
@@ -55,7 +55,7 @@ func TestSettlingTheDraftsOfAnEndedTaskCanCallBackIntoTheTasks(t *testing.T) {
 	r := newRig()
 	drafts := &reentrantDrafts{}
 	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates,
-		Authority: taskstest.BundledStates.Authority, Wakes: r.wakes, Drafts: drafts})
+		Authority: taskstest.BundledStates.Authority, Wakes: r.wakes, Ending: drafts})
 	drafts.svc = r.svc
 	coretasks.SetRaceHooks(r.svc, nil, func() { t.Fatal("settling the drafts waited on the lock the verb still held") })
 	e := r.put(t, task.Task{ID: "t-held", State: "inbox", Origin: task.OriginGate})
@@ -66,9 +66,9 @@ func TestSettlingTheDraftsOfAnEndedTaskCanCallBackIntoTheTasks(t *testing.T) {
 
 func TestAVerbItsHandlerEndsSettlesTheTasksDraftsToo(t *testing.T) {
 	r := newRig()
-	drafts := &endedDrafts{}
+	drafts := &endedTasks{}
 	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates,
-		Authority: taskstest.BundledStates.Authority, Wakes: r.wakes, Drafts: drafts})
+		Authority: taskstest.BundledStates.Authority, Wakes: r.wakes, Ending: drafts})
 	r.svc.Register(coretasks.EveryKind, "finish", func(ctx context.Context, e task.Task, _ coretasks.Request) (coretasks.Result, error) {
 		return coretasks.Result{}, r.svc.Close(ctx, e.ID, task.CategoryDone)
 	})
@@ -76,7 +76,7 @@ func TestAVerbItsHandlerEndsSettlesTheTasksDraftsToo(t *testing.T) {
 	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone}); err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"t-finished done done"}; !slices.Equal(drafts.ended, want) {
+	if want := []string{"t-finished done done person"}; !slices.Equal(drafts.ended, want) {
 		t.Errorf("settled %q, want %q: a verb its handler runs settles the drafts of the task it ended", drafts.ended, want)
 	}
 }
@@ -96,9 +96,9 @@ func TestATaskNoLongerStoredHasEnded(t *testing.T) {
 
 func TestATaskReconcileOrItsUnitClosingEndsSettlesItsDrafts(t *testing.T) {
 	r := newRig()
-	drafts := &endedDrafts{}
+	drafts := &endedTasks{}
 	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates,
-		Authority: taskstest.BundledStates.Authority, Wakes: r.wakes, Drafts: drafts})
+		Authority: taskstest.BundledStates.Authority, Wakes: r.wakes, Ending: drafts})
 	coretasks.SetRaceHooks(r.svc, nil, func() { t.Fatal("settling the drafts waited on the lock the change still held") })
 	ctx := context.Background()
 	r.items.byUnit[unitU] = []items.Item{owed(unitU, "a")}
@@ -121,7 +121,7 @@ func TestATaskReconcileOrItsUnitClosingEndsSettlesItsDrafts(t *testing.T) {
 	if err := r.svc.UnitClosed(ctx, other); err != nil {
 		t.Fatal(err)
 	}
-	want := []string{string(es[0].ID) + "  " + string(r.task(t, es[0].ID).Category), string(held.ID) + "  done"}
+	want := []string{string(es[0].ID) + "  " + string(r.task(t, es[0].ID).Category) + " plugin", string(held.ID) + "  done plugin"}
 	if !slices.Equal(drafts.ended, want) {
 		t.Errorf("settled %q, want %q: a task reconcile or its unit's closing ends settles its drafts", drafts.ended, want)
 	}

@@ -90,7 +90,8 @@
               "key": "acme/api#1"
             },
             "ref": "situation:review",
-            "permalink": "https://github.com/acme/api/pull/1"
+            "permalink": "https://github.com/acme/api/pull/1",
+            "at": "2026-10-14T02:00:00Z"
           },
           "requester": {
             "key": "github:ana",
@@ -408,7 +409,8 @@
               "key": "acme/api#2"
             },
             "ref": "situation:review",
-            "permalink": "https://github.com/acme/api/pull/2"
+            "permalink": "https://github.com/acme/api/pull/2",
+            "at": "2026-10-13T13:00:00Z"
           },
           "requester": {
             "key": "github:bob",
@@ -727,7 +729,8 @@
               "key": "acme/api#3"
             },
             "ref": "situation:review",
-            "permalink": "https://github.com/acme/api/pull/3"
+            "permalink": "https://github.com/acme/api/pull/3",
+            "at": "2026-10-13T00:00:00Z"
           },
           "requester": {
             "key": "github:me-login",
@@ -1050,7 +1053,8 @@
               "key": "acme/api#4"
             },
             "ref": "situation:no_reviewer",
-            "permalink": "https://github.com/acme/api/pull/4"
+            "permalink": "https://github.com/acme/api/pull/4",
+            "at": "2026-10-12T11:00:00Z"
           },
           "requester": {
             "key": "github:me-login",
@@ -1372,7 +1376,8 @@
               "key": "acme/api#5"
             },
             "ref": "situation:draft",
-            "permalink": "https://github.com/acme/api/pull/5"
+            "permalink": "https://github.com/acme/api/pull/5",
+            "at": "2026-10-11T22:00:00Z"
           },
           "requester": {
             "key": "github:me-login",
@@ -1698,7 +1703,8 @@
               "key": "acme/api#6"
             },
             "ref": "situation:checks",
-            "permalink": "https://github.com/acme/api/pull/6"
+            "permalink": "https://github.com/acme/api/pull/6",
+            "at": "2026-10-11T09:00:00Z"
           },
           "requester": {
             "key": "github:me-login",
@@ -2056,7 +2062,8 @@
               "key": "acme/api#7"
             },
             "ref": "situation:changes",
-            "permalink": "https://github.com/acme/api/pull/7"
+            "permalink": "https://github.com/acme/api/pull/7",
+            "at": "2026-10-05T15:00:00Z"
           },
           "requester": {
             "key": "github:me-login",
@@ -2405,7 +2412,8 @@
               "key": "acme/api#8"
             },
             "ref": "situation:merge",
-            "permalink": "https://github.com/acme/api/pull/8"
+            "permalink": "https://github.com/acme/api/pull/8",
+            "at": "2026-10-14T13:00:00Z"
           },
           "requester": {
             "key": "github:me-login",
@@ -2738,7 +2746,8 @@
               "key": "acme/api#9"
             },
             "ref": "situation:conflicts",
-            "permalink": "https://github.com/acme/api/pull/9"
+            "permalink": "https://github.com/acme/api/pull/9",
+            "at": "2026-10-14T14:00:00Z"
           },
           "requester": {
             "key": "github:me-login",
@@ -3070,7 +3079,8 @@
               "key": "acme/api#10"
             },
             "ref": "situation:reply",
-            "permalink": "https://github.com/acme/api/pull/10"
+            "permalink": "https://github.com/acme/api/pull/10",
+            "at": "2026-10-09T15:00:00Z"
           },
           "requester": {
             "key": "github:me-login",
@@ -3408,7 +3418,8 @@
               "key": "acme/api#11"
             },
             "ref": "situation:no_reviewer",
-            "permalink": "https://github.com/acme/api/pull/11"
+            "permalink": "https://github.com/acme/api/pull/11",
+            "at": "2026-10-08T16:00:00Z"
           },
           "requester": {
             "key": "github:me-login",
@@ -4245,7 +4256,8 @@
               "key": "acme/api#18"
             },
             "ref": "situation:held",
-            "permalink": "https://github.com/acme/api/pull/18"
+            "permalink": "https://github.com/acme/api/pull/18",
+            "at": "2026-10-14T14:00:00Z"
           },
           "requester": {
             "key": "github:me-login",
@@ -4557,7 +4569,8 @@
               "key": "acme/api#19"
             },
             "ref": "situation:blocked",
-            "permalink": "https://github.com/acme/api/pull/19"
+            "permalink": "https://github.com/acme/api/pull/19",
+            "at": "2026-10-14T13:00:00Z"
           },
           "requester": {
             "key": "github:me-login",
@@ -4869,7 +4882,8 @@
               "key": "acme/api#20"
             },
             "ref": "situation:to_address",
-            "permalink": "https://github.com/acme/api/pull/20"
+            "permalink": "https://github.com/acme/api/pull/20",
+            "at": "2026-10-14T12:00:00Z"
           },
           "requester": {
             "key": "github:me-login",
@@ -5512,7 +5526,8 @@
               "key": "acme/api#26"
             },
             "ref": "situation:review",
-            "permalink": "https://github.com/acme/api/pull/26"
+            "permalink": "https://github.com/acme/api/pull/26",
+            "at": "2026-09-30T13:00:00Z"
           },
           "requester": {
             "key": "github:me-login",
@@ -5839,7 +5854,8 @@
               "key": "acme/api#27"
             },
             "ref": "situation:no_reviewer",
-            "permalink": "https://github.com/acme/api/pull/27"
+            "permalink": "https://github.com/acme/api/pull/27",
+            "at": "2026-09-30T00:00:00Z"
           },
           "requester": {
             "key": "github:me-login",
@@ -6141,52 +6157,6 @@
         "turns_link": "#unit=github/acme/api#28",
         "cares": true
       },
-      "items": [
-        {
-          "id": "gh:follow",
-          "unit": {
-            "provider": "github",
-            "key": "acme/api#28"
-          },
-          "kind": "todo",
-          "summary": "Follow acme/api#28: change ana",
-          "urls": [
-            "https://github.com/acme/api/pull/28"
-          ],
-          "contexts": [
-            "@repo-api"
-          ],
-          "origin": {
-            "unit": {
-              "provider": "github",
-              "key": "acme/api#28"
-            },
-            "ref": "situation:merge",
-            "permalink": "https://github.com/acme/api/pull/28"
-          },
-          "requester": {
-            "key": "github:me-login",
-            "name": "me-login"
-          },
-          "assignees": [
-            {
-              "key": "github:ana",
-              "name": "ana"
-            }
-          ],
-          "basis": "none",
-          "waiting_on": [
-            {
-              "key": "github:ana",
-              "name": "ana"
-            }
-          ],
-          "state": "open",
-          "confidence": "high",
-          "provenance": "derived",
-          "task_key": "github:acme/api#28"
-        }
-      ],
       "facts": [
         {
           "name": "pr.repo",
@@ -6502,7 +6472,8 @@
               "key": "acme/api#31"
             },
             "ref": "situation:review",
-            "permalink": "https://github.com/acme/api/pull/31"
+            "permalink": "https://github.com/acme/api/pull/31",
+            "at": "2026-08-15T15:00:00Z"
           },
           "requester": {
             "key": "github:ana",
