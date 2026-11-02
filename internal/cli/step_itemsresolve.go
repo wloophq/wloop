@@ -48,7 +48,7 @@ func (s *stepSet) itemsResolveRun(ctx context.Context, c stepCall, _ automation.
 	if err != nil {
 		return "", err
 	}
-	if len(got.Refused) > 0 {
+	if len(got.Refused) == len(ops) {
 		return "", automation.Refused{Reason: fmt.Sprintf("the ledger refused %d of %d items: %s", len(got.Refused), len(ops), got.Refused[0].Reason)}
 	}
 	resolved := 0
@@ -61,6 +61,9 @@ func (s *stepSet) itemsResolveRun(ctx context.Context, c stepCall, _ automation.
 	out := fmt.Sprintf("resolved %d items of %s as %s", resolved, id, res)
 	if len(got.Proposed) > 0 {
 		out += fmt.Sprintf(", proposed %d you confirmed", len(got.Proposed))
+	}
+	if len(got.Refused) > 0 {
+		out += fmt.Sprintf(", refused %d: %s", len(got.Refused), got.Refused[0].Reason)
 	}
 	return out, nil
 }

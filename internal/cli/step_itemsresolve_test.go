@@ -139,9 +139,14 @@ func TestItemsResolveReportsWhatTheLedgerDid(t *testing.T) {
 		t.Fatalf("a confirmed item: %q %v", out, err)
 	}
 	l.propose, l.refuse = nil, map[string]bool{"i1": true}
+	if out, err := s.Run(ctx, st, u, why, automation.RunOpts{}); err != nil || !strings.Contains(out, "resolved 1 items") ||
+		!strings.Contains(out, "refused 1: bad anchor") {
+		t.Fatalf("one op refused, one applied: %q %v", out, err)
+	}
+	l.refuse = map[string]bool{"i1": true, "i2": true}
 	_, err := s.Run(ctx, st, u, why, automation.RunOpts{})
 	var refused automation.Refused
-	if !errors.As(err, &refused) || !strings.Contains(refused.Reason, "refused 1 of 2") {
-		t.Fatalf("a refused op: %v", err)
+	if !errors.As(err, &refused) || !strings.Contains(refused.Reason, "refused 2 of 2") {
+		t.Fatalf("every op refused: %v", err)
 	}
 }

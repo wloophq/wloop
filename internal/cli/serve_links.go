@@ -111,6 +111,7 @@ func resolveNoted(ctx context.Context, run func(context.Context, []unit.Unit) (i
 	})()
 	seeded := false
 	var retry, again <-chan time.Time
+	reseeded := false
 	for {
 		if !seeded {
 			targets, err := seed(ctx)
@@ -119,8 +120,7 @@ func resolveNoted(ctx context.Context, run func(context.Context, []unit.Unit) (i
 				retry = time.After(linksRetry)
 			} else {
 				add(targets)
-				seeded = true
-				again = time.After(every)
+				seeded, reseeded = true, true
 			}
 		}
 		mu.Lock()
@@ -139,6 +139,9 @@ func resolveNoted(ctx context.Context, run func(context.Context, []unit.Unit) (i
 				add(units)
 				retry = time.After(linksRetry)
 			}
+		}
+		if reseeded {
+			again, reseeded = time.After(every), false
 		}
 		select {
 		case <-ctx.Done():

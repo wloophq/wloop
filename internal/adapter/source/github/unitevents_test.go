@@ -31,8 +31,8 @@ func TestGitHubUnitEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 	u := ref.Unit()
-	reported := prStates{ref: {Ref: ref, State: "CLOSED", ClosedAt: at(6)}}
-	got, err := UnitEvents{Store: st, PRs: reported}.UnitEvents(ctx, u, now)
+	reported := prStates{ref: {Ref: ref, State: "CLOSED", ClosedAt: at(6), LastSeenAt: at(6)}}
+	got, err := UnitEvents{Store: st, PRs: reported, Fresh: time.Hour, Now: func() time.Time { return at(6) }}.UnitEvents(ctx, u, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,10 +52,10 @@ func TestGitHubUnitEvents(t *testing.T) {
 		}
 	}
 	outside := github.Ref{Owner: "acme", Repo: "api", Number: 999}.Unit()
-	if got, err := (UnitEvents{Store: st, PRs: reported}).UnitEvents(ctx, outside, time.Time{}); err != nil || got != nil {
+	if got, err := (UnitEvents{Store: st, PRs: reported, Fresh: time.Hour, Now: func() time.Time { return at(6) }}).UnitEvents(ctx, outside, time.Time{}); err != nil || got != nil {
 		t.Fatalf("a pull request outside the inventory = %v, %v", got, err)
 	}
-	if got, err := (UnitEvents{Store: st, PRs: reported}).UnitEvents(ctx, unit.Unit{Provider: "slack", Key: "C1/1"}, now); err == nil || got != nil {
+	if got, err := (UnitEvents{Store: st, PRs: reported, Fresh: time.Hour, Now: func() time.Time { return at(6) }}).UnitEvents(ctx, unit.Unit{Provider: "slack", Key: "C1/1"}, now); err == nil || got != nil {
 		t.Fatalf("a slack unit = %v, %v", got, err)
 	}
 }
@@ -67,7 +67,7 @@ func (s prStates) PR(_ context.Context, ref pr.Ref) (dinv.PR, bool, error) {
 	return p, ok, nil
 }
 
-func TestAPullRequestOpenAgainHasNoClose(t *testing.T) {
+func TestAPullRequestOpenAgainOrNotSeenLatelyHasNoClose(t *testing.T) {
 	ctx := context.Background()
 	st := openStore(t)
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 527}
@@ -75,10 +75,11 @@ func TestAPullRequestOpenAgainHasNoClose(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, states := range map[string]prStates{
-		"reopened":   {ref: {Ref: ref, State: "OPEN", ClosedAt: now.Add(time.Hour)}},
-		"unreported": {},
+		"reopened":                     {ref: {Ref: ref, State: "OPEN", ClosedAt: now.Add(time.Hour)}},
+		"unreported":                   {},
+		"closed, not seen for an hour": {ref: {Ref: ref, State: "CLOSED", ClosedAt: now.Add(-2 * time.Hour), LastSeenAt: now.Add(-time.Hour)}},
 	} {
-		got, err := UnitEvents{Store: st, PRs: states}.UnitEvents(ctx, ref.Unit(), time.Time{})
+		got, err := UnitEvents{Store: st, PRs: states, Fresh: time.Hour, Now: func() time.Time { return now }}.UnitEvents(ctx, ref.Unit(), time.Time{})
 		if err != nil || len(got) != 0 {
 			t.Fatalf("%s: events = %+v, %v", name, got, err)
 		}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -28,11 +29,17 @@ type Refresher interface {
 }
 
 // RetryAfter is how long a target whose read failed waits before the next, RetryNotFoundAfter
-// when its source has no such unit or will not show it.
+// when its source has no such unit or will not show it. ReadEndedEvery is how often a target that
+// ended, and still settles nothing, is read: only a reopening would change it.
 const (
 	RetryAfter         = time.Hour
 	RetryNotFoundAfter = 24 * time.Hour
+	ReadEndedEvery     = 24 * time.Hour
 )
+
+// ErrNotReady is a Refresher's answer while its source cannot read at all, such as a plugin still
+// starting: Run fails with it, so its units run again soon, and the target waits for nothing.
+var ErrNotReady = errors.New("the source cannot read yet")
 
 type Resolver struct {
 	Links  port.LinkStore
@@ -48,8 +55,8 @@ type Resolver struct {
 	mu sync.Mutex
 	// silent is when each target was last logged for each reason.
 	silent map[silentKey]time.Time
-	// failed is until when each target whose read failed waits.
-	failed map[unit.Unit]time.Time
+	// next is until when each target read or tried waits before the next read.
+	next map[unit.Unit]time.Time
 }
 
 type silentKey struct {
@@ -157,9 +164,15 @@ func (p *pass) resolve(ctx context.Context, k itemKey) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	if !ok && p.refresh(ctx, waits) {
-		if op, _, ok, err = p.r.judge(ctx, ls, its[i], p.eventsOf); err != nil {
+	if !ok {
+		read, err := p.refresh(ctx, waits)
+		if err != nil {
 			return 0, err
+		}
+		if read {
+			if op, _, ok, err = p.r.judge(ctx, ls, its[i], p.eventsOf); err != nil {
+				return 0, err
+			}
 		}
 	}
 	if !ok {
@@ -194,52 +207,72 @@ func (p *pass) eventsOf(ctx context.Context, u unit.Unit) ([]link.Event, bool, e
 }
 
 // refresh reads again each target of waits not read yet in this pass; true when it read any.
-func (p *pass) refresh(ctx context.Context, waits []unit.Unit) bool {
+func (p *pass) refresh(ctx context.Context, waits []unit.Unit) (bool, error) {
 	read := false
 	for _, u := range waits {
 		if p.read[u] {
 			continue
 		}
 		p.read[u] = true
-		if p.r.refresh(ctx, u) {
-			delete(p.events, u)
-			read = true
+		got, err := p.r.refresh(ctx, u)
+		if err != nil {
+			return read, fmt.Errorf("read %s: %w", u, err)
+		}
+		if !got {
+			continue
+		}
+		read = true
+		delete(p.events, u)
+		evs, _, err := p.eventsOf(ctx, u)
+		if err != nil {
+			return read, fmt.Errorf("events of %s: %w", u, err)
+		}
+		if slices.ContainsFunc(evs, func(ev link.Event) bool { return ev.Kind == link.EventMerged || ev.Kind == link.EventClosed }) {
+			p.r.wait(u, ReadEndedEvery)
 		}
 	}
-	return read
+	return read, nil
 }
 
-func (r *Resolver) refresh(ctx context.Context, u unit.Unit) bool {
+// refresh reads u again unless it waits; an error is ErrNotReady's alone.
+func (r *Resolver) refresh(ctx context.Context, u unit.Unit) (bool, error) {
 	rf := r.Refresh[u.Provider]
 	if rf == nil {
-		return false
+		return false, nil
 	}
-	now := r.now()
 	r.mu.Lock()
-	until := r.failed[u]
+	until := r.next[u]
 	r.mu.Unlock()
-	if now.Before(until) {
-		return false
+	if r.now().Before(until) {
+		return false, nil
 	}
 	read, err := rf.Refresh(ctx, u)
-	if err != nil {
-		if ctx.Err() != nil {
-			return false
-		}
-		wait := RetryAfter
-		if errors.Is(err, port.ErrNotFound) {
-			wait = RetryNotFoundAfter
-		}
-		r.mu.Lock()
-		if r.failed == nil {
-			r.failed = map[unit.Unit]time.Time{}
-		}
-		r.failed[u] = now.Add(wait)
-		r.mu.Unlock()
-		r.quiet(u, "cannot be read: "+err.Error())
-		return false
+	switch {
+	case err == nil:
+		return read, nil
+	case errors.Is(err, ErrNotReady):
+		return false, err
+	case ctx.Err() != nil:
+		return false, nil
+	case errors.Is(err, port.ErrNotFound):
+		r.wait(u, RetryNotFoundAfter)
+	default:
+		r.wait(u, RetryAfter)
 	}
-	return read
+	r.quiet(u, "cannot be read: "+err.Error())
+	return false, nil
+}
+
+// wait makes u wait d before its next read, dropping the waits that passed.
+func (r *Resolver) wait(u unit.Unit, d time.Duration) {
+	now := r.now()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.next == nil {
+		r.next = map[unit.Unit]time.Time{}
+	}
+	maps.DeleteFunc(r.next, func(_ unit.Unit, until time.Time) bool { return !now.Before(until) })
+	r.next[u] = now.Add(d)
 }
 
 // Settles is the op that settles it, open, through its review and merge links ls from the events their

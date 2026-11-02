@@ -377,6 +377,41 @@ func TestAFailedReadWaitsBeforeTheNext(t *testing.T) {
 	}
 }
 
+func TestATargetItsSourceCannotReadYetIsTriedOnTheNextRun(t *testing.T) {
+	f := newFixture(t, openItem(octocat), reviewLink(link.Merge))
+	rf := &refresher{err: fmt.Errorf("%w: the plugin is starting", links.ErrNotReady)}
+	f.r.Refresh = map[unit.ProviderID]links.Refresher{unit.GitHub: rf}
+	if _, err := f.r.Run(context.Background(), []unit.Unit{pull}); !errors.Is(err, links.ErrNotReady) {
+		t.Fatalf("a source not ready yet = %v", err)
+	}
+	rf.err = nil
+	f.run(t)
+	if len(rf.calls) != 2 || len(f.logs) != 0 {
+		t.Fatalf("reads %v, logs %q", rf.calls, f.logs)
+	}
+}
+
+func TestAnEndedTargetThatSettlesNothingIsReadOnceADay(t *testing.T) {
+	f := newFixture(t, askedAt(t0.Add(-30*time.Minute)), reviewLink(link.Review))
+	rf := &refresher{read: func() { f.events.evs = []link.Event{state(link.EventClosed, t0.Add(-time.Hour))} }}
+	f.r.Refresh = map[unit.ProviderID]links.Refresher{unit.GitHub: rf}
+	now := t0.Add(48 * time.Hour)
+	f.r.Clock = clock{now}
+	if n := f.run(t); n != 0 || len(rf.calls) != 1 {
+		t.Fatalf("resolved = %d, reads %v", n, rf.calls)
+	}
+	f.r.Clock = clock{now.Add(links.ReadEndedEvery - time.Second)}
+	f.run(t)
+	if len(rf.calls) != 1 {
+		t.Fatalf("an ended target read again within a day: %v", rf.calls)
+	}
+	f.r.Clock = clock{now.Add(links.ReadEndedEvery)}
+	f.run(t)
+	if len(rf.calls) != 2 {
+		t.Fatalf("an ended target not read after a day: %v", rf.calls)
+	}
+}
+
 func TestFirstSettlingEventWins(t *testing.T) {
 	f := newFixture(t, openItem(octocat), reviewLink(link.Review))
 	f.events.evs = []link.Event{state(link.EventClosed, t0.Add(2*time.Hour)), review("octocat", t0.Add(time.Hour))}

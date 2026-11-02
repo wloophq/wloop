@@ -524,6 +524,9 @@ func fieldsOf(it items.Item) *items.Fields {
 }
 
 func (b *batch) commit(ctx context.Context) (Result, error) {
+	if b.err != nil {
+		return Result{}, b.err
+	}
 	b.settleLinked(ctx)
 	if b.err != nil {
 		return Result{}, b.err

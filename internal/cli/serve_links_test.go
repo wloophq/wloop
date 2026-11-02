@@ -17,6 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/links"
 	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/daemon"
@@ -104,12 +105,14 @@ type runs struct {
 	calls [][]unit.Unit
 	fail  int
 	got   chan struct{}
+	took  time.Duration
 }
 
 func (r *runs) run(_ context.Context, units []unit.Unit) (int, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.calls = append(r.calls, slices.Clone(units))
+	time.Sleep(r.took)
 	defer func() { r.got <- struct{}{} }()
 	if r.fail > 0 {
 		r.fail--
@@ -173,23 +176,27 @@ func TestResolverRunsEveryTargetAgainEachPeriod(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		log := change.NewLog(change.DefaultWindow, t.Logf)
 		pull := r7.Unit()
-		r := &runs{got: make(chan struct{}, 8)}
+		r := &runs{got: make(chan struct{}, 8), took: 10 * time.Minute}
 		ctx, cancel := context.WithCancel(context.Background())
 		done := make(chan struct{})
 		go func() {
 			defer close(done)
 			resolveNoted(ctx, r.run, func(context.Context) ([]unit.Unit, error) { return []unit.Unit{pull}, nil }, time.Hour, log, t.Logf)
 		}()
+		time.Sleep(r.took)
 		synctest.Wait()
 		if n := len(r.got); n != 1 {
 			t.Fatalf("runs at start = %d", n)
 		}
 		time.Sleep(time.Hour - time.Second)
 		synctest.Wait()
-		if n := len(r.got); n != 1 {
-			t.Fatalf("runs before the period = %d", n)
+		r.mu.Lock()
+		started := len(r.calls)
+		r.mu.Unlock()
+		if started != 1 {
+			t.Fatalf("runs started within a period of the first run's end = %d", started)
 		}
-		time.Sleep(time.Second)
+		time.Sleep(time.Second + r.took)
 		synctest.Wait()
 		if calls := r.wait(t, 2); len(calls) != 2 || !slices.Equal(calls[1], []unit.Unit{pull}) {
 			t.Fatalf("runs after the period = %v", calls)
@@ -274,6 +281,9 @@ func TestALinkedPullRequestIsReadAtTheBackgroundsPriority(t *testing.T) {
 	}
 	if len(f.reqs) != 1 || f.reqs[0].Action != ghsource.ActionRefresh || f.calls[0].Priority != src.PriorityBackground {
 		t.Fatalf("requests %+v, calls %+v", f.reqs, f.calls)
+	}
+	if err := (&Env{}).refreshLinked(context.Background(), r7); !errors.Is(err, links.ErrNotReady) {
+		t.Fatalf("no plugin running = %v", err)
 	}
 	f.err = fmt.Errorf("%w: no such pull request", src.ErrNotFound)
 	if err := e.refreshLinked(context.Background(), r7); !errors.Is(err, port.ErrNotFound) {

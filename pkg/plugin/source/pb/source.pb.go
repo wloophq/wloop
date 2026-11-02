@@ -1318,7 +1318,7 @@ func (x *ItemOptionList) GetOptions() []*ItemOption {
 
 type ItemEvidence struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// kind is "message", "reaction", "external_claim", "unit_event" or "sent_draft".
+	// kind is "message", "reaction", "external_claim", "unit_event", "sent_draft" or "workflow".
 	Kind          string  `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
 	Anchor        *Anchor `protobuf:"bytes,2,opt,name=anchor,proto3" json:"anchor,omitempty"`
 	unknownFields protoimpl.UnknownFields

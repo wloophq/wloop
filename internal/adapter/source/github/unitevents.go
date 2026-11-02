@@ -24,11 +24,16 @@ type PRStates interface {
 type UnitEvents struct {
 	Store *inventory.Store
 	PRs   PRStates
+	// Fresh is how recently the plugin must have seen a closed pull request
+	// for its close to count.
+	Fresh time.Duration
+	Now   func() time.Time
 }
 
 // UnitEvents are u's events at or after since, oldest first. A dismissal is
-// no review. A close is the reported pull request's, while it is closed: the
-// stored close events outlive a reopening, which records no event.
+// no review. A close is the reported pull request's, while it is closed and
+// seen within Fresh: the stored close events outlive a reopening, which
+// records no event, and a report goes stale on one no sweep reads.
 func (e UnitEvents) UnitEvents(ctx context.Context, u unit.Unit, since time.Time) ([]link.Event, error) {
 	if u.Provider != unit.GitHub {
 		return nil, fmt.Errorf("%s is not a pull request", u)
@@ -63,7 +68,8 @@ func (e UnitEvents) UnitEvents(ctx context.Context, u unit.Unit, since time.Time
 		out = append(out, link.Event{Unit: u, Kind: kind, Actor: actorKey(ev.Actor), At: ev.At,
 			Anchor: unit.Anchor{Unit: u, Ref: anchor, At: ev.At}})
 	}
-	if ok && reported.State == "CLOSED" && !reported.ClosedAt.IsZero() && !reported.ClosedAt.Before(since) {
+	closed := ok && reported.State == "CLOSED" && !reported.ClosedAt.IsZero() && e.Now().Sub(reported.LastSeenAt) < e.Fresh
+	if closed && !reported.ClosedAt.Before(since) {
 		at := reported.ClosedAt
 		out = append(out, link.Event{Unit: u, Kind: link.EventClosed, At: at, Anchor: unit.Anchor{Unit: u, Ref: "closed", At: at}})
 		slices.SortStableFunc(out, func(a, b link.Event) int { return a.At.Compare(b.At) })
