@@ -188,11 +188,9 @@ async function loadUnitTasks(key) {
     detailState.unitTasks = [];
     return;
   }
-  const i = key.indexOf(":");
-  const path = "/api/units/" + [key.slice(0, i), key.slice(i + 1), "tasks"].map(encodeURIComponent).join("/");
-  const out = await detailEnv.getJSON(path).catch(() => []);
+  const out = await detailEnv.getJSON(unitPath(keyUnit(key), "tasks")).catch(() => []);
   if (detailState.unitKey !== key) return;
-  detailState.unitTasks = out || [];
+  detailState.unitTasks = out;
 }
 
 // verbState is how verb stands on e; null when e does not offer it.

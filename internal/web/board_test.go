@@ -80,13 +80,16 @@ func jsConst(t *testing.T, src, name string) string {
 	return m + "\n"
 }
 
-// keyJS is app.js's naming of rows and pull requests: keys, labels and unit
+// keyJS is app.js's and routes.js's naming of rows and pull requests: keys, labels and unit
 // paths.
 func keyJS(t *testing.T) string {
-	src := appJS(t)
+	src, routes := appJS(t), staticJS(t, "routes.js")
 	var b strings.Builder
-	for _, c := range []string{"refLabel", "unitKey", "keyUnit", "unitPath", "unitOf", "keyOf", "labelOf", "labelTail"} {
+	for _, c := range []string{"refLabel", "unitKey", "unitOf", "keyOf", "labelOf", "labelTail"} {
 		b.WriteString(jsConst(t, src, c))
+	}
+	for _, c := range []string{"keyUnit", "unitPath"} {
+		b.WriteString(jsConst(t, routes, c))
 	}
 	return b.String()
 }

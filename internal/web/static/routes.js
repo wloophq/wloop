@@ -22,6 +22,11 @@ function routeUnit(key) {
   return key.slice(0, at) + "/" + encodeURIComponent(key.slice(at + 1));
 }
 
+// keyUnit is the unit a unit key "<provider>:<key>" names.
+const keyUnit = (k) => ({ provider: k.slice(0, k.indexOf(":")), key: k.slice(k.indexOf(":") + 1) });
+// unitPath is the API path of u's detail, followed by the segments of rest.
+const unitPath = (u, ...rest) => "/api/units/" + [u.provider, u.key, ...rest].map(encodeURIComponent).join("/");
+
 // routeHash is a hash (no "#") with view first, then unit, then rest, a
 // URLSearchParams of the other parameters.
 function routeHash(view, unitKey, rest) {
