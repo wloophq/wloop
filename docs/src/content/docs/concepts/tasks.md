@@ -77,7 +77,7 @@ Each plugin says when one of its units has ended: a pull request merged or close
 
 A task derived from a unit's items closes when its items resolve. Besides the extraction, two things resolve them from what the source shows:
 
-- An item's `review` or `merge` link settles when the pull request it names is reviewed, merges or closes, as the [glossary](/architecture/glossary/) says, counting from the ask on, so an event before the link was made settles the item as the link is stored; an item you reopened or edited since stays open.
+- An item's `review` or `merge` link settles when the pull request it names is reviewed, merges or closes, as the [glossary](/architecture/glossary/) says, counting from the ask on, so a review or merge before the link was made settles the item as the link is stored; an item you reopened or edited since stays open. A close counts only after the link, since a pull request closed and reopened keeps its close.
 - The `items.resolve` step resolves every open item a derived task holds, as the workflow (provenance `workflow`, evidence of kind `workflow` anchored at `workflow:<name>`), with its `resolution`; an item you confirmed becomes a proposal on the task instead. It refuses a task that is not derived or holds no open item, and posts nothing.
 
 The Slack plugin's layer bundles three workflows over the `items.resolve` step, one per signal, each on an open `thread` task with open items, and each a plan gate that waits for you (Run this?). The two that read a link signal offer only on a task of one unit, since a signal on one thread says nothing of another's items. They exclude each other in the table's order, so a task gets one offer at a time:

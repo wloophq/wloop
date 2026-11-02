@@ -43,7 +43,9 @@ const silentEvery = 24 * time.Hour
 
 // pending is an open item a link may resolve, with the time after which an
 // event of its target counts: the ask, or the user's last edit or the item's
-// reopening when later. An event between the ask and the link still settles it.
+// reopening when later. An event between the ask and the link still settles it,
+// but a close only after the link: the stored events keep a close the pull
+// request was reopened from, and there is no reopen event.
 type pending struct {
 	link link.Link
 	item ditems.Item
@@ -124,7 +126,7 @@ func pendingOf(l link.Link, it ditems.Item) pending {
 
 // Settles is the op that settles it, open, through l from the events l's target already has, as Run would
 // apply it; ok is false when none does yet. The items ledger calls it as it stores l, so an item linked to a
-// pull request that merged, closed or was reviewed after the ask resolves in the same batch, before any task holds it.
+// pull request that merged or was reviewed after the ask resolves in the same batch, before any task holds it.
 func (r *Resolver) Settles(ctx context.Context, l link.Link, it ditems.Item) (ditems.Op, bool, error) {
 	reader := r.Events[l.To.Provider]
 	if reader == nil || l.Item == "" || l.Item != it.ID || it.State != ditems.Open || (l.Kind != link.Review && l.Kind != link.Merge) {
@@ -197,6 +199,7 @@ func settle(p pending, evs []link.Event, codecs unit.KeyComparer) (link.Event, d
 	for _, ev := range evs {
 		switch {
 		case !ev.At.After(p.from):
+		case ev.Kind == link.EventClosed && !ev.At.After(p.link.At):
 		case ev.Kind == link.EventMerged:
 			return ev, mergeResolution(p.link.Kind), true
 		case ev.Kind == link.EventClosed:

@@ -226,7 +226,6 @@ func TestAnEventBetweenTheAskAndTheLinkSettlesIt(t *testing.T) {
 	}{
 		{"merged", link.Review, []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}, items.Moot},
 		{"merged", link.Merge, []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}, items.Done},
-		{"closed", link.Merge, []link.Event{state(link.EventClosed, t0.Add(-time.Hour))}, items.Moot},
 		{"reviewed, then merged", link.Review, []link.Event{review("octocat", t0.Add(-90*time.Minute)), state(link.EventMerged, t0.Add(-time.Hour))}, items.Done},
 	}
 	for _, c := range cases {
@@ -235,6 +234,18 @@ func TestAnEventBetweenTheAskAndTheLinkSettlesIt(t *testing.T) {
 		if n := f.run(t); n != 1 || f.ledger.applied[0].Resolution != c.want {
 			t.Fatalf("%s link, %s before it: resolved = %d, ops %+v", c.kind, c.name, n, f.ledger.applied)
 		}
+	}
+}
+
+func TestACloseBeforeTheLinkLeavesItOpen(t *testing.T) {
+	f := newFixture(t, askedAt(t0.Add(-2*time.Hour)), reviewLink(link.Merge))
+	f.events.evs = []link.Event{state(link.EventClosed, t0.Add(-time.Hour))}
+	if n := f.run(t); n != 0 {
+		t.Fatalf("a close the pull request may have been reopened from resolved it: %+v", f.ledger.applied)
+	}
+	f.events.evs = append(f.events.evs, state(link.EventClosed, t0.Add(time.Hour)))
+	if n := f.run(t); n != 1 || f.ledger.applied[0].Resolution != items.Moot {
+		t.Fatalf("a close after the link: resolved = %d, ops %+v", n, f.ledger.applied)
 	}
 }
 
