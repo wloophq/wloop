@@ -500,3 +500,59 @@ func TestAddressSelfReviewThroughTheDaemon(t *testing.T) {
 		t.Fatalf("actions %v", actions)
 	}
 }
+
+func TestIntentFlagsParseOnEitherSideOfTheTarget(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		intent string
+		flags  []string
+	}{
+		{"address", []string{"--self-review"}},
+		{"address", []string{"--take-over"}},
+		{"address", []string{"--no-wait", "--no-brief"}},
+		{"address", []string{"--self-review", "--no-wait"}},
+		{"review", []string{"--no-wait"}},
+		{"review", []string{"--no-brief"}},
+	} {
+		guidance := []string{"the", "plan", "is", "in", "the", "description"}
+		var runs [][]string
+		for _, args := range [][]string{
+			slices.Concat([]string{c.intent}, c.flags, []string{r7.URL()}, guidance),
+			slices.Concat([]string{c.intent, r7.URL()}, c.flags, guidance),
+		} {
+			te, calls := daemonForActions(t)
+			if code := te.run(args...); code != 0 {
+				t.Fatalf("%v: exit %d: %s", args, code, te.err)
+			}
+			runs = append(runs, calls())
+		}
+		if len(runs[0]) == 0 || !reflect.DeepEqual(runs[0], runs[1]) || !strings.Contains(strings.Join(runs[0], "\n"), `"guidance":"the plan is in the description"`) {
+			t.Errorf("%s %v: before the target %q, after it %q", c.intent, c.flags, runs[0], runs[1])
+		}
+	}
+}
+
+func TestATargetAfterAFlagsValueIsTheTarget(t *testing.T) {
+	t.Parallel()
+	reg := turnBundled(t).Registry
+	d, _ := reg.Get(dintent.Address)
+	for _, c := range []struct {
+		args   []string
+		target string
+		rest   []string
+	}{
+		{[]string{r7.URL(), "fix", "it"}, r7.URL(), []string{"fix", "it"}},
+		{[]string{"--self-review", r7.URL(), "fix"}, r7.URL(), []string{"--self-review", "fix"}},
+		{[]string{"--no-wait", "--take-over", r7.URL()}, r7.URL(), []string{"--no-wait", "--take-over"}},
+		{[]string{"--manager", "orca", r7.URL()}, r7.URL(), []string{"--manager", "orca"}},
+		{[]string{"--manager=orca", r7.URL(), "x"}, r7.URL(), []string{"--manager=orca", "x"}},
+		{[]string{"--self-review"}, "", []string{"--self-review"}},
+		{[]string{"--", r7.URL()}, "", []string{"--", r7.URL()}},
+		{nil, "", nil},
+	} {
+		target, rest := splitTarget(d, c.args)
+		if target != c.target || !slices.Equal(rest, c.rest) {
+			t.Errorf("%q: got %q %q; want %q %q", c.args, target, rest, c.target, c.rest)
+		}
+	}
+}

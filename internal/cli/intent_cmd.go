@@ -56,25 +56,26 @@ func runIntent(ctx context.Context, e *Env, d dintent.Def, args []string) error 
 	if d.Target.Missing == dintent.TargetCapture {
 		return runCapturing(ctx, e, d, args)
 	}
-	if len(args) == 0 {
+	target, rest := splitTarget(d, args)
+	if target == "" {
 		return errors.New(usage)
 	}
-	ref, err := pr.ParseURL(args[0])
+	ref, err := pr.ParseURL(target)
 	if err != nil {
-		u, uerr := e.unitTarget(ctx, args[0])
+		u, uerr := e.unitTarget(ctx, target)
 		switch {
-		case uerr != nil && strings.Contains(args[0], "://") && !e.pluginTakes(args[0]):
+		case uerr != nil && strings.Contains(target, "://") && !e.pluginTakes(target):
 			return err
 		case uerr != nil:
 			return uerr
 		case isPR(u):
 			ref = prOf(u)
 		default:
-			return runIntentOn(ctx, e, d, u, args[1:])
+			return runIntentOn(ctx, e, d, u, rest)
 		}
 	}
 	reg := e.loadedIntents().Registry
-	p, err := parseIntentArgs(reg, d, surfaceCLI, usage, args[1:])
+	p, err := parseIntentArgs(reg, d, surfaceCLI, usage, rest)
 	if err != nil {
 		return err
 	}
@@ -96,13 +97,13 @@ func runIntent(ctx context.Context, e *Env, d dintent.Def, args []string) error 
 // task args name as task:<id>, else on a new task that captures the
 // run's guidance as its notes; a failed run says how to retry on it.
 func runCapturing(ctx context.Context, e *Env, d dintent.Def, args []string) error {
-	if len(args) > 0 {
-		u, ok, err := explicitTask(args[0])
+	if target, rest := splitTarget(d, args); target != "" {
+		u, ok, err := explicitTask(target)
 		if err != nil {
 			return err
 		}
 		if ok {
-			return runIntentOn(ctx, e, d, u, args[1:])
+			return runIntentOn(ctx, e, d, u, rest)
 		}
 	}
 	p, err := parseIntentArgs(e.loadedIntents().Registry, d, surfaceCLI, intentUsage(d), args)
@@ -251,6 +252,35 @@ func refusal(err error) string {
 		return r.Refusal()
 	}
 	return ""
+}
+
+// splitTarget is the first word of args that is neither one of d's flags
+// nor a flag's value, and args without it; "" when guidance or the end
+// comes first, so flags parse on either side of the target.
+func splitTarget(d dintent.Def, args []string) (string, []string) {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if a == "--" {
+			break
+		}
+		if !strings.HasPrefix(a, "-") {
+			return a, slices.Concat(args[:i], args[i+1:])
+		}
+		if !strings.Contains(a, "=") && flagTakesValue(d, a) {
+			i++
+		}
+	}
+	return "", args
+}
+
+// flagTakesValue tells a flag of d whose value is the word after it.
+func flagTakesValue(d dintent.Def, flag string) bool {
+	switch flag {
+	case flagBriefFile, flagManager, flagParent:
+		return true
+	}
+	in, ok := inputOfFlag(d, flag)
+	return ok && in.Type == "text"
 }
 
 // parseIntentArgs reads d's flags up to the first word that is not one, or
