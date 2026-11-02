@@ -38,15 +38,16 @@ func TestThePluginProposesTheNudgeOfItsStalledPullRequests(t *testing.T) {
 	p := started(t, &githubGraphQL{states: map[int]string{}}, h)
 	waitingOnBob(t, p, h)
 	ctx := context.Background()
-	ds, err := p.Proposals(ctx, testAt)
-	if err != nil || len(ds) != 1 {
-		t.Fatalf("proposals %+v %v", ds, err)
+	got, err := p.Proposals(ctx, testAt)
+	if err != nil || len(got.Drafts) != 1 {
+		t.Fatalf("proposals %+v %v", got, err)
 	}
-	if d := ds[0]; d.Unit != ref7.Unit() || d.Origin.Rule != nudge.Rule || !strings.Contains(d.Text, "@{github:bob}") || d.Delivery != "" {
+	if d := got.Drafts[0]; d.Unit != ref7.Unit() || d.Origin.Rule != nudge.Rule || !strings.Contains(d.Text, "@{github:bob}") || d.Delivery != "" {
 		t.Fatalf("proposed %+v", d)
 	}
-	if ds, err := p.Proposals(ctx, testAt.Add(-9*24*time.Hour)); err != nil || len(ds) != 0 {
-		t.Fatalf("a day after the request: %+v %v", ds, err)
+	if got, err := p.Proposals(ctx, testAt.Add(-9*24*time.Hour)); err != nil || len(got.Drafts) != 0 ||
+		!slices.Equal(got.Withdrawals, []src.Withdrawal{{Unit: ref7.Unit(), Rule: nudge.Rule}}) {
+		t.Fatalf("a day after the request: %+v %v", got, err)
 	}
 }
 

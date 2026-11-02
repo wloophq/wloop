@@ -400,7 +400,9 @@ func (s *Plugin) ApplyEffect(ctx context.Context, req src.EffectRequest) error {
 }
 
 // Proposals are none: the plugin's drafts come from the profile's workflows.
-func (s *Plugin) Proposals(context.Context, time.Time) ([]src.Draft, error) { return nil, nil }
+func (s *Plugin) Proposals(context.Context, time.Time) (src.Proposed, error) {
+	return src.Proposed{}, nil
+}
 
 func (s *Plugin) Placement(ctx context.Context, u sdk.Unit, item string) (src.Placements, error) {
 	p, err := s.running()
