@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,18 +21,35 @@ type EventReader interface {
 	UnitEvents(ctx context.Context, u unit.Unit, since time.Time) ([]link.Event, error)
 }
 
+// Refresher reads a unit from its source again when what the host holds of it may be stale.
+type Refresher interface {
+	// Refresh says whether it read u; a unit it holds fresh is not read.
+	Refresh(ctx context.Context, u unit.Unit) (read bool, err error)
+}
+
+// RetryAfter is how long a target whose read failed waits before the next, RetryNotFoundAfter
+// when its source has no such unit or will not show it.
+const (
+	RetryAfter         = time.Hour
+	RetryNotFoundAfter = 24 * time.Hour
+)
+
 type Resolver struct {
 	Links  port.LinkStore
 	Events map[unit.ProviderID]EventReader // from source.Module.UnitEvents of enabled plugins
-	Ledger items.Applier
-	Clock  port.Clock
-	Log    func(string, ...any)
+	// Refresh reads a target an open item still waits on again, by provider; nil reads none.
+	Refresh map[unit.ProviderID]Refresher
+	Ledger  items.Applier
+	Clock   port.Clock
+	Log     func(string, ...any)
 	// Codecs compare an actor's key with an assignee's; nil compares them byte for byte.
 	Codecs unit.KeyComparer
 
 	mu sync.Mutex
 	// silent is when each target was last logged for each reason.
 	silent map[silentKey]time.Time
+	// failed is until when each target whose read failed waits.
+	failed map[unit.Unit]time.Time
 }
 
 type silentKey struct {
@@ -41,46 +59,61 @@ type silentKey struct {
 
 const silentEvery = 24 * time.Hour
 
-// pending is an open item a link may resolve, with the time after which an
-// event of its target counts: the ask, or the user's last edit or the item's
-// reopening when later. An event between the ask and the link still settles it,
-// but a close only after the link: the stored events keep a close the pull
-// request was reopened from, and there is no reopen event.
+// pending is an open item one of its links may settle, with the time after which a review, or an
+// end on a review link, counts: the ask, or the user's last edit or the item's reopening when
+// later. An end settles a merge link whenever it happened, unless the user edited the item or
+// it reopened since.
 type pending struct {
 	link link.Link
 	item ditems.Item
 	from time.Time
+	user time.Time
 }
 
-// Run resolves the open linked items whose link targets are in targets.
+func pendingOf(l link.Link, it ditems.Item) pending {
+	from := it.Origin.At
+	if from.IsZero() {
+		from = it.CreatedAt
+	}
+	user := it.UserAt
+	if it.ReopenedAt.After(user) {
+		user = it.ReopenedAt
+	}
+	if user.After(from) {
+		from = user
+	}
+	return pending{link: l, item: it, from: from, user: user}
+}
+
+type itemKey struct {
+	unit unit.Unit
+	item string
+}
+
+// Run resolves the open items linked to a unit of targets once every review and merge link of each
+// settles, reading a target such an item still waits on again through Refresh.
 func (r *Resolver) Run(ctx context.Context, targets []unit.Unit) (resolved int, err error) {
 	ls, err := r.Links.To(ctx, targets)
 	if err != nil {
 		return 0, fmt.Errorf("links to %d units: %w", len(targets), err)
 	}
-	byTarget := map[unit.Unit][]link.Link{}
-	var order []unit.Unit
+	var keys []itemKey
 	for _, l := range ls {
-		if l.Item == "" || (l.Kind != link.Review && l.Kind != link.Merge) {
-			continue
+		if settling(l) && !slices.Contains(keys, itemKey{l.From, l.Item}) {
+			keys = append(keys, itemKey{l.From, l.Item})
 		}
-		if _, seen := byTarget[l.To]; !seen {
-			order = append(order, l.To)
-		}
-		byTarget[l.To] = append(byTarget[l.To], l)
 	}
-	slices.SortFunc(order, compareUnits)
-	itemsOf := map[unit.Unit][]ditems.Item{}
+	slices.SortFunc(keys, func(a, b itemKey) int {
+		if c := compareUnits(a.unit, b.unit); c != 0 {
+			return c
+		}
+		return strings.Compare(a.item, b.item)
+	})
+	run := &pass{r: r, events: map[unit.Unit][]link.Event{}, links: map[unit.Unit][]link.Link{}, items: map[unit.Unit][]ditems.Item{},
+		read: map[unit.Unit]bool{}}
 	var errs []error
-	for _, target := range order {
-		open, err := r.open(ctx, byTarget[target], itemsOf)
-		if err != nil {
-			errs = append(errs, err)
-		}
-		if len(open) == 0 {
-			continue
-		}
-		n, err := r.resolve(ctx, target, open)
+	for _, k := range keys {
+		n, err := run.resolve(ctx, k)
 		resolved += n
 		if err != nil {
 			errs = append(errs, err)
@@ -89,120 +122,211 @@ func (r *Resolver) Run(ctx context.Context, targets []unit.Unit) (resolved int, 
 	return resolved, errors.Join(errs...)
 }
 
-// open are the links of ls whose item is open, read through itemsOf.
-func (r *Resolver) open(ctx context.Context, ls []link.Link, itemsOf map[unit.Unit][]ditems.Item) ([]pending, error) {
-	var out []pending
-	var errs []error
-	for _, l := range ls {
-		its, ok := itemsOf[l.From]
-		if !ok {
-			var err error
-			if its, err = r.Ledger.Items(ctx, l.From); err != nil {
-				errs = append(errs, fmt.Errorf("items of %s: %w", l.From, err))
-			}
-			itemsOf[l.From] = its
-		}
-		i := slices.IndexFunc(its, func(it ditems.Item) bool { return it.ID == l.Item })
-		if i < 0 || its[i].State != ditems.Open {
-			continue
-		}
-		out = append(out, pendingOf(l, its[i]))
-	}
-	return out, errors.Join(errs...)
+// pass is one Run's reads, so each target, unit's links and unit's items is read once.
+type pass struct {
+	r      *Resolver
+	events map[unit.Unit][]link.Event
+	links  map[unit.Unit][]link.Link
+	items  map[unit.Unit][]ditems.Item
+	read   map[unit.Unit]bool
 }
 
-func pendingOf(l link.Link, it ditems.Item) pending {
-	from := it.Origin.At
-	if from.IsZero() {
-		from = it.CreatedAt
-	}
-	for _, t := range []time.Time{it.UserAt, it.ReopenedAt} {
-		if t.After(from) {
-			from = t
-		}
-	}
-	return pending{link: l, item: it, from: from}
-}
-
-// Settles is the op that settles it, open, through l from the events l's target already has, as Run would
-// apply it; ok is false when none does yet. The items ledger calls it as it stores l, so an item linked to a
-// pull request that merged or was reviewed after the ask resolves in the same batch, before any task holds it.
-func (r *Resolver) Settles(ctx context.Context, l link.Link, it ditems.Item) (ditems.Op, bool, error) {
-	reader := r.Events[l.To.Provider]
-	if reader == nil || l.Item == "" || l.Item != it.ID || it.State != ditems.Open || (l.Kind != link.Review && l.Kind != link.Merge) {
-		return ditems.Op{}, false, nil
-	}
-	p := pendingOf(l, it)
-	evs, err := reader.UnitEvents(ctx, l.To, p.from)
-	if err != nil {
-		return ditems.Op{}, false, fmt.Errorf("events of %s: %w", l.To, err)
-	}
-	slices.SortStableFunc(evs, func(a, b link.Event) int { return a.At.Compare(b.At) })
-	ev, res, ok := settle(p, evs, r.Codecs)
+func (p *pass) resolve(ctx context.Context, k itemKey) (int, error) {
+	its, ok := p.items[k.unit]
 	if !ok {
-		return ditems.Op{}, false, nil
+		var err error
+		if its, err = p.r.Ledger.Items(ctx, k.unit); err != nil {
+			return 0, fmt.Errorf("items of %s: %w", k.unit, err)
+		}
+		p.items[k.unit] = its
 	}
-	return resolveOp(p, ev, res), true, nil
-}
-
-func resolveOp(p pending, ev link.Event, res ditems.Resolution) ditems.Op {
-	e := ditems.Evidence{Kind: ditems.EvidenceUnitEvent, Anchor: ev.Anchor}
-	return ditems.Op{Op: ditems.OpResolve, Unit: p.link.From, Item: p.link.Item, Anchor: ev.Anchor, Resolution: res, Evidence: &e,
-		Reason: fmt.Sprintf("%s link: %s on %s", p.link.Kind, ev.Kind, p.link.To)}
-}
-
-func (r *Resolver) resolve(ctx context.Context, target unit.Unit, open []pending) (int, error) {
-	reader := r.Events[target.Provider]
-	if reader == nil {
-		r.quiet(target, "has no events")
+	i := slices.IndexFunc(its, func(it ditems.Item) bool { return it.ID == k.item })
+	if i < 0 || its[i].State != ditems.Open {
 		return 0, nil
 	}
-	since := open[0].from
-	for _, p := range open[1:] {
-		if p.from.Before(since) {
-			since = p.from
+	all, ok := p.links[k.unit]
+	if !ok {
+		var err error
+		if all, err = p.r.Links.From(ctx, k.unit); err != nil {
+			return 0, fmt.Errorf("links of %s: %w", k.unit, err)
 		}
+		p.links[k.unit] = all
 	}
-	evs, err := reader.UnitEvents(ctx, target, since)
+	ls := slices.DeleteFunc(slices.Clone(all), func(l link.Link) bool { return !settling(l) || l.Item != k.item })
+	op, waits, ok, err := p.r.judge(ctx, ls, its[i], p.eventsOf)
 	if err != nil {
-		return 0, fmt.Errorf("events of %s: %w", target, err)
+		return 0, err
 	}
-	slices.SortStableFunc(evs, func(a, b link.Event) int { return a.At.Compare(b.At) })
-	resolved := 0
-	var errs []error
-	for _, p := range open {
-		ev, res, ok := settle(p, evs, r.Codecs)
-		if !ok {
-			continue
-		}
-		got, err := r.Ledger.Apply(ctx, ditems.Derived, []ditems.Op{resolveOp(p, ev, res)})
-		var disabled *items.DisabledError
-		switch {
-		case errors.As(err, &disabled):
-			continue
-		case err != nil:
-			errs = append(errs, fmt.Errorf("resolve %s %s: %w", p.link.From, p.link.Item, err))
-			continue
-		}
-		for _, a := range got.Applied {
-			if a.Changed && a.Item.State == ditems.Resolved {
-				resolved++
-			}
+	if !ok && p.refresh(ctx, waits) {
+		if op, _, ok, err = p.r.judge(ctx, ls, its[i], p.eventsOf); err != nil {
+			return 0, err
 		}
 	}
-	return resolved, errors.Join(errs...)
+	if !ok {
+		return 0, nil
+	}
+	got, err := p.r.Ledger.Apply(ctx, ditems.Derived, []ditems.Op{op})
+	var disabled *items.DisabledError
+	switch {
+	case errors.As(err, &disabled):
+		return 0, nil
+	case err != nil:
+		return 0, fmt.Errorf("resolve %s %s: %w", k.unit, k.item, err)
+	}
+	n := 0
+	for _, a := range got.Applied {
+		if a.Changed && a.Item.State == ditems.Resolved {
+			n++
+		}
+	}
+	return n, nil
 }
 
-// settle is the first event of evs, oldest first, that settles p's item, and
-// the resolution it gives.
+func (p *pass) eventsOf(ctx context.Context, u unit.Unit) ([]link.Event, bool, error) {
+	if evs, ok := p.events[u]; ok {
+		return evs, true, nil
+	}
+	evs, ok, err := p.r.eventsOf(ctx, u)
+	if err == nil && ok {
+		p.events[u] = evs
+	}
+	return evs, ok, err
+}
+
+// refresh reads again each target of waits not read yet in this pass; true when it read any.
+func (p *pass) refresh(ctx context.Context, waits []unit.Unit) bool {
+	read := false
+	for _, u := range waits {
+		if p.read[u] {
+			continue
+		}
+		p.read[u] = true
+		if p.r.refresh(ctx, u) {
+			delete(p.events, u)
+			read = true
+		}
+	}
+	return read
+}
+
+func (r *Resolver) refresh(ctx context.Context, u unit.Unit) bool {
+	rf := r.Refresh[u.Provider]
+	if rf == nil {
+		return false
+	}
+	now := r.now()
+	r.mu.Lock()
+	until := r.failed[u]
+	r.mu.Unlock()
+	if now.Before(until) {
+		return false
+	}
+	read, err := rf.Refresh(ctx, u)
+	if err != nil {
+		if ctx.Err() != nil {
+			return false
+		}
+		wait := RetryAfter
+		if errors.Is(err, port.ErrNotFound) {
+			wait = RetryNotFoundAfter
+		}
+		r.mu.Lock()
+		if r.failed == nil {
+			r.failed = map[unit.Unit]time.Time{}
+		}
+		r.failed[u] = now.Add(wait)
+		r.mu.Unlock()
+		r.quiet(u, "cannot be read: "+err.Error())
+		return false
+	}
+	return read
+}
+
+// Settles is the op that settles it, open, through its review and merge links ls from the events their
+// targets already have, as Run would apply it; ok is false while one of them does not settle. The items
+// ledger calls it once a batch stored its links, so an item linked to pull requests that already ended
+// resolves in the same batch, before any task holds it.
+func (r *Resolver) Settles(ctx context.Context, ls []link.Link, it ditems.Item) (ditems.Op, bool, error) {
+	ls = slices.DeleteFunc(slices.Clone(ls), func(l link.Link) bool { return !settling(l) || l.Item != it.ID })
+	if len(ls) == 0 || it.State != ditems.Open {
+		return ditems.Op{}, false, nil
+	}
+	op, _, ok, err := r.judge(ctx, ls, it, r.eventsOf)
+	return op, ok, err
+}
+
+// judge is the op that resolves it once every link of ls settles: done when one settles done, else moot,
+// with the latest settling event as its evidence; waits are the targets that do not settle yet.
+func (r *Resolver) judge(ctx context.Context, ls []link.Link, it ditems.Item,
+	read func(context.Context, unit.Unit) ([]link.Event, bool, error)) (op ditems.Op, waits []unit.Unit, ok bool, err error) {
+	var last link.Event
+	var lastLink pending
+	res := ditems.Moot
+	for _, l := range ls {
+		evs, known, err := read(ctx, l.To)
+		if err != nil {
+			return ditems.Op{}, nil, false, fmt.Errorf("events of %s: %w", l.To, err)
+		}
+		if !known {
+			return ditems.Op{}, nil, false, nil
+		}
+		p := pendingOf(l, it)
+		ev, got, settled := settle(p, evs, r.Codecs)
+		if !settled {
+			waits = append(waits, l.To)
+			continue
+		}
+		if got == ditems.Done {
+			res = ditems.Done
+		}
+		if last.At.IsZero() || ev.At.After(last.At) {
+			last, lastLink = ev, p
+		}
+	}
+	if len(ls) == 0 || len(waits) > 0 {
+		return ditems.Op{}, waits, false, nil
+	}
+	return resolveOp(lastLink, last, res, len(ls)), nil, true, nil
+}
+
+// eventsOf are u's events, oldest first; false when no reader knows its provider.
+func (r *Resolver) eventsOf(ctx context.Context, u unit.Unit) ([]link.Event, bool, error) {
+	reader := r.Events[u.Provider]
+	if reader == nil {
+		r.quiet(u, "has no events")
+		return nil, false, nil
+	}
+	evs, err := reader.UnitEvents(ctx, u, time.Time{})
+	if err != nil {
+		return nil, false, err
+	}
+	slices.SortStableFunc(evs, func(a, b link.Event) int { return a.At.Compare(b.At) })
+	return evs, true, nil
+}
+
+func resolveOp(p pending, ev link.Event, res ditems.Resolution, links int) ditems.Op {
+	e := ditems.Evidence{Kind: ditems.EvidenceUnitEvent, Anchor: ev.Anchor}
+	reason := fmt.Sprintf("%s link: %s on %s", p.link.Kind, ev.Kind, p.link.To)
+	if links > 1 {
+		reason += fmt.Sprintf(", the last of %d links to settle", links)
+	}
+	return ditems.Op{Op: ditems.OpResolve, Unit: p.link.From, Item: p.link.Item, Anchor: ev.Anchor, Resolution: res, Evidence: &e, Reason: reason}
+}
+
+func settling(l link.Link) bool {
+	return l.Item != "" && (l.Kind == link.Review || l.Kind == link.Merge)
+}
+
+// settle is the first event of evs, oldest first, that settles p's link, and the resolution it gives.
 func settle(p pending, evs []link.Event, codecs unit.KeyComparer) (link.Event, ditems.Resolution, bool) {
 	for _, ev := range evs {
+		ended := ev.Kind == link.EventMerged || ev.Kind == link.EventClosed
 		switch {
+		case !p.user.IsZero() && !ev.At.After(p.user):
+		case ended && p.link.Kind == link.Merge:
+			return ev, mergeResolution(ev.Kind), true
 		case !ev.At.After(p.from):
-		case ev.Kind == link.EventClosed && !ev.At.After(p.link.At):
-		case ev.Kind == link.EventMerged:
-			return ev, mergeResolution(p.link.Kind), true
-		case ev.Kind == link.EventClosed:
+		case ended:
 			return ev, ditems.Moot, true
 		case ev.Kind == link.EventReview && p.link.Kind == link.Review && byAssignee(p.item, ev.Actor, codecs):
 			return ev, ditems.Done, true
@@ -211,9 +335,9 @@ func settle(p pending, evs []link.Event, codecs unit.KeyComparer) (link.Event, d
 	return link.Event{}, "", false
 }
 
-// mergeResolution is how a merge of its target settles a link of kind k.
-func mergeResolution(k link.Kind) ditems.Resolution {
-	if k == link.Merge {
+// mergeResolution is how an end of its target settles a merge link.
+func mergeResolution(k link.EventKind) ditems.Resolution {
+	if k == link.EventMerged {
 		return ditems.Done
 	}
 	return ditems.Moot
@@ -229,16 +353,13 @@ func byAssignee(it ditems.Item, actor string, codecs unit.KeyComparer) bool {
 }
 
 // quiet logs, once per target and reason per day, why a target cannot resolve
-// anything: no reader for its provider. A target with no review, merge or
+// anything: no reader for its provider, or a failed read. A target with no review, merge or
 // close yet is waiting, which is not worth a line.
 func (r *Resolver) quiet(target unit.Unit, why string) {
 	if r.Log == nil {
 		return
 	}
-	now := time.Now()
-	if r.Clock != nil {
-		now = r.Clock.Now()
-	}
+	now := r.now()
 	r.mu.Lock()
 	key := silentKey{target, why}
 	last, logged := r.silent[key]
@@ -252,6 +373,13 @@ func (r *Resolver) quiet(target unit.Unit, why string) {
 	r.silent[key] = now
 	r.mu.Unlock()
 	r.Log("link target %s %s", target, why)
+}
+
+func (r *Resolver) now() time.Time {
+	if r.Clock == nil {
+		return time.Now()
+	}
+	return r.Clock.Now()
 }
 
 func compareUnits(a, b unit.Unit) int {

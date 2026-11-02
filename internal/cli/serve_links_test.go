@@ -2,13 +2,17 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/config"
@@ -22,6 +26,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/workspace/fake"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 func TestServeResolvesLinkedItems(t *testing.T) {
@@ -135,7 +140,7 @@ func TestResolverCatchesUpOnStart(t *testing.T) {
 	r := &runs{got: make(chan struct{}, 8)}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go resolveNoted(ctx, r.run, func(context.Context) ([]unit.Unit, error) { return []unit.Unit{pull}, nil }, log, t.Logf)
+	go resolveNoted(ctx, r.run, func(context.Context) ([]unit.Unit, error) { return []unit.Unit{pull}, nil }, time.Hour, log, t.Logf)
 	if calls := r.wait(t, 1); !slices.Equal(calls[0], []unit.Unit{pull}) {
 		t.Fatalf("first run = %v", calls)
 	}
@@ -157,11 +162,63 @@ func TestResolverRetriesFailedUnits(t *testing.T) {
 		}
 		return []unit.Unit{pull}, nil
 	}
-	go resolveNoted(ctx, r.run, seed, log, t.Logf)
+	go resolveNoted(ctx, r.run, seed, time.Hour, log, t.Logf)
 	calls := r.wait(t, 2)
 	if !slices.Equal(calls[0], []unit.Unit{pull}) || !slices.Equal(calls[1], []unit.Unit{pull}) {
 		t.Fatalf("runs = %v", calls)
 	}
+}
+
+func TestResolverRunsEveryTargetAgainEachPeriod(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		log := change.NewLog(change.DefaultWindow, t.Logf)
+		pull := r7.Unit()
+		r := &runs{got: make(chan struct{}, 8)}
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			resolveNoted(ctx, r.run, func(context.Context) ([]unit.Unit, error) { return []unit.Unit{pull}, nil }, time.Hour, log, t.Logf)
+		}()
+		synctest.Wait()
+		if n := len(r.got); n != 1 {
+			t.Fatalf("runs at start = %d", n)
+		}
+		time.Sleep(time.Hour - time.Second)
+		synctest.Wait()
+		if n := len(r.got); n != 1 {
+			t.Fatalf("runs before the period = %d", n)
+		}
+		time.Sleep(time.Second)
+		synctest.Wait()
+		if calls := r.wait(t, 2); len(calls) != 2 || !slices.Equal(calls[1], []unit.Unit{pull}) {
+			t.Fatalf("runs after the period = %v", calls)
+		}
+		cancel()
+		<-done
+	})
+}
+
+func TestResolverWakesOnAReportedPullRequest(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		log := change.NewLog(change.DefaultWindow, t.Logf)
+		pull := r7.Unit()
+		r := &runs{got: make(chan struct{}, 8)}
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			resolveNoted(ctx, r.run, func(context.Context) ([]unit.Unit, error) { return nil, nil }, time.Hour, log, t.Logf)
+		}()
+		synctest.Wait()
+		log.Note(port.TopicPRs, pull)
+		synctest.Wait()
+		if calls := r.wait(t, 1); len(calls) != 1 || !slices.Equal(calls[0], []unit.Unit{pull}) {
+			t.Fatalf("runs = %v", calls)
+		}
+		cancel()
+		<-done
+	})
 }
 
 func TestServeSettlesALinkToAPullRequestMergedAfterTheAsk(t *testing.T) {
@@ -194,5 +251,32 @@ func TestServeSettlesALinkToAPullRequestMergedAfterTheAsk(t *testing.T) {
 	got, err := ledger.Items(ctx, thread)
 	if err != nil || len(got) != 1 || got[0].State != items.Resolved || got[0].Resolution != items.Done {
 		t.Fatalf("items %+v %v", got, err)
+	}
+}
+
+type actionForge struct {
+	forgeCalls
+	err   error
+	calls []src.Call
+	reqs  []src.ActionRequest
+}
+
+func (f *actionForge) Action(ctx context.Context, req src.ActionRequest) (json.RawMessage, error) {
+	f.calls, f.reqs = append(f.calls, src.CallOf(ctx)), append(f.reqs, req)
+	return nil, f.err
+}
+
+func TestALinkedPullRequestIsReadAtTheBackgroundsPriority(t *testing.T) {
+	f := &actionForge{}
+	e := &Env{forge: f}
+	if err := e.refreshLinked(context.Background(), r7); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.reqs) != 1 || f.reqs[0].Action != ghsource.ActionRefresh || f.calls[0].Priority != src.PriorityBackground {
+		t.Fatalf("requests %+v, calls %+v", f.reqs, f.calls)
+	}
+	f.err = fmt.Errorf("%w: no such pull request", src.ErrNotFound)
+	if err := e.refreshLinked(context.Background(), r7); !errors.Is(err, port.ErrNotFound) {
+		t.Fatalf("a pull request GitHub will not show = %v", err)
 	}
 }
