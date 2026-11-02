@@ -365,20 +365,28 @@ func TestResolvingAStepGateRecordsAnEvent(t *testing.T) {
 	}
 }
 
-func TestAnEndedTasksGatesCloseWithTheIntentGatesTomlNames(t *testing.T) {
+func TestAnEndedTasksGatesCloseAsWhoEndedItSays(t *testing.T) {
 	ctx := context.Background()
-	for _, by := range []task.Actor{task.ActorPerson, task.ActorWorkflow, task.ActorPlugin} {
-		t.Run(string(by), func(t *testing.T) {
+	for _, c := range []struct {
+		by     task.Actor
+		status gate.Status
+		intent string
+	}{
+		{task.ActorPerson, gate.Dismissed, "dismiss"},
+		{task.ActorWorkflow, gate.Superseded, ""},
+		{task.ActorPlugin, gate.Superseded, ""},
+	} {
+		t.Run(string(c.by), func(t *testing.T) {
 			f := newFixture(t, policy{dec: gates.Decision{Mode: gate.ModeWait}}, bundled)
 			id := task.ID("t-0000000000000001")
 			question := f.open(t, gate.Gate{Task: id, Kind: gate.KindQuestion}, nil)
 			plan := f.open(t, gate.Gate{Task: id, Kind: gate.KindPlan}, nil)
 			other := f.open(t, gate.Gate{Task: "t-0000000000000002", Unit: task.UnitOf("t-0000000000000002"), Kind: gate.KindQuestion}, nil)
-			if err := f.svc.TaskEnded(ctx, id, by); err != nil {
+			if err := f.svc.TaskEnded(ctx, id, c.by, fixedNow()); err != nil {
 				t.Fatal(err)
 			}
-			if got := f.get(t, question.ID); got.Status != gate.Dismissed || got.Intent != "dismiss" || got.By != by {
-				t.Fatalf("the ended task's question = %+v, want dismissed by %s", got, by)
+			if got := f.get(t, question.ID); got.Status != c.status || got.Intent != c.intent || got.By != c.by {
+				t.Fatalf("the ended task's question = %+v, want %s with %q by %s", got, c.status, c.intent, c.by)
 			}
 			for _, g := range []gate.Gate{plan, other} {
 				if got := f.get(t, g.ID); got.Status != gate.Open {
@@ -389,10 +397,40 @@ func TestAnEndedTasksGatesCloseWithTheIntentGatesTomlNames(t *testing.T) {
 	}
 }
 
+func TestAGateOpenedAfterItsTaskEndedStaysOpen(t *testing.T) {
+	f := newFixture(t, policy{dec: gates.Decision{Mode: gate.ModeWait}}, bundled)
+	g := f.open(t, gate.Gate{Task: "t-0000000000000001", Kind: gate.KindQuestion}, nil)
+	if err := f.svc.TaskEnded(context.Background(), "t-0000000000000001", task.ActorPerson, fixedNow().Add(-time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.get(t, g.ID); got.Status != gate.Open {
+		t.Fatalf("a question opened after the end = %+v, want open", got)
+	}
+}
+
+func TestAQuestionHoldsItsTaskAndAPlanDoesNot(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t, policy{dec: gates.Decision{Mode: gate.ModeWait}}, bundled)
+	asked, planned := task.ID("t-0000000000000001"), task.ID("t-0000000000000002")
+	question := f.open(t, gate.Gate{Task: asked, Kind: gate.KindQuestion}, nil)
+	f.open(t, gate.Gate{Task: planned, Kind: gate.KindPlan}, nil)
+	for id, want := range map[task.ID]bool{asked: true, planned: false} {
+		if got, err := f.svc.HoldsTask(ctx, id); err != nil || got != want {
+			t.Errorf("HoldsTask(%s) = %v, %v, want %v", id, got, err, want)
+		}
+	}
+	if err := f.svc.Resolve(ctx, question.ID, gates.Resolution{Intent: "dismiss", By: task.ActorPerson}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := f.svc.HoldsTask(ctx, asked); err != nil || got {
+		t.Errorf("HoldsTask after the question closed = %v, %v, want false", got, err)
+	}
+}
+
 func TestNoAgentEndsAGate(t *testing.T) {
 	f := newFixture(t, policy{dec: gates.Decision{Mode: gate.ModeWait}}, bundled)
 	g := f.open(t, gate.Gate{Task: "t-0000000000000001", Kind: gate.KindQuestion}, nil)
-	if err := f.svc.TaskEnded(context.Background(), "t-0000000000000001", task.ActorAgent); !errors.Is(err, gates.ErrRefused) {
+	if err := f.svc.TaskEnded(context.Background(), "t-0000000000000001", task.ActorAgent, fixedNow()); !errors.Is(err, gates.ErrRefused) {
 		t.Fatalf("an agent ending a task: %v, want ErrRefused", err)
 	}
 	if got := f.get(t, g.ID); got.Status != gate.Open {

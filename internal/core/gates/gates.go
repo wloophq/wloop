@@ -243,11 +243,26 @@ func (s *Service) Supersede(ctx context.Context, id int64, by task.Actor) error 
 	return s.endHeld(ctx, closed)
 }
 
-// TaskEnded closes each open gate of task id, which by just ended, whose ClosesWith names one of its intents,
-// with that intent: what the gate asks is moot once its task ended. ClosesWith refuses the gate, so ending a
-// task never approves or answers for the person. It refuses an agent, as Supersede does, and logs what it
-// returns.
-func (s *Service) TaskEnded(ctx context.Context, id task.ID, by task.Actor) (err error) {
+// HoldsTask says whether an open gate of task id holds it open: one whose ClosesWith names one of its intents,
+// a question to the person only the person, or the end of the task's unit, settles.
+func (s *Service) HoldsTask(ctx context.Context, id task.ID) (bool, error) {
+	gs, err := s.d.Reader.OfTask(ctx, id)
+	if err != nil {
+		return false, err
+	}
+	return slices.ContainsFunc(gs, s.closesWithTask), nil
+}
+
+func (s *Service) closesWithTask(g gate.Gate) bool {
+	def, err := s.def(g)
+	return g.Status == gate.Open && err == nil && def.ClosesWith != "" && slices.Contains(g.Intents, def.ClosesWith)
+}
+
+// TaskEnded settles each gate of task id that HoldsTask counts and that opened by at, when by ended the task:
+// a person's end closes it with its ClosesWith intent, which refuses the gate, in their name; a plugin's or a
+// workflow's end, which only the end of the task's unit makes, supersedes it as moot. It never approves or
+// answers, refuses an agent, as Supersede does, and logs what it returns.
+func (s *Service) TaskEnded(ctx context.Context, id task.ID, by task.Actor, at time.Time) (err error) {
 	defer func() {
 		if err != nil {
 			s.logf("gates of ended task %s: %v", id, err)
@@ -262,13 +277,17 @@ func (s *Service) TaskEnded(ctx context.Context, id task.ID, by task.Actor) (err
 	}
 	var errs []error
 	for _, g := range gs {
-		def, err := s.def(g)
-		if g.Status != gate.Open || err != nil || def.ClosesWith == "" || !slices.Contains(g.Intents, def.ClosesWith) {
+		if !s.closesWithTask(g) || g.OpenedAt.After(at) {
 			continue
 		}
-		r, err := withStatus(g, def, Resolution{Intent: def.ClosesWith, By: by})
-		if err == nil {
-			_, err = s.close(ctx, g, r)
+		if by == task.ActorPerson {
+			def, _ := s.def(g)
+			var r Resolution
+			if r, err = withStatus(g, def, Resolution{Intent: def.ClosesWith, By: by}); err == nil {
+				_, err = s.close(ctx, g, r)
+			}
+		} else {
+			err = s.Supersede(ctx, g.ID, by)
 		}
 		if err != nil && !errors.Is(err, ErrResolved) {
 			errs = append(errs, fmt.Errorf("gate %d: %w", g.ID, err))

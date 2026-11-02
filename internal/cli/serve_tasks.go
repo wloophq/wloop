@@ -54,7 +54,8 @@ func (e *Env) factsOfTask(ctx context.Context, t task.Task) (workflow.Facts, err
 }
 
 // taskEnding settles what a task that ended holds, while it stays ended: its held drafts, but those of the
-// purposes the verb's keep_drafts names, and its gates gates.toml closes with the task.
+// purposes the verb's keep_drafts names, and the gates gates.toml closes with the task that opened before it
+// ended.
 type taskEnding struct{ e *Env }
 
 func (d taskEnding) Ended(ctx context.Context, t task.Task, v task.Verb, by task.Actor) {
@@ -67,7 +68,11 @@ func (d taskEnding) Ended(ctx context.Context, t task.Task, v task.Verb, by task
 		}
 	}
 	if g := d.e.gates; g != nil {
-		_ = g.TaskEnded(ctx, t.ID, by)
+		at := t.Updated
+		if at.IsZero() {
+			at = d.e.Now()
+		}
+		_ = g.TaskEnded(ctx, t.ID, by, at)
 	}
 }
 

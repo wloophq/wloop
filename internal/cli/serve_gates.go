@@ -144,6 +144,10 @@ func (g serviceTaskGates) OfTask(ctx context.Context, id task.ID) ([]gate.Gate, 
 	return g.e.gateReader.OfTask(ctx, id)
 }
 
+func (g serviceTaskGates) HoldsTask(ctx context.Context, id task.ID) (bool, error) {
+	return g.e.newGates(g.db, nil).HoldsTask(ctx, id)
+}
+
 // profileGates are the gates of gates.toml as the profile loads now.
 type profileGates struct{ loaded func() *intentload.Loaded }
 

@@ -451,16 +451,18 @@ func writeTask(ctx context.Context, tx *Tx, e task.Task, rev uint64) error {
 var _ coretasks.Recategorizer = taskStore{}
 
 const (
-	heldStatesSQL    = `SELECT state, category FROM tasks GROUP BY state, category ORDER BY state, category`
-	recategorizeSQL  = `UPDATE tasks SET category = ?, rev = ? WHERE state = ? AND category != ?`
+	heldStatesSQL   = `SELECT state, category FROM tasks GROUP BY state, category ORDER BY state, category`
+	recategorizeSQL = `UPDATE tasks SET category = ?, rev = ?,
+		open_changed_at = CASE WHEN (category NOT IN (?, ?)) = (? NOT IN (?, ?)) THEN open_changed_at ELSE ? END
+		WHERE state = ? AND category != ?`
 	recategorizedSQL = `SELECT 'task', id FROM tasks WHERE state = ?1 AND rev = ?2
 		UNION SELECT u.provider, u.unit_key FROM task_units u JOIN tasks t ON t.id = u.task_id WHERE t.state = ?1 AND t.rev = ?2
 		UNION SELECT i.provider, i.unit_key FROM task_items i JOIN tasks t ON t.id = i.task_id WHERE t.state = ?1 AND t.rev = ?2`
 )
 
-// Recategorize gives every stored task the category of its state as of reads it, moving the tasks it changes to
-// a new rev and noting each one's unit and the units Apply notes for it; a state of says nothing of is unknown, and its tasks keep their category.
-func (s taskStore) Recategorize(ctx context.Context, of func(state string) (task.Category, bool)) ([]string, error) {
+// Recategorize gives every stored task the category of its state as of reads it, at at, moving the tasks it
+// changes to a new rev, stamping when it opened or closed one, and noting each one's unit and the units Apply notes for it; a state of says nothing of is unknown, and its tasks keep their category.
+func (s taskStore) Recategorize(ctx context.Context, of func(state string) (task.Category, bool), at time.Time) ([]string, error) {
 	var unknown []string
 	_, err := s.db.Write(ctx, func(tx *Tx) error {
 		unknown = nil
@@ -502,7 +504,8 @@ func (s taskStore) Recategorize(ctx context.Context, of func(state string) (task
 					return err
 				}
 			}
-			if _, err := tx.ExecContext(ctx, recategorizeSQL, string(c), rev, p.state, string(c)); err != nil {
+			if _, err := tx.ExecContext(ctx, recategorizeSQL, string(c), rev, string(task.CategoryDone), string(task.CategoryDropped),
+				string(c), string(task.CategoryDone), string(task.CategoryDropped), eventTime(at), p.state, string(c)); err != nil {
 				return fmt.Errorf("recategorizing %s: %w", p.state, err)
 			}
 			if err := eachRow(ctx, tx, recategorizedSQL, []any{p.state, rev}, func(r *sql.Rows) error {

@@ -79,7 +79,7 @@ func (r *recordedDecisions) Decide(_ context.Context, g gate.Gate) error {
 	return nil
 }
 
-func TestATaskThatEndsClosesTheGatesGatesTomlClosesWithIt(t *testing.T) {
+func TestATaskAPersonEndsClosesTheGatesGatesTomlClosesWithIt(t *testing.T) {
 	r := newProfileRig(t, "")
 	ctx := context.Background()
 	r.put(t, "t-0000000000000001", "next", task.CategoryReady)
@@ -95,15 +95,21 @@ func TestATaskThatEndsClosesTheGatesGatesTomlClosesWithIt(t *testing.T) {
 		}
 		asked[id] = q
 	}
-	if _, err := g.Do(ctx, "t-0000000000000001", coretasks.Request{Verb: task.VerbDone, Actor: task.ActorWorkflow, Source: "workflow"}); err != nil {
+	if _, err := g.Do(ctx, "t-0000000000000001", coretasks.Request{Verb: task.VerbDone, Actor: task.ActorWorkflow, Source: "workflow"}); !errors.Is(err, coretasks.ErrVerb) {
+		t.Fatalf("a workflow's done on a task its question holds: %v, want ErrVerb", err)
+	}
+	read := r.db.Gates(func() time.Time { return testNow })
+	if got, _ := read.Get(ctx, asked["t-0000000000000001"].ID); got.Status != gate.Open {
+		t.Fatalf("the question after the workflow's refused done = %+v, want open", got)
+	}
+	if _, err := g.Do(ctx, "t-0000000000000001", coretasks.Request{Verb: task.VerbDone, Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := g.Do(ctx, "t-0000000000000002", coretasks.Request{Verb: task.VerbSomeday, Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
 		t.Fatal(err)
 	}
-	read := r.db.Gates(func() time.Time { return testNow })
-	if got, _ := read.Get(ctx, asked["t-0000000000000001"].ID); got.Status != gate.Dismissed || got.By != task.ActorWorkflow {
-		t.Errorf("the question of the task a workflow ended = %+v, want dismissed by the workflow", got)
+	if got, _ := read.Get(ctx, asked["t-0000000000000001"].ID); got.Status != gate.Dismissed || got.By != task.ActorPerson {
+		t.Errorf("the question of the task a person ended = %+v, want dismissed by the person", got)
 	}
 	if got, _ := read.Get(ctx, asked["t-0000000000000002"].ID); got.Status != gate.Open {
 		t.Errorf("the question of a task still open = %+v, want open", got)

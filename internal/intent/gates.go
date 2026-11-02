@@ -105,7 +105,9 @@ type GateDef struct {
 	Label   string
 	Intents []GateIntent
 	// ClosesWith is the intent, one that refuses the gate, a person's
-	// closing of the gate's task resolves it with; "" leaves it open.
+	// ending of the gate's task resolves it with; an open gate with one
+	// holds its task open until a person settles it or its unit ends,
+	// which supersedes it. "" neither holds nor closes.
 	ClosesWith string
 	// EndsTask is the category, done or dropped, a task opened only to hold gates ends in once the gate closes
 	// with a status and none of its gates is open; a status it leaves out leaves the task open.

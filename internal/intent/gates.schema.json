@@ -60,7 +60,7 @@
         "description": "A gate, by its name: the one a gate.open step, an intent's record.missing or a verb's gate opens; a gate the loop opens by kind takes the first of its kind. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
         "properties": {
           "closes_with": {
-            "description": "The intent, one that refuses the gate, the gate closes with once the task it is on ends, however it ends (a verb, a workflow, its items resolving, its unit closing), recorded as by whoever ended it; an agent ending the task leaves it open. Empty or left out, the gate stays open.",
+            "description": "The intent, one that refuses the gate, the gate closes with when you end the task it is on. While the gate is open, nothing else ends the task: its items resolving leave it open, and a workflow's verb that would end it is refused, until you settle the gate. The task's unit ending (a pull request merged or closed) supersedes the gate as moot. Empty or left out, the gate neither holds its task nor closes with it.",
             "type": "string"
           },
           "ends_task": {
