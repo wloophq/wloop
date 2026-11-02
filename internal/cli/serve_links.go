@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"maps"
 	"slices"
@@ -46,25 +47,35 @@ func (e *Env) linkDeps(db *sqlite.DB, cfg config.Config, logf func(string, ...an
 func (w *linkWiring) serve(d daemon.Deps, mods []pluginModule) daemon.Deps {
 	w.units.Store(d.Units)
 	events := map[unit.ProviderID]links.EventReader{}
+	refresh := map[unit.ProviderID]links.Refresher{}
 	for _, m := range mods {
 		if m.UnitEvents != nil {
 			events[m.ID] = m.UnitEvents
+		}
+		if m.Refresh != nil {
+			refresh[m.ID] = m.Refresh
 		}
 	}
 	if len(events) == 0 {
 		return d
 	}
 	ledger := w.e.itemsLedger(w.db, w.cfg, w.logf)
-	r := &links.Resolver{Links: w.store, Events: events, Ledger: ledger, Clock: clockFunc(w.e.Now), Log: w.logf, Codecs: d.Units}
+	r := &links.Resolver{Links: w.store, Events: events, Refresh: refresh, Ledger: ledger, Clock: clockFunc(w.e.Now), Log: w.logf, Codecs: d.Units}
 	ledger.SetSettle(r.Settles)
 	if w.e.changes == nil {
 		return d
 	}
 	changes := w.e.changes
 	d.Runtimes = append(d.Runtimes, daemon.PluginRuntime{ID: linksRuntime, Run: func(ctx context.Context) error {
-		return resolveNoted(ctx, r.Run, w.db.LinkTargets, changes, w.logf)
+		return resolveNoted(ctx, r.Run, w.db.LinkTargets, linksEvery(w.cfg), changes, w.logf)
 	}})
 	return d
+}
+
+// linksEvery is how often the resolver runs every link target again, so a target no source
+// follows, and no event wakes it for, is read again: the slow sweep's period.
+func linksEvery(cfg config.Config) time.Duration {
+	return time.Duration(cmp.Or(cfg.Sweep.Slow, config.Defaults().Sweep.Slow))
 }
 
 // linksRetry is how long the resolver waits before running units again after
@@ -73,11 +84,11 @@ var linksRetry = 30 * time.Second
 
 // resolveNoted runs the resolver until ctx ends: first over every link
 // target from seed, which catches up on events noted while it was not
-// listening, then over the units noted with source events or links. Units of
-// a failed run run again after linksRetry. The subscription only hands the
-// units over.
+// listening, then over the units noted with source events, reports or links,
+// and over every target from seed again each period. Units of a failed run
+// run again after linksRetry. The subscription only hands the units over.
 func resolveNoted(ctx context.Context, run func(context.Context, []unit.Unit) (int, error), seed func(context.Context) ([]unit.Unit, error),
-	changes port.Changes, logf func(string, ...any)) error {
+	every time.Duration, changes port.Changes, logf func(string, ...any)) error {
 	var mu sync.Mutex
 	noted := map[unit.Unit]bool{}
 	add := func(units []unit.Unit) {
@@ -89,7 +100,7 @@ func resolveNoted(ctx context.Context, run func(context.Context, []unit.Unit) (i
 	}
 	wake := make(chan struct{}, 1)
 	defer changes.Subscribe(func(c port.Change) {
-		if !c.Has(port.TopicSourceEvents|port.TopicLinks) || len(c.Units) == 0 {
+		if !c.Has(port.TopicSourceEvents|port.TopicLinks|port.TopicPRs) || len(c.Units) == 0 {
 			return
 		}
 		add(c.Units)
@@ -99,7 +110,8 @@ func resolveNoted(ctx context.Context, run func(context.Context, []unit.Unit) (i
 		}
 	})()
 	seeded := false
-	var retry <-chan time.Time
+	var retry, again <-chan time.Time
+	reseeded := false
 	for {
 		if !seeded {
 			targets, err := seed(ctx)
@@ -108,7 +120,7 @@ func resolveNoted(ctx context.Context, run func(context.Context, []unit.Unit) (i
 				retry = time.After(linksRetry)
 			} else {
 				add(targets)
-				seeded = true
+				seeded, reseeded = true, true
 			}
 		}
 		mu.Lock()
@@ -128,12 +140,17 @@ func resolveNoted(ctx context.Context, run func(context.Context, []unit.Unit) (i
 				retry = time.After(linksRetry)
 			}
 		}
+		if reseeded {
+			again, reseeded = time.After(every), false
+		}
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-wake:
 		case <-retry:
 			retry = nil
+		case <-again:
+			again, seeded = nil, false
 		}
 	}
 }

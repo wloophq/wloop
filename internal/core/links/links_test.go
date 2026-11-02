@@ -2,6 +2,7 @@ package links_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/ingest/ingesttest"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/links"
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/link"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -227,6 +229,7 @@ func TestAnEventBetweenTheAskAndTheLinkSettlesIt(t *testing.T) {
 		{"merged", link.Review, []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}, items.Moot},
 		{"merged", link.Merge, []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}, items.Done},
 		{"closed", link.Merge, []link.Event{state(link.EventClosed, t0.Add(-time.Hour))}, items.Moot},
+		{"closed", link.Review, []link.Event{state(link.EventClosed, t0.Add(-time.Hour))}, items.Moot},
 		{"reviewed, then merged", link.Review, []link.Event{review("octocat", t0.Add(-90*time.Minute)), state(link.EventMerged, t0.Add(-time.Hour))}, items.Done},
 	}
 	for _, c := range cases {
@@ -235,6 +238,27 @@ func TestAnEventBetweenTheAskAndTheLinkSettlesIt(t *testing.T) {
 		if n := f.run(t); n != 1 || f.ledger.applied[0].Resolution != c.want {
 			t.Fatalf("%s link, %s before it: resolved = %d, ops %+v", c.kind, c.name, n, f.ledger.applied)
 		}
+	}
+}
+
+func TestAMergeLinkSettlesOnAnEndBeforeTheAsk(t *testing.T) {
+	cases := []struct {
+		event link.EventKind
+		want  items.Resolution
+	}{{link.EventMerged, items.Done}, {link.EventClosed, items.Moot}}
+	for _, c := range cases {
+		f := newFixture(t, askedAt(t0.Add(-30*time.Minute)), reviewLink(link.Merge))
+		f.events.evs = []link.Event{state(c.event, t0.Add(-time.Hour))}
+		if n := f.run(t); n != 1 || f.ledger.applied[0].Resolution != c.want {
+			t.Fatalf("asked to merge a pull request already %s: resolved = %d, ops %+v", c.event, n, f.ledger.applied)
+		}
+	}
+	it := askedAt(t0.Add(-30 * time.Minute))
+	it.UserAt = t0
+	f := newFixture(t, it, reviewLink(link.Merge))
+	f.events.evs = []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}
+	if n := f.run(t); n != 0 {
+		t.Fatalf("an item you edited after the merge resolved: %+v", f.ledger.applied)
 	}
 }
 
@@ -252,6 +276,139 @@ func TestAnEndBeforeTheAskLeavesItOpen(t *testing.T) {
 		if n := f.run(t); n != 0 {
 			t.Fatalf("%s: resolved = %d", name, n)
 		}
+	}
+}
+
+var pull2 = unit.Unit{Provider: unit.GitHub, Key: "acme/api#528"}
+
+func linkTo(to unit.Unit, kind link.Kind) link.Link {
+	l := reviewLink(kind)
+	l.To = to
+	return l
+}
+
+func on(u unit.Unit, ev link.Event) link.Event {
+	ev.Unit, ev.Anchor.Unit = u, u
+	return ev
+}
+
+func TestAnItemLinkedToSeveralPullRequestsSettlesOnceEveryOneDoes(t *testing.T) {
+	f := newFixture(t, openItem(octocat), linkTo(pull, link.Merge), linkTo(pull2, link.Merge))
+	f.events.evs = []link.Event{state(link.EventMerged, t0.Add(time.Hour))}
+	if n, err := f.r.Run(context.Background(), []unit.Unit{pull, pull2}); err != nil || n != 0 {
+		t.Fatalf("one of two merged: resolved = %d, %v, ops %+v", n, err, f.ledger.applied)
+	}
+	f.events.evs = append(f.events.evs, on(pull2, state(link.EventClosed, t0.Add(2*time.Hour))))
+	if n := f.run(t); n != 1 {
+		t.Fatalf("both ended: resolved = %d", n)
+	}
+	op := f.ledger.applied[0]
+	if op.Resolution != items.Done || op.Evidence.Anchor.Unit != pull2 || op.Evidence.Anchor.Ref != "closed" {
+		t.Fatalf("one merged and one closed: op %+v, evidence %+v", op, op.Evidence)
+	}
+
+	f = newFixture(t, openItem(octocat), linkTo(pull, link.Merge), linkTo(pull2, link.Review))
+	f.events.evs = []link.Event{state(link.EventClosed, t0.Add(time.Hour)), on(pull2, state(link.EventClosed, t0.Add(2*time.Hour)))}
+	if n := f.run(t); n != 1 || f.ledger.applied[0].Resolution != items.Moot {
+		t.Fatalf("both closed: resolved = %d, ops %+v", n, f.ledger.applied)
+	}
+}
+
+type refresher struct {
+	// read is what a read of the target adds to its events; nil reads nothing.
+	read  func()
+	err   error
+	calls []unit.Unit
+}
+
+func (r *refresher) Refresh(_ context.Context, u unit.Unit) (bool, error) {
+	r.calls = append(r.calls, u)
+	if r.err != nil || r.read == nil {
+		return false, r.err
+	}
+	r.read()
+	return true, nil
+}
+
+func TestAPendingTargetIsReadAgainAndSettlesInTheSameRun(t *testing.T) {
+	f := newFixture(t, openItem(octocat), reviewLink(link.Merge))
+	rf := &refresher{read: func() { f.events.evs = []link.Event{state(link.EventMerged, t0.Add(time.Hour))} }}
+	f.r.Refresh = map[unit.ProviderID]links.Refresher{unit.GitHub: rf}
+	if n := f.run(t); n != 1 || len(rf.calls) != 1 || rf.calls[0] != pull {
+		t.Fatalf("resolved = %d, reads %v", n, rf.calls)
+	}
+	if n := f.run(t); n != 0 || len(rf.calls) != 1 {
+		t.Fatalf("a settled item read its target again: %v", rf.calls)
+	}
+}
+
+func TestAFailedReadWaitsBeforeTheNext(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		wait time.Duration
+	}{
+		{"unavailable", errors.New("rate limited"), links.RetryAfter},
+		{"not found", fmt.Errorf("%w: gone", port.ErrNotFound), links.RetryNotFoundAfter},
+	}
+	for _, c := range cases {
+		f := newFixture(t, openItem(octocat), reviewLink(link.Merge))
+		rf := &refresher{err: c.err}
+		f.r.Refresh = map[unit.ProviderID]links.Refresher{unit.GitHub: rf}
+		now := t0.Add(48 * time.Hour)
+		f.r.Clock = clock{now}
+		if n, err := f.r.Run(context.Background(), []unit.Unit{pull}); n != 0 || err != nil {
+			t.Fatalf("%s: a failed read failed the run: %d, %v", c.name, n, err)
+		}
+		f.run(t)
+		f.r.Clock = clock{now.Add(c.wait - time.Second)}
+		f.run(t)
+		if len(rf.calls) != 1 {
+			t.Fatalf("%s: read again before %v: %d reads", c.name, c.wait, len(rf.calls))
+		}
+		f.r.Clock = clock{now.Add(c.wait)}
+		f.run(t)
+		if len(rf.calls) != 2 {
+			t.Fatalf("%s: not read again after %v: %d reads", c.name, c.wait, len(rf.calls))
+		}
+		if len(f.logs) == 0 || !strings.Contains(f.logs[0], "cannot be read: ") {
+			t.Fatalf("%s: logs = %q", c.name, f.logs)
+		}
+	}
+}
+
+func TestATargetItsSourceCannotReadYetIsTriedOnTheNextRun(t *testing.T) {
+	f := newFixture(t, openItem(octocat), reviewLink(link.Merge))
+	rf := &refresher{err: fmt.Errorf("%w: the plugin is starting", links.ErrNotReady)}
+	f.r.Refresh = map[unit.ProviderID]links.Refresher{unit.GitHub: rf}
+	if _, err := f.r.Run(context.Background(), []unit.Unit{pull}); !errors.Is(err, links.ErrNotReady) {
+		t.Fatalf("a source not ready yet = %v", err)
+	}
+	rf.err = nil
+	f.run(t)
+	if len(rf.calls) != 2 || len(f.logs) != 0 {
+		t.Fatalf("reads %v, logs %q", rf.calls, f.logs)
+	}
+}
+
+func TestAnEndedTargetThatSettlesNothingIsReadOnceADay(t *testing.T) {
+	f := newFixture(t, askedAt(t0.Add(-30*time.Minute)), reviewLink(link.Review))
+	rf := &refresher{read: func() { f.events.evs = []link.Event{state(link.EventClosed, t0.Add(-time.Hour))} }}
+	f.r.Refresh = map[unit.ProviderID]links.Refresher{unit.GitHub: rf}
+	now := t0.Add(48 * time.Hour)
+	f.r.Clock = clock{now}
+	if n := f.run(t); n != 0 || len(rf.calls) != 1 {
+		t.Fatalf("resolved = %d, reads %v", n, rf.calls)
+	}
+	f.r.Clock = clock{now.Add(links.ReadEndedEvery - time.Second)}
+	f.run(t)
+	if len(rf.calls) != 1 {
+		t.Fatalf("an ended target read again within a day: %v", rf.calls)
+	}
+	f.r.Clock = clock{now.Add(links.ReadEndedEvery)}
+	f.run(t)
+	if len(rf.calls) != 2 {
+		t.Fatalf("an ended target not read after a day: %v", rf.calls)
 	}
 }
 
@@ -349,17 +506,21 @@ func TestSettlesWhatTheTargetAlreadyShows(t *testing.T) {
 	asked := askedAt(t0.Add(-2 * time.Hour))
 	f := newFixture(t, asked)
 	f.events.evs = []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}
-	op, ok, err := f.r.Settles(context.Background(), reviewLink(link.Merge), asked)
+	op, ok, err := f.r.Settles(context.Background(), []link.Link{reviewLink(link.Merge)}, asked)
 	if err != nil || !ok || op.Op != items.OpResolve || op.Unit != thread || op.Item != "i1" || op.Resolution != items.Done ||
 		op.Evidence == nil || op.Evidence.Anchor.Ref != "merged" {
 		t.Fatalf("op %+v ok %v err %v", op, ok, err)
 	}
-	if _, ok, _ := f.r.Settles(context.Background(), reviewLink(link.Mention), asked); ok {
+	if _, ok, _ := f.r.Settles(context.Background(), []link.Link{reviewLink(link.Mention)}, asked); ok {
 		t.Fatal("a mention settled its item")
 	}
 	f.events.evs = []link.Event{review("octocat", t0.Add(-3*time.Hour))}
-	if _, ok, _ := f.r.Settles(context.Background(), reviewLink(link.Review), asked); ok {
+	if _, ok, _ := f.r.Settles(context.Background(), []link.Link{reviewLink(link.Review)}, asked); ok {
 		t.Fatal("a review before the ask settled it")
+	}
+	f.events.evs = []link.Event{state(link.EventMerged, t0.Add(-time.Hour))}
+	if _, ok, _ := f.r.Settles(context.Background(), []link.Link{linkTo(pull, link.Merge), linkTo(pull2, link.Merge)}, asked); ok {
+		t.Fatal("one of two merged settled the item")
 	}
 	if len(f.ledger.applied) != 0 {
 		t.Fatalf("Settles applied %+v", f.ledger.applied)

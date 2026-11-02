@@ -45,11 +45,11 @@ type Ledger struct {
 	confirmedNoops map[itemKey]string
 }
 
-// Settler is the op that settles open item it through link l from what l's target already shows, such as
-// a pull request merged after the ask; ok is false when nothing settles it yet.
-type Settler func(ctx context.Context, l link.Link, it items.Item) (op items.Op, ok bool, err error)
+// Settler is the op that settles open item it through its links ls from what their targets already show,
+// such as pull requests merged after the ask; ok is false when nothing settles it yet.
+type Settler func(ctx context.Context, ls []link.Link, it items.Item) (op items.Op, ok bool, err error)
 
-// SetSettle makes the ledger settle an item as it stores the item's link; nil settles nothing then.
+// SetSettle makes the ledger settle an item once a batch stored its links; nil settles nothing then.
 func (l *Ledger) SetSettle(f Settler) {
 	l.mu.Lock()
 	defer l.mu.Unlock()

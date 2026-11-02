@@ -15,6 +15,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/intake"
+	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/port"
 	coresweep "github.com/wloophq/wloop/internal/core/sweep"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
@@ -68,6 +69,8 @@ type stepDeps struct {
 	Props coretasks.PropStore
 	// Gates are what gate.open opens and reads; nil refuses it.
 	Gates stepGates
+	// Items are what items.resolve resolves; nil refuses it.
+	Items coreitems.Applier
 	Pub   port.Publisher
 	Log   func(format string, args ...any)
 	// Headless starts turn.start's headless turns; Turns counts the
@@ -213,6 +216,7 @@ func stepRegistry() map[string]stepEntry {
 		builtin.StepTaskVerb:     {check: (*stepSet).taskVerbCheck, run: (*stepSet).taskVerbRun},
 		builtin.StepTaskSet:      {check: (*stepSet).taskSetCheck, run: (*stepSet).taskSetRun},
 		builtin.StepGateOpen:     {check: (*stepSet).gateOpenCheck, run: (*stepSet).gateOpenRun},
+		builtin.StepItemsResolve: {check: (*stepSet).itemsResolveCheck, run: (*stepSet).itemsResolveRun},
 	}
 }
 

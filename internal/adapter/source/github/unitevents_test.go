@@ -2,11 +2,13 @@ package ghsource
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/link"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 )
@@ -29,14 +31,15 @@ func TestGitHubUnitEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 	u := ref.Unit()
-	got, err := UnitEvents{st}.UnitEvents(ctx, u, now)
+	reported := prStates{ref: {Ref: ref, State: "CLOSED", ClosedAt: at(6), LastSeenAt: at(6)}}
+	got, err := UnitEvents{Store: st, PRs: reported, Fresh: time.Hour, Now: func() time.Time { return at(6) }}.UnitEvents(ctx, u, now)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []link.Event{
 		{Unit: u, Kind: link.EventReview, Actor: "github:OctoCat", At: at(2), Anchor: unit.Anchor{Unit: u, Ref: "review:r1", At: at(2)}},
 		{Unit: u, Kind: link.EventMerged, Actor: "github:ana", At: at(4), Anchor: unit.Anchor{Unit: u, Ref: "merged", At: at(4)}},
-		{Unit: u, Kind: link.EventClosed, At: at(5), Anchor: unit.Anchor{Unit: u, Ref: "closed", At: at(5)}},
+		{Unit: u, Kind: link.EventClosed, At: at(6), Anchor: unit.Anchor{Unit: u, Ref: "closed", At: at(6)}},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("events = %+v", got)
@@ -49,10 +52,73 @@ func TestGitHubUnitEvents(t *testing.T) {
 		}
 	}
 	outside := github.Ref{Owner: "acme", Repo: "api", Number: 999}.Unit()
-	if got, err := (UnitEvents{st}).UnitEvents(ctx, outside, time.Time{}); err != nil || got != nil {
+	if got, err := (UnitEvents{Store: st, PRs: reported, Fresh: time.Hour, Now: func() time.Time { return at(6) }}).UnitEvents(ctx, outside, time.Time{}); err != nil || got != nil {
 		t.Fatalf("a pull request outside the inventory = %v, %v", got, err)
 	}
-	if got, err := (UnitEvents{st}).UnitEvents(ctx, unit.Unit{Provider: "slack", Key: "C1/1"}, now); err == nil || got != nil {
+	if got, err := (UnitEvents{Store: st, PRs: reported, Fresh: time.Hour, Now: func() time.Time { return at(6) }}).UnitEvents(ctx, unit.Unit{Provider: "slack", Key: "C1/1"}, now); err == nil || got != nil {
 		t.Fatalf("a slack unit = %v, %v", got, err)
+	}
+}
+
+type prStates map[pr.Ref]dinv.PR
+
+func (s prStates) PR(_ context.Context, ref pr.Ref) (dinv.PR, bool, error) {
+	p, ok := s[ref]
+	return p, ok, nil
+}
+
+func TestAPullRequestOpenAgainOrNotSeenLatelyHasNoClose(t *testing.T) {
+	ctx := context.Background()
+	st := openStore(t)
+	ref := github.Ref{Owner: "acme", Repo: "api", Number: 527}
+	if _, err := st.AppendEvents(ctx, []dinv.Event{{PR: ref, Kind: dinv.KindClosed, At: now.Add(time.Hour)}}); err != nil {
+		t.Fatal(err)
+	}
+	for name, states := range map[string]prStates{
+		"reopened":                     {ref: {Ref: ref, State: "OPEN", ClosedAt: now.Add(time.Hour)}},
+		"unreported":                   {},
+		"closed, not seen for an hour": {ref: {Ref: ref, State: "CLOSED", ClosedAt: now.Add(-2 * time.Hour), LastSeenAt: now.Add(-time.Hour)}},
+	} {
+		got, err := UnitEvents{Store: st, PRs: states, Fresh: time.Hour, Now: func() time.Time { return now }}.UnitEvents(ctx, ref.Unit(), time.Time{})
+		if err != nil || len(got) != 0 {
+			t.Fatalf("%s: events = %+v, %v", name, got, err)
+		}
+	}
+}
+
+func TestRefresherReadsAPullRequestOnlyWhenItsReportMayBeStale(t *testing.T) {
+	ctx := context.Background()
+	ref := github.Ref{Owner: "acme", Repo: "api", Number: 527}
+	cases := []struct {
+		name string
+		pr   *dinv.PR
+		read bool
+	}{
+		{"never reported", nil, true},
+		{"open, seen an hour ago", &dinv.PR{Ref: ref, State: "OPEN", LastSeenAt: now.Add(-time.Hour)}, true},
+		{"open, seen a minute ago", &dinv.PR{Ref: ref, State: "OPEN", LastSeenAt: now.Add(-time.Minute)}, false},
+		{"closed, seen an hour ago", &dinv.PR{Ref: ref, State: "CLOSED", LastSeenAt: now.Add(-time.Hour)}, true},
+		{"merged long ago", &dinv.PR{Ref: ref, State: "MERGED", LastSeenAt: now.Add(-30 * 24 * time.Hour)}, false},
+	}
+	for _, c := range cases {
+		states := prStates{}
+		if c.pr != nil {
+			states[ref] = *c.pr
+		}
+		var reads []pr.Ref
+		r := Refresher{PRs: states, Every: time.Hour, Now: func() time.Time { return now },
+			Read: func(_ context.Context, got pr.Ref) error { reads = append(reads, got); return nil }}
+		read, err := r.Refresh(ctx, ref.Unit())
+		if err != nil || read != c.read || len(reads) != map[bool]int{true: 1}[c.read] {
+			t.Fatalf("%s: read = %v, %v, reads %v", c.name, read, err, reads)
+		}
+	}
+	r := Refresher{PRs: prStates{}, Every: time.Hour, Now: func() time.Time { return now },
+		Read: func(context.Context, pr.Ref) error { return errors.New("rate limited") }}
+	if _, err := r.Refresh(ctx, ref.Unit()); err == nil {
+		t.Fatal("a failed read is no error")
+	}
+	if _, err := r.Refresh(ctx, unit.Unit{Provider: "slack", Key: "C1/1"}); err == nil {
+		t.Fatal("a slack unit read as a pull request")
 	}
 }

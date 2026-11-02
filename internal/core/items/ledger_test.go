@@ -379,8 +379,8 @@ func TestALinkToAnEndedUnitSettlesItsItemInTheSameBatch(t *testing.T) {
 	l, _ := newLedger(s)
 	l.Links = &fakeLinks{}
 	merged := unit.Anchor{Unit: pull, Ref: "merged", At: t0}
-	l.SetSettle(func(_ context.Context, lk link.Link, it items.Item) (items.Op, bool, error) {
-		if lk.To != pull || it.ID != "i1" || it.State != items.Open {
+	l.SetSettle(func(_ context.Context, ls []link.Link, it items.Item) (items.Op, bool, error) {
+		if len(ls) != 1 || ls[0].To != pull || it.ID != "i1" || it.State != items.Open {
 			return items.Op{}, false, nil
 		}
 		ev := items.Evidence{Kind: items.EvidenceUnitEvent, Anchor: merged}
@@ -397,6 +397,24 @@ func TestALinkToAnEndedUnitSettlesItsItemInTheSameBatch(t *testing.T) {
 	}
 	if got := s.items[thread][i]; got.State != items.Resolved || got.Resolution != items.Moot || got.Evidence.Anchor != merged {
 		t.Fatalf("item %+v", got)
+	}
+}
+
+func TestAnItemIsSettledOnceOverEveryLinkTheBatchStored(t *testing.T) {
+	s := newMem()
+	l, _ := newLedger(s)
+	l.Links = &fakeLinks{}
+	other := unit.Unit{Provider: pull.Provider, Key: pull.Key + "0"}
+	var calls [][]link.Link
+	l.SetSettle(func(_ context.Context, ls []link.Link, _ items.Item) (items.Op, bool, error) {
+		calls = append(calls, ls)
+		return items.Op{}, false, nil
+	})
+	apply(t, l, items.Extracted, create(thread, "i1", "merge both"),
+		items.Op{Op: items.OpLink, Unit: thread, Item: "i1", Anchor: anchor("C000AAA/1.3"), To: &pull, LinkKind: link.Merge},
+		items.Op{Op: items.OpLink, Unit: thread, Item: "i1", Anchor: anchor("C000AAA/1.3"), To: &other, LinkKind: link.Merge})
+	if len(calls) != 1 || len(calls[0]) != 2 {
+		t.Fatalf("settle calls = %+v", calls)
 	}
 }
 
@@ -548,7 +566,7 @@ func TestARefusedSettleLeavesTheLinkApplied(t *testing.T) {
 	l.Links = links
 	var logged []string
 	l.Log = func(f string, a ...any) { logged = append(logged, fmt.Sprintf(f, a...)) }
-	l.SetSettle(func(context.Context, link.Link, items.Item) (items.Op, bool, error) {
+	l.SetSettle(func(context.Context, []link.Link, items.Item) (items.Op, bool, error) {
 		return items.Op{Op: items.OpResolve, Unit: thread, Item: "i1", Anchor: anchor("x"), Resolution: "bogus"}, true, nil
 	})
 	res := apply(t, l, items.Extracted, create(thread, "i1", "review o/r#1"),
