@@ -930,13 +930,14 @@ func TestUnitTasksAreTheOpenTasksHoldingTheUnit(t *testing.T) {
 		task.Task{ID: "t-next", State: "next", Category: task.CategoryReady, Units: []unit.Unit{r7u, other}},
 		task.Task{ID: "t-done", State: "done", Category: task.CategoryDone, Units: []unit.Unit{r7u}},
 		task.Task{ID: "t-other", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{other}},
+		task.Task{ID: "t-item", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{other}, Items: []task.ItemRef{{Unit: r7u, Item: "i1"}}},
 	)
 	var got []api.TaskView
 	if code := get(t, r.s, api.UnitPath(r7u, "tasks"), &got); code != 200 {
 		t.Fatalf("status %d", code)
 	}
-	if ids := taskIDs(got); !slices.Equal(slices.Sorted(slices.Values(ids)), []string{"t-next", "t-open"}) {
-		t.Fatalf("tasks %v, want t-next and t-open", ids)
+	if ids := taskIDs(got); !slices.Equal(slices.Sorted(slices.Values(ids)), []string{"t-item", "t-next", "t-open"}) {
+		t.Fatalf("tasks %v, want t-item, t-next and t-open", ids)
 	}
 	if i := slices.Index(taskIDs(got), "t-open"); len(got[i].Verbs) == 0 {
 		t.Fatalf("a unit's task carries its verbs as a view lists them: %+v", got[i])
@@ -944,5 +945,38 @@ func TestUnitTasksAreTheOpenTasksHoldingTheUnit(t *testing.T) {
 	var none []api.TaskView
 	if code := get(t, r.s, api.UnitPath(pr.Ref(ref9).Unit(), "tasks"), &none); code != 200 || len(none) != 0 {
 		t.Fatalf("a unit no task holds: %d %v", code, none)
+	}
+}
+
+func TestUnitTasksWithoutATasksServiceAreNone(t *testing.T) {
+	t.Parallel()
+	s := newNotedServer(t, func(d *Deps) { d.Tasks = nil })
+	var got []api.TaskView
+	if code := get(t, s, api.UnitPath(r7u, "tasks"), &got); code != 200 || got == nil || len(got) != 0 {
+		t.Fatalf("%d %v", code, got)
+	}
+}
+
+func TestUnitTasksLeaveOutADisabledPluginsTasks(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, func(d *Deps) { d.PluginEnabled = func(p unit.ProviderID) bool { return p != unit.GitHub } })
+	r.put(t, task.Task{ID: "t-open", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}})
+	var got []api.TaskView
+	if code := get(t, r.s, api.UnitPath(r7u, "tasks"), &got); code != 200 || len(got) != 0 {
+		t.Fatalf("%d: a disabled plugin's task shows: %v", code, taskIDs(got))
+	}
+}
+
+func TestUnitTasksListChildrenInTheirSiblingOrder(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.put(t,
+		task.Task{ID: "t-second", State: "inbox", Category: task.CategoryInbox, Parent: "t-p", Position: 2, Units: []unit.Unit{r7u},
+			Created: tasksNow.Add(-time.Hour), Updated: tasksNow},
+		task.Task{ID: "t-first", State: "inbox", Category: task.CategoryInbox, Parent: "t-p", Position: 1, Units: []unit.Unit{r7u}},
+	)
+	var got []api.TaskView
+	if code := get(t, r.s, api.UnitPath(r7u, "tasks"), &got); code != 200 || !slices.Equal(taskIDs(got), []string{"t-first", "t-second"}) {
+		t.Fatalf("%d: tasks %v, want t-first then t-second", code, taskIDs(got))
 	}
 }

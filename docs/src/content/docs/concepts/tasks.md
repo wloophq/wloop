@@ -104,7 +104,7 @@ Resolving the items of a thread you started can make `slack-closure` propose its
 
 A task's timeline is its own events and those of the units it holds, every one kept forever, newest first: `GET /api/tasks/<id>/timeline` pages it by each event's `seq`, and its `kinds` parameter keeps the kinds asked for.
 
-The open tasks that hold a unit or one of its items are at `GET /api/units/<provider>/<key>/tasks`, one read by the unit whatever view lists them; the cockpit's unit detail shows them from it.
+The open tasks that hold a unit or one of its items are at `GET /api/units/<provider>/<key>/tasks`, one read by the unit whatever view lists them, oldest first with children in their sibling order, but those whose units all belong to a disabled plugin; the cockpit's unit detail shows them from it.
 
 A record is a typed note on a unit or a task, of a kind `records.toml` declares: the JSON schema under `records/` its data follows, who may write it, and the task properties its fields set. A unit keeps one record of each kind, the newest; the timeline shows it as a `record` event. The bundled kinds are `brief`, `report` and `decision`. A brief record sets the task's `risk` from its `risk` and the task's `effort` from its `size`, when its writer may write the property: `size` stays the attention you give the task. A task's brief is its own brief record, else the brief of the first unit it holds that has one, so a pull request task's brief is its pull request's.
 

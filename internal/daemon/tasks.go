@@ -241,16 +241,13 @@ func (s *Server) handleUnitTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	es, err := g.TasksOf(ctx, u)
+	es, err := g.OpenTasksOf(ctx, u)
 	if err != nil {
 		writeTasksError(w, err)
 		return
 	}
 	vs := s.taskViews(ctx, g, false)
 	for _, e := range es {
-		if !e.Open() {
-			continue
-		}
 		v, err := vs.view(ctx, e)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
