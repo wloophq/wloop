@@ -3,6 +3,7 @@ package taskstest
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -86,6 +87,33 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 		}
 		if _, err := s.Task(ctx, "t-missing"); !errors.Is(err, coretasks.ErrNoTask) {
 			t.Fatalf("a missing task: %v", err)
+		}
+	})
+	t.Run("AWriteThatOpensOrClosesATaskStampsWhen", func(t *testing.T) {
+		s := open(t)
+		e := Full("t-0000000000000003")
+		at := e.Updated
+		for i, st := range []struct {
+			category task.Category
+			want     int
+			why      string
+		}{
+			{task.CategoryReady, 0, "created open"},
+			{task.CategoryWaiting, 0, "moved between open categories"},
+			{task.CategoryDone, 2, "closed"},
+			{task.CategoryDone, 2, "written again while closed"},
+			{task.CategoryDropped, 2, "moved between closed categories"},
+			{task.CategoryReady, 5, "opened again"},
+		} {
+			e.Category, e.Title, e.Updated = st.category, fmt.Sprint(i), at.Add(time.Duration(i)*time.Hour)
+			apply(t, s, e)
+			got, err := s.Task(ctx, e.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := at.Add(time.Duration(st.want) * time.Hour); !got.OpenChanged.Equal(want) {
+				t.Errorf("%s: opened or closed at %v, want %v", st.why, got.OpenChanged, want)
+			}
 		}
 	})
 	t.Run("EmptyApplyWritesNothing", func(t *testing.T) {

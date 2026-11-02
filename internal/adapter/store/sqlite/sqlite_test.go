@@ -47,7 +47,7 @@ var golden = []string{
 	"task_position: only, epoch, rev",
 	"task_props: task_id, name, value, writer, at",
 	"task_units: task_id, provider, unit_key, ord",
-	"tasks: id, state, title, notes, parent, position, sequential, changed, seen_at, origin, created, updated, rev, category, review_every, reviewed_at",
+	"tasks: id, state, title, notes, parent, position, sequential, changed, seen_at, origin, created, updated, rev, category, review_every, reviewed_at, open_changed_at",
 	"turn_answers: id, turn_seq, provider, unit_key, at, text, source, option_id, yes, no, route, session, message_id, read_at, noticed_at, gate_id",
 	"turn_instructions: sha, kind, repo, created_at, bundled_sha, sources, parts",
 	"turn_records: id, turn_seq, provider, unit_key, session, agent_session, head, hash, at, acked, record",

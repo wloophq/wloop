@@ -26,13 +26,15 @@ const itemOpen items.State = "open"
 //
 // An open task keeps an item it holds while the item waits on someone, even once no rule above calls for it,
 // except an item of the key that names f.Unit.
-// A derived task none of whose items calls for it any more is resolved into the done category, except the
-// task of a key that names f.Unit: the unit's one task lives as long as its unit, so it ends through the
-// profile, and is dropped once its card says the user no longer Cares about the unit (PropUnfollowed), to come
-// back when they do again. An item of that key that waits on nobody keeps the task while f Cares. A task that was clarified never returns to
-// the inbox: a done task moves back into the ready category with Changed set only when its unit asks something
-// new of Me, an item waiting on Me that the task did not hold or that changed since the task was last updated;
-// an item that opens again on an open task sets Changed and keeps its state. A task the user dropped stays dropped.
+// A derived task none of whose items calls for it any more is resolved into the done category. The task of a
+// key that names f.Unit, the unit's one task, is dropped once its card says the user no longer Cares about the
+// unit (PropUnfollowed), to come back when they do again, and, while it holds no other unit, is resolved only
+// when an item of its key resolved after the task last opened or closed (OpenChanged), so one the user opened
+// again stays open until the unit moves. An item of that key that waits on nobody keeps the task while f Cares. A task that was clarified never
+// returns to the inbox: a done task moves back into the ready category with Changed set only when its unit asks
+// something new of Me, an item waiting on Me that the task did not hold or that changed after the task last
+// closed; an item that opens again on an open task sets Changed and keeps its state. A task the user dropped
+// stays dropped.
 //
 // Never changes the state, the parent or a property the user set, except to resolve and to reopen as said.
 //
@@ -95,10 +97,15 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st Profile, no
 		case hasOwn && id == own:
 			e.Items, e.Resolved = unheld(old, f.Unit)
 			why = "no item calls for it"
-			if old.Open() && old.Origin == OriginDerived && f.Carded && !f.Cares {
+			switch {
+			case !old.Open() || old.Origin != OriginDerived:
+			case f.Carded && !f.Cares:
 				op, why = OpResolve, "its unit is no longer followed"
 				err = e.MoveTo(CategoryDropped, st)
 				e.SetProp(PropUnfollowed, Value{Time: now}, WriterPlugin, now)
+			case len(old.Units) == 1 && settledSince(its, f.Unit.String(), old.OpenChanged):
+				op, why = OpResolve, "its unit asks nothing more"
+				err = e.MoveTo(CategoryDone, st)
 			}
 		case old.Origin == OriginDerived && slices.Contains(old.Units, f.Unit) && len(old.Items)+len(old.Resolved) > 0:
 			e.Items, e.Resolved, why = nil, settle(old.Resolved, old.Items...), "no item calls for it"
@@ -278,7 +285,7 @@ func newTask(id ID, f UnitFacts, ws []items.Item, initial Category, st Profile, 
 // reconcile dropped once nobody followed the unit comes back into the ready category, Changed, when it is
 // followed again. An item old does not hold opened again marks an open task Changed; a done task moves back
 // into the ready category, Changed, only for an item waiting on me that it did not hold or that changed after
-// old was last updated.
+// old closed.
 func update(old Task, f UnitFacts, ws []items.Item, me Me, st Profile, now time.Time) (Task, string, error) {
 	e := old
 	e.Items = slices.DeleteFunc(slices.Clone(old.Items), func(r ItemRef) bool { return r.Unit == f.Unit })
@@ -289,7 +296,7 @@ func update(old Task, f UnitFacts, ws []items.Item, me Me, st Profile, now time.
 		calling = append(calling, r)
 		fresh := !slices.Contains(old.Items, r)
 		reopened = reopened || fresh
-		asksMe = asksMe || waitsOnMe(it, me) && (fresh || it.UpdatedAt.After(old.Updated))
+		asksMe = asksMe || waitsOnMe(it, me) && (fresh || it.UpdatedAt.After(old.OpenChanged))
 		if !slices.Contains(e.Items, r) {
 			e.Items = append(e.Items, r)
 		}
@@ -326,6 +333,13 @@ func update(old Task, f UnitFacts, ws []items.Item, me Me, st Profile, now time.
 	}
 	e.Changed = true
 	return e, "an item reopened", nil
+}
+
+// settledSince says whether an item of task key key resolved after at, such as after its task last opened.
+func settledSince(its []items.Item, key string, at time.Time) bool {
+	return slices.ContainsFunc(its, func(it items.Item) bool {
+		return it.TaskKey == key && it.State != itemOpen && it.UpdatedAt.After(at)
+	})
 }
 
 func waitsOnMe(it items.Item, me Me) bool {

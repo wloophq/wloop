@@ -305,9 +305,6 @@
         },
         {
           "name": "workspace"
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -628,9 +625,6 @@
         },
         {
           "name": "workspace"
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -947,9 +941,6 @@
         },
         {
           "name": "workspace"
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -1276,9 +1267,6 @@
         },
         {
           "name": "workspace"
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -1589,9 +1577,6 @@
         {
           "name": "workspace",
           "on": true
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -1930,9 +1915,6 @@
         },
         {
           "name": "workspace"
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -2291,9 +2273,6 @@
         },
         {
           "name": "workspace"
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -2642,9 +2621,6 @@
         {
           "name": "workspace",
           "on": true
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -2978,9 +2954,6 @@
         },
         {
           "name": "workspace"
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -3313,9 +3286,6 @@
         },
         {
           "name": "workspace"
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -3654,9 +3624,6 @@
         },
         {
           "name": "workspace"
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -3920,9 +3887,6 @@
         {
           "name": "workspace",
           "on": true
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -4185,9 +4149,6 @@
         },
         {
           "name": "workspace"
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -4500,9 +4461,6 @@
         {
           "name": "workspace",
           "on": true
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -4813,9 +4771,6 @@
         },
         {
           "name": "workspace"
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -5129,9 +5084,6 @@
         },
         {
           "name": "workspace"
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -5452,9 +5404,6 @@
         {
           "name": "workspace",
           "on": true
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -5778,9 +5727,6 @@
         },
         {
           "name": "workspace"
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -6109,9 +6055,6 @@
         },
         {
           "name": "workspace"
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {
@@ -6198,52 +6141,6 @@
         "turns_link": "#unit=github/acme/api#28",
         "cares": true
       },
-      "items": [
-        {
-          "id": "gh:follow",
-          "unit": {
-            "provider": "github",
-            "key": "acme/api#28"
-          },
-          "kind": "todo",
-          "summary": "Follow acme/api#28: change ana",
-          "urls": [
-            "https://github.com/acme/api/pull/28"
-          ],
-          "contexts": [
-            "@repo-api"
-          ],
-          "origin": {
-            "unit": {
-              "provider": "github",
-              "key": "acme/api#28"
-            },
-            "ref": "situation:merge",
-            "permalink": "https://github.com/acme/api/pull/28"
-          },
-          "requester": {
-            "key": "github:me-login",
-            "name": "me-login"
-          },
-          "assignees": [
-            {
-              "key": "github:ana",
-              "name": "ana"
-            }
-          ],
-          "basis": "none",
-          "waiting_on": [
-            {
-              "key": "github:ana",
-              "name": "ana"
-            }
-          ],
-          "state": "open",
-          "confidence": "high",
-          "provenance": "derived",
-          "task_key": "github:acme/api#28"
-        }
-      ],
       "facts": [
         {
           "name": "pr.repo",
@@ -6435,10 +6332,6 @@
         },
         {
           "name": "workspace",
-          "on": true
-        },
-        {
-          "name": "approved_by_me",
           "on": true
         }
       ],
@@ -6780,9 +6673,6 @@
         },
         {
           "name": "workspace"
-        },
-        {
-          "name": "approved_by_me"
         }
       ],
       "facets": {

@@ -37,8 +37,8 @@ type Deps struct {
 	Authority Authority
 	// Gates opens the gate a gated verb opens; nil: a gated verb fails.
 	Gates Gates
-	// Drafts settles the drafts of a task a verb ends; nil settles none.
-	Drafts Drafts
+	// Ending settles what a task that ends holds; nil settles nothing.
+	Ending Ending
 	// Wakes are the tasks' wakes, which schedule puts and wake reads; nil: schedule fails and no task has one.
 	Wakes Wakes
 	// Baseline fills a wake Sleep puts on task t: a When that asks to wake once a fact of t changes becomes the
@@ -133,7 +133,7 @@ func (s *Service) handler(e task.Task, verb task.Verb) VerbHandler {
 // plugin's units from any other.
 func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, error) {
 	prev, r, err := s.do(ctx, id, req)
-	if err != nil || s.d.Drafts == nil || !prev.Open() {
+	if err != nil || s.d.Ending == nil || !prev.Open() {
 		return r, err
 	}
 	next := r.Task
@@ -142,19 +142,19 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 			return r, nil
 		}
 	}
-	s.settle(ctx, []task.Task{next}, req.Verb)
+	s.settle(ctx, []task.Task{next}, req.Verb, req.Actor)
 	return r, nil
 }
 
-// settle hands Drafts each of es that ended, by verb v, or by no verb when v is empty; it runs with the lock
-// released, since settling a draft can reach back into the service.
-func (s *Service) settle(ctx context.Context, es []task.Task, v task.Verb) {
-	if s.d.Drafts == nil {
+// settle hands Ending each of es that ended, by verb v of by, or by no verb when v is empty; it runs with the
+// lock released, since settling a draft or a gate can reach back into the service.
+func (s *Service) settle(ctx context.Context, es []task.Task, v task.Verb, by task.Actor) {
+	if s.d.Ending == nil {
 		return
 	}
 	for _, e := range es {
 		if !e.Open() {
-			s.d.Drafts.Ended(ctx, e, v)
+			s.d.Ending.Ended(ctx, e, v, by)
 		}
 	}
 }
@@ -722,7 +722,7 @@ func (p *pending) changes() []task.Change {
 // keeps its tasks as they are.
 func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 	ended, err := s.sync(ctx, units)
-	s.settle(ctx, ended, "")
+	s.settle(ctx, ended, "", task.ActorPlugin)
 	return err
 }
 
@@ -894,7 +894,7 @@ func (s *Service) UnitClosed(ctx context.Context, u unit.Unit) error {
 	if err != nil {
 		return err
 	}
-	s.settle(ctx, ended, "")
+	s.settle(ctx, ended, "", task.ActorPlugin)
 	return nil
 }
 

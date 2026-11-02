@@ -75,8 +75,6 @@ func Targets(s Situation, author, viewer string, ignore []string) ([]string, str
 	switch situation.Kind(s.Kind) {
 	case situation.KindDone:
 		return nil, "is " + s.Reason
-	case situation.KindDraft:
-		return nil, "is a draft"
 	case situation.KindLoopWorking, situation.KindLoopWaiting, situation.KindLoopStopped, situation.KindHeldByCap:
 		return nil, "waits on the review loop (" + s.Reason + ")"
 	case situation.KindNoReviewer:
@@ -241,30 +239,23 @@ type Reader interface {
 }
 
 // Proposals are the nudge drafts of rows at now, reading the host's
-// overrides and turns of the stalled ones only, and the withdrawal of the
-// nudge on each open one no longer stalled. A hold, a mute or a running turn
-// only keeps a stalled one's nudge from being proposed now.
-func Proposals(ctx context.Context, rows []row.Row, rd Reader, x Texts, ignore []string, now time.Time) (src.Proposed, error) {
+// overrides and turns of the stalled ones only.
+func Proposals(ctx context.Context, rows []row.Row, rd Reader, x Texts, ignore []string, now time.Time) ([]src.Draft, error) {
 	var candidates []row.Row
 	var units []sdk.Unit
-	var out src.Proposed
 	for _, r := range rows {
-		switch {
-		case r.Payload.Viewer == "" || r.PR.State != "OPEN":
-		case Stalled(r):
+		if Stalled(r) && r.Payload.Viewer != "" {
 			candidates = append(candidates, r)
 			units = append(units, r.PR.Ref.Unit())
-		default:
-			out.Withdrawals = append(out.Withdrawals, src.Withdrawal{Unit: r.PR.Ref.Unit(), Rule: Rule})
 		}
 	}
 	if len(candidates) == 0 {
-		return out, nil
+		return nil, nil
 	}
 	books := map[sdk.Unit]src.Book{}
 	bs, err := rd.Books(ctx, units)
 	if err != nil && !errors.Is(err, src.ErrUnsupported) {
-		return src.Proposed{}, err
+		return nil, err
 	}
 	for _, b := range bs {
 		books[b.Unit] = b
@@ -272,7 +263,7 @@ func Proposals(ctx context.Context, rows []row.Row, rd Reader, x Texts, ignore [
 	asleep := map[sdk.Unit]bool{}
 	ts, err := rd.Tasks(ctx, units)
 	if err != nil && !errors.Is(err, src.ErrUnsupported) {
-		return src.Proposed{}, err
+		return nil, err
 	}
 	for _, t := range ts {
 		if t.Category == categoryDeferred {
@@ -281,18 +272,19 @@ func Proposals(ctx context.Context, rows []row.Row, rd Reader, x Texts, ignore [
 			}
 		}
 	}
+	var out []src.Draft
 	for _, r := range candidates {
 		u := r.PR.Ref.Unit()
 		st, err := rd.RoundState(ctx, u)
 		if err != nil {
-			return src.Proposed{}, fmt.Errorf("the round state of %s: %w", r.PR.Ref, err)
+			return nil, fmt.Errorf("the round state of %s: %w", r.PR.Ref, err)
 		}
 		d, ok, err := Propose(r, Host{Overrides: st.Overrides, Book: books[u], Asleep: asleep[u]}, x, ignore, now)
 		if err != nil {
-			return src.Proposed{}, err
+			return nil, err
 		}
 		if ok {
-			out.Drafts = append(out.Drafts, d)
+			out = append(out, d)
 		}
 	}
 	return out, nil

@@ -432,7 +432,7 @@ func TestADoneTaskComesBackOnlyWhenItsUnitAsksSomethingNewOfMe(t *testing.T) {
 	closedAt := now.Add(-time.Hour)
 	done := task.Task{ID: "t-00000000000000a3", State: "done", Category: task.CategoryDone, Title: "do gh:review",
 		Units: []unit.Unit{pr}, Items: []task.ItemRef{{Unit: pr, Item: "gh:review"}}, Origin: task.OriginDerived,
-		Created: now.Add(-48 * time.Hour), Updated: closedAt}
+		Created: now.Add(-48 * time.Hour), Updated: now.Add(-time.Minute), OpenChanged: closedAt}
 	asked := func(at time.Time) items.Item {
 		return item("gh:review", keyed, func(it *items.Item) { it.UpdatedAt = at })
 	}
@@ -441,11 +441,41 @@ func TestADoneTaskComesBackOnlyWhenItsUnitAsksSomethingNewOfMe(t *testing.T) {
 	}
 	e := only(t, reconcile(t, f, []items.Item{asked(closedAt.Add(time.Minute))}, []task.Task{done}, now))
 	if e.Category != task.CategoryReady || !e.Changed {
-		t.Fatalf("the ask changed after you closed the task, still on you: %+v", e)
+		t.Fatalf("the ask changed after you closed the task, still on you, though the task was written since: %+v", e)
 	}
 	waits := item("gh:review", keyed, owedBy(ana), func(it *items.Item) { it.UpdatedAt = closedAt.Add(time.Minute) })
 	if e := only(t, reconcile(t, f, []items.Item{waits}, []task.Task{done}, now)); e.Category != task.CategoryDone || e.Changed {
 		t.Fatalf("the ask moved to someone else after you closed the task: %+v", e)
+	}
+}
+
+func TestAPullRequestsTaskClosesOnceItsAsksResolveAfterItLastOpened(t *testing.T) {
+	f := facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true })
+	opened := now.Add(-time.Hour)
+	own := task.Task{ID: task.DerivedID(pr, pr.String()), State: "next", Category: task.CategoryReady, Title: "Review acme/api#7",
+		Units: []unit.Unit{pr}, Items: []task.ItemRef{{Unit: pr, Item: "gh:review"}}, Origin: task.OriginDerived,
+		Created: opened, Updated: opened, OpenChanged: opened}
+	settled := func(at time.Time) []items.Item {
+		return []items.Item{item("gh:review", keyed, resolved, func(it *items.Item) { it.UpdatedAt = at })}
+	}
+	e := only(t, reconcile(t, f, settled(opened.Add(time.Minute)), []task.Task{own}, now))
+	if e.Category != task.CategoryDone || len(e.Items) != 0 {
+		t.Fatalf("a pull request that asks nothing more of you: %+v", e)
+	}
+	reopened := own
+	reopened.OpenChanged = opened.Add(2 * time.Minute)
+	if e := only(t, reconcile(t, f, settled(opened.Add(time.Minute)), []task.Task{reopened}, now)); !e.Open() {
+		t.Fatalf("a task you opened again after its asks resolved: %+v", e)
+	}
+	attached := own
+	attached.Units = []unit.Unit{pr, {Provider: "slack", Key: "T1/C1/1.1"}}
+	if e := only(t, reconcile(t, f, settled(opened.Add(time.Minute)), []task.Task{attached}, now)); !e.Open() {
+		t.Fatalf("a task that also holds a thread: %+v", e)
+	}
+	captured := own
+	captured.Origin = task.OriginUser
+	if e := only(t, reconcile(t, f, settled(opened.Add(time.Minute)), []task.Task{captured}, now)); !e.Open() {
+		t.Fatalf("a task you captured, holding the pull request: %+v", e)
 	}
 }
 

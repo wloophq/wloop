@@ -117,10 +117,11 @@ type Request struct {
 	Approved int64
 }
 
-// Drafts settles the drafts of a task a verb ended: e as the verb left it, done or dropped. The verb stands
-// whatever happens to them, so Ended reports its own failures.
-type Drafts interface {
-	Ended(ctx context.Context, e task.Task, v task.Verb)
+// Ending settles what a task that ended still holds, its drafts and gates: e as it was left, done or dropped, by
+// verb v of by, or by no verb when the source ended it. The end stands whatever happens to them, so Ended
+// reports its own failures.
+type Ending interface {
+	Ended(ctx context.Context, e task.Task, v task.Verb, by task.Actor)
 }
 
 // Gates are the gates a gated verb opens and reads back: one open gate per proposal.

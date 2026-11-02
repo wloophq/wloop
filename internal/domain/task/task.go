@@ -98,7 +98,7 @@ func (e Task) IsProject() bool { return e.Prop(PropKind).Text == KindProject }
 // Same says whether e and o hold the same values, Updated aside.
 func (e Task) Same(o Task) bool {
 	a, b := e.canonical(), o.canonical()
-	a.Updated, b.Updated = time.Time{}, time.Time{}
+	a.Updated, b.Updated, a.OpenChanged, b.OpenChanged = time.Time{}, time.Time{}, time.Time{}, time.Time{}
 	return reflect.DeepEqual(a, b)
 }
 

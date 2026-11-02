@@ -31,7 +31,12 @@ var _ coretasks.Store = taskStore{}
 func (db *DB) Tasks() coretasks.Store { return taskStore{db} }
 
 const taskFields = `id, state, category, title, notes, parent, position, sequential,
-	changed, seen_at, origin, created, updated, review_every, reviewed_at`
+	changed, seen_at, origin, created, updated, review_every, reviewed_at, open_changed_at`
+
+// openChangedSQL keeps open_changed_at while a write leaves the task as open, or as closed, as it was, and takes
+// the write's updated when it opens or closes it. It binds done and dropped twice, after the row's values.
+const openChangedSQL = `CASE WHEN (tasks.category NOT IN (?, ?)) = (excluded.category NOT IN (?, ?))
+	THEN tasks.open_changed_at ELSE excluded.updated END`
 
 // hasWake holds a task that holds a wake.
 const hasWake = `EXISTS (SELECT 1 FROM wakes WHERE wakes.task_id = tasks.id)`
@@ -43,6 +48,10 @@ var upsertTaskSQL = func() string {
 	set := make([]string, 0, len(cols)-1)
 	for _, c := range cols[1:] {
 		c = strings.TrimSpace(c)
+		if c == "open_changed_at" {
+			set = append(set, c+` = `+openChangedSQL)
+			continue
+		}
 		set = append(set, c+` = excluded.`+c)
 	}
 	return `INSERT INTO tasks (` + taskFields + `, rev) VALUES (?` + strings.Repeat(`, ?`, len(cols)-1) +
@@ -77,12 +86,12 @@ func taskTime(s string) (time.Time, error) {
 
 func scanTask(row scanner) (task.Task, error) {
 	var e task.Task
-	var seenAt, created, updated, reviewed string
+	var seenAt, created, updated, reviewed, openChanged string
 	var state, category, parent string
 	var every int64
 	if err := row.Scan(&e.ID, &state, &category, &e.Title, &e.Notes, &parent,
 		&e.Position, &e.Sequential, &e.Changed, &seenAt, &e.Origin, &created, &updated, &every, &reviewed,
-		&e.Asleep); err != nil {
+		&openChanged, &e.Asleep); err != nil {
 		return task.Task{}, err
 	}
 	e.State, e.Category, e.Parent = task.State(state), task.Category(category), task.ID(parent)
@@ -90,7 +99,7 @@ func scanTask(row scanner) (task.Task, error) {
 	for _, f := range []struct {
 		dst *time.Time
 		raw string
-	}{{&e.SeenAt, seenAt}, {&e.Created, created}, {&e.Updated, updated}, {&e.ReviewedAt, reviewed}} {
+	}{{&e.SeenAt, seenAt}, {&e.Created, created}, {&e.Updated, updated}, {&e.ReviewedAt, reviewed}, {&e.OpenChanged, openChanged}} {
 		t, err := taskTime(f.raw)
 		if err != nil {
 			return task.Task{}, fmt.Errorf("a time of task %s: %w", e.ID, err)
@@ -400,7 +409,8 @@ func writeTask(ctx context.Context, tx *Tx, e task.Task, rev uint64) error {
 	if _, err := tx.ExecContext(ctx, upsertTaskSQL,
 		string(e.ID), string(e.State), string(e.Category), e.Title, e.Notes, string(e.Parent), e.Position,
 		e.Sequential, e.Changed, eventTime(e.SeenAt), e.Origin, eventTime(e.Created), eventTime(e.Updated),
-		int64(e.ReviewEvery/time.Second), eventTime(e.ReviewedAt), rev); err != nil {
+		int64(e.ReviewEvery/time.Second), eventTime(e.ReviewedAt), eventTime(e.Updated), rev, string(task.CategoryDone),
+		string(task.CategoryDropped), string(task.CategoryDone), string(task.CategoryDropped)); err != nil {
 		return err
 	}
 	for _, rs := range []struct {

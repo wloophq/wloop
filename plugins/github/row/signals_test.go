@@ -41,7 +41,7 @@ func TestTheSignalsOfEachFixture(t *testing.T) {
 		"held by the cap":              {SignalInLoop, SignalWorkspace},
 		"workspace agent waiting":      {SignalInLoop, SignalWorkspace},
 		"tracked":                      {SignalStalled},
-		"approved review head":         {SignalInLoop, SignalReady, SignalWorkspace, SignalApprovedByMe},
+		"approved review head":         {SignalInLoop, SignalReady, SignalWorkspace},
 		"old stalled review":           {SignalStalled},
 		"closed in a review workspace": {SignalWorkspace},
 	}
@@ -61,30 +61,30 @@ func TestAStalledSignalSaysSinceWhen(t *testing.T) {
 	}
 }
 
-func TestApprovedByMeIsMyNewestVerdictOnSomeoneElsesOpenPullRequest(t *testing.T) {
+func TestSomeoneElsesPullRequestMyNewestVerdictApprovesAsksNothing(t *testing.T) {
 	theirs := open(50, "ana", func(p *pr.PR) { p.Reasons = []string{"review-requested"} })
+	requested := open(50, "ana", func(p *pr.PR) { p.Reasons, p.ReviewRequests = []string{"review-requested"}, []string{fixtureViewer} })
 	approved := ev(50, pr.KindReview, fixtureViewer, ago(3*day), "APPROVED:h0")
 	for _, c := range []struct {
-		name string
-		pr   pr.PR
-		evs  []pr.Event
-		want bool
+		name     string
+		pr       pr.PR
+		override pr.Override
+		evs      []pr.Event
+		asks     bool
 	}{
-		{"approved, then pushed", theirs, []pr.Event{approved, ev(50, pr.KindPush, "ana", ago(2*day), "")}, true},
-		{"approved, then commented", theirs, []pr.Event{approved, ev(50, pr.KindReview, fixtureViewer, ago(day), "COMMENTED:h1")}, true},
-		{"approved, then asked changes", theirs, []pr.Event{approved, ev(50, pr.KindReview, fixtureViewer, ago(day), "CHANGES_REQUESTED:h1")}, false},
-		{"approved, then re-requested", open(50, "ana", func(p *pr.PR) { p.Reasons, p.ReviewRequests = []string{"review-requested"}, []string{fixtureViewer} }),
-			[]pr.Event{approved, ev(50, pr.KindReviewRequest, "ana", ago(day), fixtureViewer)}, false},
-		{"approved, re-requested, then the request withdrawn", theirs, []pr.Event{approved, ev(50, pr.KindReviewRequest, "ana", ago(day), fixtureViewer)}, true},
-		{"approved, then listed as requested with no event", open(50, "ana", func(p *pr.PR) { p.Reasons, p.ReviewRequests = []string{"review-requested"}, []string{fixtureViewer} }),
-			[]pr.Event{approved}, true},
-		{"approved my own", open(50, fixtureViewer, nil), []pr.Event{approved}, false},
-		{"approved, then merged", open(50, "ana", func(p *pr.PR) { p.State, p.MergedAt = "MERGED", ago(day) }), []pr.Event{approved}, false},
-		{"never reviewed", theirs, nil, false},
+		{"approved, then pushed", theirs, pr.Override{}, []pr.Event{approved, ev(50, pr.KindPush, "ana", ago(2*day), "")}, false},
+		{"approved, then commented", theirs, pr.Override{}, []pr.Event{approved, ev(50, pr.KindReview, fixtureViewer, ago(day), "COMMENTED:h1")}, false},
+		{"approved, then asked changes", theirs, pr.Override{}, []pr.Event{approved, ev(50, pr.KindReview, fixtureViewer, ago(day), "CHANGES_REQUESTED:h1")}, true},
+		{"approved, then re-requested", requested, pr.Override{}, []pr.Event{approved, ev(50, pr.KindReviewRequest, "ana", ago(day), fixtureViewer)}, true},
+		{"approved, re-requested, then the request withdrawn", theirs, pr.Override{}, []pr.Event{approved, ev(50, pr.KindReviewRequest, "ana", ago(day), fixtureViewer)}, false},
+		{"approved, then listed as requested with no event, which the situation reads as asking you", requested, pr.Override{}, []pr.Event{approved}, true},
+		{"approved and tracked", theirs, pr.Override{Tracked: true}, []pr.Event{approved}, true},
+		{"approved my own", open(50, fixtureViewer, func(p *pr.PR) { p.Reasons = []string{"author"} }), pr.Override{}, []pr.Event{approved}, true},
+		{"never reviewed", requested, pr.Override{}, nil, true},
 	} {
-		got := slices.Contains(on(Derive(input(fixture{pr: c.pr, events: c.evs}))), SignalApprovedByMe)
-		if got != c.want {
-			t.Errorf("%s: approved_by_me %v, want %v", c.name, got, c.want)
+		got := len(Derive(input(fixture{pr: c.pr, override: c.override, events: c.evs})).Items()) > 0
+		if got != c.asks {
+			t.Errorf("%s: asks %v, want %v", c.name, got, c.asks)
 		}
 	}
 }

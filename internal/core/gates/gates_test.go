@@ -41,7 +41,8 @@ var bundled = profile{
 	{Name: "draft", Kind: gate.KindDraft, Label: "Send this draft?", Intents: []gates.Intent{{Name: "approve", Status: gate.Approved}, {Name: "discard", Status: gate.Rejected}},
 		EndsTask: map[gate.Status]task.Category{gate.Approved: task.CategoryDone, gate.Rejected: task.CategoryDropped, gate.Superseded: task.CategoryDropped}},
 	{Name: "plan", Kind: gate.KindPlan, Label: "Run this?", Intents: []gates.Intent{{Name: "run", Status: gate.Approved}, {Name: "skip", Status: gate.Rejected}}},
-	{Name: "question", Kind: gate.KindQuestion, Label: "The agent asks", Intents: []gates.Intent{{Name: "answer", Status: gate.Answered, Answer: true}, {Name: "dismiss", Status: gate.Dismissed}}},
+	{Name: "question", Kind: gate.KindQuestion, Label: "The agent asks", Intents: []gates.Intent{{Name: "answer", Status: gate.Answered, Answer: true}, {Name: "dismiss", Status: gate.Dismissed}},
+		ClosesWith: "dismiss"},
 	{Name: "review-diff", Kind: gate.KindStep, Label: "Review the diff", Intents: []gates.Intent{{Name: "approve", Status: gate.Approved}}},
 }
 
@@ -361,5 +362,40 @@ func TestResolvingAStepGateRecordsAnEvent(t *testing.T) {
 	want := port.Event{Unit: task.UnitOf("t-0000000000000001"), Kind: gate.EventResolved, Key: fmt.Sprintf("review-diff/%d", step.ID), Actor: "person", Data: "approve", At: fixedNow()}
 	if len(log.evs) != 1 || log.evs[0] != want {
 		t.Fatalf("events %+v, want only %+v", log.evs, want)
+	}
+}
+
+func TestAnEndedTasksGatesCloseWithTheIntentGatesTomlNames(t *testing.T) {
+	ctx := context.Background()
+	for _, by := range []task.Actor{task.ActorPerson, task.ActorWorkflow, task.ActorPlugin} {
+		t.Run(string(by), func(t *testing.T) {
+			f := newFixture(t, policy{dec: gates.Decision{Mode: gate.ModeWait}}, bundled)
+			id := task.ID("t-0000000000000001")
+			question := f.open(t, gate.Gate{Task: id, Kind: gate.KindQuestion}, nil)
+			plan := f.open(t, gate.Gate{Task: id, Kind: gate.KindPlan}, nil)
+			other := f.open(t, gate.Gate{Task: "t-0000000000000002", Unit: task.UnitOf("t-0000000000000002"), Kind: gate.KindQuestion}, nil)
+			if err := f.svc.TaskEnded(ctx, id, by); err != nil {
+				t.Fatal(err)
+			}
+			if got := f.get(t, question.ID); got.Status != gate.Dismissed || got.Intent != "dismiss" || got.By != by {
+				t.Fatalf("the ended task's question = %+v, want dismissed by %s", got, by)
+			}
+			for _, g := range []gate.Gate{plan, other} {
+				if got := f.get(t, g.ID); got.Status != gate.Open {
+					t.Errorf("gate %s of %s = %s, want open: no closes_with, or another task", g.Kind, g.Task, got.Status)
+				}
+			}
+		})
+	}
+}
+
+func TestNoAgentEndsAGate(t *testing.T) {
+	f := newFixture(t, policy{dec: gates.Decision{Mode: gate.ModeWait}}, bundled)
+	g := f.open(t, gate.Gate{Task: "t-0000000000000001", Kind: gate.KindQuestion}, nil)
+	if err := f.svc.TaskEnded(context.Background(), "t-0000000000000001", task.ActorAgent); !errors.Is(err, gates.ErrRefused) {
+		t.Fatalf("an agent ending a task: %v, want ErrRefused", err)
+	}
+	if got := f.get(t, g.ID); got.Status != gate.Open {
+		t.Fatalf("the question = %+v, want open", got)
 	}
 }

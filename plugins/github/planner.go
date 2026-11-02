@@ -15,23 +15,22 @@ import (
 var _ src.Planner = (*Plugin)(nil)
 
 // Proposals are the github-nudge rule's drafts: one per stalled open pull
-// request whose nudge would go now, and its withdrawal on each open one no
-// longer stalled. None before the store knows the viewer.
-func (p *Plugin) Proposals(ctx context.Context, now time.Time) (src.Proposed, error) {
+// request whose nudge would go now. None before the store knows the viewer.
+func (p *Plugin) Proposals(ctx context.Context, now time.Time) ([]src.Draft, error) {
 	r, err := p.running()
 	if err != nil {
-		return src.Proposed{}, err
+		return nil, err
 	}
 	if r.host.Reader == nil {
-		return src.Proposed{}, nil
+		return nil, nil
 	}
 	viewer, err := r.db.Viewer(ctx)
 	if err != nil || viewer == "" {
-		return src.Proposed{}, err
+		return nil, err
 	}
 	open, err := r.db.ListPRs(ctx, true)
 	if err != nil {
-		return src.Proposed{}, err
+		return nil, err
 	}
 	refs := make([]pr.Ref, len(open))
 	for i, x := range open {
@@ -39,7 +38,7 @@ func (p *Plugin) Proposals(ctx context.Context, now time.Time) (src.Proposed, er
 	}
 	ds, err := r.rows(ctx, refs, now)
 	if err != nil {
-		return src.Proposed{}, err
+		return nil, err
 	}
 	rows := make([]row.Row, len(ds))
 	for i, d := range ds {
@@ -47,7 +46,7 @@ func (p *Plugin) Proposals(ctx context.Context, now time.Time) (src.Proposed, er
 	}
 	x, err := r.texts(ctx)
 	if err != nil {
-		return src.Proposed{}, err
+		return nil, err
 	}
 	return nudge.Proposals(ctx, rows, r.host.Reader, x, r.settings().Ignore, now)
 }
