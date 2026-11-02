@@ -283,18 +283,16 @@ func TestAReopenedItemMarksChangedAndStaysOutOfTheInbox(t *testing.T) {
 	}
 	resolved(&its[0])
 	done := only(t, reconcile(t, facts(), its, []task.Task{e}, now))
-	its[0].State = "open"
+	its[0].State, its[0].UpdatedAt = "open", now.Add(time.Hour)
 	got := only(t, reconcile(t, facts(), its, []task.Task{done}, now.Add(time.Hour)))
-	if got.Category != task.CategoryDone || got.Changed || len(got.Items) != 1 {
-		t.Fatalf("an item that waits on someone else reopened on a done task: %+v", got)
+	if got.Category != task.CategoryReady || !got.Changed || len(got.Items) != 1 {
+		t.Fatalf("an item the done task resolved, waiting on someone else, reopened: %+v", got)
 	}
-	mine := []items.Item{item("a")}
-	resolved(&mine[0])
-	doneMine := only(t, reconcile(t, facts(), mine, []task.Task{e}, now))
-	mine[0].State = "open"
-	if got := only(t, reconcile(t, facts(), mine, []task.Task{doneMine}, now.Add(time.Hour))); got.Category != task.CategoryReady || !got.Changed {
-		t.Fatalf("an item that waits on me reopened on a done task: %+v", got)
+	its[0].UpdatedAt = now.Add(-time.Minute)
+	if got := only(t, reconcile(t, facts(), its, []task.Task{done}, now.Add(time.Hour))); got.Category != task.CategoryDone {
+		t.Fatalf("an item open again before the task closed brought it back: %+v", got)
 	}
+	its[0].UpdatedAt = time.Time{}
 	dropped := done
 	dropped.State, dropped.Category = "trash", task.CategoryDropped
 	if got := only(t, reconcile(t, facts(), its, []task.Task{dropped}, now.Add(time.Hour))); got.Category != task.CategoryDropped {
@@ -446,6 +444,20 @@ func TestADoneTaskComesBackOnlyWhenItsUnitAsksSomethingNewOfMe(t *testing.T) {
 	waits := item("gh:review", keyed, owedBy(ana), func(it *items.Item) { it.UpdatedAt = closedAt.Add(time.Minute) })
 	if e := only(t, reconcile(t, f, []items.Item{waits}, []task.Task{done}, now)); e.Category != task.CategoryDone || e.Changed {
 		t.Fatalf("the ask moved to someone else after you closed the task: %+v", e)
+	}
+	retitled := asked(closedAt.Add(time.Minute))
+	retitled.Origin.At = closedAt.Add(-time.Hour)
+	if cs := reconciled(t, f, []items.Item{retitled}, me, []task.Task{done}, bundled, now); len(cs) != 0 {
+		t.Fatalf("the ask you closed the task over, only reworded since, brought it back: %+v", cs)
+	}
+	retitled.Origin.At = closedAt.Add(time.Minute)
+	if e := only(t, reconcile(t, f, []items.Item{retitled}, []task.Task{done}, now)); e.Category != task.CategoryReady {
+		t.Fatalf("the ask made again after you closed the task: %+v", e)
+	}
+	unstamped := done
+	unstamped.OpenChanged = time.Time{}
+	if cs := reconciled(t, f, []items.Item{asked(now.Add(-2 * time.Minute))}, me, []task.Task{unstamped}, bundled, now); len(cs) != 0 {
+		t.Fatalf("a task with no open or close time, an ask older than its last write: %+v", cs)
 	}
 }
 

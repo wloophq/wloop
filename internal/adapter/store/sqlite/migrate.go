@@ -70,7 +70,7 @@ var migrations = []migration{
 	)},
 	{to: 6, name: "answer_message", compatible: 4, up: v6Answers},
 	{to: 7, name: "tasks", foreignKeysOff: true, compatible: 7, before: v7ExportPlugins, up: v7},
-	{to: 8, name: "task_open_changed", compatible: 7, up: execAll(
+	{to: 8, name: "task_open_changed", up: execAll(
 		`ALTER TABLE tasks ADD COLUMN open_changed_at TEXT NOT NULL DEFAULT ''`,
 		`UPDATE tasks SET open_changed_at = updated`,
 	)},

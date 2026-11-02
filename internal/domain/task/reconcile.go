@@ -32,8 +32,9 @@ const itemOpen items.State = "open"
 // when an item of its key resolved after the task last opened or closed (OpenChanged), so one the user opened
 // again stays open until the unit moves. An item of that key that waits on nobody keeps the task while f Cares. A task that was clarified never
 // returns to the inbox: a done task moves back into the ready category with Changed set only when its unit asks
-// something new of Me, an item waiting on Me that the task did not hold or that changed after the task last
-// closed; an item that opens again on an open task sets Changed and keeps its state. A task the user dropped
+// something new of Me, an item waiting on Me that the task did not hold or that asked again after the task last
+// closed, or when an item the task held as resolved opens again after that; an item that opens again on an open
+// task sets Changed and keeps its state. A task the user dropped
 // stays dropped.
 //
 // Never changes the state, the parent or a property the user set, except to resolve and to reopen as said.
@@ -103,7 +104,7 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st Profile, no
 				op, why = OpResolve, "its unit is no longer followed"
 				err = e.MoveTo(CategoryDropped, st)
 				e.SetProp(PropUnfollowed, Value{Time: now}, WriterPlugin, now)
-			case len(old.Units) == 1 && settledSince(its, f.Unit.String(), old.OpenChanged):
+			case len(old.Units) == 1 && settledSince(its, f.Unit.String(), old.openChangedAt()):
 				op, why = OpResolve, "its unit asks nothing more"
 				err = e.MoveTo(CategoryDone, st)
 			}
@@ -284,19 +285,21 @@ func newTask(id ID, f UnitFacts, ws []items.Item, initial Category, st Profile, 
 // opened on the unit before its items came becomes the derived task of the unit's key, and a unit's own task
 // reconcile dropped once nobody followed the unit comes back into the ready category, Changed, when it is
 // followed again. An item old does not hold opened again marks an open task Changed; a done task moves back
-// into the ready category, Changed, only for an item waiting on me that it did not hold or that changed after
-// old closed.
+// into the ready category, Changed, only for an item waiting on me that it did not hold or that asked again
+// after old closed, or for an item it held as resolved that opened again after that.
 func update(old Task, f UnitFacts, ws []items.Item, me Me, st Profile, now time.Time) (Task, string, error) {
 	e := old
 	e.Items = slices.DeleteFunc(slices.Clone(old.Items), func(r ItemRef) bool { return r.Unit == f.Unit })
-	reopened, asksMe := false, false
+	reopened, back := false, false
+	closed := old.openChangedAt()
 	var calling []ItemRef
 	for _, it := range ws {
 		r := refOf(f, it)
 		calling = append(calling, r)
 		fresh := !slices.Contains(old.Items, r)
 		reopened = reopened || fresh
-		asksMe = asksMe || waitsOnMe(it, me) && (fresh || it.UpdatedAt.After(old.OpenChanged))
+		back = back || waitsOnMe(it, me) && (fresh || askedAt(it).After(closed)) ||
+			slices.Contains(old.Resolved, r) && it.UpdatedAt.After(closed)
 		if !slices.Contains(e.Items, r) {
 			e.Items = append(e.Items, r)
 		}
@@ -324,7 +327,7 @@ func update(old Task, f UnitFacts, ws []items.Item, me Me, st Profile, now time.
 		return e, "its unit is followed again", nil
 	}
 	switch {
-	case old.Category == CategoryDone && asksMe:
+	case old.Category == CategoryDone && back:
 		if err := e.MoveTo(CategoryReady, st); err != nil {
 			return e, "", err
 		}
@@ -333,6 +336,24 @@ func update(old Task, f UnitFacts, ws []items.Item, me Me, st Profile, now time.
 	}
 	e.Changed = true
 	return e, "an item reopened", nil
+}
+
+// openChangedAt is when e last opened or closed, its last write when the store has no such time for it, as a
+// release before the time was kept leaves it.
+func (e Task) openChangedAt() time.Time {
+	if e.OpenChanged.IsZero() {
+		return e.Updated
+	}
+	return e.OpenChanged
+}
+
+// askedAt is when item it made its ask: its origin's time, which a reworded summary or an added evidence leaves
+// alone, else its last change.
+func askedAt(it items.Item) time.Time {
+	if it.Origin.At.IsZero() {
+		return it.UpdatedAt
+	}
+	return it.Origin.At
 }
 
 // settledSince says whether an item of task key key resolved after at, such as after its task last opened.
