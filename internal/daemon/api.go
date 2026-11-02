@@ -87,6 +87,7 @@ func (s *Server) routes() []route {
 		{"GET " + api.Resolve, s.handleResolve},
 		{"GET " + api.UnitDetail, s.handleDetail},
 		{"GET " + api.UnitDetail + "/checks", s.handleChecks},
+		{"GET " + api.UnitTasks, s.handleUnitTasks},
 		{"POST /api/jobs/{name}", s.handleJobs},
 		{"POST " + api.UnitDetail + "/{action}", s.handleAction},
 		{"GET " + api.Actions, s.handleActions},

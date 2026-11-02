@@ -42,17 +42,13 @@ detailEnv.notice = () => {}; detailEnv.changed = () => {}; detailEnv.render = ()
 
 func TestUnitDetailRoute(t *testing.T) {
 	mine := task("e-1", "next", func(e *api.TaskView) { e.Units = []unit.Unit{prUnit} })
-	other := task("e-2", "next", func(e *api.TaskView) { e.Units = []unit.Unit{{Provider: "github", Key: "acme/api#80"}} })
 	waiting := task("e-3", "waiting", func(e *api.TaskView) { e.Units = []unit.Unit{prUnit} })
-	shipped := task("e-4", "done", func(e *api.TaskView) { e.Units, e.Category = []unit.Unit{prUnit}, "done" })
-	page := func(es ...api.TaskView) api.TasksPage {
-		return api.TasksPage{Full: true, Tasks: es, Removed: []string{}}
-	}
 	detail := map[string]any{"row": map[string]any{"unit": prUnit}, "events": []any{}, "items": []any{},
 		"card": card.Snapshot{Card: card.Card{Unit: prUnit, Title: "Retry flaky uploads", State: "open"}}}
 	var got struct {
 		Text  string
 		Tasks []string
+		Asked []string
 		Route map[string]any
 	}
 	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
@@ -63,13 +59,9 @@ tasksState.catalog = input.cat;
   const route = readRoute("#unit=github/acme%2Fapi%238");
   await loadDetailPane(route);
   const box = unitExtras(input.detail);
-  process.stdout.write(JSON.stringify({ Text: text(box), Tasks: detailState.unitTasks.map((e) => e.id), Route: route }));
+  process.stdout.write(JSON.stringify({ Text: text(box), Tasks: detailState.unitTasks.map((e) => e.id), Asked: asked, Route: route }));
 })();`, map[string]any{"detail": detail, "cat": viewsCatalog(), "answers": map[string]any{
-		"/api/tasks?view=logbook":  page(shipped),
-		"/api/tasks?view=inbox":    page(),
-		"/api/tasks?view=fits-now": page(mine, other),
-		"/api/tasks?view=waiting":  page(waiting),
-		"/api/tasks?view=someday":  page(),
+		api.UnitPath(prUnit, "tasks"): []api.TaskView{mine, waiting},
 	}}, &got)
 	if got.Route["unit"] != "github:acme/api#8" {
 		t.Fatalf("route %v", got.Route)
@@ -77,13 +69,13 @@ tasksState.catalog = input.cat;
 	if !slices.Equal(got.Tasks, []string{"e-1", "e-3"}) {
 		t.Errorf("the unit's tasks %v, want e-1 and e-3", got.Tasks)
 	}
+	if want := []string{api.UnitPath(prUnit, "tasks")}; !slices.Equal(got.Asked, want) {
+		t.Errorf("the pane asked %v, want the unit's tasks in one request: %v", got.Asked, want)
+	}
 	for _, s := range []string{"Retry flaky uploads", "Tasks", "Task e-1", "Task e-3"} {
 		if !strings.Contains(got.Text, s) {
 			t.Errorf("the unit detail lacks %q: %s", s, got.Text)
 		}
-	}
-	if strings.Contains(got.Text, "Task e-2") {
-		t.Errorf("another unit's task shows: %s", got.Text)
 	}
 }
 

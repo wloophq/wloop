@@ -3,8 +3,6 @@
 // SKIP_HANDLERS are the handlers of the verbs the page offers elsewhere: seen when it opens, answer in its
 // gate and a draft's in its card; the verb whose handler replies is in the composer.
 const SKIP_HANDLERS = new Set(["seen", "answer", "edit", "retry"]);
-// CLOSED_CATEGORIES are the categories of a state a task leaves the lists for.
-const CLOSED_CATEGORIES = new Set(["done", "dropped"]);
 // DRAFT_HANDLERS are the handlers of a draft's delivery actions; DRAFT_CARD_HANDLERS those of every verb its
 // card offers, the kind's own dismiss among them.
 const DRAFT_HANDLERS = { "draft.edit": "edit", "draft.retry": "retry" };
@@ -183,27 +181,18 @@ async function loadDetailPane(route) {
   }
 }
 
-// loadUnitTasks reads the open tasks that hold the unit key, from every view of tasks.
+// loadUnitTasks reads the open tasks that hold the unit key, "<provider>:<key>".
 async function loadUnitTasks(key) {
   detailState.unitKey = key || "";
   if (!key) {
     detailState.unitTasks = [];
     return;
   }
-  const views = coreViews().filter((v) => (v.over || "tasks") === "tasks");
-  const pages = await Promise.allSettled(views.map((v) => detailEnv.getJSON(tasksURL(v.id, "", [], ""))));
+  const i = key.indexOf(":");
+  const path = "/api/units/" + [key.slice(0, i), key.slice(i + 1), "tasks"].map(encodeURIComponent).join("/");
+  const out = await detailEnv.getJSON(path).catch(() => []);
   if (detailState.unitKey !== key) return;
-  const seen = new Set();
-  const out = [];
-  for (const p of pages) {
-    if (p.status !== "fulfilled") continue;
-    for (const e of p.value.tasks || []) {
-      if (seen.has(e.id) || CLOSED_CATEGORIES.has(e.category) || !(e.units || []).some((u) => `${u.provider}:${u.key}` === key)) continue;
-      seen.add(e.id);
-      out.push(e);
-    }
-  }
-  detailState.unitTasks = out;
+  detailState.unitTasks = out || [];
 }
 
 // verbState is how verb stands on e; null when e does not offer it.

@@ -918,3 +918,31 @@ func TestTaskViewServesTheWake(t *testing.T) {
 		t.Fatalf("%d: a task with no wake serves %+v", code, none.Wake)
 	}
 }
+
+func TestUnitTasksAreTheOpenTasksHoldingTheUnit(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	ref8, ref9 := r7, r7
+	ref8.Number, ref9.Number = 8, 9
+	other := pr.Ref(ref8).Unit()
+	r.put(t,
+		task.Task{ID: "t-open", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}},
+		task.Task{ID: "t-next", State: "next", Category: task.CategoryReady, Units: []unit.Unit{r7u, other}},
+		task.Task{ID: "t-done", State: "done", Category: task.CategoryDone, Units: []unit.Unit{r7u}},
+		task.Task{ID: "t-other", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{other}},
+	)
+	var got []api.TaskView
+	if code := get(t, r.s, api.UnitPath(r7u, "tasks"), &got); code != 200 {
+		t.Fatalf("status %d", code)
+	}
+	if ids := taskIDs(got); !slices.Equal(slices.Sorted(slices.Values(ids)), []string{"t-next", "t-open"}) {
+		t.Fatalf("tasks %v, want t-next and t-open", ids)
+	}
+	if i := slices.Index(taskIDs(got), "t-open"); len(got[i].Verbs) == 0 {
+		t.Fatalf("a unit's task carries its verbs as a view lists them: %+v", got[i])
+	}
+	var none []api.TaskView
+	if code := get(t, r.s, api.UnitPath(pr.Ref(ref9).Unit(), "tasks"), &none); code != 200 || len(none) != 0 {
+		t.Fatalf("a unit no task holds: %d %v", code, none)
+	}
+}
