@@ -52,6 +52,9 @@ type Task struct {
 	Origin  string // "derived", "user", "message", "draft"
 
 	Created, Updated time.Time
+	// OpenChanged is when the task last opened or closed: the Updated of the write that moved it between an
+	// open category and done or dropped, or of its first write; the store keeps it.
+	OpenChanged time.Time
 
 	// A parent's review interval (zero: DefaultReviewEvery) and last review.
 	ReviewEvery time.Duration

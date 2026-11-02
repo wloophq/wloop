@@ -180,8 +180,8 @@ func TestEveryNeedsMeRowHasAnInboxOrNextTask(t *testing.T) {
 }
 
 // TestEveryFollowedPRHasOneTask derives every situation's row through the real ledger and Sync: each open
-// pull request the user follows, or that needs them, has exactly one task, with the pull request as its first
-// unit and every item it derived as its asks.
+// pull request the user follows, or that needs them, and that asks something of them, has exactly one task,
+// with the pull request as its first unit and every item it derived as its asks.
 func TestEveryFollowedPRHasOneTask(t *testing.T) {
 	t.Parallel()
 	cases := ghsourcetest.Cases()
@@ -197,12 +197,18 @@ func TestEveryFollowedPRHasOneTask(t *testing.T) {
 		if !open || !prrow.InScope(c.Row) && !prrow.NeedsMe(c.Row) {
 			continue
 		}
+		its := ghsource.ItemsOf(c.Row, c.Report)
+		if len(its) == 0 {
+			if slices.ContainsFunc(es, task.Task.Open) {
+				t.Errorf("%s (%s) asks nothing, yet holds an open task: %+v", c.Name, c.Row.Kind, es)
+			}
+			continue
+		}
 		followed++
 		if len(es) != 1 || !es[0].Open() || es[0].Units[0] != c.Row.Unit {
 			t.Errorf("%s (%s): tasks %+v", c.Name, c.Row.Kind, es)
 			continue
 		}
-		its := ghsource.ItemsOf(c.Row, c.Report)
 		for _, it := range its {
 			if !slices.Contains(es[0].Items, task.ItemRef{Unit: c.Row.Unit, Item: it.ID}) {
 				t.Errorf("%s: the task holds %+v, not %s", c.Name, es[0].Items, it.ID)

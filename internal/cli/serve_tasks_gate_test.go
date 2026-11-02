@@ -78,3 +78,40 @@ func (r *recordedDecisions) Decide(_ context.Context, g gate.Gate) error {
 	r.gates = append(r.gates, g)
 	return nil
 }
+
+func TestATaskAPersonEndsClosesTheGatesGatesTomlClosesWithIt(t *testing.T) {
+	r := newProfileRig(t, "")
+	ctx := context.Background()
+	r.put(t, "t-0000000000000001", "next", task.CategoryReady)
+	r.put(t, "t-0000000000000002", "next", task.CategoryReady)
+	r.te.Env.consequences = &recordedDecisions{}
+	g := r.te.newTasks(r.db, r.te.cfg, nil)
+	svc := r.te.newGates(r.db, t.Logf)
+	asked := map[task.ID]gate.Gate{}
+	for _, id := range []task.ID{"t-0000000000000001", "t-0000000000000002"} {
+		q, err := svc.Open(ctx, gate.Gate{Task: id, Unit: task.UnitOf(id), Kind: gate.KindQuestion, Subject: "9"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		asked[id] = q
+	}
+	if _, err := g.Do(ctx, "t-0000000000000001", coretasks.Request{Verb: task.VerbDone, Actor: task.ActorWorkflow, Source: "workflow"}); !errors.Is(err, coretasks.ErrVerb) {
+		t.Fatalf("a workflow's done on a task its question holds: %v, want ErrVerb", err)
+	}
+	read := r.db.Gates(func() time.Time { return testNow })
+	if got, _ := read.Get(ctx, asked["t-0000000000000001"].ID); got.Status != gate.Open {
+		t.Fatalf("the question after the workflow's refused done = %+v, want open", got)
+	}
+	if _, err := g.Do(ctx, "t-0000000000000001", coretasks.Request{Verb: task.VerbDone, Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := g.Do(ctx, "t-0000000000000002", coretasks.Request{Verb: task.VerbSomeday, Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := read.Get(ctx, asked["t-0000000000000001"].ID); got.Status != gate.Dismissed || got.By != task.ActorPerson {
+		t.Errorf("the question of the task a person ended = %+v, want dismissed by the person", got)
+	}
+	if got, _ := read.Get(ctx, asked["t-0000000000000002"].ID); got.Status != gate.Open {
+		t.Errorf("the question of a task still open = %+v, want open", got)
+	}
+}

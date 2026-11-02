@@ -18,13 +18,15 @@ import (
 )
 
 // Store is an in-memory gates.Store, gates.Reader, gates.Sent and
-// gates.Begun; Now stamps OpenedAt and ClosedAt.
+// gates.Begun; Now stamps OpenedAt and ClosedAt. As the gates a task
+// service reads, an open gate of the kinds in Holding holds its task open.
 type Store struct {
 	mu      sync.Mutex
 	gates   []gate.Gate
 	applied map[int64]bool
 	begun   map[int64]bool
 	Now     func() time.Time
+	Holding []gate.Kind
 }
 
 var (
@@ -133,6 +135,12 @@ func (s *Store) Get(_ context.Context, id int64) (gate.Gate, error) {
 
 func (s *Store) OfTask(_ context.Context, id task.ID) ([]gate.Gate, error) {
 	return s.filter(func(g gate.Gate) bool { return g.Task == id }), nil
+}
+
+func (s *Store) HoldsTask(_ context.Context, id task.ID) (bool, error) {
+	return len(s.filter(func(g gate.Gate) bool {
+		return g.Task == id && g.Status == gate.Open && slices.Contains(s.Holding, g.Kind)
+	})) > 0, nil
 }
 
 func (s *Store) Where(_ context.Context, q gates.Query) ([]gate.Gate, error) {

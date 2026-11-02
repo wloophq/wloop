@@ -283,11 +283,16 @@ func TestAReopenedItemMarksChangedAndStaysOutOfTheInbox(t *testing.T) {
 	}
 	resolved(&its[0])
 	done := only(t, reconcile(t, facts(), its, []task.Task{e}, now))
-	its[0].State = "open"
+	its[0].State, its[0].UpdatedAt = "open", now.Add(time.Hour)
 	got := only(t, reconcile(t, facts(), its, []task.Task{done}, now.Add(time.Hour)))
-	if got.Category != task.CategoryReady || !got.Changed {
-		t.Fatalf("an item reopened on a done task: %+v", got)
+	if got.Category != task.CategoryReady || !got.Changed || len(got.Items) != 1 {
+		t.Fatalf("an item the done task resolved, waiting on someone else, reopened: %+v", got)
 	}
+	its[0].UpdatedAt = now.Add(-time.Minute)
+	if got := only(t, reconcile(t, facts(), its, []task.Task{done}, now.Add(time.Hour))); got.Category != task.CategoryDone {
+		t.Fatalf("an item open again before the task closed brought it back: %+v", got)
+	}
+	its[0].UpdatedAt = time.Time{}
 	dropped := done
 	dropped.State, dropped.Category = "trash", task.CategoryDropped
 	if got := only(t, reconcile(t, facts(), its, []task.Task{dropped}, now.Add(time.Hour))); got.Category != task.CategoryDropped {
@@ -411,8 +416,78 @@ func TestAnOpenPRsDoneTaskTakesItsItemsBack(t *testing.T) {
 	done := task.Task{ID: "t-00000000000000a2", State: "done", Category: task.CategoryDone, Title: "Review acme/api#7", Units: []unit.Unit{pr},
 		Origin: task.OriginDerived, Created: now.Add(-48 * time.Hour), Updated: now.Add(-24 * time.Hour)}
 	es := reconcile(t, facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true }), []items.Item{item("gh:follow", keyed, owedBy(ana))}, []task.Task{done}, now)
+	if e := only(t, es); e.ID != done.ID || e.Category != task.CategoryDone || e.Changed || len(e.Items) != 1 {
+		t.Fatalf("an open pull request that waits on someone else, whose task is done: %+v", es)
+	}
+	es = reconcile(t, facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true }), []items.Item{item("gh:review", keyed)}, []task.Task{done}, now)
 	if e := only(t, es); e.ID != done.ID || e.Category != task.CategoryReady || !e.Changed || len(e.Items) != 1 {
-		t.Fatalf("an open pull request whose task is done: %+v", es)
+		t.Fatalf("an open pull request that waits on me, whose task is done: %+v", es)
+	}
+}
+
+func TestADoneTaskComesBackOnlyWhenItsUnitAsksSomethingNewOfMe(t *testing.T) {
+	f := facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true })
+	closedAt := now.Add(-time.Hour)
+	done := task.Task{ID: "t-00000000000000a3", State: "done", Category: task.CategoryDone, Title: "do gh:review",
+		Units: []unit.Unit{pr}, Items: []task.ItemRef{{Unit: pr, Item: "gh:review"}}, Origin: task.OriginDerived,
+		Created: now.Add(-48 * time.Hour), Updated: now.Add(-time.Minute), OpenChanged: closedAt}
+	asked := func(at time.Time) items.Item {
+		return item("gh:review", keyed, func(it *items.Item) { it.UpdatedAt = at })
+	}
+	if cs := reconciled(t, f, []items.Item{asked(closedAt.Add(-time.Minute))}, me, []task.Task{done}, bundled, now); len(cs) != 0 {
+		t.Fatalf("the ask you closed the task over, unchanged, brought it back: %+v", cs)
+	}
+	e := only(t, reconcile(t, f, []items.Item{asked(closedAt.Add(time.Minute))}, []task.Task{done}, now))
+	if e.Category != task.CategoryReady || !e.Changed {
+		t.Fatalf("the ask changed after you closed the task, still on you, though the task was written since: %+v", e)
+	}
+	waits := item("gh:review", keyed, owedBy(ana), func(it *items.Item) { it.UpdatedAt = closedAt.Add(time.Minute) })
+	if e := only(t, reconcile(t, f, []items.Item{waits}, []task.Task{done}, now)); e.Category != task.CategoryDone || e.Changed {
+		t.Fatalf("the ask moved to someone else after you closed the task: %+v", e)
+	}
+	retitled := asked(closedAt.Add(time.Minute))
+	retitled.Origin.At = closedAt.Add(-time.Hour)
+	if cs := reconciled(t, f, []items.Item{retitled}, me, []task.Task{done}, bundled, now); len(cs) != 0 {
+		t.Fatalf("the ask you closed the task over, only reworded since, brought it back: %+v", cs)
+	}
+	retitled.Origin.At = closedAt.Add(time.Minute)
+	if e := only(t, reconcile(t, f, []items.Item{retitled}, []task.Task{done}, now)); e.Category != task.CategoryReady {
+		t.Fatalf("the ask made again after you closed the task: %+v", e)
+	}
+	unstamped := done
+	unstamped.OpenChanged = time.Time{}
+	if cs := reconciled(t, f, []items.Item{asked(now.Add(-2 * time.Minute))}, me, []task.Task{unstamped}, bundled, now); len(cs) != 0 {
+		t.Fatalf("a task with no open or close time, an ask older than its last write: %+v", cs)
+	}
+}
+
+func TestAPullRequestsTaskClosesOnceItsAsksResolveAfterItLastOpened(t *testing.T) {
+	f := facts(func(f *task.UnitFacts) { f.Cares, f.Carded = true, true })
+	opened := now.Add(-time.Hour)
+	own := task.Task{ID: task.DerivedID(pr, pr.String()), State: "next", Category: task.CategoryReady, Title: "Review acme/api#7",
+		Units: []unit.Unit{pr}, Items: []task.ItemRef{{Unit: pr, Item: "gh:review"}}, Origin: task.OriginDerived,
+		Created: opened, Updated: opened, OpenChanged: opened}
+	settled := func(at time.Time) []items.Item {
+		return []items.Item{item("gh:review", keyed, resolved, func(it *items.Item) { it.UpdatedAt = at })}
+	}
+	e := only(t, reconcile(t, f, settled(opened.Add(time.Minute)), []task.Task{own}, now))
+	if e.Category != task.CategoryDone || len(e.Items) != 0 {
+		t.Fatalf("a pull request that asks nothing more of you: %+v", e)
+	}
+	reopened := own
+	reopened.OpenChanged = opened.Add(2 * time.Minute)
+	if e := only(t, reconcile(t, f, settled(opened.Add(time.Minute)), []task.Task{reopened}, now)); !e.Open() {
+		t.Fatalf("a task you opened again after its asks resolved: %+v", e)
+	}
+	attached := own
+	attached.Units = []unit.Unit{pr, {Provider: "slack", Key: "T1/C1/1.1"}}
+	if e := only(t, reconcile(t, f, settled(opened.Add(time.Minute)), []task.Task{attached}, now)); !e.Open() {
+		t.Fatalf("a task that also holds a thread: %+v", e)
+	}
+	captured := own
+	captured.Origin = task.OriginUser
+	if e := only(t, reconcile(t, f, settled(opened.Add(time.Minute)), []task.Task{captured}, now)); !e.Open() {
+		t.Fatalf("a task you captured, holding the pull request: %+v", e)
 	}
 }
 

@@ -37,8 +37,8 @@ type Deps struct {
 	Authority Authority
 	// Gates opens the gate a gated verb opens; nil: a gated verb fails.
 	Gates Gates
-	// Drafts settles the drafts of a task a verb ends; nil settles none.
-	Drafts Drafts
+	// Ending settles what a task that ends holds; nil settles nothing.
+	Ending Ending
 	// Wakes are the tasks' wakes, which schedule puts and wake reads; nil: schedule fails and no task has one.
 	Wakes Wakes
 	// Baseline fills a wake Sleep puts on task t: a When that asks to wake once a fact of t changes becomes the
@@ -133,7 +133,7 @@ func (s *Service) handler(e task.Task, verb task.Verb) VerbHandler {
 // plugin's units from any other.
 func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, error) {
 	prev, r, err := s.do(ctx, id, req)
-	if err != nil || s.d.Drafts == nil || !prev.Open() {
+	if err != nil || s.d.Ending == nil || !prev.Open() {
 		return r, err
 	}
 	next := r.Task
@@ -142,19 +142,19 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 			return r, nil
 		}
 	}
-	s.settle(ctx, []task.Task{next}, req.Verb)
+	s.settle(ctx, []task.Task{next}, req.Verb, req.Actor)
 	return r, nil
 }
 
-// settle hands Drafts each of es that ended, by verb v, or by no verb when v is empty; it runs with the lock
-// released, since settling a draft can reach back into the service.
-func (s *Service) settle(ctx context.Context, es []task.Task, v task.Verb) {
-	if s.d.Drafts == nil {
+// settle hands Ending each of es that ended, by verb v of by, or by no verb when v is empty; it runs with the
+// lock released, since settling a draft or a gate can reach back into the service.
+func (s *Service) settle(ctx context.Context, es []task.Task, v task.Verb, by task.Actor) {
+	if s.d.Ending == nil {
 		return
 	}
 	for _, e := range es {
 		if !e.Open() {
-			s.d.Drafts.Ended(ctx, e, v)
+			s.d.Ending.Ended(ctx, e, v, by)
 		}
 	}
 }
@@ -205,6 +205,9 @@ func (s *Service) do(ctx context.Context, id task.ID, req Request) (task.Task, R
 	if gated, err := s.Allowed(ctx, e, req); err != nil || gated {
 		r, err := s.gated(ctx, e, req, err)
 		return e, r, err
+	}
+	if err := s.heldOpen(ctx, e, req); err != nil {
+		return e, Result{}, err
 	}
 	if h := s.handler(e, req.Verb); h != nil {
 		r, err := h(ctx, e, req)
@@ -472,6 +475,31 @@ func (s *Service) verbEvents(e task.Task, req Request, now time.Time) []port.Eve
 		Data: workflow.ChainData(string(e.State), req.Chain), At: now}}
 }
 
+// heldOpen refuses, with ErrVerb, a verb anyone but a person runs that would end e while a gate holds it.
+func (s *Service) heldOpen(ctx context.Context, e task.Task, req Request) error {
+	if req.Actor == task.ActorPerson || !e.Open() || !s.ends(req.Verb) {
+		return nil
+	}
+	if held, err := s.holds(ctx, e.ID); err != nil || !held {
+		return err
+	}
+	return fmt.Errorf("%w: %s by %s: task %s holds an open gate for a person", ErrVerb, req.Verb, req.Actor, e.ID)
+}
+
+// ends says whether verb moves a task into a category that ends it.
+func (s *Service) ends(verb task.Verb) bool {
+	_, to, _ := s.d.States.Move(string(verb))
+	c, ok := s.d.States.CategoryOf(to)
+	return ok && (c == task.CategoryDone || c == task.CategoryDropped)
+}
+
+func (s *Service) holds(ctx context.Context, id task.ID) (bool, error) {
+	if s.d.Gates == nil {
+		return false, nil
+	}
+	return s.d.Gates.HoldsTask(ctx, id)
+}
+
 // gated opens the gate req's verb names on e, for a person to approve, and leaves e as it is; err, the
 // authority's refusal, is returned as it is.
 func (s *Service) gated(ctx context.Context, e task.Task, req Request, err error) (Result, error) {
@@ -722,7 +750,7 @@ func (p *pending) changes() []task.Change {
 // keeps its tasks as they are.
 func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 	ended, err := s.sync(ctx, units)
-	s.settle(ctx, ended, "")
+	s.settle(ctx, ended, "", task.ActorPlugin)
 	return err
 }
 
@@ -777,9 +805,14 @@ func (s *Service) sync(ctx context.Context, units []unit.Unit) ([]task.Task, err
 	}
 	var ended []task.Task
 	if len(p.order) > 0 {
-		cs := p.changes()
-		if err := s.d.Store.Apply(ctx, cs); err != nil {
+		cs, err := s.unheld(ctx, p.changes(), wasOpen)
+		if err != nil {
 			return nil, err
+		}
+		if len(cs) > 0 {
+			if err := s.d.Store.Apply(ctx, cs); err != nil {
+				return nil, err
+			}
 		}
 		for _, c := range cs {
 			if wasOpen[c.Task.ID] && !c.Task.Open() {
@@ -797,6 +830,25 @@ func (s *Service) sync(ctx context.Context, units []unit.Unit) ([]task.Task, err
 	return ended, errors.Join(errs...)
 }
 
+// unheld are cs without the changes that would end a task a gate holds open: what the gate asks the person is
+// still asked while the unit stays open.
+func (s *Service) unheld(ctx context.Context, cs []task.Change, wasOpen map[task.ID]bool) ([]task.Change, error) {
+	out := cs[:0:0]
+	for _, c := range cs {
+		if wasOpen[c.Task.ID] && !c.Task.Open() {
+			held, err := s.holds(ctx, c.Task.ID)
+			if err != nil {
+				return nil, err
+			}
+			if held {
+				continue
+			}
+		}
+		out = append(out, c)
+	}
+	return out, nil
+}
+
 // Recategorize gives every stored task the category of its state as the profile declares it now, and returns
 // the states stored tasks hold that the profile does not declare; those tasks keep their category. A store
 // that keeps no categories recategorizes nothing.
@@ -807,7 +859,7 @@ func (s *Service) Recategorize(ctx context.Context) ([]string, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return r.Recategorize(ctx, s.d.States.CategoryOf)
+	return r.Recategorize(ctx, s.d.States.CategoryOf, s.now())
 }
 
 // Attach adds u to task id's units, after those it holds; a unit it holds already changes nothing.
@@ -894,7 +946,7 @@ func (s *Service) UnitClosed(ctx context.Context, u unit.Unit) error {
 	if err != nil {
 		return err
 	}
-	s.settle(ctx, ended, "")
+	s.settle(ctx, ended, "", task.ActorPlugin)
 	return nil
 }
 

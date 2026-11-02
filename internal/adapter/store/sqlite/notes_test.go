@@ -413,7 +413,7 @@ var writes = []writeCase{
 			}
 		},
 		call: func(ctx context.Context, e *noteEnv) error {
-			_, err := e.db.Tasks().(coretasks.Recategorizer).Recategorize(ctx, func(string) (task.Category, bool) { return task.CategoryInbox, true })
+			_, err := e.db.Tasks().(coretasks.Recategorizer).Recategorize(ctx, func(string) (task.Category, bool) { return task.CategoryInbox, true }, noteAt)
 			return err
 		},
 		topics: port.TopicTasks, units: []unit.Unit{task.UnitOf("t-1")},
