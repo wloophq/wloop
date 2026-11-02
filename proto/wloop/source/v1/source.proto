@@ -257,7 +257,7 @@ message ItemOptionList {
 }
 
 message ItemEvidence {
-  // kind is "message", "reaction", "external_claim", "unit_event" or "sent_draft".
+  // kind is "message", "reaction", "external_claim", "unit_event", "sent_draft" or "workflow".
   string kind = 1;
   Anchor anchor = 2;
 }

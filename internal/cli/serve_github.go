@@ -31,6 +31,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/ingest"
+	"github.com/wloophq/wloop/internal/core/links"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/daemon"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -487,6 +488,7 @@ func (e *Env) relayGitHub(cfg config.Config, m pluginModule) (pluginModule, erro
 		return summary, skipped, err
 	}
 	m.Track, m.Untrack = r.track, r.untrack
+	m.Refresh = ghsource.Refresher{PRs: e.reportedPRs(), Read: e.refreshLinked, Every: linksEvery(cfg), Now: e.Now}
 	m.Checkouts = pluginCheckouts{psource.Checkouts{ID: string(unit.GitHub), Units: r.units, Kind: e.pluginKind}}
 	s, err := e.pluginSource(unit.GitHub)
 	if err != nil {
@@ -617,6 +619,25 @@ func (e *Env) refreshPR(ctx context.Context, ref pr.Ref) error {
 	return err
 }
 
+// refreshLinked has the GitHub plugin read ref, a pull request an open linked item waits on, at the
+// background's priority, so it never spends the reserve the user's own reads keep; links.ErrNotReady
+// while the plugin is not running.
+func (e *Env) refreshLinked(ctx context.Context, ref pr.Ref) error {
+	if e.forge == nil {
+		if e.pluginKind == nil {
+			return links.ErrNotReady
+		}
+		if _, err := e.pluginKind.Client(string(unit.GitHub)); err != nil {
+			return fmt.Errorf("%w: %w", links.ErrNotReady, err)
+		}
+	}
+	err := e.refreshPR(src.WithCall(ctx, src.Call{Priority: src.PriorityBackground}), ref)
+	if errors.Is(err, src.ErrNotFound) {
+		return fmt.Errorf("%w: %w", port.ErrNotFound, err)
+	}
+	return err
+}
+
 // pluginLoaded is what serve does once plugin id loaded.
 func (e *Env) pluginLoaded(ctx context.Context, db *sqlite.DB, id string) {
 	if id == string(unit.GitHub) {
@@ -675,10 +696,18 @@ func githubHostModule(cfg config.Config, d moduleDeps) (pluginModule, error) {
 		Items:      ghsource.Cards{Reports: d.Reports}.Items,
 		Card:       ghsource.Cards{Reports: d.Reports}.Card,
 		Identity:   ghsource.IdentityOf(d.Inventory),
-		UnitEvents: ghsource.UnitEvents{Store: d.Inventory},
+		UnitEvents: ghsource.UnitEvents{Store: d.Inventory, PRs: prrow.ReportedPRs{Reports: d.Reports}, Fresh: linksEvery(cfg), Now: clockNow(d.Clock)},
 		Detail:     true,
 		Briefs:     brief.GitHubSource{Store: prrow.ReportedPRs{Reports: d.Reports}, Retry: time.Duration(cfg.Sweep.Slow)},
 	}, nil
+}
+
+// clockNow is c's time, the wall clock's without one.
+func clockNow(c port.Clock) func() time.Time {
+	if c == nil {
+		return time.Now
+	}
+	return c.Now
 }
 
 func githubFactsOf(cfg config.Config, d moduleDeps) automation.Units {

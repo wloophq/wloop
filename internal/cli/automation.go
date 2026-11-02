@@ -123,6 +123,8 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 		sd.Overrides = d.DB
 		sd.Props = serviceProps{e}
 		sd.Gates = serviceGates{e}
+		cfg, _ := e.loadConfig()
+		sd.Items = e.itemsLedger(d.DB, cfg, d.Log)
 		sd.Classify.Store = d.DB.Classifications()
 		sd.Removal.Fetched = d.DB.Fetches()
 	}

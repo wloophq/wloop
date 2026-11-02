@@ -15,7 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-var provenances = []items.Provenance{items.Extracted, items.Derived, items.User, items.Turn, items.Effects}
+var provenances = []items.Provenance{items.Extracted, items.Derived, items.User, items.Turn, items.Effects, items.Workflow}
 
 func emptyResult() Result {
 	return Result{Applied: []Applied{}, Proposed: []Proposal{}, Refused: []Refused{}}
@@ -47,8 +47,11 @@ type batch struct {
 	created []Proposal
 	decided []int64
 	noops   map[itemKey]string
-	res     Result
-	err     error
+	// linked are the items whose links this batch stored, settled once it applied every op, with
+	// the index of the last such op.
+	linked []linkedItem
+	res    Result
+	err    error
 }
 
 func (l *Ledger) begin(ctx context.Context, units []unit.Unit) (*batch, error) {
@@ -317,18 +320,43 @@ func (b *batch) link(ctx context.Context, i int, o items.Op, prov items.Provenan
 	b.links[o.Unit] = append(have, l)
 	b.res.Applied = append(b.res.Applied, Applied{Op: o, Item: it, Changed: true})
 	b.log = append(b.log, LogEntry{Unit: o.Unit, Item: o.Item, Op: o, Provenance: prov, Outcome: OutcomeApplied, Reason: o.Reason, At: b.now})
-	b.settle(ctx, i, l, cur)
-}
-
-// settle applies, as derived, the op that settles cur through l from what l's target already shows.
-func (b *batch) settle(ctx context.Context, i int, l link.Link, cur *items.Item) {
-	if b.l.settle == nil || cur == nil || cur.State != items.Open {
+	if o.Item == "" {
 		return
 	}
-	op, ok, err := b.l.settle(ctx, l, *cur)
+	k := itemKey{o.Unit, o.Item}
+	if j := slices.IndexFunc(b.linked, func(li linkedItem) bool { return li.key == k }); j >= 0 {
+		b.linked[j].op = i
+		return
+	}
+	b.linked = append(b.linked, linkedItem{key: k, op: i})
+}
+
+type linkedItem struct {
+	key itemKey
+	op  int
+}
+
+// settleLinked applies, as derived, the op that settles each item whose links the batch stored, from
+// what the targets of all its links already show.
+func (b *batch) settleLinked(ctx context.Context) {
+	if b.l.settle == nil {
+		return
+	}
+	for _, li := range b.linked {
+		cur := b.items[li.key.unit][li.key.id]
+		if cur == nil || cur.State != items.Open {
+			continue
+		}
+		ls := slices.DeleteFunc(slices.Clone(b.links[li.key.unit]), func(l link.Link) bool { return l.Item != li.key.id })
+		b.settle(ctx, li.op, ls, *cur)
+	}
+}
+
+func (b *batch) settle(ctx context.Context, i int, ls []link.Link, cur items.Item) {
+	op, ok, err := b.l.settle(ctx, ls, cur)
 	if err != nil {
 		if b.l.Log != nil {
-			b.l.Log("link %s to %s: settling %s: %v", l.From, l.To, l.Item, err)
+			b.l.Log("links of %s %s: settling: %v", cur.Unit, cur.ID, err)
 		}
 		return
 	}
@@ -339,7 +367,7 @@ func (b *batch) settle(ctx context.Context, i int, l link.Link, cur *items.Item)
 	b.apply(ctx, i, op, items.Derived)
 	for _, r := range b.res.Refused[refused:] {
 		if b.l.Log != nil {
-			b.l.Log("link %s to %s: settling %s: refused: %s", l.From, l.To, l.Item, r.Reason)
+			b.l.Log("links of %s %s: settling: refused: %s", cur.Unit, cur.ID, r.Reason)
 		}
 	}
 	b.res.Refused = b.res.Refused[:refused]
@@ -496,6 +524,10 @@ func fieldsOf(it items.Item) *items.Fields {
 }
 
 func (b *batch) commit(ctx context.Context) (Result, error) {
+	if b.err != nil {
+		return Result{}, b.err
+	}
+	b.settleLinked(ctx)
 	if b.err != nil {
 		return Result{}, b.err
 	}

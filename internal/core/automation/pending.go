@@ -68,7 +68,8 @@ func (e *Engine) dueRun(ctx context.Context, pause Pause) (tally, error) {
 }
 
 // dueOne runs it, of w, unless the pause holds its unit or its facts cannot
-// be read; an item whose source or key facts moved is dropped instead.
+// be read; an item whose key facts moved, or whose source moved and that is
+// stale, is dropped instead.
 func (e *Engine) dueOne(ctx context.Context, w workflow.Workflow, it workflow.Item, pause Pause) (result, error) {
 	facts, err := e.factsFor(ctx, w, it.Unit)
 	if err != nil {
@@ -78,17 +79,36 @@ func (e *Engine) dueOne(ctx context.Context, w workflow.Workflow, it workflow.It
 	if holds(pause, w.Slot, facts) {
 		return result{outcome: outcomeNone}, nil
 	}
-	if moved, err := e.sourceMoved(ctx, it); err != nil || moved || keyMoved(w, it, facts) {
-		if err == nil {
-			err = e.dropMoved(ctx, it)
-		}
-		return result{outcome: outcomeDropped}, err
+	why, err := e.invalid(ctx, w, it, facts, false)
+	if err != nil {
+		e.logf("%s: not run, its marks cannot be read: %v", it.ID, err)
+		return result{outcome: outcomeNone}, nil
+	}
+	if why != "" {
+		return result{outcome: outcomeDropped}, e.dropMoved(ctx, it, why)
 	}
 	return e.runItem(ctx, it, RunOpts{})
 }
 
-// whyMoved drops or refuses an item whose source moved since it was planned.
-const whyMoved = "its source moved; planned again on the next sweep"
+// invalid says why it, of w, must not run on its unit's current facts: its
+// key facts moved, or its source moved and it is stale.
+func (e *Engine) invalid(ctx context.Context, w workflow.Workflow, it workflow.Item, facts workflow.Facts, byHand bool) (string, error) {
+	if keyMoved(w, it, facts) {
+		return "its unit changed since it was planned", nil
+	}
+	moved, err := e.sourceMoved(ctx, it)
+	if err != nil {
+		return "", err
+	}
+	if !moved {
+		return "", nil
+	}
+	return e.stale(ctx, w, it, facts, byHand)
+}
+
+// whyMoved refuses an item of a workflow no longer loaded whose source moved
+// since it was planned.
+const whyMoved = "its source moved since it was planned"
 
 // sourceMoved says whether it's unit was reported again since the last
 // sweep planned it, as the sweep checks before it runs an item; an item
@@ -119,15 +139,16 @@ func keyMoved(w workflow.Workflow, it workflow.Item, facts workflow.Facts) bool 
 	return workflow.NewKey(w, it.Unit, facts, it.Why).Value != it.Key.Value
 }
 
-// dropMoved discards a pending item without marking its key.
-func (e *Engine) dropMoved(ctx context.Context, it workflow.Item) error {
+// dropMoved discards a pending item without marking its key, for why.
+func (e *Engine) dropMoved(ctx context.Context, it workflow.Item, why string) error {
 	all, err := e.Ledger.Items(ctx, Filter{Workflow: it.Workflow})
 	if err != nil {
 		return err
 	}
 	all = slices.DeleteFunc(all, func(o workflow.Item) bool { return o.ID == it.ID })
 	now := e.now()
-	e.logf("drop %s: %s", it.ID, whyMoved)
-	ev := event(it, workflow.KindItemDropped, it.ID+":"+now.UTC().Format(time.RFC3339Nano), whyMoved, now)
+	why += "; planned again on the next sweep"
+	e.logf("drop %s: %s", it.ID, why)
+	ev := event(it, workflow.KindItemDropped, it.ID+":"+now.UTC().Format(time.RFC3339Nano), why, now)
 	return e.save(ctx, PlanWrite{Workflows: []string{it.Workflow}, Items: all}, []port.Event{ev})
 }

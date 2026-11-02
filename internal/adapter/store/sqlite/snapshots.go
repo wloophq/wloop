@@ -22,6 +22,7 @@ func (db *DB) Snapshots() snapshot.Store { return snapshotStore{db} }
 const (
 	upsertSnapshotSQL = `INSERT INTO unit_snapshots (provider, unit_key, snapshot, rev, at) VALUES (?, ?, ?, ?, ?)
 		ON CONFLICT (provider, unit_key) DO UPDATE SET snapshot = excluded.snapshot, rev = excluded.rev, at = excluded.at`
+	snapshotRevSQL    = `SELECT rev FROM unit_snapshots WHERE provider = ? AND unit_key = ?`
 	deleteSnapshotSQL = `DELETE FROM unit_snapshots WHERE provider = ? AND unit_key = ?`
 	snapshotsSQL      = `SELECT provider, unit_key, snapshot, rev, at FROM unit_snapshots
 		WHERE (provider, unit_key) IN (SELECT value->>0, value->>1 FROM json_each(?))`
@@ -39,11 +40,19 @@ func (s snapshotStore) Put(ctx context.Context, puts []snapshot.Stored, gone []u
 			if p.Unit.IsZero() {
 				return errors.New("snapshot: no unit")
 			}
+			var last uint64
+			err := tx.QueryRowContext(ctx, snapshotRevSQL, string(p.Unit.Provider), p.Unit.Key).Scan(&last)
+			stored := err == nil
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("snapshot of %s: %w", p.Unit, err)
+			}
 			if _, err := tx.ExecContext(ctx, upsertSnapshotSQL, string(p.Unit.Provider), p.Unit.Key, string(p.JSON),
 				p.Rev, formatTime(p.At)); err != nil {
 				return fmt.Errorf("snapshot of %s: %w", p.Unit, err)
 			}
-			tx.Touch(port.TopicPRs, p.Unit)
+			if !stored || last != p.Rev {
+				tx.Touch(port.TopicPRs, p.Unit)
+			}
 		}
 		for _, u := range gone {
 			if _, err := tx.ExecContext(ctx, deleteSnapshotSQL, string(u.Provider), u.Key); err != nil {

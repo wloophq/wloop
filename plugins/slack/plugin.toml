@@ -112,6 +112,13 @@ type = "string"
 doc = "The unit, its newest message and the update time of its items."
 untrusted = true
 
+[[source.signals]]
+name = "asked_reacted"
+doc = "Every open item of the unit has a check mark from whoever asked it or whom it waits on, other than you, on a message posted after its ask."
+
+[[source.signals]]
+name = "replied_last"
+doc = "You posted the unit's newest person's message, after every open item's ask, at least 3 days ago, and every open item waits on you or got a message from someone else after its ask."
 
 [[source.jobs]]
 name = "ingest"

@@ -159,3 +159,41 @@ func mustGate(t *testing.T, st *gatestest.Store, subject string) gate.Gate {
 }
 
 var _ automation.Gates = gateAccess{}
+
+func TestAGateReleasedAfterItsUnitIsReportedAgainStillRuns(t *testing.T) {
+	ctx := context.Background()
+	r := newRig(t, windowed(sweepWF("follow", idle, "turn.start"), time.Minute))
+	svc, st := gated(r)
+	r.put(s1, "a")
+	r.sweep()
+	it := r.mustItem("follow", s1)
+	mustGate(t, st, it.ID)
+	r.units.Report(t, s1)
+	r.clock.Advance(time.Minute)
+	if err := svc.Tick(ctx, r.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.ran("turn.start"); !slices.Equal(got, []unit.Unit{s1}) {
+		t.Fatalf("the window's end ran %v after a report that changed no fact, want %s; items %+v", got, s1, r.items())
+	}
+}
+
+func TestAGateReleasedAfterItsUnitStoppedMatchingDropsTheItem(t *testing.T) {
+	ctx := context.Background()
+	r := newRig(t, windowed(sweepWF("follow", idle, "turn.start"), time.Minute))
+	svc, _ := gated(r)
+	r.put(s1, "a")
+	r.sweep()
+	r.units.Report(t, s1)
+	r.units.Set(s1, "session.idle", false)
+	r.clock.Advance(time.Minute)
+	if err := svc.Tick(ctx, r.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.ran("turn.start"); len(got) != 0 {
+		t.Fatalf("ran %v on a unit that no longer matches", got)
+	}
+	if it, ok := r.item("follow", s1); ok {
+		t.Fatalf("the item that no longer matches stayed: %+v", it)
+	}
+}

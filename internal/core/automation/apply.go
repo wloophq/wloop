@@ -187,22 +187,15 @@ func (e *Engine) Act(ctx context.Context, id string, a workflow.Action, guidance
 	return it, err
 }
 
-// byHand checks every step's guards and that the item's source did not move
-// before running any step, then runs the item.
+// byHand checks every step's guards and that the item still holds on its
+// unit's current facts before running any step, then runs the item.
 func (e *Engine) byHand(ctx context.Context, it workflow.Item, o RunOpts) (workflow.Item, error) {
-	moved, err := e.sourceMoved(ctx, it)
+	why, err := e.handInvalid(ctx, it)
 	if err != nil {
 		return it, err
 	}
-	if w, ok := e.live()[it.Workflow]; ok && !moved {
-		facts, err := e.factsFor(ctx, w, it.Unit)
-		if err != nil {
-			return it, err
-		}
-		moved = keyMoved(w, it, facts)
-	}
-	if moved {
-		return outcomeOf(e.stopped(ctx, it, Refused{Reason: whyMoved}, nil, e.now()))
+	if why != "" {
+		return outcomeOf(e.stopped(ctx, it, Refused{Reason: why}, nil, e.now()))
 	}
 	for _, st := range it.Steps {
 		refusal, err := e.Steps.Check(ctx, st, it.Unit, it.Why, CheckOpts{Observe: it.Observe, ByHand: true})
@@ -214,6 +207,24 @@ func (e *Engine) byHand(ctx context.Context, it workflow.Item, o RunOpts) (workf
 		}
 	}
 	return outcomeOf(e.runItem(ctx, it, o))
+}
+
+// handInvalid is invalid for an item applied by hand; one of a workflow no
+// longer loaded is invalid only when its source moved.
+func (e *Engine) handInvalid(ctx context.Context, it workflow.Item) (string, error) {
+	w, ok := e.live()[it.Workflow]
+	if !ok {
+		moved, err := e.sourceMoved(ctx, it)
+		if err != nil || !moved {
+			return "", err
+		}
+		return whyMoved, nil
+	}
+	facts, err := e.factsFor(ctx, w, it.Unit)
+	if err != nil {
+		return "", err
+	}
+	return e.invalid(ctx, w, it, facts, true)
 }
 
 // outcomeOf is a by-hand run's item and error: the ledger's, else the step's.

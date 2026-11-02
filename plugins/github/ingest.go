@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -49,7 +50,10 @@ type running struct {
 	cfgMu sync.Mutex
 	cfg   settings
 
+	// reportMu orders the reports, and guards reported: the rev and content
+	// of each pull request's last report.
 	reportMu sync.Mutex
+	reported map[pr.Ref]reported
 	dirtyMu  sync.Mutex
 	dirty    map[pr.Ref]bool
 
@@ -86,7 +90,7 @@ func (p *Plugin) brand() string {
 
 // start builds what a started plugin runs over db and the host's broker.
 func (p *Plugin) start(ctx context.Context, db *store.DB, host src.Host) *running {
-	r := &running{now: p.now, db: db, host: host, dirty: map[pr.Ref]bool{}, loop: p.brand(), dues: map[pr.Ref]time.Time{},
+	r := &running{now: p.now, db: db, host: host, dirty: map[pr.Ref]bool{}, reported: map[pr.Ref]reported{}, loop: p.brand(), dues: map[pr.Ref]time.Time{},
 		dueWake: make(chan struct{}, 1)}
 	r.git = p.Git
 	if r.git == nil {
@@ -266,10 +270,7 @@ func (r *running) snapshots(ctx context.Context, refs []pr.Ref) ([]src.Snapshot,
 	}
 	planner := plan.New(ctx, pin)
 	settled := map[pr.Ref]plan.Settlement{}
-	rev, err := r.nextRev(ctx)
-	if err != nil {
-		return nil, err
-	}
+	var rev uint64
 	var out []src.Snapshot
 	for _, d := range rows {
 		ref := d.row.PR.Ref
@@ -286,8 +287,11 @@ func (r *running) snapshots(ctx context.Context, refs []pr.Ref) ([]src.Snapshot,
 			return nil, err
 		}
 		s := d.row.Report()
-		s.Unit, s.Rev, s.At, s.Data = ref.Unit(), rev, at, raw
+		s.Unit, s.At, s.Data = ref.Unit(), at, raw
 		s.Facts = append(s.Facts, planner.Facts(ref, res)...)
+		if s.Rev, err = r.revOf(ctx, ref, s, &rev); err != nil {
+			return nil, err
+		}
 		out = append(out, s)
 		due := d.row.Due()
 		if t := res.Due(at); !t.IsZero() && (due.IsZero() || t.Before(due)) {
@@ -447,6 +451,35 @@ func addressedAt(b src.Book) (time.Time, bool) {
 	return driving.At, true
 }
 
+// reported is a pull request's last report: its rev and a digest of the
+// rest but its time.
+type reported struct {
+	rev uint64
+	sum [sha256.Size]byte
+}
+
+// revOf is the rev of s, ref's report: its last report's when nothing but
+// the time changed since, else batch, which the first change of a batch
+// takes from nextRev.
+func (r *running) revOf(ctx context.Context, ref pr.Ref, s src.Snapshot, batch *uint64) (uint64, error) {
+	s.Rev, s.At = 0, time.Time{}
+	raw, err := json.Marshal(s)
+	if err != nil {
+		return 0, err
+	}
+	sum := sha256.Sum256(raw)
+	if last, ok := r.reported[ref]; ok && last.sum == sum {
+		return last.rev, nil
+	}
+	if *batch == 0 {
+		if *batch, err = r.nextRev(ctx); err != nil {
+			return 0, err
+		}
+	}
+	r.reported[ref] = reported{rev: *batch, sum: sum}
+	return *batch, nil
+}
+
 // nextRev is a rev above every rev the plugin reported before, kept across
 // its restarts.
 func (r *running) nextRev(ctx context.Context) (uint64, error) {
@@ -542,6 +575,8 @@ const (
 // retain drops what the host's retention ends from the store and reports
 // each dropped pull request gone.
 func (r *running) retain(ctx context.Context) error {
+	r.reportMu.Lock()
+	defer r.reportMu.Unlock()
 	now := r.now()
 	dropped, err := r.db.Retain(ctx, now.Add(-endedRetention), now.Add(-fetchesRetention))
 	if err != nil || len(dropped) == 0 {
@@ -552,6 +587,9 @@ func (r *running) retain(ctx context.Context) error {
 		delete(r.dirty, ref)
 	}
 	r.dirtyMu.Unlock()
+	for _, ref := range dropped {
+		delete(r.reported, ref)
+	}
 	if r.host.Reporter == nil {
 		return nil
 	}

@@ -62,7 +62,9 @@ type pluginModule struct {
 	// Identity is the user as this plugin knows them.
 	Identity   func(ctx context.Context) (items.Person, error)
 	UnitEvents links.EventReader
-	CLI        *pluginCLI
+	// Refresh reads a unit an open linked item waits on again.
+	Refresh links.Refresher
+	CLI     *pluginCLI
 	// Run is a long-running stream; the daemon runs it for an enabled plugin until ctx ends, restarting after 30 s on error.
 	Run    func(ctx context.Context) error
 	Health func(ctx context.Context) (api.SourceHealth, error)
