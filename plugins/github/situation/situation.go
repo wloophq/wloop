@@ -64,9 +64,9 @@ type Input struct {
 	// AddressedAt is when the pull request's driving turn, an address turn,
 	// reached its state; zero without one.
 	AddressedAt time.Time
-	// ThreadsSettled says the pull request has review threads and every one
-	// is resolved, as its last full read found them.
-	ThreadsSettled bool
+	// ThreadsSettledAt is when a full read last found the pull request's
+	// review threads, at least one, every one resolved; zero when it did not.
+	ThreadsSettledAt time.Time
 }
 
 type Result struct {
@@ -91,7 +91,7 @@ func (r Result) StalledAt(now time.Time) bool {
 }
 
 func Derive(in Input) Result {
-	evs := slices.Clone(in.Events)
+	evs := Standing(in.Events)
 	slices.SortStableFunc(evs, func(a, b pr.Event) int { return a.At.Compare(b.At) })
 	last := func(kinds ...string) (pr.Event, bool) {
 		for i := len(evs) - 1; i >= 0; i-- {
@@ -217,7 +217,7 @@ func Derive(in Input) Result {
 	for i := len(evs) - 1; i >= 0; i-- {
 		e := evs[i]
 		if (e.Kind != pr.KindReview && e.Kind != pr.KindComment) || ignored(e.Actor) || nudgeComment[e] ||
-			(e.Kind == pr.KindReview && (strings.HasPrefix(e.Data, "APPROVED:") || strings.HasPrefix(e.Data, "DISMISSED:"))) {
+			(e.Kind == pr.KindReview && strings.HasPrefix(e.Data, "APPROVED:")) {
 			continue
 		}
 		if at, ok := approvedAt[strings.ToLower(e.Actor)]; ok && e.Actor != p.Author && !e.At.After(at) {
@@ -236,7 +236,7 @@ func Derive(in Input) Result {
 		}
 		return login
 	}
-	if !lastReviewer.At.IsZero() && lastReviewer.At.After(pushedAt) && !(in.ThreadsSettled && approvedAfter(evs, p, lastReviewer.At)) {
+	if !lastReviewer.At.IsZero() && lastReviewer.At.After(pushedAt) && !(in.ThreadsSettledAt.After(lastReviewer.At) && approvedAfter(evs, p, lastReviewer.At)) {
 		if lastAuthor.At.After(lastReviewer.At) {
 			return stalled(Result{Kind: KindReviewerBack, WaitingOn: me(lastReviewer.Actor), Since: lastAuthor.At,
 				Reason: p.Author + " replied, " + lastReviewer.Actor + " has not returned"}, in.Stalled.Reply)
@@ -280,21 +280,37 @@ func requestedOfMe(in Input, evs []pr.Event) (at time.Time, again, ok bool) {
 }
 
 // Pending says p asks login's review: it lists the request by name, and
-// login reviewed never or before the newest event that asked it.
+// login's standing reviews are none or older than the newest event that
+// asked it.
 func Pending(p pr.PR, evs []pr.Event, login string) bool {
 	if !slices.ContainsFunc(p.ReviewRequests, func(r string) bool { return strings.EqualFold(r, login) }) {
 		return false
 	}
 	var asked, reviewed time.Time
-	for _, e := range evs {
+	for _, e := range Standing(evs) {
 		switch {
 		case e.Kind == pr.KindReviewRequest && strings.EqualFold(e.Data, login):
-			asked = e.At
+			asked = latest(asked, e.At)
 		case e.Kind == pr.KindReview && strings.EqualFold(e.Actor, login):
-			reviewed = e.At
+			reviewed = latest(reviewed, e.At)
 		}
 	}
 	return reviewed.IsZero() || asked.After(reviewed)
+}
+
+// Standing are evs without the dismissals and the reviews they dismissed:
+// the collector stores a dismissal as its own event, keyed on the review's
+// key and its state, beside the review it dismissed.
+func Standing(evs []pr.Event) []pr.Event {
+	dismissed := map[string]bool{}
+	for _, e := range evs {
+		if e.Kind == pr.KindReview && strings.HasPrefix(e.Data, pr.ReviewDismissed+":") {
+			dismissed[strings.TrimSuffix(e.Key, ":"+pr.ReviewDismissed)] = true
+		}
+	}
+	return slices.DeleteFunc(slices.Clone(evs), func(e pr.Event) bool {
+		return e.Kind == pr.KindReview && (dismissed[e.Key] || strings.HasPrefix(e.Data, pr.ReviewDismissed+":"))
+	})
 }
 
 // approvedAfter says whether someone other than the author, an automated

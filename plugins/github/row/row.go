@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wloophq/wloop/plugins/github/api"
 	"github.com/wloophq/wloop/plugins/github/pr"
 	"github.com/wloophq/wloop/plugins/github/situation"
 	"github.com/wloophq/wloop/plugins/github/store"
@@ -58,9 +59,12 @@ const ViewMine = "mine"
 // Derive is in's source row at in.Now.
 func Derive(in Input) Row {
 	p := in.PR
-	settled := in.Detail != nil && in.Detail.ThreadsRead && in.Detail.ThreadsTotal > 0 && len(in.Detail.OpenThreads) == 0
+	var settled time.Time
+	if d := in.Detail; d != nil && d.ThreadsRead && d.ThreadsTotal > 0 && d.ThreadsTotal <= api.MaxThreads && len(d.OpenThreads) == 0 {
+		settled = d.ReadAt
+	}
 	res := situation.Derive(situation.Input{PR: p, Events: in.Events, Viewer: in.Viewer, MyTeams: in.Teams, Ignore: in.Ignore,
-		Now: in.Now, Stalled: in.Stalled, AddressedAt: in.AddressedAt, ThreadsSettled: settled})
+		Now: in.Now, Stalled: in.Stalled, AddressedAt: in.AddressedAt, ThreadsSettledAt: settled})
 	ws := WorkspaceOf(p.Workspace)
 	pl := Payload{Author: p.Author, Repo: p.Ref.Owner + "/" + p.Ref.Repo, Head: pr.OneLine(p.HeadBranch, 255), Reasons: nonNil(p.Reasons),
 		Workspace: ws, Override: Override{Adopted: in.Override.Adopted, Tracked: in.Override.Tracked}, Viewer: in.Viewer}

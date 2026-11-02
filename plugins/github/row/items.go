@@ -29,11 +29,11 @@ const (
 // the viewer when the row needs them or is the viewer's own to merge, staff
 // or answer, what waits on others in scope, and otherwise, while the pull
 // request is open and followed, ItemFollow. Someone else's pull request the
-// viewer approved last, that does not need them and that they do not track,
-// asks nothing: merging it is its author's. A held or blocked round asks
+// viewer approved last, that does not need them and that they neither track
+// nor adopted, asks nothing: merging it is its author's. A held or blocked round asks
 // through its gate, never an item.
 func (r Row) Items() []src.Item {
-	if r.Payload.Viewer == "" || r.Kind() == situation.KindDone || r.approvedByMe() && !r.needsMe() && !r.Payload.Override.Tracked {
+	if r.Payload.Viewer == "" || r.Kind() == situation.KindDone || r.approvedByMe() && !r.needsMe() && !r.Payload.Override.Tracked && !r.Payload.Override.Adopted {
 		return nil
 	}
 	out := r.asks()
@@ -181,7 +181,7 @@ func (r Row) item(kind, category string, contexts []string) src.Item {
 		URLs:       []string{link},
 		Contexts:   contexts,
 		Category:   category,
-		Origin:     src.Anchor{Unit: r.PR.Ref.Unit(), Ref: "situation:" + string(r.Kind()), Permalink: link},
+		Origin:     src.Anchor{Unit: r.PR.Ref.Unit(), Ref: "situation:" + string(r.Kind()), Permalink: link, At: r.Situation.Since},
 		State:      stateOpen,
 		Confidence: confidenceHigh,
 		Provenance: provenanceDerived,
@@ -214,7 +214,7 @@ func (r Row) approvedByMe() bool {
 		return false
 	}
 	var verdict pr.Event
-	for _, e := range r.in.Events {
+	for _, e := range situation.Standing(r.in.Events) {
 		if e.Kind == pr.KindReview && strings.EqualFold(e.Actor, viewer) && !strings.HasPrefix(e.Data, "COMMENTED:") && !e.At.Before(verdict.At) {
 			verdict = e
 		}

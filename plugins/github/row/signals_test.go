@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/plugins/github/api"
 	"github.com/wloophq/wloop/plugins/github/pr"
 	"github.com/wloophq/wloop/plugins/github/situation"
 	"github.com/wloophq/wloop/plugins/github/store"
@@ -79,6 +80,8 @@ func TestSomeoneElsesPullRequestMyNewestVerdictApprovesAsksNothing(t *testing.T)
 		{"approved, re-requested, then the request withdrawn", theirs, pr.Override{}, []pr.Event{approved, ev(50, pr.KindReviewRequest, "ana", ago(day), fixtureViewer)}, false},
 		{"approved, then listed as requested with no event, which the situation reads as asking you", requested, pr.Override{}, []pr.Event{approved}, true},
 		{"approved and tracked", theirs, pr.Override{Tracked: true}, []pr.Event{approved}, true},
+		{"approved, then adopted", theirs, pr.Override{Adopted: true}, []pr.Event{approved}, true},
+		{"approved, the approval dismissed", theirs, pr.Override{}, []pr.Event{approved, ev(50, pr.KindReview, fixtureViewer, ago(3*day), "DISMISSED:h0")}, true},
 		{"approved my own", open(50, fixtureViewer, func(p *pr.PR) { p.Reasons = []string{"author"} }), pr.Override{}, []pr.Event{approved}, true},
 		{"never reviewed", requested, pr.Override{}, nil, true},
 	} {
@@ -97,11 +100,13 @@ func TestResolvedThreadsSettleAReviewersCommentOnlyWhenThePullRequestHasThreads(
 		detail *store.Detail
 		want   situation.Kind
 	}{
-		"no detail":                {nil, situation.KindReply},
-		"no thread, a top comment": {&store.Detail{ThreadsRead: true}, situation.KindReply},
-		"a thread open":            {&store.Detail{ThreadsRead: true, ThreadsTotal: 2, OpenThreads: []pr.Thread{{}}}, situation.KindReply},
-		"threads not read":         {&store.Detail{ThreadsTotal: 2}, situation.KindReply},
-		"every thread resolved":    {&store.Detail{ThreadsRead: true, ThreadsTotal: 2, ReadAt: ago(30 * day)}, situation.KindReview},
+		"no detail":                         {nil, situation.KindReply},
+		"no thread, a top comment":          {&store.Detail{ThreadsRead: true}, situation.KindReply},
+		"a thread open":                     {&store.Detail{ThreadsRead: true, ThreadsTotal: 2, OpenThreads: []pr.Thread{{}}}, situation.KindReply},
+		"threads not read":                  {&store.Detail{ThreadsTotal: 2}, situation.KindReply},
+		"resolved, read before the comment": {&store.Detail{ThreadsRead: true, ThreadsTotal: 2, ReadAt: ago(5 * day)}, situation.KindReply},
+		"more threads than a read holds":    {&store.Detail{ThreadsRead: true, ThreadsTotal: api.MaxThreads + 1, ReadAt: ago(2 * day)}, situation.KindReply},
+		"every thread resolved":             {&store.Detail{ThreadsRead: true, ThreadsTotal: 2, ReadAt: ago(2 * day)}, situation.KindReview},
 	} {
 		in.Detail = c.detail
 		if got := Derive(in).Kind(); got != c.want {

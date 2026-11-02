@@ -497,7 +497,22 @@ func TestAReviewerWhoseNewestReviewApprovesAwaitsNoReply(t *testing.T) {
 func TestADismissedReviewAwaitsNoReply(t *testing.T) {
 	r := derive(open("ana"), h(10), ev(pr.KindPush, "h2", "ana", h(1), ""), ev(pr.KindReview, "r1", "carla", h(3), "DISMISSED:h2"))
 	if r.Kind != KindNoReviewer {
-		t.Fatalf("%+v", r)
+		t.Fatalf("a dismissal alone: %+v", r)
+	}
+	r = derive(open("ana"), h(10), ev(pr.KindPush, "h2", "ana", h(1), ""), ev(pr.KindReview, "r1", "carla", h(3), "CHANGES_REQUESTED:h2"),
+		ev(pr.KindReview, "r1:DISMISSED", "carla", h(3), "DISMISSED:h2"))
+	if r.Kind != KindNoReviewer {
+		t.Fatalf("a review stored before its dismissal: %+v", r)
+	}
+}
+
+func TestADismissedApprovalSettlesNoComment(t *testing.T) {
+	p := open("ana")
+	evs := []pr.Event{ev(pr.KindPush, "h2", "ana", h(1), ""), ev(pr.KindReview, "r1", "carla", h(3), "COMMENTED:h2"),
+		ev(pr.KindReview, "r2", "carla", h(4), "APPROVED:h2"), ev(pr.KindReview, "r2:DISMISSED", "carla", h(4), "DISMISSED:h2")}
+	in := Input{PR: p, Events: evs, Viewer: "me", Now: h(10), Stalled: th, ThreadsSettledAt: h(5)}
+	if r := Derive(in); r.Kind != KindReply {
+		t.Fatalf("carla's comment, her approval dismissed: %+v", r)
 	}
 }
 
@@ -510,7 +525,11 @@ func TestResolvedThreadsAndALaterApprovalAnswerAComment(t *testing.T) {
 	if r := Derive(in); r.Kind != KindReply {
 		t.Fatalf("threads not known to be resolved: %+v", r)
 	}
-	in.ThreadsSettled = true
+	in.ThreadsSettledAt = h(2)
+	if r := Derive(in); r.Kind != KindReply {
+		t.Fatalf("threads found resolved before the comment: %+v", r)
+	}
+	in.ThreadsSettledAt = h(5)
 	if r := Derive(in); r.Kind != KindReview || r.WaitingOn != "dave" {
 		t.Fatalf("threads resolved and approved after the comment: %+v", r)
 	}
@@ -525,5 +544,13 @@ func TestAReRequestAfterMyReviewWaitsOnMe(t *testing.T) {
 		ev(pr.KindPush, "h2", "ana", h(2), ""), ev(pr.KindReview, "r2", "carla", h(3), "COMMENTED:h2"), requested("me", "ana", h(4)))
 	if r.Kind != KindReview || r.WaitingOn != "me" || !r.Since.Equal(h(4)) || r.Reason != "review requested again after your review" {
 		t.Fatalf("%+v", r)
+	}
+}
+
+func TestPendingReadsTheNewestEventsWhateverTheirOrder(t *testing.T) {
+	p := pr.PR{ReviewRequests: []string{"me"}}
+	evs := []pr.Event{requested("me", "ana", h(4)), ev(pr.KindReview, "r1", "me", h(1), "APPROVED:h1")}
+	if !Pending(p, evs, "me") {
+		t.Fatal("a request after my review, listed first, is not pending")
 	}
 }
