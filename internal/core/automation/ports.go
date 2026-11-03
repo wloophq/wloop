@@ -23,11 +23,14 @@ type Units interface {
 	Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error)
 }
 
-// Preparer is a capability of the engine's Keep: the context one evaluation
-// reads the units' facts through, such as a pass over every unit whose reads
-// of the store the facts share; run by Sweep only, before Evaluate.
+// Preparer is a capability of the engine's Keep: it runs fn with the
+// context one pass of reads goes through, such as a pass over every unit
+// whose reads of the store the facts share, in one snapshot of the store,
+// which a write made during fn does not move. Prepare runs fn once, unless
+// it fails before. Sweep evaluates in one pass and judges the withdrawals in
+// others.
 type Preparer interface {
-	Prepare(ctx context.Context) (context.Context, error)
+	Prepare(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
 // Refresher is a capability of the engine's Keep: the provider's own writes
@@ -168,7 +171,9 @@ type PlanWrite struct {
 }
 
 type Filter struct {
-	Workflow  string
+	Workflow string
+	// Workflows keeps the items of any of them; none keeps every workflow's.
+	Workflows []string
 	Provider  unit.ProviderID
 	Unit      *unit.Unit
 	Decisions []workflow.Decision
@@ -179,6 +184,8 @@ type Filter struct {
 // withdraws when the workflow's [drafts.withdraw] when matches one, or when the
 // workflow is no longer loaded; never those of a disabled plugin's units.
 type Withdrawals interface {
+	// Any says whether a workflow's draft is still proposed.
+	Any(ctx context.Context) (bool, error)
 	// Proposed are the proposed drafts of workflow; "" lists every
 	// workflow's.
 	Proposed(ctx context.Context, workflow string) ([]ProposedDraft, error)

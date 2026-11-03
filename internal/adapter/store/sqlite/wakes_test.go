@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -42,6 +43,10 @@ func TestATaskReadsItsWakeAndClosingItDropsTheWake(t *testing.T) {
 	}
 	if ws, err := db.Wakes().UnitWakes(ctx, []unit.Unit{pr}); err != nil || ws[pr].Task != asleep.ID {
 		t.Fatalf("the unit's wake %+v %v", ws, err)
+	}
+	one, _, _ := db.Wakes().Of(ctx, asleep.ID)
+	if all, err := db.Wakes().All(ctx); err != nil || len(all) != 1 || !reflect.DeepEqual(all[0], one) {
+		t.Fatalf("every wake %+v %v, want %+v", all, err, one)
 	}
 	done := asleep
 	done.State, done.Category = "done", task.CategoryDone

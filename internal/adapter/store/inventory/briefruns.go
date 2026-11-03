@@ -620,4 +620,33 @@ func (s *Store) UnitBrief(ctx context.Context, u unit.Unit) (UnitBrief, bool, er
 	return b, err == nil, err
 }
 
+const unitBriefsSQL = `SELECT b.provider, b.unit_key, b.run, r.version, r.brief FROM unit_briefs b JOIN brief_runs r ON b.run != 0 AND r.id = b.run
+	WHERE (b.provider, b.unit_key) IN (SELECT value->>0, value->>1 FROM json_each(?)) AND r.brief != ''`
+
+// UnitBriefs reads the briefs in use of units, in one statement; a unit with none is absent.
+func (s *Store) UnitBriefs(ctx context.Context, units []unit.Unit) (map[unit.Unit]UnitBrief, error) {
+	out := make(map[unit.Unit]UnitBrief, len(units))
+	if len(units) == 0 {
+		return out, nil
+	}
+	pairs, err := sqlite.UnitPairs(units)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.db.R().QueryContext(ctx, unitBriefsSQL, pairs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var u unit.Unit
+		var b UnitBrief
+		if err := rows.Scan(&u.Provider, &u.Key, &b.Run, &b.Version, &b.Brief); err != nil {
+			return nil, err
+		}
+		out[u] = b
+	}
+	return out, rows.Err()
+}
+
 const briefReadChunk = 400

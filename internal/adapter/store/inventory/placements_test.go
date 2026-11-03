@@ -24,6 +24,13 @@ func TestPlacementOverrideRoundTripsAndZeroClears(t *testing.T) {
 	if got, ok, err := s.Override(ctx, u); !ok || err != nil || got != want {
 		t.Fatalf("Override = %+v %v %v", got, ok, err)
 	}
+	other := unit.Unit{Provider: "slack", Key: "T000/C001/2.2"}
+	if err := s.SetOverride(ctx, other, placement.Placement{Repo: "acme/web"}); err != nil {
+		t.Fatal(err)
+	}
+	if all, err := s.All(ctx); err != nil || len(all) != 2 || all[u] != want || all[other] != (placement.Placement{Repo: "acme/web"}) {
+		t.Fatalf("All = %+v %v", all, err)
+	}
 	if err := s.SetOverride(ctx, u, placement.Placement{}); err != nil {
 		t.Fatal(err)
 	}

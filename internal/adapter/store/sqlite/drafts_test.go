@@ -408,3 +408,39 @@ func TestADraftStoresItsShapeAndEffects(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 }
+
+func TestSettledAtIsEachSubjectsNewestSettledDraftOfTheWorkflow(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	s := db.Drafts()
+	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
+	other := unit.Unit{Provider: "slack", Key: "C9:2.0"}
+	put := func(u unit.Unit, taskID, wf string, st draft.State, updated time.Time) {
+		t.Helper()
+		d := sampleDraft(u, at)
+		d.Task, d.State, d.UpdatedAt = taskID, st, updated
+		d.Origin = draft.Origin{Kind: draft.OriginAuto, Workflow: wf}
+		if _, err := s.Insert(ctx, d); err != nil {
+			t.Fatal(err)
+		}
+	}
+	put(slackThread, "t-01", "nudge", draft.Sent, at.Add(500*time.Millisecond))
+	put(slackThread, "", "nudge", draft.Dropped, at.Add(time.Second))
+	put(other, "t-01", "nudge", draft.Sent, at.Add(2*time.Second))
+	put(other, "", "nudge", draft.Held, at.Add(time.Hour))
+	put(other, "", "close", draft.Sent, at.Add(time.Hour))
+	got, err := s.(outbox.SettledReader).SettledAt(ctx, "nudge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	all, err := s.List(ctx, outbox.Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range []unit.Unit{slackThread, other, {Provider: unit.Task, Key: "t-01"}, {Provider: unit.Task, Key: "t-02"}} {
+		if want := draft.SettledAt(all, "nudge", u); !got[u].Equal(want) {
+			t.Errorf("%s: settled at %v, want %v", u, got[u], want)
+		}
+	}
+}

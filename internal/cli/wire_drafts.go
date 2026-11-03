@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/wloophq/wloop/internal/core/automation"
@@ -59,6 +60,15 @@ type draftWithdrawals struct{ d *draftDeps }
 
 var _ automation.Withdrawals = draftWithdrawals{}
 
+func (w draftWithdrawals) Any(ctx context.Context) (bool, error) {
+	ob, err := w.d.outbox()
+	if errors.Is(err, errNoDraftDeps) {
+		return false, nil
+	}
+	ds, err := ob.List(ctx, outbox.Filter{States: []draft.State{draft.Held}})
+	return slices.ContainsFunc(ds, func(d draft.Draft) bool { return proposedByAWorkflow(d) }), err
+}
+
 func (w draftWithdrawals) Proposed(ctx context.Context, name string) ([]automation.ProposedDraft, error) {
 	ob, err := w.d.outbox()
 	if errors.Is(err, errNoDraftDeps) {
@@ -70,7 +80,7 @@ func (w draftWithdrawals) Proposed(ctx context.Context, name string) ([]automati
 	}
 	var out []automation.ProposedDraft
 	for _, d := range ds {
-		if d.Origin.Kind != draft.OriginAuto || d.Origin.Workflow == "" || w.d.Enabled != nil && !w.d.Enabled(d.Unit.Provider) {
+		if !proposedByAWorkflow(d) || w.d.Enabled != nil && !w.d.Enabled(d.Unit.Provider) {
 			continue
 		}
 		subject := draftSubjectUnit(d)
@@ -101,6 +111,10 @@ func (w draftWithdrawals) Withdraw(ctx context.Context, id int64, reason string)
 		return nil
 	}
 	return err
+}
+
+func proposedByAWorkflow(d draft.Draft) bool {
+	return d.Origin.Kind == draft.OriginAuto && d.Origin.Workflow != ""
 }
 
 // draftPerson is the person a per-person draft's key names after its unit, or, as drafts proposed before the

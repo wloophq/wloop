@@ -25,6 +25,25 @@ func (s Placements) Override(ctx context.Context, u unit.Unit) (placement.Placem
 	return p, err == nil, err
 }
 
+// All are every unit's placement override.
+func (s Placements) All(ctx context.Context) (map[unit.Unit]placement.Placement, error) {
+	rows, err := s.db.R().QueryContext(ctx, `SELECT provider, unit_key, repo, checkout, role, shared FROM placements`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[unit.Unit]placement.Placement{}
+	for rows.Next() {
+		var u unit.Unit
+		var p placement.Placement
+		if err := rows.Scan(&u.Provider, &u.Key, &p.Repo, &p.Checkout, &p.Role, &p.Shared); err != nil {
+			return nil, err
+		}
+		out[u] = p
+	}
+	return out, rows.Err()
+}
+
 // SetOverride stores p for u; the zero Placement clears it. Source is not kept.
 func (s Placements) SetOverride(ctx context.Context, u unit.Unit, p placement.Placement) error {
 	p.Source = ""

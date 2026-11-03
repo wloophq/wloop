@@ -11,11 +11,12 @@ import (
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
 // TestAPassReadsTheStoreOnceForEveryTask: the facts of the tasks of one pass read the sessions, the items,
-// the open gates, the turn counts and the cards once each, and are the facts each task has on its own.
+// the open gates, the turn counts, the cards and the wakes once each, and are the facts each task has on its own.
 func TestAPassReadsTheStoreOnceForEveryTask(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -31,6 +32,9 @@ func TestAPassReadsTheStoreOnceForEveryTask(t *testing.T) {
 		}
 	}
 	e.turns[task.UnitOf("t-02")] = 3
+	if err := e.db.Wakes().Put(ctx, wake.Wake{Task: "t-03", Until: monday.Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
 	alone := map[task.ID]workflow.Facts{}
 	for _, en := range all {
 		f, err := e.p.TaskFacts(ctx, en)
@@ -50,7 +54,7 @@ func TestAPassReadsTheStoreOnceForEveryTask(t *testing.T) {
 			t.Errorf("%s: the facts in a pass\n%v\ndiffer from its own\n%v", en.ID, f, alone[en.ID])
 		}
 	}
-	for _, what := range []string{"sessions", "items", "gates", "turns", "cards"} {
+	for _, what := range []string{"sessions", "items", "gates", "turns", "cards", "wakes"} {
 		if n := e.reads[what]; n != 1 {
 			t.Errorf("%s read %d times in a pass over %d tasks", what, n, len(all))
 		}
@@ -78,19 +82,21 @@ func TestPrepareStartsAPassOverEveryTask(t *testing.T) {
 		}
 		alone[u] = f
 	}
-	pctx, err := e.p.Prepare(ctx)
+	err := e.p.Prepare(ctx, func(pctx context.Context) error {
+		e.reads = map[string]int{}
+		for _, u := range units {
+			f, err := e.p.Facts(pctx, u)
+			if err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(f, alone[u]) {
+				t.Errorf("%s: the facts in the prepared pass\n%v\ndiffer from its own\n%v", u, f, alone[u])
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
-	}
-	e.reads = map[string]int{}
-	for _, u := range units {
-		f, err := e.p.Facts(pctx, u)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !reflect.DeepEqual(f, alone[u]) {
-			t.Errorf("%s: the facts in the prepared pass\n%v\ndiffer from its own\n%v", u, f, alone[u])
-		}
 	}
 	for _, what := range []string{"sessions", "items", "gates", "turns", "cards"} {
 		if n := e.reads[what]; n != 1 {

@@ -54,14 +54,11 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 			return "", "", fmt.Errorf("refreshing facts: %w", err)
 		}
 	}
-	ectx := ctx
-	if p, ok := e.Keep.(Preparer); ok {
-		if ectx, err = p.Prepare(ctx); err != nil {
-			return "", "", fmt.Errorf("preparing facts: %w", err)
-		}
-	}
-	ev, err := e.evaluate(ectx, "", true)
-	if err != nil {
+	var ev *evaluation
+	if err := e.prepared(ctx, func(ctx context.Context) (err error) {
+		ev, err = e.evaluate(ctx, "", true)
+		return err
+	}); err != nil {
 		return "", "", err
 	}
 	if s, ok := e.Keep.(Seener); ok {
@@ -177,6 +174,26 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 		return summary, "", fmt.Errorf("%d item(s) failed", t.failed)
 	}
 	return summary, "", nil
+}
+
+// prepared runs fn through the Keep's Preparer, or with ctx when it has none.
+func (e *Engine) prepared(ctx context.Context, fn func(ctx context.Context) error) error {
+	p, ok := e.Keep.(Preparer)
+	if !ok {
+		return fn(ctx)
+	}
+	var ran bool
+	var fnErr error
+	if err := p.Prepare(ctx, func(ctx context.Context) error {
+		ran, fnErr = true, fn(ctx)
+		return nil
+	}); err != nil {
+		return fmt.Errorf("preparing facts: %w", err)
+	}
+	if !ran {
+		return errors.New("preparing facts: the pass never ran")
+	}
+	return fnErr
 }
 
 func (e *Engine) pause(ctx context.Context) (Pause, error) {

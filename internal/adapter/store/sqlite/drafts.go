@@ -186,6 +186,38 @@ func (s draftStore) List(ctx context.Context, f outbox.Filter) ([]draft.Draft, e
 	return out, rows.Err()
 }
 
+var _ outbox.SettledReader = draftStore{}
+
+func (s draftStore) SettledAt(ctx context.Context, workflow string) (map[unit.Unit]time.Time, error) {
+	states, err := json.Marshal(draft.SettledStates)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.db.R().QueryContext(ctx, `SELECT provider, unit_key, task, updated_at FROM drafts
+		WHERE workflow = ? AND state IN (SELECT value FROM json_each(?))`, workflow, string(states))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[unit.Unit]time.Time{}
+	for rows.Next() {
+		var d draft.Draft
+		var updated string
+		if err := rows.Scan(&d.Unit.Provider, &d.Unit.Key, &d.Task, &updated); err != nil {
+			return nil, err
+		}
+		if d.UpdatedAt, err = parseDraftTime(updated); err != nil {
+			return nil, fmt.Errorf("a settled draft's time: %w", err)
+		}
+		for _, sub := range draft.Subjects(d) {
+			if d.UpdatedAt.After(out[sub]) {
+				out[sub] = d.UpdatedAt
+			}
+		}
+	}
+	return out, rows.Err()
+}
+
 func (s draftStore) Update(ctx context.Context, d draft.Draft, from draft.State) (draft.Draft, error) {
 	_, err := s.db.Write(ctx, func(tx *Tx) error {
 		res, err := tx.ExecContext(ctx, updateDraft, append(draftArgs(d), int64(d.ID), string(from), d.Rev)...)

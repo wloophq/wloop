@@ -167,6 +167,7 @@ func (l *Ledger) Items(ctx context.Context, f automation.Filter) ([]workflow.Ite
 	for _, it := range l.items {
 		switch {
 		case f.Workflow != "" && it.Workflow != f.Workflow,
+			len(f.Workflows) > 0 && !slices.Contains(f.Workflows, it.Workflow),
 			f.Provider != "" && it.Unit.Provider != f.Provider,
 			f.Unit != nil && it.Unit != *f.Unit,
 			len(f.Decisions) > 0 && !slices.Contains(f.Decisions, it.Decision),

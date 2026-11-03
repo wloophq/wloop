@@ -17,6 +17,19 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
+// allOverrides is an optional capability of placement.Overrides: every unit's override, which a pass reads once.
+type allOverrides interface {
+	All(ctx context.Context) (map[unit.Unit]placement.Placement, error)
+}
+
+func override(ctx context.Context, o placement.Overrides, u unit.Unit) (placement.Placement, bool, error) {
+	var all func() (map[unit.Unit]placement.Placement, error)
+	if a, ok := o.(allOverrides); ok {
+		all = func() (map[unit.Unit]placement.Placement, error) { return a.All(ctx) }
+	}
+	return coretasks.Lookup(ctx, "cli.placements", u, all, func() (placement.Placement, bool, error) { return o.Override(ctx, u) })
+}
+
 // unitsEnded says whether a unit has ended by its plugin's ended fact
 // (builtin.EndedFact); a unit whose plugin has no such fact, or whose facts
 // are gone, has not.
@@ -89,7 +102,7 @@ func (e *Env) newTaskResults(g *coretasks.Service, mods []pluginModule) taskResu
 func unitsRepo(mods []pluginModule, cfg func() config.Config, overrides placement.Overrides) func(ctx context.Context, u unit.Unit) (string, error) {
 	return func(ctx context.Context, u unit.Unit) (string, error) {
 		if overrides != nil {
-			p, ok, err := overrides.Override(ctx, u)
+			p, ok, err := override(ctx, overrides, u)
 			if err != nil {
 				return "", err
 			}

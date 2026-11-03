@@ -10,13 +10,15 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/automation"
-	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
+	"github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/pkg/plugin/manifest"
 )
 
 // slackFacts stand in for the facts the Slack plugin reports of its units,
@@ -88,8 +90,43 @@ func (f *slackFacts) Due() time.Time {
 	return f.due
 }
 
+// Facts are read once per pass for every unit, as the plugin's snapshots are.
 func (f *slackFacts) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error) {
-	now := f.clock.Now()
+	if _, ok := coretasks.PassOf(ctx); !ok {
+		return f.read(ctx, u)
+	}
+	all, err := coretasks.Once(ctx, "replay.slack", func() (map[unit.Unit]workflow.Facts, error) {
+		es, err := f.db.Tasks().Tasks(ctx, task.Query{All: true})
+		if err != nil {
+			return nil, err
+		}
+		byUnit := map[unit.Unit][]task.Task{}
+		for _, e := range es {
+			for _, u := range e.Units {
+				byUnit[u] = append(byUnit[u], e)
+			}
+		}
+		units := slices.Collect(maps.Keys(byUnit))
+		got, err := f.db.Items().Load(ctx, units)
+		if err != nil {
+			return nil, err
+		}
+		out := make(map[unit.Unit]workflow.Facts, len(units))
+		for _, u := range units {
+			out[u] = f.of(u, byUnit[u], got[u])
+		}
+		return out, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if facts, ok := all[u]; ok {
+		return maps.Clone(facts), nil
+	}
+	return f.read(ctx, u)
+}
+
+func (f *slackFacts) read(ctx context.Context, u unit.Unit) (workflow.Facts, error) {
 	es, err := f.db.Tasks().TasksOf(ctx, u)
 	if err != nil {
 		return nil, err
@@ -98,9 +135,15 @@ func (f *slackFacts) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, er
 	if err != nil {
 		return nil, err
 	}
+	return f.of(u, es, got[u]), nil
+}
+
+// of are u's facts over es, the tasks it is attached to, and its, its items.
+func (f *slackFacts) of(u unit.Unit, es []task.Task, its []items.Item) workflow.Facts {
+	now := f.clock.Now()
 	open, resolved, orphans, age := 0, 0, 0, 0
 	var updated time.Time
-	for _, it := range got[u] {
+	for _, it := range its {
 		if it.UpdatedAt.After(updated) {
 			updated = it.UpdatedAt
 		}
@@ -140,17 +183,14 @@ func (f *slackFacts) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, er
 		"slack.items_unowned_age_days": age,
 		"slack.settled_at":             time.Time{},
 		"slack.fingerprint":            u.String() + "||" + updated.UTC().Format(time.RFC3339Nano),
-	}, nil
+	}
 }
 
+// Scope fills slack.settled_at as the plugin's host does.
 func (f *slackFacts) Scope(ctx context.Context, wf string, u unit.Unit, facts workflow.Facts) (workflow.Facts, error) {
-	ds, err := f.db.Drafts().List(ctx, outbox.Filter{Unit: &u, Workflow: wf})
-	if err != nil {
-		return nil, err
-	}
-	out := maps.Clone(facts)
-	out["slack.settled_at"] = draft.SettledAt(ds, wf, u)
-	return out, nil
+	settled := source.SettledFacts{Source: &manifest.Source{SourceVocabulary: manifest.SourceVocabulary{Slot: "slack", Facts: []manifest.Fact{{Name: "slack." + source.SettledFact}}}},
+		Drafts: f.db.Drafts()}
+	return settled.Scope(ctx, wf, u, facts)
 }
 
 // markClosed is the plugin's unit.closed: the draft's unit is closed.

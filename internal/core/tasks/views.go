@@ -47,6 +47,7 @@ type Pass struct {
 	once  map[string]*loaded
 	units []unit.Unit
 	held  map[unit.Unit]bool
+	byID  map[task.ID]task.Task
 }
 
 type loaded struct {
@@ -131,6 +132,20 @@ func (p *Pass) Units() []unit.Unit {
 	return p.units
 }
 
+// Task is task id of the pass; false when the pass does not range over it.
+func (p *Pass) Task(id task.ID) (task.Task, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.byID == nil {
+		p.byID = make(map[task.ID]task.Task, len(p.Tasks))
+		for _, e := range p.Tasks {
+			p.byID[e.ID] = e
+		}
+	}
+	e, ok := p.byID[id]
+	return e, ok
+}
+
 // Holds says whether u is a unit of a task of the pass.
 func (p *Pass) Holds(u unit.Unit) bool {
 	units := p.Units()
@@ -157,6 +172,31 @@ func Once[T any](ctx context.Context, key string, load func() (T, error)) (T, er
 		return zero, err
 	}
 	return v.(T), nil
+}
+
+// ItemsKey is the Once key of the items of every unit of a pass, a map[unit.Unit][]items.Item, which the facts
+// and the draft step share.
+const ItemsKey = "items"
+
+// Lookup is the value of k, held or not: in a pass, when all is not nil, every value is loaded once under key
+// with all; one reads k alone otherwise.
+func Lookup[K comparable, V any](ctx context.Context, key string, k K, all func() (map[K]V, error), one func() (V, bool, error)) (V, bool, error) {
+	if _, ok := PassOf(ctx); !ok || all == nil {
+		return one()
+	}
+	m, err := Once(ctx, key, all)
+	v, held := m[k]
+	return v, held, err
+}
+
+// UnitLookup is Lookup over the units of the pass: when the pass holds u, the values of all its units are
+// loaded once under key with all.
+func UnitLookup[V any](ctx context.Context, key string, u unit.Unit, all func(units []unit.Unit) (map[unit.Unit]V, error), one func() (V, bool, error)) (V, bool, error) {
+	pass, ok := PassOf(ctx)
+	if !ok || all == nil || !pass.Holds(u) {
+		return one()
+	}
+	return Lookup(ctx, key, u, func() (map[unit.Unit]V, error) { return all(pass.Units()) }, one)
 }
 
 type viewSource struct {

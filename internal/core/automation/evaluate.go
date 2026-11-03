@@ -112,6 +112,7 @@ func (e *Engine) evaluate(ctx context.Context, t workflow.TriggerKind, apply boo
 		return cmp.Or(cmp.Compare(a.Order, b.Order), cmp.Compare(a.Name, b.Name))
 	})
 	batches, errs := e.batches(ctx, ws, now, apply)
+	byWorkflow, storedErr := e.storedItems(ctx, ws)
 	p := &planner{e: e, ctx: ctx, now: now, pause: pause, facts: map[factsRead]workflow.Facts{},
 		factErr: map[factsRead]error{}, revs: map[unit.Unit]uint64{}, marks: map[unit.Unit]map[string]string{}, lists: map[unit.ProviderID][]unit.Unit{}, seen: map[string]bool{},
 		perRun: map[string]int{}, perUnit: map[unitOf]int{}, errs: errs, apply: apply}
@@ -122,7 +123,7 @@ func (e *Engine) evaluate(ctx context.Context, t workflow.TriggerKind, apply boo
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		if p.workflow(&b) {
+		if p.workflow(&b, byWorkflow[b.w.Name], storedErr) {
 			ev.batches = append(ev.batches, b)
 			ev.workflows = append(ev.workflows, b.w.Name)
 		}
@@ -135,15 +136,32 @@ func (e *Engine) evaluate(ctx context.Context, t workflow.TriggerKind, apply boo
 	return ev, nil
 }
 
+// storedItems are the stored items of ws, by workflow, in one read.
+func (e *Engine) storedItems(ctx context.Context, ws []workflow.Workflow) (map[string][]workflow.Item, error) {
+	byWorkflow := map[string][]workflow.Item{}
+	if len(ws) == 0 {
+		return byWorkflow, nil
+	}
+	names := make([]string, len(ws))
+	for i, w := range ws {
+		names[i] = w.Name
+	}
+	stored, err := e.Ledger.Items(ctx, Filter{Workflows: names})
+	for _, it := range stored {
+		byWorkflow[it.Workflow] = append(byWorkflow[it.Workflow], it)
+	}
+	return byWorkflow, err
+}
+
 func (p *planner) errorf(format string, args ...any) {
 	p.errs = append(p.errs, fmt.Sprintf(format, args...))
 }
 
-// workflow plans one workflow's batch; false when the workflow could not be
-// planned and its stored items must stay as they are.
-func (p *planner) workflow(b *batch) bool {
+// workflow plans one workflow's batch over its stored items, which err
+// could not read; false when the workflow could not be planned and its
+// stored items must stay as they are.
+func (p *planner) workflow(b *batch, stored []workflow.Item, err error) bool {
 	w := b.w
-	stored, err := p.e.Ledger.Items(p.ctx, Filter{Workflow: w.Name})
 	if err != nil {
 		p.errorf("%s: %v", w.Name, err)
 		return false

@@ -32,6 +32,17 @@ func (w *Withdrawals) Put(workflow string, ds ...automation.ProposedDraft) {
 	}
 }
 
+func (w *Withdrawals) Any(context.Context) (bool, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for _, ds := range w.open {
+		if len(ds) > 0 {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // Proposed lists the drafts of workflow, every workflow's by id when it is "".
 func (w *Withdrawals) Proposed(_ context.Context, workflow string) ([]automation.ProposedDraft, error) {
 	w.mu.Lock()
