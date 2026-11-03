@@ -10,6 +10,7 @@ import (
 	"maps"
 	"path"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -792,6 +793,46 @@ type CacheOptions struct {
 	LoadTree func([]profile.Layer, *dintent.Registry, []dintent.Name) (profile.Tree, error)
 	// OnReload is called, holding no lock, after Get replaces the loaded registry with a changed one; the first load is not a reload.
 	OnReload func()
+	// Shared, when set and LoadTree is not, is where the caches that name
+	// it take one registry while the layers are all the binary's.
+	Shared *Shared
+}
+
+// Shared is one registry for the caches that name it, while their layers
+// are all embedded: those layers over the same installed builtin tables
+// load the same registry. The caches pass the same bundled FS, base and
+// check; no caller changes a Loaded.
+type Shared struct {
+	mu     sync.Mutex
+	layers []profile.Layer
+	tables *builtin.Vocabulary
+	loaded *Loaded
+}
+
+func (s *Shared) get(layers []profile.Layer, load func() *Loaded) *Loaded {
+	if !embeddedOnly(layers) {
+		return load()
+	}
+	tables := builtin.Installed()
+	s.mu.Lock()
+	if s.loaded != nil && s.tables == tables && slices.Equal(s.layers, layers) {
+		defer s.mu.Unlock()
+		return s.loaded
+	}
+	s.mu.Unlock()
+	l := load()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.layers, s.tables, s.loaded = slices.Clone(layers), tables, l
+	return l
+}
+
+// embeddedOnly says whether every layer is the binary's, with an FS that
+// compares by identity.
+func embeddedOnly(layers []profile.Layer) bool {
+	return !slices.ContainsFunc(layers, func(l profile.Layer) bool {
+		return !l.Embedded() || l.FS != nil && !reflect.TypeOf(l.FS).Comparable()
+	})
 }
 
 // Cache reloads when the newest mtime under the user layer's intents/ and blocks changes; safe for concurrent use.
@@ -837,12 +878,24 @@ func (c *Cache) get() (loaded *Loaded, reloaded bool) {
 	c.checked = now
 	if c.loaded == nil || stamp != c.stamp {
 		reloaded = c.loaded != nil
-		c.loaded, _ = Load(layers, c.bundled, c.base, c.check)
-		c.loaded.loadTree = c.opts.LoadTree
-		_, _ = c.loaded.Tree()
+		if c.opts.Shared != nil && c.opts.LoadTree == nil {
+			c.loaded = c.opts.Shared.get(layers, c.load(layers))
+		} else {
+			c.loaded = c.load(layers)()
+		}
 		c.stamp = stamp
 	}
 	return c.loaded, reloaded
+}
+
+// load is a loader of the registry over layers, its tree read.
+func (c *Cache) load(layers []profile.Layer) func() *Loaded {
+	return func() *Loaded {
+		l, _ := Load(layers, c.bundled, c.base, c.check)
+		l.loadTree = c.opts.LoadTree
+		_, _ = l.Tree()
+		return l
+	}
 }
 
 // stampOf is each layer's directory, file count and newest mtime: a change to

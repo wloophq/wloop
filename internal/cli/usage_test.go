@@ -283,3 +283,21 @@ func TestTheBundledIntentsLeadTheGroupTheirManifestsName(t *testing.T) {
 		t.Errorf("PULL REQUESTS lists %q, want %q", prs, want)
 	}
 }
+
+func TestArgumentsWithNoHelpFlagDoNotLoadTheProfile(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	te.intents = nil
+	for _, args := range [][]string{
+		{"review", "https://github.com/acme/api/pull/7", "explain"},
+		{"status"},
+		{"profile", "add", "review", "--", "text"},
+	} {
+		if te.asksHelp(args) {
+			t.Errorf("%q asks for help", args)
+		}
+	}
+	if te.intents != nil {
+		t.Error("asking whether arguments with no help flag ask for help loaded the profile")
+	}
+}

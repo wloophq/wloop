@@ -103,14 +103,20 @@ func BundledFS() fs.FS {
 	return sub
 }
 
-// NewCache is the registry cache over the bundled intents and those of layers.
+// NewCache is the registry cache over the bundled intents and those of
+// layers. The caches whose layers are all embedded share one registry.
 func NewCache(layers func() []profile.Layer, opts intentload.CacheOptions) (*intentload.Cache, error) {
 	b, err := Base()
 	if err != nil {
 		return nil, err
 	}
+	if opts.Shared == nil {
+		opts.Shared = sharedRegistry
+	}
 	return intentload.NewCache(layers, BundledFS(), b, CheckTemplate, opts), nil
 }
+
+var sharedRegistry = &intentload.Shared{}
 
 // Bundled is the profile the release ships, the bundled layer and the
 // bundled plugins' layers, loaded once; callers never change it.

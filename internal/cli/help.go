@@ -178,6 +178,9 @@ func helpWords(args []string) []string {
 // help. An intent's guidance and what follows "--" are text, never a flag.
 func (e *Env) asksHelp(args []string) bool {
 	rest := args[1:]
+	if !slices.ContainsFunc(rest, func(a string) bool { return slices.Contains(helpFlags, a) }) {
+		return false
+	}
 	if d, ok := e.loadedIntents().Registry.Get(dintent.Name(args[0])); ok && d.UserFacing {
 		if len(rest) > 0 && !strings.HasPrefix(rest[0], "-") {
 			rest = rest[1:]

@@ -1064,3 +1064,26 @@ func TestStartKeysAreChecked(t *testing.T) {
 		})
 	}
 }
+
+func TestCachesOverEmbeddedLayersShareOneRegistry(t *testing.T) {
+	shared := &Shared{}
+	embedded := func() []profile.Layer { return []profile.Layer{{Name: "bundled", Source: "embedded"}} }
+	a := NewCache(embedded, bundledFS(), testBase(), nil, CacheOptions{Shared: shared})
+	b := NewCache(embedded, bundledFS(), testBase(), nil, CacheOptions{Shared: shared})
+	if a.Get() != b.Get() {
+		t.Error("two caches over the same embedded layers loaded the registry twice")
+	}
+	root := t.TempDir()
+	onDisk := func() []profile.Layer { return userLayer(root) }
+	c := NewCache(onDisk, bundledFS(), testBase(), nil, CacheOptions{Shared: shared})
+	d := NewCache(onDisk, bundledFS(), testBase(), nil, CacheOptions{Shared: shared})
+	if c.Get() == d.Get() {
+		t.Error("caches over a layer on disk share a registry")
+	}
+	tree := func([]profile.Layer, *dintent.Registry, []dintent.Name) (profile.Tree, error) {
+		return profile.Tree{}, nil
+	}
+	if e := NewCache(embedded, bundledFS(), testBase(), nil, CacheOptions{Shared: shared, LoadTree: tree}); e.Get() == a.Get() {
+		t.Error("a cache with its own tree reader shares a registry")
+	}
+}

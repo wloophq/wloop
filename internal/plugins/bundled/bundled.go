@@ -12,6 +12,7 @@ import (
 	"maps"
 	"path"
 	"slices"
+	"sync"
 
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -66,8 +67,17 @@ func Profiles() ([]profile.PluginFS, error) {
 	return out, nil
 }
 
-// Sources are the [source] tables of the bundled source plugins.
+// Sources are the [source] tables of the bundled source plugins, read once
+// per process: the slice is the caller's, the tables are shared and no
+// caller changes them.
 func Sources() ([]*manifest.Source, error) {
+	ss, err := sources()
+	return slices.Clone(ss), err
+}
+
+var sources = sync.OnceValues(readSources)
+
+func readSources() ([]*manifest.Source, error) {
 	ms, err := Manifests()
 	if err != nil {
 		return nil, err
