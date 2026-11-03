@@ -11,7 +11,9 @@ import (
 	"io/fs"
 	"maps"
 	"path"
+	"reflect"
 	"slices"
+	"sync"
 
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -66,8 +68,74 @@ func Profiles() ([]profile.PluginFS, error) {
 	return out, nil
 }
 
-// Sources are the [source] tables of the bundled source plugins.
+// Sources are the [source] tables of the bundled source plugins, read and
+// validated once per process; each caller gets its own copy.
 func Sources() ([]*manifest.Source, error) {
+	ss, err := sources()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*manifest.Source, len(ss))
+	for i, s := range ss {
+		out[i] = deepCopy(s)
+	}
+	return out, nil
+}
+
+func deepCopy[T any](v T) T {
+	return copyValue(reflect.ValueOf(v)).Interface().(T)
+}
+
+// copyValue is v with no pointer, slice or map shared with it; v holds only
+// exported fields.
+func copyValue(v reflect.Value) reflect.Value {
+	switch v.Kind() {
+	case reflect.Pointer:
+		if v.IsNil() {
+			return v
+		}
+		out := reflect.New(v.Type().Elem())
+		out.Elem().Set(copyValue(v.Elem()))
+		return out
+	case reflect.Struct:
+		out := reflect.New(v.Type()).Elem()
+		for i := range v.NumField() {
+			out.Field(i).Set(copyValue(v.Field(i)))
+		}
+		return out
+	case reflect.Slice:
+		if v.IsNil() {
+			return v
+		}
+		out := reflect.MakeSlice(v.Type(), v.Len(), v.Len())
+		for i := range v.Len() {
+			out.Index(i).Set(copyValue(v.Index(i)))
+		}
+		return out
+	case reflect.Map:
+		if v.IsNil() {
+			return v
+		}
+		out := reflect.MakeMapWithSize(v.Type(), v.Len())
+		for it := v.MapRange(); it.Next(); {
+			out.SetMapIndex(it.Key(), copyValue(it.Value()))
+		}
+		return out
+	case reflect.Interface:
+		if v.IsNil() {
+			return v
+		}
+		out := reflect.New(v.Type()).Elem()
+		out.Set(copyValue(v.Elem()))
+		return out
+	default:
+		return v
+	}
+}
+
+var sources = sync.OnceValues(readSources)
+
+func readSources() ([]*manifest.Source, error) {
 	ms, err := Manifests()
 	if err != nil {
 		return nil, err

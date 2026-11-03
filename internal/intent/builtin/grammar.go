@@ -94,15 +94,15 @@ type Problem struct {
 // keys and values, with did-you-mean, kinds and enums. A
 // surface the grammar has no row of refuses every key.
 func Check(surface Surface, doc map[string]any) []Problem {
-	return check(Grammar, surface, doc)
+	return checkRows(grammarRows()[surface], surface, doc)
 }
 
 // CheckStep is Check on the arguments of a workflow step, use, without use itself.
 func CheckStep(use string, args map[string]any) []Problem {
-	var rows []Key
-	for _, k := range stepGrammar {
-		if k.Step == use {
-			rows = append(rows, k)
+	var rows []row
+	for _, r := range grammarRows()[SurfaceStep] {
+		if r.Step == use {
+			rows = append(rows, r)
 		}
 	}
 	w := walker{rows: rows}

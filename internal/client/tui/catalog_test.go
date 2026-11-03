@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	intentload "github.com/wloophq/wloop/internal/intent"
@@ -120,17 +121,28 @@ func setPR(r *api.Row, change func(p *prView)) {
 	r.Payload = raw
 }
 
+var (
+	bundledKeys = sync.OnceValue(func() intentload.KeyTexts {
+		help, _ := intentload.BundledKeys(os.DirFS("../../../profiles/default"))
+		return help
+	})
+	bundledViews = sync.OnceValue(func() intentload.ViewsDef {
+		def, _ := intentload.BundledViews(os.DirFS("../../../profiles/default"))
+		return def
+	})
+)
+
 // servedKeys are the bindings GET /api/keys serves the terminal for specs:
 // the core keys, the views' keys, the GitHub plugin's, then the actions' keys.
 func servedKeys(specs api.ActionsResponse) []api.KeyView {
-	help, _ := intentload.BundledKeys(os.DirFS("../../../profiles/default"))
+	help := bundledKeys()
 	var out []api.KeyView
 	for _, b := range keys.Core {
 		if slices.Contains(b.Surfaces, keys.TUI) {
 			out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: help.Help(string(b.Context), b.Action)})
 		}
 	}
-	def, _ := intentload.BundledViews(os.DirFS("../../../profiles/default"))
+	def := bundledViews()
 	var views []keys.View
 	for _, v := range def.Views {
 		views = append(views, keys.View{ID: v.ID, Key: v.Key})

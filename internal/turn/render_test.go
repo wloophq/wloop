@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/instructions"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/plugins"
 	"github.com/wloophq/wloop/profiles"
@@ -408,5 +409,20 @@ func TestOnlyAnAddressRoundWithAReasonSaysWhyNow(t *testing.T) {
 		if got := strings.Contains(r.Text, "## Why now"); got != want {
 			t.Errorf("%s: why now %v, want %v", s.Name, got, want)
 		}
+	}
+}
+
+func TestBundledIsTheRegistryOfACacheOverTheBundledChain(t *testing.T) {
+	l, err := Bundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := time.Unix(1000, 0)
+	c, err := NewCache(profile.BundledChain, intentload.CacheOptions{Now: func() time.Time { return at }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Get() != l {
+		t.Error("Bundled and a cache over the bundled chain loaded the profile twice")
 	}
 }

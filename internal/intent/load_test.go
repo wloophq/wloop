@@ -1064,3 +1064,107 @@ func TestStartKeysAreChecked(t *testing.T) {
 		})
 	}
 }
+
+func TestCachesOverEmbeddedLayersShareOneRegistry(t *testing.T) {
+	clock := &fakeClock{}
+	opts := CacheOptions{Now: clock.Now}
+	shared := NewShared(bundledFS(), testBase(), nil)
+	embedded := func() []profile.Layer { return []profile.Layer{{Name: "bundled", Source: "embedded"}} }
+	a, b := shared.NewCache(embedded, opts), shared.NewCache(embedded, opts)
+	if a.Get() != b.Get() {
+		t.Error("two caches over the same embedded layers loaded the registry twice")
+	}
+	if l, _ := shared.Load(embedded()); l != a.Get() {
+		t.Error("Load over the caches' layers loaded the registry again")
+	}
+	pluginFS := &fstest.MapFS{}
+	withPlugin := func() []profile.Layer {
+		return append(embedded(), profile.Layer{Name: "plugin:acme", Source: "plugins/acme", FS: pluginFS})
+	}
+	p := shared.NewCache(withPlugin, opts).Get()
+	if p == a.Get() {
+		t.Error("another embedded chain got the first chain's registry")
+	}
+	if shared.NewCache(withPlugin, opts).Get() != p {
+		t.Error("two caches over the same plugin chain loaded the registry twice")
+	}
+	root := t.TempDir()
+	onDisk := func() []profile.Layer { return userLayer(root) }
+	c, d := shared.NewCache(onDisk, opts), shared.NewCache(onDisk, opts)
+	if c.Get() == d.Get() {
+		t.Error("caches over a layer on disk share a registry")
+	}
+	tree := func([]profile.Layer, *dintent.Registry, []dintent.Name) (profile.Tree, error) {
+		return profile.Tree{}, nil
+	}
+	if shared.NewCache(embedded, CacheOptions{Now: clock.Now, LoadTree: tree}).Get() == a.Get() {
+		t.Error("a cache with its own tree reader shares a registry")
+	}
+}
+
+func TestSharedLoadsOnceUnderConcurrentFirstGets(t *testing.T) {
+	embedded := func() []profile.Layer { return []profile.Layer{{Name: "bundled", Source: "embedded"}} }
+	counting := func() (TemplateCheck, func() int) {
+		var mu sync.Mutex
+		n := 0
+		return func(dintent.Def, *template.Template) []Problem {
+				mu.Lock()
+				defer mu.Unlock()
+				n++
+				return nil
+			}, func() int {
+				mu.Lock()
+				defer mu.Unlock()
+				return n
+			}
+	}
+	check, oneLoad := counting()
+	NewShared(bundledFS(), testBase(), check).Load(embedded())
+	check, checks := counting()
+	shared := NewShared(bundledFS(), testBase(), check)
+	clock := &fakeClock{}
+	got := make([]*Loaded, 8)
+	var wg sync.WaitGroup
+	for i := range got {
+		c := shared.NewCache(embedded, CacheOptions{Now: clock.Now})
+		wg.Go(func() { got[i] = c.Get() })
+	}
+	wg.Wait()
+	if checks() != oneLoad() {
+		t.Errorf("%d template checks, want the %d of one load", checks(), oneLoad())
+	}
+	for _, l := range got[1:] {
+		if l != got[0] {
+			t.Fatal("caches loading at once got different registries")
+		}
+	}
+}
+
+func TestSharedTellsLayersApartWhoseFSDoesNotCompare(t *testing.T) {
+	type wrapped struct{ fs.FS }
+	layers := func() []profile.Layer {
+		return []profile.Layer{{Name: "bundled", Source: "embedded"}, {Name: "plugin:acme", Source: "plugins/acme", FS: wrapped{fstest.MapFS{}}}}
+	}
+	clock := &fakeClock{}
+	shared := NewShared(bundledFS(), testBase(), nil)
+	shared.NewCache(layers, CacheOptions{Now: clock.Now}).Get()
+	shared.NewCache(layers, CacheOptions{Now: clock.Now}).Get()
+}
+
+func TestCacheReloadsWhenAnEmbeddedLayerLeavesTheChain(t *testing.T) {
+	withPlugin := true
+	layers := func() []profile.Layer {
+		out := []profile.Layer{{Name: "bundled", Source: "embedded"}}
+		if withPlugin {
+			out = append(out, profile.Layer{Name: "plugin:acme", Source: "plugins/acme", FS: fstest.MapFS{}})
+		}
+		return out
+	}
+	clock := &fakeClock{}
+	c := NewCache(layers, bundledFS(), testBase(), nil, CacheOptions{Now: clock.Now})
+	before := c.Get()
+	withPlugin = false
+	if c.Get() == before {
+		t.Error("the cache kept the registry of a chain that lost a layer")
+	}
+}

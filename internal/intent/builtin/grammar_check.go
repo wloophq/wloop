@@ -7,28 +7,38 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/wloophq/wloop/internal/domain/duration"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
-func rowsOf(rows []Key, surface Surface) []Key {
-	var out []Key
-	for _, k := range rows {
-		if k.In == surface {
-			out = append(out, k)
-		}
+// row is a grammar key with its path split into segments.
+type row struct {
+	Key
+	segs []string
+}
+
+// rowsBySurface are keys' rows by the surface each lies in.
+func rowsBySurface(keys []Key) map[Surface][]row {
+	out := map[Surface][]row{}
+	for _, k := range keys {
+		out[k.In] = append(out[k.In], row{Key: k, segs: segments(k.Path)})
 	}
 	return out
 }
+
+// grammarRows are Grammar's rows; Grammar never changes after the package
+// initializes.
+var grammarRows = sync.OnceValue(func() map[Surface][]row { return rowsBySurface(Grammar) })
 
 func segments(path string) []string { return strings.Split(path, ".") }
 
 // bare is a path or a segment without its array marks.
 func bare(s string) string { return strings.ReplaceAll(s, "[]", "") }
 
-func check(all []Key, surface Surface, doc map[string]any) []Problem {
-	w := walker{rows: rowsOf(all, surface)}
+func checkRows(rows []row, surface Surface, doc map[string]any) []Problem {
+	w := walker{rows: rows}
 	switch surface {
 	case SurfaceConfig:
 		w.renamed = KeyRenamedTo
@@ -40,7 +50,7 @@ func check(all []Key, surface Surface, doc map[string]any) []Problem {
 }
 
 type walker struct {
-	rows     []Key
+	rows     []row
 	problems []Problem
 	// renamed is the key that replaced a document path, "" for none.
 	renamed func(path string) string
@@ -73,7 +83,7 @@ func (w *walker) table(pat []string, at string, m map[string]any) {
 func (w *walker) match(pat []string, k string) (string, bool) {
 	var wild string
 	for _, r := range w.rows {
-		s := segments(r.Path)
+		s := r.segs
 		if len(s) <= len(pat) || !slices.Equal(s[:len(pat)], pat) {
 			continue
 		}
@@ -89,16 +99,16 @@ func (w *walker) match(pat []string, k string) (string, bool) {
 
 // parent says whether a row lies under pat.
 func (w *walker) parent(pat []string) bool {
-	return slices.ContainsFunc(w.rows, func(r Key) bool {
-		s := segments(r.Path)
+	return slices.ContainsFunc(w.rows, func(r row) bool {
+		s := r.segs
 		return len(s) > len(pat) && slices.Equal(s[:len(pat)], pat)
 	})
 }
 
 func (w *walker) row(pat []string) (Key, bool) {
 	for _, r := range w.rows {
-		if slices.Equal(segments(r.Path), pat) {
-			return r, true
+		if slices.Equal(r.segs, pat) {
+			return r.Key, true
 		}
 	}
 	return Key{}, false
@@ -316,7 +326,7 @@ func (w *walker) moved(path string, v any) bool {
 func (w *walker) unknown(pat []string, k, path string) {
 	var siblings []string
 	for _, r := range w.rows {
-		s := segments(r.Path)
+		s := r.segs
 		if len(s) > len(pat) && slices.Equal(s[:len(pat)], pat) && bare(s[len(pat)]) != "*" {
 			siblings = append(siblings, bare(s[len(pat)]))
 		}
