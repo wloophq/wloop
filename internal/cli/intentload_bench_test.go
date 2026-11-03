@@ -13,10 +13,10 @@ import (
 func BenchmarkIntentLoad(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
-		c, err := turn.NewCache(func() []profile.Layer { return profile.Chain(config.Config{}) }, intentload.CacheOptions{Recheck: time.Hour, Shared: &intentload.Shared{}})
+		s, err := turn.NewShared()
 		if err != nil {
 			b.Fatal(err)
 		}
-		c.Get()
+		s.NewCache(func() []profile.Layer { return profile.Chain(config.Config{}) }, intentload.CacheOptions{Recheck: time.Hour}).Get()
 	}
 }

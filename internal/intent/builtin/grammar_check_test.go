@@ -7,6 +7,11 @@ import (
 	"testing"
 )
 
+// check is Check over keys in place of Grammar.
+func check(keys []Key, surface Surface, doc map[string]any) []Problem {
+	return checkRows(rowsBySurface(keys)[surface], surface, doc)
+}
+
 func roleValues() []Value {
 	return []Value{{Name: "pr.review"}, {Name: "pr.address"}, {Name: "probe"}}
 }

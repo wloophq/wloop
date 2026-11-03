@@ -6,6 +6,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -117,10 +118,12 @@ var installed *Vocabulary
 // Installed is the vocabulary the tables hold, for a test to restore.
 func Installed() *Vocabulary {
 	if installed == nil {
-		return build(nil)
+		return coreVocabulary()
 	}
 	return installed
 }
+
+var coreVocabulary = sync.OnceValue(func() *Vocabulary { return build(nil) })
 
 // Install makes v the tables. The composition root installs once, before
 // the configuration and the profile load and before anything else reads the

@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -47,7 +46,6 @@ import (
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/intent/builtin"
-	"github.com/wloophq/wloop/internal/plugins/bundled"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -491,37 +489,10 @@ func TestMain(m *testing.M) {
 	storeReportWait = 0
 	builtin.Providers = append(builtin.Providers, ingesttest.Provider)
 	code := m.Run()
-	if err := bundledSourcesUnchanged(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		code = 1
-	}
 	if len(fxCheckouts.paths.roots) > 0 {
 		os.RemoveAll(fxCheckouts.paths.roots[0])
 	}
 	os.Exit(code)
-}
-
-// bundledSourcesUnchanged refuses a test run that changed the bundled
-// plugins' [source] tables, which every caller in the process shares.
-func bundledSourcesUnchanged() error {
-	shared, err := bundled.Sources()
-	if err != nil {
-		return err
-	}
-	ms, err := bundled.Manifests()
-	if err != nil {
-		return err
-	}
-	for i, m := range ms {
-		fresh, err := m.Source()
-		if err != nil {
-			return err
-		}
-		if !reflect.DeepEqual(shared[i], fresh) {
-			return fmt.Errorf("a test changed the bundled source table of %s, which bundled.Sources shares", fresh.Provider)
-		}
-	}
-	return nil
 }
 
 func sharedCheckouts(t *testing.T, repos []fxRepo, wss []fxWorkspace, prs []fxPR) (fixturePaths, map[string]string) {

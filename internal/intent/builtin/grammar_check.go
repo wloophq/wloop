@@ -19,34 +19,23 @@ type row struct {
 	segs []string
 }
 
-func rowsOf(keys []Key, surface Surface) []row {
-	var out []row
+// rowsBySurface are keys' rows by the surface each lies in.
+func rowsBySurface(keys []Key) map[Surface][]row {
+	out := map[Surface][]row{}
 	for _, k := range keys {
-		if k.In == surface {
-			out = append(out, row{Key: k, segs: segments(k.Path)})
-		}
+		out[k.In] = append(out[k.In], row{Key: k, segs: segments(k.Path)})
 	}
 	return out
 }
 
-// grammarRows are Grammar's rows by surface; Grammar never changes after
-// the package initializes.
-var grammarRows = sync.OnceValue(func() map[Surface][]row {
-	out := map[Surface][]row{}
-	for _, k := range Grammar {
-		out[k.In] = append(out[k.In], row{Key: k, segs: segments(k.Path)})
-	}
-	return out
-})
+// grammarRows are Grammar's rows; Grammar never changes after the package
+// initializes.
+var grammarRows = sync.OnceValue(func() map[Surface][]row { return rowsBySurface(Grammar) })
 
 func segments(path string) []string { return strings.Split(path, ".") }
 
 // bare is a path or a segment without its array marks.
 func bare(s string) string { return strings.ReplaceAll(s, "[]", "") }
-
-func check(all []Key, surface Surface, doc map[string]any) []Problem {
-	return checkRows(rowsOf(all, surface), surface, doc)
-}
 
 func checkRows(rows []row, surface Surface, doc map[string]any) []Problem {
 	w := walker{rows: rows}

@@ -106,31 +106,38 @@ func BundledFS() fs.FS {
 // NewCache is the registry cache over the bundled intents and those of
 // layers. The caches whose layers are all embedded share one registry.
 func NewCache(layers func() []profile.Layer, opts intentload.CacheOptions) (*intentload.Cache, error) {
+	s, err := shared()
+	if err != nil {
+		return nil, err
+	}
+	return s.NewCache(layers, opts), nil
+}
+
+// NewShared is a registry over the bundled intents for the caches it makes,
+// apart from the one NewCache and Bundled share.
+func NewShared() (*intentload.Shared, error) {
 	b, err := Base()
 	if err != nil {
 		return nil, err
 	}
-	if opts.Shared == nil {
-		opts.Shared = sharedRegistry
-	}
-	return intentload.NewCache(layers, BundledFS(), b, CheckTemplate, opts), nil
+	return intentload.NewShared(BundledFS(), b, CheckTemplate), nil
 }
 
-var sharedRegistry = &intentload.Shared{}
+var shared = sync.OnceValues(NewShared)
 
 // Bundled is the profile the release ships, the bundled layer and the
 // bundled plugins' layers, loaded once; callers never change it.
-var Bundled = sync.OnceValues(func() (*intentload.Loaded, error) {
-	b, err := Base()
+func Bundled() (*intentload.Loaded, error) {
+	s, err := shared()
 	if err != nil {
 		return nil, err
 	}
-	l, problems := intentload.Load(profile.BundledChain(), BundledFS(), b, CheckTemplate)
+	l, problems := s.Load(profile.BundledChain())
 	if len(problems) > 0 {
 		return nil, problems
 	}
 	return l, nil
-})
+}
 
 // Render writes the instructions of a completed turn. devDir, when set, is
 // a profile directory whose partials/ and

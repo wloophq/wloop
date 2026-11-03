@@ -793,45 +793,80 @@ type CacheOptions struct {
 	LoadTree func([]profile.Layer, *dintent.Registry, []dintent.Name) (profile.Tree, error)
 	// OnReload is called, holding no lock, after Get replaces the loaded registry with a changed one; the first load is not a reload.
 	OnReload func()
-	// Shared, when set and LoadTree is not, is where the caches that name
-	// it take one registry while the layers are all the binary's.
-	Shared *Shared
 }
 
-// Shared is one registry for the caches that name it, while their layers
-// are all embedded: those layers over the same installed builtin tables
-// load the same registry. The caches pass the same bundled FS, base and
-// check; no caller changes a Loaded.
+// Shared loads one registry per chain of embedded layers over the installed
+// builtin tables, for the caches it makes and for Load. No caller changes a
+// Loaded it returns.
 type Shared struct {
-	mu     sync.Mutex
+	bundled fs.FS
+	base    *template.Template
+	check   TemplateCheck
+
+	mu      sync.Mutex
+	entries []*sharedEntry
+}
+
+// sharedEntry holds mu while it loads: a channel or a sync.Cond would tie
+// it to the synctest bubble of the test that made it.
+type sharedEntry struct {
 	layers []profile.Layer
 	tables *builtin.Vocabulary
-	loaded *Loaded
+
+	mu       sync.Mutex
+	loaded   *Loaded
+	problems Problems
 }
 
-func (s *Shared) get(layers []profile.Layer, load func() *Loaded) *Loaded {
-	if !embeddedOnly(layers) {
-		return load()
+func NewShared(bundled fs.FS, base *template.Template, check TemplateCheck) *Shared {
+	return &Shared{bundled: bundled, base: base, check: check}
+}
+
+// NewCache is a Cache over s's bundled FS, base and check that takes s's
+// registry while its layers are all embedded and opts has no LoadTree.
+func (s *Shared) NewCache(layers func() []profile.Layer, opts CacheOptions) *Cache {
+	c := NewCache(layers, s.bundled, s.base, s.check, opts)
+	if opts.LoadTree == nil {
+		c.shared = s
 	}
+	return c
+}
+
+// Load is the registry over layers, loaded once while they are all embedded
+// and the installed tables stay the same; a layer on disk loads anew.
+func (s *Shared) Load(layers []profile.Layer) (*Loaded, Problems) {
+	if !embeddedOnly(layers) {
+		return Load(layers, s.bundled, s.base, s.check)
+	}
+	e := s.entry(layers)
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.loaded == nil {
+		e.loaded, e.problems = Load(layers, s.bundled, s.base, s.check)
+	}
+	return e.loaded, e.problems
+}
+
+func (s *Shared) entry(layers []profile.Layer) *sharedEntry {
 	tables := builtin.Installed()
 	s.mu.Lock()
-	if s.loaded != nil && s.tables == tables && slices.Equal(s.layers, layers) {
-		defer s.mu.Unlock()
-		return s.loaded
-	}
-	s.mu.Unlock()
-	l := load()
-	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.layers, s.tables, s.loaded = slices.Clone(layers), tables, l
-	return l
+	s.entries = slices.DeleteFunc(s.entries, func(e *sharedEntry) bool { return e.tables != tables })
+	for _, e := range s.entries {
+		if slices.Equal(e.layers, layers) {
+			return e
+		}
+	}
+	e := &sharedEntry{layers: slices.Clone(layers), tables: tables}
+	s.entries = append(s.entries, e)
+	return e
 }
 
 // embeddedOnly says whether every layer is the binary's, with an FS that
 // compares by identity.
 func embeddedOnly(layers []profile.Layer) bool {
 	return !slices.ContainsFunc(layers, func(l profile.Layer) bool {
-		return !l.Embedded() || l.FS != nil && !reflect.TypeOf(l.FS).Comparable()
+		return !l.Embedded() || l.FS != nil && !reflect.ValueOf(l.FS).Comparable()
 	})
 }
 
@@ -848,6 +883,7 @@ type Cache struct {
 	checked time.Time
 	walks   int
 	loaded  *Loaded
+	shared  *Shared
 }
 
 func NewCache(layers func() []profile.Layer, bundled fs.FS, base *template.Template, check TemplateCheck, opts CacheOptions) *Cache {
@@ -878,32 +914,33 @@ func (c *Cache) get() (loaded *Loaded, reloaded bool) {
 	c.checked = now
 	if c.loaded == nil || stamp != c.stamp {
 		reloaded = c.loaded != nil
-		if c.opts.Shared != nil && c.opts.LoadTree == nil {
-			c.loaded = c.opts.Shared.get(layers, c.load(layers))
-		} else {
-			c.loaded = c.load(layers)()
-		}
+		c.loaded = c.load(layers)
 		c.stamp = stamp
 	}
 	return c.loaded, reloaded
 }
 
-// load is a loader of the registry over layers, its tree read.
-func (c *Cache) load(layers []profile.Layer) func() *Loaded {
-	return func() *Loaded {
-		l, _ := Load(layers, c.bundled, c.base, c.check)
-		l.loadTree = c.opts.LoadTree
+// load is the registry over layers, its tree read.
+func (c *Cache) load(layers []profile.Layer) *Loaded {
+	if c.shared != nil {
+		l, _ := c.shared.Load(layers)
 		_, _ = l.Tree()
 		return l
 	}
+	l, _ := Load(layers, c.bundled, c.base, c.check)
+	l.loadTree = c.opts.LoadTree
+	_, _ = l.Tree()
+	return l
 }
 
-// stampOf is each layer's directory, file count and newest mtime: a change to
-// a manifest, a template or a block moves it.
+// stampOf is each embedded layer's name and each other layer's directory,
+// file count and newest mtime: a layer joining or leaving the chain, or a
+// change to a manifest, a template or a block, moves it.
 func stampOf(layers []profile.Layer) string {
 	var b strings.Builder
 	for _, l := range layers {
 		if l.Embedded() {
+			fmt.Fprintf(&b, "%s\x00%s\x00", l.Name, l.Source)
 			continue
 		}
 		var n int

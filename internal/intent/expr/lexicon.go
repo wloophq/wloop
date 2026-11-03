@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 
 	celast "cel.dev/cel-go/common/ast"
 	"cel.dev/cel-go/common/types"
@@ -35,30 +34,8 @@ func (e Env) Untrusted(name string) bool {
 // that compares it with a literal outside them does not compile.
 func (e Env) SetEnum(name string, values []string) {
 	for _, v := range values {
-		e[enumKey(name, v)] = meta
+		e[enumMeta+name+"\x00"+v] = meta
 	}
-}
-
-// enumKeys are the keys SetEnum has spelled, kept so that the Envs every
-// profile load builds share them.
-var enumKeys = struct {
-	sync.RWMutex
-	m map[[2]string]string
-}{m: map[[2]string]string{}}
-
-func enumKey(name, value string) string {
-	at := [2]string{name, value}
-	enumKeys.RLock()
-	k, ok := enumKeys.m[at]
-	enumKeys.RUnlock()
-	if ok {
-		return k
-	}
-	k = enumMeta + name + "\x00" + value
-	enumKeys.Lock()
-	enumKeys.m[at] = k
-	enumKeys.Unlock()
-	return k
 }
 
 // ClearEnum lets the string fact name take any value again.
