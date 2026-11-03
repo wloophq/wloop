@@ -40,7 +40,7 @@ func testHomeKinds(t *testing.T) map[string]setup.HomeKind {
 // fakeClaudeEnv makes this test binary run as the fake claude, which keeps
 // the user-scoped MCP servers in the .claude.json of CLAUDE_CONFIG_DIR or
 // HOME, so the fake needs nothing from the developer's PATH.
-const fakeClaudeEnv = "WLOOP_TEST_FAKE_CLAUDE"
+const fakeClaudeEnv = "CLI_TEST_FAKE_CLAUDE"
 
 // servedAsClaude runs the fake claude when this process is one, and says
 // whether it was, with its exit code.
