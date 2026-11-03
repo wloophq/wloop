@@ -78,7 +78,7 @@ var hotPlans = []hotPlan{
 	{name: "retain workflow events", query: retainWorkflowEventsSQL, args: len(workflow.EngineKinds) + 1, want: []string{"SEARCH events USING INDEX events_kind (kind=? AND at<?)"}},
 	{name: "events since a cursor", query: eventsSinceSQL, args: 1, want: []string{"SEARCH events USING INTEGER PRIMARY KEY (rowid>?)"}},
 	{name: "events of kinds since a cursor", query: eventsSinceKindsSQL, args: 2, want: []string{"SEARCH events USING INTEGER PRIMARY KEY (rowid>?)"}},
-	{name: "replace a workflow's plan items", query: `DELETE FROM plan_items WHERE workflow = ?`, args: 1, want: []string{"SEARCH plan_items USING INDEX plan_items_workflow (workflow=?)"}},
+	{name: "replace workflows' plan items", query: deletePlanItemsSQL, args: 1, want: []string{"SEARCH plan_items USING INDEX plan_items_workflow (workflow=?)"}},
 	{name: "tasks in a category", query: `SELECT ` + taskFields + ` FROM tasks WHERE category = ?` + taskOrder, args: 1,
 		want: []string{"tasks_category (category=?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
 	{name: "recategorize a state's tasks", query: recategorizeSQL, args: 10, want: []string{"tasks_state (state=?)"}},

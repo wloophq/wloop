@@ -38,7 +38,7 @@ func init() {
 		},
 	)
 	hotPlans = append(hotPlans,
-		hotPlan{name: "card of a unit", query: cardOfUnitSQL, args: 2, want: []string{"SEARCH unit_cards USING PRIMARY KEY (provider=? AND unit_key=?)"}})
+		hotPlan{name: "cards of units", query: cardsOfUnitsSQL, args: 1, want: []string{"SEARCH unit_cards USING PRIMARY KEY (provider=? AND unit_key=?)"}})
 }
 
 func sampleCard(u unit.Unit, title string) card.Card {

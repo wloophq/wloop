@@ -141,6 +141,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	units.classified = &classifiedUnits{c: steps.classify, workflows: workflows}
 	if d.DB != nil {
 		units.briefed = &briefedFacts{store: inventory.New(d.DB), intent: e.briefIntents(func(string, ...any) {})}
+		units.snapshot = d.DB.Snapshot
 	}
 	eng := &automation.Engine{
 		Workflows: workflows,
@@ -526,6 +527,9 @@ type unitSet struct {
 	briefed *briefedFacts
 	// blocks lifts the answered start blocks first; nil lifts none.
 	blocks *startBlocks
+	// snapshot runs a pass in one read transaction of the store; nil reads
+	// each statement on its own.
+	snapshot func(ctx context.Context, fn func(context.Context) error) error
 }
 
 var (
@@ -552,19 +556,34 @@ var (
 	_ automation.EventFacts = unitKeeping{}
 )
 
-// Prepare is ctx as each provider that prepares an evaluation's reads leaves it.
-func (k unitKeeping) Prepare(ctx context.Context) (context.Context, error) {
+// Prepare runs fn in the set's snapshot, with ctx as each provider that
+// prepares a pass's reads leaves it.
+func (k unitKeeping) Prepare(ctx context.Context, fn func(context.Context) error) error {
+	var preparers []unit.ProviderID
 	for _, id := range k.s.order {
-		p, ok := k.s.providers[id].(automation.Preparer)
-		if !ok {
-			continue
-		}
-		var err error
-		if ctx, err = p.Prepare(ctx); err != nil {
-			return nil, fmt.Errorf("%s: %w", id, err)
+		if _, ok := k.s.providers[id].(automation.Preparer); ok {
+			preparers = append(preparers, id)
 		}
 	}
-	return ctx, nil
+	var through func(ctx context.Context, ids []unit.ProviderID) error
+	through = func(ctx context.Context, ids []unit.ProviderID) error {
+		if len(ids) == 0 {
+			return fn(ctx)
+		}
+		var fnErr error
+		err := k.s.providers[ids[0]].(automation.Preparer).Prepare(ctx, func(ctx context.Context) error {
+			fnErr = through(ctx, ids[1:])
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("%s: %w", ids[0], err)
+		}
+		return fnErr
+	}
+	if k.s.snapshot == nil {
+		return through(ctx, preparers)
+	}
+	return k.s.snapshot(ctx, func(ctx context.Context) error { return through(ctx, preparers) })
 }
 
 func newUnitSet(providers map[unit.ProviderID]automation.Units) *unitSet {

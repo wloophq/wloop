@@ -98,6 +98,11 @@ func (s WakeStore) Of(ctx context.Context, id task.ID) (wake.Wake, bool, error) 
 	return ws[0], true, nil
 }
 
+// All are every task's wake.
+func (s WakeStore) All(ctx context.Context) ([]wake.Wake, error) {
+	return s.query(ctx, `SELECT `+wakeColumns+` FROM wakes ORDER BY task_id`)
+}
+
 // Due are the wakes whose until or expires is set and not after now.
 func (s WakeStore) Due(ctx context.Context, now time.Time) ([]wake.Wake, error) {
 	at := eventTime(now)

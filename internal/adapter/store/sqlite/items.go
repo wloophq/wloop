@@ -24,10 +24,11 @@ var _ coreitems.Store = itemStore{}
 func (db *DB) Items() coreitems.Store { return itemStore{db} }
 
 const (
-	itemsOfUnitSQL = `SELECT body FROM items WHERE provider = ? AND unit_key = ? ORDER BY created_at, id`
-	itemsQuerySQL  = `SELECT body FROM items`
-	itemsOrder     = ` ORDER BY provider, unit_key, created_at, id`
-	upsertItemSQL  = `INSERT INTO items (provider, unit_key, id, body, state, confirmed, provenance, created_at, updated_at)
+	itemsOfUnitsSQL = `SELECT provider, unit_key, body FROM items
+		WHERE (provider, unit_key) IN (SELECT value->>0, value->>1 FROM json_each(?))` + itemsOrder
+	itemsQuerySQL = `SELECT body FROM items`
+	itemsOrder    = ` ORDER BY provider, unit_key, created_at, id`
+	upsertItemSQL = `INSERT INTO items (provider, unit_key, id, body, state, confirmed, provenance, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (provider, unit_key, id) DO UPDATE SET body = excluded.body, state = excluded.state,
 		confirmed = excluded.confirmed, provenance = excluded.provenance,
@@ -54,22 +55,31 @@ var proposalsSQL = fmt.Sprintf(`SELECT id, provider, unit_key, item, op, provena
 
 func (s itemStore) Load(ctx context.Context, units []unit.Unit) (map[unit.Unit][]items.Item, error) {
 	out := make(map[unit.Unit][]items.Item, len(units))
-	err := s.db.Read(ctx, func(tx *sql.Tx) error {
-		for _, u := range units {
-			if _, done := out[u]; done {
-				continue
-			}
-			its, err := scanItems(tx.QueryContext(ctx, itemsOfUnitSQL, string(u.Provider), u.Key))
-			if err != nil {
-				return fmt.Errorf("items of %s: %w", u, err)
-			}
-			if len(its) > 0 {
-				out[u] = its
-			}
+	if len(units) == 0 {
+		return out, nil
+	}
+	pairs, err := unitPairs(units)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.db.R().QueryContext(ctx, itemsOfUnitsSQL, pairs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var u unit.Unit
+		var body string
+		if err := rows.Scan(&u.Provider, &u.Key, &body); err != nil {
+			return nil, err
 		}
-		return nil
-	})
-	return out, err
+		var it items.Item
+		if err := json.Unmarshal([]byte(body), &it); err != nil {
+			return nil, fmt.Errorf("items of %s: %w", u, err)
+		}
+		out[u] = append(out[u], it)
+	}
+	return out, rows.Err()
 }
 
 func scanItems(rows *sql.Rows, err error) ([]items.Item, error) {

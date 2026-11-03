@@ -30,7 +30,7 @@ func init() {
 		},
 	)
 	hotPlans = append(hotPlans,
-		hotPlan{name: "items of a unit", query: itemsOfUnitSQL, args: 2, want: []string{"SEARCH items USING PRIMARY KEY (provider=? AND unit_key=?)"},
+		hotPlan{name: "items of units", query: itemsOfUnitsSQL, args: 1, want: []string{"SEARCH items USING PRIMARY KEY (provider=? AND unit_key=?)"},
 			tempSort: "USE TEMP B-TREE FOR ORDER BY"},
 		hotPlan{name: "open items", query: itemsQuerySQL + " WHERE state = ?" + itemsOrder, args: 1, want: []string{"SEARCH items USING INDEX items_state (state=?)"},
 			tempSort: "USE TEMP B-TREE FOR LAST 2 TERMS OF ORDER BY"},
@@ -210,3 +210,34 @@ func TestQueryByProviderAndState(t *testing.T) {
 }
 
 func ptrTo[T any](v T) *T { return &v }
+
+func TestItemsLoadKeepsEachUnitsItemsInTheirOrder(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
+	its := []items.Item{sampleItem(ghPull, "i2", at.Add(time.Hour)), sampleItem(slackThread, "i3", at), sampleItem(ghPull, "i1", at.Add(time.Hour)),
+		sampleItem(ghPull, "i0", at.Add(2*time.Hour)), sampleItem(slackThread, "i4", at.Add(-time.Hour))}
+	if err := db.Items().Commit(ctx, coreitems.Commit{Items: its}); err != nil {
+		t.Fatal(err)
+	}
+	none := unit.Unit{Provider: "slack", Key: "C000AAA/9.9"}
+	got, err := db.Items().Load(ctx, []unit.Unit{ghPull, slackThread, none, ghPull})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := func(its []items.Item) (out []string) {
+		for _, it := range its {
+			out = append(out, it.ID)
+		}
+		return out
+	}
+	if _, ok := got[none]; ok || len(got) != 2 {
+		t.Fatalf("loaded %v, want the two units with items", got)
+	}
+	for u, want := range map[unit.Unit][]string{ghPull: {"i1", "i2", "i0"}, slackThread: {"i4", "i3"}} {
+		if g := ids(got[u]); !slices.Equal(g, want) {
+			t.Errorf("%s: items %v, want %v, oldest first", u, g, want)
+		}
+	}
+}

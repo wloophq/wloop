@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -674,18 +675,32 @@ func (g draftGatesOver) Where(ctx context.Context, q gates.Query) ([]gate.Gate, 
 
 type preparedKey struct{}
 
+type snapshotKey struct{}
+
 type preparingUnits struct{ *automationtest.Units }
 
-func (preparingUnits) Prepare(ctx context.Context) (context.Context, error) {
-	return context.WithValue(ctx, preparedKey{}, "github"), nil
+func (preparingUnits) Prepare(ctx context.Context, fn func(context.Context) error) error {
+	if ctx.Value(snapshotKey{}) == nil {
+		return errors.New("prepared outside the snapshot")
+	}
+	return fn(context.WithValue(ctx, preparedKey{}, "github"))
 }
 
-func TestUnitsPrepareAnEvaluationThroughEachProviderThatDoes(t *testing.T) {
+func TestUnitsPrepareAPassInOneSnapshotThroughEachProviderThatDoes(t *testing.T) {
 	t.Parallel()
 	gh, sess := automationtest.NewUnits(), automationtest.NewUnits()
 	set := newUnitSet(map[unit.ProviderID]automation.Units{unit.GitHub: preparingUnits{gh}, unit.Session: sess})
-	ctx, err := (unitKeeping{set}).Prepare(context.Background())
-	if err != nil || ctx.Value(preparedKey{}) != "github" {
-		t.Fatalf("prepared %v %v", ctx.Value(preparedKey{}), err)
+	snapshots := 0
+	set.snapshot = func(ctx context.Context, fn func(context.Context) error) error {
+		snapshots++
+		return fn(context.WithValue(ctx, snapshotKey{}, true))
+	}
+	var got any
+	err := (unitKeeping{set}).Prepare(context.Background(), func(ctx context.Context) error {
+		got = ctx.Value(preparedKey{})
+		return nil
+	})
+	if err != nil || got != "github" || snapshots != 1 {
+		t.Fatalf("prepared %v in %d snapshots: %v", got, snapshots, err)
 	}
 }

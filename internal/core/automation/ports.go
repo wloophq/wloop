@@ -23,11 +23,13 @@ type Units interface {
 	Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error)
 }
 
-// Preparer is a capability of the engine's Keep: the context one evaluation
-// reads the units' facts through, such as a pass over every unit whose reads
-// of the store the facts share; run by Sweep only, before Evaluate.
+// Preparer is a capability of the engine's Keep: it runs fn with the
+// context one pass of reads goes through, such as a pass over every unit
+// whose reads of the store the facts share, in one snapshot of the store,
+// which a write made during fn does not move. Sweep evaluates in one pass
+// and judges the withdrawals in others.
 type Preparer interface {
-	Prepare(ctx context.Context) (context.Context, error)
+	Prepare(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
 // Refresher is a capability of the engine's Keep: the provider's own writes

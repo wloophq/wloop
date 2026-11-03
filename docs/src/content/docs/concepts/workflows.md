@@ -5,7 +5,7 @@ description: Everything the loop does on its own, written as rules you can read 
 
 Everything {{name}} does without being asked is a **workflow**: a manifest, `workflow.toml`, that names the provider of the units it looks at (pull requests, agent sessions, workspaces, tasks or Slack threads), a condition over their facts, and the steps to run. The daemon evaluates every workflow on each **sweep**, right after each fast job.
 
-GitHub cannot call your laptop, and the events that matter (a push, a reply, an approval, a merge) happen there. The sweep observes their result on a schedule, costs a few GraphQL requests per run, and does nothing when nothing changed.
+GitHub cannot call your laptop, and the events that matter (a push, a reply, an approval, a merge) happen there. The sweep observes their result on a schedule, costs a few GraphQL requests per run, and does nothing when nothing changed. Each sweep plans every workflow on one snapshot of the store, reading each table once for all the units, so what it decides of one unit and another comes from the same moment. It judges the drafts for withdrawal on a snapshot of its own, taken again after each withdrawal, so the drafts after one see it.
 
 ## The bundled workflows
 

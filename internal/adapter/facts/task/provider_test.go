@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/gates"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
+	"github.com/wloophq/wloop/internal/core/outbox"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/card"
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -75,6 +76,31 @@ func (c countingItems) Load(ctx context.Context, us []unit.Unit) (map[unit.Unit]
 	return c.Store.Load(ctx, us)
 }
 
+type countingDrafts struct {
+	facttask.Drafts
+	e *env
+}
+
+func (c countingDrafts) List(ctx context.Context, f outbox.Filter) ([]draft.Draft, error) {
+	c.e.reads["drafts"]++
+	return c.Drafts.List(ctx, f)
+}
+
+type countingWakes struct {
+	sqlite.WakeStore
+	e *env
+}
+
+func (c countingWakes) Of(ctx context.Context, id task.ID) (wake.Wake, bool, error) {
+	c.e.reads["wakes"]++
+	return c.WakeStore.Of(ctx, id)
+}
+
+func (c countingWakes) All(ctx context.Context) ([]wake.Wake, error) {
+	c.e.reads["wakes"]++
+	return c.WakeStore.All(ctx)
+}
+
 type countingCards struct {
 	card.Store
 	e *env
@@ -110,7 +136,7 @@ func newEnv(t *testing.T) *env {
 	e := &env{t: t, db: db, clock: &clock{now: monday}, s: facttask.Settings{StaleDays: 2, RenudgeAfter: 72 * time.Hour}, ended: map[unit.Unit]bool{}, turns: map[unit.Unit]int{}, repos: map[unit.Unit]string{}, links: map[unit.Unit]facttask.Link{},
 		unextracted: map[unit.Unit]time.Time{}, reads: map[string]int{}}
 	e.p = facttask.New(facttask.Deps{
-		Tasks: db.Tasks(), Items: countingItems{db.Items(), e}, Drafts: db.Drafts(),
+		Tasks: db.Tasks(), Items: countingItems{db.Items(), e}, Drafts: countingDrafts{db.Drafts(), e},
 		Cards:    coretasks.CardFacts{Cards: countingCards{db.Cards(), e}},
 		Enabled:  func(p unit.ProviderID) bool { return p != mailX.Provider },
 		Settings: func() facttask.Settings { return e.s },
@@ -132,7 +158,7 @@ func newEnv(t *testing.T) *env {
 		Props:    func(t task.Task) workflow.Facts { return catalog.PropFacts(t, bundledTasks) },
 		Me:       func() task.Me { return task.Me{Keys: []string{"chat:ME"}} },
 		OwedBy:   catalog.OwedByOf(func() *intentload.Loaded { return &intentload.Loaded{Tasks: bundledTasks} }),
-		Wakes:    db.Wakes(),
+		Wakes:    countingWakes{db.Wakes(), e},
 		Links: func(_ context.Context, u unit.Unit) (facttask.Link, error) {
 			return e.links[u], nil
 		},
@@ -434,19 +460,35 @@ func TestTaskSettledAtIsTheWorkflowsOwn(t *testing.T) {
 	put("nudge-a", draft.Dropped, monday.Add(-2*time.Hour))
 	put("nudge-a", draft.Held, monday.Add(-time.Hour))
 	put("nudge-b", draft.Sent, monday.Add(-30*time.Minute))
+	e.task(waiting("t-02", chatB, monday))
 	f := e.facts("t-01")
-	scoped, err := e.p.Scope(ctx, "nudge-a", task.UnitOf("t-01"), f)
-	if err != nil {
-		t.Fatal(err)
+	pass := coretasks.WithPass(ctx, &coretasks.Pass{})
+	for name, ctx := range map[string]context.Context{"alone": ctx, "in a pass": pass} {
+		scoped, err := e.p.Scope(ctx, "nudge-a", task.UnitOf("t-01"), f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := scoped["task.settled_at"].(time.Time); !got.Equal(monday.Add(-2 * time.Hour)) {
+			t.Errorf("%s: nudge-a settled_at %v, want its withdrawn draft's", name, got)
+		}
+		if got := f["task.settled_at"].(time.Time); !got.IsZero() {
+			t.Errorf("%s: Scope wrote the unit's facts: %v", name, got)
+		}
+		if fresh, _ := e.p.Scope(ctx, "nudge-c", task.UnitOf("t-01"), f); !fresh["task.settled_at"].(time.Time).IsZero() {
+			t.Errorf("%s: a workflow with no drafts: %v", name, fresh["task.settled_at"])
+		}
+		if other, _ := e.p.Scope(ctx, "nudge-a", task.UnitOf("t-02"), f); !other["task.settled_at"].(time.Time).IsZero() {
+			t.Errorf("%s: another task's settled_at %v, want zero", name, other["task.settled_at"])
+		}
 	}
-	if got := scoped["task.settled_at"].(time.Time); !got.Equal(monday.Add(-2 * time.Hour)) {
-		t.Errorf("nudge-a settled_at %v, want its withdrawn draft's", got)
+	e.reads = map[string]int{}
+	for _, id := range []task.ID{"t-01", "t-02"} {
+		if _, err := e.p.Scope(pass, "nudge-b", task.UnitOf(id), f); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if got := f["task.settled_at"].(time.Time); !got.IsZero() {
-		t.Errorf("Scope wrote the unit's facts: %v", got)
-	}
-	if fresh, _ := e.p.Scope(ctx, "nudge-c", task.UnitOf("t-01"), f); !fresh["task.settled_at"].(time.Time).IsZero() {
-		t.Errorf("a workflow with no drafts: %v", fresh["task.settled_at"])
+	if n := e.reads["drafts"]; n != 1 {
+		t.Errorf("a pass read a workflow's drafts %d times for two tasks", n)
 	}
 }
 

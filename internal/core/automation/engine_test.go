@@ -1820,8 +1820,8 @@ type preparingUnits struct {
 	seen int
 }
 
-func (p *preparingUnits) Prepare(ctx context.Context) (context.Context, error) {
-	return context.WithValue(ctx, preparedKey{}, true), nil
+func (p *preparingUnits) Prepare(ctx context.Context, fn func(context.Context) error) error {
+	return fn(context.WithValue(ctx, preparedKey{}, true))
 }
 
 func (p *preparingUnits) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error) {

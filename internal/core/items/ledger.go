@@ -144,6 +144,11 @@ func (l *Ledger) Reconcile(ctx context.Context, u unit.Unit, desired []items.Ite
 	return b.commit(ctx)
 }
 
+// Load are the items of units; a unit with none is absent.
+func (l *Ledger) Load(ctx context.Context, units []unit.Unit) (map[unit.Unit][]items.Item, error) {
+	return l.Store.Load(ctx, units)
+}
+
 func (l *Ledger) Items(ctx context.Context, u unit.Unit) ([]items.Item, error) {
 	got, err := l.Store.Load(ctx, []unit.Unit{u})
 	if err != nil {

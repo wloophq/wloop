@@ -45,10 +45,14 @@ func (l ledger) Save(ctx context.Context, p automation.PlanWrite, evs ...port.Ev
 		}
 		rows = append(rows, args)
 	}
+	workflows, err := json.Marshal(p.Workflows)
+	if err != nil {
+		return err
+	}
 	saved := eventTime(l.now())
 	return l.write(ctx, evs, func(tx *Tx) error {
-		for _, wf := range p.Workflows {
-			if _, err := tx.ExecContext(ctx, `DELETE FROM plan_items WHERE workflow = ?`, wf); err != nil {
+		if len(p.Workflows) > 0 {
+			if _, err := tx.ExecContext(ctx, deletePlanItemsSQL, string(workflows)); err != nil {
 				return err
 			}
 		}
@@ -61,6 +65,8 @@ func (l ledger) Save(ctx context.Context, p automation.PlanWrite, evs ...port.Ev
 		return nil
 	})
 }
+
+const deletePlanItemsSQL = `DELETE FROM plan_items WHERE workflow IN (SELECT value FROM json_each(?))`
 
 // saveItemSQL is insertItemSQL unless the item's key is done or dismissed;
 // it takes the key's workflow, provider, unit key and value last.

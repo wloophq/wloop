@@ -338,7 +338,7 @@ var reads = []string{
 	"UseClock",
 	"PR", "PRs", "PRsWithOverrides", "Seen", "LastEvent", "ListPRs", "Events", "EventsByPR", "UnitlessEvents", "FirstRoundBlocks",
 	"RecentActivity", "BriefStates", "Tracked", "Override", "Overrides", "Meta", "MetaPrefixed", "Viewer", "Viewers", "Now", "Turn", "LastBundledSHA",
-	"Timings", "Tags", "TagVocabulary", "BriefRuns", "BriefRun", "BriefRecord", "BriefRecords", "UnitBrief", "Ended",
+	"Timings", "Tags", "TagVocabulary", "BriefRuns", "BriefRun", "BriefRecord", "BriefRecords", "UnitBrief", "UnitBriefs", "Ended",
 	"Details", "Host", "List", "PRsByUnit",
 }
 

@@ -113,6 +113,11 @@ type Wakes interface {
 	Of(ctx context.Context, id task.ID) (wake.Wake, bool, error)
 }
 
+// AllWakes is an optional capability of Wakes: every task's wake, which a pass reads once for all.
+type AllWakes interface {
+	All(ctx context.Context) ([]wake.Wake, error)
+}
+
 // Provider is the task subject's facts provider. It names the task's own
 // unit as the subject's owner and wakes the sweep at the next check_on, or
 // at the end of a nudge's quiet time.
@@ -204,13 +209,13 @@ func (p *Provider) passTask(ctx context.Context, id task.ID) (task.Task, error) 
 	return p.d.Tasks.Task(ctx, id)
 }
 
-// Prepare is ctx carrying a pass over every task, so the facts of each read the store once for all.
-func (p *Provider) Prepare(ctx context.Context) (context.Context, error) {
+// Prepare runs fn with ctx carrying a pass over every task, so the facts of each read the store once for all.
+func (p *Provider) Prepare(ctx context.Context, fn func(context.Context) error) error {
 	es, err := p.d.Tasks.Tasks(ctx, task.Query{})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return coretasks.WithPass(ctx, &coretasks.Pass{Tasks: es}), nil
+	return fn(coretasks.WithPass(ctx, &coretasks.Pass{Tasks: es}))
 }
 
 func (p *Provider) task(ctx context.Context, u unit.Unit, anyState bool) (task.Task, error) {
@@ -308,7 +313,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		maps.Copy(f, p.d.Props(e))
 	}
 	if p.d.Wakes != nil {
-		w, ok, err := p.d.Wakes.Of(ctx, e.ID)
+		w, ok, err := p.wake(ctx, e.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -551,13 +556,30 @@ func (p *Provider) Scope(ctx context.Context, wf string, u unit.Unit, f workflow
 	if p.d.Drafts == nil {
 		return f, nil
 	}
-	ds, err := p.d.Drafts.List(ctx, outbox.Filter{Task: u.Key, Workflow: wf})
+	ds, err := p.settled(ctx, wf, u)
 	if err != nil {
 		return nil, err
 	}
 	out := maps.Clone(f)
 	out["task.settled_at"] = draft.SettledAt(ds, wf, u)
 	return out, nil
+}
+
+// settled are the drafts of task u that wf proposed, those settled at least; in a pass, the settled drafts of
+// wf are read once for every task.
+func (p *Provider) settled(ctx context.Context, wf string, u unit.Unit) ([]draft.Draft, error) {
+	if _, ok := coretasks.PassOf(ctx); !ok {
+		return p.d.Drafts.List(ctx, outbox.Filter{Task: u.Key, Workflow: wf})
+	}
+	byTask, err := coretasks.Once(ctx, passSettled+wf, func() (map[string][]draft.Draft, error) {
+		ds, err := p.d.Drafts.List(ctx, outbox.Filter{Workflow: wf, States: draft.SettledStates})
+		out := map[string][]draft.Draft{}
+		for _, d := range ds {
+			out[d.Task] = append(out[d.Task], d)
+		}
+		return out, err
+	})
+	return byTask[u.Key], err
 }
 
 // Owners are the task's units, whose timelines show the steps run on it.
@@ -727,6 +749,24 @@ func (p *Provider) gates(ctx context.Context, id task.ID) ([]gate.Gate, error) {
 	return slices.DeleteFunc(gs, func(g gate.Gate) bool { return g.Status != gate.Open }), err
 }
 
+// wake is task id's wake; in a pass, every task's is read once.
+func (p *Provider) wake(ctx context.Context, id task.ID) (wake.Wake, bool, error) {
+	all, ok := p.d.Wakes.(AllWakes)
+	if _, pass := coretasks.PassOf(ctx); !ok || !pass {
+		return p.d.Wakes.Of(ctx, id)
+	}
+	byTask, err := coretasks.Once(ctx, passWakes, func() (map[task.ID]wake.Wake, error) {
+		ws, err := all.All(ctx)
+		out := make(map[task.ID]wake.Wake, len(ws))
+		for _, w := range ws {
+			out[w.Task] = w
+		}
+		return out, err
+	})
+	w, held := byTask[id]
+	return w, held, err
+}
+
 // What every task's facts read of the store as a whole, once per pass.
 const (
 	passSessions = "facts.sessions"
@@ -734,6 +774,8 @@ const (
 	passTurns    = "facts.turns"
 	passGates    = "facts.gates"
 	passTasks    = "facts.tasks"
+	passSettled  = "facts.settled."
+	passWakes    = "facts.wakes"
 )
 
 // items are the items of units; those of the pass ctx carries are read once for every unit of it.

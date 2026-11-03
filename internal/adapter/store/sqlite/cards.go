@@ -22,7 +22,8 @@ var _ card.Store = cardStore{}
 func (db *DB) Cards() card.Store { return cardStore{db} }
 
 const (
-	cardOfUnitSQL = `SELECT card, at FROM unit_cards WHERE provider = ? AND unit_key = ?`
+	cardsOfUnitsSQL = `SELECT provider, unit_key, card, at FROM unit_cards
+		WHERE (provider, unit_key) IN (SELECT value->>0, value->>1 FROM json_each(?))`
 	cardBodySQL   = `SELECT card FROM unit_cards WHERE provider = ? AND unit_key = ?`
 	upsertCardSQL = `INSERT INTO unit_cards (provider, unit_key, card, at) VALUES (?, ?, ?, ?)
 		ON CONFLICT (provider, unit_key) DO UPDATE SET card = excluded.card, at = excluded.at`
@@ -60,23 +61,29 @@ func (s cardStore) Save(ctx context.Context, c card.Card, at time.Time) (bool, e
 // never set here: the plugin's state is the caller's.
 func (s cardStore) Get(ctx context.Context, units []unit.Unit) (map[unit.Unit]card.Snapshot, error) {
 	out := make(map[unit.Unit]card.Snapshot, len(units))
-	err := s.db.Read(ctx, func(tx *sql.Tx) error {
-		for _, u := range units {
-			var body, at string
-			err := tx.QueryRowContext(ctx, cardOfUnitSQL, string(u.Provider), u.Key).Scan(&body, &at)
-			if errors.Is(err, sql.ErrNoRows) {
-				continue
-			}
-			if err != nil {
-				return fmt.Errorf("card of %s: %w", u, err)
-			}
-			var c card.Card
-			if err := json.Unmarshal([]byte(body), &c); err != nil {
-				return fmt.Errorf("card of %s: %w", u, err)
-			}
-			out[u] = card.Snapshot{Card: c, At: parseTime(at)}
+	if len(units) == 0 {
+		return out, nil
+	}
+	pairs, err := unitPairs(units)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.db.R().QueryContext(ctx, cardsOfUnitsSQL, pairs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var u unit.Unit
+		var body, at string
+		if err := rows.Scan(&u.Provider, &u.Key, &body, &at); err != nil {
+			return nil, err
 		}
-		return nil
-	})
-	return out, err
+		var c card.Card
+		if err := json.Unmarshal([]byte(body), &c); err != nil {
+			return nil, fmt.Errorf("card of %s: %w", u, err)
+		}
+		out[u] = card.Snapshot{Card: c, At: parseTime(at)}
+	}
+	return out, rows.Err()
 }

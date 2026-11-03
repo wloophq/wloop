@@ -47,6 +47,12 @@ type draftItems interface {
 	Items(ctx context.Context, u unit.Unit) ([]items.Item, error)
 }
 
+// draftItemsLoader is an optional capability of draftItems: the items of units, which a pass reads once for
+// every unit of it.
+type draftItemsLoader interface {
+	Load(ctx context.Context, units []unit.Unit) (map[unit.Unit][]items.Item, error)
+}
+
 // draftDeps are what draft.propose and the workflows' withdrawals read and
 // act through.
 type draftDeps struct {
@@ -306,7 +312,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 func (d *draftDeps) subject(ctx context.Context, u unit.Unit) (draftSubject, error) {
 	sub := draftSubject{subject: u, unit: u}
 	if id, ok := task.IDOf(u); ok {
-		e, err := d.Tasks.Task(ctx, id)
+		e, err := d.task(ctx, id)
 		if err != nil {
 			return sub, err
 		}
@@ -320,7 +326,7 @@ func (d *draftDeps) subject(ctx context.Context, u unit.Unit) (draftSubject, err
 			return sub, fmt.Errorf("task %s has no unit to post on", e.ID)
 		}
 	}
-	its, err := d.Items.Items(ctx, sub.unit)
+	its, err := d.items(ctx, sub.unit)
 	if err != nil {
 		return sub, err
 	}
@@ -329,6 +335,34 @@ func (d *draftDeps) subject(ctx context.Context, u unit.Unit) (draftSubject, err
 		return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), strings.Compare(a.ID, b.ID))
 	})
 	return sub, nil
+}
+
+// task is task id as the pass ctx carries holds it, else as the store does.
+func (d *draftDeps) task(ctx context.Context, id task.ID) (task.Task, error) {
+	if pass, ok := coretasks.PassOf(ctx); ok {
+		byID, _ := coretasks.Once(ctx, "cli.draft.tasks", func() (map[task.ID]task.Task, error) {
+			out := make(map[task.ID]task.Task, len(pass.Tasks))
+			for _, e := range pass.Tasks {
+				out[e.ID] = e
+			}
+			return out, nil
+		})
+		if e, held := byID[id]; held {
+			return e, nil
+		}
+	}
+	return d.Tasks.Task(ctx, id)
+}
+
+// items are u's items; in a pass, those of every unit of it are read once.
+func (d *draftDeps) items(ctx context.Context, u unit.Unit) ([]items.Item, error) {
+	l, ok := d.Items.(draftItemsLoader)
+	pass, inPass := coretasks.PassOf(ctx)
+	if !ok || !inPass || !pass.Holds(u) {
+		return d.Items.Items(ctx, u)
+	}
+	all, err := coretasks.Once(ctx, "cli.draft.items", func() (map[unit.Unit][]items.Item, error) { return l.Load(ctx, pass.Units()) })
+	return all[u], err
 }
 
 // people are the persons a per-person step proposes to: those the open

@@ -8,6 +8,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/brief"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -40,7 +41,7 @@ func (b briefedFacts) add(ctx context.Context, u unit.Unit, f workflow.Facts) (w
 		}
 		of = unit.Unit{Provider: unit.ProviderID(p), Key: key}
 	}
-	ub, ok, err := b.store.UnitBrief(ctx, of)
+	ub, ok, err := b.brief(ctx, of)
 	if err != nil {
 		return f, err
 	}
@@ -51,6 +52,25 @@ func (b briefedFacts) add(ctx context.Context, u unit.Unit, f workflow.Facts) (w
 		}
 	}
 	return withBrief(f, stored, b.intent(of.Provider)), nil
+}
+
+// unitBriefsReader is an optional capability of a briefedFacts store: the briefs of units, which a pass reads once
+// for every unit of it.
+type unitBriefsReader interface {
+	UnitBriefs(ctx context.Context, units []unit.Unit) (map[unit.Unit]inventory.UnitBrief, error)
+}
+
+func (b briefedFacts) brief(ctx context.Context, u unit.Unit) (inventory.UnitBrief, bool, error) {
+	all, ok := b.store.(unitBriefsReader)
+	pass, inPass := coretasks.PassOf(ctx)
+	if !ok || !inPass || !pass.Holds(u) {
+		return b.store.UnitBrief(ctx, u)
+	}
+	got, err := coretasks.Once(ctx, "cli.briefs", func() (map[unit.Unit]inventory.UnitBrief, error) {
+		return all.UnitBriefs(ctx, pass.Units())
+	})
+	ub, held := got[u]
+	return ub, held, err
 }
 
 func withBrief(f workflow.Facts, b *brief.Brief, in brief.Intent) workflow.Facts {
