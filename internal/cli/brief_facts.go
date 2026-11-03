@@ -61,16 +61,11 @@ type unitBriefsReader interface {
 }
 
 func (b briefedFacts) brief(ctx context.Context, u unit.Unit) (inventory.UnitBrief, bool, error) {
-	all, ok := b.store.(unitBriefsReader)
-	pass, inPass := coretasks.PassOf(ctx)
-	if !ok || !inPass || !pass.Holds(u) {
-		return b.store.UnitBrief(ctx, u)
+	var all func([]unit.Unit) (map[unit.Unit]inventory.UnitBrief, error)
+	if r, ok := b.store.(unitBriefsReader); ok {
+		all = func(units []unit.Unit) (map[unit.Unit]inventory.UnitBrief, error) { return r.UnitBriefs(ctx, units) }
 	}
-	got, err := coretasks.Once(ctx, "cli.briefs", func() (map[unit.Unit]inventory.UnitBrief, error) {
-		return all.UnitBriefs(ctx, pass.Units())
-	})
-	ub, held := got[u]
-	return ub, held, err
+	return coretasks.UnitLookup(ctx, "cli.briefs", u, all, func() (inventory.UnitBrief, bool, error) { return b.store.UnitBrief(ctx, u) })
 }
 
 func withBrief(f workflow.Facts, b *brief.Brief, in brief.Intent) workflow.Facts {

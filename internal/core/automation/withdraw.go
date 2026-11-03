@@ -27,28 +27,29 @@ func (e *Engine) withdraw(ctx context.Context) error {
 	if e.Config != nil {
 		vars.Config = e.Config()
 	}
-	var ds []ProposedDraft
+	if open, err := e.Withdrawals.Any(ctx); err != nil || !open {
+		return err
+	}
+	judged := map[int64]bool{}
 	var errs []error
-	for listed := false; !listed || len(ds) > 0; {
+	for {
 		var d ProposedDraft
 		var reason string
 		err := e.prepared(ctx, func(ctx context.Context) error {
-			if !listed {
-				var err error
-				if ds, err = e.Withdrawals.Proposed(ctx, ""); err != nil {
-					return err
-				}
-				listed = true
-				ds = slices.DeleteFunc(ds, func(d ProposedDraft) bool {
-					return d.Workflow == "" || e.PluginEnabled != nil && !e.PluginEnabled(d.Subject.Provider) || slices.Contains(broken, d.Workflow)
-				})
+			ds, err := e.Withdrawals.Proposed(ctx, "")
+			if err != nil {
+				return err
 			}
-			for len(ds) > 0 {
-				d, ds = ds[0], ds[1:]
+			for _, c := range ds {
+				if judged[c.ID] || c.Workflow == "" || e.PluginEnabled != nil && !e.PluginEnabled(c.Subject.Provider) || slices.Contains(broken, c.Workflow) {
+					continue
+				}
+				judged[c.ID] = true
 				var err error
-				if reason, err = e.withdrawal(ctx, live, d, vars); err != nil {
+				if reason, err = e.withdrawal(ctx, live, c, vars); err != nil {
 					errs = append(errs, err)
 				} else if reason != "" {
+					d = c
 					return nil
 				}
 			}
@@ -58,9 +59,9 @@ func (e *Engine) withdraw(ctx context.Context) error {
 			return errors.Join(append(errs, err)...)
 		}
 		if reason == "" {
-			continue
+			break
 		}
-		// A withdrawal moves the facts of the drafts after it: they are read in a new pass.
+		// A withdrawal moves the facts of the drafts after it, theirs included: they are listed again in a new pass.
 		if err := e.Withdrawals.Withdraw(ctx, d.ID, reason); err != nil {
 			errs = append(errs, err)
 			continue

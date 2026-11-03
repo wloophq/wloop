@@ -112,11 +112,7 @@ func (e *Engine) evaluate(ctx context.Context, t workflow.TriggerKind, apply boo
 		return cmp.Or(cmp.Compare(a.Order, b.Order), cmp.Compare(a.Name, b.Name))
 	})
 	batches, errs := e.batches(ctx, ws, now, apply)
-	stored, storedErr := e.Ledger.Items(ctx, Filter{})
-	byWorkflow := map[string][]workflow.Item{}
-	for _, it := range stored {
-		byWorkflow[it.Workflow] = append(byWorkflow[it.Workflow], it)
-	}
+	byWorkflow, storedErr := e.storedItems(ctx, ws)
 	p := &planner{e: e, ctx: ctx, now: now, pause: pause, facts: map[factsRead]workflow.Facts{},
 		factErr: map[factsRead]error{}, revs: map[unit.Unit]uint64{}, marks: map[unit.Unit]map[string]string{}, lists: map[unit.ProviderID][]unit.Unit{}, seen: map[string]bool{},
 		perRun: map[string]int{}, perUnit: map[unitOf]int{}, errs: errs, apply: apply}
@@ -138,6 +134,23 @@ func (e *Engine) evaluate(ctx context.Context, t workflow.TriggerKind, apply boo
 	}
 	ev.plan.Errors = p.errs
 	return ev, nil
+}
+
+// storedItems are the stored items of ws, by workflow, in one read.
+func (e *Engine) storedItems(ctx context.Context, ws []workflow.Workflow) (map[string][]workflow.Item, error) {
+	byWorkflow := map[string][]workflow.Item{}
+	if len(ws) == 0 {
+		return byWorkflow, nil
+	}
+	names := make([]string, len(ws))
+	for i, w := range ws {
+		names[i] = w.Name
+	}
+	stored, err := e.Ledger.Items(ctx, Filter{Workflows: names})
+	for _, it := range stored {
+		byWorkflow[it.Workflow] = append(byWorkflow[it.Workflow], it)
+	}
+	return byWorkflow, err
 }
 
 func (p *planner) errorf(format string, args ...any) {

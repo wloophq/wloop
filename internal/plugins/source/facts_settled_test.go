@@ -34,7 +34,20 @@ func (l *listedDrafts) List(_ context.Context, f outbox.Filter) ([]draft.Draft, 
 	return out, nil
 }
 
-func TestSettledAtIsTheSameInAPassWhichListsAWorkflowsDraftsOnce(t *testing.T) {
+func (l *listedDrafts) SettledAt(ctx context.Context, wf string) (map[unit.Unit]time.Time, error) {
+	ds, err := l.List(ctx, outbox.Filter{Workflow: wf, States: draft.SettledStates})
+	out := map[unit.Unit]time.Time{}
+	for _, d := range ds {
+		for _, u := range draft.Subjects(d) {
+			if d.UpdatedAt.After(out[u]) {
+				out[u] = d.UpdatedAt
+			}
+		}
+	}
+	return out, err
+}
+
+func TestSettledAtIsTheSameInAPassWhichReadsAWorkflowsSettledDraftsOnce(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	at := time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC)
@@ -70,6 +83,6 @@ func TestSettledAtIsTheSameInAPassWhichListsAWorkflowsDraftsOnce(t *testing.T) {
 		}
 	}
 	if drafts.lists != 1 {
-		t.Errorf("a pass listed the workflow's drafts %d times for %d units", drafts.lists, len(want))
+		t.Errorf("a pass read the workflow's settled drafts %d times for %d units", drafts.lists, len(want))
 	}
 }

@@ -629,15 +629,11 @@ func (s *Store) UnitBriefs(ctx context.Context, units []unit.Unit) (map[unit.Uni
 	if len(units) == 0 {
 		return out, nil
 	}
-	keys := make([][2]string, len(units))
-	for i, u := range units {
-		keys[i] = [2]string{string(u.Provider), u.Key}
-	}
-	raw, err := json.Marshal(keys)
+	pairs, err := sqlite.UnitPairs(units)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.db.R().QueryContext(ctx, unitBriefsSQL, string(raw))
+	rows, err := s.db.R().QueryContext(ctx, unitBriefsSQL, pairs)
 	if err != nil {
 		return nil, err
 	}

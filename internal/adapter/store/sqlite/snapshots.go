@@ -70,7 +70,7 @@ func (s snapshotStore) Get(ctx context.Context, units []unit.Unit) (map[unit.Uni
 	if len(units) == 0 {
 		return out, nil
 	}
-	pairs, err := unitPairs(units)
+	pairs, err := UnitPairs(units)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (s snapshotStore) Revs(ctx context.Context, units []unit.Unit) (map[unit.Un
 	if len(units) == 0 {
 		return out, nil
 	}
-	pairs, err := unitPairs(units)
+	pairs, err := UnitPairs(units)
 	if err != nil {
 		return nil, err
 	}
@@ -112,9 +112,9 @@ func (s snapshotStore) Revs(ctx context.Context, units []unit.Unit) (map[unit.Un
 	return out, err
 }
 
-// unitPairs are units as the JSON list of [provider, key] a query reads
+// UnitPairs are units as the JSON list of [provider, key] a query reads
 // with json_each.
-func unitPairs(units []unit.Unit) (string, error) {
+func UnitPairs(units []unit.Unit) (string, error) {
 	pairs := make([][2]string, len(units))
 	for i, u := range units {
 		pairs[i] = [2]string{string(u.Provider), u.Key}

@@ -86,6 +86,11 @@ func (c countingDrafts) List(ctx context.Context, f outbox.Filter) ([]draft.Draf
 	return c.Drafts.List(ctx, f)
 }
 
+func (c countingDrafts) SettledAt(ctx context.Context, wf string) (map[unit.Unit]time.Time, error) {
+	c.e.reads["drafts"]++
+	return c.Drafts.(outbox.SettledReader).SettledAt(ctx, wf)
+}
+
 type countingWakes struct {
 	sqlite.WakeStore
 	e *env

@@ -179,6 +179,13 @@ func (l ledger) Items(ctx context.Context, f automation.Filter) ([]workflow.Item
 	if f.Workflow != "" {
 		add(`workflow = ?`, f.Workflow)
 	}
+	if len(f.Workflows) > 0 {
+		list, err := json.Marshal(f.Workflows)
+		if err != nil {
+			return nil, err
+		}
+		add(`workflow IN (SELECT value FROM json_each(?))`, string(list))
+	}
 	if f.Provider != "" {
 		add(`provider = ?`, string(f.Provider))
 	}

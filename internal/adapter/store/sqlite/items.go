@@ -58,7 +58,7 @@ func (s itemStore) Load(ctx context.Context, units []unit.Unit) (map[unit.Unit][
 	if len(units) == 0 {
 		return out, nil
 	}
-	pairs, err := unitPairs(units)
+	pairs, err := UnitPairs(units)
 	if err != nil {
 		return nil, err
 	}

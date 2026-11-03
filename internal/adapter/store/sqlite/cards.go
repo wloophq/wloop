@@ -64,7 +64,7 @@ func (s cardStore) Get(ctx context.Context, units []unit.Unit) (map[unit.Unit]ca
 	if len(units) == 0 {
 		return out, nil
 	}
-	pairs, err := unitPairs(units)
+	pairs, err := UnitPairs(units)
 	if err != nil {
 		return nil, err
 	}

@@ -3,6 +3,7 @@ package automation_test
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -206,5 +207,50 @@ func TestTheSweepReadsTheDraftsAfterAWithdrawalInANewPass(t *testing.T) {
 	if w := ws.after[1]; last(s1) != w || last(s2) <= w || last(s3) != last(s2) {
 		t.Errorf("draft 1 withdrawn after pass %d; its subject read last in pass %d, the next drafts' in %d and %d",
 			w, last(s1), last(s2), last(s3))
+	}
+}
+
+// movingWithdrawals are Withdrawals whose drafts' facts read the store as it
+// is: withdrawing draft from assigns the items of draft to.
+type movingWithdrawals struct {
+	*automationtest.Withdrawals
+	from, to int64
+}
+
+func (w movingWithdrawals) Proposed(ctx context.Context, wf string) ([]automation.ProposedDraft, error) {
+	ds, err := w.Withdrawals.Proposed(ctx, wf)
+	if _, gone := w.Withdrawn(w.from); gone {
+		for i, d := range ds {
+			if d.ID == w.to {
+				ds[i].Facts = workflow.Facts{"draft.items_assigned": 1}
+			}
+		}
+	}
+	return ds, err
+}
+
+func TestADraftAfterAWithdrawalIsJudgedOnItsOwnFactsAsTheWithdrawalLeftThem(t *testing.T) {
+	r := newRig(t, withdrawWF("ask", draft.WithdrawAssigned))
+	ws := movingWithdrawals{Withdrawals: automationtest.NewWithdrawals(), from: 1, to: 2}
+	r.e.Withdrawals = ws
+	r.put(s1, "a")
+	r.put(s2, "b")
+	ws.Put("ask", owned(1, s1, 1), owned(2, s2, 0))
+	r.sweep()
+	if _, ok := ws.Withdrawn(2); !ok {
+		t.Fatal("draft 2 was judged on the facts it had before draft 1 was withdrawn")
+	}
+}
+
+// idleKeep is a Keep whose Prepare never runs the pass.
+type idleKeep struct{ *automationtest.Units }
+
+func (idleKeep) Prepare(context.Context, func(context.Context) error) error { return nil }
+
+func TestASweepWhosePassNeverRunsFails(t *testing.T) {
+	r := newRig(t, withdrawWF("ask", draft.WithdrawAssigned))
+	r.e.Keep = idleKeep{r.units}
+	if _, _, err := r.e.Sweep(t.Context(), &sync.Mutex{}); err == nil {
+		t.Fatal("a sweep whose pass never ran succeeded")
 	}
 }

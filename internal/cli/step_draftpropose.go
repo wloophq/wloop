@@ -340,14 +340,7 @@ func (d *draftDeps) subject(ctx context.Context, u unit.Unit) (draftSubject, err
 // task is task id as the pass ctx carries holds it, else as the store does.
 func (d *draftDeps) task(ctx context.Context, id task.ID) (task.Task, error) {
 	if pass, ok := coretasks.PassOf(ctx); ok {
-		byID, _ := coretasks.Once(ctx, "cli.draft.tasks", func() (map[task.ID]task.Task, error) {
-			out := make(map[task.ID]task.Task, len(pass.Tasks))
-			for _, e := range pass.Tasks {
-				out[e.ID] = e
-			}
-			return out, nil
-		})
-		if e, held := byID[id]; held {
+		if e, held := pass.Task(id); held {
 			return e, nil
 		}
 	}
@@ -356,13 +349,15 @@ func (d *draftDeps) task(ctx context.Context, id task.ID) (task.Task, error) {
 
 // items are u's items; in a pass, those of every unit of it are read once.
 func (d *draftDeps) items(ctx context.Context, u unit.Unit) ([]items.Item, error) {
-	l, ok := d.Items.(draftItemsLoader)
-	pass, inPass := coretasks.PassOf(ctx)
-	if !ok || !inPass || !pass.Holds(u) {
-		return d.Items.Items(ctx, u)
+	var all func([]unit.Unit) (map[unit.Unit][]items.Item, error)
+	if l, ok := d.Items.(draftItemsLoader); ok {
+		all = func(units []unit.Unit) (map[unit.Unit][]items.Item, error) { return l.Load(ctx, units) }
 	}
-	all, err := coretasks.Once(ctx, "cli.draft.items", func() (map[unit.Unit][]items.Item, error) { return l.Load(ctx, pass.Units()) })
-	return all[u], err
+	its, _, err := coretasks.UnitLookup(ctx, coretasks.ItemsKey, u, all, func() ([]items.Item, bool, error) {
+		its, err := d.Items.Items(ctx, u)
+		return its, true, err
+	})
+	return its, err
 }
 
 // people are the persons a per-person step proposes to: those the open

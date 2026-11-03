@@ -71,6 +71,12 @@ type Applier interface {
 	Pending(ctx context.Context) ([]draft.Draft, error)
 }
 
+// SettledReader is an optional capability of a Store: draft.SettledAt of every subject of a draft workflow
+// proposed, read without the drafts' bodies; a subject with none is absent.
+type SettledReader interface {
+	SettledAt(ctx context.Context, workflow string) (map[unit.Unit]time.Time, error)
+}
+
 type Store interface {
 	Insert(ctx context.Context, d draft.Draft) (draft.Draft, error) // assigns ID
 	Get(ctx context.Context, id draft.ID) (draft.Draft, error)      // ErrNotFound

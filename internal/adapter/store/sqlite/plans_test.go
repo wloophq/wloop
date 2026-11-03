@@ -90,6 +90,7 @@ var hotPlans = []hotPlan{
 		want: []string{"task_units_unit (provider=? AND unit_key=?)", "task_items_unit (provider=? AND unit_key=?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
 	{name: "the current review run", query: currentRunSQL, want: []string{"review_runs_open (finished_at=?)"}},
 	{name: "a workflow's plan items", query: `SELECT ` + itemColumns + ` FROM plan_items WHERE workflow = ? ORDER BY id`, args: 1, want: []string{"plan_items_workflow (workflow=?)"}},
+	{name: "some workflows' plan items", query: `SELECT ` + itemColumns + ` FROM plan_items WHERE workflow IN (SELECT value FROM json_each(?)) ORDER BY id`, args: 1, want: []string{"plan_items_workflow (workflow=?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
 	{name: "due gates", query: gatesDueSQL, args: 2, want: []string{"gates_due (status=? AND deadline<?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
 	{name: "a task's gates", query: gatesOfTaskSQL, args: 1, want: []string{"gates_task (task_id=?)"}},
 	gatesWherePlan("open gates", gates.Query{}, "gates_due (status=?)", "USE TEMP B-TREE FOR ORDER BY"),

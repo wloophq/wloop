@@ -29,5 +29,13 @@ func SettledAt(ds []Draft, workflow string, subject unit.Unit) time.Time {
 }
 
 func on(d Draft, subject unit.Unit) bool {
-	return d.Unit == subject || d.Task != "" && task.UnitOf(task.ID(d.Task)) == subject
+	return slices.Contains(Subjects(d), subject)
+}
+
+// Subjects are the subjects d is on: its unit and, when it serves one, its task.
+func Subjects(d Draft) []unit.Unit {
+	if d.Task == "" {
+		return []unit.Unit{d.Unit}
+	}
+	return []unit.Unit{d.Unit, task.UnitOf(task.ID(d.Task))}
 }

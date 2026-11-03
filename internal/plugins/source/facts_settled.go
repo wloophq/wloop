@@ -4,6 +4,7 @@ import (
 	"context"
 	"maps"
 	"slices"
+	"time"
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/outbox"
@@ -40,28 +41,24 @@ func (f SettledFacts) Scope(ctx context.Context, wf string, u unit.Unit, facts w
 	if f.Drafts == nil || !slices.ContainsFunc(f.Source.Facts, func(m manifest.Fact) bool { return m.Name == name }) {
 		return facts, nil
 	}
-	ds, err := f.settled(ctx, wf, u)
+	at, err := f.settledAt(ctx, wf, u)
 	if err != nil {
 		return nil, err
 	}
 	out := maps.Clone(facts)
-	out[name] = draft.SettledAt(ds, wf, u)
+	out[name] = at
 	return out, nil
 }
 
-// settled are the drafts on u that wf proposed, those settled at least; in a pass, the settled drafts of wf
-// are read once for every unit.
-func (f SettledFacts) settled(ctx context.Context, wf string, u unit.Unit) ([]draft.Draft, error) {
-	if _, ok := coretasks.PassOf(ctx); !ok {
-		return f.Drafts.List(ctx, outbox.Filter{Unit: &u, Workflow: wf})
+// settledAt is draft.SettledAt of the drafts wf proposed on u; in a pass, that of every unit is read once.
+func (f SettledFacts) settledAt(ctx context.Context, wf string, u unit.Unit) (time.Time, error) {
+	var all func() (map[unit.Unit]time.Time, error)
+	if r, ok := f.Drafts.(outbox.SettledReader); ok {
+		all = func() (map[unit.Unit]time.Time, error) { return r.SettledAt(ctx, wf) }
 	}
-	byUnit, err := coretasks.Once(ctx, "source.settled."+f.Source.Slot+"."+wf, func() (map[unit.Unit][]draft.Draft, error) {
-		ds, err := f.Drafts.List(ctx, outbox.Filter{Workflow: wf, States: draft.SettledStates})
-		out := map[unit.Unit][]draft.Draft{}
-		for _, d := range ds {
-			out[d.Unit] = append(out[d.Unit], d)
-		}
-		return out, err
+	at, _, err := coretasks.Lookup(ctx, "source.settled."+f.Source.Slot+"."+wf, u, all, func() (time.Time, bool, error) {
+		ds, err := f.Drafts.List(ctx, outbox.Filter{Unit: &u, Workflow: wf})
+		return draft.SettledAt(ds, wf, u), true, err
 	})
-	return byUnit[u], err
+	return at, err
 }

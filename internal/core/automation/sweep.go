@@ -182,12 +182,16 @@ func (e *Engine) prepared(ctx context.Context, fn func(ctx context.Context) erro
 	if !ok {
 		return fn(ctx)
 	}
+	var ran bool
 	var fnErr error
 	if err := p.Prepare(ctx, func(ctx context.Context) error {
-		fnErr = fn(ctx)
+		ran, fnErr = true, fn(ctx)
 		return nil
 	}); err != nil {
 		return fmt.Errorf("preparing facts: %w", err)
+	}
+	if !ran {
+		return errors.New("preparing facts: the pass never ran")
 	}
 	return fnErr
 }

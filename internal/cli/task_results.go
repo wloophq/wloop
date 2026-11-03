@@ -23,13 +23,11 @@ type allOverrides interface {
 }
 
 func override(ctx context.Context, o placement.Overrides, u unit.Unit) (placement.Placement, bool, error) {
-	all, ok := o.(allOverrides)
-	if _, pass := coretasks.PassOf(ctx); !ok || !pass {
-		return o.Override(ctx, u)
+	var all func() (map[unit.Unit]placement.Placement, error)
+	if a, ok := o.(allOverrides); ok {
+		all = func() (map[unit.Unit]placement.Placement, error) { return a.All(ctx) }
 	}
-	got, err := coretasks.Once(ctx, "cli.placements", func() (map[unit.Unit]placement.Placement, error) { return all.All(ctx) })
-	p, held := got[u]
-	return p, held, err
+	return coretasks.Lookup(ctx, "cli.placements", u, all, func() (placement.Placement, bool, error) { return o.Override(ctx, u) })
 }
 
 // unitsEnded says whether a unit has ended by its plugin's ended fact

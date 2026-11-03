@@ -195,14 +195,7 @@ func (p *Provider) Due() time.Time {
 // passTask is task id as the pass ctx carries holds it, else as the store does.
 func (p *Provider) passTask(ctx context.Context, id task.ID) (task.Task, error) {
 	if pass, ok := coretasks.PassOf(ctx); ok {
-		byID, err := coretasks.Once(ctx, passTasks, func() (map[task.ID]task.Task, error) {
-			out := make(map[task.ID]task.Task, len(pass.Tasks))
-			for _, e := range pass.Tasks {
-				out[e.ID] = e
-			}
-			return out, nil
-		})
-		if e, held := byID[id]; err == nil && held {
+		if e, held := pass.Task(id); held {
 			return e, nil
 		}
 	}
@@ -556,30 +549,26 @@ func (p *Provider) Scope(ctx context.Context, wf string, u unit.Unit, f workflow
 	if p.d.Drafts == nil {
 		return f, nil
 	}
-	ds, err := p.settled(ctx, wf, u)
+	at, err := p.settledAt(ctx, wf, u)
 	if err != nil {
 		return nil, err
 	}
 	out := maps.Clone(f)
-	out["task.settled_at"] = draft.SettledAt(ds, wf, u)
+	out["task.settled_at"] = at
 	return out, nil
 }
 
-// settled are the drafts of task u that wf proposed, those settled at least; in a pass, the settled drafts of
-// wf are read once for every task.
-func (p *Provider) settled(ctx context.Context, wf string, u unit.Unit) ([]draft.Draft, error) {
-	if _, ok := coretasks.PassOf(ctx); !ok {
-		return p.d.Drafts.List(ctx, outbox.Filter{Task: u.Key, Workflow: wf})
+// settledAt is draft.SettledAt of the drafts wf proposed on task u; in a pass, that of every task is read once.
+func (p *Provider) settledAt(ctx context.Context, wf string, u unit.Unit) (time.Time, error) {
+	var all func() (map[unit.Unit]time.Time, error)
+	if r, ok := p.d.Drafts.(outbox.SettledReader); ok {
+		all = func() (map[unit.Unit]time.Time, error) { return r.SettledAt(ctx, wf) }
 	}
-	byTask, err := coretasks.Once(ctx, passSettled+wf, func() (map[string][]draft.Draft, error) {
-		ds, err := p.d.Drafts.List(ctx, outbox.Filter{Workflow: wf, States: draft.SettledStates})
-		out := map[string][]draft.Draft{}
-		for _, d := range ds {
-			out[d.Task] = append(out[d.Task], d)
-		}
-		return out, err
+	at, _, err := coretasks.Lookup(ctx, passSettled+wf, u, all, func() (time.Time, bool, error) {
+		ds, err := p.d.Drafts.List(ctx, outbox.Filter{Task: u.Key, Workflow: wf})
+		return draft.SettledAt(ds, wf, u), true, err
 	})
-	return byTask[u.Key], err
+	return at, err
 }
 
 // Owners are the task's units, whose timelines show the steps run on it.
@@ -751,29 +740,25 @@ func (p *Provider) gates(ctx context.Context, id task.ID) ([]gate.Gate, error) {
 
 // wake is task id's wake; in a pass, every task's is read once.
 func (p *Provider) wake(ctx context.Context, id task.ID) (wake.Wake, bool, error) {
-	all, ok := p.d.Wakes.(AllWakes)
-	if _, pass := coretasks.PassOf(ctx); !ok || !pass {
-		return p.d.Wakes.Of(ctx, id)
-	}
-	byTask, err := coretasks.Once(ctx, passWakes, func() (map[task.ID]wake.Wake, error) {
-		ws, err := all.All(ctx)
-		out := make(map[task.ID]wake.Wake, len(ws))
-		for _, w := range ws {
-			out[w.Task] = w
+	var all func() (map[task.ID]wake.Wake, error)
+	if a, ok := p.d.Wakes.(AllWakes); ok {
+		all = func() (map[task.ID]wake.Wake, error) {
+			ws, err := a.All(ctx)
+			out := make(map[task.ID]wake.Wake, len(ws))
+			for _, w := range ws {
+				out[w.Task] = w
+			}
+			return out, err
 		}
-		return out, err
-	})
-	w, held := byTask[id]
-	return w, held, err
+	}
+	return coretasks.Lookup(ctx, passWakes, id, all, func() (wake.Wake, bool, error) { return p.d.Wakes.Of(ctx, id) })
 }
 
 // What every task's facts read of the store as a whole, once per pass.
 const (
 	passSessions = "facts.sessions"
-	passItems    = "facts.items"
 	passTurns    = "facts.turns"
 	passGates    = "facts.gates"
-	passTasks    = "facts.tasks"
 	passSettled  = "facts.settled."
 	passWakes    = "facts.wakes"
 )
@@ -784,7 +769,7 @@ func (p *Provider) items(ctx context.Context, units []unit.Unit) (map[unit.Unit]
 	if !ok {
 		return p.d.Items.Load(ctx, units)
 	}
-	all, err := coretasks.Once(ctx, passItems, func() (map[unit.Unit][]items.Item, error) { return p.d.Items.Load(ctx, pass.Units()) })
+	all, err := coretasks.Once(ctx, coretasks.ItemsKey, func() (map[unit.Unit][]items.Item, error) { return p.d.Items.Load(ctx, pass.Units()) })
 	if err != nil {
 		return nil, err
 	}

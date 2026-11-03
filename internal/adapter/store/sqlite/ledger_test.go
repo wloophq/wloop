@@ -499,6 +499,10 @@ func TestRetentionPrunesWorkflowRows(t *testing.T) {
 	if want := []string{"gone/pending", "w/blocked-since-long"}; !slices.Equal(ids, want) {
 		t.Errorf("items left %v, want %v", ids, want)
 	}
+	some, err := db.Ledger().Items(ctx, automation.Filter{Workflows: []string{"w", "absent"}})
+	if err != nil || len(some) != 1 || some[0].Workflow != "w" {
+		t.Errorf("the items of w and absent: %v %v", some, err)
+	}
 	if got := rowsOf(t, db, `SELECT key_value FROM workflow_runs ORDER BY key_value`); !slices.Equal(got, []string{"new-done", "old-dismissed", "old-failed"}) {
 		t.Errorf("runs left %v", got)
 	}
