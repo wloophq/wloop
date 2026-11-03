@@ -3,7 +3,7 @@ title: Testing
 description: Fakes and contracts, goldens, budgets, the brand build and the architecture tests that keep the boundaries.
 ---
 
-`make test` runs `go test -race ./...`; `make lint` runs gofmt and golangci-lint. Both pass before a pull request. CI splits the tests into shards that `scripts/test-shard.sh` names; a new package falls in the `rest` shard, and `scripts/test-shard.sh check` fails when the test and brand matrices of `ci.yml` and `cache.yml` drift from the script.
+`make test` runs `go test -race ./...` without instrumenting `modernc.org/sqlite`, SQLite translated from C, which would make the store's tests many times slower and checks none of the loop's code; `PKGS=<packages>` limits it, as CI runs each shard; `make lint` runs gofmt and golangci-lint. Both pass before a pull request. CI splits the tests into shards that `scripts/test-shard.sh` names; a new package falls in the `rest` shard, and `scripts/test-shard.sh check` fails when the test and brand matrices of `ci.yml` and `cache.yml` drift from the script.
 
 ## Fakes and contracts
 

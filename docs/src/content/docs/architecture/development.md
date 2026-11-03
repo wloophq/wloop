@@ -7,7 +7,7 @@ description: Build and test from source, work on the procedures, and check a rel
 
 ```sh
 make build        # the binary in ./bin
-make test         # go test -race ./...
+make test         # go test -race ./..., modernc.org/sqlite uninstrumented
 make lint         # gofmt and golangci-lint
 make vet-tags     # compile the contract and live tests without running them
 make fuzz         # fuzz the predicate compilers for 60 s each

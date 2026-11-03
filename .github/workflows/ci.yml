@@ -42,9 +42,7 @@ jobs:
         with:
           cache: test-${{ matrix.shard }}
       - run: |
-          pkgs=$(scripts/test-shard.sh "$SHARD")
-          # shellcheck disable=SC2086
-          go test -race -timeout 30m $pkgs
+          make test PKGS="$(scripts/test-shard.sh "$SHARD")"
         env:
           SHARD: ${{ matrix.shard }}
 
@@ -73,7 +71,7 @@ jobs:
         with:
           cache: macos
       - run: go test -timeout 30m ./...
-      - run: go test -race ./cmd/... ./internal/client/menubar/macos/
+      - run: make test PKGS="./cmd/... ./internal/client/menubar/macos/"
       - run: CGO_ENABLED=0 go test ./internal/client/menubar/macos/
 
   brand:
