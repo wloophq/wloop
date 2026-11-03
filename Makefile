@@ -46,8 +46,16 @@ dev-install: build ## Run this checkout's build as the installed one: agent home
 	bin/$(BINARY) app install
 	bin/$(BINARY) store migrate
 
-test: ## Run the tests
-	go test -race -timeout 30m ./...
+# modernc.org/sqlite is SQLite translated from C; instrumenting it makes the
+# store's tests up to 20x slower and checks no code of ours.
+RACE_FLAGS := -race -gcflags=modernc.org/...=-race=false
+PKGS ?= ./...
+
+test: ## Run the tests; PKGS=<packages> limits them
+	go test $(RACE_FLAGS) -timeout 30m $(strip $(PKGS))
+
+test-build: ## Build the tests as make test does, without running them, to warm the build cache
+	go test $(RACE_FLAGS) -run '^$$' $(strip $(PKGS))
 
 test-brand: ## Run the tests built with the test brand; SHARD=<name> runs one shard of scripts/test-shard.sh
 	pkgs=$$(if [ -n "$(SHARD)" ]; then scripts/test-shard.sh "$(SHARD)"; else echo ./...; fi) && \
