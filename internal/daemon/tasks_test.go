@@ -83,7 +83,7 @@ func newTasksRig(t *testing.T, edit func(*Deps)) *tasksRig {
 			Facts: coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: func() task.Me { return meID }},
 			Me:    meID, Clock: fixedClock(tasksNow), Disabled: disabledOf(enabled), Wakes: db.Wakes(),
 			Activity: func(ctx context.Context, id task.ID) error { return r.wakes.Event(ctx, id, wake.OnActivity, "") }}, loaded, lensFacts(db, loaded, tasksNow)))
-		d.Tasks, d.Wakes = r.g, r.wakes
+		d.Tasks, d.Wakes, d.TaskUnits = r.g, r.wakes, SyncUnits(db.Tasks(), r.ledger)
 	})
 	stopOnCleanup(t, r.s)
 	return r
@@ -480,6 +480,23 @@ func TestItemsNoteSyncsTasks(t *testing.T) {
 	}
 	es, err := r.db.Tasks().TasksOf(context.Background(), r7u)
 	if err != nil || len(es) != 1 || es[0].State != task.State("inbox") || es[0].Origin != task.OriginDerived {
+		t.Fatalf("%+v %v", es, err)
+	}
+}
+
+func TestItemsNotedBeforeTheSyncStartsSyncTasks(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	sub := r.subscribe(t)
+	if _, err := r.ledger.Apply(context.Background(), items.User, []items.Op{owedToMe(r7u, "i1")}); err != nil {
+		t.Fatal(err)
+	}
+	r.startSync(t)
+	c := nextChange(t, sub)
+	for !slices.Contains(c.Units, r7u) {
+		c = nextChange(t, sub)
+	}
+	if es, err := r.db.Tasks().TasksOf(context.Background(), r7u); err != nil || len(es) != 1 {
 		t.Fatalf("%+v %v", es, err)
 	}
 }
@@ -916,5 +933,67 @@ func TestTaskViewServesTheWake(t *testing.T) {
 	var none api.TaskView
 	if code := get(t, r.s, api.TaskPath("t-n"), &none); code != 200 || none.Wake != nil {
 		t.Fatalf("%d: a task with no wake serves %+v", code, none.Wake)
+	}
+}
+
+func TestUnitTasksAreTheOpenTasksHoldingTheUnit(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	ref8, ref9 := r7, r7
+	ref8.Number, ref9.Number = 8, 9
+	other := pr.Ref(ref8).Unit()
+	r.put(t,
+		task.Task{ID: "t-open", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}},
+		task.Task{ID: "t-next", State: "next", Category: task.CategoryReady, Units: []unit.Unit{r7u, other}},
+		task.Task{ID: "t-done", State: "done", Category: task.CategoryDone, Units: []unit.Unit{r7u}},
+		task.Task{ID: "t-other", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{other}},
+		task.Task{ID: "t-item", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{other}, Items: []task.ItemRef{{Unit: r7u, Item: "i1"}}},
+	)
+	var got []api.TaskView
+	if code := get(t, r.s, api.UnitPath(r7u, "tasks"), &got); code != 200 {
+		t.Fatalf("status %d", code)
+	}
+	if ids := taskIDs(got); !slices.Equal(slices.Sorted(slices.Values(ids)), []string{"t-item", "t-next", "t-open"}) {
+		t.Fatalf("tasks %v, want t-item, t-next and t-open", ids)
+	}
+	if i := slices.Index(taskIDs(got), "t-open"); len(got[i].Verbs) == 0 {
+		t.Fatalf("a unit's task carries its verbs as a view lists them: %+v", got[i])
+	}
+	var none []api.TaskView
+	if code := get(t, r.s, api.UnitPath(pr.Ref(ref9).Unit(), "tasks"), &none); code != 200 || len(none) != 0 {
+		t.Fatalf("a unit no task holds: %d %v", code, none)
+	}
+}
+
+func TestUnitTasksWithoutATasksServiceAreNone(t *testing.T) {
+	t.Parallel()
+	s := newNotedServer(t, func(d *Deps) { d.Tasks = nil })
+	var got []api.TaskView
+	if code := get(t, s, api.UnitPath(r7u, "tasks"), &got); code != 200 || got == nil || len(got) != 0 {
+		t.Fatalf("%d %v", code, got)
+	}
+}
+
+func TestUnitTasksLeaveOutADisabledPluginsTasks(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, func(d *Deps) { d.PluginEnabled = func(p unit.ProviderID) bool { return p != unit.GitHub } })
+	r.put(t, task.Task{ID: "t-open", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}})
+	var got []api.TaskView
+	if code := get(t, r.s, api.UnitPath(r7u, "tasks"), &got); code != 200 || len(got) != 0 {
+		t.Fatalf("%d: a disabled plugin's task shows: %v", code, taskIDs(got))
+	}
+}
+
+func TestUnitTasksListChildrenInTheirSiblingOrder(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.put(t,
+		task.Task{ID: "t-second", State: "inbox", Category: task.CategoryInbox, Parent: "t-p", Position: 2, Units: []unit.Unit{r7u},
+			Created: tasksNow.Add(-time.Hour), Updated: tasksNow},
+		task.Task{ID: "t-first", State: "inbox", Category: task.CategoryInbox, Parent: "t-p", Position: 1, Units: []unit.Unit{r7u}},
+	)
+	var got []api.TaskView
+	if code := get(t, r.s, api.UnitPath(r7u, "tasks"), &got); code != 200 || !slices.Equal(taskIDs(got), []string{"t-first", "t-second"}) {
+		t.Fatalf("%d: tasks %v, want t-first then t-second", code, taskIDs(got))
 	}
 }

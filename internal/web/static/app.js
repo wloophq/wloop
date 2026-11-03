@@ -233,8 +233,6 @@ function writeHash(change, replace) {
 }
 
 const unitKey = (u) => `${u.provider}:${u.key}`;
-const keyUnit = (k) => ({ provider: k.slice(0, k.indexOf(":")), key: k.slice(k.indexOf(":") + 1) });
-const unitPath = (u, ...rest) => "/api/units/" + [u.provider, u.key, ...rest].map(encodeURIComponent).join("/");
 const unitOf = (x) => x.unit;
 const keyOf = (x) => unitKey(unitOf(x));
 const labelOf = (x) => x.label || "";

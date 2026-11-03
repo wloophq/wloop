@@ -228,6 +228,36 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, v)
 }
 
+func (s *Server) handleUnitTasks(w http.ResponseWriter, r *http.Request) {
+	u, ok := s.parseUnit(r)
+	if !ok {
+		writeNoUnit(w, r)
+		return
+	}
+	g := s.deps.Tasks
+	out := []api.TaskView{}
+	if g == nil {
+		writeJSON(w, out)
+		return
+	}
+	ctx := r.Context()
+	es, err := g.OpenTasksOf(ctx, u)
+	if err != nil {
+		writeTasksError(w, err)
+		return
+	}
+	vs := s.taskViews(ctx, g, false)
+	for _, e := range es {
+		v, err := vs.view(ctx, e)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		out = append(out, v)
+	}
+	writeJSON(w, out)
+}
+
 func (s *Server) handleTaskVerb(w http.ResponseWriter, r *http.Request) {
 	var req api.TaskRequest
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, tasksBodyMax)).Decode(&req); err != nil && !errors.Is(err, io.EOF) {

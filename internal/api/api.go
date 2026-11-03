@@ -66,8 +66,11 @@ const Plan = "/api/plan"
 // address query parameter and answers a Resolved.
 const Resolve = "/api/resolve"
 
-// UnitDetail is a unit's detail; its checks and actions are under it.
+// UnitDetail is a unit's detail; its checks, tasks and actions are under it.
 const UnitDetail = "/api/units/{provider}/{key}"
+
+// UnitTasks serves the open tasks that hold the unit or one of its items, as []TaskView.
+const UnitTasks = UnitDetail + "/tasks"
 
 // UnitPath is the path of u's detail, followed by the segments of rest.
 func UnitPath(u unit.Unit, rest ...string) string {
@@ -93,6 +96,7 @@ var Operations = []Operation{
 	{"GET", Resolve},
 	{"GET", UnitDetail},
 	{"GET", UnitDetail + "/checks"},
+	{"GET", UnitTasks},
 	{"POST", "/api/jobs/{name}"},
 	{"POST", UnitDetail + "/{action}"},
 	{"GET", Actions},

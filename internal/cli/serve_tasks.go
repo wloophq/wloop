@@ -11,12 +11,10 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
-	coreitems "github.com/wloophq/wloop/internal/core/items"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/wakes"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/gate"
-	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/wake"
@@ -153,7 +151,7 @@ func (e *Env) serveTasks(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods [
 		g.SetMe(me.get())
 		return grew, err
 	}
-	d.TaskUnits = func(ctx context.Context) ([]unit.Unit, error) { return syncUnits(ctx, db.Tasks(), ledger) }
+	d.TaskUnits = daemon.SyncUnits(db.Tasks(), ledger)
 	return d
 }
 
@@ -209,38 +207,6 @@ func (i *identity) set(me task.Me) (grew bool) {
 		}
 	}
 	return grew
-}
-
-// syncUnits are the units with an open item or a live task.
-func syncUnits(ctx context.Context, tasks coretasks.Reader, ledger *coreitems.Ledger) ([]unit.Unit, error) {
-	open, err := ledger.Query(ctx, coreitems.Query{State: items.Open})
-	if err != nil {
-		return nil, err
-	}
-	seen := map[unit.Unit]bool{}
-	var out []unit.Unit
-	add := func(u unit.Unit) {
-		if !seen[u] {
-			seen[u] = true
-			out = append(out, u)
-		}
-	}
-	for _, it := range open {
-		add(it.Unit)
-	}
-	live, err := tasks.Tasks(ctx, task.Query{})
-	if err != nil {
-		return nil, err
-	}
-	for _, e := range live {
-		for _, u := range e.Units {
-			add(u)
-		}
-		for _, r := range e.Items {
-			add(r.Unit)
-		}
-	}
-	return out, nil
 }
 
 // envWakes are the tasks as a plugin's wakes move them, through the tasks service once serve built it.

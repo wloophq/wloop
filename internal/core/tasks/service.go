@@ -885,6 +885,19 @@ func (s *Service) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error)
 	return s.d.Store.TasksOf(ctx, u)
 }
 
+// OpenTasksOf are the open tasks that hold u or one of its items, but those a view hides for a disabled
+// plugin, in the order a view lists them before its sort.
+func (s *Service) OpenTasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
+	es, err := s.d.Store.TasksOf(ctx, u)
+	if err != nil {
+		return nil, err
+	}
+	hidden := s.hider()
+	es = slices.DeleteFunc(es, func(e task.Task) bool { return !e.Open() || hidden != nil && hidden(e) })
+	baseOrder(es)
+	return es, nil
+}
+
 // ReopenOwn is u's own task when u's items key on u (task.UnitTask), moved back into the ready category,
 // Changed, when it is done; ok is false when u's items key on no unit task or no task holds it. A dropped
 // task stays dropped.
