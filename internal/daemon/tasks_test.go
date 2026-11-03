@@ -83,7 +83,7 @@ func newTasksRig(t *testing.T, edit func(*Deps)) *tasksRig {
 			Facts: coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: func() task.Me { return meID }},
 			Me:    meID, Clock: fixedClock(tasksNow), Disabled: disabledOf(enabled), Wakes: db.Wakes(),
 			Activity: func(ctx context.Context, id task.ID) error { return r.wakes.Event(ctx, id, wake.OnActivity, "") }}, loaded, lensFacts(db, loaded, tasksNow)))
-		d.Tasks, d.Wakes = r.g, r.wakes
+		d.Tasks, d.Wakes, d.TaskUnits = r.g, r.wakes, SyncUnits(db.Tasks(), r.ledger)
 	})
 	stopOnCleanup(t, r.s)
 	return r
@@ -480,6 +480,23 @@ func TestItemsNoteSyncsTasks(t *testing.T) {
 	}
 	es, err := r.db.Tasks().TasksOf(context.Background(), r7u)
 	if err != nil || len(es) != 1 || es[0].State != task.State("inbox") || es[0].Origin != task.OriginDerived {
+		t.Fatalf("%+v %v", es, err)
+	}
+}
+
+func TestItemsNotedBeforeTheSyncStartsSyncTasks(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	sub := r.subscribe(t)
+	if _, err := r.ledger.Apply(context.Background(), items.User, []items.Op{owedToMe(r7u, "i1")}); err != nil {
+		t.Fatal(err)
+	}
+	r.startSync(t)
+	c := nextChange(t, sub)
+	for !slices.Contains(c.Units, r7u) {
+		c = nextChange(t, sub)
+	}
+	if es, err := r.db.Tasks().TasksOf(context.Background(), r7u); err != nil || len(es) != 1 {
 		t.Fatalf("%+v %v", es, err)
 	}
 }
