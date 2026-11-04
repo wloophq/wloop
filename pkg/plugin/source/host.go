@@ -168,7 +168,9 @@ type Book struct {
 	Records []TurnRecord
 }
 
-// Turn is one turn on a unit. At is when it reached its state.
+// Turn is one turn on a unit. At is when it reached its state; AnsweredAt
+// is when the newest answer the user gave since its last record was
+// stored, refused ones aside.
 type Turn struct {
 	Seq                                 int64
 	ID, Intent, Role, Workflow          string
