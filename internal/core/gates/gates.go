@@ -274,13 +274,13 @@ func (s *Service) TaskEnded(ctx context.Context, id task.ID, by task.Actor, sess
 		}
 	}()
 	user := by == task.ActorPerson
-	switch {
-	case by == task.ActorAgent:
+	switch by {
+	case task.ActorAgent:
 		if err := s.vouch(ctx, gate.Gate{}, session); err != nil {
 			return fmt.Errorf("%w: the gates of task %s close with it, not by %s", err, id, by)
 		}
 		user = true
-	case by == "":
+	case "":
 		return fmt.Errorf("%w: the gates of task %s close with it, not by no one", ErrRefused, id)
 	}
 	gs, err := s.d.Reader.OfTask(ctx, id)
