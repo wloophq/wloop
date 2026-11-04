@@ -60,7 +60,7 @@ One route, `POST /api/tasks`, creates every task you make: a title alone capture
 - each `--prop` is a property `tasks.toml` declares, parsed by its type in the daemon's time zone, such as `priority=high`, `due=2026-11-02` or `size=30m`; a property the profile does not declare, one its writers leave you out of, or a value its type refuses, creates nothing;
 - `--repo` is where the task's work runs: a later `start` on the task without `--repo` works in that repository.
 
-A task created from an agent's session is written by `agent`: its brief and properties are untrusted, and a property agents do not write is refused. The bundled properties agents write are those you write, plus those only agents write.
+A task created from an agent's session is written by `agent`: its brief and properties are untrusted, and a property agents do not write is refused. The bundled properties agents write are those you write, plus those only agents write; a property you write is written only from a session you drive, and a session the loop runs a turn in is refused it with `403`.
 
 ## Units attached to a task
 

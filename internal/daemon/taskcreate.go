@@ -40,6 +40,10 @@ func (s *Server) handleTaskCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writer := task.Writer(q.Actor)
+	if name, ok := s.yoursToWrite(req.Props, q); ok {
+		writeError(w, http.StatusForbidden, unattended("writing the property "+name))
+		return
+	}
 	props, err := s.createProps(req.Props, writer)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -109,6 +113,21 @@ func (s *Server) createProps(texts map[string]string, w task.Writer) (map[string
 		out[name] = v
 	}
 	return out, nil
+}
+
+// yoursToWrite is the first of texts' properties a person writes when q is an agent whose session the user does
+// not drive: an agent writes such a property only for the user.
+func (s *Server) yoursToWrite(texts map[string]string, q requester) (string, bool) {
+	if q.user() {
+		return "", false
+	}
+	def := s.loaded().Tasks
+	for _, name := range slices.Sorted(maps.Keys(texts)) {
+		if p, ok := def.Prop(name); ok && slices.Contains(p.Writers, task.WriterPerson) {
+			return name, true
+		}
+	}
+	return "", false
 }
 
 // createBrief is the brief record that markdown is, nil for none; records.toml must let w write a brief.
