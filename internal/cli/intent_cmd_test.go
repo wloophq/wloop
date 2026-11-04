@@ -100,6 +100,9 @@ func TestAFlagOfAnotherIntentIsRefusedBeforeGuidance(t *testing.T) {
 		{[]string{"nudge", r7.URL(), "--no-wait"}, "--no-wait applies to address or review"},
 		{[]string{"review", r7.URL(), "--take-over", "look"}, "--take-over applies to address"},
 		{[]string{"review", r7.URL(), "--no-wait=x", "look"}, "--no-wait takes no value"},
+		{[]string{"address", "--repo", "acme/api", r7.URL()}, "--repo applies to"},
+		{[]string{"address", r7.URL(), "--repo", "acme/api"}, "--repo applies to"},
+		{[]string{"address", "--nope", "x", r7.URL()}, "unknown flag --nope"},
 	} {
 		te := newTestEnv(t, &fake.Manager{})
 		te.noDaemon(t)

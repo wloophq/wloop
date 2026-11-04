@@ -60,6 +60,11 @@ func runIntent(ctx context.Context, e *Env, d dintent.Def, args []string) error 
 	if target == "" {
 		return errors.New(usage)
 	}
+	reg := e.loadedIntents().Registry
+	p, err := parseIntentArgs(reg, d, surfaceCLI, usage, rest)
+	if err != nil {
+		return err
+	}
 	ref, err := pr.ParseURL(target)
 	if err != nil {
 		u, uerr := e.unitTarget(ctx, target)
@@ -73,11 +78,6 @@ func runIntent(ctx context.Context, e *Env, d dintent.Def, args []string) error 
 		default:
 			return runIntentOn(ctx, e, d, u, rest)
 		}
-	}
-	reg := e.loadedIntents().Registry
-	p, err := parseIntentArgs(reg, d, surfaceCLI, usage, rest)
-	if err != nil {
-		return err
 	}
 	req := api.ActionRequest{Guidance: p.guidance, NoBrief: p.noBrief, Inputs: p.inputs}
 	if beforeSet(d, p.inputs, beforeTakeOver) {
