@@ -196,6 +196,7 @@ var otherFacts = []Fact{
 	timeVarying(untrusted(wf("task", "check_on", expr.Time, "When to check on the task: its check_on property, else, when the items it holds wait on someone else and not on you, tasks.stale_waiting_days working days after the oldest of them; zero when neither. Test with `> timestamp(0)`."))),
 	wf("task", "gates_open", expr.Int, "The task's open gates."),
 	wf("task", "turns_open_by_hand", expr.Int, "The open turns (sent, started or asked) someone started by hand on the task or a unit it links, but those of the chat intent tasks.toml names."),
+	wf("task", "turn_by_hand_at", expr.Time, "When the newest of task.turns_open_by_hand was sent; zero when none is open. Test with `> timestamp(0)`."),
 	wf("task", "turns_running", expr.Int, "The turns the loop sent on the task or a unit it links that an agent is working on: sent or started, not yet asking or ended."),
 	untrusted(wf("task", "wake_until", expr.Time, "When the task's wake wakes it; zero when it has none, or one that waits on events or a condition only. Test with `> timestamp(0)`.")),
 	untrusted(wf("task", "wake_when", expr.String, "The condition the task's wake waits on; empty when none.")),

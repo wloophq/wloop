@@ -19,17 +19,21 @@ func TestOpenTurnsCountWhatWasStartedByHandAndWhatRuns(t *testing.T) {
 	e.task(task.Task{ID: "t-c", State: "inbox", Category: task.CategoryInbox, Title: "c"})
 	e.open = map[unit.Unit][]turn.Turn{
 		task.UnitOf("t-a"): {
-			{Seq: 1, Intent: "start", Trigger: turn.ByHand, State: turn.Started},
-			{Seq: 2, Intent: "chat", Trigger: turn.ByHand, State: turn.Sent},
+			{Seq: 1, Intent: "start", Trigger: turn.ByHand, State: turn.Started, SentAt: monday},
+			{Seq: 2, Intent: "chat", Trigger: turn.ByHand, State: turn.Sent, SentAt: monday.Add(2 * time.Hour)},
 		},
-		pr:                 {{Seq: 3, Intent: "review", Trigger: turn.Automated, State: turn.Sent}, {Seq: 4, Intent: "act", Trigger: turn.ByHand, State: turn.Asked}},
+		pr:                 {{Seq: 3, Intent: "review", Trigger: turn.Automated, State: turn.Sent}, {Seq: 4, Intent: "act", Trigger: turn.ByHand, State: turn.Asked, SentAt: monday.Add(time.Hour)}},
 		task.UnitOf("t-b"): {{Seq: 5, Intent: "start", Trigger: turn.Automated, State: turn.Asked}},
 		task.UnitOf("t-c"): {{Seq: 6, Intent: "chat", Trigger: turn.ByHand, State: turn.Started}},
 	}
-	for id, want := range map[task.ID][2]int{"t-a": {2, 3}, "t-b": {0, 0}, "t-c": {0, 1}} {
+	for id, want := range map[task.ID]struct {
+		byHand, running int
+		at              time.Time
+	}{"t-a": {2, 3, monday.Add(time.Hour)}, "t-b": {0, 0, time.Time{}}, "t-c": {0, 1, time.Time{}}} {
 		f := e.facts(id)
-		if got := [2]any{f["task.turns_open_by_hand"], f["task.turns_running"]}; got != [2]any{want[0], want[1]} {
-			t.Errorf("%s: turns_open_by_hand and turns_running %v, want %v", id, got, want)
+		if f["task.turns_open_by_hand"] != want.byHand || f["task.turns_running"] != want.running || !f["task.turn_by_hand_at"].(time.Time).Equal(want.at) {
+			t.Errorf("%s: turns_open_by_hand, turns_running and turn_by_hand_at %v %v %v, want %+v", id,
+				f["task.turns_open_by_hand"], f["task.turns_running"], f["task.turn_by_hand_at"], want)
 		}
 	}
 }

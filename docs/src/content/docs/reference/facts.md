@@ -206,6 +206,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task.check_on` | timestamp | When to check on the task: its check_on property, else, when the items it holds wait on someone else and not on you, tasks.stale_waiting_days working days after the oldest of them; zero when neither. Test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.gates_open` | int | The task's open gates. |
 | `task.turns_open_by_hand` | int | The open turns (sent, started or asked) someone started by hand on the task or a unit it links, but those of the chat intent tasks.toml names. |
+| `task.turn_by_hand_at` | timestamp | When the newest of task.turns_open_by_hand was sent; zero when none is open. Test with `> timestamp(0)`. |
 | `task.turns_running` | int | The turns the loop sent on the task or a unit it links that an agent is working on: sent or started, not yet asking or ended. |
 | `task.wake_until` | timestamp | When the task's wake wakes it; zero when it has none, or one that waits on events or a condition only. Test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.wake_when` | string | The condition the task's wake waits on; empty when none. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |

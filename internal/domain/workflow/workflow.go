@@ -152,7 +152,17 @@ type Vars struct {
 	Trigger Facts             // "trigger.kind", "trigger.event.kind", "trigger.event.key", "trigger.event.data", "trigger.fired_at"
 	Config  Facts             // "config.cleanup.idle", ...
 	Marks   map[string]string // the unit's handled marks by name, which handled() reads
-	Now     time.Time
+	// LoadMarks reads Marks when Marks is nil, only once a predicate reaches a handled(); nil reads none.
+	LoadMarks func() (map[string]string, error)
+	Now       time.Time
+}
+
+// UnitMarks are v's marks: Marks, else what LoadMarks reads; nil for none.
+func (v Vars) UnitMarks() (map[string]string, error) {
+	if v.Marks != nil || v.LoadMarks == nil {
+		return v.Marks, nil
+	}
+	return v.LoadMarks()
 }
 
 // Facts are a unit's facts by dotted name; values are bool, int, string,

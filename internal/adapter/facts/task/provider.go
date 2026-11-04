@@ -283,6 +283,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.check_on":            e.Prop(task.PropCheckOn).Time,
 		"task.gates_open":          0,
 		"task.turns_open_by_hand":  0,
+		"task.turn_by_hand_at":     time.Time{},
 		"task.turns_running":       0,
 		"task.wake_until":          time.Time{},
 		"task.wake_when":           "",
@@ -336,11 +337,11 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 	f["task.gates_open"] = len(gs)
 	us := unitsOf(e)
 	if p.d.OpenTurns != nil {
-		byHand, running, err := p.openTurns(ctx, append([]unit.Unit{task.UnitOf(e.ID)}, us...))
+		o, err := p.openTurns(ctx, append([]unit.Unit{task.UnitOf(e.ID)}, us...))
 		if err != nil {
 			return nil, err
 		}
-		f["task.turns_open_by_hand"], f["task.turns_running"] = byHand, running
+		f["task.turns_open_by_hand"], f["task.turn_by_hand_at"], f["task.turns_running"] = o.byHand, o.byHandAt, o.running
 	}
 	if err := p.links(ctx, e, us, f); err != nil {
 		return nil, err
@@ -830,27 +831,38 @@ func (p *Provider) turns(ctx context.Context, e task.Task) (int, error) {
 
 // openTurns counts the open turns on us started by hand, but those of the chat intent, and those sent or
 // started; every unit's open turns are read once per pass.
-func (p *Provider) openTurns(ctx context.Context, us []unit.Unit) (byHand, running int, err error) {
+// openTurnsOf is what a task's open turns say: how many someone started by hand, when the newest of them was
+// sent, and how many run.
+type openTurnsOf struct {
+	byHand, running int
+	byHandAt        time.Time
+}
+
+func (p *Provider) openTurns(ctx context.Context, us []unit.Unit) (openTurnsOf, error) {
 	all, err := coretasks.Once(ctx, passOpenTurns, func() (map[unit.Unit][]turn.Turn, error) { return p.d.OpenTurns(ctx) })
 	if err != nil {
-		return 0, 0, err
+		return openTurnsOf{}, err
 	}
 	var chat turn.Intent
 	if p.d.Chat != nil {
 		chat = p.d.Chat()
 	}
+	var o openTurnsOf
 	for i, u := range us {
 		if slices.Contains(us[:i], u) {
 			continue
 		}
 		for _, t := range all[u] {
 			if t.Trigger == turn.ByHand && (chat == "" || t.Intent != chat) {
-				byHand++
+				o.byHand++
+				if t.SentAt.After(o.byHandAt) {
+					o.byHandAt = t.SentAt
+				}
 			}
 			if t.State == turn.Sent || t.State == turn.Started {
-				running++
+				o.running++
 			}
 		}
 	}
-	return byHand, running, nil
+	return o, nil
 }

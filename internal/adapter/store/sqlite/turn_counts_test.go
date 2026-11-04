@@ -51,7 +51,7 @@ func TestOpenTurnsAreTheBooksOpenTurns(t *testing.T) {
 		var open []turn.Turn
 		for _, tr := range b.Turns {
 			if tr.State.Open() {
-				open = append(open, turn.Turn{Seq: tr.Seq, Intent: tr.Intent, Trigger: tr.Trigger, State: tr.State, Session: tr.Session})
+				open = append(open, turn.Turn{Seq: tr.Seq, Intent: tr.Intent, Trigger: tr.Trigger, State: tr.State, Session: tr.Session, SentAt: tr.SentAt})
 			}
 		}
 		want += len(open)

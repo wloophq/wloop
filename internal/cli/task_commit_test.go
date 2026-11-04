@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -36,8 +37,8 @@ func TestStartingWorkByHandCommitsTheTask(t *testing.T) {
 	finished := capture("finished", done)
 	idle := capture("idle", nil)
 	books := sqlite.New(r.db)
-	open := func(id task.ID, intent string, trig turn.Trigger, st turn.State) {
-		b := turn.Book{Unit: task.UnitOf(id), Turns: []turn.Turn{{Intent: turn.Intent(intent), ID: string(id) + intent, Trigger: trig, State: st, SentAt: r.now}}}
+	open := func(id task.ID, intent string, trig turn.Trigger, st turn.State, more ...turn.Turn) {
+		b := turn.Book{Unit: task.UnitOf(id), Turns: append([]turn.Turn{{Intent: turn.Intent(intent), ID: string(id) + intent, Trigger: trig, State: st, SentAt: r.now}}, more...)}
 		if _, err := books.Save(ctx, b); err != nil {
 			t.Fatal(err)
 		}
@@ -55,5 +56,24 @@ func TestStartingWorkByHandCommitsTheTask(t *testing.T) {
 		if got := r.taskOf(id).State; got != want {
 			t.Errorf("%s: %s, want %s", r.taskOf(id).Title, got, want)
 		}
+	}
+
+	moved := r.taskOf(started)
+	someday(&moved)
+	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: moved}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.taskOf(started).State; got != "someday" {
+		t.Fatalf("the turn that committed the task moved it back from Someday: %s", got)
+	}
+	open(started, "start", turn.ByHand, turn.Started, turn.Turn{Intent: "start", ID: "again", Trigger: turn.ByHand, State: turn.Started, SentAt: r.now.Add(time.Minute)})
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.taskOf(started).State; got != "next" {
+		t.Fatalf("a new turn by hand left the task in %s", got)
 	}
 }

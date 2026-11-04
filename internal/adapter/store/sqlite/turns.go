@@ -648,9 +648,9 @@ func (s *Store) Open(ctx context.Context) ([]unit.Unit, error) {
 }
 
 // OpenTurns are the open turns (sent, started or asked) of every unit, in ascending Seq, with their Seq,
-// Intent, Trigger, State and Session.
+// Intent, Trigger, State, Session and SentAt.
 func (s *Store) OpenTurns(ctx context.Context) (map[unit.Unit][]turn.Turn, error) {
-	rows, err := s.db.R().QueryContext(ctx, `SELECT provider, unit_key, seq, intent, trigger, state, session FROM turns
+	rows, err := s.db.R().QueryContext(ctx, `SELECT provider, unit_key, seq, intent, trigger, state, session, sent_at FROM turns
 		WHERE state IN ('sent', 'started', 'asked') ORDER BY seq`)
 	if err != nil {
 		return nil, err
@@ -660,9 +660,11 @@ func (s *Store) OpenTurns(ctx context.Context) (map[unit.Unit][]turn.Turn, error
 	for rows.Next() {
 		var u unit.Unit
 		var t turn.Turn
-		if err := rows.Scan(&u.Provider, &u.Key, &t.Seq, &t.Intent, &t.Trigger, &t.State, &t.Session); err != nil {
+		var sent string
+		if err := rows.Scan(&u.Provider, &u.Key, &t.Seq, &t.Intent, &t.Trigger, &t.State, &t.Session, &sent); err != nil {
 			return nil, err
 		}
+		t.SentAt = parseTime(sent)
 		out[u] = append(out[u], t)
 	}
 	return out, rows.Err()
