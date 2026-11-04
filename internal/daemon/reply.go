@@ -194,9 +194,13 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate, q reques
 	}
 	s.draftMu.Lock()
 	defer s.draftMu.Unlock()
+	origin := draft.Origin{Kind: draft.OriginUser}
+	if !q.user() {
+		origin.Session = q.Session
+	}
 	o := s.deps.Outbox
 	d, err := o.Propose(ctx, outbox.Proposal{Unit: c.Unit, Items: c.Items, Task: c.Task, Kind: kind, Text: c.Text, Target: strings.TrimSpace(c.Target),
-		Reaction: strings.Trim(strings.TrimSpace(c.Reaction), ":"), Origin: draft.Origin{Kind: draft.OriginUser, Session: q.Session}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
+		Reaction: strings.Trim(strings.TrimSpace(c.Reaction), ":"), Origin: origin, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
 	if errors.Is(err, outbox.ErrDisabled) {
 		err = noPublisher{c.Unit.Provider, err}
 	}
