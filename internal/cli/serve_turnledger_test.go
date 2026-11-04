@@ -133,7 +133,7 @@ func TestHistoryShowsLedgerOps(t *testing.T) {
 		t.Fatal(err)
 	}
 	b := te.unitBook(t, u)
-	past, err := te.Env.turnHistory(ctx, u, b)
+	past, err := te.Env.turnHistory(ctx, u, b, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestTurnsWithoutALedgerListNoItems(t *testing.T) {
 	if te.Env.itemsReader() != nil {
 		t.Fatal("a reader without a ledger")
 	}
-	past, err := te.Env.turnHistory(context.Background(), ghUnit(7), dturn.Book{})
+	past, err := te.Env.turnHistory(context.Background(), ghUnit(7), dturn.Book{}, "")
 	if err != nil || past != nil {
 		t.Fatalf("%+v %v", past, err)
 	}
@@ -249,7 +249,7 @@ func TestTurnLedgerCostOnARealStore(t *testing.T) {
 	b := te.unitBook(t, u)
 	start = time.Now()
 	for range reads {
-		if past, err := te.Env.turnHistory(ctx, u, b); err != nil || len(past[0].Ledger) != record.LedgerMax {
+		if past, err := te.Env.turnHistory(ctx, u, b, ""); err != nil || len(past[0].Ledger) != record.LedgerMax {
 			t.Fatalf("%+v %v", past, err)
 		}
 	}

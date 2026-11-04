@@ -52,7 +52,7 @@ func TestHistoryNamesEachOpWithItsOutcome(t *testing.T) {
 		{Op: at1(resolve), Outcome: "applied", At: at(1)},
 		{Op: at1(resolve), Outcome: "noop", At: at(3)},
 	}
-	h := b.HistoryWith(10, log)
+	h := b.HistoryWith(10, log, "")
 	if want := []string{"resolved i2: answered", "refused i3: anchor: required", "reopen i4: no outcome logged"}; !slices.Equal(h[1].Ledger, want) {
 		t.Fatalf("the first turn: %q", h[1].Ledger)
 	}

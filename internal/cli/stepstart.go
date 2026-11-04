@@ -360,13 +360,37 @@ func (s *stepSet) asks(ctx context.Context, c stepCall, p *startPlan) (string, e
 		return "", nil
 	}
 	intent := dturn.Intent(p.args.intent)
+	why := "its " + p.args.intent + " turn asks you something"
 	switch {
 	case b.QuestionAnswered(intent):
-		return "its " + p.args.intent + refusalAnswerOnItsWay, nil
+		why = turns.AnswerOnItsWay(intent)
 	case p.round && c.arg("open_question") == builtin.QuestionReplaceIfMoved && b.QuestionMoved(intent, p.planned.Head):
 		return "", nil
 	}
-	return "its " + p.args.intent + refusalAsks, nil
+	s.holdByQuestion(c.u, questionHold{refusal: why, head: p.planned.Head})
+	return why, nil
+}
+
+// questionHold is a round an open question refused, and the head it was
+// planned on, "" unknown.
+type questionHold struct{ refusal, head string }
+
+func (s *stepSet) holdByQuestion(u unit.Unit, h questionHold) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.held == nil {
+		s.held = map[unit.Unit]questionHold{}
+	}
+	s.held[u] = h
+}
+
+// questionHeld is the hold behind refusal on u, false when an open question
+// did not give it.
+func (s *stepSet) questionHeld(u unit.Unit, refusal string) (questionHold, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	h, ok := s.held[u]
+	return h, ok && h.refusal == refusal
 }
 
 func (s *stepSet) intakeAsks(ctx context.Context, u unit.Unit, intent string) (string, error) {
@@ -459,36 +483,24 @@ func (s *stepSet) startNote(ctx context.Context, c stepCall, refusal string) err
 		return s.recordBriefWaiting(ctx, p)
 	case isCapRefusal(refusal):
 		return s.holdByCap(ctx, c, refusal)
-	case isQuestionRefusal(refusal):
-		s.logQuestionHold(ctx, c, refusal)
+	default:
+		if h, ok := s.questionHeld(c.u, refusal); ok {
+			s.logQuestionHold(c, h)
+		}
 	}
 	return nil
 }
 
-func isQuestionRefusal(refusal string) bool {
-	return strings.HasPrefix(refusal, "its ") && (strings.HasSuffix(refusal, refusalAsks) || strings.HasSuffix(refusal, refusalAnswerOnItsWay))
-}
-
-// The tails of the refusals of a round an open question holds.
-const (
-	refusalAsks           = " turn asks you something"
-	refusalAnswerOnItsWay = " question has an answer on its way"
-)
-
 // logQuestionHold logs, once a day per planned head, that an open question
 // holds the round, which the plan shows and nothing else would.
-func (s *stepSet) logQuestionHold(ctx context.Context, c stepCall, refusal string) {
+func (s *stepSet) logQuestionHold(c stepCall, h questionHold) {
 	st := s.bound()
 	ref, err := githubRef(c.u)
 	if st == nil || err != nil {
 		return
 	}
 	args := s.e.startOf(c.st, c.u.Provider)
-	head := "an unknown head"
-	if planned, ok, err := s.plan(ctx, c.u, args.candidate()); err == nil && ok && planned.Head != "" {
-		head = planned.Head
-	}
-	line := fmt.Sprintf("skip the %s of %s at %s: %s", args.kindName(), ref, head, refusal)
+	line := fmt.Sprintf("skip the %s of %s at %s: %s", args.kindName(), ref, cmp.Or(h.head, "an unknown head"), h.refusal)
 	if st.FirstNote(line, s.e.Now()) {
 		fmt.Fprintf(s.e.Err, "%s %s\n", s.e.stamp(), line)
 	}

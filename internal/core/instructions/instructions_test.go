@@ -46,7 +46,7 @@ func book() turn.Book {
 }
 
 func TestHistoryMapsEndorsementTriageAndWhatTheUserSaid(t *testing.T) {
-	h := History(book(), 10, nil)
+	h := History(book(), 10, nil, "")
 	if len(h) != 3 || h[0].Intent != "review" || h[0].When != at(20) || h[2].When != at(0) {
 		t.Fatalf("newest first: %+v", h)
 	}
@@ -64,13 +64,13 @@ func TestHistoryMapsEndorsementTriageAndWhatTheUserSaid(t *testing.T) {
 	if h[0].Verdict != "" || h[0].Endorsed != "" {
 		t.Fatalf("a held draft is no verdict: %+v", h[0])
 	}
-	if len(History(book(), 2, nil)) != 2 {
+	if len(History(book(), 2, nil, "")) != 2 {
 		t.Fatal("limit")
 	}
 }
 
 func TestEarlierLeavesOutTheTurnAndThoseAfterIt(t *testing.T) {
-	h := History(Earlier(book(), 3), 10, nil)
+	h := History(Earlier(book(), 3), 10, nil, "")
 	if len(h) != 2 || h[0].Intent != "address" {
 		t.Fatalf("%+v", h)
 	}

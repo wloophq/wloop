@@ -21,10 +21,10 @@ type Entry struct {
 	Intent, Trigger, State, Verdict, Head, Endorsed string
 	Summary, Next, Triage                           string
 	Said                                            []string
-	// Question and Options are what the turn asked that no answer reached,
-	// for a turn still asked or replaced while it asked.
+	// Question and Options are what the turn asks that no answer reached, on
+	// the turn the send these entries are for replaces.
 	Question string
-	Options  []string
+	Options  []record.Option
 	// Ledger is one line per op of the turn's records with its outcome.
 	Ledger []string
 }
@@ -32,11 +32,12 @@ type Entry struct {
 // History is one entry per turn but the withdrawn ones, newest first, at most
 // limit. Summary, Next and Triage were written by an agent; Said holds what
 // the user said: the answers that reached the agent, then the guidance.
-func (b *Book) History(limit int) []Entry { return b.HistoryWith(limit, nil) }
+func (b *Book) History(limit int) []Entry { return b.HistoryWith(limit, nil, "") }
 
 // HistoryWith is History with the outcomes the items ledger logged for the
-// ops of the turns' records, oldest first.
-func (b *Book) HistoryWith(limit int, log []OpOutcome) []Entry {
+// ops of the turns' records, oldest first, for a send of intent sending ("" for
+// none), which replaces that intent's open turn.
+func (b *Book) HistoryWith(limit int, log []OpOutcome, sending Intent) []Entry {
 	m := &outcomes{log: log, used: make([]bool, len(log))}
 	lines := map[int64][]string{}
 	for _, r := range b.Records {
@@ -48,6 +49,9 @@ func (b *Book) HistoryWith(limit int, log []OpOutcome) []Entry {
 	for i := len(b.Turns) - 1; i >= 0 && len(out) < limit; i-- {
 		if t := b.Turns[i]; t.State != Withdrawn {
 			e := b.entry(t)
+			if q, ok := b.leftOpen(t, sending); ok {
+				e.Question, e.Options = q.Text, q.Options
+			}
 			e.Ledger = lines[t.Seq]
 			out = append(out, e)
 		}
@@ -208,12 +212,6 @@ func (b *Book) entry(t Turn) Entry {
 		if r.State == record.Done && r.Outcome != nil {
 			e.Verdict = r.Outcome.Verdict
 		}
-		if q := r.Question; q != nil && b.leftOpen(t, last.At) {
-			e.Question = q.Text
-			for _, o := range q.Options {
-				e.Options = append(e.Options, fmt.Sprintf("%s (%s): %s", o.Label, o.ID, o.Consequence))
-			}
-		}
 		if t.State == Done && r.Artifact != nil && b.HistoryArtifact != nil && r.Artifact.Kind == b.HistoryArtifact(string(t.Intent)) {
 			e.Triage = cut(r.Artifact.Body, TriageMax)
 		}
@@ -229,11 +227,21 @@ func (b *Book) entry(t Turn) Entry {
 	return e
 }
 
-// leftOpen says whether t's question asked at recorded is still unanswered:
-// t still asks, or a send replaced it while it asked, and no answer came.
-func (b *Book) leftOpen(t Turn, recorded time.Time) bool {
-	asking := t.State == Asked || t.State == Replaced && t.Before == Asked
-	return asking && !b.answeredSince(t.Seq, recorded)
+// leftOpen is the question of t, a send of intent sending replaces: t is
+// that intent's newest turn, it asks, and no answer came since.
+func (b *Book) leftOpen(t Turn, sending Intent) (record.Question, bool) {
+	newest, ok := b.Newest(sending)
+	if sending == "" || !ok || newest.Seq != t.Seq || t.State != Asked {
+		return record.Question{}, false
+	}
+	last, ok := b.LastRecord(t.Seq)
+	if !ok || last.Record.Question == nil {
+		return record.Question{}, false
+	}
+	if _, answered := b.AnswerStoredAt(t.Seq); answered {
+		return record.Question{}, false
+	}
+	return *last.Record.Question, true
 }
 
 // Said is the answer as the agent reads it: the chosen option, yes or no,

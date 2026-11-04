@@ -457,24 +457,36 @@ func TestAQuestionIsAnsweredByAnAnswerSinceItsRecordThatWasNotRefused(t *testing
 	}
 }
 
-func TestTheHistoryCarriesTheQuestionNoAnswerReached(t *testing.T) {
+func TestTheHistoryCarriesTheQuestionOnlyToTheSendThatReplacesIt(t *testing.T) {
 	q := &record.Question{Kind: "choice", Text: "nudge the author or drop?", Options: []record.Option{{ID: "nudge", Label: "Nudge", Consequence: "posts a nudge"}, {ID: "drop", Label: "Drop", Consequence: "ends the review"}}}
-	b := askedOn("c1")
-	b.Records[0].Record.Question = q
-	b.Turns[0].State, b.Turns[0].Before = Replaced, Asked
-	e := b.History(1)[0]
-	want := []string{"Nudge (nudge): posts a nudge", "Drop (drop): ends the review"}
-	if e.Question != q.Text || !slices.Equal(e.Options, want) {
-		t.Fatalf("entry %+v", e)
+	asked := func() Book {
+		b := askedOn("c1")
+		b.Records[0].Record.Question = q
+		return b
 	}
-	b.Answers = []Answer{{TurnSeq: 1, OptionID: "drop", Route: Resumed, At: at(3)}}
-	if e := b.History(1)[0]; e.Question != "" || e.Options != nil {
-		t.Fatalf("an answered question is carried: %+v", e)
+	b := asked()
+	if e := b.HistoryWith(1, nil, "review")[0]; e.Question != q.Text || !slices.Equal(e.Options, q.Options) {
+		t.Fatalf("the replacing send's entry %+v", e)
 	}
-	b = askedOn("c1")
-	b.Records[0].Record.Question = q
-	b.Turns[0].State = Done
-	if e := b.History(1)[0]; e.Question != "" {
-		t.Fatalf("a question its turn settled is carried: %+v", e)
+	for name, c := range map[string]struct {
+		change  func(*Book)
+		sending Intent
+	}{
+		"another intent's send": {func(*Book) {}, "nudge"},
+		"a resume":              {func(*Book) {}, ""},
+		"an answer on its way":  {func(b *Book) { b.Answers = []Answer{{TurnSeq: 1, OptionID: "drop", Route: Queued, At: at(3)}} }, "review"},
+		"a later turn replaced it": {func(b *Book) {
+			b.Turns[0].State, b.Turns[0].Before = Replaced, Asked
+			b.Turns = append(b.Turns, Turn{Seq: 2, Intent: "review", State: Done, Head: "c2"})
+		}, "review"},
+		"its turn settled": {func(b *Book) { b.Turns[0].State = Done }, "review"},
+	} {
+		b := asked()
+		c.change(&b)
+		for _, e := range b.HistoryWith(2, nil, c.sending) {
+			if e.Question != "" || e.Options != nil {
+				t.Errorf("%s: the question is carried: %+v", name, e)
+			}
+		}
 	}
 }

@@ -163,8 +163,11 @@ func TestAFollowUpOnAMovedPullRequestReplacesTheQuestionItsReviewAsked(t *testin
 	if q.Seq != seq || q.State != dturn.Replaced || q.Before != dturn.Asked || !ok || next.Seq == seq || next.Head != planned.Head || b.OpenQuestion(dturn.Intent(dintent.Review)) {
 		t.Fatalf("turns %+v", b.Turns)
 	}
-	if e := b.History(2)[1]; e.Question != "nudge the author or drop?" || len(e.Options) != 2 {
-		t.Fatalf("the replaced turn's history carries no question: %+v", e)
+	text := storedText(t, r.sc.te, next.ID)
+	for _, want := range []string{"nudge the author or drop?", "Drop (drop): ends the review", "This question is still open"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("the follow-up's instructions miss %q:\n%s", want, text)
+		}
 	}
 }
 
@@ -231,6 +234,23 @@ func TestAQuestionHoldingTheRoundIsLoggedOncePerHeadADay(t *testing.T) {
 	want := "skip the follow-up of " + r.sc.ref.String() + " at " + planned.Head + ": its review turn asks you something"
 	if got := strings.Count(r.sc.te.err.String(), want); got != 1 {
 		t.Fatalf("logged %d times, want once:\n%s", got, r.sc.te.err)
+	}
+	b := r.sc.te.bookOf(t, r.sc.ref)
+	b.Answers = append(b.Answers, dturn.Answer{TurnSeq: b.Turns[len(b.Turns)-1].Seq, Text: "drop", Route: dturn.Queued, At: testNow.Add(time.Minute)})
+	if _, err := r.sc.te.repo.Save(context.Background(), b); err != nil {
+		t.Fatal(err)
+	}
+	refusal = r.check(t, automation.CheckOpts{})
+	r.load(t)
+	if err := r.steps.Note(context.Background(), r.st, r.u, r.why, refusal); err != nil {
+		t.Fatal(err)
+	}
+	r.save(t)
+	if want := " at " + planned.Head + ": its review question has an answer on its way"; !strings.Contains(r.sc.te.err.String(), want) {
+		t.Fatalf("the answer on its way is not logged:\n%s", r.sc.te.err)
+	}
+	if err := r.steps.Note(context.Background(), r.st, r.u, r.why, "held by you"); err != nil || strings.Contains(r.sc.te.err.String(), "held by you") {
+		t.Fatalf("a refusal no question gave is logged: %v\n%s", err, r.sc.te.err)
 	}
 }
 
