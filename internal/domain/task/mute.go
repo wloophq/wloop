@@ -8,8 +8,8 @@ import (
 )
 
 // Activity marks Changed the tasks of f.Unit parked on someone else when f.LastHuman is after what the user
-// saw (SeenAt, or Created before any): a deferred task, or an open one out of the inbox that has an owner or
-// holds an item of its that waits on someone but me. It moves no task: a task never returns to the inbox on
+// saw (SeenAt, or Created before any): a deferred task, or an open one out of the inbox that has an owner but
+// me, a date to check on it, or an item of its that waits on someone but me. It moves no task: a task never returns to the inbox on
 // activity, and a wake on activity is the wakes' to match.
 func Activity(f UnitFacts, its []items.Item, me Me, have []Task, now time.Time) []Change {
 	var out []Change
@@ -30,7 +30,7 @@ func parked(f UnitFacts, e Task, its []items.Item, me Me) bool {
 	if !e.Open() || e.Category == CategoryInbox {
 		return false
 	}
-	if !e.Prop(PropOwner).IsZero() {
+	if slices.ContainsFunc(e.Prop(PropOwner).Actors, func(p items.Person) bool { return !isMe(p, me) }) || !e.Prop(PropCheckOn).Time.IsZero() {
 		return true
 	}
 	return slices.ContainsFunc(its, func(it items.Item) bool {
