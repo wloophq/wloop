@@ -137,3 +137,35 @@ func TestTheTimelineNamesAChangeMadeThroughASessionTheUserDrove(t *testing.T) {
 		t.Fatalf("the timeline %+v", evs)
 	}
 }
+
+func TestADraftASessionWritesIsItsOwnSubject(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newOutboxRig(t)
+	svc := sessionsOn(r.db)
+	r.s.deps.Turns = svc
+	worker, mine := adoptSession(t, svc, "term_1", false), adoptSession(t, svc, "term_2", true)
+	st := r.db.Gates(r.clock.Now)
+	gs := gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{r.s.loaded().Gates}, Clock: r.clock, Sessions: svc,
+		Publisher: publishTo(func(ctx context.Context, g gate.Gate) error { return r.o.Publish(ctx, g) })})
+	r.s.deps.Gates, r.o.Gates = gs, rigGates{gs, st}
+	r.put(t, unitTask("t-1", task.OriginDerived, r7u))
+	body := fmt.Sprintf(`{"unit":{"provider":%q,"key":%q},"task":"t-1","text":"From a session","source":"terminal"}`, r7u.Provider, r7u.Key)
+	for _, c := range []struct{ name, handle, session string }{{"a worker", "term_1", worker}, {"a session the user drives", "term_2", mine}} {
+		rec := postFrom(t, r.s, c.handle, api.Drafts, body)
+		if rec.Code != 200 {
+			t.Fatalf("%s: %d %s", c.name, rec.Code, rec.Body)
+		}
+		var d api.Draft
+		if err := json.Unmarshal(rec.Body.Bytes(), &d); err != nil {
+			t.Fatal(err)
+		}
+		g, err := st.Get(ctx, d.Gate)
+		if err != nil || g.Session != c.session {
+			t.Fatalf("%s: its draft's gate %+v %v, want the subject of session %s", c.name, g, err, c.session)
+		}
+		if rec := postFrom(t, r.s, c.handle, fmt.Sprintf("/api/gates/%d/approve", g.ID), `{"source":"claude"}`); rec.Code != 403 {
+			t.Errorf("%s approved its own draft: %d %s", c.name, rec.Code, rec.Body)
+		}
+	}
+}
