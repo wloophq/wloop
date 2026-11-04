@@ -324,7 +324,8 @@ type ActionRequest struct {
 	Action string
 	Input  string
 	Args   json.RawMessage
-	// Actor is who asked for the action: ActorPerson or ActorAgent; ""
+	// Actor is who asked for the action: ActorPerson for the user, a person
+	// or an agent session they drive, ActorAgent for any other session; ""
 	// when the host does not say.
 	Actor string
 }
