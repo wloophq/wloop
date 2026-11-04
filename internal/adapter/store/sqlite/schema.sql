@@ -4,7 +4,9 @@ CREATE TABLE events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   provider TEXT NOT NULL, unit_key TEXT NOT NULL,
   kind TEXT NOT NULL, key TEXT NOT NULL DEFAULT '', actor TEXT NOT NULL DEFAULT '',
-  at TEXT NOT NULL, data TEXT NOT NULL DEFAULT '', anchor TEXT NOT NULL DEFAULT ''
+  at TEXT NOT NULL, data TEXT NOT NULL DEFAULT '', anchor TEXT NOT NULL DEFAULT '',
+  -- the session an agent acted through; '' for any other actor
+  session TEXT NOT NULL DEFAULT ''
 );
 CREATE UNIQUE INDEX events_keyed ON events(provider, unit_key, kind, key) WHERE key != '';
 CREATE UNIQUE INDEX events_unkeyed ON events(provider, unit_key, kind, at) WHERE key = '';
@@ -118,7 +120,9 @@ CREATE TABLE turn_answers (
   option_id TEXT NOT NULL DEFAULT '', yes INTEGER NOT NULL DEFAULT 0, no INTEGER NOT NULL DEFAULT 0,
   route TEXT NOT NULL, session TEXT NOT NULL DEFAULT '',
   message_id INTEGER NOT NULL DEFAULT 0, read_at TEXT NOT NULL DEFAULT '', noticed_at TEXT NOT NULL DEFAULT '',
-  gate_id INTEGER NOT NULL DEFAULT 0
+  gate_id INTEGER NOT NULL DEFAULT 0,
+  -- the session an agent answered through; '' for a person's answer
+  by_session TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX turn_answers_unit ON turn_answers(provider, unit_key);
 
@@ -363,7 +367,9 @@ CREATE TABLE gates (
   deadline TEXT NOT NULL DEFAULT '', default_intent TEXT NOT NULL DEFAULT '',
   opened_at TEXT NOT NULL, closed_at TEXT NOT NULL DEFAULT '',
   applied_at TEXT NOT NULL DEFAULT '',
-  begun_at TEXT NOT NULL DEFAULT ''
+  begun_at TEXT NOT NULL DEFAULT '',
+  -- the session whose turn produced the subject, which never resolves the gate; the session an agent resolved it through
+  session TEXT NOT NULL DEFAULT '', by_session TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX gates_due ON gates (status, deadline);
 CREATE INDEX gates_task ON gates (task_id);
@@ -433,7 +439,9 @@ CREATE TABLE drafts (
   -- the unit of the proposing turn when it is not the draft's; '' when it is
   origin_provider TEXT NOT NULL DEFAULT '', origin_unit_key TEXT NOT NULL DEFAULT '',
   -- an edit's: the text it replaced
-  replaced TEXT NOT NULL DEFAULT ''
+  replaced TEXT NOT NULL DEFAULT '',
+  -- the session that proposed it; '' when none did
+  origin_session TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX drafts_state ON drafts (state, id);
 CREATE INDEX drafts_unit ON drafts (provider, unit_key, id);

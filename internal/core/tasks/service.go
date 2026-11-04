@@ -142,19 +142,19 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 			return r, nil
 		}
 	}
-	s.settle(ctx, []task.Task{next}, req.Verb, req.Actor)
+	s.settle(ctx, []task.Task{next}, req.Verb, req.Actor, req.Session)
 	return r, nil
 }
 
 // settle hands Ending each of es that ended, by verb v of by, or by no verb when v is empty; it runs with the
 // lock released, since settling a draft or a gate can reach back into the service.
-func (s *Service) settle(ctx context.Context, es []task.Task, v task.Verb, by task.Actor) {
+func (s *Service) settle(ctx context.Context, es []task.Task, v task.Verb, by task.Actor, session string) {
 	if s.d.Ending == nil {
 		return
 	}
 	for _, e := range es {
 		if !e.Open() {
-			s.d.Ending.Ended(ctx, e, v, by)
+			s.d.Ending.Ended(ctx, e, v, by, session)
 		}
 	}
 }
@@ -750,7 +750,7 @@ func (p *pending) changes() []task.Change {
 // keeps its tasks as they are.
 func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 	ended, err := s.sync(ctx, units)
-	s.settle(ctx, ended, "", task.ActorPlugin)
+	s.settle(ctx, ended, "", task.ActorPlugin, "")
 	return err
 }
 
@@ -959,7 +959,7 @@ func (s *Service) UnitClosed(ctx context.Context, u unit.Unit) error {
 	if err != nil {
 		return err
 	}
-	s.settle(ctx, ended, "", task.ActorPlugin)
+	s.settle(ctx, ended, "", task.ActorPlugin, "")
 	return nil
 }
 

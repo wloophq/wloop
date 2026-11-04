@@ -149,8 +149,29 @@ func (m *gateMigration) open(ctx context.Context, g gate.Gate, explicit string) 
 	if g.Task, err = m.taskOf(ctx, explicit, g.Unit); err != nil {
 		return err
 	}
-	_, err = insertGate(ctx, m.tx, g)
+	_, err = insertV7Gate(ctx, m.tx, g)
 	return err
+}
+
+// insertV7Gate writes g into the gates table as version 7 has it.
+func insertV7Gate(ctx context.Context, tx *sql.Tx, g gate.Gate) (int64, error) {
+	intents, err := json.Marshal(nonNil(g.Intents))
+	if err != nil {
+		return 0, err
+	}
+	var taskID any
+	if g.Task != "" {
+		taskID = string(g.Task)
+	}
+	res, err := tx.ExecContext(ctx, `INSERT INTO gates (task_id, provider, unit_key, kind, name, subject, status, intents, intent, answer,
+	by_actor, rule, deadline, default_intent, opened_at, closed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		taskID, string(g.Unit.Provider), g.Unit.Key, string(g.Kind), g.Name, g.Subject,
+		string(g.Status), string(intents), g.Intent, g.Answer, string(g.By), g.Rule, eventTime(g.Deadline), g.Default,
+		eventTime(g.OpenedAt), eventTime(g.ClosedAt))
+	if err != nil {
+		return 0, fmt.Errorf("a %s gate on %q: %w", g.Kind, g.Subject, err)
+	}
+	return res.LastInsertId()
 }
 
 // taskOf is the task a gate on u belongs to: explicit when that task exists, else the task u is, else the task
