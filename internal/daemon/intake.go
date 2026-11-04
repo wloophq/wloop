@@ -479,7 +479,7 @@ func (s *Server) startAction(ctx context.Context, i intake.Intake, out io.Writer
 		line = d.StartLine
 	}
 	fmt.Fprintln(out, line)
-	err := s.act(ctx, p.Action, i.Unit, p.ActionRequest, out)
+	err := s.act(ctx, p.Action, i.Unit, p.ActionRequest, personRequest, out)
 	var refused Refusal
 	if errors.As(err, &refused) {
 		s.logDetail(p.Action, i.Unit, refused)

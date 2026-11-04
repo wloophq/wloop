@@ -480,7 +480,7 @@ func TestHoldPauseAndByHandDropWithoutMarking(t *testing.T) {
 		}},
 		{"by hand", func(t *testing.T, r *planRig) {
 			r.s.deps.Actions = &fakeActions{}
-			if err := r.s.act(context.Background(), "run_now", u7, api.ActionRequest{}, &bytes.Buffer{}); err != nil {
+			if err := r.s.act(context.Background(), "run_now", u7, api.ActionRequest{}, personRequest, &bytes.Buffer{}); err != nil {
 				t.Fatal(err)
 			}
 		}},
