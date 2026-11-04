@@ -32,8 +32,8 @@ type Input struct {
 	// AddressedAt is when the pull request's driving turn, an address turn,
 	// reached its state; zero without one.
 	AddressedAt time.Time
-	// AskedAt is when a turn on the pull request asked the user something
-	// no answer reached yet; zero without one.
+	// AskedAt is when the newest turn of an intent on the pull request asked
+	// the user something no answer reached yet; zero without one.
 	AskedAt time.Time
 	// MaxDetailAge is the oldest detail the plugin calls fresh.
 	MaxDetailAge time.Duration

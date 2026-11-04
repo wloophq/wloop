@@ -103,6 +103,22 @@ func TestAnAddressTurnInTheBooksEndsTheReviewToAddress(t *testing.T) {
 	}
 }
 
+func TestAWithdrawnAddressTurnLeavesTheReviewToAddress(t *testing.T) {
+	h := &fakeHost{}
+	p := started(t, &githubGraphQL{}, h)
+	ref := mine(t, p)
+	h.record(src.Event{Unit: ref.Unit(), Kind: pr.KindWouldAddress, Key: "w1", At: testAt.Add(-2 * time.Hour), Data: []byte("reviewed by bruno")})
+	h.mu.Lock()
+	h.books = []src.Book{{Unit: ref.Unit(), Turns: []src.Turn{{Seq: 1, Intent: "address", Role: "pr.address", State: "withdrawn", At: testAt.Add(-time.Hour)}}}}
+	h.mu.Unlock()
+	if err := p.Notify(context.Background(), []sdk.Unit{ref.Unit()}, []sdk.Topic{sdk.TopicEvents, sdk.TopicTurns}); err != nil {
+		t.Fatal(err)
+	}
+	if s := h.lastReport(t, ref); s.Situation.Kind != string(situation.KindToAddress) {
+		t.Fatalf("a withdrawn address turn addressed the review: %+v", s.Situation)
+	}
+}
+
 func TestAnOpenQuestionInTheBooksWaitsOnTheViewerUntilItsAnswer(t *testing.T) {
 	h := &fakeHost{}
 	p := started(t, &githubGraphQL{}, h)
@@ -113,19 +129,22 @@ func TestAnOpenQuestionInTheBooksWaitsOnTheViewerUntilItsAnswer(t *testing.T) {
 	}
 	h.record(src.Event{Unit: ref.Unit(), Kind: pr.KindReview, Key: "r1", Actor: "carla", At: testAt.Add(-2 * time.Hour), Data: []byte("CHANGES_REQUESTED:h7")})
 	asked := src.Turn{Seq: 1, Intent: "review", Role: "pr.review", State: "asked", At: testAt.Add(-time.Hour)}
+	withdrawn := src.Turn{Seq: 2, Intent: "review", Role: "pr.review", State: "withdrawn", At: testAt.Add(-time.Minute)}
 	for _, c := range []struct {
 		name          string
 		answer        time.Time
+		after         []src.Turn
 		kind          situation.Kind
 		item, waiting string
 	}{
-		{"unanswered", time.Time{}, situation.KindLoopWaiting, "gh:follow", "github:carla"},
-		{"answered", testAt.Add(-time.Minute), situation.KindChanges, "gh:fix", "github:ana"},
+		{"unanswered", time.Time{}, nil, situation.KindLoopWaiting, "gh:follow", "github:carla"},
+		{"restored by a withdrawn send", time.Time{}, []src.Turn{withdrawn}, situation.KindLoopWaiting, "gh:follow", "github:carla"},
+		{"answered", testAt.Add(-time.Minute), nil, situation.KindChanges, "gh:fix", "github:ana"},
 	} {
 		turn := asked
 		turn.AnsweredAt = c.answer
 		h.mu.Lock()
-		h.books = []src.Book{{Unit: ref.Unit(), Turns: []src.Turn{turn}}}
+		h.books = []src.Book{{Unit: ref.Unit(), Turns: append([]src.Turn{turn}, c.after...)}}
 		h.mu.Unlock()
 		if err := p.Notify(ctx, []sdk.Unit{ref.Unit()}, []sdk.Topic{sdk.TopicEvents, sdk.TopicTurns}); err != nil {
 			t.Fatal(err)

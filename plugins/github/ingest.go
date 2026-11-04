@@ -380,6 +380,9 @@ func (in rowInputs) of(ref pr.Ref) row.Input {
 func askedAt(b src.Book) time.Time {
 	newest := map[string]src.Turn{}
 	for _, t := range b.Turns {
+		if t.State == turnWithdrawn {
+			continue
+		}
 		if n, ok := newest[t.Intent]; !ok || t.Seq > n.Seq {
 			newest[t.Intent] = t
 		}
@@ -393,8 +396,11 @@ func askedAt(b src.Book) time.Time {
 	return at
 }
 
-// turnAsked is the state of a turn that asks the user something.
-const turnAsked = "asked"
+// The turn states the rows read; a withdrawn turn reads as never sent.
+const (
+	turnAsked     = "asked"
+	turnWithdrawn = "withdrawn"
+)
 
 func (r *running) rowInputs(ctx context.Context, refs []pr.Ref) (rowInputs, error) {
 	viewer, err := r.db.Viewer(ctx)
@@ -456,6 +462,9 @@ const (
 func addressedAt(b src.Book) (time.Time, bool) {
 	var newest, driving *src.Turn
 	for i, t := range b.Turns {
+		if t.State == turnWithdrawn {
+			continue
+		}
 		if newest == nil || t.Seq > newest.Seq {
 			newest = &b.Turns[i]
 		}

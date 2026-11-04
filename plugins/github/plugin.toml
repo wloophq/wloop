@@ -51,7 +51,7 @@ doc = "A round waits on you before it starts."
 
 [[source.situations]]
 name = "loop_waiting"
-doc = "The agent of the round asks you a question."
+doc = "A turn on the pull request asks you a question no answer reached yet, or the agent of the round waits on you."
 
 [[source.situations]]
 name = "loop_stopped"
