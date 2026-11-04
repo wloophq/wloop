@@ -459,7 +459,7 @@ func TestAnAgentSessionsShellResolvesNoGate(t *testing.T) {
 func TestAnAgentShellApprovesThroughASessionTheUserDrives(t *testing.T) {
 	ctx := context.Background()
 	te := newTestEnv(t, &fake.Manager{})
-	db := outboxDaemon(t, te, true, func(d *daemon.Deps) { d.Turns = te.Turns })
+	db := outboxDaemon(t, te, false, func(d *daemon.Deps) { d.Turns = te.Turns })
 	te.Harness.SessionEnvs["fake"] = fake.SessionEnv{}
 	worker, err := te.Turns.Resolve(ctx, "fake", "term_1")
 	if err != nil {

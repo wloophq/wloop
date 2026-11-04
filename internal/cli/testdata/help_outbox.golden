@@ -16,9 +16,9 @@ reply, or a reaction, on a unit: a Slack message ref (<conversation>/<ts>) or
 permalink (its thread, or with --react the message itself), a pull request URL
 or owner/repo#n, or <provider>:<key>. It waits in the Outbox for your approval;
 with --send it posts once you read it and say yes. approve shows a draft whole
-and posts it once you say yes, only from a terminal of your own, never an
-agent's shell; retry posts a failed one again. edit changes a draft's text and
-discard drops it.
+and posts it once you say yes at a terminal; from an agent's shell it needs
+--yes and a session you drive, whose agent asks you first; retry posts a failed
+one again. edit changes a draft's text and discard drops it.
 
 FLAGS
   --color <when>     list, show: auto, always or never
