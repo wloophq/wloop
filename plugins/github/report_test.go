@@ -103,6 +103,43 @@ func TestAnAddressTurnInTheBooksEndsTheReviewToAddress(t *testing.T) {
 	}
 }
 
+func TestAnOpenQuestionInTheBooksWaitsOnTheViewerUntilItsAnswer(t *testing.T) {
+	h := &fakeHost{}
+	p := started(t, &githubGraphQL{}, h)
+	ref := mine(t, p)
+	ctx := context.Background()
+	if err := p.store().SetViewer(ctx, "carla"); err != nil {
+		t.Fatal(err)
+	}
+	h.record(src.Event{Unit: ref.Unit(), Kind: pr.KindReview, Key: "r1", Actor: "carla", At: testAt.Add(-2 * time.Hour), Data: []byte("CHANGES_REQUESTED:h7")})
+	asked := src.Turn{Seq: 1, Intent: "review", Role: "pr.review", State: "asked", At: testAt.Add(-time.Hour)}
+	for _, c := range []struct {
+		name          string
+		answer        time.Time
+		kind          situation.Kind
+		item, waiting string
+	}{
+		{"unanswered", time.Time{}, situation.KindLoopWaiting, "gh:follow", "github:carla"},
+		{"answered", testAt.Add(-time.Minute), situation.KindChanges, "gh:fix", "github:ana"},
+	} {
+		turn := asked
+		turn.AnsweredAt = c.answer
+		h.mu.Lock()
+		h.books = []src.Book{{Unit: ref.Unit(), Turns: []src.Turn{turn}}}
+		h.mu.Unlock()
+		if err := p.Notify(ctx, []sdk.Unit{ref.Unit()}, []sdk.Topic{sdk.TopicEvents, sdk.TopicTurns}); err != nil {
+			t.Fatal(err)
+		}
+		s := h.lastReport(t, ref)
+		if s.Situation.Kind != string(c.kind) {
+			t.Fatalf("%s: situation %+v", c.name, s.Situation)
+		}
+		if len(s.Items) != 1 || s.Items[0].ID != c.item || len(s.Items[0].WaitingOn) != 1 || s.Items[0].WaitingOn[0].Key != c.waiting {
+			t.Fatalf("%s: items %+v", c.name, s.Items)
+		}
+	}
+}
+
 func TestEachPullRequestIsReportedAgainOnlyWhenItsOwnDueTimePasses(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r := &running{now: time.Now, dues: map[pr.Ref]time.Time{}, dueWake: make(chan struct{}, 1)}

@@ -414,3 +414,67 @@ func TestWithdrawUndoesASendThatReplacedAQuestion(t *testing.T) {
 		t.Fatalf("a late record moved the withdrawn turn: %+v", b.Turns[1])
 	}
 }
+
+func askedOn(head string) Book {
+	return Book{Unit: r7, Turns: []Turn{{Seq: 1, Intent: "review", State: Asked, Head: head}},
+		Records: []Record{{TurnSeq: 1, Head: head, At: at(2), Record: record.Record{State: record.Asked}}}}
+}
+
+func TestAQuestionMovedOnlyWhenBothHeadsAreKnownAndDiffer(t *testing.T) {
+	b := askedOn("c1")
+	if !b.QuestionMoved("review", "c2") {
+		t.Fatal("a question asked on c1 did not move on c2")
+	}
+	for name, change := range map[string]func(*Book){
+		"same head":         func(b *Book) { b.Turns[0].Head, b.Records[0].Head = "c2", "c2" },
+		"turn with no head": func(b *Book) { b.Turns[0].Head, b.Records[0].Head = "", "" },
+		"not asked":         func(b *Book) { b.Turns[0].State = Done },
+		"other intent":      func(b *Book) { b.Turns[0].Intent = "address" },
+	} {
+		b := askedOn("c1")
+		change(&b)
+		if b.QuestionMoved("review", "c2") {
+			t.Errorf("%s: the question moved", name)
+		}
+	}
+	if b := askedOn("c1"); b.QuestionMoved("review", "") {
+		t.Error("an unknown head moved the question")
+	}
+}
+
+func TestAQuestionIsAnsweredByAnAnswerSinceItsRecordThatWasNotRefused(t *testing.T) {
+	b := askedOn("c1")
+	if b.QuestionAnswered("review") {
+		t.Fatal("no answer, answered")
+	}
+	b.Answers = []Answer{{TurnSeq: 1, At: at(1), Route: Typed}, {TurnSeq: 1, Route: Refused, At: at(4)}}
+	if b.QuestionAnswered("review") {
+		t.Fatal("an answer before the record, or a refused one, answers the question")
+	}
+	b.Answers = append(b.Answers, Answer{TurnSeq: 1, Route: Pending, At: at(5)})
+	if !b.QuestionAnswered("review") {
+		t.Fatal("a pending answer since the record does not answer it")
+	}
+}
+
+func TestTheHistoryCarriesTheQuestionNoAnswerReached(t *testing.T) {
+	q := &record.Question{Kind: "choice", Text: "nudge the author or drop?", Options: []record.Option{{ID: "nudge", Label: "Nudge", Consequence: "posts a nudge"}, {ID: "drop", Label: "Drop", Consequence: "ends the review"}}}
+	b := askedOn("c1")
+	b.Records[0].Record.Question = q
+	b.Turns[0].State, b.Turns[0].Before = Replaced, Asked
+	e := b.History(1)[0]
+	want := []string{"Nudge (nudge): posts a nudge", "Drop (drop): ends the review"}
+	if e.Question != q.Text || !slices.Equal(e.Options, want) {
+		t.Fatalf("entry %+v", e)
+	}
+	b.Answers = []Answer{{TurnSeq: 1, OptionID: "drop", Route: Resumed, At: at(3)}}
+	if e := b.History(1)[0]; e.Question != "" || e.Options != nil {
+		t.Fatalf("an answered question is carried: %+v", e)
+	}
+	b = askedOn("c1")
+	b.Records[0].Record.Question = q
+	b.Turns[0].State = Done
+	if e := b.History(1)[0]; e.Question != "" {
+		t.Fatalf("a question its turn settled is carried: %+v", e)
+	}
+}

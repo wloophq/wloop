@@ -457,6 +457,21 @@ func scenarios() []Scenario {
 			MaxWords: oldReview,
 		},
 		{
+			Name: "review/history/question-left-open",
+			Context: review(Automated, func(c *Context) {
+				c.Planned = PlannedFollowUp
+				c.PR().Prior = prior("CHANGES_REQUESTED")
+				c.History = []instructions.PastTurn{{When: time.Date(2026, 10, 16, 9, 30, 0, 0, time.UTC), Intent: "review", Trigger: "automated", State: "replaced",
+					Head: "9f8e7d", Summary: "nudge or drop?", Question: "The author went quiet: nudge them or drop the review?",
+					Options: []string{"Nudge (nudge): posts a nudge", "Drop (drop): ends the review"}}}
+			}),
+			Expect: "A follow-up on a pull request that moved after the last review turn asked the user something no one answered. The agent must weigh the question " +
+				"against the new commits and either ask it again (record `asked`) or say in its summary why it no longer applies.",
+			Must: []string{"- 2026-10-16 09:30, review (automated): replaced at `9f8e7d`", "it asked the user this, and no answer came:",
+				"      The author went quiet: nudge them or drop the review?", "      Drop (drop): ends the review", "This question is still open"},
+			MaxWords: oldReview,
+		},
+		{
 			Name:    "probe/first",
 			Context: probeContext(nil),
 			Expect: brand.Name + "'s self-test of an agent home. The agent must end its first prompt with the line `probe: step A` and no tool call, then record the first question " +

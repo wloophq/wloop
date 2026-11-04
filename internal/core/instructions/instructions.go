@@ -20,6 +20,10 @@ type PastTurn struct {
 	Intent, Trigger, State, Verdict, Head, Endorsed string
 	Summary, Next, Triage                           string
 	Said                                            []string
+	// Question and Options are what the turn asked that no answer reached:
+	// an agent's.
+	Question string
+	Options  []string
 	// Ledger is one line per op of the turn's records with its outcome.
 	Ledger []string
 }

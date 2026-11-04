@@ -34,7 +34,7 @@ The pull request shows in the **In loop** view while the agent works.
 The agent ends every round with a record, through the `turn_end` tool of {{name}}'s MCP server:
 
 - **done**: it published the review. The card moves to `reviewed`, or to `completed` when it approved.
-- **asked**: it held its draft and asks you something, for example whether a finding blocks or whether to approve a change to a risky surface. The card moves to `needs-me` and the question shows in the cockpit's **Needs me** view, the terminal client and, on macOS, a notification.
+- **asked**: it held its draft and asks you something, for example whether a finding blocks or whether to approve a change to a risky surface. The card moves to `needs-me` and the question shows in the cockpit's **Needs me** view, the terminal client and, on macOS, a notification. If the author pushes before you answer, the follow-up round replaces the question and asks it again when it still matters.
 - **failed**: something broke and nothing was published. It shows in **Needs me** with what broke.
 
 ## 4. Answer a question

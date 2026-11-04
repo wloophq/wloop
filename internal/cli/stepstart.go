@@ -277,7 +277,7 @@ func (s *stepSet) startGuards(ctx context.Context, c stepCall, byHand, live bool
 			return why, p, nil
 		}
 	}
-	if why, err := s.asks(ctx, c.u, &p); err != nil || why != "" {
+	if why, err := s.asks(ctx, c, &p); err != nil || why != "" {
 		return why, p, err
 	}
 	if !p.observed() {
@@ -343,20 +343,30 @@ func (s *stepSet) activity(ctx context.Context, p startPlan, byHand bool) string
 }
 
 // asks refuses a round whose intent's newest turn asks the user something:
-// the round would replace the turn the agent finishes with the answer.
-func (s *stepSet) asks(ctx context.Context, u unit.Unit, p *startPlan) (string, error) {
+// the round would replace the turn the agent finishes with the answer. A
+// step that replaces a moved question lets a round planned on another head
+// replace one no answer is on its way to.
+func (s *stepSet) asks(ctx context.Context, c stepCall, p *startPlan) (string, error) {
 	if s.e.Turns == nil {
 		return "", nil
 	}
-	books, err := s.e.Turns.Store.Books(ctx, u)
+	books, err := s.e.Turns.Store.Books(ctx, c.u)
 	if err != nil {
 		return "", err
 	}
-	p.first = !slices.ContainsFunc(books[u].Turns, func(t dturn.Turn) bool { return t.State != dturn.Withdrawn })
-	if s.e.Rec != nil && s.e.Rec.OpenQuestions(books)[p.ref][p.args.intent] {
-		return "its " + p.args.intent + " turn asks you something", nil
+	b := books[c.u]
+	p.first = !slices.ContainsFunc(b.Turns, func(t dturn.Turn) bool { return t.State != dturn.Withdrawn })
+	if s.e.Rec == nil || !s.e.Rec.OpenQuestions(books)[p.ref][p.args.intent] {
+		return "", nil
 	}
-	return "", nil
+	intent := dturn.Intent(p.args.intent)
+	switch {
+	case b.QuestionAnswered(intent):
+		return "its " + p.args.intent + refusalAnswerOnItsWay, nil
+	case p.round && c.arg("open_question") == builtin.QuestionReplaceIfMoved && b.QuestionMoved(intent, p.planned.Head):
+		return "", nil
+	}
+	return "its " + p.args.intent + refusalAsks, nil
 }
 
 func (s *stepSet) intakeAsks(ctx context.Context, u unit.Unit, intent string) (string, error) {
@@ -449,8 +459,39 @@ func (s *stepSet) startNote(ctx context.Context, c stepCall, refusal string) err
 		return s.recordBriefWaiting(ctx, p)
 	case isCapRefusal(refusal):
 		return s.holdByCap(ctx, c, refusal)
+	case isQuestionRefusal(refusal):
+		s.logQuestionHold(ctx, c, refusal)
 	}
 	return nil
+}
+
+func isQuestionRefusal(refusal string) bool {
+	return strings.HasPrefix(refusal, "its ") && (strings.HasSuffix(refusal, refusalAsks) || strings.HasSuffix(refusal, refusalAnswerOnItsWay))
+}
+
+// The tails of the refusals of a round an open question holds.
+const (
+	refusalAsks           = " turn asks you something"
+	refusalAnswerOnItsWay = " question has an answer on its way"
+)
+
+// logQuestionHold logs, once a day per planned head, that an open question
+// holds the round, which the plan shows and nothing else would.
+func (s *stepSet) logQuestionHold(ctx context.Context, c stepCall, refusal string) {
+	st := s.bound()
+	ref, err := githubRef(c.u)
+	if st == nil || err != nil {
+		return
+	}
+	args := s.e.startOf(c.st, c.u.Provider)
+	head := "an unknown head"
+	if planned, ok, err := s.plan(ctx, c.u, args.candidate()); err == nil && ok && planned.Head != "" {
+		head = planned.Head
+	}
+	line := fmt.Sprintf("skip the %s of %s at %s: %s", args.kindName(), ref, head, refusal)
+	if st.FirstNote(line, s.e.Now()) {
+		fmt.Fprintf(s.e.Err, "%s %s\n", s.e.stamp(), line)
+	}
 }
 
 // kindBriefWaiting records once per wait, keyed by intent and head, that a

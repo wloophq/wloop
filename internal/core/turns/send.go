@@ -74,6 +74,10 @@ func (s *Service) send(ctx context.Context, r SendRequest, start bool, handle st
 		s.mu.Unlock()
 		return turn.Turn{}, err
 	}
+	if r.Trigger == turn.Automated && !start && r.ResumeOf == 0 && b.QuestionAnswered(r.Intent) {
+		s.mu.Unlock()
+		return turn.Turn{}, Refusal{fmt.Sprintf("%s: its %s question has an answer on its way", r.Unit.Label(), r.Intent)}
+	}
 	now := s.now()
 	next := turn.Turn{
 		Intent: r.Intent, ID: r.Turn, Trigger: r.Trigger, Guidance: r.Guidance, Head: r.Head,

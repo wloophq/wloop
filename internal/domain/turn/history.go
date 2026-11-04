@@ -21,6 +21,10 @@ type Entry struct {
 	Intent, Trigger, State, Verdict, Head, Endorsed string
 	Summary, Next, Triage                           string
 	Said                                            []string
+	// Question and Options are what the turn asked that no answer reached,
+	// for a turn still asked or replaced while it asked.
+	Question string
+	Options  []string
 	// Ledger is one line per op of the turn's records with its outcome.
 	Ledger []string
 }
@@ -204,6 +208,12 @@ func (b *Book) entry(t Turn) Entry {
 		if r.State == record.Done && r.Outcome != nil {
 			e.Verdict = r.Outcome.Verdict
 		}
+		if q := r.Question; q != nil && b.leftOpen(t, last.At) {
+			e.Question = q.Text
+			for _, o := range q.Options {
+				e.Options = append(e.Options, fmt.Sprintf("%s (%s): %s", o.Label, o.ID, o.Consequence))
+			}
+		}
 		if t.State == Done && r.Artifact != nil && b.HistoryArtifact != nil && r.Artifact.Kind == b.HistoryArtifact(string(t.Intent)) {
 			e.Triage = cut(r.Artifact.Body, TriageMax)
 		}
@@ -217,6 +227,13 @@ func (b *Book) entry(t Turn) Entry {
 		e.Said = append(e.Said, t.Guidance)
 	}
 	return e
+}
+
+// leftOpen says whether t's question asked at recorded is still unanswered:
+// t still asks, or a send replaced it while it asked, and no answer came.
+func (b *Book) leftOpen(t Turn, recorded time.Time) bool {
+	asking := t.State == Asked || t.State == Replaced && t.Before == Asked
+	return asking && !b.answeredSince(t.Seq, recorded)
 }
 
 // Said is the answer as the agent reads it: the chosen option, yes or no,

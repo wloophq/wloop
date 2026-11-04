@@ -2,6 +2,7 @@ package messages_test
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strconv"
 	"sync"
@@ -50,14 +51,32 @@ func (c *clock) advance(d time.Duration) {
 	c.t = c.t.Add(d)
 }
 
+// logf keeps what the services log.
+func (r *rig) logf(format string, args ...any) {
+	r.logMu.Lock()
+	defer r.logMu.Unlock()
+	r.logs = append(r.logs, fmt.Sprintf(format, args...))
+}
+
+func (r *rig) logged() []string {
+	r.logMu.Lock()
+	defer r.logMu.Unlock()
+	return slices.Clone(r.logs)
+}
+
 type launcher struct {
 	mu       sync.Mutex
 	launches []turns.Launch
+	// err fails every launch.
+	err error
 }
 
 func (l *launcher) Launch(_ context.Context, x turns.Launch) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if l.err != nil {
+		return l.err
+	}
 	l.launches = append(l.launches, x)
 	return nil
 }
@@ -124,6 +143,8 @@ type rig struct {
 	ledger    *fakeLedger
 	clock     *clock
 	launch    *launcher
+	logMu     sync.Mutex
+	logs      []string
 	gateStore *gatestest.Store
 	gates     *gates.Service
 }
@@ -178,7 +199,7 @@ func newRig(t *testing.T) *rig {
 		taskStore: taskstest.New(), items: noItems{map[unit.Unit][]items.Item{}}, facts: facts{map[unit.ProviderID]bool{}},
 		ledger: &fakeLedger{}, clock: &clock{t: t0}, launch: &launcher{}}
 	r.turns = &turns.Service{Intents: turnstest.Intents(), Store: r.books, Registry: r.reg, Sessions: r.sess, Launcher: r.launch, Answers: r.launch,
-		Clock: r.clock, Command: "loop", FastJob: 2 * time.Minute}
+		Clock: r.clock, Command: "loop", FastJob: 2 * time.Minute, Log: r.logf}
 	r.tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: r.taskStore, Items: r.items, Facts: r.facts, Clock: r.clock})
 	r.gateStore = gatestest.NewStore(r.clock.Now)
 	r.svc = &messages.Service{Store: r.msgs, Books: r.books, Turns: r.turns, Ledger: r.ledger, Tasks: r.tasks, Intents: turnstest.Intents(),

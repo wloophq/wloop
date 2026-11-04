@@ -554,3 +554,16 @@ func TestPendingReadsTheNewestEventsWhateverTheirOrder(t *testing.T) {
 		t.Fatal("a request after my review, listed first, is not pending")
 	}
 }
+
+func TestAnOpenQuestionWaitsOnMeWhateverTheAuthorOwes(t *testing.T) {
+	p := open("ana")
+	p.Workspace = pr.Workspace{ID: "w", IsReview: true}
+	evs := []pr.Event{ev(pr.KindPush, "h2", "ana", h(1), ""), ev(pr.KindReview, "r1", "me", h(3), "CHANGES_REQUESTED:h2")}
+	r := Derive(Input{PR: p, Events: evs, Viewer: "me", Now: h(10), Stalled: th, AskedAt: h(4)})
+	if r.Kind != KindLoopWaiting || r.WaitingOn != "me" || !r.Since.Equal(h(4)) {
+		t.Fatalf("%+v", r)
+	}
+	if r := Derive(Input{PR: p, Events: evs, Viewer: "me", Now: h(10), Stalled: th}); r.Kind != KindChanges {
+		t.Fatalf("no question: %+v", r)
+	}
+}

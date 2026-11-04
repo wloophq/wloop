@@ -67,6 +67,9 @@ type Input struct {
 	// ThreadsSettledAt is when a full read last found the pull request's
 	// review threads, at least one, every one resolved; zero when it did not.
 	ThreadsSettledAt time.Time
+	// AskedAt is when the newest turn of an intent on the pull request asked
+	// the user something no answer reached yet; zero without one.
+	AskedAt time.Time
 }
 
 type Result struct {
@@ -127,6 +130,9 @@ func Derive(in Input) Result {
 	}
 	if w, ok := last(pr.KindWouldAddress); ok && p.Workspace.ID == "" && !addressedSince(in, evs, w.At) {
 		return Result{Kind: KindToAddress, WaitingOn: "me", Since: w.At, Reason: Cut("review to address, no workspace: " + w.Data)}
+	}
+	if !in.AskedAt.IsZero() {
+		return Result{Kind: KindLoopWaiting, WaitingOn: "me", Since: in.AskedAt, Reason: "the agent asked you something"}
 	}
 	if p.Workspace.IsReview {
 		if slices.Contains(p.Workspace.AgentStates, agentWaiting) {

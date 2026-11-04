@@ -75,11 +75,13 @@ func (s *Service) Answer(ctx context.Context, r AnswerRequest) (AnswerResult, er
 			return AnswerResult{}, err
 		}
 	}
-	return s.dispatch(ctx, r.Unit, q, a, said, route)
+	return s.dispatch(ctx, r.Unit, q, a, said, route, false)
 }
 
-// dispatch sends the stored answer a the way route says and saves where it went.
-func (s *Service) dispatch(ctx context.Context, ref unit.Unit, q turn.Turn, a turn.Answer, said string, route AnswerResult) (AnswerResult, error) {
+// dispatch sends the stored answer a the way route says and saves where it
+// went. A resume that fails refuses the answer, so its question asks again,
+// unless retried: the caller then keeps the answer to send again.
+func (s *Service) dispatch(ctx context.Context, ref unit.Unit, q turn.Turn, a turn.Answer, said string, route AnswerResult, retried bool) (AnswerResult, error) {
 	switch route.Route {
 	case turn.Typed:
 		var err error
@@ -91,10 +93,15 @@ func (s *Service) dispatch(ctx context.Context, ref unit.Unit, q turn.Turn, a tu
 			route = s.runHeadless(ctx, q, said)
 			break
 		}
-		if err := s.Launcher.Launch(ctx, Launch{Unit: ref, Intent: q.Intent, ResumeOf: q.Seq, Answer: said, Inputs: q.Inputs}); errors.Is(err, ErrWorkspaceGone) {
+		err := s.Launcher.Launch(ctx, Launch{Unit: ref, Intent: q.Intent, ResumeOf: q.Seq, Answer: said, Inputs: q.Inputs})
+		switch {
+		case errors.Is(err, ErrWorkspaceGone):
 			route = AnswerResult{Route: turn.Refused, Note: "the workspace is gone"}
-		} else if err != nil {
+		case err != nil && retried:
 			return AnswerResult{}, err
+		case err != nil:
+			s.logf("%s: resuming turn %s with the answer failed: %v; its question asks again", ref.Label(), q.ID, err)
+			route = AnswerResult{Route: turn.Refused, Note: "resuming the turn failed: " + err.Error()}
 		}
 	}
 	if err := s.saveRoute(ctx, ref, q, a.ID, route); err != nil {
@@ -464,7 +471,7 @@ func (s *Service) deliverQuestion(ctx context.Context, ref unit.Unit, b turn.Boo
 		return nil
 	}
 	defer s.release(a.ID)
-	_, err = s.dispatch(ctx, ref, *q, a, b.Said(a), route)
+	_, err = s.dispatch(ctx, ref, *q, a, b.Said(a), route, true)
 	if refused := (Refusal{}); errors.As(err, &refused) {
 		s.logf("the queued answer %d on %s: %s", a.ID, ref, refused.Reason)
 		return nil

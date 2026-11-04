@@ -32,6 +32,9 @@ type Input struct {
 	// AddressedAt is when the pull request's driving turn, an address turn,
 	// reached its state; zero without one.
 	AddressedAt time.Time
+	// AskedAt is when a turn on the pull request asked the user something
+	// no answer reached yet; zero without one.
+	AskedAt time.Time
 	// MaxDetailAge is the oldest detail the plugin calls fresh.
 	MaxDetailAge time.Duration
 	// Loop is the loop's name, as items it asks of the user name it.
@@ -64,7 +67,7 @@ func Derive(in Input) Row {
 		settled = d.ReadAt
 	}
 	res := situation.Derive(situation.Input{PR: p, Events: in.Events, Viewer: in.Viewer, MyTeams: in.Teams, Ignore: in.Ignore,
-		Now: in.Now, Stalled: in.Stalled, AddressedAt: in.AddressedAt, ThreadsSettledAt: settled})
+		Now: in.Now, Stalled: in.Stalled, AddressedAt: in.AddressedAt, ThreadsSettledAt: settled, AskedAt: in.AskedAt})
 	ws := WorkspaceOf(p.Workspace)
 	pl := Payload{Author: p.Author, Repo: p.Ref.Owner + "/" + p.Ref.Repo, Head: pr.OneLine(p.HeadBranch, 255), Reasons: nonNil(p.Reasons),
 		Workspace: ws, Override: Override{Adopted: in.Override.Adopted, Tracked: in.Override.Tracked}, Viewer: in.Viewer}

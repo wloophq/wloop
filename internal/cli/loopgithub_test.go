@@ -221,8 +221,14 @@ func TestAnAnswerAfterAMergeIsRefused(t *testing.T) {
 	te.gh.mu.Lock()
 	te.gh.basics = strings.Replace(openBasics, `"state":"OPEN"`, `"state":"MERGED"`, 1)
 	te.gh.mu.Unlock()
-	if err := answerByAction(te); err == nil || !strings.Contains(err.Error(), "is MERGED") {
-		t.Fatalf("err = %v", err)
+	out, err := client.New(te.Socket).Action(context.Background(), r7.Unit(), "answer", api.ActionRequest{Guidance: "yes, ask it", Source: "cockpit"})
+	if err != nil || !slices.ContainsFunc(out, func(l string) bool {
+		return strings.Contains(l, "resuming the turn failed") && strings.Contains(l, "is MERGED")
+	}) {
+		t.Fatalf("out %q, err %v", out, err)
+	}
+	if b := te.bookOf(t, r7); len(b.Answers) != 1 || b.Answers[0].Route != dturn.Refused {
+		t.Fatalf("answers %+v", b.Answers)
 	}
 	if len(m.Prompts) != 1 {
 		t.Fatalf("a turn was launched on a merged pull request: %+v", m.Prompts)
