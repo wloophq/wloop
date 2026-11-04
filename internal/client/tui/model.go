@@ -454,9 +454,14 @@ func inputLabel(name string, spec api.ActionSpec, st api.ActionState) string {
 	return label
 }
 
+const queuedAnswer = "your answer is queued until the agent's session is free; an answer now replaces it"
+
 // questionLabel is the question's summary, with the drafted verdict and
 // the numbered options of a choice.
 func questionLabel(name string, q *api.QuestionView) string {
+	if q.Queued {
+		return name + ": " + queuedAnswer
+	}
 	text := q.Text
 	if text == "" {
 		text = q.LastMessage
@@ -490,6 +495,9 @@ func questionLabel(name string, q *api.QuestionView) string {
 // answer.
 func answerRequest(q *api.QuestionView, text string) api.ActionRequest {
 	req := api.ActionRequest{Guidance: text, Source: Source}
+	if q.Queued {
+		return req
+	}
 	if q.Kind == "confirm" {
 		switch strings.ToLower(text) {
 		case "y", "yes":

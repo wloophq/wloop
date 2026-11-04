@@ -145,7 +145,12 @@ type QuestionView struct {
 	Blocking    int             `json:"blocking"`
 	NonBlocking int             `json:"non_blocking"`
 	LastMessage string          `json:"last_message,omitempty"`
+	// Queued says the user's answer waits for the agent's busy session.
+	Queued bool `json:"queued,omitempty"`
 }
+
+// Open says whether q still takes an answer from its options.
+func (q *QuestionView) Open() bool { return q != nil && !q.Queued }
 
 // AttentionAction ids are catalog ids, task:<verb> (task:<verb>:<mode> with
 // the delegate's mode) for a task's verb, answer:option:<id>, answer:yes,

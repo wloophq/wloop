@@ -55,6 +55,8 @@ All three exit at once outside a session of an enabled workspace manager, give t
 
 An `asked` turn shows its question in the cockpit's detail, in a notification (macOS) and in the terminal client (`W`). You can pick an option, answer Yes or No to a confirmation, or write your own answer; text given with an option reaches the agent as a note after the choice.
 
+The question leaves the row as soon as its answer reaches the session, typed, noticed through the Stop hook or carried by a resume turn: the row shows the loop working on it, and offers the question's answers, Continue and Dismiss no more. An answer waiting for a busy session shows as queued in place of the question, with no options; an answer sent then replaces it, and Continue and Dismiss stay. When the agent records a new question in the same turn, that question shows as any other.
+
 The question is a message, as is every note an agent posts mid-turn with `task_post`, and each waits on its gate (see [Messages](/concepts/tasks/#messages)); every answer names the message and the gate it answers. The agent never receives the answer as text typed into its session. {{name}} tells the session that gate G was answered, and the agent reads the answer with the `task_read` tool, or `{{command}} turn answer <unit> --gate G` without the tool:
 
 ```
@@ -74,7 +76,7 @@ The notice goes:
 
 **A question the pull request moved past.** While a question waits, the pull request's task waits on you, and the rounds of its intent wait too: the sweep logs `skip the <round> of <pr> at <head>: <why>` once a day per head and reason, the reason being that the turn asks you something or that an answer is on its way to it. A `turn.start` step with `open_question = "replace_if_moved"`, as the bundled `review-follow-up` has, lets a round planned on a head other than the one the question was asked on run anyway: it replaces the asked turn, its gate closes as superseded (no one answered it), and the new turn's history carries the question and its options, so the agent asks it again when it still needs you or says why it no longer applies. An answer on its way to the question, stored but not yet in the turn, holds every automatic round of the intent until the agent records again. An answer that cannot reach the agent (typing its notice or resuming the turn fails) is refused with the reason, so it never holds a round; a gate's answer stored and never routed, as when the daemon stops in between, is routed when the gate's consequence runs again.
 
-**Continue** sends a resume turn with no answer to an `asked`, `failed` or `unrecorded` turn. **Dismiss** closes it as `dismissed`. Answer, Continue and Dismiss are the intents of the question gate open on the unit, the question's or the missing gate of a stopped turn; with none open, Answer answers again a question already answered while its turn still asks. An answer typed directly in the agent's session still works, and closes the question's gate as superseded.
+**Continue** sends a resume turn with no answer to an `asked`, `failed` or `unrecorded` turn. **Dismiss** closes it as `dismissed`. Answer, Continue and Dismiss are the intents of the question gate open on the unit, the question's or the missing gate of a stopped turn; with none open, Answer answers again a question whose answer is still queued, which replaces it. An answer typed directly in the agent's session still works, and closes the question's gate as superseded.
 
 ## Sessions
 

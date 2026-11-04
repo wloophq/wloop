@@ -1774,3 +1774,50 @@ func TestActivityNamesAnEventByItsUnitsLabel(t *testing.T) {
 		t.Fatalf("got %s, want %s", b, want)
 	}
 }
+
+func TestAQueuedAnswerHidesTheQuestionsOptions(t *testing.T) {
+	src := appJS(t)
+	prelude := `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
+const roundGate = () => undefined;
+const state = { busy: new Set(), guidance: {}, health: { viewer: "me" }, specs: { byId: { answer: { id: "answer", input: { kind: "answer" } } } } };
+function render() {}
+function setNotice() {}
+function scheduleLoad() {}
+const document = { getElementById: () => null };
+` + keyJS(t) + jsConst(t, src, "ARTIFACT_LINES") + jsConst(t, src, "API_VERSION")
+	question := func(queued bool) map[string]any {
+		return map[string]any{
+			"row": map[string]any{"unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "kind": "loop_working",
+				"actions": []map[string]any{{"id": "answer", "enabled": true}, {"id": "continue", "enabled": true}, {"id": "dismiss", "enabled": true}},
+				"question": map[string]any{"record_id": 3, "state": "asked", "kind": "choice", "text": "Publish the review?", "queued": queued,
+					"options": []map[string]any{{"id": "a", "label": "Publish", "consequence": "posts it"}, {"id": "b", "label": "Hold", "consequence": "keeps it"}}}},
+			"turn": map[string]any{"turn": map[string]any{"seq": 1}, "records": []any{}, "answers": []any{}},
+		}
+	}
+	var got struct {
+		Text    string   `json:"text"`
+		Buttons []string `json:"buttons"`
+		Label   string   `json:"label"`
+		Open    bool     `json:"open"`
+		Queued  bool     `json:"queued"`
+	}
+	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "answerableQuestion", "act"}, `(async () => {
+  const walk = (n, out = []) => { if (n && typeof n === "object") { out.push(n); n.children.forEach((c) => walk(c, out)); } return out; };
+  const text = (n) => (n && typeof n === "object" ? n.children.map(text).join("") : String(n));
+  const block = questionBlock(input.queued);
+  process.stdout.write(JSON.stringify({ text: text(block), buttons: walk(block).filter((x) => x.tag === "button").map(text), label: guidanceLabel(input.queued.row),
+    open: !!answerableQuestion(input.open), queued: !!answerableQuestion(input.queued) }));
+})();`, map[string]any{"queued": question(true), "open": question(false)}, &got)
+	if !strings.Contains(got.Text, "Your answer is queued") || strings.Contains(got.Text, "Publish the review?") || strings.Contains(got.Text, "Agent asks") {
+		t.Errorf("the queued block:\n%s", got.Text)
+	}
+	if !reflect.DeepEqual(got.Buttons, []string{"Send answer", "Continue", "Dismiss"}) {
+		t.Errorf("buttons %v", got.Buttons)
+	}
+	if got.Label != "Replace the queued answer" {
+		t.Errorf("label %q", got.Label)
+	}
+	if !got.Open || got.Queued {
+		t.Errorf("the keys answer an open question %v, a queued one %v", got.Open, got.Queued)
+	}
+}

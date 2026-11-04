@@ -434,8 +434,9 @@ function appEnv() {
     questionAt: (el) => {
       if (readHash().task) return detailPane.gateAt(el);
       const d = state.detail;
-      if (!el || !el.closest || !el.closest(".d-question") || !d || !d.row.question || d.row.question.state !== "asked") return null;
-      return { row: d.row, question: d.row.question };
+      const q = answerableQuestion(d);
+      if (!el || !el.closest || !el.closest(".d-question") || !q) return null;
+      return { row: d.row, question: q };
     },
     move: (delta) => {
       if (isCoreView(readHash().view)) {

@@ -16,7 +16,8 @@ type Run struct {
 	Turn Turn
 	// Session is the handle of a started turn's session, "" otherwise.
 	Session string
-	// Question is the open question or stop of the book, nil for none.
+	// Question is the open question or stop of the book, nil for none or
+	// for one whose answer reached its agent.
 	Question *api.QuestionView
 	// Unstarted are the ids of the turns that ended before their agent
 	// started them.
@@ -40,10 +41,16 @@ func RunOf(b turn.Book, reg *dintent.Registry) (Run, bool) {
 		f.Summary, f.At = r.Record.Headline(), r.At
 	}
 	f.AnsweredAt, _ = b.AnsweredAt(t.Seq)
+	f.QueuedAt, _ = b.QueuedAt(t.Seq)
 	run := Run{Turn: f, Unstarted: Unstarted(b)}
 	if q, ok := b.Question(reg.Answerable()); ok {
-		qLast, _ := b.LastRecord(q.Seq)
-		run.Question, _ = QuestionOf(q, qLast)
+		if _, sent := b.AnsweredAt(q.Seq); !sent {
+			qLast, _ := b.LastRecord(q.Seq)
+			run.Question, _ = QuestionOf(q, qLast)
+			if _, queued := b.QueuedAt(q.Seq); queued && run.Question != nil {
+				run.Question.Queued = true
+			}
+		}
 	}
 	if t.State == turn.Started && t.Session != "" {
 		run.Session = t.Session

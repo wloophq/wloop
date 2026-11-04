@@ -1501,6 +1501,7 @@ function activityEmptyNote(q) {
 }
 
 function guidanceLabel(r) {
+  if (r.question && r.question.queued) return "Replace the queued answer";
   if (r.question) return r.question.state === "asked" && questionChoices(r, r.question).length ?"Or answer in your own words" : "Answer in your own words";
   const start = Object.values(state.specs.byId).find((sp) => sp.group === "start" && sp.verb === "approve");
   if (!roundGate(r)) return "Guidance for the next round (optional)";
@@ -1772,23 +1773,31 @@ function artifactBlock(a) {
   return h("details", { class: "d-artifact" }, h("summary", { class: "d-sub" }, `${kind}, ${lines} lines`), body);
 }
 
+// answerableQuestion is the detail's question whose options the keys pick:
+// asked, its answer not queued.
+function answerableQuestion(d) {
+  const q = d && d.row.question;
+  return q && q.state === "asked" && !q.queued ? q : null;
+}
+
 // questionBlock is the turn that waits on the user: the agent's question
-// with its options, or its stop with the last message.
+// with its options, its stop with the last message, or its queued answer.
 function questionBlock(d) {
   const r = d.row;
   const q = r.question;
   if (!q) return null;
   const rec = questionRecord(d);
-  const asked = q.state === "asked";
-  const head = asked ? "Agent asks" : "Agent stopped";
+  const asked = q.state === "asked" && !q.queued;
+  const head = q.queued ? "Your answer is queued" : asked ? "Agent asks" : "Agent stopped";
   const last = q.last_message || (d.turn && d.turn.last_message) || "";
   const choices = asked ? questionChoices(r, q) : [];
   return h("section", { class: "d-question", "aria-label": head },
     h("h2", { class: "d-sub" }, head),
+    q.queued ? h("p", { class: "muted small" }, "The agent gets it once its session is free. An answer sent now replaces it.") : null,
     rec.summary ? h("p", { class: "summary" }, rec.summary) : null,
     q.verdict ? h("p", { class: "verdict" }, `drafted ${q.verdict}, ${q.blocking} blocking, ${q.non_blocking} non-blocking`) : null,
     asked && q.text ? h("pre", { class: "q-text" }, q.text) : null,
-    !asked && last ? [h("div", { class: "muted small" }, "Last message"), h("pre", { class: "q-text" }, last)] : null,
+    !asked && !q.queued && last ? [h("div", { class: "muted small" }, "Last message"), h("pre", { class: "q-text" }, last)] : null,
     asked && q.kind === "free" && q.recommend ? h("p", { class: "recommend" }, `Agent recommends: ${q.recommend}`) : null,
     choices.length ? h("div", { class: "q-options" }, choices) : null,
     answerBlock(r, choices.length > 0),

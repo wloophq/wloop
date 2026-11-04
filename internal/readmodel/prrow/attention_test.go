@@ -10,6 +10,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/situation"
@@ -93,5 +94,27 @@ func TestAttentionKeepsTodaysPolicy(t *testing.T) {
 		if a := d.Attention(api.Row{Unit: policyRef(7).Unit(), Kind: api.Kind(k), Summary: api.Summary{WaitsOn: "me"}}, nil); a != nil {
 			t.Errorf("%s got %+v", k, a)
 		}
+	}
+}
+
+func TestAQueuedAnswerOffersNoOptionToTap(t *testing.T) {
+	d := Deriver{Now: policyNow, Loaded: bundled(t)}
+	q := &api.QuestionView{State: "asked", RecordID: 3, Kind: "choice", Text: "publish?", Options: []record.Option{{ID: "publish", Label: "Publish"}, {ID: "hold", Label: "Hold"}}}
+	r := api.Row{Unit: policyRef(8).Unit(), Title: "Docs", Kind: api.Kind(situation.KindLoopWaiting), Question: q, Summary: api.Summary{WaitsOn: "me", Since: policyNow}}
+	f := catalog.Facts{PR: refOf(r).Unit(), Owner: "acme", Repo: "api", Row: r, Tracked: true, Open: true, Question: true, GateOn: true, Intents: d.Loaded}
+	r.Actions = catalog.States(f)
+	ids := func() []string {
+		var out []string
+		for _, a := range d.notificationActions(r) {
+			out = append(out, a.ID)
+		}
+		return out
+	}
+	if got := ids(); !slices.Contains(got, "answer:option:publish") || !slices.Contains(got, "answer:text") {
+		t.Fatalf("an open question's actions: %v", got)
+	}
+	q.Queued = true
+	if got := ids(); slices.Contains(got, "answer:option:publish") || slices.Contains(got, "answer:option:hold") || !slices.Contains(got, "answer:text") {
+		t.Fatalf("a queued answer's actions: %v", got)
 	}
 }
