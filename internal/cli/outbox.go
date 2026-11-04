@@ -243,10 +243,10 @@ func printDraft(w io.Writer, d api.Draft, text string) {
 	}
 }
 
-// userAtTerminal refuses to post from a shell an agent session runs, or one with no terminal to ask in: what
-// posts is approved by the user, who reads it whole first.
+// userAtTerminal refuses to post from a shell of an agent session the daemon cannot tell, or one with no terminal
+// to ask in: what posts is approved by the user, who reads it whole first.
 func (e *Env) userAtTerminal(verb string) error {
-	if err := e.notAnAgent(verb); err != nil {
+	if err := e.namedAgent(verb); err != nil {
 		return err
 	}
 	if !outboxInteractive(e) {
@@ -255,15 +255,20 @@ func (e *Env) userAtTerminal(verb string) error {
 	return nil
 }
 
-// notAnAgent refuses outbox verb from a shell an agent session runs: it posts as the user.
-func (e *Env) notAnAgent(verb string) error {
+// namedAgent refuses outbox verb from a shell an agent session runs that names no session handle: the daemon
+// takes a session's request for yours only when the user drives that session, so a shell that names none
+// would pass for you.
+func (e *Env) namedAgent(verb string) error {
 	getenv := e.Getenv
 	if getenv == nil {
 		getenv = os.Getenv
 	}
+	if e.sessionHandle() != "" {
+		return nil
+	}
 	for _, kind := range slices.Sorted(maps.Keys(e.Harness.Agents)) {
 		if e.Harness.Agents[kind].SessionID(getenv) != "" {
-			return fmt.Errorf("outbox %s posts as you, and this shell belongs to a %s agent session: approve the draft in the cockpit or the terminal UI, or run this in a terminal of your own", verb, kind)
+			return fmt.Errorf("outbox %s posts as you, and this shell belongs to a %s agent session that names no workspace manager's handle: approve the draft in the cockpit or the terminal UI, or run this in a terminal of your own", verb, kind)
 		}
 	}
 	return nil
@@ -361,7 +366,7 @@ func outboxNew(ctx context.Context, e *Env, c *client.Client, args []string) err
 		fmt.Fprintf(e.Out, "draft %d saved to the Outbox for your approval: %s\n", d.ID, draftLabel(d))
 		return nil
 	}
-	if err := e.notAnAgent("new --send"); err != nil {
+	if err := e.namedAgent("new --send"); err != nil {
 		return err
 	}
 	return e.sendUserDraft(ctx, c, cr, *yes, func() error { return e.userAtTerminal("new --send") }, true)
