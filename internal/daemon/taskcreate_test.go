@@ -134,6 +134,20 @@ func TestTaskCreateFromASessionTheUserDrivesWritesYourProperties(t *testing.T) {
 	}
 }
 
+func TestAHandleNoSessionTookIsAnAgentsAsBefore(t *testing.T) {
+	t.Parallel()
+	r := newCreateRig(t, nil)
+	r.s.deps.Turns = sessionsOn(r.db)
+	rec := postFrom(t, r.s, "term_9", api.TasksPath, `{"title":"Add retries","props":{"effort":"s"}}`)
+	var v api.TaskView
+	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &v) != nil {
+		t.Fatalf("a create from a handle no session took: %d %s", rec.Code, rec.Body)
+	}
+	if rec := postFrom(t, r.s, "term_9", api.TasksPath, `{"title":"x","props":{"priority":"high"}}`); rec.Code != 403 {
+		t.Errorf("a handle no session took wrote your property: %d %s", rec.Code, rec.Body)
+	}
+}
+
 func TestTaskCreateParsesADateInTheDaemonsLocation(t *testing.T) {
 	t.Parallel()
 	zone := time.FixedZone("UTC-3", -3*60*60)

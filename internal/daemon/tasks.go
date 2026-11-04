@@ -388,8 +388,8 @@ func requestOf(r coretasks.Request) requester {
 }
 
 // requester is who r comes from: the person with no session header, else an agent through the session that
-// holds the header's handle, and whether the user drives it. A header that is not a handle, or a handle no
-// session holds, is refused on w.
+// holds the header's handle, and whether the user drives it; an agent through no session when no session holds
+// the handle and the request names no manager to make it one. A header that is not a handle is refused on w.
 func (s *Server) requester(w http.ResponseWriter, r *http.Request) (requester, bool) {
 	h, ok := callerHandle(w, r, false)
 	switch {
@@ -400,9 +400,18 @@ func (s *Server) requester(w http.ResponseWriter, r *http.Request) (requester, b
 	case s.deps.Turns == nil:
 		return requester{Actor: task.ActorAgent}, true
 	}
-	id, ok := s.caller(w, r, false)
-	if !ok {
+	id, known := "", true
+	if r.Header.Get(api.ManagerHeader) == "" {
+		var err error
+		if id, known, err = s.deps.Turns.SessionOfHandle(r.Context(), h); err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return requester{}, false
+		}
+	} else if id, ok = s.caller(w, r, false); !ok {
 		return requester{}, false
+	}
+	if !known {
+		return requester{Actor: task.ActorAgent}, true
 	}
 	driven, err := s.deps.Turns.UserDriven(r.Context(), id)
 	if err != nil {

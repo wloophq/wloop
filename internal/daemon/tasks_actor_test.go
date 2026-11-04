@@ -61,7 +61,7 @@ func TestAVerbFromASessionNeedsTheUserToDriveIt(t *testing.T) {
 	if e, _ := r.db.Tasks().Task(ctx, "t-1"); e.Category != task.CategoryReady {
 		t.Fatalf("the refused done moved the task to %s", e.State)
 	}
-	if rec := postFrom(t, r.s, "term_9", api.TaskPath("t-1", "done"), `{"source":"claude"}`); rec.Code != 409 {
+	if rec := postFrom(t, r.s, "term_9", api.TaskPath("t-1", "done"), `{"source":"claude"}`); rec.Code != 403 {
 		t.Fatalf("a handle no session holds: %d %s", rec.Code, rec.Body)
 	}
 	if rec := postFrom(t, r.s, "term_2", api.TaskPath("t-1", "done"), `{"source":"claude"}`); rec.Code != 200 {
