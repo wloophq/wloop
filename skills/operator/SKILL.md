@@ -56,8 +56,16 @@ continues without an answer, `X` dismisses). {{name}} types an answer into the
 agent's session as its next prompt (a long one tells the agent to run
 `{{command}} turn answer <url>`), or starts a new session that resumes the turn
 when the old one is gone; an agent reads the answers to what it posted, and
-what you wrote on its task's chat, with `task_read`. Do not answer for the user and do not type into that agent's
-terminal.
+what you wrote on its task's chat, with `task_read`. Do not type into that agent's terminal.
+
+While the user drives this session, {{name}} takes what you run for theirs: you
+can move tasks, start turns, answer another agent's question and approve a
+draft or a round, as they can. It stops the moment a turn the loop sent runs
+here, or the loop typed into this session last, and refuses a gate whose
+draft or question this session's own turn produced. Approving a draft, or
+answering for the user, publishes or decides in their name: do it when they
+asked for it, and when it is unclear whether they want it, ask them here
+first.
 
 ## Reading `{{command}} status`
 

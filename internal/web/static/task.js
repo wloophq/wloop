@@ -246,7 +246,7 @@ function taskTimeline(e) {
     !taskState.timeline && !taskState.timelineError ? h("p", { class: "empty" }, "Loading the timeline.") : null,
     taskState.timeline && !events.length ? h("p", { class: "empty" }, "Nothing here yet.") : null,
     events.length ? h("ol", { class: "chat" }, ...[...events].reverse().map((ev) => h("li", { class: `msg ev-${ev.kind} by-${String(ev.actor || "").replace(/[^a-z0-9-]/gi, "")}`, "data-seq": String(ev.seq) },
-      h("div", { class: "meta" }, ev.actor ? h("strong", {}, ev.actor) : null, " ", h("span", { class: "kind" }, String(ev.kind).replaceAll("_", " "), ev.sub ? " " + ev.sub : ""), " ", h("time", { datetime: ev.at }, stamp(ev.at))),
+      h("div", { class: "meta" }, ev.by || ev.actor ? h("strong", { title: ev.actor || "" }, ev.by || ev.actor) : null, " ", h("span", { class: "kind" }, String(ev.kind).replaceAll("_", " "), ev.sub ? " " + ev.sub : ""), " ", h("time", { datetime: ev.at }, stamp(ev.at))),
       eventText(ev) ? h("p", {}, eventText(ev)) : null))) : null);
 }
 

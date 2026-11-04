@@ -13,6 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/timeline"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	"github.com/wloophq/wloop/internal/domain/gate"
@@ -114,5 +115,25 @@ func TestATaskPageOffersItsVerbsToWhoReadsIt(t *testing.T) {
 	}
 	if st := done("term_1"); st.Enabled || !strings.Contains(st.Reason, "session you drive") {
 		t.Errorf("done to a worker session: %+v", st)
+	}
+}
+
+func TestTheTimelineNamesAChangeMadeThroughASessionTheUserDrove(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.s.deps.Timeline = timeline.Merged{Log: r.db, Holdings: r.db}
+	svc := sessionsOn(r.db)
+	r.s.deps.Turns = svc
+	mine := adoptSession(t, svc, "term_2", true)
+	r.put(t, task.Task{ID: "t-1", State: "next", Category: task.CategoryReady})
+	if rec := postFrom(t, r.s, "term_2", api.TaskPath("t-1", "done"), `{"source":"claude"}`); rec.Code != 200 {
+		t.Fatalf("done: %d %s", rec.Code, rec.Body)
+	}
+	var evs []api.TimelineEvent
+	if code := get(t, r.s, api.TaskPath("t-1", "timeline")+"?kinds=verb_done", &evs); code != 200 {
+		t.Fatalf("GET the timeline: %d", code)
+	}
+	if len(evs) != 1 || evs[0].Session != mine || evs[0].By != "you, via session "+mine || evs[0].Actor != "agent:claude" {
+		t.Fatalf("the timeline %+v", evs)
 	}
 }

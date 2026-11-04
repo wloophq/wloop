@@ -360,3 +360,8 @@ by      = { person = "true", agent = "true" }
 # starts a turn of this intent, resuming the task's last session.
 [chat]
 intent = "chat"
+
+# How the task's page and its timeline name a change an agent made for
+# you through a session you drove; {session} is that session's id.
+[attribution]
+via_session = "you, via session {session}"
