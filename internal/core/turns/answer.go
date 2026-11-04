@@ -11,6 +11,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -230,7 +231,7 @@ func (s *Service) answerPosted(ctx context.Context, r AnswerRequest) (AnswerResu
 	a := r.answer(q.Seq)
 	a.At, a.Posted = s.now(), true
 	b.Answer(a)
-	evs := []port.Event{s.event(r.Unit, KindAnswered, "", oneLine(b.Said(a), answeredMax))}
+	evs := []port.Event{s.answered(r.Unit, a, b.Said(a))}
 	saved, err := s.Store.Save(ctx, b, evs...)
 	s.mu.Unlock()
 	if err != nil {
@@ -300,7 +301,7 @@ func (s *Service) storeAnswer(ctx context.Context, r AnswerRequest) (turn.Turn, 
 	a.At = s.now()
 	said := b.Said(a)
 	b.Answer(a)
-	evs = append(evs, s.event(r.Unit, KindAnswered, "", oneLine(said, answeredMax)))
+	evs = append(evs, s.answered(r.Unit, a, said))
 	saved, err := s.Store.Save(ctx, b, evs...)
 	if err != nil {
 		return turn.Turn{}, turn.Answer{}, "", nil, err
@@ -715,4 +716,13 @@ func (s *Service) MarkRead(ctx context.Context, u unit.Unit, ids []int64) error 
 	s.publish(evs...)
 	s.changed(ctx, u)
 	return nil
+}
+
+// answered is the event of answer a on u, saying said; one given through a session names it, as an agent's.
+func (s *Service) answered(u unit.Unit, a turn.Answer, said string) port.Event {
+	ev := s.event(u, KindAnswered, "", oneLine(said, answeredMax))
+	if a.BySession != "" {
+		ev.Actor, ev.Session = string(task.ActorAgent), a.BySession
+	}
+	return ev
 }

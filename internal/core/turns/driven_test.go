@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/turn"
 )
 
@@ -26,5 +27,23 @@ func TestUserDrivenReadsTheSessionAndItsTurns(t *testing.T) {
 	}
 	if got, err := e.s.UserDriven(ctx, "term_9"); err != nil || got {
 		t.Fatalf("an unknown session: %v %v", got, err)
+	}
+}
+
+func TestAnAnswerGivenThroughASessionNamesItInItsEvent(t *testing.T) {
+	for _, c := range []struct {
+		name, session, actor string
+	}{{"the person", "", ""}, {"a session the user drives", "s-mine", "agent"}} {
+		t.Run(c.name, func(t *testing.T) {
+			s, store, _, _, _ := newService(t)
+			putTurn(store, true)
+			if _, err := s.Answer(context.Background(), turns.AnswerRequest{Unit: r7, Message: 9, Gate: 4, Text: "go ahead", Source: turn.Cockpit, BySession: c.session}); err != nil {
+				t.Fatal(err)
+			}
+			answered := kinds(store.Events(), turns.KindAnswered)
+			if len(answered) != 1 || answered[0].Actor != c.actor || answered[0].Session != c.session {
+				t.Fatalf("answered events %+v, want actor %q and session %q", answered, c.actor, c.session)
+			}
+		})
 	}
 }
