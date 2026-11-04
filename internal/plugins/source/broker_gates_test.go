@@ -85,8 +85,8 @@ func TestASessionsGateTakesItsOriginTaskAndItemsFromTheHostsBook(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := ds.proposed[0]
-	if p.Origin.Kind != draft.OriginTurn || p.Origin.TurnSeq != 7 || p.Origin.Rule != "" || p.Task != "task-1" || len(p.Items) != 1 || p.Items[0] != "i1" {
-		t.Fatalf("proposed %+v, want the turn's origin, task and items", p)
+	if p.Origin.Kind != draft.OriginTurn || p.Origin.TurnSeq != 7 || p.Origin.Session != "live" || p.Origin.Rule != "" || p.Task != "task-1" || len(p.Items) != 1 || p.Items[0] != "i1" {
+		t.Fatalf("proposed %+v, want the turn's origin and session, task and items", p)
 	}
 }
 
@@ -163,7 +163,7 @@ func TestAPostWithNoSessionRecordsAsASentDraftOfNoTurn(t *testing.T) {
 		if err != nil {
 			t.Fatalf("session %q: %v", session, err)
 		}
-		if p := ds.sent[0]; p.Origin != (draft.Origin{Kind: draft.OriginSession}) || ref.State != string(draft.Sent) {
+		if p := ds.sent[0]; p.Origin != (draft.Origin{Kind: draft.OriginSession, Session: session}) || ref.State != string(draft.Sent) {
 			t.Fatalf("session %q: recorded %+v as %q, want the session origin, sent", session, p, ref.State)
 		}
 	}
@@ -183,7 +183,7 @@ func TestASessionWithNoTurnDraftsOnThePluginsUnitWithTheSessionAsOrigin(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p := ds.proposed[0]; p.Origin != (draft.Origin{Kind: draft.OriginSession}) || p.Unit.Key != "t2" || len(p.Items) != 0 || p.Task != "" ||
+	if p := ds.proposed[0]; p.Origin != (draft.Origin{Kind: draft.OriginSession, Session: "bare"}) || p.Unit.Key != "t2" || len(p.Items) != 0 || p.Task != "" ||
 		ref.State != string(draft.Held) {
 		t.Fatalf("proposed %+v as %q, want t2 with the session origin", p, ref.State)
 	}

@@ -35,7 +35,7 @@ var everyStatus = []gate.Status{gate.Open, gate.Approved, gate.Rejected, gate.An
 
 // gateOf is the gate d waits on, before it opens.
 func gateOf(d draft.Draft) gate.Gate {
-	return gate.Gate{Kind: gate.KindDraft, Unit: d.Unit, Task: task.ID(d.Task), Subject: strconv.FormatInt(int64(d.ID), 10)}
+	return gate.Gate{Kind: gate.KindDraft, Unit: d.Unit, Task: task.ID(d.Task), Subject: strconv.FormatInt(int64(d.ID), 10), Session: d.Origin.Session}
 }
 
 // decided is the gates' Policy of the decision a draft's approval made.
@@ -75,7 +75,7 @@ func (s *Service) Publish(ctx context.Context, g gate.Gate) error {
 	case gate.Approved:
 	case gate.Rejected:
 		reason := reasonUser
-		if g.By != task.ActorPerson {
+		if !g.ByUser() {
 			reason = reasonDryRun
 		}
 		_, err = s.drop(ctx, d, reason)
@@ -84,7 +84,7 @@ func (s *Service) Publish(ctx context.Context, g gate.Gate) error {
 		_, err = s.drop(ctx, d, reasonGone)
 		return err
 	}
-	if g.By != task.ActorPerson {
+	if !g.ByUser() {
 		if why := s.unreleasable(d); why != "" {
 			s.logf("draft %d failed on its release: %s", d.ID, why)
 			return s.failHeld(ctx, d, why)

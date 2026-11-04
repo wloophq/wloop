@@ -633,12 +633,12 @@ func nudgeDraftRule(when, mode string) config.Config {
 func TestAConfigDraftWaitRuleReadsATrustedProperty(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	cfg := nudgeDraftRule(`task.prop.owner == "slack:U0AAA"`, string(draft.Wait))
+	cfg := nudgeDraftRule(`task.prop.last_nudge > timestamp(0)`, string(draft.Wait))
 	if errs := configWorkflowProblems(cfg, te.loadedIntents()); len(errs) > 0 {
 		t.Fatalf("%v", errs)
 	}
 	file := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(file, []byte("[[workflows.slack-stalled-nudge.gates.approval.rule]]\nwhen = 'task.prop.owner == \"slack:U0AAA\"'\nmode = \"wait\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(file, []byte("[[workflows.slack-stalled-nudge.gates.approval.rule]]\nwhen = 'task.prop.last_nudge > timestamp(0)'\nmode = \"wait\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := config.LoadFile(file, Defaults()); err != nil {

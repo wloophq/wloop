@@ -74,9 +74,9 @@ func TestCaptureIsTaskCreateWithATitle(t *testing.T) {
 func TestTaskCreateFromAnAgentSessionIsWrittenByTheAgent(t *testing.T) {
 	t.Parallel()
 	r := newCreateRig(t, nil)
-	for _, personOnly := range []string{`{"title":"x","props":{"due":"2026-11-02"}}`, `{"title":"x","props":{"area":"OSS"}}`} {
-		if rec := postFrom(t, r.s, "term_1", api.TasksPath, personOnly); rec.Code != 400 || !strings.Contains(rec.Body.String(), "agent") {
-			t.Errorf("%s from an agent session: %d %s", personOnly, rec.Code, rec.Body)
+	for _, notAgents := range []string{`{"title":"x","props":{"last_nudge":"2026-11-02"}}`, `{"title":"x","props":{"kind":"capture"}}`} {
+		if rec := postFrom(t, r.s, "term_1", api.TasksPath, notAgents); rec.Code != 400 || !strings.Contains(rec.Body.String(), "agent") {
+			t.Errorf("%s from an agent session: %d %s", notAgents, rec.Code, rec.Body)
 		}
 	}
 	if p := r.page(t, "view=inbox"); len(p.Tasks) != 0 {

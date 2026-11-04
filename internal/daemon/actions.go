@@ -19,7 +19,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
@@ -258,13 +257,9 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 	}
 	name := r.PathValue("action")
 	l := s.loaded()
-	actor := task.ActorPerson
+	actor := personRequest
 	if _, ok := catalog.RowGateIntent(l, name); ok {
-		if actor, ok = requestActor(w, r); !ok {
-			return
-		}
-		if actor != task.ActorPerson {
-			writeError(w, http.StatusForbidden, name+" resolves a gate as a person; an agent's session does not")
+		if actor, ok = s.forUser(w, r, name+" resolves a gate: it"); !ok {
 			return
 		}
 	}
@@ -556,7 +551,7 @@ func (s *Server) act(ctx context.Context, name string, u unit.Unit, req api.Acti
 			}
 			return s.delegate(ctx, runHeld, u, Call{Guidance: req.Guidance, AgentHome: req.AgentHome, Out: out})
 		}
-		return s.actOnGate(ctx, g, u, req, task.ActorPerson, out)
+		return s.actOnGate(ctx, g, u, req, personRequest, out)
 	}
 	if followActions[name] {
 		if !sourceFollowed(name, u, s.deps.Follows) {

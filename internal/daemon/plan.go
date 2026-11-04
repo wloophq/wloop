@@ -15,7 +15,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/round"
-	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -136,12 +135,12 @@ func (s *Server) handlePlanAct(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "guide needs guidance")
 		return
 	}
-	actor, ok := requestActor(w, r)
+	actor, ok := s.requester(w, r)
 	if !ok {
 		return
 	}
-	if actor != task.ActorPerson && req.Action != "pause" {
-		writeError(w, http.StatusForbidden, fmt.Sprintf("%s decides a plan item as a person; an agent's session does not", req.Action))
+	if !actor.user() && req.Action != "pause" {
+		writeError(w, http.StatusForbidden, unattended(req.Action+" decides a plan item: it"))
 		return
 	}
 	ctx := context.WithoutCancel(r.Context())
@@ -165,7 +164,7 @@ func (s *Server) handlePlanAct(w http.ResponseWriter, r *http.Request) {
 
 // actOnPlanItem acts on item id when it offers the action; kept is false
 // when no item is left to show.
-func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance string, by task.Actor) (_ workflow.Item, kept bool, _ error) {
+func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance string, by requester) (_ workflow.Item, kept bool, _ error) {
 	items, err := p.Items(ctx, automation.Filter{ID: id})
 	if err != nil {
 		return workflow.Item{}, false, err

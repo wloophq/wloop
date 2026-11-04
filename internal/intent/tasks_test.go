@@ -247,7 +247,8 @@ func TestAgentWritablePropIsUntrusted(t *testing.T) {
 	}
 	for prop, want := range map[string]bool{
 		"risk": true, "effort": true, "priority": true, "due": true, "asker": true, "kind": true,
-		"promised": false, "owner": false, "area": false, "focus": false, "last_nudge": false, "check_on": false,
+		"promised": true, "owner": true, "area": true, "focus": true, "check_on": true,
+		"last_nudge": false, "autostar": false,
 		"undeclared": true,
 	} {
 		if got := d.Untrusted(prop); got != want {
@@ -255,7 +256,7 @@ func TestAgentWritablePropIsUntrusted(t *testing.T) {
 		}
 	}
 	env := d.Facts()
-	if !env.Untrusted(builtin.PropPrefix+"risk") || env.Untrusted(builtin.PropPrefix+"promised") {
+	if !env.Untrusted(builtin.PropPrefix+"risk") || env.Untrusted(builtin.PropPrefix+"last_nudge") {
 		t.Error("the facts do not carry the properties' trust")
 	}
 }
@@ -355,10 +356,12 @@ func TestAnApprovalRuleReadsATrustedPropertyNeverAnAgentWrittenOne(t *testing.T)
 	t.Parallel()
 	bundled := fstest.MapFS{TasksFile: {Data: []byte(defaultTasks(t))}}
 	for when, refused := range map[string]bool{
-		`task.prop.promised > timestamp(0)`: false,
-		`task.prop.owner == "slack:U0AAA"`:  false,
-		`task.prop.risk == "high"`:          true,
-		`task.prop.due > timestamp(0)`:      true,
+		`task.prop.last_nudge > timestamp(0)`: false,
+		`task.prop.autostar == "on"`:          false,
+		`task.prop.owner == "slack:U0AAA"`:    true,
+		`task.prop.promised > timestamp(0)`:   true,
+		`task.prop.risk == "high"`:            true,
+		`task.prop.due > timestamp(0)`:        true,
 	} {
 		root := t.TempDir()
 		writeWorkflow(t, root, "focus", focusOnTask+"when = '"+when+"'\nmode = \"run\"\n")

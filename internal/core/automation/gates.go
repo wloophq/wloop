@@ -97,7 +97,8 @@ func (e *Engine) syncGatesOrLog(ctx context.Context) {
 }
 
 // Release is a resolved plan gate's consequence on the item it names; the
-// caller holds the loop lock. A person's approval runs the item by hand,
+// caller holds the loop lock. The user's approval, a person's or an agent's
+// through a session the user drives, runs the item by hand,
 // with the gate's answer as its guidance when it has one; an approval by
 // its window or a trusted rule runs it as an automatic run; a rejection
 // skips it and a dismissal dismisses it. An item that no longer waits is
@@ -115,7 +116,7 @@ func (e *Engine) Release(ctx context.Context, g gate.Gate) error {
 	switch g.Status {
 	case gate.Approved, gate.Answered:
 		switch {
-		case g.By != task.ActorPerson:
+		case !g.ByUser():
 			return e.runReleased(ctx, it)
 		case g.Answer != "":
 			_, err = e.Act(ctx, it.ID, workflow.ActionGuide, g.Answer)

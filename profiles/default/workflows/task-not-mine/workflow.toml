@@ -6,7 +6,7 @@ order = 54
 
 [trigger]
 on = ["verb_not-mine"]
-actors = ["person"]
+actors = ["person", "agent"]
 
 [[step]]
 use = "draft.propose"

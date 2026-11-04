@@ -71,7 +71,7 @@ func (s *Server) replyVerb() string {
 // runReply holds the reply the task's args carry as a user draft on its first unit, for the task and its
 // items there; send "now" approves it at once and "draft" holds it, and with no send the verb's profile
 // send says which.
-func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretasks.Service, e task.Task, v task.Verb, req api.TaskRequest, actor task.Actor) {
+func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretasks.Service, e task.Task, v task.Verb, req api.TaskRequest, q requester) {
 	if why := s.replyRefusal(e); why != "" {
 		writeTasksError(w, fmt.Errorf("%w: %s", coretasks.ErrVerb, why))
 		return
@@ -89,12 +89,12 @@ func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretas
 			c.Items = append(c.Items, ref.Item)
 		}
 	}
-	d, err := s.writeUserDraft(ctx, c, actor)
+	d, err := s.writeUserDraft(ctx, c, q)
 	if err != nil {
 		writeTasksError(w, taskDraftError(err))
 		return
 	}
-	s.recordVerb(ctx, g, e, coretasks.Request{Verb: v, Source: req.Source, Actor: actor})
+	s.recordVerb(ctx, g, e, q.task(coretasks.Request{Verb: v, Source: req.Source}))
 	now, err := g.Task(ctx, e.ID)
 	if err != nil {
 		now = e
@@ -150,11 +150,11 @@ func (s *Server) handleDraftCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	actor, ok := requestActor(w, r)
+	q, ok := s.requester(w, r)
 	if !ok {
 		return
 	}
-	d, err := s.writeUserDraft(ctx, c, actor)
+	d, err := s.writeUserDraft(ctx, c, q)
 	if err != nil {
 		writeDraftError(w, err)
 		return
@@ -169,9 +169,9 @@ func (s *Server) handleDraftCreate(w http.ResponseWriter, r *http.Request) {
 
 // writeUserDraft proposes the draft the user wrote, under the wait policy whatever the unit's, and approves its
 // gate right away when c.Send: the same approval and publish path a draft takes from the Outbox.
-func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate, actor task.Actor) (draft.Draft, error) {
-	if c.Send && actor != task.ActorPerson {
-		return draft.Draft{}, fmt.Errorf("%w: a draft sent at once is approved by a person, not by %s", gates.ErrRefused, cmp.Or(string(actor), "no one"))
+func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate, q requester) (draft.Draft, error) {
+	if c.Send && !q.user() {
+		return draft.Draft{}, fmt.Errorf("%w: a draft sent at once %s", gates.ErrRefused, unattended("is approved: it"))
 	}
 	source := turn.Source(c.Source)
 	if source == "" {
@@ -204,7 +204,7 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate, actor ta
 		return d, err
 	}
 	s.logf("draft %d sent at once by the user from the %s", d.ID, source)
-	got, err := s.decideDraft(ctx, d, gate.Approved, nil, actor)
+	got, err := s.decideDraft(ctx, d, gate.Approved, nil, q)
 	if err != nil {
 		return d, fmt.Errorf("draft %d is in the Outbox, not approved: %w", d.ID, err)
 	}

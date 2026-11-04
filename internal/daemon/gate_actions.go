@@ -17,7 +17,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/round"
-	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
@@ -128,7 +127,7 @@ func (s *Server) openRowGate(ctx context.Context, k gate.Kind, u unit.Unit) (gat
 // no such gate open, the plan gate's first approving intent runs a round
 // the cap held, and its first taking text keeps the guidance for the next
 // round; any other intent is refused.
-func (s *Server) actOnGate(ctx context.Context, g catalog.GateIntent, u unit.Unit, req api.ActionRequest, by task.Actor, out io.Writer) error {
+func (s *Server) actOnGate(ctx context.Context, g catalog.GateIntent, u unit.Unit, req api.ActionRequest, by requester, out io.Writer) error {
 	if g.Kind == gate.KindQuestion {
 		return s.actOnQuestion(ctx, g, u, req, by, out)
 	}
@@ -152,7 +151,7 @@ func (s *Server) actOnGate(ctx context.Context, g catalog.GateIntent, u unit.Uni
 	case !ok || s.deps.Gates == nil:
 		return s.actWithoutGate(ctx, g, u, req, guidance, out)
 	}
-	r := gates.Resolution{Intent: g.Intent.Name, By: by}
+	r := gates.Resolution{Intent: g.Intent.Name, By: by.Actor, Session: by.Session}
 	if g.Intent.Answer {
 		if guidance == "" {
 			return badRequest{g.Intent.Name + " needs your text"}
@@ -254,7 +253,7 @@ func (s *Server) itemGate(ctx context.Context, it workflow.Item) (gate.Gate, boo
 
 // resolveItemGate resolves g, the gate of a plan item, with the first intent
 // of the role the plan's action names, as by.
-func (s *Server) resolveItemGate(ctx context.Context, g gate.Gate, action, guidance string, by task.Actor) error {
+func (s *Server) resolveItemGate(ctx context.Context, g gate.Gate, action, guidance string, by requester) error {
 	role := planRoles[action]
 	def, _ := s.loaded().Gates.Gate(g.Name)
 	i := slices.IndexFunc(def.Intents, func(in intentload.GateIntent) bool {
@@ -263,7 +262,7 @@ func (s *Server) resolveItemGate(ctx context.Context, g gate.Gate, action, guida
 	if i < 0 {
 		return conflict{msg: fmt.Sprintf("gate %s offers no intent that %s", g.Name, role)}
 	}
-	r := gates.Resolution{Intent: def.Intents[i].Name, By: by}
+	r := gates.Resolution{Intent: def.Intents[i].Name, By: by.Actor, Session: by.Session}
 	if def.Intents[i].Answer {
 		r.Answer = guidance
 	}

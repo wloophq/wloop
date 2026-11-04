@@ -416,7 +416,7 @@ func (s *Service) openMissing(ctx context.Context) {
 		if err != nil || rules.Missing == "" {
 			continue
 		}
-		g := gate.Gate{Unit: e.u, Name: rules.Missing, Subject: MissingSubject(e.t.ID)}
+		g := gate.Gate{Unit: e.u, Name: rules.Missing, Subject: MissingSubject(e.t.ID), Session: e.t.Session}
 		if id, ok := task.IDOf(e.u); ok {
 			g.Task = id
 		}

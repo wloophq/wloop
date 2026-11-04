@@ -34,7 +34,7 @@ func (s *Server) Handler() http.Handler {
 		writeError(w, http.StatusNotFound, "no such endpoint "+r.URL.Path)
 	})
 	mux.Handle("GET /", web.Handler(s.deps.Version))
-	return s.versioned(s.afterReconcile(s.slowLogged(mux)))
+	return s.versioned(s.afterReconcile(s.slowLogged(withCaller(mux))))
 }
 
 // SocketHandler is Handler with the runtime's profiles under /debug/pprof/, for the socket alone: the person

@@ -276,7 +276,7 @@ func (s *Server) runTaskVerb(w http.ResponseWriter, r *http.Request, verb string
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown verb %q; one of %s", verb, strings.Join(names, ", ")))
 		return
 	}
-	actor, ok := requestActor(w, r)
+	q, ok := s.forUser(w, r, verb)
 	if !ok {
 		return
 	}
@@ -296,7 +296,7 @@ func (s *Server) runTaskVerb(w http.ResponseWriter, r *http.Request, verb string
 			return
 		}
 	}
-	s.doTaskVerb(w, r, g, e, coretasks.Request{Verb: v, Args: req.Args, Source: req.Source, Actor: actor}, req)
+	s.doTaskVerb(w, r, g, e, q.task(coretasks.Request{Verb: v, Args: req.Args, Source: req.Source}), req)
 }
 
 // gateVerbRoles are the roles of the gate intents a verb of each handler resolves a task's open gate with.
@@ -339,7 +339,7 @@ func (s *Server) doTaskVerb(w http.ResponseWriter, r *http.Request, g *coretasks
 		}
 	}
 	if reply {
-		s.runReply(ctx, w, g, e, v, req, creq.Actor)
+		s.runReply(ctx, w, g, e, v, req, requestOf(creq))
 		return
 	}
 	if bridged {
@@ -348,24 +348,84 @@ func (s *Server) doTaskVerb(w http.ResponseWriter, r *http.Request, g *coretasks
 			writeError(w, http.StatusConflict, b.reason())
 			return
 		}
-		s.runBridge(w, r, g, e, v, b.unit, st, req, creq.Actor)
+		s.runBridge(w, r, g, e, v, b.unit, st, req, requestOf(creq))
 		return
 	}
 	res, err := g.Do(ctx, e.ID, creq)
 	s.writeTaskResult(ctx, w, g, res, err)
 }
 
-// requestActor is who runs the verb a request asks for: an agent when the request comes from a session, the
-// person otherwise; false when its session header is not a handle, refused on w.
-func requestActor(w http.ResponseWriter, r *http.Request) (task.Actor, bool) {
+// requester is who a request comes from: the person, or an agent through Session, the stable id of the session
+// that holds the request's handle. Driven says the user drives that session, so the agent acts for them.
+type requester struct {
+	Actor   task.Actor
+	Session string
+	Driven  bool
+}
+
+var personRequest = requester{Actor: task.ActorPerson}
+
+// user says whether the request carries the user's authority: the person's, or an agent's through a session they
+// drive.
+func (q requester) user() bool {
+	return q.Actor == task.ActorPerson || q.Actor == task.ActorAgent && q.Driven
+}
+
+// task is q as a task verb's request: the session only when the user drives it.
+func (q requester) task(r coretasks.Request) coretasks.Request {
+	r.Actor = q.Actor
+	if q.Driven {
+		r.Session = q.Session
+	}
+	return r
+}
+
+// requestOf is who ran r, a task verb's request the daemon checked.
+func requestOf(r coretasks.Request) requester {
+	q := requester{Actor: cmp.Or(r.Actor, task.ActorPerson), Session: r.Session}
+	q.Driven = q.Actor == task.ActorAgent && q.Session != ""
+	return q
+}
+
+// requester is who r comes from: the person with no session header, else an agent through the session that
+// holds the header's handle, and whether the user drives it. A header that is not a handle, or a handle no
+// session holds, is refused on w.
+func (s *Server) requester(w http.ResponseWriter, r *http.Request) (requester, bool) {
 	h, ok := callerHandle(w, r, false)
 	switch {
 	case !ok:
-		return "", false
-	case h != "":
-		return task.ActorAgent, true
+		return requester{}, false
+	case h == "":
+		return personRequest, true
+	case s.deps.Turns == nil:
+		return requester{Actor: task.ActorAgent}, true
 	}
-	return task.ActorPerson, true
+	id, ok := s.caller(w, r, false)
+	if !ok {
+		return requester{}, false
+	}
+	driven, err := s.deps.Turns.UserDriven(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return requester{}, false
+	}
+	return requester{Actor: task.ActorAgent, Session: id, Driven: driven}, true
+}
+
+// forUser is requester refusing, with 403, an agent whose session the user does not drive: it runs a turn the
+// loop sent, or the loop typed into it last.
+func (s *Server) forUser(w http.ResponseWriter, r *http.Request, what string) (requester, bool) {
+	q, ok := s.requester(w, r)
+	if ok && !q.user() {
+		writeError(w, http.StatusForbidden, unattended(what))
+		return requester{}, false
+	}
+	return q, ok
+}
+
+// unattended is the refusal of what to a session the user does not drive.
+func unattended(what string) string {
+	return what + " acts for you, so only you run it, or a session you drive; this session runs a turn the loop sent or the loop typed into it last"
 }
 
 // offers says whether the profile offers verb on e; a verb with no offer is
@@ -490,7 +550,7 @@ func rankOffered(served []api.ActionSpec, row api.Row, verb task.Verb) bridgeAct
 
 // runBridge runs st on u as POST /api/units/<provider>/<key>/<action> would, with the row's basis, the
 // task's items on u, and the guidance and mode of the task's args.
-func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coretasks.Service, e task.Task, verb task.Verb, u unit.Unit, st api.ActionState, req api.TaskRequest, actor task.Actor) {
+func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coretasks.Service, e task.Task, verb task.Verb, u unit.Unit, st api.ActionState, req api.TaskRequest, q requester) {
 	mode := req.Args["mode"]
 	if err := s.bridgeMode(st.ID, mode); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -521,6 +581,11 @@ func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coretasks.
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	for _, h := range []string{api.SessionHeader, api.ManagerHeader} {
+		if v := r.Header.Get(h); v != "" {
+			ar.Header.Set(h, v)
+		}
+	}
 	ar.SetPathValue("provider", string(u.Provider))
 	ar.SetPathValue("key", u.Key)
 	ar.SetPathValue("action", st.ID)
@@ -548,7 +613,7 @@ func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coretasks.
 		}
 	}
 	ctx := context.WithoutCancel(r.Context())
-	s.recordVerb(ctx, g, e, coretasks.Request{Verb: verb, Source: req.Source, Actor: actor})
+	s.recordVerb(ctx, g, e, q.task(coretasks.Request{Verb: verb, Source: req.Source}))
 	now, err := g.Task(ctx, e.ID)
 	if err != nil {
 		now = e
@@ -711,10 +776,52 @@ type taskViewer struct {
 	briefs map[unit.Unit]port.Event
 	// whereBy bounds every draft destination lookup of this page.
 	whereBy time.Time
+	// as is who the page is for, whose verbs it offers.
+	as requester
 }
 
-func (s *Server) taskViews(_ context.Context, g *coretasks.Service, detail bool) *taskViewer {
-	return &taskViewer{s: s, g: g, detail: detail, whereBy: time.Now().Add(s.whereBudget())}
+func (s *Server) taskViews(ctx context.Context, g *coretasks.Service, detail bool) *taskViewer {
+	return &taskViewer{s: s, g: g, detail: detail, whereBy: time.Now().Add(s.whereBudget()), as: s.pageFor(ctx)}
+}
+
+type callerKey struct{}
+
+// withCaller keeps the session header of each request on its context, for the pages it reads to offer what its
+// caller may run.
+func withCaller(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if v := r.Header.Get(api.SessionHeader); v != "" {
+			r = r.WithContext(context.WithValue(r.Context(), callerKey{}, v))
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
+// pageFor is who a page read with ctx is for: the person when the request names no session, else an agent through
+// the session that holds its handle, driven by the user or not.
+func (s *Server) pageFor(ctx context.Context) requester {
+	v, _ := ctx.Value(callerKey{}).(string)
+	if v == "" {
+		return personRequest
+	}
+	q := requester{Actor: task.ActorAgent}
+	h, err := api.SessionHandle(v)
+	if err != nil || s.deps.Turns == nil {
+		return q
+	}
+	if id, ok, err := s.deps.Turns.SessionOfHandle(ctx, h); err == nil && ok {
+		q.Session = id
+		q.Driven, _ = s.deps.Turns.UserDriven(ctx, id)
+	}
+	return q
+}
+
+// accepts refuses verb on e unless the viewer may run it.
+func (ev *taskViewer) accepts(e task.Task, verb task.Verb) error {
+	if !ev.as.user() {
+		return errors.New(unattended(string(verb)))
+	}
+	return ev.g.Accepts(e, verb, ev.as.Actor)
 }
 
 func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, error) {
@@ -984,7 +1091,7 @@ func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
 				st.Runners = ev.s.delegateModes(ctx, b.unit, runs.ID)
 			}
 		default:
-			if err := ev.g.Accepts(e, verb, task.ActorPerson); err != nil {
+			if err := ev.accepts(e, verb); err != nil {
 				st.Reason = err.Error()
 			} else {
 				st.Enabled = true

@@ -33,10 +33,12 @@ type AnswerRequest struct {
 	Posted        bool
 	// Gate is the gate whose resolution the answer is.
 	Gate int64
+	// BySession is the session an agent answered through, "" for a person.
+	BySession string
 }
 
 func (r AnswerRequest) answer(seq int64) turn.Answer {
-	return turn.Answer{TurnSeq: seq, Text: r.Text, OptionID: r.OptionID, Yes: r.Yes, No: r.No, Source: r.Source, Message: r.Message, Gate: r.Gate}
+	return turn.Answer{TurnSeq: seq, Text: r.Text, OptionID: r.OptionID, Yes: r.Yes, No: r.No, Source: r.Source, Message: r.Message, Gate: r.Gate, BySession: r.BySession}
 }
 
 type AnswerResult struct {

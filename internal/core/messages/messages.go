@@ -176,7 +176,7 @@ func (s *Service) missingOf(u unit.Unit, b *turn.Book, answerable []string) (gat
 	if err != nil || rules.Missing == "" {
 		return gate.Gate{}, false
 	}
-	g := gate.Gate{Unit: u, Name: rules.Missing, Subject: turns.MissingSubject(q.ID)}
+	g := gate.Gate{Unit: u, Name: rules.Missing, Subject: turns.MissingSubject(q.ID), Session: q.Session}
 	if id, ok := task.IDOf(u); ok {
 		g.Task = id
 	}
@@ -472,7 +472,7 @@ func (s *Service) gated(ctx context.Context, m message.Message) (message.Message
 			return m, err
 		}
 	}
-	g, err := s.Gates.Open(ctx, gate.Gate{Kind: m.Kind.Gate(), Unit: m.Unit, Task: task.ID(m.TaskID), Subject: subjectOf(m)}, nil)
+	g, err := s.Gates.Open(ctx, gate.Gate{Kind: m.Kind.Gate(), Unit: m.Unit, Task: task.ID(m.TaskID), Subject: subjectOf(m), Session: m.Origin.Session}, nil)
 	if err != nil {
 		return m, fmt.Errorf("opening the gate of message %d: %w", m.ID, err)
 	}
@@ -746,7 +746,7 @@ func (s *Service) Deliver(ctx context.Context, g gate.Gate) error {
 		return err
 	}
 	d.Route, err = s.Turns.Answer(ctx, turns.AnswerRequest{Unit: m.Unit, Message: m.ID, Gate: g.ID, Text: a.Text, OptionID: a.OptionID,
-		Yes: a.Yes, No: a.No, Source: d.Source})
+		Yes: a.Yes, No: a.No, Source: d.Source, BySession: g.BySession})
 	var refused turns.Refusal
 	if err != nil && !errors.As(err, &refused) {
 		return err
@@ -765,7 +765,7 @@ func (s *Service) deliverPost(ctx context.Context, g gate.Gate, m message.Messag
 		return err
 	}
 	req := turns.AnswerRequest{Unit: m.Unit, Message: m.ID, Gate: g.ID, Posted: true, Turn: m.Origin.TurnSeq, Text: a.Text, OptionID: a.OptionID,
-		Yes: a.Yes, No: a.No, Source: d.Source}
+		Yes: a.Yes, No: a.No, Source: d.Source, BySession: g.BySession}
 	d.Route, err = s.Turns.Answer(ctx, req)
 	var refused turns.Refusal
 	switch {
@@ -808,7 +808,7 @@ func (s *Service) deliverMissing(ctx context.Context, g gate.Gate, id string) er
 	case strings.TrimSpace(g.Answer) == "":
 		return s.Turns.Continue(ctx, g.Unit)
 	}
-	d.Route, err = s.Turns.Answer(ctx, turns.AnswerRequest{Unit: g.Unit, Gate: g.ID, Text: strings.TrimSpace(g.Answer), Source: d.Source})
+	d.Route, err = s.Turns.Answer(ctx, turns.AnswerRequest{Unit: g.Unit, Gate: g.ID, Text: strings.TrimSpace(g.Answer), Source: d.Source, BySession: g.BySession})
 	return err
 }
 
@@ -861,7 +861,7 @@ func (s *Service) Decide(ctx context.Context, g gate.Gate) error {
 		if err != nil || len(res.Refused) == 0 {
 			return err
 		}
-		return s.notApplied(ctx, gate.Gate{Kind: gate.KindProposal, Unit: g.Unit, Task: g.Task, Subject: g.Subject}, res)
+		return s.notApplied(ctx, gate.Gate{Kind: gate.KindProposal, Unit: g.Unit, Task: g.Task, Subject: g.Subject, Session: g.Session}, res)
 	}
 	m, err := s.subject(ctx, g)
 	if errors.Is(err, ErrClosed) {
@@ -887,7 +887,7 @@ func (s *Service) Decide(ctx context.Context, g gate.Gate) error {
 	if err != nil || len(res.Refused) == 0 {
 		return err
 	}
-	reopen := gate.Gate{Kind: gate.KindProposal, Unit: m.Unit, Task: g.Task, Subject: subjectOf(m)}
+	reopen := gate.Gate{Kind: gate.KindProposal, Unit: m.Unit, Task: g.Task, Subject: subjectOf(m), Session: g.Session}
 	if cur, ok, err := s.Store.Message(ctx, m.ID); err != nil || !ok || !cur.Open() {
 		reopen.Subject = gate.ProposalSubject(m.Origin.Proposal)
 	}

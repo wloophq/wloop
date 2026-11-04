@@ -19,11 +19,14 @@ func (s *Server) handlePluginAction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "plugin action: "+err.Error())
 		return
 	}
-	actor, ok := requestActor(w, r)
+	q, ok := s.requester(w, r)
 	if !ok {
 		return
 	}
-	req.Action, req.Actor = r.PathValue("action"), string(actor)
+	req.Action, req.Actor = r.PathValue("action"), string(q.Actor)
+	if q.user() {
+		req.Actor = string(task.ActorPerson)
+	}
 	out, err := s.deps.PluginAction(r.Context(), r.PathValue("id"), req)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
@@ -40,12 +43,7 @@ func (s *Server) handlePluginRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "no plugin runs command lines in this daemon")
 		return
 	}
-	actor, ok := requestActor(w, r)
-	if !ok {
-		return
-	}
-	if actor != task.ActorPerson {
-		writeError(w, http.StatusForbidden, "a plugin's command line is the person's; an agent's session runs none")
+	if _, ok := s.forUser(w, r, "a plugin's command line"); !ok {
 		return
 	}
 	var req api.PluginRunRequest

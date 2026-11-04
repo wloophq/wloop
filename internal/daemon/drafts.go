@@ -182,7 +182,7 @@ type draftAction struct {
 
 // draftDo runs action on draft id as actor: refused with pluginOff when the draft's plugin is disabled, but for
 // discard. Approving and discarding a held draft resolve its gate.
-func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a draftAction, actor task.Actor) (draft.Draft, error) {
+func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a draftAction, actor requester) (draft.Draft, error) {
 	s.draftMu.Lock()
 	defer s.draftMu.Unlock()
 	o := s.deps.Outbox
@@ -231,7 +231,7 @@ func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a draf
 
 // decideDraft resolves the open gate of held draft d, as actor, with its first intent gates.toml gives the status
 // want; an approval posts text when it is set. It runs under draftMu.
-func (s *Server) decideDraft(ctx context.Context, d draft.Draft, want gate.Status, text *string, actor task.Actor) (draft.Draft, error) {
+func (s *Server) decideDraft(ctx context.Context, d draft.Draft, want gate.Status, text *string, actor requester) (draft.Draft, error) {
 	o := s.deps.Outbox
 	if s.deps.Gates == nil {
 		return draft.Draft{}, errGatesUnavailable
@@ -255,12 +255,16 @@ func (s *Server) decideDraft(ctx context.Context, d draft.Draft, want gate.Statu
 	return o.Store.Get(ctx, d.ID)
 }
 
-// resolveDraftGate resolves draft gate g with intent as actor, under draftMu. Only a person resolves a draft's
-// gate here, refused before anything is written. An approval readies its draft at rev; with text other than the
-// draft's, it edits the draft first, which supersedes g, and approves the gate that edit opened.
-func (s *Server) resolveDraftGate(ctx context.Context, g gate.Gate, intent string, rev int64, text *string, actor task.Actor) error {
-	if actor != task.ActorPerson {
-		return fmt.Errorf("%w: draft gate %d is resolved by a person, not by %s", gates.ErrRefused, g.ID, cmp.Or(string(actor), "no one"))
+// resolveDraftGate resolves draft gate g with intent as actor, under draftMu. Only the user, a person or an agent
+// through a session they drive that did not propose the draft, resolves a draft's gate here, refused before
+// anything is written. An approval readies its draft at rev; with text other than the draft's, it edits the draft
+// first, which supersedes g, and approves the gate that edit opened.
+func (s *Server) resolveDraftGate(ctx context.Context, g gate.Gate, intent string, rev int64, text *string, actor requester) error {
+	switch {
+	case !actor.user():
+		return fmt.Errorf("%w: draft gate %d %s", gates.ErrRefused, g.ID, unattended("is resolved: it"))
+	case actor.Actor == task.ActorAgent && g.Session == actor.Session:
+		return fmt.Errorf("%w: draft gate %d holds a draft session %s proposed, which it does not resolve", gates.ErrRefused, g.ID, actor.Session)
 	}
 	if st, _ := s.intentStatus(g, intent); st == gate.Approved {
 		o := s.deps.Outbox
@@ -290,7 +294,7 @@ func (s *Server) resolveDraftGate(ctx context.Context, g gate.Gate, intent strin
 			g = ng
 		}
 	}
-	return s.deps.Gates.Resolve(ctx, g.ID, gates.Resolution{Intent: intent, By: actor})
+	return s.deps.Gates.Resolve(ctx, g.ID, gates.Resolution{Intent: intent, By: actor.Actor, Session: actor.Session})
 }
 
 // gateIntentOf is the first intent g offers that gates.toml resolves to want.
@@ -372,7 +376,7 @@ func (s *Server) draftVerb(handler string) coretasks.VerbHandler {
 			}
 			a.Rev = &n
 		}
-		d, err := s.draftDo(ctx, id, draftHandlers[handler], a, cmp.Or(req.Actor, task.ActorPerson))
+		d, err := s.draftDo(ctx, id, draftHandlers[handler], a, requestOf(req))
 		if err != nil {
 			return coretasks.Result{}, taskDraftError(err)
 		}

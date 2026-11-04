@@ -104,12 +104,12 @@ func TestAVerbsTransitionComesFromTheProfile(t *testing.T) {
 func TestAnAgentMayCloseWhenTheProfileSaysSo(t *testing.T) {
 	ctx := context.Background()
 	e := task.Task{ID: "t-1", State: "next", Origin: task.OriginUser}
-	bundled := profileRig(t, tasksToml(t))
-	bundled.put(t, e)
-	if _, err := bundled.svc.Do(ctx, e.ID, coretasks.Request{Verb: task.VerbDone, Actor: task.ActorAgent}); !errors.Is(err, coretasks.ErrForbidden) {
-		t.Fatalf("an agent closing under the bundled profile: %v", err)
+	restricted := profileRig(t, tasksToml(t, verbEdit{"done", `agent = "true", workflow = "true" }`, `workflow = "true" }`}))
+	restricted.put(t, e)
+	if _, err := restricted.svc.Do(ctx, e.ID, coretasks.Request{Verb: task.VerbDone, Actor: task.ActorAgent}); !errors.Is(err, coretasks.ErrForbidden) {
+		t.Fatalf("an agent closing under a profile that leaves agent out: %v", err)
 	}
-	r := profileRig(t, tasksToml(t, verbEdit{"done", `workflow = "true" }`, `workflow = "true", agent = "true" }`}))
+	r := profileRig(t, tasksToml(t))
 	r.put(t, e)
 	res, err := r.svc.Do(ctx, e.ID, coretasks.Request{Verb: task.VerbDone, Actor: task.ActorAgent, Source: "claude"})
 	if err != nil {
@@ -126,10 +126,8 @@ func TestAnAgentMayCloseWhenTheProfileSaysSo(t *testing.T) {
 func TestNoActorMeansForbidden(t *testing.T) {
 	r := profileRig(t, tasksToml(t))
 	e := r.put(t, task.Task{ID: "t-1", State: "next", Origin: task.OriginUser})
-	for _, a := range []task.Actor{task.ActorAgent, task.ActorPlugin} {
-		if err := r.svc.Accepts(e, task.VerbDone, a); !errors.Is(err, coretasks.ErrForbidden) {
-			t.Errorf("%s on done, which names no by.%s: %v", a, a, err)
-		}
+	if err := r.svc.Accepts(e, task.VerbDone, task.ActorPlugin); !errors.Is(err, coretasks.ErrForbidden) {
+		t.Errorf("a plugin on done, which names no by.plugin: %v", err)
 	}
 	if err := r.svc.Accepts(e, task.VerbSomeday, task.ActorWorkflow); !errors.Is(err, coretasks.ErrForbidden) {
 		t.Errorf("a workflow on someday, which names no by.workflow: %v", err)
@@ -146,16 +144,18 @@ func TestNoActorMeansForbidden(t *testing.T) {
 	}
 }
 
-func TestAPersonMayRunEveryBundledVerb(t *testing.T) {
+func TestThePersonAndTheirSessionsMayRunEveryBundledVerb(t *testing.T) {
 	d := tasksToml(t)
 	auth := profileStates{TasksDef: d}
 	for verb := range d.Verbs {
-		allow, gated, err := auth.Authority(context.Background(), verb, task.ActorPerson, task.Task{ID: "t-1", State: "next"})
-		if err != nil || !allow || gated {
-			t.Errorf("a person on %s: allow %v, gate %v, %v", verb, allow, gated, err)
+		for _, a := range []task.Actor{task.ActorPerson, task.ActorAgent} {
+			allow, gated, err := auth.Authority(context.Background(), verb, a, task.Task{ID: "t-1", State: "next"})
+			if err != nil || !allow || gated {
+				t.Errorf("%s on %s: allow %v, gate %v, %v", a, verb, allow, gated, err)
+			}
 		}
-		if _, ok := d.Verbs[verb].By[string(task.ActorAgent)]; ok {
-			t.Errorf("%s has a by.agent; the bundled profile gives agents no verb", verb)
+		if by := d.Verbs[verb].By; by[string(task.ActorAgent)] != by[string(task.ActorPerson)] {
+			t.Errorf("%s: by.agent %q, want by.person's %q", verb, by[string(task.ActorAgent)], by[string(task.ActorPerson)])
 		}
 	}
 	for _, v := range []string{"done", "dismiss", "next", "waiting", "schedule", "focus"} {
@@ -166,7 +166,7 @@ func TestAPersonMayRunEveryBundledVerb(t *testing.T) {
 }
 
 func TestAByPredicateAllowsPerKind(t *testing.T) {
-	r := profileRig(t, tasksToml(t, verbEdit{"someday", `by      = { person = "true" }`, `by      = { person = "true", workflow = 'task.prop.kind == "capture"' }`}))
+	r := profileRig(t, tasksToml(t, verbEdit{"someday", `by      = { person = "true", agent = "true" }`, `by      = { person = "true", agent = "true", workflow = 'task.prop.kind == "capture"' }`}))
 	capture := r.put(t, task.Task{ID: "t-1", State: "next", Origin: task.OriginUser, Props: task.Props{task.PropKind: {Text: "capture"}}})
 	action := r.put(t, task.Task{ID: "t-2", State: "next", Origin: task.OriginUser})
 	if err := r.svc.Accepts(capture, task.VerbSomeday, task.ActorWorkflow); err != nil {
@@ -185,7 +185,7 @@ func TestAByPredicateAllowsPerKind(t *testing.T) {
 
 func TestAGatedVerbOpensTheGateItsVerbNames(t *testing.T) {
 	ctx := context.Background()
-	d := tasksToml(t, verbEdit{"done", `by      = { person = "true", workflow = "true" }`, `by      = { person = "true", workflow = "gate" }` + "\ngate    = \"close-check\""})
+	d := tasksToml(t, verbEdit{"done", `by      = { person = "true", agent = "true", workflow = "true" }`, `by      = { person = "true", agent = "true", workflow = "gate" }` + "\ngate    = \"close-check\""})
 	confirm := gate.Gate{Name: "close-check", Kind: gate.KindProposal, Intents: []string{"approve", "reject"}}
 	r := newRig()
 	gs := gatestest.NewStore(func() time.Time { return t0 })

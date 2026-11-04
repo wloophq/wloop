@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/gates/gatestest"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
+	"github.com/wloophq/wloop/internal/core/timeline"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -29,10 +30,10 @@ func postFrom(t *testing.T, s *Server, handle, path, body string) *httptest.Resp
 	return rec
 }
 
-// agentsClose is the bundled authority with by.agent = "true" on done.
-func agentsClose(ctx context.Context, verb string, a task.Actor, t task.Task) (bool, bool, error) {
+// agentsNeverClose is the bundled authority with agent left out of done.
+func agentsNeverClose(ctx context.Context, verb string, a task.Actor, t task.Task) (bool, bool, error) {
 	if verb == string(task.VerbDone) && a == task.ActorAgent {
-		return true, false, nil
+		return false, false, nil
 	}
 	return taskstest.BundledStates.Authority(ctx, verb, a, t)
 }
@@ -46,28 +47,37 @@ func (r *tasksRig) doneEvents(t *testing.T) []workflow.Event {
 	return evs
 }
 
-func TestDoneFromAnAgentSessionNeedsTheProfilesByAgent(t *testing.T) {
+func TestAVerbFromASessionNeedsTheUserToDriveIt(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newTasksRig(t, nil)
+	svc := sessionsOn(r.db)
+	r.s.deps.Turns = svc
+	worker, mine := adoptSession(t, svc, "term_1", false), adoptSession(t, svc, "term_2", true)
 	r.put(t, task.Task{ID: "t-1", State: "next", Category: task.CategoryReady})
 	if rec := postFrom(t, r.s, "term_1", api.TaskPath("t-1", "done"), `{"source":"claude"}`); rec.Code != 403 {
-		t.Fatalf("an agent's done under the bundled profile: %d %s", rec.Code, rec.Body)
+		t.Fatalf("a worker session's done: %d %s", rec.Code, rec.Body)
 	}
 	if e, _ := r.db.Tasks().Task(ctx, "t-1"); e.Category != task.CategoryReady {
 		t.Fatalf("the refused done moved the task to %s", e.State)
 	}
-
-	r.s.deps.Tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Authority: agentsClose, Store: r.db.Tasks(), Items: r.ledger,
-		Facts: coretasks.CardFacts{Cards: r.db.Cards()}, Me: meID, Clock: fixedClock(tasksNow)})
-	if rec := postFrom(t, r.s, "term_1", api.TaskPath("t-1", "done"), `{"source":"claude"}`); rec.Code != 200 {
-		t.Fatalf("an agent's done with by.agent: %d %s", rec.Code, rec.Body)
+	if rec := postFrom(t, r.s, "term_9", api.TaskPath("t-1", "done"), `{"source":"claude"}`); rec.Code != 409 {
+		t.Fatalf("a handle no session holds: %d %s", rec.Code, rec.Body)
 	}
-	if evs := r.doneEvents(t); len(evs) != 1 || evs[0].Actor != "agent:claude" {
-		t.Fatalf("events %+v", evs)
+	if rec := postFrom(t, r.s, "term_2", api.TaskPath("t-1", "done"), `{"source":"claude"}`); rec.Code != 200 {
+		t.Fatalf("the done of a session the user drives: %d %s", rec.Code, rec.Body)
+	}
+	evs, err := r.db.EventsOf(ctx, []unit.Unit{task.UnitOf("t-1")}, timeline.Filter{Kinds: []string{"verb_done"}})
+	if err != nil || len(evs) != 1 || evs[0].Actor != "agent:claude" || evs[0].Session != mine || mine == worker {
+		t.Fatalf("events %+v %v, want one by agent:claude through %s", evs, err, mine)
 	}
 
 	r.put(t, task.Task{ID: "t-2", State: "next", Category: task.CategoryReady})
+	r.s.deps.Tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Authority: agentsNeverClose, Store: r.db.Tasks(), Items: r.ledger,
+		Facts: coretasks.CardFacts{Cards: r.db.Cards()}, Me: meID, Clock: fixedClock(tasksNow)})
+	if rec := postFrom(t, r.s, "term_2", api.TaskPath("t-2", "done"), `{"source":"claude"}`); rec.Code != 403 {
+		t.Fatalf("a profile that leaves agent out of done: %d %s", rec.Code, rec.Body)
+	}
 	if rec := post(t, r.s, api.TaskPath("t-2", "done"), `{"source":"cockpit"}`); rec.Code != 200 {
 		t.Fatalf("a person's done: %d %s", rec.Code, rec.Body)
 	}

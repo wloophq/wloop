@@ -76,7 +76,7 @@ func (ev *taskViewer) project(ctx context.Context, e task.Task, v *api.TaskView)
 		case h == handlerProject && e.IsProject():
 			err = errors.New("a project cannot join a project")
 		case h == handlerProject, e.IsProject() && slices.Contains([]string{handlerFinish, handlerDrop}, h):
-			err = ev.g.Accepts(e, verb, task.ActorPerson)
+			err = ev.accepts(e, verb)
 		case e.IsProject() && (h == handlerReviewed || h == handlerSequential) && !e.Open():
 			err = fmt.Errorf("%s on a %s project", verb, e.State)
 		}

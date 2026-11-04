@@ -35,11 +35,11 @@ func (s *Server) handleTaskCreate(w http.ResponseWriter, r *http.Request) {
 	if req.Unit != nil && s.refusePlugin(w, *req.Unit) {
 		return
 	}
-	actor, ok := requestActor(w, r)
+	q, ok := s.requester(w, r)
 	if !ok {
 		return
 	}
-	writer := task.Writer(actor)
+	writer := task.Writer(q.Actor)
 	props, err := s.createProps(req.Props, writer)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())

@@ -91,13 +91,15 @@ type Service struct {
 func New(d Deps) *Service {
 	s := &Service{d: d, handlers: map[handlerKey]VerbHandler{}, views: map[string]viewSource{}, authority: d.Authority}
 	if s.authority == nil {
-		s.authority = personOnly
+		s.authority = userOnly
 	}
 	return s
 }
 
-func personOnly(_ context.Context, _ string, a task.Actor, _ task.Task) (bool, bool, error) {
-	return a == task.ActorPerson, false, nil
+// userOnly lets the user run every verb: a person, or an agent, which reaches the service only through a session
+// the user drives.
+func userOnly(_ context.Context, _ string, a task.Actor, _ task.Task) (bool, bool, error) {
+	return a == task.ActorPerson || a == task.ActorAgent, false, nil
 }
 
 func (s *Service) now() time.Time { return s.d.Clock.Now() }
@@ -465,19 +467,20 @@ func (s *Service) RecordVerb(ctx context.Context, e task.Task, req Request) erro
 	return s.d.Store.Apply(ctx, nil, evs...)
 }
 
-// verbEvents are the event of req's verb on e: its actor as "<actor>:<source>", and as data the state it left
-// with req's chain. None for a verb whose handler is seen, which clients send on their own.
+// verbEvents are the event of req's verb on e: its actor as "<actor>:<source>" and the session an agent ran it
+// through, and as data the state it left with req's chain. None for a verb whose handler is seen, which clients send on their own.
 func (s *Service) verbEvents(e task.Task, req Request, now time.Time) []port.Event {
 	if s.d.States.Handler(string(req.Verb)) == handlerSeen {
 		return nil
 	}
 	return []port.Event{{Unit: task.UnitOf(e.ID), Kind: task.VerbEventKind(req.Verb), Actor: string(req.Actor) + ":" + req.Source,
-		Data: workflow.ChainData(string(e.State), req.Chain), At: now}}
+		Session: req.Session, Data: workflow.ChainData(string(e.State), req.Chain), At: now}}
 }
 
-// heldOpen refuses, with ErrVerb, a verb anyone but a person runs that would end e while a gate holds it.
+// heldOpen refuses, with ErrVerb, a verb anyone but the user, a person or an agent through a session they drive,
+// runs that would end e while a gate holds it.
 func (s *Service) heldOpen(ctx context.Context, e task.Task, req Request) error {
-	if req.Actor == task.ActorPerson || !e.Open() || !s.ends(req.Verb) {
+	if req.Actor == task.ActorPerson || req.Actor == task.ActorAgent && req.Session != "" || !e.Open() || !s.ends(req.Verb) {
 		return nil
 	}
 	if held, err := s.holds(ctx, e.ID); err != nil || !held {

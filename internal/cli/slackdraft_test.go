@@ -208,7 +208,7 @@ func TestSessionSendsToUntrackedPlacesAreRecorded(t *testing.T) {
 	var units []unit.Unit
 	for _, d := range w.drafts(t) {
 		parts := strings.Split(d.Unit.Key, "/")
-		if len(parts) < 2 || d.State != draft.Sent || d.Origin != (draft.Origin{Kind: draft.OriginSession}) || d.Evidence.Ref != parts[1]+"/"+sessPosted {
+		if len(parts) < 2 || d.State != draft.Sent || noSession(d.Origin) != (draft.Origin{Kind: draft.OriginSession}) || d.Evidence.Ref != parts[1]+"/"+sessPosted {
 			t.Fatalf("draft %+v", d)
 		}
 		units = append(units, d.Unit)
@@ -304,7 +304,7 @@ func TestSlackDraftProposes(t *testing.T) {
 	}
 	d := ds[0]
 	want := draft.Origin{Kind: draft.OriginTurn, TurnSeq: newest.Seq, Intent: "reply", Workflow: newest.Workflow}
-	if d.Unit != u || d.State != draft.Held || d.Origin != want || d.Kind != draft.Reply || d.Text != "on it, **today**" || decided(t, w.deps.Outbox, d).Mode != draft.Wait {
+	if d.Unit != u || d.State != draft.Held || noSession(d.Origin) != want || d.Kind != draft.Reply || d.Text != "on it, **today**" || decided(t, w.deps.Outbox, d).Mode != draft.Wait {
 		t.Fatalf("draft %+v", d)
 	}
 	if n := len(w.st.srv.Calls("chat.postMessage")) + len(w.st.srv.Calls("reactions.add")); n != 0 {
@@ -633,7 +633,7 @@ func TestSlackDraftFromAPullRequestTurnDraftsInThePermalinksThread(t *testing.T)
 	}
 	d := ds[0]
 	wantOrigin := draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1, Intent: "address", Unit: pr.Ref{Owner: "acme", Repo: "widgets", Number: 7}.Unit()}
-	if d.Unit != slackThreadUnit("T000", sessThreaded, sessParent) || d.Origin != wantOrigin || d.Target != link ||
+	if d.Unit != slackThreadUnit("T000", sessThreaded, sessParent) || noSession(d.Origin) != wantOrigin || d.Target != link ||
 		d.State != draft.Held || decided(t, w.deps.Outbox, d).Mode != draft.Wait {
 		t.Fatalf("draft %+v", d)
 	}
@@ -691,7 +691,7 @@ func TestFromAPullRequestTurnEditsAndReactionsPostAtOnceAndAreRecorded(t *testin
 		t.Fatalf("records %+v", ds)
 	}
 	for i, want := range []struct{ purpose, reaction string }{{"edit", ""}, {"react", "white_check_mark"}, {"unreact", "hourglass"}} {
-		if d := ds[i]; d.State != draft.Sent || d.Purpose != want.purpose || d.Reaction != want.reaction || d.Unit != thread || d.Origin != origin {
+		if d := ds[i]; d.State != draft.Sent || d.Purpose != want.purpose || d.Reaction != want.reaction || d.Unit != thread || noSession(d.Origin) != origin {
 			t.Fatalf("record %d %+v", i, d)
 		}
 	}
@@ -794,7 +794,7 @@ func TestPostingOutsideATurn(t *testing.T) {
 				t.Fatalf("slack_react = %q", got)
 			}
 			for _, d := range w.drafts(t) {
-				if d.State != draft.Sent || d.Unit != thread || d.Origin != session {
+				if d.State != draft.Sent || d.Unit != thread || noSession(d.Origin) != session {
 					t.Fatalf("record %+v", d)
 				}
 			}
@@ -812,7 +812,7 @@ func TestPostingOutsideATurn(t *testing.T) {
 			if isErr {
 				t.Fatalf("slack_draft = %q", got)
 			}
-			if d := w.drafts(t)[0]; d.State != draft.Held || d.Unit != thread || d.Origin != session || decided(t, w.deps.Outbox, d).Mode != draft.Wait {
+			if d := w.drafts(t)[0]; d.State != draft.Held || d.Unit != thread || noSession(d.Origin) != session || decided(t, w.deps.Outbox, d).Mode != draft.Wait {
 				t.Fatalf("draft %+v", d)
 			}
 			if got, isErr := w.callTool(t, "", handle, "slack_draft", `{"text":"any news?"}`); !isErr || !strings.Contains(got, "no turn") {
@@ -858,7 +858,7 @@ func TestSlackDraftFromATaskTurnPostsToItsTargetThroughSlack(t *testing.T) {
 		t.Fatalf("drafts %+v", ds)
 	}
 	d := ds[0]
-	if d.Unit != task || d.Target != sessChannel || d.Origin != (draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1, Intent: "act"}) ||
+	if d.Unit != task || d.Target != sessChannel || noSession(d.Origin) != (draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1, Intent: "act"}) ||
 		d.State != draft.Held || decided(t, w.deps.Outbox, d).Mode != draft.Wait {
 		t.Fatalf("draft %+v", d)
 	}
@@ -902,7 +902,7 @@ func TestASendFromATaskTurnIsRecordedWithTheTurnAsOrigin(t *testing.T) {
 	w.send(t, sessChannel)
 	ds := w.drafts(t)
 	want := draft.Origin{Kind: draft.OriginSession, TurnSeq: 1, Intent: "act", Unit: task}
-	if len(ds) != 1 || ds[0].Unit != slackThreadUnit("T000", sessChannel, sessPosted) || ds[0].State != draft.Sent || ds[0].Origin != want {
+	if len(ds) != 1 || ds[0].Unit != slackThreadUnit("T000", sessChannel, sessPosted) || ds[0].State != draft.Sent || noSession(ds[0].Origin) != want {
 		t.Fatalf("drafts %+v", ds)
 	}
 }
@@ -947,4 +947,10 @@ items = "unowned_aged"
 			}
 		})
 	}
+}
+
+// noSession is o without the session that proposed it, which the broker's tests cover.
+func noSession(o draft.Origin) draft.Origin {
+	o.Session = ""
+	return o
 }
