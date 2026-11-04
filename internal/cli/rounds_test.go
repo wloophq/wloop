@@ -5,15 +5,19 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/intake"
+	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/record"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/workspace"
@@ -117,6 +121,136 @@ func TestARoundWaitsWhileItsTurnAsksTheUser(t *testing.T) {
 	r.rec.questions = map[pr.Ref]map[string]bool{r.sc.ref: {string(dintent.Address): true}}
 	if got := r.check(t, automation.CheckOpts{}); got != "" {
 		t.Fatalf("an address question refused the review: %q", got)
+	}
+}
+
+// askOn stores an asked turn of intent on the rig's unit, sent and recorded
+// on head, and returns its seq.
+func (r *startRig) askOn(t *testing.T, intent, head string) int64 {
+	t.Helper()
+	b := r.sc.te.bookOf(t, r.sc.ref)
+	b.Unit = r.u
+	q := &record.Question{Kind: "choice", Text: "nudge the author or drop?", Options: []record.Option{{ID: "nudge", Label: "Nudge", Consequence: "posts a nudge"}, {ID: "drop", Label: "Drop", Consequence: "ends the review"}}}
+	b.Turns = append(b.Turns, dturn.Turn{Intent: dturn.Intent(intent), ID: "q-" + head, Trigger: dturn.Automated, Head: head, Session: "term-" + head, State: dturn.Asked, SentAt: testNow})
+	b.Records = append(b.Records, dturn.Record{Session: "term-" + head, Hash: "h-" + head, Head: head, At: testNow, Record: record.Record{State: record.Asked, Summary: "nudge or drop?", Question: q}})
+	saved, err := r.sc.te.repo.Save(context.Background(), b, port.Event{Unit: r.u, Kind: turns.KindTurnSent, Key: "q-" + head, At: testNow})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.rec.questions = map[pr.Ref]map[string]bool{r.sc.ref: {intent: true}}
+	asked, _ := saved.ByID("q-" + head)
+	return asked.Seq
+}
+
+// replacingMoved makes the rig's step replace a question the pull request moved past.
+func (r *startRig) replacingMoved() { r.st.Args["open_question"] = "replace_if_moved" }
+
+func TestAFollowUpOnAMovedPullRequestReplacesTheQuestionItsReviewAsked(t *testing.T) {
+	t.Parallel()
+	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
+	r.replacingMoved()
+	planned, _ := r.planner().round(r.sc.ref.String(), roundFollowup)
+	seq := r.askOn(t, string(dintent.Review), "c-gone")
+	if got := r.check(t, automation.CheckOpts{}); got != "" {
+		t.Fatalf("a question on a head the pull request moved past: %q", got)
+	}
+	if _, err := r.run(t, automation.RunOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	b := r.sc.te.bookOf(t, r.sc.ref)
+	q, _ := b.ByID("q-c-gone")
+	next, ok := b.Newest(dturn.Intent(dintent.Review))
+	if q.Seq != seq || q.State != dturn.Replaced || q.Before != dturn.Asked || !ok || next.Seq == seq || next.Head != planned.Head || b.OpenQuestion(dturn.Intent(dintent.Review)) {
+		t.Fatalf("turns %+v", b.Turns)
+	}
+	text := storedText(t, r.sc.te, next.ID)
+	for _, want := range []string{"nudge the author or drop?", "Drop (drop): ends the review", "This question is still open"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("the follow-up's instructions miss %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestAQuestionOnThePlannedHeadHoldsTheFollowUp(t *testing.T) {
+	t.Parallel()
+	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
+	r.replacingMoved()
+	planned, ok := r.planner().round(r.sc.ref.String(), roundFollowup)
+	if !ok || planned.Head == "" {
+		t.Fatalf("planned %+v %v", planned, ok)
+	}
+	r.askOn(t, string(dintent.Review), planned.Head)
+	if got := r.check(t, automation.CheckOpts{}); got != "its review turn asks you something" {
+		t.Fatalf("refusal %q", got)
+	}
+}
+
+func TestAQuestionHoldsAMovedPullRequestsRoundUnlessItsStepReplacesIt(t *testing.T) {
+	t.Parallel()
+	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
+	r.askOn(t, string(dintent.Review), "c-gone")
+	if got := r.check(t, automation.CheckOpts{}); got != "its review turn asks you something" {
+		t.Fatalf("refusal %q", got)
+	}
+}
+
+func TestAQuestionWithAnAnswerOnItsWayHoldsTheFollowUpOnAMovedPullRequest(t *testing.T) {
+	t.Parallel()
+	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
+	r.replacingMoved()
+	seq := r.askOn(t, string(dintent.Review), "c-gone")
+	b := r.sc.te.bookOf(t, r.sc.ref)
+	b.Answers = append(b.Answers, dturn.Answer{TurnSeq: seq, Text: "drop", Route: dturn.Pending, At: testNow.Add(time.Minute)})
+	if _, err := r.sc.te.repo.Save(context.Background(), b); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.check(t, automation.CheckOpts{}); got != "its review question has an answer on its way" {
+		t.Fatalf("refusal %q", got)
+	}
+}
+
+func TestTheFollowUpWorkflowReplacesAQuestionTheMovedPullRequestLeftBehind(t *testing.T) {
+	t.Parallel()
+	_, te := scenario(t)
+	w := bundledWorkflow(t, te, "review-follow-up")
+	if len(w.Steps) != 1 || w.Steps[0].Args["open_question"] != "replace_if_moved" {
+		t.Fatalf("steps %+v", w.Steps)
+	}
+}
+
+func TestAQuestionHoldingTheRoundIsLoggedOncePerHeadADay(t *testing.T) {
+	t.Parallel()
+	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
+	planned, _ := r.planner().round(r.sc.ref.String(), roundFollowup)
+	r.askOn(t, string(dintent.Review), planned.Head)
+	refusal := r.check(t, automation.CheckOpts{})
+	for range 2 {
+		r.load(t)
+		if err := r.steps.Note(context.Background(), r.st, r.u, r.why, refusal); err != nil {
+			t.Fatal(err)
+		}
+		r.save(t)
+	}
+	want := "skip the follow-up of " + r.sc.ref.String() + " at " + planned.Head + ": its review turn asks you something"
+	if got := strings.Count(r.sc.te.err.String(), want); got != 1 {
+		t.Fatalf("logged %d times, want once:\n%s", got, r.sc.te.err)
+	}
+	b := r.sc.te.bookOf(t, r.sc.ref)
+	b.Answers = append(b.Answers, dturn.Answer{TurnSeq: b.Turns[len(b.Turns)-1].Seq, Text: "drop", Route: dturn.Queued, At: testNow.Add(time.Minute)})
+	if _, err := r.sc.te.repo.Save(context.Background(), b); err != nil {
+		t.Fatal(err)
+	}
+	refusal = r.check(t, automation.CheckOpts{})
+	r.load(t)
+	if err := r.steps.Note(context.Background(), r.st, r.u, r.why, refusal); err != nil {
+		t.Fatal(err)
+	}
+	r.save(t)
+	if want := " at " + planned.Head + ": its review question has an answer on its way"; !strings.Contains(r.sc.te.err.String(), want) {
+		t.Fatalf("the answer on its way is not logged:\n%s", r.sc.te.err)
+	}
+	if err := r.steps.Note(context.Background(), r.st, r.u, r.why, "held by you"); err != nil || strings.Contains(r.sc.te.err.String(), "held by you") {
+		t.Fatalf("a refusal no question gave is logged: %v\n%s", err, r.sc.te.err)
 	}
 }
 

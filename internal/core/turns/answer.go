@@ -57,44 +57,95 @@ func (s *Service) Answer(ctx context.Context, r AnswerRequest) (AnswerResult, er
 		return s.answerPosted(ctx, r)
 	}
 	s.mu.Lock()
-	if prior, ok, err := s.gateAnswered(ctx, r); err != nil || ok {
+	q, a, said, unrouted, err := s.unroutedAnswer(ctx, r)
+	if err != nil || !unrouted {
+		if prior, ok, err := s.gateAnswered(ctx, r); err != nil || ok {
+			s.mu.Unlock()
+			return prior, err
+		}
+		var evs []port.Event
+		q, a, said, evs, err = s.storeAnswer(ctx, r)
 		s.mu.Unlock()
-		return prior, err
+		if err != nil {
+			return AnswerResult{}, err
+		}
+		s.publish(evs...)
+		s.changed(ctx, r.Unit)
+	} else {
+		s.mu.Unlock()
 	}
-	q, a, said, evs, err := s.storeAnswer(ctx, r)
-	s.mu.Unlock()
-	if err != nil {
-		return AnswerResult{}, err
-	}
-	s.publish(evs...)
-	s.changed(ctx, r.Unit)
 
 	route := AnswerResult{Route: turn.Resumed}
 	if !q.State.Stopped() {
 		if route, err = s.route(ctx, q, false, false); err != nil {
-			return AnswerResult{}, err
+			return s.undelivered(ctx, r.Unit, q, a, "routing it failed", err)
 		}
 	}
-	return s.dispatch(ctx, r.Unit, q, a, said, route)
+	return s.dispatch(ctx, r.Unit, q, a, said, route, false)
 }
 
-// dispatch sends the stored answer a the way route says and saves where it went.
-func (s *Service) dispatch(ctx context.Context, ref unit.Unit, q turn.Turn, a turn.Answer, said string, route AnswerResult) (AnswerResult, error) {
+// unroutedAnswer is the answer r's gate stored and never routed, as when the
+// daemon stopped between storing and routing it and the gate's consequence
+// runs again, with the question it answers; false for none. The caller holds
+// s.mu.
+func (s *Service) unroutedAnswer(ctx context.Context, r AnswerRequest) (turn.Turn, turn.Answer, string, bool, error) {
+	if r.Gate == 0 {
+		return turn.Turn{}, turn.Answer{}, "", false, nil
+	}
+	b, err := s.book(ctx, r.Unit)
+	if err != nil {
+		return turn.Turn{}, turn.Answer{}, "", false, err
+	}
+	i := slices.IndexFunc(b.Answers, func(a turn.Answer) bool { return a.Gate == r.Gate })
+	if i < 0 || b.Answers[i].Route != turn.Pending {
+		return turn.Turn{}, turn.Answer{}, "", false, nil
+	}
+	a := b.Answers[i]
+	q, ok := bySeq(&b, a.TurnSeq)
+	if !ok || (q.State != turn.Asked && !q.State.Stopped()) {
+		return turn.Turn{}, turn.Answer{}, "", false, nil
+	}
+	return *q, a, b.Said(a), true, nil
+}
+
+// undelivered refuses answer a, which failed to reach the agent with err, so
+// its question asks again, and says so to the log and the caller.
+func (s *Service) undelivered(ctx context.Context, ref unit.Unit, q turn.Turn, a turn.Answer, what string, err error) (AnswerResult, error) {
+	note := what + ": " + err.Error()
+	s.logf("%s: the answer to turn %s was not delivered, %s; its question asks again", ref.Label(), q.ID, note)
+	route := AnswerResult{Route: turn.Refused, Note: note}
+	if serr := s.saveRoute(context.WithoutCancel(ctx), ref, q, a.ID, route); serr != nil {
+		return AnswerResult{}, errors.Join(err, serr)
+	}
+	return route, Refusal{"the answer was not delivered: " + note}
+}
+
+// dispatch sends the stored answer a the way route says and saves where it
+// went. A resume that fails refuses the answer, so its question asks again,
+// unless retried: the caller then keeps the answer to send again.
+func (s *Service) dispatch(ctx context.Context, ref unit.Unit, q turn.Turn, a turn.Answer, said string, route AnswerResult, retried bool) (AnswerResult, error) {
 	switch route.Route {
 	case turn.Typed:
 		var err error
 		if route, err = s.typeNotice(ctx, ref, route, a); err != nil {
-			return AnswerResult{}, err
+			if retried {
+				return AnswerResult{}, err
+			}
+			return s.undelivered(ctx, ref, q, a, "typing its notice failed", err)
 		}
 	case turn.Resumed:
 		if headless(q) {
 			route = s.runHeadless(ctx, q, said)
 			break
 		}
-		if err := s.Launcher.Launch(ctx, Launch{Unit: ref, Intent: q.Intent, ResumeOf: q.Seq, Answer: said, Inputs: q.Inputs}); errors.Is(err, ErrWorkspaceGone) {
+		err := s.Launcher.Launch(ctx, Launch{Unit: ref, Intent: q.Intent, ResumeOf: q.Seq, Answer: said, Inputs: q.Inputs})
+		switch {
+		case errors.Is(err, ErrWorkspaceGone):
 			route = AnswerResult{Route: turn.Refused, Note: "the workspace is gone"}
-		} else if err != nil {
+		case err != nil && retried:
 			return AnswerResult{}, err
+		case err != nil:
+			return s.undelivered(ctx, ref, q, a, "resuming the turn failed", err)
 		}
 	}
 	if err := s.saveRoute(ctx, ref, q, a.ID, route); err != nil {
@@ -464,7 +515,7 @@ func (s *Service) deliverQuestion(ctx context.Context, ref unit.Unit, b turn.Boo
 		return nil
 	}
 	defer s.release(a.ID)
-	_, err = s.dispatch(ctx, ref, *q, a, b.Said(a), route)
+	_, err = s.dispatch(ctx, ref, *q, a, b.Said(a), route, true)
 	if refused := (Refusal{}); errors.As(err, &refused) {
 		s.logf("the queued answer %d on %s: %s", a.ID, ref, refused.Reason)
 		return nil

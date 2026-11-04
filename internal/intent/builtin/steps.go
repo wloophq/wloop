@@ -55,6 +55,13 @@ var (
 // TurnRunners are the values of turn.start's runner.
 var TurnRunners = []string{"session", "headless"}
 
+// TurnOpenQuestion are the values of turn.start's open_question, its default first.
+var TurnOpenQuestion = []string{"hold", QuestionReplaceIfMoved}
+
+// QuestionReplaceIfMoved is the open_question of a turn.start whose round
+// replaces a question the unit moved past.
+const QuestionReplaceIfMoved = "replace_if_moved"
+
 // Steps is the step vocabulary of workflow manifests.
 var Steps = stepsWith(nil)
 

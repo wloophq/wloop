@@ -83,7 +83,7 @@ func (c cliLauncher) probe(ctx context.Context, d dintent.Def, l turns.Launch) e
 	if wsID == "" {
 		return errors.New("a probe needs the workspace to run in")
 	}
-	if r.History, err = e.turnHistory(ctx, l.Unit, b); err != nil {
+	if r.History, err = e.turnHistory(ctx, l.Unit, b, ""); err != nil {
 		return err
 	}
 	loaded, err := e.loadConfig()

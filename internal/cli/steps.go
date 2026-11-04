@@ -116,6 +116,9 @@ type stepSet struct {
 	peek    *round.Store
 	peekGen port.Generation
 	looks   map[string]removeLook
+	// held is, per unit, the refusal an open question last gave its round
+	// and the head that round was planned on.
+	held map[unit.Unit]questionHold
 }
 
 var _ automation.Steps = (*stepSet)(nil)

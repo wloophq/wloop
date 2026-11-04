@@ -82,7 +82,7 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) error {
 			r.Inputs = prev.Inputs
 		}
 		r.Resume = instructions.ResumeOf(b, l.ResumeOf, l.Answer, pr.HeadRefOid, "")
-		if r.History, err = e.turnHistory(ctx, l.Unit, b); err != nil {
+		if r.History, err = e.turnHistory(ctx, l.Unit, b, ""); err != nil {
 			return err
 		}
 	}

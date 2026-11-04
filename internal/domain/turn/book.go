@@ -242,6 +242,46 @@ func (b *Book) OpenQuestion(i Intent) bool {
 	return ok && t.State == Asked
 }
 
+// QuestionMoved says whether the open question of intent i was asked on a
+// head other than head, both known.
+func (b *Book) QuestionMoved(i Intent, head string) bool {
+	t, ok := b.Newest(i)
+	if !ok || t.State != Asked || head == "" {
+		return false
+	}
+	asked := t.Head
+	if last, ok := b.LastRecord(t.Seq); ok && last.Head != "" {
+		asked = last.Head
+	}
+	return asked != "" && asked != head
+}
+
+// QuestionAnswered says whether the open question of intent i has an answer
+// stored since its last record, refused ones aside: one on its way.
+func (b *Book) QuestionAnswered(i Intent) bool {
+	t, ok := b.Newest(i)
+	if !ok || t.State != Asked {
+		return false
+	}
+	_, answered := b.AnswerStoredAt(t.Seq)
+	return answered
+}
+
+// AnswerStoredAt is when the newest answer stored for turn seq since its
+// last record was, refused ones aside: the user owes it nothing more.
+func (b *Book) AnswerStoredAt(seq int64) (time.Time, bool) {
+	var since time.Time
+	if last, ok := b.LastRecord(seq); ok {
+		since = last.At
+	}
+	for i := len(b.Answers) - 1; i >= 0; i-- {
+		if a := b.Answers[i]; a.TurnSeq == seq && a.Route != Refused && a.At.After(since) {
+			return a.At, true
+		}
+	}
+	return time.Time{}, false
+}
+
 // AnsweredAt is when the newest answer noticed or resumed after the turn's last
 // record arrived.
 func (b *Book) AnsweredAt(seq int64) (time.Time, bool) {

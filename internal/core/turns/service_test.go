@@ -127,6 +127,30 @@ func refusal(err error, want string) bool {
 	return errors.As(err, &r) && strings.Contains(r.Reason, want)
 }
 
+func TestAnAutomatedSendWaitsForTheAnswerOnItsWay(t *testing.T) {
+	s, store, _, _, _ := newService(t)
+	ctx := context.Background()
+	asked := store.Put(turn.Book{Unit: r7, Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), ID: "q", Trigger: turn.Automated, State: turn.Asked, Head: "c1", SentAt: t0.Add(-time.Hour)}},
+		Answers: []turn.Answer{{TurnSeq: 1, Text: "publish it", Route: turn.Typed, At: t0.Add(-time.Minute)}}})
+	req := turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: "abc", Trigger: turn.Automated, Head: "c2", Records: true}
+	if _, err := s.Send(ctx, req); !refusal(err, "has an answer on its way") {
+		t.Fatalf("send = %v", err)
+	}
+	if b := bookOf(t, store, r7); len(b.Turns) != 1 || b.Turns[0].State != turn.Asked {
+		t.Fatalf("turns %+v", b.Turns)
+	}
+	byHand := req
+	byHand.Trigger, byHand.Turn = turn.ByHand, "by-hand"
+	if _, err := s.Send(ctx, byHand); err != nil {
+		t.Fatalf("a round by hand: %v", err)
+	}
+	store.Put(asked)
+	req.ResumeOf = asked.Turns[0].Seq
+	if _, err := s.Send(ctx, req); err != nil {
+		t.Fatalf("the resume of the answered question: %v", err)
+	}
+}
+
 func TestWithdrawUndoesTheSend(t *testing.T) {
 	s, store, _, _, rec := newService(t)
 	ctx := context.Background()
@@ -1153,5 +1177,40 @@ func TestSendKeepsTheItemsAndTaskItWasAskedAbout(t *testing.T) {
 	got := bookOf(t, store, r7).Turns[0]
 	if !slices.Equal(turns.ItemsOf(got), []string{"i1", "i2"}) || turns.TaskOf(got) != "t-1" || got.Inputs["depth"] != "deep" {
 		t.Fatalf("turn %+v", got)
+	}
+}
+
+func TestAnAnswerWhoseNoticeFailsToTypeIsRefusedAndLogged(t *testing.T) {
+	s, store, reg, sess, _ := newService(t)
+	putTurn(store, true)
+	reg.Put(turn.Session{ID: "term_1", Pane: "tab-1:leaf-1", WorkspaceID: "ws", AgentSession: "s1", StartedAt: t0.Add(-2 * time.Hour), MCPAt: t0.Add(-2 * time.Hour)})
+	sess.Put("ws", turns.Terminal{Session: "term_1", Key: "tab-1", LastOutput: t0.Add(-5 * time.Minute)})
+	var logs []string
+	s.Log = func(format string, args ...any) { logs = append(logs, fmt.Sprintf(format, args...)) }
+	sess.OnType = func(context.Context, string, string) (bool, error) { return false, errors.New("orca: no such pane") }
+	_, err := s.Answer(context.Background(), turns.AnswerRequest{Unit: r7, OptionID: "publish", Source: turn.Cockpit})
+	if !refusal(err, "orca: no such pane") {
+		t.Fatalf("answer = %v", err)
+	}
+	if b := bookOf(t, store, r7); len(b.Answers) != 1 || b.Answers[0].Route != turn.Refused || b.QuestionAnswered(turn.Intent(dintent.Review)) {
+		t.Fatalf("answers %+v", b.Answers)
+	}
+	if len(logs) != 1 || !strings.Contains(logs[0], "orca: no such pane") {
+		t.Fatalf("logs %q", logs)
+	}
+}
+
+func TestAGateReplayRoutesTheAnswerTheDaemonStoppedBeforeRouting(t *testing.T) {
+	s, store, _, _, rec := newService(t)
+	putTurn(store, true, turn.Answer{TurnSeq: 1, OptionID: "publish", Route: turn.Pending, Gate: 4, At: t0.Add(-time.Minute)})
+	got, err := s.Answer(context.Background(), turns.AnswerRequest{Unit: r7, OptionID: "publish", Gate: 4, Source: turn.Cockpit})
+	if err != nil || got.Route != turn.Resumed {
+		t.Fatalf("answer = %+v, %v", got, err)
+	}
+	if b := bookOf(t, store, r7); len(b.Answers) != 1 || b.Answers[0].Route != turn.Resumed || len(rec.launches) != 1 {
+		t.Fatalf("answers %+v, launches %+v", b.Answers, rec.launches)
+	}
+	if _, err := s.Answer(context.Background(), turns.AnswerRequest{Unit: r7, OptionID: "publish", Gate: 4, Source: turn.Cockpit}); err != nil || len(rec.launches) != 1 {
+		t.Fatalf("a routed answer replayed again: %v, launches %d", err, len(rec.launches))
 	}
 }

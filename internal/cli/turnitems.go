@@ -51,14 +51,15 @@ func (e *Env) itemsReader() turn.ItemsReader {
 }
 
 // turnHistory is the earlier turns of u's book b as instructions carry them,
-// each naming its ledger ops with their logged outcomes.
-func (e *Env) turnHistory(ctx context.Context, u unit.Unit, b dturn.Book) ([]instructions.PastTurn, error) {
+// each naming its ledger ops with their logged outcomes, for a send of intent
+// sending ("" for a resume).
+func (e *Env) turnHistory(ctx context.Context, u unit.Unit, b dturn.Book, sending dturn.Intent) ([]instructions.PastTurn, error) {
 	b.Unit, b.HistoryArtifact = u, e.historyArtifact
 	log, err := e.turnOpsLog(ctx, b)
 	if err != nil {
 		return nil, err
 	}
-	return instructions.History(b, instructions.HistoryMax, log), nil
+	return instructions.History(b, instructions.HistoryMax, log, sending), nil
 }
 
 // turnOpsLog is what the ledger logged for the ops of b's turns since the

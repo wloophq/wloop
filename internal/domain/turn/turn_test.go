@@ -414,3 +414,79 @@ func TestWithdrawUndoesASendThatReplacedAQuestion(t *testing.T) {
 		t.Fatalf("a late record moved the withdrawn turn: %+v", b.Turns[1])
 	}
 }
+
+func askedOn(head string) Book {
+	return Book{Unit: r7, Turns: []Turn{{Seq: 1, Intent: "review", State: Asked, Head: head}},
+		Records: []Record{{TurnSeq: 1, Head: head, At: at(2), Record: record.Record{State: record.Asked}}}}
+}
+
+func TestAQuestionMovedOnlyWhenBothHeadsAreKnownAndDiffer(t *testing.T) {
+	b := askedOn("c1")
+	if !b.QuestionMoved("review", "c2") {
+		t.Fatal("a question asked on c1 did not move on c2")
+	}
+	for name, change := range map[string]func(*Book){
+		"same head":         func(b *Book) { b.Turns[0].Head, b.Records[0].Head = "c2", "c2" },
+		"turn with no head": func(b *Book) { b.Turns[0].Head, b.Records[0].Head = "", "" },
+		"not asked":         func(b *Book) { b.Turns[0].State = Done },
+		"other intent":      func(b *Book) { b.Turns[0].Intent = "address" },
+	} {
+		b := askedOn("c1")
+		change(&b)
+		if b.QuestionMoved("review", "c2") {
+			t.Errorf("%s: the question moved", name)
+		}
+	}
+	if b := askedOn("c1"); b.QuestionMoved("review", "") {
+		t.Error("an unknown head moved the question")
+	}
+}
+
+func TestAQuestionIsAnsweredByAnAnswerSinceItsRecordThatWasNotRefused(t *testing.T) {
+	b := askedOn("c1")
+	if b.QuestionAnswered("review") {
+		t.Fatal("no answer, answered")
+	}
+	b.Answers = []Answer{{TurnSeq: 1, At: at(1), Route: Typed}, {TurnSeq: 1, Route: Refused, At: at(4)}}
+	if b.QuestionAnswered("review") {
+		t.Fatal("an answer before the record, or a refused one, answers the question")
+	}
+	b.Answers = append(b.Answers, Answer{TurnSeq: 1, Route: Pending, At: at(5)})
+	if !b.QuestionAnswered("review") {
+		t.Fatal("a pending answer since the record does not answer it")
+	}
+}
+
+func TestTheHistoryCarriesTheQuestionOnlyToTheSendThatReplacesIt(t *testing.T) {
+	q := &record.Question{Kind: "choice", Text: "nudge the author or drop?", Options: []record.Option{{ID: "nudge", Label: "Nudge", Consequence: "posts a nudge"}, {ID: "drop", Label: "Drop", Consequence: "ends the review"}}}
+	asked := func() Book {
+		b := askedOn("c1")
+		b.Records[0].Record.Question = q
+		return b
+	}
+	b := asked()
+	if e := b.HistoryWith(1, nil, "review")[0]; e.Question != q.Text || !slices.Equal(e.Options, q.Options) {
+		t.Fatalf("the replacing send's entry %+v", e)
+	}
+	for name, c := range map[string]struct {
+		change  func(*Book)
+		sending Intent
+	}{
+		"another intent's send": {func(*Book) {}, "nudge"},
+		"a resume":              {func(*Book) {}, ""},
+		"an answer on its way":  {func(b *Book) { b.Answers = []Answer{{TurnSeq: 1, OptionID: "drop", Route: Queued, At: at(3)}} }, "review"},
+		"a later turn replaced it": {func(b *Book) {
+			b.Turns[0].State, b.Turns[0].Before = Replaced, Asked
+			b.Turns = append(b.Turns, Turn{Seq: 2, Intent: "review", State: Done, Head: "c2"})
+		}, "review"},
+		"its turn settled": {func(b *Book) { b.Turns[0].State = Done }, "review"},
+	} {
+		b := asked()
+		c.change(&b)
+		for _, e := range b.HistoryWith(2, nil, c.sending) {
+			if e.Question != "" || e.Options != nil {
+				t.Errorf("%s: the question is carried: %+v", name, e)
+			}
+		}
+	}
+}

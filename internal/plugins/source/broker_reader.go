@@ -90,7 +90,7 @@ func (r reader) Books(ctx context.Context, units []plugin.Unit) ([]src.Book, err
 			if rec, ok := b.LastRecord(t.Seq); ok {
 				wt.Summary, wt.At = rec.Record.Headline(), rec.At
 			}
-			wt.AnsweredAt, _ = b.AnsweredAt(t.Seq)
+			wt.AnsweredAt, _ = b.AnswerStoredAt(t.Seq)
 			wb.Turns = append(wb.Turns, wt)
 		}
 		for _, rec := range b.Records {

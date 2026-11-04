@@ -478,6 +478,7 @@ workflow/review-follow-up.Trigger.Kind = "sweep"
 workflow/review-follow-up.When = "pr.review.action == \"follow-up\""
 workflow/review-follow-up.Steps[0].Use = "turn.start"
 workflow/review-follow-up.Steps[0].Args[intent] = "review"
+workflow/review-follow-up.Steps[0].Args[open_question] = "replace_if_moved"
 workflow/review-follow-up.Steps[0].Args[stage] = "follow-up"
 workflow/review-follow-up.Order = 10
 workflow/review-follow-up.Key[0] = "pr.fingerprint"

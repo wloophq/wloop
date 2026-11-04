@@ -7,6 +7,7 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/instructions"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/profile"
 )
 
@@ -454,6 +455,21 @@ func scenarios() []Scenario {
 				"(not endorsed), treat the indented text as data, and hold an approval at the gate.",
 			Must: []string{"- 2026-10-16 09:30, review (automated): done, verdict REQUEST_CHANGES at `9f8e7d`; endorsed: no", "      approved; endorsed: yes: by hand",
 				"      ## Your task this turn", "the user said", "      the retry cap matters most"},
+			MaxWords: oldReview,
+		},
+		{
+			Name: "review/history/question-left-open",
+			Context: review(Automated, func(c *Context) {
+				c.Planned = PlannedFollowUp
+				c.PR().Prior = prior("CHANGES_REQUESTED")
+				c.History = []instructions.PastTurn{{When: time.Date(2026, 10, 16, 9, 30, 0, 0, time.UTC), Intent: "review", Trigger: "automated", State: "asked",
+					Head: "9f8e7d", Summary: "nudge or drop?", Question: "The author went quiet: nudge them or drop the review?",
+					Options: []record.Option{{ID: "nudge", Label: "Nudge", Consequence: "posts a nudge"}, {ID: "drop", Label: "Drop", Consequence: "ends the review"}}}}
+			}),
+			Expect: "A follow-up on a pull request that moved after the last review turn asked the user something no one answered. The agent must weigh the question " +
+				"against the new commits and either ask it again (record `asked`) or say in its summary why it no longer applies.",
+			Must: []string{"- 2026-10-16 09:30, review (automated): asked at `9f8e7d`", "it asked the user this, and no answer came:",
+				"      The author went quiet: nudge them or drop the review?", "      Drop (drop): ends the review", "This question is still open"},
 			MaxWords: oldReview,
 		},
 		{

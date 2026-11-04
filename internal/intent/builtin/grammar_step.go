@@ -7,6 +7,7 @@ var stepGrammar = []Key{
 	required(stepKey(StepTurnStart, "intent", KindText, "", "The intent whose turn starts; it must serve the unit. Required.")),
 	stepEnum(StepTurnStart, "stage", Stages, "", "The pass over the unit: its first, or one after."),
 	stepEnum(StepTurnStart, "runner", TurnRunners, "", "How the turn runs, one of the intent's runners; by default its first."),
+	stepEnum(StepTurnStart, "open_question", TurnOpenQuestion, TurnOpenQuestion[0], "What an open question of the intent's newest turn does to a round of the unit's plan: hold waits for its answer; replace_if_moved runs a round planned on a head other than the one the question was asked on, which replaces the asked turn, supersedes its gate and carries the question in the new turn's history. An answer on its way holds the round either way."),
 
 	required(stepKey(StepDraftPropose, "purpose", KindText, "", "What the draft is for, such as nudge or close. Required.")),
 	{Path: "delivery", In: SurfaceStep, Step: StepDraftPropose, Kind: KindEnum, Values: func() []Value { return names(DraftDeliveries) }, Default: DraftDeliveries[0], Doc: "How the draft posts: the core's message or reaction, or a delivery a plugin declares."},

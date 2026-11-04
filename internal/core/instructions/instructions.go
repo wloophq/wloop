@@ -20,6 +20,10 @@ type PastTurn struct {
 	Intent, Trigger, State, Verdict, Head, Endorsed string
 	Summary, Next, Triage                           string
 	Said                                            []string
+	// Question and Options are what the turn asks that no answer reached, on
+	// the turn this send replaces; an agent wrote them.
+	Question string
+	Options  []record.Option
 	// Ledger is one line per op of the turn's records with its outcome.
 	Ledger []string
 }
@@ -54,10 +58,10 @@ type Resume struct {
 }
 
 // History is b's earlier turns, each naming its ledger ops with the outcome
-// log holds for them.
-func History(b turn.Book, limit int, log []turn.OpOutcome) []PastTurn {
+// log holds for them, for a send of intent sending ("" for none).
+func History(b turn.Book, limit int, log []turn.OpOutcome, sending turn.Intent) []PastTurn {
 	var out []PastTurn
-	for _, e := range b.HistoryWith(limit, log) {
+	for _, e := range b.HistoryWith(limit, log, sending) {
 		out = append(out, PastTurn(e))
 	}
 	return out

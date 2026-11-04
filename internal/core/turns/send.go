@@ -39,6 +39,12 @@ type SendRequest struct {
 	Task  string
 }
 
+// AnswerOnItsWay is why an automated send of intent i waits: its open
+// question has an answer stored that the turn has not taken yet.
+func AnswerOnItsWay(i turn.Intent) string {
+	return "its " + string(i) + " question has an answer on its way"
+}
+
 // Send stores a new turn, replacing the open one of the same intent. The
 // views learn it from SentTo, once it is typed.
 func (s *Service) Send(ctx context.Context, r SendRequest) (turn.Turn, error) {
@@ -73,6 +79,10 @@ func (s *Service) send(ctx context.Context, r SendRequest, start bool, handle st
 	if err := refuseOverRunning(&b, r.Intent); err != nil {
 		s.mu.Unlock()
 		return turn.Turn{}, err
+	}
+	if r.Trigger == turn.Automated && !start && r.ResumeOf == 0 && b.QuestionAnswered(r.Intent) {
+		s.mu.Unlock()
+		return turn.Turn{}, Refusal{r.Unit.Label() + ": " + AnswerOnItsWay(r.Intent)}
 	}
 	now := s.now()
 	next := turn.Turn{

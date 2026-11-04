@@ -8,6 +8,7 @@ key = ["pr.fingerprint"]
 use = "turn.start"
 intent = "review"
 stage = "follow-up"
+open_question = "replace_if_moved"
 
 [[gates.approval.rule]]
 when = 'gate.kind == "plan"'

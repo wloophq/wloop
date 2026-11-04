@@ -207,6 +207,27 @@ func TestTheRoundStateCrossesTheWireWithItsBookkeeping(t *testing.T) {
 	}
 }
 
+func TestBooksServeAQuestionsAnswerFromWhenItWasStored(t *testing.T) {
+	t.Parallel()
+	b, _ := brokerOver(t)
+	asked := time.Date(2026, 10, 28, 9, 0, 0, 0, time.UTC)
+	t1 := unit.Unit{Provider: "acme", Key: "t1"}
+	b.Books = func(context.Context, ...unit.Unit) (map[unit.Unit]turn.Book, error) {
+		return map[unit.Unit]turn.Book{t1: {Unit: t1, Turns: []turn.Turn{{Seq: 1, ID: "a", Intent: "review", State: turn.Asked, SentAt: asked.Add(-time.Hour)}},
+			Records: []turn.Record{{ID: 9, TurnSeq: 1, At: asked, Record: record.Record{State: record.Asked}}},
+			Answers: []turn.Answer{{ID: 1, TurnSeq: 1, Route: turn.Refused, At: asked.Add(time.Minute)}, {ID: 2, TurnSeq: 1, Route: turn.Queued, At: asked.Add(2 * time.Minute)}}}}, nil
+	}
+	stub := sourcetest.NewStub()
+	sourcetest.Launch(t, "acme", stub, b.Host())
+	books, err := stub.Host().Reader.Books(context.Background(), []plugin.Unit{{Provider: "acme", Key: "t1"}})
+	if err != nil || len(books) != 1 {
+		t.Fatalf("books %+v %v", books, err)
+	}
+	if got := books[0].Turns[0].AnsweredAt; !got.Equal(asked.Add(2 * time.Minute)) {
+		t.Fatalf("answered at %v, want the queued answer's", got)
+	}
+}
+
 func TestBooksServeEachTurnAtWhenItReachedItsState(t *testing.T) {
 	t.Parallel()
 	b, _ := brokerOver(t)

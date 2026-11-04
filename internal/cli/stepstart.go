@@ -277,7 +277,7 @@ func (s *stepSet) startGuards(ctx context.Context, c stepCall, byHand, live bool
 			return why, p, nil
 		}
 	}
-	if why, err := s.asks(ctx, c.u, &p); err != nil || why != "" {
+	if why, err := s.asks(ctx, c, &p); err != nil || why != "" {
 		return why, p, err
 	}
 	if !p.observed() {
@@ -343,20 +343,54 @@ func (s *stepSet) activity(ctx context.Context, p startPlan, byHand bool) string
 }
 
 // asks refuses a round whose intent's newest turn asks the user something:
-// the round would replace the turn the agent finishes with the answer.
-func (s *stepSet) asks(ctx context.Context, u unit.Unit, p *startPlan) (string, error) {
+// the round would replace the turn the agent finishes with the answer. A
+// step that replaces a moved question lets a round planned on another head
+// replace one no answer is on its way to.
+func (s *stepSet) asks(ctx context.Context, c stepCall, p *startPlan) (string, error) {
 	if s.e.Turns == nil {
 		return "", nil
 	}
-	books, err := s.e.Turns.Store.Books(ctx, u)
+	books, err := s.e.Turns.Store.Books(ctx, c.u)
 	if err != nil {
 		return "", err
 	}
-	p.first = !slices.ContainsFunc(books[u].Turns, func(t dturn.Turn) bool { return t.State != dturn.Withdrawn })
-	if s.e.Rec != nil && s.e.Rec.OpenQuestions(books)[p.ref][p.args.intent] {
-		return "its " + p.args.intent + " turn asks you something", nil
+	b := books[c.u]
+	p.first = !slices.ContainsFunc(b.Turns, func(t dturn.Turn) bool { return t.State != dturn.Withdrawn })
+	if s.e.Rec == nil || !s.e.Rec.OpenQuestions(books)[p.ref][p.args.intent] {
+		return "", nil
 	}
-	return "", nil
+	intent := dturn.Intent(p.args.intent)
+	why := "its " + p.args.intent + " turn asks you something"
+	switch {
+	case b.QuestionAnswered(intent):
+		why = turns.AnswerOnItsWay(intent)
+	case p.round && c.arg("open_question") == builtin.QuestionReplaceIfMoved && b.QuestionMoved(intent, p.planned.Head):
+		return "", nil
+	}
+	s.holdByQuestion(c.u, questionHold{refusal: why, head: p.planned.Head})
+	return why, nil
+}
+
+// questionHold is a round an open question refused, and the head it was
+// planned on, "" unknown.
+type questionHold struct{ refusal, head string }
+
+func (s *stepSet) holdByQuestion(u unit.Unit, h questionHold) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.held == nil {
+		s.held = map[unit.Unit]questionHold{}
+	}
+	s.held[u] = h
+}
+
+// questionHeld is the hold behind refusal on u, false when an open question
+// did not give it.
+func (s *stepSet) questionHeld(u unit.Unit, refusal string) (questionHold, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	h, ok := s.held[u]
+	return h, ok && h.refusal == refusal
 }
 
 func (s *stepSet) intakeAsks(ctx context.Context, u unit.Unit, intent string) (string, error) {
@@ -449,8 +483,27 @@ func (s *stepSet) startNote(ctx context.Context, c stepCall, refusal string) err
 		return s.recordBriefWaiting(ctx, p)
 	case isCapRefusal(refusal):
 		return s.holdByCap(ctx, c, refusal)
+	default:
+		if h, ok := s.questionHeld(c.u, refusal); ok {
+			s.logQuestionHold(c, h)
+		}
 	}
 	return nil
+}
+
+// logQuestionHold logs, once a day per planned head, that an open question
+// holds the round, which the plan shows and nothing else would.
+func (s *stepSet) logQuestionHold(c stepCall, h questionHold) {
+	st := s.bound()
+	ref, err := githubRef(c.u)
+	if st == nil || err != nil {
+		return
+	}
+	args := s.e.startOf(c.st, c.u.Provider)
+	line := fmt.Sprintf("skip the %s of %s at %s: %s", args.kindName(), ref, cmp.Or(h.head, "an unknown head"), h.refusal)
+	if st.FirstNote(line, s.e.Now()) {
+		fmt.Fprintf(s.e.Err, "%s %s\n", s.e.stamp(), line)
+	}
 }
 
 // kindBriefWaiting records once per wait, keyed by intent and head, that a

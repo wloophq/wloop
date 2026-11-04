@@ -328,7 +328,7 @@ func (e *Env) sendTurn(ctx context.Context, cfg config.Config, r turn.Request) (
 		}
 		b := books[r.Unit]
 		if r.History == nil {
-			if r.History, err = e.turnHistory(ctx, r.Unit, b); err != nil {
+			if r.History, err = e.turnHistory(ctx, r.Unit, b, dturn.Intent(r.Intent)); err != nil {
 				return sentTurn{}, err
 			}
 		}

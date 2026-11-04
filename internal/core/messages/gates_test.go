@@ -2,7 +2,9 @@ package messages_test
 
 import (
 	"context"
+	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	coreitems "github.com/wloophq/wloop/internal/core/items"
@@ -221,5 +223,32 @@ func TestAMissingGateMovesOffAClosedTask(t *testing.T) {
 	}
 	if e := r.task(t, string(open[0].Task)); e.Category == task.CategoryDone || e.Category == task.CategoryDropped {
 		t.Fatalf("the moved gate is on %+v", e)
+	}
+}
+
+func TestAnAnswerWhoseResumeFailsIsLoggedAndItsQuestionAsksAgain(t *testing.T) {
+	r := newRig(t)
+	r.asked(t, r7)
+	r.reconcile(t, r7)
+	m := r.only(t)
+	r.launch.err = errors.New("git fetch: Permission denied (publickey)")
+	_, err := r.answer(m, messages.Answer{OptionID: "publish", Source: turn.Cockpit})
+	if err == nil || !strings.Contains(err.Error(), "Permission denied (publickey)") {
+		t.Fatalf("answer = %v", err)
+	}
+	if b := r.book(t, r7); len(b.Answers) != 1 || b.Answers[0].Route != turn.Refused || b.Turns[0].State != turn.Asked {
+		t.Fatalf("answers %+v, turns %+v", b.Answers, b.Turns)
+	}
+	if !slices.ContainsFunc(r.logged(), func(l string) bool { return strings.Contains(l, "Permission denied (publickey)") }) {
+		t.Fatalf("log %q", r.logged())
+	}
+	r.reconcile(t, r7)
+	again := r.openGates(t, gate.KindQuestion)
+	if len(again) != 1 {
+		t.Fatalf("the question asks again through %+v", again)
+	}
+	r.launch.err = nil
+	if _, err := r.answer(r.only(t), messages.Answer{OptionID: "publish", Source: turn.Cockpit}); err != nil || len(r.launch.launches) != 1 {
+		t.Fatalf("the second answer = %v, launches %+v", err, r.launch.launches)
 	}
 }
