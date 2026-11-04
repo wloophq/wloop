@@ -20,6 +20,14 @@ func TestUserDrivenReadsTheSessionAndItsTurns(t *testing.T) {
 	if got, err := e.s.UserDriven(ctx, "term_1"); err != nil || !got {
 		t.Fatalf("the user typed last: %v %v", got, err)
 	}
+	done := e.s.Typing("term_1")
+	if got, err := e.s.UserDriven(ctx, "term_1"); err != nil || got {
+		t.Fatalf("the loop is typing into it: %v %v", got, err)
+	}
+	done()
+	if got, err := e.s.UserDriven(ctx, "term_1"); err != nil || !got {
+		t.Fatalf("the loop stopped typing before it noted the line: %v %v", got, err)
+	}
 	running := doneTurn("term_1", turn.Started)
 	e.store.Put(turn.Book{Unit: ref(len("term_1")), Turns: running})
 	if got, err := e.s.UserDriven(ctx, "term_1"); err != nil || got {
