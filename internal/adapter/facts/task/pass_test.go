@@ -63,6 +63,23 @@ func TestAPassReadsTheStoreOnceForEveryTask(t *testing.T) {
 
 // TestPrepareStartsAPassOverEveryTask: a sweep's facts, read through the prepared context, read the store once
 // for all the tasks and are the facts each task has on its own.
+func TestAPassWorksOutATasksFactsOnceThoughItsProjectReadsThem(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	e := newEnv(t)
+	project := e.task(task.Task{ID: "p-1", State: "next", Category: task.CategoryReady, Title: "p", Props: task.Props{task.PropKind: {Text: task.KindProject}}})
+	child := e.task(task.Task{ID: "t-1", State: "next", Category: task.CategoryReady, Title: "c", Parent: "p-1", Units: []unit.Unit{chatA}})
+	pctx := coretasks.WithPass(ctx, &coretasks.Pass{Tasks: []task.Task{project, child}})
+	for _, en := range []task.Task{project, child, project} {
+		if _, err := e.p.TaskFacts(pctx, en); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := e.reads["repo of "+chatA.String()]; n != 1 {
+		t.Errorf("the child's facts were worked out %d times in one pass", n)
+	}
+}
+
 func TestPrepareStartsAPassOverEveryTask(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

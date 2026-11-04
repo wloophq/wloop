@@ -156,7 +156,10 @@ func newEnv(t *testing.T) *env {
 			}
 			return out, nil
 		},
-		Repo:      func(_ context.Context, u unit.Unit) (string, error) { return e.repos[u], nil },
+		Repo: func(_ context.Context, u unit.Unit) (string, error) {
+			e.reads["repo of "+u.String()]++
+			return e.repos[u], nil
+		},
 		Gates:     countingGates{db.Gates(func() time.Time { return e.clock.now }), e},
 		OpenTurns: func(context.Context) (map[unit.Unit][]turn.Turn, error) { e.reads["open turns"]++; return e.open, nil },
 		Chat:      func() turn.Intent { return "chat" },

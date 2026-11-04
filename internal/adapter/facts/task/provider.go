@@ -234,11 +234,18 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 
 // TaskFacts are the facts of task e, as Facts reads them of its unit.
 func (p *Provider) TaskFacts(ctx context.Context, e task.Task) (workflow.Facts, error) {
-	f, err := p.base(ctx, e)
-	if err != nil {
-		return nil, err
-	}
-	return p.owed(ctx, e, f)
+	f, err := coretasks.Once(ctx, passTask+fingerprint(e), func() (workflow.Facts, error) {
+		f, err := p.base(ctx, e)
+		if err != nil {
+			return nil, err
+		}
+		return p.owed(ctx, e, f)
+	})
+	return maps.Clone(f), err
+}
+
+func fingerprint(e task.Task) string {
+	return string(e.ID) + "|" + string(e.State) + "|" + e.Updated.UTC().Format(time.RFC3339Nano)
 }
 
 // EventFacts are the facts of a task an event names, also once done or
@@ -252,11 +259,7 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 	if err != nil {
 		return nil, err
 	}
-	f, err := p.base(ctx, e)
-	if err != nil {
-		return nil, err
-	}
-	return p.owed(ctx, e, f)
+	return p.TaskFacts(ctx, e)
 }
 
 func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error) {
@@ -275,7 +278,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.items_open":          0,
 		"task.items_resolved":      0,
 		"task.settled_at":          time.Time{},
-		"task.fingerprint":         string(e.ID) + "|" + string(e.State) + "|" + e.Updated.UTC().Format(time.RFC3339Nano),
+		"task.fingerprint":         fingerprint(e),
 		"task.category":            string(e.Category),
 		"task.owed_by":             "",
 		"task.owed_since":          time.Time{},
@@ -779,6 +782,7 @@ const (
 	passGates     = "facts.gates"
 	passSettled   = "facts.settled."
 	passWakes     = "facts.wakes"
+	passTask      = "facts.task."
 )
 
 // items are the items of units; those of the pass ctx carries are read once for every unit of it.
