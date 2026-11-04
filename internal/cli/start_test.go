@@ -251,6 +251,26 @@ func TestAStartAgainOnTheTaskReusesItsRepositoryAndWorktree(t *testing.T) {
 	}
 }
 
+func TestStartFindsTheTaskAfterItsFlags(t *testing.T) {
+	te, m, _, _ := startEnv(t)
+	var clones []string
+	te.gh.clone = cloneAs(t, "acme/api", &clones)
+	if code := te.run("start", "--repo", "acme/api", "add retries"); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	task := capturedTask.FindStringSubmatch(te.out.String())
+	if task == nil {
+		t.Fatalf("no task captured:\n%s", te.out)
+	}
+	te.out.Reset()
+	if code := te.run("start", "--repo", "acme/api", task[1], "retry", "twice"); code != 0 {
+		t.Fatalf("again: exit %d: %s", code, te.err)
+	}
+	if capturedTask.MatchString(te.out.String()) || len(m.Prompts) != 2 || m.Prompts[1].Handle != m.Prompts[0].Handle {
+		t.Fatalf("the second start did not run on %s:\n%s\nprompts %+v", task[1], te.out, m.Prompts)
+	}
+}
+
 func TestStartRunsInTheProjectsAgentHome(t *testing.T) {
 	te, m, _, _ := startEnv(t)
 	home, file := untrustedHome(t)
