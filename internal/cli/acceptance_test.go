@@ -485,6 +485,9 @@ func TestMain(m *testing.M) {
 	if servedAsPlugin() {
 		os.Exit(0)
 	}
+	if code, ok := servedAsClaude(); ok {
+		os.Exit(code)
+	}
 	os.Unsetenv("ORCA_USER_DATA_PATH")
 	storeReportWait = 0
 	builtin.Providers = append(builtin.Providers, ingesttest.Provider)

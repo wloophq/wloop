@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -36,34 +37,83 @@ func testHomeKinds(t *testing.T) map[string]setup.HomeKind {
 	return map[string]setup.HomeKind{"claude": claude.NewHomeKind(sh)}
 }
 
-const fakeClaudeScript = `#!/bin/sh
-exec python3 -I - "$@" <<'PY'
-import json, os, sys
-a = sys.argv[1:]
-if len(a) < 5 or a[0] != "mcp" or a[2:4] != ["--scope", "user"] or a[1] not in ("add-json", "remove"):
-    sys.exit("fake claude: unexpected " + " ".join(a))
-d = os.environ.get("CLAUDE_CONFIG_DIR") or os.environ["HOME"]
-p = os.path.join(d, ".claude.json")
-doc = json.load(open(p)) if os.path.exists(p) else {}
-s = doc.setdefault("mcpServers", {})
-if a[1] == "add-json":
-    if a[4] in s:
-        sys.exit("MCP server " + a[4] + " already exists")
-    s[a[4]] = json.loads(a[5])
-else:
-    if a[4] not in s:
-        sys.exit("No MCP server named " + a[4])
-    del s[a[4]]
-os.makedirs(d, exist_ok=True)
-with open(p, "w") as f:
-    json.dump(doc, f)
-PY
-`
+// fakeClaudeEnv makes this test binary run as the fake claude, which keeps
+// the user-scoped MCP servers in the .claude.json of CLAUDE_CONFIG_DIR or
+// HOME, so the fake needs nothing from the developer's PATH.
+const fakeClaudeEnv = "CLI_TEST_FAKE_CLAUDE"
 
+// servedAsClaude runs the fake claude when this process is one, and says
+// whether it was, with its exit code.
+func servedAsClaude() (int, bool) {
+	if os.Getenv(fakeClaudeEnv) == "" {
+		return 0, false
+	}
+	if err := runFakeClaude(os.Args[1:]); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1, true
+	}
+	return 0, true
+}
+
+func runFakeClaude(a []string) error {
+	if len(a) < 5 || a[0] != "mcp" || !slices.Equal(a[2:4], []string{"--scope", "user"}) || (a[1] != "add-json" && a[1] != "remove") {
+		return fmt.Errorf("fake claude: unexpected %s", strings.Join(a, " "))
+	}
+	dir := os.Getenv("CLAUDE_CONFIG_DIR")
+	if dir == "" {
+		dir = os.Getenv("HOME")
+	}
+	path := filepath.Join(dir, ".claude.json")
+	doc := map[string]any{}
+	if raw, err := os.ReadFile(path); err == nil {
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			return err
+		}
+	}
+	servers, _ := doc["mcpServers"].(map[string]any)
+	if servers == nil {
+		servers = map[string]any{}
+	}
+	doc["mcpServers"] = servers
+	name := a[4]
+	if a[1] == "add-json" {
+		if _, ok := servers[name]; ok {
+			return fmt.Errorf("MCP server %s already exists", name)
+		}
+		if len(a) < 6 {
+			return fmt.Errorf("fake claude: add-json %s without its JSON", name)
+		}
+		var v any
+		if err := json.Unmarshal([]byte(a[5]), &v); err != nil {
+			return err
+		}
+		servers[name] = v
+	} else {
+		if _, ok := servers[name]; !ok {
+			return fmt.Errorf("No MCP server named %s", name)
+		}
+		delete(servers, name)
+	}
+	raw, err := json.Marshal(doc)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, raw, 0o644)
+}
+
+// fakeClaude is a directory whose claude runs this test binary as the fake.
 func fakeClaude(t *testing.T, root string) string {
 	t.Helper()
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
 	dir := filepath.Join(root, "bin")
-	writeFile(t, filepath.Join(dir, "claude"), fakeClaudeScript)
+	script := "#!/bin/sh\n" + fakeClaudeEnv + "=1 exec '" + strings.ReplaceAll(exe, "'", `'\''`) + "' \"$@\"\n"
+	writeFile(t, filepath.Join(dir, "claude"), script)
 	if err := os.Chmod(filepath.Join(dir, "claude"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -584,5 +634,29 @@ func TestInstallKeysTheMCPRegistrationAndDoctorSeesAStaleKey(t *testing.T) {
 	writeFile(t, te.mcpKeyPath(), "other\n")
 	if c := mcpCheck(); c.mark != markMissing || !strings.Contains(c.info, "X-Loop-Key is stale") || strings.Contains(c.info, key) {
 		t.Fatalf("stale: %+v", c)
+	}
+}
+
+func TestTheFakeClaudeNeedsNothingOnThePath(t *testing.T) {
+	root := t.TempDir()
+	bin := filepath.Join(fakeClaude(t, root), "claude")
+	home := filepath.Join(root, "home")
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command(bin, args...)
+		cmd.Env = []string{"PATH=", "HOME=" + home}
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("claude %s: %v: %s", strings.Join(args, " "), err, out)
+		}
+	}
+	run("mcp", "add-json", "--scope", "user", "acme", `{"command":"acme"}`)
+	raw, _ := os.ReadFile(filepath.Join(home, ".claude.json"))
+	if !strings.Contains(string(raw), `"acme":{"command":"acme"}`) {
+		t.Fatalf(".claude.json after add-json: %s", raw)
+	}
+	run("mcp", "remove", "--scope", "user", "acme")
+	raw, _ = os.ReadFile(filepath.Join(home, ".claude.json"))
+	if strings.Contains(string(raw), "acme") {
+		t.Fatalf(".claude.json after remove: %s", raw)
 	}
 }
