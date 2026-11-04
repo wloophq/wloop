@@ -168,7 +168,7 @@ func (s *Server) resolveTaskGate(ctx context.Context, e task.Task, role builtin.
 			return true, err
 		}
 	}
-	r.By = req.Actor
+	r.By, r.Session = req.Actor, req.Session
 	return true, s.resolveGate(ctx, g, r, ar.Source, out)
 }
 

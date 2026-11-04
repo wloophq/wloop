@@ -262,13 +262,16 @@ type RecordView struct {
 // TimelineEvent is one event of a task's timeline: Seq its stable position, which pages it, and Unit the unit it
 // happened on, "" for the task itself.
 type TimelineEvent struct {
-	Seq   int64           `json:"seq"`
-	Kind  string          `json:"kind"`
-	Sub   string          `json:"sub,omitempty"`
-	Actor string          `json:"actor,omitempty"`
-	At    time.Time       `json:"at"`
-	Unit  string          `json:"unit,omitempty"`
-	Data  json.RawMessage `json:"data,omitempty"`
+	Seq   int64  `json:"seq"`
+	Kind  string `json:"kind"`
+	Sub   string `json:"sub,omitempty"`
+	Actor string `json:"actor,omitempty"`
+	// Session is the session an agent acted through, and By how the profile names a change made through one.
+	Session string          `json:"session,omitempty"`
+	By      string          `json:"by,omitempty"`
+	At      time.Time       `json:"at"`
+	Unit    string          `json:"unit,omitempty"`
+	Data    json.RawMessage `json:"data,omitempty"`
 }
 
 // ChatRequest is a message to a task's agent; Intent picks the intent of the turn it starts when no session

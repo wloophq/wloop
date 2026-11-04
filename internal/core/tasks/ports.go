@@ -110,19 +110,23 @@ type VerbHandler func(ctx context.Context, e task.Task, req Request) (Result, er
 // approved gate a gated run of the verb opened, which ProposedVerb sets and
 // no route copies: the person's approval stands for the verb's by.
 type Request struct {
-	Verb     task.Verb
-	Args     map[string]string
-	Source   string
-	Actor    task.Actor
+	Verb   task.Verb
+	Args   map[string]string
+	Source string
+	// Actor is who runs the verb: an agent only through a session the user drives, which the daemon checks
+	// before it asks.
+	Actor task.Actor
+	// Session is the session an agent's request came through, "" for any other actor.
+	Session  string
 	Chain    workflow.Chain
 	Approved int64
 }
 
 // Ending settles what a task that ended still holds, its drafts and gates: e as it was left, done or dropped, by
-// verb v of by, or by no verb when the source ended it. The end stands whatever happens to them, so Ended
-// reports its own failures.
+// verb v of by, through session when by is an agent, or by no verb when the source ended it. The end stands
+// whatever happens to them, so Ended reports its own failures.
 type Ending interface {
-	Ended(ctx context.Context, e task.Task, v task.Verb, by task.Actor)
+	Ended(ctx context.Context, e task.Task, v task.Verb, by task.Actor, session string)
 }
 
 // Gates are the gates a gated verb opens and reads back: one open gate per proposal.

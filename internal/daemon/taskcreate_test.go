@@ -74,16 +74,25 @@ func TestCaptureIsTaskCreateWithATitle(t *testing.T) {
 func TestTaskCreateFromAnAgentSessionIsWrittenByTheAgent(t *testing.T) {
 	t.Parallel()
 	r := newCreateRig(t, nil)
-	for _, personOnly := range []string{`{"title":"x","props":{"due":"2026-11-02"}}`, `{"title":"x","props":{"area":"OSS"}}`} {
-		if rec := postFrom(t, r.s, "term_1", api.TasksPath, personOnly); rec.Code != 400 || !strings.Contains(rec.Body.String(), "agent") {
-			t.Errorf("%s from an agent session: %d %s", personOnly, rec.Code, rec.Body)
+	for _, notAgents := range []string{`{"title":"x","props":{"last_nudge":"2026-11-02"}}`, `{"title":"x","props":{"kind":"capture"}}`} {
+		if rec := postFrom(t, r.s, "term_1", api.TasksPath, notAgents); rec.Code != 400 || !strings.Contains(rec.Body.String(), "agent") {
+			t.Errorf("%s from an agent session: %d %s", notAgents, rec.Code, rec.Body)
 		}
 	}
 	if p := r.page(t, "view=inbox"); len(p.Tasks) != 0 {
 		t.Fatalf("a refused create made a task: %+v", p.Tasks)
 	}
 
-	rec := postFrom(t, r.s, "term_1", api.TasksPath, `{"title":"Add retries","brief":"the sender gives up","props":{"priority":"high","effort":"s"}}`)
+	for _, yours := range []string{`{"title":"x","props":{"priority":"high"}}`, `{"title":"x","props":{"owner":"slack:U9"}}`, `{"title":"x","props":{"focus":"on"}}`} {
+		if rec := postFrom(t, r.s, "term_1", api.TasksPath, yours); rec.Code != 403 || !strings.Contains(rec.Body.String(), "session you drive") {
+			t.Errorf("%s from a session the user does not drive: %d %s", yours, rec.Code, rec.Body)
+		}
+	}
+	if p := r.page(t, "view=inbox"); len(p.Tasks) != 0 {
+		t.Fatalf("a refused create made a task: %+v", p.Tasks)
+	}
+
+	rec := postFrom(t, r.s, "term_1", api.TasksPath, `{"title":"Add retries","brief":"the sender gives up","props":{"effort":"s"}}`)
 	var v api.TaskView
 	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &v) != nil {
 		t.Fatalf("an agent's create: %d %s", rec.Code, rec.Body)
@@ -93,15 +102,49 @@ func TestTaskCreateFromAnAgentSessionIsWrittenByTheAgent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"priority", "effort"} {
-		if by := tk.Written[name].By; by != task.WriterAgent {
-			t.Errorf("%s written by %q", name, by)
-		}
+	if by := tk.Written["effort"].By; by != task.WriterAgent {
+		t.Errorf("effort written by %q", by)
 	}
 	u := task.UnitOf(task.ID(v.ID))
 	recs, err := r.db.Records(ctx, "brief", u)
 	if err != nil || recs[u].Actor != string(task.WriterAgent) {
 		t.Fatalf("the brief record %+v %v", recs[u], err)
+	}
+}
+
+func TestTaskCreateFromASessionTheUserDrivesWritesYourProperties(t *testing.T) {
+	t.Parallel()
+	r := newCreateRig(t, nil)
+	svc := sessionsOn(r.db)
+	r.s.deps.Turns = svc
+	adoptSession(t, svc, "term_2", true)
+	rec := postFrom(t, r.s, "term_2", api.TasksPath, `{"title":"Add retries","props":{"priority":"high","owner":"slack:U9"}}`)
+	var v api.TaskView
+	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &v) != nil {
+		t.Fatalf("a create from a session the user drives: %d %s", rec.Code, rec.Body)
+	}
+	tk, err := r.db.Tasks().Task(context.Background(), task.ID(v.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"priority", "owner"} {
+		if by := tk.Written[name].By; by != task.WriterAgent {
+			t.Errorf("%s written by %q", name, by)
+		}
+	}
+}
+
+func TestAHandleNoSessionTookIsAnAgentsAsBefore(t *testing.T) {
+	t.Parallel()
+	r := newCreateRig(t, nil)
+	r.s.deps.Turns = sessionsOn(r.db)
+	rec := postFrom(t, r.s, "term_9", api.TasksPath, `{"title":"Add retries","props":{"effort":"s"}}`)
+	var v api.TaskView
+	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &v) != nil {
+		t.Fatalf("a create from a handle no session took: %d %s", rec.Code, rec.Body)
+	}
+	if rec := postFrom(t, r.s, "term_9", api.TasksPath, `{"title":"x","props":{"priority":"high"}}`); rec.Code != 403 {
+		t.Errorf("a handle no session took wrote your property: %d %s", rec.Code, rec.Body)
 	}
 }
 

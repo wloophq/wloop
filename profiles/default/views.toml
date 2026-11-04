@@ -29,7 +29,7 @@ label         = "Waiting"
 summary       = "Tasks whose next step is someone else's, grouped by who owes it."
 empty         = "Nobody owes you anything."
 key           = "g w"
-when          = "task.category in ['ready', 'active', 'waiting'] && task.owed_by != 'me'"
+when          = "task.category in ['ready', 'active', 'waiting'] && task.owed_by != 'me' && (task.owed_by != '' || task.turns_running == 0)"
 group         = "task.owed_by"
 
 [views.chase]
@@ -73,7 +73,7 @@ label         = "In loop"
 summary       = "Tasks an agent is working on right now."
 empty         = "No agent is working on anything."
 key           = "g u"
-when          = "task.link_signal.in_loop || task.runs_live > 0"
+when          = "task.link_signal.in_loop || task.turns_running > 0"
 hide_disabled = true
 
 [views.approved]
@@ -141,9 +141,9 @@ hide_disabled = true
 
 [views.review-projects]
 label         = "Projects to review"
-summary       = "Projects past their review, or with no next action and not in Someday."
+summary       = "Projects past their review, or with no next action of yours and not in Someday."
 empty         = "Every project has a next action and is reviewed."
-when          = "task.prop.kind == 'project' && !(task.category in ['done', 'dropped']) && (task.review_due || (!task.children_ready && task.state != 'someday'))"
+when          = "task.prop.kind == 'project' && !(task.category in ['done', 'dropped']) && (task.review_due || (!task.children_mine && task.state != 'someday'))"
 hide_disabled = true
 
 # The review lists nothing itself: the clients walk its steps.

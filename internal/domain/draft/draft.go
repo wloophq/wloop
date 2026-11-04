@@ -119,6 +119,9 @@ type Origin struct {
 	// Unit is the unit of the proposing turn when it is not the draft's, such
 	// as a pull request whose turn drafts in a Slack thread; zero when it is.
 	Unit unit.Unit
+	// Session is the session that proposed it through its tools, which never
+	// resolves its gate; "" when no session did.
+	Session string
 }
 
 type Evidence struct {

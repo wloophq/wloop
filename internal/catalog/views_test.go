@@ -24,7 +24,7 @@ var lensNow = time.Date(2026, 3, 2, 9, 0, 0, 0, time.UTC)
 func lensFacts(t *testing.T, l *intentload.Loaded, c task.Category, more workflow.Facts) workflow.Facts {
 	t.Helper()
 	f := workflow.Facts{"task.category": string(c), "task.gates_open": 0, "task.link_owes": []string{}, "task.wake_until": time.Time{}, "task.wake_when": "",
-		"task.check_on": time.Time{}, "task.since_movement": time.Duration(0), "task.runs_live": 0}
+		"task.check_on": time.Time{}, "task.since_movement": time.Duration(0), "task.turns_running": 0, "task.children_mine": false}
 	for _, name := range builtin.LinkSignals {
 		f[builtin.LinkSignalPrefix+name] = false
 	}
@@ -61,14 +61,19 @@ func TestAViewIsTheProfilesPredicate(t *testing.T) {
 		f    workflow.Facts
 		want []string
 	}{
-		"an inbox task":       {lensFacts(t, l, task.CategoryInbox, nil), []string{"inbox"}},
-		"my next action":      {lensFacts(t, l, task.CategoryReady, nil), []string{"needs-me"}},
-		"one Ana owes":        {lensFacts(t, l, task.CategoryWaiting, workflow.Facts{"task.link_owes": []string{"slack:U0ANA"}}), []string{"waiting"}},
-		"a snoozed one":       {lensFacts(t, l, task.CategoryDeferred, workflow.Facts{"task.state": "scheduled", "task.wake_until": time.Date(2026, 11, 2, 9, 0, 0, 0, time.UTC)}), []string{"snoozed"}},
-		"a someday one":       {lensFacts(t, l, task.CategoryDeferred, workflow.Facts{"task.state": "someday"}), []string{"someday"}},
-		"a starred project":   {lensFacts(t, l, task.CategoryReady, workflow.Facts{"task.prop.focus": "on", "task.prop.kind": "project", "task.children_ready": true}), []string{"needs-me", "focus", "projects"}},
-		"a project to review": {lensFacts(t, l, task.CategoryReady, workflow.Facts{"task.prop.kind": "project"}), []string{"needs-me", "projects", "review-projects"}},
-		"a done one":          {lensFacts(t, l, task.CategoryDone, nil), []string{"logbook"}},
+		"an inbox task":                            {lensFacts(t, l, task.CategoryInbox, nil), []string{"inbox"}},
+		"my next action":                           {lensFacts(t, l, task.CategoryReady, nil), []string{"needs-me"}},
+		"one Ana owes":                             {lensFacts(t, l, task.CategoryReady, workflow.Facts{"task.link_owes": []string{"slack:U0ANA"}}), []string{"waiting"}},
+		"a snoozed one":                            {lensFacts(t, l, task.CategoryDeferred, workflow.Facts{"task.state": "scheduled", "task.wake_until": time.Date(2026, 11, 2, 9, 0, 0, 0, time.UTC)}), []string{"snoozed"}},
+		"a someday one":                            {lensFacts(t, l, task.CategoryDeferred, workflow.Facts{"task.state": "someday"}), []string{"someday"}},
+		"a starred project":                        {lensFacts(t, l, task.CategoryReady, workflow.Facts{"task.prop.focus": "on", "task.prop.kind": "project", "task.children_ready": true, "task.children_mine": true}), []string{"needs-me", "focus", "projects"}},
+		"a project to review":                      {lensFacts(t, l, task.CategoryReady, workflow.Facts{"task.prop.kind": "project"}), []string{"needs-me", "projects", "review-projects"}},
+		"a done one":                               {lensFacts(t, l, task.CategoryDone, nil), []string{"logbook"}},
+		"one handed to Ana":                        {lensFacts(t, l, task.CategoryReady, workflow.Facts{"task.state": "waiting", "task.prop.owner": "slack:U0ANA", "task.prop_by.owner": "person"}), []string{"waiting"}},
+		"one an agent runs":                        {lensFacts(t, l, task.CategoryReady, workflow.Facts{"task.turns_running": 1}), []string{"in-loop"}},
+		"a done one an agent runs":                 {lensFacts(t, l, task.CategoryDone, workflow.Facts{"task.turns_running": 1}), []string{"in-loop", "logbook"}},
+		"one an agent runs that Ana owes":          {lensFacts(t, l, task.CategoryReady, workflow.Facts{"task.turns_running": 1, "task.link_owes": []string{"slack:U0ANA"}}), []string{"waiting", "in-loop"}},
+		"a project whose ready child waits on Ana": {lensFacts(t, l, task.CategoryReady, workflow.Facts{"task.prop.kind": "project", "task.children_ready": true}), []string{"needs-me", "projects", "review-projects"}},
 		"a done one whose pull request's workspace remains": {lensFacts(t, l, task.CategoryDone, workflow.Facts{"task.link_signal.workspace": true}),
 			[]string{"logbook", "done"}},
 		"a dropped starred one": {lensFacts(t, l, task.CategoryDropped, workflow.Facts{"task.prop.focus": "on"}), nil},

@@ -554,7 +554,7 @@ func TestLoopActionsWaitOnTheSharedLoopMutex(t *testing.T) {
 		})
 		go func() {
 			defer close(ran)
-			done <- s.act(context.Background(), "review", r7.Unit(), api.ActionRequest{}, io.Discard)
+			done <- s.act(context.Background(), "review", r7.Unit(), api.ActionRequest{}, personRequest, io.Discard)
 		}()
 		synctest.Wait()
 		if len(fa.calls) != 0 {

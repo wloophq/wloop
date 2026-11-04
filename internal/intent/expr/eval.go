@@ -52,16 +52,23 @@ func (p *Program) run(a activation) (bool, error) {
 
 type activation struct {
 	env   Env
-	marks map[string]string
+	marks func() (map[string]string, error)
 	get   func(string) any
 }
 
 func (a activation) ResolveName(name string) (any, bool) {
 	if name == marksVar {
-		if a.marks == nil {
+		var m map[string]string
+		if a.marks != nil {
+			var err error
+			if m, err = a.marks(); err != nil {
+				return types.NewErr("reading the unit's marks: %v", err), true
+			}
+		}
+		if m == nil {
 			return map[string]string{}, true
 		}
-		return a.marks, true
+		return m, true
 	}
 	typ, ok := a.env[name]
 	if !ok {
@@ -184,7 +191,7 @@ func Requires(p workflow.Predicate, field, value string) bool {
 }
 
 func (w predicate) Match(v workflow.Vars) (bool, error) {
-	return w.p.run(activation{env: w.p.env, marks: v.Marks, get: func(name string) any {
+	return w.p.run(activation{env: w.p.env, marks: v.UnitMarks, get: func(name string) any {
 		if name == nowVar {
 			return v.Now
 		}

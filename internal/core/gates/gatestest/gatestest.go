@@ -63,7 +63,7 @@ func (s *Store) Resolve(_ context.Context, id int64, r gates.Resolution) (gate.G
 	if g.Status != gate.Open {
 		return clone(*g), fmt.Errorf("%w: %d is %s", gates.ErrResolved, id, g.Status)
 	}
-	g.Status, g.Intent, g.Answer, g.By, g.Rule, g.ClosedAt = r.Status, r.Intent, r.Answer, r.By, r.Rule, s.Now()
+	g.Status, g.Intent, g.Answer, g.By, g.BySession, g.Rule, g.ClosedAt = r.Status, r.Intent, r.Answer, r.By, r.Session, r.Rule, s.Now()
 	if g.Status == gate.Superseded {
 		s.mark(id)
 	}
@@ -247,6 +247,21 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 			t.Fatal(err)
 		}
 		if got, err := r.Get(ctx, g.ID); err != nil || got.Task != "" {
+			t.Fatalf("get %+v %v", got, err)
+		}
+	})
+	t.Run("a gate keeps the session of its subject and the one that resolved it", func(t *testing.T) {
+		s, r, _ := open(t)
+		g := draft("t-01")
+		g.Session = "s-worker"
+		opened, err := s.Open(ctx, g)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.Resolve(ctx, opened.ID, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorAgent, Session: "s-user"}); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := r.Get(ctx, opened.ID); err != nil || got.Session != "s-worker" || got.BySession != "s-user" || got.By != task.ActorAgent {
 			t.Fatalf("get %+v %v", got, err)
 		}
 	})

@@ -78,8 +78,10 @@ type Deps struct {
 	Gates Gates
 	// Turns counts the turns on each of units; a unit with none is absent.
 	Turns func(ctx context.Context, units []unit.Unit) (map[unit.Unit]int, error)
-	// Sessions are the sessions not closed, for task.runs_live; nil: none.
-	Sessions func(ctx context.Context) ([]turn.Session, error)
+	// OpenTurns are every unit's open turns, for task.turns_open_by_hand and task.turns_running; nil: none.
+	OpenTurns func(ctx context.Context) (map[unit.Unit][]turn.Turn, error)
+	// Chat is the intent of the turns a task's chat starts, which task.turns_open_by_hand leaves out; nil: none.
+	Chat func() turn.Intent
 	// Clock's location is where working days are counted.
 	Clock port.Clock
 	// Props are the task.prop.* facts of a task, typed as tasks.toml declares them; nil: none.
@@ -232,11 +234,18 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 
 // TaskFacts are the facts of task e, as Facts reads them of its unit.
 func (p *Provider) TaskFacts(ctx context.Context, e task.Task) (workflow.Facts, error) {
-	f, err := p.base(ctx, e)
-	if err != nil {
-		return nil, err
-	}
-	return p.owed(ctx, e, f)
+	f, err := coretasks.Once(ctx, passTask+fingerprint(e), func() (workflow.Facts, error) {
+		f, err := p.base(ctx, e)
+		if err != nil {
+			return nil, err
+		}
+		return p.owed(ctx, e, f)
+	})
+	return maps.Clone(f), err
+}
+
+func fingerprint(e task.Task) string {
+	return string(e.ID) + "|" + string(e.State) + "|" + e.Updated.UTC().Format(time.RFC3339Nano)
 }
 
 // EventFacts are the facts of a task an event names, also once done or
@@ -250,11 +259,7 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 	if err != nil {
 		return nil, err
 	}
-	f, err := p.base(ctx, e)
-	if err != nil {
-		return nil, err
-	}
-	return p.owed(ctx, e, f)
+	return p.TaskFacts(ctx, e)
 }
 
 func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error) {
@@ -273,20 +278,23 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.items_open":          0,
 		"task.items_resolved":      0,
 		"task.settled_at":          time.Time{},
-		"task.fingerprint":         string(e.ID) + "|" + string(e.State) + "|" + e.Updated.UTC().Format(time.RFC3339Nano),
+		"task.fingerprint":         fingerprint(e),
 		"task.category":            string(e.Category),
 		"task.owed_by":             "",
 		"task.owed_since":          time.Time{},
 		"task.since_movement":      time.Duration(0),
 		"task.check_on":            e.Prop(task.PropCheckOn).Time,
 		"task.gates_open":          0,
-		"task.runs_live":           0,
+		"task.turns_open_by_hand":  0,
+		"task.turn_by_hand_at":     time.Time{},
+		"task.turns_running":       0,
 		"task.wake_until":          time.Time{},
 		"task.wake_when":           "",
 		"task.repo":                "",
 		"task.sequential_next":     false,
 		"task.review_due":          false,
 		"task.children_ready":      false,
+		"task.children_mine":       false,
 		"task.ask_age":             time.Duration(0),
 		"task.askers":              []string{},
 		"task.promised":            time.Time{},
@@ -330,14 +338,14 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		return nil, err
 	}
 	f["task.gates_open"] = len(gs)
-	if p.d.Sessions != nil {
-		n, err := p.runsLive(ctx, task.UnitOf(e.ID))
+	us := unitsOf(e)
+	if p.d.OpenTurns != nil {
+		o, err := p.openTurns(ctx, append([]unit.Unit{task.UnitOf(e.ID)}, us...))
 		if err != nil {
 			return nil, err
 		}
-		f["task.runs_live"] = n
+		f["task.turns_open_by_hand"], f["task.turn_by_hand_at"], f["task.turns_running"] = o.byHand, o.byHandAt, o.running
 	}
-	us := unitsOf(e)
 	if err := p.links(ctx, e, us, f); err != nil {
 		return nil, err
 	}
@@ -473,7 +481,8 @@ func (p *Provider) links(ctx context.Context, e task.Task, us []unit.Unit, f wor
 
 // family sets the facts of e's place among its parent's children and of its own children:
 // task.sequential_next, e is its sequential parent's first open child by sibling order; task.children_ready,
-// an open child of e is in the ready category; task.review_due, e is an open project whose review is due. The
+// an open child of e is in the ready category; task.children_mine, such a child's next step is mine (its
+// task.owed_by is me); task.review_due, e is an open project whose review is due. The
 // tasks are the pass's when the service evaluates a view, else the store's open ones, read only for a task
 // with a parent or a project.
 func (p *Provider) family(ctx context.Context, e task.Task, f workflow.Facts) error {
@@ -491,6 +500,7 @@ func (p *Provider) family(ctx context.Context, e task.Task, f workflow.Facts) er
 		}
 	}
 	var first *task.Task
+	var ready []task.Task
 	sequential := false
 	for i, o := range all {
 		switch {
@@ -499,6 +509,7 @@ func (p *Provider) family(ctx context.Context, e task.Task, f workflow.Facts) er
 		case !o.Open():
 		case o.Parent == e.ID && o.Category == task.CategoryReady:
 			f["task.children_ready"] = true
+			ready = append(ready, o)
 		}
 		if e.Parent != "" && o.Parent == e.Parent && o.Open() &&
 			(first == nil || cmp.Or(cmp.Compare(o.Position, first.Position), cmp.Compare(o.ID, first.ID)) < 0) {
@@ -506,6 +517,16 @@ func (p *Provider) family(ctx context.Context, e task.Task, f workflow.Facts) er
 		}
 	}
 	f["task.sequential_next"] = sequential && first != nil && first.ID == e.ID
+	for _, c := range ready {
+		cf, err := p.TaskFacts(ctx, c)
+		if err != nil {
+			return err
+		}
+		if cf["task.owed_by"] == "me" {
+			f["task.children_mine"] = true
+			break
+		}
+	}
 	return nil
 }
 
@@ -756,11 +777,12 @@ func (p *Provider) wake(ctx context.Context, id task.ID) (wake.Wake, bool, error
 
 // What every task's facts read of the store as a whole, once per pass.
 const (
-	passSessions = "facts.sessions"
-	passTurns    = "facts.turns"
-	passGates    = "facts.gates"
-	passSettled  = "facts.settled."
-	passWakes    = "facts.wakes"
+	passOpenTurns = "facts.open_turns"
+	passTurns     = "facts.turns"
+	passGates     = "facts.gates"
+	passSettled   = "facts.settled."
+	passWakes     = "facts.wakes"
+	passTask      = "facts.task."
 )
 
 // items are the items of units; those of the pass ctx carries are read once for every unit of it.
@@ -811,17 +833,40 @@ func (p *Provider) turns(ctx context.Context, e task.Task) (int, error) {
 	return n[own], err
 }
 
-// runsLive counts the sessions of u with a live process; the sessions are read once per pass.
-func (p *Provider) runsLive(ctx context.Context, u unit.Unit) (int, error) {
-	all, err := coretasks.Once(ctx, passSessions, func() ([]turn.Session, error) { return p.d.Sessions(ctx) })
+// openTurns counts the open turns on us started by hand, but those of the chat intent, and those sent or
+// started; every unit's open turns are read once per pass.
+// openTurnsOf is what a task's open turns say: how many someone started by hand, when the newest of them was
+// sent, and how many run.
+type openTurnsOf struct {
+	byHand, running int
+	byHandAt        time.Time
+}
+
+func (p *Provider) openTurns(ctx context.Context, us []unit.Unit) (openTurnsOf, error) {
+	all, err := coretasks.Once(ctx, passOpenTurns, func() (map[unit.Unit][]turn.Turn, error) { return p.d.OpenTurns(ctx) })
 	if err != nil {
-		return 0, err
+		return openTurnsOf{}, err
 	}
-	n := 0
-	for _, s := range all {
-		if s.Unit == u && s.State() == turn.SessionActive {
-			n++
+	var chat turn.Intent
+	if p.d.Chat != nil {
+		chat = p.d.Chat()
+	}
+	var o openTurnsOf
+	for i, u := range us {
+		if slices.Contains(us[:i], u) {
+			continue
+		}
+		for _, t := range all[u] {
+			if t.Trigger == turn.ByHand && (chat == "" || t.Intent != chat) {
+				o.byHand++
+				if t.SentAt.After(o.byHandAt) {
+					o.byHandAt = t.SentAt
+				}
+			}
+			if t.State == turn.Sent || t.State == turn.Started {
+				o.running++
+			}
 		}
 	}
-	return n, nil
+	return o, nil
 }

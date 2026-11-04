@@ -92,7 +92,8 @@ func (s *Server) handleGates(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGate resolves a gate with the intent its path names. A request
-// from a session resolves it as the agent, which the gates service refuses.
+// from a session resolves it as the agent through that session, which the
+// gates service accepts only from a session the user drives.
 func (s *Server) handleGate(w http.ResponseWriter, r *http.Request) {
 	rd, ok := s.gateReader(w)
 	if !ok {
@@ -108,7 +109,7 @@ func (s *Server) handleGate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid body: "+err.Error())
 		return
 	}
-	actor, ok := requestActor(w, r)
+	q, ok := s.requester(w, r)
 	if !ok {
 		return
 	}
@@ -120,14 +121,15 @@ func (s *Server) handleGate(w http.ResponseWriter, r *http.Request) {
 	}
 	intent := r.PathValue("intent")
 	if g.Kind == gate.KindDraft && s.deps.Outbox != nil {
-		err = s.resolveDraftGateAt(ctx, g, intent, req.Args, actor)
+		err = s.resolveDraftGateAt(ctx, g, intent, req.Args, q)
 	} else {
 		source := turn.Cockpit
-		if actor == task.ActorPerson {
+		if q.Actor == task.ActorPerson {
 			source, err = answerSource(req.Source)
 		}
 		if err == nil {
-			err = s.deps.Gates.Resolve(messages.WithDelivery(ctx, &messages.Delivery{Source: source}), id, gates.Resolution{Intent: intent, Answer: req.Args["answer"], By: actor})
+			err = s.deps.Gates.Resolve(messages.WithDelivery(ctx, &messages.Delivery{Source: source}), id,
+				gates.Resolution{Intent: intent, Answer: req.Args["answer"], By: q.Actor, Session: q.Session})
 		}
 	}
 	if err != nil {
@@ -235,7 +237,7 @@ func (ev *taskViewer) openGates(ctx context.Context, e task.Task, v *api.TaskVie
 
 // resolveDraftGateAt resolves draft gate g with intent as actor, under draftMu: an approval readies its draft at the
 // args' rev, the draft's own when absent, with the args' text when present, and is refused while its plugin is off.
-func (s *Server) resolveDraftGateAt(ctx context.Context, g gate.Gate, intent string, args map[string]string, actor task.Actor) error {
+func (s *Server) resolveDraftGateAt(ctx context.Context, g gate.Gate, intent string, args map[string]string, actor requester) error {
 	s.draftMu.Lock()
 	defer s.draftMu.Unlock()
 	id, err := strconv.ParseInt(g.Subject, 10, 64)

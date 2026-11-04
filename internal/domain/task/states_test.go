@@ -17,7 +17,7 @@ var bundledTable = []struct {
 	name string
 	c    task.Category
 }{
-	{"inbox", task.CategoryInbox}, {"next", task.CategoryReady}, {"waiting", task.CategoryWaiting},
+	{"inbox", task.CategoryInbox}, {"next", task.CategoryReady}, {"waiting", task.CategoryReady},
 	{"scheduled", task.CategoryDeferred}, {"someday", task.CategoryDeferred}, {"done", task.CategoryDone},
 	{"reference", task.CategoryDone}, {"trash", task.CategoryDropped},
 }
@@ -67,8 +67,4 @@ func reconciled(t *testing.T, f task.UnitFacts, its []items.Item, me task.Me, ha
 	t.Helper()
 	cs, err := task.Reconcile(f, its, me, have, st, now)
 	return must(t, cs, err)
-}
-
-func activity(f task.UnitFacts, have []task.Task, now time.Time) []task.Change {
-	return task.Activity(f, have, now)
 }

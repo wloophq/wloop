@@ -266,3 +266,21 @@ func (s *Service) Placed(ctx context.Context, id, workspaceID, worktree string, 
 		s.logf("placing the session %s: %v", id, err)
 	}
 }
+
+// UserDriven says whether the user drives session id, as turn.Session.UserDriven reads it from the session and
+// the book of its newest turn; a session the registry does not know is not, nor one the loop is typing a turn
+// into, which it stamps only once the line is typed.
+func (s *Service) UserDriven(ctx context.Context, id string) (bool, error) {
+	if s.typingInto(id) {
+		return false, nil
+	}
+	sess, ok, err := s.Registry.Session(ctx, id)
+	if err != nil || !ok {
+		return false, err
+	}
+	b, _, err := s.Store.BookOf(ctx, Key{Session: id})
+	if err != nil {
+		return false, err
+	}
+	return sess.UserDriven(b.Turns), nil
+}

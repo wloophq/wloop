@@ -50,16 +50,16 @@ type clock struct{ now time.Time }
 func (c *clock) Now() time.Time { return c.now }
 
 type env struct {
-	t        *testing.T
-	db       *sqlite.DB
-	clock    *clock
-	p        *facttask.Provider
-	s        facttask.Settings
-	ended    map[unit.Unit]bool
-	turns    map[unit.Unit]int
-	repos    map[unit.Unit]string
-	sessions []turn.Session
-	links    map[unit.Unit]facttask.Link
+	t     *testing.T
+	db    *sqlite.DB
+	clock *clock
+	p     *facttask.Provider
+	s     facttask.Settings
+	ended map[unit.Unit]bool
+	turns map[unit.Unit]int
+	repos map[unit.Unit]string
+	open  map[unit.Unit][]turn.Turn
+	links map[unit.Unit]facttask.Link
 	// unextracted are when each unit's oldest message not yet extracted arrived.
 	unextracted map[unit.Unit]time.Time
 	// reads counts the store reads by what they read.
@@ -156,14 +156,18 @@ func newEnv(t *testing.T) *env {
 			}
 			return out, nil
 		},
-		Repo:     func(_ context.Context, u unit.Unit) (string, error) { return e.repos[u], nil },
-		Gates:    countingGates{db.Gates(func() time.Time { return e.clock.now }), e},
-		Sessions: func(context.Context) ([]turn.Session, error) { e.reads["sessions"]++; return e.sessions, nil },
-		Clock:    e.clock,
-		Props:    func(t task.Task) workflow.Facts { return catalog.PropFacts(t, bundledTasks) },
-		Me:       func() task.Me { return task.Me{Keys: []string{"chat:ME"}} },
-		OwedBy:   catalog.OwedByOf(func() *intentload.Loaded { return &intentload.Loaded{Tasks: bundledTasks} }),
-		Wakes:    countingWakes{db.Wakes(), e},
+		Repo: func(_ context.Context, u unit.Unit) (string, error) {
+			e.reads["repo of "+u.String()]++
+			return e.repos[u], nil
+		},
+		Gates:     countingGates{db.Gates(func() time.Time { return e.clock.now }), e},
+		OpenTurns: func(context.Context) (map[unit.Unit][]turn.Turn, error) { e.reads["open turns"]++; return e.open, nil },
+		Chat:      func() turn.Intent { return "chat" },
+		Clock:     e.clock,
+		Props:     func(t task.Task) workflow.Facts { return catalog.PropFacts(t, bundledTasks) },
+		Me:        func() task.Me { return task.Me{Keys: []string{"chat:ME"}} },
+		OwedBy:    catalog.OwedByOf(func() *intentload.Loaded { return &intentload.Loaded{Tasks: bundledTasks} }),
+		Wakes:     countingWakes{db.Wakes(), e},
 		Links: func(_ context.Context, u unit.Unit) (facttask.Link, error) {
 			return e.links[u], nil
 		},

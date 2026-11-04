@@ -323,14 +323,12 @@ func (p *planner) unitMarks(u unit.Unit) (map[string]string, error) {
 	return m, nil
 }
 
-func (p *planner) vars(w workflow.Workflow, u unit.Unit, facts workflow.Facts, why workflow.Why) (workflow.Vars, error) {
+func (p *planner) vars(w workflow.Workflow, u unit.Unit, facts workflow.Facts, why workflow.Why) workflow.Vars {
 	v := workflow.Vars{Facts: facts, Trigger: triggerFacts(why), Config: p.config, Now: p.now}
-	if !readsMarks(w) {
-		return v, nil
+	if readsMarks(w) {
+		v.LoadMarks = func() (map[string]string, error) { return p.unitMarks(u) }
 	}
-	var err error
-	v.Marks, err = p.unitMarks(u)
-	return v, err
+	return v
 }
 
 // decide applies the decision rules to one candidate; a unit that does not
@@ -346,11 +344,7 @@ func (p *planner) decide(w workflow.Workflow, c candidate, stored map[string]wor
 		p.errorf("%s: %s: %v", w.Name, c.u, err)
 		return err
 	}
-	vars, err := p.vars(w, c.u, facts, c.why)
-	if err != nil {
-		p.errorf("%s: %s: reading its marks: %v", w.Name, c.u, err)
-		return err
-	}
+	vars := p.vars(w, c.u, facts, c.why)
 	if ok, err := match(w.When, vars); err != nil {
 		p.errorf("%s: %s: %v", w.Name, c.u, err)
 		return err

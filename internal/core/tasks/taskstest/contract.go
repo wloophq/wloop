@@ -99,7 +99,7 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 			why      string
 		}{
 			{task.CategoryReady, 0, "created open"},
-			{task.CategoryWaiting, 0, "moved between open categories"},
+			{task.CategoryInbox, 0, "moved between open categories"},
 			{task.CategoryDone, 2, "closed"},
 			{task.CategoryDone, 2, "written again while closed"},
 			{task.CategoryDropped, 2, "moved between closed categories"},

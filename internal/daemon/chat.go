@@ -25,12 +25,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	actor, ok := requestActor(w, r)
-	if !ok {
-		return
-	}
-	if actor != task.ActorPerson {
-		writeError(w, http.StatusForbidden, "only the person writes on a task's chat")
+	if _, ok := s.forUser(w, r, "a task's chat"); !ok {
 		return
 	}
 	if s.deps.Messages == nil {

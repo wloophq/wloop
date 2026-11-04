@@ -14,7 +14,7 @@ import (
 )
 
 func TestAGatedVerbOpensItsGateThroughServe(t *testing.T) {
-	r := newProfileRig(t, "[verbs.done]\nby = { person = \"gate\" }\ngate = \"proposal\"\n")
+	r := newProfileRig(t, "[verbs.done]\nby = { person = \"gate\", agent = \"false\" }\ngate = \"proposal\"\n")
 	ctx := context.Background()
 	r.put(t, "t-0000000000000001", "next", task.CategoryReady)
 	g := r.te.newTasks(r.db, r.te.cfg, nil)
@@ -37,7 +37,7 @@ func TestAGatedVerbOpensItsGateThroughServe(t *testing.T) {
 		t.Errorf("the gate proposes %+v %v", req, ok)
 	}
 	if _, err := g.Do(ctx, "t-0000000000000001", coretasks.Request{Verb: task.VerbDone, Actor: task.ActorAgent, Source: "claude"}); !errors.Is(err, coretasks.ErrForbidden) {
-		t.Errorf("an agent on done, which no by.agent lets: %v", err)
+		t.Errorf("an agent on done, which by.agent refuses: %v", err)
 	}
 }
 

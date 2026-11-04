@@ -59,8 +59,8 @@ func writeEvents(ctx context.Context, tx *Tx, evs []port.Event) error {
 	for _, ev := range evs {
 		u := storedUnit(ev)
 		if ev.Key != "" {
-			res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO events (provider, unit_key, kind, key, actor, at, data) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-				string(u.Provider), u.Key, ev.Kind, ev.Key, ev.Actor, ev.At.UTC().Format(event.TimeLayout), ev.Data)
+			res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO events (provider, unit_key, kind, key, actor, at, data, session) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				string(u.Provider), u.Key, ev.Kind, ev.Key, ev.Actor, ev.At.UTC().Format(event.TimeLayout), ev.Data, ev.Session)
 			if err != nil {
 				return err
 			}
@@ -114,8 +114,8 @@ func compareUnits(a, b unit.Unit) int {
 
 func writeUnkeyed(ctx context.Context, tx *Tx, ev port.Event, u unit.Unit) error {
 	for at := ev.At.UTC(); ; at = at.Add(time.Nanosecond) {
-		res, err := tx.ExecContext(ctx, `INSERT INTO events (provider, unit_key, kind, key, actor, at, data) VALUES (?, ?, ?, '', ?, ?, ?) ON CONFLICT DO NOTHING`,
-			string(u.Provider), u.Key, ev.Kind, ev.Actor, at.Format(event.TimeLayout), ev.Data)
+		res, err := tx.ExecContext(ctx, `INSERT INTO events (provider, unit_key, kind, key, actor, at, data, session) VALUES (?, ?, ?, '', ?, ?, ?, ?) ON CONFLICT DO NOTHING`,
+			string(u.Provider), u.Key, ev.Kind, ev.Actor, at.Format(event.TimeLayout), ev.Data, ev.Session)
 		if err != nil {
 			return err
 		}
@@ -208,7 +208,7 @@ const (
 		agent, brief_run, agent_session, inputs, runner, workflow, role FROM turns%s ORDER BY provider, unit_key, seq`
 	bookRecordsSQL = `SELECT provider, unit_key, id, turn_seq, session, agent_session, head, hash, at, acked, record
 		FROM turn_records%s ORDER BY provider, unit_key, id`
-	bookAnswersSQL = `SELECT provider, unit_key, id, turn_seq, at, text, source, option_id, yes, no, route, session, message_id, gate_id, read_at, noticed_at,
+	bookAnswersSQL = `SELECT provider, unit_key, id, turn_seq, at, text, source, option_id, yes, no, route, session, message_id, gate_id, read_at, noticed_at, by_session,
 		coalesce((SELECT m.origin_kind = 'agent' FROM messages m WHERE m.id = turn_answers.message_id), 0)
 		FROM turn_answers%s ORDER BY provider, unit_key, id`
 )
@@ -283,7 +283,7 @@ func loadChunk(ctx context.Context, tx *sql.Tx, provider unit.ProviderID, keys [
 		var a turn.Answer
 		var at, read, noticed string
 		if err := rows.Scan(&ref.Provider, &ref.Key, &a.ID, &a.TurnSeq, &at, &a.Text, &a.Source, &a.OptionID, &a.Yes, &a.No, &a.Route, &a.Session,
-			&a.Message, &a.Gate, &read, &noticed, &a.Posted); err != nil {
+			&a.Message, &a.Gate, &read, &noticed, &a.BySession, &a.Posted); err != nil {
 			return err
 		}
 		a.At, a.ReadAt, a.NoticedAt = parseTime(at), parseTime(read), parseTime(noticed)
@@ -456,7 +456,7 @@ func storedRecord(r turn.Record, raw string) turn.Record {
 }
 
 func answerColumns(a turn.Answer) []any {
-	return []any{a.TurnSeq, formatTime(a.At), a.Text, string(a.Source), a.OptionID, a.Yes, a.No, string(a.Route), a.Session, a.Message, a.Gate, formatTime(a.ReadAt), formatTime(a.NoticedAt)}
+	return []any{a.TurnSeq, formatTime(a.At), a.Text, string(a.Source), a.OptionID, a.Yes, a.No, string(a.Route), a.Session, a.Message, a.Gate, formatTime(a.ReadAt), formatTime(a.NoticedAt), a.BySession}
 }
 
 // saveBook writes the turns, records and answers of b that differ from stored
@@ -597,15 +597,15 @@ func saveBook(ctx context.Context, tx *Tx, ref unit.Unit, stored, b turn.Book) (
 				continue
 			}
 			if _, err := tx.ExecContext(ctx, `UPDATE turn_answers SET turn_seq = ?, at = ?, text = ?, source = ?, option_id = ?, yes = ?, no = ?, route = ?, session = ?,
-				message_id = ?, gate_id = ?, read_at = ?, noticed_at = ? WHERE id = ? AND provider = ? AND unit_key = ?`, append(cols, a.ID, string(ref.Provider), ref.Key)...); err != nil {
+				message_id = ?, gate_id = ?, read_at = ?, noticed_at = ?, by_session = ? WHERE id = ? AND provider = ? AND unit_key = ?`, append(cols, a.ID, string(ref.Provider), ref.Key)...); err != nil {
 				return turn.Book{}, false, err
 			}
 			out.Answers[i] = a
 			changed = true
 			continue
 		}
-		res, err := tx.ExecContext(ctx, `INSERT INTO turn_answers (provider, unit_key, turn_seq, at, text, source, option_id, yes, no, route, session, message_id, gate_id, read_at, noticed_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, append([]any{string(ref.Provider), ref.Key}, cols...)...)
+		res, err := tx.ExecContext(ctx, `INSERT INTO turn_answers (provider, unit_key, turn_seq, at, text, source, option_id, yes, no, route, session, message_id, gate_id, read_at, noticed_at, by_session)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, append([]any{string(ref.Provider), ref.Key}, cols...)...)
 		if err != nil {
 			return turn.Book{}, false, err
 		}
@@ -645,6 +645,29 @@ const openUnitsSQL = `SELECT DISTINCT provider, unit_key FROM turns WHERE state 
 
 func (s *Store) Open(ctx context.Context) ([]unit.Unit, error) {
 	return queryUnits(ctx, s.db.R(), openUnitsSQL)
+}
+
+// OpenTurns are the open turns (sent, started or asked) of every unit, in ascending Seq, with their Seq,
+// Intent, Trigger, State, Session and SentAt.
+func (s *Store) OpenTurns(ctx context.Context) (map[unit.Unit][]turn.Turn, error) {
+	rows, err := s.db.R().QueryContext(ctx, `SELECT provider, unit_key, seq, intent, trigger, state, session, sent_at FROM turns
+		WHERE state IN ('sent', 'started', 'asked') ORDER BY seq`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[unit.Unit][]turn.Turn{}
+	for rows.Next() {
+		var u unit.Unit
+		var t turn.Turn
+		var sent string
+		if err := rows.Scan(&u.Provider, &u.Key, &t.Seq, &t.Intent, &t.Trigger, &t.State, &t.Session, &sent); err != nil {
+			return nil, err
+		}
+		t.SentAt = parseTime(sent)
+		out[u] = append(out[u], t)
+	}
+	return out, rows.Err()
 }
 
 func (s *Store) WithTurns(ctx context.Context, i turn.Intent) ([]unit.Unit, error) {

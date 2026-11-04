@@ -13,7 +13,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/gate"
-	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -29,7 +28,7 @@ func questionIntent(l *intentload.Loaded, name string) (catalog.GateIntent, bool
 // the intent of g's role that gate offers, as by. With no question gate open, an answer answers again a
 // question already answered, or a stopped turn no gate holds, and the others continue or dismiss the turn's
 // question.
-func (s *Server) actOnQuestion(ctx context.Context, g catalog.GateIntent, u unit.Unit, req api.ActionRequest, by task.Actor, out io.Writer) error {
+func (s *Server) actOnQuestion(ctx context.Context, g catalog.GateIntent, u unit.Unit, req api.ActionRequest, by requester, out io.Writer) error {
 	open, _, ok, err := s.openRowGate(ctx, gate.KindQuestion, u)
 	if err == nil && !ok && s.deps.Messages != nil {
 		if err = s.deps.Messages.Reconcile(ctx, u); err == nil {
@@ -47,7 +46,7 @@ func (s *Server) actOnQuestion(ctx context.Context, g catalog.GateIntent, u unit
 	if !ok {
 		return conflict{msg: fmt.Sprintf("the question on %s offers no intent that %s", u.Label(), g.Role)}
 	}
-	r := gates.Resolution{Intent: in.Name, By: by}
+	r := gates.Resolution{Intent: in.Name, By: by.Actor, Session: by.Session}
 	if err := s.checkAnswer(ctx, open, req); err != nil {
 		return err
 	}

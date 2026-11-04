@@ -243,6 +243,8 @@ type TurnAnswer struct {
 	Route    string    `json:"route"`
 	Session  string    `json:"session,omitempty"`
 	At       time.Time `json:"at"`
+	// BySession is the session an agent answered through for you, absent for your own answer.
+	BySession string `json:"by_session,omitempty"`
 	// Message is the Inbox message answered, 0 for none; Posted says the agent posted it. Gate is the gate the
 	// answer resolved, 0 for one given with no gate open.
 	Message int64 `json:"message_id,omitempty"`

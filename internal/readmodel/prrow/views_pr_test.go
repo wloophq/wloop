@@ -282,7 +282,7 @@ func (c prCase) facts(t *testing.T, l *intentload.Loaded, row api.Row) workflow.
 	t.Helper()
 	f := workflow.Facts{"task.category": string(c.category), "task.state": "", "task.gates_open": c.gates, "task.items_open": c.items, "task.link_owes": c.owes,
 		"task.wake_until": time.Time{}, "task.wake_when": "", "task.check_on": time.Time{}, "task.since_movement": prNow.Sub(row.Summary.Since),
-		"task.runs_live": c.runs}
+		"task.turns_running": c.runs}
 	reported := []string{}
 	for _, name := range builtin.LinkSignals {
 		on, ok := prrow.Signals(row)[name]

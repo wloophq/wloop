@@ -66,7 +66,10 @@ type TasksDef struct {
 	// ChatIntent is the intent of the turn a chat message starts on a task with no live session.
 	ChatIntent string
 	// ChatAt is where the layer that set ChatIntent sets it.
-	ChatAt           dintent.Pos
+	ChatAt dintent.Pos
+	// ViaSession names a change an agent made for the user through a session they drove; {session} is the
+	// session's id.
+	ViaSession       string
 	Areas, Contexts  []string
 	StaleWaitingDays int
 }
@@ -332,6 +335,7 @@ type mTasks struct {
 	States           map[string]mState    `toml:"states"`
 	OwedBy           *mOwedBy             `toml:"owed_by"`
 	Chat             *mChat               `toml:"chat"`
+	Attribution      *mAttribution        `toml:"attribution"`
 	Areas            []string             `toml:"areas"`
 	Contexts         []string             `toml:"contexts"`
 	StaleWaitingDays *int                 `toml:"stale_waiting_days"`
@@ -370,6 +374,10 @@ type mOwedBy struct {
 
 type mChat struct {
 	Intent *string `toml:"intent"`
+}
+
+type mAttribution struct {
+	ViaSession *string `toml:"via_session"`
 }
 
 // ref is a name a file's key holds, checked once every layer is read.
@@ -444,6 +452,9 @@ func (l *tasksLoad) merge(file string, src []byte) Problems {
 		if m.Chat.Intent != nil {
 			l.def.ChatAt = s.pos("chat.intent")
 		}
+	}
+	if m.Attribution != nil {
+		text(s, "attribution.via_session", m.Attribution.ViaSession, &l.def.ViaSession)
 	}
 	if m.Areas != nil {
 		l.def.Areas = slices.Clone(m.Areas)

@@ -205,13 +205,16 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task.since_movement` | duration | Time since the task, or a unit linked to it, last moved: a state change, a source event, a run. |
 | `task.check_on` | timestamp | When to check on the task: its check_on property, else, when the items it holds wait on someone else and not on you, tasks.stale_waiting_days working days after the oldest of them; zero when neither. Test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.gates_open` | int | The task's open gates. |
-| `task.runs_live` | int | The task's runs whose session is live. |
+| `task.turns_open_by_hand` | int | The open turns (sent, started or asked) someone started by hand on the task or a unit it links, but those of the chat intent tasks.toml names. |
+| `task.turn_by_hand_at` | timestamp | When the newest of task.turns_open_by_hand was sent; zero when none is open. Test with `> timestamp(0)`. |
+| `task.turns_running` | int | The turns the loop sent on the task or a unit it links that an agent is working on: sent or started, not yet asking or ended. |
 | `task.wake_until` | timestamp | When the task's wake wakes it; zero when it has none, or one that waits on events or a condition only. Test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.wake_when` | string | The condition the task's wake waits on; empty when none. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.repo` | string | owner/repo of the task's work: its placement, else its pull request's; empty when unknown. |
 | `task.sequential_next` | bool | The task is the first open child of a sequential parent. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.review_due` | bool | The task is a parent whose review is due. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.children_ready` | bool | The task has a child in the ready category. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.children_mine` | bool | The task has a child in the ready category whose next step is yours: its task.owed_by is me. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.ask_age` | duration | The age of the task's oldest unanswered ask: the oldest open item it holds that waits on you; zero when none does. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.askers` | list | Who waits on you through the task: the requesters of the open items it holds that wait on you, each once, by key such as slack:U0123. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.promised` | timestamp | When you promised the task by: the property of role promise, which acknowledge sets; zero when unset. Untrusted, since a profile may let an agent write that property. Test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |

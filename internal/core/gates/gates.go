@@ -21,9 +21,10 @@ import (
 const RuleWindow = "window"
 
 var (
-	// ErrRefused is a resolution the gate does not accept: by an agent or a
-	// plugin, by a rule the trusted policy does not hold, or by a window that
-	// has not passed.
+	// ErrRefused is a resolution the gate does not accept: by an agent through
+	// a session the user does not drive or whose turn produced the gate's
+	// subject, by a plugin, by a rule the trusted policy does not hold, or by
+	// a window that has not passed.
 	ErrRefused = errors.New("the gate refuses the resolution")
 	// ErrIntent is an intent the gate does not offer, or one gates.toml does
 	// not declare for it.
@@ -119,6 +120,8 @@ type Deps struct {
 	Unblocker Unblocker
 	// Events records a resolved step gate; nil records none.
 	Events Events
+	// Sessions says which sessions the user drives; nil refuses every agent.
+	Sessions Sessions
 
 	Log func(format string, args ...any)
 }
@@ -210,10 +213,11 @@ func (s *Service) Open(ctx context.Context, g gate.Gate, p Policy) (gate.Gate, e
 	return s.close(ctx, opened, r)
 }
 
-// Resolve closes open gate id with r. It accepts a person's intent, the
-// Default of a gate whose Deadline passed with the rule window, and a rule
-// the service's trusted Policy holds for the gate now; it refuses anything
-// else, an agent's or a plugin's resolution above all. Status comes from
+// Resolve closes open gate id with r. It accepts a person's intent, an
+// agent's through a session the user drives whose turns did not produce the
+// gate's subject, the Default of a gate whose Deadline passed with the rule
+// window, and a rule the service's trusted Policy holds for the gate now; it
+// refuses anything else, an unattended agent's or a plugin's above all. Status comes from
 // the intent's declaration in gates.toml. It then applies the one
 // consequence the gate's kind names.
 func (s *Service) Resolve(ctx context.Context, id int64, r Resolution) error {
@@ -258,18 +262,26 @@ func (s *Service) closesWithTask(g gate.Gate) bool {
 	return g.Status == gate.Open && err == nil && def.ClosesWith != "" && slices.Contains(g.Intents, def.ClosesWith)
 }
 
-// TaskEnded settles each gate of task id that HoldsTask counts and that opened by at, when by ended the task:
-// a person's end closes it with its ClosesWith intent, which refuses the gate, in their name; a plugin's or a
-// workflow's end, which only the end of the task's unit makes, supersedes it as moot. It never approves or
-// answers, refuses an agent, as Supersede does, and logs what it returns.
-func (s *Service) TaskEnded(ctx context.Context, id task.ID, by task.Actor, at time.Time) (err error) {
+// TaskEnded settles each gate of task id that HoldsTask counts and that opened by at, when by ended the task,
+// through session when an agent did: the user's end, a person's or an agent's through a session the user drives,
+// closes it with its ClosesWith intent, which refuses the gate, in their name, and supersedes one whose subject the
+// session's own turn produced; a plugin's or a workflow's end, which only the end of the task's unit makes,
+// supersedes it as moot. It never approves or answers, refuses any other agent, and logs what it returns.
+func (s *Service) TaskEnded(ctx context.Context, id task.ID, by task.Actor, session string, at time.Time) (err error) {
 	defer func() {
 		if err != nil {
 			s.logf("gates of ended task %s: %v", id, err)
 		}
 	}()
-	if by == task.ActorAgent || by == "" {
-		return fmt.Errorf("%w: the gates of task %s close with it, not by %s", ErrRefused, id, cmp.Or(string(by), "no one"))
+	user := by == task.ActorPerson
+	switch by {
+	case task.ActorAgent:
+		if err := s.vouch(ctx, gate.Gate{}, session); err != nil {
+			return fmt.Errorf("%w: the gates of task %s close with it, not by %s", err, id, by)
+		}
+		user = true
+	case "":
+		return fmt.Errorf("%w: the gates of task %s close with it, not by no one", ErrRefused, id)
 	}
 	gs, err := s.d.Reader.OfTask(ctx, id)
 	if err != nil {
@@ -280,13 +292,16 @@ func (s *Service) TaskEnded(ctx context.Context, id task.ID, by task.Actor, at t
 		if !s.closesWithTask(g) || g.OpenedAt.After(at) {
 			continue
 		}
-		if by == task.ActorPerson {
+		switch {
+		case user && g.Session != "" && g.Session == session:
+			_, err = s.d.Store.Resolve(ctx, g.ID, Resolution{Status: gate.Superseded, By: by, Session: session})
+		case user:
 			def, _ := s.def(g)
 			var r Resolution
-			if r, err = withStatus(g, def, Resolution{Intent: def.ClosesWith, By: by}); err == nil {
+			if r, err = withStatus(g, def, Resolution{Intent: def.ClosesWith, By: by, Session: session}); err == nil {
 				_, err = s.close(ctx, g, r)
 			}
-		} else {
+		default:
 			err = s.Supersede(ctx, g.ID, by)
 		}
 		if err != nil && !errors.Is(err, ErrResolved) {
@@ -402,6 +417,11 @@ func (s *Service) resolve(ctx context.Context, id int64, r Resolution, now time.
 	}
 	switch {
 	case r.By == task.ActorPerson && r.Rule == "":
+		r.Session = ""
+	case r.By == task.ActorAgent && r.Rule == "":
+		if err := s.vouch(ctx, g, r.Session); err != nil {
+			return gate.Gate{}, err
+		}
 	case r.Rule == RuleWindow && (r.By == "" || r.By == task.ActorWorkflow):
 		if g.Deadline.IsZero() || now.Before(g.Deadline) || g.Default == "" || r.Intent != "" && r.Intent != g.Default {
 			return gate.Gate{}, fmt.Errorf("%w: gate %d has no window passed to its default", ErrRefused, id)
@@ -420,6 +440,25 @@ func (s *Service) resolve(ctx context.Context, id int64, r Resolution, now time.
 		return gate.Gate{}, err
 	}
 	return s.close(ctx, g, r)
+}
+
+// vouch refuses, with ErrRefused, an agent acting on g through session unless the user drives the session and
+// its turns did not produce g's subject.
+func (s *Service) vouch(ctx context.Context, g gate.Gate, session string) error {
+	if session == "" || s.d.Sessions == nil {
+		return fmt.Errorf("%w: an agent resolves a gate only through a session the user drives", ErrRefused)
+	}
+	if g.Session == session {
+		return fmt.Errorf("%w: gate %d's subject came from session %s's own turn, which does not resolve it", ErrRefused, g.ID, session)
+	}
+	driven, err := s.d.Sessions.UserDriven(ctx, session)
+	switch {
+	case err != nil:
+		return err
+	case !driven:
+		return fmt.Errorf("%w: the user does not drive session %s: it runs a turn the loop sent, or the loop typed into it last", ErrRefused, session)
+	}
+	return nil
 }
 
 // released is the resolution dec gives g when it resolves it at once.
@@ -725,5 +764,5 @@ func resolvedEvent(g gate.Gate) port.Event {
 	if g.Task != "" {
 		u = task.UnitOf(g.Task)
 	}
-	return port.Event{Unit: u, Kind: gate.EventResolved, Key: fmt.Sprintf("%s/%d", g.Name, g.ID), Actor: string(g.By), Data: g.Intent, At: g.ClosedAt}
+	return port.Event{Unit: u, Kind: gate.EventResolved, Key: fmt.Sprintf("%s/%d", g.Name, g.ID), Actor: string(g.By), Session: g.BySession, Data: g.Intent, At: g.ClosedAt}
 }

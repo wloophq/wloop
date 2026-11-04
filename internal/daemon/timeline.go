@@ -39,9 +39,13 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	own := task.UnitOf(e.ID)
+	via := s.loaded().Tasks.ViaSession
 	out := make([]api.TimelineEvent, len(evs))
 	for i, ev := range evs {
-		out[i] = api.TimelineEvent{Seq: ev.Seq, Kind: ev.Kind, Actor: ev.Actor, At: ev.At, Data: jsonData(ev.Data)}
+		out[i] = api.TimelineEvent{Seq: ev.Seq, Kind: ev.Kind, Actor: ev.Actor, Session: ev.Session, At: ev.At, Data: jsonData(ev.Data)}
+		if ev.Session != "" && via != "" {
+			out[i].By = strings.ReplaceAll(via, "{session}", ev.Session)
+		}
 		if ev.Kind == timeline.KindRecord {
 			out[i].Sub = ev.Key
 		}

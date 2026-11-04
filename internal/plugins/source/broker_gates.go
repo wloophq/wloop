@@ -50,7 +50,7 @@ func (g gates) OpenGate(ctx context.Context, req src.GateRequest) (src.GateRef, 
 		}
 		p.Unit = u
 		p.Origin = draft.Origin{Kind: draft.OriginAuto, Rule: d.Origin.Rule, Key: d.Origin.Key}
-		return g.open(ctx, p)
+		return g.open(ctx, p, "")
 	}
 	if h.Sessions == nil {
 		return src.GateRef{}, src.ErrUnsupported
@@ -77,7 +77,7 @@ func (g gates) OpenGate(ctx context.Context, req src.GateRequest) (src.GateRef, 
 			return src.GateRef{}, fmt.Errorf("plugin %s drafts on %s, which is neither its unit nor the session's", g.b.ID, u)
 		}
 		p.Origin = sessionOrigin(b, t, u, draft.OriginTurn)
-		return g.open(ctx, p)
+		return g.open(ctx, p, req.Session)
 	}
 	if u.Provider != unit.ProviderID(g.b.ID) && h.Drafts.PublisherOf(draft.Draft{Unit: u, Target: p.Target}) != unit.ProviderID(g.b.ID) {
 		return src.GateRef{}, fmt.Errorf("this session's turn is on %s; plugin %s drafts outside its own units only on a target it posts to, "+
@@ -96,7 +96,7 @@ func (g gates) OpenGate(ctx context.Context, req src.GateRequest) (src.GateRef, 
 		}
 	}
 	p.Task, p.Origin = turns.TaskOf(*t), sessionOrigin(b, t, u, draft.OriginTurn)
-	return g.open(ctx, p)
+	return g.open(ctx, p, req.Session)
 }
 
 // openOutside proposes p for a live session with no turn: on one of the
@@ -115,10 +115,12 @@ func (g gates) openOutside(ctx context.Context, p outbox.Proposal, session strin
 		return src.GateRef{}, err
 	}
 	p.Origin = draft.Origin{Kind: draft.OriginSession}
-	return g.open(ctx, p)
+	return g.open(ctx, p, session)
 }
 
-func (g gates) open(ctx context.Context, p outbox.Proposal) (src.GateRef, error) {
+// open proposes p, from session when one proposes it.
+func (g gates) open(ctx context.Context, p outbox.Proposal, session string) (src.GateRef, error) {
+	p.Origin.Session = session
 	d, err := g.b.Hosted.Drafts.Propose(ctx, p)
 	if err != nil {
 		return src.GateRef{}, err
@@ -215,6 +217,7 @@ func (g gates) RecordSent(ctx context.Context, d src.Draft, session, tool string
 	if b, t, err := g.turnOf(ctx, session); session != "" && err == nil {
 		origin = sessionOrigin(b, t, u, draft.OriginSession)
 	}
+	origin.Session = session
 	p := outbox.Proposal{Unit: u, Purpose: d.Purpose, Delivery: draft.Delivery(d.Delivery), Target: d.Target, Text: d.Text, Reaction: d.Reaction,
 		Replaced: d.Replaced, Origin: origin, Tool: tool}
 	sent, err := h.Drafts.RecordSent(ctx, p, draft.Evidence(d.Evidence))

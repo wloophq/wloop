@@ -14,7 +14,7 @@ import (
 
 type endedTasks struct{ ended []string }
 
-func (d *endedTasks) Ended(_ context.Context, e task.Task, v task.Verb, by task.Actor) {
+func (d *endedTasks) Ended(_ context.Context, e task.Task, v task.Verb, by task.Actor, _ string) {
 	d.ended = append(d.ended, string(e.ID)+" "+string(v)+" "+string(e.Category)+" "+string(by))
 }
 
@@ -47,7 +47,7 @@ type reentrantDrafts struct {
 	err error
 }
 
-func (d *reentrantDrafts) Ended(ctx context.Context, e task.Task, _ task.Verb, _ task.Actor) {
+func (d *reentrantDrafts) Ended(ctx context.Context, e task.Task, _ task.Verb, _ task.Actor, _ string) {
 	d.err = d.svc.EndHeld(ctx, e.ID, task.CategoryDropped)
 }
 

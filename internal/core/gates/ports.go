@@ -46,13 +46,20 @@ type Reader interface {
 // Resolution is how a gate closed: Intent is the intent a person or a rule
 // chose and Status the one gates.toml gives it, Answer a question's text, By
 // who resolved it, Rule the policy rule that released it ("window" for a
-// deadline's default), "" for a person.
+// deadline's default), "" for a person. Session is the session an agent
+// resolves it through, which the service checks the user drives.
 type Resolution struct {
-	Status gate.Status
-	Intent string
-	Answer string
-	By     task.Actor
-	Rule   string
+	Status  gate.Status
+	Intent  string
+	Answer  string
+	By      task.Actor
+	Rule    string
+	Session string
+}
+
+// Sessions says whether the user drives an agent's session, by its stable id.
+type Sessions interface {
+	UserDriven(ctx context.Context, id string) (bool, error)
 }
 
 // Query narrows Where: a zero field matches every gate, but Statuses, which

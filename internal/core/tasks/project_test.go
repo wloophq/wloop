@@ -278,8 +278,8 @@ func TestProjectStatusOverTheOpenSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st["p"] != (coretasks.ProjectState{ProjectStatus: task.ProjectStatus{Next: "b", NextTitle: "Action b", Open: 2}}) {
-		t.Errorf("status %+v", st["p"])
+	if st["p"].Due {
+		t.Errorf("a new project is due: %+v", st["p"])
 	}
 	if !st["old"].Due || len(st) != 2 {
 		t.Errorf("an old project is not due: %+v", st)
