@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // sessionsOn is a turns service whose sessions db keeps, for a daemon to resolve a request's handle.
@@ -115,6 +116,9 @@ func TestATaskPageOffersItsVerbsToWhoReadsIt(t *testing.T) {
 	}
 	if st := done("term_1"); st.Enabled || !strings.Contains(st.Reason, "session you drive") {
 		t.Errorf("done to a worker session: %+v", st)
+	}
+	if st, want := done("term_1"), r.s.notice(builtin.NoticeVerbForYou, map[string]any{"Verb": "done"}); r.s.loaded().Notices[builtin.NoticeVerbForYou] == "" || st.Reason != want {
+		t.Errorf("the reason a worker session may not run done is %q, not the profile's %q", st.Reason, want)
 	}
 }
 

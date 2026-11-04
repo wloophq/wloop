@@ -819,7 +819,7 @@ func (s *Server) pageFor(ctx context.Context) requester {
 // accepts refuses verb on e unless the viewer may run it.
 func (ev *taskViewer) accepts(e task.Task, verb task.Verb) error {
 	if !ev.as.user() {
-		return errors.New(unattended(string(verb)))
+		return errors.New(ev.s.notice(builtin.NoticeVerbForYou, map[string]any{"Verb": string(verb)}))
 	}
 	return ev.g.Accepts(e, verb, ev.as.Actor)
 }
