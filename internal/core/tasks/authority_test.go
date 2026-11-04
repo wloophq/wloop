@@ -92,7 +92,7 @@ func TestAVerbsTransitionComesFromTheProfile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Task.State != "waiting" || res.Task.Category != task.CategoryWaiting {
+	if res.Task.State != "waiting" || res.Task.Category != task.CategoryReady {
 		t.Errorf("someday moved the task to %s (%s), want waiting as the profile's to says", res.Task.State, res.Task.Category)
 	}
 	r.put(t, task.Task{ID: "t-2", State: "done", Origin: task.OriginUser})

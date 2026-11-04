@@ -18,7 +18,7 @@ var states = []struct {
 	name string
 	c    task.Category
 }{
-	{"inbox", task.CategoryInbox}, {"next", task.CategoryReady}, {"waiting", task.CategoryWaiting},
+	{"inbox", task.CategoryInbox}, {"next", task.CategoryReady}, {"waiting", task.CategoryReady},
 	{"scheduled", task.CategoryDeferred}, {"someday", task.CategoryDeferred}, {"done", task.CategoryDone},
 	{"reference", task.CategoryDone}, {"trash", task.CategoryDropped},
 }

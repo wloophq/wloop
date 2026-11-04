@@ -34,7 +34,7 @@
       "context": "list",
       "owner": "core",
       "help": "to Next",
-      "summary": "Move it to Next: something you will do as soon as you can."
+      "summary": "Move it to Next: committed, you or an agent will do it."
     },
     {
       "key": "w",

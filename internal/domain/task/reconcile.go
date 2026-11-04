@@ -238,7 +238,7 @@ func wants(f UnitFacts, it items.Item, me Me) (Category, bool) {
 	start, ok := CategoryInbox, true
 	if !waitsOnMe(it, me) {
 		own := it.TaskKey == f.Unit.String() && len(it.WaitingOn) == 0
-		start, ok = CategoryWaiting, (len(it.WaitingOn) > 0 || own) && (mine(it, me) || f.Cares)
+		start, ok = CategoryReady, (len(it.WaitingOn) > 0 || own) && (mine(it, me) || f.Cares)
 	}
 	if it.Initial != "" {
 		start = Category(it.Initial)

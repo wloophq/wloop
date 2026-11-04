@@ -799,7 +799,7 @@ func (s *Service) sync(ctx context.Context, units []unit.Unit) ([]task.Task, err
 				roused = append(roused, e.ID)
 			}
 		}
-		for _, c := range task.Activity(f, p.of(have, u), now) {
+		for _, c := range task.Activity(f, its, s.d.Me, p.of(have, u), now) {
 			p.put(c)
 		}
 	}

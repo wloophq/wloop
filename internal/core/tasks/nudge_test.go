@@ -19,7 +19,7 @@ func waitingOnAna(t *testing.T, r *rig) task.ID {
 		t.Fatal(err)
 	}
 	id := task.DerivedID(unitU, "a")
-	if e := r.task(t, id); e.Category != task.CategoryWaiting {
+	if e := r.task(t, id); e.Category != task.CategoryReady {
 		t.Fatalf("%+v", e)
 	}
 	return id
@@ -75,7 +75,7 @@ func TestNudgeStampKeepsAConcurrentSyncMove(t *testing.T) {
 		}()
 		wg.Wait()
 		e := r.task(t, id)
-		if e.Category != task.CategoryWaiting || !e.Changed || !e.Prop(task.PropLastNudge).Time.Equal(at) {
+		if e.Category != task.CategoryReady || !e.Changed || !e.Prop(task.PropLastNudge).Time.Equal(at) {
 			t.Fatalf("round %d: %s changed=%v lastNudge=%v", round, e.State, e.Changed, e.Prop(task.PropLastNudge).Time)
 		}
 	}

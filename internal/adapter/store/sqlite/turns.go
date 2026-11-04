@@ -647,6 +647,27 @@ func (s *Store) Open(ctx context.Context) ([]unit.Unit, error) {
 	return queryUnits(ctx, s.db.R(), openUnitsSQL)
 }
 
+// OpenTurns are the open turns (sent, started or asked) of every unit, in ascending Seq, with their Seq,
+// Intent, Trigger, State and Session.
+func (s *Store) OpenTurns(ctx context.Context) (map[unit.Unit][]turn.Turn, error) {
+	rows, err := s.db.R().QueryContext(ctx, `SELECT provider, unit_key, seq, intent, trigger, state, session FROM turns
+		WHERE state IN ('sent', 'started', 'asked') ORDER BY seq`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[unit.Unit][]turn.Turn{}
+	for rows.Next() {
+		var u unit.Unit
+		var t turn.Turn
+		if err := rows.Scan(&u.Provider, &u.Key, &t.Seq, &t.Intent, &t.Trigger, &t.State, &t.Session); err != nil {
+			return nil, err
+		}
+		out[u] = append(out[u], t)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) WithTurns(ctx context.Context, i turn.Intent) ([]unit.Unit, error) {
 	return queryUnits(ctx, s.db.R(), `SELECT DISTINCT provider, unit_key FROM turns WHERE intent = ? AND state != ? ORDER BY provider, unit_key`, string(i), string(turn.Withdrawn))
 }

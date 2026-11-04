@@ -86,16 +86,16 @@ func TestAProfileChangingAStatesCategoryRecategorizesTasks(t *testing.T) {
 	r.put(t, "t-w", "waiting", task.CategoryWaiting, pr)
 	r.put(t, "t-n", "next", task.CategoryReady)
 	g := r.te.newTasks(r.db, r.te.cfg, nil)
-	if unknown, err := g.Recategorize(ctx); err != nil || len(unknown) != 0 || r.category(t, "t-w") != task.CategoryWaiting {
-		t.Fatalf("the bundled profile moved a task: %v %v %s", unknown, err, r.category(t, "t-w"))
+	if unknown, err := g.Recategorize(ctx); err != nil || len(unknown) != 0 || r.category(t, "t-w") != task.CategoryReady || r.category(t, "t-n") != task.CategoryReady {
+		t.Fatalf("the bundled profile left a waiting task stored before it in %s: %v %v", r.category(t, "t-w"), unknown, err)
 	}
-	r.write(t, "[states.waiting]\ncategory = \"ready\"\n")
+	r.write(t, "[states.waiting]\ncategory = \"waiting\"\n")
 	from := r.log.Gen()
 	if unknown, err := g.Recategorize(ctx); err != nil || len(unknown) != 0 {
 		t.Fatalf("recategorize: %v %v", unknown, err)
 	}
-	if c := r.category(t, "t-w"); c != task.CategoryReady {
-		t.Errorf("a waiting task is %s, want ready", c)
+	if c := r.category(t, "t-w"); c != task.CategoryWaiting {
+		t.Errorf("a waiting task is %s, want waiting", c)
 	}
 	if c := r.log.Since(from, port.TopicTasks); !slices.Equal(c.Units, []unit.Unit{pr, task.UnitOf("t-w")}) {
 		t.Errorf("noted %+v", c)

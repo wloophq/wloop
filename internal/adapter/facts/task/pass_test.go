@@ -15,7 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
-// TestAPassReadsTheStoreOnceForEveryTask: the facts of the tasks of one pass read the sessions, the items,
+// TestAPassReadsTheStoreOnceForEveryTask: the facts of the tasks of one pass read the open turns, the items,
 // the open gates, the turn counts, the cards and the wakes once each, and are the facts each task has on its own.
 func TestAPassReadsTheStoreOnceForEveryTask(t *testing.T) {
 	t.Parallel()
@@ -54,7 +54,7 @@ func TestAPassReadsTheStoreOnceForEveryTask(t *testing.T) {
 			t.Errorf("%s: the facts in a pass\n%v\ndiffer from its own\n%v", en.ID, f, alone[en.ID])
 		}
 	}
-	for _, what := range []string{"sessions", "items", "gates", "turns", "cards", "wakes"} {
+	for _, what := range []string{"open turns", "items", "gates", "turns", "cards", "wakes"} {
 		if n := e.reads[what]; n != 1 {
 			t.Errorf("%s read %d times in a pass over %d tasks", what, n, len(all))
 		}
@@ -98,7 +98,7 @@ func TestPrepareStartsAPassOverEveryTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, what := range []string{"sessions", "items", "gates", "turns", "cards"} {
+	for _, what := range []string{"open turns", "items", "gates", "turns", "cards"} {
 		if n := e.reads[what]; n != 1 {
 			t.Errorf("%s read %d times for %d tasks", what, n, len(units))
 		}

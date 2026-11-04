@@ -60,21 +60,20 @@ func (s *Service) ServeProjects(d ProjectDeps) {
 
 // ProjectState is a project's status at the service's now.
 type ProjectState struct {
-	task.ProjectStatus
 	Due bool // past its review interval
 }
 
-// ProjectsStatus is each live project's next action, open actions and review mark, over one read of the open set.
+// ProjectsStatus is each live project's review mark, over one read of the open set.
 func (s *Service) ProjectsStatus(ctx context.Context) (map[task.ID]ProjectState, error) {
 	open, err := s.d.Store.Tasks(ctx, task.Query{})
 	if err != nil {
 		return nil, err
 	}
-	st, now := task.ProjectsOf(open), s.now()
-	out := make(map[task.ID]ProjectState, len(st))
+	now := s.now()
+	out := map[task.ID]ProjectState{}
 	for _, e := range open {
 		if e.IsProject() {
-			out[e.ID] = ProjectState{ProjectStatus: st[e.ID], Due: e.Open() && e.ReviewDue(now)}
+			out[e.ID] = ProjectState{Due: e.Open() && e.ReviewDue(now)}
 		}
 	}
 	return out, nil

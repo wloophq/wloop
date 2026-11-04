@@ -32,28 +32,6 @@ func TestReviewDue(t *testing.T) {
 	}
 }
 
-func TestProjectsOf(t *testing.T) {
-	seq := Task{ID: "p-seq", Props: Props{PropKind: {Text: KindProject}}, Category: CategoryReady, Sequential: true}
-	par := Task{ID: "p-par", Props: Props{PropKind: {Text: KindProject}}, Category: CategoryReady}
-	empty := Task{ID: "p-empty", Props: Props{PropKind: {Text: KindProject}}, Category: CategoryReady}
-	all := []Task{seq, par, empty,
-		{ID: "a1", Category: CategoryWaiting, Parent: "p-seq", Position: 1},
-		{ID: "a2", Category: CategoryReady, Parent: "p-seq", Position: 2},
-		{ID: "b1", Category: CategoryDeferred, Parent: "p-par", Position: 1},
-		{ID: "b2", Category: CategoryReady, Parent: "p-par", Position: 3},
-		{ID: "b3", Category: CategoryReady, Title: "Draft the plan", Parent: "p-par", Position: 2},
-		{ID: "b4", Category: CategoryDone, Parent: "p-par", Position: 0},
-		{ID: "c1", Category: CategoryDone, Parent: "p-empty", Position: 1},
-	}
-	got := ProjectsOf(all)
-	want := map[ID]ProjectStatus{"p-seq": {Next: "", Open: 2}, "p-par": {Next: "b3", NextTitle: "Draft the plan", Open: 3}, "p-empty": {}}
-	for id, w := range want {
-		if got[id] != w {
-			t.Errorf("%s: %+v, want %+v", id, got[id], w)
-		}
-	}
-}
-
 func TestPlace(t *testing.T) {
 	acts := []Task{{ID: "a", Position: 1}, {ID: "b", Position: 2}, {ID: "c", Position: 3}}
 	pos := func(es []Task) []string {

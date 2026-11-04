@@ -56,7 +56,7 @@ func TestBundledTasksDeclareTheEightStatesWithTheirCategories(t *testing.T) {
 	want := []StateDef{
 		{Name: "inbox", Category: task.CategoryInbox},
 		{Name: "next", Category: task.CategoryReady},
-		{Name: "waiting", Category: task.CategoryWaiting},
+		{Name: "waiting", Category: task.CategoryReady},
 		{Name: "scheduled", Category: task.CategoryDeferred},
 		{Name: "someday", Category: task.CategoryDeferred},
 		{Name: "done", Category: task.CategoryDone},

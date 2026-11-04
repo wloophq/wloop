@@ -102,7 +102,7 @@ func TestServiceOverSqliteKeepsClarifiedTasksOutOfTheInboxOnActivity(t *testing.
 	if _, err := r.svc.Do(ctx, action, coretasks.Request{Actor: task.ActorWorkflow, Source: "task-wake", Verb: task.VerbWake}); err != nil {
 		t.Fatal(err)
 	}
-	for id, want := range map[task.ID]task.Category{action: task.CategoryReady, waiting: task.CategoryWaiting} {
+	for id, want := range map[task.ID]task.Category{action: task.CategoryReady, waiting: task.CategoryReady} {
 		e, err := r.store.Task(ctx, id)
 		if err != nil || e.Category != want || !e.Changed {
 			t.Fatalf("%s after a new message: %+v %v, want %s and changed", id, e, err, want)
