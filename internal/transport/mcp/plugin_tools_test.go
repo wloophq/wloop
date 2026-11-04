@@ -80,7 +80,7 @@ func (f *fakePlugin) tool(t *testing.T, name string) PluginTool {
 }
 
 func TestSlackToolsComeFromTheManifest(t *testing.T) {
-	for _, name := range []string{"slack_send_message", "slack_read", "slack_search", "slack_draft", "slack_react", "slack_edit"} {
+	for _, name := range []string{"slack_send_message", "slack_read", "slack_search", "slack_draft", "slack_react", "slack_edit", "slack_delete"} {
 		m := manifestTool(t, name)
 		if !slices.ContainsFunc(builtin.Tools, func(v builtin.Value) bool { return v.Name == name && v.Doc == m.Doc }) {
 			t.Errorf("%s is not the manifest's tool in builtin.Tools", name)

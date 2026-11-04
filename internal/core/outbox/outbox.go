@@ -278,7 +278,7 @@ func checkContent(d draft.Draft) error {
 		return fmt.Errorf("%w: unknown delivery %q", ErrInvalid, d.Delivery)
 	case d.Delivery == draft.Reaction && strings.TrimSpace(d.Reaction) == "":
 		return fmt.Errorf("%w: a reaction needs an emoji", ErrInvalid)
-	case d.Delivery != draft.Reaction && strings.TrimSpace(d.Text) == "":
+	case d.Delivery != draft.Reaction && d.Delivery != draft.DeleteDelivery && strings.TrimSpace(d.Text) == "":
 		return fmt.Errorf("%w: empty text", ErrInvalid)
 	case strings.TrimSpace(d.Purpose) == "":
 		return fmt.Errorf("%w: no purpose", ErrInvalid)
@@ -310,7 +310,7 @@ func checkKind(k draft.Kind) error {
 	return nil
 }
 
-var deliveries = []draft.Delivery{draft.Message, draft.Reaction, draft.CommentDelivery, draft.EditDelivery}
+var deliveries = []draft.Delivery{draft.Message, draft.Reaction, draft.CommentDelivery, draft.EditDelivery, draft.DeleteDelivery}
 
 // decide is the approval of d under p's policy. A policy that does not
 // validate, a rule that cannot be read, or a rule that reads the unit's
@@ -715,7 +715,7 @@ func (s *Service) landed(ctx context.Context, d draft.Draft) (unit.Unit, bool, e
 	return l.Landed(ctx, d)
 }
 
-// posts are the deliveries that post a message; a reaction or an edit is none.
+// posts are the deliveries that post a message; a reaction, an edit or a deletion is none.
 var posts = []draft.Delivery{draft.Message, draft.CommentDelivery}
 
 // Send is the sender pass: the effects of the sent drafts not applied yet,

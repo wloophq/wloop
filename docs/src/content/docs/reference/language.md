@@ -410,7 +410,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `open_question` (one of `hold`, `replace_if_moved`, default `hold`): What an open question of the intent's newest turn does to a round of the unit's plan: hold waits for its answer; replace_if_moved runs a round planned on a head other than the one the question was asked on, which replaces the asked turn, supersedes its gate and carries the question in the new turn's history. An answer on its way holds the round either way.
 - `draft.propose`:
   - `purpose` (string): What the draft is for, such as nudge or close. Required.
-  - `delivery` (one of `message`, `reaction`, `comment`, `edit`, default `message`): How the draft posts: the core's message or reaction, or a delivery a plugin declares.
+  - `delivery` (one of `message`, `reaction`, `comment`, `edit`, `delete`, default `message`): How the draft posts: the core's message or reaction, or a delivery a plugin declares.
   - `text` (file, default `text.md.tmpl`): The template of the draft's text, beside the manifest.
   - `reaction` (string): The emoji name, with delivery reaction.
   - `items` (one of `owed`, `resolved`, `unowned`, `unowned_aged`, `all`, default `all`): Which of the unit's items the draft lists.
@@ -477,6 +477,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `slack_draft`: Proposes a Slack message or reaction for the user's approval.
   - `slack_react`: Adds or removes a reaction on a Slack message as the user, now.
   - `slack_edit`: Replaces the text of one of the user's Slack messages, now.
+  - `slack_delete`: Deletes one of the user's Slack messages, now.
 - `<name>.description` (template): What the tool does and when to call it, over the tool data. Required.
 - `<name>.params` (table by name): A parameter's description, by its path: a nested one as "record.state", an array's element as "items[]".
 - `<name>.params.<name>` (template): The parameter's description, over the tool data.
@@ -593,6 +594,14 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `problem_text_required`: A problem: text is missing or empty.
   - `broadcast`: The text notifies a whole channel or group.
   - `edited` (`Conversation`, `Message`, `Permalink`, `Text`, `Replaced`): The message is edited: where, its ref and its permalink, "" when Slack gave none, its new text as posted and the text it replaced.
+- `slack_delete`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `not_logged_in`: Slack is logged out.
+  - `failed` (`Error`): Slack or the daemon failed the call.
+  - `problem_message`: A problem: message is not a message ref or permalink.
+  - `deleted` (`Conversation`, `Message`, `Permalink`, `Deleted`): The message is deleted: where, its ref and its permalink, "" when Slack gave none, and the text it held.
 
 ## What the loop tells a session (`notices.toml`)
 

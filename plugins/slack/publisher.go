@@ -70,10 +70,10 @@ func (p *Publisher) Validate(ctx context.Context, d draft.Draft) error {
 	return err
 }
 
-// Where names the conversation d would post to, or, for a recorded edit, the
-// conversation of the message it replaced.
+// Where names the conversation d would post to, or, for a recorded edit or
+// deletion, the conversation of the message it changed.
 func (p *Publisher) Where(ctx context.Context, d draft.Draft) (string, error) {
-	if d.Delivery == draft.EditDelivery {
+	if madeAtOnce(d.Delivery) {
 		if p.Send == nil || p.Send.Client == nil {
 			return "", send.ErrNotLoggedIn
 		}
@@ -88,6 +88,10 @@ func (p *Publisher) Where(ctx context.Context, d draft.Draft) (string, error) {
 	return pl.where(), nil
 }
 
+// madeAtOnce says a draft of delivery d is a tool's change the Outbox only
+// records: slack_edit's or slack_delete's.
+func madeAtOnce(d draft.Delivery) bool { return d == draft.EditDelivery || d == draft.DeleteDelivery }
+
 func (p *Publisher) prepare(ctx context.Context, d draft.Draft) (plan, error) {
 	k, err := dslack.ParseUnit(d.Unit)
 	if err != nil && strings.TrimSpace(d.Target) == "" {
@@ -96,8 +100,8 @@ func (p *Publisher) prepare(ctx context.Context, d draft.Draft) (plan, error) {
 	if p.Send == nil || p.Send.Client == nil {
 		return plan{}, send.ErrNotLoggedIn
 	}
-	if d.Delivery == draft.EditDelivery {
-		return plan{}, errors.New("an edit goes out through slack_edit at once and is only recorded, never published from the Outbox")
+	if madeAtOnce(d.Delivery) {
+		return plan{}, fmt.Errorf("%s goes out through its tool at once and is only recorded, never published from the Outbox", d.Delivery)
 	}
 	var pl plan
 	if d.Delivery == draft.Reaction {

@@ -26,7 +26,7 @@ posted = """Posted to {{.Conversation}}{{with .Parent}} in the thread {{printf "
 {{.Text}}"""
 
 [slack_read]
-description = "Read a Slack thread or conversation, rendered: a unit (slack:<key>), or the thread of a message ref (<conversation>/<ts>) or permalink. Stored messages come first; a channel thread not stored is read from Slack and not followed; direct messages only when tracked. Each message prints as [m<N> <conversation>/<ts>]: that ref is a target slack_react, slack_edit, slack_draft and slack_send_message take, and slack_read reads its thread; m<N> only numbers the messages of this read, as in \"reply to m<K>\"."
+description = "Read a Slack thread or conversation, rendered: a unit (slack:<key>), or the thread of a message ref (<conversation>/<ts>) or permalink. Stored messages come first; a channel thread not stored is read from Slack and not followed; direct messages only when tracked. Each message prints as [m<N> <conversation>/<ts>]: that ref is a target slack_react, slack_edit, slack_delete, slack_draft and slack_send_message take, and slack_read reads its thread; m<N> only numbers the messages of this read, as in \"reply to m<K>\"."
 
 [slack_read.params]
 "target" = "a unit (slack:<key>), a message ref (<conversation>/<ts>) or a message permalink"
@@ -44,7 +44,7 @@ problem_limit = "limit: an integer from 1 to {{.Max}}"
 read = "{{.Text}}"
 
 [slack_search]
-description = "Search the Slack messages the user can read, newest first: one line per message, \"<permalink> · <author> · <time> · <first line>\", times in the user's time zone. Direct messages show only when tracked. Pass a permalink, or the ref a line without one prints, to slack_read to read its thread, or to slack_draft, slack_react, slack_edit or slack_send_message to act on it."
+description = "Search the Slack messages the user can read, newest first: one line per message, \"<permalink> · <author> · <time> · <first line>\", times in the user's time zone. Direct messages show only when tracked. Pass a permalink, or the ref a line without one prints, to slack_read to read its thread, or to slack_draft, slack_react, slack_edit, slack_delete or slack_send_message to act on it."
 
 [slack_search.params]
 "query" = "what to look for, as Slack's search box reads it"
@@ -141,3 +141,23 @@ edited = """Edited the message {{.Message}} in {{.Conversation}}{{with .Permalin
 It replaced:
 
 {{.Replaced}}"""
+
+[slack_delete]
+description = "Delete one of the user's own Slack messages, at once and without their approval; the {{.Name}} Outbox keeps the text it held. It refuses a message someone else posted. When it is unclear whether the user wants the message removed, ask them first."
+
+[slack_delete.params]
+"message" = "the user's message: its ref (<conversation>/<ts>), as slack_read and your turn print it, or its permalink"
+
+[slack_delete.answers]
+refused = "slack_delete refused: {{.Error}}."
+bad_arguments = "Nothing was deleted: the arguments are not an object with message{{with .Error}} ({{.}}){{end}}."
+fix_these = """Nothing was deleted; fix these and call slack_delete again:
+{{.Problems}}"""
+not_logged_in = "not logged in to Slack; run \"{{.Command}} slack login\""
+failed = "Slack delete failed: {{.Error}}"
+problem_message = "message: required, a Slack message ref (<conversation>/<ts>) or permalink"
+deleted = """Deleted the message {{.Message}} in {{.Conversation}}{{with .Permalink}}: {{.}}{{end}}
+
+It held:
+
+{{.Deleted}}"""

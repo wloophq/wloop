@@ -528,6 +528,23 @@ func TestRecordSentSkipsPublish(t *testing.T) {
 	}
 }
 
+func TestRecordSentKeepsADeletionWithTheTextItRemoved(t *testing.T) {
+	e := newEnv()
+	for _, text := range []string{"posted twice", ""} {
+		p := Proposal{Unit: thread, Kind: draft.Delete, Text: text, Target: "C1/1.2"}
+		d, err := e.svc.RecordSent(ctx, p, draft.Evidence{Ref: "C1/1.2"})
+		if err != nil {
+			t.Fatalf("a deletion of %q: %v", text, err)
+		}
+		if got := e.get(d.ID); got.Kind != draft.Delete || got.Delivery != draft.DeleteDelivery || got.Text != text || got.State != draft.Sent {
+			t.Fatalf("%+v", got)
+		}
+	}
+	if len(e.fx.published) != 0 {
+		t.Fatalf("published %v", e.fx.published)
+	}
+}
+
 func TestHookErrorsDoNotUndoTheSend(t *testing.T) {
 	e := newEnv()
 	e.svc.Evidence = func(context.Context, draft.Draft) error { return errBoom }

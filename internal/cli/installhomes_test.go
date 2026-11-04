@@ -473,6 +473,7 @@ would add permission ` + brand.ToolPrefix() + `turn_end in <root>/user/.claude/s
 would add permission ` + brand.ToolPrefix() + `slack_send_message in <root>/user/.claude/settings.json
 would add permission ` + brand.ToolPrefix() + `slack_react in <root>/user/.claude/settings.json
 would add permission ` + brand.ToolPrefix() + `slack_edit in <root>/user/.claude/settings.json
+would add permission ` + brand.ToolPrefix() + `slack_delete in <root>/user/.claude/settings.json
 would add MCP server ` + brand.Name + ` in <root>/user/Library/Application Support/orca/claude-profiles/p1/home/.claude.json
 would add hook Stop in <root>/user/Library/Application Support/orca/claude-profiles/p1/home/settings.json
 would add hook SessionStart in <root>/user/Library/Application Support/orca/claude-profiles/p1/home/settings.json
@@ -481,6 +482,7 @@ would add permission ` + brand.ToolPrefix() + `turn_end in <root>/user/Library/A
 would add permission ` + brand.ToolPrefix() + `slack_send_message in <root>/user/Library/Application Support/orca/claude-profiles/p1/home/settings.json
 would add permission ` + brand.ToolPrefix() + `slack_react in <root>/user/Library/Application Support/orca/claude-profiles/p1/home/settings.json
 would add permission ` + brand.ToolPrefix() + `slack_edit in <root>/user/Library/Application Support/orca/claude-profiles/p1/home/settings.json
+would add permission ` + brand.ToolPrefix() + `slack_delete in <root>/user/Library/Application Support/orca/claude-profiles/p1/home/settings.json
 would back up <root>/work-home/settings.json
 would add MCP server ` + brand.Name + ` in <root>/work-home/.claude.json
 would add hook Stop in <root>/work-home/settings.json
@@ -490,6 +492,7 @@ would add permission ` + brand.ToolPrefix() + `turn_end in <root>/work-home/sett
 would add permission ` + brand.ToolPrefix() + `slack_send_message in <root>/work-home/settings.json
 would add permission ` + brand.ToolPrefix() + `slack_react in <root>/work-home/settings.json
 would add permission ` + brand.ToolPrefix() + `slack_edit in <root>/work-home/settings.json
+would add permission ` + brand.ToolPrefix() + `slack_delete in <root>/work-home/settings.json
 would add MCP server ` + brand.Name + ` in <root>/oss-home/.claude.json
 would add hook Stop in <root>/oss-home/settings.json
 would add hook SessionStart in <root>/oss-home/settings.json
@@ -498,6 +501,7 @@ would add permission ` + brand.ToolPrefix() + `turn_end in <root>/oss-home/setti
 would add permission ` + brand.ToolPrefix() + `slack_send_message in <root>/oss-home/settings.json
 would add permission ` + brand.ToolPrefix() + `slack_react in <root>/oss-home/settings.json
 would add permission ` + brand.ToolPrefix() + `slack_edit in <root>/oss-home/settings.json
+would add permission ` + brand.ToolPrefix() + `slack_delete in <root>/oss-home/settings.json
 would add skill ` + brand.Name + `-address in <root>/user/.claude/skills/` + brand.Name + `-address/SKILL.md
 would add skill ` + brand.Name + `-nudge in <root>/user/.claude/skills/` + brand.Name + `-nudge/SKILL.md
 would add skill ` + brand.Name + `-review in <root>/user/.claude/skills/` + brand.Name + `-review/SKILL.md

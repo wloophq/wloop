@@ -33,6 +33,9 @@ name = "reaction"
 [[source.deliveries]]
 name = "edit"
 
+[[source.deliveries]]
+name = "delete"
+
 [[source.draft_kinds]]
 name = "react"
 delivery = "reaction"
@@ -40,6 +43,10 @@ delivery = "reaction"
 [[source.draft_kinds]]
 name = "edit"
 delivery = "edit"
+
+[[source.draft_kinds]]
+name = "delete"
+delivery = "delete"
 
 [[source.facts]]
 name = "slack.channel"
@@ -397,3 +404,27 @@ doc = "The text notifies a whole channel or group."
 name = "edited"
 doc = "The message is edited: where, its ref and its permalink, \"\" when Slack gave none, its new text as posted and the text it replaced."
 fields = [{ name = "Conversation" }, { name = "Message" }, { name = "Permalink" }, { name = "Text" }, { name = "Replaced" }]
+
+[[source.tools]]
+name = "slack_delete"
+doc = "Deletes one of the user's Slack messages, now."
+posts = "now"
+input = '{"type":"object","properties":{"message":{"type":"string"}},"required":["message"],"additionalProperties":false}'
+
+[[source.tools.answers]]
+name = "not_logged_in"
+doc = "Slack is logged out."
+
+[[source.tools.answers]]
+name = "failed"
+doc = "Slack or the daemon failed the call."
+fields = [{ name = "Error" }]
+
+[[source.tools.answers]]
+name = "problem_message"
+doc = "A problem: message is not a message ref or permalink."
+
+[[source.tools.answers]]
+name = "deleted"
+doc = "The message is deleted: where, its ref and its permalink, \"\" when Slack gave none, and the text it held."
+fields = [{ name = "Conversation" }, { name = "Message" }, { name = "Permalink" }, { name = "Deleted" }]

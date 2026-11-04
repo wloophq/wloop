@@ -708,6 +708,66 @@ func TestFromAPullRequestTurnEditsAndReactionsPostAtOnceAndAreRecorded(t *testin
 	}
 }
 
+func TestFromAPullRequestTurnADeletionGoesAtOnceAndTheOutboxKeepsItsText(t *testing.T) {
+	t.Parallel()
+	w := newSessionWiring(t)
+	ctx := context.Background()
+	prUnit := pr.Ref{Owner: "acme", Repo: "widgets", Number: 7}.Unit()
+	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: prUnit, Turns: []dturn.Turn{
+		{Intent: "address", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	author, deleted := "U000", false
+	w.st.srv.Handle("conversations.history", func(url.Values) any { return map[string]any{"messages": []any{}} })
+	w.st.srv.Handle("conversations.replies", func(v url.Values) any {
+		mu.Lock()
+		defer mu.Unlock()
+		msgs := []map[string]any{{"ts": sessParent, "thread_ts": sessParent, "text": "parent"}}
+		if !deleted {
+			msgs = append(msgs, map[string]any{"ts": sessReply, "thread_ts": sessParent, "user": author, "text": "posted twice"})
+		}
+		return map[string]any{"messages": msgs}
+	})
+	w.st.srv.Handle("chat.delete", func(v url.Values) any {
+		mu.Lock()
+		defer mu.Unlock()
+		deleted = true
+		return map[string]any{"channel": v.Get("channel"), "ts": v.Get("ts")}
+	})
+	ref := sessThreaded + "/" + sessReply
+
+	mu.Lock()
+	author = "U0000000077"
+	mu.Unlock()
+	if got, isErr := w.callTool(t, "", draftHandle, "slack_delete", `{"message":"`+ref+`"}`); !isErr || !strings.Contains(got, "only the user's own") {
+		t.Fatalf("another's message: %q", got)
+	}
+	if n := len(w.st.srv.Calls("chat.delete")); n != 0 {
+		t.Fatalf("chat.delete %d", n)
+	}
+	mu.Lock()
+	author = "U000"
+	mu.Unlock()
+	if got, isErr := w.callTool(t, "", draftHandle, "slack_delete", `{"message":"`+ref+`"}`); isErr || !strings.Contains(got, "#random") ||
+		!strings.Contains(got, "posted twice") {
+		t.Fatalf("slack_delete = %q", got)
+	}
+	if dels := w.st.srv.Calls("chat.delete"); len(dels) != 1 || dels[0].Get("channel") != sessThreaded || dels[0].Get("ts") != sessReply {
+		t.Fatalf("chat.delete %v", dels)
+	}
+	ds := w.drafts(t)
+	origin := draft.Origin{Kind: draft.OriginSession, TurnSeq: 1, Intent: "address", Unit: prUnit}
+	if len(ds) != 1 {
+		t.Fatalf("records %+v", ds)
+	}
+	if d := ds[0]; d.State != draft.Sent || d.Kind != draft.Delete || d.Purpose != "delete" || d.Text != "posted twice" ||
+		d.Unit != slackThreadUnit("T000", sessThreaded, sessParent) || d.Origin != origin || d.Evidence.Ref != ref {
+		t.Fatalf("delete record %+v", d)
+	}
+}
+
 func TestSlackDraftResolvesHandlesAndEmailsIntoMentions(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
@@ -734,7 +794,7 @@ func TestSlackDraftResolvesHandlesAndEmailsIntoMentions(t *testing.T) {
 func TestEveryToolIsDescribedByTheBundledProfile(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
-	if w.srv.Tasks == nil || len(w.srv.Plugins) != 6 {
+	if w.srv.Tasks == nil || len(w.srv.Plugins) != 7 {
 		t.Fatal("the wiring serves only some tools")
 	}
 	init := rpc(t, w.srv, "", draftHandle, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}`)
