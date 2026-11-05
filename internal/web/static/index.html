@@ -11,7 +11,7 @@
 <body>
 <header id="top">
   <span class="mark">{{name}}</span>
-  <input id="search" class="search" type="search" maxlength="200" autocomplete="off" spellcheck="false" aria-label="Filter the list" aria-keyshortcuts="/" placeholder="Filter: text, repo:, author:, wait:me, risk:high, tag:lang:go  ( / )" data-focus="top:search">
+  <input id="search" class="search" type="search" maxlength="200" autocomplete="off" spellcheck="false" aria-label="Filter the list" aria-keyshortcuts="/" placeholder="Filter: text, where:, author:, wait:me, risk:high, tag:lang:go  ( / )" data-focus="top:search">
   <span id="sync" class="sync">connecting</span>
   <span id="notice" class="notice" role="status" aria-live="polite"></span>
 </header>
@@ -47,7 +47,7 @@
       <table id="table">
         <thead>
           <tr>
-            <th scope="col" class="c-pr"><button type="button" class="th-sort" data-sort="repo" data-focus="th:repo" title="Sort by repo">Pull request</button></th>
+            <th scope="col" class="c-pr"><button type="button" class="th-sort" data-sort="where" data-focus="th:where" title="Sort by where">Pull request</button></th>
             <th scope="col" class="c-wait"><button type="button" class="th-sort" data-sort="wait" data-focus="th:wait" title="Sort by whom it waits on">Waiting on</button></th>
             <th scope="col" class="c-for"><button type="button" class="th-sort" data-sort="age" data-focus="th:age" title="Sort by how long it waits">For</button></th>
             <th scope="col" class="c-why"><button type="button" class="th-sort" data-sort="kind" data-focus="th:kind" title="Sort by situation">Why</button></th>

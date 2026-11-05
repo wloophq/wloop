@@ -128,7 +128,7 @@ type presenter struct{}
 func (presenter) Views() []api.ViewSpec { return nil }
 
 func (presenter) Facets() []api.FacetSpec {
-	return []api.FacetSpec{{ID: FacetWhere, Label: "Where", Provider: string(ID), Group: true, Sort: "text", Menu: true}}
+	return []api.FacetSpec{{ID: FacetWhere, Label: "Where", Provider: string(ID), Group: true, Sort: "text", Match: "suffix", Menu: true}}
 }
 
 func (presenter) Situations() []api.SituationSpec {
