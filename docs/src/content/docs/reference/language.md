@@ -315,6 +315,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `facets.<name>.buckets.<name>.within` (duration): How long ago an instant may be and still fall in the bucket.
 - `facets.<name>.buckets.<name>.label` (string): The text people read; the id when absent.
 - `facets.<name>.merge` (one of `union`, `rows-first`, default `union`): How a task's value joins its units' rows' values: union adds it to them, rows-first uses it only when no row has a value.
+- `facets.<name>.turn_of` (string): Another facet whose values, joined with the rows' as that facet's merge says, give this facet's value in place of its own and its rows': me when they hold me, nobody when they hold none, others otherwise. The bundled task strip, turn, takes the turn of waits-on, so it agrees with the Waiting on column.
 - `facets.<name>.units` (one of `all`, `primary`, default `all`): Which of a task's units contribute rows' values: all of them, or the primary unit alone.
 - `views` (table): The lists of tasks, by view.
 - `views.<name>` (table): A view, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.

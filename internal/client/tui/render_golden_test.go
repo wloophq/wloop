@@ -1,11 +1,10 @@
 package tui
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/wloophq/wloop/internal/api/lens"
-	psource "github.com/wloophq/wloop/internal/plugins/source"
-	"github.com/wloophq/wloop/internal/readmodel"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,7 +13,10 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/lens"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
@@ -159,17 +161,19 @@ type bundled struct {
 // slackGolden is the Slack view: conversations placed by the Slack plugin's specs, a channel thread, a
 // DM and a stalled one.
 func slackGolden(t *testing.T, color bool) *Model {
+	shared := slackRowFacets(t)
 	conv := func(key, label, title, waits string, since time.Duration, stalled bool) api.Row {
-		kind, turn := api.Kind("waits_on_viewer"), "me"
+		kind := api.Kind("waits_on_viewer")
 		if waits != "me" {
-			kind, turn = "waits_on_others", "others"
+			kind = "waits_on_others"
 		}
+		facets := maps.Clone(shared.BySituation[string(kind)])
+		facets["waits-on"] = []string{waits}
+		facets[shared.Since] = []string{now.Add(-since).UTC().Format(time.RFC3339Nano)}
 		r := api.Row{Unit: unit.Unit{Provider: "slack", Key: key}, Label: label, Title: title, Kind: kind, Views: []string{"slack"},
-			Link: "https://chat.example/" + key, Summary: api.Summary{WaitsOn: waits, Since: now.Add(-since), Stalled: stalled},
-			Facets: map[string][]string{"waits-on": {waits}, "turn": {turn}, "situation": {string(kind)},
-				"age": {now.Add(-since).UTC().Format(time.RFC3339Nano)}}}
+			Link: "https://chat.example/" + key, Summary: api.Summary{WaitsOn: waits, Since: now.Add(-since), Stalled: stalled}, Facets: facets}
 		if channel, ok := strings.CutPrefix(label, "#"); ok {
-			r.Facets["where"] = []string{channel}
+			r.Facets[shared.Channel] = []string{channel}
 		}
 		return r
 	}
@@ -184,6 +188,24 @@ func slackGolden(t *testing.T, color bool) *Model {
 	m.navigate("slack")
 	m.SetColor(color)
 	return m
+}
+
+// slackRowFacets reads the facets a Slack row holds from the file the Slack plugin's tests check against its
+// rows, since this package may not import the plugin.
+func slackRowFacets(t *testing.T) (out struct {
+	BySituation map[string]map[string][]string `json:"by_situation"`
+	Since       string                         `json:"since"`
+	Channel     string                         `json:"channel"`
+}) {
+	t.Helper()
+	raw, err := os.ReadFile("../../../plugins/slack/testdata/row-facets.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatal(err)
+	}
+	return out
 }
 
 func renderGolden(t *testing.T, prefix string, model func(*testing.T, bool) *Model, color bool, size [2]int) {

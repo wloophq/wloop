@@ -662,7 +662,6 @@ menu = true
 id = "kind"
 group = true
 sort = "rank"
-situations = true
 rank = ["round_pending", "loop_waiting", "loop_stopped", "blocked", "to_address", "held", "loop_working", "changes", "checks", "conflicts", "reply", "reviewer_back", "review", "no_reviewer", "merge", "draft", "muted", "done"]
 menu = true
 

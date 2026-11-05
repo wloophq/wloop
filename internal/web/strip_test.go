@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 )
 
 type bundledProvider = readmodel.Provider
@@ -211,5 +212,24 @@ func TestATaskViewsMenusNameEachFieldApart(t *testing.T) {
 			t.Errorf("%s and %s both read %q", id, f[0], f[1])
 		}
 		seen[f[1]] = f[0]
+	}
+}
+
+// TestALoopRowsTooltipNamesNobodyTheLoopWaitsOn renders the GitHub rows the loop drives, which the overlay
+// sets waiting on the viewer: the tooltip says the loop holds them and names no one.
+func TestALoopRowsTooltipNamesNobodyTheLoopWaitsOn(t *testing.T) {
+	now := time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC)
+	working := lensRows()[4]
+	waiting := lensRows()[4]
+	waiting["kind"], waiting["waiting_on"] = overlay.KindLoopWaiting, overlay.WaitsOnMe
+	working["kind"], working["waiting_on"] = overlay.KindLoopWorking, overlay.WaitsOnMe
+	var got struct{ Working, Waiting stripRow }
+	rowViewRun(t, bundledCatalog(t), stripJS+`state.rows = [input.working, input.waiting];
+process.stdout.write(JSON.stringify({ Working: rowStripShown(input.working, "mine"), Waiting: rowStripShown(input.waiting, "mine") }));`,
+		map[string]any{"working": wireRow("me", now, working), "waiting": wireRow("me", now, waiting), "now": now.UnixMilli()}, &got)
+	for name, r := range map[string]stripRow{"working": got.Working, "waiting": got.Waiting} {
+		if r.Value != "loop" || !strings.HasPrefix(r.Tip, "In loop: ") || strings.Contains(r.Tip, "(") {
+			t.Errorf("the loop %s row's strip %q and tooltip %q, want loop and \"In loop: <its situation>\"", name, r.Value, r.Tip)
+		}
 	}
 }

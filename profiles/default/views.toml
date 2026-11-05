@@ -117,14 +117,15 @@ merge  = "rows-first"
 show   = "who"
 
 [facets.turn]
-fact   = "task.turn"
-label  = "Whose turn"
-group  = true
-sort   = "rank"
-rank   = ["me", "others", "nobody"]
-values = { me = "Your turn", others = "Others' turn", nobody = "Nobody's turn" }
-strip  = true
-colors = { me = "me", others = "author", nobody = "nobody" }
+fact    = "task.turn"
+turn_of = "waits-on"
+label   = "Whose turn"
+group   = true
+sort    = "rank"
+rank    = ["me", "others", "nobody"]
+values  = { me = "Your turn", others = "Others' turn", nobody = "Nobody's turn" }
+strip   = true
+colors  = { me = "me", others = "author", nobody = "nobody" }
 
 [facets.asked-by]
 fact  = "task.asker_names"

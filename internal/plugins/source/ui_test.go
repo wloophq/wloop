@@ -69,18 +69,21 @@ func TestAPluginsEventKindsAreWordedByItsLayer(t *testing.T) {
 	}
 }
 
-func TestAFacetOfTheRowsSituationsReadsAsTheSituationsDo(t *testing.T) {
+func TestAFacetRankedBySituationsReadsAsTheSituationsDo(t *testing.T) {
 	for _, c := range []struct{ plugin, facet string }{{"github", "kind"}, {"slack", "situation"}} {
 		cat := bundledCatalog(t, c.plugin)
-		var labels map[string]string
+		labels := map[string]map[string]string{}
 		for _, f := range cat.Facets() {
-			if f.ID == c.facet {
-				labels = f.Labels
-			}
+			labels[f.ID] = f.Labels
 		}
 		for _, s := range cat.Situations() {
-			if labels[string(s.Kind)] != s.Label {
-				t.Errorf("%s's %s reads %s as %q, its situation as %q", c.plugin, c.facet, s.Kind, labels[string(s.Kind)], s.Label)
+			if got := labels[c.facet][string(s.Kind)]; got != s.Label {
+				t.Errorf("%s's %s reads %s as %q, its situation as %q", c.plugin, c.facet, s.Kind, got, s.Label)
+			}
+			for id, ls := range labels {
+				if id != c.facet && ls[string(s.Kind)] == s.Label && s.Label != string(s.Kind) {
+					t.Errorf("%s's %s, not ranked by situations, reads %s as its situation", c.plugin, id, s.Kind)
+				}
 			}
 		}
 	}

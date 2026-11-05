@@ -58,6 +58,8 @@ type FacetDef struct {
 	Values       map[string]string
 	Buckets      []FacetBucket
 	Merge, Units string
+	// TurnOf names the facet whose merged values give this facet's value, their turn (builtin.TurnsOf).
+	TurnOf string
 
 	from map[string]*sheet
 }
@@ -186,6 +188,7 @@ type mFacet struct {
 	Buckets     map[string]mBucket `toml:"buckets"`
 	Merge       *string            `toml:"merge"`
 	Units       *string            `toml:"units"`
+	TurnOf      *string            `toml:"turn_of"`
 }
 
 type mBucket struct {
@@ -382,6 +385,10 @@ func (l *viewsLoad) mergeFacets(s *sheet, facets map[string]mFacet) {
 					set(o.key)
 				}
 			}
+		}
+		if m.TurnOf != nil {
+			f.TurnOf = strings.TrimSpace(*m.TurnOf)
+			set("turn_of")
 		}
 		if m.Group != nil {
 			f.Group = *m.Group
@@ -636,6 +643,17 @@ func (d *ViewsDef) checkFacets(tasks TasksDef, records RecordsDef) Problems {
 		}
 		return true
 	})
+	ids := make([]string, len(d.Facets))
+	for i, f := range d.Facets {
+		ids[i] = f.ID
+	}
+	for i := range d.Facets {
+		f := &d.Facets[i]
+		if f.TurnOf != "" && (f.TurnOf == f.ID || !slices.Contains(ids, f.TurnOf)) {
+			out = append(out, f.Problem("turn_of", "%s names no other facet of %s%s", f.TurnOf, ViewsFile, expr.DidYouMean(f.TurnOf, ids)))
+			f.TurnOf = ""
+		}
+	}
 	for i := range d.Views {
 		v := &d.Views[i]
 		if v.Over != task.OverTasks || v.Group == "" || slices.ContainsFunc(d.Facets, func(f FacetDef) bool { return f.Fact == v.Group }) {

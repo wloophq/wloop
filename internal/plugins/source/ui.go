@@ -64,7 +64,7 @@ func (c Catalog) Facets() []api.FacetSpec {
 		if w.LabelPrefix != nil {
 			spec.LabelPrefix = *w.LabelPrefix
 		}
-		if f.Situations {
+		if c.rankedBySituations(f.Rank) {
 			spec.Labels = maps.Clone(t.Situations)
 		}
 		if len(w.Values) > 0 {
@@ -80,6 +80,20 @@ func (c Catalog) Facets() []api.FacetSpec {
 		out = append(out, spec)
 	}
 	return out
+}
+
+// rankedBySituations says whether a facet's rank lists only the plugin's situation kinds: its values are
+// situations, and read as the situations do unless its own values word them.
+func (c Catalog) rankedBySituations(rank []string) bool {
+	if len(rank) == 0 {
+		return false
+	}
+	for _, v := range rank {
+		if !slices.ContainsFunc(c.Source.Situations, func(s manifest.Situation) bool { return s.Name == v }) {
+			return false
+		}
+	}
+	return true
 }
 
 func (c Catalog) Situations() []api.SituationSpec {

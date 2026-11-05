@@ -613,3 +613,23 @@ func TestAStripFacetColorsEachValueWithAStripHue(t *testing.T) {
 		t.Errorf("an unknown hue in ui.toml, once: %v", problems)
 	}
 }
+
+func TestAFacetTakesTheTurnOfAnotherFacetsValues(t *testing.T) {
+	views, problems := loadFacets(t, "")
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	if f, _ := facetOf(views, "turn"); f.TurnOf != "waits-on" {
+		t.Errorf("the bundled turn is the turn of %q", f.TurnOf)
+	}
+	views, problems = loadFacets(t, "[facets.turn]\nturn_of = \"nobody-here\"\n")
+	if len(problems) != 1 || !strings.Contains(problems.Error(), "facets.turn.turn_of") {
+		t.Fatalf("turn_of naming no facet: %v", problems)
+	}
+	if f, _ := facetOf(views, "turn"); f.TurnOf != "" {
+		t.Errorf("a bad turn_of is kept: %q", f.TurnOf)
+	}
+	if _, problems := loadFacets(t, "[facets.turn]\nturn_of = \"turn\"\n"); len(problems) != 1 {
+		t.Errorf("turn_of naming itself: %v", problems)
+	}
+}

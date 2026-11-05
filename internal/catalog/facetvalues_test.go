@@ -57,3 +57,24 @@ func TestMergeFacetsJoinsTheLayersAsEachFacetSays(t *testing.T) {
 		t.Fatalf("facets of nothing %v", got)
 	}
 }
+
+func TestATurnFacetFollowsTheMergedValuesItTakesTheTurnOf(t *testing.T) {
+	t.Parallel()
+	defs := []intentload.FacetDef{{ID: "waits-on", Merge: "rows-first", Units: "all"}, {ID: "turn", Merge: "union", Units: "all", TurnOf: "waits-on"}}
+	for _, c := range []struct {
+		name string
+		own  map[string][]string
+		rows []map[string][]string
+		want string
+	}{
+		{"a row's person wins over the task's own owner", map[string][]string{"waits-on": {"me"}, "turn": {"me"}}, []map[string][]string{{"waits-on": {"ana"}, "turn": {"others"}}}, "others"},
+		{"a row waiting on the viewer", map[string][]string{"waits-on": {"ana"}, "turn": {"others"}}, []map[string][]string{{"waits-on": {"ana", "me"}}}, "me"},
+		{"no row, the task's own owner", map[string][]string{"waits-on": {"me"}, "turn": {"me"}}, nil, "me"},
+		{"nobody", map[string][]string{"turn": {"nobody"}}, []map[string][]string{{"turn": {"others"}}}, "nobody"},
+	} {
+		got := MergeFacets(defs, c.own, c.rows)
+		if !reflect.DeepEqual(got["turn"], []string{c.want}) {
+			t.Errorf("%s: turn %v, want %s", c.name, got["turn"], c.want)
+		}
+	}
+}
