@@ -309,13 +309,12 @@ func TestFacetsDoNotDependOnTheClock(t *testing.T) {
 
 func TestProviderFacetsStayWithTheirRows(t *testing.T) {
 	c := readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))}), fakesource.New().Rows())
-	i := slices.IndexFunc(c.Facets, func(f api.FacetSpec) bool { return f.ID == fakesource.FacetWhere && f.Provider == "thread" })
-	if i < 0 {
-		t.Fatalf("where facet of the thread plugin: %+v", c.Facets)
+	if n := len(slices.DeleteFunc(slices.Clone(c.Facets), func(f api.FacetSpec) bool { return f.ID != fakesource.FacetWhere || f.Provider != "" })); n != 1 {
+		t.Fatalf("where facet both plugins share, once: %+v", c.Facets)
 	}
 	for _, r := range deriveCases(t, fixtureNow) {
 		for id := range r.Facets {
-			if j := slices.IndexFunc(c.Facets, func(f api.FacetSpec) bool { return f.ID == id && f.Provider == "github" }); j < 0 {
+			if j := slices.IndexFunc(c.Facets, func(f api.FacetSpec) bool { return f.ID == id && (f.Provider == "github" || f.Provider == "") }); j < 0 {
 				t.Errorf("%s: facet %s is not GitHub's", r.Label, id)
 			}
 		}

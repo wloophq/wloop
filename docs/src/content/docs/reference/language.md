@@ -264,6 +264,26 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ## Views and the review (`views.toml`)
 
 - `empty` (template): What a view without its own empty shows when it lists nothing, over the view's label as `{{.label}}`. Required in the bundled profile; a user layer may replace it.
+- `default_sort` (string): What clients call a view's own order in the sort menu, such as "View order". Required in the bundled profile; a user layer may replace it.
+- `facets` (table by name): The task facets, by id: the fields every client filters, groups and sorts tasks by, in the order the file declares them, a user layer's new ones after the bundled. A plugin's row facet of the same id must agree on group, sort, match and buckets.
+- `facets.<name>` (table): A facet, by its id. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
+- `facets.<name>.fact` (fact): The fact the facet reads: a fact of a task (task.*, task.prop.*), or a field of a record kind, written &lt;kind&gt;.&lt;field&gt; (brief.risk). Required.
+- `facets.<name>.label` (string): The name people read. Required.
+- `facets.<name>.group` (bool, default `false`): Whether a list can group by the facet.
+- `facets.<name>.sort` (one of `rank`, `text`, `time`): How the facet's values order: by rank, as text, or as instants (time). Absent, as text.
+- `facets.<name>.rank` (list of strings): The facet's values in their order, first first.
+- `facets.<name>.values` (table by name): The text people read for a value, by value.
+- `facets.<name>.values.<name>` (string): The text of one value.
+- `facets.<name>.empty` (string): What a group of tasks with no value shows.
+- `facets.<name>.match` (one of `exact`, `suffix`, `prefix`, `team`, default `exact`): How a filter's text matches a value: the whole value, its last segment, its first, or a person's team.
+- `facets.<name>.menu` (bool, default `true`): Whether the facet is offered in the filter menu.
+- `facets.<name>.strip` (bool, default `false`): Whether each row's strip is colored by the facet's first value, its rank the strip's legend.
+- `facets.<name>.buckets` (table by name): For a facet that sorts by time: the buckets its instants fall in, by id, in the order the file declares them; the first whose within covers the time since the instant wins, and one with no within takes the rest.
+- `facets.<name>.buckets.<name>` (table): A bucket, by its id.
+- `facets.<name>.buckets.<name>.within` (duration): How long ago an instant may be and still fall in the bucket.
+- `facets.<name>.buckets.<name>.label` (string): The text people read; the id when absent.
+- `facets.<name>.merge` (one of `union`, `rows-first`, default `union`): How a task's value joins its units' rows' values: union adds it to them, rows-first uses it only when no row has a value.
+- `facets.<name>.units` (one of `all`, `primary`, default `all`): Which of a task's units contribute rows' values: all of them, or the primary unit alone.
 - `views` (table): The lists of tasks, by view.
 - `views.<name>` (table): A view, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `views.<name>.label` (string): The name people read in the list of views. Required.

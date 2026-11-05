@@ -997,3 +997,57 @@ func TestUnitTasksListChildrenInTheirSiblingOrder(t *testing.T) {
 		t.Fatalf("%d: tasks %v, want t-first then t-second", code, taskIDs(got))
 	}
 }
+
+func TestTheViewsCatalogServesFacetsAndAVersion(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	var cat api.ViewsCatalog
+	if code := get(t, r.s, api.ViewsPath, &cat); code != 200 {
+		t.Fatalf("%d", code)
+	}
+	if len(cat.Facets) != len(bundledLoaded().Views.Facets) || cat.Version == "" {
+		t.Fatalf("facets %d, version %q", len(cat.Facets), cat.Version)
+	}
+	if i := slices.IndexFunc(cat.Facets, func(f api.FacetSpec) bool { return f.ID == "waits-on" }); i < 0 || cat.Facets[i].Match != "team" || cat.Facets[i].Provider != "" {
+		t.Errorf("waits-on: %+v", cat.Facets)
+	}
+	if cat.DefaultSort != "View order" {
+		t.Errorf("default sort %q", cat.DefaultSort)
+	}
+
+	l := *bundledLoaded()
+	l.Views.Facets = slices.Clone(l.Views.Facets)
+	l.Views.Facets[0].Label = "Origin"
+	other := newTasksRig(t, func(d *Deps) { d.Intents = func() *intentload.Loaded { return &l } })
+	var changed api.ViewsCatalog
+	get(t, other.s, api.ViewsPath, &changed)
+	if changed.Version == "" || changed.Version == cat.Version || changed.Facets[0].Label != "Origin" {
+		t.Errorf("version %q after a label change, was %q", changed.Version, cat.Version)
+	}
+	var again api.ViewsCatalog
+	get(t, r.s, api.ViewsPath, &again)
+	if again.Version != cat.Version {
+		t.Errorf("version %q then %q for the same profile", cat.Version, again.Version)
+	}
+}
+
+func TestAFacetThatDisagreesWithAPluginIsAHealthWarning(t *testing.T) {
+	t.Parallel()
+	l := *bundledLoaded()
+	l.Views.Facets = slices.Clone(l.Views.Facets)
+	i := slices.IndexFunc(l.Views.Facets, func(f intentload.FacetDef) bool { return f.ID == "risk" })
+	l.Views.Facets[i].Sort = "text"
+	r := newTasksRig(t, func(d *Deps) { d.Intents = func() *intentload.Loaded { return &l } })
+	var h api.Health
+	if code := get(t, r.s, "/api/health", &h); code != 200 {
+		t.Fatalf("%d", code)
+	}
+	if !slices.ContainsFunc(h.Warnings, func(w string) bool { return strings.HasPrefix(w, "profile: ") && strings.Contains(w, "facets.risk") }) {
+		t.Fatalf("warnings %v", h.Warnings)
+	}
+	var clean api.Health
+	get(t, newTasksRig(t, nil).s, "/api/health", &clean)
+	if slices.ContainsFunc(clean.Warnings, func(w string) bool { return strings.HasPrefix(w, "profile: ") }) {
+		t.Errorf("the bundled profile warns: %v", clean.Warnings)
+	}
+}

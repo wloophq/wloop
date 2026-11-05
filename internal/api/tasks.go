@@ -64,6 +64,11 @@ type ViewsCatalog struct {
 	// States are the profile's states in their declared order; Props its task properties.
 	States []StateSpec `json:"states,omitempty"`
 	Props  []PropSpec  `json:"props,omitempty"`
+	// Facets are the profile's task facets, DefaultSort what clients call a view's own order.
+	Facets      []FacetSpec `json:"facets,omitempty"`
+	DefaultSort string      `json:"default_sort,omitempty"`
+	// Version changes whenever anything above does.
+	Version string `json:"version,omitempty"`
 }
 
 // TaskViewSpec is a view of views.toml: Summary is one line on what it lists, Empty what it shows when it lists

@@ -166,7 +166,7 @@
       "id": "waits-on",
       "label": "Waits on (person)",
       "provider": "github",
-      "group": false,
+      "group": true,
       "match": "team",
       "menu": true
     },

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -33,7 +34,7 @@ func splitLists(src string) map[string]string {
 	out := map[string]string{}
 	file := ViewsFile
 	for _, line := range strings.SplitAfter(src, "\n") {
-		if strings.HasPrefix(line, "empty =") {
+		if strings.HasPrefix(line, "empty =") || strings.HasPrefix(line, "default_sort =") {
 			out[ViewsFile] += line
 			continue
 		}
@@ -357,5 +358,105 @@ func TestAViewsKeyComesFromTheProfile(t *testing.T) {
 		if !strings.Contains(problems, want) {
 			t.Errorf("no %q in:\n%s", want, problems)
 		}
+	}
+}
+
+func loadFacets(t *testing.T, userViews string) (ViewsDef, Problems) {
+	t.Helper()
+	var layers []profile.Layer
+	if userViews != "" {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, ViewsFile), []byte(userViews), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		layers = []profile.Layer{{Name: "user", Dir: dir}}
+	}
+	bundled := os.DirFS("../../profiles/default")
+	views, tasks, problems := loadViews(layers, bundled, nil)
+	records, recordProblems := loadRecords(layers, bundled, &tasks)
+	problems = append(problems, recordProblems...)
+	return views, append(problems, views.checkFacets(tasks, records)...)
+}
+
+func facetOf(d ViewsDef, id string) (FacetDef, bool) {
+	i := slices.IndexFunc(d.Facets, func(f FacetDef) bool { return f.ID == id })
+	if i < 0 {
+		return FacetDef{}, false
+	}
+	return d.Facets[i], true
+}
+
+func TestTaskFacetsLoadFromViews(t *testing.T) {
+	views, problems := loadFacets(t, "")
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	var ids []string
+	for _, f := range views.Facets {
+		ids = append(ids, f.ID)
+	}
+	want := []string{"source", "state", "category", "waits-on", "asked-by", "placement", "moved", "gates", "signal", "prop.kind", "prop.risk", "prop.focus", "prop.priority", "type", "risk", "size", "tag"}
+	if !slices.Equal(ids, want) {
+		t.Fatalf("facets %v, want %v", ids, want)
+	}
+	if f, _ := facetOf(views, "waits-on"); f.Fact != "task.owed_by" || f.Merge != "rows-first" || f.Match != "team" || f.Units != "all" || !f.Menu {
+		t.Errorf("waits-on: %+v", f)
+	}
+	if f, _ := facetOf(views, "tag"); f.Fact != "brief.tags" || f.Match != "prefix" {
+		t.Errorf("tag: %+v", f)
+	}
+	moved, _ := facetOf(views, "moved")
+	if moved.Sort != "time" || len(moved.Buckets) != 6 || moved.Buckets[0] != (FacetBucket{ID: "1d", Label: "0-1 days", Within: 24 * time.Hour}) || moved.Buckets[5].Within != 0 {
+		t.Errorf("moved: %+v", moved)
+	}
+	if views.DefaultSort == "" {
+		t.Error("no default_sort")
+	}
+}
+
+func TestAFacetNamingNoFactIsAProblem(t *testing.T) {
+	views, problems := loadFacets(t, "[facets.mine]\nfact = \"task.nope\"\nlabel = \"Mine\"\n\n[facets.owed]\nfact = \"task.owed_bi\"\nlabel = \"Owed\"\n\n[facets.when]\nfact = \"task.state\"\nlabel = \"When\"\nsort = \"time\"\n\n[facets.field]\nfact = \"brief.nope\"\nlabel = \"Field\"\n")
+	got := problems.Error()
+	for _, want := range []string{"facets.mine.fact", "task.nope", "facets.owed.fact: task.owed_bi", `did you mean "task.owed_by"?`, "facets.when.sort", "facets.field.fact"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("problems lack %q:\n%s", want, got)
+		}
+	}
+	for _, id := range []string{"mine", "owed", "when", "field"} {
+		if _, ok := facetOf(views, id); ok {
+			t.Errorf("facet %s with a problem is served", id)
+		}
+	}
+}
+
+func TestAUserLayerReplacesOnlyTheFacetKeysItSets(t *testing.T) {
+	views, problems := loadFacets(t, "[facets.risk]\nlabel = \"Danger\"\n\n[facets.placement.values]\n\"acme/api\" = \"API\"\n")
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	risk, _ := facetOf(views, "risk")
+	if risk.Label != "Danger" || risk.Fact != "brief.risk" || risk.Sort != "rank" || !slices.Equal(risk.Rank, []string{"high", "medium", "low"}) {
+		t.Errorf("risk: %+v", risk)
+	}
+	if p, _ := facetOf(views, "placement"); p.Values["acme/api"] != "API" {
+		t.Errorf("placement: %+v", p)
+	}
+	_, problems = loadFacets(t, "[facets.fresh]\nlabel = \"Fresh\"\n")
+	if !strings.Contains(problems.Error(), "facets.fresh.fact: is required") {
+		t.Errorf("a new facet without a fact: %s", problems.Error())
+	}
+}
+
+func TestAViewGroupNeedsAFacet(t *testing.T) {
+	views, problems := loadFacets(t, "[views.waiting]\ngroup = \"task.since_movement\"\n")
+	if got := problems.Error(); !strings.Contains(got, "views.waiting.group") || !strings.Contains(got, "no facet") {
+		t.Fatalf("problems: %s", got)
+	}
+	if v, _ := views.View("waiting"); v.Group != "" {
+		t.Errorf("group %q kept", v.Group)
+	}
+	views, problems = loadFacets(t, "")
+	if v, _ := views.View("waiting"); len(problems) > 0 || v.Group != "task.owed_by" {
+		t.Errorf("bundled group %q, problems %s", v.Group, problems.Error())
 	}
 }

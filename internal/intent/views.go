@@ -9,7 +9,9 @@ import (
 	"slices"
 	"strings"
 	"text/template"
+	"time"
 
+	"github.com/wloophq/wloop/internal/domain/duration"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -32,6 +34,42 @@ type ViewsDef struct {
 	Badge []string
 	// Empty is what a view without its own empty shows when it lists nothing.
 	Empty *template.Template
+	// DefaultSort is what clients call a view's own order.
+	DefaultSort string
+	// Facets are the task facets in their declared order.
+	Facets []FacetDef
+}
+
+// FacetDef is a task facet: the fact (or the "<record>.<field>" of a
+// record kind) it reads, and the mechanics every client filters, groups and
+// sorts it by. Merge is "union" or "rows-first", Units "all" or "primary".
+type FacetDef struct {
+	ID, Fact, Label, Empty, Sort, Match string
+	Group, Menu, Strip                  bool
+	Rank                                []string
+	Values                              map[string]string
+	Buckets                             []FacetBucket
+	Merge, Units                        string
+
+	from map[string]*sheet
+}
+
+// FacetBucket is a bucket of a facet that sorts by time; a Within of 0 takes the rest.
+type FacetBucket struct {
+	ID, Label string
+	Within    time.Duration
+}
+
+// Problem is a problem at key of the facet's declaration, in the file of the layer that set it.
+func (f FacetDef) Problem(key, format string, args ...any) Problem {
+	s := f.from[key]
+	if s == nil {
+		s = f.from["fact"]
+	}
+	if s == nil {
+		return Problem{File: ViewsFile, Field: "facets." + f.ID + "." + key, Msg: fmt.Sprintf(format, args...)}
+	}
+	return s.problem("facets."+f.ID+"."+key, format, args...)
 }
 
 // ViewDef is a view: Summary, one line on what it lists; what it lists (Over,
@@ -84,10 +122,12 @@ func (d ViewsDef) IDs() []string {
 func (d ViewsDef) Badged(id string) bool { return slices.Contains(d.Badge, id) }
 
 type mViews struct {
-	Empty  *string                `toml:"empty"`
-	Views  map[string]mView       `toml:"views"`
-	Review map[string]mReviewStep `toml:"review"`
-	Badge  *mBadge                `toml:"badge"`
+	Empty       *string                `toml:"empty"`
+	DefaultSort *string                `toml:"default_sort"`
+	Facets      map[string]mFacet      `toml:"facets"`
+	Views       map[string]mView       `toml:"views"`
+	Review      map[string]mReviewStep `toml:"review"`
+	Badge       *mBadge                `toml:"badge"`
 }
 
 type mView struct {
@@ -103,6 +143,27 @@ type mView struct {
 	RemoveClean  *bool   `toml:"remove_clean"`
 }
 
+type mFacet struct {
+	Fact    *string            `toml:"fact"`
+	Label   *string            `toml:"label"`
+	Group   *bool              `toml:"group"`
+	Sort    *string            `toml:"sort"`
+	Rank    []string           `toml:"rank"`
+	Values  map[string]string  `toml:"values"`
+	Empty   *string            `toml:"empty"`
+	Match   *string            `toml:"match"`
+	Menu    *bool              `toml:"menu"`
+	Strip   *bool              `toml:"strip"`
+	Buckets map[string]mBucket `toml:"buckets"`
+	Merge   *string            `toml:"merge"`
+	Units   *string            `toml:"units"`
+}
+
+type mBucket struct {
+	Within *string `toml:"within"`
+	Label  *string `toml:"label"`
+}
+
 type mReviewStep struct {
 	Label *string `toml:"label"`
 }
@@ -113,8 +174,9 @@ type mBadge struct {
 
 // BundledViews is the views of the bundled profile alone.
 func BundledViews(bundled fs.FS) (ViewsDef, Problems) {
-	out, _, problems := loadViews(nil, bundled, nil)
-	return out, problems
+	out, tasks, problems := loadViews(nil, bundled, nil)
+	records, recordProblems := loadRecords(nil, bundled, &tasks)
+	return out, slices.Concat(problems, recordProblems, out.checkFacets(tasks, records))
 }
 
 // viewsLoad is views.toml on its way to a ViewsDef over the layers; the
@@ -211,6 +273,8 @@ func (l *viewsLoad) merge(file string, src []byte) Problems {
 			l.def.Empty = t
 		}
 	}
+	text(s, "default_sort", m.DefaultSort, &l.def.DefaultSort)
+	l.mergeFacets(s, m.Facets)
 	l.mergeViews(s, m.Views)
 	l.mergeReview(s, m.Review)
 	if m.Badge != nil && m.Badge.Views != nil {
@@ -223,6 +287,88 @@ func (l *viewsLoad) merge(file string, src []byte) Problems {
 	}
 	s.addGrammar(grammar(builtin.SurfaceViews, src))
 	return s.problems
+}
+
+func (l *viewsLoad) mergeFacets(s *sheet, facets map[string]mFacet) {
+	for _, id := range declared(s, "facets", facets) {
+		path, m := "facets."+id, facets[id]
+		i := slices.IndexFunc(l.def.Facets, func(f FacetDef) bool { return f.ID == id })
+		f := FacetDef{ID: id, Menu: true, Merge: "union", Units: "all", from: map[string]*sheet{}}
+		if i >= 0 {
+			f = l.def.Facets[i]
+			f.from = maps.Clone(f.from)
+		}
+		n := len(s.problems)
+		set := func(key string) { f.from[key] = s }
+		switch {
+		case m.Fact != nil:
+			text(s, path+".fact", m.Fact, &f.Fact)
+			set("fact")
+		case i < 0:
+			s.add(path+".fact", "is required")
+		}
+		switch {
+		case m.Label != nil:
+			text(s, path+".label", m.Label, &f.Label)
+		case i < 0:
+			s.add(path+".label", "is required")
+		}
+		if m.Empty != nil {
+			f.Empty = strings.TrimSpace(*m.Empty)
+		}
+		for _, o := range []struct {
+			key string
+			v   *string
+			dst *string
+		}{{"sort", m.Sort, &f.Sort}, {"match", m.Match, &f.Match}, {"merge", m.Merge, &f.Merge}, {"units", m.Units, &f.Units}} {
+			if o.v != nil {
+				s.oneOf(path+"."+o.key, *o.v, builtin.ValuesOf(builtin.SurfaceViews, "facets.*."+o.key))
+				*o.dst = *o.v
+				set(o.key)
+			}
+		}
+		if m.Group != nil {
+			f.Group = *m.Group
+			set("group")
+		}
+		if m.Menu != nil {
+			f.Menu = *m.Menu
+		}
+		if m.Strip != nil {
+			f.Strip = *m.Strip
+		}
+		if m.Rank != nil {
+			f.Rank = slices.Clone(m.Rank)
+		}
+		if m.Values != nil {
+			f.Values = maps.Clone(m.Values)
+		}
+		if m.Buckets != nil {
+			f.Buckets = nil
+			for _, b := range declared(s, path+".buckets", m.Buckets) {
+				bucket := FacetBucket{ID: b, Label: b}
+				mb := m.Buckets[b]
+				text(s, path+".buckets."+b+".label", mb.Label, &bucket.Label)
+				if mb.Within != nil {
+					d, err := duration.Parse(*mb.Within)
+					if err != nil {
+						s.add(path+".buckets."+b+".within", "%s", err)
+					}
+					bucket.Within = d
+				}
+				f.Buckets = append(f.Buckets, bucket)
+			}
+			set("buckets")
+		}
+		f.from["id"] = s
+		switch {
+		case len(s.problems) > n && i < 0:
+		case i < 0:
+			l.def.Facets = append(l.def.Facets, f)
+		default:
+			l.def.Facets[i] = f
+		}
+	}
 }
 
 func (l *viewsLoad) mergeViews(s *sheet, views map[string]mView) {
@@ -357,7 +503,7 @@ func (l *viewsLoad) check(tasks TasksDef) Problems {
 		v := &l.def.Views[i]
 		path := "views." + v.ID
 		env := ViewEnv(v.Over, tasks)
-		facts := slices.Sorted(maps.Keys(env))
+		facts := env.Names()
 		v.When = nil
 		if r, ok := l.refs[path+".when"]; ok {
 			pred, err := expr.CompileWorkflow(r.name, env)
@@ -400,6 +546,49 @@ func (l *viewsLoad) check(tasks TasksDef) Problems {
 	l.def.Review = slices.DeleteFunc(l.def.Review, func(st ReviewStepDef) bool { return !slices.Contains(ids, st.View) })
 	l.def.Badge = slices.DeleteFunc(l.def.Badge, func(id string) bool { return !slices.Contains(ids, id) })
 	return append(out, l.sharedKeys()...)
+}
+
+// checkFacets leaves out the facets that read no fact of a task or field of a
+// record kind, or sort by time what is no instant, and clears the group of
+// a view that no remaining facet reads.
+func (d *ViewsDef) checkFacets(tasks TasksDef, records RecordsDef) Problems {
+	var out Problems
+	env := ViewEnv(task.OverTasks, tasks)
+	fields := recordFields(records)
+	names := append(env.Names(), slices.Sorted(maps.Keys(fields))...)
+	d.Facets = slices.DeleteFunc(d.Facets, func(f FacetDef) bool {
+		typ, ok := env[f.Fact]
+		_, isField := fields[f.Fact]
+		switch {
+		case !ok && !isField:
+			out = append(out, f.Problem("fact", "%s names no fact of a task nor field of a record kind%s", f.Fact, expr.DidYouMean(f.Fact, names)))
+		case f.Sort == "time" && (!ok || typ != expr.Time):
+			out = append(out, f.Problem("sort", "time sorts instants, and %s is not one", f.Fact))
+		default:
+			return false
+		}
+		return true
+	})
+	for i := range d.Views {
+		v := &d.Views[i]
+		if v.Over != task.OverTasks || v.Group == "" || slices.ContainsFunc(d.Facets, func(f FacetDef) bool { return f.Fact == v.Group }) {
+			continue
+		}
+		out = append(out, Problem{File: ViewsFile, Field: "views." + v.ID + ".group", Msg: v.Group + " is read by no facet of " + ViewsFile})
+		v.Group = ""
+	}
+	return out
+}
+
+// recordFields are the "<kind>.<field>" names of the record kinds' schemas.
+func recordFields(records RecordsDef) map[string]bool {
+	out := map[string]bool{}
+	for _, k := range records.Kinds {
+		for _, p := range k.Schema.Properties() {
+			out[k.Name+"."+p.Name] = true
+		}
+	}
+	return out
 }
 
 // sharedKeys are the views whose key another view has too; the view keeps none.

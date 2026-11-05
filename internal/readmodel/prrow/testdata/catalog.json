@@ -1,5 +1,5 @@
 {
-  "version": "de730f202fd3",
+  "version": "f0d52a828201",
   "views": [
     {
       "id": "mine",
@@ -167,7 +167,7 @@
       "id": "waits-on",
       "label": "Waits on (person)",
       "provider": "github",
-      "group": false,
+      "group": true,
       "match": "team",
       "menu": true
     },

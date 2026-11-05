@@ -1,0 +1,82 @@
+package catalog
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/domain/unit"
+	intentload "github.com/wloophq/wloop/internal/intent"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/profile"
+	"github.com/wloophq/wloop/internal/turn"
+)
+
+func loadWithViews(t *testing.T, views string) *intentload.Loaded {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, intentload.ViewsFile), []byte(views), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	base, err := turn.Base()
+	if err != nil {
+		t.Fatal(err)
+	}
+	l, problems := intentload.Load(append(profile.BundledChain(), profile.Layer{Name: "user", Source: dir, Dir: dir}), turn.BundledFS(), base, turn.CheckTemplate)
+	if len(problems) > 0 {
+		t.Fatal(problems)
+	}
+	return l
+}
+
+func githubFacets() []api.FacetSpec { return psource.BundledCatalog(string(unit.GitHub)).Facets() }
+
+func TestTheBundledTaskFacetsAgreeWithTheGitHubPluginsFacets(t *testing.T) {
+	plugin := append(githubFacets(), psource.BundledCatalog("slack").Facets()...)
+	if p := CheckFacets(bundled(t).Views.Facets, plugin); len(p) > 0 {
+		t.Fatal(p.Error())
+	}
+}
+
+func TestAFacetDeclaredTwiceWithOtherMechanicsIsAProblem(t *testing.T) {
+	l := loadWithViews(t, "[facets.risk]\nsort = \"text\"\n")
+	got := CheckFacets(l.Views.Facets, githubFacets())
+	if len(got) != 1 {
+		t.Fatalf("problems: %s", got.Error())
+	}
+	p := got[0]
+	if !strings.HasSuffix(p.File, intentload.ViewsFile) || p.Line == 0 || !strings.Contains(p.Msg, "github") || !strings.Contains(p.Msg, "risk") {
+		t.Errorf("problem %+v", p)
+	}
+}
+
+func TestTwoPluginsMustAgreeOnAFacetToo(t *testing.T) {
+	plugin := []api.FacetSpec{
+		{ID: "where", Provider: "github", Group: true, Sort: "text"},
+		{ID: "where", Provider: "slack", Group: true, Sort: "rank"},
+	}
+	got := CheckFacets(nil, plugin)
+	if len(got) != 1 || !strings.Contains(got[0].Msg, "github") || !strings.Contains(got[0].Msg, "slack") {
+		t.Fatalf("problems: %s", got.Error())
+	}
+}
+
+func TestTaskFacetsServeTheirMechanics(t *testing.T) {
+	specs := TaskFacets(bundled(t).Views.Facets)
+	byID := map[string]api.FacetSpec{}
+	for _, f := range specs {
+		byID[f.ID] = f
+	}
+	moved := byID["moved"]
+	if moved.Provider != "" || moved.Sort != "time" || len(moved.Buckets) != 6 || moved.Buckets[0] != (api.Bucket{ID: "1d", Label: "0-1 days", Within: "24h"}) || moved.Buckets[5].Within != "" {
+		t.Errorf("moved: %+v", moved)
+	}
+	if w := byID["waits-on"]; w.Match != "team" || !w.Menu || w.Label == "" {
+		t.Errorf("waits-on: %+v", w)
+	}
+	if s := byID["size"]; s.Labels["xl"] != "XL" || s.Rank[0] != "xs" {
+		t.Errorf("size: %+v", s)
+	}
+}

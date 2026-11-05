@@ -654,6 +654,7 @@ strip = true
 
 [[source.ui.facets]]
 id = "waits-on"
+group = true
 match = "team"
 menu = true
 

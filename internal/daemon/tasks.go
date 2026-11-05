@@ -135,6 +135,8 @@ func (s *Server) handleViews(w http.ResponseWriter, r *http.Request) {
 		cat.Verbs = append(cat.Verbs, api.VerbSpec{Verb: v, Handler: l.Tasks.Handler(v), Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
 			Input: cmp.Or(t.Input, b.Input), Send: s.replySend(v), Key: verbKey(task.Verb(v)), From: slices.Clone(t.From), To: t.To})
 	}
+	cat.Facets, cat.DefaultSort = catalog.TaskFacets(l.Views.Facets), l.Views.DefaultSort
+	cat.Version = api.VersionOf(cat)
 	writeJSON(w, cat)
 }
 
@@ -1219,6 +1221,11 @@ func (s *Server) heldProblems(l *intentload.Loaded) intentload.Problems {
 		return nil
 	}
 	return l.Tasks.HeldProblems(*held)
+}
+
+// facetProblems are the facets of the profile and of the plugins that disagree on how to group, sort, match or bucket.
+func (s *Server) facetProblems(l *intentload.Loaded) intentload.Problems {
+	return catalog.CheckFacets(l.Views.Facets, s.readModel().Catalog().Facets)
 }
 
 // feedTasks publishes a change with the counters after each burst of task and draft notes, naming the units

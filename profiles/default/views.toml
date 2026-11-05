@@ -7,6 +7,160 @@
 
 empty = "Nothing in {{.label}} right now."
 
+# What the sort menu calls a view's own order.
+default_sort = "View order"
+
+# The task facets: the fields every client filters, groups and sorts tasks
+# by. A facet reads a fact of the task (task.*), or a field of a record kind
+# (brief.*). A plugin's row facet of the same id must agree on group, sort,
+# match and buckets; where rows and the task both have a value, merge says
+# which wins.
+[facets.source]
+fact  = "task.unit_providers"
+label = "Source"
+group = true
+sort  = "text"
+
+[facets.state]
+fact  = "task.state"
+label = "State"
+group = true
+sort  = "text"
+
+[facets.category]
+fact  = "task.category"
+label = "Category"
+group = true
+sort  = "rank"
+rank  = ["inbox", "ready", "active", "waiting", "deferred", "done", "dropped"]
+
+[facets.waits-on]
+fact  = "task.owed_by"
+label = "Waits on (person)"
+group = true
+match = "team"
+merge = "rows-first"
+
+[facets.asked-by]
+fact  = "task.askers"
+label = "Asked by"
+group = true
+sort  = "text"
+
+[facets.placement]
+fact  = "task.placement"
+label = "Placement"
+group = true
+sort  = "text"
+match = "suffix"
+empty = "no placement"
+
+[facets.moved]
+fact  = "task.moved_at"
+label = "Moved"
+group = true
+sort  = "time"
+empty = "never moved"
+
+[facets.moved.buckets.1d]
+within = "24h"
+label  = "0-1 days"
+
+[facets.moved.buckets.3d]
+within = "72h"
+label  = "1-3 days"
+
+[facets.moved.buckets.7d]
+within = "168h"
+label  = "3-7 days"
+
+[facets.moved.buckets.2w]
+within = "336h"
+label  = "1-2 weeks"
+
+[facets.moved.buckets.4w]
+within = "672h"
+label  = "2-4 weeks"
+
+[facets.moved.buckets.older]
+label = "over 4 weeks"
+
+[facets.gates]
+fact  = "task.gates_open"
+label = "Open gates"
+group = true
+sort  = "text"
+
+[facets.signal]
+fact  = "task.link_signals"
+label = "Signals"
+
+[facets."prop.kind"]
+fact  = "task.prop.kind"
+label = "Kind"
+group = true
+sort  = "text"
+
+[facets."prop.risk"]
+fact  = "task.prop.risk"
+label = "Task risk"
+group = true
+sort  = "rank"
+rank  = ["high", "medium", "low"]
+
+[facets."prop.focus"]
+fact  = "task.prop.focus"
+label = "Focus"
+group = true
+sort  = "rank"
+rank  = ["on", "off"]
+
+[facets."prop.priority"]
+fact  = "task.prop.priority"
+label = "Priority"
+group = true
+sort  = "rank"
+rank  = ["high", "normal", "low"]
+
+[facets.type]
+fact  = "brief.kind"
+label = "Type"
+group = true
+sort  = "text"
+empty = "no brief"
+merge = "rows-first"
+
+[facets.risk]
+fact  = "brief.risk"
+label = "Risk"
+group = true
+sort  = "rank"
+rank  = ["high", "medium", "low"]
+empty = "no brief"
+merge = "rows-first"
+
+[facets.size]
+fact  = "brief.size"
+label = "Size"
+group = true
+sort  = "rank"
+rank  = ["xs", "s", "m", "l", "xl"]
+empty = "no brief"
+merge = "rows-first"
+
+[facets.size.values]
+xs = "XS"
+s  = "S"
+m  = "M"
+l  = "L"
+xl = "XL"
+
+[facets.tag]
+fact  = "brief.tags"
+label = "Tag"
+match = "prefix"
+merge = "rows-first"
+
 [views.inbox]
 label         = "Inbox"
 summary       = "What nobody has clarified yet; once clarified, a task leaves for good."

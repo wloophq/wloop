@@ -171,6 +171,12 @@ group = true
 sort = "text"
 menu = true
 
+[[source.ui.facets]]
+id = "waits-on"
+match = "team"
+group = true
+menu = true
+
 [[source.commands]]
 name = "login"
 usage = "[--no-browser] | --app-token (reads standard input)"
