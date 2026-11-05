@@ -124,7 +124,7 @@ func filterPrelude(t *testing.T) string {
 
 var queryFuncs = []string{"fold", "tokens", "unquote", "terms", "fieldById", "normValue", "qualifierOf", "qualifiers"}
 
-var filterFuncs = append(slices.Clone(queryFuncs), "haystack", "matches", "foldMap", "marked", "rowByURL")
+var filterFuncs = append(slices.Clone(queryFuncs), "rowTexts", "rowKindLabel", "kindLabel", "haystack", "matches", "foldMap", "marked", "rowByURL")
 
 func TestFilterFoldsAndMarks(t *testing.T) {
 	cases := [][2]string{
@@ -483,7 +483,7 @@ func TestAQueryHoldsFreeTermsAndQualifiers(t *testing.T) {
 	qs := []string{
 		`where:acme/widgets wait:me fix`,
 		`status:"needs me" -risk:high "two words"`,
-		`fix: https://github.com/acme/api/pull/7 is:pr author:@me AUTHOR:Ana`,
+		`fix: https://github.com/acme/api/pull/7 is:pr author:me AUTHOR:Ana`,
 		`Where:Widgets -waits-on:team:acme/search unknown:x`,
 	}
 	nodeRun(t, filterPrelude(t), queryFuncs, `process.stdout.write(JSON.stringify({
@@ -501,7 +501,7 @@ func TestAQueryHoldsFreeTermsAndQualifiers(t *testing.T) {
 	wantQuals := [][]map[string]any{
 		{q("where", "acme/widgets", "acme/widgets", false), q("wait", "me", "me", false)},
 		{q("status", "needs me", "needs me", false), q("risk", "high", "high", true)},
-		{q("is", "pr", "pr", false), q("author", "me", "@me", false), q("author", "ana", "Ana", false)},
+		{q("is", "pr", "pr", false), q("author", "me", "me", false), q("author", "ana", "Ana", false)},
 		{q("where", "widgets", "Widgets", false), q("waits-on", "team:acme/search", "team:acme/search", true)},
 	}
 	if !reflect.DeepEqual(got.Quals, wantQuals) {
@@ -520,7 +520,7 @@ func TestAFacetTogglesItsQualifier(t *testing.T) {
   toggledQualifier("where:a", "where", "b", false),
   toggledQualifier("where:a", "where", "a", true),
   toggledQualifier("-where:a", "where", "a", false),
-  toggledQualifier("author:@me", "author", "me", false),
+  toggledQualifier("author:me", "author", "me", false),
   toggledQualifier("", "status", "needs me", false),
   toggledQualifier('status:"needs me"', "status", "needs me", false),
   withoutQualifiers("where:a fix -where:b where:c wait:me", "where", false),
@@ -532,13 +532,13 @@ func TestAFacetTogglesItsQualifier(t *testing.T) {
 }
 
 // lensFuncs are what pipeline runs, with what the fields call.
-var lensFuncs = append(slices.Clone(queryFuncs), "haystack", "matches", "inView", "isSet", "isMuted", "isMine", "resolveWho", "waitingWho", "waitingLabel",
-	"waitCat", "waitClass", "isStalled", "rowFlags", "upcoming", "sinceTime", "rowValues", "rowKey", "filtersOf", "passesFilters", "passes", "parseSort",
-	"tagKeyField", "groupField", "effectiveGroup", "cmp", "byDefault", "keyRank", "keyOrder", "compareRows", "groupLabel", "groupRows", "pipeline")
+var lensFuncs = append(slices.Clone(queryFuncs), "rowTexts", "rowKindLabel", "kindLabel", "haystack", "matches", "inView", "isSet", "isMuted", "isMine", "resolveWho", "waitingWho", "waitingLabel",
+	"waitCat", "waitClass", "isStalled", "rowFlags", "upcoming", "sinceTime", "itemValues", "itemKey", "filtersOf", "passesFilters", "passes", "parseSort",
+	"tagKeyField", "groupField", "effectiveGroup", "cmp", "byDefault", "keyRank", "keyOrder", "compareItems", "groupLabel", "groupItems", "pipelineOf", "pipeline")
 
 func lensPrelude(t *testing.T) string {
 	src := appJS(t)
-	return filterPrelude(t) + jsConst(t, src, "SIZES") + jsConst(t, src, "RISKS") + jsConst(t, src, "rowValuesCache") + `const state = { health: { viewer: "me" } };
+	return filterPrelude(t) + jsConst(t, src, "SIZES") + jsConst(t, src, "RISKS") + jsConst(t, src, "itemValuesCache") + `const state = { health: { viewer: "me" } };
 const roundGate = (r) => r.round_gate;` + "\n"
 }
 
@@ -627,7 +627,7 @@ func TestPipelineFiltersSortsAndGroups(t *testing.T) {
 		{"view": "needs-me", "q": "where:widgets"},
 		{"view": "needs-me", "q": "where:widgets where:acme/web"},
 		{"view": "needs-me", "q": "where:acme/api wait:loop"},
-		{"view": "needs-me", "q": "author:@me"},
+		{"view": "needs-me", "q": "author:me"},
 		{"view": "needs-me", "q": "-risk:high risk:none risk:low"},
 		{"view": "needs-me", "q": "waits-on:me"},
 		{"view": "needs-me", "q": "is:stalled"},

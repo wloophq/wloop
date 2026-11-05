@@ -50,7 +50,7 @@ const noUpdate = "const checkBuild = () => {};\n"
 
 // viewsScripts are routes.js, views.js, review.js, task.js and detail.js, in the page's order.
 func viewsScripts(t *testing.T) string {
-	return staticJS(t, "routes.js") + staticJS(t, "views.js") + staticJS(t, "review.js") + staticJS(t, "task.js") + staticJS(t, "detail.js")
+	return jsFunction(t, appJS(t), "fold") + staticJS(t, "routes.js") + staticJS(t, "views.js") + staticJS(t, "review.js") + staticJS(t, "task.js") + staticJS(t, "detail.js")
 }
 
 // viewsPrelude is viewsScripts and plugins.js over a tree h.

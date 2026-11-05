@@ -146,7 +146,7 @@ function dashPeopleOption(rows, lens, pal) {
 
 function dashAuthorsOption(rows, lens, pal) {
   const f = fieldById("author");
-  const counts = dashTally(rows, lens, "author", (r) => [rowKey(f, r)]);
+  const counts = dashTally(rows, lens, "author", (r) => [itemKey(f, r)]);
   return dashBars(dashRanked(counts, DASH_TOP).map(([a, n]) => dashItem(lens, "author", a, n, a === "me" ? pal.me : pal.author)), pal);
 }
 
@@ -408,7 +408,7 @@ function dashCompact(n) {
 
 function dashHas(f, r, value) {
   const v = fold(value);
-  return rowValues(f, r).some((x) => (f.match ? f.match(x, v) : x === v));
+  return itemValues(f, r).some((x) => (f.match ? f.match(x, v) : x === v));
 }
 
 function dashBlockersOption(rows, lens, pal) {

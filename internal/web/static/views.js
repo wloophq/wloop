@@ -384,18 +384,7 @@ function taskHaystack(e) {
     e.owed_by || "",
     ...(e.asks || []).flatMap((a) => [a.summary, a.asker]),
     ...(e.cards || []).flatMap((c) => [((c.card || {}).last_human || {}).who ? personName(c.card.last_human.who) : "", ...((c.card || {}).waits_on || []).map(personName)]),
-    d.target, d.where, d.text, d.reaction, d.unit, m.text].map((x) => foldText(x));
-}
-
-// FOLD_ACCENTS are the accents api.Fold folds; foldText folds as api.Fold does, so the daemon's counts
-// match what the list shows.
-const FOLD_ACCENTS = {
-  á: "a", à: "a", â: "a", ã: "a", ä: "a", é: "e", è: "e", ê: "e", ë: "e", í: "i", ì: "i", î: "i", ï: "i",
-  ó: "o", ò: "o", ô: "o", õ: "o", ö: "o", ú: "u", ù: "u", û: "u", ü: "u", ç: "c", ñ: "n",
-};
-
-function foldText(s) {
-  return String(s || "").toLowerCase().replace(/[áàâãäéèêëíìîïóòôõöúùûüçñ]/g, (c) => FOLD_ACCENTS[c]).replace(/\p{Mn}/gu, "");
+    d.target, d.where, d.text, d.reaction, d.unit, m.text].map((x) => fold(x));
 }
 
 // filterTerms are the free words of the filter query, the qualifiers left to the pull request lists, as the
@@ -403,7 +392,7 @@ function foldText(s) {
 function filterTerms(q) {
   const qualifier = typeof qualifierOf === "function" ? qualifierOf : () => null;
   return (String(q || "").match(/[^\s"]*"[^"]*"?|[^\s"]+/g) || []).filter((t) => !qualifier(t))
-    .map((t) => foldText(t.replace(/^"|"$/g, "")).trim()).filter(Boolean);
+    .map((t) => fold(t.replace(/^"|"$/g, "")).trim()).filter(Boolean);
 }
 
 // taskMatches says whether every free word of ts is in e.

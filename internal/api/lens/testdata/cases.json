@@ -1,0 +1,836 @@
+{
+ "now": "2026-11-04T12:00:00Z",
+ "specs": [
+  {
+   "id": "where",
+   "label": "Where",
+   "group": true,
+   "sort": "text",
+   "match": "suffix",
+   "empty": "no place"
+  },
+  {
+   "id": "author",
+   "label": "Author",
+   "group": true
+  },
+  {
+   "id": "waits-on",
+   "label": "Waits on",
+   "match": "team"
+  },
+  {
+   "id": "tag",
+   "label": "Tag",
+   "group": true,
+   "match": "prefix",
+   "empty": "no tag"
+  },
+  {
+   "id": "status",
+   "label": "Status",
+   "group": true,
+   "rank": [
+    "needs-me",
+    "waiting",
+    "done"
+   ],
+   "labels": {
+    "needs-me": "Needs me",
+    "waiting": "Waiting",
+    "done": "Done"
+   }
+  },
+  {
+   "id": "opened",
+   "label": "Opened",
+   "group": true,
+   "sort": "time",
+   "buckets": [
+    {
+     "id": "today",
+     "label": "Today",
+     "within": "24h"
+    },
+    {
+     "id": "week",
+     "label": "This week",
+     "within": "168h"
+    },
+    {
+     "id": "older",
+     "label": "Older",
+     "within": ""
+    }
+   ]
+  },
+  {
+   "id": "risk",
+   "label": "Risk",
+   "group": true,
+   "sort": "rank",
+   "rank": [
+    "low",
+    "medium",
+    "high"
+   ],
+   "empty": "no risk"
+  }
+ ],
+ "items": [
+  {
+   "facets": {
+    "where": [
+     "acme/widgets"
+    ],
+    "author": [
+     "ana"
+    ],
+    "waits-on": [
+     "me"
+    ],
+    "tag": [
+     "area:billing",
+     "lang:go"
+    ],
+    "status": [
+     "needs-me"
+    ],
+    "opened": [
+     "2026-11-04T10:00:00Z"
+    ],
+    "risk": [
+     "low"
+    ]
+   },
+   "texts": [
+    "Exportação de dados",
+    "acme/widgets#1"
+   ]
+  },
+  {
+   "facets": {
+    "where": [
+     "acme/api"
+    ],
+    "author": [
+     "bia"
+    ],
+    "waits-on": [
+     "team:acme/web"
+    ],
+    "tag": [
+     "area:search"
+    ],
+    "status": [
+     "waiting"
+    ],
+    "opened": [
+     "2026-11-01T12:00:00Z"
+    ],
+    "risk": [
+     "high"
+    ]
+   },
+   "texts": [
+    "Fix 日本語 parser",
+    "acme/api#2"
+   ]
+  },
+  {
+   "facets": {
+    "where": [
+     "acme/widgets"
+    ],
+    "author": [
+     "ana"
+    ],
+    "waits-on": [
+     "acme/web"
+    ],
+    "tag": [
+     "lang:go"
+    ],
+    "status": [
+     "needs-me"
+    ],
+    "opened": [
+     "2026-10-01T12:00:00Z"
+    ],
+    "risk": [
+     "medium"
+    ]
+   },
+   "texts": [
+    "Refactor widgets cache"
+   ]
+  },
+  {
+   "facets": {
+    "where": [
+     "acme/docs"
+    ],
+    "author": [
+     "me"
+    ],
+    "waits-on": [],
+    "tag": [],
+    "status": [
+     "done"
+    ],
+    "opened": [],
+    "risk": []
+   },
+   "texts": [
+    "Écrire la documentation",
+    "acme/docs#4"
+   ]
+  },
+  {
+   "facets": {
+    "where": [
+     "acme/api"
+    ],
+    "author": [
+     "bia"
+    ],
+    "waits-on": [
+     "me"
+    ],
+    "tag": [
+     "area:billing"
+    ],
+    "status": [
+     "needs-me"
+    ],
+    "opened": [
+     "2026-11-04T11:30:00Z"
+    ],
+    "risk": [
+     "high"
+    ]
+   },
+   "texts": [
+    "Say \"hello world\" in the logs"
+   ]
+  },
+  {
+   "facets": {
+    "where": [
+     "acme/web"
+    ],
+    "author": [
+     "cris"
+    ],
+    "waits-on": [
+     "bia"
+    ],
+    "tag": [
+     "lang:rust",
+     "lang:go"
+    ],
+    "status": [
+     "waiting"
+    ],
+    "opened": [
+     "2026-10-28T12:00:00Z"
+    ],
+    "risk": [
+     "low"
+    ]
+   },
+   "texts": [
+    "fix: unknown:x notes"
+   ]
+  }
+ ],
+ "cases": [
+  {
+   "q": "",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ]
+   }
+  },
+  {
+   "q": "exportacao",
+   "want": {
+    "shown": [
+     0
+    ]
+   }
+  },
+  {
+   "q": "EXPORTAÇÃO",
+   "want": {
+    "shown": [
+     0
+    ]
+   }
+  },
+  {
+   "q": "日本語",
+   "want": {
+    "shown": [
+     1
+    ]
+   }
+  },
+  {
+   "q": "documentation ECRIRE",
+   "want": {
+    "shown": [
+     3
+    ]
+   }
+  },
+  {
+   "q": "\"hello world\"",
+   "want": {
+    "shown": [
+     4
+    ]
+   }
+  },
+  {
+   "q": "hello world",
+   "want": {
+    "shown": [
+     4
+    ]
+   }
+  },
+  {
+   "q": "\"world hello\"",
+   "want": {
+    "shown": []
+   }
+  },
+  {
+   "q": "where:widgets",
+   "want": {
+    "shown": [
+     0,
+     2
+    ]
+   }
+  },
+  {
+   "q": "where:acme/widgets",
+   "want": {
+    "shown": [
+     0,
+     2
+    ]
+   }
+  },
+  {
+   "q": "where:widget",
+   "want": {
+    "shown": []
+   }
+  },
+  {
+   "q": "-where:widgets",
+   "want": {
+    "shown": [
+     1,
+     3,
+     4,
+     5
+    ]
+   }
+  },
+  {
+   "q": "author:ana author:bia",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     4
+    ]
+   }
+  },
+  {
+   "q": "author:bia where:api",
+   "want": {
+    "shown": [
+     1,
+     4
+    ]
+   }
+  },
+  {
+   "q": "AUTHOR:Ana",
+   "want": {
+    "shown": [
+     0,
+     2
+    ]
+   }
+  },
+  {
+   "q": "tag:area",
+   "want": {
+    "shown": [
+     0,
+     1,
+     4
+    ]
+   }
+  },
+  {
+   "q": "tag:lang:go",
+   "want": {
+    "shown": [
+     0,
+     2,
+     5
+    ]
+   }
+  },
+  {
+   "q": "tag:lang -tag:area",
+   "want": {
+    "shown": [
+     2,
+     5
+    ]
+   }
+  },
+  {
+   "q": "tag:ar",
+   "want": {
+    "shown": []
+   }
+  },
+  {
+   "q": "waits-on:acme/web",
+   "want": {
+    "shown": [
+     1,
+     2
+    ]
+   }
+  },
+  {
+   "q": "waits-on:team:acme/web",
+   "want": {
+    "shown": [
+     1
+    ]
+   }
+  },
+  {
+   "q": "waits-on:me",
+   "want": {
+    "shown": [
+     0,
+     4
+    ]
+   }
+  },
+  {
+   "q": "opened:today",
+   "want": {
+    "shown": [
+     0,
+     4
+    ]
+   }
+  },
+  {
+   "q": "opened:week",
+   "want": {
+    "shown": [
+     1
+    ]
+   }
+  },
+  {
+   "q": "opened:older",
+   "want": {
+    "shown": [
+     2,
+     5
+    ]
+   }
+  },
+  {
+   "q": "opened:none",
+   "want": {
+    "shown": [
+     3
+    ]
+   }
+  },
+  {
+   "q": "-opened:today",
+   "want": {
+    "shown": [
+     1,
+     2,
+     3,
+     5
+    ]
+   }
+  },
+  {
+   "q": "unknown:x",
+   "want": {
+    "shown": [
+     5
+    ]
+   }
+  },
+  {
+   "q": "fix:",
+   "want": {
+    "shown": [
+     5
+    ]
+   }
+  },
+  {
+   "q": "author:",
+   "want": {
+    "shown": []
+   }
+  },
+  {
+   "q": "status:\"needs-me\"",
+   "want": {
+    "shown": [
+     0,
+     2,
+     4
+    ]
+   }
+  },
+  {
+   "q": "cache author:ana",
+   "want": {
+    "shown": [
+     2
+    ]
+   }
+  },
+  {
+   "q": "",
+   "group": "status",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "groups": [
+     {
+      "key": "needs-me",
+      "items": [
+       0,
+       2,
+       4
+      ]
+     },
+     {
+      "key": "waiting",
+      "items": [
+       1,
+       5
+      ]
+     },
+     {
+      "key": "done",
+      "items": [
+       3
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "q": "",
+   "group": "risk",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "groups": [
+     {
+      "key": "low",
+      "items": [
+       0,
+       5
+      ]
+     },
+     {
+      "key": "medium",
+      "items": [
+       2
+      ]
+     },
+     {
+      "key": "high",
+      "items": [
+       1,
+       4
+      ]
+     },
+     {
+      "key": "none",
+      "items": [
+       3
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "q": "",
+   "group": "tag",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "groups": [
+     {
+      "key": "area:billing",
+      "items": [
+       0,
+       4
+      ]
+     },
+     {
+      "key": "area:search",
+      "items": [
+       1
+      ]
+     },
+     {
+      "key": "lang:go",
+      "items": [
+       0,
+       2,
+       5
+      ]
+     },
+     {
+      "key": "lang:rust",
+      "items": [
+       5
+      ]
+     },
+     {
+      "key": "none",
+      "items": [
+       3
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "q": "",
+   "group": "where",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "groups": [
+     {
+      "key": "acme/api",
+      "items": [
+       1,
+       4
+      ]
+     },
+     {
+      "key": "acme/docs",
+      "items": [
+       3
+      ]
+     },
+     {
+      "key": "acme/web",
+      "items": [
+       5
+      ]
+     },
+     {
+      "key": "acme/widgets",
+      "items": [
+       0,
+       2
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "q": "",
+   "group": "opened",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "groups": [
+     {
+      "key": "older",
+      "items": [
+       2,
+       5
+      ]
+     },
+     {
+      "key": "today",
+      "items": [
+       0,
+       4
+      ]
+     },
+     {
+      "key": "week",
+      "items": [
+       1
+      ]
+     },
+     {
+      "key": "none",
+      "items": [
+       3
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "q": "",
+   "sort": "risk",
+   "want": {
+    "shown": [
+     0,
+     5,
+     2,
+     1,
+     4,
+     3
+    ]
+   }
+  },
+  {
+   "q": "",
+   "sort": "risk",
+   "desc": true,
+   "want": {
+    "shown": [
+     1,
+     4,
+     2,
+     0,
+     5,
+     3
+    ]
+   }
+  },
+  {
+   "q": "",
+   "sort": "opened",
+   "want": {
+    "shown": [
+     3,
+     2,
+     5,
+     1,
+     0,
+     4
+    ]
+   }
+  },
+  {
+   "q": "",
+   "sort": "opened",
+   "desc": true,
+   "want": {
+    "shown": [
+     4,
+     0,
+     1,
+     5,
+     2,
+     3
+    ]
+   }
+  },
+  {
+   "q": "",
+   "sort": "where",
+   "want": {
+    "shown": [
+     1,
+     4,
+     3,
+     5,
+     0,
+     2
+    ]
+   }
+  },
+  {
+   "q": "author:ana",
+   "group": "risk",
+   "sort": "opened",
+   "desc": true,
+   "want": {
+    "shown": [
+     0,
+     2
+    ],
+    "groups": [
+     {
+      "key": "low",
+      "items": [
+       0
+      ]
+     },
+     {
+      "key": "medium",
+      "items": [
+       2
+      ]
+     }
+    ]
+   }
+  }
+ ]
+}

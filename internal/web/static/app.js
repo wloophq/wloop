@@ -79,9 +79,12 @@ function rowKindLabel(r) {
 // sits in one group. A time facet's values are its buckets now.
 function fieldOf(spec) {
   const f = { id: spec.id, label: spec.label, provider: spec.provider || "", group: !!spec.group, sort: !!spec.sort && spec.menu !== false,
-    menu: spec.menu !== false, rank: spec.rank, empty: spec.empty, match: MATCH[spec.match], buckets: spec.buckets || null };
+    menu: spec.menu !== false, rank: spec.rank, empty: spec.empty, match: MATCH[spec.match], buckets: spec.buckets && spec.buckets.length ? spec.buckets : null };
   if (spec.labels) f.show = (k) => spec.labels[k] || k;
-  if (spec.match === "prefix") f.groupBy = (raw) => "tag:" + raw.split(":")[0];
+  if (spec.match === "prefix") {
+    f.groupBy = (raw) => "tag:" + raw.split(":")[0];
+    f.keys = (it) => facetValues(it, spec.id);
+  }
   if (spec.sort === "time") f.sortValue = (r) => facetTime(r, spec.id);
   f.values = f.buckets ? (r) => bucketsOf(f, r) : (r) => facetValues(r, spec.id);
   if (spec.id === "is") f.values = (r) => (dueNow(r) ? [...facetValues(r, "is"), "due"] : facetValues(r, "is"));
@@ -240,8 +243,10 @@ const labelTail = (r) => (pl(r).repo && labelOf(r).startsWith(pl(r).repo) ? labe
 const refLabel = (ref) => `${ref.owner}/${ref.repo}#${ref.number}`;
 const eventRef = (it) => it.label || "";
 
+// fold lowers s and drops its accents as api.Fold does, so the lens, the daemon's counts and the terminal
+// compare text the same way.
 function fold(s) {
-  return String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  return String(s || "").toLowerCase().replace(/[áàâãäéèêëíìîïóòôõöúùûüçñ]/g, (c) => c.normalize("NFD")[0]).replace(/\p{Mn}/gu, "");
 }
 
 // tokens splits a query on spaces, keeping a "quoted value" whole.
@@ -286,8 +291,7 @@ function tagKeys(rows) {
 }
 
 function normValue(field, raw) {
-  const v = fold(unquote(String(raw || "")));
-  return (field === "author" || field === "waits-on") && v === "@me" ? "me" : v;
+  return fold(unquote(String(raw || "")));
 }
 
 // qualifierOf reads a field:value term of a field that filters; anything else
@@ -329,20 +333,27 @@ function withoutQualifiers(q, field, neg) {
   }).join(" ");
 }
 
-function haystack(r) {
-  let f = folded.get(r);
+// rowTexts are the texts a free word searches in a row. The pull request payload's own texts stay until a
+// row serves its search texts.
+function rowTexts(r) {
+  const p = pl(r);
+  const ws = p.workspace || {};
+  return [r.title, labelOf(r), r.link, rowKindLabel(r), sm(r).waits_on, sm(r).reason, sm(r).line, r.search,
+    ...Object.values(r.facets || {}).flat(), p.head, r.kind, ws.display_name, ws.status, ws.comment, (p.brief || {}).goal];
+}
+
+// haystack is an item's folded texts: its own, or a row's.
+function haystack(it) {
+  let f = folded.get(it);
   if (!f) {
-    const p = pl(r);
-    const ws = p.workspace || {};
-    f = [r.title, labelOf(r), p.repo, p.author, p.head, sm(r).waits_on, r.kind, rowKindLabel(r), sm(r).reason, sm(r).line,
-      ws.display_name, ws.status, ws.comment, (p.brief || {}).goal, ...((p.brief || {}).tags || [])].map(fold);
-    folded.set(r, f);
+    f = (it.texts || rowTexts(it)).map(fold);
+    folded.set(it, f);
   }
   return f;
 }
 
-function matches(r, ts) {
-  return ts.every((t) => haystack(r).some((f) => f.includes(t)));
+function matches(it, ts) {
+  return ts.every((t) => haystack(it).some((f) => f.includes(t)));
 }
 
 function matchesActivity(it, ts) {
@@ -556,23 +567,23 @@ function fieldShow(id, k) {
   return f && f.show ? f.show(k) : k;
 }
 
-// rowValuesCache holds the values of the current minute: a time facet's
+// itemValuesCache holds the values of the current minute: a time facet's
 // buckets move with the clock.
-const rowValuesCache = { minute: -1, rows: new WeakMap() };
+const itemValuesCache = { minute: -1, items: new WeakMap() };
 
-// rowValues are a row's values of a field, folded, the way filters compare.
-function rowValues(f, r) {
+// itemValues are an item's values of a field, folded, the way filters compare.
+function itemValues(f, it) {
   const minute = Math.floor(Date.now() / 60000);
-  if (rowValuesCache.minute !== minute) Object.assign(rowValuesCache, { minute, rows: new WeakMap() });
-  const cache = rowValuesCache.rows;
-  let m = cache.get(r);
-  if (!m) cache.set(r, (m = new Map()));
-  if (!m.has(f.id)) m.set(f.id, (f.values ? f.values(r) : []).filter(Boolean).map((v) => fold(v)));
+  if (itemValuesCache.minute !== minute) Object.assign(itemValuesCache, { minute, items: new WeakMap() });
+  const cache = itemValuesCache.items;
+  let m = cache.get(it);
+  if (!m) cache.set(it, (m = new Map()));
+  if (!m.has(f.id)) m.set(f.id, (f.values ? f.values(it) : []).filter(Boolean).map((v) => fold(v)));
   return m.get(f.id);
 }
 
-function rowKey(f, r) {
-  return (f.key ? f.key(r) : (f.values(r) || [])[0]) || "none";
+function itemKey(f, it) {
+  return (f.key ? f.key(it) : (f.values(it) || [])[0]) || "none";
 }
 
 function filtersOf(quals) {
@@ -586,11 +597,11 @@ function filtersOf(quals) {
 
 // passesFilters ORs the values of one field and ANDs the fields; except
 // leaves one field out, to count what picking another of its values shows.
-function passesFilters(r, filters, except) {
+function passesFilters(it, filters, except) {
   for (const [id, { inc, exc }] of filters) {
     if (id === except || (Array.isArray(except) && except.includes(id))) continue;
     const f = fieldById(id);
-    const vs = rowValues(f, r);
+    const vs = itemValues(f, it);
     const hit = (q) => vs.some((v) => (f.match ? f.match(v, q) : v === q));
     if ((inc.length && !inc.some(hit)) || exc.some(hit)) return false;
   }
@@ -646,10 +657,12 @@ function keyOrder(f, a, b, desc) {
   return desc ? cmp(sb, sa) : cmp(sa, sb);
 }
 
-function compareRows(f, desc) {
+// compareItems orders by f, ties by byDefault when there is one; the sort is stable, so the rest keep their
+// order.
+function compareItems(f, desc, byDefault) {
   return (a, b) => {
-    const c = f.sortValue ? (desc ? cmp(f.sortValue(b), f.sortValue(a)) : cmp(f.sortValue(a), f.sortValue(b))) : keyOrder(f, rowKey(f, a), rowKey(f, b), desc);
-    return c || byDefault(a, b);
+    const c = f.sortValue ? (desc ? cmp(f.sortValue(b), f.sortValue(a)) : cmp(f.sortValue(a), f.sortValue(b))) : keyOrder(f, itemKey(f, a), itemKey(f, b), desc);
+    return c || (byDefault ? byDefault(a, b) : 0);
   };
 }
 
@@ -657,31 +670,34 @@ function groupLabel(f, raw) {
   return !raw || raw === "none" ? f.empty || "none" : f.show ? f.show(raw) : raw;
 }
 
-function groupRows(f, rows) {
+function groupItems(f, items) {
   const buckets = new Map();
   const add = (raw) => {
     const k = fold(raw);
     if (!buckets.has(k)) buckets.set(k, { field: f.id, key: k, raw, label: groupLabel(f, raw), rows: [] });
     return buckets.get(k);
   };
-  for (const r of rows) {
-    const ks = f.keys ? f.keys(r) : [rowKey(f, r)];
-    for (const k of ks.length ? ks : ["none"]) add(k).rows.push(r);
+  for (const it of items) {
+    const ks = f.keys ? f.keys(it) : [itemKey(f, it)];
+    for (const k of new Set(ks.length ? ks : ["none"])) add(k).rows.push(it);
   }
   if (f.id === "lane") for (const id of f.rank || []) add(id);
   return [...buckets.values()].sort((a, b) => keyOrder(f, a.key, b.key, false));
 }
 
-// pipeline is every list view's one path: filter, then sort, then group,
-// rows keeping the sort inside their group.
-function pipeline(rows, lens) {
-  const all = rows.filter((r) => inView(r, lens.view, lens.done));
-  const shown = all.filter((r) => matches(r, lens.ts) && passesFilters(r, lens.filters));
+// pipelineOf is every list's one path: filter, then sort, then group, items
+// keeping the sort inside their group. An item is { facets, texts }.
+function pipelineOf(items, lens, byDefault) {
+  const shown = items.filter((it) => matches(it, lens.ts) && passesFilters(it, lens.filters));
   const { field, desc } = parseSort(lens.sort);
-  shown.sort(field ? compareRows(fieldById(field), desc) : byDefault);
+  shown.sort(field ? compareItems(fieldById(field), desc, byDefault) : byDefault || (() => 0));
   const g = groupField(effectiveGroup(lens));
-  const groups = g ? groupRows(g, shown) : [{ field: "", key: "", raw: "", label: "", rows: shown }];
-  return { groups, group: g ? g.id : "", total: all.length, shown: shown.length };
+  const groups = g ? groupItems(g, shown) : [{ field: "", key: "", raw: "", label: "", rows: shown }];
+  return { groups, group: g ? g.id : "", total: items.length, shown: shown.length };
+}
+
+function pipeline(rows, lens) {
+  return pipelineOf(rows.filter((r) => inView(r, lens.view, lens.done)), lens, byDefault);
 }
 
 // groupedRows lists each row once, though grouping by a tag key may put it
