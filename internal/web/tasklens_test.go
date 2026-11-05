@@ -17,6 +17,8 @@ import (
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 )
 
+var tasklensNow = time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC)
+
 // servedViews is GET /api/views as the daemon serves the bundled profile: its views, its task facets and what
 // the sort menu calls a view's own order.
 func servedViews(t *testing.T) api.ViewsCatalog {
@@ -142,7 +144,7 @@ func mixedInput(t *testing.T, extra map[string]any) map[string]any {
 }
 
 func TestNeedsMeOffersTheFieldsItsTasksHave(t *testing.T) {
-	rows := wireRows("me", time.Now(), lensRows()...)
+	rows := wireRows("me", tasklensNow, lensRows()...)
 	for _, r := range rows {
 		r["views"] = []string{"mine"}
 	}
@@ -278,7 +280,7 @@ process.stdout.write(JSON.stringify([before,
 }
 
 func TestAHopThroughAViewWithoutTheFieldKeepsTheGroup(t *testing.T) {
-	rows := wireRows("me", time.Now(), lensRows()...)
+	rows := wireRows("me", tasklensNow, lensRows()...)
 	for _, r := range rows {
 		r["views"] = []string{"mine"}
 	}
@@ -298,7 +300,7 @@ process.stdout.write(JSON.stringify({ Plan: plan.g, PlanGroup: lensOf(plan).grou
 }
 
 func TestABoardWithNoGroupIsOneLane(t *testing.T) {
-	rows := wireRows("me", time.Now(), lensRows()...)
+	rows := wireRows("me", tasklensNow, lensRows()...)
 	for _, r := range rows {
 		r["views"] = []string{"mine"}
 	}
@@ -374,7 +376,7 @@ process.stdout.write(JSON.stringify({ Focus: focus, Walk: walk }));`, mixedInput
 // TestTheTaskListAndTheRailCountAgreeOnAQualifier keeps the list a task view shows on the tasks the daemon
 // counts for its rail: the same query over the same specs, the daemon's through the Go lens.
 func TestTheTaskListAndTheRailCountAgreeOnAQualifier(t *testing.T) {
-	now := time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC)
+	now := tasklensNow
 	views := servedViews(t)
 	specs := taskSpecs(t, views)
 	es := mixedTasks()

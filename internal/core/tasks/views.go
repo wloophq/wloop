@@ -390,8 +390,9 @@ func (s *Service) Counts(ctx context.Context, area string) (task.Counters, error
 	return s.CountsWhere(ctx, area, nil)
 }
 
-// CountsWhere is Counts over the tasks keep holds, every task when nil, keep reading them inside the pass its ctx carries: each view, area and context counts only
-// the tasks of its list that keep takes, so a client's filter narrows the counters as it narrows the lists.
+// CountsWhere is Counts over the tasks keep takes, every task when keep is nil. Each view, area and context
+// counts only the tasks of its list that keep takes, so a client's filter narrows the counters as it narrows
+// the lists; keep reads a task inside the pass its ctx carries.
 func (s *Service) CountsWhere(ctx context.Context, area string, keep func(context.Context, task.Task) (bool, error)) (task.Counters, error) {
 	n, err := s.Snapshot(ctx)
 	if err != nil {

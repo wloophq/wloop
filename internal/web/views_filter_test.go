@@ -84,7 +84,7 @@ const route = { view: "fits-now", area: "", ctx: [], task: "", q: "invoice" };
 		t.Errorf("an older answer replaced the latest: %v, want %v", got.Stale, got.Rail)
 	}
 	if want := []any{1.0, 3.0, 0.0, 3.0, 0.0, 0.0, 0.0, 4.0}; !slices.Equal(got.Cleared, want) {
-		t.Errorf("rail without free words %v, want %v", got.Cleared, want)
+		t.Errorf("rail with the query cleared %v, want %v", got.Cleared, want)
 	}
 	if want := "/api/counters?q=invoice"; len(got.URLs) == 0 || got.URLs[0] != want {
 		t.Errorf("urls %v, want first %s", got.URLs, want)

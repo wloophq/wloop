@@ -670,7 +670,6 @@ func (l *viewsLoad) sharedKeys() Problems {
 	return problems
 }
 
-// text lays v, the text at path, over dst: absent keeps it, blank is a problem.
 // word is a lens word: text whose template names only vars.
 func word(s *sheet, path string, v *string, dst *string, vars ...string) {
 	if v == nil {
@@ -691,6 +690,7 @@ func word(s *sheet, path string, v *string, dst *string, vars ...string) {
 	text(s, path, v, dst)
 }
 
+// text lays v, the text at path, over dst: absent keeps it, blank is a problem.
 func text(s *sheet, path string, v *string, dst *string) {
 	switch {
 	case v == nil:

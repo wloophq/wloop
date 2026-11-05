@@ -109,18 +109,10 @@ func TestATaskWithNoUnitHasOnlyItsOwnFacets(t *testing.T) {
 	r.withFacetRows(facetRows{generalThread: {"where": {"general"}}})
 	e := task.Task{ID: "t-own", State: "inbox", Category: task.CategoryInbox, Title: "Think it over", Created: tasksNow, Updated: tasksNow, Origin: task.OriginUser}
 	r.put(t, e)
-	f, err := r.facts(context.Background(), e)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defs := bundledLoaded().Views.Facets
-	want := catalog.MergeFacets(defs, catalog.FactFacets(defs, f), nil)
 	got := facetsOf(t, r.page(t, "view=inbox"), "t-own")
-	if len(got) == 0 || !reflect.DeepEqual(got, want) {
+	want := map[string][]string{"category": {"inbox"}, "moved": {tasksNow.Format(time.RFC3339)}, "state": {"inbox"}, "waits-on": {"me"}}
+	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("facets %v, want its facts' %v", got, want)
-	}
-	if _, ok := got["where"]; ok {
-		t.Fatalf("a task with no unit has a where: %v", got)
 	}
 }
 
