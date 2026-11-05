@@ -22,7 +22,7 @@ func (e *Env) wireSubjects(w *serveWiring) {
 		w.Engine.Subjects = map[unit.ProviderID]automation.Units{}
 	}
 	if w.DB != nil {
-		p := e.taskFacts(w.DB, unitsEnded(w.Modules), unitsRepo(w.Modules, e.currentConfig, inventory.Placements{Store: inventory.New(w.DB)}))
+		p := e.taskFacts(w.DB, unitsEnded(w.Modules), unitsPlacement(w.Modules, e.currentConfig, inventory.Placements{Store: inventory.New(w.DB)}))
 		w.Engine.Subjects[task.Codec{}.Provider()] = p
 		e.wakeFacts = p.TaskFacts
 		if w.Deps != nil {

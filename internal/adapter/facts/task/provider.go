@@ -71,9 +71,9 @@ type Deps struct {
 	Settings func() Settings
 	// Ended says whether a unit has ended, as its plugin says; nil: none has.
 	Ended func(ctx context.Context, u unit.Unit) (bool, error)
-	// Repo is the repository of a unit, owner/name: its placement's, else its plugin's; "" none, and nil none
-	// at all.
-	Repo func(ctx context.Context, u unit.Unit) (string, error)
+	// Placement is the repository of a unit, owner/name: its placement's, else its plugin's; "" none, and nil
+	// none at all.
+	Placement func(ctx context.Context, u unit.Unit) (string, error)
 	// Gates are read for task.gates_open; nil: always zero.
 	Gates Gates
 	// Turns counts the turns on each of units; a unit with none is absent.
@@ -282,6 +282,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.category":            string(e.Category),
 		"task.owed_by":             "",
 		"task.owed_since":          time.Time{},
+		"task.moved_at":            time.Time{},
 		"task.since_movement":      time.Duration(0),
 		"task.check_on":            e.Prop(task.PropCheckOn).Time,
 		"task.gates_open":          0,
@@ -290,7 +291,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.turns_running":       0,
 		"task.wake_until":          time.Time{},
 		"task.wake_when":           "",
-		"task.repo":                "",
+		"task.placement":           "",
 		"task.sequential_next":     false,
 		"task.review_due":          false,
 		"task.children_ready":      false,
@@ -349,6 +350,9 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 	if err := p.links(ctx, e, us, f); err != nil {
 		return nil, err
 	}
+	if f["task.placement"], err = p.placement(ctx, append([]unit.Unit{task.UnitOf(e.ID)}, us...)); err != nil {
+		return nil, err
+	}
 	if len(us) == 0 {
 		return f, nil
 	}
@@ -367,9 +371,6 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		return nil, err
 	}
 	f["task.link_ended"] = ended
-	if f["task.repo"], err = p.repo(ctx, us); err != nil {
-		return nil, err
-	}
 	if p.d.Cards != nil {
 		uf, ok, err := p.d.Cards.UnitFacts(ctx, eu)
 		if err != nil {
@@ -447,7 +448,7 @@ func owing(e task.Task, u unit.Unit, its []items.Item) []items.Item {
 }
 
 // links sets task.link_signal.<name>, on when the signal is on for any of us, task.link_signals, the declared
-// signals any of us reports, and task.since_movement, the time
+// signals any of us reports, task.moved_at, the newest of those moves, and task.since_movement, the time
 // since the newest of e's own last change and its units' last moves.
 func (p *Provider) links(ctx context.Context, e task.Task, us []unit.Unit, f workflow.Facts) error {
 	moved := e.Updated
@@ -473,6 +474,7 @@ func (p *Provider) links(ctx context.Context, e task.Task, us []unit.Unit, f wor
 			}
 		}
 	}
+	f["task.moved_at"] = moved
 	if !moved.IsZero() {
 		f["task.since_movement"] = max(p.d.Clock.Now().Sub(moved), 0)
 	}
@@ -530,13 +532,13 @@ func (p *Provider) family(ctx context.Context, e task.Task, f workflow.Facts) er
 	return nil
 }
 
-// repo is the repository of the first unit of us that has one.
-func (p *Provider) repo(ctx context.Context, us []unit.Unit) (string, error) {
-	if p.d.Repo == nil {
+// placement is the repository of the first unit of us that has one.
+func (p *Provider) placement(ctx context.Context, us []unit.Unit) (string, error) {
+	if p.d.Placement == nil {
 		return "", nil
 	}
 	for _, u := range us {
-		r, err := p.d.Repo(ctx, u)
+		r, err := p.d.Placement(ctx, u)
 		if err != nil || r != "" {
 			return r, err
 		}
