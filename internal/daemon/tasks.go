@@ -1343,7 +1343,7 @@ func (s *Server) heldProblems(l *intentload.Loaded) intentload.Problems {
 	return l.Tasks.HeldProblems(*held)
 }
 
-// facetProblems are the facets of the profile and of the plugins that disagree on how to group, sort, match or bucket.
+// facetProblems are the facets of the profile and of the plugins that disagree on how to group, sort, rank, match or bucket.
 func (s *Server) facetProblems(l *intentload.Loaded) intentload.Problems {
 	c := s.rowsCatalog()
 	k := &s.facetCheck

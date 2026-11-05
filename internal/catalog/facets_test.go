@@ -64,6 +64,17 @@ func TestTwoPluginsMustAgreeOnAFacetToo(t *testing.T) {
 	}
 }
 
+func TestTwoPluginsMustRankAFacetAlike(t *testing.T) {
+	plugin := []api.FacetSpec{
+		{ID: "risk", Provider: "github", Group: true, Sort: "rank", Rank: []string{"low", "high"}},
+		{ID: "risk", Provider: "slack", Group: true, Sort: "rank", Rank: []string{"high", "low"}},
+	}
+	got := CheckFacets(nil, plugin)
+	if len(got) != 1 || !strings.Contains(got[0].Msg, "rank") {
+		t.Fatalf("problems: %s", got.Error())
+	}
+}
+
 func TestTaskFacetsServeTheirMechanics(t *testing.T) {
 	specs := TaskFacets(bundled(t).Views.Facets, bundled(t).Tasks, nil)
 	byID := map[string]api.FacetSpec{}

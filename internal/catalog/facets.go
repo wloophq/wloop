@@ -99,7 +99,7 @@ func withinText(d time.Duration) string {
 	return d.String()
 }
 
-// CheckFacets are the problems of facets of one id that do not group, sort,
+// CheckFacets are the problems of facets of one id that do not group, sort, rank,
 // match and bucket alike: two plugins' facets, and a task facet against a
 // plugin's. plugin are the facets the plugins serve, those of one id that
 // agree already merged into one.
@@ -127,7 +127,7 @@ func CheckFacets(task []intentload.FacetDef, plugin []api.FacetSpec) intentload.
 func sources(f api.FacetSpec) string { return "plugin " + strings.Join(f.Sources(), "+") }
 
 func diffKey(diff string) string {
-	for _, k := range []string{"group", "sort", "match", "buckets"} {
+	for _, k := range []string{"group", "sort", "rank", "match", "buckets"} {
 		if strings.HasPrefix(diff, k) {
 			return k
 		}

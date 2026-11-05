@@ -21,18 +21,23 @@ type lensPick struct {
 	desc  bool
 }
 
-// lensView is a list the lens applies to: its key in the picks, its items before the filter and the field it
-// groups by unless a pick says otherwise.
+// lensView is a list the lens applies to: its key in the picks, its items before the filter, the fields a
+// query of it names and the field it groups by unless a pick says otherwise.
 type lensView struct {
 	key          string
 	items        []lens.Item
+	facets       []api.FacetSpec
+	facetByID    map[string]api.FacetSpec
 	defaultGroup string
 	defaultSort  string
 }
 
+// refreshFacets indexes the fields of the views: a task view's are the plugins' and the profile's, as the daemon
+// counts them; a row view's are its plugins' alone.
 func (m *Model) refreshFacets() {
 	m.facets = lens.Merge(m.catalog.Facets, m.viewsCat.Facets)
 	m.facetByID = lens.ByID(m.facets)
+	m.rowFacetByID = lens.ByID(m.catalog.Facets)
 }
 
 // indexRows builds the lens items of the rows, which change with the rows and the kinds' labels.
@@ -67,18 +72,24 @@ func (m *Model) rowsOf(id string) (rows []api.Row, items []lens.Item) {
 func (m *Model) lensViewOnScreen() (lensView, bool) {
 	if v, ok := m.viewOnScreen(); ok {
 		id := m.listView(v)
-		return lensView{key: "task:" + id, items: m.taskItems[id], defaultGroup: m.defaultGroup(id), defaultSort: m.viewsCat.DefaultSort}, true
+		return lensView{key: "task:" + id, items: m.taskItems[id], facets: m.facets, facetByID: m.facetByID, defaultGroup: m.defaultGroup(id),
+			defaultSort: m.viewsCat.DefaultSort}, true
 	}
 	if m.view >= len(m.views) {
 		return lensView{}, false
 	}
 	id := m.views[m.view].ID
 	_, items := m.rowsOf(id)
+	return m.rowLensView(id, items), true
+}
+
+// rowLensView is row view id's list of items.
+func (m *Model) rowLensView(id string, items []lens.Item) lensView {
 	sort := m.viewsCat.DefaultSort
 	if i := slices.IndexFunc(m.catalog.Views, func(v api.ViewSpec) bool { return v.ID == id }); i >= 0 {
 		sort = cmp.Or(m.catalog.Views[i].DefaultSort, sort)
 	}
-	return lensView{key: "row:" + id, items: items, defaultSort: sort}, true
+	return lensView{key: "row:" + id, items: items, facets: m.catalog.Facets, facetByID: m.rowFacetByID, defaultSort: sort}
 }
 
 // defaultGroup is the field a task view groups by unless a pick says otherwise: the facet reading its group
@@ -98,7 +109,7 @@ func (m *Model) defaultGroup(view string) string {
 // by the pick or the view's field. order indexes items; heads is the label of the group each position opens, ""
 // inside a group.
 func (m *Model) arrange(v lensView, items []lens.Item) (order []int, heads []string) {
-	specs := m.facetByID
+	specs := v.facetByID
 	query := lens.Parse(m.FilterQuery(), specs)
 	var idx []int
 	var kept []lens.Item
@@ -143,7 +154,7 @@ func reorder[T any](s []T, order []int) []T {
 
 // menuFields are the fields the lens menus of v offer: those some item of the view holds a value of.
 func (m *Model) menuFields(v lensView) []api.FacetSpec {
-	return lens.Offered(v.items, m.facets)
+	return lens.Offered(v.items, v.facets)
 }
 
 // cycleGroup moves the group pick of the view on screen to the next of: the view's own, the other fields the
@@ -172,7 +183,7 @@ func (m *Model) cycleGroup() {
 	pick := m.picks[v.key]
 	next := steps[(slices.Index(steps, pick.group)+1)%len(steps)]
 	m.setPick(v.key, func(p *lensPick) { p.group = next })
-	byID := lens.ByID(lens.Merge(m.facets, fields))
+	byID := lens.ByID(lens.Merge(v.facets, fields))
 	var text string
 	switch {
 	case next == "" && v.defaultGroup == "", next == noGroup:

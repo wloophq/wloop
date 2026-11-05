@@ -271,7 +271,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `lens.no_group` (string): The group menu's entry that lists the view in one group.
 - `lens.copied` (template): What Copy list says it copied, over `{{.count}}` items and the `{{.view}}` they came from.
 - `lens.copied_grouped` (template): What Copy list says it copied from a grouped list, over `{{.count}}`, `{{.view}}` and the `{{.group}}` field's label.
-- `facets` (table by name): The task facets, by id: the fields every client filters, groups and sorts tasks by, in the order the file declares them, a user layer's new ones after the bundled. A plugin's row facet of the same id must agree on group, sort, match and buckets.
+- `facets` (table by name): The task facets, by id: the fields every client filters, groups and sorts tasks by, in the order the file declares them, a user layer's new ones after the bundled. A plugin's row facet of the same id must agree on group, sort, rank, match and buckets.
 - `facets.<name>` (table): A facet, by its id. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `facets.<name>.fact` (fact): The fact the facet reads: a fact of a task (task.*, task.prop.*), or a field of a record kind, written &lt;kind&gt;.&lt;field&gt; (brief.risk). Required.
 - `facets.<name>.label` (string): The name people read. Required.

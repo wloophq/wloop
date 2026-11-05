@@ -10,7 +10,7 @@ var viewsGrammar = []Key{
 	{Path: "lens.no_group", In: SurfaceViews, Kind: KindText, Required: true, Doc: "The group menu's entry that lists the view in one group."},
 	{Path: "lens.copied", In: SurfaceViews, Kind: KindTemplate, Required: true, Doc: "What Copy list says it copied, over `{{.count}}` items and the `{{.view}}` they came from."},
 	{Path: "lens.copied_grouped", In: SurfaceViews, Kind: KindTemplate, Required: true, Doc: "What Copy list says it copied from a grouped list, over `{{.count}}`, `{{.view}}` and the `{{.group}}` field's label."},
-	{Path: "facets", In: SurfaceViews, Kind: KindMap, Doc: "The task facets, by id: the fields every client filters, groups and sorts tasks by, in the order the file declares them, a user layer's new ones after the bundled. A plugin's row facet of the same id must agree on group, sort, match and buckets."},
+	{Path: "facets", In: SurfaceViews, Kind: KindMap, Doc: "The task facets, by id: the fields every client filters, groups and sorts tasks by, in the order the file declares them, a user layer's new ones after the bundled. A plugin's row facet of the same id must agree on group, sort, rank, match and buckets."},
 	{Path: "facets.*", In: SurfaceViews, Kind: KindTable, Doc: "A facet, by its id. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones."},
 	{Path: "facets.*.fact", In: SurfaceViews, Kind: KindFact, Required: true, Doc: "The fact the facet reads: a fact of a task (task.*, task.prop.*), or a field of a record kind, written <kind>.<field> (brief.risk). Required."},
 	{Path: "facets.*.label", In: SurfaceViews, Kind: KindText, Required: true, Doc: "The name people read. Required."},

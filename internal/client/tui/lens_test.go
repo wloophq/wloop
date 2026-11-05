@@ -267,6 +267,18 @@ func TestTheTUIFiltersARowViewByQualifier(t *testing.T) {
 	}
 }
 
+func TestTheTUIFiltersARowViewByThePluginsFacetsAlone(t *testing.T) {
+	m := whereModel(t)
+	a, b := row(7, "Batch export", "review", "needs-me"), row(8, "Cache warmup", "review", "needs-me")
+	a.Facets["where"], b.Facets["where"] = []string{"acme/api"}, []string{"acme/web"}
+	m.SetData([]api.Row{a, b}, api.Health{})
+	m.view = 0
+	filterBy(m, "where:web")
+	if got := m.visible(); len(got) != 1 || got[0].Unit != b.Unit {
+		t.Fatalf("where:web matches the plugin's suffix where, kept %v", got)
+	}
+}
+
 func TestTheTUIGroupsByAnOfferedField(t *testing.T) {
 	m := whereModel(t)
 	press(m, Key{Rune: '='})

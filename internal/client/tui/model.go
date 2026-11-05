@@ -94,9 +94,11 @@ type EditRequest struct {
 
 type Model struct {
 	view int
-	// facets are the fields a query names: the plugins' and the profile's, one by id.
+	// facets are the fields a query of a task view names: the plugins' and the profile's, one by id.
 	facets    []api.FacetSpec
 	facetByID map[string]api.FacetSpec
+	// rowFacetByID are the fields a query of a row view names: the plugins' alone.
+	rowFacetByID map[string]api.FacetSpec
 	// picks are the group and sort a person chose, by list.
 	picks map[string]lensPick
 	// now is the time of the last render, which the lens buckets time facets by.
@@ -260,7 +262,7 @@ func (m *Model) SetError(err error) { m.err = "daemon not answering: " + err.Err
 // them, and beside each the head of the group it opens.
 func (m *Model) in(id string) ([]api.Row, []string) {
 	all, items := m.rowsOf(id)
-	order, heads := m.arrange(lensView{key: "row:" + id}, items)
+	order, heads := m.arrange(m.rowLensView(id, items), items)
 	return reorder(all, order), heads
 }
 
