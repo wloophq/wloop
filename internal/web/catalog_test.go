@@ -138,7 +138,7 @@ state.rows = [r];
 const lens = lensOf({ ...readHash(), view: "mine" });
 const m = rowModel(r, "", lens, "");
 const tr = rowTr(m, lens, rowColumns([m]));
-const c = card(r, "");
+const c = rowCard(rowModel(r, "", lens, "", "card"), lens);
 location.hash = "#" + routeHash("mine", keyOf(r));
 state.detail = { row: r, events: [] };
 renderDetail();
@@ -152,15 +152,17 @@ process.stdout.write(JSON.stringify({ row: tr.textContent, card: c.textContent, 
 			}
 		}
 	}
-	for _, part := range []string{"card", "detail"} {
+	for _, part := range []string{"detail"} {
 		for _, want := range []string{"waits for a reply", "3h 0m"} {
 			if !strings.Contains(got[part], want) {
 				t.Errorf("%s lacks %q: %s", part, want, got[part])
 			}
 		}
 	}
-	if strings.Contains(got["row"], "waits for a reply") {
-		t.Errorf("the row shows a situation its plugin places nowhere: %s", got["row"])
+	for _, part := range []string{"row", "card"} {
+		if strings.Contains(got[part], "waits for a reply") {
+			t.Errorf("the %s shows a situation its plugin places nowhere: %s", part, got[part])
+		}
 	}
 	for _, part := range []string{"row", "detail"} {
 		if !strings.Contains(got[part], "asked about the deploy") {

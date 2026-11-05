@@ -259,6 +259,18 @@
           "description": "The head of the column of why a row waits.",
           "type": "string"
         },
+        "countdown_minutes": {
+          "description": "A pending round's countdown from 100 seconds, over its minutes `{{.m}}` and the seconds past them, two digits, `{{.s}}`.",
+          "type": "string"
+        },
+        "countdown_seconds": {
+          "description": "A pending round's countdown under 100 seconds, over the seconds `{{.s}}`.",
+          "type": "string"
+        },
+        "countdown_sending": {
+          "description": "A pending round's countdown once its deadline passed.",
+          "type": "string"
+        },
         "countdown_title": {
           "description": "The tooltip of a pending round's countdown, over the `{{.time}}` it sends at.",
           "type": "string"
@@ -337,6 +349,18 @@
         },
         "starred": {
           "description": "The tooltip of a starred task's star.",
+          "type": "string"
+        },
+        "tip_kind": {
+          "description": "A row's tooltip with its situation, over the `{{.tip}}` so far and the `{{.kind}}` labels.",
+          "type": "string"
+        },
+        "tip_named": {
+          "description": "A row's tooltip's start when it names whom the row waits on, over the `{{.strip}}` value's label and `{{.who}}`.",
+          "type": "string"
+        },
+        "tip_why": {
+          "description": "A row's tooltip with why it waits, over the `{{.tip}}` so far and the `{{.why}}`.",
           "type": "string"
         },
         "unread": {

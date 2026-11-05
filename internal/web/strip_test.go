@@ -183,8 +183,8 @@ catalog.views.push({ id: "mixed", label: "Mixed", provider: "", rows: true, surf
 const slackLens = lensOf({ ...readHash(), view: "slack" }), mineLens = lensOf({ ...readHash(), view: "mine" });
 process.stdout.write(JSON.stringify({ Folded: stripColor(ana, "ana"), Head: stripColor(ana, fold("Ana")),
   Merged: !!stripSpec(merged, "b"), Unmarked: !!stripSpec(merged, "a") || !!stripSpec(merged, "c"), Mixed: !!viewStrip("mixed"),
-  LoopNames: stripTip({ label: "In loop", color: "loop", value: "loop" }, "ana", "agent working"),
-  MeNames: stripTip({ label: "Waiting on me", color: "me", value: "me" }, "me", "review"),
+  LoopNames: rowTip({ label: "In loop", color: "loop", value: "loop" }, "ana", "agent working", "", lensWords()),
+  MeNames: rowTip({ label: "Waiting on me", color: "me", value: "me" }, "me", "review", "", lensWords()),
   SlackLegend: stripLegend(slackLens, slackLens.fields).attrs.title, GitHubLegend: stripLegend(mineLens, mineLens.fields).attrs.title }));`,
 		map[string]any{"now": 0}, &got)
 	if got.Folded != "author" || got.Head != "author" {

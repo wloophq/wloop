@@ -306,6 +306,18 @@
           "description": "What Copy list says it copied from a grouped list, over `{{.count}}`, `{{.view}}` and the `{{.group}}` field's label.",
           "type": "string"
         },
+        "countdown_minutes": {
+          "description": "A pending round's countdown from 100 seconds, over its minutes `{{.m}}` and the seconds past them, two digits, `{{.s}}`.",
+          "type": "string"
+        },
+        "countdown_seconds": {
+          "description": "A pending round's countdown under 100 seconds, over the seconds `{{.s}}`.",
+          "type": "string"
+        },
+        "countdown_sending": {
+          "description": "A pending round's countdown once its deadline passed.",
+          "type": "string"
+        },
         "countdown_title": {
           "description": "The tooltip of a pending round's countdown, over the `{{.time}}` it sends at.",
           "type": "string"
@@ -418,6 +430,18 @@
           "description": "The group of the items with no tag of that key, over the `{{.key}}`.",
           "type": "string"
         },
+        "tip_kind": {
+          "description": "A row's tooltip with its situation, over the `{{.tip}}` so far and the `{{.kind}}` labels.",
+          "type": "string"
+        },
+        "tip_named": {
+          "description": "A row's tooltip's start when it names whom the row waits on, over the `{{.strip}}` value's label and `{{.who}}`.",
+          "type": "string"
+        },
+        "tip_why": {
+          "description": "A row's tooltip with why it waits, over the `{{.tip}}` so far and the `{{.why}}`.",
+          "type": "string"
+        },
         "unread": {
           "description": "The flag of a task whose links hold messages the extraction has not read, over how long the oldest waited, `{{.lag}}`.",
           "type": "string"
@@ -450,6 +474,9 @@
         "col_why",
         "copied",
         "copied_grouped",
+        "countdown_minutes",
+        "countdown_seconds",
+        "countdown_sending",
         "countdown_title",
         "default_group",
         "descending",
@@ -478,6 +505,9 @@
         "starred",
         "tag_key",
         "tag_key_empty",
+        "tip_kind",
+        "tip_named",
+        "tip_why",
         "unread",
         "unread_title",
         "until"

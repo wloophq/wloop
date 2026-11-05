@@ -273,25 +273,6 @@ function taskTable(res, lens, open, all) {
   return h("table", { class: "task-table" }, rowHead(cols, lens, ""), ...rowTable(res, model, lens, cols));
 }
 
-// taskCard is a task's card on a board: its title, then every piece its row shows, each a facet button.
-function taskCard(e, open, copy, lens) {
-  const m = taskModel(e, open, copy, lens);
-  return h("li", {
-    class: [...m.cls, m.selected ? "sel" : ""].filter(Boolean).join(" "),
-    tabindex: 0, "data-focus": m.scope, "aria-selected": m.selected ? "true" : "false",
-    onclick: m.open || undefined,
-    onkeydown: m.open ? (ev) => {
-      if ((ev.key === "Enter" || ev.key === " ") && ev.target === ev.currentTarget) {
-        ev.preventDefault();
-        m.open();
-      }
-    } : undefined,
-  },
-    h("div", { class: "task-line" }, m.pre, h("span", { class: "title" }, m.title)),
-    h("div", { class: "meta" }, ...["ref", "meta", "flag", "who", "kind", "age"].flatMap((part) => pieceButtons(m, lens, part)), m.ref, m.flags),
-    m.after);
-}
-
 // shortLag reads a Go duration as its largest unit: 2h, 12m, 30s.
 function shortLag(d) {
   const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?$/.exec(d || "");
@@ -461,7 +442,7 @@ function viewPage(route, open) {
 // taskBoard is a lane per group of the lens, each holding its tasks' cards.
 function taskBoard(res, lens, open) {
   return h("div", { class: "board task-board" }, ...res.groups.filter((g) => g.rows.length)
-    .map((g) => lane(g, lens, viewLabel(lens.view), (it, copy) => taskCard(it.task, open, copy, lens))));
+    .map((g) => lane(g, lens, viewLabel(lens.view), (it, copy) => rowCard(taskModel(it.task, open, copy, lens), lens))));
 }
 
 // viewIntro is a view's summary under its heading, and the rule its profile lists it by behind a toggle.

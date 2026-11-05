@@ -344,6 +344,12 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `lens.filter_group` (template): What a facet button calls whom a row waits on when the value is a group of people, such as a Slack user group, in place of the facet's label.
 - `lens.list_count` (template): A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.
 - `lens.countdown_title` (template): The tooltip of a pending round's countdown, over the `{{.time}}` it sends at.
+- `lens.countdown_sending` (template): A pending round's countdown once its deadline passed.
+- `lens.countdown_seconds` (template): A pending round's countdown under 100 seconds, over the seconds `{{.s}}`.
+- `lens.countdown_minutes` (template): A pending round's countdown from 100 seconds, over its minutes `{{.m}}` and the seconds past them, two digits, `{{.s}}`.
+- `lens.tip_named` (template): A row's tooltip's start when it names whom the row waits on, over the `{{.strip}}` value's label and `{{.who}}`.
+- `lens.tip_kind` (template): A row's tooltip with its situation, over the `{{.tip}}` so far and the `{{.kind}}` labels.
+- `lens.tip_why` (template): A row's tooltip with why it waits, over the `{{.tip}}` so far and the `{{.why}}`.
 - `lens.legend_title` (template): The tooltip of the legend of a view's strip, the colors of its strip facet's values.
 - `lens.sort_by` (template): A column head's tooltip, over the `{{.label}}` of the facet it sorts by.
 - `lens.col_unit` (template): The head of the column of a row's title, ref and flags in a view whose rows mix kinds.
@@ -851,6 +857,12 @@ The fields each notice reads besides `Name` and `Command`:
 - `lens.filter_group` (template): What a facet button calls whom a row waits on when the value is a group of people, such as a Slack user group, in place of the facet's label.
 - `lens.list_count` (template): A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.
 - `lens.countdown_title` (template): The tooltip of a pending round's countdown, over the `{{.time}}` it sends at.
+- `lens.countdown_sending` (template): A pending round's countdown once its deadline passed.
+- `lens.countdown_seconds` (template): A pending round's countdown under 100 seconds, over the seconds `{{.s}}`.
+- `lens.countdown_minutes` (template): A pending round's countdown from 100 seconds, over its minutes `{{.m}}` and the seconds past them, two digits, `{{.s}}`.
+- `lens.tip_named` (template): A row's tooltip's start when it names whom the row waits on, over the `{{.strip}}` value's label and `{{.who}}`.
+- `lens.tip_kind` (template): A row's tooltip with its situation, over the `{{.tip}}` so far and the `{{.kind}}` labels.
+- `lens.tip_why` (template): A row's tooltip with why it waits, over the `{{.tip}}` so far and the `{{.why}}`.
 - `lens.legend_title` (template): The tooltip of the legend of a view's strip, the colors of its strip facet's values.
 - `lens.sort_by` (template): A column head's tooltip, over the `{{.label}}` of the facet it sorts by.
 - `lens.col_unit` (template): The head of the column of a row's title, ref and flags in a view whose rows mix kinds.

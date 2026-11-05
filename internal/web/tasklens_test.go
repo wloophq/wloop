@@ -224,7 +224,10 @@ func TestATaskViewBoardHasALanePerGroup(t *testing.T) {
 const p = viewPage(route({ g: "source", layout: "board" }), "");
 const board = byClass(h("div", {}, ...p.body), "board")[0];
 process.stdout.write(JSON.stringify(byClass(board, "lane").map((l) => ({ Label: text(byClass(l, "lane-head")[0].children[0]),
-  Focus: all(l, (x) => x.tag === "li").map((x) => x.attrs["data-focus"]) }))));`, mixedInput(t, nil), &got)
+  Focus: all(l, (x) => x.tag === "li").map((x) => {
+    const open = all(x, (y) => y.attrs && y.attrs.class === "open")[0];
+    return open && open.attrs["data-focus"] === x.attrs["data-row"] ? x.attrs["data-row"] : "";
+  }) }))));`, mixedInput(t, nil), &got)
 	want := []lane{{"GitHub", []string{"task:g-1", "task:g-2"}}, {"Slack", []string{"task:s-1", "task:s-2"}}}
 	if !slices.EqualFunc(got, want, func(a, b lane) bool { return a.Label == b.Label && slices.Equal(a.Focus, b.Focus) }) {
 		t.Errorf("lanes %+v, want %+v", got, want)

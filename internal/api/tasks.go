@@ -105,6 +105,12 @@ type RowWords struct {
 	FilterGroup      string `json:"filter_group"`
 	ListCount        string `json:"list_count"`
 	CountdownTitle   string `json:"countdown_title"`
+	CountdownSending string `json:"countdown_sending"`
+	CountdownSeconds string `json:"countdown_seconds"`
+	CountdownMinutes string `json:"countdown_minutes"`
+	TipNamed         string `json:"tip_named"`
+	TipKind          string `json:"tip_kind"`
+	TipWhy           string `json:"tip_why"`
 	LegendTitle      string `json:"legend_title"`
 	SortBy           string `json:"sort_by"`
 	ColUnit          string `json:"col_unit"`

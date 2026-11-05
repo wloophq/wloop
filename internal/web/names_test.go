@@ -23,7 +23,7 @@ func TestRowLinkNamesItsProvider(t *testing.T) {
 	b.WriteString(jsFunction(t, src, "pl"))
 	b.WriteString(pluginsJS(t))
 	var got []string
-	nodeRun(t, b.String(), []string{"where", "rowLink"}, `
+	nodeRun(t, b.String(), []string{"where", "rowLink", "roveStop"}, `
 applyPlugins(input.plugins);
 process.stdout.write(JSON.stringify(input.rows.map((r) => {
   const a = where(r, "row:x").find((n) => n.tag === "a");

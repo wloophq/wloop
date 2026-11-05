@@ -546,12 +546,12 @@ func TestAFacetTogglesItsQualifier(t *testing.T) {
 
 // rowFuncs are app.js's row renderer and what it calls beyond the lens.
 var rowFuncs = []string{"stripDot", "specFor", "rfc3339", "agePart", "ageText", "partPiece", "rowParts", "rowClasses", "partClass", "pieceButtons", "rowColumnDefs", "rowColumns",
-	"columnSort", "sortPick", "rowHead", "rowTr", "joined", "refTail", "rowTable", "unitTitle", "rowWords", "lensWords", "fillWord", "facet",
+	"columnSort", "sortPick", "rowHead", "rowTr", "rowMeta", "rowWho", "rowCard", "roveKey", "roveStop", "rowStops", "joined", "refTail", "rowTable", "unitTitle", "rowWords", "lensWords", "fillWord", "facet",
 	"rowLink", "bucketOf", "goDuration", "toggleCollapsed", "onlyThis", "groupQualifier", "multiCopy", "marked", "foldMap", "copySlot"}
 
 // lensFuncs are what pipeline runs, with what the fields call.
-var lensFuncs = append(slices.Clone(queryFuncs), "rowTexts", "rowKindLabel", "kindLabel", "haystack", "matches", "inView", "isSet", "isMuted", "isMine", "resolveWho", "waitingWho", "waitingLabel",
-	"specFor", "stripSpec", "stripColor", "stripOf", "rowStrip", "waitCat", "waitColor", "waitClass", "stripTip", "viewStrip", "isStalled", "rowFlags", "upcoming", "sinceTime", "itemValues", "itemKey", "filtersOf", "passesFilters", "passes", "parseSort",
+var lensFuncs = append(slices.Clone(queryFuncs), "rowTexts", "rowKindLabel", "kindLabel", "haystack", "matches", "inView", "isSet", "isMuted", "resolveWho", "waitingWho", "waitingLabel",
+	"specFor", "stripSpec", "stripColor", "stripOf", "rowStrip", "waitCat", "waitColor", "waitClass", "rowTip", "viewStrip", "isStalled", "rowFlags", "upcoming", "sinceTime", "itemValues", "itemKey", "filtersOf", "passesFilters", "passes", "parseSort",
 	"lensWords", "fillWord", "tagKeyField", "groupField", "effectiveGroup", "cmp", "byDefault", "keyRank", "keyOrder", "compareItems", "groupLabel", "groupItems", "pipelineOf", "pipeline")
 
 func lensPrelude(t *testing.T) string {
@@ -743,11 +743,6 @@ func TestTheOpenRowIsMarkedAndScrolledToOnce(t *testing.T) {
 		t.Skip("node is not on PATH")
 	}
 	src := appJS(t)
-	for _, want := range []string{`"aria-current": key === pr`} {
-		if !strings.Contains(src, want) {
-			t.Errorf("app.js lacks %s", want)
-		}
-	}
 	css, err := fs.ReadFile(files, "static/app.css")
 	if err != nil {
 		t.Fatal(err)
@@ -1158,7 +1153,7 @@ const useSpecs = (s) => { state.specs = { version: s.version, byId: Object.fromE
 `
 }
 
-var buttonFuncs = []string{"actionStates", "actionTitle", "actionButton", "actionButtons", "actionNotes", "act", "apiError", "acceptedNote"}
+var buttonFuncs = []string{"actionStates", "actionTitle", "actionButton", "roveStop", "actionButtons", "actionNotes", "act", "apiError", "acceptedNote"}
 
 func TestActionButtonsRenderTheServedStates(t *testing.T) {
 	specs, rows, byID, states := wireFixtures(t)
@@ -1577,7 +1572,7 @@ const getJSON = async (url) => {
 };
 const loadActivity = async () => {}, loadExploreRecent = async () => {}, loadPlan = async () => {}, loadRoundGates = async () => {}, render = () => {};
 const loadDetail = async () => { state.detail = { row: row(detailVersion) }; };
-`, []string{"specsStale", "loadSpecs", "refreshSpecs", "actionStates", "actionTitle", "actionButton", "actionButtons", "load"}, `(async () => {
+`, []string{"specsStale", "loadSpecs", "refreshSpecs", "actionStates", "actionTitle", "actionButton", "roveStop", "actionButtons", "load"}, `(async () => {
   const versions = [];
   await load(); versions.push(state.specs.version);
   listed = "v2"; detailVersion = "v2"; actionsFail = true;

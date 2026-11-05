@@ -77,7 +77,7 @@ const lens = { ...lensOf({ ...readHash(), view: "mine" }), group: "tag:lang" };
 const tr = (copy) => { const m = rowModel(r, "", lens, copy); return rowTr(m, lens, rowColumns([m])); };
 const copies = ["lang:go", "lang:sql"].map((c) => slots(tr(c)));
 const plain = slots(tr(""));
-const cards = ["lang:go", "lang:sql"].map((c) => card(r, "", c).children[0].attrs["data-focus"]);
+const cards = ["lang:go", "lang:sql"].map((c) => rowCard(rowModel(r, "", lens, c, "card"), lens).children[0].children[0].attrs["data-focus"]);
 state.openSlot = copies[1][0];
 const open = [openSlot("github:acme/web#2"), openSlot("github:acme/web#20"), openSlot("github:acme/api#2")];
 state.revealed = "";

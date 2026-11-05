@@ -245,12 +245,11 @@ const providerName = (id) => id;
 		Keys      []string
 	}
 	nodeRun(t, prelude, slices.Concat(lensFuncs, rowFuncs, []string{"fieldById", "rowModel", "countdown", "age",
-		"stripTitle", "mineMark", "tagChips", "briefTags", "intakeWaiting", "intakeChip", "actionStates", "actionTitle", "actionButton", "actionButtons",
-		"openRow", "openSlot", "card"}), `
+		"intakeWaiting", "intakeChip", "actionStates", "actionTitle", "actionButton", "actionButtons", "openRow", "openSlot"}), `
 const lens = { view: "all", q: "", ts: [], quals: [], filters: new Map(), group: "", sort: "", layout: "", fields: catalog.fields, specs: catalog.specs, words: lensWords() };
 const m = rowModel(input, "", lens, "");
 const tr = rowTr(m, lens, rowColumns([m]));
-const c = card(input, "", "");
+const c = rowCard(rowModel(input, "", lens, "", "card"), lens);
 process.stdout.write(JSON.stringify({ Row: text(tr), Card: text(c), Keys: Object.keys(input.payload || {}) }));`, row, &got)
 	for _, s := range []string{got.Row, got.Card} {
 		if !strings.Contains(s, "Can someone look at the deploy?") || !strings.Contains(s, "#general thread") {

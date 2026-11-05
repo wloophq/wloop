@@ -19,6 +19,12 @@ type RowWords struct {
 	FilterGroup      string
 	ListCount        string
 	CountdownTitle   string
+	CountdownSending string
+	CountdownSeconds string
+	CountdownMinutes string
+	TipNamed         string
+	TipKind          string
+	TipWhy           string
 	LegendTitle      string
 	SortBy           string
 	ColUnit          string
@@ -72,6 +78,18 @@ func (w *RowWords) field(key string) *string {
 		return &w.ListCount
 	case "countdown_title":
 		return &w.CountdownTitle
+	case "countdown_sending":
+		return &w.CountdownSending
+	case "countdown_seconds":
+		return &w.CountdownSeconds
+	case "countdown_minutes":
+		return &w.CountdownMinutes
+	case "tip_named":
+		return &w.TipNamed
+	case "tip_kind":
+		return &w.TipKind
+	case "tip_why":
+		return &w.TipWhy
 	case "legend_title":
 		return &w.LegendTitle
 	case "sort_by":

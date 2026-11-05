@@ -465,11 +465,12 @@ function age(since, now = Date.now()) {
   return `${Math.floor(hours / 24)}d ${hours % 24}h`;
 }
 
-function left(deadline, now = Date.now()) {
+// left is a pending round's countdown to deadline in the row words w.
+function left(deadline, w, now = Date.now()) {
   const s = Math.ceil((Date.parse(deadline) - now) / 1000);
-  if (s <= 0) return "sending";
-  if (s <= 99) return `in ${s} s`;
-  return `in ${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
+  if (s <= 0) return w.countdown_sending || "";
+  if (s <= 99) return fillWord(w.countdown_seconds, { s });
+  return fillWord(w.countdown_minutes, { m: Math.floor(s / 60), s: String(s % 60).padStart(2, "0") });
 }
 
 // roundGate is the open plan gate an automatic round of the row waits on, until its deadline.
@@ -479,11 +480,13 @@ function roundGate(row) {
 
 function countdown(row) {
   const deadline = roundGate(row).deadline;
-  return h("span", { class: "age countdown", "data-deadline": deadline, title: fillWord(rowWords(unitOf(row).provider).countdown_title, { time: stamp(deadline) }) }, left(deadline));
+  const provider = unitOf(row).provider;
+  const w = rowWords(provider);
+  return h("span", { class: "age countdown", "data-deadline": deadline, "data-provider": provider, title: fillWord(w.countdown_title, { time: stamp(deadline) }) }, left(deadline, w));
 }
 
 function tickCountdowns() {
-  for (const el of document.querySelectorAll(".countdown[data-deadline]")) el.textContent = left(el.dataset.deadline);
+  for (const el of document.querySelectorAll(".countdown[data-deadline]")) el.textContent = left(el.dataset.deadline, rowWords(el.dataset.provider));
   for (const el of document.querySelectorAll(".plan-left[data-deadline]")) el.textContent = planWhen({ decision: "pending", default: "run", deadline: el.dataset.deadline });
 }
 
@@ -556,21 +559,14 @@ function waitClass(row) {
   return s ? "w-" + s.color : "";
 }
 
-// stripTip is what a strip says: its value's label, whom the row waits on unless that is you or nobody, then
-// the row's kind.
-function stripTip(strip, who, kind) {
-  const named = strip && who && who !== "me" && who !== "nobody" ? ` (${who})` : "";
-  return [strip ? strip.label + named : "", kind].filter(Boolean).join(": ");
-}
-
-function isMine(author) {
-  const viewer = state.health && state.health.viewer;
-  return !!viewer && (author || "").toLowerCase() === viewer.toLowerCase();
-}
-
-// stripTitle names whom the row's strip says it waits on, and why.
-function stripTitle(row) {
-  return [stripTip(rowStrip(row), waitingLabel(row), rowKindLabel(row)), sm(row).reason].filter(Boolean).join(". ");
+// rowTip is a row's tooltip in the row words w: its strip value's label, whom it waits on unless that is you
+// or nobody, its kind, then why.
+function rowTip(strip, who, kind, why, w) {
+  let tip = strip ? strip.label : "";
+  if (tip && who && who !== "me" && who !== "nobody") tip = fillWord(w.tip_named, { strip: tip, who });
+  if (kind) tip = tip ? fillWord(w.tip_kind, { tip, kind }) : kind;
+  if (why) tip = tip ? fillWord(w.tip_why, { tip, why }) : why;
+  return tip;
 }
 
 function isMuted(p) {
@@ -1284,7 +1280,7 @@ function actionButton(subject, st, sp, opts) {
     type: "button",
     class: ["act", st.enabled && st.primary ? "primary" : "", st.enabled ? "" : "off"].filter(Boolean).join(" "),
     title: actionTitle(st, sp),
-    "data-focus": `${opts.scope || "row:" + key}:${focusSlot(st.id)}`,
+    "data-focus": `${opts.scope || "row:" + key}:${focusSlot(st.id)}`, ...roveStop(opts.rove),
     disabled: state.busy.has(key) || !st.enabled,
     onclick: (e) => { e.stopPropagation(); return run(st.id); },
   }, st.label || sp.label);
@@ -1302,7 +1298,8 @@ function actionNotes(subject, surface) {
 // facet is a value on screen that filters by itself: a click filters by it,
 // Shift groups by its field and Alt leaves it out. A field the lens does not
 // know, or a lens that does not filter, shows its content alone. opts may
-// give the words to say it in and the noun that names the field.
+// give the words to say it in, the noun that names the field, and rove for
+// a stop of a row's roving focus.
 function facet(lens, field, raw, content, slot, opts = {}) {
   const fields = lens.fields || catalog.fields;
   const f = fieldById(field, fields);
@@ -1318,7 +1315,7 @@ function facet(lens, field, raw, content, slot, opts = {}) {
     writeHash({ q: toggledQualifier(readHash().q, field, raw, e.altKey, fields) });
   };
   return h("button", {
-    type: "button", class: "facet", "data-focus": slot,
+    type: "button", class: "facet", "data-focus": slot, ...roveStop(opts.rove),
     "aria-pressed": String(lens.quals.some((x) => x.field === field && x.value === v && !x.neg)),
     "aria-label": fillWord(w.filter_label, vars),
     title: fillWord(group ? w.filter_title_group : w.filter_title, vars),
@@ -1343,8 +1340,43 @@ function where(row, scope) {
   return bits;
 }
 
-function rowLink(row, scope) {
-  return h("a", { href: safeURL(row.link), target: "_blank", rel: "noopener noreferrer", class: "ext", "data-focus": `${scope}:link`, onclick: (e) => e.stopPropagation() }, providerName(unitOf(row).provider));
+function rowLink(row, scope, rove) {
+  return h("a", { href: safeURL(row.link), target: "_blank", rel: "noopener noreferrer", class: "ext", "data-focus": `${scope}:link`, ...roveStop(rove), onclick: (e) => e.stopPropagation() }, providerName(unitOf(row).provider));
+}
+
+// roveStop marks a control of a row as a stop of its roving focus: out of the Tab order, reached with the
+// arrows from the row.
+function roveStop(on) {
+  return on ? { tabindex: -1, "data-rove": "" } : {};
+}
+
+// rowStops are the stops of a row's roving focus in their order: the row itself when it takes the focus, then
+// its controls that are shown and enabled.
+function rowStops(row) {
+  const out = [];
+  const walk = (n) => {
+    if (!n || !n.getAttribute || n.hidden || n.getAttribute("disabled") != null) return;
+    if (n.getAttribute("data-rove") != null) out.push(n);
+    for (const c of n.children || []) walk(c);
+  };
+  walk(row);
+  return out;
+}
+
+// ROVE_KEYS are how far each key moves a row's roving focus.
+const ROVE_KEYS = { ArrowLeft: -1, ArrowRight: 1, Home: -Infinity, End: Infinity };
+
+// roveKey moves the focus among a row's stops with the arrows, Home and End; true when it took the key.
+function roveKey(e) {
+  const step = ROVE_KEYS[e.key];
+  if (!step || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return false;
+  const stops = rowStops(e.currentTarget);
+  const at = stops.indexOf(e.target);
+  if (at < 0) return false;
+  e.preventDefault();
+  const next = stops[Math.max(0, Math.min(stops.length - 1, at + step))];
+  if (next !== e.target) next.focus();
+  return true;
 }
 
 // copySlot is the focus slot of one copy of a row or card: grouping by a tag
@@ -1457,7 +1489,7 @@ function partClass(part) {
 function pieceButtons(m, lens, part) {
   return (m.parts[part] || []).map((p) => facet(lens, p.field, p.value,
     h("span", { class: partClass(part), "data-field": p.field, "data-value": p.value, title: agePart(part) ? stamp(p.raw) : undefined }, marked(p.label, lens.ts)),
-    `facet:${m.scope}:${p.field}:${p.value}`, { words: m.words, noun: (m.nouns || {})[`${p.field}:${p.value}`] }));
+    `facet:${m.scope}:${p.field}:${p.value}`, { words: m.words, noun: (m.nouns || {})[`${p.field}:${p.value}`], rove: true }));
 }
 
 // rowColumnDefs are a row's columns: the parts each shows, and whether a row has anything for it.
@@ -1520,13 +1552,11 @@ function rowTr(m, lens, cols) {
   const open = m.open;
   const cells = {
     unit: () => [
-      h("div", { class: "title", title: m.titleTip || undefined }, m.pre || null, m.href ? h("a", { href: m.href, onclick: (e) => e.stopPropagation() }, marked(m.title, lens.ts)) : marked(m.title, lens.ts)),
-      h("div", { class: "meta" },
-        h("span", { class: "ref" }, pieceButtons(m, lens, "ref"), (m.ref || []).map((x) => typeof x === "string" ? marked(x, lens.ts) : x)),
-        pieceButtons(m, lens, "meta"), m.meta || null,
-        pieceButtons(m, lens, "flag"), m.flags || null),
+      h("div", { class: "title", title: m.titleTip || undefined }, m.pre || null,
+        m.href ? h("a", { href: m.href, ...roveStop(true), onclick: (e) => e.stopPropagation() }, marked(m.title, lens.ts)) : marked(m.title, lens.ts)),
+      rowMeta(m, lens),
       m.after || null],
-    who: () => [h("div", { class: "who" }, m.lead || null, m.lead ? " " : null, joined(pieceButtons(m, lens, "who"))), pieceButtons(m, lens, "kind")],
+    who: () => rowWho(m, lens),
     since: (c) => m.age || pieceButtons(m, lens, c.parts[0]),
     why: () => m.why || "",
     aside: () => [m.asideLead || null, pieceButtons(m, lens, "aside"), m.aside || null],
@@ -1538,14 +1568,48 @@ function rowTr(m, lens, cols) {
     tabindex: 0,
     "aria-selected": m.selected ? "true" : "false",
     "data-focus": m.scope,
+    "data-row": m.scope,
+    "data-rove": "",
     onclick: open || undefined,
-    onkeydown: open ? (e) => {
+    onkeydown: (e) => {
+      if (roveKey(e) || !open) return;
       if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
         e.preventDefault();
         open();
       }
-    } : undefined,
+    },
   }, cols.map((c) => h("td", { class: c.cls }, cells[c.id](c))));
+}
+
+// rowMeta is a model's ref, meta and flag parts, with what no facet carries after each.
+function rowMeta(m, lens) {
+  return h("div", { class: "meta" },
+    h("span", { class: "ref" }, pieceButtons(m, lens, "ref"), (m.ref || []).map((x) => typeof x === "string" ? marked(x, lens.ts) : x)),
+    pieceButtons(m, lens, "meta"), m.meta || null,
+    pieceButtons(m, lens, "flag"), m.flags || null);
+}
+
+// rowWho is whom a model waits on: its strip's dot and its who pieces, then its kind.
+function rowWho(m, lens) {
+  return [h("div", { class: "who" }, m.lead || null, m.lead ? " " : null, joined(pieceButtons(m, lens, "who"))), pieceButtons(m, lens, "kind")];
+}
+
+// rowCard is a model as a board's card: an li whose title is the control that opens it, stretched over the
+// card, with the pieces its row shows as siblings, the arrows moving between them.
+function rowCard(m, lens) {
+  const label = marked(m.title, lens.ts);
+  const title = m.open ? h("button", { type: "button", class: "open", "data-focus": m.scope, "data-rove": "", "aria-current": m.selected ? "true" : undefined, onclick: m.open }, label)
+    : m.href ? h("a", { class: "open", href: m.href, "data-focus": m.scope, "data-rove": "", "aria-current": m.selected ? "true" : undefined }, label) : label;
+  return h("li", {
+    class: ["card", ...(m.cls || []), m.selected ? "sel" : ""].filter(Boolean).join(" "),
+    title: m.tip || undefined,
+    "data-row": m.scope,
+    onkeydown: roveKey,
+  },
+    h("div", { class: "title", title: m.titleTip || undefined }, m.pre || null, title),
+    rowMeta(m, lens),
+    h("div", { class: "card-who" }, rowWho(m, lens), m.age || pieceButtons(m, lens, "age")),
+    m.after || null);
 }
 
 function joined(nodes) {
@@ -1558,15 +1622,15 @@ function refTail(label, ref) {
   return lead && label.startsWith(lead) ? label.slice(lead.length) : label;
 }
 
-// rowModel is a plugin row as the row renderer lays it out: its facets placed by its provider's specs, then
-// what no facet carries.
-function rowModel(r, pr, lens, copy) {
+// rowModel is a plugin row as the row renderer lays it out, in a list or as a board's card (kind "card"): its
+// facets placed by its provider's specs, then what no facet carries.
+function rowModel(r, pr, lens, copy, kind = "row") {
   const key = keyOf(r);
   const p = pl(r);
   const w = rowWords(unitOf(r).provider);
   const item = { facets: r.facets || {}, provider: unitOf(r).provider };
   const parts = rowParts(item, lens.specs, w);
-  const scope = copySlot("row", key, copy);
+  const scope = copySlot(kind, key, copy);
   const n = Number.isInteger((p.brief || {}).open_questions) ? p.brief.open_questions : 0;
   const ws = p.workspace || {};
   const strip = stripOf(item, lens.specs);
@@ -1585,10 +1649,10 @@ function rowModel(r, pr, lens, copy) {
     age: roundGate(r) ? countdown(r) : null,
     why,
     asideLead: ws.display_name ? h("span", { class: "ws" }, ws.display_name) : null,
-    aside: [(ws.agent_states || []).length ? h("span", { class: "agent" }, ws.agent_states.join(", ")) : null, rowLink(r, scope)],
-    actions: actionButtons(r, "row", { scope }),
+    aside: [(ws.agent_states || []).length ? h("span", { class: "agent" }, ws.agent_states.join(", ")) : null, rowLink(r, scope, true)],
+    actions: actionButtons(r, "row", { scope, rove: true }),
     cls: [strip ? "w-" + strip.color : "", ...rowClasses(item, lens.specs)],
-    tip: [stripTip(strip, waitingLabel(r), (parts.kind || []).map((x) => x.label).join(", ")), why].filter(Boolean).join(". "),
+    tip: rowTip(strip, waitingLabel(r), (parts.kind || []).map((x) => x.label).join(", "), why, w),
   };
 }
 
@@ -1596,7 +1660,7 @@ function rowModel(r, pr, lens, copy) {
 function stripDot(strip, lens, scope, words) {
   if (!strip) return null;
   const id = strip.spec.id;
-  return facet(lens, id, strip.value, h("span", { class: "dot", "aria-hidden": "true", "data-field": id, "data-value": strip.value }, "●"), `facet:${scope}:${id}`, { words });
+  return facet(lens, id, strip.value, h("span", { class: "dot", "aria-hidden": "true", "data-field": id, "data-value": strip.value }, "●"), `facet:${scope}:${id}`, { words, rove: true });
 }
 
 // groupQualifier is the filter that keeps only a group's rows: a tag key's
@@ -1755,27 +1819,7 @@ function lane(g, lens, title, item) {
 
 function renderBoard(groups, pr, lens) {
   const title = (catalog.views.find((v) => v.id === lens.view) || {}).label || lens.view;
-  document.getElementById("board").replaceChildren(...groups.map((g) => lane(g, lens, title, (r, copy) => card(r, pr, copy))));
-}
-
-function mineMark() {
-  return h("span", { class: "flag mine-mark", title: "You opened this pull request" }, "mine");
-}
-
-function card(r, pr, copy) {
-  const key = keyOf(r);
-  const p = pl(r);
-  const mine = isMine(p.author);
-  const scope = copySlot("card", key, copy);
-  return h("li", {},
-    h("button", {
-      type: "button", class: ["card", waitClass(r), mine ? "mine" : "", key === pr ? "sel" : ""].join(" "), "data-focus": scope, title: stripTitle(r),
-      "aria-current": key === pr ? "true" : undefined, onclick: () => openRow(scope, key),
-    },
-      h("span", { class: "title", title: (p.brief || {}).goal }, r.title || labelOf(r)),
-      h("span", { class: "meta" }, `${labelOf(r)} · ${waitingLabel(r)} · ${rowKindLabel(r)}`,
-        mine ? mineMark() : null, (p.override || {}).hold ? h("span", { class: "flag" }, "paused") : null, intakeChip(r), briefTags(p.brief)),
-      h("span", { class: "age", title: stamp(sm(r).since) }, age(sm(r).since))));
+  document.getElementById("board").replaceChildren(...groups.map((g) => lane(g, lens, title, (r, copy) => rowCard(rowModel(r, pr, lens, copy, "card"), lens))));
 }
 
 function loopOnly() {
@@ -1946,9 +1990,8 @@ function tagChips(tags, lens, slot, all) {
   ];
 }
 
-// briefTags takes a row's brief summary; open_questions is a count. With a
-// lens, size, risk and tags are facets.
-function briefTags(b, lens, slot) {
+// briefTags are the pills of an Explore candidate's brief summary; open_questions is a count.
+function briefTags(b) {
   if (!b) return null;
   const size = SIZES.includes(b.size) ? b.size : "";
   const risk = RISKS.includes(b.risk) ? b.risk : "";
@@ -1956,15 +1999,12 @@ function briefTags(b, lens, slot) {
   const tags = Array.isArray(b.tags) ? b.tags : [];
   const type = b.kind || "";
   if (!type && !size && !risk && !n && !tags.length) return null;
-  const typePill = type ? h("span", { class: "pill", title: `type ${type}` }, type) : null;
-  const sizePill = size ? h("span", { class: "pill", title: `size ${size}` }, size.toUpperCase()) : null;
-  const riskPill = risk ? h("span", { class: `pill risk-${risk}` }, `risk ${risk}`) : null;
   return h("span", { class: "btags" },
-    typePill && lens ? facet(lens, "type", type, typePill, slot + "type") : typePill,
-    sizePill && lens ? facet(lens, "size", size, sizePill, slot + "size") : sizePill,
-    riskPill && lens ? facet(lens, "risk", risk, riskPill, slot + "risk") : riskPill,
+    type ? h("span", { class: "pill", title: `type ${type}` }, type) : null,
+    size ? h("span", { class: "pill", title: `size ${size}` }, size.toUpperCase()) : null,
+    risk ? h("span", { class: `pill risk-${risk}` }, `risk ${risk}`) : null,
     n ? h("span", { class: "pill qs", title: `${n} open question${n === 1 ? "" : "s"} in the brief` }, `? ${n}`) : null,
-    tagChips(tags, lens, slot));
+    tagChips(tags));
 }
 
 function refreshBriefButton(r) {
