@@ -227,7 +227,7 @@ func jsonEqual(t *testing.T, a, b []byte) bool {
 func TestDeepLinkViewSurvivesBeforeTheCatalog(t *testing.T) {
 	src := appJS(t)
 	prelude := jsConst(t, src, "catalog") + jsConst(t, src, "UNIT_KEY") + jsConst(t, src, "QUERY_MAX") +
-		noPlugins + "const location = { hash: \"#view=stalled&q=x\" };\nconst groupField = () => null;\nconst parseSort = () => ({ field: \"\" });\n" + viewsScripts(t)
+		noPlugins + "const location = { hash: \"#view=stalled&q=x\" };\nconst lensPicks = () => ({ g: \"\", s: \"\" });\n" + viewsScripts(t)
 	var got struct{ Before, Unknown, After, Missing string }
 	nodeRun(t, prelude, []string{"readHash"}, `
 const before = readHash().view;

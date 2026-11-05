@@ -22,7 +22,7 @@ func TaskFacets(defs []intentload.FacetDef) []api.FacetSpec {
 }
 
 func taskFacet(f intentload.FacetDef) api.FacetSpec {
-	spec := api.FacetSpec{ID: f.ID, Label: f.Label, Group: f.Group, Sort: f.Sort, Rank: slices.Clone(f.Rank), Labels: maps.Clone(f.Values),
+	spec := api.FacetSpec{ID: f.ID, Label: f.Label, Fact: f.Fact, Group: f.Group, Sort: f.Sort, Rank: slices.Clone(f.Rank), Labels: maps.Clone(f.Values),
 		Empty: f.Empty, Match: f.Match, Menu: f.Menu, Strip: f.Strip}
 	for _, b := range f.Buckets {
 		within := ""

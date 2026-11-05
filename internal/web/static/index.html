@@ -40,7 +40,11 @@
     </section>
     <section id="plan" class="plan" aria-label="The workflows' plan" hidden></section>
     <section id="dash" class="dash" aria-label="Backlog dashboard" hidden></section>
-    <section id="tasks" class="tasks" hidden></section>
+    <section id="tasks" class="tasks" hidden>
+      <div id="tasks-head"></div>
+      <div id="task-tools" class="tools" role="toolbar" aria-label="Filter, group and sort the tasks" hidden></div>
+      <div id="tasks-body"></div>
+    </section>
     <details id="list-box" class="list-box" open>
       <summary id="list-sum" class="list-sum"></summary>
       <div id="tools" class="tools" role="toolbar" aria-label="Filter, group and sort" hidden></div>
@@ -51,7 +55,7 @@
             <th scope="col" class="c-wait"><button type="button" class="th-sort" data-sort="wait" data-focus="th:wait" title="Sort by whom it waits on">Waiting on</button></th>
             <th scope="col" class="c-for"><button type="button" class="th-sort" data-sort="age" data-focus="th:age" title="Sort by how long it waits">For</button></th>
             <th scope="col" class="c-why"><button type="button" class="th-sort" data-sort="kind" data-focus="th:kind" title="Sort by situation">Why</button></th>
-            <th scope="col" class="c-where"><button type="button" class="th-sort" data-sort="status" data-focus="th:status" title="Sort by workspace column">Where</button></th>
+            <th scope="col" class="c-where"><button type="button" class="th-sort" data-sort="status" data-focus="th:status" title="Sort by workspace column">Workspace</button></th>
             <th scope="col" class="c-act"><span class="sr">Actions</span></th>
           </tr>
         </thead>

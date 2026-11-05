@@ -211,42 +211,6 @@ async function loadTaskList(route) {
   if (page.specs && page.specs !== (tasksState.catalog || {}).version) await readViews();
 }
 
-
-
-// groupValue reads fact, a task fact such as task.category or task.prop.size, from a task as the wire serves it:
-// its first value when it holds several.
-function groupValue(fact, e) {
-  const name = String(fact || "").replace(/^task\./, "");
-  let v;
-  if (name.startsWith("prop.")) v = (e.props || {})[name.slice(5)];
-  else v = e[name];
-  if (Array.isArray(v)) v = v[0];
-  if (v && typeof v === "object") v = v.name || v.key;
-  return v === undefined || v === null ? "" : String(v);
-}
-
-// viewGroups splits a view's list by the fact its spec groups by; a view
-// that names none is one group. Groups of a state or a category follow the
-// catalog's states, with their labels; others sort by value. The empty
-// value comes last.
-function viewGroups(spec, tasks, cat = tasksState.catalog) {
-  const fact = (spec && spec.group) || "";
-  if (!fact) return [{ key: "", label: "", tasks }];
-  const states = (cat && cat.states) || [];
-  const name = fact.replace(/^task\./, "");
-  const order = name === "state" ? states.map((s) => s.name) : name === "category" ? [...new Set(states.map((s) => s.category))] : [];
-  const label = (k) => (!k ? "None" : name === "state" ? stateLabel(k) : k);
-  const groups = new Map();
-  for (const e of tasks) {
-    const k = groupValue(fact, e);
-    if (!groups.has(k)) groups.set(k, []);
-    groups.get(k).push(e);
-  }
-  const rank = (k) => (order.includes(k) ? order.indexOf(k) : order.length);
-  return [...groups.keys()].sort((a, b) => (a === "") - (b === "") || rank(a) - rank(b) || a.localeCompare(b))
-    .map((k) => ({ key: k, label: label(k), tasks: groups.get(k) }));
-}
-
 function unitLabel(u) {
   return !u ? "" : `${u.provider}:${u.key}`;
 }
@@ -413,60 +377,73 @@ function taskHaystack(e) {
     ...Object.keys(e.facets || {}).sort().flatMap((id) => e.facets[id])].map((x) => fold(x));
 }
 
-// filterTerms are the free words of the filter query, the qualifiers left to the pull request lists, as the
-// daemon reads them.
-function filterTerms(q) {
-  const qualifier = typeof qualifierOf === "function" ? qualifierOf : () => null;
-  return (String(q || "").match(/[^\s"]*"[^"]*"?|[^\s"]+/g) || []).filter((t) => !qualifier(t))
-    .map((t) => fold(t.replace(/^"|"$/g, "")).trim()).filter(Boolean);
+const taskItems = new WeakMap();
+
+// taskItemOf is e as the lens reads an item: its facets and the texts the daemon's counters search.
+function taskItemOf(e) {
+  let it = taskItems.get(e);
+  if (!it) taskItems.set(e, (it = { task: e, facets: e.facets || {}, texts: taskHaystack(e) }));
+  return it;
 }
 
-// taskMatches says whether every free word of ts is in e.
-function taskMatches(e, ts) {
-  if (!ts.length) return true;
-  const hay = taskHaystack(e);
-  return ts.every((t) => hay.some((f) => f.includes(t)));
+// taskLensItems are the loaded tasks as the lens's items, in the daemon's order.
+function taskLensItems() {
+  return tasksState.tasks.map(taskItemOf);
 }
 
-// taskList is the list of a core view; its heading counts what the filter
-// shows of the view, as a pull request list's bar does.
-function taskList(route, open) {
+// viewPage is a core view's page: its head, the lens over its tasks with what it shows (null while it loads
+// or for a list of gates), and its body. The lens counts what the filter shows of the view, as a pull
+// request list's bar does.
+function viewPage(route, open) {
   const label = viewLabel(route.view);
   const loaded = tasksState.key === viewQueryKey(route.view, route.area, route.ctx);
-  const ts = filterTerms(route.q);
-  const shown = loaded ? tasksState.tasks.filter((e) => taskMatches(e, ts)) : [];
   const spec = viewSpec(route.view);
   const n = loaded ? tasksState.tasks.length : 0;
-  const parts = [h("div", { class: "tools tasks-tools" }, h("h2", { class: "tasks-head" }, label), areaPicker(route), contextChips(route),
-    loaded ? h("span", { class: "lens-count" }, `${shown.length} of ${tasksState.tasks.length}`) : null,
+  const head = [h("div", { class: "tools tasks-tools" }, h("h2", { class: "tasks-head" }, label), areaPicker(route), contextChips(route),
     spec && spec.remove_clean ? h("button", {
       type: "button", class: "act", "data-focus": "tasks:remove-clean", disabled: n === 0 || removeState.busy,
       title: "Remove the workspaces of this view's tasks whose checkouts hold nothing unpublished",
       onclick: () => removeAllClean(n, route.view),
     }, "Remove all clean") : null), viewIntro(spec)];
-  if (tasksState.error) parts.push(h("p", { class: "plan-error" }, tasksState.error));
-  if (loaded) parts.push(...loadingNotes(tasksState.loading));
+  const page = { head, lens: lensOf(route), res: null, body: [] };
+  const body = page.body;
+  if (tasksState.error) body.push(h("p", { class: "plan-error" }, tasksState.error));
+  if (loaded) body.push(...loadingNotes(tasksState.loading));
   if (!loaded) {
-    parts.push(h("p", { class: "empty" }, "Loading."));
-    return parts;
+    body.push(h("p", { class: "empty" }, "Loading."));
+    return page;
   }
   if (spec && spec.over === "gates") {
-    parts.push(tasksState.gates.length ? h("div", { class: "gate-list" }, ...tasksState.gates.map((g) => gateCard(taskById(g.task), g))) : h("p", { class: "empty" }, spec.empty));
-    return parts;
+    body.push(tasksState.gates.length ? h("div", { class: "gate-list" }, ...tasksState.gates.map((g) => gateCard(taskById(g.task), g))) : h("p", { class: "empty" }, spec.empty));
+    return page;
   }
+  page.res = pipelineOf(taskLensItems(), page.lens, null);
   if (!tasksState.tasks.length) {
-    parts.push(h("p", { class: "empty" }, spec && spec.empty));
-    return parts;
+    body.push(h("p", { class: "empty" }, spec && spec.empty));
+    return page;
   }
-  if (!shown.length) {
-    parts.push(h("p", { class: "empty" }, `Nothing here matches "${route.q}".`));
-    return parts;
+  if (!page.res.shown) {
+    body.push(h("p", { class: "empty" }, `Nothing here matches "${route.q}".`));
+    return page;
   }
-  for (const g of viewGroups(spec, shown)) {
-    if (g.label) parts.push(h("h3", { class: "plan-head" }, `${g.label} (${g.tasks.length})`));
-    parts.push(h("ol", { class: "task-list" }, ...g.tasks.map((e) => listItem(e, open))));
-  }
-  return parts;
+  if (page.lens.layout === "board") body.push(taskBoard(page.res, page.lens, open));
+  else body.push(...taskGroups(page.res, page.lens, open).filter(Boolean));
+  return page;
+}
+
+// taskGroups lists the lens's groups of tasks, each under its heading when the lens groups.
+function taskGroups(res, lens, open) {
+  return res.groups.filter((g) => g.rows.length).flatMap((g) => [
+    res.group ? h("h3", { class: "plan-head" }, `${g.label} (${g.rows.length})`, onlyThis(g, lens)) : null,
+    h("ol", { class: "task-list" }, ...g.rows.map((it) => listItem(it.task, open)))]);
+}
+
+// taskBoard is a lane per group of the lens, each holding its tasks' rows.
+function taskBoard(res, lens, open) {
+  return h("div", { class: "board task-board" }, ...res.groups.filter((g) => g.rows.length).map((g) => h("section", { class: "lane", "aria-label": g.label },
+    h("h2", { class: "lane-head" + (g.field === catalog.strip ? " w-" + g.key : "") }, h("span", {}, g.label),
+      h("span", { class: "lane-tools" }, onlyThis(g, lens), h("span", { class: "count" }, g.rows.length))),
+    h("ol", { class: "cards" }, ...g.rows.map((it) => listItem(it.task, open))))));
 }
 
 // viewIntro is a view's summary under its heading, and the rule its profile lists it by behind a toggle.
@@ -542,13 +519,23 @@ async function removeAllClean(n, view) {
 
 function renderTasks(route) {
   const box = document.getElementById("tasks");
+  const head = document.getElementById("tasks-head");
+  const tools = document.getElementById("task-tools");
+  const body = document.getElementById("tasks-body");
   const on = isCoreView(route.view);
   box.hidden = !on;
   if (route.view !== REVIEW) reviewState.step = "";
-  if (!on) {
-    box.replaceChildren();
+  if (!on || route.view === REVIEW) {
+    head.replaceChildren();
+    hideLens(tools);
+    body.replaceChildren(...(on ? reviewPanel(route.task) : []));
+    if (on) box.setAttribute("aria-label", REVIEW_TITLE);
     return;
   }
-  box.setAttribute("aria-label", route.view === REVIEW ? REVIEW_TITLE : viewLabel(route.view));
-  box.replaceChildren(...(route.view === REVIEW ? reviewPanel(route.task) : taskList(route, route.task)));
+  box.setAttribute("aria-label", viewLabel(route.view));
+  const page = viewPage(route, route.task);
+  head.replaceChildren(...page.head);
+  if (page.res) renderLens(page.lens, page.res, tools);
+  else hideLens(tools);
+  body.replaceChildren(...page.body);
 }

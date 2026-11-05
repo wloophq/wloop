@@ -5,15 +5,18 @@
 [views.mine]
 label = "My PRs"
 unit = "Pull request"
+default_sort = "Waiting longest"
 
 [views.plan]
 label = "Plan"
 
 [views.dash]
 label = "Backlog"
+default_sort = "Waiting longest"
 
 [views.all]
 label = "All"
+default_sort = "Waiting longest"
 
 [views.explore]
 label = "Explore"

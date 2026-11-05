@@ -1,5 +1,5 @@
 {
-  "version": "f0d52a828201",
+  "version": "14698a670b72",
   "views": [
     {
       "id": "mine",
@@ -11,7 +11,8 @@
         "web",
         "tui"
       ],
-      "unit": "Pull request"
+      "unit": "Pull request",
+      "default_sort": "Waiting longest"
     },
     {
       "id": "plan",
@@ -32,7 +33,8 @@
       "order": 6,
       "surfaces": [
         "web"
-      ]
+      ],
+      "default_sort": "Waiting longest"
     },
     {
       "id": "all",
@@ -42,7 +44,8 @@
       "order": 8,
       "surfaces": [
         "web"
-      ]
+      ],
+      "default_sort": "Waiting longest"
     },
     {
       "id": "explore",

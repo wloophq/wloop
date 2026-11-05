@@ -5,8 +5,10 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/lens"
 	"github.com/wloophq/wloop/internal/domain/card"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -64,12 +66,12 @@ const route = { view: "fits-now", area: "", ctx: [], task: "", q: "invoice" };
   await loadFiltered({ ...route, area: "OSS", q: "invoice \"the client\"" });
   tasksState.key = viewQueryKey("fits-now", "", []);
   tasksState.tasks = input.next;
-  const list = taskList(route, "");
+  const list = taskListNodes(route, "");
   const filtered = tasksState.filtered;
   process.stdout.write(JSON.stringify({ urls, before, rail, stale, cleared, filtered,
     head: text(byClass(list, "lens-count")),
     groups: all(list, (x) => x.tag === "h3").map(text),
-    areas: all(list, (x) => x.tag === "option").map(text),
+    areas: all(all(list, (x) => x.attrs["data-focus"] === "view:area"), (x) => x.tag === "option").map(text),
     chips: byClass(list, "chip").map(text) }));
 })();`, map[string]any{"cat": viewsCatalog(), "whole": whole, "narrowed": narrowed, "next": next}, &got)
 	if slices.ContainsFunc(got.Before, func(c any) bool { return c != "" }) {
@@ -111,17 +113,15 @@ function writeHash() {}
 tasksState.catalog = input.cat;
 tasksState.key = viewQueryKey("inbox", "", []);
 tasksState.tasks = input.tasks;
-process.stdout.write(JSON.stringify(text(byClass(taskList({ view: "inbox", area: "", ctx: [], task: "", q: "" }, ""), "lens-count"))));`,
+process.stdout.write(JSON.stringify(text(byClass(taskListNodes({ view: "inbox", area: "", ctx: [], task: "", q: "" }, ""), "lens-count"))));`,
 		map[string]any{"cat": viewsCatalog(), "tasks": []api.TaskView{task("a", "inbox", nil), task("b", "inbox", nil)}}, &head)
 	if head != "2 of 2" {
 		t.Errorf("heading %q", head)
 	}
 }
 
-// TestTheCockpitAndTheDaemonMatchTheSameTasks keeps the cockpit's list
-// and the daemon's counts on the same tasks: the daemon matches the terms
-// the cockpit sends, trimmed as handleCounters trims them, with
-// api.TaskMatches.
+// TestTheCockpitAndTheDaemonMatchTheSameTasks keeps the cockpit's list and the daemon's counts on the same
+// tasks: the daemon reads the query the cockpit sends with the Go lens over the same specs.
 func TestTheCockpitAndTheDaemonMatchTheSameTasks(t *testing.T) {
 	gh := unit.Unit{Provider: unit.GitHub, Key: "acme/api#12"}
 	es := []api.TaskView{
@@ -152,39 +152,31 @@ func TestTheCockpitAndTheDaemonMatchTheSameTasks(t *testing.T) {
 		"dora", "window", "c0rel", "releases", "ship", "eyes", "slack/t1", "next", "capture", "draft ship", "nobody", `"task a" ação`,
 		"Škoda", "skoda", "erdos", "Erdős", "회의", "が", "がんばる", `"invoice `, `" the invoice"`, `"send the"`, "eclair", "éclair", "cafe",
 		"where:acme invoice", "general", "failure thread"}
-	var got []struct {
-		Terms   []string `json:"terms"`
-		Matches []bool   `json:"matches"`
-	}
+	views := servedViews(t)
+	specs := taskSpecs(t, views)
+	now := time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC)
+	var got [][]bool
 	nodeRun(t, viewsPrelude(t), nil, `
+Date.now = () => input.now;
+tasksState.catalog = input.cat;
+const items = input.tasks.map(taskItemOf);
 process.stdout.write(JSON.stringify(input.queries.map((q) => {
-  const ts = filterTerms(q);
-  return { terms: ts, matches: input.tasks.map((e) => taskMatches(e, ts)) };
-})));`, map[string]any{"tasks": es, "queries": queries}, &got)
+  const lens = lensOf({ view: "inbox", area: "", ctx: [], q });
+  return items.map((it) => matches(it, lens.ts) && passesFilters(it, lens.filters));
+})));`, map[string]any{"tasks": es, "queries": queries, "cat": views, "now": now.UnixMilli()}, &got)
 	for _, q := range []string{"general", "failure thread"} {
-		i, last := slices.Index(queries, q), len(es)-1
-		if !got[i].Matches[last] || !api.TaskMatches(es[last], filterTermsOf(got[i].Terms)) {
-			t.Errorf("%q misses the task whose facets hold it: the list %v", q, got[i].Matches[last])
+		if i := slices.Index(queries, q); !got[i][len(es)-1] {
+			t.Errorf("%q misses the task whose facets hold it", q)
 		}
 	}
 	for i, q := range queries {
-		sent := filterTermsOf(got[i].Terms)
+		query := strings.TrimSpace(q)
 		for j, e := range es {
-			if want := api.TaskMatches(e, sent); got[i].Matches[j] != want {
-				t.Errorf("%q (terms %q) on %s: the list shows %v, the daemon counts %v", q, got[i].Terms, e.ID, got[i].Matches[j], want)
+			if want := lens.Parse(query, specs).Match(lens.Item{Facets: e.Facets, Texts: e.Texts()}, specs, now); got[i][j] != want {
+				t.Errorf("%q on %s: the list shows %v, the daemon counts %v", q, e.ID, got[i][j], want)
 			}
 		}
 	}
-}
-
-func filterTermsOf(terms []string) []string {
-	var out []string
-	for _, term := range terms {
-		if term = strings.TrimSpace(term); term != "" {
-			out = append(out, term)
-		}
-	}
-	return out
 }
 
 func TestAFailedFilteredReadLeavesTheRailWithoutCounts(t *testing.T) {

@@ -80,3 +80,18 @@ func TestTaskFacetsServeTheirMechanics(t *testing.T) {
 		t.Errorf("size: %+v", s)
 	}
 }
+
+func TestATaskFacetNamesTheFactItReads(t *testing.T) {
+	facts := map[string]string{}
+	for _, f := range TaskFacets(bundled(t).Views.Facets) {
+		facts[f.ID] = f.Fact
+	}
+	if facts["waits-on"] != "task.owed_by" || facts["asked-by"] != "task.askers" || facts["risk"] != "brief.risk" {
+		t.Errorf("facts %v", facts)
+	}
+	for _, f := range githubFacets() {
+		if f.Fact != "" {
+			t.Errorf("the plugin facet %s names the fact %q", f.ID, f.Fact)
+		}
+	}
+}

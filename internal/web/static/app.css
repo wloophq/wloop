@@ -608,6 +608,10 @@ button.kpi:hover { border-color: var(--muted); }
 .task-row .star, #detail h1 .star { color: var(--late); }
 .task-row.outbox { cursor: default; }
 .task-row .project-facts .flag { color: var(--late); }
+.tasks > .tools { padding: 0 0 var(--space-8); }
+.task-board { padding: var(--space-8) 0 var(--space-16); }
+.task-board .task-row { background: var(--panel); border: 1px solid var(--rule); border-radius: var(--radius-md); overflow-wrap: anywhere; }
+.task-board .task-row:hover { background: var(--hover); }
 .review-steps { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-6); margin: 0 0 var(--space-8); padding: 0; }
 .review-pick { display: inline-flex; gap: var(--space-6); align-items: baseline; padding: var(--space-4) var(--space-10); border: 1px solid var(--rule); border-radius: var(--radius-pill); background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; }
 .review-step.done .review-pick { color: var(--muted); }

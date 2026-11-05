@@ -697,6 +697,7 @@ The fields each notice reads besides `Name` and `Command`:
 - `views.<name>` (table): One view's words.
 - `views.<name>.label` (string): The view's name, as navigation lists it. Required.
 - `views.<name>.unit` (string): What one of the view's rows is, such as "Pull request", the unit column's heading; empty for a view whose rows mix kinds.
+- `views.<name>.default_sort` (string): What the sort menu calls a row view's own order, such as "Waiting longest".
 - `views.<name>.search` (table): A custom view's search: the queries it runs at a press, the terms it toggles and the orders it offers.
 - `views.<name>.search.default_sort` (string): The order a query with none is read in.
 - `views.<name>.search.presets[]` (table): A query run at a press.

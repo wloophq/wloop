@@ -210,10 +210,10 @@ func TestCardRefOpensTheUnitInItsPluginView(t *testing.T) {
 	type link struct{ Href, Text, Target string }
 	var got map[string]struct{ Ref, Ext []link }
 	nodeRun(t, viewsPrelude(t), nil, `
-const catalog = { views: [
+catalog.views = [
   { id: "needs-me", provider: "github", rows: true }, { id: "dash", provider: "github", rows: false },
   { id: "all", provider: "github", rows: true }, { id: "slack", provider: "slack", rows: true },
-] };
+];
 applyPlugins([{ id: "github", name: "GitHub" }, { id: "slack", name: "Slack" }]);
 const links = (n, c) => byClass(n, c).map((a) => ({ Href: a.attrs.href, Text: text(a), Target: a.attrs.target || "" }));
 const out = {};

@@ -123,7 +123,7 @@ func TestTagKeysListTheKeysPresentAndATagChipTogglesItsQualifier(t *testing.T) {
 
 func TestMyPullRequestsStandOutAndTheStripExplainsItself(t *testing.T) {
 	src := appJS(t)
-	for _, want := range []string{`mine ? "mine" : ""`, `title: stripTitle(r)`, `mine ? mineMark() : null`, "stripLegend(),"} {
+	for _, want := range []string{`mine ? "mine" : ""`, `title: stripTitle(r)`, `mine ? mineMark() : null`, "stripLegend(offered),"} {
 		if !strings.Contains(src, want) {
 			t.Errorf("app.js lacks %s", want)
 		}

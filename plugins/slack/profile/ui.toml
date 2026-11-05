@@ -4,6 +4,7 @@
 [views.slack]
 label = "Slack"
 unit = "Conversation"
+default_sort = "Waiting longest"
 
 [facets.conversation]
 label = "Conversation"

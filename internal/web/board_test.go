@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/brand/brandtest"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 func appJS(t *testing.T) string {
@@ -429,21 +430,27 @@ func TestACopiedListIsYAMLAnAgentCanRead(t *testing.T) {
 			"override":  map[string]any{"hold": true},
 		}),
 	}
+	in["task"] = map[string]any{"task": task("t-1", "next", func(e *api.TaskView) {
+		e.Title, e.Units, e.UnitLabels = "Answer the deploy question", []unit.Unit{{Provider: "slack", Key: "T1/C1/1"}}, []string{"#general thread"}
+		e.Facets = map[string][]string{"where": {"general"}, "source": {"slack"}, "asked-by": {}}
+	})}
 	var got string
 	prelude := keyJS(t) + catalogPrelude(t) + `const state = { health: { viewer: "carol" } };`
-	nodeRun(t, prelude, []string{"isSet", "resolveWho", "waitingLabel", "isMuted", "yamlString", "listYAML"},
-		`process.stdout.write(JSON.stringify(listYAML(input.meta, input.rows)));`, in, &got)
+	nodeRun(t, prelude, []string{"yamlString", "listYAML", "copyEntry"},
+		`process.stdout.write(JSON.stringify(listYAML(input.meta, [...input.rows, input.task])));`, in, &got)
 	for _, want := range []string{
-		`view: "needs-me"`, `filter: "widgets \"x\""`, `copied_at: "2026-10-15T13:00:00Z"`, "count: 1", "pull_requests:",
+		`view: "needs-me"`, `filter: "widgets \"x\""`, `copied_at: "2026-10-15T13:00:00Z"`, "count: 2", "items:",
 		`  - ref: "acme/widgets#4870"`, `    url: "https://github.com/acme/widgets/pull/4870"`,
-		`    title: "perf: one \"conn\"\nper batch"`, `    situation: "merge conflicts"`, `    waiting_on: "me"`,
-		`    since: "2026-10-13T13:00:00Z"`, "    stalled: true", `    reason: "merge conflicts with develop"`,
-		`    head: "fix/x"`, `    workspace: "fix-x (in-progress)"`, `    in_scope_as: ["author"]`,
-		`    brief: {size: "m", risk: "high", open_questions: 2, goal: "Run batches on one connection."}`, `    flags: ["paused"]`,
+		`    title: "perf: one \"conn\"\nper batch"`, `    author: ["me", "carol"]`, `    kind: ["conflicts"]`, `    risk: ["high"]`,
+		`    size: ["m"]`, `    status: ["in-progress"]`, `    wait: ["me"]`,
+		`  - ref: "t-1"`, `    title: "Answer the deploy question"`, `    units: ["#general thread"]`, `    source: ["slack"]`, `    where: ["general"]`,
 	} {
 		if !strings.Contains(got, want+"\n") {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
+	}
+	if strings.Contains(got, "asked-by") || strings.Index(got, "    author:") > strings.Index(got, "    wait:") {
+		t.Errorf("facets not by id, or an empty one listed:\n%s", got)
 	}
 }
 
@@ -488,7 +495,7 @@ func TestAQueryHoldsFreeTermsAndQualifiers(t *testing.T) {
 	}
 	nodeRun(t, filterPrelude(t), queryFuncs, `process.stdout.write(JSON.stringify({
   tokens: input.map(tokens),
-  terms: input.map(terms),
+  terms: input.map((q) => terms(q)),
   quals: input.map((q) => qualifiers(q).map(({ field, value, raw, neg }) => ({ field, value, raw, neg }))),
 }));`, qs, &got)
 	wantTerms := [][]string{{"fix"}, {"two words"}, {"fix:", "https://github.com/acme/api/pull/7"}, {"unknown:x"}}
@@ -538,7 +545,7 @@ var lensFuncs = append(slices.Clone(queryFuncs), "rowTexts", "rowKindLabel", "ki
 
 func lensPrelude(t *testing.T) string {
 	src := appJS(t)
-	return filterPrelude(t) + jsConst(t, src, "SIZES") + jsConst(t, src, "RISKS") + jsConst(t, src, "itemValuesCache") + `const state = { health: { viewer: "me" } };
+	return filterPrelude(t) + jsConst(t, src, "NO_GROUP") + jsConst(t, src, "SIZES") + jsConst(t, src, "RISKS") + jsConst(t, src, "itemValuesCache") + `const state = { health: { viewer: "me" } };
 const roundGate = (r) => r.round_gate;` + "\n"
 }
 
@@ -707,9 +714,9 @@ func mustJS(t *testing.T, v any) string {
 func TestACopiedListSaysHowItWasGroupedAndSorted(t *testing.T) {
 	var got string
 	prelude := keyJS(t) + catalogPrelude(t) + `const state = { health: { viewer: "me" } };`
-	nodeRun(t, prelude, []string{"isSet", "resolveWho", "waitingLabel", "isMuted", "yamlString", "listYAML"},
+	nodeRun(t, prelude, []string{"yamlString", "listYAML", "copyEntry"},
 		`process.stdout.write(JSON.stringify(listYAML({ view: "needs-me", filter: "where:widgets", group_by: "where", sort: "risk descending", at: "x" }, [])));`, nil, &got)
-	for _, want := range []string{`filter: "where:widgets"`, `group_by: "where"`, `sort: "risk descending"`, "count: 0"} {
+	for _, want := range []string{`filter: "where:widgets"`, `group_by: "where"`, `sort: "risk descending"`, "count: 0", "items:"} {
 		if !strings.Contains(got, want+"\n") {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
