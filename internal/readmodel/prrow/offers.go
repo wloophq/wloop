@@ -209,7 +209,7 @@ func (d Deriver) notificationActions(r api.Row) []api.AttentionAction {
 		}
 		spec := specs[i]
 		if st.ID == "answer" {
-			if r.Question != nil {
+			if r.Question.Open() {
 				choices = append(choices, answerChoices(r.Question)...)
 			}
 			choices = append(choices, actionReply)

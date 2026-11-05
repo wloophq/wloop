@@ -394,6 +394,10 @@ func (m *Model) detail(r api.Row, width int, now time.Time) []string {
 // question adds the open question, the drafted verdict and the options.
 func (m *Model) question(q *api.QuestionView, fact func(label, text string, style func(string) string)) {
 	t := m.t
+	if q.Queued {
+		fact("answer", queuedAnswer, t.Dim)
+		return
+	}
 	text := cmp.Or(q.Text, q.LastMessage, "the agent stopped")
 	label := "asks"
 	if q.Text == "" {

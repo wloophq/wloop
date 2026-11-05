@@ -490,3 +490,30 @@ func TestTheHistoryCarriesTheQuestionOnlyToTheSendThatReplacesIt(t *testing.T) {
 		}
 	}
 }
+
+func TestAQueuedAnswerReadsAsQueuedUntilItIsDelivered(t *testing.T) {
+	b := Book{Unit: r7, Turns: []Turn{{Seq: 1, Intent: "review", ID: "abc", State: Asked, Session: "term_1", StartedAt: at(1)}},
+		Records: []Record{{ID: 1, TurnSeq: 1, Session: "term_1", At: at(2), Record: askedRecord(false)}}}
+	posted := b.Answer(Answer{TurnSeq: 1, Text: "later", Source: Cockpit, At: at(3), Message: 9, Posted: true})
+	posted.Route = Queued
+	if _, ok := b.QueuedAt(1); ok {
+		t.Fatal("a queued answer to a message the agent posted reads as the question's")
+	}
+	queued := b.Answer(Answer{TurnSeq: 1, Text: "go", Source: Cockpit, At: at(4)})
+	queued.Route = Queued
+	if got, ok := b.QueuedAt(1); !ok || !got.Equal(at(4)) {
+		t.Fatalf("queued at %v %v", got, ok)
+	}
+	if _, ok := b.AnsweredAt(1); ok {
+		t.Fatal("a queued answer reads as sent")
+	}
+	b.Answers[len(b.Answers)-1].Route = Typed
+	if _, ok := b.QueuedAt(1); ok {
+		t.Fatal("a delivered answer still reads as queued")
+	}
+	b.Answers[len(b.Answers)-1].Route = Queued
+	b.Records = append(b.Records, Record{ID: 2, TurnSeq: 1, Session: "term_1", At: at(5), Record: askedRecord(false)})
+	if _, ok := b.QueuedAt(1); ok {
+		t.Fatal("an answer queued before the turn's last record reads as queued")
+	}
+}

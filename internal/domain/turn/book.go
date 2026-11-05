@@ -297,3 +297,19 @@ func (b *Book) AnsweredAt(seq int64) (time.Time, bool) {
 	}
 	return time.Time{}, false
 }
+
+// QueuedAt is when the newest answer to turn seq's question, queued for its
+// busy session after the turn's last record, was given.
+func (b *Book) QueuedAt(seq int64) (time.Time, bool) {
+	var since time.Time
+	if last, ok := b.LastRecord(seq); ok {
+		since = last.At
+	}
+	for i := len(b.Answers) - 1; i >= 0; i-- {
+		a := b.Answers[i]
+		if a.TurnSeq == seq && a.Route == Queued && !a.Posted && a.At.After(since) {
+			return a.At, true
+		}
+	}
+	return time.Time{}, false
+}
