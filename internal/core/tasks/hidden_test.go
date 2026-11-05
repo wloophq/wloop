@@ -65,7 +65,7 @@ func TestDisabledPluginTasksAreHidden(t *testing.T) {
 	if c.Badge != 2 || c.Views["inbox"] != 2 || c.Views["ready"] != 0 || c.Views["waiting"] != 1 {
 		t.Fatalf("counts %+v", c)
 	}
-	p, err := r.svc.TasksSince(ctx, task.Query{View: "inbox"}, coretasks.Since{})
+	p, err := r.svc.TasksSince(ctx, task.Query{View: "inbox"}, coretasks.Since{}, nil)
 	if err != nil || len(p.Tasks) != 2 || p.Counters.Badge != 2 {
 		t.Fatalf("page %+v %v", p, err)
 	}

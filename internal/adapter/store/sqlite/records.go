@@ -126,7 +126,7 @@ func (tx *Tx) PutRecord(ctx context.Context, u unit.Unit, kind, actor, data stri
 		string(u.Provider), u.Key, timeline.KindRecord, kind, actor, at.UTC().Format(event.TimeLayout), data); err != nil {
 		return err
 	}
-	tx.Touch(port.TopicLoopEvents, u)
+	tx.Touch(port.TopicLoopEvents|port.TopicRecords, u)
 	return nil
 }
 
@@ -141,7 +141,7 @@ func (tx *Tx) DropRecord(ctx context.Context, u unit.Unit, kind string) (dropped
 	if err != nil || n == 0 {
 		return false, err
 	}
-	tx.Touch(port.TopicLoopEvents, u)
+	tx.Touch(port.TopicLoopEvents|port.TopicRecords, u)
 	return true, nil
 }
 

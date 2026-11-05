@@ -43,7 +43,7 @@ func viewsCatalog() api.ViewsCatalog {
 var coreViewIDs = []string{"focus", "inbox", "outbox", "fits-now", "waiting", "projects", "someday", "logbook"}
 
 // noViews stands in for views.js where a test runs app.js's loading alone.
-const noViews = "const loadTasks = async () => {};\n"
+const noViews = "const loadTasks = async () => {};\nconst forgetTasksPage = () => {};\n"
 
 // noUpdate stands in for update.js where a test runs app.js's loading alone.
 const noUpdate = "const checkBuild = () => {};\n"

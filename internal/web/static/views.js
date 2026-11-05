@@ -4,7 +4,7 @@
 // views; REVIEW_TITLE is its title.
 const REVIEW = "review";
 const REVIEW_TITLE = "Review";
-const tasksState = { catalog: null, catalogError: "", key: "", page: null, tasks: [], gates: [], loading: [], counters: null, filtered: null, filterSeq: 0, error: "" };
+const tasksState = { catalog: null, catalogError: "", key: "", page: null, units: [], tasks: [], gates: [], loading: [], counters: null, filtered: null, filterSeq: 0, error: "" };
 
 function coreViews(cat = tasksState.catalog) {
   return (cat && cat.views) || [];
@@ -60,12 +60,14 @@ function railSections(nav, name) {
   return out.filter((sec) => sec.views.length);
 }
 
-// tasksURL lists view, narrowed to area.
-function tasksURL(view, area, ctx, since) {
+// tasksURL lists view, narrowed to area; a page since a position also
+// holds the tasks of units, as provider:key.
+function tasksURL(view, area, ctx, since, units) {
   const p = new URLSearchParams({ view });
   if (area) p.set("area", area);
   if (ctx && ctx.length) p.set("context", ctx.join(","));
   if (since) p.set("since", since);
+  for (const u of (since && units) || []) p.append("units", u);
   return "/api/tasks?" + p.toString();
 }
 
@@ -151,18 +153,30 @@ function applyTasksPage(key, page) {
 // loadTasks loads the catalog once, then the list of route (the hash's when
 // not given, read once the catalog can resolve it) with its counters, or the
 // counters alone on a plugin view, and the counters the filter narrows.
-async function loadTasks(given) {
-  if (!tasksState.catalog) {
-    try {
-      tasksState.catalog = await getJSON("/api/views");
-      tasksState.catalogError = "";
-    } catch (err) {
-      tasksState.catalogError = err.message;
-      return;
-    }
-  }
+// units are those a change named, whose tasks the next page since the list's
+// position holds.
+async function loadTasks(given, units) {
+  if (units) tasksState.units = [...new Set([...tasksState.units, ...units])];
+  if (!tasksState.catalog && !(await readViews())) return;
   const route = given || readHash();
   await Promise.all([loadTaskList(route), loadFiltered(route)]);
+}
+
+// readViews reads the catalog of the task views; false when it failed.
+async function readViews() {
+  try {
+    tasksState.catalog = await getJSON("/api/views");
+    tasksState.catalogError = "";
+    return true;
+  } catch (err) {
+    tasksState.catalogError = err.message;
+    return false;
+  }
+}
+
+// forgetTasksPage makes the next list read whole.
+function forgetTasksPage() {
+  tasksState.page = null;
 }
 
 async function loadTaskList(route) {
@@ -178,12 +192,18 @@ async function loadTaskList(route) {
   const key = viewQueryKey(route.view, route.area, route.ctx);
   const cur = tasksState.page;
   const since = tasksState.key === key && cur && cur.epoch ? `${cur.epoch}:${cur.rev}` : "";
+  const units = tasksState.units;
+  let page;
   try {
-    applyTasksPage(key, await getJSON(tasksURL(route.view, route.area, route.ctx, since)));
+    page = await getJSON(tasksURL(route.view, route.area, route.ctx, since, units));
+    applyTasksPage(key, page);
+    tasksState.units = tasksState.units.filter((u) => !units.includes(u));
     tasksState.error = "";
   } catch (err) {
     tasksState.error = `Could not load the ${route.view} list: ${err.message}`;
+    return;
   }
+  if (page.specs && page.specs !== (tasksState.catalog || {}).version) await readViews();
 }
 
 

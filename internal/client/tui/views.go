@@ -531,6 +531,16 @@ type taskSet struct {
 	since api.Since
 	order []string
 	byID  map[string]api.TaskView
+	// moved are the units changes named since the set's last pull, whose tasks the next page holds.
+	moved []unit.Unit
+}
+
+func (s *taskSet) move(units []unit.Unit) {
+	for _, u := range units {
+		if !slices.Contains(s.moved, u) {
+			s.moved = append(s.moved, u)
+		}
+	}
 }
 
 // apply takes a page: false when it is a delta the set cannot take, from

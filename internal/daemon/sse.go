@@ -145,7 +145,8 @@ func (sub *subscriber) take() (api.Change, bool) {
 }
 
 // publishRows publishes what moved in the rows since the last row change
-// published; the first call only learns where the rows are.
+// published, and hands it to the tasks feed; the first call only learns
+// where the rows are.
 func (s *Server) publishRows(ctx context.Context) {
 	s.hub.feed.Lock()
 	defer s.hub.feed.Unlock()
@@ -160,6 +161,40 @@ func (s *Server) publishRows(ctx context.Context) {
 		return
 	}
 	s.hub.publish(c)
+	s.moved.add(c)
+}
+
+// rowMoves gathers the units of the row changes published until the tasks
+// feed takes them; wake holds at most one pending wake.
+type rowMoves struct {
+	mu    sync.Mutex
+	units []unit.Unit
+	all   bool
+	wake  chan struct{}
+}
+
+func newRowMoves() *rowMoves { return &rowMoves{wake: make(chan struct{}, 1)} }
+
+func (m *rowMoves) add(c api.Change) {
+	m.mu.Lock()
+	m.all = m.all || c.All
+	m.units = append(m.units, c.Units...)
+	m.mu.Unlock()
+	select {
+	case m.wake <- struct{}{}:
+	default:
+	}
+}
+
+// take is what moved since the last take: the units, distinct and sorted,
+// or all when a change was too large to list.
+func (m *rowMoves) take() (units []unit.Unit, all bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	units, all = m.units, m.all
+	m.units, m.all = nil, false
+	slices.SortFunc(units, api.CompareUnits)
+	return slices.Compact(units), all
 }
 
 // feedRows keeps the read model current and publishes each revision it

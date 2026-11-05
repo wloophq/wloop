@@ -87,6 +87,8 @@ type RowsPage struct {
 	Counters *Counters   `json:"counters,omitempty"`
 	// Loading are the plugins whose rows are not all here yet.
 	Loading []Loading `json:"loading,omitempty"`
+	// Catalog is the version of GET /api/catalog; a client holding another reads it again.
+	Catalog string `json:"catalog,omitempty"`
 }
 
 // Loading is a plugin that has not yet imported its data and reported every

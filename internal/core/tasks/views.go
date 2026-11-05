@@ -471,9 +471,9 @@ func (s *Service) counts(ctx context.Context, area string, all []task.Task, keep
 }
 
 // TasksSince is q's page after since with the counters of q's area. A paged view's page from the same epoch
-// lists the tasks written after since that are in the view, and removes those written that are not; any other
-// view's page is Full, at the store's position.
-func (s *Service) TasksSince(ctx context.Context, q task.Query, since Since) (Page, error) {
+// lists the tasks written after since and the tasks holding one of units that are in the view, and removes
+// those that are not; any other view's page is Full, at the store's position.
+func (s *Service) TasksSince(ctx context.Context, q task.Query, since Since, units []unit.Unit) (Page, error) {
 	spec, err := s.spec(q.View)
 	if err != nil {
 		return Page{}, err
@@ -498,7 +498,7 @@ func (s *Service) TasksSince(ctx context.Context, q task.Query, since Since) (Pa
 		p.Full, p.Removed = true, nil
 		p.Tasks, err = s.list(ctx, spec, q, all)
 	default:
-		p.Tasks, p.Removed, err = s.delta(ctx, spec, q, p.Tasks)
+		p.Tasks, p.Removed, err = s.delta(ctx, spec, q, withHolding(p.Tasks, all, units))
 	}
 	if err != nil {
 		return Page{}, err
@@ -506,6 +506,56 @@ func (s *Service) TasksSince(ctx context.Context, q task.Query, since Since) (Pa
 	p.Counters, err = s.counts(ctx, q.Area, all, nil)
 	p.Pass = pass
 	return p, err
+}
+
+// withHolding is changed and the tasks of all that hold one of units, each once.
+func withHolding(changed, all []task.Task, units []unit.Unit) []task.Task {
+	if len(units) == 0 {
+		return changed
+	}
+	moved := map[unit.Unit]bool{}
+	for _, u := range units {
+		moved[u] = true
+	}
+	out := slices.Clone(changed)
+	listed := map[task.ID]bool{}
+	for _, e := range changed {
+		listed[e.ID] = true
+	}
+	for _, e := range all {
+		if !listed[e.ID] && holdsAny(e, moved) {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// holdsAny says whether e holds one of units, as its own or an item's.
+func holdsAny(e task.Task, units map[unit.Unit]bool) bool {
+	for _, u := range e.Units {
+		if units[u] {
+			return true
+		}
+	}
+	for _, it := range e.Items {
+		if units[it.Unit] {
+			return true
+		}
+	}
+	return false
+}
+
+// Held are those of units a stored task holds, as its own or an item's, in their order.
+func (s *Service) Held(ctx context.Context, units []unit.Unit) ([]unit.Unit, error) {
+	if len(units) == 0 {
+		return nil, nil
+	}
+	all, err := s.d.Store.Tasks(ctx, task.Query{All: true})
+	if err != nil {
+		return nil, err
+	}
+	pass := &Pass{Tasks: all}
+	return slices.DeleteFunc(slices.Clone(units), func(u unit.Unit) bool { return !pass.Holds(u) }), nil
 }
 
 // delta splits the tasks written since a position into those in the paged view and the ids of those not.

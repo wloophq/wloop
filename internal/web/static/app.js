@@ -2551,6 +2551,7 @@ async function load() {
     state.error = "";
     state.authLost = false;
   }
+  forgetTasksPage();
   await Promise.all([loadActivity(), loadDetail(), loadExploreRecent(), loadPlan(), loadRoundGates(), loadTasks()]);
   await refreshSpecs([...state.rows, ...(state.detail ? [state.detail.row] : [])]);
   render();
@@ -2648,6 +2649,7 @@ async function applyChange(c) {
     if (c.rows || c.units.length) {
       const page = await getJSON(`/api/rows?since=${encodeURIComponent(`${state.epoch}:${state.rev}`)}`);
       if (!mergeRows(page)) return load();
+      if (page.catalog && page.catalog !== catalog.version) applyCatalog(await getJSON("/api/catalog"));
     }
     if (c.health) {
       state.health = await getJSON("/api/health");
@@ -2665,7 +2667,7 @@ async function applyChange(c) {
     (pr && c.units.some((u) => u.toLowerCase() === pr.toLowerCase())) || (c.tasks && (route.task || pr)) ? loadDetail() : null,
     loadPlan(),
     loadRoundGates(),
-    c.tasks ? loadTasks(route) : null,
+    c.tasks ? loadTasks(route, c.units) : null,
   ]);
   await refreshSpecs([...state.rows, ...(state.detail ? [state.detail.row] : [])]);
   render();

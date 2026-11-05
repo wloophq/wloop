@@ -820,3 +820,86 @@ const boardProvider unit.ProviderID = "fake"
 func boardPlugins(enabled bool) []api.Plugin {
 	return []api.Plugin{{ID: unit.GitHub, Enabled: true}, {ID: boardProvider, Enabled: enabled}}
 }
+
+func TestAViewsVersionChangeRereadsTheViewsCatalog(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		cat := viewsCatalog()
+		cat.Version = "v1"
+		d := &fakeDaemon{rows: oneRow(), viewsCat: &cat, tasks: viewTasks(), counters: viewCounters()}
+		term, done := start(t, d)
+		eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "Reply on the batch export review") })
+		eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
+		reads := func() int {
+			d.mu.Lock()
+			defer d.mu.Unlock()
+			return d.viewsReads
+		}
+		d.changeTasks("focus", nil, viewCounters())
+		eventually(t, "the delta", func() bool { return len(d.asks()) == 2 })
+		if n := reads(); n != 1 {
+			t.Fatalf("the views read %d times at one version", n)
+		}
+		d.mu.Lock()
+		next := viewsCatalog()
+		next.Version = "v2"
+		next.Views[0].Label = "Today"
+		d.viewsCat = &next
+		d.mu.Unlock()
+		d.changeTasks("focus", nil, viewCounters())
+		eventually(t, "the new views", func() bool { return strings.Contains(term.screen(), "Today") })
+		d.changeTasks("focus", nil, viewCounters())
+		eventually(t, "another delta", func() bool { return len(d.asks()) == 4 })
+		if n := reads(); n != 2 {
+			t.Fatalf("the views read %d times over two versions", n)
+		}
+		quit(t, term, done)
+	})
+}
+
+func TestARowsPageOfAnotherCatalogRereadsTheCatalog(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow()}
+		term, done := start(t, d)
+		eventually(t, "the row", func() bool { return strings.Contains(term.screen(), "Batch export") })
+		eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
+		reads := func() int {
+			d.mu.Lock()
+			defer d.mu.Unlock()
+			return d.catalogReads
+		}
+		d.change(nil)
+		d.announce()
+		eventually(t, "a delta", func() bool { return len(d.times(&d.rowsAt)) == 2 })
+		if n := reads(); n != 1 {
+			t.Fatalf("the catalog read %d times at one version", n)
+		}
+		d.mu.Lock()
+		d.catalog = "c2"
+		d.mu.Unlock()
+		d.change(nil)
+		d.announce()
+		eventually(t, "the new catalog", func() bool { return reads() == 2 })
+		quit(t, term, done)
+	})
+}
+
+func TestATaskPullNamesTheUnitsTheChangesNamed(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow(), viewsCat: ptr(viewsCatalog()), tasks: viewTasks(), counters: viewCounters()}
+		term, done := start(t, d)
+		eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "Reply on the batch export review") })
+		eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
+		pr := unit.Unit{Provider: unit.GitHub, Key: "acme/api#12"}
+		d.changeTasks("focus", nil, viewCounters(), pr)
+		eventually(t, "the delta", func() bool { return len(d.asks()) == 2 })
+		if got := d.asks()[1]; got.since == (api.Since{}) || !slices.Equal(got.units, []unit.Unit{pr}) {
+			t.Fatalf("asked %+v, want the page since naming %v", got, pr)
+		}
+		d.changeTasks("focus", nil, viewCounters())
+		eventually(t, "another delta", func() bool { return len(d.asks()) == 3 })
+		if got := d.asks()[2]; len(got.units) != 0 {
+			t.Fatalf("asked %+v, want no unit once the page holding them was read", got)
+		}
+		quit(t, term, done)
+	})
+}

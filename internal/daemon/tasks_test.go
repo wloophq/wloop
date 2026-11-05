@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -21,9 +22,11 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/wake"
 
+	facttask "github.com/wloophq/wloop/internal/adapter/facts/task"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/change"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/messages"
@@ -40,6 +43,7 @@ import (
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
+	"github.com/wloophq/wloop/internal/readmodel"
 )
 
 // tasksNow is newServerOn's now.
@@ -59,6 +63,8 @@ type tasksRig struct {
 	// facts are the tasks' facts the views read, factReads how many times they were computed.
 	facts     func(context.Context, task.Task) (workflow.Facts, error)
 	factReads atomic.Int32
+	// linked reads the read model's link state of a unit for the facts when set.
+	linked bool
 }
 
 func newTasksRig(t testing.TB, edit func(*Deps)) *tasksRig {
@@ -83,7 +89,13 @@ func newTasksRig(t testing.TB, edit func(*Deps)) *tasksRig {
 		if d.Intents != nil {
 			loaded = func() *intentload.Loaded { return cmp.Or(d.Intents(), bundledLoaded()) }
 		}
-		r.facts = countedLensFacts(db, loaded, tasksNow, &r.factReads)
+		r.facts = countedLensFacts(db, loaded, tasksNow, &r.factReads, func(ctx context.Context, u unit.Unit) (facttask.Link, error) {
+			if !r.linked {
+				return facttask.Link{}, nil
+			}
+			signals, moved, _, err := r.s.LinkState(ctx, u)
+			return facttask.Link{Signals: signals, Moved: moved}, err
+		})
 		r.g = coretasks.New(withLens(coretasks.Deps{States: loadedHandlers{taskstest.BundledStates, loaded}, Authority: taskstest.BundledStates.Authority, Store: db.Tasks(), Items: r.ledger,
 			Facts: coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: func() task.Me { return meID }},
 			Me:    meID, Clock: fixedClock(tasksNow), Disabled: disabledOf(enabled), Wakes: db.Wakes(),
@@ -1071,5 +1083,186 @@ func TestFacetProblemsAreComputedOncePerProfileAndCatalog(t *testing.T) {
 	l.Views.Facets[i].Sort = "rank"
 	if again := r.s.facetProblems(&l); len(again) != len(first) {
 		t.Errorf("recomputed for the same profile and catalog: %d then %d", len(first), len(again))
+	}
+}
+
+// liveRows serves a row with each unit's facets and link signals, which a test moves with set.
+type liveRows struct {
+	mu   sync.Mutex
+	rows map[unit.Unit]liveRow
+}
+
+type liveRow struct {
+	facets  map[string][]string
+	signals map[string]bool
+}
+
+func (*liveRows) Provider() unit.ProviderID { return "fake" }
+
+func (p *liveRows) Listed(context.Context) ([]unit.Unit, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return slices.SortedFunc(maps.Keys(p.rows), api.CompareUnits), nil
+}
+
+func (p *liveRows) Load(_ context.Context, units []unit.Unit) (map[unit.Unit]any, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	in := map[unit.Unit]any{}
+	for _, u := range units {
+		in[u] = p.rows[u]
+	}
+	return in, nil
+}
+
+func (*liveRows) Derive(_ readmodel.Base, in any, _ time.Time) (api.Row, error) {
+	r := in.(liveRow)
+	return api.Row{Title: "row", Facets: r.facets, Views: []string{}, Summary: api.Summary{Stalled: r.signals["stalled"]}}, nil
+}
+
+func (*liveRows) Signals(_ readmodel.Base, _ api.Row, in any, _ time.Time) map[string]bool {
+	return in.(liveRow).signals
+}
+
+// set gives u's row facets and signals and notes it, as a source's write does.
+func (p *liveRows) set(log *change.Log, u unit.Unit, facets map[string][]string, signals map[string]bool) {
+	p.mu.Lock()
+	p.rows[u] = liveRow{facets: facets, signals: signals}
+	p.mu.Unlock()
+	log.Note(port.TopicPRs, u)
+}
+
+// withLiveRows serves rows over r's store, gives its tasks' views their facts, briefs and link state, and
+// returns the rows to move.
+func (r *tasksRig) withLiveRows(rows map[unit.Unit]liveRow) *liveRows {
+	p := &liveRows{rows: rows}
+	m := readmodel.New(r.log, nil, nil, nil, nil, p)
+	m.UseClock(r.s.deps.Now)
+	r.s.modelOnce.Do(func() { r.s.model = m })
+	r.s.deps.Row = catalog.RowOf(bundledLoaded, r.facts)
+	r.s.deps.TaskRecords = r.db
+	r.linked = true
+	return p
+}
+
+// follow runs the rows and tasks feeds until the test ends, in a synctest bubble, and returns a subscriber
+// to the hub once both wait for changes.
+func (r *tasksRig) follow(t *testing.T) *subscriber {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	var wg sync.WaitGroup
+	t.Cleanup(func() { cancel(); wg.Wait() })
+	wg.Go(func() { r.s.feedRows(ctx) })
+	wg.Go(func() { r.s.feedTasks(ctx) })
+	synctest.Wait()
+	sub := r.s.hub.subscribe("test")
+	t.Cleanup(func() { r.s.hub.unsubscribe(sub) })
+	return sub
+}
+
+// published is what sub was published after d, merged; ok is false when nothing was.
+func published(sub *subscriber, d time.Duration) (api.Change, bool) {
+	time.Sleep(d)
+	synctest.Wait()
+	return sub.take()
+}
+
+func tasksSince(p api.TasksPage) string { return api.Since{Epoch: p.Epoch, Rev: p.Rev}.String() }
+
+func TestARowChangeResendsTheTasksHoldingItsUnit(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		r := newTasksRig(t, nil)
+		lone := unit.Unit{Provider: unit.GitHub, Key: "acme/api#99"}
+		rows := r.withLiveRows(map[unit.Unit]liveRow{
+			apiPR: {facets: map[string][]string{"where": {"acme/api"}, "ci": {"failure"}}},
+			lone:  {facets: map[string][]string{"where": {"acme/api"}}},
+		})
+		r.put(t, task.Task{ID: "t-pr", State: "inbox", Category: task.CategoryInbox, Title: "Review the fix", Units: []unit.Unit{apiPR}},
+			task.Task{ID: "t-own", State: "inbox", Category: task.CategoryInbox, Title: "Think it over"})
+		sub := r.follow(t)
+		first := r.page(t, "view=inbox")
+		if got := facetsOf(t, first, "t-pr")["ci"]; !slices.Equal(got, []string{"failure"}) {
+			t.Fatalf("ci %v before the move", got)
+		}
+		rows.set(r.log, lone, map[string][]string{"where": {"acme/web"}}, nil)
+		if c, _ := published(sub, readmodel.PokeQuiet+syncQuiet); c.Counters != nil {
+			t.Fatalf("a row no task holds moved the counters: %+v", c)
+		}
+		rows.set(r.log, apiPR, map[string][]string{"where": {"acme/api"}, "ci": {"success"}}, nil)
+		c, ok := published(sub, readmodel.PokeQuiet+syncQuiet)
+		if !ok || c.Counters == nil || !slices.Contains(c.Units, apiPR) {
+			t.Fatalf("the row's move published %+v (%v), want its unit with the counters", c, ok)
+		}
+		q := url.Values{"view": {"inbox"}, "since": {tasksSince(first)}, "units": {apiPR.String()}}
+		got := r.page(t, q.Encode())
+		if got.Full || !slices.Equal(taskIDs(got.Tasks), []string{"t-pr"}) {
+			t.Fatalf("the page since the move: full %v, tasks %v", got.Full, taskIDs(got.Tasks))
+		}
+		if ci := got.Tasks[0].Facets["ci"]; !slices.Equal(ci, []string{"success"}) {
+			t.Fatalf("ci %v after the move, want success", ci)
+		}
+	})
+}
+
+func TestABriefWriteResendsItsTask(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		r := newTasksRig(t, nil)
+		r.withLiveRows(map[unit.Unit]liveRow{generalThread: {facets: map[string][]string{"where": {"general"}}}})
+		r.put(t, task.Task{ID: "t-slack", State: "inbox", Category: task.CategoryInbox, Title: "Answer in general", Units: []unit.Unit{generalThread}})
+		sub := r.follow(t)
+		first := r.page(t, "view=inbox")
+		if err := r.db.PutRecord(context.Background(), generalThread, "brief", task.WriterAgent, []byte(`{"goal":"Answer","kind":"question"}`), tasksNow); err != nil {
+			t.Fatal(err)
+		}
+		c, ok := published(sub, readmodel.PokeQuiet+syncQuiet)
+		if !ok || c.Counters == nil || !slices.Contains(c.Units, generalThread) {
+			t.Fatalf("the brief write published %+v (%v), want its unit with the counters", c, ok)
+		}
+		q := url.Values{"view": {"inbox"}, "since": {tasksSince(first)}, "units": {generalThread.String()}}
+		got := r.page(t, q.Encode())
+		if got.Full || !slices.Equal(taskIDs(got.Tasks), []string{"t-slack"}) || !slices.Equal(got.Tasks[0].Facets["type"], []string{"question"}) {
+			t.Fatalf("the page since the brief: full %v, tasks %v %+v", got.Full, taskIDs(got.Tasks), got.Tasks)
+		}
+	})
+}
+
+func TestStalledGainsATaskWhenItsPRStalls(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		r := newTasksRig(t, nil)
+		rows := r.withLiveRows(map[unit.Unit]liveRow{apiPR: {facets: map[string][]string{"where": {"acme/api"}}}})
+		r.put(t, task.Task{ID: "t-pr", State: "next", Category: task.CategoryReady, Title: "Land the fix", Units: []unit.Unit{apiPR}})
+		sub := r.follow(t)
+		if n := r.page(t, "view=stalled").Counters.Views["stalled"]; n != 0 {
+			t.Fatalf("%d stalled before the pull request stalls", n)
+		}
+		rows.set(r.log, apiPR, map[string][]string{"where": {"acme/api"}}, map[string]bool{"stalled": true})
+		c, ok := published(sub, readmodel.PokeQuiet+syncQuiet)
+		if !ok || c.Counters == nil || c.Counters.Views["stalled"] != 1 {
+			t.Fatalf("the stall published %+v (%v), want Stalled at 1", c, ok)
+		}
+	})
+}
+
+func TestPagesNameTheVersionsOfTheirSpecs(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.withFacetRows(facetRows{apiPR: {"where": {"acme/api"}}})
+	var views api.ViewsCatalog
+	if code := get(t, r.s, api.ViewsPath, &views); code != 200 || views.Version == "" {
+		t.Fatalf("views %d %q", code, views.Version)
+	}
+	if p := r.page(t, "view=inbox"); p.Specs != views.Version {
+		t.Errorf("the tasks page names specs %q, the views are at %q", p.Specs, views.Version)
+	}
+	var cat api.CatalogResponse
+	if code := get(t, r.s, api.Catalog, &cat); code != 200 || cat.Version == "" {
+		t.Fatalf("catalog %d %q", code, cat.Version)
+	}
+	var rows api.RowsPage
+	if code := get(t, r.s, api.Rows, &rows); code != 200 || rows.Catalog != cat.Version {
+		t.Errorf("the rows page names catalog %q, the catalog is at %q", rows.Catalog, cat.Version)
 	}
 }

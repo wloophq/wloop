@@ -408,11 +408,13 @@ type Server struct {
 		version string
 		out     intentload.Problems
 	}
-	jobs      map[string]*job
-	token     string
-	warnings  *warnings
-	grace     time.Duration
-	hub       *hub
+	jobs     map[string]*job
+	token    string
+	warnings *warnings
+	grace    time.Duration
+	hub      *hub
+	// moved holds the units of the row changes published, for the tasks feed.
+	moved     *rowMoves
 	model     *readmodel.Model
 	modelOnce sync.Once
 	viewer    viewerCache
@@ -489,7 +491,7 @@ func New(d Deps) *Server {
 	if d.GitAccess == nil && d.Meta != nil {
 		d.GitAccess = &GitAccessLog{Store: d.Meta}
 	}
-	s := &Server{deps: d, jobs: map[string]*job{}, token: rand.Text(), warnings: &warnings{}, grace: ShutdownGrace, hub: newHub(), app: d.App,
+	s := &Server{deps: d, jobs: map[string]*job{}, token: rand.Text(), warnings: &warnings{}, grace: ShutdownGrace, hub: newHub(), moved: newRowMoves(), app: d.App,
 		track:     d.Track,
 		reconcile: reconcileState{ready: make(chan struct{}), done: make(chan struct{}), wait: ReconcileWait}, sessionWait: cmp.Or(d.SessionWait, brief.SessionWait),
 		streamClock: wallClock{}, draftClock: wallClock{}}

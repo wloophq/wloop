@@ -7,13 +7,16 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// TaskQuery selects a view's tasks; Contexts must all match, and the Inbox ignores Area.
+// TaskQuery selects a view's tasks; Contexts must all match, and the Inbox ignores Area. Units are the units
+// changes named since the page asked from, whose tasks a page since it holds too.
 type TaskQuery struct {
 	View     string
 	Area     string
 	Contexts []string
+	Units    []unit.Unit
 }
 
 // Views is the views, areas, contexts and verbs the daemon serves.
@@ -36,6 +39,9 @@ func (c *Client) TasksSince(ctx context.Context, q TaskQuery, since api.Since) (
 	}
 	if s := since.String(); s != "" {
 		v.Set("since", s)
+	}
+	for _, u := range q.Units {
+		v.Add(api.TasksUnits, u.String())
 	}
 	var page api.TasksPage
 	err := c.do(ctx, ReadTimeout, http.MethodGet, api.TasksPath+"?"+v.Encode(), nil, &page)

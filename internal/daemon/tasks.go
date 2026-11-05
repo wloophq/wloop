@@ -47,9 +47,9 @@ const (
 // syncInputs are the notes whose units Sync reconciles.
 const syncInputs = port.TopicItems | port.TopicSourceEvents | port.TopicCards | port.TopicGates
 
-// taskInputs are the notes after which a change carries the counters: a view reads the tasks, their gates and
-// their wakes.
-const taskInputs = port.TopicTasks | port.TopicGates | port.TopicWakes | port.TopicDrafts
+// taskInputs are the notes after which a change carries the counters: a view reads the tasks, their gates,
+// their wakes, their units' records and their links.
+const taskInputs = port.TopicTasks | port.TopicGates | port.TopicWakes | port.TopicDrafts | port.TopicRecords | port.TopicLinks
 
 // bridged are the handlers whose verbs a task with units runs as its unit's action when no handler takes them.
 var bridged = []string{handlerApprove, handlerDelegate, handlerDrop}
@@ -115,6 +115,11 @@ func (s *Server) handleViews(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.tasks(w); !ok {
 		return
 	}
+	writeJSON(w, s.viewsCatalog())
+}
+
+// viewsCatalog is what GET /api/views serves, with its version.
+func (s *Server) viewsCatalog() api.ViewsCatalog {
 	l := s.loaded()
 	cat := api.ViewsCatalog{Areas: nonNil(slices.Clone(s.deps.Cfg.Tasks.Areas)), Contexts: nonNil(slices.Clone(s.deps.Cfg.Tasks.Contexts)), Views: s.servedViews(),
 		Review: []string{}, States: []api.StateSpec{}, Props: []api.PropSpec{}}
@@ -138,7 +143,7 @@ func (s *Server) handleViews(w http.ResponseWriter, r *http.Request) {
 	}
 	cat.Facets, cat.DefaultSort = catalog.TaskFacets(l.Views.Facets), l.Views.DefaultSort
 	cat.Version = api.VersionOf(cat)
-	writeJSON(w, cat)
+	return cat
 }
 
 // servedViews are the profile's views, in its order.
@@ -170,14 +175,19 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 			query.Contexts = append(query.Contexts, c)
 		}
 	}
+	units, err := api.ParseUnits(q[api.TasksUnits])
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	ctx := r.Context()
-	p, err := g.TasksSince(ctx, query, coretasks.Since{Epoch: since.Epoch, Rev: since.Rev})
+	p, err := g.TasksSince(ctx, query, coretasks.Since{Epoch: since.Epoch, Rev: since.Rev}, units)
 	if err != nil {
 		writeTasksError(w, err)
 		return
 	}
 	page := api.TasksPage{Epoch: p.Epoch, Rev: p.Rev, Full: p.Full, Tasks: []api.TaskView{}, Removed: []string{}, Counters: wireCounters(p.Counters),
-		Loading: s.loading()}
+		Loading: s.loading(), Specs: s.viewsCatalog().Version}
 	if p.Pass != nil {
 		ctx = coretasks.WithPass(ctx, p.Pass)
 	}
@@ -1315,8 +1325,8 @@ func (s *Server) facetProblems(l *intentload.Loaded) intentload.Problems {
 	return k.out
 }
 
-// feedTasks publishes a change with the counters after each burst of task and draft notes, naming the units
-// of the tasks that moved, until ctx ends.
+// feedTasks publishes a change with the counters after each burst of task and draft notes and of row changes
+// whose units a task holds, naming the units they moved, until ctx ends.
 func (s *Server) feedTasks(ctx context.Context) {
 	if s.deps.Changes == nil {
 		return
@@ -1330,25 +1340,42 @@ func (s *Server) feedTasks(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-poke:
-			if quiet == nil {
-				quiet = time.After(syncQuiet)
-			}
-			continue
+		case <-s.moved.wake:
 		case <-quiet:
 			quiet = nil
+			c := s.deps.Changes.Since(from, taskInputs)
+			from = c.Gen
+			pctx, scope := meter.Start(ctx, meter.Loop("tasks-feed"))
+			s.publishTasks(pctx, c)
+			scope.End()
+			continue
 		}
-		c := s.deps.Changes.Since(from, taskInputs)
-		from = c.Gen
-		pctx, scope := meter.Start(ctx, meter.Loop("tasks-feed"))
-		counters := s.counters(pctx)
-		scope.End()
-		pos := s.hub.position()
-		ch := api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev, Units: c.Units, Counters: counters}
-		if c.All {
-			ch.Units = nil
+		if quiet == nil {
+			quiet = time.After(syncQuiet)
 		}
-		s.hub.publish(ch)
 	}
+}
+
+// publishTasks publishes the counters with the units c and the row changes since the last call moved, unless
+// nothing moved but rows no task holds.
+func (s *Server) publishTasks(ctx context.Context, c port.Change) {
+	rows, all := s.moved.take()
+	held, err := s.deps.Tasks.Held(ctx, rows)
+	if err != nil {
+		s.logf("tasks feed: %v", err)
+		held = rows
+	}
+	if c.Empty() && !all && len(held) == 0 {
+		return
+	}
+	pos := s.hub.position()
+	ch := api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev, Counters: s.counters(ctx)}
+	if !c.All && !all {
+		units := slices.Concat(c.Units, held)
+		slices.SortFunc(units, api.CompareUnits)
+		ch.Units = slices.Compact(units)
+	}
+	s.hub.publish(ch)
 }
 
 // rowsRead are the read model's rows of units, from one snapshot.

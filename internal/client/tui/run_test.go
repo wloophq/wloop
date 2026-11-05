@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -52,7 +53,10 @@ type fakeDaemon struct {
 	plugins    []api.Plugin
 	pluginsErr error
 
-	viewsCat *api.ViewsCatalog
+	viewsCat   *api.ViewsCatalog
+	viewsReads int
+	// catalog is the version of the catalog, which every rows page names; "" is c1.
+	catalog string
 	// gates are the open gates.
 	gates []api.GateView
 	// tasks are each view's tasks; a page since the fake's position
@@ -82,6 +86,7 @@ type fakeDaemon struct {
 type taskAsk struct {
 	view, area string
 	since      api.Since
+	units      []unit.Unit
 }
 
 type gateResolve struct {
@@ -106,6 +111,7 @@ func (f *fakeDaemon) Plugins(context.Context) ([]api.Plugin, error) {
 func (f *fakeDaemon) Views(context.Context) (api.ViewsCatalog, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.viewsReads++
 	if f.viewsCat == nil {
 		return api.ViewsCatalog{}, errors.New("the tasks are not served: the daemon runs without a store")
 	}
@@ -115,14 +121,18 @@ func (f *fakeDaemon) Views(context.Context) (api.ViewsCatalog, error) {
 func (f *fakeDaemon) TasksSince(_ context.Context, q client.TaskQuery, since api.Since) (api.TasksPage, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.taskAsks = append(f.taskAsks, taskAsk{q.View, q.Area, since})
+	f.taskAsks = append(f.taskAsks, taskAsk{q.View, q.Area, since, q.Units})
 	if f.down {
 		return api.TasksPage{}, errors.New("connection refused")
 	}
-	if since == (api.Since{}) || since.Epoch != "g1" {
-		return api.TasksPage{Epoch: "g1", Rev: f.taskRev, Full: true, Tasks: slices.Clone(f.tasks[q.View]), Removed: []string{}, Counters: f.counters}, nil
+	var specs string
+	if f.viewsCat != nil {
+		specs = f.viewsCat.Version
 	}
-	page := api.TasksPage{Epoch: "g1", Rev: f.taskRev, Tasks: f.taskDelta[q.View], Removed: []string{}, Counters: f.counters}
+	if since == (api.Since{}) || since.Epoch != "g1" {
+		return api.TasksPage{Epoch: "g1", Rev: f.taskRev, Full: true, Tasks: slices.Clone(f.tasks[q.View]), Removed: []string{}, Counters: f.counters, Specs: specs}, nil
+	}
+	page := api.TasksPage{Epoch: "g1", Rev: f.taskRev, Tasks: f.taskDelta[q.View], Removed: []string{}, Counters: f.counters, Specs: specs}
 	delete(f.taskDelta, q.View)
 	return page, nil
 }
@@ -207,8 +217,8 @@ func (f *fakeDaemon) Keys(_ context.Context, surface string) (api.KeysResponse, 
 }
 
 // changeTasks makes the daemon hold delta for view at the next position
-// and announces it with the counters, as the tasks feed does.
-func (f *fakeDaemon) changeTasks(view string, delta []api.TaskView, c api.Counters) {
+// and announces it with the counters and units, as the tasks feed does.
+func (f *fakeDaemon) changeTasks(view string, delta []api.TaskView, c api.Counters, units ...unit.Unit) {
 	f.mu.Lock()
 	f.taskRev++
 	if f.taskDelta == nil {
@@ -218,7 +228,7 @@ func (f *fakeDaemon) changeTasks(view string, delta []api.TaskView, c api.Counte
 	f.counters = c
 	s, rev := f.stream, f.rev
 	f.mu.Unlock()
-	s <- api.Change{Type: "changed", Epoch: "e1", Rev: rev, Counters: &c}
+	s <- api.Change{Type: "changed", Epoch: "e1", Rev: rev, Counters: &c, Units: units}
 }
 
 func (f *fakeDaemon) Plan(_ context.Context, q api.PlanQuery) (api.PlanResponse, error) {
@@ -266,9 +276,9 @@ func (f *fakeDaemon) RowsSince(_ context.Context, since api.Since) (api.RowsPage
 		return api.RowsPage{}, errors.New("connection refused")
 	}
 	if since == (api.Since{}) || since.Epoch != "e1" {
-		return api.RowsPage{Epoch: "e1", Rev: f.rev, Full: true, Rows: slices.Clone(f.rows), Removed: []unit.Unit{}}, nil
+		return api.RowsPage{Epoch: "e1", Rev: f.rev, Full: true, Rows: slices.Clone(f.rows), Removed: []unit.Unit{}, Catalog: cmp.Or(f.catalog, "c1")}, nil
 	}
-	page := api.RowsPage{Epoch: "e1", Rev: f.rev, Rows: f.delta, Removed: f.removed}
+	page := api.RowsPage{Epoch: "e1", Rev: f.rev, Rows: f.delta, Removed: f.removed, Catalog: cmp.Or(f.catalog, "c1")}
 	f.delta, f.removed = nil, nil
 	return page, nil
 }
@@ -284,9 +294,10 @@ func (f *fakeDaemon) change(rows []api.Row, removed ...unit.Unit) {
 func (f *fakeDaemon) Catalog(context.Context) (api.CatalogResponse, error) {
 	f.mu.Lock()
 	f.catalogReads++
+	version := cmp.Or(f.catalog, "c1")
 	f.mu.Unlock()
 	tui := []string{"tui"}
-	return api.CatalogResponse{Version: "c1", Views: []api.ViewSpec{
+	return api.CatalogResponse{Version: version, Views: []api.ViewSpec{
 		{ID: "needs-me", Label: "Needs me", Rows: true, Surfaces: tui},
 		{ID: "mine", Label: "My PRs", Rows: true, Order: 1, Surfaces: tui},
 		{ID: "loop", Label: "In loop", Rows: true, Order: 2, Surfaces: tui},

@@ -3,8 +3,10 @@ package api
 import (
 	"cmp"
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/card"
@@ -14,7 +16,7 @@ import (
 )
 
 // The tasks' routes: ViewsPath serves the ViewsCatalog, TasksPath lists a view (query parameters view, area,
-// context as "a,b" and since, a Since's String) and takes a TaskCreate, TaskVerb runs a verb, CountersPath
+// context as "a,b", since, a Since's String, and TasksUnits) and takes a TaskCreate, TaskVerb runs a verb, CountersPath
 // serves the counters of the query parameter area (narrowed to the tasks holding each CountersTerm), DigestPath the daily digest of the query parameter day
 // (YYYY-MM-DD).
 const (
@@ -44,6 +46,23 @@ const (
 	RunEnter      = "/api/runs/{seq}/enter"
 	RunTranscript = "/api/runs/{seq}/transcript"
 )
+
+// TasksUnits is the query parameter of TasksPath, repeated, that names a unit as its String does: a page
+// since a position also holds the tasks holding it, as a change named it.
+const TasksUnits = "units"
+
+// ParseUnits reads the TasksUnits of a request.
+func ParseUnits(raw []string) ([]unit.Unit, error) {
+	out := make([]unit.Unit, 0, len(raw))
+	for _, r := range raw {
+		provider, key, ok := strings.Cut(r, ":")
+		if !ok || provider == "" || key == "" {
+			return nil, fmt.Errorf("unit %q is not <provider>:<key>", r)
+		}
+		out = append(out, unit.Unit{Provider: unit.ProviderID(provider), Key: key})
+	}
+	return out, nil
+}
 
 // TaskPath is the path of task id, followed by the segments of rest.
 func TaskPath(id string, rest ...string) string {
@@ -333,6 +352,8 @@ type TasksPage struct {
 	Counters Counters   `json:"counters"`
 	// Loading are the plugins whose units are not all reported yet.
 	Loading []Loading `json:"loading,omitempty"`
+	// Specs is the version of GET /api/views; a client holding another reads them again.
+	Specs string `json:"specs,omitempty"`
 }
 
 // TaskCreate creates a task: a Title alone captures it. Brief is its brief's markdown, Props its properties
