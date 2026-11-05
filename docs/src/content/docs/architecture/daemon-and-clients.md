@@ -24,7 +24,7 @@ a task, gate, wake or draft ───┴─▶ change log ─┬─▶ read mode
                                            event ─▶ client ─▶ GET /api/tasks?since=…&units=…
 ```
 
-The daemon computes a task's facets when it serves the task: its own facts and its brief's fields, joined with the facets of its units' rows from the read model snapshot the page already reads (see [Facets](/concepts/tasks/#facets)). Clients do no join, and the daemon counts the rail the same way: `GET /api/counters` takes the whole query as `q`, qualifiers included, and counts with the lens the clients filter with (`internal/api`), so `where:general` narrows the counts as it narrows the list. `@me` in a qualifier stands for `me`.
+The daemon computes a task's facets when it serves the task: its own facts and its brief's fields, joined with the facets of its units' rows from the read model snapshot the page already reads (see [Facets](/concepts/tasks/#facets)). Clients do no join, and the daemon counts the rail the same way: `GET /api/counters` takes the whole query as `q`, qualifiers included, and counts with the lens the clients filter with (`internal/api/lens`), so `where:general` narrows the counts as it narrows the list. `@me` in a qualifier stands for `me`.
 
 A page of the rows names the version of `GET /api/catalog` (`catalog`), and a page of the tasks that of `GET /api/views` (`specs`); a client holding another version reads it again, so a reloaded profile reaches it.
 
