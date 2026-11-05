@@ -162,6 +162,44 @@ process.stdout.write(JSON.stringify({ row: tr.textContent, card: c.textContent, 
 	}
 }
 
+// A row offers a facet button only for a value it holds, so clicking it keeps the row in the list: a thread
+// row, which has no strip or kind facet, shows its dot and its situation as plain text.
+func TestARowFiltersOnlyByTheFacetsItHolds(t *testing.T) {
+	var catalog map[string]any
+	if err := json.Unmarshal([]byte(servedCatalog(t)), &catalog); err != nil {
+		t.Fatal(err)
+	}
+	catalog["situations"] = append(catalog["situations"].([]any), map[string]any{"provider": "thread", "kind": "waiting", "label": "waits for a reply", "rank": 0})
+	row := func(facets map[string][]string) map[string]any {
+		return map[string]any{"unit": map[string]any{"provider": "thread", "key": "c1"}, "link": "https://chat.example/c1", "label": "#general c1", "title": "Deploy question",
+			"kind": "waiting", "summary": map[string]any{"waits_on": "ana", "since": "2026-10-14T12:00:00Z"},
+			"views": []string{"needs-me"}, "facets": facets, "actions": []any{}, "specs_version": ""}
+	}
+	var got [][]string
+	nodeRun(t, cockpitScript(t), nil, `
+applyCatalog(input.catalog);
+state.health = { viewer: "me" };
+const lens = { view: "needs-me", q: "", ts: [], quals: [], filters: new Map(), group: "", sort: "", layout: "" };
+const filters = (el, out = []) => {
+  if (el && el.tag === "button" && el.attrs.class === "facet") out.push(el.attrs["aria-label"]);
+  for (const c of (el && el.children) || []) filters(c, out);
+  return out;
+};
+process.stdout.write(JSON.stringify(input.rows.map((r) => filters(rowTr(r, "", lens)))));`,
+		map[string]any{"catalog": catalog, "rows": []any{
+			row(map[string][]string{"waits-on": {"ana"}}),
+			row(map[string][]string{"waits-on": {"ana"}, "wait": {"reviewer"}, "kind": {"waiting"}}),
+		}}, &got)
+	for _, label := range got[0] {
+		if strings.Contains(label, "situation") || strings.Contains(label, "nobody") || !strings.Contains(label, "ana") {
+			t.Errorf("a thread row filters by a facet it lacks: %q in %q", label, got[0])
+		}
+	}
+	if len(got[1]) != 3 {
+		t.Errorf("a row holding the strip and kind facets offers %q, want its strip, waits-on and kind", got[1])
+	}
+}
+
 // lensOp is a filter, group or sort of the cockpit's lens with what app.js
 // shows for the deriver fixtures (testdata/lens.golden.json).
 type lensOp struct {

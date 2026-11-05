@@ -1270,6 +1270,11 @@ function facet(lens, field, raw, content, slot, noun) {
   }, content);
 }
 
+// heldFacet is facet when r holds raw in field, so a click keeps r in the list; otherwise content alone.
+function heldFacet(r, lens, field, raw, content, slot) {
+  return fieldById(field) && facetValues(r, field).includes(raw) ? facet(lens, field, raw, content, slot) : content;
+}
+
 function whoFacets(r, lens, slot) {
   const groups = new Set((pl(r).waits_on || []).filter((p) => String(p.key || "").startsWith("group:")).map((p) => p.name));
   return (sm(r).waits_on || "").split(", ").map((w) => resolveWho(r, w)).flatMap((w, i) => [i ? ", " : null,
@@ -1346,8 +1351,8 @@ function rowTr(r, pr, lens, copy) {
         intakeChip(r))),
     h("td", { class: "c-wait" },
       h("div", { class: "who" },
-        facet(lens, catalog.strip, waitCat(r), h("span", { class: "dot", "aria-hidden": "true" }, "●"), slot + catalog.strip), " ", whoFacets(r, lens, slot)),
-      facet(lens, "kind", r.kind, h("span", { class: "pill" }, rowKindLabel(r)), slot + "kind")),
+        heldFacet(r, lens, catalog.strip, waitCat(r), h("span", { class: "dot", "aria-hidden": "true" }, "●"), slot + catalog.strip), " ", whoFacets(r, lens, slot)),
+      heldFacet(r, lens, "kind", r.kind, h("span", { class: "pill" }, rowKindLabel(r)), slot + "kind")),
     h("td", { class: "c-for" }, roundGate(r) ? countdown(r) : h("span", { class: "age", title: stamp(sm(r).since) }, age(sm(r).since))),
     h("td", { class: "c-why" }, sm(r).reason),
     h("td", { class: "c-where" }, where(r, scope, lens)),

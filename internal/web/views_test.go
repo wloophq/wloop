@@ -235,7 +235,7 @@ const providerName = (id) => id;
 		Row, Card string
 		Keys      []string
 	}
-	nodeRun(t, prelude, append(slices.Clone(lensFuncs), "fieldById", "foldMap", "marked", "where", "facet", "whoFacets", "countdown", "age",
+	nodeRun(t, prelude, append(slices.Clone(lensFuncs), "fieldById", "foldMap", "marked", "where", "facet", "heldFacet", "whoFacets", "countdown", "age",
 		"stripTitle", "mineMark", "tagChips", "briefTags", "intakeWaiting", "intakeChip", "actionStates", "actionTitle", "actionButton", "actionButtons",
 		"copySlot", "multiCopy", "openRow", "openSlot", "rowTr", "card"), `
 const lens = { view: "all", q: "", ts: [], quals: [], filters: new Map(), group: "", sort: "", layout: "" };

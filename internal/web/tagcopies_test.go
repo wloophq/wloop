@@ -70,7 +70,7 @@ function slots(n, out = []) {
 	row := tagRows()[1]
 	row["workspace"] = map[string]any{"id": "w1", "status": "reviewing"}
 	row["actions"] = []map[string]any{{"id": "open", "enabled": true}, {"id": "hold", "enabled": true}, {"id": "mute", "enabled": true}}
-	nodeRun(t, prelude, append(slices.Clone(lensFuncs), "fieldById", "foldMap", "marked", "safeURL", "where", "facet", "whoFacets", "countdown", "age", "stamp",
+	nodeRun(t, prelude, append(slices.Clone(lensFuncs), "fieldById", "foldMap", "marked", "safeURL", "where", "facet", "heldFacet", "whoFacets", "countdown", "age", "stamp",
 		"stripTitle", "mineMark", "tagChips", "briefTags", "intakeWaiting", "intakeChip", "actionStates", "actionTitle", "actionButton", "actionButtons",
 		"copySlot", "multiCopy", "openRow", "openSlot", "rowTr", "card", "revealOpenRow"), `
 const lens = { view: "needs-me", q: "", ts: [], quals: [], filters: new Map(), group: "tag:lang", sort: "", layout: "" };
