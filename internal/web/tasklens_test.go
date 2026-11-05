@@ -425,7 +425,7 @@ process.stdout.write(JSON.stringify({ State: groups("state"), Contexts: groups("
 	if !slices.Equal(got.State, want) {
 		t.Errorf("states group as %v, want %v", got.State, want)
 	}
-	if want := []group{{"calls", "@calls"}, {"computer", "@computer"}, {"none", "no context"}}; !slices.Equal(got.Contexts, want) {
-		t.Errorf("contexts group as %v, want %v", got.Contexts, want)
+	if want := []group{{"calls", "calls"}, {"computer", "computer"}, {"none", "no context"}}; !slices.Equal(got.Contexts, want) {
+		t.Errorf("contexts group as %v, want %v: label_prefix shows on rows, never in a group's head", got.Contexts, want)
 	}
 }

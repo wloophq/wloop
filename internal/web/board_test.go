@@ -545,7 +545,7 @@ func TestAFacetTogglesItsQualifier(t *testing.T) {
 }
 
 // rowFuncs are app.js's row renderer and what it calls beyond the lens.
-var rowFuncs = []string{"specFor", "agePart", "ageText", "partPiece", "rowParts", "rowClasses", "partClass", "pieceButtons", "rowColumnDefs", "rowColumns",
+var rowFuncs = []string{"specFor", "rfc3339", "agePart", "ageText", "partPiece", "rowParts", "rowClasses", "partClass", "pieceButtons", "rowColumnDefs", "rowColumns",
 	"columnSort", "sortPick", "rowHead", "rowTr", "joined", "refTail", "rowTable", "unitTitle", "rowWords", "lensWords", "fillWord", "facet", "heldFacet",
 	"rowLink", "bucketOf", "goDuration", "toggleCollapsed", "onlyThis", "groupQualifier", "multiCopy", "marked", "foldMap", "copySlot"}
 
@@ -741,7 +741,7 @@ func TestTheOpenRowIsMarkedAndScrolledToOnce(t *testing.T) {
 		t.Skip("node is not on PATH")
 	}
 	src := appJS(t)
-	for _, want := range []string{`m.selected ? "sel" : ""`, `"aria-selected": m.selected`, `selected: key === pr`, `"aria-current": key === pr`} {
+	for _, want := range []string{`"aria-current": key === pr`} {
 		if !strings.Contains(src, want) {
 			t.Errorf("app.js lacks %s", want)
 		}

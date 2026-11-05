@@ -131,7 +131,7 @@ func TestTaskFacetsTakeTheOrderOfTheirFactFromTheProfile(t *testing.T) {
 		t.Errorf("category rank %v, want %v", got, want)
 	}
 	c := byID["contexts"]
-	if !slices.Equal(c.Rank, []string{"calls", "@decide"}) || c.Labels["calls"] != "@calls" || c.Labels["@decide"] != "" {
+	if !slices.Equal(c.Rank, []string{"calls", "@decide"}) || len(c.Labels) > 0 || c.LabelPrefix != "@" {
 		t.Errorf("contexts: rank %v labels %v", c.Rank, c.Labels)
 	}
 	if got := byID["prop.priority"].Rank; !slices.Equal(got, []string{"high", "normal", "low"}) {

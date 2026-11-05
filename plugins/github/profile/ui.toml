@@ -81,6 +81,7 @@ show = "meta"
 label = "Risk"
 empty = "no brief"
 show = "meta"
+label_prefix = "risk "
 
 [facets.size]
 label = "Size"
@@ -99,6 +100,7 @@ show = "meta"
 
 [facets.is]
 label = "Flags"
+values = { adopted = "adopted", approved = "approved", due = "due", in-loop = "in loop", muted = "muted", needs-me = "needs me", paused = "paused", stalled = "stalled", tracked = "tracked" }
 show = { flag = ["paused", "muted"] }
 row_class = { stalled = "late" }
 

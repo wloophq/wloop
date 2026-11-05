@@ -47,7 +47,7 @@ type ViewsDef struct {
 // sorts it by. Merge is "union" or "rows-first", Units "all" or "primary".
 type FacetDef struct {
 	ID, Fact, Label, Empty, Sort, Match string
-	// LabelPrefix goes before the label of each value of a facet whose ranks the catalog derives.
+	// LabelPrefix goes before the label of each value the facet shows on a row.
 	LabelPrefix        string
 	Group, Menu, Strip bool
 	// Show is where the facet's values show on a task's row.

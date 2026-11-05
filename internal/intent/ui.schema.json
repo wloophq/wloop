@@ -92,7 +92,7 @@
             "type": "object"
           },
           "show": {
-            "description": "The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = [\"paused\", \"muted\"] }`. Absent, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show.",
+            "description": "The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = [\"paused\", \"muted\"] }`, or `\"\"` to take a facet a lower layer places off the row. Absent or `\"\"`, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show.",
             "oneOf": [
               {
                 "type": "string"
@@ -244,12 +244,20 @@
           "description": "The head of the column of why a row waits.",
           "type": "string"
         },
+        "countdown_title": {
+          "description": "The tooltip of a pending round's countdown, over the `{{.time}}` it sends at.",
+          "type": "string"
+        },
         "due": {
           "description": "The flag of a task's deadline, over the `{{.date}}`.",
           "type": "string"
         },
         "every": {
           "description": "How often a project is reviewed, over the `{{.every}}`.",
+          "type": "string"
+        },
+        "filter_group": {
+          "description": "What a facet button calls whom a row waits on when the value is a group of people, such as a Slack user group, in place of the facet's label.",
           "type": "string"
         },
         "filter_label": {
@@ -262,6 +270,10 @@
         },
         "filter_title_group": {
           "description": "A facet button's tooltip when its facet groups, over `{{.label}}`, `{{.value}}` and the `{{.group}}` field's label.",
+          "type": "string"
+        },
+        "list_count": {
+          "description": "A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.",
           "type": "string"
         },
         "no_next_action": {

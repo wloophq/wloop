@@ -480,7 +480,7 @@ function roundGate(row) {
 
 function countdown(row) {
   const deadline = roundGate(row).deadline;
-  return h("span", { class: "age countdown", "data-deadline": deadline, title: `sends at ${stamp(deadline)}` }, left(deadline));
+  return h("span", { class: "age countdown", "data-deadline": deadline, title: fillWord(lensWords().countdown_title, { time: stamp(deadline) }) }, left(deadline));
 }
 
 function tickCountdowns() {
@@ -1256,16 +1256,17 @@ function actionNotes(subject, surface) {
 
 // facet is a value on screen that filters by itself: a click filters by it,
 // Shift groups by its field and Alt leaves it out. A field the lens does not
-// know shows its content alone.
-function facet(lens, field, raw, content, slot) {
+// know, or a lens that does not filter, shows its content alone. opts may
+// give the words to say it in and the noun that names the field.
+function facet(lens, field, raw, content, slot, opts = {}) {
   const fields = lens.fields || catalog.fields;
   const f = fieldById(field, fields);
-  if (!f) return content;
+  if (!f || lens.static) return content;
   const v = normValue(field, raw);
-  const w = lens.words || lensWords();
+  const w = opts.words || lens.words || lensWords();
   const by = f.groupBy ? f.groupBy(raw) : f.group ? field : "";
   const group = by ? groupField(by, fields) : null;
-  const vars = { label: f.label.toLowerCase(), value: raw, group: group ? group.label.toLowerCase() : "" };
+  const vars = { label: opts.noun || f.label.toLowerCase(), value: raw, group: group ? group.label.toLowerCase() : "" };
   const pick = (e) => {
     e.stopPropagation();
     if (e.shiftKey && by) return setGroup(by);
@@ -1350,7 +1351,7 @@ function partPiece(spec, raw, words, now) {
   if (!raw || fold(raw) === "none") return null;
   const p = { field: spec.id, value: raw, raw, label: (spec.labels || {})[raw] || raw };
   if (spec.sort === "time" || (spec.buckets || []).length) {
-    const at = Date.parse(raw);
+    const at = rfc3339(raw) ? Date.parse(raw) : NaN;
     if (Number.isNaN(at)) return null;
     if ((spec.buckets || []).length) {
       p.value = bucketOf(spec.buckets, raw, now);
@@ -1362,6 +1363,11 @@ function partPiece(spec, raw, words, now) {
   }
   if (spec.label_prefix && !p.label.startsWith(spec.label_prefix)) p.label = spec.label_prefix + p.label;
   return p;
+}
+
+// rfc3339 says whether s is an RFC 3339 instant, as Go's lens parses them.
+function rfc3339(s) {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(String(s));
 }
 
 // agePart says whether a part shows one time of one facet, as its age.
@@ -1393,6 +1399,7 @@ function rowParts(it, specs, words, now = Date.now()) {
 function rowClasses(it, specs) {
   const out = [];
   for (const s of specs || []) {
+    if (s.provider && it.provider && s.provider !== it.provider) continue;
     const spec = specFor(s, it.provider || "");
     for (const v of (it.facets || {})[spec.id] || []) if ((spec.row_class || {})[v]) out.push(spec.row_class[v]);
   }
@@ -1407,8 +1414,8 @@ function partClass(part) {
 // pieceButtons are a part's pieces, each a facet button whose label marks the search's hits.
 function pieceButtons(m, lens, part) {
   return (m.parts[part] || []).map((p) => facet(lens, p.field, p.value,
-    h("span", { class: partClass(part), "data-field": p.field, "data-value": p.value }, marked(p.label, lens.ts)),
-    `facet:${m.scope}:${p.field}:${p.value}`));
+    h("span", { class: partClass(part), "data-field": p.field, "data-value": p.value, title: agePart(part) ? stamp(p.raw) : undefined }, marked(p.label, lens.ts)),
+    `facet:${m.scope}:${p.field}:${p.value}`, { words: m.words, noun: (m.nouns || {})[`${p.field}:${p.value}`] }));
 }
 
 // rowColumnDefs are a row's columns: the parts each shows, and whether a row has anything for it.
@@ -1419,7 +1426,7 @@ function rowColumnDefs() {
     { id: "since", cls: "c-for", parts: ["age"], has: (m) => !!(m.parts.age || m.age) },
     { id: "why", cls: "c-why", parts: [], has: (m) => !!m.why },
     { id: "aside", cls: "c-where", parts: ["aside"], has: (m) => !!(m.parts.aside || (m.aside || []).some(Boolean)) },
-    { id: "actions", cls: "c-act", parts: [], has: (m) => !!m.actions },
+    { id: "actions", cls: "c-act", parts: [], has: (m) => (m.actions || []).some(Boolean) },
   ];
 }
 
@@ -1452,7 +1459,7 @@ function rowHead(cols, lens, unit) {
   const heads = { unit: unit || w.col_unit, who: w.col_who, since: w.col_age, why: w.col_why, aside: w.col_aside };
   return h("thead", {}, h("tr", {}, cols.map((c) => {
     if (c.id === "actions") return h("th", { scope: "col", class: c.cls }, h("span", { class: "sr" }, w.col_actions));
-    const f = columnSort(c, lens);
+    const f = lens.static ? null : columnSort(c, lens);
     if (!f) return h("th", { scope: "col", class: c.cls }, heads[c.id]);
     return h("th", { scope: "col", class: c.cls, "aria-sort": f.id === field ? (desc ? "descending" : "ascending") : "none" },
       h("button", { type: "button", class: "th-sort", "data-sort": f.id, "data-focus": "th:" + f.id, title: fillWord(w.sort_by, { label: f.label.toLowerCase() }), onclick: () => sortPick(f.id) }, heads[c.id]));
@@ -1508,7 +1515,7 @@ function refTail(label, ref) {
 function rowModel(r, pr, lens, copy) {
   const key = keyOf(r);
   const p = pl(r);
-  const w = lens.words || {};
+  const w = rowWords(unitOf(r).provider);
   const item = { facets: r.facets || {}, provider: unitOf(r).provider };
   const parts = rowParts(item, lens.specs, w);
   const scope = copySlot("row", key, copy);
@@ -1517,8 +1524,9 @@ function rowModel(r, pr, lens, copy) {
   const strip = waitField();
   const cat = waitCat(r);
   const why = sm(r).reason || "";
+  const nouns = Object.fromEntries((p.waits_on || []).filter((x) => String(x.key || "").startsWith("group:")).map((x) => [`waits-on:${x.name}`, w.filter_group]));
   return {
-    key, scope, item, parts, selected: key === pr, open: () => openRow(scope, key),
+    key, scope, item, parts, words: w, nouns, selected: key === pr, open: () => openRow(scope, key),
     title: r.title || labelOf(r), titleTip: (p.brief || {}).goal,
     ref: [refTail(labelOf(r), parts.ref)],
     meta: [
@@ -1636,7 +1644,7 @@ function renderRows() {
     return;
   }
   const res = pipeline(state.rows, lens);
-  document.getElementById("list-sum").textContent = `${unitTitle(view, lens)}s: ${res.shown} of ${res.total}`;
+  document.getElementById("list-sum").textContent = fillWord((lens.words || {}).list_count, { unit: unitTitle(view, lens), shown: res.shown, total: res.total });
   if (state.collapsedFor !== res.group) {
     state.collapsed.clear();
     state.collapsedFor = res.group;

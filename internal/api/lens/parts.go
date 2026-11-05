@@ -21,9 +21,8 @@ type Piece struct {
 
 // Parts are the pieces of it each part of a row shows, by part, from the specs that show in one, in their
 // order: a spec of another provider places none, and a spec merged across providers places it with its
-// provider's display keys. A value "none" and a
-// time facet's value that is no time never show, and the age part holds the first time of its first facet,
-// labeled with its age at now in words.
+// provider's display keys. A value "none" and a time facet's value that is no time never show, and the age
+// part holds the first time of its first facet, labeled with its age at now in words.
 func Parts(it Item, specs []api.FacetSpec, words api.LensWords, now time.Time) map[string][]Piece {
 	out := map[string][]Piece{}
 	for _, s := range specs {

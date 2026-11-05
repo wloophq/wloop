@@ -125,7 +125,7 @@ type FacetSpec struct {
 	// Strip says each row's strip is colored by the facet's first value,
 	// its rank the strip's legend.
 	Strip bool `json:"strip,omitempty"`
-	// Show is the part of a row the facet's values show in (one of RowParts); "" keeps the facet to the lens.
+	// Show is the part of a row the facet's values show in (builtin.ShowParts names them); "" keeps the facet to the lens.
 	Show string `json:"show,omitempty"`
 	// ShowOnly are the values the part shows, all of them when empty.
 	ShowOnly []string `json:"show_only,omitempty"`
@@ -141,9 +141,6 @@ type FacetSpec struct {
 	// Providers are the providers a merged facet (Provider "") came from; never served.
 	Providers []string `json:"-"`
 }
-
-// Parts are the parts of a row a facet's Show may name, in the order a row lays them out.
-var RowParts = []string{"ref", "meta", "flag", "who", "kind", "age", "aside"}
 
 // FacetDisplay is where and how one provider shows a facet's values on its rows: FacetSpec's keys of the
 // same names.

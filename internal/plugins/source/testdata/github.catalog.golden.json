@@ -253,7 +253,8 @@
       ],
       "empty": "no brief",
       "menu": true,
-      "show": "meta"
+      "show": "meta",
+      "label_prefix": "risk "
     },
     {
       "id": "size",
@@ -303,6 +304,17 @@
       "label": "Flags",
       "provider": "github",
       "group": false,
+      "labels": {
+        "adopted": "adopted",
+        "approved": "approved",
+        "due": "due",
+        "in-loop": "in loop",
+        "muted": "muted",
+        "needs-me": "needs me",
+        "paused": "paused",
+        "stalled": "stalled",
+        "tracked": "tracked"
+      },
       "menu": true,
       "show": "flag",
       "show_only": [

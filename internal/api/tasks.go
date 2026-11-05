@@ -88,7 +88,7 @@ type LensWords struct {
 	Sorted        string `json:"sorted"`
 	Descending    string `json:"descending"`
 	NoLens        string `json:"no_lens"`
-	// RowWords are what a row says beside its facets, RowWordKeys names their keys and variables.
+	// RowWords are what a row says beside its facets.
 	RowWords
 }
 
@@ -102,6 +102,9 @@ type RowWords struct {
 	FilterLabel      string `json:"filter_label"`
 	FilterTitle      string `json:"filter_title"`
 	FilterTitleGroup string `json:"filter_title_group"`
+	FilterGroup      string `json:"filter_group"`
+	ListCount        string `json:"list_count"`
+	CountdownTitle   string `json:"countdown_title"`
 	SortBy           string `json:"sort_by"`
 	ColUnit          string `json:"col_unit"`
 	ColWho           string `json:"col_who"`

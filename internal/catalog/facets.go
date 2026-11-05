@@ -65,11 +65,7 @@ func deriveOrder(spec *api.FacetSpec, f intentload.FacetDef, tasks intentload.Ta
 		if _, ok := spec.Labels[v]; ok {
 			continue
 		}
-		label := cmp.Or(labels[v], v)
-		if f.LabelPrefix != "" && !strings.HasPrefix(label, f.LabelPrefix) {
-			label = f.LabelPrefix + label
-		}
-		if label != v {
+		if label := labels[v]; label != "" && label != v {
 			if spec.Labels == nil {
 				spec.Labels = map[string]string{}
 			}

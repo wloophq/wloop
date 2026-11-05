@@ -110,7 +110,7 @@ const shown = chips.map((b) => {
 });
 process.stdout.write(JSON.stringify({ Titles: chips.map((b) => b.attrs["aria-label"]), Shown: shown }));`,
 		map[string]any{"rows": []any{row, other}, "catalog": json.RawMessage(servedCatalog(t)), "views": servedViews(t)}, &got)
-	want := []string{"Filter by waits on (person) @team-a", "Filter by waits on (person) Ana", "Filter by waits on (person) channel participants"}
+	want := []string{"Filter by waits on (group) @team-a", "Filter by waits on (person) Ana", "Filter by waits on (group) channel participants"}
 	if !slices.Equal(got.Titles, want) {
 		t.Errorf("chips %q, want %q", got.Titles, want)
 	}

@@ -286,8 +286,9 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `facets.<name>.rank` (list of strings): The facet's values in their order, first first.
 - `facets.<name>.values` (table by name): The text people read for a value, by value.
 - `facets.<name>.values.<name>` (string): The text of one value.
-- `facets.<name>.label_prefix` (string): Text before the label of each value the facet shows on a row, such as the `@` of a context; a label that has it already keeps it. A facet whose order the catalog derives has it in its group heads too.
-- `facets.<name>.show` (one of `ref`, `meta`, `flag`, `who`, `kind`, `age`, `aside`, or a table): The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = ["paused", "muted"] }`. Absent, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show.
+- `facets.<name>.label_prefix` (string): Text before the label of each value the facet shows on a row, such as the `@` of a context, never in a group's head; a label that has it already keeps it, as a context configured as `@calls` does.
+- `facets.<name>.show` (one of ``, `ref`, `meta`, `flag`, `who`, `kind`, `age`, `aside`, or a table): The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = ["paused", "muted"] }`, or `""` to take a facet a lower layer places off the row. Absent or `""`, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show.
+  - ``: Nowhere: the facet is for the lens alone, as when a user layer takes a lower layer's placement off the row.
   - `ref`: Beside the title, before the unit's own label: where it lives.
   - `meta`: Under the title: who opened it, its contexts, its brief's type, size, risk and tags.
   - `flag`: Under the title, after the meta: a state worth a glance, such as paused.
@@ -332,6 +333,9 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `lens.filter_label` (template): What a facet button on a row says to a screen reader, over the facet's `{{.label}}` and the `{{.value}}`.
 - `lens.filter_title` (template): A facet button's tooltip, over the facet's `{{.label}}` and the `{{.value}}`.
 - `lens.filter_title_group` (template): A facet button's tooltip when its facet groups, over `{{.label}}`, `{{.value}}` and the `{{.group}}` field's label.
+- `lens.filter_group` (template): What a facet button calls whom a row waits on when the value is a group of people, such as a Slack user group, in place of the facet's label.
+- `lens.list_count` (template): A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.
+- `lens.countdown_title` (template): The tooltip of a pending round's countdown, over the `{{.time}}` it sends at.
 - `lens.sort_by` (template): A column head's tooltip, over the `{{.label}}` of the facet it sorts by.
 - `lens.col_unit` (template): The head of the column of a row's title, ref and flags in a view whose rows mix kinds.
 - `lens.col_who` (template): The head of the column of whom a row waits on and its situation.
@@ -782,7 +786,8 @@ The fields each notice reads besides `Name` and `Command`:
 - `facets` (table): The words of the plugin's facets, by facet id.
 - `facets.<name>` (table): One facet's words.
 - `facets.<name>.label` (string): The facet's name, as the filter menu and the groups show it. Required.
-- `facets.<name>.show` (one of `ref`, `meta`, `flag`, `who`, `kind`, `age`, `aside`, or a table): The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = ["paused", "muted"] }`. Absent, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show.
+- `facets.<name>.show` (one of ``, `ref`, `meta`, `flag`, `who`, `kind`, `age`, `aside`, or a table): The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = ["paused", "muted"] }`, or `""` to take a facet a lower layer places off the row. Absent or `""`, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show.
+  - ``: Nowhere: the facet is for the lens alone, as when a user layer takes a lower layer's placement off the row.
   - `ref`: Beside the title, before the unit's own label: where it lives.
   - `meta`: Under the title: who opened it, its contexts, its brief's type, size, risk and tags.
   - `flag`: Under the title, after the meta: a state worth a glance, such as paused.
@@ -827,6 +832,9 @@ The fields each notice reads besides `Name` and `Command`:
 - `lens.filter_label` (template): What a facet button on a row says to a screen reader, over the facet's `{{.label}}` and the `{{.value}}`.
 - `lens.filter_title` (template): A facet button's tooltip, over the facet's `{{.label}}` and the `{{.value}}`.
 - `lens.filter_title_group` (template): A facet button's tooltip when its facet groups, over `{{.label}}`, `{{.value}}` and the `{{.group}}` field's label.
+- `lens.filter_group` (template): What a facet button calls whom a row waits on when the value is a group of people, such as a Slack user group, in place of the facet's label.
+- `lens.list_count` (template): A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.
+- `lens.countdown_title` (template): The tooltip of a pending round's countdown, over the `{{.time}}` it sends at.
 - `lens.sort_by` (template): A column head's tooltip, over the `{{.label}}` of the facet it sorts by.
 - `lens.col_unit` (template): The head of the column of a row's title, ref and flags in a view whose rows mix kinds.
 - `lens.col_who` (template): The head of the column of whom a row waits on and its situation.

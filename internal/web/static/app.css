@@ -507,7 +507,7 @@ label.d-sub { display: block; margin-top: var(--space-12); }
   .views .count { margin-left: var(--space-6); }
   #detail-resize, body.has-detail #detail-resize { display: none; }
   #detail { position: fixed; inset: 0; z-index: 10; border-left: 0; }
-  .c-why, .c-where { display: none; }
+  .c-wait, .c-why, .c-where { display: none; }
   .c-pr { min-width: 0; }
   .search { flex-basis: 100%; }
   .lens-count { margin-left: 0; }
@@ -524,7 +524,7 @@ label.d-sub { display: block; margin-top: var(--space-12); }
 .card .btags { display: flex; flex-wrap: wrap; margin: var(--space-2) 0 0; }
 .brief-line .btags { margin-left: 0; }
 @media (max-width: 600px) {
-  .meta .btags { display: none; }
+  .meta .btags, .c-pr .meta > .facet:has(.pill) { display: none; }
 }
 .risk-high { color: var(--err); background: var(--err-bg); }
 .risk-medium { color: var(--late); background: var(--late-bg); }

@@ -520,6 +520,10 @@ func TestAFacetsShowNamesAPartOrAPartsValues(t *testing.T) {
 	if moved, _ := facetOf(views, "moved"); moved.Show.Part != "age" {
 		t.Errorf("the bundled moved shows %+v", moved.Show)
 	}
+	views, problems = loadFacets(t, "[facets.moved]\nshow = \"\"\n")
+	if moved, _ := facetOf(views, "moved"); len(problems) > 0 || moved.Show.Part != "" {
+		t.Errorf("show = \"\" leaves moved %+v, problems %v", moved.Show, problems)
+	}
 	for _, bad := range []string{"show = \"corner\"", "show = { corner = [\"high\"] }", "show = { flag = \"high\" }", "show_values = \"some\""} {
 		_, problems := loadFacets(t, "[facets.risk]\n"+bad+"\n")
 		if !strings.Contains(problems.Error(), "facets.risk.show") {
@@ -561,6 +565,11 @@ func TestAPluginsUIShowsItsFacetsAndReplacesRowWords(t *testing.T) {
 	}
 	if got := texts["acme"].Lens.Set(); !maps.Equal(got, map[string]string{"col_aside": "Workspace"}) {
 		t.Errorf("row words %v", got)
+	}
+	write(user, "[facets.author]\nshow = \"\"\n")
+	texts, problems = loadUI([]profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}, {Name: "user:acme", Dir: user}})
+	if a := texts["acme"].Facets["author"]; len(problems) > 0 || a.Show.Part != "" || a.Show.Values != "first" {
+		t.Errorf("show = \"\" over a placed facet: %+v, problems %v", a.Show, problems)
 	}
 	write(user, "[facets.author]\nshow = \"corner\"\n\n[lens]\ncol_aside = \"{{.label}}\"\n")
 	_, problems = loadUI([]profile.Layer{{Name: "user:acme", Dir: user}})

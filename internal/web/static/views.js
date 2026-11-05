@@ -246,7 +246,7 @@ function taskModel(e, open, copy, lens) {
   const draft = isDraftTask(e);
   const due = roleValue(e, "deadline");
   return {
-    key: e.id, scope: taskSlot(e.id, copy), item, parts, selected: e.id === open,
+    key: e.id, scope: taskSlot(e.id, copy), item, parts, words: w, selected: e.id === open,
     open: draft ? null : () => writeHash({ task: e.id, pr: "" }),
     href: draft ? "#" + viewHash({ task: e.id, pr: "" }) : "",
     title: e.title || e.id,

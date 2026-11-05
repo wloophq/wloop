@@ -412,7 +412,7 @@ func TestTheTUIGroupsStatesAndContextsAsTheBundledProfileDeclares(t *testing.T) 
 	if got, want := heads("state"), []string{"Inbox:t-2", "Next:t-3", "Done:t-1"}; !slices.Equal(got, want) {
 		t.Errorf("state heads %v, want %v", got, want)
 	}
-	if got, want := heads("contexts"), []string{"@calls:t-4", "@computer:t-3", "no context:t-1"}; !slices.Equal(got, want) {
+	if got, want := heads("contexts"), []string{"calls:t-4", "computer:t-3", "no context:t-1"}; !slices.Equal(got, want) {
 		t.Errorf("context heads %v, want %v", got, want)
 	}
 }

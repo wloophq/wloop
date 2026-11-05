@@ -1308,6 +1308,52 @@
     "label": "Lane",
     "provider": "github",
     "show": "flag"
+   },
+   {
+    "id": "st",
+    "label": "State",
+    "show": "kind",
+    "labels": {
+     "a": "Shared A"
+    },
+    "displays": {
+     "github": {
+      "show": "kind",
+      "labels": {
+       "a": "GitHub A"
+      }
+     }
+    }
+   },
+   {
+    "id": "fl",
+    "label": "Flags",
+    "displays": {
+     "slack": {
+      "show": "flag",
+      "show_only": [
+       "x"
+      ]
+     }
+    }
+   },
+   {
+    "id": "opened",
+    "label": "Opened",
+    "sort": "time",
+    "show": "meta",
+    "buckets": [
+     {
+      "id": "1d",
+      "label": "0-1 days",
+      "within": "24h"
+     },
+     {
+      "id": "older",
+      "label": "older",
+      "within": ""
+     }
+    ]
    }
   ],
   "cases": [
@@ -1354,6 +1400,9 @@
       ],
       "lane": [
        "me"
+      ],
+      "st": [
+       "a"
       ]
      },
      "texts": []
@@ -1427,6 +1476,12 @@
        "value": "review",
        "raw": "review",
        "label": "Review"
+      },
+      {
+       "field": "st",
+       "value": "a",
+       "raw": "a",
+       "label": "GitHub A"
       }
      ],
      "age": [
@@ -1456,10 +1511,18 @@
        "ws-1"
       ],
       "conv": [
-       "general"
+       "general",
+       "#random"
       ],
       "lane": [
        "me"
+      ],
+      "fl": [
+       "x",
+       "y"
+      ],
+      "opened": [
+       "2026-11-04T10:00:00Z"
       ]
      },
      "texts": []
@@ -1477,6 +1540,18 @@
        "value": "general",
        "raw": "general",
        "label": "#general"
+      },
+      {
+       "field": "conv",
+       "value": "#random",
+       "raw": "#random",
+       "label": "#random"
+      },
+      {
+       "field": "opened",
+       "value": "1d",
+       "raw": "2026-11-04T10:00:00Z",
+       "label": "0-1 days"
       }
      ],
      "age": [
@@ -1493,6 +1568,14 @@
        "value": "ws-1",
        "raw": "ws-1",
        "label": "ws-1"
+      }
+     ],
+     "flag": [
+      {
+       "field": "fl",
+       "value": "x",
+       "raw": "x",
+       "label": "x"
       }
      ]
     }
@@ -1511,6 +1594,9 @@
       ],
       "lane": [
        "loop"
+      ],
+      "st": [
+       "a"
       ]
      },
      "texts": []
@@ -1538,6 +1624,14 @@
        "value": "loop",
        "raw": "loop",
        "label": "loop"
+      }
+     ],
+     "kind": [
+      {
+       "field": "st",
+       "value": "a",
+       "raw": "a",
+       "label": "Shared A"
       }
      ]
     }
@@ -1579,6 +1673,20 @@
      "facets": {
       "ci": [
        "failure"
+      ]
+     },
+     "texts": []
+    },
+    "want": {}
+   },
+   {
+    "item": {
+     "facets": {
+      "moved": [
+       "2026-11-04"
+      ],
+      "opened": [
+       "2026-11-04"
       ]
      },
      "texts": []

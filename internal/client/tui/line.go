@@ -26,9 +26,8 @@ type listLine struct {
 }
 
 // lineCells lays lines out in aligned columns: the age, the ref, the title, from 100 columns the meta part
-// and the facts,
-// and from 60 whom it waits on with its kind; heads open the groups, and the height of them around the
-// cursor shows.
+// and the facts, and from 60 whom it waits on with its kind; heads open the groups, and the height of them
+// around the cursor shows.
 func (m *Model) lineCells(lines []listLine, heads []string, cur, width, height int) []string {
 	t := m.t
 	cols := []termfmt.Column{{Right: true}, {}, {Flex: true}}
@@ -138,7 +137,8 @@ func whoCell(l listLine, w int) string {
 // of its age, and its age marked ! and red once stalled, yellow from two days.
 func (m *Model) rowLine(r api.Row, now time.Time) listLine {
 	t := m.t
-	l := listLine{parts: lens.Parts(m.rowItem(r), m.catalog.Facets, m.viewsCat.Lens, now), label: r.Label, link: r.Link, title: r.Title}
+	words := m.catalog.RowWordsOf(string(r.Unit.Provider), m.viewsCat.Lens)
+	l := listLine{parts: lens.Parts(m.rowItem(r), m.catalog.Facets, words, now), label: r.Label, link: r.Link, title: r.Title}
 	if r.Stale {
 		l.title = staleMark + " " + r.Title
 	}

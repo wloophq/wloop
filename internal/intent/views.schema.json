@@ -67,7 +67,7 @@
             "type": "string"
           },
           "label_prefix": {
-            "description": "Text before the label of each value the facet shows on a row, such as the `@` of a context; a label that has it already keeps it. A facet whose order the catalog derives has it in its group heads too.",
+            "description": "Text before the label of each value the facet shows on a row, such as the `@` of a context, never in a group's head; a label that has it already keeps it, as a context configured as `@calls` does.",
             "type": "string"
           },
           "match": {
@@ -103,7 +103,7 @@
             "type": "array"
           },
           "show": {
-            "description": "The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = [\"paused\", \"muted\"] }`. Absent, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show.",
+            "description": "The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = [\"paused\", \"muted\"] }`, or `\"\"` to take a facet a lower layer places off the row. Absent or `\"\"`, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show.",
             "oneOf": [
               {
                 "type": "string"
@@ -287,6 +287,10 @@
           "description": "What Copy list says it copied from a grouped list, over `{{.count}}`, `{{.view}}` and the `{{.group}}` field's label.",
           "type": "string"
         },
+        "countdown_title": {
+          "description": "The tooltip of a pending round's countdown, over the `{{.time}}` it sends at.",
+          "type": "string"
+        },
         "default_group": {
           "description": "The group menu's entry for the field a view groups by on its own, over the field's label as `{{.label}}`.",
           "type": "string"
@@ -303,6 +307,10 @@
           "description": "How often a project is reviewed, over the `{{.every}}`.",
           "type": "string"
         },
+        "filter_group": {
+          "description": "What a facet button calls whom a row waits on when the value is a group of people, such as a Slack user group, in place of the facet's label.",
+          "type": "string"
+        },
         "filter_label": {
           "description": "What a facet button on a row says to a screen reader, over the facet's `{{.label}}` and the `{{.value}}`.",
           "type": "string"
@@ -317,6 +325,10 @@
         },
         "grouped": {
           "description": "What the terminal says after a group pick, over the picked entry's `{{.label}}`.",
+          "type": "string"
+        },
+        "list_count": {
+          "description": "A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.",
           "type": "string"
         },
         "no_group": {
@@ -415,14 +427,17 @@
         "col_why",
         "copied",
         "copied_grouped",
+        "countdown_title",
         "default_group",
         "descending",
         "due",
         "every",
+        "filter_group",
         "filter_label",
         "filter_title",
         "filter_title_group",
         "grouped",
+        "list_count",
         "no_group",
         "no_lens",
         "no_next_action",

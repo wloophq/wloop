@@ -126,7 +126,7 @@ process.stdout.write(JSON.stringify({ PR: rowShown(input.pr, "mine"), Slack: row
 			}
 		}
 	}
-	for _, want := range []string{"where:acme/web", "author:by me", "size:L", "risk:high", "tag:lang:go", "tag:lang:sql", "is:paused", "kind:changes asked"} {
+	for _, want := range []string{"where:acme/web", "author:by me", "size:L", "risk:risk high", "tag:lang:go", "tag:lang:sql", "is:paused", "kind:changes asked"} {
 		if !slices.Contains(labelsOf(got.PR), want) {
 			t.Errorf("the pull request lacks %s: %v", want, labelsOf(got.PR))
 		}
@@ -134,8 +134,8 @@ process.stdout.write(JSON.stringify({ PR: rowShown(input.pr, "mine"), Slack: row
 	if !slices.Contains(got.PR.Classes, "mine") || !slices.Contains(got.PR.Classes, "late") {
 		t.Errorf("the pull request's classes %v, want mine and late from its author and is facets", got.PR.Classes)
 	}
-	if want := []string{"Pull request", "Waiting on", "For", "Why", "Workspace", "Actions"}; !slices.Equal(got.PR.Heads, want) {
-		t.Errorf("the pull request's heads %q, want %q", got.PR.Heads, want)
+	if want := []string{"Pull request", "Waiting on", "For", "Why", "Workspace"}; !slices.Equal(got.PR.Heads, want) {
+		t.Errorf("the pull request's heads %q, want %q: a row view without actions draws no Actions column", got.PR.Heads, want)
 	}
 	if want := []string{"where:#general", "waits-on:Ana"}; !slices.Equal(labelsOf(got.Slack), want) {
 		t.Errorf("the conversation shows %v, want %v", labelsOf(got.Slack), want)
@@ -206,5 +206,96 @@ process.stdout.write(JSON.stringify(rowShown(input.slack, "slack")));`, map[stri
 	}
 	if got.Heads[0] != "Conversation" {
 		t.Errorf("heads %q", got.Heads)
+	}
+}
+
+// TestARowShowsWhatItsOwnPluginSays renders a mixed view's rows: the open one is selected, a row with
+// actions draws the Actions column, its age tells the exact time, each row takes its own plugin's words, and a
+// provider's row_class never marks another provider's row.
+func TestARowShowsWhatItsOwnPluginSays(t *testing.T) {
+	now := time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC)
+	pr := tagRows()[0]
+	pr["views"] = []string{"all"}
+	pr["actions"] = []map[string]any{{"id": "open", "enabled": true}}
+	slack := map[string]any{"unit": map[string]any{"provider": "slack", "key": slackUnit.Key}, "label": "#general", "title": "Deploy plan", "kind": "new",
+		"views": []string{"all"}, "summary": map[string]any{"waits_on": "Ana"}, "facets": map[string][]string{"author": {"me"}, "waits-on": {"Ana"}}}
+	var cat map[string]any
+	if err := json.Unmarshal([]byte(servedCatalog(t)), &cat); err != nil {
+		t.Fatal(err)
+	}
+	cat["lens"] = []any{map[string]any{"provider": "github", "words": map[string]string{"filter_label": "GitHub filter {{.value}}", "col_aside": "Workspace"}}}
+	raw, err := json.Marshal(cat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Class, Selected, AgeTitle string
+		Heads                     []string
+		Labels                    [][]string
+		SlackClass                []string
+		Count                     string
+	}
+	rowViewRun(t, raw, `state.rows = [input.pr, input.slack];
+state.specs = { version: "", byId: { open: { id: "open", label: "Open", group: "control", surfaces: ["row"] } } };
+const lens = lensOf({ ...readHash(), view: "all" });
+const key = keyOf(input.pr);
+const models = state.rows.map((r) => rowModel(r, key, lens, ""));
+const cols = rowColumns(models);
+const trs = models.map((m) => rowTr(m, lens, cols));
+const labels = (n, out = []) => { if (n && n.tag === "button" && n.attrs.class === "facet") out.push(n.attrs["aria-label"]); for (const c of (n && n.children) || []) labels(c, out); return out; };
+const agePiece = (n) => { if (n && n.attrs && n.attrs["data-field"] === "age") return n; for (const c of (n && n.children) || []) { const a = agePiece(c); if (a) return a; } return null; };
+location.hash = "#" + hashString({ view: "all" });
+state.loaded = true;
+renderRows();
+process.stdout.write(JSON.stringify({ Class: trs[0].attrs.class, Selected: trs[0].attrs["aria-selected"], AgeTitle: (agePiece(trs[0]) || { attrs: {} }).attrs.title || "",
+  Heads: heads(rowHead(cols, lens, unitTitle("all", lens))), Labels: trs.map((tr) => labels(tr)), SlackClass: trs[1].attrs.class.split(" "),
+  Count: document.getElementById("list-sum").textContent }));`,
+		map[string]any{"pr": wireRow("me", now, pr), "slack": slack, "now": now.UnixMilli()}, &got)
+	if !strings.Contains(" "+got.Class+" ", " sel ") || got.Selected != "true" {
+		t.Errorf("the open row is %q, aria-selected %q", got.Class, got.Selected)
+	}
+	if !slices.Contains(got.Heads, "Actions") {
+		t.Errorf("heads %q lack the Actions a row serves", got.Heads)
+	}
+	if got.AgeTitle == "" {
+		t.Error("the age piece does not tell its exact time")
+	}
+	if len(got.Labels[0]) == 0 || !strings.HasPrefix(got.Labels[0][0], "GitHub filter ") {
+		t.Errorf("the GitHub row's buttons say %q, want its plugin's words", got.Labels[0])
+	}
+	for _, l := range got.Labels[1] {
+		if strings.HasPrefix(l, "GitHub filter ") {
+			t.Errorf("the Slack row says GitHub's words: %q", got.Labels[1])
+		}
+	}
+	if slices.Contains(got.SlackClass, "mine") {
+		t.Errorf("GitHub's author row_class marks a Slack row: %v", got.SlackClass)
+	}
+	if !strings.HasSuffix(got.Count, "s: 2 of 2") {
+		t.Errorf("the list summary reads %q", got.Count)
+	}
+}
+
+// TestTheReviewWalkOffersNoFilterItCannotApply renders a review step's tasks: a step lists what its view
+// holds, so its pieces are text and its heads do not sort.
+func TestTheReviewWalkOffersNoFilterItCannotApply(t *testing.T) {
+	e := task("e-1", "next", func(e *api.TaskView) {
+		e.Facets = map[string][]string{"source": {"slack"}, "state": {"next"}, "contexts": {"calls"}}
+	})
+	var got struct{ Buttons, Text string }
+	nodeRun(t, viewsPrelude(t), nil, `
+tasksState.catalog = { ...input.cat, review: ["inbox"] };
+reviewState.review = { steps: [{ id: "inbox", view: "inbox", label: "Inbox to zero", count: 1 }] };
+reviewState.step = "inbox";
+tasksState.key = "review|inbox";
+tasksState.tasks = [input.task];
+const panel = h("div", {}, ...reviewPanel(""));
+process.stdout.write(JSON.stringify({ Buttons: all(panel, (x) => x.tag === "button" && ["facet", "th-sort"].includes(x.attrs.class)).length + "", Text: text(panel) }));`,
+		map[string]any{"cat": servedViews(t), "task": e}, &got)
+	if got.Buttons != "0" {
+		t.Errorf("the review step offers %s filter or sort buttons", got.Buttons)
+	}
+	if !strings.Contains(got.Text, "@calls") {
+		t.Errorf("the review step lacks the task's pieces: %s", got.Text)
 	}
 }

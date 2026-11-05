@@ -177,13 +177,24 @@ func TestRenderShowsSizeAndRiskFromAHundredColumns(t *testing.T) {
 	setPR(&rs[1], func(p *prView) { p.Brief = &api.BriefSummary{Size: "xl", Risk: "medium"} })
 	m.SetData(withServedFacets("", rs), api.Health{})
 	lines := m.Render(100, 8, now)
-	if !strings.Contains(lines[2], "by ana high M ") || !strings.Contains(lines[3], "by ana medium XL ") {
+	if !strings.Contains(lines[2], "by ana risk high M ") || !strings.Contains(lines[3], "by ana risk medium XL ") {
 		t.Fatalf("at 100 columns:\n%s", strings.Join(lines, "\n"))
 	}
 	for _, w := range []int{60, 99} {
 		lines := m.Render(w, 8, now)
-		if strings.Contains(strings.Join(lines, "\n"), "high M") {
+		if strings.Contains(strings.Join(lines, "\n"), "risk high M") {
 			t.Fatalf("at %d columns:\n%s", w, strings.Join(lines, "\n"))
 		}
+	}
+}
+
+func TestARowLineSaysItsAgeInItsPluginsWords(t *testing.T) {
+	m := newModel(t)
+	c := servedCatalog(t)
+	c.Lens = []api.ProviderWords{{Provider: "github", Words: map[string]string{"age_hours": "{{.h}} hours"}}}
+	m.SetCatalog(c)
+	m.SetData(withServedFacets("", rows()[:1]), api.Health{})
+	if screen := strings.Join(m.Render(100, 8, now), "\n"); !strings.Contains(screen, "3 hours") {
+		t.Fatalf("the row's age is not in its plugin's words:\n%s", screen)
 	}
 }

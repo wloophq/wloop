@@ -11,6 +11,9 @@ type RowWords struct {
 	FilterLabel      string
 	FilterTitle      string
 	FilterTitleGroup string
+	FilterGroup      string
+	ListCount        string
+	CountdownTitle   string
 	SortBy           string
 	ColUnit          string
 	ColWho           string
@@ -57,6 +60,12 @@ func (w *RowWords) field(key string) *string {
 		return &w.FilterTitle
 	case "filter_title_group":
 		return &w.FilterTitleGroup
+	case "filter_group":
+		return &w.FilterGroup
+	case "list_count":
+		return &w.ListCount
+	case "countdown_title":
+		return &w.CountdownTitle
 	case "sort_by":
 		return &w.SortBy
 	case "col_unit":
@@ -144,8 +153,8 @@ type Show struct {
 	Values string
 }
 
-// readShow reads a facet's show at path, a part's name or a table of one part to its values, and its
-// show_values, over sh.
+// readShow reads a facet's show at path, a part's name, "" for the lens alone, or a table of one part to its
+// values, and its show_values, over sh.
 func readShow(s *sheet, path string, v any, values *string, sh *Show) {
 	parts := builtin.ShowParts()
 	switch x := v.(type) {

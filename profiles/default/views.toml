@@ -34,6 +34,9 @@ age_days           = "{{.d}}d {{.h}}h"
 filter_label       = "Filter by {{.label}} {{.value}}"
 filter_title       = "Filter by {{.label}} {{.value}} · Alt+click leaves it out"
 filter_title_group = "Filter by {{.label}} {{.value}} · Shift+click groups by {{.group}} · Alt+click leaves it out"
+filter_group       = "waits on (group)"
+list_count         = "{{.unit}}s: {{.shown}} of {{.total}}"
+countdown_title    = "sends at {{.time}}"
 sort_by            = "Sort by {{.label}}"
 col_unit           = "Item"
 col_who            = "Waiting on"
@@ -223,6 +226,7 @@ rank  = ["high", "medium", "low"]
 empty = "no brief"
 merge = "rows-first"
 show  = "meta"
+label_prefix = "risk "
 
 [facets.size]
 fact  = "brief.size"
