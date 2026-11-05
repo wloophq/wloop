@@ -490,6 +490,18 @@
    }
   },
   {
+   "q": "-where:\"a\nb\"",
+   "want": {
+    "shown": []
+   }
+  },
+  {
+   "q": "-where:\"a\rb\"",
+   "want": {
+    "shown": []
+   }
+  },
+  {
    "q": "tag:area",
    "want": {
     "shown": [
