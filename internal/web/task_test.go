@@ -221,7 +221,7 @@ done({
 	if !slices.Equal(got.Keyed, []string{"/api/gates/7/skip"}) || !strings.HasPrefix(got.Empty, "! Answer") {
 		t.Errorf("digits posted %v, then said %q", got.Keyed, got.Empty)
 	}
-	want := []any{map[string]any{"path": "/api/gates/9/answer", "body": map[string]any{"source": "cockpit", "args": map[string]any{"guidance": "Take the timeout case first"}}}}
+	want := []any{map[string]any{"path": "/api/gates/9/answer", "body": map[string]any{"source": "cockpit", "args": map[string]any{"answer": "Take the timeout case first"}}}}
 	if mustJS(t, got.Clicked) != mustJS(t, want) {
 		t.Errorf("answering posted %v, want %v", got.Clicked, want)
 	}
@@ -281,8 +281,8 @@ const chips = walk(cls(box, "kinds")[0], (x) => x.tag === "button").map((b) => b
 await focus(box, "timeline:kind:message").on.click();
 box = await page("t-0123456789abcdef");
 done({ Before: before, After: said(box), Chips: chips, Asked: asked.slice(-1)[0] });`, answers, &got)
-	if len(got.Before) != 3 || !strings.Contains(got.Before[0], "Take the timeout case first.") || !strings.Contains(got.Before[2], "ready for review") {
-		t.Errorf("the chat, oldest first: %q", got.Before)
+	if len(got.Before) != 3 || !strings.Contains(got.Before[0], "ready for review") || !strings.Contains(got.Before[2], "Take the timeout case first.") {
+		t.Errorf("the timeline, newest first: %q", got.Before)
 	}
 	if !slices.Equal(got.Chips, []string{"all", "message", "verb"}) {
 		t.Errorf("kind chips %v", got.Chips)
@@ -429,5 +429,32 @@ done({ Primary: cls(compose, "primary")[0].textContent, Replies: buttons.slice(1
 		if mustJS(t, got.Posts) != mustJS(t, want) {
 			t.Errorf("send %s: posts %v, want %v", send, got.Posts, want)
 		}
+	}
+}
+
+// TestAQuestionGateOffersItsOptions checks that a question gate whose message offers options shows one button
+// per option, the recommended first, and that picking one answers with the option and the note typed beside it.
+func TestAQuestionGateOffersItsOptions(t *testing.T) {
+	var got struct {
+		Buttons []string
+		Clicked []any
+	}
+	in := pageAnswers(t)
+	e := pageTask(t)
+	e.Gates[1].Subject = json.RawMessage(`{"kind": "question", "text": "Approve it?", "recommend": "approve",
+		"options": [{"id": "threads", "label": "Resolve the threads"}, {"id": "approve", "label": "Approve", "consequence": "Publishes APPROVE"}]}`)
+	in["/api/tasks/"+e.ID] = e
+	runTaskPage(t, `
+const box = await page("t-0123456789abcdef");
+const gate = cls(box, "d-gate")[1];
+focus(box, "gate:9:text").on.input({ target: { value: "ship it" } });
+await focus(box, "gate:9:option:approve").on.click();
+done({ Buttons: walk(gate, (x) => x.tag === "button").map((b) => b.textContent), Clicked: posts });`, in, &got)
+	if want := []string{"Approve recommended", "Resolve the threads", "1 Answer", "2 Dismiss"}; !slices.Equal(got.Buttons, want) {
+		t.Errorf("gate buttons %q, want %q", got.Buttons, want)
+	}
+	want := []any{map[string]any{"path": "/api/gates/9/answer", "body": map[string]any{"source": "cockpit", "args": map[string]any{"answer": "approve\nship it"}}}}
+	if mustJS(t, got.Clicked) != mustJS(t, want) {
+		t.Errorf("picking an option posted %v, want %v", got.Clicked, want)
 	}
 }
