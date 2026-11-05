@@ -136,7 +136,7 @@ func (d ViewsDef) Badged(id string) bool { return slices.Contains(d.Badge, id) }
 // LensWords are what a list's lens bar says, each a template whose only actions are the {{.name}} its key's
 // doc lists, which clients fill in.
 type LensWords struct {
-	DefaultGroup, BoardGroup, NoGroup, Copied, CopiedGrouped, TagKey, TagKeyEmpty string
+	DefaultGroup, BoardGroup, NoGroup, Copied, CopiedGrouped, TagKey, TagKeyEmpty, Grouped, Sorted, Descending, NoLens string
 }
 
 type mLens struct {
@@ -147,6 +147,10 @@ type mLens struct {
 	CopiedGrouped *string `toml:"copied_grouped"`
 	TagKey        *string `toml:"tag_key"`
 	TagKeyEmpty   *string `toml:"tag_key_empty"`
+	Grouped       *string `toml:"grouped"`
+	Sorted        *string `toml:"sorted"`
+	Descending    *string `toml:"descending"`
+	NoLens        *string `toml:"no_lens"`
 }
 
 type mViews struct {
@@ -312,6 +316,10 @@ func (l *viewsLoad) merge(file string, src []byte) Problems {
 		word(s, "lens.copied_grouped", w.CopiedGrouped, &l.def.Lens.CopiedGrouped, "count", "view", "group")
 		word(s, "lens.tag_key", w.TagKey, &l.def.Lens.TagKey, "label", "key")
 		word(s, "lens.tag_key_empty", w.TagKeyEmpty, &l.def.Lens.TagKeyEmpty, "key")
+		word(s, "lens.grouped", w.Grouped, &l.def.Lens.Grouped, "label")
+		word(s, "lens.sorted", w.Sorted, &l.def.Lens.Sorted, "label")
+		word(s, "lens.descending", w.Descending, &l.def.Lens.Descending, "label")
+		word(s, "lens.no_lens", w.NoLens, &l.def.Lens.NoLens)
 	}
 	l.mergeFacets(s, m.Facets)
 	l.mergeViews(s, m.Views)

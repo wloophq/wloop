@@ -19,6 +19,10 @@ copied         = "Copied {{.count}} from {{.view}} as YAML."
 copied_grouped = "Copied {{.count}} from {{.view}}, grouped by {{.group}}, as YAML."
 tag_key        = "{{.label}} {{.key}}"
 tag_key_empty  = "no {{.key}}"
+grouped        = "group: {{.label}}"
+sorted         = "sort: {{.label}}"
+descending     = "{{.label}} (descending)"
+no_lens        = "nothing to group or sort here"
 
 # The task facets: the fields every client filters, groups and sorts tasks
 # by. A facet reads a fact of the task (task.*), or a field of a record kind

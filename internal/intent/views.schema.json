@@ -159,8 +159,24 @@
           "description": "The group menu's entry for the field a view groups by on its own, over the field's label as `{{.label}}`.",
           "type": "string"
         },
+        "descending": {
+          "description": "The terminal's sort entry for a field in descending order, over the field's `{{.label}}`.",
+          "type": "string"
+        },
+        "grouped": {
+          "description": "What the terminal says after a group pick, over the picked entry's `{{.label}}`.",
+          "type": "string"
+        },
         "no_group": {
           "description": "The group menu's entry that lists the view in one group.",
+          "type": "string"
+        },
+        "no_lens": {
+          "description": "What the terminal says when a group or sort pick is asked where no list is on screen.",
+          "type": "string"
+        },
+        "sorted": {
+          "description": "What the terminal says after a sort pick, over the picked entry's `{{.label}}`.",
           "type": "string"
         },
         "tag_key": {
@@ -177,7 +193,11 @@
         "copied",
         "copied_grouped",
         "default_group",
+        "descending",
+        "grouped",
         "no_group",
+        "no_lens",
+        "sorted",
         "tag_key",
         "tag_key_empty"
       ],

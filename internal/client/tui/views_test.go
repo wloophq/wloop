@@ -34,7 +34,7 @@ func viewsCatalog() api.ViewsCatalog {
 	props := []api.PropSpec{{Name: "focus", Type: "enum", Values: []string{"on", "off"}, Role: "star"}, {Name: "contexts", Type: "string[]", Role: "contexts"},
 		{Name: "area", Type: "string", Role: "area"}, {Name: "due", Type: "date", Role: "deadline"}}
 	return api.ViewsCatalog{Views: views, Areas: []string{"work", "home"}, Contexts: []string{"computer", "calls"}, Verbs: verbs, Props: props, Facets: taskFacets(),
-		Lens: api.LensWords{DefaultGroup: "{{.label}} (default)", NoGroup: "None"}, DefaultSort: "View order"}
+		Lens: testLensWords, DefaultSort: "View order"}
 }
 
 func taskFacets() []api.FacetSpec {

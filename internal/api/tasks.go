@@ -75,7 +75,7 @@ func TaskPath(id string, rest ...string) string {
 
 // LensWords are what a list's lens bar says, templates whose only actions are {{.name}} substitutions:
 // DefaultGroup and BoardGroup over label, Copied over count and view, CopiedGrouped over those and group, TagKey
-// over the tag facet's label and key, TagKeyEmpty over key.
+// over the tag facet's label and key, TagKeyEmpty over key, Grouped, Sorted and Descending over label.
 type LensWords struct {
 	DefaultGroup  string `json:"default_group"`
 	BoardGroup    string `json:"board_group"`
@@ -84,6 +84,10 @@ type LensWords struct {
 	CopiedGrouped string `json:"copied_grouped"`
 	TagKey        string `json:"tag_key"`
 	TagKeyEmpty   string `json:"tag_key_empty"`
+	Grouped       string `json:"grouped"`
+	Sorted        string `json:"sorted"`
+	Descending    string `json:"descending"`
+	NoLens        string `json:"no_lens"`
 }
 
 type ViewsCatalog struct {

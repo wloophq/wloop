@@ -161,7 +161,7 @@ func (m *Model) menuFields(v lensView) []api.FacetSpec {
 func (m *Model) cycleGroup() {
 	v, ok := m.lensViewOnScreen()
 	if !ok {
-		m.status = "nothing to group here"
+		m.status = m.viewsCat.Lens.NoLens
 		return
 	}
 	var steps []string
@@ -192,7 +192,7 @@ func (m *Model) cycleGroup() {
 	default:
 		text = byID[next].Label
 	}
-	m.status = "group: " + cmp.Or(text, "none")
+	m.status = lensWord(m.viewsCat.Lens.Grouped, text)
 	m.keepSelections()
 }
 
@@ -201,7 +201,7 @@ func (m *Model) cycleGroup() {
 func (m *Model) cycleSort() {
 	v, ok := m.lensViewOnScreen()
 	if !ok {
-		m.status = "nothing to sort here"
+		m.status = m.viewsCat.Lens.NoLens
 		return
 	}
 	type step struct {
@@ -219,14 +219,14 @@ func (m *Model) cycleSort() {
 	pick := m.picks[v.key]
 	next := steps[(slices.Index(steps, step{pick.sort, pick.desc})+1)%len(steps)]
 	m.setPick(v.key, func(p *lensPick) { p.sort, p.desc = next.field, next.desc })
-	text := cmp.Or(v.defaultSort, "view order")
+	text := v.defaultSort
 	if next.field != "" {
 		text = labels[next.field]
 		if next.desc {
-			text += " (descending)"
+			text = lensWord(m.viewsCat.Lens.Descending, text)
 		}
 	}
-	m.status = "sort: " + text
+	m.status = lensWord(m.viewsCat.Lens.Sorted, text)
 	m.keepSelections()
 }
 

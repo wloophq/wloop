@@ -23,11 +23,15 @@ func lensCatalog() api.ViewsCatalog {
 		States: []api.StateSpec{{Name: "parked", Label: "Parked", Category: "waiting"}, {Name: "doing", Label: "Doing", Category: "active"}},
 		Facets: []api.FacetSpec{{ID: "state", Fact: "task.state", Label: "State", Group: true, Menu: true, Rank: []string{"parked", "doing"},
 			Labels: map[string]string{"parked": "Parked", "doing": "Doing"}, Empty: "none"}},
-		Lens: api.LensWords{DefaultGroup: "{{.label}} (default)", NoGroup: "None"}, DefaultSort: "View order",
+		Lens: testLensWords, DefaultSort: "View order",
 		Verbs: []api.VerbSpec{{Verb: "park", Handler: "waiting", Label: "Park", Input: "Parked on whom"}, {Verb: "toss", Handler: "drop", Label: "Toss"},
 			{Verb: "hand", Handler: "delegate", Label: "Hand", Input: "What should the agent do"}, {Verb: "tidy", Label: "Tidy"}},
 	}
 }
+
+// testLensWords are the bundled profile's lens words.
+var testLensWords = api.LensWords{DefaultGroup: "{{.label}} (default)", BoardGroup: "{{.label}} (board)", NoGroup: "None", Grouped: "group: {{.label}}",
+	Sorted: "sort: {{.label}}", Descending: "{{.label}} (descending)", NoLens: "nothing to group or sort here", TagKey: "{{.label}} {{.key}}", TagKeyEmpty: "no {{.key}}"}
 
 func lensTask(id, title, state string) api.TaskView {
 	e := task(id, title, state)
@@ -347,6 +351,28 @@ func TestTheTUISortsByAnOfferedField(t *testing.T) {
 	press(m, Key{Rune: '-'})
 	if want := "sort: View order"; m.status != want {
 		t.Fatalf("status %q, want %q", m.status, want)
+	}
+}
+
+func TestTheTUISaysTheLensWordsOfTheProfile(t *testing.T) {
+	c := lensCatalog()
+	c.Facets = append(c.Facets, api.FacetSpec{ID: "where", Label: "Where", Group: true, Menu: true, Sort: "text", Empty: "nowhere"})
+	c.Lens.Grouped, c.Lens.Sorted, c.Lens.Descending, c.Lens.NoLens = "Grouped by {{.label}}", "Sorted by {{.label}}", "{{.label}}, last first", "No lens here"
+	m := newModel(t)
+	m.SetViews(c)
+	m.SetTasks("stalled", []api.TaskView{whereTask("t-1", "Ship the export", "doing", "general"), whereTask("t-2", "Call the bank", "parked", "ops")}, api.Counters{})
+	var seen []string
+	for _, k := range []rune{'=', '-', '-', '-'} {
+		press(m, Key{Rune: k})
+		seen = append(seen, m.status)
+	}
+	if want := []string{"Grouped by Where", "Sorted by Where", "Sorted by Where, last first", "Sorted by View order"}; !slices.Equal(seen, want) {
+		t.Fatalf("the lens said %q, want %q", seen, want)
+	}
+	m.view = m.planView()
+	m.cycleGroup()
+	if m.status != "No lens here" {
+		t.Fatalf("on the plan the lens said %q", m.status)
 	}
 }
 
