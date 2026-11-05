@@ -538,7 +538,7 @@ func (f *fakeGit) Run(ctx context.Context, dir string, _ []string, args ...strin
 
 type testEnv struct {
 	*Env
-	t        *testing.T
+	t        testing.TB
 	out, err *bytes.Buffer
 	gh       *fakeGH
 	git      *fakeGit
@@ -593,7 +593,7 @@ func (te *testEnv) runViews(t *testing.T) {
 	t.Cleanup(func() { cancel(); <-done })
 }
 
-func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
+func newTestEnv(t testing.TB, ws workspace.Manager) *testEnv {
 	t.Helper()
 	te := &testEnv{
 		t:   t,
@@ -760,10 +760,10 @@ func (q quietGH) Run(ctx context.Context, args ...string) ([]byte, error) {
 
 // serve runs te's daemon over a socket, with the actions, the turns by hand
 // and AdminAPI wired as serve wires them, and points te's command line at it.
-func (te *testEnv) serve(t *testing.T) { te.serveWith(t, nil) }
+func (te *testEnv) serve(t testing.TB) { te.serveWith(t, nil) }
 
 // serveWithTasks serves te's daemon with the tasks on te's store.
-func (te *testEnv) serveWithTasks(t *testing.T) {
+func (te *testEnv) serveWithTasks(t testing.TB) {
 	mods, err := buildSources(plugins, te.cfg, moduleDeps{Inventory: te.Store, Turns: te.Turns, Clock: clockFunc(te.Now)}, bundledUI)
 	if err != nil {
 		t.Fatal(err)
@@ -772,7 +772,7 @@ func (te *testEnv) serveWithTasks(t *testing.T) {
 }
 
 // serveWith serves te's daemon, its deps passed through with when set.
-func (te *testEnv) serveWith(t *testing.T, with func(daemon.Deps) daemon.Deps) {
+func (te *testEnv) serveWith(t testing.TB, with func(daemon.Deps) daemon.Deps) {
 	t.Helper()
 	mu := &lock.Mutex{}
 	te.loop = mu

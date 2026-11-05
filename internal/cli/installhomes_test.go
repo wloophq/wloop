@@ -21,7 +21,7 @@ import (
 
 // testHomeKinds run only a claude found under the temporary directory, so a
 // test can never reach the developer's real one.
-func testHomeKinds(t *testing.T) map[string]setup.HomeKind {
+func testHomeKinds(t testing.TB) map[string]setup.HomeKind {
 	tmp, _ := filepath.EvalSymlinks(os.TempDir())
 	sh := func(ctx context.Context, dir string, env []string, stdin, bin string, args ...string) ([]byte, error) {
 		path, err := exec.LookPath(bin)

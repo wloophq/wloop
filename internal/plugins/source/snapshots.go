@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"hash/maphash"
 	"maps"
 	"slices"
 	"sync"
@@ -25,11 +26,20 @@ type Snapshots struct {
 	mu    sync.Mutex
 	down  map[unit.ProviderID]bool
 	notes []func(unit.ProviderID)
+
+	seed      maphash.Seed
+	extracted map[unit.Unit]extraction
+}
+
+// extraction is the oldest message not yet extracted that a stored snapshot whose JSON hashes to sum holds.
+type extraction struct {
+	sum    uint64
+	oldest time.Time
 }
 
 // NewSnapshots keeps the snapshots in store.
 func NewSnapshots(store snapshot.Store) *Snapshots {
-	return &Snapshots{store: store, down: map[unit.ProviderID]bool{}}
+	return &Snapshots{store: store, down: map[unit.ProviderID]bool{}, seed: maphash.MakeSeed(), extracted: map[unit.Unit]extraction{}}
 }
 
 // Put keeps each snapshot of ss, by its unit; a gone unit's is dropped.
@@ -49,6 +59,11 @@ func (s *Snapshots) Put(ctx context.Context, ss map[unit.Unit]src.Snapshot) erro
 	}
 	slices.SortFunc(puts, func(a, b snapshot.Stored) int { return compareUnits(a.Unit, b.Unit) })
 	slices.SortFunc(gone, compareUnits)
+	s.mu.Lock()
+	for _, u := range gone {
+		delete(s.extracted, u)
+	}
+	s.mu.Unlock()
 	return s.store.Put(ctx, puts, gone)
 }
 
@@ -123,20 +138,43 @@ func (s *Snapshots) Unextracted(ctx context.Context, units []unit.Unit) (time.Ti
 	}
 	var oldest time.Time
 	for u, st := range got {
-		var h struct {
-			Extraction *src.ExtractionHealth `json:"extraction"`
-		}
-		if err := json.Unmarshal(st.JSON, &h); err != nil {
+		at, err := s.unextracted(u, st.JSON)
+		if err != nil {
 			return time.Time{}, fmt.Errorf("snapshot of %s: %w", u, err)
 		}
-		if h.Extraction == nil || h.Extraction.Oldest.IsZero() {
-			continue
-		}
-		if oldest.IsZero() || h.Extraction.Oldest.Before(oldest) {
-			oldest = h.Extraction.Oldest
+		if !at.IsZero() && (oldest.IsZero() || at.Before(oldest)) {
+			oldest = at
 		}
 	}
 	return oldest, nil
+}
+
+// unextracted is the oldest message not yet extracted that raw, u's stored snapshot, holds; decoded once for
+// each content u stores.
+func (s *Snapshots) unextracted(u unit.Unit, raw []byte) (time.Time, error) {
+	sum := maphash.Bytes(s.seed, raw)
+	s.mu.Lock()
+	x, ok := s.extracted[u]
+	s.mu.Unlock()
+	if ok && x.sum == sum {
+		return x.oldest, nil
+	}
+	var h struct {
+		Extraction *src.ExtractionHealth `json:"extraction"`
+	}
+	if err := json.Unmarshal(raw, &h); err != nil {
+		return time.Time{}, err
+	}
+	if h.Extraction != nil {
+		x.oldest = h.Extraction.Oldest
+	} else {
+		x.oldest = time.Time{}
+	}
+	x.sum = sum
+	s.mu.Lock()
+	s.extracted[u] = x
+	s.mu.Unlock()
+	return x.oldest, nil
 }
 
 // Decode is the snapshot st stores.
