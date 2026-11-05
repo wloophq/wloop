@@ -27,8 +27,8 @@ no_lens        = "nothing to group or sort here"
 # The task facets: the fields every client filters, groups and sorts tasks
 # by. A facet reads a fact of the task (task.*), or a field of a record kind
 # (brief.*). A plugin's row facet of the same id must agree on group, sort,
-# match and buckets; where rows and the task both have a value, merge says
-# which wins.
+# rank, match and buckets; where rows and the task both have a value, merge
+# says which wins.
 [facets.source]
 fact  = "task.unit_providers"
 label = "Source"

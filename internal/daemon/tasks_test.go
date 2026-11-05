@@ -1336,6 +1336,21 @@ func TestARowMoveNamesItsUnitWhenTheTasksCannotBeRead(t *testing.T) {
 	}
 }
 
+func TestAProfileReloadResendsEveryTask(t *testing.T) {
+	t.Parallel()
+	s := newTasksRig(t, nil).s
+	sub := s.hub.subscribe("test")
+	t.Cleanup(func() { s.hub.unsubscribe(sub) })
+	s.moved.attach()
+	s.publishTasks(context.Background(), port.Change{Topics: port.TopicConfig})
+	if c, ok := sub.take(); !ok || !c.All {
+		t.Fatalf("published %+v (%v), want a change of every task", c, ok)
+	}
+	if taskInputs&port.TopicConfig == 0 {
+		t.Fatal("the tasks feed does not wake on a reloaded profile")
+	}
+}
+
 func TestPagesReuseOneBuildOfTheirSpecs(t *testing.T) {
 	t.Parallel()
 	loaded := bundledLoaded()

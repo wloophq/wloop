@@ -49,8 +49,9 @@ const (
 const syncInputs = port.TopicItems | port.TopicSourceEvents | port.TopicCards | port.TopicGates
 
 // taskInputs are the notes after which a change carries the counters: a view reads the tasks, their gates,
-// their wakes, their units' records and their links.
-const taskInputs = port.TopicTasks | port.TopicGates | port.TopicWakes | port.TopicDrafts | port.TopicRecords | port.TopicLinks | port.TopicPlacements
+// their wakes, their units' records, their links and the profile's facets.
+const taskInputs = port.TopicTasks | port.TopicGates | port.TopicWakes | port.TopicDrafts | port.TopicRecords | port.TopicLinks |
+	port.TopicPlacements | port.TopicConfig
 
 // bridged are the handlers whose verbs a task with units runs as its unit's action when no handler takes them.
 var bridged = []string{handlerApprove, handlerDelegate, handlerDrop}
@@ -1388,7 +1389,7 @@ func (s *Server) feedTasks(ctx context.Context) {
 }
 
 // publishTasks publishes the counters with the units c and the row changes since the last call moved, unless
-// nothing moved but rows no task holds.
+// nothing moved but rows no task holds; a reloaded profile moves every task, since it can change their facets.
 func (s *Server) publishTasks(ctx context.Context, c port.Change) {
 	rows, all := s.moved.take()
 	held := rows
@@ -1402,7 +1403,7 @@ func (s *Server) publishTasks(ctx context.Context, c port.Change) {
 		return
 	}
 	pos := s.hub.position()
-	ch := api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev, All: c.All || all}
+	ch := api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev, All: c.All || all || c.Has(port.TopicConfig)}
 	if err == nil {
 		ch.Counters = s.countersOf(snap.Counts(ctx, ""))
 	}
