@@ -104,7 +104,7 @@ func TestATaskFacetNamesTheFactItReads(t *testing.T) {
 	for _, f := range TaskFacets(bundled(t).Views.Facets, bundled(t).Tasks, nil) {
 		facts[f.ID] = f.Fact
 	}
-	if facts["waits-on"] != "task.owed_by" || facts["asked-by"] != "task.askers" || facts["risk"] != "brief.risk" {
+	if facts["waits-on"] != "task.owed_by" || facts["asked-by"] != "task.asker_names" || facts["risk"] != "brief.risk" {
 		t.Errorf("facts %v", facts)
 	}
 	for _, f := range githubFacets() {

@@ -33,6 +33,9 @@ func TestTheTriageFactsReadTheAsksThePromiseAndTheExtraction(t *testing.T) {
 	if got, _ := f["task.askers"].([]string); !slices.Equal(got, []string{"chat:U9"}) {
 		t.Errorf("task.askers %v, want the requester of the asks to me, once", got)
 	}
+	if got, _ := f["task.asker_names"].([]string); !slices.Equal(got, []string{"Uma Nove"}) {
+		t.Errorf("task.asker_names %v, want the name of the requester of the asks to me, once", got)
+	}
 	if got, _ := f["task.promised"].(time.Time); !got.Equal(promised) {
 		t.Errorf("task.promised %v, want %v", got, promised)
 	}
@@ -41,7 +44,7 @@ func TestTheTriageFactsReadTheAsksThePromiseAndTheExtraction(t *testing.T) {
 	}
 
 	f = e.facts("t-02")
-	if f["task.ask_age"] != time.Duration(0) || len(f["task.askers"].([]string)) != 0 || !f["task.promised"].(time.Time).IsZero() ||
+	if f["task.ask_age"] != time.Duration(0) || len(f["task.askers"].([]string)) != 0 || len(f["task.asker_names"].([]string)) != 0 || !f["task.promised"].(time.Time).IsZero() ||
 		f["task.extraction_lag"] != time.Duration(0) {
 		t.Errorf("a task with no ask, promise or backlog: %v %v %v %v", f["task.ask_age"], f["task.askers"], f["task.promised"], f["task.extraction_lag"])
 	}

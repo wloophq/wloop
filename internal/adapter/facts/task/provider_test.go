@@ -222,7 +222,7 @@ func (e *env) task(en task.Task) task.Task {
 func (e *env) item(u unit.Unit, id string, s items.State, created time.Time, waitingOn ...items.Person) items.Item {
 	e.t.Helper()
 	it := items.Item{ID: id, Unit: u, Kind: items.Request, Summary: "s " + id, Origin: unit.Anchor{Unit: u, Ref: "m:" + id},
-		Requester: items.Person{Key: "chat:U9"}, Basis: items.NoBasis, State: s, Confidence: items.High,
+		Requester: items.Person{Key: "chat:U9", Name: "Uma Nove"}, Basis: items.NoBasis, State: s, Confidence: items.High,
 		Provenance: items.Extracted, WaitingOn: waitingOn, CreatedAt: created, UpdatedAt: created}
 	if s == items.Resolved {
 		it.Resolution = items.Done

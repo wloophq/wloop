@@ -208,6 +208,7 @@ var otherFacts = []Fact{
 	untrusted(wf("task", "children_mine", expr.Bool, "The task has a child in the ready category whose next step is yours: its task.owed_by is me.")),
 	timeVarying(untrusted(wf("task", "ask_age", expr.Duration, "The age of the task's oldest unanswered ask: the oldest open item it holds that waits on you; zero when none does."))),
 	untrusted(wf("task", "askers", expr.List, "Who waits on you through the task: the requesters of the open items it holds that wait on you, each once, by key such as slack:U0123.")),
+	untrusted(wf("task", "asker_names", expr.List, "The names of task.askers, as their items name them, each once; a requester with no name is its key.")),
 	untrusted(wf("task", "promised", expr.Time, "When you promised the task by: the property of role promise, which acknowledge sets; zero when unset. Untrusted, since a profile may let an agent write that property. Test with `> timestamp(0)`.")),
 	timeVarying(untrusted(wf("task", "extraction_lag", expr.Duration, "How long the oldest message of a unit linked to the task has waited to be extracted, as its plugin's extraction health says; zero when none waits."))),
 	untrusted(wf("task", "link_signals", expr.List, "The link signals the units the task links report, on or off, each once, by name: the profile reads whether a source keeps its own staleness, such as 'stalled' in task.link_signals.")),

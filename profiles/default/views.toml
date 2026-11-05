@@ -71,7 +71,7 @@ merge = "rows-first"
 strip = true
 
 [facets.asked-by]
-fact  = "task.askers"
+fact  = "task.asker_names"
 label = "Asked by"
 group = true
 sort  = "text"
@@ -241,7 +241,7 @@ summary       = "Asks that wait on you, grouped by who asked, the oldest first."
 empty         = "Nobody is blocked by you."
 key           = "g b"
 when          = "task.owed_by == 'me' && size(task.askers) > 0 && !(task.category in ['deferred', 'done', 'dropped'])"
-group         = "task.askers"
+group         = "task.asker_names"
 sort          = "-task.ask_age"
 hide_disabled = true
 

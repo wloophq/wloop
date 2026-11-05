@@ -298,6 +298,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.children_mine":       false,
 		"task.ask_age":             time.Duration(0),
 		"task.askers":              []string{},
+		"task.asker_names":         []string{},
 		"task.promised":            time.Time{},
 		"task.extraction_lag":      time.Duration(0),
 		"task.link_owes":           []string{},
@@ -397,7 +398,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 	}
 	f["task.items_open"], f["task.items_resolved"] = open, resolved
 	f["task.link_owes"] = p.linkOwes(e, us, got)
-	f["task.ask_age"], f["task.askers"] = p.asks(e, us, got)
+	f["task.ask_age"], f["task.askers"], f["task.asker_names"] = p.asks(e, us, got)
 	if p.d.Extraction != nil {
 		oldest, err := p.d.Extraction(ctx, us)
 		if err != nil {
@@ -412,13 +413,13 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 
 // asks are the age of the oldest open item e's units hold that waits on me, and the requesters of those items,
 // each once; the items are those task.link_owes reads.
-func (p *Provider) asks(e task.Task, us []unit.Unit, got map[unit.Unit][]items.Item) (time.Duration, []string) {
+func (p *Provider) asks(e task.Task, us []unit.Unit, got map[unit.Unit][]items.Item) (time.Duration, []string, []string) {
 	var me task.Me
 	if p.d.Me != nil {
 		me = p.d.Me()
 	}
 	var oldest time.Time
-	askers := []string{}
+	askers, names := []string{}, []string{}
 	for _, u := range us {
 		for _, it := range owing(e, u, got[u]) {
 			if !slices.ContainsFunc(it.WaitingOn, func(who items.Person) bool { return who.Is(me) }) {
@@ -429,13 +430,16 @@ func (p *Provider) asks(e task.Task, us []unit.Unit, got map[unit.Unit][]items.I
 			}
 			if k := it.Requester.Key; k != "" && !it.Requester.Is(me) && !slices.Contains(askers, k) {
 				askers = append(askers, k)
+				if n := cmp.Or(it.Requester.Name, k); !slices.Contains(names, n) {
+					names = append(names, n)
+				}
 			}
 		}
 	}
 	if oldest.IsZero() {
-		return 0, askers
+		return 0, askers, names
 	}
-	return max(p.d.Clock.Now().Sub(oldest), 0), askers
+	return max(p.d.Clock.Now().Sub(oldest), 0), askers, names
 }
 
 // owing are the open items of its, u's, that e's facts read: those e holds, or every open one of a unit e holds
