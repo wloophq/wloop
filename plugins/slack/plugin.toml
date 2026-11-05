@@ -189,6 +189,7 @@ strip = true
 id = "situation"
 group = true
 sort = "rank"
+situations = true
 rank = ["waits_on_viewer", "needs_closure", "new", "waits_on_others", "fyi", "resolved"]
 menu = true
 

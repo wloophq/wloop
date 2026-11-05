@@ -1,6 +1,9 @@
 package api
 
-import "time"
+import (
+	"slices"
+	"time"
+)
 
 type Summary struct {
 	WaitsOn   string    `json:"waits_on"` // "me", a login, "loop", "nobody", ...
@@ -155,12 +158,14 @@ type FacetDisplay struct {
 	Labels      map[string]string `json:"labels,omitempty"`
 	Strip       bool              `json:"strip,omitempty"`
 	Colors      map[string]string `json:"colors,omitempty"`
+	// BucketLabels are the words of the facet's buckets, by bucket id.
+	BucketLabels map[string]string `json:"bucket_labels,omitempty"`
 }
 
 // Display is the facet's own display keys.
 func (f FacetSpec) Display() FacetDisplay {
 	return FacetDisplay{Show: f.Show, ShowOnly: f.ShowOnly, ShowValues: f.ShowValues, LabelPrefix: f.LabelPrefix, RowClass: f.RowClass, Labels: f.Labels,
-		Strip: f.Strip, Colors: f.Colors}
+		Strip: f.Strip, Colors: f.Colors, BucketLabels: f.bucketLabels()}
 }
 
 // For is the facet as provider's rows show it: its display keys replaced by provider's on a merged facet,
@@ -172,10 +177,29 @@ func (f FacetSpec) For(provider string) FacetSpec {
 	}
 	f.Show, f.ShowOnly, f.ShowValues, f.LabelPrefix, f.RowClass = d.Show, d.ShowOnly, d.ShowValues, d.LabelPrefix, d.RowClass
 	f.Strip, f.Colors = d.Strip, d.Colors
+	if len(d.BucketLabels) > 0 {
+		f.Buckets = slices.Clone(f.Buckets)
+		for i, b := range f.Buckets {
+			if l, ok := d.BucketLabels[b.ID]; ok {
+				f.Buckets[i].Label = l
+			}
+		}
+	}
 	if len(d.Labels) > 0 {
 		f.Labels = d.Labels
 	}
 	return f
+}
+
+func (f FacetSpec) bucketLabels() map[string]string {
+	if len(f.Buckets) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(f.Buckets))
+	for _, b := range f.Buckets {
+		out[b.ID] = b.Label
+	}
+	return out
 }
 
 // Sources are the providers the facet comes from, none for a facet of the profile.

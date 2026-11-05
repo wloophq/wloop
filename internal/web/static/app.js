@@ -512,16 +512,19 @@ function waitingLabel(row) {
 // provider shows it; null when the provider has none.
 function stripSpec(specs, provider) {
   for (const s of specs || []) {
-    if (s.provider && s.provider !== provider) continue;
+    if (s.provider ? s.provider !== provider : s.displays && !(provider in s.displays)) continue;
     const spec = specFor(s, provider);
     if (spec.strip) return spec;
   }
   return null;
 }
 
-// stripColor is the hue a strip facet's value colors a strip with.
+// stripColor is the hue a strip facet's value colors a strip with, its colors' keys matched folded as group
+// keys are.
 function stripColor(spec, value) {
-  return ((spec && spec.colors) || {})[value] || "nobody";
+  const v = fold(value);
+  const hit = Object.entries((spec && spec.colors) || {}).find(([k]) => fold(k) === v);
+  return hit ? hit[1] : "nobody";
 }
 
 // stripOf is an item's strip: its provider's strip facet, the item's first value of it, that value's hue and
@@ -553,10 +556,10 @@ function waitClass(row) {
   return s ? "w-" + s.color : "";
 }
 
-// stripTip is what a strip says: its value's label, the people it names in a hue of someone else's, then the
-// row's kind.
+// stripTip is what a strip says: its value's label, whom the row waits on unless that is you or nobody, then
+// the row's kind.
 function stripTip(strip, who, kind) {
-  const named = strip && (strip.color === "author" || strip.color === "reviewer") && who ? ` (${who})` : "";
+  const named = strip && who && who !== "me" && who !== "nobody" ? ` (${who})` : "";
   return [strip ? strip.label + named : "", kind].filter(Boolean).join(": ");
 }
 
@@ -731,11 +734,11 @@ function defaultSortLabel(view) {
 }
 
 // viewStrip is the facet that colors the strip of view's items: a task view's from its profile, a row view's
-// from its provider, a view of mixed rows the first a plugin serves; null when none does.
+// from its provider; null for a view of mixed rows, whose rows each take their own.
 function viewStrip(view) {
   if (typeof isCoreView === "function" && isCoreView(view)) return stripSpec(((typeof tasksState === "object" && tasksState.catalog) || {}).facets, "");
   const provider = (catalog.views.find((v) => v.id === view) || {}).provider || "";
-  return provider ? stripSpec(catalog.specs, provider) : catalog.specs.find((f) => f.strip) || null;
+  return provider ? stripSpec(catalog.specs, provider) : null;
 }
 
 // boardGroupField is the field a board of view groups by when nothing is picked: the facet that colors its
@@ -1329,11 +1332,6 @@ function facet(lens, field, raw, content, slot, opts = {}) {
   }, content);
 }
 
-// heldFacet is facet when r holds raw in field, so a click keeps r in the list; otherwise content alone.
-function heldFacet(r, lens, field, raw, content, slot) {
-  return fieldById(field, lens.fields || catalog.fields) && facetValues(r, field).includes(raw) ? facet(lens, field, raw, content, slot) : content;
-}
-
 // where is a row's workspace, its column and agents, and its link, as the detail shows them.
 function where(row, scope) {
   const ws = pl(row).workspace || {};
@@ -1378,6 +1376,7 @@ function specFor(spec, provider) {
   if (!d) return spec;
   return { ...spec, show: d.show || "", show_only: d.show_only, show_values: d.show_values, label_prefix: d.label_prefix, row_class: d.row_class,
     strip: !!d.strip, colors: d.colors,
+    buckets: d.bucket_labels ? (spec.buckets || []).map((b) => (b.id in d.bucket_labels ? { ...b, label: d.bucket_labels[b.id] } : b)) : spec.buckets,
     labels: d.labels && Object.keys(d.labels).length ? d.labels : spec.labels };
 }
 

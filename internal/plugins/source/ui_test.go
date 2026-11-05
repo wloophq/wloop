@@ -68,3 +68,20 @@ func TestAPluginsEventKindsAreWordedByItsLayer(t *testing.T) {
 		t.Fatalf("push %+v", e)
 	}
 }
+
+func TestAFacetOfTheRowsSituationsReadsAsTheSituationsDo(t *testing.T) {
+	for _, c := range []struct{ plugin, facet string }{{"github", "kind"}, {"slack", "situation"}} {
+		cat := bundledCatalog(t, c.plugin)
+		var labels map[string]string
+		for _, f := range cat.Facets() {
+			if f.ID == c.facet {
+				labels = f.Labels
+			}
+		}
+		for _, s := range cat.Situations() {
+			if labels[string(s.Kind)] != s.Label {
+				t.Errorf("%s's %s reads %s as %q, its situation as %q", c.plugin, c.facet, s.Kind, labels[string(s.Kind)], s.Label)
+			}
+		}
+	}
+}

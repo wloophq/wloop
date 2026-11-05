@@ -89,3 +89,18 @@ func TestAMergedFacetKeepsWhichProvidersItIsTheStripOf(t *testing.T) {
 		t.Errorf("slack's turn %+v", s.Display())
 	}
 }
+
+func TestAMergedFacetKeepsEachProvidersBucketWords(t *testing.T) {
+	buckets := func(label string) []api.Bucket {
+		return []api.Bucket{{ID: "1d", Label: label, Within: "24h"}, {ID: "older", Label: "older"}}
+	}
+	gh := facetPresenter{facets: []api.FacetSpec{{ID: "age", Provider: "github", Sort: "time", Buckets: buckets("a day")}}}
+	sl := facetPresenter{facets: []api.FacetSpec{{ID: "age", Provider: "slack", Sort: "time", Buckets: buckets("today")}}}
+	got := facetByID(readmodel.BuildCatalog(gh, sl), "age")
+	if len(got) != 1 {
+		t.Fatalf("age facets %+v", got)
+	}
+	if g, s := got[0].For("github"), got[0].For("slack"); g.Buckets[0].Label != "a day" || s.Buckets[0].Label != "today" || s.Buckets[0].Within != "24h" {
+		t.Errorf("github's buckets %+v, slack's %+v", g.Buckets, s.Buckets)
+	}
+}

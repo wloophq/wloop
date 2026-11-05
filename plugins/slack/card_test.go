@@ -449,6 +449,17 @@ func TestARowWaitingOnTheViewerIsItsTurn(t *testing.T) {
 	}
 }
 
+func TestAConversationTheViewerMustCloseIsTheirTurn(t *testing.T) {
+	f := newFixture(t)
+	f.login(t)
+	f.people(t)
+	u := f.thread(t)
+	f.state(t, u, store.ExtractionState{Verdict: "needs_closure", StartedByViewer: true, At: f.now})
+	if r, _ := f.row(t, u); r.Facets[slackrows.FacetTurn][0] != slackrows.TurnMe || r.Facets[slackrows.FacetSituation][0] != "needs_closure" {
+		t.Errorf("facets %v", r.Facets)
+	}
+}
+
 func TestSlackSnapshotsLeaveTheLoopActivityToTheHost(t *testing.T) {
 	f := newFixture(t)
 	f.login(t)

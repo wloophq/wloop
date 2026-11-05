@@ -138,9 +138,6 @@ func loadUI(layers []profile.Layer) (map[string]UITexts, Problems) {
 				readShow(s, "facets."+id, f.ShowRaw, f.ShowValues, &f.Show)
 				m.Facets[id] = f
 			}
-			if f.Colors != nil {
-				readColors(s, "facets."+id, f.Colors)
-			}
 		}
 		mergeRowWords(s, "lens", m.LensRaw, &m.Lens)
 		if problems = append(problems, s.problems...); len(s.problems) > 0 {

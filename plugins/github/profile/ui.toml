@@ -70,7 +70,6 @@ show = "who"
 
 [facets.kind]
 label = "Situation"
-values = { blocked = "round blocked", changes = "changes asked", checks = "checks failing", conflicts = "merge conflicts", done = "closed", draft = "draft", held = "held (cap)", loop_stopped = "agent stopped", loop_waiting = "agent asks", loop_working = "agent working", merge = "can merge", muted = "muted", no_reviewer = "no reviewer", reply = "reply due", review = "review", reviewer_back = "reviewer due", round_pending = "round soon", to_address = "to address" }
 show = "kind"
 
 [facets.type]

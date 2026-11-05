@@ -124,7 +124,7 @@ process.stdout.write(JSON.stringify({
 
 func TestMyPullRequestsStandOutAndTheStripExplainsItself(t *testing.T) {
 	src := appJS(t)
-	for _, want := range []string{`mine ? "mine" : ""`, `title: stripTitle(r)`, `mine ? mineMark() : null`, "stripLegend(lens, offered),"} {
+	for _, want := range []string{`mine ? "mine" : ""`, `title: stripTitle(r)`, `mine ? mineMark() : null`} {
 		if !strings.Contains(src, want) {
 			t.Errorf("app.js lacks %s", want)
 		}

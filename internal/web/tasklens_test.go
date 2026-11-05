@@ -80,20 +80,20 @@ func mixedTasks() []api.TaskView {
 	return []api.TaskView{
 		task("s-1", "next", func(e *api.TaskView) {
 			e.Title, e.Category, e.Units, e.UnitLabels = "Answer the deploy question", "ready", []unit.Unit{slackUnit}, []string{"#general thread"}
-			e.Facets = map[string][]string{"source": {"slack"}, "where": {"general"}, "conversation": {"thread"}, "waits-on": {"me"}, "state": {"next"}, "category": {"ready"}}
+			e.Facets = map[string][]string{"source": {"slack"}, "where": {"general"}, "conversation": {"thread"}, "waits-on": {"me"}, "turn": {"me"}, "state": {"next"}, "category": {"ready"}}
 		}),
 		task("s-2", "next", func(e *api.TaskView) {
 			e.Title, e.Category = "Close the lunch poll", "ready"
-			e.Facets = map[string][]string{"source": {"slack"}, "where": {"random"}, "waits-on": {"me"}, "state": {"next"}, "category": {"ready"}}
+			e.Facets = map[string][]string{"source": {"slack"}, "where": {"random"}, "waits-on": {"me"}, "turn": {"me"}, "state": {"next"}, "category": {"ready"}}
 		}),
 		task("g-1", "doing", func(e *api.TaskView) {
 			e.Title, e.Category, e.Units = "Fix the flaky upload test", "active", []unit.Unit{prUnit}
-			e.Facets = map[string][]string{"source": {"github"}, "where": {"acme/api"}, "ci": {"failure"}, "kind": {"checks"}, "wait": {"me"}, "waits-on": {"me"},
+			e.Facets = map[string][]string{"source": {"github"}, "where": {"acme/api"}, "ci": {"failure"}, "kind": {"checks"}, "wait": {"me"}, "waits-on": {"me"}, "turn": {"me"},
 				"state": {"doing"}, "category": {"active"}, "tag": {"lang:go"}}
 		}),
 		task("g-2", "doing", func(e *api.TaskView) {
 			e.Title, e.Category, e.Units = "Review the general settings page", "active", []unit.Unit{prUnit2}
-			e.Facets = map[string][]string{"source": {"github"}, "where": {"acme/web"}, "ci": {"success"}, "kind": {"review"}, "wait": {"reviewer"}, "waits-on": {"bia"},
+			e.Facets = map[string][]string{"source": {"github"}, "where": {"acme/web"}, "ci": {"success"}, "kind": {"review"}, "wait": {"reviewer"}, "waits-on": {"bia"}, "turn": {"others"},
 				"state": {"doing"}, "category": {"active"}}
 		}),
 	}
@@ -334,8 +334,8 @@ const g = p.res.group, f = first(p);
 tasksState.tasks = input.tasks.map((e) => ({ ...e, facets: { source: e.facets.source } }));
 const bare = viewPage(route({ layout: "board" }), "");
 process.stdout.write(JSON.stringify({ Group: g, First: f, Bare: bare.res.group, BareFirst: first(bare) }));`, mixedInput(t, nil), &got)
-	if got.Group != "waits-on" || got.First != "Waits on (person) (board)" {
-		t.Errorf("Needs me's board groups by %q, menu %q; want the profile's strip facet waits-on", got.Group, got.First)
+	if got.Group != "turn" || got.First != "Whose turn (board)" {
+		t.Errorf("Needs me's board groups by %q, menu %q; want the profile's strip facet turn", got.Group, got.First)
 	}
 	if got.Bare != "" || got.BareFirst != "None" {
 		t.Errorf("tasks without the strip facet group by %q, menu %q; want no grouping", got.Bare, got.BareFirst)

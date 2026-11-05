@@ -546,7 +546,7 @@ func TestAFacetTogglesItsQualifier(t *testing.T) {
 
 // rowFuncs are app.js's row renderer and what it calls beyond the lens.
 var rowFuncs = []string{"stripDot", "specFor", "rfc3339", "agePart", "ageText", "partPiece", "rowParts", "rowClasses", "partClass", "pieceButtons", "rowColumnDefs", "rowColumns",
-	"columnSort", "sortPick", "rowHead", "rowTr", "joined", "refTail", "rowTable", "unitTitle", "rowWords", "lensWords", "fillWord", "facet", "heldFacet",
+	"columnSort", "sortPick", "rowHead", "rowTr", "joined", "refTail", "rowTable", "unitTitle", "rowWords", "lensWords", "fillWord", "facet",
 	"rowLink", "bucketOf", "goDuration", "toggleCollapsed", "onlyThis", "groupQualifier", "multiCopy", "marked", "foldMap", "copySlot"}
 
 // lensFuncs are what pipeline runs, with what the fields call.
@@ -661,6 +661,7 @@ func TestPipelineFiltersSortsAndGroups(t *testing.T) {
 	}
 	var got []res
 	nodeRun(t, lensPrelude(t), lensFuncs, `const rows = `+mustJS(t, wireRows("me", time.Now(), lensRows()...))+`;
+catalog.views.push({ id: "needs-me", label: "Needs me", provider: "github", rows: true, surfaces: ["web"] });
 process.stdout.write(JSON.stringify(input.map((l) => {
   const lens = { view: l.view, q: l.q, ts: terms(l.q), quals: qualifiers(l.q), filters: filtersOf(qualifiers(l.q)), group: l.group || "", sort: l.sort || "", layout: l.layout || "" };
   const r = pipeline(rows, lens);

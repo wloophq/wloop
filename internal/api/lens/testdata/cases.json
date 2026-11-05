@@ -1354,6 +1354,33 @@
       "within": ""
      }
     ]
+   },
+   {
+    "id": "seen",
+    "label": "Seen",
+    "sort": "time",
+    "show": "meta",
+    "buckets": [
+     {
+      "id": "1d",
+      "label": "0-1 days",
+      "within": "24h"
+     },
+     {
+      "id": "older",
+      "label": "older",
+      "within": ""
+     }
+    ],
+    "displays": {
+     "slack": {
+      "show": "meta",
+      "bucket_labels": {
+       "1d": "today",
+       "older": "before"
+      }
+     }
+    }
    }
   ],
   "cases": [
@@ -1692,6 +1719,27 @@
      "texts": []
     },
     "want": {}
+   },
+   {
+    "item": {
+     "provider": "slack",
+     "facets": {
+      "seen": [
+       "2026-11-04T11:00:00Z"
+      ]
+     },
+     "texts": []
+    },
+    "want": {
+     "meta": [
+      {
+       "field": "seen",
+       "value": "1d",
+       "raw": "2026-11-04T11:00:00Z",
+       "label": "today"
+      }
+     ]
+    }
    }
   ]
  }

@@ -386,6 +386,9 @@ func TestTheOwedFactsFollowWhoOwesTheTask(t *testing.T) {
 	theirs := e.item(chatA, "i1", items.Open, friday, items.Person{Key: "chat:U1"})
 	e.task(waiting("t-01", chatA, monday, theirs))
 	f := e.facts("t-01")
+	if f["task.turn"] != "others" {
+		t.Errorf("a task another person owes is %v's turn, want others", f["task.turn"])
+	}
 	if f["task.owed_by"] != "chat:U1" || !equal(f["task.owed_since"], friday) || !equal(f["task.check_on"], time.Date(2026, 3, 3, 9, 0, 0, 0, brt)) {
 		t.Errorf("owed by %v since %v, check on %v; want chat:U1 since friday, check on tuesday", f["task.owed_by"], f["task.owed_since"], f["task.check_on"])
 	}
@@ -404,8 +407,13 @@ func TestTheOwedFactsFollowWhoOwesTheTask(t *testing.T) {
 	}
 	mine := e.item(chatB, "i2", items.Open, friday, items.Person{Key: "chat:ME"})
 	e.task(task.Task{ID: "t-03", State: "next", Category: task.CategoryReady, Title: "m", Units: []unit.Unit{chatB}, Items: []task.ItemRef{{Unit: chatB, Item: mine.ID}}})
-	if f := e.facts("t-03"); f["task.owed_by"] != "me" || !equal(f["task.check_on"], time.Time{}) {
+	if f := e.facts("t-03"); f["task.owed_by"] != "me" || f["task.turn"] != "me" || !equal(f["task.check_on"], time.Time{}) {
 		t.Errorf("my task: by %v, check on %v", f["task.owed_by"], f["task.check_on"])
+	}
+	quiet := e.item(chatB, "i3", items.Open, friday)
+	e.task(task.Task{ID: "t-04", State: "next", Category: task.CategoryReady, Title: "q", Units: []unit.Unit{chatB}, Items: []task.ItemRef{{Unit: chatB, Item: quiet.ID}}})
+	if f := e.facts("t-04"); f["task.owed_by"] != "" || f["task.turn"] != "nobody" {
+		t.Errorf("a task whose items wait on no one: by %v, turn %v; want nobody's", f["task.owed_by"], f["task.turn"])
 	}
 }
 

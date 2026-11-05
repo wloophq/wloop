@@ -25,8 +25,7 @@ values = { me = "Your turn", others = "Others' turn", nobody = "Nobody's turn" }
 colors = { me = "me", others = "author", nobody = "nobody" }
 
 [facets.situation]
-label = "Situation"
-values = { waits_on_viewer = "waits on you", needs_closure = "needs closing", new = "new", waits_on_others = "waits on others", fyi = "for your information", resolved = "resolved" }
+label = "Conversation state"
 show = "kind"
 
 [facets.age]

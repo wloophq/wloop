@@ -207,6 +207,9 @@ type UIFacet struct {
 	// Strip colors each row's strip by the facet's first value, its legend
 	// the facet's rank; at most one facet of a plugin is the strip's.
 	Strip bool `toml:"strip" doc:"Each row's strip is colored by its value, and its rank is the strip's legend; at most one facet."`
+	// Situations says the facet's values are the plugin's situation kinds, so a value its ui.toml does not
+	// word reads as its situation.
+	Situations bool `toml:"situations" doc:"Its values are the plugin's situation kinds: a value with no words of its own reads as its situation does."`
 }
 
 // UIBucket is an age bucket of a time facet: the values younger than

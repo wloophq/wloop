@@ -108,7 +108,7 @@ func derive(in *Input) Row {
 	if pl.Channel != "" {
 		r.Facets[FacetWhere] = []string{pl.Channel}
 	}
-	r.Facets[FacetTurn] = []string{turn(r.Summary.WaitsOn)}
+	r.Facets[FacetTurn] = []string{turn(kind, r.Summary.WaitsOn)}
 	r.Facets[FacetSituation] = []string{string(kind)}
 	if !r.Summary.Since.IsZero() {
 		r.Facets[FacetAge] = []string{r.Summary.Since.UTC().Format(time.RFC3339Nano)}
@@ -117,12 +117,13 @@ func derive(in *Input) Row {
 	return r
 }
 
-// turn is whose turn a summary that waits on summary says it is.
-func turn(summary string) string {
-	switch summary {
-	case "me":
+// turn is whose turn a row of kind k that waits on summary is: the viewer's when the conversation waits on
+// them or on their closure.
+func turn(k Kind, summary string) string {
+	switch {
+	case k == KindWaitsOnViewer || k == KindNeedsClosure || summary == "me":
 		return TurnMe
-	case "nobody", "":
+	case summary == "nobody" || summary == "":
 		return TurnNobody
 	}
 	return TurnOthers

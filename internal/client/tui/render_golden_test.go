@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/wloophq/wloop/internal/api/lens"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/readmodel"
 	"os"
 	"path/filepath"
 	"slices"
@@ -148,16 +149,25 @@ func TestRenderGolden(t *testing.T) {
 	}
 }
 
+type bundledProvider = readmodel.Provider
+
+type bundled struct {
+	bundledProvider
+	psource.Catalog
+}
+
 // slackGolden is the Slack view: conversations placed by the Slack plugin's specs, a channel thread, a
 // DM and a stalled one.
 func slackGolden(t *testing.T, color bool) *Model {
 	conv := func(key, label, title, waits string, since time.Duration, stalled bool) api.Row {
-		r := api.Row{Unit: unit.Unit{Provider: "slack", Key: key}, Label: label, Title: title, Kind: "waits_on_viewer", Views: []string{"slack"},
-			Link: "https://chat.example/" + key, Summary: api.Summary{WaitsOn: waits, Since: now.Add(-since), Stalled: stalled}, Facets: map[string][]string{"waits-on": {waits}, "turn": {"me"}, "situation": {"waits_on_viewer"},
-				"age": {now.Add(-since).UTC().Format(time.RFC3339)}}}
+		kind, turn := api.Kind("waits_on_viewer"), "me"
 		if waits != "me" {
-			r.Kind, r.Facets["turn"], r.Facets["situation"] = "waits_on_others", []string{"others"}, []string{"waits_on_others"}
+			kind, turn = "waits_on_others", "others"
 		}
+		r := api.Row{Unit: unit.Unit{Provider: "slack", Key: key}, Label: label, Title: title, Kind: kind, Views: []string{"slack"},
+			Link: "https://chat.example/" + key, Summary: api.Summary{WaitsOn: waits, Since: now.Add(-since), Stalled: stalled},
+			Facets: map[string][]string{"waits-on": {waits}, "turn": {turn}, "situation": {string(kind)},
+				"age": {now.Add(-since).UTC().Format(time.RFC3339Nano)}}}
 		if channel, ok := strings.CutPrefix(label, "#"); ok {
 			r.Facets["where"] = []string{channel}
 		}
@@ -168,9 +178,8 @@ func slackGolden(t *testing.T, color bool) *Model {
 		conv("T1/C2/3.3", "#general", "Who owns the flaky upload test?", "me", 5*24*time.Hour, true))
 	c := servedCatalog(t)
 	c.Views = append(c.Views, api.ViewSpec{ID: "slack", Label: "Slack", Provider: "slack", Rows: true, Surfaces: []string{"tui"}, Unit: "Conversation"})
-	slack := psource.BundledCatalog("slack")
-	c.Facets = append(c.Facets, slack.Facets()...)
-	c.Situations = append(c.Situations, slack.Situations()...)
+	both := readmodel.BuildCatalog(bundled{Catalog: psource.BundledCatalog(string(unit.GitHub))}, bundled{Catalog: psource.BundledCatalog("slack")})
+	c.Facets, c.Situations = both.Facets, both.Situations
 	m.SetCatalog(c)
 	m.navigate("slack")
 	m.SetColor(color)

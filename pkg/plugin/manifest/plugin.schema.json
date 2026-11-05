@@ -648,6 +648,10 @@
                     },
                     "type": "array"
                   },
+                  "situations": {
+                    "description": "Its values are the plugin's situation kinds: a value with no words of its own reads as its situation does.",
+                    "type": "boolean"
+                  },
                   "sort": {
                     "description": "How its values sort.",
                     "enum": [

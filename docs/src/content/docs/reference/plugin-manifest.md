@@ -206,6 +206,7 @@ every = "5m"
 | `match` | one of `exact`, `suffix`, `prefix`, `team` | How a filter matches a value; empty is exact. |
 | `menu` | bool | It shows in the filter menu. |
 | `strip` | bool | Each row's strip is colored by its value, and its rank is the strip's legend; at most one facet. |
+| `situations` | bool | Its values are the plugin's situation kinds: a value with no words of its own reads as its situation does. |
 
 ## `[[source.ui.facets.buckets]]`
 

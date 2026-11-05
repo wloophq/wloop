@@ -64,8 +64,11 @@ func (c Catalog) Facets() []api.FacetSpec {
 		if w.LabelPrefix != nil {
 			spec.LabelPrefix = *w.LabelPrefix
 		}
+		if f.Situations {
+			spec.Labels = maps.Clone(t.Situations)
+		}
 		if len(w.Values) > 0 {
-			spec.Labels = w.Values
+			spec.Labels = mergeLabels(spec.Labels, w.Values)
 		}
 		for _, b := range f.Buckets {
 			within := ""
@@ -206,3 +209,11 @@ var bundledTexts = sync.OnceValue(func() map[string]intentload.UITexts {
 	t, _ := intentload.BundledUI()
 	return t
 })
+
+func mergeLabels(into, over map[string]string) map[string]string {
+	if into == nil {
+		return over
+	}
+	maps.Copy(into, over)
+	return into
+}

@@ -68,6 +68,24 @@ func enum(f Fact, values map[unit.ProviderID][]string) Fact {
 const anyProvider unit.ProviderID = ""
 
 // enumOf is an enum of values that holds for every provider.
+// The values of task.turn.
+const (
+	TurnMe     = "me"
+	TurnOthers = "others"
+	TurnNobody = "nobody"
+)
+
+// TurnOf is task.turn of a task.owed_by.
+func TurnOf(owedBy string) string {
+	switch owedBy {
+	case "me":
+		return TurnMe
+	case "":
+		return TurnNobody
+	}
+	return TurnOthers
+}
+
 func enumOf(values ...string) map[unit.ProviderID][]string {
 	return map[unit.ProviderID][]string{anyProvider: values}
 }
@@ -191,6 +209,7 @@ var otherFacts = []Fact{
 	untrusted(wf("task", "fingerprint", expr.String, "The task's id, state and update time.")),
 	untrusted(enum(wf("task", "category", expr.String, "The category of the task's state: inbox, ready, active, waiting, deferred, done or dropped."), enumOf(categoryNames()...))),
 	untrusted(wf("task", "owed_by", expr.String, "Who owes the task's next step, as tasks.toml's owed_by says: me, a person's key, or empty when nobody does.")),
+	untrusted(enum(wf("task", "turn", expr.String, "Whose turn the task's next step is, from task.owed_by: me, others (a person's), or nobody."), enumOf(TurnMe, TurnOthers, TurnNobody))),
 	timeVarying(untrusted(wf("task", "owed_since", expr.Time, "Since when task.owed_by has owed the next step; zero when nobody does. Test with `> timestamp(0)`."))),
 	wf("task", "moved_at", expr.Time, "When the task, or a unit linked to it, last moved; zero when never. Test with `> timestamp(0)`."),
 	timeVarying(wf("task", "since_movement", expr.Duration, "Time since the task, or a unit linked to it, last moved: a state change, a source event, a run.")),

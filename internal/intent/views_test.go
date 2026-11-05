@@ -396,7 +396,7 @@ func TestTaskFacetsLoadFromViews(t *testing.T) {
 	for _, f := range views.Facets {
 		ids = append(ids, f.ID)
 	}
-	want := []string{"source", "state", "category", "contexts", "waits-on", "asked-by", "placement", "moved", "gates", "signal", "prop.kind", "prop.area", "prop.risk", "prop.focus", "prop.priority", "type", "risk", "size", "tag"}
+	want := []string{"source", "state", "category", "contexts", "waits-on", "turn", "asked-by", "placement", "moved", "gates", "signal", "prop.kind", "prop.area", "prop.risk", "prop.focus", "prop.priority", "type", "risk", "size", "tag"}
 	if !slices.Equal(ids, want) {
 		t.Fatalf("facets %v, want %v", ids, want)
 	}
@@ -590,7 +590,7 @@ func TestAStripFacetColorsEachValueWithAStripHue(t *testing.T) {
 	if w, _ := facetOf(views, "waits-on"); !maps.Equal(w.Colors, map[string]string{"me": "me", "ana": "author"}) {
 		t.Errorf("waits-on colors %v", w.Colors)
 	}
-	if _, problems := loadFacets(t, "[facets.waits-on]\ncolors = { me = \"pink\" }\n"); !strings.Contains(problems.Error(), "facets.waits-on.colors.me") {
+	if _, problems := loadFacets(t, "[facets.waits-on]\ncolors = { me = \"pink\" }\n"); len(problems) != 1 || !strings.Contains(problems.Error(), "facets.waits-on.colors.me") {
 		t.Errorf("an unknown hue: %v", problems)
 	}
 	plugin, user := t.TempDir(), t.TempDir()
@@ -609,7 +609,7 @@ func TestAStripFacetColorsEachValueWithAStripHue(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(user, UIFile), []byte("[facets.turn]\ncolors = { others = \"pink\" }\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, problems := loadUI([]profile.Layer{{Name: "user:acme", Dir: user}}); !strings.Contains(problems.Error(), "facets.turn.colors.others") {
-		t.Errorf("an unknown hue in ui.toml: %v", problems)
+	if _, problems := loadUI([]profile.Layer{{Name: "user:acme", Dir: user}}); len(problems) != 1 || !strings.Contains(problems.Error(), "facets.turn.colors.others") {
+		t.Errorf("an unknown hue in ui.toml, once: %v", problems)
 	}
 }

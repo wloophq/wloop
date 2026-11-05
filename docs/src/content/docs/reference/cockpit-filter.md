@@ -15,9 +15,12 @@ The counts follow the filter in every view. The rail (the tabs in the terminal) 
 |---|---|
 | `where:` | where the unit lives: a pull request's repository (`where:api` matches any owner) or a Slack channel |
 | `author:` | the author; `author:@me` for yours (`@me` is an alias of `me` in every qualifier) |
-| `wait:` | whom it waits on, by role: `me`, `loop`, `reviewer`, `author`, `nobody` |
+| `wait:` | a pull request's strip: whom it waits on, by role: `me`, `loop`, `reviewer`, `author`, `nobody` (GitHub) |
+| `turn:` | whose turn it is: `me`, `others`, `nobody`; a Slack conversation's strip, and a task's, from whom it is owed by |
 | `waits-on:` | a person or team it waits on |
-| `kind:` | the situation |
+| `kind:` | a pull request's situation (GitHub) |
+| `situation:` | a Slack conversation's situation: `waits_on_viewer`, `needs_closure`, `new`, `waits_on_others`, `fyi`, `resolved` |
+| `age:` | how long it has waited in its situation: `1d`, `3d`, `7d`, `2w`, `4w`, `older` (GitHub and Slack) |
 | `type:` | the brief's kind: `feature`, `fix`, `refactor`, `chore`, `infra` |
 | `risk:`, `size:` | the brief's risk and size |
 | `status:` | the workspace's board column |
@@ -27,7 +30,7 @@ The counts follow the filter in every view. The rail (the tabs in the terminal) 
 | `scope:` | a scope reason |
 | `tag:` | a brief tag: `tag:lang:python` that tag, `tag:lang` any `lang:` tag |
 
-A facet value that is false, zero or empty is no value: it is not matched by a qualifier and forms no group. A task view also takes the task facets of your `views.toml`; the bundled ones are `source:` (`github`, `slack`), `state:`, `category:`, `asked-by:`, `placement:`, `moved:` (`1d` to `older`, since it last moved), `gates:`, `signal:` and `prop.<name>:` for an enum property, beside the facets of its units' rows above.
+A facet value that is false, zero or empty is no value: it is not matched by a qualifier and forms no group. A task view also takes the task facets of your `views.toml`; the bundled ones are `source:` (`github`, `slack`), `state:`, `category:`, `turn:`, `asked-by:`, `placement:`, `moved:` (`1d` to `older`, since it last moved), `gates:`, `signal:` and `prop.<name>:` for an enum property, beside the facets of its units' rows above.
 
 Values of one qualifier widen, different qualifiers narrow, and a leading `-` leaves a value out:
 
