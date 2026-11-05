@@ -19,25 +19,27 @@ status = "approved"
 label = "Discard"
 status = "rejected"
 
-# A round, or any workflow item, that waits for you or for its window.
+# A round, or any workflow item, that waits for you or for its window; it
+# asks its workflow's ask, else its summary, and the label only without one.
 [gates.plan]
 kind = "plan"
 label = "Run this?"
+ends_task = { approved = "done", rejected = "dropped", dismissed = "dropped", superseded = "dropped" }
 
 [gates.plan.intents.run_now]
 label = "Run now"
-summary = "Start the round waiting on this pull request now, without waiting for its delay or the daily budget. Skip drops it instead."
+summary = "Run what waits now, without waiting for its delay or the daily budget. Skip drops it instead."
 confirm = "{{if and .row.capped (not .row.pending)}}Run the held round on {{.pr.slug}} now? It does not count against the cap.{{end}}"
 status = "approved"
 
 [gates.plan.intents.skip]
 label = "Skip"
-summary = "Drop the round waiting on this pull request without running it. Run now starts it instead."
+summary = "Drop what waits without running it. Run now runs it instead."
 status = "rejected"
 
 [gates.plan.intents.guide]
 label = "Guide"
-summary = "Tell the agent what its round should look at; your text goes with the round waiting now, or with the next one when none waits."
+summary = "Tell the agent what to look at; your text goes with what waits now, or with the next run when nothing waits."
 note = "{{if not .row.pending}}Kept for the next automatic round{{end}}"
 status = "approved"
 answer = true

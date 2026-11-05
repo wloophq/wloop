@@ -189,3 +189,16 @@ line = "x"
 		t.Fatalf("%+v %v", d, ok)
 	}
 }
+
+func TestAWorkflowsAskWordsItsPlanGate(t *testing.T) {
+	root := t.TempDir()
+	writeWorkflow(t, root, "my-nudge", strings.Replace(slackNudge, `key = `, "ask = 'Nudge {{index .Facts \"task.owed_by\"}} on {{.Unit}}?'\nkey = ", 1))
+	l, problems := Load(userLayer(root), nil, testBase(), nil)
+	if len(problems) > 0 || len(l.Workflows) != 1 || l.Workflows[0].Ask == nil {
+		t.Fatalf("%s %+v", problems.Error(), l.Workflows)
+	}
+	writeWorkflow(t, root, "my-nudge", strings.Replace(slackNudge, `key = `, "ask = 'Nudge {{.Unit'\nkey = ", 1))
+	if _, problems := Load(userLayer(root), nil, testBase(), nil); !strings.Contains(problems.Error(), "ask:") {
+		t.Fatalf("a broken ask loads: %s", problems.Error())
+	}
+}

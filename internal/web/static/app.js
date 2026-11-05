@@ -2613,8 +2613,14 @@ async function getJSON(url) {
   const res = await fetch(url, { headers: { Accept: "application/json", "X-Loop-API": API_VERSION }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   if (res.status === 401) state.authLost = true;
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(apiError(body, `${url}: HTTP ${res.status}`, res.status));
+  if (!res.ok) throw Object.assign(new Error(apiError(body, `${url}: HTTP ${res.status}`, res.status)), { status: res.status });
   return body;
+}
+
+// unitFallback is the route a unit with no detail opens instead: the first
+// open task that holds it; "" when none does or the read failed otherwise.
+function unitFallback(err, tasks) {
+  return err && err.status === 404 && tasks && tasks.length ? "#" + viewHash({ task: tasks[0].id, pr: "" }) : "";
 }
 
 async function loadActivity() {
@@ -2649,7 +2655,9 @@ async function loadDetail() {
   } catch (err) {
     if (readHash().pr !== pr) return;
     state.detail = null;
-    state.detailError = err.message;
+    const instead = unitFallback(err, detailState.unitTasks);
+    state.detailError = instead ? "" : err.message;
+    if (instead) location.replace(instead);
   }
 }
 

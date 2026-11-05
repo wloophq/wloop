@@ -193,7 +193,7 @@ func (s *Service) Open(ctx context.Context, g gate.Gate, p Policy) (gate.Gate, e
 		}
 	}
 	if g.Task == "" {
-		if g.Task, err = s.taskOf(ctx, g.Unit, def); err != nil {
+		if g.Task, err = s.taskOf(ctx, g.Unit, cmp.Or(g.Text, def.Label)); err != nil {
 			return gate.Gate{}, err
 		}
 	}
@@ -510,6 +510,25 @@ func (s *Service) SettleHeld(ctx context.Context, id task.ID) error {
 	return s.endHeld(ctx, last)
 }
 
+// SettleEnded settles every task a closed gate whose status ends a held task was on, as SettleHeld does, so a task
+// left open by gates that closed before their declaration ended it ends now.
+func (s *Service) SettleEnded(ctx context.Context) error {
+	closed, err := s.d.Reader.Where(ctx, Query{Statuses: []gate.Status{gate.Approved, gate.Rejected, gate.Answered, gate.Dismissed, gate.Superseded}})
+	if err != nil {
+		return err
+	}
+	seen := map[task.ID]bool{}
+	var errs []error
+	for _, g := range closed {
+		if _, ends := s.endsTask(g); !ends || g.Task == "" || seen[g.Task] {
+			continue
+		}
+		seen[g.Task] = true
+		errs = append(errs, s.SettleHeld(ctx, g.Task))
+	}
+	return errors.Join(errs...)
+}
+
 // endHeld ends the task closed gate g was on when Tasks opened it only to hold gates and none of them is open now,
 // in the category g's EndsTask names for its status.
 func (s *Service) endHeld(ctx context.Context, g gate.Gate) error {
@@ -727,16 +746,16 @@ func statusIntent(g gate.Gate, def Def, want gate.Status) (Intent, bool) {
 
 // taskOf is the task holding u: u's own when it is a task, else the first
 // open task that holds it, else the unit's own task (OwnTasks), reopened
-// when done, else a new capture task named by the gate's label: a gate on a
-// done task would wait where no list shows it.
-func (s *Service) taskOf(ctx context.Context, u unit.Unit, def Def) (task.ID, error) {
+// when done, else a new capture task named title: a gate on a done task would
+// wait where no list shows it.
+func (s *Service) taskOf(ctx context.Context, u unit.Unit, title string) (task.ID, error) {
 	if id, ok := task.IDOf(u); ok {
 		return id, nil
 	}
 	if s.d.Tasks == nil {
 		return "", nil
 	}
-	r := coretasks.OpenRequest{Title: def.Label, Origin: task.OriginGate}
+	r := coretasks.OpenRequest{Title: title, Origin: task.OriginGate}
 	if !u.IsZero() {
 		ts, err := s.d.Tasks.TasksOf(ctx, u)
 		if err != nil {

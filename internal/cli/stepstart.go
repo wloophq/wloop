@@ -545,23 +545,47 @@ func (s *stepSet) holdByCap(ctx context.Context, c stepCall, why string) error {
 	if planned.ws.ID != "" {
 		errs = append(errs, s.e.setCard(ctx, planned.ws, "", true))
 	}
-	errs = append(errs, s.openHeldGate(ctx, c.u))
+	errs = append(errs, s.openHeldGate(ctx, c))
 	return errors.Join(errs...)
 }
 
 // openHeldGate opens the plan gate of u's round the daily cap held today, once: approving it runs the round by
 // hand, and no rule releases it, since the cap held it.
-func (s *stepSet) openHeldGate(ctx context.Context, u unit.Unit) error {
+func (s *stepSet) openHeldGate(ctx context.Context, c stepCall) error {
 	if s.d.Gates == nil {
 		return nil
 	}
+	u := c.u
 	subject := round.HeldSubject(s.e.Now())
 	open, err := s.d.Gates.Where(ctx, gates.Query{Kind: gate.KindPlan, Unit: u})
 	if err != nil || slices.ContainsFunc(open, func(g gate.Gate) bool { return g.Subject == subject }) {
 		return err
 	}
-	_, err = s.d.Gates.Open(ctx, gate.Gate{Kind: gate.KindPlan, Unit: u, Subject: subject}, waitsForYou{})
+	_, err = s.d.Gates.Open(ctx, gate.Gate{Kind: gate.KindPlan, Unit: u, Subject: subject, Text: s.gateWords(ctx, c)}, waitsForYou{})
 	return err
+}
+
+// gateWords is what the plan gate of c's run asks, as its workflow words it over its unit's facts; "" when the workflow
+// is not loaded.
+func (s *stepSet) gateWords(ctx context.Context, c stepCall) string {
+	l := s.e.loadedIntents()
+	if l == nil {
+		return ""
+	}
+	i := slices.IndexFunc(l.Workflows, func(w workflow.Workflow) bool { return w.Name == c.why.Workflow })
+	if i < 0 {
+		return ""
+	}
+	w := l.Workflows[i]
+	facts, err := s.facts(ctx, c.u)
+	if err != nil {
+		return w.Summary
+	}
+	text, err := w.Asks(c.u.Label(), facts)
+	if err != nil {
+		s.logf("%s: the words of its gate on %s: %v", w.Name, c.u, err)
+	}
+	return text
 }
 
 // startRun checks again on current facts, then sends the round through

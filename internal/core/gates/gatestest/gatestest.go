@@ -265,6 +265,18 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 			t.Fatalf("get %+v %v", got, err)
 		}
 	})
+	t.Run("a gate keeps the words its opener gave it", func(t *testing.T) {
+		s, r, _ := open(t)
+		g := draft("t-01")
+		g.Text = "Close the quiet session demo?"
+		opened, err := s.Open(ctx, g)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, err := r.Get(ctx, opened.ID); err != nil || got.Text != g.Text {
+			t.Fatalf("get %+v %v", got, err)
+		}
+	})
 	t.Run("resolve closes once with the intent", func(t *testing.T) {
 		s, r, _ := open(t)
 		g, _ := s.Open(ctx, draft("t-01"))

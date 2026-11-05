@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/automation"
@@ -195,5 +196,42 @@ func TestAGateReleasedAfterItsUnitStoppedMatchingDropsTheItem(t *testing.T) {
 	}
 	if it, ok := r.item("follow", s1); ok {
 		t.Fatalf("the item that no longer matches stayed: %+v", it)
+	}
+}
+
+func TestAPlanGateSaysWhatItsWorkflowAsks(t *testing.T) {
+	asks := sweepWF("asks", idle, "session.close")
+	asks.Approval = workflow.Approval{Mode: workflow.ApprovalWait}
+	asks.Ask = template.Must(template.New("ask").Parse(`Close the quiet session {{index .Facts "session.name"}} ({{.Unit}})?`))
+	plain := sweepWF("plain", idle, "session.close")
+	plain.Approval = workflow.Approval{Mode: workflow.ApprovalWait}
+	plain.Summary = "Offer to close a quiet session"
+	r := newRig(t, asks, plain)
+	_, st := gated(r)
+	r.put(s1, "a", "session.name", "demo-worktree")
+	r.sweep()
+
+	if g := mustGate(t, st, r.mustItem("asks", s1).ID); g.Text != "Close the quiet session demo-worktree ("+s1.Label()+")?" {
+		t.Fatalf("the gate of a workflow with ask reads %q", g.Text)
+	}
+	if g := mustGate(t, st, r.mustItem("plain", s1).ID); g.Text != plain.Summary {
+		t.Fatalf("the gate of a workflow with no ask reads %q, want its summary", g.Text)
+	}
+}
+
+func TestAPlanGateIsWithdrawnWhenItsUnitLeavesTheInventory(t *testing.T) {
+	waits := sweepWF("waits", idle, "session.close")
+	waits.Approval = workflow.Approval{Mode: workflow.ApprovalWait}
+	r := newRig(t, waits)
+	_, st := gated(r)
+	r.put(s1, "a")
+	r.sweep()
+	it := r.mustItem("waits", s1)
+	mustGate(t, st, it.ID)
+
+	r.units.Remove(s1)
+	r.sweep()
+	if g, _ := gateOf(t, st, it.ID, closedOrOpen...); g.Status != gate.Superseded || g.By != task.ActorWorkflow {
+		t.Fatalf("the gate of a unit gone from the inventory = %+v, want superseded by the workflow", g)
 	}
 }

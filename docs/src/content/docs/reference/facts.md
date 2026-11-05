@@ -154,6 +154,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `session.process_gone` | bool | The active session's process was missed by two complete censuses of its manager. |
 | `session.fingerprint` | string | The session id, its state, the start of the idle period and the newest turn's sequence. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `session.repo` | string | owner/repo of the book's pull request; empty when none. |
+| `session.name` | string | What people call the session: its workspace's display name, else its worktree's folder, else its terminal's title, else its id. |
 
 ### Workspaces (`workspace.*`)
 

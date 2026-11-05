@@ -263,6 +263,7 @@ func (s *state) facts(now time.Time, pf turns.PromptFacts, processGone bool) wor
 		"session.process_gone":          processGone,
 		"session.fingerprint":           s.fingerprint(),
 		"session.repo":                  w.repoOf(s.unit),
+		"session.name":                  s.name(),
 	}
 	if s.hasAgent {
 		f["session.agent_state"] = s.agent.State.String()
@@ -321,6 +322,17 @@ func (s *state) kept() bool {
 
 func older(a, b turn.Session) bool {
 	return cmp.Or(a.StartedAt.Compare(b.StartedAt), strings.Compare(a.ID, b.ID)) < 0
+}
+
+// name is what people call the session: its workspace's display name, else
+// its worktree's folder, else its terminal's title, else its id.
+func (s *state) name() string {
+	ws := s.w.spaces[s.sess.WorkspaceID]
+	folder := ""
+	if path := cmp.Or(s.sess.Worktree, ws.Path); path != "" {
+		folder = filepath.Base(path)
+	}
+	return cmp.Or(ws.DisplayName, folder, s.term.Title, s.sess.ID)
 }
 
 // worktreeGone stats only local paths: a listed workspace on this host, or
