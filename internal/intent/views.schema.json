@@ -17,9 +17,191 @@
       },
       "type": "object"
     },
+    "default_sort": {
+      "description": "What clients call a view's own order in the sort menu, such as \"View order\". Required in the bundled profile; a user layer may replace it.",
+      "type": "string"
+    },
     "empty": {
       "description": "What a view without its own empty shows when it lists nothing, over the view's label as `{{.label}}`. Required in the bundled profile; a user layer may replace it.",
       "type": "string"
+    },
+    "facets": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "A facet, by its id. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
+        "properties": {
+          "buckets": {
+            "additionalProperties": {
+              "additionalProperties": false,
+              "description": "A bucket, by its id.",
+              "properties": {
+                "label": {
+                  "description": "The text people read; the id when absent.",
+                  "type": "string"
+                },
+                "within": {
+                  "description": "How long ago an instant may be and still fall in the bucket.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "description": "For a facet that sorts by time: the buckets its instants fall in, by id, in the order the file declares them; the first whose within covers the time since the instant wins, and one with no within takes the rest.",
+            "type": "object"
+          },
+          "empty": {
+            "description": "What a group of tasks with no value shows.",
+            "type": "string"
+          },
+          "fact": {
+            "description": "The fact the facet reads: a fact of a task (task.*, task.prop.*), or a field of a record kind, written <kind>.<field> (brief.risk). Required.",
+            "type": "string"
+          },
+          "group": {
+            "default": false,
+            "description": "Whether a list can group by the facet.",
+            "type": "boolean"
+          },
+          "label": {
+            "description": "The name people read. Required.",
+            "type": "string"
+          },
+          "label_prefix": {
+            "description": "Text before the label of each value of a facet whose order the catalog derives, such as the `@` of a context; a label that has it already keeps it.",
+            "type": "string"
+          },
+          "match": {
+            "default": "exact",
+            "description": "How a filter's text matches a value: the whole value, its last segment, its first, or a person's team.",
+            "enum": [
+              "exact",
+              "suffix",
+              "prefix",
+              "team"
+            ],
+            "type": "string"
+          },
+          "menu": {
+            "default": true,
+            "description": "Whether the facet is offered in the filter menu.",
+            "type": "boolean"
+          },
+          "merge": {
+            "default": "union",
+            "description": "How a task's value joins its units' rows' values: union adds it to them, rows-first uses it only when no row has a value.",
+            "enum": [
+              "union",
+              "rows-first"
+            ],
+            "type": "string"
+          },
+          "rank": {
+            "description": "The facet's values in their order, first first.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "sort": {
+            "description": "How the facet's values order: by rank, as text, or as instants (time). Absent, as text.",
+            "enum": [
+              "rank",
+              "text",
+              "time"
+            ],
+            "type": "string"
+          },
+          "strip": {
+            "default": false,
+            "description": "Whether each row's strip is colored by the facet's first value, its rank the strip's legend.",
+            "type": "boolean"
+          },
+          "units": {
+            "default": "all",
+            "description": "Which of a task's units contribute rows' values: all of them, or the primary unit alone.",
+            "enum": [
+              "all",
+              "primary"
+            ],
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {
+              "description": "The text of one value.",
+              "type": "string"
+            },
+            "description": "The text people read for a value, by value.",
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "description": "The task facets, by id: the fields every client filters, groups and sorts tasks by, in the order the file declares them, a user layer's new ones after the bundled. A plugin's row facet of the same id must agree on group, sort, rank, match and buckets.",
+      "type": "object"
+    },
+    "lens": {
+      "additionalProperties": false,
+      "description": "What every list's lens bar says. Each is a template whose only actions are the `{{.name}}` its doc lists, which the clients fill in. Required in the bundled profile; a user layer may replace any.",
+      "properties": {
+        "board_group": {
+          "description": "The group menu's entry for the field a board groups by when nothing is picked, over the field's label as `{{.label}}`.",
+          "type": "string"
+        },
+        "copied": {
+          "description": "What Copy list says it copied, over `{{.count}}` items and the `{{.view}}` they came from.",
+          "type": "string"
+        },
+        "copied_grouped": {
+          "description": "What Copy list says it copied from a grouped list, over `{{.count}}`, `{{.view}}` and the `{{.group}}` field's label.",
+          "type": "string"
+        },
+        "default_group": {
+          "description": "The group menu's entry for the field a view groups by on its own, over the field's label as `{{.label}}`.",
+          "type": "string"
+        },
+        "descending": {
+          "description": "The terminal's sort entry for a field in descending order, over the field's `{{.label}}`.",
+          "type": "string"
+        },
+        "grouped": {
+          "description": "What the terminal says after a group pick, over the picked entry's `{{.label}}`.",
+          "type": "string"
+        },
+        "no_group": {
+          "description": "The group menu's entry that lists the view in one group.",
+          "type": "string"
+        },
+        "no_lens": {
+          "description": "What the terminal says when a group or sort pick is asked where no list is on screen.",
+          "type": "string"
+        },
+        "sorted": {
+          "description": "What the terminal says after a sort pick, over the picked entry's `{{.label}}`.",
+          "type": "string"
+        },
+        "tag_key": {
+          "description": "The name of the field that groups by one key of the tag facet's `key:value` values, over the tag facet's `{{.label}}` and the `{{.key}}`.",
+          "type": "string"
+        },
+        "tag_key_empty": {
+          "description": "The group of the items with no tag of that key, over the `{{.key}}`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "board_group",
+        "copied",
+        "copied_grouped",
+        "default_group",
+        "descending",
+        "grouped",
+        "no_group",
+        "no_lens",
+        "sorted",
+        "tag_key",
+        "tag_key_empty"
+      ],
+      "type": "object"
     },
     "review": {
       "additionalProperties": {
@@ -96,6 +278,7 @@
     }
   },
   "required": [
+    "default_sort",
     "empty"
   ],
   "title": "Views and the review (views.toml)",

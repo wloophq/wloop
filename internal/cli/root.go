@@ -346,9 +346,9 @@ func (e *Env) closedByManager(ctx context.Context, manager, session, lastHandle 
 }
 
 // taskFacts is the task subject's facts provider, reading the config the
-// daemon holds at each read; ended says whether a unit has ended, repo what
+// daemon holds at each read; ended says whether a unit has ended, placement what
 // repository it is of.
-func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (bool, error), repo func(context.Context, unit.Unit) (string, error)) *facttask.Provider {
+func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (bool, error), placement func(context.Context, unit.Unit) (string, error)) *facttask.Provider {
 	enabled := func(p unit.ProviderID) bool { return e.currentConfig().PluginEnabled(string(p)) }
 	return facttask.New(facttask.Deps{
 		Tasks: db.Tasks(), Items: db.Items(), Drafts: db.Drafts(),
@@ -359,7 +359,7 @@ func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (b
 			return facttask.Settings{StaleDays: cfg.Tasks.StaleWaitingDays, RenudgeAfter: time.Duration(cfg.Drafts.RepeatAfter)}
 		},
 		Ended:      ended,
-		Repo:       repo,
+		Placement:  placement,
 		Gates:      db.Gates(e.Now),
 		Turns:      sqlite.New(db).TurnCounts,
 		OpenTurns:  sqlite.New(db).OpenTurns,

@@ -603,7 +603,6 @@ id = "mine"
 rows = true
 order = 2
 surfaces = ["web", "tui"]
-unit_sort = "repo"
 
 [[source.ui.views]]
 id = "plan"
@@ -632,7 +631,7 @@ order = 10
 surfaces = ["web"]
 
 [[source.ui.facets]]
-id = "repo"
+id = "where"
 group = true
 sort = "text"
 match = "suffix"
@@ -655,6 +654,7 @@ strip = true
 
 [[source.ui.facets]]
 id = "waits-on"
+group = true
 match = "team"
 menu = true
 

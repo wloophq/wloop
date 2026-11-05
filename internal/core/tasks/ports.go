@@ -72,6 +72,8 @@ type Page struct {
 	Tasks    []task.Task
 	Removed  []task.ID
 	Counters task.Counters
+	// Pass is the pass the page was listed in, which a reader of its tasks' facts reuses; nil from a store.
+	Pass *Pass
 }
 
 // Wakes keeps the tasks' wakes, one per task: Put replaces a task's, Drop removes it, dropping none is no

@@ -226,6 +226,9 @@ func TestDMSegmentCard(t *testing.T) {
 	if h := c.LastHuman; h == nil || h.Who.Key != otherPerson.Key || h.What != "the release?" {
 		t.Errorf("last human %+v", h)
 	}
+	if r, _ := f.row(t, u); r.Facets[slackrows.FacetWhere] != nil {
+		t.Errorf("a DM lives nowhere: where = %v", r.Facets[slackrows.FacetWhere])
+	}
 	if r, _ := f.row(t, u); r.Label != "DM with Ana" || !slices.Equal(r.Facets[slackrows.FacetConversation], []string{"DM with Ana"}) {
 		t.Errorf("row %+v", r)
 	}
@@ -347,7 +350,7 @@ func TestUserGroupsAreNamedNotShownByID(t *testing.T) {
 	if got := r.Facets[slackrows.FacetWaitsOn]; !slices.Equal(got, []string{"@team-a", dslack.UnknownGroup}) {
 		t.Errorf("waits-on facet %v", got)
 	}
-	if got := r.Facets[slackrows.FacetChannel]; !slices.Equal(got, []string{"general"}) {
+	if got := r.Facets[slackrows.FacetWhere]; !slices.Equal(got, []string{"general"}) {
 		t.Errorf("channel facet %v", got)
 	}
 	in, err := f.p.rowsSource().Load(context.Background(), []unit.Unit{u})
@@ -358,7 +361,7 @@ func TestUserGroupsAreNamedNotShownByID(t *testing.T) {
 	if got := snap.FacetValues[slackrows.FacetWaitsOn]; !slices.Equal(got, []string{"@team-a", dslack.UnknownGroup}) {
 		t.Errorf("reported waits-on facet %v", got)
 	}
-	if got := snap.Facets[slackrows.FacetChannel]; got != "general" {
+	if got := snap.Facets[slackrows.FacetWhere]; got != "general" {
 		t.Errorf("reported channel facet %q", got)
 	}
 	c := f.card(t, u)

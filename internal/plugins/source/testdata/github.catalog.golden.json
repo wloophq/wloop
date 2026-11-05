@@ -11,7 +11,7 @@
         "tui"
       ],
       "unit": "Pull request",
-      "unit_sort": "repo"
+      "default_sort": "Waiting longest"
     },
     {
       "id": "plan",
@@ -32,7 +32,8 @@
       "order": 6,
       "surfaces": [
         "web"
-      ]
+      ],
+      "default_sort": "Waiting longest"
     },
     {
       "id": "all",
@@ -42,7 +43,8 @@
       "order": 8,
       "surfaces": [
         "web"
-      ]
+      ],
+      "default_sort": "Waiting longest"
     },
     {
       "id": "explore",
@@ -121,8 +123,8 @@
   ],
   "facets": [
     {
-      "id": "repo",
-      "label": "Repo",
+      "id": "where",
+      "label": "Where",
       "provider": "github",
       "group": true,
       "sort": "text",
@@ -167,7 +169,7 @@
       "id": "waits-on",
       "label": "Waits on (person)",
       "provider": "github",
-      "group": false,
+      "group": true,
       "match": "team",
       "menu": true
     },

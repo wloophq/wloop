@@ -13,6 +13,21 @@ The daemon is the only process that opens the store as its writer: `internal/cli
 
 Each write notes what it changed in the daemon's change log (`internal/core/change`), kept in memory with an epoch. The read model and the clients follow it: rows are derived once from one store snapshot, revised in memory, and pulled by clients as deltas after a server-sent event.
 
+The tasks are pulled the same way, a page since a position. A task's view also reads what is not the task's own row in the store: its units' rows, briefs and links, and its placement. The daemon has no revision per unit, so the event says which units moved: after a write of the tasks, their gates, wakes, drafts, placements, a unit's records or links, and after a row change whose units a task holds, the event carries the counters and those units, and a client that sees counters asks for the page since its position naming them (`units`). That page also holds every task holding one of them, its own unit included, those out of the view in its removed. A change too large to list is All, and it or a reconnection makes the client read its list whole.
+
+```
+a unit's row, brief or links ─┐
+a task, gate, wake or draft ───┴─▶ change log ─┬─▶ read model ─▶ row change ─┐
+                                               └─▶ tasks feed ◀──────────────┘
+                                                       │ the units a task holds, the counters
+                                                       ▼
+                                           event ─▶ client ─▶ GET /api/tasks?since=…&units=…
+```
+
+The daemon computes a task's facets when it serves the task: its own facts and its brief's fields, joined with the facets of its units' rows from the read model snapshot the page already reads (see [Facets](/concepts/tasks/#facets)). Clients do no join, and the daemon counts the rail the same way: `GET /api/counters` takes the whole query as `q`, qualifiers included, and counts with the lens the clients filter with (`internal/api/lens`), so `where:general` narrows the counts as it narrows the list. `@me` in a qualifier stands for `me`.
+
+A page of the rows names the version of `GET /api/catalog` (`catalog`), and a page of the tasks that of `GET /api/views` (`specs`); a client holding another version reads it again, so a reloaded profile reaches it. A reload also moves every task in the next change (`all`), since it can change their facets, so a paged view reads its tasks again.
+
 ## The API
 
 `internal/api` is the one schema every client speaks: the wire types, the route paths and the version. It imports only the domain. The version is a major, sent in the `X-Loop-API` header; the daemon answers a client of another major with 426 and both versions, and a change older clients can ignore, such as a new field, keeps it.

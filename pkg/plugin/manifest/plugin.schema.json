@@ -750,10 +750,6 @@
                       "type": "string"
                     },
                     "type": "array"
-                  },
-                  "unit_sort": {
-                    "description": "The facet the unit column sorts by.",
-                    "type": "string"
                   }
                 },
                 "required": [

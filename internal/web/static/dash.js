@@ -146,15 +146,15 @@ function dashPeopleOption(rows, lens, pal) {
 
 function dashAuthorsOption(rows, lens, pal) {
   const f = fieldById("author");
-  const counts = dashTally(rows, lens, "author", (r) => [rowKey(f, r)]);
+  const counts = dashTally(rows, lens, "author", (r) => [itemKey(f, r)]);
   return dashBars(dashRanked(counts, DASH_TOP).map(([a, n]) => dashItem(lens, "author", a, n, a === "me" ? pal.me : pal.author)), pal);
 }
 
 function dashReposOption(rows, lens, pal) {
   const orgs = new Map();
   for (const r of rows) {
-    if (!passesFilters(r, lens.filters, "repo")) continue;
-    const repo = facetValues(r, "repo")[0];
+    if (!passesFilters(r, lens.filters, "where")) continue;
+    const repo = facetValues(r, "where")[0];
     if (!repo) continue;
     const org = repo.split("/")[0];
     if (!orgs.has(org)) orgs.set(org, new Map());
@@ -168,7 +168,7 @@ function dashReposOption(rows, lens, pal) {
   const data = [...orgs.entries()].sort(cmp).map(([org, repos]) => ({
     name: org,
     children: [...repos.entries()].sort(cmp).map(([repo, c]) => ({
-      ...dashItem(lens, "repo", repo, c.n, dashMix(pal.panel, pal.late, 0.6 * c.stalled / c.n), repo.slice(org.length + 1)),
+      ...dashItem(lens, "where", repo, c.n, dashMix(pal.panel, pal.late, 0.6 * c.stalled / c.n), repo.slice(org.length + 1)),
       tooltip: { formatter: `${dashEsc(repo)}: ${c.n} pending, ${c.stalled} stalled` },
     })),
   }));
@@ -408,7 +408,7 @@ function dashCompact(n) {
 
 function dashHas(f, r, value) {
   const v = fold(value);
-  return rowValues(f, r).some((x) => (f.match ? f.match(x, v) : x === v));
+  return itemValues(f, r).some((x) => (f.match ? f.match(x, v) : x === v));
 }
 
 function dashBlockersOption(rows, lens, pal) {

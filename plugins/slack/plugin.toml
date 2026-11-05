@@ -157,7 +157,6 @@ doc = "The conversation's asks resolved, and an item is still open."
 id = "slack"
 rows = true
 surfaces = ["web", "tui"]
-unit_sort = "channel"
 
 [[source.ui.facets]]
 id = "conversation"
@@ -166,9 +165,16 @@ sort = "text"
 menu = true
 
 [[source.ui.facets]]
-id = "channel"
+id = "where"
+match = "suffix"
 group = true
 sort = "text"
+menu = true
+
+[[source.ui.facets]]
+id = "waits-on"
+match = "team"
+group = true
 menu = true
 
 [[source.commands]]

@@ -8,6 +8,7 @@ var uiGrammar = []Key{
 	{Path: "views.*", In: SurfaceUI, Kind: KindTable, Doc: "One view's words."},
 	{Path: "views.*.label", In: SurfaceUI, Kind: KindText, Required: true, Doc: "The view's name, as navigation lists it. Required."},
 	{Path: "views.*.unit", In: SurfaceUI, Kind: KindText, Doc: "What one of the view's rows is, such as \"Pull request\", the unit column's heading; empty for a view whose rows mix kinds."},
+	{Path: "views.*.default_sort", In: SurfaceUI, Kind: KindText, Doc: "What the sort menu calls a row view's own order, such as \"Waiting longest\"."},
 	{Path: "views.*.search", In: SurfaceUI, Kind: KindTable, Doc: "A custom view's search: the queries it runs at a press, the terms it toggles and the orders it offers."},
 	{Path: "views.*.search.default_sort", In: SurfaceUI, Kind: KindText, Doc: "The order a query with none is read in."},
 	{Path: "views.*.search.presets[]", In: SurfaceUI, Kind: KindTable, Doc: "A query run at a press."},

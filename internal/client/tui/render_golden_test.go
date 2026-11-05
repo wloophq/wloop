@@ -76,6 +76,21 @@ func viewsGolden(t *testing.T, color bool, view string) *Model {
 	return m
 }
 
+// groupedGolden is a Needs me view whose tasks a person grouped by State with
+// the group key.
+func groupedGolden(t *testing.T, color bool) *Model {
+	m := newModel(t)
+	c := viewsCatalog()
+	c.Views = []api.TaskViewSpec{{ID: "needs-me", Label: "Needs me"}}
+	m.SetViews(c)
+	m.SetTasks("needs-me", []api.TaskView{task("e1", "Reply on the batch export review", "next", "computer"), task("e2", "Deploy window tonight?", "inbox"),
+		waitingOn(task("e3", "Contract signature", "waiting"), "bob"), task("e4", "Call the bank", "next", "calls"), task("e5", "Buy cables", "inbox")},
+		api.Counters{Views: map[string]int{"needs-me": 5}})
+	m.SetColor(color)
+	press(m, Key{Rune: '='}, Key{Rune: '='})
+	return m
+}
+
 // draftsGolden is Focus with its task's detail open, listing the drafts
 // made for it, the first one picked.
 func draftsGolden(t *testing.T, color bool) *Model {
@@ -112,6 +127,7 @@ func TestRenderGolden(t *testing.T) {
 		models["views-"+v] = func(t *testing.T, color bool) *Model { return viewsGolden(t, color, v) }
 	}
 	models["views-review"] = func(t *testing.T, color bool) *Model { return reviewModel(t, color) }
+	models["views-needs-me-grouped"] = groupedGolden
 	models["views-drafts"] = draftsGolden
 	models["plan"] = planGolden
 	for prefix, model := range models {

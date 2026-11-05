@@ -115,7 +115,7 @@ func (d Deriver) UntrackedRow(c dgh.Candidate, o dinv.Override) api.Row {
 	if f.Mine {
 		author = []string{"me", c.Author}
 	}
-	r.Facets = map[string][]string{FacetRepo: {p.Repo}, FacetAuthor: author, FacetStatus: {"none"}, FacetCI: {"none"}}
+	r.Facets = map[string][]string{FacetWhere: {p.Repo}, FacetAuthor: author, FacetStatus: {"none"}, FacetCI: {"none"}}
 	return d.Seal(r, p)
 }
 

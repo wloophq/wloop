@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/brand/brandtest"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 func appJS(t *testing.T) string {
@@ -124,7 +125,7 @@ func filterPrelude(t *testing.T) string {
 
 var queryFuncs = []string{"fold", "tokens", "unquote", "terms", "fieldById", "normValue", "qualifierOf", "qualifiers"}
 
-var filterFuncs = append(slices.Clone(queryFuncs), "haystack", "matches", "foldMap", "marked", "rowByURL")
+var filterFuncs = append(slices.Clone(queryFuncs), "rowTexts", "rowKindLabel", "kindLabel", "haystack", "matches", "foldMap", "marked", "rowByURL")
 
 func TestFilterFoldsAndMarks(t *testing.T) {
 	cases := [][2]string{
@@ -165,7 +166,7 @@ func TestFilterMatchesEveryTermAndAPastedLinkFindsItsRow(t *testing.T) {
 		Matches []bool   `json:"matches"`
 		Keys    []string `json:"keys"`
 	}
-	pull := wireRow("me", time.Now(), map[string]any{"title": "Batch export", "label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "repo": "acme/api", "author": "ana", "head": "ana/batch-x", "waiting_on": "bob"})
+	pull := wireRow("me", time.Now(), map[string]any{"title": "Batch export", "label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "repo": "acme/api", "author": "ana", "search": []string{"ana/batch-x"}, "waiting_on": "bob"})
 	pull["link"] = "https://github.com/acme/api/pull/7"
 	issue := map[string]any{"unit": map[string]any{"provider": "linear", "key": "PAY-88"}, "label": "PAY-88", "title": "Retry budget", "link": "https://linear.app/acme/issue/PAY-88"}
 	in := map[string]any{
@@ -345,9 +346,9 @@ func TestRowsShowTheBriefSizeRiskAndQuestions(t *testing.T) {
 	}
 }
 
-func TestTheFilterFindsTheBriefGoal(t *testing.T) {
+func TestTheFilterFindsARowsSearchTexts(t *testing.T) {
 	var got []bool
-	row := wireRow("me", time.Now(), map[string]any{"title": "Batch export", "label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "brief": map[string]any{"goal": "Retry the webhook delivery"}})
+	row := wireRow("me", time.Now(), map[string]any{"title": "Batch export", "label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "search": []string{"Retry the webhook delivery"}})
 	nodeRun(t, filterPrelude(t), filterFuncs,
 		`process.stdout.write(JSON.stringify(["webhook", "batch delivery", "zebra"].map((q) => matches(input, terms(q)))));`, row, &got)
 	if !slices.Equal(got, []bool{true, true, false}) {
@@ -429,21 +430,29 @@ func TestACopiedListIsYAMLAnAgentCanRead(t *testing.T) {
 			"override":  map[string]any{"hold": true},
 		}),
 	}
+	in["task"] = map[string]any{"task": task("t-1", "next", func(e *api.TaskView) {
+		e.Title, e.Units, e.UnitLabels = "Answer the deploy question", []unit.Unit{{Provider: "slack", Key: "T1/C1/1"}}, []string{"#general thread"}
+		e.Facets = map[string][]string{"where": {"general"}, "source": {"slack"}, "asked-by": {}}
+	})}
 	var got string
-	prelude := keyJS(t) + catalogPrelude(t) + `const state = { health: { viewer: "carol" } };`
-	nodeRun(t, prelude, []string{"isSet", "resolveWho", "waitingLabel", "isMuted", "yamlString", "listYAML"},
-		`process.stdout.write(JSON.stringify(listYAML(input.meta, input.rows)));`, in, &got)
+	in["linked"] = map[string]any{"unit": map[string]any{"provider": "slack", "key": "T1/C1/1"}, "link": "https://acme.slack.com/archives/C1/p1"}
+	prelude := keyJS(t) + catalogPrelude(t) + `const state = { health: { viewer: "carol" }, rows: [input.linked] };`
+	nodeRun(t, prelude, []string{"yamlString", "listYAML", "copyEntry", "rowByKey", "isSet"},
+		`process.stdout.write(JSON.stringify(listYAML(input.meta, [...input.rows, input.task])));`, in, &got)
 	for _, want := range []string{
-		`view: "needs-me"`, `filter: "widgets \"x\""`, `copied_at: "2026-10-15T13:00:00Z"`, "count: 1", "pull_requests:",
+		`view: "needs-me"`, `filter: "widgets \"x\""`, `copied_at: "2026-10-15T13:00:00Z"`, "count: 2", "items:",
 		`  - ref: "acme/widgets#4870"`, `    url: "https://github.com/acme/widgets/pull/4870"`,
-		`    title: "perf: one \"conn\"\nper batch"`, `    situation: "merge conflicts"`, `    waiting_on: "me"`,
-		`    since: "2026-10-13T13:00:00Z"`, "    stalled: true", `    reason: "merge conflicts with develop"`,
-		`    head: "fix/x"`, `    workspace: "fix-x (in-progress)"`, `    in_scope_as: ["author"]`,
-		`    brief: {size: "m", risk: "high", open_questions: 2, goal: "Run batches on one connection."}`, `    flags: ["paused"]`,
+		`    title: "perf: one \"conn\"\nper batch"`, `    author: ["me", "carol"]`, `    kind: ["conflicts"]`, `    risk: ["high"]`,
+		`    size: ["m"]`, `    status: ["in-progress"]`, `    wait: ["me"]`,
+		`    since: "2026-10-13T13:00:00Z"`, `    reason: "merge conflicts with develop"`,
+		`  - ref: "t-1"`, `    url: "https://acme.slack.com/archives/C1/p1"`, `    title: "Answer the deploy question"`, `    units: ["#general thread"]`, `    source: ["slack"]`, `    where: ["general"]`,
 	} {
 		if !strings.Contains(got, want+"\n") {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
+	}
+	if strings.Contains(got, "asked-by") || strings.Index(got, "    author:") > strings.Index(got, "    wait:") {
+		t.Errorf("facets not by id, or an empty one listed:\n%s", got)
 	}
 }
 
@@ -481,14 +490,14 @@ func TestAQueryHoldsFreeTermsAndQualifiers(t *testing.T) {
 		Quals  [][]map[string]any `json:"quals"`
 	}
 	qs := []string{
-		`repo:acme/widgets wait:me fix`,
+		`where:acme/widgets wait:me fix`,
 		`status:"needs me" -risk:high "two words"`,
 		`fix: https://github.com/acme/api/pull/7 is:pr author:@me AUTHOR:Ana`,
-		`Repo:Widgets -waits-on:team:acme/search unknown:x`,
+		`Where:Widgets -waits-on:team:acme/search unknown:x`,
 	}
 	nodeRun(t, filterPrelude(t), queryFuncs, `process.stdout.write(JSON.stringify({
   tokens: input.map(tokens),
-  terms: input.map(terms),
+  terms: input.map((q) => terms(q)),
   quals: input.map((q) => qualifiers(q).map(({ field, value, raw, neg }) => ({ field, value, raw, neg }))),
 }));`, qs, &got)
 	wantTerms := [][]string{{"fix"}, {"two words"}, {"fix:", "https://github.com/acme/api/pull/7"}, {"unknown:x"}}
@@ -499,10 +508,10 @@ func TestAQueryHoldsFreeTermsAndQualifiers(t *testing.T) {
 		return map[string]any{"field": field, "value": value, "raw": raw, "neg": neg}
 	}
 	wantQuals := [][]map[string]any{
-		{q("repo", "acme/widgets", "acme/widgets", false), q("wait", "me", "me", false)},
+		{q("where", "acme/widgets", "acme/widgets", false), q("wait", "me", "me", false)},
 		{q("status", "needs me", "needs me", false), q("risk", "high", "high", true)},
 		{q("is", "pr", "pr", false), q("author", "me", "@me", false), q("author", "ana", "Ana", false)},
-		{q("repo", "widgets", "Widgets", false), q("waits-on", "team:acme/search", "team:acme/search", true)},
+		{q("where", "widgets", "Widgets", false), q("waits-on", "team:acme/search", "team:acme/search", true)},
 	}
 	if !reflect.DeepEqual(got.Quals, wantQuals) {
 		t.Errorf("qualifiers\n%v\nwant\n%v", got.Quals, wantQuals)
@@ -515,31 +524,32 @@ func TestAQueryHoldsFreeTermsAndQualifiers(t *testing.T) {
 func TestAFacetTogglesItsQualifier(t *testing.T) {
 	var got []string
 	nodeRun(t, filterPrelude(t), append(slices.Clone(queryFuncs), "qualifierToken", "toggledQualifier", "withoutQualifiers"), `process.stdout.write(JSON.stringify([
-  toggledQualifier("fix", "repo", "acme/widgets", false),
-  toggledQualifier("fix repo:acme/widgets", "repo", "Acme/Widgets", false),
-  toggledQualifier("repo:a", "repo", "b", false),
-  toggledQualifier("repo:a", "repo", "a", true),
-  toggledQualifier("-repo:a", "repo", "a", false),
+  toggledQualifier("fix", "where", "acme/widgets", false),
+  toggledQualifier("fix where:acme/widgets", "where", "Acme/Widgets", false),
+  toggledQualifier("where:a", "where", "b", false),
+  toggledQualifier("where:a", "where", "a", true),
+  toggledQualifier("-where:a", "where", "a", false),
   toggledQualifier("author:@me", "author", "me", false),
   toggledQualifier("", "status", "needs me", false),
   toggledQualifier('status:"needs me"', "status", "needs me", false),
-  withoutQualifiers("repo:a fix -repo:b repo:c wait:me", "repo", false),
+  withoutQualifiers("where:a fix -where:b where:c wait:me", "where", false),
 ]));`, nil, &got)
-	want := []string{"fix repo:acme/widgets", "fix", "repo:a repo:b", "-repo:a", "repo:a", "", `status:"needs me"`, "", "fix -repo:b wait:me"}
+	want := []string{"fix where:acme/widgets", "fix", "where:a where:b", "-where:a", "where:a", "", `status:"needs me"`, "", "fix -where:b wait:me"}
 	if !slices.Equal(got, want) {
 		t.Errorf("got  %q\nwant %q", got, want)
 	}
 }
 
 // lensFuncs are what pipeline runs, with what the fields call.
-var lensFuncs = append(slices.Clone(queryFuncs), "haystack", "matches", "inView", "isSet", "isMuted", "isMine", "resolveWho", "waitingWho", "waitingLabel",
-	"waitCat", "waitClass", "isStalled", "rowFlags", "upcoming", "sinceTime", "rowValues", "rowKey", "filtersOf", "passesFilters", "passes", "parseSort",
-	"tagKeyField", "groupField", "effectiveGroup", "cmp", "byDefault", "keyRank", "keyOrder", "compareRows", "groupLabel", "groupRows", "pipeline")
+var lensFuncs = append(slices.Clone(queryFuncs), "rowTexts", "rowKindLabel", "kindLabel", "haystack", "matches", "inView", "isSet", "isMuted", "isMine", "resolveWho", "waitingWho", "waitingLabel",
+	"waitCat", "waitClass", "isStalled", "rowFlags", "upcoming", "sinceTime", "itemValues", "itemKey", "filtersOf", "passesFilters", "passes", "parseSort",
+	"lensWords", "fillWord", "tagKeyField", "groupField", "effectiveGroup", "cmp", "byDefault", "keyRank", "keyOrder", "compareItems", "groupLabel", "groupItems", "pipelineOf", "pipeline")
 
 func lensPrelude(t *testing.T) string {
 	src := appJS(t)
-	return filterPrelude(t) + jsConst(t, src, "SIZES") + jsConst(t, src, "RISKS") + jsConst(t, src, "rowValuesCache") + `const state = { health: { viewer: "me" } };
-const roundGate = (r) => r.round_gate;` + "\n"
+	return filterPrelude(t) + jsConst(t, src, "NO_GROUP") + jsConst(t, src, "SIZES") + jsConst(t, src, "RISKS") + jsConst(t, src, "itemValuesCache") + `const state = { health: { viewer: "me" } };
+const roundGate = (r) => r.round_gate;
+globalThis.tasksState = { catalog: { lens: ` + mustJS(t, servedViews(t).Lens) + ` } };` + "\n"
 }
 
 func TestWaitCatIsTheStripAndAgreesWithTheLabel(t *testing.T) {
@@ -600,6 +610,17 @@ func lensRows() []map[string]any {
 	}
 }
 
+func TestWhereFiltersBySuffix(t *testing.T) {
+	var got []int
+	nodeRun(t, lensPrelude(t), lensFuncs, `const rows = `+mustJS(t, wireRows("me", time.Now(), lensRows()...))+`;
+const q = input.q;
+const lens = { view: "needs-me", q, ts: terms(q), quals: qualifiers(q), filters: filtersOf(qualifiers(q)), group: "", sort: "", layout: "" };
+process.stdout.write(JSON.stringify(pipeline(rows, lens).groups.flatMap((g) => g.rows.map((x) => x.ref.number)).sort()));`, map[string]any{"q": "where:widgets"}, &got)
+	if want := []int{3, 4}; !slices.Equal(got, want) {
+		t.Errorf("where:widgets keeps %v, want the acme/widgets rows %v", got, want)
+	}
+}
+
 func TestPipelineFiltersSortsAndGroups(t *testing.T) {
 	type res struct {
 		Total  int `json:"total"`
@@ -613,10 +634,10 @@ func TestPipelineFiltersSortsAndGroups(t *testing.T) {
 	}
 	lenses := []map[string]any{
 		{"view": "needs-me", "q": ""},
-		{"view": "needs-me", "q": "repo:widgets"},
-		{"view": "needs-me", "q": "repo:widgets repo:acme/web"},
-		{"view": "needs-me", "q": "repo:acme/api wait:loop"},
-		{"view": "needs-me", "q": "author:@me"},
+		{"view": "needs-me", "q": "where:widgets"},
+		{"view": "needs-me", "q": "where:widgets where:acme/web"},
+		{"view": "needs-me", "q": "where:acme/api wait:loop"},
+		{"view": "needs-me", "q": "author:me"},
 		{"view": "needs-me", "q": "-risk:high risk:none risk:low"},
 		{"view": "needs-me", "q": "waits-on:me"},
 		{"view": "needs-me", "q": "is:stalled"},
@@ -624,7 +645,7 @@ func TestPipelineFiltersSortsAndGroups(t *testing.T) {
 		{"view": "needs-me", "q": "", "sort": "risk-desc"},
 		{"view": "needs-me", "q": "", "sort": "age-desc"},
 		{"view": "needs-me", "q": "", "group": "wait"},
-		{"view": "needs-me", "q": "", "group": "repo", "sort": "age"},
+		{"view": "needs-me", "q": "", "group": "where", "sort": "age"},
 		{"view": "needs-me", "q": "", "layout": "board"},
 		{"view": "needs-me", "q": "", "group": "size"},
 	}
@@ -696,9 +717,9 @@ func mustJS(t *testing.T, v any) string {
 func TestACopiedListSaysHowItWasGroupedAndSorted(t *testing.T) {
 	var got string
 	prelude := keyJS(t) + catalogPrelude(t) + `const state = { health: { viewer: "me" } };`
-	nodeRun(t, prelude, []string{"isSet", "resolveWho", "waitingLabel", "isMuted", "yamlString", "listYAML"},
-		`process.stdout.write(JSON.stringify(listYAML({ view: "needs-me", filter: "repo:widgets", group_by: "repo", sort: "risk descending", at: "x" }, [])));`, nil, &got)
-	for _, want := range []string{`filter: "repo:widgets"`, `group_by: "repo"`, `sort: "risk descending"`, "count: 0"} {
+	nodeRun(t, prelude, []string{"yamlString", "listYAML", "copyEntry", "rowByKey", "isSet"},
+		`process.stdout.write(JSON.stringify(listYAML({ view: "needs-me", filter: "where:widgets", group_by: "where", sort: "risk descending", at: "x" }, [])));`, nil, &got)
+	for _, want := range []string{`filter: "where:widgets"`, `group_by: "where"`, `sort: "risk descending"`, "count: 0", "items:"} {
 		if !strings.Contains(got, want+"\n") {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}

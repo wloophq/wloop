@@ -179,18 +179,35 @@ func (d Deriver) Parts(rep Report, evs []dinv.Event, o dinv.Override) (api.Row, 
 	return r, p
 }
 
-// Seal fills the row's summary line and facets from p and encodes p as its
-// payload.
+// Seal fills the row's summary line, facets and search texts from p and
+// encodes p as its payload.
 func (d Deriver) Seal(r api.Row, p Payload) api.Row {
 	r.Summary.Closed = situation.Kind(r.Kind) == situation.KindDone
 	r.Summary.Line = summaryLine(r, p)
 	r.Facets = d.facetValues(r, p, r.Facets)
+	r.Search = searchTexts(p)
 	raw, err := json.Marshal(p)
 	if err != nil {
 		panic(fmt.Sprintf("prrow: encoding a payload: %v", err))
 	}
 	r.Payload = raw
 	return r
+}
+
+// searchTexts are the payload's texts a filter's free words search: the
+// head branch, the workspace's name, status and comment, the brief's goal.
+func searchTexts(p Payload) []string {
+	var out []string
+	texts := []string{p.Head, p.Workspace.DisplayName, p.Workspace.Status, p.Workspace.Comment}
+	if p.Brief != nil {
+		texts = append(texts, p.Brief.Goal)
+	}
+	for _, t := range texts {
+		if t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 // summaryLine is the short status the menu bar and the terminal list show.

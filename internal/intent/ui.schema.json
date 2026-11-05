@@ -117,6 +117,10 @@
         "additionalProperties": false,
         "description": "One view's words.",
         "properties": {
+          "default_sort": {
+            "description": "What the sort menu calls a row view's own order, such as \"Waiting longest\".",
+            "type": "string"
+          },
           "label": {
             "description": "The view's name, as navigation lists it. Required.",
             "type": "string"

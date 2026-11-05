@@ -536,11 +536,8 @@ func TestSlashFiltersTheViewAcrossFields(t *testing.T) {
 	m := newModel(t)
 	rs := rows()
 	rs[0].Title = "Résumé export in batches"
-	setPR(&rs[1], func(p *prView) {
-		p.Head = "carol/cache-warmup"
-		p.Brief = &api.BriefSummary{Size: "s", Risk: "low", Goal: "Retry the webhook delivery"}
-	})
-	setPR(&rs[0], func(p *prView) { p.Workspace = api.Workspace{DisplayName: "batch-ledger", Comment: "waiting on infra"} })
+	rs[1].Search = []string{"carol/cache-warmup", "Retry the webhook delivery"}
+	rs[0].Search = []string{"batch-ledger", "waiting on infra"}
 	m.SetData(rs, api.Health{})
 	for text, want := range map[string]int{"webhook": 8, "carol": 8, "resume export": 7, "acme/api#8": 8, "RÉSUMÉ": 7, "batch-ledger": 7, "infra": 7} {
 		filterBy(m, text)

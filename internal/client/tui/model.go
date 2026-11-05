@@ -9,9 +9,11 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/lens"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -92,11 +94,23 @@ type EditRequest struct {
 
 type Model struct {
 	view int
+	// facets are the fields a query of a task view names: the plugins' and the profile's, one by id.
+	facets    []api.FacetSpec
+	facetByID map[string]api.FacetSpec
+	// rowFacetByID are the fields a query of a row view names: the plugins' alone.
+	rowFacetByID map[string]api.FacetSpec
+	// picks are the group and sort a person chose, by list.
+	picks map[string]lensPick
+	// now is the time of the last render, which the lens buckets time facets by.
+	now time.Time
 	// views are the catalog's row views for the terminal; catalog names
 	// the kinds.
 	views   []View
 	catalog api.CatalogResponse
 	rows    []api.Row
+	// rowLens and taskItems are the lens items of rows and of each view's tasks, built when they arrive.
+	rowLens   []lens.Item
+	taskItems map[string][]lens.Item
 	// plans are the open plan gates with a deadline, by unit: the automatic
 	// rounds that wait on them.
 	plans  map[string]api.GateView
@@ -196,6 +210,7 @@ func (m *Model) Stay(why string) { m.quit, m.status = false, why }
 // still in the view, else the same place in the list.
 func (m *Model) SetData(rows []api.Row, h api.Health) {
 	m.rows, m.health, m.loaded, m.err = rows, h, true, ""
+	m.indexRows()
 	m.keepSelection()
 }
 
@@ -221,6 +236,8 @@ func (m *Model) roundGate(r api.Row) (api.GateView, bool) {
 func (m *Model) SetCatalog(c api.CatalogResponse) {
 	current := m.viewKey()
 	m.catalog, m.views = c, nil
+	m.refreshFacets()
+	m.indexRows()
 	for _, v := range c.ViewsOn(surface) {
 		if v.Rows {
 			m.views = append(m.views, View{ID: v.ID, Label: v.Label, Provider: v.Provider})
@@ -241,25 +258,31 @@ func (m *Model) SetSpecs(specs []api.ActionSpec) { m.specs = specs }
 // SetError keeps the last rows on screen while the daemon does not answer.
 func (m *Model) SetError(err error) { m.err = "daemon not answering: " + err.Error() }
 
-func (m *Model) in(id string) []api.Row {
-	var out []api.Row
-	q := string(m.filter)
-	for _, r := range m.rows {
-		if slices.Contains(r.Views, id) && Matches(r, q, m.kindLabel(r), prOf(r).haystack()...) {
-			out = append(out, r)
-		}
-	}
-	return out
+// in are the rows of view id the filter keeps, in the order the list shows
+// them, and beside each the head of the group it opens.
+func (m *Model) in(id string) ([]api.Row, []string) {
+	all, items := m.rowsOf(id)
+	order, heads := m.arrange(m.rowLensView(id, items), items)
+	return reorder(all, order), heads
 }
 
 func (m *Model) visible() []api.Row {
+	rows, _ := m.visibleRows()
+	return rows
+}
+
+// visibleRows are the rows of the row view on screen and the group heads.
+func (m *Model) visibleRows() ([]api.Row, []string) {
 	if m.view >= m.planView() || m.view >= len(m.views) {
-		return nil
+		return nil, nil
 	}
 	return m.in(m.views[m.view].ID)
 }
 
 func (m *Model) cursor(rows []api.Row) int {
+	if m.at >= 0 && m.at < len(rows) && rows[m.at].Unit == m.sel {
+		return m.at
+	}
 	if i := slices.IndexFunc(rows, func(r api.Row) bool { return r.Unit == m.sel }); i >= 0 {
 		return i
 	}
@@ -686,7 +709,8 @@ func (m *Model) jump() {
 	}
 	m.filter = nil
 	for i, v := range m.views {
-		for _, r := range m.in(v.ID) {
+		shown, _ := m.in(v.ID)
+		for _, r := range shown {
 			if links(r.Link, addr) {
 				m.view, m.sel = i, r.Unit
 				m.keepSelection()

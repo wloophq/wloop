@@ -4,11 +4,14 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/readmodel"
+	"github.com/wloophq/wloop/pkg/plugin/manifest"
 )
 
 // uiOf is what a plugin's clients show of it, from its manifest and its
@@ -49,4 +52,40 @@ func (e *Env) pluginUI(id unit.ProviderID) (*api.PluginUI, fs.FS) {
 		}
 	}
 	return ui, nil
+}
+
+// pluginFacets are the facets the compiled-in and the installed plugins' rows serve with the profile l,
+// merged as the read model merges them, for a check that reads no read model.
+func (e *Env) pluginFacets(l *intentload.Loaded) []api.FacetSpec {
+	catalogOf := func(id unit.ProviderID, s *manifest.Source) psource.Catalog {
+		return psource.Catalog{Source: s, Texts: func() intentload.UITexts { return l.UI[string(id)] }}
+	}
+	var ps []readmodel.Provider
+	for _, p := range plugins {
+		s, err := e.pluginSource(p.ID)
+		if err != nil {
+			continue
+		}
+		if p.CheckRows != nil {
+			ps = append(ps, p.CheckRows(catalogOf(p.ID, s), l))
+			continue
+		}
+		ps = append(ps, catalogRows{noRows{p.ID}, catalogOf(p.ID, s)})
+	}
+	for _, p := range e.plugins {
+		id := unit.ProviderID(p.ID())
+		if slices.ContainsFunc(plugins, func(c compiledPlugin) bool { return c.ID == id }) {
+			continue
+		}
+		if s, err := p.Manifest.Source(); err == nil {
+			ps = append(ps, catalogRows{noRows{id}, catalogOf(id, s)})
+		}
+	}
+	return readmodel.BuildCatalog(ps...).Facets
+}
+
+// catalogRows serve no rows and present a plugin's catalog.
+type catalogRows struct {
+	noRows
+	psource.Catalog
 }

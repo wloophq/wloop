@@ -94,27 +94,42 @@ type ViewSpec struct {
 	Surfaces []string `json:"surfaces"` // "web", "tui", "menubar"
 	// Unit names the view's rows, such as "Pull request"; "" for a view whose rows mix providers.
 	Unit string `json:"unit,omitempty"`
-	// UnitSort is the facet the unit column sorts by, such as "repo"; "" sorts by "repo".
-	UnitSort string `json:"unit_sort,omitempty"`
+	// DefaultSort is what the sort menu calls the view's own order.
+	DefaultSort string `json:"default_sort,omitempty"`
 	// Search is a custom view's search; nil for none.
 	Search *SearchSpec `json:"search,omitempty"`
 }
 
 type FacetSpec struct {
-	ID       string            `json:"id"` // "repo", "author", "kind", ...
-	Label    string            `json:"label"`
-	Provider string            `json:"provider"` // "" applies to every row
-	Group    bool              `json:"group"`
-	Sort     string            `json:"sort,omitempty"` // "", "rank", "text", "time" (RFC 3339 values)
-	Rank     []string          `json:"rank,omitempty"`
-	Labels   map[string]string `json:"labels,omitempty"` // value -> shown text
-	Empty    string            `json:"empty,omitempty"`
-	Match    string            `json:"match,omitempty"` // "exact" (default), "suffix" (repo), "prefix" (tag), "team"
-	Menu     bool              `json:"menu"`
-	Buckets  []Bucket          `json:"buckets,omitempty"` // Sort "time" only: the client buckets now - value
+	ID       string `json:"id"` // "repo", "author", "kind", ...
+	Label    string `json:"label"`
+	Provider string `json:"provider"` // "" applies to every row
+	// Fact is the task fact or record field a profile's task facet reads; "" for a plugin's facet.
+	Fact    string            `json:"fact,omitempty"`
+	Group   bool              `json:"group"`
+	Sort    string            `json:"sort,omitempty"` // "", "rank", "text", "time" (RFC 3339 values)
+	Rank    []string          `json:"rank,omitempty"`
+	Labels  map[string]string `json:"labels,omitempty"` // value -> shown text
+	Empty   string            `json:"empty,omitempty"`
+	Match   string            `json:"match,omitempty"` // "exact" (default), "suffix" (repo), "prefix" (tag), "team"
+	Menu    bool              `json:"menu"`
+	Buckets []Bucket          `json:"buckets,omitempty"` // Sort "time" only: the client buckets now - value
 	// Strip says each row's strip is colored by the facet's first value,
 	// its rank the strip's legend.
 	Strip bool `json:"strip,omitempty"`
+	// Providers are the providers a merged facet (Provider "") came from; never served.
+	Providers []string `json:"-"`
+}
+
+// Sources are the providers the facet comes from, none for a facet of the profile.
+func (f FacetSpec) Sources() []string {
+	if len(f.Providers) > 0 {
+		return f.Providers
+	}
+	if f.Provider != "" {
+		return []string{f.Provider}
+	}
+	return nil
 }
 
 type Bucket struct {

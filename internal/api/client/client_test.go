@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -321,5 +323,22 @@ func TestViewsRouteServesTheCatalog(t *testing.T) {
 	res, err := c.TaskDo(ctx, "t-1", "done", api.TaskRequest{Source: "cli"})
 	if err != nil || res.Task.State != "done" {
 		t.Fatalf("result %+v %v", res, err)
+	}
+}
+
+func TestTasksSinceNamesTheMovedUnits(t *testing.T) {
+	asked := make(chan url.Values, 1)
+	socket := serve(t, func(w http.ResponseWriter, r *http.Request) {
+		asked <- r.URL.Query()
+		fmt.Fprint(w, `{"epoch":"e","rev":3,"full":false,"tasks":[],"removed":[]}`)
+	})
+	units := []unit.Unit{{Provider: unit.GitHub, Key: "acme/api#12"}, {Provider: "slack", Key: "T1/C1/1"}}
+	if _, err := New(socket).TasksSince(context.Background(), TaskQuery{View: "inbox", Units: units}, api.Since{Epoch: "e", Rev: 2}); err != nil {
+		t.Fatal(err)
+	}
+	q := <-asked
+	got, err := api.ParseUnits(q[api.TasksUnits])
+	if err != nil || !slices.Equal(got, units) || q.Get("since") != "e:2" {
+		t.Fatalf("asked %v: units %v %v", q, got, err)
 	}
 }

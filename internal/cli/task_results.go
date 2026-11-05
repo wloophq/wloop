@@ -97,9 +97,9 @@ func (e *Env) newTaskResults(g *coretasks.Service, mods []pluginModule) taskResu
 	return taskResults{tasks: g, units: unit.NewRegistry(codecs...), intents: func() *dintent.Registry { return e.loadedIntents().Registry }}
 }
 
-// unitsRepo is the repository of a unit: its placement override's, else the one the placement rules give it,
+// unitsPlacement is the repository of a unit: its placement override's, else the one the placement rules give it,
 // else the repo fact of its plugin's facts; "" when none names one.
-func unitsRepo(mods []pluginModule, cfg func() config.Config, overrides placement.Overrides) func(ctx context.Context, u unit.Unit) (string, error) {
+func unitsPlacement(mods []pluginModule, cfg func() config.Config, overrides placement.Overrides) func(ctx context.Context, u unit.Unit) (string, error) {
 	return func(ctx context.Context, u unit.Unit) (string, error) {
 		if overrides != nil {
 			p, ok, err := override(ctx, overrides, u)

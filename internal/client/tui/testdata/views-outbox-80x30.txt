@@ -27,4 +27,4 @@ Reply in the release thread
 
 
 warning: app: notifications are off
-a approve  Backspace dismiss  ↑↓ move  g view  / filter  ? keys  q quit
+a approve  Backspace dismiss  ↑↓ move  g view  / filter  = group  ? keys  q quit

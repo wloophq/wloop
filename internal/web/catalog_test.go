@@ -36,9 +36,9 @@ func TestTimeFacetsBucketOnTheClient(t *testing.T) {
 		"facets": map[string][]string{"opened": {iso(t0.Add(-20 * time.Hour))}, "age": {iso(t0.Add(-2 * time.Hour))},
 			"due": {iso(t0.Add(30 * time.Hour))}, "is": {"needs-me"}}}
 	var got []map[string][]string
-	nodeRun(t, keyJS(t)+catalogPrelude(t)+jsConst(t, appJS(t), "rowValuesCache"), []string{"fold", "fieldById", "rowValues", "rowKey"}, `
+	nodeRun(t, keyJS(t)+catalogPrelude(t)+jsConst(t, appJS(t), "itemValuesCache"), []string{"fold", "fieldById", "itemValues", "itemKey"}, `
 const r = input.row;
-const at = (ms) => { Date.now = () => ms; return Object.fromEntries(["opened", "age", "due", "is"].map((id) => [id, rowValues(fieldById(id), r)])); };
+const at = (ms) => { Date.now = () => ms; return Object.fromEntries(["opened", "age", "due", "is"].map((id) => [id, itemValues(fieldById(id), r)])); };
 process.stdout.write(JSON.stringify([at(input.t0), at(input.t0 + 2 * 86400000)]));`,
 		map[string]any{"row": row, "t0": t0.UnixMilli()}, &got)
 	want := []map[string][]string{
@@ -50,9 +50,9 @@ process.stdout.write(JSON.stringify([at(input.t0), at(input.t0 + 2 * 86400000)])
 	}
 	row["facets"].(map[string][]string)["due"] = []string{iso(t0.Add(day + 6*time.Hour))}
 	got = nil
-	nodeRun(t, keyJS(t)+catalogPrelude(t)+jsConst(t, appJS(t), "rowValuesCache"), []string{"fold", "fieldById", "rowValues", "rowKey"}, `
+	nodeRun(t, keyJS(t)+catalogPrelude(t)+jsConst(t, appJS(t), "itemValuesCache"), []string{"fold", "fieldById", "itemValues", "itemKey"}, `
 const r = input.row;
-const at = (ms) => { Date.now = () => ms; return { due: rowValues(fieldById("due"), r), is: rowValues(fieldById("is"), r) }; };
+const at = (ms) => { Date.now = () => ms; return { due: itemValues(fieldById("due"), r), is: itemValues(fieldById("is"), r) }; };
 process.stdout.write(JSON.stringify([at(input.t0), at(input.t0 + 86400000)]));`,
 		map[string]any{"row": row, "t0": t0.UnixMilli()}, &got)
 	want = []map[string][]string{{"due": {"later"}, "is": {"needs-me"}}, {"due": {"due"}, "is": {"needs-me", "due"}}}
@@ -227,7 +227,7 @@ func jsonEqual(t *testing.T, a, b []byte) bool {
 func TestDeepLinkViewSurvivesBeforeTheCatalog(t *testing.T) {
 	src := appJS(t)
 	prelude := jsConst(t, src, "catalog") + jsConst(t, src, "UNIT_KEY") + jsConst(t, src, "QUERY_MAX") +
-		noPlugins + "const location = { hash: \"#view=stalled&q=x\" };\nconst groupField = () => null;\nconst parseSort = () => ({ field: \"\" });\n" + viewsScripts(t)
+		noPlugins + "const location = { hash: \"#view=stalled&q=x\" };\n" + viewsScripts(t)
 	var got struct{ Before, Unknown, After, Missing string }
 	nodeRun(t, prelude, []string{"readHash"}, `
 const before = readHash().view;

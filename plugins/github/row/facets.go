@@ -10,7 +10,7 @@ import (
 // the facets that read its own state or the row's situation after its
 // overlays.
 const (
-	FacetRepo   = "repo"
+	FacetWhere  = "where"
 	FacetAuthor = "author"
 	FacetStatus = "status"
 	FacetCI     = "ci"
@@ -28,7 +28,7 @@ func (r Row) facets() map[string][]string {
 	}
 	ci := []string{or(strings.ToLower(p.Facts.Checks.State), "none")}
 	out := map[string][]string{
-		FacetRepo:   {p.Repo},
+		FacetWhere:  {p.Repo},
 		FacetAuthor: author,
 		FacetStatus: {or(p.Workspace.Status, "none")},
 		FacetCI:     append(ci, p.Facts.Checks.Failing...),

@@ -23,7 +23,7 @@ const lens = (q, group) => ({ view: "needs-me", q, ts: terms(q), quals: qualifie
 const r = pipeline(rows, lens("", "tag:lang"));
 process.stdout.write(JSON.stringify({
   groups: r.groups.map((g) => g.key + "(" + g.label + ")=" + g.rows.map((x) => x.ref.number).join(",")),
-  only: r.groups.map(groupQualifier),
+  only: r.groups.map((g) => groupQualifier(g)),
   shown: pipeline(rows, lens("tag:lang:none", "")).groups[0].rows.map((x) => x.ref.number),
 }));`, nil, &got)
 	if want := []string{"lang:go(lang:go)=2", "lang:none(lang:none)=1", "none(no lang)=3"}; !slices.Equal(got.Groups, want) {
@@ -81,7 +81,7 @@ state.openSlot = copies[1][0];
 const open = [openSlot("github:acme/web#2"), openSlot("github:acme/web#20"), openSlot("github:acme/api#2")];
 state.revealed = "";
 revealOpenRow("github:acme/web#2");
-process.stdout.write(JSON.stringify({ copies, plain, cards, open, asked, multi: [multiCopy("tag:lang"), multiCopy("repo")] }));`, wireRow("me", time.Now(), row), &got)
+process.stdout.write(JSON.stringify({ copies, plain, cards, open, asked, multi: [multiCopy("tag:lang"), multiCopy("where")] }));`, wireRow("me", time.Now(), row), &got)
 	if !slices.Equal(got.Multi, []bool{true, false}) {
 		t.Errorf("multi copy %v", got.Multi)
 	}

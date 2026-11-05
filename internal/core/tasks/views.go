@@ -390,17 +390,18 @@ func (s *Service) Counts(ctx context.Context, area string) (task.Counters, error
 	return s.CountsWhere(ctx, area, nil)
 }
 
-// CountsWhere is Counts over the tasks keep holds, every task when nil: each view, area and context counts only
-// the tasks of its list that keep takes, so a client's filter narrows the counters as it narrows the lists.
-func (s *Service) CountsWhere(ctx context.Context, area string, keep func(task.Task) (bool, error)) (task.Counters, error) {
-	all, err := s.d.Store.Tasks(ctx, task.Query{All: true})
+// CountsWhere is Counts over the tasks keep takes, every task when keep is nil. Each view, area and context
+// counts only the tasks of its list that keep takes, so a client's filter narrows the counters as it narrows
+// the lists; keep reads a task inside the pass its ctx carries.
+func (s *Service) CountsWhere(ctx context.Context, area string, keep func(context.Context, task.Task) (bool, error)) (task.Counters, error) {
+	n, err := s.Snapshot(ctx)
 	if err != nil {
 		return task.Counters{}, err
 	}
-	return s.counts(WithPass(ctx, &Pass{Tasks: all}), area, all, keep)
+	return s.counts(WithPass(ctx, n.pass), area, n.pass.Tasks, keep)
 }
 
-func (s *Service) counts(ctx context.Context, area string, all []task.Task, keep func(task.Task) (bool, error)) (task.Counters, error) {
+func (s *Service) counts(ctx context.Context, area string, all []task.Task, keep func(context.Context, task.Task) (bool, error)) (task.Counters, error) {
 	kept := map[task.ID]bool{}
 	keeps := func(e task.Task) (bool, error) {
 		if keep == nil {
@@ -409,7 +410,7 @@ func (s *Service) counts(ctx context.Context, area string, all []task.Task, keep
 		k, seen := kept[e.ID]
 		if !seen {
 			var err error
-			if k, err = keep(e); err != nil {
+			if k, err = keep(ctx, e); err != nil {
 				return false, err
 			}
 			kept[e.ID] = k
@@ -471,9 +472,9 @@ func (s *Service) counts(ctx context.Context, area string, all []task.Task, keep
 }
 
 // TasksSince is q's page after since with the counters of q's area. A paged view's page from the same epoch
-// lists the tasks written after since that are in the view, and removes those written that are not; any other
-// view's page is Full, at the store's position.
-func (s *Service) TasksSince(ctx context.Context, q task.Query, since Since) (Page, error) {
+// lists the tasks written after since and the tasks holding one of units that are in the view, and removes
+// those that are not; any other view's page is Full, at the store's position.
+func (s *Service) TasksSince(ctx context.Context, q task.Query, since Since, units []unit.Unit) (Page, error) {
 	spec, err := s.spec(q.View)
 	if err != nil {
 		return Page{}, err
@@ -488,7 +489,8 @@ func (s *Service) TasksSince(ctx context.Context, q task.Query, since Since) (Pa
 			return Page{}, err
 		}
 	}
-	ctx = WithPass(ctx, &Pass{Tasks: all})
+	pass := &Pass{Tasks: all}
+	ctx = WithPass(ctx, pass)
 	switch {
 	case spec.Over != task.OverTasks:
 		p.Full, p.Removed = true, nil
@@ -497,13 +499,80 @@ func (s *Service) TasksSince(ctx context.Context, q task.Query, since Since) (Pa
 		p.Full, p.Removed = true, nil
 		p.Tasks, err = s.list(ctx, spec, q, all)
 	default:
-		p.Tasks, p.Removed, err = s.delta(ctx, spec, q, p.Tasks)
+		p.Tasks, p.Removed, err = s.delta(ctx, spec, q, withHolding(p.Tasks, all, units))
 	}
 	if err != nil {
 		return Page{}, err
 	}
 	p.Counters, err = s.counts(ctx, q.Area, all, nil)
+	p.Pass = pass
 	return p, err
+}
+
+// withHolding is changed and the tasks of all that hold one of units, each once.
+func withHolding(changed, all []task.Task, units []unit.Unit) []task.Task {
+	if len(units) == 0 {
+		return changed
+	}
+	moved := map[unit.Unit]bool{}
+	for _, u := range units {
+		moved[u] = true
+	}
+	out := slices.Clone(changed)
+	listed := map[task.ID]bool{}
+	for _, e := range changed {
+		listed[e.ID] = true
+	}
+	for _, e := range all {
+		if !listed[e.ID] && holdsAny(e, moved) {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// holdsAny says whether e holds one of units: its own unit, one of its units or an item's.
+func holdsAny(e task.Task, units map[unit.Unit]bool) bool {
+	if units[task.UnitOf(e.ID)] {
+		return true
+	}
+	for _, u := range e.Units {
+		if units[u] {
+			return true
+		}
+	}
+	for _, it := range e.Items {
+		if units[it.Unit] {
+			return true
+		}
+	}
+	return false
+}
+
+// Snapshot is the stored tasks read once, for the calls that must agree on them, such as the tasks feed's
+// publish of the units they hold and the counters.
+type Snapshot struct {
+	s    *Service
+	pass *Pass
+}
+
+// Snapshot reads every stored task, whatever its category.
+func (s *Service) Snapshot(ctx context.Context) (Snapshot, error) {
+	all, err := s.d.Store.Tasks(ctx, task.Query{All: true})
+	if err != nil {
+		return Snapshot{}, err
+	}
+	return Snapshot{s: s, pass: &Pass{Tasks: all}}, nil
+}
+
+// Held are those of units a task of n holds, as its own or an item's, in their order.
+func (n Snapshot) Held(units []unit.Unit) []unit.Unit {
+	return slices.DeleteFunc(slices.Clone(units), func(u unit.Unit) bool { return !n.pass.Holds(u) })
+}
+
+// Counts are the counters of the profile's views over area, over the tasks of n.
+func (n Snapshot) Counts(ctx context.Context, area string) (task.Counters, error) {
+	return n.s.counts(WithPass(ctx, n.pass), area, n.pass.Tasks, nil)
 }
 
 // delta splits the tasks written since a position into those in the paged view and the ids of those not.

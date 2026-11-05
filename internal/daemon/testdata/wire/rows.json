@@ -94,9 +94,6 @@
       "lane": [
         "loop"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "low"
       ],
@@ -115,6 +112,9 @@
       ],
       "wait": [
         "nobody"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "kind": "muted",
@@ -185,6 +185,12 @@
         "status": "reviewing"
       }
     },
+    "search": [
+      "REVIEW batch",
+      "reviewing",
+      "r2 held",
+      "Export in batches"
+    ],
     "specs_version": "d989fdf6b655",
     "summary": {
       "closed": false,
@@ -231,9 +237,6 @@
       "lane": [
         "author"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -251,6 +254,9 @@
       ],
       "wait": [
         "nobody"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "kind": "done",

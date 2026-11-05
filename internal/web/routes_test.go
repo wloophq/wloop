@@ -8,16 +8,16 @@ import (
 func routesPrelude(t *testing.T) string {
 	src := appJS(t)
 	var b strings.Builder
-	b.WriteString(catalogPrelude(t))
 	b.WriteString(noPlugins)
 	b.WriteString(`const location = { hash: "" }; const history = { replaceState: (_, __, h) => { location.hash = h; } };` + "\n")
 	b.WriteString(`const window = { addEventListener() {} };` + "\n")
 	b.WriteString(staticJS(t, "routes.js"))
 	b.WriteString(staticJS(t, "views.js"))
+	b.WriteString(taskLensJS(t))
 	for _, c := range []string{"UNIT_KEY", "QUERY_MAX"} {
 		b.WriteString(jsConst(t, src, c))
 	}
-	for _, f := range []string{"fieldById", "tagKeyField", "groupField", "parseSort", "readHash", "hashString"} {
+	for _, f := range []string{"fold", "readHash", "hashString"} {
 		b.WriteString(jsFunction(t, src, f))
 	}
 	return b.String()
@@ -42,7 +42,7 @@ const r = readHash();
 const box = { dataset: {}, hidden: true, replaceChildren() {}, contains: () => false };
 globalThis.document = { activeElement: null, body: { classList: { add() {} } } };
 const shown = renderTaskDetail(box, r);
-process.stdout.write(JSON.stringify({ View: r.view, Task: r.task, PR: r.pr, Detail: shown && !box.hidden, List: text(taskList(r, r.task)), Back: hashString({ ...r, task: "" }), Old: old }));`, viewsCatalog(), &got)
+process.stdout.write(JSON.stringify({ View: r.view, Task: r.task, PR: r.pr, Detail: shown && !box.hidden, List: text(taskListNodes(r, r.task)), Back: hashString({ ...r, task: "" }), Old: old }));`, viewsCatalog(), &got)
 	if got.View != "fits-now" || got.Task != "e-1" || got.PR != "" {
 		t.Errorf("#view=fits-now&task=e-1 reads view %q task %q unit %q", got.View, got.Task, got.PR)
 	}

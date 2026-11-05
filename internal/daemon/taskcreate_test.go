@@ -3,13 +3,18 @@ package daemon
 import (
 	"context"
 	"encoding/json"
+	"net/url"
+	"slices"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/domain/placement"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/readmodel"
 )
 
 func newCreateRig(t *testing.T, edit func(*Deps)) *tasksRig {
@@ -160,4 +165,26 @@ func TestTaskCreateParsesADateInTheDaemonsLocation(t *testing.T) {
 	if due := tk.Props["due"].Time; !due.Equal(time.Date(2026, 11, 2, 0, 0, 0, 0, zone)) {
 		t.Fatalf("due %v, want midnight of 2026-11-02 in the daemon's zone", due)
 	}
+}
+
+func TestAPlacementWriteResendsItsTask(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		r := newCreateRig(t, nil)
+		r.put(t, task.Task{ID: "t-own", State: "inbox", Category: task.CategoryInbox, Title: "Add retries"})
+		sub := r.follow(t)
+		first := r.page(t, "view=inbox")
+		own := task.UnitOf("t-own")
+		if err := r.s.deps.Placements.SetOverride(context.Background(), own, placement.Placement{Repo: "acme/api"}); err != nil {
+			t.Fatal(err)
+		}
+		c, ok := published(sub, readmodel.PokeQuiet+syncQuiet)
+		if !ok || c.Counters == nil || !slices.Contains(c.Units, own) {
+			t.Fatalf("the placement write published %+v (%v), want the task's unit with the counters", c, ok)
+		}
+		q := url.Values{"view": {"inbox"}, "since": {tasksSince(first)}, "units": {own.String()}}
+		if got := r.page(t, q.Encode()); got.Full || !slices.Equal(taskIDs(got.Tasks), []string{"t-own"}) {
+			t.Fatalf("the page since the placement: full %v, tasks %v", got.Full, taskIDs(got.Tasks))
+		}
+	})
 }

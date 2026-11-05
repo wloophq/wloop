@@ -309,22 +309,18 @@ func TestFacetsDoNotDependOnTheClock(t *testing.T) {
 
 func TestProviderFacetsStayWithTheirRows(t *testing.T) {
 	c := readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))}), fakesource.New().Rows())
-	i := slices.IndexFunc(c.Facets, func(f api.FacetSpec) bool { return f.ID == fakesource.FacetChannel })
-	if i < 0 || c.Facets[i].Provider != "thread" {
-		t.Fatalf("channel facet: %+v", c.Facets)
+	if n := len(slices.DeleteFunc(slices.Clone(c.Facets), func(f api.FacetSpec) bool { return f.ID != fakesource.FacetWhere || f.Provider != "" })); n != 1 {
+		t.Fatalf("where facet both plugins share, once: %+v", c.Facets)
 	}
 	for _, r := range deriveCases(t, fixtureNow) {
-		if _, ok := r.Facets[fakesource.FacetChannel]; ok {
-			t.Errorf("%s carries the thread facet", r.Label)
-		}
 		for id := range r.Facets {
-			if j := slices.IndexFunc(c.Facets, func(f api.FacetSpec) bool { return f.ID == id }); j < 0 || c.Facets[j].Provider != "github" {
+			if j := slices.IndexFunc(c.Facets, func(f api.FacetSpec) bool { return f.ID == id && (f.Provider == "github" || f.Provider == "") }); j < 0 {
 				t.Errorf("%s: facet %s is not GitHub's", r.Label, id)
 			}
 		}
 	}
 	thread := fakesource.Row(fakesource.Thread{Key: "C1/1.1", Channel: "general", Kind: fakesource.KindWaiting, WaitsOn: "me"})
-	if !slices.Equal(slices.Collect(maps.Keys(thread.Facets)), []string{fakesource.FacetChannel}) {
+	if !slices.Equal(slices.Collect(maps.Keys(thread.Facets)), []string{fakesource.FacetWhere}) {
 		t.Errorf("thread facets %v", thread.Facets)
 	}
 }

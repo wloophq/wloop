@@ -11,7 +11,7 @@
 <body>
 <header id="top">
   <span class="mark">{{name}}</span>
-  <input id="search" class="search" type="search" maxlength="200" autocomplete="off" spellcheck="false" aria-label="Filter the list" aria-keyshortcuts="/" placeholder="Filter: text, repo:, author:, wait:me, risk:high, tag:lang:go  ( / )" data-focus="top:search">
+  <input id="search" class="search" type="search" maxlength="200" autocomplete="off" spellcheck="false" aria-label="Filter the list" aria-keyshortcuts="/" placeholder="Filter: text, where:, author:, wait:me, risk:high, tag:lang:go  ( / )" data-focus="top:search">
   <span id="sync" class="sync">connecting</span>
   <span id="notice" class="notice" role="status" aria-live="polite"></span>
 </header>
@@ -40,18 +40,22 @@
     </section>
     <section id="plan" class="plan" aria-label="The workflows' plan" hidden></section>
     <section id="dash" class="dash" aria-label="Backlog dashboard" hidden></section>
-    <section id="tasks" class="tasks" hidden></section>
+    <section id="tasks" class="tasks" hidden>
+      <div id="tasks-head"></div>
+      <div id="task-tools" class="tools" role="toolbar" aria-label="Filter, group and sort the tasks" hidden></div>
+      <div id="tasks-body"></div>
+    </section>
     <details id="list-box" class="list-box" open>
       <summary id="list-sum" class="list-sum"></summary>
       <div id="tools" class="tools" role="toolbar" aria-label="Filter, group and sort" hidden></div>
       <table id="table">
         <thead>
           <tr>
-            <th scope="col" class="c-pr"><button type="button" class="th-sort" data-sort="repo" data-focus="th:repo" title="Sort by repo">Pull request</button></th>
+            <th scope="col" class="c-pr"><button type="button" class="th-sort" data-sort="where" data-focus="th:where" title="Sort by where">Pull request</button></th>
             <th scope="col" class="c-wait"><button type="button" class="th-sort" data-sort="wait" data-focus="th:wait" title="Sort by whom it waits on">Waiting on</button></th>
             <th scope="col" class="c-for"><button type="button" class="th-sort" data-sort="age" data-focus="th:age" title="Sort by how long it waits">For</button></th>
             <th scope="col" class="c-why"><button type="button" class="th-sort" data-sort="kind" data-focus="th:kind" title="Sort by situation">Why</button></th>
-            <th scope="col" class="c-where"><button type="button" class="th-sort" data-sort="status" data-focus="th:status" title="Sort by workspace column">Where</button></th>
+            <th scope="col" class="c-where"><button type="button" class="th-sort" data-sort="status" data-focus="th:status" title="Sort by workspace column">Workspace</button></th>
             <th scope="col" class="c-act"><span class="sr">Actions</span></th>
           </tr>
         </thead>

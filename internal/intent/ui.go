@@ -64,9 +64,10 @@ type UISearchSort struct {
 
 // UIView is a view's words.
 type UIView struct {
-	Label  string    `toml:"label"`
-	Unit   string    `toml:"unit"`
-	Search *UISearch `toml:"search"`
+	Label       string    `toml:"label"`
+	Unit        string    `toml:"unit"`
+	DefaultSort string    `toml:"default_sort"`
+	Search      *UISearch `toml:"search"`
 }
 
 // UIEvent is an event kind's words.
@@ -137,6 +138,9 @@ func mergeUI(into, over UITexts) UITexts {
 		}
 		if b.Unit != "" {
 			a.Unit = b.Unit
+		}
+		if b.DefaultSort != "" {
+			a.DefaultSort = b.DefaultSort
 		}
 		if b.Search != nil {
 			a.Search = b.Search

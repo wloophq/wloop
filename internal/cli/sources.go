@@ -9,7 +9,8 @@ import (
 
 // plugins are the compiled-in plugins; this is the only file that names
 // one.
-var plugins = []compiledPlugin{{ID: unit.GitHub, Name: "GitHub", Codec: bundledCodec(unit.GitHub), Build: githubHostModule},
+var plugins = []compiledPlugin{{ID: unit.GitHub, Name: "GitHub", Codec: bundledCodec(unit.GitHub), Build: githubHostModule,
+	CheckRows: githubCheckRows},
 	{ID: slackPlugin, Name: "Slack", Codec: bundledCodec(slackPlugin), Build: slackModule}}
 
 // bundledCodec is the codec bundled plugin id's manifest declares.

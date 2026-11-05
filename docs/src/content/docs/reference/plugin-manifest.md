@@ -192,7 +192,6 @@ every = "5m"
 | `rows` | bool | A list of rows filtered by a snapshot's views; otherwise a custom view served by View. |
 | `order` | integer | Its order among the views. |
 | `surfaces` | list of `web`, `tui`, `menubar` | Where it shows. |
-| `unit_sort` | string | The facet the unit column sorts by. |
 
 ## `[[source.ui.facets]]`
 

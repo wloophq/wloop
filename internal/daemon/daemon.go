@@ -401,15 +401,36 @@ type Server struct {
 	// heldStates are the states stored tasks hold that the profile does not declare, as of the last
 	// recategorize pass.
 	heldStates atomic.Pointer[[]string]
-	jobs       map[string]*job
-	token      string
-	warnings   *warnings
-	grace      time.Duration
-	hub        *hub
-	model      *readmodel.Model
-	modelOnce  sync.Once
-	viewer     viewerCache
-	app        *AppState
+	// facetCheck is the last facetProblems, for the profile and the catalog version it was computed on.
+	facetCheck struct {
+		sync.Mutex
+		loaded  *intentload.Loaded
+		version string
+		out     intentload.Problems
+	}
+	// viewsBuilt is the views catalog of loaded; rowsBuilt the read model's catalog under loaded.
+	viewsBuilt struct {
+		sync.Mutex
+		loaded *intentload.Loaded
+		cat    api.ViewsCatalog
+	}
+	rowsBuilt struct {
+		sync.Mutex
+		model  *readmodel.Model
+		loaded *intentload.Loaded
+		cat    api.CatalogResponse
+	}
+	jobs     map[string]*job
+	token    string
+	warnings *warnings
+	grace    time.Duration
+	hub      *hub
+	// moved holds the units of the row changes published, for the tasks feed.
+	moved     *rowMoves
+	model     *readmodel.Model
+	modelOnce sync.Once
+	viewer    viewerCache
+	app       *AppState
 	// presenters are the compiled-in plugins' presenters, built once.
 	presenters     map[unit.ProviderID]Presenter
 	presentersOnce sync.Once
@@ -420,7 +441,9 @@ type Server struct {
 	// pauseMu serializes every read-modify-write of the pause.
 	pauseMu sync.Mutex
 	// track reads a pull request before it is tracked; nil tracks unread.
-	track        func(ctx context.Context, u unit.Unit) (port.TrackRead, error)
+	track func(ctx context.Context, u unit.Unit) (port.TrackRead, error)
+	// readRows reads the rows of units in one snapshot; nil reads the read model's.
+	readRows     func(ctx context.Context, units []unit.Unit) (map[unit.Unit]readmodel.Read, error)
 	reconcile    reconcileState
 	homes        homeCache
 	mutesFailing atomic.Bool
@@ -480,7 +503,7 @@ func New(d Deps) *Server {
 	if d.GitAccess == nil && d.Meta != nil {
 		d.GitAccess = &GitAccessLog{Store: d.Meta}
 	}
-	s := &Server{deps: d, jobs: map[string]*job{}, token: rand.Text(), warnings: &warnings{}, grace: ShutdownGrace, hub: newHub(), app: d.App,
+	s := &Server{deps: d, jobs: map[string]*job{}, token: rand.Text(), warnings: &warnings{}, grace: ShutdownGrace, hub: newHub(), moved: newRowMoves(), app: d.App,
 		track:     d.Track,
 		reconcile: reconcileState{ready: make(chan struct{}), done: make(chan struct{}), wait: ReconcileWait}, sessionWait: cmp.Or(d.SessionWait, brief.SessionWait),
 		streamClock: wallClock{}, draftClock: wallClock{}}

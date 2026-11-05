@@ -283,7 +283,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	h.Warnings = append(h.Warnings, s.reconcileWarnings()...)
 	h.Warnings = append(h.Warnings, s.homeWarnings()...)
 	l := s.loaded()
-	if w := profileWarning(l, s.heldProblems(l)); w != "" {
+	if w := profileWarning(l, append(s.heldProblems(l), s.facetProblems(l)...)); w != "" {
 		h.Warnings = append(h.Warnings, w)
 	}
 	for _, src := range s.sourceHealth(r.Context()) {
@@ -532,6 +532,7 @@ func (s *Server) handleRows(w http.ResponseWriter, r *http.Request) {
 	}
 	page.Counters = s.counters(r.Context())
 	page.Loading = s.loading()
+	page.Catalog = s.rowsCatalog().Version
 	writeJSON(w, page)
 }
 

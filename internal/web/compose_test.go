@@ -67,7 +67,8 @@ func TestTheViewFilterMatchesTasksByTheirWords(t *testing.T) {
 	nodeRun(t, viewsPrelude(t), nil, `
 const out = {};
 for (const q of ["", "#ops", "dana", "souza review", "ACME/API", "\"retry\"", "nothing"]) {
-  out[q] = input.tasks.filter((e) => taskMatches(e, filterTerms(q))).map((e) => e.id);
+  const lens = lensOf({ view: "", q });
+  out[q] = input.tasks.filter((e) => matches(taskItemOf(e), lens.ts)).map((e) => e.id);
 }
 process.stdout.write(JSON.stringify(out));`, map[string]any{"tasks": es}, &got)
 	want := map[string][]string{"": {"e-1", "e-2", "e-3"}, "#ops": {"e-1"}, "dana": {"e-2"}, "souza review": {"e-2"}, "ACME/API": {"e-3"}, `"retry"`: {"e-2"}, "nothing": {}}
@@ -90,7 +91,7 @@ tasksState.catalog = input.cat;
 tasksState.key = viewQueryKey("inbox", "", []);
 tasksState.tasks = input.tasks;
 const out = [];
-for (const q of ["rollout", "zzz"]) out.push(text(taskList({ view: "inbox", area: "", ctx: [], q }, "")));
+for (const q of ["rollout", "zzz"]) out.push(text(taskListNodes({ view: "inbox", area: "", ctx: [], q }, "")));
 process.stdout.write(JSON.stringify({ Text: out }));`, map[string]any{"tasks": es, "cat": viewsCatalog()}, &got)
 	if !strings.Contains(got.Text[0], "Rollout date") || strings.Contains(got.Text[0], "Review the retry") {
 		t.Errorf("filtered list: %s", got.Text[0])

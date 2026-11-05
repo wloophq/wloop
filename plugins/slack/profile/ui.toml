@@ -4,12 +4,16 @@
 [views.slack]
 label = "Slack"
 unit = "Conversation"
+default_sort = "Waiting longest"
 
 [facets.conversation]
 label = "Conversation"
 
-[facets.channel]
-label = "Channel"
+[facets.where]
+label = "Where"
+
+[facets.waits-on]
+label = "Waits on (person)"
 
 [situations]
 waits_on_viewer = "waits on you"

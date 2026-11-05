@@ -105,9 +105,9 @@ func (o fixedOverrides) Override(_ context.Context, u unit.Unit) (placement.Plac
 
 func (fixedOverrides) SetOverride(context.Context, unit.Unit, placement.Placement) error { return nil }
 
-func TestATasksRepoIsItsPlacementOverride(t *testing.T) {
+func TestATasksPlacementIsItsPlacementOverride(t *testing.T) {
 	placed, bare := task.UnitOf("t-1"), task.UnitOf("t-2")
-	repo := unitsRepo(nil, config.Defaults, fixedOverrides{placed: {Repo: "acme/api"}})
+	repo := unitsPlacement(nil, config.Defaults, fixedOverrides{placed: {Repo: "acme/api"}})
 	for u, want := range map[unit.Unit]string{placed: "acme/api", bare: ""} {
 		if got, err := repo(context.Background(), u); err != nil || got != want {
 			t.Errorf("%s: repo %q, %v; want %q", u, got, err, want)

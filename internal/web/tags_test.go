@@ -12,7 +12,7 @@ import (
 
 func tagRows() []map[string]any {
 	rows := lensRows()
-	for i, tags := range [][]string{{"change:fix", "lang:go"}, {"lang:go", "lang:sql"}, nil, {"change:refac", "domain:billing"}, {"lang:python"}} {
+	for i, tags := range [][]string{{"change:fix", "lang:go", "urgent"}, {"lang:go", "lang:sql"}, nil, {"change:refac", "domain:billing"}, {"lang:python"}} {
 		if tags == nil {
 			continue
 		}
@@ -46,7 +46,7 @@ func TestTheTagQualifierAndGroupingByTagKey(t *testing.T) {
 		{"q": "tag:lang:go -tag:change:fix"},
 		{"q": "billing"},
 		{"q": "TAG:Lang:Go"},
-		{"q": "tag:lang repo:acme/api"},
+		{"q": "tag:lang where:acme/api"},
 		{"q": "", "group": "tag:lang"},
 		{"q": "", "group": "tag:domain"},
 	}
@@ -103,16 +103,17 @@ func TestTagKeysListTheKeysPresentAndATagChipTogglesItsQualifier(t *testing.T) {
 		GroupBy string   `json:"groupBy"`
 		Toggled []string `json:"toggled"`
 	}
-	nodeRun(t, fieldsPrelude(t), append(slices.Clone(queryFuncs), "tagKeyField", "groupField", "tagKeys", "qualifierToken", "toggledQualifier"), `process.stdout.write(JSON.stringify({
+	nodeRun(t, fieldsPrelude(t), append(slices.Clone(queryFuncs), "tagKeyField", "groupField", "tagKeys", "qualifierToken", "toggledQualifier", "lensWords", "fillWord"), `globalThis.tasksState = { catalog: { lens: { tag_key: "{{.label}} {{.key}}", tag_key_empty: "no {{.key}}" } } };
+process.stdout.write(JSON.stringify({
   keys: tagKeys(input),
-  fields: ["tag:lang", "tag", "tag:Lang", "tag:", "repo"].map((id) => { const f = groupField(id); return f ? [f.id, f.label, !!f.group] : null; }),
+  fields: ["tag:lang", "tag", "tag:Lang", "tag:", "where"].map((id) => { const f = groupField(id); return f ? [f.id, f.label, !!f.group] : null; }),
   groupBy: fieldById("tag").groupBy("lang:go"),
   toggled: [toggledQualifier("fix", "tag", "lang:go", false), toggledQualifier("tag:lang:go", "tag", "lang:go", false), toggledQualifier("tag:lang:go", "tag", "lang:go", true)],
 }));`, wireRows("me", time.Now(), tagRows()...), &got)
 	if !slices.Equal(got.Keys, []string{"change", "domain", "lang"}) {
 		t.Errorf("keys %v", got.Keys)
 	}
-	want := []any{[]any{"tag:lang", "Tag lang", true}, []any{"tag", "Tag", false}, nil, nil, []any{"repo", "Repo", true}}
+	want := []any{[]any{"tag:lang", "Tag lang", true}, []any{"tag", "Tag", false}, nil, nil, []any{"where", "Where", true}}
 	if !reflect.DeepEqual(got.Fields, want) {
 		t.Errorf("fields %v, want %v", got.Fields, want)
 	}
@@ -123,7 +124,7 @@ func TestTagKeysListTheKeysPresentAndATagChipTogglesItsQualifier(t *testing.T) {
 
 func TestMyPullRequestsStandOutAndTheStripExplainsItself(t *testing.T) {
 	src := appJS(t)
-	for _, want := range []string{`mine ? "mine" : ""`, `title: stripTitle(r)`, `mine ? mineMark() : null`, "stripLegend(),"} {
+	for _, want := range []string{`mine ? "mine" : ""`, `title: stripTitle(r)`, `mine ? mineMark() : null`, "stripLegend(offered),"} {
 		if !strings.Contains(src, want) {
 			t.Errorf("app.js lacks %s", want)
 		}

@@ -117,15 +117,15 @@ process.stdout.write(JSON.stringify({ Titles: chips.map((c) => c.attrs["aria-lab
 }
 
 func TestUnitColumnNamesTheViewsProvider(t *testing.T) {
-	views := []api.ViewSpec{{ID: "needs-me", Provider: "github", Rows: true, Unit: "Pull request", UnitSort: "repo"},
-		{ID: "all", Provider: "github", Rows: true}, {ID: "slack", Provider: "slack", Rows: true, Unit: "Conversation", UnitSort: "channel"}}
+	views := []api.ViewSpec{{ID: "needs-me", Provider: "github", Rows: true, Unit: "Pull request"},
+		{ID: "all", Provider: "github", Rows: true}, {ID: "slack", Provider: "slack", Rows: true, Unit: "Conversation"}}
 	var got []map[string]string
 	nodeRun(t, `const catalog = { views: [] };
-const fieldById = (id) => ({ repo: { label: "Repo" }, channel: { label: "Channel" } })[id];
+const fieldById = (id) => ({ where: { label: "Where" } })[id];
 `, []string{"unitColumn"}, `catalog.views = input.views;
 process.stdout.write(JSON.stringify(["needs-me", "slack", "all"].map(unitColumn)));`, map[string]any{"views": views}, &got)
-	want := []map[string]string{{"title": "Pull request", "sort": "repo", "sortTitle": "Sort by repo"},
-		{"title": "Conversation", "sort": "channel", "sortTitle": "Sort by channel"}, {"title": "Item", "sort": "repo", "sortTitle": "Sort by repo"}}
+	want := []map[string]string{{"title": "Pull request", "sort": "where", "sortTitle": "Sort by where"},
+		{"title": "Conversation", "sort": "where", "sortTitle": "Sort by where"}, {"title": "Item", "sort": "where", "sortTitle": "Sort by where"}}
 	if len(got) != 3 {
 		t.Fatalf("columns %v", got)
 	}

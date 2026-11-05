@@ -164,6 +164,16 @@ func TestLastHumanSkipsViewerAndBots(t *testing.T) {
 	}
 }
 
+func TestAPullRequestLivesWhereItsRepoIs(t *testing.T) {
+	f := Derive(input(fixture{pr: open(1, fixtureViewer, nil)})).facets()
+	if got := f["where"]; !slices.Equal(got, []string{"acme/api"}) {
+		t.Errorf("where = %v", got)
+	}
+	if _, ok := f["repo"]; ok {
+		t.Errorf("the repo facet is gone: %v", f)
+	}
+}
+
 func TestCardFromRow(t *testing.T) {
 	in := input(fixture{pr: open(1, fixtureViewer, func(p *pr.PR) {
 		p.ChecksState, p.FailingChecks = "FAILURE", []pr.FailingCheck{{Name: "lint"}}

@@ -427,8 +427,8 @@ func TestAnIntentRefuseReadsATaskProperty(t *testing.T) {
 }
 
 func TestAByPredicateNamesOnlyFactsTheAuthorityReads(t *testing.T) {
-	_, problems := loadTasksWith(t, defaultTasks(t), "[verbs.done]\nby = { agent = 'task.repo != \"acme/prod\"' }\n")
-	if !strings.Contains(problems, "verbs.done.by.agent") || !strings.Contains(problems, "task.repo") {
+	_, problems := loadTasksWith(t, defaultTasks(t), "[verbs.done]\nby = { agent = 'task.placement != \"acme/prod\"' }\n")
+	if !strings.Contains(problems, "verbs.done.by.agent") || !strings.Contains(problems, "task.placement") {
 		t.Errorf("a by naming a fact the authority does not read loads:\n%s", problems)
 	}
 	if _, problems := loadTasksWith(t, defaultTasks(t), "[verbs.done]\nby = { agent = 'task.prop.kind == \"capture\" && task.prop.risk == \"low\"' }\n"); problems != "" {

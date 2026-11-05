@@ -8,12 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/lens"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/messages"
@@ -46,9 +48,10 @@ const (
 // syncInputs are the notes whose units Sync reconciles.
 const syncInputs = port.TopicItems | port.TopicSourceEvents | port.TopicCards | port.TopicGates
 
-// taskInputs are the notes after which a change carries the counters: a view reads the tasks, their gates and
-// their wakes.
-const taskInputs = port.TopicTasks | port.TopicGates | port.TopicWakes | port.TopicDrafts
+// taskInputs are the notes after which a change carries the counters: a view reads the tasks, their gates,
+// their wakes, their units' records, their links and the profile's facets.
+const taskInputs = port.TopicTasks | port.TopicGates | port.TopicWakes | port.TopicDrafts | port.TopicRecords | port.TopicLinks |
+	port.TopicPlacements | port.TopicConfig
 
 // bridged are the handlers whose verbs a task with units runs as its unit's action when no handler takes them.
 var bridged = []string{handlerApprove, handlerDelegate, handlerDrop}
@@ -114,7 +117,22 @@ func (s *Server) handleViews(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.tasks(w); !ok {
 		return
 	}
+	writeJSON(w, s.viewsCatalog())
+}
+
+// viewsCatalog is what GET /api/views serves, with its version, built once per loaded profile.
+func (s *Server) viewsCatalog() api.ViewsCatalog {
 	l := s.loaded()
+	b := &s.viewsBuilt
+	b.Lock()
+	defer b.Unlock()
+	if b.loaded != l {
+		b.loaded, b.cat = l, s.buildViewsCatalog(l)
+	}
+	return b.cat
+}
+
+func (s *Server) buildViewsCatalog(l *intentload.Loaded) api.ViewsCatalog {
 	cat := api.ViewsCatalog{Areas: nonNil(slices.Clone(s.deps.Cfg.Tasks.Areas)), Contexts: nonNil(slices.Clone(s.deps.Cfg.Tasks.Contexts)), Views: s.servedViews(),
 		Review: []string{}, States: []api.StateSpec{}, Props: []api.PropSpec{}}
 	for _, st := range l.Views.Review {
@@ -135,7 +153,9 @@ func (s *Server) handleViews(w http.ResponseWriter, r *http.Request) {
 		cat.Verbs = append(cat.Verbs, api.VerbSpec{Verb: v, Handler: l.Tasks.Handler(v), Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
 			Input: cmp.Or(t.Input, b.Input), Send: s.replySend(v), Key: verbKey(task.Verb(v)), From: slices.Clone(t.From), To: t.To})
 	}
-	writeJSON(w, cat)
+	cat.Facets, cat.DefaultSort, cat.Lens = catalog.TaskFacets(l.Views.Facets, l.Tasks, cat.Contexts), l.Views.DefaultSort, api.LensWords(l.Views.Lens)
+	cat.Version = api.VersionOf(cat)
+	return cat
 }
 
 // servedViews are the profile's views, in its order.
@@ -167,15 +187,24 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 			query.Contexts = append(query.Contexts, c)
 		}
 	}
+	units, err := api.ParseUnits(q[api.TasksUnits])
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	ctx := r.Context()
-	p, err := g.TasksSince(ctx, query, coretasks.Since{Epoch: since.Epoch, Rev: since.Rev})
+	p, err := g.TasksSince(ctx, query, coretasks.Since{Epoch: since.Epoch, Rev: since.Rev}, units)
 	if err != nil {
 		writeTasksError(w, err)
 		return
 	}
 	page := api.TasksPage{Epoch: p.Epoch, Rev: p.Rev, Full: p.Full, Tasks: []api.TaskView{}, Removed: []string{}, Counters: wireCounters(p.Counters),
-		Loading: s.loading()}
+		Loading: s.loading(), Specs: s.viewsCatalog().Version}
+	if p.Pass != nil {
+		ctx = coretasks.WithPass(ctx, p.Pass)
+	}
 	vs := s.taskViews(ctx, g, false)
+	vs.readRows(ctx, p.Tasks)
 	for _, e := range p.Tasks {
 		v, err := vs.view(ctx, e)
 		if err != nil {
@@ -712,21 +741,25 @@ func (s *Server) handleCounters(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx, q := r.Context(), r.URL.Query()
-	var terms []string
-	for _, t := range q[api.CountersTerm] {
-		if t = strings.TrimSpace(t); t != "" {
-			terms = append(terms, t)
-		}
-	}
 	var c task.Counters
 	var err error
-	if len(terms) == 0 {
+	if text := strings.TrimSpace(q.Get(api.CountersQuery)); text == "" {
 		c, err = g.Counts(ctx, q.Get("area"))
 	} else {
+		specs := s.taskFacetSpecs()
+		query, now := lens.Parse(text, specs), s.deps.Now()
 		vs := s.taskViews(ctx, g, false)
-		c, err = g.CountsWhere(ctx, q.Get("area"), func(e task.Task) (bool, error) {
+		preloaded := false
+		c, err = g.CountsWhere(ctx, q.Get("area"), func(ctx context.Context, e task.Task) (bool, error) {
+			if pass, ok := coretasks.PassOf(ctx); ok && !preloaded {
+				preloaded = true
+				vs.readRows(ctx, pass.Tasks)
+			}
 			v, err := vs.view(ctx, e)
-			return err == nil && api.TaskMatches(v, terms), err
+			if err != nil {
+				return false, err
+			}
+			return query.Match(lens.Item{Facets: v.Facets, Texts: v.Texts()}, specs, now), nil
 		})
 	}
 	if err != nil {
@@ -734,6 +767,18 @@ func (s *Server) handleCounters(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, wireCounters(c))
+}
+
+// taskFacetSpecs are the facets a query over tasks can name: the plugins' and the profile's, one spec by id.
+func (s *Server) taskFacetSpecs() map[string]api.FacetSpec {
+	specs := map[string]api.FacetSpec{}
+	for _, f := range s.rowsCatalog().Facets {
+		specs[f.ID] = f
+	}
+	for _, f := range s.viewsCatalog().Facets {
+		specs[f.ID] = f
+	}
+	return specs
 }
 
 func (s *Server) writeTask(w http.ResponseWriter, ctx context.Context, g *coretasks.Service, e task.Task) {
@@ -750,7 +795,10 @@ func (s *Server) counters(ctx context.Context) *api.Counters {
 	if s.deps.Tasks == nil {
 		return nil
 	}
-	c, err := s.deps.Tasks.Counts(ctx, "")
+	return s.countersOf(s.deps.Tasks.Counts(ctx, ""))
+}
+
+func (s *Server) countersOf(c task.Counters, err error) *api.Counters {
 	if err != nil {
 		s.logf("tasks: counters: %v", err)
 		return nil
@@ -783,6 +831,10 @@ type taskViewer struct {
 	status   map[task.ID]coretasks.ProjectState
 	// briefs are the brief records by unit, read once per page.
 	briefs map[unit.Unit]port.Event
+	// rows are the read model's rows of the units read, each read once: a page reads its tasks' in one
+	// snapshot.
+	rows map[unit.Unit]readmodel.Read
+	read map[unit.Unit]bool
 	// whereBy bounds every draft destination lookup of this page.
 	whereBy time.Time
 	// as is who the page is for, whose verbs it offers.
@@ -841,7 +893,7 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 	if v.Units == nil {
 		v.Units = []unit.Unit{}
 	}
-	v.UnitLabels = ev.s.unitLabels(v.Units)
+	v.UnitLabels = ev.unitLabels(ctx, v.Units)
 	if w, ok, err := ev.g.WakeOf(ctx, e.ID); err != nil {
 		return api.TaskView{}, err
 	} else if ok {
@@ -875,6 +927,7 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 	if err := ev.brief(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
+	ev.facets(ctx, e, &v)
 	if err := ev.openGates(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
@@ -912,6 +965,76 @@ func (ev *taskViewer) brief(ctx context.Context, e task.Task, v *api.TaskView) e
 	}
 	v.Brief = &api.RecordView{Kind: rec.Key, At: rec.At, Data: jsonData(rec.Data)}
 	return nil
+}
+
+// facets sets the task's facets: those of its facts row set, its brief's, and its units' rows', joined as
+// the profile's facets say.
+func (ev *taskViewer) facets(ctx context.Context, e task.Task, v *api.TaskView) {
+	defs := ev.s.loaded().Views.Facets
+	own := map[string][]string{}
+	maps.Copy(own, v.Facets)
+	if v.Brief != nil {
+		maps.Copy(own, catalog.RecordFacets(defs, v.Brief.Kind, v.Brief.Data))
+	}
+	rows := ev.rowsOf(ctx, e.Units)
+	units := make([]map[string][]string, len(e.Units))
+	for i, u := range e.Units {
+		units[i] = rows[u].Row.Facets
+	}
+	v.Facets = catalog.MergeFacets(defs, own, units)
+	if len(v.Facets) == 0 {
+		v.Facets = nil
+	}
+}
+
+// readRows reads the rows of the units of es in one snapshot, for their views.
+func (ev *taskViewer) readRows(ctx context.Context, es []task.Task) {
+	var units []unit.Unit
+	for _, e := range es {
+		units = append(units, e.Units...)
+	}
+	ev.rowsOf(ctx, units)
+}
+
+// rowsOf are the rows of the units read so far, units among them: those not read yet are read in one
+// snapshot. A unit no provider lists has none, and a failed read leaves its units without one.
+func (ev *taskViewer) rowsOf(ctx context.Context, units []unit.Unit) map[unit.Unit]readmodel.Read {
+	if ev.rows == nil {
+		ev.rows, ev.read = map[unit.Unit]readmodel.Read{}, map[unit.Unit]bool{}
+	}
+	var unread []unit.Unit
+	for _, u := range units {
+		if !ev.read[u] {
+			ev.read[u] = true
+			unread = append(unread, u)
+		}
+	}
+	if len(unread) == 0 {
+		return ev.rows
+	}
+	got, err := ev.s.rowsRead(ctx, unread)
+	if err != nil {
+		ev.s.logf("tasks: reading the rows of %d units: %v", len(unread), err)
+	}
+	for _, u := range unread {
+		if r, ok := got[u]; ok {
+			ev.rows[u] = r
+		}
+	}
+	return ev.rows
+}
+
+// unitLabels are units as a person reads them, in order: each row's label, else the unit's own label.
+func (ev *taskViewer) unitLabels(ctx context.Context, units []unit.Unit) []string {
+	if len(units) == 0 {
+		return nil
+	}
+	rows := ev.rowsOf(ctx, units)
+	out := make([]string, len(units))
+	for i, u := range units {
+		out[i] = cmp.Or(rows[u].Row.Label, u.Label())
+	}
+	return out
 }
 
 // childrenOf sets the open children of a project, or of any task in a detail, from one read per page.
@@ -973,7 +1096,7 @@ func (ev *taskViewer) row(ctx context.Context, e task.Task, v *api.TaskView) err
 	if err != nil {
 		return err
 	}
-	v.OwedBy, v.Askers = r.OwedBy, r.Askers
+	v.OwedBy, v.Askers, v.Facets = r.OwedBy, r.Askers, r.Facets
 	if r.ExtractionLag > 0 {
 		v.ExtractionLag = r.ExtractionLag.String()
 	}
@@ -1063,7 +1186,7 @@ func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
 	}
 	var row *api.Row
 	if len(e.Units) > 0 {
-		if rd, ok, err := ev.s.readModel().Read(ctx, e.Units[0]); err == nil && ok {
+		if rd, ok := ev.rowsOf(ctx, e.Units[:1])[e.Units[0]]; ok {
 			row = &rd.Row
 		}
 	}
@@ -1221,14 +1344,27 @@ func (s *Server) heldProblems(l *intentload.Loaded) intentload.Problems {
 	return l.Tasks.HeldProblems(*held)
 }
 
-// feedTasks publishes a change with the counters after each burst of task and draft notes, naming the units
-// of the tasks that moved, until ctx ends.
+// facetProblems are the facets of the profile and of the plugins that disagree on how to group, sort, rank, match or bucket.
+func (s *Server) facetProblems(l *intentload.Loaded) intentload.Problems {
+	c := s.rowsCatalog()
+	k := &s.facetCheck
+	k.Lock()
+	defer k.Unlock()
+	if k.loaded != l || k.version != c.Version {
+		k.loaded, k.version, k.out = l, c.Version, catalog.CheckFacets(l.Views.Facets, c.Facets)
+	}
+	return k.out
+}
+
+// feedTasks publishes a change with the counters after each burst of task and draft notes and of row changes
+// whose units a task holds, naming the units they moved, until ctx ends.
 func (s *Server) feedTasks(ctx context.Context) {
 	if s.deps.Changes == nil {
 		return
 	}
 	poke, cancel := change.Poke(s.deps.Changes, taskInputs)
 	defer cancel()
+	s.moved.attach()
 	from := s.deps.Changes.Gen()
 	var quiet <-chan time.Time
 	for {
@@ -1236,39 +1372,56 @@ func (s *Server) feedTasks(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-poke:
-			if quiet == nil {
-				quiet = time.After(syncQuiet)
-			}
-			continue
+		case <-s.moved.wake:
 		case <-quiet:
 			quiet = nil
+			c := s.deps.Changes.Since(from, taskInputs)
+			from = c.Gen
+			pctx, scope := meter.Start(ctx, meter.Loop("tasks-feed"))
+			s.publishTasks(pctx, c)
+			scope.End()
+			continue
 		}
-		c := s.deps.Changes.Since(from, taskInputs)
-		from = c.Gen
-		pctx, scope := meter.Start(ctx, meter.Loop("tasks-feed"))
-		counters := s.counters(pctx)
-		scope.End()
-		pos := s.hub.position()
-		ch := api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev, Units: c.Units, Counters: counters}
-		if c.All {
-			ch.Units = nil
+		if quiet == nil {
+			quiet = time.After(syncQuiet)
 		}
-		s.hub.publish(ch)
 	}
 }
 
-// unitLabels are units as a person reads them, in order: each row's label,
-// else the unit's own label.
-func (s *Server) unitLabels(units []unit.Unit) []string {
-	if len(units) == 0 {
-		return nil
+// publishTasks publishes the counters with the units c and the row changes since the last call moved, unless
+// nothing moved but rows no task holds; a reloaded profile moves every task, since it can change their facets.
+func (s *Server) publishTasks(ctx context.Context, c port.Change) {
+	rows, all := s.moved.take()
+	held := rows
+	snap, err := s.deps.Tasks.Snapshot(ctx)
+	if err != nil {
+		s.logf("tasks feed: %v", err)
+	} else {
+		held = snap.Held(rows)
 	}
-	known := s.presentations(units)
-	out := make([]string, len(units))
-	for i, u := range units {
-		out[i] = known[u].Label
+	if c.Empty() && !all && len(held) == 0 {
+		return
 	}
-	return out
+	pos := s.hub.position()
+	ch := api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev, All: c.All || all || c.Has(port.TopicConfig)}
+	if err == nil {
+		ch.Counters = s.countersOf(snap.Counts(ctx, ""))
+	}
+	if !ch.All {
+		units := slices.Concat(c.Units, held)
+		slices.SortFunc(units, api.CompareUnits)
+		ch.Units = slices.Compact(units)
+	}
+	s.hub.publish(ch)
+}
+
+// rowsRead are the read model's rows of units, from one snapshot.
+func (s *Server) rowsRead(ctx context.Context, units []unit.Unit) (map[unit.Unit]readmodel.Read, error) {
+	if s.readRows != nil {
+		return s.readRows(ctx, units)
+	}
+	got, _, _, err := s.readModel().ReadMany(ctx, units)
+	return got, err
 }
 
 // presentations are units as their rows present them, from one snapshot;
@@ -1284,7 +1437,8 @@ func (s *Server) presentations(units []unit.Unit) map[unit.Unit]readmodel.Presen
 	return out
 }
 
-func (s *Server) unitLabel(u unit.Unit) string { return s.unitLabels([]unit.Unit{u})[0] }
+// unitLabel is u as a person reads it outside a page: its row's label, else its own.
+func (s *Server) unitLabel(u unit.Unit) string { return s.presentations([]unit.Unit{u})[u].Label }
 
 // resolvesGate says whether verb resolves an open gate of e: its handler approves or answers, no handler of
 // e's kind takes it, and e has an open gate that takes its role.
