@@ -19,9 +19,17 @@ func holds(pause Pause, slot string, facts workflow.Facts) bool {
 	if pause.On {
 		return true
 	}
-	repo, _ := facts[slot+".repo"].(string)
-	return repo != "" && slices.ContainsFunc(pause.Repos, func(r string) bool { return strings.EqualFold(r, repo) })
+	for _, name := range repoFacts {
+		if repo, _ := facts[slot+name].(string); repo != "" {
+			return slices.ContainsFunc(pause.Repos, func(r string) bool { return strings.EqualFold(r, repo) })
+		}
+	}
+	return false
 }
+
+// repoFacts are the facts, after a slot's name, that name the owner/repo a unit's work runs in: a pull
+// request's repository, a task's placement.
+var repoFacts = []string{".repo", ".placement"}
 
 // limit is the reason a workflow's limits skip one more item on u, or "".
 // The ledger counts done runs; the items this evaluation already decided to
