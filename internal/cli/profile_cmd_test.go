@@ -9,7 +9,9 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/plugins/host"
 	"github.com/wloophq/wloop/internal/workspace/fake"
+	"github.com/wloophq/wloop/pkg/plugin/manifest"
 )
 
 func profileEnv(t *testing.T, files map[string]string) (*testEnv, string) {
@@ -140,6 +142,21 @@ func TestProfileCheckReportsATaskFacetThatDisagreesWithAPlugin(t *testing.T) {
 	code := te.run("profile", "check")
 	if code != 1 || !strings.Contains(te.err.String(), filepath.Join(d, "views.toml")) || !strings.Contains(te.err.String(), "differs from the facet risk of plugin github") {
 		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
+	}
+}
+
+func TestProfileCheckReportsATaskFacetThatDisagreesWithAnInstalledPlugin(t *testing.T) {
+	t.Parallel()
+	te, d := profileEnv(t, nil)
+	m, err := manifest.Parse([]byte("id = \"acme\"\nkinds = [\"source\"]\nprotocol = 1\n[source]\nname = \"Acme\"\nslot = \"acme\"\ncodec = {keys = [\"{name}\"]}\n" +
+		"[[source.ui.views]]\nid = \"acme\"\nrows = true\nsurfaces = [\"web\"]\n[[source.ui.facets]]\nid = \"source\"\nmatch = \"suffix\"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	te.plugins = []host.Plugin{{Manifest: m, Dir: t.TempDir()}}
+	code := te.run("profile", "check")
+	if code != 1 || !strings.Contains(te.err.String(), "differs from the facet source of plugin acme") {
+		t.Fatalf("exit %d (profile %s): %s%s", code, d, te.out, te.err)
 	}
 }
 
