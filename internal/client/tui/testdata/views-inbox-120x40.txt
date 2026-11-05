@@ -1,7 +1,7 @@
  Focus 1   [Inbox 2]   Outbox 1    Next 4    Waiting 4    Projects 0    Someday 0    Logbook 12
 
->• 5h  Deploy window tonight?
-   5h  Buy cables
+>• 5h 0m    Deploy window tonight?    inbox
+   5h 0m    Buy cables                inbox
 
 Deploy window tonight?
   state      inbox · changed

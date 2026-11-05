@@ -11,9 +11,12 @@ label = "Conversation"
 
 [facets.where]
 label = "Where"
+show = "ref"
+label_prefix = "#"
 
 [facets.waits-on]
 label = "Waits on (person)"
+show = "who"
 
 [situations]
 waits_on_viewer = "waits on you"

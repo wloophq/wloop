@@ -25,7 +25,9 @@ var viewsGrammar = []Key{
 	{Path: "facets.*.rank", In: SurfaceViews, Kind: KindList, Elem: KindText, Doc: "The facet's values in their order, first first."},
 	{Path: "facets.*.values", In: SurfaceViews, Kind: KindMap, Doc: "The text people read for a value, by value."},
 	{Path: "facets.*.values.*", In: SurfaceViews, Kind: KindText, Doc: "The text of one value."},
-	{Path: "facets.*.label_prefix", In: SurfaceViews, Kind: KindText, Doc: "Text before the label of each value of a facet whose order the catalog derives, such as the `@` of a context; a label that has it already keeps it."},
+	{Path: "facets.*.label_prefix", In: SurfaceViews, Kind: KindText, Doc: "Text before the label of each value the facet shows on a row, such as the `@` of a context; a label that has it already keeps it. A facet whose order the catalog derives has it in its group heads too."},
+	{Path: "facets.*.show", In: SurfaceViews, Kind: KindAny, Values: ShowParts, Doc: ShowDoc},
+	{Path: "facets.*.show_values", In: SurfaceViews, Kind: KindEnum, Values: ShowValues, Default: "all", Doc: ShowValuesDoc},
 	{Path: "facets.*.empty", In: SurfaceViews, Kind: KindText, Doc: "What a group of tasks with no value shows."},
 	{Path: "facets.*.match", In: SurfaceViews, Kind: KindEnum, Values: named("exact", "suffix", "prefix", "team"), Default: "exact", Doc: "How a filter's text matches a value: the whole value, its last segment, its first, or a person's team."},
 	{Path: "facets.*.menu", In: SurfaceViews, Kind: KindBool, Default: "true", Doc: "Whether the facet is offered in the filter menu."},
@@ -54,3 +56,25 @@ var viewsGrammar = []Key{
 	{Path: "review.*", In: SurfaceViews, Kind: KindTable, Doc: "A step of the review, by the view it walks, which views declares. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones, and comes after the steps below it."},
 	{Path: "review.*.label", In: SurfaceViews, Kind: KindText, Required: true, Doc: "What the step asks of you, as the review lists it. Required."},
 }
+
+// ShowParts are the parts of a row a facet's show may name.
+func ShowParts() []Value {
+	return []Value{{Name: "ref", Doc: "Beside the title, before the unit's own label: where it lives."},
+		{Name: "meta", Doc: "Under the title: who opened it, its contexts, its brief's type, size, risk and tags."},
+		{Name: "flag", Doc: "Under the title, after the meta: a state worth a glance, such as paused."},
+		{Name: "who", Doc: "Whom it waits on."},
+		{Name: "kind", Doc: "Its situation or state, the pill under whom it waits on."},
+		{Name: "age", Doc: "How long since the facet's instant, for a facet that sorts by time; only the first such facet shows."},
+		{Name: "aside", Doc: "Beside the reason: its workspace and links."}}
+}
+
+// ShowValues are how many of an item's values a facet shows.
+func ShowValues() []Value {
+	return []Value{{Name: "all", Doc: "Every value, in the item's order."}, {Name: "first", Doc: "The first value alone."}}
+}
+
+// ShowDoc and ShowValuesDoc are the docs of a facet's show and show_values, in views.toml and in ui.toml.
+const (
+	ShowDoc       = "The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = [\"paused\", \"muted\"] }`. Absent, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show."
+	ShowValuesDoc = "How many of an item's values the part shows: all, or the first alone."
+)

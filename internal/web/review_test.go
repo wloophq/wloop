@@ -104,6 +104,7 @@ reviewEnv.render = () => {};
 reviewEnv.focusStep = (id) => focused.push(id);
 (async () => {
   await loadReview();
+  tasksState.catalog = { ...tasksState.catalog, lens: input.lens };
   const first = reviewState.step;
   const inboxIDs = tasksState.tasks.map((e) => e.id);
   await reviewKey("done");
@@ -118,7 +119,8 @@ reviewEnv.focusStep = (id) => focused.push(id);
   const panel = reviewPanel("");
   process.stdout.write(JSON.stringify({ first, gets, posts, after, moves, text: text(panel), tasks: tasksState.tasks.map((e) => e.id).concat(inboxIDs),
     heads: all(panel, (x) => String(x.attrs["data-focus"] || "").startsWith("review:step:")).map((x) => x.attrs["data-focus"]), focused }));
-})();`, map[string]any{"review": review, "doneInbox": doneInbox, "inbox": []any{task("e-1", "inbox", nil), task("e-2", "inbox", nil)}, "projects": []any{project}}, &got)
+})();`, map[string]any{"review": review, "doneInbox": doneInbox, "inbox": []any{task("e-1", "inbox", nil), task("e-2", "inbox", nil)}, "projects": []any{project},
+		"lens": servedViews(t).Lens}, &got)
 	if got.First != "inbox" {
 		t.Errorf("the review opened on %q, want the first open step", got.First)
 	}
@@ -156,7 +158,8 @@ func TestProjectFactsShowTheNextActionAndTheLocalDay(t *testing.T) {
 	q.Props, q.Title = map[string]json.RawMessage{"kind": json.RawMessage(`"project"`)}, "Idle"
 	nodeRun(t, viewsPrelude(t), nil, `
 process.env.TZ = "America/Sao_Paulo";
-process.stdout.write(JSON.stringify({ with: text(taskItem(input.p, "")), without: text(taskItem(input.q, "")) }));`, map[string]any{"p": p, "q": q}, &got)
+tasksState.catalog = input.cat;
+process.stdout.write(JSON.stringify({ with: text(taskRow(input.p)), without: text(taskRow(input.q)) }));`, map[string]any{"p": p, "q": q, "cat": servedViews(t)}, &got)
 	for _, s := range []string{"2 open", "every 7d", "reviewed 2026-10-22"} {
 		if !strings.Contains(got.With, s) {
 			t.Errorf("the project lacks %q: %s", s, got.With)

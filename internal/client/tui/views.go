@@ -295,59 +295,17 @@ func (m *Model) loadingLine(ls []api.Loading, width int) (string, bool) {
 	return "  " + m.t.Dim(termfmt.Cut(termfmt.Clean("loading "+strings.Join(parts, " · ")), width-2)), true
 }
 
-// taskList lays the tasks out in columns, with a head line before each
-// group, and shows the height of them around the cursor.
+// taskList lays the tasks out as lines, with a head line before each group, and shows the height of them
+// around the cursor.
 func (m *Model) taskList(view string, tasks []api.TaskView, heads []string, cur, width, height int, now time.Time) []string {
-	t := m.t
 	if m.viewSpec(view).Over == dtask.OverGates {
 		return m.outboxList(tasks, cur, width, height, now)
 	}
-	cols := []termfmt.Column{{Right: true}, {Flex: true}}
-	if width >= 60 {
-		cols = append(cols, termfmt.Column{Max: min(max((width-2)/3, 14), 40)})
-	}
-	cells := make([][]termfmt.Cell, len(tasks))
+	lines := make([]listLine, len(tasks))
 	for i, e := range tasks {
-		age, style := m.taskAge(e, now)
-		title := oneLine(e.Title)
-		if m.viewsCat.Starred(e) {
-			title = "★ " + title
-		}
-		c := []termfmt.Cell{{Text: age, Style: style}, {Text: title}}
-		if len(cols) > 2 {
-			c = append(c, termfmt.Cell{Text: m.taskWhere(e), Style: t.Dim})
-		}
-		cells[i] = c
+		lines[i] = m.taskLine(e, now)
 	}
-	laid := t.Columns(width-3, 2, cols, cells)
-	var out []string
-	var at []int
-	for i, e := range tasks {
-		if heads[i] != "" {
-			out, at = append(out, " "+t.Bold(termfmt.Cut(oneLine(heads[i]), width-1))), append(at, -1)
-		}
-		out, at = append(out, m.taskLine(e, laid[i], i == cur, width)), append(at, i)
-	}
-	return window(out, slices.Index(at, cur), height)
-}
-
-// taskLine marks the cursor, a busy task and a changed one.
-func (m *Model) taskLine(e api.TaskView, laid string, selected bool, width int) string {
-	t := m.t
-	mark := []rune("   ")
-	if selected {
-		mark[0] = '>'
-	}
-	if _, busy := m.busy[taskUnit(e.ID)]; busy {
-		mark[1] = '*'
-	} else if e.Changed {
-		mark[1] = '•'
-	}
-	line := string(mark) + laid
-	if selected && t.Color {
-		line = t.Reverse(line + strings.Repeat(" ", max(width-termfmt.Cells(termfmt.Plain(line)), 0)))
-	}
-	return line
+	return m.lineCells(lines, heads, cur, width, height)
 }
 
 // window is the height of lines that keeps line cur in sight.
@@ -369,28 +327,6 @@ func (m *Model) taskAge(e api.TaskView, now time.Time) (string, func(string) str
 		return span(now.Sub(since)), m.t.Yellow
 	}
 	return span(now.Sub(since)), m.t.Dim
-}
-
-// contexts are e's contexts: the property the catalog's contexts role acts on.
-func (m *Model) contexts(e api.TaskView) []string {
-	p, ok := m.viewsCat.PropOf(string(dtask.RoleContexts))
-	if !ok {
-		return nil
-	}
-	return e.PropList(p.Name)
-}
-
-// taskWhere is the task's contexts and its first unit.
-func (m *Model) taskWhere(e api.TaskView) string {
-	var parts []string
-	for _, c := range m.contexts(e) {
-		parts = append(parts, "@"+c)
-	}
-	parts = append(parts, projectFacts(e)...)
-	if len(e.Units) > 0 {
-		parts = append(parts, e.UnitLabel(0))
-	}
-	return termfmt.Clean(strings.Join(parts, " "))
 }
 
 // viewTabs are the task views with their counts.

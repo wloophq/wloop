@@ -19,8 +19,8 @@ import (
 // count only shrinks: a lower count fails until the entry is lowered.
 var appJSDebts = map[string]int{
 	"closed": 3, "draft": 2, "guidance": 7, "review": 1, "wait": 1,
-	"age": 4, "author": 6, "due": 6, "is": 7, "kind": 6, "lane": 2, "where": 5, "risk": 3, "size": 4, "status": 4, "tag": 5, "type": 3, "waits-on": 6,
-	"all": 1, "dash": 7, "explore": 14, "mine": 3, "plan": 9, "recent": 8,
+	"age": 4, "author": 4, "due": 6, "is": 5, "kind": 5, "lane": 2, "where": 1, "risk": 3, "size": 4, "status": 2, "tag": 5, "type": 3, "waits-on": 5,
+	"all": 1, "dash": 7, "explore": 14, "mine": 2, "plan": 9, "recent": 8,
 }
 
 // githubVocabulary is every event kind, intent, view id and facet id the

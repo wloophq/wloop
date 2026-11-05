@@ -1201,5 +1201,390 @@
     ]
    }
   }
- ]
+ ],
+ "parts": {
+  "words": {
+   "age_now": "now",
+   "age_minutes": "{{.m}}m",
+   "age_hours": "{{.h}}h {{.m}}m",
+   "age_days": "{{.d}}d {{.h}}h"
+  },
+  "specs": [
+   {
+    "id": "where",
+    "label": "Where",
+    "show": "ref"
+   },
+   {
+    "id": "author",
+    "label": "Author",
+    "show": "meta",
+    "show_values": "first",
+    "label_prefix": "by "
+   },
+   {
+    "id": "is",
+    "label": "Flags",
+    "show": "flag",
+    "show_only": [
+     "paused",
+     "muted"
+    ]
+   },
+   {
+    "id": "waits-on",
+    "label": "Waits on",
+    "show": "who",
+    "match": "team"
+   },
+   {
+    "id": "kind",
+    "label": "Situation",
+    "show": "kind",
+    "labels": {
+     "review": "Review"
+    }
+   },
+   {
+    "id": "age",
+    "label": "Waiting for",
+    "sort": "time",
+    "show": "age",
+    "buckets": [
+     {
+      "id": "1d",
+      "label": "0-1 days",
+      "within": "24h"
+     },
+     {
+      "id": "older",
+      "label": "older",
+      "within": ""
+     }
+    ]
+   },
+   {
+    "id": "moved",
+    "label": "Moved",
+    "sort": "time",
+    "show": "age"
+   },
+   {
+    "id": "status",
+    "label": "Workspace",
+    "show": "aside"
+   },
+   {
+    "id": "tag",
+    "label": "Tag",
+    "show": "meta",
+    "match": "prefix"
+   },
+   {
+    "id": "size",
+    "label": "Size",
+    "show": "meta",
+    "labels": {
+     "s": "S"
+    }
+   },
+   {
+    "id": "ci",
+    "label": "Checks"
+   },
+   {
+    "id": "conv",
+    "label": "Conversation",
+    "show": "ref",
+    "displays": {
+     "slack": {
+      "show": "meta",
+      "label_prefix": "#"
+     }
+    }
+   },
+   {
+    "id": "lane",
+    "label": "Lane",
+    "provider": "github",
+    "show": "flag"
+   }
+  ],
+  "cases": [
+   {
+    "item": {
+     "provider": "github",
+     "facets": {
+      "where": [
+       "acme/web"
+      ],
+      "author": [
+       "me",
+       "ana"
+      ],
+      "is": [
+       "stalled",
+       "paused",
+       "muted"
+      ],
+      "waits-on": [
+       "me",
+       "bia"
+      ],
+      "kind": [
+       "review"
+      ],
+      "age": [
+       "2026-11-04T09:30:00Z"
+      ],
+      "moved": [
+       "2026-11-01T12:00:00Z"
+      ],
+      "status": [
+       "none"
+      ],
+      "tag": [
+       "lang:go"
+      ],
+      "size": [
+       "s"
+      ],
+      "ci": [
+       "failure"
+      ],
+      "lane": [
+       "me"
+      ]
+     },
+     "texts": []
+    },
+    "want": {
+     "ref": [
+      {
+       "field": "where",
+       "value": "acme/web",
+       "raw": "acme/web",
+       "label": "acme/web"
+      }
+     ],
+     "meta": [
+      {
+       "field": "author",
+       "value": "me",
+       "raw": "me",
+       "label": "by me"
+      },
+      {
+       "field": "tag",
+       "value": "lang:go",
+       "raw": "lang:go",
+       "label": "lang:go"
+      },
+      {
+       "field": "size",
+       "value": "s",
+       "raw": "s",
+       "label": "S"
+      }
+     ],
+     "flag": [
+      {
+       "field": "is",
+       "value": "paused",
+       "raw": "paused",
+       "label": "paused"
+      },
+      {
+       "field": "is",
+       "value": "muted",
+       "raw": "muted",
+       "label": "muted"
+      },
+      {
+       "field": "lane",
+       "value": "me",
+       "raw": "me",
+       "label": "me"
+      }
+     ],
+     "who": [
+      {
+       "field": "waits-on",
+       "value": "me",
+       "raw": "me",
+       "label": "me"
+      },
+      {
+       "field": "waits-on",
+       "value": "bia",
+       "raw": "bia",
+       "label": "bia"
+      }
+     ],
+     "kind": [
+      {
+       "field": "kind",
+       "value": "review",
+       "raw": "review",
+       "label": "Review"
+      }
+     ],
+     "age": [
+      {
+       "field": "age",
+       "value": "1d",
+       "raw": "2026-11-04T09:30:00Z",
+       "label": "2h 30m"
+      }
+     ]
+    }
+   },
+   {
+    "item": {
+     "provider": "slack",
+     "facets": {
+      "author": [
+       "ana"
+      ],
+      "age": [
+       "not a time"
+      ],
+      "moved": [
+       "2026-11-01T12:00:00Z"
+      ],
+      "status": [
+       "ws-1"
+      ],
+      "conv": [
+       "general"
+      ],
+      "lane": [
+       "me"
+      ]
+     },
+     "texts": []
+    },
+    "want": {
+     "meta": [
+      {
+       "field": "author",
+       "value": "ana",
+       "raw": "ana",
+       "label": "by ana"
+      },
+      {
+       "field": "conv",
+       "value": "general",
+       "raw": "general",
+       "label": "#general"
+      }
+     ],
+     "age": [
+      {
+       "field": "moved",
+       "value": "2026-11-01T12:00:00Z",
+       "raw": "2026-11-01T12:00:00Z",
+       "label": "3d 0h"
+      }
+     ],
+     "aside": [
+      {
+       "field": "status",
+       "value": "ws-1",
+       "raw": "ws-1",
+       "label": "ws-1"
+      }
+     ]
+    }
+   },
+   {
+    "item": {
+     "facets": {
+      "conv": [
+       "x"
+      ],
+      "age": [
+       "2026-11-04T11:50:00Z"
+      ],
+      "kind": [
+       "none"
+      ],
+      "lane": [
+       "loop"
+      ]
+     },
+     "texts": []
+    },
+    "want": {
+     "ref": [
+      {
+       "field": "conv",
+       "value": "x",
+       "raw": "x",
+       "label": "x"
+      }
+     ],
+     "age": [
+      {
+       "field": "age",
+       "value": "1d",
+       "raw": "2026-11-04T11:50:00Z",
+       "label": "10m"
+      }
+     ],
+     "flag": [
+      {
+       "field": "lane",
+       "value": "loop",
+       "raw": "loop",
+       "label": "loop"
+      }
+     ]
+    }
+   },
+   {
+    "item": {
+     "facets": {
+      "age": [
+       "2026-11-04T11:59:30Z"
+      ],
+      "author": [
+       "none",
+       "bob"
+      ]
+     },
+     "texts": []
+    },
+    "want": {
+     "meta": [
+      {
+       "field": "author",
+       "value": "bob",
+       "raw": "bob",
+       "label": "by bob"
+      }
+     ],
+     "age": [
+      {
+       "field": "age",
+       "value": "1d",
+       "raw": "2026-11-04T11:59:30Z",
+       "label": "now"
+      }
+     ]
+    }
+   },
+   {
+    "item": {
+     "facets": {
+      "ci": [
+       "failure"
+      ]
+     },
+     "texts": []
+    },
+    "want": {}
+   }
+  ]
+ }
 }

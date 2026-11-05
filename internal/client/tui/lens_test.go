@@ -30,8 +30,7 @@ func lensCatalog() api.ViewsCatalog {
 }
 
 // testLensWords are the bundled profile's lens words.
-var testLensWords = api.LensWords{DefaultGroup: "{{.label}} (default)", BoardGroup: "{{.label}} (board)", NoGroup: "None", Grouped: "group: {{.label}}",
-	Sorted: "sort: {{.label}}", Descending: "{{.label}} (descending)", NoLens: "nothing to group or sort here", TagKey: "{{.label}} {{.key}}", TagKeyEmpty: "no {{.key}}"}
+var testLensWords = catalog.LensWords(bundledViews().Lens)
 
 func lensTask(id, title, state string) api.TaskView {
 	e := task(id, title, state)

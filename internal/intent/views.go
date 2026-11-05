@@ -50,10 +50,12 @@ type FacetDef struct {
 	// LabelPrefix goes before the label of each value of a facet whose ranks the catalog derives.
 	LabelPrefix        string
 	Group, Menu, Strip bool
-	Rank               []string
-	Values             map[string]string
-	Buckets            []FacetBucket
-	Merge, Units       string
+	// Show is where the facet's values show on a task's row.
+	Show         Show
+	Rank         []string
+	Values       map[string]string
+	Buckets      []FacetBucket
+	Merge, Units string
 
 	from map[string]*sheet
 }
@@ -137,26 +139,14 @@ func (d ViewsDef) Badged(id string) bool { return slices.Contains(d.Badge, id) }
 // doc lists, which clients fill in.
 type LensWords struct {
 	DefaultGroup, BoardGroup, NoGroup, Copied, CopiedGrouped, TagKey, TagKeyEmpty, Grouped, Sorted, Descending, NoLens string
-}
-
-type mLens struct {
-	DefaultGroup  *string `toml:"default_group"`
-	BoardGroup    *string `toml:"board_group"`
-	NoGroup       *string `toml:"no_group"`
-	Copied        *string `toml:"copied"`
-	CopiedGrouped *string `toml:"copied_grouped"`
-	TagKey        *string `toml:"tag_key"`
-	TagKeyEmpty   *string `toml:"tag_key_empty"`
-	Grouped       *string `toml:"grouped"`
-	Sorted        *string `toml:"sorted"`
-	Descending    *string `toml:"descending"`
-	NoLens        *string `toml:"no_lens"`
+	// Row are the words of a row.
+	Row RowWords
 }
 
 type mViews struct {
 	Empty       *string                `toml:"empty"`
 	DefaultSort *string                `toml:"default_sort"`
-	Lens        *mLens                 `toml:"lens"`
+	Lens        map[string]string      `toml:"lens"`
 	Facets      map[string]mFacet      `toml:"facets"`
 	Views       map[string]mView       `toml:"views"`
 	Review      map[string]mReviewStep `toml:"review"`
@@ -185,6 +175,8 @@ type mFacet struct {
 	Values      map[string]string  `toml:"values"`
 	Empty       *string            `toml:"empty"`
 	LabelPrefix *string            `toml:"label_prefix"`
+	Show        any                `toml:"show"`
+	ShowValues  *string            `toml:"show_values"`
 	Match       *string            `toml:"match"`
 	Menu        *bool              `toml:"menu"`
 	Strip       *bool              `toml:"strip"`
@@ -309,17 +301,24 @@ func (l *viewsLoad) merge(file string, src []byte) Problems {
 	}
 	text(s, "default_sort", m.DefaultSort, &l.def.DefaultSort)
 	if w := m.Lens; w != nil {
-		word(s, "lens.default_group", w.DefaultGroup, &l.def.Lens.DefaultGroup, "label")
-		word(s, "lens.board_group", w.BoardGroup, &l.def.Lens.BoardGroup, "label")
-		word(s, "lens.no_group", w.NoGroup, &l.def.Lens.NoGroup)
-		word(s, "lens.copied", w.Copied, &l.def.Lens.Copied, "count", "view")
-		word(s, "lens.copied_grouped", w.CopiedGrouped, &l.def.Lens.CopiedGrouped, "count", "view", "group")
-		word(s, "lens.tag_key", w.TagKey, &l.def.Lens.TagKey, "label", "key")
-		word(s, "lens.tag_key_empty", w.TagKeyEmpty, &l.def.Lens.TagKeyEmpty, "key")
-		word(s, "lens.grouped", w.Grouped, &l.def.Lens.Grouped, "label")
-		word(s, "lens.sorted", w.Sorted, &l.def.Lens.Sorted, "label")
-		word(s, "lens.descending", w.Descending, &l.def.Lens.Descending, "label")
-		word(s, "lens.no_lens", w.NoLens, &l.def.Lens.NoLens)
+		at := func(key string) *string {
+			if v, ok := w[key]; ok {
+				return &v
+			}
+			return nil
+		}
+		word(s, "lens.default_group", at("default_group"), &l.def.Lens.DefaultGroup, "label")
+		word(s, "lens.board_group", at("board_group"), &l.def.Lens.BoardGroup, "label")
+		word(s, "lens.no_group", at("no_group"), &l.def.Lens.NoGroup)
+		word(s, "lens.copied", at("copied"), &l.def.Lens.Copied, "count", "view")
+		word(s, "lens.copied_grouped", at("copied_grouped"), &l.def.Lens.CopiedGrouped, "count", "view", "group")
+		word(s, "lens.tag_key", at("tag_key"), &l.def.Lens.TagKey, "label", "key")
+		word(s, "lens.tag_key_empty", at("tag_key_empty"), &l.def.Lens.TagKeyEmpty, "key")
+		word(s, "lens.grouped", at("grouped"), &l.def.Lens.Grouped, "label")
+		word(s, "lens.sorted", at("sorted"), &l.def.Lens.Sorted, "label")
+		word(s, "lens.descending", at("descending"), &l.def.Lens.Descending, "label")
+		word(s, "lens.no_lens", at("no_lens"), &l.def.Lens.NoLens)
+		mergeRowWords(s, "lens", w, &l.def.Lens.Row)
 	}
 	l.mergeFacets(s, m.Facets)
 	l.mergeViews(s, m.Views)
@@ -366,6 +365,7 @@ func (l *viewsLoad) mergeFacets(s *sheet, facets map[string]mFacet) {
 		if m.LabelPrefix != nil {
 			f.LabelPrefix = *m.LabelPrefix
 		}
+		readShow(s, path, m.Show, m.ShowValues, &f.Show)
 		for _, o := range []struct {
 			key string
 			v   *string

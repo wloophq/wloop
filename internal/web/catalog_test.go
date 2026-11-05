@@ -122,32 +122,45 @@ func TestThreadRowRendersInTheCockpit(t *testing.T) {
 		t.Fatal(err)
 	}
 	catalog["situations"] = append(catalog["situations"].([]any), map[string]any{"provider": "thread", "kind": "waiting", "label": "waits for a reply", "rank": 0})
+	catalog["facets"] = append(catalog["facets"].([]any), map[string]any{"id": "waits-on", "label": "Waits on", "provider": "thread", "show": "who"})
 	row := map[string]any{"unit": map[string]any{"provider": "thread", "key": "c1"}, "link": "https://chat.example/c1", "label": "#general c1", "title": "Deploy question",
 		"kind": "waiting", "summary": map[string]any{"waits_on": "ana", "since": iso(now.Add(-3 * time.Hour)), "stalled": false, "closed": false,
 			"reason": "asked about the deploy", "line": "ana asked about the deploy"},
-		"views": []string{"needs-me"}, "facets": map[string][]string{}, "actions": []any{}, "specs_version": ""}
+		"views": []string{"mine"}, "facets": map[string][]string{"waits-on": {"ana"}}, "actions": []any{}, "specs_version": ""}
 	var got map[string]string
 	nodeRun(t, cockpitScript(t), nil, `
 Date.now = () => input.now;
 applyCatalog(input.catalog);
+tasksState.catalog = input.views;
 state.health = { viewer: "me" };
 const r = input.row;
 state.rows = [r];
-const lens = { view: "needs-me", q: "", ts: [], quals: [], filters: new Map(), group: "", sort: "", layout: "" };
-const tr = rowTr(r, "", lens);
+const lens = lensOf({ ...readHash(), view: "mine" });
+const m = rowModel(r, "", lens, "");
+const tr = rowTr(m, lens, rowColumns([m]));
 const c = card(r, "");
-location.hash = "#" + routeHash("needs-me", keyOf(r));
+location.hash = "#" + routeHash("mine", keyOf(r));
 state.detail = { row: r, events: [] };
 renderDetail();
 const shown = pipeline(state.rows, lens).shown;
 process.stdout.write(JSON.stringify({ row: tr.textContent, card: c.textContent, detail: document.getElementById("detail").textContent, shown: String(shown) }));`,
-		map[string]any{"row": row, "catalog": catalog, "now": now.UnixMilli()}, &got)
+		map[string]any{"row": row, "catalog": catalog, "views": servedViews(t), "now": now.UnixMilli()}, &got)
 	for _, part := range []string{"row", "card", "detail"} {
-		for _, want := range []string{"Deploy question", "#general c1", "waits for a reply", "ana", "3h 0m"} {
+		for _, want := range []string{"Deploy question", "#general c1", "ana"} {
 			if !strings.Contains(got[part], want) {
 				t.Errorf("%s lacks %q: %s", part, want, got[part])
 			}
 		}
+	}
+	for _, part := range []string{"card", "detail"} {
+		for _, want := range []string{"waits for a reply", "3h 0m"} {
+			if !strings.Contains(got[part], want) {
+				t.Errorf("%s lacks %q: %s", part, want, got[part])
+			}
+		}
+	}
+	if strings.Contains(got["row"], "waits for a reply") {
+		t.Errorf("the row shows a situation its plugin places nowhere: %s", got["row"])
 	}
 	for _, part := range []string{"row", "detail"} {
 		if !strings.Contains(got[part], "asked about the deploy") {
@@ -158,35 +171,39 @@ process.stdout.write(JSON.stringify({ row: tr.textContent, card: c.textContent, 
 		t.Errorf("detail lacks the summary line or since: %s", got["detail"])
 	}
 	if got["shown"] != "1" {
-		t.Errorf("the needs-me list shows %s rows", got["shown"])
+		t.Errorf("the mine list shows %s rows", got["shown"])
 	}
 }
 
 // A row offers a facet button only for a value it holds, so clicking it keeps the row in the list: a thread
-// row, which has no strip or kind facet, shows its dot and its situation as plain text.
+// row, which has no strip facet, shows its dot as plain text, and another provider's kind facet places nothing
+// on it.
 func TestARowFiltersOnlyByTheFacetsItHolds(t *testing.T) {
 	var catalog map[string]any
 	if err := json.Unmarshal([]byte(servedCatalog(t)), &catalog); err != nil {
 		t.Fatal(err)
 	}
 	catalog["situations"] = append(catalog["situations"].([]any), map[string]any{"provider": "thread", "kind": "waiting", "label": "waits for a reply", "rank": 0})
+	catalog["facets"] = append(catalog["facets"].([]any), map[string]any{"id": "waits-on", "label": "Waits on", "provider": "thread", "show": "who"})
 	row := func(facets map[string][]string) map[string]any {
 		return map[string]any{"unit": map[string]any{"provider": "thread", "key": "c1"}, "link": "https://chat.example/c1", "label": "#general c1", "title": "Deploy question",
 			"kind": "waiting", "summary": map[string]any{"waits_on": "ana", "since": "2026-10-14T12:00:00Z"},
-			"views": []string{"needs-me"}, "facets": facets, "actions": []any{}, "specs_version": ""}
+			"views": []string{"mine"}, "facets": facets, "actions": []any{}, "specs_version": ""}
 	}
 	var got [][]string
 	nodeRun(t, cockpitScript(t), nil, `
 applyCatalog(input.catalog);
+tasksState.catalog = input.views;
 state.health = { viewer: "me" };
-const lens = { view: "needs-me", q: "", ts: [], quals: [], filters: new Map(), group: "", sort: "", layout: "" };
+const lens = lensOf({ ...readHash(), view: "mine" });
 const filters = (el, out = []) => {
   if (el && el.tag === "button" && el.attrs.class === "facet") out.push(el.attrs["aria-label"]);
   for (const c of (el && el.children) || []) filters(c, out);
   return out;
 };
-process.stdout.write(JSON.stringify(input.rows.map((r) => filters(rowTr(r, "", lens)))));`,
-		map[string]any{"catalog": catalog, "rows": []any{
+const tr = (r) => { const m = rowModel(r, "", lens, ""); return rowTr(m, lens, rowColumns([m])); };
+process.stdout.write(JSON.stringify(input.rows.map((r) => filters(tr(r)))));`,
+		map[string]any{"catalog": catalog, "views": servedViews(t), "rows": []any{
 			row(map[string][]string{"waits-on": {"ana"}}),
 			row(map[string][]string{"waits-on": {"ana"}, "wait": {"reviewer"}, "kind": {"waiting"}}),
 		}}, &got)
@@ -195,8 +212,8 @@ process.stdout.write(JSON.stringify(input.rows.map((r) => filters(rowTr(r, "", l
 			t.Errorf("a thread row filters by a facet it lacks: %q in %q", label, got[0])
 		}
 	}
-	if len(got[1]) != 3 {
-		t.Errorf("a row holding the strip and kind facets offers %q, want its strip, waits-on and kind", got[1])
+	if len(got[1]) != 2 || strings.Contains(strings.Join(got[1], " "), "situation") {
+		t.Errorf("a row holding the strip and kind facets offers %q, want its strip and waits-on", got[1])
 	}
 }
 

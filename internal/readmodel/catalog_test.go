@@ -45,6 +45,26 @@ func TestFacetsOfTheSameIDMergeWhenTheirMechanicsAgree(t *testing.T) {
 	}
 }
 
+func TestAMergedFacetKeepsEachProvidersDisplay(t *testing.T) {
+	gh := facetPresenter{facets: []api.FacetSpec{{ID: "where", Provider: "github", Group: true, Show: "ref", Labels: map[string]string{"acme/web": "Web"}}}}
+	sl := facetPresenter{facets: []api.FacetSpec{{ID: "where", Provider: "slack", Group: true, Show: "meta", LabelPrefix: "#"}}}
+	third := facetPresenter{facets: []api.FacetSpec{{ID: "where", Provider: "thread", Group: true}}}
+	got := facetByID(readmodel.BuildCatalog(gh, sl, third), "where")
+	if len(got) != 1 {
+		t.Fatalf("where facets %+v", got)
+	}
+	m := got[0]
+	if g := m.For("github"); g.Show != "ref" || g.LabelPrefix != "" || g.Labels["acme/web"] != "Web" {
+		t.Errorf("github places where as %+v", g.Display())
+	}
+	if s := m.For("slack"); s.Show != "meta" || s.LabelPrefix != "#" {
+		t.Errorf("slack places where as %+v", s.Display())
+	}
+	if th := m.For("thread"); th.Show != "" {
+		t.Errorf("thread places where as %+v", th.Display())
+	}
+}
+
 func TestFacetsOfTheSameIDWithOtherMechanicsStayApart(t *testing.T) {
 	a := facetPresenter{facets: []api.FacetSpec{{ID: "risk", Provider: "github", Group: true, Sort: "rank"}}}
 	b := facetPresenter{facets: []api.FacetSpec{{ID: "risk", Provider: "thread", Group: true, Sort: "text"}}}

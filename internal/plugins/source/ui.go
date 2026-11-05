@@ -59,7 +59,11 @@ func (c Catalog) Facets() []api.FacetSpec {
 	for _, f := range c.ui().Facets {
 		w := t.Facets[f.ID]
 		spec := api.FacetSpec{ID: f.ID, Label: cmp.Or(w.Label, f.ID), Provider: c.Source.Provider, Group: f.Group, Sort: f.Sort,
-			Rank: slices.Clone(f.Rank), Empty: w.Empty, Match: f.Match, Menu: f.Menu, Strip: f.Strip}
+			Rank: slices.Clone(f.Rank), Empty: w.Empty, Match: f.Match, Menu: f.Menu, Strip: f.Strip,
+			Show: w.Show.Part, ShowOnly: slices.Clone(w.Show.Only), ShowValues: w.Show.Values, RowClass: maps.Clone(w.RowClass)}
+		if w.LabelPrefix != nil {
+			spec.LabelPrefix = *w.LabelPrefix
+		}
 		if len(w.Values) > 0 {
 			spec.Labels = w.Values
 		}
@@ -89,6 +93,14 @@ func (c Catalog) Situations() []api.SituationSpec {
 		out = append(out, api.SituationSpec{Provider: c.Source.Provider, Kind: api.Kind(s.Name), Label: cmp.Or(t.Situations[s.Name], s.Name), Rank: rank})
 	}
 	return out
+}
+
+// Lens are the plugin's own row words, those its profile layers set.
+func (c Catalog) Lens() api.ProviderWords {
+	if c.Source == nil {
+		return api.ProviderWords{}
+	}
+	return api.ProviderWords{Provider: c.Source.Provider, Words: c.texts().Lens.Set()}
 }
 
 // Events are the words of the event kinds the manifest declares that its

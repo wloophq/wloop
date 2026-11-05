@@ -1,5 +1,5 @@
 {
-  "version": "14698a670b72",
+  "version": "61d92e6987e8",
   "views": [
     {
       "id": "mine",
@@ -130,7 +130,8 @@
       "group": true,
       "sort": "text",
       "match": "suffix",
-      "menu": true
+      "menu": true,
+      "show": "ref"
     },
     {
       "id": "author",
@@ -141,7 +142,13 @@
       "rank": [
         "me"
       ],
-      "menu": true
+      "menu": true,
+      "show": "meta",
+      "show_values": "first",
+      "label_prefix": "by ",
+      "row_class": {
+        "me": "mine"
+      }
     },
     {
       "id": "wait",
@@ -172,7 +179,8 @@
       "provider": "github",
       "group": true,
       "match": "team",
-      "menu": true
+      "menu": true,
+      "show": "who"
     },
     {
       "id": "kind",
@@ -220,7 +228,8 @@
         "round_pending": "round soon",
         "to_address": "to address"
       },
-      "menu": true
+      "menu": true,
+      "show": "kind"
     },
     {
       "id": "type",
@@ -229,7 +238,8 @@
       "group": true,
       "sort": "text",
       "empty": "no brief",
-      "menu": true
+      "menu": true,
+      "show": "meta"
     },
     {
       "id": "risk",
@@ -243,7 +253,8 @@
         "low"
       ],
       "empty": "no brief",
-      "menu": true
+      "menu": true,
+      "show": "meta"
     },
     {
       "id": "size",
@@ -266,7 +277,8 @@
         "xs": "XS"
       },
       "empty": "no brief",
-      "menu": true
+      "menu": true,
+      "show": "meta"
     },
     {
       "id": "status",
@@ -275,7 +287,8 @@
       "group": true,
       "sort": "text",
       "empty": "no workspace",
-      "menu": true
+      "menu": true,
+      "show": "aside"
     },
     {
       "id": "tag",
@@ -283,14 +296,23 @@
       "provider": "github",
       "group": false,
       "match": "prefix",
-      "menu": true
+      "menu": true,
+      "show": "meta"
     },
     {
       "id": "is",
       "label": "Flags",
       "provider": "github",
       "group": false,
-      "menu": true
+      "menu": true,
+      "show": "flag",
+      "show_only": [
+        "paused",
+        "muted"
+      ],
+      "row_class": {
+        "stalled": "late"
+      }
     },
     {
       "id": "ci",
@@ -407,7 +429,8 @@
           "label": "over 4 weeks",
           "within": ""
         }
-      ]
+      ],
+      "show": "age"
     },
     {
       "id": "lane",
@@ -681,6 +704,14 @@
       "field": "profile_chain",
       "label": "Review profile",
       "title": "The review profile layers a round here reads, lowest first; the profile show command lists the files"
+    }
+  ],
+  "lens": [
+    {
+      "provider": "github",
+      "words": {
+        "col_aside": "Workspace"
+      }
     }
   ]
 }

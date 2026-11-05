@@ -1,6 +1,7 @@
 package intent
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -395,7 +396,7 @@ func TestTaskFacetsLoadFromViews(t *testing.T) {
 	for _, f := range views.Facets {
 		ids = append(ids, f.ID)
 	}
-	want := []string{"source", "state", "category", "contexts", "waits-on", "asked-by", "placement", "moved", "gates", "signal", "prop.kind", "prop.risk", "prop.focus", "prop.priority", "type", "risk", "size", "tag"}
+	want := []string{"source", "state", "category", "contexts", "waits-on", "asked-by", "placement", "moved", "gates", "signal", "prop.kind", "prop.area", "prop.risk", "prop.focus", "prop.priority", "type", "risk", "size", "tag"}
 	if !slices.Equal(ids, want) {
 		t.Fatalf("facets %v, want %v", ids, want)
 	}
@@ -502,5 +503,68 @@ func TestTheLensWordsNameOnlyTheirVariables(t *testing.T) {
 	_, problems = loadFacets(t, "[lens]\ncopied = \"Copied {{.count}} of {{.group}}\"\n")
 	if len(problems) != 1 || problems[0].Field != "lens.copied" {
 		t.Errorf("a copied word naming the group: %v", problems)
+	}
+}
+
+func TestAFacetsShowNamesAPartOrAPartsValues(t *testing.T) {
+	views, problems := loadFacets(t, "[facets.risk]\nshow = { flag = [\"high\"] }\nshow_values = \"first\"\n\n[facets.size]\nshow = \"aside\"\n")
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	if risk, _ := facetOf(views, "risk"); risk.Show.Part != "flag" || !slices.Equal(risk.Show.Only, []string{"high"}) || risk.Show.Values != "first" {
+		t.Errorf("risk shows %+v", risk.Show)
+	}
+	if size, _ := facetOf(views, "size"); size.Show.Part != "aside" || size.Show.Only != nil {
+		t.Errorf("size shows %+v", size.Show)
+	}
+	if moved, _ := facetOf(views, "moved"); moved.Show.Part != "age" {
+		t.Errorf("the bundled moved shows %+v", moved.Show)
+	}
+	for _, bad := range []string{"show = \"corner\"", "show = { corner = [\"high\"] }", "show = { flag = \"high\" }", "show_values = \"some\""} {
+		_, problems := loadFacets(t, "[facets.risk]\n"+bad+"\n")
+		if !strings.Contains(problems.Error(), "facets.risk.show") {
+			t.Errorf("%s: %v", bad, problems)
+		}
+	}
+}
+
+func TestTheRowWordsAreSetAndNameOnlyTheirVariables(t *testing.T) {
+	views, problems := loadFacets(t, "")
+	if len(problems) > 0 {
+		t.Fatal(problems)
+	}
+	if set := views.Lens.Row.Set(); len(set) != len(builtin.RowWords) {
+		t.Fatalf("the bundled profile sets %d of %d row words: %v", len(set), len(builtin.RowWords), set)
+	}
+	_, problems = loadFacets(t, "[lens]\nage_days = \"{{.d}} days {{.m}}\"\n")
+	if len(problems) != 1 || problems[0].Field != "lens.age_days" {
+		t.Errorf("an age naming the minutes: %v", problems)
+	}
+}
+
+func TestAPluginsUIShowsItsFacetsAndReplacesRowWords(t *testing.T) {
+	plugin, user := t.TempDir(), t.TempDir()
+	write := func(dir, body string) {
+		if err := os.WriteFile(filepath.Join(dir, UIFile), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(plugin, "[lens]\ncol_aside = \"Workspace\"\n\n[facets.author]\nlabel = \"Author\"\nshow = \"meta\"\nshow_values = \"first\"\nlabel_prefix = \"by \"\nrow_class = { me = \"mine\" }\n")
+	write(user, "[facets.author]\nshow = \"who\"\n")
+	texts, problems := loadUI([]profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}, {Name: "user:acme", Dir: user}})
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	a := texts["acme"].Facets["author"]
+	if a.Show.Part != "who" || a.Show.Values != "first" || a.LabelPrefix == nil || *a.LabelPrefix != "by " || a.RowClass["me"] != "mine" {
+		t.Errorf("author: %+v", a)
+	}
+	if got := texts["acme"].Lens.Set(); !maps.Equal(got, map[string]string{"col_aside": "Workspace"}) {
+		t.Errorf("row words %v", got)
+	}
+	write(user, "[facets.author]\nshow = \"corner\"\n\n[lens]\ncol_aside = \"{{.label}}\"\n")
+	_, problems = loadUI([]profile.Layer{{Name: "user:acme", Dir: user}})
+	if got := problems.Error(); !strings.Contains(got, "facets.author.show") || !strings.Contains(got, "lens.col_aside") {
+		t.Errorf("problems: %s", got)
 	}
 }

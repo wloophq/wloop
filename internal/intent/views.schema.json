@@ -67,7 +67,7 @@
             "type": "string"
           },
           "label_prefix": {
-            "description": "Text before the label of each value of a facet whose order the catalog derives, such as the `@` of a context; a label that has it already keeps it.",
+            "description": "Text before the label of each value the facet shows on a row, such as the `@` of a context; a label that has it already keeps it. A facet whose order the catalog derives has it in its group heads too.",
             "type": "string"
           },
           "match": {
@@ -101,6 +101,78 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "show": {
+            "description": "The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = [\"paused\", \"muted\"] }`. Absent, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "age": {
+                    "description": "The values the facet shows in the age part.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "aside": {
+                    "description": "The values the facet shows in the aside part.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "flag": {
+                    "description": "The values the facet shows in the flag part.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "kind": {
+                    "description": "The values the facet shows in the kind part.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "meta": {
+                    "description": "The values the facet shows in the meta part.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "ref": {
+                    "description": "The values the facet shows in the ref part.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "who": {
+                    "description": "The values the facet shows in the who part.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          },
+          "show_values": {
+            "default": "all",
+            "description": "How many of an item's values the part shows: all, or the first alone.",
+            "enum": [
+              "all",
+              "first"
+            ],
+            "type": "string"
           },
           "sort": {
             "description": "How the facet's values order: by rank, as text, or as instants (time). Absent, as text.",
@@ -143,8 +215,68 @@
       "additionalProperties": false,
       "description": "What every list's lens bar says. Each is a template whose only actions are the `{{.name}}` its doc lists, which the clients fill in. Required in the bundled profile; a user layer may replace any.",
       "properties": {
+        "age_days": {
+          "description": "A row's age from a day, over its days `{{.d}}` and the hours past them `{{.h}}`.",
+          "type": "string"
+        },
+        "age_hours": {
+          "description": "A row's age under a day, over its hours `{{.h}}` and the minutes past them `{{.m}}`.",
+          "type": "string"
+        },
+        "age_minutes": {
+          "description": "A row's age under an hour, over its minutes as `{{.m}}`.",
+          "type": "string"
+        },
+        "age_now": {
+          "description": "A row's age under a minute.",
+          "type": "string"
+        },
         "board_group": {
           "description": "The group menu's entry for the field a board groups by when nothing is picked, over the field's label as `{{.label}}`.",
+          "type": "string"
+        },
+        "briefing": {
+          "description": "The flag of a row whose intake waits for its brief.",
+          "type": "string"
+        },
+        "briefing_attempt": {
+          "description": "What the briefing flag's tooltip adds of a retried intake, over the attempt `{{.n}}`.",
+          "type": "string"
+        },
+        "briefing_error": {
+          "description": "What the briefing flag's tooltip adds of an intake's last error, over the `{{.error}}`.",
+          "type": "string"
+        },
+        "briefing_title": {
+          "description": "The briefing flag's tooltip, over the intake's `{{.seq}}`.",
+          "type": "string"
+        },
+        "changed": {
+          "description": "The flag of a task that changed since you last opened it.",
+          "type": "string"
+        },
+        "col_actions": {
+          "description": "The head of the column of a row's actions, read only by a screen reader.",
+          "type": "string"
+        },
+        "col_age": {
+          "description": "The head of the column of a row's age.",
+          "type": "string"
+        },
+        "col_aside": {
+          "description": "The head of the column of a row's workspace and links.",
+          "type": "string"
+        },
+        "col_unit": {
+          "description": "The head of the column of a row's title, ref and flags in a view whose rows mix kinds.",
+          "type": "string"
+        },
+        "col_who": {
+          "description": "The head of the column of whom a row waits on and its situation.",
+          "type": "string"
+        },
+        "col_why": {
+          "description": "The head of the column of why a row waits.",
           "type": "string"
         },
         "copied": {
@@ -163,6 +295,26 @@
           "description": "The terminal's sort entry for a field in descending order, over the field's `{{.label}}`.",
           "type": "string"
         },
+        "due": {
+          "description": "The flag of a task's deadline, over the `{{.date}}`.",
+          "type": "string"
+        },
+        "every": {
+          "description": "How often a project is reviewed, over the `{{.every}}`.",
+          "type": "string"
+        },
+        "filter_label": {
+          "description": "What a facet button on a row says to a screen reader, over the facet's `{{.label}}` and the `{{.value}}`.",
+          "type": "string"
+        },
+        "filter_title": {
+          "description": "A facet button's tooltip, over the facet's `{{.label}}` and the `{{.value}}`.",
+          "type": "string"
+        },
+        "filter_title_group": {
+          "description": "A facet button's tooltip when its facet groups, over `{{.label}}`, `{{.value}}` and the `{{.group}}` field's label.",
+          "type": "string"
+        },
         "grouped": {
           "description": "What the terminal says after a group pick, over the picked entry's `{{.label}}`.",
           "type": "string"
@@ -175,8 +327,52 @@
           "description": "What the terminal says when a group or sort pick is asked where no list is on screen.",
           "type": "string"
         },
+        "no_next_action": {
+          "description": "The flag of a project with no open child.",
+          "type": "string"
+        },
+        "open_children": {
+          "description": "A project's open children, over their number `{{.n}}`.",
+          "type": "string"
+        },
+        "questions": {
+          "description": "The pill of a brief's open questions, over their number `{{.n}}`.",
+          "type": "string"
+        },
+        "questions_title": {
+          "description": "That pill's tooltip, over `{{.n}}`.",
+          "type": "string"
+        },
+        "review_due": {
+          "description": "The flag of a project past its review.",
+          "type": "string"
+        },
+        "reviewed": {
+          "description": "When a project was last reviewed, over the `{{.date}}`.",
+          "type": "string"
+        },
+        "sequential": {
+          "description": "The flag of a project that takes its children one at a time.",
+          "type": "string"
+        },
+        "sort_by": {
+          "description": "A column head's tooltip, over the `{{.label}}` of the facet it sorts by.",
+          "type": "string"
+        },
         "sorted": {
           "description": "What the terminal says after a sort pick, over the picked entry's `{{.label}}`.",
+          "type": "string"
+        },
+        "stale": {
+          "description": "The flag of a row whose plugin is not reporting.",
+          "type": "string"
+        },
+        "stale_title": {
+          "description": "The stale flag's tooltip.",
+          "type": "string"
+        },
+        "starred": {
+          "description": "The tooltip of a starred task's star.",
           "type": "string"
         },
         "tag_key": {
@@ -186,20 +382,66 @@
         "tag_key_empty": {
           "description": "The group of the items with no tag of that key, over the `{{.key}}`.",
           "type": "string"
+        },
+        "unread": {
+          "description": "The flag of a task whose links hold messages the extraction has not read, over how long the oldest waited, `{{.lag}}`.",
+          "type": "string"
+        },
+        "unread_title": {
+          "description": "The unread flag's tooltip.",
+          "type": "string"
+        },
+        "until": {
+          "description": "The flag of a task asleep until a date, over the `{{.date}}`.",
+          "type": "string"
         }
       },
       "required": [
+        "age_days",
+        "age_hours",
+        "age_minutes",
+        "age_now",
         "board_group",
+        "briefing",
+        "briefing_attempt",
+        "briefing_error",
+        "briefing_title",
+        "changed",
+        "col_actions",
+        "col_age",
+        "col_aside",
+        "col_unit",
+        "col_who",
+        "col_why",
         "copied",
         "copied_grouped",
         "default_group",
         "descending",
+        "due",
+        "every",
+        "filter_label",
+        "filter_title",
+        "filter_title_group",
         "grouped",
         "no_group",
         "no_lens",
+        "no_next_action",
+        "open_children",
+        "questions",
+        "questions_title",
+        "review_due",
+        "reviewed",
+        "sequential",
+        "sort_by",
         "sorted",
+        "stale",
+        "stale_title",
+        "starred",
         "tag_key",
-        "tag_key_empty"
+        "tag_key_empty",
+        "unread",
+        "unread_title",
+        "until"
       ],
       "type": "object"
     },

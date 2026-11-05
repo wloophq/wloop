@@ -161,7 +161,7 @@ func TestMyPullRequestsStandOutAndTheStripExplainsItself(t *testing.T) {
 		row(5, "ana", "draft", "nobody", ""),
 	}
 	nodeRun(t, prelude, []string{"isSet", "age", "stamp", "resolveWho", "waitingLabel", "waitField", "waitCat", "waitClass", "isMine", "stripTitle",
-		"intakeWaiting", "intakeChip", "tagChips", "briefTags", "mineMark", "copySlot", "card", "stripLegend"}, `process.stdout.write(JSON.stringify({
+		"intakeWaiting", "intakeChip", "lensWords", "fillWord", "tagChips", "briefTags", "mineMark", "copySlot", "card", "stripLegend"}, `process.stdout.write(JSON.stringify({
   cards: input.map((r) => card(r, "").children[0].attrs),
   titles: input.map(stripTitle),
   legend: stripLegend(),

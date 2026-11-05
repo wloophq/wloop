@@ -1,10 +1,10 @@
 [Needs me 5]   My PRs 1    In loop 1    Plan 0           automatic rounds paused
 
->   6d  acme/api#7                 Batch export             me · agent asks
-   42s  acme/api#3                 Retry webhooks with ba…  me · round soon
-   !9d  acme/billing-service#1365  Remove hardcoded crede…  car… · changes asked
-    2d  acme/api#42                ✨ feat: export ⚡️ fas…  me · checks failing
- * 12m  acme/api#9                 Loop one                 me · agent working
+>   6d 5h  acme/api#7                 Batch export          me · agent asks
+      42s  acme/api#3                 Retry webhooks with…  me · round soon
+   !9d 0h  acme/billing-service#1365  Remove hardcoded cr…  car… · changes asked
+    2d 2h  acme/api#42                ✨ feat: export ⚡️ …  me · checks failing
+ *    12m  acme/api#9                 Loop one              me · agent working
 
 acme/api#7  Batch export
   waiting    me · agent asks · 6d

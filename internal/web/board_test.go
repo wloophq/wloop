@@ -63,8 +63,12 @@ func nodeRun(t *testing.T, prelude string, funcs []string, main string, in, out 
 	src := cockpitJS(t)
 	var script strings.Builder
 	script.WriteString(prelude)
+	seen := map[string]bool{}
 	for _, f := range funcs {
-		script.WriteString(jsFunction(t, src, f))
+		if !seen[f] {
+			seen[f] = true
+			script.WriteString(jsFunction(t, src, f))
+		}
 	}
 	script.WriteString("\n")
 	script.WriteString(main)
@@ -86,7 +90,7 @@ func jsConst(t *testing.T, src, name string) string {
 func keyJS(t *testing.T) string {
 	src, routes := appJS(t), staticJS(t, "routes.js")
 	var b strings.Builder
-	for _, c := range []string{"refLabel", "unitKey", "unitOf", "keyOf", "labelOf", "labelTail"} {
+	for _, c := range []string{"refLabel", "unitKey", "unitOf", "keyOf", "labelOf"} {
 		b.WriteString(jsConst(t, src, c))
 	}
 	for _, c := range []string{"keyUnit", "unitPath"} {
@@ -540,6 +544,11 @@ func TestAFacetTogglesItsQualifier(t *testing.T) {
 	}
 }
 
+// rowFuncs are app.js's row renderer and what it calls beyond the lens.
+var rowFuncs = []string{"specFor", "agePart", "ageText", "partPiece", "rowParts", "rowClasses", "partClass", "pieceButtons", "rowColumnDefs", "rowColumns",
+	"columnSort", "sortPick", "rowHead", "rowTr", "joined", "refTail", "rowTable", "unitTitle", "rowWords", "lensWords", "fillWord", "facet", "heldFacet",
+	"rowLink", "bucketOf", "goDuration", "toggleCollapsed", "onlyThis", "groupQualifier", "multiCopy", "marked", "foldMap", "copySlot"}
+
 // lensFuncs are what pipeline runs, with what the fields call.
 var lensFuncs = append(slices.Clone(queryFuncs), "rowTexts", "rowKindLabel", "kindLabel", "haystack", "matches", "inView", "isSet", "isMuted", "isMine", "resolveWho", "waitingWho", "waitingLabel",
 	"waitCat", "waitClass", "isStalled", "rowFlags", "upcoming", "sinceTime", "itemValues", "itemKey", "filtersOf", "passesFilters", "passes", "parseSort",
@@ -732,7 +741,7 @@ func TestTheOpenRowIsMarkedAndScrolledToOnce(t *testing.T) {
 		t.Skip("node is not on PATH")
 	}
 	src := appJS(t)
-	for _, want := range []string{`key === pr ? "sel" : ""`, `"aria-selected": key === pr`, `"aria-current": key === pr`} {
+	for _, want := range []string{`m.selected ? "sel" : ""`, `"aria-selected": m.selected`, `selected: key === pr`, `"aria-current": key === pr`} {
 		if !strings.Contains(src, want) {
 			t.Errorf("app.js lacks %s", want)
 		}
@@ -990,7 +999,8 @@ func TestTimelineSaysWhatTheAnswerChoseAndThatItIsQueued(t *testing.T) {
 }
 
 func TestCockpitShowsTheBriefingIntake(t *testing.T) {
-	prelude := `function h(tag, attrs, ...c) { return { tag, attrs, children: c.flat() }; }` + "\n" + `function stamp(t) { return t; }`
+	prelude := `function h(tag, attrs, ...c) { return { tag, attrs, children: c.flat() }; }` + "\n" + `function stamp(t) { return t; }` + "\n" +
+		`globalThis.tasksState = { catalog: { lens: ` + mustJS(t, servedViews(t).Lens) + ` } };` + "\n"
 	in := []any{
 		map[string]any{"payload": map[string]any{"intake": map[string]any{"seq": 42, "intent": "review", "state": "briefing", "attempt": 2, "last_error": "rate limited", "next": "14:05"}}},
 		map[string]any{"payload": map[string]any{"intake": map[string]any{"seq": 43, "intent": "review", "state": "starting"}}},
@@ -1001,7 +1011,7 @@ func TestCockpitShowsTheBriefingIntake(t *testing.T) {
 		Lines [][]string `json:"lines"`
 		Notes []string   `json:"notes"`
 	}
-	nodeRun(t, prelude, []string{"isSet", "pl", "intakeWaiting", "intakeChip", "intakeLines", "acceptedNote"}, `process.stdout.write(JSON.stringify({
+	nodeRun(t, prelude, []string{"isSet", "pl", "intakeWaiting", "intakeChip", "intakeLines", "acceptedNote", "lensWords", "fillWord"}, `process.stdout.write(JSON.stringify({
 		chips: input.map((r) => intakeChip(r)),
 		lines: [intakeLines(input[0].payload.intake)],
 		notes: [acceptedNote("review", "acme/api#7", { seq: 42 }), acceptedNote("review", "acme/api#7", { seq: 42, joined: true, state: "briefing" }), acceptedNote("open", "acme/api#7", undefined)],

@@ -80,7 +80,8 @@ func deriveOrder(spec *api.FacetSpec, f intentload.FacetDef, tasks intentload.Ta
 
 func taskFacet(f intentload.FacetDef) api.FacetSpec {
 	spec := api.FacetSpec{ID: f.ID, Label: f.Label, Fact: f.Fact, Group: f.Group, Sort: f.Sort, Rank: slices.Clone(f.Rank), Labels: maps.Clone(f.Values),
-		Empty: f.Empty, Match: f.Match, Menu: f.Menu, Strip: f.Strip}
+		Empty: f.Empty, Match: f.Match, Menu: f.Menu, Strip: f.Strip,
+		Show: f.Show.Part, ShowOnly: slices.Clone(f.Show.Only), ShowValues: f.Show.Values, LabelPrefix: f.LabelPrefix}
 	for _, b := range f.Buckets {
 		within := ""
 		if b.Within > 0 {
@@ -133,4 +134,11 @@ func diffKey(diff string) string {
 		}
 	}
 	return "fact"
+}
+
+// LensWords are the profile's lens words as clients read them.
+func LensWords(w intentload.LensWords) api.LensWords {
+	return api.LensWords{DefaultGroup: w.DefaultGroup, BoardGroup: w.BoardGroup, NoGroup: w.NoGroup, Copied: w.Copied,
+		CopiedGrouped: w.CopiedGrouped, TagKey: w.TagKey, TagKeyEmpty: w.TagKeyEmpty, Grouped: w.Grouped, Sorted: w.Sorted,
+		Descending: w.Descending, NoLens: w.NoLens, RowWords: api.RowWords(w.Row)}
 }

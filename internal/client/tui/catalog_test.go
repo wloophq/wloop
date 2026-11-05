@@ -76,9 +76,10 @@ func modelWith(t testing.TB, rows ...api.Row) *Model {
 	t.Helper()
 	m := NewModel()
 	m.SetCatalog(servedCatalog(t))
+	m.SetViews(api.ViewsCatalog{Lens: testLensWords})
 	m.SetSpecs(servedSpecs(t).Specs)
 	m.SetKeys(servedKeys(servedSpecs(t)))
-	m.SetData(rows, api.Health{})
+	m.SetData(withServedFacets("", rows), api.Health{})
 	return m
 }
 
@@ -86,6 +87,7 @@ func newModel(t testing.TB) *Model {
 	t.Helper()
 	m := NewModel()
 	m.SetCatalog(servedCatalog(t))
+	m.SetViews(api.ViewsCatalog{Lens: testLensWords})
 	m.SetSpecs(servedSpecs(t).Specs)
 	m.SetKeys(servedKeys(servedSpecs(t)))
 	return m

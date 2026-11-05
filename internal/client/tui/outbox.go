@@ -31,7 +31,7 @@ func (m *Model) outboxList(tasks []api.TaskView, cur, width, height int, now tim
 	laid := t.Columns(width-3, 2, cols, cells)
 	out := make([]string, len(tasks))
 	for i, e := range tasks {
-		out[i] = m.taskLine(e, laid[i], i == cur, width)
+		out[i] = m.draftLine(e, laid[i], i == cur, width)
 	}
 	return window(out, cur, height)
 }
@@ -92,4 +92,23 @@ func (m *Model) draftFacts(d *api.Draft, fact func(label, text string, style fun
 	if d.Deadline != nil {
 		fact("sends", d.Deadline.Local().Format("2006-01-02 15:04")+" unless you decide first", t.Dim)
 	}
+}
+
+// draftLine marks the cursor, a busy draft and a changed one.
+func (m *Model) draftLine(e api.TaskView, laid string, selected bool, width int) string {
+	t := m.t
+	mark := []rune("   ")
+	if selected {
+		mark[0] = '>'
+	}
+	if _, busy := m.busy[taskUnit(e.ID)]; busy {
+		mark[1] = '*'
+	} else if e.Changed {
+		mark[1] = '•'
+	}
+	line := string(mark) + laid
+	if selected && t.Color {
+		line = t.Reverse(line + strings.Repeat(" ", max(width-termfmt.Cells(termfmt.Plain(line)), 0)))
+	}
+	return line
 }

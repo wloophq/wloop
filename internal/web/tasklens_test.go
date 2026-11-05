@@ -31,7 +31,7 @@ func servedViews(t *testing.T) api.ViewsCatalog {
 	if len(problems) > 0 {
 		t.Fatal(problems)
 	}
-	cat := api.ViewsCatalog{Facets: catalog.TaskFacets(def.Facets, tasks, []string{"calls", "computer"}), DefaultSort: def.DefaultSort, Lens: api.LensWords(def.Lens)}
+	cat := api.ViewsCatalog{Facets: catalog.TaskFacets(def.Facets, tasks, []string{"calls", "computer"}), DefaultSort: def.DefaultSort, Lens: catalog.LensWords(def.Lens)}
 	for _, v := range def.Views {
 		cat.Views = append(cat.Views, api.TaskViewSpec{ID: v.ID, Label: v.Label, Summary: v.Summary, Empty: v.Empty, When: v.WhenText, Sort: v.SortText, Over: v.Over, Group: v.Group})
 	}
@@ -115,9 +115,13 @@ func taskLensJS(t *testing.T) string {
 	for _, c := range []string{"folded", "itemValuesCache", "NO_GROUP", "lensMemo", "labelOf", "unitKey"} {
 		b.WriteString(jsConst(t, src, c))
 	}
-	b.WriteString("const state = { rows: [], loaded: false, health: null };\n")
-	for _, f := range taskLensFuncs {
-		b.WriteString(jsFunction(t, src, f))
+	b.WriteString("const state = { rows: [], loaded: false, health: null, collapsed: new Set() };\n")
+	seen := map[string]bool{}
+	for _, f := range slices.Concat(taskLensFuncs, rowFuncs) {
+		if !seen[f] {
+			seen[f] = true
+			b.WriteString(jsFunction(t, src, f))
+		}
 	}
 	b.WriteString("const taskListNodes = (r, open) => { const p = viewPage(r, open); return [...p.head, ...(p.res ? lensBar(p.lens, p.res) : []), ...p.body]; };\n")
 	return b.String()
@@ -199,7 +203,7 @@ process.stdout.write(JSON.stringify({ Group: p.res.group, Groups: p.res.groups.f
 	if got.Group != "source" || len(got.Groups) != 1 || got.Groups[0].Key != "slack" || !slices.Equal(got.Groups[0].IDs, []string{"s-1"}) {
 		t.Fatalf("where:general grouped by source: %+v", got)
 	}
-	if !strings.Contains(got.Text, "Slack (1)") || !strings.Contains(got.Text, "Answer the deploy question") || strings.Contains(got.Text, "general settings") {
+	if !strings.Contains(got.Text, "▾ Slack1") || !strings.Contains(got.Text, "Answer the deploy question") || strings.Contains(got.Text, "general settings") {
 		t.Errorf("list %q", got.Text)
 	}
 	if got.Nested {
@@ -359,7 +363,7 @@ func TestATaskInTwoGroupsHasTwoFocusSlotsAndTheKeysWalkBoth(t *testing.T) {
 	nodeRun(t, mixedPrelude(t), nil, `
 tasksState.tasks = input.tasks.map((e) => e.id === "g-1" ? { ...e, facets: { ...e.facets, tag: ["lang:go", "lang:rust"] } } : e);
 const p = viewPage(route({ g: "tag:lang" }), "");
-const focus = all(h("div", {}, ...p.body), (x) => x.tag === "li").map((x) => x.attrs["data-focus"]);
+const focus = all(h("div", {}, ...p.body), (x) => x.tag === "tr" && String(x.attrs["data-focus"] || "").startsWith("task:")).map((x) => x.attrs["data-focus"]);
 const nodes = focus.map((f) => ({ dataset: { focus: f } }));
 const walk = [];
 let at = null;
