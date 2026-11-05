@@ -35,6 +35,13 @@ label = "Source"
 group = true
 sort  = "text"
 
+[facets.source.values]
+github    = "GitHub"
+slack     = "Slack"
+session   = "Session"
+workspace = "Workspace"
+task      = "Task"
+
 [facets.state]
 fact  = "task.state"
 label = "State"
@@ -107,6 +114,7 @@ label  = "2-4 weeks"
 [facets.moved.buckets.older]
 label = "over 4 weeks"
 
+# The number of the task's open gates, a count.
 [facets.gates]
 fact  = "task.gates_open"
 label = "Open gates"
@@ -116,6 +124,7 @@ sort  = "text"
 [facets.signal]
 fact  = "task.link_signals"
 label = "Signals"
+group = true
 
 [facets."prop.kind"]
 fact  = "task.prop.kind"

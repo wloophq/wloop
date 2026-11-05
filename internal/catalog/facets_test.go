@@ -91,6 +91,12 @@ func TestTaskFacetsServeTheirMechanics(t *testing.T) {
 	if s := byID["size"]; s.Labels["xl"] != "XL" || s.Rank[0] != "xs" {
 		t.Errorf("size: %+v", s)
 	}
+	if s := byID["source"]; s.Labels["github"] != "GitHub" || s.Labels["slack"] != "Slack" {
+		t.Errorf("source: %+v", s)
+	}
+	if s := byID["signal"]; !s.Group {
+		t.Errorf("signal: %+v", s)
+	}
 }
 
 func TestATaskFacetNamesTheFactItReads(t *testing.T) {

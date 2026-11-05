@@ -193,7 +193,7 @@ Reply (`r`) writes a draft of your own on the task's first unit, a reply in its 
 
 ## Facets
 
-A facet is a field every client filters, groups and sorts a list by. A task has facets from three layers, which the daemon joins and serves with the task: its own facts (source, state, category, whom it waits on, who asked, its placement, when it last moved, its open gates, its link signals, its enum properties), its brief (type, risk, size, tags and the brief intent's enum extras), and the facets of the rows of its units, whatever plugin emitted them (a pull request's checks and situation, a conversation's waits-on).
+A facet is a field every client filters, groups and sorts a list by. A task has facets from three layers, which the daemon joins and serves with the task: its own facts (source, state, category, whom it waits on, who asked, its placement, when it last moved, how many gates it has open, its link signals, its enum properties), its brief (type, risk, size, tags and the brief intent's enum extras), and the facets of the rows of its units, whatever plugin emitted them (a pull request's checks and situation, a conversation's waits-on).
 
 `where` is the reserved facet for where a unit lives: a pull request's `owner/repo`, a Slack channel. Every source plugin emits it for its units, and `where:wloop` finds `acme/wloop`. It replaces the `repo` and `channel` facets and the views' `unit_sort`. `task.placement` is where a task's work runs (its workspace's repository), and `task.moved_at` is when the task, or a unit it links, last moved.
 

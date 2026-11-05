@@ -197,7 +197,7 @@ process.stdout.write(JSON.stringify({ Group: p.res.group, Groups: p.res.groups.f
 	if got.Group != "source" || len(got.Groups) != 1 || got.Groups[0].Key != "slack" || !slices.Equal(got.Groups[0].IDs, []string{"s-1"}) {
 		t.Fatalf("where:general grouped by source: %+v", got)
 	}
-	if !strings.Contains(got.Text, "slack (1)") || !strings.Contains(got.Text, "Answer the deploy question") || strings.Contains(got.Text, "general settings") {
+	if !strings.Contains(got.Text, "Slack (1)") || !strings.Contains(got.Text, "Answer the deploy question") || strings.Contains(got.Text, "general settings") {
 		t.Errorf("list %q", got.Text)
 	}
 	if got.Nested {
@@ -219,7 +219,7 @@ const p = viewPage(route({ g: "source", layout: "board" }), "");
 const board = byClass(h("div", {}, ...p.body), "board")[0];
 process.stdout.write(JSON.stringify(byClass(board, "lane").map((l) => ({ Label: text(byClass(l, "lane-head")[0].children[0]),
   Focus: all(l, (x) => x.tag === "li").map((x) => x.attrs["data-focus"]) }))));`, mixedInput(t, nil), &got)
-	want := []lane{{"github", []string{"task:g-1", "task:g-2"}}, {"slack", []string{"task:s-1", "task:s-2"}}}
+	want := []lane{{"GitHub", []string{"task:g-1", "task:g-2"}}, {"Slack", []string{"task:s-1", "task:s-2"}}}
 	if !slices.EqualFunc(got, want, func(a, b lane) bool { return a.Label == b.Label && slices.Equal(a.Focus, b.Focus) }) {
 		t.Errorf("lanes %+v, want %+v", got, want)
 	}
