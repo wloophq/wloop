@@ -2373,8 +2373,6 @@ function renderDetail() {
   const key = keyOf(r);
   const opening = box.hidden || box.dataset.key !== key;
   const inCard = !!r.question;
-  const old = document.getElementById("guidance");
-  const caret = old && document.activeElement === old ? [old.selectionStart, old.selectionEnd] : null;
   const guidance = inCard ? null : guidanceBox(key, guidanceLabel(r));
   const muteState = (p.mute || {}).until_state_change ? "muted until who it waits on changes"
     : isMuted(p) ? `muted until ${stamp(p.mute.until)}` : "";
@@ -2416,24 +2414,34 @@ function renderDetail() {
       h("div", {}, h("span", { class: "kind" }, eventLabel(e.kind)), e.actor ? h("span", { class: "who" }, " " + e.actor) : null),
       e.data ? h("span", { class: "data" }, e.data) : null))));
 
-  if (box.querySelector(".d-acts") && (!guidance || guidance.parentNode === box)) {
-    box.querySelector(".d-top").replaceWith(top);
-    box.querySelector(".d-acts").replaceWith(acts);
-    box.querySelector(".d-log").replaceWith(log);
-  } else {
-    box.replaceChildren(...[top, guidance, acts, log].filter(Boolean));
-  }
-  // The card is rebuilt on every render and takes the box along, which drops
-  // its focus and caret.
-  const now = document.getElementById("guidance");
-  if (caret && now && document.activeElement !== now) {
-    now.focus({ preventScroll: true });
-    now.setSelectionRange(...caret);
-  }
+  keepFocusIn(box, () => {
+    if (box.querySelector(".d-acts") && (!guidance || guidance.parentNode === box)) {
+      box.querySelector(".d-top").replaceWith(top);
+      box.querySelector(".d-acts").replaceWith(acts);
+      box.querySelector(".d-log").replaceWith(log);
+    } else {
+      box.replaceChildren(...[top, guidance, acts, log].filter(Boolean));
+    }
+  });
   box.dataset.key = key;
   box.hidden = false;
   document.body.classList.add("has-detail");
   if (opening && matchMedia("(max-width: 900px)").matches) box.scrollIntoView({ block: "start" });
+}
+
+// keepFocusIn runs redraw, which rebuilds the controls inside box, and gives the focus, the caret and the
+// scroll back to the rebuilt control of the slot that had them, so a sync does not interrupt typing.
+function keepFocusIn(box, redraw) {
+  const was = document.activeElement && box.contains(document.activeElement) ? document.activeElement : null;
+  const slot = was && was.dataset && was.dataset.focus;
+  const caret = slot && typeof was.selectionStart === "number" ? [was.selectionStart, was.selectionEnd, was.selectionDirection] : null;
+  const scroll = was ? was.scrollTop : 0;
+  redraw();
+  const now = slot && box.querySelector(`[data-focus="${CSS.escape(slot)}"]`);
+  if (!now || now === was) return;
+  now.focus({ preventScroll: true });
+  if (caret && now.setSelectionRange) now.setSelectionRange(...caret);
+  now.scrollTop = scroll;
 }
 
 function revealOpenRow(pr) {
