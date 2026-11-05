@@ -3,7 +3,6 @@ package tui
 import (
 	"cmp"
 	"maps"
-	"regexp"
 	"slices"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -124,7 +123,7 @@ func (m *Model) arrange(v lensView, items []lens.Item) (order []int, heads []str
 		idx, kept = reorder(idx, sorted), reorder(kept, sorted)
 	}
 	field := cmp.Or(pick.group, v.defaultGroup)
-	spec, keys, ok := lens.GroupField(field, specs)
+	spec, keys, ok := lens.GroupField(field, specs, m.viewsCat.Lens)
 	if field == noGroup || !ok {
 		return idx, make([]string, len(idx))
 	}
@@ -154,7 +153,7 @@ func reorder[T any](s []T, order []int) []T {
 
 // menuFields are the fields the lens menus of v offer: those some item of the view holds a value of.
 func (m *Model) menuFields(v lensView) []api.FacetSpec {
-	return lens.Offered(v.items, v.facets)
+	return lens.Offered(v.items, v.facets, m.viewsCat.Lens)
 }
 
 // cycleGroup moves the group pick of the view on screen to the next of: the view's own, the other fields the
@@ -245,8 +244,6 @@ func (m *Model) keepSelections() {
 	m.keepTaskSelection()
 }
 
-var lensVarRE = regexp.MustCompile(`\{\{\s*\.label\s*\}\}`)
-
 func lensWord(template, label string) string {
-	return lensVarRE.ReplaceAllLiteralString(template, label)
+	return lens.Word(template, map[string]string{"label": label})
 }

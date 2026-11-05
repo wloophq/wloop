@@ -12,7 +12,7 @@ import (
 
 func tagRows() []map[string]any {
 	rows := lensRows()
-	for i, tags := range [][]string{{"change:fix", "lang:go"}, {"lang:go", "lang:sql"}, nil, {"change:refac", "domain:billing"}, {"lang:python"}} {
+	for i, tags := range [][]string{{"change:fix", "lang:go", "urgent"}, {"lang:go", "lang:sql"}, nil, {"change:refac", "domain:billing"}, {"lang:python"}} {
 		if tags == nil {
 			continue
 		}
@@ -103,7 +103,8 @@ func TestTagKeysListTheKeysPresentAndATagChipTogglesItsQualifier(t *testing.T) {
 		GroupBy string   `json:"groupBy"`
 		Toggled []string `json:"toggled"`
 	}
-	nodeRun(t, fieldsPrelude(t), append(slices.Clone(queryFuncs), "tagKeyField", "groupField", "tagKeys", "qualifierToken", "toggledQualifier"), `process.stdout.write(JSON.stringify({
+	nodeRun(t, fieldsPrelude(t), append(slices.Clone(queryFuncs), "tagKeyField", "groupField", "tagKeys", "qualifierToken", "toggledQualifier", "lensWords", "fillWord"), `globalThis.tasksState = { catalog: { lens: { tag_key: "{{.label}} {{.key}}", tag_key_empty: "no {{.key}}" } } };
+process.stdout.write(JSON.stringify({
   keys: tagKeys(input),
   fields: ["tag:lang", "tag", "tag:Lang", "tag:", "where"].map((id) => { const f = groupField(id); return f ? [f.id, f.label, !!f.group] : null; }),
   groupBy: fieldById("tag").groupBy("lang:go"),

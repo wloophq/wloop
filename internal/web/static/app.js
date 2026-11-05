@@ -279,23 +279,30 @@ function fieldById(id, fields = catalog.fields) {
 // tagKeyField groups by one brief tag key, "tag:lang": a row sits under each
 // of its tags of that key, or under "no lang" with none. Its group keys are
 // whole tags, so no value, "none" included, reads as the empty group.
-function tagKeyField(id) {
+function tagKeyField(id, fields = catalog.fields) {
   const m = /^tag:([a-z-]+)$/.exec(id || "");
-  if (!m) return null;
+  const tag = fieldById("tag", fields);
+  if (!m || !tag || tag.match !== MATCH.prefix) return null;
   const key = m[1];
+  const w = lensWords();
   return {
-    id, label: `Tag ${key}`, empty: `no ${key}`, group: true, tagKey: key,
-    keys: (r) => facetValues(r, "tag").filter((t) => t.startsWith(key + ":")),
+    id, label: fillWord(w.tag_key, { label: tag.label, key }), empty: fillWord(w.tag_key_empty, { key }), group: true, tagKey: key,
+    keys: (r) => facetValues(r, tag.id).filter((t) => t.startsWith(key + ":")),
   };
 }
 
 function groupField(id, fields = catalog.fields) {
-  return fieldById(id, fields) || tagKeyField(id);
+  return fieldById(id, fields) || tagKeyField(id, fields);
 }
 
 function tagKeys(rows) {
   const keys = new Set();
-  for (const r of rows) for (const t of facetValues(r, "tag")) keys.add(t.split(":")[0]);
+  for (const r of rows) {
+    for (const t of facetValues(r, "tag")) {
+      const at = t.indexOf(":");
+      if (at > 0) keys.add(t.slice(0, at));
+    }
+  }
   return [...keys].filter((k) => /^[a-z-]+$/.test(k)).sort();
 }
 
@@ -648,7 +655,7 @@ function lensFields(view) {
 function fieldsFor(view, items) {
   const has = new Set();
   for (const it of items) for (const [id, vs] of Object.entries(it.facets || {})) if ((vs || []).some(Boolean)) has.add(id);
-  return [...lensFields(view).filter((f) => has.has(f.id)), ...tagKeys(items).map((k) => tagKeyField("tag:" + k))];
+  return [...lensFields(view).filter((f) => has.has(f.id)), ...tagKeys(items).map((k) => tagKeyField("tag:" + k, lensFields(view))).filter(Boolean)];
 }
 
 // viewSource is what view lists before the lens, as loaded: a task view's tasks, a row view's rows, which
@@ -1068,7 +1075,7 @@ function hideLens(tools) {
 function lensBar(lens, res) {
   const offered = lens.offered || catalog.fields;
   const fields = lens.fields || catalog.fields;
-  const current = tagKeyField(lens.group);
+  const current = tagKeyField(lens.group, fields);
   const groups = offered.filter((f) => f.group && f.menu !== false);
   if (current && !groups.some((f) => f.id === current.id)) groups.push(current);
   const board = lens.layout === "board";

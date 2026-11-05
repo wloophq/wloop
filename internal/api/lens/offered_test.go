@@ -34,11 +34,11 @@ func TestOfferedKeepsTheFieldsSomeItemHasAndAddsTagKeys(t *testing.T) {
 		{Facets: map[string][]string{"repo": {"acme/api"}, "author": {""}, "tag": {"area:billing", "plain"}}},
 		{Facets: map[string][]string{"repo": {"acme/web"}, "tag": {"kind:bug", "Bad Key:x"}}},
 	}
-	got := lens.Offered(items, specs)
+	got := lens.Offered(items, specs, api.LensWords{TagKey: "{{.label}} {{.key}}", TagKeyEmpty: "no {{.key}}"})
 	if want := []string{"repo", "tag", "tag:area", "tag:kind"}; !slices.Equal(ids(got), want) {
 		t.Fatalf("ids %v, want %v", ids(got), want)
 	}
-	if got[2].Label != "Tag area" || !got[2].Group {
+	if got[2].Label != "Tag area" || got[2].Empty != "no area" || !got[2].Group {
 		t.Fatalf("tag field %+v", got[2])
 	}
 }

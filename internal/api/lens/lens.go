@@ -183,8 +183,8 @@ func GroupBy(items []Item, spec api.FacetSpec, now time.Time) []Group {
 
 // GroupField resolves a group field id: a facet's own, or "<facet>:<key>" for a prefix-match facet, which
 // groups by the values starting with "<key>:", an item under each of them. For the second kind it returns the
-// keys of an item, to give GroupByKeys; for the first, nil keys and GroupBy applies.
-func GroupField(id string, specs map[string]api.FacetSpec) (api.FacetSpec, func(Item) []string, bool) {
+// keys of an item, to give GroupByKeys, and its name in words; for the first, nil keys and GroupBy applies.
+func GroupField(id string, specs map[string]api.FacetSpec, words api.LensWords) (api.FacetSpec, func(Item) []string, bool) {
 	if spec, ok := specs[id]; ok {
 		return spec, nil, true
 	}
@@ -202,7 +202,15 @@ func GroupField(id string, specs map[string]api.FacetSpec) (api.FacetSpec, func(
 		}
 		return out
 	}
-	return api.FacetSpec{ID: id, Label: spec.Label + " " + key, Group: true, Menu: true, Empty: "no " + key}, keys, true
+	return api.FacetSpec{ID: id, Label: Word(words.TagKey, map[string]string{"label": spec.Label, "key": key}), Group: true, Menu: true,
+		Empty: Word(words.TagKeyEmpty, map[string]string{"key": key})}, keys, true
+}
+
+var wordVarRE = regexp.MustCompile(`\{\{\s*\.(\w+)\s*\}\}`)
+
+// Word fills a lens word's {{.name}} actions from vars, a name vars lacks with nothing.
+func Word(template string, vars map[string]string) string {
+	return wordVarRE.ReplaceAllStringFunc(template, func(m string) string { return vars[wordVarRE.FindStringSubmatch(m)[1]] })
 }
 
 // GroupByKeys groups like GroupBy, an item under each of the keys the function gives, "none" without one.
@@ -349,7 +357,7 @@ func ByID(specs []api.FacetSpec) map[string]api.FacetSpec {
 
 // Offered are the fields a list's menus offer: the specs some item has a value of, in order, then a
 // "tag:<key>" field for each key of the prefix-match "tag" facet's values the items hold.
-func Offered(items []Item, specs []api.FacetSpec) []api.FacetSpec {
+func Offered(items []Item, specs []api.FacetSpec, words api.LensWords) []api.FacetSpec {
 	has := map[string]bool{}
 	tagKeys := map[string]bool{}
 	for _, it := range items {
@@ -372,7 +380,7 @@ func Offered(items []Item, specs []api.FacetSpec) []api.FacetSpec {
 	}
 	byID := ByID(specs)
 	for _, key := range slices.Sorted(maps.Keys(tagKeys)) {
-		if spec, _, ok := GroupField("tag:"+key, byID); ok {
+		if spec, _, ok := GroupField("tag:"+key, byID, words); ok {
 			out = append(out, spec)
 		}
 	}

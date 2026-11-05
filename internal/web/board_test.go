@@ -543,12 +543,13 @@ func TestAFacetTogglesItsQualifier(t *testing.T) {
 // lensFuncs are what pipeline runs, with what the fields call.
 var lensFuncs = append(slices.Clone(queryFuncs), "rowTexts", "rowKindLabel", "kindLabel", "haystack", "matches", "inView", "isSet", "isMuted", "isMine", "resolveWho", "waitingWho", "waitingLabel",
 	"waitCat", "waitClass", "isStalled", "rowFlags", "upcoming", "sinceTime", "itemValues", "itemKey", "filtersOf", "passesFilters", "passes", "parseSort",
-	"tagKeyField", "groupField", "effectiveGroup", "cmp", "byDefault", "keyRank", "keyOrder", "compareItems", "groupLabel", "groupItems", "pipelineOf", "pipeline")
+	"lensWords", "fillWord", "tagKeyField", "groupField", "effectiveGroup", "cmp", "byDefault", "keyRank", "keyOrder", "compareItems", "groupLabel", "groupItems", "pipelineOf", "pipeline")
 
 func lensPrelude(t *testing.T) string {
 	src := appJS(t)
 	return filterPrelude(t) + jsConst(t, src, "NO_GROUP") + jsConst(t, src, "SIZES") + jsConst(t, src, "RISKS") + jsConst(t, src, "itemValuesCache") + `const state = { health: { viewer: "me" } };
-const roundGate = (r) => r.round_gate;` + "\n"
+const roundGate = (r) => r.round_gate;
+globalThis.tasksState = { catalog: { lens: ` + mustJS(t, servedViews(t).Lens) + ` } };` + "\n"
 }
 
 func TestWaitCatIsTheStripAndAgreesWithTheLabel(t *testing.T) {

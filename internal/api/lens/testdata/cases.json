@@ -1,5 +1,9 @@
 {
  "now": "2026-11-04T12:00:00Z",
+ "words": {
+  "tag_key": "{{.label}} with {{.key}}",
+  "tag_key_empty": "without {{.key}}"
+ },
  "specs": [
   {
    "id": "where",
@@ -875,7 +879,7 @@
      },
      {
       "key": "none",
-      "label": "no lang",
+      "label": "without lang",
       "items": [
        1,
        3,

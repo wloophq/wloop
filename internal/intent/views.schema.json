@@ -162,6 +162,14 @@
         "no_group": {
           "description": "The group menu's entry that lists the view in one group.",
           "type": "string"
+        },
+        "tag_key": {
+          "description": "The name of the field that groups by one key of the tag facet's `key:value` values, over the tag facet's `{{.label}}` and the `{{.key}}`.",
+          "type": "string"
+        },
+        "tag_key_empty": {
+          "description": "The group of the items with no tag of that key, over the `{{.key}}`.",
+          "type": "string"
         }
       },
       "required": [
@@ -169,7 +177,9 @@
         "copied",
         "copied_grouped",
         "default_group",
-        "no_group"
+        "no_group",
+        "tag_key",
+        "tag_key_empty"
       ],
       "type": "object"
     },

@@ -136,7 +136,7 @@ func (d ViewsDef) Badged(id string) bool { return slices.Contains(d.Badge, id) }
 // LensWords are what a list's lens bar says, each a template whose only actions are the {{.name}} its key's
 // doc lists, which clients fill in.
 type LensWords struct {
-	DefaultGroup, BoardGroup, NoGroup, Copied, CopiedGrouped string
+	DefaultGroup, BoardGroup, NoGroup, Copied, CopiedGrouped, TagKey, TagKeyEmpty string
 }
 
 type mLens struct {
@@ -145,6 +145,8 @@ type mLens struct {
 	NoGroup       *string `toml:"no_group"`
 	Copied        *string `toml:"copied"`
 	CopiedGrouped *string `toml:"copied_grouped"`
+	TagKey        *string `toml:"tag_key"`
+	TagKeyEmpty   *string `toml:"tag_key_empty"`
 }
 
 type mViews struct {
@@ -308,6 +310,8 @@ func (l *viewsLoad) merge(file string, src []byte) Problems {
 		word(s, "lens.no_group", w.NoGroup, &l.def.Lens.NoGroup)
 		word(s, "lens.copied", w.Copied, &l.def.Lens.Copied, "count", "view")
 		word(s, "lens.copied_grouped", w.CopiedGrouped, &l.def.Lens.CopiedGrouped, "count", "view", "group")
+		word(s, "lens.tag_key", w.TagKey, &l.def.Lens.TagKey, "label", "key")
+		word(s, "lens.tag_key_empty", w.TagKeyEmpty, &l.def.Lens.TagKeyEmpty, "key")
 	}
 	l.mergeFacets(s, m.Facets)
 	l.mergeViews(s, m.Views)

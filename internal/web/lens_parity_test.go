@@ -18,6 +18,7 @@ type lensWant struct {
 func TestTheCockpitLensMatchesTheGoLens(t *testing.T) {
 	var table struct {
 		Now   string           `json:"now"`
+		Words map[string]any   `json:"words"`
 		Specs []map[string]any `json:"specs"`
 		Items []map[string]any `json:"items"`
 		Cases []struct {
@@ -34,6 +35,7 @@ func TestTheCockpitLensMatchesTheGoLens(t *testing.T) {
 	var got []lensWant
 	nodeRun(t, lensPrelude(t), lensFuncs, `
 Date.now = () => Date.parse(input.now);
+globalThis.tasksState = { catalog: { lens: input.words } };
 catalog.fields = input.specs.map(fieldOf);
 process.stdout.write(JSON.stringify(input.cases.map((c) => {
   const quals = qualifiers(c.q);
@@ -43,7 +45,7 @@ process.stdout.write(JSON.stringify(input.cases.map((c) => {
   const out = { shown: at(flat.groups[0].rows) };
   if (c.group) out.groups = pipelineOf(input.items, { ...lens, group: c.group }, null).groups.map((g) => ({ key: g.key, label: g.label, items: at(g.rows) }));
   return out;
-})));`, map[string]any{"now": table.Now, "specs": table.Specs, "items": table.Items, "cases": table.Cases}, &got)
+})));`, map[string]any{"now": table.Now, "words": table.Words, "specs": table.Specs, "items": table.Items, "cases": table.Cases}, &got)
 	if len(got) != len(table.Cases) {
 		t.Fatalf("%d results for %d cases", len(got), len(table.Cases))
 	}

@@ -13,6 +13,7 @@ import (
 
 type caseTable struct {
 	Now   time.Time         `json:"now"`
+	Words api.LensWords     `json:"words"`
 	Specs []api.FacetSpec   `json:"specs"`
 	Items []lens.Item       `json:"items"`
 	Cases []caseExpectation `json:"cases"`
@@ -65,7 +66,7 @@ func TestLensCases(t *testing.T) {
 		if c.Group == "" {
 			continue
 		}
-		spec, keys, ok := lens.GroupField(c.Group, specs)
+		spec, keys, ok := lens.GroupField(c.Group, specs, table.Words)
 		if !ok {
 			t.Errorf("group field %q is unknown", c.Group)
 			continue
