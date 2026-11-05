@@ -395,7 +395,7 @@ func TestTaskFacetsLoadFromViews(t *testing.T) {
 	for _, f := range views.Facets {
 		ids = append(ids, f.ID)
 	}
-	want := []string{"source", "state", "category", "waits-on", "asked-by", "placement", "moved", "gates", "signal", "prop.kind", "prop.risk", "prop.focus", "prop.priority", "type", "risk", "size", "tag"}
+	want := []string{"source", "state", "category", "contexts", "waits-on", "asked-by", "placement", "moved", "gates", "signal", "prop.kind", "prop.risk", "prop.focus", "prop.priority", "type", "risk", "size", "tag"}
 	if !slices.Equal(ids, want) {
 		t.Fatalf("facets %v, want %v", ids, want)
 	}

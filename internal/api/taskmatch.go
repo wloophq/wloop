@@ -76,21 +76,3 @@ func (e TaskView) Texts() []string {
 	}
 	return out
 }
-
-// TaskMatches says whether every term is in one of e's Texts, ignoring case and accents.
-func TaskMatches(e TaskView, terms []string) bool {
-	if len(terms) == 0 {
-		return true
-	}
-	texts := e.Texts()
-	for i, t := range texts {
-		texts[i] = Fold(t)
-	}
-	for _, t := range terms {
-		t = Fold(t)
-		if !slices.ContainsFunc(texts, func(s string) bool { return strings.Contains(s, t) }) {
-			return false
-		}
-	}
-	return true
-}

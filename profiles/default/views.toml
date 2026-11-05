@@ -33,14 +33,21 @@ sort  = "text"
 fact  = "task.state"
 label = "State"
 group = true
-sort  = "text"
+sort  = "rank"
 
 [facets.category]
 fact  = "task.category"
 label = "Category"
 group = true
 sort  = "rank"
-rank  = ["inbox", "ready", "active", "waiting", "deferred", "done", "dropped"]
+
+[facets.contexts]
+fact         = "task.prop.contexts"
+label        = "Context"
+group        = true
+sort         = "rank"
+empty        = "no context"
+label_prefix = "@"
 
 [facets.waits-on]
 fact  = "task.owed_by"

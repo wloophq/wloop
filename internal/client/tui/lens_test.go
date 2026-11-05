@@ -3,13 +3,16 @@ package tui
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"reflect"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
 // lensCatalog is a profile's views, verbs and states the terminal knows nothing of beforehand.
@@ -332,5 +335,91 @@ func TestTheTUISortsByAnOfferedField(t *testing.T) {
 	press(m, Key{Rune: '-'})
 	if want := "sort: View order"; m.status != want {
 		t.Fatalf("status %q, want %q", m.status, want)
+	}
+}
+
+func bundledFacets(t *testing.T) []api.FacetSpec {
+	t.Helper()
+	fsys := os.DirFS("../../../profiles/default")
+	views, problems := intentload.BundledViews(fsys)
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	tasks, problems := intentload.BundledTasks(fsys)
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	return catalog.TaskFacets(views.Facets, tasks, []string{"calls", "computer"})
+}
+
+func TestTheTUIGroupsStatesAndContextsAsTheBundledProfileDeclares(t *testing.T) {
+	m := newModel(t)
+	c := lensCatalog()
+	c.Facets = bundledFacets(t)
+	c.Views = []api.TaskViewSpec{{ID: "stalled", Label: "Stalled"}}
+	m.SetViews(c)
+	a, b, d, e := lensTask("t-1", "Done one", "done"), lensTask("t-2", "Inbox one", "inbox"), lensTask("t-3", "Next one", "next"), lensTask("t-4", "Other", "next")
+	d.Facets["contexts"], e.Facets["contexts"] = []string{"computer"}, []string{"calls"}
+	m.SetTasks("stalled", []api.TaskView{a, b, d, e}, api.Counters{})
+	heads := func(group string) []string {
+		m.picks = map[string]lensPick{"task:stalled": {group: group}}
+		tasks, hs := m.arrangedTasks()
+		var out []string
+		for i, h := range hs {
+			if h != "" {
+				out = append(out, h+":"+tasks[i].ID)
+			}
+		}
+		return out
+	}
+	if got, want := heads("state"), []string{"Inbox:t-2", "Next:t-3", "Done:t-1"}; !slices.Equal(got, want) {
+		t.Errorf("state heads %v, want %v", got, want)
+	}
+	if got, want := heads("contexts"), []string{"@calls:t-4", "@computer:t-3", "no context:t-1"}; !slices.Equal(got, want) {
+		t.Errorf("context heads %v, want %v", got, want)
+	}
+}
+
+func TestTheTUIShowsAnItemUnderEachOfItsValues(t *testing.T) {
+	m := whereModel(t)
+	c := lensCatalog()
+	c.Facets = append(c.Facets, api.FacetSpec{ID: "tag", Label: "Tag", Match: "prefix", Menu: true})
+	m.SetViews(c)
+	a, b := lensTask("t-1", "Ship the export", "doing"), lensTask("t-2", "Call the bank", "parked")
+	a.Facets["tag"], b.Facets["tag"] = []string{"area:billing", "area:ops"}, []string{"area:ops"}
+	m.SetTasks("stalled", []api.TaskView{a, b}, api.Counters{})
+	m.picks = map[string]lensPick{"task:stalled": {group: "tag:area"}}
+	tasks, heads := m.arrangedTasks()
+	var got []string
+	for i, h := range heads {
+		got = append(got, h+"|"+tasks[i].ID)
+	}
+	if want := []string{"area:billing|t-1", "area:ops|t-1", "|t-2"}; !slices.Equal(got, want) {
+		t.Fatalf("groups %q, want %q", got, want)
+	}
+	press(m, Key{Rune: 'j'}, Key{Rune: 'j'})
+	if sel, _ := m.selectedTask(); sel.ID != "t-2" || m.taskAt != 2 {
+		t.Fatalf("the cursor did not walk past the repeated task: %q at %d", sel.ID, m.taskAt)
+	}
+}
+
+func TestTheTUIBuildsALensItemOncePerArrival(t *testing.T) {
+	m := whereModel(t)
+	first, _ := m.lensViewOnScreen()
+	m.visibleTasks()
+	again, _ := m.lensViewOnScreen()
+	if &first.items[0] != &again.items[0] {
+		t.Fatal("the lens items were rebuilt")
+	}
+	m.SetData([]api.Row{row(7, "Batch export", "review", "needs-me")}, api.Health{})
+	a, _ := m.rowsOf("needs-me")
+	b, _ := m.rowsOf("needs-me")
+	if len(a) != 1 || len(b) != 1 {
+		t.Fatalf("rows %d %d", len(a), len(b))
+	}
+	_, x := m.rowsOf("needs-me")
+	_, y := m.rowsOf("needs-me")
+	if &x[0].Texts[0] != &y[0].Texts[0] {
+		t.Fatal("the row items were rebuilt")
 	}
 }

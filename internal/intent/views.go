@@ -47,11 +47,13 @@ type ViewsDef struct {
 // sorts it by. Merge is "union" or "rows-first", Units "all" or "primary".
 type FacetDef struct {
 	ID, Fact, Label, Empty, Sort, Match string
-	Group, Menu, Strip                  bool
-	Rank                                []string
-	Values                              map[string]string
-	Buckets                             []FacetBucket
-	Merge, Units                        string
+	// LabelPrefix goes before the label of each value of a facet whose ranks the catalog derives.
+	LabelPrefix        string
+	Group, Menu, Strip bool
+	Rank               []string
+	Values             map[string]string
+	Buckets            []FacetBucket
+	Merge, Units       string
 
 	from map[string]*sheet
 }
@@ -169,19 +171,20 @@ type mView struct {
 }
 
 type mFacet struct {
-	Fact    *string            `toml:"fact"`
-	Label   *string            `toml:"label"`
-	Group   *bool              `toml:"group"`
-	Sort    *string            `toml:"sort"`
-	Rank    []string           `toml:"rank"`
-	Values  map[string]string  `toml:"values"`
-	Empty   *string            `toml:"empty"`
-	Match   *string            `toml:"match"`
-	Menu    *bool              `toml:"menu"`
-	Strip   *bool              `toml:"strip"`
-	Buckets map[string]mBucket `toml:"buckets"`
-	Merge   *string            `toml:"merge"`
-	Units   *string            `toml:"units"`
+	Fact        *string            `toml:"fact"`
+	Label       *string            `toml:"label"`
+	Group       *bool              `toml:"group"`
+	Sort        *string            `toml:"sort"`
+	Rank        []string           `toml:"rank"`
+	Values      map[string]string  `toml:"values"`
+	Empty       *string            `toml:"empty"`
+	LabelPrefix *string            `toml:"label_prefix"`
+	Match       *string            `toml:"match"`
+	Menu        *bool              `toml:"menu"`
+	Strip       *bool              `toml:"strip"`
+	Buckets     map[string]mBucket `toml:"buckets"`
+	Merge       *string            `toml:"merge"`
+	Units       *string            `toml:"units"`
 }
 
 type mBucket struct {
@@ -347,6 +350,9 @@ func (l *viewsLoad) mergeFacets(s *sheet, facets map[string]mFacet) {
 		}
 		if m.Empty != nil {
 			f.Empty = strings.TrimSpace(*m.Empty)
+		}
+		if m.LabelPrefix != nil {
+			f.LabelPrefix = *m.LabelPrefix
 		}
 		for _, o := range []struct {
 			key string

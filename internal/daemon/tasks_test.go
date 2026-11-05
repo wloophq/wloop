@@ -28,6 +28,7 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/lens"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/change"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
@@ -834,8 +835,9 @@ func TestCountersWithTermsCountWhatTheFilteredListsShow(t *testing.T) {
 			for _, view := range storedViews() {
 				v := url.Values{"view": {view}, "area": {area}}
 				n := 0
+				query := lens.Parse(strings.Join(terms, " "), nil)
 				for _, e := range r.page(t, v.Encode()).Tasks {
-					if api.TaskMatches(e, terms) {
+					if query.Match(lens.Item{Facets: e.Facets, Texts: e.Texts()}, nil, time.Time{}) {
 						n++
 					}
 				}

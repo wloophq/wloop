@@ -16,6 +16,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
+	"github.com/wloophq/wloop/internal/api/lens"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -149,7 +150,7 @@ func (f *fakeDaemon) Counters(_ context.Context, area, query string) (api.Counte
 	for v, es := range f.tasks {
 		c.Views[v] = 0
 		for _, e := range es {
-			if api.TaskMatches(e, strings.Fields(query)) {
+			if lens.Parse(query, nil).Match(taskItem(e), nil, time.Time{}) {
 				c.Views[v]++
 			}
 		}

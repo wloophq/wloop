@@ -13,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/lens"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -105,6 +106,9 @@ type Model struct {
 	views   []View
 	catalog api.CatalogResponse
 	rows    []api.Row
+	// rowLens and taskItems are the lens items of rows and of each view's tasks, built when they arrive.
+	rowLens   []lens.Item
+	taskItems map[string][]lens.Item
 	// plans are the open plan gates with a deadline, by unit: the automatic
 	// rounds that wait on them.
 	plans  map[string]api.GateView
@@ -204,6 +208,7 @@ func (m *Model) Stay(why string) { m.quit, m.status = false, why }
 // still in the view, else the same place in the list.
 func (m *Model) SetData(rows []api.Row, h api.Health) {
 	m.rows, m.health, m.loaded, m.err = rows, h, true, ""
+	m.indexRows()
 	m.keepSelection()
 }
 
@@ -230,6 +235,7 @@ func (m *Model) SetCatalog(c api.CatalogResponse) {
 	current := m.viewKey()
 	m.catalog, m.views = c, nil
 	m.refreshFacets()
+	m.indexRows()
 	for _, v := range c.ViewsOn(surface) {
 		if v.Rows {
 			m.views = append(m.views, View{ID: v.ID, Label: v.Label, Provider: v.Provider})
@@ -272,6 +278,9 @@ func (m *Model) visibleRows() ([]api.Row, []string) {
 }
 
 func (m *Model) cursor(rows []api.Row) int {
+	if m.at >= 0 && m.at < len(rows) && rows[m.at].Unit == m.sel {
+		return m.at
+	}
 	if i := slices.IndexFunc(rows, func(r api.Row) bool { return r.Unit == m.sel }); i >= 0 {
 		return i
 	}

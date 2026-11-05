@@ -19,6 +19,7 @@ var viewsGrammar = []Key{
 	{Path: "facets.*.rank", In: SurfaceViews, Kind: KindList, Elem: KindText, Doc: "The facet's values in their order, first first."},
 	{Path: "facets.*.values", In: SurfaceViews, Kind: KindMap, Doc: "The text people read for a value, by value."},
 	{Path: "facets.*.values.*", In: SurfaceViews, Kind: KindText, Doc: "The text of one value."},
+	{Path: "facets.*.label_prefix", In: SurfaceViews, Kind: KindText, Doc: "Text before the label of each value of a facet whose order the catalog derives, such as the `@` of a context; a label that has it already keeps it."},
 	{Path: "facets.*.empty", In: SurfaceViews, Kind: KindText, Doc: "What a group of tasks with no value shows."},
 	{Path: "facets.*.match", In: SurfaceViews, Kind: KindEnum, Values: named("exact", "suffix", "prefix", "team"), Default: "exact", Doc: "How a filter's text matches a value: the whole value, its last segment, its first, or a person's team."},
 	{Path: "facets.*.menu", In: SurfaceViews, Kind: KindBool, Default: "true", Doc: "Whether the facet is offered in the filter menu."},

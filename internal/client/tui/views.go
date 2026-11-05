@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/lens"
 	dtask "github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/termfmt"
@@ -52,6 +53,13 @@ func (m *Model) SetTasks(view string, tasks []api.TaskView, c api.Counters) {
 		m.tasks = map[string][]api.TaskView{}
 	}
 	m.tasks[view] = tasks
+	if m.taskItems == nil {
+		m.taskItems = map[string][]lens.Item{}
+	}
+	m.taskItems[view] = make([]lens.Item, len(tasks))
+	for i, e := range tasks {
+		m.taskItems[view][i] = taskItem(e)
+	}
 	m.tasksLoaded = true
 	m.SetCounters(c)
 	if d := m.opened; d != nil {
@@ -152,6 +160,9 @@ func (m *Model) arrangedTasks() ([]api.TaskView, []string) {
 }
 
 func (m *Model) taskCursor(tasks []api.TaskView) int {
+	if m.taskAt >= 0 && m.taskAt < len(tasks) && tasks[m.taskAt].ID == m.taskSel {
+		return m.taskAt
+	}
 	if i := slices.IndexFunc(tasks, func(e api.TaskView) bool { return e.ID == m.taskSel }); i >= 0 {
 		return i
 	}

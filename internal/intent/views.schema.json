@@ -66,6 +66,10 @@
             "description": "The name people read. Required.",
             "type": "string"
           },
+          "label_prefix": {
+            "description": "Text before the label of each value of a facet whose order the catalog derives, such as the `@` of a context; a label that has it already keeps it.",
+            "type": "string"
+          },
           "match": {
             "default": "exact",
             "description": "How a filter's text matches a value: the whole value, its last segment, its first, or a person's team.",

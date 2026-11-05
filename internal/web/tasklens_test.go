@@ -25,7 +25,11 @@ func servedViews(t *testing.T) api.ViewsCatalog {
 	if len(problems) > 0 {
 		t.Fatal(problems)
 	}
-	cat := api.ViewsCatalog{Facets: catalog.TaskFacets(def.Facets), DefaultSort: def.DefaultSort, Lens: api.LensWords(def.Lens)}
+	tasks, problems := intentload.BundledTasks(os.DirFS("../../profiles/default"))
+	if len(problems) > 0 {
+		t.Fatal(problems)
+	}
+	cat := api.ViewsCatalog{Facets: catalog.TaskFacets(def.Facets, tasks, []string{"calls", "computer"}), DefaultSort: def.DefaultSort, Lens: api.LensWords(def.Lens)}
 	for _, v := range def.Views {
 		cat.Views = append(cat.Views, api.TaskViewSpec{ID: v.ID, Label: v.Label, Summary: v.Summary, Empty: v.Empty, When: v.WhenText, Sort: v.SortText, Over: v.Over, Group: v.Group})
 	}
@@ -393,5 +397,29 @@ process.stdout.write(JSON.stringify(input.queries.map((q) => groupedRows(viewPag
 		if !slices.Equal(got[i], want) && !(len(got[i]) == 0 && len(want) == 0) {
 			t.Errorf("%q: the list shows %v, the daemon counts %v", q, got[i], want)
 		}
+	}
+}
+
+func TestATaskViewGroupsStatesAndContextsAsTheBundledProfileDeclares(t *testing.T) {
+	mk := func(id, state, ctx string) api.TaskView {
+		return task(id, state, func(e *api.TaskView) {
+			e.Title, e.Facets = id, map[string][]string{"state": {state}}
+			if ctx != "" {
+				e.Facets["contexts"] = []string{ctx}
+			}
+		})
+	}
+	tasks := []api.TaskView{mk("a", "done", ""), mk("b", "inbox", "computer"), mk("c", "next", "calls"), mk("d", "scheduled", "")}
+	type group struct{ Key, Label string }
+	var got struct{ State, Contexts []group }
+	nodeRun(t, mixedPrelude(t), nil, `
+const groups = (g) => viewPage(route({ g }), "").res.groups.filter((x) => x.rows.length).map((x) => ({ Key: x.key, Label: x.label }));
+process.stdout.write(JSON.stringify({ State: groups("state"), Contexts: groups("contexts") }));`, mixedInput(t, map[string]any{"tasks": tasks}), &got)
+	want := []group{{"inbox", "Inbox"}, {"next", "Next"}, {"scheduled", "Scheduled"}, {"done", "Done"}}
+	if !slices.Equal(got.State, want) {
+		t.Errorf("states group as %v, want %v", got.State, want)
+	}
+	if want := []group{{"calls", "@calls"}, {"computer", "@computer"}, {"none", "no context"}}; !slices.Equal(got.Contexts, want) {
+		t.Errorf("contexts group as %v, want %v", got.Contexts, want)
 	}
 }

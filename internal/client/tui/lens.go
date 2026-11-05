@@ -35,6 +35,14 @@ func (m *Model) refreshFacets() {
 	m.facetByID = lens.ByID(m.facets)
 }
 
+// indexRows builds the lens items of the rows, which change with the rows and the kinds' labels.
+func (m *Model) indexRows() {
+	m.rowLens = make([]lens.Item, len(m.rows))
+	for i, r := range m.rows {
+		m.rowLens[i] = m.rowItem(r)
+	}
+}
+
 func taskItem(e api.TaskView) lens.Item { return lens.Item{Facets: e.Facets, Texts: e.Texts()} }
 
 func (m *Model) rowItem(r api.Row) lens.Item {
@@ -47,9 +55,9 @@ func (m *Model) rowItem(r api.Row) lens.Item {
 
 // rowsOf are the rows of row view id and their lens items.
 func (m *Model) rowsOf(id string) (rows []api.Row, items []lens.Item) {
-	for _, r := range m.rows {
+	for i, r := range m.rows {
 		if slices.Contains(r.Views, id) {
-			rows, items = append(rows, r), append(items, m.rowItem(r))
+			rows, items = append(rows, r), append(items, m.rowLens[i])
 		}
 	}
 	return rows, items
@@ -59,11 +67,7 @@ func (m *Model) rowsOf(id string) (rows []api.Row, items []lens.Item) {
 func (m *Model) lensViewOnScreen() (lensView, bool) {
 	if v, ok := m.viewOnScreen(); ok {
 		id := m.listView(v)
-		items := make([]lens.Item, len(m.tasks[id]))
-		for i, e := range m.tasks[id] {
-			items[i] = taskItem(e)
-		}
-		return lensView{key: "task:" + id, items: items, defaultGroup: m.defaultGroup(id), defaultSort: m.viewsCat.DefaultSort}, true
+		return lensView{key: "task:" + id, items: m.taskItems[id], defaultGroup: m.defaultGroup(id), defaultSort: m.viewsCat.DefaultSort}, true
 	}
 	if m.view >= len(m.views) {
 		return lensView{}, false
@@ -119,14 +123,9 @@ func (m *Model) arrange(v lensView, items []lens.Item) (order []int, heads []str
 	} else {
 		groups = lens.GroupBy(kept, spec, m.now)
 	}
-	placed := map[int]bool{}
 	for _, g := range groups {
 		head := g.Label
 		for _, j := range g.Items {
-			if placed[j] {
-				continue
-			}
-			placed[j] = true
 			order, heads = append(order, idx[j]), append(heads, head)
 			head = ""
 		}

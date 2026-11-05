@@ -280,6 +280,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `facets.<name>.rank` (list of strings): The facet's values in their order, first first.
 - `facets.<name>.values` (table by name): The text people read for a value, by value.
 - `facets.<name>.values.<name>` (string): The text of one value.
+- `facets.<name>.label_prefix` (string): Text before the label of each value of a facet whose order the catalog derives, such as the `@` of a context; a label that has it already keeps it.
 - `facets.<name>.empty` (string): What a group of tasks with no value shows.
 - `facets.<name>.match` (one of `exact`, `suffix`, `prefix`, `team`, default `exact`): How a filter's text matches a value: the whole value, its last segment, its first, or a person's team.
 - `facets.<name>.menu` (bool, default `true`): Whether the facet is offered in the filter menu.

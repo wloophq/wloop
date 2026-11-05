@@ -3,6 +3,7 @@ package catalog
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -64,7 +65,7 @@ func TestTwoPluginsMustAgreeOnAFacetToo(t *testing.T) {
 }
 
 func TestTaskFacetsServeTheirMechanics(t *testing.T) {
-	specs := TaskFacets(bundled(t).Views.Facets)
+	specs := TaskFacets(bundled(t).Views.Facets, bundled(t).Tasks, nil)
 	byID := map[string]api.FacetSpec{}
 	for _, f := range specs {
 		byID[f.ID] = f
@@ -83,7 +84,7 @@ func TestTaskFacetsServeTheirMechanics(t *testing.T) {
 
 func TestATaskFacetNamesTheFactItReads(t *testing.T) {
 	facts := map[string]string{}
-	for _, f := range TaskFacets(bundled(t).Views.Facets) {
+	for _, f := range TaskFacets(bundled(t).Views.Facets, bundled(t).Tasks, nil) {
 		facts[f.ID] = f.Fact
 	}
 	if facts["waits-on"] != "task.owed_by" || facts["asked-by"] != "task.askers" || facts["risk"] != "brief.risk" {
@@ -93,5 +94,33 @@ func TestATaskFacetNamesTheFactItReads(t *testing.T) {
 		if f.Fact != "" {
 			t.Errorf("the plugin facet %s names the fact %q", f.ID, f.Fact)
 		}
+	}
+}
+
+func TestTaskFacetsTakeTheOrderOfTheirFactFromTheProfile(t *testing.T) {
+	l := bundled(t)
+	byID := map[string]api.FacetSpec{}
+	for _, f := range TaskFacets(l.Views.Facets, l.Tasks, []string{"calls", "@decide"}) {
+		byID[f.ID] = f
+	}
+	var states, labels []string
+	for _, st := range l.Tasks.States {
+		states, labels = append(states, st.Name), append(labels, st.Label)
+	}
+	if got := byID["state"]; !slices.Equal(got.Rank, states) || got.Labels[states[1]] != labels[1] {
+		t.Errorf("state: rank %v labels %v, want the states %v labelled %v", got.Rank, got.Labels, states, labels)
+	}
+	if got, want := byID["category"].Rank, []string{"inbox", "ready", "deferred", "done", "dropped"}; !slices.Equal(got, want) {
+		t.Errorf("category rank %v, want %v", got, want)
+	}
+	c := byID["contexts"]
+	if !slices.Equal(c.Rank, []string{"calls", "@decide"}) || c.Labels["calls"] != "@calls" || c.Labels["@decide"] != "" {
+		t.Errorf("contexts: rank %v labels %v", c.Rank, c.Labels)
+	}
+	if got := byID["prop.priority"].Rank; !slices.Equal(got, []string{"high", "normal", "low"}) {
+		t.Errorf("a declared rank changed: %v", got)
+	}
+	if p, ok := l.Tasks.Prop("kind"); ok && len(p.Values) > 0 && !slices.Equal(byID["prop.kind"].Rank, p.Values) {
+		t.Errorf("prop.kind rank %v, want its enum values %v", byID["prop.kind"].Rank, p.Values)
 	}
 }
