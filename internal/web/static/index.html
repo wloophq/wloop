@@ -48,19 +48,7 @@
     <details id="list-box" class="list-box" open>
       <summary id="list-sum" class="list-sum"></summary>
       <div id="tools" class="tools" role="toolbar" aria-label="Filter, group and sort" hidden></div>
-      <table id="table">
-        <thead>
-          <tr>
-            <th scope="col" class="c-pr"><button type="button" class="th-sort" data-sort="where" data-focus="th:where" title="Sort by where">Pull request</button></th>
-            <th scope="col" class="c-wait"><button type="button" class="th-sort" data-sort="wait" data-focus="th:wait" title="Sort by whom it waits on">Waiting on</button></th>
-            <th scope="col" class="c-for"><button type="button" class="th-sort" data-sort="age" data-focus="th:age" title="Sort by how long it waits">For</button></th>
-            <th scope="col" class="c-why"><button type="button" class="th-sort" data-sort="kind" data-focus="th:kind" title="Sort by situation">Why</button></th>
-            <th scope="col" class="c-where"><button type="button" class="th-sort" data-sort="status" data-focus="th:status" title="Sort by workspace column">Workspace</button></th>
-            <th scope="col" class="c-act"><span class="sr">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody id="rows"></tbody>
-      </table>
+      <table id="table"></table>
       <div id="board" class="board" hidden></div>
       <ol id="activity" class="activity" aria-label="Recent activity" hidden></ol>
       <p id="empty" class="empty" hidden></p>

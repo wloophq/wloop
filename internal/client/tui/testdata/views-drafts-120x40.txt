@@ -1,6 +1,6 @@
 [Focus 1]   Inbox 2    Outbox 1    Next 4    Waiting 4    Projects 0    Someday 0    Logbook 12
 
->  5h  ★ Reply on the batch export review  @computer acme/api#7
+>  5h 0m  acme/api#7  ★ Reply on the batch export review  @computer  next
 
 Reply on the batch export review
   state      next · focus

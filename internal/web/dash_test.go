@@ -15,7 +15,7 @@ import (
 )
 
 var dashFuncs = append(slices.Clone(lensFuncs), "toggledQualifier", "qualifierToken", "tagKeys", "stamp",
-	"dashPalette", "dashSeries", "dashTheme", "dashMix", "dashDim", "dashItem", "dashTally", "dashRanked", "dashBase", "dashCountAxis", "dashBars",
+	"dashStrip", "dashPalette", "dashSeries", "dashTheme", "dashMix", "dashDim", "dashItem", "dashTally", "dashRanked", "dashBase", "dashCountAxis", "dashBars",
 	"dashKpis", "dashWaitOption", "dashPeopleOption", "dashAuthorsOption", "dashReposOption", "dashKindOption", "dashTagsOption",
 	"dashShapeOption", "dashWorkingMs", "dashDays", "dashQuantile", "dashRound", "dashAgingOption", "dashNextOption", "dashOpenedOption",
 	"dashCostOption", "dashCompact", "dashHas", "dashBlockersOption", "dashLift", "dashLiftOption", "dashAgeBoxOption", "dashClickQuery", "dashEsc")

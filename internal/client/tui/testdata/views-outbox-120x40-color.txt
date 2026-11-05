@@ -1,6 +1,6 @@
  [2mFocus 1[22m    [2mInbox 2[22m   [7m[1m Outbox 1 [22m[27m   [2mNext 4[22m    [2mWaiting 4[22m    [2mProjects 0[22m    [2mSomeday 0[22m    [2mLogbook 12[22m
 
-[7m>  [2m5h[22m  #releases thread  Ship it tonight. Rollback plan in the doc.  [2mpending[22m                                            [27m
+[7m>  [2m5h 0m[22m  #releases thread  Ship it tonight. Rollback plan in the doc.    pending                                       [27m
 
 [1mReply in the release thread[22m
   [2mstate    [22m  outbox

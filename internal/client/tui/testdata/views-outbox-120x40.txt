@@ -1,6 +1,6 @@
  Focus 1    Inbox 2   [Outbox 1]   Next 4    Waiting 4    Projects 0    Someday 0    Logbook 12
 
->  5h  #releases thread  Ship it tonight. Rollback plan in the doc.  pending
+>  5h 0m  #releases thread  Ship it tonight. Rollback plan in the doc.    pending
 
 Reply in the release thread
   state      outbox

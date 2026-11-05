@@ -1,12 +1,12 @@
  [2mOutbox 1[22m    [2mNext 4[22m   [7m[1m Waiting 4 [22m[27m   [2mProjects 0[22m    [2mSomeday 0[22m    [2mLogbook 12[22m
 
  [1mana[22m
-[7m>  [2m5h[22m  Design review                                                            [27m
-   [2m5h[22m  Laptop order
+[7m>  [2m5h 0m[22m    Design review       ana · waiting                                   [27m
+   [2m5h 0m[22m    Laptop order        ana · waiting
  [1mbob[22m
-   [2m5h[22m  Contract signature
+   [2m5h 0m[22m    Contract signature  bob · waiting
  [1mnone[22m
-   [2m5h[22m  Reimbursement
+   [2m5h 0m[22m    Reimbursement       waiting
 
 
 

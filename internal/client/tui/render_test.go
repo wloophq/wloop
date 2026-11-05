@@ -87,10 +87,10 @@ func TestRenderShowsTheViewCountdownAndHelp(t *testing.T) {
 	stalled := row(8, "Stalled one", "changes", "needs-me", "mine")
 	stalled.Summary.Stalled = true
 	stalled.Summary.Since = now.Add(-50 * time.Hour)
-	m.SetData([]api.Row{pending, stalled}, api.Health{Warnings: []string{"app: notifications are off"}})
+	m.SetData(withServedFacets("", []api.Row{pending, stalled}), api.Health{Warnings: []string{"app: notifications are off"}})
 	m.SetGates([]api.GateView{planGate(pending, now.Add(42*time.Second)), {ID: 2, Unit: stalled.Unit.String(), Kind: "question", Status: "open"}})
 	screen := strings.Join(m.Render(120, 10, now), "\n")
-	for _, want := range []string{"[Needs me 2]", "My PRs 1", "In loop 0", "acme/api#3  Pending round", "42s", "!2d", "round soon", "changes asked", "warning: app: notifications are off", "V review", "q quit"} {
+	for _, want := range []string{"[Needs me 2]", "My PRs 1", "In loop 0", "acme/api#3  Pending round", "in 42 s", "!2d 2h", "round soon", "changes asked", "warning: app: notifications are off", "V review", "q quit"} {
 		if !strings.Contains(screen, want) {
 			t.Errorf("screen lacks %q:\n%s", want, screen)
 		}
@@ -120,7 +120,7 @@ func TestRenderNamesTheAuthorItWaitsOn(t *testing.T) {
 	mine.Summary.WaitsOn = "author"
 	setPR(&mine, func(p *prView) { p.Author = "Me" })
 	setPR(&mine, func(p *prView) { p.Workspace.Status = "in-progress" })
-	m.SetData([]api.Row{theirs, mine}, api.Health{Viewer: "me"})
+	m.SetData(withServedFacets("me", []api.Row{theirs, mine}), api.Health{Viewer: "me"})
 	press(m, Key{Name: KeyDown})
 	screen := strings.Join(m.Render(160, 16, now), "\n")
 	for _, want := range []string{"ana, carla · changes", "me · changes asked", "in-progress"} {
@@ -175,15 +175,44 @@ func TestRenderShowsSizeAndRiskFromAHundredColumns(t *testing.T) {
 	rs := rows()
 	setPR(&rs[0], func(p *prView) { p.Brief = &api.BriefSummary{Size: "m", Risk: "high", Goal: "Export in batches"} })
 	setPR(&rs[1], func(p *prView) { p.Brief = &api.BriefSummary{Size: "xl", Risk: "medium"} })
-	m.SetData(rs, api.Health{})
+	m.SetData(withServedFacets("", rs), api.Health{})
 	lines := m.Render(100, 8, now)
-	if !strings.Contains(lines[2], " M·hi ") || !strings.Contains(lines[3], " XL·md ") {
+	if !strings.Contains(lines[2], "by ana risk high M ") || !strings.Contains(lines[3], "by ana risk medium XL ") {
 		t.Fatalf("at 100 columns:\n%s", strings.Join(lines, "\n"))
 	}
 	for _, w := range []int{60, 99} {
 		lines := m.Render(w, 8, now)
-		if strings.Contains(strings.Join(lines, "\n"), "M·hi") {
+		if strings.Contains(strings.Join(lines, "\n"), "risk high M") {
 			t.Fatalf("at %d columns:\n%s", w, strings.Join(lines, "\n"))
 		}
+	}
+}
+
+func TestARowLineSaysItsAgeInItsPluginsWords(t *testing.T) {
+	m := newModel(t)
+	c := servedCatalog(t)
+	c.Lens = []api.ProviderWords{{Provider: "github", Words: map[string]string{"age_hours": "{{.h}} hours"}}}
+	m.SetCatalog(c)
+	m.SetData(withServedFacets("", rows()[:1]), api.Health{})
+	if screen := strings.Join(m.Render(100, 8, now), "\n"); !strings.Contains(screen, "3 hours") {
+		t.Fatalf("the row's age is not in its plugin's words:\n%s", screen)
+	}
+}
+
+func TestARowLineTakesItsPluginsWordsOncePerCatalog(t *testing.T) {
+	m := newModel(t)
+	c := servedCatalog(t)
+	c.Lens = []api.ProviderWords{{Provider: "github", Words: map[string]string{"age_hours": "{{.h}} hours"}}}
+	m.SetCatalog(c)
+	m.SetData(withServedFacets("", rows()[:2]), api.Health{})
+	m.Render(100, 8, now)
+	if len(m.rowWords) != 1 {
+		t.Fatalf("words merged for %d providers, want 1: %v", len(m.rowWords), m.rowWords)
+	}
+	c.Lens[0].Words = map[string]string{"age_hours": "{{.h}} hrs"}
+	c.Version = c.Version + "x"
+	m.SetCatalog(c)
+	if screen := strings.Join(m.Render(100, 8, now), "\n"); !strings.Contains(screen, "3 hrs") {
+		t.Fatalf("a new catalog's words are not on the row:\n%s", screen)
 	}
 }

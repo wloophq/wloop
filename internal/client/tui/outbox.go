@@ -5,35 +5,30 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/termfmt"
+	"github.com/wloophq/wloop/internal/api/lens"
 )
 
-// outboxList lays the drafts out: their age, target, text and state.
+// outboxList lays the drafts out on the list's line: how long since each last changed, its target as the ref,
+// its text as the title, and its state as the kind.
 func (m *Model) outboxList(tasks []api.TaskView, cur, width, height int, now time.Time) []string {
-	t := m.t
-	cols := []termfmt.Column{{Right: true}, {Max: min(max((width-2)/4, 12), 32)}, {Flex: true}}
-	if width >= 80 {
-		cols = append(cols, termfmt.Column{Max: 18})
-	}
-	cells := make([][]termfmt.Cell, len(tasks))
+	words := m.viewsCat.Lens.RowWords
+	lines := make([]listLine, len(tasks))
 	for i, e := range tasks {
-		age, style := m.taskAge(e, now)
-		target, text := draftTarget(e), oneLine(e.Title)
+		text := oneLine(e.Title)
 		if d := draftOn(e); d != nil {
 			text = oneLine(d.Text)
 		}
-		c := []termfmt.Cell{{Text: age, Style: style}, {Text: target}, {Text: text}}
-		if len(cols) > 3 {
-			c = append(c, termfmt.Cell{Text: draftState(e), Style: t.Dim})
+		l := listLine{label: draftTarget(e), title: text, changed: e.Changed, parts: map[string][]lens.Piece{"kind": {{Label: draftState(e)}}}}
+		_, l.busy = m.busy[taskUnit(e.ID)]
+		if since := now.Sub(e.Updated); !e.Updated.IsZero() && since > 0 {
+			l.age, l.ageStyle = lens.Age(words, since), m.t.Dim
+			if since >= 48*time.Hour {
+				l.ageStyle = m.t.Yellow
+			}
 		}
-		cells[i] = c
+		lines[i] = l
 	}
-	laid := t.Columns(width-3, 2, cols, cells)
-	out := make([]string, len(tasks))
-	for i, e := range tasks {
-		out[i] = m.taskLine(e, laid[i], i == cur, width)
-	}
-	return window(out, cur, height)
+	return m.lineCells(lines, make([]string, len(tasks)), cur, width, height)
 }
 
 // draftTarget is where the draft goes as its publisher named it, else its raw target or unit, marked

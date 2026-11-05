@@ -3,10 +3,12 @@ package tui
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/lens"
 	dtask "github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
@@ -230,21 +232,22 @@ func (m *Model) reviewHelp() []helpItem {
 }
 
 // projectFacts are a project's review mark, open children, with no next
-// action when it has none, and interval; none for another kind.
-func projectFacts(e api.TaskView) []string {
+// action when it has none, and interval, in the row words w; none for
+// another kind.
+func projectFacts(e api.TaskView, w api.RowWords) []string {
 	if e.PropText(dtask.PropKind) != dtask.KindProject {
 		return nil
 	}
 	var out []string
 	if e.ReviewDue {
-		out = append(out, "review due")
+		out = append(out, w.ReviewDue)
 	}
 	if len(e.Children) == 0 {
-		out = append(out, "no next action")
+		out = append(out, w.NoNextAction)
 	}
-	out = append(out, fmt.Sprintf("%d open", len(e.Children)))
+	out = append(out, lens.Word(w.OpenChildren, map[string]string{"n": strconv.Itoa(len(e.Children))}))
 	if d, err := time.ParseDuration(e.ReviewEvery); err == nil && d > 0 {
-		out = append(out, "every "+everyLabel(d))
+		out = append(out, lens.Word(w.Every, map[string]string{"every": everyLabel(d)}))
 	}
 	return out
 }

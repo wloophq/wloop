@@ -1,0 +1,20 @@
+ Next 4   [Waiting 4]   Projects 0    Someday 0
+
+ ana
+>  5h 0m    Design review       ana · waiting
+   5h 0m    Laptop order        ana · waiting
+ bob
+   5h 0m    Contract signature  bob · waiting
+ none
+   5h 0m    Reimbursement       waiting
+
+
+
+
+
+
+
+
+
+warning: app: notifications are off
+x next  w waiting  s schedule  y someday  ? keys  q quit

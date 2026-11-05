@@ -1104,6 +1104,7 @@ type liveRows struct {
 type liveRow struct {
 	facets  map[string][]string
 	signals map[string]bool
+	reason  string
 }
 
 func (*liveRows) Provider() unit.ProviderID { return "fake" }
@@ -1126,7 +1127,7 @@ func (p *liveRows) Load(_ context.Context, units []unit.Unit) (map[unit.Unit]any
 
 func (*liveRows) Derive(_ readmodel.Base, in any, _ time.Time) (api.Row, error) {
 	r := in.(liveRow)
-	return api.Row{Title: "row", Facets: r.facets, Views: []string{}, Summary: api.Summary{Stalled: r.signals["stalled"]}}, nil
+	return api.Row{Title: "row", Facets: r.facets, Views: []string{}, Summary: api.Summary{Stalled: r.signals["stalled"], Reason: r.reason}}, nil
 }
 
 func (*liveRows) Signals(_ readmodel.Base, _ api.Row, in any, _ time.Time) map[string]bool {
@@ -1212,6 +1213,27 @@ func TestARowChangeResendsTheTasksHoldingItsUnit(t *testing.T) {
 			t.Fatalf("ci %v after the move, want success", ci)
 		}
 	})
+}
+
+func TestATaskPageCarriesItsPrimaryUnitsReason(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	other := unit.Unit{Provider: unit.GitHub, Key: "acme/api#98"}
+	r.withLiveRows(map[unit.Unit]liveRow{
+		apiPR: {facets: map[string][]string{"where": {"acme/api"}}, reason: "checks failing"},
+		other: {facets: map[string][]string{"where": {"acme/api"}}, reason: "review asked"},
+	})
+	unlisted := unit.Unit{Provider: unit.GitHub, Key: "acme/api#97"}
+	r.put(t, task.Task{ID: "t-pr", State: "inbox", Category: task.CategoryInbox, Title: "Fix the checks", Units: []unit.Unit{apiPR, other}},
+		task.Task{ID: "t-gone", State: "inbox", Category: task.CategoryInbox, Title: "Unlisted first", Units: []unit.Unit{unlisted, other}},
+		task.Task{ID: "t-own", State: "inbox", Category: task.CategoryInbox, Title: "Think it over"})
+	got := map[string]string{}
+	for _, e := range r.page(t, "view=inbox").Tasks {
+		got[e.ID] = e.Reason
+	}
+	if want := map[string]string{"t-pr": "checks failing", "t-gone": "", "t-own": ""}; !maps.Equal(got, want) {
+		t.Fatalf("reasons %v, want %v", got, want)
+	}
 }
 
 func TestABriefWriteResendsItsTask(t *testing.T) {

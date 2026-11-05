@@ -54,7 +54,7 @@ func (m *Model) rowItem(r api.Row) lens.Item {
 	for _, id := range slices.Sorted(maps.Keys(r.Facets)) {
 		texts = append(texts, r.Facets[id]...)
 	}
-	return lens.Item{Facets: r.Facets, Texts: append(texts, r.Search...)}
+	return lens.Item{Facets: r.Facets, Texts: append(texts, r.Search...), Provider: string(r.Unit.Provider)}
 }
 
 // rowsOf are the rows of row view id and their lens items.

@@ -129,7 +129,8 @@
       "group": true,
       "sort": "text",
       "match": "suffix",
-      "menu": true
+      "menu": true,
+      "show": "ref"
     },
     {
       "id": "author",
@@ -140,7 +141,13 @@
       "rank": [
         "me"
       ],
-      "menu": true
+      "menu": true,
+      "show": "meta",
+      "show_values": "first",
+      "label_prefix": "by ",
+      "row_class": {
+        "me": "mine"
+      }
     },
     {
       "id": "wait",
@@ -163,7 +170,14 @@
         "reviewer": "Waiting on a reviewer"
       },
       "menu": true,
-      "strip": true
+      "strip": true,
+      "colors": {
+        "author": "author",
+        "loop": "loop",
+        "me": "me",
+        "nobody": "nobody",
+        "reviewer": "reviewer"
+      }
     },
     {
       "id": "waits-on",
@@ -171,7 +185,8 @@
       "provider": "github",
       "group": true,
       "match": "team",
-      "menu": true
+      "menu": true,
+      "show": "who"
     },
     {
       "id": "kind",
@@ -219,7 +234,8 @@
         "round_pending": "round soon",
         "to_address": "to address"
       },
-      "menu": true
+      "menu": true,
+      "show": "kind"
     },
     {
       "id": "type",
@@ -228,7 +244,8 @@
       "group": true,
       "sort": "text",
       "empty": "no brief",
-      "menu": true
+      "menu": true,
+      "show": "meta"
     },
     {
       "id": "risk",
@@ -242,7 +259,9 @@
         "low"
       ],
       "empty": "no brief",
-      "menu": true
+      "menu": true,
+      "show": "meta",
+      "label_prefix": "risk "
     },
     {
       "id": "size",
@@ -265,7 +284,8 @@
         "xs": "XS"
       },
       "empty": "no brief",
-      "menu": true
+      "menu": true,
+      "show": "meta"
     },
     {
       "id": "status",
@@ -274,7 +294,8 @@
       "group": true,
       "sort": "text",
       "empty": "no workspace",
-      "menu": true
+      "menu": true,
+      "show": "aside"
     },
     {
       "id": "tag",
@@ -282,14 +303,34 @@
       "provider": "github",
       "group": false,
       "match": "prefix",
-      "menu": true
+      "menu": true,
+      "show": "meta"
     },
     {
       "id": "is",
       "label": "Flags",
       "provider": "github",
       "group": false,
-      "menu": true
+      "labels": {
+        "adopted": "adopted",
+        "approved": "approved",
+        "due": "due",
+        "in-loop": "in loop",
+        "muted": "muted",
+        "needs-me": "needs me",
+        "paused": "paused",
+        "stalled": "stalled",
+        "tracked": "tracked"
+      },
+      "menu": true,
+      "show": "flag",
+      "show_only": [
+        "paused",
+        "muted"
+      ],
+      "row_class": {
+        "stalled": "late"
+      }
     },
     {
       "id": "ci",
@@ -406,7 +447,8 @@
           "label": "over 4 weeks",
           "within": ""
         }
-      ]
+      ],
+      "show": "age"
     },
     {
       "id": "lane",

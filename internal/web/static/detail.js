@@ -38,8 +38,8 @@ const detailEnv = {
   ask: (label, value) => prompt(label, value || ""),
   postJSON: (path, body) => taskPost(path, body),
   focused: () => {
-    const el = typeof document !== "undefined" && document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-focus^="task:"]');
-    return el ? el.dataset.focus.slice("task:".length).replace(/@.*$/, "") : "";
+    const el = typeof document !== "undefined" && document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-row^="task:"]');
+    return el ? el.dataset.row.slice("task:".length).replace(/@.*$/, "") : "";
   },
 };
 

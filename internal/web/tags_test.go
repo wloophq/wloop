@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"reflect"
@@ -123,18 +124,12 @@ process.stdout.write(JSON.stringify({
 }
 
 func TestMyPullRequestsStandOutAndTheStripExplainsItself(t *testing.T) {
-	src := appJS(t)
-	for _, want := range []string{`mine ? "mine" : ""`, `title: stripTitle(r)`, `mine ? mineMark() : null`, "stripLegend(offered),"} {
-		if !strings.Contains(src, want) {
-			t.Errorf("app.js lacks %s", want)
-		}
-	}
 	raw, err := fs.ReadFile(files, "static/app.css")
 	if err != nil {
 		t.Fatal(err)
 	}
 	css := string(raw)
-	for _, want := range []string{"tbody tr.mine { background: var(--mine-bg); }", ".card.mine { background: var(--mine-bg); }", ".mine-mark {", ".legend .sw {"} {
+	for _, want := range []string{"tbody tr.mine { background: var(--mine-bg); }", ".card.mine { background: var(--mine-bg); }", ".legend .sw {"} {
 		if !strings.Contains(css, want) {
 			t.Errorf("app.css lacks %s", want)
 		}
@@ -142,16 +137,14 @@ func TestMyPullRequestsStandOutAndTheStripExplainsItself(t *testing.T) {
 	if strings.Index(css, "tbody tr.mine {") > strings.Index(css, "tbody tr.sel,") || strings.Index(css, ".card.mine {") > strings.Index(css, ".card.sel,") {
 		t.Error("the mine tint must come before the selection, so the open row still shows as open")
 	}
-	prelude := `function h(tag, attrs, ...c) { return { tag, attrs, children: c.flat().filter((x) => x !== null && x !== undefined && x !== false) }; }` + "\n" +
-		jsConst(t, src, "SIZES") + jsConst(t, src, "RISKS") + jsConst(t, src, "TAG_CHIPS") + keyJS(t) + catalogPrelude(t) +
-		`const state = { health: { viewer: "Me" } }; function writeHash() {}` + "\n"
 	var got struct {
-		Cards  []map[string]any `json:"cards"`
-		Titles []string         `json:"titles"`
-		Legend map[string]any   `json:"legend"`
+		Cards  []map[string]string `json:"cards"`
+		Rows   []string            `json:"rows"`
+		Legend map[string]any      `json:"legend"`
 	}
 	row := func(n int, author, kind, waiting, reason string) map[string]any {
-		return map[string]any{"ref": map[string]any{"owner": "acme", "repo": "api", "number": n}, "author": author, "kind": kind, "waiting_on": waiting, "reason": reason}
+		return map[string]any{"ref": map[string]any{"owner": "acme", "repo": "api", "number": n}, "author": author, "kind": kind, "waiting_on": waiting, "reason": reason,
+			"views": []string{"mine"}}
 	}
 	rows := []map[string]any{
 		row(1, "me", "changes", "author", "changes requested by bia"),
@@ -160,13 +153,14 @@ func TestMyPullRequestsStandOutAndTheStripExplainsItself(t *testing.T) {
 		row(4, "ana", "loop_working", "me", "a review round runs"),
 		row(5, "ana", "draft", "nobody", ""),
 	}
-	nodeRun(t, prelude, []string{"isSet", "age", "stamp", "resolveWho", "waitingLabel", "waitField", "waitCat", "waitClass", "isMine", "stripTitle",
-		"intakeWaiting", "intakeChip", "tagChips", "briefTags", "mineMark", "copySlot", "card", "stripLegend"}, `process.stdout.write(JSON.stringify({
-  cards: input.map((r) => card(r, "").children[0].attrs),
-  titles: input.map(stripTitle),
-  legend: stripLegend(),
-}));`, wireRows("Me", time.Now(), rows...), &got)
-	classes := func(i int) []string { return strings.Fields(got.Cards[i]["class"].(string)) }
+	rowViewRun(t, json.RawMessage(servedCatalog(t)), `state.rows = input.rows;
+const lens = lensOf({ ...readHash(), view: "mine" });
+process.stdout.write(JSON.stringify({
+  cards: input.rows.map((r) => { const c = rowCard(rowModel(r, "", lens, "", "card"), lens); return { class: c.attrs.class, title: c.children[0].children[0].attrs.title }; }),
+  rows: input.rows.map((r) => rowTr(rowModel(r, "", lens, ""), lens, []).attrs.title),
+  legend: stripLegend({ stripSpec: viewStrip("mine") }),
+}));`, map[string]any{"rows": wireRows("me", time.Now(), rows...), "now": time.Now().UnixMilli()}, &got)
+	classes := func(i int) []string { return strings.Fields(got.Cards[i]["class"]) }
 	if !slices.Contains(classes(0), "mine") || slices.Contains(classes(1), "mine") {
 		t.Errorf("mine class: %v / %v", classes(0), classes(1))
 	}
@@ -177,11 +171,10 @@ func TestMyPullRequestsStandOutAndTheStripExplainsItself(t *testing.T) {
 		"In loop: agent working. a review round runs",
 		"Waiting on nobody: draft",
 	}
-	if !slices.Equal(got.Titles, wantTitles) {
-		t.Errorf("titles\n%q\nwant\n%q", got.Titles, wantTitles)
-	}
-	if got.Cards[1]["title"] != wantTitles[1] {
-		t.Errorf("card title %v", got.Cards[1]["title"])
+	for i, want := range wantTitles {
+		if got.Cards[i]["title"] != want || got.Rows[i] != want {
+			t.Errorf("row %d's card reads %q and its list row %q, want %q", i+1, got.Cards[i]["title"], got.Rows[i], want)
+		}
 	}
 	legend := mustJS(t, got.Legend)
 	for _, want := range []string{`"Waits on (role):"`, `"lg w-me"`, `"Waiting on me"`, `"lg w-author"`, `"lg w-reviewer"`, `"lg w-loop"`, `"lg w-nobody"`, `"Waiting on nobody"`} {

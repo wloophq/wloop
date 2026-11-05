@@ -1,12 +1,12 @@
  [2mFocus 1[22m    [2mInbox 2[22m    [2mOutbox 1[22m   [7m[1m Next 4 [22m[27m   [2mWaiting 4[22m    [2mProjects 0[22m    [2mSomeday 0[22m    [2mLogbook 12[22m
 
  [1m@computer[22m
-[7m>* [2m5h[22m  Rename the export flag  [2m@computer[22m                                                                                [27m
-   [2m5h[22m  Write the runbook       [2m@computer[22m
+[7m>* [2m5h 0m[22m    Rename the export flag  [2m@computer[22m  next                                                                     [27m
+   [2m5h 0m[22m    Write the runbook       [2m@computer[22m  next
  [1m@calls[22m
-   [2m5h[22m  Call the bank           [2m@calls[22m
+   [2m5h 0m[22m    Call the bank           [2m@calls[22m     next
  [1mnone[22m
-   [2m5h[22m  Sort the receipts
+   [2m5h 0m[22m    Sort the receipts                  next
 
 
 

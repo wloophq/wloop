@@ -119,6 +119,13 @@ func (p *Reported) Details() []api.DetailSpec {
 	return nil
 }
 
+func (p *Reported) Lens() api.ProviderWords {
+	if lp, ok := p.src.Catalog.(LensPresenter); ok {
+		return lp.Lens()
+	}
+	return api.ProviderWords{}
+}
+
 func (p *Reported) Situations() []api.SituationSpec {
 	if p.src.Catalog == nil {
 		return nil

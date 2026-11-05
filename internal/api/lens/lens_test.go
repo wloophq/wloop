@@ -3,6 +3,7 @@ package lens_test
 import (
 	"encoding/json"
 	"os"
+	"reflect"
 	"slices"
 	"testing"
 	"time"
@@ -104,4 +105,48 @@ func remap(shown, idx []int) []int {
 		out[i] = shown[j]
 	}
 	return out
+}
+
+type partTable struct {
+	Now   time.Time `json:"now"`
+	Parts struct {
+		Words api.RowWords    `json:"words"`
+		Specs []api.FacetSpec `json:"specs"`
+		Cases []struct {
+			Item lens.Item               `json:"item"`
+			Want map[string][]lens.Piece `json:"want"`
+		} `json:"cases"`
+	} `json:"parts"`
+}
+
+func TestPartsCases(t *testing.T) {
+	raw, err := os.ReadFile("testdata/cases.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var table partTable
+	if err := json.Unmarshal(raw, &table); err != nil {
+		t.Fatal(err)
+	}
+	if len(table.Parts.Cases) == 0 {
+		t.Fatal("no part cases")
+	}
+	for i, c := range table.Parts.Cases {
+		got := lens.Parts(c.Item, table.Parts.Specs, api.LensWords{RowWords: table.Parts.Words}, table.Now)
+		if !reflect.DeepEqual(got, c.Want) {
+			t.Errorf("case %d: parts\n got  %+v\n want %+v", i, got, c.Want)
+		}
+	}
+}
+
+func TestACountdownSaysTheTimeLeftInTheRowWords(t *testing.T) {
+	w := api.RowWords{CountdownSending: "sending", CountdownSeconds: "in {{.s}} s", CountdownMinutes: "in {{.m}}m {{.s}}s"}
+	for _, c := range []struct {
+		left time.Duration
+		want string
+	}{{0, "sending"}, {-time.Second, "sending"}, {4200 * time.Millisecond, "in 5 s"}, {99 * time.Second, "in 99 s"}, {125 * time.Second, "in 2m 05s"}} {
+		if got := lens.Countdown(w, c.left); got != c.want {
+			t.Errorf("%v left reads %q, want %q", c.left, got, c.want)
+		}
+	}
 }

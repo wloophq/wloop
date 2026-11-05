@@ -25,16 +25,20 @@ var viewsGrammar = []Key{
 	{Path: "facets.*.rank", In: SurfaceViews, Kind: KindList, Elem: KindText, Doc: "The facet's values in their order, first first."},
 	{Path: "facets.*.values", In: SurfaceViews, Kind: KindMap, Doc: "The text people read for a value, by value."},
 	{Path: "facets.*.values.*", In: SurfaceViews, Kind: KindText, Doc: "The text of one value."},
-	{Path: "facets.*.label_prefix", In: SurfaceViews, Kind: KindText, Doc: "Text before the label of each value of a facet whose order the catalog derives, such as the `@` of a context; a label that has it already keeps it."},
+	{Path: "facets.*.label_prefix", In: SurfaceViews, Kind: KindText, Doc: "Text before the label of each value the facet shows on a row, such as the `@` of a context, never in a group's head; a label that has it already keeps it, as a context configured as `@calls` does."},
+	{Path: "facets.*.show", In: SurfaceViews, Kind: KindAny, Values: ShowParts, Doc: ShowDoc},
+	{Path: "facets.*.show_values", In: SurfaceViews, Kind: KindEnum, Values: ShowValues, Default: "all", Doc: ShowValuesDoc},
 	{Path: "facets.*.empty", In: SurfaceViews, Kind: KindText, Doc: "What a group of tasks with no value shows."},
 	{Path: "facets.*.match", In: SurfaceViews, Kind: KindEnum, Values: named("exact", "suffix", "prefix", "team"), Default: "exact", Doc: "How a filter's text matches a value: the whole value, its last segment, its first, or a person's team."},
 	{Path: "facets.*.menu", In: SurfaceViews, Kind: KindBool, Default: "true", Doc: "Whether the facet is offered in the filter menu."},
 	{Path: "facets.*.strip", In: SurfaceViews, Kind: KindBool, Default: "false", Doc: "Whether each row's strip is colored by the facet's first value, its rank the strip's legend."},
+	{Path: "facets.*.colors", In: SurfaceViews, Kind: KindMap, Doc: ColorsDoc},
+	{Path: "facets.*.colors.*", In: SurfaceViews, Kind: KindEnum, Values: StripColors, Doc: "One value's hue."},
 	{Path: "facets.*.buckets", In: SurfaceViews, Kind: KindMap, Doc: "For a facet that sorts by time: the buckets its instants fall in, by id, in the order the file declares them; the first whose within covers the time since the instant wins, and one with no within takes the rest."},
 	{Path: "facets.*.buckets.*", In: SurfaceViews, Kind: KindTable, Doc: "A bucket, by its id."},
 	{Path: "facets.*.buckets.*.within", In: SurfaceViews, Kind: KindDur, Doc: "How long ago an instant may be and still fall in the bucket."},
 	{Path: "facets.*.buckets.*.label", In: SurfaceViews, Kind: KindText, Doc: "The text people read; the id when absent."},
-	{Path: "facets.*.merge", In: SurfaceViews, Kind: KindEnum, Values: named("union", "rows-first"), Default: "union", Doc: "How a task's value joins its units' rows' values: union adds it to them, rows-first uses it only when no row has a value."},
+	{Path: "facets.*.merge", In: SurfaceViews, Kind: KindEnum, Values: named("union", "rows-first", "own"), Default: "union", Doc: "How a task's value joins its units' rows' values: union adds it to them, rows-first uses it only when no row has a value, own keeps it alone."},
 	{Path: "facets.*.units", In: SurfaceViews, Kind: KindEnum, Values: named("all", "primary"), Default: "all", Doc: "Which of a task's units contribute rows' values: all of them, or the primary unit alone."},
 	{Path: "views", In: SurfaceViews, Kind: KindTable, Doc: "The lists of tasks, by view."},
 	{Path: "views.*", In: SurfaceViews, Kind: KindTable, Doc: "A view, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones."},
@@ -54,3 +58,36 @@ var viewsGrammar = []Key{
 	{Path: "review.*", In: SurfaceViews, Kind: KindTable, Doc: "A step of the review, by the view it walks, which views declares. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones, and comes after the steps below it."},
 	{Path: "review.*.label", In: SurfaceViews, Kind: KindText, Required: true, Doc: "What the step asks of you, as the review lists it. Required."},
 }
+
+// ShowParts are the parts of a row a facet's show may name.
+func ShowParts() []Value {
+	return []Value{{Name: "", Doc: "Nowhere: the facet is for the lens alone, as when a user layer takes a lower layer's placement off the row."},
+		{Name: "ref", Doc: "Beside the title, before the unit's own label: where it lives."},
+		{Name: "meta", Doc: "Under the title: who opened it, its contexts, its brief's type, size, risk and tags."},
+		{Name: "flag", Doc: "Under the title, after the meta: a state worth a glance, such as paused."},
+		{Name: "who", Doc: "Whom it waits on."},
+		{Name: "kind", Doc: "Its situation or state, the pill under whom it waits on."},
+		{Name: "age", Doc: "How long since the facet's instant, for a facet that sorts by time; only the first such facet shows."},
+		{Name: "aside", Doc: "Beside the reason: its workspace and links."}}
+}
+
+// StripColors are the hues a strip facet's value may take, the design's colors of whom a row waits on.
+func StripColors() []Value {
+	return []Value{{Name: "me", Doc: "Yours: the next step is the viewer's."},
+		{Name: "author", Doc: "Someone else's, such as a pull request's author."},
+		{Name: "reviewer", Doc: "Another person's, apart from the author, such as a reviewer."},
+		{Name: "loop", Doc: "The loop's: an agent works on it or is due to."},
+		{Name: "nobody", Doc: "Nobody's: a faint strip."}}
+}
+
+// ShowValues are how many of an item's values a facet shows.
+func ShowValues() []Value {
+	return []Value{{Name: "all", Doc: "Every value, in the item's order."}, {Name: "first", Doc: "The first value alone."}}
+}
+
+// ShowDoc and ShowValuesDoc are the docs of a facet's show and show_values, in views.toml and in ui.toml.
+const (
+	ShowDoc       = "The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = [\"paused\", \"muted\"] }`, or `\"\"` to take a facet a lower layer places off the row. Absent or `\"\"`, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show."
+	ShowValuesDoc = "How many of an item's values the part shows: all, or the first alone."
+	ColorsDoc     = "For the facet that colors the strip: the hue of each value's strip and dot, by value; a value it does not name takes nobody's."
+)
