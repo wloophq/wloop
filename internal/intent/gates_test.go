@@ -337,8 +337,11 @@ func TestAGateNamesWhatItsClosingDoesToATaskHeldForGates(t *testing.T) {
 	if !maps.Equal(dg.EndsTask, want) {
 		t.Fatalf("the bundled draft gate ends a held task as %v, want %v", dg.EndsTask, want)
 	}
-	if plan, _ := d.Gate("plan"); plan.EndsTask != nil {
-		t.Errorf("the plan gate ends a held task as %v, want it left open", plan.EndsTask)
+	plan, _ := d.Gate("plan")
+	wantPlan := map[gate.Status]task.Category{gate.Approved: task.CategoryDone, gate.Rejected: task.CategoryDropped,
+		gate.Dismissed: task.CategoryDropped, gate.Superseded: task.CategoryDropped}
+	if !maps.Equal(plan.EndsTask, wantPlan) {
+		t.Errorf("the plan gate ends a held task as %v, want %v: an offer withdrawn with its unit leaves the Inbox", plan.EndsTask, wantPlan)
 	}
 	d, problems = loadGatesWith(t, "[gates.draft]\nends_task = { rejected = \"done\" }\n")
 	if problems != "" {

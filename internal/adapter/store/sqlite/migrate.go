@@ -81,6 +81,9 @@ var migrations = []migration{
 		`ALTER TABLE gates ADD COLUMN by_session TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE drafts ADD COLUMN origin_session TEXT NOT NULL DEFAULT ''`,
 	)},
+	{to: 10, name: "gate_text", compatible: 9, up: execAll(
+		`ALTER TABLE gates ADD COLUMN text TEXT NOT NULL DEFAULT ''`,
+	)},
 }
 
 // schemaSet is a schema and the migrations that reach it, so tests can run

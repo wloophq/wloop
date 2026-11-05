@@ -369,7 +369,9 @@ CREATE TABLE gates (
   applied_at TEXT NOT NULL DEFAULT '',
   begun_at TEXT NOT NULL DEFAULT '',
   -- the session whose turn produced the subject, which never resolves the gate; the session an agent resolved it through
-  session TEXT NOT NULL DEFAULT '', by_session TEXT NOT NULL DEFAULT ''
+  session TEXT NOT NULL DEFAULT '', by_session TEXT NOT NULL DEFAULT '',
+  -- what the gate asks, as its opener worded it; '' reads its declaration's label
+  text TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX gates_due ON gates (status, deadline);
 CREATE INDEX gates_task ON gates (task_id);

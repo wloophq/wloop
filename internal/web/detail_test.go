@@ -332,3 +332,19 @@ func TestATaskOffersTheIntentsThatServeIt(t *testing.T) {
 
 // draftGates are the gates of a task carrying d.
 func draftGates(d api.Draft) []api.GateView { return []api.GateView{api.DraftGate(d)} }
+
+func TestAUnitWithNoDetailOpensTheTaskThatHoldsIt(t *testing.T) {
+	prelude := `const viewHash = (c) => "view=all&task=" + c.task + "&pr=" + c.pr;
+const gone = Object.assign(new Error("session:0b9c7d1e is not in the inventory"), { status: 404 });
+`
+	var got []string
+	nodeRun(t, prelude, []string{"unitFallback"}, `process.stdout.write(JSON.stringify([
+  unitFallback(gone, [{ id: "t-01" }, { id: "t-02" }]),
+  unitFallback(gone, []),
+  unitFallback(Object.assign(new Error("boom"), { status: 500 }), [{ id: "t-01" }]),
+]));`, nil, &got)
+	want := []string{"#view=all&task=t-01&pr=", "", ""}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}

@@ -78,6 +78,9 @@ type Gate struct {
 	// Session is the session whose turn produced the gate's subject, a draft or a message; "" when none did.
 	// That session never resolves the gate.
 	Session string
+	// Text is what the gate asks, in the words its opener rendered from the profile; "" leaves its
+	// declaration's label.
+	Text string
 }
 
 // ByUser says whether the user resolved g: a person, or an agent through a session the user drives.

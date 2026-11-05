@@ -642,6 +642,7 @@ workflow/session-manual-quiet.Gates[step].Mode = "wait"
 workflow/session-manual-quiet.Gates[trust].Mode = "wait"
 workflow/session-manual-quiet.Source = "workflows/session-manual-quiet/workflow.toml"
 workflow/session-manual-quiet.Bundled = true
+workflow/session-manual-quiet.Ask = "Close the quiet session {{index .Facts \"session.name\"}}?"
 workflow/review-first-round.Name = "review-first-round"
 workflow/review-first-round.Summary = "Start the first review round of a pull request that requests my review"
 workflow/review-first-round.Provider = "github"

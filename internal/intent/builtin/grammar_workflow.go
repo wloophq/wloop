@@ -10,6 +10,7 @@ import (
 // workflowGrammar is the workflow manifest's keys.
 var workflowGrammar = slices.Concat([]Key{
 	{Path: "summary", In: SurfaceWorkflow, Kind: KindText, Required: true, Doc: "One line, what the workflow does; its plan items' description. Required."},
+	{Path: "ask", In: SurfaceWorkflow, Kind: KindText, Doc: "What the plan gate of a run asks, a text template over `.Unit` (the unit as people read it) and `.Facts` (the unit's facts by name, such as `{{index .Facts \"session.name\"}}`); its summary when absent."},
 	{Path: "provider", In: SurfaceWorkflow, Kind: KindEnum, Values: providerValues, Required: true, Doc: "The provider of the units it matches. Required."},
 	{Path: "when", In: SurfaceWorkflow, Kind: KindPred, Required: true, Doc: "The match condition, over the unit's facts, the trigger's and config.*. Required."},
 	{Path: "order", In: SurfaceWorkflow, Kind: KindInt, Default: "100", Doc: "Evaluation order, lowest first."},

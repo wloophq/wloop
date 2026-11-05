@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -285,10 +286,10 @@ func writeRoute(out io.Writer, route turn.Route, note string) {
 	}
 }
 
-// gateWords is how gates.toml names g.
+// gateWords is what g asks, as its opener worded it, else how gates.toml names it.
 func (s *Server) gateWords(g gate.Gate) string {
 	def, _ := s.loaded().Gates.Gate(g.Name)
-	return cmpOr(def.Label, g.Name)
+	return cmp.Or(g.Text, def.Label, g.Name)
 }
 
 // messageOf is the message question, post or proposal gate g is the gate of.

@@ -487,6 +487,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 ### Gate approval
 
+- `ask` (string): What the plan gate of a run asks, a text template over `.Unit` (the unit as people read it) and `.Facts` (the unit's facts by name, such as `{{index .Facts "session.name"}}`); its summary when absent.
 - `gates` (table): The gates its runs and drafts open.
 - `gates.approval` (an [approval table](#approval-tables) of gate modes): The approval of its gates: a rule applies to the kinds its when pins gate.kind to, else to draft gates alone when it reads a draft's facts, else to every kind; what no rule or mode here decides, gates.toml's [approval] does.
 

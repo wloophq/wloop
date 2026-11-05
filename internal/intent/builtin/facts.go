@@ -172,6 +172,7 @@ var otherFacts = []Fact{
 	wf("session", "process_gone", expr.Bool, "The active session's process was missed by two complete censuses of its manager."),
 	untrusted(wf("session", "fingerprint", expr.String, "The session id, its state, the start of the idle period and the newest turn's sequence.")),
 	wf("session", "repo", expr.String, "owner/repo of the book's pull request; empty when none."),
+	wf("session", "name", expr.String, "What people call the session: its workspace's display name, else its worktree's folder, else its terminal's title, else its id."),
 	enum(wf("workspace", "role", expr.String, "author (a taken-over workspace included), review or none."), enumOf("author", "review", "none")),
 	wf("workspace", "main", expr.Bool, "The workspace is the repository's main checkout."),
 	wf("workspace", "pr", expr.String, "The linked pull request, owner/repo#number; empty when none."),

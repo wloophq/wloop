@@ -18,7 +18,7 @@ var workflowTable = map[string]string{
 		"last_interaction_at:T silent_days:I waits_on_user:B nudge.refusal:S fingerprint:S repo:S repo_name:S owner:S author:S visibility:S " +
 		"slug:S base:S association:S cross_repository:B requested_teams:L labels:L review_requested_me:B nudge.who:L nudge.why:S " +
 		"last_review.exists:B last_review.verdict:S last_review.decision:S",
-	"session": "state:S manager:S managed:B listed:B orphaned:B agent_state:S user_active:B user_typed_after_turn:B prompt_knowable:B " +
+	"session": "state:S name:S manager:S managed:B listed:B orphaned:B agent_state:S user_active:B user_typed_after_turn:B prompt_knowable:B " +
 		"prompted_while_idle:B open_turn:S newest_state:S newest_age:D newest_intent:S closes_when_done:B idle_since:T " +
 		"idle_for:D unread_gates:I unread_since:T unread_for:D pr_state:S duplicate:B worktree_gone:B closed_by_manager:B transcript_gone:B process_gone:B fingerprint:S repo:S",
 	"workspace": "role:S main:B pr:S pr_state:S pr_finished_for:D path_exists:B temporary:B duplicate:B dirty:I untracked:I " +

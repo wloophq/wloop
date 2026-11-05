@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -30,10 +31,14 @@ import (
 // gateTickEvery is the longest the gates' tick waits between two looks.
 const gateTickEvery = 30 * time.Second
 
-// tickGates resolves the gates whose window passed, after each gates note,
-// at the earliest open deadline and at least every gateTickEvery, until ctx
-// ends.
+// tickGates settles the tasks held by gates that closed before their
+// declaration ended them, then resolves the gates whose window passed, after
+// each gates note, at the earliest open deadline and at least every
+// gateTickEvery, until ctx ends.
 func (s *Server) tickGates(ctx context.Context) {
+	if err := s.deps.Gates.SettleEnded(ctx); err != nil && ctx.Err() == nil {
+		s.logf("gates: settling held tasks: %v", err)
+	}
 	var poke <-chan struct{}
 	if s.deps.Changes != nil {
 		p, cancel := change.Poke(s.deps.Changes, port.TopicGates)
@@ -185,7 +190,7 @@ func (s *Server) gateView(ctx context.Context, g gate.Gate) api.GateView {
 // draftGateView is draft gate g with dv, its draft, as its subject, and its delivery.
 func (s *Server) draftGateView(g gate.Gate, dv api.Draft) api.GateView {
 	v := gateView(gate.Gate{ID: g.ID, Task: g.Task, Unit: g.Unit, Kind: g.Kind, Name: g.Name, Status: g.Status, Intents: g.Intents,
-		Deadline: g.Deadline, Default: g.Default}, s.loaded().Gates)
+		Deadline: g.Deadline, Default: g.Default, Text: g.Text}, s.loaded().Gates)
 	v.Subject, _ = json.Marshal(dv)
 	v.Delivery = dv.State
 	return v
@@ -199,7 +204,7 @@ func gateView(g gate.Gate, d intentload.GatesDef) api.GateView {
 		v.Unit = g.Unit.String()
 	}
 	def, _ := d.Gate(g.Name)
-	v.Text = def.Label
+	v.Text = cmp.Or(g.Text, def.Label)
 	for _, name := range g.Intents {
 		iv := api.IntentView{ID: name, Label: name}
 		for _, in := range def.Intents {

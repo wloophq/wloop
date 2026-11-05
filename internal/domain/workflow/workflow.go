@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -289,6 +290,28 @@ type Workflow struct {
 	// WithdrawReason is the Reason of a draft Withdraw withdraws: assigned
 	// or moot.
 	WithdrawReason string
+	// Ask is what the plan gate of a run asks, over AskData; nil asks its Summary.
+	Ask *template.Template
+}
+
+// AskData is what a workflow's Ask renders: its unit as people read it and
+// the unit's facts, by name.
+type AskData struct {
+	Unit  string
+	Facts Facts
+}
+
+// Asks is what the plan gate of w's run on the unit labelled label asks over
+// its facts: its Ask, else its Summary.
+func (w Workflow) Asks(label string, facts Facts) (string, error) {
+	if w.Ask == nil {
+		return w.Summary, nil
+	}
+	var b strings.Builder
+	if err := w.Ask.Execute(&b, AskData{Unit: label, Facts: facts}); err != nil {
+		return w.Summary, err
+	}
+	return strings.TrimSpace(b.String()), nil
 }
 
 // Visible says whether a step of the workflow acts in the user's name where others see it.

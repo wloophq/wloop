@@ -355,6 +355,20 @@ func TestOpenGivesAGateTheTaskOfItsUnitOrACaptureTask(t *testing.T) {
 	}
 }
 
+func TestACaptureTaskReadsTheWordsTheGateWasOpenedWith(t *testing.T) {
+	store := gatestest.NewStore(fixedNow)
+	tk := &tasksFake{}
+	svc := gates.New(gates.Deps{Store: store, Reader: store, Profile: bundled, Tasks: tk, Clock: clock{fixedNow}})
+	session := unit.Unit{Provider: "session", Key: "0b9c7d1e"}
+	g, err := svc.Open(context.Background(), gate.Gate{Kind: gate.KindPlan, Unit: session, Text: "Close the quiet session demo?"}, nil)
+	if err != nil || g.Text != "Close the quiet session demo?" {
+		t.Fatalf("open = %+v, %v", g, err)
+	}
+	if len(tk.opened) != 1 || tk.opened[0].Title != "Close the quiet session demo?" {
+		t.Fatalf("capture = %+v, want it titled by the gate's words", tk.opened)
+	}
+}
+
 func TestAGateSkipsTheClosedTasksOfItsUnit(t *testing.T) {
 	store := gatestest.NewStore(fixedNow)
 	thread := unit.Unit{Provider: "slack", Key: "T1/C1/1.2"}

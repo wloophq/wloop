@@ -2,6 +2,7 @@ package gates_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/core/gates"
@@ -77,7 +78,7 @@ func TestATaskOpenedToHoldGatesEndsWithItsLastGate(t *testing.T) {
 		t.Fatal(err)
 	}
 	if c := category(plan.Task); c != task.CategoryInbox {
-		t.Fatalf("its plan gate run, the task it held is %s: only a draft's gate ends it", c)
+		t.Fatalf("its plan gate run, the task it held is %s: a gate with no ends_task leaves it open", c)
 	}
 
 	user := task.Task{ID: "t-00000000000000c1", State: "inbox", Category: task.CategoryInbox, Origin: task.OriginUser, Units: []unit.Unit{acme},
@@ -128,6 +129,43 @@ func TestATaskLeftHoldingOnlyClosedDraftGatesEndsWhenSettled(t *testing.T) {
 		}
 	}
 	for id, want := range map[task.ID]task.Category{discarded: task.CategoryDropped, sent: task.CategoryDone, pending.Task: task.CategoryInbox} {
+		if e, err := store.Task(ctx, id); err != nil || e.Category != want {
+			t.Errorf("task %s is %s (%v), want %s", id, e.Category, err, want)
+		}
+	}
+}
+
+func TestSettlingEveryHeldTaskEndsTheOnesWhoseGatesClosedBefore(t *testing.T) {
+	ctx := context.Background()
+	store := taskstest.New()
+	svc := coretasks.New(coretasks.Deps{Store: store, Items: prItems{}, Clock: clock{fixedNow}, States: taskstest.BundledStates})
+	gs := gatestest.NewStore(fixedNow)
+	ending := slices.Clone(bundled)
+	i := slices.IndexFunc(ending, func(d gates.Def) bool { return d.Kind == gate.KindPlan })
+	ending[i].EndsTask = map[gate.Status]task.Category{gate.Superseded: task.CategoryDropped}
+	g := gates.New(gates.Deps{Store: gs, Reader: gs, Profile: ending, Tasks: svc, Clock: clock{fixedNow}})
+	offer := func(key string) (task.ID, gate.Gate) {
+		t.Helper()
+		session := unit.Unit{Provider: "session", Key: key}
+		e, err := svc.Open(ctx, coretasks.OpenRequest{Title: "Run this?", Unit: &session, Origin: task.OriginGate})
+		if err != nil {
+			t.Fatal(err)
+		}
+		p, err := gs.Open(ctx, gate.Gate{Kind: gate.KindPlan, Name: "plan", Unit: session, Task: e.ID, Subject: "quiet/" + key})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return e.ID, p
+	}
+	stale, p := offer("0b9c7d1e")
+	if _, err := gs.Resolve(ctx, p.ID, gates.Resolution{Status: gate.Superseded, By: task.ActorWorkflow}); err != nil {
+		t.Fatal(err)
+	}
+	waiting, _ := offer("5f2a8c3b")
+	if err := g.SettleEnded(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for id, want := range map[task.ID]task.Category{stale: task.CategoryDropped, waiting: task.CategoryInbox} {
 		if e, err := store.Task(ctx, id); err != nil || e.Category != want {
 			t.Errorf("task %s is %s (%v), want %s", id, e.Category, err, want)
 		}

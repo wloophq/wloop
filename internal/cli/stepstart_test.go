@@ -744,4 +744,9 @@ func TestAHeldRoundIsAPlanGate(t *testing.T) {
 	if len(hg.open) != 1 || hg.open[0].Kind != gate.KindPlan || hg.open[0].Unit != r.u || hg.open[0].Subject != round.HeldSubject(testNow) {
 		t.Fatalf("the held round's gates %+v, want one plan gate on %s for the day", hg.open, r.u)
 	}
+	ws := sc.env.loadedIntents().Workflows
+	i := slices.IndexFunc(ws, func(w workflow.Workflow) bool { return w.Name == r.why.Workflow })
+	if i < 0 || hg.open[0].Text == "" || hg.open[0].Text != ws[i].Summary {
+		t.Fatalf("the held round's gate reads %q, want the summary of its workflow %q", hg.open[0].Text, r.why.Workflow)
+	}
 }
