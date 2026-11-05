@@ -14,3 +14,8 @@ type EventPresenter interface {
 	Events() []api.EventSpec
 	Details() []api.DetailSpec
 }
+
+// LensPresenter is optional on a Presenter: its own row words.
+type LensPresenter interface {
+	Lens() api.ProviderWords
+}

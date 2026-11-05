@@ -30,8 +30,7 @@ func lensCatalog() api.ViewsCatalog {
 }
 
 // testLensWords are the bundled profile's lens words.
-var testLensWords = api.LensWords{DefaultGroup: "{{.label}} (default)", BoardGroup: "{{.label}} (board)", NoGroup: "None", Grouped: "group: {{.label}}",
-	Sorted: "sort: {{.label}}", Descending: "{{.label}} (descending)", NoLens: "nothing to group or sort here", TagKey: "{{.label}} {{.key}}", TagKeyEmpty: "no {{.key}}"}
+var testLensWords = catalog.LensWords(bundledViews().Lens)
 
 func lensTask(id, title, state string) api.TaskView {
 	e := task(id, title, state)
@@ -413,7 +412,7 @@ func TestTheTUIGroupsStatesAndContextsAsTheBundledProfileDeclares(t *testing.T) 
 	if got, want := heads("state"), []string{"Inbox:t-2", "Next:t-3", "Done:t-1"}; !slices.Equal(got, want) {
 		t.Errorf("state heads %v, want %v", got, want)
 	}
-	if got, want := heads("contexts"), []string{"@calls:t-4", "@computer:t-3", "no context:t-1"}; !slices.Equal(got, want) {
+	if got, want := heads("contexts"), []string{"calls:t-4", "computer:t-3", "no context:t-1"}; !slices.Equal(got, want) {
 		t.Errorf("context heads %v, want %v", got, want)
 	}
 }

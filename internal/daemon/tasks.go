@@ -153,7 +153,7 @@ func (s *Server) buildViewsCatalog(l *intentload.Loaded) api.ViewsCatalog {
 		cat.Verbs = append(cat.Verbs, api.VerbSpec{Verb: v, Handler: l.Tasks.Handler(v), Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
 			Input: cmp.Or(t.Input, b.Input), Send: s.replySend(v), Key: verbKey(task.Verb(v)), From: slices.Clone(t.From), To: t.To})
 	}
-	cat.Facets, cat.DefaultSort, cat.Lens = catalog.TaskFacets(l.Views.Facets, l.Tasks, cat.Contexts), l.Views.DefaultSort, api.LensWords(l.Views.Lens)
+	cat.Facets, cat.DefaultSort, cat.Lens = catalog.TaskFacets(l.Views.Facets, l.Tasks, cat.Contexts), l.Views.DefaultSort, catalog.LensWords(l.Views.Lens)
 	cat.Version = api.VersionOf(cat)
 	return cat
 }
@@ -968,7 +968,7 @@ func (ev *taskViewer) brief(ctx context.Context, e task.Task, v *api.TaskView) e
 }
 
 // facets sets the task's facets: those of its facts row set, its brief's, and its units' rows', joined as
-// the profile's facets say.
+// the profile's facets say, and its reason, its primary unit's row's.
 func (ev *taskViewer) facets(ctx context.Context, e task.Task, v *api.TaskView) {
 	defs := ev.s.loaded().Views.Facets
 	own := map[string][]string{}
@@ -984,6 +984,9 @@ func (ev *taskViewer) facets(ctx context.Context, e task.Task, v *api.TaskView) 
 	v.Facets = catalog.MergeFacets(defs, own, units)
 	if len(v.Facets) == 0 {
 		v.Facets = nil
+	}
+	if len(e.Units) > 0 {
+		v.Reason = rows[e.Units[0]].Row.Summary.Reason
 	}
 }
 

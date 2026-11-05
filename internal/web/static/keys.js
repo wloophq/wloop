@@ -388,8 +388,8 @@ function createKeys(env) {
 function appEnv() {
   const rowOf = (u) => state.rows.find((r) => sameUnit(unitOf(r), u)) || (state.detail && sameUnit(unitOf(state.detail.row), u) ? state.detail.row : null);
   const focusedRow = () => {
-    const el = document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-focus^="row:"], [data-focus^="card:"]');
-    const m = el && /^(?:row|card):(.+?)(?:@.*)?$/.exec(el.dataset.focus);
+    const el = document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-row^="row:"], [data-row^="card:"]');
+    const m = el && /^(?:row|card):(.+?)(?:@.*)?$/.exec(el.dataset.row);
     return m ? state.rows.find((r) => keyOf(r) === m[1]) || null : null;
   };
   const selectedRow = () => {
@@ -441,7 +441,8 @@ function appEnv() {
     move: (delta) => {
       if (isCoreView(readHash().view)) {
         const nodes = taskNodes();
-        const active = document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-focus^="task:"]');
+        const row = document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-row^="task:"]');
+        const active = row ? nodes.find((n) => n.dataset.focus === row.dataset.row) : null;
         const sel = detailPane.selected();
         const next = nextTaskNode(nodes, active, sel && sel.id, delta);
         if (!next) return false;

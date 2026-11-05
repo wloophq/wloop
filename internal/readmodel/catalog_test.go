@@ -45,6 +45,26 @@ func TestFacetsOfTheSameIDMergeWhenTheirMechanicsAgree(t *testing.T) {
 	}
 }
 
+func TestAMergedFacetKeepsEachProvidersDisplay(t *testing.T) {
+	gh := facetPresenter{facets: []api.FacetSpec{{ID: "where", Provider: "github", Group: true, Show: "ref", Labels: map[string]string{"acme/web": "Web"}}}}
+	sl := facetPresenter{facets: []api.FacetSpec{{ID: "where", Provider: "slack", Group: true, Show: "meta", LabelPrefix: "#"}}}
+	third := facetPresenter{facets: []api.FacetSpec{{ID: "where", Provider: "thread", Group: true}}}
+	got := facetByID(readmodel.BuildCatalog(gh, sl, third), "where")
+	if len(got) != 1 {
+		t.Fatalf("where facets %+v", got)
+	}
+	m := got[0]
+	if g := m.For("github"); g.Show != "ref" || g.LabelPrefix != "" || g.Labels["acme/web"] != "Web" {
+		t.Errorf("github places where as %+v", g.Display())
+	}
+	if s := m.For("slack"); s.Show != "meta" || s.LabelPrefix != "#" {
+		t.Errorf("slack places where as %+v", s.Display())
+	}
+	if th := m.For("thread"); th.Show != "" {
+		t.Errorf("thread places where as %+v", th.Display())
+	}
+}
+
 func TestFacetsOfTheSameIDWithOtherMechanicsStayApart(t *testing.T) {
 	a := facetPresenter{facets: []api.FacetSpec{{ID: "risk", Provider: "github", Group: true, Sort: "rank"}}}
 	b := facetPresenter{facets: []api.FacetSpec{{ID: "risk", Provider: "thread", Group: true, Sort: "text"}}}
@@ -52,5 +72,35 @@ func TestFacetsOfTheSameIDWithOtherMechanicsStayApart(t *testing.T) {
 	got := facetByID(c, "risk")
 	if len(got) != 2 || !slices.Equal([]string{got[0].Provider, got[1].Provider}, []string{"github", "thread"}) {
 		t.Fatalf("conflicting facets %+v", got)
+	}
+}
+
+func TestAMergedFacetKeepsWhichProvidersItIsTheStripOf(t *testing.T) {
+	gh := facetPresenter{facets: []api.FacetSpec{{ID: "turn", Provider: "github", Group: true, Strip: true, Colors: map[string]string{"me": "me"}}}}
+	sl := facetPresenter{facets: []api.FacetSpec{{ID: "turn", Provider: "slack", Group: true}}}
+	got := facetByID(readmodel.BuildCatalog(gh, sl), "turn")
+	if len(got) != 1 {
+		t.Fatalf("turn facets %+v", got)
+	}
+	if g := got[0].For("github"); !g.Strip || g.Colors["me"] != "me" {
+		t.Errorf("github's turn %+v", g.Display())
+	}
+	if s := got[0].For("slack"); s.Strip || s.Colors != nil {
+		t.Errorf("slack's turn %+v", s.Display())
+	}
+}
+
+func TestAMergedFacetKeepsEachProvidersBucketWords(t *testing.T) {
+	buckets := func(label string) []api.Bucket {
+		return []api.Bucket{{ID: "1d", Label: label, Within: "24h"}, {ID: "older", Label: "older"}}
+	}
+	gh := facetPresenter{facets: []api.FacetSpec{{ID: "age", Provider: "github", Sort: "time", Buckets: buckets("a day")}}}
+	sl := facetPresenter{facets: []api.FacetSpec{{ID: "age", Provider: "slack", Sort: "time", Buckets: buckets("today")}}}
+	got := facetByID(readmodel.BuildCatalog(gh, sl), "age")
+	if len(got) != 1 {
+		t.Fatalf("age facets %+v", got)
+	}
+	if g, s := got[0].For("github"), got[0].For("slack"); g.Buckets[0].Label != "a day" || s.Buckets[0].Label != "today" || s.Buckets[0].Within != "24h" {
+		t.Errorf("github's buckets %+v, slack's %+v", g.Buckets, s.Buckets)
 	}
 }

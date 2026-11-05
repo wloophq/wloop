@@ -8,8 +8,8 @@
    ✓ Prune Focus                                         1
 
 >  Inbox to zero (2)
- • 5h  Deploy window tonight?
-   5h  Buy cables
+ • 5h 0m    Deploy window tonight?    inbox
+   5h 0m    Buy cables                inbox
 
 
 

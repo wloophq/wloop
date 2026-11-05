@@ -8,8 +8,8 @@
    [2m✓[22m [2mPrune Focus[22m                                         [2m1[22m
 
 [7m>  [1mInbox to zero (2)[22m                                                                                                    [27m
- • [2m5h[22m  Deploy window tonight?
-   [2m5h[22m  Buy cables
+ • [2m5h 0m[22m    Deploy window tonight?    inbox
+   [2m5h 0m[22m    Buy cables                inbox
 
 
 

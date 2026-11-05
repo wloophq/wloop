@@ -55,8 +55,17 @@ func viewsScripts(t *testing.T) string {
 
 // viewsPrelude is viewsScripts, plugins.js and the lens the task views run, over a tree h.
 func viewsPrelude(t *testing.T) string {
-	return treeJS + pluginsJS(t) + viewsScripts(t) + taskLensJS(t)
+	return treeJS + pluginsJS(t) + viewsScripts(t) + taskLensJS(t) + taskRowJS
 }
+
+// taskRowJS renders a task's row as a view of the catalog lists it.
+const taskRowJS = `
+function taskRow(e, view) {
+  const lens = lensOf({ view: view || "inbox", q: "", g: "", s: "", layout: "", area: "", ctx: [], tk: "", done: false });
+  const m = taskModel(e, "", "", lens);
+  return rowTr(m, lens, rowColumns([m]));
+}
+`
 
 func task(id, state string, mod func(*api.TaskView)) api.TaskView {
 	e := api.TaskView{ID: id, State: state, Title: "Task " + id, Units: []unit.Unit{}, Verbs: []api.VerbState{},
@@ -223,7 +232,7 @@ process.stdout.write(JSON.stringify({ triage: chips("triage"), gates: chips("app
 
 func TestFakeProviderRowRenders(t *testing.T) {
 	src := appJS(t)
-	prelude := lensPrelude(t) + jsConst(t, src, "FOCUS_PAIRS") + jsFunction(t, src, "focusSlot") + jsFunction(t, src, "waitField") + jsConst(t, src, "CARD_GROUPS") + jsConst(t, src, "TAG_CHIPS") + treeJS +
+	prelude := lensPrelude(t) + jsConst(t, src, "FOCUS_PAIRS") + jsFunction(t, src, "focusSlot") + jsConst(t, src, "CARD_GROUPS") + jsConst(t, src, "TAG_CHIPS") + treeJS +
 		`state.busy = new Set(); state.openSlot = ""; state.specs = { version: "v", byId: {} };
 const CSS = { escape: (s) => s }; const document = { querySelector: () => null };
 const providerName = (id) => id;
@@ -235,12 +244,12 @@ const providerName = (id) => id;
 		Row, Card string
 		Keys      []string
 	}
-	nodeRun(t, prelude, append(slices.Clone(lensFuncs), "fieldById", "foldMap", "marked", "where", "facet", "whoFacets", "countdown", "age",
-		"stripTitle", "mineMark", "tagChips", "briefTags", "intakeWaiting", "intakeChip", "actionStates", "actionTitle", "actionButton", "actionButtons",
-		"copySlot", "multiCopy", "openRow", "openSlot", "rowTr", "card"), `
-const lens = { view: "all", q: "", ts: [], quals: [], filters: new Map(), group: "", sort: "", layout: "" };
-const tr = rowTr(input, "", lens, "");
-const c = card(input, "", "");
+	nodeRun(t, prelude, slices.Concat(lensFuncs, rowFuncs, []string{"fieldById", "rowModel", "countdown", "age",
+		"intakeWaiting", "intakeChip", "actionStates", "actionTitle", "actionButton", "actionButtons", "openRow", "openSlot"}), `
+const lens = { view: "all", q: "", ts: [], quals: [], filters: new Map(), group: "", sort: "", layout: "", fields: catalog.fields, specs: catalog.specs, words: lensWords() };
+const m = rowModel(input, "", lens, "");
+const tr = rowTr(m, lens, rowColumns([m]));
+const c = rowCard(rowModel(input, "", lens, "", "card"), lens);
 process.stdout.write(JSON.stringify({ Row: text(tr), Card: text(c), Keys: Object.keys(input.payload || {}) }));`, row, &got)
 	for _, s := range []string{got.Row, got.Card} {
 		if !strings.Contains(s, "Can someone look at the deploy?") || !strings.Contains(s, "#general thread") {
@@ -355,22 +364,28 @@ process.stdout.write(JSON.stringify(byClass(h("div", {}, ...taskListNodes({ view
 	}
 }
 
-// TestATaskRowReadsItsPropertiesByRole checks that a row shows the star, the contexts, the area and the
-// deadline of the properties the catalog gives those roles, whatever their names.
+// TestATaskRowReadsItsPropertiesByRole checks that a row shows the star and the deadline of the properties
+// the catalog gives those roles, whatever their names, and its contexts and area as the facets that show them.
 func TestATaskRowReadsItsPropertiesByRole(t *testing.T) {
 	var got string
+	cat := servedViews(t)
+	cat.Props = []api.PropSpec{{Name: "pin", Type: "enum", Values: []string{"yes", "no"}, Role: "star"}, {Name: "by", Type: "time", Role: "deadline"},
+		{Name: "focus", Type: "enum", Values: []string{"on", "off"}}}
 	nodeRun(t, viewsPrelude(t), nil, `
 function writeHash() {}
 tasksState.catalog = input.cat;
-process.stdout.write(JSON.stringify(text(taskItem(input.task, ""))));`,
-		map[string]any{"cat": api.ViewsCatalog{Props: []api.PropSpec{{Name: "pin", Type: "enum", Values: []string{"yes", "no"}, Role: "star"},
-			{Name: "where", Type: "string[]", Role: "contexts"}, {Name: "team", Type: "string", Role: "area"}}},
-			"task": task("e-1", "next", func(e *api.TaskView) {
-				e.Props = map[string]json.RawMessage{"pin": json.RawMessage(`"yes"`), "where": json.RawMessage(`["@calls"]`), "team": json.RawMessage(`"OSS"`),
-					"focus": json.RawMessage(`"on"`), "area": json.RawMessage(`"Hiring"`)}
-			})}, &got)
-	if !strings.Contains(got, "★") || !strings.Contains(got, "@calls") || !strings.Contains(got, "OSS") || strings.Contains(got, "Hiring") {
-		t.Errorf("row %q", got)
+process.stdout.write(JSON.stringify(text(taskRow(input.task))));`,
+		map[string]any{"cat": cat, "task": task("e-1", "next", func(e *api.TaskView) {
+			e.Props = map[string]json.RawMessage{"pin": json.RawMessage(`"yes"`), "by": json.RawMessage(`"2026-11-20T00:00:00Z"`), "focus": json.RawMessage(`"on"`)}
+			e.Facets = map[string][]string{"contexts": {"calls"}, "prop.area": {"OSS"}}
+		})}, &got)
+	for _, want := range []string{"★", "@calls", "OSS", "due 2026-11-20"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("row %q lacks %q", got, want)
+		}
+	}
+	if strings.Contains(got, "focus") {
+		t.Errorf("row %q shows a property no role or facet places", got)
 	}
 }
 
@@ -421,5 +436,34 @@ process.stdout.write(JSON.stringify({
 	}
 	if got.Rules != 0 {
 		t.Errorf("a view without a rule shows %d", got.Rules)
+	}
+}
+
+// TestATaskRowsUnitLabelFiltersByWhere checks that a unit label on a task row is a facet button for the where
+// value the label names, a channel's or a repository's, so a click keeps the task in the list; a label no where
+// value names stays text.
+func TestATaskRowsUnitLabelFiltersByWhere(t *testing.T) {
+	var got []map[string]string
+	nodeRun(t, viewsPrelude(t), nil, `
+function writeHash() {}
+tasksState.catalog = input.cat;
+const tr = taskRow(input.task);
+const units = all(tr, (n) => n.attrs && n.attrs.class === "unit");
+process.stdout.write(JSON.stringify(units.map((u) => {
+  const b = all(tr, (n) => n.tag === "button" && n.children.includes(u))[0];
+  return { label: text(u), slot: b ? b.attrs["data-focus"] : "" };
+})));`,
+		map[string]any{"cat": servedViews(t), "task": task("e-1", "next", func(e *api.TaskView) {
+			e.Units = []unit.Unit{{Provider: "slack", Key: "T1/C1/seg/1"}, {Provider: "github", Key: "acme/api#7"}, {Provider: "session", Key: "s-1"}}
+			e.UnitLabels = []string{"#team-alpha", "acme/api#7", "a session"}
+			e.Facets = map[string][]string{"where": {"team-alpha", "acme/api"}}
+		})}, &got)
+	want := []map[string]string{
+		{"label": "#team-alpha", "slot": "facet:task:e-1:where:team-alpha"},
+		{"label": "acme/api#7", "slot": "facet:task:e-1:where:acme/api"},
+		{"label": "a session", "slot": ""},
+	}
+	if mustJS(t, got) != mustJS(t, want) {
+		t.Errorf("unit labels %v, want %v", got, want)
 	}
 }

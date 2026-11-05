@@ -229,7 +229,7 @@ func TestPaletteRunsTheProjectVerbs(t *testing.T) {
 func TestProjectFactsCountTheOpenChildren(t *testing.T) {
 	p := task("e-p", "Ship", "next")
 	p.Props, p.Children = map[string]json.RawMessage{"kind": json.RawMessage(`"project"`)}, []string{"e-a", "e-b"}
-	if got := strings.Join(projectFacts(p), " "); got != "2 open" {
+	if got := strings.Join(projectFacts(p, testLensWords.RowWords), " "); got != "2 open" {
 		t.Errorf("facts %q", got)
 	}
 }

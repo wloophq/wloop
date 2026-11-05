@@ -1,13 +1,13 @@
 [Needs me 5]   │    Needs me 0    My PRs 0    In loop 0    Plan 0
 
  inbox
-   5h  Deploy window tonight?
-   5h  Buy cables
+   5h 0m    Deploy window tonight?            inbox
+   5h 0m    Buy cables                        inbox
  next
->  5h  Reply on the batch export review  @computer
-   5h  Call the bank                     @calls
+>  5h 0m    Reply on the batch export review  next
+   5h 0m    Call the bank                     next
  waiting
-   5h  Contract signature
+   5h 0m    Contract signature                bob · waiting
 
 
 

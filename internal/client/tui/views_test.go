@@ -39,10 +39,11 @@ func viewsCatalog() api.ViewsCatalog {
 
 func taskFacets() []api.FacetSpec {
 	return []api.FacetSpec{
-		{ID: "state", Fact: "task.state", Label: "State", Group: true, Menu: true, Sort: "rank", Rank: []string{"inbox", "next", "waiting", "someday"}, Empty: "none"},
+		{ID: "state", Fact: "task.state", Label: "State", Group: true, Menu: true, Sort: "rank", Rank: []string{"inbox", "next", "waiting", "someday"}, Empty: "none", Show: "kind"},
 		{ID: "context", Fact: "task.prop.contexts", Label: "Context", Group: true, Menu: true, Sort: "text", Rank: []string{"computer", "calls"},
-			Labels: map[string]string{"computer": "@computer", "calls": "@calls"}, Empty: "none"},
-		{ID: "waits-on", Fact: "task.owed_by", Label: "Waits on", Group: true, Menu: true, Sort: "text", Empty: "none"},
+			Labels: map[string]string{"computer": "@computer", "calls": "@calls"}, Empty: "none", Show: "meta"},
+		{ID: "waits-on", Fact: "task.owed_by", Label: "Waits on", Group: true, Menu: true, Sort: "text", Empty: "none", Show: "who"},
+		{ID: "moved", Fact: "task.moved_at", Label: "Moved", Group: true, Menu: true, Sort: "time", Empty: "never moved", Show: "age"},
 		{ID: "where", Label: "Where", Group: true, Menu: true, Sort: "text", Empty: "nowhere"},
 	}
 }
@@ -71,7 +72,7 @@ func task(id, title, state string, contexts ...string) api.TaskView {
 		b, _ := json.Marshal(contexts)
 		props = map[string]json.RawMessage{"contexts": b}
 	}
-	facets := map[string][]string{"state": {state}, "context": contexts}
+	facets := map[string][]string{"state": {state}, "context": contexts, "moved": {now.Add(-5 * time.Hour).UTC().Format(time.RFC3339)}}
 	return api.TaskView{ID: id, State: state, Category: categoryOf[state], Title: title, Props: props, Facets: facets,
 		Verbs: verbs(allVerbs...), Created: now.Add(-30 * time.Hour), Updated: now.Add(-5 * time.Hour)}
 }

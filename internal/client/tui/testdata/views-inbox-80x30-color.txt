@@ -1,7 +1,7 @@
  [2mFocus 1[22m   [7m[1m Inbox 2 [22m[27m   [2mOutbox 1[22m    [2mNext 4[22m    [2mWaiting 4[22m    [2mProjects 0[22m
 
-[7m>• [2m5h[22m  Deploy window tonight?                                                   [27m
-   [2m5h[22m  Buy cables
+[7m>• [2m5h 0m[22m    Deploy window tonight?  inbox                                       [27m
+   [2m5h 0m[22m    Buy cables              inbox
 
 [1mDeploy window tonight?[22m
   [2mstate    [22m  inbox · changed

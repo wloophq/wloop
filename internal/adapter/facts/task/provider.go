@@ -281,6 +281,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.fingerprint":         fingerprint(e),
 		"task.category":            string(e.Category),
 		"task.owed_by":             "",
+		"task.turn":                builtin.TurnNobody,
 		"task.owed_since":          time.Time{},
 		"task.moved_at":            time.Time{},
 		"task.since_movement":      time.Duration(0),
@@ -679,7 +680,7 @@ func (p *Provider) owed(ctx context.Context, e task.Task, f workflow.Facts) (wor
 	if err != nil {
 		return nil, err
 	}
-	f["task.owed_by"] = who
+	f["task.owed_by"], f["task.turn"] = who, builtin.TurnOf(who)
 	if who == "" {
 		return f, nil
 	}
