@@ -314,8 +314,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `facets.<name>.buckets.<name>` (table): A bucket, by its id.
 - `facets.<name>.buckets.<name>.within` (duration): How long ago an instant may be and still fall in the bucket.
 - `facets.<name>.buckets.<name>.label` (string): The text people read; the id when absent.
-- `facets.<name>.merge` (one of `union`, `rows-first`, default `union`): How a task's value joins its units' rows' values: union adds it to them, rows-first uses it only when no row has a value.
-- `facets.<name>.turn_of` (string): Another facet whose values, joined with the rows' as that facet's merge says, give this facet's value in place of its own and its rows': me when they hold me, nobody when they hold none, others otherwise. The bundled task strip, turn, takes the turn of waits-on, so it agrees with the Waiting on column.
+- `facets.<name>.merge` (one of `union`, `rows-first`, `own`, default `union`): How a task's value joins its units' rows' values: union adds it to them, rows-first uses it only when no row has a value, own keeps it alone.
 - `facets.<name>.units` (one of `all`, `primary`, default `all`): Which of a task's units contribute rows' values: all of them, or the primary unit alone.
 - `views` (table): The lists of tasks, by view.
 - `views.<name>` (table): A view, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
@@ -343,6 +342,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `lens.filter_title_group` (template): A facet button's tooltip when its facet groups, over `{{.label}}`, `{{.value}}` and the `{{.group}}` field's label.
 - `lens.filter_group` (template): What a facet button calls whom a row waits on when the value is a group of people, such as a Slack user group, in place of the facet's label.
 - `lens.list_count` (template): A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.
+- `lens.list_empty` (template): What a plugin view's list says when it holds no row and the plugin gives no words of its own.
 - `lens.countdown_title` (template): The tooltip of a pending round's countdown, over the `{{.time}}` it sends at.
 - `lens.countdown_sending` (template): A pending round's countdown once its deadline passed.
 - `lens.countdown_seconds` (template): A pending round's countdown under 100 seconds, over the seconds `{{.s}}`.
@@ -856,6 +856,7 @@ The fields each notice reads besides `Name` and `Command`:
 - `lens.filter_title_group` (template): A facet button's tooltip when its facet groups, over `{{.label}}`, `{{.value}}` and the `{{.group}}` field's label.
 - `lens.filter_group` (template): What a facet button calls whom a row waits on when the value is a group of people, such as a Slack user group, in place of the facet's label.
 - `lens.list_count` (template): A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.
+- `lens.list_empty` (template): What a plugin view's list says when it holds no row and the plugin gives no words of its own.
 - `lens.countdown_title` (template): The tooltip of a pending round's countdown, over the `{{.time}}` it sends at.
 - `lens.countdown_sending` (template): A pending round's countdown once its deadline passed.
 - `lens.countdown_seconds` (template): A pending round's countdown under 100 seconds, over the seconds `{{.s}}`.

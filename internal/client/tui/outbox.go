@@ -5,35 +5,30 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/termfmt"
+	"github.com/wloophq/wloop/internal/api/lens"
 )
 
-// outboxList lays the drafts out: their age, target, text and state.
+// outboxList lays the drafts out on the list's line: how long since each last changed, its target as the ref,
+// its text as the title, and its state as the kind.
 func (m *Model) outboxList(tasks []api.TaskView, cur, width, height int, now time.Time) []string {
-	t := m.t
-	cols := []termfmt.Column{{Right: true}, {Max: min(max((width-2)/4, 12), 32)}, {Flex: true}}
-	if width >= 80 {
-		cols = append(cols, termfmt.Column{Max: 18})
-	}
-	cells := make([][]termfmt.Cell, len(tasks))
+	words := m.viewsCat.Lens.RowWords
+	lines := make([]listLine, len(tasks))
 	for i, e := range tasks {
-		age, style := m.taskAge(e, now)
-		target, text := draftTarget(e), oneLine(e.Title)
+		text := oneLine(e.Title)
 		if d := draftOn(e); d != nil {
 			text = oneLine(d.Text)
 		}
-		c := []termfmt.Cell{{Text: age, Style: style}, {Text: target}, {Text: text}}
-		if len(cols) > 3 {
-			c = append(c, termfmt.Cell{Text: draftState(e), Style: t.Dim})
+		l := listLine{label: draftTarget(e), title: text, changed: e.Changed, parts: map[string][]lens.Piece{"kind": {{Label: draftState(e)}}}}
+		_, l.busy = m.busy[taskUnit(e.ID)]
+		if since := now.Sub(e.Updated); !e.Updated.IsZero() && since > 0 {
+			l.age, l.ageStyle = lens.Age(words, since), m.t.Dim
+			if since >= 48*time.Hour {
+				l.ageStyle = m.t.Yellow
+			}
 		}
-		cells[i] = c
+		lines[i] = l
 	}
-	laid := t.Columns(width-3, 2, cols, cells)
-	out := make([]string, len(tasks))
-	for i, e := range tasks {
-		out[i] = m.draftLine(e, laid[i], i == cur, width)
-	}
-	return window(out, cur, height)
+	return m.lineCells(lines, make([]string, len(tasks)), cur, width, height)
 }
 
 // draftTarget is where the draft goes as its publisher named it, else its raw target or unit, marked
@@ -92,23 +87,4 @@ func (m *Model) draftFacts(d *api.Draft, fact func(label, text string, style fun
 	if d.Deadline != nil {
 		fact("sends", d.Deadline.Local().Format("2006-01-02 15:04")+" unless you decide first", t.Dim)
 	}
-}
-
-// draftLine marks the cursor, a busy draft and a changed one.
-func (m *Model) draftLine(e api.TaskView, laid string, selected bool, width int) string {
-	t := m.t
-	mark := []rune("   ")
-	if selected {
-		mark[0] = '>'
-	}
-	if _, busy := m.busy[taskUnit(e.ID)]; busy {
-		mark[1] = '*'
-	} else if e.Changed {
-		mark[1] = '•'
-	}
-	line := string(mark) + laid
-	if selected && t.Color {
-		line = t.Reverse(line + strings.Repeat(" ", max(width-termfmt.Cells(termfmt.Plain(line)), 0)))
-	}
-	return line
 }

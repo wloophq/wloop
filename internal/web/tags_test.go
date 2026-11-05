@@ -156,7 +156,7 @@ func TestMyPullRequestsStandOutAndTheStripExplainsItself(t *testing.T) {
 	rowViewRun(t, json.RawMessage(servedCatalog(t)), `state.rows = input.rows;
 const lens = lensOf({ ...readHash(), view: "mine" });
 process.stdout.write(JSON.stringify({
-  cards: input.rows.map((r) => rowCard(rowModel(r, "", lens, "", "card"), lens).attrs),
+  cards: input.rows.map((r) => { const c = rowCard(rowModel(r, "", lens, "", "card"), lens); return { class: c.attrs.class, title: c.children[0].children[0].attrs.title }; }),
   rows: input.rows.map((r) => rowTr(rowModel(r, "", lens, ""), lens, []).attrs.title),
   legend: stripLegend({ stripSpec: viewStrip("mine") }),
 }));`, map[string]any{"rows": wireRows("me", time.Now(), rows...), "now": time.Now().UnixMilli()}, &got)

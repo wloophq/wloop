@@ -103,10 +103,11 @@
           },
           "merge": {
             "default": "union",
-            "description": "How a task's value joins its units' rows' values: union adds it to them, rows-first uses it only when no row has a value.",
+            "description": "How a task's value joins its units' rows' values: union adds it to them, rows-first uses it only when no row has a value, own keeps it alone.",
             "enum": [
               "union",
-              "rows-first"
+              "rows-first",
+              "own"
             ],
             "type": "string"
           },
@@ -202,10 +203,6 @@
             "default": false,
             "description": "Whether each row's strip is colored by the facet's first value, its rank the strip's legend.",
             "type": "boolean"
-          },
-          "turn_of": {
-            "description": "Another facet whose values, joined with the rows' as that facet's merge says, give this facet's value in place of its own and its rows': me when they hold me, nobody when they hold none, others otherwise. The bundled task strip, turn, takes the turn of waits-on, so it agrees with the Waiting on column.",
-            "type": "string"
           },
           "units": {
             "default": "all",
@@ -366,6 +363,10 @@
           "description": "A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.",
           "type": "string"
         },
+        "list_empty": {
+          "description": "What a plugin view's list says when it holds no row and the plugin gives no words of its own.",
+          "type": "string"
+        },
         "no_group": {
           "description": "The group menu's entry that lists the view in one group.",
           "type": "string"
@@ -489,6 +490,7 @@
         "grouped",
         "legend_title",
         "list_count",
+        "list_empty",
         "no_group",
         "no_lens",
         "no_next_action",

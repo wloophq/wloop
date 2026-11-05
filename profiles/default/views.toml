@@ -36,6 +36,7 @@ filter_title       = "Filter by {{.label}} {{.value}} · Alt+click leaves it out
 filter_title_group = "Filter by {{.label}} {{.value}} · Shift+click groups by {{.group}} · Alt+click leaves it out"
 filter_group       = "waits on (group)"
 list_count         = "{{.unit}}s: {{.shown}} of {{.total}}"
+list_empty         = "Nothing here right now."
 countdown_title    = "sends at {{.time}}"
 countdown_sending  = "sending"
 countdown_seconds  = "in {{.s}} s"
@@ -124,7 +125,7 @@ show   = "who"
 
 [facets.turn]
 fact    = "task.turn"
-turn_of = "waits-on"
+merge   = "own"
 label   = "Whose turn"
 group   = true
 sort    = "rank"

@@ -19,6 +19,7 @@ var RowWords = []RowWord{
 	{Key: "filter_title_group", Vars: []string{"label", "value", "group"}, Doc: "A facet button's tooltip when its facet groups, over `{{.label}}`, `{{.value}}` and the `{{.group}}` field's label."},
 	{Key: "filter_group", Vars: []string{}, Doc: "What a facet button calls whom a row waits on when the value is a group of people, such as a Slack user group, in place of the facet's label."},
 	{Key: "list_count", Vars: []string{"unit", "shown", "total"}, Doc: "A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`."},
+	{Key: "list_empty", Vars: []string{}, Doc: "What a plugin view's list says when it holds no row and the plugin gives no words of its own."},
 	{Key: "countdown_title", Vars: []string{"time"}, Doc: "The tooltip of a pending round's countdown, over the `{{.time}}` it sends at."},
 	{Key: "countdown_sending", Vars: []string{}, Doc: "A pending round's countdown once its deadline passed."},
 	{Key: "countdown_seconds", Vars: []string{"s"}, Doc: "A pending round's countdown under 100 seconds, over the seconds `{{.s}}`."},

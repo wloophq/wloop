@@ -2,6 +2,7 @@ package lens
 
 import (
 	"cmp"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -96,4 +97,16 @@ func Age(w api.RowWords, d time.Duration) string {
 		return Word(w.AgeHours, map[string]string{"h": n(mins / 60), "m": n(mins % 60)})
 	}
 	return Word(w.AgeDays, map[string]string{"d": n(mins / (24 * 60)), "h": n(mins / 60 % 24)})
+}
+
+// Countdown is the time left before a pending round sends, in the row words; it mirrors app.js's left.
+func Countdown(w api.RowWords, left time.Duration) string {
+	s := int((left + time.Second - 1) / time.Second)
+	switch {
+	case s <= 0:
+		return w.CountdownSending
+	case s <= 99:
+		return Word(w.CountdownSeconds, map[string]string{"s": strconv.Itoa(s)})
+	}
+	return Word(w.CountdownMinutes, map[string]string{"m": strconv.Itoa(s / 60), "s": fmt.Sprintf("%02d", s%60)})
 }

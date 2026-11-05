@@ -144,7 +144,7 @@ func (m *Model) rowLine(r api.Row, now time.Time) listLine {
 	}
 	_, l.busy = m.busy[r.Unit]
 	if g, pending := m.roundGate(r); pending {
-		l.age, l.ageStyle = countdownText(g, now), t.Cyan
+		l.age, l.ageStyle = lens.Countdown(words.RowWords, g.Deadline.Sub(now)), t.Cyan
 		return l
 	}
 	ages := l.parts["age"]

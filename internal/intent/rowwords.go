@@ -18,6 +18,7 @@ type RowWords struct {
 	FilterTitleGroup string
 	FilterGroup      string
 	ListCount        string
+	ListEmpty        string
 	CountdownTitle   string
 	CountdownSending string
 	CountdownSeconds string
@@ -76,6 +77,8 @@ func (w *RowWords) field(key string) *string {
 		return &w.FilterGroup
 	case "list_count":
 		return &w.ListCount
+	case "list_empty":
+		return &w.ListEmpty
 	case "countdown_title":
 		return &w.CountdownTitle
 	case "countdown_sending":

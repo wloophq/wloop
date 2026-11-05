@@ -85,18 +85,6 @@ func TurnOf(owedBy string) string {
 	return TurnOthers
 }
 
-// TurnsOf is the turn of whom a facet's values say something waits on: me when they hold me, nobody when
-// they hold none, others otherwise.
-func TurnsOf(who []string) string {
-	if len(who) == 0 {
-		return TurnNobody
-	}
-	if slices.Contains(who, "me") {
-		return TurnMe
-	}
-	return TurnOthers
-}
-
 // enumOf is an enum of values that holds for every provider.
 func enumOf(values ...string) map[unit.ProviderID][]string {
 	return map[unit.ProviderID][]string{anyProvider: values}

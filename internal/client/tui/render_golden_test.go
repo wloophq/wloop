@@ -289,7 +289,7 @@ func TestACutDetailEndsInAnEllipsis(t *testing.T) {
 
 func TestAStalledAgeIsMarkedWithoutColor(t *testing.T) {
 	lines := goldenModel(t, false).Render(80, 30, now)
-	if !strings.HasPrefix(lines[4], "   !9d 0h  acme/billing-service#1365") {
+	if !strings.HasPrefix(strings.TrimLeft(lines[4], " "), "!9d 0h  acme/billing-service#1365") {
 		t.Fatalf("%q", lines[4])
 	}
 }

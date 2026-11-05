@@ -1553,7 +1553,7 @@ function rowTr(m, lens, cols) {
   const cells = {
     unit: () => [
       h("div", { class: "title", title: m.titleTip || undefined }, m.pre || null,
-        m.href ? h("a", { href: m.href, ...roveStop(true), onclick: (e) => e.stopPropagation() }, marked(m.title, lens.ts)) : marked(m.title, lens.ts)),
+        m.href ? h("a", { href: m.href, "data-focus": m.scope + ":title", ...roveStop(true), onclick: (e) => e.stopPropagation() }, marked(m.title, lens.ts)) : marked(m.title, lens.ts)),
       rowMeta(m, lens),
       m.after || null],
     who: () => rowWho(m, lens),
@@ -1597,16 +1597,15 @@ function rowWho(m, lens) {
 // rowCard is a model as a board's card: an li whose title is the control that opens it, stretched over the
 // card, with the pieces its row shows as siblings, the arrows moving between them.
 function rowCard(m, lens) {
-  const label = marked(m.title, lens.ts);
-  const title = m.open ? h("button", { type: "button", class: "open", "data-focus": m.scope, "data-rove": "", "aria-current": m.selected ? "true" : undefined, onclick: m.open }, label)
-    : m.href ? h("a", { class: "open", href: m.href, "data-focus": m.scope, "data-rove": "", "aria-current": m.selected ? "true" : undefined }, label) : label;
+  const label = h("span", { title: m.titleTip || undefined }, marked(m.title, lens.ts));
+  const at = { class: "open", "data-focus": m.scope, "data-rove": "", title: m.tip || undefined, "aria-current": m.selected ? "true" : undefined };
+  const title = m.open ? h("button", { type: "button", ...at, onclick: m.open }, label) : m.href ? h("a", { ...at, href: m.href }, label) : label;
   return h("li", {
     class: ["card", ...(m.cls || []), m.selected ? "sel" : ""].filter(Boolean).join(" "),
-    title: m.tip || undefined,
     "data-row": m.scope,
     onkeydown: roveKey,
   },
-    h("div", { class: "title", title: m.titleTip || undefined }, m.pre || null, title),
+    h("div", { class: "title" }, m.pre || null, title),
     rowMeta(m, lens),
     h("div", { class: "card-who" }, rowWho(m, lens), m.age || pieceButtons(m, lens, "age")),
     m.after || null);
@@ -2055,7 +2054,7 @@ function intakeWaiting(r) {
   return !!i && (i.state === "accepted" || i.state === "briefing");
 }
 
-function intakeChip(r, w = lensWords()) {
+function intakeChip(r, w) {
   if (!intakeWaiting(r)) return null;
   const i = pl(r).intake;
   const title = [fillWord(w.briefing_title, { seq: i.seq }), i.attempt ? fillWord(w.briefing_attempt, { n: i.attempt }) : "",
@@ -2845,8 +2844,17 @@ function restoreFocus() {
   if (!lastFocus) return;
   const active = document.activeElement;
   if (active && active !== document.body && active.isConnected) return;
-  const el = document.querySelector(`[data-focus="${CSS.escape(lastFocus)}"]`);
+  const el = document.querySelector(`[data-focus="${CSS.escape(lastFocus)}"]`) || rowHomeOf(lastFocus);
   if (el && !el.disabled) el.focus({ preventScroll: true });
+}
+
+// rowHomeOf is the element that holds the focus of the row a vanished slot was a control of: a facet whose
+// value changed, an action no longer served.
+function rowHomeOf(slot) {
+  const row = [...document.querySelectorAll("[data-row]")].map((r) => r.getAttribute("data-row"))
+    .filter((r) => slot.startsWith(r + ":") || slot.startsWith(`facet:${r}:`))
+    .sort((a, b) => b.length - a.length)[0];
+  return row ? document.querySelector(`[data-focus="${CSS.escape(row)}"]`) : null;
 }
 
 function renderSearch() {

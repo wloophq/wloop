@@ -165,16 +165,17 @@ const cockpitHost = {
   detail: pluginDetail,
 };
 
+// pluginList is a plugin view's list of rows, drawn with the cockpit's row under the view's lens.
 function pluginList(el, rows, opts) {
+  const lens = readLens();
   if (!rows.length) {
-    el.replaceChildren(h("p", { class: "empty" }, opts.empty || "Nothing here right now."));
+    el.replaceChildren(h("p", { class: "empty" }, opts.empty || (lens.words || {}).list_empty));
     return;
   }
-  el.replaceChildren(h("ol", { class: "plugin-list" }, ...rows.map((r) => h("li", { class: waitClass(r) },
-    h("a", { href: "#" + lensHash({ pr: keyOf(r) }), class: "ref", "data-focus": "plugin:" + keyOf(r) }, labelOf(r)),
-    " ", r.title || "",
-    " ", h("span", { class: "pill" }, rowKindLabel(r)),
-    sm(r).reason ? h("div", { class: "why" }, sm(r).reason) : null))));
+  const { pr } = readHash();
+  const models = rows.map((r) => rowModel(r, pr, lens, ""));
+  const cols = rowColumns(models);
+  el.replaceChildren(h("table", { class: "plugin-list" }, rowHead(cols, lens, unitTitle(lens.view, lens)), h("tbody", {}, models.map((m) => rowTr(m, lens, cols)))));
 }
 
 function pluginDetail(el, unit) {

@@ -104,6 +104,7 @@ type RowWords struct {
 	FilterTitleGroup string `json:"filter_title_group"`
 	FilterGroup      string `json:"filter_group"`
 	ListCount        string `json:"list_count"`
+	ListEmpty        string `json:"list_empty"`
 	CountdownTitle   string `json:"countdown_title"`
 	CountdownSending string `json:"countdown_sending"`
 	CountdownSeconds string `json:"countdown_seconds"`

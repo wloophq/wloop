@@ -9,7 +9,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
-	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // FactFacets are the values of the facets defs declares that f holds the fact of, as text: a true bool is
@@ -110,9 +109,9 @@ func text(v any) string {
 
 // MergeFacets joins a task's own facet values with those of its units' rows, rows in unit order, the
 // primary unit's first and nil for a unit without a row. A facet defs declares as rows-first takes the rows'
-// values, its own only when no row has one; any other joins its own and then the rows', each value once. A
+// values, its own only when no row has one; one declared own keeps its own alone; any other joins its own and then the rows', each value once. A
 // facet declared for the primary unit reads the first row alone. A facet defs does not declare comes from
-// the rows alone. A facet that takes the turn of another holds that turn alone.
+// the rows alone.
 func MergeFacets(defs []intentload.FacetDef, own map[string][]string, rows []map[string][]string) map[string][]string {
 	out := map[string][]string{}
 	declared := make(map[string]bool, len(defs))
@@ -127,16 +126,14 @@ func MergeFacets(defs []intentload.FacetDef, own map[string][]string, rows []map
 			theirs = appendNew(theirs, r[d.ID]...)
 		}
 		vs := theirs
-		if d.Merge != "rows-first" || len(theirs) == 0 {
+		switch {
+		case d.Merge == "own":
+			vs = appendNew(nil, own[d.ID]...)
+		case d.Merge != "rows-first" || len(theirs) == 0:
 			vs = appendNew(appendNew(nil, own[d.ID]...), theirs...)
 		}
 		if len(vs) > 0 {
 			out[d.ID] = vs
-		}
-	}
-	for _, d := range defs {
-		if d.TurnOf != "" {
-			out[d.ID] = []string{builtin.TurnsOf(out[d.TurnOf])}
 		}
 	}
 	for _, r := range rows {

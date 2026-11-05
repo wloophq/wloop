@@ -25,7 +25,8 @@ function cardShown(m, card, tr, aside) {
   const facets = walk(card, isFacet);
   const asidePieces = (aside || []).map((p) => p.field + ":" + p.value);
   return {
-    Tag: card.tag, Class: card.attrs.class, Row: card.attrs["data-row"] || "", Tip: card.attrs.title || "", RowTip: tr.attrs.title || "",
+    Tag: card.tag, Class: card.attrs.class, Row: card.attrs["data-row"] || "", Tip: open ? open.n.attrs.title || "" : "", RowTip: tr.attrs.title || "",
+    Titled: walk(card, (n) => "title" in n.attrs && n.attrs.class !== "open").filter((x) => !x.inOpen).map((x) => x.n.tag + "." + (x.n.attrs.class || "")),
     OpenTag: open ? open.n.tag : "", OpenFocus: open ? open.n.attrs["data-focus"] : "", OpenTab: open ? open.n.attrs.tabindex || "" : "none",
     OpenCurrent: open ? open.n.attrs["aria-current"] || "" : "", OpenHref: open ? open.n.attrs.href || "" : "",
     FacetsOutside: facets.every((x) => !x.inOpen), FacetsRove: facets.every((x) => x.n.attrs.tabindex === "-1" && "data-rove" in x.n.attrs),
@@ -37,6 +38,7 @@ function cardShown(m, card, tr, aside) {
 
 type cardShown struct {
 	Tag, Class, Row, Tip, RowTip string
+	Titled                       []string
 	OpenTag, OpenFocus, OpenTab  string
 	OpenCurrent, OpenHref        string
 	FacetsOutside, FacetsRove    bool
@@ -92,6 +94,9 @@ process.stdout.write(JSON.stringify(out));`,
 		}
 		if !slices.Equal(c.Pieces, c.RowPieces) {
 			t.Errorf("the %s's card shows %v, its row %v", name, c.Pieces, c.RowPieces)
+		}
+		if slices.Contains(c.Titled, "li.card") || slices.Contains(c.Titled, "div.title") {
+			t.Errorf("the %s's card holds a tooltip over its stretched title: %v", name, c.Titled)
 		}
 		if c.Tip != c.RowTip {
 			t.Errorf("the %s's card tooltip %q, its row's %q", name, c.Tip, c.RowTip)

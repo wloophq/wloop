@@ -1009,7 +1009,7 @@ func TestCockpitShowsTheBriefingIntake(t *testing.T) {
 		Notes []string   `json:"notes"`
 	}
 	nodeRun(t, prelude, []string{"isSet", "pl", "intakeWaiting", "intakeChip", "intakeLines", "acceptedNote", "lensWords", "fillWord"}, `process.stdout.write(JSON.stringify({
-		chips: input.map((r) => intakeChip(r)),
+		chips: input.map((r) => intakeChip(r, lensWords())),
 		lines: [intakeLines(input[0].payload.intake)],
 		notes: [acceptedNote("review", "acme/api#7", { seq: 42 }), acceptedNote("review", "acme/api#7", { seq: 42, joined: true, state: "briefing" }), acceptedNote("open", "acme/api#7", undefined)],
 	}));`, in, &got)

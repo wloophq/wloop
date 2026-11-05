@@ -317,18 +317,6 @@ func window(lines []string, cur, height int) []string {
 	return lines[start:min(len(lines), start+height)]
 }
 
-// taskAge is how long the task has stood since it last changed.
-func (m *Model) taskAge(e api.TaskView, now time.Time) (string, func(string) string) {
-	since := e.Updated
-	if since.IsZero() || !now.After(since) {
-		return "-", m.t.Dim
-	}
-	if now.Sub(since) >= 48*time.Hour {
-		return span(now.Sub(since)), m.t.Yellow
-	}
-	return span(now.Sub(since)), m.t.Dim
-}
-
 // viewTabs are the task views with their counts.
 func (m *Model) viewTabs() []string {
 	out := make([]string, len(m.taskViews))

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/lens"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
@@ -263,7 +264,7 @@ func (m *Model) age(r api.Row, now time.Time) (string, func(string) string) {
 	g, pending := m.roundGate(r)
 	switch {
 	case pending:
-		return countdownText(g, now), t.Cyan
+		return lens.Countdown(m.rowWordsOf(string(r.Unit.Provider)).RowWords, g.Deadline.Sub(now)), t.Cyan
 	case r.Summary.Since.IsZero():
 		return "-", t.Dim
 	case r.Summary.Stalled:
@@ -272,11 +273,6 @@ func (m *Model) age(r api.Row, now time.Time) (string, func(string) string) {
 		return span(now.Sub(r.Summary.Since)), t.Yellow
 	}
 	return span(now.Sub(r.Summary.Since)), t.Dim
-}
-
-// countdownText is the seconds left before a round's gate goes.
-func countdownText(g api.GateView, now time.Time) string {
-	return fmt.Sprintf("%ds", max(0, int(g.Deadline.Sub(now).Seconds()+0.999)))
 }
 
 // detail is the selected pull request: its title, its facts under aligned

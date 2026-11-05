@@ -90,7 +90,7 @@ func TestRenderShowsTheViewCountdownAndHelp(t *testing.T) {
 	m.SetData(withServedFacets("", []api.Row{pending, stalled}), api.Health{Warnings: []string{"app: notifications are off"}})
 	m.SetGates([]api.GateView{planGate(pending, now.Add(42*time.Second)), {ID: 2, Unit: stalled.Unit.String(), Kind: "question", Status: "open"}})
 	screen := strings.Join(m.Render(120, 10, now), "\n")
-	for _, want := range []string{"[Needs me 2]", "My PRs 1", "In loop 0", "acme/api#3  Pending round", "42s", "!2d 2h", "round soon", "changes asked", "warning: app: notifications are off", "V review", "q quit"} {
+	for _, want := range []string{"[Needs me 2]", "My PRs 1", "In loop 0", "acme/api#3  Pending round", "in 42 s", "!2d 2h", "round soon", "changes asked", "warning: app: notifications are off", "V review", "q quit"} {
 		if !strings.Contains(screen, want) {
 			t.Errorf("screen lacks %q:\n%s", want, screen)
 		}

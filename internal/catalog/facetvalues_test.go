@@ -58,23 +58,26 @@ func TestMergeFacetsJoinsTheLayersAsEachFacetSays(t *testing.T) {
 	}
 }
 
-func TestATurnFacetFollowsTheMergedValuesItTakesTheTurnOf(t *testing.T) {
+func TestAnOwnFacetKeepsTheTasksValueOverItsRows(t *testing.T) {
 	t.Parallel()
-	defs := []intentload.FacetDef{{ID: "waits-on", Merge: "rows-first", Units: "all"}, {ID: "turn", Merge: "union", Units: "all", TurnOf: "waits-on"}}
+	defs := []intentload.FacetDef{{ID: "waits-on", Merge: "rows-first", Units: "all"}, {ID: "turn", Merge: "own", Units: "all"}}
 	for _, c := range []struct {
 		name string
 		own  map[string][]string
 		rows []map[string][]string
-		want string
+		want []string
 	}{
-		{"a row's person wins over the task's own owner", map[string][]string{"waits-on": {"me"}, "turn": {"me"}}, []map[string][]string{{"waits-on": {"ana"}, "turn": {"others"}}}, "others"},
-		{"a row waiting on the viewer", map[string][]string{"waits-on": {"ana"}, "turn": {"others"}}, []map[string][]string{{"waits-on": {"ana", "me"}}}, "me"},
-		{"no row, the task's own owner", map[string][]string{"waits-on": {"me"}, "turn": {"me"}}, nil, "me"},
-		{"nobody", map[string][]string{"turn": {"nobody"}}, []map[string][]string{{"turn": {"others"}}}, "nobody"},
+		{"a draft you owe on a pull request that waits on its author", map[string][]string{"waits-on": {"me"}, "turn": {"me"}},
+			[]map[string][]string{{"waits-on": {"ana"}, "wait": {"author"}}}, []string{"me"}},
+		{"a task Ana owes holding a thread that waits on you", map[string][]string{"waits-on": {"ana"}, "turn": {"others"}},
+			[]map[string][]string{{"waits-on": {"me"}, "turn": {"me"}}}, []string{"others"}},
+		{"a task the loop works on", map[string][]string{"turn": {"nobody"}}, []map[string][]string{{"waits-on": {"me"}}}, []string{"nobody"}},
+		{"a Slack conversation waiting on your closure", map[string][]string{"waits-on": {"ana"}, "turn": {"others"}},
+			[]map[string][]string{{"waits-on": {"bia"}, "turn": {"me"}}}, []string{"others"}},
+		{"no value of its own", nil, []map[string][]string{{"turn": {"me"}}}, nil},
 	} {
-		got := MergeFacets(defs, c.own, c.rows)
-		if !reflect.DeepEqual(got["turn"], []string{c.want}) {
-			t.Errorf("%s: turn %v, want %s", c.name, got["turn"], c.want)
+		if got := MergeFacets(defs, c.own, c.rows)["turn"]; !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s: turn %v, want %v", c.name, got, c.want)
 		}
 	}
 }

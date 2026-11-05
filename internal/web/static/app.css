@@ -462,13 +462,13 @@ label.d-sub { display: block; margin-top: var(--space-12); }
 .lane-tools { display: inline-flex; align-items: baseline; gap: var(--space-6); }
 .lane-tools .only { margin-left: 0; text-transform: none; letter-spacing: 0; font-weight: 400; }
 .cards { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-6); }
-.card { position: relative; display: grid; gap: var(--space-2); padding: var(--space-8); background: var(--panel); border: 1px solid var(--rule); border-left: var(--strip-card) solid var(--none); border-radius: var(--radius-md); overflow-wrap: anywhere; }
+.card { position: relative; isolation: isolate; display: grid; gap: var(--space-2); padding: var(--space-8); background: var(--panel); border: 1px solid var(--rule); border-left: var(--strip-card) solid var(--none); border-radius: var(--radius-md); overflow-wrap: anywhere; }
 /* The title's control covers the card, so a click anywhere opens it; the card's other controls sit above it. */
 .card .open { padding: 0; font: inherit; font-weight: 600; text-align: left; color: inherit; background: none; border: 0; cursor: pointer; text-decoration: none; }
 .card .open::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
 .card .open:focus-visible { outline: none; }
 .card:has(.open:focus-visible) { outline: 2px solid var(--me); outline-offset: 1px; }
-.card .facet, .card a:not(.open), .card button:not(.open), .card .d-draft, .card .project-facts { position: relative; z-index: 1; }
+.card .facet, .card a:not(.open), .card button:not(.open), .card .d-draft, .card .project-facts, .card .meta [title] { position: relative; z-index: 1; }
 .card.mine { background: var(--mine-bg); }
 .card:hover { background: var(--hover); }
 .card.w-me { border-left-color: var(--me); }
@@ -610,13 +610,11 @@ button.kpi:hover { border-color: var(--muted); }
 .view-rule dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-2) var(--space-8); margin: var(--space-4) 0 0; }
 .view-rule dd { margin: 0; }
 .view-rule code { font: var(--text-meta)/1.4 var(--mono); color: var(--ink); overflow-wrap: anywhere; }
-.task-row { padding: var(--space-8) var(--space-10); border-bottom: 1px solid var(--rule); cursor: pointer; }
-.task-row:hover { background: var(--hover); }
+tr.task-row { cursor: pointer; }
 .task-row.changed .title { color: var(--me-text); }
-.task-row .task-line { display: flex; gap: var(--space-6); align-items: baseline; }
-.task-row .meta { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-8); margin-top: var(--space-2); }
+tr.task-row .meta { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-8); margin-top: var(--space-2); }
 .task-row .star, #detail h1 .star { color: var(--late); }
-.task-row.outbox { cursor: default; }
+tr.task-row.outbox { cursor: default; }
 .task-row .project-facts .flag { color: var(--late); }
 .tasks > .tools { padding: 0 0 var(--space-8); }
 .task-board { padding: var(--space-8) 0 var(--space-16); }

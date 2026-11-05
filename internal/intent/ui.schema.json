@@ -307,6 +307,10 @@
           "description": "A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.",
           "type": "string"
         },
+        "list_empty": {
+          "description": "What a plugin view's list says when it holds no row and the plugin gives no words of its own.",
+          "type": "string"
+        },
         "no_next_action": {
           "description": "The flag of a project with no open child.",
           "type": "string"

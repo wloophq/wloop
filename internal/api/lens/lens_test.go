@@ -138,3 +138,15 @@ func TestPartsCases(t *testing.T) {
 		}
 	}
 }
+
+func TestACountdownSaysTheTimeLeftInTheRowWords(t *testing.T) {
+	w := api.RowWords{CountdownSending: "sending", CountdownSeconds: "in {{.s}} s", CountdownMinutes: "in {{.m}}m {{.s}}s"}
+	for _, c := range []struct {
+		left time.Duration
+		want string
+	}{{0, "sending"}, {-time.Second, "sending"}, {4200 * time.Millisecond, "in 5 s"}, {99 * time.Second, "in 99 s"}, {125 * time.Second, "in 2m 05s"}} {
+		if got := lens.Countdown(w, c.left); got != c.want {
+			t.Errorf("%v left reads %q, want %q", c.left, got, c.want)
+		}
+	}
+}

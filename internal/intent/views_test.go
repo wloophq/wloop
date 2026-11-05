@@ -614,22 +614,15 @@ func TestAStripFacetColorsEachValueWithAStripHue(t *testing.T) {
 	}
 }
 
-func TestAFacetTakesTheTurnOfAnotherFacetsValues(t *testing.T) {
+func TestTheTaskStripIsTheTasksOwnTurn(t *testing.T) {
 	views, problems := loadFacets(t, "")
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
-	if f, _ := facetOf(views, "turn"); f.TurnOf != "waits-on" {
-		t.Errorf("the bundled turn is the turn of %q", f.TurnOf)
+	if f, _ := facetOf(views, "turn"); f.Fact != "task.turn" || f.Merge != "own" || !f.Strip {
+		t.Errorf("the bundled turn reads %q merged %q, strip %v", f.Fact, f.Merge, f.Strip)
 	}
-	views, problems = loadFacets(t, "[facets.turn]\nturn_of = \"nobody-here\"\n")
-	if len(problems) != 1 || !strings.Contains(problems.Error(), "facets.turn.turn_of") {
-		t.Fatalf("turn_of naming no facet: %v", problems)
-	}
-	if f, _ := facetOf(views, "turn"); f.TurnOf != "" {
-		t.Errorf("a bad turn_of is kept: %q", f.TurnOf)
-	}
-	if _, problems := loadFacets(t, "[facets.turn]\nturn_of = \"turn\"\n"); len(problems) != 1 {
-		t.Errorf("turn_of naming itself: %v", problems)
+	if _, problems := loadFacets(t, "[facets.turn]\nturn_of = \"waits-on\"\n"); len(problems) != 1 {
+		t.Errorf("turn_of is no key: %v", problems)
 	}
 }
