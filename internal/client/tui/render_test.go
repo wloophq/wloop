@@ -198,3 +198,21 @@ func TestARowLineSaysItsAgeInItsPluginsWords(t *testing.T) {
 		t.Fatalf("the row's age is not in its plugin's words:\n%s", screen)
 	}
 }
+
+func TestARowLineTakesItsPluginsWordsOncePerCatalog(t *testing.T) {
+	m := newModel(t)
+	c := servedCatalog(t)
+	c.Lens = []api.ProviderWords{{Provider: "github", Words: map[string]string{"age_hours": "{{.h}} hours"}}}
+	m.SetCatalog(c)
+	m.SetData(withServedFacets("", rows()[:2]), api.Health{})
+	m.Render(100, 8, now)
+	if len(m.rowWords) != 1 {
+		t.Fatalf("words merged for %d providers, want 1: %v", len(m.rowWords), m.rowWords)
+	}
+	c.Lens[0].Words = map[string]string{"age_hours": "{{.h}} hrs"}
+	c.Version = c.Version + "x"
+	m.SetCatalog(c)
+	if screen := strings.Join(m.Render(100, 8, now), "\n"); !strings.Contains(screen, "3 hrs") {
+		t.Fatalf("a new catalog's words are not on the row:\n%s", screen)
+	}
+}

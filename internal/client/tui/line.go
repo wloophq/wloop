@@ -137,7 +137,7 @@ func whoCell(l listLine, w int) string {
 // of its age, and its age marked ! and red once stalled, yellow from two days.
 func (m *Model) rowLine(r api.Row, now time.Time) listLine {
 	t := m.t
-	words := m.catalog.RowWordsOf(string(r.Unit.Provider), m.viewsCat.Lens)
+	words := m.rowWordsOf(string(r.Unit.Provider))
 	l := listLine{parts: lens.Parts(m.rowItem(r), m.catalog.Facets, words, now), label: r.Label, link: r.Link, title: r.Title}
 	if r.Stale {
 		l.title = staleMark + " " + r.Title

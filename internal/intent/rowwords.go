@@ -172,7 +172,11 @@ func readShow(s *sheet, path string, v any, values *string, sh *Show) {
 		}
 		for part, vs := range x {
 			n := len(s.problems)
-			s.oneOf(path+".show."+part, part, parts)
+			if part == "" {
+				s.add(path+".show", "names no part; a table names the part its values show in")
+			} else {
+				s.oneOf(path+".show."+part, part, parts)
+			}
 			list, ok := vs.([]any)
 			if !ok {
 				s.add(path+".show."+part, "must be a list of values")

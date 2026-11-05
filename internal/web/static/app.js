@@ -480,7 +480,7 @@ function roundGate(row) {
 
 function countdown(row) {
   const deadline = roundGate(row).deadline;
-  return h("span", { class: "age countdown", "data-deadline": deadline, title: fillWord(lensWords().countdown_title, { time: stamp(deadline) }) }, left(deadline));
+  return h("span", { class: "age countdown", "data-deadline": deadline, title: fillWord(rowWords(unitOf(row).provider).countdown_title, { time: stamp(deadline) }) }, left(deadline));
 }
 
 function tickCountdowns() {
@@ -1524,7 +1524,8 @@ function rowModel(r, pr, lens, copy) {
   const strip = waitField();
   const cat = waitCat(r);
   const why = sm(r).reason || "";
-  const nouns = Object.fromEntries((p.waits_on || []).filter((x) => String(x.key || "").startsWith("group:")).map((x) => [`waits-on:${x.name}`, w.filter_group]));
+  const groups = new Set((p.waits_on || []).filter((x) => String(x.key || "").startsWith("group:")).map((x) => fold(x.name || "")));
+  const nouns = Object.fromEntries((parts.who || []).filter((x) => groups.has(fold(x.raw))).map((x) => [`${x.field}:${x.value}`, w.filter_group]));
   return {
     key, scope, item, parts, words: w, nouns, selected: key === pr, open: () => openRow(scope, key),
     title: r.title || labelOf(r), titleTip: (p.brief || {}).goal,

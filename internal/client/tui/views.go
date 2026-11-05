@@ -26,7 +26,7 @@ func (m *Model) SetViews(c api.ViewsCatalog) {
 	if !m.navigated && len(c.Views) > 0 {
 		current = "view:" + c.Views[0].ID
 	}
-	m.viewsCat, m.taskViews = c, nil
+	m.viewsCat, m.taskViews, m.rowWords = c, nil, nil
 	m.refreshFacets()
 	for _, v := range c.Views {
 		m.taskViews = append(m.taskViews, View{ID: v.ID, Label: v.Label})

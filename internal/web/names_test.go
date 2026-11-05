@@ -87,7 +87,7 @@ func TestEveryWhoChipFiltersToItsRow(t *testing.T) {
 		"unit": map[string]string{"provider": "slack", "key": slackUnit.Key}, "label": "#general", "title": "Deploy plan", "kind": "waits_on_others",
 		"views": []string{"slack", "all"}, "summary": map[string]any{"waits_on": "@team-a, Ana, channel participants"},
 		"facets":  map[string][]string{"conversation": {"#general"}, "waits-on": {"@team-a", "Ana", "channel participants"}},
-		"payload": map[string]any{"waits_on": []map[string]string{{"key": "group:S0001", "name": "@team-a"}, {"key": "slack:U0002", "name": "Ana"}, {"key": "group:channel participants", "name": "channel participants"}}},
+		"payload": map[string]any{"waits_on": []map[string]string{{"key": "group:S0001", "name": "@Team-A"}, {"key": "slack:U0002", "name": "Ana"}, {"key": "group:channel participants", "name": "channel participants"}}},
 	}
 	other := map[string]any{"unit": map[string]string{"provider": "slack", "key": "T0001/C0002/1700000000.000200"}, "label": "#random", "kind": "waits_on_others",
 		"views": []string{"slack", "all"}, "summary": map[string]any{"waits_on": "Bo"}, "facets": map[string][]string{"waits-on": {"Bo"}}}

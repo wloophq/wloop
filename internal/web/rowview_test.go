@@ -223,7 +223,7 @@ func TestARowShowsWhatItsOwnPluginSays(t *testing.T) {
 	if err := json.Unmarshal([]byte(servedCatalog(t)), &cat); err != nil {
 		t.Fatal(err)
 	}
-	cat["lens"] = []any{map[string]any{"provider": "github", "words": map[string]string{"filter_label": "GitHub filter {{.value}}", "col_aside": "Workspace"}}}
+	cat["lens"] = []any{map[string]any{"provider": "github", "words": map[string]string{"filter_label": "GitHub filter {{.value}}", "col_aside": "Workspace", "countdown_title": "GitHub sends at {{.time}}"}}}
 	raw, err := json.Marshal(cat)
 	if err != nil {
 		t.Fatal(err)
@@ -233,9 +233,12 @@ func TestARowShowsWhatItsOwnPluginSays(t *testing.T) {
 		Heads                     []string
 		Labels                    [][]string
 		SlackClass                []string
-		Count                     string
+		Count, Countdown          string
 	}
 	rowViewRun(t, raw, `state.rows = [input.pr, input.slack];
+state.roundGates.set(keyOf(input.pr), { deadline: new Date(input.now + 600000).toISOString() });
+const countdownTitle = countdown(input.pr).attrs.title;
+state.roundGates.clear();
 state.specs = { version: "", byId: { open: { id: "open", label: "Open", group: "control", surfaces: ["row"] } } };
 const lens = lensOf({ ...readHash(), view: "all" });
 const key = keyOf(input.pr);
@@ -249,7 +252,7 @@ state.loaded = true;
 renderRows();
 process.stdout.write(JSON.stringify({ Class: trs[0].attrs.class, Selected: trs[0].attrs["aria-selected"], AgeTitle: (agePiece(trs[0]) || { attrs: {} }).attrs.title || "",
   Heads: heads(rowHead(cols, lens, unitTitle("all", lens))), Labels: trs.map((tr) => labels(tr)), SlackClass: trs[1].attrs.class.split(" "),
-  Count: document.getElementById("list-sum").textContent }));`,
+  Count: document.getElementById("list-sum").textContent, Countdown: countdownTitle }));`,
 		map[string]any{"pr": wireRow("me", now, pr), "slack": slack, "now": now.UnixMilli()}, &got)
 	if !strings.Contains(" "+got.Class+" ", " sel ") || got.Selected != "true" {
 		t.Errorf("the open row is %q, aria-selected %q", got.Class, got.Selected)
@@ -270,6 +273,9 @@ process.stdout.write(JSON.stringify({ Class: trs[0].attrs.class, Selected: trs[0
 	}
 	if slices.Contains(got.SlackClass, "mine") {
 		t.Errorf("GitHub's author row_class marks a Slack row: %v", got.SlackClass)
+	}
+	if !strings.HasPrefix(got.Countdown, "GitHub sends at ") {
+		t.Errorf("the countdown says %q, want its plugin's words", got.Countdown)
 	}
 	if !strings.HasSuffix(got.Count, "s: 2 of 2") {
 		t.Errorf("the list summary reads %q", got.Count)

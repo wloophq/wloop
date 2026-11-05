@@ -524,6 +524,10 @@ func TestAFacetsShowNamesAPartOrAPartsValues(t *testing.T) {
 	if moved, _ := facetOf(views, "moved"); len(problems) > 0 || moved.Show.Part != "" {
 		t.Errorf("show = \"\" leaves moved %+v, problems %v", moved.Show, problems)
 	}
+	views, problems = loadFacets(t, "[facets.risk]\nshow = { \"\" = [\"high\"] }\n")
+	if risk, _ := facetOf(views, "risk"); risk.Show.Only != nil || !strings.Contains(problems.Error(), "names no part") {
+		t.Errorf("a table of no part leaves risk %+v, problems %v", risk.Show, problems)
+	}
 	for _, bad := range []string{"show = \"corner\"", "show = { corner = [\"high\"] }", "show = { flag = \"high\" }", "show_values = \"some\""} {
 		_, problems := loadFacets(t, "[facets.risk]\n"+bad+"\n")
 		if !strings.Contains(problems.Error(), "facets.risk.show") {
