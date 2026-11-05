@@ -104,8 +104,8 @@ func servedCatalog(t testing.TB) api.CatalogResponse {
 		t.Fatal(err)
 	}
 	tui := []string{"tui"}
-	c.Views = append([]api.ViewSpec{{ID: "needs-me", Label: "Needs me", Provider: "github", Rows: true, Surfaces: tui, Unit: "Pull request", UnitSort: "repo"},
-		{ID: "loop", Label: "In loop", Provider: "github", Rows: true, Order: 3, Surfaces: tui, Unit: "Pull request", UnitSort: "repo"}}, c.Views...)
+	c.Views = append([]api.ViewSpec{{ID: "needs-me", Label: "Needs me", Provider: "github", Rows: true, Surfaces: tui, Unit: "Pull request"},
+		{ID: "loop", Label: "In loop", Provider: "github", Rows: true, Order: 3, Surfaces: tui, Unit: "Pull request"}}, c.Views...)
 	slices.SortStableFunc(c.Views, func(a, b api.ViewSpec) int { return a.Order - b.Order })
 	return c
 }

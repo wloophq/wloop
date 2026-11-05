@@ -8,8 +8,8 @@ unit = "Conversation"
 [facets.conversation]
 label = "Conversation"
 
-[facets.channel]
-label = "Channel"
+[facets.where]
+label = "Where"
 
 [situations]
 waits_on_viewer = "waits on you"

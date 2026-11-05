@@ -48,7 +48,7 @@ func (c Catalog) Views() []api.ViewSpec {
 	for _, v := range c.ui().Views {
 		w := t.Views[v.ID]
 		out = append(out, api.ViewSpec{ID: v.ID, Label: cmp.Or(w.Label, v.ID), Provider: c.Source.Provider, Rows: v.Rows, Order: v.Order,
-			Surfaces: slices.Clone(v.Surfaces), Unit: w.Unit, UnitSort: v.UnitSort, Search: searchOf(w.Search)})
+			Surfaces: slices.Clone(v.Surfaces), Unit: w.Unit, Search: searchOf(w.Search)})
 	}
 	return out
 }

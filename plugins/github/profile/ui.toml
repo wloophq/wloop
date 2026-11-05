@@ -41,8 +41,8 @@ no_decision = "no review required"
 [views.recent]
 label = "Recent"
 
-[facets.repo]
-label = "Repo"
+[facets.where]
+label = "Where"
 
 [facets.author]
 label = "Author"

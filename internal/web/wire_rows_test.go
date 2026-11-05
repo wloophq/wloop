@@ -164,7 +164,7 @@ func facetsOf(viewer string, now time.Time, r map[string]any) map[string][]strin
 	}
 	f := map[string][]string{"kind": {kind}, "wait": wait, "waits-on": who}
 	if repo := str(r["repo"]); repo != "" {
-		f["repo"] = []string{repo}
+		f["where"] = []string{repo}
 	}
 	if author != "" {
 		f["author"] = []string{author}

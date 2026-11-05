@@ -28,8 +28,8 @@ const (
 	KindAnswered api.Kind = "answered"
 )
 
-// FacetChannel is the thread plugin's own facet.
-const FacetChannel = "channel"
+// FacetWhere is the thread plugin's where facet.
+const FacetWhere = "where"
 
 // Thread is one thread as its plugin knows it.
 type Thread struct {
@@ -48,7 +48,7 @@ func (t Thread) Snapshot() src.Snapshot {
 	return src.Snapshot{Unit: plugin.Unit{Provider: string(ID), Key: t.Key}, Rev: 1,
 		Situation: &src.Situation{Kind: string(t.Kind), WaitingOn: t.WaitsOn, Since: t.Since, Reason: t.Reason, Stalled: src.Bool(t.Stalled)},
 		Card:      &src.Card{Label: "#" + t.Channel, Title: t.Title, Link: "https://chat.example/" + t.Key},
-		Facets:    map[string]string{FacetChannel: t.Channel}, Views: []string{}}
+		Facets:    map[string]string{FacetWhere: t.Channel}, Views: []string{}}
 }
 
 // Source holds the threads' last reports.
@@ -128,7 +128,7 @@ type presenter struct{}
 func (presenter) Views() []api.ViewSpec { return nil }
 
 func (presenter) Facets() []api.FacetSpec {
-	return []api.FacetSpec{{ID: FacetChannel, Label: "Channel", Provider: string(ID), Group: true, Sort: "text", Menu: true}}
+	return []api.FacetSpec{{ID: FacetWhere, Label: "Where", Provider: string(ID), Group: true, Sort: "text", Menu: true}}
 }
 
 func (presenter) Situations() []api.SituationSpec {

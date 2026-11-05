@@ -94,8 +94,6 @@ type ViewSpec struct {
 	Surfaces []string `json:"surfaces"` // "web", "tui", "menubar"
 	// Unit names the view's rows, such as "Pull request"; "" for a view whose rows mix providers.
 	Unit string `json:"unit,omitempty"`
-	// UnitSort is the facet the unit column sorts by, such as "repo"; "" sorts by "repo".
-	UnitSort string `json:"unit_sort,omitempty"`
 	// Search is a custom view's search; nil for none.
 	Search *SearchSpec `json:"search,omitempty"`
 }

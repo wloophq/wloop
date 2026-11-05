@@ -50,9 +50,9 @@ const ViewSlack = "slack"
 // FacetConversation groups rows by channel or DM.
 const FacetConversation = "conversation"
 
-// FacetChannel is a channel thread's channel name, without "#": the
-// qualifier channel:<name>.
-const FacetChannel = "channel"
+// FacetWhere is a channel thread's channel name, without "#": the
+// qualifier where:<name>. DMs have none.
+const FacetWhere = "where"
 
 // FacetWaitsOn is the core facet of whom a row waits on.
 const FacetWaitsOn = "waits-on"
@@ -90,7 +90,7 @@ func derive(in *Input) Row {
 		r.Facets[FacetWaitsOn] = w
 	}
 	if pl.Channel != "" {
-		r.Facets[FacetChannel] = []string{pl.Channel}
+		r.Facets[FacetWhere] = []string{pl.Channel}
 	}
 	r.Payload, _ = json.Marshal(pl)
 	return r

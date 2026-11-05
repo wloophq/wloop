@@ -190,7 +190,6 @@ type UIView struct {
 	Rows     bool     `toml:"rows" doc:"A list of rows filtered by a snapshot's views; otherwise a custom view served by View."`
 	Order    int      `toml:"order" doc:"Its order among the views."`
 	Surfaces []string `toml:"surfaces" doc:"Where it shows." enum:"web,tui,menubar"`
-	UnitSort string   `toml:"unit_sort" doc:"The facet the unit column sorts by."`
 }
 
 // UIFacet is a facet of a plugin's rows.
@@ -475,13 +474,11 @@ func (s *Source) validateUI(bad func(string, ...any), unique func(string, string
 		views = append(views, v.ID)
 	}
 	strips := 0
-	var facets []string
 	for _, f := range ui.Facets {
 		if !nameRe.MatchString(f.ID) {
 			bad("ui facet %q is not a lowercase name", f.ID)
 		}
 		unique("ui facet", f.ID)
-		facets = append(facets, f.ID)
 		if len(f.Buckets) > 0 && f.Sort != "time" {
 			bad("ui facet %q: buckets need sort = time", f.ID)
 		}
@@ -503,11 +500,6 @@ func (s *Source) validateUI(bad func(string, ...any), unique func(string, string
 	}
 	if strips > 1 {
 		bad("ui: %d facets are the strip's; at most one is", strips)
-	}
-	for _, v := range ui.Views {
-		if v.UnitSort != "" && !slices.Contains(facets, v.UnitSort) {
-			bad("ui view %q: unit_sort %q is not a facet", v.ID, v.UnitSort)
-		}
 	}
 	for _, m := range ui.Menubar {
 		unique("ui menubar", m.ID)

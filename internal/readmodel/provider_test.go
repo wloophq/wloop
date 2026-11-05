@@ -161,7 +161,7 @@ func TestThreadRowNeedsNoPRField(t *testing.T) {
 		t.Fatalf("rows %+v", page.Rows)
 	}
 	r := page.Rows[0]
-	if r.Unit != th.Unit() || r.Payload != nil || r.Summary.Line != "ana asked you" || !slices.Equal(r.Facets[fakesource.FacetChannel], []string{"general"}) {
+	if r.Unit != th.Unit() || r.Payload != nil || r.Summary.Line != "ana asked you" || !slices.Equal(r.Facets[fakesource.FacetWhere], []string{"general"}) {
 		t.Fatalf("thread row %+v", r)
 	}
 	raw, err := json.Marshal(r)

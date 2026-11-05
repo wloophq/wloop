@@ -42,7 +42,7 @@ func (p *Provider) Situations() []api.SituationSpec {
 
 // Facet ids of the GitHub rows.
 const (
-	FacetRepo    = "repo"
+	FacetWhere   = "where"
 	FacetAuthor  = "author"
 	FacetWait    = "wait"
 	FacetWaitsOn = "waits-on"

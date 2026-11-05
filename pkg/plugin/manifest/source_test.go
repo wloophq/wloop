@@ -126,7 +126,6 @@ web = "web"
 id = "my-pulls"
 rows = true
 surfaces = ["web", "menubar"]
-unit_sort = "repo"
 
 [[source.ui.facets]]
 id = "repo"
@@ -173,7 +172,7 @@ func TestManifestCodecParsesKeysWithoutThePlugin(t *testing.T) {
 	if src.Provider != "pulls" || src.Slot != "pull" || len(src.Facts) != 2 || src.Jobs[0].Every != Duration(5*time.Minute) || src.Jobs[0].EveryFrom != "sweep.fast" ||
 		!src.Deliveries[0].Posts || src.Deliveries[1].Posts || src.Events[0].Resolves != "merged" || !src.Events[1].AnswersAskedTurn ||
 		src.Situations[0].Rank != 2 || src.Tools[0].Answers[0].Fields[1] != (AnswerField{Name: "Count", Number: true}) || src.Tools[1].Posts != "now" ||
-		src.UI.Views[0].UnitSort != "repo" || src.UI.Web != "web" || src.DraftKinds[1].Delivery != "reaction" {
+		src.UI.Web != "web" || src.DraftKinds[1].Delivery != "reaction" {
 		t.Errorf("source %+v", src)
 	}
 	c, err := src.Codec.Compile()
@@ -235,6 +234,17 @@ func TestManifestCodecParsesKeysWithoutThePlugin(t *testing.T) {
 	}
 	if !c.Takes("C123") || c.Takes("acme/api#1") {
 		t.Error("targets")
+	}
+}
+
+func TestAViewNoLongerTakesAUnitSort(t *testing.T) {
+	m, err := Parse([]byte("id = \"acme\"\nkinds = [\"source\"]\nprotocol = 1\n[source]\nname = \"Acme\"\nslot = \"acme\"\ncodec = {keys = [\"{id}\"]}\n" +
+		"[[source.ui.views]]\nid = \"v\"\nunit_sort = \"where\"\n"))
+	if err == nil {
+		_, err = m.Source()
+	}
+	if err == nil || !strings.Contains(err.Error(), "unit_sort") {
+		t.Errorf("err = %v, want an unknown key unit_sort", err)
 	}
 }
 

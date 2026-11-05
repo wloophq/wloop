@@ -10,8 +10,7 @@
         "web",
         "tui"
       ],
-      "unit": "Pull request",
-      "unit_sort": "repo"
+      "unit": "Pull request"
     },
     {
       "id": "plan",
@@ -121,8 +120,8 @@
   ],
   "facets": [
     {
-      "id": "repo",
-      "label": "Repo",
+      "id": "where",
+      "label": "Where",
       "provider": "github",
       "group": true,
       "sort": "text",

@@ -353,11 +353,11 @@ function matchesActivity(it, ts) {
 
 // Recent applies the filters an event can answer: its repository and the
 // author of its pull request.
-const ACTIVITY_FIELDS = ["repo", "author"];
+const ACTIVITY_FIELDS = ["where", "author"];
 
 function activityPasses(it, lens) {
   const filters = new Map([...lens.filters].filter(([id]) => ACTIVITY_FIELDS.includes(id)));
-  return matchesActivity(it, lens.ts) && passesFilters({ facets: { repo: activityRepos(it), author: [it.author || ""] } }, filters);
+  return matchesActivity(it, lens.ts) && passesFilters({ facets: { where: activityRepos(it), author: [it.author || ""] } }, filters);
 }
 
 function activityRepos(it) {
@@ -1182,7 +1182,7 @@ function rowTr(r, pr, lens, copy) {
     h("td", { class: "c-pr" },
       h("div", { class: "title", title: (p.brief || {}).goal }, marked(r.title || labelOf(r), ts)),
       h("div", { class: "meta" },
-        h("span", { class: "ref" }, p.repo ? facet(lens, "repo", p.repo, marked(p.repo, ts), slot + "repo") : null, marked(labelTail(r), ts)),
+        h("span", { class: "ref" }, p.repo ? facet(lens, "where", p.repo, marked(p.repo, ts), slot + "where") : null, marked(labelTail(r), ts)),
         p.author ? [" by ", facet(lens, "author", mine ? "me" : p.author, h("span", { class: "who" }, marked(p.author, ts)), slot + "author")] : null,
         mine ? mineMark() : null,
         briefTags(p.brief, lens, slot),
@@ -1253,13 +1253,13 @@ function renderTable(res, pr, lens) {
   }));
 }
 
-const SORT_COLUMNS = { "c-pr": "repo", "c-for": "age", "c-why": "kind", "c-where": "status" };
+const SORT_COLUMNS = { "c-pr": "where", "c-for": "age", "c-why": "kind", "c-where": "status" };
 
 // unitColumn is how the list names its unit column in view: by the view's
 // provider, "Item" when its rows mix providers.
 function unitColumn(view) {
   const v = catalog.views.find((x) => x.id === view) || {};
-  const sort = v.unit_sort || "repo";
+  const sort = "where";
   const f = fieldById(sort);
   return { title: v.unit || "Item", sort, sortTitle: "Sort by " + (f ? f.label.toLowerCase() : sort) };
 }

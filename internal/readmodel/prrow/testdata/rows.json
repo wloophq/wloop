@@ -40,9 +40,6 @@
       "opened": [
         "2026-10-14T02:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "high"
       ],
@@ -67,6 +64,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -211,9 +211,6 @@
       "opened": [
         "2026-10-13T13:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "low"
       ],
@@ -234,6 +231,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -371,9 +371,6 @@
       "opened": [
         "2026-10-13T00:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -394,6 +391,9 @@
       ],
       "waits-on": [
         "carol"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -530,9 +530,6 @@
       "opened": [
         "2026-10-12T11:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -553,6 +550,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -684,9 +684,6 @@
       "opened": [
         "2026-10-11T22:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -707,6 +704,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -849,9 +849,6 @@
       "opened": [
         "2026-10-11T09:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -872,6 +869,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -1011,9 +1011,6 @@
       "opened": [
         "2026-10-10T20:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -1034,6 +1031,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -1174,9 +1174,6 @@
       "opened": [
         "2026-10-10T07:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -1197,6 +1194,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -1342,9 +1342,6 @@
       "opened": [
         "2026-10-09T18:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -1365,6 +1362,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -1496,9 +1496,6 @@
       "opened": [
         "2026-10-09T05:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -1519,6 +1516,9 @@
       ],
       "waits-on": [
         "ana"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -1652,9 +1652,6 @@
       "opened": [
         "2026-10-08T16:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -1675,6 +1672,9 @@
       ],
       "waits-on": [
         "ana"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -1817,9 +1817,6 @@
       "opened": [
         "2026-10-08T03:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -1840,6 +1837,9 @@
       ],
       "waits-on": [
         "dave"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -1977,9 +1977,6 @@
       "opened": [
         "2026-10-07T14:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -1997,6 +1994,9 @@
       ],
       "wait": [
         "nobody"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -2087,9 +2087,6 @@
       "opened": [
         "2026-10-07T01:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -2107,6 +2104,9 @@
       ],
       "wait": [
         "nobody"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -2198,9 +2198,6 @@
       "opened": [
         "2026-10-06T12:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -2218,6 +2215,9 @@
       ],
       "wait": [
         "nobody"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -2363,9 +2363,6 @@
       "opened": [
         "2026-10-05T23:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -2383,6 +2380,9 @@
       ],
       "wait": [
         "nobody"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -2522,9 +2522,6 @@
       "opened": [
         "2026-10-05T10:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -2545,6 +2542,9 @@
       ],
       "waits-on": [
         "ana"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -2679,9 +2679,6 @@
       "opened": [
         "2026-10-04T21:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -2702,6 +2699,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -2848,9 +2848,6 @@
       "opened": [
         "2026-10-04T08:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -2871,6 +2868,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -3007,9 +3007,6 @@
       "opened": [
         "2026-10-03T19:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -3030,6 +3027,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -3165,9 +3165,6 @@
       "opened": [
         "2026-10-03T06:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -3188,6 +3185,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -3342,9 +3342,6 @@
       "opened": [
         "2026-10-02T17:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -3365,6 +3362,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -3503,9 +3503,6 @@
       "opened": [
         "2026-10-02T04:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -3523,6 +3520,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -3662,9 +3662,6 @@
       "opened": [
         "2026-10-01T15:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -3685,6 +3682,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -3822,9 +3822,6 @@
       "opened": [
         "2026-10-01T02:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -3845,6 +3842,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -3988,9 +3988,6 @@
       "opened": [
         "2026-09-30T13:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -4008,6 +4005,9 @@
       ],
       "waits-on": [
         "carol"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -4138,9 +4138,6 @@
       "opened": [
         "2026-09-30T00:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -4161,6 +4158,9 @@
       ],
       "waits-on": [
         "bob"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -4301,9 +4301,6 @@
       "opened": [
         "2026-09-29T11:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -4324,6 +4321,9 @@
       ],
       "waits-on": [
         "ana"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -4463,9 +4463,6 @@
       "opened": [
         "2026-09-28T22:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -4486,6 +4483,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -4626,9 +4626,6 @@
       "lane": [
         "reviewer"
       ],
-      "repo": [
-        "acme/web"
-      ],
       "risk": [
         "none"
       ],
@@ -4649,6 +4646,9 @@
       ],
       "waits-on": [
         "team:acme/web"
+      ],
+      "where": [
+        "acme/web"
       ]
     },
     "actions": [
@@ -4789,9 +4789,6 @@
       "opened": [
         "2026-08-15T15:00:00Z"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "medium"
       ],
@@ -4815,6 +4812,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [

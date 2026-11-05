@@ -81,7 +81,7 @@ state.openSlot = copies[1][0];
 const open = [openSlot("github:acme/web#2"), openSlot("github:acme/web#20"), openSlot("github:acme/api#2")];
 state.revealed = "";
 revealOpenRow("github:acme/web#2");
-process.stdout.write(JSON.stringify({ copies, plain, cards, open, asked, multi: [multiCopy("tag:lang"), multiCopy("repo")] }));`, wireRow("me", time.Now(), row), &got)
+process.stdout.write(JSON.stringify({ copies, plain, cards, open, asked, multi: [multiCopy("tag:lang"), multiCopy("where")] }));`, wireRow("me", time.Now(), row), &got)
 	if !slices.Equal(got.Multi, []bool{true, false}) {
 		t.Errorf("multi copy %v", got.Multi)
 	}

@@ -153,8 +153,8 @@ function dashAuthorsOption(rows, lens, pal) {
 function dashReposOption(rows, lens, pal) {
   const orgs = new Map();
   for (const r of rows) {
-    if (!passesFilters(r, lens.filters, "repo")) continue;
-    const repo = facetValues(r, "repo")[0];
+    if (!passesFilters(r, lens.filters, "where")) continue;
+    const repo = facetValues(r, "where")[0];
     if (!repo) continue;
     const org = repo.split("/")[0];
     if (!orgs.has(org)) orgs.set(org, new Map());
@@ -168,7 +168,7 @@ function dashReposOption(rows, lens, pal) {
   const data = [...orgs.entries()].sort(cmp).map(([org, repos]) => ({
     name: org,
     children: [...repos.entries()].sort(cmp).map(([repo, c]) => ({
-      ...dashItem(lens, "repo", repo, c.n, dashMix(pal.panel, pal.late, 0.6 * c.stalled / c.n), repo.slice(org.length + 1)),
+      ...dashItem(lens, "where", repo, c.n, dashMix(pal.panel, pal.late, 0.6 * c.stalled / c.n), repo.slice(org.length + 1)),
       tooltip: { formatter: `${dashEsc(repo)}: ${c.n} pending, ${c.stalled} stalled` },
     })),
   }));

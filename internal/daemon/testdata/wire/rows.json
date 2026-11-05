@@ -94,9 +94,6 @@
       "lane": [
         "loop"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "low"
       ],
@@ -115,6 +112,9 @@
       ],
       "wait": [
         "nobody"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "kind": "muted",
@@ -231,9 +231,6 @@
       "lane": [
         "author"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -251,6 +248,9 @@
       ],
       "wait": [
         "nobody"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "kind": "done",

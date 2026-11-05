@@ -148,7 +148,7 @@ func TestTheCockpitAndTheDaemonMatchTheSameTasks(t *testing.T) {
 	queries := []string{"acao", "runbook oss", "launch", "@reply", "acme/api#12", "slack:t1/c9", "deploys", "bruna", "question", "octocat",
 		"dora", "window", "c0rel", "releases", "ship", "eyes", "slack/t1", "next", "capture", "draft ship", "nobody", `"task a" ação`,
 		"Škoda", "skoda", "erdos", "Erdős", "회의", "が", "がんばる", `"invoice `, `" the invoice"`, `"send the"`, "eclair", "éclair", "cafe",
-		"repo:acme invoice"}
+		"where:acme invoice"}
 	var got []struct {
 		Terms   []string `json:"terms"`
 		Matches []bool   `json:"matches"`

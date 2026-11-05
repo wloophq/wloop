@@ -481,10 +481,10 @@ func TestAQueryHoldsFreeTermsAndQualifiers(t *testing.T) {
 		Quals  [][]map[string]any `json:"quals"`
 	}
 	qs := []string{
-		`repo:acme/widgets wait:me fix`,
+		`where:acme/widgets wait:me fix`,
 		`status:"needs me" -risk:high "two words"`,
 		`fix: https://github.com/acme/api/pull/7 is:pr author:@me AUTHOR:Ana`,
-		`Repo:Widgets -waits-on:team:acme/search unknown:x`,
+		`Where:Widgets -waits-on:team:acme/search unknown:x`,
 	}
 	nodeRun(t, filterPrelude(t), queryFuncs, `process.stdout.write(JSON.stringify({
   tokens: input.map(tokens),
@@ -499,10 +499,10 @@ func TestAQueryHoldsFreeTermsAndQualifiers(t *testing.T) {
 		return map[string]any{"field": field, "value": value, "raw": raw, "neg": neg}
 	}
 	wantQuals := [][]map[string]any{
-		{q("repo", "acme/widgets", "acme/widgets", false), q("wait", "me", "me", false)},
+		{q("where", "acme/widgets", "acme/widgets", false), q("wait", "me", "me", false)},
 		{q("status", "needs me", "needs me", false), q("risk", "high", "high", true)},
 		{q("is", "pr", "pr", false), q("author", "me", "@me", false), q("author", "ana", "Ana", false)},
-		{q("repo", "widgets", "Widgets", false), q("waits-on", "team:acme/search", "team:acme/search", true)},
+		{q("where", "widgets", "Widgets", false), q("waits-on", "team:acme/search", "team:acme/search", true)},
 	}
 	if !reflect.DeepEqual(got.Quals, wantQuals) {
 		t.Errorf("qualifiers\n%v\nwant\n%v", got.Quals, wantQuals)
@@ -515,17 +515,17 @@ func TestAQueryHoldsFreeTermsAndQualifiers(t *testing.T) {
 func TestAFacetTogglesItsQualifier(t *testing.T) {
 	var got []string
 	nodeRun(t, filterPrelude(t), append(slices.Clone(queryFuncs), "qualifierToken", "toggledQualifier", "withoutQualifiers"), `process.stdout.write(JSON.stringify([
-  toggledQualifier("fix", "repo", "acme/widgets", false),
-  toggledQualifier("fix repo:acme/widgets", "repo", "Acme/Widgets", false),
-  toggledQualifier("repo:a", "repo", "b", false),
-  toggledQualifier("repo:a", "repo", "a", true),
-  toggledQualifier("-repo:a", "repo", "a", false),
+  toggledQualifier("fix", "where", "acme/widgets", false),
+  toggledQualifier("fix where:acme/widgets", "where", "Acme/Widgets", false),
+  toggledQualifier("where:a", "where", "b", false),
+  toggledQualifier("where:a", "where", "a", true),
+  toggledQualifier("-where:a", "where", "a", false),
   toggledQualifier("author:@me", "author", "me", false),
   toggledQualifier("", "status", "needs me", false),
   toggledQualifier('status:"needs me"', "status", "needs me", false),
-  withoutQualifiers("repo:a fix -repo:b repo:c wait:me", "repo", false),
+  withoutQualifiers("where:a fix -where:b where:c wait:me", "where", false),
 ]));`, nil, &got)
-	want := []string{"fix repo:acme/widgets", "fix", "repo:a repo:b", "-repo:a", "repo:a", "", `status:"needs me"`, "", "fix -repo:b wait:me"}
+	want := []string{"fix where:acme/widgets", "fix", "where:a where:b", "-where:a", "where:a", "", `status:"needs me"`, "", "fix -where:b wait:me"}
 	if !slices.Equal(got, want) {
 		t.Errorf("got  %q\nwant %q", got, want)
 	}
@@ -600,6 +600,17 @@ func lensRows() []map[string]any {
 	}
 }
 
+func TestWhereFiltersBySuffix(t *testing.T) {
+	var got []int
+	nodeRun(t, lensPrelude(t), lensFuncs, `const rows = `+mustJS(t, wireRows("me", time.Now(), lensRows()...))+`;
+const q = input.q;
+const lens = { view: "needs-me", q, ts: terms(q), quals: qualifiers(q), filters: filtersOf(qualifiers(q)), group: "", sort: "", layout: "" };
+process.stdout.write(JSON.stringify(pipeline(rows, lens).groups.flatMap((g) => g.rows.map((x) => x.ref.number)).sort()));`, map[string]any{"q": "where:widgets"}, &got)
+	if want := []int{3, 4}; !slices.Equal(got, want) {
+		t.Errorf("where:widgets keeps %v, want the acme/widgets rows %v", got, want)
+	}
+}
+
 func TestPipelineFiltersSortsAndGroups(t *testing.T) {
 	type res struct {
 		Total  int `json:"total"`
@@ -613,9 +624,9 @@ func TestPipelineFiltersSortsAndGroups(t *testing.T) {
 	}
 	lenses := []map[string]any{
 		{"view": "needs-me", "q": ""},
-		{"view": "needs-me", "q": "repo:widgets"},
-		{"view": "needs-me", "q": "repo:widgets repo:acme/web"},
-		{"view": "needs-me", "q": "repo:acme/api wait:loop"},
+		{"view": "needs-me", "q": "where:widgets"},
+		{"view": "needs-me", "q": "where:widgets where:acme/web"},
+		{"view": "needs-me", "q": "where:acme/api wait:loop"},
 		{"view": "needs-me", "q": "author:@me"},
 		{"view": "needs-me", "q": "-risk:high risk:none risk:low"},
 		{"view": "needs-me", "q": "waits-on:me"},
@@ -624,7 +635,7 @@ func TestPipelineFiltersSortsAndGroups(t *testing.T) {
 		{"view": "needs-me", "q": "", "sort": "risk-desc"},
 		{"view": "needs-me", "q": "", "sort": "age-desc"},
 		{"view": "needs-me", "q": "", "group": "wait"},
-		{"view": "needs-me", "q": "", "group": "repo", "sort": "age"},
+		{"view": "needs-me", "q": "", "group": "where", "sort": "age"},
 		{"view": "needs-me", "q": "", "layout": "board"},
 		{"view": "needs-me", "q": "", "group": "size"},
 	}
@@ -697,8 +708,8 @@ func TestACopiedListSaysHowItWasGroupedAndSorted(t *testing.T) {
 	var got string
 	prelude := keyJS(t) + catalogPrelude(t) + `const state = { health: { viewer: "me" } };`
 	nodeRun(t, prelude, []string{"isSet", "resolveWho", "waitingLabel", "isMuted", "yamlString", "listYAML"},
-		`process.stdout.write(JSON.stringify(listYAML({ view: "needs-me", filter: "repo:widgets", group_by: "repo", sort: "risk descending", at: "x" }, [])));`, nil, &got)
-	for _, want := range []string{`filter: "repo:widgets"`, `group_by: "repo"`, `sort: "risk descending"`, "count: 0"} {
+		`process.stdout.write(JSON.stringify(listYAML({ view: "needs-me", filter: "where:widgets", group_by: "where", sort: "risk descending", at: "x" }, [])));`, nil, &got)
+	for _, want := range []string{`filter: "where:widgets"`, `group_by: "where"`, `sort: "risk descending"`, "count: 0"} {
 		if !strings.Contains(got, want+"\n") {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
