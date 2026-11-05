@@ -177,7 +177,7 @@ func (s *Server) taskGate(ctx context.Context, e task.Task, role builtin.GateRol
 	if s.deps.GateReader == nil || s.deps.Gates == nil {
 		return gate.Gate{}, gates.Resolution{}, false, nil
 	}
-	all, err := s.deps.GateReader.OfTask(ctx, e.ID)
+	all, err := s.openGatesOf(ctx, e.ID)
 	if err != nil {
 		return gate.Gate{}, gates.Resolution{}, false, err
 	}

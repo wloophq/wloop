@@ -78,7 +78,7 @@ func (s *syncBuffer) String() string {
 	return s.b.String()
 }
 
-func eventually(t *testing.T, what string, cond func() bool) {
+func eventually(t testing.TB, what string, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(time.Minute)
 	for !cond() {

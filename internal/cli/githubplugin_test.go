@@ -33,7 +33,7 @@ import (
 )
 
 // bundledGitHubSource is the bundled GitHub plugin's [source] table.
-func bundledGitHubSource(t *testing.T) *manifest.Source {
+func bundledGitHubSource(t testing.TB) *manifest.Source {
 	t.Helper()
 	srcs, err := bundled.Sources()
 	if err != nil {
@@ -176,7 +176,7 @@ func (te *testEnv) serveGitHubPlugin(db *sqlite.DB, ghs ghplugingh.Runner) {
 }
 
 // bundledGitHubManifest is the GitHub plugin's bundled manifest.
-func bundledGitHubManifest(t *testing.T) *manifest.Manifest {
+func bundledGitHubManifest(t testing.TB) *manifest.Manifest {
 	t.Helper()
 	ms, err := bundled.Manifests()
 	if err != nil {

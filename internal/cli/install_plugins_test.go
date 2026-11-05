@@ -106,7 +106,7 @@ func TestInstallPlacesTheBundledPluginsWithChecksums(t *testing.T) {
 
 // recordedPlugins are ps with a checksum recorded under stateDir for each,
 // as install records them, which a test's launcher does not check.
-func recordedPlugins(t *testing.T, stateDir string, ps ...host.Plugin) []host.Plugin {
+func recordedPlugins(t testing.TB, stateDir string, ps ...host.Plugin) []host.Plugin {
 	t.Helper()
 	if stateDir == "" {
 		t.Fatal("recording plugin checksums needs a state directory")

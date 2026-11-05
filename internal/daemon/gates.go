@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -217,13 +219,34 @@ func gateView(g gate.Gate, d intentload.GatesDef) api.GateView {
 	return v
 }
 
+// openGatesOf are task id's open gates, the oldest first; in a pass, the open gates of every task are read
+// once for all of them.
+func (s *Server) openGatesOf(ctx context.Context, id task.ID) ([]gate.Gate, error) {
+	rd := s.deps.GateReader
+	if _, ok := coretasks.PassOf(ctx); ok {
+		open, err := coretasks.Once(ctx, passOpenGates, func() (map[task.ID][]gate.Gate, error) {
+			gs, err := rd.Where(ctx, gates.Query{Statuses: []gate.Status{gate.Open}})
+			out := map[task.ID][]gate.Gate{}
+			for _, g := range gs {
+				out[g.Task] = append(out[g.Task], g)
+			}
+			return out, err
+		})
+		return open[id], err
+	}
+	gs, err := rd.OfTask(ctx, id)
+	return slices.DeleteFunc(gs, func(g gate.Gate) bool { return g.Status != gate.Open }), err
+}
+
+const passOpenGates = "daemon.open_gates"
+
 // openGates sets v's open gates.
 func (ev *taskViewer) openGates(ctx context.Context, e task.Task, v *api.TaskView) error {
 	rd := ev.s.deps.GateReader
 	if rd == nil {
 		return nil
 	}
-	gs, err := rd.OfTask(ctx, e.ID)
+	gs, err := ev.s.openGatesOf(ctx, e.ID)
 	if err != nil {
 		return err
 	}

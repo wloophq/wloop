@@ -69,3 +69,23 @@ func TestAPassReadsTheSnapshotsOnce(t *testing.T) {
 		t.Fatalf("outside a pass: %v, %d reads", err, store.gets)
 	}
 }
+
+func TestUnextractedFollowsARewrittenSnapshot(t *testing.T) {
+	u := unit.Unit{Provider: "acme", Key: "1"}
+	store := &countingSnapshots{stored: map[unit.Unit]snapshot.Stored{}}
+	snaps := psource.NewSnapshots(store)
+	ctx := context.Background()
+	for i, oldest := range []time.Time{time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC), {}} {
+		var h *src.ExtractionHealth
+		if !oldest.IsZero() {
+			h = &src.ExtractionHealth{Oldest: oldest}
+		}
+		raw, _ := json.Marshal(src.Snapshot{Rev: 7, Extraction: h})
+		store.stored[u] = snapshot.Stored{Unit: u, Rev: 7, JSON: raw}
+		for range 2 {
+			if got, err := snaps.Unextracted(ctx, []unit.Unit{u}); err != nil || !got.Equal(oldest) {
+				t.Fatalf("snapshot %d: unextracted %v %v, want %v", i, got, err, oldest)
+			}
+		}
+	}
+}

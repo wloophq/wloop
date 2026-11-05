@@ -147,7 +147,7 @@ func (ev *taskViewer) openGate(ctx context.Context, e task.Task, k gate.Kind) (g
 	if k == "" || ev.s.deps.GateReader == nil {
 		return gate.Gate{}, false
 	}
-	gs, err := ev.s.deps.GateReader.OfTask(ctx, e.ID)
+	gs, err := ev.s.openGatesOf(ctx, e.ID)
 	if err != nil {
 		ev.s.logf("notifications: the gates of %s: %v", e.ID, err)
 		return gate.Gate{}, false
@@ -252,7 +252,7 @@ func (ev *taskViewer) message(ctx context.Context, e task.Task) (dmessage.Messag
 	if ev.s.deps.Messages == nil || ev.s.deps.GateReader == nil {
 		return dmessage.Message{}, false
 	}
-	gs, err := ev.s.deps.GateReader.OfTask(ctx, e.ID)
+	gs, err := ev.s.openGatesOf(ctx, e.ID)
 	if err != nil {
 		ev.s.logf("notifications: the gates of %s: %v", e.ID, err)
 		return dmessage.Message{}, false

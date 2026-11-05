@@ -27,7 +27,7 @@ import (
 
 // serveSocket serves h on a Unix socket in a short temporary directory and
 // returns the socket path.
-func serveSocket(t *testing.T, h http.Handler) string {
+func serveSocket(t testing.TB, h http.Handler) string {
 	t.Helper()
 	dir, err := os.MkdirTemp("/tmp", brand.Name)
 	if err != nil {
