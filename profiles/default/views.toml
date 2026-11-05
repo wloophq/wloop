@@ -149,6 +149,16 @@ sort  = "text"
 match = "suffix"
 empty = "no placement"
 
+# where is the unit's place, a repository or a channel, as its rows say it, else the task's placement; a
+# task's row shows it on its unit labels, each a button that filters by the where value it names.
+[facets.where]
+fact  = "task.placement"
+merge = "rows-first"
+label = "Where"
+group = true
+sort  = "text"
+match = "suffix"
+
 [facets.moved]
 fact  = "task.moved_at"
 label = "Moved"

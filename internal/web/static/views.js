@@ -253,7 +253,7 @@ function taskModel(e, open, copy, lens) {
     href: draft ? "#" + viewHash({ task: e.id, pr: "" }) : "",
     title: e.title || e.id,
     pre: starred(e) ? h("span", { class: "star", title: w.starred }, "★ ") : null,
-    ref: (e.units || []).map((u, i) => h("span", { class: "unit" }, marked((e.unit_labels || [])[i] || unitLabel(u), lens.ts))),
+    ref: (e.units || []).map((u, i) => whereRef((e.unit_labels || [])[i] || unitLabel(u), item, lens, scope, w)),
     flags: [
       e.changed ? h("span", { class: "flag" }, w.changed) : null,
       due ? h("span", { class: "flag due" }, fillWord(w.due, { date: shortDate(due) })) : null,
@@ -264,6 +264,15 @@ function taskModel(e, open, copy, lens) {
     why: e.reason || "",
     cls: ["task-row", strip ? "w-" + strip.color : "", e.changed ? "changed" : "", draft ? "outbox" : "", ...rowClasses(item, lens.specs)],
   };
+}
+
+// whereRef is a unit's label on a task's row, a button that filters by the where value it names when the task
+// holds one: the longest the label ends with, or holds after its owner, as "#chan" or "owner/repo#7" do.
+function whereRef(label, item, lens, scope, w) {
+  const named = ((item.facets || {}).where || []).filter((v) => v && (label.endsWith(v) || label.includes(v + "#")))
+    .sort((a, b) => b.length - a.length)[0];
+  const text = h("span", { class: "unit" }, marked(label, lens.ts));
+  return named ? facet(lens, "where", named, text, `facet:${scope}:where:${named}`, { words: w, rove: true }) : text;
 }
 
 // taskTable is a table of the lens's groups of tasks, its columns those some task of all has a piece for.

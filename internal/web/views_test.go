@@ -438,3 +438,32 @@ process.stdout.write(JSON.stringify({
 		t.Errorf("a view without a rule shows %d", got.Rules)
 	}
 }
+
+// TestATaskRowsUnitLabelFiltersByWhere checks that a unit label on a task row is a facet button for the where
+// value the label names, a channel's or a repository's, so a click keeps the task in the list; a label no where
+// value names stays text.
+func TestATaskRowsUnitLabelFiltersByWhere(t *testing.T) {
+	var got []map[string]string
+	nodeRun(t, viewsPrelude(t), nil, `
+function writeHash() {}
+tasksState.catalog = input.cat;
+const tr = taskRow(input.task);
+const units = all(tr, (n) => n.attrs && n.attrs.class === "unit");
+process.stdout.write(JSON.stringify(units.map((u) => {
+  const b = all(tr, (n) => n.tag === "button" && n.children.includes(u))[0];
+  return { label: text(u), slot: b ? b.attrs["data-focus"] : "" };
+})));`,
+		map[string]any{"cat": servedViews(t), "task": task("e-1", "next", func(e *api.TaskView) {
+			e.Units = []unit.Unit{{Provider: "slack", Key: "T1/C1/seg/1"}, {Provider: "github", Key: "acme/api#7"}, {Provider: "session", Key: "s-1"}}
+			e.UnitLabels = []string{"#team-alpha", "acme/api#7", "a session"}
+			e.Facets = map[string][]string{"where": {"team-alpha", "acme/api"}}
+		})}, &got)
+	want := []map[string]string{
+		{"label": "#team-alpha", "slot": "facet:task:e-1:where:team-alpha"},
+		{"label": "acme/api#7", "slot": "facet:task:e-1:where:acme/api"},
+		{"label": "a session", "slot": ""},
+	}
+	if mustJS(t, got) != mustJS(t, want) {
+		t.Errorf("unit labels %v, want %v", got, want)
+	}
+}
