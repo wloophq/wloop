@@ -9,6 +9,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/readmodel"
 )
 
 // uiOf is what a plugin's clients show of it, from its manifest and its
@@ -49,4 +50,29 @@ func (e *Env) pluginUI(id unit.ProviderID) (*api.PluginUI, fs.FS) {
 		}
 	}
 	return ui, nil
+}
+
+// pluginFacets are the facets the compiled-in plugins' rows serve with the profile l, merged as the read
+// model merges them, for a check that reads no read model.
+func (e *Env) pluginFacets(l *intentload.Loaded) []api.FacetSpec {
+	var ps []readmodel.Provider
+	for _, p := range plugins {
+		s, err := e.pluginSource(p.ID)
+		if err != nil {
+			continue
+		}
+		cat := psource.Catalog{Source: s, Texts: func() intentload.UITexts { return l.UI[string(p.ID)] }}
+		if p.CheckRows != nil {
+			ps = append(ps, p.CheckRows(cat, l))
+			continue
+		}
+		ps = append(ps, catalogRows{noRows{p.ID}, cat})
+	}
+	return readmodel.BuildCatalog(ps...).Facets
+}
+
+// catalogRows serve no rows and present a plugin's catalog.
+type catalogRows struct {
+	noRows
+	psource.Catalog
 }

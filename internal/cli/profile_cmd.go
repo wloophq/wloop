@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/backup"
+	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -440,6 +441,7 @@ func runProfileCheck(e *Env, args []string) error {
 		return err
 	}
 	loaded, problems := intentload.Load(layer, turn.BundledFS(), b, turn.CheckTemplate)
+	problems = append(problems, catalog.CheckFacets(loaded.Views.Facets, e.pluginFacets(loaded))...)
 	for _, w := range loaded.Warnings.Sorted() {
 		fmt.Fprintf(e.Err, "warning: %s\n", intentload.Problems{w}.Error())
 	}

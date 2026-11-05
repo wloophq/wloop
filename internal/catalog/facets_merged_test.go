@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
@@ -38,6 +39,23 @@ func TestAMergedFacetNamesEverySourceInAConflict(t *testing.T) {
 	c := readmodel.BuildCatalog(presenter{Catalog: psource.BundledCatalog(string(unit.GitHub))}, presenter{Catalog: psource.BundledCatalog("slack")})
 	got := catalog.CheckFacets(l.Views.Facets, c.Facets)
 	if len(got) != 1 || !strings.Contains(got[0].Msg, "github") || !strings.Contains(got[0].Msg, "slack") || !strings.HasSuffix(got[0].File, intentload.ViewsFile) {
+		t.Fatalf("problems: %s", got.Error())
+	}
+}
+
+// otherWhere is a plugin whose where facet sorts otherwise than the bundled plugins'.
+type otherWhere struct{ baseProvider }
+
+func (otherWhere) Views() []api.ViewSpec           { return nil }
+func (otherWhere) Situations() []api.SituationSpec { return nil }
+func (otherWhere) Facets() []api.FacetSpec {
+	return []api.FacetSpec{{ID: "where", Provider: "jira", Group: true, Sort: "rank"}}
+}
+
+func TestAPluginThatDisagreesWithAMergedFacetNamesEverySource(t *testing.T) {
+	c := readmodel.BuildCatalog(presenter{Catalog: psource.BundledCatalog(string(unit.GitHub))}, presenter{Catalog: psource.BundledCatalog("slack")}, otherWhere{})
+	got := catalog.CheckFacets(nil, c.Facets)
+	if len(got) != 1 || got[0].Msg != `the facet where of plugin jira differs from that of plugin github+slack: sort is "text", not "rank"` || got[0].File != "plugins/jira/plugin.toml" {
 		t.Fatalf("problems: %s", got.Error())
 	}
 }

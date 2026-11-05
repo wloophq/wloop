@@ -26,6 +26,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/placement"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/gitx"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace"
@@ -144,6 +145,9 @@ type compiledPlugin struct {
 	Name  string
 	Codec unit.Codec
 	Build moduleBuild
+	// CheckRows are the plugin's rows as a check that reads no store sees them, over its catalog cat and the
+	// profile l: none, with the facets they serve; nil serves cat's alone.
+	CheckRows func(cat readmodel.Presenter, l *intentload.Loaded) readmodel.Provider
 }
 
 type pluginJob struct {

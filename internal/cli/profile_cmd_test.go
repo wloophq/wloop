@@ -134,6 +134,15 @@ func TestProfileCheckExitsOneOnAnError(t *testing.T) {
 	}
 }
 
+func TestProfileCheckReportsATaskFacetThatDisagreesWithAPlugin(t *testing.T) {
+	t.Parallel()
+	te, d := profileEnv(t, map[string]string{"views.toml": "[facets.risk]\nsort = \"text\"\n"})
+	code := te.run("profile", "check")
+	if code != 1 || !strings.Contains(te.err.String(), filepath.Join(d, "views.toml")) || !strings.Contains(te.err.String(), "differs from the facet risk of plugin github") {
+		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
+	}
+}
+
 func TestProfileCheckPrintsASortedProblemForABrokenIntent(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
