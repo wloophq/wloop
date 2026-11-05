@@ -307,7 +307,7 @@ function normValue(field, raw) {
 // qualifierOf reads a field:value term of a field that filters; anything else
 // is free text, so "fix:" or a URL stays a word.
 function qualifierOf(token, fields = catalog.fields) {
-  const m = /^(-?)([a-z][a-z-]*):(.+)$/i.exec(token);
+  const m = /^(-?)([a-zA-Z][a-zA-Z.-]*):(.+)$/.exec(token);
   const f = m && fieldById(m[2].toLowerCase(), fields);
   if (!f || !f.values) return null;
   const value = normValue(f.id, m[3]);

@@ -37,7 +37,7 @@ type Query struct {
 
 var (
 	tokenRE     = regexp.MustCompile(`[^\s\x0B\p{Z}\x{FEFF}"]*"[^"]*"?|[^\s\x0B\p{Z}\x{FEFF}"]+`)
-	qualifierRE = regexp.MustCompile(`^(-?)([a-zA-Z][a-zA-Z-]*):([^\n\r\x{2028}\x{2029}]+)$`)
+	qualifierRE = regexp.MustCompile(`^(-?)([a-zA-Z][a-zA-Z.-]*):([^\n\r\x{2028}\x{2029}]+)$`)
 	tagKeyRE    = regexp.MustCompile(`^([a-z-]+)$`)
 )
 

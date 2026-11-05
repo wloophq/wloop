@@ -81,6 +81,12 @@
     "high"
    ],
    "empty": "no risk"
+  },
+  {
+   "id": "prop.risk",
+   "label": "Risk",
+   "group": true,
+   "empty": "no risk"
   }
  ],
  "items": [
@@ -136,6 +142,9 @@
     ],
     "risk": [
      "high"
+    ],
+    "prop.risk": [
+     "high"
     ]
    },
    "texts": [
@@ -185,7 +194,10 @@
      "done"
     ],
     "opened": [],
-    "risk": []
+    "risk": [],
+    "prop.risk": [
+     "low"
+    ]
    },
    "texts": [
     "Écrire la documentation",
@@ -1091,6 +1103,95 @@
       "label": "medium",
       "items": [
        2
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "q": "prop.risk:high",
+   "want": {
+    "shown": [
+     1
+    ]
+   }
+  },
+  {
+   "q": "PROP.Risk:HIGH",
+   "want": {
+    "shown": [
+     1
+    ]
+   }
+  },
+  {
+   "q": "-prop.risk:high",
+   "want": {
+    "shown": [
+     0,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ]
+   }
+  },
+  {
+   "q": "prop.risk:high prop.risk:low",
+   "want": {
+    "shown": [
+     1,
+     3
+    ]
+   }
+  },
+  {
+   "q": ".risk:high",
+   "want": {
+    "shown": []
+   }
+  },
+  {
+   "q": "",
+   "group": "prop.risk",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "groups": [
+     {
+      "key": "high",
+      "label": "high",
+      "items": [
+       1
+      ]
+     },
+     {
+      "key": "low",
+      "label": "low",
+      "items": [
+       3
+      ]
+     },
+     {
+      "key": "none",
+      "label": "no risk",
+      "items": [
+       0,
+       2,
+       4,
+       5,
+       6,
+       7
       ]
      }
     ]
