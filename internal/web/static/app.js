@@ -334,13 +334,10 @@ function withoutQualifiers(q, field, neg) {
   }).join(" ");
 }
 
-// rowTexts are the texts a free word searches in a row. The pull request payload's own texts stay until a
-// row serves its search texts.
+// rowTexts are the texts a free word searches in a row.
 function rowTexts(r) {
-  const p = pl(r);
-  const ws = p.workspace || {};
-  return [r.title, labelOf(r), r.link, rowKindLabel(r), sm(r).waits_on, sm(r).reason, sm(r).line, r.search,
-    ...Object.values(r.facets || {}).flat(), p.head, r.kind, ws.display_name, ws.status, ws.comment, (p.brief || {}).goal];
+  return [r.title, labelOf(r), r.link, r.kind, rowKindLabel(r), sm(r).waits_on, sm(r).reason, sm(r).line,
+    ...(r.search || []), ...Object.values(r.facets || {}).flat()];
 }
 
 // haystack is an item's folded texts: its own, or a row's.

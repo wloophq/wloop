@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	facttask "github.com/wloophq/wloop/internal/adapter/facts/task"
@@ -52,6 +53,11 @@ func withLens(d coretasks.Deps, loaded func() *intentload.Loaded, facts func(con
 
 // lensFacts are the task subject's facts over db, as serve reads them for a view, under the profile loaded reads.
 func lensFacts(db *sqlite.DB, loaded func() *intentload.Loaded, now time.Time) func(context.Context, task.Task) (workflow.Facts, error) {
+	return countedLensFacts(db, loaded, now, &atomic.Int32{})
+}
+
+// countedLensFacts are lensFacts counting into reads each time a task's facts are computed.
+func countedLensFacts(db *sqlite.DB, loaded func() *intentload.Loaded, now time.Time, reads *atomic.Int32) func(context.Context, task.Task) (workflow.Facts, error) {
 	p := facttask.New(facttask.Deps{Tasks: db.Tasks(), Items: db.Items(), Gates: db.Gates(func() time.Time { return now }), Wakes: db.Wakes(),
 		Clock: fixedClock(now), Me: func() task.Me { return meID }, OwedBy: catalog.OwedByOf(loaded),
 		Props:      func(t task.Task) workflow.Facts { return catalog.PropFacts(t, loaded().Tasks) },
@@ -61,7 +67,10 @@ func lensFacts(db *sqlite.DB, loaded func() *intentload.Loaded, now time.Time) f
 			return name
 		}})
 	return func(ctx context.Context, t task.Task) (workflow.Facts, error) {
-		read := func() (workflow.Facts, error) { return p.TaskFacts(ctx, t) }
+		read := func() (workflow.Facts, error) {
+			reads.Add(1)
+			return p.TaskFacts(ctx, t)
+		}
 		if pass, ok := coretasks.PassOf(ctx); ok {
 			return pass.Facts(t.ID, read)
 		}

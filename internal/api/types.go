@@ -36,6 +36,9 @@ type Row struct {
 	Question *QuestionView   `json:"question,omitempty"`
 	Items    []RowItem       `json:"items,omitempty"`
 	Payload  json.RawMessage `json:"payload,omitempty"`
+	// Search are the row's texts a filter's free words search beyond its title, label, link, kind, summary
+	// and facet values, such as what its payload holds.
+	Search []string `json:"search,omitempty"`
 	// Stale says the row is its plugin's last report, which the plugin no
 	// longer stands behind: it is down.
 	Stale bool `json:"stale,omitempty"`

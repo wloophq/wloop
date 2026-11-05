@@ -16,15 +16,6 @@ type prView struct {
 	Workspace api.Workspace     `json:"workspace"`
 }
 
-// haystack are the payload's texts the filter searches.
-func (p prView) haystack() []string {
-	out := []string{p.Head, p.Workspace.DisplayName, p.Workspace.Comment}
-	if p.Brief != nil {
-		out = append(out, p.Brief.Goal)
-	}
-	return out
-}
-
 func prOf(r api.Row) prView {
 	var p prView
 	if len(r.Payload) > 0 {

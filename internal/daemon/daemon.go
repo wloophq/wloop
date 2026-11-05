@@ -427,7 +427,9 @@ type Server struct {
 	// pauseMu serializes every read-modify-write of the pause.
 	pauseMu sync.Mutex
 	// track reads a pull request before it is tracked; nil tracks unread.
-	track        func(ctx context.Context, u unit.Unit) (port.TrackRead, error)
+	track func(ctx context.Context, u unit.Unit) (port.TrackRead, error)
+	// readRows reads the rows of units in one snapshot; nil reads the read model's.
+	readRows     func(ctx context.Context, units []unit.Unit) (map[unit.Unit]readmodel.Read, error)
 	reconcile    reconcileState
 	homes        homeCache
 	mutesFailing atomic.Bool

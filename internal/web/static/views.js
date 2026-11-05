@@ -374,7 +374,7 @@ function contextChips(route) {
 
 // taskHaystack is what the filter's free words search in a task, the texts the daemon's counters search
 // (api.TaskView.Texts): its title, notes, state, the text and the lists of text of its properties, its units,
-// who owes it, its asks, its cards' people, its draft and its message.
+// who owes it, its asks, its cards' people, its draft, its message and its facets' values, by facet id.
 function taskHaystack(e) {
   const d = draftOf(e) || {};
   const m = messageOf(e) || {};
@@ -384,7 +384,8 @@ function taskHaystack(e) {
     e.owed_by || "",
     ...(e.asks || []).flatMap((a) => [a.summary, a.asker]),
     ...(e.cards || []).flatMap((c) => [((c.card || {}).last_human || {}).who ? personName(c.card.last_human.who) : "", ...((c.card || {}).waits_on || []).map(personName)]),
-    d.target, d.where, d.text, d.reaction, d.unit, m.text].map((x) => fold(x));
+    d.target, d.where, d.text, d.reaction, d.unit, m.text,
+    ...Object.keys(e.facets || {}).sort().flatMap((id) => e.facets[id])].map((x) => fold(x));
 }
 
 // filterTerms are the free words of the filter query, the qualifiers left to the pull request lists, as the

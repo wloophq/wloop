@@ -670,7 +670,8 @@ const FacetWaitsOn = "waits-on"
 // cloneRow copies everything of r a caller could change in place, so no
 // caller reaches the snapshot's rows.
 func cloneRow(r api.Row) api.Row {
-	r.Views, r.Actions, r.Items, r.Payload = slices.Clone(r.Views), slices.Clone(r.Actions), slices.Clone(r.Items), slices.Clone(r.Payload)
+	r.Views, r.Actions, r.Items, r.Payload, r.Search = slices.Clone(r.Views), slices.Clone(r.Actions), slices.Clone(r.Items), slices.Clone(r.Payload),
+		slices.Clone(r.Search)
 	if r.Facets != nil {
 		f := make(map[string][]string, len(r.Facets))
 		for k, v := range r.Facets {

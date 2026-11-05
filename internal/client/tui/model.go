@@ -245,7 +245,7 @@ func (m *Model) in(id string) []api.Row {
 	var out []api.Row
 	q := string(m.filter)
 	for _, r := range m.rows {
-		if slices.Contains(r.Views, id) && Matches(r, q, m.kindLabel(r), prOf(r).haystack()...) {
+		if slices.Contains(r.Views, id) && Matches(r, q, m.kindLabel(r)) {
 			out = append(out, r)
 		}
 	}

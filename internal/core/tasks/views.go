@@ -488,7 +488,8 @@ func (s *Service) TasksSince(ctx context.Context, q task.Query, since Since) (Pa
 			return Page{}, err
 		}
 	}
-	ctx = WithPass(ctx, &Pass{Tasks: all})
+	pass := &Pass{Tasks: all}
+	ctx = WithPass(ctx, pass)
 	switch {
 	case spec.Over != task.OverTasks:
 		p.Full, p.Removed = true, nil
@@ -503,6 +504,7 @@ func (s *Service) TasksSince(ctx context.Context, q task.Query, since Since) (Pa
 		return Page{}, err
 	}
 	p.Counters, err = s.counts(ctx, q.Area, all, nil)
+	p.Pass = pass
 	return p, err
 }
 

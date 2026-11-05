@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -55,9 +56,12 @@ type tasksRig struct {
 	g      *coretasks.Service
 	ledger *coreitems.Ledger
 	wakes  *wakes.Service
+	// facts are the tasks' facts the views read, factReads how many times they were computed.
+	facts     func(context.Context, task.Task) (workflow.Facts, error)
+	factReads atomic.Int32
 }
 
-func newTasksRig(t *testing.T, edit func(*Deps)) *tasksRig {
+func newTasksRig(t testing.TB, edit func(*Deps)) *tasksRig {
 	t.Helper()
 	log := change.NewLog(change.DefaultWindow, nil)
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "inv.db"), log)
@@ -79,10 +83,11 @@ func newTasksRig(t *testing.T, edit func(*Deps)) *tasksRig {
 		if d.Intents != nil {
 			loaded = func() *intentload.Loaded { return cmp.Or(d.Intents(), bundledLoaded()) }
 		}
+		r.facts = countedLensFacts(db, loaded, tasksNow, &r.factReads)
 		r.g = coretasks.New(withLens(coretasks.Deps{States: loadedHandlers{taskstest.BundledStates, loaded}, Authority: taskstest.BundledStates.Authority, Store: db.Tasks(), Items: r.ledger,
 			Facts: coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: func() task.Me { return meID }},
 			Me:    meID, Clock: fixedClock(tasksNow), Disabled: disabledOf(enabled), Wakes: db.Wakes(),
-			Activity: func(ctx context.Context, id task.ID) error { return r.wakes.Event(ctx, id, wake.OnActivity, "") }}, loaded, lensFacts(db, loaded, tasksNow)))
+			Activity: func(ctx context.Context, id task.ID) error { return r.wakes.Event(ctx, id, wake.OnActivity, "") }}, loaded, r.facts))
 		d.Tasks, d.Wakes, d.TaskUnits = r.g, r.wakes, SyncUnits(db.Tasks(), r.ledger)
 	})
 	stopOnCleanup(t, r.s)
@@ -110,7 +115,7 @@ func disabledOf(enabled func(unit.ProviderID) bool) func() []unit.ProviderID {
 	}
 }
 
-func (r *tasksRig) put(t *testing.T, es ...task.Task) {
+func (r *tasksRig) put(t testing.TB, es ...task.Task) {
 	t.Helper()
 	var cs []task.Change
 	for _, e := range es {

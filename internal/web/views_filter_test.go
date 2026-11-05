@@ -144,11 +144,14 @@ func TestTheCockpitAndTheDaemonMatchTheSameTasks(t *testing.T) {
 		task("d", "next", func(e *api.TaskView) { e.Title = "Škoda deal with Erdős" }),
 		task("e", "next", func(e *api.TaskView) { e.Title = "회의 준비, がんばる" }),
 		task("f", "next", func(e *api.TaskView) { e.Title, e.Notes = "Send the invoice", "e\u0301clair and CAFÉ" }),
+		task("g", "inbox", func(e *api.TaskView) {
+			e.Title, e.Facets = "Answer the thread", map[string][]string{"where": {"general"}, "source": {"slack"}, "ci": {"failure"}}
+		}),
 	}
 	queries := []string{"acao", "runbook oss", "launch", "@reply", "acme/api#12", "slack:t1/c9", "deploys", "bruna", "question", "octocat",
 		"dora", "window", "c0rel", "releases", "ship", "eyes", "slack/t1", "next", "capture", "draft ship", "nobody", `"task a" ação`,
 		"Škoda", "skoda", "erdos", "Erdős", "회의", "が", "がんばる", `"invoice `, `" the invoice"`, `"send the"`, "eclair", "éclair", "cafe",
-		"where:acme invoice"}
+		"where:acme invoice", "general", "failure thread"}
 	var got []struct {
 		Terms   []string `json:"terms"`
 		Matches []bool   `json:"matches"`
@@ -158,19 +161,30 @@ process.stdout.write(JSON.stringify(input.queries.map((q) => {
   const ts = filterTerms(q);
   return { terms: ts, matches: input.tasks.map((e) => taskMatches(e, ts)) };
 })));`, map[string]any{"tasks": es, "queries": queries}, &got)
-	for i, q := range queries {
-		var sent []string
-		for _, term := range got[i].Terms {
-			if term = strings.TrimSpace(term); term != "" {
-				sent = append(sent, term)
-			}
+	for _, q := range []string{"general", "failure thread"} {
+		i, last := slices.Index(queries, q), len(es)-1
+		if !got[i].Matches[last] || !api.TaskMatches(es[last], filterTermsOf(got[i].Terms)) {
+			t.Errorf("%q misses the task whose facets hold it: the list %v", q, got[i].Matches[last])
 		}
+	}
+	for i, q := range queries {
+		sent := filterTermsOf(got[i].Terms)
 		for j, e := range es {
 			if want := api.TaskMatches(e, sent); got[i].Matches[j] != want {
 				t.Errorf("%q (terms %q) on %s: the list shows %v, the daemon counts %v", q, got[i].Terms, e.ID, got[i].Matches[j], want)
 			}
 		}
 	}
+}
+
+func filterTermsOf(terms []string) []string {
+	var out []string
+	for _, term := range terms {
+		if term = strings.TrimSpace(term); term != "" {
+			out = append(out, term)
+		}
+	}
+	return out
 }
 
 func TestAFailedFilteredReadLeavesTheRailWithoutCounts(t *testing.T) {

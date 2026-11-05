@@ -168,7 +168,11 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x",
+      "add x"
+    ]
   },
   {
     "unit": {
@@ -331,7 +335,10 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -484,7 +491,10 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -641,7 +651,10 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -800,7 +813,12 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x",
+      "author",
+      "in-progress"
+    ]
   },
   {
     "unit": {
@@ -964,7 +982,10 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -1128,7 +1149,10 @@
         "at": "2026-10-05T15:00:00Z",
         "link": "https://github.com/acme/api/pull/7"
       }
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -1296,7 +1320,12 @@
         "at": "2026-10-14T13:00:00Z",
         "link": "https://github.com/acme/api/pull/8"
       }
-    }
+    },
+    "search": [
+      "feat/x",
+      "author",
+      "in-progress"
+    ]
   },
   {
     "unit": {
@@ -1453,7 +1482,10 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -1609,7 +1641,10 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -1771,7 +1806,10 @@
         "at": "2026-10-09T15:00:00Z",
         "link": "https://github.com/acme/api/pull/11"
       }
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -1934,7 +1972,10 @@
         "at": "2026-10-11T15:00:00Z",
         "link": "https://github.com/acme/api/pull/12"
       }
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -2047,7 +2088,12 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x",
+      "review",
+      "in-review"
+    ]
   },
   {
     "unit": {
@@ -2152,7 +2198,10 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -2320,7 +2369,10 @@
       "mute": {
         "until": "2026-10-14T20:00:00Z"
       }
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -2479,7 +2531,10 @@
       "mute": {
         "until_state_change": true
       }
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -2635,7 +2690,10 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -2805,7 +2863,12 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x",
+      "review",
+      "in-review"
+    ]
   },
   {
     "unit": {
@@ -2961,7 +3024,10 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -3118,7 +3184,10 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -3298,7 +3367,12 @@
         ]
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x",
+      "review",
+      "in-review"
+    ]
   },
   {
     "unit": {
@@ -3460,7 +3534,12 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x",
+      "review",
+      "in-review"
+    ]
   },
   {
     "unit": {
@@ -3616,7 +3695,12 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x",
+      "review",
+      "in-review"
+    ]
   },
   {
     "unit": {
@@ -3778,7 +3862,12 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x",
+      "author",
+      "in-progress"
+    ]
   },
   {
     "unit": {
@@ -3942,7 +4031,12 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x",
+      "review",
+      "in-review"
+    ]
   },
   {
     "unit": {
@@ -4094,7 +4188,10 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -4257,7 +4354,10 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -4419,7 +4519,12 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x",
+      "review",
+      "in-review"
+    ]
   },
   {
     "unit": {
@@ -4586,7 +4691,10 @@
         }
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -4745,7 +4853,10 @@
         ]
       },
       "viewer": "me-login"
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   },
   {
     "unit": {
@@ -4921,6 +5032,9 @@
         "at": "2026-08-15T15:00:00Z",
         "link": "https://github.com/acme/api/pull/31"
       }
-    }
+    },
+    "search": [
+      "feat/x"
+    ]
   }
 ]

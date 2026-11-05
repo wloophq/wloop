@@ -19,7 +19,7 @@ import (
 func TestExtractionLagShowsOnTheLens(t *testing.T) {
 	ctx := context.Background()
 	r := newTasksRig(t, nil)
-	r.s.deps.Row = catalog.RowOf(lensFacts(r.db, bundledLoaded, tasksNow))
+	r.s.deps.Row = catalog.RowOf(bundledLoaded, lensFacts(r.db, bundledLoaded, tasksNow))
 	behind := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1.1"}
 	caught := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/2.2"}
 	if err := psource.NewSnapshots(r.db.Snapshots()).Put(ctx, map[unit.Unit]src.Snapshot{

@@ -165,7 +165,7 @@ func TestFilterMatchesEveryTermAndAPastedLinkFindsItsRow(t *testing.T) {
 		Matches []bool   `json:"matches"`
 		Keys    []string `json:"keys"`
 	}
-	pull := wireRow("me", time.Now(), map[string]any{"title": "Batch export", "label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "repo": "acme/api", "author": "ana", "head": "ana/batch-x", "waiting_on": "bob"})
+	pull := wireRow("me", time.Now(), map[string]any{"title": "Batch export", "label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "repo": "acme/api", "author": "ana", "search": []string{"ana/batch-x"}, "waiting_on": "bob"})
 	pull["link"] = "https://github.com/acme/api/pull/7"
 	issue := map[string]any{"unit": map[string]any{"provider": "linear", "key": "PAY-88"}, "label": "PAY-88", "title": "Retry budget", "link": "https://linear.app/acme/issue/PAY-88"}
 	in := map[string]any{
@@ -345,9 +345,9 @@ func TestRowsShowTheBriefSizeRiskAndQuestions(t *testing.T) {
 	}
 }
 
-func TestTheFilterFindsTheBriefGoal(t *testing.T) {
+func TestTheFilterFindsARowsSearchTexts(t *testing.T) {
 	var got []bool
-	row := wireRow("me", time.Now(), map[string]any{"title": "Batch export", "label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "brief": map[string]any{"goal": "Retry the webhook delivery"}})
+	row := wireRow("me", time.Now(), map[string]any{"title": "Batch export", "label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "search": []string{"Retry the webhook delivery"}})
 	nodeRun(t, filterPrelude(t), filterFuncs,
 		`process.stdout.write(JSON.stringify(["webhook", "batch delivery", "zebra"].map((q) => matches(input, terms(q)))));`, row, &got)
 	if !slices.Equal(got, []bool{true, true, false}) {

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
@@ -177,7 +178,11 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 	}
 	page := api.TasksPage{Epoch: p.Epoch, Rev: p.Rev, Full: p.Full, Tasks: []api.TaskView{}, Removed: []string{}, Counters: wireCounters(p.Counters),
 		Loading: s.loading()}
+	if p.Pass != nil {
+		ctx = coretasks.WithPass(ctx, p.Pass)
+	}
 	vs := s.taskViews(ctx, g, false)
+	vs.readRows(ctx, p.Tasks)
 	for _, e := range p.Tasks {
 		v, err := vs.view(ctx, e)
 		if err != nil {
@@ -785,6 +790,10 @@ type taskViewer struct {
 	status   map[task.ID]coretasks.ProjectState
 	// briefs are the brief records by unit, read once per page.
 	briefs map[unit.Unit]port.Event
+	// rows are the read model's rows of the units read, each read once: a page reads its tasks' in one
+	// snapshot.
+	rows map[unit.Unit]readmodel.Read
+	read map[unit.Unit]bool
 	// whereBy bounds every draft destination lookup of this page.
 	whereBy time.Time
 	// as is who the page is for, whose verbs it offers.
@@ -843,7 +852,7 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 	if v.Units == nil {
 		v.Units = []unit.Unit{}
 	}
-	v.UnitLabels = ev.s.unitLabels(v.Units)
+	v.UnitLabels = ev.unitLabels(ctx, v.Units)
 	if w, ok, err := ev.g.WakeOf(ctx, e.ID); err != nil {
 		return api.TaskView{}, err
 	} else if ok {
@@ -877,6 +886,7 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 	if err := ev.brief(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
+	ev.facets(ctx, e, &v)
 	if err := ev.openGates(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
@@ -914,6 +924,76 @@ func (ev *taskViewer) brief(ctx context.Context, e task.Task, v *api.TaskView) e
 	}
 	v.Brief = &api.RecordView{Kind: rec.Key, At: rec.At, Data: jsonData(rec.Data)}
 	return nil
+}
+
+// facets sets the task's facets: those of its facts row set, its brief's, and its units' rows', joined as
+// the profile's facets say.
+func (ev *taskViewer) facets(ctx context.Context, e task.Task, v *api.TaskView) {
+	defs := ev.s.loaded().Views.Facets
+	own := map[string][]string{}
+	maps.Copy(own, v.Facets)
+	if v.Brief != nil {
+		maps.Copy(own, catalog.RecordFacets(defs, v.Brief.Kind, v.Brief.Data))
+	}
+	rows := ev.rowsOf(ctx, e.Units)
+	units := make([]map[string][]string, len(e.Units))
+	for i, u := range e.Units {
+		units[i] = rows[u].Row.Facets
+	}
+	v.Facets = catalog.MergeFacets(defs, own, units)
+	if len(v.Facets) == 0 {
+		v.Facets = nil
+	}
+}
+
+// readRows reads the rows of the units of es in one snapshot, for their views.
+func (ev *taskViewer) readRows(ctx context.Context, es []task.Task) {
+	var units []unit.Unit
+	for _, e := range es {
+		units = append(units, e.Units...)
+	}
+	ev.rowsOf(ctx, units)
+}
+
+// rowsOf are the rows of the units read so far, units among them: those not read yet are read in one
+// snapshot. A unit no provider lists has none, and a failed read leaves its units without one.
+func (ev *taskViewer) rowsOf(ctx context.Context, units []unit.Unit) map[unit.Unit]readmodel.Read {
+	if ev.rows == nil {
+		ev.rows, ev.read = map[unit.Unit]readmodel.Read{}, map[unit.Unit]bool{}
+	}
+	var unread []unit.Unit
+	for _, u := range units {
+		if !ev.read[u] {
+			ev.read[u] = true
+			unread = append(unread, u)
+		}
+	}
+	if len(unread) == 0 {
+		return ev.rows
+	}
+	got, err := ev.s.rowsRead(ctx, unread)
+	if err != nil {
+		ev.s.logf("tasks: reading the rows of %d units: %v", len(unread), err)
+	}
+	for _, u := range unread {
+		if r, ok := got[u]; ok {
+			ev.rows[u] = r
+		}
+	}
+	return ev.rows
+}
+
+// unitLabels are units as a person reads them, in order: each row's label, else the unit's own label.
+func (ev *taskViewer) unitLabels(ctx context.Context, units []unit.Unit) []string {
+	if len(units) == 0 {
+		return nil
+	}
+	rows := ev.rowsOf(ctx, units)
+	out := make([]string, len(units))
+	for i, u := range units {
+		out[i] = cmp.Or(rows[u].Row.Label, u.Label())
+	}
+	return out
 }
 
 // childrenOf sets the open children of a project, or of any task in a detail, from one read per page.
@@ -975,7 +1055,7 @@ func (ev *taskViewer) row(ctx context.Context, e task.Task, v *api.TaskView) err
 	if err != nil {
 		return err
 	}
-	v.OwedBy, v.Askers = r.OwedBy, r.Askers
+	v.OwedBy, v.Askers, v.Facets = r.OwedBy, r.Askers, r.Facets
 	if r.ExtractionLag > 0 {
 		v.ExtractionLag = r.ExtractionLag.String()
 	}
@@ -1065,7 +1145,7 @@ func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
 	}
 	var row *api.Row
 	if len(e.Units) > 0 {
-		if rd, ok, err := ev.s.readModel().Read(ctx, e.Units[0]); err == nil && ok {
+		if rd, ok := ev.rowsOf(ctx, e.Units[:1])[e.Units[0]]; ok {
 			row = &rd.Row
 		}
 	}
@@ -1269,6 +1349,15 @@ func (s *Server) feedTasks(ctx context.Context) {
 		}
 		s.hub.publish(ch)
 	}
+}
+
+// rowsRead are the read model's rows of units, from one snapshot.
+func (s *Server) rowsRead(ctx context.Context, units []unit.Unit) (map[unit.Unit]readmodel.Read, error) {
+	if s.readRows != nil {
+		return s.readRows(ctx, units)
+	}
+	got, _, _, err := s.readModel().ReadMany(ctx, units)
+	return got, err
 }
 
 // unitLabels are units as a person reads them, in order: each row's label,

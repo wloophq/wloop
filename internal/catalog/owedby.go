@@ -29,15 +29,18 @@ func OwedByOf(loaded func() *intentload.Loaded) func(ctx context.Context, f work
 }
 
 // Row is what a task's row shows of its facts: who owes its next step (task.owed_by), who waits on you through
-// it (task.askers) and how long its links' messages have waited to be extracted (task.extraction_lag).
+// it (task.askers), how long its links' messages have waited to be extracted (task.extraction_lag), and its
+// values of the profile's facets that read its facts.
 type Row struct {
 	OwedBy        string
 	Askers        []string
 	ExtractionLag time.Duration
+	Facets        map[string][]string
 }
 
-// RowOf is the Row of a task over the facts facts reads of it, the task facts provider's.
-func RowOf(facts func(ctx context.Context, t task.Task) (workflow.Facts, error)) func(ctx context.Context, t task.Task) (Row, error) {
+// RowOf is the Row of a task over the facts facts reads of it, the task facts provider's, with the facets of
+// the profile loaded reads.
+func RowOf(loaded func() *intentload.Loaded, facts func(ctx context.Context, t task.Task) (workflow.Facts, error)) func(ctx context.Context, t task.Task) (Row, error) {
 	return func(ctx context.Context, t task.Task) (Row, error) {
 		f, err := facts(ctx, t)
 		if err != nil {
@@ -46,6 +49,6 @@ func RowOf(facts func(ctx context.Context, t task.Task) (workflow.Facts, error))
 		owed, _ := f["task.owed_by"].(string)
 		askers, _ := f["task.askers"].([]string)
 		lag, _ := f["task.extraction_lag"].(time.Duration)
-		return Row{OwedBy: owed, Askers: askers, ExtractionLag: lag}, nil
+		return Row{OwedBy: owed, Askers: askers, ExtractionLag: lag, Facets: FactFacets(loaded().Views.Facets, f)}, nil
 	}
 }

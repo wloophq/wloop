@@ -1421,7 +1421,10 @@
         }
       },
       "viewer": "me"
-    }
+    },
+    "search": [
+      "feat-done"
+    ]
   },
   "explore_candidate_mine": {
     "unit": {
@@ -1699,7 +1702,10 @@
         "at": "2026-10-06T08:00:00Z",
         "link": "https://github.com/acme/api/pull/7"
       }
-    }
+    },
+    "search": [
+      "REVIEW batch"
+    ]
   },
   "gate_off": {
     "unit": {

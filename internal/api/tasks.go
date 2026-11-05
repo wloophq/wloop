@@ -172,6 +172,9 @@ type TaskView struct {
 	// ExtractionLag is how long the oldest message of its links has waited to be extracted, a Go duration;
 	// empty when none waits.
 	ExtractionLag string `json:"extraction_lag,omitempty"`
+	// Facets are the task's values of every facet, by facet id, from its facts, its brief and its units' rows,
+	// joined as the profile's facets say; Values[0] is the group and sort key.
+	Facets map[string][]string `json:"facets,omitempty"`
 	// Asks are the items the task holds, detail only.
 	Asks  []AskView   `json:"asks,omitempty"`
 	Gates []GateView  `json:"gates,omitempty"` // the open ones
